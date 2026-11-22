@@ -912,5 +912,10 @@
   "vm.gvtFailed": "A videokártya-részt nem sikerült létrehozni",
   "vm.memlockCap": "Ez a gép {need} MB-ot zárolna, de a videokártyás gépek számára most csak {cap} MB szabad (Beállítások → Videokártyák)",
   "vm.memlockRefused": "Nem sikerült zárolni a gép memóriáját",
-  "gpu.memlockRange": "Ez az érték kívül esik azon, amennyit ez a számítógép engedélyez a gépeknek zárolni"
+  "gpu.memlockRange": "Ez az érték kívül esik azon, amennyit ez a számítógép engedélyez a gépeknek zárolni",
+  "studio.failed": "A LordOS Studio nem tudott elindulni.",
+  "studio.badPicture": "Ez a kép nem használható háttérként.",
+  "studio.invalid": "Ez a LordOS Studio-beállítás érvénytelen.",
+  "studio.noCamera": "Nincs csatlakoztatott kamera.",
+  "studio.unavailable": "A LordOS Studio nem érhető el ezen a számítógépen."
 }

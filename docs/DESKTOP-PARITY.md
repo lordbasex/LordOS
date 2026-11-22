@@ -82,7 +82,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done · ⛔ waiting for appro
 
 | Item | Why | Size | Status |
 |---|---|---|---|
-| `linux-drm-syncobj-v1` (explicit sync) | Nvidia's proprietary driver flickers | M | ⬜ needs an Nvidia card |
+| `linux-drm-syncobj-v1` (explicit sync) | Nvidia's proprietary driver flickers | M | 🟨 built 2026-11-22 (`SYNCOBJ-PLAN.md`; checked with Mesa's Vulkan WSI on an AMD card, the CPU path); NVIDIA itself needs an Nvidia card |
 | `tablet-v2` from evdev (pressure, tilt, pen buttons) without libinput | Krita, GIMP, Xournal++ | M | ⬜ needs a tablet |
 | `tearing-control-v1` and VRR (`VRR_ENABLED`) | games with FreeSync/G-Sync | M | ⬜ needs a VRR monitor |
 | Xwayland apps sharp on HiDPI (the X apps scale themselves, as in KWin) | old X apps look blurry | M | 🟨 built, to check on the VM (`xwscale.c`, Settings → Displays → X11 apps; `WAYLAND.md`) |

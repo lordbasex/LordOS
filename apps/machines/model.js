@@ -196,6 +196,112 @@ export function wheelSteps(acc, deltaY, precise) {
 // Ctrl+Alt+Delete as evdev codes: press in order, release in reverse
 export const CTRL_ALT_DEL = [29, 56, 111];
 
+// ---- the Keys panel: held keys, combinations and single keys sent straight to the guest ----
+// evdev codes (linux/input-event-codes.h). Sent with lord.vm.key, they never pass through LordOS's shortcuts, so ❖P
+// reaches a Windows guest even while LordOS keeps ❖ for itself.
+export const KEY = {
+  esc: 1, tab: 15, e: 18, r: 19, t: 20, p: 25, ctrl: 29, s: 31, d: 32, l: 38, shift: 42, alt: 56,
+  f1: 59, f2: 60, f3: 61, f4: 62, f5: 63, f6: 64, f7: 65, f8: 66, f9: 67, f10: 68, f11: 87, f12: 88,
+  prtsc: 99, home: 102, up: 103, pgup: 104, left: 105, right: 106, end: 107, down: 108, pgdn: 109, ins: 110, del: 111, meta: 125,
+};
+// the modifiers, left and right: a key the person types with one of these held is still "the next key" only once a
+// key that isn't one is let go of
+const MODIFIERS = new Set([29, 97, 42, 54, 56, 100, 125, 126]);
+export const isModifier = (code) => MODIFIERS.has(code);
+// the keys the panel can hold down, in order; meta is "Windows" or "Super" by the guest's system (keyName)
+export const HELD_KEYS = ['ctrl', 'alt', 'shift', 'meta'];
+const F = (n) => `f${n}`;
+// [id, keys]: the id names what it does (machines.keys.do.<id>), the keys say how it is labelled (keyName)
+const WIN_COMBOS = [
+  ['cad', ['ctrl', 'alt', 'del']], ['start', ['meta']], ['project', ['meta', 'p']], ['desktop', ['meta', 'd']],
+  ['explorer', ['meta', 'e']], ['run', ['meta', 'r']], ['lock', ['meta', 'l']], ['taskView', ['meta', 'tab']],
+  ['switchApp', ['alt', 'tab']], ['closeWin', ['alt', 'f4']], ['taskMgr', ['ctrl', 'shift', 'esc']],
+  ['moveLeft', ['meta', 'shift', 'left']], ['moveRight', ['meta', 'shift', 'right']], ['maximize', ['meta', 'up']],
+  ['minimize', ['meta', 'down']], ['screenshot', ['prtsc']], ['snip', ['meta', 'shift', 's']],
+];
+const LINUX_COMBOS = [
+  ['cadLinux', ['ctrl', 'alt', 'del']], ['activities', ['meta']], ['switchApp', ['alt', 'tab']], ['closeWin', ['alt', 'f4']],
+  ['terminal', ['ctrl', 'alt', 't']], ['screenshot', ['prtsc']],
+];
+export const SINGLE_KEYS = ['esc', 'tab', 'ins', 'del', 'home', 'end', 'pgup', 'pgdn'];
+export const F_KEYS = Array.from({ length: 12 }, (_, i) => F(i + 1));
+// Linux's text consoles: Ctrl+Alt+F1 … F7
+export const CONSOLE_KEYS = Array.from({ length: 7 }, (_, i) => ['ctrl', 'alt', F(i + 1)]);
+const codesOf = (keys) => keys.map((k) => KEY[k]);
+// the combinations for a guest: { id, keys: names, codes }
+export function keyCombos(windows) {
+  return (windows ? WIN_COMBOS : LINUX_COMBOS).map(([id, keys]) => ({ id, keys, codes: codesOf(keys) }));
+}
+// a key's label: letters and F keys as they are, arrows as arrows, the rest by name (names: t of machines.keys.<k>)
+const ARROWS = { left: '←', right: '→', up: '↑', down: '↓' };
+export function keyName(k, windows, names = (x) => x) {
+  if (ARROWS[k]) return ARROWS[k];
+  if (/^f\d+$/.test(k)) return k.toUpperCase();
+  if (k.length === 1) return k.toUpperCase();
+  return names(k === 'meta' ? (windows ? 'win' : 'super') : k);
+}
+export const comboLabel = (keys, windows, names) => keys.map((k) => keyName(k, windows, names)).join('+');
+
+// Held keys (latched): down in the guest from the click until the next key the person types there or the next
+// combination sent, then up in reverse. Each function returns the latched codes left and what to send, [[code, 1|0]].
+export function latchToggle(latched, code) {
+  return latched.includes(code) ? { latched: latched.filter((c) => c !== code), send: [[code, 0]] } : { latched: [...latched, code], send: [[code, 1]] };
+}
+export const latchRelease = (latched) => ({ latched: [], send: [...latched].reverse().map((c) => [c, 0]) });
+// a key let go of in the guest (already sent): a latched one the person pressed and let go of themselves is up now;
+// another modifier keeps them (latched Ctrl + Shift + T); any other key ends them
+export function latchKeyUp(latched, code) {
+  if (latched.includes(code)) return { latched: latched.filter((c) => c !== code), send: [] };
+  if (!latched.length || isModifier(code)) return { latched, send: [] };
+  return latchRelease(latched);
+}
+// a combination: its keys down in order (but those already held), up in reverse, then the held ones up
+export function comboSend(codes, latched = []) {
+  const own = codes.filter((c) => !latched.includes(c));
+  return { latched: [], send: [...own.map((c) => [c, 1]), ...[...own].reverse().map((c) => [c, 0]), ...latchRelease(latched).send] };
+}
+
+// ---- the keyboard to the guest ----
+// Every key of the session reaches every key listener (runtime addListener), so a window's own focus flag is not
+// enough to send keys to a guest: it is from the window's last render, and it was once true for a full-screen machine
+// and a Terminal at the same time. guestKeys asks owns() at each key: wm.hasKeyboard(winId), the window in front with
+// no search, launcher, sheet or system prompt open. A key goes down in the guest only while owns() is true, and its
+// release only when its press went there; the first key while owns() is false lets go of everything held in the guest
+// (release(): VD_RELEASE_ALL, latched keys included), once, so nothing stays down and nothing typed elsewhere goes in.
+//   guestKeys({ send(code, down), release(), owns() }) → { down(code) → bool, up(code) → bool, held() → codes }
+export function guestKeys({ send, release, owns }) {
+  const held = new Set();
+  let lost = false;
+  const lose = () => { held.clear(); if (!lost) { lost = true; release(); } };
+  return {
+    down(code) {
+      if (!(code > 0)) return false;
+      if (!owns()) { lose(); return false; }
+      lost = false;
+      held.add(code);
+      send(code, 1);
+      return true;
+    },
+    up(code) {
+      if (!held.has(code)) return false;
+      held.delete(code);
+      if (!owns()) { lose(); return false; }
+      send(code, 0);
+      return true;
+    },
+    held: () => [...held],
+  };
+}
+// Whether a window the guest opens or brings back in apps mode may take the front: only while the person is already
+// in this machine (its window or one of its guest windows is in front, or nothing is). Otherwise it opens behind the
+// window in front, so a guest's new window never takes the keys of a Terminal being typed in.
+export function guestMayTakeFront(front, dir) {
+  if (!front) return true;
+  if (front.app !== 'machines' || !dir) return false;
+  const a = front.args || {};
+  return a.guestWin?.dir === dir || a.machine === dir;
+}
+
 // the window's title: "<name> — <state>"
 export const windowTitle = (name, stateText) => (stateText ? `${name} — ${stateText}` : name);
 
@@ -394,7 +500,7 @@ export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math
 // transfer: the guest has the transfer folder (6.7.1) mounted; transferSetup: a Windows guest that gets it once WinFsp is
 // installed (Set Up the Transfer Folder); clipNoTool: the Linux guest's helper runs but the guest has no clipboard tool
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -427,7 +533,7 @@ export function clipState(agent, cfg) {
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w6', linux: '5' };
+export const TOOLS_SHIPPED = { windows: 'w10', linux: '5' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -437,6 +543,74 @@ export function toolsOutdated(agent, shipped = TOOLS_SHIPPED) {
   if (!have) return false;
   const want = toolsVer(have[1] ? shipped?.windows : shipped?.linux);
   return !!want && want[1] === have[1] && Number(have[2]) < Number(want[2]);
+}
+// the version this LordOS ships for that guest's tools when theirs is older ('' when it isn't, or nothing is known)
+export function toolsWant(agent, shipped = TOOLS_SHIPPED) {
+  if (!toolsOutdated(agent, shipped)) return '';
+  return toolsVer(agent.tools)[1] ? String(shipped.windows) : String(shipped.linux);
+}
+// the popover's line about the LordOS tools, apart from qemu-guest-agent's version: null (not connected, or no tools said
+// hello), { key: 'current', have } (the ones shipped, or newer), { key: 'old', have, want }, or { key: 'other', have } (a
+// version this LordOS can't compare)
+export function toolsLine(agent, shipped = TOOLS_SHIPPED) {
+  if (agent?.state !== 'connected' || !agent.tools) return null;
+  const have = String(agent.tools);
+  const want = toolsWant(agent, shipped);
+  if (want) return { key: 'old', have, want };
+  return toolsVer(have) ? { key: 'current', have } : { key: 'other', have };
+}
+
+// ---- the LordOS tools brought up to date by themselves (docs/VIRTUALIZATION.md "Keeping the LordOS tools up to date") ----
+// When a machine's agent is connected and its tools are older than the ones shipped, Machines asks for the same install
+// as the popover's button (lord.vm.agent 'update', which lord-vm logs), unless the person turned it off: the machine's
+// Configure → Agent (app.json toolsAuto) or, for machines that don't say, Machines settings (machinesDefaults.toolsAuto).
+// Only when it's safe: the agent connected for TOOLS_SETTLE_MS and nothing on its way (files copying, the transfer
+// folder's setup, an app of apps mode opening, an install the person asked for). At most TOOLS_TRIES attempts per run of
+// the machine and version, TOOLS_BACKOFF_MS apart; an attempt without an answer in TOOLS_WAIT_MS failed. Off, or given
+// up: one notification per run and version, with Update.
+export const TOOLS_SETTLE_MS = 20000;
+export const TOOLS_BACKOFF_MS = [2 * 60000, 10 * 60000];
+export const TOOLS_TRIES = 3;
+export const TOOLS_WAIT_MS = 10 * 60000;
+export const TOOLS_AUTO_IDLE = { want: '', since: 0, tries: 0, next: 0, pending: 0, done: 0, told: '' };
+// the machine's choice, else the default for all of them (on unless turned off)
+export const toolsAutoOn = (meta, defaults) => (typeof meta?.toolsAuto === 'boolean' ? meta.toolsAuto : defaults?.toolsAuto !== false);
+// an attempt that failed: the next one after its backoff, none after the last
+export function toolsAutoFailed(s, now) {
+  const k = Math.min(Math.max(s.tries - 1, 0), TOOLS_BACKOFF_MS.length - 1);
+  return { ...s, pending: 0, next: s.tries >= TOOLS_TRIES ? Infinity : now + TOOLS_BACKOFF_MS[k] };
+}
+// One step at every poll of a running machine: s (TOOLS_AUTO_IDLE for a new run), the poll's agent, on (toolsAutoOn),
+// busy (something on its way, see above), now. → { s, act: null | 'install' | 'notify', why: 'off' | 'failed' (with
+// notify), result: 'ok' | 'failed' (an attempt of ours ended) }. After 'install' the caller sends it and, when
+// lord-server refuses it at once, calls toolsAutoFailed.
+export function toolsAutoStep(s0, { agent, on, busy, now }, shipped = TOOLS_SHIPPED) {
+  let s = { ...TOOLS_AUTO_IDLE, ...(s0 || {}) };
+  const inst = agent?.install || 0;
+  // our attempt on its way: how it ended. lord.vm.agent sets the session's install to 1 as it sends, so a 2 or 3 after
+  // it is its answer; 0 (the window opened again on the machine, a new session) waits for TOOLS_WAIT_MS
+  if (s.pending) {
+    if (inst === 2) return { s: { ...s, pending: 0, done: now }, act: null, result: 'ok' };
+    if (inst !== 3 && now - s.pending <= TOOLS_WAIT_MS) return { s, act: null };
+    s = toolsAutoFailed(s, now);
+    if (s.tries < TOOLS_TRIES || s.told === s.want) return { s, act: null, result: 'failed' };
+    return { s: { ...s, told: s.want }, act: 'notify', why: 'failed', result: 'failed' };
+  }
+  if (agent?.state !== 'connected') return { s: s.since ? { ...s, since: 0 } : s, act: null };
+  const want = toolsWant(agent, shipped);
+  if (!want) return { s, act: null };
+  // another version to bring (the shipped one changed): a fresh count
+  if (want !== s.want) s = { ...TOOLS_AUTO_IDLE, want, since: s.since };
+  if (!s.since) s = { ...s, since: now };
+  if (now - s.since < TOOLS_SETTLE_MS) return { s, act: null };
+  if (!on) return s.told === want ? { s, act: null } : { s: { ...s, told: want }, act: 'notify', why: 'off' };
+  // installed, and the tools still say the older version a while later: said once, never tried again in this run
+  if (s.done) {
+    if (s.told === want || now - s.done < TOOLS_SETTLE_MS * 3) return { s, act: null };
+    return { s: { ...s, told: want }, act: 'notify', why: 'failed' };
+  }
+  if (s.tries >= TOOLS_TRIES || now < s.next || busy || inst === 1) return { s, act: null };
+  return { s: { ...s, tries: s.tries + 1, pending: now }, act: 'install' };
 }
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
 export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? 'run' : 'pause');
@@ -983,6 +1157,25 @@ export function cropPoint(px, py, box, crop, gw, gh) {
   return [Math.max(0, Math.min(gw - 1, x)), Math.max(0, Math.min(gh - 1, y))];
 }
 
+// A point while a button is held on a guest's window (dragging its own title bar, a selection): mapped as the window and
+// its crop were when the button went down (anchor { box, crop }), never as they are now. The guest moves its window as
+// the pointer goes and the LordOS window follows a moment later; mapped through the window as it is now, every move of
+// the guest's window pushed the point further by as much again and the window ran away from the pointer. Outside the
+// box too (the pointer may leave it during a drag); kept inside the guest's screen (gw × gh)
+export function anchorPoint(px, py, anchor, gw, gh) {
+  const box = anchor?.box, crop = anchor?.crop;
+  if (!box || !crop || !(box[2] > 0) || !(box[3] > 0)) return null;
+  const x = Math.floor(crop[0] + (px - box[0]) * crop[2] / box[2]), y = Math.floor(crop[1] + (py - box[1]) * crop[3] / box[3]);
+  return [Math.max(0, Math.min(gw - 1, x)), Math.max(0, Math.min(gh - 1, y))];
+}
+
+// Apps mode: the guest's picture changed size (a change of resolution; the guest's displays moved around it): the window
+// list the guest sent before it may be relative to the display as it was, and a crop of it shows part of one display,
+// part of another, or black. Held (the windows show black, not a wrong part of the picture) until the guest's next list,
+// unless a list came just before the size did (they cross), or for at most STALE_MS
+export const STALE_MS = 1500;
+export const cropsStale = (resizedAt, listedAt, now) => !!resizedAt && !(listedAt >= resizedAt - 400) && now - resizedAt < STALE_MS;
+
 // Apps mode: a place asked of a guest's window (lord.vm.winAct move) that the guest didn't take, and won't: its window
 // is still elsewhere (a smaller size than its minimum, a maximized window) a while after the ask. The LordOS window
 // then goes back to where the guest's window is, or it would show the guest's picture squeezed into the wrong size.
@@ -1037,10 +1230,142 @@ export function planWindows(list, have) {
   return { open, close, follow, minimize, restore };
 }
 
+// The tracks (Map gid → { winId, icon }) whose icon is asked of lord.vm.winIcon now (appsmode.jsx): every one with a
+// LordOS window but no icon yet, on each new list or new icons. Before 2026-11-22 the icons were asked only when the
+// guest's icons changed, so a window opened from a later list (one minimized in the guest when apps mode began, or
+// opened after the icons came, as on a re-attach) kept a letter tile in the Dock for good. iconsSeq: an icon already
+// taken is asked again when the guest's icons changed since (an app that changed its icon)
+export function iconsToAsk(tracks, iconsSeq) {
+  const out = [];
+  for (const x of tracks || []) if (x && x.winId && (!x.icon || x.iconSeq !== iconsSeq)) out.push(x);
+  return out;
+}
+
 // The guest's apps for the Applications menu: by name, no repeats of a token
 export function guestAppItems(apps) {
   const seen = new Set();
   return (apps || []).filter((a) => a && a.token && a.name && !seen.has(a.token) && seen.add(a.token)).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Apps mode's Running list (the controller panel, the Applications menu): the guest's own windows, not its popups or the
+// windows another one owns (a menu, a dialog: they come with their owner), nor a sliver no window opens for. Sorted by
+// app, then title, then id: the guest's list is in stacking order, and a list that reordered on every click would jump.
+export function runningWindows(list) {
+  const out = [];
+  for (const w of list || []) {
+    if (!w || !Number.isFinite(w.id) || w.owner > 0 || isPopup(w)) continue;
+    if (!w.minimized && !(w.w >= 8 && w.h >= 8)) continue;
+    out.push({ id: w.id, title: String(w.title || w.app || ''), app: String(w.app || ''), minimized: !!w.minimized, focused: !!w.focused });
+  }
+  return out.sort((a, b) => a.app.localeCompare(b.app) || a.title.localeCompare(b.title) || a.id - b.id);
+}
+// what the Running rows show, as one string: menus are set again only when it changes, not on every move of a window
+export const runningKey = (rows) => (rows || []).map((r) => `${r.id}\u0001${r.title}\u0001${r.minimized ? 1 : 0}${r.focused ? 1 : 0}`).join('\u0002');
+
+// text as compared by a search: lower case, accents off ("Pequeño" matches "pequeno")
+const folded = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+// The guest's apps that match a search (each word somewhere in the name), the ones whose name starts with it first; an
+// empty search keeps them all, in their order
+export function appsMatching(apps, query) {
+  const words = folded(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return apps || [];
+  const hits = [];
+  for (const a of apps || []) {
+    const n = folded(a?.name);
+    if (!words.every((w) => n.includes(w))) continue;
+    const rank = n.startsWith(words[0]) ? 0 : n.split(/[\s\-_.]+/).some((p) => p.startsWith(words[0])) ? 1 : 2;
+    hits.push({ a, rank });
+  }
+  return hits.sort((x, y) => x.rank - y.rank).map((h) => h.a);
+}
+// the letter a guest app's row shows (the guest lists no icons for its apps): its first character, upper case
+export const appInitial = (name) => (Array.from(String(name || '').trim())[0] || '?').toUpperCase();
+
+// The guest's apps a launcher lists (the controller's panel, the status item's menu): the ones matching the search, each
+// with its icon when the guest sent one (icons: token → pixels; none yet, so the initial tile shows instead)
+export function launcherApps(apps, query, icons) {
+  return appsMatching(apps, query).map((a) => ({ ...a, icon: (icons && a && icons[a.token]) || null }));
+}
+
+// The machines in apps mode, as their status items by the clock show them: one per machine with a session (guests: dir →
+// what useAppsMode publishes), in name order so the items keep their places
+export function appsStatusList(guests) {
+  const out = [];
+  for (const [dir, g] of Object.entries(guests || {})) if (g && g.sid) out.push({ dir, name: String(g.name || dir.split('/').pop() || '') });
+  return out.sort((a, b) => a.name.localeCompare(b.name) || a.dir.localeCompare(b.dir));
+}
+// what to add and remove so the registered items (have: dirs) are the machines in apps mode now
+export function appsStatusDiff(have, guests) {
+  const now = appsStatusList(guests).map((x) => x.dir);
+  const was = new Set(have || []);
+  return { add: now.filter((d) => !was.has(d)), remove: [...was].filter((d) => !now.includes(d)) };
+}
+// the system a machine runs, for its mark (ui.jsx OsMark): the one kept in app.json, or guessed from its name
+export const machineOsId = (meta, name) => meta?.os || systemOf(meta?.osName, name).id;
+
+// Apps mode: the closes the guest refused (lord.vm.closeRefusals: its window runs as administrator in Windows, or the
+// system refused) as guests[dir].closeRefused: gid → { reason: 'elevated' | 'other', at (ms since 1970) }; anything else
+// the list holds is left out.
+export function closeRefusedOf(list) {
+  const out = {};
+  for (const r of Array.isArray(list) ? list : []) {
+    if (!r || !(Number.isInteger(r.gid) && r.gid > 0) || !(r.reason === 'elevated' || r.reason === 'other') || !Number.isFinite(r.at)) continue;
+    out[r.gid] = { reason: r.reason, at: r.at };
+  }
+  return out;
+}
+
+// Launch feedback (the launcher's rows): an app opened in the guest may take seconds to show a window, or show it where
+// the person doesn't look, so its row says "Opening…" and a click on it again is ignored until a new window of that app
+// is listed or LAUNCH_WAIT_MS pass. The guest lists its apps by name and its windows by program file name, so a window
+// belongs to an app when its program's name (without the extension) holds a word of the app's name (3 letters or more;
+// "Microsoft Edge" → msedge.exe, "Word" → WINWORD.EXE) or its title holds the app's whole name.
+export const LAUNCH_WAIT_MS = 5000;
+export function windowOfApp(name, w) {
+  const n = folded(name).trim();
+  if (!n || !w) return false;
+  const exe = folded(w.app).replace(/\.[a-z0-9]{1,4}$/, '');
+  if (exe && n.split(/[^\p{L}\p{N}]+/u).some((p) => p.length >= 3 && exe.includes(p))) return true;
+  return folded(w.title).includes(n);
+}
+// launches (token → { at, name, seen: the guest window ids listed when it was clicked }) with this one started
+export function launchStart(launches, a, list, now) {
+  return { ...(launches || {}), [a.token]: { at: now, name: String(a.name || ''), seen: (list || []).map((w) => w.id) } };
+}
+// the id of the new window that answered a launch, or 0
+export function launchAnswered(entry, list) {
+  if (!entry) return 0;
+  const seen = new Set(entry.seen || []);
+  const w = (list || []).find((x) => x && !seen.has(x.id) && !(x.owner > 0) && windowOfApp(entry.name, x));
+  return w ? w.id : 0;
+}
+// whether an app's row still waits (shows "Opening…" and ignores clicks)
+export const launchPending = (entry, list, now) => !!entry && now - entry.at < LAUNCH_WAIT_MS && !launchAnswered(entry, list);
+// the launches still waiting (the others dropped)
+export function launchPrune(launches, list, now) {
+  const out = {};
+  for (const [k, e] of Object.entries(launches || {})) if (launchPending(e, list, now)) out[k] = e;
+  return out;
+}
+
+// Close feedback (Running's ×): the guest may refuse (Windows doesn't let a normal program close a window that runs as
+// administrator). After ×, the row says "Closing…"; when the window is still listed CLOSE_WAIT_MS later, or the guest
+// says it refused (refusal: { reason, at }, at ≥ the click), a note on the row says why. Gone from the list: nothing.
+export const CLOSE_WAIT_MS = 3000;
+export const closeStart = (closes, gid, now) => ({ ...(closes || {}), [gid]: { gid, at: now } });
+// null, { state: 'closing' } or { state: 'refused', reason: 'elevated' | '' }
+export function closeView(entry, list, refusal, now) {
+  if (!entry) return null;
+  if (!(list || []).some((w) => w && w.id === entry.gid)) return null;
+  if (refusal && refusal.at >= entry.at) return { state: 'refused', reason: refusal.reason === 'elevated' ? 'elevated' : '' };
+  return now - entry.at >= CLOSE_WAIT_MS ? { state: 'refused', reason: '' } : { state: 'closing' };
+}
+// the closes worth keeping: their window is still listed
+export function closePrune(closes, list) {
+  const ids = new Set((list || []).map((w) => w && w.id));
+  const out = {};
+  for (const [k, e] of Object.entries(closes || {})) if (ids.has(e.gid)) out[k] = e;
+  return out;
 }
 
 // Where a machine starts from (Configure → Boot; machine.json's boot_order): "auto" (the system disk, then the CD/DVD
@@ -1090,3 +1415,22 @@ export const lordVmWhy = (out) => {
   const s = String(out || '').trim();
   return (s.split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || s).slice(0, 400);
 };
+
+// A PopMenu's height (apps/machines/ui.jsx: 6 px padding and a 1 px edge on each side, 30 px a row, 11 a separator,
+// about 24 an information row), for placing it before it's drawn
+export const popMenuHeight = (items) => 14 + (items || []).filter(Boolean).reduce((s, it) => s + (it === '-' ? 11 : it.note ? 24 : 30), 0);
+
+// Where a menu w × h opened at at ({ x, y }: its top-left on the desktop; above: the y its bottom goes to when it opens
+// upwards, the button's top or the pointer) goes on the display b ({ x, y, w, h }, the one under at): below when it
+// fits, else above, else as low as the display lets it; never past an edge (m from each). The window doesn't cut it:
+// it's drawn over everything.
+export function menuSpot(at, w, h, b, m = 8) {
+  const bx = b?.x || 0, by = b?.y || 0, bw = b?.w || 0, bh = b?.h || 0;
+  const left = Math.max(bx + m, Math.min(Math.round(at?.x || 0), bx + bw - w - m));
+  const y = Math.round(at?.y || 0);
+  if (y + h <= by + bh - m) return { left, top: Math.max(by + m, y) };
+  const up = Math.round(at?.above ?? y) - h;
+  return { left, top: up >= by + m ? up : Math.max(by + m, by + bh - h - m) };
+}
+// the display under a point (screen.displays), or the main one
+export const displayUnder = (ds, x, y) => (ds || []).find((d) => x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h) || (ds || []).find((d) => d.main) || (ds || [])[0] || null;

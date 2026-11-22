@@ -1,12 +1,13 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory } from './model.js';
+  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
+import { defaultsOf } from './store.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
 import { BUILTIN, builtinProfile, onHost } from './profiles.js';
 
@@ -455,7 +456,11 @@ export function Configure({ dir, section: section0, onClose }) {
       <Row label={tr('machines.cfg.agent')} note={tr('machines.cfg.agentNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><Toggle on={!!cur.agent} onChange={(x) => set({ agent: x, ...(!x ? { clipboard: 'off' } : {}) })} /></Off>
       </Row>
-      <Row label={tr('machines.cfg.agentInstall')} last note={tr('machines.cfg.agentInstallNote')} />
+      <Row label={tr('machines.cfg.agentInstall')} note={tr('machines.cfg.agentInstallNote')} />
+      {/* the LordOS tools brought up to date by themselves (model.js toolsAutoStep): app.json, at once, also while it runs */}
+      <Row label={tr('machines.cfg.toolsAuto')} last note={tr('machines.cfg.toolsAutoNote')}>
+        <Toggle on={toolsAutoOn(meta, defaultsOf(settings.get().machinesDefaults))} onChange={(x) => { writeMeta(dir, { toolsAuto: x }); setMeta(readMeta(dir)); }} />
+      </Row>
     </Group>
   </>;
   else if (sec === 'boot') pane = <>

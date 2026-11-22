@@ -5,14 +5,14 @@
 // windows (wm.open('terminal', { new: true }) → id 'terminal#2'), a dynamic title
 // (wm.setTitle), confirmation on close (wm.setCloseGuard) and its own menus (wm.setMenus)
 // that the theme shows in its menu bar.
-import { screen, onScreenChange, addListener, mainDisplay, displayAt, displayFor } from '@lordos/runtime';
+import { screen, onScreenChange, addListener, mainDisplay, displayAt, displayFor, shellHasKeyboard } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { appName, t } from './i18n.js';
 import { webAppOfWindow } from './webapps.js';
 import { webWindowTitles, profileHex } from './webappsmodel.js';
 import { SNAP_ZONES, snapRect, zoneAt, snapNext, dwellZone, SNAP_DWELL_MS, snapAllowed } from './snap.js';
 import { settings } from './settings.js';
-import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo } from './desktopmodel.js';
+import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, keyboardWindow, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo, cleanLayer } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
 
@@ -80,7 +80,9 @@ export const placeLinuxWindow = (dockId) => (linuxPlacement ? linuxPlacement(doc
 let seq = 2;
 const guards = new Map();
 
-// State: list ordered from bottom to top (the last one is in front).
+// State: list in the order the windows were brought forward (the last one is in front and has the keyboard). It is
+// also the drawing order inside each layer: always-on-top windows (w.layer) are drawn over the rest (desktopmodel.js
+// stackOrder; useWindows().mounted is already in that order).
 export const windows = createStore([]);
 
 // Desktops (docs/DESKTOPS.md, the rules are in desktopmodel.js): each window has w.desktop, and only
@@ -529,6 +531,10 @@ export const wm = {
   get: (id) => windows.get().find((w) => w.id === id) || null,
   // The window in front of the showing desktop.
   focused: () => focusedOn(windows.get(), activeDesktop.get())?.id ?? null,
+  // Whether the keys typed now are window `id`'s: it is in front of the showing desktop and no shell surface (search,
+  // the launcher, a sheet, a system prompt) has the keyboard (desktopmodel.js keyboardWindow). A key listener is the
+  // whole session's, so whatever sends keys out of LordOS (Machines' guest) asks this at each key.
+  hasKeyboard: (id) => id != null && keyboardWindow(windows.get(), activeDesktop.get(), typeof shellHasKeyboard === 'function' && shellHasKeyboard()) === id,
   // Protected window (capture protection): it looks normal on screen, but
   // comes out black in screenshots, recordings and remote desktop (docs/MEDIA.md). Used, for
   // example, by a password app.
@@ -546,8 +552,27 @@ export const wm = {
   // without the theme's frame. Esc or wm.setFullscreen(id, false) goes back.
   // { capture: true }: Screenshots' area selection, a still of the screen. It goes in the capture layer,
   // above every other one (sheets, menus, prompts, Live Speech), and Esc is the selection's own.
-  setFullscreen: (id, on = true, { capture = false } = {}) => windows.set((ws) => ws.map((w) => (w.id === id
-    ? { ...w, fullscreen: !!on, capture: !!(on && capture), minimized: false } : w))),
+  // Going full screen brings the window to the front: the keyboard is the front window's (wm.hasKeyboard, AppHost).
+  setFullscreen: (id, on = true, { capture = false } = {}) => windows.set((ws) => {
+    const next = ws.map((w) => (w.id === id ? { ...w, fullscreen: !!on, capture: !!(on && capture), minimized: false } : w));
+    return on && next.some((w) => w.id === id) ? raiseUnlessTop(next, id) : next;
+  }),
+  // Always on top (docs/WINDOWS.md, "Always on top"; the rules are desktopmodel.js stackOrder): layer 'above' keeps the
+  // window over every normal one, 'below' under them, null is normal. It changes only what is drawn over what: the
+  // keyboard stays with the window brought forward last, which may be a normal one under it. An X11 window is told
+  // (_NET_WM_STATE_ABOVE / _BELOW, sdk/wayland.js), and its own request arrives here the same way.
+  setLayer: (id, layer) => {
+    const w = windows.get().find((x) => x.id === id), l = cleanLayer(layer);
+    if (w && (w.layer || null) !== l) patch(id, { layer: l });
+  },
+  layer: (id) => cleanLayer(windows.get().find((x) => x.id === id)?.layer),
+  isAbove: (id) => wm.layer(id) === 'above',
+  // the window menu's Always on Top: on, it also comes forward (the person is looking at it)
+  toggleAbove(id) {
+    const on = !wm.isAbove(id);
+    wm.setLayer(id, on ? 'above' : null);
+    if (on) wm.raise(id);
+  },
   // Picture-in-picture: a small frameless window, always on top (frame = { x, y, w, h } or null).
   // It shows on every desktop; back from it, the window stays on the one in view.
   desktop: () => activeDesktop.get(),

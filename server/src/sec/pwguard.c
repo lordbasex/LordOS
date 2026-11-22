@@ -31,6 +31,7 @@
 #define MAX_CLIENTS 256
 #define MAX_NODES   1024
 #define MAX_PORTS   4096
+#define MAX_PWLINKS   1024
 #define MAX_PROXY   (MAX_CLIENTS + 8)
 #define IN_MAX      (1u << 20)
 #define OUT_MAX     (1u << 20)
@@ -62,6 +63,9 @@ typedef struct {
 
 typedef struct { uint32_t id, client, flag, stream; int live; } PgNode;   /* flag: capture node; stream: capture stream */
 typedef struct { uint32_t id, node; int live; } PgPort;
+/* a link from a capture node (a microphone, a camera, a shared screen) into an app's capture stream: what the capture
+ * indicator says is in use (pwguard_on_use) */
+typedef struct { uint32_t id, out, in; int live; } PgLink;
 
 static struct {
     int fd;
@@ -73,6 +77,7 @@ static struct {
     PgClient cl[MAX_CLIENTS];
     PgNode node[MAX_NODES];
     PgPort port[MAX_PORTS];
+    PgLink link[MAX_PWLINKS];
     uint8_t proxy_used[MAX_PROXY];
     double next_try, next_tick;
     int up;
@@ -166,6 +171,7 @@ static void drop(void) {
     memset(P.cl, 0, sizeof P.cl);
     memset(P.node, 0, sizeof P.node);
     memset(P.port, 0, sizeof P.port);
+    memset(P.link, 0, sizeof P.link);
     memset(P.proxy_used, 0, sizeof P.proxy_used);
     P.next_try = now_ms() + 2000;
 }
@@ -548,12 +554,15 @@ static int in_user_manager(int pid) {
     return 1;
 }
 
-static void resolve(PgClient *c) {
-    c->app[0] = 0;
-    c->unverified = 0;
-    c->resolved = 1;
+/* Who a client is: its app into app ("" when it is in no app's scope), *unverified when that can't be established, and the
+ * PID it was worked out from into *pid_out. verify: a pulse client's own word (application.process.id) is checked; the
+ * restrictions do it only while restricted apps run (guard_armed), the capture indicator always. */
+static void resolve_as(PgClient *c, int verify, char *app, size_t n, int *unverified, int *pid_out) {
+    app[0] = 0;
+    *unverified = 0;
+    *pid_out = 0;
     int pid = c->pid_sec;                           /* the socket's credentials: always the start */
-    if (c->pulse && !guard_armed) pid = c->pid_app;  /* no restricted app runs: nothing to verify */
+    if (c->pulse && !verify) pid = c->pid_app;      /* no restricted app runs: nothing to verify */
     else if (c->pulse) {
         /* a pulse client of the real pipewire-pulse: the app's own pid is what it reported, so it
          * counts only if that process really holds as many connections to pipewire-pulse as
@@ -567,26 +576,33 @@ static void resolve(PgClient *c) {
                 if (P.cl[i].live && P.cl[i].pulse && P.cl[i].pid_app == c->pid_app && !strcmp(P.cl[i].fpid, c->fpid)) claims++;
             fp = flatpak_host_pid(c, claims);
             if (fp) pid = fp;
-            else if (!same_pidns(c->pid_app)) { c->unverified = 1; return; }
+            else if (!same_pidns(c->pid_app)) { *unverified = 1; return; }
             claims = 0;
         }
         if (!fp) {
             for (int i = 0; i < MAX_CLIENTS; i++) if (P.cl[i].live && P.cl[i].pulse && P.cl[i].pid_app == c->pid_app) claims++;
             int real = c->pid_app > 0 ? pulse_connections(c->pid_sec, c->pid_app) : -1;
-            if (real < claims || !same_pidns(c->pid_app)) { c->unverified = 1; return; }
+            if (real < claims || !same_pidns(c->pid_app)) { *unverified = 1; return; }
             pid = c->pid_app;
         }
     }
-    if (pid <= 0) { c->unverified = 1; return; }
-    int r = appid_of_pid((unsigned)pid, c->app, sizeof c->app);
-    if (r < 0) { c->unverified = 1; c->app[0] = 0; }  /* gone or unreadable */
+    if (pid <= 0) { *unverified = 1; return; }
+    *pid_out = pid;
+    int r = appid_of_pid((unsigned)pid, app, n);
+    if (r < 0) { *unverified = 1; app[0] = 0; }      /* gone or unreadable */
 
     else if (r > 0) {                                /* not in any app's scope */
-        c->app[0] = 0;
+        app[0] = 0;
         /* escaped to the user's service manager while restricted apps run: treated as restricted
          * (like lord-netperm's per-user union) */
-        if (guard_armed && in_user_manager(pid)) c->unverified = 1;
+        if (guard_armed && in_user_manager(pid)) *unverified = 1;
     }
+}
+
+static void resolve(PgClient *c) {
+    int pid;
+    c->resolved = 1;
+    resolve_as(c, guard_armed, c->app, sizeof c->app, &c->unverified, &pid);
 }
 
 static int guarded(const char *app, void *u) {
@@ -596,6 +612,79 @@ static int guarded(const char *app, void *u) {
 
 /* Re-arms the guard: is any restricted app of this session running? (its scope is there) */
 static void arm(void) { guard_armed = appid_running(guarded, NULL); }
+
+/* ---- what is captured now (the capture indicator, sdk/capturestatus.jsx) ------------------- */
+
+static void (*use_emit)(const char *kind, const char *json);
+static char use_last[4096] = "[]";
+static int use_dirty;
+
+void pwguard_on_use(void (*emit)(const char *kind, const char *json)) { use_emit = emit; }
+
+/* "[{"app":"desktop:obs","mic":1,"camera":0,"screen":1},...]": one entry per app ("" an unknown program), its flags
+ * merged; -1 when it doesn't fit or an id isn't plain (the caller then says an unknown program captures). */
+int pwguard_use_format(const PwUse *u, int n, char *out, size_t cap) {
+    int w = snprintf(out, cap, "[");
+    if (w < 0 || (size_t)w >= cap) return -1;
+    size_t at = (size_t)w;
+    int first = 1;
+    for (int i = 0; i < n; i++) {
+        int seen = 0;
+        for (int k = 0; k < i && !seen; k++) if (!strcmp(u[k].app, u[i].app)) seen = 1;
+        if (seen) continue;
+        uint32_t f = 0;
+        for (int k = i; k < n; k++) if (!strcmp(u[k].app, u[i].app)) f |= u[k].flags;
+        if (!(f & (FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_SCREEN))) continue;
+        for (const char *q = u[i].app; *q; q++)          /* app ids are plain; anything else is not named */
+            if (*q == '"' || *q == '\\' || (unsigned char)*q < 0x20) return -1;
+        w = snprintf(out + at, cap - at, "%s{\"app\":\"%s\",\"mic\":%d,\"camera\":%d,\"screen\":%d}", first ? "" : ",", u[i].app,
+                     !!(f & FW_R_NO_MIC), !!(f & FW_R_NO_CAMERA), !!(f & FW_R_NO_SCREEN));
+        if (w < 0 || (size_t)w >= cap - at) return -1;
+        at += (size_t)w;
+        first = 0;
+    }
+    w = snprintf(out + at, cap - at, "]");
+    if (w < 0 || (size_t)w >= cap - at) return -1;
+    return 0;
+}
+
+/* Who owns a capture stream, for the indicator: always checked (resolve_as with verify), never a pulse client's word
+ * alone. 1 when it is lord-server itself (its own recordings: the shell already shows them under the app they are for). */
+static int capture_owner(PgClient *c, char *app, size_t n) {
+    app[0] = 0;
+    if (!c || c->daemon || !c->resolved) return 0;          /* untracked, or a module pipewire-pulse loaded: unknown */
+    int unverified = 0, pid = 0;
+    if (c->pulse && !guard_armed) resolve_as(c, 1, app, n, &unverified, &pid);
+    else {
+        unverified = c->unverified;
+        snprintf(app, n, "%s", c->app);
+        pid = c->pulse ? (c->fpid[0] ? 0 : c->pid_app) : c->pid_sec;
+    }
+    if (unverified) { app[0] = 0; return 0; }
+    return pid > 0 && pid == (int)getpid();
+}
+
+static void use_report(void) {
+    if (!use_emit) return;
+    static PwUse u[MAX_PWLINKS];
+    int n = 0;
+    for (int i = 0; i < MAX_PWLINKS; i++) {
+        PgLink *l = &P.link[i];
+        if (!l->live) continue;
+        PgNode *src = node_by_id(l->out), *dst = node_by_id(l->in);
+        if (!src || !dst || !src->flag || !dst->stream) continue;
+        char app[FW_APP_MAX];
+        if (capture_owner(client_by_id(dst->client), app, sizeof app)) continue;
+        snprintf(u[n].app, sizeof u[n].app, "%s", app);
+        u[n].flags = src->flag;
+        n++;
+    }
+    char json[sizeof use_last];
+    if (pwguard_use_format(u, n, json, sizeof json)) snprintf(json, sizeof json, "[{\"app\":\"\",\"mic\":1,\"camera\":1,\"screen\":0}]");
+    if (!strcmp(json, use_last)) return;
+    memcpy(use_last, json, sizeof json);
+    use_emit("capture-use", json);
+}
 
 /* ---- events -------------------------------------------------------------------------------- */
 
@@ -652,6 +741,16 @@ static void on_global(PwPod body) {
         if (flag)                                               /* a new microphone or camera: hidden from the restricted at once */
             for (int i = 0; i < MAX_CLIENTS; i++) if (P.cl[i].live && (P.cl[i].applied & flag)) apply_permissions(&P.cl[i], P.cl[i].applied);
         if (stream) kill_streams();
+    } else if (!strcmp(type, "PipeWire:Interface:Link") && has_props) {
+        const char *o = dict_get(props, "link.output.node"), *in = dict_get(props, "link.input.node");
+        if (!o || !in) return;
+        PgNode *src = node_by_id((uint32_t)strtoul(o, NULL, 10)), *dst = node_by_id((uint32_t)strtoul(in, NULL, 10));
+        if (!src || !dst || !src->flag || !dst->stream) return;     /* only a capture node into a capture stream */
+        PgLink *l = NULL;
+        for (int i = 0; i < MAX_PWLINKS && !l; i++) if (!P.link[i].live) l = &P.link[i];
+        if (!l) return;
+        *l = (PgLink){ .id = (uint32_t)id, .out = src->id, .in = dst->id, .live = 1 };
+        use_dirty = 1;
     } else if (!strcmp(type, "PipeWire:Interface:Port") && has_props) {
         const char *nid = dict_get(props, "node.id");
         if (!nid) return;
@@ -672,6 +771,8 @@ static void on_global_remove(uint32_t id) {
     for (int i = 0; i < MAX_CLIENTS; i++) if (P.cl[i].live && P.cl[i].id == id) P.cl[i].live = 0;   /* its proxy: remove_id */
     for (int i = 0; i < MAX_NODES; i++) if (P.node[i].live && P.node[i].id == id) P.node[i].live = 0;
     for (int i = 0; i < MAX_PORTS; i++) if (P.port[i].live && P.port[i].id == id) P.port[i].live = 0;
+    for (int i = 0; i < MAX_PWLINKS; i++)
+        if (P.link[i].live && (P.link[i].id == id || P.link[i].in == id || P.link[i].out == id)) { P.link[i].live = 0; use_dirty = 1; }
 }
 
 /* client.info(id, change_mask, props): who it is */
@@ -756,9 +857,11 @@ void pwguard_dispatch(void) {
 void pwguard_tick(void) {
     double t = now_ms();
     if (P.fd < 0) {
+        if (use_emit && strcmp(use_last, "[]")) { strcpy(use_last, "[]"); use_emit("capture-use", use_last); }   /* PipeWire went */
         if (t >= P.next_try) pwguard_start();
         return;
     }
+    if (use_dirty) { use_dirty = 0; use_report(); }
     if (t < P.next_tick) return;
     P.next_tick = t + 1000;
     /* the rules or the running apps may have changed: apply or lift; who the pulse clients are is
@@ -771,5 +874,6 @@ void pwguard_tick(void) {
         evaluate(c);
     }
     kill_streams();
+    use_report();                       /* who an app is may have been checked again */
     flush_out();
 }

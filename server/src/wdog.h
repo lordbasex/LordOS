@@ -47,6 +47,15 @@ static inline int wdog_js_poll(void) {
     return r ? wdog_js_slow(r) : 0;
 }
 
+/* A crash (SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT) leaves a line in the log before the process dies: the
+ * version and build, the signal and the faulting address, and the C stack (backtrace_symbols_fd: for a
+ * stripped binary each frame reads "lord-server(+0x2c45e7)", the offset addr2line wants with the build's
+ * symbols, tools/iso/mkdeb.sh DEBUG_SYMBOLS=1). The handler runs on an alternate stack of its own, so a stack
+ * overflow (endless recursion) is caught too; it allocates nothing and writes with write(2). A fault is then
+ * left to happen again with the default action (so the kernel still logs its "segfault at" line), an abort
+ * is raised again. On the calling thread (the main one), once, as early as possible. what: "0.8.9.4 (build)" */
+void wdog_crash_hooks(const char *what);
+
 /* How many stalls this session had and how many JS tasks were stopped (tests, the system report). */
 int wdog_stalls(void);
 int wdog_js_stopped(void);

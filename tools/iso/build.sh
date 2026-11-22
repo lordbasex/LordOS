@@ -71,7 +71,10 @@ PKGS_SPLASH="plymouth plymouth-label"
 # guest tools for VMware virtual machines (power operations from the hypervisor, time sync, guest IP
 # report). The base package only: open-vm-tools-desktop targets X11 (no clipboard sharing or automatic
 # resize yet). Its units carry ConditionVirtualization=vmware, so they don't run anywhere else.
-PKGS_VM="open-vm-tools"
+# qemu-guest-agent for QEMU/KVM guests (LordOS in Machines, docs/VIRTUALIZATION.md 6.17; Proxmox): shut down, the
+# guest's address and name for the host. Debian's udev rule starts it only when the org.qemu.guest_agent.0 port exists
+# (BindsTo that device), so it never runs on a computer or a machine without it.
+PKGS_VM="open-vm-tools qemu-guest-agent"
 # the SSH server, installed but off, as in the Raspberry Pi image: Settings → Sharing → "Remote login (SSH)"
 # makes this computer's host keys and turns it on for good (ssh-set on, server/src/remote/ssh_admin.c).
 # openssh-sftp-server too: scp and sftp need it

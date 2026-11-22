@@ -912,5 +912,10 @@
   "vm.gvtFailed": "Sehemu ya kadi ya michoro haikuweza kuundwa",
   "vm.memlockCap": "Mashine hii ingefunga MB {need}, lakini sasa ni MB {cap} tu zilizo wazi kwa mashine zenye kadi ya michoro (Mipangilio → Kadi za michoro)",
   "vm.memlockRefused": "Kumbukumbu ya mashine hii haikuweza kufungwa",
-  "gpu.memlockRange": "Kiasi hicho kiko nje ya kile kompyuta hii inaruhusu mashine kufunga"
+  "gpu.memlockRange": "Kiasi hicho kiko nje ya kile kompyuta hii inaruhusu mashine kufunga",
+  "studio.failed": "LordOS Studio haikuweza kuanza.",
+  "studio.badPicture": "Picha hiyo haiwezi kutumika kama mandharinyuma.",
+  "studio.invalid": "Mpangilio huo wa LordOS Studio si sahihi.",
+  "studio.noCamera": "Hakuna kamera iliyounganishwa.",
+  "studio.unavailable": "LordOS Studio haipatikani kwenye kompyuta hii."
 }

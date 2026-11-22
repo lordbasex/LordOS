@@ -916,5 +916,10 @@
   "vm.gvtFailed": "تعذّر إنشاء حصة بطاقة الرسوميات",
   "vm.memlockCap": "سيقفل هذا الجهاز {need} MB، لكن المتاح الآن للأجهزة التي تستخدم بطاقة الرسوميات هو {cap} MB فقط (الإعدادات ← بطاقات الرسوميات)",
   "vm.memlockRefused": "تعذّر قفل ذاكرة هذا الجهاز",
-  "gpu.memlockRange": "هذه الكمية خارج ما يسمح به هذا الحاسوب للأجهزة بقفله"
+  "gpu.memlockRange": "هذه الكمية خارج ما يسمح به هذا الحاسوب للأجهزة بقفله",
+  "studio.failed": "تعذّر تشغيل LordOS Studio.",
+  "studio.badPicture": "لا يمكن استخدام هذه الصورة كخلفية.",
+  "studio.invalid": "إعداد LordOS Studio هذا غير صالح.",
+  "studio.noCamera": "لا توجد كاميرا متصلة.",
+  "studio.unavailable": "LordOS Studio غير متاح على هذا الكمبيوتر."
 }

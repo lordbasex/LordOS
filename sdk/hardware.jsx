@@ -52,6 +52,8 @@ import { globalShortcutsEvent } from './globalshortcuts.jsx';
 import { castEvent, castNames } from './screencast.jsx';
 import { castAskerName, shotFreeName, shotStamp } from './screencastmodel.js';
 import { mkdir as fsMkdir, stat as fsStat } from './fs.js';
+import { linuxCapture, studioUse } from './privacy.js';
+import { studioUseOf } from './studiomodel.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -493,6 +495,12 @@ function shotPath() {
 }
 castNames({ app: castAsker, window: windowAppName, shotPath });
 
+// lord-server's list of what Linux apps capture, named as the ScreenCast chooser names an app ('' an unknown program)
+function captureUseList(data) {
+  return (Array.isArray(data) ? data : []).filter((u) => u && typeof u.app === 'string')
+    .map((u) => ({ app: u.app, name: u.app ? castAsker({ who: u.app }) : '', mic: !!u.mic, camera: !!u.camera, screen: !!u.screen }));
+}
+
 export function PolkitPrompt() {
   const p = useStore(polkitPrompt);
   const th = useSystemTokens();
@@ -778,6 +786,9 @@ globalThis.__lordHw = (kind, data) => {
     case 'portal-shortcuts': case 'portal-shortcuts-gone': case 'portal-shortcuts-changed': globalShortcutsEvent(kind, data); break;
     case 'portal-cast': case 'portal-cast-gone': case 'portal-casts': castEvent(kind, data); break;   // ScreenCast (screencast.jsx)
     case 'portal-shot': case 'portal-shot-gone': case 'portal-shot-taken': castEvent(kind, data); break;   // Screenshot (screencast.jsx)
+    // what Linux apps capture through PipeWire (server/src/sec/pwguard.c): the capture indicator (capturestatus.jsx)
+    case 'capture-use': linuxCapture.set(captureUseList(data)); break;
+    case 'studio-use': studioUse.set(studioUseOf(data)); break;          // LordOS Studio's camera device (capturestatus.jsx)
     case 'webapps-ask': case 'webapps-ask-gone': webAskEvent(kind, data); break;
     case 'webapps-badge': webBadgeEvent(data); break;
     case 'webapps-menu': case 'webapps-menu-gone': webMenuEvent(kind, data); break;

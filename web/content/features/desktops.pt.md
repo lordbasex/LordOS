@@ -14,6 +14,7 @@ Os três rodam sobre o mesmo servidor gráfico, o mesmo motor de interface e os 
 - **A barra de menus** tem os menus do app, os itens de status e o relógio; a **Central de controle** reúne rede, som, brilho, Não perturbe e o resto.
 - **O lançador de apps** mostra todos os apps, e a Busca encontra apps, ajustes e arquivos.
 - **Encaixe janelas** arrastando-as para as bordas: meia tela, um quarto ou a tela inteira (no Lord Flow desde a 0.8.9).
+- **Sempre no topo** no menu da janela deixa uma janela por cima das outras enquanto você digita em outra (em desenvolvimento, em todos os desktops do LordOS; os apps X11 também podem pedir isso).
 - **Desktops** com uma Visão geral, desde a 0.8.7, e um seletor de apps no ❖Tab.
 
 **Para quem é:** quem quer começar a trabalhar sem aprender nada novo.

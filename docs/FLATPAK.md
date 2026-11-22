@@ -466,7 +466,7 @@ callers are Linux apps outside Flatpak; none of them identifies a Flatpak app ye
 
 | Interface | Status | What it does in LordOS |
 |---|---|---|
-| `org.freedesktop.portal.Settings` | served (0.8.6) | dark or light mode, accent, contrast, title bar buttons, GTK 3 theme; `SettingChanged` live |
+| `org.freedesktop.portal.Settings` | served (0.8.6) | dark or light mode, accent, contrast, title bar buttons, GTK 3 theme, fonts and their antialiasing (in development, "Fonts" below); `SettingChanged` live |
 | `org.freedesktop.portal.FileChooser` | served (version 2) | `OpenFile`, `SaveFile`: the shell's own file dialog, the answer only to the app that asked |
 | `org.freedesktop.portal.OpenURI` | served (version 3; 0.8.8.8) | `OpenURI` (http and https to the default browser, only an address every URL parser reads the same way: printable ASCII, no backslash, no user info, no `%` in the host, a numeric host only as a dotted IPv4, so the question names the host the browser goes to; a `file://` address like `OpenFile`), `OpenFile` and `OpenDirectory` with the file as an fd, used only for its name: it must still name the same file, inside the home folder or the user's disks, outside `fsops_protected`, and opening never takes an executable or a `.desktop` file. Its device, inode and type are kept and checked again right before it opens (`portalcheck.c`), so a file swapped while the question was up is refused. Opened the way LordOS opens everything else (`sdk/sysopen.js`); an app that is not the one with the keyboard (the bus's pid against the focused Wayland client's, or the same app scope) makes the person confirm it first |
 | `org.freedesktop.portal.Inhibit` | served (version 1; 0.8.8.8) | `Inhibit` with the idle or suspend flag counts as the compositor's idle inhibition (`wl_idle_inhibited()`, the screen-off, lock and sleep timers); released by `Request.Close` or when the caller leaves the bus. Logout and user-switch flags are accepted and do nothing; no `CreateMonitor` |
@@ -534,6 +534,20 @@ listed as "other". Until 2026-11-22 an app whose `[Application] base=` was `org.
 question 2); since the Spawn helper ("Sub-sandboxes") they install like any other app.
 `org.freedesktop.portal.Flatpak` is not a "never" row any more: it is LordOS's own Spawn, which only starts the same
 app in a sub-sandbox. Checked on VM 127 with GNOME Calculator and MarkText.
+
+**Display and toolkit (in development, after 0.8.9.4; `apps/store/fhlook.js`, `flathubmodel.displayOf`/`toolkitOf`):**
+an app's page also says, from the same metadata and before it is installed, how the app shows its windows and what it
+is built with. Display follows Flatpak 1.16's own rule (Debian 13's; `common/flatpak-run-sockets.c`: with
+`fallback-x11`, X11 only when the app got no Wayland): `wayland` alone is **Wayland**; `wayland` with `fallback-x11` is
+**Wayland (X11 only without Wayland)**, and since LordOS always gives a Flatpak app its Wayland socket such an app gets
+no X11 at all (Spotify's case under "Results"); `wayland` with `x11` gets **both** and its toolkit chooses; `x11` alone
+(or `fallback-x11` without `wayland`) is **X11, through Xwayland**, and the page says it gets no X11, so no windows,
+while its files or a device are blocked for it (the "X display" row of Problem 1's table). The toolkit comes from the
+base app (`org.electronjs.Electron2.BaseApp`, `io.atom.electron.BaseApp` → Electron; `org.chromium.Chromium.BaseApp` →
+Chromium) or the runtime (`org.gnome.Platform`, `io.elementary.Platform` → GTK; `org.kde.Platform` or an `io.qt.*`
+base → Qt; anything else → "its own"), with the runtime's id and branch shown under it. Only the app's page shows it:
+the catalog (AppStream) doesn't carry the metadata, and a column in the lists would mean one `remote-info` per app.
+Tested in `server/tests/flathub_model_test.mjs` with the real metadata samples there.
 
 ## Problem 4: installing
 
@@ -637,6 +651,22 @@ for every decoder. The website's API is never used.
 Flatpak keeps next to the `.gz`. Its index line: id, branch, name, summary, icon (`64x64/` or `128x128/<file>.png`),
 categories, license, developer, verified (`flathub::verification::verified`). The Store shows the verified ones by
 default (maintainer's decision); the filter is the shell's, the index carries every app.
+
+**Descriptions (in development, after 0.8.9.4):** an app's page shows what it says about itself, AppStream's
+`<description>`, like Flathub's site and other app centres do. The same helper, with nothing new (no syscall, no
+network, still only the C library), takes the component's own `<description>` (never a release's) in the person's
+language with the scoring of the name (`es-AR`: `es_AR`, then `es`, then the untranslated one; translations per
+paragraph, `<p xml:lang>`, are followed too) and flattens its markup to plain text: `<p>` paragraphs apart by an empty
+line, `<ul>`/`<ol>` items on their own line after `• ` or their number, `<em>`/`<code>` and anything else dropped,
+entities decoded, spaces collapsed, control characters and bytes that aren't UTF-8 removed, at most 4 KB cut at a word
+with `…`. It is written as a second line right after its app's, `#d<TAB>id<TAB>text`, with the text's line breaks and
+backslashes escaped (`\n`, `\\`). lord-server checks it again (`fpakas_desc_line`: the id, only those two escapes, no
+tab or control character, valid UTF-8, the size, no more than one empty line in a row) and keeps it only right after
+its own app's line, once, and 24 MB of descriptions at most. The descriptions are kept out of `lord.flatpak.catalog()`,
+which the Store reads at every load: the page asks for one app's with `lord.flatpak.description(id)`. Measured on
+Flathub's catalog of 2026-11-22 (52 MB of XML, 3381 apps): the index grew from 0.6 MB to 2.5 MB, every app has a
+description, four were cut at 4 KB, and the helper still reads the whole file in about 0.1 s, far under its 512 MB cap
+(it keeps one 4 KB buffer per app being read, nothing more).
 
 ### Updates (Design)
 
@@ -1133,6 +1163,44 @@ before, Steam, ksnip and what they brought installed for the run and removed aft
   and seccomp. pressure-vessel's Spawn carries 82 environment variables: the per-Spawn limit went from 64 to 128 (the
   whole command line still fits the Spawn helper's, checked at build time). Whatsie's Spawn with a `usr-fd` was refused
   (`NotSupported`, "option not served: usr-fd").
+
+### Fonts (fixed 2026-11-22)
+
+GTK apps from Flathub looked out of place: their text was bigger, wider and softer than LordOS's. Checked offline with
+CPU-X (`io.github.thetumultuousunicornofdarkness.cpu-x`, GTK 3.24.50 in `org.freedesktop.Platform//25.08`), nothing
+shown on screen:
+
+- Inside the sandbox, `gdbus call … org.freedesktop.portal.Settings.ReadAll "['org.gnome.*']"` gave only
+  `color-scheme`, `accent-color`, `gtk-theme`, `gtk-im-module` and `button-layout`: no font keys.
+- GDK's settings table in that runtime (`libgdk-3.so.0`) falls back to `font-name` = `Adwaita Sans 11` and reads
+  `font-antialiasing`, `font-hinting`, `font-rgba-order`, `text-scaling-factor`, `icon-theme` and `cursor-*` from
+  `org.gnome.desktop.interface` (older GTKs read the first three from `org.gnome.settings-daemon.plugins.xsettings`).
+- `fc-match "Adwaita Sans"` and `fc-match sans` in the sandbox both give `DejaVu Sans`: the app drew DejaVu Sans 11
+  (14.7 px), where LordOS draws Inter at 12–13 px. The sandbox sees the host's `/usr/share/fonts` (as
+  `/run/host/fonts`), never `/usr/lib/lordos/assets/fonts`, so Inter wasn't there to ask for.
+
+What changed:
+
+- **The settings portal serves the text keys** (`server/src/ui/portal.c`), in `org.gnome.desktop.interface`:
+  `font-name` and `document-font-name` `Inter 10` (13.3 px at 96 dpi), `monospace-font-name` `JetBrains Mono 10`,
+  `font-antialiasing` `grayscale` (LordOS's own text is grayscale coverage, `ui/text.c`), `font-hinting` `slight`,
+  `font-rgba-order` `rgb`, `text-scaling-factor` `1.0` and `icon-theme` `Adwaita`; and the same three antialiasing keys
+  in `org.gnome.settings-daemon.plugins.xsettings` for older runtimes. When Inter or JetBrains Mono isn't in
+  `/usr/share/fonts/truetype/lordos`, the names are fontconfig's `Sans 10` and `Monospace 10`; a change is sent with
+  `SettingChanged`. The same keys go to the GSettings keyfile, for GTK 3 apps outside Flatpak (Debian's schema
+  default, `Adwaita Sans 11`, isn't installed on LordOS either).
+- **The lordos package installs Inter and JetBrains Mono in `/usr/share/fonts/truetype/lordos`** as well as in
+  `/usr/lib/lordos/assets/fonts` (`tools/iso/mkdeb.sh`): copies, since a link to `/usr/lib/lordos` would not resolve in
+  the sandbox. fontconfig's dpkg trigger refreshes the cache. New files, no migration.
+- **Not served:** `cursor-theme` and `cursor-size`. GTK 3.24.50 and GTK 4 ask for cursors by shape
+  (`cursor-shape-v1`), and LordOS draws them itself (`cursor.c`); it has no Xcursor theme to name.
+- **Display scale** reaches GTK through the Wayland output, so `text-scaling-factor` stays 1 (more would scale the text
+  twice). LordOS has no separate text-size setting today; if one is added, it goes here.
+
+Tests: `build/portal-gs-test` reads every key with `ReadOne` and `ReadAll("org.gnome.*")` and checks the keyfile;
+`tests/gtk_defaults_test.mjs` checks the font folder against `mkdeb.sh` and the three values against Debian's schema
+enums. Still to check in a real session: CPU-X's text next to LordOS's, after installing the package that carries the
+fonts.
 
 ## Open questions
 

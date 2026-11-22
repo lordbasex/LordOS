@@ -19,6 +19,9 @@ typedef struct {
     int pref_w, pref_h;         /* first detailed timing (the native mode) */
     int version, revision;      /* 1.3, 1.4 */
     int digital;
+    /* chromaticities (bytes 25-34): red, green, blue and white x, y ×1,000,000 from the 10-bit values; all 0 when a
+     * value is 0 (not given). color-management-v1 tells apps the display's own gamut with them (wl/wlcolor.h). */
+    int chroma[8];
 } Edid;
 
 /* 0 if the base block is a valid EDID (header and checksum). Reads only validated bytes. */

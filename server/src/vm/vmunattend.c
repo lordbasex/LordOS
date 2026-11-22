@@ -162,14 +162,15 @@ int vmu_parse(const char *json, size_t n, VmUnattend *u, char *err, size_t errle
         return rc;
     }
     const char *bad = NULL;
-    u->kind = !k ? 0 : !strcmp(k, "preseed") ? VMU_PRESEED : !strcmp(k, "autoinstall") ? VMU_AUTOINSTALL : !strcmp(k, "kickstart") ? VMU_KICKSTART : 0;
+    u->kind = !k ? 0 : !strcmp(k, "preseed") ? VMU_PRESEED : !strcmp(k, "autoinstall") ? VMU_AUTOINSTALL : !strcmp(k, "kickstart") ? VMU_KICKSTART :
+              !strcmp(k, "lordos") ? VMU_LORDOS : 0;
     /* the strings must fit their fields: a longer one is refused, not cut */
-    static const char *const keys[] = { "user", "fullname", "hash", "hostname", "timezone", "keymap", "variant", "locale", "release", "arch", "kernel", "initrd", "append", "keydesc" };
-    static const size_t caps[] = { 33, 65, 128, 64, 64, 32, 32, 32, 16, 8, 128, 128, 512, 96 };
+    static const char *const keys[] = { "user", "fullname", "hash", "hostname", "timezone", "keymap", "variant", "locale", "release", "arch", "kernel", "initrd", "append", "keydesc", "lang" };
+    static const size_t caps[] = { 33, 65, 128, 64, 64, 32, 32, 32, 16, 8, 128, 128, 512, 96, 16 };
     for (size_t i = 0; i < sizeof keys / sizeof keys[0] && !bad; i++) { const char *v = json_str(r, keys[i]); if (v && strlen(v) >= caps[i]) bad = keys[i]; }
     CP(user, "user"); CP(fullname, "fullname"); CP(hash, "hash"); CP(hostname, "hostname"); CP(timezone, "timezone");
     CP(keymap, "keymap"); CP(variant, "variant"); CP(locale, "locale"); CP(release, "release"); CP(arch, "arch");
-    CP(kernel, "kernel"); CP(initrd, "initrd"); CP(append, "append"); CP(keydesc, "keydesc");
+    CP(kernel, "kernel"); CP(initrd, "initrd"); CP(append, "append"); CP(keydesc, "keydesc"); CP(lang, "lang");
     u->desktop = json_bool(r, "desktop", 1);
     json_free(&d);
     if (bad) {}
@@ -188,6 +189,8 @@ int vmu_parse(const char *json, size_t n, VmUnattend *u, char *err, size_t errle
     else if (!isopath_ok(u->kernel)) bad = "kernel";
     else if (!isopath_ok(u->initrd)) bad = "initrd";
     else if (!append_ok(u->append)) bad = "append";
+    else if (u->lang[0] && !word_of(u->lang, sizeof u->lang, "-", 1)) bad = "lang";
+    else if (u->kind == VMU_LORDOS && !strstr(u->append, "lordos.auto=1")) bad = "append";
     if (bad) { snprintf(err, errlen, "the unattended spec's %s isn't valid", bad); memset(u, 0, sizeof *u); return -1; }
     /* an installer wants a real locale: the host's C.UTF-8 becomes en_US.UTF-8 */
     if (!strncmp(u->locale, "C.", 2) || !strcmp(u->locale, "C") || !strcmp(u->locale, "POSIX")) snprintf(u->locale, sizeof u->locale, "en_US.UTF-8");
@@ -288,6 +291,24 @@ static char *kickstart(const VmUnattend *u) {
     return b.p;
 }
 
+/* LordOS's lordos-auto.conf (docs/UNATTENDED.md): key = value lines that lord-autoinstall checks again; every value here
+ * passed vmu_parse's checks (no '=', '#' or line ends in them; spaces only in the full name) */
+static char *lordos_conf(const VmUnattend *u) {
+    if (!u->disk_bytes || !word_of(u->disk, sizeof u->disk, "", 1)) return NULL;
+    Buf b = { 0 };
+    bput(&b, "# Made by Machines (LordOS) for an unattended install: the account's password is only a hash here.\n");
+    bput(&b, "disk = %s\ndisk_bytes = %llu\nmode = erase\nerase = yes\n", u->disk, u->disk_bytes);
+    bput(&b, "user = %s\n", u->user);
+    if (u->fullname[0]) bput(&b, "fullname = %s\n", u->fullname);
+    bput(&b, "password_hash = %s\nhostname = %s\n", u->hash, u->hostname);
+    bput(&b, "lang = %s\nlocale = %s\ntimezone = %s\nkeyboard = %s\n", u->lang[0] ? u->lang : "en", u->locale, u->timezone, u->keymap);
+    if (u->variant[0]) bput(&b, "keyboard_variant = %s\n", u->variant);
+    /* its restart ends the machine's QEMU (lord-vm: the install is done) and the live kernel and the seed disk go */
+    bput(&b, "autologin = no\nafter = reboot\n");
+    if (b.oom) { free(b.p); return NULL; }
+    return b.p;
+}
+
 /* text for XML: the parser's checks already keep out < > & and quotes; escaped anyway */
 static void xput(Buf *b, const char *s) {
     for (; *s; s++) {
@@ -369,6 +390,7 @@ char *vmu_answer(const VmUnattend *u, const char **name) {
     case VMU_PRESEED: *name = "preseed.cfg"; return preseed(u);
     case VMU_AUTOINSTALL: *name = "user-data"; return autoinstall(u);
     case VMU_KICKSTART: *name = "ks.cfg"; return kickstart(u);
+    case VMU_LORDOS: *name = "lordos-auto.conf"; return lordos_conf(u);
     }
     *name = NULL;
     return NULL;
@@ -721,7 +743,7 @@ int vmu_prepare(const char *disks, const char *iso, const VmUnattend *u, const c
     else if (vmu_iso_find(fd, u->kernel, &ko, &ks) || ks > (64u << 20) || ks < 4096) snprintf(err, errlen, "the ISO has no installer kernel at %s", u->kernel);
     else if (vmu_iso_find(fd, u->initrd, &io, &is) || is > (512u << 20) || is < 4096) snprintf(err, errlen, "the ISO has no installer initrd at %s", u->initrd);
     else if (vmu_cmdline(u, label, cmd, sizeof cmd)) snprintf(err, errlen, "the kernel command line doesn't fit (or the ISO's label isn't a plain word)");
-    else if (!(answer = vmu_answer(u, &answer_name))) snprintf(err, errlen, "out of memory");
+    else if (!(answer = vmu_answer(u, &answer_name))) snprintf(err, errlen, u->kind == VMU_LORDOS ? "the system disk isn't known" : "out of memory");
     else {
         VmuFile f[2] = { { answer_name, answer, strlen(answer) }, { NULL, NULL, 0 } };
         int nf = 1;
@@ -738,7 +760,7 @@ int vmu_prepare(const char *disks, const char *iso, const VmUnattend *u, const c
             if (vmu_cpio(f, 1, &extra, &extra_len) || append_file(p, extra, extra_len)) snprintf(err, errlen, "can't add the answers to the initrd");
             else rc = 0;
         } else {
-            if (vmu_fat_image(u->kind == VMU_AUTOINSTALL ? "CIDATA" : "OEMDRV", f, nf, &extra, &extra_len)) snprintf(err, errlen, "can't make the seed disk");
+            if (vmu_fat_image(u->kind == VMU_AUTOINSTALL ? "CIDATA" : u->kind == VMU_LORDOS ? "LORDOSAUTO" : "OEMDRV", f, nf, &extra, &extra_len)) snprintf(err, errlen, "can't make the seed disk");
             else if (snprintf(p, sizeof p, "%s/seed.img", dir), write_file(p, extra, extra_len)) snprintf(err, errlen, "can't write the seed disk: %s", strerror(errno));
             else rc = 0;
         }

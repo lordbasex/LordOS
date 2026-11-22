@@ -10,7 +10,10 @@ the components below, each under its own license.
 | QuickJS | JavaScript engine for the UI | MIT (`third_party/quickjs/LICENSE`) |
 | stb_image, stb_image_write, stb_truetype | image decoding/encoding, font rasterization | MIT or public domain (dual) |
 | Monocypher 4 | vault and keyring cryptography | CC0-1.0 or BSD-2-Clause (`third_party/monocypher/LICENCE.md`) |
+| Wayland's `wl_fixes` interface (wayland.xml 1.24) | the core `wl_fixes` global on a libwayland older than 1.24 (`server/mk/wlfixes.mk`) | MIT (in `third_party/wayland/wl-fixes.xml`) |
 | EFF large wordlist, SecLists common passwords | passphrase generator, weak-password check | CC BY 3.0 (EFF), MIT (SecLists, `third_party/wordlists/LICENSE-SecLists`) |
+| `pointer-warp-v1.xml` from wayland-protocols 1.45 (`staging/pointer-warp`, commit `b3f29d8a41320a9231587835ee5e485f4a5f6eba`; Debian 13 ships 1.44 without it), in `server/protocols/`, unmodified | `wp_pointer_warp_v1` (wayland-scanner generates the code) | MIT (copyright notice in the file) |
+| wayland-protocols 1.50: `ext-background-effect-v1.xml`, `xdg-session-management-v1.xml` (in `server/protocols/`, unchanged; newer than Debian 13's 1.44) | protocol descriptions wayland-scanner turns into code for lord-server | MIT (the notice is in each file) |
 
 ## Fetched at build time (`third_party/audiocpp`, ignored by git)
 
@@ -46,6 +49,8 @@ its `NOTICE.md`) against it. The option ROM links EDK2 library code; nothing els
 | Plus Jakarta Sans 2.7.1 (`assets/fonts/PlusJakartaSans-ExtraBold.ttf`, `-Medium.ttf`) | the LordOS wordmark: live text in the UI (fontFamily `brand`) and outlined in `assets/brand/*.svg` | SIL OFL 1.1 (`assets/fonts/PlusJakartaSans-LICENSE.txt`) |
 | JetBrains Mono (`assets/fonts/JetBrainsMono-*.ttf`) | terminal and code text | SIL OFL 1.1 (`assets/fonts/JetBrainsMono-LICENSE.txt`) |
 | Noto Sans Arabic, Devanagari, Thai and CJK SC, subset (`server/src/bench/fonts/`) | built into `lord-bench` for LordBench's shaping workload (subset by `tools/gen-lbfonts.py`) | SIL OFL 1.1 (`server/src/bench/fonts/OFL.txt`) |
+| MediaPipe Selfie Segmenter (landscape) and BlazeFace short range, by Google (`third_party/studio-models/`: the original `.tflite` files and Google's model cards; converted by `tools/studio/tflite2lnn.mjs` into `assets/studio/models/*.lnn`, which LordOS ships) | LordOS Studio's person segmentation (Portrait, Background) and, in later phases, face finding; run by LordOS's own inference code in `lord-studio` (`server/src/media/studio/nn.c`), no ML library | Apache-2.0 (`third_party/studio-models/LICENSE`; sources, hashes and the modification notice in `third_party/studio-models/README.md`) |
+| LordOS Studio's test frames (`server/tests/data/studio/`): ten photographs from Wikimedia Commons, cropped and scaled | `build/studio-nn-test`, `build/studio-test` (not shipped) | CC0 1.0 (authors and pages in `server/tests/data/studio/README.md`) |
 
 ### Local changes to bundled components
 
@@ -106,11 +111,11 @@ These are not part of this repository; they are installed from Debian.
 | libcrypt | lord-sessiond | LGPL-2.1+ |
 | Poppler (glib), cairo, freetype, fontconfig | lord-doc | GPL-2.0-or-later / LGPL / FTL |
 | libarchive | lord-doc | BSD-2-Clause |
-| FFmpeg (libavcodec, libavformat, libavutil, libswscale, libswresample), libva | lord-media | LGPL-2.1+; Debian's build is GPL-2.0-or-later |
+| FFmpeg (libavcodec, libavformat, libavutil, libswscale, libswresample), libva | lord-media, lord-stream and lord-studio (LordOS Studio's camera, which also links Mesa's libgbm, libEGL and libGLESv2 like lord-bench) | LGPL-2.1+; Debian's build is GPL-2.0-or-later |
 | Tesseract (libtesseract5) and its English, Spanish, Portuguese, French and Italian data (`tesseract-ocr-*`) | lord-ocr (0.8.8.6: Screenshots' copy the text, the markup editor's Transcribe) | Apache-2.0 |
 | Vulkan loader (libvulkan1), OpenMP (libgomp1), the C++ runtime (libstdc++6) | lord-tts (0.8.8.6) | Apache-2.0 (Vulkan loader); GPL-3.0 with the GCC Runtime Library Exception |
 
-Note: `lord-doc` and `lord-media` are separate helper processes. Because they link Poppler and
+Note: `lord-doc` and `lord-media` (and `lord-stream` and `lord-studio`, built from its sources) are separate helper processes. Because they link Poppler and
 Debian's FFmpeg build, those two binaries as distributed are covered by the GPL; the MIT-licensed
 LordOS source they are built from is GPL-compatible. `lord-server` itself does not link them.
 `lord-tts` links audio.cpp and ggml (above) in the same way: a separate sandboxed helper.

@@ -68,6 +68,7 @@
 
 typedef struct {
     int id, x, y, major, pressure;
+    int orient, orient_new;         /* ABS_MT_ORIENTATION, and that it changed since it was told (touchscreens) */
     int kdown;                      /* the kernel says there is a contact (tracking id >= 0) */
     int down, was;                  /* it counts as a touch (kdown, and firm enough) */
     double mx, my, pmx, pmy, sx, sy, t0;
@@ -164,6 +165,7 @@ static void out_swipe(int ph, int n, double dx, double dy) { if (sink && sink->s
 static void out_hold(int ph, int n) { if (sink && sink->hold) sink->hold(sink_ud, ph, n); }
 static int  out_touch(int ph, int id, double x, double y) { return sink && sink->touch ? sink->touch(sink_ud, ph, id, x, y) : 0; }
 static void out_touch_frame(void) { if (sink && sink->touch_frame) sink->touch_frame(sink_ud); }
+static void out_touch_orient(int id, double deg) { if (sink && sink->touch_orient) sink->touch_orient(sink_ud, id, deg); }
 static void out_warp(double x, double y) { if (sink && sink->warp) sink->warp(sink_ud, x, y); }
 
 /* ---- curves ---- */
@@ -276,6 +278,7 @@ TpDevice *tp_open(int fd, const char *name) {
     ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &c.y);
     if (HAS(abs, ABS_MT_PRESSURE)) { c.has_pressure = 1; ioctl(fd, EVIOCGABS(ABS_MT_PRESSURE), &c.pressure); }
     if (HAS(abs, ABS_MT_TOUCH_MAJOR)) { c.has_major = 1; ioctl(fd, EVIOCGABS(ABS_MT_TOUCH_MAJOR), &c.major); }
+    if (HAS(abs, ABS_MT_ORIENTATION)) { ioctl(fd, EVIOCGABS(ABS_MT_ORIENTATION), &c.orient); c.has_orient = c.orient.maximum > 0; }
     c.max_fingers = HAS(keys, BTN_TOOL_QUINTTAP) ? 5 : HAS(keys, BTN_TOOL_QUADTAP) ? 4 : HAS(keys, BTN_TOOL_TRIPLETAP) ? 3
                   : HAS(keys, BTN_TOOL_DOUBLETAP) ? 2 : 1;
     if (c.max_fingers < c.nslots) c.max_fingers = c.nslots;
@@ -855,6 +858,26 @@ static void touchpad_frame(TpDevice *d, double dt) {
     } else if (want > 0 && npos > 0) gesture_frame(d, idx, npos, dt);
 }
 
+/* A contact's ABS_MT_ORIENTATION in degrees for wl_touch.orientation: 0 is along the y axis, the maximum is 90°
+ * clockwise (the kernel's multi-touch protocol), turned with the picture, normalized to -180..180 */
+double tp_orient_degrees(int value, int maximum, int turn) {
+    if (maximum <= 0) return 0;
+    double deg = (double)value * 90.0 / maximum + 90.0 * (turn & 3);
+    while (deg > 180) deg -= 360;
+    while (deg <= -180) deg += 360;
+    return deg;
+}
+/* each touch of an app whose orientation is new (or with its down): told before the frame */
+static void ts_orients(TpDevice *d, int all) {
+    if (!d->c.has_orient) return;
+    for (int i = 0; i < d->c.nslots; i++) {
+        Slot *s = &d->s[i];
+        if (!s->down || (!all && !s->orient_new && s->was)) continue;
+        s->orient_new = 0;
+        out_touch_orient(i, tp_orient_degrees(s->orient, d->c.orient.maximum, d->turn));
+    }
+}
+
 static void touchscreen_frame(TpDevice *d, double dt) {
     int idx[MAX_SLOTS], n = 0;
     for (int i = 0; i < d->c.nslots; i++) if (d->s[i].down) idx[n++] = i;
@@ -868,6 +891,7 @@ static void touchscreen_frame(TpDevice *d, double dt) {
         d->ts_multi = 0;
         if (d->ts_app) {
             for (int i = 1; i < n; i++) { ts_pos(d, d->s[idx[i]].mx, d->s[idx[i]].my, &x, &y); out_touch(TP_BEGIN, idx[i], x, y); }
+            ts_orients(d, 1);
             out_touch_frame();
             d->ts_prev_n = n;
             return;
@@ -880,6 +904,7 @@ static void touchscreen_frame(TpDevice *d, double dt) {
             else if (s->down && (s->mx != s->pmx || s->my != s->pmy)) out_touch(TP_UPDATE, i, x, y);
             else if (!s->down && s->was) out_touch(TP_END, i, x, y);
         }
+        ts_orients(d, 0);
         out_touch_frame();
         if (n == 0) d->ts_app = 0;
         d->ts_prev_n = n;
@@ -969,6 +994,7 @@ void tp_event_at(TpDevice *d, const struct input_event *ev, double now) {
         case ABS_MT_POSITION_X: s->x = ev->value; break;
         case ABS_MT_POSITION_Y: s->y = ev->value; break;
         case ABS_MT_TOUCH_MAJOR: s->major = ev->value; break;
+        case ABS_MT_ORIENTATION: if (s->orient != ev->value) { s->orient = ev->value; s->orient_new = 1; } break;
         case ABS_MT_PRESSURE:
             s->pressure = ev->value;
             if (d->pressure_palm && ev->value > d->c.pressure.maximum) {     /* the declared range isn't the real one */

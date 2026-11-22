@@ -7,13 +7,21 @@
  * missing signature, another list's signature, another maker's key, a key file that lacks a pinned key, an expired key,
  * a signature from the future, a clear-signed list with text added outside its signature.
  *
+ * And LordOS's own releases (VMCAT_SIG_LORDOS): v0.8.9-beta's SHA256SUMS and SHA256SUMS.sig as published (tests/vmimage/
+ * lordos.sums, lordos.sig) with the release key compiled into LordOS (codesig_release_key, tests/imager_key.c here):
+ * the published list verifies; a changed hash, a line added, another key, no signature, an empty or garbage one, and
+ * another key size are refused.
+ *
  *   build/vmcatalog-test ../assets/machines/systems.json tests/vmimage ../packaging/keys/machines */
 #include "../src/vm/vmcatalog.h"
 
 #include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+extern const uint8_t codesig_release_key[32];       /* tests/imager_key.c: the same bytes as src/sec/codesig.c's */
 
 static int pass, fail;
 #define T(name, cond) do { if (cond) pass++; else { fail++; printf("FAIL  %s\n", name); } } while (0)
@@ -141,6 +149,60 @@ static void signatures(const char *cat, size_t n, const char *fx, const char *kd
         }
         free(okeys); free(add); free(ch); free(list); free(sig); free(keys);
     }
+    /* LordOS's own release (VMCAT_SIG_LORDOS): the release key compiled into LordOS, no key file */
+    {
+        VmCatEntry l;
+        size_t ln = 0, sn = 0;
+        char *list = load(fx, "lordos.sums", &ln), *sig = load(fx, "lordos.sig", &sn);
+        const char *key = (const char *)codesig_release_key;
+        T("lordos: fixtures", list && sig && !vmcat_find(cat, n, "lordos", "amd64", &l) && l.sig_type == VMCAT_SIG_LORDOS);
+        if (list && sig) {
+            int r = verify(&l, key, 32, list, ln, sig, sn, NOW, why, sizeof why);
+            T("lordos: the published list verifies with the release key", r == 1);
+            if (r != 1) printf("      %s\n", why);
+            char *body = NULL;
+            size_t bl = 0;
+            vmcat_verify_list(&l, key, 32, list, ln, sig, sn, NOW, &body, &bl, why, sizeof why);
+            T("lordos: the list is kept as it is, and names the ISOs", body && bl == ln && !memcmp(body, list, ln) && vmcat_sums_has(body, bl, "lordos-live-0.8.9-amd64.iso",
+              "2ef62214e5a5791bc03ccfbdc5fa0f310fa71fc14c810d23527840eaf0344848") && vmcat_sums_has(body, bl, "lordos-live-0.8.9-arm64.iso",
+              "10ab3a093f7c6b67f309030c94eacc5b341842a67d4fa7024c7202a372b116bd"));
+            free(body);
+            char *ch = malloc(ln + 1);
+            memcpy(ch, list, ln + 1);
+            char *d = strstr(ch, "  lordos-live-0.8.9-amd64.iso") - 64;
+            *d = *d == '0' ? '1' : '0';
+            T("lordos: a changed hash is refused", verify(&l, key, 32, ch, ln, sig, sn, NOW, why, sizeof why) == -1 && strstr(why, "imager.badSignature"));
+            char *add = malloc(ln + 200);
+            int al = snprintf(add, ln + 200, "%s%064d  lordos-live-9.9.9-amd64.iso\n", list, 0);
+            T("lordos: a line added is refused", verify(&l, key, 32, add, (size_t)al, sig, sn, NOW, why, sizeof why) == -1);
+            uint8_t other[32];
+            memcpy(other, codesig_release_key, 32);
+            other[0] ^= 1;
+            T("lordos: another key is refused", verify(&l, (const char *)other, 32, list, ln, sig, sn, NOW, why, sizeof why) == -1 && strstr(why, "imager.badSignature"));
+            T("lordos: a key file instead of the key is refused", verify(&l, key, 31, list, ln, sig, sn, NOW, why, sizeof why) == -1 &&
+              verify(&l, "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA\n-----END PUBLIC KEY-----\n", 64, list, ln, sig, sn, NOW, why, sizeof why) == -1);
+            T("lordos: no signature file is unsigned", verify(&l, key, 32, list, ln, NULL, 0, NOW, why, sizeof why) == 0);
+            T("lordos: an empty signature is refused", verify(&l, key, 32, list, ln, "", 0, NOW, why, sizeof why) == -1);
+            T("lordos: garbage for a signature is refused", verify(&l, key, 32, list, ln, "not base64 at all!\n", 19, NOW, why, sizeof why) == -1);
+            /* an OpenPGP signature of another maker's list where the release signature should be */
+            size_t on = 0;
+            char *osig = load(fx, "debian-amd64.sig", &on);
+            T("lordos: an OpenPGP signature is refused", osig && verify(&l, key, 32, list, ln, osig, on, NOW, why, sizeof why) == -1);
+            free(osig);
+            /* LordOS's signature over Debian's list */
+            size_t dn = 0;
+            char *dl = load(fx, "debian-amd64.sums", &dn);
+            T("lordos: the signature over another list is refused", dl && verify(&l, key, 32, dl, dn, sig, sn, NOW, why, sizeof why) == -1);
+            free(dl);
+            /* the release key can't stand in for a maker's OpenPGP key, nor an entry of another kind take the release key */
+            VmCatEntry deb;
+            vmcat_find(cat, n, "debian", "amd64", &deb);
+            T("lordos: a maker's entry doesn't take the release key", verify(&deb, key, 32, list, ln, sig, sn, NOW, why, sizeof why) == -1);
+            free(add); free(ch);
+        }
+        free(list); free(sig);
+    }
+
     /* Debian's amd64 signature over its arm64 list */
     VmCatEntry e;
     size_t a = 0, b = 0, k = 0;
@@ -202,6 +264,22 @@ int main(int argc, char **argv) {
     T("fedora-netinst: found, clear-signed", !vmcat_find(cat, n, "fedora-netinst", "amd64", &e) && e.sig_type == VMCAT_SIG_CLEAR &&
       vmcat_match(e.sums_re, "Fedora-Everything-45-1.4-x86_64-CHECKSUM") && vmcat_match(e.file_re, "Fedora-Everything-netinst-x86_64-45-1.4.iso") &&
       !vmcat_match(e.file_re, "Fedora-Workstation-Live-45-1.4.x86_64.iso"));
+    /* LordOS: its own release folder on GitHub (a pinned tag), its live ISOs only, signed with the release key */
+    for (int a = 0; a < 2; a++) {
+        char lab[96], nm[64], other[64];
+        snprintf(nm, sizeof nm, "lordos-live-0.8.9-%s.iso", arches[a]);
+        snprintf(other, sizeof other, "lordos-live-0.8.9-%s.iso", arches[!a]);
+        snprintf(lab, sizeof lab, "lordos %s: found, a release folder, the release key, no key file", arches[a]);
+        T(lab, !vmcat_find(cat, n, "lordos", arches[a], &e) && !strncmp(e.dir, "https://github.com/lordbasex/LordOS/releases/download/v", 55) &&
+          !strcmp(e.file_dir, e.dir) && !strcmp(e.sums, "SHA256SUMS") && e.sig_type == VMCAT_SIG_LORDOS && !strcmp(e.sig_name, "SHA256SUMS.sig") &&
+          !e.keys[0] && !e.nfprs);
+        snprintf(lab, sizeof lab, "lordos %s: the live ISO, not the other arch, the OVA, the image or a source list", arches[a]);
+        T(lab, vmcat_match(e.file_re, nm) && !vmcat_match(e.file_re, other) && !vmcat_match(e.file_re, "lordos-0.8.9-amd64.ova") &&
+          !vmcat_match(e.file_re, "lordos-0.8.9-rpi5-arm64.img.xz") && !vmcat_match(e.file_re, "lordos-live-0.8.9-amd64.sources.tsv") &&
+          vmcat_match(e.file_re, arches[a][0] == 'a' && arches[a][1] == 'm' ? "lordos-live-0.8.10.1-amd64.iso" : "lordos-live-0.8.10.1-arm64.iso"));
+        snprintf(lab, sizeof lab, "lordos %s: a size limit", arches[a]);
+        T(lab, e.max_bytes >= (2ull << 30) && e.max_bytes <= (8ull << 30));
+    }
     T("unknown id", vmcat_find(cat, n, "nothing", "amd64", &e));
     T("unknown arch", vmcat_find(cat, n, "debian", "riscv64", &e));
     T("fedora: its list's name", !vmcat_find(cat, n, "fedora", "amd64", &e) && vmcat_match(e.sums_re, "Fedora-Workstation-45-1.4-x86_64-CHECKSUM") &&
@@ -282,6 +360,11 @@ int main(int argc, char **argv) {
         "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"clearsigned\"},\"keys\":\"k.asc\",\"fingerprints\":[],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
         "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"clearsigned\"},\"keys\":\"k.asc\",\"fingerprints\":[\"6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
         "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"clearsigned\"},\"keys\":\"k.asc\",\"fingerprints\":[\"ZF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        /* LordOS's release signature: a signature file's name, and no key file or fingerprints (the key is compiled in) */
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"lordos-release\"},\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"lordos-release\",\"name\":\"../S.sig\"},\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"lordos-release\",\"name\":\"S.sig\"},\"keys\":\"k.asc\",\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"lordos-release\",\"name\":\"S.sig\"},\"fingerprints\":[\"DF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"file\":\"^a$\",\"maxMb\":10}}}]}",
     };
     for (size_t i = 0; i < sizeof badsig / sizeof badsig[0]; i++) {
         char lab[48];
@@ -293,6 +376,9 @@ int main(int argc, char **argv) {
       e.sig_type == VMCAT_SIG_DETACHED && !strcmp(e.sig_name, "S.sig") && !strcmp(e.keys, "k.asc") && e.nfprs == 1 &&
       !strcmp(e.fprs[0], "DF9B9C49EAA9298432589D76DA87E80D6294BE9B"));
     T("pattern needs a whole name", !vmcat_match(e.file_re, "a.iso2") && vmcat_match(e.file_re, "a.iso"));
+    const char *goodl = "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"lordos-release\",\"name\":\"SHA256SUMS.sig\"},\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"SHA256SUMS\",\"file\":\"^a\\\\.iso$\",\"maxMb\":10}}}]}";
+    T("good LordOS release entry", !vmcat_find(goodl, strlen(goodl), "x", "amd64", &e) && e.sig_type == VMCAT_SIG_LORDOS && !strcmp(e.sig_name, "SHA256SUMS.sig") &&
+      !e.keys[0] && !e.nfprs);
 
     /* pinned entries (Windows' evaluation, virtio-win): the catalog names each file, its URL, hash and size */
     {

@@ -27,7 +27,7 @@ WL_OBJ  := build/gen/xdg-shell-protocol.o build/gen/xdg-decoration-unstable-v1-p
 WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presentation-time stable/viewporter/viewporter \
            unstable/relative-pointer/relative-pointer-unstable-v1 unstable/pointer-constraints/pointer-constraints-unstable-v1 \
            unstable/pointer-gestures/pointer-gestures-unstable-v1 \
-           staging/cursor-shape/cursor-shape-v1 unstable/tablet/tablet-unstable-v2 \
+           staging/cursor-shape/cursor-shape-v1 stable/tablet/tablet-v2 \
            staging/fractional-scale/fractional-scale-v1 unstable/xdg-output/xdg-output-unstable-v1 \
            unstable/primary-selection/primary-selection-unstable-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1 \
            unstable/text-input/text-input-unstable-v3 staging/xdg-activation/xdg-activation-v1 \
@@ -35,9 +35,25 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            staging/security-context/security-context-v1 \
            unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
            staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
-           staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
+           staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1 \
+           staging/linux-drm-syncobj/linux-drm-syncobj-v1 \
+           staging/drm-lease/drm-lease-v1
+# color-management-v1 and color-representation-v1 (src/wl/wlcolor.c, docs/WAYLAND.md "Colour management")
+WL_MORE += staging/color-management/color-management-v1 staging/color-representation/color-representation-v1
+# frame timing and presentation hints (src/wl/timing.c, docs/WAYLAND.md "Frame timing")
+WL_MORE += staging/fifo/fifo-v1 staging/commit-timing/commit-timing-v1 staging/tearing-control/tearing-control-v1 \
+           staging/content-type/content-type-v1
+# shell extras (src/wl/wlshell.h, docs/WAYLAND.md "Shell extras"): tab tear-off, window tags, the bell
+WL_MORE += staging/xdg-toplevel-drag/xdg-toplevel-drag-v1 staging/xdg-toplevel-tag/xdg-toplevel-tag-v1 staging/xdg-system-bell/xdg-system-bell-v1
+# Xwayland's windows matched to their surfaces by serial (src/wl/xwshell.c), offered to Xwayland only
+WL_MORE += staging/xwayland-shell/xwayland-shell-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
+# Newer than Debian 13's wayland-protocols (1.44): the XML is kept in protocols/, unmodified (THIRD_PARTY.md):
+# pointer-warp from 1.45, ext-background-effect and xdg-session-management from 1.50
+WL_LOCAL := pointer-warp-v1 ext-background-effect-v1 xdg-session-management-v1
+WL_GEN  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.h)
+WL_OBJ  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.o)
 
 # GPU compositing (src/gpu): Mesa (GBM + EGL + GLES2) if its -dev packages are present; otherwise (or with
 # GPU=0) it's built without GPU and lord-server always composites on the CPU. See docs/GPU.md.
@@ -57,11 +73,11 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
 MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
-MEDIA_SRC := src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
+MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/syncobj.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/timing.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/wl/drmlease.c src/wl/drmlcore.c src/osk.c \
        src/ui/wave.c src/sound/spectrum.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c \
@@ -83,6 +99,11 @@ SRC += src/ui/js_guestwin.c
 SRC += src/ui/js_vmcli.c src/vm/vmcli.c
 # Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
 SRC += src/gpu/dmaread.c
+SRC += src/wl/wlcolor.c src/wl/colorconv.c
+# Shell extras (src/wl/wlshell.h): xdg-toplevel-drag, xdg-toplevel-tag, xdg-system-bell, xdg-session-management,
+# ext-background-effect, one file each
+SRC += src/wl/wlshell.c src/wl/tldrag.c src/wl/tltag.c src/wl/sysbell.c src/wl/xsession.c src/wl/xsstore.c src/wl/bgeffect.c
+SRC += src/wl/xwshell.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
@@ -92,6 +113,9 @@ HDR += $(wildcard src/*/*.h)
 # Wayland apps (src/wl/wl_input.c) and lord.input (src/ui/js_input.c). See docs/TRACKPAD.md.
 TP_SRC := src/tp/tp.c src/tp/tp_route.c src/wl/wl_input.c src/wl/wl_textinput.c src/wl/tiutf8.c src/ui/js_input.c
 SRC += $(TP_SRC)
+# Graphics tablets from evdev (src/tablet.c, no libinput or libwacom) for the apps by tablet-v2 (src/wl/wl_tablet.c),
+# and pointer-warp-v1 (src/wl/wl_warp.c). See docs/WAYLAND.md, "Graphics tablets" and "Pointer warp".
+SRC += src/tablet.c src/wl/wl_tablet.c src/wl/wl_warp.c
 # Window management: dragging in C, a layer for the window being moved and our own cursors (docs/WINDOWS.md).
 # cursor-shape-v1 needs the tablet-v2 interfaces (they're only linked, not advertised).
 # GTK/GNOME/Qt apps: our own org.freedesktop.portal.Settings (src/ui/portal.c) with the D-Bus client from
@@ -246,6 +270,12 @@ build/cgroup-restart-test: tests/cgroup_restart_test.c src/sec/cgroup.c src/sec/
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/cgroup_restart_test.c src/sec/cgroup.c
 	./$@ || { rm -f $@; exit 1; }
+# color-management-v1's conversion: matrices and every converted pixel against a reference (src/wl/colorconv.c)
+test: build/colorconv-test
+build/colorconv-test: tests/colorconv_test.c src/wl/colorconv.c src/wl/colorconv.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/colorconv_test.c src/wl/colorconv.c -lm
+	./$@ || { rm -f $@; exit 1; }
 # the toolkit variables Linux apps get: Wayland first, X11 as the fallback (src/wl/toolkitenv.h, #76, #96)
 test: build/toolkitenv-test
 build/toolkitenv-test: tests/toolkitenv_test.c src/wl/toolkitenv.h
@@ -317,7 +347,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/popup-client build/wlperf-client build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/wlperf-client build/syncobj-client build/wltiming-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -382,6 +412,27 @@ build/startlogin-test: tests/startlogin_test.c src/remote/startlogin.h
 	$(CC) $(CFLAGS) -o $@ tests/startlogin_test.c
 	./$@
 
+# Graphics tablets from evdev: which devices are pens and pads, and the frames of synthetic event sequences (src/tablet.c)
+test: build/tablet-test
+build/tablet-test: tests/tablet_test.c src/tablet.c src/tablet.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/tablet_test.c src/tablet.c -lm
+	./$@ || { rm -f $@; exit 1; }
+# tablet-v2 and pointer-warp-v1 on the wire: libwayland clients against src/wl/wl_tablet.c and src/wl/wl_warp.c
+# (tests/wltablet_test.c, the compositor side in tests/wltablet_srv.c)
+test: build/wltablet-test
+WLTAB_GEN := build/gen/tablet-v2-protocol.h build/gen/tablet-v2-protocol.c build/gen/pointer-warp-v1-protocol.h \
+             build/gen/pointer-warp-v1-protocol.c build/gen/client/tablet-v2-client-protocol.h \
+             build/gen/client/pointer-warp-v1-client-protocol.h
+build/wltablet-test: tests/wltablet_test.c tests/wltablet_srv.c tests/wltablet_srv.h src/tablet.c src/tablet.h src/wl/wl_tablet.c \
+                     src/wl/wl_tablet.h src/wl/wl_warp.c src/wl/wl_warp.h src/wl/pwarp.h $(WLTAB_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -Ibuild/gen/client -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all \
+	    -fno-omit-frame-pointer -o $@ tests/wltablet_test.c tests/wltablet_srv.c src/tablet.c src/wl/wl_tablet.c src/wl/wl_warp.c \
+	    build/gen/tablet-v2-protocol.c build/gen/pointer-warp-v1-protocol.c -lwayland-server -lwayland-client -lm
+	./$@ || { rm -f $@; exit 1; }
+
 test: build/inputkind-test
 build/inputkind-test: tests/inputkind_test.c src/inputkind.h
 	@mkdir -p build
@@ -393,6 +444,15 @@ build/framegate-test: tests/framegate_test.c src/wl/framegate.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/framegate_test.c
 	./$@ || { rm -f $@; exit 1; }
+# fifo-v1 and commit-timing-v1: when a held content update may apply (src/wl/wltiming.h, docs/WAYLAND.md "Frame timing")
+test: build/wltiming-test
+build/wltiming-test: tests/wltiming_test.c src/wl/wltiming.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/wltiming_test.c
+	./$@ || { rm -f $@; exit 1; }
+# the same against a headless lord-server: tests/wltiming_client.c, run by tests/wltiming_headless.sh (run_suites.sh)
+build/wltiming-client: tests/wltiming_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wltiming_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client -lm
 # a Linux window's display for its frame callbacks, presentation and new content (src/wl/outpick.h, docs/WAYLAND.md)
 test: build/outpick-test
 build/outpick-test: tests/outpick_test.c src/wl/outpick.h
@@ -404,6 +464,22 @@ test: build/buftf-test
 build/buftf-test: tests/buftf_test.c src/wl/buftf.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/buftf_test.c
+	./$@ || { rm -f $@; exit 1; }
+# drm-lease-v1, only non-desktop connectors and only with the "vr" permission: the state machine against a fake DRM layer
+# (src/wl/drmlcore.c, docs/WAYLAND.md "DRM leases")
+test: build/drmlease-test
+build/drmlease-test: tests/drmlease_test.c src/wl/drmlcore.c src/wl/drmlcore.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/drmlease_test.c src/wl/drmlcore.c
+	./$@ || { rm -f $@; exit 1; }
+# the same, end to end: drmlease.c's protocol, the gate in secctx.c's filter, two clients over socketpairs, the card's
+# kernel part faked
+test: build/drmlease-e2e-test
+build/drmlease-e2e-test: tests/drmlease_e2e_test.c src/wl/drmlease.c src/wl/drmlease.h src/wl/drmlcore.c src/wl/drmlcore.h \
+                         src/wl/secctx.c src/wl/secctx.h build/gen/client/drm-lease-v1-client-protocol.h $(WL_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -DDRMLEASE_TEST $(CFLAGS) $(WARN) -std=c11 -o $@ tests/drmlease_e2e_test.c src/wl/drmlease.c src/wl/drmlcore.c \
+	    src/wl/secctx.c build/gen/drm-lease-v1-protocol.c build/gen/security-context-v1-protocol.c -lwayland-server -lwayland-client
 	./$@ || { rm -f $@; exit 1; }
 # ext-idle-notify with the person's permission (src/wl/idlenotify.h, docs/WAYLAND.md "Idle notifications")
 test: build/idlenotify-test
@@ -680,6 +756,12 @@ build/pwguard-test: tests/pwguard_test.c $(PWGUARD_SRC) $(wildcard src/sec/*.h s
 build/wl-globals: tests/wl_globals.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ $< -lwayland-client
+# Wayland and Xwayland conformance, point by point, scored 0–100 % per protocol (tools/wl-conformance.mjs, docs/WAYLAND.md,
+# "Conformance"): a headless lord-server, build/wl-conformance-client and build/x11-conformance-client (built by the tool).
+# Needs the theme bundle (npm run build). WLCONF_ARGS=--record writes docs/wayland-conformance.json.
+wl-conformance: build/lord-server build/wl-globals
+	node ../tools/wl-conformance.mjs $(WLCONF_ARGS)
+.PHONY: wl-conformance
 build/fw-rules-test: tests/fw_rules_test.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c $(wildcard src/fw/*.h) src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fw_rules_test.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
@@ -809,8 +891,8 @@ build/tp-test: tests/tp_test.c src/tp/tp.c src/tp/tp.h ../tests/touchpad-sim/ges
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/tp_test.c src/tp/tp.c ../tests/touchpad-sim/gestures.c -lm
 # the on-screen keyboard: devices, allowed keys, the queue and XKB labels; the lock lights (input.c)
 test: build/osk-test
-build/osk-test: tests/osk_test.c src/osk.c src/osk.h src/keyboard.c src/keyboard.h src/input.c src/input.h src/tp/tp.c src/tp/tp.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/osk_test.c src/osk.c src/keyboard.c src/input.c src/tp/tp.c -lxkbcommon -lm
+build/osk-test: tests/osk_test.c src/osk.c src/osk.h src/keyboard.c src/keyboard.h src/input.c src/input.h src/tp/tp.c src/tp/tp.h src/tablet.c src/tablet.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/osk_test.c src/osk.c src/keyboard.c src/input.c src/tp/tp.c src/tablet.c -lxkbcommon -lm
 	./$@ || (rm -f $@; exit 1)
 
 build/ime-test: tests/ime_test.c src/ime.c src/ime.h src/keyboard.h
@@ -841,7 +923,11 @@ CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoratio
                 staging/security-context/security-context-v1 \
                 unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
                 staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
-                staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
+                staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1 \
+                staging/linux-drm-syncobj/linux-drm-syncobj-v1 \
+                staging/drm-lease/drm-lease-v1
+CLIENT_PROTO += staging/fifo/fifo-v1 staging/commit-timing/commit-timing-v1 staging/tearing-control/tearing-control-v1 \
+                staging/content-type/content-type-v1
 CLIENT_GEN := $(foreach p,$(CLIENT_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 define wl_client_proto
 build/gen/client/$(notdir $(1))-client-protocol.h: $(WLPROTO)/$(1).xml
@@ -873,12 +959,63 @@ build/guestwin-client: tests/guestwin_client.c src/vm/vmagent.c src/vm/vmagent.h
 # tests/wlperf_headless.sh against a headless lord-server
 build/wlperf-client: tests/wlperf_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlperf_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+test: build/color-client
+# color-management-v1 and color-representation-v1 (tests/color_client.c, docs/WAYLAND.md "Colour management"): run
+# by tests/color_headless.sh against a headless lord-server
+COLOR_PROTO := staging/color-management/color-management-v1 staging/color-representation/color-representation-v1
+$(foreach p,$(COLOR_PROTO),$(eval $(call wl_client_proto,$(p))))
+COLOR_GEN := $(foreach p,$(COLOR_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
+build/color-client: tests/color_client.c $(CLIENT_GEN) $(COLOR_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/color_client.c $(filter %.c,$(CLIENT_GEN) $(COLOR_GEN)) -lwayland-client
+# Explicit sync (linux-drm-syncobj-v1, src/wl/syncobj.h, docs/SYNCOBJ-PLAN.md): tests/syncobj_client.c, run by
+# tests/syncobj_headless.sh against a headless lord-server; the pure part in tests/syncobj_test.c
+build/syncobj-client: tests/syncobj_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/syncobj_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+test: build/syncobj-test
+build/syncobj-test: tests/syncobj_test.c src/wl/syncobj.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/syncobj_test.c
+	./$@ || { rm -f $@; exit 1; }
+# the kernel side on this machine's render node (run by tests/run_suites.sh; exit 77 without timeline syncobjs)
+build/syncobj-kernel-test: tests/syncobj_kernel_test.c src/wl/syncobj.c src/wl/syncobj.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/syncobj_kernel_test.c src/wl/syncobj.c
+# The shell extras (tests/shellx_client.c, src/wl/wlshell.h): run by tests/shellx_headless.sh against a headless lord-server;
+# their pure parts (the bell's limit, blur regions, the session store and its file) in tests/shellx_units_test.c
+test: build/shellx-client build/shellx-units-test
+build/shellx-units-test: tests/shellx_units_test.c src/wl/xsstore.c src/wl/xsstore.h src/wl/bgregion.h src/wl/bellgate.h src/wl/wlregion.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/shellx_units_test.c src/wl/xsstore.c
+	./$@ || { rm -f $@; exit 1; }
+SHELLX_PROTO := staging/xdg-toplevel-drag/xdg-toplevel-drag-v1 staging/xdg-toplevel-tag/xdg-toplevel-tag-v1 staging/xdg-system-bell/xdg-system-bell-v1
+$(foreach p,$(SHELLX_PROTO),$(eval $(call wl_client_proto,$(p))))
+SHELLX_GEN := $(foreach p,$(notdir $(SHELLX_PROTO)) $(WL_LOCAL),build/gen/client/$(p)-client-protocol.h build/gen/client/$(p)-protocol.c)
+build/shellx-client: tests/shellx_client.c $(CLIENT_GEN) $(SHELLX_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/shellx_client.c $(filter build/gen/client/xdg-shell-protocol.c,$(CLIENT_GEN)) $(filter %.c,$(SHELLX_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# Subsurface order and viewport crop/scale shown in pixels, for tools/wl-proof.mjs's screenshots (docs/wayland-proofs/)
+build/wlproof-client: tests/wlproof_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlproof_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# Surfaces made children of themselves or of their own descendants (subsurfaces, popups) are refused with the
+# protocol's error and lord-server goes on (tests/cycle_client.c; tests/run_suites.sh runs it against a headless
+# lord-server: tests/popup_headless.sh cycle-client)
+test: build/cycle-client build/wlfuzz-client
+# Hostile clients: random misuse of what is a protocol error, a witness window beside them (tests/wlfuzz_client.c;
+# tests/run_suites.sh runs it against a headless lord-server: tests/popup_headless.sh wlfuzz-client)
+# (xdg-activation's client code is mk/web.mk's WEB_PROTO)
+build/wlfuzz-client: tests/wlfuzz_client.c $(CLIENT_GEN) build/gen/client/xdg-activation-v1-client-protocol.h build/gen/client/xdg-activation-v1-protocol.c
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlfuzz_client.c $(filter %.c,$(CLIENT_GEN)) build/gen/client/xdg-activation-v1-protocol.c -lwayland-client
+build/cycle-client: tests/cycle_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/cycle_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag
 # (tests/dnd_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/dnd-client, then press twice in its window)
 build/dnd-client: tests/dnd_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/dnd_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# Two wl_seat bindings in one client, as Firefox has: each wl_pointer and wl_keyboard gets every event once, a pointer made
+# while over the window gets its enter (tests/seat2_client.c; run inside a session, then click twice and type a letter)
+build/seat2-client: tests/seat2_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/seat2_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Files on the clipboard: an app's text/uri-list and gnome-copied-files, checked and offered back
 # (tests/clipfiles_client.c; run inside a session: WAYLAND_DISPLAY=wayland-0 build/clipfiles-client)
 build/clipfiles-client: tests/clipfiles_client.c $(CLIENT_GEN)
@@ -917,6 +1054,13 @@ build/dmaread-test: tests/dmaread_test.c src/gpu/dmaread.c src/gpu/dmaread.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/dmaread_test.c src/gpu/dmaread.c $(shell pkg-config --libs gbm egl glesv2)
 	./$@ || { rm -f $@; exit 1; }
 endif
+# which rows each linear copy of a vGPU's picture lacks (src/gpu/gband.h, ui/js_vm.c gout): a model of both copies
+# over random bands, attaches, re-imports and dmabuf changes; no GPU needed
+test: build/gband-test
+build/gband-test: tests/gband_test.c src/gpu/gband.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=c11 -o $@ tests/gband_test.c
+	./$@ || { rm -f $@; exit 1; }
 # what slows the GPU under CPU load (tests/gpu_contention.c, docs/GPU.md): a test tool, never installed
 GC_PKGS := gbm egl glesv2
 build/gpu-contention: tests/gpu_contention.c src/gpu/gcontend.c src/gpu/gcontend.h
@@ -927,6 +1071,11 @@ build/gpu-contention: tests/gpu_contention.c src/gpu/gcontend.c src/gpu/gcontend
 test: build/hwfall-test
 build/hwfall-test: tests/hwfall_test.c src/media/helper/lm_hwfall.h
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/hwfall_test.c
+	./$@ || { rm -f $@; exit 1; }
+# how much decoded audio the player has queued, counted exactly (src/media/helper/lm_aqlevel.h)
+test: build/aqlevel-test
+build/aqlevel-test: tests/aqlevel_test.c src/media/helper/lm_aqlevel.h
+	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/aqlevel_test.c
 	./$@ || { rm -f $@; exit 1; }
 
 MEDIA_PKGS := libavcodec libavformat libavutil libswscale libswresample
@@ -1070,6 +1219,21 @@ build/gen/$(notdir $(1))-protocol.c: $(WLPROTO)/$(1).xml
 	wayland-scanner private-code $$< $$@
 endef
 $(foreach p,$(WL_MORE),$(eval $(call wl_proto,$(p))))
+define wl_local_proto
+build/gen/$(1)-protocol.h: protocols/$(1).xml
+	@mkdir -p build/gen
+	wayland-scanner server-header $$< $$@
+build/gen/$(1)-protocol.c: protocols/$(1).xml
+	@mkdir -p build/gen
+	wayland-scanner private-code $$< $$@
+build/gen/client/$(1)-client-protocol.h: protocols/$(1).xml
+	@mkdir -p build/gen/client
+	wayland-scanner client-header $$< $$@
+build/gen/client/$(1)-protocol.c: protocols/$(1).xml
+	@mkdir -p build/gen/client
+	wayland-scanner private-code $$< $$@
+endef
+$(foreach p,$(WL_LOCAL),$(eval $(call wl_local_proto,$(p))))
 
 build/gen/%.o: build/gen/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -w -c -o $@ $<
@@ -1118,12 +1282,16 @@ LORD_VERSION := $(shell sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' ../package.j
 LORD_CHANNEL := $(shell sed -n 's/.*"channel": *"\([^"]*\)".*/\1/p' ../package.json 2>/dev/null | head -1 | tr -cd 'a-z0-9-')
 LORD_BUILD ?= $(shell d=$$(date -u -d "@$${SOURCE_DATE_EPOCH:-$$(date +%s)}" +%Y%m%d 2>/dev/null || date -u +%Y%m%d); \
                       c=$$(git -C .. rev-parse --short=8 HEAD 2>/dev/null); echo "$$d$${c:+.$$c}")
+# lordos-fetch's "UI engine" line (About shows the same): React's version as package.json pins it, QuickJS's from its VERSION
+LORD_REACT_VERSION := $(shell sed -n 's/.*"react": *"[^0-9]*\([^"]*\)".*/\1/p' ../package.json 2>/dev/null | head -1 | tr -cd 'A-Za-z0-9.+~-')
+LORD_QJS_VERSION := $(shell head -1 ../third_party/quickjs/VERSION 2>/dev/null | tr -cd 'A-Za-z0-9.+~-')
 build/gen/lord_version.h: FORCE
 	@mkdir -p build/gen
-	@printf '#define LORD_VERSION "%s"\n#define LORD_CHANNEL "%s"\n#define LORD_BUILD "%s"\n' \
-	    '$(or $(LORD_VERSION),0.0.0)' '$(LORD_CHANNEL)' '$(shell printf %s '$(LORD_BUILD)' | tr -cd 'A-Za-z0-9.+~-')' > $@.new
+	@printf '#define LORD_VERSION "%s"\n#define LORD_CHANNEL "%s"\n#define LORD_BUILD "%s"\n#define LORD_REACT_VERSION "%s"\n#define LORD_QJS_VERSION "%s"\n' \
+	    '$(or $(LORD_VERSION),0.0.0)' '$(LORD_CHANNEL)' '$(shell printf %s '$(LORD_BUILD)' | tr -cd 'A-Za-z0-9.+~-')' \
+	    '$(LORD_REACT_VERSION)' '$(LORD_QJS_VERSION)' > $@.new
 	@if cmp -s $@.new $@; then rm -f $@.new; else mv $@.new $@; fi
-build/obj/ui/js.o build/obj/ui/js_sys.o build/obj/ui/js_hw.o build/obj/term/pty.o build/obj/remote/sessiond.o: build/gen/lord_version.h
+build/obj/main.o build/obj/ui/js.o build/obj/ui/js_sys.o build/obj/ui/js_hw.o build/obj/term/pty.o build/obj/remote/sessiond.o: build/gen/lord_version.h
 # Verified system code (src/sec/codesig.c, docs/SIGNING.md "Verified system code"). RELEASE=1: a
 # release build, which only runs a manifest signed with the LordOS release key (no development mode).
 # CODE_PUBKEY=<64 hex>: a TEST build that trusts a throwaway key instead of the release key (VM tests

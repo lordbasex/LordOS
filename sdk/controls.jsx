@@ -3,7 +3,7 @@
 // ("inset") forms; and (0.8.8.8) the choice controls with their keys built in: Dropdown, Checkbox,
 // RadioGroup, Tabs, Popover, Tooltip and ProgressBar (their rules are in sdk/controlmodel.js; List
 // and Table are in sdk/lists.jsx). The spacing and type scale they follow is in docs/DESIGN.md.
-import { View, Text, addListener } from '@lordos/runtime';
+import { View, Text, addListener, displayAt } from '@lordos/runtime';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme, popupBg } from './theme.js';
 import { TextInput, ScrollView, useAppWindow, hasTextFocus, clearTextFocus } from './components.jsx';
@@ -15,7 +15,7 @@ import { Lumo } from './mascot.js';
 import { Overlay, shellLayers } from './layers.js';
 import { menuStep, within } from './focusmodel.js';
 import { focusRingColor, useFocusScope, keyFocused, onFocusMove } from './focus.js';
-import { groupKey, dropdownKey, tipSide, progressSpan, disclosureDir, chevronGeometry, DISCLOSURE_SIZE, DISCLOSURE_BOX } from './controlmodel.js';
+import { groupKey, dropdownKey, tipSide, popoverRoom, progressSpan, disclosureDir, chevronGeometry, DISCLOSURE_SIZE, DISCLOSURE_BOX } from './controlmodel.js';
 import { typeAhead, matchIndex, TYPE_MS } from './menunav.js';
 import { findChar } from './listmodel.js';
 
@@ -25,10 +25,19 @@ export const typeScale = { caption: 11, body: 13, callout: 12, headline: 15, tit
 export const controlSize = { regular: 28, small: 22, toolbar: 44, radius: 7, radiusSmall: 6, groupRadius: 10 };
 
 // Is a point on the trailing half of the window? Tooltips and menus open toward the inside.
+// The box a control's menus, popovers and tooltips stay inside: its window's. A floating window (picture in picture,
+// Screenshots' toolbar) is too small for them, and they go anywhere on its display, as from the Dock.
+const boxOfWindow = (id) => {
+  const w = wm.get(id);
+  if (!w || !w.pip) return w;
+  const d = displayAt(w.pip.x + w.pip.w / 2, w.pip.y + w.pip.h / 2);
+  return d ? { x: d.x, y: d.y, w: d.w, h: d.h } : w.pip;
+};
+
 function nearEnd(winId, node) {
   try {
     const [x, , w] = lord.getLayout(node.id);
-    const f = wm.get(winId);
+    const f = boxOfWindow(winId);
     const mid = f ? f.x + f.w / 2 : 640;
     const end = x + w / 2 > mid;
     return direction() === 'rtl' ? !end : end;
@@ -47,7 +56,7 @@ export function opensUp(btn, win, height) {
 function nearBottom(winId, node, items) {
   try {
     const [x, y, w, h] = lord.getLayout(node.id);
-    return opensUp({ x, y, w, h }, wm.get(winId), menuHeight(items));
+    return opensUp({ x, y, w, h }, boxOfWindow(winId), menuHeight(items));
   } catch (e) { return false; }
 }
 
@@ -410,7 +419,7 @@ const refNode = (r) => (r && typeof r === 'object' && 'current' in r ? r.current
 // The area a popup stays inside: the window's frame (the window's own surface in an isolated app's process), or the
 // screen when there is none.
 function areaOf(win) {
-  const f = shellLayers() ? wm.get(win?.id) : win?.overlayHost ? boxOf(win.overlayHost) : null;
+  const f = shellLayers() ? boxOfWindow(win?.id) : win?.overlayHost ? boxOf(win.overlayHost) : null;
   if (f && f.w > 0 && f.h > 0) return { x: f.x, y: f.y, w: f.w, h: f.h };
   const sc = typeof lord !== 'undefined' && lord.screen ? lord.screen : { width: 1280, height: 800 };
   return { x: 0, y: 0, w: sc.width, h: sc.height };
@@ -446,10 +455,13 @@ function usePopup(open, box, anchor, onClose) {
 
 // A popover opened from a control: anchor (a ref to it), onClose (a press outside it, or Escape), width (240),
 // padding (6). Below the anchor at its start edge, above it when there is no room below in the window, and moved
-// sideways to stay inside the window; drawn in the popover layer (sdk/layers.js) above the whole window. A focus
+// sideways to stay inside the window; drawn in the popover layer (sdk/layers.js) above the whole window. area (a
+// screen box, optional) replaces the window as the box it stays inside: a bare floating bar passes its display's work
+// area, since its own frame is only as tall as the bar; with it the popover is never taller than the room on the side
+// it opens to (sdk/controlmodel.js popoverRoom), so long content goes in a ScrollView with flexShrink 1. A focus
 // scope (sdk/focus.js): opened from the keyboard the focus moves to its first control and Tab goes round its own;
 // Escape closes it and the focus goes back to the control it was opened from.
-export function Popover({ anchor, onClose, width = 240, padding = 6, children, style }) {
+export function Popover({ anchor, onClose, width = 240, padding = 6, children, style, area: inArea }) {
   const t = useTheme();
   const win = useAppWindow();
   const box = useRef(null);
@@ -458,7 +470,7 @@ export function Popover({ anchor, onClose, width = 240, padding = 6, children, s
   useFocusScope(box);
   usePopup(true, box, anchor, onClose);
   const a = boxOf(refNode(anchor));
-  const area = areaOf(win);
+  const area = inArea && inArea.w > 0 && inArea.h > 0 ? inArea : areaOf(win);
   useEffect(() => {
     if (!a) { const id = setTimeout(() => force((v) => v + 1), 16); return () => clearTimeout(id); }
     const b = box.current && boxOf(box.current);
@@ -469,9 +481,10 @@ export function Popover({ anchor, onClose, width = 240, padding = 6, children, s
   const w = Math.max(0, Math.min(width, area.w - 16));
   const rtl = direction() === 'rtl';
   const x = Math.max(area.x + 8, Math.min(area.x + area.w - w - 8, rtl ? a.x + a.w - w : a.x));
+  const room = inArea ? popoverRoom(a, area, up) : undefined;
   return (
     <Overlay anchor={anchor}>
-      <View ref={box} style={[{ position: 'absolute', left: x - a.x, [up ? 'bottom' : 'top']: a.h + 4, width: w, padding,
+      <View ref={box} style={[{ position: 'absolute', left: x - a.x, [up ? 'bottom' : 'top']: a.h + 4, width: w, ...(room ? { maxHeight: room } : null), padding,
         borderRadius: t.menuRadius + 2, backgroundColor: popupBg(t), border: `1px solid ${t.separator}`, boxShadow: '0 12px 32px rgba(0,0,0,0.32)' }, style]}>
         {children}
       </View>

@@ -912,5 +912,10 @@
   "vm.gvtFailed": "La part de la carte graphique n’a pas pu être créée",
   "vm.memlockCap": "Cette machine verrouillerait {need} Mo, mais seuls {cap} Mo sont libres pour les machines avec carte graphique en ce moment (Réglages → Cartes graphiques)",
   "vm.memlockRefused": "Impossible de verrouiller la mémoire de cette machine",
-  "gpu.memlockRange": "Cette quantité sort de ce que cet ordinateur permet aux machines de verrouiller"
+  "gpu.memlockRange": "Cette quantité sort de ce que cet ordinateur permet aux machines de verrouiller",
+  "studio.failed": "LordOS Studio n’a pas pu démarrer.",
+  "studio.badPicture": "Cette image ne peut pas servir d’arrière-plan.",
+  "studio.invalid": "Ce réglage de LordOS Studio n’est pas valide.",
+  "studio.noCamera": "Aucune caméra n’est branchée.",
+  "studio.unavailable": "LordOS Studio n’est pas disponible sur cet ordinateur."
 }

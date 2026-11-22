@@ -1,0 +1,4025 @@
+{
+ "compared": {
+  "date": "2026-11-22",
+  "source": "https://wayland.app/protocols/",
+  "kwin": {
+   "name": "KWin",
+   "desktop": "KDE Plasma",
+   "version": "6.7",
+   "dataDate": "2026-09-04"
+  },
+  "mutter": {
+   "name": "Mutter",
+   "desktop": "GNOME",
+   "version": "51",
+   "dataDate": "2026-09-06"
+  }
+ },
+ "stats": {
+  "total": 108,
+  "lordos": 47,
+  "kwin": 63,
+  "mutter": 40,
+  "both": 37,
+  "lordosOfBoth": 37,
+  "either": 66,
+  "lordosOfEither": 46,
+  "onPurpose": 30,
+  "missing": 31,
+  "gaps": []
+ },
+ "conformance": {
+  "date": "2026-11-22",
+  "commit": "de240de5",
+  "dirty": true,
+  "tool": "tools/wl-conformance.mjs",
+  "schema": 1,
+  "env": {
+   "waylandProtocols": "1.44",
+   "libwayland": "1.23.1",
+   "xwayland": "2:24.1.6-1",
+   "mode": "static+dynamic (headless, CPU path)"
+  },
+  "summary": {
+   "protocols": 48,
+   "complete": 29,
+   "mean": 100,
+   "x11Items": 28,
+   "x11Complete": 23,
+   "x11Mean": 100
+  },
+  "globals": [
+   {
+    "global": "ext_background_effect_manager_v1",
+    "row": "ext-background-effect-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "ext_idle_notifier_v1",
+    "row": "ext-idle-notify-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 18,
+    "total": 18,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "org_kde_kwin_server_decoration_manager",
+    "row": "kde-server-decoration",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 12,
+    "total": 12,
+    "skipped": 1,
+    "depth": "partial",
+    "proofs": []
+   },
+   {
+    "global": "wl_compositor",
+    "row": "wayland-wl_compositor",
+    "version": 6,
+    "advertised": true,
+    "score": 100,
+    "points": 102,
+    "total": 102,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wl_data_device_manager",
+    "row": "wayland-wl_data_device_manager",
+    "version": 3,
+    "advertised": true,
+    "score": 100,
+    "points": 95,
+    "total": 95,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wl_fixes",
+    "row": "wayland-wl_fixes",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 5,
+    "total": 5,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wl_output",
+    "row": "wayland-wl_output",
+    "version": 4,
+    "advertised": true,
+    "score": 100,
+    "points": 42,
+    "total": 42,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wl_seat",
+    "row": "wayland-wl_seat",
+    "version": 9,
+    "advertised": true,
+    "score": 100,
+    "points": 109,
+    "total": 109,
+    "skipped": 1,
+    "depth": "partial",
+    "proofs": []
+   },
+   {
+    "global": "wl_shm",
+    "row": "wayland-wl_shm",
+    "version": 2,
+    "advertised": true,
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wl_subcompositor",
+    "row": "wayland-wl_subcompositor",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "wl_subcompositor-wp_viewporter"
+    ]
+   },
+   {
+    "global": "wp_alpha_modifier_v1",
+    "row": "alpha-modifier-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 25,
+    "total": 25,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_color_manager_v1",
+    "row": "color-management-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 118,
+    "total": 118,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_color_representation_manager_v1",
+    "row": "color-representation-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_commit_timing_manager_v1",
+    "row": "commit-timing-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 18,
+    "total": 18,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_content_type_manager_v1",
+    "row": "content-type-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_cursor_shape_manager_v1",
+    "row": "cursor-shape-v1",
+    "version": 2,
+    "advertised": true,
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_drm_lease_device_v1",
+    "row": "drm-lease-v1",
+    "version": 1,
+    "advertised": false,
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "code",
+    "proofs": []
+   },
+   {
+    "global": "wp_fifo_manager_v1",
+    "row": "fifo-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_fractional_scale_manager_v1",
+    "row": "fractional-scale-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 23,
+    "total": 23,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_linux_drm_syncobj_manager_v1",
+    "row": "linux-drm-syncobj-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 31,
+    "total": 31,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_pointer_warp_v1",
+    "row": "pointer-warp-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_presentation",
+    "row": "presentation-time",
+    "version": 2,
+    "advertised": true,
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_security_context_manager_v1",
+    "row": "security-context-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 46,
+    "total": 46,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_single_pixel_buffer_manager_v1",
+    "row": "single-pixel-buffer-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "wp_tearing_control_manager_v1",
+    "row": "tearing-control-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "wp_viewporter",
+    "row": "viewporter",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "wl_subcompositor-wp_viewporter"
+    ]
+   },
+   {
+    "global": "xdg_activation_v1",
+    "row": "xdg-activation-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 38,
+    "total": 38,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "xdg_session_manager_v1",
+    "row": "xdg-session-management-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 44,
+    "total": 44,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "xdg_system_bell_v1",
+    "row": "xdg-system-bell-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "xdg_toplevel_drag_manager_v1",
+    "row": "xdg-toplevel-drag-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 17,
+    "total": 17,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "xdg_toplevel_icon_manager_v1",
+    "row": "xdg-toplevel-icon-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 39,
+    "total": 39,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "xdg_toplevel_tag_manager_v1",
+    "row": "xdg-toplevel-tag-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 11,
+    "total": 11,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "xdg_wm_base",
+    "row": "xdg-shell",
+    "version": 7,
+    "advertised": true,
+    "score": 100,
+    "points": 248,
+    "total": 248,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "xdg_wm_base-foot",
+     "xdg_wm_base-gtk4-zenity",
+     "xdg_wm_base-qt-featherpad"
+    ]
+   },
+   {
+    "global": "xdg_wm_dialog_v1",
+    "row": "xdg-dialog-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 24,
+    "total": 24,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "xwayland_shell_v1",
+    "row": "xwayland-shell-v1",
+    "version": 1,
+    "advertised": false,
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "code",
+    "proofs": []
+   },
+   {
+    "global": "zwp_idle_inhibit_manager_v1",
+    "row": "idle-inhibit-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_keyboard_shortcuts_inhibit_manager_v1",
+    "row": "keyboard-shortcuts-inhibit-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 22,
+    "total": 22,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_linux_dmabuf_v1",
+    "row": "linux-dmabuf-v1",
+    "version": 5,
+    "advertised": true,
+    "score": 100,
+    "points": 96,
+    "total": 96,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_pointer_constraints_v1",
+    "row": "pointer-constraints-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_pointer_gestures_v1",
+    "row": "pointer-gestures-unstable-v1",
+    "version": 3,
+    "advertised": true,
+    "score": 100,
+    "points": 39,
+    "total": 39,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_primary_selection_device_manager_v1",
+    "row": "primary-selection-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 42,
+    "total": 42,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_relative_pointer_manager_v1",
+    "row": "relative-pointer-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zwp_tablet_manager_v2",
+    "row": "tablet-v2",
+    "version": 2,
+    "advertised": true,
+    "score": 100,
+    "points": 156,
+    "total": 156,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "global": "zwp_text_input_manager_v3",
+    "row": "text-input-unstable-v3",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 50,
+    "total": 50,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zxdg_decoration_manager_v1",
+    "row": "xdg-decoration-unstable-v1",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zxdg_exporter_v2",
+    "row": "xdg-foreign-unstable-v2",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 23,
+    "total": 23,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zxdg_importer_v2",
+    "row": "xdg-foreign-unstable-v2",
+    "version": 1,
+    "advertised": true,
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "global": "zxdg_output_manager_v1",
+    "row": "xdg-output-unstable-v1",
+    "version": 3,
+    "advertised": true,
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   }
+  ],
+  "x11": [
+   {
+    "id": "xwayland.startup",
+    "title": "Xwayland startup and surface association",
+    "score": 100,
+    "points": 13,
+    "total": 13,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-xwayland.startup"
+    ]
+   },
+   {
+    "id": "icccm.wm_name",
+    "title": "ICCCM WM_NAME / EWMH _NET_WM_NAME",
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "icccm.wm_class",
+    "title": "ICCCM WM_CLASS",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "icccm.wm_protocols",
+    "title": "ICCCM WM_PROTOCOLS (WM_DELETE_WINDOW, WM_TAKE_FOCUS)",
+    "score": 100,
+    "points": 9,
+    "total": 9,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "icccm.wm_hints",
+    "title": "ICCCM WM_HINTS (input, urgency)",
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-icccm.wm_hints"
+    ]
+   },
+   {
+    "id": "icccm.wm_normal_hints",
+    "title": "ICCCM WM_NORMAL_HINTS (min/max size)",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-icccm.wm_normal_hints"
+    ]
+   },
+   {
+    "id": "icccm.transient_for",
+    "title": "ICCCM WM_TRANSIENT_FOR",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-icccm.transient_for"
+    ]
+   },
+   {
+    "id": "icccm.focus",
+    "title": "ICCCM input focus model",
+    "score": 100,
+    "points": 5,
+    "total": 5,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "icccm.wm_state",
+    "title": "ICCCM WM_STATE and WM_CHANGE_STATE",
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.supporting_wm_check",
+    "title": "EWMH _NET_SUPPORTING_WM_CHECK",
+    "score": 100,
+    "points": 10,
+    "total": 10,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.net_supported",
+    "title": "EWMH _NET_SUPPORTED",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-ewmh.net_supported"
+    ]
+   },
+   {
+    "id": "ewmh.wm_name",
+    "title": "EWMH _NET_WM_NAME",
+    "score": 100,
+    "points": 3,
+    "total": 3,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.wm_state",
+    "title": "EWMH _NET_WM_STATE (fullscreen, maximized, hidden, above, below, demands attention, modal, skip taskbar and pager, focused)",
+    "score": 100,
+    "points": 127,
+    "total": 127,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-always-on-top"
+    ]
+   },
+   {
+    "id": "ewmh.window_type",
+    "title": "EWMH _NET_WM_WINDOW_TYPE",
+    "score": 100,
+    "points": 22,
+    "total": 22,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.active_window",
+    "title": "EWMH _NET_ACTIVE_WINDOW",
+    "score": 100,
+    "points": 10,
+    "total": 10,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.client_list",
+    "title": "EWMH _NET_CLIENT_LIST",
+    "score": 100,
+    "points": 17,
+    "total": 17,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.wm_pid",
+    "title": "EWMH _NET_WM_PID",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 1,
+    "depth": "partial",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.wm_icon",
+    "title": "EWMH _NET_WM_ICON",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-ewmh.wm_icon"
+    ]
+   },
+   {
+    "id": "ewmh.moveresize",
+    "title": "EWMH _NET_WM_MOVERESIZE",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.frame_extents",
+    "title": "EWMH _NET_FRAME_EXTENTS",
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": [
+     "x11-ewmh.frame_extents"
+    ]
+   },
+   {
+    "id": "ewmh.workarea",
+    "title": "EWMH _NET_WORKAREA",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "ewmh.close_window",
+    "title": "EWMH _NET_CLOSE_WINDOW",
+    "score": 100,
+    "points": 7,
+    "total": 7,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "motif.wm_hints",
+    "title": "_MOTIF_WM_HINTS",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "xdnd",
+    "title": "XDND drag and drop (both ways)",
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   },
+   {
+    "id": "selections",
+    "title": "CLIPBOARD and PRIMARY, both ways, INCR",
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "complete",
+    "proofs": []
+   },
+   {
+    "id": "xwayland.hidpi",
+    "title": "HiDPI scale (xwscale.c)",
+    "score": 100,
+    "points": 3,
+    "total": 3,
+    "skipped": 1,
+    "depth": "partial",
+    "proofs": []
+   },
+   {
+    "id": "xwayland.cursor",
+    "title": "Cursor (root cursor; app cursors through wl_pointer)",
+    "score": 100,
+    "points": 1,
+    "total": 1,
+    "skipped": 0,
+    "depth": "code",
+    "proofs": []
+   },
+   {
+    "id": "xwayland.security",
+    "title": "Isolation (auth cookie, no TCP, own network namespace)",
+    "score": 100,
+    "points": 4,
+    "total": 4,
+    "skipped": 0,
+    "depth": "general",
+    "proofs": []
+   }
+  ],
+  "proofs": [
+   {
+    "id": "wl_subcompositor-wp_viewporter",
+    "png": "wl_subcompositor-wp_viewporter.png",
+    "kind": "wayland",
+    "app": "build/wlproof-client (tests/wlproof_client.c, purpose-built)",
+    "version": "this tree",
+    "shows": "Subsurface order and viewport: red placed above green (place_above), blue placed below the window (place_below, seen only through its transparent right third), and a 64×64 four-colour buffer cropped to its white quadrant and scaled to 100×100 (wp_viewport set_source + set_destination)."
+   },
+   {
+    "id": "xdg_wm_base-foot",
+    "png": "xdg_wm_base-foot.png",
+    "kind": "wayland",
+    "app": "foot",
+    "version": "foot 1.21.0-2",
+    "shows": "foot (wayland-native terminal) mapped and focused: it answered xdg_wm_base.ping with pong, acked each configure once (invalid_serial is now enforced), and asked for the theme's frame through xdg-decoration."
+   },
+   {
+    "id": "xdg_wm_base-gtk4-zenity",
+    "png": "xdg_wm_base-gtk4-zenity.png",
+    "kind": "wayland",
+    "app": "zenity (GTK 4, libadwaita)",
+    "version": "zenity 4.1.90-1, GTK 4.18.6+ds-2",
+    "shows": "A GTK 4 / libadwaita dialog with its own decorations: GTK 4 answers ping, acks configures once and creates its xdg_surface before any buffer (invalid_surface_state and unconfigured_buffer are now enforced)."
+   },
+   {
+    "id": "xdg_wm_base-qt-featherpad",
+    "png": "xdg_wm_base-qt-featherpad.png",
+    "kind": "wayland",
+    "app": "FeatherPad (Qt 6)",
+    "version": "featherpad 1.6.1-1, Qt 6.8.2+dfsg-9+deb13u2",
+    "shows": "A Qt 6 editor (FeatherPad) on Wayland: xdg-shell with the new error checks, xdg-decoration (server-side frame from the theme)."
+   },
+   {
+    "id": "linux-dmabuf-vkcube",
+    "png": "linux-dmabuf-vkcube.png",
+    "kind": "wayland",
+    "app": "vkcube (Vulkan)",
+    "version": "vkcube 1.4.304.0+dfsg1-1, Mesa 25.0.7-2+deb13u1",
+    "shows": "vkcube through the Vulkan WSI: its buffers pass the new zwp_linux_buffer_params_v1 out_of_bounds checks (offset + stride × height inside each dmabuf)."
+   },
+   {
+    "id": "egl-es2gears",
+    "png": "egl-es2gears.png",
+    "kind": "wayland",
+    "app": "es2gears_wayland (EGL / GLES2)",
+    "version": "mesa-utils 9.0.0-2+b2",
+    "shows": "An EGL client: its buffers (dmabuf or shm through Mesa's Wayland EGL) and xdg-shell flow pass the new checks."
+   },
+   {
+    "id": "chromium",
+    "png": "chromium.png",
+    "kind": "wayland",
+    "app": "Chromium",
+    "version": "Chromium 156.0.8078.79 built on Debian GNU/Linux 13 (trixie)",
+    "shows": "Chromium (Ozone/Wayland): subsurfaces, viewporter, xdg-shell, xdg-decoration, xdg-activation and the data device with the new error checks; no protocol error."
+   },
+   {
+    "id": "x11-always-on-top",
+    "png": "x11-always-on-top.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "EWMH _NET_WM_STATE (fullscreen, maximized, hidden, above, below, demands attention, modal, skip taskbar and pager, focused)"
+   },
+   {
+    "id": "x11-ewmh.frame_extents",
+    "png": "x11-ewmh.frame_extents.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "EWMH _NET_FRAME_EXTENTS"
+   },
+   {
+    "id": "x11-ewmh.net_supported",
+    "png": "x11-ewmh.net_supported.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "EWMH _NET_SUPPORTED"
+   },
+   {
+    "id": "x11-ewmh.wm_icon",
+    "png": "x11-ewmh.wm_icon.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "EWMH _NET_WM_ICON"
+   },
+   {
+    "id": "x11-icccm.transient_for",
+    "png": "x11-icccm.transient_for.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "ICCCM WM_TRANSIENT_FOR"
+   },
+   {
+    "id": "x11-icccm.wm_hints",
+    "png": "x11-icccm.wm_hints.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "ICCCM WM_HINTS (input, urgency)"
+   },
+   {
+    "id": "x11-icccm.wm_normal_hints",
+    "png": "x11-icccm.wm_normal_hints.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "ICCCM WM_NORMAL_HINTS (min/max size)"
+   },
+   {
+    "id": "x11-xwayland.startup",
+    "png": "x11-xwayland.startup.png",
+    "kind": "x11",
+    "app": "Xwayland",
+    "version": "Xwayland 2:24.1.6-1",
+    "shows": "Xwayland startup and surface association"
+   }
+  ]
+ },
+ "protocols": [
+  {
+   "id": "wayland-wl_compositor",
+   "name": "wl_compositor",
+   "cat": "core",
+   "deprecated": false,
+   "summary": "The compositor singleton",
+   "url": "https://wayland.app/protocols/wayland#wl_compositor",
+   "globals": [
+    "wl_compositor"
+   ],
+   "kwin": 6,
+   "mutter": 6,
+   "lordos": {
+    "status": "supported",
+    "version": 6,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "VM screenshots (docs/WAYLAND.md)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 102,
+    "total": 102,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_compositor"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "wayland-wl_shm",
+   "name": "wl_shm",
+   "cat": "core",
+   "deprecated": false,
+   "summary": "Shared memory support",
+   "url": "https://wayland.app/protocols/wayland#wl_shm",
+   "globals": [
+    "wl_shm"
+   ],
+   "kwin": 2,
+   "mutter": 2,
+   "lordos": {
+    "status": "supported",
+    "version": 2,
+    "since": null,
+    "bumped": null,
+    "note": "Created by libwayland's wl_display_init_shm (version 2 since libwayland 1.22; Debian 13 has 1.23).",
+    "checked": "libwayland 1.23 (Debian 13)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_shm"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "wayland-wl_data_device_manager",
+   "name": "wl_data_device_manager",
+   "cat": "core",
+   "deprecated": false,
+   "summary": "Data transfer interface",
+   "url": "https://wayland.app/protocols/wayland#wl_data_device_manager",
+   "globals": [
+    "wl_data_device_manager"
+   ],
+   "kwin": 3,
+   "mutter": 3,
+   "lordos": {
+    "status": "supported",
+    "version": 3,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "VM 127 (clipboard and drag and drop, 0.8.8.8)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 95,
+    "total": 95,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_data_device_manager"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "wayland-wl_shell",
+   "name": "wl_shell",
+   "cat": "core",
+   "deprecated": true,
+   "summary": "Create desktop-style surfaces",
+   "url": "https://wayland.app/protocols/wayland#wl_shell",
+   "globals": [
+    "wl_shell"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Deprecated; replaced by xdg-shell.",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wayland-wl_seat",
+   "name": "wl_seat",
+   "cat": "core",
+   "deprecated": false,
+   "summary": "Group of input devices",
+   "url": "https://wayland.app/protocols/wayland#wl_seat",
+   "globals": [
+    "wl_seat"
+   ],
+   "kwin": 10,
+   "mutter": 10,
+   "lordos": {
+    "status": "supported",
+    "version": 9,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "VM screenshots (docs/WAYLAND.md)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 109,
+    "total": 109,
+    "skipped": 1,
+    "depth": "partial",
+    "globals": [
+     "wl_seat"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "wayland-wl_output",
+   "name": "wl_output",
+   "cat": "core",
+   "deprecated": false,
+   "summary": "Compositor output region",
+   "url": "https://wayland.app/protocols/wayland#wl_output",
+   "globals": [
+    "wl_output"
+   ],
+   "kwin": 4,
+   "mutter": 4,
+   "lordos": {
+    "status": "supported",
+    "version": 4,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 42,
+    "total": 42,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_output"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "wayland-wl_subcompositor",
+   "name": "wl_subcompositor",
+   "cat": "core",
+   "deprecated": false,
+   "summary": "Sub-surface compositing",
+   "url": "https://wayland.app/protocols/wayland#wl_subcompositor",
+   "globals": [
+    "wl_subcompositor"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "VM screenshots (docs/WAYLAND.md)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wl_subcompositor"
+    ],
+    "proofs": [
+     "wl_subcompositor-wp_viewporter"
+    ]
+   }
+  },
+  {
+   "id": "wayland-wl_fixes",
+   "name": "wl_fixes",
+   "cat": "core",
+   "deprecated": false,
+   "summary": "Wayland protocol fixes",
+   "url": "https://wayland.app/protocols/wayland#wl_fixes",
+   "globals": [
+    "wl_fixes"
+   ],
+   "kwin": 2,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "destroy_registry: a client drops a wl_registry it no longer needs and lord-server stops sending it global events. Debian 13's libwayland is 1.23, so the interface comes from wayland.xml 1.24, vendored. Not yet checked with a real app.",
+    "checked": "headless lord-server: tests/wlfixes_client.c (tests/wlperf_headless.sh)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 5,
+    "total": 5,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wl_fixes"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "presentation-time",
+   "name": "Presentation time",
+   "cat": "stable",
+   "deprecated": false,
+   "summary": "Presentation time",
+   "url": "https://wayland.app/protocols/presentation-time",
+   "globals": [
+    "wp_presentation"
+   ],
+   "kwin": 2,
+   "mutter": 2,
+   "lordos": {
+    "status": "supported",
+    "version": 2,
+    "since": null,
+    "bumped": "0.8.9.5",
+    "note": "Version 2 (feedback per display) since 0.8.9.5.",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_presentation"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "viewporter",
+   "name": "Viewporter",
+   "cat": "stable",
+   "deprecated": false,
+   "summary": "Viewporter",
+   "url": "https://wayland.app/protocols/viewporter",
+   "globals": [
+    "wp_viewporter"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_viewporter"
+    ],
+    "proofs": [
+     "wl_subcompositor-wp_viewporter"
+    ]
+   }
+  },
+  {
+   "id": "xdg-shell",
+   "name": "XDG shell",
+   "cat": "stable",
+   "deprecated": false,
+   "summary": "XDG shell",
+   "url": "https://wayland.app/protocols/xdg-shell",
+   "globals": [
+    "xdg_wm_base"
+   ],
+   "kwin": 6,
+   "mutter": 7,
+   "lordos": {
+    "status": "supported",
+    "version": 7,
+    "since": null,
+    "bumped": "0.8.9.5",
+    "note": "Version 7 (constrained_* states) since 0.8.9.5.",
+    "checked": "VM screenshots (docs/WAYLAND.md); wlperf-client protocols",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 248,
+    "total": 248,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "xdg_wm_base"
+    ],
+    "proofs": [
+     "xdg_wm_base-foot",
+     "xdg_wm_base-gtk4-zenity",
+     "xdg_wm_base-qt-featherpad"
+    ]
+   }
+  },
+  {
+   "id": "linux-dmabuf-v1",
+   "name": "Linux DMA-BUF",
+   "cat": "stable",
+   "deprecated": false,
+   "summary": "Linux DMA-BUF",
+   "url": "https://wayland.app/protocols/linux-dmabuf-v1",
+   "globals": [
+    "zwp_linux_dmabuf_v1"
+   ],
+   "kwin": 5,
+   "mutter": 5,
+   "lordos": {
+    "status": "supported",
+    "version": 5,
+    "since": null,
+    "bumped": "0.8.9.5",
+    "note": "Version 5 (one modifier for every plane) since 0.8.9.5.",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 96,
+    "total": 96,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_linux_dmabuf_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "tablet-v2",
+   "name": "Tablet",
+   "cat": "stable",
+   "deprecated": false,
+   "summary": "Wayland protocol for graphics tablets",
+   "url": "https://wayland.app/protocols/tablet-v2",
+   "globals": [
+    "zwp_tablet_manager_v2"
+   ],
+   "kwin": 2,
+   "mutter": 2,
+   "lordos": {
+    "status": "supported",
+    "version": 2,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Pens (pressure, tilt, distance, rotation, slider, buttons, a mouse or lens tool's wheel) and pads (buttons, rings, strips, dials; set_feedback kept) read from evdev by LordOS's own tablet.c, without libinput or libwacom. One mode per pad group (no libwacom data to know the mode-switch button). Not yet checked with a real tablet.",
+    "checked": "build/tablet-test, build/wltablet-test; headless lord-server",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 156,
+    "total": 156,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "zwp_tablet_manager_v2"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xdg-activation-v1",
+   "name": "XDG activation",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Protocol for requesting activation of surfaces",
+   "url": "https://wayland.app/protocols/xdg-activation-v1",
+   "globals": [
+    "xdg_activation_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "tests/desktop_model_test.mjs; VM",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 38,
+    "total": 38,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "xdg_activation_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "drm-lease-v1",
+   "name": "DRM lease",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "DRM lease",
+   "url": "https://wayland.app/protocols/drm-lease-v1",
+   "globals": [
+    "wp_drm_lease_device_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Only a connector the kernel marks non-desktop (a VR headset), only to an app the person allowed (the vr permission: Allow once, Always allow, Don't allow), never to a sandboxed or isolated app or Xwayland; revoked on unplug, permission taken back, lock, user switch or text console. Approved by the maintainer 2026-11-22. Not yet checked with a real headset.",
+    "checked": "build/drmlease-test, drmlease-e2e-test",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "code",
+    "globals": [
+     "wp_drm_lease_device_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "linux-drm-syncobj-v1",
+   "name": "DRM synchronization object",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Protocol for providing explicit synchronization",
+   "url": "https://wayland.app/protocols/linux-drm-syncobj-v1",
+   "globals": [
+    "wp_linux_drm_syncobj_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "A dmabuf frame is applied once its acquire point is signalled, without blocking, and its release point is signalled when LordOS is done with it. Offered when a render node has timeline syncobjs and SYNCOBJ_EVENTFD (Linux 6.6), on the GPU and the CPU path (docs/WAYLAND.md, \"Explicit sync\").",
+    "checked": "build/syncobj-test, tests/syncobj_headless.sh; vkcube (Mesa 25.0.7 Vulkan) on an AMD RX 580",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 31,
+    "total": 31,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_linux_drm_syncobj_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "ext-session-lock-v1",
+   "name": "Session lock",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Secure session locking with arbitrary graphics",
+   "url": "https://wayland.app/protocols/ext-session-lock-v1",
+   "globals": [
+    "ext_session_lock_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "LordOS locks the screen itself; an outside locker would draw over the session (docs/DESKTOP-PARITY.md).",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "single-pixel-buffer-v1",
+   "name": "Single-pixel buffer",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Single pixel buffer factory",
+   "url": "https://wayland.app/protocols/single-pixel-buffer-v1",
+   "globals": [
+    "wp_single_pixel_buffer_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "",
+    "checked": "tests/wlperf_headless.sh",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_single_pixel_buffer_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "content-type-v1",
+   "name": "Content type hint",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Content type hint",
+   "url": "https://wayland.app/protocols/content-type-v1",
+   "globals": [
+    "wp_content_type_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "Kept per surface and applied on commit; nothing uses it yet (docs/WAYLAND.md \"Frame timing\").",
+    "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_content_type_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "ext-idle-notify-v1",
+   "name": "Idle notify",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Idle notify",
+   "url": "https://wayland.app/protocols/ext-idle-notify-v1",
+   "globals": [
+    "ext_idle_notifier_v1"
+   ],
+   "kwin": 2,
+   "mutter": null,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Only once the person allowed the app (the idle permission).",
+    "checked": "build/idlenotify-test; wlperf-client idle",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 18,
+    "total": 18,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "ext_idle_notifier_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "ext-image-capture-source-v1",
+   "name": "Image Capture Source",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Opaque image capture source objects",
+   "url": "https://wayland.app/protocols/ext-image-capture-source-v1",
+   "globals": [
+    "ext_output_image_capture_source_manager_v1",
+    "ext_foreign_toplevel_image_capture_source_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "ext-image-copy-capture-v1",
+   "name": "Image Copy Capture",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Image capturing into client buffers",
+   "url": "https://wayland.app/protocols/ext-image-copy-capture-v1",
+   "globals": [
+    "ext_image_copy_capture_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "tearing-control-v1",
+   "name": "Tearing control",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Tearing control",
+   "url": "https://wayland.app/protocols/tearing-control-v1",
+   "globals": [
+    "wp_tearing_control_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "The hint is kept; \"async\" tears only a fullscreen app's own buffer scanned out alone, when the driver reports DRM_CAP_ASYNC_PAGE_FLIP; composed frames wait for vblank. The torn flip is not yet checked on hardware (docs/WAYLAND.md \"Frame timing\").",
+    "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_tearing_control_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xwayland-shell-v1",
+   "name": "Xwayland shell",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Protocol for associating X11 windows to wl_surfaces",
+   "url": "https://wayland.app/protocols/xwayland-shell-v1",
+   "globals": [
+    "xwayland_shell_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Offered to Xwayland only (hidden from every other client; a bind by anyone else is an error). X windows are matched to their surfaces by serial (WL_SURFACE_SERIAL), so a recycled surface id can't show another window; WL_SURFACE_ID still works for older Xwayland (server/src/wl/xwshell.c, xwm.c).",
+    "checked": "Xwayland 24.1.6 with xterm on a headless lord-server (docs/wayland-proofs/x11-xwayland.startup.png); x11-conformance-client",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "code",
+    "globals": [
+     "xwayland_shell_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "fractional-scale-v1",
+   "name": "Fractional scale",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Protocol for requesting fractional surface scales",
+   "url": "https://wayland.app/protocols/fractional-scale-v1",
+   "globals": [
+    "wp_fractional_scale_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "VM (docs/DISPLAYS.md)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 23,
+    "total": 23,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_fractional_scale_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "cursor-shape-v1",
+   "name": "Cursor shape",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Cursor shape",
+   "url": "https://wayland.app/protocols/cursor-shape-v1",
+   "globals": [
+    "wp_cursor_shape_manager_v1"
+   ],
+   "kwin": 2,
+   "mutter": 2,
+   "lordos": {
+    "status": "supported",
+    "version": 2,
+    "since": null,
+    "bumped": "0.8.9.5",
+    "note": "Version 2 (dnd_ask, all_resize) since 0.8.9.5.",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 26,
+    "total": 26,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_cursor_shape_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "ext-foreign-toplevel-list-v1",
+   "name": "Foreign toplevel list",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "List toplevels",
+   "url": "https://wayland.app/protocols/ext-foreign-toplevel-list-v1",
+   "globals": [
+    "ext_foreign_toplevel_list_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "A program could list and control other apps' windows (third-party docks and taskbars). LordOS's Dock, switcher and window list are part of the desktop (docs/DESKTOP-PARITY.md).",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "security-context-v1",
+   "name": "Security context",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Security context",
+   "url": "https://wayland.app/protocols/security-context-v1",
+   "globals": [
+    "wp_security_context_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.8.8",
+    "bumped": null,
+    "note": "Built; not yet checked on the VM with a real Flatpak.",
+    "checked": "build/secctx-test",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 46,
+    "total": 46,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_security_context_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "ext-transient-seat-v1",
+   "name": "Transient seat",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Protocol for creating temporary seats",
+   "url": "https://wayland.app/protocols/ext-transient-seat-v1",
+   "globals": [
+    "ext_transient_seat_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list).",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xdg-toplevel-drag-v1",
+   "name": "XDG toplevel drag",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "XDG toplevel drag",
+   "url": "https://wayland.app/protocols/xdg-toplevel-drag-v1",
+   "globals": [
+    "xdg_toplevel_drag_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Tab tear-off: the window follows the pointer at the app's offset, is never the drag's target and stays where it is let go.",
+    "checked": "Chromium 156 on a headless lord-server (tear-off and reattach); tests/shellx_headless.sh",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 17,
+    "total": 17,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "xdg_toplevel_drag_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xdg-toplevel-icon-v1",
+   "name": "XDG toplevel icon",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Protocol to assign icons to toplevels",
+   "url": "https://wayland.app/protocols/xdg-toplevel-icon-v1",
+   "globals": [
+    "xdg_toplevel_icon_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Used only when the app has no installed icon; buffers re-encoded and size-limited, icon names ignored.",
+    "checked": "build/wlicon-test",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 39,
+    "total": 39,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "xdg_toplevel_icon_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xdg-dialog-v1",
+   "name": "XDG dialog windows",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "XDG dialog windows",
+   "url": "https://wayland.app/protocols/xdg-dialog-v1",
+   "globals": [
+    "xdg_wm_dialog_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.8.8",
+    "bumped": null,
+    "note": "",
+    "checked": "tests/dialog_model_test.mjs",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 24,
+    "total": 24,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "xdg_wm_dialog_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "alpha-modifier-v1",
+   "name": "Alpha modifier protocol",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Alpha modifier protocol",
+   "url": "https://wayland.app/protocols/alpha-modifier-v1",
+   "globals": [
+    "wp_alpha_modifier_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "",
+    "checked": "tests/wlperf_headless.sh",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 25,
+    "total": 25,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "wp_alpha_modifier_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "commit-timing-v1",
+   "name": "Commit timing protocol",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Commit timing protocol",
+   "url": "https://wayland.app/protocols/commit-timing-v1",
+   "globals": [
+    "wp_commit_timing_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "An update is not shown before its target on wp_presentation's clock: it applies at the latch of the first frame predicted at or after it (docs/WAYLAND.md \"Frame timing\").",
+    "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 18,
+    "total": 18,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_commit_timing_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "ext-data-control-v1",
+   "name": "Data control protocol",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Control data devices",
+   "url": "https://wayland.app/protocols/ext-data-control-v1",
+   "globals": [
+    "ext_data_control_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "A program could read every copy, or replace the clipboard, without having the focus. LordOS gives the clipboard only to the focused app; GNOME doesn't offer it either (docs/DESKTOP-PARITY.md).",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "fifo-v1",
+   "name": "Fifo protocol",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Fifo protocol",
+   "url": "https://wayland.app/protocols/fifo-v1",
+   "globals": [
+    "wp_fifo_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "An update waits until the surface's display has latched a frame since the one that set the barrier: Mesa's Vulkan FIFO mode runs at the display's rate. Held in explicit sync's queue; hidden windows and a screen that is off clear it once a second (docs/WAYLAND.md \"Frame timing\").",
+    "checked": "headless lord-server: tests/wltiming_headless.sh, vkcube (lavapipe, and Mesa's Intel driver with explicit sync)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_fifo_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xdg-system-bell-v1",
+   "name": "System bell protocol",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "System bell protocol",
+   "url": "https://wayland.app/protocols/xdg-system-bell-v1",
+   "globals": [
+    "xdg_system_bell_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app.",
+    "checked": "tests/shellx_headless.sh; build/shellx-units-test",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "xdg_system_bell_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "ext-workspace-v1",
+   "name": "Workspace protocol",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Workspace protocol",
+   "url": "https://wayland.app/protocols/ext-workspace-v1",
+   "globals": [
+    "ext_workspace_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list).",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "color-management-v1",
+   "name": "Color management",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Color management protocol",
+   "url": "https://wayland.app/protocols/color-management-v1",
+   "globals": [
+    "wp_color_manager_v1"
+   ],
+   "kwin": 2,
+   "mutter": 2,
+   "lordos": {
+    "status": "partial",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Parametric descriptions only (no ICC, no luminances or mastering metadata, no scRGB); pixels are converted to the SDR sRGB / gamma 2.2 every display is driven with. No HDR (docs/WAYLAND.md, \"Colour management\").",
+    "checked": "tests/color_headless.sh; GTK 4.18.6 (GDK_DEBUG=color-mgmt)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 118,
+    "total": 118,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_color_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "color-representation-v1",
+   "name": "Color representation",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Color representation protocol extension",
+   "url": "https://wayland.app/protocols/color-representation-v1",
+   "globals": [
+    "wp_color_representation_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "partial",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Alpha modes premultiplied electrical, premultiplied optical and straight; coefficients and range identity / full only, since lord-server imports no YUV buffer.",
+    "checked": "tests/color_headless.sh",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 19,
+    "total": 19,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_color_representation_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xdg-toplevel-tag-v1",
+   "name": "XDG toplevel tag",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "XDG toplevel tag",
+   "url": "https://wayland.app/protocols/xdg-toplevel-tag-v1",
+   "globals": [
+    "xdg_toplevel_tag_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "A window's tag keys its own remembered place; its description names the window while it has no title.",
+    "checked": "tests/shellx_headless.sh",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 11,
+    "total": 11,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "xdg_toplevel_tag_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "pointer-warp-v1",
+   "name": "Pointer warp",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Pointer warp",
+   "url": "https://wayland.app/protocols/pointer-warp-v1",
+   "globals": [
+    "wp_pointer_warp_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Only within the app's own surface, with the pointer over it, the serial of its enter and the keyboard; never while the pointer is locked or in a drag. Not yet checked with an app on the VM.",
+    "checked": "build/wltablet-test",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 8,
+    "total": 8,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "wp_pointer_warp_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "ext-background-effect-v1",
+   "name": "Background effect",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Background effect",
+   "url": "https://wayland.app/protocols/ext-background-effect-v1",
+   "globals": [
+    "ext_background_effect_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "partial",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "Blur behind a region of a window, drawn with the UI's own backdrop blur: offered only on the CPU path with transparency and blur on, not on the GPU path.",
+    "checked": "tests/shellx_headless.sh (CPU path); build/shellx-units-test",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 15,
+    "total": 15,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "ext_background_effect_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xdg-session-management-v1",
+   "name": "XDG session management",
+   "cat": "staging",
+   "deprecated": false,
+   "summary": "Protocol for managing application sessions",
+   "url": "https://wayland.app/protocols/xdg-session-management-v1",
+   "globals": [
+    "xdg_session_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.9.5",
+    "bumped": null,
+    "note": "An app's windows come back where they were: random session ids, scoped to the program lord-server checked, kept in ~/.config/lordos/wl-sessions (mode 0600).",
+    "checked": "tests/shellx_headless.sh",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 44,
+    "total": 44,
+    "skipped": 0,
+    "depth": "general",
+    "globals": [
+     "xdg_session_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xx-input-method-v2",
+   "name": "Input method v2",
+   "cat": "experimental",
+   "deprecated": false,
+   "summary": "Input method v2",
+   "url": "https://wayland.app/protocols/xx-input-method-v2",
+   "globals": [],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, \"Input methods\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xx-session-management-v1",
+   "name": "Session management",
+   "cat": "experimental",
+   "deprecated": false,
+   "summary": "Protocol for managing application sessions",
+   "url": "https://wayland.app/protocols/xx-session-management-v1",
+   "globals": [
+    "xx_session_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xx-cutouts-v1",
+   "name": "Cutouts",
+   "cat": "experimental",
+   "deprecated": false,
+   "summary": "Protocol to describe cut out surface regions",
+   "url": "https://wayland.app/protocols/xx-cutouts-v1",
+   "globals": [
+    "xx_cutouts_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xx-keyboard-filter-v1",
+   "name": "Keyboard filter",
+   "cat": "experimental",
+   "deprecated": false,
+   "summary": "Filter and intercept keyboard events",
+   "url": "https://wayland.app/protocols/xx-keyboard-filter-v1",
+   "globals": [
+    "xx_keyboard_filter_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xx-hotkey-v1",
+   "name": "Hotkey",
+   "cat": "experimental",
+   "deprecated": false,
+   "summary": "Client-managed global hotkeys",
+   "url": "https://wayland.app/protocols/xx-hotkey-v1",
+   "globals": [
+    "xx_hotkey_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xx-image-capture-color-management-v1",
+   "name": "Image capture color management",
+   "cat": "experimental",
+   "deprecated": false,
+   "summary": "Image-copy-capture extension to support color management",
+   "url": "https://wayland.app/protocols/xx-image-capture-color-management-v1",
+   "globals": [
+    "xx_image_capture_color_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xx-text-input-v3",
+   "name": "Text input",
+   "cat": "experimental",
+   "deprecated": false,
+   "summary": "Protocol for composing text",
+   "url": "https://wayland.app/protocols/xx-text-input-v3",
+   "globals": [
+    "xx_text_input_manager_v3"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xx-zones-v1",
+   "name": "Zones",
+   "cat": "experimental",
+   "deprecated": false,
+   "summary": "Protocol to manage client-specific zones for explicit window placement",
+   "url": "https://wayland.app/protocols/xx-zones-v1",
+   "globals": [
+    "xx_zone_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xx-fractional-scale-v2",
+   "name": "Fractional scale v2",
+   "cat": "experimental",
+   "deprecated": false,
+   "summary": "Protocol for fractional scaling",
+   "url": "https://wayland.app/protocols/xx-fractional-scale-v2",
+   "globals": [
+    "xx_fractional_scale_manager_v2"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "fullscreen-shell-unstable-v1",
+   "name": "Fullscreen shell",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Fullscreen shell",
+   "url": "https://wayland.app/protocols/fullscreen-shell-unstable-v1",
+   "globals": [
+    "zwp_fullscreen_shell_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "idle-inhibit-unstable-v1",
+   "name": "Idle inhibit",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Idle inhibit",
+   "url": "https://wayland.app/protocols/idle-inhibit-unstable-v1",
+   "globals": [
+    "zwp_idle_inhibit_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.5",
+    "bumped": null,
+    "note": "",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_idle_inhibit_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "input-method-unstable-v1",
+   "name": "Input method v1",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Input method v1",
+   "url": "https://wayland.app/protocols/input-method-unstable-v1",
+   "globals": [
+    "zwp_input_method_v1",
+    "zwp_input_panel_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, \"Input methods\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "input-timestamps-unstable-v1",
+   "name": "Input timestamps",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "High-resolution timestamps for input events",
+   "url": "https://wayland.app/protocols/input-timestamps-unstable-v1",
+   "globals": [
+    "zwp_input_timestamps_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "keyboard-shortcuts-inhibit-unstable-v1",
+   "name": "Keyboard shortcuts inhibit",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Protocol for inhibiting the compositor keyboard shortcuts",
+   "url": "https://wayland.app/protocols/keyboard-shortcuts-inhibit-unstable-v1",
+   "globals": [
+    "zwp_keyboard_shortcuts_inhibit_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.8.8",
+    "bumped": null,
+    "note": "Once the person allowed the app; ❖Esc gives the shortcuts back.",
+    "checked": "VM 127; build/kbinhibit-client",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 22,
+    "total": 22,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_keyboard_shortcuts_inhibit_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "linux-explicit-synchronization-unstable-v1",
+   "name": "Linux explicit synchronization (dma-fence)",
+   "cat": "unstable",
+   "deprecated": true,
+   "summary": "Linux explicit synchronization (dma-fence)",
+   "url": "https://wayland.app/protocols/linux-explicit-synchronization-unstable-v1",
+   "globals": [
+    "zwp_linux_explicit_synchronization_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "pointer-constraints-unstable-v1",
+   "name": "Pointer constraints",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Protocol for constraining pointer motions",
+   "url": "https://wayland.app/protocols/pointer-constraints-unstable-v1",
+   "globals": [
+    "zwp_pointer_constraints_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_pointer_constraints_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "pointer-gestures-unstable-v1",
+   "name": "Pointer gestures",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Pointer gestures",
+   "url": "https://wayland.app/protocols/pointer-gestures-unstable-v1",
+   "globals": [
+    "zwp_pointer_gestures_v1"
+   ],
+   "kwin": 3,
+   "mutter": 3,
+   "lordos": {
+    "status": "supported",
+    "version": 3,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 39,
+    "total": 39,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_pointer_gestures_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "primary-selection-unstable-v1",
+   "name": "Primary selection",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Primary selection protocol",
+   "url": "https://wayland.app/protocols/primary-selection-unstable-v1",
+   "globals": [
+    "zwp_primary_selection_device_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.3",
+    "bumped": null,
+    "note": "",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 42,
+    "total": 42,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_primary_selection_device_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "relative-pointer-unstable-v1",
+   "name": "Relative pointer",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Protocol for relative pointer motion events",
+   "url": "https://wayland.app/protocols/relative-pointer-unstable-v1",
+   "globals": [
+    "zwp_relative_pointer_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 14,
+    "total": 14,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_relative_pointer_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "text-input-unstable-v3",
+   "name": "Text input",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Protocol for composing text",
+   "url": "https://wayland.app/protocols/text-input-unstable-v3",
+   "globals": [
+    "zwp_text_input_manager_v3"
+   ],
+   "kwin": 2,
+   "mutter": 2,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.7",
+    "bumped": null,
+    "note": "",
+    "checked": "VM 127 (input methods, 0.8.8.8)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 50,
+    "total": 50,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zwp_text_input_manager_v3"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xdg-decoration-unstable-v1",
+   "name": "XDG decoration",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "XDG decoration",
+   "url": "https://wayland.app/protocols/xdg-decoration-unstable-v1",
+   "globals": [
+    "zxdg_decoration_manager_v1"
+   ],
+   "kwin": 2,
+   "mutter": null,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.4",
+    "bumped": null,
+    "note": "",
+    "checked": "VM screenshots (docs/WAYLAND.md)",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 41,
+    "total": 41,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zxdg_decoration_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xdg-foreign-unstable-v2",
+   "name": "XDG foreign",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Protocol for exporting xdg surface handles",
+   "url": "https://wayland.app/protocols/xdg-foreign-unstable-v2",
+   "globals": [
+    "zxdg_exporter_v2",
+    "zxdg_importer_v2"
+   ],
+   "kwin": 1,
+   "mutter": 1,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.8.8",
+    "bumped": null,
+    "note": "",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 49,
+    "total": 49,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zxdg_exporter_v2",
+     "zxdg_importer_v2"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xdg-output-unstable-v1",
+   "name": "XDG output",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Protocol to describe output regions",
+   "url": "https://wayland.app/protocols/xdg-output-unstable-v1",
+   "globals": [
+    "zxdg_output_manager_v1"
+   ],
+   "kwin": 3,
+   "mutter": 3,
+   "lordos": {
+    "status": "supported",
+    "version": 3,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "wl_global_create in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 43,
+    "total": 43,
+    "skipped": 0,
+    "depth": "complete",
+    "globals": [
+     "zxdg_output_manager_v1"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "xwayland-keyboard-grab-unstable-v1",
+   "name": "XWayland keyboard grabbing",
+   "cat": "unstable",
+   "deprecated": false,
+   "summary": "Protocol for grabbing the keyboard from Xwayland",
+   "url": "https://wayland.app/protocols/xwayland-keyboard-grab-unstable-v1",
+   "globals": [
+    "zwp_xwayland_keyboard_grab_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-data-control-unstable-v1",
+   "name": "wlr data control",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "Control data devices",
+   "url": "https://wayland.app/protocols/wlr-data-control-unstable-v1",
+   "globals": [
+    "zwlr_data_control_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "A program could read every copy, or replace the clipboard, without having the focus. LordOS gives the clipboard only to the focused app; GNOME doesn't offer it either (docs/DESKTOP-PARITY.md).",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-export-dmabuf-unstable-v1",
+   "name": "wlr export DMA-BUF",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "A protocol for low overhead screen content capturing",
+   "url": "https://wayland.app/protocols/wlr-export-dmabuf-unstable-v1",
+   "globals": [
+    "zwlr_export_dmabuf_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-foreign-toplevel-management-unstable-v1",
+   "name": "wlr foreign toplevel management",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "Wlr foreign toplevel management",
+   "url": "https://wayland.app/protocols/wlr-foreign-toplevel-management-unstable-v1",
+   "globals": [
+    "zwlr_foreign_toplevel_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "A program could list and control other apps' windows (third-party docks and taskbars). LordOS's Dock, switcher and window list are part of the desktop (docs/DESKTOP-PARITY.md).",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-gamma-control-unstable-v1",
+   "name": "wlr gamma control",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "Manage gamma tables of outputs",
+   "url": "https://wayland.app/protocols/wlr-gamma-control-unstable-v1",
+   "globals": [
+    "zwlr_gamma_control_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). Night Light is LordOS's own (Settings → Displays).",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-input-inhibitor-unstable-v1",
+   "name": "wlr input inhibitor",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "Wlr input inhibitor",
+   "url": "https://wayland.app/protocols/wlr-input-inhibitor-unstable-v1",
+   "globals": [
+    "zwlr_input_inhibit_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Deprecated in favour of ext-session-lock-v1.",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-layer-shell-unstable-v1",
+   "name": "wlr layer shell",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "Wlr layer shell",
+   "url": "https://wayland.app/protocols/wlr-layer-shell-unstable-v1",
+   "globals": [
+    "zwlr_layer_shell_v1"
+   ],
+   "kwin": 5,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Panels, docks and overlays from other programs would draw above every window. LordOS draws its own Dock, menu bar and notifications (docs/DESKTOP-PARITY.md, \"Left out on purpose\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-output-management-unstable-v1",
+   "name": "wlr output management",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "Protocol to configure output devices",
+   "url": "https://wayland.app/protocols/wlr-output-management-unstable-v1",
+   "globals": [
+    "zwlr_output_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list). Displays are set in LordOS's Settings.",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-output-power-management-unstable-v1",
+   "name": "wlr output power management",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "Control power management modes of outputs",
+   "url": "https://wayland.app/protocols/wlr-output-power-management-unstable-v1",
+   "globals": [
+    "zwlr_output_power_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Only for a trusted desktop tool; if it is ever added, sandboxed clients won't see it (secctx.c's hidden list).",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-screencopy-unstable-v1",
+   "name": "wlr screencopy",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "Screen content capturing on client buffers",
+   "url": "https://wayland.app/protocols/wlr-screencopy-unstable-v1",
+   "globals": [
+    "zwlr_screencopy_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "wlr-virtual-pointer-unstable-v1",
+   "name": "wlr virtual pointer",
+   "cat": "wlr",
+   "deprecated": false,
+   "summary": "Wlr virtual pointer",
+   "url": "https://wayland.app/protocols/wlr-virtual-pointer-unstable-v1",
+   "globals": [
+    "zwlr_virtual_pointer_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Made-up keys and pointer motion from other programs. LordOS has its own on-screen keyboard, and RemoteDesktop input is not offered: it would be a new security exception (docs/WAYLAND.md, \"Sharing a screen or a window\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "input-method-unstable-v2",
+   "name": "Input method v2",
+   "cat": "other",
+   "deprecated": false,
+   "summary": "Protocol for creating input methods",
+   "url": "https://wayland.app/protocols/input-method-unstable-v2",
+   "globals": [
+    "zwp_input_method_manager_v2"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "An outside input method would read every key. LordOS's own input methods (server/src/ime.c) compose into apps through text-input-v3 (docs/WAYLAND.md, \"Input methods\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-appmenu",
+   "name": "KDE AppMenu",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE AppMenu",
+   "url": "https://wayland.app/protocols/kde-appmenu",
+   "globals": [
+    "org_kde_kwin_appmenu_manager"
+   ],
+   "kwin": 2,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-blur",
+   "name": "KDE blur",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE blur",
+   "url": "https://wayland.app/protocols/kde-blur",
+   "globals": [
+    "org_kde_kwin_blur_manager"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-contrast",
+   "name": "KDE contrast",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE contrast",
+   "url": "https://wayland.app/protocols/kde-contrast",
+   "globals": [
+    "org_kde_kwin_contrast_manager"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-dpms",
+   "name": "KDE DPMS",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE DPMS",
+   "url": "https://wayland.app/protocols/kde-dpms",
+   "globals": [
+    "org_kde_kwin_dpms_manager"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-external-brightness-v1",
+   "name": "KDE external brightness",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE external brightness",
+   "url": "https://wayland.app/protocols/kde-external-brightness-v1",
+   "globals": [
+    "kde_external_brightness_v1"
+   ],
+   "kwin": 3,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-fake-input",
+   "name": "KDE fake input",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE fake input",
+   "url": "https://wayland.app/protocols/kde-fake-input",
+   "globals": [
+    "org_kde_kwin_fake_input"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Made-up keys and pointer motion from other programs. LordOS has its own on-screen keyboard, and RemoteDesktop input is not offered: it would be a new security exception (docs/WAYLAND.md, \"Sharing a screen or a window\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-idle",
+   "name": "KDE idle",
+   "cat": "kde",
+   "deprecated": true,
+   "summary": "KDE idle",
+   "url": "https://wayland.app/protocols/kde-idle",
+   "globals": [
+    "org_kde_kwin_idle"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Deprecated; ext-idle-notify-v1 is offered instead.",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-keystate",
+   "name": "KDE key state",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE key state",
+   "url": "https://wayland.app/protocols/kde-keystate",
+   "globals": [
+    "org_kde_kwin_keystate"
+   ],
+   "kwin": 5,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-lockscreen-overlay-v1",
+   "name": "KDE lockscreen overlay",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE lockscreen overlay",
+   "url": "https://wayland.app/protocols/kde-lockscreen-overlay-v1",
+   "globals": [
+    "kde_lockscreen_overlay_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-output-management",
+   "name": "KDE output management",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE output management",
+   "url": "https://wayland.app/protocols/kde-output-management",
+   "globals": [
+    "org_kde_kwin_outputmanagement"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-output-management-v2",
+   "name": "KDE output management v2",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE output management v2",
+   "url": "https://wayland.app/protocols/kde-output-management-v2",
+   "globals": [
+    "kde_output_management_v2"
+   ],
+   "kwin": 21,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-outputdevice",
+   "name": "KDE output device",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE output device",
+   "url": "https://wayland.app/protocols/kde-outputdevice",
+   "globals": [
+    "org_kde_kwin_outputdevice"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-output-device-v2",
+   "name": "KDE output device v2",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE output device v2",
+   "url": "https://wayland.app/protocols/kde-output-device-v2",
+   "globals": [
+    "kde_output_device_registry_v2"
+   ],
+   "kwin": 23,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-output-order-v1",
+   "name": "KDE output order",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE output order",
+   "url": "https://wayland.app/protocols/kde-output-order-v1",
+   "globals": [
+    "kde_output_order_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-plasma-shell",
+   "name": "KDE plasma shell",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE plasma shell",
+   "url": "https://wayland.app/protocols/kde-plasma-shell",
+   "globals": [
+    "org_kde_plasma_shell"
+   ],
+   "kwin": 8,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-plasma-virtual-desktop",
+   "name": "KDE plasma virtual desktop",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE plasma virtual desktop",
+   "url": "https://wayland.app/protocols/kde-plasma-virtual-desktop",
+   "globals": [
+    "org_kde_plasma_virtual_desktop_management"
+   ],
+   "kwin": 4,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-plasma-window-management",
+   "name": "KDE plasma window management",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE plasma window management",
+   "url": "https://wayland.app/protocols/kde-plasma-window-management",
+   "globals": [
+    "org_kde_plasma_window_management"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-primary-output-v1",
+   "name": "KDE primary output",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE primary output",
+   "url": "https://wayland.app/protocols/kde-primary-output-v1",
+   "globals": [
+    "kde_primary_output_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-screen-edge-v1",
+   "name": "KDE screen edge",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE screen edge",
+   "url": "https://wayland.app/protocols/kde-screen-edge-v1",
+   "globals": [
+    "kde_screen_edge_manager_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Plasma's private link between KWin and its own shell or System Settings. LordOS's desktop and Settings run inside lord-server, so no outside program needs it, and it would let one control the desktop. Confirmed by the maintainer 2026-11-22.",
+    "checked": "maintainer's decision",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-zkde-screencast-unstable-v1",
+   "name": "KDE screencast",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE screencast",
+   "url": "https://wayland.app/protocols/kde-zkde-screencast-unstable-v1",
+   "globals": [
+    "zkde_screencast_unstable_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "No app copies the screen on its own. It asks through LordOS's ScreenCast portal and gets only what the person picks, while the indicator shows it (docs/FIREWALL.md, docs/WAYLAND.md \"Sharing a screen or a window\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-server-decoration",
+   "name": "KDE server decoration",
+   "cat": "kde",
+   "deprecated": true,
+   "summary": "KDE server decoration",
+   "url": "https://wayland.app/protocols/kde-server-decoration",
+   "globals": [
+    "org_kde_kwin_server_decoration_manager"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "supported",
+    "version": 1,
+    "since": "0.8.4",
+    "bumped": null,
+    "note": "GTK 3's way to ask for the theme's frame (Firefox, Mousepad).",
+    "checked": "VM (docs/WAYLAND.md, \"Who draws the frame\")",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": {
+    "score": 100,
+    "points": 12,
+    "total": 12,
+    "skipped": 1,
+    "depth": "partial",
+    "globals": [
+     "org_kde_kwin_server_decoration_manager"
+    ],
+    "proofs": []
+   }
+  },
+  {
+   "id": "kde-server-decoration-palette",
+   "name": "KDE server decoration palette",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE server decoration palette",
+   "url": "https://wayland.app/protocols/kde-server-decoration-palette",
+   "globals": [
+    "org_kde_kwin_server_decoration_palette_manager"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-shadow",
+   "name": "KDE shadow",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE shadow",
+   "url": "https://wayland.app/protocols/kde-shadow",
+   "globals": [
+    "org_kde_kwin_shadow_manager"
+   ],
+   "kwin": 2,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "kde-slide",
+   "name": "KDE slide",
+   "cat": "kde",
+   "deprecated": false,
+   "summary": "KDE slide",
+   "url": "https://wayland.app/protocols/kde-slide",
+   "globals": [
+    "org_kde_kwin_slide_manager"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "frog-color-management-v1",
+   "name": "Frog color management",
+   "cat": "other",
+   "deprecated": false,
+   "summary": "Experimental color management protocol",
+   "url": "https://wayland.app/protocols/frog-color-management-v1",
+   "globals": [
+    "frog_color_management_factory_v1"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "virtual-keyboard-unstable-v1",
+   "name": "Virtual keyboard",
+   "cat": "other",
+   "deprecated": false,
+   "summary": "Virtual keyboard",
+   "url": "https://wayland.app/protocols/virtual-keyboard-unstable-v1",
+   "globals": [
+    "zwp_virtual_keyboard_manager_v1"
+   ],
+   "kwin": null,
+   "mutter": null,
+   "lordos": {
+    "status": "on-purpose",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Made-up keys and pointer motion from other programs. LordOS has its own on-screen keyboard, and RemoteDesktop input is not offered: it would be a new security exception (docs/WAYLAND.md, \"Sharing a screen or a window\").",
+    "checked": "docs and server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "gtk-shell",
+   "name": "GTK Shell",
+   "cat": "other",
+   "deprecated": false,
+   "summary": "GTK Shell",
+   "url": "https://wayland.app/protocols/gtk-shell",
+   "globals": [
+    "gtk_shell1"
+   ],
+   "kwin": null,
+   "mutter": 7,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "GNOME's own extensions to GTK windows.",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "xdg-foreign-unstable-v1",
+   "name": "XDG foreign v1",
+   "cat": "unstable",
+   "deprecated": true,
+   "summary": "Protocol for exporting xdg surface handles (superseded by xdg-foreign-unstable-v2)",
+   "url": "https://wayland.app/protocols/",
+   "globals": [
+    "zxdg_exporter_v1",
+    "zxdg_importer_v1"
+   ],
+   "kwin": null,
+   "mutter": 1,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "Superseded; xdg-foreign-unstable-v2 is offered.",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  },
+  {
+   "id": "text-input-unstable-v2",
+   "name": "Text input v2",
+   "cat": "kde",
+   "deprecated": true,
+   "summary": "Protocol for composing text (KDE's v2, superseded by text-input-unstable-v3)",
+   "url": "https://wayland.app/protocols/",
+   "globals": [
+    "zwp_text_input_manager_v2"
+   ],
+   "kwin": 1,
+   "mutter": null,
+   "lordos": {
+    "status": "missing",
+    "version": null,
+    "since": null,
+    "bumped": null,
+    "note": "KDE's older text input; text-input-unstable-v3 is offered.",
+    "checked": "not in server/src/wl",
+    "checkedDate": "2026-11-22"
+   },
+   "conf": null
+  }
+ ]
+}

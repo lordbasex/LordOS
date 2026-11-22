@@ -14,6 +14,7 @@ Los tres corren sobre el mismo servidor gráfico, el mismo motor de interfaz y l
 - **La barra de menús** tiene los menús de la app, los ítems de estado y el reloj; el **Centro de control** junta red, sonido, brillo, No molestar y el resto.
 - **El lanzador de apps** muestra todas las apps, y la Búsqueda encuentra apps, ajustes y archivos.
 - **Acomodá ventanas** arrastrándolas a los bordes: media pantalla, un cuarto o la pantalla entera (en Lord Flow desde la 0.8.9).
+- **Siempre encima** en el menú de la ventana deja una ventana sobre las demás mientras escribís en otra (en desarrollo, en todos los escritorios de LordOS; las apps X11 también pueden pedirlo).
 - **Escritorios** con una Vista general, desde la 0.8.7, y un selector de apps con ❖Tab.
 
 **Para quién es:** quien quiere ponerse a trabajar sin aprender nada nuevo.

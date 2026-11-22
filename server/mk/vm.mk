@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/qmp.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/qmp.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -60,18 +60,26 @@ build/lord-vmdisplay: $(VMDISPLAY_SRC) $(VM_HDR)
 build/lordvm-dev: tests/vm_dev.c src/vm/vmproto.h src/vm/vmagent.c src/vm/vmagent.h src/media/maudio.c src/media/mpulse.c src/sound/pulse.c src/media/aring.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_dev.c src/vm/vmagent.c src/media/maudio.c src/media/mpulse.c src/sound/pulse.c -lm $(if $(filter 1,$(GPU)),$(shell pkg-config --libs gbm egl glesv2))
+# lord-vmdisplay against a mock QEMU (its D-Bus display) and a mock lord-server: QEMU's listener calls answered inside
+# its 1 s, and buttons after the pointer's position in both mouse modes. No QEMU, KVM or GPU
+test: build/vmdisplay-test
+build/vmdisplay-test: tests/vmdisplay_test.c src/vm/vmproto.h build/lord-vmdisplay
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ tests/vmdisplay_test.c $(shell pkg-config --libs libsystemd)
+	./$@ build/lord-vmdisplay 2>build/vmdisplay-test.err || { cat build/vmdisplay-test.err; rm -f $@; exit 1; }
 endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
-test: build/vm-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
+test: build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
-# and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage
-VMCAT_SRC := src/vm/vmcatalog.c src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c
-build/vmcatalog-test: tests/vmcatalog_test.c $(VMCAT_SRC) src/vm/vmcatalog.h src/pkg/pgp.h ../assets/machines/systems.json $(wildcard tests/vmimage/*) $(wildcard ../packaging/keys/machines/*)
+# and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage,
+# and LordOS's own release signature (imager/imgverify.c) with the compiled-in release key
+VMCAT_SRC := src/vm/vmcatalog.c src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c src/imager/imgverify.c
+build/vmcatalog-test: tests/vmcatalog_test.c $(VMCAT_SRC) tests/imager_key.c src/vm/vmcatalog.h src/pkg/pgp.h src/imager/imgverify.h ../assets/machines/systems.json $(wildcard tests/vmimage/*) $(wildcard ../packaging/keys/machines/*)
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcatalog_test.c $(VMCAT_SRC)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcatalog_test.c $(VMCAT_SRC) tests/imager_key.c
 	./$@ ../assets/machines/systems.json tests/vmimage ../packaging/keys/machines || { rm -f $@; exit 1; }
 # unattended installs (vmunattend.c): the spec, the answer files, the FAT seed disk, the cpio, ISO 9660 paths
 build/vmunattend-test: tests/vmunattend_test.c src/vm/vmunattend.c src/vm/vmunattend.h src/sec/json.c
@@ -119,7 +127,7 @@ build/obj/ui/js.o: src/ui/js_vm.h
 
 # vm-image-* like the admin helper runs them, against the makers' servers (tests/vm_image_cli.c; a manual check, not in
 # make test: it needs root, lord-tls beside it and the network). Its catalog, keys and store are under /var/tmp/lordos-vmimage-test (root's: sudo install the catalog and packaging/keys/machines there first).
-VMIMAGE_CLI_SRC := tests/vm_image_cli.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/pkg/http.c src/pkg/pubhost.c src/pkg/crypto.c src/pkg/pgp.c src/sec/cgroup.c src/sec/json.c
+VMIMAGE_CLI_SRC := tests/vm_image_cli.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/pkg/http.c src/pkg/pubhost.c src/pkg/crypto.c src/pkg/pgp.c src/sec/cgroup.c src/sec/json.c src/imager/imgverify.c tests/imager_key.c
 build/vm-image-cli: $(VMIMAGE_CLI_SRC) src/vm/vmcatalog.h src/vm/vm_admin.h src/pkg/http.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -DVM_CATALOG='"/var/tmp/lordos-vmimage-test/systems.json"' -DVM_STORE='"/var/tmp/lordos-vmimage-test/machines"' -DVM_KEYS='"/var/tmp/lordos-vmimage-test/keys"' -o $@ $(VMIMAGE_CLI_SRC)
@@ -136,3 +144,10 @@ build/vm-net-cli: $(VMNET_CLI_SRC) src/vm/vmnet.h src/vm/vm_admin.h src/net/netp
 build/vm-gvt-cli: tests/vm_gvt_cli.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmgpu.h src/vm/vm_admin.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -Isrc -o $@ tests/vm_gvt_cli.c src/vm/vmgpu.c src/vm/vmgpu_admin.c
+
+# lord-vm's log (src/vm/vmlog.c): a child's output in whole lines, a repeated line counted (QEMU calling a closed
+# D-Bus listener every 30 ms filled the log on 2026-11-22), rotation when full; under ASan and UBSan
+build/vmlog-test: tests/vmlog_test.c src/vm/vmlog.c src/vm/vmlog.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmlog_test.c src/vm/vmlog.c
+	./$@ || { rm -f $@; exit 1; }

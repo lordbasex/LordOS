@@ -2,7 +2,7 @@
 // server/src/pkg) and makes changes through the administration helper (pkg-update, pkg-install,
 // pkg-remove, pkg-upgrade, pkg-install-file). Before changing anything it shows the plan: what is
 // installed, upgraded or removed, and how much is downloaded and used. See docs/PACKAGES.md.
-import { createElement as h, useEffect, useState } from 'react';
+import { createElement as h, memo as memoComponent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   View, Text, Image, Button, EmptyState, GroupBox, useTheme, useStore, createStore, admin, formatBytes, formatDate,
   refreshApps, launchApp, useLauncherApps, LetterIcon, typeScale, spacing, direction, t, locale, errorText, statusText,
@@ -13,6 +13,7 @@ import { Card, CardGrid, Facts, Pill, Shelf } from './ui.js';
 import { sysPkgKey, snapshotDate, companionsOf } from './syspkg.js';
 import { AdminRescue, isNotAdmin } from './rescue.js';
 import { search } from './search.js';
+import { MoreButton, usePaged } from './endless.js';
 
 const available = () => typeof lord.pkg !== 'undefined';
 const ready = () => available() && lord.pkg.available();
@@ -204,7 +205,8 @@ const catOf = (a) => (a.categories || []).find((c) => CATS.includes(c));
 
 // A Debian app's card: Get (the app page and its plan), Open when it is installed and has a window,
 // View otherwise.
-function DebCard({ a, onOpen }) {
+// memo: a category that grows by a page doesn't draw the cards it already showed again (the items are cached objects)
+const DebCard = memoComponent(function DebCard({ a, onOpen }) {
   const launcher = useLauncherApps();
   const app = a.app || a;
   const name = a.package || a.name;
@@ -214,7 +216,7 @@ function DebCard({ a, onOpen }) {
     : h(Pill, { label: a.installed ? t('store.ai.view') : t('store.get'), onClick: () => onOpen(name) });
   return h(Card, { icon: h(PkgIcon, { app, name, size: 56 }), name: app.name || name, tag: 'Debian', kind: cat ? t(`store.cat.${cat}`) : '',
     summary: app.summary || a.summary || '', note: a.size ? formatBytes(a.size) : '', action, onClick: () => onOpen(name) });
-}
+});
 
 const Grid = ({ items, onOpen }) => h(CardGrid, null, ...items.map((a) => h(DebCard, { key: `${a.package || a.name}:${a.id || ''}`, a, onOpen })));
 
@@ -227,7 +229,6 @@ function StoreGlyph() {
     h(View, { style: { position: 'absolute', left: 4, top: 12, width: 40, height: 34, borderRadius: 7, backgroundColor: c } }));
 }
 
-const CAT_PAGE = 60;
 export const CATS = ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'System', 'Utility'];
 // The package index's answers, kept until it (or what is installed) changes (gen) or the language does: each one walks
 // the whole index on lord-server's thread and builds thousands of objects, and pages asked again on every render, so
@@ -253,23 +254,32 @@ function NoIndex() {
 }
 
 // Search results: apps as cards, other packages as rows.
-function Results({ q, onOpen, more, hide = [] }) {
+function Results({ q, onOpen, more: hasTop, hide = [] }) {
   const th = useTheme();
-  const res = cached(`q:${q}`, () => lord.pkg.search(q, { limit: 60, lang: lang2() })).filter((r) => !hide.includes(r.name));
+  // up to the engine's 500 (it was 60, the other packages cut at 30), shown a page at a time as the results are
+  // scrolled (endless.js): the apps first, then the other packages; the cards' items are cached (memoized cards)
+  const all = cached(`q:${q}`, () => lord.pkg.search(q, { limit: 500, lang: lang2() }).map((r) => (r.app ? { ...r, package: r.name } : r)));
+  const res = hide.length ? all.filter((r) => !hide.includes(r.name)) : all;
   const apps = res.filter((r) => r.app), others = res.filter((r) => !r.app);
+  const { limit, more } = usePaged(res.length, `q:${q}`);
+  const openRef = useRef(onOpen);
+  openRef.current = onOpen;
+  const open = useCallback((name) => openRef.current(name), []);
+  const otherLimit = Math.max(0, limit - apps.length);
   return h(View, { style: { gap: spacing.l } },
     h(Progress),
-    apps.length ? h(Shelf, { title: t('store.debian.results', { q }) }, h(Grid, { items: apps.map((r) => ({ ...r, package: r.name })), onOpen })) : null,
-    others.length ? h(View, { style: { marginTop: spacing.s } },
+    apps.length ? h(Shelf, { title: t('store.debian.results', { q }) }, h(Grid, { items: apps.slice(0, limit), onOpen: open })) : null,
+    others.length && otherLimit ? h(View, { style: { marginTop: spacing.s } },
       h(Header, { th }, t('store.debian.otherPackages')),
-      h(GroupBox, null, ...others.slice(0, 30).map((r) => h(View, { key: r.name, onClick: () => onOpen(r.name),
+      h(GroupBox, null, ...others.slice(0, otherLimit).map((r) => h(View, { key: r.name, onClick: () => onOpen(r.name),
         style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, minHeight: 44, paddingVertical: 6 } },
         h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
           h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.name),
           h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, r.summary)),
         r.installed ? h(Text, { style: { fontSize: typeScale.caption, fontWeight: 500, color: '#30d158' } }, t('store.installedBadge')) : null,
         h(Text, { style: { fontSize: 15, color: th.textDim } }, direction() === 'rtl' ? '‹' : '›'))))) : null,
-    res.length === 0 && !more ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }) : null);
+    h(MoreButton, { left: res.length - limit, onMore: more }),
+    res.length === 0 && !hasTop ? h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }) : null);
 }
 
 // Discover: what the page above it brings (`top`: the featured app and the AI shelf; while searching,
@@ -298,18 +308,20 @@ function SuggestedPage() {
 function Category({ cat, query, onOpen }) {
   const { gen } = useStore(state);
   void gen;
-  // a page of cards at a time: hundreds of cards redrawn on every change were most of the cost
-  const [limit, setLimit] = useState(CAT_PAGE);
-  useEffect(() => setLimit(CAT_PAGE), [cat, query]);
-  if (!ready()) return h(NoIndex);
-  const all = cached(`cat:${cat}`, () => lord.pkg.apps({ category: cat, limit: 2000, lang: lang2() }));
+  // a page of cards at a time (hundreds of cards redrawn on every change were most of the cost), the next one when the
+  // list is scrolled near its end (endless.js)
+  const all = ready() ? cached(`cat:${cat}`, () => lord.pkg.apps({ category: cat, limit: 2000, lang: lang2() })) : [];
   const q = query.trim();
   const list = q ? cached(`cat:${cat}:${q}`, () => search(all, q, (a) => ({ names: [a.name, a.package], texts: [a.summary] }))) : all;
+  const { limit, more } = usePaged(list.length, `${cat}|${q}`);
+  const openRef = useRef(onOpen);
+  openRef.current = onOpen;
+  const open = useCallback((name) => openRef.current(name), []);
+  if (!ready()) return h(NoIndex);
   return h(View, { style: { gap: spacing.l } },
     h(Progress),
-    list.length ? h(Grid, { items: list.slice(0, limit), onOpen }) : null,
-    list.length > limit ? h(View, { style: { alignItems: 'center' } },
-      h(Button, { label: t('flathub.showMore', { count: list.length - limit }), onClick: () => setLimit(limit + CAT_PAGE) })) : null,
+    list.length ? h(Grid, { items: list.slice(0, limit), onOpen: open }) : null,
+    h(MoreButton, { left: list.length - limit, onMore: more }),
     list.length ? null
       : h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }));
 }
@@ -380,10 +392,12 @@ function Updates() {
   const [plan, setPlan] = useState(null);
   const [prefs, setPrefs] = useState(updatePrefs);
   void gen;
-  if (!ready()) return h(NoIndex);
-  const ups = lord.pkg.upgrades();
-  const own = lordosUpdate(lang2());
+  const ups = ready() ? lord.pkg.upgrades() : [];
   const others = ups.filter((u) => u.name !== 'lordos');
+  // a full upgrade can list hundreds of packages: a page of rows at a time as the page is scrolled (endless.js)
+  const { limit, more } = usePaged(others.length, 'updates');
+  if (!ready()) return h(NoIndex);
+  const own = lordosUpdate(lang2());
   const need = !job ? restartNeeded() : null;
   const auto = (on) => { setUpdatePrefs({ autoCheck: on }); setPrefs(updatePrefs()); };
   return h(View, { style: { gap: 12 } },
@@ -408,12 +422,13 @@ function Updates() {
     ups.length === 0 ? h(EmptyState, { mascot: 'celebrate', title: t('store.updates.none'), style: { minHeight: 260 } }) : null,
     others.length ? h(View, { style: { marginTop: spacing.s } },
       h(Header, { th }, t('store.updates.debian', { count: others.length })),
-      h(GroupBox, null, ...others.map((u) => h(View, { key: u.name, style: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 } },
+      h(GroupBox, null, ...others.slice(0, limit).map((u) => h(View, { key: u.name, style: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 } },
         h(PkgIcon, { name: u.name, size: 32 }),
         h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
           h(Text, { style: { fontSize: 13, fontWeight: 600, color: th.text, textAlign: 'start' } }, pkgLabel(u.name)),
           h(Text, { style: { fontSize: 11, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, pkgLine(u))),
-        h(Text, { style: { fontSize: 11, color: th.textDim } }, formatBytes(u.size)))))) : null,
+        h(Text, { style: { fontSize: 11, color: th.textDim } }, formatBytes(u.size))))),
+      h(MoreButton, { left: others.length - limit, onMore: more })) : null,
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, marginTop: spacing.m, paddingHorizontal: spacing.xs } },
       h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
         h(Text, { style: { fontSize: typeScale.body, color: th.text, textAlign: 'start' } }, t('store.updates.auto')),

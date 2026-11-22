@@ -97,6 +97,7 @@ static struct {
     /* input */
     int motion_pending, mx, my, last_mx, last_my;
     int abs_mouse;
+    int layout[6];                      /* VD_LAYOUT: the shown display in the guest's desktop (0s: none) */
     /* "Capture mouse" (VD_CAPTURE, VD_REL): relative motion gathered until the next send, and until when IsAbsolute is
      * asked again sooner (lord-vm switches the guest's mouse at the same time) */
     int capture, rel_pending, rdx, rdy;
@@ -163,9 +164,19 @@ static void drop_fb(void) {
     if (D.src == SRC_FB) D.src = SRC_NONE;
 }
 
+/* how long QEMU's held UpdateDMABUFs waited for their answer, and the longest a turn of the loop kept every connection
+ * waiting: QEMU gives each listener call 1 s (DBUS_DEFAULT_TIMEOUT) and then logs "Failed to call update: Timeout was
+ * reached". Logged at the end (and a busy turn when it happens), so such a line can be told from one QEMU caused itself:
+ * QEMU drops its own UpdateDMABUFs still queued when it sends a new ScanoutDMABUF or Disable (ui/dbus-listener.c,
+ * ddl_discard_display_messages), and those calls never reach this helper */
+static struct { long long held, slowest, busy_max, busy_told; } T;
+
 /* QEMU's UpdateDMABUF waiting for its answer: given now */
 static void answer_update(void) {
     if (!D.upd) return;
+    long long waited = now_ms() - D.upd_ms;
+    T.held++;
+    if (waited > T.slowest) T.slowest = waited;
     sd_bus_reply_method_return(D.upd, NULL);
     D.upd = sd_bus_message_unref(D.upd);
 }
@@ -848,10 +859,16 @@ static void ask_abs(long long now) {
     sd_bus_call_method_async(bus, NULL, NULL, CONSOLE_PATH, "org.freedesktop.DBus.Properties", "Get", on_abs, NULL, "ss", "org.qemu.Display1.Mouse", "IsAbsolute");
 }
 
-static void send_input(long long now) {
-    /* just captured or released: the mouse QEMU uses is asked again without waiting for a move (lord-vm switches it at the
-     * same time), so the first move after it goes the right way */
-    if (now < D.abs_fast_until) ask_abs(now);
+/* a picture point for the guest's tablet: onto the shown display of its whole desktop (VD_LAYOUT), or as it is */
+static int abs_x(int x) { return vd_abs_map(x, (int)D.w, D.layout[0], D.layout[2], D.layout[4]); }
+static int abs_y(int y) { return vd_abs_map(y, (int)D.h, D.layout[1], D.layout[3], D.layout[5]); }
+
+/* the pointer's motion gathered since the last send: sent before any button or wheel step that follows it, so a click
+ * lands where the pointer is. The machine's window sends a click as VD_MOTION then VD_BUTTON in one burst; with the
+ * button sent at once and the motion at the end of the turn, the guest's tablet pressed at the previous position and
+ * moved with the button down, a short drag, and Windows' shell opens no menu for a right-button drag (2026-11-22,
+ * tests/vmdisplay_test.c) */
+static void send_motion(long long now) {
     if (D.rel_pending && D.w && D.h) {
         D.rel_pending = 0;
         ask_abs(now);
@@ -862,7 +879,7 @@ static void send_input(long long now) {
             int x = D.last_mx + D.rdx, y = D.last_my + D.rdy;
             x = x < 0 ? 0 : x >= (int)D.w ? (int)D.w - 1 : x;
             y = y < 0 ? 0 : y >= (int)D.h ? (int)D.h - 1 : y;
-            call_noreply("org.qemu.Display1.Mouse", "SetAbsPosition", "uu", (uint32_t)x, (uint32_t)y);
+            call_noreply("org.qemu.Display1.Mouse", "SetAbsPosition", "uu", (uint32_t)abs_x(x), (uint32_t)abs_y(y));
             D.last_mx = x; D.last_my = y;
         }
         D.rdx = D.rdy = 0;
@@ -872,10 +889,17 @@ static void send_input(long long now) {
         D.motion_pending = 0;
         ask_abs(now);
         int x = D.mx < (int)D.w ? D.mx : (int)D.w - 1, y = D.my < (int)D.h ? D.my : (int)D.h - 1;
-        if (D.abs_mouse) call_noreply("org.qemu.Display1.Mouse", "SetAbsPosition", "uu", (uint32_t)x, (uint32_t)y);
+        if (D.abs_mouse) call_noreply("org.qemu.Display1.Mouse", "SetAbsPosition", "uu", (uint32_t)abs_x(x), (uint32_t)abs_y(y));
         else call_noreply("org.qemu.Display1.Mouse", "RelMotion", "ii", x - D.last_mx, y - D.last_my);
         D.last_mx = x; D.last_my = y;
     }
+}
+
+static void send_input(long long now) {
+    /* just captured or released: the mouse QEMU uses is asked again without waiting for a move (lord-vm switches it at the
+     * same time), so the first move after it goes the right way */
+    if (now < D.abs_fast_until) ask_abs(now);
+    send_motion(now);
     if (D.resize_pending && now - D.resize_ms >= RESIZE_GAP_MS) {
         D.resize_pending = 0;
         D.resize_ms = now;
@@ -934,8 +958,8 @@ static int from_server(void) {
         case VD_FRAME_DONE: if (m.e == D.frame) D.acked = 1; break;
         case VD_KEY: key(m.a, m.b); break;
         case VD_MOTION: D.mx = m.a; D.my = m.b; D.motion_pending = 1; break;
-        case VD_BUTTON: button(m.a, m.b); break;
-        case VD_WHEEL: if (m.a) wheel(m.a, 3, 4); if (m.b) wheel(m.b, 8, 7); break;
+        case VD_BUTTON: send_motion(now_ms()); button(m.a, m.b); break;
+        case VD_WHEEL: send_motion(now_ms()); if (m.a) wheel(m.a, 3, 4); if (m.b) wheel(m.b, 8, 7); break;
         case VD_REL:
             if (!D.capture) break;
             D.rdx = D.rdx + m.a > 65535 ? 65535 : D.rdx + m.a < -65535 ? -65535 : D.rdx + m.a;
@@ -948,6 +972,11 @@ static int from_server(void) {
             D.abs_fast_until = now_ms() + 3000;
             abs_asked_ms = 0;
             fprintf(stderr, "lord-vmdisplay %s: the mouse is %s\n", me, m.a ? "captured (relative)" : "free (absolute)");
+            break;
+        case VD_LAYOUT:
+            memcpy(D.layout, (int[6]){ m.a, m.b, m.c, m.d, m.e, m.f }, sizeof D.layout);
+            if (m.e) fprintf(stderr, "lord-vmdisplay %s: the tablet points at %dx%d at %d,%d of the guest's %dx%d desktop\n", me, m.c, m.d, m.a, m.b, m.e, m.f);
+            else fprintf(stderr, "lord-vmdisplay %s: the tablet covers the picture\n", me);
             break;
         case VD_RELEASE_ALL: release_all(); break;
         case VD_RESIZE: D.rw = m.a; D.rh = m.b; D.resize_pending = 1; break;
@@ -1121,6 +1150,7 @@ int main(int argc, char **argv) {
 
     D.stats_ms = now_ms();
     int rc = 0;
+    long long woke = now_ms();
     for (;;) {
         int r;
         while ((r = sd_bus_process(lbus, NULL)) > 0) ;
@@ -1169,13 +1199,22 @@ int main(int argc, char **argv) {
         if (D.resize_pending) { int tr = (int)(D.resize_ms + RESIZE_GAP_MS - now); if (tr < 0) tr = 0; if (to < 0 || tr < to) to = tr; }
         if (D.stats_changed) { int ts = (int)(D.stats_ms + STATS_MS - now); if (ts < 0) ts = 0; if (to < 0 || ts < to) to = ts; }
         if (now < D.abs_fast_until && (to < 0 || to > 100)) to = 100;     /* send_input asks IsAbsolute again meanwhile */
+        long long busy = now_ms() - woke;
+        if (busy > T.busy_max) T.busy_max = busy;
+        if (busy >= 200 && now - T.busy_told >= 10000) {
+            T.busy_told = now;
+            fprintf(stderr, "lord-vmdisplay %s: a turn of its loop took %lld ms (QEMU's calls waited meanwhile)\n", me, busy);
+        }
         if (poll(p, 5, to) < 0 && errno != EINTR) break;
+        woke = now_ms();
         if (p[2].revents & (POLLHUP | POLLERR) && !(p[2].revents & POLLIN)) break;
         if (p[2].revents & POLLIN && from_server()) break;
     }
     release_all();
     answer_update();
     au_counts("end");
+    fprintf(stderr, "lord-vmdisplay %s: the display listener's calls: %lld UpdateDMABUF answers held for lord-server, the "
+                    "longest %lld ms; the longest turn of the loop %lld ms\n", me, T.held, T.slowest, T.busy_max);
     sd_bus_process(bus, NULL);      /* pushes what the socket takes; never waits on QEMU */
     return rc;
 }

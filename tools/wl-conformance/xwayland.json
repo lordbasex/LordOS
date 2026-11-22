@@ -1,0 +1,585 @@
+{
+ "comment": "Xwayland / X11 items scored by tools/wl-conformance.mjs. Each item has source patterns (weight 1: a regular expression that must appear in the file, or in any file under a directory ending in /), unit tests (weight 1: build/<name> must pass) and the dynamic checks that server/tests/x11_conformance.c and the driver report under the same id (weight 3). Add an item or a pattern here; the X11 client reports its checks by item id.",
+ "items": [
+  {
+   "id": "xwayland.startup",
+   "title": "Xwayland startup and surface association",
+   "static": [
+    {
+     "id": "on_demand",
+     "file": "server/src/wl/xwayland.c",
+     "pattern": "static int on_connect\\(",
+     "what": "Xwayland starts on the first X11 connection (watched socket)"
+    },
+    {
+     "id": "rootless",
+     "file": "server/src/wl/xwayland.c",
+     "pattern": "\"-rootless\"",
+     "what": "Xwayland runs rootless with our WM on -wm"
+    },
+    {
+     "id": "wl_surface_id",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "WL_SURFACE_ID",
+     "what": "X window to wl_surface association through WL_SURFACE_ID (the legacy way)"
+    },
+    {
+     "id": "xwayland_shell_v1",
+     "file": "server/src/",
+     "pattern": "&xwayland_shell_v1_interface",
+     "what": "xwayland-shell-v1 (the race-free association Xwayland 23.1+ uses)"
+    }
+   ]
+  },
+  {
+   "id": "icccm.wm_name",
+   "title": "ICCCM WM_NAME / EWMH _NET_WM_NAME",
+   "static": [
+    {
+     "id": "wm_name",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "XA_WM_NAME",
+     "what": "WM_NAME read"
+    },
+    {
+     "id": "net_wm_name",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(NET_WM_NAME\\)",
+     "what": "_NET_WM_NAME read (UTF-8 preferred)"
+    }
+   ]
+  },
+  {
+   "id": "icccm.wm_class",
+   "title": "ICCCM WM_CLASS",
+   "static": [
+    {
+     "id": "wm_class",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "XA_WM_CLASS",
+     "what": "WM_CLASS read (the app's .desktop)"
+    }
+   ]
+  },
+  {
+   "id": "icccm.wm_protocols",
+   "title": "ICCCM WM_PROTOCOLS (WM_DELETE_WINDOW, WM_TAKE_FOCUS)",
+   "static": [
+    {
+     "id": "delete",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(WM_DELETE_WINDOW\\), 0",
+     "what": "WM_DELETE_WINDOW sent to close"
+    },
+    {
+     "id": "take_focus",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(WM_TAKE_FOCUS\\), 0",
+     "what": "WM_TAKE_FOCUS sent on focus"
+    },
+    {
+     "id": "kill",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "KillClient",
+     "what": "KillClient when the window doesn't speak WM_DELETE_WINDOW"
+    }
+   ]
+  },
+  {
+   "id": "icccm.wm_hints",
+   "title": "ICCCM WM_HINTS (input, urgency)",
+   "static": [
+    {
+     "id": "wm_hints",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "XA_WM_HINTS",
+     "what": "WM_HINTS read"
+    },
+    {
+     "id": "urgency",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "[Uu]rgen",
+     "what": "the urgency hint (1 << 8) marks the window as demanding attention"
+    }
+   ]
+  },
+  {
+   "id": "icccm.wm_normal_hints",
+   "title": "ICCCM WM_NORMAL_HINTS (min/max size)",
+   "static": [
+    {
+     "id": "normal_hints",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "XA_WM_NORMAL_HINTS",
+     "what": "WM_NORMAL_HINTS read"
+    }
+   ]
+  },
+  {
+   "id": "icccm.transient_for",
+   "title": "ICCCM WM_TRANSIENT_FOR",
+   "static": [
+    {
+     "id": "transient",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "XA_WM_TRANSIENT_FOR",
+     "what": "WM_TRANSIENT_FOR read (the dialog's parent)"
+    }
+   ]
+  },
+  {
+   "id": "icccm.focus",
+   "title": "ICCCM input focus model",
+   "static": [
+    {
+     "id": "set_focus",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "X_SetInputFocus",
+     "what": "SetInputFocus on the focused window"
+    },
+    {
+     "id": "revert",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "X_FocusIn",
+     "what": "an X app taking the focus from another one is reverted"
+    }
+   ]
+  },
+  {
+   "id": "icccm.wm_state",
+   "title": "ICCCM WM_STATE and WM_CHANGE_STATE",
+   "static": [
+    {
+     "id": "wm_state",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(WM_STATE\\)",
+     "what": "WM_STATE written"
+    },
+    {
+     "id": "change_state",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(WM_CHANGE_STATE\\)",
+     "what": "WM_CHANGE_STATE (iconify) handled"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.supporting_wm_check",
+   "title": "EWMH _NET_SUPPORTING_WM_CHECK",
+   "static": [
+    {
+     "id": "check",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(NET_SUPPORTING_WM_CHECK\\)",
+     "what": "the check window"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.net_supported",
+   "title": "EWMH _NET_SUPPORTED",
+   "static": [
+    {
+     "id": "supported",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(NET_SUPPORTED\\)",
+     "what": "_NET_SUPPORTED written on the root"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.wm_name",
+   "title": "EWMH _NET_WM_NAME",
+   "static": []
+  },
+  {
+   "id": "ewmh.wm_state",
+   "title": "EWMH _NET_WM_STATE (fullscreen, maximized, hidden, above, below, demands attention, modal, skip taskbar and pager, focused)",
+   "static": [
+    {
+     "id": "fullscreen",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_STATE_FULLSCREEN\"",
+     "what": "fullscreen"
+    },
+    {
+     "id": "maximized",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_STATE_MAXIMIZED_VERT\"",
+     "what": "maximized"
+    },
+    {
+     "id": "hidden",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_STATE_HIDDEN\"",
+     "what": "hidden"
+    },
+    {
+     "id": "above",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_STATE_ABOVE\"",
+     "what": "above"
+    },
+    {
+     "id": "demands_attention",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_STATE_DEMANDS_ATTENTION\"",
+     "what": "demands attention"
+    },
+    {
+     "id": "modal",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_STATE_MODAL\"",
+     "what": "modal"
+    },
+    {
+     "id": "skip_taskbar",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_STATE_SKIP_TASKBAR\"",
+     "what": "skip taskbar"
+    },
+    {
+     "id": "skip_pager",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "wlx_skip_pager\\(",
+     "what": "skip pager: out of the Overview"
+    },
+    {
+     "id": "below",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_STATE_BELOW\"",
+     "what": "below"
+    },
+    {
+     "id": "layers",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "restack_layers\\(\\)",
+     "what": "X's stacking follows the layers (always on top, normal, below)"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.window_type",
+   "title": "EWMH _NET_WM_WINDOW_TYPE",
+   "static": [
+    {
+     "id": "dialog",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_WINDOW_TYPE_DIALOG\"",
+     "what": "dialog"
+    },
+    {
+     "id": "menus",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_WINDOW_TYPE_POPUP_MENU\"",
+     "what": "menus"
+    },
+    {
+     "id": "utility",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_WINDOW_TYPE_UTILITY\"",
+     "what": "utility / toolbar"
+    },
+    {
+     "id": "notification",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_WINDOW_TYPE_NOTIFICATION\"",
+     "what": "notification"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.active_window",
+   "title": "EWMH _NET_ACTIVE_WINDOW",
+   "static": [
+    {
+     "id": "active",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(NET_ACTIVE_WINDOW\\)",
+     "what": "_NET_ACTIVE_WINDOW kept and requests handled"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.client_list",
+   "title": "EWMH _NET_CLIENT_LIST",
+   "static": [
+    {
+     "id": "list",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(NET_CLIENT_LIST\\)",
+     "what": "_NET_CLIENT_LIST kept"
+    },
+    {
+     "id": "stacking",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_CLIENT_LIST_STACKING\"",
+     "what": "_NET_CLIENT_LIST_STACKING kept"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.wm_pid",
+   "title": "EWMH _NET_WM_PID",
+   "static": [
+    {
+     "id": "pid",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(NET_WM_PID\\)",
+     "what": "_NET_WM_PID read"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.wm_icon",
+   "title": "EWMH _NET_WM_ICON",
+   "static": [
+    {
+     "id": "icon",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WM_ICON\"",
+     "what": "_NET_WM_ICON read (an X app's own icon)"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.moveresize",
+   "title": "EWMH _NET_WM_MOVERESIZE",
+   "static": [
+    {
+     "id": "moveresize",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(NET_WM_MOVERESIZE\\)",
+     "what": "move/resize requests (apps with their own frame)"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.frame_extents",
+   "title": "EWMH _NET_FRAME_EXTENTS",
+   "static": [
+    {
+     "id": "extents",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(NET_FRAME_EXTENTS\\)",
+     "what": "_NET_FRAME_EXTENTS written"
+    },
+    {
+     "id": "request",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_REQUEST_FRAME_EXTENTS\"",
+     "what": "_NET_REQUEST_FRAME_EXTENTS answered before map"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.workarea",
+   "title": "EWMH _NET_WORKAREA",
+   "static": [
+    {
+     "id": "workarea",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_WORKAREA\"",
+     "what": "_NET_WORKAREA on the root (the area apps may use)"
+    }
+   ]
+  },
+  {
+   "id": "ewmh.close_window",
+   "title": "EWMH _NET_CLOSE_WINDOW",
+   "static": [
+    {
+     "id": "close",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"_NET_CLOSE_WINDOW\"",
+     "what": "_NET_CLOSE_WINDOW requests (pagers, taskbars)"
+    }
+   ]
+  },
+  {
+   "id": "motif.wm_hints",
+   "title": "_MOTIF_WM_HINTS",
+   "static": [
+    {
+     "id": "motif",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(MOTIF_WM_HINTS\\)",
+     "what": "_MOTIF_WM_HINTS decorations read"
+    }
+   ]
+  },
+  {
+   "id": "xdnd",
+   "title": "XDND drag and drop (both ways)",
+   "static": [
+    {
+     "id": "xdndaware",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndAware\"",
+     "what": "XdndAware"
+    },
+    {
+     "id": "xdndenter",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndEnter\"",
+     "what": "XdndEnter"
+    },
+    {
+     "id": "xdndposition",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndPosition\"",
+     "what": "XdndPosition"
+    },
+    {
+     "id": "xdndstatus",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndStatus\"",
+     "what": "XdndStatus"
+    },
+    {
+     "id": "xdndleave",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndLeave\"",
+     "what": "XdndLeave"
+    },
+    {
+     "id": "xdnddrop",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndDrop\"",
+     "what": "XdndDrop"
+    },
+    {
+     "id": "xdndfinished",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndFinished\"",
+     "what": "XdndFinished"
+    },
+    {
+     "id": "xdndselection",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndSelection\"",
+     "what": "XdndSelection"
+    },
+    {
+     "id": "xdndtypelist",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndTypeList\"",
+     "what": "XdndTypeList"
+    },
+    {
+     "id": "xdndactioncopy",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndActionCopy\"",
+     "what": "XdndActionCopy"
+    },
+    {
+     "id": "xdndactionmove",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndActionMove\"",
+     "what": "XdndActionMove"
+    },
+    {
+     "id": "xdndactionask",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XdndActionAsk\"",
+     "what": "XdndActionAsk"
+    }
+   ],
+   "unit": [
+    "xwm-test",
+    "dndgate-test",
+    "urilist-test"
+   ]
+  },
+  {
+   "id": "selections",
+   "title": "CLIPBOARD and PRIMARY, both ways, INCR",
+   "static": [
+    {
+     "id": "incr_out",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "AT\\(INCR\\), 32",
+     "what": "INCR when sending to an X app"
+    },
+    {
+     "id": "incr_in",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "type == AT\\(INCR\\)",
+     "what": "INCR when reading from an X app"
+    },
+    {
+     "id": "xfixes",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "\"XFIXES\"",
+     "what": "XFixes selection notify (an X app copied)"
+    },
+    {
+     "id": "primary",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "XA_PRIMARY",
+     "what": "PRIMARY"
+    }
+   ]
+  },
+  {
+   "id": "xwayland.hidpi",
+   "title": "HiDPI scale (xwscale.c)",
+   "static": [
+    {
+     "id": "xft_dpi",
+     "file": "server/src/wl/xwscale.c",
+     "pattern": "Xft\\.dpi:",
+     "what": "Xft.dpi in RESOURCE_MANAGER"
+    },
+    {
+     "id": "scale",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "wlx_scale\\(\\)",
+     "what": "X pixels to logical conversion"
+    }
+   ],
+   "unit": [
+    "xwscale-test"
+   ]
+  },
+  {
+   "id": "xwayland.cursor",
+   "title": "Cursor (root cursor; app cursors through wl_pointer)",
+   "static": [
+    {
+     "id": "render_cursor",
+     "file": "server/src/wl/xwm.c",
+     "pattern": "X\\.cursor = cur",
+     "what": "the root's cursor is LordOS's arrow (Render)"
+    }
+   ]
+  },
+  {
+   "id": "xwayland.security",
+   "title": "Isolation (auth cookie, no TCP, own network namespace)",
+   "static": [
+    {
+     "id": "nolisten",
+     "file": "server/src/wl/xwayland.c",
+     "pattern": "\"-nolisten\", \"tcp\"",
+     "what": "no TCP listener"
+    },
+    {
+     "id": "netns",
+     "file": "server/src/wl/xwayland.c",
+     "pattern": "CLONE_NEWNET",
+     "what": "its own empty network namespace"
+    },
+    {
+     "id": "auth",
+     "file": "server/src/wl/xwayland.c",
+     "pattern": "\"-auth\"",
+     "what": "an X cookie (-auth)"
+    }
+   ],
+   "unit": [
+    "xauth-test"
+   ]
+  }
+ ]
+}

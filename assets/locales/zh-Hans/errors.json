@@ -911,5 +911,10 @@
   "vm.gvtFailed": "无法创建显卡份额",
   "vm.memlockCap": "这台虚拟机将锁定 {need} MB，但带显卡的虚拟机现在只剩 {cap} MB 可用（设置 → 显卡）",
   "vm.memlockRefused": "无法锁定这台虚拟机的内存",
-  "gpu.memlockRange": "该数量超出了这台电脑允许虚拟机锁定的范围"
+  "gpu.memlockRange": "该数量超出了这台电脑允许虚拟机锁定的范围",
+  "studio.failed": "LordOS Studio 无法启动。",
+  "studio.badPicture": "该图片无法用作背景。",
+  "studio.invalid": "该 LordOS Studio 设置无效。",
+  "studio.noCamera": "未连接摄像头。",
+  "studio.unavailable": "此电脑上无法使用 LordOS Studio。"
 }

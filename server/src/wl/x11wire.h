@@ -102,6 +102,18 @@ void x11_size_hints(const uint32_t *v, size_t n, XSizeHints *h);    /* WM_NORMAL
 
 /* WM_HINTS: 1 if the window takes keyboard focus (input hint true or absent). */
 int x11_wm_hints_input(const uint32_t *v, size_t n);
+/* WM_HINTS: 1 if the urgency hint (XUrgencyHint, 1 << 8) is set: the window wants the person's attention. */
+int x11_wm_hints_urgent(const uint32_t *v, size_t n);
+/* A size the window manager grants: *w × *h kept within the WM_NORMAL_HINTS minimum and maximum (a maximum below
+ * the minimum counts as none, as do 0s), and within 1..32767. */
+void x11_size_clamp(const XSizeHints *h, int *w, int *h_);
+
+/* _NET_WM_ICON: CARDINALs (32-bit, little endian on this wire), each image its width, its height and then
+ * width × height ARGB words (straight alpha). The image to use: every width and height is checked against what
+ * is left of the property, images larger than max a side or not 1 px are skipped, and of the rest the one
+ * whose larger side is closest to want (the larger on a tie). 1 with its first pixel word's index in *first and
+ * its size, 0 if none. nwords: the property's length in 32-bit words. */
+int x11_net_wm_icon_pick(const uint8_t *v, size_t nwords, int max, int want, size_t *first, int *w, int *h);
 
 /* _NET_WM_MOVERESIZE direction → what the theme does: -1 move, 0 nothing (cancel, keyboard),
  * otherwise the resize edges (1 top, 2 bottom, 4 left, 8 right, like xdg_toplevel.resize). */
@@ -161,7 +173,8 @@ int x11_same_process(uint32_t a, uint32_t b, const uint32_t *base, const uint32_
 /* Whether an X drag of files may reach LordOS (Files copies them): the selection owner's client has a pid
  * the server knows, and no client of the display is sandboxed (sandboxed(pid) != 0; it is called for every pid):
  * on one X display any client can stand in for another's selection, so one sandboxed client is enough to
- * refuse. 0 if owner is 0, n < 0 (too many clients) or no pid is known for the owner. */
+ * refuse. The X server's own client (resource base 0: Xwayland, in its own user namespace) is not one of them.
+ * 0 if owner is 0, n < 0 (too many clients) or no pid is known for the owner. */
 int x11_xdnd_trusted(uint32_t owner, const uint32_t *base, const uint32_t *pid, int n, uint32_t id_mask,
                      int (*sandboxed)(int pid));
 

@@ -10,9 +10,9 @@ all: build/lord-pgpv
 
 test: build/vmurl-test build/vmsig-test
 # vmurl.c and pubhost.c: the addresses, sizes and space vm-image-get-user accepts, with a fuzz pass, under ASan and UBSan
-build/vmurl-test: tests/vmurl_test.c src/vm/vmurl.c src/vm/vmurl.h src/vm/vmcatalog.c src/vm/vmcatalog.h src/pkg/pubhost.c src/pkg/pubhost.h src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c
+build/vmurl-test: tests/vmurl_test.c src/vm/vmurl.c src/vm/vmurl.h src/vm/vmcatalog.c src/vm/vmcatalog.h src/pkg/pubhost.c src/pkg/pubhost.h src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c src/imager/imgverify.c
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmurl_test.c src/vm/vmurl.c src/vm/vmcatalog.c src/pkg/pubhost.c src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmurl_test.c src/vm/vmurl.c src/vm/vmcatalog.c src/pkg/pubhost.c src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c src/imager/imgverify.c
 	./$@ || { rm -f $@; exit 1; }
 # vmsig.c with keys and signatures made by the test itself (Ed25519): good, changed, another key, a key block with two
 # keys, a wrong fingerprint, a future signature, grafted or badly bound subkeys (pgp_keyring_add_untrusted); lord-server's

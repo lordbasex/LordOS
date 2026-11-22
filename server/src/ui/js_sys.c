@@ -41,6 +41,8 @@
 #include "../wl/xwayland.h"
 #include "../wl/xwm.h"
 #include "../wl/urilist.h"
+#include "../wl/wlshell.h"
+#include "../wl/drmlease.h"
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../fsasync.h"
@@ -929,7 +931,8 @@ static JSValue f_kb_list(JSContext *c, JSValueConst this_val, int argc, JSValueC
                 JSValue o = JS_GetPropertyUint32(c, arr, i);
                 JSValue lid = JS_GetPropertyStr(c, o, "id");
                 const char *s = JS_ToCString(c, lid);
-                if (s && !strcmp(s, p)) {
+                int match = s && !strcmp(s, p);         /* s is freed below, before the loop tests it */
+                if (match) {
                     JSValue vs = JS_GetPropertyStr(c, o, "variants");
                     JSValue v = JS_NewObject(c);
                     JS_SetPropertyStr(c, v, "id", JS_NewString(c, id));
@@ -944,7 +947,7 @@ static JSValue f_kb_list(JSContext *c, JSValueConst this_val, int argc, JSValueC
                 if (s) JS_FreeCString(c, s);
                 JS_FreeValue(c, lid);
                 JS_FreeValue(c, o);
-                if (s && !strcmp(s, p)) break;
+                if (match) break;
             }
         }
     }
@@ -1672,6 +1675,7 @@ static JSValue f_wl_state(JSContext *c, JSValueConst this_val, int argc, JSValue
     if (argc > 5) wl_set_covered(id, JS_ToBool(c, argv[5]));
     if (argc > 6) wl_set_fixed(id, JS_ToBool(c, argv[6]));
     if (argc > 7) { int32_t e = 0; JS_ToInt32(c, &e, argv[7]); wl_set_tiled(id, e); }
+    if (argc > 8) { int32_t l = 0; JS_ToInt32(c, &l, argv[8]); wl_set_layer(id, l); }   /* always on top: 1, below: -1 */
     return JS_UNDEFINED;
 }
 
@@ -1703,6 +1707,18 @@ static JSValue f_wl_icon(JSContext *c, JSValueConst this_val, int argc, JSValueC
     JS_SetPropertyStr(c, o, "height", JS_NewInt32(c, side));
     JS_SetPropertyStr(c, o, "data", JS_NewArrayBufferCopy(c, px, (size_t)side * (size_t)side * 4));
     return o;
+}
+
+/* lord.wayland.leaseAnswer(app, "once" | "always" | "deny") → bool: the person's answer to the "vr" prompt (drm-lease)
+ * lord-server is waiting on for app; anything else is ignored and nothing is saved (drmlease_answer) */
+static JSValue f_wl_lease_answer(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1])) return JS_FALSE;
+    const char *app = JS_ToCString(c, argv[0]), *how = JS_ToCString(c, argv[1]);
+    int ok = app && how && drmlease_answer(app, how);
+    if (app) JS_FreeCString(c, app);
+    if (how) JS_FreeCString(c, how);
+    return JS_NewBool(c, ok);
 }
 
 /* lord.wayland.idleAnswer(app, allow) → bool: the person's answer to the "idle" prompt (ext-idle-notify) lord-server is
@@ -1867,6 +1883,60 @@ static JSValue f_wl_dropped_files(JSContext *c, JSValueConst this_val, int argc,
     return arr;
 }
 
+/* ---- shell extras (wl/wlshell.h, docs/WAYLAND.md "Shell extras") ---- */
+
+/* lord.wayland.toplevelDrag(id, frameNode) → { ox, oy, gx?, gy? } | null: window id following a drag (xdg-toplevel-drag):
+ * the point of its geometry that stays under the pointer, and where its geometry is now when placed. frameNode, if it
+ * is that window's frame, is left out of the drag's hit test (the window isn't a drop target). */
+static JSValue f_wl_toplevel_drag(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t id = 0, node = 0;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0])) return JS_NULL;
+    if (argc > 1 && JS_ToInt32(c, &node, argv[1])) node = 0;
+    int ox, oy, gx, gy, placed;
+    if (!tldrag_follow(id, node, &ox, &oy, &gx, &gy, &placed)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "ox", JS_NewInt32(c, ox));
+    JS_SetPropertyStr(c, o, "oy", JS_NewInt32(c, oy));
+    if (placed) {
+        JS_SetPropertyStr(c, o, "gx", JS_NewInt32(c, gx));
+        JS_SetPropertyStr(c, o, "gy", JS_NewInt32(c, gy));
+    }
+    return o;
+}
+/* lord.wayland.tag(id) → { tag, description } | null (xdg-toplevel-tag: the app's own words, checked in C) */
+static JSValue f_wl_tag(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t id = 0;
+    const char *tag, *desc;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0]) || !tltag_get(id, &tag, &desc)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "tag", JS_NewString(c, tag));
+    JS_SetPropertyStr(c, o, "description", JS_NewString(c, desc));
+    return o;
+}
+/* lord.wayland.sessionFrame(id) → { x, y, w, h, max } | null: where a window its app restored (xdg-session-management)
+ * was, its geometry on screen; given once */
+static JSValue f_wl_session_frame(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t id = 0;
+    int r[4], max = 0;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0]) || !xsession_frame(id, r, &max)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "x", JS_NewInt32(c, r[0]));
+    JS_SetPropertyStr(c, o, "y", JS_NewInt32(c, r[1]));
+    JS_SetPropertyStr(c, o, "w", JS_NewInt32(c, r[2]));
+    JS_SetPropertyStr(c, o, "h", JS_NewInt32(c, r[3]));
+    JS_SetPropertyStr(c, o, "max", JS_NewBool(c, max));
+    return o;
+}
+/* lord.wayland.effects(on): Settings → transparency with blur; blur behind Linux windows is offered only with it */
+static JSValue f_wl_effects(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc > 0) bgeffect_set_effects(JS_ToBool(c, argv[0]));
+    return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("dragFiles", 1, f_wl_drag_files),
     JS_CFUNC_DEF("dragTaken", 0, f_wl_drag_taken),
@@ -1882,12 +1952,17 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("focus", 2, f_wl_focus),
     JS_CFUNC_DEF("close", 1, f_wl_close),
     JS_CFUNC_DEF("kill", 1, f_wl_kill),
-    JS_CFUNC_DEF("state", 8, f_wl_state),
+    JS_CFUNC_DEF("state", 9, f_wl_state),
     JS_CFUNC_DEF("workAreas", 1, f_wl_work_areas),
     JS_CFUNC_DEF("idleAnswer", 2, f_wl_idle_answer),
+    JS_CFUNC_DEF("leaseAnswer", 2, f_wl_lease_answer),
     JS_CFUNC_DEF("icon", 1, f_wl_icon),
     JS_CFUNC_DEF("info", 0, f_wl_info),
     JS_CFUNC_DEF("x11SelfScale", 1, f_wl_x11_self_scale),
+    JS_CFUNC_DEF("toplevelDrag", 2, f_wl_toplevel_drag),
+    JS_CFUNC_DEF("tag", 1, f_wl_tag),
+    JS_CFUNC_DEF("sessionFrame", 1, f_wl_session_frame),
+    JS_CFUNC_DEF("effects", 1, f_wl_effects),
 };
 
 /* ---- lord.apps: installed Linux apps (.desktop, apps.c) ---- */

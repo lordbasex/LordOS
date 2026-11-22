@@ -10,8 +10,10 @@ THEME=../themes/default/theme.bundle.js
 D=$(mktemp -d "${TMPDIR:-/tmp}/lgw.XXXXXX") || exit 1
 G=''
 trap 'kill $P $G 2>/dev/null; rm -rf "$D"' EXIT
-mkdir -p "$D/home"
+mkdir -p "$D/home/.config/lordos"
 chmod 700 "$D"
+# the welcome tour already shown: its Help window would be one more window in the lists checked
+printf '{"welcomeShown": true}\n' >"$D/home/.config/lordos/settings.json"
 env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
     XDG_RUNTIME_DIR="$D" HOME="$D/home" LORD_GPU=0 LORD_GUESTWIN=1 \
     ./build/lord-server --headless 1024x768 --theme "$THEME" --timeout 90 >"$D/server.log" 2>&1 &

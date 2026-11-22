@@ -14,7 +14,7 @@ import {
 const TINT = {
   vm: ['#5e8cff', '#3757d8'], gpu: ['#6fcf5b', '#2f9a3b'], board: ['#e2557a', '#b12c55'], printer: ['#8e8e93', '#5f5f66'],
   scanner: ['#8e8e93', '#5f5f66'], wifi: ['#36a3ff', '#1463d6'], bluetooth: ['#4f7dff', '#2448c9'], network: ['#2fb5a5', '#16867a'],
-  graphics: ['#6fcf5b', '#2f9a3b'], other: ['#a07cff', '#6a45d6'], package: ['#a07cff', '#6a45d6'],
+  graphics: ['#6fcf5b', '#2f9a3b'], camera: ['#ff9f43', '#e0662a'], other: ['#a07cff', '#6a45d6'], package: ['#a07cff', '#6a45d6'],
 };
 
 function Glyph({ kind, size: s = 40 }) {
@@ -48,6 +48,10 @@ function Glyph({ kind, size: s = 40 }) {
       break;
     case 'bluetooth':
       parts = [h(Text, { key: 'b', style: { position: 'absolute', left: 0, top: 6, width: s, textAlign: 'center', fontSize: 22, fontWeight: 700, color: w, lineHeight: 28 } }, 'B')];
+      break;
+    case 'camera':                      // a body and a lens hood (the capture indicator's camera)
+      parts = [box({ left: 7, top: 13, width: 18, height: 14, borderRadius: 3, backgroundColor: w }),
+        box({ left: 26, top: 16, width: 7, height: 8, borderTopRightRadius: 1, borderBottomRightRadius: 1, backgroundColor: w })];
       break;
     case 'network':
       parts = [box({ left: 8, top: 14, width: 24, height: 12, borderRadius: 2, border: `2px solid ${w}` }),

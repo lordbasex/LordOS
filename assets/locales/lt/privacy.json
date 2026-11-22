@@ -59,5 +59,11 @@
   "ask.idle": "„{app}“ nori žinoti, kada esate nutolę nuo kompiuterio",
   "ask.idleNote": "Jai pranešama, kai kurį laiką nenaudojate klaviatūros ir pelės ir kai grįžtate; nieko daugiau. Vėliau tai galite pakeisti skiltyje Nustatymai → Privatumas.",
   "perm.idle": "Nebuvimas prie kompiuterio",
-  "permHint.idle": "Programos, kurioms pranešama, kai kurį laiką nenaudojate kompiuterio ir kai grįžtate, pvz., pokalbių programos, rodančios jus kaip nesantį. Daugiau jos nieko nesužino; vaizdo įrašas ar pateiktis, laikanti ekraną įjungtą, laikomi buvimu."
+  "permHint.idle": "Programos, kurioms pranešama, kai kurį laiką nenaudojate kompiuterio ir kai grįžtate, pvz., pokalbių programos, rodančios jus kaip nesantį. Daugiau jos nieko nesužino; vaizdo įrašas ar pateiktis, laikanti ekraną įjungtą, laikomi buvimu.",
+  "allowOnce": "Leisti vieną kartą",
+  "allowAlways": "Leisti visada",
+  "ask.vr": "„{app}“ nori naudoti VR akinius {headset}",
+  "ask.vrNote": "Jų ekranas atiduodamas tik programai; LordOS niekada ten nerodo jūsų darbalaukio. Jis atimamas, kai programa užsidaro, akiniai atjungiami arba ekranas užrakinamas. Vėliau tai galite pakeisti skiltyje Nustatymai → Privatumas.",
+  "perm.vr": "VR akiniai",
+  "permHint.vr": "Programos, galinčios tiesiogiai valdyti VR akinių ekraną. Skolinami tik akiniai, niekada jūsų monitoriai, ir jie atimami, kai ekranas užrakinamas, keičiate naudotoją arba pasirenkate Drausti."
 }

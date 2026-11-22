@@ -1,5 +1,6 @@
 /* kms.c — modesetting with kernel ioctls: connector, CRTC, dumb buffers, page flip. */
 #include "kms.h"
+#include "drmcard.h"
 
 #include <errno.h>
 #include <drm/drm_fourcc.h>
@@ -54,6 +55,9 @@ static void destroy_buffer(Kms *k, KmsBuffer *b) {
 /* CRTCs (bit = index in GETRESOURCES) driven by a head of this process: a second display never
  * takes the main one's CRTC (docs/DISPLAYS.md). */
 static uint32_t busy_crtcs;
+/* CRTCs (same bits) leased to an app (wl/drmlease.c): no head of ours takes one while the lease lasts */
+static uint32_t leased_crtcs;
+void kms_set_leased_crtcs(uint32_t mask) { leased_crtcs = mask; }
 
 static KmsPicker picker;
 void kms_set_picker(KmsPicker fn) { picker = fn; }
@@ -107,7 +111,10 @@ int kms_outputs(int fd, KmsOutput *out, int max) {
         o->id = c.connector_id;
         o->type = c.connector_type;
         o->type_id = c.connector_type_id;
-        o->connected = c.connection == 1;
+        /* a non-desktop connector (a VR headset) counts as not connected: no head, no Settings choice, no mirror
+         * ever lights it; only a lease the person allowed does (kms_lease_objects, wl/drmlease.c) */
+        o->non_desktop = c.connection == 1 && drm_conn_non_desktop(fd, c.connector_id);
+        o->connected = c.connection == 1 && !o->non_desktop;
         o->mm_w = c.mm_width;
         o->mm_h = c.mm_height;
         o->modes = modes;
@@ -124,7 +131,7 @@ int kms_outputs(int fd, KmsOutput *out, int max) {
                 if (e.possible_crtcs & (1u << j)) o->possible_crtcs |= 1u << j;
         }
         free(cencs);
-        if (o->connected) read_edid(fd, o->id, o);
+        if (o->connected || o->non_desktop) read_edid(fd, o->id, o);
         n++;
     }
 out:
@@ -149,7 +156,7 @@ static uint32_t crtc_for(int fd, const KmsOutput *o, uint32_t prefer, int *index
     if (!xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &r2)) {
         uint32_t n = r2.count_crtcs < res.count_crtcs ? r2.count_crtcs : res.count_crtcs;
         uint32_t want[3] = { o->current_crtc, prefer, 0 };
-        uint32_t busy = busy_crtcs & ~(mine >= 0 ? 1u << mine : 0);
+        uint32_t busy = (busy_crtcs & ~(mine >= 0 ? 1u << mine : 0)) | leased_crtcs;
         for (int w = 0; w < 2 && !got; w++)
             for (uint32_t j = 0; j < n && j < 32 && want[w]; j++)
                 if (crtcs[j] == want[w] && (o->possible_crtcs >> j & 1) && !(busy >> j & 1)) { got = crtcs[j]; *index = (int)j; }
@@ -289,6 +296,43 @@ static void read_scanout_formats(Kms *k) {
     fputc('\n', stderr);
 }
 
+/* A lease's objects (kms.h): the connector, a CRTC no head drives or that is leased already (busy_crtcs, leased_crtcs,
+ * avoid), and that CRTC's primary plane (UNIVERSAL_PLANES is set on the card's fd by read_scanout_formats; with it the
+ * kernel wants the plane named). */
+int kms_lease_objects(int fd, const KmsOutput *o, uint32_t avoid, uint32_t objs[3], uint32_t *crtc_bit) {
+    if (!o || !o->non_desktop) return -1;
+    struct drm_mode_card_res res = {0};
+    if (xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &res) || !res.count_crtcs) return -1;
+    uint32_t crtcs[32], nc = res.count_crtcs > 32 ? 32 : res.count_crtcs;
+    struct drm_mode_card_res r2 = { .crtc_id_ptr = (uintptr_t)crtcs, .count_crtcs = nc };
+    if (xioctl(fd, DRM_IOCTL_MODE_GETRESOURCES, &r2)) return -1;
+    if (r2.count_crtcs < nc) nc = r2.count_crtcs;
+    uint32_t busy = busy_crtcs | leased_crtcs | avoid;
+    struct drm_mode_get_plane_res pr = {0};
+    if (xioctl(fd, DRM_IOCTL_MODE_GETPLANERESOURCES, &pr) || !pr.count_planes) return -1;
+    uint32_t planes[64], np = pr.count_planes > 64 ? 64 : pr.count_planes;
+    pr.count_planes = np;
+    pr.plane_id_ptr = (uintptr_t)planes;
+    if (xioctl(fd, DRM_IOCTL_MODE_GETPLANERESOURCES, &pr)) return -1;
+    if (pr.count_planes < np) np = pr.count_planes;
+    for (uint32_t j = 0; j < nc; j++) {
+        if (!(o->possible_crtcs >> j & 1) || (busy >> j & 1)) continue;
+        for (uint32_t i = 0; i < np; i++) {
+            struct drm_mode_get_plane gp = { .plane_id = planes[i] };
+            uint64_t type = 0;
+            if (xioctl(fd, DRM_IOCTL_MODE_GETPLANE, &gp) || !(gp.possible_crtcs >> j & 1)) continue;
+            if (gp.crtc_id && gp.crtc_id != crtcs[j]) continue;        /* a plane another CRTC shows now */
+            if (obj_prop(fd, planes[i], DRM_MODE_OBJECT_PLANE, "type", &type) || type != PLANE_TYPE_PRIMARY) continue;
+            objs[0] = o->id;
+            objs[1] = crtcs[j];
+            objs[2] = planes[i];
+            *crtc_bit = 1u << j;
+            return 0;
+        }
+    }
+    return -1;
+}
+
 int kms_scanout_ok(const Kms *k, uint32_t fourcc, uint64_t modifier) {
     if (!k->scan_known) return 1;
     uint64_t m = modifier == DRM_FORMAT_MOD_INVALID ? DRM_FORMAT_MOD_LINEAR : modifier;
@@ -297,9 +341,16 @@ int kms_scanout_ok(const Kms *k, uint32_t fourcc, uint64_t modifier) {
     return 0;
 }
 
+/* Does the driver flip without waiting for vblank when asked (DRM_MODE_PAGE_FLIP_ASYNC on the legacy ioctl)? */
+static int async_flip_cap(int fd) {
+    struct drm_get_cap c = { .capability = DRM_CAP_ASYNC_PAGE_FLIP };
+    return !xioctl(fd, DRM_IOCTL_GET_CAP, &c) && c.value;
+}
+
 static int kms_setup(Kms *k, int keep) {
     if (pick_output(k)) return -1;
     read_scanout_formats(k);
+    k->async_cap = async_flip_cap(k->fd);
     k->saved.crtc_id = k->crtc_id;
     xioctl(k->fd, DRM_IOCTL_MODE_GETCRTC, &k->saved);
     if (create_buffer(k, &k->buf[0]) || create_buffer(k, &k->buf[1])) return -1;
@@ -343,6 +394,7 @@ int kms_head_open(Kms *k, int fd, uint32_t conn_id, const struct drm_mode_modein
     k->width = mode->hdisplay;
     k->height = mode->vdisplay;
     read_scanout_formats(k);
+    k->async_cap = async_flip_cap(fd);
     k->saved.crtc_id = k->crtc_id;
     xioctl(fd, DRM_IOCTL_MODE_GETCRTC, &k->saved);
     if (create_buffer(k, &k->buf[0]) || create_buffer(k, &k->buf[1])) { kms_close(k); return -1; }
@@ -418,6 +470,7 @@ int kms_flip(Kms *k) {
     };
     if (xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) {
         k->flip_pending = 1;
+        k->flip_async = 0;
         k->flip_submit_ns = kms_now_ns();
         return 0;
     }
@@ -516,6 +569,16 @@ int kms_flip_fb(Kms *k, uint32_t fb, void *data) {
         .crtc_id = k->crtc_id, .fb_id = fb, .flags = DRM_MODE_PAGE_FLIP_EVENT, .user_data = (uintptr_t)data,
     };
     k->custom = 1;
+    int async = k->async_next && k->async_cap && !k->modeset_pending;
+    k->async_next = 0;
+    /* a torn flip the driver refuses (amdgpu: a buffer of another format, modifier or pitch than the one shown, as the
+     * first one after a composed frame) goes at vblank instead */
+    if (async) {
+        pf.flags |= DRM_MODE_PAGE_FLIP_ASYNC;
+        if (xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) { k->flip_async = k->flip_pending = 1; k->flip_submit_ns = kms_now_ns(); return 0; }
+        pf.flags &= ~(uint32_t)DRM_MODE_PAGE_FLIP_ASYNC;
+    }
+    k->flip_async = 0;
     if (!k->modeset_pending && xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) { k->flip_pending = 1; k->flip_submit_ns = kms_now_ns(); return 0; }
     /* no page flip: synchronous modeset and notify right away */
     if (kms_set_fb(k, fb)) return -1;

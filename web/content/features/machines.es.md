@@ -16,6 +16,14 @@ Una tarjeta nueva del asistente Nueva máquina arma una máquina que Windows 11 
 - **Instalar sin preguntas.** Tu cuenta local y una contraseña opcional, el nombre del equipo, la edición con tu clave (o la clave que publica Microsoft para instalarla sin activar), sin pedir una cuenta en línea, las opciones de privacidad apagadas, y el idioma, el teclado y la zona horaria de este equipo. Al terminar, Máquinas borra el disco chico que tenía la contraseña y saca los dos discos. O usá el instalador propio de Windows, guiado, con los drivers ya puestos.
 - **El TPM va con la máquina**: las instantáneas lo guardan, volver a una lo repone y los clones se lo llevan.
 
+## LordOS en una máquina
+
+La primera tarjeta del asistente de Nueva máquina es el propio LordOS, en desarrollo:
+
+- **La ISO live** de la versión que nombra la tarjeta, para PC de 64 bits y arm64, comprobada con la clave de publicación de LordOS incluida en LordOS antes de confiar en un solo byte.
+- **Instalación sin preguntas**: tu cuenta y contraseña (guardada solo como hash), el nombre del equipo, la zona horaria, el teclado y tu idioma. Solo se puede borrar el disco nuevo de la propia máquina.
+- **4 procesadores, 4 GB, 32 GB y 3D** por defecto, y el agente del invitado funcionando desde el primer arranque, así el modo apps anda enseguida (con la próxima ISO).
+
 ## Las herramientas de LordOS para Windows
 
 Un programa chico que construye LordOS, que se instala solo después de una instalación desatendida (o desde el botón del agente) y corre como vos, nunca como servicio:
@@ -25,6 +33,7 @@ Un programa chico que construye LordOS, que se instala solo después de una inst
 - **El modo apps**, **los archivos soltados** y **Abrir con** (más abajo).
 - **El puntero lo dibuja LordOS**, así moverlo ya no espera a la máquina. Un interruptor por máquina se lo devuelve al invitado.
 - **Un clon recibe su propio nombre de equipo**, que usa desde su próximo reinicio.
+- **Se mantienen al día solas.** Cuando este LordOS trae herramientas más nuevas, Máquinas las instala mientras la máquina corre y no se está copiando nada; un interruptor en los ajustes de Máquinas y en Configurar de cada máquina lo apaga, y entonces una notificación ofrece **Actualizar**.
 
 ## El portapapeles, solo cuando pegás
 
@@ -83,6 +92,11 @@ El resto del escritorio recibió el mismo cuidado: Ajustes, la Tienda, Archivos 
 - **Resolución de inicio**: *Sigue a la ventana* o un tamaño fijo, que todo sistema toma al arrancar.
 - **Un aspecto nuevo**: hojas sobre la ventana, ajustes agrupados y 38 glifos propios de LordOS que siguen tu color de acento, y una vista Almacenamiento de dónde se va tu espacio.
 - **La Tienda, ordenada por el origen de las apps**: Debian, Flathub, Apps web y apps de LordOS, y las apps que eligió LordOS.
+- **Teclas** (en desarrollo): Ctrl, Alt, Mayús y Win mantenidas para la tecla siguiente, y combinaciones que tu computadora se quedaría para sí, como Ctrl+Alt+Supr, enviadas directo a la máquina.
+- **El modo apps, desde la barra de menús** (en desarrollo): un ítem junto al reloj para cada máquina, cuyo menú funciona como el menú Inicio de la máquina, y un panel con sus ventanas abiertas y sus apps.
+- **Capturar el mouse** (en desarrollo) para juegos y programas 3D; ❖Esc o Ctrl+Alt lo sueltan.
+- **Una tarjeta gráfica real para una máquina** (en desarrollo): una parte de una iGPU Intel (de Broadwell a Comet Lake) con GVT-g, con un controlador de arranque propio de LordOS para ella, escrito a partir de fuentes públicas.
+- **`machines` en la Terminal** (en desarrollo): listar, arrancar, detener, tomar instantáneas, clonar y cambiar máquinas desde una terminal.
 
 ## Qué se probó y qué no
 

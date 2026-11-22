@@ -15,6 +15,7 @@
 #include "../media/streamurl.h"
 #include "js_media.h"
 #include "../media/media_int.h"
+#include "../media/mstudio.h"
 #include "ui.h"
 #include "../media/proto.h"
 #include "../media/hwdec.h"
@@ -260,7 +261,9 @@ static JSValue f_control(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc ? media_src_get(arg_id(c, argv[0])) : NULL;
-    if (s) media_src_close(s);
+    /* LordOS Studio's loopback writer belongs to the session (media/mstudio.c): the popover lets go of its preview
+     * with lord.studio.endPreview() instead */
+    if (s && !mstudio_is_hub(s->id)) media_src_close(s);
     return JS_UNDEFINED;
 }
 
@@ -700,7 +703,9 @@ static JSValue f_copy_image(JSContext *c, JSValueConst t, int argc, JSValueConst
 
 /* ---- recordings ---- */
 
-/* screenRecord(app, salida.mp4, { mic, source, fps, hw }) → id */
+/* screenRecord(app, salida.mp4, { mic, source, fps, hw, region: { x, y, w, h }, cursor }) → id
+ * region: an area of the recorded display in logical pixels (Screenshots' "Record selected area"); cursor: 0 leaves the
+ * pointer out */
 static JSValue f_screen_record(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *app = argc > 0 ? arg_app(c, argv[0]) : NULL, *out = argc > 1 ? arg_path(c, argv[1]) : NULL;
@@ -709,6 +714,17 @@ static JSValue f_screen_record(JSContext *c, JSValueConst t, int argc, JSValueCo
     if (!app || !out) { ret = js_throw_code(c, "media.invalidArguments", NULL); goto out; }
     int mic = opt_int(c, o, "mic", 0, 0, 1);
     if (!permitted(c, app, PERM_SCREEN) || (mic && !permitted(c, app, PERM_MICROPHONE))) goto out;
+    int cw, chh, reg[4], has_reg = 0;
+    media_capture_size(&cw, &chh);
+    JSValue rv = JS_IsObject(o) ? JS_GetPropertyStr(c, o, "region") : JS_UNDEFINED;
+    if (JS_IsObject(rv)) {
+        has_reg = 1;
+        if (media_capture_region(opt_num(c, rv, "x", 0), opt_num(c, rv, "y", 0), opt_num(c, rv, "w", 0), opt_num(c, rv, "h", 0), &reg[0], &reg[1], &reg[2], &reg[3]))
+            has_reg = -1;
+        else { cw = reg[2]; chh = reg[3]; }
+    }
+    JS_FreeValue(c, rv);
+    if (has_reg < 0) { ret = js_throw_code(c, "media.invalidArguments", NULL); goto out; }
     MediaSrc *s = media_src_new(SK_SCREENREC, app);
     if (!s) { ret = js_throw_code(c, "media.tooMany", NULL); goto out; }
     int fd = media_open_output(out, s->tmp, sizeof s->tmp, s->dst, sizeof s->dst);
@@ -720,15 +736,13 @@ static JSValue f_screen_record(JSContext *c, JSValueConst t, int argc, JSValueCo
     if (mic) s->mic = maudio_open(1, appname[0] ? appname : app, "Screen recording", src, &ring);
     int hw = opt_int(c, o, "hw", 1, 0, 1), render = hw ? media_render_fd() : -1;
     char params[160];
-    int cw, chh;
-    media_capture_size(&cw, &chh);
     snprintf(params, sizeof params, "width=%d\nheight=%d\nfps=%d\nhw=%d\nhwaccel=%s\n", cw, chh,
              opt_int(c, o, "fps", 30, 5, 60), render >= 0, media_hwaccel());
     int fds[3] = { fd, ring, render };
     s->sock = media_spawn(MK_SCREENREC, params, fds, 3, &s->pid);
     close(fd);
     if (render >= 0) close(render);
-    if (s->sock < 0 || media_screenrec_start(s, opt_int(c, o, "fps", 30, 5, 60))) {
+    if (s->sock < 0 || media_screenrec_start(s, opt_int(c, o, "fps", 30, 5, 60), has_reg > 0 ? reg : NULL, opt_int(c, o, "cursor", 1, 0, 1))) {
         /* no lord-media (0.8.8.6 shipped without it, GitHub #77) is said as such, not as "another recording" */
         int nohelper = s->sock < 0;
         media_src_close(s);
@@ -796,14 +810,28 @@ static int dev_ok(const char *d) {
     return 1;
 }
 
-/* camera(app, '/dev/videoN', { width, height }) → id */
+/* camera(app, '/dev/videoN' | 'studio', { width, height }) → id. 'studio' is LordOS Studio (media/mstudio.c): the
+ * same camera permission, and lord-studio instead of lord-media on the camera the person chose for it */
 static JSValue f_camera(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     const char *app = argc > 0 ? arg_app(c, argv[0]) : NULL, *dev = argc > 1 ? JS_ToCString(c, argv[1]) : NULL;
     JSValueConst o = argc > 2 ? argv[2] : JS_UNDEFINED;
     JSValue ret = JS_EXCEPTION;
-    if (!app || !dev_ok(dev)) { ret = js_throw_code(c, "camera.invalid", NULL); goto out; }
+    int studio = dev && !strcmp(dev, STUDIO_DEVICE);
+    if (!app || (!studio && !dev_ok(dev))) { ret = js_throw_code(c, "camera.invalid", NULL); goto out; }
     if (!permitted(c, app, PERM_CAMERA)) goto out;
+    if (studio) {
+        MediaSrc *s = media_src_new(SK_CAMERA, app);
+        if (!s) { ret = js_throw_code(c, "media.tooMany", NULL); goto out; }
+        const char *code = NULL;
+        if (mstudio_open(s, opt_int(c, o, "width", 1280, 160, 3840), opt_int(c, o, "height", 720, 120, 2160), &code)) {
+            media_src_close(s);
+            ret = js_throw_code(c, code ? code : "studio.unavailable", NULL);
+            goto out;
+        }
+        ret = JS_NewInt32(c, s->id);
+        goto out;
+    }
     int fd = open(dev, O_RDWR | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) { ret = js_throw_code(c, "camera.openFailed", NULL); goto out; }
     MediaSrc *s = media_src_new(SK_CAMERA, app);

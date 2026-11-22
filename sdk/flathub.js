@@ -225,4 +225,11 @@ export function info(ref) {
 }
 
 export const catalogApp = (id) => state.get().catalog.find((a) => a.id === id) || null;
+// An app's description from the last catalog read, in its language ('' when it has none): asked for one app at a time,
+// so the catalog itself stays small (lord.flatpak.description, checked again in lord-server).
+export function description(id) {
+  const a = api();
+  if (!a || typeof a.description !== 'function' || !M.idOk(id)) return '';
+  try { return String(a.description(id) || ''); } catch (e) { return ''; }
+}
 export const installedApp = (id) => state.get().installed.find((a) => a.id === id) || null;

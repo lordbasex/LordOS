@@ -33,6 +33,11 @@ int  pwguard_fd(void);          /* -1 if not connected */
 int  pwguard_wants_write(void);
 void pwguard_dispatch(void);
 void pwguard_tick(void);        /* every pass of the main loop; does work once a second */
+/* The capture indicator (sdk/capturestatus.jsx): emit("capture-use", json) whenever what Linux apps capture through
+ * PipeWire changes. A capture stream counts once a microphone, a camera or a shared screen is linked into it; its owner
+ * is worked out as for the restrictions, a pulse client's own word always checked; "" an unknown program. lord-server's
+ * own streams are left out (the shell shows them under the app they are for). */
+void pwguard_on_use(void (*emit)(const char *kind, const char *json));
 
 /* ---- for tests (tests/pwguard_test.c) ---- */
 /* A SPA POD reader over buf: the n-th field of a Struct and its kind. */
@@ -48,5 +53,9 @@ uint32_t pwguard_stream_flag(const char *media_class);
  * Video/Source whose media.role is Screen, or named lordos-screencast-*) is FW_R_NO_SCREEN, not a camera; else as
  * pwguard_capture_flag. Any app's node that says so is hidden from no-screen apps, which only hides it more. */
 uint32_t pwguard_node_flag(const char *media_class, const char *media_role, const char *node_name);
+/* The capture indicator's JSON from (app, flags) pairs, one entry per app: 0, or -1 when it doesn't fit or an id isn't
+ * plain. */
+typedef struct { char app[128]; uint32_t flags; } PwUse;
+int pwguard_use_format(const PwUse *u, int n, char *out, size_t cap);
 
 #endif

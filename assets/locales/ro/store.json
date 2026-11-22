@@ -330,5 +330,11 @@
   "src.wine": "Wine",
   "src.android": "Aplicații Android",
   "soon": "În curând",
-  "sub.all": "Toate"
+  "sub.all": "Toate",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Am detectat o cameră.",
+  "suggest.studioCamera.detail": "Oferă tuturor aplicațiilor, inclusiv browserelor și apelurilor video, camera „LordOS Studio” cu efectele tale: fundal estompat sau o imagine în spatele tău ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} nu se află în sursele de pachete ale acestui computer.",
+  "suggest.studioCamera.note.dkms": "Pe un PC, modulul său de nucleu este compilat pentru nucleul tău pe acest computer (DKMS), ceea ce aduce circa 500 MB de compilatoare și antete de nucleu, și din nou după fiecare actualizare a nucleului. Pe un Raspberry Pi vine cu nucleul LordOS.",
+  "suggest.studioCamera.note.secureBoot": "Cu Secure Boot activat, trebuie să înregistrezi cheia de semnare a modulului la următoarea repornire, altfel camera nu apare."
 }

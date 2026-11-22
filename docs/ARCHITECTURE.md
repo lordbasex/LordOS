@@ -104,7 +104,7 @@ Besides the kernel and libc, only these are allowed:
 | FreeRDP (`libfreerdp3`, `libfreerdp-client3`, `libwinpr3`) | RDP in the sandboxed `lord-rdesk` (0.8.7, `FILES.md`, "Remote desktop"); its client library only for shared folders | system |
 | `libcrypt`           | verifying passwords against `/etc/shadow` (`lord-sessiond`, `admin.c`) | system |
 | `libsrtp2`, `usrsctp` | the remote desktop's video (WebRTC, 0.8.4): SRTP and the data channels' SCTP, in `lord-sessiond`'s bridge only (as the user, after it dropped root); with OpenSSL's DTLS and our own ICE-lite, SDP and RTP code (`remote/rtc.c`, `remote/rtcwire.c`) because Debian 13 packages no libdatachannel. Required for `lord-sessiond` since the remote desktop shows the screen only over WebRTC (the image path was removed in 0.8.4). Never `lord-server` | system |
-| FFmpeg (`libavcodec`, `libavformat`, `libavutil`, `libswscale`, `libswresample`) and `libva` (+ `libva-drm`) | Decoding and encoding video, audio and images; VA-API for hardware decoding (M9, approved by the user). **Only `lord-media` links them**, the sandboxed helper; the player, synchronization and interface are our own. Never `lord-server` (`MEDIA.md`) | system |
+| FFmpeg (`libavcodec`, `libavformat`, `libavutil`, `libswscale`, `libswresample`) and `libva` (+ `libva-drm`) | Decoding and encoding video, audio and images; VA-API for hardware decoding (M9, approved by the user). **Only `lord-media` links them**, the sandboxed helper (and `lord-stream` and `lord-studio`, built from its sources); the player, synchronization and interface are our own. Never `lord-server` (`MEDIA.md`) | system |
 | audio.cpp (`libaudiocpp`, Apache-2.0) and its ggml (MIT) | Text to speech (0.8.8.6, `say`; Pocket TTS, Kyutai, weights CC-BY-4.0; approved by the user). **Only `lord-tts` links them**, the sandboxed helper (`server/src/doc/h_tts.c`); audio.cpp at the commit `tools/tts/fetch-audiocpp.sh` pins, built with Pocket TTS only, ggml's CPU kernels for every x86-64 generation and Vulkan, in `/usr/lib/lordos/lib/tts`. No voice model ships with LordOS. Never `lord-server` (`VOICE.md`) | pinned source |
 | PipeWire's client library (`libpipewire-0.3`) | Sharing a screen or a window with a Linux app (0.8.8.8, the ScreenCast portal, approved by the maintainer): the video source node and the app's restricted connection. **Only `lord-screencast` links it**, the sandboxed helper (`server/src/cast/lordscreencast.c`), with no real-time module, no D-Bus and no socket of its own: lord-server connects the user's PipeWire socket and hands the fds over. Never `lord-server`, which keeps its own native-protocol code for the guard (`sec/pwguard.c`) (`WAYLAND.md`, "Sharing a screen or a window") | system |
 | Tesseract (`libtesseract`) | Text recognition (0.8.8.6, Screenshots' "copy the text", approved by the user). **Only `lord-ocr` links it**, the sandboxed helper (`server/src/doc/h_ocr.c`); it brings Leptonica, libarchive, libcurl and libgomp. The language data is Debian's (`tesseract-ocr-eng` as a dependency, Spanish, Portuguese, French and Italian recommended). Never `lord-server` or `lord-doc` | system |
@@ -155,6 +155,12 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   camera and the render node), in `sandbox_apply_helper`. It decodes and encodes with FFmpeg; the
   frames come back through sealed shared memory and the audio goes to a ring whose PipeWire
   stream belongs to `lord-server`. See `MEDIA.md`.
+- **`lord-studio`** (LordOS Studio, in development; E-S1 approved by the maintainer on 2026-11-22): `lord-media`'s camera
+  built with `LM_STUDIO`, plus LordOS's own inference (`server/src/media/studio/nn.c`, MediaPipe's Selfie Segmenter
+  converted to our `.lnn` file) and the guided filter, blur and picture composite, on the GPU (GBM + surfaceless EGL +
+  GLES 3 on the render node fd, like `lord-bench`) or the CPU. Same rules as `lord-media`: fixed path, no arguments,
+  fds only (the camera, the render node, the model whose SHA-256 lord-server checked, a background picture), V4L2 and
+  DRM/dma-buf ioctls only, no network, no PipeWire, no exec. See `CAMERA-STUDIO-PLAN.md`.
 
 - **`lord-vault`** (M9): the Passwords and keyring helper. Same rules as `lord-doc`/`lord-media`
   (fixed path, no arguments, minimal environment, `sandbox_apply_helper`: no network, no new

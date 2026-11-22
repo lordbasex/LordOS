@@ -2,7 +2,7 @@
 // pill, the featured banner, the facts row of an app page and the sidebar glyphs. Data comes from the
 // pages (debian.js, ai.js, index.jsx); these pieces only draw.
 import { createElement as h, useEffect, useState } from 'react';
-import { View, Text, Image, useTheme, useStore, settings, typeScale, spacing } from '@lordos/sdk';
+import { View, Text, Image, useTheme, useStore, settings, typeScale, spacing, openUrl } from '@lordos/sdk';
 
 export const CARD_BASIS = 250;
 const CARD_HEIGHT = 148;     // two lines of summary and the foot, so the action keeps the card's padding
@@ -124,14 +124,18 @@ export function Featured({ icon, glow, image, colors, kicker, title, text, actio
 }
 
 // The facts row of an app page: up to four label/value columns between hairlines.
+// items: [label, value, link?]; link { url, title }: the value is a link that opens url in the browser (sdk openUrl)
 export function Facts({ items }) {
   const th = useTheme();
   const list = items.filter((x) => x && x[1]);
   return h(View, { style: { flexDirection: 'row', borderTop: `1px solid ${th.separator}`, borderBottom: `1px solid ${th.separator}` } },
-  ...list.map(([label, value], i) => h(View, { key: label, style: { flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 10, gap: 2, alignItems: 'center',
+  ...list.map(([label, value, link], i) => h(View, { key: label, style: { flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 10, gap: 2, alignItems: 'center',
     ...(i ? { borderStart: `1px solid ${th.separator}` } : {}) } },
   h(Text, { style: { fontSize: 11, color: th.textDim, whiteSpace: 'nowrap' } }, label),
-  h(Text, { style: { fontSize: 13, fontWeight: 650, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' } }, value))));
+  link ? h(View, { title: link.title, onClick: () => openUrl(link.url), style: { flexDirection: 'row', alignItems: 'center', gap: 4, maxWidth: '100%', cursor: 'pointer' } },
+    h(Text, { style: { fontSize: 13, fontWeight: 650, color: th.accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 } }, value),
+    h(Text, { style: { fontSize: 12, color: th.accent } }, '↗'))
+    : h(Text, { style: { fontSize: 13, fontWeight: 650, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' } }, value))));
 }
 
 // A placeholder while something isn't there yet (the banner before the first package list): grey

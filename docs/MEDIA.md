@@ -32,7 +32,7 @@ We took the way the apps of popular desktop systems work, never their logos or t
 | ![picture in picture](video-picture-in-picture.png) | ![open with](media-open-with.png) |
 | Picture in picture over Files | Files: video thumbnails and "Open with → Player" |
 | ![panel](screenshots-panel.png) | ![permission](screenshots-permission.png) |
-| The Screenshots panel (❖⇧5) | The system asks for the screen permission the first time |
+| The old Screenshots panel (❖⇧5; now a floating toolbar, picture to be retaken) | The system asks for the screen permission the first time |
 | ![area](screenshots-area.png) | ![annotate](screenshots-annotate.png) |
 | Capturing an area over the frozen screen | Editor: arrow, box, blur and text, at full resolution |
 | ![recording](screen-recording-in-progress.png) | ![frame](screen-recording-frame.png) |
@@ -144,6 +144,34 @@ Cameras, streams and TV channels for the desktop's **Video** widget and the Play
   a webcam served by VLC on 127.0.0.1 (VLC refuses RTSP over TCP, so lord-stream falls back to UDP by itself; a camera
   starts with a 1 s analysis, the first frame in about 4 s there; stopping VLC was noticed within a second). Not yet:
   ONVIF discovery; NDI (closed SDK: not possible).
+
+### LordOS Studio: `lord-studio` (in development, phases 0 and 1)
+
+The camera's effects (docs/CAMERA-STUDIO-PLAN.md): background blur, a background picture and the mirror, for every
+LordOS app that picks the "LordOS Studio" camera in `lord.media.cameras()` (device `studio`; isolated apps through
+`BOP_CAMERA`). Opening it starts **`lord-studio`**, lord-media's camera job built with `LM_STUDIO`
+(`server/src/media/studio/`): the same `MK_CAMERA` ring, photo, video and companion link, with each decoded picture
+passed through the pipeline first (`stcam.c` → `stfx.c`).
+
+- **Fds only**, all opened by lord-server (`media/mstudio.c`): the real camera the person chose in the popover (kept by
+  its USB bus id), the render node, the segmenter's model (`assets/studio/models/`, SHA-256 checked against
+  `studio/models.h`) and, with `MM_STUDIO_BG`, a background picture that the helper decodes itself. The effects travel
+  as numbers (`MM_STUDIO`: mode, blur, mirror) to every running source at once; `MM_STUDIO_STATS` comes back once a
+  second (frames, the segmenter's and the composite's µs, GPU or not).
+- **The pipeline**: one pass over the frame for the guide grid (a quarter of the frame) and the segmenter's 256×144 input;
+  MediaPipe's Selfie Segmenter on our own inference (`nn.c`); temporal smoothing; the fast guided filter; a blur that
+  keeps the person's pixels out of the background, or a picture fitted to cover; the composite on the GPU (GLES 3 on
+  the render node, like lord-bench) or on the CPU. Measured numbers: docs/CAMERA-STUDIO-PLAN.md 3.3 (720p: about
+  11 ms a frame with an RX 580, 17 ms on the CPU).
+- **The popover**: `sdk/studio.jsx`, from the camera capture item's "Video effects" (`sdk/capturestatus.jsx`).
+- **Tests**: `build/studio-nn-test`, `build/studio-test`, `tests/studio_model_test.mjs` (`make test`),
+  `build/studio-helper-test` (`make test-full`), `tests/studio_headless.sh` (screenshots, no camera opened).
+- **Phase 2, the loopback** (with the optional `lordos-studio-camera` package; docs/CAMERA-STUDIO-PLAN.md 11.2): one
+  more lord-studio per session with `loopback=1` (`stcam_hub`): fds = render node, model and `/dev/video50`; the idle
+  card at 1 fps with no camera, the real camera only by `MM_STUDIO_CAM` while a reader streams (`MM_STUDIO_READERS`,
+  from v4l2loopback's client-usage event) or the popover previews it; YUYV out with `write()`. LordOS apps that choose
+  "LordOS Studio" then read the device through lord-media like any camera, so one lord-studio serves them all.
+  `build/studio-hub-test` and `tests/studio_package_test.sh` (`make test`).
 
 ### The `lord-media` helper
 
@@ -294,7 +322,7 @@ Screen, microphone and camera go through the system permissions (`sec/perms.c`, 
 |---|---|
 | ❖⇧3 or Print Screen | Capture the whole screen |
 | ❖⇧4 | Capture an area (Space: a window; Esc cancels) |
-| ❖⇧5 | Screenshots panel; if recording, stops the recording |
+| ❖⇧5 | Screenshots toolbar (`apps/screenshots/toolbar.jsx`); if recording, stops the recording |
 | Media keys (play/pause, next, previous, stop) | LordOS's Player while it plays; otherwise the Linux player that plays, or the one active last (see "Linux players") |
 | Player: Space, ← →, ⇧← ⇧→, ↑ ↓, F | Pause, ±5 s, ±30 s, volume, full screen |
 | Photos: ← →, + −, 0, 1, R, F, Space, ❖P | Previous/next, zoom, fit, 100 %, rotate, full screen, slideshow, print |
@@ -396,7 +424,7 @@ browser's screen-sharing test page. The details are in `WAYLAND.md` ("Sharing a 
 | `screenshot(app, { x, y, width, height, display, until, also })` → id, `crop`, `annotate(base, ops, dest)` | Screenshots (`screen` permission). `until`: a window's frame node (`wm.frameNode(id)`); the screen is painted up to that window and no further (`paint_capture_until`), so a window capture is the window whole, without the windows, menus or Dock that covered it (#70). `also`: up to 8 nodes painted over it afterwards, each only if it is still on screen: the window's sheets (`wm.sheetNodes(id)`, a `<Layer name="modal">` its app opened, such as Settings → Wallpaper's file dialog), which a window capture used to leave out (#58) |
 | `resize(id, width, height)`, `rotate(id, quarterTurns)` → id | The markup editor (0.8.8.4, issue #30): a new picture from a capture or a decoded image; whole sides 1..8192, turns -3..3, anything else refused in C (`server/src/media/imgops.c`) |
 | `saveImage(id, output, { format })`, `copyImage(id)` | PNG/JPEG to a file or to the clipboard |
-| `screenRecord(app, output.mp4, { mic, fps })`, `audioRecord(app, output.wav)`, `stop(id)` | Recordings (`screen`, `microphone` permissions) |
+| `screenRecord(app, output.mp4, { mic, source, fps, region: { x, y, w, h }, cursor })` (region: a part of the main display, logical px; cursor: 0 leaves the pointer out), `audioRecord(app, output.wav)`, `stop(id)` | Recordings (`screen`, `microphone` permissions) |
 | `cameras()`, `camera(app, device, { width, height })`, `photo(id, output, mirror)`, `cameraRecord(id, output \| null, { mic, mirror })` | Camera (`camera` permission) |
 | `info(id)`, `close(id)`, `protectedCount()`, `hwaccel()` | |
 

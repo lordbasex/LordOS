@@ -383,6 +383,32 @@ lord-server passes `--render-node none` when it draws without a GPU, so the CPU 
   nothing, and passes the descriptor on (`VD_DMABUF`, `vmproto.h`). QEMU doesn't let the guest draw again until `UpdateDMABUF` is
   answered, so the helper answers once lord-server read that frame (`VD_FRAME_DONE`) or after 250 ms: no tearing, and a stuck
   compositor holds the guest 250 ms at most.
+- **QEMU's "Failed to call update: Timeout was reached"** (seen 2026-11-22 on a Windows 11 machine with an Intel GVT-g vGPU,
+  five times, around a capture switch and when apps mode resized the guest to 1920x1080). QEMU gives each listener call 1 s
+  (`DBUS_DEFAULT_TIMEOUT`, `include/qemu/dbus.h`) and logs this when an `UpdateDMABUF` gets no answer in time. lord-vmdisplay
+  answers every listener call from its main loop at once, or holds an `UpdateDMABUF` 250 ms at most (above), and never calls
+  QEMU and waits; `tests/vmdisplay_test.c` (a mock QEMU and a mock lord-server, in `make test`) checks it: with lord-server
+  reading every frame, never reading one, slow with the picture for a new size, and 200 updates at once with input arriving, the
+  slowest answer is 251 ms and every call is answered. QEMU itself drops listener calls: when it sends a new `ScanoutDMABUF` or
+  `Disable`, every `Update`/`UpdateDMABUF`/`Scanout*` still waiting in its D-Bus queue is thrown away (`ddl_discard_display_messages`
+  and the connection's filter in `ui/dbus-listener.c`, 10.0). Such a call never reaches the helper, its answer never comes, and
+  QEMU logs the timeout a second later. That is the likely source of these lines: they come when the guest's picture changes
+  buffers or size. On a vfio display (GVT-g) they don't stop the picture (QEMU's vfio display sends an `UpdateDMABUF` every refresh
+  whatever is pending); on virgl the guest's drawing waits that second. To tell the two apart in a real session, lord-vmdisplay
+  now logs a turn of its loop that took 200 ms or more, and at the end how many `UpdateDMABUF` answers it held and the longest
+  (`the display listener's calls: …`): QEMU timeouts with a longest well under 1000 ms are QEMU's own drops. **To check** in the
+  maintainer's session: those lines beside QEMU's.
+- **A closed display connection stays registered in QEMU** (seen the same day): after the machine's window closed, QEMU went on
+  calling the dead listener and logged `Failed to call update: The connection is closed` twice every 30 ms (32,557 lines in
+  `lord-vm.log` in six minutes); the next window's connection is added beside it. That is QEMU's: QEMU 10's
+  `dbus_console_register_listener` drops a listener on its connection's `closed` signal (`listener_vanished_cb`), yet the calls
+  went on, and the D-Bus display has no call to unregister a listener, so lord-vmdisplay closing its connection (it does) is all
+  this side can do; not fixed in QEMU. On 2026-11-22 the same flood filled `lord-vm.log`'s 4 MB cap and lord-vm wrote **nothing**
+  more for the rest of that run (no agent or display lines). Since then (`src/vm/vmlog.c`, `build/vmlog-test`): a child's stderr
+  is logged in whole lines (QEMU's timestamp and message no longer come out as two cut lines); a line that comes again with the
+  same text (QEMU's own timestamp aside) is logged once and then counted, with `qemu: (the line before came N more times in S s)`
+  at most every 10 s and when another line comes; and a full `lord-vm.log` is rotated (`lord-vm.log` → `.1` → `.2`, the oldest
+  dropped; at most 3 × 4 MB) with a first line that says so, never left silent.
 - lord-server imports each dmabuf once with EGL (`gpu_tex_dmabuf`; QEMU names the same few buffers again on each flip, known by
   inode, four kept) and reads the damaged rows back into the shared picture (`gpu_tex_read_rows`), so the rest of the picture's path
   (MediaView, thumbnails, recordings) is unchanged. It never waits on the guest's GPU work: the dmabuf's fence is polled, and a frame
@@ -496,7 +522,7 @@ compromised QEMU can't change `machine.json` (and through it, what the next star
 | `machine.json` | The description, schema 1 (`machine.h`; schema 2 added `base`, `agent`, `clipboard`, schema 3 an imported machine's hardware, 6.22; 4 `shares`; 5 `secure_boot`, `tpm`, `hyperv`, `drivers`, `graphics`; 6 the network's modes, `bridge`, `ports`, `resolution`, `sound`, `volume`, `microphone`, `boot_order`, `boot_menu`; 7 `transfer`; 8 `sound_out`, `sound_in`, 6.9; 9 `clipboard_ask`, 6.8; 10 `pointer`, 7.1.2): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
 | `disks/system.qcow2` | System disk, made by `qemu-img` at creation (empty, or converted from an image with `--import`) |
 | `disks/nvram.qcow2` | UEFI variables as qcow2, converted from the firmware's template (6.2). arm64 always uses UEFI (`AAVMF_CODE.no-secboot.fd`); amd64 uses UEFI (`OVMF_CODE_4M.fd`) when the `ovmf` package is there and SeaBIOS otherwise, which is what a Pi gets for an emulated amd64 guest |
-| `log/lord-vm.log` | This run: lord-vm's lines, QEMU's and passt's stderr, the command line (credentials named, never their values); 4 MB at most. `lord-vm.1.log` and `lord-vm.2.log` are the two runs before (6.19) |
+| `log/lord-vm.log` | This run: lord-vm's lines, QEMU's and passt's stderr (whole lines; a repeated line once, then a count every 10 s), the command line (credentials named, never their values); 4 MB at most. `lord-vm.1.log` and `lord-vm.2.log` are the two runs before (6.19), or, when a run filled its log, that run's earlier parts: the log is rotated when full, never left silent, 12 MB at most in all |
 | `log/serial.log` | The guest's serial console, 1 MB at most per run (`serial.1.log`, the run before) |
 | `lock` | `flock`ed by the running lord-vm: a second one on the same machine is refused |
 | `run.json` | The last state lord-vm wrote: state, reason, code, pids, time, detail. Status and recovery read it |
@@ -1218,10 +1244,64 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
   qemu-guest-agent first when it answers and presses the button 10 s later if the guest still runs (without the
   agent, the button first); the card's installs bring the standard task or a desktop (`dbus`, logind),
   `qemu-guest-agent` with the machine's agent on, and, on a console Debian, `acpid` and `acpi-support-base`.
-- *Deviation from the mock:* the mock's first card is LordOS; LordOS publishes no ISO as a release file yet (its
-  releases carry the `.deb` packages and the Pi image is written by the Imager), so its card is left out until one is,
-  and the fourth card is Kali (in 4.1's list). The mock's step names stay (*Install* is shown as *Create*, as in the
-  alpha).
+- *Deviation from the mock:* the mock's first card is LordOS; until 0.8.9 LordOS published no ISO as a release file,
+  so its card was left out and the fourth card is Kali (in 4.1's list). The LordOS card came after (below). The mock's
+  step names stay (*Install* is shown as *Create*, as in the alpha).
+- *The LordOS card (in development, 2026-11-22; maintainer's decision the same day).* The first card is **LordOS**,
+  with LordOS's own icon (`LordOSLogo`: LordOS is ours, no trademark question), for amd64 and arm64: the **live ISO**
+  (`lordos-live-<version>-<arch>.iso`, about 1.1 GB), not the OVA or the Pi image.
+  - *Which release:* the entry's folder is a GitHub release folder with a **pinned tag**
+    (`https://github.com/lordbasex/LordOS/releases/download/v0.8.9-beta/`), and `release` says its version
+    (*LordOS 0.8.9*). No GitHub API call: the downloader keeps to the catalog's folder (the image's download redirects
+    to GitHub's signed asset URL, as for the Imager), and the API's answers would be one more thing to parse and
+    rate-limit. The release process moves the tag (`RELEASING.md`, step 1) whenever a release ships new ISOs; a release
+    with a fourth number and no ISO keeps the card where it is. `vm_catalog_test.mjs` fails when the site's current ISO
+    (`web/content/downloads.json`) is newer than the card's tag, so a forgotten move shows up in `make test`. Pre-releases
+    (`-beta` tags) are what exists today; the card says the version only. An installed LordOS's card names the release
+    its own package was built with (or a newer one after an update).
+  - *The signature:* LordOS's own releases are signed with the **LordOS release key**: `SHA256SUMS.sig` is base64 of the
+    Ed25519 signature over `SHA256SUMS` (`SIGNING.md`, "Release files"). The entry's `signature` is
+    `{ "type": "lordos-release", "name": "SHA256SUMS.sig" }`, with no `keys` or `fingerprints` (a catalog entry of that
+    kind that names them is refused). `vmcatalog.c` checks it with `img_sig_verify`, the LordOS Imager's own check of
+    official images (`imager/imgverify.c`), and the key the helper passes is `codesig_release_key`, the release key
+    compiled into lord-server: no new crypto, no new key, no key file on disk. A missing `SHA256SUMS.sig` is
+    `vm.listUnsigned`; one that doesn't verify (a changed list, a line added, another key, an OpenPGP signature in its
+    place, another list) is `vm.listBadSignature` with `imager.badSignature`. Then the image is checked against that
+    signed list like any card's. `maxMb` is 4096 for both.
+  - *Size:* a card may carry `defaults`, the least a new machine of it gets over the chosen profile (`cardSize` in
+    `catalog.js`; processors never more than this computer has): LordOS asks for **4 vCPU, 4 GB, 32 GB and 3D
+    graphics** (3D where this computer can give it, 6.10).
+  - *Install without questions:* `unattended` kind **`lordos`**, the live ISO's own unattended install
+    (`UNATTENDED.md`, in the live ISO since 0.8.8.1): the live kernel and initrd (`live/vmlinuz`, `live/initrd.img`, the same
+    paths on both architectures) with `boot=live components loglevel=3 nosplash lordos.auto=1 console=tty1`, and a FAT
+    seed disk labelled **`LORDOSAUTO`** with `lordos-auto.conf` (`vmu_answer`): the account, the SHA-512 hash of the
+    password, the computer's name, time zone, keyboard, locale, LordOS's interface language (this LordOS's own), `mode =
+    erase`, `erase = yes`, `autologin = no`, `after = reboot`, and the disk: lord-vm fills `disk` (`vda`, or `sda`
+    with the compatible devices) and `disk_bytes`, the exact size of the system disk it just made, so
+    `lord-autoinstall` erases only that disk and stops, touching nothing, at anything else (the seed disk, the ISO, a
+    different size). A spec of kind `lordos` without `lordos.auto=1` on its command line is refused. Its restart at the
+    end ends QEMU as with the other installers, and the next start is the installed LordOS. No ISO-side change was
+    needed: the live ISO already reads `lordos-auto.conf` from a `LORDOSAUTO` file system of any kind. An older live ISO
+    without `lordos-autoinstall.service` (before 0.8.8.1) starts its live session instead and nothing is erased; the
+    card only names 0.8.9 or newer.
+  - *The guest agent from the first boot:* the `lordos` package ships `lordos-guest.service`, a user unit on by
+    default (`/usr/lib/systemd/user/default.target.wants`) that runs `/usr/lib/lordos/guest/lordos-guest` only where
+    `/dev/virtio-ports/org.lordos.agent` exists, which is only inside a Machines guest whose agent is on, and
+    `71-lordos-guest.rules` (the same rule the Install Agent writes in other guests: the seat's person may open the
+    port). On a computer, or a machine without the agent, nothing runs. The live ISO now also has `qemu-guest-agent`
+    (`ISO.md`): Debian's unit starts only when the host gives the `org.qemu.guest_agent.0` port. So a LordOS machine
+    made by the card has its agent connected and apps mode (7.2) offered from its first boot; both reach installed
+    systems with the next ISO and the next `lordos` package.
+  - *Checked:* `vmcatalog-test` with v0.8.9-beta's published `SHA256SUMS` and `SHA256SUMS.sig` (`tests/vmimage/lordos.*`)
+    and the compiled-in key: the list verifies; a changed hash, a line added, another key, a 31-byte or PEM key, no
+    signature, an empty, garbage or OpenPGP signature, the signature over Debian's list, and Debian's entry given the
+    release key are all refused; entries of that kind with a key file, fingerprints, no name or a path for a name are
+    refused. `vmunattend-test`: the `lordos-auto.conf` keys and values, no answers until lord-vm names the disk and its
+    size, refused languages and command lines, and `vmu_prepare` end to end (the `LORDOSAUTO` FAT image read back, the
+    file on it). `vm_catalog_test.mjs`: the card per architecture, the live ISO picked from the real list (never the
+    OVA or a `.sources.tsv`), the tag against `downloads.json`, `unattendedOf`, `cardSize`. **Not run yet:** the whole
+    path on a machine (download 1.1 GB, the unattended install to the installed desktop, the agent and apps mode on
+    first boot) needs the next ISO (with `qemu-guest-agent`) and a host with this branch.
 - *Tests:* `tests/vmcatalog_test.c` (ASan, UBSan; the real catalog for both architectures, names against patterns and
   what must never pass: paths, `.torrent`, the other architecture, Debian's *edu* and *mac* images; both list forms,
   capitals, CRLF, a NUL, odd spacing; fourteen malformed catalogs refused) and `tests/vm_catalog_test.mjs` (the cards,
@@ -1294,7 +1374,7 @@ Every current Linux has virtio drivers in its kernel. Cards: Ubuntu, Fedora, Deb
 
 **Always the newest image of a release.** The catalog doesn't pin a file. An entry names a release, the maker's list that names its images (a `SHA256SUMS` file, a directory listing, a releases file) and a file-name pattern, so "Ubuntu 26.04" keeps working when 26.04.2 appears. The app reads the list, takes the newest matching name, checks that it can really be downloaded (lists sometimes name removed files), and verifies the download against that same list, whose signature it checks with the maker's key (confirmed for all four cards on 2026-11-06: every maker signs its list, with the keys pinned in 3.9, "The Linux download cards"). So the catalog stays small and rarely needs an update, and our own signature covers only the entry: which list and which key are trusted. LordOS itself is a guest too, since we build UEFI ISOs for both architectures.
 
-Automatic install: Debian preseed, Ubuntu autoinstall, Fedora kickstart. The person gives a name and password once, in the assistant;
+Automatic install: Debian preseed, Ubuntu autoinstall, Fedora kickstart, and LordOS's own `lordos-auto.conf` (the live ISO's unattended install, in development: 3.9, "The LordOS card"). The person gives a name and password once, in the assistant;
 it reaches the guest through a small seed disk (Debian: inside the installer's initrd) that is deleted after the first boot, and only
 its hash is ever stored (built in 0.8.9: 3.9, "Install without questions").
 
@@ -1463,7 +1543,7 @@ A light never carries meaning by color alone: each has a tooltip and the state i
 Steps, each one screen, with Back always available:
 
 1. **Choose:** cards.
-   - Download: Debian, Ubuntu, Fedora, Kali (built 2026-11-06, 3.9, "The Linux download cards"); LordOS once it publishes an ISO; Android (later).
+   - Download: Debian, Ubuntu, Fedora, Kali (built 2026-11-06, 3.9, "The Linux download cards"); LordOS (its live ISO, signed with the release key; in development, 3.9, "The LordOS card"); Android (later).
    - "Install from an ISO file" (drag a file on it).
    - "Migrate from another app": a machine of another virtualization app (6.22). Built 2026-11-05; it took the tile the mock gave
      "Migrate from another PC" (6.11), which comes later.
@@ -1738,6 +1818,51 @@ A screen in the app's Help and first run lists, per host, what's native, slow, l
 Follows `docs/SHORTCUTS.md`: app menus, ❖ shortcuts for the host while the app has focus outside capture, all passed to the guest while captured. The release combination is shown in the bar and is configurable. In Lord Classic the same table.
 
 Since 0.8.8.8 the VM window can also take the desktop's shortcuts (❖, ⌥Tab and the rest) while it has the keyboard, so they reach the guest (`apps/machines/vmwindow.jsx` → `sdk/kbinhibit.js`, `sdk/kbinhibitmodel.js`). It follows the same rule as a Linux app's keyboard-shortcuts inhibitor: the person allows it once (the `shortcuts` permission, Settings → Privacy → Keyboard shortcuts), ❖Esc turns it off for that window and back on, and the lock, the console switch and the media keys always stay LordOS's.
+
+**Keys panel** (in development, after 0.8.9.4): a keyboard button on the machine window's bar (and on the full-screen floating
+bar) opens a panel, like noVNC's side keys but richer (`apps/machines/keys.jsx`; the tables and the latch logic are pure, in
+`apps/machines/model.js` `KEY`, `keyCombos`, `latch*`, `comboSend`, tested in `server/tests/vm_model_test.mjs`):
+
+- **Hold down**: Ctrl, Alt, Shift and Win (Windows guests) or Super (the others). A click presses it in the guest and keeps it
+  down until the next key typed into the machine (another modifier keeps them, so held Ctrl + Shift + T works) or the next
+  combination sent; then they go up in reverse. A second click lets it go. Nothing stays stuck: blur, leaving the window, the
+  machine stopping and the window closing all release everything (`lord.vm.release`, the same path as a held physical key).
+- **Combinations**, each one click (down in order, up in reverse, like Ctrl+Alt+Delete). Windows guests: Ctrl+Alt+Del, Win,
+  Win+P, Win+D, Win+E, Win+R, Win+L, Win+Tab, Alt+Tab, Alt+F4, Ctrl+Shift+Esc, Win+Shift+←/→, Win+↑/↓, PrintScreen,
+  Win+Shift+S. Others: Ctrl+Alt+Del, Super, Alt+Tab, Alt+F4, Ctrl+Alt+T, PrintScreen and the text consoles Ctrl+Alt+F1…F7.
+  They go straight to the guest with `lord.vm.key`, never through LordOS's shortcuts, so ❖P reaches a Windows guest without
+  the `shortcuts` permission.
+- **Single keys** (Esc, Tab, Insert, Delete, Home, End, PgUp, PgDn) and **F1–F12**.
+- **Show on-screen keyboard**: LordOS's own (`sdk/osk.js`). Its taps go down the same path as a physical key
+  (`lord.input.tap` → `js_key`) to the window in front, so the machine window forwards them like typed keys, held keys included;
+  no change to the keyboard was needed.
+
+While the panel is open the keyboard keeps typing into the machine (it is not a menu), so a held Win and a P typed after it make
+Win+P; a click outside closes it. The menu bar's **Actions → Send Keys** has the same combinations and single keys; Power and
+Actions keep their own Ctrl+Alt+Delete.
+
+**Keys reach a machine only while it has the keyboard** (security, in development after 0.8.9.4). A key listener
+(`runtime/events.js` `addListener`) hears every key of the session, whatever window it was typed in, so a window's own
+`focused` flag decides nothing on its own. Every path that sends keys to a guest (the machine window's keyboard and its
+serial console pane in `vmwindow.jsx`, each apps mode window in `appsmode.jsx` `GuestWindow`, the Keys panel's held keys)
+asks `wm.hasKeyboard(window)` **at each key**: true only for the front window of the showing desktop while no search,
+launcher, sheet or system prompt has the keyboard (`sdk/desktopmodel.js` `keyboardWindow`, the same rule as the Wayland
+keyboard's `keyboardSurface`). The first key typed while it is false lets go of everything held in the guest
+(`lord.vm.release`, the held keys included), and a release is sent only for a press that went to the guest
+(`apps/machines/model.js` `guestKeys`). What was wrong before: `FloatingWindows` gave every full-screen window of the
+desktop the keys and the theme gave them to the top framed window too, so with a machine full screen on one display and
+the Terminal on another both heard each key, and a password typed in the Terminal went into the guest; a system prompt
+over the machine window sent its keys there as well. Now `AppHost` is focused only when it is also `wm.focused()`, a press
+on a full-screen window brings it to the front, and going full screen brings the window forward. In apps mode a window the
+guest opens or brings back takes the front only while the person is in this machine (its window or one of its guest
+windows in front, `guestMayTakeFront`); otherwise it opens behind the window in front, so a guest cannot steal the focus
+from a Terminal being typed in. The desktop's shortcuts held for the machine (`sdk/kbinhibit.js`) follow the same
+`wm.hasKeyboard`. lord-server sends a key to a guest only from `lord.vm.key` (`ui/js_vm.c` `f_key` → `VD_KEY`); capture
+mode takes the mouse only, never the keyboard, and lord-vmdisplay lets go of every held key when lord-server goes away, so a
+session that re-attaches to a running machine finds nothing held. Tested by `server/tests/vm_model_test.mjs` (`guestKeys`:
+focus moving to the Terminal or a search between a press and the next key), `desktop_model_test.mjs` (`keyboardWindow`)
+and `vm_keys_scene.mjs` (`node tests/focus_scene_test.mjs vm_keys_scene.mjs`: a framed and a full-screen machine with the
+Terminal in front, and a system prompt over the machine, through the real AppHost, FloatingWindows and `__lordKey`).
 
 ## 6. Features
 
@@ -2481,6 +2606,17 @@ pointer is hidden and held inside the picture, and the guest gets relative motio
   and `rel` was ignored. With compat devices the same on *QEMU USB Mouse* and *QEMU USB Tablet*. The first move after a switch goes
   the right way (lord-vmdisplay asks `IsAbsolute` again every 100 ms for 3 s). Not yet seen: the lord-server window itself (the
   pointer lock, the button, the notice, full screen), Windows guests and arm64.
+- **Buttons in both modes** (fixed 2026-11-22). Free and captured, a button or wheel step goes to QEMU the same way
+  (`Mouse.Press`/`Release` with QEMU's button number, 2 for the right), and QEMU hands it to whichever mouse is active: the
+  tablet when free, the relative mouse when captured. Each of them reports left, right and middle. The difference was the
+  order: the machine's window sends a click as the pointer's position and then the button (`VD_MOTION`, `VD_BUTTON`) in one
+  burst, and lord-vmdisplay sent the button at once but the position only at the end of its turn. So the tablet pressed at the
+  previous position, then moved with the button down, which is a short drag. Captured, a press only sends a button, so nothing
+  moved in between. Windows' shell treats a right-button drag of more than a few pixels as a drag, and no menu opens. That is the
+  likely reason right-click failed only with the mouse free, while a left click still landed. Now any motion gathered so far
+  goes out before each button and wheel step, in both modes. `tests/vmdisplay_test.c` checks the order for right, left and wheel
+  clicks, free and captured, and that release-all lets go of a right button. **To check** on the Windows 11 GVT-g machine: a
+  right-click with the mouse free, on the desktop and in Explorer, in a window and in apps mode.
 - Hotkeys are fixed for now (❖Esc and Ctrl+Alt); choosing them is for later.
 
 ## 7. Guest tools
@@ -2601,9 +2737,43 @@ virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent 
   token and an unlisted window ignored; the taskbar hidden while on and back after.
 - Not tested: switching between two people's sessions, Remote Desktop, a machine with a multi-monitor guest.
 
+### 7.1.3 Keeping the LordOS tools up to date (in development, after 0.8.9.4)
+
+A guest keeps the tools it was given: a LordOS upgrade ships newer ones (`TOOLS_SHIPPED` in `apps/machines/model.js`,
+`w9` and `5` today, checked against the sources by `vm_model_test`), but before this a guest ran its older tools, with
+their known bugs, until someone found **Update LordOS Tools** in the agent's popover. Now Machines updates them by
+itself (`toolsAutoStep`, run every second by the machine's window, `vmwindow.jsx`):
+
+- **When.** The machine runs, its agent has been connected for 20 s, the tools said hello with an older version of
+  the same kind (`w<n>` Windows, `<n>` Linux; a guest without the tools is never given them by itself), and nothing is
+  on its way: no files copying (drops, "Open with"), no transfer-folder setup, no app of apps mode opening (its launch
+  still waiting for a window), no install the person asked for. Otherwise it waits for the next second.
+- **How.** The same install as the button: `lord.vm.agent(id, 'update')` is `VAG_INSTALL` with `b = 1`, so lord-vm
+  writes `agent: Machines updates the LordOS tools in the guest by itself (they said w7)` in the machine's log before
+  its usual install lines. No new path, privilege or program: the approved guest install (7.1.2, AGENTS.md) is all
+  it uses.
+- **How often.** At most three attempts per run of the machine and per shipped version, 2 and then 10 minutes apart;
+  an attempt with no answer in 10 minutes failed. An install that worked but whose tools still say the older version a
+  minute later is never tried again in that run. The count lives for the run, not the window: closing and reopening
+  the window (or an upgrade of the host while the machine kept running) doesn't start it over unless the version to
+  bring changed; a new start of the machine does.
+- **Off, or given up.** One notification per run and version: "The LordOS tools in ‹machine› are out of date", with
+  **Update** (the same install) and a click that brings the machine's window to the front. The agent button keeps its
+  blue dot while they are older.
+- **Settings.** Machines settings → General → **Update the LordOS tools in machines automatically** (on by default;
+  `machinesDefaults.toolsAuto`), and per machine Configure → Guest agent → **Update the LordOS tools in this machine
+  automatically** (`app.json` `toolsAuto`; while it doesn't say, the default applies). It applies at once, also while
+  the machine runs.
+- **The popover** shows the tools on their own line, apart from the system and qemu-guest-agent's version:
+  "LordOS tools w9 (up to date)", "LordOS tools w7 → w9 available", or "… updating…" while the install runs.
+
+Limits: only a machine whose window (or apps mode) Machines has open is watched; one kept running with its window
+closed is updated the next time its window opens. Tested by `server/tests/vm_model_test.mjs` (when, once per run,
+backoff, never a loop, settings, the notification); not yet on the dev VM with a real w7 guest.
+
 ### 7.2 Apps mode (seamless)
 
-**Built (in development, 2026-11-20).** Each window of the guest is its own LordOS window: its title (with the machine's name, so a guest's window is always told apart), its app's icon in the Dock, the taskbar and the switcher (one Dock icon per app of each machine, `vm:<machine>:<app>`), and the guest's own desktop hidden. The machine's window shrinks to a small controller (the machine's name, an **Applications** menu, **Leave Apps Mode**; Esc there leaves too). The toolbar's Apps button and **Actions → Apps Mode** turn it on; the choice is kept per machine (`app.json` `appsMode`) and the window opens in it next time. It's offered only when the agent is connected and the guest's helper says `windows` in its hello (`LAG_CAP_WINDOWS`, 256, in `VM_AGENT_STATE`); otherwise the button says why: the agent is off, or the guest needs LordOS or Windows inside, with the LordOS tools.
+**Built (in development, 2026-11-20).** Each window of the guest is its own LordOS window: its title (with the machine's name, so a guest's window is always told apart), its app's icon in the Dock, the taskbar and the switcher (one Dock icon per app of each machine, `vm:<machine>:<app>`), and the guest's own desktop hidden. The machine's window becomes a controller panel (about 420 × 520; in development, 2026-11-22, like VMware Fusion's Unity launcher): the machine's name and **Leave Apps Mode** (Esc there leaves too, after clearing the search); **Running**, the guest's own windows (not its popups or owned windows), each with its icon (the one the Dock shows, `LAG_WINICON`) and title: a click brings its LordOS window to the front (restored if minimized; the guest follows as from the Dock), × asks the guest to close it (`LAG_WINACT` close, as the window's own close button: the guest may ask about unsaved work); and the guest's apps (`LAG_APPLIST`) with a search (each word, accents and case ignored, names that start with it first; Enter opens the first), each with a plain initial since the guest lists no app icons. The menu bar's **Applications** menu lists the same Running windows above the apps. The lists' logic is `runningWindows`, `appsMatching` and `appInitial` in `model.js`. Each machine in apps mode also has a **status item by the clock** (`apps/machines/appsstatus.jsx`, in development, 2026-11-22, like Fusion's Unity menu in the menu bar): an SDK status item (`registerStatusItem`, so every theme that draws `<StatusItems />` shows it on each bar: Lord Flow's menu bar, the Classic taskbar when horizontal, Workspaces' top bar), its glyph the machine's mark (`OsMark`) and its tooltip the machine's name. Its menu works like the guest's Start menu: a search (focused; Enter opens the first match, Esc clears then closes), Running (hidden while searching), the guest's apps, then the machine's name, **Show the Machine's Window** and **Leave Apps Mode**; it uses the same list components as the controller (`appslist.jsx`), and while it is open a guest window in front doesn't take the keys. An app row takes an icon (`launcherApps`: `appIcons` by token) once the guest sends app icons; until then the initial. The item goes when apps mode ends (`appsStatusDiff` over `guests`). Both launchers give feedback: a launched app's row shows **Opening…** and ignores clicks (`launchGuest`, also for Enter and the Applications menu) until a new window of that app is listed (`windowOfApp`: its program's name holds a word of the app's name, or its title the whole name) or 5 s pass, so an app whose window opens out of sight isn't launched again and again; the status menu closes when that window appears. After ×, the row shows **Closing…**, and a note when the window is still listed 3 s later or the guest reports a refusal (`closeRefused[gid] = { reason, at }` in `guests`, reason `elevated` for a Windows window that runs as administrator: the tools' report is to come; `closeView`). The toolbar's Apps button and **Actions → Apps Mode** turn it on; the choice is kept per machine (`app.json` `appsMode`) and the window opens in it next time. It's offered only when the agent is connected and the guest's helper says `windows` in its hello (`LAG_CAP_WINDOWS`, 256, in `VM_AGENT_STATE`); otherwise the button says why: the agent is off, or the guest needs LordOS or Windows inside, with the LordOS tools.
 
 **How.** The guest's helper lists its windows (`LAG_WINDOWS`: id, place in the guest's pixels, focused, minimized, on top, owner, pid, title, app; at most 64), their icons (`LAG_WINICON`, at most 64 × 64 RGBA) and its apps (`LAG_APPLIST`, name and an opaque token), all in `server/src/vm/vmagent.h`. lord-vm parses each with strict parsers (exact lengths, counts, sane rectangles, UTF-8 without control characters), writes it again and hands it to lord-server as a sealed memfd (`VM_WINDATA`), which parses it again. The host sends `LAG_APPS` (on/off: the guest hides its own desktop), `LAG_WINACT` (focus, close, minimize, restore, move to x, y, w, h) and `LAG_LAUNCH` with a token the guest listed (lord-server names the app by its place in the list and the list's generation; lord-vm sends the token from its own copy). The guest's screen is asked to be as large as this display (`lord.vm.resize`), so no window is cut. Each LordOS window shows its part of the machine's one picture: `<MediaView crop={[x, y, w, h]}>` (`Node.crop`, `media/mview.c`), drawn straight from the shared picture (2D) or the picture read back from the 3D dmabuf, copied as rows at 1:1; a new frame damages each window only where its part changed (`media_src_damage_rect`), and a frame that touches no shown part counts as read at once. The pointer goes to the guest at the window's place (`cropPoint`), the keyboard while the window is in front. Moving or resizing the LordOS window moves the guest's (`move`), minimizing, focusing and closing do the same in the guest; a window the guest moves or resizes itself is followed. A menu or tooltip (owned and on top) is a small frameless window over the others.
 
@@ -2612,6 +2782,18 @@ virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent 
 **The work area.** The guest's screen is laid over the whole display, so a guest window near its top edge would put its LordOS title bar under the menu bar (a Store app opens at y = −10). Such a window opens, and follows the guest, just below the menu bar (or a bar at the start side), and the guest is asked to move its window there too (`insideWork` in `model.js`, once per place): the window keeps showing its own part of the picture 1:1, and if the guest keeps it where it was the crop is still its rectangle.
 
 **More than one display (fixed 2026-11-21).** The guest has one screen, laid over the main display, but its LordOS windows can go anywhere: a window dragged to another monitor (x past the main display, or negative for one to its left) used to ask the guest to move its window off its own screen, where Windows hid it, its list stopped naming it and the LordOS window closed. Now the place asked of the guest is always inside its screen (`guestPlace` in `model.js`: the size kept as far as it fits, the position clamped), and the LordOS window keeps where it was put: it remembers how far it is from the guest's window (`off`) and follows the guest's moves by that much; its menus go with it. A guest window that the guest minimized right after such a move is restored, not minimized here too (`minimizedByUs`). The tools clamp a move to the monitor too (w4), so an older host can't push a window away either. Sizes go through the main display's scale, whatever the monitor's own scale.
+
+**A guest with more than one display (fixed 2026-11-22, in development, tools w8).** Windows can have more than one display on its desktop while the machine's window shows one picture: on the maintainer's GVT-g guest a 1022 × 724 primary that isn't on a PCI adapter (a basic or indirect display) sat next to the vGPU's output, the one the host shows. The tools used the primary and the virtual desktop for everything, so the size the host asked for was never set, each LordOS window showed the wrong part of the picture, and the moves the host asked for put the guest's windows on the display nobody sees. `lordos-guest-win` now picks the **shown display** (`ag_shown_pick`, `vmagent.c`, tested in `vm-test` with that guest's displays): the host's picture only ever comes from a PCI GPU (GVT-g, virtio-gpu, QXL, a passed-through card), so a display on a PCI adapter always wins over one that isn't; among those, the one chosen before by size while it stays, else the one whose mode is the size the host asked for (the primary first), else the primary, else the first; a change of which displays there are forgets the choice. (w7 chose by size alone and locked onto the basic display, which had the size asked at hello.) The shown display is made Windows' **primary** once per topology (`SetDisplayConfig`: its source at 0,0, the others in a row to its right, saved; what Settings' "Make this my main display" does), so the taskbar, the desktop's icons, new windows and a **UAC consent prompt** (Windows shows it on the secure desktop, on the primary display) are in the picture. Nothing is detached: a wrong guess costs only a primary that can be set back in Settings. The size (`AGK_DISPLAY`) is set on the shown display, and apps mode's rectangles (`LAG_WINDOWS`, `LAG_WINACT`'s move, `AGK_PLACE`'s point) are relative to its corner and kept inside it. A window on another display is moved onto it as the tools start, after the primary changes, as apps mode starts (or when the window appears) and when apps mode ends: the same place relative to the display's corner, its size kept, then clamped to the work area; a minimized one stays minimized (only where it comes back moves), a maximized one is maximized there; a window on no display at all, or one running as administrator, is left alone. The tools send the displays at hello and on every change (`AGK_DISPLAYS`, for the log only; strict parser, at most 8, printable ASCII names of at most 32 bytes): lord-vm logs `agent: guest displays: \\.\DISPLAY2 1920x1080 at 0,0 primary (shown); \\.\DISPLAY1 1022x724 at 1920,0 (not a PCI adapter)`, and the tools' own log lists every adapter and monitor, each choice and the primary made.
+
+**Clicks on a guest with more than one display (2026-11-22, in development).** A guest spreads its absolute tablet over its whole desktop (Windows maps a HID tablet over every display), while QEMU's `Mouse.SetAbsPosition` scales by the picture's width: with the extra display on, a click landed scaled across both. lord-vm passes where the picture sits in the guest's desktop (`ag_displays_layout`, from `AGK_DISPLAYS`) as `VM_GUEST_LAYOUT` → lord-server → `VD_LAYOUT` → lord-vmdisplay, which gives QEMU the position of the shown display's pixel (`vd_abs_map`, within 2 pixels: QEMU takes whole picture pixels). No layout (one display): as before.
+
+**Correction (tools w10, 2026-11-22, in development).** The paragraph above had it wrong: Windows maps a HID tablet (mouhid) over its *primary* display only (its input carries no `MOUSE_VIRTUAL_DESKTOP`). With the shown display primary at 0,0 beside a second one, the whole-desktop mapping put a click at about half its x. lord-vm now computes the layout with `ag_tablet_layout`: with the shown display primary there is no layout (the picture is all the tablet covers, 1:1); with another display primary the tablet can't reach the picture (logged once; the tools make the shown one primary again). The tools read the tablet's raw input in the background (`RIDEV_INPUTSINK`, mice only, nothing taken) and say how the guest maps it (`AGK_TABLET`, 21, one byte: 1 primary, 2 whole desktop); lord-vm uses the whole-desktop layout only on a 2. Their log shows the first three moves with where the pointer went against both readings. The tools also keep the shown display primary after every change of mode (at most once in 2 s and five times a minute), ask the display configuration twice at most per size (it was every 250 ms for 4 s: a mode set each time), ask again, twice at most, for a size the guest changed by itself right after (a vGPU monitor back with a new EDID), and make apps mode's list with the displays as they are at that moment, sent again after every change of the displays; Machines shows a window's picture black after a change of the picture's size until that list comes (1.5 s at most), never a wrong part.
+
+**Frameless apps mode windows (2026-11-22, in development).** A guest window has no LordOS frame (`args.csd`): it is the guest's window with its own title bar and caption buttons, which minimize, maximize, close and move it in the guest, and the LordOS window follows the guest's next list. While a button is held on it, a point is mapped as the window was at the press (`anchorPoint`), so dragging the guest's title bar doesn't run away from the pointer. The machine's menus stay in the menu bar, the Dock's menu, the panel and the status item; the panel carries the machine's bar (less the resolution, Capture mouse and full screen).
+
+**Turn Off the Extra Display (tools w9).** When the guest has a display that isn't on a PCI adapter next to the PCI one the picture shows (`VAC_EXTRA`), the agent's popover offers to turn it off: `VAG_EXTRA_OFF` → lord-vm → `AGK_EXTRA` (one byte) → the tools leave its paths out of the display configuration (never the shown one's), saved, and remember it (`HKCU\Software\LordOS\GuestWin` `ExtraDisplaysOff`, hello word `extraoff`, `VAC_EXTRA_OFF`); **Turn the Extra Display Back On** (`VAG_EXTRA_ON`) extends the desktop over every connected display again, which the tools also do by themselves when no PCI display is left. It isn't automatic because what that display is (on the maintainer's guest, a 1022 × 724 display beside the GVT-g output) isn't known for sure; the tools log its adapter's name and id. The popover shows the LordOS tools' version on its own line, apart from qemu-guest-agent's (7.1.3).
+
+**A window that runs as administrator (2026-11-22, in development, tools w8).** The tools run with the person's normal rights (they are never elevated), so Windows drops their messages to a program running as administrator (Computer Management, `mmc.exe`) and refuses its moves (UIPI). Such a window is flagged in the list (`LAGW_ELEVATED`, set only when the host's hello says `elevated`); a close, move, minimize or restore that is refused is answered (`LAG_WINREFUSED`: window, action, reason), which lord-vm logs and passes on (`VM_WINREFUSED`); lord-server keeps the last refused close per window (`lord.vm.closeRefusals(session)`, `closeRefusedSeq`), and apps mode puts it in `guests[dir].closeRefused` so the window says to close it from inside the machine.
 
 **The clipboard in apps mode.** The same gate as the machine's window (6.8): a guest window in front counts as the machine in use (`guestFocus`), the offer goes in when one comes to the front or is clicked, and a click that carried a new offer reaches the guest `CLIP_HOLD_MS` later, so a right-click's Paste finds it (2026-11-21). Checked on the card's guest with `lordvm-dev`: an offer pasted into Notepad in apps mode (one request, answered) and Notepad's copy came back.
 
@@ -2643,7 +2825,7 @@ start an off machine asks first. Other files just list the machine under Open wi
 **Which machines.** The ones whose tools said `open` in their hello (`AG_HELLO_OPEN`; lord-vm sets `VAC_OPEN`, 8192, in
 `VM_AGENT_STATE`). The machine's window writes that into `app.json` (`opens: 'windows'`) when it sees it, so an off
 machine is listed too (`apps/machines/openwith.js`, tested by `server/tests/vm_openwith_test.mjs`). Today that is
-Windows guests with `lordos-guest-win` w3 or later (w4 also takes files on its windows, 7.2.1; w5 lets LordOS draw the pointer, 7.1.2): install or update the tools from the agent's popover. **Linux
+Windows guests with `lordos-guest-win` w3 or later (w4 also takes files on its windows, 7.2.1; w5 lets LordOS draw the pointer, 7.1.2; w8 follows the display the picture shows when Windows has more than one and makes it the primary, and says when a window runs as administrator; w9 turns off an extra display when asked, 7.2): install or update the tools from the agent's popover. **Linux
 guests are not listed:** `lordos-guest` is approved to start only the clipboard tools (`xclip`, `wl-clipboard`) and
 `systemctl --user show-environment`; opening a sent file there would mean `xdg-open` or `gio open` in the person's
 session, with its own rules for executables and launchers, and needs its own review first.

@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import * as rt from '@lordos/runtime';
 import { AppHost, Button, Toggle, TextInput, Slider, Stepper, Segmented, ScrollView, hasTextFocus } from '../../sdk/components.jsx';
 import { MenuButton } from '../../sdk/controls.jsx';
-import { registerBuiltinApp } from '../../sdk/windows.js';
+import { registerBuiltinApp, wm } from '../../sdk/windows.js';
 import { dialogStack } from '../../sdk/dialogkeys.js';
 
 const { styles, parents, texts, removed } = globalThis.__lordTest;
@@ -43,6 +43,7 @@ function Demo() {
     h(ScrollView, { style: { height: 100 } }, h(rt.View, { style: { height: 1000 } })));
 }
 registerBuiltinApp({ id: 'demo', Component: Demo });
+wm.open('demo');                 // AppHost's window has the keys only as the desktop's front window
 rt.render(h(AppHost, { id: 'demo', focused: true }));
 await flush();
 await new Promise((res) => setTimeout(res, 80));     // the scroll view measures its content 50 ms after a render

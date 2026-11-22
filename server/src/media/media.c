@@ -23,6 +23,7 @@
 #include "../errcode.h"
 #include "../sec/json.h"
 #include "streamurl.h"
+#include "mstudio.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -149,6 +150,18 @@ int media_spawn_stream(int kind, const char *params, const int *fds, int nfds, p
     if (!checked) { checked = helper_path_of("lord-stream", path, sizeof path) ? -1 : 1; if (checked < 0) fprintf(stderr, "media: lord-stream is missing (no cameras or IPTV)\n"); }
     if (checked < 0) return -1;
     return spawn_bin("lord-stream", path, kind, params, fds, nfds, pid);
+}
+/* lord-studio (LordOS Studio, mstudio.c): the camera job only */
+int media_spawn_studio(const char *params, const int *fds, int nfds, pid_t *pid) {
+    static char path[PATH_MAX];
+    static int checked;
+    if (!checked) { checked = helper_path_of("lord-studio", path, sizeof path) ? -1 : 1; if (checked < 0) fprintf(stderr, "media: lord-studio is missing (no LordOS Studio)\n"); }
+    if (checked < 0) return -1;
+    return spawn_bin("lord-studio", path, MK_CAMERA, params, fds, nfds, pid);
+}
+int media_has_studio(void) {
+    char path[PATH_MAX];
+    return helper_path_of("lord-studio", path, sizeof path) == 0;
 }
 static int spawn_bin(const char *bin, const char *path, int kind, const char *params, const int *fds, int nfds, pid_t *pid) {
     int sv[2];
@@ -696,6 +709,12 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
         media_event(s->id, "level", "{\"level\":%lld,\"ms\":%lld,\"a\":%lld,\"b\":%lld}", (long long)m->v[0], (long long)m->v[1],
                     (long long)m->v[2], (long long)m->v[3]);
         break;
+    case MM_STUDIO_STATS:
+        if (s->studio == STUDIO_SRC_OWN || s->studio == STUDIO_SRC_HUB) mstudio_stats(s->id, m->v[0], m->v[1], m->v[2], m->v[3]);
+        break;
+    case MM_STUDIO_READERS:
+        if (s->studio == STUDIO_SRC_HUB) mstudio_readers(s->id, m->v[0], m->v[1], m->v[2]);
+        break;
     case MM_STATS:
         memcpy(s->stats, m->v, sizeof s->stats);
         media_event(s->id, "stats", "{\"decoded\":%lld,\"shown\":%lld,\"dropped\":%lld,\"hw\":%s,\"underruns\":%lld}", (long long)m->v[0],
@@ -959,9 +978,12 @@ static void worker_overdue(double t) {
 void media_reap(void) {
     if (workers[0].deadline || workers[1].deadline) worker_overdue(now_ms());
     if (nzombies) reap();
+    mstudio_tick();                             /* LordOS Studio's loopback: its lord-studio, the camera, the readers */
 }
 double media_reap_timeout(void) {
     double d = nzombies ? 100 : -1, t = now_ms();
+    double st = mstudio_timeout();
+    if (st >= 0 && (d < 0 || st < d)) d = st;
     for (int bg = 0; bg < 2; bg++)
         if (workers[bg].cur && workers[bg].deadline) {
             double left = workers[bg].deadline - t;
@@ -1104,7 +1126,8 @@ int media_cameras(char *json, size_t n) {
         memset(&cap, 0, sizeof cap);
         if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
             uint32_t caps = (cap.capabilities & V4L2_CAP_DEVICE_CAPS) ? cap.device_caps : cap.capabilities;
-            if ((caps & V4L2_CAP_VIDEO_CAPTURE) && (caps & V4L2_CAP_STREAMING)) {
+            /* LordOS Studio's own loopback is its "studio" entry below, never a real camera */
+            if ((caps & V4L2_CAP_VIDEO_CAPTURE) && (caps & V4L2_CAP_STREAMING) && !mstudio_is_loopback_card((const char *)cap.card)) {
                 char name[80], bus[80];
                 media_json_str(name, sizeof name, (const char *)cap.card);
                 media_json_str(bus, sizeof bus, (const char *)cap.bus_info);
@@ -1114,6 +1137,8 @@ int media_cameras(char *json, size_t n) {
         }
         close(fd);
     }
+    /* LordOS Studio: one more camera, over the real ones (docs/CAMERA-STUDIO-PLAN.md) */
+    if (!first && o + 200 < n) { mstudio_camera_entry(json + o, n - o, 0); o += strlen(json + o); }
     snprintf(json + o, n - o, "]");
     return 0;
 }

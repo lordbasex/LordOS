@@ -44,7 +44,7 @@ static void r_swipe(void *u, int ph, int n, double dx, double dy) { (void)u; put
 static void r_hold(void *u, int ph, int n) { (void)u; put(O_HOLD, ph, n, 0, 0, 0, 0, 0); }
 static int r_touch(void *u, int ph, int id, double x, double y) { (void)u; put(O_TOUCH, ph, id, 0, x, y, 0, 0); return touch_consume; }
 static void r_warp(void *u, double x, double y) { (void)u; put(O_WARP, 0, 0, 0, x, y, 0, 0); }
-static const TpSink sink = { r_motion, r_button, r_scroll, r_pinch, r_swipe, r_hold, r_touch, NULL, r_warp, NULL };
+static const TpSink sink = { r_motion, r_button, r_scroll, r_pinch, r_swipe, r_hold, r_touch, NULL, NULL, r_warp, NULL };
 
 static TpDevice *dev;
 static double last_tick;
@@ -934,6 +934,16 @@ static int live(const char *what, double secs) {
     return 0;
 }
 
+/* ABS_MT_ORIENTATION → wl_touch.orientation: 0 along y, the maximum 90° clockwise, turned with the picture */
+static void t_orient(void) {
+    CHECK(tp_orient_degrees(0, 128, 0) == 0, "0 is along the y axis");
+    CHECK(tp_orient_degrees(128, 128, 0) == 90, "the maximum is 90 degrees: %f", tp_orient_degrees(128, 128, 0));
+    CHECK(tp_orient_degrees(-64, 128, 0) == -45, "negative is counter-clockwise: %f", tp_orient_degrees(-64, 128, 0));
+    CHECK(tp_orient_degrees(128, 128, 1) == 180, "turned a quarter: %f", tp_orient_degrees(128, 128, 1));
+    CHECK(tp_orient_degrees(64, 128, 2) == -135, "turned half, normalized to -180..180: %f", tp_orient_degrees(64, 128, 2));
+    CHECK(tp_orient_degrees(5, 0, 0) == 0, "no range: 0");
+}
+
 int main(int argc, char **argv) {
     tp_set_sink(&sink, NULL);
     tp_set_screen(1280, 800);
@@ -950,6 +960,7 @@ int main(int argc, char **argv) {
     t_hold();
     t_touchscreen();
     t_touchscreen_turned();
+    t_orient();
     t_bcm5974();
     t_pin();
     t_alps();

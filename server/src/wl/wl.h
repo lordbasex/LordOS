@@ -26,6 +26,14 @@ int  wl_frame_unseen(unsigned time_ms);
  * once a second, here when no frame of lord-server's did. ms until the next one is due, -1 when none waits. */
 double wl_frame_hidden(unsigned time_ms);
 double wl_title_wait(void);
+/* fifo-v1 and commit-timing-v1 (wl/timing.h, docs/WAYLAND.md "Frame timing"). wl_latch: lord-server is about to paint a
+ * frame for the displays `keys` (the ones not waiting for a flip; OUTPICK_ALL without a monitor): the held content
+ * updates that may go in it apply now. immediate: the frame is shown when painted (no monitor, or flips that don't
+ * wait for vblank), not at the display's next vblank. wl_timing_wait: each loop, after the render; ms until a held
+ * update's target time is due, 0 also when held updates applied outside a client's request (they want the next
+ * frame), -1: none; with unseen (nothing is drawn), the ones whose time has come apply at once. */
+void wl_latch(unsigned keys, int immediate);
+double wl_timing_wait(int unseen);
 /* ext-idle-notify (wl/idlenotify.h): each loop with display.c's last activity; ms until the next is due, or -1 */
 double wl_idle_tick(double last_ms, double now_ms);
 void wl_idle_changed(void);
@@ -77,6 +85,7 @@ void wl_set_fixed(int id, int fixed);     /* locked by the theme: no maximize or
 void wl_set_minimized(int id, int minimized);   /* X11 windows: iconic and at the bottom of X's stack */
 void wl_set_parked(int id, int parked);         /* on a hidden desktop: no keyboard and no fullscreen until back */
 void wl_set_covered(int id, int covered);       /* wholly under an opaque window: paced once a second, suspended */
+void wl_set_layer(int id, int layer);           /* 1 always on top, -1 kept below, 0 normal (X11: _NET_WM_STATE) */
 int  wl_count(void);
 int  wl_idle_inhibited(void);             /* idle-inhibit: a shown surface asks the screen to stay on */
 void wl_output_resized(void);               /* headless: one display of ui.width × ui.height */
@@ -88,6 +97,7 @@ typedef struct {
     int x, y, w, h, pw, ph, refresh, scale, mm_w, mm_h;
     char name[32], desc[96];
     int key;                    /* main.c's index of the display: the bit wl_frame_done and wl_presented name it by */
+    int chroma[8];              /* its EDID's chromaticities ×1,000,000, all 0 if unknown (color-management-v1, wlcolor.h) */
 } WlOutput;
 void wl_set_outputs(const WlOutput *o, int n, int main);
 void wl_set_pointer_scale(int pct);         /* the display under the pointer: cursor-shape images */               /* ui.width/ui.height changed */

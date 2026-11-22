@@ -15,7 +15,7 @@ first time and the user decides. See also [SIGNING.md](SIGNING.md) (signed packa
 | Hardened variant for decoding helpers (`sandbox_apply_helper`, lord-media and lord-doc) | **done** (`build/sandbox-test helper`: 17/17) |
 | Sandbox (`build/sandbox-test`) | **13/13→14/14 app**, 14/14 with network, 17/17 helper |
 | Per-app permissions with system-drawn prompts, stored where the app can't write (`server/src/sec/perms.c`) | **done** |
-| Prompts drawn by the system (including those an isolated app requests through the broker), Settings → Privacy, green/orange dots | **done** |
+| Prompts drawn by the system (including those an isolated app requests through the broker), Settings → Privacy, the capture indicator by the clock | **done** |
 | Per-app cgroup (`app-lordos-lpk-<id>.scope`, `app-lordos-<id>.scope`) with limits, in the session's delegated subtree | **done**, tested with `lord-sessiond` and `Delegate=yes` |
 | **Root-owned app scopes**: an app can't move itself to another cgroup (`lord-sessiond` places each process, see [Root-owned app scopes](#root-owned-app-scopes)) | **done**, tested on VM 122 (the `systemd-run --user` escape is now closed by the `user@` union, see there and `docs/FIREWALL.md`) |
 | Package signing and trust levels | **done**, see [SIGNING.md](SIGNING.md) |
@@ -458,6 +458,11 @@ Also not for a manifest or the broker: `idle` (0.8.9.5, approved by the maintain
 told when the person is away from the computer (`ext-idle-notify-v1`): a Linux app by the same checked identity, an
 isolated LordOS app by its id, asked once by lord-server's own prompt, never granted without it, listed under Away from
 the computer; a denied app is never told ([WAYLAND.md](WAYLAND.md), "Idle notifications").
+Nor `vr` (0.8.9.5, approved by the maintainer 2026-11-22): a Linux app that wants to drive a VR headset's display through
+a DRM lease (`drm-lease-v1`): only by the identity lord-server checked, never for a sandboxed or isolated app or
+Xwayland, and only for connectors the kernel marks non-desktop (never a monitor). lord-server's prompt offers Don't
+allow, Allow once (not saved) and Always allow; listed under VR headsets. The lease is revoked when the app lets it go,
+the decision is taken back, the headset is unplugged or the screen locks ([WAYLAND.md](WAYLAND.md), "DRM leases").
 
 | | |
 |---|---|
@@ -473,17 +478,61 @@ its own section (see connections per app, locate them on the map) through
 
 ![Settings → Privacy](privacy-settings.png)
 
-### Camera and microphone indicators
+### What is captured now: the capture indicator
 
-A **green** dot in the menu bar while the camera is in use and an **orange** one for the
-microphone (`default` and `classic` themes); tapping it shows which app is using it. Sources: the
-broker (isolated apps) and, for Linux apps, the Monitor's `sdk/monitor.js` (via PipeWire, phase 2)
-through `globalThis.__lordos.monitorDevices`.
+(In development, 2026-11-22; before it, a green dot for the camera, an orange one for the microphone and a red pill per screen
+share.) While anything captures the screen, the camera or the microphone, a **green pill** stays by the clock in every
+theme (where `<PrivacyIndicators />` is: Lord Flow's menu bar, the Lord Classic taskbar — also on the side, where the
+other status items are left out — Lord Workspaces' status cluster and Lord Celeste's bar). Its glyph says what, system-wide:
+
+| Captured now | Glyph |
+|---|---|
+| the screen (a share, a window, a screenshot just taken) | a display |
+| the microphone | a microphone |
+| the camera | a video camera |
+| the screen and the microphone | a display with a microphone badge |
+| the camera and the microphone | a camera with a microphone badge |
+| the screen and the camera (with or without the microphone) | a display with a camera badge |
+
+Clicking it opens a panel with **one row per app**: its icon, its name and what it captures (screen, a window, screens and
+windows, camera, microphone; "may use your mouse and keyboard" for a share with input). **Stop sharing** ends a screen
+share by its own path (`lord.share.stop`, `lord.portal.castStop`). **Turn off for this app** turns off the camera and the
+microphone: for a native or `.lpk` app its permission (`perms.set(app, perm, 'deny')`: an isolated app loses the device at
+once, a native app's `lord.media` sources close), for a Linux or Flatpak app the firewall's restriction (`no-camera`,
+`no-mic`, `no-screen`: lord-server's PipeWire guard closes its streams within a second and keeps them closed). A native
+app's camera shows a live preview from its own `lord.media` source. The footer opens Settings → Privacy. The screen
+reader reads the item as "Screen and microphone in use" and so on.
+
+It is a security indicator: **there is no setting to hide it**. A screen share's frames wait for it (`lord.share.shown`,
+`lord.portal.castShown`), and a share of the screen-sharing API ends if every indicator leaves. While a window is full
+screen, a small copy of the pill stays in the top right corner of each display, in the `notification` layer.
+
+Where it knows from (`sdk/capturemodel.js`, `sdk/capturestatus.jsx`, `server/tests/capture_model_test.mjs`):
+
+| Source | Screen | Camera | Microphone |
+|---|---|---|---|
+| The screen-sharing API (`sdk/share.js`) | per app | — | — |
+| The ScreenCast and Screenshot portals (`sdk/screencast.jsx`; lord-server tells screens from windows) | per app, or "an unknown program" | — | — |
+| `lord.media` in native apps (`sdk/media.js` → `markDeviceUse`) | — | per app, with a preview | per app |
+| The broker, for isolated `.lpk` apps (`device` events) | — | per app | per app |
+| The PipeWire guard (`server/src/sec/pwguard.c`, hw event `capture-use`) | a stream linked to a shared screen | a stream linked to a camera | a stream linked to a microphone |
+
+The PipeWire guard follows every link from a capture node (a microphone, a camera, lord-screencast's screen) into a
+capture stream, and names the stream's owner as it does for the restrictions: the PID's cgroup and the launcher's scope,
+a Flatpak app by its sandbox, and a PulseAudio client's own word (`application.process.id`) always checked against the
+connections it really holds. Anything it can't name is "an unknown program", shown and never hidden, with nothing to
+turn off from the panel. lord-server's own streams are left out: they are the recordings and calls it makes for an app,
+already shown under that app.
+
+Not covered: a program that opens `/dev/video*` or an ALSA capture device itself, without PipeWire (many browsers still
+read the camera through V4L2 directly), isn't seen by the indicator; "no camera" still blocks it through the device rules
+(docs/FIREWALL.md). A capture stream that is linked but paused counts as in use. The remote desktop's viewers keep their
+own notice (`RemoteBadge`, docs/REMOTE.md).
 
 | | |
 |---|---|
 | ![prompt](privacy-prompt.png) | ![indicator](privacy-indicator-microphone.png) |
-| System prompt (camera) | Orange dot with the app recording |
+| System prompt (camera) | Before the capture indicator: the orange dot with the app recording |
 
 ## Performance (VM 122, 4 vCPU, CPU without GPU)
 
@@ -516,7 +565,8 @@ through `globalThis.__lordos.monitorDevices`.
 | `server/src/sec/cgroup.c` | per-app scopes and delegation of the session subtree |
 | `server/src/sec/perms.c` | per-app permissions, `permisos.json` |
 | `server/src/ui/js_sec.c` | `lord.perms`, `lord.sign` and `lord.broker.resolve` |
-| `sdk/privacy.js` | prompts, indicators, `registerPrivacySection`, `requestPermission` |
+| `sdk/privacy.js` | prompts, what camera and microphone are in use, `registerPrivacySection`, `requestPermission` |
+| `sdk/capturestatus.jsx`, `sdk/capturemodel.js` | the capture indicator by the clock (screen, camera, microphone) |
 | `server/src/remote/cgsup.c` | the root placement service on `/run/lordos/cgroup.sock` (child of `lord-sessiond`) |
 | `server/src/sec/brokercam.c`, `broker_int.h` | the camera of isolated apps, server side (ring, ACK validation, powerbox saves, revoke) |
 | `server/src/ui/js_brokercam.c` | `lord.media` (camera) inside the app process |
@@ -864,6 +914,29 @@ do it anyway (no D-Bus, no new sockets).
 
 Not tested this round: a second user over fast user switching and the remote desktop (no test
 password at hand). Their code path is the same `cgroup_delegate_session()` per uid.
+
+## LordOS Studio's camera (in development)
+
+"LordOS Studio" (docs/CAMERA-STUDIO-PLAN.md, section 8) is one more camera in the list apps see. It is a camera like
+any other for permissions: opening it needs the app's `camera` permission and is refused by the "no camera"
+restriction, both checked by lord-server before anything starts (`js_media.c`, `sec/brokercam.c`), and revoking or
+restricting ends it at once. The real camera's fd goes only to the sandboxed `lord-studio` helper (no network, no
+PipeWire, no paths); an isolated app gets the same read-only ring as with a device. Apps never control the effects:
+`lord.studio` exists only in the desktop's own context. The popover's own preview is shown by the capture indicator
+like any camera ("LordOS Studio"), and it closes with the popover. Nothing leaves the computer: the models ship in the
+package and the effects run locally.
+
+**For every app (phase 2, with the optional `lordos-studio-camera` package).** The "LordOS Studio" V4L2 device
+(`/dev/video50`, v4l2loopback) is what Linux apps read. Its only writer is the session's `lord-studio`, which gets the
+device's fd from lord-server and, while nobody reads, shows a still card with the **real camera closed**; lord-server
+hands it the real camera only while an app streams from the device (v4l2loopback's client-usage event) or the popover's
+preview is open, so the camera's light means somebody is watching. The capture indicator names the app reading it
+(lord-server looks at its own user's processes' open files, `appid_of_pid`), for example "Chromium · Camera via LordOS
+Studio (the real camera) · effects on", and its Turn off sets that app's "no camera" restriction, which blocks the
+device like any camera (major 81, `lord-netperm`'s `cgroup/dev`). Turned off while an app reads it, the device shows a
+"camera off" card, never the raw camera. Known limit (plan 8.4): an unsandboxed program of the same user could open the
+device as a writer before lord-studio does; lord-studio then stays off, as any program of the user can already open
+the real camera.
 
 ## Camera for isolated apps
 

@@ -11,6 +11,7 @@ import { AiDetail, AiDiscover, AiPage, CatalogCategory, CatalogResults, catalogA
 import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
+import { EndsContext, MoreButton, makeEnds, usePaged } from './endless.js';
 import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits, webCategoryCounts } from './webapps.js';
 import { WebAppDetail } from './webdetail.js';
 import { FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts } from './flathubpages.js';
@@ -297,6 +298,8 @@ function InstalledPage({ query, filter: initial }) {
   const fhJob = useStore(flathub.state, (st) => st.job);
   const offCount = apps.filter((a) => a.off).length;
   const shown = apps.filter((a) => (filter === 'off' ? a.off : true) && matches(query, [a.name, a.id, a.genericName], [a.comment]));
+  // hundreds of apps with Debian's and Flathub's: a page of rows at a time as the list is scrolled (endless.js)
+  const { limit, more } = usePaged(shown.length, `${filter}|${query}`);
   // the kind, and a LordOS app's or package's own version (manifest "version")
   const kind = (a) => (a.version && a.kind !== 'linux' ? tr('store.kindVersion', { kind: tr(`store.kind.${a.kind}`), v: a.version }) : tr(`store.kind.${a.kind}`));
   const builtin = (a) => a.kind === 'lordos' && isSystemApp(a.id);
@@ -314,7 +317,7 @@ function InstalledPage({ query, filter: initial }) {
       <debian.Progress />
       <Message msg={msg} />
       <List count={null} empty={filter === 'off' ? tr('store.off.none') : tr('store.debian.none')}>
-        {shown.map((a) => (
+        {shown.slice(0, limit).map((a) => (
           <AppRow key={a.id} icon={<View style={{ opacity: a.off ? 0.45 : 1 }}><a.Icon size={32} /></View>} name={a.name} detail={a.comment || a.genericName || ''}
             extra={a.off ? `${kind(a)} · ${tr('store.off.badge')}` : kind(a)}
             below={removing === a.id ? <debian.RemoveSheet app={a} onClose={() => setRemoving(null)} /> : null}>
@@ -332,6 +335,7 @@ function InstalledPage({ query, filter: initial }) {
           </AppRow>
         ))}
       </List>
+      <MoreButton left={shown.length - limit} onMore={more} />
     </View>
   );
 }
@@ -383,8 +387,12 @@ export default function Store() {
   };
   // Each page, search and app opens at the top (#20); back from an app returns to where the list was.
   const scroll = useRef(null);
+  // the long lists load their next page near the end of the scroll (endless.js)
+  const ends = useMemo(() => makeEnds(scroll), []);
   const listAt = useRef(null);
   const listKey = `${page}|${sub}|${query}`;
+  useEffect(() => { ends.reset(); }, [listKey, app]);
+  useEffect(() => { ends.limits.clear(); }, [listKey]);      // a list is as long as it was only back from an app's page
   useEffect(() => {
     const at = listAt.current;
     if (app || !at) return;
@@ -521,7 +529,8 @@ export default function Store() {
           </View>
           {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={side.narrow ? 150 : 200} /> : null}
         </Toolbar>
-        <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
+        <EndsContext.Provider value={ends}>
+        <ScrollView scrollRef={scroll} onScroll={ends.check} resetKey={app ? `app:${app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
           {subCounts && !app && side.narrow ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
               {[null, ...CATS.filter((c) => subCounts[c])].map((c) => (
@@ -536,6 +545,7 @@ export default function Store() {
           {body}
           <View style={{ height: 24 }} />
         </ScrollView>
+        </EndsContext.Provider>
       </View>
       {side.narrow && side.shown ? <SidebarOverlay width={sideW} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
     </View>

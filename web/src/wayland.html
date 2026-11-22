@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="{{t.lang}}">
+<head>
+{{{head}}}
+</head>
+<body data-page="wayland-protocols-table" data-lang="{{t.lang}}">
+<a class="skip" href="#main">{{t.skip}}</a>
+{{{header}}}
+
+<main id="main" class="wrap wide g-main wp">
+<p class="kicker">{{t.pages.wayland.kicker}}</p>
+<h1>{{t.pages.wayland.title}}</h1>
+<p class="g-lead">{{t.pages.wayland.lead}}</p>
+
+<dl class="wp-meta">
+<div><dt>{{t.pages.wayland.metaDate}}</dt><dd><time datetime="{{{date}}}">{{{dateText}}}</time></dd></div>
+<div><dt>LordOS</dt><dd>{{{lordosVer}}}</dd></div>
+<div><dt>{{t.pages.wayland.kde}}</dt><dd>KWin {{{kwinVer}}}</dd></div>
+<div><dt>{{t.pages.wayland.gnome}}</dt><dd>Mutter {{{mutterVer}}}</dd></div>
+<div><dt>{{t.pages.wayland.metaSource}}</dt><dd>{{{source}}}</dd></div>
+</dl>
+
+<ul class="wp-stats">
+{{{stats}}}
+{{{confTiles}}}
+</ul>
+<p class="wp-sum">{{{summary}}}</p>
+
+<section class="wp-sec" aria-labelledby="wp-h-table">
+<h2 id="wp-h-table">{{t.pages.wayland.tableTitle}}</h2>
+<div class="wp-tools" role="search">
+<label class="wp-q"><span class="vh">{{t.pages.wayland.search}}</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="wp-q" placeholder="{{t.pages.wayland.searchPlaceholder}}" autocomplete="off"></label>
+<label class="wp-sel"><span>{{t.pages.wayland.catLabel}}</span><select id="wp-cat">{{{catOptions}}}</select></label>
+<label class="wp-sel"><span>{{t.pages.wayland.statusLabel}}</span><select id="wp-st">{{{statusOptions}}}</select></label>
+<label class="wp-sel"><span>{{t.pages.wayland.compLabel}}</span><select id="wp-comp">{{{compOptions}}}</select></label>
+<label class="wp-sel"><span>{{t.pages.wayland.conf.filterLabel}}</span><select id="wp-cf">{{{confOptions}}}</select></label>
+</div>
+<p class="wp-count" id="wp-count" aria-live="polite" data-tpl="{{t.pages.wayland.shown}}"></p>
+<div class="wp-table">
+<table id="wp-table">
+<thead><tr><th scope="col">{{t.pages.wayland.hProtocol}}</th><th scope="col">{{t.pages.wayland.hCategory}}</th><th scope="col">LordOS</th><th scope="col">{{{hKwin}}}</th><th scope="col">{{{hMutter}}}</th><th scope="col">{{{hConf}}}</th><th scope="col">{{t.pages.wayland.hNote}}</th></tr></thead>
+<tbody>
+{{{rows}}}
+</tbody>
+</table>
+</div>
+<p class="g-empty" id="wp-empty" hidden>{{t.pages.wayland.empty}}</p>
+</section>
+
+{{{confSection}}}
+
+<section class="wp-sec" aria-labelledby="wp-h-legend">
+<h2 id="wp-h-legend">{{t.pages.wayland.legendTitle}}</h2>
+<dl class="wp-legend">
+{{{legend}}}
+</dl>
+<p class="hw-note">{{t.pages.wayland.versionNote}}</p>
+<p class="hw-note">{{t.pages.wayland.catNote}}</p>
+<p class="hw-note">{{t.pages.wayland.sourceNote}}</p>
+<p class="hw-note">{{t.pages.wayland.englishNote}}</p>
+</section>
+
+<section class="wp-sec" aria-labelledby="wp-h-sync">
+<h2 id="wp-h-sync">{{t.pages.wayland.syncTitle}}</h2>
+<p class="g-lead">{{t.pages.wayland.syncText}}</p>
+<p><a class="btn btn-ghost" href="{{{docsUrl}}}" rel="noopener">{{t.pages.wayland.docsLink}}</a> <a class="btn btn-ghost" href="{{{jsonUrl}}}" rel="noopener">{{t.pages.wayland.jsonLink}}</a></p>
+</section>
+</main>
+
+{{{lightbox}}}
+{{{footer}}}
+<script src="{{{js}}}" defer></script>
+<script src="{{{waylandJs}}}" defer></script>
+</body>
+</html>

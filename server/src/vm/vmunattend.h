@@ -6,6 +6,11 @@
  *                          which the kernel unpacks too); no seed disk
  *   Ubuntu (autoinstall)   user-data and meta-data on a FAT seed disk labelled CIDATA (cloud-init's NoCloud)
  *   Fedora (kickstart)     ks.cfg on a FAT seed disk labelled OEMDRV
+ *   LordOS (lordos)        lordos-auto.conf on a FAT seed disk labelled LORDOSAUTO: the live ISO's own unattended install
+ *                          (docs/UNATTENDED.md, server/src/install/autoinstall.c), started by lordos.auto=1 on the live
+ *                          kernel's command line. It erases only the disk named in the file, and only if it has exactly
+ *                          the size the file says: the machine's system disk, which lord-vm names (vda, or sda with the
+ *                          compatible devices) with its size when it prepares the install
  *   Windows (4.3)          Autounattend.xml on a FAT seed disk (USB, removable), with the virtio-win drivers Setup
  *                          needs for its disk and network in $WinPEDriver$ (which Setup loads by itself, answers or
  *                          not); no kernel: the machine boots its DVD. A guided install gets the drivers only.
@@ -23,7 +28,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum { VMU_PRESEED = 1, VMU_AUTOINSTALL, VMU_KICKSTART, VMU_WINDOWS };
+enum { VMU_PRESEED = 1, VMU_AUTOINSTALL, VMU_KICKSTART, VMU_WINDOWS, VMU_LORDOS };
 
 typedef struct {
     int kind;
@@ -42,6 +47,10 @@ typedef struct {
     char initrd[128];
     char append[512];       /* the kernel command line; {label} is the ISO's volume label */
     int desktop;            /* install the system's own desktop (default 1) */
+    /* LordOS only (VMU_LORDOS) */
+    char lang[16];          /* the interface language: a LordOS locale id ("es", "zh-Hans"); "" → "en" */
+    char disk[16];          /* the system disk's name in the guest (vda, sda): set by lord-vm, never from the spec */
+    unsigned long long disk_bytes;   /* its exact size: set by lord-vm from the disk it made */
     /* Windows only (VMU_WINDOWS): its answer file can't hold a hash, only the password Setup's own way (base64 of
      * UTF-16LE text + "Password"), so the seed disk is wiped when the install is done (lord-vm, the guest agent's first
      * answer) */
@@ -58,7 +67,8 @@ typedef struct {
 /* the spec lord-server writes (JSON, see the top of lordvm.c): 0, or -1 with why in err */
 int vmu_parse(const char *json, size_t n, VmUnattend *u, char *err, size_t errlen);
 
-/* the answer file's text (malloc, NUL-terminated) and its name in the guest: "preseed.cfg", "user-data" or "ks.cfg" */
+/* the answer file's text (malloc, NUL-terminated) and its name in the guest: "preseed.cfg", "user-data", "ks.cfg" or
+ * "lordos-auto.conf" (NULL for LordOS while disk or disk_bytes isn't set) */
 char *vmu_answer(const VmUnattend *u, const char **name);
 /* cloud-init's meta-data (autoinstall only; malloc) */
 char *vmu_meta_data(const VmUnattend *u, const char *instance);

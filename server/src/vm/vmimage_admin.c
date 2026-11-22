@@ -5,6 +5,7 @@
 #include "vmcatalog.h"
 #include "vmurl.h"
 #include "../pkg/http.h"
+#include "../sec/codesig.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -141,7 +142,7 @@ static void get_signed_list(const char *id, const char *arch, const VmCatEntry *
     snprintf(url, sizeof url, "%s%s", e->dir, name);
     if (fetch_one(url, raw, VM_LIST_MAX, &it)) { admin_err("vm.listFailed", "reason", it.err[0] ? it.err : "?", NULL); return; }
     int have_sig = 0;
-    if (e->sig_type == VMCAT_SIG_DETACHED) {
+    if (e->sig_type == VMCAT_SIG_DETACHED || e->sig_type == VMCAT_SIG_LORDOS) {
         snprintf(url, sizeof url, "%s%s", e->dir, e->sig_name);
         if (!fetch_one(url, sigp, 64 * 1024, &it)) have_sig = 1;
         else if (strcmp(it.err, "pkg.http.status status=404") && strcmp(it.err, "pkg.http.status status=410")) {   /* none published: unsigned */ unlink(raw); admin_err("vm.listFailed", "reason", it.err[0] ? it.err : "?", NULL); return; }
@@ -150,7 +151,10 @@ static void get_signed_list(const char *id, const char *arch, const VmCatEntry *
     char *list = read_root_file(raw, VM_LIST_MAX, &ln), *sig = have_sig ? read_root_file(sigp, 64 * 1024, &sn) : NULL;
     char kp[200];
     snprintf(kp, sizeof kp, VM_KEYS "/%s", e->keys);
-    char *keys = read_root_file(kp, 1u << 20, &kn);
+    /* LordOS's own releases (VMCAT_SIG_LORDOS): the release key compiled into LordOS, the one the Imager checks with */
+    char *keys = NULL;
+    if (e->sig_type == VMCAT_SIG_LORDOS) { if ((keys = malloc(32))) { memcpy(keys, codesig_release_key, 32); kn = 32; } }
+    else keys = read_root_file(kp, 1u << 20, &kn);
     unlink(raw);
     unlink(sigp);
     char *body = NULL, why[200] = "";

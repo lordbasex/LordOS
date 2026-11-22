@@ -42,6 +42,7 @@ typedef struct {
     int scale;                          /* percent: 100, 125, 150, 175, 200 */
     int recommended;
     int mm_w, mm_h;
+    int chroma[8];                      /* its EDID's chromaticities ×1,000,000 (edid.h), all 0 if unknown */
     OutView v;                          /* its place in the global logical space */
 } DisplayOut;
 

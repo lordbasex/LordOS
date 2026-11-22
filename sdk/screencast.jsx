@@ -6,18 +6,18 @@
 // (`who`, its launcher's scope), else "an unknown program" with a warning, never the name a process gives itself, which
 // any process can set (portal.c sends none). Nothing is shared until the
 // person picks and presses Share; Cancel answers the app "cancelled". What the app may be offered comes from
-// lord-server (screens, windows, one or several: sdk/screencastmodel.js). While it shares, the indicator of the
-// screen-sharing API (ShareBadge, sdk/share.js) shows it with its Stop, and lord-server sends no frame until it is on
+// lord-server (screens, windows, one or several: sdk/screencastmodel.js). While it shares, the
+// capture indicator by the clock (sdk/capturestatus.jsx) shows it with its Stop, and lord-server sends no frame until it is on
 // screen (lord.portal.castShown).
 //
-//   useStore(castRuns)   → [{ id, who, name }]: the sessions sharing now (for the indicator)
+//   useStore(castRuns)   → [{ id, who, name, screens, windows }]: the sessions sharing now (for the indicator)
 //   castStop(id)         the indicator's Stop
 //
 // The Screenshot portal (org.freedesktop.portal.Screenshot, approved 2026-11-22) uses the same chooser: a screen, a
 // window, or "Select Area…", which closes it and lets the person drag over the screen (ShotOverlay); PickColor shows only
 // the overlay, a click picks the point. The picture is taken only once the chooser and the overlay are gone (an effect
 // after the commit that removed them), so neither is in it. Then the indicator says the app took it (shotTaken).
-//   useStore(shotTaken)  → [{ key, name, color, at }]: pills of the last few seconds
+//   useStore(shotTaken)  → [{ key, name, color, at }]: the indicator's rows of the last few seconds
 import { createElement as h, useEffect, useState } from 'react';
 import { View, Text, MediaView, mainBox, screen, addListener } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';

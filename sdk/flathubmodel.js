@@ -101,6 +101,38 @@ export function permissionRows(meta) {
   return rows;
 }
 
+// How the app shows its windows, from the sockets it declares, by Flatpak's own rule (1.16, Debian 13's:
+// common/flatpak-run-sockets.c, `allow_x11 = !has_wayland` when fallback-x11 is set): 'wayland' (Wayland only),
+// 'waylandFallback' (wayland and fallback-x11: X11 only when it gets no Wayland, and LordOS always gives it, so Wayland;
+// a declared x11 is ignored then too), 'both' (wayland and x11: it gets both and its toolkit chooses), 'x11' (X11 only,
+// or fallback-x11 without wayland: through Xwayland in LordOS) or 'none' (neither); null without metadata.
+// The keys are under "flathub.display.".
+export function displayOf(meta) {
+  if (!meta || !meta.context) return null;
+  const s = meta.context.sockets;
+  const wl = s.includes('wayland'), x = s.includes('x11'), fb = s.includes('fallback-x11');
+  if (fb) return wl ? 'waylandFallback' : 'x11';
+  if (wl) return x ? 'both' : 'wayland';
+  return x ? 'x11' : 'none';
+}
+
+// The toolkit an app is built with, from its runtime and base app: { kind, runtime, version } with kind a key under
+// "flathub.toolkit." ('electron' and 'chromium' from the base, Electron's old io.atom base too; 'gtk' on GNOME's or
+// elementary's platform; 'qt' on KDE's or a Qt base; else 'other': the app brings its own on the Freedesktop platform)
+// and the runtime's id and branch as written; null without metadata. Only for showing, like the permission rows.
+export function toolkitOf(meta) {
+  if (!meta) return null;
+  const rt = String(meta.runtime || '').split('/');
+  const base = String(meta.base || '').split('/')[1] || '';
+  const id = rt[0] || '';
+  let kind = 'other';
+  if (base === 'org.electronjs.Electron2.BaseApp' || base === 'io.atom.electron.BaseApp') kind = 'electron';
+  else if (base === 'org.chromium.Chromium.BaseApp') kind = 'chromium';
+  else if (id === 'org.gnome.Platform' || id === 'io.elementary.Platform') kind = 'gtk';
+  else if (id === 'org.kde.Platform' || base.startsWith('io.qt.')) kind = 'qt';
+  return { kind, runtime: id, version: rt[2] || '' };
+}
+
 // The catalog language from LordOS's ('zh-Hant' → AppStream's 'zh_TW'); lord.flatpak.loadCatalog takes [A-Za-z0-9_-].
 export function catalogLang(lang) {
   const l = String(lang || 'en');
@@ -171,3 +203,42 @@ export const prefsOf = (s) => ({ on: !!(s && s.on), showAll: !!(s && s.showAll),
 // recordings can only go to the person's folders; OBS's Flatpak asks for Videos, where they go.
 const NOTES = { 'com.obsproject.Studio': 'obsVideos' };
 export const appNote = (id) => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(NOTES, id) ? NOTES[id] : null);
+
+// An app's license from Flathub's catalog (AppStream project_license: an SPDX expression, or
+// "LicenseRef-proprietary=<address>"), as the Store's Facts row shows it: { kind, text, url }.
+// kind: 'proprietary' (text empty: the row says so in the person's language), 'spdx' (text: the expression as given)
+// or null for nothing. url: where the license can be read in the browser, only an https address with no spaces or
+// control characters (at most 512 bytes): the address a proprietary license names, or SPDX's page for a single
+// license id (spdx.org/licenses/<id>.html); null otherwise (an expression with AND/OR has no one page).
+const SPDX_ID = /^[A-Za-z0-9][A-Za-z0-9.+-]{0,63}$/;
+const okUrl = (u) => typeof u === 'string' && u.length <= 512 && /^https:\/\/[^\s/?#]+[^\s]*$/.test(u) && !/[\u0000-\u001f\u007f]/.test(u);
+export function licenseView(s) {
+  const raw = typeof s === 'string' ? s.trim() : '';
+  if (!raw) return { kind: null, text: '', url: null };
+  const m = /^LicenseRef-proprietary(?:=(.*))?$/i.exec(raw);
+  if (m) return { kind: 'proprietary', text: '', url: okUrl((m[1] || '').trim()) ? m[1].trim() : null };
+  const id = raw.replace(/\+$/, '');
+  return { kind: 'spdx', text: raw, url: SPDX_ID.test(raw) && !/^LicenseRef-/i.test(raw) ? `https://spdx.org/licenses/${id}.html` : null };
+}
+
+// An app's description (lord.flatpak.description(id): plain text, paragraphs apart by an empty line, list items on
+// their own line) as the page shows it: { paras: [{ text, clamp }], long }. Shut, it keeps about `lines` lines (each
+// estimated at `perLine` characters): whole paragraphs while they fit, then the next one cut to the lines left (clamp,
+// 0 for none); long says there is more to open. Open, every paragraph whole.
+export const DESC_LINES = 6;
+export function descriptionView(text, { open = false, lines = DESC_LINES, perLine = 90 } = {}) {
+  const paras = String(text || '').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  const est = (p) => p.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil([...l].length / perLine)), 0);
+  const total = paras.reduce((n, p) => n + est(p), 0);
+  const long = total > lines;
+  if (open || !long) return { paras: paras.map((p) => ({ text: p, clamp: 0 })), long };
+  const out = [];
+  let left = lines;
+  for (const p of paras) {
+    if (left <= 0) break;
+    const e = est(p);
+    out.push({ text: p, clamp: e <= left ? 0 : left });
+    left -= e;
+  }
+  return { paras: out, long };
+}

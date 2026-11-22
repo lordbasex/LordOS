@@ -183,6 +183,43 @@ int x11_wm_hints_input(const uint32_t *v, size_t n) {
     return v[1] != 0;
 }
 
+int x11_wm_hints_urgent(const uint32_t *v, size_t n) {
+    return v && n >= 1 && (v[0] & (1u << 8)) != 0;
+}
+
+void x11_size_clamp(const XSizeHints *h, int *w, int *h_) {
+    int minw = h ? h->min_w : 0, minh = h ? h->min_h : 0, maxw = h ? h->max_w : 0, maxh = h ? h->max_h : 0;
+    if (maxw && maxw < minw) maxw = 0;
+    if (maxh && maxh < minh) maxh = 0;
+    if (minw && *w < minw) *w = minw;
+    if (minh && *h_ < minh) *h_ = minh;
+    if (maxw && *w > maxw) *w = maxw;
+    if (maxh && *h_ > maxh) *h_ = maxh;
+    if (*w < 1) *w = 1;
+    if (*h_ < 1) *h_ = 1;
+    if (*w > 32767) *w = 32767;
+    if (*h_ > 32767) *h_ = 32767;
+}
+
+int x11_net_wm_icon_pick(const uint8_t *v, size_t nwords, int max, int want, size_t *first, int *w, int *h) {
+    int found = 0, best = 0;
+    size_t i = 0;
+    while (v && nwords >= 2 && i <= nwords - 2) {
+        uint32_t iw = x11_get32(v + 4 * i), ih = x11_get32(v + 4 * i + 4);
+        i += 2;
+        if (!iw || !ih || iw > 32767 || ih > 32767) break;      /* nonsense: nothing after it can be trusted */
+        uint64_t px = (uint64_t)iw * ih;
+        if (px > nwords - i) break;                             /* longer than what is left */
+        int side = iw > ih ? (int)iw : (int)ih;
+        if ((int)iw <= max && (int)ih <= max) {
+            int dn = side > want ? side - want : want - side, db = best > want ? best - want : want - best;
+            if (!found || dn < db || (dn == db && side > best)) { found = 1; best = side; *first = i; *w = (int)iw; *h = (int)ih; }
+        }
+        i += (size_t)px;
+    }
+    return found;
+}
+
 int x11_moveresize_edges(uint32_t d) {
     static const int edges[8] = { 1 | 4, 1, 1 | 8, 8, 2 | 8, 2, 2 | 4, 4 };
     if (d < 8) return edges[d];
@@ -337,6 +374,9 @@ int x11_xdnd_trusted(uint32_t owner, const uint32_t *base, const uint32_t *pid, 
     if (!owner || n < 0) return 0;
     for (int i = 0; i < n; i++) {
         if (!pid[i] || pid[i] > 0x7fffffffu) continue;
+        /* client 0 (resource base 0) is the X server itself, Xwayland: lord-server starts it in a user namespace of
+         * its own (no network), so it always looked sandboxed and no X drag of files ever reached Files */
+        if (!base[i]) continue;
         if (sandboxed((int)pid[i])) return 0;
         if (x11_same_client(owner, base[i], id_mask)) known = 1;
     }
@@ -359,7 +399,10 @@ int x11_xdnd_same_owner(const XdndOwner *then, uint32_t cur, const XdndOwner *no
 }
 
 int x11_xdnd_notify(const uint8_t ev[32], uint32_t requestor, uint32_t selection, uint32_t target, uint32_t prop) {
-    if (ev[0] != X_SelectionNotify) return -1;              /* the 0x80 bit: sent by a client (SendEvent) */
+    /* the 0x80 bit (SendEvent) is not refused: an owner always answers ConvertSelection that way (ICCCM 2.2), the
+     * server makes one only when nobody owns the selection, so refusing it refused every real X drag. Who wrote the
+     * property is checked by the read that follows (XdndSelection's owner asked again first, xi_read) */
+    if ((ev[0] & 0x7f) != X_SelectionNotify) return -1;
     if (x11_get32(ev + 8) != requestor || x11_get32(ev + 12) != selection || x11_get32(ev + 16) != target) return -1;
     uint32_t p = x11_get32(ev + 20);
     return p == prop ? 1 : p == 0 ? 0 : -1;

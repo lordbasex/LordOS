@@ -1290,8 +1290,14 @@ class AppBoundary extends Component {
 // synchronously (useSyncExternalStore updates are never time-sliced): a switch in Settings re-rendered the Store's
 // cards and the pointer stopped meanwhile. Now an app renders again only for its own state, its window's (args,
 // mode, focus) and the contexts it reads (useTheme, useAppWindow).
-export const AppHost = memo(function AppHost({ id, focused }) {
+export const AppHost = memo(function AppHost({ id, focused: asked }) {
   useStore(appRegistry);                  // an installed or updated package app: its new code
+  // focused only when it is also the desktop's front window (wm.focused): the theme's flag alone let a full-screen
+  // window (FloatingWindows, on its display) and the top framed window (another display) both have the keys, so a
+  // password typed in one went to the other too, a virtual machine's guest included (desktopmodel.js keyboardWindow)
+  useStore(activeDesktop);
+  const front = useStore(windows, () => wm.focused());
+  const focused = !!asked && front === id;
   const app = getApp(id);
   const args = useStore(windows, (ws) => ws.find((w) => w.id === id)?.args || null);
   const prot = useStore(windows, (ws) => !!ws.find((w) => w.id === id)?.protected);
@@ -1358,7 +1364,13 @@ export function FloatingWindows() {
   if (!fs.length && !pips.length) return null;
   return (
     <>
-      {pips.map((w) => (
+      {pips.map((w) => (w.pip.bare ? (
+        // a bare one (Screenshots' toolbar, wm.setPip(id, { …, bare: true })): the app draws its own shape, shadow and
+        // grip, and moves it itself; nothing here paints, drags or resizes it
+        <View key={w.id} style={{ position: 'absolute', left: w.pip.x, top: w.pip.y, width: w.pip.w, height: w.pip.h, pointerEvents: 'box-none' }}>
+          <AppHost id={w.id} focused={false} />
+        </View>
+      ) : (
         <View key={w.id} style={{ position: 'absolute', left: w.pip.x, top: w.pip.y, width: w.pip.w, height: w.pip.h, borderRadius: 10,
           overflow: 'hidden', backgroundColor: '#000', boxShadow: '0 18px 48px rgba(0,0,0,0.55)', pointerEvents: 'auto' }}
           onMouseDown={(e) => { drag.current = { id: w.id, x: e.x, y: e.y, frame: w.pip }; }}>
@@ -1366,14 +1378,15 @@ export function FloatingWindows() {
           <View onMouseDown={(e) => { e.stopPropagation?.(); drag.current = { id: w.id, x: e.x, y: e.y, frame: w.pip, resize: true }; }}
             style={{ position: 'absolute', right: 0, bottom: 0, width: 18, height: 18 }} />
         </View>
-      ))}
+      )))}
       {fs.map((w) => {
         const d = displayFor(w);              // the display the window was on (docs/DISPLAYS.md)
         const here = onDesktop(w, desktop);
         // a capture window (Screenshots' ❖⇧4) goes above every layer. keepFocus: a press on it is not a
-        // click elsewhere, so the menu, sheet or text field under the still stays as it was
+        // click elsewhere, so the menu, sheet or text field under the still stays as it was. A press on it brings it
+        // to the front, so it has the keyboard again (AppHost: only the front window does)
         const win = (
-        <View key={w.id} keepFocus={w.capture || undefined}
+        <View key={w.id} keepFocus={w.capture || undefined} onMouseDownCapture={() => { if (wm.focused() !== w.id) wm.focus(w.id); }}
           style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, backgroundColor: '#000', display: here ? 'flex' : 'none' }}>
           <AppHost id={w.id} focused={here} />
         </View>

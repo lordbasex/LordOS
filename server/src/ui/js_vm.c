@@ -20,6 +20,7 @@
  *   sendFile(id, path[, { open }]) → request id: a dropped file into the guest's Downloads (guest agent); with open, the
  *             guest tools then open it there (Files' "Open with", 7.3); files(id) → how they went */
 #include "js_vm.h"
+#include "js_secret.h"
 #include "../media/media_int.h"
 #include "../media/aring.h"
 #include "../vm/vmproto.h"
@@ -35,6 +36,7 @@
 #include "../wl/wl.h"
 #include "../gpu/gpu.h"
 #include "../gpu/dmaread.h"
+#include "../gpu/gband.h"
 #include <drm/drm_fourcc.h>
 #include "../sec/json.h"
 #include "../sec/perms.h"
@@ -629,7 +631,7 @@ static int win_password(const char *pw, char *out, size_t on) {
 
 static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char *path, size_t pn) {
     static const char *const keys[] = { "kind", "user", "fullname", "hostname", "timezone", "keymap", "variant", "locale", "release",
-                                        "kernel", "initrd", "append", NULL };
+                                        "kernel", "initrd", "append", "lang", NULL };
     char buf[8192];
     size_t n = (size_t)snprintf(buf, sizeof buf, "{\"arch\":\"%s\"", arch);
     int ok = 1;
@@ -679,10 +681,11 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
         if (JS_IsBool(vg)) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"guided\":%s", JS_ToBool(c, vg) ? "true" : "false");
         JS_FreeValue(c, vg);
         JSValue vp = JS_GetPropertyStr(c, o, "password");
-        const char *pw = JS_IsString(vp) ? JS_ToCString(c, vp) : NULL;
+        size_t pwn = 0;
+        char *pw = JS_IsString(vp) ? js_secret_dup(c, vp, &pwn) : NULL;
         char wp[260] = "";
         if (pw && pw[0] && (strlen(pw) > 127 || win_password(pw, wp, sizeof wp))) ok = 0;
-        if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
+        js_secret_free(pw, pwn);
         JS_FreeValue(c, vp);
         n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"wpass\":\"%s\"", wp);
         explicit_bzero(wp, sizeof wp);
@@ -692,7 +695,8 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
     JS_FreeValue(c, vd);
     /* the password: only its hash leaves here */
     JSValue vp = win ? JS_UNDEFINED : JS_GetPropertyStr(c, o, "password");
-    const char *pw = JS_IsString(vp) ? JS_ToCString(c, vp) : NULL;
+    size_t pwn = 0;
+    char *pw = JS_IsString(vp) ? js_secret_dup(c, vp, &pwn) : NULL;
     char hash[160] = "";
     if (pw && pw[0] && strlen(pw) < 256) {
         char salt[64];
@@ -702,7 +706,7 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
         if (h && h[0] == '$' && strlen(h) < sizeof hash) snprintf(hash, sizeof hash, "%s", h);
         explicit_bzero(&cd, sizeof cd);
     }
-    if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
+    js_secret_free(pw, pwn);
     JS_FreeValue(c, vp);
     if (!win && !hash[0]) ok = 0;
     if (!win) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"hash\":\"%s\"}", hash);
@@ -755,7 +759,8 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     char hash[160] = "";
     JSValue vp = JS_GetPropertyStr(c, argv[0], "rootPassword");
     if (ok && JS_IsString(vp)) {
-        const char *pw = JS_ToCString(c, vp);
+        size_t pwn = 0;
+        char *pw = js_secret_dup(c, vp, &pwn);
         if (pw && pw[0]) {
             char salt[64];
             struct crypt_data cd;
@@ -764,7 +769,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
             if (h && h[0] == '$' && strlen(h) < sizeof hash) snprintf(hash, sizeof hash, "%s", h); else ok = 0;
             explicit_bzero(&cd, sizeof cd);
         }
-        if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
+        js_secret_free(pw, pwn);
     }
     JS_FreeValue(c, vp);
     /* an unattended install (only from an ISO) */
@@ -1400,7 +1405,7 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 #define MAX_SESS 4
 /* one dmabuf of a 3D machine's picture (VD_DMABUF) and its import: a texture of the desktop's GPU (tex) or of the reader
  * on the buffer's own render node (ri, gpu/dmaread.h); gfail/rfail: that one refused it (not tried again for this dmabuf) */
-typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; DmaImg *ri; int gfail, rfail; unsigned used; } VmDmabuf;
+typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; DmaImg *ri; int gfail, rfail; unsigned used, gen; } VmDmabuf;
 typedef struct {
     int used, vm, vd, err;              /* channels; lord-vm's stderr (until its log is open) */
     pid_t vm_pid, vd_pid;
@@ -1480,10 +1485,14 @@ typedef struct {
      * picture without a readback"): the desktop GPU's own import of QEMU's dmabuf (VmDmabuf.tex, a Linux 3D machine),
      * or for an Intel vGPU's picture two linear copies made on the iGPU (gout), imported by the desktop's GPU: one is
      * shown (gshow) while the next frame is copied into the other (gpend, until its fence on the copy's dmabuf
-     * signals). y0..y1: rows that copy lacks (the frames copied into the other one since). The copy also tests whether
+     * signals). gstale: the rows each copy lacks (gpu/gband.h: the frames copied into the other one since; all of them
+     * for a copy just made or imported, and for both when the picture's source changes). The copy also tests whether
      * anything changed (QEMU's vfio display sends the whole picture every refresh, changed or not): a frame that
      * didn't is acknowledged at once and nothing is presented */
-    struct { DmaOut *o; GpuTex *tex; int w, h, y0, y1; } gout[2];
+    struct { DmaOut *o; GpuTex *tex; int w, h; } gout[2];
+    GBand gstale[2];
+    unsigned gsrc;                      /* the dmabuf (VmDmabuf.gen) the copies were last made from; 0 none */
+    unsigned db_gen;
     int gshow, gpend, gfail;
     int gcopy_y0, gcopy_y1;             /* the frame's rows in the copy in flight */
     int db_more;                        /* frames came while a copy was in flight: another copy after it */
@@ -1510,6 +1519,10 @@ typedef struct {
     struct { uint32_t id; int w, h; uint8_t *rgba; } icons[LAG_WIN_MAX];
     LagAppList *gapps;
     int wins_seq, icons_seq, gapps_seq, gapps_gen, apps_mode;
+    /* closes the guest refused (VM_WINREFUSED with LAGA_CLOSE): the last per window, newest last; closeRefusedSeq */
+    struct { uint32_t gid; int reason; double at; } refused[8];
+    int layout[6];                      /* VM_GUEST_LAYOUT, handed to lord-vmdisplay (VD_LAYOUT); 0s none */
+    int refused_n, refused_seq;
     /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
      * did (PTRLOCK_END_*), for the window */
     int captured, cap_ends, cap_why;
@@ -1520,6 +1533,21 @@ static void win_free(Sess *s) {
     free(s->wins); s->wins = NULL;
     free(s->gapps); s->gapps = NULL;
     for (int i = 0; i < LAG_WIN_MAX; i++) { free(s->icons[i].rgba); s->icons[i].rgba = NULL; s->icons[i].id = 0; }
+    s->refused_n = 0;
+}
+
+/* a close the guest refused, kept for closeRefusals(): the same window's earlier one goes, the oldest when full */
+static void refused_add(Sess *s, uint32_t gid, int reason) {
+    int n = 0;
+    for (int i = 0; i < s->refused_n; i++) if (s->refused[i].gid != gid) s->refused[n++] = s->refused[i];
+    if (n == (int)(sizeof s->refused / sizeof *s->refused)) { memmove(s->refused, s->refused + 1, (size_t)(n - 1) * sizeof *s->refused); n--; }
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    s->refused[n].gid = gid;
+    s->refused[n].reason = reason;
+    s->refused[n].at = (double)ts.tv_sec * 1000.0 + (double)(ts.tv_nsec / 1000000);
+    s->refused_n = n + 1;
+    s->refused_seq++;
 }
 
 /* lord-vm processes whose window closed before they exited */
@@ -1578,6 +1606,12 @@ static int mic_permitted(void) {
     uint32_t rf = restrict_flag_of(PERM_MICROPHONE);
     if (rf && restrict_blocks(BUILTIN_FWID, rf)) return 0;
     return perm_get("machines", PERM_MICROPHONE) == PERM_ALLOW;
+}
+/* the guest's layout to lord-vmdisplay (its tablet points at the shown display) */
+static void layout_send(Sess *s) {
+    if (s->vd < 0) return;
+    VdMsg m = vd_msg(VD_LAYOUT, s->layout[0], s->layout[1], s->layout[2], s->layout[3], s->layout[4], s->layout[5]);
+    vd_send(s->vd, &m, -1);
 }
 static void vdsend_fd(Sess *s, int type, int a, int fd) { if (s->vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, 0, 0, 0, 0, 0); vd_send(s->vd, &m, fd); } }
 
@@ -1898,6 +1932,7 @@ static void gout_free(Sess *s) {
         memset(&s->gout[k], 0, sizeof s->gout[k]);
     }
     s->gshow = s->gpend = -1;
+    s->gsrc = 0;
 }
 
 static void db_free(Sess *s, int i) {
@@ -1935,6 +1970,7 @@ static void db_take(Sess *s, const VdMsg *m, int fd) {
         db_free(s, k);
         s->db[k].fd = fd; s->db[k].ino = st.st_ino; s->db[k].w = m->a; s->db[k].h = m->b; s->db[k].stride = st_stride;
         s->db[k].fourcc = (uint32_t)m->d; s->db[k].mod = mod;
+        s->db[k].gen = ++s->db_gen ? s->db_gen : ++s->db_gen;
     }
     s->db[k].flip = flip;
     s->db[k].used = ++s->db_tick;
@@ -1961,7 +1997,7 @@ static int gout_ready(Sess *s, const VmDmabuf *d) {
             s->gout[k].w = d->w; s->gout[k].h = d->h;
             if (!s->gout[k].o) return -1;
             s->gout[k].tex = NULL;
-            s->gout[k].y0 = 0; s->gout[k].y1 = d->h;    /* nothing in it yet */
+            gband_all(&s->gstale[k], d->h);             /* nothing in it yet */
             if (s->gshow == k) s->gshow = -1;
         }
         if (!s->gout[k].tex) {
@@ -1970,7 +2006,7 @@ static int gout_ready(Sess *s, const VmDmabuf *d) {
                             .fd = { fd, -1, -1, -1 }, .offset = { 0 }, .stride = { (uint32_t)stride } };
             s->gout[k].tex = fd >= 0 ? gpu_tex_dmabuf(&b) : NULL;
             if (!s->gout[k].tex) return -1;
-            s->gout[k].y0 = 0; s->gout[k].y1 = d->h;    /* a new import: copied whole next time */
+            gband_all(&s->gstale[k], d->h);             /* a new import: copied whole next time */
             if (s->gshow == k) s->gshow = -1;
         }
     }
@@ -2062,18 +2098,15 @@ static int db_read(Sess *s, MediaSrc *ms, int *ry0, int *ry1) {
     if (show && d->ri && !s->gfail) {
         if (!gout_ready(s, d)) {
             int k = s->gshow == 0 ? 1 : 0;
-            int cy0 = s->gout[k].y1 > s->gout[k].y0 && s->gout[k].y0 < y0 ? s->gout[k].y0 : y0;
-            int cy1 = s->gout[k].y1 > s->gout[k].y0 && s->gout[k].y1 > y1 ? s->gout[k].y1 : y1;
+            /* another dmabuf than the copies were made from (a new attach, the guest flipped to another buffer): what
+             * either copy holds says nothing about it, so every row is copied (both copies, in turn) */
+            if (s->gsrc != d->gen) { gband_all(&s->gstale[0], d->h); gband_all(&s->gstale[1], d->h); s->gsrc = d->gen; }
+            GBand c = gband_copy(&s->gstale[k], y0, y1, d->h);
             const DmaOut *prev = s->gshow >= 0 ? s->gout[s->gshow].o : NULL;
-            if (!dmaread_copy(d->ri, s->gout[k].o, cy0, cy1 - cy0, d->flip, prev)) {
-                s->gout[k].y0 = s->gout[k].y1 = 0;
-                if (s->gshow >= 0) {        /* the shown copy lacks this frame's rows now */
-                    int o = s->gshow;
-                    if (s->gout[o].y1 <= s->gout[o].y0) { s->gout[o].y0 = y0; s->gout[o].y1 = y1; }
-                    else { if (y0 < s->gout[o].y0) s->gout[o].y0 = y0; if (y1 > s->gout[o].y1) s->gout[o].y1 = y1; }
-                }
+            if (!dmaread_copy(d->ri, s->gout[k].o, c.y0, c.y1 - c.y0, d->flip, prev)) {
+                gband_copied(s->gstale, k, y0, y1);     /* the other copy lacks this frame's rows now */
                 s->gpend = k;
-                s->gcopy_y0 = y0; s->gcopy_y1 = y1;
+                s->gcopy_y0 = c.y0; s->gcopy_y1 = c.y1;   /* the rows copied: all of them for a new source */
                 /* frames that come while it's in flight start a new band */
                 s->db_y0 = INT_MAX; s->db_y1 = INT_MIN; s->db_more = 0;
                 s->db_reads++;
@@ -2320,6 +2353,14 @@ static void from_vm(Sess *s) {
         case VM_WINDATA:
             if (fd >= 0) windata(s, &m, fd);
             break;
+        case VM_GUEST_LAYOUT:
+            s->layout[0] = m.a; s->layout[1] = m.b; s->layout[2] = (m.c >> 16) & 0xffff; s->layout[3] = m.c & 0xffff;
+            s->layout[4] = (m.d >> 16) & 0xffff; s->layout[5] = m.d & 0xffff;
+            layout_send(s);
+            break;
+        case VM_WINREFUSED:
+            if (m.b == LAGA_CLOSE) refused_add(s, (uint32_t)m.a, m.c);
+            break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
                 if (s->console_term) { Session *old = term_get(s->console_term); if (old) term_close(old); }
@@ -2370,6 +2411,10 @@ static void set_picture(Sess *s, int w, int h) {
     uint8_t *map = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (map == MAP_FAILED) { close(fd); return; }
     MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
+    /* a new picture (an attach, another size): no texture of the one before is shown over it, and the copies of a
+     * vGPU's picture start again, whole */
+    gout_free(s);
+    if (m && m->gtex) { m->gtex = NULL; m->gpu_drawn = 0; }
     if (!m) m = media_src_new(SK_IMAGE, "machines");
     if (!m) { munmap(map, len); close(fd); return; }
     if (m->map) munmap(m->map, m->map_len);
@@ -2432,7 +2477,7 @@ static void from_vd(Sess *s) {
         if (!r) break;
         if (!vd_msg_valid(&m, 0)) { if (fd >= 0) close(fd); continue; }
         switch (m.type) {
-        case VD_READY: s->vd_up = 1; snd_apply(s); break;
+        case VD_READY: s->vd_up = 1; snd_apply(s); layout_send(s); break;
         case VD_SIZE: set_picture(s, m.a, m.b); snd_apply(s); break;
         case VD_GUEST_AUDIO:
             if (m.a == VDG_OUT) s->guest_out = m.b; else s->guest_in = m.b;
@@ -2710,6 +2755,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "windowsSeq", s->wins_seq);
     set_int(c, o, "iconsSeq", s->icons_seq);
     set_int(c, o, "guestAppsSeq", s->gapps_seq);
+    set_int(c, o, "closeRefusedSeq", s->refused_seq);
     return o;
 }
 
@@ -3208,8 +3254,9 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     return JS_NewString(c, path);
 }
 
-/* agent(session, 'install'|'timesync'|'shutdown') → bool: a guest agent request (poll's agent.install says how
- * Install went) */
+/* agent(session, 'install'|'update'|'timesync'|'shutdown') → bool: a guest agent request (poll's agent.install says how
+ * Install went). 'update' is Install asked by Machines itself for older LordOS tools: the same install, marked so
+ * lord-vm's log says it */
 /* WinFsp's installer for agent(id, 'transfer', path): only a file the admin helper keeps in the machines' image store,
  * root's, named by its SHA-256 (images/<sha256>.iso), whose record there says it's the catalog's "winfsp" entry. The
  * descriptor, and the hash as text, go to lord-vm, which hashes the file again; the guest checks its signature too */
@@ -3243,8 +3290,9 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     (void)t;
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
     const char *w = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
-    int a = !w ? 0 : !strcmp(w, "install") ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN :
-            !strcmp(w, "transfer") ? VAG_TRANSFER : 0;
+    int upd = w && !strcmp(w, "update");
+    int a = !w ? 0 : !strcmp(w, "install") || upd ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN :
+            !strcmp(w, "transfer") ? VAG_TRANSFER : !strcmp(w, "extraOff") ? VAG_EXTRA_OFF : !strcmp(w, "extraOn") ? VAG_EXTRA_ON : 0;
     if (w) JS_FreeCString(c, w);
     if (!s || !a || s->vm < 0) return JS_FALSE;
     if (a == VAG_TRANSFER) {
@@ -3262,7 +3310,9 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     /* one install at a time: a click while one is on its way (lord-vm answers when the guest's script ended) is the
      * same request, not another run of the script */
     if (a == VAG_INSTALL && s->ag_seq) return JS_TRUE;
-    int q = ask(s, VM_AGENT, a);
+    int q = -1;
+    if (upd) { VmMsg m = vm_msg(VM_AGENT, ++s->seq, VAG_INSTALL, 1, 0, 0, NULL); q = vm_send(s->vm, &m, -1) ? -1 : (int)s->seq; }
+    else q = ask(s, VM_AGENT, a);
     if (q < 0) return JS_FALSE;
     if (a == VAG_INSTALL) { s->ag_seq = (uint32_t)q; s->ag_result = 1; s->ag_msg[0] = 0; }
     return JS_TRUE;
@@ -3274,7 +3324,9 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
  * top to bottom, in the guest's pixels (poll's windowsSeq counts changes). winIcon(session, id) → { width, height, data }
  * (RGBA, at most 64 × 64) or null (iconsSeq). winAct(session, id, 'focus'|'close'|'minimize'|'restore'|'move'[, x, y, w,
  * h]) → bool. guestApps(session) → [{ name, token }] (guestAppsSeq); launch(session, token) → bool: lord-vm sends only a
- * token the guest listed. Everything the guest said is shown as text only. */
+ * token the guest listed. closeRefusals(session) → [{ gid, reason: 'elevated'|'other', at }] (closeRefusedSeq): the guest
+ * couldn't close that window (it runs as administrator in Windows, or the system refused), at (ms since 1970) when it
+ * said so; the last per window. Everything the guest said is shown as text only. */
 static JSValue f_apps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
@@ -3282,6 +3334,20 @@ static JSValue f_apps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     int on = JS_ToBool(c, argv[1]) > 0;
     s->apps_mode = on;
     return JS_NewBool(c, ask(s, VM_APPS, on) >= 0);
+}
+
+static JSValue f_close_refusals(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 1 ? get(c, argv[0]) : NULL;
+    JSValue a = JS_NewArray(c);
+    for (int i = 0; s && i < s->refused_n; i++) {
+        JSValue o = JS_NewObject(c);
+        JS_SetPropertyStr(c, o, "gid", JS_NewFloat64(c, s->refused[i].gid));
+        set_str(c, o, "reason", s->refused[i].reason == LAGR_ELEVATED ? "elevated" : "other");
+        JS_SetPropertyStr(c, o, "at", JS_NewFloat64(c, s->refused[i].at));
+        JS_SetPropertyUint32(c, a, (uint32_t)i, o);
+    }
+    return a;
 }
 
 static JSValue f_windows(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -3297,6 +3363,7 @@ static JSValue f_windows(JSContext *c, JSValueConst t, int argc, JSValueConst *a
         JS_SetPropertyStr(c, o, "focused", JS_NewBool(c, w->flags & LAGW_FOCUSED));
         JS_SetPropertyStr(c, o, "minimized", JS_NewBool(c, w->flags & LAGW_MINIMIZED));
         JS_SetPropertyStr(c, o, "topmost", JS_NewBool(c, w->flags & LAGW_TOPMOST));
+        JS_SetPropertyStr(c, o, "elevated", JS_NewBool(c, w->flags & LAGW_ELEVATED));   /* runs as administrator in the guest */
         JS_SetPropertyStr(c, o, "owner", JS_NewFloat64(c, w->owner));
         JS_SetPropertyStr(c, o, "pid", JS_NewFloat64(c, w->pid));
         set_str(c, o, "title", w->title);
@@ -4303,7 +4370,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
-    JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act),
+    JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act), JS_CFUNC_DEF("closeRefusals", 1, f_close_refusals),
     JS_CFUNC_DEF("guestApps", 1, f_guest_apps), JS_CFUNC_DEF("gpus", 0, f_gpus), JS_CFUNC_DEF("launch", 2, f_launch),
 };
 

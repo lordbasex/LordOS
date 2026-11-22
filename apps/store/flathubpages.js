@@ -4,16 +4,17 @@
 // installed, and the installed ones with Update and Remove. Chromium and Electron apps install like any other: their
 // helpers' sub-sandboxes are served by LordOS (docs/FLATPAK.md, "Sub-sandboxes"). The jobs and state are
 // sdk/flathub.js's; the logic sdk/flathubmodel.js's.
-import { createElement as h, useEffect, useMemo, useState } from 'react';
+import { createElement as h, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, Image, Button, GroupBox, Toggle, LetterIcon, useTheme, useStore, useLauncherApps, launchApp, admin, formatBytes, errorText, settings,
   flathubModel as M, typeScale, spacing, t,
 } from '@lordos/sdk';
 import { debian } from './debian.js';
 import { Card, CardGrid, Facts, Pill, Shelf, Tag } from './ui.js';
+import { MoreButton, usePaged } from './endless.js';
+import { DisplayToolkit } from './fhlook.js';
 import { flathub as F } from '@lordos/sdk';
 
-const PAGE = 60;            // cards shown at first, and how many "Show more" adds
 const SHELF = 8;            // cards in a Discover or category shelf
 
 const box = (th, extra) => ({ padding: spacing.xl, borderRadius: 12, backgroundColor: th.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.025)',
@@ -48,7 +49,8 @@ const catLabel = (a) => {
 };
 const openApp = (id) => launchApp(`flatpak:${id}`);
 
-export function FlathubCard({ a, onOpen }) {
+// memo: a list that grows by a page doesn't draw the cards it already showed again (onOpen must be stable)
+export const FlathubCard = memo(function FlathubCard({ a, onOpen }) {
   // only whether this app is installed: a job's progress doesn't redraw every card
   const installed = useStore(F.state, (s) => s.installed.some((x) => x.id === a.id));
   return h(Card, {
@@ -57,7 +59,7 @@ export function FlathubCard({ a, onOpen }) {
     action: installed ? h(Pill, { label: t('store.open'), onClick: () => openApp(a.id) }) : h(Pill, { label: t('store.get'), onClick: () => onOpen(a.id) }),
     onClick: () => onOpen(a.id),
   });
-}
+});
 
 // The running job: what, its progress and Flatpak's last line; then its outcome (only the outcome for app forId when
 // given: '' for "Update Flathub apps").
@@ -158,10 +160,13 @@ export function FlathubPage({ query, onOpen, category = null }) {
   const working = useStore(F.state, (x) => !!x.busy || !!x.job);
   const s = { catalog, loaded };
   const fh = useFlathub();
-  const [limit, setLimit] = useState(PAGE);
-  useEffect(() => { setLimit(PAGE); }, [query, fh.prefs.showAll, category]);
   useEffect(() => { if (fh.on) { if (!s.loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
   const list = useMemo(() => M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll, category }), [s.catalog, query, fh.prefs.showAll, category]);
+  // the next page comes when the list is scrolled near its end (endless.js)
+  const { limit, more } = usePaged(list.length, `${query}|${fh.prefs.showAll}|${category}`);
+  const openRef = useRef(onOpen);
+  openRef.current = onOpen;
+  const open = useCallback((id) => openRef.current(id), []);
   const hidden = useMemo(() => (fh.prefs.showAll ? 0 : s.catalog.length - s.catalog.filter((a) => a.verified).length), [s.catalog, fh.prefs.showAll]);
   if (!fh.supported) return h(Line, { th }, t('flathub.notSupported'));
   if (!fh.on) return h(View, null, h(TurnOn));
@@ -177,9 +182,8 @@ export function FlathubPage({ query, onOpen, category = null }) {
     h(InstalledList, { onOpen }),
     s.loaded ? h(Header, { th }, query ? t('flathub.results', { count: list.length }) : t('flathub.catalogTitle', { count: list.length })) : null,
     s.loaded && !list.length ? h(Line, { th }, t('flathub.noResults')) : null,
-    h(CardGrid, null, ...list.slice(0, limit).map((a) => h(FlathubCard, { key: a.id, a, onOpen }))),
-    list.length > limit ? h(View, { style: { alignItems: 'center', marginTop: spacing.l } },
-      h(Button, { label: t('flathub.showMore', { count: list.length - limit }), onClick: () => setLimit(limit + PAGE) })) : null);
+    h(CardGrid, null, ...list.slice(0, limit).map((a) => h(FlathubCard, { key: a.id, a, onOpen: open }))),
+    h(MoreButton, { left: list.length - limit, onMore: more }));
 }
 
 // How many shown Flathub apps each category has (the Store's second column)
@@ -205,11 +209,17 @@ export function FlathubCategory({ cat, query, onOpen }) {
   const fh = useFlathub();
   const [all, setAll] = useState(false);
   useEffect(() => { if (fh.on && !s.loaded) F.loadCatalog(); }, [fh.on]);
-  if (!fh.on || !s.loaded) return null;
-  const list = M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll, category: cat });
+  const list = useMemo(() => (fh.on && s.loaded ? M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll, category: cat }) : []),
+    [fh.on, s.loaded, s.catalog, query, fh.prefs.showAll, cat]);
+  // "See all": every app, a page at a time as the list is scrolled (endless.js); it used to stop at 240
+  const { limit, more } = usePaged(all ? list.length : 0, `${cat}|${query}|${fh.prefs.showAll}|${all}`);
+  const openRef = useRef(onOpen);
+  openRef.current = onOpen;
+  const open = useCallback((id) => openRef.current(id), []);
   if (!list.length) return null;
   return h(Shelf, { title: t('flathub.shelf'), more: all ? '' : t('store.seeAll', { count: list.length }), onMore: all || list.length <= SHELF ? null : () => setAll(true) },
-    h(CardGrid, null, ...list.slice(0, all ? 240 : SHELF).map((a) => h(FlathubCard, { key: a.id, a, onOpen }))));
+    h(CardGrid, null, ...list.slice(0, all ? limit : SHELF).map((a) => h(FlathubCard, { key: a.id, a, onOpen: open }))),
+    all ? h(MoreButton, { left: list.length - limit, onMore: more }) : null);
 }
 
 // Store → Updates: Flathub's apps are updated together (Flatpak finds what changed), and the runtimes no app uses any
@@ -253,6 +263,24 @@ function Permissions({ meta }) {
       r.change ? h(Text, { style: { fontSize: typeScale.caption, color: LEVEL[r.level] || th.textDim, lineHeight: 1.4, textAlign: 'start' } }, t(`flathub.change.${r.change}`)) : null))));
 }
 
+// What the app says about itself (AppStream's description, in the catalog's language): shut to about six lines, with
+// "Show more" when there is more. Nothing when it has none.
+function About({ id, catalog }) {
+  const th = useTheme();
+  const [open, setOpen] = useState(false);
+  const text = useMemo(() => F.description(id), [id, catalog]);     // read again after each catalog load (language)
+  useEffect(() => setOpen(false), [id]);
+  const v = M.descriptionView(text, { open });
+  if (!v.paras.length) return null;
+  return h(View, null,
+    h(Header, { th }, t('flathub.about.title')),
+    h(View, { style: { gap: spacing.s, paddingHorizontal: spacing.xs } },
+      ...v.paras.map((p, i) => h(Text, { key: `${i}`, style: { fontSize: typeScale.body, color: th.text, lineHeight: 1.45, textAlign: 'start',
+        ...(p.clamp ? { numberOfLines: p.clamp, textOverflow: 'ellipsis' } : {}) } }, p.text))),
+    v.long ? h(Button, { plain: true, small: true, label: open ? t('flathub.about.less') : t('flathub.about.more'), onClick: () => setOpen(!open),
+      style: { alignSelf: 'flex-start', marginTop: spacing.xs } }) : null);
+}
+
 export function FlathubDetail({ id }) {
   const th = useTheme();
   const s = useStore(F.state);
@@ -273,6 +301,7 @@ export function FlathubDetail({ id }) {
   if (!a) return h(Line, { th }, s.loaded ? t('flathub.gone') : t('flathub.busy.catalog'));
   const busy = !!s.job;
   const mine = s.job && s.job.id === a.id;
+  const lic = M.licenseView(a.license);
   const buttons = inst
     ? [h(Button, { key: 'rm', label: t('flathub.remove'), disabled: busy, onClick: () => !busy && F.uninstall({ ...inst, name: a.name }) }),
       h(Button, { key: 'up', label: t('flathub.update'), disabled: busy, onClick: () => !busy && F.update({ ...inst, name: a.name }) }),
@@ -291,12 +320,15 @@ export function FlathubDetail({ id }) {
             a.verified ? t('flathub.verified', { developer: a.developer || a.id }) : t('flathub.unverified')))),
       h(View, { style: { flexDirection: 'row', gap: spacing.s, alignItems: 'center' } }, ...buttons)),
     mine || (!s.job && s.msg && s.msg.id === a.id) ? h(JobProgress, { forId: a.id }) : null,
+    a.unknown ? null : h(About, { id: a.id, catalog: s.catalog }),
     h(Facts, { items: [
       [t('flathub.fact.developer'), a.developer],
-      [t('flathub.fact.license'), a.license],
+      [t('flathub.fact.license'), lic.kind === 'proprietary' ? t('flathub.license.proprietary') : lic.text,
+        lic.url ? { url: lic.url, title: `${t('flathub.license.open')}: ${lic.url}` } : null],
       [t('flathub.fact.version'), inst && inst.version],
       [t('flathub.fact.branch'), a.branch],
     ] }),
+    h(DisplayToolkit, { meta }),
     h(View, null,
       h(Header, { th }, t('flathub.perm.title')),
       h(Permissions, { meta })),

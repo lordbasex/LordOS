@@ -36,6 +36,14 @@
       "ifUnavailable": "explain"
     },
     {
+      "id": "studioCamera",
+      "when": { "usbClass": ["0e"] },
+      "packages": ["lordos-studio-camera"],
+      "free": true,
+      "notes": ["dkms", "secureBoot"],
+      "icon": "camera"
+    },
+    {
       "id": "rpi5Tools",
       "when": { "compatible": ["raspberrypi,5-model-b", "raspberrypi,500", "raspberrypi,5-compute-module"] },
       "packages": ["rpi-eeprom", "raspi-utils", "gpiod"],
@@ -58,6 +66,7 @@
   "firmware": {
     "about": "Firmware files a driver asked for and the kernel didn't find, by path prefix, mapped to the Debian package that ships them (checked against trixie's non-free-firmware Contents). The first matching prefix wins; files no prefix matches get no suggestion.",
     "component": "non-free-firmware",
+    "notShipped": ["i915/gvt/"],
     "map": [
       { "prefix": "iwlwifi-", "package": "firmware-iwlwifi", "kind": "wifi" },
       { "prefix": "intel/ibt-", "package": "firmware-iwlwifi", "kind": "bluetooth" },

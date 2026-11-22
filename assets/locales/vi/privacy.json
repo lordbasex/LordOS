@@ -59,5 +59,11 @@
   "ask.idle": "“{app}” muốn biết khi nào bạn rời khỏi máy tính",
   "ask.idleNote": "Ứng dụng được báo khi bạn ngừng dùng bàn phím và chuột một lúc, và khi bạn quay lại; không gì khác. Bạn có thể đổi điều này sau trong Cài đặt → Quyền riêng tư.",
   "perm.idle": "Rời khỏi máy tính",
-  "permHint.idle": "Các ứng dụng được báo khi bạn ngừng dùng máy tính một lúc và khi bạn quay lại, như ứng dụng trò chuyện hiển thị bạn đang vắng mặt. Chúng không biết gì thêm; video hoặc bài trình chiếu giữ màn hình sáng được tính là bạn đang có mặt."
+  "permHint.idle": "Các ứng dụng được báo khi bạn ngừng dùng máy tính một lúc và khi bạn quay lại, như ứng dụng trò chuyện hiển thị bạn đang vắng mặt. Chúng không biết gì thêm; video hoặc bài trình chiếu giữ màn hình sáng được tính là bạn đang có mặt.",
+  "allowOnce": "Cho phép một lần",
+  "allowAlways": "Luôn cho phép",
+  "ask.vr": "“{app}” muốn dùng kính VR {headset}",
+  "ask.vrNote": "Màn hình của kính chỉ dành cho ứng dụng; LordOS không bao giờ hiện màn hình nền của bạn ở đó. Nó được lấy lại khi ứng dụng đóng, kính bị rút ra hoặc màn hình khóa. Bạn có thể đổi điều này sau trong Cài đặt → Quyền riêng tư.",
+  "perm.vr": "Kính VR",
+  "permHint.vr": "Các ứng dụng được điều khiển trực tiếp màn hình của kính VR. Chỉ kính được cho mượn, không bao giờ là màn hình của bạn, và được lấy lại khi màn hình khóa, bạn đổi người dùng hoặc chọn Từ chối."
 }

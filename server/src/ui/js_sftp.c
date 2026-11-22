@@ -10,6 +10,7 @@
  */
 #include "js_sftp.h"
 #include "js_err.h"
+#include "js_secret.h"
 #include "../term/sftpc.h"
 
 #include <stdlib.h>
@@ -23,11 +24,11 @@ static JSValue f_available(JSContext *c, JSValueConst t, int argc, JSValueConst 
 static JSValue f_request(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     size_t len = 0;
-    const char *j = argc > 0 && JS_IsString(argv[0]) ? JS_ToCStringLen(c, &len, argv[0]) : NULL;
+    /* an open as root may carry the sudo password: our own copy, wiped (js_secret.h) */
+    char *j = argc > 0 && JS_IsString(argv[0]) ? js_secret_dup(c, argv[0], &len) : NULL;
     if (!j) return js_throw_code(c, "sys.badArgument", NULL);
     int id = sftp_request(j, len);
-    explicit_bzero((char *)j, len);          /* an open as root may carry the sudo password */
-    JS_FreeCString(c, j);
+    js_secret_free(j, len);
     return JS_NewInt32(c, id);
 }
 

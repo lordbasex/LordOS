@@ -29,6 +29,7 @@
 #include "vmimport.h"
 #include "vmunattend.h"
 #include "vmgvtwin.h"
+#include "vmlog.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -119,8 +120,17 @@ static const char *const REASON_NAME[VR_COUNT] = {
 
 /* ---- log ---- */
 
+static long long now_ms_log(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
 static int log_fd = -1, log_stderr = 1;
 static off_t log_bytes;
+/* the folder lord-vm.log is rotated in when it reaches LOG_CAP (vmlog.h); "" none: that log stops at its cap */
+static char log_dir[PATH_MAX];
+#define LOG_KEEP 3                      /* lord-vm.log, .1 and .2: at most 3 x LOG_CAP */
 
 static void vlog(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void vlog(const char *fmt, ...) {
@@ -137,20 +147,58 @@ static void vlog(const char *fmt, ...) {
     va_end(ap);
     n += k < 0 ? 0 : k >= (int)(sizeof line - (size_t)n - 1) ? (int)(sizeof line - (size_t)n - 2) : k;
     line[n++] = '\n';
+    /* full: rotated, never silent for the rest of the run (before 2026-11-22 it stopped writing at the cap) */
+    if (log_fd >= 0 && log_dir[0] && log_bytes + n > LOG_CAP) {
+        close(log_fd);
+        log_fd = vmlog_rotate(log_dir, "lord-vm", LOG_KEEP);
+        log_bytes = 0;
+        static const char head[] = "lord-vm: the log goes on in a new file (lord-vm.1.log holds what came before)\n";
+        if (log_fd >= 0 && write(log_fd, head, sizeof head - 1) > 0) log_bytes += (off_t)sizeof head - 1;
+    }
     if (log_fd >= 0 && log_bytes < LOG_CAP) { if (write(log_fd, line, (size_t)n) > 0) log_bytes += n; }
     if (log_stderr) { ssize_t w = write(2, line, (size_t)n); (void)w; }
 }
 
-/* raw bytes from a child's stderr into the log, line by line */
+/* A child's stderr (QEMU, passt) into the log: whole lines, however its writes were cut, and a line that comes again
+ * logged once, then counted (vmlog.h): QEMU calling a closed D-Bus listener wrote the same error every 30 ms */
+typedef struct { const char *who; VmLineBuf lines; VmLogRep rep; } ChildLog;
+static ChildLog child_log[] = { { .who = "qemu" }, { .who = "passt" }, { .who = "child" } };
+#define CHILD_LOGS ((int)(sizeof child_log / sizeof child_log[0]))
+
+static ChildLog *child_of(const char *who) {
+    for (int i = 0; i < CHILD_LOGS - 1; i++) if (!strcmp(child_log[i].who, who)) return &child_log[i];
+    return &child_log[CHILD_LOGS - 1];
+}
+
+static void child_line(void *ctx, const char *line, size_t n) {
+    ChildLog *c = ctx;
+    char sum[160];
+    int say = vmlog_repeat(&c->rep, line, n, now_ms_log(), sum, sizeof sum);
+    if (sum[0]) vlog("%s: %s", c->who, sum);
+    if (say) vlog("%s: %.*s", c->who, (int)(n > 900 ? 900 : n), line);
+}
+
 static void log_child(const char *who, const char *buf, size_t n) {
-    while (n) {
-        const char *nl = memchr(buf, '\n', n);
-        size_t l = nl ? (size_t)(nl - buf) : n;
-        if (l) vlog("%s: %.*s", who, (int)(l > 900 ? 900 : l), buf);
-        if (!nl) break;
-        buf = nl + 1;
-        n -= l + 1;
+    ChildLog *c = child_of(who);
+    vmlog_lines(&c->lines, buf, n, child_line, c);
+}
+
+/* the loop's tick: repeats not said yet (force: the run ends, and a line cut short is said too) */
+static void child_logs_tick(long long now, int force) {
+    for (int i = 0; i < CHILD_LOGS; i++) {
+        ChildLog *c = &child_log[i];
+        if (force) vmlog_lines_flush(&c->lines, child_line, c);
+        char sum[160];
+        if (vmlog_repeat_tick(&c->rep, force ? c->rep.said_at + VMLOG_SUMMARY_MS : now, sum, sizeof sum)) vlog("%s: %s", c->who, sum);
     }
+}
+
+/* when the next summary of repeats is due, or -1 */
+static long long child_logs_next(void) {
+    long long next = -1;
+    for (int i = 0; i < CHILD_LOGS; i++)
+        if (child_log[i].rep.rep && (next < 0 || child_log[i].rep.said_at + VMLOG_SUMMARY_MS < next)) next = child_log[i].rep.said_at + VMLOG_SUMMARY_MS;
+    return next;
 }
 
 /* ---- small utilities ---- */
@@ -785,6 +833,12 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         char dd[PATH_MAX + 64], why[300];
         snprintf(dd, sizeof dd, "%s/disks", real);
         if (un.kind == VMU_WINDOWS && !m.drivers[0]) { fprintf(stderr, "lord-vm: a Windows install needs --drivers (virtio-win)\n"); unlink(sys); return 2; }
+        /* LordOS (vmunattend.h): its installer erases only the disk the answers name, with exactly this size: the system
+         * disk just made (virtio-blk in slot 1, the guest's first: vda; SATA with the compatible devices: sda) */
+        if (un.kind == VMU_LORDOS) {
+            snprintf(un.disk, sizeof un.disk, "%s", m.devices == VM_DEV_COMPAT ? "sda" : "vda");
+            un.disk_bytes = (unsigned long long)m.disk_gb << 30;
+        }
         if (un.kind == VMU_WINDOWS ? vmu_prepare_windows(dd, m.drivers, &un, why, sizeof why) : vmu_prepare(dd, m.iso, &un, m.id, why, sizeof why)) {
             fprintf(stderr, "lord-vm: the unattended install can't be prepared: %s\n", why);
             unlink(sys);
@@ -989,11 +1043,21 @@ static struct {
     /* the guest's display (AGK_DISPLAY): the size the window wants last, sent to a helper with "display" */
     int lag_display, lag_windows;
     uint32_t disp_w, disp_h;
+    char lag_disps[AG_DISPLAYS_MAX * 128];   /* the guest's displays (AGK_DISPLAYS) as last logged, "" none yet */
+    int layout[6];                          /* where the picture sits in the guest's desktop (VM_GUEST_LAYOUT), 0s none */
+    int lag_extra, lag_extraoff, extra_avail; /* the tools turn off an extra display (AGK_EXTRA); one is off; one is there */
+    AgDisplay disp_list[AG_DISPLAYS_MAX];   /* the guest's displays (AGK_DISPLAYS) as last said, for the tablet's layout */
+    int disp_n, disp_shown;
+    int tablet;                             /* how the guest maps the tablet (AGK_TABLET, AG_TABLET_*; 0 not said yet) */
+    int tablet_far;                         /* said in the log: the tablet covers a primary that isn't the shown display */
     /* "Open with" a machine (7.3): the helper said "open"; the drop's token and its hash on the agent's way (the
      * transfer folder's way has fx_dig); the drops waiting for the guest tools' answer */
     int lag_open, lag_place;
     uint32_t lag_win_ids[LAG_WIN_MAX];      /* the guest's last window list (apps mode), for a drop on one of them */
     int lag_win_n;
+    /* the icons of the windows in that list, as VM_WINDATA gave them (lag_windata): given again to a client that turns
+     * apps mode on (lord-server re-attached after a restart), since the guest sends each window's icon once */
+    struct { uint32_t id; uint8_t *data; size_t n; } lag_icons[LAG_WIN_MAX];
     char fx_otok[AG_OPEN_TOKEN + 1];
     Sha256 fx_hs;
     OpWait opw[OP_MAX];
@@ -2880,7 +2944,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 /* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
-#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS)
+#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS | VAC_EXTRA | VAC_EXTRA_OFF)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
@@ -3300,7 +3364,7 @@ static void on_qga_reply(const JVal *root, int ok) {
         gvt_begin();
         /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
          * is asked to say it again (once; its answer gets the plain hello) */
-        if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx clipreq ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
+        if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx clipreq elevated ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
         break;
     }
     case AQ_PING: if (ok) S.ping_at = now_ms(); break;
@@ -4490,8 +4554,40 @@ static int clip_waiting(uint32_t gen, int form) {
 }
 
 /* ---- apps mode (7.2): the guest's windows, icons and apps, checked here and handed to lord-server ---- */
+static void lag_icons_forget(int all) {
+    for (int i = 0; i < LAG_WIN_MAX; i++) {
+        if (!S.lag_icons[i].data) continue;
+        int listed = 0;
+        for (int k = 0; k < S.lag_win_n && !all && !listed; k++) listed = S.lag_win_ids[k] == S.lag_icons[i].id;
+        if (!listed) { free(S.lag_icons[i].data); memset(&S.lag_icons[i], 0, sizeof S.lag_icons[i]); }
+    }
+}
+
+static void lag_icon_keep(uint32_t id, const uint8_t *data, size_t n) {
+    int k = -1;
+    for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (S.lag_icons[i].data && S.lag_icons[i].id == id) k = i;
+    for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (!S.lag_icons[i].data) k = i;
+    uint8_t *c = k >= 0 ? malloc(n) : NULL;
+    if (!c) return;
+    memcpy(c, data, n);
+    free(S.lag_icons[k].data);
+    S.lag_icons[k].id = id; S.lag_icons[k].data = c; S.lag_icons[k].n = n;
+}
+
+/* VM_WINDATA as a sealed memfd to one client (ci) or all (-1) */
+static void windata_send(int ci, const uint8_t *out, size_t n, int kind) {
+    if (!n || n > VM_WINDATA_MAX) return;
+    int fd = memfd_create("lordos-vm-windows", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd >= 0 && !write_all(fd, out, n) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+        VmMsg m = vm_msg(VM_WINDATA, 0, (int)n, kind, S.lag_applist_gen, 0, "");
+        for (int i = 0; i < MAX_CLIENTS; i++) if (ci < 0 || i == ci) send_to(i, &m, fd);
+    }
+    if (fd >= 0) close(fd);
+}
+
 static void lag_windows_off(void) {
     S.lag_apps = 0;
+    lag_icons_forget(1);
     free(S.lag_applist);
     S.lag_applist = NULL;
 }
@@ -4499,6 +4595,8 @@ static void lag_windows_off(void) {
 /* a guest frame of apps mode: parsed to its last byte (vmagent.c), written again (nothing the guest sent passes on as
  * it came), and given to every client as a sealed memfd (VM_WINDATA); the list of apps is kept, with a generation, for
  * VM_LAUNCH */
+static void layout_set(const int L[6]);
+static void layout_update(void);
 static void lag_windata(const AgFrame *f) {
     static LagWinList wl;
     uint8_t *out = NULL;
@@ -4507,6 +4605,7 @@ static void lag_windata(const AgFrame *f) {
         if (lag_winlist_read(f->data, f->len, &wl)) { vlog("agent: a window list that doesn't parse: dropped"); return; }
         S.lag_win_n = wl.n;
         for (int i = 0; i < wl.n; i++) S.lag_win_ids[i] = wl.w[i].id;
+        lag_icons_forget(0);
         out = malloc(LAG_WINDOWS_BYTES);
         n = out ? lag_windows_write(&wl, out, LAG_WINDOWS_BYTES) : 0;
         if (S.dev_qmp) {
@@ -4519,6 +4618,7 @@ static void lag_windata(const AgFrame *f) {
         if (lag_winicon_parse(f->data, f->len, &id, &w, &h, &px)) { vlog("agent: a window icon that doesn't parse: dropped"); return; }
         out = malloc(8 + LAG_ICON_MAX * LAG_ICON_MAX * 4);
         n = out ? lag_icon_write(id, w, h, px, out, 8 + LAG_ICON_MAX * LAG_ICON_MAX * 4) : 0;
+        if (n) lag_icon_keep(id, out, n);
     } else {
         LagAppList *al = malloc(sizeof *al);
         if (!al || lag_applist_read(f->data, f->len, al)) { free(al); vlog("agent: a program list that doesn't parse: dropped"); return; }
@@ -4529,14 +4629,7 @@ static void lag_windata(const AgFrame *f) {
         n = out ? lag_applist_write(al, out, LAG_APPLIST_BYTES) : 0;
         vlog("agent: the guest lists %d programs", al->n);
     }
-    if (n && n <= VM_WINDATA_MAX) {
-        int fd = memfd_create("lordos-vm-windows", MFD_CLOEXEC | MFD_ALLOW_SEALING);
-        if (fd >= 0 && !write_all(fd, out, n) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
-            VmMsg m = vm_msg(VM_WINDATA, 0, (int)n, f->kind, S.lag_applist_gen, 0, "");
-            for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, fd);
-        }
-        if (fd >= 0) close(fd);
-    }
+    windata_send(-1, out, n, f->kind);
     free(out);
 }
 
@@ -4569,6 +4662,8 @@ static void drain_lag(void) {
                 S.lag_place = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_PLACE) != 0;
                 S.lag_pointer = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_POINTER) != 0;
                 S.lag_gvt = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_GVT) != 0;
+                S.lag_extra = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRA) != 0;
+                S.lag_extraoff = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRAOFF) != 0;
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
@@ -4584,9 +4679,10 @@ static void drain_lag(void) {
                 if (!S.lag_windows) lag_windows_off();
                 S.ag_caps = (S.ag_caps & ~VAC_LAG) | (clip ? VAC_CLIPBOARD : 0) | (clip && S.lag_clipreq ? VAC_CLIP_LAZY : 0) |
                             (notool ? VAC_CLIP_NOTOOL : 0) | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0) |
-                            (S.lag_open && S.ag_windows ? VAC_OPEN : 0) | (S.lag_place && S.ag_windows ? VAC_PLACE : 0);
+                            (S.lag_open && S.ag_windows ? VAC_OPEN : 0) | (S.lag_place && S.ag_windows ? VAC_PLACE : 0) |
+                            (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0) | (S.lag_extra && S.lag_extraoff ? VAC_EXTRA_OFF : 0);
                 if (!S.lag_open && !S.lag_place) open_all_end();
-                static const char me[] = "lord-vm 2 clipboard clipx clipreq";
+                static const char me[] = "lord-vm 2 clipboard clipx clipreq elevated";   /* elevated: LAGW_ELEVATED is understood */
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
                 ag_broadcast();
@@ -4621,6 +4717,45 @@ static void drain_lag(void) {
             uint32_t w, h;
             if (ag_display_parse(f.data, f.len, &w, &h)) vlog("agent: the guest's display size: malformed");
             else vlog("agent: the guest's display is %ux%u%s", w, h, w == S.disp_w && h == S.disp_h ? "" : " (not the size asked for)");
+        } else if (f.kind == LAG_WINREFUSED && S.lag_hello && S.lag_windows) {
+            /* an apps mode action the guest couldn't do (LordOS shows why from LAGW_ELEVATED in the list): logged */
+            static const char *const act[] = { "", "focus", "close", "minimize", "restore", "move" };
+            uint32_t id;
+            uint8_t a, why;
+            if (lag_winrefused_parse(f.data, f.len, &id, &a, &why)) vlog("agent: a refused window action: malformed");
+            else {
+                vlog("agent: the guest couldn't %s its window %u: %s", act[a], id,
+                     why == LAGR_ELEVATED ? "it runs as administrator (close it from inside the machine)" : "the system refused");
+                VmMsg m = vm_msg(VM_WINREFUSED, 0, (int)id, a, why, 0, "");
+                for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
+            }
+        } else if (f.kind == AGK_DISPLAYS && S.lag_hello) {
+            /* the guest's displays (lordos-guest-win w7 and later), for this log only: logged when they change */
+            AgDisplay d[AG_DISPLAYS_MAX];
+            char t[sizeof S.lag_disps];
+            int shown, n = ag_displays_parse(f.data, f.len, d, &shown);
+            if (n < 0) vlog("agent: the guest's displays: malformed");
+            else {
+                ag_displays_text(d, n, shown, t, sizeof t);
+                if (strcmp(t, S.lag_disps)) { memcpy(S.lag_disps, t, sizeof t); vlog("agent: guest displays: %s", t); }
+                memcpy(S.disp_list, d, sizeof S.disp_list);
+                S.disp_n = n;
+                S.disp_shown = shown;
+                layout_update();
+                /* a display the tools can turn off (Machines offers it) */
+                S.extra_avail = ag_displays_extra(d, n, shown);
+                int caps = (S.ag_caps & ~VAC_EXTRA) | (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0);
+                if (caps != S.ag_caps) { S.ag_caps = caps; ag_broadcast(); }
+            }
+        } else if (f.kind == AGK_TABLET && S.lag_hello) {
+            /* how the guest maps the absolute tablet (tools w10, from the tablet's own raw input) */
+            int mode;
+            if (ag_tablet_parse(f.data, f.len, &mode)) vlog("agent: the guest's tablet mapping: malformed");
+            else if (mode != S.tablet) {
+                S.tablet = mode;
+                vlog("agent: the guest maps the tablet over %s", mode == AG_TABLET_DESKTOP ? "its whole desktop (every display)" : "its primary display only");
+                layout_update();
+            }
         } else if ((f.kind == LAG_WINDOWS || f.kind == LAG_WINICON || f.kind == LAG_APPLIST) && S.lag_hello && S.lag_windows) {
             lag_windata(&f);
         } else if ((f.kind == AGK_OPENED && S.lag_hello && S.lag_open) || (f.kind == AGK_PLACED && S.lag_hello && S.lag_place)) {
@@ -4630,6 +4765,28 @@ static void drain_lag(void) {
         memmove(S.lag_buf, S.lag_buf + k, S.lag_n - (size_t)k);
         S.lag_n -= (size_t)k;
     }
+}
+
+/* the guest's layout for the absolute tablet (VM_GUEST_LAYOUT), to every client; all 0s: none */
+static void layout_set(const int L[6]) {
+    memcpy(S.layout, L, sizeof S.layout);
+    if (L[4]) vlog("agent: the tablet points at the shown display: %dx%d at %d,%d of a %dx%d desktop", L[2], L[3], L[0], L[1], L[4], L[5]);
+    else vlog("agent: the tablet covers the picture (%s)", S.disp_n > 1 ? "the shown display is the one the guest maps it over" : "one display");
+    VmMsg m = vm_msg(VM_GUEST_LAYOUT, 0, L[0], L[1], L[2] << 16 | L[3], L[4] << 16 | L[5], "");
+    for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
+}
+
+/* The tablet's layout from the guest's displays and how it maps the tablet (ag_tablet_layout). A Windows guest maps a
+ * HID tablet over its primary display only (mouhid sets no MOUSE_VIRTUAL_DESKTOP; tools w10 read it from the tablet's raw
+ * input and say so, AGK_TABLET): with the shown display primary, the picture is all of it, as with one display. Until
+ * the tools say, the primary is assumed (2026-11-22, the maintainer's guest: with the shown display primary at 0,0 and a
+ * second display beside it, the whole-desktop mapping of before put clicks at about half their x) */
+static void layout_update(void) {
+    int L[6];
+    int r = ag_tablet_layout(S.disp_list, S.disp_n, S.disp_shown, S.tablet, L);
+    if (r == 2 && !S.tablet_far) vlog("agent: the guest's primary display isn't the shown one: the tablet can't reach the picture until the tools make it primary again");
+    S.tablet_far = r == 2;
+    if (memcmp(L, S.layout, sizeof L)) layout_set(L);
 }
 
 /* the agent's turn of the loop: sync, ping, the journal, the shutdown fallback */
@@ -4775,6 +4932,17 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
     case VM_AGENT:
         if (fd >= 0 && m->a != VAG_TRANSFER) { close(fd); fd = -1; }
         if (!S.m.agent) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_DENIED, "the guest agent is off for this machine"); return; }
+        if (m->a == VAG_EXTRA_OFF || m->a == VAG_EXTRA_ON) {
+            /* the guest's extra display, through its tools (not qemu-guest-agent): only when they can and it's there */
+            int off = m->a == VAG_EXTRA_OFF;
+            if (!S.lag_hello || !S.lag_extra) { reply(ci, m->seq, VME_WRONG_STATE, "the LordOS tools in the guest can't turn a display off (w9 and later)"); return; }
+            if (off ? !S.extra_avail : !S.lag_extraoff) { reply(ci, m->seq, VME_WRONG_STATE, off ? "the guest has no extra display" : "no display was turned off"); return; }
+            uint8_t b = (uint8_t)off;
+            lag_send(AGK_EXTRA, &b, 1);
+            vlog("agent: the guest's tools are asked to turn %s its extra display", off ? "off" : "back on");
+            reply(ci, m->seq, VME_OK, off ? "asked to turn it off" : "asked to turn it back on");
+            return;
+        }
         if (!S.qga_up) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
         if (m->a == VAG_TRANSFER) {
             /* the transfer folder (6.7.1): a Linux guest mounts it again; a Windows guest gets WinFsp, whose installer
@@ -4802,6 +4970,9 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         }
         if (m->a == VAG_SHUTDOWN) { qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1); reply(ci, m->seq, VME_OK, ""); return; }
         if (m->a == VAG_TIMESYNC) { ag_timesync(); reply(ci, m->seq, VME_OK, ""); return; }
+        /* Machines' own update of older LordOS tools (docs/VIRTUALIZATION.md "Keeping the LordOS tools up to date"):
+         * the same install as the button, and each attempt in this log */
+        if (m->b == 1) vlog("agent: Machines updates the LordOS tools in the guest by itself (they said %s)", S.lag_hello && S.lag_version[0] ? S.lag_version : "no version");
         if (S.ag_windows) { const char *why = NULL; if (wi_begin(ci, m->seq, &why)) reply(ci, m->seq, VME_WRONG_STATE, why); return; }
         if (S.inst_busy || S.helper_handle) { reply(ci, m->seq, VME_BUSY, "busy"); return; }      /* one install at a time */
         if (!S.helper || !(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) { reply(ci, m->seq, VME_WRONG_STATE, S.helper ? "the guest agent can't write files or run commands" : "lordos-guest isn't available for this machine's architecture"); return; }
@@ -4890,6 +5061,8 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         lag_send(LAG_APPS, &on, 1);
         vlog("agent: apps mode %s", m->a ? "on" : "off");
         reply(ci, m->seq, VME_OK, "");
+        /* the icons the guest already sent (it sends each window's once): a re-attached lord-server has none */
+        if (on) for (int i = 0; i < LAG_WIN_MAX; i++) if (S.lag_icons[i].data) windata_send(ci, S.lag_icons[i].data, S.lag_icons[i].n, LAG_WINICON);
         return;
     }
     case VM_WINACT: {
@@ -5075,7 +5248,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -5451,9 +5624,12 @@ static void loop(void) {
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
         if (S.win_key_at && (next < 0 || S.win_key_at < next)) next = S.win_key_at;
         if (mice_watched() && S.mice_at && (next < 0 || S.mice_at < next)) next = S.mice_at;
+        long long cl = child_logs_next();
+        if (cl >= 0 && (next < 0 || cl < next)) next = cl;
         int to = next < 0 ? -1 : next <= now ? 0 : (int)(next - now);
         if (poll(p, (nfds_t)n, to) < 0 && errno != EINTR) { vlog("poll: %s", strerror(errno)); break; }
         now = now_ms();
+        child_logs_tick(now, 0);
         if (S.migq_next && now >= S.migq_next) { S.migq_next = now + 500; qmp_do("query-migrate", NULL, P_MIGQ, -1, 0, -1, -1); }
         if (S.qga_fd >= 0 && S.ag_next && now >= S.ag_next) ag_tick(now);
         if (S.win_key_at && now >= S.win_key_at) {
@@ -5541,6 +5717,7 @@ static void loop(void) {
     /* what QEMU said last */
     for (int k = 0; k < 20 && S.qemu_err >= 0; k++) pump_fd(&S.qemu_err, "qemu");
     for (int k = 0; k < 20 && S.passt_err >= 0; k++) pump_fd(&S.passt_err, "passt");
+    child_logs_tick(now_ms(), 1);
     if (S.passt > 0) {
         for (int k = 0; k < 20; k++) { if (waitpid(S.passt, NULL, WNOHANG) == S.passt) { S.passt = 0; break; } struct timespec ts = { 0, 50000000 }; nanosleep(&ts, NULL); }
         if (S.passt > 0) { kill(S.passt, SIGKILL); waitpid(S.passt, NULL, 0); }
@@ -5853,6 +6030,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     rotate_logs();
     snprintf(p, sizeof p, "%s/log/lord-vm.log", S.dir);
     log_fd = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0600);
+    snprintf(log_dir, sizeof log_dir, "%s/log", S.dir);
     snprintf(p, sizeof p, "%s/log/serial.log", S.dir);
     S.serial_log = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     vlog("lord-vm %d: machine %s \"%s\" (%s, %s, %d vCPU, %d MB, %s)", (int)getpid(), S.m.id, S.m.name, vm_arch_name(S.m.arch),

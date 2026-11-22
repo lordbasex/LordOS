@@ -68,11 +68,13 @@ export function saveSystems(list) {
   bump();
 }
 
-// settings.machinesDefaults (0.8.9): { profile, bridge, logos } — the default profile, the card bridged machines join,
-// and the official logos switch (off unless the person turned it on)
+// settings.machinesDefaults (0.8.9): { profile, bridge, logos, toolsAuto } — the default profile, the card bridged machines join,
+// the official logos switch (off unless the person turned it on) and the LordOS tools updated by themselves (on unless
+// turned off; a machine's Configure → Agent can say otherwise, model.js toolsAutoOn)
 export const defaultsOf = (v) => {
   const o = v && typeof v === 'object' ? v : {};
-  return { profile: typeof o.profile === 'string' ? o.profile : null, bridge: typeof o.bridge === 'string' ? o.bridge : '', logos: o.logos === true };
+  return { profile: typeof o.profile === 'string' ? o.profile : null, bridge: typeof o.bridge === 'string' ? o.bridge : '', logos: o.logos === true,
+    toolsAuto: o.toolsAuto !== false };
 };
 export function setDefaults(patch) {
   settings.set({ machinesDefaults: { ...defaultsOf(settings.get().machinesDefaults), ...patch } });

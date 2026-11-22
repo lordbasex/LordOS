@@ -1,0 +1,60 @@
+/* vmlog.h — lord-vm's log kept useful for a whole run (docs/VIRTUALIZATION.md, "lord-vm's log").
+ *
+ * Found live on 2026-11-22: after a machine's window closed, QEMU went on calling the dead D-Bus listener and wrote
+ * "Failed to call update: The connection is closed" twice every 30 ms; 32,000 such lines filled lord-vm.log's 4 MB cap
+ * in 15 minutes and lord-vm wrote nothing more for the rest of the run. So:
+ *
+ *   - a child's stderr (QEMU, passt) is cut into whole lines (vmlog_lines), not into whatever each read() returned;
+ *   - a line that comes again with the same text (its leading timestamp aside: QEMU's own) is logged once, then counted,
+ *     and a summary line says how many times it came, at most every VMLOG_SUMMARY_MS (vmlog_repeat, vmlog_repeat_tick);
+ *   - the log is rotated when it is full (vmlog_rotate: base.log → base.1.log → base.2.log, the oldest dropped) instead
+ *     of going silent, so it stays within keep × the cap.
+ *
+ * Pure functions on caller-owned state, except vmlog_rotate (files in one folder); tests/vmlog_test.c. */
+#ifndef LORD_VM_VMLOG_H
+#define LORD_VM_VMLOG_H
+
+#include <stddef.h>
+
+#define VMLOG_LINE_MAX 1024
+#define VMLOG_SUMMARY_MS 10000
+
+/* bytes of a child's output, gathered into whole lines */
+typedef struct {
+    char buf[VMLOG_LINE_MAX];
+    size_t n;
+} VmLineBuf;
+
+typedef void (*VmLineFn)(void *ctx, const char *line, size_t n);
+
+/* p[0..n) in; fn(ctx, line, len) for every complete line (without its '\n'; empty lines skipped). A line longer than
+ * VMLOG_LINE_MAX is given in pieces of that size. */
+void vmlog_lines(VmLineBuf *b, const char *p, size_t n, VmLineFn fn, void *ctx);
+/* what is left without a '\n' (the child ended), given as a line */
+void vmlog_lines_flush(VmLineBuf *b, VmLineFn fn, void *ctx);
+
+/* the repeats of one source's last line */
+typedef struct {
+    char last[VMLOG_LINE_MAX];          /* the last line logged, its key (vmlog_key) */
+    size_t last_n;
+    unsigned long rep;                  /* times it came again since, not logged */
+    long long rep_since;                /* when the first of those came (ms) */
+    long long said_at;                  /* when the line, or its last summary, was logged */
+} VmLogRep;
+
+/* the part of a line that names it: without a leading ISO 8601 timestamp ("2026-11-22T14:04:50.906182Z "), which QEMU
+ * puts in front of each of its messages */
+const char *vmlog_key(const char *line, size_t n, size_t *kn);
+
+/* A line from a source at now (ms): 1 to log it, 0 a repeat of the last one (counted, not logged). *sum (cap bytes)
+ * gets a summary line to log before it, or "" (the repeats of the line before, when another comes, or the count so
+ * far, every VMLOG_SUMMARY_MS while it keeps coming). */
+int vmlog_repeat(VmLogRep *r, const char *line, size_t n, long long now, char *sum, size_t cap);
+/* the loop's tick: the repeats not said yet, once VMLOG_SUMMARY_MS went by since the last time; 1 when *sum holds one */
+int vmlog_repeat_tick(VmLogRep *r, long long now, char *sum, size_t cap);
+
+/* dir/base.log → dir/base.1.log, …, base.(keep-1).log (the oldest dropped), and a new, empty dir/base.log opened for
+ * appending (0600, O_CLOEXEC, O_NOFOLLOW). Its fd, or -1. keep 1..9. */
+int vmlog_rotate(const char *dir, const char *base, int keep);
+
+#endif

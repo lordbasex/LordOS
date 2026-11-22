@@ -18,6 +18,7 @@
 #include "../hw/display.h"
 
 #include <fcntl.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -87,17 +88,20 @@ static void feed_recording(const Canvas *src, const MediaCursor *cur) {
     double t = now_ms();
     double gap = 1000.0 / (s->rec_fps > 0 ? s->rec_fps : 30);
     if (t - s->rec_last < gap - 2) { rec_pending = 1; return; }
-    if (src->w != s->in_w || src->h != s->in_h) { s->rec_dropped++; return; }    /* the screen changed: skipped */
+    if (src->w != s->rec_fw || src->h != s->rec_fh) { s->rec_dropped++; return; }    /* the screen changed: skipped */
     int slot = -1;
     for (int i = 0; i < s->in_slots; i++) if (!s->in_busy[i]) { slot = i; break; }
     if (slot < 0) { s->rec_dropped++; rec_pending = 1; return; }              /* the encoder is behind */
     uint32_t *dst = (uint32_t *)(s->in_map + (size_t)slot * s->in_w * s->in_h * 4);
-    for (int y = 0; y < src->h; y++) memcpy(dst + (size_t)y * s->in_w, src->px + (size_t)y * src->stride, (size_t)src->w * 4);
-    if (cur) {
+    /* the whole frame, or the area chosen (Screenshots' "Record selected area") */
+    for (int y = 0; y < s->in_h; y++)
+        memcpy(dst + (size_t)y * s->in_w, src->px + (size_t)(y + s->rec_y) * src->stride + s->rec_x, (size_t)s->in_w * 4);
+    if (cur && s->rec_cursor) {
         Canvas c;
         canvas_init(&c, dst, s->in_w, s->in_h, s->in_w);
-        if (cur->mode == 1 && cur->px) canvas_blit(&c, cur->px, cur->w, cur->h, cur->x - cur->hx, cur->y - cur->hy, 0, 1, 0);
-        else if (cur->mode == 0) canvas_bitmap(&c, cur->x, cur->y, arrow, 0xff000000u, 0xffffffffu);
+        int cx = cur->x - s->rec_x, cy = cur->y - s->rec_y;
+        if (cur->mode == 1 && cur->px) canvas_blit(&c, cur->px, cur->w, cur->h, cx - cur->hx, cy - cur->hy, 0, 1, 0);
+        else if (cur->mode == 0) canvas_bitmap(&c, cx, cy, arrow, 0xff000000u, 0xffffffffu);
     }
     if (mp_sendv(s->sock, MM_INFRAME, (uint32_t)slot, (int64_t)(t - s->rec_start), 0, 0, 0)) { s->rec_dropped++; return; }
     s->in_busy[slot] = 1;
@@ -270,10 +274,37 @@ MediaSrc *media_rotate(MediaSrc *src, int turns) {
 
 /* ---- screen recording ---- */
 
-int media_screenrec_start(MediaSrc *s, int fps) {
-    if (rec) return -1;
+int media_capture_region(double lx, double ly, double lw, double lh, int *x, int *y, int *w, int *h) {
     int W, H;
     media_capture_size(&W, &H);
+    if (!(lw > 0) || !(lh > 0) || lw > 1e6 || lh > 1e6 || !(lx > -1e6 && lx < 1e6) || !(ly > -1e6 && ly < 1e6)) return -1;
+    const DisplayOut *m = capture_main();
+    Rect r;
+    if (m) r = out_phys_rect(&m->v, (float)lx, (float)ly, (float)(lx + lw), (float)(ly + lh));
+    else r = (Rect){ (int)floor(lx), (int)floor(ly), (int)ceil(lx + lw), (int)ceil(ly + lh) };
+    if (r.x0 < 0) r.x0 = 0;
+    if (r.y0 < 0) r.y0 = 0;
+    if (r.x1 > W) r.x1 = W;
+    if (r.y1 > H) r.y1 = H;
+    int rw = (r.x1 - r.x0) & ~1, rh = (r.y1 - r.y0) & ~1;       /* the encoder wants even sizes */
+    if (rw < 16 || rh < 16) return -1;
+    *x = r.x0; *y = r.y0; *w = rw; *h = rh;
+    return 0;
+}
+
+int media_screenrec_start(MediaSrc *s, int fps, const int *region, int cursor) {
+    if (rec) return -1;
+    int FW, FH;
+    media_capture_size(&FW, &FH);
+    int W = FW, H = FH;
+    s->rec_x = s->rec_y = 0;
+    if (region) {
+        if (region[0] < 0 || region[1] < 0 || region[2] < 16 || region[3] < 16 || region[0] + region[2] > FW || region[1] + region[3] > FH) return -1;
+        s->rec_x = region[0]; s->rec_y = region[1]; W = region[2] & ~1; H = region[3] & ~1;
+    }
+    s->rec_fw = FW;
+    s->rec_fh = FH;
+    s->rec_cursor = !!cursor;
     int slots = 3;
     size_t n = (size_t)W * H * 4 * slots;
     int fd = memfd_create("lordos-screen", MFD_CLOEXEC | MFD_ALLOW_SEALING);

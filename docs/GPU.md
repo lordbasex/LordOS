@@ -598,8 +598,9 @@ Several displays and HiDPI (`DISPLAYS.md`): one GBM/EGL surface and UI texture p
 single context; app textures are shared and drawn at each display's scale; `wp_fractional_scale_v1`
 and `zxdg_output_manager_v1` are there. Direct scanout only with one display.
 
-Not there: `xdg_activation` and explicit sync (`linux-drm-syncobj`). dma-resv
-implicit sync is used.
+Explicit sync (`linux-drm-syncobj-v1`): built 2026-11-22, in development (`SYNCOBJ-PLAN.md`, `WAYLAND.md` "Explicit
+sync"). An app that binds it gets its frame applied once its acquire point is signalled and its release point signalled
+with the buffer's own fences after the frame that replaced it; apps that don't keep dma-resv implicit sync.
 
 ## Tested (VM 116 `lordos-gpu`)
 
@@ -697,6 +698,7 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
   graphics newer than Whiskey Lake.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).
-- `linux-drm-syncobj` (explicit sync, the one Nvidia prefers; designed in `SYNCOBJ-PLAN.md`, for review), `xdg_activation`, tearing control (`wp_tearing_control`) and VRR.
+- Tearing control (`wp_tearing_control`) and VRR. (`linux-drm-syncobj`, explicit sync: built 2026-11-22, see
+  `SYNCOBJ-PLAN.md`; NVIDIA's driver itself still unchecked.)
 - Letting JS know a window is fullscreen (today it receives the `fullscreen` event, but the themes
   ignore it).

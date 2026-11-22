@@ -38,7 +38,7 @@ const SHOWN = [
   ['files', FolderGlyph, '#30b0c7'], ['network', '⇅', '#0a84ff'], ['clipboard', '⎘', '#5e5ce6'],
   ['notifications', '◉', '#ff375f'], ['apps', '▦', '#8e8e93'], ['listen', '⇄', '#34c759'],
   ['usb', '⇆', '#8e8e93'], ['bluetooth', 'ᛒ', '#0a84ff'], ['status-item', '◔', '#8e8e93'], ['shortcuts', '❖', '#5e5ce6'],
-  ['idle', '☾', '#8e8e93'],
+  ['idle', '☾', '#8e8e93'], ['vr', '◎', '#bf5af2'],
 ];
 
 // A Linux app's "shortcuts" name: the installed app's whose .desktop entry runs the program (or Flatpak app)
@@ -54,16 +54,19 @@ function linuxName(id, who) {
   return linuxNames.get(id) || who.short;
 }
 
-// A decision's app as the person knows it: a LordOS app's name, or a Linux app's for "shortcuts"
+// Permissions lord-server keeps by the identity it checked (server/src/wl/kbinhibit.h), never declared by a manifest
+const BY_IDENTITY = new Set(['shortcuts', 'idle', 'vr']);
+
+// A decision's app as the person knows it: a LordOS app's name, or a Linux app's for "shortcuts", "idle" and "vr"
 function nameOf(id, perm) {
-  const who = perm === 'shortcuts' || perm === 'idle' ? shortcutsWho(id) : null;
+  const who = BY_IDENTITY.has(perm) ? shortcutsWho(id) : null;
   if (who && who.kind !== 'lord') return linuxName(id, who);
   return appName(getApp(id)) || id;
 }
 
 // A decision this page lists: for "shortcuts", only those whose app lord-server can tell (the first format's
 // "desktop:<app_id>" and "exe:<path>" were never released and are ignored)
-const listed = (d) => (d.perm !== 'shortcuts' && d.perm !== 'idle') || !!shortcutsWho(d.app);
+const listed = (d) => !BY_IDENTITY.has(d.perm) || !!shortcutsWho(d.app);
 
 const PermBadge = ({ glyph: G, color }) => (typeof G === 'string' ? <Badge glyph={G} color={color} size={22} /> : <Badge color={color} size={22}><G /></Badge>);
 
@@ -84,7 +87,7 @@ function PermSection({ perm, glyph, color }) {
   return (
     <Section icon={<PermBadge glyph={glyph} color={color} />} title={tr(`privacy.perm.${perm}`)} footer={tr(`privacy.permHint.${perm}`)}>
       {apps.map(([id, name]) => (
-        <SettingRow key={id} label={name} hint={perm === 'shortcuts' || perm === 'idle' ? shortcutsWhoText(id) || undefined : undefined}>
+        <SettingRow key={id} label={name} hint={BY_IDENTITY.has(perm) ? shortcutsWhoText(id) || undefined : undefined}>
           <Segmented small value={perms.get(id, perm)} onChange={(s) => perms.set(id, perm, s)}
             options={[['allow', tr('privacy.allowShort')], ['ask', tr('privacy.askShort')], ['deny', tr('privacy.denyShort')]]} />
         </SettingRow>

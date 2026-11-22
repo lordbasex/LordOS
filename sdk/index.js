@@ -49,13 +49,18 @@ import { registerStatusItem } from './statusitems.js';
 import { ClipboardPanel, ClipboardToast, clipboard as clipboardApi } from './clipboard.js';
 import { SpotlightPanel } from './spotlight.js';
 import { RemoteBadge } from './remote.js';
-import { ShareBadge, SharePrompt, sweepShareGrants } from './share.js';
+import { SharePrompt, sweepShareGrants } from './share.js';
+import { CaptureCorner } from './capturestatus.jsx';
 import { linuxIds } from './apps.js';
 export { share, shareHolder, shareRev } from './share.js';
 export { remote, remoteViewers, sshLogin, remoteCidr, remoteMinutesLeft, remoteAccess, remoteVideo, remoteIceServer, remoteFingerprint } from './remote.js';
 export { inhibitShortcuts } from './kbinhibit.js';
 export { shortcutsWho } from './kbinhibitmodel.js';
-export { perms, permsRev, requestPermission, markDeviceUse, useIndicators, PrivacyIndicators, PermissionPrompt, registerPrivacySection, privacySections, PERMISSIONS, onPermissionRevoked, micStart, micStop, micLevel, shortcutsWhoText } from './privacy.js';
+export { perms, permsRev, requestPermission, markDeviceUse, useIndicators, PermissionPrompt, registerPrivacySection, privacySections, PERMISSIONS, onPermissionRevoked, micStart, micStop, micLevel, shortcutsWhoText } from './privacy.js';
+// the capture indicator by the clock (screen, camera, microphone): themes draw it as <PrivacyIndicators />
+export { PrivacyIndicators, CaptureGlyph, useCaptureRows } from './capturestatus.jsx';
+export { StudioPanel, studioAvailable } from './studio.jsx';
+export { captureRows, captureGlyph, captureSummary, rowStops } from './capturemodel.js';
 import { PermissionPrompt } from './privacy.js';
 import { Powerbox } from './powerbox.jsx';
 export { openFile, saveFile, Powerbox } from './powerbox.jsx';
@@ -126,7 +131,7 @@ export { spotlight, spotlightOpen, calc as spotlightCalc, convert as spotlightCo
 export { registerSpotlightSource, searchEverything } from './spotlight.js';
 // session notifications, menu bar status items, Clock (alarms) and Help (docs/SYSTEM.md)
 export { notify, dismissNotification, useNotifications, notifications, notifyHistory, clearNotifyHistory, NotificationBanner, setBannerPlacement } from './notify.js';
-export { registerStatusItem, StatusItems, statusItems, setStatusPanelPlacer } from './statusitems.js';
+export { registerStatusItem, StatusItems, statusItems, setStatusPanelPlacer, statusPanelAt, statusPanelRoom } from './statusitems.js';
 export { MoonGlyph, SunGlyph, ContrastGlyph, LayersGlyph, BluetoothGlyph, SignalGlyph } from './quickglyphs.jsx';   // quick settings' glyphs (issue #114)
 export { setBacklight, useBacklight } from './hwkeys.js';   // the Control Center's brightness slider (issue #114)
 export { MENUBAR_DEFAULTS, menuBarPrefs, menuBarPatch, cleanerItemShown, outputChoices, monthCells, monthWeeks, weekStartFor, wifiBars, wifiTile, wifiTileView, backlightOf, backlightValue } from './menubarmodel.js';   // what the bar shows (issue #58)
@@ -158,6 +163,8 @@ export { menuStep } from './focusmodel.js';
 import { FloatingWindows } from './components.jsx';
 // One stacking order for the desktop: <Layer name>, <Overlay anchor> (docs/LAYERS.md)
 export { LAYERS, Layer, Overlay, shellLayers } from './layers.js';
+// where a small floating bar goes and comes back (the reading-aloud player's rule; Screenshots' toolbar uses it too)
+export { placePlayer as placeFloatingBar, rememberPlace as rememberFloatingBar } from './voiceplayermodel.js';
 import { Layer, enableShellLayers } from './layers.js';
 export {
   ToolbarButton, ToolbarGroup, Toolbar, ToolbarSpacer, ToolbarDivider, Hairline, MenuButton, SearchField, EmptyState, GroupBox, FormRow, spacing, typeScale, controlSize, ConfirmDialog,
@@ -375,7 +382,7 @@ function LocaleRoot({ children }) {
     at('overlay', SpotlightPanel, LiveSpeechPanel),
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt, FirstStart),
-    at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
+    at('notification', NotificationBanner, ClipboardToast, RemoteBadge, CaptureCorner, DisplayIdentify, VoicePlayer),
     at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
     at('input', OskPanel, ImeOverlay));
 }
@@ -385,7 +392,7 @@ export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, 
 export { userVideoProblem, motionCodecs, MAX_SECONDS } from './motionmodel.js';
 export { lordosWallpapers, userWallpaperName, wallpaperSrc, wallpaperThumb, findWallpaper, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';
 export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem, webHelpItems, webAppearanceItem, webUserAgentItem } from './appcontrol.js';
-export { windowMenuItems, moveResizeItems, registerWindowMenuItems } from './windowmenu.js';
+export { windowMenuItems, moveResizeItems, registerWindowMenuItems, alwaysOnTopItem } from './windowmenu.js';
 export { setDesktopCount } from './desktops.js';
 // Apps in a small window (a Workspaces tile): the window's width, a breakpoint and a sidebar that hides (sdk/narrow.jsx)
 export { useWindowWidth, useWindowHeight, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, NARROW, MIN_W, MIN_H } from './narrow.jsx';

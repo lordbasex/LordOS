@@ -399,6 +399,26 @@ eq('crop of', M.cropOf({ x: 10, y: 20, w: 30, h: 40 }), [10, 20, 30, 40]);
 eq('crop point 1:1', M.cropPoint(110, 220, [100, 200, 300, 400], [500, 600, 300, 400], 1920, 1080), [510, 620]);
 eq('crop point scaled', M.cropPoint(250, 400, [100, 200, 300, 400], [500, 600, 600, 800], 1920, 1080), [800, 1000]);
 eq('crop point clamped to the screen', M.cropPoint(399, 599, [100, 200, 300, 400], [1800, 1000, 300, 400], 1920, 1080), [1919, 1079]);
+// a drag on the guest's own title bar: mapped as at the press, whatever the guest's window and the LordOS one did since
+{
+  const anchor = { box: [100, 200, 300, 400], crop: [500, 600, 300, 400] };
+  eq('anchor point at the press', M.anchorPoint(110, 220, anchor, 1920, 1080), [510, 620]);
+  // the pointer went 40 px right: the guest gets 40 px right of the press point, not 40 + however far its window moved
+  eq('anchor point after a move', M.anchorPoint(150, 220, anchor, 1920, 1080), [550, 620]);
+  eq('anchor point outside the box', M.anchorPoint(40, 150, anchor, 1920, 1080), [440, 550]);
+  eq('anchor point clamped', M.anchorPoint(5000, -5000, anchor, 1920, 1080), [1919, 0]);
+  eq('anchor point scaled', M.anchorPoint(250, 400, { box: [100, 200, 300, 400], crop: [500, 600, 600, 800] }, 1920, 1080), [800, 1000]);
+  eq('no anchor', M.anchorPoint(1, 1, null, 1920, 1080), null);
+  // the runaway it replaces: through the crop as it is now, a guest window that moved by 40 put the point 40 further
+  const moved = M.cropPoint(150, 220, [100, 200, 300, 400], [540, 600, 300, 400], 1920, 1080);
+  eq('crop point through a moved window runs ahead', moved[0], 590);
+}
+// crops held after a change of the picture's size until the guest's next list
+eq('crops: no resize', M.cropsStale(0, 0, 1000), false);
+eq('crops: resized, no list since', M.cropsStale(10000, 5000, 10200), true);
+eq('crops: a list after the resize', M.cropsStale(10000, 10100, 10200), false);
+eq('crops: a list just before the resize (they crossed)', M.cropsStale(10000, 9700, 10200), false);
+eq('crops: not held for long', M.cropsStale(10000, 5000, 10000 + M.STALE_MS), false);
 eq('crop point outside', [M.cropPoint(99, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(400, 220, [100, 200, 300, 400], [0, 0, 300, 400], 1920, 1080), M.cropPoint(1, 1, [0, 0, 0, 0], [0, 0, 1, 1], 9, 9)], [null, null, null]);
 {
   // a guest window above the menu bar (Calculator at y = -10 on a 1:1 guest; 28 px menu bar, 32 px title bar): moved
@@ -468,6 +488,16 @@ eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, 
   eq('at most PLACE_MAX at once', [many.items.length, many.left, many.items[7].place.count, many.items[0].place.batch >= 1], [M.PLACE_MAX, 3, M.PLACE_MAX, true]);
   eq('offsetRect without offset', M.offsetRect({ x: 1, y: 2, w: 3, h: 4 }, null), { x: 1, y: 2, w: 3, h: 4 });
   eq('minimized by our move: restored', [M.minimizedByUs(1000, 2000, false), M.minimizedByUs(1000, 5000, false), M.minimizedByUs(1000, 2000, true), M.minimizedByUs(0, 2000, false)], [true, false, false, false]);
+  // a window's Dock icon: asked for every window that has none yet, on each new list, not only when the icons change
+  // (a window opened from a later list than its icon came with, as after a re-attach, kept a letter tile)
+  {
+    const a = { gid: 1, winId: 'machines#ga-m-1' }, b = { gid: 2, winId: 0 }, c = { gid: 3, winId: 'machines#ga-m-3', icon: true, iconSeq: 4 };
+    eq('icons: windows without one, not those without a LordOS window', M.iconsToAsk([a, b, c], 4).map((x) => x.gid), [1]);
+    eq('icons: all again when the guest\'s icons changed', M.iconsToAsk([a, b, c], 5).map((x) => x.gid), [1, 3]);
+    a.icon = true; a.iconSeq = 4;
+    eq('icons: nothing to ask once each has its own', M.iconsToAsk(new Map([[1, a], [3, c]]).values(), 4), []);
+    eq('icons: no tracks', M.iconsToAsk(null, 1), []);
+  }
 }
 }
 eq('popup', [M.isPopup({ owner: 5, topmost: true }), M.isPopup({ owner: 5, topmost: false }), M.isPopup({ owner: 0, topmost: true })], [true, false, false]);
@@ -483,7 +513,78 @@ eq('instance', [M.guestInstance('ab12-cd', 4294967295), M.guestInstance('a/../b'
   const q = M.planWindows([W(1, 200, { minimized: true })], new Map([[1, { rect: W(1, 0), minimized: false }]]));
   eq('plan minimize, no follow', [q.minimize.map((w) => w.id), q.follow.length], [[1], 0]);
 }
+eq('close refusals: the guest\'s list as a slot per window', M.closeRefusedOf([{ gid: 70188, reason: 'elevated', at: 1795400000000 }, { gid: 5, reason: 'other', at: 1 }]),
+  { 70188: { reason: 'elevated', at: 1795400000000 }, 5: { reason: 'other', at: 1 } });
+eq('close refusals: anything else left out', M.closeRefusedOf([null, { gid: 0, reason: 'elevated', at: 1 }, { gid: 3, reason: 'admin', at: 1 }, { gid: 4, reason: 'other' }, { gid: '7', reason: 'other', at: 1 }]), {});
+eq('close refusals: the last per window', M.closeRefusedOf([{ gid: 9, reason: 'other', at: 1 }, { gid: 9, reason: 'elevated', at: 2 }]), { 9: { reason: 'elevated', at: 2 } });
+eq('close refusals: not a list', [M.closeRefusedOf(undefined), M.closeRefusedOf({})], [{}, {}]);
 eq('guest apps menu', M.guestAppItems([{ name: 'Zeta', token: 'z' }, { name: 'alpha', token: 'a' }, { name: 'dup', token: 'a' }, { name: '', token: 'x' }, null]).map((a) => a.token), ['a', 'z']);
+{
+  // apps mode's Running list: no popups, no owned windows, no slivers; minimized kept; sorted by app, title, id
+  const list = [
+    { id: 7, title: 'Report.docx', app: 'Word', w: 800, h: 600, focused: true },
+    { id: 3, title: '', app: 'Notepad', w: 400, h: 300, minimized: true },
+    { id: 9, title: 'Menu', app: 'Word', owner: 7, topmost: true, w: 200, h: 300 },
+    { id: 10, title: 'Save As', app: 'Word', owner: 7, w: 500, h: 400 },
+    { id: 11, title: 'tiny', app: 'X', w: 4, h: 4 },
+    { id: 5, title: 'Budget.docx', app: 'Word', w: 800, h: 600 },
+    null, { title: 'no id', w: 100, h: 100 },
+  ];
+  const rows = M.runningWindows(list);
+  eq('running windows', rows.map((r) => r.id), [3, 5, 7]);
+  eq('running row (title falls back to the app)', rows[0], { id: 3, title: 'Notepad', app: 'Notepad', minimized: true, focused: false });
+  eq('running none', [M.runningWindows(null), M.runningWindows([])], [[], []]);
+  eq('running key changes with a title, not with a move', [M.runningKey(rows) === M.runningKey(M.runningWindows(list.map((w) => (w ? { ...w, x: 99 } : w)))),
+    M.runningKey(rows) === M.runningKey(M.runningWindows(list.map((w) => (w?.id === 5 ? { ...w, title: 'Other' } : w))))], [true, false]);
+  const apps = M.guestAppItems([{ name: 'Calculator', token: 'c' }, { name: 'Microsoft Edge', token: 'e' }, { name: 'Paint', token: 'p' }, { name: 'Edge Dev Tools', token: 'd' }, { name: 'Configuración', token: 's' }]);
+  eq('apps search empty keeps all', M.appsMatching(apps, '  ').map((a) => a.token), ['c', 's', 'd', 'e', 'p']);
+  eq('apps search: name start, then a word start, then inside', M.appsMatching(apps, 'ed').map((a) => a.token), ['d', 'e']);
+  eq('apps search: accents and case off', M.appsMatching(apps, 'CONFIGURACION').map((a) => a.token), ['s']);
+  eq('apps search: every word', [M.appsMatching(apps, 'micro edge').map((a) => a.token), M.appsMatching(apps, 'micro paint')], [['e'], []]);
+  eq('apps search: inside a word last', M.appsMatching(apps, 'a').map((a) => a.token)[0], 'c');
+  eq('app initial', [M.appInitial(' paint'), M.appInitial(''), M.appInitial('écran')], ['P', '?', 'É']);
+  // the launcher's apps (status item, controller): the search, and an icon per token when the guest sent one
+  const px = { w: 16, h: 16 };
+  eq('launcher apps: icons by token, none otherwise', M.launcherApps(apps, 'ed', { d: px }).map((a) => [a.token, a.icon]), [['d', px], ['e', null]]);
+  eq('launcher apps: no icons at all', M.launcherApps(apps, '', undefined).every((a) => a.icon === null), true);
+  eq('launcher apps: keeps name and token', M.launcherApps([{ name: 'Paint', token: 'p' }], 'pa', {})[0], { name: 'Paint', token: 'p', icon: null });
+  // the status items by the clock: one per machine with a session, in name order
+  const gs = { '/m/win': { sid: 3, name: 'Windows 11' }, '/m/deb': { sid: 2, name: 'Debian' }, '/m/off': { name: 'Off' }, '/m/x': null };
+  eq('apps status list', M.appsStatusList(gs), [{ dir: '/m/deb', name: 'Debian' }, { dir: '/m/win', name: 'Windows 11' }]);
+  eq('apps status list: no name → the folder', M.appsStatusList({ '/a/b/vm1': { sid: 1 } }), [{ dir: '/a/b/vm1', name: 'vm1' }]);
+  eq('apps status list: none', [M.appsStatusList(null), M.appsStatusList({})], [[], []]);
+  eq('apps status diff: added and gone', M.appsStatusDiff(['/m/deb', '/m/old'], gs), { add: ['/m/win'], remove: ['/m/old'] });
+  eq('apps status diff: nothing to do', M.appsStatusDiff(['/m/win', '/m/deb'], gs), { add: [], remove: [] });
+  eq('apps status diff: apps mode ended everywhere', M.appsStatusDiff(['/m/deb'], {}), { add: [], remove: ['/m/deb'] });
+  // launch feedback: one launch while it waits for a window of that app (5 s at most)
+  eq('window of app: program name holds a word', [M.windowOfApp('Notepad', { app: 'notepad.exe' }), M.windowOfApp('Microsoft Edge', { app: 'msedge.exe' }),
+    M.windowOfApp('Word', { app: 'WINWORD.EXE' }), M.windowOfApp('Calculadora', { app: 'ApplicationFrameHost.exe', title: 'Calculadora' })], [true, true, true, true]);
+  eq('window of app: not another app', [M.windowOfApp('Notepad', { app: 'mspaint.exe', title: 'Untitled - Paint' }), M.windowOfApp('', { app: 'x.exe' }), M.windowOfApp('Go', { app: 'go.exe' })], [false, false, false]);
+  const lst0 = [{ id: 1, app: 'explorer.exe', title: 'Files' }];
+  const np = { name: 'Notepad', token: 'n' };
+  const L1 = M.launchStart({}, np, lst0, 1000);
+  eq('launch start: what was listed', L1.n, { at: 1000, name: 'Notepad', seen: [1] });
+  eq('launch pending: waits', M.launchPending(L1.n, lst0, 1000 + 4999), true);
+  eq('launch pending: 5 s passed', M.launchPending(L1.n, lst0, 1000 + M.LAUNCH_WAIT_MS), false);
+  const lst1 = [...lst0, { id: 7, app: 'notepad.exe', title: 'Untitled - Notepad' }];
+  eq('launch answered by a new window of the app', [M.launchAnswered(L1.n, lst1), M.launchPending(L1.n, lst1, 1500)], [7, false]);
+  eq('launch: a window that was already there does not answer', M.launchAnswered(M.launchStart({}, np, lst1, 0).n, lst1), 0);
+  eq('launch: an owned window does not answer', M.launchAnswered(L1.n, [...lst0, { id: 8, app: 'notepad.exe', owner: 7 }]), 0);
+  eq('launch: none', [M.launchPending(undefined, lst0, 0), M.launchAnswered(null, lst1)], [false, 0]);
+  eq('launch prune keeps the waiting ones', Object.keys(M.launchPrune({ ...L1, p: { at: 0, name: 'Paint', seen: [] } }, lst0, 5500)), ['n']);
+  // close feedback: Closing…, then a note when it stays or the guest refused
+  const C1 = M.closeStart({}, 7, 1000);
+  eq('close start', C1, { 7: { gid: 7, at: 1000 } });
+  eq('close: closing', M.closeView(C1[7], lst1, null, 2000), { state: 'closing' });
+  eq('close: still there after 3 s', M.closeView(C1[7], lst1, null, 1000 + M.CLOSE_WAIT_MS), { state: 'refused', reason: '' });
+  eq('close: gone', M.closeView(C1[7], lst0, null, 9000), null);
+  eq('close: refused as administrator', M.closeView(C1[7], lst1, { reason: 'elevated', at: 1200 }, 1300), { state: 'refused', reason: 'elevated' });
+  eq('close: another reason is generic', M.closeView(C1[7], lst1, { reason: 'busy', at: 1200 }, 1300), { state: 'refused', reason: '' });
+  eq('close: a refusal from before the click does not count', M.closeView(C1[7], lst1, { reason: 'elevated', at: 900 }, 1300), { state: 'closing' });
+  eq('close: none', M.closeView(null, lst1, null, 0), null);
+  eq('close prune drops closed windows', M.closePrune({ ...C1, 9: { gid: 9, at: 0 } }, lst1), C1);
+  eq('machine os: kept, then guessed', [M.machineOsId({ os: 'fedora' }, 'Debian'), M.machineOsId({ osName: 'Ubuntu 24.04' }, 'Work'), M.machineOsId({}, 'Debian 13'), M.machineOsId(null, 'zzz')], ['fedora', 'ubuntu', 'debian', 'other']);
+}
 // the boot order (Configure → Boot)
 eq('boot list auto', M.bootList('auto'), ['disk', 'cd', 'network']);
 eq('boot list chosen', M.bootList('network,disk'), ['network', 'disk', 'cd']);
@@ -623,6 +724,94 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('unknown format: nothing to say', [M.toolsOutdated(on('x7'), S), M.toolsOutdated(on('w4.1'), S), M.toolsOutdated(on('w'), S)], [false, false, false]);
   eq('not connected: nothing to say', [M.toolsOutdated({ state: 'waiting', tools: 'w1' }, S), M.toolsOutdated(null, S)], [false, false]);
   eq('the default is what ships', M.toolsOutdated(on('w1')), true);
+  // the popover's line, apart from qemu-guest-agent's version
+  eq('tools line: older', M.toolsLine(on('w7'), { windows: 'w9', linux: '5' }), { key: 'old', have: 'w7', want: 'w9' });
+  eq('tools line: current', M.toolsLine(on('w9'), { windows: 'w9', linux: '5' }), { key: 'current', have: 'w9' });
+  eq('tools line: newer is current', M.toolsLine(on('w12'), { windows: 'w9', linux: '5' }), { key: 'current', have: 'w12' });
+  eq('tools line: Linux older', M.toolsLine(on('4'), S), { key: 'old', have: '4', want: '5' });
+  eq('tools line: unknown format', M.toolsLine(on('x1'), S), { key: 'other', have: 'x1' });
+  eq('tools line: none', [M.toolsLine(on(''), S), M.toolsLine({ state: 'waiting', tools: 'w1' }, S), M.toolsLine(null, S)], [null, null, null]);
+  eq('tools want', [M.toolsWant(on('w1'), S), M.toolsWant(on('w4'), S), M.toolsWant(on('3'), S)], ['w4', '', '5']);
+}
+
+// ---- the LordOS tools updated by themselves: when, once per run and version, backoff, settings, the notification ----
+{
+  const S = { windows: 'w9', linux: '5' };
+  const ag = (tools, install = 0, state = 'connected') => ({ state, caps: 0, tools, install });
+  const step = (s, agent, now, o = {}) => M.toolsAutoStep(s, { agent, on: true, busy: false, now, ...o }, S);
+  const T0 = 1000000, SET = M.TOOLS_SETTLE_MS;
+  // settings: the machine's own choice, else the default (on)
+  eq('auto: on by default', M.toolsAutoOn({}, {}), true);
+  eq('auto: the global default off', M.toolsAutoOn({}, { toolsAuto: false }), false);
+  eq('auto: the machine says on over the default', M.toolsAutoOn({ toolsAuto: true }, { toolsAuto: false }), true);
+  eq('auto: the machine says off', M.toolsAutoOn({ toolsAuto: false }, {}), false);
+  eq('auto: nothing known', M.toolsAutoOn(undefined, undefined), true);
+  // waits for the agent to settle, then installs once
+  let r = step(null, ag('w7'), T0);
+  eq('auto: just connected: waits', [r.act, r.s.since, r.s.want], [null, T0, 'w9']);
+  r = step(r.s, ag('w7'), T0 + SET - 1);
+  eq('auto: still settling', r.act, null);
+  r = step(r.s, ag('w7'), T0 + SET);
+  eq('auto: settled: install', [r.act, r.s.tries], ['install', 1]);
+  const sent = r.s;
+  r = step(sent, ag('w7', 1), T0 + SET + 20);
+  eq('auto: on its way', [r.act, r.s.pending], [null, T0 + SET]);
+  eq('auto: a new session (install 0) waits for the answer', step(sent, ag('w7', 0), T0 + SET + 60000).s.pending, T0 + SET);
+  eq('auto: refused at once counts', step(sent, ag('w7', 3), T0 + SET + 5).result, 'failed');
+  let ok = step(r.s, ag('w7', 2), T0 + SET + 30);
+  eq('auto: done', [ok.act, ok.result, ok.s.pending, ok.s.done], [null, 'ok', 0, T0 + SET + 30]);
+  eq('auto: the tools say w9: nothing more', step(ok.s, ag('w9', 2), T0 + SET + 40).act, null);
+  // installed but the tools still say w7 a while later: one notification, never another install in this run
+  r = step(ok.s, ag('w7', 2), T0 + SET + 40);
+  eq('auto: installed, still old, too soon to say', r.act, null);
+  r = step(r.s, ag('w7', 2), T0 + SET + 30 + SET * 3);
+  eq('auto: installed, still old: notify once', [r.act, r.why], ['notify', 'failed']);
+  r = step(r.s, ag('w7', 2), T0 + SET * 50);
+  eq('auto: and only once', r.act, null);
+  // failures: backoff, then given up with one notification
+  r = step(sent, ag('w7', 1), T0 + SET + 20);
+  r = step(r.s, ag('w7', 3), T0 + SET + 30);
+  eq('auto: failed: backoff', [r.act, r.result, r.s.next], [null, 'failed', T0 + SET + 30 + M.TOOLS_BACKOFF_MS[0]]);
+  let t = T0 + SET + 30;
+  eq('auto: not before the backoff', step(r.s, ag('w7', 3), t + M.TOOLS_BACKOFF_MS[0] - 1).act, null);
+  r = step(r.s, ag('w7', 3), t + M.TOOLS_BACKOFF_MS[0]);
+  eq('auto: second try', [r.act, r.s.tries], ['install', 2]);
+  t += M.TOOLS_BACKOFF_MS[0];
+  // no answer at all: counted as failed after TOOLS_WAIT_MS
+  eq('auto: waiting for its answer', step(r.s, ag('w7', 0), t + M.TOOLS_WAIT_MS).act, null);
+  r = step(r.s, ag('w7', 0), t + M.TOOLS_WAIT_MS + 1);
+  eq('auto: no answer: failed', [r.result, r.s.next], ['failed', t + M.TOOLS_WAIT_MS + 1 + M.TOOLS_BACKOFF_MS[1]]);
+  t = r.s.next;
+  r = step(r.s, ag('w7', 3), t);
+  eq('auto: third try', [r.act, r.s.tries], ['install', 3]);
+  r = step(r.s, ag('w7', 1), t + 5);
+  r = step(r.s, ag('w7', 3), t + 10);
+  eq('auto: the last failed: notify', [r.act, r.why, r.result], ['notify', 'failed', 'failed']);
+  let loop = 0, s = r.s;
+  for (let k = 1; k < 200; k++) { const x = step(s, ag('w7', 3), t + k * 3600000); s = x.s; if (x.act) loop++; }
+  eq('auto: never a loop after giving up', loop, 0);
+  // never while something is on its way, nor during an install the person asked for
+  r = step(null, ag('w7'), T0);
+  eq('auto: busy: deferred', step(r.s, ag('w7'), T0 + SET, { busy: true }).act, null);
+  eq('auto: the person\'s install on its way: deferred', step(r.s, ag('w7', 1), T0 + SET).act, null);
+  eq('auto: idle again: install', step(r.s, ag('w7'), T0 + SET + 5).act, 'install');
+  // off: one notification per run and version, with no install
+  r = step(null, ag('w7'), T0, { on: false });
+  r = step(r.s, ag('w7'), T0 + SET, { on: false });
+  eq('auto off: notify', [r.act, r.why, r.s.tries], ['notify', 'off', 0]);
+  eq('auto off: once', step(r.s, ag('w7'), T0 + SET * 9, { on: false }).act, null);
+  // the agent going away restarts the settling, nothing else
+  r = step(r.s, ag('w7', 0, 'waiting'), T0 + SET * 10, { on: false });
+  eq('auto: agent gone: settle again', r.s.since, 0);
+  eq('auto: back, still told', step(r.s, ag('w7'), T0 + SET * 12, { on: false }).act, null);
+  // nothing to do: current tools, a Linux helper current, a guest without the tools, not connected
+  eq('auto: current tools', step(null, ag('w9'), T0 + SET * 2).act, null);
+  eq('auto: no tools: never installs them by itself', step({ since: T0 }, ag(''), T0 + SET * 2).act, null);
+  eq('auto: Linux helper older', step({ since: T0, want: '5' }, ag('4'), T0 + SET).act, 'install');
+  // the shipped version changed (the host was upgraded): a fresh count
+  r = M.toolsAutoStep({ ...M.TOOLS_AUTO_IDLE, want: 'w8', tries: 3, told: 'w8', since: T0 }, { agent: ag('w7'), on: true, busy: false, now: T0 + SET }, S);
+  eq('auto: a newer version shipped: tried again', [r.act, r.s.want, r.s.tries], ['install', 'w9', 1]);
+  eq('auto: failed backoff stops after the last', M.toolsAutoFailed({ tries: M.TOOLS_TRIES }, 5).next, Infinity);
 }
 
 
@@ -657,6 +846,100 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('memlock fits without a cap', [M.memlockFits({ memoryMb: 999999 }, null), M.memlockFits({ memoryMb: 999999 }, { capMb: 0 })], [true, true]);
   eq('memlock max memory', [M.memlockMaxMemory(ml), M.memlockMaxMemory({ capMb: 12000 }), M.memlockMaxMemory(null)], [11776, 11264, Infinity]);
   eq('no suspend: a graphics card, or 3D running', [M.noSuspend(null, 'intel-shared'), M.noSuspend({ sandbox: 512 }, ''), M.noSuspend({ sandbox: 1 }, '')], [true, true, false]);
+}
+
+// ---- a card's ··· menu on the screen, never cut by the window ----
+{
+  const items = ['a', 'b', '-', 'c'].map((x) => (x === '-' ? x : { label: x }));
+  eq('menu height', M.popMenuHeight(items), 14 + 30 * 3 + 11);
+  eq('menu height: no items, nulls skipped', [M.popMenuHeight(null), M.popMenuHeight([null, { label: 'a' }])], [14, 44]);
+  eq('menu below when it fits', M.menuSpot({ x: 100, y: 200, above: 160 }, 220, 300, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 100, top: 200 });
+  eq('menu too tall both ways: as low as fits', M.menuSpot({ x: 1150, y: 420, above: 380 }, 220, 450, { x: 0, y: 0, w: 1920, h: 860 }), { left: 1150, top: 402 });
+  eq('menu above the button', M.menuSpot({ x: 10, y: 800, above: 760 }, 220, 450, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 10, top: 310 });
+  eq('menu with room neither way: as low as fits', M.menuSpot({ x: 10, y: 300, above: 260 }, 220, 900, { x: 0, y: 0, w: 1920, h: 1000 }), { left: 10, top: 92 });
+  eq('menu kept off the right edge', M.menuSpot({ x: 1800, y: 10 }, 220, 100, { x: 0, y: 0, w: 1920, h: 1080 }).left, 1920 - 220 - 8);
+  eq('menu kept off the left and top edges', M.menuSpot({ x: -20, y: -5 }, 220, 100, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 8, top: 8 });
+  const two = [{ x: 0, y: 0, w: 1920, h: 1080, main: true }, { x: 1920, y: 0, w: 1280, h: 720 }];
+  eq('the display under a point', [M.displayUnder(two, 2000, 100).x, M.displayUnder(two, 2000, 900).x, M.displayUnder([], 1, 1)], [1920, 0, null]);
+  eq('menu on the second, shorter display opens up there', M.menuSpot({ x: 3100, y: 600, above: 560 }, 220, 300, two[1]), { left: 1920 + 1280 - 220 - 8, top: 260 });
+  eq('a pointer menu opens up from the pointer', M.menuSpot({ x: 500, y: 1000 }, 220, 300, { x: 0, y: 0, w: 1920, h: 1080 }), { left: 500, top: 700 });
+}
+
+// ---- the Keys panel (codes from linux/input-event-codes.h) ----
+{
+  const K = M.KEY;
+  eq('evdev codes', [K.ctrl, K.alt, K.shift, K.meta, K.del, K.p, K.left, K.right, K.up, K.down, K.prtsc, K.esc, K.tab, K.f1, K.f10, K.f11, K.f12, K.t, K.s],
+    [29, 56, 42, 125, 111, 25, 105, 106, 103, 108, 99, 1, 15, 59, 68, 87, 88, 20, 31]);
+  eq('editing keys', [K.ins, K.home, K.end, K.pgup, K.pgdn, K.d, K.e, K.r, K.l], [110, 102, 107, 104, 109, 32, 18, 19, 38]);
+  eq('Ctrl+Alt+Del is the same as the Power menu\'s', M.keyCombos(true)[0].codes, M.CTRL_ALT_DEL);
+  const win = Object.fromEntries(M.keyCombos(true).map((c) => [c.id, c.codes]));
+  eq('Windows: Win+P', win.project, [125, 25]);
+  eq('Windows: Win+Shift+← / →', [win.moveLeft, win.moveRight], [[125, 42, 105], [125, 42, 106]]);
+  eq('Windows: Ctrl+Shift+Esc, Win+Shift+S, PrintScreen', [win.taskMgr, win.snip, win.screenshot], [[29, 42, 1], [125, 42, 31], [99]]);
+  eq('Windows: the whole list', Object.keys(win), ['cad', 'start', 'project', 'desktop', 'explorer', 'run', 'lock', 'taskView', 'switchApp', 'closeWin', 'taskMgr', 'moveLeft', 'moveRight', 'maximize', 'minimize', 'screenshot', 'snip']);
+  const lin = Object.fromEntries(M.keyCombos(false).map((c) => [c.id, c.codes]));
+  eq('Linux: the list', Object.keys(lin), ['cadLinux', 'activities', 'switchApp', 'closeWin', 'terminal', 'screenshot']);
+  eq('Linux: Ctrl+Alt+T, Super', [lin.terminal, lin.activities], [[29, 56, 20], [125]]);
+  eq('consoles: Ctrl+Alt+F1 … F7', [M.CONSOLE_KEYS.length, M.CONSOLE_KEYS[0].map((k) => K[k]), M.CONSOLE_KEYS[6].map((k) => K[k])], [7, [29, 56, 59], [29, 56, 65]]);
+  eq('F keys and single keys all have codes', [...M.F_KEYS, ...M.SINGLE_KEYS, ...M.HELD_KEYS].every((k) => K[k] > 0), true);
+  eq('labels', [M.comboLabel(['meta', 'shift', 'left'], true), M.comboLabel(['meta'], false), M.comboLabel(['ctrl', 'alt', 'f3'], false), M.comboLabel(['meta', 'p'], true, (x) => x.toUpperCase())],
+    ['win+shift+←', 'super', 'ctrl+alt+F3', 'WIN+P']);
+  // held keys
+  let l = M.latchToggle([], 125);
+  eq('latch: down at once', l, { latched: [125], send: [[125, 1]] });
+  l = M.latchToggle(l.latched, 42);
+  eq('latch: a second one', l, { latched: [125, 42], send: [[42, 1]] });
+  eq('latch: again lets it go', M.latchToggle(l.latched, 42), { latched: [125], send: [[42, 0]] });
+  eq('a modifier typed keeps them', M.latchKeyUp([29], 42), { latched: [29], send: [] });
+  eq('the next key ends them, in reverse', M.latchKeyUp([125, 42], 25), { latched: [], send: [[42, 0], [125, 0]] });
+  eq('a latched key the person let go of is up', M.latchKeyUp([29, 56], 29), { latched: [56], send: [] });
+  eq('nothing latched: nothing to send', M.latchKeyUp([], 25), { latched: [], send: [] });
+  eq('a combination: in order, reverse, then the held ones', M.comboSend([125, 25], [29]), { latched: [], send: [[125, 1], [25, 1], [25, 0], [125, 0], [29, 0]] });
+  eq('a combination with a key already held doesn\'t press it twice', M.comboSend([125, 42, 105], [42]), { latched: [], send: [[125, 1], [105, 1], [105, 0], [125, 0], [42, 0]] });
+  eq('a single key', M.comboSend([1]), { latched: [], send: [[1, 1], [1, 0]] });
+  eq('release', M.latchRelease([29, 56, 42]), { latched: [], send: [[42, 0], [56, 0], [29, 0]] });
+  eq('modifiers', [29, 97, 42, 54, 56, 100, 125, 126, 25, 1].map(M.isModifier), [true, true, true, true, true, true, true, true, false, false]);
+}
+
+// ---- the keyboard to the guest (security): never a key typed while another window has the keyboard ----
+{
+  // a session of two windows: the machine ('vm') and LordOS's Terminal ('term'); `front` is wm.hasKeyboard's answer
+  let front = 'vm';
+  const calls = [];                // lord.vm.key(sid, code, down) and lord.vm.release(sid), in order
+  const gk = M.guestKeys({ send: (c, v) => calls.push(['key', c, v]), release: () => calls.push(['release']), owns: () => front === 'vm' });
+  eq('keys: a key while the machine has the keyboard goes in', [gk.down(30), gk.up(30)], [true, true]);
+  eq('keys: down then up', calls, [['key', 30, 1], ['key', 30, 0]]);
+  calls.length = 0;
+  gk.down(42);                                     // Shift held in the guest
+  front = 'term';                                  // the focus moved; the window has not rendered again yet
+  const typed = [25, 30, 31, 31, 20, 28];          // "password" typed into the Terminal
+  eq('keys: nothing typed in the Terminal goes to the guest', typed.map((c) => gk.down(c)), typed.map(() => false));
+  eq('keys: their releases neither', typed.map((c) => gk.up(c)), typed.map(() => false));
+  eq('keys: what was held is let go of once, no key sent', calls, [['key', 42, 1], ['release']]);
+  eq('keys: the held Shift is forgotten', gk.held(), []);
+  eq('keys: its release later is not sent', gk.up(42), false);
+  calls.length = 0;
+  front = 'vm';
+  eq('keys: back in the machine, keys go in again', gk.down(30), true);
+  front = 'search';                                // a shell surface took the keyboard (wm.hasKeyboard false)
+  eq('keys: a key typed in the search does not go in', gk.down(31), false);
+  eq('keys: the key held at that moment is released, not sent up', gk.up(30), false);
+  eq('keys: one release for the whole change', calls, [['key', 30, 1], ['release']]);
+  calls.length = 0;
+  front = 'vm';
+  eq('keys: a release for a press that never went in is not sent', gk.up(44), false);
+  eq('keys: code 0 (text an input method committed) never goes', gk.down(0), false);
+  eq('keys: nothing sent', calls, []);
+}
+// a window the guest opens takes the front only while the person is in this machine (no focus stealing)
+{
+  const dir = '/home/u/Machines/Win.lordvm';
+  eq('front: nothing in front', M.guestMayTakeFront(null, dir), true);
+  eq('front: the machine window', M.guestMayTakeFront({ app: 'machines', args: { machine: dir } }, dir), true);
+  eq('front: one of its guest windows', M.guestMayTakeFront({ app: 'machines', args: { guestWin: { dir, gid: 4 } } }, dir), true);
+  eq('front: the Terminal keeps the front', M.guestMayTakeFront({ app: 'terminal', args: null }, dir), false);
+  eq('front: another machine keeps it', M.guestMayTakeFront({ app: 'machines', args: { machine: '/other.lordvm' } }, dir), false);
+  eq('front: the library keeps it', M.guestMayTakeFront({ app: 'machines', args: null }, dir), false);
 }
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);

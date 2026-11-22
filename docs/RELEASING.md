@@ -48,6 +48,14 @@ The releases page is the project's public changelog: every release is documented
 
    Also bump `package.json` (`version`, `lordos.channel`) and commit both.
 
+   **Machines' LordOS card** (in development after 0.8.9): when this release ships new live ISOs, point the `lordos`
+   entry of `assets/machines/systems.json` at it in the same commit: both `dir` folders
+   (`https://github.com/lordbasex/LordOS/releases/download/v<version>/`), `release` (the version without its suffix),
+   `approxMb` (each ISO's size in MiB, from the build), and `checked`. Its `SHA256SUMS` and `SHA256SUMS.sig` are the
+   ones step 5 writes, so nothing else changes. A release without ISOs leaves it alone. `vm_catalog_test.mjs` fails
+   once `web/content/downloads.json` names an ISO newer than the card's tag ([VIRTUALIZATION.md](VIRTUALIZATION.md),
+   3.9, "The LordOS card").
+
    **Web apps' Browser identity** (0.8.8.9): set `WEBPAGE_CHROME_MAJOR`, `WEBPAGE_EDGE_MAJOR` and `WEBPAGE_FIREFOX_MAJOR`
    in `server/src/web/webpage.h` to the current stable desktop majors (Chrome's from the Chrome Releases blog, Edge's
    from its Stable channel release notes, Firefox's from its release notes) and update the strings quoted in `docs/WEBAPPS.md` ("Browser identity") and in the
@@ -77,7 +85,7 @@ The releases page is the project's public changelog: every release is documented
      `web/lib/imager-guide.mjs`, and to README's downloads; they stay amd64 until the file exists)
      the Raspberry Pi 5 image (`sudo RELEASE=1 REQUIRE_SIGNED_CODE=1 tools/rpi/build-img.sh`,
      [RASPBERRY.md](RASPBERRY.md)) and the `.deb` for amd64 and arm64
-     (`REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb.sh`), plus (0.8.7) `lordos-disk-formats_<version>_<arch>.deb` on each architecture (`tools/iso/mkdeb-diskformats.sh <folder>`, the Store's Disk Formats item, published with `lordos` and never inside the images),
+     (`REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb.sh`), plus (0.8.7) `lordos-disk-formats_<version>_<arch>.deb` on each architecture (`tools/iso/mkdeb-diskformats.sh <folder>`, the Store's Disk Formats item, published with `lordos` and never inside the images), plus `lordos-studio-camera_<version>_<arch>.deb` on each architecture (`tools/iso/mkdeb-studiocamera.sh <folder> <arch>`, the Store's LordOS Studio Camera card, [CAMERA-STUDIO-PLAN.md](CAMERA-STUDIO-PLAN.md) 11.2; never inside the images),
      and the one `lordos-hwdata_<date>_all.deb` for both
      (`REQUIRE_SIGNED_CODE=1 tools/iso/mkdeb-hwdata.sh <folder>`; the ISO and image builds make it too and install
      it with `lordos`, which depends on it), plus (0.8.8.5) `lordos-rclone_<version>_<arch>.deb` for each architecture
@@ -116,7 +124,7 @@ The releases page is the project's public changelog: every release is documented
 
    ```sh
    # staging first: the same .debs, the notes from this version's CHANGELOG section
-   tools/release/apt-repo.sh build staging <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos-disk-formats_<file-version>_amd64.deb <release-dir>/lordos-disk-formats_<file-version>_arm64.deb <release-dir>/lordos-rclone_<rclone-version>_amd64.deb <release-dir>/lordos-rclone_<rclone-version>_arm64.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb <release-dir>/lordos-web_<file-version>_amd64.deb <release-dir>/lordos-web_<file-version>_arm64.deb
+   tools/release/apt-repo.sh build staging <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos-disk-formats_<file-version>_amd64.deb <release-dir>/lordos-disk-formats_<file-version>_arm64.deb <release-dir>/lordos-studio-camera_<file-version>_amd64.deb <release-dir>/lordos-studio-camera_<file-version>_arm64.deb <release-dir>/lordos-rclone_<rclone-version>_amd64.deb <release-dir>/lordos-rclone_<rclone-version>_arm64.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb <release-dir>/lordos-web_<file-version>_amd64.deb <release-dir>/lordos-web_<file-version>_arm64.deb
    tools/release/apt-repo.sh publish staging
    tools/release/apt-repo.sh verify staging        # https and http, signature, every index hash
    ```
@@ -131,7 +139,7 @@ The releases page is the project's public changelog: every release is documented
    Then the same for the live repository:
 
    ```sh
-   tools/release/apt-repo.sh build live <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos-disk-formats_<file-version>_amd64.deb <release-dir>/lordos-disk-formats_<file-version>_arm64.deb <release-dir>/lordos-rclone_<rclone-version>_amd64.deb <release-dir>/lordos-rclone_<rclone-version>_arm64.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb <release-dir>/lordos-web_<file-version>_amd64.deb <release-dir>/lordos-web_<file-version>_arm64.deb
+   tools/release/apt-repo.sh build live <release-dir>/lordos-hwdata_<date>_all.deb <release-dir>/lordos-disk-formats_<file-version>_amd64.deb <release-dir>/lordos-disk-formats_<file-version>_arm64.deb <release-dir>/lordos-studio-camera_<file-version>_amd64.deb <release-dir>/lordos-studio-camera_<file-version>_arm64.deb <release-dir>/lordos-rclone_<rclone-version>_amd64.deb <release-dir>/lordos-rclone_<rclone-version>_arm64.deb <release-dir>/lordos_<file-version>_amd64.deb <release-dir>/lordos_<file-version>_arm64.deb <release-dir>/lordos-web_<file-version>_amd64.deb <release-dir>/lordos-web_<file-version>_arm64.deb
    tools/release/apt-repo.sh publish live
    tools/release/apt-repo.sh verify live
    ```

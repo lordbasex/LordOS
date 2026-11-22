@@ -30,6 +30,10 @@ typedef struct {
     uint64_t flip_ns;
     uint64_t flip_submit_ns; /* when that flip was queued (CLOCK_MONOTONIC, ns) */
     unsigned flip_seq;
+    /* tearing (tearing-control-v1, docs/WAYLAND.md "Frame timing"): async_cap, the driver takes DRM_MODE_PAGE_FLIP_ASYNC
+     * on the legacy page flip (DRM_CAP_ASYNC_PAGE_FLIP); async_next, the next kms_flip_fb may tear (gpu_scanout sets it
+     * for a fullscreen game's own buffer); flip_async, the last flip queued was one (its time is no vblank's) */
+    int async_cap, async_next, flip_async;
     /* hardware cursor (cursor plane, legacy ioctl) */
     uint32_t cursor_handle, cursor_w, cursor_h, cursor_pitch;   /* plane size (the driver's cap) and row in pixels */
     uint32_t *cursor_map;
@@ -93,7 +97,8 @@ void kms_cursor_show(Kms *k, int visible);
 #define KMS_MAX_OUTPUTS 8
 typedef struct {
     uint32_t id, type, type_id;         /* connector id; type (DRM_MODE_CONNECTOR_*) and its number */
-    int connected;
+    int connected;                      /* a desktop display is plugged in (never a non-desktop one) */
+    int non_desktop;                    /* plugged in, and the kernel's "non-desktop" property is set (a VR headset) */
     uint32_t mm_w, mm_h;
     uint32_t possible_crtcs;            /* bit j = the j-th CRTC of GETRESOURCES */
     uint32_t current_crtc;              /* driving it now, 0 if none */
@@ -114,6 +119,11 @@ typedef int (*KmsPicker)(const KmsOutput *o, int n, int *index, struct drm_mode_
 void kms_set_picker(KmsPicker fn);
 /* Value and property id of a KMS object property by name. 0 if found. */
 int  kms_obj_prop(int fd, uint32_t obj, uint32_t type, const char *name, uint64_t *val, uint32_t *prop_id);
+/* DRM leases (wl/drmlease.c): the CRTCs (bit = GETRESOURCES index) leased now, which no head takes; and the objects
+ * of a lease for connector o (a non-desktop one): o itself, a free CRTC that can drive it (not a head's, not in
+ * avoid) and that CRTC's primary plane. objs gets 3 ids, *crtc_bit the CRTC's bit. 0 if found. */
+void kms_set_leased_crtcs(uint32_t mask);
+int  kms_lease_objects(int fd, const KmsOutput *o, uint32_t avoid, uint32_t objs[3], uint32_t *crtc_bit);
 /* Runtime modeset (CPU path: the dumb buffers are recreated at the new size). The GPU path must
  * be shut down first and started again after. Not while a flip is pending. On failure the
  * previous mode is restored and -1 returned. */

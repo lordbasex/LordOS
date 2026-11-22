@@ -26,6 +26,8 @@
 extern int lm_debug;
 #ifdef LM_NET
 #define LM_WHO "lord-stream"
+#elif defined(LM_STUDIO)
+#define LM_WHO "lord-studio"
 #else
 #define LM_WHO "lord-media"
 #endif
@@ -117,6 +119,14 @@ void ls_m3u(const char *params);                                       /* ../str
 #endif
 void lm_screenrec(const char *params, int out, int pulse, int render);  /* lm_rec.c */
 void lm_camera(const char *params, int dev, int render);                /* lm_cam.c */
+/* the capture itself (lm_cam.c): our own V4L2 with MJPEG decoded by libavcodec; the camera job and lord-studio's
+ * loopback output use it. open: code is the error's code line on failure; dev stays the caller's (close it after). */
+typedef struct LmCam LmCam;
+LmCam *lm_cam_open(int dev, int want_w, int want_h, const char **code);
+void lm_cam_size(const LmCam *c, int *w, int *h, uint32_t *pixfmt);
+const char *lm_cam_card(const LmCam *c);
+int  lm_cam_read(LmCam *c, AVFrame *frame);     /* after POLLIN: 1 a picture, 0 none, -1 the device went away */
+void lm_cam_close(LmCam *c);
 void lm_audiorec(const char *params, int out, int pulse);               /* lm_rec.c */
 void lm_hwprobe(const int *render, int n_render);                       /* lm_hwprobe.c */
 void lm_stream(const char *params, int ring, int render);               /* lm_stream.c */
@@ -124,5 +134,18 @@ void lm_stream(const char *params, int ring, int render);               /* lm_st
 AVCodecContext *lm_stream_sw_encoder(int vp8, int w, int h, int fps, unsigned kbps);
 void lm_live(const char *params, int link, int ring);                   /* lm_live.c */
 void lm_vbench(const char *params);                                     /* lm_vbench.c */
+#ifdef LM_STUDIO
+/* lord-studio (../studio/stcam.c): LordOS Studio's pipeline on the camera's pictures */
+int  stcam_init(int model_fd, int render);      /* reads and checks the model; the render node stays the caller's */
+void stcam_config(const MediaMsg *m);           /* MM_STUDIO */
+void stcam_background(int fd);                  /* MM_STUDIO_BG: takes the fd */
+AVFrame *stcam_frame(AVFrame *f);               /* the picture with the effects (BGRA), or f itself */
+void stcam_tick(void);                          /* MM_STUDIO_STATS once a second */
+void stcam_probe(void);                         /* probe=1: a self-test without a camera */
+/* loopback=1: LordOS Studio's camera for every app (docs/CAMERA-STUDIO-PLAN.md 2.2): the loopback's output, the idle
+ * card, the readers (MM_STUDIO_READERS) and the real camera only when lord-server sends it (MM_STUDIO_CAM) */
+void stcam_hub(const char *params, int loop, int render);
+void stcam_free(void);
+#endif
 
 #endif

@@ -6,13 +6,17 @@
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
   inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr, useSound, microphones,
+  hasTextFocus, settings,
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
+import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta } from './meta.js';
+import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
+import { KeysBtn, sendKeysItems } from './keys.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
 import { opensOf, openStep, withoutAsks, askStale } from './openwith.js';
@@ -22,14 +26,16 @@ import { captureOffer, captureStep, captureEndedByServer, captureLabelKey, CAPTU
 
 const BAR = 48;
 // the window widths the machine's bar needs: all of it with the name and state, and compact (5.3)
-const TOOLS_WIDE = 880, TOOLS_COMPACT = 620;
+const TOOLS_WIDE = 920, TOOLS_COMPACT = 660;
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
 const THUMB_MS = 5000;
+// dir → the LordOS tools' automatic update (model.js toolsAutoStep) for the machine's current run
+const toolsRuns = new Map();
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}.${x.output}.${x.input}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'captured', 'captureEnds'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'closeRefusedSeq', 'captured', 'captureEnds'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
@@ -67,6 +73,7 @@ function AgentPop({ ctl, onClose }) {
   }, []);
   const on = g?.state === 'connected';
   const old = toolsOutdated(g);
+  const tl = toolsLine(g);
   const lines = agentLines(g, cfg);
   const tone = ctl.a.start ? 'off' : agentTone(g, cfg.agent);
   const bg = p.dark ? '#34343c' : '#fbfbfd';
@@ -81,8 +88,13 @@ function AgentPop({ ctl, onClose }) {
           <StateDot tone={tone} size={10} />
           <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : tr('machines.agent.waiting')}</Text>
         </View>
+        {/* the system and qemu-guest-agent's version, then the LordOS tools' own line: up to date, or which version
+            this LordOS brings (and whether it's on its way) */}
         {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version })].filter(Boolean).join(' · ')}</Text>
           : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
+        {on && tl ? <Text style={{ fontSize: 12, fontWeight: tl.key === 'old' ? 600 : 400, color: tl.key === 'old' ? '#0a84ff' : p.dim, textAlign: 'start' }}>
+          {tl.key === 'old' ? tr(g.install === 1 ? 'machines.agent.toolsUpdating' : 'machines.agent.toolsOld', { have: tl.have, want: tl.want })
+            : tr(tl.key === 'current' ? 'machines.agent.toolsCurrent' : 'machines.agent.toolsVersion', { v: tl.have })}</Text> : null}
         <View style={{ marginTop: 4, borderRadius: 12, backgroundColor: p.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.035)', paddingVertical: 4 }}>
           {lines.map(([k, st], i) => (
             <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 6,
@@ -93,7 +105,6 @@ function AgentPop({ ctl, onClose }) {
             </View>
           ))}
         </View>
-        {old && g.install !== 1 && g.install !== 2 ? <Text style={{ fontSize: 12, lineHeight: 1.45, fontWeight: 600, color: '#0a84ff', textAlign: 'start' }}>{tr('machines.agent.toolsUpdate')}</Text> : null}
         {on ? (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
             <Pill label={g.install === 1 ? tr('machines.agent.installing') : old ? tr('machines.agent.updateTools') : guestWindows(g) ? tr('machines.agent.installTools') : tr('machines.agent.installHelper')}
@@ -102,6 +113,17 @@ function AgentPop({ ctl, onClose }) {
             {ctl.xfer.state === 'setup' || ctl.xfer.state === 'settingUp'
               ? <Pill label={ctl.xfer.state === 'settingUp' ? tr('machines.tb.transferSettingUp') : tr('machines.tb.transferSetup')} disabled={ctl.xfer.state === 'settingUp'} onClick={ctl.xfer.setup} /> : null}
           </View>
+        ) : null}
+        {/* a second display in the guest that LordOS doesn't show (not on a PCI adapter): the tools turn it off when the
+            person says so, and back on */}
+        {on && (g.caps & AGENT_CAPS.extra) ? (
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.extraHint')}</Text>
+            <View style={{ flexDirection: 'row' }}><Pill label={tr('machines.agent.extraOff')} onClick={() => lord.vm.agent(ctl.sid, 'extraOff')} /></View>
+          </View>
+        ) : null}
+        {on && (g.caps & AGENT_CAPS.extraOff) ? (
+          <View style={{ flexDirection: 'row' }}><Pill label={tr('machines.agent.extraOn')} onClick={() => lord.vm.agent(ctl.sid, 'extraOn')} /></View>
         ) : null}
         {g?.install === 2 ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{guestWindows(g) ? tr('machines.agent.toolsInstalled') : tr('machines.agent.installed')}</Text> : null}
         {/* the clipboard is off in this machine's description (the default for machines made before 6.8): installing the
@@ -130,7 +152,9 @@ function AgentPop({ ctl, onClose }) {
 
 // The bar, in groups (5.3): the agent and what it brings (clipboard, folders, apps) | the guest's display and devices |
 // shell, logs, screenshot, record | pause and power | configure and full screen. Icons, each named in its tooltip.
-function Tools({ ctl, floating, compact, tiny }) {
+// apps: apps mode's panel (AppsController), the same buttons less the ones apps mode has no use for: the resolution (the
+// guest's screen is this display's size then), Capture mouse (never in apps mode) and full screen (a panel)
+function Tools({ ctl, floating, compact, tiny, apps }) {
   const { st, a, follow, cfg } = ctl;
   // the mock "Toolbar": sizes that fit this display, then Follow the window (5.3)
   const res = [
@@ -185,10 +209,12 @@ function Tools({ ctl, floating, compact, tiny }) {
       {compact ? null : <BarSep />}
     </> : null}
     <BarGroup>
-      <IconMenuBtn sym="display" label={resLabel} items={res} disabled={!a.keys} on={!follow} />
+      {apps ? null : <IconMenuBtn sym="display" label={resLabel} items={res} disabled={!a.keys} on={!follow} />}
       {/* Capture mouse (6.25): Automatic (the tablet, the pointer free) or Captured; never in apps mode, which says why */}
-      <IconBtn sym="capture" label={tr(captureLabelKey({ on: ctl.capOn, why: ctl.capOffer.why }))} on={ctl.capOn}
-        disabled={!ctl.capOffer.offered && !ctl.capOn} onClick={ctl.toggleCapture} />
+      {apps ? null : <IconBtn sym="capture" label={tr(captureLabelKey({ on: ctl.capOn, why: ctl.capOffer.why }))} on={ctl.capOn}
+        disabled={!ctl.capOffer.offered && !ctl.capOn} onClick={ctl.toggleCapture} />}
+      {/* Keys: held keys, the guest's combinations, single keys and the on-screen keyboard (keys.jsx) */}
+      <KeysBtn ctl={ctl} />
       <IconMenuBtn sym="eject" label={tr('machines.tb.devices')} items={ctl.devices} />
       {/* the machine's sound (6.9): its menu mutes it or turns it back on and picks the output and input; the microphone
           shows while the guest hears it */}
@@ -215,7 +241,7 @@ function Tools({ ctl, floating, compact, tiny }) {
     {compact ? null : <BarSep />}
     <BarGroup>
       {!floating ? <IconBtn sym="gear" label={tr('machines.cmd.configure')} onClick={() => ctl.configure()} /> : null}
-      {floating ? <IconBtn sym="fullscreen-exit" label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} />
+      {apps ? null : floating ? <IconBtn sym="fullscreen-exit" label={tr('machines.cmd.exitFullscreen')} onClick={() => ctl.setFull(false)} />
         : <IconBtn sym="fullscreen" label={tr('machines.cmd.fullscreen')} onClick={() => ctl.setFull(true)} />}
     </BarGroup>
   </>;
@@ -248,10 +274,10 @@ function FloatingBar({ ctl, name }) {
   // the bar stays while one of its menus is open (the pointer leaves it to reach the menu's items, 2026-11-20: the
   // resolution menu went away under the pointer) and hides once the menu closes with the pointer elsewhere
   const over = useRef(true);
-  const leave = () => { over.current = false; if (!menus.open) setNear(false); };
+  const leave = () => { over.current = false; if (!menus.open && !menus.panel) setNear(false); };
   useEffect(() => {
-    const a = setTimeout(() => { if (!menus.open) setNear(false); over.current = false; }, 2500), b = setTimeout(() => setHint(false), 5000);
-    const c = setInterval(() => { if (!over.current && !menus.open) setNear(false); }, 300);
+    const a = setTimeout(() => { if (!menus.open && !menus.panel) setNear(false); over.current = false; }, 2500), b = setTimeout(() => setHint(false), 5000);
+    const c = setInterval(() => { if (!over.current && !menus.open && !menus.panel) setNear(false); }, 300);
     return () => { clearTimeout(a); clearTimeout(b); clearInterval(c); };
   }, []);
   const v = stateView(ctl.st?.state, ctl.st?.reason);
@@ -345,22 +371,34 @@ function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard }) 
   );
 }
 
-// Apps mode's controller (7.2): what's left of the machine's window while its apps are windows of their own: the
-// machine's name, the guest's apps to open, how many windows it shows, and the way back to its desktop (Esc too)
-function AppsController({ name, g, onLeave }) {
+// Apps mode's controller (7.2): what's left of the machine's window while its apps are windows of their own, as a panel
+// (like a Unity mode's launcher): Running, the guest's windows (a click brings one to the front, × asks the guest to close
+// it), then the guest's apps to open, with a search; and the way back to its desktop (Esc too). The same lists are in the
+// machine's status item by the clock (appsstatus.jsx); both come from appslist.jsx.
+// The machine's bar is on the panel too (the agent, clipboard, folders and apps; keys, devices and sound; the console,
+// logs, screenshot and recording; pause and power; Configure), its groups wrapped over as many rows as the panel needs.
+function AppsController({ name, g, onLeave, ctl }) {
   const p = usePal();
-  const n = (g?.list || []).filter((w) => !w.minimized).length;
+  const [query, setQuery] = useState('');
+  const apps = launcherApps(g?.apps || [], query, g?.appIcons);
+  const v = stateView(ctl?.st?.state, ctl?.st?.reason);
   return (
-    <View style={{ flex: 1, padding: 18, gap: 10, backgroundColor: p.bg }}>
+    <View style={{ flex: 1, padding: 16, gap: 10, backgroundColor: p.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <StateDot tone="run" size={9} />
-        <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{name}</Text>
-      </View>
-      <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.apps.controllerHint', { count: n })}</Text>
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-        <IconMenuBtn sym="apps" label={tr('machines.apps.menu')} items={appsMenuItems(g)} />
+        <StateDot tone={v.tone} size={9} />
+        <Text style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{name}</Text>
         <Btn label={tr('machines.apps.leave')} onClick={onLeave} />
       </View>
+      {ctl ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}><Tools ctl={ctl} compact apps /></View> : null}
+      <ListHead label={tr('machines.apps.running')} />
+      <ScrollView style={{ maxHeight: 176, borderRadius: 10, backgroundColor: p.raised }} contentStyle={{ padding: 4 }}>
+        <RunningList g={g} />
+      </ScrollView>
+      <ListHead label={tr('machines.apps.launch')} />
+      <AppsSearch value={query} onChange={setQuery} onSubmit={() => launchFirst(g, apps)} onCancel={onLeave} />
+      <ScrollView style={{ flex: 1, borderRadius: 10, backgroundColor: p.raised }} contentStyle={{ padding: 4 }}>
+        <LaunchList g={g} apps={apps} />
+      </ScrollView>
     </View>
   );
 }
@@ -418,6 +456,12 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const filesSeen = useRef(-1);
   const onFiles = useRef(null);
   const buttons = useRef(new Set());
+  // the Keys panel's held keys (model.js latch*): down in the guest until the next key or combination; let go of with
+  // everything else whenever the window stops sending the keyboard (blur, leaving, the machine stopping)
+  const latchRef = useRef([]);
+  const [latched, setLatched] = useState([]);
+  const keysTo = (id, r) => { latchRef.current = r.latched; setLatched(r.latched); if (id) r.send.forEach(([c, v]) => lord.vm.key(id, c, v)); };
+  const dropLatched = () => { if (latchRef.current.length) { latchRef.current = []; setLatched([]); } };
   const wheel = useRef(0);
   const sidRef = useRef(sid);
   sidRef.current = sid;
@@ -433,6 +477,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     setStarting(false);
     const id = active ? lord.vm.attach(dir) : lord.vm.start(dir, opts || {});
     if (!id) { setErr(active ? tr('machines.win.cantAttach') : vmRefusal(tr('machines.win.cantStart'))); return; }
+    if (!active) toolsRuns.delete(dir);            // a new run: the tools' automatic update starts over
     sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0, asked: null, askedAt: 0 };
     setErr(''); setSt(null); setSid(id);
   };
@@ -505,6 +550,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       if (q.ended) {
         lord.vm.close(sid);
         setSid(0);
+        toolsRuns.delete(dir);                     // the run ended: the tools' automatic update starts over next time
         if (closingRef.current) { setClosing(false); wm.close(winId, true); return; }
         // an unattended install ended with the installer's restart: lord-vm took the installer and the seed disk away,
         // so starting again is the installed system (3.9, "Unattended install")
@@ -569,7 +615,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (!shell || !shellKeys || !focused || !st?.console) return undefined;
     const id = st.console;
     return addListener('keydown', (e) => {
-      if (menus.open > 0) return;
+      // the session's every key reaches this listener: only the ones typed while this window has the keyboard, now
+      if (menus.open > 0 || !wm.hasKeyboard(winId)) return;
       const key = e.key && e.key.length > 1 ? e.key : '';
       const base = e.ctrl || e.alt ? e.base || '' : '';
       if (!key && !e.char && !base) return;
@@ -578,20 +625,24 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     });
   }, [shell, shellKeys, focused, st?.console]);
   useEffect(() => {
-    if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } return undefined; }
+    if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } dropLatched(); return undefined; }
     // a key pressed while one of the window's menus is open is the menu's, down and up (Esc closes it)
     const kept = new Set();
+    // each key asks whether this window has the keyboard at that moment (wm.hasKeyboard: in front, no search, sheet or
+    // system prompt open), not the focus flag of the last render: a key typed in another window never reaches the
+    // guest, and the first one lets go of everything held there, the Keys panel's held keys included (model.js guestKeys)
+    const gk = guestKeys({ send: (c, v) => lord.vm.key(sid, c, v), owns: () => wm.hasKeyboard(winId), release: () => { lord.vm.release(sid); dropLatched(); } });
     const ka = addListener('keydown', (e) => {
       if (!(e.code > 0)) return;
       // ❖0 opens the library (index.jsx), never reaches the machine
       if (menus.open > 0 || kept.has(e.code) || (e.meta && !e.ctrl && !e.alt && (e.base || e.key) === '0')) { kept.add(e.code); return; }
+      if (!gk.down(e.code)) return;
       e.preventDefault?.();                      // Tab goes to the machine, not to the window's buttons (sdk/focus.js)
-      lord.vm.key(sid, e.code, 1);
     });
     const kb = addListener('keyup', (e) => {
       if (!(e.code > 0)) return;
       if (kept.delete(e.code)) return;
-      lord.vm.key(sid, e.code, 0);
+      if (gk.up(e.code) && latchRef.current.length) keysTo(sid, latchKeyUp(latchRef.current, e.code));
     });
     const kc = addListener('pointerup', (e) => {
       if (!buttons.current.has(e.button)) return;
@@ -599,7 +650,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       const wait = held.current - Date.now(), b = e.button;
       if (wait > 0) setTimeout(() => lord.vm.button(sid, b, 0), wait + 10); else lord.vm.button(sid, b, 0);
     });
-    return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
+    return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); dropLatched(); };
   }, [live, focused, sid]);
   // ❖, ⌥Tab and the desktop's other shortcuts go to the machine too, once the person allowed it (asked the first
   // time); ❖Esc gives them back and takes them again (sdk/kbinhibit.js)
@@ -628,11 +679,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (n) lord.vm.wheel(sid, n, 0);
   };
   const cmd = (c) => { if (sid) { if (c === 'shutdown' && st?.state === 'running' && (!cfgRef.current?.agent || st?.agent?.state === 'connected')) lord.vm.snapshot(sid); lord.vm.cmd(sid, c); } };
-  const cad = () => {
-    if (!sid) return;
-    CTRL_ALT_DEL.forEach((k) => lord.vm.key(sid, k, 1));
-    [...CTRL_ALT_DEL].reverse().forEach((k) => lord.vm.key(sid, k, 0));
-  };
+  const sendCombo = (codes) => { if (sid) keysTo(sid, comboSend(codes, latchRef.current)); };
+  const cad = () => sendCombo(CTRL_ALT_DEL);
   const full = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.fullscreen);
   const m0 = { dir, name, id: winId.split('#vm-')[1] };
   const shot = () => {
@@ -929,6 +977,38 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // the machine's tools said whether they open files: kept, so Files lists it while it's off too
   const opensNow = opensOf(st?.agent);
   useEffect(() => { if (opensNow !== undefined && (readMeta(dir).opens ?? false) !== opensNow) writeMeta(dir, { opens: opensNow }); }, [opensNow]);
+  // The LordOS tools brought up to date by themselves (model.js toolsAutoStep): the same install as the popover's
+  // button, only while nothing is on its way; off or given up, a notification with Update. Its state lives for the
+  // machine's run (toolsRuns), so the window closed and opened again doesn't try again.
+  const toolsBusy = useRef(false);
+  const gl = guests.get()[dir];
+  toolsBusy.current = copies.length > 0 || opening.current.size > 0 || !!asks || xferBusy.current || xstate === 'settingUp' || st?.agent?.transfer === 1
+    || Object.values(gl?.launches || {}).some((e) => launchPending(e, gl.list, Date.now()));
+  useEffect(() => {
+    if (!sid) return undefined;
+    const say = (why, agent) => {
+      const have = agent?.tools || '', want = toolsWant(agent);
+      notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.agent.toolsOldTitle', { machine: name || dir.split('/').pop() }),
+        body: tr(why === 'off' ? 'machines.agent.toolsOldBody' : 'machines.agent.toolsAutoFailed', { have, want }), sound: false,
+        defaultAction: { id: 'show', run: () => wm.focus(winId) },
+        actions: [{ id: 'update', label: tr('machines.agent.toolsUpdateBtn'), run: () => { const x = sidRef.current; if (x) lord.vm.agent(x, 'install'); } }] });
+    };
+    const timer = setInterval(() => {
+      const q = stRef.current;
+      if (!q || q.ended || q.state !== 'running' || closingRef.current) return;
+      const t0 = Date.now();
+      const r = toolsAutoStep(toolsRuns.get(dir), { agent: q.agent, on: toolsAutoOn(readMeta(dir), defaultsOf(settings.get().machinesDefaults)), busy: toolsBusy.current, now: t0 });
+      let s = r.s, why = r.act === 'notify' ? r.why : null;
+      // lord-server didn't take it (the session is going away): a failed attempt
+      if (r.act === 'install' && !lord.vm.agent(sid, 'update')) {
+        s = toolsAutoFailed(s, t0);
+        if (s.tries >= TOOLS_TRIES && s.told !== s.want) { s = { ...s, told: s.want }; why = 'failed'; }
+      }
+      toolsRuns.set(dir, s);
+      if (why) say(why, q.agent);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [sid, name]);
   // apps mode (7.2): the guest's windows as LordOS windows (appsmode.jsx); this window becomes a small controller
   const appsBlocked = appsBlocker(st?.agent, cfg);
   appsBlockedRef.current = appsBlocked;
@@ -937,7 +1017,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     writeMeta(dir, { appsMode: on });
     if (!on) sized.current.last = null;            // the guest takes this window's size again (Follow)
   };
-  const appsActive = useAppsMode({ dir, sid, st, name, mid: m0.id || dir.split('/').pop(), on: appsOn, ready: !appsBlocked, onLeave: () => setApps(false), onTouch: () => sendClipRef.current(true) });
+  const appsActive = useAppsMode({ dir, sid, st, name, mid: m0.id || dir.split('/').pop(), home: winId, on: appsOn, ready: !appsBlocked, onLeave: () => setApps(false), onTouch: () => sendClipRef.current(true) });
   // apps mode: the guest window in front shows the bar instead
   useEffect(() => { if (appsActive) guests.set((g) => (g[dir] ? { ...g, [dir]: { ...g[dir], ask: askBar, askAnswer } } : g)); }, [appsActive, askSt]);
   appsRef.current = appsActive;
@@ -946,14 +1026,25 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (appsActive) {
       if (w && !preApps.current) preApps.current = { w: w.w, h: w.h };
       if (full) wm.setFullscreen(winId, false);
-      wm.resize(winId, 460, 250);
+      // the controller's panel: the machine's bar, Running and the guest's apps (AppsController); taller with the
+      // console open under it
+      wm.resize(winId, 420, shell ? 860 : 600);
     } else if (preApps.current) { wm.resize(winId, preApps.current.w, preApps.current.h); preApps.current = null; }
-  }, [appsActive]);
+  }, [appsActive, appsActive && shell]);
   const gApps = useStore(guests, (x) => x[dir] || null);
+  const gRunning = runningKey(runningWindows(gApps?.list));
   // why it can't be on: the agent, or a guest whose helper can't list its windows (it needs LordOS or Windows inside)
   const appsWhy = appsBlocked === 'needsTools' ? tr('machines.win.appsNeedsTools') : appsBlocked ? tr('machines.apps.needsAgent') : '';
   const appsLabel = appsOn ? tr('machines.apps.leave') : appsWhy || tr('machines.apps.enter');
+  // the Keys panel: a Windows guest gets the Windows key and its combinations, any other the Super key and Linux's
+  const keys = {
+    windows: !!cfg.windows || /^windows/i.test(st?.agent?.system || '') || familyOf({ ...cfgRef.current, meta: readMeta(dir), name }) === 'windows',
+    latched, ok: !!sid && a.keys, hold: !!sid && a.keys && live && focused,
+    toggle: (c) => { if (sid && live && wm.hasKeyboard(winId)) keysTo(sid, latchToggle(latchRef.current, c)); },
+    send: sendCombo,
+  };
   const ctl = {
+    keys,
     appsOn, appsBlocked, appsLabel, toggleApps: () => setApps(!appsOn),
     sid, cfg, heard, toggleSound, micLive: micOn,
     // the speaker's menu: mute, the output and the input (each applied at once, schema 8), the sound settings
@@ -1005,6 +1096,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
         { label: a.resume ? tr('machines.cmd.resume') : tr('machines.cmd.pause'), disabled: !a.pause && !a.resume, onClick: () => cmd(a.resume ? 'resume' : 'pause') },
         { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => cmd('reset') },
         { label: tr('machines.cmd.cad'), disabled: !a.keys, onClick: cad },
+        { label: tr('machines.keys.send'), disabled: !a.keys, submenu: sendKeysItems(keys) },
         '-',
         { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
         { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || noSuspend(st, gpu), onClick: () => cmd('suspend') },
@@ -1027,9 +1119,10 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       { label: tr('machines.menu.devices'), items: ctl.devices.filter((x) => x !== '-') },
       ...(appsActive ? [{ label: tr('machines.apps.menu'), items: appsMenuItems(gApps) }] : []),
     ]);
-  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, cfg.transfer, xstate, capOn, capOffer.offered, focused]);
-  // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's)
-  useEffect(() => (appsActive && focused && !askClose ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open) setApps(false); }) : undefined), [appsActive, focused, askClose]);
+  }, [st?.state, full, iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, gRunning, cfg.transfer, xstate, capOn, capOffer.offered, focused, keys.windows]);
+  // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's); in its search field, Esc is the
+  // field's (it clears the search first)
+  useEffect(() => (appsActive && focused && !askClose ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open && !hasTextFocus()) setApps(false); }) : undefined), [appsActive, focused, askClose]);
   // Esc on the close question is Cancel (in apps mode too, where it would otherwise leave apps mode behind the card)
   useEffect(() => (askClose && focused ? addListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault?.(); setAskClose(false); } }) : undefined), [askClose, focused]);
 
@@ -1064,7 +1157,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
 
   return (
     <View ref={root} {...drop.props} style={{ flex: 1, backgroundColor: '#000' }}>
-      {appsActive ? <AppsController name={name} g={gApps} onLeave={() => setApps(false)} />
+      {appsActive ? <AppsController name={name} g={gApps} onLeave={() => setApps(false)} ctl={ctl} />
         : <View ref={box} onMouseDown={(e) => { setShellKeys(false); down(e, sendClipRef.current(true)); }} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, marginTop: full ? 0 : BAR }}>
           {st?.media && st.display === 'up' ? <MediaView media={st.media} style={{ flex: 1 }} /> : null}
         </View>}

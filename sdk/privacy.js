@@ -6,14 +6,13 @@
 //   - the queue of permission prompts, which THE SYSTEM DRAWS (PermissionPrompt), never the app;
 //   - requestPermission(app, perm): returns a promise with true/false, asking only
 //     once (afterwards the saved decision applies);
-//   - the camera (green dot) and microphone (orange) indicators in the menu bar;
+//   - what camera and microphone are in use, for the capture indicator by the clock (sdk/capturestatus.jsx);
 //   - registerPrivacySection(): a slot so other parts (e.g. the Monitor) can add their
 //     own section to the Privacy page, without touching its code.
 import { appStatusEvent } from './appstatus.jsx';
-import { createElement as h, Fragment, useRef } from 'react';
+import { createElement as h, Fragment } from 'react';
 import { View, Text, mainBox } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
-import { statusPanelAt } from './statusitems.js';
 import { t, locale, direction, regionData } from './i18n.js';
 import { appName } from './i18n.js';
 import { getApp } from './windows.js';
@@ -66,9 +65,11 @@ export function shortcutsWhoText(key) {
 
 // A prompt whose decision lord-server keeps itself: a Linux app that asks for the desktop's shortcuts
 // (sdk/wayland.js, server/src/wl/kbinhibit.h). name: what the person reads; done(allow) reports the answer.
-export function promptForServer({ app, perm, name, done }) {
+// once: three answers (Don't allow, Allow once, Always allow), and done gets 'deny', 'once' or 'always' (the VR
+// headset's lease, server/src/wl/drmlease.c); headset: the device it names.
+export function promptForServer({ app, perm, name, done, once = false, headset = '' }) {
   if (queue.get().some((x) => x.app === app && x.perm === perm)) return;
-  queue.set((q) => [...q, { id: seq++, app, perm, name, done }]);
+  queue.set((q) => [...q, { id: seq++, app, perm, name, done, once, headset }]);
 }
 
 // The server (compositor) receives prompts from isolated apps through the broker: it shows the
@@ -99,9 +100,12 @@ if (typeof globalThis !== 'undefined') {
   };
 }
 
-function answer(item, allow) {
+function answer(item, allow, how) {
   queue.set((q) => q.filter((x) => x.id !== item.id));
-  if (item.broker != null) {
+  if (item.once && item.done) {
+    // three answers, lord-server saves "always" and "no" itself (a VR headset's lease)
+    try { item.done(how || (allow ? 'once' : 'deny')); } finally { permsRev.set((v) => v + 1); }
+  } else if (item.broker != null) {
     // prompt from an isolated app: lord-server saves the decision and answers the app
     try { lord.broker.resolve(item.broker, allow); } catch (e) { /* server without broker */ }
   } else if (item.done) {
@@ -120,11 +124,11 @@ export function PermissionPrompt() {
   const item = q[0];
   const name = item.name || appName(getApp(item.app)) || item.app;
   const owner = item.owner ? appName(getApp(item.owner)) || item.owner : '';
-  const msg = t(`privacy.ask.${item.perm}`, { app: name, owner });
+  const msg = t(`privacy.ask.${item.perm}`, { app: name, owner, headset: item.headset || '' });
   const note = item.perm === 'keyring' ? 'privacy.ask.keyringNote' : item.perm === 'shortcuts' ? 'privacy.ask.shortcutsNote'
-    : item.perm === 'idle' ? 'privacy.ask.idleNote' : 'privacy.ask.where';
+    : item.perm === 'idle' ? 'privacy.ask.idleNote' : item.perm === 'vr' ? 'privacy.ask.vrNote' : 'privacy.ask.where';
   // a Linux app's "shortcuts" or "idle": who lord-server checked it is, under its name (the name alone could be anyone's)
-  const who = item.done && (item.perm === 'shortcuts' || item.perm === 'idle') ? shortcutsWhoText(item.app) : '';
+  const who = item.done && (item.perm === 'shortcuts' || item.perm === 'idle' || item.perm === 'vr') ? shortcutsWhoText(item.app) : '';
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100000 } },
     h(View, { style: { marginTop: 80, width: 320, borderRadius: 14, padding: 20, gap: 14, backgroundColor: '#2b2b30',
@@ -134,9 +138,14 @@ export function PermissionPrompt() {
       h(Text, { style: { alignSelf: 'stretch', fontSize: 14, fontWeight: 700, color: '#f5f5f7', textAlign: 'center', lineHeight: 1.4 } }, msg),
       who ? h(Text, { style: { alignSelf: 'stretch', fontSize: 11, color: 'rgba(235,235,245,0.75)', textAlign: 'center' } }, who) : null,
       h(Text, { style: { alignSelf: 'stretch', fontSize: 11, color: 'rgba(235,235,245,0.55)', textAlign: 'center' } }, t(note)),
-      h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 4 } },
-        h(Btn, { label: t('privacy.deny'), onClick: () => answer(item, false) }),
-        h(Btn, { primary: true, label: t('privacy.allow'), onClick: () => answer(item, true) }))));
+      item.once
+        ? h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10, marginTop: 4 } },
+          h(Btn, { label: t('privacy.deny'), onClick: () => answer(item, false, 'deny') }),
+          h(Btn, { label: t('privacy.allowOnce'), onClick: () => answer(item, true, 'once') }),
+          h(Btn, { primary: true, label: t('privacy.allowAlways'), onClick: () => answer(item, true, 'always') }))
+        : h(View, { style: { flexDirection: 'row', gap: 10, marginTop: 4 } },
+          h(Btn, { label: t('privacy.deny'), onClick: () => answer(item, false) }),
+          h(Btn, { primary: true, label: t('privacy.allow'), onClick: () => answer(item, true) }))));
 }
 
 function Btn({ label, primary, onClick }) {
@@ -145,14 +154,20 @@ function Btn({ label, primary, onClick }) {
     h(Text, { style: { fontSize: 13, fontWeight: 600, color: '#fff' } }, label));
 }
 
-const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p === 'screen' ? '▦' : p === 'network' ? '⇅' : p === 'keyring' ? '🔑' : p === 'shortcuts' ? '❖' : p === 'idle' ? '☾' : '●');
+const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p === 'screen' ? '▦' : p === 'network' ? '⇅' : p === 'keyring' ? '🔑' : p === 'shortcuts' ? '❖' : p === 'idle' ? '☾' : p === 'vr' ? '◎' : '●');
 
-// ---- camera/microphone indicators ----
-// Own source (isolated .lpk apps: the broker knows and reflects it here with markDeviceUse) +
-// the Monitor's source (Linux apps, via PipeWire: globalThis.__lordos.monitorDevices, phase 2).
-const brokerDevices = createStore([]);    // [{ app, kind: 'camera'|'microphone' }]
+// ---- camera/microphone in use ----
+// LordOS's own: native apps (lord.media, sdk/media.js) and isolated .lpk apps (the broker reports it, brokerDevicesByApp);
+// and Linux apps' through PipeWire, as lord-server's PipeWire guard sees it (hw event "capture-use", sdk/hardware.jsx).
+// The capture indicator by the clock draws them (sdk/capturestatus.jsx); Settings → Privacy lists them (useIndicators).
+export const brokerDevices = createStore([]);    // [{ app, kind: 'camera'|'microphone', media? }]
+export const linuxCapture = createStore([]);     // [{ app, name, mic, camera, screen }]: app '' an unknown program
+// the Linux apps reading LordOS Studio's camera device (hw event "studio-use", server/src/media/mstudio.c):
+// { apps: [id], camera, effects } (sdk/studiomodel.js studioUseOf)
+export const studioUse = createStore({ apps: [], camera: '', effects: false });
 
-export function markDeviceUse(app, kind, on) {
+// media: a native app's camera source (lord.media), so the indicator can show what it sees
+export function markDeviceUse(app, kind, on, media = null) {
   // Inside an isolated app, it is reported through the broker (lord-server shows the indicator).
   if (typeof lord !== 'undefined' && lord.broker && typeof lord.broker.device === 'function') {
     try { lord.broker.device(kind, !!on); } catch (e) { /* */ }
@@ -160,7 +175,7 @@ export function markDeviceUse(app, kind, on) {
   }
   brokerDevices.set((list) => {
     const rest = list.filter((d) => !(d.app === app && d.kind === kind));
-    return on ? [...rest, { app, kind }] : rest;
+    return on ? [...rest, { app, kind, ...(media ? { media } : null) }] : rest;
   });
 }
 
@@ -173,47 +188,21 @@ function brokerDevicesByApp(app, kind, on) {
   });
 }
 
-function monitorDeviceStore() {
-  try { return globalThis.__lordos && globalThis.__lordos.monitorDevices; } catch (e) { return null; }
-}
-
 // [{ kind, apps: [name] }] for each device in use.
 export function useIndicators() {
   const own = useStore(brokerDevices);
-  const md = monitorDeviceStore();
-  const ext = md ? useStore(md) : [];
-  const all = [...own, ...(Array.isArray(ext) ? ext : [])];
+  const ext = useStore(linuxCapture);
   const byKind = {};
-  for (const d of all) {
-    const name = d.name || appName(getApp(d.app)) || d.app;
-    (byKind[d.kind] = byKind[d.kind] || []).push(name);
+  const add = (kind, name) => { const l = (byKind[kind] = byKind[kind] || []); if (!l.includes(name)) l.push(name); };
+  for (const d of own) add(d.kind, appName(getApp(d.app)) || d.app);
+  for (const d of ext) {
+    const name = d.name || t('shell.cast.unknownApp');
+    if (d.camera) add('camera', name);
+    if (d.mic) add('microphone', name);
   }
   return Object.entries(byKind).map(([kind, apps]) => ({ kind, apps }));
 }
 
-// Component for the menu bar (both themes include it). A green dot for the camera and
-// an orange one for the microphone; tapping it shows which app is using it.
-export function PrivacyIndicators({ size = 8 }) {
-  const list = useIndicators();
-  // with a bar on every display there is one of these per bar: only the one tapped opens its list, under itself
-  const dotsAt = useRef(null);
-  const open = useStore(openStore) === dotsAt;
-  const setOpen = (on) => openStore.set(() => (on ? dotsAt : null));
-  if (!list.length) return null;
-  // the list opens toward the middle of the display: below a bar at the top, above the Classic taskbar at the bottom
-  return h(View, { ref: (n) => { dotsAt.current = n; }, style: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 6 }, onClick: () => setOpen(!open) },
-    list.map((d) => h(View, { key: d.kind, style: { width: size, height: size, borderRadius: size / 2,
-      backgroundColor: d.kind === 'camera' ? '#30d158' : '#ff9f0a' } })),
-    open ? h(View, { style: { ...statusPanelAt(dotsAt, 14), minWidth: 180, borderRadius: 10, padding: 10, gap: 6,
-      backgroundColor: '#2b2b30', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 40px rgba(0,0,0,0.45)', zIndex: 99999 } },
-      list.map((d) => h(View, { key: d.kind, style: { gap: 2 } },
-        h(Text, { style: { fontSize: 11, fontWeight: 700, color: d.kind === 'camera' ? '#30d158' : '#ff9f0a' } },
-          t(`privacy.inUse.${d.kind}`)),
-        d.apps.map((a, i) => h(Text, { key: i, style: { fontSize: 12, color: '#f5f5f7' } }, a))))) : null);
-}
-
-// which bar's list is open (the ref of its dots), in a module store so a tap on another bar's dots moves it there
-const openStore = createStore(null);
 
 // ---- Privacy page slots (e.g. the Monitor adds its own) ----
 export const privacySections = createStore([]);   // [{ id, order, Component }]

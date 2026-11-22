@@ -132,6 +132,11 @@ int main(void) {
     CHECK(!fsops_protected(a));
     path(a, ".var/app/org.gnome.Calculator/config/x");
     CHECK(!fsops_protected(a));
+    /* Linux apps' window sessions (xdg-session-management, src/wl/xsstore.h): the file and the one written first */
+    path(a, ".config/lordos/wl-sessions/sessions");
+    CHECK(fsops_protected(a));
+    path(a, ".config/lordos/wl-sessions/sessions.new");
+    CHECK(fsops_protected(a));
     path(a, "Documentos/x.txt");
     CHECK(!fsops_protected(a));
     path(a, ".config/lordos/global-shortcuts.json");     /* the global shortcuts portal's decisions */

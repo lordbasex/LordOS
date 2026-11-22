@@ -789,7 +789,7 @@ static void test_messages(void) {
     /* the transfer folder (6.7.1): VAG_TRANSFER is an agent request (WinFsp's hash as text, or none); the agent's state
      * says whether the guest has it (VAC_TRANSFER) or can once WinFsp is in (VAC_XFER_SETUP) */
     q = vm_msg(VM_AGENT, 7, VAG_TRANSFER, 0, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
-    q = vm_msg(VM_AGENT, 7, VAG_TRANSFER + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT, 7, VAG_EXTRA_ON + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_FILES | VAC_TRANSFER, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_DISPLAY | (int)LAG_CAP_WINDOWS | VAC_TRANSFER | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
@@ -1390,7 +1390,7 @@ static void test_apps_mode(void) {
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, LAG_DIM_MAX + 1, 0, 10, 10, 0, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);      /* x too far */
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, -32000, -32000, 160, 28, LAGW_MINIMIZED, 0, "a", "b");
     CHECK(lag_winlist_read(b, k, &l) == -1);                                                                                     /* minimized: still a place */
-    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 16, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);          /* unknown flag */
+    k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 32, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);          /* unknown flag */
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, LAGW_OWNED, 5, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);  /* owns itself */
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, LAGW_OWNED, 0, "a", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);  /* owner 0 */
     k = win1(b, put16(b, put32(b, 0, 1), 1), 5, 0, 0, 10, 10, 0, 0, "a\x01", "b"); CHECK(lag_winlist_read(b, k, &l) == -1);        /* control character */
@@ -1496,6 +1496,264 @@ static void tbwin(TB *t, uint32_t id, int32_t x, int32_t y, int32_t w, int32_t h
     if (flags & LAGW_OWNED) tb32(t, owner);
     tb32(t, 4242); tbs(t, title); tbs(t, app);
 }
+/* AGK_DISPLAYS: the guest's displays, for lord-vm's log (lordos-guest-win w7) */
+static void test_displays(void) {
+    AgDisplay in[AG_DISPLAYS_MAX], out[AG_DISPLAYS_MAX];
+    memset(in, 0, sizeof in);
+    in[0] = (AgDisplay){ 0, 0, 1022, 724, AGDS_PRIMARY | AGDS_HW, "\\\\.\\DISPLAY1" };
+    in[1] = (AgDisplay){ 1022, 0, 1920, 1080, AGDS_HW, "\\\\.\\DISPLAY2" };
+    uint8_t b[AG_DISPLAYS_BYTES + 4];
+    size_t n = ag_displays_write(in, 2, 1, b, sizeof b);
+    int shown = 7;
+    CHECK(n == 2 + 2 * 18 + 24 && ag_displays_parse(b, n, out, &shown) == 2 && shown == 1);
+    CHECK(out[1].x == 1022 && out[1].w == 1920 && out[1].h == 1080 && out[1].flags == AGDS_HW && !strcmp(out[1].name, "\\\\.\\DISPLAY2"));
+    char t[512];
+    ag_displays_text(out, 2, shown, t, sizeof t);
+    CHECK(!strcmp(t, "\\\\.\\DISPLAY1 1022x724 at 0,0 primary; \\\\.\\DISPLAY2 1920x1080 at 1022,0 (shown)"));
+    ag_displays_text(out, 2, shown, t, 10);
+    CHECK(strlen(t) == 9);
+    /* exact length: one byte short or one too many */
+    CHECK(ag_displays_parse(b, n - 1, out, &shown) == -1);
+    b[n] = 0; CHECK(ag_displays_parse(b, n + 1, out, &shown) == -1);
+    CHECK(ag_displays_parse(NULL, n, out, &shown) == -1 && ag_displays_parse(b, 1, out, &shown) == -1);
+    /* no shown display */
+    CHECK(ag_displays_write(in, 2, -1, b, sizeof b) == n && b[1] == AG_DISPLAYS_NONE && ag_displays_parse(b, n, out, &shown) == 2 && shown == -1);
+    /* count 0 or above AG_DISPLAYS_MAX, shown out of range */
+    uint8_t c[AG_DISPLAYS_BYTES + 64];
+    memcpy(c, b, n); c[0] = 0; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[0] = AG_DISPLAYS_MAX + 1; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[1] = 2; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[1] = 1; CHECK(ag_displays_parse(c, n, out, &shown) == 2);
+    /* the name: empty, too long, not printable ASCII; its length past the end */
+    memcpy(c, b, n); c[2 + 17] = 0; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 17] = AG_DISPLAY_NAME_MAX + 1; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 18] = 0x1b; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 18] = 0xc3; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 18 + 12 + 17] = 200; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    /* flags: an unknown bit, two primaries */
+    memcpy(c, b, n); c[2 + 16] |= 4; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    memcpy(c, b, n); c[2 + 18 + 12 + 16] |= AGDS_PRIMARY; CHECK(ag_displays_parse(c, n, out, &shown) == -1);
+    /* sizes and places */
+    AgDisplay bad[1] = { { 0, 0, 0, 600, 0, "X" } };
+    CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 0);
+    bad[0].w = AG_DISPLAY_MAX + 1; CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 0);
+    bad[0].w = 800; bad[0].x = LAG_DIM_MAX + 1; CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 0);
+    bad[0].x = -LAG_DIM_MAX; CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 2 + 18 + 1);
+    memcpy(c, b, 21); memset(c + 2 + 8, 0, 4); CHECK(ag_displays_parse(c, 21, out, &shown) == -1);               /* w 0 */
+    memcpy(c, b, 21); c[2 + 11] = 0x80; CHECK(ag_displays_parse(c, 21, out, &shown) == -1);           /* w huge */
+    memcpy(c, b, 21); c[2 + 3] = 0x7f; CHECK(ag_displays_parse(c, 21, out, &shown) == -1);            /* x huge */
+    memcpy(c, b, 21); c[2 + 4] = 0xff; c[2 + 7] = 0x80; CHECK(ag_displays_parse(c, 21, out, &shown) == -1);   /* y negative huge */
+    bad[0].name[0] = 0; CHECK(ag_displays_write(bad, 1, 0, b, sizeof b) == 0);
+    /* the writer: a shown index out of range, too many, a buffer too small */
+    CHECK(ag_displays_write(in, 2, 2, b, sizeof b) == 0 && ag_displays_write(in, 0, -1, b, sizeof b) == 0);
+    CHECK(ag_displays_write(in, AG_DISPLAYS_MAX + 1, -1, b, sizeof b) == 0 && ag_displays_write(in, 2, 0, b, 30) == 0);
+    /* eight displays fit AG_DISPLAYS_BYTES with the longest names */
+    for (int i = 0; i < AG_DISPLAYS_MAX; i++) { in[i] = (AgDisplay){ i * 100, 0, 640, 480, i ? 0 : AGDS_PRIMARY, "" }; memset(in[i].name, 'A' + i, AG_DISPLAY_NAME_MAX); }
+    n = ag_displays_write(in, AG_DISPLAYS_MAX, 3, b, sizeof b);
+    CHECK(n == AG_DISPLAYS_BYTES && ag_displays_parse(b, n, out, &shown) == AG_DISPLAYS_MAX && shown == 3 && strlen(out[7].name) == AG_DISPLAY_NAME_MAX);
+    /* random bytes never crash it */
+    uint32_t r = 12345;
+    for (int k = 0; k < 20000; k++) {
+        size_t m = 2 + (r % 120);
+        for (size_t i = 0; i < m; i++) { r = r * 1103515245u + 12345u; c[i] = (uint8_t)(r >> 16); }
+        c[0] = (uint8_t)(1 + c[0] % 3);
+        int s2 = 0;
+        (void)ag_displays_parse(c, m, out, &s2);
+    }
+}
+
+/* which display the picture shows (lordos-guest-win w8): the maintainer's GVT-g guest as w7 reported it */
+static void test_shown_pick(void) {
+    AgDisplay d[3];
+    memset(d, 0, sizeof d);
+    /* \\.\DISPLAY2: the Intel vGPU (PCI), follows the host's size; \\.\DISPLAY1: primary, not PCI, 1022x724 */
+    d[0] = (AgDisplay){ 1022, 0, 1024, 768, AGDS_HW, "\\\\.\\DISPLAY2" };
+    d[1] = (AgDisplay){ 0, 0, 1022, 724, AGDS_PRIMARY, "\\\\.\\DISPLAY1" };
+    int lock = 9;
+    /* at hello the host asked 1022x724: the non-PCI display has that size, but never wins over a PCI one */
+    CHECK(ag_shown_pick(d, 2, 1022, 724, -1, &lock) == 0 && lock == -1);
+    /* nothing asked yet */
+    CHECK(ag_shown_pick(d, 2, 0, 0, -1, &lock) == 0 && lock == -1);
+    /* w7's lock on DISPLAY1 isn't kept while a PCI display is there */
+    CHECK(ag_shown_pick(d, 2, 1022, 724, 1, &lock) == 0 && lock == -1);
+    /* apps mode: the host asks 1920x1080 and the vGPU's output follows */
+    d[0].w = 1920; d[0].h = 1080;
+    CHECK(ag_shown_pick(d, 2, 1920, 1080, -1, &lock) == 0 && lock == 0);
+    CHECK(ag_shown_pick(d, 2, 1600, 900, 0, &lock) == 0 && lock == 0);          /* kept while it stays */
+    /* two PCI displays: the one with the size asked for, then the primary */
+    d[1].flags = AGDS_PRIMARY | AGDS_HW;
+    CHECK(ag_shown_pick(d, 2, 1920, 1080, -1, &lock) == 0 && lock == 0);
+    CHECK(ag_shown_pick(d, 2, 1022, 724, -1, &lock) == 1 && lock == 1);
+    CHECK(ag_shown_pick(d, 2, 800, 600, -1, &lock) == 1 && lock == -1);         /* no size match: the primary */
+    CHECK(ag_shown_pick(d, 2, 1925, 1085, -1, &lock) == 0 && lock == 0);        /* under by less than 8 */
+    /* no PCI display at all: the size, then the primary */
+    d[0].flags = 0; d[1].flags = AGDS_PRIMARY;
+    CHECK(ag_shown_pick(d, 2, 1920, 1080, -1, &lock) == 0 && lock == 0);
+    CHECK(ag_shown_pick(d, 2, 0, 0, -1, &lock) == 1 && lock == -1);
+    /* one display; none; a lock out of range */
+    CHECK(ag_shown_pick(d, 1, 0, 0, -1, &lock) == 0);
+    CHECK(ag_shown_pick(d, 0, 0, 0, -1, &lock) == -1 && ag_shown_pick(NULL, 2, 0, 0, -1, &lock) == -1);
+    CHECK(ag_shown_pick(d, 2, 0, 0, 5, NULL) == 1);
+    /* a third, PCI display that isn't primary beats two that aren't PCI */
+    d[2] = (AgDisplay){ 3000, 0, 1280, 800, AGDS_HW, "\\\\.\\DISPLAY3" };
+    CHECK(ag_shown_pick(d, 3, 1920, 1080, 1, &lock) == 2 && lock == -1);
+}
+
+/* the absolute tablet on a guest with two displays (w8 on the GVT-g guest: clicks landed across both) */
+static void test_tablet_layout(void) {
+    AgDisplay d[2];
+    memset(d, 0, sizeof d);
+    /* after w8 made the vGPU's output primary: \\.\DISPLAY2 1920x1080 at 0,0 (shown), \\.\DISPLAY1 1022x724 at 1920,0 */
+    d[0] = (AgDisplay){ 0, 0, 1920, 1080, AGDS_PRIMARY | AGDS_HW, "\\\\.\\DISPLAY2" };
+    d[1] = (AgDisplay){ 1920, 0, 1022, 724, 0, "\\\\.\\DISPLAY1" };
+    int L[6];
+    CHECK(ag_displays_layout(d, 2, 0, L) == 0 && L[0] == 0 && L[1] == 0 && L[2] == 1920 && L[3] == 1080 && L[4] == 2942 && L[5] == 1080);
+    /* as w7 left it: DISPLAY1 primary at 0,0, DISPLAY2 to its right */
+    d[0].x = 1022; d[1].x = 0;
+    CHECK(ag_displays_layout(d, 2, 0, L) == 0 && L[0] == 1022 && L[1] == 0 && L[4] == 2942 && L[5] == 1080);
+    /* a display left of and above the primary: the box starts there */
+    d[1].x = -1022; d[1].y = -100; d[0].x = 0;
+    CHECK(ag_displays_layout(d, 2, 0, L) == 0 && L[0] == 1022 && L[1] == 100 && L[4] == 2942 && L[5] == 1180);
+    /* one display, none shown, the shown one the whole box (a smaller one inside it): no layout */
+    CHECK(ag_displays_layout(d, 1, 0, L) == 1 && !L[4]);
+    CHECK(ag_displays_layout(d, 2, -1, L) == 1 && !L[0] && !L[4]);
+    d[1] = (AgDisplay){ 0, 0, 800, 600, 0, "X" };
+    CHECK(ag_displays_layout(d, 2, 0, L) == 1);
+    /* too wide for the message */
+    d[1] = (AgDisplay){ 30000, 0, 8192, 600, 0, "X" };
+    CHECK(ag_displays_layout(d, 2, 0, L) == 1);
+
+    /* the mapping: every picture pixel of the shown display lands on its own guest pixel (within 1), as QEMU scales by
+     * the picture's width (0x7fff over it) and the guest spreads that range over its whole desktop */
+    struct { int off, shown, desk; } cases[] = { { 0, 1920, 2942 }, { 1022, 1920, 2942 }, { 0, 1080, 1080 }, { 100, 1080, 1180 } };
+    for (size_t c = 0; c < sizeof cases / sizeof *cases; c++) {
+        int worst = 0, pic = cases[c].shown;
+        for (int p = 0; p < pic; p++) {
+            int q = vd_abs_map(p, pic, cases[c].off, cases[c].shown, cases[c].desk);
+            CHECK(q >= 0 && q < pic);
+            long long abs = (long long)q * 0x7fff / pic;                              /* qemu_input_scale_axis */
+            long long g = abs * cases[c].desk / 0x7fff;                               /* the guest's pixel */
+            int err = (int)(g - (cases[c].off + p));
+            if (err < 0) err = -err;
+            if (err > worst) worst = err;
+        }
+        CHECK(worst <= 2);
+    }
+    /* no layout: as it was (clamped) */
+    CHECK(vd_abs_map(500, 1920, 0, 0, 0) == 500 && vd_abs_map(5000, 1920, 0, 0, 0) == 1919 && vd_abs_map(-3, 1920, 0, 0, 0) == 0);
+    CHECK(vd_abs_map(10, 0, 0, 1920, 2942) == 0);
+    CHECK(vd_abs_map(10, 1920, 2000, 1920, 2942) == 10);                    /* a layout that doesn't fit: ignored */
+    /* the right edge of the shown display stays left of the other display */
+    CHECK(vd_abs_map(1919, 1920, 0, 1920, 2942) * 2942LL / 1920 < 1920);
+
+    /* How the guest maps the tablet (AGK_TABLET, tools w10), over every layout of the maintainer's log (2026-11-22, ws126,
+     * tools w9): the vGPU's \\.\DISPLAY2 (shown) beside a display not on a PCI adapter, \\.\DISPLAY1 1784x830 */
+    struct { int sx, sw, sh, gx, sprim; } logged[] = {
+        { 0, 1784, 830, 1784, 1 }, { 1784, 1920, 1080, 0, 0 }, { 0, 1920, 1080, 1920, 1 }, { 0, 1400, 1050, 1400, 1 },
+        { 1784, 1400, 1050, 0, 0 }, { 1784, 1680, 1050, 0, 0 }, { 1784, 1600, 900, 0, 0 },
+    };
+    for (size_t c = 0; c < sizeof logged / sizeof *logged; c++) {
+        AgDisplay g[2];
+        memset(g, 0, sizeof g);
+        g[0] = (AgDisplay){ logged[c].sx, 0, (uint32_t)logged[c].sw, (uint32_t)logged[c].sh, (uint8_t)(AGDS_HW | (logged[c].sprim ? AGDS_PRIMARY : 0)), "\\\\.\\DISPLAY2" };
+        g[1] = (AgDisplay){ logged[c].gx, 0, 1784, 830, (uint8_t)(logged[c].sprim ? 0 : AGDS_PRIMARY), "\\\\.\\DISPLAY1" };
+        /* the primary mapping (Windows' HID tablet, and the default until the tools say): with the shown display primary
+         * the picture is all the tablet covers (no layout: identity); with the other one primary it can't be reached */
+        int r0 = ag_tablet_layout(g, 2, 0, AG_TABLET_UNKNOWN, L), r1 = ag_tablet_layout(g, 2, 0, AG_TABLET_PRIMARY, L);
+        CHECK(r0 == r1 && r1 == (logged[c].sprim ? 1 : 2) && !L[0] && !L[2] && !L[4]);
+        /* the whole-desktop mapping: the shown display's place in the box, every pixel within 2 */
+        CHECK(ag_tablet_layout(g, 2, 0, AG_TABLET_DESKTOP, L) == 0 && L[0] == logged[c].sx && L[2] == logged[c].sw && L[4] == logged[c].sw + 1784);
+        int worst = 0;
+        for (int p = 0; p < logged[c].sw; p++) {
+            long long abs = (long long)vd_abs_map(p, logged[c].sw, L[0], L[2], L[4]) * 0x7fff / logged[c].sw;
+            int err = (int)(abs * L[4] / 0x7fff - (L[0] + p));
+            if (err < 0) err = -err;
+            if (err > worst) worst = err;
+        }
+        CHECK(worst <= 2);
+        /* identity really is: the primary mapping's picture pixel is the guest's (QEMU's scale only) */
+        for (int p = 0; p < logged[c].sw; p += 7) {
+            long long abs = (long long)vd_abs_map(p, logged[c].sw, 0, 0, 0) * 0x7fff / logged[c].sw;
+            int err = (int)(abs * logged[c].sw / 0x7fff - p);
+            CHECK(err >= -1 && err <= 1);
+        }
+    }
+    /* one display: nothing to map; no primary flag at all: the display at 0,0 counts as the primary */
+    d[0] = (AgDisplay){ 0, 0, 1920, 1080, AGDS_HW, "A" };
+    d[1] = (AgDisplay){ 1920, 0, 800, 600, 0, "B" };
+    CHECK(ag_tablet_layout(d, 1, 0, AG_TABLET_PRIMARY, L) == 1 && ag_tablet_layout(d, 2, 0, AG_TABLET_PRIMARY, L) == 1);
+    CHECK(ag_tablet_layout(d, 2, 1, AG_TABLET_PRIMARY, L) == 2 && ag_tablet_layout(d, 2, -1, AG_TABLET_PRIMARY, L) == 1 && ag_tablet_layout(NULL, 2, 0, 0, L) == 1);
+    /* the message: exactly one byte, 1 or 2 */
+    int tm = -1;
+    CHECK(!ag_tablet_parse((const uint8_t *)"\x01", 1, &tm) && tm == AG_TABLET_PRIMARY);
+    CHECK(!ag_tablet_parse((const uint8_t *)"\x02", 1, &tm) && tm == AG_TABLET_DESKTOP);
+    CHECK(ag_tablet_parse((const uint8_t *)"\x00", 1, &tm) && ag_tablet_parse((const uint8_t *)"\x03", 1, &tm));
+    CHECK(ag_tablet_parse((const uint8_t *)"\x01\x01", 2, &tm) && ag_tablet_parse(NULL, 1, &tm) && ag_tablet_parse((const uint8_t *)"", 0, &tm));
+
+    /* the messages */
+    VmMsg m = vm_msg(VM_GUEST_LAYOUT, 0, 0, 0, 1920 << 16 | 1080, 2942 << 16 | 1080, NULL);
+    CHECK(vm_msg_valid(&m, 0) && !vm_msg_valid(&m, 1));
+    m = vm_msg(VM_GUEST_LAYOUT, 0, 0, 0, 0, 0, NULL); CHECK(vm_msg_valid(&m, 0));                  /* none */
+    m = vm_msg(VM_GUEST_LAYOUT, 0, 1023, 0, 1920 << 16 | 1080, 2942 << 16 | 1080, NULL); CHECK(!vm_msg_valid(&m, 0));   /* past the box */
+    m = vm_msg(VM_GUEST_LAYOUT, 0, -1, 0, 1920 << 16 | 1080, 2942 << 16 | 1080, NULL); CHECK(!vm_msg_valid(&m, 0));
+    m = vm_msg(VM_GUEST_LAYOUT, 0, 0, 0, 0, 2942 << 16 | 1080, NULL); CHECK(!vm_msg_valid(&m, 0));                      /* no size */
+    m = vm_msg(VM_GUEST_LAYOUT, 0, 0, 0, 1920 << 16 | 1080, (int)(0x8000u << 16 | 1080), NULL); CHECK(!vm_msg_valid(&m, 0));
+    VdMsg v = vd_msg(VD_LAYOUT, 0, 0, 1920, 1080, 2942, 1080); CHECK(vd_msg_valid(&v, 1) && !vd_msg_valid(&v, 0));
+    v = vd_msg(VD_LAYOUT, 0, 0, 0, 0, 0, 0); CHECK(vd_msg_valid(&v, 1));
+    v = vd_msg(VD_LAYOUT, 1100, 0, 1920, 1080, 2942, 1080); CHECK(!vd_msg_valid(&v, 1));
+    v = vd_msg(VD_LAYOUT, 0, 0, 1920, 1080, 40000, 1080); CHECK(!vd_msg_valid(&v, 1));
+
+    /* the extra display (w9): offered only while the shown display is on a PCI adapter and another isn't */
+    d[0] = (AgDisplay){ 0, 0, 1920, 1080, AGDS_PRIMARY | AGDS_HW, "\\\\.\\DISPLAY2" };
+    d[1] = (AgDisplay){ 1920, 0, 1022, 724, 0, "\\\\.\\DISPLAY1" };
+    CHECK(ag_displays_extra(d, 2, 0) == 1);
+    CHECK(ag_displays_extra(d, 2, 1) == 0);                                 /* the shown one isn't PCI */
+    CHECK(ag_displays_extra(d, 1, 0) == 0 && ag_displays_extra(d, 2, -1) == 0 && ag_displays_extra(NULL, 2, 0) == 0);
+    d[1].flags = AGDS_HW; CHECK(ag_displays_extra(d, 2, 0) == 0);           /* two PCI displays: nothing extra */
+    uint8_t one = 1, zero = 0, two = 2, pair[2] = { 1, 0 };
+    int off = -1;
+    CHECK(!ag_extra_parse(&one, 1, &off) && off == 1 && !ag_extra_parse(&zero, 1, &off) && off == 0);
+    CHECK(ag_extra_parse(&two, 1, &off) == -1 && ag_extra_parse(pair, 2, &off) == -1 && ag_extra_parse(NULL, 1, &off) == -1 && ag_extra_parse(&one, 0, &off) == -1);
+    CHECK(ag_hello_caps((const uint8_t *)"w9 gvt extra", 12) == (AG_HELLO_GVT | AG_HELLO_EXTRA));
+    CHECK(ag_hello_caps((const uint8_t *)"w9 extra extraoff", 17) == (AG_HELLO_EXTRA | AG_HELLO_EXTRAOFF));
+    CHECK(ag_hello_caps((const uint8_t *)"w9 extras extraof", 17) == 0);
+    m = vm_msg(VM_AGENT, 1, VAG_EXTRA_OFF, 0, 0, 0, ""); CHECK(vm_msg_valid(&m, 1));
+    m.a = VAG_EXTRA_ON; CHECK(vm_msg_valid(&m, 1));
+    m.a = VAG_EXTRA_ON + 1; CHECK(!vm_msg_valid(&m, 1));
+    m = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXTRA | VAC_EXTRA_OFF, 0, 0, "1\tx"); CHECK(vm_msg_valid(&m, 0));
+}
+
+/* LAG_WINREFUSED and LAGW_ELEVATED (w8: a window that runs as administrator in Windows) */
+static void test_winrefused(void) {
+    uint8_t b[LAG_WINREFUSED_BYTES + 1];
+    uint32_t id = 0;
+    uint8_t a = 0, r = 0;
+    CHECK(!lag_winrefused_write(b, 0x10a2c, LAGA_CLOSE, LAGR_ELEVATED));
+    CHECK(!lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, &id, &a, &r) && id == 0x10a2c && a == LAGA_CLOSE && r == LAGR_ELEVATED);
+    CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES - 1, &id, &a, &r) == -1 && lag_winrefused_parse(b, LAG_WINREFUSED_BYTES + 1, &id, &a, &r) == -1);
+    CHECK(lag_winrefused_parse(NULL, LAG_WINREFUSED_BYTES, &id, &a, &r) == -1);
+    b[4] = 0; CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);
+    b[4] = LAGA_MOVE + 1; CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);
+    b[4] = LAGA_MOVE; b[5] = 0; CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);
+    b[5] = LAGR_LAST + 1; CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);
+    b[5] = LAGR_DENIED; CHECK(!lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, &r) && r == LAGR_DENIED);
+    memset(b, 0, 4); CHECK(lag_winrefused_parse(b, LAG_WINREFUSED_BYTES, NULL, NULL, NULL) == -1);       /* id 0 */
+    CHECK(lag_winrefused_write(b, 0, LAGA_CLOSE, LAGR_ELEVATED) == -1 && lag_winrefused_write(b, 1, 9, LAGR_ELEVATED) == -1 &&
+          lag_winrefused_write(b, 1, LAGA_CLOSE, 7) == -1);
+    /* a window flagged elevated survives the list's parse and copy; an unknown flag still doesn't */
+    LagWinList l;
+    memset(&l, 0, sizeof l);
+    l.serial = 3; l.n = 1;
+    l.w[0] = (LagWinEntry){ .id = 77, .flags = LAGW_ELEVATED | LAGW_FOCUSED, .pid = 9, .x = 10, .y = 20, .w = 300, .h = 200 };
+    strcpy(l.w[0].title, "Computer Management"); strcpy(l.w[0].app, "mmc.exe");
+    static uint8_t buf[LAG_WINDOWS_BYTES];
+    size_t n = lag_windows_write(&l, buf, sizeof buf);
+    static LagWinList back;
+    CHECK(n > 0 && !lag_winlist_read(buf, n, &back) && back.n == 1 && back.w[0].flags == (LAGW_ELEVATED | LAGW_FOCUSED));
+    buf[6 + 20] = 32;               /* flags: a bit nobody knows */
+    CHECK(lag_winlist_read(buf, n, &back) == -1);
+}
+
 static void test_lag(void) {
     uint8_t d[8];
     uint32_t w = 0, h = 0;
@@ -1533,7 +1791,7 @@ static void test_lag(void) {
         { 1, 0, 0, 0, 10, 0, 0, "a", "b" },                         /* empty */
         { 1, 0, 0, 10, LAG_DIM_MAX + 1, 0, 0, "a", "b" },
         { 1, -LAG_DIM_MAX - 1, 0, 10, 10, 0, 0, "a", "b" },
-        { 1, 0, 0, 10, 10, 16, 0, "a", "b" },                       /* unknown flag */
+        { 1, 0, 0, 10, 10, 32, 0, "a", "b" },                       /* unknown flag */
         { 1, 0, 0, 10, 10, LAGW_OWNED, 0, "a", "b" },               /* owner 0 */
         { 1, 0, 0, 10, 10, LAGW_OWNED, 1, "a", "b" },               /* owns itself */
         { 1, 0, 0, 10, 10, 0, 0, "a\xff", "b" },                    /* not UTF-8 */
@@ -1664,6 +1922,16 @@ static void test_clip_on_demand(void) {
     m.d = AGF_TEXT; m.b = VCF_TEXT; CHECK(!vm_msg_valid(&m, 1));                  /* answers are in AGK_CLIPX's layout */
     m = vm_msg(VM_CLIP, 1, 10, VCF_TEXT, 0, 0, NULL); CHECK(vm_msg_valid(&m, 1)); /* a push, as before */
     m.c = -1; CHECK(!vm_msg_valid(&m, 1));
+    /* VM_WINREFUSED (w8): a window id, an action, a reason; nothing else */
+    m = vm_msg(VM_WINREFUSED, 0, 0x10a2c, LAGA_CLOSE, LAGR_ELEVATED, 0, NULL); CHECK(vm_msg_valid(&m, 0) && !vm_msg_valid(&m, 1));
+    m.c = LAGR_DENIED; CHECK(vm_msg_valid(&m, 0));
+    m.c = 0; CHECK(!vm_msg_valid(&m, 0));
+    m.c = 3; CHECK(!vm_msg_valid(&m, 0));
+    m.c = 1; m.b = 0; CHECK(!vm_msg_valid(&m, 0));
+    m.b = 6; CHECK(!vm_msg_valid(&m, 0));
+    m.b = LAGA_MOVE; m.a = 0; CHECK(!vm_msg_valid(&m, 0));
+    m.a = -5; CHECK(vm_msg_valid(&m, 0));                              /* an id above 2^31, as an int */
+    m.d = 1; CHECK(!vm_msg_valid(&m, 0));
     m = vm_msg(VM_CLIP_REQ, 0, 5, AGF_PNG, 0, 0, NULL); CHECK(vm_msg_valid(&m, 0) && !vm_msg_valid(&m, 1));
     m.a = 0; CHECK(!vm_msg_valid(&m, 0));
     m.a = 5; m.b = 4; CHECK(!vm_msg_valid(&m, 0));
@@ -1881,6 +2149,10 @@ int main(void) {
     test_clip_on_demand();
     test_resolution();
     test_lag();
+    test_displays();
+    test_shown_pick();
+    test_winrefused();
+    test_tablet_layout();
     test_apps_mode();
     test_clipx();
     test_log_clean();

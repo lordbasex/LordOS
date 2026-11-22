@@ -27,6 +27,8 @@
 #include "keygrab.h"
 #include "secctx.h"
 #include "kbinhibit.h"
+#include "timing.h"
+#include "wlfixes.h"
 #include "../keylag.h"
 #include "../sec/perms.h"
 #include "../apps.h"
@@ -85,12 +87,18 @@
 #include "../cursor.h"
 #include "ptrlock.h"
 #include "outpick.h"
+#include "wlcolor.h"
 #include "buftf.h"
 #include "idlenotify.h"
+#include "drmlease.h"
 #include "ext-idle-notify-v1-protocol.h"
 #include "xdg-toplevel-icon-v1-protocol.h"
+#include "linux-drm-syncobj-v1-protocol.h"
+#include "syncobj.h"
 #include "wlicon.h"
 #include "wl_input.h"
+#include "wl_tablet.h"
+#include "wl_warp.h"
 #include "../gpu/gpu.h"
 #include "../media/media.h"
 #include <drm/drm_fourcc.h>
@@ -100,6 +108,7 @@
 #include "../ui/ui.h"
 #include "../sec/broker.h"
 #include "wlregion.h"
+#include "wlshell.h"
 #include "urilist.h"
 
 enum { R_NONE, R_TOPLEVEL, R_POPUP, R_SUB, R_CURSOR, R_DNDICON };
@@ -112,7 +121,14 @@ typedef struct Dmabuf {
     GpuTex *tex;                        /* EGLImage (GPU path); stale once its context is gone */
     int refs, scanned;
     unsigned no_import;                 /* the GPU context (generation) where EGL refused it: mapped and copied */
+    /* explicit sync: release points of commits that showed it, waiting for its direct scanout to end (scanout_done) */
+    SobjPoint srel[4];
+    int nsrel;
 } Dmabuf;
+
+/* A commit's double-buffered state (Surf's p_* fields), moved out of the surface while the commit waits for its
+ * acquire point (explicit sync, syncobj.h) and moved back when it is applied */
+typedef struct Pend Pend;
 
 typedef struct Surf Surf;
 struct Surf {
@@ -151,6 +167,9 @@ struct Surf {
     int pop_x, pop_y, grab;
     /* subsurface */
     int sx, sy, p_sx, p_sy;
+    /* the subsurfaces' places a held commit of this surface (its parent) brings (Pend.kids): set by pend_put, used and
+     * dropped by surface_apply; without them the places set now (each child's p_sx, p_sy) go with the commit */
+    int p_kids_set, p_nkid, p_kid_id[16], p_kid_x[16], p_kid_y[16];
     Surf *kids[16];
     int nkids;
     int node;                   /* UI node that shows it (windows) */
@@ -190,6 +209,7 @@ struct Surf {
     uint32_t conf_serial, acked_serial;   /* xdg_surface: the last configure sent, the last one acked */
     int parked, fs_resume;          /* on a hidden desktop (wl_set_parked); fullscreen waits for its return */
     int covered;                    /* wholly under an opaque window of its desktop (wl_set_covered) */
+    int layer;                      /* 1 always on top, -1 kept below, 0 normal (wl_set_layer; an X window's is xwm's) */
     FrameGate fgate;                /* its frame callbacks while it can't be seen (framegate.h) */
     int sent_suspended;             /* the last configure said "suspended" */
     /* HiDPI (docs/DISPLAYS.md): wl_surface.set_buffer_scale, the displays it is on (wl_surface
@@ -210,6 +230,29 @@ struct Surf {
     WlRgn input, p_input;
     int has_input, p_input_set, p_has_input;
     struct wl_resource *ksi;        /* zwp_keyboard_shortcuts_inhibitor_v1: one per surface (kbinhibit.h) */
+    /* explicit sync (syncobj.h): its wp_linux_drm_syncobj_surface_v1, the points pending until commit, the current
+     * buffer's release point, and the commits waiting for an acquire point (the first one's eventfd and 5 s timer) */
+    struct wl_resource *sobj;
+    SobjPoint p_acq, p_rel, rel;
+    SobjQueue sq;
+    struct wl_event_source *sq_src, *sq_timer;
+    int sq_polling;                 /* past the session's eventfds: in sobj_polls, checked by one shared timer */
+    int sq_fd, sq_logged;
+    WlTiming *tm;                   /* fifo, commit timing, tearing and content type (timing.h); its held updates are in sq */
+    int sub_sync;                   /* wl_subsurface: in synchronized mode (the default) */
+    /* wl_subsurface.place_above/place_below: the first nbelow of kids[] are under this surface, the rest over it, in
+     * kids[] order (bottom first). The pending order (surface ids, this surface's own id among them) is applied with
+     * this surface's next commit (p_zn > 0) */
+    int nbelow, p_zn, p_z[17];
+    /* xdg-shell: the xdg_wm_base the xdg_surface came from (defunct_surfaces, the errors xdg-shell posts on it), the
+     * configure serials sent and not acked yet (oldest first; cfg_lost: older ones dropped, up to that serial), whether
+     * a configure was ever acked since the role started (unconfigured_buffer), the positioner of a reactive popup
+     * (its copy, moved again when the parent changes), and that the size limits are checked at the next commit */
+    struct wl_resource *wmb;
+    uint32_t cfg_ser[16], cfg_lost;
+    int ncfg, cfg_lost_set, xdg_acked, limits_check;
+    struct XdgPos *pos;
+    int pref_tf_sent;               /* wl_surface.preferred_buffer_transform told (v6) */
 };
 
 /* Shape of a surface's hole in the UI: if it changes, the UI must be repainted. */
@@ -252,7 +295,8 @@ static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
 static int frames_held;             /* frame callbacks wait for their own display's frame (wl_frame_done) */
 static unsigned new_keys;           /* the displays (WlOutput.key bits) new content must reach: wl_new_content */
-static Dmabuf *to_release[64];      /* replaced: released after the next frame */
+typedef struct { Dmabuf *d; SobjPoint rel; } Release;
+static Release to_release[64];      /* replaced: released after the next frame (with the commit's release point) */
 static int nrelease;
 
 /* fullscreen (presented by the compositor, on top of everything) */
@@ -308,7 +352,9 @@ static unsigned cursor_gen;
 
 /* zwp_pointer_constraints / zwp_relative_pointer */
 static struct wl_list rel_pointers;
-typedef struct { struct wl_resource *res; Surf *surf; int lock, active, oneshot, spent; } Constraint;
+/* region: the constraint's own (pointer-constraints: with the surface's input region, where it holds; none = all of
+ * the surface), current and pending until the surface's commit (p_set) */
+typedef struct { struct wl_resource *res; Surf *surf; int lock, active, oneshot, spent; WlRgn region, p_region; int has_region, p_has_region, p_set; } Constraint;
 static Constraint *constraint;      /* the only active (or pending) one */
 static void constraint_update(void);
 static void constraint_escape(void);
@@ -466,11 +512,13 @@ static int damage_box(Surf *s, Box *b) {
     return 1;
 }
 
-static void damage_node(Surf *s) {
+/* whole: all of the window, never its own last damage, and on the GPU path painted again (its draw list changes: a
+ * subsurface came, moved or went) */
+static void damage_node_ex(Surf *s, int whole) {
     Surf *top = s;
     while (top->parent && top->role != R_TOPLEVEL) top = top->parent;
     Box part;
-    int have_part = top == s && damage_box(s, &part);
+    int have_part = !whole && top == s && damage_box(s, &part);
     if (content_on) {               /* a menu or a fullscreen app may be anywhere: all of it */
         Node *tn = top->node ? node_get(top->node) : NULL;
         if (have_part) content_note(part);
@@ -478,15 +526,66 @@ static void damage_node(Surf *s) {
         else content_note(tn->prev_box);
     }
     /* GPU path: if only the content changed, presenting again is enough */
-    if (gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { new_on(surf_keys(top)); return; }
+    if (!whole && gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { new_on(surf_keys(top)); return; }
     Node *n = top->node ? node_get(top->node) : NULL;
     if (have_part) { if (part.x1 > part.x0) damage_add(part); }     /* CPU path: only what the app damaged */
     else if (n && n->prev_box.x1 > n->prev_box.x0) damage_add(n->prev_box);
     ui.dirty = 1;
 }
+static void damage_node(Surf *s) { damage_node_ex(s, 0); }
+
+static void popup_box_damage(Surf *s);
+/* A subsurface changed on its own: a commit of a desync one (GTK 3 maps Firefox's <select> lists and its tooltips as
+ * desync subsurfaces of the window), or it came, moved, was unmapped or destroyed (whole). The window's own last damage
+ * (damage_box) says nothing of it: such a list stayed on screen after it closed and the next one never showed. Its own
+ * box when it has the shape it was painted with; else (whole, new, moved, resized, unmapped) all of the window. */
+static void damage_sub(Surf *s, int whole) {
+    Surf *root = s;
+    while (root->role == R_SUB && root->parent) root = root->parent;
+    if (root == s) return;                      /* a subsurface of nothing is not on screen */
+    if (root->role == R_POPUP) { popup_box_damage(root); return; }
+    Node *n = root->node ? node_get(root->node) : NULL;
+    float x, y;
+    if (whole || root->role != R_TOPLEVEL || root == fs_surf || root->tf_drawn || !n || n->has_tf || !s->content ||
+        s->lw <= 0 || s->lh <= 0 || hole_sig(s) != s->hole_sig || !origin(s, &x, &y)) {
+        damage_node_ex(root, 1);
+        return;
+    }
+    Box b = { floorf(x) - 2, floorf(y) - 2, ceilf(x + (float)s->lw) + 2, ceilf(y + (float)s->lh) + 2 };
+    if (b.x0 < n->prev_box.x0) b.x0 = n->prev_box.x0;
+    if (b.y0 < n->prev_box.y0) b.y0 = n->prev_box.y0;
+    if (b.x1 > n->prev_box.x1) b.x1 = n->prev_box.x1;
+    if (b.y1 > n->prev_box.y1) b.y1 = n->prev_box.y1;
+    if (b.x1 <= b.x0 || b.y1 <= b.y0) return;   /* outside the window: not shown */
+    if (content_on) content_note(b);
+    if (gpu_active()) { new_on(surf_keys(root)); return; }
+    damage_add(b);
+    ui.dirty = 1;
+}
 
 /* On-screen origin of a surface's buffer (window or menu). 0 if unknown. */
+/* The recursive walks of a surface tree (origin, paint_tree, draw_tree, blit_tree, surface_at) go no deeper than
+ * WALK_MAX levels, all of them together: the requests that link surfaces refuse cycles (surf_reaches), and this is
+ * the safety net if one is ever missed: the tree is cut there (said once) instead of the stack running out. */
+#define WALK_MAX 64
+static int walk_depth;
+static int walk_enter(void) {
+    if (walk_depth >= WALK_MAX) {
+        static int said;
+        if (!said) { said = 1; fprintf(stderr, "wayland: a surface tree deeper than %d levels: cut there\n", WALK_MAX); }
+        return 0;
+    }
+    walk_depth++;
+    return 1;
+}
+static int origin_r(Surf *s, float *x, float *y);
 static int origin(Surf *s, float *x, float *y) {
+    if (!walk_enter()) return 0;
+    int r = origin_r(s, x, y);
+    walk_depth--;
+    return r;
+}
+static int origin_r(Surf *s, float *x, float *y) {
     if (s == fs_surf) {
         float fx, fy, fw, fh;
         fs_rect(&fx, &fy, &fw, &fh);
@@ -547,6 +646,21 @@ static void x_configure(Surf *s) {
     s->sent_configure = 1;
 }
 
+/* An xdg_surface.configure: its serial is kept until acked (xs_ack checks an ack against them: invalid_serial).
+ * Sixteen unacked at most; older ones are dropped, and an ack of one of them is still taken (cfg_lost). */
+static uint32_t xdg_configure(Surf *s) {
+    uint32_t serial = wl_display_next_serial(dpy);
+    if (s->ncfg == (int)(sizeof s->cfg_ser / sizeof s->cfg_ser[0])) {
+        s->cfg_lost = s->cfg_ser[0];
+        s->cfg_lost_set = 1;
+        memmove(s->cfg_ser, s->cfg_ser + 1, sizeof s->cfg_ser - sizeof s->cfg_ser[0]);
+        s->ncfg--;
+    }
+    s->cfg_ser[s->ncfg++] = serial;
+    xdg_surface_send_configure(s->xdg, serial);
+    return serial;
+}
+
 static void work_bounds(Surf *s, int *w, int *h);
 static void send_toplevel_configure(Surf *s) {
     if (s->xw) { x_configure(s); return; }
@@ -580,8 +694,7 @@ static void send_toplevel_configure(Surf *s) {
     }
     xdg_toplevel_send_configure(s->top, s->conf_w, s->conf_h, &states);
     wl_array_release(&states);
-    s->conf_serial = wl_display_next_serial(dpy);
-    xdg_surface_send_configure(s->xdg, s->conf_serial);
+    s->conf_serial = xdg_configure(s);
     s->sent_configure = 1;
 }
 
@@ -669,6 +782,7 @@ static void upright(uint32_t **px, int *w, int *h, int tf) {
 
 static void dm_unref(Dmabuf *d) {
     if (!d || --d->refs > 0) return;
+    for (int i = 0; i < d->nsrel; i++) sobj_release_after(&d->srel[i], d->d.fd[0]);
     gpu_tex_free(d->tex);
     for (int i = 0; i < d->d.nplanes; i++) if (d->d.fd[i] >= 0) close(d->d.fd[i]);
     free(d);
@@ -736,9 +850,21 @@ static int map_linear(Surf *s, Dmabuf *d) {
     return 0;
 }
 
-static void queue_release(Dmabuf *d) {
-    if (nrelease < 64) { to_release[nrelease++] = d; return; }
+/* A commit's release point, now that the frame that replaced its buffer is done: signalled with the buffer's fences
+ * (the GPU's reads of it), or once its direct scanout ends */
+static void dm_release_point(Dmabuf *d, SobjPoint *p) {
+    if (!p->tl) return;
+    if (d->scanned && d->nsrel < 4) { d->srel[d->nsrel++] = *p; p->tl = NULL; return; }
+    sobj_release_after(p, d->d.fd[0]);
+}
+
+/* d no longer shows on its surface: wl_buffer.release and its release point (*rel, taken) after the next frame */
+static void queue_release(Dmabuf *d, SobjPoint *rel) {
+    SobjPoint r = { 0 };
+    if (rel) { r = *rel; rel->tl = NULL; }
+    if (nrelease < 64) { to_release[nrelease++] = (Release){ d, r }; return; }
     if (d->res && !d->scanned) wl_buffer_send_release(d->res);
+    dm_release_point(d, &r);
     dm_unref(d);
 }
 
@@ -804,14 +930,46 @@ static void bind_am(struct wl_client *c, void *data, uint32_t ver, uint32_t id) 
 }
 static float surf_alpha(const Surf *s) { return s->alpha == UINT32_MAX ? 1.0f : (float)((double)s->alpha / (double)UINT32_MAX); }
 
-/* The buffer the app just sent becomes the surface's content. */
-static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
+/* color-management-v1 (wlcolor.h): a surface whose content needs converting has it as pixels, converted where they
+ * changed; a dmabuf the CPU can't map is read back from its texture first. */
+static void color_convert(Surf *s, const CcConv *cv) {
+    if (!cv || !s->px) return;
+    if (s->dmg_full) cc_convert(cv, s->px, s->w, 0, 0, s->w, s->h, s->opaque);
+    else cc_convert(cv, s->px, s->w, s->dmg.x0, s->dmg.y0, s->dmg.x1, s->dmg.y1, s->opaque);
+}
+static int dm_read_converted(Surf *s, Dmabuf *dm, const CcConv *cv) {
+    int w = dm->d.width, h = dm->d.height;
+    if (!dm_tex(dm) || w <= 0 || h <= 0 || w > 8192 || h > 8192) return -1;
+    uint32_t *px = malloc((size_t)w * (size_t)h * 4);
+    if (!px || gpu_tex_read(dm->tex, px, w, h)) { free(px); return -1; }
+    upright(&px, &w, &h, s->tf);
+    free(s->px);
+    s->px = px;
+    s->w = w;
+    s->h = h;
+    s->tf_px = s->tf;
+    s->opaque = dm->d.fourcc == DRM_FORMAT_XRGB8888 || dm->d.fourcc == DRM_FORMAT_XBGR8888;
+    s->content = 1;
+    s->tex_dirty = 1;
+    s->dmg_full = 1;
+    color_convert(s, cv);
+    return 0;
+}
+
+/* The buffer the app just sent becomes the surface's content. rel: its commit's release point (explicit sync), taken:
+ * kept with a dmabuf held on screen, signalled at once when the buffer was copied (or refused). */
+static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg, SobjPoint *rel) {
     Dmabuf *dm = dmabuf_of(buf), *old = s->dmabuf;
+    const CcConv *cv = wlcolor_conv(s->res);
+    SobjPoint old_rel = s->rel;
+    s->rel.tl = NULL;
     s->dmabuf = NULL;
     s->dmg_full = 1;                        /* a dmabuf or no buffer: all of it (copy_buffer says less) */
-    if (dm && s->role != R_CURSOR && dm_tex(dm)) {
+    if (dm && s->role != R_CURSOR && !cv && dm_tex(dm)) {
         dm->refs++;
         s->dmabuf = dm;
+        s->rel = *rel;
+        rel->tl = NULL;
         s->w = dm->d.width;
         s->h = dm->d.height;
         s->opaque = dm->d.fourcc == DRM_FORMAT_XRGB8888 || dm->d.fourcc == DRM_FORMAT_XBGR8888;
@@ -821,6 +979,9 @@ static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     } else if (dm && map_linear(s, dm) == 0) {
         s->content = 1;
         s->tex_dirty = 1;
+        color_convert(s, cv);
+        wl_buffer_send_release(buf);
+    } else if (dm && cv && dm_read_converted(s, dm, cv) == 0) {
         wl_buffer_send_release(buf);
     } else if (dm && !gpu_active() && s->role != R_CURSOR) {
         /* Off the GPU (the session left the monitor, or a remote viewer) with a buffer the CPU
@@ -829,6 +990,8 @@ static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
          * is back without waiting for the app's next frame. */
         dm->refs++;
         s->dmabuf = dm;
+        s->rel = *rel;
+        rel->tl = NULL;
         s->content = s->px != NULL;
     } else if (dm) {
         s->content = 0;
@@ -848,15 +1011,19 @@ static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
             s->content = 1;
             s->tf_px = s->tf;
             s->tex_dirty = 1;
+            color_convert(s, cv);
         }
         wl_buffer_send_release(buf);
     } else {
         copy_buffer(s, buf, dmg);
         s->tex_dirty = 1;
+        if (s->content) color_convert(s, cv);
     }
     if (s->dmg_full) s->tex_full = 1;
     else s->tex_dmg = buftf_union(s->tex_dmg, s->dmg);
-    if (old) queue_release(old);
+    sobj_release(rel);                      /* not held: copied, or refused (a no-op without a point) */
+    if (old) queue_release(old, &old_rel);
+    else sobj_release(&old_rel);
 }
 
 /* The transform its texture is drawn with: a dmabuf's own (shared memory is copied upright, buftf.h) */
@@ -884,12 +1051,33 @@ static void apply_viewport(Surf *s) {
 
 static void surface_commit_role(Surf *s);
 static void dnd_icon_damage(void);
+static void kid_remove(Surf *p, Surf *k);
+static void kids_restack(Surf *p);
+static void cons_commit(Surf *s);
 
-static void srf_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+/* wayland.xml: the role object goes before the wl_surface (defunct_role_object, from version 6 here: older clients
+ * predate the rule). The role object is the xdg_toplevel or xdg_popup, as wlroots counts it (an xdg_surface left after
+ * its role object, then destroyed after the wl_surface, is accepted, as there); a wl_subsurface becomes inert when its
+ * surface goes (wayland.xml), so it isn't one here. */
+static void srf_destroy(struct wl_client *c, struct wl_resource *r) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s && wl_resource_get_version(r) >= 6 && (s->top || s->popup)) {
+        wl_resource_post_error(r, WL_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT, "the wl_surface was destroyed before its %s",
+                               s->top ? "xdg_toplevel" : "xdg_popup");
+        return;
+    }
+    wl_resource_destroy(r);
+}
 
 static void srf_attach(struct wl_client *c, struct wl_resource *r, struct wl_resource *buf, int32_t x, int32_t y) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
+    /* from version 5 the offset is wl_surface.offset: attach's own must be 0 (invalid_offset) */
+    if (wl_resource_get_version(r) >= 5 && (x || y)) {
+        wl_resource_post_error(r, WL_SURFACE_ERROR_INVALID_OFFSET, "attach with offset %d,%d (use wl_surface.offset)", x, y);
+        return;
+    }
     if (wl_resource_get_version(r) < 5) { s->p_dnd_x += x; s->p_dnd_y += y; }   /* from version 5 that is wl_surface.offset */
     if (s->p_buf) { wl_list_remove(&s->p_buf_destroy.link); wl_list_init(&s->p_buf_destroy.link); }
     s->p_buf = buf;
@@ -973,19 +1161,580 @@ static void srf_input(struct wl_client *c, struct wl_resource *r, struct wl_reso
     s->p_has_input = region != NULL;
 }
 
-static void srf_commit(struct wl_client *c, struct wl_resource *r) {
+/* ---- explicit sync: linux-drm-syncobj-v1 (syncobj.h, docs/SYNCOBJ-PLAN.md) ---- */
+
+/* The p_* fields of a Surf: a commit's state, held in the surface's one queue while its acquire point (explicit sync),
+ * its fifo barrier or its target time (timing.h) isn't there yet. A new double-buffered field of Surf goes here too. Values the protocol keeps from one commit to the next (transform, scale,
+ * opacity, the viewport's numbers, a subsurface's place, the cursor's hotspot) are copied; the rest is moved. */
+struct Pend {
+    struct wl_resource *buf;
+    struct wl_listener buf_destroy;
+    int attached, gx, gy, gw, gh, geom;
+    struct wl_list frames, feedback;
+    float ds[4];
+    int ds_on, db_on;
+    BufBox db;
+    int tf;
+    uint32_t alpha;
+    WlIcon *icon;
+    int icon_set;
+    float vsx, vsy, vsw, vsh;
+    int vdw, vdh, vp, hx, hy, dnd_x, dnd_y, sx, sy, bscale;
+    WlRgn input;
+    int input_set, has_input;
+    SobjPoint acq, rel;
+    WlcPend color;                      /* its colour state (wlcolor.h) */
+    WltUpdate tu;                       /* this commit's fifo barrier, target time and hints (timing.h) */
+    int nkid, kid_id[16], kid_x[16], kid_y[16];  /* its subsurfaces' places when it was committed (set_position) */
+};
+
+/* the per-client counts of the limits (syncobj.h); found by client, so a surface outliving its client's record (the
+ * client's destroy signal comes before its resources go) just isn't counted any more */
+typedef struct { struct wl_list link; struct wl_client *c; struct wl_listener gone; pid_t pid; int timelines, surfaces, waits; } SobjClient;
+static struct wl_list sobj_clients;
+static int sobj_waits;                  /* eventfds alive in the session */
+
+static void sobj_client_gone(struct wl_listener *l, void *data) {
+    (void)data;
+    SobjClient *k = wl_container_of(l, k, gone);
+    wl_list_remove(&k->link);
+    wl_list_remove(&k->gone.link);
+    free(k);
+}
+static SobjClient *sobj_client_find(struct wl_client *c) {
+    SobjClient *k;
+    wl_list_for_each(k, &sobj_clients, link) if (k->c == c) return k;
+    return NULL;
+}
+static SobjClient *sobj_client(struct wl_client *c) {
+    SobjClient *k = sobj_client_find(c);
+    if (k || !(k = calloc(1, sizeof *k))) return k;
+    k->c = c;
+    wl_client_get_credentials(c, &k->pid, NULL, NULL);
+    k->gone.notify = sobj_client_gone;
+    wl_client_add_destroy_listener(c, &k->gone);
+    wl_list_insert(&sobj_clients, &k->link);
+    return k;
+}
+
+/* The client destroyed a buffer a held commit attaches (Mesa does, recreating a swapchain): that commit keeps what is
+ * shown instead of emptying the window (attaching nothing would unmap it); its release point is still signalled. */
+static void pend_buf_gone(struct wl_listener *l, void *data) {
+    (void)data;
+    Pend *e = wl_container_of(l, e, buf_destroy);
+    e->buf = NULL;
+    e->attached = 0;
+    wl_list_remove(&l->link);
+    wl_list_init(&l->link);
+}
+
+/* The surface's pending state into e; the surface is left with nothing pending (its kept values stay) */
+static void pend_take(Surf *s, Pend *e) {
+    e->buf = s->p_buf;
+    e->attached = s->p_attached;
+    wl_list_init(&e->buf_destroy.link);
+    if (s->p_buf) {
+        wl_list_remove(&s->p_buf_destroy.link);
+        wl_list_init(&s->p_buf_destroy.link);
+        e->buf_destroy.notify = pend_buf_gone;
+        wl_resource_add_destroy_listener(e->buf, &e->buf_destroy);
+    }
+    s->p_buf = NULL;
+    s->p_attached = 0;
+    e->gx = s->p_gx; e->gy = s->p_gy; e->gw = s->p_gw; e->gh = s->p_gh; e->geom = s->p_geom;
+    s->p_geom = 0;
+    wl_list_init(&e->frames);
+    wl_list_insert_list(&e->frames, &s->p_frames);
+    wl_list_init(&s->p_frames);
+    wl_list_init(&e->feedback);
+    wl_list_insert_list(&e->feedback, &s->p_feedback);
+    wl_list_init(&s->p_feedback);
+    memcpy(e->ds, s->p_ds, sizeof e->ds);
+    e->ds_on = s->p_ds_on; e->db_on = s->p_db_on; e->db = s->p_db;
+    s->p_ds_on = s->p_db_on = 0;
+    e->tf = s->p_tf;
+    e->alpha = s->p_alpha;
+    e->icon = s->p_icon; e->icon_set = s->p_icon_set;
+    s->p_icon = NULL;
+    s->p_icon_set = 0;
+    e->vsx = s->p_vsx; e->vsy = s->p_vsy; e->vsw = s->p_vsw; e->vsh = s->p_vsh;
+    e->vdw = s->p_vdw; e->vdh = s->p_vdh; e->vp = s->p_vp;
+    s->p_vp = 0;
+    e->hx = s->p_hx; e->hy = s->p_hy; e->sx = s->p_sx; e->sy = s->p_sy; e->bscale = s->p_bscale;
+    e->dnd_x = s->p_dnd_x; e->dnd_y = s->p_dnd_y;
+    s->p_dnd_x = s->p_dnd_y = 0;
+    e->input = s->p_input; e->input_set = s->p_input_set; e->has_input = s->p_has_input;
+    s->p_input = (WlRgn){ 0 };
+    s->p_input_set = 0;
+    e->acq = s->p_acq; e->rel = s->p_rel;
+    s->p_acq.tl = s->p_rel.tl = NULL;
+    wlcolor_pend_take(s->res, &e->color);
+    e->nkid = 0;                                /* wl_subsurface.set_position goes with the parent's commit */
+    for (int i = 0; i < s->nkids && e->nkid < 16; i++)
+        if (s->kids[i]->role == R_SUB) {
+            e->kid_id[e->nkid] = s->kids[i]->id;
+            e->kid_x[e->nkid] = s->kids[i]->p_sx;
+            e->kid_y[e->nkid++] = s->kids[i]->p_sy;
+        }
+}
+
+/* e back into the surface's pending state (what is left there of an applied commit is dropped) */
+static void pend_put(Surf *s, Pend *e) {
+    if (s->p_buf) { wl_list_remove(&s->p_buf_destroy.link); wl_list_init(&s->p_buf_destroy.link); }
+    s->p_buf = e->buf;
+    s->p_attached = e->attached;
+    if (e->buf) {
+        wl_list_remove(&e->buf_destroy.link);
+        s->p_buf_destroy.notify = buffer_destroyed;
+        wl_resource_add_destroy_listener(e->buf, &s->p_buf_destroy);
+    }
+    wl_list_init(&e->buf_destroy.link);
+    s->p_gx = e->gx; s->p_gy = e->gy; s->p_gw = e->gw; s->p_gh = e->gh; s->p_geom = e->geom;
+    wl_list_insert_list(s->p_frames.prev, &e->frames);
+    wl_list_init(&e->frames);
+    wl_list_insert_list(s->p_feedback.prev, &e->feedback);
+    wl_list_init(&e->feedback);
+    memcpy(s->p_ds, e->ds, sizeof e->ds);
+    s->p_ds_on = e->ds_on; s->p_db_on = e->db_on; s->p_db = e->db;
+    s->p_tf = e->tf;
+    s->p_alpha = e->alpha;
+    wlicon_unref(s->p_icon);
+    s->p_icon = e->icon; s->p_icon_set = e->icon_set;
+    e->icon = NULL;
+    s->p_vsx = e->vsx; s->p_vsy = e->vsy; s->p_vsw = e->vsw; s->p_vsh = e->vsh;
+    s->p_vdw = e->vdw; s->p_vdh = e->vdh; s->p_vp = e->vp;
+    s->p_hx = e->hx; s->p_hy = e->hy; s->p_sx = e->sx; s->p_sy = e->sy; s->p_bscale = e->bscale;
+    s->p_dnd_x = e->dnd_x; s->p_dnd_y = e->dnd_y;
+    wlrgn_free(&s->p_input);
+    s->p_input = e->input; s->p_input_set = e->input_set; s->p_has_input = e->has_input;
+    e->input = (WlRgn){ 0 };
+    sobj_unref(s->p_acq.tl);
+    sobj_unref(s->p_rel.tl);
+    s->p_acq = e->acq; s->p_rel = e->rel;
+    e->acq.tl = e->rel.tl = NULL;
+    wlcolor_pend_put(s->res, &e->color);
+    s->p_kids_set = 1;
+    s->p_nkid = e->nkid;
+    memcpy(s->p_kid_id, e->kid_id, sizeof e->kid_id);
+    memcpy(s->p_kid_x, e->kid_x, sizeof e->kid_x);
+    memcpy(s->p_kid_y, e->kid_y, sizeof e->kid_y);
+}
+
+/* A commit that will never be applied (its surface is gone): its callbacks are dropped, its presentation feedback
+ * discarded, and its release point signalled (the app may wait on it) */
+static void pend_free(Pend *e) {
+    if (e->buf) wl_list_remove(&e->buf_destroy.link);
+    struct wl_resource *cb, *tmp;
+    wl_resource_for_each_safe(cb, tmp, &e->frames) wl_resource_destroy(cb);
+    wl_resource_for_each_safe(cb, tmp, &e->feedback) { wp_presentation_feedback_send_discarded(cb); wl_resource_destroy(cb); }
+    wlicon_unref(e->icon);
+    wlrgn_free(&e->input);
+    sobj_unref(e->acq.tl);
+    sobj_release(&e->rel);
+    wlcolor_pend_free(&e->color);
+    free(e);
+}
+
+static void surface_apply(Surf *s);
+static const char *app_of_client(struct wl_client *cl);
+
+/* the eventfds every connection of k's process holds (one app can't take the session's share through many sockets) */
+static int sobj_process_waits(const SobjClient *k) {
+    int n = 0;
+    const SobjClient *o;
+    wl_list_for_each(o, &sobj_clients, link) if (o->pid == k->pid) n += o->waits;
+    return n;
+}
+
+/* Surfaces whose first queued commit waits by polling (the session's eventfds are taken): at most SOBJ_MAX_POLLS, all
+ * checked by one timer every SOBJ_POLL_MS. Each counts as one of its client's waits, like an eventfd. */
+static Surf *sobj_polls[SOBJ_MAX_POLLS];
+static int sobj_npolls;
+static struct wl_event_source *sobj_poll_timer;
+
+static void sq_disarm(Surf *s) {
+    if (s->sq_polling) {
+        for (int i = 0; i < sobj_npolls; i++)
+            if (sobj_polls[i] == s) { sobj_polls[i] = sobj_polls[--sobj_npolls]; break; }
+        s->sq_polling = 0;
+        SobjClient *k = sobj_client_find(s->client);
+        if (k) k->waits--;
+    }
+    if (s->sq_src) {
+        wl_event_source_remove(s->sq_src);
+        s->sq_src = NULL;
+        close(s->sq_fd);
+        s->sq_fd = -1;
+        sobj_waits--;
+        SobjClient *k = sobj_client_find(s->client);
+        if (k) k->waits--;
+    }
+    if (s->sq_timer) wl_event_source_timer_update(s->sq_timer, 0);
+}
+
+static void sq_drain(Surf *s);
+static void sq_drain_at(Surf *s, uint64_t present);
+static int sq_ready(int fd, uint32_t mask, void *data) {
+    (void)fd; (void)mask;
+    Surf *s = data;
+    sq_disarm(s);
+    sq_drain(s);
+    return 0;
+}
+
+/* a frame that waits 5 s: logged once per surface; it keeps waiting (the protocol has no timeout) */
+static int sq_slow(void *data) {
+    Surf *s = data;
+    if (s->sq.n && !s->sq_logged) {
+        s->sq_logged = 1;
+        fprintf(stderr, "wayland: %s: a frame waits for its acquire point for %d s\n",
+                s->app_id[0] ? s->app_id : app_of_client(s->client), SOBJ_WAIT_LOG_MS / 1000);
+    }
+    return 0;
+}
+
+/* the shared timer: every polling surface's point checked once (a bounded batch: at most SOBJ_MAX_POLLS, without
+ * blocking); the ready ones are applied, and it is re-armed while any still wait */
+static int sobj_polled(void *data) {
+    (void)data;
+    Surf *ready[SOBJ_MAX_POLLS];
+    int n = 0;
+    for (int i = 0; i < sobj_npolls; i++) {
+        Pend *e = sobjq_front(&sobj_polls[i]->sq);
+        if (!e || !e->acq.tl || sobj_signalled(e->acq) == 1) ready[n++] = sobj_polls[i];
+    }
+    for (int i = 0; i < n; i++) {           /* (applying never destroys a surface; it may queue one again) */
+        sq_disarm(ready[i]);
+        sq_drain(ready[i]);
+    }
+    if (sobj_npolls && sobj_poll_timer) wl_event_source_timer_update(sobj_poll_timer, SOBJ_POLL_MS);
+    return 0;
+}
+
+/* Waits for the first queued commit's acquire point: 0 armed (an eventfd, or a timer when the session's eventfds are
+ * taken), -1 the kernel refused (it is applied as it is), -2 past this client's (or its process's) own share: only
+ * then is the client disconnected, never for what other clients hold */
+static int sq_arm(Surf *s, Pend *e) {
+    SobjClient *k = sobj_client(s->client);
+    if (!k) return -2;
+    int mode = sobj_wait_mode(k->waits, sobj_waits >= SOBJ_MAX_WAITS ? sobj_process_waits(k) : 0, sobj_waits);
+    if (mode == SOBJ_WAIT_REFUSE) return -2;
+    if (mode == SOBJ_WAIT_POLL) {
+        /* the session's polls are taken too (many processes, each within its share): applied as it is, as when the
+         * kernel refuses an eventfd; never a disconnection for what others hold */
+        if (sobj_npolls >= SOBJ_MAX_POLLS) return -1;
+        if (!sobj_poll_timer && !(sobj_poll_timer = wl_event_loop_add_timer(loop, sobj_polled, NULL))) return -1;
+        if (!sobj_npolls) wl_event_source_timer_update(sobj_poll_timer, SOBJ_POLL_MS);
+        sobj_polls[sobj_npolls++] = s;
+        s->sq_polling = 1;
+        k->waits++;
+        static int told;
+        if (!told++) fprintf(stderr, "wayland: explicit sync: the session's %d waits are taken; a frame's point is checked every %d ms\n",
+                             SOBJ_MAX_WAITS, SOBJ_POLL_MS);
+        if (!s->sq_logged) {
+            if (!s->sq_timer) s->sq_timer = wl_event_loop_add_timer(loop, sq_slow, s);
+            if (s->sq_timer) wl_event_source_timer_update(s->sq_timer, SOBJ_WAIT_LOG_MS);
+        }
+        return 0;
+    }
+    int fd = sobj_eventfd(e->acq);
+    if (fd < 0) return -1;
+    s->sq_src = wl_event_loop_add_fd(loop, fd, WL_EVENT_READABLE, sq_ready, s);
+    if (!s->sq_src) { close(fd); return -1; }
+    s->sq_fd = fd;
+    k->waits++;
+    sobj_waits++;
+    if (!s->sq_logged) {
+        if (!s->sq_timer) s->sq_timer = wl_event_loop_add_timer(loop, sq_slow, s);
+        if (s->sq_timer) wl_event_source_timer_update(s->sq_timer, SOBJ_WAIT_LOG_MS);
+    }
+    return 0;
+}
+
+/* A queued commit applied: the state pending now (later requests of the app) is set aside around it */
+static void sq_apply(Surf *s, Pend *e) {
+    Pend live;
+    pend_take(s, &live);
+    pend_put(s, e);
+    surface_apply(s);
+    pend_put(s, &live);
+    s->p_kids_set = 0;                          /* the places set since are the children's own (p_sx), live */
+    free(e);
+}
+
+/* Applies the queued commits, in order, while the first is ready: its acquire point signalled (else it is armed and
+ * waits), then its fifo barrier down and its target time come (else a latch, a frame done or the loop's timer brings it
+ * back, timing.h). present: when a frame latched now is shown (0: not at a latch, now). */
+static void timing_applied(Surf *s, const WltUpdate *u);
+static int timing_ready(Surf *s, const WltUpdate *u, uint64_t present);
+static uint64_t mono_now(void);
+static int timing_kick;                 /* held updates applied outside a client's request: the loop must look again */
+static void sq_drain_at(Surf *s, uint64_t present) {
+    Pend *e;
+    while (!s->sq_src && !s->sq_polling && (e = sobjq_front(&s->sq))) {
+        if (e->acq.tl && sobj_signalled(e->acq) != 1) {
+            int r = sq_arm(s, e);
+            if (r == 0) return;
+            if (r == -2) { wl_client_post_no_memory(s->client); return; }
+            static int told;
+            if (!told++) fprintf(stderr, "wayland: explicit sync: could not wait for an acquire point; applied as it is\n");
+            sobj_unref(e->acq.tl);          /* (not tried again) */
+            e->acq.tl = NULL;
+        }
+        if (!present) present = mono_now();
+        if (!timing_ready(s, &e->tu, present)) return;
+        sobjq_pop(&s->sq);
+        WltUpdate tu = e->tu;
+        sq_apply(s, e);
+        timing_applied(s, &tu);
+        timing_kick = 1;
+    }
+}
+static void sq_drain(Surf *s) { sq_drain_at(s, 0); }
+
+/* The surface goes: its waiting commits are dropped (their release points signalled), its points forgotten */
+static void sobj_surface_gone(Surf *s) {
+    sq_disarm(s);
+    if (s->sq_timer) { wl_event_source_remove(s->sq_timer); s->sq_timer = NULL; }
+    Pend *e;
+    while ((e = sobjq_pop(&s->sq))) pend_free(e);
+    sobj_unref(s->p_acq.tl);
+    sobj_unref(s->p_rel.tl);
+    s->p_acq.tl = s->p_rel.tl = NULL;
+    if (s->sobj) {
+        wl_resource_set_user_data(s->sobj, NULL);
+        SobjClient *k = sobj_client_find(s->client);
+        if (k) k->surfaces--;
+        s->sobj = NULL;
+    }
+}
+
+/* syncobj.h's verdict as the protocol's own error code (named, not assumed equal) */
+static uint32_t sobj_wl_error(int err) {
+    switch (err) {
+    case SOBJ_ERR_UNSUPPORTED_BUFFER: return WP_LINUX_DRM_SYNCOBJ_SURFACE_V1_ERROR_UNSUPPORTED_BUFFER;
+    case SOBJ_ERR_NO_BUFFER: return WP_LINUX_DRM_SYNCOBJ_SURFACE_V1_ERROR_NO_BUFFER;
+    case SOBJ_ERR_NO_ACQUIRE_POINT: return WP_LINUX_DRM_SYNCOBJ_SURFACE_V1_ERROR_NO_ACQUIRE_POINT;
+    case SOBJ_ERR_NO_RELEASE_POINT: return WP_LINUX_DRM_SYNCOBJ_SURFACE_V1_ERROR_NO_RELEASE_POINT;
+    case SOBJ_ERR_CONFLICTING_POINTS: return WP_LINUX_DRM_SYNCOBJ_SURFACE_V1_ERROR_CONFLICTING_POINTS;
+    default: return WP_LINUX_DRM_SYNCOBJ_SURFACE_V1_ERROR_NO_SURFACE;
+    }
+}
+static const char *sobj_err_text(int err) {
+    switch (err) {
+    case SOBJ_ERR_UNSUPPORTED_BUFFER: return "the buffer is not a dmabuf";
+    case SOBJ_ERR_NO_BUFFER: return "timeline points set with no buffer attached";
+    case SOBJ_ERR_NO_ACQUIRE_POINT: return "a buffer attached with no acquire point";
+    case SOBJ_ERR_NO_RELEASE_POINT: return "a buffer attached with no release point";
+    case SOBJ_ERR_CONFLICTING_POINTS: return "the acquire point is not below the release point on the same timeline";
+    default: return "explicit sync error";
+    }
+}
+
+/* wp_linux_drm_syncobj_timeline_v1 */
+static void sobjt_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct wp_linux_drm_syncobj_timeline_v1_interface sobjt_impl = { .destroy = sobjt_destroy };
+static void sobjt_gone(struct wl_resource *r) {
+    sobj_unref(wl_resource_get_user_data(r));           /* points still pending keep their own reference */
+    SobjClient *k = sobj_client_find(wl_resource_get_client(r));
+    if (k) k->timelines--;
+}
+
+/* wp_linux_drm_syncobj_surface_v1 */
+static void sobjs_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void sobjs_point(struct wl_resource *r, struct wl_resource *timeline, uint32_t hi, uint32_t lo, int release) {
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s) { wl_resource_post_error(r, WP_LINUX_DRM_SYNCOBJ_SURFACE_V1_ERROR_NO_SURFACE, "the wl_surface is gone"); return; }
+    SobjPoint *p = release ? &s->p_rel : &s->p_acq;
+    sobj_unref(p->tl);
+    p->tl = sobj_ref(wl_resource_get_user_data(timeline));
+    p->point = sobj_point(hi, lo);
+}
+static void sobjs_acquire(struct wl_client *c, struct wl_resource *r, struct wl_resource *t, uint32_t hi, uint32_t lo) {
     (void)c;
+    sobjs_point(r, t, hi, lo, 0);
+}
+static void sobjs_release(struct wl_client *c, struct wl_resource *r, struct wl_resource *t, uint32_t hi, uint32_t lo) {
+    (void)c;
+    sobjs_point(r, t, hi, lo, 1);
+}
+static const struct wp_linux_drm_syncobj_surface_v1_interface sobjs_impl = {
+    .destroy = sobjs_destroy, .set_acquire_point = sobjs_acquire, .set_release_point = sobjs_release,
+};
+/* the object goes: points set since the last commit are dropped; commits already made keep theirs (and still wait) */
+static void sobjs_gone(struct wl_resource *r) {
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s || s->sobj != r) return;
+    s->sobj = NULL;
+    sobj_unref(s->p_acq.tl);
+    sobj_unref(s->p_rel.tl);
+    s->p_acq.tl = s->p_rel.tl = NULL;
+    SobjClient *k = sobj_client_find(s->client);
+    if (k) k->surfaces--;
+}
+
+/* wp_linux_drm_syncobj_manager_v1 */
+static void sobjm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void sobjm_get_surface(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface) {
+    Surf *s = wl_resource_get_user_data(surface);
+    if (s->sobj) {
+        wl_resource_post_error(r, WP_LINUX_DRM_SYNCOBJ_MANAGER_V1_ERROR_SURFACE_EXISTS, "the wl_surface has a syncobj object");
+        return;
+    }
+    SobjClient *k = sobj_client(c);
+    if (!k || k->surfaces >= SOBJ_MAX_SURFACES) { wl_client_post_no_memory(c); return; }
+    struct wl_resource *o = wl_resource_create(c, &wp_linux_drm_syncobj_surface_v1_interface, wl_resource_get_version(r), id);
+    if (!o) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(o, &sobjs_impl, s, sobjs_gone);
+    s->sobj = o;
+    k->surfaces++;
+}
+static void sobjm_import(struct wl_client *c, struct wl_resource *r, uint32_t id, int32_t fd) {
+    SobjClient *k = sobj_client(c);
+    if (!k || k->timelines >= SOBJ_MAX_TIMELINES) { close(fd); wl_client_post_no_memory(c); return; }
+    SobjTimeline *t = sobj_import(fd);
+    close(fd);
+    if (!t) { wl_resource_post_error(r, WP_LINUX_DRM_SYNCOBJ_MANAGER_V1_ERROR_INVALID_TIMELINE, "not a DRM syncobj"); return; }
+    struct wl_resource *o = wl_resource_create(c, &wp_linux_drm_syncobj_timeline_v1_interface, wl_resource_get_version(r), id);
+    if (!o) { sobj_unref(t); wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(o, &sobjt_impl, t, sobjt_gone);
+    k->timelines++;
+}
+static const struct wp_linux_drm_syncobj_manager_v1_interface sobjm_impl = {
+    .destroy = sobjm_destroy, .get_surface = sobjm_get_surface, .import_timeline = sobjm_import,
+};
+static void bind_sobjm(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &wp_linux_drm_syncobj_manager_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &sobjm_impl, NULL, NULL);
+}
+
+/* wl_surface.commit: with explicit sync, the protocol's rules first; then applied now, or queued while its acquire
+ * point, its fifo barrier or its target time (timing.h), or an earlier commit, isn't there yet (order). */
+static uint64_t timing_present(Surf *s, uint64_t now);
+
+/* A buffer's size in pixels (0: unknown kind) */
+static int buffer_size(struct wl_resource *buf, int *w, int *h) {
+    struct wl_shm_buffer *b = buf ? wl_shm_buffer_get(buf) : NULL;
+    const Dmabuf *d = b ? NULL : dmabuf_of(buf);
+    if (b) { *w = wl_shm_buffer_get_width(b); *h = wl_shm_buffer_get_height(b); return 1; }
+    if (d) { *w = d->d.width; *h = d->d.height; return 1; }
+    if (spb_of(buf)) { *w = *h = 1; return 1; }
+    return 0;
+}
+
+/* The rules a commit must keep before anything of it is applied (a broken one is a protocol error, as the
+ * specifications say; the client is disconnected and nothing else is touched). Xwayland is lord-server's own
+ * client and keeps its own size rules (its viewport is the X server's scaling). 1 when it may go on. */
+static int commit_ok(Surf *s) {
+    int has_buf = s->p_attached && s->p_buf, bw = 0, bh = 0;
+    int known = has_buf && buffer_size(s->p_buf, &bw, &bh);
+    int tf = s->p_tf;
+    if (!has_buf && s->content) {           /* the current buffer, upright (shared memory is kept turned already) */
+        known = 1;
+        bw = s->w; bh = s->h;
+        tf = surf_tex_tf(s);
+    }
+    int vp = s->viewport != NULL;
+    float sw = vp ? (s->p_vp ? s->p_vsw : s->vsw) : -1, sh = vp ? (s->p_vp ? s->p_vsh : s->vsh) : -1;
+    float sx = vp ? (s->p_vp ? s->p_vsx : s->vsx) : 0, sy = vp ? (s->p_vp ? s->p_vsy : s->vsy) : 0;
+    int dw = vp ? (s->p_vp ? s->p_vdw : s->vdw) : 0;
+    if (s->client != xwl_client) {
+        /* wl_surface.attach: a buffer whose size isn't a multiple of the scale (not for cursors and drag icons, whose
+         * hotspot rules come first, as wlroots; nor with a viewport destination, which sets the size) */
+        int sc = s->p_bscale > 0 ? s->p_bscale : 1;
+        if (has_buf && known && sc > 1 && dw <= 0 && s->role != R_CURSOR && s->role != R_DNDICON && (bw % sc || bh % sc)) {
+            wl_resource_post_error(s->res, WL_SURFACE_ERROR_INVALID_SIZE, "buffer %dx%d is not a multiple of the scale %d", bw, bh, sc);
+            return 0;
+        }
+        /* wp_viewport: a source size that isn't whole needs a destination (bad_size); the source must be inside the
+         * buffer (out_of_buffer), both when the state is applied with a buffer */
+        if (vp && sw > 0 && sh > 0 && (has_buf || s->content)) {
+            if (dw <= 0 && (sw != (float)(int)sw || sh != (float)(int)sh)) {
+                wl_resource_post_error(s->viewport, WP_VIEWPORT_ERROR_BAD_SIZE, "source size %.2fx%.2f is not whole and there is no destination", sw, sh);
+                return 0;
+            }
+            if (known) {
+                int uw = (tf & 1) ? bh : bw, uh = (tf & 1) ? bw : bh;
+                float lw = (float)uw / (float)sc, lh = (float)uh / (float)sc;
+                if (sx + sw > lw + 0.001f || sy + sh > lh + 0.001f) {
+                    wl_resource_post_error(s->viewport, WP_VIEWPORT_ERROR_OUT_OF_BUFFER, "source rectangle %.2f,%.2f %.2fx%.2f is outside the buffer (%.2fx%.2f)",
+                                           sx, sy, sw, sh, lw, lh);
+                    return 0;
+                }
+            }
+        }
+    }
+    /* xdg-shell: no buffer before the first configure is acked */
+    if (has_buf && s->xdg && (s->top || s->popup) && !s->xdg_acked) {
+        wl_resource_post_error(s->xdg, XDG_SURFACE_ERROR_UNCONFIGURED_BUFFER, "a buffer was attached before the first configure was acked");
+        return 0;
+    }
+    /* xdg_toplevel: a maximum size below the minimum one */
+    if (s->top && s->limits_check) {
+        s->limits_check = 0;
+        if ((s->max_w > 0 && s->max_w < s->min_w) || (s->max_h > 0 && s->max_h < s->min_h)) {
+            wl_resource_post_error(s->top, XDG_TOPLEVEL_ERROR_INVALID_SIZE, "maximum size %dx%d is below the minimum %dx%d", s->max_w, s->max_h, s->min_w, s->min_h);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (keylag_enabled && key_focus && c == key_focus->client) keylag_commit();
+    if (!commit_ok(s)) return;
+    if (s->sobj) {
+        int err = sobj_commit_error(s->p_attached, s->p_buf != NULL, dmabuf_of(s->p_buf) != NULL, s->p_acq.tl != NULL,
+                                    s->p_rel.tl != NULL, s->p_acq.tl && s->p_acq.tl == s->p_rel.tl, s->p_acq.point, s->p_rel.point);
+        if (err) { wl_resource_post_error(s->sobj, sobj_wl_error(err), "%s", sobj_err_text(err)); return; }
+    }
+    WltUpdate tu = s->tm ? wlt_take(s->tm) : (WltUpdate){ 0 };
+    int act = sobj_commit_action(s->sq.n > 0, s->p_acq.tl != NULL, s->p_acq.tl ? sobj_signalled(s->p_acq) == 1 : 1);
+    if (act == SOBJ_APPLY && timing_ready(s, &tu, timing_present(s, mono_now()))) {
+        surface_apply(s);
+        timing_applied(s, &tu);
+        return;
+    }
+    /* full: while the first waits only for its barrier or its time, it goes now (fifo and commit timing never cost a
+     * client its connection); one waiting for its acquire point keeps explicit sync's limit */
+    while (s->sq.n >= SOBJ_MAX_PENDING && s->tm && !s->sq_src && !s->sq_polling) {
+        Pend *f = sobjq_front(&s->sq);
+        if (f->acq.tl && sobj_signalled(f->acq) != 1) break;
+        int n = s->sq.n;
+        s->tm->barrier = 0;
+        f->tu.has_target = f->tu.wait_barrier = 0;
+        sq_drain(s);
+        if (s->sq.n == n) break;
+    }
+    Pend *e = calloc(1, sizeof *e);
+    if (!e) { wl_client_post_no_memory(c); return; }
+    pend_take(s, e);
+    e->tu = tu;
+    if (sobjq_push(&s->sq, e)) { pend_free(e); wl_client_post_no_memory(c); return; }
+    if (s->sq.n == 1) sq_drain(s);
+}
+
+/* A commit's state becomes current (at wl_surface.commit, or later once its acquire point is signalled) */
+static void surface_apply(Surf *s) {
     s->tf = s->p_tf;
+    sobj_unref(s->p_acq.tl);                    /* waited for */
+    s->p_acq.tl = NULL;
+    /* color-management-v1 and color-representation-v1 (wlcolor.h): a new conversion converts all of the next buffer */
+    int cc = wlcolor_commit(s->res, s->p_attached ? s->p_buf != NULL : s->content);
+    if (cc < 0) return;
+    if (cc > 0 && s->p_attached) { free(s->px); s->px = NULL; }
     if (s->p_attached) {
-        take_buffer(s, s->p_buf, commit_damage(s, s->p_buf));
+        take_buffer(s, s->p_buf, commit_damage(s, s->p_buf), &s->p_rel);
         if (s->p_buf) { wl_list_remove(&s->p_buf_destroy.link); wl_list_init(&s->p_buf_destroy.link); }
         s->p_buf = NULL;
         s->p_attached = 0;
     }
     else if (s->p_ds_on || s->p_db_on) s->dmg_full = 1;     /* damage with no new buffer: shown again as it is */
     else { s->dmg_full = 0; s->dmg = (BufBox){ 0, 0, 0, 0 }; }  /* a commit of state only */
+    sobj_release(&s->p_rel);                    /* (none left: take_buffer took it, or no buffer had one) */
     s->p_ds_on = s->p_db_on = 0;
     if (s->p_alpha != s->alpha) { s->alpha = s->p_alpha; s->dmg_full = 1; }   /* a new opacity: all of it again */
     if (s->p_icon_set) {                        /* xdg_toplevel_icon_manager_v1.set_icon, double-buffered */
@@ -1028,7 +1777,20 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
         s->has_geom = 1;
         s->p_geom = 0;
     }
-    if (s->role == R_SUB) { s->sx = s->p_sx; s->sy = s->p_sy; }
+    wlshell_commit(s->id);              /* double-buffered state of the shell extras (a blur region) */
+    cons_commit(s);                     /* zwp_locked_pointer_v1 / zwp_confined_pointer_v1.set_region */
+    /* wl_subsurface.set_position takes effect when the parent's commit is applied (a held one brings the places it was
+     * committed with, Pend.kids); a subsurface's own commit doesn't move it */
+    for (int i = 0; i < s->nkids; i++) {
+        Surf *k = s->kids[i];
+        if (k->role != R_SUB) continue;
+        int x = k->p_sx, y = k->p_sy, known = !s->p_kids_set;
+        for (int j = 0; s->p_kids_set && j < s->p_nkid; j++)
+            if (s->p_kid_id[j] == k->id) { x = s->p_kid_x[j]; y = s->p_kid_y[j]; known = 1; break; }
+        if (known && (k->sx != x || k->sy != y)) { k->sx = x; k->sy = y; damage_sub(k, 1); }
+    }
+    s->p_kids_set = 0;
+    kids_restack(s);                    /* wl_subsurface.place_above/place_below */
     surface_commit_role(s);
 }
 
@@ -1260,6 +2022,8 @@ static void dnd_surface_gone(Surf *s);
 static void kbi_surface_gone(struct wl_resource *ksi);
 static void surface_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
+    wlt_gone(s->tm);                    /* (its held updates go with explicit sync's queue: sobj_surface_gone) */
+    s->tm = NULL;
     if (s->xw) { xwm_surface_gone(s->xw); s->xw = NULL; }
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
     if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
@@ -1272,8 +2036,8 @@ static void surface_gone(struct wl_resource *r) {
     if (s->ksi) kbi_surface_gone(s->ksi);
     if (s->parent) {
         Surf *p = s->parent;
-        for (int i = 0; i < p->nkids; i++) if (p->kids[i] == s) { p->kids[i] = p->kids[--p->nkids]; break; }
-        damage_node(p);
+        if (s->role == R_SUB) damage_sub(s, 1); else damage_node(p);
+        kid_remove(p, s);
     }
     for (int i = 0; i < s->nkids; i++) s->kids[i]->parent = NULL;
     for (int i = 0; i < MAX_SURF; i++) {
@@ -1293,6 +2057,7 @@ static void surface_gone(struct wl_resource *r) {
     if (s->am) wl_resource_set_user_data(s->am, NULL);
     wlicon_unref(s->p_icon);
     wlicon_unref(s->icon);
+    free(s->pos);
     if (s->kde) wl_resource_set_user_data(s->kde, NULL);
     if (s->deco) wl_resource_set_user_data(s->deco, NULL);
     /* a client may destroy the wl_surface before its role objects: they must not keep the freed Surf, or set_parent,
@@ -1305,7 +2070,9 @@ static void surface_gone(struct wl_resource *r) {
     if (cursor_surf == s) { cursor_surf = NULL; cursor_mode = 0; cursor_gen++; }
     if (constraint && constraint->surf == s) { constraint->surf = NULL; constraint->active = 0; }
     constraint_update();                /* s may have been the window with the keyboard */
-    if (s->dmabuf) queue_release(s->dmabuf);
+    if (s->dmabuf) queue_release(s->dmabuf, &s->rel);
+    else sobj_release(&s->rel);
+    sobj_surface_gone(s);
     gpu_tex_free(s->tex);
     wlrgn_free(&s->input);
     wlrgn_free(&s->p_input);
@@ -1347,6 +2114,7 @@ static void comp_create_surface(struct wl_client *c, struct wl_resource *r, uint
     s->bscale = s->p_bscale = 1;
     s->fslot = -1;
     s->p_alpha = s->alpha = UINT32_MAX;
+    s->sq_fd = -1;
     surfs[slot] = s;
     wl_resource_set_implementation(res, &surface_impl, s, surface_gone);
     if (c == xwl_client) xwm_surface_created(id);   /* WL_SURFACE_ID may have come first */
@@ -1378,11 +2146,73 @@ static void sub_position(struct wl_client *c, struct wl_resource *r, int32_t x, 
     Surf *s = wl_resource_get_user_data(r);
     if (s) { s->p_sx = x; s->p_sy = y; }
 }
-static void sub_place(struct wl_client *c, struct wl_resource *r, struct wl_resource *sibling) { (void)c; (void)r; (void)sibling; }
-static void sub_sync(struct wl_client *c, struct wl_resource *r) { (void)c; (void)r; }
+/* Removes k from p's children, keeping the order (and how many are under p) */
+static void kid_remove(Surf *p, Surf *k) {
+    for (int i = 0; i < p->nkids; i++)
+        if (p->kids[i] == k) {
+            if (i < p->nbelow) p->nbelow--;
+            memmove(p->kids + i, p->kids + i + 1, sizeof *p->kids * (size_t)(p->nkids - i - 1));
+            p->nkids--;
+            return;
+        }
+}
+/* wl_subsurface.place_above/place_below: the reference must be the parent or a sibling, never the subsurface itself
+ * (bad_surface). The order is pending until the parent's commit (surface_apply → kids_restack): p_z lists the
+ * stack bottom first by surface id, the parent's own id among them. */
+static void sub_place(struct wl_resource *r, struct wl_resource *sibling, int above) {
+    Surf *s = wl_resource_get_user_data(r), *o = sibling ? wl_resource_get_user_data(sibling) : NULL;
+    if (!s || !s->parent) return;                   /* inert: its wl_surface or its parent is gone */
+    Surf *p = s->parent;
+    if (!o || o == s || (o != p && (o->parent != p || o->role != R_SUB))) {
+        wl_resource_post_error(r, WL_SUBSURFACE_ERROR_BAD_SURFACE, "the reference surface is neither the parent nor a sibling");
+        return;
+    }
+    if (!p->p_zn) {                                  /* the pending order starts from the current one */
+        for (int i = 0; i < p->nbelow; i++) p->p_z[p->p_zn++] = p->kids[i]->id;
+        p->p_z[p->p_zn++] = p->id;
+        for (int i = p->nbelow; i < p->nkids; i++) p->p_z[p->p_zn++] = p->kids[i]->id;
+    }
+    int n = 0;
+    for (int i = 0; i < p->p_zn; i++) if (p->p_z[i] != s->id) p->p_z[n++] = p->p_z[i];
+    if (n == p->p_zn) {                              /* a new one not yet in the pending order: on top */
+        if (n >= (int)(sizeof p->p_z / sizeof p->p_z[0])) return;
+    }
+    p->p_zn = n;
+    int at = n;
+    for (int i = 0; i < n; i++) if (p->p_z[i] == o->id) { at = above ? i + 1 : i; break; }
+    memmove(p->p_z + at + 1, p->p_z + at, sizeof p->p_z[0] * (size_t)(n - at));
+    p->p_z[at] = s->id;
+    p->p_zn++;
+}
+static void sub_above(struct wl_client *c, struct wl_resource *r, struct wl_resource *sibling) { (void)c; sub_place(r, sibling, 1); }
+static void sub_below(struct wl_client *c, struct wl_resource *r, struct wl_resource *sibling) { (void)c; sub_place(r, sibling, 0); }
+/* The pending order applied (the parent's commit): children not in it (new since) stay on top in their order */
+static void kids_restack(Surf *p) {
+    if (!p->p_zn) return;
+    Surf *order[16];
+    int n = 0, below = -1;
+    for (int i = 0; i < p->p_zn; i++) {
+        if (p->p_z[i] == p->id) { below = n; continue; }
+        for (int j = 0; j < p->nkids; j++)
+            if (p->kids[j]->id == p->p_z[i]) { int dup = 0; for (int k = 0; k < n; k++) dup |= order[k] == p->kids[j]; if (!dup && n < 16) order[n++] = p->kids[j]; break; }
+    }
+    for (int j = 0; j < p->nkids; j++) {
+        int in = 0;
+        for (int k = 0; k < n; k++) in |= order[k] == p->kids[j];
+        if (!in && n < 16) order[n++] = p->kids[j];
+    }
+    p->p_zn = 0;
+    if (n != p->nkids) return;                      /* (never: every child is placed once) */
+    memcpy(p->kids, order, sizeof *order * (size_t)n);
+    p->nbelow = below < 0 ? 0 : below;
+    for (int i = 0; i < n; i++) damage_sub(p->kids[i], 1);
+}
+/* (its commits apply as a desynchronized one's; the mode only tells fifo-v1 to ignore wait_barrier, timing.h) */
+static void sub_sync(struct wl_client *c, struct wl_resource *r) { (void)c; Surf *s = wl_resource_get_user_data(r); if (s) s->sub_sync = 1; }
+static void sub_desync(struct wl_client *c, struct wl_resource *r) { (void)c; Surf *s = wl_resource_get_user_data(r); if (s) s->sub_sync = 0; }
 static const struct wl_subsurface_interface subsurface_impl = {
-    .destroy = sub_destroy, .set_position = sub_position, .place_above = sub_place, .place_below = sub_place,
-    .set_sync = sub_sync, .set_desync = sub_sync,
+    .destroy = sub_destroy, .set_position = sub_position, .place_above = sub_above, .place_below = sub_below,
+    .set_sync = sub_sync, .set_desync = sub_desync,
 };
 
 static void sub_gone(struct wl_resource *r) {
@@ -1390,20 +2220,61 @@ static void sub_gone(struct wl_resource *r) {
     if (!s) return;
     if (s->parent) {
         Surf *p = s->parent;
-        for (int i = 0; i < p->nkids; i++) if (p->kids[i] == s) { p->kids[i] = p->kids[--p->nkids]; break; }
-        damage_node(p);
+        damage_sub(s, 1);                   /* unmapped at once: the window under it, before it is unlinked */
+        kid_remove(p, s);
     }
     s->parent = NULL;
     s->sub = NULL;
     s->role = R_NONE;
 }
 
+/* 1 if s is a or one of a's parents (a subsurface's or a menu's). A surface made a child of itself or of its own
+ * descendant would close a cycle, and the walks of the tree (origin, damage_node, paint_tree, surface_at) would
+ * recurse or loop for ever: the requests that set a parent refuse it. A chain longer than MAX_SURF is a cycle. */
+static int surf_in_chain(const Surf *a, const Surf *s) {
+    for (int n = 0; a && n <= MAX_SURF; n++, a = a->parent) if (a == s) return 1;
+    return a != NULL;
+}
+
+/* 1 if to can be reached from `from` along the edges the walks follow downwards: a surface's subsurfaces (kids[],
+ * paint_tree, surface_at, ...) and its menus (popups whose parent it is, origin). Linking to as from's child (or
+ * menu) would close a cycle when it is reached already. Every surface is visited once at most. */
+static int surf_reaches(Surf *from, const Surf *to) {
+    Surf *stack[MAX_SURF + 1], *seen[MAX_SURF + 1];
+    int ns = 0, nseen = 0;
+    stack[ns++] = from;
+    while (ns) {
+        Surf *a = stack[--ns];
+        if (a == to) return 1;
+        int dup = 0;
+        for (int i = 0; i < nseen && !dup; i++) dup = seen[i] == a;
+        if (dup) continue;
+        if (nseen > MAX_SURF) return 1;             /* more than every surface: a cycle already */
+        seen[nseen++] = a;
+        for (int i = 0; i < a->nkids; i++) { if (ns > MAX_SURF) return 1; stack[ns++] = a->kids[i]; }
+        for (int i = 0; i < MAX_SURF; i++)
+            if (surfs[i] && surfs[i] != a && surfs[i]->parent == a && surfs[i]->role == R_POPUP) {
+                if (ns > MAX_SURF) return 1;                /* more edges than surfaces: a cycle already */
+                stack[ns++] = surfs[i];
+            }
+    }
+    return 0;
+}
+
 static void subc_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void subc_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, struct wl_resource *parent) {
     Surf *s = wl_resource_get_user_data(surface), *p = wl_resource_get_user_data(parent);
-    /* one wl_subsurface per wl_surface, and not for a surface that has another role (cursor, drag icon) */
-    if (s->sub || s->role == R_CURSOR || s->role == R_DNDICON || s == p) {
+    if (!s || !p) { wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE, "the wl_surface is gone"); return; }
+    /* one wl_subsurface per wl_surface, and not for a surface that has another role (window, menu, cursor, drag icon) or
+     * an xdg_surface that may take one: a subsurface that became a menu too was linked twice (kids[] and parent) */
+    if (s->sub || s->xdg || s->top || s->popup || s->role == R_TOPLEVEL || s->role == R_POPUP || s->role == R_CURSOR ||
+        s->role == R_DNDICON) {
         wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE, "the wl_surface already has a role");
+        return;
+    }
+    /* wayland.xml: the parent may be neither the surface itself nor one of its descendants */
+    if (surf_in_chain(p, s) || surf_reaches(s, p)) {
+        wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_PARENT, "the parent is the surface itself or one of its descendants");
         return;
     }
     struct wl_resource *res = wl_resource_create(c, &wl_subsurface_interface, wl_resource_get_version(r), id);
@@ -1411,6 +2282,7 @@ static void subc_get(struct wl_client *c, struct wl_resource *r, uint32_t id, st
     wl_resource_set_implementation(res, &subsurface_impl, s, sub_gone);
     s->role = R_SUB;
     s->sub = res;
+    s->sub_sync = 1;
     s->parent = p;
     if (p->nkids < 16) p->kids[p->nkids++] = s;
 }
@@ -1652,8 +2524,10 @@ void wl_set_outputs(const WlOutput *list, int n, int main) {
             wl_list_init(&o->res);
             wl_list_init(&o->xdg);
             o->global = wl_global_create(dpy, &wl_output_interface, 4, (void *)(intptr_t)(slot + 1), bind_output);
+            wlcolor_set_output(slot, o->o.chroma);
             continue;
         }
+        wlcolor_set_output(slot, o->o.chroma);      /* image_description_changed, before the done below */
         struct wl_resource *r;
         wl_resource_for_each(r, &o->res) send_output(r, &o->o);
         wl_resource_for_each(r, &o->xdg) send_xdg_output(r, &o->o);
@@ -1662,6 +2536,7 @@ void wl_set_outputs(const WlOutput *list, int n, int main) {
     for (int i = 0; i < OUT_MAX; i++) {
         if (!oslots[i].used || keep[i]) continue;
         surface_leave_slot(i);
+        wlcolor_output_gone(i);
         struct wl_resource *r, *t;
         wl_resource_for_each_safe(r, t, &oslots[i].res) { wl_resource_set_user_data(r, NULL); wl_list_remove(wl_resource_get_link(r)); wl_list_init(wl_resource_get_link(r)); }
         wl_resource_for_each_safe(r, t, &oslots[i].xdg) { wl_resource_set_user_data(r, NULL); wl_list_remove(wl_resource_get_link(r)); wl_list_init(wl_resource_get_link(r)); }
@@ -1691,7 +2566,11 @@ static void set_pref_scale(Surf *s, int pct) {
     if (s->pref_scale == pct) return;
     s->pref_scale = pct;
     if (s->frac) wp_fractional_scale_v1_send_preferred_scale(s->frac, (uint32_t)(pct * 120 / 100));
-    if (wl_resource_get_version(s->res) >= 6) wl_surface_send_preferred_buffer_scale(s->res, int_scale(pct));
+    if (wl_resource_get_version(s->res) >= 6) {
+        wl_surface_send_preferred_buffer_scale(s->res, int_scale(pct));
+        /* the displays are never turned (wl_output.geometry says normal): told once, with the first scale */
+        if (!s->pref_tf_sent) { s->pref_tf_sent = 1; wl_surface_send_preferred_buffer_transform(s->res, WL_OUTPUT_TRANSFORM_NORMAL); }
+    }
 }
 
 static void surface_outputs(Surf *s, float x, float y, int depth, int fslot) {
@@ -1702,6 +2581,7 @@ static void surface_outputs(Surf *s, float x, float y, int depth, int fslot) {
         fslot = outpick_main(p, OUT_MAX, x, y, x + s->lw, y + s->lh);
     }
     s->fslot = fslot;
+    wlcolor_surface_slot(s->res, fslot);            /* its preferred image description (wlcolor.h) */
     unsigned mask = 0;
     int best = 0;
     for (int i = 0; i < OUT_MAX; i++) {
@@ -1740,10 +2620,14 @@ static void surface_leave_slot(int slot) {
 
 /* App cursor: only valid if the pointer is over one of its surfaces. */
 static void ptr_set_cursor(struct wl_client *c, struct wl_resource *r, uint32_t serial, struct wl_resource *surface, int32_t x, int32_t y) {
-    (void)r; (void)serial;
+    (void)serial;
     if (!pointer_focus || pointer_focus->client != c) return;
     Surf *s = surface ? wl_resource_get_user_data(surface) : NULL;
-    if (s && s->role != R_NONE && s->role != R_CURSOR) return;
+    /* a surface with another role (a window, a menu, a subsurface, a drag icon) is the role error (wayland.xml) */
+    if (s && ((s->role != R_NONE && s->role != R_CURSOR) || s->xdg || s->sub)) {
+        wl_resource_post_error(r, WL_POINTER_ERROR_ROLE, "the cursor surface has another role");
+        return;
+    }
     if (s) { s->role = R_CURSOR; s->cursor_hx = s->p_hx = x; s->cursor_hy = s->p_hy = y; }
     cursor_surf = s;
     cursor_mode = s ? 1 : 2;
@@ -1761,25 +2645,26 @@ static void csd_set_shape(struct wl_client *c, struct wl_resource *r, uint32_t s
         wl_resource_post_error(r, WP_CURSOR_SHAPE_DEVICE_V1_ERROR_INVALID_SHAPE, "invalid shape %u", shape);
         return;
     }
-    if (!pointer_focus || pointer_focus->client != c) return;
+    /* a tablet tool's device: only while that tool is over a surface of this app (wl_tablet.c) */
+    struct wl_resource *tool = wl_resource_get_user_data(r);
+    if (tool ? !wl_tablet_tool_over(tool, c) : !pointer_focus || pointer_focus->client != c) return;
     cursor_surf = NULL;
     cursor_mode = 3;
     cursor_shape = shape;
     cursor_gen++;
 }
 static const struct wp_cursor_shape_device_v1_interface csd_impl = { .destroy = res_release, .set_shape = csd_set_shape };
-static void csm_device(struct wl_client *c, struct wl_resource *r, uint32_t id) {
+static void csm_device(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *tool) {
     struct wl_resource *d = wl_resource_create(c, &wp_cursor_shape_device_v1_interface, wl_resource_get_version(r), id);
     if (!d) { wl_client_post_no_memory(c); return; }
-    wl_resource_set_implementation(d, &csd_impl, NULL, NULL);
+    wl_resource_set_implementation(d, &csd_impl, tool, NULL);   /* tool: only compared, never used (wl_tablet_tool_over) */
 }
 static void csm_get_pointer(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *pointer) {
     (void)pointer;
-    csm_device(c, r, id);
+    csm_device(c, r, id, NULL);
 }
 static void csm_get_tablet(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *tool) {
-    (void)tool;
-    csm_device(c, r, id);               /* no tablets: the device exists but is unused */
+    csm_device(c, r, id, tool);         /* a tablet tool's cursor (tablet-v2, wl_tablet.c) */
 }
 static const struct wp_cursor_shape_manager_v1_interface csm_impl = {
     .destroy = res_release, .get_pointer = csm_get_pointer, .get_tablet_tool_v2 = csm_get_tablet,
@@ -1815,30 +2700,45 @@ static void bind_iim(struct wl_client *c, void *data, uint32_t ver, uint32_t id)
 }
 
 /* ---- xdg-activation: a window comes forward only with a token LordOS or the app in front gave (xdgact.c) ---- */
-typedef struct { uint32_t serial; int has_serial, committed; char app_id[128]; } ActReq;
+typedef struct { uint32_t serial; int has_serial, committed, surf; char app_id[128]; } ActReq;
 static void tok_gone(struct wl_resource *r) { free(wl_resource_get_user_data(r)); }
 static void tok_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+/* After commit the token is made: any other request on it is already_used (xdg-activation-v1, as wlroots) */
+static ActReq *tok_open(struct wl_resource *r) {
+    ActReq *q = wl_resource_get_user_data(r);
+    if (q->committed) { wl_resource_post_error(r, XDG_ACTIVATION_TOKEN_V1_ERROR_ALREADY_USED, "the token was already committed"); return NULL; }
+    return q;
+}
 static void tok_serial(struct wl_client *c, struct wl_resource *r, uint32_t serial, struct wl_resource *seat) {
     (void)c; (void)seat;                /* one seat */
-    ActReq *q = wl_resource_get_user_data(r);
+    ActReq *q = tok_open(r);
+    if (!q) return;
     q->serial = serial;
     q->has_serial = 1;
 }
 static void tok_app_id(struct wl_client *c, struct wl_resource *r, const char *app_id) {
     (void)c;
-    ActReq *q = wl_resource_get_user_data(r);
-    snprintf(q->app_id, sizeof q->app_id, "%s", app_id);
+    ActReq *q = tok_open(r);
+    if (q) snprintf(q->app_id, sizeof q->app_id, "%s", app_id);
 }
-static void tok_surface(struct wl_client *c, struct wl_resource *r, struct wl_resource *surface) { (void)c; (void)r; (void)surface; }
-/* Granted when the asking app has the keyboard, or the serial it names is a click or key LordOS
- * sent it a moment ago; otherwise the token exists but only asks for attention. The grant ends
- * when the keyboard leaves that app (wl_set_focus) or after XACT_CLIENT_MS. */
+/* The surface asking (its id: it may be gone by the commit) */
+static void tok_surface(struct wl_client *c, struct wl_resource *r, struct wl_resource *surface) {
+    (void)c;
+    ActReq *q = tok_open(r);
+    Surf *s = surface ? wl_resource_get_user_data(surface) : NULL;
+    if (q) q->surf = s ? s->id : -1;
+}
+/* Granted when the asking app has the keyboard (and the surface it names, if any, is that window or one of its
+ * menus), or the serial it names is a click or key LordOS sent it a moment ago; otherwise the token exists but only
+ * asks for attention. The grant ends when the keyboard leaves that app (wl_set_focus) or after XACT_CLIENT_MS. */
 static void tok_commit(struct wl_client *c, struct wl_resource *r) {
     ActReq *q = wl_resource_get_user_data(r);
     if (q->committed) { wl_resource_post_error(r, XDG_ACTIVATION_TOKEN_V1_ERROR_ALREADY_USED, "token already committed"); return; }
     q->committed = 1;
     double now = xact_now();
-    int granted = (key_focus && key_focus->client == c) || (q->has_serial && xact_serial_recent(q->serial, c, now));
+    Surf *asker = q->surf > 0 ? find(q->surf) : NULL;
+    int focused = key_focus && key_focus->client == c && (!q->surf || (asker && toplevel_of(asker) == key_focus));
+    int granted = focused || (q->has_serial && xact_serial_recent(q->serial, c, now));
     const char *t = xact_issue_for(now, XACT_CLIENT_MS, granted, q->app_id, c);
     xdg_activation_token_v1_send_done(r, t ? t : "none");
 }
@@ -1948,11 +2848,22 @@ static void send_enter_keyboard(struct wl_resource *kb, Surf *s) {
     wl_keyboard_send_modifiers(kb, wl_display_next_serial(dpy), d, l, k, g);
 }
 
+static uint32_t enter_serial;           /* (defined with pointer_enter) */
 static void seat_get_pointer(struct wl_client *c, struct wl_resource *r, uint32_t id) {
     struct wl_resource *p = wl_resource_create(c, &wl_pointer_interface, wl_resource_get_version(r), id);
     if (!p) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(p, &pointer_impl, NULL, link_gone);
     wl_list_insert(&pointers, wl_resource_get_link(p));
+    /* the pointer is already over one of this client's surfaces (a second wl_seat, a toolkit's own pointer made
+     * late): this wl_pointer is told so too, as a new wl_keyboard is, or its buttons would come with no enter */
+    float ox, oy;
+    if (pointer_focus && pointer_focus->client == c && origin(pointer_focus, &ox, &oy)) {
+        float lx = last_x - ox, ly = last_y - oy;
+        if (xw_scaled(c)) { lx = (float)xws_to_xf(lx, xw_pct); ly = (float)xws_to_xf(ly, xw_pct); }
+        /* the enter's serial the client's other pointers got (pointer-warp names it) */
+        wl_pointer_send_enter(p, enter_serial ? enter_serial : wl_display_next_serial(dpy), pointer_focus->res, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
+        if (wl_resource_get_version(p) >= 5) wl_pointer_send_frame(p);
+    }
 }
 
 static void seat_get_keyboard(struct wl_client *c, struct wl_resource *r, uint32_t id) {
@@ -2360,8 +3271,15 @@ static void ofr_receive(struct wl_client *c, struct wl_resource *r, const char *
     close(fd);
 }
 static void ofr_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
-static void ofr_finish(struct wl_client *c, struct wl_resource *r) { (void)c; (void)r; }
-static void ofr_actions(struct wl_client *c, struct wl_resource *r, uint32_t a, uint32_t p) { (void)c; (void)r; (void)a; (void)p; }
+/* A selection offer is no drag-and-drop one: finish is invalid_finish and set_actions invalid_offer (wayland.xml) */
+static void ofr_finish(struct wl_client *c, struct wl_resource *r) {
+    (void)c;
+    wl_resource_post_error(r, WL_DATA_OFFER_ERROR_INVALID_FINISH, "finish on a selection offer (not drag and drop)");
+}
+static void ofr_actions(struct wl_client *c, struct wl_resource *r, uint32_t a, uint32_t p) {
+    (void)c; (void)a; (void)p;
+    wl_resource_post_error(r, WL_DATA_OFFER_ERROR_INVALID_OFFER, "set_actions on a selection offer (not drag and drop)");
+}
 static const struct wl_data_offer_interface offer_impl = {
     .accept = ofr_accept, .receive = ofr_receive, .destroy = ofr_destroy, .finish = ofr_finish, .set_actions = ofr_actions,
 };
@@ -2508,6 +3426,9 @@ static void dev_set_selection(struct wl_client *c, struct wl_resource *r, struct
     (void)c; (void)serial;
     Source *s = src ? wl_resource_get_user_data(src) : NULL;
     if (s && s->used == 2) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_USED_SOURCE, "the source started a drag"); return; }
+    /* wl_data_source.set_actions makes it a drag-and-drop source: never the selection (invalid_source, as Mutter) */
+    if (s && s->actions_set) { wl_resource_post_error(src, WL_DATA_SOURCE_ERROR_INVALID_SOURCE, "a drag-and-drop source used as the selection"); return; }
+    if (s && tldrag_claims(src)) return;     /* a toplevel drag's source (tldrag.c posted the error) */
     if (s) s->used = 1;
     if (selection && selection != s) wl_data_source_send_cancelled(selection->res);
     selection = s;
@@ -2679,31 +3600,59 @@ static void bind_pdm(struct wl_client *c, void *data, uint32_t ver, uint32_t id)
 
 /* ---- xdg_positioner ---- */
 
-typedef struct {
+typedef struct XdgPos {
     int w, h, ax, ay, aw, ah, anchor, gravity, constraint, ox, oy;
+    int has_rect;                       /* set_anchor_rect was called (with set_size: complete, xdg-shell) */
+    int reactive, pw, ph;               /* v3: placed again when the parent changes; the parent size it was made for */
+    uint32_t pserial;                   /* v3: the parent's configure it answers (kept; the place uses the parent now) */
 } Positioner;
 
+/* Each request checks its input as xdg-shell says (invalid_input): a size of zero or less, a negative anchor
+ * rectangle, an anchor or gravity outside its enum, an adjustment with unknown bits, a negative parent size. */
 static void pos_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void pos_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
-    (void)c; Positioner *p = wl_resource_get_user_data(r); p->w = w; p->h = h;
+    (void)c;
+    if (w <= 0 || h <= 0) { wl_resource_post_error(r, XDG_POSITIONER_ERROR_INVALID_INPUT, "size %dx%d is not positive", w, h); return; }
+    Positioner *p = wl_resource_get_user_data(r); p->w = w; p->h = h;
 }
 static void pos_rect(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) {
-    (void)c; Positioner *p = wl_resource_get_user_data(r); p->ax = x; p->ay = y; p->aw = w; p->ah = h;
+    (void)c;
+    if (w < 0 || h < 0) { wl_resource_post_error(r, XDG_POSITIONER_ERROR_INVALID_INPUT, "anchor rectangle %dx%d is negative", w, h); return; }
+    Positioner *p = wl_resource_get_user_data(r); p->ax = x; p->ay = y; p->aw = w; p->ah = h; p->has_rect = 1;
 }
-static void pos_anchor(struct wl_client *c, struct wl_resource *r, uint32_t a) { (void)c; ((Positioner *)wl_resource_get_user_data(r))->anchor = (int)a; }
-static void pos_gravity(struct wl_client *c, struct wl_resource *r, uint32_t g) { (void)c; ((Positioner *)wl_resource_get_user_data(r))->gravity = (int)g; }
-static void pos_constraint(struct wl_client *c, struct wl_resource *r, uint32_t k) { (void)c; ((Positioner *)wl_resource_get_user_data(r))->constraint = (int)k; }
+static void pos_anchor(struct wl_client *c, struct wl_resource *r, uint32_t a) {
+    (void)c;
+    if (a > XDG_POSITIONER_ANCHOR_BOTTOM_RIGHT) { wl_resource_post_error(r, XDG_POSITIONER_ERROR_INVALID_INPUT, "anchor %u is not an xdg_positioner.anchor", a); return; }
+    ((Positioner *)wl_resource_get_user_data(r))->anchor = (int)a;
+}
+static void pos_gravity(struct wl_client *c, struct wl_resource *r, uint32_t g) {
+    (void)c;
+    if (g > XDG_POSITIONER_GRAVITY_BOTTOM_RIGHT) { wl_resource_post_error(r, XDG_POSITIONER_ERROR_INVALID_INPUT, "gravity %u is not an xdg_positioner.gravity", g); return; }
+    ((Positioner *)wl_resource_get_user_data(r))->gravity = (int)g;
+}
+static void pos_constraint(struct wl_client *c, struct wl_resource *r, uint32_t k) {
+    (void)c;
+    ((Positioner *)wl_resource_get_user_data(r))->constraint = (int)k;     /* (unknown bits are ignored, as Mutter does) */
+}
 static void pos_offset(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y) {
     (void)c; Positioner *p = wl_resource_get_user_data(r); p->ox = x; p->oy = y;
 }
-static void pos_reactive(struct wl_client *c, struct wl_resource *r) { (void)c; (void)r; }
-static void pos_parent_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) { (void)c; (void)r; (void)w; (void)h; }
-static void pos_parent_conf(struct wl_client *c, struct wl_resource *r, uint32_t s) { (void)c; (void)r; (void)s; }
+static void pos_reactive(struct wl_client *c, struct wl_resource *r) { (void)c; ((Positioner *)wl_resource_get_user_data(r))->reactive = 1; }
+static void pos_parent_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
+    (void)c;
+    if (w < 0 || h < 0) { wl_resource_post_error(r, XDG_POSITIONER_ERROR_INVALID_INPUT, "parent size %dx%d is negative", w, h); return; }
+    Positioner *p = wl_resource_get_user_data(r); p->pw = w; p->ph = h;
+}
+static void pos_parent_conf(struct wl_client *c, struct wl_resource *r, uint32_t serial) {
+    (void)c; ((Positioner *)wl_resource_get_user_data(r))->pserial = serial;
+}
 static const struct xdg_positioner_interface positioner_impl = {
     .destroy = pos_destroy, .set_size = pos_size, .set_anchor_rect = pos_rect, .set_anchor = pos_anchor,
     .set_gravity = pos_gravity, .set_constraint_adjustment = pos_constraint, .set_offset = pos_offset,
     .set_reactive = pos_reactive, .set_parent_size = pos_parent_size, .set_parent_configure = pos_parent_conf,
 };
+/* complete (xdg-shell): a size and an anchor rectangle */
+static int pos_complete(const Positioner *p) { return p && p->w > 0 && p->h > 0 && p->has_rect; }
 static void pos_gone(struct wl_resource *r) { free(wl_resource_get_user_data(r)); }
 
 static int has_left(int e) { return e == XDG_POSITIONER_ANCHOR_LEFT || e == XDG_POSITIONER_ANCHOR_TOP_LEFT || e == XDG_POSITIONER_ANCHOR_BOTTOM_LEFT; }
@@ -2777,10 +3726,23 @@ static void position_popup(Surf *s, const Positioner *p) {
 
 /* ---- xdg_toplevel ---- */
 
-static void top_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+/* xdg-decoration: a toplevel destroyed before its decoration object leaves it orphaned (a protocol error, as wlroots) */
+static void top_destroy(struct wl_client *c, struct wl_resource *r) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s && s->top == r && s->deco) {
+        wl_resource_post_error(s->deco, ZXDG_TOPLEVEL_DECORATION_V1_ERROR_ORPHANED, "the xdg_toplevel was destroyed before its decoration");
+        return;
+    }
+    wl_resource_destroy(r);
+}
 static void top_parent(struct wl_client *c, struct wl_resource *r, struct wl_resource *p) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r), *o = p ? wl_resource_get_user_data(p) : NULL;
+    /* xdg-shell: the parent may be neither the window itself nor one of its descendants (invalid_parent) */
+    int n = 0;
+    for (Surf *q = o; s && q && n <= MAX_SURF; q = q->owner, n++)
+        if (q == s) { wl_resource_post_error(r, XDG_TOPLEVEL_ERROR_INVALID_PARENT, "the parent is the toplevel itself or one of its descendants"); return; }
     if (s) set_owner(s, o && o->role == R_TOPLEVEL && o->top ? o : NULL, NULL);     /* only a live toplevel parents */
 }
 /* A window's title: only a different one counts, and JS hears it at most once a frame (TITLE_MS), the last one of a
@@ -2829,17 +3791,26 @@ static void top_move(struct wl_client *c, struct wl_resource *r, struct wl_resou
 static void top_resize(struct wl_client *c, struct wl_resource *r, struct wl_resource *seat, uint32_t serial, uint32_t edges) {
     (void)c; (void)seat; (void)serial;
     Surf *s = wl_resource_get_user_data(r);
+    /* xdg_toplevel.resize_edge: none, top, bottom, left, top_left, bottom_left, right, top_right, bottom_right */
+    if (edges > XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM_RIGHT || edges == 3 || edges == 7) {
+        wl_resource_post_error(r, XDG_TOPLEVEL_ERROR_INVALID_RESIZE_EDGE, "resize edge %u is not an xdg_toplevel.resize_edge", edges);
+        return;
+    }
     if (s && s->mapped && buttons_held > 0) { buttons_held = 0; emit(s, "resize", "{\"edges\":%u,\"x\":%.0f,\"y\":%.0f}", edges, press_x, press_y); }
 }
+/* Size limits: a negative one is invalid_size at once; a maximum below the minimum is checked when they are committed
+ * together (xdg_commit_ok), as both are double-buffered */
 static void top_max_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
-    if (s) { s->max_w = w; s->max_h = h; }
+    if (w < 0 || h < 0) { wl_resource_post_error(r, XDG_TOPLEVEL_ERROR_INVALID_SIZE, "maximum size %dx%d is negative", w, h); return; }
+    if (s) { s->max_w = w; s->max_h = h; s->limits_check = 1; }
 }
 static void top_min_size(struct wl_client *c, struct wl_resource *r, int32_t w, int32_t h) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
-    if (s) { s->min_w = w; s->min_h = h; }
+    if (w < 0 || h < 0) { wl_resource_post_error(r, XDG_TOPLEVEL_ERROR_INVALID_SIZE, "minimum size %dx%d is negative", w, h); return; }
+    if (s) { s->min_w = w; s->min_h = h; s->limits_check = 1; }
 }
 /* A refused request still gets its answer: a configure with the state as it is (xdg-shell asks for one after
  * set_maximized and unset_maximized; an app that waits for it, Google Chrome, stops responding without it). */
@@ -2936,6 +3907,9 @@ static void role_reset(Surf *s) {
     s->sent_configure = 0;
     s->has_geom = s->p_geom = 0;
     s->conf_serial = s->acked_serial = 0;
+    s->ncfg = s->cfg_lost_set = s->xdg_acked = 0;
+    free(s->pos);
+    s->pos = NULL;
 }
 static void top_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
@@ -2950,21 +3924,63 @@ static void top_gone(struct wl_resource *r) {
 
 /* ---- xdg_popup ---- */
 
-static void pop_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+/* xdg-shell: nested popups go in the reverse order they came; a popup with a live menu of its own isn't the topmost
+ * (not_the_topmost_popup, on the xdg_wm_base, as wlroots does) */
+static void pop_destroy(struct wl_client *c, struct wl_resource *r) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    for (int i = 0; s && i < MAX_SURF; i++)
+        if (surfs[i] && surfs[i] != s && surfs[i]->parent == s && surfs[i]->role == R_POPUP && surfs[i]->popup) {
+            if (s->wmb) { wl_resource_post_error(s->wmb, XDG_WM_BASE_ERROR_NOT_THE_TOPMOST_POPUP, "a popup was destroyed before its child popup"); return; }
+            break;
+        }
+    wl_resource_destroy(r);
+}
 static void pop_grab(struct wl_client *c, struct wl_resource *r, struct wl_resource *seat, uint32_t serial) {
     (void)c; (void)seat; (void)serial;
     Surf *s = wl_resource_get_user_data(r);
+    if (s && s->mapped) { wl_resource_post_error(r, XDG_POPUP_ERROR_INVALID_GRAB, "grab on a popup that is already mapped"); return; }
     if (s) s->grab = 1;
+}
+/* A popup's positioner is kept when it is reactive (xdg-shell 3): placed again when its parent changes (popups_follow) */
+static void pop_keep_positioner(Surf *s, const Positioner *p) {
+    if (!p->reactive) { free(s->pos); s->pos = NULL; return; }
+    if (!s->pos && !(s->pos = malloc(sizeof *s->pos))) return;
+    *s->pos = *p;
 }
 static void pop_reposition(struct wl_client *c, struct wl_resource *r, struct wl_resource *positioner, uint32_t token) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
-    if (!s) return;
+    Positioner *p = wl_resource_get_user_data(positioner);
+    if (!pos_complete(p)) {
+        if (s && s->wmb) wl_resource_post_error(s->wmb, XDG_WM_BASE_ERROR_INVALID_POSITIONER, "the positioner has no size or anchor rectangle");
+        else wl_resource_post_error(r, XDG_WM_BASE_ERROR_INVALID_POSITIONER, "the positioner has no size or anchor rectangle");
+        return;
+    }
+    if (!s || !s->xdg) return;
     popup_box_damage(s);
-    position_popup(s, wl_resource_get_user_data(positioner));
+    position_popup(s, p);
+    pop_keep_positioner(s, p);
     xdg_popup_send_repositioned(r, token);
     xdg_popup_send_configure(r, s->pop_x, s->pop_y, s->conf_w, s->conf_h);
-    xdg_surface_send_configure(s->xdg, wl_display_next_serial(dpy));
+    xdg_configure(s);
+}
+/* The reactive popups of a parent whose place or size changed go where their positioner now puts them */
+static void popups_follow(Surf *parent) {
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *k = surfs[i];
+        if (!k || k->parent != parent || k->role != R_POPUP || !k->popup || !k->xdg || !k->pos || !k->sent_configure) continue;
+        int x = k->pop_x, y = k->pop_y, w = k->conf_w, h = k->conf_h;
+        position_popup(k, k->pos);
+        if (x == k->pop_x && y == k->pop_y && w == k->conf_w && h == k->conf_h) continue;
+        int nx = k->pop_x, ny = k->pop_y;
+        k->pop_x = x; k->pop_y = y;
+        popup_box_damage(k);                    /* where it was, then where it goes */
+        k->pop_x = nx; k->pop_y = ny;
+        popup_box_damage(k);
+        xdg_popup_send_configure(k->popup, k->pop_x, k->pop_y, k->conf_w, k->conf_h);
+        xdg_configure(k);
+    }
 }
 static const struct xdg_popup_interface popup_impl = { .destroy = pop_destroy, .grab = pop_grab, .reposition = pop_reposition };
 static void pop_gone(struct wl_resource *r) {
@@ -2979,7 +3995,16 @@ static void pop_gone(struct wl_resource *r) {
 
 /* ---- xdg_surface / xdg_wm_base ---- */
 
-static void xs_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+/* xdg-shell: the role object goes first (defunct_role_object) */
+static void xs_destroy(struct wl_client *c, struct wl_resource *r) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (s && s->xdg == r && (s->top || s->popup)) {
+        wl_resource_post_error(r, XDG_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT, "the xdg_surface was destroyed before its %s", s->top ? "xdg_toplevel" : "xdg_popup");
+        return;
+    }
+    wl_resource_destroy(r);
+}
 /* What the window manager offers this toplevel (xdg-shell 5): the window menu (the theme's, at the app's own bar,
  * top_menu), maximize unless it is locked, fullscreen unless a screen share refuses it (wl_fullscreen_allow), and
  * minimize even locked. A new list takes effect with the next configure. */
@@ -2999,6 +4024,7 @@ static void xs_toplevel(struct wl_client *c, struct wl_resource *r, uint32_t id)
     Surf *s = wl_resource_get_user_data(r);
     if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
     if (s->top || s->popup) { wl_resource_post_error(r, XDG_SURFACE_ERROR_ALREADY_CONSTRUCTED, "the xdg_surface already has a role object"); return; }
+    if (s->sub || s->role == R_SUB) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface is a subsurface"); return; }
     struct wl_resource *t = wl_resource_create(c, &xdg_toplevel_interface, wl_resource_get_version(r), id);
     if (!t) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(t, &toplevel_impl, s, top_gone);
@@ -3012,25 +4038,55 @@ static void xs_popup(struct wl_client *c, struct wl_resource *r, uint32_t id, st
     Surf *s = wl_resource_get_user_data(r);
     if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
     if (s->top || s->popup) { wl_resource_post_error(r, XDG_SURFACE_ERROR_ALREADY_CONSTRUCTED, "the xdg_surface already has a role object"); return; }
+    if (s->sub || s->role == R_SUB) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface is a subsurface"); return; }
+    Positioner *pos = wl_resource_get_user_data(positioner);
+    if (!pos_complete(pos)) {           /* xdg-shell: on the xdg_wm_base, as wlroots and Mutter do */
+        wl_resource_post_error(s->wmb ? s->wmb : r, XDG_WM_BASE_ERROR_INVALID_POSITIONER, "the positioner has no size or anchor rectangle");
+        return;
+    }
+    Surf *ps = parent ? wl_resource_get_user_data(parent) : NULL;
+    /* a menu of itself, of its own menu or of a surface it reaches: a cycle (surf_in_chain, surf_reaches) */
+    if (ps && (surf_in_chain(ps, s) || surf_reaches(s, ps))) {
+        wl_resource_post_error(r, XDG_WM_BASE_ERROR_INVALID_POPUP_PARENT, "the popup's parent is the popup itself or one of its menus");
+        return;
+    }
     struct wl_resource *p = wl_resource_create(c, &xdg_popup_interface, wl_resource_get_version(r), id);
     if (!p) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(p, &popup_impl, s, pop_gone);
     s->popup = p;
     s->role = R_POPUP;
-    s->parent = parent ? wl_resource_get_user_data(parent) : NULL;
-    position_popup(s, wl_resource_get_user_data(positioner));
+    s->parent = ps;
+    position_popup(s, pos);
+    pop_keep_positioner(s, pos);
 }
 static void xs_geometry(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) {
     (void)c;
+    if (w <= 0 || h <= 0) { wl_resource_post_error(r, XDG_SURFACE_ERROR_INVALID_SIZE, "window geometry %dx%d is not positive", w, h); return; }
     Surf *s = wl_resource_get_user_data(r);
     if (!s) return;
     s->p_gx = x; s->p_gy = y; s->p_gw = w; s->p_gh = h;
     s->p_geom = 1;
 }
+/* serial a, b in the display's order (they wrap) */
+static int serial_le(uint32_t a, uint32_t b) { return (int32_t)(a - b) <= 0; }
+/* An ack must name a configure sent and not acked yet (or consumed by a later ack): invalid_serial otherwise. It
+ * consumes the configures before it too. */
 static void xs_ack(struct wl_client *c, struct wl_resource *r, uint32_t serial) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
-    if (s) s->acked_serial = serial;
+    if (!s) return;
+    int at = -1;
+    for (int i = 0; i < s->ncfg; i++) if (s->cfg_ser[i] == serial) { at = i; break; }
+    if (at < 0 && !(s->cfg_lost_set && serial_le(serial, s->cfg_lost) && (!s->xdg_acked || !serial_le(serial, s->acked_serial)))) {
+        wl_resource_post_error(r, XDG_SURFACE_ERROR_INVALID_SERIAL, "serial %u is not a configure waiting for an ack", serial);
+        return;
+    }
+    if (at >= 0) {
+        s->ncfg -= at + 1;
+        memmove(s->cfg_ser, s->cfg_ser + at + 1, sizeof s->cfg_ser[0] * (size_t)s->ncfg);
+    }
+    s->acked_serial = serial;
+    s->xdg_acked = 1;
 }
 static const struct xdg_surface_interface xdg_surface_impl = {
     .destroy = xs_destroy, .get_toplevel = xs_toplevel, .get_popup = xs_popup,
@@ -3038,10 +4094,44 @@ static const struct xdg_surface_interface xdg_surface_impl = {
 };
 static void xs_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
-    if (s && s->xdg == r) s->xdg = NULL;
+    if (s && s->xdg == r) { s->xdg = NULL; s->wmb = NULL; }
 }
 
-static void wm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+/* An xdg_wm_base: its ping waiting for a pong (0 none) and since when */
+typedef struct { uint32_t ping; unsigned ping_ms; int told; } WmBase;
+
+/* xdg-shell: destroying it while xdg_surfaces it made are alive is defunct_surfaces */
+static void wm_destroy(struct wl_client *c, struct wl_resource *r) {
+    (void)c;
+    for (int i = 0; i < MAX_SURF; i++)
+        if (surfs[i] && surfs[i]->wmb == r && surfs[i]->xdg) {
+            wl_resource_post_error(r, XDG_WM_BASE_ERROR_DEFUNCT_SURFACES, "xdg_wm_base was destroyed before its xdg_surfaces");
+            return;
+        }
+    wl_resource_destroy(r);
+}
+static void wm_gone(struct wl_resource *r) {
+    for (int i = 0; i < MAX_SURF; i++) if (surfs[i] && surfs[i]->wmb == r) surfs[i]->wmb = NULL;
+    free(wl_resource_get_user_data(r));
+}
+/* Pings the client of a window that takes the keyboard (xdg_wm_base.ping): a client that has not answered the last one
+ * for 5 s is logged as not responding (once until it answers). It is never disconnected for it: xdg-shell leaves
+ * that to the compositor, and like Mutter and KWin LordOS keeps the app (the unresponsive error is never raised). */
+static void wm_ping(Surf *s) {
+    WmBase *w = s && s->wmb ? wl_resource_get_user_data(s->wmb) : NULL;
+    if (!w) return;
+    unsigned now = now_ms();
+    if (w->ping) {
+        if (now - w->ping_ms >= 5000 && !w->told) {
+            w->told = 1;
+            fprintf(stderr, "wayland: %s: not answering xdg_wm_base.ping for %u s\n", s->app_id[0] ? s->app_id : "?", (now - w->ping_ms) / 1000);
+        }
+        return;
+    }
+    w->ping = wl_display_next_serial(dpy);
+    w->ping_ms = now;
+    xdg_wm_base_send_ping(s->wmb, w->ping);
+}
 static void wm_positioner(struct wl_client *c, struct wl_resource *r, uint32_t id) {
     Positioner *p = calloc(1, sizeof *p);
     struct wl_resource *res = p ? wl_resource_create(c, &xdg_positioner_interface, wl_resource_get_version(r), id) : NULL;
@@ -3053,21 +4143,35 @@ static void wm_get_xdg_surface(struct wl_client *c, struct wl_resource *r, uint3
     /* one xdg_surface per wl_surface: a second one would keep pointing at the Surf after it is freed */
     if (!s || s->xdg) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface already has an xdg_surface"); return; }
     if (s->role == R_SUB || s->role == R_CURSOR || s->role == R_DNDICON) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface has another role"); return; }
+    /* xdg-shell: not for a surface with a buffer attached or committed (Mutter's invalid_surface_state) */
+    if (s->content || (s->p_attached && s->p_buf)) {
+        wl_resource_post_error(r, XDG_WM_BASE_ERROR_INVALID_SURFACE_STATE, "the wl_surface already has a buffer");
+        return;
+    }
     struct wl_resource *x = wl_resource_create(c, &xdg_surface_interface, wl_resource_get_version(r), id);
     if (!x) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(x, &xdg_surface_impl, s, xs_gone);
     s->xdg = x;
+    s->wmb = r;
 }
-static void wm_pong(struct wl_client *c, struct wl_resource *r, uint32_t serial) { (void)c; (void)r; (void)serial; }
+static void wm_pong(struct wl_client *c, struct wl_resource *r, uint32_t serial) {
+    (void)c;
+    WmBase *w = wl_resource_get_user_data(r);
+    if (!w || !w->ping || serial != w->ping) return;        /* an old or unknown serial: nothing (no error defined) */
+    if (w->told) fprintf(stderr, "wayland: a client answers xdg_wm_base.ping again\n");
+    w->ping = 0;
+    w->told = 0;
+}
 static const struct xdg_wm_base_interface wm_base_impl = {
     .destroy = wm_destroy, .create_positioner = wm_positioner, .get_xdg_surface = wm_get_xdg_surface, .pong = wm_pong,
 };
 
 static void bind_wm_base(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
     (void)data;
-    struct wl_resource *r = wl_resource_create(c, &xdg_wm_base_interface, (int)ver, id);
-    if (!r) { wl_client_post_no_memory(c); return; }
-    wl_resource_set_implementation(r, &wm_base_impl, NULL, NULL);
+    WmBase *w = calloc(1, sizeof *w);
+    struct wl_resource *r = w ? wl_resource_create(c, &xdg_wm_base_interface, (int)ver, id) : NULL;
+    if (!r) { free(w); wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &wm_base_impl, w, wm_gone);
 }
 
 /* ---- xdg-decoration: the app picks who draws the frame ----
@@ -3093,6 +4197,10 @@ static uint32_t deco_answer(uint32_t requested) {
 static void deco_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void deco_mode(struct wl_client *c, struct wl_resource *r, uint32_t mode) {
     (void)c;
+    if (mode != ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE && mode != ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE) {
+        wl_resource_post_error(r, ZXDG_TOPLEVEL_DECORATION_V1_ERROR_INVALID_MODE, "mode %u is not a zxdg_toplevel_decoration_v1.mode", mode);
+        return;
+    }
     Surf *s = wl_resource_get_user_data(r);
     uint32_t m = deco_answer(mode);
     zxdg_toplevel_decoration_v1_send_configure(r, m);
@@ -3113,6 +4221,11 @@ static void decm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; 
 static void decm_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *toplevel) {
     Surf *s = wl_resource_get_user_data(toplevel);
     if (s && s->deco) { wl_resource_post_error(r, ZXDG_TOPLEVEL_DECORATION_V1_ERROR_ALREADY_CONSTRUCTED, "the toplevel already has a decoration object"); return; }
+    /* not for a toplevel with a buffer attached or committed (unconfigured_buffer) */
+    if (s && (s->content || (s->p_attached && s->p_buf))) {
+        wl_resource_post_error(r, ZXDG_TOPLEVEL_DECORATION_V1_ERROR_UNCONFIGURED_BUFFER, "the toplevel already has a buffer");
+        return;
+    }
     struct wl_resource *d = wl_resource_create(c, &zxdg_toplevel_decoration_v1_interface, wl_resource_get_version(r), id);
     if (!d) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(d, &deco_impl, s, deco_gone);
@@ -3200,8 +4313,10 @@ static void emit_map(Surf *s, int w, int h) {
     if (s->xw) {                    /* X11: WM_CLASS class, and its instance for the .desktop match */
         char alt[260];
         json_str(alt, sizeof alt, s->app_alt);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s}",
-             t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false");
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"appAlt\":\"%s\",\"x11\":true,\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"skipTaskbar\":%s,\"skipPager\":%s,\"layer\":%d}",
+             t, a, alt, w, h, s->csd ? "true" : "false", xwm_is_dialog(s->xw) ? "true" : "false", xwm_is_fixed(s->xw) ? "true" : "false",
+             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", xwm_skip_taskbar(s->xw) ? "true" : "false",
+             xwm_skip_pager(s->xw) ? "true" : "false", xwm_layer(s->xw));
     } else {
         int fixed = s->min_w > 0 && s->min_w == s->max_w && s->min_h > 0 && s->min_h == s->max_h;
         /* a Flatpak app's window: the app lord-server knows from the client's root-owned scope (or its security context),
@@ -3209,10 +4324,11 @@ static void emit_map(Surf *s, int w, int h) {
         const char *who = client_identity(s->client);
         char fp[KBI_ID_MAX + 8] = "";
         if (!strncmp(who, "flatpak:", 8)) json_str(fp, sizeof fp, who + 8);
-        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"flatpak\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s}",
+        emit(s, "map", "{\"title\":\"%s\",\"appId\":\"%s\",\"flatpak\":\"%s\",\"width\":%d,\"height\":%d,\"csd\":%s,\"dialog\":%s,\"fixed\":%s,\"parent\":%d,\"modal\":%s,\"layer\":%d}",
              t, a, fp, w, h, s->csd ? "true" : "false", s->owner || s->dlg ? "true" : "false", fixed ? "true" : "false",
-             s->owner ? s->owner->id : 0, s->modal ? "true" : "false");
+             s->owner ? s->owner->id : 0, s->modal ? "true" : "false", s->layer);
     }
+    wlshell_mapped(s->id);              /* its tag, a drag it follows (wlshell.h) */
 }
 
 /* A new JS context (the theme was switched live): the windows that are still mapped are announced
@@ -3261,11 +4377,12 @@ static void surface_commit_role(Surf *s) {
             s->conf_h = h;
         }
         damage_node(s);
+        if (s->mapped) popups_follow(s);        /* reactive menus (xdg_positioner.set_reactive) */
     } else if (s->role == R_POPUP) {
         if (!s->popup || !s->xdg) return;   /* its popup is gone (closed): unmapped until a new one is made */
         if (!s->sent_configure) {
             xdg_popup_send_configure(s->popup, s->pop_x, s->pop_y, s->conf_w, s->conf_h);
-            xdg_surface_send_configure(s->xdg, wl_display_next_serial(dpy));
+            xdg_configure(s);
             s->sent_configure = 1;
             return;
         }
@@ -3273,10 +4390,9 @@ static void surface_commit_role(Surf *s) {
         if (s->content && !s->mapped && npopups < 32) { s->mapped = 1; popups[npopups++] = s; }
         else if (!s->content && s->mapped) { s->mapped = 0; unmap_popup(s); }
         popup_box_damage(s);
+        if (s->mapped) popups_follow(s);
     } else if (s->role == R_SUB) {
-        Surf *top = s;
-        while (top->parent) top = top->parent;
-        if (top->role == R_POPUP) popup_box_damage(top); else damage_node(top);
+        damage_sub(s, 0);
     }
 }
 
@@ -3408,8 +4524,16 @@ static uint32_t *capture_readback(const Surf *s) {
     return NULL;
 }
 
+static void paint_tree_r(Canvas *c, Surf *s, float x, float y, float op_tree, Rect clip);
 static void paint_tree(Canvas *c, Surf *s, float x, float y, float op_tree, Rect clip) {
+    if (!walk_enter()) return;
+    paint_tree_r(c, s, x, y, op_tree, clip);
+    walk_depth--;
+}
+static void paint_tree_r(Canvas *c, Surf *s, float x, float y, float op_tree, Rect clip) {
     uint32_t *tmp;
+    for (int i = 0; i < s->nbelow; i++)             /* placed under it (wl_subsurface.place_below) */
+        paint_tree(c, s->kids[i], x + s->kids[i]->sx, y + s->kids[i]->sy, op_tree, clip);
     float op = op_tree * surf_alpha(s);         /* wp_alpha_modifier_v1: this surface only, not its subsurfaces */
     s->hole_sig = hole_sig(s);          /* the shape it was painted with: damage_box and the GPU path compare it */
     if (gpu_active() && !paint_capture_mode) {          /* in a screenshot they are always copied */
@@ -3448,7 +4572,7 @@ static void paint_tree(Canvas *c, Surf *s, float x, float y, float op_tree, Rect
         s->px = NULL;
         free(tmp);
     }
-    for (int i = 0; i < s->nkids; i++) paint_tree(c, s->kids[i], x + s->kids[i]->sx, y + s->kids[i]->sy, op_tree, clip);
+    for (int i = s->nbelow; i < s->nkids; i++) paint_tree(c, s->kids[i], x + s->kids[i]->sx, y + s->kids[i]->sy, op_tree, clip);
 }
 
 void wl_paint_begin(void) { ndraws[0] = ndraws[1] = 0; }
@@ -3568,9 +4692,17 @@ static void draw_surface(Surf *s, float x, float y, float dw, float dh, Rect cli
     draw_tex(s, t, PVX(x), PVY(y), dw * paint_view.k, dh * paint_view.k, phys_rect(clip), op);
 }
 
+static void draw_tree_r(Surf *s, float x, float y, float scale_x, float scale_y, Rect clip);
 static void draw_tree(Surf *s, float x, float y, float scale_x, float scale_y, Rect clip) {
+    if (!walk_enter()) return;
+    draw_tree_r(s, x, y, scale_x, scale_y, clip);
+    walk_depth--;
+}
+static void draw_tree_r(Surf *s, float x, float y, float scale_x, float scale_y, Rect clip) {
+    for (int i = 0; i < s->nbelow; i++)             /* placed under it (wl_subsurface.place_below) */
+        draw_tree(s->kids[i], x + s->kids[i]->sx * scale_x, y + s->kids[i]->sy * scale_y, scale_x, scale_y, clip);
     draw_surface(s, x, y, s->lw * scale_x, s->lh * scale_y, clip, surf_alpha(s));
-    for (int i = 0; i < s->nkids; i++)
+    for (int i = s->nbelow; i < s->nkids; i++)
         draw_tree(s->kids[i], x + s->kids[i]->sx * scale_x, y + s->kids[i]->sy * scale_y, scale_x, scale_y, clip);
 }
 
@@ -3673,14 +4805,22 @@ void wl_gpu_draw_layer(int layer) {
 
 /* A fullscreen window and its subsurfaces, scaled as one (the GPU path's draw_tree): a browser such as Firefox draws
  * its page in a subsurface and leaves the window's own buffer clear, so copying only the window showed nothing. */
+static void blit_tree_r(Canvas *c, Surf *s, float x, float y, float sxk, float syk);
 static void blit_tree(Canvas *c, Surf *s, float x, float y, float sxk, float syk) {
+    if (!walk_enter()) return;
+    blit_tree_r(c, s, x, y, sxk, syk);
+    walk_depth--;
+}
+static void blit_tree_r(Canvas *c, Surf *s, float x, float y, float sxk, float syk) {
+    for (int i = 0; i < s->nbelow; i++)
+        blit_tree(c, s->kids[i], x + s->kids[i]->sx * sxk, y + s->kids[i]->sy * syk, sxk, syk);
     if (s->content) {
         uint32_t *tmp = s->px ? NULL : capture_readback(s);      /* a GPU app in a screenshot */
         if (tmp) s->px = tmp;
         if (s->px) blit_surface(c, s, x, y, sxk, syk, surf_alpha(s));
         if (tmp) { s->px = NULL; free(tmp); }
     }
-    for (int i = 0; i < s->nkids; i++)
+    for (int i = s->nbelow; i < s->nkids; i++)
         blit_tree(c, s->kids[i], x + s->kids[i]->sx * sxk, y + s->kids[i]->sy * syk, sxk, syk);
 }
 
@@ -3712,7 +4852,10 @@ void wl_paint_fullscreen(Canvas *out) {
 }
 
 int wl_fullscreen_active(void) { return fs_surf && fs_surf->content; }
-int wl_wants_frame(void) { return need_frame || frames_held; }
+static int timing_due(void);
+static int waits_frame(Surf *s);
+static void timing_refreshed(Surf *s);
+int wl_wants_frame(void) { return need_frame || frames_held || timing_due(); }
 unsigned wl_new_content(void) {
     unsigned k = need_frame ? new_keys : 0;
     new_keys = 0;
@@ -3727,6 +4870,8 @@ static void scanout_done(void *data) {
     int current = 0;
     for (int i = 0; i < MAX_SURF && !current; i++) if (surfs[i] && surfs[i]->dmabuf == d) current = 1;
     if (d->res && !current) wl_buffer_send_release(d->res);
+    for (int i = 0; i < d->nsrel; i++) sobj_release_after(&d->srel[i], d->d.fd[0]);   /* off the screen now */
+    d->nsrel = 0;
     dm_unref(d);
 }
 
@@ -3739,7 +4884,10 @@ int wl_try_scanout(int cursor_free) {
     if (nused != 1 || fs_surf->viewport || fs_surf->gx || fs_surf->gy || !gpu_can_scanout(&d->d, pw, ph)) return 0;
     d->refs++;
     d->scanned = 1;
-    if (gpu_scanout(&d->d, scanout_done, d)) { d->scanned = 0; dm_unref(d); return 0; }
+    /* tearing-control-v1's "async" (a game that would rather tear than wait): this buffer, and only an app's own buffer
+     * alone on the screen, flips without waiting for vblank when the driver can (kms.c); every other frame waits */
+    int tear = fs_surf->tm && fs_surf->tm->hint == WLT_HINT_ASYNC;
+    if (gpu_scanout_tear(&d->d, scanout_done, d, tear)) { d->scanned = 0; dm_unref(d); return 0; }
     return 1;
 }
 
@@ -3755,8 +4903,9 @@ void wl_frame_done(unsigned t, unsigned keys) {
     frames_held = 0;
     update_surface_outputs();
     for (int i = 0; i < nrelease; i++) {
-        Dmabuf *d = to_release[i];
+        Dmabuf *d = to_release[i].d;
         if (d->res && !d->scanned) wl_buffer_send_release(d->res);
+        dm_release_point(d, &to_release[i].rel);
         dm_unref(d);
     }
     nrelease = 0;
@@ -3764,13 +4913,13 @@ void wl_frame_done(unsigned t, unsigned keys) {
         Surf *s = surfs[i];
         if (!s) continue;
         int hidden = surf_hidden(s);
-        if (hidden && wl_list_empty(&s->frames)) continue;
+        if (hidden && !waits_frame(s)) continue;
         if (!framegate_due(&s->fgate, hidden, t)) continue;    /* minimized, a hidden desktop: once a second */
         if (hidden) framegate_sent(&s->fgate, t);
         /* shown: with a frame of its own display, not another one's (a 60 Hz display's windows paced by a 144 Hz one's
          * frames drew frames nobody saw); while that display waits for its flip, they wait too */
         else if (!outpick_due(slot_key(s->fslot), keys)) {
-            if (!wl_list_empty(&s->frames)) frames_held = 1;
+            if (waits_frame(s)) frames_held = 1;
             continue;
         }
         struct wl_resource *cb, *tmp;
@@ -3780,6 +4929,8 @@ void wl_frame_done(unsigned t, unsigned keys) {
         }
         wl_list_insert_list(s->sent_feedback.prev, &s->feedback);
         wl_list_init(&s->feedback);
+        /* its fifo barrier: the frame was latched (timing.h); what applies now is in the next frame, feedback too */
+        timing_refreshed(s);
     }
     wl_display_flush_clients(dpy);
     if (keylag_enabled) keylag_flushed();
@@ -3788,7 +4939,7 @@ void wl_frame_done(unsigned t, unsigned keys) {
 /* The hidden windows' own tick (framegate.h): their waiting callbacks, once a second, when no frame of
  * lord-server's sent them; nothing of them was shown, so their presentation feedback is discarded. */
 static int hidden_due(Surf *s, unsigned t, unsigned *wait) {
-    if (!surf_hidden(s) || wl_list_empty(&s->frames)) return 0;
+    if (!surf_hidden(s) || !waits_frame(s)) return 0;
     unsigned w = framegate_wait(&s->fgate, t);
     if (w && wait && w < *wait) *wait = w;
     return !w;
@@ -3805,6 +4956,7 @@ double wl_frame_hidden(unsigned t) {
         struct wl_resource *r, *tmp;
         wl_resource_for_each_safe(r, tmp, &s->frames) { wl_callback_send_done(r, t); wl_resource_destroy(r); }
         wl_resource_for_each_safe(r, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); }
+        timing_refreshed(s);
         sent = 1;
         if (wait > FRAMEGATE_HIDDEN_MS) wait = FRAMEGATE_HIDDEN_MS;
     }
@@ -3822,16 +4974,135 @@ int wl_frame_unseen(unsigned t) {
         wl_resource_for_each_safe(r, tmp, &s->frames) { wl_callback_send_done(r, t); wl_resource_destroy(r); waiting = 1; }
         wl_resource_for_each_safe(r, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); waiting = 1; }
         wl_resource_for_each_safe(r, tmp, &s->sent_feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); waiting = 1; }
+        if (s->tm && (s->tm->barrier || s->sq.n)) { if (s->sq.n) waiting = 1; timing_refreshed(s); }   /* (fifo, timing.h) */
+        wl_resource_for_each_safe(r, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); }
     }
     need_frame = frames_held = 0;
     if (waiting) wl_display_flush_clients(dpy);
     return waiting;
 }
 
+/* ---- fifo-v1 and commit-timing-v1 (timing.h, wltiming.h; docs/WAYLAND.md, "Frame timing") ----
+ * Their held updates are the same Pend entries in the same queue as explicit sync's (s->sq): an entry applies once its
+ * acquire point is signalled AND its fifo barrier is down AND its target time has come (sq_ready_now), in order. The
+ * helpers here say when, and wake the loop for it. */
+
+/* The display whose refresh paces the surface: its own, else the main one. */
+static const WltClock *surf_clock(Surf *s) {
+    int k = slot_key(s->fslot);
+    return wlt_clock(k >= 0 ? k : slot_key(out_main));
+}
+static uint64_t mono_now(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec;
+}
+/* A frame is shown as soon as it is painted (no monitor, or a driver whose flips don't wait for vblank: main.c paces
+ * them itself), not at the next vblank: wl_latch says which. */
+static int timing_immediate;
+/* When a frame latched at `now` is shown: at the next vblank; immediate, once painted, which takes as long as that
+ * frame does (a light one well under a millisecond, the first ones of a session many): not known ahead, so `now`, and
+ * an update is never shown before its time, at worst a refresh after it. */
+static uint64_t timing_present(Surf *s, uint64_t now) {
+    return timing_immediate ? now : wlt_next_vblank(surf_clock(s), now);
+}
+/* a subsurface in synchronized mode: fifo-v1 says its wait_barrier is ignored */
+static int timing_nowait(const Surf *s) { return s->role == R_SUB && s->sub_sync; }
+
+/* Is the timing part of update u ready for a frame shown at `present`? (no WlTiming: no constraint) */
+static int timing_ready(Surf *s, const WltUpdate *u, uint64_t present) {
+    if (!s->tm) return 1;
+    return wlt_ready(u, s->tm->barrier, timing_nowait(s), present, wlt_slack(surf_clock(s)));
+}
+
+/* an update became current: its barrier and hints */
+static void timing_applied(Surf *s, const WltUpdate *u) {
+    if (!s->tm) return;
+    wlt_applied(s->tm, u);
+    /* its barrier clears with the next frame of its display: there must be one even if this update drew nothing */
+    if (u->set_barrier && !surf_hidden(s)) need_frame = 1;
+}
+
+/* Its display latched a frame (or, unseen, its own tick came): the barrier clears, and what waited for it applies. */
+static void timing_refreshed(Surf *s) {
+    if (!s->tm) return;
+    s->tm->barrier = 0;
+    if (s->sq.n) sq_drain_at(s, 0);
+}
+
+/* Does the surface wait for a frame? Its frame callbacks, or a held update behind its barrier. */
+static int waits_frame(Surf *s) {
+    return !wl_list_empty(&s->frames) || (s->tm && s->tm->barrier && s->sq.n);
+}
+
+/* ns until the queue's first update is due by its time alone (UINT64_MAX: none, or it waits for its acquire point or
+ * its barrier, which wake the loop themselves) */
+static uint64_t timing_left(Surf *s, uint64_t now) {
+    Pend *e = sobjq_front(&s->sq);
+    if (!e || !s->tm || s->sq_src || s->sq_polling) return UINT64_MAX;
+    const WltUpdate *u = &e->tu;
+    if (u->wait_barrier && s->tm->barrier && !timing_nowait(s)) return UINT64_MAX;
+    if (!u->has_target) return 0;
+    if (timing_immediate) {                     /* the latch's frame is shown then */
+        uint64_t lead = wlt_slack(surf_clock(s)), at = u->target - lead;
+        return u->target <= lead || at <= now ? 0 : at - now;
+    }
+    return wlt_due_in(surf_clock(s), u->target, now);
+}
+static int timing_due(void) {
+    uint64_t now = 0;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->tm || !s->sq.n) continue;
+        if (!now) now = mono_now();
+        if (timing_left(s, now) == 0) return 1;
+    }
+    return 0;
+}
+
+void wl_latch(unsigned keys, int immediate) {
+    if (!dpy) return;
+    timing_immediate = immediate;
+    uint64_t now = 0;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->tm || !s->sq.n || !outpick_due(slot_key(s->fslot), keys)) continue;
+        if (!now) now = mono_now();
+        sq_drain_at(s, timing_present(s, now));
+    }
+}
+
+double wl_timing_wait(int unseen) {
+    if (!dpy) return -1;
+    uint64_t now = 0, wait = UINT64_MAX;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->tm || !s->sq.n) continue;
+        if (!now) now = mono_now();
+        if (unseen) sq_drain_at(s, now);        /* nothing is drawn: its time came, it applies */
+        uint64_t l = timing_left(s, now);
+        if (l < wait) wait = l;
+    }
+    if (timing_kick) { timing_kick = 0; wait = 0; }
+    return wait == UINT64_MAX ? -1 : (double)wait / 1e6;
+}
+
+static WlTiming **timing_slot(struct wl_resource *surface) {
+    Surf *s = wl_resource_get_user_data(surface);
+    return s ? &s->tm : NULL;
+}
+
 /* ---- input ---- */
 
+static Surf *surface_at_r(Surf *s, float lx, float ly, float *ox, float *oy);
 static Surf *surface_at(Surf *s, float lx, float ly, float *ox, float *oy) {
-    for (int i = s->nkids - 1; i >= 0; i--) {
+    if (!walk_enter()) return NULL;
+    Surf *r = surface_at_r(s, lx, ly, ox, oy);
+    walk_depth--;
+    return r;
+}
+static Surf *surface_at_r(Surf *s, float lx, float ly, float *ox, float *oy) {
+    for (int i = s->nkids - 1; i >= s->nbelow; i--) {      /* the ones over it, top first */
         Surf *k = s->kids[i];
         Surf *hit = surface_at(k, lx - k->sx, ly - k->sy, ox, oy);
         if (hit) return hit;
@@ -3842,9 +5113,15 @@ static Surf *surface_at(Surf *s, float lx, float ly, float *ox, float *oy) {
         *ox = lx; *oy = ly;
         return s;
     }
+    for (int i = s->nbelow - 1; i >= 0; i--) {             /* then the ones under it */
+        Surf *k = s->kids[i];
+        Surf *hit = surface_at(k, lx - k->sx, ly - k->sy, ox, oy);
+        if (hit) return hit;
+    }
     return NULL;
 }
 
+static uint32_t enter_serial;           /* the serial of the last wl_pointer.enter (pointer-warp, wl_warp.c) */
 static void pointer_enter(Surf *s, float lx, float ly) {
     if (pointer_focus == s) return;
     if (!s || !pointer_focus || s->client != pointer_focus->client) { cursor_surf = NULL; cursor_mode = 0; cursor_gen++; }
@@ -3858,8 +5135,9 @@ static void pointer_enter(Surf *s, float lx, float ly) {
     pointer_focus = s;
     if (s) {
         if (xw_scaled(s->client)) { lx = (float)xws_to_xf(lx, xw_pct); ly = (float)xws_to_xf(ly, xw_pct); }
+        enter_serial = wl_display_next_serial(dpy);     /* one for all of the client's pointers */
         FOR_CLIENT(&pointers, s->client, p) {
-            wl_pointer_send_enter(p, wl_display_next_serial(dpy), s->res, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
+            wl_pointer_send_enter(p, enter_serial, s->res, wl_fixed_from_double(lx), wl_fixed_from_double(ly));
             if (wl_resource_get_version(p) >= 5) wl_pointer_send_frame(p);
         }
     }
@@ -4188,6 +5466,7 @@ static int dnd_files_in(void) {
         return 0;
     }
     if (!drag.src || drag.contained || !(dnd_source_actions() & DND_COPY)) return 0;
+    if (tldrag_following()) return 0;   /* a tab torn off is a window, not files for LordOS (tldrag.c) */
     for (int i = 0; i < drag.src->nmimes; i++) if (!strcmp(drag.src->mimes[i], "text/uri-list")) return 1;
     return 0;
 }
@@ -4242,6 +5521,7 @@ static void dnd_focus(Surf *t, float lx, float ly) {
 
 static void dnd_end(void) {
     dnd_icon_damage();
+    tldrag_ended();
     memset(&drag, 0, sizeof drag);
 }
 static void dnd_cancel(void) {
@@ -4301,6 +5581,7 @@ static int in_drop_ready(int fd, uint32_t mask, void *data) {
     in_drop.paths = in_drop.len && !full ? uril_parse(in_drop.buf, in_drop.len, 0, &cut, &plen, &count) : NULL;
     in_drop.npaths = in_drop.paths && count <= URIL_MAX_PATHS ? count : 0;
     int ok = in_drop.gate.claimed && in_drop.npaths > 0;
+    if (getenv("LORD_WL_DEBUG")) fprintf(stderr, "wayland: dropped files read: %zu bytes, %d paths%s\n", in_drop.len, in_drop.npaths, full ? " (too long)" : "");
     if (in_drop.src && ok && wl_resource_get_version(in_drop.src->res) >= 3) wl_data_source_send_dnd_finished(in_drop.src->res);
     else if (in_drop.src && !ok) wl_data_source_send_cancelled(in_drop.src->res);
     in_drop.src = NULL;
@@ -4326,6 +5607,8 @@ static void dnd_take_files(void) {
 }
 int wl_drop_claim(void) {
     Source *src = in_drop.src;
+    if (getenv("LORD_WL_DEBUG")) fprintf(stderr, "wayland: drop claimed by Files: %s%s\n", src ? "a Wayland app's" : in_drop.x ? "an X app's" : "none",
+                                         in_drop.gate.pending && in_drop.gate.claimable ? "" : " (not claimable)");
     if ((!src && !in_drop.x) || (src && dnd_contained(wl_resource_get_client(src->res))) || !dndg_claim(&in_drop.gate)) return 0;
     int p[2];
     if (pipe2(p, O_CLOEXEC | O_NONBLOCK)) { in_drop_cancel(); return 0; }
@@ -4374,6 +5657,16 @@ static void dnd_drop(void) {
         dnd_end();
         return;
     }
+    /* a window following the drag (a tab torn off) let go where nothing took it: dropped there, as a move that ended,
+     * not cancelled (the app would take the tab back); as Mutter and KWin do (tldrag.c) */
+    if (!ok && drag.src && tldrag_following() && wl_resource_get_version(drag.src->res) >= 3) {
+        Source *src = drag.src;
+        dnd_leave();
+        wl_data_source_send_dnd_drop_performed(src->res);
+        wl_data_source_send_dnd_finished(src->res);
+        dnd_end();
+        return;
+    }
     if (!ok) { dnd_cancel(); return; }
     wl_data_device_send_drop(drag.dev);
     if (o) o->dropped = 1;
@@ -4390,7 +5683,8 @@ static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *dow
     last_x = x;
     last_y = y;
     dnd_icon_damage();
-    Surf *t = surface_under(x, y, hit, &lx, &ly);
+    /* the window following the drag is no target (tldrag.c); once dropped, the pointer is over it again */
+    Surf *t = surface_under(x, y, tldrag_hit(x, y, hit), &lx, &ly);
     dnd_focus(t, lx, ly);
     int released = 0;
     for (int i = 0; i < nbuttons; i++) {
@@ -4425,6 +5719,10 @@ static void xdrag_pointer(float x, float y, Node *hit) {
 /* Its last button is up: over a Wayland window it drops when the X app says (XdndDrop, wlx_xdrag_drop); files
  * over LordOS itself are claimable while the UI handles this release, and read from the X app once claimed. */
 static void xdrag_release(void) {
+    if (getenv("LORD_WL_DEBUG"))
+        fprintf(stderr, "wayland: X drag released: %s%s%s%s\n", drag.on && drag.xsrc ? "running" : "not running",
+                drag.focus ? ", over a Linux window" : "", drag.over_lord ? ", over LordOS with files" : "",
+                drag.contained ? ", files kept from LordOS" : "");
     xwm_xdrag_out(0);
     if (!drag.on || !drag.xsrc || drag.focus || !drag.over_lord) return;
     in_drop_cancel();
@@ -4460,6 +5758,7 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
     drag.src = src;
     drag.icon = icon;
     drag.contained = dnd_contained(c);
+    tldrag_started(src_res);            /* a window attached to this source follows the pointer (tldrag.c) */
     float ox, oy;
     if (under && origin(under, &ox, &oy)) dnd_focus(under, last_x - ox, last_y - oy);
     dnd_icon_damage();
@@ -4923,10 +6222,36 @@ int wl_shortcuts_answer(const char *app, int allow) {
  * Buffers are copied at add_buffer (shared memory only, square, 1…WLICON_MAX px, ARGB/XRGB8888) into lord-server's own
  * RGBA, the one closest to WLICON_WANT kept; an icon name is ignored (a name would let an app show another app's
  * icon). The shell uses the result only for a window whose app has no installed icon. */
-typedef struct { WlIcon *ic; int immutable; } IconObj;
+/* The buffers given (xdg-toplevel-icon: each must outlive the icon object, else no_buffer): watched by a destroy
+ * listener. The error is posted from an idle callback, never from inside the buffer's destruction (a disconnecting
+ * client's objects are destroyed in any order; its icon object going first cancels it). */
+#define ICON_BUFS 8
+typedef struct IconObj IconObj;
+typedef struct { struct wl_listener l; IconObj *o; } IconBuf;
+struct IconObj {
+    WlIcon *ic;
+    int immutable, nbuf;
+    IconBuf buf[ICON_BUFS];
+    struct wl_resource *res;
+    struct wl_event_source *gone_idle;
+};
+static void icon_no_buffer(void *data) {
+    IconObj *o = data;
+    o->gone_idle = NULL;
+    wl_resource_post_error(o->res, XDG_TOPLEVEL_ICON_V1_ERROR_NO_BUFFER, "a buffer of the icon was destroyed before the icon");
+}
+static void icon_buf_gone(struct wl_listener *l, void *data) {
+    (void)data;
+    IconBuf *b = wl_container_of(l, b, l);
+    wl_list_remove(&l->link);
+    wl_list_init(&l->link);
+    if (!b->o->gone_idle) b->o->gone_idle = wl_event_loop_add_idle(loop, icon_no_buffer, b->o);
+}
 static void icon_obj_gone(struct wl_resource *r) {
     IconObj *o = wl_resource_get_user_data(r);
     if (!o) return;
+    for (int i = 0; i < o->nbuf; i++) wl_list_remove(&o->buf[i].l.link);
+    if (o->gone_idle) wl_event_source_remove(o->gone_idle);
     wlicon_unref(o->ic);
     free(o);
 }
@@ -4944,6 +6269,12 @@ static void icon_add_buffer(struct wl_client *c, struct wl_resource *r, struct w
     struct wl_shm_buffer *b = buffer ? wl_shm_buffer_get(buffer) : NULL;
     int w = b ? wl_shm_buffer_get_width(b) : 0, h = b ? wl_shm_buffer_get_height(b) : 0;
     if (!b || w != h || w <= 0) { wl_resource_post_error(r, XDG_TOPLEVEL_ICON_V1_ERROR_INVALID_BUFFER, "not a square shared-memory buffer"); return; }
+    if (o->nbuf < ICON_BUFS && !wl_resource_get_destroy_listener(buffer, icon_buf_gone)) {
+        IconBuf *ib = &o->buf[o->nbuf++];
+        ib->o = o;
+        ib->l.notify = icon_buf_gone;
+        wl_resource_add_destroy_listener(buffer, &ib->l);
+    }
     uint32_t fmt = wl_shm_buffer_get_format(b);
     int stride = wl_shm_buffer_get_stride(b);
     if ((fmt != WL_SHM_FORMAT_ARGB8888 && fmt != WL_SHM_FORMAT_XRGB8888) || stride < w * 4) return;   /* not taken, no error */
@@ -4963,6 +6294,7 @@ static void iconm_create(struct wl_client *c, struct wl_resource *r, uint32_t id
     IconObj *o = calloc(1, sizeof *o);
     struct wl_resource *res = o ? wl_resource_create(c, &xdg_toplevel_icon_v1_interface, wl_resource_get_version(r), id) : NULL;
     if (!res) { free(o); wl_client_post_no_memory(c); return; }
+    o->res = res;
     wl_resource_set_implementation(res, &icon_impl, o, icon_obj_gone);
 }
 static void iconm_set(struct wl_client *c, struct wl_resource *r, struct wl_resource *toplevel, struct wl_resource *icon) {
@@ -5256,6 +6588,22 @@ static void params_create_common(struct wl_client *c, struct wl_resource *r, uin
         wl_resource_post_error(r, n ? ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_DIMENSIONS : ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INCOMPLETE, "invalid buffer");
         return;
     }
+    /* out_of_bounds (as wlroots): each plane's offset and one row inside its dmabuf, and the first plane's rows
+     * (the others may be subsampled); skipped where the kernel can't tell a dmabuf's size */
+    for (int i = 0; i < n; i++) {
+        if ((uint64_t)p->off[i] + p->stride[i] > UINT32_MAX) {
+            wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_OUT_OF_BOUNDS, "plane %d: offset + stride overflows", i);
+            return;
+        }
+        off_t size = lseek(p->fd[i], 0, SEEK_END);
+        if (size <= 0) continue;
+        if ((uint64_t)p->off[i] >= (uint64_t)size || (uint64_t)p->off[i] + p->stride[i] > (uint64_t)size ||
+            (i == 0 && (uint64_t)p->off[i] + (uint64_t)p->stride[i] * (uint64_t)h > (uint64_t)size)) {
+            wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_OUT_OF_BOUNDS, "plane %d: offset %u, stride %u and height %d go past its %lld bytes",
+                                   i, p->off[i], p->stride[i], h, (long long)size);
+            return;
+        }
+    }
     Dmabuf *d = calloc(1, sizeof *d);
     if (!d) { wl_client_post_no_memory(c); return; }
     d->d = (GpuDmabuf){ .width = w, .height = h, .nplanes = n, .fourcc = format, .modifier = p->mod };
@@ -5444,7 +6792,10 @@ static void wl_gpu_changed(void) {
     for (int i = 0; i < MAX_SURF; i++) {
         Surf *s = surfs[i];
         if (!s) continue;
-        if (s->dmabuf && dm_tex(s->dmabuf)) {
+        if (s->dmabuf && wlcolor_conv(s->res)) {           /* converted: read back once the GPU is here (wlcolor.h) */
+            Dmabuf *d = s->dmabuf;
+            if (dm_read_converted(s, d, wlcolor_conv(s->res)) == 0) { s->dmabuf = NULL; queue_release(d, &s->rel); apply_viewport(s); }
+        } else if (s->dmabuf && dm_tex(s->dmabuf)) {
             const GpuDmabuf *g = &s->dmabuf->d;
             s->w = g->width;
             s->h = g->height;
@@ -5461,6 +6812,7 @@ static void wl_gpu_changed(void) {
     new_on(OUTPICK_ALL);
     ui.dirty = 1;
     damage_add((Box){ 0, 0, ui.width, ui.height });
+    bgeffect_caps_changed();            /* blur behind windows is drawn only off the GPU (bgeffect.c) */
     GpuFormat f[256];
     int n = dmabuf_formats(f, 256);
     if (formats_sig(f, n, feedback_dev()) != feedback_sig) {
@@ -5495,6 +6847,13 @@ static void bind_presentation(struct wl_client *c, void *data, uint32_t ver, uin
 /* The flip finished (main.c, with the KMS time and vblank number). */
 void wl_presented(int key, int main_key, uint64_t ns, unsigned seq, unsigned refresh_ns) {
     if (!dpy) return;
+    /* a torn flip (tearing-control, wl_try_scanout) was shown when it completed, not at a vblank: no vsync in its
+     * feedback, and the display's vblank grid (fifo, commit timing) stays the last vsync'd one's */
+    int torn = gpu_flip_torn();
+    if (!torn) wlt_clock_set(key, ns, refresh_ns);
+    uint32_t kind = torn ? WP_PRESENTATION_FEEDBACK_KIND_HW_COMPLETION
+                         : WP_PRESENTATION_FEEDBACK_KIND_VSYNC | WP_PRESENTATION_FEEDBACK_KIND_HW_CLOCK |
+                           WP_PRESENTATION_FEEDBACK_KIND_HW_COMPLETION;
     for (int i = 0; i < MAX_SURF; i++) {
         Surf *s = surfs[i];
         if (!s || wl_list_empty(&s->sent_feedback) || !outpick_presents(slot_key(s->fslot), key, main_key)) continue;
@@ -5506,9 +6865,7 @@ void wl_presented(int key, int main_key, uint64_t ns, unsigned seq, unsigned ref
                     FOR_CLIENT(&oslots[k].res, s->client, o) wp_presentation_feedback_send_sync_output(fb, o);
             uint64_t sec = ns / 1000000000ull;
             wp_presentation_feedback_send_presented(fb, (uint32_t)(sec >> 32), (uint32_t)sec, (uint32_t)(ns % 1000000000ull),
-                                                    refresh_ns, 0, seq,
-                                                    WP_PRESENTATION_FEEDBACK_KIND_VSYNC | WP_PRESENTATION_FEEDBACK_KIND_HW_CLOCK |
-                                                    WP_PRESENTATION_FEEDBACK_KIND_HW_COMPLETION);
+                                                    refresh_ns, 0, seq, kind);
             wl_resource_destroy(fb);
         }
     }
@@ -5608,12 +6965,27 @@ static void constraint_send(Constraint *k, int on) {
     else { if (on) zwp_confined_pointer_v1_send_confined(k->res); else zwp_confined_pointer_v1_send_unconfined(k->res); }
 }
 
-/* Holds while the pointer is on its surface and the keyboard on its app (ptrlock.h). */
+/* A point of the constrained surface (its logical coordinates) inside where the constraint holds: the surface, its
+ * input region and the constraint's region (all in the surface's own pixels, X pixels for an X window) */
+static int cons_inside(const Constraint *k, float lx, float ly) {
+    const Surf *s = k->surf;
+    if (!s || lx < 0 || ly < 0 || lx >= s->lw || ly >= s->lh) return 0;
+    float rx = lx, ry = ly;
+    if (xw_scaled(s->client)) { rx = (float)xws_to_xf(lx, xw_pct); ry = (float)xws_to_xf(ly, xw_pct); }
+    if (s->has_input && !wlrgn_has(&s->input, rx, ry)) return 0;
+    return !k->has_region || wlrgn_has(&k->region, rx, ry);
+}
+
+/* Holds while the pointer is on its surface (inside the region) and the keyboard on its app (ptrlock.h). */
 static void constraint_update(void) {
     Constraint *k = constraint;
     if (!k || !k->surf) return;
     Surf *top = pointer_focus;
     int on = top && (top == k->surf || top->parent == k->surf);
+    float ox, oy;
+    /* activated only from inside its region; once active, the region doesn't end it (a lock keeps the pointer still,
+     * a confinement keeps it inside) */
+    if (on && !k->active && origin(k->surf, &ox, &oy) && !cons_inside(k, last_x - ox, last_y - oy)) on = 0;
     int kb = key_focus && key_focus->client == k->surf->client;
     int what = ptrlock_step(&k->active, &k->spent, k->oneshot, on, kb);
     if (what == PTRLOCK_SAME) return;
@@ -5634,15 +7006,37 @@ static void cons_gone(struct wl_resource *r) {
     if (!k) return;
     if (constraint == k) constraint = NULL;
     cursor_gen++;
+    wlrgn_free(&k->region);
+    wlrgn_free(&k->p_region);
     free(k);
 }
 static void cons_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void cons_hint(struct wl_client *c, struct wl_resource *r, wl_fixed_t x, wl_fixed_t y) { (void)c; (void)r; (void)x; (void)y; }
-static void cons_region(struct wl_client *c, struct wl_resource *r, struct wl_resource *region) { (void)c; (void)r; (void)region; }
+/* set_region: a copy of the region (NULL: none, all of the surface), applied with the surface's next commit */
+static void cons_region(struct wl_client *c, struct wl_resource *r, struct wl_resource *region) {
+    Constraint *k = wl_resource_get_user_data(r);
+    if (!k) return;
+    WlRgn *g = region ? wl_resource_get_user_data(region) : NULL;
+    if (g ? wlrgn_copy(&k->p_region, g) : (wlrgn_free(&k->p_region), 0)) { wl_client_post_no_memory(c); return; }
+    k->p_has_region = g != NULL;
+    k->p_set = 1;
+}
+/* The surface's commit: the pending region becomes the constraint's (surface_apply) */
+static void cons_commit(Surf *s) {
+    Constraint *k = constraint;
+    if (!k || k->surf != s || !k->p_set) return;
+    WlRgn t = k->region;
+    k->region = k->p_region;
+    k->p_region = t;
+    k->has_region = k->p_has_region;
+    k->p_set = 0;
+    constraint_update();
+}
 static const struct zwp_locked_pointer_v1_interface locked_impl = { .destroy = cons_destroy, .set_cursor_position_hint = cons_hint, .set_region = cons_region };
 static const struct zwp_confined_pointer_v1_interface confined_impl = { .destroy = cons_destroy, .set_region = cons_region };
 
-static void cons_new(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, uint32_t lifetime, int lock) {
+static void cons_new(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, struct wl_resource *region,
+                     uint32_t lifetime, int lock) {
     Surf *s = wl_resource_get_user_data(surface);
     if (constraint && constraint->surf == s) { wl_resource_post_error(r, ZWP_POINTER_CONSTRAINTS_V1_ERROR_ALREADY_CONSTRAINED, "already constrained"); return; }
     Constraint *k = calloc(1, sizeof *k);
@@ -5651,6 +7045,9 @@ static void cons_new(struct wl_client *c, struct wl_resource *r, uint32_t id, st
     k->res = res;
     k->surf = s;
     k->lock = lock;
+    WlRgn *g = region ? wl_resource_get_user_data(region) : NULL;      /* the initial region, current at once */
+    if (g && wlrgn_copy(&k->region, g)) { wl_resource_destroy(res); wl_client_post_no_memory(c); return; }
+    k->has_region = g != NULL;
     k->oneshot = lifetime == ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_ONESHOT;
     if (lock) wl_resource_set_implementation(res, &locked_impl, k, cons_gone);
     else wl_resource_set_implementation(res, &confined_impl, k, cons_gone);
@@ -5660,13 +7057,13 @@ static void cons_new(struct wl_client *c, struct wl_resource *r, uint32_t id, st
 }
 static void cons_lock(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, struct wl_resource *pointer,
                       struct wl_resource *region, uint32_t lifetime) {
-    (void)pointer; (void)region;
-    cons_new(c, r, id, surface, lifetime, 1);
+    (void)pointer;
+    cons_new(c, r, id, surface, region, lifetime, 1);
 }
 static void cons_confine(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, struct wl_resource *pointer,
                          struct wl_resource *region, uint32_t lifetime) {
-    (void)pointer; (void)region;
-    cons_new(c, r, id, surface, lifetime, 0);
+    (void)pointer;
+    cons_new(c, r, id, surface, region, lifetime, 0);
 }
 static void consm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static const struct zwp_pointer_constraints_v1_interface consm_impl = { .destroy = consm_destroy, .lock_pointer = cons_lock, .confine_pointer = cons_confine };
@@ -5680,15 +7077,37 @@ static void bind_consm(struct wl_client *c, void *data, uint32_t ver, uint32_t i
 /* For main.c: pointer locked (does not move) or confined to the surface (clipped). */
 int wl_pointer_locked(void) { return constraint && constraint->active && constraint->lock; }
 void wl_pointer_confine(int *x, int *y) {
-    if (!constraint || !constraint->active || constraint->lock || !constraint->surf) return;
+    Constraint *k = constraint;
+    if (!k || !k->active || k->lock || !k->surf) return;
     float ox, oy;
-    Surf *s = constraint->surf;
+    Surf *s = k->surf;
     if (!origin(s, &ox, &oy)) return;
     int x0 = (int)ox, y0 = (int)oy, x1 = x0 + s->lw - 1, y1 = y0 + s->lh - 1;
     if (*x < x0) *x = x0;
     if (*y < y0) *y = y0;
     if (*x > x1) *x = x1;
     if (*y > y1) *y = y1;
+    if (!k->has_region && !s->has_input) return;            /* the whole surface */
+    if (cons_inside(k, (float)*x - ox, (float)*y - oy)) return;
+    /* outside the region: the nearest point of one of its rectangles that is inside, else where it was */
+    const WlRgn *g = k->has_region ? &k->region : &s->input;
+    int bx = (int)last_x, by = (int)last_y;
+    long best = -1;
+    int xs = xw_scaled(s->client);
+    for (int i = 0; i < g->n; i++) {
+        const WlRgnOp *o = &g->op[i];
+        if (o->sub) continue;
+        float rx0 = (float)o->x, ry0 = (float)o->y, rx1 = (float)o->x + (float)o->w - 1, ry1 = (float)o->y + (float)o->h - 1;
+        if (xs) { rx0 = (float)xws_from_x((int)rx0, xw_pct); ry0 = (float)xws_from_x((int)ry0, xw_pct); rx1 = (float)xws_from_x((int)rx1, xw_pct); ry1 = (float)xws_from_x((int)ry1, xw_pct); }
+        float px = (float)*x - ox, py = (float)*y - oy;
+        px = px < rx0 ? rx0 : px > rx1 ? rx1 : px;
+        py = py < ry0 ? ry0 : py > ry1 ? ry1 : py;
+        if (!cons_inside(k, px, py)) continue;
+        long dx = (long)(px + ox) - *x, dy = (long)(py + oy) - *y, d = dx * dx + dy * dy;
+        if (best < 0 || d < best) { best = d; bx = (int)(px + ox); by = (int)(py + oy); }
+    }
+    *x = bx;
+    *y = by;
 }
 
 /* Cursor requested by the app with the pointer: 0 = LordOS arrow, 1 = image, 2 = hidden. */
@@ -5743,12 +7162,14 @@ void wl_set_focus(int id) {
         FOR_CLIENT(&keyboards, s->client, kb) send_enter_keyboard(kb, s);
         s->activated = 1;
         send_toplevel_configure(s);
+        wm_ping(s);
         offer_to_focus();
         prim_offer_focus();
         clip_seen = term_clipboard_gen();
     }
     /* X11: the X focus follows (and with it whether X apps may read LordOS's clipboard) */
     xwm_focus(s && s->xw ? s->xw : NULL);
+    wl_tablet_key_focus(s ? s->res : NULL);   /* tablet pads follow the keyboard (wl_tablet.c) */
     constraint_update();                /* a pointer lock holds only with the keyboard (ptrlock.h) */
     wl_display_flush_clients(dpy);
 }
@@ -5893,6 +7314,17 @@ void wl_set_parked(int id, int parked) {
     if (dpy) wl_display_flush_clients(dpy);
 }
 
+/* The window's layer, as the theme stacks it (sdk/desktopmodel.js stackOrder): 1 always on top, -1 kept below, 0.
+ * Kept for a theme switch (the map carries it); an X11 window's goes to xwm (its _NET_WM_STATE and X's stacking).
+ * Wayland has no protocol to tell an app, so a Wayland window isn't told. */
+void wl_set_layer(int id, int layer) {
+    Surf *s = find(id);
+    layer = layer > 0 ? 1 : layer < 0 ? -1 : 0;
+    if (!s || (!s->top && !s->xw)) return;
+    if (s->xw) { xwm_set_layer(s->xw, layer); return; }
+    s->layer = layer;
+}
+
 /* Wholly covered by an opaque window above it on the showing desktop (sdk/desktopmodel.js coveredIds): it stays
  * where it is, with its keyboard and pointer rules unchanged, but nothing of it is on screen, so its frame callbacks
  * go out once a second and a Wayland window hears "suspended" (framegate.h). An X11 window is only paced: X has no
@@ -5910,7 +7342,7 @@ void wl_set_covered(int id, int covered) {
 void wl_output_resized(void) {
     if (!dpy) return;
     int w = (int)ui.width, h = (int)ui.height;
-    WlOutput o = { 0, 0, w, h, w, h, 60000, 100, w * 254 / 960, h * 254 / 960, "LORD-1", "LordOS display", 0 };
+    WlOutput o = { 0, 0, w, h, w, h, 60000, 100, w * 254 / 960, h * 254 / 960, "LORD-1", "LordOS display", 0, { 0 } };
     wl_set_outputs(&o, 1, 0);
 }
 
@@ -5932,6 +7364,26 @@ int wl_count(void) {
     int n = 0;
     for (int i = 0; i < MAX_SURF; i++) if (surfs[i] && surfs[i]->role == R_TOPLEVEL && surfs[i]->mapped) n++;
     return n;
+}
+
+/* ---- drm-lease-v1 (drmlease.c): what it needs to know of a client ---- */
+static int drml_trusted(struct wl_client *c) {
+    return c && c != xwl_client && !greeter && client_pid(c) != getpid() && !app_of_client(c) && !client_sandboxed(c);
+}
+static const char *drml_identity(struct wl_client *c) {
+    const char *who = client_identity(c);
+    return kbi_key_valid(who) ? who : "";
+}
+static void drml_ask(const char *app, const char *headset) {
+    /* the shell asks (sdk/wayland.js); the name is an installed app's whose entry runs that program, never the client's */
+    char name[128] = "", id[400], a[160], h[160], json[600];
+    wl_shortcuts_name(app, "", name, sizeof name);
+    json_str(id, sizeof id, app);
+    json_str(a, sizeof a, name);
+    json_str(h, sizeof h, headset);
+    int n = snprintf(json, sizeof json, "{\"app\":\"%s\",\"name\":\"%s\",\"headset\":\"%s\"}", id, a, h);
+    if (n > 0 && n < (int)sizeof json) emit_id(0, "drmlease", json);   /* never a cut one (an event holds 600) */
+    else fprintf(stderr, "wayland: drm-lease: the prompt for %s does not fit an event\n", app);
 }
 
 /* ---- startup and loop ---- */
@@ -5978,10 +7430,18 @@ int wl_start(void) {
     if (gpu_active()) ngpu_fmt = gpu_formats(gpu_fmt_cache, 256);
     gpu_set_hooks(wl_gpu_lost, wl_gpu_changed);
     wl_global_create(dpy, &zwp_linux_dmabuf_v1_interface, 5, NULL, bind_dmabuf);   /* 5: one modifier for every plane */
+    /* explicit sync: only with a render node that has timeline syncobjs and SYNCOBJ_EVENTFD (syncobj.c); on both the
+     * GPU and the CPU path (a commit is applied once its acquire point is signalled, so the CPU copy reads a finished
+     * frame) */
+    wl_list_init(&sobj_clients);
+    dev_t sdev = drm_dev;
+    if (gpu_active()) gpu_device(&sdev);
+    if (sobj_init(sdev) == 0) wl_global_create(dpy, &wp_linux_drm_syncobj_manager_v1_interface, 1, NULL, bind_sobjm);
     wl_global_create(dpy, &wp_presentation_interface, 2, NULL, bind_presentation);
     wl_global_create(dpy, &wp_viewporter_interface, 1, NULL, bind_viewporter);
     wl_global_create(dpy, &wp_single_pixel_buffer_manager_v1_interface, 1, NULL, bind_spbm);   /* one-pixel buffers (backgrounds) */
     wl_global_create(dpy, &wp_alpha_modifier_v1_interface, 1, NULL, bind_am);                   /* a surface's opacity */
+    wlcolor_init(dpy);                  /* color-management-v1 and color-representation-v1 (wlcolor.h) */
     wl_global_create(dpy, &zwp_relative_pointer_manager_v1_interface, 1, NULL, bind_relm);
     wl_global_create(dpy, &zwp_pointer_constraints_v1_interface, 1, NULL, bind_consm);
     wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 2, NULL, bind_csm);   /* cursors by name (2: dnd_ask, all_resize) */
@@ -5992,8 +7452,19 @@ int wl_start(void) {
     wl_display_add_client_created_listener(dpy, &client_created);
     wl_global_create(dpy, &kde_mgr_interface, 1, NULL, bind_kde_deco);   /* theme frame for GTK 3 (Firefox) */
     wl_input_globals(dpy);              /* zwp_pointer_gestures_v1 (wl_input.c) */
+    wl_tablet_globals(dpy);             /* zwp_tablet_manager_v2 (wl_tablet.c) */
+    wl_warp_globals(dpy);               /* wp_pointer_warp_v1 (wl_warp.c) */
     wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */
+    tldrag_globals(dpy);                /* shell extras (wlshell.h): a window that follows a drag, */
+    tltag_globals(dpy);                 /* window tags, */
+    sysbell_globals(dpy);               /* the bell, */
+    xsession_globals(dpy);              /* windows back where they were, */
+    bgeffect_globals(dpy);              /* and blur behind a window where it can be drawn */
+    xwshell_globals(dpy);               /* xwayland-shell-v1: Xwayland's windows matched to their surfaces (xwshell.c) */
     secctx_init(dpy, may_secctx);       /* a sandbox's own socket per app (secctx.c) */
+    wlfixes_init(dpy);                  /* wl_fixes: a client destroys a registry it no longer needs (wlfixes.c) */
+    wlt_globals(dpy, timing_slot);      /* fifo, commit timing, tearing control, content type (timing.c) */
+    drmlease_init(dpy, &(DrmlHooks){ drml_trusted, drml_identity, drml_ask });   /* a VR headset, if allowed (after secctx) */
     /* inherited by apps opened from the LordOS terminal */
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);
@@ -6033,6 +7504,66 @@ void wl_flush(void) {
     if (keylag_enabled) keylag_flushed();
 }
 
+/* ---- for the shell extras (wlshell.h: tldrag.c, tltag.c, sysbell.c, xsession.c, bgeffect.c) ---- */
+int wl__surface_id(struct wl_resource *r) {
+    Surf *s = r && wl_resource_instance_of(r, &wl_surface_interface, &surface_impl) ? wl_resource_get_user_data(r) : NULL;
+    return s ? s->id : 0;
+}
+int wl__toplevel_id(struct wl_resource *r) {
+    Surf *s = r && wl_resource_instance_of(r, &xdg_toplevel_interface, &toplevel_impl) ? wl_resource_get_user_data(r) : NULL;
+    return s && s->top == r ? s->id : 0;
+}
+int wl__window_of(int id) {
+    Surf *s = find(id);
+    while (s && s->role != R_TOPLEVEL && s->parent) s = s->parent;
+    return s && s->role == R_TOPLEVEL ? s->id : 0;
+}
+int wl__surface_state(int id, int *mapped, int *committed, int *toplevel) {
+    Surf *s = find(id);
+    if (!s) return 0;
+    *mapped = s->mapped;
+    *committed = s->sent_configure;
+    *toplevel = s->role == R_TOPLEVEL && s->top;
+    return 1;
+}
+int wl__window_rect(int id, int r[4], int *maximized, int *fullscreen) {
+    Surf *s = find(id);
+    Node *n = s && s->role == R_TOPLEVEL && s->node ? node_get(s->node) : NULL;
+    if (!n || n->prev_box.x1 <= n->prev_box.x0) return 0;
+    int w, h;
+    geometry(s, &w, &h);
+    r[0] = (int)lroundf(n->ax); r[1] = (int)lroundf(n->ay); r[2] = w; r[3] = h;
+    *maximized = s->maximized;
+    *fullscreen = s->fullscreen || s == fs_surf;
+    return 1;
+}
+int wl__surface_geom(int id, int g[4], int *lw, int *lh) {
+    Surf *s = find(id);
+    if (!s) return 0;
+    int w, h;
+    geometry(s, &w, &h);
+    g[0] = s->has_geom ? s->gx : 0; g[1] = s->has_geom ? s->gy : 0; g[2] = w; g[3] = h;
+    *lw = s->lw; *lh = s->lh;
+    return 1;
+}
+int wl__surface_node(int id) { Surf *s = find(id); return s ? s->node : 0; }
+struct wl_client *wl__surface_client(int id) { Surf *s = find(id); return s ? s->client : NULL; }
+const char *wl__client_owner(struct wl_client *c) {
+    static char out[KBI_ID_MAX + 8];
+    if (!c || c == xwl_client || greeter) return "";
+    const char *iso = app_of_client(c);
+    if (iso) { snprintf(out, sizeof out, "app:%s", iso); return lpk_valid_id(iso) ? out : ""; }
+    const char *who = client_identity(c);
+    return kbi_key_valid(who) ? who : "";
+}
+int wl__source_used(struct wl_resource *r) {
+    Source *s = r ? wl_resource_get_user_data(r) : NULL;
+    return s ? s->used : 0;
+}
+void wl__emit(int id, const char *type, const char *json) { emit_id(id, type, json); }
+void wl__pointer(float *x, float *y) { *x = last_x; *y = last_y; }
+void wl__json_str(char *out, size_t size, const char *s) { json_str(out, size, s); }
+
 /* ---- for wl_input.c (gestures, fine scrolling and touches) ---- */
 struct wl_display *wl__display(void) { return dpy; }
 struct wl_resource *wl__pointer_focus(void) { return dpy && pointer_focus ? pointer_focus->res : NULL; }
@@ -6060,6 +7591,68 @@ struct wl_resource *wl__surface_at(float x, float y, float *lx, float *ly) {
     return target ? target->res : NULL;
 }
 
+/* ---- for wl_tablet.c and wl_warp.c (tablet-v2 and pointer-warp) ---- */
+static Surf *surf_of(struct wl_resource *r) {
+    return r && wl_resource_instance_of(r, &wl_surface_interface, &surface_impl) ? wl_resource_get_user_data(r) : NULL;
+}
+/* A surface's box on screen (logical px): 0 if it isn't shown. */
+int wl__surface_box(struct wl_resource *surface, float *x, float *y, float *w, float *h) {
+    Surf *s = surf_of(surface);
+    if (!dpy || !s || !s->content || !origin(s, x, y)) return 0;
+    *w = (float)s->lw;
+    *h = (float)s->lh;
+    return 1;
+}
+/* Under a modal dialog: no presses (as wl_pointer). */
+int wl__surface_held(struct wl_resource *surface) {
+    Surf *t = toplevel_of(surf_of(surface));
+    return t && t->role == R_TOPLEVEL && modal_over(t) != NULL;
+}
+/* Both surfaces are of the same window (one may be a subsurface of the other's toplevel). */
+int wl__same_window(struct wl_resource *a, struct wl_resource *b) {
+    Surf *x = toplevel_of(surf_of(a)), *y = toplevel_of(surf_of(b));
+    return x && x == y;
+}
+struct wl_resource *wl__key_focus(void) { return dpy && key_focus ? key_focus->res : NULL; }
+uint32_t wl__pointer_enter_serial(void) { return pointer_focus ? enter_serial : 0; }
+int wl__dragging(void) { return drag.on; }
+/* A tablet tool's tip on a surface or off it: a press as a button's for move, resize, a drag's start and popups
+ * (the serial is the tool's down). On a press elsewhere than a menu the menus close. */
+void wl__tool_press(struct wl_resource *surface, float x, float y, int down, uint32_t serial) {
+    Surf *s = surf_of(surface);
+    if (!dpy) return;
+    if (!down) {
+        if (buttons_held > 0) buttons_held--;
+        if (!buttons_held) { npress = 0; press_surf = NULL; }
+        return;
+    }
+    if (!s) return;
+    if (npopups) {
+        Surf *t = s;
+        while (t && t->role == R_SUB) t = t->parent;
+        if (!t || t->role != R_POPUP) dismiss_popups();
+    }
+    npress = 0;
+    press_surf = s;
+    press_serials[npress++] = serial;
+    press_x = x;
+    press_y = y;
+    buttons_held++;
+    if (fs_surf && key_focus != fs_surf && toplevel_of(s) == fs_surf) wl_set_focus(fs_surf->id);
+}
+/* The cursor a tablet tool asked for over its app (zwp_tablet_tool_v2.set_cursor): as wl_pointer.set_cursor. */
+int wl__tool_cursor(struct wl_resource *surface, int32_t x, int32_t y) {
+    Surf *s = surf_of(surface);
+    if (s && ((s->role != R_NONE && s->role != R_CURSOR) || s->xdg || s->sub)) return -1;
+    if (s) { s->role = R_CURSOR; s->cursor_hx = s->p_hx = x; s->cursor_hy = s->p_hy = y; }
+    cursor_surf = s;
+    cursor_mode = s ? 1 : 2;
+    cursor_gen++;
+    return 0;
+}
+/* The pointer leaves the app while a tablet tool is over it: its toolkit takes the tool's events, not the mouse's. */
+void wl__pointer_leave(void) { if (dpy) pointer_enter(NULL, 0, 0); }
+
 /* ---- X11 windows (xwm.c): the role of Xwayland's surfaces ---- */
 
 struct wl_client *wlx_client(void) { return xwl_client; }
@@ -6074,11 +7667,25 @@ int wlx_begin_scale(int self) {
 int wlx_scale(void) { return xw_pct; }
 float wl__client_scale(struct wl_client *c) { return xw_scaled(c) ? xw_pct / 100.0f : 1.0f; }
 
+static int xattach(Surf *s, XWin *w, const XWinInfo *in);
 int wlx_attach(uint32_t res_id, XWin *w, const XWinInfo *in) {
     if (!dpy || !xwl_client) return 0;
     struct wl_resource *r = wl_client_get_object(xwl_client, res_id);
     if (!r || !wl_resource_instance_of(r, &wl_surface_interface, &surface_impl)) return 0;
-    Surf *s = wl_resource_get_user_data(r);
+    return xattach(wl_resource_get_user_data(r), w, in);
+}
+/* xwayland-shell-v1 (xwshell.c): the surface its serial named */
+int wlx_attach_id(int sid, XWin *w, const XWinInfo *in) {
+    Surf *s = dpy && xwl_client ? find(sid) : NULL;
+    return s && s->client == xwl_client ? xattach(s, w, in) : 0;
+}
+/* A wl_surface of Xwayland's with no role yet (xwayland_shell_v1.get_xwayland_surface takes only those). */
+int wlx_surface_free(struct wl_resource *surface) {
+    if (!surface || !wl_resource_instance_of(surface, &wl_surface_interface, &surface_impl)) return 0;
+    Surf *s = wl_resource_get_user_data(surface);
+    return s && xwl_client && s->client == xwl_client && s->role == R_NONE && !s->xw;
+}
+static int xattach(Surf *s, XWin *w, const XWinInfo *in) {
     if (!s || s->role != R_NONE || s->xw) return 0;
     s->xw = w;
     s->sent_configure = 1;                                  /* no xdg configure: X sizes it */
@@ -6106,6 +7713,67 @@ void wlx_detach(int sid) {
     s->xw = NULL;
     s->xpop = 0;
     s->role = R_NONE;
+}
+
+/* WM_TRANSIENT_FOR and _NET_WM_STATE_MODAL: the window it belongs to (0: none), as xdg_toplevel.set_parent and
+ * xdg-dialog-v1 do for a Wayland window ("parent" event; a modal one takes its owner's input). Only another X
+ * window's toplevel can be the owner; a loop is ignored (set_owner). */
+void wlx_set_parent(int sid, int parent_sid, int modal) {
+    Surf *s = find(sid), *p = parent_sid ? find(parent_sid) : NULL;
+    if (!s || !s->xw || s->role != R_TOPLEVEL) return;
+    if (p && (!p->xw || p->role != R_TOPLEVEL || p == s)) p = NULL;
+    set_owner(s, p, NULL);
+    set_modal(s, modal);
+}
+/* WM_HINTS urgency or _NET_WM_STATE_DEMANDS_ATTENTION ("attention"), or a _NET_ACTIVE_WINDOW request LordOS grants
+ * ("activate"): what xdg_activation_v1.activate tells the theme for a Wayland window (sdk/desktopmodel.js). */
+void wlx_attention(int sid, int granted) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL || !s->mapped) return;
+    emit(s, granted ? "activate" : "attention", "{}");
+}
+/* _NET_WM_STATE_SKIP_TASKBAR changed while it is shown (the map carries it the first time). */
+void wlx_skip_taskbar(int sid, int skip) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL || !s->mapped) return;
+    emit(s, "taskbar", "{\"skip\":%s}", skip ? "true" : "false");
+}
+/* _NET_WM_STATE_SKIP_PAGER changed while it is shown: left out of the Overview (the map carries it the first time). */
+void wlx_skip_pager(int sid, int skip) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL || !s->mapped) return;
+    emit(s, "pager", "{\"skip\":%s}", skip ? "true" : "false");
+}
+/* _NET_WM_STATE_ABOVE / _BELOW changed while it is shown: the window's layer in the theme (sdk/desktopmodel.js
+ * stackOrder). The map carries it the first time. */
+void wlx_layer(int sid, int layer) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL || !s->mapped) return;
+    emit(s, "layer", "{\"layer\":%d}", layer > 0 ? 1 : layer < 0 ? -1 : 0);
+}
+/* _NET_WM_ICON: the image xwm.c picked (x11_net_wm_icon_pick), copied here within wlicon.h's limits and budget, as
+ * the window's own icon (what xdg_toplevel_icon_v1 gives a Wayland window); NULL clears it. */
+void wlx_set_icon(int sid, const uint8_t *argb_le, int w, int h) {
+    Surf *s = find(sid);
+    if (!s || !s->xw || s->role != R_TOPLEVEL) return;
+    WlIcon *ic = argb_le ? wlicon_from_net(argb_le, w, h) : NULL;
+    if (argb_le && !ic) return;                             /* past the limits: the old one stays */
+    if (!ic && !s->icon) return;
+    wlicon_unref(s->icon);
+    s->icon = ic;
+    if (s->mapped) emit(s, "icon", "{\"size\":%d}", ic ? ic->size : 0);
+}
+/* _NET_WORKAREA: the work area of the first display (logical; the menu bar and Dock out, wl_set_work_areas), or
+ * the display itself while the theme hasn't said. 0 if there is no display. */
+int wlx_work_area(int *x, int *y, int *w, int *h) {
+    for (int i = 0; i < OUT_MAX; i++) {
+        if (!oslots[i].used) continue;
+        const WlOutput *o = &oslots[i].o;
+        if (warea[i].w > 0 && warea[i].h > 0) { *x = warea[i].x; *y = warea[i].y; *w = warea[i].w; *h = warea[i].h; }
+        else { *x = o->x; *y = o->y; *w = o->w; *h = o->h; }
+        return 1;
+    }
+    return 0;
 }
 
 void wlx_set_title(int sid, const char *t) {
@@ -6199,6 +7867,7 @@ int wlx_xdrag_begin(const char *const *mimes, int n) {
     nxsrc = 0;
     for (int i = 0; i < n && nxsrc < MAX_MIMES; i++)
         if (strlen(mimes[i]) < sizeof xsrc_mimes[0]) snprintf(xsrc_mimes[nxsrc++], sizeof xsrc_mimes[0], "%s", mimes[i]);
+    if (getenv("LORD_WL_DEBUG")) for (int i = 0; i < nxsrc; i++) fprintf(stderr, "wayland: X drag type %s\n", xsrc_mimes[i]);
     return 1;
 }
 void wlx_xdrag_action(uint32_t actions) {

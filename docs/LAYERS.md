@@ -36,7 +36,7 @@ in it, so an empty part of a layer lets the click through to whatever is below.
 
 | Layer | zIndex | What goes there |
 |---|---|---|
-| base | 0 | the theme's own tree: wallpaper, desktop widgets, windows (in tree order) |
+| base | 0 | the theme's own tree: wallpaper, desktop widgets, windows (in tree order: kept below, normal, always on top; `WINDOWS.md`, "Always on top") |
 | `dock` | 10 | the Dock; the Lord Classic taskbar |
 | `menubar` | 20 | the top menu bar |
 | `floating` | 30 | fullscreen and picture-in-picture windows |

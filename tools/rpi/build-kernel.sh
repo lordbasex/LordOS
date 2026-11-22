@@ -1,6 +1,8 @@
 #!/bin/sh
 # build-kernel.sh — the LordOS Raspberry Pi kernel: Raspberry Pi's own kernel source and defconfig,
-# plus what LordOS needs that it lacks (Landlock, the BPF LSM and BTF). See docs/RASPBERRY.md,
+# plus what LordOS needs that it lacks (Landlock, the BPF LSM and BTF) and, since revision 4, the
+# v4l2loopback module for LordOS Studio's camera (docs/CAMERA-STUDIO-PLAN.md 2.2, E-S3: built here out of
+# tree from its pinned source, so the board needs no DKMS, compiler or headers). See docs/RASPBERRY.md,
 # "The LordOS kernel".
 #
 # Usage (on an arm64 Debian 13, e.g. the Pi itself, about 75 min per flavour on a Pi 5; or cross on
@@ -23,8 +25,10 @@
 # corresponding source with the tree (the exact .config, this script, SOURCE): docs/RELEASING.md, "Source code".
 #
 # Variables: RPI_KERNEL_REPO (default the Raspberry Pi GitHub tree), RPI_KERNEL_BRANCH (rpi-6.18.y),
-# RPI_KERNEL_REF (a commit to pin; default the branch head), LORDOS_KREV (package revision: 3 since
-# 0.8.4, sock_diag SOCK_DESTROY; 2 was 0.8.1's, the BPF LSM and BTF; 1 was 0.8.0's),
+# RPI_KERNEL_REF (a commit to pin; default the branch head), LORDOS_KREV (package revision: 4 adds
+# v4l2loopback; 3 since 0.8.4, sock_diag SOCK_DESTROY; 2 was 0.8.1's, the BPF LSM and BTF; 1 was 0.8.0's),
+# V4L2LOOPBACK_REPO and V4L2LOOPBACK_REF (default the umlaeute/v4l2loopback tag v0.15.0, the version Debian 13
+# ships as v4l2loopback-dkms; GPL-2.0, its commit goes into SOURCE with the kernel's),
 # JOBS (default nproc). Building packages needs: build-essential bc bison flex libssl-dev
 # libelf-dev libdw-dev dwarves (pahole, for BTF) cpio kmod rsync dpkg-dev debhelper git.
 set -eu
@@ -34,7 +38,10 @@ FLAVOURS=${2:-2712}
 REPO=${RPI_KERNEL_REPO:-https://github.com/raspberrypi/linux.git}
 BRANCH=${RPI_KERNEL_BRANCH:-rpi-6.18.y}
 REF=${RPI_KERNEL_REF:-}
-KREV=${LORDOS_KREV:-3}
+KREV=${LORDOS_KREV:-4}
+LB_REPO=${V4L2LOOPBACK_REPO:-https://github.com/umlaeute/v4l2loopback.git}
+LB_REF=${V4L2LOOPBACK_REF:-v0.15.0}
+LB="$WORK/v4l2loopback"
 JOBS=${JOBS:-$(nproc)}
 SRC="$WORK/linux"
 OUT="$WORK/out"
@@ -68,7 +75,35 @@ add_overlay_readme() {   # .deb, kernel release
     echo "   added overlays/README to $(basename "$1")"
 }
 
+# LordOS Studio's camera (E-S3): v4l2loopback built against this kernel and put in the image package under
+# /lib/modules/<release>/updates, so the lordos-studio-camera package's modprobe.d file finds it like Debian's
+# DKMS module on a PC. The kernel's own modules_install strips it (and signs it when this kernel signs its modules).
+add_v4l2loopback() {   # .deb, kernel release, build folder
+    make -s -C "$3" ARCH=arm64 $CROSS M="$LB" modules > "$OUT/v4l2loopback-$2.log" 2>&1 || { tail -20 "$OUT/v4l2loopback-$2.log"; exit 1; }
+    I="$WORK/lbinstall"
+    rm -rf "$I"
+    make -s -C "$3" ARCH=arm64 $CROSS M="$LB" INSTALL_MOD_PATH="$I" INSTALL_MOD_DIR=updates INSTALL_MOD_STRIP=1 \
+        DEPMOD=true modules_install >> "$OUT/v4l2loopback-$2.log" 2>&1 || { tail -20 "$OUT/v4l2loopback-$2.log"; exit 1; }
+    KO=$(find "$I" -name 'v4l2loopback.ko*' | head -1)
+    [ -n "$KO" ] || { echo "build-kernel.sh: v4l2loopback.ko was not built for $2" >&2; exit 1; }
+    R="$WORK/repack"
+    rm -rf "$R"; dpkg-deb -R "$1" "$R"
+    MD=$(cd "$R" && for d in lib/modules/"$2" usr/lib/modules/"$2"; do [ -d "$d" ] && echo "$d" && break; done)
+    [ -n "$MD" ] || { echo "build-kernel.sh: no modules folder for $2 in $(basename "$1")" >&2; exit 1; }
+    install -D -m 644 "$KO" "$R/$MD/updates/$(basename "$KO")"
+    [ -f "$R/DEBIAN/md5sums" ] && (cd "$R" && md5sum "$MD/updates/$(basename "$KO")" >> DEBIAN/md5sums)
+    dpkg-deb --root-owner-group -Zxz -b "$R" "$1" > /dev/null
+    rm -rf "$R" "$I"
+    make -s -C "$3" ARCH=arm64 $CROSS M="$LB" clean > /dev/null 2>&1 || true
+    echo "   added v4l2loopback ($LB_REF) to $(basename "$1")"
+}
+
 mkdir -p "$WORK" "$OUT"
+if [ ! -f "$LB/v4l2loopback.c" ]; then
+    echo "== cloning $LB_REPO ($LB_REF)"
+    git clone --depth 1 -b "$LB_REF" "$LB_REPO" "$LB"
+fi
+LB_COMMIT=$(git -C "$LB" rev-parse HEAD)
 if [ ! -f "$SRC/Makefile" ]; then
     echo "== cloning $REPO ($BRANCH)"
     git clone --depth 1 -b "$BRANCH" "$REPO" "$SRC"
@@ -139,6 +174,8 @@ for FL in $FLAVOURS; do
     for o in SECURITY_LANDLOCK SECURITY_YAMA SECCOMP_FILTER CGROUP_BPF BPF_SYSCALL BPF_LSM DEBUG_INFO_BTF INET_DIAG_DESTROY; do
         grep -q "^CONFIG_$o=y" "$B/.config" || { echo "build-kernel.sh: CONFIG_$o did not stick" >&2; exit 1; }
     done
+    # v4l2loopback (LordOS Studio) needs the V4L2 core, which Raspberry Pi's defconfig has for its cameras
+    grep -Eq '^CONFIG_VIDEO_DEV=(y|m)' "$B/.config" || { echo "build-kernel.sh: no CONFIG_VIDEO_DEV for v4l2loopback" >&2; exit 1; }
     grep -q '^CONFIG_LSM="landlock' "$B/.config" || { echo "build-kernel.sh: CONFIG_LSM did not stick" >&2; exit 1; }
     # the diff against Raspberry Pi's defconfig, kept next to the packages
     diff "$B/config.defconfig" "$B/.config" > "$OUT/config-$KV$LV.diff" || true
@@ -167,6 +204,9 @@ for FL in $FLAVOURS; do
     [ -f "$IMGDEB" ] || {
         echo "build-kernel.sh: no $(basename "$IMGDEB"); built: $(ls "$WORK"/*.deb "$OUT"/*.deb 2>/dev/null)" >&2; exit 1; }
     add_overlay_readme "$IMGDEB" "$KV$LV"
+    add_v4l2loopback "$IMGDEB" "$KV$LV" "$B"
+    dpkg-deb -c "$IMGDEB" | grep -q "modules/$KV$LV/updates/v4l2loopback.ko" ||
+        { echo "build-kernel.sh: $IMGDEB has no v4l2loopback" >&2; exit 1; }
     # BTF really in the kernel (vmlinux's .BTF section, what becomes /sys/kernel/btf/vmlinux)
     readelf -S "$B/vmlinux" | grep -q ' \.BTF ' ||
         { echo "build-kernel.sh: $B/vmlinux has no .BTF section" >&2; exit 1; }
@@ -181,7 +221,9 @@ done
 # the SHA-256 of the tree as `git archive` writes it: GitHub's tarball of the commit, uncompressed, is
 # byte for byte this, so tools/release/apt-repo.sh can check the copy LordOS publishes is that commit
 TARSUM=$(git -C "$SRC" archive --format=tar --prefix="linux-$COMMIT/" "$COMMIT" | sha256sum | cut -d' ' -f1)
-printf 'source=%s\nbranch=%s\ncommit=%s\nversion=%s\ntar_sha256=%s\n' "$REPO" "$BRANCH" "$COMMIT" "$KV" "$TARSUM" > "$OUT/SOURCE"
+LB_TARSUM=$(git -C "$LB" archive --format=tar --prefix="v4l2loopback-$LB_COMMIT/" "$LB_COMMIT" | sha256sum | cut -d' ' -f1)
+printf 'source=%s\nbranch=%s\ncommit=%s\nversion=%s\ntar_sha256=%s\nv4l2loopback_source=%s\nv4l2loopback_ref=%s\nv4l2loopback_commit=%s\nv4l2loopback_tar_sha256=%s\n' \
+    "$REPO" "$BRANCH" "$COMMIT" "$KV" "$TARSUM" "$LB_REPO" "$LB_REF" "$LB_COMMIT" "$LB_TARSUM" > "$OUT/SOURCE"
 # the corresponding source LordOS publishes next to these packages (GPL-2.0, docs/SOURCE-OFFER.md):
 # per flavour, the folder to commit as tools/rpi/kernel/<source package>_<version>/ (the exact .config,
 # this script, SOURCE), and the rpi-mirror.list "tarball" line (docs/RELEASING.md, "Source code")

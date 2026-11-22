@@ -54,6 +54,7 @@ typedef struct {
     /* touchscreen: 1 if a Wayland app took the touch (TP_BEGIN); then the pointer isn't emulated */
     int  (*touch)(void *ud, int phase, int id, double x, double y);
     void (*touch_frame)(void *ud);
+    void (*touch_orient)(void *ud, int id, double degrees);  /* a touch's new orientation (ABS_MT_ORIENTATION), before its frame */
     void (*warp)(void *ud, double x, double y);              /* absolute pointer (0..1), touchscreen */
     void (*frame)(void *ud);                                 /* there was output from tp_tick */
 } TpSink;
@@ -67,6 +68,8 @@ typedef struct {
     int max_fingers;                    /* from BTN_TOOL_*TAP (can be more than nslots) */
     struct input_absinfo x, y, pressure, major;
     int has_pressure, has_major;
+    struct input_absinfo orient;            /* ABS_MT_ORIENTATION (touchscreens that report it) */
+    int has_orient;
     int bus, vendor, product;           /* struct input_id (EVIOCGID) */
     char name[80];
 } TpCaps;
@@ -81,6 +84,7 @@ void tp_set_screen(int w, int h);       /* for touchscreens (mm → pixels) */
  * turn the picture): its positions, scroll and pinch follow the picture. Taken by each touchscreen
  * between touches, never in the middle of one. */
 void tp_set_rotation(int rot);
+double tp_orient_degrees(int value, int maximum, int turn);   /* ABS_MT_ORIENTATION → wl_touch.orientation degrees */
 
 /* Looks at the fd: if it's a touchpad or touchscreen it returns the device (and sets the monotonic
  * clock on its events); otherwise, NULL. */

@@ -6,12 +6,12 @@
 // own (GTK, Chromium and Firefox with their own bar) go "frameless": args.csd = true, and the theme
 // draws only the content. The app may switch while open ('deco'). Moving, resizing and the window
 // menu from the app's own bar arrive as requests from the compositor.
-import { createElement as h } from 'react';
+import { createElement as h, Fragment } from 'react';
 import { View, Text, Surface, addListener, onShellKeyboard, shellHasKeyboard, displayFor, screen, onScreenChange } from '@lordos/runtime';
 import { windows, wm, registerBuiltinApp, windowChrome, pointerWorkArea, openingArea, getApp, placeLinuxWindow, activeDesktop, overviewShowing, workAreaOf, isWindowLocked, windowLocks } from './windows.js';
 import { followParents, overParent } from './dialogmodel.js';
 import { tiledEdges } from './snap.js';
-import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H } from './desktopmodel.js';
+import { acceptsAppRequest, activationOutcome, keyboardSurface, focusedOn, surfaceState, coveredIds, isNoticeWindow, noticeFrame, NOTICE_MAX_W, NOTICE_MAX_H, ownLayer, layerName } from './desktopmodel.js';
 import { desktopOfSurface } from './desktops.js';
 import { useAppWindow } from './components.jsx';
 import { locale, appName, direction } from './i18n.js';
@@ -24,6 +24,10 @@ import { rememberedFrame } from './windowmemory.js';
 import { settings } from './settings.js';
 import { dockIdOfWindow } from './dock.js';
 import { promptForServer } from './privacy.js';
+import { fitFrame } from './sessionmodel.js';
+import { chromeInset, dragFrameAt, tagKey, placeKeyOf, descriptionTitle, restoredFrame, bellAction, blurBoxes, BLUR_RADIUS } from './shellxmodel.js';
+import { dndActive } from './notify.js';
+import { sound } from './sound.js';
 
 // the launcher entry a new window belongs to (as sdk/dock.js launcherIdOf), for its assigned display
 const launcherKeyFor = (appId) => (!appId ? null : getApp(appId)?.package || getApp(appId)?.isolated ? appId : windowLinuxApp(appId)?.id || null);
@@ -31,9 +35,15 @@ const launcherKeyFor = (appId) => (!appId ? null : getApp(appId)?.package || get
 const idOf = (sid) => `linux#${sid}`;
 export const surfaceOf = (wid) => (String(wid).startsWith('linux#') ? Number(String(wid).slice(6)) || 0 : 0);
 
+// ext-background-effect: blurred boxes right under the surface, where the app asked (server/src/wl/bgeffect.c; lord-server
+// sends them only while blur can really be drawn). The surface keeps its key, so it stays the same node.
 function LinuxWindow() {
   const { args } = useAppWindow();
-  return h(Surface, { surface: args?.surface || 0, style: { flex: 1 } });
+  const blur = args?.blur?.length ? args.blur : null;
+  const surface = h(Surface, { key: 's', surface: args?.surface || 0, style: { flex: 1 } });
+  if (!blur) return surface;
+  return h(Fragment, null, ...blur.map((b, i) => h(View, { key: `b${i}`, style: { position: 'absolute', left: b.x, top: b.y, width: b.w, height: b.h,
+    backdropFilter: `blur(${BLUR_RADIUS}px)`, pointerEvents: 'none' } })), surface);
 }
 
 // Ícono genérico (los temas que dibujan app.Icon lo necesitan): un pingüino sobre gris.
@@ -73,6 +83,22 @@ addListener('pointermove', (e) => {
 });
 addListener('pointerup', () => { drag = null; });
 
+// xdg-toplevel-drag (server/src/wl/tldrag.c): a window that follows a drag, a browser tab torn off. Its geometry's
+// (ox, oy) point stays under the pointer; lord-server skips its frame when choosing where the drag goes.
+let tdrag = null;
+function followDrag(px, py) {
+  const w = tdrag && wm.get(tdrag.id);
+  if (!w || isWindowLocked(tdrag.id)) { tdrag = null; return; }
+  let g = null;
+  try { g = lord.wayland.toplevelDrag(tdrag.sid, wm.frameNode(tdrag.id) || 0); } catch (e) { g = null; }
+  if (!g) { tdrag = null; return; }
+  if (w.maximized) wm.toggleMaximize(tdrag.id);
+  const f = wm.frame(wm.get(tdrag.id));
+  const at = dragFrameAt(f, g, g.ox, g.oy, px, py, chromeInset(windowChrome(), !!w.args?.csd));
+  if (at.x !== f.x || at.y !== f.y) wm.move(tdrag.id, at.x, at.y);
+}
+addListener('pointermove', (e) => { if (tdrag) followDrag(e.x, e.y); });
+
 // a Linux app's drag of files released over LordOS: who claimed it at the release (wayland.takeDrop) gets the
 // paths once lord-server has read them ('filesdrop' on window 0)
 let dropTaker = null;
@@ -89,6 +115,7 @@ function windowOwnIcon(sid, id) {
   });
 }
 globalThis.__lordWayland = (sid, type, d = {}) => {
+  if (sid === 0 && type === 'bell') { ringBell(null); return; }   // xdg-system-bell with no window
   if (sid === 0 && type === 'filesdrop') {
     const fn = dropTaker;
     dropTaker = null;
@@ -132,22 +159,33 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       // a dialog over the window it belongs to (sdk/dialogmodel.js), on that window's desktop
       const owner = d.parent ? wm.get(idOf(d.parent)) : null;
       const saved = owner ? null : placeLinuxWindow(dockIdOfWindow({ id, args }));   // session restore: the place it had
+      // xdg-toplevel-tag: the kind of window it is keys its remembered place; its description names it while untitled
+      const tg = linuxTag(sid);
+      if (tagKey(tg?.tag)) args.tag = tagKey(tg.tag);
+      if (descriptionTitle(tg?.description)) args.tagDescription = descriptionTitle(tg.description);
+      // xdg-session-management: the app restored this window by name: its own place comes first (given once)
+      const restored = linuxRestored(sid, !!d.csd);
       // a dialog goes where its app asks and isn't remembered; a fixed window keeps its size
       if (d.dialog) args.dialog = true;
       if (d.fixed) args.fixedLinux = true;
+      if (d.skipTaskbar) args.skipTaskbar = true;      // X11 _NET_WM_STATE_SKIP_TASKBAR: no Dock entry of its own
+      if (d.skipPager) args.skipPager = true;          // X11 _NET_WM_STATE_SKIP_PAGER: not in the Overview
       if (d.parent) { args.parent = idOf(d.parent); args.modal = !!d.modal; }
-      const kept = saved || d.dialog ? null : rememberedFrame(dockIdOfWindow({ id, args }), { fixed: !!d.fixed, size: [w, hh] });
+      const kept = restored || saved || d.dialog ? null : rememberedFrame(placeKeyOf(dockIdOfWindow({ id, args }), args.tag), { fixed: !!d.fixed, size: [w, hh] });
       wm.open('linux', {
         instance: String(sid),
         frame: owner ? overParent(wm.frame(owner), w, hh, workAreaOf(displayFor(owner)))
-          : saved?.frame || (kept ? { x: kept.x, y: kept.y, w: kept.w, h: kept.h } : { w, h: hh, x: Math.max(area.x, Math.min(x, area.x + area.w - w)), y: Math.max(area.y, Math.min(y, area.y + area.h - hh)) }),
+          : restored?.frame || saved?.frame || (kept ? { x: kept.x, y: kept.y, w: kept.w, h: kept.h } : { w, h: hh, x: Math.max(area.x, Math.min(x, area.x + area.w - w)), y: Math.max(area.y, Math.min(y, area.y + area.h - hh)) }),
         args,
         desktop: owner ? owner.desktop : saved?.desktop ?? desktopOfSurface(sid),    // restored, or still open across a theme switch
       });
-      saved?.then(id);
+      if (restored) { if (restored.max) wm.toggleMaximize(id); } else saved?.then(id);
+      // always on top or kept below: what an X11 app asked for (_NET_WM_STATE_ABOVE / _BELOW), or the layer the
+      // window had before a theme switch
+      if (d.layer) wm.setLayer(id, layerName(d.layer));
       if (kept?.maximized) wm.toggleMaximize(id);
       // app .lpk aislada: su nombre (del manifest) en vez del id
-      { const pkg = d.appId ? getApp(d.appId) : null; wm.setTitle(id, pkg && (pkg.package || pkg.isolated) && (!d.title || d.title === d.appId) ? (pkg.isolated ? appName(pkg) : pkg.name) : (d.title || d.appId || null)); }
+      { const pkg = d.appId ? getApp(d.appId) : null; wm.setTitle(id, pkg && (pkg.package || pkg.isolated) && (!d.title || d.title === d.appId) ? (pkg.isolated ? appName(pkg) : pkg.name) : (d.title || args.tagDescription || d.appId || null)); }
       // a built-in isolated app that asks for it (manifest "protected": Passwords) is black in captures
       if (d.appId && getApp(d.appId)?.isolated && getApp(d.appId)?.protected) wm.setProtected(id, true);
       wm.setCloseGuard(id, () => { lord.wayland.close(sid); return false; });   // la app decide cuándo cierra
@@ -156,7 +194,11 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       break;
     }
     case 'unmap': if (win) wm.close(id, true); if (windowPixelIcons.get()[id]) windowOwnIcon(-1, id); break;
-    case 'icon': windowOwnIcon(sid, id); break;       // xdg_toplevel_icon_manager_v1.set_icon, committed
+    case 'icon': windowOwnIcon(sid, id); break;       // xdg_toplevel_icon_manager_v1.set_icon, committed (X11: _NET_WM_ICON)
+    case 'taskbar': if (win) wm.setArgs(id, { skipTaskbar: !!d.skip }); break;   // X11 _NET_WM_STATE_SKIP_TASKBAR changed
+    case 'pager': if (win) wm.setArgs(id, { skipPager: !!d.skip }); break;       // X11 _NET_WM_STATE_SKIP_PAGER changed
+    // X11 _NET_WM_STATE_ABOVE / _BELOW changed: its layer (it never takes the keyboard by it, desktopmodel.js stackOrder)
+    case 'layer': if (win) wm.setLayer(id, layerName(d.layer)); break;
     // the window it belongs to changed, or it became modal or not (xdg-foreign, xdg-dialog-v1)
     case 'parent': if (win) wm.setArgs(id, { parent: d.parent ? idOf(d.parent) : null, modal: !!d.parent && !!d.modal, dialog: win.args?.dialog || !!d.parent }); break;
     case 'title': {                      // an isolated app keeps its name when the title is just its id
@@ -216,6 +258,27 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       promptForServer({ app: d.app, perm: 'idle', name: String(d.name || '') || (who.kind === 'lord' ? '' : who.short), done: (allow) => lord.wayland.idleAnswer(d.app, allow) });
       break;
     }
+    // xdg-toplevel-drag: this window follows the drag from now (d.on), or stops where it was let go
+    case 'tldrag':
+      if (d.on && win) { tdrag = { id, sid }; wm.focus(id); followDrag(d.x, d.y); } else if (tdrag?.id === id) tdrag = null;
+      break;
+    // xdg-toplevel-tag changed while open: a new kind of window remembers its own place from now on
+    case 'tag':
+      if (win) wm.setArgs(id, { tag: tagKey(d.tag) || undefined, tagDescription: descriptionTitle(d.description) || undefined });
+      break;
+    case 'bell': ringBell(win); break;      // xdg-system-bell (rate-limited in lord-server, sysbell.c)
+    case 'blur': if (win) wm.setArgs(id, { blur: blurBoxes(d.rects) }); break;   // ext-background-effect (bgeffect.c)
+    // an app asks to lease a VR headset's connector (drm-lease-v1, server/src/wl/drmlease.c): lord-server offers only
+    // connectors the kernel marks non-desktop and asks every time until the person says "always" or "no" (its "vr"
+    // permission). d.app is who lord-server checked the app is (never an isolated or sandboxed app), d.headset the
+    // headset's name and connector, d.name an installed app's name for it, or ''.
+    case 'drmlease': {
+      const who = shortcutsWho(d.app);
+      if (!who || who.kind === 'lord') break;
+      promptForServer({ app: d.app, perm: 'vr', name: String(d.name || '') || who.short, headset: String(d.headset || ''), once: true,
+        done: (how) => lord.wayland.leaseAnswer(d.app, how) });
+      break;
+    }
     case 'activate': case 'attention': {
       const how = activationOutcome(win, wm.focused(), type === 'activate');
       if (how === 'focus') wm.focus(id); else if (how === 'attention' && !win.attention) wm.setAttention(id, true);
@@ -224,6 +287,35 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
     default: break;
   }
 };
+
+// The shell extras' reads (lord.wayland, server/src/ui/js_sys.c): a window's tag, and the place its app restored it to.
+function linuxTag(sid) {
+  try { return typeof lord.wayland.tag === 'function' ? lord.wayland.tag(sid) : null; } catch (e) { return null; }
+}
+function linuxRestored(sid, csd) {
+  let r = null;
+  try { r = typeof lord.wayland.sessionFrame === 'function' ? lord.wayland.sessionFrame(sid) : null; } catch (e) { r = null; }
+  const f = restoredFrame(r, chromeInset(windowChrome(), csd));
+  if (!f) return null;
+  const main = Math.max(0, (screen.displays || []).findIndex((x) => x.main));
+  return { frame: fitFrame(f, screen.displays, (x) => workAreaOf(x), main), max: !!r.max };
+}
+// xdg-system-bell: LordOS's alert sound, unless Do Not Disturb is on; a window not in front wants attention.
+function ringBell(win) {
+  const what = bellAction({ window: !!win, focused: !!win && wm.focused() === win.id, dnd: dndActive() });
+  if (what.sound) sound.play('error');
+  if (what.attention && !win.attention) wm.setAttention(win.id, true);
+}
+// Settings → transparency with blur: blur behind Linux windows is offered to apps only with it (bgeffect.c)
+let effectsSent = null;
+function applyEffects() {
+  const on = settings.get().effects !== false;
+  if (on === effectsSent || typeof lord.wayland === 'undefined' || typeof lord.wayland.effects !== 'function') return;
+  effectsSent = on;
+  lord.wayland.effects(on);
+}
+applyEffects();
+settings.subscribe(applyEffects);
 
 // LordOS's input method composes into the Linux app's field (server/src/wl/wl_textinput.c): the app
 // draws the composition itself (inline), the candidate window goes at its caret, read from the
@@ -282,8 +374,10 @@ function sync() {
     const fixed = isWindowLocked(w.id);
     // snapped to a half, quarter or third: the edges against the work area (the app may square its corners there)
     const edges = st.maximized ? 0 : tiledEdges(w.snapped);
-    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0) | (fixed ? 16 : 0) | (edges << 5);
-    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov, fixed, edges); }
+    // always on top (1) or kept below (-1): an X11 app sees it in _NET_WM_STATE (xwm.c), and it survives a theme switch
+    const layer = ownLayer(w);
+    const key = (st.maximized ? 1 : 0) | (st.iconic ? 2 : 0) | (st.parked ? 4 : 0) | (cov ? 8 : 0) | (fixed ? 16 : 0) | (edges << 5) | ((layer + 1) << 9);
+    if (lastState.get(s) !== key) { lastState.set(s, key); lord.wayland.state(s, st.maximized, false, st.iconic, st.parked, cov, fixed, edges, layer); }
   }
   sendWorkAreas();
   // search, the launcher, a sheet or a system prompt is open: the keys are LordOS's, not the app's

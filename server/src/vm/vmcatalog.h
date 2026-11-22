@@ -16,7 +16,10 @@
 #define VMCAT_FPRS 4
 #define VMCAT_PINS 48
 
-enum { VMCAT_SIG_DETACHED = 1, VMCAT_SIG_CLEAR = 2 };
+/* VMCAT_SIG_LORDOS: LordOS's own releases ("signature": { "type": "lordos-release", "name": "SHA256SUMS.sig" }, no "keys"
+ * or "fingerprints"): the detached SHA256SUMS.sig of docs/SIGNING.md, "Release files", checked with the LordOS release key
+ * compiled into LordOS (codesig_release_key) by the LordOS Imager's own check (imager/imgverify.h, img_sig_verify) */
+enum { VMCAT_SIG_DETACHED = 1, VMCAT_SIG_CLEAR = 2, VMCAT_SIG_LORDOS = 3 };
 
 typedef struct {
     char dir[VMCAT_URL];          /* https://…/ : the maker's folder for the release (its list, its listing) */
@@ -26,9 +29,9 @@ typedef struct {
     char file_re[VMCAT_RE];       /* the image's name, an extended regular expression */
     unsigned long long max_bytes; /* the most a download of this entry may be */
     /* how the maker signs the list (the system's "signature", "keys", "fingerprints") */
-    int sig_type;                 /* VMCAT_SIG_DETACHED (a file in dir) or VMCAT_SIG_CLEAR (the list itself) */
+    int sig_type;                 /* VMCAT_SIG_DETACHED (a file in dir), VMCAT_SIG_CLEAR (the list itself) or VMCAT_SIG_LORDOS */
     char sig_name[96];            /* the detached signature's file name ("" for a clear-signed list) */
-    char keys[64];                /* the maker's key file, a plain name in the keys folder */
+    char keys[64];                /* the maker's key file, a plain name in the keys folder ("" for VMCAT_SIG_LORDOS) */
     char fprs[VMCAT_FPRS][41];    /* the primary keys of that file that may sign (40 hex digits, upper case) */
     int nfprs;
     /* An entry whose maker signs no list (Windows' evaluation, virtio-win, WinFsp; docs/VIRTUALIZATION.md 4.3, 6.7.1) names its files
@@ -58,7 +61,9 @@ int vmcat_sums_has(const char *sums, size_t n, const char *name, const char *sha
  * with *body (malloc) the text that was signed (the list itself, or a clear-signed list's text without its armour),
  * 0 when the list isn't signed (no signature file, or a list that should be clear-signed and isn't): vm.listUnsigned,
  * -1 when the signature doesn't verify with the pinned keys (a changed list, another key, an expired or revoked key,
- * or a key file without a pinned fingerprint): vm.listBadSignature, with pgp.c's reason in err. */
+ * or a key file without a pinned fingerprint): vm.listBadSignature, with pgp.c's reason in err.
+ * VMCAT_SIG_LORDOS: keys is the 32-byte Ed25519 release key itself (the helper passes codesig_release_key) and sig the
+ * base64 SHA256SUMS.sig; a signature that doesn't verify, or any other key size: -1 with imager.badSignature in err. */
 int vmcat_verify_list(const VmCatEntry *e, const char *keys, size_t keys_len, const char *list, size_t list_len,
                       const char *sig, size_t sig_len, int64_t now, char **body, size_t *body_len, char *err, size_t errlen);
 

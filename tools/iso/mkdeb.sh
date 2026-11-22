@@ -1,6 +1,7 @@
 #!/bin/sh
 # mkdeb.sh — builds lordos_<version>_<arch>.deb from the already compiled tree.
 # Usage: tools/iso/mkdeb.sh <output.deb>     (from the repository root; needs dpkg-deb)
+#        DEBUG_SYMBOLS=1 tools/iso/mkdeb.sh ...   also keeps lord-server's and lord-sessiond's symbols in <output>.debug/
 #
 # Contents:
 #   /usr/lib/lordos/bin/lord-sessiond     sessions, login screen and remote desktop (root)
@@ -17,6 +18,8 @@
 #                                         docs/BENCHMARK.md): a link to /usr/lib/lordos/bin/lordos-sysreport,
 #                                         which starts the lord-bench and lord-media next to it
 #   /usr/bin/lordos-fetch                 the crown and a summary of the computer (a link to the same binary)
+#   /usr/lib/lordos/fallback-bin/{fastfetch,neofetch}  lordos-fetch under those names until the real package is
+#                                         installed; /etc/profile.d/lordos-fallback.sh puts the folder last in PATH
 #   /usr/bin/machines                     Machines from the terminal (docs/VIRTUALIZATION.md "From the terminal"): a link to
 #                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
 #                                         in /usr/share/bash-completion/completions/machines
@@ -44,6 +47,7 @@
 #   /usr/share/doc/lordos/                README, copyright, changelog, OFL-Noto.txt
 #   /usr/share/glib-2.0/schemas/90_lordos.gschema.override, /etc/gtk-{3,4}.0/settings.ini
 #                                         GTK's window-button layout where the session can't give its own (#52)
+#   /usr/share/fonts/truetype/lordos/     Inter and JetBrains Mono again, where fontconfig and Flatpak apps see them
 #   (not here: /usr/lib/lordos/assets/hwreport/, the signed tested-hardware snapshot, is the lordos-hwdata
 #   package from tools/iso/mkdeb-hwdata.sh, which this one Depends on; docs/BENCHMARK.md)
 #   /usr/lib/lordos/apt/lordos.sources    the signed LordOS repository on lordos.org (updates from the
@@ -61,6 +65,9 @@
 #   /usr/lib/systemd/system/smartmontools.service.d/lordos.conf  Debian's smartd stays off
 #   /usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf  gnome-keyring without the Secret Service
 #   /usr/lib/systemd/logind.conf.d/lordos-machines.conf  a shutdown waits up to 30 s for Machines to save running machines
+#   /usr/lib/systemd/user/lordos-guest.service (+ default.target.wants), /usr/lib/udev/rules.d/71-lordos-guest.rules
+#                                         LordOS as a Machines guest: lordos-guest for the signed-in person, only where the
+#                                         machine's agent port org.lordos.agent exists (docs/VIRTUALIZATION.md 7.2)
 #   /usr/lib/systemd/system-sleep/lordos-lid-wake  systemd-sleep's hook (root, pre/post only): on a laptop that goes
 #                                         to sleep with the lid open, the lid's ACPI wake source is off until it
 #                                         wakes (GitHub #172; src/hw/lidwake.h, docs/SETTINGS.md)
@@ -92,7 +99,7 @@ fi
 # nothing), so each one is required here. ALLOW_MISSING="lord-tts …" leaves out the ones named, on purpose.
 missing=""
 for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev libva-dev" \
-         lord-stream:"libavcodec-dev libavformat-dev" \
+         lord-stream:"libavcodec-dev libavformat-dev" lord-studio:"libavcodec-dev libavformat-dev" \
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
          lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-appstream:"" \
@@ -141,6 +148,11 @@ install -m 755 server/build/lordos-sysreport "$L/bin/lordos-sysreport"
 "$STRIP" --strip-unneeded "$L/bin/lordos-sysreport" 2>/dev/null || true
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-sysreport"
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-fetch"
+# `fastfetch` and `neofetch` run lordos-fetch until the real package is installed: the folder is the last one in
+# PATH (profile.d below and lord-sessiond's session PATH), so the real /usr/bin/fastfetch comes first
+install -D -m 755 packaging/fallback-bin/fastfetch "$L/fallback-bin/fastfetch"
+ln -s fastfetch "$L/fallback-bin/neofetch"
+install -D -m 644 packaging/profile.d/lordos-fallback.sh "$PKG/etc/profile.d/lordos-fallback.sh"
 install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
 # Machines from the terminal: in the LordOS folder because it runs the lord-vm next to its own binary (/proc/self/exe)
 # and reads its texts from ../assets
@@ -175,6 +187,20 @@ if [ -x server/build/lord-tts ]; then
 fi
 # isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
 [ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"
+# DEBUG_SYMBOLS=1 (test packages): the symbols of lord-server and lord-sessiond, kept next to the package as
+# <output>.debug/<name>.debug (objcopy --only-keep-debug; never inside the .deb). A crash report's
+# "lord-server(+0x2c45e7)" (src/wdog.h) or the kernel's "segfault ... in lord-server[2c45e7,...]" then resolves with
+#   addr2line -f -i -e <output>.debug/lord-server.debug 0x2c45e7
+# (the stripped binary keeps its GNU build id, the same as the .debug file's)
+if [ "${DEBUG_SYMBOLS:-0}" = 1 ]; then
+    DBG="${OUT%.deb}.debug"
+    OBJCOPY="${STRIP%strip}objcopy"
+    mkdir -p "$DBG"
+    for b in lord-server lord-sessiond; do
+        "$OBJCOPY" --only-keep-debug "$L/bin/$b" "$DBG/$b.debug" || { echo "could not keep the symbols of $b" >&2; exit 1; }
+    done
+    echo "symbols: $DBG"
+fi
 "$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lord-browser-prefs" "$L/bin/lordos-firstrun" "$PKG/usr/lib/systemd/system-sleep/lordos-lid-wake" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 [ -x "$L/bin/lord-ocr" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-ocr" 2>/dev/null || true; }
@@ -186,6 +212,10 @@ fi
 # lord-stream (0.8.8.10): lord-media's player with internet sockets only, for cameras and IPTV (docs/MEDIA.md "Network streams")
 [ -x server/build/lord-stream ] && install -m 755 server/build/lord-stream "$L/bin/lord-stream"
 [ -x "$L/bin/lord-stream" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-stream" 2>/dev/null || true; }
+# lord-studio (LordOS Studio, docs/CAMERA-STUDIO-PLAN.md): lord-media's camera with the effects; its models are in
+# assets/studio/models (SHA-256 pinned in server/src/media/studio/models.h), Google's Apache-2.0 notice in the docs
+[ -x server/build/lord-studio ] && install -m 755 server/build/lord-studio "$L/bin/lord-studio"
+[ -x "$L/bin/lord-studio" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-studio" 2>/dev/null || true; }
 # lord-vault: Passwords and the system keyring (docs/PASSWORDS.md); lord-server only launches the one in its own folder
 [ -x server/build/lord-vault ] && install -m 755 server/build/lord-vault "$L/bin/lord-vault"
 [ -x "$L/bin/lord-vault" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-vault" 2>/dev/null || true; }
@@ -221,6 +251,13 @@ if [ -x server/build/lordos-guest ]; then
     install -d "$L/guest"
     install -m 755 server/build/lordos-guest "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}"
     "$STRIP" --strip-unneeded "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}" 2>/dev/null || true
+    # and for LordOS itself as a Machines guest: lordos-guest.service (a user unit, on by default) runs it only where the
+    # machine's guest agent port exists (docs/VIRTUALIZATION.md 7.2), so a LordOS machine has its agent from the first boot
+    ln -sfn "lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}" "$L/guest/lordos-guest"
+    install -D -m 644 packaging/systemd/lordos-guest.service "$PKG/usr/lib/systemd/user/lordos-guest.service"
+    install -d "$PKG/usr/lib/systemd/user/default.target.wants"
+    ln -sfn ../lordos-guest.service "$PKG/usr/lib/systemd/user/default.target.wants/lordos-guest.service"
+    install -D -m 644 packaging/udev/71-lordos-guest.rules "$PKG/usr/lib/udev/rules.d/71-lordos-guest.rules"
 fi
 # lordos-guest-win.exe: the LordOS guest tools Machines installs into a Windows guest (x86-64), cross-built with mingw-w64
 # on the build machine (server/mk/vm.mk); an amd64 package without it can't give Windows guests their clipboard, display
@@ -276,7 +313,7 @@ for d in themes/*/; do
     install -m 644 "$d/theme.json" "$d/theme.bundle.js" "$L/themes/$n/"
     [ -d "$d/assets" ] && cp -r "$d/assets" "$L/themes/$n/"
 done
-cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo assets/desktops assets/cloud assets/flatpak "$L/assets/"
+cp -r assets/fonts assets/locales assets/shell assets/icons assets/mascot assets/monitor assets/help assets/fw assets/cleaner assets/machines assets/webapps assets/geo assets/desktops assets/cloud assets/flatpak assets/studio "$L/assets/"
 # the makers' keys Machines' download catalog pins (assets/machines/systems.json "keys"; docs/VIRTUALIZATION.md 3.9):
 # the admin helper checks each checksum list's signature with them before it trusts a hash
 install -d "$L/assets/machines/keys"
@@ -382,6 +419,13 @@ find "$PKG/usr/share/themes" -type d -exec chmod 755 {} +; find "$PKG/usr/share/
 install -D -m 644 assets/gtk/90_lordos.gschema.override "$PKG/usr/share/glib-2.0/schemas/90_lordos.gschema.override"
 install -D -m 644 assets/gtk/settings.ini "$PKG/etc/gtk-3.0/settings.ini"
 install -D -m 644 assets/gtk/settings.ini "$PKG/etc/gtk-4.0/settings.ini"
+# LordOS's interface and monospace fonts where fontconfig sees them, so GTK and Qt apps get the font the settings
+# portal names (server/src/ui/portal.c, LORDOS_FONT_DIR; docs/FLATPAK.md, "Fonts"): a Flatpak app's sandbox only sees
+# the host's /usr/share/fonts (as /run/host/fonts), never /usr/lib/lordos. Copies, not links: a link would point to
+# /usr/lib/lordos, which isn't in the sandbox. fontconfig's dpkg trigger refreshes the cache. New files, no migration.
+install -d "$PKG/usr/share/fonts/truetype/lordos"
+install -m 644 assets/fonts/Inter-*.ttf assets/fonts/Inter-LICENSE.txt assets/fonts/JetBrainsMono-*.ttf \
+    assets/fonts/JetBrainsMono-LICENSE.txt "$PKG/usr/share/fonts/truetype/lordos/"
 install -m 644 tools/iso/rootfs/etc/systemd/system/lord-netperm.service "$PKG/usr/lib/systemd/system/lord-netperm.service"
 # fans by temperature from the first boot (docs/FANS.md): enabled by postinst, also in a chroot
 install -m 644 tools/iso/rootfs/etc/systemd/system/lord-fand.service "$PKG/usr/lib/systemd/system/lord-fand.service"
@@ -400,6 +444,8 @@ find "$L/themes" "$L/assets" "$L/migrations" "$L/apt" -type f -exec chmod 644 {}
 
 D="$PKG/usr/share/doc/lordos"
 install -m 644 README.md "$D/README.md"
+install -D -m 644 third_party/studio-models/LICENSE "$D/studio-models/LICENSE"
+install -m 644 third_party/studio-models/README.md "$D/studio-models/README.md"
 cat > "$D/copyright" <<'C'
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: LordOS
@@ -433,7 +479,7 @@ Comment: Created by iPERFEX with an AI image generator; part of the LordOS brand
  assets. The LordOS name, the crown and Lumo shown in them are also covered by the
  LordOS trademark and brand policy (lordos.org).
 
-Files: usr/lib/lordos/assets/fonts/*
+Files: usr/lib/lordos/assets/fonts/* usr/share/fonts/truetype/lordos/*
 License: OFL-1.1
  Inter, JetBrains Mono and Plus Jakarta Sans: SIL Open Font License 1.1 (each
  font's license text ships next to it, *-LICENSE.txt).

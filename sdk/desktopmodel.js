@@ -18,16 +18,57 @@ export const windowHidden = (w, active) => !w || !!w.minimized || !onDesktop(w, 
 // The windows the theme frames on this desktop (fullscreen and picture-in-picture are the SDK's).
 export const visibleOn = (list, active) => list.filter((w) => !w.minimized && !w.fullscreen && !w.pip && onDesktop(w, active));
 
-// What the theme keeps in its tree, in stacking order. A LordOS app minimized or on a hidden desktop
+// ---- Stacking and focus (always on top, docs/WINDOWS.md "Always on top") ----
+// The window list is in the order the windows were brought forward (the last one is the most recent): that order
+// decides who has the keyboard (focusedOn). What is drawn over what is that order split into layers: a window may be
+// kept below the others (w.layer 'below'), normal, or always on top ('above'), and inside a layer the most recent is
+// on top. So the window with the keyboard can be a normal one under an always-on-top one, and clicking a normal
+// window brings it forward within the normal layer only. A dialog (args.parent) is in the highest layer of its own
+// and its owners', so it never goes under the window it belongs to.
+//
+// Over the theme's tree, in order (docs/LAYERS.md): picture-in-picture windows and a Linux app's own notification
+// popups (FloatingWindows, the `floating` layer, never the front window), then a fullscreen window (also `floating`,
+// drawn after picture-in-picture), the shell's layers (Dock, menu bar, menus, sheets, prompts) and Screenshots' area
+// selection (`capture`, above every layer); Screenshots' toolbar is a bare picture-in-picture window. A fullscreen
+// Linux app is presented above all of it, and the menus of Linux apps (xdg_popup, X override-redirect) are painted
+// by the compositor above everything. An always-on-top window is therefore over every normal window, never over a
+// fullscreen one or the shell.
+export const cleanLayer = (l) => (l === 'above' || l === 'below' ? l : null);
+export const ownLayer = (w) => (w?.layer === 'above' ? 1 : w?.layer === 'below' ? -1 : 0);
+export const layerName = (n) => (n > 0 ? 'above' : n < 0 ? 'below' : null);
+// -1, 0 or 1: the window's own layer, or its owners' when higher (a dialog of an always-on-top window), at most 8 up
+// (a loop of parents ends). byId: id → window, for the owners.
+export function layerOf(w, byId) {
+  let best = -2;
+  for (let i = 0, x = w; x && i < 8; i++) {
+    best = Math.max(best, ownLayer(x));
+    x = x.args?.parent && byId ? byId.get(x.args.parent) : null;
+  }
+  return best < -1 ? 0 : best;
+}
+// The list in drawing order, bottom to top: by layer, and inside each the list's own order (stable).
+// all: every window, so a dialog finds its owner even when only part of the list is stacked.
+export function stackOrder(list, all = list) {
+  if (!list.some((w) => w.layer || w.args?.parent)) return list;
+  const byId = new Map(all.map((w) => [w.id, w]));
+  const rank = new Map(list.map((w) => [w, layerOf(w, byId)]));
+  if (![...rank.values()].some((r) => r)) return list;
+  return list.map((w, i) => [w, i]).sort((a, b) => rank.get(a[0]) - rank.get(b[0]) || a[1] - b[1]).map(([w]) => w);
+}
+// A window that asked to be left out of the pager (X11 _NET_WM_STATE_SKIP_PAGER): not in the Overview nor in its
+// desktop miniatures.
+export const inPager = (w) => !w?.args?.skipPager;
+
+// What the theme keeps in its tree, in stacking order (stackOrder). A LordOS app minimized or on a hidden desktop
 // stays mounted (and display: none, WindowShell), so it keeps its state, unsaved text included. A Linux
 // window has its state in its own process, and with no node it can't be reached or painted. In the
-// overview, the minimized windows of this desktop are shown too.
+// overview, the minimized windows of this desktop are shown too, and a window left out of the pager isn't drawn.
 export function mountedOn(list, active, overview = false) {
-  return list.filter((w) => {
+  return stackOrder(list.filter((w) => {
     if (w.fullscreen || w.pip) return false;
     if (!w.args?.surface) return true;
-    return onDesktop(w, active) && (overview || !w.minimized);
-  });
+    return onDesktop(w, active) && (overview ? inPager(w) : !w.minimized);
+  }), list);
 }
 
 // In the overview a minimized surface window may have nothing to draw: an X11 window is iconic, and only
@@ -53,6 +94,16 @@ export function keyboardSurface(list, active, shellBusy, surfaceOf) {
   return top ? surfaceOf(top.id) : 0;
 }
 
+// The same rule for a LordOS window (wm.hasKeyboard): true only for the front window of the showing desktop, and
+// never while a shell surface takes the keyboard (search, the launcher, a sheet, a system prompt). Key listeners
+// (runtime addListener) are the whole session's, so a window that forwards keys elsewhere (Machines' guest) asks this
+// at each key, not a focus flag kept from its last render: a fullscreen window and the window under it were both
+// "focused" before this rule, and a password typed in another app or a system prompt reached a virtual machine.
+export function keyboardWindow(list, active, shellBusy) {
+  const top = shellBusy ? null : focusedOn(list, active);
+  return top ? top.id : null;
+}
+
 // A request from a Linux app that would bring its window forward (moving, resizing, the window menu).
 // These come from the app, so a window on a hidden desktop doesn't get to change the desktop.
 export const acceptsAppRequest = (w, active) => !!w && onDesktop(w, active);
@@ -74,7 +125,7 @@ export function surfaceState(w, active) {
 }
 
 // The Linux windows nothing of which is on screen though they are on the showing desktop: each wholly inside an
-// opaque window above it (list is in stacking order). lord-server then paces them once a second and tells them
+// opaque window drawn over it (in stackOrder). lord-server then paces them once a second and tells them
 // "suspended" (wl_set_covered), so a web app behind another window stops drawing. frameOf(w) is the window's rect as
 // drawn (a maximized one fills its work area); opaqueOf(w) says it hides what is under it: a LordOS window whose app
 // isn't transparent, or a web app's window. Any other Linux window may draw with transparency, so it never covers.
@@ -82,7 +133,7 @@ export function surfaceState(w, active) {
 export function coveredIds(list, active, overview, frameOf, opaqueOf) {
   const out = new Set();
   if (overview) return out;
-  const vis = visibleOn(list, active);
+  const vis = stackOrder(visibleOn(list, active), list);
   const inside = (a, b) => !!a && !!b && b.w > 0 && b.h > 0 && a.x <= b.x && a.y <= b.y && a.x + a.w >= b.x + b.w && a.y + a.h >= b.y + b.h;
   for (let i = 0; i < vis.length - 1; i++) {
     const w = vis[i];

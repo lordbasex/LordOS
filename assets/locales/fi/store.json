@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Android-sovellukset",
   "soon": "Tulossa",
-  "sub.all": "Kaikki"
+  "sub.all": "Kaikki",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Havaitsimme kameran.",
+  "suggest.studioCamera.detail": "Antaa kaikille sovelluksille, myös selaimille ja videopuheluille, kameran ”LordOS Studio” tehosteinesi: sumennettu tausta tai kuva takanasi ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} ei ole tämän tietokoneen pakettilähteissä.",
+  "suggest.studioCamera.note.dkms": "PC:llä sen ydinmoduuli käännetään ytimellesi tällä tietokoneella (DKMS), mikä tuo noin 500 Mt kääntäjiä ja ytimen otsikkotiedostoja, ja uudelleen jokaisen ydinpäivityksen jälkeen. Raspberry Pi:ssä se tulee LordOS-ytimen mukana.",
+  "suggest.studioCamera.note.secureBoot": "Kun Secure Boot on käytössä, sinun on rekisteröitävä moduulin allekirjoitusavain seuraavalla uudelleenkäynnistyksellä, muuten kamera ei näy."
 }

@@ -322,5 +322,11 @@
   "src.wine": "Wine",
   "src.android": "Android uygulamaları",
   "soon": "Yakında",
-  "sub.all": "Tümü"
+  "sub.all": "Tümü",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Bir kamera algıladık.",
+  "suggest.studioCamera.detail": "Tarayıcılar ve görüntülü aramalar dahil tüm uygulamalara efektlerinizle “LordOS Studio” kamerasını verir: bulanık arka plan veya arkanızda bir resim ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} bu bilgisayarın paket kaynaklarında yok.",
+  "suggest.studioCamera.note.dkms": "Bir PC’de çekirdek modülü bu bilgisayarda çekirdeğiniz için derlenir (DKMS); bu, yaklaşık 500 MB derleyici ve çekirdek başlığı getirir ve her çekirdek güncellemesinden sonra yeniden derlenir. Raspberry Pi’de LordOS çekirdeğiyle gelir.",
+  "suggest.studioCamera.note.secureBoot": "Güvenli Önyükleme (Secure Boot) açıksa, bir sonraki yeniden başlatmada modülün imzalama anahtarını kaydetmeniz gerekir, yoksa kamera görünmez."
 }

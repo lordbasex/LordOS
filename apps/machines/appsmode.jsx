@@ -5,6 +5,11 @@
 // part of the machine's one picture (<MediaView crop>, media/mview.c: nothing is copied per window). The pointer over
 // it goes to the guest at the window's place, the keyboard while it's in front. Moving, resizing, minimizing,
 // focusing or closing it asks the guest to do the same (lord.vm.winAct); a window the guest moves is followed.
+// The windows have no LordOS frame (args.csd, as a Linux app that draws its own bar; every theme then shows only the
+// content with its shadow): the guest's window is drawn with its own title bar and caption buttons, and those move,
+// minimize, maximize and close it in the guest, which the LordOS window follows from the guest's next list (like
+// VMware's Unity or Parallels' Coherence). The machine's menus stay in the menu bar, the Dock's menu, the machine's
+// panel and its status item by the clock.
 //
 // The machine's own window (vmwindow.jsx) holds the session and polls it: useAppsMode runs there. Each guest window is
 // the Machines app opened with args.guestWin (index.jsx → GuestWindow), reading what useAppsMode publishes in `guests`.
@@ -12,14 +17,17 @@ import {
   View, Text, MediaView, addListener, useAppWindow, useStore, createStore, wm, windows, mainDisplay, workArea, windowPixelIcons, windowChrome, t as tr,
   useFilesDrop, FilesDropHint, notify,
 } from '@lordos/sdk';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ClipAskBar } from './clipask.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch } from './model.js';
+import { menus } from './ui.jsx';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune, guestKeys, guestMayTakeFront, anchorPoint, cropsStale, STALE_MS } from './model.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
 export const CLIP_HOLD_MS = 150;
-// dir → { sid, name, mid, gw, gh, media, list: [guest window], apps: [{ name, token }], leave() }
+// dir → { dir, sid, name, mid, home (the machine's own window), gw, gh, media, list: [guest window], apps: [{ name, token }],
+// appIcons (token → pixels, once the guest sends them), wins: { gid: LordOS window id }, launches and closes (the rows'
+// Opening… and Closing…: launchGuest, closeGuest), closeRefused (closeGuest), leave() }
 export const guests = createStore({});
 // dir → the LordOS window id of that machine's guest window in front, if one is: the machine counts as in use then (its
 // clipboard's gate, 6.8)
@@ -65,9 +73,9 @@ function placeOf(x, w, sid, k, d, have) {
 
 // The machine's window side: turns apps mode on and off in the guest, and keeps the LordOS windows in step with the
 // guest's list. on: the person wants it; ready: the agent says the guest's helper lists its windows.
-export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTouch }) {
+export function useAppsMode({ dir, sid, st, name, mid, home, on, ready, onLeave, onTouch }) {
   const sent = useRef(false);
-  const seen = useRef({ w: -1, i: -1, a: -1 });
+  const seen = useRef({ w: -1, i: -1, a: -1, r: -1 });
   // a pause keeps the windows (their pictures stay as they were); stopping, or the agent going, ends it
   const active = !!(on && ready && sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused'));
   useEffect(() => {
@@ -76,8 +84,8 @@ export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTou
     // the guest's screen as large as this display: its windows are never cut by a smaller one
     const [gw, gh] = appsGuestSize(display());
     lord.vm.resize(sid, gw, gh);
-    seen.current = { w: -1, i: -1, a: -1 };
-    publish(dir, { sid, name, mid, leave: onLeave, touch: onTouch, list: [], apps: [] });
+    seen.current = { w: -1, i: -1, a: -1, r: -1 };
+    publish(dir, { dir, sid, name, mid, home, leave: onLeave, touch: onTouch, list: [], apps: [], wins: {}, closeRefused: {} });
     return () => {
       if (sent.current) lord.vm.apps(sid, false);
       sent.current = false;
@@ -89,18 +97,38 @@ export function useAppsMode({ dir, sid, st, name, mid, on, ready, onLeave, onTou
     };
   }, [active, sid]);
   // the picture's size and source can change under it (the guest took the new size); caps: what the guest's tools take
-  useEffect(() => { if (active) publish(dir, { gw: st.w, gh: st.h, media: st.media, name, caps: st.agent?.caps || 0 }); }, [active, st?.w, st?.h, st?.media, name, st?.agent?.caps]);
+  const size = useRef('');
+  useEffect(() => {
+    if (!active) { size.current = ''; return; }
+    // a new size (not the first): the crops wait for the guest's next list (model.js cropsStale)
+    const key = `${st.w}x${st.h}`;
+    const resizedAt = size.current && size.current !== key ? Date.now() : undefined;
+    size.current = key;
+    publish(dir, { gw: st.w, gh: st.h, media: st.media, name, caps: st.agent?.caps || 0, ...(resizedAt ? { resizedAt } : null) });
+  }, [active, st?.w, st?.h, st?.media, name, st?.agent?.caps]);
   useEffect(() => {
     if (!active) return;
     if (st.guestAppsSeq !== seen.current.a) { seen.current.a = st.guestAppsSeq; publish(dir, { apps: guestAppItems(lord.vm.guestApps(sid)) }); }
-    if (st.windowsSeq !== seen.current.w) { seen.current.w = st.windowsSeq; sync(dir, sid, mid, name, lord.vm.windows(sid), st.w, st.h); }
-    if (st.iconsSeq !== seen.current.i) {
+    const listed = st.windowsSeq !== seen.current.w;
+    if (listed) { seen.current.w = st.windowsSeq; publish(dir, { listedAt: Date.now() }); sync(dir, sid, mid, name, lord.vm.windows(sid), st.w, st.h); }
+    // icons: for every window that has none yet (one opened from a later list than its icon came with, as after a
+    // re-attach), and again for all when the guest's icons changed (model.js iconsToAsk)
+    if (listed || st.iconsSeq !== seen.current.i) {
       seen.current.i = st.iconsSeq;
       const icons = {};
-      for (const tr0 of trackOf(dir).values()) { const px = lord.vm.winIcon(sid, tr0.gid); if (px) icons[tr0.winId] = px; }
-      windowPixelIcons.set((m) => ({ ...m, ...icons }));
+      for (const tr0 of iconsToAsk(trackOf(dir).values(), st.iconsSeq)) {
+        const px = lord.vm.winIcon(sid, tr0.gid);
+        if (px) { icons[tr0.winId] = px; tr0.icon = true; tr0.iconSeq = st.iconsSeq; }
+      }
+      if (Object.keys(icons).length) windowPixelIcons.set((m) => ({ ...m, ...icons }));
     }
   }, [active, st?.windowsSeq, st?.iconsSeq, st?.guestAppsSeq]);
+  // a close the guest refused (its window runs as administrator in Windows): the windows' side says so
+  useEffect(() => {
+    if (!active || st.closeRefusedSeq === seen.current.r) return;
+    seen.current.r = st.closeRefusedSeq;
+    publish(dir, { closeRefused: closeRefusedOf(lord.vm.closeRefusals(sid)) });
+  }, [active, st?.closeRefusedSeq]);
   return active;
 }
 
@@ -117,15 +145,20 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     wm.close(x.winId, true);
     windowPixelIcons.set((m) => { if (!(x.winId in m)) return m; const n = { ...m }; delete n[x.winId]; return n; });
   }
+  // a window the guest opens or brings back takes the front only while the person is in this machine; otherwise it goes
+  // behind the window in front, which keeps the keyboard (model.js guestMayTakeFront: no focus stealing from a Terminal)
+  const front = wm.focused();
+  const keep = guestMayTakeFront(front ? wm.get(front) : null, dir) ? null : front;
   // bottom first, so the guest's front window ends up in front here too
   for (const w of [...plan.open].reverse()) {
     const instance = guestInstance(mid, w.id);
     const popup = isPopup(w);
-    const x = { gid: w.id, winId: 0, rect: w, minimized: false, asked: null, inset: popup ? { l: 0, t: 0, r: 0, b: 0 } : null, popup };
+    // no LordOS frame around it (csd): the content is the guest's window, its own title bar included
+    const x = { gid: w.id, winId: 0, rect: w, minimized: false, asked: null, inset: { l: 0, t: 0, r: 0, b: 0 }, popup };
     const r = placeOf(x, w, sid, k, d, have);
-    const args = { guestWin: { dir, gid: w.id }, guest: { machine: name, mid, app: w.app || w.title, key: (w.app || '').toLowerCase() || String(w.id) } };
+    const args = { guestWin: { dir, gid: w.id }, guest: { machine: name, mid, app: w.app || w.title, key: (w.app || '').toLowerCase() || String(w.id) }, csd: true };
     const winId = popup ? wm.open('machines', { instance, frame: r, pip: r, args: { ...args, notice: true } })
-      : wm.open('machines', { instance, frame: frameAround(r), args });
+      : wm.open('machines', { instance, frame: frameAround(r, x.inset), args });
     if (!winId) continue;
     x.winId = winId;
     have.set(w.id, x);
@@ -138,7 +171,8 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     x.minimized = true;
     wm.minimize(x.winId);
   }
-  for (const w of plan.restore) { const x = have.get(w.id); if (x) { x.minimized = false; wm.focus(x.winId); } }
+  for (const w of plan.restore) { const x = have.get(w.id); if (x) { x.minimized = false; if (keep) wm.raise(x.winId); else wm.focus(x.winId); } }
+  if (keep && wm.get(keep) && wm.focused() !== keep) wm.raise(keep);
   for (const w of plan.follow) {
     const x = have.get(w.id);
     if (!x) continue;
@@ -147,14 +181,60 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     x.followed = r;
   }
   for (const w of list) { const x = have.get(w.id); if (x) { x.rect = w; if (!w.minimized) x.minimized = false; } }
+  // which LordOS window shows each guest window (the controller's Running rows: their icons, the one to bring forward)
+  const wins = {};
+  for (const [gid, x] of have) wins[gid] = x.winId;
+  const was = guests.get()[dir]?.wins || {};
+  if (Object.keys(was).length !== have.size || Object.keys(wins).some((k) => was[k] !== wins[k])) publish(dir, { wins });
 }
 
-// The Applications menu's items: the guest's apps, each launched in the guest (lord.vm.launch sends only a token the
-// guest listed itself)
-export function appsMenuItems(g) {
-  if (!g?.apps?.length) return [{ label: tr('machines.apps.noApps'), disabled: true }];
-  return g.apps.map((a) => ({ label: a.name, onClick: () => lord.vm.launch(g.sid, a.token) }));
+// A guest window brought to the front from the Running list: its LordOS window (focused, brought back if minimized: the
+// guest's window follows, as from the Dock); one minimized in the guest before apps mode began has none yet, so the guest
+// is asked to bring it back and its window opens from the guest's next list
+export function focusGuest(dir, gid) {
+  const g = guests.get()[dir];
+  const winId = trackOf(dir).get(gid)?.winId || 0;
+  if (winId) { wm.focus(winId); return; }
+  if (g?.sid) { lord.vm.winAct(g.sid, gid, 'restore'); lord.vm.winAct(g.sid, gid, 'focus'); }
 }
+// A guest window closed from the Running list: asked of the guest, as the window's own close button does (it may ask
+// about unsaved work); its LordOS window goes once the guest's list says so. The row says "Closing…" meanwhile, and why
+// not when the window stays (g.closes, model.js closeView): the guest may refuse, e.g. a Windows window that runs as
+// administrator. A refusal the guest reports goes in g.closeRefused (gid → { reason: 'elevated' | '', at }); nothing fills
+// it until the guest's tools report refusals, and until then the row's note comes after CLOSE_WAIT_MS.
+export function closeGuest(dir, gid) {
+  const g = guests.get()[dir];
+  if (!g?.sid) return;
+  publish(dir, { closes: closeStart(closePrune(g.closes, g.list), gid, Date.now()) });
+  lord.vm.winAct(g.sid, gid, 'close');
+}
+// One of the guest's apps opened (lord.vm.launch sends only a token the guest listed itself), at most once while it waits
+// for its window (model.js launchPending: a new window of that app, or LAUNCH_WAIT_MS): a window that opens where the
+// person doesn't look must not lead to the app opened six times. True when it was sent.
+export function launchGuest(dir, a) {
+  const g = guests.get()[dir];
+  if (!g?.sid || !a?.token) return false;
+  const now = Date.now();
+  if (launchPending(g.launches?.[a.token], g.list, now)) return false;
+  publish(dir, { launches: launchStart(launchPrune(g.launches, g.list, now), a, g.list, now) });
+  lord.vm.launch(g.sid, a.token);
+  return true;
+}
+
+// The Applications menu's items: the guest's windows (Running: a click brings one to the front), then the guest's apps,
+// each launched in the guest (lord.vm.launch sends only a token the guest listed itself). The section's title is a
+// disabled row: every theme's menu draws those.
+export function appsMenuItems(g) {
+  const running = runningWindows(g?.list);
+  const head = running.length ? [{ label: tr('machines.apps.running'), disabled: true },
+    ...running.map((w) => ({ label: w.title || tr('machines.apps.untitled'), checked: w.focused, onClick: () => focusGuest(g.dir, w.id) })),
+    '-', { label: tr('machines.apps.launch'), disabled: true }] : [];
+  if (!g?.apps?.length) return [...head, { label: tr('machines.apps.noApps'), disabled: true }];
+  return [...head, ...g.apps.map((a) => ({ label: a.name, onClick: () => launchGuest(g.dir, a) }))];
+}
+
+// a guest window over the whole of the guest's screen (maximized there): square corners, as the guest draws them
+const full = (w, g) => !!w && !!g && w.x <= 0 && w.y <= 0 && w.w >= (g.gw || 0) && w.h >= (g.gh || 0) - 64;
 
 // One guest window as a LordOS window: its part of the picture, the pointer and keyboard to the guest, and what the
 // person does to the window asked of the guest
@@ -166,11 +246,14 @@ export function GuestWindow({ dir, gid }) {
   const buttons = useRef(new Set());
   const wheel = useRef(0);
   const held = useRef(0);          // a press held back for a new clipboard offer: its release waits until after it
+  const anchor = useRef(null);     // while a button is held: the box and crop at the press (model.js anchorPoint)
   const gref = useRef(g);
   gref.current = g;
   const meRef = useRef(me);
   meRef.current = me;
   const minimized = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.minimized);
+  // the Applications menu's Running rows, set again only when they change (not on every move of a window)
+  const running = runningKey(runningWindows(g?.list));
   const title = me ? (me.title || me.app || '') : '';
   // the guest's title, with the machine's name: a guest's window is always told apart from this computer's (7.2)
   useEffect(() => { if (g) wm.setTitle(winId, tr('machines.apps.windowTitle', { title, machine: g.name || '' })); }, [title, g?.name]);
@@ -186,7 +269,7 @@ export function GuestWindow({ dir, gid }) {
       { label: tr('machines.apps.menu'), items: appsMenuItems(g) },
       { label: g.name || tr('machines.title'), items: [{ label: tr('machines.apps.leave'), onClick: () => g.leave?.() }] },
     ]);
-  }, [g?.apps, g?.name]);
+  }, [g?.apps, g?.name, running]);
   // in front: the machine is in use (the clipboard's gate)
   useEffect(() => {
     if (!focused) return undefined;
@@ -212,10 +295,11 @@ export function GuestWindow({ dir, gid }) {
       if (!(lw > 0) || !(lh > 0)) return;
       const d = display(), k = guestScale(s.gw, s.gh, d);
       const here = { x: lx, y: ly, w: lw, h: lh };
-      if (!x.inset && !x.popup) {
+      if (!x.measured && !x.popup) {
         // first look: the theme's chrome around the content, then the content put where the guest's window is
         const f = wm.get(winId);
         if (!f) return;
+        x.measured = true;
         x.inset = { l: lx - f.x, t: ly - f.y, r: f.x + f.w - (lx + lw), b: f.y + f.h - (ly + lh) };
         const at = placeOf(x, w, s.sid, k, d, trackOf(dir));
         if (!nearRect(here, at)) wm.setFrame(winId, frameAround(at, x.inset));
@@ -245,16 +329,28 @@ export function GuestWindow({ dir, gid }) {
   useEffect(() => {
     if (!focused || !g?.sid) return undefined;
     const sid = g.sid;
-    // while the clipboard's bar asks, the keys are the bar's
-    const ka = addListener('keydown', (e) => { if (!(e.code > 0) || gref.current?.ask) return; e.preventDefault?.(); lord.vm.key(sid, e.code, 1); });
-    const kb = addListener('keyup', (e) => { if (e.code > 0) lord.vm.key(sid, e.code, 0); });
+    // each key asks whether this window has the keyboard now (wm.hasKeyboard; model.js guestKeys): never a key typed in
+    // another window, a search or a system prompt; a release only for a press that went to the guest
+    const gk = guestKeys({ send: (c, v) => lord.vm.key(sid, c, v), owns: () => wm.hasKeyboard(winId), release: () => lord.vm.release(sid) });
+    // while the clipboard's bar asks, the keys are the bar's; while a menu of ours is open (the status item's search), the menu's
+    const ka = addListener('keydown', (e) => { if (!(e.code > 0) || gref.current?.ask || menus.open > 0) return; if (gk.down(e.code)) e.preventDefault?.(); });
+    const kb = addListener('keyup', (e) => { gk.up(e.code); });
+    // a drag that started on this window (the guest's own title bar, a selection) goes on wherever the pointer goes,
+    // mapped as at the press: the guest moves its window and this one follows it a moment later
+    const km = addListener('pointermove', (e) => {
+      const s = gref.current;
+      if (!buttons.current.size || !anchor.current || !s?.gw) return;
+      const q = anchorPoint(e.x, e.y, anchor.current, s.gw, s.gh);
+      if (q) lord.vm.motion(sid, q[0], q[1]);
+    });
     const kc = addListener('pointerup', (e) => {
       if (!buttons.current.has(e.button)) return;
       buttons.current.delete(e.button);
+      if (!buttons.current.size) anchor.current = null;
       const wait = held.current - Date.now(), b = e.button;
       if (wait > 0) setTimeout(() => lord.vm.button(sid, b, 0), wait + 10); else lord.vm.button(sid, b, 0);
     });
-    return () => { ka(); kb(); kc(); lord.vm.release(sid); buttons.current.clear(); };
+    return () => { ka(); kb(); km(); kc(); lord.vm.release(sid); buttons.current.clear(); anchor.current = null; };
   }, [focused, g?.sid]);
   const at = (e) => (box.current && me && g?.gw ? cropPoint(e.x, e.y, lord.getLayout(box.current.id), cropOf(me), g.gw, g.gh) : null);
   // files dragged from Files onto this window (7.2.1): copied into the machine as any drop (transfer folder or agent's
@@ -280,7 +376,8 @@ export function GuestWindow({ dir, gid }) {
   });
   // this window's drops still copying (the machine's window publishes them), as a line at its bottom
   const line = copyLine((g?.copies || []).filter((f) => sent.current.has(f.id)));
-  const move = (e) => { const q = g?.sid && at(e); if (q) lord.vm.motion(g.sid, q[0], q[1]); };
+  // with a button held the drag's own listener above sends the motion (anchored); a move over the window otherwise
+  const move = (e) => { if (buttons.current.size && anchor.current) return; const q = g?.sid && at(e); if (q) lord.vm.motion(g.sid, q[0], q[1]); };
   const down = (e) => {
     if (trackOf(dir).get(gid)?.popup) e.stopPropagation?.();     // a popup's own frame (picture-in-picture) would start a drag
     if (!g?.sid || g.ask) return;     // the clipboard's bar is asking: its clicks are its own
@@ -288,6 +385,7 @@ export function GuestWindow({ dir, gid }) {
     // clipboard in waits a moment, as on the machine's window, so a right-click's Paste finds it there
     const fresh = !!g.touch?.();
     move(e);
+    if (!buttons.current.size && box.current && me) anchor.current = { box: lord.getLayout(box.current.id), crop: cropOf(me) };
     buttons.current.add(e.button);
     const sid = g.sid, b = e.button;
     if (fresh) { held.current = Date.now() + CLIP_HOLD_MS; setTimeout(() => lord.vm.button(sid, b, 1), CLIP_HOLD_MS); }
@@ -300,6 +398,10 @@ export function GuestWindow({ dir, gid }) {
     wheel.current = rest;
     if (n) lord.vm.wheel(g.sid, n, 0);
   };
+  // the crops wait for the guest's list after a change of the picture's size (they'd show a wrong part of it)
+  const stale = !!g && cropsStale(g.resizedAt, g.listedAt, Date.now());
+  const [, redraw] = useState(0);
+  useEffect(() => { if (!stale) return undefined; const t0 = setTimeout(() => redraw((x) => x + 1), STALE_MS + 20); return () => clearTimeout(t0); }, [stale, g?.resizedAt]);
   if (!g || !me) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' }}>
@@ -308,8 +410,9 @@ export function GuestWindow({ dir, gid }) {
     );
   }
   return (
-    <View ref={box} {...drop.props} onMouseDown={down} onMouseMove={move} onWheel={onWheel} style={{ flex: 1, backgroundColor: '#000' }}>
-      {g.media ? <MediaView media={g.media} crop={cropOf(me)} style={{ flex: 1 }} /> : null}
+    <View ref={box} {...drop.props} onMouseDown={down} onMouseMove={move} onWheel={onWheel}
+      style={{ flex: 1, backgroundColor: '#000', ...(trackOf(dir).get(gid)?.popup || full(me, g) ? null : { borderRadius: 8, overflow: 'hidden' }) }}>
+      {g.media && !stale ? <MediaView media={g.media} crop={cropOf(me)} style={{ flex: 1 }} /> : null}
       {focused && g.ask ? <ClipAskBar ask={g.ask} onAnswer={(yes) => g.askAnswer?.(yes)} /> : null}
       {line ? (
         <View style={{ position: 'absolute', left: 8, right: 8, bottom: 8, alignItems: 'center', pointerEvents: 'none' }}>

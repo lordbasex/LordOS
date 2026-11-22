@@ -22,7 +22,8 @@ export function inhibitShortcuts(win, app) {
 // For the dispatcher: 'app', 'taken' or null (see kbinhibitmodel.js keyOutcome).
 export function shortcutsKey(e, key) {
   const h = held;
-  const on = !!h && wm.focused() === h.win && perms.get(h.app, 'shortcuts') === 'allow';
+  // the window has the keyboard now: in front, and no search, sheet or system prompt open (wm.hasKeyboard)
+  const on = !!h && wm.hasKeyboard(h.win) && perms.get(h.app, 'shortcuts') === 'allow';
   const to = keyOutcome(pressed, e, e.down && !e.repeat && on ? routeKey({ code: e.code, mods: e.mods, key }, !h.off) : null);
   if (to === 'toggle') { h.off = !h.off; return 'taken'; }
   return to;

@@ -618,6 +618,21 @@ await flush();
   for (let i = 0; i < 2; i++) await flush();
 }
 
+// timer: idle, the ring shows the duration a tap starts (5:00), not a dash; the three presets on one row of pills
+// sized by sdk/timerwidgetmodel.js (server/tests/timer_widget_test.mjs checks the fit in every language)
+{
+  const shownV = (v) => [...texts].filter(([id, x]) => x === v && attached(id)).length;
+  for (const size of ['s', 'm']) {
+    const id = sdk.addDeskWidget('timer', size, L);
+    for (let i = 0; i < 2; i++) await flush();
+    const presets = [1, 5, 25].map((n) => shownV(sdk.t('clock.timer.preset', { n })));
+    check(`timer ${size}: idle shows 5:00 and the presets`, [shownV('5:00'), shownV('—'), presets], [1, 0, [1, 1, 1]]);
+    if (size === 'm') check('timer m: the stopwatch beside it', shownV(sdk.t('shell.widgets.timer.stopwatch')), 1);
+    sdk.removeDeskWidget(id);
+    for (let i = 0; i < 2; i++) await flush();
+  }
+}
+
 // every built-in widget renders in each of its sizes, and none adds a timer every second
 {
   const grid = await import('../../sdk/widgetgrid.js');

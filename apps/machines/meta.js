@@ -31,6 +31,8 @@ export function readMeta(dir) {
       if (typeof j.cloneOf === 'string' && /^[0-9a-f-]{36}$/.test(j.cloneOf)) meta.cloneOf = j.cloneOf;
       if (typeof j.importedFrom === 'string') meta.importedFrom = j.importedFrom.slice(0, 1024);
       if (typeof j.transferSetup === 'boolean') meta.transferSetup = j.transferSetup;   // set up the transfer folder once (Windows)
+      // the LordOS tools brought up to date by themselves (Configure → Agent); absent: Machines settings' default
+      if (typeof j.toolsAuto === 'boolean') meta.toolsAuto = j.toolsAuto;
       // its guest tools open files sent from Files' "Open with" (7.3): 'windows' (the system they said), or false
       if (j.opens === 'windows' || j.opens === 'other' || j.opens === false) meta.opens = j.opens;
     }

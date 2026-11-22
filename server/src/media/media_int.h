@@ -32,6 +32,7 @@ typedef struct {
 
 typedef struct {
     int used, id, kind;
+    int studio;                 /* a LordOS Studio camera (lord-studio, mstudio.c): it gets the effects' settings */
     char app[MEDIA_APP_MAX];
     /* helper (player, camera, recordings) */
     int sock;
@@ -92,6 +93,8 @@ typedef struct {
     size_t in_len;
     double rec_start, rec_last;
     int rec_fps;
+    int rec_x, rec_y, rec_fw, rec_fh;   /* screen recording of an area: its place in the full frame (rec_fw × rec_fh) */
+    int rec_cursor;                     /* screen recording: the pointer is drawn into it */
     long rec_frames, rec_dropped;
     int64_t stats[6];
     int job;                    /* image: job that decodes it */
@@ -118,6 +121,9 @@ int  media_src_crop_count(MediaSrc *s);
 int  media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
 /* the same with lord-stream (0.8.8.10: network players and M3U lists, src/media/stream; streamurl.h) */
 int  media_spawn_stream(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
+/* lord-studio: LordOS Studio's camera (mstudio.c) */
+int  media_spawn_studio(const char *params, const int *fds, int nfds, pid_t *pid);
+int  media_has_studio(void);
 int  media_pulse_fd(void);              /* socket connected to PipeWire (the user's) or -1 */
 int  media_render_fd(void);             /* render node for VA-API or -1 */
 const char *media_hwaccel(void);        /* "vaapi" | "v4l2request" | "none" (LORD_MEDIA_HWACCEL) */
@@ -175,7 +181,11 @@ void media_capture_size(int *w, int *h);     /* recording / remote desktop frame
 MediaSrc *media_crop(MediaSrc *src, int x, int y, int w, int h);
 MediaSrc *media_resize(MediaSrc *src, int w, int h);          /* new capture source, w × h */
 MediaSrc *media_rotate(MediaSrc *src, int turns);             /* new capture source, quarter turns clockwise */
-int  media_screenrec_start(MediaSrc *s, int fps);
+/* An area of the recording's frame (lx, ly, lw, lh logical, in the global space) → its physical rectangle in the
+ * frame, even-sized: 0 ok, -1 when nothing of at least 16 × 16 is left on the recorded display. */
+int  media_capture_region(double lx, double ly, double lw, double lh, int *x, int *y, int *w, int *h);
+/* region: NULL (the whole frame) or { x, y, w, h } from media_capture_region; cursor: draw the pointer into it */
+int  media_screenrec_start(MediaSrc *s, int fps, const int *region, int cursor);
 /* A recording of one picture instead of the screen (a Machines guest, 6.20): the same input ring and encoder, w × h
  * fixed at start; the caller feeds it (a picture of another size is drawn into its top left, the rest black). It never
  * becomes the screen recording, so the screen keeps its own. 0 ok. */

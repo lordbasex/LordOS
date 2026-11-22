@@ -59,5 +59,11 @@
   "ask.idle": "„{app}” chce wiedzieć, kiedy nie ma cię przy komputerze",
   "ask.idleNote": "Dostaje informację, gdy przez chwilę nie używasz klawiatury i myszy oraz gdy wracasz; nic więcej. Możesz to później zmienić w Ustawienia → Prywatność.",
   "perm.idle": "Nieobecność przy komputerze",
-  "permHint.idle": "Aplikacje informowane, gdy przez chwilę nie używasz komputera i gdy wracasz, np. komunikatory pokazujące cię jako nieobecnego. Niczego więcej się nie dowiadują; film lub prezentacja, która utrzymuje włączony ekran, liczy się jako obecność."
+  "permHint.idle": "Aplikacje informowane, gdy przez chwilę nie używasz komputera i gdy wracasz, np. komunikatory pokazujące cię jako nieobecnego. Niczego więcej się nie dowiadują; film lub prezentacja, która utrzymuje włączony ekran, liczy się jako obecność.",
+  "allowOnce": "Zezwól raz",
+  "allowAlways": "Zawsze zezwalaj",
+  "ask.vr": "„{app}” chce używać gogli VR {headset}",
+  "ask.vrNote": "Ich ekran należy wtedy tylko do aplikacji; LordOS nigdy nie pokazuje tam twojego pulpitu. Zostaje odebrany, gdy aplikacja się zamknie, gogle zostaną odłączone lub ekran się zablokuje. Możesz to później zmienić w Ustawienia → Prywatność.",
+  "perm.vr": "Gogle VR",
+  "permHint.vr": "Aplikacje, które mogą bezpośrednio sterować ekranem gogli VR. Wypożyczane są tylko gogle, nigdy twoje monitory, i są odbierane, gdy ekran się zablokuje, zmienisz użytkownika lub wybierzesz Odmów."
 }

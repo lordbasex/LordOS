@@ -314,5 +314,11 @@
   "src.wine": "Wine",
   "src.android": "Android 应用",
   "soon": "即将推出",
-  "sub.all": "全部"
+  "sub.all": "全部",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "我们检测到一个摄像头。",
+  "suggest.studioCamera.detail": "让所有应用（包括浏览器和视频通话）都能使用带有你的效果的“LordOS Studio”摄像头：背景虚化或身后的图片（{packages}）。",
+  "suggest.studioCamera.unavailable": "此电脑的软件包来源中没有 {packages}。",
+  "suggest.studioCamera.note.dkms": "在 PC 上，它的内核模块会在这台电脑上为你的内核编译（DKMS），这会带来约 500 MB 的编译器和内核头文件，并在每次内核更新后重新编译。在 Raspberry Pi 上，它随 LordOS 内核提供。",
+  "suggest.studioCamera.note.secureBoot": "启用安全启动（Secure Boot）时，需要在下次重启时登记该模块的签名密钥，否则摄像头不会出现。"
 }

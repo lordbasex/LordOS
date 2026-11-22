@@ -8,6 +8,11 @@
  *               presentation feedback it got)
  *   damage N [S] a 640×480 window that changes a 10×10 square N times a second for S s (3), damaging only that square
  *               (surface or buffer coordinates, alternately); prints the frames done
+ *   subsurface [MS] a 640×480 window with menus drawn as desync subsurfaces, as GTK 3 maps Firefox's <select> lists: one
+ *               shown, redrawn on its own, destroyed with no commit of the window, a new one elsewhere, one moved with
+ *               the window's commit, and one destroyed while a subsurface of its own is still there (Firefox's order);
+ *               the window damages one pixel in a corner after each step so a frame is painted (LORD_PAINT_VERIFY); each
+ *               step is held MS ms (250)
  *   transform   a 200×100 buffer with buffer_transform 90: the window is 100×200 (geometry checked by the script)
  *   idle        a 300 ms ext-idle-notify notification for 3 s: prints how many "idled" came (none until the "idle"
  *               permission is allowed; tests/wlperf_headless.sh answers the prompt)
@@ -15,7 +20,7 @@
  *               non-square buffer that must be invalid_buffer
  *   protocols   the globals and versions of items 4 and 7 (xdg_wm_base 7, linux-dmabuf 5, wp_presentation 2,
  *               cursor-shape 2, single-pixel-buffer, alpha-modifier): the capabilities, the bounds, a single-pixel
- *               buffer at 50 % opacity
+ *               buffer at 50 % opacity; no drm-lease device (no VR headset, no card: docs/WAYLAND.md "DRM leases")
  *
  *   WAYLAND_DISPLAY=wayland-0 build/wlperf-client MODE [ARG]   (exit 0, or 1 on a protocol error or a failed check) */
 #include <stdio.h>
@@ -44,7 +49,8 @@ static struct wp_alpha_modifier_v1 *alpha;
 static struct ext_idle_notifier_v1 *idler;
 static struct xdg_toplevel_icon_manager_v1 *iconm;
 static struct wl_seat *seat;
-static uint32_t ver_wm, ver_dmabuf, ver_pres, ver_cursor, ver_spb, ver_alpha;
+static struct wl_subcompositor *subcomp;
+static uint32_t ver_wm, ver_dmabuf, ver_pres, ver_cursor, ver_spb, ver_alpha, ver_lease;
 static int fails;
 
 static void check(const char *what, long got, long want) {
@@ -75,6 +81,8 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
         spb = wl_registry_bind(r, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
     } else if (!strcmp(iface, xdg_toplevel_icon_manager_v1_interface.name)) iconm = wl_registry_bind(r, name, &xdg_toplevel_icon_manager_v1_interface, 1);
     else if (!strcmp(iface, ext_idle_notifier_v1_interface.name)) idler = wl_registry_bind(r, name, &ext_idle_notifier_v1_interface, 1);
+    else if (!strcmp(iface, "wp_drm_lease_device_v1")) ver_lease = ver;
+    else if (!strcmp(iface, wl_subcompositor_interface.name)) subcomp = wl_registry_bind(r, name, &wl_subcompositor_interface, 1);
     else if (!strcmp(iface, wl_seat_interface.name)) seat = wl_registry_bind(r, name, &wl_seat_interface, 1);
     else if (!strcmp(iface, wp_alpha_modifier_v1_interface.name)) {
         ver_alpha = ver;
@@ -246,6 +254,78 @@ static int run_damage(int per_sec, int secs) {
     return wl_display_get_error(dpy) ? 1 : 0;
 }
 
+/* ---- subsurfaces that come and go on their own (desync), as GTK 3's menus in Firefox ---- */
+typedef struct { struct wl_surface *s; struct wl_subsurface *sub; Buf b; } Sub;
+static Sub sub_new(struct wl_surface *parent, int x, int y, int w, int h, uint32_t color) {
+    Sub m = { wl_compositor_create_surface(comp), NULL, buffer(w, h, color) };
+    m.sub = wl_subcompositor_get_subsurface(subcomp, m.s, parent);
+    wl_subsurface_set_desync(m.sub);
+    wl_subsurface_set_position(m.sub, x, y);
+    wl_surface_attach(m.s, m.b.b, 0, 0);
+    wl_surface_damage_buffer(m.s, 0, 0, w, h);
+    wl_surface_commit(m.s);
+    return m;
+}
+static void sub_gone(Sub *m) {
+    wl_subsurface_destroy(m->sub);
+    wl_surface_destroy(m->s);
+    wl_buffer_destroy(m->b.b);
+    munmap(m->b.px, (size_t)m->b.w * (size_t)m->b.h * 4);
+}
+static Buf win_buf;
+static int corner, hold_ms = 250;
+static void win_poke(void) {                    /* one pixel of the window: a frame is painted and checked */
+    win_buf.px[0] = 0xff000000u | (uint32_t)(++corner * 2654435761u);
+    wl_surface_attach(surf, win_buf.b, 0, 0);
+    wl_surface_damage_buffer(surf, 0, 0, 1, 1);
+    wl_surface_commit(surf);
+    wl_display_roundtrip(dpy);
+    pause_ms(hold_ms);
+}
+static int run_subsurface(void) {
+    if (!subcomp) { printf("FAIL no wl_subcompositor\n"); return 1; }
+    win_buf = buffer(640, 480, 0xff303030u);
+    window("subsurface", &win_buf, 0);
+    xdg_surface_set_window_geometry(xsurf, 20, 16, 600, 448);  /* a frame drawn by the app, as GTK's */
+    wl_surface_commit(surf);
+    pause_ms(1500);                             /* past the window's opening animation, which repaints all of it */
+    Sub a = sub_new(surf, 100, 100, 120, 130, 0xffc03030u);
+    wl_surface_commit(surf);                    /* the position comes with the window's commit */
+    win_poke();
+    for (int i = 0; i < 120 * 40; i++) a.b.px[i] = 0xff30c030u;    /* redrawn on its own: only its commit */
+    wl_surface_attach(a.s, a.b.b, 0, 0);
+    wl_surface_damage_buffer(a.s, 0, 0, 120, 40);
+    wl_surface_commit(a.s);
+    wl_display_roundtrip(dpy);
+    pause_ms(hold_ms);
+    win_poke();
+    sub_gone(&a);                               /* closed: no commit of the window */
+    wl_display_roundtrip(dpy);
+    pause_ms(hold_ms);
+    win_poke();
+    Sub b = sub_new(surf, 380, 220, 150, 100, 0xff3030c0u);       /* a new one elsewhere, its commit first */
+    wl_display_roundtrip(dpy);
+    pause_ms(hold_ms);
+    wl_surface_commit(surf);
+    win_poke();
+    wl_subsurface_set_position(b.sub, 60, 300);  /* moved with the window's commit */
+    wl_surface_commit(surf);
+    win_poke();
+    Sub c = sub_new(b.s, 10, 10, 60, 40, 0xffc0c030u);            /* one of its own, then the outer one goes first */
+    wl_surface_commit(b.s);
+    win_poke();
+    sub_gone(&b);
+    wl_display_roundtrip(dpy);
+    pause_ms(hold_ms);
+    win_poke();
+    wl_surface_attach(c.s, NULL, 0, 0);
+    wl_surface_commit(c.s);
+    sub_gone(&c);
+    win_poke();
+    printf("subsurface: shown, redrawn, destroyed, made elsewhere, moved, destroyed under its own subsurface\n");
+    return wl_display_get_error(dpy) ? 1 : 0;
+}
+
 /* ---- titles ---- */
 static int run_titles(void) {
     Buf b = buffer(200, 120, 0xff505050u);
@@ -282,6 +362,7 @@ static int run_protocols(void) {
     check("wp_cursor_shape_manager_v1 version 2", ver_cursor, 2);
     check("wp_single_pixel_buffer_manager_v1", ver_spb, 1);
     check("wp_alpha_modifier_v1", ver_alpha, 1);
+    check("no wp_drm_lease_device_v1 without a VR headset on lord-server's card", ver_lease, 0);
     Buf b = buffer(300, 200, 0xff808080u);
     window("protocols", &b, 0);
     check("wm_capabilities: maximize", win.caps_max, 1);
@@ -392,7 +473,7 @@ static int run_icon(void) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) { fprintf(stderr, "usage: wlperf-client titles|frames N|damage N [S]|transform|protocols|idle|icon\n"); return 2; }
+    if (argc < 2) { fprintf(stderr, "usage: wlperf-client titles|frames N|damage N [S]|subsurface|transform|protocols|idle|icon\n"); return 2; }
     dpy = wl_display_connect(NULL);
     if (!dpy) { fprintf(stderr, "wlperf-client: no Wayland display\n"); return 2; }
     struct wl_registry *reg = wl_display_get_registry(dpy);
@@ -405,6 +486,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[1], "frames")) r = run_frames(argc > 2 ? atoi(argv[2]) : 3);
     else if (!strcmp(argv[1], "damage")) r = run_damage(argc > 2 ? atoi(argv[2]) : 2, argc > 3 ? atoi(argv[3]) : 3);
     else if (!strcmp(argv[1], "transform")) r = run_transform();
+    else if (!strcmp(argv[1], "subsurface")) { if (argc > 2) hold_ms = atoi(argv[2]); r = run_subsurface(); }
     else if (!strcmp(argv[1], "protocols")) r = run_protocols();
     else if (!strcmp(argv[1], "idle")) r = run_idle();
     else if (!strcmp(argv[1], "icon")) r = run_icon();

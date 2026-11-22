@@ -202,6 +202,8 @@ EOF
     # (0.8.8.9) the Chromium-based browsers' initial preferences (src/pkg/browserprefs.c) and migration 009
     run "browserprefs-test" build/browserprefs-test
     run "migration 009 chromium-family" sh tests/migration_chromium_family_test.sh
+    # fastfetch / neofetch fall back to lordos-fetch; the real package wins (packaging/fallback-bin)
+    run "fetch-fallback (fastfetch, neofetch)" sh tests/fetch_fallback_test.sh
     run "mmdb-test" build/mmdb-test
     run "canvas-test" build/canvas-test
     run "imgops-test" build/imgops-test
@@ -234,6 +236,8 @@ EOF
     if have node; then run "photos-trash-test (apps/photos/trash.js)" node tests/photos_trash_test.mjs; fi
     if have node; then run "bt-power-model-test (sdk/btpowermodel.js)" node tests/bt_power_model_test.mjs; fi
     if have node; then run "archive-vol-test (sdk/archivevol.js)" node tests/archive_vol_test.mjs; fi
+    if have node; then run "wayland-table-test (docs/wayland-protocols.json against server/src/wl's globals, generated table up to date)" node tests/wayland_table_test.mjs; else skip "wayland-table-test" "node"; fi
+    if have node; then run "wayland-import-test (tools/wayland-app-import.mjs reads wayland.app's bundle as literals, never runs it)" node tests/wayland_import_test.mjs; else skip "wayland-import-test" "node"; fi
     if have node; then run "bt-audio-model-test (sdk/btaudiomodel.js)" node tests/bt_audio_model_test.mjs; fi
     if have node; then run "bt-list-model-test (sdk/btlistmodel.js)" node tests/bt_list_model_test.mjs; fi
     if have node; then run "kbinhibit-model-test (sdk/kbinhibitmodel.js)" node tests/kbinhibit_model_test.mjs; fi
@@ -250,12 +254,72 @@ EOF
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
     esac
+    # surfaces made children of themselves or of their descendants: refused, lord-server goes on
+    sh tests/popup_headless.sh cycle-client >"$T/out" 2>&1
+    case $? in
+        0) ok "surface-cycles (tests/cycle_client.c, headless lord-server)" ;;
+        77) skip "surface-cycles" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "surface-cycles (tests/cycle_client.c, headless lord-server)"; cat "$T/out" ;;
+    esac
+    # hostile clients: random misuse of the requests whose misuse is a protocol error; lord-server answers every one,
+    # a well-behaved window beside them is never disconnected and still gets its frames
+    sh tests/popup_headless.sh wlfuzz-client >"$T/out" 2>&1
+    case $? in
+        0) ok "wayland-fuzz (tests/wlfuzz_client.c, headless lord-server)" ;;
+        77) skip "wayland-fuzz" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "wayland-fuzz (tests/wlfuzz_client.c, headless lord-server)"; cat "$T/out" ;;
+    esac
+    # a theme switch where the new theme and the running one both fail: the recovery screen, never no JS at all
+    sh tests/theme_switch_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "theme-switch-fails (tests/theme_switch_headless.sh, headless lord-server)" ;;
+        77) skip "theme-switch-fails" "build/lord-server (make)" ;;
+        *) bad "theme-switch-fails (tests/theme_switch_headless.sh, headless lord-server)"; cat "$T/out" ;;
+    esac
+    # explicit sync's kernel side (src/wl/syncobj.c) on this machine's render node
+    ./build/syncobj-kernel-test >"$T/out" 2>&1
+    case $? in
+        0) ok "syncobj-kernel-test (src/wl/syncobj.c: import, eventfd, release at once and with a dmabuf's fences)" ;;
+        77) skip "syncobj-kernel-test" "a render node with timeline syncobjs and SYNCOBJ_EVENTFD (Linux 6.6)" ;;
+        *) bad "syncobj-kernel-test (src/wl/syncobj.c)" ;;
+    esac
+    # explicit sync (linux-drm-syncobj-v1): timelines and udmabufs through the kernel, against a headless lord-server
+    sh tests/syncobj_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "syncobj (tests/syncobj_client.c, headless lord-server: wait, order, freeze, limit, fair, errors)" ;;
+        77) skip "syncobj" "a render node with timeline syncobjs, /dev/udmabuf (group kvm), build/lord-server and the default theme" ;;
+        *) bad "syncobj (tests/syncobj_client.c, headless lord-server: wait, order, freeze, limit, fair, errors)" ;;
+    esac
     # frames, titles and damage of a Linux window, against a headless lord-server (docs/WAYLAND.md)
     sh tests/wlperf_headless.sh >"$T/out" 2>&1
     case $? in
-        0) ok "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames, protocols, transform, damage)" ;;
+        0) ok "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames, protocols, transform, fixes, subsurface, damage)" ;;
         77) skip "wlperf" "build/lord-server and the default theme (make, npm run build)" ;;
-        *) bad "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames, protocols, transform, damage)" ;;
+        *) bad "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames, protocols, transform, fixes, subsurface, damage)" ;;
+    esac
+    # color-management-v1 and color-representation-v1, against a headless lord-server (docs/WAYLAND.md, "Colour management")
+    sh tests/color_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "color (tests/color_client.c, headless lord-server: what is advertised, errors, linear light on screen)" ;;
+        77) skip "color" "build/lord-server, build/color-client and the default theme (make, npm run build)" ;;
+        *) bad "color (tests/color_client.c, headless lord-server: what is advertised, errors, linear light on screen)" ;;
+    esac
+    # fifo-v1, commit-timing-v1, tearing-control-v1, content-type-v1 against a headless lord-server, vkcube's FIFO if
+    # installed (docs/WAYLAND.md, "Frame timing")
+    sh tests/wltiming_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "wltiming (tests/wltiming_client.c, headless lord-server: fifo, commit timing, errors, vkcube)" ;;
+        77) skip "wltiming" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "wltiming (tests/wltiming_client.c, headless lord-server: fifo, commit timing, errors, vkcube)" ;;
+    esac
+    # the shell extras: tab tear-off errors, window tags, the bell, blur behind windows, session management, against a
+    # headless lord-server (tests/shellx_headless.sh; the pointer-driven tear-off with SHELLX_DRAG=1, as root)
+    if have node; then run "shellx-model-test (sdk/shellxmodel.js)" node tests/shellx_model_test.mjs; fi
+    sh tests/shellx_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "shellx (tests/shellx_client.c, headless lord-server: globals, tag, bell, blur, session)" ;;
+        77) skip "shellx" "build/lord-server, build/shellx-client and the default theme (make, npm run build)" ;;
+        *) bad "shellx (tests/shellx_client.c, headless lord-server: globals, tag, bell, blur, session)" ;;
     esac
     # apps mode's guest side: lord-server's window endpoint, directly and through lordos-guest (tests/guestwin_client.c)
     sh tests/guestwin_headless.sh >"$T/out" 2>&1
@@ -331,6 +395,8 @@ EOF
     if have qemu-img && { have qemu-system-x86_64 || have qemu-system-aarch64; } && [ -x build/lord-vm ]; then run "vm-import-test" sh tests/vm_import_test.sh build
     else skip "vm-import-test" "qemu-img, qemu-system"; fi
     if have node; then run "screenshots-model-test (apps/screenshots)" node tests/screenshots_model_test.mjs; fi
+    # the Screenshots toolbar (❖⇧5): options kept and read back, modes, keys, Save to, the remembered selection's handles
+    if have node; then run "screenshots-toolbar-model-test (apps/screenshots/toolbarmodel.js)" node tests/screenshots_toolbar_model_test.mjs; fi
     if have node; then run "imageedit-model-test (sdk/imageeditmodel.js)" node tests/imageedit_model_test.mjs; fi
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
@@ -339,7 +405,16 @@ EOF
     if have node; then run "display-apps-model-test (sdk/displayappsmodel.js)" node tests/display_apps_model_test.mjs; else skip "display-apps-model-test" node; fi
     if have node; then run "slideshow-model-test (sdk/slideshowmodel.js)" node tests/slideshow_model_test.mjs; else skip "slideshow-model-test" node; fi
     if have node; then run "widget-grid-test (sdk/widgetgrid.js)" node tests/widget_grid_test.mjs; else skip "widget-grid-test" node; fi
+    if have node; then run "timer-widget-test (sdk/timerwidgetmodel.js, every language)" node tests/timer_widget_test.mjs; else skip "timer-widget-test" node; fi
     if have node; then run "poll-same-test (sdk/samevalue.js)" node tests/poll_same_test.mjs; else skip "poll-same-test" node; fi
+    # LordOS Studio (docs/CAMERA-STUDIO-PLAN.md): our own inference against ONNX Runtime's stored outputs and the loader's
+    # fuzz; the frame pipeline on fixed frames (CPU, and GPU when a render node opens); the popover's plain logic
+    run "studio-nn-test (segmenter and BlazeFace against ONNX Runtime, the .lnn loader's fuzz)" build/studio-nn-test
+    run "studio-test (matte, guided filter, blur, picture, mirror; CPU and GPU agree)" build/studio-test
+    run "studio-hub-test (the loopback: what it shows, its readers, the cards, YUYV)" build/studio-hub-test
+    # phase 2's package, built and inspected (never installed; the device itself is checked on a VM)
+    if have dpkg-deb; then run "studio-package-test (lordos-studio-camera)" sh tests/studio_package_test.sh; else skip "studio-package-test" dpkg-deb; fi
+    if have node; then run "studio-model-test (sdk/studiomodel.js)" node tests/studio_model_test.mjs; else skip "studio-model-test" node; fi
     if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
@@ -482,6 +557,9 @@ EOF
     # (0.8.8.8) a Linux app's ScreenCast chooser: what is offered, one or several, what lord-server gets (sdk/screencastmodel.js)
     if have node; then run "screencast-model-test (sdk/screencastmodel.js)" node tests/screencast_model_test.mjs
     else skip "screencast-model-test" "node"; fi
+    # (in development) the capture indicator by the clock: its glyph, one row per app, what Stop and Turn off do (sdk/capturemodel.js)
+    if have node; then run "capture-model-test (sdk/capturemodel.js)" node tests/capture_model_test.mjs
+    else skip "capture-model-test" "node"; fi
     # (0.8.8.8) Linux apps' tray icons: which show, a dbusmenu layout as the SDK's menu, where it opens (sdk/traymodel.js)
     if have node; then run "tray-model-test (sdk/traymodel.js)" node tests/tray_model_test.mjs
     else skip "tray-model-test" "node"; fi
@@ -544,6 +622,8 @@ EOF
         run "notes-breaks-scene (sdk/markdown.jsx breaks, apps/notes)" node tests/textfield_menu_test.mjs notes_breaks_scene.mjs
         # (#166) Screenshots' markup editor: New Screenshot and Ctrl+N bring the capture panel back, the editor staying open
         run "screenshots-newcapture-scene (apps/screenshots/editor.jsx)" node tests/textfield_menu_test.mjs screenshots_newcapture_scene.mjs
+        # the Screenshots toolbar: modes, the primary button, the Options menu and its choices saved in settings
+        run "screenshots-toolbar-scene (apps/screenshots/toolbar.jsx)" node tests/textfield_menu_test.mjs screenshots_toolbar_scene.mjs
     else skip "notes-editor-scene" "node and the repository's node_modules (npm install)"; fi
     # a password TextInput: the eye shows it and keeps the focus, copies nothing, hides on blur; ⇪ follows Caps Lock
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
@@ -571,6 +651,10 @@ EOF
         run "store-trademark-scene (apps/store/trademark.js)" node tests/textfield_menu_test.mjs store_trademark_scene.mjs
         run "battery-settings-scene (apps/settings/Battery.jsx)" node tests/textfield_menu_test.mjs battery_settings_scene.mjs
     else skip "store-trademark-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.5) the Store's long lists load their next page near the end of the scroll
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "store-endless-scene (apps/store/endless.js)" node tests/textfield_menu_test.mjs store_endless_scene.mjs
+    else skip "store-endless-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs
@@ -579,6 +663,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "list-scene (sdk/lists.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs list_scene.mjs
     else skip "list-scene" "node and the repository's node_modules (npm install)"; fi
+    # (security) a key typed while another window, a full-screen window's neighbour or a system prompt has the keyboard
+    # never reaches a virtual machine's guest (wm.hasKeyboard, AppHost, apps/machines/model.js guestKeys)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "vm-keys-scene (sdk/components.jsx AppHost, sdk/windows.js hasKeyboard, apps/machines guestKeys)" node tests/focus_scene_test.mjs vm_keys_scene.mjs
+    else skip "vm-keys-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) menus from the keyboard in both themes: arrows, type-ahead, submenus, the hover pause, F10 and ⌥ alone
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "menu-keys-test (themes/default Menu, themes/classic Menu, sdk/shortcuts.js)" node tests/menu_keys_test.mjs
@@ -617,6 +706,12 @@ EOF
             run "firststart-scene-$th (sdk/firststart.jsx over themes/$th)" node tests/workspaces_test.mjs firststart_scene.mjs "$th"
         done
     else skip "firststart-scene" "node and the repository's node_modules (npm install)"; fi
+    # always on top in every theme: drawing order apart from the keyboard, the window menu's item, skip pager
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default classic workspaces celeste; do
+            run "always-on-top-scene-$th (sdk/desktopmodel.js stackOrder over themes/$th)" node tests/workspaces_test.mjs always_on_top_scene.mjs "$th"
+        done
+    else skip "always-on-top-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8, #111) how many app buttons fit on a Classic taskbar, and how big
     if have node; then run "classic-taskbarfit-test (themes/classic/taskbarfit.js)" node tests/classic_taskbarfit_test.mjs; fi
     # (0.8.8.6) the Terminal's key mappings: iTerm2's keypad, "\n", settings migration 2
@@ -655,6 +750,10 @@ EOF
         run "media-test wave" build/media-test wave "$T/tone.wav" 50
         run "media-test sandbox" build/media-test sandbox "$T/tone.wav"
     else skip "media-test" "build/lord-media (FFmpeg -dev packages) and python3"; fi
+    # LordOS Studio's helper without a camera: the pipeline inside its sandbox (GPU too), a non-camera fd, another job
+    # and a damaged model refused
+    if [ -x build/lord-studio ] && [ -x build/studio-helper-test ]; then run "studio-helper-test (lord-studio)" build/studio-helper-test build/lord-studio
+    else skip "studio-helper-test" "build/lord-studio (FFmpeg -dev packages)"; fi
     # (0.8.8.8) SVG icons through lord-media (MW_SVG, helper/lm_svg.c): a valid icon, a symbolic one recolored, then
     # malformed markup, huge numbers, deep nesting (also behind a comment) and a file over 1 MB, which must be
     # refused, not crash it

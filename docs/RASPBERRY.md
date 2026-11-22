@@ -179,6 +179,12 @@ BPF LSM and no BTF (`/sys/kernel/btf/vmlinux`), which `lord-netperm` needs for "
 Linux apps (its per-cgroup LSM program on `socket_create`, `FIREWALL.md`); without them
 `npverify-test` fails 35/36. The tests stay as they are: the fix is the kernel.
 
+**Revision 4 (in development, not built yet):** the same kernel plus the `v4l2loopback` module for LordOS Studio's
+camera (E-S3 in AGENTS.md, `CAMERA-STUDIO-PLAN.md` 11.2). `build-kernel.sh` builds `umlaeute/v4l2loopback` v0.15.0
+out of tree against each flavour, adds `updates/v4l2loopback.ko` to the image package and records its commit and
+tarball hash in `SOURCE` (it is GPL-2.0 corresponding source too). The Store's `lordos-studio-camera` package then only
+adds its options and loads it; on the Pi it needs no DKMS, compiler or headers.
+
 `tools/rpi/build-kernel.sh` builds it from **Raspberry Pi's own source and defconfig**, changing only
 what LordOS needs:
 

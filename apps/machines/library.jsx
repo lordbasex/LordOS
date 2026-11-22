@@ -7,11 +7,11 @@
 // Requirements and the Pi page are the other screens of this window.
 import {
   View, Text, Image, ScrollView, TextInput, useAppWindow, useStore, createStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
-  EmptyState, useNarrow, addListener, direction, t as tr,
+  EmptyState, useNarrow, addListener, direction, Overlay, screen, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
-  chipCounts, specParts, restLine, gvtGpu, LIB_VIEWS, LIB_SORTS } from './model.js';
+  chipCounts, specParts, restLine, gvtGpu, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet, Sym } from './kit.jsx';
@@ -100,6 +100,19 @@ function stateOf(m, windowed) {
   if (d === 'running') return { text: tr('machines.lib.state.running'), color: '#30d158', on: true };
   return { text: tr(`machines.doing.${d}`), color: v.why ? '#ff9a9a' : d === 'suspended' ? '#ffd60a' : v.active ? '#30d158' : null, on: v.active };
 }
+// A machine's menu over everything, not cut by the window (the shell's popover layer): below the ··· button or the
+// pointer, above them when it doesn't fit, always on the screen (model.js menuSpot)
+function CardMenu({ at, root, rl, items, onClose }) {
+  const w = 232, spot = menuSpot(at, w, popMenuHeight(items), displayUnder(screen.displays, at.x, at.y) || { x: 0, y: 0, w: screen.width, h: screen.height });
+  return (
+    <Overlay anchor={root}>
+      <View style={{ position: 'absolute', left: spot.left - rl[0], top: spot.top - rl[1], width: w }}>
+        <PopMenu x={0} y={0} width={w} items={items} onClose={onClose} />
+      </View>
+    </Overlay>
+  );
+}
+
 // ··· : the machine's menu, at the button
 function MoreBtn({ m, onMenu }) {
   const p = usePal();
@@ -107,7 +120,7 @@ function MoreBtn({ m, onMenu }) {
   const [hover, setHover] = useState(false);
   return (
     <View ref={ref} title={tr('machines.lib.moreFor', { name: m.name })} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      onClick={(e) => { e.stopPropagation?.(); const r = ref.current ? lord.getLayout(ref.current.id) : [e.x, e.y, 0, 0]; onMenu({ x: r[0], y: r[1] + r[3] + 4 }); }}
+      onClick={(e) => { e.stopPropagation?.(); const r = ref.current ? lord.getLayout(ref.current.id) : [e.x, e.y, 0, 0]; onMenu({ x: r[0], y: r[1] + r[3] + 4, above: r[1] - 4 }); }}
       style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${p.accent}`,
         backgroundColor: hover ? (p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') : 'transparent' }}>
       <Text style={{ fontSize: 15, fontWeight: 700, color: p.accent, marginTop: -4 }}>···</Text>
@@ -680,8 +693,7 @@ export function Library() {
           {sum.free ? <Summary label={tr('machines.lib.freeDisk')} value={bytes(sum.free.a)} onClick={openStorage} /> : null}
         </View>
       ) : null}
-      {menu ? <PopMenu x={Math.min(menu.x - rl[0], rl[2] - 232)} y={Math.min(menu.y - rl[1], rl[3] - 330)}
-        items={menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
+      {menu ? <CardMenu at={menu} root={root} rl={rl} items={menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
       {sheet}
       {cfg ? <Sheet width={1000} height={700} modal onClose={() => setCfg(null)}>
         <Configure dir={cfg.dir} section={cfg.section} onClose={() => { setCfg(null); refresh(); }} />

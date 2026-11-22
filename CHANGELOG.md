@@ -12,6 +12,709 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Always on top, in every theme, in development (the latest release is 0.8.9.4).** A window can be kept over every
+  normal window, and X11 apps' `_NET_WM_STATE_ABOVE`, `_NET_WM_STATE_BELOW` and `_NET_WM_STATE_SKIP_PAGER` are now
+  honoured and listed in `_NET_SUPPORTED`: the last X11 conformance point below 100 % (`ewmh.wm_state` 96.2 % → 100 %,
+  X11 mean 99.9 % → 100 %). See `docs/WINDOWS.md`, "Always on top".
+  - **Stacking and focus apart, in the SDK** (`sdk/desktopmodel.js`, so Lord Flow, Lord Classic, Lord Workspaces and
+    Lord Celeste all get it with no theme logic): the window list stays the order windows were brought forward (the
+    last one has the keyboard, `focusedOn`, `wm.hasKeyboard`, unchanged); what is drawn over what is that order split
+    into layers (`w.layer`: `'below'`, normal, `'above'`; `stackOrder`, `layerOf`). `useWindows().mounted`, the list
+    every theme draws, is in that order, so lord-server's painting and hit testing follow it. The keyboard can be on a
+    normal window under an always-on-top one; a click on a normal window raises it within the normal layer only; a
+    dialog (`args.parent`) is in the highest layer of its own and its owners' (at most 8 up, a loop of parents ends);
+    the covered-window pacing (`coveredIds`) judges in drawing order. A desktop with no layer keeps the same list
+    (no reorder, no redraw).
+  - **The order above the windows is unchanged and now written down** (`docs/WINDOWS.md`, `docs/LAYERS.md`):
+    picture-in-picture and a Linux app's own notification popups, then a fullscreen window (`floating`), the shell's
+    layers, Screenshots' area selection (`capture`) and its bare picture-in-picture toolbar; a fullscreen Linux app and
+    Linux apps' menus above all of it. An always-on-top window is never over a fullscreen one or the shell.
+  - **The person's toggle:** **Always on Top**, checked while it is on (`alwaysOnTopItem`, `wm.toggleAbove`; turning
+    it on also brings the window forward), in the Window menu (`windowMenuItems`: Lord Flow's menu bar, Lord Classic's
+    and Celeste's in-window menus, Lord Workspaces' window strip) and in each theme's title-bar menu (Lord Classic's and
+    Lord Workspaces' right click on the bar, Celeste's title menu, and every theme's menu for an app that draws its own
+    bar, `w.windowMenu`). `shell.window.alwaysOnTop` in all 35 languages. New SDK calls: `wm.setLayer(id, 'above' |
+    'below' | null)`, `wm.layer(id)`, `wm.isAbove(id)`, `wm.toggleAbove(id)`.
+  - **X11** (`server/src/wl/xwm.c`, `wl.c`): `_NET_WM_STATE_ABOVE` and `_NET_WM_STATE_BELOW` (one excludes the other)
+    asked for before the map or later with add, remove or toggle reach the theme as the window's layer (`layer` in the
+    map, a `layer` event later) and never move the keyboard; the menu's choice goes back into the window's
+    `_NET_WM_STATE` (`lord.wayland.state`'s new 9th argument, `wl_set_layer`, `xwm_set_layer`). X's own stacking and
+    `_NET_CLIENT_LIST_STACKING` follow the layers (`restack_layers`: minimized at the bottom, then kept below, normal,
+    always on top; a transient takes its owner's layer). `_NET_WM_STATE_SKIP_PAGER` (`pager` event, `args.skipPager`)
+    leaves the window out of the Overview and its desktop miniatures (`inPager`). The `_NET_WM_STATE` an app sets before
+    its window maps is now read until the window manager first writes the property, not only until the MapRequest:
+    an app creates, sets and maps in one go, so the request was often handled first and an initial state (above,
+    modal, skip taskbar) was lost.
+  - **Wayland:** no standard protocol asks for it, so nothing was added; the person's choice for a Wayland window is
+    kept by lord-server for a live theme switch (the map carries it).
+  - **Tests:** `tests/desktop_model_test.mjs` (stacking against focus, raising within a layer, two always-on-top
+    windows, kept below, dialogs, loops, covered windows, fullscreen and picture-in-picture, the pager; 167 checks);
+    the new `tests/always_on_top_scene.mjs` over each of the four themes in `make test` (the real tree's drawing order,
+    the theme's own window menu offering the item, checked, turned off, the Window menu, a dialog over an always-on-top
+    window, a skip-pager window not drawn in the Overview; the scene runner's stub now keeps each node's children in
+    order); `x11-conformance-client`: `_NET_WM_STATE_ABOVE` at map, the window staying at the top of
+    `_NET_CLIENT_LIST_STACKING` while a normal window mapped after it has the keyboard, toggled off and on,
+    `_NET_WM_STATE_BELOW` dropping ABOVE and stacking under, SKIP_PAGER and BELOW add and remove, and the three atoms
+    in `_NET_SUPPORTED`; `tools/wl-conformance.mjs` checks that the layer, its changes and skip pager reach the theme.
+    Proof: `docs/wayland-proofs/x11-always-on-top.png` (xterm 398 asking for ABOVE, another xterm opened after it with
+    the keyboard, xprop's state and stacking; `x11-conformance-client netstate` sends the EWMH request, as `wmctrl -b
+    add,above` does, since xprop can't and wmctrl isn't installed).
+  - Not saved between sessions; not yet tried in a real session or on the VM.
+
+- **LordOS Studio: background blur and background pictures for the camera of LordOS's apps, in development (phases 0
+  and 1 of `docs/CAMERA-STUDIO-PLAN.md`; the plan and its exceptions E-S1 to E-S7 approved by the maintainer on
+  2026-11-22).** A new camera, "LordOS Studio", appears in `lord.media.cameras()` next to the real ones, so the Camera
+  app, isolated `.lpk` apps (`BOP_CAMERA`) and go-link Desk can choose it; its picture is the real camera's with the
+  effects of the moment, all at once in every app that uses it.
+  - **The popover** (`sdk/studio.jsx`, logic in `sdk/studiomodel.js`, every theme): when a camera is in use, the
+    camera capture item by the clock (`sdk/capturestatus.jsx`) has a "Video effects" row that turns its panel into
+    LordOS Studio's, in the same style: a live preview (shown as a mirror), the camera it takes the picture from
+    (kept by its USB bus id, so a renumbered `/dev/videoN` doesn't lose it), the apps using it now, **Portrait** (the
+    background blurred, with a strength slider), **Background** (None, Blur or Picture: LordOS's own wallpapers or
+    "Choose a picture…" from the person's files) and **Mirror my video**. The preview reuses a LordOS app's running
+    LordOS Studio camera instead of opening the camera a second time; otherwise the popover opens its own, which the
+    capture item shows like any camera, and closes it with the popover. The choices live in `settings.studio` (new
+    keys with defaults; no migration) and reach lord-server at start and on every change. Right to left: chevrons
+    and the back arrow turn, the preview keeps `direction: 'ltr'`. Text in all 35 languages (`studio.*`, and the
+    `errors.studio.*` codes).
+  - **`lord-studio`**, a new sandboxed helper (AGENTS.md, E-S1): lord-media's camera job built with `LM_STUDIO`
+    (`server/src/media/studio/stcam.c`; `MM_STUDIO`, `MM_STUDIO_BG` and `MM_STUDIO_STATS` in `media/proto.h`), so
+    the preview slots, the photo, the video and a companion's link all carry the effects. lord-server opens every
+    file it gets: the real camera, the render node, the segmenter's model (its size and SHA-256 checked against
+    `server/src/media/studio/models.h` before the fd goes out) and the background picture (a LordOS wallpaper or a
+    picture inside `lord.fs`'s roots, at most 32 MB, a `.jpg`, `.png` or `.webp`), and the helper decodes the picture
+    itself. `sandbox_apply_helper` before anything is read (scope `app-lordos-studio`), V4L2 and DRM/dma-buf ioctls
+    only, no network, no PipeWire socket, no exec, no paths. It links what lord-media links plus Mesa's GBM, EGL and
+    GLES (as lord-bench does); lord-server links nothing new.
+  - **Our own inference** (`server/src/media/studio/nn.c`, decision D3): MediaPipe's Selfie Segmenter (landscape,
+    144×256) and BlazeFace short range (Google, Apache-2.0; `third_party/studio-models/` keeps the original files,
+    their hashes and Google's model cards), converted once by `tools/studio/tflite2lnn.mjs` into our flat `.lnn`
+    files (`assets/studio/models/`). Only the 14 operators the two models use exist; the converter refuses anything
+    else, and the loader treats the file as hostile (counts, shapes, offsets and every weight checked; activations in
+    one arena laid out by lifetime). Against ONNX Runtime 1.21 on 10 CC0 frames (the reference made on the dev machine
+    by `tools/studio/ort-ref.c`; ONNX Runtime is never linked): mean absolute error 4.7e-7 for the segmenter, relative
+    error 1.7e-4 for BlazeFace. Measured on an i9-10900, one thread: 3.65 ms for the segmenter (ONNX Runtime 1.97 ms),
+    2.39 ms for BlazeFace (1.16 ms). It needs `-O3` (11.3 ms at GCC's `-O2`), which `server/mk/studio.mk` sets for
+    those files only.
+  - **The pipeline** (`st.h`, `stfx.c`, `stgf.c`, `stgl.c`): the frame's box average into the guide grid and the
+    segmenter's 256×144 input in one pass, the network, temporal smoothing with motion and hysteresis, the fast guided
+    filter (He and Sun) at a quarter of the frame, a background blur that leaves the person's own pixels out (no
+    halo), and the composite with the mirror, on the GPU (OpenGL ES 3 offscreen on the render node: GBM and a
+    surfaceless EGL context, like lord-bench) or on the CPU (always available; `GPU=0` builds it alone). At 1280×720
+    a frame takes 11.3–11.9 ms with the RX 580 and 16.2–17.3 ms on the CPU; 1920×1080 20.1 ms with the GPU and 32.2 ms
+    on the CPU. The plan's section 3.3 now has these measured numbers instead of estimates.
+  - **lord-server** (`server/src/media/mstudio.c`, `server/src/ui/js_studio.c`): `lord.studio.status()`, `set()`,
+    `setBackground()` and `preview()`, registered only in the desktop's own context (AGENTS.md, E-S5); the camera
+    permission and the "no camera" restriction apply to LordOS Studio's camera exactly as to a device, in
+    `js_media.c` and in the broker (`sec/brokercam.c`), and a restriction ends a running one at once. The helper's
+    statistics come back as numbers lord-server checks.
+  - **Tests**: `build/studio-nn-test` (both models against ONNX Runtime's stored outputs on 10 + 10 frames, face
+    decoding, 6000 damaged model files), `build/studio-test` (the pipeline on fixed frames: the matte against ONNX
+    Runtime's at camera size, the person kept, the background blurred or replaced, the exact mirror, a still frame's
+    matte settling, CPU and GPU agreeing within a level), `server/tests/studio_model_test.mjs` (the popover's logic),
+    all in `make test`; `build/studio-helper-test` in `make test-full` (lord-studio inside its sandbox with and without
+    the GPU, a non-camera fd, another job and a damaged model refused); `build/broker-restrict-test` gained LordOS
+    Studio's camera under the "no camera" restriction. `server/tests/studio_headless.sh` takes screenshots of the
+    popover in a headless lord-server without ever opening a camera. The test frames are CC0 photographs from
+    Wikimedia Commons (`server/tests/data/studio/README.md`).
+  - Not in this step: the virtual camera for every Linux app (v4l2loopback, phase 2, below), the other effects and Mic Mode
+    (phase 3), the PipeWire camera and its portal (phase 4) and the Studio app (phase 5). Each LordOS Studio camera
+    starts its own lord-studio for now, so two apps can't read it at once, as with any camera.
+
+- **LordOS Studio's camera for every app, in development (phase 2 of `docs/CAMERA-STUDIO-PLAN.md`; exceptions E-S2
+  and E-S3 approved by the maintainer on 2026-11-22).** Browsers (and video calls in them), OBS and every other Linux
+  app can now choose a camera called "LordOS Studio" and get the person's effects (background blur or a picture),
+  once the new optional Store item is installed. Nothing of it was tried with a real v4l2loopback device yet: the
+  package is built and inspected, the helper's and lord-server's logic is unit-tested, and the device itself is
+  checked on a VM (open items below).
+  - **The Store item `lordos-studio-camera`** (`tools/iso/mkdeb-studiocamera.sh`): two static, root-owned
+    configuration files and nothing else. `/etc/modprobe.d/lordos-studio.conf` sets
+    `options v4l2loopback devices=1 video_nr=50 card_label="LordOS Studio" exclusive_caps=1 max_buffers=4` and
+    `/etc/modules-load.d/lordos-studio.conf` loads the module at boot; its postinst loads it at once when nothing
+    loaded it yet, its postrm unloads it when nothing uses it. On amd64 it depends on Debian's `v4l2loopback-dkms`
+    (main, GPL-2.0, 0.13.0 or later) and `linux-headers-amd64`, so DKMS builds the module for the running kernel; on
+    arm64 the module comes prebuilt in the LordOS Raspberry Pi kernel (below), so the package depends on nothing
+    else. There is no runtime root action: lord-server never creates or removes loopback devices, and the Store's
+    existing package engine installs and removes it. With Secure Boot on, the module's DKMS key has to be enrolled at
+    the next restart, which the card says, as the NVIDIA card does; the guided `dkms-mok-enroll` (NVIDIA plan A.5's
+    `gpu-mok-enroll`, renamed) is still awaiting its own approval and is not built.
+  - **The Store card** ("Suggested for your computer", `assets/store/suggestions.json`, rule `studioCamera`): shown
+    when a USB camera is plugged in (a new `usbClass` condition in `sdk/suggestengine.js`: an interface of class `0e`,
+    video), installs `lordos-studio-camera` through the usual plan and `pkg-install`, and explains in its "What
+    changes" notes the DKMS build (about 500 MB of compilers and kernel headers on a PC) and the Secure Boot step. A
+    camera glyph of our own in `apps/store/suggested.js`. Text in all 35 languages (`store.suggest.studioCamera.*`).
+  - **One lord-studio per session writes the device** (`stcam_hub` in `server/src/media/studio/stcam.c`,
+    `loopback=1`): lord-server opens `/dev/video50` read-write and checks it is a V4L2 character device (major 81)
+    whose driver is `v4l2 loopback` and whose card is "LordOS Studio" before the fd goes out; the helper checks the
+    driver again, sets YUYV at 1280×720 (640×360 on a Raspberry Pi compositing on its CPU) and never gets a path.
+    With nobody reading it writes an **idle card** once a second (a camera glyph drawn from numbers, no text or file:
+    `server/src/media/studio/stout.c`) with **the real camera closed**, so browsers keep listing the device
+    (`exclusive_caps` announces a camera only while a writer streams). v4l2loopback's client-usage event (subscribed
+    with its initial value) tells it when a reader starts or stops streaming; it reports that to lord-server
+    (`MM_STUDIO_READERS`), and lord-server opens the chosen real camera and sends its fd (`MM_STUDIO_CAM`) only while
+    a reader or the popover's preview wants it, and closes it again when the last one is gone: **the camera's light
+    goes off with no reader.** Frames go through the same pipeline as LordOS's own apps and are written in YUYV
+    (BT.601, limited range). Turning LordOS Studio's camera off while an app still reads it sends the **off card** (the
+    glyph crossed out), never the raw camera. The capture code of the camera job moved into a small `LmCam` API
+    (`lm_cam.c`) that both use; an unplugged camera now ends the camera job instead of looping, and in the hub it
+    brings back the idle card. lord-server starts it again at most 3 times a minute, then leaves the camera for apps
+    off until the setting changes.
+  - **One lord-studio shared by every reader** (phase 1's limit, fixed when the device is there): a LordOS app that
+    chooses the "LordOS Studio" camera (`lord.media.camera`, `BOP_CAMERA`) now reads the same device through
+    lord-media like any camera, after the same permission and restriction checks, so the real camera is opened once
+    and the effects run once; the popover's preview uses the hub's own frames (`lord.studio.preview` returns its id,
+    `lord.studio.endPreview()` lets go; `lord.media.close` can't close it). v4l2loopback 0.15 lets one reader stream
+    at a time, so a LordOS app and a browser still can't read it together (read in v4l2loopback's source; to verify
+    on the VM). Without the package, each LordOS Studio camera keeps its own lord-studio as in phase 1.
+  - **Who reads it, in the capture indicator**: lord-server finds the processes that hold the device open (its own
+    user's only, never itself nor its own helpers) by their `/proc/<pid>/fd`, every 2 s and only while the event says
+    somebody streams (always, if the module sends no event), names each by its app scope (`appid_of_pid`, as the
+    notification server does) and sends the shell a `studio-use` event (`server/src/media/mstudiohub.c`). The
+    indicator then shows, for example, "Chromium · Camera via LordOS Studio (Logitech Webcam C930e) · effects on";
+    **Turn off** sets that app's "no camera" restriction, which already blocks `/dev/video50` (a V4L2 device, major 81,
+    in `lord-netperm`'s `cgroup/dev` program); `server/tests/fwlinux/devices.sh` gained that check for the VM. The
+    popover's "In use" names those apps too.
+  - **The popover** gained **Every app**: a switch (`settings.studio.on`, a new key that defaults to on; no
+    migration) with what it means, or, without the package, "Not installed" and a link to the Store card. The
+    `lord.media.cameras()` list never shows the device as a real camera.
+  - **Raspberry Pi** (E-S3): `tools/rpi/build-kernel.sh` builds v4l2loopback (`umlaeute/v4l2loopback` tag v0.15.0,
+    the version Debian 13 ships; GPL-2.0) out of tree against the LordOS kernel, strips it (and signs it, when that
+    kernel signs its modules) with the kernel's own `modules_install`, puts it in the image package under `updates/`, checks it is there and records
+    its commit and tarball hash in `SOURCE` next to the kernel's. Its default package revision is now 4
+    (`6.18.57-lordos.4-rpi-*`); that kernel is not built yet.
+  - **Tests**: `build/studio-hub-test` (what the device shows and when the hub runs, finding a process that holds a
+    device and skipping lord-server's own children and other users, the indicator's event with duplicates and odd
+    ids, the idle and off cards, YUYV levels, the client-usage payload) and `server/tests/studio_package_test.sh`
+    (the package for amd64 and arm64: its files, options matching what lord-server checks, conffiles, ownership,
+    dependencies and maintainer scripts) in `make test`; `studio_model_test.mjs` and `suggest_engine_test.mjs` gained
+    the new logic and the card, and `build/studio-helper-test` (`make test-full`) checks that lord-studio refuses
+    `loopback=1` with a file that isn't a v4l2loopback device or with no device at all. **To verify on a VM** (never on the maintainer's PC): the package installing and the
+    module loading (with and without Secure Boot), Chromium, Google's browser, Firefox and Flatpak OBS listing
+    "LordOS Studio" and showing the effects in a video call, the camera's light going off with no reader, the
+    indicator naming the app, `devices.sh` step 6, and the Pi kernel build.
+
+- **`fastfetch` and `neofetch` run LordOS's `lordos-fetch` until the real package is installed, in development**
+  (`packaging/fallback-bin/fastfetch`, `packaging/profile.d/lordos-fallback.sh`, `server/src/remote/sess.c`,
+  `tools/iso/mkdeb.sh`; `docs/BENCHMARK.md`). People type the command they know and got "command not found". The
+  `lordos` package now ships `/usr/lib/lordos/fallback-bin/fastfetch` (a small sh wrapper) and `neofetch` (a link
+  to it), and that folder goes at the END of PATH: `/etc/profile.d/lordos-fallback.sh` appends it once, only when it
+  exists, for login shells (the Terminal's bash reads `/etc/profile`, which resets PATH), and lord-sessiond's
+  session PATH is now `/usr/local/bin:/usr/bin:/bin:/usr/games:/usr/lib/lordos/fallback-bin`, which the Terminal's
+  zsh and fish keep. Installing Debian's `fastfetch` or `neofetch` puts the real command in `/usr/bin`, which comes
+  first: different paths, so no dpkg file conflict, no alias and nothing to remove; and a shell that already ran
+  the fallback (its command hash still points there) is sent on to the real one, because the wrapper looks for
+  another command of its name in PATH before anything else. lordos-fetch only knows `--share` and
+  `--color=auto|always|never`: those pass, `--pipe` (fastfetch) and `--stdout` (neofetch) become `--color=never`,
+  and any other option is dropped with one line on stderr: "lordos-fetch: this is LordOS's fetch; install the
+  fastfetch package for its options" (or neofetch). New test `server/tests/fetch_fallback_test.sh` in
+  `make test` (21 checks: the fallback with no real command, option filtering and the hint, the real one winning
+  from `/usr/bin` and from a stale hash, the profile.d snippet appending last, once, and not at all without the
+  folder, under dash and bash, and the session PATH). The new PATH reaches a session at its next sign-in; no
+  migration (new files plus a session environment value).
+- **`lordos-fetch` shows what fastfetch shows and what About shows, in development** (`server/src/sysreport/fetch.c`,
+  `fetch.h`, `cli.c`, `server/mk/sysreport.mk`, `server/Makefile`; `docs/BENCHMARK.md`). New lines, all read locally
+  without root or network (about 30 ms on a 20-thread desktop): **DE** (the LordOS desktop in use, settings.json's
+  `theme` named by its `theme.json`: Lord Flow, Lord Classic, Lord Workspaces, Lord Celeste), **Compositor**
+  (`lord-server <version> (C · DRM/KMS · evdev) · Wayland`, plus `Xwayland <version>` from dpkg's status when
+  Xwayland runs for this user), **Terminal** (LordOS Terminal, `$TERM_PROGRAM` and its version, SSH, the Linux console,
+  or the nearest ancestor process that is not a shell, su or sudo), **Swap** (used / total, or "none"), **Local IP**
+  (the default route's interface from `/proc/net/route` with its IPv4 from `getifaddrs` and its first global, non-tentative
+  IPv6 from `/proc/net/if_inet6`; never with `--share`), **Locale** (`LC_ALL` or `LANG` and the interface language
+  from settings.json, "from LANG" when unset), **UI engine** (`QuickJS 2025-04-26 + React 19.3.1`: the Makefile now
+  writes `LORD_REACT_VERSION` from package.json and `LORD_QJS_VERSION` from `third_party/quickjs/VERSION` into
+  `lord_version.h`), **Build** (the build id and the system code's state: "signed by LordOS · N components" when
+  `code-manifest.json` verifies with the key this build trusts, through `codesig_parse`, which `lordos-sysreport` now
+  links with `src/pkg/crypto.c`; otherwise "development build", or "system code modified" for a bad manifest),
+  **Boot time** (this boot's line in `/var/lib/lordos/boot-times.jsonl`, only from a root-owned file nobody else can
+  write, as About reads it) and **Server RAM** (VmRSS of this user's session lord-server, skipping isolated
+  `--app` ones; the JS heap is only known inside lord-server, so it is left out). **Computer** is now **Host**,
+  as in fastfetch (the title stays `user@host`); identical monitors share one line ("3 × S27F350, 1920 × 1080,
+  27""); the Wayland/X11 note moved from Shell to Compositor; the label column is 12 wide; swap or memory under
+  1 GB reads in MB. Labels stay in English (the command was never translated) and there is no `--json` yet.
+  `tests/sysreport_test.c` gains `test_fetch_helpers` (swap, settings with a null or unsafe theme id, theme name,
+  dpkg versions without epoch or revision and only for installed packages, the lowest-metric default route, global
+  and tentative IPv6 addresses, this boot's last boot-times line, VmRSS, the terminal's name in each case, the
+  collapsed displays and the new rows), and each fixture machine now checks that `--share` leaves out the address.
+- **Machines updates the LordOS tools in a machine by itself, in development** (`apps/machines/model.js`
+  `toolsAutoStep`/`toolsLine`/`toolsAutoOn`, `vmwindow.jsx`, `configure.jsx`, `settingswin.jsx`, `store.js`, `meta.js`;
+  `server/src/ui/js_vm.c`, `server/src/vm/lordvm.c`; `docs/VIRTUALIZATION.md` 7.1.3). A guest ran older
+  LordOS tools (w7, with a known bug) for hours because updating them needed a click on **Update LordOS Tools** in
+  the agent's popover that nobody knew was there. Now, when a running machine's agent has been connected for 20 s and
+  its tools are older than the ones this LordOS ships (`TOOLS_SHIPPED`: `w9` and the Linux helper's `5`), Machines asks for
+  the same install as the button, only while nothing is on its way (files copying, the transfer folder's setup, an
+  app of apps mode opening, an install the person started). At most three attempts per run of the machine and
+  version, 2 and 10 minutes apart, an attempt without an answer in 10 minutes counted as failed, never a loop; a run
+  where the install worked but the tools still say the old version isn't tried again. lord-vm logs each attempt
+  (`agent: Machines updates the LordOS tools in the guest by itself (they said w7)`): `lord.vm.agent(id, 'update')`
+  is the existing `VAG_INSTALL` with a flag, no new privilege or program. On by default, with **Update the LordOS
+  tools in machines automatically** in Machines settings → General and **Update the LordOS tools in this machine
+  automatically** in each machine's Configure → Guest agent. When it's off, or the attempts failed, one notification
+  per run and version says "The LordOS tools in ‹machine› are out of date" with an **Update** action; the agent
+  button keeps its dot. The agent's popover now shows the LordOS tools on their own line, "LordOS tools w9 (up to
+  date)" or "LordOS tools w7 → w9 available" ("updating…" while it runs), apart from the system and
+  "qemu-guest-agent ‹version›" (which said only "agent"). New texts in all 35 languages. Tested by
+  `server/tests/vm_model_test.mjs` (settling, deferral while busy, once per run, backoff, giving up, the notification
+  when off or failed, a newer shipped version starting a fresh count, the popover's line).
+
+- **The Store's long lists load as you scroll, in development** (`apps/store/endless.js`, `index.jsx`,
+  `flathubpages.js`, `debian.js`). Flathub's catalog (thousands of apps) and each Debian category no longer end in
+  "Show more (2183 left)": the next 60 cards are drawn when the list is scrolled within a screen of its end, and a tall
+  window fills itself. The same for every Store list that can grow long: Debian search results (now up to the
+  engine's 500, apps then other packages; before, 60 with the other packages cut at 30), Installed (every app),
+  Updates (every Debian package with an update), and a Flathub category's "See all" (it stopped at 240). The web apps
+  (37) and LordOS's picks (18) are small bundled catalogs and stay whole; shelves with "See all" keep their few cards. Only the new cards are drawn (stable keys, memoized cards with a stable `onOpen`), so the grid is
+  never redrawn whole per page. A small "Show more" stays at the end for the keyboard. Back from an app's page, the list
+  is as long as it was, so it returns to where it was. Tested by `server/tests/store_endless_scene.mjs` (run by
+  `run_suites.sh`).
+- **A Flathub app's page says how it shows its windows and what it is built with, before installing, in
+  development** (`apps/store/fhlook.js`, `sdk/flathubmodel.js` `displayOf`/`toolkitOf`, `docs/FLATPAK.md`). A new
+  **Display and toolkit** box, from the metadata the page already fetches: **Display** is Wayland, Wayland with X11
+  only where there is no Wayland (`fallback-x11`: in LordOS it always gets Wayland, so no X11), Wayland and X11 (the
+  toolkit chooses), or X11 through Xwayland (with the note that it gets no X11, so no windows, while its files or a
+  device are blocked for it), following Flatpak 1.16's own rule; **Toolkit** is GTK, Qt, Electron, Chromium or "its
+  own", from the base app and the runtime, with the runtime and its branch under it. Only on the app's page: the
+  catalog doesn't carry the metadata. Text in every language (real English, Spanish and Portuguese). Tested in
+  `server/tests/flathub_model_test.mjs` with real Flathub metadata.
+- **Machines: a Keys panel in the machine window, in development** (the maintainer's request, like the side keys of other
+  remote consoles but richer; `apps/machines/keys.jsx`, `docs/VIRTUALIZATION.md` 5.8). A keyboard button on the toolbar and
+  on the full-screen floating bar opens it:
+  - **Hold down** Ctrl, Alt, Shift and Win (Super in a Linux guest): a click keeps the key down in the guest until the
+    next key typed there or the next combination sent, then everything held goes up in reverse; a second click lets it go.
+    Another modifier keeps them (held Ctrl + Shift + T). Nothing is left stuck: blur, leaving the window, the machine
+    stopping or the window closing releases all of it. The toolbar button stays lit and its tooltip names what is held.
+  - **Combinations**, one click each, pressed in order and released in reverse. With a Win key: Ctrl+Alt+Del, Win, Win+P,
+    Win+D, Win+E, Win+R, Win+L, Win+Tab, Alt+Tab, Alt+F4, Ctrl+Shift+Esc, Win+Shift+← and → (the window to the other
+    display), Win+↑ and ↓, PrintScreen and Win+Shift+S. Linux: Ctrl+Alt+Del, Super, Alt+Tab, Alt+F4, Ctrl+Alt+T,
+    PrintScreen and the text consoles Ctrl+Alt+F1…F7. They go straight to the guest (`lord.vm.key`), never through
+    LordOS's own shortcuts, so ❖P reaches the guest even without the keyboard-shortcuts permission.
+  - **Single keys**: Esc, Tab, Insert, Delete, Home, End, PgUp, PgDn and F1–F12.
+  - **Show on-screen keyboard**: LordOS's own keyboard types into the machine as it is (its taps take the path of a
+    physical key to the window in front), held keys included.
+  - The menu bar's **Actions → Send Keys** has the same combinations and single keys; Power keeps Ctrl+Alt+Delete.
+  - Key names and descriptions in all 35 languages (Strg/Entf in German, Supr in Spanish, Suppr in French…). The tables
+    of evdev codes and the hold logic are pure functions in `apps/machines/model.js`, with 24 new checks in
+    `server/tests/vm_model_test.mjs` (codes checked against `linux/input-event-codes.h`).
+- **Machines: a status item by the clock for each machine in apps mode, in development** (the maintainer's request, like
+  VMware Fusion's Unity menu in the menu bar; `docs/VIRTUALIZATION.md` 7.2). While a machine is in apps mode, the bar's
+  status area shows its mark (the machine's system mark, as in the Control Center), with the machine's name as its tooltip.
+  A click opens a menu that works like the guest's Start menu:
+  - a search field at the top (focused when the menu opens; Enter opens the first match; Esc clears it, then closes);
+  - **Running**, the guest's windows with their icons and titles (a click brings one to the front, **×** asks the guest
+    to close it), hidden while searching;
+  - **Open an app**, the guest's apps, launched in the guest with the token it listed (`lord.vm.launch`). Each row shows
+    the app's initial; the row already takes a real icon per app (`appIcons` by token) for when the guest sends them;
+  - at the bottom the machine's name, **Show the Machine's Window** (the controller panel) and **Leave Apps Mode**.
+  - **Launch feedback** (from the maintainer's test: a window that opened where he didn't look led to the app opened six
+    times). After a click, the app's row shows **Opening…** with a spinner, and further clicks on it (and Enter, and the
+    Applications menu) are ignored until a new guest window of that app is listed (its program's name holds a word of the
+    app's name, or its title the whole name) or 5 seconds pass. The status menu stays open while it waits and closes when
+    the app's window appears, so the keys reach it.
+  - **Close feedback.** After **×**, the row shows **Closing…**; if the window is still listed 3 seconds later, or the guest
+    reports that it refused, the row says why: "Can't close from here: it runs as administrator" (the guest's own words
+    for an elevated window), or "The machine didn't close it". The refusal hook (`closeRefused` per window in the machine's
+    apps mode state) is ready for the guest tools' report; until it arrives, the note comes from the timeout.
+  - Both also in the controller panel (the same components). Logic in `model.js` (`windowOfApp`, `launchStart`,
+    `launchPending`, `launchAnswered`, `launchPrune`, `closeStart`, `closeView`, `closePrune`), tested in
+    `vm_model_test.mjs`; four more texts in all 35 languages.
+  - One item per machine; it goes when apps mode ends. It is an SDK status item, so it appears in every theme with a
+    status area (Lord Flow's menu bar, the Classic taskbar when horizontal, Workspaces' top bar) and on each display's
+    bar; the menu opens on the bar that was clicked. While it is open, a guest window in front doesn't take the keys.
+  - The controller panel and the menu share the same list components (`apps/machines/appslist.jsx`); the SDK now
+    exports `statusPanelAt` and `statusPanelRoom` for an app's own status item. Pure logic in `apps/machines/model.js`
+    (`launcherApps`, `appsStatusList`, `appsStatusDiff`, `machineOsId`), tested in `server/tests/vm_model_test.mjs`.
+    Two new texts in all 35 languages.
+
+- **Machines: apps mode's controller is a panel of the guest's windows and apps, in development** (the maintainer's
+  request, like VMware Fusion's Unity mode; `docs/VIRTUALIZATION.md` 7.2). While a machine is in apps mode, its small
+  window was only a hint and **Leave Apps Mode**; it now opens at about 420 × 520 with two scrolling lists:
+  - **Running:** the guest's windows in apps mode (its own windows; popups, menus and windows another one owns are left
+    out), each with the icon the guest sent for it (the same one the Dock shows, not fetched again) and its title. A click
+    brings that window to the front (restored if it was minimized; the guest's window follows, as from the Dock); one the
+    guest minimized before apps mode began is asked back from the guest. **×** asks the guest to close it, as the
+    window's own close button does, so the guest can still ask about unsaved work.
+  - **Open an app:** the guest's apps list with a search field (every word must appear; accents and case are ignored;
+    names that start with the search come first; Enter opens the first one). The guest lists no icons for its apps, so
+    each row shows a plain tile with its initial; the guest protocol is unchanged.
+  - **Leave Apps Mode** stays at the top, and Esc still leaves (in the search field, Esc clears the search first). The
+    long hint is gone. The menu bar's **Applications** menu (on the machine's window and on every guest window) now
+    lists the same **Running** windows above the apps; it is set again only when that list changes, not on every move.
+  - The lists' logic is in `apps/machines/model.js` (`runningWindows`, `runningKey`, `appsMatching`, `appInitial`),
+    tested in `server/tests/vm_model_test.mjs`. New texts in all 35 languages.
+- **Store: a Flathub app's page shows its description, in development.** Under the header, **About this app** shows
+  what the app says about itself (AppStream's `<description>`), as Flathub's site and other app centres do, in the
+  person's language when the catalog has it (`es-AR`: `es_AR`, then `es`, then the untranslated one). Paragraphs are
+  spaced and list items have a bullet (or their number); a long text is shut to about six lines with **Show more** /
+  **Show less**; nothing is shown when the app has none. How it works (`docs/FLATPAK.md`, "The catalog"):
+  - The sandboxed `lord-appstream` (E7) reads it with nothing new: no syscall, no network, still only the C library. It
+    takes only the component's own `<description>` (never a release's), follows translations per paragraph too, and
+    flattens the markup to plain text (`<p>`, `<ul>`/`<ol>`/`<li>`, `<em>`, `<code>`; entities decoded, spaces
+    collapsed, control characters and bytes that aren't UTF-8 removed), at most 4 KB cut at a word with "…". It writes
+    it on its own line right after the app's (`#d`, the id, the text with `\n` and `\\` escaped).
+  - lord-server checks every such line again (`fpakas_desc_line`: the id, only those two escapes, no tab or control
+    character, valid UTF-8, the size) and keeps it only right after its own app's line, at most 24 MB in all. It stays
+    out of `lord.flatpak.catalog()`, which the Store reads at every load: the page asks for one app's with the new
+    `lord.flatpak.description(id)` (`sdk/flathub.js` `description`). Measured on Flathub's catalog (52 MB, 3381 apps):
+    the index grows from 0.6 to 2.5 MB and the helper still takes about 0.1 s.
+  - The layout (whole paragraphs while they fit in six lines, then the next one cut) is `descriptionView` in
+    `sdk/flathubmodel.js`. New texts `flathub.about.title`, `.more`, `.less` in all 35 languages.
+  - Tests: `build/fpakas-test` gains languages, markup flattening, entities, a release's description, the 4 KB cut (on
+    a word, on one long word, in a list), control characters and invalid UTF-8, deep nesting, description lines
+    lord-server must refuse, and 3000 rounds of random markup whose every line must pass the check;
+    `tests/flathub_model_test.mjs` covers `descriptionView`.
+- **Linux apps can describe their colours: `color-management-v1` and `color-representation-v1`, in development**
+  (approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Colour management").
+  - **What LordOS converts.** Every display stays SDR sRGB (sRGB primaries, gamma 2.2, 8 bits); HDR output is not built
+    and not advertised. An app that marks its pixels otherwise has them converted when lord-server takes the buffer
+    (`server/src/wl/colorconv.c`): straight or premultiplied (electrical or optical) alpha, decoded with its transfer
+    function (`gamma22` and `srgb` as a 2.2 power, `bt1886` as 2.4, `gamma28`, power curves 1–10, `ext_linear`),
+    mapped from its primaries to sRGB's with a 3×3 matrix and a Bradford white adaptation to D65 (every named set:
+    BT.2020, Display P3, DCI-P3, Adobe RGB, NTSC, PAL, PAL-M, generic film, CIE XYZ, and `set_primaries`), clipped to
+    the sRGB gamut and encoded for gamma 2.2. Both compositing paths draw the same converted pixels: shared memory as
+    it is copied, a mappable dmabuf copied, any other dmabuf read back from its GPU texture. Content that matches the
+    display (gamma 2.2 or sRGB, sRGB primaries, premultiplied) is not touched and keeps zero-copy and direct scanout.
+  - **`wp_color_manager_v1` 1** (`server/src/wl/wlcolor.c`) advertises only that: intents perceptual and relative,
+    features parametric, `set_primaries` and `set_tf_power` (no ICC, luminances, mastering metadata or scRGB), the five
+    transfer functions and the ten named primaries. Each display's image description is sRGB / gamma 2.2 with the SDR
+    default luminances and **target primaries from the display's EDID** (the EDID reader now reads the chromaticities,
+    `server/src/hw/edid.c`). A window's preferred description is its display's, with `preferred_changed` when it moves
+    to a display with another one. Descriptions with the same parameters share one identity. Every protocol error is
+    raised as specified; primaries that make no gamut give `failed` (`unsupported`).
+  - **`wp_color_representation_manager_v1` 1**: the three alpha modes; coefficients and range only identity / full,
+    because lord-server imports no YUV buffer (a chroma location with an RGB buffer is `pixel_format`).
+  - **Tests:** `build/colorconv-test` (the BT.2020 and Display P3 matrices against the published ones, white kept for
+    every set, refused primaries, ten sweeps of 13,824 pixels against a double-precision reference) and
+    `tests/color_headless.sh` with `build/color-client` against a headless lord-server: every advertised value, the
+    output's information, the preferred description, 22 protocol errors, and a window of linear-light pixels read back
+    from the screen as exactly 255·(v/255)^(1/2.2) next to the same pixels undescribed shown as sent. GTK 4.18.6
+    (`GDK_DEBUG=color-mgmt`) binds the protocol, reads the preferred description and sets sRGB / gamma 2.2 on its window
+    (`WAYLAND_DEBUG` checked). Not yet checked: the GPU read-back of a converted tiled dmabuf, mpv and the Weston colour
+    tools, a real display's EDID primaries.
+- **Explicit sync for Linux apps (`linux-drm-syncobj-v1`), in development** (approved by the maintainer 2026-11-22: "do
+  everything the compositor is missing"; `docs/SYNCOBJ-PLAN.md`, `docs/WAYLAND.md` "Explicit sync"). lord-server now
+  offers `wp_linux_drm_syncobj_manager_v1` version 1: an app hands over each GPU buffer (dmabuf) with an acquire point
+  (its rendering is done) and a release point (LordOS is done with it), as NVIDIA's driver needs and as Mesa's Vulkan
+  WSI (24.1 and later) and Xwayland 24.1 and later use whenever it is offered.
+  - **Never blocking:** a commit whose acquire point is already signalled is applied at once; otherwise all of its
+    state waits in the surface's queue while the Wayland event loop polls an eventfd the kernel signals with the point
+    (`DRM_IOCTL_SYNCOBJ_EVENTFD`), and the surface's later commits wait behind it in order. A point that never signals
+    freezes only that surface on its last frame (logged once after 5 s); other windows, apps, the shell and the cursor
+    go on.
+  - **Release:** at once after the CPU copy; on the GPU path after the frame that replaced the buffer is done or its
+    direct scanout ends, carrying the buffer's own fences (`DMA_BUF_IOCTL_EXPORT_SYNC_FILE` into a temporary syncobj,
+    transferred onto the point), so the GPU's last read is waited for in the kernel; always for a frame that was never
+    shown (its surface destroyed), so an app never waits on LordOS forever.
+  - **Rules and limits:** every protocol error (`no_acquire_point`, `no_release_point`, `no_buffer`,
+    `unsupported_buffer`, `conflicting_points`, `surface_exists`, `no_surface`, `invalid_timeline`); 64 timelines per
+    client, 8 commits waiting per surface (the plan's 4 raised for mailbox swapchains of up to 5 images) and 32
+    eventfds per connection, past which that client is disconnected. The session has 128 eventfds; once they are
+    taken only a process already holding 32 is disconnected, and any other app's waiting frame is checked every 4 ms
+    instead, so one app filling them can't get other apps disconnected (security review). Those checks count in the
+    same per-connection and per-process 32, at most 64 surfaces wait that way (one shared timer checks them all), and
+    past that a frame is applied as it is (implicit sync), never a disconnection.
+  - **Where:** only with a render node that has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), opened by
+    lord-server itself (raw ioctls with the kernel's headers, no libdrm, no DRM master, no new privilege); on the GPU
+    path and the CPU path (the CPU copy reads a frame whose point is signalled); `LORD_SYNCOBJ=0` turns it off. Apps that
+    don't bind it keep implicit sync, unchanged.
+  - **Tests:** `build/syncobj-test` (pure rules, in `make test`), `build/syncobj-kernel-test` (the ioctls on this
+    machine's render node) and `tests/syncobj_headless.sh` (a test client through
+    the kernel with udmabufs, against a headless lord-server, in `tests/run_suites.sh`). Checked 2026-11-22 on the
+    development PC (Linux 6.12, Mesa 25.0.7, headless CPU path): the suite passes; `vkcube --wsi wayland` on an AMD
+    RX 580 commits every frame with `set_acquire_point`/`set_release_point`, 600 frames at 60 fps (FIFO) and 1500 at
+    330 fps (mailbox), no protocol error, no stall; an ASan build runs the suite cleanly; on VM 116 the suite also
+    passes with GPU composition on the monitor (llvmpipe). Not checked yet: a buffer sampled in place by a real GPU
+    (virtio-gpu copies udmabufs), NVIDIA's driver (LordOS doesn't support it), Xwayland's own use.
+- **Linux apps: frame timing and presentation hints (`fifo-v1`, `commit-timing-v1`, `tearing-control-v1`,
+  `content-type-v1`), in development** (approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frame timing").
+  - **Held content updates, in explicit sync's queue.** A commit that may not apply yet is held with its whole pending
+    state in the surface's one queue, the one explicit sync (`linux-drm-syncobj-v1`) uses, and every later commit
+    queues behind it, in order: the first applies only when its acquire point is signalled, its fifo barrier is down
+    and its target time has come. The queue holds 8 (explicit sync's limit); full, a first update that waits only for
+    its barrier or its time applies at once, so these protocols never disconnect a client. Held updates apply at
+    the latch of the frame about to be painted for the surface's own display (`wl_latch`), when that display's frame is
+    done, or when the main loop wakes for their time (`wl_timing_wait`); their frame callbacks and presentation feedback
+    go with the frame that shows them. A buffer destroyed while held keeps what is shown; a surface destroyed drops its
+    held updates (feedback discarded). `server/src/wl/timing.c` (the objects), `wltiming.h` (the pure decisions).
+  - **`wp_fifo_manager_v1` 1:** an update with `wait_barrier` waits until the display has latched a frame since the
+    update that set the barrier: Mesa's Vulkan FIFO present mode runs at the display's rate without frame callbacks. A
+    window nobody can see clears it with its once-a-second tick, a screen that is off once a second, so no client is
+    left waiting; a synchronized subsurface ignores `wait_barrier`, as the protocol says.
+  - **`wp_commit_timing_manager_v1` 1:** an update is not shown before its target time on `wp_presentation`'s clock;
+    it applies at the latch of the first frame predicted at or after it (the next vblank from the display's last flip,
+    or, without a monitor or with flips that don't wait for vblank, the latch's own time), less 1/16 of a refresh.
+  - **`wp_tearing_control_manager_v1` 1:** the hint is kept. "async" tears only for a fullscreen app's own buffer
+    scanned out alone, when the driver reports `DRM_CAP_ASYNC_PAGE_FLIP`: that flip carries
+    `DRM_MODE_PAGE_FLIP_ASYNC`, and one the driver refuses goes at vblank. Composed frames always wait for vblank; a torn
+    flip's feedback is not marked vsync and doesn't count as a driver that never waits. Not yet checked on hardware.
+  - **`wp_content_type_manager_v1` 1:** none, photo, video or game, kept per surface and applied on commit; nothing uses
+    it yet.
+  - **Checked** against a headless lord-server (`tests/wltiming_headless.sh`, `build/wltiming-client`, run by
+    `tests/run_suites.sh`; `build/wltiming-test`): a FIFO client 60.5 updates a second with none sharing a refresh (180
+    a second and 2 in 3 sharing without fifo); targets 17–400 ms ahead shown within 1 ms of them; every protocol error;
+    vkcube (Mesa 25.0.7 lavapipe, FIFO) binds fifo and commit timing, sends `set_timestamp`, `set_barrier` and
+    `wait_barrier` on every present, and shows 51–57 frames a second with no gap over 50 ms; vkcube IMMEDIATE asks for
+    async. With explicit sync (Mesa's Intel driver): FIFO sends acquire and release points with the barrier and the
+    timestamp on every present, 55 frames a second; MAILBOX 16 896 commits with points in 5 s, no error. `tests/wlperf_headless.sh` now marks the welcome tour as shown, so the Help window no longer covers its test
+    windows (its frame test got 19 callbacks a second, the rate of a covered window), and so does
+    `tests/guestwin_headless.sh` (the Help window was one more window in the lists it checks).
+- **The Wayland protocol table, on lordos.org and in `docs/WAYLAND.md`, in development.** A new page,
+  [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/) (English, Spanish and Portuguese,
+  linked from the footer, the sitemap and the site's search), lists 108 Wayland protocols (the core protocol's globals,
+  every wayland-protocols one, wlroots', KDE's, and the others KWin, Mutter or LordOS offer) with the version LordOS,
+  KDE Plasma's KWin 6.7 and GNOME's Mutter 51 advertise, compared on 2026-11-22 (KWin's and Mutter's data as
+  wayland.app lists it: the globals each advertised to an ordinary client, from 2026-09-04 and 2026-09-06). For LordOS
+  each row has a status (offered, partly, left out on purpose, not offered), a note, how it was checked and when, and
+  "in development" when it is in the code after the latest release (0.8.9.4). Today: LordOS offers 46 of the 108 (3 of them in part),
+  KWin 63 and Mutter 40; of the 37 both KWin and Mutter offer, LordOS offers all 37; 30 are left out on purpose, each with
+  its reason (layer-shell, data-control, foreign-toplevel, session-lock, screencopy and image capture, virtual
+  keyboard and pointer, input methods, Plasma's own shell protocols). The page has a search, filters by category,
+  LordOS's status and who offers it (including "both KDE and GNOME, not LordOS"), kept in the address, a legend, and
+  turns each row into a card on a phone; its script and stylesheet (`web/src/wayland.js`, `wayland.css`) load on that
+  page only.
+  - **One source of truth:** `docs/wayland-protocols.json`. `tools/gen-wayland-table.mjs` writes from it the
+    "Protocol table (generated)" section of `docs/WAYLAND.md` (between marker comments) and the page's data,
+    `web/content/wayland/protocols.json`; `--check` only checks. `tools/wayland-app-import.mjs` refreshes KWin's and
+    Mutter's columns and the protocol list from wayland.app's own data, keeping LordOS's entries.
+  - **Drift test:** `server/tests/wayland_table_test.mjs` (in `make -C server test`) reads every
+    `wl_global_create(…, &X_interface, VERSION, …)` in `server/src` (hand-written interface tables and libwayland's
+    `wl_shm` included) and fails when a global is created and not in the JSON, listed and not created, or at another
+    version, and when the generated section or the page's data is stale.
+  - **Hardened against its external input** (part of the data comes from wayland.app): the generator's `validate()`,
+    the importer (which refuses to write) and `web/build.mjs` (which refuses to build, `validateWeb()`) accept only
+    positive integer versions, interface names matching `^[a-z][a-z0-9_]*$`, protocol ids `^[a-z][a-z0-9_-]*$`,
+    sources, stabilities, categories and statuses from fixed sets, `https://wayland.app/protocols/` links and plain
+    text without markup; every value the page prints is also escaped. The drift test feeds hostile rows (for example a
+    category `"><script>`) to both checks and fails if one is accepted.
+  - **Maintainer's decisions of 2026-11-22 recorded:** the 13 KDE Plasma shell, output and settings protocols stay left
+    out on purpose (confirmed); `drm-lease-v1` is in progress (a permission, non-desktop connectors only), shown as
+    not offered yet with that note.
+- **The Wayland protocol page shows the conformance results, in English, Spanish and Portuguese, in development**
+  ([lordos.org/wayland-protocols-table/#conformance](https://lordos.org/wayland-protocols-table/#conformance);
+  `tools/gen-wayland-table.mjs`, `web/build.mjs`, `web/src/wayland.{html,js,css}`, `web/i18n/pages.json`).
+  - **A Conformance column** in the protocol table: per protocol the score of its globals (0–100 %, with a ten-step bar
+    as `tools/wl-conformance.mjs` prints it), the points passed, any skipped, and the **depth** of the test:
+    *Complete* (protocol-specific tests of every request, event and error, all passed, nothing skipped), *Partial*
+    (protocol-specific, a point skipped headless: `wl_seat`'s pointer role, KDE's server decoration's generic bind),
+    *General* (the static code check and the generic bind at every version, no flow of its own yet) and *Code only*
+    (not usable headless: `drm-lease` needs a headset, `xwayland_shell` is offered to Xwayland only). A filter by
+    depth, kept in the address (`#cf=complete`), and a tile at the top (100 %, 48 globals, 29 complete).
+  - **A Conformance section:** the run (2026-11-22, `tools/wl-conformance.mjs` at commit `de240de5`, report schema 1,
+    wayland-protocols 1.44, libwayland 1.23.1, Xwayland 24.1.6), the summary (48 globals, mean 100 %, 29 complete;
+    28 X11 items, mean 100 %, 23 complete), what each depth means, a second table for the X11/Xwayland items (ICCCM,
+    EWMH, Motif, XDND, selections, HiDPI, cursor, isolation) with their scores and depths, and the 15 proof
+    screenshots of `docs/wayland-proofs/` (7 Wayland programs, 8 X11 items) as WebP thumbnails that open in the
+    site's lightbox, each linked from its protocol's or item's row.
+  - **The generator writes it:** `tools/gen-wayland-table.mjs` reads `docs/wayland-conformance.json` and
+    `docs/wayland-proofs/` and adds `conformance` (run, versions, summary, every global with its table row, the X11
+    items, the proofs) and a `conf` per row to `web/content/wayland/protocols.json`, and a second generated block to
+    `docs/WAYLAND.md`'s "Conformance": every global and every X11 item with its score, points and depth. Depths are
+    derived from the run (`complete`, and the tool's `protocol-specific`, `generic only`, `static only`), never typed by
+    hand. X11 screenshots are matched by name (`x11-<item>.png`; `x11-always-on-top.png` proves `ewmh.wm_state`).
+  - **Strict shapes for the new fields:** `validateWeb()` (which `web/build.mjs` runs before rendering) accepts scores
+    only as numbers 0–100, points and counts as integers, depths from the fixed set, X11 ids, proof names and `.png`
+    file names by pattern, a hex commit, Debian-style versions and plain text; every value is escaped on the page.
+  - **More drift checks** in `server/tests/wayland_table_test.mjs`: every scored global is a LordOS global of
+    `docs/wayland-protocols.json` at the same version and every LordOS global was scored; the run's summary agrees
+    with its items; `docs/WAYLAND.md`'s hand-written summary lines ("48 globals, mean 100 %, 29 complete", "28 items,
+    mean 100 %") match the run; the generated conformance block is current; every screenshot named exists and every one
+    in the folder is shown; and 24 hostile values in the new fields are refused.
+- **The paper and the site describe the work in development after 0.8.9.4** (paper edition of 2026-11-22, "0.8.9.4 Beta
+  + in development"; `docs/PAPER-VALIDATION.md`): conformance depths and the published table, the new Wayland protocols
+  and the X11 work, always on top, LordOS Studio and `lord-studio`, Machines' Keys panel, apps mode's status item and
+  panel, Capture mouse, Intel GVT-g and the `machines` command, `fastfetch`/`neofetch` through `lordos-fetch`, the
+  Store's endless lists and Flathub descriptions; corrected: the LordOS tools shipped are w10 (not w9), drags out of X11
+  apps now work and were checked on VM 127, and 3D through a share of an Intel GPU is built for guests that need it. The Linux
+  apps and Machines pages and the FAQ (Linux apps, Machines, and a new "Can I blur my background in video calls?") say
+  the same, in English, Spanish and Portuguese.
+- **Wayland and Xwayland conformance, scored point by point, in development** (`tools/wl-conformance.mjs`,
+  `make -C server wl-conformance`; `docs/WAYLAND.md`, "Conformance").
+  - Every advertised global, and every interface it creates, is checked against its protocol XML up to the advertised
+    version: each request has a real handler (not a stub, and a destructor that destroys), each event is sent somewhere,
+    each protocol error is raised somewhere. A new protocol is picked up with no change to the script.
+  - A test client (`server/tests/wl_conformance.c`) against a headless lord-server binds every global at every version
+    and runs each protocol's main flow and misuses (about 150 checks: configure order, maximize and fullscreen,
+    popups, the clipboard through the compositor, dmabuf feedback, security contexts, each error code the
+    specification names).
+  - An xcb client (`server/tests/x11_conformance.c`) against Xwayland checks ICCCM and EWMH (WM_STATE, WM_PROTOCOLS,
+    focus, `_NET_WM_STATE`, client list, frame extents, ...) and the selections both ways, with INCR at 1 and 2 MiB.
+  - Each item gets a weighted score from 0 to 100 % and is called complete only with a protocol-specific flow and nothing
+    skipped; justified exceptions are listed with their reason (`tools/wl-conformance/allow.json`). Installed real
+    clients (foot, vkcube, xterm, ...) are run and reported with the globals they bound.
+  - First results, 2026-11-22 (`docs/wayland-conformance.json`): 31 globals, mean 94 %, 19 complete; X11 74 %. The gaps
+    found (xdg-shell errors not raised, subsurface stacking and sync ignored, `_NET_WM_ICON`, `_NET_WORKAREA`,
+    xwayland-shell-v1, ...) are listed in `docs/WAYLAND.md`.
+- **Wayland conformance at 100 % for all 48 globals, X11 at 99.9 %, in development** (`tools/wl-conformance.mjs`,
+  `docs/wayland-conformance.json`, `docs/WAYLAND.md` "Conformance"; the maintainer asked for every gap to be closed).
+  Every protocol error below is the one the specification names, raised only where Mutter or wlroots raise it too; most
+  have a flow in `server/tests/wl_conformance.c` checking that a misbehaving client gets exactly that error, the rest
+  (dmabuf bounds, the icon's buffer, the tablet's role) are covered by unit tests and the fuzz client below.
+  - **xdg-shell (`server/src/wl/wl.c`):** `xdg_wm_base.ping` is sent when a window takes the keyboard and `pong` is
+    tracked (an app that doesn't answer for 5 s is logged; like Mutter and KWin it is never disconnected, so
+    `unresponsive` stays unused, listed in `tools/wl-conformance/allow.json`); `defunct_surfaces` (the wm_base destroyed
+    with xdg_surfaces alive); `invalid_surface_state` (an xdg_surface for a wl_surface that already has a buffer);
+    `invalid_positioner` (get_popup or reposition with no size or anchor rectangle); `not_the_topmost_popup` (a popup
+    destroyed while a popup of its own is alive, as wlroots); `xdg_surface.unconfigured_buffer` (a buffer before the
+    first configure is acked), `invalid_serial` (an ack of a serial that was never a configure, or was acked already:
+    the last 16 configure serials are kept per surface), `invalid_size` (a window geometry of zero or less) and
+    `defunct_role_object` (the xdg_surface destroyed before its toplevel or popup); `xdg_toplevel.invalid_parent` (a
+    parent that is the window itself or one of its descendants), `invalid_size` (a negative minimum or maximum, or a
+    maximum below the minimum when they are committed), `invalid_resize_edge`; `xdg_popup.invalid_grab` (a grab on a
+    mapped popup); `xdg_positioner.invalid_input` (a size of zero or less, a negative anchor rectangle or parent size,
+    an anchor or gravity outside its enum). `set_reactive`, `set_parent_size` and `set_parent_configure` are kept: a
+    reactive popup is placed again, and told with a new configure, when its parent window changes.
+  - **wl_compositor:** `invalid_offset` (attach with an offset from version 5, where wl_surface.offset does it),
+    `invalid_size` (a buffer not a multiple of the buffer scale, except for cursors, drag icons and surfaces with a
+    viewport destination, as wlroots), `defunct_role_object` (from version 6, the wl_surface destroyed before its
+    xdg_toplevel or xdg_popup; a wl_subsurface becomes inert instead, as wayland.xml says), and
+    `preferred_buffer_transform` (normal: the displays are never turned) with the first preferred scale.
+  - **wl_subcompositor:** `place_above` and `place_below` work: a subsurface can go under its parent or between its
+    siblings; the order is pending until the parent's commit (as wayland.xml says) and every walk of the tree (CPU
+    paint, GPU draw, fullscreen blit, hit test) follows it. A reference that is neither the parent nor a sibling (or the
+    subsurface itself) is `bad_surface`. Children are removed keeping their order (they were swapped before).
+  - **Viewporter:** `bad_size` (a fractional source with no destination) and `out_of_buffer` (a source outside the
+    buffer, with its scale and transform), checked when the state is applied.
+  - **Data devices:** `wl_data_offer.finish` and `set_actions` on a selection offer are `invalid_finish` and
+    `invalid_offer`; a source with drag-and-drop actions used as the selection is `invalid_source` (as Mutter).
+  - **wl_seat:** `get_touch` on a seat that never had a touchscreen is `missing_capability` (as wlroots);
+    `wl_pointer.set_cursor` with a surface that has another role is `role`; `wl_touch.orientation` is sent (version 6)
+    from the touchscreen's `ABS_MT_ORIENTATION` (0 along the y axis, the maximum 90° clockwise, turned with the
+    picture; `tp.c` `tp_orient_degrees`, checked in `tp-test`; not yet checked on a real touchscreen).
+  - **xdg-decoration:** `invalid_mode`, `unconfigured_buffer` (a decoration for a toplevel that has a buffer) and
+    `orphaned` (the toplevel destroyed before its decoration, as wlroots).
+  - **xdg-activation:** any request on a committed token is `already_used`; `set_surface` is kept, and a token asked
+    by the app with the keyboard is granted only when the surface it names is that window or one of its menus.
+  - **Pointer constraints:** `set_region` and the region given with `lock_pointer`/`confine_pointer` work: the
+    constraint activates only with the pointer inside the region (and the surface's input region), and a confinement
+    keeps the pointer inside it (the nearest point of its rectangles). Pending until the surface's commit.
+  - **Tablets:** a mouse or lens tool's wheel (`REL_WHEEL`, hi-res when the device has it) is sent as
+    `zwp_tablet_tool_v2.wheel` (15° a click; `tablet-test`); `set_cursor` with a surface of another role is `role`;
+    the pads', rings', strips' and dials' `set_feedback` texts are kept when they come with the last mode_switch serial
+    (LordOS draws no pad help yet). A pad group has one mode, so `modes` is not sent, as tablet-v2 says (allowed).
+  - **dmabuf:** `out_of_bounds` (an offset, a row or the first plane's rows past the dmabuf's size, or an overflowing
+    offset + stride, as wlroots). **Explicit sync:** its errors are posted with the protocol's own codes (named).
+    **Toplevel icon:** `no_buffer` when a buffer given to an icon is destroyed before the icon (posted from an idle
+    callback, never while a disconnecting client's objects go). **Colour management:** ICC profiles are an optional
+    feature lord-server doesn't advertise (`create_icc_creator` is `unsupported_feature`): allowed with that reason.
+  - **The tool, where its expectation was wrong:** its own client acked the same configure serial twice (invalid in
+    xdg-shell: it now acks each once); an error on an object the request destroyed (a refused destructor) comes back
+    with no interface in libwayland-client, so those checks compare the code; an event handed to a helper as a
+    function (`info_prim(..., wp_image_description_info_v1_send_primaries)`) counts as sent. The headless server is
+    stopped with SIGTERM and then SIGKILL.
+  - **Security:** a new test, `server/tests/wlfuzz_client.c` (in `make -C server test`), opens 400 connections that
+    misuse these requests at random (orders, serials, sizes, regions, destroys in the wrong order) while a
+    well-behaved window stays mapped: lord-server answers every one, the window is never disconnected and still gets
+    its frames, and a new client maps afterwards (also run with 6 seeds × 1,500 connections, and against an
+    AddressSanitizer/UBSan build of lord-server).
+  - **Proof with real programs** (`tools/wl-proof.mjs`, `docs/wayland-proofs/`): on a headless lord-server, screenshots
+    of foot 1.21, zenity 4.1.90 (GTK 4.18), FeatherPad 1.6.1 (Qt 6.8), vkcube, es2gears and Chromium 156 working with
+    the new checks (each answered ping with pong, acked each configure once, no protocol error), and of a purpose-built
+    client showing subsurface order and a cropped, scaled viewport.
+  - **Results (2026-11-22):** 48 globals, mean 100 %, 29 complete (before: 47, 95.8 %, 19); X11 mean 99.9 % (before 74 %).
+    The globals that score 100 % without being "complete" have no protocol-specific flow in this tool (only the
+    generic bind; most have their own headless test), or skip a check that needs a pointer over a window (`wl_seat`).
+- **X11 apps (Xwayland) handled as GNOME and KDE handle them, in development** (`server/src/wl/xwm.c`, new
+  `xwshell.c`; `docs/WAYLAND.md`, "X11 apps" and "Conformance").
+  - **Window matching:** lord-server offers `xwayland-shell-v1` to Xwayland only (hidden from every other client's
+    registry; a bind by anyone else is an error). Each X window is matched to its surface by serial
+    (`WL_SURFACE_SERIAL`) instead of `WL_SURFACE_ID`, so a recycled surface id can never show another window; `role`,
+    `already_associated` and `invalid_serial` are raised; `WL_SURFACE_ID` still works for older Xwayland.
+  - **Attention:** the ICCCM urgency hint (an xterm with `bellIsUrgent`) and `_NET_WM_STATE_DEMANDS_ATTENTION` mark the
+    window in the Dock; the mark clears when the window gets the keyboard, and the window in front never demands
+    attention (as KWin and Mutter).
+  - **Size limits:** `WM_NORMAL_HINTS` minimum and maximum are enforced, when the app asks for a size and when the
+    limits change.
+  - **Dialogs:** `WM_TRANSIENT_FOR` and `_NET_WM_STATE_MODAL` give X dialogs an owner and modality, as Wayland dialogs
+    have; a modal one takes its owner's input. An owner destroyed or unmapped is forgotten, so a reused X window id is
+    never taken as a dialog's owner (found with real xterms).
+  - **Icons:** an X app's own `_NET_WM_ICON` becomes its window's icon in the Dock: the image closest to 128 px, at most
+    256 px a side, every length checked against the property, copied within the session's icon budget (non-square
+    images centred; `x11_net_wm_icon_pick`, `wlicon_from_net`, checked with hostile lengths in `build/xwm-test`).
+  - **Activation:** `_NET_ACTIVE_WINDOW` is granted only from a pager while an X window has the keyboard, or from the
+    app whose window has it (and then a minimized window comes back); any other request only asks for attention.
+  - **Taskbar and types:** `_NET_WM_STATE_SKIP_TASKBAR` keeps a window out of the Dock (`sdk/dock.js`); utility and
+    toolbar windows are placed where the app asks and not remembered.
+  - **More EWMH:** `_NET_CLIENT_LIST` in mapping order, `_NET_CLIENT_LIST_STACKING`, `_NET_REQUEST_FRAME_EXTENTS`
+    answered, `_NET_WORKAREA` (the theme's work area, without the menu bar and Dock), `_NET_CLOSE_WINDOW` (closes as the
+    theme's close button), `_NET_WM_PID` read for diagnostics only, never trusted.
+  - **Not supported at first:** `_NET_WM_STATE_ABOVE` and `SKIP_PAGER` were kept in the property for the app but not
+    listed in `_NET_SUPPORTED`, as LordOS had no always-on-top layer and no pager; both came later in this cycle
+    ("Always on top", above), which brought X11 to 100 %.
+  - **The tool:** its `DEMANDS_ATTENTION` check set the state on the window in front, which KWin and Mutter refuse; it now
+    uses a window that isn't in front, and checks that the focused window refuses it. New dynamic checks: frame extents
+    answered, stacking order, above/modal/skip-taskbar add and remove, maximum size, urgency set and cleared, utility
+    windows, `_NET_CLOSE_WINDOW`. Screenshots with xterm 398, xprop, xwininfo and zenity on X11
+    (`tools/wl-conformance/x11-proofs.sh`, `docs/wayland-proofs/x11-*.png`).
+- **Linux apps: tab tear-off, window tags, the bell, session management and blur behind windows, in development**
+  (approved by the maintainer 2026-11-22; five Wayland protocols, one file each in `server/src/wl/`, `wlshell.h`;
+  `docs/WAYLAND.md`, "Shell extras"; the latest release is 0.8.9.4).
+  - **Tab tear-off (`xdg-toplevel-drag-v1` 1, `tldrag.c`):** a tab dragged out of Firefox or Chromium becomes a window
+    that follows the pointer during the drag (at the point of the window the browser gave), is never the drag's target
+    (the hit test leaves its frame out, so it can be dropped back onto another window of the browser), and stays where
+    it is let go: a drop nothing takes ends with `dnd_drop_performed` and `dnd_finished`, not `cancelled` (the browser
+    would take the tab back), as Mutter and KWin do, and such a drag never hands files to LordOS. Only a window of the app
+    that owns the drag follows; `invalid_source`, `toplevel_attached` and `ongoing_drag` as the protocol says. Checked
+    with Chromium 156 on a headless lord-server (the pointer driven through the session's `remote.sock`): a tab torn off
+    followed the pointer, stayed on the desktop as its own window, and dragged back onto the first window it was
+    reattached (`docs/wayland-tab-tearoff.png`, `docs/wayland-tab-dropped.png`). Firefox not yet tried.
+  - **Window tags (`xdg-toplevel-tag-v1` 1, `tltag.c`):** a window's tag keys its own remembered place
+    (`sdk/windowmemory.js`: the app's Dock id plus `#<tag>`), so each kind of window of a multi-window app reopens where
+    that kind was; its description names it while it has no title. Both kept as text only, cut and cleaned in C and
+    again in the shell (`sdk/shellxmodel.js`).
+  - **The bell (`xdg-system-bell-v1` 1, `sysbell.c`):** LordOS's alert sound (silent in Do Not Disturb; the system volume
+    and mute apply) and, for a window that isn't in front, the Dock's and taskbar's attention mark. At most one ring
+    every 250 ms and five in 10 s per app (`bellgate.h`).
+  - **Session management (`xdg-session-management-v1` 1, `xsession.c`, `xsstore.c`):** an app's windows come back at
+    their place and size (and maximized) when it starts again, ahead of session restore's frame and the remembered
+    place, fitted on today's displays. Session ids are random (getrandom), scoped to the program lord-server checked the
+    app runs (or its Flatpak id, or the isolated LordOS app), never to an id the app sent: another app's id finds
+    nothing. Kept in `~/.config/lordos/wl-sessions/sessions` (0600), written by lord-server only and protected from
+    `lord.fs` (`fsops_protected`); limits of 128 sessions, 16 per app, 32 windows each.
+  - **Blur behind windows (`ext-background-effect-v1` 1, `bgeffect.c`, `bgregion.h`):** the region an app asks for is
+    blurred with the UI's own backdrop blur, under the window. Offered honestly: only on the CPU path with transparency
+    and blur on; with GPU compositing (no blur there yet) or effects off the capabilities are none and every app is told
+    when that changes.
+  - The protocol files for `ext-background-effect-v1` and `xdg-session-management-v1`, newer than Debian 13's
+    wayland-protocols 1.44, are copied unchanged from wayland-protocols 1.50 into `server/protocols/` (MIT).
+  - New native calls, for the shell only: `lord.wayland.toplevelDrag`, `tag`, `sessionFrame` and `effects`.
+  - Tests: `build/shellx-units-test`, `tests/shellx_model_test.mjs`, `tests/shellx_headless.sh` (all five against a
+    headless lord-server, `tests/shellx_client.c`; the pointer-driven tear-off with `SHELLX_DRAG=1`), and
+    `build/fsops-test` for the protected folder.
+- **VR headsets for Linux apps, only if you allow it, in development** (`drm-lease-v1`, approved by the maintainer
+  2026-11-22; `docs/WAYLAND.md`, "DRM leases"). A VR runtime such as Monado can lease a headset's display from LordOS
+  and drive it directly. Only connectors the kernel marks as non-desktop (head-mounted displays) are ever offered, never
+  a monitor, and LordOS itself no longer lights such a connector as a desktop display (Settings → Displays lists it as
+  not connected). The first time an app asks, LordOS shows its own prompt ("‹App› wants to use the VR headset ‹name›",
+  Don't allow / Allow once / Always allow), remembered per app by the identity lord-server checks itself and changed in
+  Settings → Privacy → VR headsets (the new `vr` permission, which a manifest can't declare and the broker refuses).
+  Sandboxed (Flatpak) and isolated apps and X11 apps through Xwayland are never offered a lease. A lease ends when the
+  app lets it go, the permission is taken back, the headset is unplugged, or the session leaves the screen (lock, Switch
+  User, logging out, a text console). No libdrm: the lease is made with the kernel's own ioctls. Checked with a fake
+  card (`drmlease-test`, `drmlease-e2e-test`); not yet with a real headset. Texts in all 35 languages.
+- **Machines: a LordOS download card, in development** (maintainer's decision 2026-11-22; `docs/VIRTUALIZATION.md` 3.9,
+  "The LordOS card"). The New Machine assistant's first card is now **LordOS**, with LordOS's own icon, for amd64 and
+  arm64: it downloads the **live ISO** of the release the card names (*LordOS 0.8.9*, about 1.1 GB), not the OVA.
+  - **Signed with the LordOS release key.** The catalog (`assets/machines/systems.json`) has a new signature kind,
+    `lordos-release`: the release's `SHA256SUMS.sig` (Ed25519) is checked with the release key compiled into LordOS
+    (`codesig_release_key`), by the same check the LordOS Imager uses for official images (`img_sig_verify`). No new
+    crypto, no new key, no key file. A missing signature is refused as unsigned, a bad one as a bad signature, and then
+    the ISO must have the SHA-256 that signed list gives, as for every card.
+  - **Which release:** the card names a pinned release tag (`v0.8.9-beta` today), moved by the release process whenever a
+    release ships new ISOs (`docs/RELEASING.md`, step 1); no GitHub API call. A test fails when the site's current ISO is
+    newer than the card's.
+  - **Install without questions:** the account, password (only its SHA-512 hash), computer name, time zone, keyboard,
+    locale and this LordOS's language go into `lordos-auto.conf` on a `LORDOSAUTO` seed disk, and the machine boots the
+    ISO's live kernel with `lordos.auto=1`: the live ISO's own unattended install (`docs/UNATTENDED.md`), which erases
+    only the machine's system disk, named with its exact size by `lord-vm`, then restarts into the installed LordOS.
+  - **Size:** a card can ask for a least size over the profile; LordOS's is 4 processors, 4 GB, 32 GB and 3D graphics.
+  - **The guest agent from the first boot:** the `lordos` package adds `lordos-guest.service` (a user unit, on by
+    default) and `71-lordos-guest.rules`, which run `lordos-guest` only inside a Machines guest whose agent is on (the
+    `org.lordos.agent` port exists): nothing runs anywhere else. The live ISO also gets `qemu-guest-agent`, which Debian
+    starts only when the host gives the `org.qemu.guest_agent.0` port. So a LordOS machine has its agent and apps mode
+    from the first boot (with the next ISO).
+  - Tests: `vmcatalog-test` (v0.8.9-beta's published list and signature: good, a changed hash, a line added, another
+    key, a missing, empty, garbage or OpenPGP signature, another list, malformed entries), `vmunattend-test`
+    (`lordos-auto.conf`, the seed disk read back), `vm_catalog_test.mjs` (the card, the live ISO from the real list, the
+    tag against `web/content/downloads.json`). Not run yet: a whole install on a machine, which needs the next ISO.
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).
@@ -83,6 +786,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (three displays: the card's quick launch per display, no suggestion before the moment or for a set seen once,
     nothing opened by itself, Open from the keyboard opening the apps on that display in the usual layout and order,
     offered once, "Don't suggest" kept for that display only, Clear and off); `workspaces_model_test.mjs` (theme.json).
+
+- **Graphics tablets for Linux apps: pressure, tilt and pads, in development** (`tablet-v2` version 2, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Graphics tablets"). lord-server reads pens and pads straight from evdev with
+  its own code (`server/src/tablet.c`, no libinput or libwacom) and offers `zwp_tablet_manager_v2`: Krita, GIMP,
+  Inkscape, GTK 4 and Qt 6 apps get the pen's proximity, tip, motion, pressure, distance, tilt, rotation, slider and
+  buttons, with its name, USB ids, bus and device path; a tool's serial and Wacom id; and the pad's buttons, rings,
+  strips and dials, sent to the window with the keyboard. X apps get them through Xwayland, which binds tablet-v2
+  itself. Only the app under the pen hears of it. Where no app takes the pen (LordOS's own UI, an app without tablet-v2,
+  a window under a modal dialog) it is a mouse — and now one that clicks: the tip is the left button and the pen's
+  buttons the right and middle ones (before, a pen only moved the pointer). A pen display covers the main display, a
+  tablet every display; both follow a rotated display. An old Wacom pad is no longer taken for an absolute pointer.
+  Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire);
+  not yet with a real tablet or on the VM.
+
+- **Apps may move the pointer on their own window, in development** (`pointer-warp-v1`, approved by the maintainer
+  2026-11-22; `docs/WAYLAND.md`, "Pointer warp"). `wp_pointer_warp_v1` lets a game, a 3D tool or a VM put the pointer at
+  a point of its surface, only while the pointer is over that window and it has the keyboard, with the serial of the
+  enter it got, inside the surface, and never while the pointer is locked or in a drag; a confinement still holds. The
+  protocol's XML comes from wayland-protocols 1.45 (Debian 13 ships 1.44) and is kept unmodified in `server/protocols/`.
 
 - **A Linux window's own icon for apps with no installed one, in development** (`xdg-toplevel-icon-v1`, approved by the
   maintainer 2026-11-22; `docs/WAYLAND.md`, "Window icons"). An AppImage, a Wine program or a game without a `.desktop`
@@ -159,11 +881,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
       `~/.local/share/keyrings`, `~/.docker`, `~/.netrc`, `~/.pki`, `~/.mozilla`, `~/.thunderbird`, Chrome's, Chromium's,
       Brave's and Edge's folders under `~/.config`, `~/.var/app`; `lend_sensitive` in `apps.c`). A file there the person
       opens is lent read-only. Isolated apps' own data folders are unchanged (an isolated Firefox keeps `~/.mozilla`).
+    - Nothing under a hidden path is saved or lent writable (found by the review of the fix above): with a save lending
+      only its file, a save could create a new dot-file that runs code later (`~/.npmrc`, `~/.vimrc`, `~/.bashrc`,
+      `~/.config/mimeapps.list`, `~/.config/git/config`). A save to any path with a component starting with `.` is now
+      refused, and a dot-file or hidden folder the person chooses is lent read-only (`hidden_path` in `fplend.c`).
     - A screen-share restore token is revoked before it is spent: the indicator's Stop drops that app's tokens, a lock, a
       text console, a user switch or every share ending drops all of them (`csm_token_drop`, `portal_cast_away`,
       `portal_cast_tokens_drop`), and none is honoured while the session is locked. Only the app's own Close keeps it.
     - Tests: `build/fplend-test` (new: `/./`, `//`, `..`, a trailing `/` or `.` and links refused for files, folders and
-      saves even past a string-compared grant rule; a save names its file, never its folder), `build/sandbox-lend-test`
+      saves even past a string-compared grant rule; a save names its file, never its folder; saves of dot-files
+      refused, chosen dot-files and hidden folders lent read-only), `build/sandbox-lend-test`
       (a save's grant holds only the chosen name, the files and folders next to it can't be read; non-canonical paths
       refused by PID 1), `build/portal-cast-test` (a token dead after Stop, after every share ended and while locked, and
       working again for a new share after the unlock; non-canonical chosen paths dropped), `castsm-test`
@@ -251,7 +978,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     image store with the catalog's own downloader, with progress and Stop Download: root checks the address again in C
     (`vmurl.c`, `pkg/pubhost.c`: https, a public DNS name, never an IP literal, localhost or a local suffix such as
     `.local`, `.lan`, `.internal`, `.home.arpa`; port 443 only, no user name or password, plain path characters with no
-    `%00` or dot segment, no fragment, at most 1000 bytes), the SHA-256 (required) and the size (at most 16 GiB), keeps
+    `%00` or dot segment, no fragment, at most 1000 bytes; an IPv6 address counts as public only in global unicast
+    `2000::/3`, without `2001::/23` (Teredo, ORCHID…) and `3fff::/20`, so local NAT64 `64:ff9b:1::/48` and SIIT
+    `::ffff:0:0/96` are refused, found by the review of the Claude Security fixes), the SHA-256 (required) and the size (at most 16 GiB), keeps
     2 GiB free on the store, and the downloader connects only to public addresses and follows redirects only to addresses
     that pass the same rules (`FetchItem.public_only`, `pkg.http.notPublic`). The image is kept only with that SHA-256 and
     hashed again before a machine is made from it; its description keeps the address without its query (`vmurl_redact`),
@@ -286,12 +1015,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     so a subkey grafted under a genuine primary key could sign a checksum list and be reported "verified by" that
     fingerprint, with no key-changed warning. `lord-pgpv` now reads the key with the new `pgp_keyring_add_untrusted`
     (`pkg/pgp.c`): every self-signature, subkey binding (0x18) and revocation is verified with the primary key (RFC 4880 /
-    RFC 9580 hashing; SHA-256/512; RSA or Ed25519) and only verified ones give flags, expiry and revocation; a primary
+    RFC 9580 hashing; SHA-256/512; RSA or Ed25519) and only verified ones give flags, expiry and revocation, except
+    that a revocation whose hash can't be checked revokes anyway; a primary
     key with no verified self-signature and a subkey with no verified binding are dropped; a subkey signs only with the
     sign flag and a valid back-signature (0x19) made by the subkey; a subkey lives no longer than its primary. APT keyrings
     are read as before. `vmsig-test` adds a grafted subkey, a binding signed by another key, no back-signature, a
     back-signature by another key, an encryption-only subkey, expired and revoked subkeys, a forged revocation, bindings
-    older than the subkey or from the future, a subkey of an expired primary, missing, forged and certify-only
+    older than the subkey or from the future, a revocation whose hash can't be checked (SHA-1, SHA-384) still revoking
+    (fail closed, found by the review of this fix), a subkey of an expired primary, missing, forged and certify-only
     self-signatures, every truncation of a block with a bound subkey, `lord-pgpv` on a grafted subkey, the real Debian CD,
     Ubuntu and Kali lists with the pinned keys, and Debian's archive keyrings (signing subkeys) read the same way as
     trusted.
@@ -662,9 +1393,365 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   in `make test`, and `theme_cost_scene.mjs` now measures it too (426 native calls on the first render and 312 timer
   wake-ups a minute at rest, against Lord Flow's 465 and 330). Seen in headless sessions on the development machine in
   dark, light and Arabic; not yet on a real session with real monitors, a Linux app's own bar or the GPU path.
+- **Linux apps: the core `wl_fixes` global (version 1), in development.** `wl_registry` has no destructor, so until now
+  every registry a client asked for stayed in lord-server, and kept getting `global` and `global_remove` events, until
+  the client disconnected. `wl_fixes.destroy_registry` (wayland.xml 1.24) destroys it: lord-server sends
+  `wl_display.delete_id` and the client can reuse the id. Debian 13's libwayland is 1.23, which doesn't ship the
+  interface, so `server/mk/wlfixes.mk` generates it with wayland-scanner from `third_party/wayland/wl-fixes.xml`
+  (vendored from wayland.xml 1.24 with its MIT license; listed in `THIRD_PARTY.md`); on libwayland 1.24 or newer the
+  system's interface is used. The code is `server/src/wl/wlfixes.c`, one call in `wl.c`. Test:
+  `server/tests/wlfixes_client.c`, the "fixes" part of `tests/wlperf_headless.sh` in `make test`, against a headless
+  lord-server: the global is offered at version 1, the destroyed registry's id comes back for a new registry that gets
+  every global once (with destroy_registry turned into a no-op the check fails), and a non-registry argument is a
+  display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **Machines: clicks with the mouse free, resolutions, and apps mode's windows on a guest with two displays, in
+  development** (LordOS guest tools **w10**; found on the maintainer's guest with an Intel GVT-g vGPU, ws126 and tools
+  w9, whose desktop has the vGPU's output and a second display that isn't on a PCI adapter).
+  - **Clicks land where they're aimed with the mouse free.** The guest maps QEMU's absolute tablet (a HID mouse) over
+    its *primary* display only, not over its whole desktop: its tablet input carries no `MOUSE_VIRTUAL_DESKTOP`. The
+    mapping of before (`vd_abs_map` over the whole desktop) put a click on a 1920x1080 shown display beside a 1784x830
+    second one at about half its x (in Notepad the caret went elsewhere, the Start button missed). lord-vm now computes
+    the layout with `ag_tablet_layout` (`vmagent.c`): with the shown display primary the picture is all the tablet
+    covers (no layout, every pixel 1:1); with another display primary the tablet can't reach the picture at all, which
+    is said in lord-vm's log once, and the tools make the shown display primary again (below). The tools no longer
+    leave it to an assumption: they read the tablet's own raw input in the background (`RIDEV_INPUTSINK` for mice,
+    nothing taken from anyone) and say how the guest maps it (`AGK_TABLET`, 21, one byte: 1 the primary display, 2 the
+    whole desktop; a strict parser), and lord-vm uses the whole-desktop layout of before only when they say 2. The tools'
+    log (`%LOCALAPPDATA%\LordOS\lordos-guest-win.log`) shows the first three moves with where the guest put the pointer
+    against both readings, so the mapping is measured, not guessed. `vm-test` checks every layout of the maintainer's
+    log in both mappings (each picture pixel within 2 of its guest pixel through QEMU's scale) and the parser.
+  - **The shown display stays the guest's primary.** w8 made it primary once per set of displays; a change of size on
+    it then let the guest put the other display at 0,0 as primary (the log flipped between "at 0,0 primary" and "at
+    1784,0" within a second, and sometimes stayed so: clicks, the taskbar and new windows went out of sight). The tools
+    now put it back after every change of mode and whenever they find another display primary, at most once in 2 s and
+    five times a minute (a guest that keeps undoing it isn't fought with).
+  - **Resolutions settle.** The tools asked the guest's display configuration for a size that wasn't listed yet on
+    every 250 ms try for 4 s, each one a mode set the person saw (the flicker after a change of resolution); now twice
+    at most. A size the guest changes by itself right after it was set (a vGPU's monitor comes back with a new EDID
+    after QEMU's ui_info, and the guest applies the mode it remembers for it: 1920x1080 set, 1400x1050 half a second
+    later, and it stayed) is asked again, twice at most per request and within 30 s of it, never when it is the closest
+    mode the tools themselves ended with.
+  - **Apps mode's windows show their own window after a change of resolution.** The tools made the window list with
+    the shown display's corner from before the change until 500 ms after it, so a window's crop showed part of one
+    display, part of the other and a black block. The list now looks the displays up again every time, a change of
+    the displays marks it at once and sends it even when nothing in it changed, and Machines holds a window's picture
+    (black, not a wrong part) after a change of the picture's size until the guest's next list, 1.5 s at most
+    (`cropsStale`, model.js).
+  - **The ~1 s stutter after a change of resolution, also with the mouse captured**: not reproduced here (it needs the
+    GVT-g guest). QEMU's "Failed to call update: Timeout was reached" lines in that log mean a display update waited
+    1 s for its answer; lord-vmdisplay answers within 250 ms in `vmdisplay-test`, so the wait is either QEMU's own main
+    loop or lord-server reading the vGPU's picture. The changes above remove the mode sets and display flips that came
+    after each change; whether the stutter goes with them is still to be checked on that guest.
+- **Machines: apps mode's windows have no LordOS frame, and the panel has the machine's bar, in development.** A guest
+  window in apps mode is now only the guest's window, with its own title bar and caption buttons (`args.csd`, as a
+  Linux app that draws its own bar; every theme then shows the content with its shadow; rounded 8 px unless it fills
+  the guest's screen), as other hypervisors' seamless modes do: its own buttons minimize, maximize and close it in
+  the guest and dragging its title bar moves it there, and the LordOS window follows from the guest's next list. A
+  press on a guest window is now mapped as the window was at the press for as long as the button is held, also when
+  the pointer leaves it (`anchorPoint`, model.js): mapped through the window as it was a moment later, each move of
+  the guest's window pushed the point further and a dragged window ran away from the pointer. Resizing from the
+  LordOS window's edges asks the guest as before. The machine's menus stay in the menu bar, the Dock's menu, the
+  machine's panel and its status item by the clock. Apps mode's panel (Running, Open an app) now has the machine's
+  bar: the agent, clipboard, shared folders; keys, devices, sound; the console, logs, screenshot, recording; pause and
+  power; Configure, wrapped over the rows it needs (the resolution, Capture mouse and full screen have no use in apps
+  mode). With the console open the panel is taller.
+- **The Screenshots bar's Options menu opened below the bar, off the bottom of the screen.** The bar sits near the
+  bottom of the screen in a bare floating window only as tall as the bar, and the menu chose its side by that window, so
+  it always opened downward. A `Popover` can now be given an `area` (a screen box) in place of the window: the bar passes
+  the work area of the display it is on, so the menu opens above the bar when there is more room there, moves sideways
+  to stay on that display, and is never taller than the room on its side (`popoverRoom` in `sdk/controlmodel.js`); the
+  rows scroll when even that is too short, for example on a small screen with the bar dragged to the middle. Other
+  popovers keep their behaviour. Tests: `control_model_test.mjs` (the room above a bar near the bottom, below a control
+  near the top, a second display) and the toolbar scene.
+- **The Timer desktop widget fits its card at every size and in every language, in development**
+  (`sdk/deskwidgets.jsx` TimerBody, new `sdk/timerwidgetmodel.js`; `server/tests/timer_widget_test.mjs`,
+  `server/tests/workspaces_scene.mjs`). At the small size (one 170 px cell) and on the timer half of the medium one,
+  the three presets ("1 min", "5 min", "25 min") sat on a wrapping row of 30 px pills, so "25 min" fell to a second
+  row that the card's bottom edge cut off; the stopwatch's "Start"/"Reset" pills could overflow their half the same
+  way in German ("Starten"/"Zurücksetzen"). The layout now comes from a pure model: each row of pills is a single row
+  whose style (font 13 → 12 → 11 → 10.5 px, smaller padding and height) is the largest that keeps every label whole,
+  measured with `lord.measureText`; when even the smallest doesn't fit, the "1 min" preset is dropped first, then
+  "25 min" ("5 min" stays), and a label still too long is cut with an ellipsis. The ring's size and the time's font
+  follow the room left under it, the stopwatch's figure shrinks to its column, and the medium size splits into two
+  columns of equal width with the rule between them. An idle timer's ring now shows the duration a tap starts (the
+  last one used, else 5:00) instead of "—", and tapping the ring starts, pauses or resumes it; tapping the
+  stopwatch's figure starts or pauses it. The ring also fills again as the time runs (its fraction divided the
+  remaining milliseconds by the duration × 1000, so it barely moved). The new test lays the widget out at both of
+  its sizes (the timer has no large size), in each state, with times up to 10:00:00, in all 35 UI languages with a
+  measure wider than the UI font, and checks that every part stays inside the card's content box, each row of pills
+  inside its column, the columns apart and equal, and all three presets whole in English and Spanish; the workspaces
+  scene checks the idle widget shows 5:00, the presets and the stopwatch.
+- **Machines: lord-vm's log no longer goes silent for the rest of a run, in development** (seen live on 2026-11-22).
+  After a machine's window closed, QEMU went on calling the closed D-Bus display listener and wrote `Failed to call
+  update: The connection is closed` twice every 30 ms; 32,000 such lines reached `lord-vm.log`'s 4 MB cap in 15 minutes,
+  and from then on lord-vm wrote nothing (no agent, display or state lines). Now a child's stderr (QEMU, passt) is logged
+  in whole lines (a QEMU message used to come out cut in two, its timestamp on one line); a line that comes again with
+  the same text, QEMU's own timestamp aside, is logged once and then counted (`qemu: (the line before came N more times
+  in S s)`, at most every 10 s and when another line comes); and a full log is rotated (`lord-vm.log` → `lord-vm.1.log`
+  → `lord-vm.2.log`, at most 12 MB in all) instead of stopping. QEMU's dead listener itself is QEMU's (its D-Bus display
+  has no call to drop one; lord-vmdisplay already closes its connection). `src/vm/vmlog.c`, test `build/vmlog-test`
+  (the incident's 60,000 lines give one line and a summary every 10 s; cut writes; rotation keeps three files).
+- **Machines' apps mode with an Intel vGPU: the two linear copies of the picture never show rows of an older frame, in
+  development** (`src/gpu/gband.h`, `ui/js_vm.c`; `docs/MACHINES-GPU.md`). The rows a copy lacked were added only to the
+  copy shown; with none shown (the shown copy had just been imported again by the desktop's GPU, e.g. after a new GPU
+  context) the other copy kept an old frame's rows and showed them next. They are now added to the other copy whether it
+  is shown or not; both copies are copied whole when the picture's dmabuf changes (a new attach, the guest flipping to
+  another buffer) and when lord-vmdisplay announces a picture (an attach or another size), when the texture of the
+  picture before is also dropped; and a new copy is cleared to black on the iGPU before its first use, so a row never
+  shows what its memory held. Seen as stripes of coloured noise in an apps mode window after lord-server restarted while
+  the machine ran; the cause on that computer isn't proven (no log: see above), **to be checked** on the maintainer's
+  RX 580 + UHD 630. Test `build/gband-test`: a model of both copies over 200,000 random frames with attaches, re-imports
+  and dmabuf changes (it caught the copy-not-shown bug).
+- **Machines' apps mode: a guest window's own icon in the Dock after a re-attach, in development** (`apps/machines/
+  appsmode.jsx`, `model.js` `iconsToAsk`; `src/vm/lordvm.c`). Icons were asked of the session only when the guest's icons
+  changed, so a window whose LordOS window opened from a later list (minimized in the guest when apps mode began, or
+  listed after its icon came, as when lord-server restarted while the machine ran) kept a letter tile for good. Now every
+  window without its icon asks on each new list. And lord-vm keeps the last icon of each listed window and gives them to
+  a client that turns apps mode on, since the guest sends each window's icon once. Checks in `tests/vm_model_test.mjs`.
+- **Firefox's drop-down lists and tooltips show and go away again, in development** (the open item of October 19,
+  "Firefox ignored mouse clicks", checked on VM 127 on 2026-11-22; `docs/WAYLAND.md`, "Two wl_seat bindings (Firefox)").
+  Firefox binds `wl_seat` twice (GTK 3's and its own) and gets two pointers and two keyboards: that was checked with
+  `WAYLAND_DEBUG` and is right, each resource gets every event once with its own `frame` and serial, and the page's
+  clicks, links, fields, tabs, menus and drag and drop all reacted. What looked dead were the `<select>` lists: GTK 3
+  maps them (and tooltips) as desync subsurfaces of the window, and lord-server's partial repaint painted only the
+  window's own last damage for a subsurface's commit and nothing when one was destroyed, unmapped or moved, so a closed
+  list stayed on screen and the next one never showed. A subsurface's commit now damages its own box, and one that
+  comes, moves, is unmapped or destroyed damages its whole window (drawn again on the GPU path); `set_position` now takes
+  effect when the parent's commit is applied (a held one brings the places it was committed with), not with the
+  subsurface's own commit. Also, a `wl_pointer` made while the pointer is already over that client's surface
+  gets its `enter` at once (it got none until the pointer left and came back, so its clicks had no focus). Tests:
+  `build/seat2-client` (`tests/seat2_client.c`, inside a session: two `wl_seat` bindings, the event stream of each
+  pointer and keyboard, a third pointer made over the window) and `wlperf-client subsurface` in
+  `tests/wlperf_headless.sh` (desync subsurfaces shown, redrawn, destroyed, made elsewhere and moved; every frame equals
+  a full repaint; the old build's stale menus were shown with the same client on VM 127, captured step by step).
+- **Drag and drop with X11 apps works, in development** (XDND, built in 0.8.8.8, checked on VM 127 for the first time on
+  2026-11-22 with Firefox on X11 and on Wayland and with Files; `docs/WAYLAND.md`, "Drag and drop"). Wayland → X11 and
+  Files → X11 already worked. X11 → anything never did: the X app's answer to the conversion of `XdndSelection` was
+  ignored as forged because it came with `SendEvent`, which is how every selection owner answers (ICCCM), so no X drag
+  delivered its data; the right check is that it answers our conversion exactly, then who owns the selection, which is
+  asked again before each read. And X drags of files never reached Files: Xwayland itself, the X server's own entry in
+  X-Resource's list (resource base 0), runs in a user namespace of its own and counted as a sandboxed client; it is not
+  a client and is left out. Last, a drop Files claimed at the release (before the app's `XdndDrop`) told the X app it was
+  refused although the files were copied; it is now told the result. `build/xwm-test` covers the first two.
+- **lord-server crashed when a theme switch failed and the running theme could not be loaded back** (`src/main.c`
+  `switch_theme`, `src/ui/js.c`; reported by the maintainer, 2026-11-22 13:41, package ws123). The crash was
+  `segfault at 170 … lord-server[2b8f60]`. A rebuild of `test/ws123` (`ad983794`) has `.text` byte-for-byte the
+  package's, and 0x2b8f60 is the first instruction of QuickJS's `JS_GetGlobalObject()`, reading `ctx->global_obj`
+  with a NULL context. The session log shows the path:
+  - The maintainer chose another theme (Workspaces). The verified-code check refused it: "size differs from the
+    manifest". The package had been updated under the running session, and the code manifest checked is the one read
+    at login.
+  - Going back to Default was refused for the same reason ("did not load again either").
+  - That left lord-server with no JavaScript context at all, and the main loop's next `js_tick` → `call_hot` →
+    `call_global_atom` crashed on it.
 
+  Now a switch that can't go back shows the recovery screen, as a failed start already did (`start_theme`). Every
+  entry point from C into the theme (`js_tick`, `js_wants_frame`, `js_frame`, input, Wayland and the other events)
+  also does nothing when there is no context.
+
+  Test: `tests/theme_switch_headless.sh` (in `run_suites.sh`) switches a headless lord-server to a theme that throws,
+  after the running theme's file was removed. The ws123 binary crashes there with the same `segfault at 170` at
+  `2b8f60`. Now lord-server goes on with the recovery screen.
+- **Two lord-server crashes in the maintainer's session: what was found, the fixes, and a crash report for the next
+  one** (reported by the maintainer, 2026-11-22). Neither crash left a stack: the package's `lord-server` is stripped
+  and no core is kept. What could be established, and what was changed:
+  - *10:06, package ws119* (`segfault at 20 … in lord-server[2c45e7]`): `ff27c948` was rebuilt with the same flags,
+    and its `.text` is byte-for-byte the package's. Offset `0x2c45e7` is QuickJS's `find_own_property()` inlined in
+    `JS_DefineProperty()`, reading `p->shape->prop_hash_mask` with `shape == NULL`. `free_object()` sets the shape to
+    NULL, so a property was defined on a **JS object that had already been freed**. The caller is not known. A
+    reference-count audit of every native binding (`server/src/ui/js*.c`) found no over-release. The likeliest
+    remaining suspect, now removed, is the stall sampler: in that session it ran once a second (the log shows a stack
+    sample on every slow `__lordTick`) and it evaluated `new Error().stack` from QuickJS's interrupt handler. That
+    means compiling and running JavaScript and allocating objects at any point of the interpreter (a loop's back edge,
+    a call's entry, inside a regex). The sampler and the watchdog's JS stack now read QuickJS's frames directly with
+    `JS_GetStackText()`, a LordOS patch in `third_party/quickjs`: it runs no JavaScript, creates no JS value and
+    prints the same one-line format.
+  - *12:05, package ws122* (`segfault at 7fffeaa61e1c … error 6 in libc.so.6[6259d]`): a write 0x4c bytes above
+    the stack pointer, in the frame of glibc's printf engine (`sub $0x4f8,%rsp` just before). That is a **main-thread
+    stack overflow** with a printf at the bottom. A call graph of the ws122 build (`gcc -fcallgraph-info=su`, `.text`
+    byte-for-byte the package's) lists every recursive cycle. Each directory walk has a depth limit, and the
+    JavaScript engine's own limit (4 MB) is half the stack, so the overflow had to come from a cycle in a tree or
+    from re-entry. The ones found and closed:
+    - **wl_subcompositor accepted a surface as the child of itself or of its own descendant.** wayland.xml requires
+      `bad_parent`; only "itself" was refused, and with the wrong error. A cycle sent `damage_node()` and the paint,
+      hit-test and output walks round it for ever: against the ws122 binary, `tests/cycle_client.c` hangs the main
+      loop at 100 % CPU until the watchdog steps in. `get_subsurface` now refuses a parent that is the surface or one
+      of its descendants (`bad_parent`) and a surface that already has a window or menu role (`bad_surface`).
+      `xdg_surface.get_popup` refuses a parent that is the popup itself or one of its own menus
+      (`invalid_popup_parent`).
+      A security review then found a mixed case. A surface could first get an xdg_surface, then become a subsurface,
+      then a menu. It ended up linked twice, in its parent's `kids[]` and as a menu of another surface, and the
+      parent-chain check did not follow the edges the walks use. Now a surface with an xdg_surface can't become a
+      subsurface (`bad_surface`), and a subsurface can't take a window or menu role (`role`). The cycle check walks
+      exactly the edges the walks follow (`surf_reaches`: subsurfaces and menus). As a safety net, the recursive walks
+      (`origin`, `paint_tree`, `draw_tree`, `blit_tree`, `surface_at`) stop 64 levels down and log it once, so a tree
+      that is cut never runs the stack out.
+    - **The X window manager could re-enter its own shutdown** (`src/wl/xwm.c`). When a write to Xwayland failed,
+      `lost()` called `xwm_stop()`, which ends a drag and unmaps every X window through wl.c. Those calls send to X
+      again, so a second failed write called `xwm_stop()` from inside itself and freed the same window twice. The
+      connection is now marked closed before anything is torn down, a nested call returns, and `free_win` unlinks the
+      window before it calls out.
+    - **UI node cycles:** `lord.appendChild`/`insertBefore` with a node and its own ancestor (a stale id: ids are
+      reused once a node is destroyed) closed a cycle that `invalidate_measure` would loop on for ever, and that
+      layout and paint would recurse on. Such a call is now ignored (`src/ui/node.c`).
+  - **Crash report** (`src/wdog.c` `wdog_crash_hooks`, called first thing in `main`): on SIGSEGV, SIGBUS, SIGILL,
+    SIGFPE or SIGABRT, lord-server writes the signal, the faulting address, its version and build, and the C stack
+    (`backtrace_symbols_fd`, `lord-server(+0x2c45e7)` frames) to the session log. The handler runs on an alternate
+    stack, so a stack overflow is reported too. It allocates nothing. A fault then happens again with the default
+    action, so the kernel still logs it; an abort is raised again. `tools/iso/mkdeb.sh` gains `DEBUG_SYMBOLS=1`, which
+    keeps lord-server's and lord-sessiond's symbols as `<package>.debug/*.debug` next to a test package (never inside
+    it), for `addr2line`.
+  - **Smaller bugs found on the way:**
+    - **Passwords were wiped inside QuickJS's own strings.** Five native functions wiped the pointer
+      `JS_ToCString` returns (Machines' unattended-install and root passwords, the Imager's password hash and Wi-Fi
+      key, the Terminal's SFTP request). For an ASCII string that pointer is the `JSString` itself, so the value
+      JavaScript still held turned into zeros. They now copy the secret and wipe the copy (`src/ui/js_secret.h`).
+    - `lord.sys` keyboard layouts read a string after freeing it (`f_kb_list`).
+  - Tests: `tests/cycle_client.c` (run by `tests/run_suites.sh` against a headless lord-server, through
+    `tests/popup_headless.sh cycle-client`) covers a subsurface of itself, under its child and under its grandchild,
+    a popup of itself, two popups each the other's parent, and a nested subsurface tree that must still work. Further
+    cases: a surface with an xdg_surface made a subsurface, a subsurface given an xdg_surface, a menu made a
+    subsurface of its own subsurface, and a window → menu → subsurface → subsurface chain that must work, with a cycle
+    in it refused.
+    `wdog_test.c` covers the JS stack read from the interrupt handler and the crash report: a stack overflow ends in
+    SIGSEGV with a complete report on the alternate stack, and an abort ends in SIGABRT.
+- **Store → For this computer: no firmware card for a file no package has** (`sdk/suggestengine.js`,
+  `assets/store/suggestions.json` `firmware.notShipped`; reported by the maintainer): on a computer that gives its Intel
+  graphics to a machine (GVT-g), the kernel asks for `i915/gvt/vid_…_rid_….golden_hw_state`, a cache of the vGPU's
+  starting state that GVT-g builds itself when the file isn't there and that no Debian package ships. The Graphics
+  firmware card named it as if firmware-intel-graphics would bring it. Such files are now left out: the card appears
+  only for real missing firmware (here `i915/kbl_dmc_ver1_04.bin`, the display engine's power-saving firmware) and
+  names only that. Tests: `suggest_engine_test.mjs`.
+- **Store: a Flathub app's license reads as a license, with a link** (`sdk/flathubmodel.js` `licenseView`,
+  `apps/store/ui.js` `Facts`, `apps/store/flathubpages.js`; reported by the maintainer): the License fact showed
+  Flathub's raw value, so a proprietary app read "LicenseRef-proprietary=https://gitlab.com/…", cut off. It now says
+  "Proprietary" and, when the app names where its license is, is a link that opens it in the default browser; a single
+  SPDX license (GPL-3.0-or-later, MIT…) links to its page on spdx.org, and an expression (MIT AND Apache-2.0) shows as
+  given. Only an https address with no spaces or control characters, at most 512 bytes, becomes a link; the Store
+  never downloads the license itself. Tests: `flathub_model_test.mjs`. New text in all 35 languages.
+- **Machines: a machine's ··· menu is never cut by the window** (`apps/machines/library.jsx` `CardMenu`, `model.js`
+  `menuSpot`, `popMenuHeight`, `displayUnder`; reported by the maintainer): the library's card and row menu was drawn
+  inside the window and placed for a menu of 330 px, so with Clone, Logs, Show in Files and Open Transfer Folder its
+  last rows went past the window's bottom edge. It is now drawn in the desktop's popover layer, over the window and
+  the Dock, below the ··· button or the pointer, above them when the display has no room below, and always inside the
+  display it opened on (a second, shorter monitor too). Tests: `vm_model_test.mjs` (placement below, above, too tall
+  both ways, the screen's edges, a second display).
+
+- **Machines: a guest with more than one display shows the right one, in apps mode too, in development**
+  (`lordos-guest-win` **w7**; Machines offers the update). On a guest with an Intel GVT-g vGPU, the guest had a
+  1022 × 724 primary display next to the 1920 × 1080 output the machine's window shows. `lordos-guest-win` measured and
+  moved everything on the primary and the virtual desktop: lord-vm kept logging "the guest's display is 1022x724 (not
+  the size asked for)", each apps mode window showed the wrong part of the picture (Explorer about 200 pixels lower, the
+  browser only wallpaper), and after leaving apps mode the guest's windows were on the display nobody sees (only
+  Win+Shift+← brought one back).
+  - The tools now pick the **shown display**: the only one; else the one they chose before while it stays; else the one
+    whose mode is the size the host asked for (a PCI adapter first, then the primary); else the primary on a PCI
+    adapter, the first on a PCI adapter, the primary. The size the host asks for is set on it.
+- **Machines: a guest with more than one display shows the right one, in apps mode too, in development** (the guest
+  tools `lordos-guest-win` **w9**; Machines offers the update). On the maintainer's guest with an Intel GVT-g vGPU, the
+  guest system had a 1022 × 724 primary display that isn't on a PCI adapter (a basic or indirect display) next to the
+  vGPU's output, the one the machine's window shows. The tools measured and moved everything on the primary and the
+  virtual desktop: lord-vm kept logging "the guest's display is 1022x724 (not the size asked for)", each apps mode
+  window showed the wrong part of the picture (Explorer about 200 pixels lower, the browser only wallpaper), and after
+  leaving apps mode the guest's windows were on the display nobody sees. w7 (never released) chose by size alone and
+  locked onto the basic display; the real guest's log showed it.
+  - The tools pick the **shown display** (`ag_shown_pick` in `vmagent.c`, tested with that guest's displays as a
+    fixture): the host's picture only ever comes from a PCI GPU (GVT-g, virtio-gpu, QXL, a passed-through card), so a
+    display on a PCI adapter always wins over one that isn't; among those, the one chosen before by size while it
+    stays, else the one whose mode is the size the host asked for (the primary first), else the primary, else the
+    first. A change of which displays there are forgets the choice. The size the host asks for is set on it.
+  - The shown display is made the guest's **primary** (the display configuration, as Settings' "Make this my main
+    display" does, saved): the taskbar, the desktop's icons, new windows and a consent prompt are where the person
+    looks. Once per topology, logged. Nothing is detached: the other display stays, to the shown one's right.
+  - Apps mode's rectangles (`LAG_WINDOWS`, a move, a drop's point) are relative to the shown display's corner and kept
+    inside it, instead of the primary's and `MonitorFromRect(…, MONITOR_DEFAULTTOPRIMARY)`.
+  - A window on another display is moved onto the shown one as the tools start, after the primary changes, when apps
+    mode starts (or when it appears) and when apps mode ends: the same place relative to the display's corner, its size
+    kept, clamped to the work area; a minimized window stays minimized (only where it comes back moves), a maximized
+    one is maximized there; a window on no display at all, or one that runs as administrator, is left alone. A
+    minimized window's place is read in screen coordinates now (it was workspace coordinates).
+  - The guest's displays go to lord-vm's log at hello and on every change (`AGK_DISPLAYS`, 18, guest → host, log only;
+    a strict parser: exact length, 1..8 displays, sane rectangles, at most one primary, printable ASCII names of at most
+    32 bytes; cases in `vm-test`): `agent: guest displays: \\.\DISPLAY1 1022x724 at 0,0 primary; \\.\DISPLAY2
+    1920x1080 at 1022,0 (shown)`. The tools' own log (`%LOCALAPPDATA%\LordOS\lordos-guest-win.log`) lists every adapter
+    and monitor, the choice, and each apps mode translation and move.
+  - Still to check on the maintainer's guest. Not changed: the guest's taskbar and desktop icons stay on its primary display.
+    32 bytes; cases in `vm-test`): `agent: guest displays: \\.\DISPLAY2 1920x1080 at 0,0 primary (shown);
+    \\.\DISPLAY1 1022x724 at 1920,0 (not a PCI adapter)`. The tools' own log (`%LOCALAPPDATA%\LordOS\lordos-guest-win.log`)
+    lists every adapter and monitor, the choice, the primary made, and each apps mode translation and move.
+  - **Clicks and typing land where they're aimed again** (found with w8 on that guest: nothing could be clicked or
+    typed). The guest spreads its absolute tablet over its whole desktop, both displays, while QEMU scales a position by
+    the picture's width, so a click landed scaled across both (often on the display nobody sees, which then took the
+    keyboard's focus). lord-vm now passes where the picture sits in the guest's desktop (`ag_displays_layout`, from
+    `AGK_DISPLAYS`) to lord-server (`VM_GUEST_LAYOUT`) and on to lord-vmdisplay (`VD_LAYOUT`), which gives QEMU the
+    position that lands on the shown display's pixel (`vd_abs_map`; tested with that layout: every pixel within 2, the
+    limit of QEMU's integer position). Without a layout, as before.
+  - **Turn Off the Extra Display** (tools **w9**): the agent's popover offers it when the guest has a display that
+    isn't on a PCI adapter next to the PCI one it shows; the tools leave that display out of the guest's display
+    configuration (never the shown one), remember it, and **Turn the Extra Display Back On** puts every display back
+    (also by itself when no PCI display is left). Not automatic: what that display is isn't known for sure, so the
+    tools log its adapter and the person decides. `AGK_EXTRA` (20, one byte), the tools' hello words `extra` and
+    `extraoff`, `VAG_EXTRA_OFF` / `VAG_EXTRA_ON`, `VAC_EXTRA` / `VAC_EXTRA_OFF`; strict parsers with tests.
+  - The popover shows the LordOS tools' version next to the agent's ("agent 109.1.0 · LordOS tools w9"): the first is
+    qemu-guest-agent's.
+- **Machines: a guest window that runs as administrator can't be closed from LordOS, and LordOS is told, in
+  development** (tools w8). The tools run with the person's normal rights, so the guest system drops their close
+  message to a program running as administrator (Computer Management, `mmc.exe`) and refuses its moves; the × in the
+  Running list did nothing. The tools now tell: such a window is flagged in the list (`LAGW_ELEVATED`, 16, set only when
+  the host's hello says `elevated`, so an older host never sees a flag it refuses), a refused close, move, minimize or
+  restore is answered (`LAG_WINREFUSED`, 19: window, action, reason; exactly 6 bytes, strict parser in `vmagent.c`),
+  lord-vm logs it and passes it on (`VM_WINREFUSED`), and lord-server keeps the last refused close per window for the
+  app: `lord.vm.closeRefusals(session)` → `[{ gid, reason: 'elevated' | 'other', at }]`, with `closeRefusedSeq` in the
+  machine's status and `elevated` on each of `lord.vm.windows()`. Apps mode copies it into `guests[dir].closeRefused`
+  (`closeRefusedOf` in `model.js`, tested), where the window says to close it from inside the machine. The tools are
+  never elevated to get around it.
+
+- **Videos and songs with 44.1 kHz sound no longer freeze after about half a minute, in development** (lord-media's
+  player, `src/media/helper/lm_aqlevel.h`). The player counted the decoded sound waiting for lord-server in
+  milliseconds, rounded down every time a piece of it went into the audio ring. Sound at 44.1 kHz, resampled to the
+  ring's 48 kHz, comes in chunks that never fit the ring's free space whole, so each one was split and the count lost
+  about 1 ms per chunk: after 30–45 s it read a full second queued with nothing queued, the decoder stopped making
+  sound, the audio clock stopped and the picture froze with it (reported with a 4K60 AV1 video that VLC played; the
+  same happened with a 640 × 360 AV1 clip and with an audio-only 44.1 kHz file, while 48 kHz sound and playback
+  without sound were never affected). The level is now counted in bytes, which add up exactly. The 4K60 AV1 video
+  plays in software at 59.9 frames a second past 75 s (it stopped at 31.5 s before), and `build/aqlevel-test` checks
+  that the level comes back to zero after 70 s of 44.1 kHz chunks split as the ring takes them.
+
+- **GTK apps from Flathub use LordOS's font, in development** (`docs/FLATPAK.md`, "Fonts"). A GTK 3 app such as CPU-X
+  drew its text in DejaVu Sans 11, bigger, wider and softer than the desktop's: the settings portal gave GTK no font
+  keys, so it fell back to its built-in `Adwaita Sans 11`, which isn't installed, and the sandbox couldn't see Inter
+  (it sees only the host's `/usr/share/fonts`). Checked offline inside CPU-X's sandbox (`ReadAll` gave no font key;
+  `fc-match` of both names gave DejaVu Sans). lord-server's settings portal (`server/src/ui/portal.c`) now serves
+  `font-name` and `document-font-name` `Inter 10`, `monospace-font-name` `JetBrains Mono 10`, `font-antialiasing`
+  `grayscale` (as LordOS draws its own text), `font-hinting` `slight`, `font-rgba-order` `rgb`, `text-scaling-factor`
+  `1.0` and `icon-theme` `Adwaita` in `org.gnome.desktop.interface`, the three antialiasing keys also in
+  `org.gnome.settings-daemon.plugins.xsettings` for older runtimes, with `SettingChanged` when the fonts appear or go;
+  without LordOS's fonts it names fontconfig's `Sans 10` and `Monospace 10`. The same keys go to the GSettings keyfile
+  for GTK 3 apps outside Flatpak. The lordos package also installs Inter and JetBrains Mono in
+  `/usr/share/fonts/truetype/lordos` (copies; fontconfig's dpkg trigger refreshes its cache; new files, no migration),
+  and the SBOM lists each font's checksum once. No new privilege: the portal only answers with fixed values. Cursor
+  theme and size aren't served: GTK asks for cursors by shape and LordOS draws them. Tests: `build/portal-gs-test`
+  (every key through `ReadOne` and `ReadAll`, and the keyfile) and `tests/gtk_defaults_test.mjs` (the font folder
+  against `mkdeb.sh`, the values against Debian's schema).
+- **Machines: a click lands where the pointer is, in development** (`docs/VIRTUALIZATION.md` 6.25, "Buttons in both
+  modes"). On a guest with an Intel GVT-g vGPU, right-click did nothing while the mouse was free (the tablet)
+  and worked while captured. lord-vmdisplay sent a button to QEMU as soon as it arrived, but the pointer's position that
+  the machine's window sends just before it only at the end of its turn. So the tablet pressed at the previous position
+  and then moved with the button down: a short drag, which the guest's shell doesn't take as a right-click. Now any motion
+  gathered so far goes out before each button and wheel step, free and captured. To be confirmed on that machine.
+- **Machines: QEMU's "Failed to call update: Timeout was reached" explained, and lord-vmdisplay's answers measured, in
+  development** (`docs/VIRTUALIZATION.md` 3.2). QEMU gives each display listener call 1 s. lord-vmdisplay answers every
+  call from its loop at once, or holds an `UpdateDMABUF` for lord-server 250 ms at most, and never waits on QEMU. The new
+  `build/vmdisplay-test` (a mock QEMU display and a mock lord-server, in `make test`) checks it: with lord-server reading
+  every frame, reading none, slow with the picture after a resize to 1920x1080, and 200 updates at once with input
+  arriving, every call is answered and the slowest takes 251 ms. It also checks that buttons follow the pointer's position.
+  The likely source of the timeouts is QEMU itself: when it sends a new picture buffer (`ScanoutDMABUF`) or `Disable`, it
+  throws away the updates still in its queue (`ui/dbus-listener.c`), and those calls never get an answer. On a GVT-g
+  machine that doesn't stop the picture. To tell the two causes apart in a real session, lord-vmdisplay now logs a turn of
+  its loop that took 200 ms or more, and at the end how many answers it held and the longest. Not fixed, and noted: QEMU
+  keeps calling a display connection after it closed, about 66 log lines a second in `lord-vm.log`.
 - **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
   copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it
@@ -1051,7 +2138,42 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Raspberry Pi build (`server/src/apps.c`).
 
 ### Security
+- **The Wayland table importer no longer runs code from wayland.app** (`tools/wayland-app-import.mjs`, a maintainer
+  tool, new in development; found by the pre-merge security scan). It cut the protocol registry and each
+  `JSON.parse('...')` module out of wayland.app's JavaScript bundle and evaluated them with `Function()`, so whoever
+  controlled that third-party bundle could run code on the maintainer's machine when the table was refreshed; the
+  string scan also let an escaped backslash before a quote end the literal early. The bundle is now read by a small
+  literal reader (`readLiteral`, `readString`): string, number and boolean literals, arrays, objects, the bundle's own
+  string enum members and module references only, with JavaScript's escape rules, a depth limit and no
+  `__proto__`/`constructor` keys; anything else is refused and nothing in the bundle ever runs. Test:
+  `server/tests/wayland_import_test.mjs` (both breakouts refused, nothing executed).
 
+- **Machines: keys typed in another window never reach a machine, in development** (`docs/VIRTUALIZATION.md` 5.8;
+  `sdk/components.jsx` `AppHost`/`FloatingWindows`, `sdk/windows.js` `wm.hasKeyboard`/`setFullscreen`,
+  `sdk/desktopmodel.js` `keyboardWindow`, `sdk/kbinhibit.js`, `apps/machines/vmwindow.jsx`, `appsmode.jsx`, `model.js`).
+  Reported on a real session: typing in LordOS's Terminal also typed into the guest of a running machine (its beeps were heard). Every
+  key of the session reaches every key listener, and a machine sent keys to its guest whenever its own `focused` flag was
+  true, and that flag could be true for two windows at once: `FloatingWindows` gave every full-screen window of the
+  desktop the keys, while the theme gave them to its top framed window too. With a machine full screen on one display and
+  the Terminal on another, a password typed in the Terminal went into the guest; a system prompt (a password, the
+  keyring), the search or the launcher open over the machine window sent their keys there as well.
+  - **At each key.** The machine window (picture and serial console), every apps mode window and the Keys panel's held
+    keys ask `wm.hasKeyboard(window)` for each key, not a flag from the last render: the front window of the showing
+    desktop, with no search, launcher, sheet or system prompt holding the keyboard (the same rule as a Linux app's
+    Wayland keyboard). The first key typed elsewhere lets go of everything held in the guest, the held Win or Ctrl
+    included, and a release goes to the guest only for a press that went there (`model.js` `guestKeys`).
+  - **One focused window.** `AppHost` is focused only when it is also `wm.focused()`, in every theme and in isolated apps;
+    a press on a full-screen window brings it to the front (so it has its keys again), and going full screen brings the
+    window forward. The desktop's shortcuts held for a machine follow `wm.hasKeyboard` too.
+  - **No focus stealing in apps mode.** A window the guest opens or brings back takes the front only while you are in
+    that machine (its window or one of its windows in front); otherwise it opens behind the window you are typing in.
+  - lord-server needed no change: keys reach a guest only through `lord.vm.key`, capture mode takes only the mouse, and
+    lord-vmdisplay lets go of held keys when lord-server goes away (a session that re-attaches finds nothing held).
+  - Tested by `server/tests/vm_model_test.mjs` (focus moving to the Terminal or a search between keys: no `lord.vm.key`,
+    one release), `desktop_model_test.mjs` (`keyboardWindow`) and the new `vm_keys_scene.mjs` (run by `run_suites.sh`:
+    a framed and a full-screen machine with the Terminal in front, and a system prompt over the machine, through the real
+    `AppHost`, `FloatingWindows` and `__lordKey`; it fails on the code before this change). `focus_scene.mjs` and
+    `list_scene.mjs` now open their window, since an `AppHost` is focused only as the front window.
 - **Machines: the clipboard goes into and out of a machine only while you use it, and into it only when something
   there pastes** (`docs/VIRTUALIZATION.md` 6.8; `server/src/vm/vmagent.[ch]`, `lordvm.c`, `ui/js_vm.c`,
   `apps/machines/vmwindow.jsx`, `appsmode.jsx`, `model.js`, `tools/guest-win`, `tools/guest`). A guest is untrusted
@@ -1098,6 +2220,68 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   showed. The check now allows every known bit.
 
 ### Changed
+
+- **What is captured now: one green pill by the clock, in development** (`sdk/capturestatus.jsx`, `sdk/capturemodel.js`,
+  `sdk/privacy.js`, `sdk/share.js`, `sdk/media.js`, `sdk/hardware.jsx`, `server/src/sec/pwguard.c`,
+  `server/src/ui/portal.c`, `docs/PRIVACY.md` "What is captured now", `docs/SCREEN-SHARING.md`, `docs/WAYLAND.md`). The
+  red floating pill of each screen share ("● OBS Studio can see what you chose to share [Stop]") and the green and
+  orange camera and microphone dots are replaced by one status item by the clock, in every theme (Lord Flow, Lord
+  Classic — also its taskbar on the side, Lord Workspaces, Lord Celeste): a green pill whose glyph says what is captured
+  right now, system-wide — a display (the screen, a window, a screenshot just taken), a microphone, a video camera, a
+  display with a microphone badge, a camera with a microphone badge, or a display with a camera badge (screen and
+  camera, with or without the microphone). Clicked, it lists one row per app — its icon, its name, what it captures
+  (screen, a window, screens and windows, camera, microphone; "may use your mouse and keyboard" for a share with input)
+  — with **Stop sharing** (the share's own stop: `lord.share.stop`, `lord.portal.castStop`) and **Turn off for this app**
+  (the app's camera or microphone permission for a native or `.lpk` app — an isolated app loses the device at once, a
+  native app's `lord.media` sources close; the firewall's `no-camera`, `no-mic` or `no-screen` restriction for a Linux
+  or Flatpak app, which the PipeWire guard applies within a second). A native app's camera shows a live preview from its
+  own `lord.media` source; the footer opens Settings → Privacy ("Camera and microphone settings…"). It is a security
+  indicator: there is no setting to hide it, a share's frames still wait for it (`lord.share.shown`,
+  `lord.portal.castShown`), and while a window is full screen a small copy of the pill stays in the top right corner of
+  each display. Screen readers read it as "Screen and microphone in use" and so on.
+  New source: lord-server's PipeWire guard now also follows the links from a microphone, a camera or a shared screen
+  into each capture stream and reports who owns them (hw event `capture-use`), so a Linux or Flatpak app recording the
+  microphone or using the camera through PipeWire shows too, named only after the same checks as its restrictions (a
+  PulseAudio client's `application.process.id` is always verified for this); anything it can't name shows as "An
+  unknown program". The ScreenCast portal now says whether a session shares screens, windows or both. Settings →
+  Privacy's "in use" list includes Linux apps too. Not covered: a program that opens `/dev/video*` or an ALSA capture
+  device itself, without PipeWire. Tested by `server/tests/capture_model_test.mjs` (the glyph for each combination, one
+  row per app across sources, what each button does) and new cases in `build/pwguard-test`. The old pill's texts are
+  removed from every language; the new ones are in all 35.
+- **Screenshots: a thin floating toolbar instead of the panel window, in development** (`apps/screenshots/toolbar.jsx`,
+  `toolbarmodel.js`, `state.js`; `docs/MEDIA.md`). ❖⇧5 (or opening Screenshots) no longer opens the big "Screenshots"
+  window that covered the screen: a compact dark bar shows near the bottom center, translucent and
+  blurred where the theme has blur (Settings' effects on), with a soft shadow and a hairline border. Left to right: a
+  grip (drag it anywhere, to any display; it opens there next time, as the reading-aloud player), Close, the capture
+  modes (Entire Screen, Selected Window, Selected Portion), the recording modes (Record Entire Screen, Record Selected
+  Portion), Color and Text (OCR) as small icons, Options ⌄ and the primary Capture or Record button. Icons only, each
+  with a tooltip (the ❖⇧3 and ❖⇧4 shortcuts in theirs); the chosen mode is lit and kept. Options is grouped in sections:
+  dimmed section headers and separators: **Save to** Desktop, Documents, Pictures (the Screenshots folder, the
+  default), Clipboard, Mail (a new message with the capture attached, when Mail is installed), Markup Editor (opens
+  on the capture at once) and Other Location… (a folder chosen in the file dialog, remembered); **Timer** None, 5 or
+  10 seconds; **Microphone** None or a device, for recordings; **Options** Show Floating Thumbnail, Remember Last
+  Selection, Show Mouse Pointer in Recordings; then "Protect the front window from captures" (was the panel's Privacy
+  menu) and **Recent**, a page of its own instead of the panel's list. Keys while the bar shows: Esc closes it, Enter
+  captures, ← → go through its items (Enter or Space presses one), ↓ on Options opens it and ↑ ↓ go through its rows.
+  ❖⇧3, ❖⇧4, Print Screen, Space/C/T/Esc in the selection and ❖⇧5 to stop a recording are unchanged.
+  - **Record Selected Portion is new**: `media.screenRecord` takes `region` (logical pixels; lord-server records only
+    that part of the main display, even-sized) and `cursor` (0 leaves the pointer out of the video;
+    `server/src/media/capture.c`, `ui/js_media.c`). The area is drawn over a still and confirmed with Record or Enter.
+  - **Remember Last Selection**: ❖⇧4 and the toolbar's Selected Portion bring back the last area with eight handles to
+    resize it and its inside to move it; Enter or its Capture button takes it. Without the option, a drag takes the
+    area at once, as before.
+  - The floating thumbnail stays in the main display's bottom-right corner for a few seconds and a click opens the
+    markup editor; Show Floating Thumbnail off skips it. Dragging the thumbnail to save it elsewhere is not done.
+  - The older settings' "Only copy to the clipboard" reads as Save to → Clipboard, and the old key follows the choice,
+    so nothing is lost either way (no settings migration). The panel's texts (its mode labels, shortcut line,
+    "Record the microphone", "Only copy…") are removed from every language; the toolbar's are in all 35.
+  - SDK: a bare picture-in-picture window (`wm.setPip(id, { …, bare: true })`) is drawn without the black box, drag
+    and resize handle, so an app can draw its own floating shape; menus, popovers and tooltips opened from a floating
+    window place themselves on its display instead of inside its small box (`sdk/controls.jsx`); `Enter` can be named
+    in `addShortcuts`; `placeFloatingBar`/`rememberFloatingBar` export the reading-aloud player's placement.
+  - Tests: `screenshots_toolbar_model_test.mjs` (56 checks: options read back and kept, the old key, modes, the keys'
+    order, Save to's folders, the remembered area and its handles) and `screenshots_toolbar_scene.mjs` (25: modes lit
+    and chosen, Capture/Record, the Options sections and their choices saved, Recent, Close/Color/Text).
 
 - **Chromium and Electron apps from Flathub install and work; the Store no longer marks them "not yet supported"**
   (`apps/store/flathubpages.js`, `sdk/flathubmodel.js`, `docs/FLATPAK.md`). Their helpers' sub-sandboxes are now served

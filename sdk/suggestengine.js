@@ -46,6 +46,8 @@ export function matches(cond, facts) {
     case 'virtio': return arr(facts.virtio).some((n) => arr(v).includes(n));
     case 'compatible': return arr(facts.compatible).some((n) => arr(v).includes(n));
     case 'arch': return arr(v).includes(str(facts.arch));
+    // a USB device with an interface of one of these classes (two hex digits: "0e" video, a webcam)
+    case 'usbClass': return arr(facts.usb).some((d) => arr(d.ifaces).some((i) => arr(v).includes(str(i).slice(0, 2))));
     default: return false;                       // an unknown condition never matches
   }
 }
@@ -134,7 +136,10 @@ function usbSuggestions(data, facts, info, check) {
   return out;
 }
 
-function firmwarePackage(map, file) {
+// notShipped: prefixes of files a driver asks for that no package has (i915/gvt/…golden_hw_state: GVT-g's own cache of
+// a vGPU's starting state, which it builds itself when the file isn't there), never offered as missing firmware
+function firmwarePackage(map, file, notShipped) {
+  if (arr(notShipped).some((p) => typeof p === 'string' && p && file.startsWith(p))) return null;
   return arr(map).find((m) => m && typeof m.prefix === 'string' && m.prefix && file.startsWith(m.prefix)) || null;
 }
 
@@ -143,7 +148,7 @@ function firmwareSuggestions(data, facts, info, check) {
   const groups = new Map();                       // package → { kind, files, drivers }
   for (const m of arr(facts.firmware?.missing)) {
     const file = str(m.file);
-    const hit = file && firmwarePackage(fw.map, file);
+    const hit = file && firmwarePackage(fw.map, file, fw.notShipped);
     if (!hit || !PKG.test(hit.package)) continue;
     const g = groups.get(hit.package) || { kind: hit.kind, files: [], drivers: [] };
     if (!g.files.includes(file)) g.files.push(file);

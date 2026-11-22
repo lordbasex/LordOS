@@ -314,5 +314,11 @@
   "src.wine": "Wine",
   "src.android": "Apl Android",
   "soon": "Akan datang",
-  "sub.all": "Semua"
+  "sub.all": "Semua",
+  "suggest.studioCamera.title": "LordOS Studio Camera",
+  "suggest.studioCamera.why": "Kami mengesan kamera.",
+  "suggest.studioCamera.detail": "Memberi semua apl, termasuk pelayar dan panggilan video, kamera “LordOS Studio” dengan kesan anda: latar belakang kabur atau gambar di belakang anda ({packages}).",
+  "suggest.studioCamera.unavailable": "{packages} tiada dalam sumber pakej komputer ini.",
+  "suggest.studioCamera.note.dkms": "Pada PC, modul kernelnya dibina untuk kernel anda pada komputer ini (DKMS), yang membawa kira-kira 500 MB pengkompil dan pengepala kernel, dan dibina semula selepas setiap kemas kini kernel. Pada Raspberry Pi ia disertakan dengan kernel LordOS.",
+  "suggest.studioCamera.note.secureBoot": "Dengan Secure Boot dihidupkan, anda perlu mendaftarkan kunci tandatangan modul pada mula semula seterusnya, jika tidak kamera tidak akan muncul."
 }

@@ -1,0 +1,17 @@
+# LordOS inside a Machines virtual machine (docs/VIRTUALIZATION.md 6.17, 7.2): lordos-guest, the guest's side of
+# Machines' agent (clipboard, display, apps mode through this lord-server's lordos-guestwin.sock), for the person
+# signed in. It starts only where the machine's guest agent is on (the port org.lordos.agent exists, 71-lordos-guest.rules
+# lets the seat's person open it); anywhere else the condition fails and nothing runs. lordos-guest never runs anything
+# the host names. Machines' Install Agent writes /etc/systemd/user/lordos-guest.service in other guests, which takes
+# precedence over this file under the same name: one helper either way.
+[Unit]
+Description=LordOS Machines guest agent (clipboard, apps mode)
+ConditionPathExists=/dev/virtio-ports/org.lordos.agent
+
+[Service]
+ExecStart=/usr/lib/lordos/guest/lordos-guest
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

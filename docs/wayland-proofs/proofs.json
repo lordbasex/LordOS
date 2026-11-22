@@ -1,0 +1,141 @@
+{
+ "date": "2026-11-22",
+ "results": [
+  {
+   "name": "wl_subcompositor-wp_viewporter",
+   "result": "pass",
+   "app": "build/wlproof-client (tests/wlproof_client.c, purpose-built)",
+   "version": "this tree",
+   "shows": "Subsurface order and viewport: red placed above green (place_above), blue placed below the window (place_below, seen only through its transparent right third), and a 64×64 four-colour buffer cropped to its white quadrant and scaled to 100×100 (wp_viewport set_source + set_destination).",
+   "alive": true,
+   "errors": [],
+   "found": [
+    {
+     "w": "wl_subsurface#\\d+\\.place_above",
+     "n": 1
+    },
+    {
+     "w": "wl_subsurface#\\d+\\.place_below",
+     "n": 1
+    },
+    {
+     "w": "wp_viewport#\\d+\\.set_source",
+     "n": 1
+    }
+   ],
+   "png": "wl_subcompositor-wp_viewporter.png"
+  },
+  {
+   "name": "xdg_wm_base-foot",
+   "result": "pass",
+   "app": "foot",
+   "version": "foot 1.21.0-2",
+   "shows": "foot (wayland-native terminal) mapped and focused: it answered xdg_wm_base.ping with pong, acked each configure once (invalid_serial is now enforced), and asked for the theme's frame through xdg-decoration.",
+   "alive": true,
+   "errors": [],
+   "found": [
+    {
+     "w": "xdg_wm_base#\\d+\\.pong",
+     "n": 1
+    },
+    {
+     "w": "xdg_surface#\\d+\\.ack_configure",
+     "n": 2
+    },
+    {
+     "w": "zxdg_toplevel_decoration_v1#\\d+\\.set_mode",
+     "n": 1
+    }
+   ],
+   "png": "xdg_wm_base-foot.png"
+  },
+  {
+   "name": "xdg_wm_base-gtk4-zenity",
+   "result": "pass",
+   "app": "zenity (GTK 4, libadwaita)",
+   "version": "zenity 4.1.90-1, GTK 4.18.6+ds-2",
+   "shows": "A GTK 4 / libadwaita dialog with its own decorations: GTK 4 answers ping, acks configures once and creates its xdg_surface before any buffer (invalid_surface_state and unconfigured_buffer are now enforced).",
+   "alive": true,
+   "errors": [],
+   "found": [
+    {
+     "w": "xdg_wm_base#\\d+\\.pong",
+     "n": 1
+    },
+    {
+     "w": "xdg_surface#\\d+\\.ack_configure",
+     "n": 2
+    }
+   ],
+   "png": "xdg_wm_base-gtk4-zenity.png"
+  },
+  {
+   "name": "xdg_wm_base-qt-featherpad",
+   "result": "pass",
+   "app": "FeatherPad (Qt 6)",
+   "version": "featherpad 1.6.1-1, Qt 6.8.2+dfsg-9+deb13u2",
+   "shows": "A Qt 6 editor (FeatherPad) on Wayland: xdg-shell with the new error checks, xdg-decoration (server-side frame from the theme).",
+   "alive": true,
+   "errors": [],
+   "found": [
+    {
+     "w": "xdg_wm_base#\\d+\\.pong",
+     "n": 1
+    },
+    {
+     "w": "xdg_surface#\\d+\\.ack_configure",
+     "n": 2
+    }
+   ],
+   "png": "xdg_wm_base-qt-featherpad.png"
+  },
+  {
+   "name": "linux-dmabuf-vkcube",
+   "result": "pass",
+   "app": "vkcube (Vulkan)",
+   "version": "vkcube 1.4.304.0+dfsg1-1, Mesa 25.0.7-2+deb13u1",
+   "shows": "vkcube through the Vulkan WSI: its buffers pass the new zwp_linux_buffer_params_v1 out_of_bounds checks (offset + stride × height inside each dmabuf).",
+   "alive": true,
+   "errors": [],
+   "found": [
+    {
+     "w": "wl_surface#\\d+\\.commit",
+     "n": 655
+    }
+   ],
+   "png": "linux-dmabuf-vkcube.png"
+  },
+  {
+   "name": "egl-es2gears",
+   "result": "pass",
+   "app": "es2gears_wayland (EGL / GLES2)",
+   "version": "mesa-utils 9.0.0-2+b2",
+   "shows": "An EGL client: its buffers (dmabuf or shm through Mesa's Wayland EGL) and xdg-shell flow pass the new checks.",
+   "alive": true,
+   "errors": [],
+   "found": [
+    {
+     "w": "wl_surface#\\d+\\.commit",
+     "n": 327
+    }
+   ],
+   "png": "egl-es2gears.png"
+  },
+  {
+   "name": "chromium",
+   "result": "pass",
+   "app": "Chromium",
+   "version": "Chromium 156.0.8078.79 built on Debian GNU/Linux 13 (trixie)",
+   "shows": "Chromium (Ozone/Wayland): subsurfaces, viewporter, xdg-shell, xdg-decoration, xdg-activation and the data device with the new error checks; no protocol error.",
+   "alive": true,
+   "errors": [],
+   "found": [
+    {
+     "w": "xdg_wm_base#\\d+\\.pong",
+     "n": 1
+    }
+   ],
+   "png": "chromium.png"
+  }
+ ]
+}

@@ -39,6 +39,16 @@ int edid_parse(const uint8_t *d, size_t len, Edid *e) {
     e->digital = d[20] >> 7;
     e->width_cm = d[21];
     e->height_cm = d[22];
+    {   /* 10-bit chromaticities: the two low bits of each in bytes 25 and 26, the high eight in 27..34 */
+        const int lo[8] = { d[25] >> 6, d[25] >> 4, d[25] >> 2, d[25], d[26] >> 6, d[26] >> 4, d[26] >> 2, d[26] };
+        int any0 = 0;
+        for (int i = 0; i < 8; i++) {
+            int v = d[27 + i] << 2 | (lo[i] & 3);
+            e->chroma[i] = (int)((v * 1000000LL + 512) / 1024);
+            if (!v) any0 = 1;
+        }
+        if (any0) memset(e->chroma, 0, sizeof e->chroma);
+    }
     for (int k = 0; k < 4; k++) {
         const uint8_t *x = d + 54 + 18 * k;
         if (x[0] || x[1]) {                          /* detailed timing */
