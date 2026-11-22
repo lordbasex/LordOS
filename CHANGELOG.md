@@ -772,7 +772,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Trust:** Bliss OS signs no list, so `assets/machines/systems.json` pins the one file, its SourceForge address and its
     SHA-256 (`735cb962…a68e`, 2 342 518 784 bytes), checked on 2026-11-22 against the project's own `.sha256` file, a download
     that day, and the MD5 SourceForge recorded at the upload (2024-10-12). The admin helper keeps the download only with that
-    hash (`vm-image-get`, as for the Windows evaluation and virtio-win); no address comes from the app.
+    hash (`vm-image-get`, as for the guest evaluation image and virtio-win); no address comes from the app.
   - **The machine:** a new `"machine"` field gives the card 4 vCPUs, 4 GB, a 32 GB disk and 3D graphics (virgl) whatever the
     profile, fitted to the computer (`cardSize`), on the usual q35 + UEFI virtio devices. Install is Bliss OS's own installer.
   - **What it says:** choosing the card shows the file with "SHA-256 pinned in LordOS's signed catalog" and a warning that Bliss
