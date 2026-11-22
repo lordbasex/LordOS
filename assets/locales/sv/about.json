@@ -44,5 +44,6 @@
   "version": "Version {v}",
   "versionChannel": "Version {v} · {channel}",
   "case": "Hölje",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Produktnamn och logotyper är varumärken som tillhör respektive ägare; LordOS är inte knutet till eller godkänt av dem. Logotyper laddas bara ner på begäran, från varje ägares webbplats, och visas bara på den här datorn."
 }

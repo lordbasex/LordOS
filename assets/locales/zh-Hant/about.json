@@ -42,5 +42,6 @@
   "version": "版本 {v}",
   "versionChannel": "版本 {v} · {channel}",
   "case": "機殼",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "產品名稱與標誌為其各自擁有者的商標；LordOS 與它們沒有關聯，也未獲得其背書。標誌僅在要求時從各擁有者的網站下載，且只在這台電腦上顯示。"
 }

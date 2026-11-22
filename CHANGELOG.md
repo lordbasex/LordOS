@@ -34,6 +34,52 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     started without a window and in its window, opened and powered off through a headless lord-server, and the
     requests the channel refuses).
 
+- **Machines: the library redesigned, Machines settings, profiles you can make and share, your own systems, in development**
+  (the approved mocks of 2026-11-22; `docs/VIRTUALIZATION.md` 5.1, 5.6, 5.6.1, 5.6.2; `docs/TRADEMARKS.md`).
+  - **Library** (`apps/machines/library.jsx`): toolbar with the gear (Machines settings), search, grid or list and +; chips
+    All, Running, Linux and the other system's, each with its count; the New machine card first; each card with its real
+    picture, a state pill, CPU and memory while it runs (the graphics card's name when off), ▶ or Open, its name, one line
+    "10 CPU · 8 GB · 64 GB · Bridged · Intel card" and a ··· menu with every action of before; list rows with CPU and memory
+    bars while running, else "Last used … ago", "Resumes where you left it" or its profile; running, memory and free disk at
+    the bottom. Arrows move the selection, Return opens or starts, Escape clears the search; the order moved to the View
+    menu; right-click and RTL as before. The library's old "Off" filter reads as All.
+  - **Machines settings** (its own window: the gear or Machine → Machines Settings…): General (library view and order, what
+    closing does, Storage and Requirements, the official logos switch), Profiles, Systems, Network (the card bridged
+    machines join), Graphics cards (what Settings → Graphics cards set up, with a link) and Keyboard and mouse (❖Esc, the
+    system-shortcuts permission, the mouse from the profile).
+  - **Profiles** (`profiles.js`): Productivity (default), Development, Games, 3D design and Light, plus your own (New,
+    Duplicate, Edit in six parts, Delete, Make default; `~/.config/lordos/machines/profiles/`). "On this computer" shows
+    what one gives here: never more than half of the processors, never more memory than machines may use, a graphics card
+    only when one is set up for machines, 3D only where it can be had. New Machine starts from the default profile (or the
+    one an added system names) and applies the rest after creating (network mode and ports, bridged card, clipboard
+    direction, transfer folder, shared folder, graphics card) with `lord.vm.set` while the machine is still off.
+    Productivity now gives the clipboard both ways and the transfer folder, as the mock says (the review still has the
+    switch). The legacy Testing profile stays readable on existing machines.
+  - **.lordprofile files** (`format: "lordos-machine-profile/1"`): Export from the editor; Import with strict checks
+    (64 KB, known fields only and the unknown ones listed, ranges, port rules as Configure checks them, a shared folder
+    only under the home and not hidden, enums), fitted to this computer, and a summary sheet that shows everything,
+    including a system the file brings (full https address, size, SHA-256, signature fields), before anything is kept. A
+    profile never runs or downloads anything.
+  - **Systems** (`systems.js`, `download.js`): the catalog with Downloaded or "Download · size" (the same pinned, signed
+    machinery as the assistant), and "Added by you" (`~/.config/lordos/machines/systems.json`): name, kind, icon color,
+    default profile, manual install or without questions the way the catalog's preseed, autoinstall or kickstart installers
+    do, and the image: an ISO from the home folder (hashed at once) or an https address with its SHA-256 (required).
+    An address opens in the browser after a sheet with the full address and hash; the file in Downloads is hashed by
+    lord-vm and used only if it matches, and hashed again before a machine is made from it. An optional detached OpenPGP
+    signature and key fingerprint are kept and shown as "Signature: not checked by this version" (the design of a
+    sandboxed check is in the docs, not built). Added systems show in New Machine under "Added by you".
+  - **Official logos, opt-in** (maintainer's approval 2026-11-22): Machines settings → General → "Official logos of the
+    systems", off by default, with a confirmation notice; "Remove downloaded logos". PNG only (at most 512 KB and
+    1024 × 1024), pinned in the catalog with its SHA-256 and downloaded by the admin helper's existing `vm-image-get`, then
+    re-encoded by lord-media in its sandbox into `~/.cache/lordos/machines/logos/`. Listed only where the owner's policy
+    explicitly allows it: Debian's Open Use Logo. Ubuntu, Fedora, Kali and Linux Mint stay out (permission required,
+    restricted, or no official PNG), and so does the other system's. The Debian, Fedora and Kali SVG logos that shipped in
+    `assets/machines/logos` were removed: LordOS ships no third-party logo; its own drawn marks are the default and the
+    fallback. About shows a trademark notice. All new text in all 35 languages.
+  - Tests: `server/tests/vm_profiles_test.mjs` (profile reading, clamping and import with a fuzz pass, export round trip,
+    system validation: https only, 64-hex SHA-256, paths under the home; PNG header checks; the catalog's logos; chips,
+    search, the numbers line); `vm_catalog_test.mjs` checks logo entries.
+
 - **Machines: LordOS draws the pointer of a machine with the VirtIO GPU display-only driver, in development** (`docs/VIRTUALIZATION.md` 7.1.2,
   `docs/MACHINES-GPU.md` Part 1 step 2). The LordOS guest tools (`lordos-guest-win`) are now w5 and say `pointer`; lord-vm then sets
   viogpudo's `HWCursor` value through qemu-guest-agent with one fixed SYSTEM script (`PTR_PS`: only `VioGpuDod`

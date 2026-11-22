@@ -42,6 +42,7 @@ const DEFAULTS = {
   logs: null,                 // 0.8.9.1 (#199), Logs: { collapsed } the sidebar groups folded (sdk/logfile.js toggleGroup); new key, no migration
   editor: null,               // 0.8.8.8 (#113), Text Editor: { recent } File → Open Recent (apps/editor/recent.js); new key, no migration
   machinesView: null,         // 0.8.8.7, Machines' library: { view, sort, show } (apps/machines/model.js libView)
+  machinesDefaults: null,     // 0.8.9, Machines' defaults: { profile, bridge, logos } (apps/machines/store.js defaultsOf; logos: the official-logos switch, off unless the person turns it on)
   files: null,                // 0.8.7, Files → Settings (apps/files/prefs.js)
   pickerView: null,           // 0.8.8.3, the system file dialog's List / Thumbnails: { files, images } (sdk/filepickermodel.js viewFor)
   sessionSaved: null,         // { clean, windows } what was open; written by sessionrestore.jsx only

@@ -44,5 +44,6 @@
   "version": "Versio {v}",
   "versionChannel": "Versio {v} · {channel}",
   "case": "Kotelo",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Tuotenimet ja logot ovat omistajiensa tavaramerkkejä; LordOS ei ole sidoksissa niihin eivätkä ne ole hyväksyneet sitä. Logot ladataan vain pyynnöstä kunkin omistajan sivustolta, ja ne näytetään vain tässä tietokoneessa."
 }

@@ -42,5 +42,6 @@
   "version": "Phiên bản {v}",
   "versionChannel": "Phiên bản {v} · {channel}",
   "case": "Vỏ máy",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Tên sản phẩm và logo là thương hiệu của các chủ sở hữu tương ứng; LordOS không liên kết với họ và không được họ bảo trợ. Logo chỉ được tải về khi có yêu cầu, từ trang web của từng chủ sở hữu, và chỉ hiển thị trên máy tính này."
 }

@@ -12,11 +12,14 @@
 // Windows 11 (windows.js, 4.3): the person's own multi-edition ISO from Microsoft's page (found in Downloads and checked
 // against Microsoft's published SHA-256) or Microsoft's 90-day evaluation (downloaded by the helper); the machine is
 // made ready for it (secure boot, TPM 2.0, virtio-win drivers) and installs without questions or with Windows' own.
-import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, entryOf, listingNames, newest, pickImage, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor } from './catalog.js';
-import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, PROFILES, profileSize, gfxFor, no3dReason, winfspFor } from './model.js';
+import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard } from './model.js';
+import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
+import { customUnattended, systemState } from './systems.js';
+import { loadProfiles, loadSystems, defaultsOf, profileTitle } from './store.js';
 import { usePal, OsMark, Btn, Bar, gb, bytes } from './ui.jsx';
 import { SheetHeader, Pill, Round, Sym } from './kit.jsx';
 import { writeMeta } from './meta.js';
@@ -56,7 +59,13 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const [sys, setSys] = useState({ id: 'other', name: '' });
   const [ver, setVer] = useState('');
   const [arch, setArch] = useState(host.arch);
-  const [profile, setProfile] = useState('productivity');
+  // profiles (Machines settings → Profiles): LordOS's five and the person's own; the default one first chosen
+  const [own] = useState(loadProfiles);
+  const [customs] = useState(loadSystems);
+  const [profile, setProfile] = useState(() => defaultProfileId(defaultsOf(settings.get().machinesDefaults).profile, own));
+  const [custom, setCustom] = useState(null);     // a system the person added (systems.js), once its image is verified
+  const [shareOn, setShareOn] = useState(true);   // the profile's shared folder, confirmed in the review
+  const [gpuReady] = useState(() => { try { return !!gvtGpu(typeof lord !== 'undefined' && lord.vm?.gpus ? lord.vm.gpus() : null); } catch (e) { return false; } });
   const [name, setName] = useState('');
   const [rootPassword, setRootPassword] = useState('');
   const [customize, setCustomize] = useState(false);
@@ -83,12 +92,20 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   const other = host.arch === 'amd64' ? 'arm64' : 'amd64';
   const windows = source === 'windows';
   const winE = windowsEntry(CATALOG, arch);
-  const size = windows ? windowsSize(profileSize(profile, host), host) : profileSize(profile, host);
+  const prof = profileById(profile, own, host) || builtinProfile(DEFAULT_PROFILE, host);
+  // what the profile gives on this computer (half its processors at most, the memory machines may use here, a graphics
+  // card only when one is set up for machines)
+  const pv = onHost(prof, host, { gpuReady, no3d: arch !== host.arch ? 'arch' : no3dReason(host, windows, arch) });
+  const base = { vcpus: pv.vcpus, memoryMb: pv.memoryMb, diskGb: pv.diskGb, network: pv.network, gfx: prof.resources.graphics };
+  const size = windows ? windowsSize(base, host) : base;
+  const home = typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : '';
+  const shareDir = pv.share ? shareAbs(pv.share.path, home) : '';
+  const shareThere = (() => { if (!shareDir) return false; try { return !!fs.stat(shareDir)?.dir || !!fs.stat(shareDir)?.isDir; } catch (e) { return false; } })();
   const downloading = source === 'download';
   const evalFile = windows && win?.mode === 'eval' ? evalFiles(winE).find((f) => f.lang === win.lang) || evalFor(winE, hd.locale) : null;
   const winPath = windows ? (win?.mode === 'eval' ? evalFile?.name || '' : win?.phase === 'ready' ? win.iso.path : '') : '';
   // a download is checked as the ISO it will be (its file name), and made from the downloaded path
-  const d = { name, arch, vcpus: size.vcpus, memoryMb: size.memoryMb, diskGb: size.diskGb, network: size.network, source: source === 'iso' || downloading || windows ? 'iso' : 'import',
+  const d = { name, arch, vcpus: size.vcpus, memoryMb: size.memoryMb, diskGb: size.diskGb, network: size.network, source: source === 'iso' || source === 'custom' || downloading || windows ? 'iso' : 'import',
     path: downloading ? (dl?.image?.name || '') : windows ? winPath : path, rootPassword, shareClipboard: shareClip,
     // Design's 3D (6.10): Linux machines of this computer's architecture, where it can give them
     graphics: arch === host.arch ? gfxFor(size.gfx, host, windows, arch) : '2d' };
@@ -169,6 +186,15 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     return () => clearInterval(timer);
   }, [windows, win?.mode, win?.phase, arch]);
   useEffect(() => { if (windows) setUn((u) => ({ ...u, hostname: windowsHostname(name) })); }, [windows, name]);
+  // the clipboard both ways when the profile says so (the review's switch starts there)
+  useEffect(() => { setShareClip(pv.clipboard === 'both'); }, [profile]);
+  // a system the person added: its verified image, the profile it says
+  const pickCustom = (s) => {
+    pickSeq.current++;
+    setSource('custom'); setCustom(s); setDl(null); setAlt(null); setPicking(false); setPath(s.verified.path);
+    setSys({ id: s.kind === 'windows' ? 'windows' : 'other', name: s.name }); setVer(''); setName(suggestName({ name: s.name }, '', names));
+    if (profileById(s.profile, own, host)) setProfile(s.profile);
+  };
   const pickDownload = async (s, a = arch) => {
     if (s.kind === 'windows') { pickWindows(); return; }
     const seq = ++pickSeq.current;
@@ -192,9 +218,9 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     if (s) pickDownload(s, arch); else { setSource(null); setDl(null); }
   }, [arch]);
   // the image an unattended install boots, when it isn't the card's own: read once the switch is on
-  const uo = downloading && dl ? unattendedOf(CATALOG, dl.id, arch) : null;
+  const uo = downloading && dl ? unattendedOf(CATALOG, dl.id, arch) : source === 'custom' ? customUnattended(custom, CATALOG, arch) : null;
   const unOn = !!uo && un.on;
-  const needAlt = unOn && uo.image !== dl?.id;
+  const needAlt = unOn && downloading && uo.image !== dl?.id;
   useEffect(() => {
     if (!needAlt || (alt && alt.id === uo.image && alt.arch === arch && alt.phase !== 'error')) return;
     const seq = ++altSeq.current;
@@ -215,9 +241,22 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       setJob(0);
       if (r.ok) {
         // a Windows machine sets up its transfer folder (WinFsp) by itself once its guest tools are in (6.7.1)
-        writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' '), profile, ...(windows ? { transferSetup: true } : {}) });
+        writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' '), profile, onClose: pv.onClose, appsMode: pv.appsMode, input: pv.input,
+          ...(source === 'custom' && custom?.kind === 'linux' ? { family: 'linux' } : {}), ...(windows ? { transferSetup: true } : {}) });
         const m = lord.vm.list().find((x) => x.dir === r.dir);
-        if (customize) onConfigure(m || null); else onCreated(m || null);
+        const done = () => { if (customize) onConfigure(m || null); else onCreated(m || null); };
+        // what lord.vm.create doesn't take (the network mode and its ports, the clipboard's way, the transfer folder, the
+        // shared folder, the graphics card): lord.vm.set while the new machine is still off
+        const patch = setPatch(pv, { bridge: defaultCard(host.cards, defaultsOf(settings.get().machinesDefaults).bridge), shareAbsPath: shareOn && shareThere ? shareDir : '' });
+        const sid = Object.keys(patch).length ? lord.vm.set(r.dir, patch) : 0;
+        if (!sid) { done(); return; }
+        const t2 = setInterval(() => {
+          const q = lord.vm.job(sid);
+          if (q && !q.done) return;
+          clearInterval(t2);
+          if (q && !q.ok) setFail(q.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || tr('machines.cfg.refused'));
+          else done();
+        }, 300);
       } else setFail(r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim() || '?');
     }, 300);
     return () => clearInterval(timer);
@@ -262,6 +301,26 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
     setFail(null); setStopped(false);
     if (windows) { await createWindows(); return; }
     let iso = null;
+    if (source === 'custom') {
+      // a system the person added: its image hashed again now, and used only if it is still the one they verified
+      setStep(4); setGot({ done: 0, total: 100, checking: true });
+      const ok = await new Promise((res) => {
+        const id = lord.vm.hash(custom.verified.path);
+        if (!id) { res(false); return; }
+        const t3 = setInterval(() => {
+          const r = lord.vm.job(id);
+          if (!r) return;
+          let pct = 0, sha = '';
+          for (const l of String(r.out || '').trim().split('\n')) { try { const o = JSON.parse(l); if (typeof o.progress === 'number') pct = o.progress; if (o.sha256) sha = o.sha256; } catch (e) { /* partial */ } }
+          if (!r.done) { setGot({ done: pct, total: 100, checking: true }); return; }
+          clearInterval(t3);
+          res(r.ok && sha.toLowerCase() === custom.sha256);
+        }, 400);
+      });
+      setGot(null);
+      if (!ok) { setFail(tr('machines.set.sys.shaMismatch', { file: custom.verified.path.split('/').pop() })); return; }
+      iso = custom.verified.path;
+    }
     if (downloading) {
       setStep(4); setGot({ done: 0, total: inst.image.size || 0 }); cancelled.current = false;
       try {
@@ -317,6 +376,19 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
         {row.length < 4 ? Array.from({ length: 4 - row.length }, (_, k) => <View key={`f${k}`} style={{ flex: 1 }} />) : null}
       </View>
     ))}
+    {customs.length ? <>
+      <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.set.sys.yours')}</Text>
+      {rowsOf(customs, 4).map((row, i) => (
+        <View key={`c${i}`} style={{ flexDirection: 'row', gap: 12 }}>
+          {row.map((s) => {
+            const ready = systemState(s) === 'ready';
+            return <Tile key={s.id} height={118} selected={source === 'custom' && custom?.id === s.id} disabled={!ready} mark={<OsMark id="other" color={s.color} letter={s.name} size={40} />}
+              title={s.name} hint={ready ? tr('machines.set.sys.verified') : tr('machines.as.customNotReady')} onClick={() => pickCustom(s)} />;
+          })}
+          {row.length < 4 ? Array.from({ length: 4 - row.length }, (_, k) => <View key={`f${k}`} style={{ flex: 1 }} />) : null}
+        </View>
+      ))}
+    </> : null}
     <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.as.own')}</Text>
     <View style={{ flexDirection: 'row', gap: 12 }}>
       <Tile title={tr('machines.as.iso')} hint={fileHint('iso')} selected={source === 'iso'} onClick={() => { pickSeq.current++; setDl(null); if (source !== 'iso') setPath(''); setSource('iso'); setPicking(true); }} />
@@ -348,18 +420,19 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   </>;
   else if (step === 1) {
     // the mock "Profiles": two columns of cards, each with what it's for and what it gives on this computer
+    const all = allProfiles(own, host);
     const rows = [];
-    for (let i = 0; i < PROFILES.length; i += 2) rows.push(PROFILES.slice(i, i + 2));
+    for (let i = 0; i < all.length; i += 2) rows.push(all.slice(i, i + 2));
     body = <>
     <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start' }}>{tr('machines.as.profileFits', { cpus: host.cpus, mem: gb(host.ramMb) })}</Text>
     {rows.map((r, i) => (
       <View key={i} style={{ flexDirection: 'row', gap: 12 }}>
-        {r.map((k) => { const s = profileSize(k, host); return (
+        {r.map((pr) => { const k = pr.id; const s = onHost(pr, host, { gpuReady, no3d: arch !== host.arch ? 'arch' : no3dReason(host, windows, arch) }); return (
           <View key={k} onClick={() => setProfile(k)} style={{ flex: 1, minHeight: 92, paddingHorizontal: 14, paddingVertical: 10, gap: 4, borderRadius: 10,
             backgroundColor: p.card, border: `2px solid ${profile === k ? p.accent : p.line}` }}>
-            <Text style={{ fontSize: 14, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr(`machines.as.profile.${k}`)}</Text>
-            <Text style={{ fontSize: 12, lineHeight: 1.4, color: p.dim, textAlign: 'start' }}>{tr(`machines.as.profileHint.${k}`)}</Text>
-            <Text style={{ fontSize: 12, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.as.spec', { cpus: s.vcpus, mem: gb(s.memoryMb), gfx: tr(`machines.as.gfx.${s.gfx}`) })}</Text>
+            <Text style={{ fontSize: 14, fontWeight: 600, color: p.text, textAlign: 'start' }}>{profileTitle(pr)}</Text>
+            <Text style={{ fontSize: 12, lineHeight: 1.4, color: p.dim, textAlign: 'start' }}>{pr.builtin ? tr(`machines.as.profileHint.${k}`) : pr.description || tr('machines.set.prof.yours')}</Text>
+            <Text style={{ fontSize: 12, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.as.spec', { cpus: s.vcpus, mem: gb(s.memoryMb), gfx: tr(`machines.as.gfx.${pr.resources.graphics}`) })}</Text>
           </View>); })}
         {r.length < 2 ? <View style={{ flex: 1 }} /> : null}
       </View>
@@ -453,8 +526,8 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
       [tr('machines.as.r.arch'), emulated ? `${arch}, ${tr('machines.emulatedLower')}` : arch],
       [tr('machines.as.r.cpu'), tr('machines.vcpus', { n: size.vcpus })],
       [tr('machines.as.r.memory'), gb(size.memoryMb)],
-      [tr('machines.as.r.disk'), source === 'iso' || downloading ? tr('machines.as.r.diskNew', { n: size.diskGb }) : tr('machines.as.r.diskCopy', { n: size.diskGb })],
-      [tr('machines.as.r.profile'), tr(`machines.as.profile.${profile}`)],
+      [tr('machines.as.r.disk'), source === 'iso' || source === 'custom' || downloading ? tr('machines.as.r.diskNew', { n: size.diskGb }) : tr('machines.as.r.diskCopy', { n: size.diskGb })],
+      [tr('machines.as.r.profile'), profileTitle(prof)],
       [tr('machines.as.r.network'), tr(`machines.cfg.net.${size.network}`)],
       [tr('machines.as.r.where'), `~/Machines/${name}.lordvm`],
     ];
@@ -467,12 +540,19 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
           </View>
         ))}
       </View>
-      {profile === 'productivity' ? (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
+        <Toggle on={shareClip} onChange={setShareClip} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.shareClip')}</Text>
+          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.shareClipHint')}</Text>
+        </View>
+      </View>
+      {pv.share ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
-          <Toggle on={shareClip} onChange={setShareClip} />
+          <Toggle on={shareOn && shareThere} onChange={setShareOn} />
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.shareClip')}</Text>
-            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.shareClipHint')}</Text>
+            <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.shareFolder', { path: pv.share.path, how: tr(pv.share.writable ? 'machines.set.imp.write' : 'machines.set.imp.read') })}</Text>
+            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{shareThere ? tr('machines.as.shareFolderHint') : tr('machines.as.shareFolderMissing')}</Text>
           </View>
         </View>
       ) : null}
@@ -495,11 +575,11 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   } else if (got && !fail) {
     // the download, with its progress; the helper checks the SHA-256 at the end
     const mb = bytes;
-    const checking = got.total > 0 && got.done >= got.total;
+    const checking = got.checking || (got.total > 0 && got.done >= got.total);
     body = (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
         <OsMark id={sys.id} size={72} />
-        <Text style={{ fontSize: 16, fontWeight: 700, color: p.text }}>{tr('machines.dl.downloading', { name: windows && got.file ? got.file : [sys.name, ver].filter(Boolean).join(' ') })}</Text>
+        <Text style={{ fontSize: 16, fontWeight: 700, color: p.text }}>{got.checking ? tr('machines.as.checkingImage', { name: sys.name }) : tr('machines.dl.downloading', { name: windows && got.file ? got.file : [sys.name, ver].filter(Boolean).join(' ') })}</Text>
         <View style={{ width: 360 }}><Bar frac={got.total ? got.done / got.total : 0} color={p.accent} /></View>
         <Text style={{ fontSize: 13, color: p.dim }}>{checking ? tr('machines.dl.checking') : got.total ? tr('machines.dl.progress', { a: mb(got.done), b: mb(got.total) }) : mb(got.done)}</Text>
         {got.resumed > 0 && !checking ? <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.dl.resumed', { size: mb(got.resumed) })}</Text> : null}
@@ -509,7 +589,7 @@ export function Assistant({ host, mode, names, onClose, onCreated, onConfigure, 
   } else body = (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 }}>
       <OsMark id={sys.id} size={72} />
-      <Text style={{ fontSize: 16, fontWeight: 700, color: p.text }}>{fail ? (downloading && !job ? tr('machines.dl.failed') : tr('machines.as.failed')) : source === 'iso' || downloading ? tr('machines.new.creating') : tr('machines.new.importing')}</Text>
+      <Text style={{ fontSize: 16, fontWeight: 700, color: p.text }}>{fail ? (downloading && !job ? tr('machines.dl.failed') : tr('machines.as.failed')) : source === 'iso' || source === 'custom' || downloading ? tr('machines.new.creating') : tr('machines.new.importing')}</Text>
       {fail ? <Text style={{ maxWidth: 560, fontSize: 13, color: '#ff453a', textAlign: 'center' }}>{fail}</Text>
         : <Text style={{ fontSize: 13, color: p.dim }}>{tr('machines.as.thenStart')}</Text>}
     </View>

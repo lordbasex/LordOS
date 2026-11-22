@@ -1412,6 +1412,20 @@ Name and icon: a generic name, ours (open decision 1). The icon is a screen hold
 
 ### 5.1 Control Center (main window)
 
+**Redesigned 2026-11-22 (the approved mocks "Main" and "List"; `apps/machines/library.jsx`).** Toolbar: the gear (Machines
+settings), search, grid or list, + (New machine). Chips: All, Running, Linux, Windows, each with its count (`chipCounts`,
+`familyOf`; settings `machinesView.show`). Grid: the New machine card first, then a card per machine: its picture (live while
+its window shows it, the last one when it's off) with the state pill, CPU and memory while running (or the graphics card's
+name when off), ▶ to start or resume, Open while running; its name and one line "10 CPU · 8 GB · 64 GB · Bridged · Intel
+card" (`specParts`); ··· with the machine's menu. List: picture, name and state in color, the same line, CPU and memory bars
+while running, else "Last used … ago", "Resumes where you left it" or its profile (`restLine`), ▶ or Open, ···. Bottom:
+running, memory, free disk (a click opens Storage). Arrows move the selection, Return opens or starts, Escape clears the
+search; the order is in the View menu. Machines settings (gear or the Machine menu): General, Profiles (5.6), Systems
+(5.6.1), Network, Graphics cards, Keyboard and mouse (`settingswin.jsx`).
+
+The original plan below is kept for reference.
+
+
 The library. A **summary header**, then a grid of machines, each with a **live picture** while running and the last picture when off. All in LordOS's own flat, modern style: real data in calm type, no imitation of physical equipment.
 
 **Header:** machines running of total, memory used of host total, free space on the library's volume, and two actions: **Disk** (the Storage window) and **New**.
@@ -1540,19 +1554,141 @@ Reachable from the bar and from `⋯`. Changes that need a power-off are marked 
 
 ### 5.6 Profiles
 
-Chosen when creating, changeable later. A profile only sets values shown in Configuration: nothing hidden. Numbers scale with host.
+**Built 2026-11-22 (in development, after 0.8.9.4), from the approved mocks "Settings", "ProfileEdit" and "ProfileImport".**
+Code: `apps/machines/profiles.js` (pure, `server/tests/vm_profiles_test.mjs`), `store.js`, `settingswin.jsx`, `assistant.jsx`.
 
-| Profile | vCPU (of host) | Memory | Graphics | Other |
-|---|---|---|---|---|
-| Productivity | half | 8 GB or 1/3 | 2D | Asks about folders and clipboard, Apps mode, suspend on close |
-| Software Development | three quarters | 16 GB or 1/2 | 2D | Port forwarding UI, serial console, nested if available, snapshots on |
-| Testing | half | 4 GB | 2D | Isolated network, snapshot before each boot, nothing shared, disposable mode |
-| Design | three quarters | 16 GB or 1/2 | 3D | Color-accurate full screen, tablet pointer |
-| Games | all but one | 2/3 | 3D (venus) | Hugepages, Faster guest, capture on, low-latency audio |
+A profile is the starting point of a new machine: only values, every one shown and changeable later in Configure. The New
+Machine assistant starts on the default profile (Machines settings → Profiles → Make default; `settings.machinesDefaults.profile`)
+or on the one an added system names, and its step 2 lists LordOS's five and the person's own.
 
-Only what the host can do appears: a Pi has no Games profile, shows a "Light desktop" one instead, and a virtio-win guest has 2D only so Design and Games say so.
+| Profile | Processors | Memory | Disk | Graphics | Network, integration, input |
+|---|---|---|---|---|---|
+| Productivity (default) | 4 | 8 GB or 1/3 of RAM | 64 GB | 3D where the system can | shared; clipboard both ways; transfer folder on |
+| Development | half | 16 GB or 1/2 | 80 GB | 2D | shared; clipboard both ways; transfer folder on |
+| Games | half | 16 GB or 1/2 | 128 GB | 3D; Intel card (shared) when one is set up | shared; mouse captured, captured in full screen |
+| 3D design | half | 32 GB or 1/2 | 80 GB | 3D | shared; clipboard both ways; transfer folder on |
+| Light | 2 | 4 GB or 1/2 | 40 GB | 2D | shared; nothing shared |
 
-**No profile shares anything by itself.** Productivity adds a question to the Review step, with its switches off: share Downloads read-only, share the clipboard, and in which direction. Testing starts on the Isolated network with the agent's shell off.
+**Fitted to this computer, always** (`onHost`): never more than half of its processors (`cpuCap`, also within
+`vcpusRecommended`), never more memory than machines may use here (`host.memMaxMb`, `memCap`), a graphics card only when
+Settings → Graphics cards set one up for machines (`gvtGpu`), 3D only where `no3dReason` allows. Machines settings shows the
+result as "On this computer"; the assistant creates with it.
+
+Note: the approved mock gives Productivity the clipboard both ways and the transfer folder; before 0.8.9 no profile shared
+anything by itself. The review step still shows the clipboard switch (now on for those profiles) and the person can turn it
+off; the transfer folder is the machine's own folder under ~/Machines (6.7.1), not the person's files.
+
+**What creating applies.** `lord.vm.create` takes CPU, memory, disk, shared or isolated network, the clipboard both ways and
+3D; right after, while the machine is still off, `lord.vm.set` gets the rest (`setPatch`): host-only or bridged network (the
+card from Machines settings → Network, else the first wired one up), its port rules, another clipboard direction, the
+transfer folder, the shared folder and the graphics card. `app.json` keeps the profile id, what closing the window does,
+apps mode and the keyboard and mouse choices (`meta.input`: `mouse` auto|capture, `shortcuts` ask|never,
+`captureFullscreen`). The machine window reads `meta.input` once mouse capture lands (separate branch); until then it is
+stored, shown and exported, and has no effect.
+
+**A profile's shared folder** is a path under the person's home, written `~/…`, no hidden folder and no `.`/`..` part
+(`sharePathOk`); the review step shows it with a switch, it is shared only if it exists, and lord-vm checks it again
+(`share_writable_ok`, never a folder that holds a protected file).
+
+**The person's profiles** live in `~/.config/lordos/machines/profiles/u-<8 hex>.json`, the same JSON as a `.lordprofile`
+plus their id: New, Duplicate, Edit (the six parts of the mock: identity, system, resources and graphics, network,
+integration, keyboard and mouse), Delete (moved to the Trash and out of it), Make default.
+
+#### The .lordprofile file
+
+```json
+{
+  "format": "lordos-machine-profile/1",
+  "name": "Linux Mint para oficina", "author": "Ana Pérez", "description": "", "color": "green",
+  "system": { "kind": "linux", "suggested": ["s-1a2b3c4d", "debian"],
+              "image": { "id": "s-1a2b3c4d", "name": "Linux Mint 22.1 Cinnamon", "kind": "linux", "install": "manual",
+                         "url": "https://…/linuxmint-22.1-cinnamon-64bit.iso", "sha256": "<64 hex>", "size": 2900000000,
+                         "signature": { "url": "https://…/sha256sum.txt.gpg", "sums": "https://…/sha256sum.txt", "fingerprint": "<40 or 64 hex>" } } },
+  "resources": { "cpus": 2, "memoryMb": 4096, "diskGb": 40, "graphics": "2d", "gpu": "" },
+  "network": { "mode": "hostonly", "ports": [{ "proto": "tcp", "host": 2222, "guest": 22, "open": "this-computer" }] },
+  "integration": { "clipboard": "off", "share": { "path": "~/Servidor", "writable": true }, "transfer": false, "appsMode": false, "onClose": "ask" },
+  "input": { "mouse": "auto", "shortcuts": "ask", "captureFullscreen": false },
+  "logo": { "url": "https://…/logo.png", "sha256": "<64 hex>" }
+}
+```
+
+Export writes it from the editor (a FilePicker save). Import (Machines settings → Profiles → Import…) reads it with
+`readProfile`, strictly: at most 64 KB; `format` must be exactly that; a name of 1–64 characters without control or bidi
+characters; known fields only (each unknown one listed: "«script»: unknown field, ignored. A profile can't run anything");
+enums (`NET_MODES`, clipboard, `CLOSE_CHOICES`, `GPU_CHOICES`, mouse, shortcuts, kind, color) fall back to the default and
+are listed; `cpus` 1–64 or "half", `memoryMb` 256 MB–1 TB, `diskGb` 1–16384, then fitted to this computer ("«cpus: 32»
+becomes 10: never more than half of this computer"); port rules are checked as Configure checks them (`portProblems`: host
+port 1024–65535, no duplicates, LAN not in host-only), at most 32, a wrong one dropped; suggested systems only those this
+computer knows (the catalog, the person's own, the one the file brings). The summary sheet (the mock "ProfileImport") shows
+all of it before anything is kept; Import keeps the profile and, when the file brings a system, adds it to "Added by you".
+A profile never executes or downloads anything by itself.
+
+### 5.6.1 Your own systems (Machines settings → Systems)
+
+The catalog (assets/machines/systems.json) with its state per architecture: Downloaded (an image of the card, or of the one
+its unattended install boots, is in /var/lib/lordos/machines/images) or "Download · size", which downloads it ahead of time
+through the same pinned and signed-list machinery as the assistant (`download.js`: vm-image-list, vm-image-get; the Windows
+card its evaluation in the person's language).
+
+**Added by you** (`systems.js`, `~/.config/lordos/machines/systems.json`, format `lordos-machine-systems/1`): name, kind
+(Linux, Windows, Other: the card's mark and the library's chips), icon color, default profile, install (manual, or without
+questions the way the catalog's Debian (preseed), Ubuntu (autoinstall) or Fedora (kickstart) installer does: the catalog
+entry of that kind gives kernel and initrd and lord-vm checks everything again; only for Linux), and the image:
+
+- **An ISO on this computer**, picked in the home folder: hashed at once (`lord.vm.hash`, lord-vm --sha256), its SHA-256 and
+  path kept as verified.
+- **An https address and its SHA-256** (required, 64 hex digits; `http://`, user names in the address, other schemes or a
+  path that isn't a plain file name are refused: `httpsUrl`, `fileOfUrl`). **How it downloads:** the admin helper's
+  `vm-image-get` takes only catalog ids and never an address from JS (AGENTS.md "Machines' pinned downloads"), and no other
+  downloader runs for the session, so this version opens the address in the person's browser after a sheet that shows the
+  full address, the size when known and the SHA-256; Machines watches Downloads for that file name (or a renamed copy),
+  hashes it with lord-vm and keeps it only if it matches ("Choose the file…" for one saved elsewhere). The image stays where
+  the browser put it (Downloads, in the home); its path is recorded only after the hash matched. Downloading inside the app
+  would need a new closed admin action (an address and hash from the person: a design question for the maintainer, not built).
+- **Signature (optional):** a detached OpenPGP signature over a checksum file, plus the project's key fingerprint (40 or 64
+  hex). Stored and shown as "Signature: not checked by this version": LordOS's OpenPGP verifier (`server/src/pkg` pgp.c) runs
+  only in the admin helper, against keys the catalog pins (vm-image-list), never against a key a person or a file names.
+
+**Design for a signature check (not built; needs maintainer review):** a sandboxed helper given three fds by lord-server (the
+signature, the checksum file, the person's chosen key file), `sandbox_apply_helper` before reading, no network, linking only
+the existing `pgp.c` code; it answers "good signature by <fingerprint> over <checksum file sha256>" or a code, and lord-server
+then requires the fingerprint to equal the one stored and the checksum file to list the image's name with its SHA-256. The
+key itself would be fetched by the person (WKD/keyserver lookups are another egress decision).
+
+**Before a machine is made from an added system** the assistant hashes the image again and refuses it if it changed
+("The SHA-256 of … doesn't match: it isn't used"). Added systems show in New Machine under "Added by you"; one not verified
+yet is shown dimmed. An added Windows image is made as a plain ISO machine (no TPM template or answer file: those are for
+the image Microsoft lists, 4.3.1).
+
+**Storage and fsops_protected.** Profiles, systems.json and the logos folder are written with lord.fs as the person. None of
+them launches anything or holds a permission, so they are not in `fsops_protected`; whatever they hold is validated again on
+every read (`readProfile`, `readSystems`), an image is used only after its SHA-256 matched, and lord-vm checks every value
+again. A program that can write the home folder could edit them, as it could edit the ISOs themselves; it can't make
+Machines download or run anything without the person pressing the button that shows the address.
+
+### 5.6.2 Official logos (opt-in)
+
+Approved by the maintainer 2026-11-22. LordOS ships no third-party logo (the Debian, Fedora and Kali SVGs that were in
+`assets/machines/logos` were removed); its own drawn marks are the default and the fallback. Machines settings → General →
+"Official logos of the systems", off by default; turning it on asks for confirmation with "The logos are downloaded from each
+project's official site and stay on this computer only. The marks belong to their owners." Off: no logo shows, at once.
+"Remove downloaded logos" deletes the PNGs.
+
+- **Which systems:** only those whose owner's policy explicitly lets a third party show the logo to identify its software
+  (docs/TRADEMARKS.md, checked 2026-11-22): **Debian** (Open Use Logo). Not Ubuntu (written permission), not Fedora (limited
+  to promoting the Fedora Project), not Kali (no commercial products without written permission), not Linux Mint (no
+  official PNG), never Windows.
+- **Format:** PNG only, at most 512 KB and 1024 × 1024 (`pngHeader`: signature, IHDR first, sane depth and color type).
+- **How:** each is a hidden catalog entry of kind `logo` (`logo-debian`, `for: debian`) with its https address, SHA-256 and
+  size pinned, so the admin helper's existing `vm-image-get` downloads it like any pinned file (the address from the
+  signed catalog, never from JS; kept only with that hash). The app then checks the bytes, copies them to
+  `~/.cache/lordos/machines/logos/.<sha>.download.png` and has lord-media re-encode them in its sandbox (`lord.media.edit`,
+  MW_EDIT, fds only) into `<sha256>.png`; the copy is deleted. Only the re-encoded PNG is shown. The helper's copy stays in
+  the root-owned image store (not listed in Storage); removing it needs the admin action `vm-image-remove`.
+- **Profiles and added systems** may carry `logo: { url, sha256 }` (PNG, https): validated, shown in the import summary
+  with "A logo in a profile is its author's responsibility: LordOS doesn't host or share it", exported as address and hash
+  only, never the image. This version doesn't download them (no downloader takes an address from JS).
+- About shows the trademark notice in every language.
 
 ### 5.7 What this computer can run
 
