@@ -108,6 +108,8 @@ const imgs = downloadedImages(CAT, entries, (sha) => { if (!infos[sha]) throw ne
 eq('images: which', imgs.map((x) => [x.sha[0], x.partial, x.size]), [['a', false, 790626304], ['b', true, 1000], ['d', false, 5]]);
 eq('images: labels', imgs.map((x) => [x.label, x.arch, x.id]), [['Debian 13.7', 'amd64', 'debian'], ['Kali 2026.3', 'amd64', 'kali'], ['', '', 'other']]);
 eq('images: users and running', [imgs[0].users, imgs[0].dirs, imgs[0].running, imgs[1].users], [['Deb', 'Deb 2'], ['/h/Deb.lordvm', '/h/Deb 2.lordvm'], ['Deb'], []]);
+eq('images: a system the person added shows its file and site, never the query', downloadedImages(CAT, [{ name: `${'c'.repeat(64)}.iso`, size: 5 }],
+  () => ({ id: 'user', arch: '', file: 'mint-22.iso', from: 'https://u:pw@mirror.example.org/mint-22.iso?token=SECRET' }), []).map((x) => [x.id, x.label]), [['other', 'mint-22.iso · mirror.example.org']]);
 eq('images: a part next to its image', downloadedImages(CAT, [{ name: `${A}.iso.part`, size: 3 }, { name: `${A}.iso`, size: 9 }], () => null, []).map((x) => [x.partial, x.size]), [[false, 9]]);
 eq('images: a bad info file', downloadedImages(CAT, [{ name: `${A}.iso`, size: 9 }], () => ({ id: 'debian', arch: 'x', file: '../../etc' }), [])[0].file, '');
 const st = { total: 1000, free: 100, machines: [{ total: 300 }], bases: [], isos: 250, trash: 10 };

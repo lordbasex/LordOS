@@ -11,6 +11,7 @@
 #include "http.h"
 #include "../errcode.h"
 #include "crypto.h"
+#include "pubhost.h"
 #include "../sec/cgroup.h"
 
 #include <ctype.h>
@@ -80,6 +81,7 @@ typedef struct {
     int out;                            /* pipe to the parent */
     char dead[DEAD_MAX][264];           /* "host:port" that didn't answer in this batch */
     int ndead;
+    int public_only;                    /* the item's (FetchItem.public_only) */
 } Conn;
 
 static long long mono_ms(void) {
@@ -183,9 +185,11 @@ static int conn_open(Conn *c, const char *host, const char *port, int tls, char 
     int r = getaddrinfo(host, port, &hints, &res);
     if (r) { mark_dead(c, host, port); lerr_set(err, errlen, "pkg.http.hostNotFound", "host", host, NULL); return -1; }
     long long end = mono_ms() + CONNECT_TOTAL_MS;
+    int skipped = 0;
     for (struct addrinfo *a = res; a; a = a->ai_next) {
         long long left = end - mono_ms();
         if (left <= 0) break;
+        if (c->public_only && !pubhost_addr_ok(a->ai_addr, a->ai_addrlen)) { skipped++; continue; }   /* never a LAN or loopback */
         int fd = socket(a->ai_family, a->ai_socktype | SOCK_CLOEXEC | SOCK_NONBLOCK, a->ai_protocol);
         if (fd < 0) continue;
         if (connect(fd, a->ai_addr, a->ai_addrlen) && errno != EINPROGRESS) { close(fd); continue; }
@@ -197,6 +201,7 @@ static int conn_open(Conn *c, const char *host, const char *port, int tls, char 
         break;
     }
     freeaddrinfo(res);
+    if (c->fd < 0 && skipped) { lerr_set(err, errlen, "pkg.http.notPublic", "host", host, NULL); return -1; }
     if (c->fd < 0) { mark_dead(c, host, port); lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
     c->tls = tls;
     if (tls && (c->fd = tls_start(c, c->fd, host, err, errlen)) < 0) return -1;
@@ -325,6 +330,8 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
         int tls;
         if (parse_url(url, host, sizeof host, port, sizeof port, &path, &tls)) { lerr_set(err, sizeof err, "pkg.http.badUrl", NULL); break; }
         if (was_tls && !tls) { lerr_set(err, sizeof err, "pkg.http.downgrade", NULL); break; }   /* https never back to http */
+        /* an address a person typed, and every redirect from it: https, port 443, a public DNS name */
+        if (it->public_only && (!tls || strcmp(port, "443") || !pubhost_name_ok(host))) { lerr_set(err, sizeof err, "pkg.http.notPublic", "host", host, NULL); break; }
         was_tls = tls;
         const char *defport = tls ? "443" : "80";
         int retry = c->fd >= 0;             /* a reused connection may have been closed */
@@ -519,7 +526,11 @@ int fetch_batch_in(FetchItem *items, int n, FetchProgress cb, void *ud, const ch
         if (drop_to_nobody()) _exit(2);
         static Conn c;
         c.fd = -1; c.out = 3; c.tls = 0; c.helper = 0; c.ndead = 0;
-        for (int i = 0; i < n; i++) get_one(&c, &items[i], (uint32_t)i, items[i].resumed);
+        for (int i = 0; i < n; i++) {
+            if (c.public_only != items[i].public_only) conn_close(&c);   /* never reuse a connection across the rule */
+            c.public_only = items[i].public_only;
+            get_one(&c, &items[i], (uint32_t)i, items[i].resumed);
+        }
         conn_close(&c);
         _exit(0);
     }

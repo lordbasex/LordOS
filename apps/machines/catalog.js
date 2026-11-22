@@ -2,6 +2,7 @@
 // 4.1 and 3.9, "The Linux download cards"): pure functions, tested by server/tests/vm_catalog_test.mjs. The admin
 // helper fetches the makers' lists and the images (vm-image-list, vm-image-get) and checks again everything chosen
 // here: the app only reads a list and names the newest file in it, with its SHA-256.
+import { hostOf, redactUrl } from './systems.js';
 
 // the cards for an architecture, in the catalog's order: { id, name, release, approxMb, kind }
 export function systemsFor(cat, arch) {
@@ -127,8 +128,11 @@ export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m)
       users.push(x.name); dirs.push(x.dir);
       if (runningOf(x)) running.push(x.name);
     }
+    // a system the person added (vm-image-get-user): its file and the site it came from (the helper wrote the address
+    // without its query; redacted again here all the same)
+    const from = info?.id === 'user' && typeof info.from === 'string' ? hostOf(redactUrl(info.from)) : '';
     out.set(m[1], { sha: m[1], path, partial, size: Number(e.size) || 0, id: sys ? sys.id : 'other', arch: info?.arch === 'arm64' || info?.arch === 'amd64' ? info.arch : '',
-      file, version, label: sys ? [sys.name, version].filter(Boolean).join(' ') : '', users, dirs, running });
+      file, version, label: sys ? [sys.name, version].filter(Boolean).join(' ') : file && from ? `${file} · ${from}` : '', users, dirs, running });
   }
   return [...out.values()].sort((a, b) => b.size - a.size || a.sha.localeCompare(b.sha));
 }

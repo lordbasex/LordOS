@@ -3,6 +3,7 @@
  * tests/vm_image_cli.c can run them like the helper does. */
 #include "vm_admin.h"
 #include "vmcatalog.h"
+#include "vmurl.h"
 #include "../pkg/http.h"
 
 #include <ctype.h>
@@ -15,6 +16,7 @@
 #include <string.h>
 #include <sys/file.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <time.h>
 #include <dirent.h>
 #include <unistd.h>
@@ -109,15 +111,17 @@ static int fetch_it(const char *url, const char *dest, uint64_t max, int resume,
 static int fetch_one(const char *url, const char *dest, uint64_t max, FetchItem *it) { return fetch_it(url, dest, max, 0, it); }
 
 /* images/<sha256>.json, root's: what the image is, for the Storage window (the content is named by its hash only) */
-static void write_image_info(const char *sha, const char *id, const char *arch, const char *file, uint64_t size) {
+static void write_image_info(const char *sha, const char *id, const char *arch, const char *file, const char *from, uint64_t size) {
     char p[200], t[208];
     snprintf(p, sizeof p, VM_IMAGES "/%s.json", sha);
     snprintf(t, sizeof t, "%s.tmp", p);
     FILE *f = fopen(t, "we");
     if (!f) return;
     /* id, arch and file are words and plain names checked against the catalog: nothing to escape */
-    fprintf(f, "{\"id\": \"%s\", \"arch\": \"%s\", \"file\": \"%s\", \"size\": %llu, \"at\": %lld}\n", id, arch, file,
-            (unsigned long long)size, (long long)time(NULL));
+    fprintf(f, "{\"id\": \"%s\", \"arch\": \"%s\", \"file\": \"%s\", ", id, arch, file);
+    /* a person's address, checked by vmurl_check and without its query (vmurl_redact): no '"' or '\\' in it */
+    if (from) fprintf(f, "\"from\": \"%s\", ", from);
+    fprintf(f, "\"size\": %llu, \"at\": %lld}\n", (unsigned long long)size, (long long)time(NULL));
     if (fclose(f) || chmod(t, 0644) || rename(t, p)) unlink(t);
 }
 
@@ -195,6 +199,51 @@ void vm_act_image_list(const AdminReq *r, const char *arg, size_t len) {
 
 static void image_job(const AdminReq *r, char *p, size_t n) { snprintf(p, n, "/run/lordos/vm-image-%u.job", (unsigned)r->uid); }
 
+/* downloads url into images/<sha>.iso (vm-image-get, vm-image-get-user): at most max bytes, kept only with that SHA-256.
+ * A cut or stopped download stays as <sha>.iso.part and the next try continues it; the hash is over the whole file. */
+static void image_fetch(const AdminReq *r, const char *sha, const char *url, uint64_t max, int public_only,
+                        const char *id, const char *arch, const char *file, const char *from) {
+    char dest[200], lock[200];
+    snprintf(dest, sizeof dest, VM_IMAGES "/%s.iso", sha);
+    struct stat st;
+    if (!lstat(dest, &st) && S_ISREG(st.st_mode) && st.st_uid == 0) { admin_say("OK", "%s", dest); return; }   /* i18n-ok: a path */
+    snprintf(lock, sizeof lock, VM_IMAGES "/%s.lock", sha);
+    int lfd = open(lock, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (lfd < 0 || flock(lfd, LOCK_EX | LOCK_NB)) { if (lfd >= 0) close(lfd); admin_err("vm.imageBusy", NULL); return; }
+    char jp[64];
+    image_job(r, jp, sizeof jp);
+    mkdir("/run/lordos", 0755);
+    FILE *jf = fopen(jp, "we");
+    if (jf) { fprintf(jf, "%d %u %s\n", (int)getpid(), (unsigned)r->uid, sha); fclose(jf); }
+    write_image_info(sha, id, arch, file, from, 0);
+    char pp[208];
+    snprintf(pp, sizeof pp, "%s.part", dest);
+    if (!lstat(pp, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && st.st_size > 0)
+        admin_log("vm.downloadResumed", "from", lerr_int((long long)st.st_size), NULL);   /* parsed by apps/machines */
+    FetchItem it;
+    memset(&it, 0, sizeof it);
+    int bad = -1;
+    if (snprintf(it.url, sizeof it.url, "%s", url) < (int)sizeof it.url) {
+        snprintf(it.dest, sizeof it.dest, "%s", dest);
+        it.max = max;
+        it.resume = 1;
+        it.public_only = public_only;
+        fetch_batch_in(&it, 1, vm_progress, NULL, VM_SCOPE);
+        bad = it.status != 200;
+        if (bad) unlink(dest); else chmod(dest, 0644);
+    }
+    char hex[65];
+    for (int i = 0; i < 32; i++) snprintf(hex + i * 2, 3, "%02x", it.sha256[i]);
+    unlink(jp);
+    if (!bad && strcmp(hex, sha)) { unlink(dest); bad = 2; }
+    if (!bad) write_image_info(sha, id, arch, file, from, it.size);
+    unlink(lock);
+    close(lfd);
+    if (bad == 2) { admin_err("vm.hashMismatch", NULL); return; }
+    if (bad) { admin_err("vm.downloadFailed", "reason", it.err[0] ? it.err : "?", NULL); return; }
+    admin_say("OK", "%s", dest);                             /* i18n-ok: a path, parsed by apps/machines */
+}
+
 void vm_act_image_get(const AdminReq *r, const char *arg, size_t len) {
     char buf[320], *f[4];
     VmCatEntry e;
@@ -220,41 +269,74 @@ void vm_act_image_get(const AdminReq *r, const char *arg, size_t len) {
         free(sums);
         if (!listed) { admin_err("vm.notListed", NULL); return; }
     }
-    store_dirs();
-    char dest[200], lock[200];
-    snprintf(dest, sizeof dest, VM_IMAGES "/%s.iso", sha);
-    struct stat st;
-    if (!lstat(dest, &st) && S_ISREG(st.st_mode) && st.st_uid == 0) { admin_say("OK", "%s", dest); return; }   /* i18n-ok: a path */
-    snprintf(lock, sizeof lock, VM_IMAGES "/%s.lock", sha);
-    int lfd = open(lock, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
-    if (lfd < 0 || flock(lfd, LOCK_EX | LOCK_NB)) { if (lfd >= 0) close(lfd); admin_err("vm.imageBusy", NULL); return; }
-    char jp[64];
-    image_job(r, jp, sizeof jp);
-    mkdir("/run/lordos", 0755);
-    FILE *jf = fopen(jp, "we");
-    if (jf) { fprintf(jf, "%d %u %s\n", (int)getpid(), (unsigned)r->uid, sha); fclose(jf); }
     char url[VMCAT_URL + 160];
     if (pin >= 0) snprintf(url, sizeof url, "%s", e.pin[pin].url);
     else snprintf(url, sizeof url, "%s%s", e.file_dir, f[2]);
-    write_image_info(sha, f[0], f[1], f[2], 0);
-    /* a cut download is kept as <sha256>.iso.part (root's, next to its final name) and continued from there; the hash
-     * is over the whole file all the same, and a part that turns out wrong is deleted with it */
-    char pp[208];
+    store_dirs();
+    image_fetch(r, sha, url, e.max_bytes, 0, f[0], f[1], f[2], NULL);
+}
+
+/* a person's system (vm-image-get-user): a small file of its signature (the detached signature, the checksum file it
+ * signs) from an address checked like the image's, into lists/u-<sha>.<kind>, root's; refused or not found: -1 */
+static int fetch_user_small(const char *url, const char *sha, const char *kind, uint64_t max, FetchItem *it) {
+    char dest[200];
+    snprintf(dest, sizeof dest, VM_LISTS "/u-%s.%s", sha, kind);
+    unlink(dest);                                            /* only there while the last download of it worked */
+    memset(it, 0, sizeof *it);
+    snprintf(it->url, sizeof it->url, "%s", url);
+    snprintf(it->dest, sizeof it->dest, "%s", dest);
+    it->max = max;
+    it->public_only = 1;
+    fetch_batch_in(it, 1, NULL, NULL, VM_SCOPE);
+    if (it->status != 200) { unlink(dest); return -1; }
+    chmod(dest, 0644);
+    return 0;
+}
+
+/* vm-image-get-user "<https URL> <sha256> <size|-> [<signature URL> <checksum file URL>]" (vm_admin.h; approved by the
+ * maintainer on 2026-11-22): a system the person added in Machines settings → Systems. Every address passes
+ * vmurl_check (https, a public DNS name, port 443, no user name, a plain path), and the downloader keeps to public
+ * addresses and those rules through every redirect (FetchItem.public_only). The image goes to images/<sha256>.iso like
+ * a catalog one, at most 16 GiB (or its stated size) and only while the store keeps VMURL_RESERVE free, and is kept
+ * only with that SHA-256. The signature files are only stored for lord-pgpv (lord-server checks them, never root). */
+void vm_act_image_get_user(const AdminReq *r, const char *arg, size_t len) {
+    char buf[3 * VMURL_MAX + 160], *f[5];
+    int n = split(arg, len, buf, sizeof buf, f, 5);
+    char host[256], file[128], h2[256], f2[128];
+    uint64_t size = 0;
+    if ((n != 3 && n != 5) || vmurl_check(f[0], host, sizeof host, file, sizeof file) || !vmcat_sha_ok(f[1]) ||
+        vmurl_size(f[2], &size) ||
+        (n == 5 && (vmurl_check(f[3], h2, sizeof h2, f2, sizeof f2) || vmurl_check(f[4], h2, sizeof h2, f2, sizeof f2)))) {
+        admin_err("vm.urlRefused", NULL);
+        return;
+    }
+    char sha[65];
+    for (int i = 0; i < 64; i++) sha[i] = (char)tolower((unsigned char)f[1][i]);
+    sha[64] = 0;
+    store_dirs();
+    if (n == 5) {
+        FetchItem it;
+        if (fetch_user_small(f[3], sha, "sig", VMURL_SIG_MAX, &it) || fetch_user_small(f[4], sha, "sums", VMURL_SUMS_MAX, &it)) {
+            admin_err("vm.sigFetchFailed", "reason", it.err[0] ? it.err : "?", NULL);
+            return;
+        }
+    }
+    char dest[200], pp[208];
+    snprintf(dest, sizeof dest, VM_IMAGES "/%s.iso", sha);
     snprintf(pp, sizeof pp, "%s.part", dest);
-    if (!lstat(pp, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && st.st_size > 0)
-        admin_log("vm.downloadResumed", "from", lerr_int((long long)st.st_size), NULL);   /* parsed by apps/machines */
-    FetchItem it;
-    int bad = fetch_it(url, dest, e.max_bytes, 1, &it);
-    char hex[65];
-    for (int i = 0; i < 32; i++) snprintf(hex + i * 2, 3, "%02x", it.sha256[i]);
-    unlink(jp);
-    if (!bad && strcmp(hex, sha)) { unlink(dest); bad = 2; }
-    if (!bad) write_image_info(sha, f[0], f[1], f[2], it.size);
-    unlink(lock);
-    close(lfd);
-    if (bad == 2) { admin_err("vm.hashMismatch", NULL); return; }
-    if (bad) { admin_err("vm.downloadFailed", "reason", it.err[0] ? it.err : "?", NULL); return; }
-    admin_say("OK", "%s", dest);                             /* i18n-ok: a path, parsed by apps/machines */
+    struct stat st;
+    if (!lstat(dest, &st) && S_ISREG(st.st_mode) && st.st_uid == 0) { admin_say("OK", "%s", dest); return; }   /* i18n-ok: a path */
+    uint64_t part = !lstat(pp, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 ? (uint64_t)st.st_size : 0;
+    struct statvfs vf;
+    uint64_t free_bytes = !statvfs(VM_IMAGES, &vf) ? (uint64_t)vf.f_bavail * vf.f_frsize : 0, need = 0;
+    uint64_t max = vmurl_room(size, part, free_bytes, &need);
+    if (!max) {
+        admin_err("vm.noSpace", "need", lerr_int((long long)need), "free", lerr_int((long long)free_bytes), NULL);
+        return;
+    }
+    char from[VMURL_MAX + 16];
+    vmurl_redact(f[0], from, sizeof from);
+    image_fetch(r, sha, f[0], max, 1, "user", "", file, from);
 }
 
 void vm_act_image_cancel(const AdminReq *r, const char *arg, size_t len) {

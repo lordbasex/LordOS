@@ -1644,23 +1644,44 @@ entry of that kind gives kernel and initrd and lord-vm checks everything again; 
 
 - **An ISO on this computer**, picked in the home folder: hashed at once (`lord.vm.hash`, lord-vm --sha256), its SHA-256 and
   path kept as verified.
-- **An https address and its SHA-256** (required, 64 hex digits; `http://`, user names in the address, other schemes or a
-  path that isn't a plain file name are refused: `httpsUrl`, `fileOfUrl`). **How it downloads:** the admin helper's
-  `vm-image-get` takes only catalog ids and never an address from JS (AGENTS.md "Machines' pinned downloads"), and no other
-  downloader runs for the session, so this version opens the address in the person's browser after a sheet that shows the
-  full address, the size when known and the SHA-256; Machines watches Downloads for that file name (or a renamed copy),
-  hashes it with lord-vm and keeps it only if it matches ("Choose the file…" for one saved elsewhere). The image stays where
-  the browser put it (Downloads, in the home); its path is recorded only after the hash matched. Downloading inside the app
-  would need a new closed admin action (an address and hash from the person: a design question for the maintainer, not built).
-- **Signature (optional):** a detached OpenPGP signature over a checksum file, plus the project's key fingerprint (40 or 64
-  hex). Stored and shown as "Signature: not checked by this version": LordOS's OpenPGP verifier (`server/src/pkg` pgp.c) runs
-  only in the admin helper, against keys the catalog pins (vm-image-list), never against a key a person or a file names.
-
-**Design for a signature check (not built; needs maintainer review):** a sandboxed helper given three fds by lord-server (the
-signature, the checksum file, the person's chosen key file), `sandbox_apply_helper` before reading, no network, linking only
-the existing `pgp.c` code; it answers "good signature by <fingerprint> over <checksum file sha256>" or a code, and lord-server
-then requires the fingerprint to equal the one stored and the checksum file to list the image's name with its SHA-256. The
-key itself would be fetched by the person (WKD/keyserver lookups are another egress decision).
+- **An https address and its SHA-256** (required, 64 hex digits; `http://`, user names in the address, other ports than
+  443, an IP address or a local name such as `localhost`, `*.local`, `*.lan` or `*.internal`, other schemes or a path that
+  isn't a plain file name are refused: `httpsUrl`, `publicHost`, `fileOfUrl`). **How it downloads (approved by the
+  maintainer on 2026-11-22):** "Download…" shows a sheet with the full address, the size when known, the SHA-256 and what
+  the signature check will be, then runs the closed admin action `vm-image-get-user "<url> <sha256> <size|-> [<signature
+  url> <checksum file url>]"` (administrators only; `server/src/vm/vmimage_admin.c`). Root checks every address again in C
+  (`vmurl_check`, `pkg/pubhost.c`: https, a public DNS name with no IP literal and no local suffix, port 443 only, no user
+  name or password, RFC 3986 path characters with `%XX` escapes but never `%00`, no `.`/`..` segment, no fragment, at most
+  1000 bytes), the SHA-256 (64 hex) and the size (1 B to 16 GiB; unknown: up to 16 GiB). The image store must keep 2 GiB
+  free after it (`vmurl_room`, `vm.noSpace`). The download is the catalog's own machinery: the Store's downloader in
+  `lordos-net-machines.scope` (a child as `nobody`, TLS by `lord-tls`), with `FetchItem.public_only`: it connects only to
+  public addresses the name resolves to (no private, loopback, link-local, CGNAT, documentation, multicast or reserved
+  block, IPv4-mapped and 6to4 addresses judged by their IPv4 address) and follows a redirect only to an address that passes
+  the same rules (`pkg.http.notPublic`). The image lands in `/var/lib/lordos/machines/images/<sha256>.iso`, resumed from
+  its `.part`, with progress lines and "Stop Download" (`vm-image-cancel`), and is kept only with that SHA-256; its
+  `<sha256>.json` says `"id": "user"`, the file name and the address without its query (`vmurl_redact`: never a token in
+  a query, a user name or a password), which Storage shows as "file · site". The system's `verified` is then that store
+  path. "Use a file I already downloaded…" stays for an ISO the person has: hashed by lord-vm and kept only if it matches.
+  The browser fallback of the first build (open the address in the browser, watch Downloads) is gone.
+- **Signature (optional):** a detached OpenPGP signature over a checksum file, the project's key fingerprint (40 hex for v4;
+  a v6 one, 64 hex, is stored but can't be checked) and the project's **public key** (armored, pasted or chosen as a file,
+  at most 32 KB; `keyOf`). With a key, `vm-image-get-user` also downloads the signature (at most 64 KB) and the checksum
+  file (at most 1 MB) from their addresses, checked the same way, into `lists/u-<sha256>.sig` and `.sums` (root's; root
+  never reads them). Then `lord.vm.sigCheck(sha256, key, fingerprint)` reads them (root's regular files, not writable by
+  others), puts the key, the checksum file and the signature in three sealed memfds and starts **`lord-pgpv`**
+  (`server/src/vm/lordpgpv.c`, approved by the maintainer on 2026-11-22): fixed path next to lord-server, no arguments,
+  an empty environment, the fingerprint and the time on fd 0, the memfds on fds 3–5, its answer on fd 1. It applies
+  `sandbox_apply_helper` (no network, no files, no exec, 32 MB) before reading anything, verifies with LordOS's own
+  OpenPGP code (`pkg/pgp.c` through `vmsig.c`; no new library), where only the primary key with that fingerprint (or its
+  subkeys) counts, and prints exactly `valid <fingerprint>` or `invalid <reason>`. lord-server reads that line strictly
+  (`vmsig_reply`: the fingerprint it asked for, a reason from a fixed list) and only then requires the image's SHA-256 to be
+  a line of the very checksum file bytes it handed over (`vmsig_sums_has_hash`). Settings → Systems says "Signature:
+  verified by ‹fingerprint›" or "Signature: invalid — not used" (or that the checksum file doesn't list the image), and
+  the image is verified only when both the SHA-256 and the signature hold. **Pinned on first use:** the fingerprint of
+  the first good check is kept in that system (`signature.pinned`, never taken from a profile); if the system's key later
+  has another fingerprint (an edit, a changed definition), the download is held with "This system's key changed (it was
+  …)" until the person presses "Trust the New Key". Without a key the signature is stored and shown as "Signature: not
+  checked"; a profile carries the addresses, the fingerprint and the key, never the pin.
 
 **Before a machine is made from an added system** the assistant hashes the image again and refuses it if it changed
 ("The SHA-256 of … doesn't match: it isn't used"). Added systems show in New Machine under "Added by you"; one not verified
@@ -1669,9 +1690,11 @@ the image Microsoft lists, 4.3.1).
 
 **Storage and fsops_protected.** Profiles, systems.json and the logos folder are written with lord.fs as the person. None of
 them launches anything or holds a permission, so they are not in `fsops_protected`; whatever they hold is validated again on
-every read (`readProfile`, `readSystems`), an image is used only after its SHA-256 matched, and lord-vm checks every value
-again. A program that can write the home folder could edit them, as it could edit the ISOs themselves; it can't make
-Machines download or run anything without the person pressing the button that shows the address.
+every read (`readProfile`, `readSystems`), an image is used only after its SHA-256 matched (and its signature, when the
+system has a key), and lord-vm checks every value again. A program that can write the home folder could edit them, as it
+could edit the ISOs themselves, including a system's key and its pinned fingerprint; it can't make Machines download or
+run anything without the person pressing the button that shows the address, root checks the address again, and only an
+administrator can download.
 
 ### 5.6.2 Official logos (opt-in)
 
@@ -1694,7 +1717,7 @@ project's official site and stay on this computer only. The marks belong to thei
   the root-owned image store (not listed in Storage); removing it needs the admin action `vm-image-remove`.
 - **Profiles and added systems** may carry `logo: { url, sha256 }` (PNG, https): validated, shown in the import summary
   with "A logo in a profile is its author's responsibility: LordOS doesn't host or share it", exported as address and hash
-  only, never the image. This version doesn't download them (no downloader takes an address from JS).
+  only, never the image. This version doesn't download them (vm-image-get-user is for a system's image only).
 - About shows the trademark notice in every language.
 
 ### 5.7 What this computer can run
