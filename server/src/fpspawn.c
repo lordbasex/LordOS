@@ -753,6 +753,21 @@ static int handle(DMsg *m) {
         dw_free(&b);
         return 0;
     }
+    /* Peer on any path, as every D-Bus connection answers it (Steam's Flatpak pings "/" to check the portal) */
+    int peer = fpak_bus_peer(m->iface, m->member);
+    if (peer == 1 && !sig[0]) { dbus_reply(&conn, m, NULL, NULL); return 0; }
+    if (peer == 2 && !sig[0]) {
+        char id[64] = "";
+        FILE *f = fopen("/etc/machine-id", "re");
+        if (f) { if (!fgets(id, sizeof id, f)) id[0] = 0; fclose(f); }
+        id[strcspn(id, "\n")] = 0;
+        DBuf b;
+        dw_init(&b);
+        dw_str(&b, id);
+        dbus_reply(&conn, m, "s", &b);
+        dw_free(&b);
+        return 0;
+    }
     if (!m->path || strcmp(m->path, OBJ)) { reply_error(m, "org.freedesktop.DBus.Error.UnknownObject", "no such object"); return 0; }
     if (m->iface && !strcmp(m->iface, "org.freedesktop.DBus.Properties")) {
         DRd r;

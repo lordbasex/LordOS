@@ -461,6 +461,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   sub-sandboxes): PID 1 ends it once nothing else is left (`sandbox_view_helper`). Nothing in what the view, its scope
   or Landlock allow changed. Test: `build/sandbox-view-lifetime-test` (a process left behind runs to its end, the helper
   is ended, a stop still ends everything; it fails on the old PID 1).
+- **Steam from Flathub starts: LordOS's Spawn portal answers `org.freedesktop.DBus.Peer`** (`server/src/fpspawn.c`,
+  `fpak_bus_peer` in `server/src/fpak.c`). Steam's Flatpak pings the portal on "/" before anything else and, answered
+  "no such object", stopped on "The unofficial Steam Flatpak app requires a working D-Bus session bus and flatpak-portal
+  service". Every D-Bus connection answers `Peer.Ping` and `GetMachineId` on any path; now this one does too. Test:
+  `build/fpak-test`.
 - **Session restore opens a Flatpak app once, whatever its window count** (`sdk/sessionmodel.js` `launchesOnce`,
   `sdk/sessionrestore.jsx`). Each launch of a Flatpak app is a view of its own, so a second launch never reaches the
   first (Chromium's and Electron's single-instance lock, Firefox's profile lock): four saved VS Code windows became four
