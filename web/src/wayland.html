@@ -22,6 +22,7 @@
 
 <ul class="wp-stats">
 {{{stats}}}
+{{{confTiles}}}
 </ul>
 <p class="wp-sum">{{{summary}}}</p>
 
@@ -32,11 +33,12 @@
 <label class="wp-sel"><span>{{t.pages.wayland.catLabel}}</span><select id="wp-cat">{{{catOptions}}}</select></label>
 <label class="wp-sel"><span>{{t.pages.wayland.statusLabel}}</span><select id="wp-st">{{{statusOptions}}}</select></label>
 <label class="wp-sel"><span>{{t.pages.wayland.compLabel}}</span><select id="wp-comp">{{{compOptions}}}</select></label>
+<label class="wp-sel"><span>{{t.pages.wayland.conf.filterLabel}}</span><select id="wp-cf">{{{confOptions}}}</select></label>
 </div>
 <p class="wp-count" id="wp-count" aria-live="polite" data-tpl="{{t.pages.wayland.shown}}"></p>
 <div class="wp-table">
 <table id="wp-table">
-<thead><tr><th scope="col">{{t.pages.wayland.hProtocol}}</th><th scope="col">{{t.pages.wayland.hCategory}}</th><th scope="col">LordOS</th><th scope="col">{{{hKwin}}}</th><th scope="col">{{{hMutter}}}</th><th scope="col">{{t.pages.wayland.hNote}}</th></tr></thead>
+<thead><tr><th scope="col">{{t.pages.wayland.hProtocol}}</th><th scope="col">{{t.pages.wayland.hCategory}}</th><th scope="col">LordOS</th><th scope="col">{{{hKwin}}}</th><th scope="col">{{{hMutter}}}</th><th scope="col">{{{hConf}}}</th><th scope="col">{{t.pages.wayland.hNote}}</th></tr></thead>
 <tbody>
 {{{rows}}}
 </tbody>
@@ -44,6 +46,8 @@
 </div>
 <p class="g-empty" id="wp-empty" hidden>{{t.pages.wayland.empty}}</p>
 </section>
+
+{{{confSection}}}
 
 <section class="wp-sec" aria-labelledby="wp-h-legend">
 <h2 id="wp-h-legend">{{t.pages.wayland.legendTitle}}</h2>
@@ -63,6 +67,7 @@
 </section>
 </main>
 
+{{{lightbox}}}
 {{{footer}}}
 <script src="{{{js}}}" defer></script>
 <script src="{{{waylandJs}}}" defer></script>

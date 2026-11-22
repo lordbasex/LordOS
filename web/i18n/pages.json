@@ -336,7 +336,54 @@
       "syncTitle": "Where the table comes from",
       "syncText": "One file in LordOS's repository, docs/wayland-protocols.json, holds the table. A test checks it against the interfaces lord-server really creates, and the same file writes the table in docs/WAYLAND.md, the project's log of its Wayland work, so the page, the log and the code agree.",
       "docsLink": "docs/WAYLAND.md on GitHub",
-      "jsonLink": "The table's data (JSON)"
+      "jsonLink": "The table's data (JSON)",
+      "conf": {
+        "hConf": "Conformance",
+        "filterLabel": "Conformance",
+        "filterAll": "Any depth",
+        "none": "not scored",
+        "proof": "screenshot",
+        "proofN": "screenshot {n}",
+        "points": "{p} of {t} points",
+        "skipped": "{n} skipped",
+        "tileShort": "conformance of LordOS's {n} globals ({complete} complete)",
+        "title": "Conformance: how well LordOS follows each protocol",
+        "lead": "Offering a protocol is not the same as following it. A script in LordOS's repository checks lord-server point by point against each protocol's specification: every request has a real handler, every event is sent, every protocol error is raised where the specification names it, and test clients run each protocol's flows against a lord-server started just for the test. It does the same for what X11 apps expect of the window manager. Each item gets a score from 0 to 100 % and a depth, which says how much of that score comes from tests of the protocol itself.",
+        "runDate": "Run on",
+        "runTool": "Tool",
+        "runCommit": "commit {commit}, report format {schema}",
+        "dirty": "with changes not yet committed",
+        "runEnv": "Versions",
+        "runMode": "How",
+        "mode": "Reading the source and running test clients, on a lord-server without a screen (CPU drawing)",
+        "tileGlobals": "Wayland interfaces LordOS offers, all scored",
+        "tileMean": "mean Wayland score",
+        "tileComplete": "complete: tested protocol by protocol, nothing skipped",
+        "tileX11": "mean X11 score ({n} items)",
+        "summary": "{protocols} Wayland interfaces score a mean of {mean} %, and {complete} of them are complete. The {x11Items} X11 items score a mean of {x11Mean} %, {x11Complete} of them complete. A score of 100 % with a shallower depth means every check that could run passed, but not all of them are tests of that protocol's own flow.",
+        "depthTitle": "Depth of the test",
+        "depth": {
+          "complete": "Complete",
+          "partial": "Partial",
+          "general": "General",
+          "code": "Code only"
+        },
+        "depthText": {
+          "complete": "Tests written for this protocol cover every request, event and error, and all of them passed with nothing skipped.",
+          "partial": "Tests written for this protocol, but one point was skipped because it needs something a test without a screen doesn't have, such as a pointer over a window.",
+          "general": "The source code was checked (every request handled, every event sent, every error raised) and a generic test bound the interface at every version; it has no flow of its own in the tool yet. For X11, the code check and unit tests.",
+          "code": "Only the source code was checked: the interface can't be used without real hardware or a particular client (DRM leases need a VR headset; xwayland_shell is offered to Xwayland only), or the X11 item has nothing to run without a screen."
+        },
+        "barText": "The bar shows the score in tenths, as the tool prints it in a terminal.",
+        "hItem": "X11 item",
+        "x11Title": "X11 apps (Xwayland)",
+        "x11Lead": "What LordOS's X11 window manager does for apps that still use X11: the ICCCM and EWMH conventions, Motif decoration hints, XDND drag and drop, the clipboard and primary selection, HiDPI scaling, the cursor and the isolation of Xwayland. The names are the standards' own, in English.",
+        "proofsTitle": "Proof with real programs",
+        "proofsLead": "Screenshots of real programs on a lord-server started for the test, taken the same day: {wayland} with Wayland apps (terminals, GTK and Qt, Vulkan, OpenGL and Chromium) and {x11} with X11 apps. The Wayland ones were checked in each program's protocol log, with no protocol error; the X11 ones show what xprop and xwininfo read from the windows.",
+        "limits": "Not checked here: Firefox and other programs that weren't installed on the test machine, and what needs hardware (a graphics tablet's wheel, a touchscreen, a VR headset). The descriptions of the screenshots are in English, like the tool's report.",
+        "docsLink": "How the score is made (docs/WAYLAND.md)",
+        "jsonLink": "Every check and its result (JSON)"
+      }
     }
   },
   "es": {
@@ -676,7 +723,54 @@
       "syncTitle": "De dónde sale la tabla",
       "syncText": "Un solo archivo del repositorio de LordOS, docs/wayland-protocols.json, guarda la tabla. Un test la compara con las interfaces que lord-server crea de verdad, y el mismo archivo escribe la tabla de docs/WAYLAND.md, la bitácora del trabajo de Wayland del proyecto, así la página, la bitácora y el código coinciden.",
       "docsLink": "docs/WAYLAND.md en GitHub",
-      "jsonLink": "Los datos de la tabla (JSON)"
+      "jsonLink": "Los datos de la tabla (JSON)",
+      "conf": {
+        "hConf": "Conformidad",
+        "filterLabel": "Conformidad",
+        "filterAll": "Cualquier profundidad",
+        "none": "sin puntaje",
+        "proof": "captura",
+        "proofN": "captura {n}",
+        "points": "{p} de {t} puntos",
+        "skipped": "{n} omitido",
+        "tileShort": "conformidad de las {n} interfaces de LordOS ({complete} completas)",
+        "title": "Conformidad: qué tan bien sigue LordOS cada protocolo",
+        "lead": "Ofrecer un protocolo no es lo mismo que cumplirlo. Un script del repositorio de LordOS revisa lord-server punto por punto contra la especificación de cada protocolo: cada pedido tiene un manejador real, cada evento se envía, cada error del protocolo se señala donde la especificación lo nombra, y clientes de prueba ejecutan los flujos de cada protocolo contra un lord-server iniciado solo para la prueba. Hace lo mismo con lo que las apps X11 esperan del gestor de ventanas. Cada ítem recibe un puntaje de 0 a 100 % y una profundidad, que dice cuánto de ese puntaje viene de pruebas del propio protocolo.",
+        "runDate": "Ejecutado el",
+        "runTool": "Herramienta",
+        "runCommit": "commit {commit}, formato del informe {schema}",
+        "dirty": "con cambios todavía sin commit",
+        "runEnv": "Versiones",
+        "runMode": "Cómo",
+        "mode": "Leyendo el código fuente y ejecutando clientes de prueba, en un lord-server sin pantalla (dibujo por CPU)",
+        "tileGlobals": "interfaces Wayland que ofrece LordOS, todas con puntaje",
+        "tileMean": "puntaje medio de Wayland",
+        "tileComplete": "completas: probadas protocolo por protocolo, sin omitir nada",
+        "tileX11": "puntaje medio de X11 ({n} ítems)",
+        "summary": "{protocols} interfaces Wayland tienen un puntaje medio de {mean} %, y {complete} están completas. Los {x11Items} ítems de X11 tienen un puntaje medio de {x11Mean} %, {x11Complete} completos. Un puntaje de 100 % con menos profundidad significa que pasó cada comprobación que se pudo ejecutar, pero no todas son pruebas del flujo propio de ese protocolo.",
+        "depthTitle": "Profundidad de la prueba",
+        "depth": {
+          "complete": "Completa",
+          "partial": "Parcial",
+          "general": "General",
+          "code": "Solo código"
+        },
+        "depthText": {
+          "complete": "Pruebas escritas para este protocolo cubren cada pedido, evento y error, y todas pasaron sin omitir nada.",
+          "partial": "Pruebas escritas para este protocolo, pero se omitió un punto porque necesita algo que una prueba sin pantalla no tiene, como un puntero sobre una ventana.",
+          "general": "Se revisó el código fuente (cada pedido manejado, cada evento enviado, cada error señalado) y una prueba genérica enlazó la interfaz en cada versión; todavía no tiene un flujo propio en la herramienta. En X11, la revisión del código y pruebas unitarias.",
+          "code": "Solo se revisó el código fuente: la interfaz no se puede usar sin hardware real o un cliente en particular (los arrendamientos DRM necesitan un visor de realidad virtual; xwayland_shell se ofrece solo a Xwayland), o el ítem de X11 no tiene nada que ejecutar sin pantalla."
+        },
+        "barText": "La barra muestra el puntaje en décimos, como lo imprime la herramienta en una terminal.",
+        "hItem": "Ítem de X11",
+        "x11Title": "Apps X11 (Xwayland)",
+        "x11Lead": "Lo que hace el gestor de ventanas X11 de LordOS para las apps que todavía usan X11: las convenciones ICCCM y EWMH, las indicaciones de decoración de Motif, arrastrar y soltar XDND, el portapapeles y la selección primaria, el escalado HiDPI, el cursor y el aislamiento de Xwayland. Los nombres son los de los propios estándares, en inglés.",
+        "proofsTitle": "Prueba con programas reales",
+        "proofsLead": "Capturas de programas reales en un lord-server iniciado para la prueba, tomadas el mismo día: {wayland} con apps Wayland (terminales, GTK y Qt, Vulkan, OpenGL y Chromium) y {x11} con apps X11. Las de Wayland se comprobaron en el registro de protocolo de cada programa, sin ningún error de protocolo; las de X11 muestran lo que xprop y xwininfo leen de las ventanas.",
+        "limits": "No se comprobó acá: Firefox y otros programas que no estaban instalados en la máquina de prueba, y lo que necesita hardware (la rueda de una tableta gráfica, una pantalla táctil, un visor de realidad virtual). Las descripciones de las capturas están en inglés, como el informe de la herramienta.",
+        "docsLink": "Cómo se calcula el puntaje (docs/WAYLAND.md)",
+        "jsonLink": "Cada comprobación y su resultado (JSON)"
+      }
     }
   },
   "pt": {
@@ -1016,7 +1110,54 @@
       "syncTitle": "De onde vem a tabela",
       "syncText": "Um único arquivo do repositório do LordOS, docs/wayland-protocols.json, guarda a tabela. Um teste a compara com as interfaces que o lord-server cria de verdade, e o mesmo arquivo escreve a tabela do docs/WAYLAND.md, o diário do trabalho de Wayland do projeto, assim a página, o diário e o código concordam.",
       "docsLink": "docs/WAYLAND.md no GitHub",
-      "jsonLink": "Os dados da tabela (JSON)"
+      "jsonLink": "Os dados da tabela (JSON)",
+      "conf": {
+        "hConf": "Conformidade",
+        "filterLabel": "Conformidade",
+        "filterAll": "Qualquer profundidade",
+        "none": "sem pontuação",
+        "proof": "captura",
+        "proofN": "captura {n}",
+        "points": "{p} de {t} pontos",
+        "skipped": "{n} pulado",
+        "tileShort": "conformidade das {n} interfaces do LordOS ({complete} completas)",
+        "title": "Conformidade: quão bem o LordOS segue cada protocolo",
+        "lead": "Oferecer um protocolo não é o mesmo que cumpri-lo. Um script do repositório do LordOS verifica o lord-server ponto por ponto contra a especificação de cada protocolo: cada requisição tem um tratador real, cada evento é enviado, cada erro do protocolo é sinalizado onde a especificação o nomeia, e clientes de teste executam os fluxos de cada protocolo contra um lord-server iniciado só para o teste. Faz o mesmo com o que os apps X11 esperam do gerenciador de janelas. Cada item recebe uma pontuação de 0 a 100 % e uma profundidade, que diz quanto dessa pontuação vem de testes do próprio protocolo.",
+        "runDate": "Executado em",
+        "runTool": "Ferramenta",
+        "runCommit": "commit {commit}, formato do relatório {schema}",
+        "dirty": "com mudanças ainda sem commit",
+        "runEnv": "Versões",
+        "runMode": "Como",
+        "mode": "Lendo o código-fonte e executando clientes de teste, num lord-server sem tela (desenho pela CPU)",
+        "tileGlobals": "interfaces Wayland que o LordOS oferece, todas pontuadas",
+        "tileMean": "pontuação média do Wayland",
+        "tileComplete": "completas: testadas protocolo por protocolo, sem pular nada",
+        "tileX11": "pontuação média do X11 ({n} itens)",
+        "summary": "{protocols} interfaces Wayland têm pontuação média de {mean} %, e {complete} estão completas. Os {x11Items} itens do X11 têm pontuação média de {x11Mean} %, {x11Complete} completos. Uma pontuação de 100 % com menos profundidade significa que passou cada verificação que pôde ser executada, mas nem todas são testes do fluxo próprio desse protocolo.",
+        "depthTitle": "Profundidade do teste",
+        "depth": {
+          "complete": "Completa",
+          "partial": "Parcial",
+          "general": "Geral",
+          "code": "Só código"
+        },
+        "depthText": {
+          "complete": "Testes escritos para este protocolo cobrem cada requisição, evento e erro, e todos passaram sem pular nada.",
+          "partial": "Testes escritos para este protocolo, mas um ponto foi pulado porque precisa de algo que um teste sem tela não tem, como um ponteiro sobre uma janela.",
+          "general": "O código-fonte foi verificado (cada requisição tratada, cada evento enviado, cada erro sinalizado) e um teste genérico vinculou a interface em cada versão; ainda não tem um fluxo próprio na ferramenta. No X11, a verificação do código e testes unitários.",
+          "code": "Só o código-fonte foi verificado: a interface não pode ser usada sem hardware real ou um cliente específico (os arrendamentos DRM precisam de um óculos de realidade virtual; xwayland_shell é oferecido só ao Xwayland), ou o item do X11 não tem nada para executar sem tela."
+        },
+        "barText": "A barra mostra a pontuação em décimos, como a ferramenta a imprime num terminal.",
+        "hItem": "Item do X11",
+        "x11Title": "Apps X11 (Xwayland)",
+        "x11Lead": "O que o gerenciador de janelas X11 do LordOS faz pelos apps que ainda usam X11: as convenções ICCCM e EWMH, as dicas de decoração do Motif, arrastar e soltar XDND, a área de transferência e a seleção primária, a escala HiDPI, o cursor e o isolamento do Xwayland. Os nomes são os dos próprios padrões, em inglês.",
+        "proofsTitle": "Prova com programas reais",
+        "proofsLead": "Capturas de programas reais num lord-server iniciado para o teste, tiradas no mesmo dia: {wayland} com apps Wayland (terminais, GTK e Qt, Vulkan, OpenGL e Chromium) e {x11} com apps X11. As do Wayland foram verificadas no registro de protocolo de cada programa, sem nenhum erro de protocolo; as do X11 mostram o que o xprop e o xwininfo leem das janelas.",
+        "limits": "Não verificado aqui: o Firefox e outros programas que não estavam instalados na máquina de teste, e o que precisa de hardware (a roda de uma mesa digitalizadora, uma tela sensível ao toque, um óculos de realidade virtual). As descrições das capturas estão em inglês, como o relatório da ferramenta.",
+        "docsLink": "Como a pontuação é calculada (docs/WAYLAND.md)",
+        "jsonLink": "Cada verificação e seu resultado (JSON)"
+      }
     }
   }
 }

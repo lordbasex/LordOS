@@ -92,6 +92,11 @@ O resto do desktop recebeu o mesmo cuidado: os Ajustes, a Loja, o Arquivos e o M
 - **Resolução inicial**: *Segue a janela* ou um tamanho fixo, que todo sistema adota ao iniciar.
 - **Um visual novo**: folhas sobre a janela, ajustes agrupados e 38 glifos próprios do LordOS que seguem a sua cor de destaque, e uma visão Armazenamento de para onde vai o seu espaço.
 - **A Loja, organizada pela origem dos apps**: Debian, Flathub, Apps web e apps do LordOS, e os apps que o LordOS escolheu.
+- **Teclas** (em desenvolvimento): Ctrl, Alt, Shift e Win mantidas para a próxima tecla, e combinações que o seu computador guardaria para si, como Ctrl+Alt+Del, enviadas direto à máquina.
+- **O modo apps, pela barra de menus** (em desenvolvimento): um item junto ao relógio para cada máquina, cujo menu funciona como o menu Iniciar da máquina, e um painel com suas janelas abertas e seus apps.
+- **Capturar o mouse** (em desenvolvimento) para jogos e programas 3D; ❖Esc ou Ctrl+Alt o soltam.
+- **Uma placa de vídeo real para uma máquina** (em desenvolvimento): uma parte de uma iGPU Intel (de Broadwell a Comet Lake) com GVT-g, com um driver de inicialização próprio do LordOS para ela, escrito a partir de fontes públicas.
+- **`machines` no Terminal** (em desenvolvimento): listar, iniciar, parar, tirar snapshots, clonar e mudar máquinas a partir de um terminal.
 
 ## O que foi testado, e o que não
 

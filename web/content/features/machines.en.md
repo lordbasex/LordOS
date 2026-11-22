@@ -92,6 +92,11 @@ The rest of the desktop got the same care: Settings, the Store, Files and Monito
 - **Start resolution**: *Follows the window* or a fixed size, taken by every system at boot.
 - **A new look**: sheets over the window, grouped settings and 38 glyphs of LordOS's own that follow your accent color, and a Storage view of where your space goes.
 - **The Store, arranged by where apps come from**: Debian, Flathub, Web apps and LordOS apps, and the apps LordOS picked.
+- **Keys** (in development): Ctrl, Alt, Shift and Win held down for the next key, and combinations your computer would keep for itself, such as Ctrl+Alt+Del, sent straight to the machine.
+- **Apps mode, from the menu bar** (in development): an item by the clock for each machine, whose menu works like the machine's Start menu, and a panel with its open windows and its apps.
+- **Capture mouse** (in development) for games and 3D programs; ❖Esc or Ctrl+Alt lets it go.
+- **A real graphics card for a machine** (in development): a share of an Intel iGPU (Broadwell to Comet Lake) through GVT-g, with LordOS's own start-up driver for it, written from public sources.
+- **`machines` in the Terminal** (in development): list, start, stop, snapshot, clone and change machines from a terminal.
 
 ## What was tested, and what not
 

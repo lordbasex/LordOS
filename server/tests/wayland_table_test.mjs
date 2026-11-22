@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { load, validate, validateWeb, markdown, withSection, webData } from '../../tools/gen-wayland-table.mjs';
+import { load, validate, validateWeb, markdown, withSection, webData, loadConf, confMarkdown, withConfSection, DEPTHS, PROOFS } from '../../tools/gen-wayland-table.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 let fails = 0;
@@ -77,17 +77,53 @@ for (const [g, t] of table) if (!code.has(g)) bad(`docs/wayland-protocols.json (
 }
 
 // the generated outputs
+const C = loadConf();
 const md = fs.readFileSync(path.join(REPO, 'docs/WAYLAND.md'), 'utf8');
 if (withSection(md, markdown(d)) !== md) bad('docs/WAYLAND.md\'s generated protocol table is stale: run node tools/gen-wayland-table.mjs');
+if (withConfSection(md, confMarkdown(d, C)) !== md) bad('docs/WAYLAND.md\'s generated conformance table is stale: run node tools/gen-wayland-table.mjs');
 const webFile = path.join(REPO, 'web/content/wayland/protocols.json');
 const web = fs.existsSync(webFile) ? fs.readFileSync(webFile, 'utf8') : '';
-if (web !== JSON.stringify(webData(d), null, 1) + '\n') bad('web/content/wayland/protocols.json is stale: run node tools/gen-wayland-table.mjs');
+if (web !== JSON.stringify(webData(d, C), null, 1) + '\n') bad('web/content/wayland/protocols.json is stale: run node tools/gen-wayland-table.mjs');
+
+// the conformance run (docs/wayland-conformance.json) against the table, docs/WAYLAND.md's own words and the screenshots
+if (!C) bad('docs/wayland-conformance.json is missing: record a run (make -C server wl-conformance WLCONF_ARGS=--record)');
+else {
+  const W = webData(d, C).conformance;
+  // every scored global is a LordOS global of the table at the same version, and every LordOS global was scored
+  const scored = new Map(W.globals.map((g) => [g.global, g]));
+  for (const g of W.globals) {
+    const t = table.get(g.global);
+    if (!t) bad(`docs/wayland-conformance.json scores ${g.global}, which no protocol of docs/wayland-protocols.json offers`);
+    else if (g.version != null && g.version !== t.version) bad(`${g.global}: the conformance run saw version ${g.version}, docs/wayland-protocols.json says ${t.version}: record a new run`);
+  }
+  for (const g of table.keys()) if (!scored.has(g)) bad(`docs/wayland-protocols.json offers ${g}, but the conformance run didn't score it: record a new run`);
+  // the summary agrees with the items
+  const mean = (xs) => Math.round((10 * xs.reduce((a, x) => a + x.score, 0)) / (xs.length || 1)) / 10;
+  if (C.summary.protocols !== W.globals.length) bad(`conformance summary: ${C.summary.protocols} protocols, ${W.globals.length} scored`);
+  if (C.summary.complete !== W.globals.filter((g) => g.depth === 'complete').length) bad('conformance summary: the complete count disagrees with the items');
+  if (Math.abs(C.summary.mean - mean(W.globals)) > 0.1) bad(`conformance summary: mean ${C.summary.mean}, the items give ${mean(W.globals)}`);
+  if (C.summary.x11_mean != null && Math.abs(C.summary.x11_mean - mean(W.x11)) > 0.1) bad(`conformance summary: X11 mean ${C.summary.x11_mean}, the items give ${mean(W.x11)}`);
+  for (const x of [...W.globals, ...W.x11]) if (!DEPTHS.includes(x.depth)) bad(`${x.global || x.id}: depth ${x.depth}`);
+  // docs/WAYLAND.md's hand-written summary lines say the same numbers
+  const wl = md.match(/\*\*Wayland \((\d{4}-\d{2}-\d{2})[^)]*\): (\d+) globals, mean ([\d.]+) %, (\d+) complete\.\*\*/);
+  if (!wl) bad('docs/WAYLAND.md: the "**Wayland (date, …): N globals, mean M %, K complete.**" line is missing');
+  else if (wl[1] !== C.date || +wl[2] !== W.summary.protocols || +wl[3] !== W.summary.mean || +wl[4] !== W.summary.complete) bad(`docs/WAYLAND.md says ${wl[0]}, the run says ${C.date}: ${W.summary.protocols} globals, mean ${W.summary.mean} %, ${W.summary.complete} complete`);
+  const xl = md.match(/\*\*Xwayland \/ X11 \((\d{4}-\d{2}-\d{2})[^)]*\): (\d+) items, mean ([\d.]+) %\*\*/);
+  if (!xl) bad('docs/WAYLAND.md: the "**Xwayland / X11 (date, …): N items, mean M %**" line is missing');
+  else if (xl[1] !== C.date || +xl[2] !== W.summary.x11Items || +xl[3] !== W.summary.x11Mean) bad(`docs/WAYLAND.md says ${xl[0]}, the run says ${W.summary.x11Items} items, mean ${W.summary.x11Mean} %`);
+  // the screenshots: each one named exists, and each one in the folder is shown
+  const files = new Set(fs.readdirSync(PROOFS).filter((f) => f.endsWith('.png')));
+  for (const p of W.proofs) if (!files.has(p.png)) bad(`proof ${p.id}: docs/wayland-proofs/${p.png} is missing`);
+  const shown = new Set(W.proofs.map((p) => p.png));
+  for (const f of files) if (!shown.has(f)) bad(`docs/wayland-proofs/${f} is in no proof (proofs.json, or x11-<item id>.png)`);
+  for (const p of W.proofs.filter((x) => x.kind === 'x11')) if (!W.x11.some((i) => i.proofs.includes(p.id))) bad(`${p.png} proves no X11 item: name it x11-<item id>.png or add it to X11_PROOF_ITEM`);
+}
 
 // hostile rows (wayland.app is external input): each one must be refused by validate() (the JSON, the importer) and,
 // in the site's copy, by validateWeb() (web/build.mjs refuses to build with it)
 {
   const good = d.protocols.find((p) => p.id === 'xdg-shell');
-  const web = webData(d);
+  const web = webData(d, C);
   const goodWeb = web.protocols.find((p) => p.id === 'xdg-shell');
   const XSS = '"><script>alert(1)</script>';
   const cases = [
@@ -126,6 +162,45 @@ if (web !== JSON.stringify(webData(d), null, 1) + '\n') bad('web/content/wayland
     if (!validateWeb({ ...web, protocols: [p] }).length) bad(`validateWeb() accepted a hostile ${what}`);
   }
   if (validateWeb({ ...web, compared: { ...web.compared, kwin: { ...web.compared.kwin, version: XSS } } }).length === 0) bad('validateWeb() accepted a hostile KWin version');
+  // the conformance fields (row, X11 item, proof, run)
+  const rowCases = [
+    ['conf score', (p) => { p.conf.score = '100"><b>'; }],
+    ['conf score over 100', (p) => { p.conf.score = 101; }],
+    ['conf depth', (p) => { p.conf.depth = XSS; }],
+    ['conf points', (p) => { p.conf.points = p.conf.total + 1; }],
+    ['conf global', (p) => { p.conf.globals = [XSS]; }],
+    ['conf proof', (p) => { p.conf.proofs = [XSS]; }],
+    ['conf string', (p) => { p.conf = XSS; }],
+  ];
+  for (const [what, spoil] of rowCases) {
+    const p = JSON.parse(JSON.stringify(goodWeb));
+    spoil(p);
+    if (!validateWeb({ ...web, protocols: [p] }).length) bad(`validateWeb() accepted a hostile ${what}`);
+  }
+  const confCases = [
+    ['commit', (c) => { c.commit = XSS; }],
+    ['date', (c) => { c.date = XSS; }],
+    ['tool', (c) => { c.tool = 'javascript:alert(1)'; }],
+    ['xwayland version', (c) => { c.env.xwayland = XSS; }],
+    ['mode', (c) => { c.env.mode = XSS; }],
+    ['summary mean', (c) => { c.summary.mean = '100<'; }],
+    ['x11 id', (c) => { c.x11[0].id = XSS; }],
+    ['x11 title', (c) => { c.x11[0].title = XSS; }],
+    ['x11 depth', (c) => { c.x11[0].depth = 'deep'; }],
+    ['x11 score', (c) => { c.x11[0].score = -1; }],
+    ['global row', (c) => { c.globals[0].row = 'no-such-row'; }],
+    ['global name', (c) => { c.globals[0].global = XSS; }],
+    ['proof png', (c) => { c.proofs[0].png = '../../etc/passwd.png'; }],
+    ['proof png ext', (c) => { c.proofs[0].png = 'x.svg'; }],
+    ['proof shows', (c) => { c.proofs[0].shows = XSS; }],
+    ['proof kind', (c) => { c.proofs[0].kind = XSS; }],
+    ['proof app', (c) => { c.proofs[0].app = XSS; }],
+  ];
+  for (const [what, spoil] of confCases) {
+    const w2 = JSON.parse(JSON.stringify(web));
+    spoil(w2.conformance);
+    if (!validateWeb(w2).length) bad(`validateWeb() accepted a hostile conformance ${what}`);
+  }
   if (validateWeb(web).length) bad('validateWeb() refused the real table: ' + validateWeb(web).join('; '));
 }
 
