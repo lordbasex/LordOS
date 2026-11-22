@@ -6945,6 +6945,61 @@ static void build_backtrace(JSContext *ctx, JSValueConst error_obj,
                            JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
 }
 
+/* LordOS patch: the innermost max_frames frames of the running JS stack, as
+   " at name (file.js:line:col) < name (native) < ...", written into buf (a C
+   buffer). Unlike evaluating "new Error().stack" it runs no JavaScript and
+   makes no JS value, so the interrupt handler can call it at any point of
+   the interpreter. Returns the length written. */
+int JS_GetStackText(JSContext *ctx, char *buf, int size, int max_frames)
+{
+    JSStackFrame *sf;
+    int o = 0, n = 0, r;
+    char file[128];
+
+    if (size <= 0)
+        return 0;
+    buf[0] = '\0';
+    for(sf = ctx->rt->current_stack_frame; sf != NULL && n < max_frames;
+        sf = sf->prev_frame) {
+        const char *func_name_str, *str1, *loc = "native", *slash;
+        int line_num1 = 0, col_num1 = 0;
+        JSObject *p;
+
+        if (JS_VALUE_GET_TAG(sf->cur_func) != JS_TAG_OBJECT)
+            continue;
+        p = JS_VALUE_GET_OBJ(sf->cur_func);
+        if (js_class_has_bytecode(p->class_id)) {
+            JSFunctionBytecode *b = p->u.func.function_bytecode;
+            if (!b->has_debug)
+                continue;
+            if (sf->cur_pc)
+                line_num1 = find_line_num(ctx, b, sf->cur_pc - b->byte_code_buf - 1,
+                                          &col_num1);
+            loc = JS_AtomGetStr(ctx, file, sizeof(file), b->debug.filename);
+            slash = strrchr(loc, '/');
+            if (slash)
+                loc = slash + 1;
+        }
+        func_name_str = get_func_name(ctx, sf->cur_func);
+        str1 = func_name_str && func_name_str[0] ? func_name_str : "<anonymous>";
+        if (line_num1 != 0)
+            r = snprintf(buf + o, size - o, "%s%s (%s:%d:%d)", n ? " < " : " at ",
+                         str1, loc, line_num1, col_num1);
+        else
+            r = snprintf(buf + o, size - o, "%s%s (%s)", n ? " < " : " at ", str1, loc);
+        JS_FreeCString(ctx, func_name_str);
+        if (r < 0)
+            break;
+        if (r >= size - o) {
+            o = size - 1;
+            break;
+        }
+        o += r;
+        n++;
+    }
+    return o;
+}
+
 /* Note: it is important that no exception is returned by this function */
 static BOOL is_backtrace_needed(JSContext *ctx, JSValueConst obj)
 {

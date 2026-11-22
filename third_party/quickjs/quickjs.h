@@ -444,6 +444,8 @@ typedef struct JSMemoryUsage {
 
 void JS_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s);
 size_t JS_GetMallocSize(JSRuntime *rt); /* LordOS patch */
+/* LordOS patch: the running JS stack as text, without running JavaScript (interrupt handlers) */
+int JS_GetStackText(JSContext *ctx, char *buf, int size, int max_frames);
 void JS_DumpMemoryUsage(FILE *fp, const JSMemoryUsage *s, JSRuntime *rt);
 
 /* atom support */

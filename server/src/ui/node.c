@@ -197,7 +197,16 @@ void node_detach(Node *c) {
     invalidate_measure(p);
 }
 
+/* 1 if c is p or one of p's ancestors: putting c under p would close a cycle, and invalidate_measure would loop
+ * for ever and layout and paint recurse until the stack runs out. A theme's stale node id (ids are reused once a
+ * node is destroyed) could ask for it; the call is ignored. */
+static int closes_cycle(const Node *p, const Node *c) {
+    for (const Node *a = p; a; a = a->parent) if (a == c) return 1;
+    return 0;
+}
+
 void node_append(Node *p, Node *c) {
+    if (closes_cycle(p, c)) return;
     node_detach(c);
     c->parent = p;
     c->prev = p->last;
@@ -208,6 +217,7 @@ void node_append(Node *p, Node *c) {
 
 void node_insert_before(Node *p, Node *c, Node *before) {
     if (!before || before->parent != p) { node_append(p, c); return; }
+    if (before == c || closes_cycle(p, c)) return;
     node_detach(c);
     c->parent = p;
     c->next = before;

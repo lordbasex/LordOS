@@ -20,6 +20,7 @@
  *   sendFile(id, path[, { open }]) → request id: a dropped file into the guest's Downloads (guest agent); with open, the
  *             guest tools then open it there (Files' "Open with", 7.3); files(id) → how they went */
 #include "js_vm.h"
+#include "js_secret.h"
 #include "../media/media_int.h"
 #include "../media/aring.h"
 #include "../vm/vmproto.h"
@@ -679,10 +680,11 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
         if (JS_IsBool(vg)) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"guided\":%s", JS_ToBool(c, vg) ? "true" : "false");
         JS_FreeValue(c, vg);
         JSValue vp = JS_GetPropertyStr(c, o, "password");
-        const char *pw = JS_IsString(vp) ? JS_ToCString(c, vp) : NULL;
+        size_t pwn = 0;
+        char *pw = JS_IsString(vp) ? js_secret_dup(c, vp, &pwn) : NULL;
         char wp[260] = "";
         if (pw && pw[0] && (strlen(pw) > 127 || win_password(pw, wp, sizeof wp))) ok = 0;
-        if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
+        js_secret_free(pw, pwn);
         JS_FreeValue(c, vp);
         n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"wpass\":\"%s\"", wp);
         explicit_bzero(wp, sizeof wp);
@@ -692,7 +694,8 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
     JS_FreeValue(c, vd);
     /* the password: only its hash leaves here */
     JSValue vp = win ? JS_UNDEFINED : JS_GetPropertyStr(c, o, "password");
-    const char *pw = JS_IsString(vp) ? JS_ToCString(c, vp) : NULL;
+    size_t pwn = 0;
+    char *pw = JS_IsString(vp) ? js_secret_dup(c, vp, &pwn) : NULL;
     char hash[160] = "";
     if (pw && pw[0] && strlen(pw) < 256) {
         char salt[64];
@@ -702,7 +705,7 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
         if (h && h[0] == '$' && strlen(h) < sizeof hash) snprintf(hash, sizeof hash, "%s", h);
         explicit_bzero(&cd, sizeof cd);
     }
-    if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
+    js_secret_free(pw, pwn);
     JS_FreeValue(c, vp);
     if (!win && !hash[0]) ok = 0;
     if (!win) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"hash\":\"%s\"}", hash);
@@ -755,7 +758,8 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     char hash[160] = "";
     JSValue vp = JS_GetPropertyStr(c, argv[0], "rootPassword");
     if (ok && JS_IsString(vp)) {
-        const char *pw = JS_ToCString(c, vp);
+        size_t pwn = 0;
+        char *pw = js_secret_dup(c, vp, &pwn);
         if (pw && pw[0]) {
             char salt[64];
             struct crypt_data cd;
@@ -764,7 +768,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
             if (h && h[0] == '$' && strlen(h) < sizeof hash) snprintf(hash, sizeof hash, "%s", h); else ok = 0;
             explicit_bzero(&cd, sizeof cd);
         }
-        if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
+        js_secret_free(pw, pwn);
     }
     JS_FreeValue(c, vp);
     /* an unattended install (only from an ISO) */

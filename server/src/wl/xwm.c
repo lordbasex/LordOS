@@ -337,9 +337,9 @@ static void detach(XWin *w) {
 }
 
 static void free_win(XWin *w) {
+    for (XWin **p = &X.wins; *p; p = &(*p)->next) if (*p == w) { *p = w->next; break; }   /* first: detach calls out */
     detach(w);
     if (X.focus == w) X.focus = NULL;
-    for (XWin **p = &X.wins; *p; p = &(*p)->next) if (*p == w) { *p = w->next; break; }
     free(w);
 }
 
@@ -1805,7 +1805,15 @@ int xwm_start(int fd, struct wl_event_loop *loop) {
     return 0;
 }
 
+/* Re-entered from what it calls (dnd_stop ends a drag in wl.c, free_win unmaps a window, and both may send to X),
+ * a failed send used to call lost() → xwm_stop() again from inside itself, freeing the same windows twice. The
+ * connection is marked closed first: flush() and lost() do nothing from then on, and a nested call returns. */
 void xwm_stop(void) {
+    static int stopping;
+    if (stopping) return;
+    stopping = 1;
+    int fd = X.fd;
+    X.fd = -1;
     dnd_stop();
     while (X.wins) free_win(X.wins);
     while (X.xfers) xfer_free(X.xfers);
@@ -1814,7 +1822,7 @@ void xwm_stop(void) {
     sel_ask_n = 0;
     if (X.ev) wl_event_source_remove(X.ev);
     if (X.idle) wl_event_source_remove(X.idle);
-    if (X.fd >= 0) close(X.fd);
+    if (fd >= 0) close(fd);
     xo_free(&X.out);
     free(X.in);
     int debug = X.debug;
@@ -1822,6 +1830,7 @@ void xwm_stop(void) {
     X.fd = -1;
     X.debug = debug;
     memset(atom, 0, sizeof atom);
+    stopping = 0;
 }
 
 static void lost(const char *why) {

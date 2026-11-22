@@ -12,7 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <sys/resource.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -29,7 +31,48 @@ static void sleep_ms(int ms) { struct timespec d = { ms / 1000, (ms % 1000) * 10
 /* one iteration of a main loop: out of poll() for `busy` ms (spinning), then back in it for a while */
 static void iteration(int busy) { wdog_busy(mono()); spin_ms(busy); wdog_idle(); sleep_ms(450); }
 
-static int on_interrupt(JSRuntime *r, void *o) { (void)r; (void)o; return wdog_js_poll() == 2; }
+/* the interrupt handler also reads the JS stack as text (JS_GetStackText, what js.c's stall sampler does) */
+static JSContext *spin_ctx;
+static char spin_stack[256];
+static int on_interrupt(JSRuntime *r, void *o) {
+    (void)r; (void)o;
+    if (spin_ctx && !spin_stack[0]) JS_GetStackText(spin_ctx, spin_stack, (int)sizeof spin_stack, 5);
+    return wdog_js_poll() == 2;
+}
+
+/* the crash report (wdog_crash_hooks): a child that overflows its stack, or aborts, with its stderr in a pipe */
+static volatile int sink;
+static int deep(int n) {
+    volatile char pad[256];
+    pad[n & 255] = (char)n;
+    sink = pad[(n * 7) & 255];
+    if (sink == 1000) return 0;             /* never (a char): only so the recursion isn't provably endless */
+    return deep(n + 1) + pad[0];
+}
+static int crash_child(int how, char *out, size_t n, int *sig) {
+    int fd[2];
+    if (pipe(fd)) return -1;
+    pid_t p = fork();
+    if (p < 0) return -1;
+    if (p == 0) {
+        dup2(fd[1], 2);
+        close(fd[0]);
+        wdog_crash_hooks("9.9.9 (test)");
+        if (how) abort();
+        sink = deep(0);
+        _exit(0);
+    }
+    close(fd[1]);
+    size_t o = 0;
+    ssize_t r;
+    while (o + 1 < n && (r = read(fd[0], out + o, n - 1 - o)) > 0) o += (size_t)r;
+    out[o] = 0;
+    close(fd[0]);
+    int st = 0;
+    waitpid(p, &st, 0);
+    *sig = WIFSIGNALED(st) ? WTERMSIG(st) : 0;
+    return 0;
+}
 
 int main(void) {
     setenv("LORD_WDOG_STALL_MS", "400", 1);
@@ -72,6 +115,7 @@ int main(void) {
     JSRuntime *jrt = JS_NewRuntime();
     JS_SetInterruptHandler(jrt, on_interrupt, NULL);
     JSContext *ctx = JS_NewContext(jrt);
+    spin_ctx = ctx;
     static const char loop[] = "let n = 0; for (;;) { try { for (;;) n++; } catch (e) { n = -1; } }";
     uint64_t t0 = mono();
     wdog_busy(t0);
@@ -84,6 +128,8 @@ int main(void) {
     CHECK(stopped && msg && strstr(msg, "interrupted"), "an endless JS loop (with a try/catch) is stopped: %s", msg ? msg : "-");
     CHECK(took > 1.0 && took < 4.0, "stopped after %.1f s (limit 1.2 s, then 0.5 s of its own)", took);
     CHECK(wdog_js_stopped() == 1, "one JS task stopped");
+    CHECK(strstr(spin_stack, " at <eval> (<spin>:1:") != NULL, "the JS stack read from the interrupt handler, no JS run: %s", spin_stack);
+    spin_ctx = NULL;
     if (msg) JS_FreeCString(ctx, msg);
     else JS_FreeValue(ctx, r);
     sleep_ms(450);
@@ -98,6 +144,19 @@ int main(void) {
     JS_FreeContext(ctx);
     JS_FreeRuntime(jrt);
     wdog_stop();
+
+    /* a crash leaves its report: a stack overflow (caught on the alternate stack) and an abort */
+    static char out[16384];
+    int sig = 0;
+    if (crash_child(0, out, sizeof out, &sig) == 0) {
+        CHECK(sig == SIGSEGV, "a stack overflow ends in SIGSEGV (%d)", sig);
+        CHECK(strstr(out, "lord-server: crashed: SIGSEGV") && strstr(out, "version 9.9.9 (test)"), "its report names the signal and the version");
+        CHECK(strstr(out, "wdog-test(") != NULL, "its report has the C stack");
+        CHECK(strstr(out, "end of the crash report") != NULL, "the report is complete");
+    } else CHECK(0, "fork for the crash report");
+    if (crash_child(1, out, sizeof out, &sig) == 0) {
+        CHECK(sig == SIGABRT && strstr(out, "crashed: SIGABRT") && strstr(out, "end of the crash report"), "an abort is reported, then ends in SIGABRT (%d)", sig);
+    } else CHECK(0, "fork for the abort report");
     printf("%s\n", fails ? "wdog: FAILED" : "wdog: all ok");
     return fails ? 1 : 0;
 }

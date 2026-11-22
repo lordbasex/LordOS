@@ -251,6 +251,13 @@ EOF
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
     esac
+    # surfaces made children of themselves or of their descendants: refused, lord-server goes on
+    sh tests/popup_headless.sh cycle-client >"$T/out" 2>&1
+    case $? in
+        0) ok "surface-cycles (tests/cycle_client.c, headless lord-server)" ;;
+        77) skip "surface-cycles" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "surface-cycles (tests/cycle_client.c, headless lord-server)"; cat "$T/out" ;;
+    esac
     # explicit sync's kernel side (src/wl/syncobj.c) on this machine's render node
     ./build/syncobj-kernel-test >"$T/out" 2>&1
     case $? in

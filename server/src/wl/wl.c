@@ -1953,12 +1953,26 @@ static void sub_gone(struct wl_resource *r) {
     s->role = R_NONE;
 }
 
+/* 1 if s is a or one of a's parents (a subsurface's or a menu's). A surface made a child of itself or of its own
+ * descendant would close a cycle, and the walks of the tree (origin, damage_node, paint_tree, surface_at) would
+ * recurse or loop for ever: the requests that set a parent refuse it. A chain longer than MAX_SURF is a cycle. */
+static int surf_in_chain(const Surf *a, const Surf *s) {
+    for (int n = 0; a && n <= MAX_SURF; n++, a = a->parent) if (a == s) return 1;
+    return a != NULL;
+}
+
 static void subc_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void subc_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface, struct wl_resource *parent) {
     Surf *s = wl_resource_get_user_data(surface), *p = wl_resource_get_user_data(parent);
-    /* one wl_subsurface per wl_surface, and not for a surface that has another role (cursor, drag icon) */
-    if (s->sub || s->role == R_CURSOR || s->role == R_DNDICON || s == p) {
+    if (!s || !p) { wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE, "the wl_surface is gone"); return; }
+    /* one wl_subsurface per wl_surface, and not for a surface that has another role (window, menu, cursor, drag icon) */
+    if (s->sub || s->top || s->popup || s->role == R_CURSOR || s->role == R_DNDICON) {
         wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE, "the wl_surface already has a role");
+        return;
+    }
+    /* wayland.xml: the parent may be neither the surface itself nor one of its descendants */
+    if (surf_in_chain(p, s)) {
+        wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_PARENT, "the parent is the surface itself or one of its descendants");
         return;
     }
     struct wl_resource *res = wl_resource_create(c, &wl_subsurface_interface, wl_resource_get_version(r), id);
@@ -3574,12 +3588,17 @@ static void xs_popup(struct wl_client *c, struct wl_resource *r, uint32_t id, st
     Surf *s = wl_resource_get_user_data(r);
     if (!s) { wl_resource_post_error(r, XDG_SURFACE_ERROR_NOT_CONSTRUCTED, "the wl_surface is gone"); return; }
     if (s->top || s->popup) { wl_resource_post_error(r, XDG_SURFACE_ERROR_ALREADY_CONSTRUCTED, "the xdg_surface already has a role object"); return; }
+    Surf *ps = parent ? wl_resource_get_user_data(parent) : NULL;
+    if (ps && surf_in_chain(ps, s)) {       /* a menu of itself or of its own menu: a cycle (surf_in_chain) */
+        wl_resource_post_error(r, XDG_WM_BASE_ERROR_INVALID_POPUP_PARENT, "the popup's parent is the popup itself or one of its menus");
+        return;
+    }
     struct wl_resource *p = wl_resource_create(c, &xdg_popup_interface, wl_resource_get_version(r), id);
     if (!p) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(p, &popup_impl, s, pop_gone);
     s->popup = p;
     s->role = R_POPUP;
-    s->parent = parent ? wl_resource_get_user_data(parent) : NULL;
+    s->parent = ps;
     position_popup(s, wl_resource_get_user_data(positioner));
 }
 static void xs_geometry(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) {
