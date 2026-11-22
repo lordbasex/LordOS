@@ -680,6 +680,12 @@ build/pwguard-test: tests/pwguard_test.c $(PWGUARD_SRC) $(wildcard src/sec/*.h s
 build/wl-globals: tests/wl_globals.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ $< -lwayland-client
+# Wayland and Xwayland conformance, point by point, scored 0–100 % per protocol (tools/wl-conformance.mjs, docs/WAYLAND.md,
+# "Conformance"): a headless lord-server, build/wl-conformance-client and build/x11-conformance-client (built by the tool).
+# Needs the theme bundle (npm run build). WLCONF_ARGS=--record writes docs/wayland-conformance.json.
+wl-conformance: build/lord-server build/wl-globals
+	node ../tools/wl-conformance.mjs $(WLCONF_ARGS)
+.PHONY: wl-conformance
 build/fw-rules-test: tests/fw_rules_test.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c $(wildcard src/fw/*.h) src/sec/json.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fw_rules_test.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c

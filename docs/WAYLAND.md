@@ -1041,6 +1041,8 @@ display.
 
 ### Tests
 
+- `make -C server wl-conformance`: ICCCM, EWMH, the selections with INCR and the XWM's unit tests, scored per item (see
+  "Conformance" below).
 - `build/xwm-test` (in `make -C server test`): request encoding, the setup reply, packet framing,
   sequence numbers, `WM_CLASS`, titles (UTF-8, Latin-1, invalid), Motif hints, size hints,
   `WM_HINTS`, `_NET_WM_MOVERESIZE`, text targets, the same-client check, the display choice, the XDND
@@ -1413,6 +1415,137 @@ the icon belongs to that window, and the Dock entry of an app id nobody installe
 - **Tests:** `build/wlicon-test` (the re-encoding, the limits, the session budget, which buffer is kept) and
   `wlperf-client icon` (the 64 px buffer of 64, 300 and 48 reaches the theme as 64 × 64 RGBA, a 64 × 32 buffer is
   `invalid_buffer`).
+
+## Conformance (`tools/wl-conformance.mjs`, in development)
+
+A script checks the compositor **point by point** against the protocol XML files and gives every advertised
+global, and every X11 area, a score from 0 to 100 %. The numbers below are from 2026-11-22, commit `3bee4dcc`
+(`docs/wayland-conformance.json` has every check, its result and a `file:line` hint).
+
+```sh
+npm run build && make -C server -j4      # the theme bundle and lord-server
+make -C server wl-conformance            # static + dynamic + X11 + real clients, about a minute
+node tools/wl-conformance.mjs --static-only            # only the source (no server, seconds)
+node tools/wl-conformance.mjs --only xdg_wm_base,wl_seat --verbose
+make -C server wl-conformance WLCONF_ARGS=--record     # rewrites docs/wayland-conformance.json
+```
+
+It never touches a session: it starts its own `lord-server --headless 1280x800` on the CPU path, in a private
+runtime folder and home (with `--user`, so the X socket exists and Xwayland starts on the first X11 client), and the
+theme with a small hook that logs what it gets for the test windows, closes the one titled `wlconf-close` and answers
+the idle and shortcuts permission prompts (an open prompt holds the keyboard).
+
+**What it reads.** The protocol XML files: the ones the build names in `server/Makefile` and `server/mk/*.mk` first, then
+copies vendored in the repository, then `/usr/share/wayland`, `/usr/share/wayland-protocols` and
+`/usr/share/plasma-wayland-protocols` (`--xml-dirs` adds more). The globals: `wl_global_create` in `server/src` and what a
+client really sees (`build/wl-globals`), and `docs/wayland-protocols.json` when it exists (`--claims`: each global's
+claimed version becomes a check). From each global it follows every `new_id` to the interfaces it creates, at the
+advertised version. A protocol added to the compositor is picked up with no change to the script.
+
+**The checks**, with their weights:
+
+| Kind | Weight | Passes when |
+|---|---|---|
+| Request (static) | 3 | every implementation table of the interface has a handler for it (a NULL one makes libwayland abort lord-server when a client sends it), the handler isn't a stub (an empty body, only `(void)` casts, or "not implemented"/TODO), and a destructor calls `wl_resource_destroy` |
+| Event (static) | 2 | `<interface>_send_<event>()` (or `wl_resource_post_event` with its opcode) is called somewhere |
+| Error (static) | 1 | `<INTERFACE>_ERROR_<NAME>` is raised somewhere |
+| Protocol flow (dynamic) | 3 | `server/tests/wl_conformance.c` against the headless server: the protocol's main flow (objects created and destroyed, the events expected and their order) and each misuse answered with exactly the protocol error the specification names |
+| Generic (dynamic) | 1 | binding at every version from 1 to the advertised one, and the destructor at each, end without an error (any protocol, even one with no flow yet) |
+| X11 (dynamic) | 3 | `server/tests/x11_conformance.c` (xcb) against Xwayland on that server, and what the theme got for its windows |
+| X11 source pattern, unit test | 1 | the item's patterns in `xwm.c`/`xwayland.c` (`tools/wl-conformance/xwayland.json`), and `build/xwm-test`, `xwscale-test`, `xauth-test`, `dndgate-test`, `urilist-test` |
+
+Score = points of the passed checks / points of all checks (skipped ones don't count). An item is **complete** only at
+100 % with nothing skipped, its XML found and at least one protocol-specific flow: a protocol checked only by the generic
+bind is never called complete. Exceptions the protocol itself allows (an optimization hint the compositor may ignore, an
+error no request can trigger) are listed with their reason in `tools/wl-conformance/allow.json`; they count as passed and
+the report shows them. Real programs that are installed (foot, vkcube, xterm here; `weston-simple-*`, `wayland-info`,
+GTK and Qt demos when present) run for 6 s each and are reported with the globals they bound (`WAYLAND_DEBUG`), not
+scored. Not yet covered: Firefox and Chromium (on the VM), and pointer/touch input (headless has no pointer over the
+windows, so checks that need a real enter serial are skipped).
+
+**Wayland (2026-11-22): 31 globals, mean 94 %, 19 complete.**
+
+| Global | Version | Score | Checks | Failing | Complete |
+|---|---|---|---|---|---|
+| `ext_idle_notifier_v1` | 1 | 100 % | 8 | 0 | yes |
+| `org_kde_kwin_server_decoration_manager` | 1 | 100 % | 4 | 0 | no (no XML on the system: dynamic only) |
+| `wl_compositor` | 6 | 86.2 % | 43 | 7 | no |
+| `wl_data_device_manager` | 3 | 85.2 % | 44 | 6 | no |
+| `wl_output` | 4 | 100 % | 20 | 0 | yes |
+| `wl_seat` | 9 | 93.5 % | 55 | 4 | no |
+| `wl_shm` (libwayland) | 2 | 100 % | 19 | 0 | yes |
+| `wl_subcompositor` | 1 | 51.2 % | 17 | 8 | no |
+| `wp_alpha_modifier_v1` | 1 | 100 % | 11 | 0 | yes |
+| `wp_cursor_shape_manager_v1` | 2 | 100 % | 12 | 0 | yes |
+| `wp_fractional_scale_manager_v1` | 1 | 100 % | 10 | 0 | yes |
+| `wp_presentation` | 2 | 100 % | 14 | 0 | yes |
+| `wp_security_context_manager_v1` | 1 | 100 % | 20 | 0 | yes |
+| `wp_single_pixel_buffer_manager_v1` | 1 | 100 % | 8 | 0 | yes |
+| `wp_viewporter` | 1 | 81.3 % | 19 | 4 | no |
+| `xdg_activation_v1` | 1 | 84.2 % | 15 | 2 | no |
+| `xdg_toplevel_icon_manager_v1` | 1 | 97.4 % | 17 | 1 | no |
+| `xdg_wm_base` | 7 | 71.3 % | 107 | 34 | no |
+| `xdg_wm_dialog_v1` | 1 | 100 % | 10 | 0 | yes |
+| `zwp_idle_inhibit_manager_v1` | 1 | 100 % | 6 | 0 | yes |
+| `zwp_keyboard_shortcuts_inhibit_manager_v1` | 1 | 100 % | 10 | 0 | yes |
+| `zwp_linux_dmabuf_v1` | 5 | 98.9 % | 48 | 1 | no |
+| `zwp_pointer_constraints_v1` | 1 | 85.3 % | 17 | 2 | no |
+| `zwp_pointer_gestures_v1` | 3 | 100 % | 18 | 0 | yes |
+| `zwp_primary_selection_device_manager_v1` | 1 | 100 % | 17 | 0 | yes |
+| `zwp_relative_pointer_manager_v1` | 1 | 100 % | 6 | 0 | yes |
+| `zwp_text_input_manager_v3` | 1 | 100 % | 20 | 0 | yes |
+| `zxdg_decoration_manager_v1` | 1 | 78.0 % | 18 | 5 | no |
+| `zxdg_exporter_v2` | 1 | 100 % | 10 | 0 | yes |
+| `zxdg_importer_v2` | 1 | 100 % | 11 | 0 | yes |
+| `zxdg_output_manager_v1` | 3 | 100 % | 20 | 0 | yes |
+
+What keeps the others below 100 % (every one is listed with its `file:line` in the JSON):
+
+- **xdg-shell errors are almost never raised**: a buffer before the first `ack_configure`, an unknown serial, a 0×0
+  window geometry, `set_parent` to itself, negative or crossed min/max sizes, an invalid resize edge, an
+  incomplete positioner, a popup destroyed under its child, `xdg_wm_base` destroyed with surfaces alive, a role object
+  outliving its `xdg_surface`, `grab` on a mapped popup: each one is accepted silently. `xdg_wm_base.ping` is never sent
+  (an app that hangs isn't detected, `pong` is a no-op), and `xdg_positioner.set_reactive`, `set_parent_size` and
+  `set_parent_configure` are ignored (a popup doesn't follow its moving parent).
+- **Subsurfaces**: `place_above`/`place_below` and `set_sync`/`set_desync` are stubs (`wl.c`, `sub_place`, `sub_sync`), a
+  surface as its own parent raises `bad_surface` instead of `bad_parent`, and placing against a non-sibling isn't an error.
+- **wl_surface**: `invalid_offset` (attach with x, y ≠ 0 at v5+), `invalid_size` (a buffer not a multiple of the
+  scale) and `defunct_role_object` are never raised; `preferred_buffer_transform` is never sent.
+- **Data devices**: `wl_data_offer.finish` and `set_actions` on a selection offer are no-ops instead of
+  `invalid_finish`/`invalid_offer`, and a drag-and-drop source used as the selection isn't `invalid_source`.
+- **wl_seat**: `get_touch` without touch isn't `missing_capability`, `wl_pointer.set_cursor` with another role's surface
+  isn't checked (`role`), `wl_touch.orientation` is never sent.
+- **Viewporter**: `out_of_buffer` and `bad_size` never raised. **xdg-decoration**: `unconfigured_buffer`, `orphaned` and
+  `invalid_mode` never raised. **xdg-activation**: a request on a committed token isn't `already_used`, and
+  `set_surface` is ignored. **Pointer constraints**: `set_region` is ignored. **dmabuf**: `out_of_bounds` never raised.
+  **Toplevel icon**: `no_buffer` never raised.
+
+**Xwayland / X11 (2026-11-22, Xwayland 24.1.6, run headless): 28 items, mean 74 %.** Complete: startup and surface
+association aside from xwayland-shell-v1 (92.3 %), `WM_NAME`/`_NET_WM_NAME`, `WM_CLASS`, `WM_PROTOCOLS`
+(`WM_DELETE_WINDOW` when LordOS closes a window, `WM_TAKE_FOCUS` for `input=False`), the focus model, `WM_STATE` and
+`WM_CHANGE_STATE`, `_NET_SUPPORTING_WM_CHECK`, `_NET_SUPPORTED`, `_NET_WM_MOVERESIZE`, `_MOTIF_WM_HINTS` and the
+selections (CLIPBOARD and PRIMARY X11 → Wayland, CLIPBOARD Wayland → X11, INCR both ways with 1 and 2 MiB). XDND,
+HiDPI, the root cursor and the isolation are at 100 % from source patterns and unit tests only (no dynamic check yet).
+Below 100 %:
+
+| Item | Score | What fails |
+|---|---|---|
+| Startup and surface association | 92.3 % | the association is `WL_SURFACE_ID`; `xwayland-shell-v1` isn't offered |
+| `_NET_WM_STATE` | 63.9 % | `ABOVE`, `DEMANDS_ATTENTION`, `MODAL` (and `SKIP_TASKBAR`) aren't supported (fullscreen, maximized, hidden and focused pass) |
+| `_NET_WM_WINDOW_TYPE` | 78.9 % | `UTILITY` isn't known |
+| `_NET_ACTIVE_WINDOW` | 70 % | a request is ignored even from a pager (source 2): deliberate, no focus stealing (`xwm.c`) |
+| `_NET_CLIENT_LIST` | 71.4 % | no `_NET_CLIENT_LIST_STACKING` |
+| `_NET_FRAME_EXTENTS` | 63.6 % | no `_NET_REQUEST_FRAME_EXTENTS` |
+| `WM_TRANSIENT_FOR` | 57.1 % | the theme is told the window is a dialog, not whose: no parent for X dialogs |
+| `WM_HINTS` | 50 % | the urgency hint isn't read |
+| `WM_NORMAL_HINTS` | 25 % | a ConfigureRequest below the minimum size is granted (300×200 minimum, 100×80 given) |
+| `_NET_WM_PID`, `_NET_WM_ICON`, `_NET_WORKAREA`, `_NET_CLOSE_WINDOW` | 0 % | not supported: an X app's own icon never reaches the Dock, X apps get no work area, pagers can't close windows; the pid lord-server trusts comes from X-Resource, not from `_NET_WM_PID` (which the app writes), but it isn't listed in `_NET_SUPPORTED` either |
+
+**Adding to it.** A new global is scored as soon as it's advertised: static checks from its XML and the generic bind.
+To call it complete, add its flow to `server/tests/wl_conformance.c` (a function, under `#ifdef CONF_HAVE_<XML FILE
+NAME>`, in the `flows` table with the global it's scored under) with its main flow and one check per protocol error. An X11
+item or pattern goes in `tools/wl-conformance/xwayland.json`, its dynamic checks in `server/tests/x11_conformance.c`
+under the same item id.
 
 ## Pending
 
