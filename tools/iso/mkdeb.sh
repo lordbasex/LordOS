@@ -366,7 +366,7 @@ install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-blu
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf"
 install -D -m 644 tools/iso/rootfs/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf "$PKG/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf"
-# LordOS Studio's Voice Isolation (E-S6, docs/CAMERA-STUDIO-PLAN.md 7): one more microphone from PipeWire's own echo-cancel
+# LordOS Studio's Noise Reduction (E-S6, docs/CAMERA-STUDIO-PLAN.md 7): one more microphone from PipeWire's own echo-cancel
 # module with WebRTC; static, read by each user's pipewire at its next start
 install -D -m 644 tools/iso/rootfs/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf "$PKG/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf"
 # in a virtual machine only: more headroom for emulated sound cards (docs/SOUND.md, "Virtual machines")

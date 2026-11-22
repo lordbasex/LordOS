@@ -81,11 +81,11 @@
   "faceless": "Esto necesita el modelo facial de LordOS Studio, que no está instalado.",
   "mic": "Modo de micrófono",
   "micStandard": "Estándar",
-  "micVoice": "Aislamiento de voz",
-  "micWide": "Espectro amplio",
+  "micVoice": "Reducción de ruido",
+  "micWide": "Rango completo",
   "micHint.standard": "Tu micrófono tal como es.",
   "micHint.voice": "Quita el ruido a tu alrededor para que solo se escuche tu voz. Si tu voz suena robótica, desactivá la supresión de ruido de la propia app de llamadas.",
   "micHint.wide": "Tu micrófono sin ningún procesamiento: para música y todos los sonidos de la sala.",
-  "micUnavailable": "El Aislamiento de voz aparece después de cerrar sesión y volver a entrar.",
+  "micUnavailable": "La Reducción de ruido aparece después de cerrar sesión y volver a entrar.",
   "noMic": "No hay ningún micrófono conectado."
 }

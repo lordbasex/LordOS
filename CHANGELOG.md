@@ -224,15 +224,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `studio-bg-remove` (administrators), the twins of `wallpaper-get`: JS names a catalog entry, never a URL or a path,
     the download runs as `nobody` in the Store's scope, and a file whose size or SHA-256 isn't the catalog's is never
     kept (`/var/lib/lordos/studio/<sha256>.jpg` or `.mp4`). A Credits page lists every author and license.
-  - **Mic Mode** (E-S6): Standard, Voice Isolation and Wide Spectrum in the popover. Voice Isolation is one more
-    microphone, "LordOS Voice Isolation", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
+  - **Mic Mode** (E-S6): Standard, Noise Reduction and Full Range in the popover. Noise Reduction is one more
+    microphone, "LordOS Noise Reduction", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
     static drop-in (`/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf`); choosing a mode only sets the default
     microphone through LordOS's existing sound client. There is no echo cancellation (nothing is routed to its echo
-    reference), no module loaded at runtime and no new privilege. Standard and Wide Spectrum both use the microphone
+    reference), no module loaded at runtime and no new privilege. Standard and Full Range both use the microphone
     with no processing. The sound lists hide the filter's own echo reference and streams, and the capture indicator
     no longer counts the filter's own link to the microphone (only when PipeWire itself owns it); the app that records
-    Voice Isolation is shown as before.
-  - **The popover** (`sdk/studio.jsx`, logic in `sdk/studiomodel.js`, downloads in `sdk/studiobg.js`): new rows Studio
+    Noise Reduction is shown as before. The modes carry our own names, Noise Reduction and Full Range, in all 35
+    languages (the locale keys `studio.micVoice` and `studio.micWide` and the PipeWire node names `lordos_voice_*`
+    are unchanged), and the microphone other apps list is "LordOS Noise Reduction".
+  - **The popover** (`sdk/studio.jsx`, logic in `sdk/studiomodel.js`, downloads in `sdk/studiobg.js`): new rows Face
     Light, Auto Framing, Filters and Retouch, each with its page; the Background page has None, Blur, Picture and Video,
     the green screen and colour match, the catalog by category, "Add your own…" (a picture or a short video) and
     Credits. LordOS's Cyberpunk City wallpapers are no longer offered as camera backgrounds (some show people). New
@@ -242,7 +244,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `tests/studio_voice_test.mjs` (the drop-in, without touching PipeWire), new cases in `build/studio-hub-test`,
     `tests/pwguard_test.c`, `tests/studio_model_test.mjs` and `build/studio-helper-test` (every look, BlazeFace and a
     looping video inside lord-studio's sandbox).
-  - **Still to verify on a VM:** Voice Isolation loaded by a real PipeWire and heard in a Meet call, and whether the
+  - **Still to verify on a VM:** Noise Reduction loaded by a real PipeWire and heard in a Meet call, and whether the
     microphone stays open while nothing records it. Not built yet: light wrap, the face spotlight, the key-colour eyedropper.
 - **`fastfetch` and `neofetch` run LordOS's `lordos-fetch` until the real package is installed, in development**
   (`packaging/fallback-bin/fastfetch`, `packaging/profile.d/lordos-fallback.sh`, `server/src/remote/sess.c`,

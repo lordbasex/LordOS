@@ -81,11 +81,11 @@
   "faceless": "Este nevoie de modelul facial al LordOS Studio, care nu este instalat.",
   "mic": "Mod microfon",
   "micStandard": "Standard",
-  "micVoice": "Izolarea vocii",
-  "micWide": "Spectru larg",
+  "micVoice": "Reducerea zgomotului",
+  "micWide": "Gamă completă",
   "micHint.standard": "Microfonul tău așa cum este.",
   "micHint.voice": "Elimină zgomotul din jurul tău, ca să se audă doar vocea ta. Dacă vocea ta sună robotic, dezactivează reducerea zgomotului din aplicația de apeluri.",
   "micHint.wide": "Microfonul tău fără nicio procesare: pentru muzică și orice sunet din cameră.",
-  "micUnavailable": "Izolarea vocii apare după ce te deconectezi și te conectezi din nou.",
+  "micUnavailable": "Reducerea zgomotului apare după ce te deconectezi și te conectezi din nou.",
   "noMic": "Niciun microfon nu este conectat."
 }

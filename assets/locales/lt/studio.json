@@ -81,11 +81,11 @@
   "faceless": "Tam reikia LordOS Studio veido modelio, kuris neįdiegtas.",
   "mic": "Mikrofono režimas",
   "micStandard": "Standartinis",
-  "micVoice": "Balso izoliavimas",
-  "micWide": "Platus spektras",
+  "micVoice": "Triukšmo mažinimas",
+  "micWide": "Visas diapazonas",
   "micHint.standard": "Jūsų mikrofonas toks, koks yra.",
   "micHint.voice": "Pašalina aplinkos triukšmą, kad būtų girdimas tik jūsų balsas. Jei balsas skamba kaip roboto, išjunkite paties skambučių programos triukšmo slopinimą.",
   "micHint.wide": "Jūsų mikrofonas be jokio apdorojimo: muzikai ir visiems kambario garsams.",
-  "micUnavailable": "Balso izoliavimas atsiranda, kai atsijungiate ir vėl prisijungiate.",
+  "micUnavailable": "Triukšmo mažinimas atsiranda, kai atsijungiate ir vėl prisijungiate.",
   "noMic": "Neprijungtas joks mikrofonas."
 }

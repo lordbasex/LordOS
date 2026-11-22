@@ -241,7 +241,7 @@ t('phase 3: Mic Mode through the PulseAudio client', () => {
   };
   assert.equal(voiceAvailable(st), true);
   assert.deepEqual(hardwareMics(st).map((m) => m.name), ['alsa_input.usb-mic', 'alsa_input.pci-builtin']);
-  // Voice Isolation: the filter listens to the microphone in use, which stays remembered; then it is the default
+  // Noise Reduction: the filter listens to the microphone in use, which stays remembered; then it is the default
   let p = micPlan(st, 'voice');
   assert.deepEqual(p, { ok: true, mic: 'alsa_input.usb-mic', calls: [['move', 'output', 30, 'alsa_input.usb-mic'], ['setDefault', 'source', VOICE_SOURCE]] });
   const on = { ...st, defaultSource: VOICE_SOURCE, outputs: [{ index: 30, name: VOICE_CAPTURE, source: 1 }] };
@@ -263,7 +263,7 @@ t('phase 3: Mic Mode through the PulseAudio client', () => {
   assert.deepEqual(shown.sinks.map((x) => x.name), ['alsa_output.hdmi']);
   assert.deepEqual(shown.inputs.map((x) => x.name), ['Firefox']);
   assert.deepEqual(shown.outputs.map((x) => x.name), ['Meet']);
-  assert.equal(shown.sources.length, 4);                                                    // Voice Isolation is a microphone
+  assert.equal(shown.sources.length, 4);                                                    // Noise Reduction is a microphone
   assert.equal(withoutVoiceInternals(null), null);
 });
 

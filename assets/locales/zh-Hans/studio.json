@@ -81,11 +81,11 @@
   "faceless": "这需要 LordOS Studio 的面部模型，但尚未安装。",
   "mic": "麦克风模式",
   "micStandard": "标准",
-  "micVoice": "语音突显",
-  "micWide": "宽频谱",
+  "micVoice": "降噪",
+  "micWide": "全频段",
   "micHint.standard": "保持麦克风的原始声音。",
   "micHint.voice": "去除你周围的噪音，只让你的声音被听到。如果你的声音听起来像机器人，请关闭通话应用自身的降噪功能。",
   "micHint.wide": "完全不经处理的麦克风声音：适合音乐和房间里的所有声音。",
-  "micUnavailable": "注销并重新登录后会出现“语音突显”。",
+  "micUnavailable": "注销并重新登录后会出现“降噪”。",
   "noMic": "没有连接麦克风。"
 }

@@ -13,7 +13,7 @@ import { withoutVoiceInternals } from './studiomodel.js';
 
 const has = () => typeof lord.sound !== 'undefined';
 const EMPTY = { connected: false, sinks: [], sources: [], inputs: [], outputs: [] };
-// LordOS Studio's Voice Isolation filter (sdk/studiomodel.js): its echo reference and its two streams are nobody's
+// LordOS Studio's Noise Reduction filter (sdk/studiomodel.js): its echo reference and its two streams are nobody's
 // outputs or apps, so the lists leave them out; Mic Mode reads the whole state (soundRaw).
 let raw = has() ? { ...EMPTY, ...lord.sound.state() } : EMPTY;
 export const soundRaw = () => raw;

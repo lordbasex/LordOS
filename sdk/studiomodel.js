@@ -21,8 +21,8 @@
 //   light       Face Light, lightAmount 0..100
 //   filter      'none' | 'warm' | 'cool' | 'vivid' | 'mono' | 'noir' | 'film' | 'fade' | 'sepia', filterStrength 0..100
 //   retouch     Retouch, retouchAmount 0..100
-//   mic         Mic Mode: 'standard' | 'voice' (Voice Isolation) | 'wide' (Wide Spectrum); micSource: the real
-//               microphone Voice Isolation listens to (its PulseAudio name)
+//   mic         Mic Mode: 'standard' | 'voice' (Noise Reduction) | 'wide' (Full Range); micSource: the real
+//               microphone Noise Reduction listens to (its PulseAudio name)
 //   bgFiles     the catalog's backgrounds downloaded: { [id]: variant name }
 // These are new keys with defaults, so no migration (sdk/settings.js MIGRATIONS) is needed.
 
@@ -204,9 +204,9 @@ export function bgItemOf(catalog, path) {
 }
 
 // ---- Mic Mode (docs/CAMERA-STUDIO-PLAN.md 7; the drop-in tools/iso/rootfs/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf)
-// "LordOS Voice Isolation" is one more microphone that PipeWire's echo-cancel module makes; choosing a mode only sets the
+// "LordOS Noise Reduction" is one more microphone that PipeWire's echo-cancel module makes; choosing a mode only sets the
 // default microphone and points the filter at the real one, through lord.sound (the PulseAudio client). Standard and
-// Wide Spectrum both use the microphone as it is (no processing at all); Voice Isolation is the filtered one.
+// Full Range both use the microphone as it is (no processing at all); Noise Reduction is the filtered one.
 export const VOICE_SOURCE = 'lordos_voice_isolation';
 export const VOICE_CAPTURE = 'lordos_voice_capture';
 export const VOICE_INTERNAL_SINKS = Object.freeze(['lordos_voice_reference']);
@@ -224,16 +224,16 @@ export function withoutVoiceInternals(st) {
   };
 }
 export const voiceAvailable = (st) => list(st?.sources).some((s) => s && s.name === VOICE_SOURCE);
-// the real microphones (not monitors, not Voice Isolation)
+// the real microphones (not monitors, not Noise Reduction)
 export const hardwareMics = (st) => list(st?.sources).filter((s) => s && s.monitorOf === -1 && s.name !== VOICE_SOURCE);
-// the mode shown: Voice Isolation while it is the default microphone; else what was chosen
+// the mode shown: Noise Reduction while it is the default microphone; else what was chosen
 export function micModeOf(st, cfg) {
   const c = normalizeStudio(cfg);
   if (st && st.defaultSource === VOICE_SOURCE) return 'voice';
   return c.mic === 'wide' ? 'wide' : 'standard';
 }
 // What choosing a mode does: [fn, ...args] calls of lord.sound, and the real microphone kept in settings.studio.micSource.
-// raw: lord.sound.state() as it is (with the filter's capture stream). ok false: no microphone, or no Voice Isolation.
+// raw: lord.sound.state() as it is (with the filter's capture stream). ok false: no microphone, or no Noise Reduction.
 export function micPlan(raw, mode, saved = '') {
   const hw = hardwareMics(raw);
   const def = raw?.defaultSource || '';

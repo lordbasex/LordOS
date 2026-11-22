@@ -81,11 +81,11 @@
   "faceless": "Bunun için LordOS Studio’nun yüz modeli gerekir, ancak yüklü değil.",
   "mic": "Mikrofon Modu",
   "micStandard": "Standart",
-  "micVoice": "Ses Yalıtımı",
-  "micWide": "Geniş Spektrum",
+  "micVoice": "Gürültü Azaltma",
+  "micWide": "Tam Aralık",
   "micHint.standard": "Mikrofonunuz olduğu gibi.",
   "micHint.voice": "Yalnızca sesinizin duyulması için çevrenizdeki gürültüyü kaldırır. Sesiniz robot gibi geliyorsa, arama uygulamasının kendi gürültü engellemesini kapatın.",
   "micHint.wide": "Hiçbir işleme uygulanmamış mikrofonunuz: müzik ve odadaki her ses için.",
-  "micUnavailable": "Ses Yalıtımı, oturumu kapatıp yeniden açtıktan sonra görünür.",
+  "micUnavailable": "Gürültü Azaltma, oturumu kapatıp yeniden açtıktan sonra görünür.",
   "noMic": "Bağlı mikrofon yok."
 }

@@ -81,11 +81,11 @@
   "faceless": "Bunun üçün LordOS Studio-nun üz modeli lazımdır, lakin o quraşdırılmayıb.",
   "mic": "Mikrofon rejimi",
   "micStandard": "Standart",
-  "micVoice": "Səs izolyasiyası",
-  "micWide": "Geniş spektr",
+  "micVoice": "Küyün azaldılması",
+  "micWide": "Tam diapazon",
   "micHint.standard": "Mikrofonunuz olduğu kimi.",
   "micHint.voice": "Yalnız səsiniz eşidilsin deyə ətrafınızdakı küyü silir. Səsiniz robot kimi səslənirsə, zəng tətbiqinin öz küy azaltmasını söndürün.",
   "micHint.wide": "Heç bir emal olmadan mikrofonunuz: musiqi və otaqdakı hər səs üçün.",
-  "micUnavailable": "Səs izolyasiyası sistemdən çıxıb yenidən daxil olduqdan sonra görünür.",
+  "micUnavailable": "Küyün azaldılması sistemdən çıxıb yenidən daxil olduqdan sonra görünür.",
   "noMic": "Heç bir mikrofon qoşulmayıb."
 }

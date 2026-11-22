@@ -1,4 +1,4 @@
-// studio_voice_test.mjs — LordOS Studio's Voice Isolation drop-in (E-S6; docs/CAMERA-STUDIO-PLAN.md 7):
+// studio_voice_test.mjs — LordOS Studio's Noise Reduction drop-in (E-S6; docs/CAMERA-STUDIO-PLAN.md 7):
 // tools/iso/rootfs/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf, parsed here the way PipeWire reads its
 // configuration (SPA JSON: '=' or ':', bare words, '#' comments, no commas needed). It never touches this machine's
 // PipeWire: no daemon is started, nothing is loaded. Checks: one module, PipeWire's own echo-cancel with WebRTC, the

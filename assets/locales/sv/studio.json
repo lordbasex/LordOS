@@ -81,11 +81,11 @@
   "faceless": "Det här kräver ansiktsmodellen i LordOS Studio, som inte är installerad.",
   "mic": "Mikrofonläge",
   "micStandard": "Standard",
-  "micVoice": "Röstisolering",
-  "micWide": "Brett spektrum",
+  "micVoice": "Brusreducering",
+  "micWide": "Fullt omfång",
   "micHint.standard": "Din mikrofon som den är.",
   "micHint.voice": "Tar bort ljudet omkring dig så att bara din röst hörs. Om din röst låter robotaktig, stäng av samtalsappens egen brusreducering.",
   "micHint.wide": "Din mikrofon helt utan bearbetning: för musik och alla ljud i rummet.",
-  "micUnavailable": "Röstisolering visas när du har loggat ut och in igen.",
+  "micUnavailable": "Brusreducering visas när du har loggat ut och in igen.",
   "noMic": "Ingen mikrofon är ansluten."
 }
