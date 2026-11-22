@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static int fails;
@@ -206,16 +207,23 @@ static void bind(const char *session, char *err, int n, const char *const *ids, 
     dw_free(&b);
 }
 
-/* The Settings portal's gtk-im-module (GitHub #150): GTK 4 on Wayland reads it with ReadAll("org.gnome.*") and
- * takes "wayland" (text-input-v3) from it; without it GTK uses its default, "simple". out gets the value ReadOne
- * gives ("" none); the return value is how many times ReadAll(pattern) gave the key, and with which value (in all). */
-static int settings_im(const char *pattern, char *out, size_t n, char *all, size_t an) {
+/* A value read from a variant as text: s as is, d with %g, u with %u ("?sig" for another type). */
+static void variant_text(DRd *r, const char *sig, char *out, size_t n) {
+    if (!strcmp(sig, "s")) snprintf(out, n, "%s", dr_str(r, NULL));
+    else if (!strcmp(sig, "d")) { uint64_t u = dr_u64(r); double d; memcpy(&d, &u, 8); snprintf(out, n, "%g", d); }
+    else if (!strcmp(sig, "u")) snprintf(out, n, "%u", dr_u32(r));
+    else { snprintf(out, n, "?%s", sig); dr_skip(r, sig); }
+}
+
+/* One key of the Settings portal (ns, key). out gets the value ReadOne gives, as text with its type first ("s:…",
+ * "d:1"; "" none); the return value is how many times ReadAll(pattern) gave the key, and with which value (in all). */
+static int settings_key(const char *ns_want, const char *key, const char *pattern, char *out, size_t n, char *all, size_t an) {
     out[0] = all[0] = 0;
     int seen = 0;
     for (int which = 0; which < 2; which++) {
         DBuf b;
         dw_init(&b);
-        if (which == 0) { dw_str(&b, "org.gnome.desktop.interface"); dw_str(&b, "gtk-im-module"); }
+        if (which == 0) { dw_str(&b, ns_want); dw_str(&b, key); }
         else { size_t a = dw_arr_begin(&b, 4); dw_str(&b, pattern); dw_arr_end(&b, a); }
         DHdr h = { .type = DBUS_CALL, .path = "/org/freedesktop/portal/desktop", .iface = "org.freedesktop.portal.Settings",
                    .member = which == 0 ? "ReadOne" : "ReadAll", .dest = "org.freedesktop.portal.Desktop", .sig = which == 0 ? "ss" : "as" };
@@ -234,7 +242,11 @@ static int settings_im(const char *pattern, char *out, size_t n, char *all, size
                     dr_init(&r, &m);
                     if (which == 0 && m.sig && !strcmp(m.sig, "v")) {
                         const char *sig = dr_variant(&r);
-                        if (!r.err && !strcmp(sig, "s")) snprintf(out, n, "%s", dr_str(&r, NULL));
+                        if (!r.err) {
+                            char v[128];
+                            variant_text(&r, sig, v, sizeof v);
+                            if (!r.err) snprintf(out, n, "%.8s:%.100s", sig, v);
+                        }
                     } else if (which == 1 && m.sig && !strcmp(m.sig, "a{sa{sv}}")) {
                         size_t end = dr_arr(&r, 8);
                         while (!r.err && dr_more(&r, end)) {
@@ -244,10 +256,10 @@ static int settings_im(const char *pattern, char *out, size_t n, char *all, size
                             while (!r.err && dr_more(&r, ie)) {
                                 dr_struct(&r);
                                 const char *k = dr_str(&r, NULL), *sig = dr_variant(&r);
-                                if (!r.err && !strcmp(sig, "s")) {
-                                    const char *v = dr_str(&r, NULL);
-                                    if (!strcmp(ns, "org.gnome.desktop.interface") && !strcmp(k, "gtk-im-module")) { seen++; snprintf(all, an, "%s", v); }
-                                } else dr_skip(&r, sig);
+                                if (r.err) break;
+                                char v[128];
+                                variant_text(&r, sig, v, sizeof v);
+                                if (!strcmp(ns, ns_want) && !strcmp(k, key)) { seen++; snprintf(all, an, "%.8s:%.100s", sig, v); }
                             }
                         }
                         if (r.err) seen = -1;
@@ -274,11 +286,58 @@ int main(void) {
 
     /* GTK's input-method module goes through the Settings portal, not the environment (GitHub #150) */
     {
-        char one[64], all[64];
-        CHECK(settings_im("org.gnome.*", one, sizeof one, all, sizeof all) == 1);   /* what GTK 4 asks for */
-        CHECK(!strcmp(one, "wayland") && !strcmp(all, "wayland"));
-        CHECK(settings_im("org.gnome.desktop.interface", one, sizeof one, all, sizeof all) == 1 && !strcmp(all, "wayland"));
-        CHECK(settings_im("org.freedesktop.appearance", one, sizeof one, all, sizeof all) == 0);  /* only in its namespace */
+        const char *gi = "org.gnome.desktop.interface";
+        char one[128], all[128];
+        CHECK(settings_key(gi, "gtk-im-module", "org.gnome.*", one, sizeof one, all, sizeof all) == 1);   /* what GTK 4 asks for */
+        CHECK(!strcmp(one, "s:wayland") && !strcmp(all, "s:wayland"));
+        CHECK(settings_key(gi, "gtk-im-module", gi, one, sizeof one, all, sizeof all) == 1 && !strcmp(all, "s:wayland"));
+        CHECK(settings_key(gi, "gtk-im-module", "org.freedesktop.appearance", one, sizeof one, all, sizeof all) == 0);  /* only in its namespace */
+
+        /* the text keys GTK reads (docs/FLATPAK.md, "Fonts"): without them a Flatpak GTK app drew its built-in
+         * "Adwaita Sans 11", which fell back to DejaVu Sans 11. Inter when the package put it where fontconfig sees it. */
+        struct stat st;
+        int inter = !stat("/usr/share/fonts/truetype/lordos/Inter-Regular.ttf", &st);
+        int jbm = !stat("/usr/share/fonts/truetype/lordos/JetBrainsMono-Regular.ttf", &st);
+        const char *ui = inter ? "s:Inter 10" : "s:Sans 10", *mono = jbm ? "s:JetBrains Mono 10" : "s:Monospace 10";
+        static const struct { const char *ns, *key; int ui, mono; const char *want; } want[] = {
+            { "org.gnome.desktop.interface", "font-name", 1, 0, NULL },
+            { "org.gnome.desktop.interface", "document-font-name", 1, 0, NULL },
+            { "org.gnome.desktop.interface", "monospace-font-name", 0, 1, NULL },
+            { "org.gnome.desktop.interface", "font-antialiasing", 0, 0, "s:grayscale" },
+            { "org.gnome.desktop.interface", "font-hinting", 0, 0, "s:slight" },
+            { "org.gnome.desktop.interface", "font-rgba-order", 0, 0, "s:rgb" },
+            { "org.gnome.desktop.interface", "text-scaling-factor", 0, 0, "d:1" },
+            { "org.gnome.desktop.interface", "icon-theme", 0, 0, "s:Adwaita" },
+            { "org.gnome.settings-daemon.plugins.xsettings", "antialiasing", 0, 0, "s:grayscale" },
+            { "org.gnome.settings-daemon.plugins.xsettings", "hinting", 0, 0, "s:slight" },
+            { "org.gnome.settings-daemon.plugins.xsettings", "rgba-order", 0, 0, "s:rgb" },
+        };
+        for (size_t i = 0; i < sizeof want / sizeof want[0]; i++) {
+            const char *w = want[i].ui ? ui : want[i].mono ? mono : want[i].want;
+            int seen = settings_key(want[i].ns, want[i].key, "org.gnome.*", one, sizeof one, all, sizeof all);
+            if (seen != 1 || strcmp(one, w) || strcmp(all, w))
+                printf("  %s %s: ReadOne %s, ReadAll %s (%d times), want %s\n", want[i].ns, want[i].key, one, all, seen, w);
+            CHECK(seen == 1 && !strcmp(one, w) && !strcmp(all, w));
+        }
+        CHECK(settings_key("org.gnome.desktop.interface", "font-name", "org.freedesktop.*", one, sizeof one, all, sizeof all) == 0);
+
+        /* and in the GSettings keyfile, for GTK 3 outside Flatpak */
+        double rgb[3] = { 0.5, 0.2, 0.9 };
+        portal_set(1, rgb, "purple", "close,minimize,maximize:");
+        char kf[600];
+        snprintf(kf, sizeof kf, "%s/.config/glib-2.0/settings/keyfile", home);
+        FILE *f = fopen(kf, "r");
+        char text[4096] = "";
+        if (f) { text[fread(text, 1, sizeof text - 1, f)] = 0; fclose(f); }
+        char line[128];
+        snprintf(line, sizeof line, "\nfont-name='%s'\n", ui + 2);
+        CHECK(strstr(text, line) != NULL);
+        snprintf(line, sizeof line, "\nmonospace-font-name='%s'\n", mono + 2);
+        CHECK(strstr(text, line) != NULL);
+        CHECK(strstr(text, "\nfont-antialiasing='grayscale'\n") && strstr(text, "\nfont-hinting='slight'\n"));
+        CHECK(strstr(text, "\ntext-scaling-factor=1.0\n") && strstr(text, "\nicon-theme='Adwaita'\n"));
+        const char *g1 = strstr(text, "[org/gnome/desktop/interface]");
+        CHECK(g1 && !strstr(g1 + 1, "[org/gnome/desktop/interface]"));      /* one group, the keys added to it */
     }
 
     char session[400], err[128];

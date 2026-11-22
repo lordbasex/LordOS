@@ -58,7 +58,7 @@ resolve() { # $1 = kind (depends|recommends), $2 = the control field
 } > "$tmp/deps.tsv"
 
 # Bundled files that are in the package: "published-path<TAB>sha256"
-( cd "$tmp/root" && find . -type f \( -path '*/assets/fonts/*.ttf' -o -path '*/assets/monitor/*' \) | LC_ALL=C sort ) |
+( cd "$tmp/root" && find . -type f \( -path '*/assets/fonts/*.ttf' -o -path '*/share/fonts/truetype/lordos/*.ttf' -o -path '*/assets/monitor/*' \) | LC_ALL=C sort ) |
     while IFS= read -r f; do printf '%s\t%s\n' "${f#./}" "$(sha "$tmp/root/$f")"; done > "$tmp/files.tsv"
 
 # Font versions, when fontconfig's fc-scan is there: "file<TAB>version"
@@ -173,7 +173,7 @@ for name, ver, lic, home, comment in bundled:
     contains.append(sid)
 
 def files_like(pattern):
-    return sorted(s for p, s in files.items() if re.search(pattern, p))
+    return sorted({s for p, s in files.items() if re.search(pattern, p)})   # a font installed in two places: once
 
 fonts = [("Inter", "Inter-", "https://rsms.me/inter/"),
          ("Plus Jakarta Sans", "PlusJakartaSans-", "https://github.com/tokotype/PlusJakartaSans"),
@@ -184,7 +184,7 @@ for name, prefix, home in fonts:
     sid = spdxid("Font-" + name)
     packages.append(pkg(sid, name, ver, "OFL-1.1", "NOASSERTION", home=home,
                         checksums=files_like(r"/fonts/" + re.escape(prefix)) or None,
-                        comment="Font shipped in usr/lib/lordos/assets/fonts (checksums of its .ttf files)"))
+                        comment="Font shipped in usr/lib/lordos/assets/fonts, Inter and JetBrains Mono also in usr/share/fonts/truetype/lordos (checksums of its .ttf files)"))
     contains.append(sid)
 sid = spdxid("Font-Noto-subsets")
 packages.append(pkg(sid, "Noto Sans Arabic, Devanagari, Thai and CJK SC (subsets)", "NOASSERTION", "OFL-1.1", "NOASSERTION",

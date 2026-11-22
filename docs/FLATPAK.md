@@ -466,7 +466,7 @@ callers are Linux apps outside Flatpak; none of them identifies a Flatpak app ye
 
 | Interface | Status | What it does in LordOS |
 |---|---|---|
-| `org.freedesktop.portal.Settings` | served (0.8.6) | dark or light mode, accent, contrast, title bar buttons, GTK 3 theme; `SettingChanged` live |
+| `org.freedesktop.portal.Settings` | served (0.8.6) | dark or light mode, accent, contrast, title bar buttons, GTK 3 theme, fonts and their antialiasing (in development, "Fonts" below); `SettingChanged` live |
 | `org.freedesktop.portal.FileChooser` | served (version 2) | `OpenFile`, `SaveFile`: the shell's own file dialog, the answer only to the app that asked |
 | `org.freedesktop.portal.OpenURI` | served (version 3; 0.8.8.8) | `OpenURI` (http and https to the default browser, only an address every URL parser reads the same way: printable ASCII, no backslash, no user info, no `%` in the host, a numeric host only as a dotted IPv4, so the question names the host the browser goes to; a `file://` address like `OpenFile`), `OpenFile` and `OpenDirectory` with the file as an fd, used only for its name: it must still name the same file, inside the home folder or the user's disks, outside `fsops_protected`, and opening never takes an executable or a `.desktop` file. Its device, inode and type are kept and checked again right before it opens (`portalcheck.c`), so a file swapped while the question was up is refused. Opened the way LordOS opens everything else (`sdk/sysopen.js`); an app that is not the one with the keyboard (the bus's pid against the focused Wayland client's, or the same app scope) makes the person confirm it first |
 | `org.freedesktop.portal.Inhibit` | served (version 1; 0.8.8.8) | `Inhibit` with the idle or suspend flag counts as the compositor's idle inhibition (`wl_idle_inhibited()`, the screen-off, lock and sleep timers); released by `Request.Close` or when the caller leaves the bus. Logout and user-switch flags are accepted and do nothing; no `CreateMonitor` |
@@ -1133,6 +1133,44 @@ before, Steam, ksnip and what they brought installed for the run and removed aft
   and seccomp. pressure-vessel's Spawn carries 82 environment variables: the per-Spawn limit went from 64 to 128 (the
   whole command line still fits the Spawn helper's, checked at build time). Whatsie's Spawn with a `usr-fd` was refused
   (`NotSupported`, "option not served: usr-fd").
+
+### Fonts (fixed 2026-11-22)
+
+GTK apps from Flathub looked out of place: their text was bigger, wider and softer than LordOS's. Checked offline with
+CPU-X (`io.github.thetumultuousunicornofdarkness.cpu-x`, GTK 3.24.50 in `org.freedesktop.Platform//25.08`), nothing
+shown on screen:
+
+- Inside the sandbox, `gdbus call … org.freedesktop.portal.Settings.ReadAll "['org.gnome.*']"` gave only
+  `color-scheme`, `accent-color`, `gtk-theme`, `gtk-im-module` and `button-layout`: no font keys.
+- GDK's settings table in that runtime (`libgdk-3.so.0`) falls back to `font-name` = `Adwaita Sans 11` and reads
+  `font-antialiasing`, `font-hinting`, `font-rgba-order`, `text-scaling-factor`, `icon-theme` and `cursor-*` from
+  `org.gnome.desktop.interface` (older GTKs read the first three from `org.gnome.settings-daemon.plugins.xsettings`).
+- `fc-match "Adwaita Sans"` and `fc-match sans` in the sandbox both give `DejaVu Sans`: the app drew DejaVu Sans 11
+  (14.7 px), where LordOS draws Inter at 12–13 px. The sandbox sees the host's `/usr/share/fonts` (as
+  `/run/host/fonts`), never `/usr/lib/lordos/assets/fonts`, so Inter wasn't there to ask for.
+
+What changed:
+
+- **The settings portal serves the text keys** (`server/src/ui/portal.c`), in `org.gnome.desktop.interface`:
+  `font-name` and `document-font-name` `Inter 10` (13.3 px at 96 dpi), `monospace-font-name` `JetBrains Mono 10`,
+  `font-antialiasing` `grayscale` (LordOS's own text is grayscale coverage, `ui/text.c`), `font-hinting` `slight`,
+  `font-rgba-order` `rgb`, `text-scaling-factor` `1.0` and `icon-theme` `Adwaita`; and the same three antialiasing keys
+  in `org.gnome.settings-daemon.plugins.xsettings` for older runtimes. When Inter or JetBrains Mono isn't in
+  `/usr/share/fonts/truetype/lordos`, the names are fontconfig's `Sans 10` and `Monospace 10`; a change is sent with
+  `SettingChanged`. The same keys go to the GSettings keyfile, for GTK 3 apps outside Flatpak (Debian's schema
+  default, `Adwaita Sans 11`, isn't installed on LordOS either).
+- **The lordos package installs Inter and JetBrains Mono in `/usr/share/fonts/truetype/lordos`** as well as in
+  `/usr/lib/lordos/assets/fonts` (`tools/iso/mkdeb.sh`): copies, since a link to `/usr/lib/lordos` would not resolve in
+  the sandbox. fontconfig's dpkg trigger refreshes the cache. New files, no migration.
+- **Not served:** `cursor-theme` and `cursor-size`. GTK 3.24.50 and GTK 4 ask for cursors by shape
+  (`cursor-shape-v1`), and LordOS draws them itself (`cursor.c`); it has no Xcursor theme to name.
+- **Display scale** reaches GTK through the Wayland output, so `text-scaling-factor` stays 1 (more would scale the text
+  twice). LordOS has no separate text-size setting today; if one is added, it goes here.
+
+Tests: `build/portal-gs-test` reads every key with `ReadOne` and `ReadAll("org.gnome.*")` and checks the keyfile;
+`tests/gtk_defaults_test.mjs` checks the font folder against `mkdeb.sh` and the three values against Debian's schema
+enums. Still to check in a real session: CPU-X's text next to LordOS's, after installing the package that carries the
+fonts.
 
 ## Open questions
 

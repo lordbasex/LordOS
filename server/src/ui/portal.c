@@ -1,6 +1,7 @@
 /* portal.c — our own org.freedesktop.portal.Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts and
  * ScreenCast (without xdg-desktop-portal), and org.freedesktop.ScreenSaver: GTK, GNOME (libadwaita) and Qt apps
- * read from here the dark/light mode, the accent color, the order of the title bar buttons and the GTK 3 theme,
+ * read from here the dark/light mode, the accent color, the order of the title bar buttons, the GTK 3 theme and the
+ * fonts and their antialiasing,
  * and follow LordOS's changes live (SettingChanged); they open links and files the way LordOS does, keep the
  * screen on while a video plays, get the shortcuts the person gave them (push-to-talk) and share a screen or a
  * window the person picks. Uses Passwords' own D-Bus client (vault/dbus.c). See
@@ -53,8 +54,22 @@ static int only_web;                        /* another program serves the portal
 static int dark = 1;
 static double acc[3] = { 0.04, 0.52, 1.0 };
 static char acc_name[16] = "blue", buttons[64] = "close,minimize,maximize:", gtk_theme[64] = "Adwaita-dark";
+static char font_ui[64] = "Sans 10", font_mono[64] = "Monospace 10";   /* fonts_pick() */
 
-enum { V_U, V_S, V_RGB };
+/* How LordOS draws its own text (ui/text.c: Inter at 12-13 px, stb_truetype's grayscale coverage, no subpixel
+ * colors), told to GTK so its apps look the same. Inter 10 is 13.3 px at 96 dpi. Slight hinting is what fontconfig
+ * does by default on Debian and inside the Flatpak runtimes; the rgba order matters only with "rgba" antialiasing. */
+#define FONT_SIZE  "10"
+#define FONT_AA    "grayscale"
+#define FONT_HINT  "slight"
+#define FONT_RGBA  "rgb"
+#define ICON_THEME "Adwaita"          /* LordOS's own icons come from it (iconfind.c); GTK's default, "gnome", is gone */
+
+/* LordOS's fonts where fontconfig, and so a Flatpak app's sandbox (/run/host/fonts), can see them: the lordos package
+ * installs Inter and JetBrains Mono there as well as in /usr/lib/lordos/assets/fonts (tools/iso/mkdeb.sh). */
+#define LORDOS_FONT_DIR "/usr/share/fonts/truetype/lordos"
+
+enum { V_U, V_S, V_RGB, V_D };
 typedef struct { const char *ns, *key; int type; } Key;
 static const Key keys[] = {
     { "org.freedesktop.appearance", "color-scheme", V_U },
@@ -71,8 +86,26 @@ static const Key keys[] = {
      * crashed (GitHub #150). An IBus or Fcitx user's own GTK_IM_MODULE still wins. A fixed value, never written to
      * the GSettings keyfile: GTK 3 on Wayland picks text-input-v3 by itself. */
     { "org.gnome.desktop.interface", "gtk-im-module", V_S },
+    /* Text (docs/FLATPAK.md, "Fonts"). Without these keys GTK falls back to its built-in "Adwaita Sans 11", which no
+     * LordOS system has: a Flatpak app drew DejaVu Sans 11, bigger and wider than the text around it. The display's
+     * scale reaches GTK through the Wayland output, so text-scaling-factor stays 1 (more would scale text twice). */
+    { "org.gnome.desktop.interface", "font-name", V_S },
+    { "org.gnome.desktop.interface", "document-font-name", V_S },
+    { "org.gnome.desktop.interface", "monospace-font-name", V_S },
+    { "org.gnome.desktop.interface", "font-antialiasing", V_S },
+    { "org.gnome.desktop.interface", "font-hinting", V_S },
+    { "org.gnome.desktop.interface", "font-rgba-order", V_S },
+    { "org.gnome.desktop.interface", "text-scaling-factor", V_D },
+    { "org.gnome.desktop.interface", "icon-theme", V_S },
+    /* where older GTK 3 and GTK 4 releases (older Flatpak runtimes) read the same three */
+    { "org.gnome.settings-daemon.plugins.xsettings", "antialiasing", V_S },
+    { "org.gnome.settings-daemon.plugins.xsettings", "hinting", V_S },
+    { "org.gnome.settings-daemon.plugins.xsettings", "rgba-order", V_S },
 };
 #define NKEYS (sizeof keys / sizeof keys[0])
+enum { K_FONT = 8, K_DOCFONT = 9, K_MONOFONT = 10 };     /* their indexes, for SettingChanged */
+_Static_assert(NKEYS == 19, "str_of() names keys[] by index");
+static int fonts_pick(void);
 
 static const char *str_of(int i) {
     switch (i) {
@@ -81,11 +114,17 @@ static const char *str_of(int i) {
     case 5: return gtk_theme;
     case 6: return buttons;
     case 7: return "wayland";
+    case K_FONT: case K_DOCFONT: return font_ui;
+    case K_MONOFONT: return font_mono;
+    case 11: case 16: return FONT_AA;
+    case 12: case 17: return FONT_HINT;
+    case 13: case 18: return FONT_RGBA;
+    case 15: return ICON_THEME;
     }
     return "";
 }
 
-static const char *sig_of(int type) { return type == V_U ? "u" : type == V_S ? "s" : "(ddd)"; }
+static const char *sig_of(int type) { return type == V_U ? "u" : type == V_S ? "s" : type == V_D ? "d" : "(ddd)"; }
 
 static void put_double(DBuf *w, double d) {
     uint64_t u;
@@ -98,6 +137,7 @@ static void put_value(DBuf *w, int i) {
     switch (keys[i].type) {
     case V_U: dw_u32(w, i == 0 ? (dark ? 1 : 2) : 0); break;
     case V_S: dw_str(w, str_of(i)); break;
+    case V_D: put_double(w, 1.0); break;   /* text-scaling-factor, the only double */
     default: dw_struct(w); put_double(w, acc[0]); put_double(w, acc[1]); put_double(w, acc[2]); break;
     }
 }
@@ -2065,6 +2105,7 @@ static int own_name(const char *name) {
 int portal_start(void) {
     /* apps launched by this session (GTK 3) read GSettings from the keyfile that portal_set writes */
     if (!getenv("GSETTINGS_BACKEND")) setenv("GSETTINGS_BACKEND", "keyfile", 1);
+    fonts_pick();                           /* right from the first ReadAll, before the theme's portal_set */
     int fd = dbus_connect_session();
     /* with fds: OpenFile and OpenDirectory hand the file over as one */
     if (fd < 0 || dbus_open_fds(&conn, fd, 2000)) { if (fd >= 0) dbus_close(&conn); return -1; }
@@ -2194,6 +2235,17 @@ static void keyfile_write(void) {
     keyfile_set(&buf, "org/gnome/desktop/interface", "accent-color", v);
     snprintf(v, sizeof v, "'%s'", buttons);
     keyfile_set(&buf, "org/gnome/desktop/wm/preferences", "button-layout", v);
+    /* the text keys too: Debian's schema default, 'Adwaita Sans 11', isn't installed either */
+    snprintf(v, sizeof v, "'%s'", font_ui);
+    keyfile_set(&buf, "org/gnome/desktop/interface", "font-name", v);
+    keyfile_set(&buf, "org/gnome/desktop/interface", "document-font-name", v);
+    snprintf(v, sizeof v, "'%s'", font_mono);
+    keyfile_set(&buf, "org/gnome/desktop/interface", "monospace-font-name", v);
+    keyfile_set(&buf, "org/gnome/desktop/interface", "font-antialiasing", "'" FONT_AA "'");
+    keyfile_set(&buf, "org/gnome/desktop/interface", "font-hinting", "'" FONT_HINT "'");
+    keyfile_set(&buf, "org/gnome/desktop/interface", "font-rgba-order", "'" FONT_RGBA "'");
+    keyfile_set(&buf, "org/gnome/desktop/interface", "text-scaling-factor", "1.0");
+    keyfile_set(&buf, "org/gnome/desktop/interface", "icon-theme", "'" ICON_THEME "'");
     f = fopen(tmp, "w");
     if (!f) { free(buf); return; }
     int ok = fputs(buf, f) >= 0;
@@ -2211,6 +2263,20 @@ static int theme_installed(const char *name) {
     if (!home) return 0;
     snprintf(p, sizeof p, "%s/.local/share/themes/%s/gtk-3.0/gtk.css", home, name);
     return !stat(p, &st);
+}
+
+/* Inter and JetBrains Mono when fontconfig can see them (LORDOS_FONT_DIR), otherwise fontconfig's own sans and
+ * monospace at the same size. 1 when that changed (the package was installed or removed during the session). */
+static int fonts_pick(void) {
+    struct stat st;
+    char ui[64], mono[64];
+    snprintf(ui, sizeof ui, "%s " FONT_SIZE, stat(LORDOS_FONT_DIR "/Inter-Regular.ttf", &st) ? "Sans" : "Inter");
+    snprintf(mono, sizeof mono, "%s " FONT_SIZE,
+             stat(LORDOS_FONT_DIR "/JetBrainsMono-Regular.ttf", &st) ? "Monospace" : "JetBrains Mono");
+    int diff = strcmp(ui, font_ui) || strcmp(mono, font_mono);
+    snprintf(font_ui, sizeof font_ui, "%s", ui);
+    snprintf(font_mono, sizeof font_mono, "%s", mono);
+    return diff;
 }
 
 void portal_set(int is_dark, const double rgb[3], const char *accent_name, const char *button_layout) {
@@ -2232,9 +2298,11 @@ void portal_set(int is_dark, const double rgb[3], const char *accent_name, const
     if (strcmp(old_name, acc_name)) changed(4);
     if (strcmp(old_theme, gtk_theme)) changed(5);
     if (strcmp(old_buttons, buttons)) changed(6);
+    int fonts = fonts_pick();
+    if (fonts) { changed(K_FONT); changed(K_DOCFONT); changed(K_MONOFONT); }
     if (up) dbus_flush(&conn);
     static int written;
-    if (!written || old_dark != dark || strcmp(old_name, acc_name) || strcmp(old_theme, gtk_theme) || strcmp(old_buttons, buttons)) {
+    if (!written || fonts || old_dark != dark || strcmp(old_name, acc_name) || strcmp(old_theme, gtk_theme) || strcmp(old_buttons, buttons)) {
         written = 1;
         keyfile_write();
     }

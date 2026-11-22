@@ -86,5 +86,24 @@ if (!fs.existsSync(SYS) || !fs.existsSync(ENUMS) || !has('glib-compile-schemas')
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
 
+// The text the settings portal and the GSettings keyfile give GTK (ui/portal.c; docs/FLATPAK.md, "Fonts"): the fonts it
+// names are where the package installs them, and its antialiasing, hinting and rgba order are values of Debian's schema.
+const pc = read('server/src/ui/portal.c');
+const macro = (n) => { const m = new RegExp(`#define ${n}\\s+"([^"]*)"`).exec(pc); return m && m[1]; };
+const fontDir = macro('LORDOS_FONT_DIR');
+eq('portal.c: LordOS\'s font folder is fontconfig\'s', fontDir, '/usr/share/fonts/truetype/lordos');
+eq('mkdeb.sh installs the fonts there', mk.includes(`"$PKG${fontDir}/"`) && /assets\/fonts\/Inter-\*\.ttf/.test(mk) && /assets\/fonts\/JetBrainsMono-\*\.ttf/.test(mk), true);
+for (const f of ['Inter-Regular.ttf', 'JetBrainsMono-Regular.ttf'])
+  eq(`portal.c checks ${f}, which assets/fonts has`, pc.includes(`LORDOS_FONT_DIR "/${f}"`) && fs.existsSync(path.join(REPO, 'assets/fonts', f)), true);
+const IFACE = '/usr/share/glib-2.0/schemas/org.gnome.desktop.interface.gschema.xml';
+if (!fs.existsSync(IFACE) || !has('gsettings')) {
+  console.log('  skipped the font enum check: needs gsettings-desktop-schemas and libglib2.0-bin');
+} else {
+  for (const [key, m] of [['font-antialiasing', 'FONT_AA'], ['font-hinting', 'FONT_HINT'], ['font-rgba-order', 'FONT_RGBA']]) {
+    const range = execFileSync('gsettings', ['range', 'org.gnome.desktop.interface', key], { encoding: 'utf8' });
+    eq(`${key} '${macro(m)}' is one of the schema's values`, range.split('\n').map((l) => l.trim()).includes(`'${macro(m)}'`), true);
+  }
+}
+
 console.log(`gtk-defaults-test: ${okN} ok, ${bad} failed`);
 process.exit(bad ? 1 : 0);

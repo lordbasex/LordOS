@@ -44,6 +44,7 @@
 #   /usr/share/doc/lordos/                README, copyright, changelog, OFL-Noto.txt
 #   /usr/share/glib-2.0/schemas/90_lordos.gschema.override, /etc/gtk-{3,4}.0/settings.ini
 #                                         GTK's window-button layout where the session can't give its own (#52)
+#   /usr/share/fonts/truetype/lordos/     Inter and JetBrains Mono again, where fontconfig and Flatpak apps see them
 #   (not here: /usr/lib/lordos/assets/hwreport/, the signed tested-hardware snapshot, is the lordos-hwdata
 #   package from tools/iso/mkdeb-hwdata.sh, which this one Depends on; docs/BENCHMARK.md)
 #   /usr/lib/lordos/apt/lordos.sources    the signed LordOS repository on lordos.org (updates from the
@@ -382,6 +383,13 @@ find "$PKG/usr/share/themes" -type d -exec chmod 755 {} +; find "$PKG/usr/share/
 install -D -m 644 assets/gtk/90_lordos.gschema.override "$PKG/usr/share/glib-2.0/schemas/90_lordos.gschema.override"
 install -D -m 644 assets/gtk/settings.ini "$PKG/etc/gtk-3.0/settings.ini"
 install -D -m 644 assets/gtk/settings.ini "$PKG/etc/gtk-4.0/settings.ini"
+# LordOS's interface and monospace fonts where fontconfig sees them, so GTK and Qt apps get the font the settings
+# portal names (server/src/ui/portal.c, LORDOS_FONT_DIR; docs/FLATPAK.md, "Fonts"): a Flatpak app's sandbox only sees
+# the host's /usr/share/fonts (as /run/host/fonts), never /usr/lib/lordos. Copies, not links: a link would point to
+# /usr/lib/lordos, which isn't in the sandbox. fontconfig's dpkg trigger refreshes the cache. New files, no migration.
+install -d "$PKG/usr/share/fonts/truetype/lordos"
+install -m 644 assets/fonts/Inter-*.ttf assets/fonts/Inter-LICENSE.txt assets/fonts/JetBrainsMono-*.ttf \
+    assets/fonts/JetBrainsMono-LICENSE.txt "$PKG/usr/share/fonts/truetype/lordos/"
 install -m 644 tools/iso/rootfs/etc/systemd/system/lord-netperm.service "$PKG/usr/lib/systemd/system/lord-netperm.service"
 # fans by temperature from the first boot (docs/FANS.md): enabled by postinst, also in a chroot
 install -m 644 tools/iso/rootfs/etc/systemd/system/lord-fand.service "$PKG/usr/lib/systemd/system/lord-fand.service"
@@ -433,7 +441,7 @@ Comment: Created by iPERFEX with an AI image generator; part of the LordOS brand
  assets. The LordOS name, the crown and Lumo shown in them are also covered by the
  LordOS trademark and brand policy (lordos.org).
 
-Files: usr/lib/lordos/assets/fonts/*
+Files: usr/lib/lordos/assets/fonts/* usr/share/fonts/truetype/lordos/*
 License: OFL-1.1
  Inter, JetBrains Mono and Plus Jakarta Sans: SIL Open Font License 1.1 (each
  font's license text ships next to it, *-LICENSE.txt).
