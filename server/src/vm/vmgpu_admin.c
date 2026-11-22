@@ -179,11 +179,16 @@ static int note_write(const char *id, uid_t uid) {
 }
 
 static void grant_release(const char *id);
+static int run_lock(void);
+/* the vGPU's note goes, and its grant first: under the same lock as vm-memlock's check-and-grant, so a grant is never
+ * made for a vGPU whose note is going, nor released while one is being made */
 static void note_drop(const char *id) {
+    int lk = run_lock();
     grant_release(id);
     char p[1024];
     rpath(p, sizeof p, VMGPU_RUN "/%s%s", id, "");
     unlink(p);
+    if (lk >= 0) close(lk);
 }
 
 /* the mdev's IOMMU group, or -1 when it isn't there */
@@ -513,6 +518,16 @@ static void grant_unlink(const char *id) {
     unlink(p);
 }
 
+/* /run/lordos/vm-gvt/.lock, held (exclusive flock) until the returned descriptor is closed; -1 when it can't be (the
+ * folder isn't there yet: no note, no grant to race with) */
+static int run_lock(void) {
+    char lp[1024];
+    rpath(lp, sizeof lp, VMGPU_RUN "/.lock%s%s", "", "");
+    int lk = open(lp, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (lk >= 0 && flock(lk, LOCK_EX)) { close(lk); lk = -1; }
+    return lk;
+}
+
 /* the default limit a released grant goes back to (systemd's and Debian's: 8 MB) */
 #define VMGPU_MEMLOCK_DEFAULT ((rlim_t)8 << 20)
 
@@ -606,10 +621,13 @@ void vm_act_memlock(const AdminReq *r, const char *arg, size_t len) {
     unsigned long long start = ok ? proc_start(pid) : 0;
     if (!ok || !start) { close(pfd); admin_err("vm.memlockRefused", NULL); return; }
     /* the cap counts every grant: one check-and-grant at a time, held until the grant is written and applied */
-    char lp[1024];
-    rpath(lp, sizeof lp, VMGPU_RUN "/.lock%s%s", "", "");
-    int lk = open(lp, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
-    if (lk < 0 || flock(lk, LOCK_EX)) { if (lk >= 0) close(lk); close(pfd); admin_err("vm.memlockRefused", NULL); return; }
+    int lk = run_lock();
+    if (lk < 0) { close(pfd); admin_err("vm.memlockRefused", NULL); return; }
+    /* what was checked before the lock may have changed while waiting for it: the vGPU's note, its group and the
+     * process's hold on it again */
+    if (note_uid(id) != (long)r->uid || mdev_group(id) != grp || !pid_holds_group(pid, grp) || proc_start(pid) != start) {
+        close(lk); close(pfd); admin_err("vm.memlockRefused", NULL); return;
+    }
     /* one grant per vGPU: another while the one granted lives is refused (the same process again changes nothing) */
     long gpid, gmb;
     unsigned long long gstart;

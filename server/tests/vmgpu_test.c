@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -536,6 +537,56 @@ static void test_memlock(void) {
     put("run/lordos/vm-gvt/" ID1, st);
     ACT(vm_act_memlock, a);
     CHECK(ok("vm.memlockSet") && !exists("run/lordos/vm-gvt/grant-" ID2), "a dead grant counts nothing: %s", last);
+    /* the lock: a grant waiting for it while the vGPU's note goes is refused once it gets it (checked again) */
+    {
+        snprintf(st, sizeof st, "%u\n", (unsigned)req.uid);
+        char gp[1100];
+        snprintf(gp, sizeof gp, "%s/run/lordos/vm-gvt/grant-" ID1, root);
+        unlink(gp);
+        FAKE_QEMU(q, ID1, 4096, 16, 8000);
+        char lp[1100];
+        snprintf(lp, sizeof lp, "%s/run/lordos/vm-gvt/.lock", root);
+        int lk = open(lp, O_RDWR | O_CREAT, 0600);
+        CHECK(lk >= 0 && !flock(lk, LOCK_EX), "the test holds the lock");
+        int pp[2];
+        if (pipe(pp)) pp[0] = pp[1] = -1;
+        pid_t w = fork();
+        if (!w) {
+            close(lk);              /* the child's own open: it waits for the parent's lock */
+            last[0] = 0;
+            vm_act_memlock(&req, a, strlen(a));
+            if (write(pp[1], last, strlen(last) + 1) < 0) {}
+            _exit(0);
+        }
+        struct timespec ts = { 0, 200000000 };
+        nanosleep(&ts, NULL);
+        char nb[1100];
+        snprintf(nb, sizeof nb, "%s/run/lordos/vm-gvt/" ID1, root);
+        unlink(nb);                 /* the vGPU's note goes while the grant waits */
+        flock(lk, LOCK_UN);
+        close(lk);
+        char got[256] = "";
+        if (read(pp[0], got, sizeof got - 1) < 0) got[0] = 0;
+        waitpid(w, NULL, 0);
+        CHECK(!strncmp(got, "ERR ", 4) && strstr(got, "vm.memlockRefused") && !exists("run/lordos/vm-gvt/grant-" ID1), "waited, then refused: %s", got);
+        put("run/lordos/vm-gvt/" ID1, st);
+        /* and the release waits for a grant in progress the same way: note_drop takes the lock (QEMU closed the group) */
+        snprintf(nb, sizeof nb, "%s/proc/%d/fd/9", root, (int)q);
+        unlink(nb);
+        lk = open(lp, O_RDWR, 0600);
+        CHECK(lk >= 0 && !flock(lk, LOCK_EX), "the test holds the lock again");
+        pid_t w2 = fork();
+        if (!w2) { close(lk); last[0] = 0; vm_act_gvt_remove(&req, ID1, 36); if (write(pp[1], last, strlen(last) + 1) < 0) {} _exit(0); }
+        nanosleep(&ts, NULL);
+        CHECK(exists("run/lordos/vm-gvt/" ID1), "the removal waits for the lock");
+        flock(lk, LOCK_UN);
+        close(lk);
+        if (read(pp[0], got, sizeof got - 1) < 0) got[0] = 0;
+        waitpid(w2, NULL, 0);
+        CHECK(!strncmp(got, "OK ", 3) && !exists("run/lordos/vm-gvt/" ID1), "then removed: %s", got);
+        close(pp[0]); close(pp[1]);
+        put("run/lordos/vm-gvt/" ID1, st);
+    }
     kill(q, SIGKILL); kill(q2, SIGKILL);
     waitpid(q, NULL, 0); waitpid(q2, NULL, 0);
     pl_pid = 0;

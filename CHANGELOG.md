@@ -40,7 +40,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     process holds its group; `gpu-min-freq` sets the iGPU's minimum frequency within RPn..RP0 while a machine uses it
     (lord-server asks for two thirds of RP0, 800 MHz on a UHD 630, then "default"). The GPU lord-server draws on is
     always refused, checked on the root side from the cards it holds open. Leftover vGPUs are swept when a session's
-    helper starts and ends. `vmgpu-test`: the parsers and the six actions under a fake root folder (129 checks).
+    helper starts and ends. `vmgpu-test`: the parsers and the six actions under a fake root folder (134 checks).
   - **Configure → Display → Graphics card**: None / Whole (for this machine, the largest type) / Shared (the smallest
     type that shows the machine's resolution), with each choice's free instances; refused when none is free; it
     replaces 3D graphics; such a machine can't be suspended (Suspend becomes Shut Down) or keep snapshots with memory.
@@ -51,7 +51,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     guest restart (also the one reset of the first boot with a vGPU). Its QEMU's locked-memory limit (VFIO pins
     the guest's pages): the machine's memory plus 512 MB, set on that one process by a fifth closed admin action,
     `vm-memlock "<pid>"` (root checks the pid is the caller's system QEMU under the installed lord-vm, holding the
-    /dev/vfio group of a vGPU the caller made; one grant per vGPU, recorded with the process's start time under a lock, given back to the default when the
+    /dev/vfio group of a vGPU the caller made; one grant per vGPU, recorded with the process's start time under a lock that removals take too (the checks repeated once it is held), given back to the default when the
     vGPU goes while that process lives; QEMU's seccomp now lets it make threads only, so no child inherits the limit), within
     "Memory machines may lock", the total for every running machine with a graphics card (`gpu-memlock-cap`, `/etc/lordos/gpu-memlock.conf`; by default the
     computer's memory less max(4 GB, 25 %), to a whole GB), shown and set in Settings → Graphics cards; the vCPUs wait
