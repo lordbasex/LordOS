@@ -95,7 +95,7 @@ static const int deny_eperm[] = {
 
 #define CLONE_NS_FLAGS (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET | CLONE_NEWCGROUP)
 
-static int qemu_filter(struct sock_filter *f, int cap) {
+static int qemu_filter(struct sock_filter *f, int cap, int threads_only) {
     int n = 0;
 #define EMIT(s) do { if (n < cap) f[n] = (struct sock_filter)s; n++; } while (0)
 #define LDNR() EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)))
@@ -108,13 +108,31 @@ static int qemu_filter(struct sock_filter *f, int cap) {
     /* socket: never (its sockets are the ones lord-vm passed) */
     EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_socket, 0, 1));
     RET_ERR(EACCES);
-    /* clone: no new namespaces. [0]jeq [1]ld flags [2]and [3]jeq 0 → ok [4]EPERM [5]ALLOW */
-    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_clone, 0, 5));
+    /* clone: no new namespaces; for QEMU (threads_only) also no new process, only threads: QEMU never makes one (its own
+     * -sandbox spawn=deny says the same), and a process it can't make can't inherit its limits (the locked memory root
+     * grants a vGPU machine's QEMU, vmgpu_admin.c). [0]jeq [1]ld flags [2]and NS [3]jeq 0 → [5] [4]EPERM [5]ld flags
+     * [6]and THREAD (or 0) [7]jeq mask → [9] [8]EPERM [9]ALLOW */
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_clone, 0, 9));
     EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[0])));
     EMIT(BPF_STMT(BPF_ALU | BPF_AND | BPF_K, (unsigned)CLONE_NS_FLAGS));
     EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, 0));
     RET_ERR(EPERM);
+    EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[0])));
+    EMIT(BPF_STMT(BPF_ALU | BPF_AND | BPF_K, threads_only ? (unsigned)CLONE_THREAD : 0u));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, threads_only ? (unsigned)CLONE_THREAD : 0u, 1, 0));
+    RET_ERR(EPERM);
     RET_OK();
+    LDNR();
+    /* fork and vfork: QEMU none (threads_only) */
+#ifdef SYS_fork
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_fork, 0, 1));
+    if (threads_only) RET_ERR(EPERM); else RET_OK();
+#endif
+#ifdef SYS_vfork
+    LDNR();
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_vfork, 0, 1));
+    if (threads_only) RET_ERR(EPERM); else RET_OK();
+#endif
     LDNR();
     /* clone3: its flags are in memory seccomp can't read: ENOSYS, glibc falls back to clone */
     EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_clone3, 0, 1));
@@ -232,7 +250,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
 
     if (VM_AUDIT_ARCH) {
         static struct sock_filter filt[256];
-        int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]));
+        int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]), 1);
         if (n <= (int)(sizeof filt / sizeof filt[0])) {
             struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
             if (!syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog)) mask |= VMS_SECCOMP_OURS;
@@ -244,7 +262,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
 static int apply_seccomp(void) {
     if (!VM_AUDIT_ARCH) return 0;
     static struct sock_filter filt[256];
-    int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]));
+    int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]), 0);
     if (n > (int)(sizeof filt / sizeof filt[0])) return 0;
     struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
     return !syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog) ? VMS_SECCOMP_OURS : 0;

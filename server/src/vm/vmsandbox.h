@@ -15,7 +15,9 @@
  *     as above. Our GOP option ROM is under /usr. The VFIO ioctls need nothing from seccomp (a denylist: only TIOCSTI
  *     and TIOCLINUX are refused).
  *   - seccomp, ours: no socket(2) at all (EACCES), no connect, bind, listen or accept (its sockets are the
- *     socketpairs lord-vm passed), no namespaces (unshare, setns, clone with CLONE_NEW*), no mount, ptrace,
+ *     socketpairs lord-vm passed), no namespaces (unshare, setns, clone with CLONE_NEW*), no new process (fork,
+ *     vfork, clone without CLONE_THREAD: QEMU only makes threads, and a vGPU machine's raised locked-memory limit
+ *     can't pass to a child), no mount, ptrace,
  *     process_vm_*, bpf, perf_event_open, keyctl, io_uring, userfaultfd, module or kexec calls, no TIOCSTI.
  *     A denylist: QEMU's own allowlist (-sandbox on,...) is applied by QEMU after it starts.
  * lord-vm itself, once QEMU and passt run: Landlock with read and write in the machine's folder and removal in

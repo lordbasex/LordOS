@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -177,7 +178,9 @@ static int note_write(const char *id, uid_t uid) {
     return write_file(p, b);
 }
 
+static void grant_release(const char *id);
 static void note_drop(const char *id) {
+    grant_release(id);
     char p[1024];
     rpath(p, sizeof p, VMGPU_RUN "/%s%s", id, "");
     unlink(p);
@@ -481,10 +484,14 @@ static unsigned long long proc_start(int pid) {
     return 0;
 }
 
-/* the grant noted on a vGPU: "<uid> <pid> <start> <MB>" in root's note; -1 when there is none */
+/* The grant made on a vGPU, its own record beside the vGPU's note (/run/lordos/vm-gvt/grant-<id>, "<uid> <pid> <start>
+ * <MB>"): it counts until the granted process ends, whatever happens to the vGPU; when the vGPU goes while that process
+ * lives (vm-gvt-remove, the sweep), its limit goes back to the default first (grant_release). Inheritance can't carry a
+ * raised limit past it: QEMU runs with its own -sandbox spawn=deny (fork, vfork, execve and clone without CLONE_THREAD
+ * refused, lordvm.c) and our filter refuses clone3, so the granted process never has a child. -1 when there is none */
 static int note_grant(const char *id, long *pid, unsigned long long *start, long *mb) {
     char p[1024], b[96];
-    rpath(p, sizeof p, VMGPU_RUN "/%s%s", id, "");
+    rpath(p, sizeof p, VMGPU_RUN "/grant-%s%s", id, "");
     unsigned long u;
     if (read_line(p, b, sizeof b) || sscanf(b, "%lu %ld %llu %ld", &u, pid, start, mb) != 4) return -1;
     return 0;
@@ -492,7 +499,7 @@ static int note_grant(const char *id, long *pid, unsigned long long *start, long
 
 static int note_grant_write(const char *id, uid_t uid, int pid, unsigned long long start, long mb) {
     char p[1024], b[96];
-    rpath(p, sizeof p, VMGPU_RUN "/%s%s", id, "");
+    rpath(p, sizeof p, VMGPU_RUN "/grant-%s%s", id, "");
     snprintf(b, sizeof b, "%u %d %llu %ld\n", (unsigned)uid, pid, start, mb);
     return write_file(p, b);
 }
@@ -500,21 +507,47 @@ static int note_grant_write(const char *id, uid_t uid, int pid, unsigned long lo
 /* the granted process still runs (the same pid with the same start time) */
 static int grant_live(long pid, unsigned long long start) { return pid > 1 && pid < 1000000000 && start && proc_start((int)pid) == start; }
 
-/* MB granted to the live QEMUs of every vGPU but `except` */
+static void grant_unlink(const char *id) {
+    char p[1024];
+    rpath(p, sizeof p, VMGPU_RUN "/grant-%s%s", id, "");
+    unlink(p);
+}
+
+/* the default limit a released grant goes back to (systemd's and Debian's: 8 MB) */
+#define VMGPU_MEMLOCK_DEFAULT ((rlim_t)8 << 20)
+
+/* a vGPU's grant ends: a granted process that still lives gets the default limit back, then the record goes */
+static void grant_release(const char *id) {
+    long pid, mb;
+    unsigned long long st;
+    if (note_grant(id, &pid, &st, &mb)) return;
+    if (grant_live(pid, st)) {
+        struct rlimit rl = { VMGPU_MEMLOCK_DEFAULT, VMGPU_MEMLOCK_DEFAULT };
+        if (vmgpu_admin_prlimit((pid_t)pid, &rl)) { fprintf(stderr, "admin: a vGPU's grant: can't put %ld's locked memory back\n", pid); return; }
+    }
+    grant_unlink(id);
+}
+
+/* MB granted to the live QEMUs of every vGPU but `except`; the records of processes that ended go */
 static long grants_sum(const char *except) {
     char d[1024];
     rpath(d, sizeof d, VMGPU_RUN "%s%s", "", "");
     DIR *dir = opendir(d);
     if (!dir) return 0;
     long sum = 0;
+    char dead[16][37];
+    int nd = 0;
     for (struct dirent *e; (e = readdir(dir));) {
         char id[37];
         long pid, mb;
         unsigned long long st;
-        if (strlen(e->d_name) != 36 || vmgpu_remove_arg(e->d_name, 36, id) || !strcmp(id, except)) continue;
-        if (!note_grant(id, &pid, &st, &mb) && grant_live(pid, st) && mb > 0) sum += mb;
+        if (strncmp(e->d_name, "grant-", 6) || strlen(e->d_name) != 42 || vmgpu_remove_arg(e->d_name + 6, 36, id) || !strcmp(id, except)) continue;
+        if (note_grant(id, &pid, &st, &mb)) continue;
+        if (grant_live(pid, st)) { if (mb > 0) sum += mb; }
+        else if (nd < 16) snprintf(dead[nd++], 37, "%s", id);
     }
     closedir(dir);
+    for (int i = 0; i < nd; i++) grant_unlink(dead[i]);
     return sum;
 }
 
@@ -572,11 +605,17 @@ void vm_act_memlock(const AdminReq *r, const char *arg, size_t len) {
     ok = ok && pid_holds_group(pid, grp);
     unsigned long long start = ok ? proc_start(pid) : 0;
     if (!ok || !start) { close(pfd); admin_err("vm.memlockRefused", NULL); return; }
+    /* the cap counts every grant: one check-and-grant at a time, held until the grant is written and applied */
+    char lp[1024];
+    rpath(lp, sizeof lp, VMGPU_RUN "/.lock%s%s", "", "");
+    int lk = open(lp, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (lk < 0 || flock(lk, LOCK_EX)) { if (lk >= 0) close(lk); close(pfd); admin_err("vm.memlockRefused", NULL); return; }
     /* one grant per vGPU: another while the one granted lives is refused (the same process again changes nothing) */
     long gpid, gmb;
     unsigned long long gstart;
     if (!note_grant(id, &gpid, &gstart, &gmb) && grant_live(gpid, gstart)) {
         close(pfd);
+        close(lk);
         if (gpid == pid && gstart == start) { char ns[24]; snprintf(ns, sizeof ns, "%ld", gmb); admin_ok("vm.memlockSet", "need", ns, NULL); }
         else admin_err("vm.memlockRefused", NULL);
         return;
@@ -589,16 +628,19 @@ void vm_act_memlock(const AdminReq *r, const char *arg, size_t len) {
         snprintf(ns, sizeof ns, "%ld", need);
         snprintf(cs, sizeof cs, "%ld", cap - others > 0 ? cap - others : 0);
         close(pfd);
+        close(lk);
         admin_err("vm.memlockCap", "need", ns, "cap", cs, NULL);
         return;
     }
     /* still the process checked */
-    if (syscall(SYS_pidfd_send_signal, pfd, 0, NULL, 0)) { close(pfd); admin_err("vm.memlockRefused", NULL); return; }
+    if (syscall(SYS_pidfd_send_signal, pfd, 0, NULL, 0)) { close(pfd); close(lk); admin_err("vm.memlockRefused", NULL); return; }
+    /* the record first, so the grant is counted before it exists; taken back when the limit can't be set */
+    if (note_grant_write(id, r->uid, pid, start, need)) { close(pfd); close(lk); admin_err("vm.memlockRefused", NULL); return; }
     struct rlimit rl = { (rlim_t)need << 20, (rlim_t)need << 20 };
     int e = vmgpu_admin_prlimit((pid_t)pid, &rl);
     close(pfd);
-    if (e) { admin_err("vm.memlockRefused", NULL); return; }
-    if (note_grant_write(id, r->uid, pid, start, need)) { admin_err("vm.memlockRefused", NULL); return; }
+    if (e) { grant_unlink(id); close(lk); admin_err("vm.memlockRefused", NULL); return; }
+    close(lk);
     char ns[24];
     snprintf(ns, sizeof ns, "%ld", need);
     admin_ok("vm.memlockSet", "need", ns, NULL);

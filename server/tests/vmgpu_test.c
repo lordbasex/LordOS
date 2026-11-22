@@ -24,7 +24,8 @@ extern int (*vmgpu_admin_initramfs)(void);
 extern int (*vmgpu_admin_prlimit)(pid_t pid, const struct rlimit *rl);
 static pid_t pl_pid;
 static rlim_t pl_cur, pl_max;
-static int fake_prlimit(pid_t pid, const struct rlimit *rl) { pl_pid = pid; pl_cur = rl->rlim_cur; pl_max = rl->rlim_max; return 0; }
+static int pl_fail, pl_calls;
+static int fake_prlimit(pid_t pid, const struct rlimit *rl) { pl_calls++; if (pl_fail) return -1; pl_pid = pid; pl_cur = rl->rlim_cur; pl_max = rl->rlim_max; return 0; }
 
 static int fails, checks;
 #define CHECK(c, ...) do { checks++; if (!(c)) { fails++; fprintf(stderr, "FAIL %s:%d: ", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fprintf(stderr, "\n"); } } while (0)
@@ -439,8 +440,9 @@ static void test_memlock(void) {
     CHECK(ok("vm.memlockSet") && pl_pid == q && pl_cur == (rlim_t)4608 << 20 && pl_max == pl_cur, "set 4096 + 512 MB: %s", last);
     char t2[128];
     snprintf(t2, sizeof t2, "%u %d 1000 4608", (unsigned)req.uid, (int)q);
-    get("run/lordos/vm-gvt/" ID1, t, sizeof t);
+    get("run/lordos/vm-gvt/grant-" ID1, t, sizeof t);
     CHECK(!strncmp(t, t2, strlen(t2)), "the grant noted: %s", t);
+    CHECK(exists("run/lordos/vm-gvt/.lock"), "the lock file");
     /* the same process again: nothing new */
     pl_pid = 0;
     ACT(vm_act_memlock, a);
@@ -502,6 +504,38 @@ static void test_memlock(void) {
     CHECK(err("admin.invalidArgument"), "bad arg: %s", last);
     ACT(vm_act_memlock, a);
     CHECK(ok("vm.memlockSet") && pl_pid == q, "all checks pass again: %s", last);
+    /* a limit that can't be set: the grant recorded first is taken back */
+    FAKE_QEMU(q, ID1, 4096, 16, 6000);
+    pl_fail = 1;
+    ACT(vm_act_memlock, a);
+    pl_fail = 0;
+    CHECK(err("vm.memlockRefused") && !exists("run/lordos/vm-gvt/grant-" ID1), "rolled back: %s", last);
+    ACT(vm_act_memlock, a);
+    CHECK(ok("vm.memlockSet") && exists("run/lordos/vm-gvt/grant-" ID1), "granted again: %s", last);
+    /* the vGPU goes while its QEMU lives (it closed the group): the limit goes back to the default first, then the grant */
+    char up[1100];
+    snprintf(up, sizeof up, "%s/proc/%d/fd/9", root, (int)q);
+    unlink(up);
+    put("sys/bus/mdev/devices/" ID1 "/remove", "");
+    put("sys/bus/mdev/devices/" ID2 "/remove", "");
+    pl_pid = 0; pl_calls = 0;
+    ACT(vm_act_gvt_remove, ID1);
+    CHECK(ok("vm.gvtGone") && pl_pid == q && pl_cur == (rlim_t)8 << 20 && pl_max == pl_cur && !exists("run/lordos/vm-gvt/grant-" ID1), "released on removal: %s", last);
+    /* the sweep does the same for a leftover vGPU */
+    snprintf(up, sizeof up, "%s/proc/%d/fd/9", root, (int)q2);
+    unlink(up);
+    CHECK(exists("run/lordos/vm-gvt/grant-" ID2), "ID2's grant");
+    pl_pid = 0;
+    vm_gvt_sweep(req.uid);
+    CHECK(pl_pid == q2 && pl_cur == (rlim_t)8 << 20 && !exists("run/lordos/vm-gvt/grant-" ID2), "released by the sweep");
+    /* a grant whose process ended goes from the count (and its record) without a prlimit */
+    snprintf(st, sizeof st, "%u %d 1 9999\n", (unsigned)req.uid, (int)q2);
+    put("run/lordos/vm-gvt/grant-" ID2, st);
+    FAKE_QEMU(q, ID1, 4096, 16, 7000);
+    snprintf(st, sizeof st, "%u\n", (unsigned)req.uid);
+    put("run/lordos/vm-gvt/" ID1, st);
+    ACT(vm_act_memlock, a);
+    CHECK(ok("vm.memlockSet") && !exists("run/lordos/vm-gvt/grant-" ID2), "a dead grant counts nothing: %s", last);
     kill(q, SIGKILL); kill(q2, SIGKILL);
     waitpid(q, NULL, 0); waitpid(q2, NULL, 0);
     pl_pid = 0;
