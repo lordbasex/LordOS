@@ -60,7 +60,9 @@ const piped = `jq -r '.model.display_name' | tr a-z A-Z`;
 eq('shell syntax: whole, through sh -c', wrapCommand(piped), `${BRIDGE} sh -c 'jq -r '\\''.model.display_name'\\'' | tr a-z A-Z'`);
 for (const c of [mine, piped, '', 'echo "$HOME" && date', "printf '%s' it's"]) eq(`round trip: ${c}`, unwrapCommand(wrapCommand(c)), c);
 // the wrapped command runs as the original did (env stands in for the bridge)
-const run = (cmd) => execFileSync('sh', ['-c', cmd], { input: '{"x":1}', encoding: 'utf8' });
+// a command that never reads its input can exit before node has written it (EPIPE under load): the rest of the input
+// is drained after it, the same on both sides
+const run = (cmd) => execFileSync('sh', ['-c', `${cmd}; cat >/dev/null`], { input: '{"x":1}', encoding: 'utf8' });
 for (const c of [`printf 'a b' && cat`, `cat | tr x y`, `echo "it's"; echo $((1+2))`])
   eq(`same output: ${c}`, run(wrapCommand(c).replace(BRIDGE, 'env')), run(c));
 const settings = { model: 'opus', statusLine: { type: 'command', command: mine, padding: 2 }, permissions: { allow: ['Bash(ls)'] } };
