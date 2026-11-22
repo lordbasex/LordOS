@@ -112,8 +112,9 @@ int iconfind_status(const IconRoots *r, const char *name, char *out, size_t n) {
 
 int iconfind_svg_allowed(const char *real, const char *home) {
     /* a Flatpak app's exported icon is a link into its deployment (app/<id>/<arch>/<branch>/<commit>/export/share/) */
+    /* LordOS's own assets (root's, from the package): Machines' symbols and the systems' logos */
     static const char *const sys[] = { "/usr/share/", "/usr/local/share/", "/opt/", "/var/lib/flatpak/exports/share/",
-                                       "/var/lib/flatpak/app/", NULL };
+                                       "/var/lib/flatpak/app/", "/usr/lib/lordos/assets/", NULL };
     static const char *const own[] = { "/.local/share/icons/", "/.icons/", "/.local/share/flatpak/exports/share/",
                                        "/.local/share/flatpak/app/", NULL };
     if (!real || real[0] != '/' || !ends_with(real, ".svg") || strstr(real, "/../")) return 0;

@@ -41,11 +41,13 @@
 #include "inputkind.h"
 #include "kms.h"
 #include "drmcard.h"
+#include <sys/resource.h>
 #include "term/term.h"
 #include "ui/js.h"
 #include "ui/js_input.h"
 #include "ui/ui.h"
 #include "wl/wl.h"
+#include "wl/outpick.h"
 #include "gpu/gpu.h"
 #include "remote/mirror.h"
 #include "remote/share.h"
@@ -67,6 +69,7 @@
 #include "sec/broker.h"
 #include "cursor.h"
 #include "shake.h"
+#include "pointerlock.h"
 #include "ui/grab.h"
 #include "ui/js_wm.h"
 #include "ui/portal.h"
@@ -78,7 +81,9 @@
 #include "hw/sleeplock.h"
 #include "hw/logindlock.h"
 #include "hw/modes.h"
+#include "hw/uevent.h"
 #include "ui/js_hw.h"
+#include "ui/js_vm.h"
 #include "outputs.h"
 #include "monitor/netrec.h"
 #include "sec/codesig.h"
@@ -238,7 +243,7 @@ typedef struct {
     int cursor_tex_w, cursor_tex_h;
     /* session without a monitor (lord-sessiond shows it on the monitor or the remote desktop): it is
      * drawn in memory, without DRM or evdev; greeter = the login screen */
-    int headless, greeter, shift;
+    int headless, greeter, shift, meta;
     double last_render;
     /* GPU paused because someone is watching over the network: it comes back when nobody is left */
     int gpu_paused;
@@ -324,11 +329,25 @@ static int out_rects(const Server *s, ORect *r, int *idx) {
         if (s->out[i].on) { const OutView *v = &s->out[i].v; idx[n] = i; r[n++] = (ORect){ v->x, v->y, v->w, v->h }; }
     return n;
 }
-/* the display under the pointer (-1 headless or none) */
+/* where the pointer's image is drawn: at the pointer, or where a pointer lock's owner shows it (pointerlock.h: a
+ * machine's guest pointer, inside its picture; the pointer itself stays put) */
+static void cursor_at(const Server *s, int *x, int *y) {
+    if (!ptrlock_cursor(x, y)) { *x = s->cx; *y = s->cy; }
+}
+/* the display under the pointer's image (-1 headless or none) */
 static int out_at_pointer(const Server *s) {
     ORect r[OUT_MAX];
-    int idx[OUT_MAX], n = out_rects(s, r, idx), k = out_at(r, n, s->cx, s->cy);
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    int idx[OUT_MAX], n = out_rects(s, r, idx), k = out_at(r, n, cx, cy);
     return k >= 0 ? idx[k] : -1;
+}
+/* a pointer lock's node, where it is now (pointerlock.h) */
+static int ptrlock_rect(int node, float r[4]) {
+    const Node *n = node_get(node);
+    if (!n) return -1;
+    r[0] = n->ax; r[1] = n->ay; r[2] = n->w; r[3] = n->h;
+    return 0;
 }
 /* The pointer never lands outside the displays (nor in the gap next to a shorter one). */
 static void clamp_pointer(Server *s) {
@@ -382,6 +401,8 @@ static unsigned cursor_gen_of(int shape, int pct) {
 }
 
 static void cursor_now(const Server *s, Cur *c, int pct) {
+    /* a pointer lock with no pointer shown (pointerlock.h): hidden */
+    if (ptrlock_hidden()) { *c = (Cur){ 2, NULL, 0, 0, 0, 0, 0xd0000000u }; return; }
     c->mode = wl_cursor(&c->px, &c->w, &c->h, &c->hx, &c->hy, &c->gen);
     int grabbing = grab_active();
     if (c->mode && !grabbing && (s->over_app || wl_pointer_locked())) return;   /* the app chose its own (or hid it) */
@@ -409,7 +430,9 @@ static void cursor_local(const Server *s, Cur *c, int pct) {
 /* The pointer in a display's physical pixels. */
 static void pointer_phys(const Server *s, const Out *o, int *x, int *y) {
     double px, py;
-    out_to_phys(&o->v, s->cx, s->cy, &px, &py);
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    out_to_phys(&o->v, cx, cy, &px, &py);
     *x = (int)lround(px);
     *y = (int)lround(py);
 }
@@ -623,6 +646,12 @@ static void remote_pointer(int fx, int fy) {
     double lx, ly;                          /* frame pixels of the feed → logical */
     out_to_logical(&feed_out(s)->v, fx, fy, &lx, &ly);
     int x = (int)lround(lx), y = (int)lround(ly);
+    /* a pointer lock (pointerlock.h): the viewer's pointer moves by what it moved since its last position */
+    static int rx = -1, ry = -1;
+    int had = rx >= 0;
+    int ddx = x - rx, ddy = y - ry;
+    rx = x; ry = y;
+    if (ptrlock_active()) { if (had) ptrlock_motion(ddx, ddy); return; }
     if (x == s->cx && y == s->cy) return;
     s->rdx += x - s->cx;
     s->rdy += y - s->cy;
@@ -636,12 +665,14 @@ static void remote_pointer(int fx, int fy) {
 
 static void remote_button(int button, int down) {
     Server *s = remote_server;
+    if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
     remote_settle(s);
 }
 
 static void remote_wheel(int steps) {
     Server *s = remote_server;
+    if (ptrlock_wheel(steps, 0)) return;
     s->wheel += steps;
     remote_settle(s);
 }
@@ -691,7 +722,7 @@ static void publish_displays(Server *s) {
         WlOutput *w = &wo[n];
         memset(w, 0, sizeof *w);
         *w = (WlOutput){ o->v.x, o->v.y, o->v.w, o->v.h, o->v.pw, o->v.ph, s->headless ? 60000 : mode_refresh_mhz(&o->kms.mode),
-                         out_scale(o), o->d.mm_w, o->d.mm_h, "", "" };
+                         out_scale(o), o->d.mm_w, o->d.mm_h, "", "", i };
         if (s->headless) { snprintf(w->name, sizeof w->name, "LORD-1"); snprintf(w->desc, sizeof w->desc, "LordOS display"); }
         else { snprintf(w->name, sizeof w->name, "%s", o->d.connector); snprintf(w->desc, sizeof w->desc, "%s", o->d.name); }
         if (len < (int)sizeof json - 300) {
@@ -1104,6 +1135,7 @@ static void display_attach(const int *fds, int n, int flags) {
     o0->gpu = -1;
     int card = dup(fds[0]);             /* kms_attach closes its fd when it fails */
     int keep = (flags & RP_DISPLAY_KEEP) != 0;
+    uevent_set_card(uevent_card_of_fd(fds[0]));     /* only this card's drm uevents are display hotplugs (a parked one's too) */
     if (kms_attach(&o0->kms, fds[0], keep)) {
         o0->kms.fd = -1;
         if (card >= 0 && n <= PARK_MAX) {
@@ -1172,7 +1204,8 @@ static void display_detach(void) {
     for (int i = 0; i < OUT_MAX; i++) s->out[i].gpu = -1;
     input_close(&s->input);
     kb_reset_state();                           /* a key held now (the ❖ of ❖L) is released where we can't see it */
-    s->ctrl = s->alt = s->shift = 0;            /* Ctrl and Alt of Ctrl+Alt+F2 are released on the text console */
+    s->ctrl = s->alt = s->shift = s->meta = 0;  /* Ctrl and Alt of Ctrl+Alt+F2 are released on the text console */
+    ptrlock_end(PTRLOCK_END_INPUT);             /* a pointer lock goes with the input (pointerlock.h) */
     for (int i = OUT_MAX - 1; i >= 0; i--) {        /* the second displays first: out[0] owns the fd */
         Out *o = &s->out[i];
         if (!o->on && i) continue;
@@ -1270,6 +1303,12 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         }
         /* ruedas: la de alta resolución y la horizontal van como scroll fino (tp/tp_route.c, value120);
          * los pasos enteros de siempre, solo si el mouse no tiene la de alta resolución */
+        /* a pointer lock with a wheel sink: whole steps straight to it (pointerlock.h) */
+        if (ptrlock_wants_wheel()) {
+            if (ev->code == REL_WHEEL) ptrlock_wheel(tp_config()->mouse_natural ? -ev->value : ev->value, 0);
+            if (ev->code == REL_HWHEEL) ptrlock_wheel(0, ev->value);
+            break;
+        }
         if (ev->code == REL_WHEEL && !d->wheel_hires) s->wheel += tp_config()->mouse_natural ? -ev->value : ev->value;
         if (ev->code == REL_WHEEL_HI_RES) tp_route_wheel120(tp_config()->mouse_natural ? -ev->value : ev->value, 0);
         if (ev->code == REL_HWHEEL_HI_RES) tp_route_wheel120(0, ev->value);
@@ -1301,6 +1340,7 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->code == KEY_LEFTCTRL || ev->code == KEY_RIGHTCTRL) s->ctrl = ev->value != 0;
         if (ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) s->alt = ev->value != 0;
         if (ev->code == KEY_LEFTSHIFT || ev->code == KEY_RIGHTSHIFT) s->shift = ev->value != 0;
+        if (ev->code == KEY_LEFTMETA || ev->code == KEY_RIGHTMETA) s->meta = ev->value != 0;
         /* Ctrl+Alt+Backspace ends the session at once. The modifiers are tracked from every keyboard and a release can
          * be lost (another console, a keyboard that sleeps or reconnects), so the kernel is asked whether Ctrl and Alt
          * are really held on this keyboard: a stale state must never end a session on a lone Backspace. */
@@ -1319,10 +1359,14 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->code == KEY_ESC && ev->value == 1 && s->ctrl && s->alt && s->shift && share_user_stop()) break;
         /* Ctrl+Alt+F1…F12: a text console (taken here, so no app or theme gets the key) */
         if (ev->value == 1 && s->ctrl && s->alt && !s->shift && input_vt_key(ev->code)) { vt_request(input_vt_key(ev->code)); break; }
+        /* a pointer lock (Machines' "Capture mouse") ends with ❖Esc or Ctrl+Alt, before any app sees the key (pointerlock.h) */
+        if (ev->code < BTN_MISC && ptrlock_key(ev->code, ev->value, s->meta, s->ctrl, s->alt)) break;
         /* Buttons in the DOM's numbering: 0 left, 1 middle, 2 right, 3 back, 4 forward (inputkind.h, issue #159) */
         int button = input_dom_button(ev->code);
         /* Settings → Mouse & Trackpad, primary button on the right: a mouse's (not a touchpad's) */
         if ((button == 0 || button == 2) && !d->tp && d->fd >= 0 && tp_config()->mouse_left_handed) button = 2 - button;
+        /* a pointer lock with a button sink takes them straight, with no hit test (pointerlock.h) */
+        if (button >= 0 && ev->value != 2 && ptrlock_button(button, ev->value == 1)) break;
         if (button >= 0 && ev->value != 2 && s->nbuttons < MAX_BUTTONS)
             s->buttons[s->nbuttons++] = (ButtonEvent){ ev->value == 1, button };
         else if (ev->code < BTN_MISC) {
@@ -1334,7 +1378,13 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         break;
     }
     case EV_SYN:
-        if (s->moved) {
+        if (s->moved && ptrlock_active()) {
+            /* LordOS's own pointer lock (pointerlock.h): the motion goes to its owner and the pointer stays where it is */
+            ptrlock_motion(s->rdx, s->rdy);
+            s->rdx = s->rdy = 0;
+            s->cx = s->lx; s->cy = s->ly;
+            s->moved = 0;
+        } else if (s->moved) {
             /* juegos: movimiento relativo crudo; con el puntero bloqueado el cursor no se mueve */
             wl_pointer_relative(s->rdx, s->rdy);
             s->rdx = s->rdy = 0;
@@ -1387,6 +1437,7 @@ static void tp_warp(double x, double y) {
 }
 static void tp_button(int button, int down) {
     Server *s = remote_server;
+    if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
 }
 static void tp_position(double *x, double *y, int *w, int *h) {
@@ -1446,6 +1497,7 @@ static Box paint_ui(Server *s) {
         }
     }
     ui.layout_ms = t1 - t0;
+    js_stall_note("layout", "tree", ui.layout_ms);
     s->layout_total += ui.layout_ms;
     s->renders++;
     return d;
@@ -1586,6 +1638,7 @@ static Rect paint_out(Server *s, Out *o, int index, int feed) {
     view_reset();
     if (r.x1 <= r.x0 || r.y1 <= r.y0) return (Rect){ 0, 0, 0, 0 };
     double ms = now_ms() - t0;
+    js_stall_note("paint", "display", ms);
     ui.paint_ms += ms;
     s->paint_total += ms;
     ui.damage_px += px;
@@ -1605,7 +1658,9 @@ static Rect cursor_rect(const Server *s, const Out *o, const Cur *k) {
     if (r.x1 <= 0 || r.y1 <= 0 || r.x0 >= o->v.pw || r.y0 >= o->v.ph) return (Rect){ 0, 0, 0, 0 };
     /* in a gap next to it the pointer belongs to another display */
     ORect me = { o->v.x, o->v.y, o->v.w, o->v.h };
-    if (out_at(&me, 1, s->cx, s->cy) < 0 && !(o->v.dx || o->v.dy)) return (Rect){ 0, 0, 0, 0 };
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    if (out_at(&me, 1, cx, cy) < 0 && !(o->v.dx || o->v.dy)) return (Rect){ 0, 0, 0, 0 };
     return r;
 }
 
@@ -1929,7 +1984,9 @@ static int out_needs(const Server *s, const Out *o) {
     if (!o->cdirty) return 0;
     if (o->cur_on) return 1;
     ORect me = { o->v.x, o->v.y, o->v.w, o->v.h };
-    return out_at(&me, 1, s->cx, s->cy) >= 0 || o->v.dx || o->v.dy;
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    return out_at(&me, 1, cx, cy) >= 0 || o->v.dx || o->v.dy;
 }
 static int outs_have_work(const Server *s) {
     for (int i = 0; i < OUT_MAX; i++) if (!s->out[i].kms.flip_pending && out_needs(s, &s->out[i])) return 1;
@@ -2204,8 +2261,17 @@ static int render_frame(Server *s) {
      * GPU display must still present it: before 0.8.1 nothing was flipped until some other part of
      * the screen changed (the clock, the cursor...), so typing in Chromium or Firefox showed up to a
      * second late and Chromium logged "buggy presentation feedback" (docs/TROUBLESHOOTING.md). */
-    if (wl_wants_frame() && gpu_active())
-        for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0) s->out[i].wl_new = 1;
+    /* Only the displays the window is on (0.8.9.5): a video on one display made every display compose again. */
+    unsigned wlk = wl_new_content();
+    if (wlk && gpu_active())
+        for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0 && (wlk >> i & 1)) s->out[i].wl_new = 1;
+    /* a machine's new frame in the texture its window draws (media_src_present): only the displays it is on */
+    float mx0, my0, mx1, my1;
+    if (media_present_take(&mx0, &my0, &mx1, &my1) && gpu_active())
+        for (int i = 0; i < OUT_MAX; i++) {
+            Out *o = &s->out[i];
+            if (o->on && o->gpu >= 0 && mx0 < o->v.x + o->v.w && mx1 > o->v.x && my0 < o->v.y + o->v.h && my1 > o->v.y) o->wl_new = 1;
+        }
     Out *feed = feed_out(s), *mo = main_out(s);
     int main_shown = 0, main_built = 0;     /* the main display got this frame; built here (not prepared before) */
     int done[OUT_MAX] = { 0 };              /* submitted or built in this render */
@@ -2320,8 +2386,14 @@ static int render_frame(Server *s) {
         par_light = ui.paint_ms < frame_ms * 0.25 && built < frame_ms * 0.45 ? par_light + 1 : 0;
         if (par_light >= 60) { par_on = 0; canvas_parallel(NULL); }
     }
-    /* the Linux apps' frame callbacks go with a frame submitted, not with one only painted ahead */
-    if (!prep_only) wl_frame_done((unsigned)now_ms());
+    /* the Linux apps' frame callbacks go with a frame submitted, not with one only painted ahead: each window's with its
+     * own display's, a display that just got a frame or has none waiting for a flip (wl.c, outpick.h) */
+    if (!prep_only) {
+        unsigned keys = 0;
+        if (s->headless) keys = OUTPICK_ALL;
+        else for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && (done[i] || !s->out[i].kms.flip_pending)) keys |= 1u << i;
+        wl_frame_done((unsigned)now_ms(), keys);
+    }
     if (s->headless) {                          /* no flip without a monitor: the frame is out now */
         struct timespec t;
         clock_gettime(CLOCK_MONOTONIC, &t);
@@ -2333,15 +2405,25 @@ static int render_frame(Server *s) {
         fph.submit = ns;
         fph.period = (uint32_t)(1000000000u / (unsigned)hz);
         headless_prev = ns;
+        wl_presented(-1, 0, ns, 0, (unsigned)(1000000000u / (unsigned)hz));   /* the apps' presentation feedback too */
     }
     /* No flip event will come (a modeset instead of a page flip: the first frame, or a driver
      * without page flip): the frame is on screen already, so its presentation feedback goes now.
      * Otherwise the apps' feedback would wait for some later flip. */
+    if (!s->headless)                           /* (each display: its windows' feedback, wl_presented) */
+        for (int i = 0; i < OUT_MAX; i++) {
+            const Out *o = &s->out[i];
+            if (!done[i] || !o->on || o->kms.flip_pending || o == mo) continue;
+            struct timespec t;
+            clock_gettime(CLOCK_MONOTONIC, &t);
+            wl_presented(i, s->main_out, (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec, o->kms.flip_seq,
+                         o->kms.mode.vrefresh ? 1000000000u / o->kms.mode.vrefresh : 16666667u);
+        }
     if (main_shown && !s->headless && !mo->kms.flip_pending) {
         struct timespec t;
         clock_gettime(CLOCK_MONOTONIC, &t);
         uint64_t ns = (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec;
-        wl_presented(ns, mo->kms.flip_seq, mo->kms.mode.vrefresh ? 1000000000u / mo->kms.mode.vrefresh : 16666667u);
+        wl_presented(s->main_out, s->main_out, ns, mo->kms.flip_seq, mo->kms.mode.vrefresh ? 1000000000u / mo->kms.mode.vrefresh : 16666667u);
         lbf_presented(ns, mo->kms.mode.vrefresh ? 1000000000u / mo->kms.mode.vrefresh : 16666667u);
         if (keylag_enabled) keylag_presented(ns);
     }
@@ -2396,7 +2478,10 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
     int r = js_init(theme);
     if (r == 0) return 0;
     if (r != JS_REFUSED && codesig_state() != CODE_INVALID) return -1;
-    if (r == JS_REFUSED) snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);   /* lord.themes.use won't go back to it */
+    if (r == JS_REFUSED) {              /* lord.themes.use won't go back to it */
+        snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);
+        snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "refused by the verified-code check (sec/codesig.c)");
+    }
     if (!greeter && codesig_state() != CODE_INVALID) {
         char root[PATH_MAX], tmp[PATH_MAX];
         snprintf(tmp, sizeof tmp, "%s", theme);
@@ -2506,9 +2591,13 @@ static int switch_theme(const char *current) {
     js_shutdown();
     ui_reset();
     term_detach_all();
-    if (js_init(path)) {
+    int r = js_init(path);
+    if (r) {
         fprintf(stderr, "lord-server: the theme failed, going back to %s\n", current);
         snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", path);
+        const char *why = js_init_error();     /* kept before the old theme's own start can overwrite it */
+        snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", r == JS_REFUSED ? "refused by the verified-code check (sec/codesig.c)"
+                 : why[0] ? why : "the theme's code did not load (see the log)");
         js_shutdown();
         ui_reset();
         if (js_init(current)) fprintf(stderr, "lord-server: %s did not load again either\n", current);
@@ -2733,6 +2822,7 @@ int main(int argc, char **argv) {
         if (!card) { drm_pick_card(picked, sizeof picked); card = picked; }
         kms_set_picker(display_pick);       /* the display saved in Settings (displays.json) */
         if (kms_open(K0(&s), card)) return 1;
+        uevent_set_card(uevent_card_of_fd(K0(&s)->fd));    /* only this card's drm uevents are display hotplugs */
         /* one display until the plan (after dropping root: displays.json is the user's) opens the others */
         s.W = (int)K0(&s)->width;
         s.H = (int)K0(&s)->height;
@@ -2745,6 +2835,7 @@ int main(int argc, char **argv) {
     ui.height = (float)s.H;
     s.cx = s.lx = s.W / 2;
     s.cy = s.ly = s.H / 2;
+    ptrlock_init(ptrlock_rect);
 
     int vt = -1;
     if (!s.headless) {
@@ -2887,6 +2978,26 @@ int main(int argc, char **argv) {
             if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
             wdog_expect(0);
         }
+        {   /* a pointer lock started, ended, or its owner moved the pointer image it shows (pointerlock.h) */
+            static unsigned plk;
+            int px, py;
+            /* checked each time round: the node may have moved, or gone (then the lock ends here) */
+            if (ptrlock_active() && ptrlock_where(&px, &py) && (px != s.cx || py != s.cy)) {
+                s.cx = px; s.cy = py;
+                clamp_pointer(&s);
+                s.lx = s.cx; s.ly = s.cy;
+                s.moved = 1;
+                s.motion_pending = 1;
+                if (s.hw_cursor) hw_cursor_move(&s);
+            }
+            if (ptrlock_serial() != plk) {
+                plk = ptrlock_serial();
+                s.cursor_dirty = 1;
+                if (gpu_active()) update_cursor(&s);
+                if (s.hw_cursor) hw_cursor_move(&s);     /* the shown image moved, or the lock ended */
+            }
+            js_pointer_lock_flush();        /* JavaScript's lock: its motion, once a frame (js_input.c) */
+        }
         /* El movimiento del puntero juntado: una vez por cuadro, cuando terminó el page flip. Así un
          * mouse de 1000 Hz no llama a JS (ni a las apps Linux) mil veces por segundo. */
         if (s.motion_pending && !out_blocked(&s, main_out(&s))) {
@@ -2935,6 +3046,7 @@ int main(int argc, char **argv) {
         double td = term_timeout(now);
         if (td >= 0 && (delay < 0 || td < delay)) delay = td;
         tp_tick(now);                       /* touchpad: tocar, arrastrar, inercia (tp/tp.c) */
+        if (ptrlock_waiting() && (delay < 0 || delay > 50)) delay = 50;     /* a pointer lock whose node went away */
         /* shake to find it: the cursor grows and shrinks back (a new size serial redraws it below) */
         cursor_set_boost(cursor_shake() ? shake_level(&pointer_shake, now) : 0);
         double shd0 = cursor_shake() ? shake_timeout(&pointer_shake, now) : -1;
@@ -2947,6 +3059,10 @@ int main(int argc, char **argv) {
         }
         /* a video or a presentation keeps the screen on: a Wayland surface's inhibitor or a portal hold (ui/portal.c) */
         if (wl_idle_inhibited() || portal_inhibited()) display_activity(now_ms());
+        {   /* apps the person let know they're away (ext-idle-notify; inhibitors count as activity above) */
+            double idd = wl_idle_tick(display_last_activity(), now_ms());
+            if (idd >= 0 && (delay < 0 || idd < delay)) delay = idd;
+        }
         display_tick(now_ms());             /* screen off, lock and sleep after N minutes (src/hw) */
         double hwd = display_timeout(now_ms());
         if (hwd >= 0 && (delay < 0 || hwd < delay)) delay = hwd;
@@ -2973,13 +3089,20 @@ int main(int argc, char **argv) {
         double zd = media_reap_timeout();
         if (zd >= 0 && (delay < 0 || zd < delay)) delay = zd;
         /* sin monitor y sin nadie mirando no se dibuja (al conectarse alguien llega un cuadro entero) */
-        int unseen = s.headless && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
+        /* LORD_HEADLESS_DRAW=1 (tests/perf_headless.sh): headless and nobody watching, it still lays out and paints */
+        static int headless_draw = -1;
+        if (headless_draw < 0) headless_draw = getenv("LORD_HEADLESS_DRAW") != NULL;
+        int unseen = s.headless && !headless_draw && !mirror_watchers() && !media_needs_cpu();   /* recording the screen: yes */
         if (!s.headless && display_is_off()) unseen = 1;     /* screen off after idle (DPMS): nothing to draw */
         js_sys_unseen = unseen;                     /* the desk widgets' data feeds rest too (lord.system.seen) */
         /* the minimized windows and those on a hidden desktop: their frame callbacks once a second (wl/framegate.h) */
         if (!unseen) {
             double hd = wl_frame_hidden((unsigned)now_ms());
             if (hd >= 0 && (delay < 0 || hd < delay)) delay = hd;
+        }
+        {   /* a Linux window's new title waiting for its frame slot (wl.c set_title) */
+            double td = wl_title_wait();
+            if (td >= 0 && (delay < 0 || td < delay)) delay = td;
         }
         /* nothing is drawn: the Linux apps waiting for a frame get it at most once a second (wl.c) */
         if (unseen) {
@@ -3001,7 +3124,7 @@ int main(int argc, char **argv) {
             if (media_cursor_serial() != mcur) { mcur = media_cursor_serial(); if (s.over_media) s.cursor_dirty = 1; }
         }
         int ahead = !unseen && can_prepare(&s);
-        int wants = !unseen && (ui.dirty || s.cursor_dirty || js_wants_frame() || wl_wants_frame() || media_wants_frame() ||
+        int wants = !unseen && (ui.dirty || s.cursor_dirty || js_wants_frame() || wl_wants_frame() || media_wants_frame() || media_present_pending() ||
                                 outs_have_work(&s) || prep_ready(&s) || ahead);
         /* no monitor, no vblank: 60 frames a second, or as fast as the fastest remote viewer's screen
          * (120, 144 Hz…) */
@@ -3019,6 +3142,7 @@ int main(int argc, char **argv) {
         }
         if (wants && (!all_busy(&s) || ahead) && pace <= 0) {
             render(&s);
+            js_vm_painted();                /* the machines' frames it showed: lord-vmdisplay may send the next ones */
             wants = 0;
             if (s.headless || soft) pace_next += period;
         }
@@ -3040,7 +3164,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[142 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 para los brokers de apps aisladas, +40 medios */
+        struct pollfd pfd[190 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +8 machines, +40 Spawn helpers */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -3088,8 +3212,10 @@ int main(int argc, char **argv) {
         n += nabr;
         int medbase = n, nmed = media_pollfds(pfd + n, 40);      /* ayudantes lord-media y sus streams de PipeWire */
         n += nmed;
-        int hwbase = n, nhw = hw_pollfds(pfd + n, 8);            /* uevents, the system bus and the session bus clients (src/hw) */
+        int hwbase = n, nhw = hw_pollfds(pfd + n, 48);   /* 16 fixed + up to 32 Spawn helpers */           /* uevents, the system bus and the session bus clients (src/hw) */
         n += nhw;
+        int vmbase = n, nvm = js_vm_pollfds(pfd + n, 8);         /* Machines: each picture's lord-vmdisplay (ui/js_vm.c) */
+        n += nvm;
         wdog_idle();
         int ready = poll(pfd, n, wait);
         if (ready < 0 && errno != EINTR) { perror("poll"); break; }
@@ -3098,9 +3224,18 @@ int main(int argc, char **argv) {
         loop_wake_flip = 0;
         if (pfd[0].revents & POLLIN) {
             Kms *heads[OUT_MAX], *mk = &main_out(&s)->kms;
-            int nh = 0, was = mk->flip_pending;
-            for (int i = 0; i < OUT_MAX; i++) if (s.out[i].on && s.out[i].kms.fd >= 0) heads[nh++] = &s.out[i].kms;
+            int nh = 0, was = mk->flip_pending, waswho[OUT_MAX];
+            for (int i = 0; i < OUT_MAX; i++) {
+                waswho[i] = s.out[i].on && s.out[i].kms.flip_pending;
+                if (s.out[i].on && s.out[i].kms.fd >= 0) heads[nh++] = &s.out[i].kms;
+            }
             if (nh) kms_dispatch_heads(heads, nh);
+            /* the other displays' flips: the presentation feedback of the windows on them (the main one's below) */
+            for (int i = 0; i < OUT_MAX; i++) {
+                const Kms *k = &s.out[i].kms;
+                if (!waswho[i] || k->flip_pending || k == mk) continue;
+                wl_presented(i, s.main_out, k->flip_ns, k->flip_seq, k->mode.vrefresh ? 1000000000u / k->mode.vrefresh : 16666667u);
+            }
             /* wp_presentation follows the main display's vblank */
             if (was && !mk->flip_pending) {
                 /* a flip waits for vblank, half a period on average; one that completes within an eighth
@@ -3111,7 +3246,7 @@ int main(int argc, char **argv) {
                     else if (flip_instant > 0) flip_instant--;
                     if (flip_instant == 3 && !flip_told++) fprintf(stderr, "kms: page flips complete before vblank: pacing to %d Hz\n", mk->mode.vrefresh ? mk->mode.vrefresh : 60);
                 }
-                wl_presented(mk->flip_ns, mk->flip_seq, mk->mode.vrefresh ? 1000000000u / mk->mode.vrefresh : 16666667u);
+                wl_presented(s.main_out, s.main_out, mk->flip_ns, mk->flip_seq, mk->mode.vrefresh ? 1000000000u / mk->mode.vrefresh : 16666667u);
                 lbf_presented(mk->flip_ns, mk->mode.vrefresh ? 1000000000u / mk->mode.vrefresh : 16666667u);
                 if (keylag_enabled) keylag_presented(mk->flip_ns);
                 if (lbf_recording()) {
@@ -3183,6 +3318,7 @@ int main(int argc, char **argv) {
         if (nabr) brokersrv_audio_dispatch(pfd + abr, nabr);
         if (nmed) media_dispatch(pfd + medbase, nmed);
         if (nhw) hw_dispatch(pfd + hwbase, nhw);
+        if (nvm) js_vm_dispatch(pfd + vmbase, nvm);           /* a machine's frame: damaged now, painted next */
         if (parked_n && s.headless && display_hotplug_seq() != parked_seq) {   /* a monitor may have appeared */
             int f[PARK_MAX], fn = parked_n;
             memcpy(f, parked_fd, sizeof(int) * (size_t)fn);

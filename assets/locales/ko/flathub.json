@@ -35,7 +35,6 @@
   "msg.updateDone": "{name}이(가) 최신 상태입니다.",
   "noResults": "일치하는 Flathub 앱이 없습니다.",
   "notSupported": "이 컴퓨터에서는 아직 Flathub를 사용할 수 없습니다. 현재는 PC 전용입니다.",
-  "notYet": "아직 지원되지 않음",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "다른 프로그램 디버깅",
   "perm.devicesAll": "모든 장치: 카메라, 게임 컨트롤러, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Flathub가 확인한 앱만 표시. 숨김: {count}",
   "showAllOn": "확인 여부와 관계없이 모든 Flathub 앱 표시 중",
   "showMore": "더 보기(남은 항목: {count})",
-  "subsandbox.text": "이 앱은 Chromium 또는 Electron 기반이며, 이들의 보조 프로세스는 LordOS가 아직 제공하지 않는 방식으로 Flatpak 샌드박스를 공유해야 하므로 지금은 여기에 설치할 수 없습니다.",
-  "subsandbox.title": "LordOS에서 아직 지원되지 않음",
   "subtitle": "Flathub의 Linux 앱을 LordOS 자체 격리 공간 안에서 방화벽의 적용을 받으며 실행합니다.",
   "turnOff": "끄기",
   "unverified": "Flathub에서 확인되지 않음: 게시자가 앱의 개발자가 아닐 수 있습니다.",
@@ -110,5 +107,6 @@
   "updates.button": "Flathub 앱 업데이트",
   "updates.text": "Flathub에서 설치됨: {count}. Flatpak이 각 앱을 확인하고 변경된 내용을 설치합니다. 열려 있는 앱은 다시 열 때 업데이트가 완료됩니다.",
   "updates.title": "Flathub 앱",
-  "verified": "확인됨: {developer} 게시"
+  "verified": "확인됨: {developer} 게시",
+  "note.obsVideos": "LordOS에서 OBS Studio는 녹화를 비디오 폴더에 저장합니다. 홈의 다른 폴더는 Flathub 앱에서 읽기 전용입니다."
 }

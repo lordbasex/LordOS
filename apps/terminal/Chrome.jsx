@@ -344,6 +344,7 @@ export function Toolbelt({ t, wid, w, sid }) {
   const home = lord.fs.home();
   const profiles = terminalSettings().profiles;
   const sessions = w.tabs.flatMap((tab) => leaves(tab.root));
+  useStore(meta, () => sessions.map(sessionTitle).join('\n'));     // the jobs' titles (the window no longer re-renders for them)
   const quote = (s) => `'${s.replace(/'/g, "'\\''")}'`;
   return (
     <View style={{ width: 240, maxWidth: '50%', paddingHorizontal: 10, paddingVertical: 12, backgroundColor: t.sidebarBg, overflow: 'hidden' }}>

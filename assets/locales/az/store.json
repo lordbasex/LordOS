@@ -129,7 +129,7 @@
   },
   "open": "Aç",
   "page.ai": "Süni intellekt",
-  "page.webapps": "Veb tətbiqlər",
+  "page.webapps": "Veb tətbiqlər (PWA)",
   "page.commercial": "Kommersiya",
   "page.remote": "Uzaq giriş",
   "page.suites": "Üçüncü tərəf tətbiqləri",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "Aktivləşdirilir…",
   "pkg32": "{name} (32 bit)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak tətbiqi"
+  "kind.flatpak": "Flatpak tətbiqi",
+  "section.origin": "Mənbə",
+  "section.picks": "LordOS seçimi",
+  "src.debian": "Linux tətbiqləri (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android tətbiqləri",
+  "soon": "Tezliklə",
+  "sub.all": "Hamısı"
 }

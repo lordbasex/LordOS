@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} 已是最新版本。",
   "noResults": "沒有符合的 Flathub App。",
   "notSupported": "這台電腦尚無法使用 Flathub：目前僅適用於 PC。",
-  "notYet": "尚未支援",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "偵錯其他程式",
   "perm.devicesAll": "所有裝置：相機、遊戲控制器、USB",
@@ -100,8 +99,6 @@
   "showAllOff": "僅顯示經 Flathub 驗證的 App。已隱藏：{count}",
   "showAllOn": "正在顯示所有 Flathub App，無論是否經過驗證",
   "showMore": "顯示更多（剩餘 {count}）",
-  "subsandbox.text": "這個 App 以 Chromium 或 Electron 為基礎，其輔助程序需要以 LordOS 尚未提供的方式共用 Flatpak 的沙盒，因此目前無法在此安裝。",
-  "subsandbox.title": "LordOS 尚未支援",
   "subtitle": "來自 Flathub 的 Linux App，在 LordOS 自己的隔離環境中執行，受你的防火牆約束。",
   "turnOff": "關閉",
   "unverified": "未經 Flathub 驗證：發布者可能不是 App 的開發者。",
@@ -110,5 +107,6 @@
   "updates.button": "更新 Flathub App",
   "updates.text": "從 Flathub 安裝：{count}。Flatpak 會逐一檢查並安裝有變更的內容；已開啟的 App 會在你再次開啟時完成更新。",
   "updates.title": "Flathub App",
-  "verified": "已驗證：由 {developer} 發布"
+  "verified": "已驗證：由 {developer} 發布",
+  "note.obsVideos": "在 LordOS 中，OBS Studio 會將錄影存到你的「影片」檔案夾：你個人專屬檔案夾中的其他檔案夾對 Flathub App 而言是唯讀的。"
 }

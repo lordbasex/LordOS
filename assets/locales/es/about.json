@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} nodo",
     "other": "{ms} ms · {count} nodos"
   },
+  "pauses": "Pausas de más de 50 ms",
+  "pausesValue": "{count} (la más larga: {ms} ms)",
   "server": "Servidor gráfico",
   "systemApp": "App del sistema",
   "systemReport": "Informe del sistema…",
@@ -42,5 +44,6 @@
   "version": "Versión {v}",
   "versionChannel": "Versión {v} · {channel}",
   "case": "Caja",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Los nombres y logos de productos son marcas de sus respectivos dueños; LordOS no está afiliado a ellos ni cuenta con su respaldo. Los logos se descargan solo si los pedís, del sitio de cada dueño, y se muestran en esta computadora."
 }

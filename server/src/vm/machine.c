@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/random.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
@@ -173,9 +174,219 @@ int vm_share_allowed(const char *path, const char *home, const char *user, const
     return 0;
 }
 
+int vm_transfer_path(const char *dir, char *out, size_t n) {
+    size_t l = dir ? strlen(dir) : 0;
+    while (l > 1 && dir[l - 1] == '/') l--;
+    const char *b = l ? memrchr(dir, '/', l) : NULL;
+    if (!b || b == dir) return -1;
+    size_t bl = (size_t)(dir + l - (b + 1));
+    if (bl < 8 || bl > NAME_MAX || memcmp(dir + l - 7, ".lordvm", 7) || b[1] == '.') return -1;
+    int w = snprintf(out, n, "%.*s/" VM_XFER_DIR "/%.*s", (int)(b - dir), dir, (int)(bl - 7), b + 1);
+    if (w < 0 || (size_t)w >= n || !path_valid(out)) return -1;
+    return 0;
+}
+
+/* the owner record beside a transfer folder: <library>/Transfer/.<name>.machine (outside the folder the guest sees) */
+static int xfer_owner_of(const char *xp, char *out, size_t n) {
+    const char *b = strrchr(xp, '/');
+    if (!b) return -1;
+    int w = snprintf(out, n, "%.*s/.%s.machine", (int)(b - xp), xp, b + 1);
+    return w < 0 || (size_t)w >= n || strlen(b + 1) + 9 > NAME_MAX ? -1 : 0;
+}
+static int xfer_owner_read(const char *op, char id[37]) {
+    int fd = open(op, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    struct stat st;
+    char buf[64];
+    ssize_t r = !fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_uid == geteuid() ? read(fd, buf, sizeof buf - 1) : -1;
+    close(fd);
+    if (r < 36) return -1;
+    memcpy(id, buf, 36);
+    id[36] = 0;
+    return vm_uuid_valid(id) && (r == 36 || buf[36] == '\n') ? 0 : -1;
+}
+static int xfer_owner_write(const char *op, const char *id) {
+    char tmp[PATH_MAX + 8];
+    if (snprintf(tmp, sizeof tmp, "%s.tmp", op) >= (int)sizeof tmp) return -1;
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (fd < 0) return -1;
+    char line[40];
+    int l = snprintf(line, sizeof line, "%s\n", id);
+    int ok = write(fd, line, (size_t)l) == l && !fsync(fd);
+    close(fd);
+    if (!ok || rename(tmp, op)) { unlink(tmp); return -1; }
+    return 0;
+}
+static int dir_empty(const char *p) {
+    DIR *d = opendir(p);
+    if (!d) return 0;
+    int empty = 1;
+    for (struct dirent *e; empty && (e = readdir(d));) if (strcmp(e->d_name, ".") && strcmp(e->d_name, "..")) empty = 0;
+    closedir(d);
+    return empty;
+}
+/* xp (and its owner record) to "<name> (old YYYY-MM-DD)", " 2", " 3"… beside it; the new name in moved */
+static int xfer_aside(const char *xp, char *moved, size_t mn) {
+    char day[16], to[PATH_MAX], op[PATH_MAX], top2[PATH_MAX];
+    time_t t = time(NULL);
+    struct tm tm;
+    localtime_r(&t, &tm);
+    strftime(day, sizeof day, "%Y-%m-%d", &tm);
+    for (int i = 1; i < 100; i++) {
+        int w = i == 1 ? snprintf(to, sizeof to, "%s (old %s)", xp, day) : snprintf(to, sizeof to, "%s (old %s) %d", xp, day, i);
+        const char *b = strrchr(to, '/');
+        if (w < 0 || (size_t)w >= sizeof to || !b || strlen(b + 1) + 9 > NAME_MAX) return -1;
+        struct stat st;
+        if (!lstat(to, &st) || errno != ENOENT) continue;
+        if (rename(xp, to)) return -1;
+        if (!xfer_owner_of(xp, op, sizeof op) && !xfer_owner_of(to, top2, sizeof top2)) rename(op, top2);
+        if (moved && mn) snprintf(moved, mn, "%s", b + 1);
+        return 0;
+    }
+    return -1;
+}
+
+int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char *moved, size_t mn) {
+    if (moved && mn) moved[0] = 0;
+    if (!vm_uuid_valid(id) || vm_transfer_path(dir, out, n)) return -1;
+    char top[PATH_MAX], op[PATH_MAX], who[37];
+    snprintf(top, sizeof top, "%s", out);
+    char *sl = strrchr(top, '/');
+    if (!sl) return -1;
+    *sl = 0;
+    struct stat st;
+    if (mkdir(top, 0700) && errno != EEXIST) return -1;
+    if (lstat(top, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) return -1;
+    if (xfer_owner_of(out, op, sizeof op)) return -1;
+    if (!lstat(out, &st)) {
+        int mine = S_ISDIR(st.st_mode) && st.st_uid == geteuid();
+        int owner = !xfer_owner_read(op, who);
+        if (mine && owner && !strcmp(who, id)) return 0;
+        /* a folder nobody claimed yet and empty: this machine's */
+        if (mine && !owner && dir_empty(out)) return xfer_owner_write(op, id);
+        /* another machine's (a machine of the same name, deleted or renamed, or made again): kept, beside it */
+        if (xfer_aside(out, moved, mn)) return -1;
+    } else if (errno != ENOENT) return -1;
+    if (mkdir(out, 0700)) return -1;
+    int d = open(out, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (d >= 0) { if (fchmod(d, 0777)) {} close(d); }
+    return xfer_owner_write(op, id);
+}
+
+int vm_transfer_aside(const char *dir, const char *id, char *moved, size_t mn) {
+    char xp[PATH_MAX], op[PATH_MAX], who[37];
+    if (moved && mn) moved[0] = 0;
+    if (!vm_uuid_valid(id) || vm_transfer_path(dir, xp, sizeof xp) || xfer_owner_of(xp, op, sizeof op)) return -1;
+    struct stat st;
+    if (lstat(xp, &st) || !S_ISDIR(st.st_mode)) return 1;
+    if (xfer_owner_read(op, who) || strcmp(who, id)) return 1;          /* not this machine's */
+    return xfer_aside(xp, moved, mn);
+}
+
 int vm_base_valid(const char *s) {
     size_t n = s ? strlen(s) : 0;
     return n > 15 && path_valid(s) && strstr(s, "/.shared/") && !strchr(strstr(s, "/.shared/") + 9, '/') && !strcmp(s + n - 6, ".qcow2");
+}
+
+static const char *const PROTOS[] = { "tcp", "udp", NULL };
+static const char *const OPENS[] = { "this-computer", "lan", NULL };
+
+int vm_resolution_ok(int w, int h) {
+    return w >= 640 && h >= 480 && w <= 7680 && h <= 4320 && !(w & 1) && !(h & 1);
+}
+
+int vm_resolution_parse(const char *s, int *w, int *h) {
+    int a = 0, b = 0, k = 0;
+    const char *p = s;
+    for (; *p >= '0' && *p <= '9' && k < 5; p++, k++) a = a * 10 + (*p - '0');
+    if (!k || *p != 'x') return -1;
+    p++; k = 0;
+    for (; *p >= '0' && *p <= '9' && k < 5; p++, k++) b = b * 10 + (*p - '0');
+    if (!k || *p || !vm_resolution_ok(a, b)) return -1;
+    *w = a; *h = b;
+    return 0;
+}
+
+int vm_ifname_valid(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (n < 1 || n > VM_IFNAME_MAX || !strcmp(s, ".") || !strcmp(s, "..")) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = s[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.' || c == '-')) return 0;
+    }
+    return 1;
+}
+
+int vm_sound_dev_valid(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    if (n < 1 || n > VM_SOUND_DEV_MAX) return 0;
+    for (size_t i = 0; i < n; i++) if ((unsigned char)s[i] < 0x21 || (unsigned char)s[i] > 0x7e) return 0;
+    return 1;
+}
+
+int vm_sound_devs_parse(const char *text, char *out, size_t on, char *in, size_t inn) {
+    const char *tab = text ? strchr(text, '\t') : NULL;
+    if (!tab || strchr(tab + 1, '\t')) return -1;
+    size_t lo = (size_t)(tab - text), li = strlen(tab + 1);
+    if (lo >= on || li >= inn || lo > VM_SOUND_DEV_MAX || li > VM_SOUND_DEV_MAX) return -1;
+    char a[VM_SOUND_DEV_MAX + 1], b[VM_SOUND_DEV_MAX + 1];
+    memcpy(a, text, lo); a[lo] = 0;
+    memcpy(b, tab + 1, li); b[li] = 0;
+    if ((a[0] && !vm_sound_dev_valid(a)) || (b[0] && !vm_sound_dev_valid(b))) return -1;
+    memcpy(out, a, lo + 1);
+    memcpy(in, b, li + 1);
+    return 0;
+}
+
+int vm_ports_check(const VmPort *p, int cnt, int network, char *err, size_t n) {
+    if (cnt < 0 || cnt > VM_PORTS) return fail(err, n, -1, "at most %d forwarded ports", VM_PORTS);
+    for (int i = 0; i < cnt; i++) {
+        if (p[i].proto != VM_PROTO_TCP && p[i].proto != VM_PROTO_UDP) return fail(err, n, -1, "ports: proto is tcp or udp");
+        if (p[i].host < VM_PORT_HOST_MIN || p[i].host > 65535) return fail(err, n, -1, "ports: this computer's port must be %d to 65535", VM_PORT_HOST_MIN);
+        if (p[i].guest < 1 || p[i].guest > 65535) return fail(err, n, -1, "ports: the machine's port must be 1 to 65535");
+        if (p[i].open != VM_OPEN_LOCAL && p[i].open != VM_OPEN_LAN) return fail(err, n, -1, "ports: open is this-computer or lan");
+        if (p[i].open == VM_OPEN_LAN && network == VM_NET_HOSTONLY) return fail(err, n, -1, "ports: a host-only machine opens ports to this computer only");
+        for (int k = 0; k < i; k++)
+            if (p[k].proto == p[i].proto && p[k].host == p[i].host) return fail(err, n, -1, "ports: %s port %d of this computer twice", p[i].proto ? "udp" : "tcp", p[i].host);
+    }
+    return 0;
+}
+
+int vm_port_parse(const char *s, VmPort *p) {
+    char proto[4], open[16] = "this-computer", tail;
+    int h, g, k = s ? sscanf(s, "%3[a-z]:%d:%d:%15[a-z-]%c", proto, &h, &g, open, &tail) : 0;
+    if (k != 3 && k != 4) return -1;
+    if (strlen(s) > 40) return -1;
+    memset(p, 0, sizeof *p);
+    if (!strcmp(proto, "tcp")) p->proto = VM_PROTO_TCP; else if (!strcmp(proto, "udp")) p->proto = VM_PROTO_UDP; else return -1;
+    if (!strcmp(open, "this-computer")) p->open = VM_OPEN_LOCAL; else if (!strcmp(open, "lan")) p->open = VM_OPEN_LAN; else return -1;
+    p->host = h; p->guest = g;
+    /* digits only between the colons: sscanf's %d took signs and spaces too */
+    for (const char *c = s + strlen(proto) + 1; *c && *c != ':' ; c++) if (*c < '0' || *c > '9') return -1;
+    const char *c2 = strchr(s + strlen(proto) + 1, ':');
+    for (const char *c = c2 + 1; *c && *c != ':'; c++) if (*c < '0' || *c > '9') return -1;
+    return vm_ports_check(p, 1, VM_NET_SHARED, NULL, 0);
+}
+
+void vm_port_spec(const VmPort *p, char *out, size_t n) { snprintf(out, n, "%s:%d:%d:%s", PROTOS[p->proto & 1], p->host, p->guest, OPENS[p->open & 1]); }
+
+int vm_passt_ports(const VmMachine *m, int proto, char out[][48], int max) {
+    int k = 0;
+    for (int i = 0; i < m->n_ports && k < max; i++) {
+        const VmPort *p = &m->ports[i];
+        if (p->proto != proto) continue;
+        /* host-only machines never listen beyond loopback, whatever the file says */
+        int lan = p->open == VM_OPEN_LAN && m->network != VM_NET_HOSTONLY;
+        snprintf(out[k++], 48, "%s/%d:%d", lan ? "0.0.0.0" : "127.0.0.1", p->host, p->guest);
+    }
+    if (!k && max > 0) snprintf(out[k++], 48, "none");
+    return k;
+}
+
+int vm_bridge_ifname(const char *id, char out[VM_IFNAME_MAX + 1]) {
+    if (!vm_uuid_valid(id)) return -1;
+    snprintf(out, VM_IFNAME_MAX + 1, "lvm%.8s%.4s", id, id + 9);
+    return 0;
 }
 
 int vm_machine_check(const VmMachine *m, char *err, size_t n) {
@@ -196,7 +407,11 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
         for (int i = 0; i < 64; i++) { char c = m->firmware_sha256[i]; if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return fail(err, n, VM_E_RANGE, "firmware_sha256"); }
     } else if (m->firmware_code[0] || m->firmware_sha256[0]) return fail(err, n, VM_E_RANGE, "a bios machine has no firmware_code");
     if (m->display != VM_DISPLAY_WINDOW && m->display != VM_DISPLAY_NONE) return fail(err, n, VM_E_RANGE, "display");
-    if (m->network != VM_NET_SHARED && m->network != VM_NET_ISOLATED) return fail(err, n, VM_E_RANGE, "network");
+    if (m->network < VM_NET_SHARED || m->network > VM_NET_HOSTONLY) return fail(err, n, VM_E_RANGE, "network");
+    if (m->bridge[0] && !vm_ifname_valid(m->bridge)) return fail(err, n, VM_E_RANGE, "bridge must be a network interface's name");
+    if (m->network == VM_NET_BRIDGED && !m->bridge[0]) return fail(err, n, VM_E_RANGE, "a bridged machine names the wired card it joins (bridge)");
+    if (vm_ports_check(m->ports, m->n_ports, m->network, err, n)) return VM_E_RANGE;
+    if (m->schema < 6 && (m->network > VM_NET_ISOLATED || m->bridge[0] || m->n_ports)) return fail(err, n, VM_E_FIELD, "the bridged and host-only networks, bridge and ports need schema 6");
     if (!vm_mac_valid(m->mac)) return fail(err, n, VM_E_RANGE, "mac must be 52:54:00:xx:xx:xx, lowercase");
     if (m->iso[0] && !path_valid(m->iso)) return fail(err, n, VM_E_RANGE, "iso must be an absolute path without '..', ',' or control characters");
     if (!iso_time_valid(m->created) || !iso_time_valid(m->updated)) return fail(err, n, VM_E_RANGE, "created and updated are UTC times like 2026-11-04T20:00:00Z");
@@ -204,7 +419,7 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->agent != 0 && m->agent != 1) return fail(err, n, VM_E_RANGE, "agent");
     if (m->clipboard < VM_CLIP_OFF || m->clipboard > VM_CLIP_BOTH) return fail(err, n, VM_E_RANGE, "clipboard");
     if (m->schema < 2 && (m->base[0] || m->agent || m->clipboard)) return fail(err, n, VM_E_FIELD, "base, agent and clipboard need schema 2");
-    if (m->devices != VM_DEV_VIRTIO && m->devices != VM_DEV_COMPAT) return fail(err, n, VM_E_RANGE, "devices");
+    if (m->devices != VM_DEV_VIRTIO && m->devices != VM_DEV_COMPAT && m->devices != VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "devices");
     if (m->nic_model < 0 || m->nic_model >= VM_NIC_COUNT) return fail(err, n, VM_E_RANGE, "nic_model");
     if (m->n_extra_macs < 0 || m->n_extra_macs > VM_EXTRA_NICS) return fail(err, n, VM_E_RANGE, "at most %d extra_nics", VM_EXTRA_NICS);
     for (int i = 0; i < m->n_extra_macs; i++) {
@@ -238,6 +453,44 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
         }
     }
     if (m->schema < 4 && m->n_shares) return fail(err, n, VM_E_FIELD, "shares need schema 4");
+    if (m->drivers[0] && !path_valid(m->drivers)) return fail(err, n, VM_E_RANGE, "drivers must be an absolute path without '..', ',' or control characters");
+    if (m->schema < 5 && (m->devices == VM_DEV_WINDOWS || m->drivers[0])) return fail(err, n, VM_E_FIELD, "the windows devices and drivers need schema 5");
+    if ((m->devices == VM_DEV_WINDOWS || m->drivers[0]) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "the windows devices are for amd64 machines for now");
+    if ((m->secure_boot | m->tpm | m->hyperv) & ~1) return fail(err, n, VM_E_RANGE, "secure_boot, tpm and hyperv are true or false");
+    if (m->schema < 5 && (m->secure_boot || m->tpm || m->hyperv)) return fail(err, n, VM_E_FIELD, "secure_boot, tpm and hyperv need schema 5");
+    if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
+    if (m->secure_boot && m->firmware != VM_FW_UEFI) return fail(err, n, VM_E_RANGE, "secure boot needs UEFI");
+    if (m->graphics != VM_GFX_2D && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "graphics");
+    if ((m->res_w || m->res_h) && !vm_resolution_ok(m->res_w, m->res_h)) return fail(err, n, VM_E_RANGE, "resolution must be 640x480 to 7680x4320, even numbers");
+    if (m->schema < 5 && m->graphics) return fail(err, n, VM_E_FIELD, "graphics needs schema 5");
+    if (m->graphics == VM_GFX_3D && m->devices == VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "3D graphics are for Linux machines (the windows devices stay 2D)");
+    if (m->graphics == VM_GFX_3D && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "3D graphics are for amd64 machines for now");
+    if ((m->sound | m->microphone) & ~1) return fail(err, n, VM_E_RANGE, "sound and microphone are true or false");
+    if (m->volume < 0 || m->volume > 100) return fail(err, n, VM_E_RANGE, "volume must be 0 to 100");
+    if (m->schema < 6 && (!m->sound || m->volume != 100 || m->microphone)) return fail(err, n, VM_E_FIELD, "sound, volume and microphone need schema 6");
+    if (m->n_boot < 0 || m->n_boot > VM_BOOT_DEVS || (m->boot_menu & ~1)) return fail(err, n, VM_E_RANGE, "boot_order: at most %d devices; boot_menu is true or false", VM_BOOT_DEVS);
+    for (int i = 0; i < m->n_boot; i++) {
+        if (m->boot_order[i] < 0 || m->boot_order[i] >= VM_BOOT_DEVS) return fail(err, n, VM_E_RANGE, "boot_order: disk, cd or network");
+        for (int k = 0; k < i; k++) if (m->boot_order[i] == m->boot_order[k]) return fail(err, n, VM_E_RANGE, "boot_order: the same device twice");
+    }
+    if (m->schema < 6 && (m->n_boot || m->boot_menu)) return fail(err, n, VM_E_FIELD, "boot_order and boot_menu need schema 6");
+    if ((m->sound_out[0] && !vm_sound_dev_valid(m->sound_out)) || (m->sound_in[0] && !vm_sound_dev_valid(m->sound_in)))
+        return fail(err, n, VM_E_RANGE, "sound_out and sound_in are a sound device's name: up to %d printable characters, no spaces", VM_SOUND_DEV_MAX);
+    if (m->schema < 8 && (m->sound_out[0] || m->sound_in[0])) return fail(err, n, VM_E_FIELD, "sound_out and sound_in need schema 8");
+    if (m->transfer & ~1) return fail(err, n, VM_E_RANGE, "transfer is true or false");
+    if (m->clipboard_ask & ~1) return fail(err, n, VM_E_RANGE, "clipboard_ask is true or false");
+    if (m->schema < 9 && m->clipboard_ask) return fail(err, n, VM_E_FIELD, "clipboard_ask needs schema 9");
+    if (m->pointer_guest & ~1) return fail(err, n, VM_E_RANGE, "pointer is lordos or guest");
+    if (m->vgpu < VM_VGPU_NONE || m->vgpu > VM_VGPU_SHARED) return fail(err, n, VM_E_RANGE, "gpu is intel-whole or intel-shared");
+    if (m->schema < 11 && m->vgpu) return fail(err, n, VM_E_FIELD, "gpu needs schema 11");
+    if (m->vgpu && (m->arch != VM_ARCH_AMD64 || m->firmware != VM_FW_UEFI)) return fail(err, n, VM_E_RANGE, "an Intel vGPU is for amd64 machines with UEFI");
+    if (m->vgpu && m->graphics == VM_GFX_3D) return fail(err, n, VM_E_RANGE, "an Intel vGPU replaces 3D graphics: choose one");
+    if (m->schema < 10 && m->pointer_guest) return fail(err, n, VM_E_FIELD, "pointer needs schema 10");
+    if (m->capture_fullscreen & ~1) return fail(err, n, VM_E_RANGE, "capture_fullscreen is true or false");
+    if (m->schema < 12 && m->capture_fullscreen) return fail(err, n, VM_E_FIELD, "capture_fullscreen needs schema 12");
+    if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
+    for (int i = 0; m->transfer && i < m->n_shares; i++)
+        if (!strcmp(m->share_tag[i], VM_XFER_TAG)) return fail(err, n, VM_E_RANGE, "shares: the tag " VM_XFER_TAG " is the transfer folder's");
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
@@ -275,7 +528,8 @@ static const char *const KEYS[] = {
     "schema", "id", "name", "arch", "accel", "vcpus", "memory_mb", "disk_gb", "firmware", "machine_type",
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
-    "shares", NULL,
+    "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
+    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -308,9 +562,46 @@ static const char *const ARCHS[] = { "arm64", "amd64", NULL };
 static const char *const ACCELS[] = { "kvm", "tcg", NULL };
 static const char *const FWS[] = { "uefi", "bios", NULL };
 static const char *const DISPLAYS[] = { "window", "none", NULL };
-static const char *const NETS[] = { "shared", "isolated", NULL };
+static const char *const NETS[] = { "shared", "isolated", "bridged", "hostonly", NULL };
+const char *const VM_NET_NAMES[] = { "shared", "isolated", "bridged", "hostonly", NULL };
+
 static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NULL };
-static const char *const DEVS[] = { "virtio", "compat", NULL };
+static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
+const char *const VM_DEV_NAMES[] = { "virtio", "compat", "windows", NULL };
+const char *const VM_VGPU_NAMES[] = { "", "intel-whole", "intel-shared", NULL };
+const char *const VM_BOOT_NAMES[] = { "disk", "cd", "network", NULL };
+
+int vm_boot_parse(const char *s, int order[VM_BOOT_DEVS]) {
+    if (!s) return -1;
+    if (!strcmp(s, "auto")) return 0;
+    int n = 0;
+    for (const char *p = s;;) {
+        const char *e = strchr(p, ',');
+        size_t len = e ? (size_t)(e - p) : strlen(p);
+        int d = -1;
+        for (int i = 0; VM_BOOT_NAMES[i]; i++) if (strlen(VM_BOOT_NAMES[i]) == len && !strncmp(p, VM_BOOT_NAMES[i], len)) d = i;
+        if (d < 0 || n >= VM_BOOT_DEVS) return -1;
+        for (int k = 0; k < n; k++) if (order[k] == d) return -1;
+        order[n++] = d;
+        if (!e) break;
+        p = e + 1;
+    }
+    return n;
+}
+
+void vm_boot_spec(const VmMachine *m, char *out, size_t n) {
+    if (!n) return;
+    snprintf(out, n, "%s", m->n_boot ? "" : "auto");
+    for (int i = 0; i < m->n_boot && m->boot_order[i] >= 0 && m->boot_order[i] < VM_BOOT_DEVS; i++)
+        snprintf(out + strlen(out), n - strlen(out), "%s%s", i ? "," : "", VM_BOOT_NAMES[m->boot_order[i]]);
+}
+
+void vm_boot_indexes(const VmMachine *m, int first, int idx[VM_BOOT_DEVS]) {
+    for (int i = 0; i < VM_BOOT_DEVS; i++) idx[i] = -1;
+    if (!m->n_boot) { idx[VM_BOOT_DISK] = first; idx[VM_BOOT_CD] = first + 1; return; }
+    for (int i = 0; i < m->n_boot && i < VM_BOOT_DEVS; i++)
+        if (m->boot_order[i] >= 0 && m->boot_order[i] < VM_BOOT_DEVS) idx[m->boot_order[i]] = first + i;
+}
 static const char *const RTCS[] = { "utc", "local", NULL };
 static const char *const SMB_KEYS[] = { "manufacturer", "product", "version", "serial", "sku", "family", NULL };
 
@@ -381,6 +672,39 @@ static int parse4(const JVal *o, VmMachine *m, char *err, size_t n) {
     return VM_OK;
 }
 
+/* schema 6's keys: bridge and ports (6.5) */
+static int parse6(const JVal *o, VmMachine *m, char *err, size_t n) {
+    int r;
+    if ((r = get_str(o, "bridge", m->bridge, sizeof m->bridge, 0, err, n))) return r;
+    const JVal *bo = json_get(o, "boot_order"), *bm = json_get(o, "boot_menu");
+    if (bo) {
+        if (bo->type != J_ARR) return fail(err, n, VM_E_FIELD, "boot_order must be a list");
+        if (!bo->len || bo->len > VM_BOOT_DEVS) return fail(err, n, VM_E_RANGE, "boot_order: 1 to %d devices", VM_BOOT_DEVS);
+        for (const JVal *e = bo->kid; e; e = e->next) {
+            int d = -1;
+            if (e->type == J_STR) for (int i = 0; VM_BOOT_NAMES[i]; i++) if (!strcmp(e->str, VM_BOOT_NAMES[i])) d = i;
+            if (d < 0) return fail(err, n, VM_E_RANGE, "boot_order: disk, cd or network");
+            m->boot_order[m->n_boot++] = d;
+        }
+    }
+    if (bm && bm->type != J_BOOL) return fail(err, n, VM_E_FIELD, "boot_menu must be true or false");
+    m->boot_menu = bm ? json_bool(o, "boot_menu", 0) : 0;
+    const JVal *x = json_get(o, "ports");
+    if (!x) return VM_OK;
+    if (x->type != J_ARR) return fail(err, n, VM_E_FIELD, "ports must be a list");
+    if (x->len > VM_PORTS) return fail(err, n, VM_E_RANGE, "at most %d ports", VM_PORTS);
+    for (const JVal *e = x->kid; e; e = e->next) {
+        if (e->type != J_OBJ) return fail(err, n, VM_E_FIELD, "ports: objects");
+        for (const JVal *k = e->kid; k; k = k->next)
+            if (strcmp(k->key, "proto") && strcmp(k->key, "host") && strcmp(k->key, "guest") && strcmp(k->key, "open")) return fail(err, n, VM_E_FIELD, "ports: unknown key");
+        VmPort *p = &m->ports[m->n_ports++];
+        if ((r = get_enum(e, "proto", PROTOS, &p->proto, err, n)) || (r = get_int(e, "host", &p->host, err, n)) || (r = get_int(e, "guest", &p->guest, err, n))) return r;
+        p->open = VM_OPEN_LOCAL;
+        if (json_get(e, "open") && (r = get_enum(e, "open", OPENS, &p->open, err, n))) return r;
+    }
+    return VM_OK;
+}
+
 int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size_t n) {
     memset(m, 0, sizeof *m);
     if (len > 64 * 1024) return fail(err, n, VM_E_JSON, "machine.json is larger than 64 KB");
@@ -418,6 +742,62 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         if (json_get(o, "clipboard") && (r = get_enum(o, "clipboard", CLIPS, &m->clipboard, err, n))) goto out;
     }
     if ((r = parse3(o, m, err, n)) || (r = parse4(o, m, err, n))) goto out;
+    {
+        /* schema 5's keys */
+        const char *const B[] = { "secure_boot", "tpm", "hyperv" };
+        int *dst[] = { &m->secure_boot, &m->tpm, &m->hyperv };
+        for (int i = 0; i < 3; i++) {
+            const JVal *v = json_get(o, B[i]);
+            if (v && v->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "%s must be true or false", B[i]); goto out; }
+            *dst[i] = v ? json_bool(o, B[i], 0) : 0;
+        }
+        if ((r = get_str(o, "drivers", m->drivers, sizeof m->drivers, 0, err, n))) goto out;
+        static const char *const GFX[] = { "2d", "3d", NULL };
+        if (json_get(o, "graphics") && (r = get_enum(o, "graphics", GFX, &m->graphics, err, n))) goto out;
+    }
+    if ((r = parse6(o, m, err, n))) goto out;
+    {
+        /* schema 6: the display the guest starts with ("WxH"); missing: it follows the window */
+        const JVal *rv = json_get(o, "resolution");
+        m->res_w = m->res_h = 0;
+        if (rv && (rv->type != J_STR || vm_resolution_parse(rv->str, &m->res_w, &m->res_h))) { r = fail(err, n, VM_E_FIELD, "resolution must be \"WxH\""); goto out; }
+    }
+    {
+        /* schema 6's keys: missing means sound on at full volume, microphone off */
+        const JVal *so = json_get(o, "sound"), *mi = json_get(o, "microphone");
+        if ((so && so->type != J_BOOL) || (mi && mi->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "sound and microphone must be true or false"); goto out; }
+        m->sound = so ? json_bool(o, "sound", 1) : 1;
+        m->microphone = mi ? json_bool(o, "microphone", 0) : 0;
+        m->volume = 100;
+        if ((r = get_opt_int(o, "volume", &m->volume, err, n))) goto out;
+        /* schema 7: missing means no transfer folder (a machine made before keeps its hardware) */
+        const JVal *t = json_get(o, "transfer");
+        if (t && t->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "transfer must be true or false"); goto out; }
+        m->transfer = t ? json_bool(o, "transfer", 0) : 0;
+        /* schema 8: missing (or "") means the system's default output and input */
+        if ((r = get_str(o, "sound_out", m->sound_out, sizeof m->sound_out, 0, err, n)) || (r = get_str(o, "sound_in", m->sound_in, sizeof m->sound_in, 0, err, n))) goto out;
+        /* schema 9: missing means trusted (the clipboard on demand, while the machine is in use) */
+        const JVal *ca = json_get(o, "clipboard_ask");
+        if (ca && ca->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "clipboard_ask must be true or false"); goto out; }
+        m->clipboard_ask = ca ? json_bool(o, "clipboard_ask", 0) : 0;
+        /* schema 10: missing means LordOS draws a Windows guest's pointer */
+        char ptr[16];
+        if ((r = get_str(o, "pointer", ptr, sizeof ptr, 0, err, n))) goto out;
+        if (ptr[0] && strcmp(ptr, "lordos") && strcmp(ptr, "guest")) { r = fail(err, n, VM_E_RANGE, "pointer is lordos or guest"); goto out; }
+        m->pointer_guest = !strcmp(ptr, "guest");
+        /* schema 11: missing means no real GPU */
+        char g[16];
+        if ((r = get_str(o, "gpu", g, sizeof g, 0, err, n))) goto out;
+        m->vgpu = VM_VGPU_NONE;
+        if (g[0]) {
+            for (int i = 1; VM_VGPU_NAMES[i]; i++) if (!strcmp(g, VM_VGPU_NAMES[i])) m->vgpu = i;
+            if (!m->vgpu) { r = fail(err, n, VM_E_RANGE, "gpu is intel-whole or intel-shared"); goto out; }
+        }
+        /* schema 12: missing means the mouse isn't captured on its own in full screen */
+        const JVal *cf = json_get(o, "capture_fullscreen");
+        if (cf && cf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "capture_fullscreen must be true or false"); goto out; }
+        m->capture_fullscreen = cf ? json_bool(o, "capture_fullscreen", 0) : 0;
+    }
     r = vm_machine_check(m, err, n);
 out:
     json_free(&d);
@@ -482,6 +862,37 @@ char *vm_machine_json(const VmMachine *m) {
         }
         jb_raw(&b, "]");
     }
+    if (m->schema >= 5) {
+        if (m->secure_boot) jb_raw(&b, ",\n  \"secure_boot\": true");
+        if (m->tpm) jb_raw(&b, ",\n  \"tpm\": true");
+        if (m->hyperv) jb_raw(&b, ",\n  \"hyperv\": true");
+        if (m->drivers[0]) { jb_raw(&b, ",\n  \"drivers\": "); jb_str(&b, m->drivers); }
+        if (m->graphics == VM_GFX_3D) jb_raw(&b, ",\n  \"graphics\": \"3d\"");
+        if (m->res_w && m->res_h) { char rs[48]; snprintf(rs, sizeof rs, ",\n  \"resolution\": \"%dx%d\"", m->res_w, m->res_h); jb_raw(&b, rs); }
+    }
+    if (m->schema >= 6) {
+        if (m->bridge[0]) { jb_raw(&b, ",\n  \"bridge\": "); jb_str(&b, m->bridge); }
+        if (m->n_ports) {
+            jb_raw(&b, ",\n  \"ports\": [");
+            for (int i = 0; i < m->n_ports; i++)
+                jb_printf(&b, "%s{\"proto\": \"%s\", \"host\": %d, \"guest\": %d, \"open\": \"%s\"}", i ? ", " : "", PROTOS[m->ports[i].proto], m->ports[i].host, m->ports[i].guest, OPENS[m->ports[i].open]);
+            jb_raw(&b, "]");
+        }
+    }
+    if (m->schema >= 6 && m->n_boot) {
+        jb_raw(&b, ",\n  \"boot_order\": [");
+        for (int i = 0; i < m->n_boot; i++) jb_printf(&b, "%s\"%s\"", i ? ", " : "", VM_BOOT_NAMES[m->boot_order[i]]);
+        jb_raw(&b, "]");
+    }
+    if (m->schema >= 6 && m->boot_menu) jb_raw(&b, ",\n  \"boot_menu\": true");
+    if (m->schema >= 6) jb_printf(&b, ",\n  \"sound\": %s,\n  \"volume\": %d,\n  \"microphone\": %s", m->sound ? "true" : "false", m->volume, m->microphone ? "true" : "false");
+    if (m->schema >= 7) jb_printf(&b, ",\n  \"transfer\": %s", m->transfer ? "true" : "false");
+    if (m->schema >= 9 && m->clipboard_ask) jb_raw(&b, ",\n  \"clipboard_ask\": true");
+    if (m->schema >= 10 && m->pointer_guest) jb_raw(&b, ",\n  \"pointer\": \"guest\"");
+    if (m->schema >= 11 && m->vgpu) { jb_raw(&b, ",\n  \"gpu\": "); jb_str(&b, VM_VGPU_NAMES[m->vgpu]); }
+    if (m->schema >= 12 && m->capture_fullscreen) jb_raw(&b, ",\n  \"capture_fullscreen\": true");
+    if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
+    if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
     jb_raw(&b, ",\n  \"updated\": "); jb_str(&b, m->updated);
     jb_raw(&b, "\n}\n");
@@ -616,6 +1027,9 @@ void vm_machine_defaults(VmMachine *m, const VmHost *h, int arch) {
     m->firmware = VM_FW_UEFI;
     m->display = VM_DISPLAY_WINDOW;
     m->network = VM_NET_SHARED;
+    m->sound = 1;
+    m->volume = 100;
+    m->transfer = 1;
     vm_now_iso(m->created);
     memcpy(m->updated, m->created, sizeof m->updated);
 }
@@ -676,4 +1090,25 @@ int vm_image_kind(const uint8_t *head, size_t n, const char *name, char *err, si
     }
     fail(err, errlen, -1, ends_with(name ? name : "", ".qcow2") ? "not a qcow2 image" : "only qcow2 images (or raw .img) can be imported");
     return -1;
+}
+
+int vm_mouse_pick(const JVal *list, int relative, int *current, int *added) {
+    int best = -1, best_rank = 0, best_cur = 0, n = 0;
+    *current = 0;
+    *added = 0;
+    if (!list || list->type != J_ARR) return -1;
+    for (const JVal *e = list->kid; e && n < 32; e = e->next, n++) {
+        if (e->type != J_OBJ) continue;
+        const JVal *ab = json_get(e, "absolute"), *cu = json_get(e, "current"), *ix = json_get(e, "index");
+        const char *name = json_str(e, "name");
+        if (!ab || ab->type != J_BOOL || !ix || ix->type != J_NUM || ix->num < 0 || ix->num > 1000 || ix->num != (int)ix->num) continue;
+        int is_abs = json_bool(e, "absolute", 0), is_cur = cu && cu->type == J_BOOL && json_bool(e, "current", 0);
+        int ps2 = name && strstr(name, "PS/2") != NULL, tablet = name && strstr(name, "Tablet") != NULL;
+        if (is_cur && !is_abs && !ps2) *added = 1;
+        if (is_abs == !!relative) continue;
+        int rank = relative ? (ps2 ? 1 : 2) : (tablet ? 2 : 1);
+        if (rank > best_rank) { best_rank = rank; best = (int)ix->num; best_cur = is_cur; }
+    }
+    *current = best_cur;
+    return best;
 }

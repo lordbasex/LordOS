@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak-app {id}",
   "who.program": "Program {path}",
   "perm.shortcuts": "Kortkommandon",
-  "permHint.shortcuts": "Appar som får ta ❖, ⌥Tab och skrivbordets andra kortkommandon medan de är i förgrunden, till exempel virtuella maskiner, fjärrskrivbord och spel. ❖Esc ger dem alltid tillbaka; skärmlåset och medietangenterna förblir systemets."
+  "permHint.shortcuts": "Appar som får ta ❖, ⌥Tab och skrivbordets andra kortkommandon medan de är i förgrunden, till exempel virtuella maskiner, fjärrskrivbord och spel. ❖Esc ger dem alltid tillbaka; skärmlåset och medietangenterna förblir systemets.",
+  "ask.idle": "”{app}” vill veta när du är borta från datorn",
+  "ask.idleNote": "Den får veta när du slutar använda tangentbordet och musen en stund och när du är tillbaka; inget annat. Du kan ändra detta senare i Inställningar → Integritet.",
+  "perm.idle": "Borta från datorn",
+  "permHint.idle": "Appar som får veta när du slutar använda datorn en stund och när du kommer tillbaka, till exempel chattappar som visar dig som borta. De får inte veta något annat; en video eller presentation som håller skärmen tänd räknas som att du är där."
 }

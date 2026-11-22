@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} محدّث.",
   "noResults": "لا يطابق أي تطبيق من Flathub.",
   "notSupported": "Flathub غير متاح على هذا الحاسوب بعد: إنه حاليًا لأجهزة PC فقط.",
-  "notYet": "غير مدعوم بعد",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "تنقيح برامج أخرى",
   "perm.devicesAll": "كل الأجهزة: الكاميرات، أذرع الألعاب، USB",
@@ -100,8 +99,6 @@
   "showAllOff": "التطبيقات التي تحقّق منها Flathub فقط. المخفية: {count}",
   "showAllOn": "عرض كل تطبيقات Flathub، المُتحقَّق منها وغيرها",
   "showMore": "عرض المزيد (المتبقي: {count})",
-  "subsandbox.text": "هذا التطبيق مبني على Chromium أو Electron، وتحتاج عملياتهما المساعدة إلى مشاركة بيئات العزل الخاصة بـ Flatpak بطريقة لا يوفّرها LordOS بعد، لذا لا يمكن تثبيته هنا حاليًا.",
-  "subsandbox.title": "غير مدعوم بعد على LordOS",
   "subtitle": "تطبيقات Linux من Flathub، تعمل داخل بيئة العزل الخاصة بـ LordOS تحت جدار الحماية الخاص بك.",
   "turnOff": "إيقاف",
   "unverified": "لم يتحقّق منه Flathub: قد لا يكون الناشر هو مطوّر التطبيق.",
@@ -110,5 +107,6 @@
   "updates.button": "تحديث تطبيقات Flathub",
   "updates.text": "المثبّتة من Flathub: {count}. يتحقّق Flatpak من كلٍّ منها ويثبّت ما تغيّر؛ ويكتمل تحديث التطبيق المفتوح عندما تفتحه من جديد.",
   "updates.title": "تطبيقات Flathub",
-  "verified": "مُتحقَّق منه: نشره {developer}"
+  "verified": "مُتحقَّق منه: نشره {developer}",
+  "note.obsVideos": "في LordOS يحفظ OBS Studio التسجيلات في مجلد «الفيديوهات»: باقي مجلدات منزلك للقراءة فقط لتطبيقات Flathub."
 }

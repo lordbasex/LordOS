@@ -4,8 +4,9 @@
  * helper a sealed picture memfd that the engine shows as a media node, acknowledges frames once they were painted
  * and forwards input. Nothing here blocks: each poll takes at most VD_POLL_MAX messages per channel.
  *
- *   host() → { arch, cpus, ramMb, kvmDevice, kvm, vcpusRecommended, memMaxMb, missing: { amd64, arm64 }, ready }
- *   list() → [{ dir, folder, name, id, arch, accel, vcpus, memoryMb, diskGb, firmware, network, iso, state, reason,
+ *   host() → { arch, cpus, ramMb, kvmDevice, kvm, vcpusRecommended, memMaxMb, missing: { amd64, arm64 }, ready,
+ *             cards: [{ name, kind: 'wired'|'wifi', up }] }   (cards: what a bridged machine may join, 6.5)
+ *   list() → [{ dir, folder, name, id, arch, accel, vcpus, memoryMb, diskGb, firmware, tpm, secureBoot, network, iso, state, reason,
  *              code, detail, since, error }]   the machines in ~/Machines (<name>.lordvm)
  *   create({ name, arch, vcpus, memoryMb, diskGb, import | iso }) → job id (0: refused);  job(id) → { done, ok, out, dir }
  *   start(dir) → session id · attach(dir) → session id (a machine already running, through its runtime socket)
@@ -15,7 +16,9 @@
  *   key(id, evdev, down) · motion(id, x, y) · button(id, b, down) · wheel(id, dy, dx) · release(id)
  *   resize(id, w, h) · rate(id, hz) · close(id)
  *   log(dir) → the end of the machine's lord-vm.log (what failed)
- *   cdrom(id, path | null) → a disc into (or out of) a running machine's drive; poll's cd / cdMessage say how it went */
+ *   cdrom(id, path | null) → a disc into (or out of) a running machine's drive; poll's cd / cdMessage say how it went
+ *   sendFile(id, path[, { open }]) → request id: a dropped file into the guest's Downloads (guest agent); with open, the
+ *             guest tools then open it there (Files' "Open with", 7.3); files(id) → how they went */
 #include "js_vm.h"
 #include "../media/media_int.h"
 #include "../media/aring.h"
@@ -26,17 +29,28 @@
 #include "../vm/vmops.h"
 #include "../vm/logclean.h"
 #include "../vm/vmagent.h"
+#include "../vm/vmnet.h"
+#include "../vm/vmgpu.h"
+#include "../vm/vmsig.h"
 #include "../wl/wl.h"
+#include "../gpu/gpu.h"
+#include "../gpu/dmaread.h"
+#include <drm/drm_fourcc.h>
 #include "../sec/json.h"
+#include "../sec/perms.h"
+#include "../sec/restrict.h"
+#include "../sound/snd.h"
 #include "ui.h"
 #include "../term/term.h"
 #include "../fsops.h"
+#include "../pointerlock.h"
 
 #include <crypt.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <net/if.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdio.h>
@@ -150,6 +164,20 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     JS_SetPropertyStr(c, o, "missing", miss);
     JS_SetPropertyStr(c, o, "ready", JS_NewBool(c, !bin_path("lord-vm", bin, sizeof bin)));
     JS_SetPropertyStr(c, o, "display", JS_NewBool(c, !bin_path("lord-vmdisplay", bin, sizeof bin)));
+    /* 3D graphics (6.10): "" when a Linux machine can have them here, else why not: "arch" (amd64 only for now),
+     * "gpu" (this desktop draws without a GPU, so it couldn't read the pictures back), "modules" (QEMU's OpenGL
+     * modules missing: vm-enable installs qemu-system-modules-opengl), "node" (no render node this user can open) */
+    {
+        GpuInfo gi;
+        gpu_info(&gi);
+        const char *why3d = "";
+        struct stat rs;
+        if (a != VM_ARCH_AMD64) why3d = "arch";
+        else if (!gpu_active() || !gi.dmabuf || !gi.render_node || strncmp(gi.render_node, "/dev/dri/renderD", 16)) why3d = "gpu";
+        else if (access("/usr/lib/x86_64-linux-gnu/qemu/hw-display-virtio-vga-gl.so", F_OK) || access("/usr/lib/x86_64-linux-gnu/qemu/ui-opengl.so", F_OK)) why3d = "modules";
+        else if (stat(gi.render_node, &rs) || !S_ISCHR(rs.st_mode) || access(gi.render_node, R_OK | W_OK)) why3d = "node";
+        set_str(c, o, "no3d", why3d);
+    }
     char lib[PATH_MAX];
     set_str(c, o, "library", library(lib, sizeof lib, 0) ? "" : lib);
     /* where machines live: free space and what kind of disk (a microSD card is slow for machines) */
@@ -175,7 +203,118 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (mf >= 0) { ssize_t k = read(mf, model, sizeof model - 1); close(mf); if (k > 0) model[k] = 0; }
     for (char *q = model; *q; q++) if ((unsigned char)*q < 0x20) *q = 0;
     set_str(c, o, "board", model);
+    char *cards = vmnet_cards_json("/sys/class/net");
+    JS_SetPropertyStr(c, o, "cards", cards ? JS_ParseJSON(c, cards, strlen(cards), "<cards>") : JS_NewArray(c));
+    free(cards);
     return o;
+}
+
+/* a bridged machine's macvtap (6.5) that nothing runs on any more goes: the admin helper removes only the caller's and
+ * never one a process holds. Not within 30 s of a start (Machines makes it just before), and once a minute per machine */
+static time_t last_start;
+static void unbridge_idle(const VmMachine *m, const char *state) {
+    static struct { char id[37]; time_t at; } sent[8];
+    static int next;
+    char name[VM_IFNAME_MAX + 1];
+    if (vm_bridge_ifname(m->id, name) || !if_nametoindex(name)) return;
+    if (strcmp(state, "stopped") && strcmp(state, "crashed")) return;
+    time_t now = time(NULL);
+    if (now - last_start < 30) return;
+    for (int i = 0; i < 8; i++) if (!strcmp(sent[i].id, m->id) && now - sent[i].at < 60) return;
+    if (admin_fd() < 0 || admin_send("vm-net-unbridge", m->id, strlen(m->id)) < 0) return;
+    snprintf(sent[next].id, sizeof sent[next].id, "%s", m->id);
+    sent[next].at = now;
+    next = (next + 1) % 8;
+}
+
+/* a machine's Intel vGPU (docs/MACHINES-GPU.md, Mode A) that nothing runs on any more goes, the same way: the admin
+ * helper's vm-gvt-remove removes only the caller's and never one a process holds */
+static void gvt_idle(const VmMachine *m, const char *state) {
+    static struct { char id[37]; time_t at; } sent[8];
+    static int next;
+    char p[96];
+    snprintf(p, sizeof p, "/sys/bus/mdev/devices/%s", m->id);
+    if (access(p, F_OK)) return;
+    if (strcmp(state, "stopped") && strcmp(state, "crashed")) return;
+    time_t now = time(NULL);
+    if (now - last_start < 30) return;
+    for (int i = 0; i < 8; i++) if (!strcmp(sent[i].id, m->id) && now - sent[i].at < 60) return;
+    if (admin_fd() < 0 || admin_send("vm-gvt-remove", m->id, strlen(m->id)) < 0) return;
+    snprintf(sent[next].id, sizeof sent[next].id, "%s", m->id);
+    sent[next].at = now;
+    next = (next + 1) % 8;
+}
+
+/* While a machine with a vGPU runs, the iGPU's minimum frequency is raised (gpu-min-freq): i915's own governor kept a
+ * GVT-g guest at 350 MHz and 11–16 fps where 800–1150 MHz gives 75 (docs/MACHINES-GPU.md). Two thirds of RP0, to a
+ * multiple of 50 (800 MHz on a UHD 630); "default" once none runs. Asked again at most once a minute */
+static void gvt_freq(int running) {
+    static int raised;
+    static time_t at;
+    time_t now = time(NULL);
+    if (running == raised || now - at < (running ? 5 : 60)) return;
+    VmGpu g[VMGPU_MAX];
+    int n = vmgpu_list("", g, VMGPU_MAX);
+    vmgpu_mark_desktop("", "/proc/self/fd", g, n);
+    const VmGpu *x = vmgpu_gvt(g, n);
+    if (!x || x->card < 0) { raised = running; return; }
+    char arg[48];
+    if (running) {
+        char p[160], b[32] = "";
+        snprintf(p, sizeof p, "/sys/bus/pci/devices/%s/drm/card%d/gt/gt0/rps_RP0_freq_mhz", x->addr, x->card);
+        int fd = open(p, O_RDONLY | O_CLOEXEC);
+        ssize_t r = fd >= 0 ? read(fd, b, sizeof b - 1) : -1;
+        if (fd >= 0) close(fd);
+        int rp0 = r > 0 ? (b[r] = 0, atoi(b)) : 0;
+        if (rp0 <= 0) { raised = running; return; }
+        snprintf(arg, sizeof arg, "%s %d", x->addr, rp0 * 2 / 3 / 50 * 50);
+    } else snprintf(arg, sizeof arg, "%s default", x->addr);
+    if (admin_fd() < 0 || admin_send("gpu-min-freq", arg, strlen(arg)) < 0) return;
+    raised = running;
+    at = now;
+}
+
+/* A machine with a vGPU starts with its vCPUs held until its QEMU may lock the machine's memory (lordvm.c,
+ * vgpu_memlock_tick): only root raises that limit, so the admin helper's vm-memlock does it for that one QEMU, which it
+ * checks itself (the caller's, under the caller's lord-vm, with that machine's vGPU) and caps (maintainer's decision
+ * 2026-11-21). Asked once per QEMU, from run.json's qemu_pid while the machine starts */
+static void gvt_memlock(const char *dir) {
+    static long sent[16];
+    static int next;
+    char p[PATH_MAX + 16], buf[2048];
+    snprintf(p, sizeof p, "%s/run.json", dir);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (n <= 0) return;
+    long qpid = 0;
+    JDoc d;
+    if (!json_parse(buf, (size_t)n, &d, NULL, 0)) {
+        const char *st = json_str(d.root, "state");
+        if (st && (!strcmp(st, "starting") || !strcmp(st, "running") || !strcmp(st, "paused"))) qpid = (long)json_num(d.root, "qemu_pid", 0);
+        json_free(&d);
+    }
+    if (qpid <= 1 || qpid > 999999999) return;
+    for (int i = 0; i < 16; i++) if (sent[i] == qpid) return;
+    char a[16];
+    snprintf(a, sizeof a, "%ld", qpid);
+    if (admin_fd() < 0 || admin_send("vm-memlock", a, strlen(a)) < 0) return;
+    sent[next] = qpid;
+    next = (next + 1) % 16;
+}
+
+/* gpus() → { gpus: [...], configured, restart } (vmgpu.h's vmgpu_json): Settings → Graphics cards and Machines'
+ * Configure. The desktop's GPU is the card this process holds */
+static JSValue f_gpus(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    VmGpu g[VMGPU_MAX];
+    int n = vmgpu_list("", g, VMGPU_MAX);
+    vmgpu_mark_desktop("", "/proc/self/fd", g, n);
+    char *j = vmgpu_json_full("", g, n, vmgpu_configured(""));
+    if (!j) return JS_NULL;
+    JSValue v = JS_ParseJSON(c, j, strlen(j), "<gpus>");
+    free(j);
+    return v;
 }
 
 /* ---- the library ---- */
@@ -235,6 +374,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     DIR *d = opendir(lib);
     if (!d) return arr;
     uint32_t n = 0;
+    int gvt_running = 0;
     struct dirent *e;
     while ((e = readdir(d)) && n < 256) {
         size_t l = strlen(e->d_name);
@@ -263,19 +403,60 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_int(c, o, "memoryMb", m.memory_mb);
             set_int(c, o, "diskGb", m.disk_gb);
             set_str(c, o, "firmware", m.firmware == VM_FW_UEFI ? "uefi" : "bios");
-            set_str(c, o, "network", m.network == VM_NET_SHARED ? "shared" : "isolated");
+            JS_SetPropertyStr(c, o, "tpm", JS_NewBool(c, m.tpm));
+            JS_SetPropertyStr(c, o, "secureBoot", JS_NewBool(c, m.secure_boot));
+            {
+                /* where it starts from: "auto" or "network,disk" (vm_boot_spec), and the firmware's boot menu */
+                char bo[32];
+                vm_boot_spec(&m, bo, sizeof bo);
+                set_str(c, o, "bootOrder", bo);
+                JS_SetPropertyStr(c, o, "bootMenu", JS_NewBool(c, m.boot_menu));
+            }
+            set_str(c, o, "network", VM_NET_NAMES[m.network]);
+            set_str(c, o, "bridge", m.bridge);
+            {
+                /* forwarded ports (6.5): [{ proto, host, guest, open }] */
+                JSValue pa = JS_NewArray(c);
+                for (int i = 0; i < m.n_ports; i++) {
+                    JSValue e = JS_NewObject(c);
+                    set_str(c, e, "proto", m.ports[i].proto == VM_PROTO_UDP ? "udp" : "tcp");
+                    set_int(c, e, "host", m.ports[i].host);
+                    set_int(c, e, "guest", m.ports[i].guest);
+                    set_str(c, e, "open", m.ports[i].open == VM_OPEN_LAN ? "lan" : "this-computer");
+                    JS_SetPropertyUint32(c, pa, (uint32_t)i, e);
+                }
+                JS_SetPropertyStr(c, o, "ports", pa);
+            }
             set_str(c, o, "display", m.display == VM_DISPLAY_WINDOW ? "window" : "none");
             set_str(c, o, "iso", m.iso);
             set_str(c, o, "base", m.base);
             JS_SetPropertyStr(c, o, "agent", JS_NewBool(c, m.agent));
+            JS_SetPropertyStr(c, o, "clipboardAsk", JS_NewBool(c, m.clipboard_ask));
+            set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
+            JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
             set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
             set_str(c, o, "mac", m.mac);
+            /* sound (6.9): host-side choices */
+            JS_SetPropertyStr(c, o, "sound", JS_NewBool(c, m.sound));
+            set_int(c, o, "volume", m.volume);
+            JS_SetPropertyStr(c, o, "microphone", JS_NewBool(c, m.microphone));
+            set_str(c, o, "soundOut", m.sound_out);
+            set_str(c, o, "soundIn", m.sound_in);
             {
                 /* a Clone whose guest is still to get its own hostname and machine-id (6.3) */
                 char idh[VM_HOSTNAME_MAX + 1] = "";
                 set_str(c, o, "identityPending", vm_identity_read(dir, idh, sizeof idh) ? "" : idh);
             }
             set_str(c, o, "devices", m.devices == VM_DEV_COMPAT ? "compat" : "virtio");
+            /* the windows device set (4.3), and the graphics (6.10): 3D for Linux machines only */
+            JS_SetPropertyStr(c, o, "windowsDevices", JS_NewBool(c, m.devices == VM_DEV_WINDOWS));
+            set_str(c, o, "graphics", m.graphics == VM_GFX_3D ? "3d" : "2d");
+            set_str(c, o, "gpu", VM_VGPU_NAMES[m.vgpu]);        /* an Intel vGPU (schema 11): "", "intel-whole", "intel-shared" */
+            {
+                char rs[24] = "follow";
+                if (m.res_w && m.res_h) snprintf(rs, sizeof rs, "%dx%d", m.res_w, m.res_h);
+                set_str(c, o, "resolution", rs);
+            }
             set_str(c, o, "nicModel", VM_NIC_MODELS[m.nic_model]);
             set_int(c, o, "dataDisks", m.n_data);
             {
@@ -289,6 +470,10 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
                     JS_SetPropertyUint32(c, sh, (uint32_t)i, e);
                 }
                 JS_SetPropertyStr(c, o, "shares", sh);
+                /* the transfer folder (6.7.1): on, and where it is (made at the machine's start, or by transferFolder) */
+                char xp[PATH_MAX];
+                JS_SetPropertyStr(c, o, "transfer", JS_NewBool(c, m.transfer));
+                set_str(c, o, "transferPath", vm_transfer_path(dir, xp, sizeof xp) ? "" : xp);
             }
             {
                 char ip[PATH_MAX + 320];
@@ -302,6 +487,20 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             set_str(c, o, "error", r == VM_E_NEWER ? "newer" : "invalid");
         }
         run_state(dir, c, o);
+        if (r == VM_OK) {
+            JSValue sv = JS_GetPropertyStr(c, o, "state");
+            const char *ss = JS_ToCString(c, sv);
+            if (ss) {
+                unbridge_idle(&m, ss);
+                if (m.vgpu) {
+                    gvt_idle(&m, ss);
+                    gvt_memlock(dir);
+                    if (!strcmp(ss, "running") || !strcmp(ss, "paused") || !strcmp(ss, "starting")) gvt_running++;
+                }
+                JS_FreeCString(c, ss);
+            }
+            JS_FreeValue(c, sv);
+        }
         /* an operation that was interrupted and waits for the next start (3.6) */
         {
             VmOp op;
@@ -316,13 +515,19 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyUint32(c, arr, n++, o);
     }
     closedir(d);
+    gvt_freq(gvt_running > 0);
     return arr;
 }
 
 /* ---- creating (lord-vm --create, in the background) ---- */
 
 #define MAX_JOBS 4
-typedef struct { int used, fd, done, ok, exit; pid_t pid; char out[16384]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; char creds[PATH_MAX]; } Job;
+typedef struct {
+    int used, fd, done, ok, exit; pid_t pid; char out[16384]; size_t n; char dir[PATH_MAX + 80]; char hash[160]; char creds[PATH_MAX];
+    /* a lord-pgpv job (f_sig_check): the fingerprint asked for, the image's SHA-256 and the checksum file's bytes the
+     * helper was given, to look for that SHA-256 in once it says valid */
+    int sigcheck; char sig_fpr[41]; char sig_sha[65]; char *sums; size_t sums_n;
+} Job;
 static Job jobs[MAX_JOBS];
 
 /* the folder's name from the machine's: letters, digits, space, '-', '_', '.'; others become '-' */
@@ -383,6 +588,45 @@ static void xkb_desc(const char *code, char *out, size_t n) {
 
 /* an unattended install's spec for lord-vm --unattended (vm/vmunattend.h): the object's words as JSON, the password
  * replaced by its SHA-512 crypt hash, in a 0600 file of the runtime folder that lord-vm reads and removes. 0, or -1 */
+/* UTF-8 text → Windows Setup's own encoding of a password in an answer file: base64 of UTF-16LE(text + "Password"). Not a
+ * hash (Setup has none): the seed disk that holds it is wiped when the install is done (lord-vm). 0, or -1 */
+static int win_password(const char *pw, char *out, size_t on) {
+    char t[300];
+    if (snprintf(t, sizeof t, "%sPassword", pw) >= (int)sizeof t) return -1;
+    uint8_t u16[600];
+    size_t n = 0;
+    for (const unsigned char *p = (const unsigned char *)t; *p;) {
+        uint32_t cp;
+        int k = *p < 0x80 ? 1 : (*p >> 5) == 6 ? 2 : (*p >> 4) == 14 ? 3 : (*p >> 3) == 30 ? 4 : 0;
+        if (!k) return -1;
+        cp = k == 1 ? *p : k == 2 ? (*p & 0x1Fu) : k == 3 ? (*p & 0x0Fu) : (*p & 0x07u);
+        for (int i = 1; i < k; i++) { if ((p[i] & 0xC0) != 0x80) return -1; cp = (cp << 6) | (p[i] & 0x3Fu); }
+        p += k;
+        if (cp >= 0x10000) {
+            cp -= 0x10000;
+            uint32_t hi = 0xD800 + (cp >> 10), lo = 0xDC00 + (cp & 0x3FF);
+            if (n + 4 > sizeof u16) return -1;
+            u16[n++] = (uint8_t)hi; u16[n++] = (uint8_t)(hi >> 8); u16[n++] = (uint8_t)lo; u16[n++] = (uint8_t)(lo >> 8);
+        } else {
+            if (n + 2 > sizeof u16) return -1;
+            u16[n++] = (uint8_t)cp; u16[n++] = (uint8_t)(cp >> 8);
+        }
+    }
+    explicit_bzero(t, sizeof t);
+    static const char B[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    size_t o = 0;
+    for (size_t i = 0; i < n; i += 3) {
+        uint32_t v = (uint32_t)u16[i] << 16 | (i + 1 < n ? (uint32_t)u16[i + 1] << 8 : 0) | (i + 2 < n ? u16[i + 2] : 0);
+        if (o + 5 > on) { explicit_bzero(u16, sizeof u16); return -1; }
+        out[o++] = B[v >> 18 & 63]; out[o++] = B[v >> 12 & 63];
+        out[o++] = i + 1 < n ? B[v >> 6 & 63] : '=';
+        out[o++] = i + 2 < n ? B[v & 63] : '=';
+    }
+    out[o] = 0;
+    explicit_bzero(u16, sizeof u16);
+    return 0;
+}
+
 static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char *path, size_t pn) {
     static const char *const keys[] = { "kind", "user", "fullname", "hostname", "timezone", "keymap", "variant", "locale", "release",
                                         "kernel", "initrd", "append", NULL };
@@ -409,11 +653,45 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
         if (km) JS_FreeCString(c, km);
         JS_FreeValue(c, vk);
     }
+    /* Windows (vmunattend.h): its own words; the password in Setup's encoding, and none is allowed */
+    int win = 0;
+    {
+        JSValue vk = JS_GetPropertyStr(c, o, "kind");
+        const char *k = JS_IsString(vk) ? JS_ToCString(c, vk) : NULL;
+        win = k && !strcmp(k, "windows");
+        if (k) JS_FreeCString(c, k);
+        JS_FreeValue(c, vk);
+    }
+    if (win) {
+        static const char *const wk[] = { "edition", "key", "uilang", "inputloc", "wtz", "userloc", NULL };
+        for (int i = 0; wk[i] && ok; i++) {
+            JSValue v = JS_GetPropertyStr(c, o, wk[i]);
+            if (JS_IsString(v)) {
+                const char *sv = JS_ToCString(c, v);
+                char q[200];
+                if (!sv || strlen(sv) > 64 || !json_quote(q, sizeof q, sv)) ok = 0;
+                else n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"%s\":%s", wk[i], q);
+                if (sv) JS_FreeCString(c, sv);
+            }
+            JS_FreeValue(c, v);
+        }
+        JSValue vg = JS_GetPropertyStr(c, o, "guided");
+        if (JS_IsBool(vg)) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"guided\":%s", JS_ToBool(c, vg) ? "true" : "false");
+        JS_FreeValue(c, vg);
+        JSValue vp = JS_GetPropertyStr(c, o, "password");
+        const char *pw = JS_IsString(vp) ? JS_ToCString(c, vp) : NULL;
+        char wp[260] = "";
+        if (pw && pw[0] && (strlen(pw) > 127 || win_password(pw, wp, sizeof wp))) ok = 0;
+        if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
+        JS_FreeValue(c, vp);
+        n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"wpass\":\"%s\"", wp);
+        explicit_bzero(wp, sizeof wp);
+    }
     JSValue vd = JS_GetPropertyStr(c, o, "desktop");
     if (JS_IsBool(vd)) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"desktop\":%s", JS_ToBool(c, vd) ? "true" : "false");
     JS_FreeValue(c, vd);
     /* the password: only its hash leaves here */
-    JSValue vp = JS_GetPropertyStr(c, o, "password");
+    JSValue vp = win ? JS_UNDEFINED : JS_GetPropertyStr(c, o, "password");
     const char *pw = JS_IsString(vp) ? JS_ToCString(c, vp) : NULL;
     char hash[160] = "";
     if (pw && pw[0] && strlen(pw) < 256) {
@@ -426,8 +704,9 @@ static int unattended_spec(JSContext *c, JSValueConst o, const char *arch, char 
     }
     if (pw) { explicit_bzero((char *)pw, strlen(pw)); JS_FreeCString(c, pw); }
     JS_FreeValue(c, vp);
-    if (!hash[0]) ok = 0;
-    n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"hash\":\"%s\"}", hash);
+    if (!win && !hash[0]) ok = 0;
+    if (!win) n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, ",\"hash\":\"%s\"}", hash);
+    else n += (size_t)snprintf(buf + n, n < sizeof buf ? sizeof buf - n : 0, "}");
     if (!ok || n >= sizeof buf) return -1;
     const char *rt = getenv("XDG_RUNTIME_DIR");
     static unsigned k;
@@ -493,6 +772,26 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     JSValue vu = JS_GetPropertyStr(c, argv[0], "unattended");
     if (ok && JS_IsObject(vu)) { if (!has_iso || unattended_spec(c, vu, arch, spec, sizeof spec)) ok = 0; }
     JS_FreeValue(c, vu);
+    /* a Windows 11 machine (4.3): secure boot, a TPM, Hyper-V, local time, its devices and the drivers' disc */
+    char drv[PATH_MAX] = "";
+    int windows = 0;
+    JSValue vw = JS_GetPropertyStr(c, argv[0], "windows");
+    if (ok && JS_IsObject(vw)) {
+        JSValue vdr = JS_GetPropertyStr(c, vw, "drivers");
+        windows = 1;
+        if (!JS_IsString(vdr) || user_file(c, vdr, drv, sizeof drv) || strcmp(arch, "amd64")) ok = 0;
+        JS_FreeValue(c, vdr);
+    }
+    JS_FreeValue(c, vw);
+    JSValue vg = JS_GetPropertyStr(c, argv[0], "graphics");
+    int gfx3d = 0;
+    if (JS_IsString(vg)) {
+        const char *gs = JS_ToCString(c, vg);
+        if (gs && !strcmp(gs, "3d")) gfx3d = 1;
+        else if (!gs || strcmp(gs, "2d")) ok = 0;
+        if (gs) JS_FreeCString(c, gs);
+    }
+    JS_FreeValue(c, vg);
     int id = 0;
     if (ok) {
         char folder[64], dir[PATH_MAX + 80];
@@ -502,12 +801,19 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         int native = (!strcmp(arch, "amd64") ? VM_ARCH_AMD64 : VM_ARCH_ARM64) == host_arch();
         char sv[16], sm[16], sd[16];
         snprintf(sv, sizeof sv, "%d", vcpus); snprintf(sm, sizeof sm, "%d", mem); snprintf(sd, sizeof sd, "%d", disk);
-        char *args[32] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
+        char *args[48] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
                          "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", isolated ? "isolated" : "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso, NULL };
         int na = 0;
         while (args[na]) na++;
         if (spec[0]) { args[na++] = "--unattended"; args[na++] = spec; }
         if (share) { args[na++] = "--agent"; args[na++] = "on"; args[na++] = "--clipboard"; args[na++] = "both"; }
+        /* the Design profile's 3D graphics (6.10): Linux machines only; lord-vm refuses them for the windows devices */
+        if (gfx3d && !windows) { args[na++] = "--graphics"; args[na++] = "3d"; }
+        if (windows) {
+            static char *const W[] = { "--secure-boot", "on", "--tpm", "on", "--hyperv", "on", "--rtc", "local", "--devices", "windows", "--drivers" };
+            for (size_t i = 0; i < sizeof W / sizeof W[0]; i++) args[na++] = W[i];
+            args[na++] = drv;
+        }
         args[na] = NULL;
         int p[2];
         if (!access(dir, F_OK) || pipe2(p, O_CLOEXEC)) ok = 0;
@@ -572,6 +878,16 @@ static int spawn_job(char *const args[], const char *dir) {
     return slot + 1;
 }
 
+/* hash(path) → job id: lord-vm --sha256 on a file the person chose or downloaded ({"progress":P} lines, then
+ * {"sha256":…,"size":…}), to check a Windows ISO against the catalog's list (4.3) */
+static JSValue f_hash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char path[PATH_MAX];
+    if (argc < 1 || !JS_IsString(argv[0]) || user_file(c, argv[0], path, sizeof path)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--sha256", path, NULL };
+    return JS_NewInt32(c, spawn_job(args, ""));
+}
+
 /* (security scan F5) A guest writes to a writable shared folder: never one that is, sits under or holds a path lord.fs
  * protects (settings.json, the Terminal's configuration wherever the user put it, launchers…), or the guest could rewrite
  * what the host runs. Checked when the shares are set and again before every start: the Terminal's file can move into a
@@ -588,6 +904,8 @@ static int machine_shares_ok(const char *dir) {
     if (vm_machine_load(dir, &m, err, sizeof err) != VM_OK) return 1;   /* a bad machine.json is lord-vm's to report */
     for (int i = 0; i < m.n_shares; i++)
         if (m.share_rw[i] && !share_writable_ok(m.share_path[i])) { snprintf(refusal, sizeof refusal, "vm.shareProtected"); return 0; }
+    char xp[PATH_MAX];
+    if (m.transfer && !vm_transfer_path(dir, xp, sizeof xp) && !share_writable_ok(xp)) { snprintf(refusal, sizeof refusal, "vm.shareProtected"); return 0; }
     return 1;
 }
 static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -597,13 +915,14 @@ static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return r;
 }
 
-/* set(dir, { name, vcpus, memoryMb, diskGb, network, iso, shares: [{ tag, path, writable }] }) → job id: lord-vm --set on a
+/* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
+ *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest", captureFullscreen }) → job id: lord-vm --set on a
  * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[32 + 2 * VM_SHARES], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[54 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -620,9 +939,42 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "network");
     if (JS_IsString(v)) {
         const char *s = JS_ToCString(c, v);
-        if (s && (!strcmp(s, "shared") || !strcmp(s, "isolated"))) { snprintf(net, sizeof net, "%s", s); args[n++] = "--network"; args[n++] = net; } else ok = 0;
+        int known = 0;
+        for (int k = 0; s && VM_NET_NAMES[k]; k++) if (!strcmp(s, VM_NET_NAMES[k])) known = 1;
+        if (known) { snprintf(net, sizeof net, "%s", s); args[n++] = "--network"; args[n++] = net; } else ok = 0;
         if (s) JS_FreeCString(c, s);
     }
+    JS_FreeValue(c, v);
+    /* the network's details (6.5): the wired card a bridged machine joins, the forwarded ports (replacing the list; []
+     * empties it), each checked here and again by lord-vm */
+    v = JS_GetPropertyStr(c, argv[1], "bridge");
+    if (JS_IsString(v)) {
+        const char *bs = JS_ToCString(c, v);
+        if (bs && vm_ifname_valid(bs)) { snprintf(br, sizeof br, "%s", bs); args[n++] = "--bridge"; args[n++] = br; } else ok = 0;
+        if (bs) JS_FreeCString(c, bs);
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "ports");
+    if (JS_IsArray(c, v)) {
+        uint32_t len = 0;
+        JSValue l = JS_GetPropertyStr(c, v, "length");
+        JS_ToUint32(c, &len, l);
+        JS_FreeValue(c, l);
+        VmPort ps[VM_PORTS];
+        if (len > VM_PORTS) ok = 0;
+        else if (!len) { args[n++] = "--ports"; args[n++] = "none"; }
+        for (uint32_t i = 0; ok && i < len; i++) {
+            JSValue e = JS_GetPropertyUint32(c, v, i), pr = JS_GetPropertyStr(c, e, "proto"), op = JS_GetPropertyStr(c, e, "open");
+            const char *prs = JS_IsString(pr) ? JS_ToCString(c, pr) : NULL, *ops = JS_IsString(op) ? JS_ToCString(c, op) : NULL;
+            int h = prop_int(c, e, "host"), g = prop_int(c, e, "guest");
+            ps[i] = (VmPort){ prs && !strcmp(prs, "udp") ? VM_PROTO_UDP : VM_PROTO_TCP, h, g, ops && !strcmp(ops, "lan") ? VM_OPEN_LAN : VM_OPEN_LOCAL };
+            if (!prs || (strcmp(prs, "tcp") && strcmp(prs, "udp")) || (ops && strcmp(ops, "lan") && strcmp(ops, "this-computer")) || vm_ports_check(ps, (int)i + 1, VM_NET_SHARED, NULL, 0)) ok = 0;
+            else { vm_port_spec(&ps[i], pv[i], sizeof pv[i]); args[n++] = "--port"; args[n++] = pv[i]; }
+            if (prs) JS_FreeCString(c, prs);
+            if (ops) JS_FreeCString(c, ops);
+            JS_FreeValue(c, pr); JS_FreeValue(c, op); JS_FreeValue(c, e);
+        }
+    } else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     char clip[16] = "";
     v = JS_GetPropertyStr(c, argv[1], "agent");
@@ -633,6 +985,31 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         const char *cs = JS_ToCString(c, v);
         if (cs && (!strcmp(cs, "off") || !strcmp(cs, "to-guest") || !strcmp(cs, "from-guest") || !strcmp(cs, "both"))) { snprintf(clip, sizeof clip, "%s", cs); args[n++] = "--clipboard"; args[n++] = clip; } else ok = 0;
         if (cs) JS_FreeCString(c, cs);
+    }
+    JS_FreeValue(c, v);
+    char gfx[8] = "";
+    v = JS_GetPropertyStr(c, argv[1], "graphics");
+    if (JS_IsString(v)) {
+        const char *gs = JS_ToCString(c, v);
+        if (gs && (!strcmp(gs, "2d") || !strcmp(gs, "3d"))) { snprintf(gfx, sizeof gfx, "%s", gs); args[n++] = "--graphics"; args[n++] = gfx; } else ok = 0;
+        if (gs) JS_FreeCString(c, gs);
+    }
+    JS_FreeValue(c, v);
+    char gpu[16] = "";
+    v = JS_GetPropertyStr(c, argv[1], "gpu");
+    if (JS_IsString(v)) {
+        const char *gs = JS_ToCString(c, v);
+        if (gs && (!gs[0] || !strcmp(gs, "intel-whole") || !strcmp(gs, "intel-shared"))) { snprintf(gpu, sizeof gpu, "%s", gs[0] ? gs : "none"); args[n++] = "--gpu"; args[n++] = gpu; } else ok = 0;
+        if (gs) JS_FreeCString(c, gs);
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    char res[24] = "";
+    v = JS_GetPropertyStr(c, argv[1], "resolution");
+    if (JS_IsString(v)) {
+        const char *rs = JS_ToCString(c, v);
+        int rw, rh;
+        if (rs && (!strcmp(rs, "follow") || !vm_resolution_parse(rs, &rw, &rh))) { snprintf(res, sizeof res, "%s", rs); args[n++] = "--resolution"; args[n++] = res; } else ok = 0;
+        if (rs) JS_FreeCString(c, rs);
     }
     JS_FreeValue(c, v);
     char devs[16] = "", nicm[24] = "";
@@ -651,6 +1028,25 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
         if (known) { snprintf(nicm, sizeof nicm, "%s", ns); args[n++] = "--nic-model"; args[n++] = nicm; } else ok = 0;
         if (ns) JS_FreeCString(c, ns);
     }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "transfer");
+    if (JS_IsBool(v)) { args[n++] = "--transfer"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "clipboardAsk");
+    if (JS_IsBool(v)) { args[n++] = "--clipboard-ask"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "captureFullscreen");
+    if (JS_IsBool(v)) { args[n++] = "--capture-fullscreen"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "pointer");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && (!strcmp(s, "lordos") || !strcmp(s, "guest"))) { args[n++] = "--pointer"; args[n++] = !strcmp(s, "guest") ? "guest" : "lordos"; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    } else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "shares");
     if (JS_IsArray(c, v)) {
@@ -673,6 +1069,20 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
             JS_FreeValue(c, tv); JS_FreeValue(c, pv); JS_FreeValue(c, wv); JS_FreeValue(c, e);
         }
     } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    /* the boot order, checked here as lord-vm checks it (vm_boot_parse) */
+    char boot[32] = "";
+    v = JS_GetPropertyStr(c, argv[1], "bootOrder");
+    if (JS_IsString(v)) {
+        const char *bs = JS_ToCString(c, v);
+        int ord[VM_BOOT_DEVS];
+        if (bs && strlen(bs) < sizeof boot && vm_boot_parse(bs, ord) >= 0) { snprintf(boot, sizeof boot, "%s", bs); args[n++] = "--boot-order"; args[n++] = boot; } else ok = 0;
+        if (bs) JS_FreeCString(c, bs);
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "bootMenu");
+    if (JS_IsBool(v)) { args[n++] = "--boot-menu"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "iso");
     if (JS_IsString(v)) {
@@ -725,6 +1135,15 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (!stat(p, &st)) disk += (double)st.st_blocks * 512;
     }
     JS_SetPropertyStr(c, o, "diskBytes", JS_NewFloat64(c, disk));
+    {
+        /* a linked clone's frozen base (<library>/.shared/, machine.json "base"): shared with its siblings, so shown
+         * beside the machine's own size, never added to it */
+        static VmMachine bm;
+        char berr[128];
+        struct stat st;
+        if (!vm_machine_load(dir, &bm, berr, sizeof berr) && bm.base[0] && vm_base_valid(bm.base) && !stat(bm.base, &st) && S_ISREG(st.st_mode))
+            JS_SetPropertyStr(c, o, "baseBytes", JS_NewFloat64(c, (double)st.st_blocks * 512));
+    }
     snprintf(p, sizeof p, "%s/run.json", dir);
     char buf[2048];
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
@@ -788,6 +1207,146 @@ static JSValue f_isoinfo(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return o;
 }
 
+/* ---- a person's system: its OpenPGP signature (lord-pgpv; docs/VIRTUALIZATION.md 5.6.1, AGENTS.md "lord-pgpv") ---- */
+
+#define VM_USER_LISTS "/var/lib/lordos/machines/lists/"
+
+/* a root-owned regular file of the image store, read whole (at most max bytes) */
+static char *store_file(const char *path, size_t max, size_t *len) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return NULL;
+    struct stat st;
+    char *b = NULL;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && !(st.st_mode & 022) && st.st_size > 0 &&
+        (size_t)st.st_size <= max && (b = malloc((size_t)st.st_size + 1))) {
+        size_t n = 0;
+        while (n < (size_t)st.st_size) {
+            ssize_t r = read(fd, b + n, (size_t)st.st_size - n);
+            if (r < 0 && errno == EINTR) continue;
+            if (r <= 0) break;
+            n += (size_t)r;
+        }
+        if (n != (size_t)st.st_size) { free(b); b = NULL; } else { b[n] = 0; *len = n; }
+    }
+    close(fd);
+    return b;
+}
+
+/* bytes into a sealed memfd at offset 0 (-1 on failure) */
+static int sealed_fd(const char *name, const void *b, size_t n) {
+    int fd = memfd_create(name, MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd < 0) return -1;
+    size_t o = 0;
+    while (o < n) {
+        ssize_t w = write(fd, (const char *)b + o, n - o);
+        if (w < 0 && errno == EINTR) continue;
+        if (w <= 0) { close(fd); return -1; }
+        o += (size_t)w;
+    }
+    if (fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) || lseek(fd, 0, SEEK_SET)) { close(fd); return -1; }
+    return fd;
+}
+
+/* sigCheck(sha256, key, fingerprint) → job id (0 when it can't start): checks the detached signature that
+ * vm-image-get-user stored for that image (lists/u-<sha256>.sig, over lists/u-<sha256>.sums) with the armored public
+ * key of the system's definition, of which only the primary key with that v4 fingerprint (or its subkeys) counts.
+ * lord-pgpv does the OpenPGP part in its sandbox on sealed memfds; then, only when it answered valid with that very
+ * fingerprint, the image's SHA-256 must be a line of the checksum file it checked. lord.vm.job(id).out is then
+ * {"valid":true,"fingerprint":"<40 hex>"} or {"valid":false,"reason":"<word>"} (VMSIG_REASONS, notListed, noFiles). */
+static JSValue f_sig_check(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 3 || !JS_IsString(argv[0]) || !JS_IsString(argv[1]) || !JS_IsString(argv[2])) return JS_NewInt32(c, 0);
+    int slot = -1;
+    for (int i = 0; i < MAX_JOBS; i++) if (!jobs[i].used) { slot = i; break; }
+    char bin[PATH_MAX];
+    if (slot < 0 || bin_path("lord-pgpv", bin, sizeof bin)) return JS_NewInt32(c, 0);
+    size_t kl = 0;
+    const char *sha = JS_ToCString(c, argv[0]), *fpr = JS_ToCString(c, argv[2]), *key = JS_ToCStringLen(c, &kl, argv[1]);
+    char s[65] = "", f[41] = "";
+    int ok = sha && fpr && key && strlen(sha) == 64 && vmsig_fpr_ok(fpr) && kl > 0 && kl <= VMSIG_KEY_MAX;
+    for (int i = 0; ok && i < 64; i++) {
+        char ch = sha[i];
+        if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'))) ok = 0;
+        s[i] = ch;
+    }
+    for (int i = 0; ok && i < 40; i++) f[i] = (char)(fpr[i] >= 'a' && fpr[i] <= 'f' ? fpr[i] - 32 : fpr[i]);
+    int kfd = ok ? sealed_fd("lordos-pgpv-key", key, kl) : -1;
+    if (sha) JS_FreeCString(c, sha);
+    if (fpr) JS_FreeCString(c, fpr);
+    if (key) JS_FreeCString(c, key);
+    if (kfd < 0) return JS_NewInt32(c, 0);
+    char p[160];
+    size_t sl = 0, gl = 0;
+    snprintf(p, sizeof p, VM_USER_LISTS "u-%s.sums", s);
+    char *sums = store_file(p, VMSIG_SUMS_MAX, &sl);
+    snprintf(p, sizeof p, VM_USER_LISTS "u-%s.sig", s);
+    char *sig = store_file(p, VMSIG_SIG_MAX, &gl);
+    int sfd = sums ? sealed_fd("lordos-pgpv-sums", sums, sl) : -1, gfd = sig ? sealed_fd("lordos-pgpv-sig", sig, gl) : -1;
+    int have_files = sums && sig;
+    free(sig);
+    int in[2] = { -1, -1 }, out[2] = { -1, -1 };
+    pid_t pid = -1;
+    if (sfd >= 0 && gfd >= 0 && !pipe2(in, O_CLOEXEC) && !pipe2(out, O_CLOEXEC)) {
+        pid = fork();
+        if (!pid) {
+            /* fds 0 (the request), 1 (the answer), 2 (/dev/null), 3 key, 4 checksum file, 5 signature; nothing else */
+            int a = fcntl(in[0], F_DUPFD, 10), b = fcntl(out[1], F_DUPFD, 10), k = fcntl(kfd, F_DUPFD, 10),
+                m = fcntl(sfd, F_DUPFD, 10), g = fcntl(gfd, F_DUPFD, 10), null = open("/dev/null", O_WRONLY);
+            if (a < 0 || b < 0 || k < 0 || m < 0 || g < 0 || null < 0 || dup2(a, 0) != 0 || dup2(b, 1) != 1 || dup2(null, 2) != 2 ||
+                dup2(k, 3) != 3 || dup2(m, 4) != 4 || dup2(g, 5) != 5) _exit(127);
+            syscall(SYS_close_range, 6, ~0u, 0);
+            sigset_t none;
+            sigemptyset(&none);
+            sigprocmask(SIG_SETMASK, &none, NULL);
+            char *const args[] = { "lord-pgpv", NULL }, *const envp[] = { NULL };
+            execve(bin, args, envp);
+            _exit(127);
+        }
+    }
+    close(kfd);
+    if (sfd >= 0) close(sfd);
+    if (gfd >= 0) close(gfd);
+    if (in[0] >= 0) close(in[0]);
+    if (out[1] >= 0) close(out[1]);
+    if (pid <= 0) {
+        if (in[1] >= 0) close(in[1]);
+        if (out[0] >= 0) close(out[0]);
+        free(sums);
+        /* no signature files stored for that image (downloaded before, or a failed fetch): a finished job that says so */
+        if (!have_files) {
+            jobs[slot] = (Job){ .used = 1, .fd = -1, .done = 1, .ok = 0, .exit = 1, .pid = 0 };
+            jobs[slot].n = (size_t)snprintf(jobs[slot].out, sizeof jobs[slot].out, "{\"valid\":false,\"reason\":\"noFiles\"}");
+            return JS_NewInt32(c, slot + 1);
+        }
+        return JS_NewInt32(c, 0);
+    }
+    char req[64];
+    int rl = snprintf(req, sizeof req, "%s %lld\n", f, (long long)time(NULL));
+    if (write(in[1], req, (size_t)rl) != rl) { /* the helper answers malformed */ }
+    close(in[1]);
+    fcntl(out[0], F_SETFL, O_NONBLOCK);
+    jobs[slot] = (Job){ .used = 1, .fd = out[0], .pid = pid, .sigcheck = 1, .sums = sums, .sums_n = sl };
+    memcpy(jobs[slot].sig_fpr, f, 41);
+    memcpy(jobs[slot].sig_sha, s, 65);
+    return JS_NewInt32(c, slot + 1);
+}
+
+/* the verdict of a finished lord-pgpv job, built here: never the helper's text */
+static void sig_verdict(Job *j) {
+    char why[32] = "";
+    int rep = vmsig_reply(j->out, j->n, j->sig_fpr, why, sizeof why);
+    int listed = rep == 1 && j->sums && vmsig_sums_has_hash(j->sums, j->sums_n, j->sig_sha);
+    char fpr[41];
+    memcpy(fpr, j->sig_fpr, sizeof fpr);
+    if (rep == 1 && listed)
+        j->n = (size_t)snprintf(j->out, sizeof j->out, "{\"valid\":true,\"fingerprint\":\"%s\"}", fpr);
+    else
+        j->n = (size_t)snprintf(j->out, sizeof j->out, "{\"valid\":false,\"reason\":\"%s\"}", rep == 1 ? "notListed" : why[0] ? why : "badSignature");
+    j->ok = rep == 1 && listed;
+    free(j->sums);
+    j->sums = NULL;
+}
+
 static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     int i = ival(c, argv[0]);
@@ -823,6 +1382,7 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
             }
             explicit_bzero(j->hash, sizeof j->hash);
             if (j->creds[0]) unlink(j->creds);
+            if (j->sigcheck) sig_verdict(j);
         }
     }
     JSValue o = JS_NewObject(c);
@@ -838,6 +1398,9 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 /* ---- sessions: one running machine and its window ---- */
 
 #define MAX_SESS 4
+/* one dmabuf of a 3D machine's picture (VD_DMABUF) and its import: a texture of the desktop's GPU (tex) or of the reader
+ * on the buffer's own render node (ri, gpu/dmaread.h); gfail/rfail: that one refused it (not tried again for this dmabuf) */
+typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; DmaImg *ri; int gfail, rfail; unsigned used; } VmDmabuf;
 typedef struct {
     int used, vm, vd, err;              /* channels; lord-vm's stderr (until its log is open) */
     pid_t vm_pid, vd_pid;
@@ -856,6 +1419,13 @@ typedef struct {
     char errtail[400];
     char creds[PATH_MAX];               /* the first-boot settings file, removed once lord-vm read it */
     uint8_t *cur;                       /* the guest's pointer (VD_CURSOR) until there's a picture to give it to */
+    int vgpu;                           /* the machine has an Intel vGPU (gvt_memlock while it starts) */
+    int windows;                        /* a Windows guest: its display driver draws the pointer into the picture until
+                                         * it hands one over (viogpudo's HWCursor, 7.1.2). Not with a vGPU: Intel's
+                                         * driver puts it on the vGPU's cursor plane, which QEMU hands over as
+                                         * CursorDefine; until one comes, the host's arrow */
+    int ptr_guest;                      /* machine.json "pointer": "guest": a shape QEMU still holds from before (a saved
+                                         * state's) isn't drawn over the guest's own */
     int cur_w, cur_h, cur_hx, cur_hy;
     int job_kind, job_status, job_pct;  /* the last VM_JOB (suspend, resume, snapshots) */
     char job_text[VM_TEXT_MAX];
@@ -865,6 +1435,9 @@ typedef struct {
     int ag_state, ag_caps;              /* the guest agent (VM_AGENT_STATE), and what it said about itself */
     char ag_text[VM_TEXT_MAX];
     uint32_t ag_seq;                    /* an Install Agent request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
+    uint32_t xf_seq;                    /* a Set Up the Transfer Folder request (VAG_TRANSFER), the same way */
+    int xf_result;
+    char xf_msg[VM_TEXT_MAX];
     int ag_result;
     char ag_msg[VM_TEXT_MAX];
     char *clip_in;                      /* the guest's clipboard text (VM_CLIP_DATA), and a counter of them */
@@ -875,6 +1448,18 @@ typedef struct {
     size_t clip_html_n, clip_png_n;
     uint64_t clip_last;                 /* what went either way last (its main form's hash): not sent back */
     unsigned clip_skip_img;             /* the clipboard picture made from the guest's (wl_clip_image_gen): not sent back */
+    /* the clipboard's gate (6.8): the machine is in use while its window (or one of its apps mode windows) is in front,
+     * and CLIP_GRACE_MS after; only then does the guest get the host's clipboard when it asks, or set the host's.
+     * The app says which (clipboardGate); this side holds it, so a guest can't reach either way in the background */
+    int gate_on, clip_ask;              /* in use now; "ask before each paste" (the app asks the person) */
+    long long gate_until;               /* in use until then (the grace after it went to the background) */
+    uint32_t offer_gen;                 /* the last offer (VM_CLIP_OFFER): generation, forms, the host clipboard's hash */
+    int offer_forms;
+    uint64_t offer_hash;
+    uint32_t ask_gen[4];                /* ask mode: requests waiting for the person, per AGF_* form (0 none) */
+    long long ask_at[4];
+    int ask_seq;                        /* a counter of requests put to the person */
+    int blk_read, blk_write;            /* requests refused, and guest clipboards ignored, while not in use */
     int console_term;                   /* the Shell (6.18): a terminal session on the serial console's stream */
     uint32_t console_seq;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
@@ -882,8 +1467,60 @@ typedef struct {
     int rec_sound;                      /* lord-vmdisplay writes the guest's sound into the recording's ring */
     int notice, notice_code, notice_seq; /* VM_NOTICE: VMN_*, its number, a counter of them, and its words */
     char notice_text[VM_TEXT_MAX];
+    /* 3D (VD_DMABUF): the dmabufs QEMU draws into, imported once each (QEMU flips between a few, and names each
+     * again on every ScanoutDMABUF: known by inode), the one shown now, and the rows still to read back into the
+     * picture (their frame waits until the dmabuf's fence has signalled: never a wait) */
+    VmDmabuf db[4];
+    int db_cur;                         /* index in db, -1: the picture isn't a dmabuf */
+    unsigned db_tick;
+    int db_y0, db_y1, db_frame, db_pending;
+    long db_reads, db_fails;
+    int db_warned;
+    /* With the GPU composing, the picture is shown as a texture, never read back (docs/MACHINES-GPU.md, "A vGPU's
+     * picture without a readback"): the desktop GPU's own import of QEMU's dmabuf (VmDmabuf.tex, a Linux 3D machine),
+     * or for an Intel vGPU's picture two linear copies made on the iGPU (gout), imported by the desktop's GPU: one is
+     * shown (gshow) while the next frame is copied into the other (gpend, until its fence on the copy's dmabuf
+     * signals). y0..y1: rows that copy lacks (the frames copied into the other one since). The copy also tests whether
+     * anything changed (QEMU's vfio display sends the whole picture every refresh, changed or not): a frame that
+     * didn't is acknowledged at once and nothing is presented */
+    struct { DmaOut *o; GpuTex *tex; int w, h, y0, y1; } gout[2];
+    int gshow, gpend, gfail;
+    int gcopy_y0, gcopy_y1;             /* the frame's rows in the copy in flight */
+    int db_more;                        /* frames came while a copy was in flight: another copy after it */
+    long db_same;                       /* frames that changed nothing (not shown again) */
+    unsigned rkey;                      /* names the picture in map for dmaread_rows_new's change test */
+    /* sound (6.9): machine.json's choices, what the guest does now (VD_GUEST_AUDIO), and what this side has open. The
+     * speakers' stream and the microphone's belong to the picture's media source (m->audio, m->mic), so lord-server's
+     * loop serves them; their rings go to lord-vmdisplay (VD_AUDIO_OUT, VD_MIC) */
+    int snd_on, snd_vol, mic_allowed;
+    char snd_out[VM_SOUND_DEV_MAX + 1], snd_in[VM_SOUND_DEV_MAX + 1];   /* the output and input chosen ("" the default) */
+    int guest_out, guest_in;
+    int spk_sent, mic_sent;             /* the current helper has the speakers' / microphone's ring */
+    int mic_wait;                       /* the guest records and the machine allows it, LordOS's permission not (yet) */
+    int spk_vol, spk_play;              /* what the speakers' stream was last given */
+    long long snd_retry_at;             /* a stream without PipeWire (not there yet, or gone) tries again then */
+    char name[VM_NAME_MAX + 1];
+    /* files dropped on the window, on their way into the guest (VM_FILE): 1 copying, 2 done, 3 failed; msg is the
+     * guest's path (done) or why not, for the app to show; files() hands finished ones over once */
+    struct { uint32_t seq; int state, pct, via, open, how; long long size; char name[VM_TEXT_MAX], msg[VM_TEXT_MAX]; } fx[16];
+    int fx_changes;
+    /* apps mode (7.2): the guest's windows, their icons and its apps, as lord-vm passed them on (VM_WINDATA, parsed
+     * again here); seqs count changes for the app; apps_mode: the picture may have no node that shows all of it */
+    LagWinList *wins;
+    struct { uint32_t id; int w, h; uint8_t *rgba; } icons[LAG_WIN_MAX];
+    LagAppList *gapps;
+    int wins_seq, icons_seq, gapps_seq, gapps_gen, apps_mode;
+    /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
+     * did (PTRLOCK_END_*), for the window */
+    int captured, cap_ends, cap_why;
 } Sess;
 static Sess sess[MAX_SESS];
+
+static void win_free(Sess *s) {
+    free(s->wins); s->wins = NULL;
+    free(s->gapps); s->gapps = NULL;
+    for (int i = 0; i < LAG_WIN_MAX; i++) { free(s->icons[i].rgba); s->icons[i].rgba = NULL; s->icons[i].id = 0; }
+}
 
 /* lord-vm processes whose window closed before they exited */
 static pid_t orphans[16];
@@ -914,7 +1551,108 @@ static void init_sess(Sess *s, const char *dir) {
     s->vm = s->vd = s->err = -1;
     s->state = VS_STARTING;
     s->vd_state = -1;
+    s->db_cur = -1;
+    for (int i = 0; i < 4; i++) s->db[i].fd = -1;
+    s->gshow = s->gpend = -1;
     snprintf(s->dir, sizeof s->dir, "%s", dir);
+    VmMachine m;
+    if (!vm_machine_load(dir, &m, NULL, 0)) {
+        s->snd_on = m.sound; s->snd_vol = m.volume; s->mic_allowed = m.microphone; snprintf(s->name, sizeof s->name, "%s", m.name);
+        s->windows = m.devices == VM_DEV_WINDOWS;
+        s->vgpu = m.vgpu != VM_VGPU_NONE;
+        s->ptr_guest = s->windows && !s->vgpu && m.pointer_guest;   /* HWCursor is viogpudo's: a vGPU's plane is always drawn here */
+        memcpy(s->snd_out, m.sound_out, sizeof s->snd_out);
+        memcpy(s->snd_in, m.sound_in, sizeof s->snd_in);
+    }
+    else { s->snd_on = 1; s->snd_vol = 100; }
+}
+
+/* ---- sound (6.9) ----
+ * The guest's sound plays from lord-server's own PipeWire stream (media/maudio.c), fed from a ring lord-vmdisplay writes;
+ * the guest's microphone reads a ring lord-server fills from the person's microphone. lord-vmdisplay never gets the
+ * PipeWire socket. The microphone opens only while all three hold: the machine's "microphone" is on, LordOS's
+ * microphone permission allows Machines (asked with the system prompt, revocable in Settings → Privacy; checked here,
+ * not only in the app), and the guest records now. Otherwise the guest reads silence (lord-vmdisplay). */
+#define BUILTIN_FWID "lordos"           /* built-in apps' firewall id (docs/FIREWALL.md), as js_media.c */
+static int mic_permitted(void) {
+    uint32_t rf = restrict_flag_of(PERM_MICROPHONE);
+    if (rf && restrict_blocks(BUILTIN_FWID, rf)) return 0;
+    return perm_get("machines", PERM_MICROPHONE) == PERM_ALLOW;
+}
+static void vdsend_fd(Sess *s, int type, int a, int fd) { if (s->vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, 0, 0, 0, 0, 0); vd_send(s->vd, &m, fd); } }
+
+static long long mono_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000LL + ts.tv_nsec / 1000000;
+}
+
+/* PipeWire wasn't reachable when a stream opened (a window opened early in the session) or went away: the stream
+ * connects again every 2 s while the guest plays or records, with the same ring, so the helper needs nothing new */
+static void snd_retry(Sess *s, MediaSrc *ms) {
+    int spk = ms->audio && s->guest_out && maudio_failed(ms->audio), mic = ms->mic && maudio_failed(ms->mic);
+    if (!spk && !mic) { s->snd_retry_at = 0; return; }
+    long long now = mono_ms();
+    if (s->snd_retry_at && now < s->snd_retry_at) return;
+    s->snd_retry_at = now + 2000;
+    if (spk && !maudio_retry(ms->audio)) { s->spk_vol = -1; s->spk_play = -1; }
+    if (mic) maudio_retry(ms->mic);
+}
+
+/* the device a stream uses: the one chosen while Settings → Sound lists it (or while that isn't known), else the
+ * default; checked at every poll, so a device unplugged sends the stream to the default and one plugged back in takes
+ * it again (maudio_target moves a live stream only when this changes) */
+/* the chosen device while it is listed now, else "" (the default); fails closed: an unknown sound state means the
+ * default, and an input must be a microphone, never an output's monitor (the microphone permission doesn't cover
+ * what this computer plays) */
+static const char *snd_target(int kind, const char *chosen) {
+    if (!chosen[0] || snd_device_present(kind, chosen) != 1) return "";
+    if (kind == SND_SOURCE && !snd_source_is_input(chosen)) return "";
+    return chosen;
+}
+
+static void snd_apply(Sess *s) {
+    MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
+    int up = s->vd >= 0 && s->vd_up && ms;
+    if (up) snd_retry(s, ms);
+    /* the speakers: a stream while the machine's sound is on (60 ms of buffer; the helper keeps at most 80 more) */
+    if (up && s->snd_on) {
+        if (!ms->audio) {
+            int ring = -1;
+            ms->audio = maudio_open(0, "Machines", s->name[0] ? s->name : "Machine", "video", &ring);
+            if (ms->audio) maudio_latency(ms->audio, 60);
+            s->spk_sent = 0;
+            s->spk_vol = -1;
+            s->spk_play = -1;
+        }
+        if (ms->audio) {
+            maudio_target(ms->audio, snd_target(SND_SINK, s->snd_out));     /* chosen in Configure or the bar: moved now */
+            if (!s->spk_sent) { vdsend_fd(s, VD_AUDIO_OUT, 1, maudio_ring_fd(ms->audio)); s->spk_sent = 1; }
+            if (s->spk_vol != s->snd_vol) { s->spk_vol = s->snd_vol; maudio_volume(ms->audio, s->snd_vol / 100.0); }
+            if (s->spk_play != s->guest_out) { s->spk_play = s->guest_out; maudio_playing(ms->audio, s->guest_out); }
+        }
+    } else if (ms && ms->audio) {
+        if (s->spk_sent) vdsend(s, VD_AUDIO_OUT, 0, 0);
+        maudio_close(ms->audio);
+        ms->audio = NULL;
+        s->spk_sent = 0;
+    }
+    /* the microphone: not for a paused machine either (its input stays enabled while nothing runs) */
+    int want = up && s->mic_allowed && s->guest_in && s->state == VS_RUNNING, perm = want && mic_permitted();
+    s->mic_wait = want && !perm;
+    if (perm) {
+        if (!ms->mic) {
+            int ring = -1;
+            ms->mic = maudio_open(1, "Machines", s->name[0] ? s->name : "Machine", snd_target(SND_SOURCE, s->snd_in), &ring);
+            s->mic_sent = 0;
+        } else maudio_target(ms->mic, snd_target(SND_SOURCE, s->snd_in));
+        if (ms->mic && !s->mic_sent) { vdsend_fd(s, VD_MIC, 1, maudio_ring_fd(ms->mic)); s->mic_sent = 1; }
+    } else if (ms && ms->mic) {
+        if (s->mic_sent) vdsend(s, VD_MIC, 0, 0);
+        maudio_close(ms->mic);
+        ms->mic = NULL;
+        s->mic_sent = 0;
+    }
 }
 
 /* First-boot settings for a guest that asks for them (systemd's credentials: a Debian "nocloud" image otherwise stops
@@ -1025,6 +1763,7 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     }
     int slot = new_slot();
     if (slot < 0 || machine_dir(c, argv[0], dir, sizeof dir) || bin_path("lord-vm", bin, sizeof bin)) return JS_NewInt32(c, 0);
+    last_start = time(NULL);
     if (!machine_shares_ok(dir)) return JS_NewInt32(c, 0);
     int sv[2], ep[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return JS_NewInt32(c, 0);
@@ -1034,6 +1773,12 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     fcntl(ep[0], F_SETFL, O_NONBLOCK);
     char creds[PATH_MAX];
     int have_creds = !write_creds(creds, sizeof creds, dir);
+    char rnode[64] = "none";
+    {
+        GpuInfo gi;
+        gpu_info(&gi);
+        if (gpu_active() && gi.dmabuf && gi.render_node && !strncmp(gi.render_node, "/dev/dri/renderD", 16)) snprintf(rnode, sizeof rnode, "%s", gi.render_node);
+    }
     pid_t p = fork();
     if (!p) {
         int ch = fcntl(sv[1], F_DUPFD, 10), e = fcntl(ep[1], F_DUPFD, 11);
@@ -1046,9 +1791,12 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
         /* no cgroup_enter here: lord-vm places itself in the machine's scope through lord-sessiond */
-        char *args[16];
+        char *args[20];
         int k = 0;
         args[k++] = "lord-vm"; args[k++] = "--start"; args[k++] = dir; args[k++] = "--control-fd"; args[k++] = "3"; args[k++] = "--paused";
+        /* 3D graphics (6.10): QEMU draws on the GPU this desktop composes with, whose dmabufs it can read back; without
+         * a GPU path a 3D machine starts with 2D graphics */
+        args[k++] = "--render-node"; args[k++] = rnode;
         if (anyway) args[k++] = "--resume-anyway";
         if (discard) args[k++] = "--discard-state";
         if (loadvm[0]) { args[k++] = "--loadvm"; args[k++] = loadvm; }
@@ -1133,7 +1881,224 @@ static void maybe_display(Sess *s) {
     else s->display_seq = (uint32_t)q;
 }
 
+/* ---- 3D pictures (VD_DMABUF, vmproto.h) ---- */
+
+static MediaSrc *sess_media(Sess *s) { return s->media ? media_src_get(s->media) : NULL; }
+
+/* a texture going away is no longer the picture's */
+static void gtex_drop(Sess *s, GpuTex *t) {
+    MediaSrc *ms = sess_media(s);
+    if (ms && t && ms->gtex == t) { ms->gtex = NULL; ms->gpu_drawn = 0; }
+}
+
+static void gout_free(Sess *s) {
+    for (int k = 0; k < 2; k++) {
+        if (s->gout[k].tex) { gtex_drop(s, s->gout[k].tex); gpu_tex_free(s->gout[k].tex); }
+        dmaread_out_free(s->gout[k].o);
+        memset(&s->gout[k], 0, sizeof s->gout[k]);
+    }
+    s->gshow = s->gpend = -1;
+}
+
+static void db_free(Sess *s, int i) {
+    if (s->db[i].tex) { gtex_drop(s, s->db[i].tex); gpu_tex_free(s->db[i].tex); }
+    if (s->db[i].ri) dmaread_free(s->db[i].ri);
+    if (s->db[i].fd >= 0) close(s->db[i].fd);
+    memset(&s->db[i], 0, sizeof s->db[i]);
+    s->db[i].fd = -1;
+    if (s->db_cur == i) s->db_cur = -1;
+}
+static void db_drop_all(Sess *s) {
+    gout_free(s);
+    s->gfail = 0;
+    for (int i = 0; i < 4; i++) db_free(s, i);
+    s->db_cur = -1;
+    s->db_pending = s->db_more = 0;
+}
+
+/* VD_DMABUF: the dmabuf the picture is now (fd), or none (fd < 0, m->a == 0) */
+static void db_take(Sess *s, const VdMsg *m, int fd) {
+    if (!m->a || fd < 0) { if (fd >= 0) close(fd); s->db_cur = -1; s->db_pending = 0; return; }
+    struct stat st;
+    if (fstat(fd, &st)) { close(fd); return; }
+    int st_stride = m->c & ~VD_DMABUF_FLIP, flip = (m->c & VD_DMABUF_FLIP) != 0;
+    uint64_t mod = (uint64_t)(uint32_t)m->e | (uint64_t)(uint32_t)m->f << 32;
+    int k = -1;
+    for (int i = 0; i < 4; i++)
+        if (s->db[i].fd >= 0 && s->db[i].ino == st.st_ino && s->db[i].w == m->a && s->db[i].h == m->b && s->db[i].stride == st_stride &&
+            s->db[i].fourcc == (uint32_t)m->d && s->db[i].mod == mod) k = i;
+    if (k >= 0) close(fd);
+    else {
+        /* a new one: in a free place, or the one shown longest ago */
+        for (int i = 0; i < 4 && k < 0; i++) if (s->db[i].fd < 0) k = i;
+        if (k < 0) { k = 0; for (int i = 1; i < 4; i++) if (s->db[i].used < s->db[k].used) k = i; }
+        db_free(s, k);
+        s->db[k].fd = fd; s->db[k].ino = st.st_ino; s->db[k].w = m->a; s->db[k].h = m->b; s->db[k].stride = st_stride;
+        s->db[k].fourcc = (uint32_t)m->d; s->db[k].mod = mod;
+    }
+    s->db[k].flip = flip;
+    s->db[k].used = ++s->db_tick;
+    s->db_cur = k;
+}
+
+/* The picture may be shown as a GPU texture now: the GPU composes, and nothing needs the CPU's pixels every frame (a
+ * recording of the machine, a recording of the screen). LORD_VM_GPUTEX=0 turns it off (the readback of before). */
+static int gpu_show_ok(Sess *s) {
+    static int env = -1;
+    if (env < 0) { const char *e = getenv("LORD_VM_GPUTEX"); env = !(e && !strcmp(e, "0")); }
+    return env && gpu_active() && !s->rec && !media_needs_cpu();
+}
+
+/* the two linear copies for this dmabuf's import, made and imported by the desktop's GPU once (and again for another
+ * size or a new GPU context); 0 ready */
+static int gout_ready(Sess *s, const VmDmabuf *d) {
+    if (s->gout[0].o && (s->gout[0].w != d->w || s->gout[0].h != d->h)) gout_free(s);   /* another size */
+    for (int k = 0; k < 2; k++)
+        if (s->gout[k].tex && !gpu_tex_current(s->gout[k].tex)) { gtex_drop(s, s->gout[k].tex); gpu_tex_free(s->gout[k].tex); s->gout[k].tex = NULL; }
+    for (int k = 0; k < 2; k++) {
+        if (!s->gout[k].o) {
+            s->gout[k].o = dmaread_out_new(d->ri);
+            s->gout[k].w = d->w; s->gout[k].h = d->h;
+            if (!s->gout[k].o) return -1;
+            s->gout[k].tex = NULL;
+            s->gout[k].y0 = 0; s->gout[k].y1 = d->h;    /* nothing in it yet */
+            if (s->gshow == k) s->gshow = -1;
+        }
+        if (!s->gout[k].tex) {
+            int stride = 0, fd = dmaread_out_fd(s->gout[k].o, &stride);
+            GpuDmabuf b = { .width = d->w, .height = d->h, .nplanes = 1, .fourcc = DRM_FORMAT_XRGB8888, .modifier = DRM_FORMAT_MOD_LINEAR,
+                            .fd = { fd, -1, -1, -1 }, .offset = { 0 }, .stride = { (uint32_t)stride } };
+            s->gout[k].tex = fd >= 0 ? gpu_tex_dmabuf(&b) : NULL;
+            if (!s->gout[k].tex) return -1;
+            s->gout[k].y0 = 0; s->gout[k].y1 = d->h;    /* a new import: copied whole next time */
+            if (s->gshow == k) s->gshow = -1;
+        }
+    }
+    return 0;
+}
+
+/* map brought up to date with the frame the texture shows (media_src_need_cpu: a capture, a recording, a CPU paint) */
+static int db_cpu_read(int id) {
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *s = &sess[i];
+        if (!s->used || s->media != id || s->db_cur < 0) continue;
+        MediaSrc *ms = sess_media(s);
+        VmDmabuf *d = &s->db[s->db_cur];
+        if (!ms || !ms->map || d->w != s->w || d->h != s->h) return -1;
+        if (d->tex) return gpu_tex_read_rows(d->tex, (uint8_t *)ms->map, 0, d->h, d->flip);
+        if (d->ri) return dmaread_rows_new(d->ri, (uint8_t *)ms->map, 0, d->h, d->flip, (const void *)(uintptr_t)s->rkey) < 0 ? -1 : 0;
+        return -1;
+    }
+    return -1;
+}
+
+/* The pending rows: 1 a new frame (in the picture's memory, or in the texture it is shown from), 2 a frame that changed
+ * nothing (acknowledged at once, nothing presented), 0 not yet (the dmabuf's fence, or the copy's, hasn't signalled:
+ * tried again when it does, and lord-vmdisplay goes on by itself after 250 ms), -1 can't (no GPU path, an import
+ * refused: the picture stays as it was, and the frame is acknowledged so the guest isn't held). *ry0..*ry1: its rows */
+static int db_read(Sess *s, MediaSrc *ms, int *ry0, int *ry1) {
+    if (s->db_cur < 0 || !ms || !ms->map) return -1;
+    VmDmabuf *d = &s->db[s->db_cur];
+    if (d->w != s->w || d->h != s->h) return -1;
+    if (!ms->cpu_read) ms->cpu_read = db_cpu_read;
+    /* a copy in flight: done when its fence signals; the copy that was in it becomes the one shown */
+    if (s->gpend >= 0) {
+        int k = s->gpend;
+        struct pollfd pf = { dmaread_out_fd(s->gout[k].o, NULL), POLLIN, 0 };
+        if (pf.fd >= 0 && poll(&pf, 1, 0) == 0) return 0;
+        int c = dmaread_changed(s->gout[k].o);
+        s->gpend = -1;
+        s->gshow = k;
+        *ry0 = s->gcopy_y0; *ry1 = s->gcopy_y1;
+        if (s->gout[k].tex && gpu_tex_current(s->gout[k].tex)) {
+            ms->gtex = s->gout[k].tex; ms->gtex_flip = 0; ms->cpu_stale = 1;
+        }
+        if (c == 0 && ms->gtex) { s->db_same++; return 2; }
+        return 1;
+    }
+    struct pollfd pf = { d->fd, POLLIN, 0 };
+    if (poll(&pf, 1, 0) == 0) return 0;
+    if (d->tex && !gpu_tex_current(d->tex)) { gtex_drop(s, d->tex); gpu_tex_free(d->tex); d->tex = NULL; }
+    if (!d->tex && !d->ri) {
+        /* Which GPU reads it: the desktop's (a Linux 3D machine's virgl picture is made on it), or the reader on the
+         * Intel render node (gpu/dmaread.h) for an Intel GVT-g machine's picture: its Intel-tiled modifier can't be
+         * imported by another vendor's GPU, and on the CPU path (LORD_GPU=0, no usable GPU) there is no desktop GPU;
+         * also when the desktop's GPU refused it. */
+        const char *in = dmaread_intel_node();
+        GpuInfo gi;
+        gpu_info(&gi);
+        int desk_intel = in && gi.render_node && !strcmp(gi.render_node, in);
+        if (gpu_active() && !d->gfail && !(in && dmaread_mod_intel(d->mod) && !desk_intel)) {
+            GpuDmabuf b = { .width = d->w, .height = d->h, .nplanes = 1, .fourcc = d->fourcc, .modifier = d->mod, .fd = { d->fd, -1, -1, -1 },
+                            .offset = { 0 }, .stride = { (uint32_t)d->stride } };
+            d->tex = gpu_tex_dmabuf(&b);
+            if (!d->tex) d->gfail = 1;
+        }
+        if (!d->tex && in && !d->rfail) {
+            d->ri = dmaread_import(in, d->fd, d->w, d->h, d->stride, d->fourcc, d->mod);
+            if (!d->ri) d->rfail = 1;
+        }
+        if (!d->tex && !d->ri) {
+            if (!s->db_warned++)
+                fprintf(stderr, "machines: a 3D picture can't be shown: %s (modifier %llx)\n",
+                        gpu_active() ? "no GPU took its dmabuf" : in ? "the desktop draws without a GPU and the Intel GPU refused its dmabuf" : "the desktop draws without a GPU",
+                        (unsigned long long)d->mod);
+            s->db_fails++;
+            return -1;
+        }
+    }
+    int y0 = s->db_y0 < 0 ? 0 : s->db_y0, y1 = s->db_y1 > s->h ? s->h : s->db_y1;
+    if (y1 <= y0) return 2;
+    *ry0 = y0; *ry1 = y1;
+    int show = gpu_show_ok(s);
+    /* the desktop's GPU imported it: shown straight from it */
+    if (show && d->tex) {
+        if (ms->gtex != d->tex && s->gshow >= 0) gout_free(s);  /* the copies are an Intel picture's */
+        ms->gtex = d->tex; ms->gtex_flip = d->flip; ms->cpu_stale = 1;
+        s->db_reads++;
+        return 1;
+    }
+    /* an Intel vGPU's picture: copied on the iGPU into the copy not shown, imported by the desktop's GPU */
+    if (show && d->ri && !s->gfail) {
+        if (!gout_ready(s, d)) {
+            int k = s->gshow == 0 ? 1 : 0;
+            int cy0 = s->gout[k].y1 > s->gout[k].y0 && s->gout[k].y0 < y0 ? s->gout[k].y0 : y0;
+            int cy1 = s->gout[k].y1 > s->gout[k].y0 && s->gout[k].y1 > y1 ? s->gout[k].y1 : y1;
+            const DmaOut *prev = s->gshow >= 0 ? s->gout[s->gshow].o : NULL;
+            if (!dmaread_copy(d->ri, s->gout[k].o, cy0, cy1 - cy0, d->flip, prev)) {
+                s->gout[k].y0 = s->gout[k].y1 = 0;
+                if (s->gshow >= 0) {        /* the shown copy lacks this frame's rows now */
+                    int o = s->gshow;
+                    if (s->gout[o].y1 <= s->gout[o].y0) { s->gout[o].y0 = y0; s->gout[o].y1 = y1; }
+                    else { if (y0 < s->gout[o].y0) s->gout[o].y0 = y0; if (y1 > s->gout[o].y1) s->gout[o].y1 = y1; }
+                }
+                s->gpend = k;
+                s->gcopy_y0 = y0; s->gcopy_y1 = y1;
+                /* frames that come while it's in flight start a new band */
+                s->db_y0 = INT_MAX; s->db_y1 = INT_MIN; s->db_more = 0;
+                s->db_reads++;
+                return 0;
+            }
+        }
+        fprintf(stderr, "machines: the vGPU's picture can't be shown as a texture (no linear copy the desktop's GPU takes): read back instead\n");
+        gout_free(s);
+        s->gfail = 1;
+    }
+    /* read back into the picture's memory: all of it if a texture showed it until now */
+    if (ms->gtex) { ms->gtex = NULL; ms->gpu_drawn = 0; }
+    if (s->gshow >= 0 || s->gpend >= 0) gout_free(s);
+    if (ms->cpu_stale) { y0 = 0; y1 = s->h; *ry0 = 0; *ry1 = s->h; }
+    int r = d->tex ? (gpu_tex_read_rows(d->tex, (uint8_t *)ms->map, y0, y1 - y0, d->flip) ? -1 : 1)
+                   : dmaread_rows_new(d->ri, (uint8_t *)ms->map, y0, y1 - y0, d->flip, (const void *)(uintptr_t)s->rkey);
+    if (r < 0) { s->db_fails++; return -1; }
+    ms->cpu_stale = 0;
+    s->db_reads++;
+    if (!r) { s->db_same++; return 2; }
+    return 1;
+}
+
 static void drop_display(Sess *s, int close_helper) {
+    ptrlock_end_owner(s);               /* no picture, no capture (it tells lord-vm and the helper first) */
     if (s->vd >= 0) { if (close_helper) vdsend(s, VD_CLOSE, 0, 0); close(s->vd); s->vd = -1; }
     if (s->vd_pid > 0) {
         if (waitpid(s->vd_pid, NULL, WNOHANG) == 0) { kill(s->vd_pid, SIGKILL); waitpid(s->vd_pid, NULL, 0); }
@@ -1141,12 +2106,138 @@ static void drop_display(Sess *s, int close_helper) {
     }
     s->vd_up = 0;
     s->ack_pending = 0;
+    db_drop_all(s);
+    /* the next helper gets the rings again; until then nothing plays and the microphone is closed */
+    s->guest_out = s->guest_in = 0;
+    snd_apply(s);
     /* the next helper gets the guest's pointer again from QEMU; until then, the host's */
     free(s->cur); s->cur = NULL;
-    if (s->media) media_src_cursor(s->media, NULL, 0, 0, 0, 0);
+    if (s->media) { media_src_cursor(s->media, NULL, 0, 0, 0, 0); if (s->windows && !s->vgpu) media_src_cursor_guest_draws(s->media, 1); }
 }
 
 static void drop_creds(Sess *s) { if (s->creds[0]) { unlink(s->creds); s->creds[0] = 0; } }
+
+/* the end of a VM_FILE: 1 if this reply was one */
+static int fx_reply(Sess *s, const VmMsg *m) {
+    for (int i = 0; i < 16; i++) if (s->fx[i].state == 1 && s->fx[i].seq == m->seq) {
+        s->fx[i].state = m->a == VME_OK ? 2 : 3;
+        s->fx[i].how = m->a == VME_OK && m->b >= 0 && m->b <= AGP_LAST ? m->b : 0;
+        if (m->a == VME_OK) s->fx[i].pct = 100;
+        snprintf(s->fx[i].msg, sizeof s->fx[i].msg, "%s", m->text);
+        s->fx_changes++;
+        return 1;
+    }
+    return 0;
+}
+
+/* VM_WINDATA: the guest's windows, an icon or its apps; the memfd is checked sealed and of its size, and what it holds
+ * is parsed again with vmagent.c's parsers (lord-vm wrote it, but this side trusts no length) */
+static void windata(Sess *s, const VmMsg *m, int fd) {
+    int seals = fcntl(fd, F_GET_SEALS);
+    struct stat st;
+    if (seals < 0 || (seals & (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW)) != (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW) || fstat(fd, &st) || st.st_size != m->a) return;
+    uint8_t *b = malloc((size_t)m->a);
+    if (!b || pread(fd, b, (size_t)m->a, 0) != m->a) { free(b); return; }
+    if (m->b == LAG_WINDOWS) {
+        LagWinList *l = malloc(sizeof *l);
+        if (l && !lag_winlist_read(b, (size_t)m->a, l)) {
+            free(s->wins); s->wins = l; l = NULL; s->wins_seq++;
+            /* icons of windows that are gone go too */
+            for (int i = 0; i < LAG_WIN_MAX; i++) {
+                if (!s->icons[i].id) continue;
+                int there = 0;
+                for (int k = 0; k < s->wins->n && !there; k++) there = s->wins->w[k].id == s->icons[i].id;
+                if (!there) { free(s->icons[i].rgba); s->icons[i].rgba = NULL; s->icons[i].id = 0; }
+            }
+        }
+        free(l);
+    } else if (m->b == LAG_WINICON) {
+        uint32_t id; uint16_t w, h; const uint8_t *px;
+        if (!lag_winicon_parse(b, (size_t)m->a, &id, &w, &h, &px)) {
+            int k = -1;
+            for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (s->icons[i].id == id) k = i;
+            for (int i = 0; i < LAG_WIN_MAX && k < 0; i++) if (!s->icons[i].id) k = i;
+            uint8_t *copy = k >= 0 ? malloc((size_t)w * h * 4) : NULL;
+            if (copy) {
+                memcpy(copy, px, (size_t)w * h * 4);
+                free(s->icons[k].rgba);
+                s->icons[k].id = id; s->icons[k].w = w; s->icons[k].h = h; s->icons[k].rgba = copy;
+                s->icons_seq++;
+            }
+        }
+    } else if (m->b == LAG_APPLIST) {
+        LagAppList *l = malloc(sizeof *l);
+        if (l && !lag_applist_read(b, (size_t)m->a, l)) { free(s->gapps); s->gapps = l; l = NULL; s->gapps_seq++; s->gapps_gen = m->c; }
+        free(l);
+    }
+    free(b);
+}
+
+#define CLIP_GRACE_MS 3000
+#define CLIP_ASK_MS 30000
+static int clip_in_use(Sess *s) { return s->gate_on || mono_ms() < s->gate_until; }
+static uint64_t clip_hash(const void *p, size_t n);
+/* this computer's clipboard as the guest may have it: a picture, or text with its rich text when an app gave some;
+ * never a secret (Passwords, password fields). 0 there is one (cx's parts point into the clipboard's own copies; *h its
+ * main form's hash), -1 nothing to give */
+static int host_clip(AgClip *cx, uint64_t *h) {
+    memset(cx, 0, sizeof *cx);
+    if (wl_clip_is_image()) {
+        size_t n = 0;
+        const unsigned char *png = wl_clip_png(&n);
+        if (!png || !n || n > AG_PNG_MAX || wl_clip_image_sensitive()) return -1;
+        cx->png = png; cx->png_n = (uint32_t)n;
+        *h = clip_hash(png, n);
+        return 0;
+    }
+    const char *txt = term_clipboard();
+    size_t tn = txt ? strlen(txt) : 0, hn = 0;
+    if (!tn || tn > AG_TEXT_MAX || term_clipboard_sensitive() || !ag_utf8_ok((const uint8_t *)txt, tn)) return -1;
+    const char *html = wl_clip_html(&hn);
+    cx->text = (const uint8_t *)txt; cx->text_n = (uint32_t)tn;
+    if (html && hn && hn <= AG_TEXT_MAX && ag_utf8_ok((const uint8_t *)html, hn)) { cx->html = (const uint8_t *)html; cx->html_n = (uint32_t)hn; }
+    *h = cx->html ? clip_hash(html, hn) : clip_hash(txt, tn);
+    return 0;
+}
+static int clip_forms(const AgClip *c) { return (c->text ? AGM_TEXT : 0) | (c->html ? AGM_HTML : 0) | (c->png ? AGM_PNG : 0); }
+
+static void clip_deny(Sess *s, uint32_t gen, int form, int why) {
+    VmMsg m = vm_msg(VM_CLIP_DENY, ++s->seq, (int)gen, form, why, 0, NULL);
+    if (s->vm >= 0) vm_send(s->vm, &m, -1);
+}
+
+/* the guest's request for one form of an offer: the data when the offer is still this computer's clipboard; 0 sent */
+static int clip_give(Sess *s, uint32_t gen, int form) {
+    AgClip cx, one;
+    uint64_t h;
+    if (gen != s->offer_gen || host_clip(&cx, &h) || h != s->offer_hash) { clip_deny(s, gen, form, VCD_STALE); return -1; }
+    memset(&one, 0, sizeof one);
+    if (form == AGF_TEXT) { one.text = cx.text; one.text_n = cx.text_n; }
+    else if (form == AGF_HTML) { one.html = cx.html; one.html_n = cx.html_n; }
+    else { one.png = cx.png; one.png_n = cx.png_n; }
+    size_t n = ag_clipx_size(&one);
+    if (!n) { clip_deny(s, gen, form, VCD_NONE); return -1; }
+    uint8_t *buf = malloc(n);
+    int ok = 0;
+    if (buf) {
+        ag_clipx_write(&one, buf);
+        int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+        if (fd >= 0 && write(fd, buf, n) == (ssize_t)n && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
+            VmMsg m = vm_msg(VM_CLIP, ++s->seq, (int)n, VCF_CLIPX, (int)gen, form, NULL);
+            ok = !vm_send(s->vm, &m, fd);
+        }
+        if (fd >= 0) close(fd);
+        free(buf);
+    }
+    return ok ? 0 : -1;
+}
+
+/* ask mode: requests the person didn't answer in CLIP_ASK_MS are refused */
+static void clip_ask_expire(Sess *s) {
+    long long now = mono_ms();
+    for (int f = AGF_TEXT; f <= AGF_PNG; f++)
+        if (s->ask_gen[f] && now - s->ask_at[f] > CLIP_ASK_MS) { clip_deny(s, s->ask_gen[f], f, VCD_DECLINED); s->ask_gen[f] = 0; }
+}
 
 static void from_vm(Sess *s) {
     for (int k = 0; k < VD_POLL_MAX && s->vm >= 0; k++) {
@@ -1179,7 +2270,28 @@ static void from_vm(Sess *s) {
             s->ag_state = m.a; s->ag_caps = m.b;
             snprintf(s->ag_text, sizeof s->ag_text, "%s", m.text);
             break;
+        case VM_CLIP_REQ:
+            /* a program in the guest pastes: the host's clipboard only while the machine is in use, and in ask mode
+             * only once the person says yes (clipboardAnswer) */
+            if (!clip_in_use(s)) { s->blk_read++; clip_deny(s, (uint32_t)m.a, m.b, VCD_BACKGROUND); break; }
+            if (s->clip_ask) {
+                if ((uint32_t)m.a != s->offer_gen) { clip_deny(s, (uint32_t)m.a, m.b, VCD_STALE); break; }
+                if (!s->ask_gen[m.b]) s->ask_at[m.b] = mono_ms();
+                s->ask_gen[m.b] = (uint32_t)m.a;
+                s->ask_seq++;
+                break;
+            }
+            clip_give(s, (uint32_t)m.a, m.b);
+            break;
         case VM_CLIP_DATA:
+            /* the guest's clipboard, only while the machine is in use: in the background it's ignored (and lord-vm
+             * logs it), so a guest can't change this computer's clipboard behind the person's back */
+            if (fd >= 0 && !clip_in_use(s)) {
+                s->blk_write++;
+                s->clip_last = 0;           /* the guest's clipboard isn't ours any more: offered again at the next turn */
+                clip_deny(s, 0, 0, VCD_BACKGROUND);
+                break;
+            }
             /* the guest's text: checked sealed and of the size it says, then kept for the app to take */
             if (fd >= 0) {
                 int seals = fcntl(fd, F_GET_SEALS);
@@ -1205,6 +2317,9 @@ static void from_vm(Sess *s) {
                 }
             }
             break;
+        case VM_WINDATA:
+            if (fd >= 0) windata(s, &m, fd);
+            break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
                 if (s->console_term) { Session *old = term_get(s->console_term); if (old) term_close(old); }
@@ -1222,8 +2337,13 @@ static void from_vm(Sess *s) {
             s->notice_seq++;
             snprintf(s->notice_text, sizeof s->notice_text, "%s", m.text);
             break;
+        case VM_FILE_PROGRESS:
+            for (int i = 0; i < 16; i++) if (s->fx[i].state == 1 && s->fx[i].seq == m.seq) { s->fx[i].pct = m.a; s->fx[i].via = m.b == 1; s->fx_changes++; }
+            break;
         case VM_REPLY:
+            if (fx_reply(s, &m)) break;
             if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
+            if (s->xf_seq && m.seq == s->xf_seq) { s->xf_result = m.a == VME_OK ? 2 : 3; snprintf(s->xf_msg, sizeof s->xf_msg, "%s", m.text); s->xf_seq = 0; }
             if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
             if (m.a != VME_OK) {
                 snprintf(s->last_error, sizeof s->last_error, "%s", m.text);
@@ -1246,7 +2366,8 @@ static void set_picture(Sess *s, int w, int h) {
     size_t len = (size_t)w * h * 4;
     int fd = vm_picture_memfd(len);
     if (fd < 0) return;
-    uint8_t *map = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
+    /* writable: a 3D machine's frames are read back into it here (db_read) */
+    uint8_t *map = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (map == MAP_FAILED) { close(fd); return; }
     MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
     if (!m) m = media_src_new(SK_IMAGE, "machines");
@@ -1254,7 +2375,14 @@ static void set_picture(Sess *s, int w, int h) {
     if (m->map) munmap(m->map, m->map_len);
     free(m->cache); m->cache = NULL; m->cache_w = m->cache_h = 0;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->xrgb = 1; m->frame_seq++;
+    /* a new memory: what the change test compares against (dmaread_rows_new) isn't in it; nor is a texture's frame */
+    static unsigned rkeys;
+    s->rkey = ++rkeys ? rkeys : ++rkeys;
+    m->cpu_stale = 0;
     if (!s->media && s->cur) media_src_cursor(m->id, s->cur, s->cur_w, s->cur_h, s->cur_hx, s->cur_hy);
+    /* Windows' display driver draws its pointer into the picture unless it was told to hand it over (HWCursor 1,
+     * 7.1.2): until a shape comes (VD_CURSOR), LordOS's arrow over it would be a second one (2026-11-20) */
+    if (!s->media && s->windows && !s->vgpu && !s->cur) media_src_cursor_guest_draws(m->id, 1);
     s->media = m->id; s->w = w; s->h = h;
     s->ack_pending = 0;
     VdMsg r = vd_msg(VD_SHM, 0, 0, 0, 0, 0, 0);
@@ -1272,13 +2400,30 @@ static void guest_cursor(Sess *s, int fd, int w, int h, int hx, int hy) {
     munmap(p, len);
     if (!copy) return;
     if (hx < 0 || hy < 0 || hx >= w || hy >= h) { free(copy); return; }
+    /* an Intel vGPU's cursor plane read back with nothing visible in it (the guest's driver hasn't drawn one yet, or the
+     * plane went off): the host's arrow, never no pointer at all (2026-11-22). Without a vGPU a blank image is an app
+     * hiding the pointer on purpose */
+    if (s->vgpu) {
+        size_t k = 3;
+        while (k < len && !copy[k]) k += 4;
+        if (k >= len) {
+            free(copy);
+            free(s->cur); s->cur = NULL;
+            if (s->media) media_src_cursor(s->media, NULL, 0, 0, 0, 0);
+            return;
+        }
+    }
     free(s->cur);
     s->cur = copy; s->cur_w = w; s->cur_h = h; s->cur_hx = hx; s->cur_hy = hy;
     if (s->media) media_src_cursor(s->media, copy, w, h, hx, hy);
+    /* the guest hands its pointer over (a Windows guest with viogpudo's HWCursor 1): LordOS draws it from now on,
+     * where the host's pointer is, with no round trip through the guest */
+    if (s->media) media_src_cursor_guest_draws(s->media, 0);
 }
 
 static void from_vd(Sess *s) {
     int frames = 0, last = 0;
+    struct { int x0, y0, x1, y1, c; } du = { 0, 0, 0, 0, 0 };     /* the frames' changed area, together (2D) */
     for (int k = 0; k < VD_POLL_MAX && s->vd >= 0; k++) {
         VdMsg m;
         int fd = -1;
@@ -1287,19 +2432,41 @@ static void from_vd(Sess *s) {
         if (!r) break;
         if (!vd_msg_valid(&m, 0)) { if (fd >= 0) close(fd); continue; }
         switch (m.type) {
-        case VD_READY: s->vd_up = 1; break;
-        case VD_SIZE: set_picture(s, m.a, m.b); break;
+        case VD_READY: s->vd_up = 1; snd_apply(s); break;
+        case VD_SIZE: set_picture(s, m.a, m.b); snd_apply(s); break;
+        case VD_GUEST_AUDIO:
+            if (m.a == VDG_OUT) s->guest_out = m.b; else s->guest_in = m.b;
+            snd_apply(s);
+            break;
         case VD_FRAME:
             if (!s->media || !vd_rect_inside(&m, s->w, s->h)) break;
+            if (s->db_cur >= 0) {
+                /* a 3D picture: its rows are read back (or copied) below, once the GPU is done with them */
+                if (!s->db_pending) { s->db_y0 = m.b; s->db_y1 = m.b + m.d; }
+                else { if (m.b < s->db_y0) s->db_y0 = m.b; if (m.b + m.d > s->db_y1) s->db_y1 = m.b + m.d; }
+                if (s->gpend >= 0) s->db_more = 1;  /* after the copy in flight */
+                s->db_pending = 1; s->db_frame = m.e;
+                break;
+            }
             frames++; last = m.e;
+            if (!du.c) { du.x0 = m.a; du.y0 = m.b; du.x1 = m.a + m.c; du.y1 = m.b + m.d; du.c = 1; }
+            else { du.x0 = m.a < du.x0 ? m.a : du.x0; du.y0 = m.b < du.y0 ? m.b : du.y0; du.x1 = m.a + m.c > du.x1 ? m.a + m.c : du.x1; du.y1 = m.b + m.d > du.y1 ? m.b + m.d : du.y1; }
             break;
+        case VD_DMABUF: db_take(s, &m, fd); fd = -1; break;
         case VD_CURSOR:
             /* the guest's pointer: shown instead of the host's over the picture (main.c, media_node_cursor) */
-            if (fd >= 0 && !vm_cursor_check(fd, m.a, m.b)) guest_cursor(s, fd, m.a, m.b, m.c, m.d);
+            if (fd >= 0 && !s->ptr_guest && !vm_cursor_check(fd, m.a, m.b)) guest_cursor(s, fd, m.a, m.b, m.c, m.d);
             break;
         case VD_POINTER:
-            /* where the guest puts it doesn't matter (the host's pointer drives an absolute tablet); whether it shows does */
+            /* where the guest puts it doesn't matter (the host's pointer drives an absolute tablet); whether it shows does.
+             * Captured, the guest's pointer image is drawn where the guest has it, inside the picture; the real pointer stays
+             * at the picture's centre and clicks go straight to the guest (pointerlock.h), so this steers nothing */
             if (s->media) media_src_cursor_visible(s->media, m.c != 0);
+            if (s->captured && s->media) {
+                float x, y;
+                if (m.c && m.a >= 0 && m.b >= 0 && m.a < s->w && m.b < s->h && !media_src_to_screen(s->media, m.a + 0.5f, m.b + 0.5f, &x, &y)) ptrlock_show(1, x, y);
+                else ptrlock_show(0, 0, 0);
+            }
             break;
         case VD_STATE: s->vd_state = m.a; break;
         default: break;
@@ -1307,12 +2474,36 @@ static void from_vd(Sess *s) {
         if (fd >= 0) close(fd);
     }
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
+    int gpu_frame = 0;
+    if (s->db_pending) {
+        int ry0 = 0, ry1 = s->h;
+        int was_more = s->gpend >= 0 && s->db_more;
+        int r = db_read(s, ms, &ry0, &ry1);
+        if (r == 2) {
+            /* nothing changed (QEMU's vfio display repeats the picture every refresh): acknowledged at once, so the
+             * next one comes without the 250 ms wait, and nothing is painted or presented */
+            s->db_pending = was_more;
+            VdMsg a = vd_msg(VD_FRAME_DONE, 0, 0, 0, 0, s->db_frame, 0);
+            vd_send(s->vd, &a, -1);
+        } else if (r) {
+            s->db_pending = was_more;
+            frames++; last = s->db_frame; du.x0 = 0; du.x1 = s->w; du.y0 = ry0; du.y1 = ry1; du.c = 1;
+            gpu_frame = r == 1 && ms && ms->gtex;
+        }
+    }
     if (frames && ms) {
         ms->frame_seq++;
-        media_src_damage(ms);
+        int shown;
+        /* a frame in the texture the last paint drew: presenting again is enough (no UI damage, no paint) */
+        if (gpu_frame && ms->gpu_drawn) { media_src_present(ms); shown = 1; }
+        else shown = du.c ? media_src_damage_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0) : (media_src_damage(ms), 1);
+        /* what changed isn't in the part of the picture shown (zoomed in), or in apps mode in any of the guest's
+         * windows shown here (or none is): nothing to paint, so the frame counts as read at once (the helper isn't
+         * held 250 ms) */
+        if (!shown && (s->apps_mode || ms->node)) ms->painted_seq = ms->frame_seq;
         /* the node it was drawn in went away (the window's tree was made again): one repaint of everything finds
          * the new node, and that paint binds it */
-        if (!ms->node) damage_add((Box){ 0, 0, 16384, 16384 });
+        else if (!ms->node && !media_src_crop_count(ms)) damage_add((Box){ 0, 0, 16384, 16384 });
         s->frames += frames;
         s->ack_pending = 1; s->ack_frame = last; s->ack_seq = ms->frame_seq;
     }
@@ -1339,6 +2530,51 @@ static void ack(Sess *s) {
     s->ack_pending = 0;
 }
 
+/* ---- lord-server's main loop (main.c): the pictures are read there, not at the app's poll ----
+ * Each display's socket is in the loop's poll(): a frame is taken (from_vd) as soon as lord-vmdisplay sends it and
+ * acknowledged right after the paint that showed it (js_vm_painted, after render()). Before 2026-11-21 both waited
+ * for the Machines app's poll every 16 ms, and the acknowledgement came at the poll after the next one: a guest
+ * drawing 60 frames a second was shown at 31 (docs/MACHINES-GPU.md, Part 1). A 3D picture's dmabuf waiting for its
+ * fence is polled too (it becomes readable when the GPU is done with it). */
+static int vm_poll_sess[2 * MAX_SESS];
+
+int js_vm_pollfds(struct pollfd *p, int max) {
+    int n = 0;
+    for (int i = 0; i < MAX_SESS && n < max; i++) {
+        Sess *s = &sess[i];
+        if (!s->used || s->vd < 0) continue;
+        vm_poll_sess[n] = i;
+        p[n++] = (struct pollfd){ s->vd, POLLIN, 0 };
+        /* a copy in flight (a vGPU's picture): its fence; else a frame waiting for QEMU's dmabuf */
+        int gfd = s->gpend >= 0 ? dmaread_out_fd(s->gout[s->gpend].o, NULL) : -1;
+        if (gfd >= 0 && n < max) {
+            vm_poll_sess[n] = i;
+            p[n++] = (struct pollfd){ gfd, POLLIN, 0 };
+        } else if (s->db_pending && s->db_cur >= 0 && s->db[s->db_cur].fd >= 0 && n < max) {
+            vm_poll_sess[n] = i;
+            p[n++] = (struct pollfd){ s->db[s->db_cur].fd, POLLIN, 0 };
+        }
+    }
+    return n;
+}
+
+void js_vm_dispatch(const struct pollfd *p, int n) {
+    int done[MAX_SESS] = { 0 };
+    for (int k = 0; k < n && k < 2 * MAX_SESS; k++) {
+        int i = vm_poll_sess[k];
+        if (!p[k].revents || done[i]) continue;
+        Sess *s = &sess[i];
+        if (!s->used || s->vd < 0) continue;
+        done[i] = 1;
+        from_vd(s);
+    }
+}
+
+/* after a paint: every frame it showed is acknowledged now, so lord-vmdisplay hands the guest's next one over at once */
+void js_vm_painted(void) {
+    for (int i = 0; i < MAX_SESS; i++) if (sess[i].used && sess[i].ack_pending) ack(&sess[i]);
+}
+
 static void read_err(Sess *s) {
     if (s->err < 0) return;
     char tmp[512];
@@ -1357,11 +2593,15 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     if (!s) return JS_NULL;
-    ack(s);
     from_vm(s);
-    if (s->vd >= 0) from_vd(s);
-    ack(s);
+    if (s->vgpu && (s->state == VS_STARTING || s->state == VS_PAUSED)) gvt_memlock(s->dir);
+    /* the picture's frames are read by lord-server's loop (js_vm_dispatch) and acknowledged after each paint
+     * (js_vm_painted); this poll only reports the state */
     read_err(s);
+    snd_apply(s);                       /* a permission given or taken since */
+    MediaSrc *sm = s->media ? media_src_get(s->media) : NULL;
+    if (sm && sm->audio) maudio_service(sm->audio);      /* what the helper wrote since, without waiting for PipeWire to ask */
+    if (sm && sm->mic) maudio_service(sm->mic);
     if (s->vm < 0 && !s->ended) {
         int st;
         if (s->vm_pid > 0) {
@@ -1381,6 +2621,9 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         }
     }
     JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "captured", JS_NewBool(c, s->captured));
+    set_int(c, o, "captureEnds", s->cap_ends);
+    set_int(c, o, "captureWhy", s->cap_why);
     set_str(c, o, "state", STATES[s->state]);
     set_str(c, o, "reason", REASONS[s->reason]);
     set_int(c, o, "code", s->code);
@@ -1410,12 +2653,28 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         char ver[64] = "";
         snprintf(ver, sizeof ver, "%.*s", tab ? (int)(tab - s->ag_text) : 0, s->ag_text);
         set_str(c, ag, "version", ver);
-        set_str(c, ag, "system", tab ? tab + 1 : "");
+        /* "version\tsystem\ttools" (vmproto.h): the tools' version is the LordOS tools' hello, "" before it */
+        const char *tab2 = tab ? strchr(tab + 1, '\t') : NULL;
+        char sys[VM_TEXT_MAX] = "";
+        if (tab) snprintf(sys, sizeof sys, "%.*s", tab2 ? (int)(tab2 - tab - 1) : (int)strlen(tab + 1), tab + 1);
+        set_str(c, ag, "system", sys);
+        set_str(c, ag, "tools", tab2 ? tab2 + 1 : "");
         set_int(c, ag, "install", s->ag_result);
         set_str(c, ag, "message", s->ag_msg);
+        set_int(c, ag, "transfer", s->xf_result);
+        set_str(c, ag, "transferMessage", s->xf_msg);
         JS_SetPropertyStr(c, o, "agent", ag);
     }
     set_int(c, o, "clipIn", s->clip_seq);
+    clip_ask_expire(s);
+    set_int(c, o, "clipBlockedRead", s->blk_read);
+    set_int(c, o, "clipBlockedWrite", s->blk_write);
+    set_int(c, o, "clipAskSeq", s->ask_seq);
+    {
+        uint32_t g = 0;
+        for (int f = AGF_TEXT; f <= AGF_PNG; f++) if (s->ask_gen[f]) g = s->ask_gen[f];
+        set_int(c, o, "clipAsk", (int64_t)g);
+    }
     set_str(c, o, "cdMessage", s->cd_msg);
     set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : s->notice == VMN_RECOVERED ? "recovered" : s->notice == VMN_NET_BACK ? "network-back"
                           : s->notice == VMN_IDENTITY ? "identity" : "");
@@ -1431,7 +2690,157 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyStr(c, o, "job", j);
     }
     set_str(c, o, "noticeText", s->notice_text);
+    {
+        /* sound (6.9): mic "off" (not allowed, or the guest doesn't record), "wait" (the guest records and the machine
+         * allows it: the app asks for LordOS's permission), "live" (the guest hears the microphone) */
+        JSValue so = JS_NewObject(c);
+        JS_SetPropertyStr(c, so, "on", JS_NewBool(c, s->snd_on));
+        set_int(c, so, "volume", s->snd_vol);
+        JS_SetPropertyStr(c, so, "microphone", JS_NewBool(c, s->mic_allowed));
+        set_str(c, so, "output", s->snd_out);
+        set_str(c, so, "input", s->snd_in);
+        JS_SetPropertyStr(c, so, "playing", JS_NewBool(c, s->guest_out));
+        JS_SetPropertyStr(c, so, "recording", JS_NewBool(c, s->guest_in));
+        set_str(c, so, "mic", sm && sm->mic && s->mic_sent ? "live" : s->mic_wait ? "wait" : "off");
+        JS_SetPropertyStr(c, so, "bytes", JS_NewFloat64(c, sm && sm->audio ? (double)maudio_bytes(sm->audio) : 0));
+        JS_SetPropertyStr(c, so, "micBytes", JS_NewFloat64(c, sm && sm->mic ? (double)maudio_bytes(sm->mic) : 0));
+        JS_SetPropertyStr(c, o, "sound", so);
+    }
+    set_int(c, o, "filesSeq", s->fx_changes);
+    set_int(c, o, "windowsSeq", s->wins_seq);
+    set_int(c, o, "iconsSeq", s->icons_seq);
+    set_int(c, o, "guestAppsSeq", s->gapps_seq);
     return o;
+}
+
+/* sendFile(session, path[, { open: true } | { place: { win, x, y, batch, index, count } }]) → request id (0: refused): a file dropped on the machine's window, copied
+ * into the guest's Downloads by lord-vm through the guest agent. The file is opened here, for the person, read-only, and
+ * only a regular file; lord-vm gets the descriptor and the name, never a path. With open (Files' "Open with" a machine,
+ * docs/VIRTUALIZATION.md 7.3) the guest tools then open that copy in the guest: the path must resolve inside the
+ * person's home folder or their mounts (fsops_allowed), is opened without following a last link, and lord-vm refuses
+ * it unless the guest's tools said "open". With place (files dropped on an apps mode window, 7.2.1) the same checks,
+ * then the guest tools hand the copy to that window. This exists only in the session's JS (never in an --app process
+ * or a web view: they have no lord.vm), for Files' menu and Machines.
+ * files(session) → [{ id, name, size, pct, state: 'copying'|'done'|'failed', message, via, open, place, placed }]: the guest's path or why not; finished ones are listed once (poll's filesSeq
+ * counts changes) */
+static JSValue f_send_file(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    const char *p = s ? JS_ToCString(c, argv[1]) : NULL;
+    int slot = -1, fd = -1, want_open = 0, mode = 0;
+    int32_t pw = 0, pc = 0, pd = 0;
+    uint32_t q = 0;
+    if (s && argc >= 3 && JS_IsObject(argv[2])) {
+        JSValue v = JS_GetPropertyStr(c, argv[2], "open");
+        want_open = JS_ToBool(c, v) == 1;
+        JS_FreeValue(c, v);
+        mode = want_open ? 1 : 0;
+        /* place: { win, x, y, batch, index, count }: files dropped on an apps mode window (7.2.1), checked again by lord-vm */
+        JSValue pl = JS_GetPropertyStr(c, argv[2], "place");
+        if (JS_IsObject(pl)) {
+            int32_t f[6] = { 0 };
+            static const char *const K[6] = { "win", "x", "y", "batch", "index", "count" };
+            int bad = 0;
+            for (int i = 0; i < 6; i++) { JSValue x = JS_GetPropertyStr(c, pl, K[i]); if (JS_ToInt32(c, &f[i], x)) bad = 1; JS_FreeValue(c, x); }
+            if (!bad && f[0] && f[1] >= 0 && f[1] <= LAG_DIM_MAX && f[2] >= 0 && f[2] <= LAG_DIM_MAX && f[3] >= 1 && f[3] <= 32767 && f[5] >= 1 && f[5] <= AG_PLACE_MAX && f[4] >= 0 && f[4] < f[5]) {
+                mode = 2; want_open = 1;
+                pw = f[0]; pc = f[1] | f[2] << 16; pd = f[3] << 16 | f[4] << 8 | f[5];
+            } else want_open = -1;          /* asked and malformed: refused */
+        }
+        JS_FreeValue(c, pl);
+    }
+    if (s) for (int i = 0; i < 16; i++) if (!s->fx[i].state) { slot = i; break; }
+    if (want_open < 0) { /* refused below: no descriptor */ }
+    else if (want_open && p) {
+        /* opened in the guest: only the person's own files (home, their mounts), the resolved path, no last link */
+        char real[PATH_MAX];
+        if (p[0] == '/' && slot >= 0 && s->vm >= 0 && realpath(p, real) && fsops_allowed(real))
+            fd = open(real, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NONBLOCK | O_NOFOLLOW);
+    } else if (p && p[0] == '/' && slot >= 0 && s->vm >= 0) fd = open(p, O_RDONLY | O_CLOEXEC | O_NOCTTY | O_NONBLOCK);
+    struct stat st;
+    if (fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode)) {
+        /* the name, at most VM_TEXT_MAX - 1 bytes: a long one keeps its start (on a character) and its extension;
+         * lord-vm makes it safe for the guest */
+        const char *base = strrchr(p, '/') + 1;
+        char name[VM_TEXT_MAX];
+        size_t bl = strlen(base);
+        if (bl < sizeof name) memcpy(name, base, bl + 1);
+        else {
+            const char *dot = strrchr(base, '.');
+            size_t el = dot && strlen(dot) <= 16 ? strlen(dot) : 0, hl = sizeof name - 1 - el;
+            while (hl > 0 && ((unsigned char)base[hl] & 0xc0) == 0x80) hl--;
+            memcpy(name, base, hl);
+            memcpy(name + hl, base + bl - el, el);
+            name[hl + el] = 0;
+        }
+        if (bl && name[0]) {
+            VmMsg m = vm_msg(VM_FILE, ++s->seq, mode, pw, pc, pd, name);
+            if (!vm_send(s->vm, &m, fd)) {
+                q = m.seq;
+                s->fx[slot].seq = q; s->fx[slot].state = 1; s->fx[slot].pct = 0; s->fx[slot].via = 0; s->fx[slot].open = mode; s->fx[slot].how = 0; s->fx[slot].size = (long long)st.st_size;
+                snprintf(s->fx[slot].name, sizeof s->fx[slot].name, "%s", name);
+                s->fx[slot].msg[0] = 0;
+                s->fx_changes++;
+            }
+        }
+    }
+    if (fd >= 0) close(fd);
+    if (p) JS_FreeCString(c, p);
+    return JS_NewUint32(c, q);
+}
+static JSValue f_files(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    JSValue a = JS_NewArray(c);
+    if (!s) return a;
+    uint32_t k = 0;
+    for (int i = 0; i < 16; i++) {
+        if (!s->fx[i].state) continue;
+        /* lord-vm is gone: what it had is lost */
+        if (s->fx[i].state == 1 && s->vm < 0) { s->fx[i].state = 3; snprintf(s->fx[i].msg, sizeof s->fx[i].msg, "the machine stopped"); }
+        JSValue o = JS_NewObject(c);
+        set_int(c, o, "id", (int)s->fx[i].seq);
+        set_str(c, o, "name", s->fx[i].name);
+        JS_SetPropertyStr(c, o, "size", JS_NewInt64(c, s->fx[i].size));
+        set_int(c, o, "pct", s->fx[i].pct);
+        set_str(c, o, "state", s->fx[i].state == 1 ? "copying" : s->fx[i].state == 2 ? "done" : "failed");
+        set_str(c, o, "message", s->fx[i].msg);
+        set_str(c, o, "via", s->fx[i].via ? "transfer" : "agent");
+        JS_SetPropertyStr(c, o, "open", JS_NewBool(c, s->fx[i].open == 1));
+        /* a drop on an apps mode window: how the guest took it */
+        static const char *const HOW[] = { "", "folder", "window", "clipboard" };
+        if (s->fx[i].open == 2) { JS_SetPropertyStr(c, o, "place", JS_TRUE); set_str(c, o, "placed", HOW[s->fx[i].how]); }
+        JS_SetPropertyUint32(c, a, k++, o);
+        if (s->fx[i].state != 1) s->fx[i].state = 0;
+    }
+    return a;
+}
+
+/* transferFolder(dir) → the machine's transfer folder (6.7.1), made and claimed for it as lord-vm does at its start
+ * (vm_transfer_claim: a folder of that name that's another machine's moves aside), or null; for Open Transfer Folder
+ * before the first start. transferAside(dir) → bool: before the machine goes to the Trash, its own transfer folder moves
+ * aside to "<name> (old YYYY-MM-DD)" (kept, never deleted), so a new machine of that name doesn't get its files */
+static int machine_id_of(const char *dir, char id[37]) {
+    VmMachine m;
+    char err[256];
+    if (vm_machine_load(dir, &m, err, sizeof err) != VM_OK) return -1;
+    memcpy(id, m.id, 37);
+    return 0;
+}
+static JSValue f_transfer_folder(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX], xp[PATH_MAX], id[37], moved[NAME_MAX + 1];
+    if (argc < 1 || machine_dir(c, argv[0], dir, sizeof dir) || machine_id_of(dir, id)) return JS_NULL;
+    if (vm_transfer_claim(dir, id, xp, sizeof xp, moved, sizeof moved)) return JS_NULL;
+    struct stat st;
+    if (lstat(xp, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) return JS_NULL;
+    return JS_NewString(c, xp);
+}
+static JSValue f_transfer_aside(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX], id[37], moved[NAME_MAX + 1];
+    if (argc < 1 || machine_dir(c, argv[0], dir, sizeof dir) || machine_id_of(dir, id)) return JS_FALSE;
+    return JS_NewBool(c, vm_transfer_aside(dir, id, moved, sizeof moved) >= 0);
 }
 
 /* cdrom(id, path | null) → bool: a disc into the running machine's drive (the file is opened here, for the person, and
@@ -1512,11 +2921,66 @@ static JSValue f_wheel(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     }
     return JS_UNDEFINED;
 }
+/* "Capture mouse" (docs/VIRTUALIZATION.md 6.25): the mouse's motion straight to lord-vmdisplay, no JavaScript in between */
+static void cap_motion(void *ud, int dx, int dy) {
+    Sess *s = ud;
+    while (dx || dy) {
+        int a = dx > VD_REL_MAX ? VD_REL_MAX : dx < -VD_REL_MAX ? -VD_REL_MAX : dx, b = dy > VD_REL_MAX ? VD_REL_MAX : dy < -VD_REL_MAX ? -VD_REL_MAX : dy;
+        vdsend(s, VD_REL, a, b);
+        dx -= a; dy -= b;
+    }
+}
+/* buttons and the wheel straight to the guest, with no hit test: whatever the guest says about its pointer, a click
+ * never lands on anything of this computer's (pointerlock.h) */
+static void cap_button(void *ud, int b, int down) {
+    Sess *s = ud;
+    int q = b == 0 ? VDB_LEFT : b == 1 ? VDB_MIDDLE : b == 2 ? VDB_RIGHT : b == 3 ? VDB_SIDE : b == 4 ? VDB_EXTRA : -1;
+    if (q >= 0) vdsend(s, VD_BUTTON, q, down ? 1 : 0);
+}
+static void cap_wheel(void *ud, int dy, int dx) {
+    Sess *s = ud;
+    dy = dy < -32 ? -32 : dy > 32 ? 32 : dy;
+    dx = dx < -32 ? -32 : dx > 32 ? 32 : dx;
+    if (dy || dx) vdsend(s, VD_WHEEL, dy, dx);
+}
+/* ended by the window, ❖Esc or Ctrl+Alt, the picture's node going away or the input leaving: the tablet again, and
+ * nothing left held in the guest (a button pressed while captured is released here, out of the window's sight) */
+static void cap_ended(void *ud, int why) {
+    Sess *s = ud;
+    vdsend(s, VD_RELEASE_ALL, 0, 0);
+    s->captured = 0;
+    s->cap_ends++;
+    s->cap_why = why;
+    vdsend(s, VD_CAPTURE, 0, 0);
+    ask(s, VM_CAPTURE, 0);
+}
+/* capture(sid, on, node) → true when captured (on) or released: node is the picture's box (the pointer stays inside it).
+ * Only a running machine with its picture; apps mode never asks (vmwindow.jsx) */
+static JSValue f_capture(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s) return JS_FALSE;
+    if (!JS_ToBool(c, argv[1])) { ptrlock_end_owner(s); return JS_TRUE; }
+    int node = argc >= 3 ? ival(c, argv[2]) : 0;
+    if (s->captured) return JS_NewBool(c, !ptrlock_retarget(s, node));     /* the window was rebuilt (full screen) */
+    if (s->vd < 0 || !s->media || s->vm < 0 || (s->state != VS_RUNNING && s->state != VS_PAUSED) || node <= 0) return JS_FALSE;
+    PtrLockSink k = { .motion = cap_motion, .ended = cap_ended, .ud = s, .button = cap_button, .wheel = cap_wheel };
+    /* lord-vmdisplay first: from now on it takes only relative motion */
+    vdsend(s, VD_CAPTURE, 1, 0);
+    if (ptrlock_begin(node, &k)) { vdsend(s, VD_CAPTURE, 0, 0); return JS_FALSE; }
+    s->captured = 1;
+    ask(s, VM_CAPTURE, 1);
+    return JS_TRUE;
+}
 static JSValue f_release(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; Sess *s = get(c, argv[0]); if (s) vdsend(s, VD_RELEASE_ALL, 0, 0); return JS_UNDEFINED; }
 static JSValue f_resize(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
     int w = s ? ival(c, argv[1]) : 0, h = s ? ival(c, argv[2]) : 0;
-    if (s && w >= 320 && h >= 200 && w <= (int)VD_MAX_DIM && h <= (int)VD_MAX_DIM) vdsend(s, VD_RESIZE, w, h);
+    if (s && w >= 320 && h >= 200 && w <= (int)VD_MAX_DIM && h <= (int)VD_MAX_DIM) {
+        vdsend(s, VD_RESIZE, w, h);
+        /* and to lord-vm: a guest whose helper sets its own display's size (Windows) gets it from there */
+        if (s->vm >= 0) { VmMsg m = vm_msg(VM_DISPLAY_SIZE, ++s->seq, w, h, 0, 0, NULL); vm_send(s->vm, &m, -1); }
+    }
     return JS_UNDEFINED;
 }
 static JSValue f_rate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -1546,8 +3010,97 @@ static JSValue f_close(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
     if (m) media_src_close(m);
     free(s->cur);
+    win_free(s);
     memset(s, 0, sizeof *s);
     return JS_UNDEFINED;
+}
+
+/* one of sound()'s device names: "" (the default) or a node.name as machine.json keeps it; 0 ok (out set or kept), -1 refused */
+static int snd_dev_arg(JSContext *c, JSValueConst o, const char *key, char *out, size_t n) {
+    JSValue v = JS_GetPropertyStr(c, o, key);
+    int r = 0;
+    if (JS_IsString(v)) {
+        const char *x = JS_ToCString(c, v);
+        if (x && (!*x || vm_sound_dev_valid(x)) && strlen(x) < n) snprintf(out, n, "%s", x); else r = -1;
+        if (x) JS_FreeCString(c, x);
+    } else if (!JS_IsUndefined(v)) r = -1;
+    JS_FreeValue(c, v);
+    return r;
+}
+
+/* sound(dir, { sound, volume, microphone, output, input }) → { live, job }: the machine's sound choices (6.9); output and
+ * input are a sound device's node.name (as lord.sound's state lists them) or "" for the system's default. A machine whose window is
+ * here gets them now (this side plays and records) and its lord-vm writes machine.json (VM_SOUND); one running without
+ * a window gets VM_SOUND through its runtime socket; one that is off gets lord-vm --set (job). null when refused. */
+static JSValue f_sound(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    VmMachine m;
+    if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir) || vm_machine_load(dir, &m, NULL, 0)) return JS_NULL;
+    int so = m.sound, vo = m.volume, mi = m.microphone, ok = 1;
+    char out[VM_SOUND_DEV_MAX + 1], in[VM_SOUND_DEV_MAX + 1], devs[2 * VM_SOUND_DEV_MAX + 2];
+    memcpy(out, m.sound_out, sizeof out);
+    memcpy(in, m.sound_in, sizeof in);
+    if (snd_dev_arg(c, argv[1], "output", out, sizeof out) || snd_dev_arg(c, argv[1], "input", in, sizeof in)) return JS_NULL;
+    snprintf(devs, sizeof devs, "%s\t%s", out, in);
+    JSValue v = JS_GetPropertyStr(c, argv[1], "sound");
+    if (JS_IsBool(v)) so = JS_ToBool(c, v); else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "microphone");
+    if (JS_IsBool(v)) mi = JS_ToBool(c, v); else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "volume");
+    if (JS_IsNumber(v)) { double d = 0; JS_ToFloat64(c, &d, v); if (d >= 0 && d <= 100) vo = (int)(d + 0.5); else ok = 0; } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    if (!ok) return JS_NULL;
+    int live = 0, job = 0;
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *s = &sess[i];
+        if (!s->used || s->vm < 0 || s->ended || strcmp(s->dir, dir)) continue;
+        VmMsg q = vm_msg(VM_SOUND, ++s->seq, so, vo, mi, 1, devs);
+        if (vm_send(s->vm, &q, -1)) continue;
+        s->snd_on = so; s->snd_vol = vo; s->mic_allowed = mi;
+        memcpy(s->snd_out, out, sizeof s->snd_out);
+        memcpy(s->snd_in, in, sizeof s->snd_in);
+        snd_apply(s);
+        live = 1;
+    }
+    if (!live) {
+        /* running without a window here: its runtime socket, one request, its answer awaited briefly */
+        const char *rt = getenv("XDG_RUNTIME_DIR");
+        char base[256], path[sizeof ((struct sockaddr_un *)0)->sun_path];
+        if (rt && rt[0] == '/') snprintf(base, sizeof base, "%s", rt); else snprintf(base, sizeof base, "/run/user/%u", (unsigned)getuid());
+        int fd = (size_t)snprintf(path, sizeof path, "%s/lordos-vm/%s.sock", base, m.id) < sizeof path ? socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0) : -1;
+        struct sockaddr_un a = { .sun_family = AF_UNIX };
+        if (fd >= 0) memcpy(a.sun_path, path, strlen(path) + 1);
+        if (fd >= 0 && !connect(fd, (struct sockaddr *)&a, sizeof a)) {
+            VmMsg q = vm_msg(VM_SOUND, 1, so, vo, mi, 1, devs);
+            if (!vm_send(fd, &q, -1)) {
+                for (int k = 0; k < 8; k++) {
+                    struct pollfd pf = { fd, POLLIN, 0 };
+                    if (poll(&pf, 1, 60) <= 0) continue;
+                    VmMsg r;
+                    int rfd = -1, got = vm_recv(fd, &r, &rfd);
+                    if (rfd >= 0) close(rfd);
+                    if (got <= 0) break;
+                    if (r.type == VM_REPLY && r.seq == 1) { live = r.a == VME_OK; break; }
+                }
+            }
+        }
+        if (fd >= 0) close(fd);
+    }
+    if (!live) {
+        char sv[8];
+        snprintf(sv, sizeof sv, "%d", vo);
+        char *args[] = { "lord-vm", "--set", dir, "--sound", so ? "on" : "off", "--volume", sv, "--microphone", mi ? "on" : "off",
+                         "--sound-out", out[0] ? out : "default", "--sound-in", in[0] ? in : "default", NULL };
+        job = spawn_job(args, dir);
+        if (!job) return JS_NULL;
+    }
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "live", JS_NewBool(c, live));
+    set_int(c, o, "job", job);
+    return o;
 }
 
 /* a machine with no window here (started elsewhere, or kept running): one request through its runtime socket */
@@ -1578,6 +3131,7 @@ static JSValue f_stop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         if (r.type == VM_REPLY && r.seq == (uint32_t)seq) break;
     }
     close(s->vm);
+    win_free(s);
     memset(s, 0, sizeof *s);
     return JS_NewBool(c, ok);
 }
@@ -1619,8 +3173,9 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    media_src_need_cpu(m);              /* a picture shown as a texture: read back now */
     if (!m || !m->px || m->w < 1 || m->h < 1) return JS_FALSE;
-    return JS_NewBool(c, !vm_thumb_save(s->dir, m->px, m->w, m->h, VM_THUMB_W));
+    return JS_NewBool(c, !vm_thumb_save_async(s->dir, m->px, m->w, m->h, VM_THUMB_W));
 }
 
 /* screenshot(session) → the file's path, or "": the guest's picture at its size, in ~/Pictures/Screenshots as
@@ -1630,6 +3185,7 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     const char *home = getenv("HOME");
+    media_src_need_cpu(m);
     if (!m || !m->px || !home || home[0] != '/') return JS_NewString(c, "");
     char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
     snprintf(dir, sizeof dir, "%s/Pictures", home); mkdir(dir, 0755);
@@ -1654,17 +3210,165 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
 
 /* agent(session, 'install'|'timesync'|'shutdown') → bool: a guest agent request (poll's agent.install says how
  * Install went) */
+/* WinFsp's installer for agent(id, 'transfer', path): only a file the admin helper keeps in the machines' image store,
+ * root's, named by its SHA-256 (images/<sha256>.iso), whose record there says it's the catalog's "winfsp" entry. The
+ * descriptor, and the hash as text, go to lord-vm, which hashes the file again; the guest checks its signature too */
+#define VM_IMAGE_STORE "/var/lib/lordos/machines/images/"
+static int winfsp_file(JSContext *c, JSValueConst v, char sha[65]) {
+    const char *p = JS_IsString(v) ? JS_ToCString(c, v) : NULL;
+    size_t sl = strlen(VM_IMAGE_STORE);
+    int ok = p && !strncmp(p, VM_IMAGE_STORE, sl) && strlen(p) == sl + 68 && !strcmp(p + sl + 64, ".iso") && strspn(p + sl, "0123456789abcdef") == 64;
+    if (ok) { memcpy(sha, p + sl, 64); sha[64] = 0; }
+    if (p) JS_FreeCString(c, p);
+    if (!ok) return -1;
+    char info[sizeof VM_IMAGE_STORE + 80], buf[512];
+    snprintf(info, sizeof info, VM_IMAGE_STORE "%s.json", sha);
+    int fd = open(info, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    struct stat st;
+    ssize_t n = fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    JDoc d;
+    if (n <= 0 || json_parse(buf, (size_t)n, &d, NULL, 0)) return -1;
+    const char *id = json_str(d.root, "id");
+    ok = id && !strcmp(id, "winfsp");
+    json_free(&d);
+    if (!ok) return -1;
+    snprintf(info, sizeof info, VM_IMAGE_STORE "%s.iso", sha);
+    fd = open(info, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY);
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_uid != 0 || (st.st_mode & 022)) { if (fd >= 0) close(fd); return -1; }
+    return fd;
+}
+
 static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
     const char *w = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
-    int a = !w ? 0 : !strcmp(w, "install") ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN : 0;
+    int a = !w ? 0 : !strcmp(w, "install") ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN :
+            !strcmp(w, "transfer") ? VAG_TRANSFER : 0;
     if (w) JS_FreeCString(c, w);
     if (!s || !a || s->vm < 0) return JS_FALSE;
+    if (a == VAG_TRANSFER) {
+        /* the transfer folder (6.7.1): looked at again in the guest, or (a path) WinFsp installed in a Windows guest */
+        char sha[65] = "";
+        int fd = -1;
+        if (argc >= 3 && !JS_IsUndefined(argv[2]) && !JS_IsNull(argv[2]) && (fd = winfsp_file(c, argv[2], sha)) < 0) return JS_FALSE;
+        VmMsg m = vm_msg(VM_AGENT, ++s->seq, VAG_TRANSFER, 0, 0, 0, sha);
+        int bad = vm_send(s->vm, &m, fd);
+        if (fd >= 0) close(fd);
+        if (bad) return JS_FALSE;
+        s->xf_seq = m.seq; s->xf_result = 1; s->xf_msg[0] = 0;
+        return JS_TRUE;
+    }
+    /* one install at a time: a click while one is on its way (lord-vm answers when the guest's script ended) is the
+     * same request, not another run of the script */
+    if (a == VAG_INSTALL && s->ag_seq) return JS_TRUE;
     int q = ask(s, VM_AGENT, a);
     if (q < 0) return JS_FALSE;
     if (a == VAG_INSTALL) { s->ag_seq = (uint32_t)q; s->ag_result = 1; s->ag_msg[0] = 0; }
     return JS_TRUE;
+}
+
+/* ---- apps mode (docs/VIRTUALIZATION.md 7.2) ----
+ * apps(session, on) → bool: asks the guest's helper to hide its desktop and list its windows (lord-vm refuses unless the
+ * helper said "windows"). windows(session) → [{ id, x, y, w, h, focused, minimized, topmost, owner, pid, title, app }]
+ * top to bottom, in the guest's pixels (poll's windowsSeq counts changes). winIcon(session, id) → { width, height, data }
+ * (RGBA, at most 64 × 64) or null (iconsSeq). winAct(session, id, 'focus'|'close'|'minimize'|'restore'|'move'[, x, y, w,
+ * h]) → bool. guestApps(session) → [{ name, token }] (guestAppsSeq); launch(session, token) → bool: lord-vm sends only a
+ * token the guest listed. Everything the guest said is shown as text only. */
+static JSValue f_apps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0) return JS_FALSE;
+    int on = JS_ToBool(c, argv[1]) > 0;
+    s->apps_mode = on;
+    return JS_NewBool(c, ask(s, VM_APPS, on) >= 0);
+}
+
+static JSValue f_windows(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    JSValue a = JS_NewArray(c);
+    if (!s || !s->wins) return a;
+    for (int i = 0; i < s->wins->n; i++) {
+        const LagWinEntry *w = &s->wins->w[i];
+        JSValue o = JS_NewObject(c);
+        JS_SetPropertyStr(c, o, "id", JS_NewFloat64(c, w->id));
+        set_int(c, o, "x", w->x); set_int(c, o, "y", w->y); set_int(c, o, "w", w->w); set_int(c, o, "h", w->h);
+        JS_SetPropertyStr(c, o, "focused", JS_NewBool(c, w->flags & LAGW_FOCUSED));
+        JS_SetPropertyStr(c, o, "minimized", JS_NewBool(c, w->flags & LAGW_MINIMIZED));
+        JS_SetPropertyStr(c, o, "topmost", JS_NewBool(c, w->flags & LAGW_TOPMOST));
+        JS_SetPropertyStr(c, o, "owner", JS_NewFloat64(c, w->owner));
+        JS_SetPropertyStr(c, o, "pid", JS_NewFloat64(c, w->pid));
+        set_str(c, o, "title", w->title);
+        set_str(c, o, "app", w->app);
+        JS_SetPropertyUint32(c, a, (uint32_t)i, o);
+    }
+    return a;
+}
+
+static JSValue f_win_icon(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    double idd = 0;
+    if (!s || JS_ToFloat64(c, &idd, argv[1]) || idd < 1 || idd > 4294967295.0) return JS_NULL;
+    for (int i = 0; i < LAG_WIN_MAX; i++) {
+        if (!s->icons[i].rgba || s->icons[i].id != (uint32_t)idd) continue;
+        JSValue o = JS_NewObject(c);
+        set_int(c, o, "width", s->icons[i].w);
+        set_int(c, o, "height", s->icons[i].h);
+        JS_SetPropertyStr(c, o, "data", JS_NewArrayBufferCopy(c, s->icons[i].rgba, (size_t)s->icons[i].w * s->icons[i].h * 4));
+        return o;
+    }
+    return JS_NULL;
+}
+
+static JSValue f_win_act(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
+    double idd = 0;
+    if (!s || s->vm < 0 || JS_ToFloat64(c, &idd, argv[1]) || idd < 1 || idd > 4294967295.0) return JS_FALSE;
+    const char *w = JS_ToCString(c, argv[2]);
+    int a = !w ? 0 : !strcmp(w, "focus") ? LAGA_FOCUS : !strcmp(w, "close") ? LAGA_CLOSE : !strcmp(w, "minimize") ? LAGA_MINIMIZE
+          : !strcmp(w, "restore") ? LAGA_RESTORE : !strcmp(w, "move") ? LAGA_MOVE : 0;
+    if (w) JS_FreeCString(c, w);
+    if (!a) return JS_FALSE;
+    char text[64] = "";
+    if (a == LAGA_MOVE) {
+        if (argc < 7) return JS_FALSE;
+        int x = ival(c, argv[3]), y = ival(c, argv[4]), ww = ival(c, argv[5]), hh = ival(c, argv[6]);
+        if (!lag_rect_ok(x, y, ww, hh)) return JS_FALSE;
+        snprintf(text, sizeof text, "%d %d %d %d", x, y, ww, hh);
+    }
+    VmMsg m = vm_msg(VM_WINACT, ++s->seq, (int32_t)(uint32_t)idd, a, 0, 0, text);
+    return JS_NewBool(c, !vm_send(s->vm, &m, -1));
+}
+
+static JSValue f_guest_apps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    JSValue a = JS_NewArray(c);
+    if (!s || !s->gapps) return a;
+    for (int i = 0; i < s->gapps->n; i++) {
+        JSValue o = JS_NewObject(c);
+        set_str(c, o, "name", s->gapps->a[i].name);
+        set_str(c, o, "token", s->gapps->a[i].token);
+        JS_SetPropertyUint32(c, a, (uint32_t)i, o);
+    }
+    return a;
+}
+
+static JSValue f_launch(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0 || !s->gapps) return JS_FALSE;
+    const char *tok = JS_ToCString(c, argv[1]);
+    /* the app's place in the list lord-vm passed on, with that list's generation: lord-vm sends the guest its own token */
+    int at = -1;
+    for (int i = 0; tok && i < s->gapps->n && at < 0; i++) if (!strcmp(s->gapps->a[i].token, tok)) at = i;
+    if (tok) JS_FreeCString(c, tok);
+    if (at < 0 || s->gapps_gen <= 0) return JS_FALSE;
+    VmMsg m = vm_msg(VM_LAUNCH, ++s->seq, at, s->gapps_gen, 0, 0, NULL);
+    return JS_NewBool(c, !vm_send(s->vm, &m, -1));
 }
 
 /* clipboardSend(session, text) → bool: the host's clipboard text for the guest, in a sealed memfd (lord-vm passes it
@@ -1686,10 +3390,18 @@ static JSValue f_clip_send(JSContext *c, JSValueConst t, int argc, JSValueConst 
     if (txt) JS_FreeCString(c, txt);
     return JS_NewBool(c, ok);
 }
+/* an answer bound to what was shown: clipboardApply/clipboardTake(session, seq) refuse when the guest's clipboard has
+ * changed since the copy numbered seq (ask mode: the person said yes to that preview, not to whatever came after) */
+static int clip_seq_ok(JSContext *c, Sess *s, int argc, JSValueConst *argv) {
+    if (argc < 2 || JS_IsUndefined(argv[1])) return 1;
+    int32_t seq = 0;
+    return !JS_ToInt32(c, &seq, argv[1]) && seq == s->clip_seq;
+}
+
 static JSValue f_clip_take(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     Sess *s = get(c, argv[0]);
-    return s && s->clip_in ? JS_NewString(c, s->clip_in) : JS_NewString(c, "");
+    return s && s->clip_in && clip_seq_ok(c, s, argc, argv) ? JS_NewString(c, s->clip_in) : JS_NewString(c, "");
 }
 
 static uint64_t clip_hash(const void *p, size_t n) {
@@ -1724,9 +3436,9 @@ static char *html_text(const char *h, size_t n) {
  * app) and arrives a moment later; rich text goes with its text (wl_clip_set_html); plain text is left to the app
  * (clipboard.set, which keeps the history's ways). */
 static JSValue f_clip_apply(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     Sess *s = get(c, argv[0]);
-    if (!s) return JS_NewString(c, "");
+    if (!s || !clip_seq_ok(c, s, argc, argv)) return JS_NewString(c, "");
     if (s->clip_png) {
         const char *rt = getenv("XDG_RUNTIME_DIR");
         char dir[PATH_MAX], dst[PATH_MAX + 64], tmp[PATH_MAX + 64];
@@ -1762,33 +3474,42 @@ static JSValue f_clip_apply(JSContext *c, JSValueConst t, int argc, JSValueConst
     return JS_NewString(c, "");
 }
 
-/* clipboardSendHost(session) → bool: this computer's clipboard for the guest, as it is now: a picture, or text with its
- * rich text when an app gave some; never a secret (Passwords, password fields). Not sent again if it's what went
- * either way last. lord-vm checks it all again and sends it on only the ways machine.json allows. */
+/* clipboardSendHost(session) → bool: this computer's clipboard for the guest, as it is now (host_clip: never a secret).
+ * Not again if it's what went either way last. A guest helper that takes it on demand (VAC_CLIP_LAZY) gets only an
+ * offer, which forms there are, and asks for one when a program there pastes (VM_CLIP_REQ, answered while the machine
+ * is in use); an older one gets it all at once. lord-vm checks it all again and sends it on only the ways machine.json
+ * allows. The app calls it only when the person turns to the machine (its window to the front, a click on it). */
 static JSValue f_clip_send_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     Sess *s = get(c, argv[0]);
     if (!s || s->vm < 0) return JS_FALSE;
     AgClip cx;
-    memset(&cx, 0, sizeof cx);
     uint64_t h;
-    if (wl_clip_is_image()) {
-        size_t n = 0;
-        const unsigned char *png = wl_clip_png(&n);
-        if (!png || !n || n > AG_PNG_MAX || wl_clip_image_sensitive()) return JS_FALSE;
-        if (wl_clip_image_gen() == s->clip_skip_img) { s->clip_skip_img = 0; s->clip_last = clip_hash(png, n); return JS_FALSE; }
-        cx.png = png; cx.png_n = (uint32_t)n;
-        h = clip_hash(png, n);
-    } else {
-        const char *txt = term_clipboard();
-        size_t tn = strlen(txt), hn = 0;
-        if (!tn || tn > AG_TEXT_MAX || term_clipboard_sensitive()) return JS_FALSE;
-        const char *html = wl_clip_html(&hn);
-        cx.text = (const uint8_t *)txt; cx.text_n = (uint32_t)tn;
-        if (html && hn <= AG_TEXT_MAX) { cx.html = (const uint8_t *)html; cx.html_n = (uint32_t)hn; }
-        h = cx.html ? clip_hash(html, hn) : clip_hash(txt, tn);
-    }
+    if (host_clip(&cx, &h)) return JS_FALSE;
+    if (cx.png && wl_clip_image_gen() == s->clip_skip_img) { s->clip_skip_img = 0; s->clip_last = h; return JS_FALSE; }
     if (h == s->clip_last) return JS_FALSE;
+    /* ask mode is enforced here too: a full push (a helper that can't ask for the data) needs the hash the person
+     * approved (clipboardSendHost(session, approvedHash)), and it must still be this computer's clipboard. A guest that
+     * flips its on-demand capability can't turn an offer into a push the person never saw */
+    if (s->clip_ask && !(s->ag_caps & VAC_CLIP_LAZY)) {
+        char hx[24];
+        snprintf(hx, sizeof hx, "%016llx", (unsigned long long)h);
+        const char *ap = argc >= 2 && JS_IsString(argv[1]) ? JS_ToCString(c, argv[1]) : NULL;
+        int approved = ap && !strcmp(ap, hx);
+        if (ap) JS_FreeCString(c, ap);
+        if (!approved) return JS_FALSE;
+    }
+    if (s->ag_caps & VAC_CLIP_LAZY) {
+        /* a new generation per offer: a request for an older one is refused as stale */
+        s->offer_gen = s->offer_gen >= 0x7ffffff0u ? 1 : s->offer_gen + 1;
+        s->offer_forms = clip_forms(&cx);
+        s->offer_hash = h;
+        for (int f = AGF_TEXT; f <= AGF_PNG; f++) if (s->ask_gen[f]) { clip_deny(s, s->ask_gen[f], f, VCD_STALE); s->ask_gen[f] = 0; }
+        VmMsg m = vm_msg(VM_CLIP_OFFER, ++s->seq, (int)s->offer_gen, s->offer_forms, s->clip_ask ? AGO_ASK : 0, 0, NULL);
+        int ok = !vm_send(s->vm, &m, -1);
+        if (ok) s->clip_last = h;
+        return JS_NewBool(c, ok);
+    }
     size_t n = ag_clipx_size(&cx);
     uint8_t *buf = malloc(n);
     int ok = 0;
@@ -1804,6 +3525,95 @@ static JSValue f_clip_send_host(JSContext *c, JSValueConst t, int argc, JSValueC
     }
     if (ok) s->clip_last = h;
     return JS_NewBool(c, ok);
+}
+
+/* clipboardGate(session, inUse, ask): the app says whether the person is using the machine now (its window, or one of
+ * its apps mode windows, in front; a click on it). Going out of use keeps it open CLIP_GRACE_MS more, so a paste just
+ * after switching works. ask: "ask before each paste" (machine.json clipboard_ask): requests wait for clipboardAnswer */
+static JSValue f_clip_gate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s) return JS_FALSE;
+    int on = JS_ToBool(c, argv[1]);
+    if (s->gate_on && !on) s->gate_until = mono_ms() + CLIP_GRACE_MS;
+    if (on) s->gate_until = 0;
+    s->gate_on = on;
+    if (argc >= 3) s->clip_ask = JS_ToBool(c, argv[2]);
+    return JS_TRUE;
+}
+
+/* clipboardAnswer(session, gen, yes) → bool: the person's answer (ask mode) to the requests waiting for that offer:
+ * every form asked for it at once (a program that asks for several forms of one copy is asked about once) */
+static JSValue f_clip_answer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
+    uint32_t gen = 0;
+    if (!s || JS_ToUint32(c, &gen, argv[1]) || !gen) return JS_FALSE;
+    int yes = JS_ToBool(c, argv[2]), any = 0;
+    for (int f = AGF_TEXT; f <= AGF_PNG; f++) {
+        if (s->ask_gen[f] != gen) continue;
+        s->ask_gen[f] = 0;
+        any = 1;
+        if (yes) clip_give(s, gen, f); else clip_deny(s, gen, f, VCD_DECLINED);
+    }
+    return JS_NewBool(c, any);
+}
+
+/* a line of text to show the person: the first max characters, control characters and line ends as spaces */
+static JSValue preview_text(JSContext *c, const char *p, size_t n, size_t max) {
+    char out[400];
+    size_t k = 0, chars = 0;
+    for (size_t i = 0; i < n && k + 8 < sizeof out && chars < max; ) {
+        unsigned char ch = (unsigned char)p[i];
+        size_t l = ch < 0x80 ? 1 : (ch >> 5) == 6 ? 2 : (ch >> 4) == 14 ? 3 : 4;
+        if (i + l > n) break;
+        if (ch < 0x20 || ch == 0x7f) { if (k && out[k - 1] != ' ') out[k++] = ' '; i++; continue; }
+        memcpy(out + k, p + i, l);
+        k += l; i += l; chars++;
+    }
+    while (k && out[k - 1] == ' ') k--;
+    out[k] = 0;
+    JSValue v = JS_NewString(c, out);
+    return v;
+}
+
+/* clipboardPreview(session, 'host' | 'guest') → { kind: 'text' | 'html' | 'image', text, w, h, fresh } or null: what a
+ * paste into the machine would give it (this computer's clipboard; never a secret), or what the guest copied last
+ * (waiting for clipboardApply), for the ask mode's bar. fresh: not what went either way last */
+static JSValue f_clip_preview(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 1 ? get(c, argv[0]) : NULL;
+    if (!s) return JS_NULL;
+    const char *which = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
+    int guest = which && !strcmp(which, "guest");
+    if (which) JS_FreeCString(c, which);
+    AgClip cx;
+    uint64_t h = 0;
+    char *tmp = NULL;
+    memset(&cx, 0, sizeof cx);
+    if (guest) {
+        if (s->clip_png) { cx.png = s->clip_png; cx.png_n = (uint32_t)s->clip_png_n; }
+        else if (s->clip_html) { cx.html = (const uint8_t *)s->clip_html; cx.html_n = (uint32_t)s->clip_html_n; }
+        if (s->clip_in) { cx.text = (const uint8_t *)s->clip_in; cx.text_n = (uint32_t)strlen(s->clip_in); }
+        if (!cx.png && !cx.html && !cx.text) return JS_NULL;
+    } else if (host_clip(&cx, &h)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    uint32_t w = 0, hh = 0;
+    if (cx.png && !ag_png_check(cx.png, cx.png_n, &w, &hh)) {
+        set_str(c, o, "kind", "image");
+        set_int(c, o, "w", w);
+        set_int(c, o, "h", hh);
+    } else {
+        set_str(c, o, "kind", cx.html ? "html" : "text");
+        if (!cx.text && cx.html) { tmp = html_text((const char *)cx.html, cx.html_n); if (tmp) { cx.text = (const uint8_t *)tmp; cx.text_n = (uint32_t)strlen(tmp); } }
+        JS_SetPropertyStr(c, o, "text", cx.text ? preview_text(c, (const char *)cx.text, cx.text_n, 80) : JS_NewString(c, ""));
+        free(tmp);
+    }
+    JS_SetPropertyStr(c, o, "fresh", JS_NewBool(c, guest || h != s->clip_last));
+    char hx[24];
+    snprintf(hx, sizeof hx, "%016llx", (unsigned long long)h);
+    set_str(c, o, "hash", hx);
+    return o;
 }
 
 /* console(session) → bool: asks lord-vm for the serial console's stream; poll's console is then the terminal session to
@@ -1844,6 +3654,7 @@ static JSValue f_record(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     const char *home = getenv("HOME");
+    media_src_need_cpu(m);              /* the recording reads the picture's memory from now on (gpu_show_ok) */
     if (!m || !m->px || m->w < 16 || m->h < 16 || !home || home[0] != '/' || s->rec) return JS_NewInt32(c, 0);
     char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
     snprintf(dir, sizeof dir, "%s/Pictures", home); mkdir(dir, 0755);
@@ -1916,6 +3727,7 @@ static JSValue f_start_detached(JSContext *c, JSValueConst t, int argc, JSValueC
     (void)t; (void)argc;
     char dir[PATH_MAX], creds[PATH_MAX];
     if (machine_dir(c, argv[0], dir, sizeof dir) || !machine_shares_ok(dir)) return JS_NewInt32(c, 0);
+    last_start = time(NULL);
     int have = !write_creds(creds, sizeof creds, dir);
     char *args[] = { "lord-vm", "--start", dir, "--detach", "--keep-running", have ? "--credentials-file" : NULL, creds, NULL };
     int id = spawn_job(args, dir);
@@ -2023,6 +3835,7 @@ static JSValue f_snap_take(JSContext *c, JSValueConst t, int argc, JSValueConst 
     snprintf(file, sizeof file, "%s.png", tag);
     Sess *s = argc >= 3 ? get(c, argv[2]) : NULL;
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    media_src_need_cpu(m);
     if (m && m->px && m->w > 0 && m->h > 0) vm_png_save(sd, file, m->px, m->w, m->h, 640);
     else {
         char from[PATH_MAX + 32], to[PATH_MAX + 96];
@@ -2477,18 +4290,21 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
-    JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
+    JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
-    JS_CFUNC_DEF("agent", 2, f_agent), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 1, f_clip_take),
-    JS_CFUNC_DEF("clipboardApply", 1, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 1, f_clip_send_host), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 2, f_clip_take),
+    JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 2, f_clip_send_host),
+    JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
-    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
+    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
+    JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act),
+    JS_CFUNC_DEF("guestApps", 1, f_guest_apps), JS_CFUNC_DEF("gpus", 0, f_gpus), JS_CFUNC_DEF("launch", 2, f_launch),
 };
 
 void js_vm_register(JSContext *c, JSValue lord) {

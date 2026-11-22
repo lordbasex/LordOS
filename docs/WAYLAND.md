@@ -25,7 +25,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 
 | Protocol | Version | What it does |
 |---|---|---|
-| `wl_compositor`, `wl_region` | 6 | surfaces; the buffer is copied on commit and released right away; `set_input_region` is applied on commit and the pointer hit test obeys it (`wlregion.h`). A surface with an empty region takes no input and the pointer goes to what is below: Firefox's content is such a subsurface, and GTK only knows the toplevel below it. `set_opaque_region` is ignored |
+| `wl_compositor`, `wl_region` | 6 | surfaces; the buffer is copied on commit (only its damage when the size stays, 0.8.9.5) and released right away; `set_buffer_transform` is applied; `set_input_region` is applied on commit and the pointer hit test obeys it (`wlregion.h`). A surface with an empty region takes no input and the pointer goes to what is below: Firefox's content is such a subsurface, and GTK only knows the toplevel below it. `set_opaque_region` is ignored |
 | `wl_shm` | (libwayland) | ARGB8888/XRGB8888 shared memory |
 | `wl_subcompositor` | 1 | subsurfaces (composited on top of their parent) |
 | `wl_output` | 4 | one per display: logical position, physical mode, scale rounded up, name and description (`DISPLAYS.md`) |
@@ -35,18 +35,22 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `zwp_pointer_gestures_v1` | 3 | touchpad gestures: pinch (zoom in Chromium, GTK, Firefox), swipe and hold (`wl_input.c`, see `TRACKPAD.md`) |
 | `wl_data_device_manager` | 3 | clipboard shared with LordOS's in both directions, files copied in Files as `text/uri-list` and `x-special/gnome-copied-files` (see below); drag and drop between Linux apps, from Files to a Linux app and from a Linux app to Files, with offers, actions and the drag icon, and with X11 apps through XDND (0.8.8.8; the Wayland side checked on VM 127, XDND still to check on the VM, see "Drag and drop") |
 | `zwp_primary_selection_device_manager_v1` | 1 | primary selection: select to copy, middle click to paste (0.8.3, see "X11 apps"); `set_selection` needs a recent click or key serial of the app's own, and LordOS's text fields and Terminal share it (0.8.8.8) |
-| `xdg_wm_base` | 6 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen) |
+| `xdg_wm_base` | 7 | windows (`xdg_toplevel`: title, move, resize, maximize, minimize, close, `set_parent` for dialogs) and popup menus (`xdg_popup` with `xdg_positioner`: anchor, gravity, flip and slide within the screen); `wm_capabilities` window menu, maximize (not while locked), fullscreen (not during a screen share) and minimize; `configure_bounds` with the work area of the window's display; `tiled_*` and (7) `constrained_*` states for a maximized or snapped window (0.8.9.5) |
 | `zxdg_exporter_v2`, `zxdg_importer_v2` (xdg-foreign) | 1 | a window exported as a handle that another process imports to put its dialog over it (`set_parent_of`); the file chooser portal takes it as `wayland:<handle>` (0.8.8.8, see "Dialogs") |
 | `xdg_wm_dialog_v1` | 1 | a toplevel says it is a dialog and whether it is modal: a modal one holds its parent's input (0.8.8.8, see "Dialogs") |
 | `zxdg_decoration_manager_v1` | 1 | the app picks who draws the frame: server side (Qt, foot, Kitty, Alacritty: the theme's frame) or client side (Chromium with its own bar), also while it's open (0.8.4) |
-| `wp_cursor_shape_manager_v1` | 1 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`) |
+| `wp_cursor_shape_manager_v1` | 2 | the app asks for the cursor by name (Chromium, GTK 4, Qt 6) and LordOS draws its own (`cursor.c`, see `WINDOWS.md`); 2 adds `dnd_ask` (the arrow) and `all_resize` (the move arrows) |
 | `org_kde_kwin_server_decoration_manager` | 1 | GTK 3's way to ask for the frame (Firefox, Mousepad; see "Who draws the frame") |
 | `zwp_idle_inhibit_manager_v1` | 1 | a video or presentation keeps the screen on while its surface is mapped (0.8.5, see the end of this page) |
 | `zwp_keyboard_shortcuts_inhibit_manager_v1` | 1 | a VM, remote desktop or game takes ❖, ⌥Tab and LordOS's other shortcuts while it has the keyboard, once the person allowed it; ❖Esc gives them back (0.8.8.8, checked on VM 127, `kbinhibit.c`, see "Keyboard shortcuts inhibit") |
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (0.8.8.8, checked on VM 127, `wl_textinput.c`, see "Input methods") |
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
-| `zwp_linux_dmabuf_v1` 4, `wp_presentation` 1, `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
+| `xdg_toplevel_icon_manager_v1` | 1 | a window's own icon, shown only when its app has no installed icon (an AppImage, Wine, a game); buffers copied, re-encoded and size-limited, names ignored (see "Window icons", 0.8.9.5) |
+| `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
+| `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
+| `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
+| `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 
 Windows enter the SDK's window manager (`sdk/wayland.js`) as the internal app `linux` (id
 `linux#<surface>`): the theme sees them like any other, with their title, focus, maximize,
@@ -1295,7 +1299,125 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   pipewire" without the daemon), `build/dbus-test` (fds sent with replies, in order), `build/pwguard-test` (a screen
   node is not a camera) and `tests/screencast_model_test.mjs` (the chooser's choices).
 
+## Frames, titles and damage (0.8.9.5, in development)
+
+The Wayland audit of 2026-11-22 (items 1–7, approved by the maintainer that day) made the compositor do less per app
+frame. `tests/wlperf_headless.sh` checks each part against a headless lord-server with `build/wlperf-client`
+(`tests/wlperf_client.c`); `tests/run_suites.sh` runs it.
+
+- **Titles.** `xdg_toplevel.set_title` (and an X11 window's `WM_NAME`, `wlx_set_title`) is compared with the title the
+  window has: the same one (once cut to its 255 bytes) is not news. A different one is noted and goes to JS at most once
+  per 16 ms per window, the last of a burst (`set_title`, `titles_flush`; `wl_title_wait` wakes the main loop for one
+  that waits). A terminal or a player that sets its title on every redraw re-rendered the theme's window list each
+  time. The stall detector now names the event of `__lordWayland` and `__lordTerm` lines (`js __lordWayland title`).
+  Measured with `wlperf-client titles`: the title it had set 1000 more times gives 0 events (1000 before); 1000
+  different titles in one burst give 2 (1000 before), `b999` last.
+- **Frame callbacks and presentation per display.** Each window has a main display: the one with most of it
+  (`outpick_main`, `src/wl/outpick.h`, computed with the enter/leave events once a frame; subsurfaces follow their
+  window). `main.c` passes `wl_frame_done` the displays that just got a frame or have none waiting for a flip, and a
+  window's callbacks go only with those of its own display; while its display waits for a flip they wait too
+  (`wl_wants_frame` stays on, so the loop runs again after that flip). Before, every window's callbacks went with any
+  display's frame: with a 60 Hz and a 144 Hz display, an app on the 60 Hz one drew about 198 frames a second of which 60
+  were shown (`build/outpick-test`, which runs three displays at 60, 60 and 144 Hz for a simulated second, since a
+  headless lord-server has one display: 61, 61 and 145 callbacks a second now). `wp_presentation` feedback is answered by
+  the flip of the window's display, with that display's time, vblank count and refresh (`wl_presented(key, …)`; a window
+  on no known display follows the main one); a headless lord-server now answers it at the end of each frame (it never
+  did: `wlperf-client frames 3` got 0 of 180 answered, now 180). `WlOutput.key` is main.c's index of each display.
+- **New content reaches only its displays (GPU path).** An app's new buffer is only a texture: no UI damage, but the
+  displays showing it must present again. `main.c` marked every GPU display (`wl_new`) for any app's frame, so a video on
+  one display made all three compose. Now `wl_new_content()` gives the displays it is on: the window's box and the
+  displays it was on at the last frame (`surf_keys`, `outpick_keys`), the one a fullscreen window covers, the drag icon's
+  and a menu's box; a window last drawn inside a transform (the Overview, the minimize effect) or not placed yet still
+  marks every display. `engine-test`'s damage suites (`test_damage_fuzz`, `test_damage_pipeline`) pass unchanged, and
+  `build/outpick-test` checks the keys of a box (one display, two, mirrored, none).
+- **xdg-shell polish.** `xdg_wm_base` 7: `wm_capabilities` now also offers the window menu (the theme's, at the app's
+  own bar) and fullscreen (withdrawn while a screen share refuses it, and offered again after); `configure_bounds` gives
+  the work area of the window's display (a new window: the display under the pointer), which the theme sends with
+  `lord.wayland.workAreas` (`sdk/wayland.js`); a maximized window is told every edge tiled and constrained, a window
+  snapped to a half, quarter or third the edges on its work area's border (`tiledEdges`, `sdk/snap.js`; the eighth
+  argument of `lord.wayland.state`). `zwp_linux_dmabuf_v1` 5 refuses planes with different modifiers
+  (`invalid_format`), `wp_presentation` 2 (feedback objects of the client's version), `wp_cursor_shape_manager_v1` 2
+  (`dnd_ask`, `all_resize`; a version 1 client asking for them gets `invalid_shape`). Checked with `WAYLAND_DEBUG` on
+  foot 1.21, FeatherPad (Qt 6.8) and zenity (GTK 4.18) against a headless lord-server: each binds what it knows (GTK 4
+  binds dmabuf 5), gets the four capabilities and `configure_bounds(1280, 690)` on a 1280 × 800 desktop, no protocol
+  error; `wlperf-client protocols` checks the versions, the capabilities and the bounds.
+- **Surface damage for shared memory.** `wl_surface.damage` (surface coordinates, through the buffer scale and the
+  viewport: `buftf_surface_damage`) and `damage_buffer` (buffer pixels) are kept as one box each and applied on commit
+  (`commit_damage`). A buffer of the same size, format and transform is copied only in that box (`copy_buffer`); the
+  texture gets only what changed since its last upload (`gpu_tex_pixels_rect`, `glTexSubImage2D` with
+  `GL_EXT_unpack_subimage`); on the CPU path only the box on screen is repainted (`damage_box`: a toplevel whose shape
+  didn't change, not fullscreen, not in a transform; anything else repaints the whole window as before). A commit with a
+  new buffer and no damage, or a new size, is all of it. `LORD_PAINT_VERIFY=1` compares every frame painted with only
+  that damage against a full repaint: `wlperf-client damage 30` gave 206 frames, 0 differing pixels. Measured headless
+  (CPU path, 1280 × 800, lord-server's CPU over 20 s): `wlperf-client damage 60` (a 10 × 10 square in a 640 × 480
+  window, 60 times a second) 1130–1250 ms before, 340 ms after; foot at 180 × 50 cells printing a few characters ten
+  times a second 1910–1920 ms before, 210–360 ms after (idle: 20–30 ms).
+- **Buffer transform.** `wl_surface.set_buffer_transform` is applied (it was ignored, so a turned buffer showed turned
+  and at the wrong size): shared memory and mapped dmabufs are copied upright (`buftf_copy`), so everything after the
+  copy is unchanged; a dmabuf drawn from its texture gets its corners' texture coordinates turned (`gpu_draw_uv`); the
+  logical size swaps for a quarter turn. The mapping is weston's and wlroots' (`buftf_point`); `build/buftf-test`
+  checks all eight transforms pixel by pixel, and `wlperf-client transform` a 200 × 100 buffer at 90° mapping as a
+  100 × 200 window. A transform out of range is `invalid_transform`.
+- **`wp_single_pixel_buffer_manager_v1` and `wp_alpha_modifier_v1`.** A single-pixel buffer is a `wl_buffer` of its own
+  kind (`spb_of`), taken as a 1 × 1 premultiplied pixel (a colour above its alpha is cut to it) and released at once;
+  the viewport stretches it like any buffer. The alpha multiplier is pending until commit, multiplies the surface's own
+  draw (CPU `blit_surface`, GPU `gpu_draw` at draw time, so a new opacity needs no UI repaint), not its subsurfaces, and
+  a new value repaints the whole window; destroying the object is `set_multiplier(UINT32_MAX)` from the next commit, and
+  using it after its surface is gone is `no_surface`. Both are generated from wayland-protocols 1.44 (`WL_MORE`) and
+  offered to every client, sandboxed ones too: they read nothing of other clients (`secctx_hidden` is unchanged).
+  Behind a window drawn with the multiplier on the GPU path is the compositor's black, not the desktop (the UI leaves a
+  hole there, as for any translucent app pixel). `wlperf-client protocols` binds both and shows a one-pixel window at
+  50 %.
+
+## Idle notifications (`ext_idle_notifier_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
+
+Chat apps show a person as away, and some apps pause work, with `ext-idle-notify-v1`: they ask to be told after N ms
+without input and again when the person is back. That says when someone is at the computer, so LordOS asks first.
+
+- **Whose decision.** An isolated LordOS app by its id; any other client by the identity lord-server checked when it
+  connected (`program:<path>` or `flatpak:<id>`, the same as the keyboard shortcuts permission, `kbinhibit.h`), never
+  by an app_id it set. Xwayland (it speaks for every X11 app), the login screen and a client with no identity are
+  never told. The answer is the `idle` permission in `permisos.json` (`PERM_IDLE`, `sec/perms.c`): not declarable in a
+  manifest (`perm_declarable`), refused to the broker (`BOP_PERM`), set by `lord.perms.set` only for those names, and
+  listed and changed in Settings → Privacy under Away from the computer.
+- **The prompt.** The first notification of an app with no decision makes lord-server emit `idlenotify`
+  (`{app, name, lpk}`, one prompt per app while it is up); `sdk/wayland.js` shows the system-drawn prompt
+  (`promptForServer`, perm `idle`) with the app's installed name and the checked identity under it, and the answer goes
+  back through `lord.wayland.idleAnswer(app, allow)`, which only answers a prompt lord-server is waiting on.
+- **Denied or undecided.** The global stays (clients that bind it unconditionally keep working), the notification
+  objects are made, and `idled` is never sent; a permission taken back while idled sends `resumed` once.
+- **Idle** is the time since lord-server's last activity for its own idle timers (`display_last_activity`, `hw/display.c`):
+  input, remote input, and every pass while a surface's idle inhibitor or a portal inhibit holds, so a video keeps
+  everyone "present". Version 1 only (version 2's input-only notifications ignore inhibitors).
+- **Tests.** `build/idlenotify-test` (the decision, idled and resumed, revoked while idled, an inhibitor holding) and
+  `wlperf-client idle` in `tests/wlperf_headless.sh`: the first notification asks and gets nothing before the answer,
+  an allowed one is told `idled`, a denied one never (`WLPERF_IDLE=deny`).
+
+## Window icons (`xdg_toplevel_icon_manager_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
+
+An app may hand its window an icon. LordOS's rule: **the official icon wins.** A window whose app has an installed icon
+(its `.desktop` entry, a Flatpak's exported one, an isolated or packaged LordOS app, a web app) always shows that one in
+the Dock, the switcher and the Overview (`windowIcon`, `sdk/apps.js`); the app's own icon is used only for a window with
+none of those (an AppImage, a Wine program, a game), instead of a letter. A window never changes another app's icon:
+the icon belongs to that window, and the Dock entry of an app id nobody installed shows its first window's.
+
+- **What lord-server keeps** (`wlicon.h`): each `add_buffer` is copied at once into its own memory, never kept as the
+  client's: shared memory only and square (else `invalid_buffer`), ARGB8888 or XRGB8888, 1 to 256 px a side (larger
+  ones are just not taken), re-encoded from premultiplied ARGB to straight RGBA; of an icon's buffers the one closest
+  to 128 px is kept; at most 16 MB of icons alive in the whole session (past it a buffer is not taken). `set_name` is
+  ignored: a name could show another app's icon (the protocol lets a compositor fall back to the pixels). `set_icon` is
+  double-buffered and applied on the window's commit (`icon` event to JS); an icon is immutable once set
+  (`immutable`). The compositor asks for 64 and 128 px (`icon_size`).
+- **To the shell:** `lord.wayland.icon(window)` gives `{ width, height, data }` (RGBA) for `<Image pixels>`;
+  `sdk/wayland.js` keeps it per window in `windowPixelIcons` (fetched at map and on each `icon` event, dropped at unmap).
+- **Tests:** `build/wlicon-test` (the re-encoding, the limits, the session budget, which buffer is kept) and
+  `wlperf-client icon` (the 64 px buffer of 64, 300 and 48 reaches the theme as 64 × 64 RGBA, a 64 × 32 buffer is
+  `invalid_buffer`).
+
 ## Pending
+
+- **Explicit sync (`linux-drm-syncobj-v1`)**: designed, not built, waiting for the maintainer's review: see
+  [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md).
 
 - **Firefox ESR 153 ignored mouse clicks on VM 119** (October 19, QEMU's USB tablet through QMP):
   the pointer reaches it (`enter`, `motion`, `button` on its content subsurface, checked with

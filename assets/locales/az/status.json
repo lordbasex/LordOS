@@ -160,8 +160,16 @@
   "vm.imageRemoved": "Obraz silindi",
   "vm.downloadResumed": "Dayandırılmış endirmə davam etdirilir ({from} bayt saxlanılıb)",
   "vm.kvmReady": "İcazə verildi: maşınlar artıq aparat virtualizasiyasından istifadə edə bilər",
+  "vm.bridgeReady": "Körpülü şəbəkə hazırdır ({name})",
+  "vm.bridgeGone": "Körpülü şəbəkə silindi",
   "vm.kvmNextLogin": "Növbəti girişinizdən etibarən icazə verildi",
   "pkg.foreignArchAdded": "32 bitlik ({arch}) paketlər aktivləşdirildi",
   "pkg.foreignArchPresent": "32 bitlik ({arch}) paketlər artıq aktiv idi",
-  "pkg.why.multiarchPair": "{name} ilə eyni versiya"
+  "pkg.why.multiarchPair": "{name} ilə eyni versiya",
+  "gpu.roleSet": "Qrafik kartın istifadəsi saxlanıldı ({card}): tətbiq etmək üçün yenidən başladın",
+  "vm.gvtReady": "Qrafik kart payı hazırdır ({name})",
+  "vm.gvtGone": "Qrafik kart payı silindi",
+  "gpu.freqSet": "Qrafik kartın minimum tezliyi təyin edildi",
+  "gpu.memlockSet": "Maşınların kilidləyə biləcəyi yaddaş saxlanıldı",
+  "vm.memlockSet": "Maşının yaddaşı kilidləndi"
 }

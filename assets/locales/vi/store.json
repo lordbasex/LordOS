@@ -128,7 +128,7 @@
   },
   "open": "Mở",
   "page.ai": "Trí tuệ nhân tạo",
-  "page.webapps": "Ứng dụng web",
+  "page.webapps": "Ứng dụng web (PWA)",
   "page.commercial": "Thương mại",
   "page.remote": "Truy cập từ xa",
   "page.suites": "Ứng dụng bên thứ ba",
@@ -307,5 +307,12 @@
   "multiarch.enabling": "Đang bật…",
   "pkg32": "{name} (32 bit)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Ứng dụng Flatpak"
+  "kind.flatpak": "Ứng dụng Flatpak",
+  "section.origin": "Nguồn",
+  "section.picks": "LordOS chọn",
+  "src.debian": "Ứng dụng Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Ứng dụng Android",
+  "soon": "Sắp có",
+  "sub.all": "Tất cả"
 }

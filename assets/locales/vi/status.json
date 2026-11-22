@@ -151,8 +151,16 @@
   "vm.imageRemoved": "Đã xóa ảnh đĩa",
   "vm.downloadResumed": "Đang tiếp tục bản tải xuống bị dừng (giữ lại {from} byte)",
   "vm.kvmReady": "Đã cho phép: máy ảo giờ có thể dùng ảo hóa phần cứng",
+  "vm.bridgeReady": "Mạng nối cầu đã sẵn sàng ({name})",
+  "vm.bridgeGone": "Đã gỡ mạng nối cầu",
   "vm.kvmNextLogin": "Được cho phép từ lần đăng nhập tiếp theo",
   "pkg.foreignArchAdded": "Đã bật các gói 32 bit ({arch})",
   "pkg.foreignArchPresent": "Các gói 32 bit ({arch}) đã được bật từ trước",
-  "pkg.why.multiarchPair": "Cùng phiên bản với {name}"
+  "pkg.why.multiarchPair": "Cùng phiên bản với {name}",
+  "gpu.roleSet": "Đã lưu cách dùng card đồ họa ({card}): khởi động lại để áp dụng",
+  "vm.gvtReady": "Phần card đồ họa đã sẵn sàng ({name})",
+  "vm.gvtGone": "Đã gỡ phần card đồ họa",
+  "gpu.freqSet": "Đã đặt tần số tối thiểu của card đồ họa",
+  "gpu.memlockSet": "Đã lưu bộ nhớ các máy được phép khóa",
+  "vm.memlockSet": "Đã khóa bộ nhớ của máy"
 }

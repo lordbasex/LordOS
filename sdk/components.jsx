@@ -1,9 +1,9 @@
 // components.jsx — base controls for apps. They take colors from useTheme(), so they
 // adapt to any theme.
 import { View, Text, addListener, displayFor, onCommit, onScreenChange, capsLock } from '@lordos/runtime';
-import { Component, createContext, useContext, useEffect, useRef, useState } from 'react';
+import { Component, createContext, memo, use, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from './theme.js';
-import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop } from './windows.js';
+import { getApp, windows, openedAt, wm, activeDesktop, onActiveDesktop, appContentNodes, appRegistry } from './windows.js';
 import { onDesktop } from './desktopmodel.js';
 import { useStore } from './store.js';
 import { textDirection, direction, t as tr } from './i18n.js';
@@ -23,23 +23,83 @@ import { setTextFocusBridge, useFocusArea, focusRingColor } from './focus.js';
 import { rangeKey, choiceKey, scrollKey } from './focusmodel.js';
 import { wheelValue } from './controlmodel.js';
 
+// ---- actions that take a while (docs/MAIN-THREAD.md) ----
+// Everything on the screen, the pointer too, waits for the JavaScript of the desktop: an action that blocks (an
+// admin call, a service, a disk) would leave the press unanswered until it ends. afterPaint(fn) runs fn once the
+// frame that shows the press (the switch flipped, the spinner) is on the screen, and gives its result as a promise.
+export function afterPaint(fn) {
+  return new Promise((resolve, reject) => {
+    const go = () => setTimeout(() => { try { resolve(fn()); } catch (e) { reject(e); } }, 0);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(go); else go();
+  });
+}
+
+// const [run, busy, error] = usePending(async (arg) => …): run(arg) marks busy at once, calls the function after the
+// next frame (afterPaint) and clears busy when it (or the promise it returns) ends; error is what it threw or
+// rejected with, until the next run. A run while one is going is ignored (resolves to undefined).
+export function usePending(fn) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
+  const state = useRef({ busy: false, live: true });
+  useEffect(() => { state.current.live = true; return () => { state.current.live = false; }; }, []);
+  const run = useRef(null);
+  if (!run.current) {
+    run.current = (...args) => {
+      const st = state.current;
+      if (st.busy) return Promise.resolve(undefined);
+      st.busy = true;
+      setBusy(true);
+      setError(null);
+      return afterPaint(() => fnRef.current(...args)).then((r) => r, (e) => { if (st.live) setError(e); return undefined; })
+        .finally(() => { st.busy = false; if (st.live) setBusy(false); });
+    };
+  }
+  return [run.current, busy, error];
+}
+
+// A small turning ring. Still with Reduce motion (the theme's reduceMotion token).
+export function Spinner({ size = 14, color, thickness }) {
+  const t = useTheme();
+  const [a, setA] = useState(0);
+  const still = !!t.reduceMotion;
+  useEffect(() => {
+    if (still) return undefined;
+    const id = setInterval(() => setA((x) => (x + 30) % 360), 80);
+    return () => clearInterval(id);
+  }, [still]);
+  const w = thickness || Math.max(1.5, Math.round(size / 7));
+  const c = color || t.accent;
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, border: `${w}px solid ${t.mode === 'light' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.18)'}`,
+      borderTopColor: c, transform: `rotate(${a}deg)`, pointerEvents: 'none' }} />
+  );
+}
+
 // Push button. Optional (all additive): small (22 px high), plain (no fill until hover), disabled,
 // destructive (red text) and icon (a glyph before the label). See docs/DESIGN.md.
+// busy: a spinner in place of the icon, and presses are ignored. pending: onClick may take a while (it may return a
+// promise): the button turns busy at once and onClick runs after that frame is drawn (usePending), so the press is
+// answered even when the action blocks.
 // The shared controls are Tab stops (sdk/focus.js) unless disabled or focusable={false}: Space and Enter press a
 // button or flip a Toggle, the arrows move a Slider, a Stepper or a Segmented control.
-export function Button({ label, onClick, primary, style, small, plain, disabled, destructive, icon, focusable = true }) {
+export function Button({ label, onClick, primary, style, small, plain, disabled, destructive, icon, focusable = true, busy = false, pending = false }) {
   const t = useTheme();
   const [hover, setHover] = useState(false);
+  const [run, running] = usePending((...a) => onClick?.(...a));
+  const waiting = busy || running;
   const fg = primary ? '#fff' : destructive ? '#ff453a' : t.text;
   const bg = primary ? t.accent : plain ? (hover && !disabled ? t.hover : 'transparent') : t.control;
   const border = t.buttonBorder && !plain ? { border: `1px solid ${primary ? t.accent : t.separator}` } : null;
+  const press = disabled || waiting ? undefined : pending ? (e) => { run(e); } : onClick;
   return (
-    <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <View onClick={press} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       focusable={focusable && !disabled}
       style={[{ height: small ? 22 : 28, paddingHorizontal: small ? 10 : 14, borderRadius: small ? t.controlRadiusSmall : t.controlRadius, flexDirection: 'row', gap: 6,
         justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border,
-        opacity: disabled ? 0.4 : hover && !plain ? 0.85 : 1 }, style]}>
-      {icon ? <Text style={{ fontSize: small ? 12 : 14, color: fg }}>{icon}</Text> : null}
+        opacity: disabled ? 0.4 : waiting ? 0.75 : hover && !plain ? 0.85 : 1 }, style]}>
+      {waiting ? <Spinner size={small ? 10 : 12} color={fg} /> : icon ? <Text style={{ fontSize: small ? 12 : 14, color: fg }}>{icon}</Text> : null}
       {label != null && label !== '' ? <Text style={{ fontSize: small ? 12 : 13, fontWeight: 500, color: fg, whiteSpace: 'nowrap' }}>{label}</Text> : null}
     </View>
   );
@@ -47,14 +107,43 @@ export function Button({ label, onClick, primary, style, small, plain, disabled,
 
 // small: the 36 × 20 switch of grouped forms (Settings rows) instead of 42 × 24. The knob moves
 // physically (direction: 'ltr'), also in right-to-left languages.
-export function Toggle({ on, onChange, small, focusable = true }) {
+// busy: dimmed with a spinner on the knob, and flips are ignored. pending: onChange may take a while (an admin
+// call, a service; it may return a promise): the switch flips at once and shows the spinner, onChange runs after
+// that frame is drawn, and the switch follows `on` again once it ends (at most PENDING_HOLD_MS later, if `on`
+// hasn't caught up: a state read back a moment after). If onChange throws or rejects, the switch flips back at
+// once and onError gets the error.
+const PENDING_HOLD_MS = 1500;
+export function Toggle({ on, onChange, small, focusable = true, busy = false, pending = false, onError }) {
   const t = useTheme();
+  const [want, setWant] = useState(null);
+  const [run, running] = usePending(async (v) => { try { await onChange(v); return { ok: true }; } catch (e) { return { ok: false, e }; } });
+  useEffect(() => {
+    if (want === null || running) return undefined;
+    if (!!on === want) { setWant(null); return undefined; }
+    const id = setTimeout(() => setWant(null), PENDING_HOLD_MS);
+    return () => clearTimeout(id);
+  }, [want, running, on]);
+  const shown = want === null ? !!on : want;
+  const waiting = busy || running;
+  const flip = () => {
+    if (waiting) return;
+    if (!pending) { onChange(!on); return; }
+    const v = !shown;
+    setWant(v);
+    run(v).then((r) => {
+      if (!r || r.ok) return;
+      setWant(null);
+      if (onError) onError(r.e); else console.warn('toggle:', r.e?.message || r.e);
+    });
+  };
   const w = small ? 36 : 42, h = small ? 20 : 24, k = h - 4;
   return (
-    <View onClick={() => onChange(!on)} focusable={focusable} style={{ width: w, height: h, borderRadius: h / 2, direction: 'ltr',
-      backgroundColor: on ? t.accent : t.control }}>
-      <View style={{ position: 'absolute', top: 2, left: on ? w - k - 2 : 2, width: k, height: k, borderRadius: k / 2,
-        backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)' }} />
+    <View onClick={flip} focusable={focusable} style={{ width: w, height: h, borderRadius: h / 2, direction: 'ltr',
+      backgroundColor: shown ? t.accent : t.control, opacity: waiting ? 0.7 : 1 }}>
+      <View style={{ position: 'absolute', top: 2, left: shown ? w - k - 2 : 2, width: k, height: k, borderRadius: k / 2,
+        backgroundColor: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
+        {waiting ? <Spinner size={k - 6} thickness={1.5} /> : null}
+      </View>
     </View>
   );
 }
@@ -1101,7 +1190,21 @@ export function Slider({ value, onChange, min = 0, max = 1, width = 160, step, f
 // ---- context of each app's window ----
 
 export const AppWindowContext = createContext({ id: null, focused: false, args: null });
+// Whether the window has the focus, apart: it changes on every click into another window, and in the window's
+// value it re-rendered every component that reads useAppWindow() for its id or args (most apps' root, so all of
+// the app) twice per click. The window's value reads it with use() only when `focused` is read while a
+// component renders, so only those components follow it; read later (an effect, a handler) it is the latest value.
+export const AppFocusContext = createContext(false);
 export const useAppWindow = () => useContext(AppWindowContext);
+export const useAppFocused = () => useContext(AppFocusContext);
+function windowValue(fields, focusRef) {
+  const v = { ...fields };
+  Object.defineProperty(v, 'focused', {
+    enumerable: true,
+    get() { try { return use(AppFocusContext); } catch (e) { return focusRef.current; } },
+  });
+  return v;
+}
 
 // State of a window that survives the app being remounted (going fullscreen
 // or picture-in-picture moves it in the tree). Cleared when the window closes.
@@ -1123,7 +1226,7 @@ export function useWindowState(key, initial) {
 
 // Files dragged from Files onto an app's window (apps/files: a View with onFilesDrop and onFilesOver). accepts(name)
 // and folders say what the app takes (sdk/filedrop.js); onDrop({ files, folders }, how) gets only those, how.alt
-// with ⌥ held. Spread `props` on the window's root View and draw <FilesDropHint> last with `over`, the sort of what is
+// with ⌥ held, how.x and how.y the drop point (screen coordinates) when Files gives it. Spread `props` on the window's root View and draw <FilesDropHint> last with `over`, the sort of what is
 // over the window now ({ files, folders, skipped, alt }) or null.
 export function useFilesDrop({ accepts, folders = false, onDrop }) {
   const [over, setOver] = useState(null);
@@ -1182,7 +1285,13 @@ class AppBoundary extends Component {
   render() { return this.state.failed ? <CrashNotice id={this.props.id} name={this.props.name} /> : this.props.children; }
 }
 
-export function AppHost({ id, focused }) {
+// Memoized, and so is the app's element: a theme re-renders its whole tree when a setting, the window list or the
+// notifications change (its root reads them), and before 0.8.9.5 that went on into every open app, all of it,
+// synchronously (useSyncExternalStore updates are never time-sliced): a switch in Settings re-rendered the Store's
+// cards and the pointer stopped meanwhile. Now an app renders again only for its own state, its window's (args,
+// mode, focus) and the contexts it reads (useTheme, useAppWindow).
+export const AppHost = memo(function AppHost({ id, focused }) {
+  useStore(appRegistry);                  // an installed or updated package app: its new code
   const app = getApp(id);
   const args = useStore(windows, (ws) => ws.find((w) => w.id === id)?.args || null);
   const prot = useStore(windows, (ws) => !!ws.find((w) => w.id === id)?.protected);
@@ -1192,22 +1301,33 @@ export function AppHost({ id, focused }) {
   const [overlayHost, setOverlayHost] = useState(null);
   // the window's content is the area Tab goes round while it is focused (sdk/focus.js)
   const area = useFocusArea(id, focused, focusRingColor(useTheme()));
+  useEffect(() => {                       // the content's node, for apps mode inside a Machines guest (sdk/guestwin.js)
+    const n = area.current;
+    if (n && n.id) appContentNodes.set(id, n.id);
+    return () => { if (appContentNodes.get(id) === n?.id) appContentNodes.delete(id); };
+  });
   useEffect(() => {                       // developer timing: open → first commit of this window
     const t0 = openedAt.get(id);
     if (t0 != null && app && !app.isolated) { openedAt.delete(id); console.log(`timing: ${app.id} window committed ${(lord.now() - t0).toFixed(1)} ms after wm.open`); }
   }, []);
+  const focusRef = useRef(focused);
+  focusRef.current = focused;
+  const value = useMemo(() => windowValue({ id, args, mode, protected: prot, overlayHost }, focusRef), [id, args, mode, prot, overlayHost]);
+  const C = app ? app.Component : null;
+  const body = useMemo(() => (app ? <AppBoundary id={id} app={app.id} name={app.name || app.id}><C /></AppBoundary> : null), [id, app, C]);
   if (!app) return null;
-  const C = app.Component;
   // the content goes in its own node: `protected` paints it black in screenshots (wm.setProtected)
   return (
-    <AppWindowContext.Provider value={{ id, focused, args, mode, protected: prot, overlayHost }}>
-      <View ref={area} protected={prot} style={{ flex: 1, alignSelf: 'stretch' }}>
-        <AppBoundary id={id} app={app.id} name={app.name || app.id}><C /></AppBoundary>
-        <View ref={setOverlayHost} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }} />
-      </View>
+    <AppWindowContext.Provider value={value}>
+      <AppFocusContext.Provider value={!!focused}>
+        <View ref={area} protected={prot} style={{ flex: 1, alignSelf: 'stretch' }}>
+          {body}
+          <View ref={setOverlayHost} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, pointerEvents: 'box-none' }} />
+        </View>
+      </AppFocusContext.Provider>
     </AppWindowContext.Provider>
   );
-}
+});
 
 // Fullscreen and picture-in-picture windows (wm.setFullscreen / wm.setPip): above the
 // theme, without its frame. startShell places them; the theme doesn't have to do anything.

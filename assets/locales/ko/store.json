@@ -128,7 +128,7 @@
   },
   "open": "열기",
   "page.ai": "인공지능",
-  "page.webapps": "웹 앱",
+  "page.webapps": "웹 앱 (PWA)",
   "page.commercial": "상용",
   "page.remote": "원격 접속",
   "page.suites": "타사 앱",
@@ -307,5 +307,12 @@
   "multiarch.enabling": "활성화하는 중…",
   "pkg32": "{name} (32비트)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak 앱"
+  "kind.flatpak": "Flatpak 앱",
+  "section.origin": "출처",
+  "section.picks": "LordOS 추천",
+  "src.debian": "Linux 앱 (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android 앱",
+  "soon": "곧 제공",
+  "sub.all": "전체"
 }

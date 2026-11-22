@@ -1,31 +1,52 @@
-// The Control Center (the approved mock "Main"): summary bars for machines running, the memory they use and free
-// disk space; a card per machine with its picture (live while its window shows it, the last one when it's off), its
-// system, what it's doing, the three lights (power, agent, disk activity), CPU and memory bars and what it uses on
-// disk. Double-click opens or starts; right-click has the machine's menu. FirstRun, Requirements and the Pi page are
-// the other screens of this window.
+// The library (the approved mocks "Main" and "List", 2026-11-22): a toolbar (Machines settings, search, grid or list,
+// New machine), chips that filter (all, running, Linux, the other system's, with their counts), the New machine card
+// first, then a card per machine — its picture (live while its window shows it, the last one when it's off) with its
+// state, CPU and memory while it runs, Start or Open, its name, one line of numbers and its ··· menu — or a row each
+// in the list; machines running, memory and free disk at the bottom. Double-click or Return opens or starts; the
+// arrows move the selection; right-click or ··· has the machine's menu; the order is in the View menu. FirstRun,
+// Requirements and the Pi page are the other screens of this window.
 import {
-  View, Text, Image, ScrollView, useAppWindow, useStore, admin, fs, wm, windows, revealPath, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
-  Toolbar, ToolbarButton, ToolbarGroup, ToolbarSpacer, MenuButton, SearchField, EmptyState, useNarrow,
-  t as tr,
+  View, Text, Image, ScrollView, TextInput, useAppWindow, useStore, createStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
+  EmptyState, useNarrow, addListener, direction, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsFor, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines } from './model.js';
+import { stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
+  chipCounts, specParts, restLine, gvtGpu, LIB_VIEWS, LIB_SORTS } from './model.js';
 import { Assistant } from './assistant.jsx';
-import { usePal, has, gb, bytes, gib, OsMark, Lights, Bar, Btn, PopMenu, StateDot, markColors, overlayRoot, vmRefusal } from './ui.jsx';
+import { Configure } from './configure.jsx';
+import { Sheet, Sym } from './kit.jsx';
+import { BUILTIN } from './profiles.js';
+import { loadProfiles, storeRev } from './store.js';
+import { usePal, has, gb, bytes, gib, OsMark, Bar, Btn, PopMenu, markColors, overlayRoot, vmRefusal, startPrep } from './ui.jsx';
 import { readMeta } from './meta.js';
 import { CloneSheet } from './clone.jsx';
+import { withAsk } from './openwith.js';
 
 const winIdOf = (m) => `machines#vm-${m.id || m.folder}`;
 // how long the Requirements page waits for a word from the package engine before it says the network isn't answering
 const STALL_MS = 90000;
-// opens (or brings forward) the machine's window; a new one gets the guest's usual size and the middle of the screen
+// Play asked of a window that's already open (dir → a counter): it starts its machine when it's off (vmwindow.jsx)
+export const playAsks = createStore({});
+// opens (or brings forward) the machine's window; a new one gets the guest's usual size and the middle of the screen and
+// starts the machine itself; one already open is asked to (Play on a card while its window shows Off)
 export function openMachine(m, opts) {
   const instance = `vm-${m.id || m.folder}`;
   const id = `machines#${instance}`;
   const fresh = !windows.get().some((w) => w.id === id);
   wm.open('machines', { instance, args: { machine: m.dir, name: m.name, ...(opts?.loadvm ? { loadvm: opts.loadvm } : {}) } });
   if (fresh) { wm.resize(id, 1024, 768 + 48); wm.center(id); }
+  else playAsks.set((x) => ({ ...x, [m.dir]: (x[m.dir] || 0) + 1 }));
   return id;
+}
+// files sent from Files' "Open with" (openwith.js): dir → [{ id, path, at }], taken by the machine's window once its
+// guest tools can open them
+export const openAsks = createStore({});
+let askSeq = 0;
+export function openInMachine(m, path) {
+  if (typeof path !== 'string' || !path.startsWith('/')) return false;
+  openAsks.set((x) => withAsk(x, m.dir, path, ++askSeq, Date.now()));
+  openMachine(m);
+  return true;
 }
 export function openConfigure(m, section) {
   const instance = `cfg-${m.id || m.folder}`;
@@ -55,114 +76,185 @@ export function openLogs(m) {
   if (fresh) { wm.resize(id, 980, 600); wm.center(id); }
 }
 
-// the status line under the library (5.1): machines running, the memory they use, free space (a click opens Storage)
-function Summary({ label, value, frac, color, onClick }) {
+// the status line under the library (the approved mock "Main"): machines running, the memory they use, free space (a
+// click on it opens Storage)
+function Summary({ label, value, onClick }) {
   const p = usePal();
-  const narrow = useNarrow();       // a small window: no bars, the numbers only
   return (
-    <View onClick={onClick} title={onClick ? tr('machines.storage.menu') : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <View onClick={onClick} title={onClick ? tr('machines.storage.menu') : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap' }}>{label}</Text>
-      {narrow ? null : <View style={{ width: 70 }}><Bar frac={frac} color={color} height={5} /></View>}
-      <Text style={{ fontSize: 12, fontWeight: 600, color: p.text }}>{value}</Text>
+      <Text style={{ fontSize: 12, fontWeight: 700, color: p.text, whiteSpace: 'nowrap' }}>{value}</Text>
     </View>
   );
 }
 
-function Card({ m, u, sel, onSelect, onMenu, windowed }) {
-  const p = usePal();
-  const [hover, setHover] = useState(false);
+// "10 CPU · 8 GB · 64 GB · Bridged · Intel card"
+export const specLine = (m) => specParts(m).map((x) => (x.k === 'mem' ? gb(x.mb) : tr(`machines.lib.spec.${x.k}`, { n: x.n }))).join(' · ');
+const pillStyle = { height: 24, paddingHorizontal: 10, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(0,0,0,0.55)' };
+// a machine's state in words and color: running (green), suspended (yellow), a failure (red), off
+function stateOf(m, windowed) {
   const v = stateView(m.state, m.reason);
-  const a = actionsFor(m.state);
-  const meta = m.meta || {};
-  const sys = meta.os ? { id: meta.os, name: meta.osName || '' } : systemOf(m.name);
-  const [c1, c2] = markColors(sys.id);
+  const bad = unreadableOf(m);
+  if (bad) return { text: tr(`machines.unreadable.${bad}`), color: '#ff9a9a', on: false };
+  const d = doingOf(m, windowed);
+  if (d === 'running') return { text: tr('machines.lib.state.running'), color: '#30d158', on: true };
+  return { text: tr(`machines.doing.${d}`), color: v.why ? '#ff9a9a' : d === 'suspended' ? '#ffd60a' : v.active ? '#30d158' : null, on: v.active };
+}
+// ··· : the machine's menu, at the button
+function MoreBtn({ m, onMenu }) {
+  const p = usePal();
+  const ref = useRef(null);
+  const [hover, setHover] = useState(false);
+  return (
+    <View ref={ref} title={tr('machines.lib.moreFor', { name: m.name })} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onClick={(e) => { e.stopPropagation?.(); const r = ref.current ? lord.getLayout(ref.current.id) : [e.x, e.y, 0, 0]; onMenu({ x: r[0], y: r[1] + r[3] + 4 }); }}
+      style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${p.accent}`,
+        backgroundColor: hover ? (p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)') : 'transparent' }}>
+      <Text style={{ fontSize: 15, fontWeight: 700, color: p.accent, marginTop: -4 }}>···</Text>
+    </View>
+  );
+}
+// a machine's picture: its last one (live while its window shows it), else its system's colors and mark
+function Picture({ m, sys, on, height, radius = 0 }) {
   const src = thumbSrc(m.dir, m.thumbTime);
-  const on = v.active;
-  const emulated = m.accel === 'tcg';
-  const system = [sys.name || tr('machines.card.system'), m.arch, emulated ? tr('machines.emulatedLower') : null].filter(Boolean).join(', ');
-  const doing = tr(`machines.doing.${doingOf(m, windowed)}`);
+  const [c1, c2] = markColors(sys.id);
+  return (
+    <View style={{ height, borderRadius: radius, overflow: 'hidden', ...(src ? { backgroundColor: '#000' } : { background: `linear-gradient(135deg, ${c2}, ${c1})` }) }}>
+      {src ? <Image src={src} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, objectFit: 'cover', opacity: on ? 1 : 0.72 }} /> : (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}><OsMark id={sys.id} size={Math.min(56, height * 0.4)} /></View>
+      )}
+    </View>
+  );
+}
+const sysOf = (m) => (m.meta?.os ? { id: m.meta.os, name: m.meta.osName || '' } : systemOf(m.name));
+
+function Card({ m, u, sel, onSelect, onMenu, windowed, picH, gpuName }) {
+  const p = usePal();
+  const a = actionsOf(m);
+  const st = stateOf(m, windowed);
+  const sys = sysOf(m);
   const go = () => (a.open || a.start ? openMachine(m) : null);
+  const [hover, setHover] = useState(false);
   return (
     <View onClick={onSelect} onDoubleClick={go} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       onContextMenu={(e) => { e.stopPropagation?.(); onSelect(); onMenu(e); }}
-      style={{ flex: 1, minHeight: 0, borderRadius: 14, overflow: 'hidden', backgroundColor: p.card,
-        border: `2px solid ${sel ? p.accent : 'transparent'}` }}>
-      <View style={{ flex: 1, minHeight: 0, ...(src ? { backgroundColor: '#000' } : { background: `linear-gradient(135deg, ${c1}, ${c2})` }) }}>
-        {src ? <Image src={src} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, objectFit: 'cover', opacity: on ? 1 : 0.72 }} /> : (
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}><OsMark id={sys.id} size={56} /></View>
-        )}
-        <View style={{ position: 'absolute', left: 10, top: 10, paddingHorizontal: 9, height: 20, borderRadius: 10, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.62)' }}>
-          <Text style={{ fontSize: 12, fontWeight: 600, color: v.why ? '#ff9a9a' : '#f2f2f5' }}>{doing}</Text>
+      style={{ flex: 1, minWidth: 0, borderRadius: 16, overflow: 'hidden', backgroundColor: p.card, border: `1px solid ${sel ? p.accent : p.line}` }}>
+      <View style={{ height: picH }}>
+        <Picture m={m} sys={sys} on={st.on} height={picH} />
+        <View style={{ ...pillStyle, position: 'absolute', insetInlineStart: 12, top: 12 }}>
+          {st.color ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: st.color }} /> : null}
+          <Text style={{ fontSize: 12, fontWeight: 600, color: '#f2f2f5', whiteSpace: 'nowrap' }}>{st.text}</Text>
         </View>
-        <View style={{ position: 'absolute', right: 10, top: 10 }}><Lights power={on} agent={on && m.agentState === 'connected'} disk={!!u?.disk} /></View>
-        {hover && (a.start || a.open) ? (
+        {st.on && u ? (
+          <View style={{ ...pillStyle, position: 'absolute', insetInlineEnd: 12, top: 12 }}>
+            <Text style={{ fontSize: 12, color: '#f2f2f5', whiteSpace: 'nowrap' }}>{tr('machines.lib.usage', { cpu: u.cpu != null ? Math.round(u.cpu) : '—', mem: u.memBytes ? gib(u.memBytes) : '—' })}</Text>
+          </View>
+        ) : !st.on && m.gpu && gpuName ? (
+          <View style={{ ...pillStyle, position: 'absolute', insetInlineEnd: 12, top: 12 }}>
+            <Text style={{ fontSize: 12, color: '#f2f2f5', whiteSpace: 'nowrap' }}>{gpuName}</Text>
+          </View>
+        ) : null}
+        {a.open || a.start ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-            <View onClick={(e) => { e.stopPropagation?.(); go(); }} title={a.open ? tr('machines.open') : tr('machines.start')}
-              style={{ width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)', border: '2px solid rgba(255,255,255,0.85)' }}>
-              <Text style={{ fontSize: 26, color: '#fff', marginLeft: a.open ? 0 : 4 }}>{a.open ? '⤢' : '▶'}</Text>
-            </View>
+            {a.open ? (
+              <View onClick={(e) => { e.stopPropagation?.(); go(); }} title={tr('machines.open')}
+                style={{ height: 40, paddingHorizontal: 18, borderRadius: 20, justifyContent: 'center', backgroundColor: hover ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.6)' }}>
+                <Text style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{tr('machines.open')}</Text>
+              </View>
+            ) : (
+              <View onClick={(e) => { e.stopPropagation?.(); go(); }} title={tr(m.suspended ? 'machines.lib.resumeName' : 'machines.lib.startName', { name: m.name })}
+                style={{ width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: hover ? 'rgba(0,0,0,0.72)' : 'rgba(0,0,0,0.55)' }}>
+                <Sym name="play" size={26} color="#ffffff" />
+              </View>
+            )}
           </View>
         ) : null}
       </View>
-      <View style={{ paddingHorizontal: 12, paddingVertical: 10, gap: 6 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ flex: 1, fontSize: 14, fontWeight: 700, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{m.name}</Text>
-          <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap' }}>{system}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 18 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 18, fontWeight: 600, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{m.name}</Text>
+          <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{specLine(m)}</Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.card.cpu', { v: on && u?.cpu != null ? `${Math.round(u.cpu)} %` : '—' })}</Text>
-            <Bar frac={on && u?.cpu != null ? u.cpu / 100 : 0} color={p.cpu} height={4} />
-          </View>
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.card.memory', { v: on && u?.memBytes ? `${gib(u.memBytes)} GB` : '—' })}</Text>
-            <Bar frac={on && u?.memBytes ? u.memBytes / (m.memoryMb * 1048576) : 0} color={p.mem} height={4} />
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ fontSize: 12, fontWeight: 700, color: p.text }}>{m.diskBytes != null ? bytes(m.diskBytes) : '—'}</Text>
-            <Text style={{ fontSize: 12, color: p.dim }}>{tr('machines.card.onDisk')}</Text>
-          </View>
-        </View>
+        <MoreBtn m={m} onMenu={onMenu} />
       </View>
     </View>
   );
 }
 
-// one machine in the list view: picture, name and system, what it's doing, CPU, memory, disk; the same clicks as a card
-function ListRow({ m, u, sel, onSelect, onMenu, windowed }) {
+// the first card: New machine
+function NewCard({ onClick, picH, row }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
-  const v = stateView(m.state, m.reason);
-  const a = actionsFor(m.state);
-  const sys = m.meta?.os ? { id: m.meta.os, name: m.meta.osName || '' } : systemOf(m.name);
-  const src = thumbSrc(m.dir, m.thumbTime);
-  const on = v.active;
-  const go = () => (a.open || a.start ? openMachine(m) : null);
-  const cell = (text, w, strong) => <Text style={{ width: w, fontSize: 12, fontWeight: strong ? 600 : 400, color: strong ? p.text : p.dim, textAlign: 'end', whiteSpace: 'nowrap' }}>{text}</Text>;
-  const narrow = useNarrow();       // a small window: no CPU and memory columns
+  const plus = (s) => (
+    <View style={{ width: s, height: s, borderRadius: s / 2, alignItems: 'center', justifyContent: 'center', backgroundColor: p.dark ? '#f2f2f5' : '#2b2b31' }}>
+      <Text style={{ fontSize: s * 0.55, fontWeight: 300, color: p.dark ? '#18181c' : '#fff', marginTop: -s * 0.06 }}>+</Text>
+    </View>
+  );
+  const text = (
+    <View style={{ flex: row ? 1 : undefined, minWidth: 0 }}>
+      <Text style={{ fontSize: row ? 17 : 18, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr('machines.newMachine')}</Text>
+      <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{tr('machines.win.lib.newHint')}</Text>
+    </View>
+  );
+  const box = { borderRadius: row ? 14 : 16, overflow: 'hidden', backgroundColor: hover ? p.raised : p.card, border: `1px dashed ${p.dark ? '#4a4a55' : 'rgba(0,0,0,0.25)'}` };
+  if (row) return (
+    <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{ ...box, flexDirection: 'row', alignItems: 'center', gap: 18, padding: 12 }}>
+      <View style={{ width: 132, height: 78, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: p.raised }}>{plus(32)}</View>
+      {text}
+    </View>
+  );
   return (
-    <View onClick={onSelect} onDoubleClick={go} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      onContextMenu={(e) => { e.stopPropagation?.(); onSelect(); onMenu(e); }}
-      style={{ height: 64, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, borderRadius: 10,
-        backgroundColor: sel ? (p.dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)') : hover ? p.raised : 'transparent', border: `1px solid ${sel ? p.accent : 'transparent'}` }}>
-      <View style={{ width: 80, height: 48, borderRadius: 7, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-        {src ? <Image src={src} style={{ position: 'absolute', left: 0, top: 0, width: 80, height: 48, objectFit: 'cover', opacity: on ? 1 : 0.72 }} /> : <OsMark id={sys.id} size={30} />}
+    <View onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{ ...box, flex: 1, minWidth: 0 }}>
+      <View style={{ height: picH, alignItems: 'center', justifyContent: 'center', backgroundColor: p.raised }}>{plus(72)}</View>
+      <View style={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: 18 }}>{text}</View>
+    </View>
+  );
+}
+
+// one machine in the list view (the approved mock "List"): picture, name and its state in color, the numbers line, CPU
+// and memory while it runs (else since when it's off), Start or Open, ···
+function ListRow({ m, u, sel, onSelect, onMenu, windowed }) {
+  const p = usePal();
+  const a = actionsOf(m);
+  const st = stateOf(m, windowed);
+  const sys = sysOf(m);
+  const go = () => (a.open || a.start ? openMachine(m) : null);
+  const narrow = useNarrow();       // a small window: no CPU and memory column
+  const rest = st.on ? null : restLine(m);
+  const restText = !rest ? '' : rest.k === 'profile' ? tr('machines.lib.rest.profile', { name: profileName(rest.id) }) : tr(`machines.lib.rest.${rest.k}`, { n: rest.n });
+  return (
+    <View onClick={onSelect} onDoubleClick={go} onContextMenu={(e) => { e.stopPropagation?.(); onSelect(); onMenu(e); }}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 18, padding: 12, borderRadius: 14, backgroundColor: p.card, border: `1px solid ${sel ? p.accent : p.line}` }}>
+      <View style={{ width: narrow ? 96 : 132, height: narrow ? 58 : 78 }}><Picture m={m} sys={sys} on={st.on} height={narrow ? 58 : 78} radius={10} /></View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={{ flexShrink: 1, fontSize: 17, fontWeight: 600, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{m.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            {st.on && st.color ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: st.color }} /> : null}
+            <Text style={{ fontSize: 12, color: st.color || p.dim, whiteSpace: 'nowrap' }}>{st.text}</Text>
+          </View>
+        </View>
+        <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{specLine(m)}</Text>
       </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{m.name}</Text>
-        <Text style={{ fontSize: 12, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{[sys.name || tr('machines.card.system'), m.arch, m.accel === 'tcg' ? tr('machines.emulatedLower') : null].filter(Boolean).join(', ')}</Text>
-      </View>
-      <View style={{ width: narrow ? 100 : 130, flexDirection: 'row', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-        <StateDot tone={v.tone} />
-        <Text style={{ fontSize: 12, color: v.why ? '#ff9a9a' : p.text, whiteSpace: 'nowrap' }}>{tr(`machines.doing.${doingOf(m, windowed)}`)}</Text>
-      </View>
-      {narrow ? null : cell(on && u?.cpu != null ? `${Math.round(u.cpu)} %` : '—', 56)}
-      {narrow ? null : cell(on && u?.memBytes ? `${gib(u.memBytes)} GB` : gb(m.memoryMb), 70)}
-      {cell(m.diskBytes != null ? bytes(m.diskBytes) : '—', 70, true)}
-      <View onClick={(e) => { e.stopPropagation?.(); go(); }} title={a.open ? tr('machines.open') : tr('machines.start')}
-        style={{ width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', opacity: hover || sel ? 1 : 0, backgroundColor: p.btn }}>
-        <Text style={{ fontSize: 13, color: p.text, marginLeft: a.open ? 0 : 2 }}>{a.open ? '⤢' : '▶'}</Text>
-      </View>
+      {narrow ? null : st.on ? (
+        <View style={{ width: 180, gap: 6 }}>
+          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.card.cpu', { v: u?.cpu != null ? `${Math.round(u.cpu)} %` : '—' })}</Text>
+          <Bar frac={u?.cpu != null ? u.cpu / 100 : 0} color={p.accent} height={4} />
+          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.lib.memOf', { a: u?.memBytes ? gib(u.memBytes) : '—', b: gb(m.memoryMb) })}</Text>
+          <Bar frac={u?.memBytes ? u.memBytes / (m.memoryMb * 1048576) : 0} color={p.cpu} height={4} />
+        </View>
+      ) : <Text style={{ width: 180, fontSize: 12, color: p.dim, textAlign: 'start' }}>{restText}</Text>}
+      {a.open ? (
+        <View onClick={(e) => { e.stopPropagation?.(); go(); }} style={{ height: 34, paddingHorizontal: 16, borderRadius: 17, justifyContent: 'center', backgroundColor: p.accent }}>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{tr('machines.open')}</Text>
+        </View>
+      ) : (
+        <View onClick={(e) => { e.stopPropagation?.(); go(); }} title={tr(m.suspended ? 'machines.lib.resumeName' : 'machines.lib.startName', { name: m.name })}
+          style={{ width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', opacity: a.start ? 1 : 0.4, backgroundColor: p.dark ? '#30303a' : 'rgba(0,0,0,0.08)' }}>
+          <Sym name="play" size={16} color={p.dark ? '#ffffff' : p.text} />
+        </View>
+      )}
+      <MoreBtn m={m} onMenu={onMenu} />
     </View>
   );
 }
@@ -227,17 +319,8 @@ export function Requirements({ host, onBack, onChanged, archs }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const list = archs || [host.arch];
-  const missing = missingFor(host, list);
-  const have = (pk) => !missing.includes(pk);
-  const rows = [
-    ['kvm', host.kvm ? 'ready' : host.kvmDevice ? 'notAllowed' : 'off'],
-    ...list.map((a) => [`engine.${a}`, have(a === 'amd64' ? 'qemu-system-x86' : 'qemu-system-arm') ? 'ready' : 'missing']),
-    ...list.map((a) => [`firmware.${a}`, have(a === 'amd64' ? 'ovmf' : 'qemu-efi-aarch64') ? 'ready' : 'missing']),
-    ['display', have('qemu-system-modules-opengl') ? 'ready' : 'missing'],
-    ['disk', have('qemu-utils') ? 'ready' : 'missing'],
-    ['network', have('passt') ? 'ready' : 'missing'],
-    ['folders', have('virtiofsd') ? 'ready' : 'missing'],
-  ];
+  const missing = missingFor(host, list, { windows: true });
+  const rows = reqRows(host, list, missing);
   const install = async () => {
     setBusy(true); setMsg(null);
     // a network that doesn't answer: the engine gives up on its own, but the page never waits more than STALL_MS
@@ -270,16 +353,20 @@ export function Requirements({ host, onBack, onChanged, archs }) {
     <View style={{ flex: 1, paddingHorizontal: 30, paddingVertical: 26, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
       <Text style={{ fontSize: 22, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.req.page')}</Text>
       <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start' }}>{tr('machines.req.for', { arch: list.join(', ') })}</Text>
-      {rows.map(([k, st]) => (
-        <View key={k} style={{ minHeight: 46, paddingHorizontal: 14, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 10, backgroundColor: p.card }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.req.row.${k.split('.')[0]}`, { arch: k.split('.')[1] || '' })}</Text>
-            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.req.use.${k.split('.')[0]}`)}</Text>
-          </View>
-          <Text style={{ fontSize: 12, fontWeight: 700, color: st === 'ready' ? '#8ce8b0' : '#ffc56e' }}>{tr(`machines.req.st.${st}`)}</Text>
+      {/* the rows scroll when they don't fit (Windows' own rows make the list tall); the buttons below always show */}
+      <ScrollView style={{ flex: 1, minHeight: 0 }}>
+        <View style={{ gap: 12 }}>
+          {rows.map(([k, st]) => (
+            <View key={k} style={{ minHeight: 46, paddingHorizontal: 14, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 10, backgroundColor: p.card }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.req.row.${k.split('.')[0]}`, { arch: k.split('.')[1] || '' })}</Text>
+                <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.req.use.${k.split('.')[0]}`)}</Text>
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: 700, color: st === 'ready' ? '#8ce8b0' : '#ffc56e' }}>{tr(`machines.req.st.${st}`)}</Text>
+            </View>
+          ))}
         </View>
-      ))}
-      <View style={{ flex: 1 }} />
+      </ScrollView>
       {/* how it's going, in the place of the note under the rows, so the page keeps its height */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {msg ? <Text style={{ flex: 1, fontSize: 13, color: msg.ok ? p.dim : '#ff453a', textAlign: 'start' }}>{msg.text}</Text>
@@ -335,13 +422,50 @@ function PiView({ host, list, onBack }) {
   return narrow ? <ScrollView style={{ flex: 1 }}>{page}</ScrollView> : page;
 }
 
+// a round toolbar square (the gear) and the + (accent filled), 40 × 40 as in the mock
+function Square({ icon, title, onClick, primary }) {
+  const p = usePal();
+  const [hover, setHover] = useState(false);
+  return (
+    <View title={title} onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: primary ? p.accent : hover ? p.btn : p.raised, opacity: primary && hover ? 0.88 : 1 }}>
+      <Sym name={icon} size={primary ? 22 : 20} color={primary ? '#ffffff' : p.accent} />
+    </View>
+  );
+}
+function Chip({ label, on, onClick }) {
+  const p = usePal();
+  return (
+    <View onClick={onClick} style={{ height: 30, paddingHorizontal: 14, borderRadius: 15, justifyContent: 'center',
+      backgroundColor: on ? p.accent : 'transparent', border: on ? 'none' : `1px solid ${p.line}` }}>
+      <Text style={{ fontSize: 13, fontWeight: on ? 600 : 400, color: on ? '#fff' : p.text, whiteSpace: 'nowrap' }}>{label}</Text>
+    </View>
+  );
+}
+// a profile's name for the list rows ("Profile Games")
+const own = { rev: -1, list: [] };
+export function profileName(id) {
+  if (BUILTIN.includes(id) || id === 'testing') return tr(`machines.as.profile.${id}`);
+  if (own.rev !== storeRev.get()) { own.rev = storeRev.get(); own.list = loadProfiles(); }
+  return own.list.find((x) => x.id === id)?.name || '';
+}
+// Machines settings (the approved mocks "Settings" and "Systems"): its own window
+export function openSettings(section) {
+  const id = 'machines#settings';
+  const fresh = !windows.get().some((w) => w.id === id);
+  wm.open('machines', { instance: 'settings', args: { settings: section || 'profiles', nonce: Date.now() } });
+  if (fresh) { wm.resize(id, 1100, 720); wm.center(id); }
+}
+
 export function Library() {
   const p = usePal();
-  const { id: winId } = useAppWindow();
+  const { id: winId, focused } = useAppWindow();
   const [host, setHost] = useState(() => (has() ? lord.vm.host() : null));
   const [list, setList] = useState([]);
   const [sel, setSel] = useState(null);
-  const [page, setPage] = useState('main');          // main, new, requirements, pi
+  const [page, setPage] = useState('main');          // main, new, requirements, pi: the last three as sheets over the library
+  const [cfg, setCfg] = useState(null);              // Configure as a sheet: { dir, section }
   const [newMode, setNewMode] = useState(null);
   const [menu, setMenu] = useState(null);
   const [del, setDel] = useState(null);
@@ -350,7 +474,9 @@ export function Library() {
   const [discard, setDiscard] = useState(null);
   const [copying, setCopying] = useState(null);
   const [query, setQuery] = useState('');
+  const [gpuName, setGpuName] = useState('');
   const [s0] = useSettings();
+  useStore(storeRev);
   const narrow = useNarrow();
   const lv = libView(s0.machinesView);
   const putView = (patch) => settings.set({ machinesView: { ...libView(settings.get().machinesView), ...patch } });
@@ -377,6 +503,7 @@ export function Library() {
     for (const m of ms) {
       const s = lord.vm.stats(m.dir) || {};
       m.diskBytes = s.diskBytes;
+      m.baseBytes = s.baseBytes || 0;
       try { const st = fs.stat(`${m.dir}/thumb.png`); m.thumbTime = st?.mtime || 0; } catch (e) { m.thumbTime = 0; }
       m.meta = readMeta(m.dir);
       const u = usage(prev.current[m.dir], s, m.vcpus);
@@ -390,45 +517,77 @@ export function Library() {
   useEffect(() => {
     wm.setTitle(winId, tr('machines.title'));
     read();
+    // the graphics card's name, for an off machine's card that has one
+    try { const g = typeof lord.vm?.gpus === 'function' ? gvtGpu(lord.vm.gpus()) : null; if (g?.name) setGpuName(g.name); } catch (e) { /* none */ }
     const timer = setInterval(read, 1500);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
     wm.setMenus(winId, [{ label: tr('machines.menu.machine'), items: [
       { label: tr('machines.newMachine'), onClick: () => setPage('new') },
+      { label: tr('machines.first.import'), onClick: () => { setNewMode('import'); setPage('new'); } },
+      '-',
+      { label: tr('machines.set.menu'), onClick: () => openSettings('general') },
       { label: tr('machines.req.menu'), onClick: () => setPage('requirements') },
       { label: tr('machines.storage.menu'), onClick: openStorage },
       ...(host?.arch === 'arm64' ? [{ label: tr('machines.pi.menu'), onClick: () => setPage('pi') }] : []),
+    ] }, { label: tr('machines.lib.view'), items: [
+      ...LIB_VIEWS.map((k) => ({ label: tr(k === 'grid' ? 'machines.lib.viewGrid' : 'machines.lib.viewList'), checked: lv.view === k, onClick: () => putView({ view: k }) })),
+      '-',
+      ...LIB_SORTS.map((k) => ({ label: tr(`machines.lib.sort.${k}`), checked: lv.sort === k, onClick: () => putView({ sort: k }) })),
     ] }]);
-  }, [host?.arch]);
+  }, [host?.arch, lv.view, lv.sort]);
+
+  const sorted = host ? sortMachines(filterMachines(list, { query, show: lv.show }), lv.sort) : [];
+  // the keyboard: arrows move the selection, Return opens or starts it, Escape clears the search
+  const keys = useRef(null);
+  keys.current = (e) => {
+    if (page !== 'main' || cfg || menu || del || discard || copying) return;
+    const i = sorted.findIndex((m) => m.dir === sel);
+    const cols = lv.view === 'list' ? 1 : Math.max(1, keys.cols || 1);
+    const fwd = direction() === 'rtl' ? -1 : 1;
+    const step = { ArrowDown: cols, ArrowUp: -cols, ArrowRight: lv.view === 'list' ? 0 : fwd, ArrowLeft: lv.view === 'list' ? 0 : -fwd }[e.key];
+    if (step !== undefined && step !== 0 && sorted.length) {
+      e.preventDefault?.();
+      setSel(sorted[Math.max(0, Math.min(sorted.length - 1, i < 0 ? 0 : i + step))].dir);
+    } else if (e.key === 'Enter' && i >= 0) {
+      const m = sorted[i], a = actionsOf(m);
+      if (a.open || a.start) { e.preventDefault?.(); openMachine(m); }
+    } else if (e.key === 'Escape' && query) setQuery('');
+  };
+  useEffect(() => (focused ? addListener('keydown', (e) => keys.current?.(e)) : undefined), [focused]);
   if (!host) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.noBackend')}</Text></View>;
 
-  const sorted = sortMachines(filterMachines(list, { query, show: lv.show }), lv.sort);
+  const counts = chipCounts(list, query);
   const sum = summaryOf(list, usages, host);
   const missing = missingFor(host, [host.arch]);
   const remove = (m) => {
     setDel(null);
+    // its transfer folder stays, moved aside ("<name> (old date)"), so a new machine of that name starts with its own (6.7.1)
+    if (m.transfer && has()) lord.vm.transferAside(m.dir);
     try { fs.trash(m.dir); setError(''); } catch (e) { setError(tr('machines.deleteFailed', { name: m.name })); }
     refresh();
   };
   const menuFor = (m) => {
-    const a = actionsFor(m.state);
+    const a = actionsOf(m);
     const stop = (how) => lord.vm.stop(m.dir, how);
     return [
       a.start ? { label: tr('machines.start'), onClick: () => openMachine(m) } : { label: tr('machines.open'), disabled: !a.open, onClick: () => openMachine(m) },
-      a.start ? { label: tr('machines.cmd.startNoWindow'), onClick: () => follow(lord.vm.startDetached(m.dir), m.name) } : null,
+      a.start ? { label: tr('machines.cmd.startNoWindow'), onClick: () => startPrep(m).then(() => follow(lord.vm.startDetached(m.dir), m.name),
+        (e) => setError(e.message)) } : null,
       { label: tr('machines.cmd.pause'), disabled: !a.pause, onClick: () => stop('pause') },
       { label: tr('machines.cmd.resume'), disabled: !a.resume, onClick: () => stop('resume') },
-      { label: tr('machines.cmd.suspend'), disabled: !a.suspend, onClick: () => stop('suspend') },
+      { label: tr('machines.cmd.suspend'), disabled: !a.suspend || noSuspend(null, m.gpu), onClick: () => stop('suspend') },
       { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => stop('shutdown') },
       { label: tr('machines.cmd.reset'), disabled: !a.reset, onClick: () => stop('reset') },
       { label: tr('machines.cmd.poweroff'), destructive: true, disabled: !a.poweroff, onClick: () => stop('poweroff') },
       '-',
-      { label: tr('machines.cmd.configure'), onClick: () => openConfigure(m) },
+      { label: tr('machines.cmd.configure'), onClick: () => setCfg({ dir: m.dir }) },
       { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m) },
       { label: tr('machines.cmd.clone'), onClick: () => setCopying(m) },
       { label: tr('machines.cmd.logs'), onClick: () => openLogs(m) },
       { label: tr('machines.cmd.showInFiles'), onClick: () => revealPath(m.dir) },
+      ...(m.transfer ? [{ label: tr('machines.tb.transferOpen'), onClick: () => { const x = lord.vm.transferFolder(m.dir); if (x) openFolder(x); } }] : []),
       m.iso && a.remove && !m.suspended ? { label: tr('machines.eject'), onClick: () => { setError(lord.vm.eject(m.dir) ? '' : tr('machines.ejectFailed', { name: m.name })); refresh(); } } : null,
       m.suspended && a.start ? { label: tr('machines.fail.discardState'), destructive: true, onClick: () => setDiscard(m) } : null,
       '-',
@@ -436,78 +595,97 @@ export function Library() {
     ];
   };
   const rl = root.current ? lord.getLayout(root.current.id) : [0, 0, 1000, 700];
-  // as many cards as fit at 300 px or more (as Remote Desk), each with the guest's 16:10 picture and its two lines
-  const cw = rl[2] - 40;
-  const cols = Math.max(1, Math.floor((cw + 14) / (300 + 14)));
-  const cardW = Math.floor((cw - 14 * (cols - 1)) / cols);
-  const rowH = Math.round(cardW * 10 / 16) + 72;
+  // as many cards as fit at 300 px or more, the New machine card first; each picture about half as tall as wide
+  const pad = narrow ? 16 : 24, gap = 20;
+  const cw = rl[2] - pad * 2;
+  const cols = Math.max(1, Math.floor((cw + gap) / (300 + gap)));
+  keys.cols = cols;
+  const cardW = Math.floor((cw - gap * (cols - 1)) / cols);
+  const picH = Math.max(120, Math.round(cardW * 0.48));
+  const cells = [{ isNew: true }, ...sorted];
   const rows = [];
-  for (let i = 0; i < sorted.length; i += cols) rows.push(sorted.slice(i, i + cols));
+  for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
   const cardProps = (m) => ({ m, u: usages[m.dir], sel: sel === m.dir, onSelect: () => setSel(m.dir), windowed: wins.split(' ').includes(winIdOf(m)),
     onMenu: (e) => setMenu({ x: e.x, y: e.y, m }) });
+  const newMachine = () => setPage('new');
 
   let body;
-  if (page === 'new') body = <Assistant host={host} mode={newMode} names={list.map((m) => m.name)} onClose={() => { setPage('main'); setNewMode(null); refresh(); }}
-    onCreated={(m) => { setPage('main'); setNewMode(null); refresh(); if (m) openMachine(m); }} onConfigure={(m) => { setPage('main'); refresh(); if (m) openConfigure(m, 'cpu'); }}
-    onNeeds={() => setPage('requirements')} />;
-  else if (page === 'requirements') body = <Requirements host={host} onBack={() => setPage('main')} onChanged={refresh} />;
-  else if (page === 'pi') body = <PiView host={host} list={list} onBack={() => setPage('main')} />;
-  else if (!list.length) body = <FirstRun host={host} onNew={() => setPage('new')} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
-  else if (!sorted.length) body = <EmptyState icon="⌕" hint={query.trim() ? tr('machines.lib.noMatch', { q: query.trim() }) : tr(`machines.lib.none.${lv.show}`)} />;
+  // the assistant, the requirements and the Pi page are sheets over the library, which stays behind them
+  const sheet = page === 'new' ? (
+    <Sheet width={940} height={700} modal onClose={() => { setPage('main'); setNewMode(null); }}>
+      <Assistant host={host} mode={newMode} names={list.map((m) => m.name)} onClose={() => { setPage('main'); setNewMode(null); refresh(); }}
+        onCreated={(m) => { setPage('main'); setNewMode(null); refresh(); if (m) openMachine(m); }} onConfigure={(m) => { setPage('main'); refresh(); if (m) setCfg({ dir: m.dir, section: 'cpu' }); }}
+        onNeeds={() => setPage('requirements')} />
+    </Sheet>
+  ) : page === 'requirements' ? (
+    <Sheet width={760} height={600} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><Requirements host={host} onBack={() => setPage('main')} onChanged={refresh} /></View></Sheet>
+  ) : page === 'pi' ? (
+    <Sheet width={820} height={640} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><PiView host={host} list={list} onBack={() => setPage('main')} /></View></Sheet>
+  ) : null;
+  if (!list.length) body = <FirstRun host={host} onNew={newMachine} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
+  else if (!sorted.length) body = <EmptyState icon="⌕" hint={query.trim() ? tr('machines.lib.noMatch', { q: query.trim() }) : (lv.show === 'windows' ? tr('machines.win.lib.none') : tr(`machines.lib.none.${lv.show}`))} />;
   else if (lv.view === 'list') body = (
-    <ScrollView style={{ flex: 1 }} contentStyle={{ padding: 16, gap: 2 }}>
+    <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: pad, paddingVertical: 16, gap: 12 }}>
+      <NewCard row onClick={newMachine} />
       {sorted.map((m) => <ListRow key={m.dir} {...cardProps(m)} />)}
     </ScrollView>
   );
   else body = (
-    <ScrollView style={{ flex: 1 }} contentStyle={{ padding: 20, gap: 14 }}>
+    <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: pad, paddingVertical: 16, gap }}>
       {rows.map((r, i) => (
-        <View key={i} style={{ flexDirection: 'row', gap: 14, height: rowH }}>
-          {r.map((m) => <Card key={m.dir} {...cardProps(m)} />)}
+        <View key={i} style={{ flexDirection: 'row', gap }}>
+          {r.map((c) => (c.isNew ? <NewCard key="new" picH={picH} onClick={newMachine} /> : <Card key={c.dir} {...cardProps(c)} picH={picH} gpuName={gpuName} />))}
           {Array.from({ length: cols - r.length }, (_, k) => <View key={`f${k}`} style={{ flex: 1 }} />)}
         </View>
       ))}
     </ScrollView>
   );
 
-  const full = page === 'new' || page === 'requirements' || page === 'pi';
-  const sortItems = ['name', 'state', 'last', 'disk'].map((k) => ({ label: tr(`machines.lib.sort.${k}`), checked: lv.sort === k, onClick: () => putView({ sort: k }) }));
-  const showItems = ['all', 'running', 'off'].map((k) => ({ label: tr(`machines.lib.show.${k}`), checked: lv.show === k, onClick: () => putView({ show: k }) }));
-  const addItems = [
-    { label: tr('machines.newMachine'), detail: tr('machines.lib.newHint'), onClick: () => setPage('new') },
-    { label: tr('machines.first.import'), detail: tr('machines.lib.importHint'), onClick: () => { setNewMode('import'); setPage('new'); } },
-  ];
+  const chip = (k, label) => <Chip key={k} label={label} on={lv.show === k} onClick={() => putView({ show: k })} />;
   return (
     <View ref={root} style={{ flex: 1, backgroundColor: p.bg }}>
-      {!full ? (
-        <Toolbar>
-          <ToolbarButton icon="⛁" title={tr('machines.storage.menu')} onClick={openStorage} />
-          {host.arch === 'arm64' && host.board ? <ToolbarButton icon="ⓘ" title={tr('machines.pi.menu')} onClick={() => setPage('pi')} /> : null}
-          {missing.length || (host.kvmDevice && !host.kvm) ? <ToolbarButton icon="⚠" color={p.warn} title={tr('machines.req.menu')} onClick={() => setPage('requirements')} /> : null}
-          <ToolbarSpacer />
-          <MenuButton icon="+" title={tr('machines.lib.add')} items={addItems} minWidth={300} />
-          {list.length ? <>
-            <ToolbarGroup>
-              <ToolbarButton small icon="▦" title={tr('machines.lib.viewGrid')} active={lv.view === 'grid'} onClick={() => putView({ view: 'grid' })} />
-              <ToolbarButton small icon="≡" title={tr('machines.lib.viewList')} active={lv.view === 'list'} onClick={() => putView({ view: 'list' })} />
-            </ToolbarGroup>
-            <MenuButton icon="⇅" title={tr('machines.lib.sort')} items={sortItems} />
-            <MenuButton icon={lv.show === 'all' ? '▽' : '▼'} title={tr('machines.lib.show')} items={showItems} />
-            <SearchField value={query} onChange={setQuery} placeholder={tr('machines.lib.search')} width={narrow ? 120 : 180} />
-          </> : null}
-        </Toolbar>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: pad, paddingTop: 16, paddingBottom: 8 }}>
+        <Square icon="gear" title={tr('machines.set.title')} onClick={() => openSettings()} />
+        <View style={{ flex: 1, minWidth: 0, height: 40, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: p.raised }}>
+          <Sym name="search" size={18} color={p.dim} />
+          <TextInput value={query} onChange={setQuery} placeholder={tr('machines.lib.searchMachines')} onCancel={() => setQuery('')} size={15}
+            style={{ flex: 1, minWidth: 0, backgroundColor: 'transparent', borderWidth: 0, border: 'none' }} />
+        </View>
+        {missing.length || (host.kvmDevice && !host.kvm) ? <Square icon="security" title={tr('machines.req.menu')} onClick={() => setPage('requirements')} /> : null}
+        {host.arch === 'arm64' && host.board && !narrow ? <Square icon="general" title={tr('machines.pi.menu')} onClick={() => setPage('pi')} /> : null}
+        <View style={{ flexDirection: 'row', padding: 3, borderRadius: 10, backgroundColor: p.raised }}>
+          {[['grid', 'grid', 'machines.lib.viewGrid'], ['list', 'list', 'machines.lib.viewList']].map(([k, icon, l]) => (
+            <View key={k} title={tr(l)} onClick={() => putView({ view: k })}
+              style={{ width: 40, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: lv.view === k ? p.btn : 'transparent' }}>
+              <Sym name={icon} size={18} color={lv.view === k ? p.text : p.dim} />
+            </View>
+          ))}
+        </View>
+        <Square primary icon="plus" title={tr('machines.newMachine')} onClick={newMachine} />
+      </View>
+      {list.length ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: pad, paddingTop: 8, paddingBottom: 4 }}>
+          {chip('all', tr('machines.lib.chip.all', { n: counts.all }))}
+          {chip('running', tr('machines.lib.chip.running', { n: counts.running }))}
+          {chip('linux', tr('machines.lib.chip.linux', { n: counts.linux }))}
+          {chip('windows', tr('machines.win.lib.chip', { n: counts.windows }))}
+        </View>
       ) : null}
-      {error ? <Text style={{ marginHorizontal: 20, marginTop: 10, fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
-      {full ? <View style={{ flex: 1, padding: 16 }}>{body}</View> : body}
-      {!full && list.length ? (
-        <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: narrow ? 14 : 22, paddingHorizontal: narrow ? 12 : 20, borderTopWidth: 1, borderColor: p.line, overflow: 'hidden' }}>
-          <Summary label={tr('machines.sum.running')} value={tr('machines.sum.of', { a: sum.running.a, b: sum.running.b })} frac={sum.running.frac} color={p.ok} />
-          {sum.memory ? <Summary label={tr('machines.sum.memory')} value={tr('machines.sum.ofGb', { a: gib(sum.memory.a), b: gib(sum.memory.b) })} frac={sum.memory.frac} color={p.mem} /> : null}
-          {sum.free ? <Summary label={tr('machines.sum.free')} value={bytes(sum.free.a)} frac={sum.free.frac} color={p.disk} onClick={openStorage} /> : null}
+      {error ? <Text style={{ marginHorizontal: pad, marginTop: 10, fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
+      {body}
+      {list.length ? (
+        <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: narrow ? 14 : 24, paddingHorizontal: pad, borderTopWidth: 1, borderColor: p.line, overflow: 'hidden' }}>
+          <Summary label={tr('machines.sum.running')} value={tr('machines.sum.of', { a: sum.running.a, b: sum.running.b })} />
+          {sum.memory ? <Summary label={tr('machines.sum.memory')} value={tr('machines.sum.ofGb', { a: gib(sum.memory.a), b: gib(sum.memory.b) })} /> : null}
+          {sum.free ? <Summary label={tr('machines.lib.freeDisk')} value={bytes(sum.free.a)} onClick={openStorage} /> : null}
         </View>
       ) : null}
       {menu ? <PopMenu x={Math.min(menu.x - rl[0], rl[2] - 232)} y={Math.min(menu.y - rl[1], rl[3] - 330)}
         items={menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
+      {sheet}
+      {cfg ? <Sheet width={1000} height={700} modal onClose={() => setCfg(null)}>
+        <Configure dir={cfg.dir} section={cfg.section} onClose={() => { setCfg(null); refresh(); }} />
+      </Sheet> : null}
       {copying ? <CloneSheet m={copying} running={stateView(copying.state, copying.reason).active} onClose={() => setCopying(null)}
         onDone={(out) => { setCopying(null); refresh(); if (out?.dir) setSel(out.dir); }} /> : null}
       {discard ? <ConfirmDialog title={tr('machines.discard.title', { name: discard.name })} detail={tr('machines.discard.detail')} okLabel={tr('machines.fail.discardState')} cancelLabel={tr('machines.cancel')} destructive

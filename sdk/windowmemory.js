@@ -19,6 +19,7 @@ function save() {
   let changed = false;
   for (const w of windows.get()) {
     if (w.args?.dialog || (getApp(w.app)?.builtin && !String(w.id).startsWith('linux#'))) continue;
+    if (w.args?.guest) continue;                       // a guest's window: the guest says where it is (Machines' apps mode)
     if (keyOf(w).startsWith('linux:linux#') || keyOf(w) === 'linux:') continue;   // nothing names this app
     const p = placeOf(w, displayFor(w.snapped && w.restore ? w.restore : w));
     if (!p) continue;

@@ -2,7 +2,7 @@
 // The theme builds the desktop (wallpaper, bar, dock, app launcher, Control Center) and the
 // window frames. Apps come from apps/ through the SDK.
 import {
-  startShell, View, Text, Image, screen, ThemeProvider, useSettings, useWindows, configureWindows, getApp, wm, addListener, t as tr,
+  startShell, View, Text, Image, screen, ThemeProvider, useSettings, useTrackedSettings, useWindows, configureWindows, getApp, wm, addListener, t as tr,
   useLauncherApps, launchApp, useDockEntries, dockActivate, dockMenu, dockPrefs, DOCK_LAUNCHER,
   useTrash, openTrash, emptyTrash, trashMenu, ConfirmDialog,
   DesktopWidgets, WidgetDropTarget, WidgetPicker, widgetPicker, startDeskWidgets, registerGestureActions, screenDisplays, mainDisplay, settings, Layer, PowerDialog,
@@ -10,6 +10,7 @@ import {
   toggleShowDesktop, appSettingsItem, flowDesktopKeys, flowGrabs, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome,
   openOverview, closeOverview, toggleOverview, LevelHud, useStore, notifyHistory, menuBarEveryDisplay, hasBar, displayAt, keepWindowsInWorkAreas,
   snapPreview,
+  guestAppsMode,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState, Fragment } from 'react';
@@ -124,7 +125,7 @@ function DockMenu({ pos, at, items, onClose }) {
 
 function App() {
   startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
-  const [s] = useSettings();
+  const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
   const t = makeTheme(s);
   const { windows, mounted, focused } = useWindows();
   const preview = useStore(snapPreview);
@@ -178,18 +179,20 @@ function App() {
 
   // Pinned and open apps; windows of the same app (Linux too) share a single icon. The app launcher
   // is a Dock item too (it moves, but can't be removed).
+  // inside a Machines guest in apps mode (sdk/guestwin.js) only the windows are drawn: the host shows them one by one
+  const ga = useStore(guestAppsMode);
   const entries = useDockEntries(DOCK_DEFAULT, { recents: dp.dockRecents ? 3 : 0, launcher: { Icon: LaunchpadIcon, onOpen: () => setLaunchpad(true) } });
   const byId = new Map(entries.map((e) => [e.id, e]));
 
   return (
     <ThemeProvider tokens={t}>
-      <View style={{ width: '100%', height: '100%' }}>
-        {all.map((d) => (
+      <View style={{ width: '100%', height: '100%', ...(ga ? { backgroundColor: '#000' } : null) }}>
+        {!ga && all.map((d) => (
           <Image key={d.id + ':' + d.x} src={wallpaperSrc(findWallpaper(t.wallpapers, wallpaperIdFor(s, d)), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)} onContextMenu={(e) => setContext({ x: e.x, y: e.y })}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}
-        {all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
-        <DesktopWidgets layer="below" />
+        {!ga && all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
+        {!ga && <DesktopWidgets layer="below" />}
         <WidgetDropTarget />
         <OverviewBackdrop />
         {/* keyed on the window: raising one reorders this list, and it must move, not mount again */}
@@ -200,25 +203,25 @@ function App() {
           </Fragment>
         ))}
         {minimizing.filter((x) => !mounted.includes(x.win)).map(({ win }) => <Window key={win.id} win={win} app={getApp(win.id)} t={t} focused={false} fx={minFx(win.id)} />)}
-        <DesktopWidgets layer="above" />
+        {!ga && <DesktopWidgets layer="above" />}
         <WidgetPicker />
         {/* Everything above the windows goes in its layer (sdk/layers.js, docs/LAYERS.md): the
             order is the layers', not this tree's, and clicks follow it. Menus go to «popover»
             by themselves (Menu.jsx). */}
-        <Layer name="menubar">
+        {!ga && <Layer name="menubar">
           <MenuBars t={t} height={MENU_H} displays={all} every={every} mirror={screen.mirror} focused={focused} focusRect={focusRect}
             control={control ? control.area.id : null} clock={clockPanel ? clockPanel.area.id : null} unread={unread}
             onClock={panelToggle(setClockPanel, setControl)} onControlCenter={panelToggle(setControl, setClockPanel)}
             onLaunchpad={() => setLaunchpad(true)} />
-        </Layer>
-        <Layer name="dock">
+        </Layer>}
+        {!ga && <Layer name="dock">
         <Dock t={t} items={entries} running={entries.filter((e) => e.running).map((e) => e.id)}
           onOpen={(id) => byId.has(id) && dockActivate(byId.get(id))}
           onContext={(id, at) => byId.has(id) && setDockCtx({ entry: byId.get(id), at })}
           onTrash={openTrash} onTrashContext={(at) => setTrashCtx(at)} trashFull={trash.full}
           position={dp.dockPosition} size={dp.dockSize} magnify={dp.dockMagnify} maxSize={dp.dockMagnifySize}
           hideMode={dp.dockHide} top={MENU_H} keepOpen={!!dockCtx || !!trashCtx} area={main} />
-        </Layer>
+        </Layer>}
         {dockCtx && <DockMenu pos={dp.dockPosition} at={dockCtx.at} onClose={() => setDockCtx(null)} items={dockMenu(byId.get(dockCtx.entry.id) || dockCtx.entry)} />}
         {trashCtx && <DockMenu pos={dp.dockPosition} at={trashCtx} onClose={() => setTrashCtx(null)} items={trashMenu({ onEmpty: () => setAskEmpty(true) })} />}
         {askEmpty && (

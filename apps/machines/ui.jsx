@@ -1,6 +1,10 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
-import { View, Text, Overlay, screen, addListener, useTheme, errorText, t as tr } from '@lordos/sdk';
+import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, useSettings, useStore, t as tr } from '@lordos/sdk';
+import { logoFor } from './logos.js';
+import { storeRev } from './store.js';
+import { COLOR_HEX } from './systems.js';
+import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg, memlockFits } from './model.js';
 import { useEffect, useRef, useState } from 'react';
 
 export const TONE = { run: '#30d158', pause: '#ff9f0a', off: '#8e8e93', busy: '#0a84ff', bad: '#ff453a' };
@@ -8,11 +12,23 @@ export const has = () => typeof lord !== 'undefined' && !!lord.vm;
 // why lord.vm refused a start or a change (it returned 0), or the fallback text: a writable shared folder that holds a
 // protected file (vm.shareProtected) is said as such
 export const vmRefusal = (fallback) => { const r = lord.vm.refusal ? lord.vm.refusal() : null; return r ? errorText(r) : fallback; };
-export const gb = (mb) => (mb >= 1024 ? `${Math.round((mb / 1024) * 10) / 10} GB` : `${mb} MB`);
-export const bytes = (b) => (b >= 1e12 ? `${Math.round(b / 1e11) / 10} TB` : b >= 1e9 ? `${Math.round(b / 1e8) / 10} GB` : `${Math.round(b / 1e6)} MB`);
+export const gb = (mb) => (mb == null || !Number.isFinite(+mb) ? '—' : mb >= 1024 ? `${Math.round((mb / 1024) * 10) / 10} GB` : `${mb} MB`);
+export const bytes = (b) => (b == null || !Number.isFinite(+b) ? '—' : b >= 1e12 ? `${Math.round(b / 1e11) / 10} TB` : b >= 1e9 ? `${Math.round(b / 1e8) / 10} GB` : `${Math.round(b / 1e6)} MB`);
 export const gib = (b) => `${Math.round((b / 1073741824) * 10) / 10}`;
 
 // surfaces: dark like the mocks, light from the theme
+// a color as rrggbb for a tinted glyph ('#rgb', '#rrggbb[aa]', 'rgb(…)'); white when it isn't one
+export function hexOf(c) {
+  const s = String(c || '').trim().toLowerCase();
+  let m = /^#([0-9a-f]{3})$/.exec(s);
+  if (m) return m[1].split('').map((d) => d + d).join('');
+  m = /^#([0-9a-f]{6})/.exec(s);
+  if (m) return m[1];
+  m = /^rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/.exec(s);
+  if (m) return m.slice(1, 4).map((v) => Math.max(0, Math.min(255, Math.round(+v))).toString(16).padStart(2, '0')).join('');
+  return 'ffffff';
+}
+
 export function usePal() {
   const t = useTheme();
   const dark = t.mode === 'dark';
@@ -26,22 +42,45 @@ export function usePal() {
     btn: dark ? '#3b3b43' : 'rgba(0,0,0,0.07)',
     hover: dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)',
     text: t.text, dim: t.textDim,
-    accent: '#0a84ff', cpu: '#6cb6ff', mem: '#c79bff', disk: '#ffb340', ok: '#30d158', warn: '#ffc56e', bad: '#ff9a9a',
+    // the accent the person chose (Settings → Appearance): selections, buttons and Machines' glyphs follow it
+    accent: t.accent || '#0a84ff', cpu: '#6cb6ff', mem: '#c79bff', disk: '#ffb340', ok: '#30d158', warn: '#ffc56e', bad: '#ff9a9a',
     warnBg: dark ? '#4a3512' : '#fff1d6', badBg: dark ? '#4a2028' : '#ffe1e4',
   };
 }
 
 export function StateDot({ tone, size = 8 }) { return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: TONE[tone] || TONE.off }} />; }
 
-// Our own marks for the systems we recognize: a colored rounded tile with a letter, never a project's logo.
+// Our own marks for the systems we recognize: a colored rounded tile with a letter. LordOS ships no system's logo
+// (docs/TRADEMARKS.md): with "Official logos of the systems" on (Machines settings → General, off by default) a system
+// whose owner's policy allows it shows the logo the person downloaded (logos.js), on a light tile; any other time ours.
 const MARKS = {
   lordos: ['#5aa9ff', '#1f5fbf', 'L'], debian: ['#e0668c', '#8c2146', 'D'], ubuntu: ['#f28a55', '#a83a1a', 'U'], fedora: ['#6a8fd8', '#2b4478', 'F'],
   mint: ['#8bd17c', '#3c7a32', 'M'], arch: ['#5fb4e0', '#1d6a91', 'A'], alpine: ['#4fa3c7', '#1a4f6a', 'A'], opensuse: ['#7fcf6a', '#2f6b25', 'S'],
   kali: ['#5b7fd6', '#22305a', 'K'], rocky: ['#4fc6a0', '#1f6a52', 'R'], alma: ['#e2b04a', '#8a5a14', 'A'], centos: ['#b07ad6', '#5a2d7a', 'C'],
-  freebsd: ['#e05a5a', '#7a1f1f', 'B'], raspios: ['#d6567a', '#7a1f3a', 'P'], other: ['#8a93a6', '#3b4252', '▣'],
+  windows: ['#4aa3f0', '#1a56a8', 'W'], freebsd: ['#e05a5a', '#7a1f1f', 'B'], raspios: ['#d6567a', '#7a1f3a', 'P'], other: ['#8a93a6', '#3b4252', '▣'],
 };
-export function OsMark({ id, size = 40 }) {
-  const [a, b, ch] = MARKS[id] || MARKS.other;
+// Machines' own marks for systems whose makers don't let their logos be shown (Canonical asks for written permission;
+// Microsoft allows no use of its logos or of designs like them): drawn for LordOS, nothing like either logo
+const DRAWN = { ubuntu: 'ubuntu', windows: 'windows' };
+
+// id: a system's; color and letter: a system the person added (systems.js COLOR_HEX)
+export function OsMark({ id, size = 40, color, letter }) {
+  const [s0] = useSettings();
+  useStore(storeRev);
+  const logo = s0.machinesDefaults?.logos === true && !color ? logoFor(id) : '';
+  if (logo) {
+    return (
+      <View style={{ width: size, height: size, borderRadius: size * 0.22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid rgba(0,0,0,0.08)' }}>
+        <Image src={logo} style={{ width: size * 0.74, height: size * 0.74, objectFit: 'contain' }} />
+      </View>
+    );
+  }
+  // Machines' own drawn marks (assets/machines/marks): a whole tile, colors included
+  if (DRAWN[id] && !color) {
+    const px = Math.max(32, Math.min(256, Math.ceil(size * 2)));
+    return <Image src={`svg:${px}:-:asset:machines/marks/${DRAWN[id]}.svg`} style={{ width: size, height: size }} />;
+  }
+  const [a, b, ch] = color && COLOR_HEX[color] ? [COLOR_HEX[color][1], COLOR_HEX[color][0], (letter || '▣').slice(0, 1).toUpperCase()] : MARKS[id] || MARKS.other;
   return (
     <View style={{ width: size, height: size, borderRadius: size * 0.22, alignItems: 'center', justifyContent: 'center', background: `linear-gradient(180deg, ${a}, ${b})` }}>
       <Text style={{ fontSize: size * 0.5, fontWeight: 700, color: '#fff' }}>{ch}</Text>
@@ -73,48 +112,56 @@ export function Bar({ frac, color, height = 6 }) {
   );
 }
 
-// A button in the mocks' style: filled (accent), plain (gray) or a text link
+// A button in the mocks' style: filled (accent), plain (gray) or a text link; a pill, as hypervisaur's (kit.jsx)
 export function Btn({ label, onClick, primary, disabled, big, link, danger, style }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
-  const bg = link ? 'transparent' : primary ? p.accent : p.btn;
+  const bg = link ? 'transparent' : primary ? (danger ? '#e5483f' : p.accent) : p.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)';
+  const h = big ? 44 : 32;
   return (
     <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ height: big ? 44 : 32, paddingHorizontal: big ? 18 : 12, borderRadius: big ? 12 : 8, alignItems: 'center', justifyContent: 'center',
-        backgroundColor: bg, opacity: disabled ? 0.45 : hover && !link ? 0.88 : 1, ...style }}>
+      style={{ height: h, paddingHorizontal: big ? 22 : 16, borderRadius: h / 2, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: bg, opacity: disabled ? 0.45 : hover && !link ? 0.86 : 1,
+        border: link || primary ? 'none' : `1px solid ${p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`, ...style }}>
       <Text style={{ fontSize: big ? 14 : 13, fontWeight: primary || big ? 700 : 600, whiteSpace: 'nowrap',
-        color: link ? '#6cb6ff' : primary ? '#fff' : danger ? '#ff453a' : p.text }}>{label}</Text>
+        color: link ? p.accent : primary ? '#fff' : danger ? '#ff453a' : p.text }}>{label}</Text>
     </View>
   );
 }
 
 // A toolbar button with a glyph (or a drawn icon) and its name as the tooltip (the mock "Session": agent, shell, logs,
 // screenshot, record, pause, power)
-export function IconBtn({ glyph, icon, label, onClick, disabled, on, danger, color, size = 14 }) {
+// sym: a glyph of assets/machines/symbols (kit.jsx's Sym), tinted like the text
+export function IconBtn({ glyph, icon, sym, label, onClick, disabled, on, danger, color, size = 14, badge, dot }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   const fg = on || danger ? '#fff' : color || p.text;
+  const hex = hexOf(fg);
   return (
     <View onClick={disabled ? undefined : onClick} title={label} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ width: 32, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1,
+      style={{ width: 36, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.4 : 1,
         backgroundColor: danger ? '#8f1f2c' : on ? p.accent : hover && !disabled ? p.hover : 'transparent' }}>
-      {icon ? icon(fg) : <Text style={{ fontSize: size, fontWeight: 700, color: fg }}>{glyph}</Text>}
+      {sym ? <Image src={`svg:40:${hex}:asset:machines/symbols/${sym}-symbolic.svg`} style={{ width: 18, height: 18 }} />
+        : icon ? icon(fg) : <Text style={{ fontSize: size, fontWeight: 700, color: fg }}>{glyph}</Text>}
+      {badge ? <View style={{ position: 'absolute', right: 7, bottom: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: badge,
+        border: `1.5px solid ${p.dark ? '#2b2b31' : '#f2f2f4'}` }} /> : null}
+      {/* something to do here (the agent's: newer LordOS tools to install), at the top corner */}
+      {dot ? <View style={{ position: 'absolute', right: 6, top: 3, width: 7, height: 7, borderRadius: 4, backgroundColor: dot,
+        border: `1.5px solid ${p.dark ? '#2b2b31' : '#f2f2f4'}` }} /> : null}
     </View>
   );
 }
 
-// A row of bar buttons in one rounded container, and the thin line between groups (5.3: grouped, icons with tooltips)
+// A row of bar buttons on one pill, and the space between pills (5.3: grouped, icons with tooltips)
 export function BarGroup({ children }) {
   const p = usePal();
-  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1, padding: 2, borderRadius: 9, backgroundColor: p.btn }}>{children}</View>;
+  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: 3, borderRadius: 20, backgroundColor: p.btn,
+    border: `1px solid ${p.dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)'}` }}>{children}</View>;
 }
-export function BarSep() {
-  const p = usePal();
-  return <View style={{ width: 1, height: 20, marginHorizontal: 4, backgroundColor: p.line }} />;
-}
+export function BarSep() { return <View style={{ width: 6 }} />; }
 
 // An icon button that opens a menu under itself (resolution, devices, clipboard, power)
-export function IconMenuBtn({ glyph, icon, label, items, disabled, on, color, size }) {
+export function IconMenuBtn({ glyph, icon, sym, label, items, disabled, on, color, size }) {
   const [open, setOpen] = useState(false);
   const [end, setEnd] = useState(false);
   const ref = useRef(null);
@@ -126,7 +173,7 @@ export function IconMenuBtn({ glyph, icon, label, items, disabled, on, color, si
   };
   return (
     <View ref={ref}>
-      <IconBtn glyph={glyph} icon={icon} label={label} disabled={disabled} on={on || open} color={color} size={size} onClick={() => (open ? setOpen(false) : show())} />
+      <IconBtn glyph={glyph} icon={icon} sym={sym} label={label} disabled={disabled} on={on || open} color={color} size={size} onClick={() => (open ? setOpen(false) : show())} />
       {open ? (
         <Overlay anchor={ref}>
           <View style={{ position: 'absolute', top: 32, width: 260, ...(end ? { right: 0 } : { left: 0 }) }}>
@@ -179,7 +226,8 @@ export const icons = {
   ),
 };
 
-// A menu at a point of the window (right-click on a card) or under a button; items as MenuButton's
+// A menu at a point of the window (right-click on a card) or under a button; items as MenuButton's, plus { note: true,
+// label } for a line of information that wraps
 // How many menus are open: while one is, a machine's window keeps the keyboard for the menu (Esc closes it and never
 // reaches the guest).
 export const menus = { open: 0 };
@@ -198,9 +246,9 @@ export function PopMenu({ x, y, items, onClose, width = 220 }) {
     return () => { a(); b(); };
   }, []);
   return (
-    <View ref={ref} style={{ position: 'absolute', left: x, top: y, width, padding: 5, borderRadius: 10, backgroundColor: p.dark ? '#2b2b31' : '#ffffff',
-      border: `1px solid ${p.line}`, boxShadow: '0 12px 34px rgba(0,0,0,0.5)' }}>
-      {items.filter(Boolean).map((it, i) => (it === '-' ? <View key={`s${i}`} style={{ height: 1, marginVertical: 4, marginHorizontal: 6, backgroundColor: p.line }} />
+    <View ref={ref} style={{ position: 'absolute', left: x, top: y, width, padding: 6, borderRadius: 12, backgroundColor: p.dark ? '#34343c' : '#fbfbfd',
+      border: `1px solid ${p.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)'}`, boxShadow: '0 18px 44px rgba(0,0,0,0.45)' }}>
+      {items.filter(Boolean).map((it, i) => (it === '-' ? <View key={`s${i}`} style={{ height: 1, marginVertical: 5, marginHorizontal: 10, backgroundColor: p.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }} />
         : <MenuItem key={`${i}${it.label}`} it={it} onClose={onClose} />))}
     </View>
   );
@@ -208,12 +256,22 @@ export function PopMenu({ x, y, items, onClose, width = 220 }) {
 function MenuItem({ it, onClose }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
+  // an information row (note: true): wrapped over as many lines as it needs, under the items' text column, never a
+  // target; long words of any language and right-to-left text keep to the menu's width
+  if (it.note) {
+    return (
+      <View style={{ paddingVertical: 4, paddingHorizontal: 10, flexDirection: 'row', gap: 6 }}>
+        <View style={{ width: 12 }} />
+        <Text style={{ flex: 1, fontSize: 12, lineHeight: 16, textAlign: 'start', color: p.dim }}>{it.label}</Text>
+      </View>
+    );
+  }
   const lit = hover && !it.disabled;
   return (
     <View onClick={() => { if (it.disabled) return; onClose(); it.onClick?.(); }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ minHeight: 28, paddingHorizontal: 8, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: lit ? p.accent : 'transparent', opacity: it.disabled ? 0.4 : 1 }}>
+      style={{ minHeight: 30, paddingHorizontal: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: lit ? p.accent : 'transparent', opacity: it.disabled ? 0.4 : 1 }}>
       <Text style={{ width: 12, fontSize: 11, color: lit ? '#fff' : p.text }}>{it.checked ? '✓' : ''}</Text>
-      <Text style={{ flex: 1, fontSize: 13, whiteSpace: 'nowrap', color: lit ? '#fff' : it.destructive ? '#ff453a' : p.text }}>{it.label}</Text>
+      <Text style={{ flex: 1, fontSize: 13, paddingVertical: 6, textAlign: 'start', color: lit ? '#fff' : it.destructive ? '#ff453a' : p.text }}>{it.label}</Text>
       {it.hint ? <Text style={{ fontSize: 11, color: lit ? '#e6f1ff' : p.dim }}>{it.hint}</Text> : null}
     </View>
   );
@@ -244,20 +302,66 @@ export function MenuBtn({ label, items, primary, disabled }) {
   );
 }
 
+// The sound's output or input (6.9): an entry of soundDevChoices as text, and a menu's items for one of them (list:
+// lord.sound's sinks, or its microphones; pick(name) with '' for the system's default). short: the default without the
+// device it is now (a button's label, which mustn't grow past its pane)
+export const soundDevText = (x, short) => (!x ? '' : x.isDefault ? (x.current && !short ? tr('machines.cfg.soundDefaultNow', { name: x.current }) : tr('machines.cfg.soundDefault'))
+  : x.missing ? tr('machines.cfg.soundMissing', { name: x.label }) : x.label);
+export const soundDevItems = (list, chosen, pick) => soundDevChoices(list, chosen).map((x) => ({ label: soundDevText(x), checked: x.checked, onClick: () => pick(x.name) }));
+
 // the window's content root, for a menu at a pointer position (PopMenu takes coordinates inside it)
 export const overlayRoot = { current: null };
 
 // A dialog over the window (the mocks' Clone and the snapshot sheets): title, body, actions on the right. Esc cancels.
+// An alert in hypervisaur's look (kit.jsx): the window dimmed behind, a rounded card with a hairline edge.
 export function Sheet({ title, children, actions, width = 560, onCancel }) {
   const p = usePal();
   useEffect(() => addListener('keydown', (e) => { if (e.key === 'Escape') onCancel?.(); }), [onCancel]);
   return (
-    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.45)' }}>
-      <View style={{ width, padding: 22, gap: 14, borderRadius: 18, backgroundColor: p.dark ? '#1f1f23' : '#ffffff', boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
-        <Text style={{ fontSize: 18, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
+    <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 24,
+      backgroundColor: p.dark ? 'rgba(0,0,0,0.5)' : 'rgba(30,30,40,0.28)' }}>
+      <View style={{ width, maxWidth: '100%', padding: 22, gap: 14, borderRadius: 16, backgroundColor: p.dark ? '#26262f' : '#f6f6f8',
+        border: `1px solid ${p.dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'}`, boxShadow: '0 24px 64px rgba(0,0,0,0.55)' }}>
+        <Text style={{ fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
         {children}
-        {actions?.length ? <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>{actions}</View> : null}
+        {actions?.length ? <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, marginTop: 4 }}>{actions}</View> : null}
       </View>
     </View>
   );
 }
+
+// A bridged machine's network (6.5) is made just before it starts: the admin helper's vm-net-bridge puts a macvtap on its
+// wired card and gives this user its device, which lord-vm opens. Resolves at once for the other modes; rejects with the
+// translated reason (Wi-Fi card, no administrator...).
+export async function bridgeUp(m) {
+  if (m?.network !== 'bridged') return;
+  const arg = bridgeArg(m);
+  if (!arg) throw new Error(tr('machines.win.noBridgeCard'));
+  await admin.run('vm-net-bridge', arg, undefined, { quiet: true });
+}
+
+// A machine with a graphics card (docs/MACHINES-GPU.md, Mode A) gets its share of the Intel iGPU just before it starts:
+// the admin helper's vm-gvt-create makes the mdev with the machine's UUID and gives this user its /dev/vfio group, which
+// lord-vm opens. lord-server removes it when the machine stops. Resolves at once without one; rejects with the reason.
+export async function gvtUp(m) {
+  if (!m?.gpu) return;
+  const r = typeof lord.vm?.gpus === 'function' ? lord.vm.gpus() : null;
+  const gpu = gvtGpu(r);
+  if (!gpu) throw new Error(tr('machines.win.gvtOff'));
+  // its memory is locked while it runs: it must fit "Memory machines may lock" (lord-server's vm-memlock checks again)
+  if (!memlockFits(m, r.memlock)) throw new Error(tr('machines.win.gvtMemlock', { mem: gb(m.memoryMb), cap: gb(r.memlock.capMb) }));
+  // with none free, the type anyway: the machine's own vGPU may still be there (a restart takes it again, which
+  // vm-gvt-create allows); anyone else's is refused by the helper
+  const type = gvtType(gpu, m.gpu, m.resolution, true) || gvtType(gpu, m.gpu, m.resolution, false);
+  if (!type) throw new Error(tr('machines.win.gvtNone'));
+  await admin.run('vm-gvt-create', gvtArg(m, type), undefined, { quiet: true });
+}
+
+// Everything a start needs from the admin helper, in order: the bridged network, then the graphics card. Rejects with
+// the translated message to show
+export async function startPrep(m) {
+  await bridgeUp(m).catch((e) => { throw new Error(tr('machines.win.bridgeFailed', { why: e.message })); });
+  await gvtUp(m).catch((e) => { throw new Error(tr('machines.win.gvtFailed', { why: e.message })); });
+}
+// whether a start goes through startPrep first
+export const needsPrep = (m) => m?.network === 'bridged' || !!m?.gpu;

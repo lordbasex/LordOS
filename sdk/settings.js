@@ -1,4 +1,5 @@
 // settings.js — user settings, stored in ~/.config/lordos/settings.json.
+import { useRef, useSyncExternalStore } from 'react';
 import { createStore, useStore } from './store.js';
 import { markExistingUser } from './firststartmodel.js';
 import { withWidgetCities } from './weathermodel.js';
@@ -41,6 +42,7 @@ const DEFAULTS = {
   logs: null,                 // 0.8.9.1 (#199), Logs: { collapsed } the sidebar groups folded (sdk/logfile.js toggleGroup); new key, no migration
   editor: null,               // 0.8.8.8 (#113), Text Editor: { recent } File → Open Recent (apps/editor/recent.js); new key, no migration
   machinesView: null,         // 0.8.8.7, Machines' library: { view, sort, show } (apps/machines/model.js libView)
+  machinesDefaults: null,     // 0.8.9, Machines' defaults: { profile, bridge, logos } (apps/machines/store.js defaultsOf; logos: the official-logos switch, off unless the person turns it on)
   files: null,                // 0.8.7, Files → Settings (apps/files/prefs.js)
   pickerView: null,           // 0.8.8.3, the system file dialog's List / Thumbnails: { files, images } (sdk/filepickermodel.js viewFor)
   sessionSaved: null,         // { clean, windows } what was open; written by sessionrestore.jsx only
@@ -52,8 +54,11 @@ const DEFAULTS = {
   webAppPrefs: {},            // 0.8.8.8, Settings → Web apps: per app { badge, dockPerProfile } (webappsmodel.js webPrefs); new key, no migration
   appsOffKept: null,         // what deactivating changed, to put back on Activate: { backupInterval } (appsoffactions.js)
   flathub: null,              // 0.8.9.3, Store → Flathub: { on, showAll, appstreamAt } (flathubmodel.js prefsOf); new key, no migration
+  openWithDefaults: {},       // 0.8.9.5, Files: "Always open .exe files with …" per extension → an "Open with" provider's id (sdk/openwith.js); new key, no migration
+  storeSideWidth: null,       // 0.8.9.5, the Store's sidebar width (dragged at its edge; null: the default); new key, no migration
   cloudColors: {},            // 0.8.8.10 (#184), Settings → Cloud: a color chosen per account id (cloudmodel.js accountColor); new key, no migration
   themeOptions: {},           // 0.8.9, a theme's own choices from its theme.json "options", by theme id (thememeta.js); new key, no migration
+  displayApps: null,          // 0.8.9.5, the apps used on each display, by connector: { v, off, displays } (sdk/displayappsmodel.js); new key, no migration
   workspaces: null,           // 0.8.9, Lord Workspaces' activities: { v, activities } (themes/workspaces/model/activities.js); new key, no migration
   desktopChosen: false,       // 0.8.9, the first-start desktop chooser was finished (sdk/firststart.jsx); migration 5 sets it for existing users
   firstStart: null,           // 0.8.9, that chooser's step while it is open, across its live theme switches (sdk/firststartmodel.js cleanState)
@@ -154,6 +159,45 @@ export function saveSettingsNow(durable = false) {
   return lord.settings.save(JSON.stringify(settings.get(), null, 2), durable);
 }
 
+// [settings, set]: the component renders again on every change to any setting.
 export function useSettings() {
   return [useStore(settings), settings.set];
+}
+
+// [settings, set] for a component that renders often and reads few settings (a theme's root, which holds the whole
+// desktop): it renders again only when a setting it read changed. The object it gets records the keys read from it
+// (while rendering, or later in a handler or an effect); spreading or listing it ({ ...s }, Object.keys,
+// JSON.stringify) counts as reading every key. Values are read live: a handler sees the current setting. Whatever the
+// component shows must come from this object: a helper that reads settings.get() itself is not followed (pass it
+// the object instead). Before 0.8.9.5 a theme's root rendered again, synchronously, on any change to any setting:
+// the session's saved windows, the Store's sidebar width, a switch in Settings.
+export function useTrackedSettings() {
+  const ref = useRef(null);
+  if (!ref.current) ref.current = { keys: new Set(), all: false, state: null, view: null };
+  const r = ref.current;
+  const view = useSyncExternalStore(settings.subscribe, () => settingsView(r));
+  return [view, settings.set];
+}
+function settingsView(r) {
+  const s = settings.get();
+  if (r.state === s && r.view) return r.view;
+  const old = r.state;
+  r.state = s;
+  if (!r.view || r.all || !old) r.view = trackingView(r);
+  else for (const k of r.keys) if (!Object.is(old[k], s[k])) { r.view = trackingView(r); break; }
+  return r.view;
+}
+function trackingView(r) {
+  return new Proxy({}, {
+    get(_, k) { if (typeof k === 'string') r.keys.add(k); return settings.get()[k]; },
+    has(_, k) { if (typeof k === 'string') r.keys.add(k); return k in settings.get(); },
+    ownKeys() { r.all = true; return Reflect.ownKeys(settings.get()); },
+    getOwnPropertyDescriptor(_, k) {
+      if (typeof k === 'string') r.keys.add(k);
+      const d = Reflect.getOwnPropertyDescriptor(settings.get(), k);
+      return d ? { ...d, configurable: true } : undefined;
+    },
+    set() { return false; },
+    deleteProperty() { return false; },
+  });
 }

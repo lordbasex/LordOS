@@ -46,10 +46,12 @@ import { btPowerAction } from './btpowermodel.js';
 import { openPlan, urlHost, splitPath } from './portalopenmodel.js';
 import { openUrl, openFileWithApps, revealPath } from './sysopen.js';
 import { wm } from './windows.js';
-import { linuxPlayersChanged } from './media.js';
+import { linuxPlayersChanged, userDirs } from './media.js';
 import { trayEvent } from './trayitems.jsx';
 import { globalShortcutsEvent } from './globalshortcuts.jsx';
 import { castEvent, castNames } from './screencast.jsx';
+import { castAskerName, shotFreeName, shotStamp } from './screencastmodel.js';
+import { mkdir as fsMkdir, stat as fsStat } from './fs.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -475,14 +477,21 @@ function asker(p) {
 // the ScreenCast chooser and its pill (sdk/screencast.jsx) name only the app lord-server verified (its launcher's
 // scope), never the name a process gives itself: with none they say it is an unknown program
 function castAsker(p) {
-  const who = typeof p?.who === 'string' ? p.who : '';
-  if (who.startsWith('desktop:')) {
-    const app = linuxAppFor(who.slice(8));
-    return app ? shortAppName(app) : who.slice(8);
-  }
-  return who.startsWith('lpk:') ? who.slice(4) : who;
+  return castAskerName(p?.who, {
+    linux: (id) => { const app = linuxAppFor(id); return app ? shortAppName(app) : ''; },
+    // by the verified Flatpak id only (flatpakAppFor also matches a window class the app chooses)
+    flatpak: (id) => { const a = flatpakAppFor(id); return a && a.flatpakId === id ? a.name : ''; },
+  });
 }
-castNames({ app: castAsker, window: windowAppName });
+// a Screenshot portal request's picture: a new file in the person's Screenshots folder, named as the Screenshots app
+// names its own (lord-server writes it and never over an existing file; a Flatpak app gets it lent, fplend.h)
+function shotPath() {
+  const dir = `${userDirs().pictures}/${t('screenshots.folder')}`;
+  try { fsMkdir(userDirs().pictures); } catch (e) { /* already there */ }
+  try { fsMkdir(dir); } catch (e) { /* already there */ }
+  return shotFreeName(dir, t('screenshots.fileName', { date: shotStamp(new Date()) }), (p) => { try { fsStat(p); return true; } catch (e) { return false; } });
+}
+castNames({ app: castAsker, window: windowAppName, shotPath });
 
 export function PolkitPrompt() {
   const p = useStore(polkitPrompt);
@@ -768,6 +777,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'portal-open-gone': portalOpens.set(portalOpens.get().filter((x) => x.id !== data?.id)); break;
     case 'portal-shortcuts': case 'portal-shortcuts-gone': case 'portal-shortcuts-changed': globalShortcutsEvent(kind, data); break;
     case 'portal-cast': case 'portal-cast-gone': case 'portal-casts': castEvent(kind, data); break;   // ScreenCast (screencast.jsx)
+    case 'portal-shot': case 'portal-shot-gone': case 'portal-shot-taken': castEvent(kind, data); break;   // Screenshot (screencast.jsx)
     case 'webapps-ask': case 'webapps-ask-gone': webAskEvent(kind, data); break;
     case 'webapps-badge': webBadgeEvent(data); break;
     case 'webapps-menu': case 'webapps-menu-gone': webMenuEvent(kind, data); break;

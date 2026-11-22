@@ -10,13 +10,1112 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
+  (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
+  `docs/NVIDIA-PLAN.md`).
+  - **Settings → Graphics cards** now shows on every computer with a GPU (before, only with two or more). Each card shows
+    its driver with its version (`nvidia 560.35.03 (open)`, `nouveau (Mesa 25.0.7)`, `amdgpu (Mesa …)`). An NVIDIA card
+    says *Experimental — not verified on your card model yet*, has **How to Help Test It** (a new Help article,
+    `graphics-cards`, in English, Spanish and Portuguese), shows whether CUDA's libraries are installed, and lists its
+    roles **AI and compute (CUDA)** and **Desktop** as *Planned* with an honest note and no button: installing NVIDIA's
+    driver and drawing the desktop with it wait for their admin actions and the explicit-sync design to be approved.
+  - **Send a compatibility report:** `lord.sysinfo.gpuReport()` (C, `server/src/sysreport/gpureport.c`) reads only
+    world-readable files and builds a plain-text report: the cards (PCI ids and names, kernel driver, boot display,
+    render node), which one draws the desktop (the card lord-server holds), NVIDIA's module (version, open or
+    proprietary kernel modules), `nvidia-drm` modeset and fbdev, `nouveau`, CUDA's userspace (`libcuda`, `nvidia-smi`,
+    `/dev/nvidia-uvm`), Mesa's version, the Vulkan ICDs with their API version, VA-API and VDPAU drivers, OpenCL,
+    Secure Boot, the kernel's lockdown, only the graphics options of the kernel command line, and how this session
+    composes the screen (and why the GPU didn't start, when it didn't) with its GL renderer. No program is run. The text
+    is scrubbed in C and again in JS (the home → `~`, other `/home/<name>`, the user's and host's names as whole words,
+    MAC addresses, UUIDs, e-mail addresses, serial values) and shown whole before anything else; **Open the Form on
+    GitHub** copies it to the clipboard and opens the new `gpu-report.yml` issue form prefilled (version, card, driver,
+    report), under the browser hand-off's 3000 characters, cut on whole lines and marked. Nothing is sent by LordOS.
+    Messages in all 35 languages.
+  - **From the terminal:** `lordos-sysreport gpu [--json]` prints the same report (without the session's part; the
+    desktop's card is the one the user's lord-server holds), and `lordos-issue --gpu` prints it with the form's address,
+    without asking for a password.
+  - **Tests:** `build/gpureport-test` (a fake machine with an Intel iGPU and two NVIDIA cards, one on the open modules
+    drawing the desktop and one no driver took, full of serials, a MAC, a disk UUID, an address and the user's and
+    host's names that must not come out; NVIDIA's version file in both kinds; the redaction, its cut and 20,000 random
+    inputs, under ASan and UBSan: 67 checks) and `tests/gpu_report_test.mjs` (the JS scrub, the form's address and the
+    summaries: 39 checks).
+  - **For the maintainer's approval, not published:** the issue form `.github/ISSUE_TEMPLATE/gpu-report.yml`, the site
+    page draft "Tested graphics cards" (`web/content/hardware/gpus.{en,es,pt}.md`, `gpus.meta.json`; not wired into the
+    site build), the call for testers (`docs/drafts/nvidia-call-for-testers.{en,es}.md`) and the designs in
+    `docs/NVIDIA-PLAN.md`: NVIDIA's driver as an opt-in from the Store's "Suggested for your computer" card, revised
+    after the maintainer's decision of 2026-11-22 (the free `nouveau` stays the default; Turing and newer, RTX 50
+    included, get NVIDIA's own signed repository for Debian 13 through the existing catalog `pkg-source-add`, with open
+    kernel modules and the branch pinned; GTX 9xx/10 keep Debian 13's 550 driver; CUDA and the toolkit are separate
+    options; Settings → Graphics cards opens that card; flat-repository support in the package engine; guided Secure
+    Boot key enrolment, the only closed admin action still asked for, `gpu-mok-enroll`, the other three dropped;
+    Flatpak's GL.nvidia extension) and NVIDIA drawing the desktop
+    (`nvidia-drm.modeset=1`, GBM/EGL, explicit sync, a boot fallback, a test matrix by generation).
+
+- **Lord Workspaces: each display's quick launch and its usual apps, suggested, in development** (asked by the maintainer;
+  decision 2026-11-22: suggest, never open by itself; `docs/WORKSPACES.md`, "Several displays").
+  - **The record, in the SDK for every theme** (`sdk/displayapps.js`, the rules in `sdk/displayappsmodel.js`): per display,
+    keyed by its connector (`DP-2`, `HDMI-A-1`…, never the model, which identical monitors share), the apps opened there
+    (each app once per half hour, its display read once the theme placed the window) and the apps open there together
+    for a minute and a half, in the theme's tile order with its layout and divider (each set once per session). Small
+    and pruned: at most 8 displays, 12 apps and 6 sets per display, 6 apps per set; use halves every 14 days and is
+    forgotten after 90. Stored in `settings.displayApps` (a new key, no migration), on this computer only; nothing is
+    sent anywhere. No polling: one timer after the apps on a display change.
+  - **The empty-activity card** of each display keeps Add window, Add widget and Open pinned apps, and adds **Used most
+    on this display**: up to five apps, most used there with recent ones first, one click each, opened on that display.
+  - **The usual apps, suggested:** a set seen at least twice on a display shows in its card as "Open your usual apps
+    here?" with each app and the layout's miniature, after 1.2 s with nothing open (windows coming back with the session
+    don't flash it), once per activity and display in a session (when the session starts or a new activity shows
+    there). **Open them** sets the usual layout (not on a locked display) and opens the apps aimed at that display, each
+    window taking its usual tile as it arrives whatever order the apps start in (`openUsual`, `themes/workspaces/tiler.js`);
+    **Not now** hides it for the session; **Don't suggest on this display** is kept for that display only. Nothing opens
+    without a click.
+  - **Keyboard:** the card's controls follow the activity strip in the bars' keyboard (⌃F2, then the arrows, Enter),
+    with the bars' ring. **RTL:** text aligned to start, rows follow the direction (headless screenshots in English and
+    Arabic, 2026-11-22).
+  - **Settings → Desktop style** (with the theme's options; a theme opts in with `"displayApps": true` in its
+    `theme.json`, `sdk/thememeta.js`): "Remember the apps used on each display" (turning it off forgets the record and
+    records nothing) and "Forget the apps of every display" (Clear; displays told not to suggest suggest again).
+  - **Texts** in all 35 languages (`shell.ws.usual.*`, `shell.ws.quick.title`, `shell.displayApps.*`).
+  - **Tests:** `server/tests/display_apps_model_test.mjs` (the record cleaned, pruned and small, fading use, a set
+    suggested only once seen twice, per display, quiet displays, off and clear); `server/tests/workspaces_scene.mjs`
+    (three displays: the card's quick launch per display, no suggestion before the moment or for a set seen once,
+    nothing opened by itself, Open from the keyboard opening the apps on that display in the usual layout and order,
+    offered once, "Don't suggest" kept for that display only, Clear and off); `workspaces_model_test.mjs` (theme.json).
+
+- **A Linux window's own icon for apps with no installed one, in development** (`xdg-toplevel-icon-v1`, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Window icons"). An AppImage, a Wine program or a game without a `.desktop`
+  entry now shows the icon it hands its window in the Dock, the switcher and the Overview instead of a letter. The
+  installed icon always wins for every other app, icon names are ignored (they could name another app's icon), and the
+  pixels are copied, re-encoded and size-limited by lord-server (square, at most 256 px, 16 MB for the whole session).
+
+- **Linux apps may be told when you're away from the computer, only if you allow it, in development**
+  (`ext-idle-notify-v1`, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Idle notifications"). The first time
+  an app asks, LordOS shows its own prompt ("‹App› wants to know when you're away from the computer", Allow / Don't
+  allow), remembered per app by the identity lord-server checks itself (the program it runs, the Flatpak app, or an
+  isolated LordOS app's id) and changed in Settings → Privacy → Away from the computer. A denied app keeps working but is
+  never told; idle inhibitors (a video, a presentation) count as being there. The new `idle` permission can't be
+  declared in a manifest or requested through the broker. Texts in all 35 languages.
+
+- **`wp_single_pixel_buffer_manager_v1` and `wp_alpha_modifier_v1` for Linux apps, in development** (Wayland audit item
+  7, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Apps (GTK 4, video
+  players) can draw a solid colour from a one-pixel buffer stretched by a viewport instead of a full-size buffer, and
+  fade a surface with an opacity the compositor applies (both paths). Offered to sandboxed clients too: neither reads
+  anything of another client.
+
+- **xdg-shell 7 and newer protocol versions for Linux apps, in development** (Wayland audit item 4, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Each window is offered the window menu and
+  fullscreen (not during a screen share) besides maximize and minimize, told the work area of their display
+  (`configure_bounds`, from the theme through `lord.wayland.workAreas`) so they never open larger than it, and told which
+  edges are tiled and constrained when maximized or snapped to a half, quarter or third. `zwp_linux_dmabuf_v1` 5 (one
+  modifier for every plane), `wp_presentation` 2 and `wp_cursor_shape_manager_v1` 2 (`dnd_ask`, `all_resize`). Checked
+  with `WAYLAND_DEBUG` on foot, FeatherPad (Qt 6.8) and zenity (GTK 4.18): no protocol error.
+
+- **Flatpak apps: the maintainer's decisions of 2026-11-22, in development** (`docs/FLATPAK.md`, "Shared runtime
+  folders", "Lending a chosen file", "Steam" and "Screenshots"; AGENTS.md, Flatpak entries; found by the Flathub
+  compatibility run of 2026-11-22).
+  - **A second launch reaches the first** (open question 4, decided): every view of the same app id, same user and same
+    restrictions shares `$XDG_RUNTIME_DIR/.flatpak/<id>` (Flatpak's per-app `/tmp`) and `$XDG_RUNTIME_DIR/app/<id>`
+    (the app's runtime folder), folders the launcher makes under `$XDG_RUNTIME_DIR/lordos/fpshare/<id>.<restrictions>/`
+    and binds into that app's views only (`flatpak_share` in `apps.c`, `share_src`/`share_dst` in `sec/sandbox.c`).
+    Chromium's and VS Code's single-instance logic finds the running instance again instead of starting a second copy on
+    the same profile ("Profile error occurred", locked databases, a corrupt `argv.json`). Another app, or the same app
+    with other restrictions, never sees them.
+  - **The chosen file is lent, never the rest of the home**: when a Flatpak app gets a file from LordOS's file dialog
+    (FileChooser portal), exactly that file, that folder, or for a save only the chosen file (writable, alone in its
+    grant), is bind-mounted into the app's running view by the view's own PID 1 and the app gets
+    `/run/flatpak/app/<id>/doc/<grant>/<name>`, as Flatpak's document portal would give a path of its own, without FUSE
+    (`server/src/fplend.c`, `lend_one` in `sec/sandbox.c`). PID 1 keeps a tmpfs only it writes, shown read-only to the app
+    inside `app/<id>` (which Flatpak 1.16 binds at `/run/flatpak/app/<id>`) and
+    propagated as a slave into Flatpak's sandbox, so a grant made while the app runs reaches it. PID 1 opens the path itself
+    in the view, never through a link, and lends it only if it is the device and inode lord-server checked; protected
+    paths and the launcher's sensitive folders are never lent, a save only where the launcher's grant rules allow writing.
+    The grants go with the view when the app's last process leaves. Other callers get the real path, as before.
+  - **Steam starts** (`com.valvesoftware.Steam` only): its Spawn's `usr-fd` and `app-fd` (pressure-vessel's Steam Runtime
+    container) are served when each is a folder opened for reading inside Steam's data folder or Steam's own installation
+    or the installed runtimes, checked physically (`..` by `..` on the same mount, to a folder lord-server opened with no
+    link on its way; `fpak_steam_fd_ok`), and passed as `--usr-fd`/`--app-fd` to `flatpak run` of Steam itself in Steam's
+    view and Landlock domain, with LordOS's never-granted options and restrictions after it. Every other app's
+    `usr-fd`/`app-fd` is still refused.
+  - **Screen sharing asks once**: a ScreenCast session of an app LordOS verified that asked to persist gets a restore
+    token for the sources the person picked, kept only in memory, valid 10 s and once (`csm_token_issue`/`csm_token_take`
+    in `cast/castsm.c`): Chromium's second request and OBS's restart right after the choice start without the chooser;
+    the indicator shows the share as always, and a restored session gets no new token.
+  - **Hardened after the Claude Security review of 2026-11-22** (F1, F2, F5, F6, F7):
+    - Paths are canonical before any lending decision: an app could set the dialog's starting folder to
+      `/home/u/./.config` or `/home/u//.ssh`, the chosen path kept that spelling, no entry of the string-compared deny
+      lists matched it, and `~/.config` (autostart, LordOS's permission files) or `~/.ssh` could be lent writable. Now
+      the dialog never starts in such a folder (`startFolder` refuses empty, `.` and `..` elements), the portal drops such
+      a chosen path, `fplend_check` refuses any path that isn't canonical (`sec/pathcanon.h`) or that the kernel names
+      otherwise once opened with no link (`/proc/self/fd`) and decides the policy on that path only, `apps_grant_ok`
+      refuses any non-canonical path, and the view's PID 1 refuses one too.
+    - A save lends only the chosen file, never its folder: before, the folder the app pointed the dialog at was lent
+      read-only, so an app could read every file in `~/.aws`, a browser profile or `~/Documents` after one Save. A save
+      directly in the home folder now works (only the file is lent). An app that saves through a temporary file renamed
+      over the target can't save there (`docs/FLATPAK.md`, the limit).
+    - What is never lent to a Flatpak app as a folder, writable or as a save grows by the common credential stores,
+      browser and mail profiles and other Flatpak apps' data (`~/.aws`, `~/.kube`, `~/.password-store`,
+      `~/.local/share/keyrings`, `~/.docker`, `~/.netrc`, `~/.pki`, `~/.mozilla`, `~/.thunderbird`, Chrome's, Chromium's,
+      Brave's and Edge's folders under `~/.config`, `~/.var/app`; `lend_sensitive` in `apps.c`). A file there the person
+      opens is lent read-only. Isolated apps' own data folders are unchanged (an isolated Firefox keeps `~/.mozilla`).
+    - A screen-share restore token is revoked before it is spent: the indicator's Stop drops that app's tokens, a lock, a
+      text console, a user switch or every share ending drops all of them (`csm_token_drop`, `portal_cast_away`,
+      `portal_cast_tokens_drop`), and none is honoured while the session is locked. Only the app's own Close keeps it.
+    - Tests: `build/fplend-test` (new: `/./`, `//`, `..`, a trailing `/` or `.` and links refused for files, folders and
+      saves even past a string-compared grant rule; a save names its file, never its folder), `build/sandbox-lend-test`
+      (a save's grant holds only the chosen name, the files and folders next to it can't be read; non-canonical paths
+      refused by PID 1), `build/portal-cast-test` (a token dead after Stop, after every share ended and while locked, and
+      working again for a new share after the unlock; non-canonical chosen paths dropped), `castsm-test`
+      (`csm_token_drop`), `filepicker_model_test.mjs` (`startFolder`).
+  - **Screenshot portal** (`org.freedesktop.portal.Screenshot`, Screenshot and PickColor; for Flameshot, ksnip and the
+    like): the same chooser, gate and indicator as ScreenCast, always interactive: a screen, a window, or "Select Area…"
+    to drag over the screen; for a color, a click. The picture is taken once the chooser and the overlay are gone,
+    painted as a share is (protected windows black, `cast_still`), written by lord-media as a new PNG in the person's
+    Screenshots folder (`ui/portalshot.c`) and lent to a Flatpak app as above; the indicator says "‹App› took a
+    screenshot" for a few seconds. New texts in all 35 languages.
+  - **OBS Studio**: the Store installs Debian's `obs-plugins` and `qt6-wayland` with `obs-studio` (its capture, encoders
+    and Wayland display; an OBS installed before gets them from its page's Update: `companionsOf` in
+    `apps/store/syspkg.js`), and OBS's Flathub page says recordings go to the Videos folder (the rest of the home is
+    read-only for Flathub apps).
+  - **Tests**: `build/sandbox-lend-test` (two views of one app share the folders, another app doesn't; a fake app reads
+    and writes the lent file, the file next to it isn't there, the lent folder can't be written, a save writes only its
+    name, a folder, a stale inode, a link and a bad name refused; the same inside bubblewrap with the grant made after the
+    sandbox started), `build/portal-cast-test` (the restore token: given, used once, never another app's or an unknown
+    program's; Screenshot, Cancel, refusals, PickColor; the FileChooser lending a Flatpak caller's file),
+    `castsm-test` (tokens), `fpak-test` (Steam's folders and `--usr-fd`/`--app-fd`), `screencast_model_test.mjs` (the
+    area, the file name, the pills), `screencast_scene.mjs` (the chooser in screenshot mode, the overlay, PickColor),
+    `store_syspkg_test.mjs`, `flathub_model_test.mjs`; `build/fpportal-probe`, a fake app's side of the portals run
+    inside a real Flatpak sandbox. Checked end to end on the maintainer's PC (headless session, the user's installation
+    snapshotted and restored): Whatsie got the chosen file and not the one next to it, saved through the lent name, a
+    second launch forwarded to the first; an area screenshot came back 500 × 350 without the chooser; Steam reached "Sign
+    in to Steam" with pv-adverb's `/usr` from its own runtime; Whatsie's `usr-fd` was refused.
+  - The Spawn portal takes up to 128 environment variables (was 64): pressure-vessel passes 82.
+
+- **Machines from the terminal: the `machines` command, in development** (approved by the maintainer 2026-11-21;
+  `docs/VIRTUALIZATION.md` 6.15 "From the terminal"). `machines list [--json]` shows each machine of `~/Machines` with its
+  system, state, vCPUs, memory, disk used and graphics; `status NAME [--json]`, `start NAME [--no-window]`, `open NAME`,
+  `stop|poweroff|pause|resume|suspend|reset NAME`, `snapshot NAME list|take LABEL|revert TAG|delete TAG`, `clone NAME
+  NEW_NAME [--duplicate] [--keep-identity]` and `set NAME` with lord-vm's `--set` options in friendlier units (`--memory
+  8G`, `--cpus 6`, `--disk 64G`, `--network host-only`…). NAME is the machine's name in any case, or its start when only
+  one machine matches (ambiguous: the candidates are listed), or a folder. Everything but start and open runs lord-vm on
+  the folder as the person; start and open go through the running LordOS session, so they do what the app's own
+  buttons do (the window, the bridged network, the graphics card's vGPU and its locked memory). Without a session,
+  `start --no-window` starts only machines that need no administrator step and says why for the others. Messages in all
+  35 languages (`assets/locales/*/machinescli.json`), meaningful exit statuses (0 done, 1 failed, 2 wrong command, 3 not
+  running, 4 no such machine, 5 needs the session), stable `--json`, bash completion. Installed as `/usr/bin/machines`.
+  - **The session channel:** `$XDG_RUNTIME_DIR/lordos-machines.sock` (0600, the session's own uid only by SO_PEERCRED,
+    never on the login screen) takes one line per connection from a closed set, `open`, `start`, `start-detached` or
+    `release` and a machine folder's path, and the Machines app acts only on a machine of its own library
+    (`lord.vmcli`, `apps/machines/cli.js`). No command, option or other path crosses it; no new admin action.
+  - **Tests:** `build/mcli-test` (sizes, name matching, set's options, run.json states, placeholders, the channel's
+    strict parser with a fuzz pass under ASan, which found and fixed a read past the request line before release);
+    `tests/vm_cli_test.mjs` (what the app does with each request); `tests/machinescli_headless.sh` (a throwaway machine
+    started without a window and in its window, opened and powered off through a headless lord-server, and the
+    requests the channel refuses).
+
+- **Machines: the library redesigned, Machines settings, profiles you can make and share, your own systems, in development**
+  (the approved mocks of 2026-11-22; `docs/VIRTUALIZATION.md` 5.1, 5.6, 5.6.1, 5.6.2; `docs/TRADEMARKS.md`).
+  - **Library** (`apps/machines/library.jsx`): toolbar with the gear (Machines settings), search, grid or list and +; chips
+    All, Running, Linux and the other system's, each with its count; the New machine card first; each card with its real
+    picture, a state pill, CPU and memory while it runs (the graphics card's name when off), ▶ or Open, its name, one line
+    "10 CPU · 8 GB · 64 GB · Bridged · Intel card" and a ··· menu with every action of before; list rows with CPU and memory
+    bars while running, else "Last used … ago", "Resumes where you left it" or its profile; running, memory and free disk at
+    the bottom. Arrows move the selection, Return opens or starts, Escape clears the search; the order moved to the View
+    menu; right-click and RTL as before. The library's old "Off" filter reads as All.
+  - **Machines settings** (its own window: the gear or Machine → Machines Settings…): General (library view and order, what
+    closing does, Storage and Requirements, the official logos switch), Profiles, Systems, Network (the card bridged
+    machines join), Graphics cards (what Settings → Graphics cards set up, with a link) and Keyboard and mouse (❖Esc, the
+    system-shortcuts permission, the mouse from the profile).
+  - **Profiles** (`profiles.js`): Productivity (default), Development, Games, 3D design and Light, plus your own (New,
+    Duplicate, Edit in six parts, Delete, Make default; `~/.config/lordos/machines/profiles/`). "On this computer" shows
+    what one gives here: never more than half of the processors, never more memory than machines may use, a graphics card
+    only when one is set up for machines, 3D only where it can be had. New Machine starts from the default profile (or the
+    one an added system names) and applies the rest after creating (network mode and ports, bridged card, clipboard
+    direction, transfer folder, shared folder, graphics card) with `lord.vm.set` while the machine is still off.
+    Productivity now gives the clipboard both ways and the transfer folder, as the mock says (the review still has the
+    switch). The legacy Testing profile stays readable on existing machines.
+  - **.lordprofile files** (`format: "lordos-machine-profile/1"`): Export from the editor; Import with strict checks
+    (64 KB, known fields only and the unknown ones listed, ranges, port rules as Configure checks them, a shared folder
+    only under the home and not hidden, enums), fitted to this computer, and a summary sheet that shows everything,
+    including a system the file brings (full https address, size, SHA-256, signature fields), before anything is kept. A
+    profile never runs or downloads anything. An imported profile never widens anything silently: a port open to the network becomes
+    this computer only and is listed, and the summary's "What it opens" names a bridged network, the clipboard both ways
+    and a writable shared folder; the editor has a per-rule This computer / The network control with a warning.
+  - **Systems** (`systems.js`, `download.js`): the catalog with Downloaded or "Download · size" (the same pinned, signed
+    machinery as the assistant), and "Added by you" (`~/.config/lordos/machines/systems.json`): name, kind, icon color,
+    default profile, manual install or without questions the way the catalog's preseed, autoinstall or kickstart installers
+    do, and the image: an ISO from the home folder (hashed at once) or an https address with its SHA-256 (required).
+    "Download…" (administrators) shows a sheet with the full address, size, SHA-256 and the signature check, then the
+    new closed admin action `vm-image-get-user` (approved by the maintainer on 2026-11-22) downloads it into the shared
+    image store with the catalog's own downloader, with progress and Stop Download: root checks the address again in C
+    (`vmurl.c`, `pkg/pubhost.c`: https, a public DNS name, never an IP literal, localhost or a local suffix such as
+    `.local`, `.lan`, `.internal`, `.home.arpa`; port 443 only, no user name or password, plain path characters with no
+    `%00` or dot segment, no fragment, at most 1000 bytes), the SHA-256 (required) and the size (at most 16 GiB), keeps
+    2 GiB free on the store, and the downloader connects only to public addresses and follows redirects only to addresses
+    that pass the same rules (`FetchItem.public_only`, `pkg.http.notPublic`). The image is kept only with that SHA-256 and
+    hashed again before a machine is made from it; its description keeps the address without its query (`vmurl_redact`),
+    and Storage shows it as "file · site". The first build's browser fallback (open the address, watch Downloads) is
+    gone; "Use a file I already downloaded…" stays. An optional detached OpenPGP signature now has the project's public
+    key too (armored, pasted or from a file, at most 32 KB): `vm-image-get-user` also fetches the signature and the checksum
+    file, and the new sandboxed helper **`lord-pgpv`** (approved by the maintainer on 2026-11-22; `server/src/vm/lordpgpv.c`,
+    LordOS's own `pkg/pgp.c`, libc only, no network and no files: three sealed memfds) verifies it with only the primary key
+    of that fingerprint and answers one line that lord-server reads strictly; then the image's SHA-256 must be in that
+    checksum file. Settings → Systems says "Signature: verified by ‹fingerprint›" or "Signature: invalid — not used". The
+    key's fingerprint is pinned for the system on its first good check; a later key with another fingerprint is held until
+    the person presses "Trust the New Key". A profile carries the addresses, fingerprint and key, never the pin. Without a
+    key the signature is kept and shown as "Signature: not checked". Added systems show in New Machine under "Added by you".
+  - **Official logos, opt-in** (maintainer's approval 2026-11-22): Machines settings → General → "Official logos of the
+    systems", off by default, with a confirmation notice; "Remove downloaded logos". PNG only (at most 512 KB and
+    1024 × 1024), pinned in the catalog with its SHA-256 and downloaded by the admin helper's existing `vm-image-get`, then
+    re-encoded by lord-media in its sandbox into `~/.cache/lordos/machines/logos/`. Listed only where the owner's policy
+    explicitly allows it: Debian's Open Use Logo. Ubuntu, Fedora, Kali and Linux Mint stay out (permission required,
+    restricted, or no official PNG), and so does the other system's. The Debian, Fedora and Kali SVG logos that shipped in
+    `assets/machines/logos` were removed: LordOS ships no third-party logo; its own drawn marks are the default and the
+    fallback. About shows a trademark notice. All new text in all 35 languages.
+  - Tests: `server/tests/vm_profiles_test.mjs` (profile reading, clamping and import with a fuzz pass, export round trip,
+    system validation: https only, 64-hex SHA-256, paths under the home; PNG header checks; the catalog's logos; chips,
+    search, the numbers line; the address rules with a fuzz pass, redaction, the public key, the pin, the helper's
+    argument and verdict); `vm_catalog_test.mjs` checks logo entries and a person's image in Storage;
+    `server/build/vmurl-test` (addresses, public names and IPv4/IPv6 blocks, sizes, free space, redaction, 200 000 mutated
+    addresses) and `server/build/vmsig-test` (keys and signatures made by the test: good, changed, another key, a key block
+    with two keys, a wrong fingerprint, a future signature, armored keys, every truncation; the answer read strictly; the
+    checksum lookup; then `lord-pgpv` itself on memfds in its sandbox).
+  - **The pasted key is verified, not trusted** (Claude Security F3/F4, 2026-11-22): the key of an added system came into
+    the parser written for root's APT keyrings, which took any subkey after a primary key without checking its binding,
+    so a subkey grafted under a genuine primary key could sign a checksum list and be reported "verified by" that
+    fingerprint, with no key-changed warning. `lord-pgpv` now reads the key with the new `pgp_keyring_add_untrusted`
+    (`pkg/pgp.c`): every self-signature, subkey binding (0x18) and revocation is verified with the primary key (RFC 4880 /
+    RFC 9580 hashing; SHA-256/512; RSA or Ed25519) and only verified ones give flags, expiry and revocation; a primary
+    key with no verified self-signature and a subkey with no verified binding are dropped; a subkey signs only with the
+    sign flag and a valid back-signature (0x19) made by the subkey; a subkey lives no longer than its primary. APT keyrings
+    are read as before. `vmsig-test` adds a grafted subkey, a binding signed by another key, no back-signature, a
+    back-signature by another key, an encryption-only subkey, expired and revoked subkeys, a forged revocation, bindings
+    older than the subkey or from the future, a subkey of an expired primary, missing, forged and certify-only
+    self-signatures, every truncation of a block with a bound subkey, `lord-pgpv` on a grafted subkey, the real Debian CD,
+    Ubuntu and Kali lists with the pinned keys, and Debian's archive keyrings (signing subkeys) read the same way as
+    trusted.
+
+- **Machines: Capture mouse, in development** (`docs/VIRTUALIZATION.md` 6.25; approved by the maintainer 2026-11-21). A
+  machine window's toolbar has a *Capture mouse* button (and *Actions → Capture mouse*): Automatic, as before (an absolute
+  tablet, the pointer moves freely in and out), or Captured, for games and 3D programs: the host's pointer is hidden and held
+  inside the picture and the guest gets relative motion that never stops at a screen's edge. ❖Esc or Ctrl+Alt releases it
+  (taken by lord-server before any app), as do the button, focus loss, apps mode and the machine stopping; *Mouse captured —
+  ❖Esc to release* shows for four seconds. Configure → Display → *Capture automatically in full screen* (off by default;
+  machine.json schema 12 `capture_fullscreen`, `lord-vm --set --capture-fullscreen on|off`): captured on entering full
+  screen, released on leaving it, and a click in the picture captures again after ❖Esc. Not offered in apps mode (the button
+  says why). In all 35 languages. A machine made with a profile honours its keyboard and mouse choices: *Mouse: capture*
+  captures whenever the window comes to the front (and on a click after ❖Esc), *Shortcuts: never* never takes LordOS's
+  shortcuts, and *Capture in full screen* is written to machine.json (`capture_fullscreen`, its only home) when the machine
+  is made.
+  - **A pointer lock in lord-server** (`server/src/pointerlock.c`): the pointer stays inside the owner's node, the mouse's
+    motion goes to the owner instead, buttons and wheel still go where the pointer is; it ends on ❖Esc or Ctrl+Alt, when the
+    node is gone for half a second, or when the session loses its input. Generic: native apps and games get it as
+    `lord.input.lockPointer(node)` / `unlockPointer()` with the motion as `'pointerlock'` listener events once a frame (not for
+    isolated apps). `tests/pointerlock_test.c`.
+  - **The machine's side**: the motion goes straight from lord-server's input path to lord-vmdisplay (`VD_REL`, no JavaScript),
+    which sends QEMU's `Mouse.RelMotion`. lord-vm (`VM_CAPTURE`) makes a relative mouse QEMU's active one with `query-mice` and
+    `mouse_set` (and the tablet again on release). Every machine with a window now has a `usb-mouse` (compat and USB-tablet
+    devices) or a `virtio-mouse-pci` (slot 0x14) beside its tablet; lord-vm checks every second that the tablet stays the active
+    one when not captured (the new mouse's driver takes over at each boot otherwise). amd64's PS/2 mouse isn't used: Linux drives
+    it as VMware's VMMouse, which drops relative packets. A guest that hands its pointer over has its own image drawn where it
+    puts it, inside the picture only: the host's pointer stays at the picture's centre and clicks and wheel go straight to the
+    guest with no hit test, so a guest can't steer a click onto the host's desktop (from the commit's security review). Seen on a Debian 13 guest with virtio and with compat devices: relative motion arrives exactly (−3000 px in one move,
+    no edge), the tablet works again after release. Not yet tried in the lord-server window, with a guest of another family or on arm64.
+  - Tests: `tests/vm_capture_test.mjs` (the window's decisions), `vm_test` (schema 12, the choice among QEMU's mice);
+    `lordvm-dev` `capture 0|1` and `rel DX DY`.
+
+- **Machines: LordOS draws the pointer of a machine with the VirtIO GPU display-only driver, in development** (`docs/VIRTUALIZATION.md` 7.1.2,
+  `docs/MACHINES-GPU.md` Part 1 step 2). The LordOS guest tools (`lordos-guest-win`) are now w5 and say `pointer`; lord-vm then sets
+  viogpudo's `HWCursor` value through qemu-guest-agent with one fixed SYSTEM script (`PTR_PS`: only `VioGpuDod`
+  adapters' driver keys, restarting only an adapter whose value changed) and lord-server draws the shape the guest
+  hands over where the mouse is. A pointer move no longer waits for a round trip through the guest (measured 35–39 ms
+  median, up to 97 ms): moves make no frames. Configure → Display → *Pointer drawn by*: LordOS (faster) / The machine,
+  machines with that device set only, in all 35 languages; machine.json schema 10 `"pointer": "guest"`; `lord-vm --set --pointer
+  lordos|guest`. Machines with older tools are offered the update. `lordvm-dev`: `lat`, `fps`,
+  `LORDVM_DEV_NODISPLAY`, `LORDVM_DEV_CURSOR_PNG`.
+
+- **Machines: a real graphics card for a machine (Intel GVT-g), and Settings → Graphics cards, in development**
+  (`docs/MACHINES-GPU.md` Part 2 Mode A, "Mode A — built"; `docs/VIRTUALIZATION.md` 6.10.1). On a computer whose
+  Intel iGPU (Broadwell to Comet Lake) is enabled in the firmware but doesn't show the desktop, a machine gets a share of
+  it as its own GPU: the vendor's own driver in the guest, its 3D computed by the real iGPU, and the picture back in the
+  machine's window as dmabufs.
+  - **Settings → Graphics cards** (shown on computers with more than one GPU): every GPU with its address, driver and
+    use; the one that draws the desktop is fixed; an unused iGPU is suggested ("You have a graphics card that isn't
+    used. Use it for Machines?"); Unused / Machines (shared) for a GVT-g iGPU, a note that dedicated cards come in a
+    later version; a restart notice and Restart Now. All 35 languages.
+  - **Closed admin actions** (AGENTS.md "Machines' graphics cards", approved 2026-11-21; `server/src/vm/vmgpu.c`,
+    `vmgpu_admin.c`): `gpu-role` writes only `/etc/modprobe.d/lordos-gpu.conf` (`options i915 enable_gvt=1
+    enable_guc=0`) and `/etc/modules-load.d/lordos-gpu.conf` (`kvmgt`) and runs `update-initramfs -u`, adopting
+    hand-written `i915-gvt.conf`/`kvmgt.conf` that say exactly that (no duplicate options) and removing them with
+    "unused"; `vm-gvt-create` makes an mdev of a listed type with an instance free, named after the machine's UUID,
+    and gives its `/dev/vfio/<group>` to the caller 0600; `vm-gvt-remove` removes only the caller's, never while a
+    process holds its group; `gpu-min-freq` sets the iGPU's minimum frequency within RPn..RP0 while a machine uses it
+    (lord-server asks for two thirds of RP0, 800 MHz on a UHD 630, then "default"). The GPU lord-server draws on is
+    always refused, checked on the root side from the cards it holds open. Leftover vGPUs are swept when a session's
+    helper starts and ends. `vmgpu-test`: the parsers and the six actions under a fake root folder (134 checks).
+  - **Configure → Display → Graphics card**: None / Whole (for this machine, the largest type) / Shared (the smallest
+    type that shows the machine's resolution), with each choice's free instances; refused when none is free; it
+    replaces 3D graphics; such a machine can't be suspended (Suspend becomes Shut Down) or keep snapshots with memory.
+    machine.json schema 11 `"gpu": "intel-whole" | "intel-shared"`; `lord-vm --set --gpu`; `lord.vm.gpus()`.
+  - **lord-vm**: `vfio-pci-nohotplug,sysfsdev=/sys/bus/mdev/devices/<uuid>,display=on,x-igd-opregion=on,xres,yres,
+    romfile=/usr/lib/lordos/firmware/lordos-gvt-gop.rom` as the machine's only display, `-display dbus,gl=on` on the
+    iGPU's render node, `-action reboot=shutdown` (a reset crashes a GVT-g guest) and Machines starts it again after a
+    guest restart (also the one reset of the first boot with a vGPU). Its QEMU's locked-memory limit (VFIO pins
+    the guest's pages): the machine's memory plus 512 MB, set on that one process by a fifth closed admin action,
+    `vm-memlock "<pid>"` (root checks the pid is the caller's system QEMU under the installed lord-vm, holding the
+    /dev/vfio group of a vGPU the caller made; one grant per vGPU, recorded with the process's start time under a lock that removals take too (the checks repeated once it is held), given back to the default when the
+    vGPU goes while that process lives; QEMU's seccomp now lets it make threads only, so no child inherits the limit), within
+    "Memory machines may lock", the total for every running machine with a graphics card (`gpu-memlock-cap`, `/etc/lordos/gpu-memlock.conf`; by default the
+    computer's memory less max(4 GB, 25 %), to a whole GB), shown and set in Settings → Graphics cards; the vCPUs wait
+    for it and the start ends after 30 s saying why; Configure → CPU & memory keeps such a machine's memory under it.
+    QEMU's Landlock widens only for `/dev/vfio/vfio`, that vGPU's `/dev/vfio/<group>` and its sysfs folder (the
+    seccomp denylist already allows the VFIO ioctls); without Landlock's rules applied the machine doesn't start.
+  - **lord-server**: Intel-tiled dmabufs (`I915_FORMAT_MOD_Y_TILED`) are imported on the iGPU's own render node in a
+    second EGL context and read back, imports cached per buffer, with the desktop on another GPU or on the CPU path;
+    hotplug uevents from a DRM card that doesn't drive the desktop are ignored (a vGPU start makes two).
+  - **Guest tools w6**: when the machine has a vGPU, lord-vm runs one fixed SYSTEM script that installs Intel's display
+    driver 27.20.100.8681 from the vendor catalog only when it is missing (fixed URL, SHA-256 checked, the catalog file's
+    and the kernel driver's signatures checked), blocks later drivers for that one device (device installation
+    restriction) and turns off hibernation and Fast Startup.
+  - **Packaging**: the GOP option ROM ships at `/usr/lib/lordos/firmware/lordos-gvt-gop.rom` from the reproducible
+    build committed in `firmware/gvt-gop/prebuilt` (SHA-256 checked by `mkdeb.sh`).
+- **Machines: LordOS's own UEFI GOP option ROM for Intel GVT-g vGPUs, in development** (`firmware/gvt-gop`,
+  `tools/firmware/build-gvt-gop.sh`, `docs/MACHINES-GPU.md` "Our own GVT-g GOP driver"). An EDK2 UEFI driver, MIT,
+  written from public, licensed sources only (MIT-licensed Linux i915/GVT-g files, QEMU's IGD and fw_cfg documents,
+  UEFI/EDK2, VESA; listed file by file in `firmware/gvt-gop/NOTICE.md`), replacing the unlicensed i915ovmfPkg that the
+  earlier test used. It binds only to a gen9 Intel display controller whose PVINFO page says GVT-g, hands the vGPU's
+  OpRegion to the OS (fw_cfg `etc/igd-opregion` → ACPI NVS → ASLS), reads the virtual monitor's EDID over
+  I2C-over-AUX, lights pipe A and DDI D at the EDID's preferred mode with a linear XRGB8888 framebuffer in the GGTT
+  (within the PVINFO ballooning range), and installs GOP (every listed mode settable) and the EDID protocols. The
+  build script fetches `edk2-stable202502` (tarball SHA-256 and commit checked), builds X64 RELEASE and DEBUG
+  reproducibly and wraps them with EfiRom (RELEASE ROM 8,704 bytes). Tested on the maintainer's computer (UHD 630 vGPU
+  `i915-GVTg_V5_4`, the test guest with Intel's driver 27.20.100.8681, stock Secure Boot OVMF): UEFI at 1920×1080 on
+  the vGPU's own display, the guest's desktop at 1920×1080 74 Hz with resizes following the EDID, WebGL aquarium 75
+  fps with vsync and 314–432 fps uncapped (the old ROM: 75 and 333–410 the same day), 21 minutes at 99 % guest 3D with
+  53,392 dmabuf frames and 0 read failures, a clean guest restart, Secure Boot on, and with a policy-0x04 OVMF a
+  test-signed ROM runs while an unsigned one is refused. Machines uses it for a machine's Intel graphics card (next entry).
+- **Files: "Open with" a machine, like VMware Fusion** (`docs/VIRTUALIZATION.md` 7.3, `docs/FILES.md`). A file's Open with
+  lists, after the apps, each machine whose LordOS guest tools open files ("‹name› (…)", for the guests of the card in
+  `docs/VIRTUALIZATION.md` 4.3 with `lordos-guest-win` w3). Choosing one opens the machine's window, starts the machine
+  if it's off (a bridged one through the admin helper first) or resumes it, waits for the tools, copies the file in as a
+  drop does (the transfer folder or the agent's way, SHA-256 checked, the same progress line) and has the tools open it
+  in the guest with its default handler as the signed-in person: a document opens in its app, a program (`.exe`,
+  `.msi`, `.bat`, `.cmd`, `.lnk`…) runs; then apps mode turns on so the program is its own LordOS window, or the machine
+  comes to the front. A double click on a program for another system that no app here opens offers the machine, with
+  "Always open .exe files with ‹machine›" (settings `openWithDefaults`, per extension; "Ask Each Time for .exe Files" in
+  the menu undoes it); an off machine is started only after asking. Such programs are no longer offered to the Text
+  Editor. Security: `lord.vm.sendFile(…, { open: true })` takes only a path inside the home folder or the person's mounts
+  (resolved, no last link, a descriptor to lord-vm); lord-vm sends the tools a new frame, `AGK_OPEN`, with a random token,
+  the size and the SHA-256 it measured, never a path; the person's own copy step records where the file went under that
+  token, and the tools open only the file of a fresh record whose size and hash match, answering `AGK_OPENED` (logged in
+  the machine's log). Strict parsers in `vmagent.c` with cases and random-input checks in `vm-test`; the hello word
+  `open` becomes `VAC_OPEN` (8192). Linux guests aren't listed (their helper may start only the clipboard tools).
+  Verified on a test machine: a `.txt` opened in Notepad and a small test program ran and wrote its marker file.
+- **Machines: files dropped on an apps mode window go to that window** (`docs/VIRTUALIZATION.md` 7.2.1). Dragging files
+  from Files onto one of a guest's windows copies them in as a drop does (verified, with the window's own progress line)
+  and the LordOS guest tools (w4) hand them to that window: into the folder an Explorer window shows (under their own
+  names), dropped on a window that takes files (Notepad opens them), or on the guest's clipboard with "The files are in
+  ‹machine›: paste them with Ctrl+V". At most 8 at once. New frames `AGK_PLACE`/`AGK_PLACED` with strict parsers, cases
+  and random-input checks in `vm-test`; `lord.vm.sendFile(…, { place })`, `VM_FILE` a = 2, `VAC_PLACE`; Files passes the
+  drop point to the app under it (`how.x`, `how.y`); `lordvm-dev place`. lord-vm reads a guest's hello up to 255 bytes
+  (64 cut "open place"). Checked on a test machine with Explorer (a folder, and Home), Notepad and the clipboard.
+- **"Open with" providers in the SDK** (`sdk/openwith.js`, `sdk/openwithmodel.js`, `docs/FILES.md`):
+  `registerOpenProvider` / `registerOpenProviders` with `{ id, label, icon?, accepts, suggests?, available?,
+  needsStart?, open }`; Files lists `openProvidersFor(file)`, offers `suggestedProviderFor(file)` and keeps
+  `setDefaultProvider`. Machines registers one per eligible machine; other runners can register the same way. Tests:
+  `openwith-model-test`, `vm-openwith-test`.
+
+- **Windows 11 in Machines, ready as it starts** (`docs/VIRTUALIZATION.md` 4.3, `apps/machines/windows.js`). A new card in
+  the New Machine assistant offers two ways in, both from Microsoft's own servers, with nothing of Microsoft's kept by
+  LordOS:
+  - **Your Windows 11**: the full multi-edition ISO from Microsoft's own download page. Machines opens the page, finds the
+    ISO in Downloads when it's whole (or lets you choose it) and checks it against the SHA-256 Microsoft publishes there
+    for each of its 38 languages, pinned in the catalog (`assets/machines/systems.json`).
+  - **Try it for 90 days**: Microsoft's Windows 11 Enterprise Evaluation (English, Spanish, Portuguese), downloaded by the
+    admin helper from Microsoft's server and kept only with the hash Microsoft publishes for it (KB5130867).
+  - **The machine is a template Windows 11 accepts as it is**: UEFI with secure boot and Microsoft's keys enrolled
+    (Debian's `OVMF_CODE_4M.secboot.fd` and `OVMF_VARS_4M.ms.fd`, variables writable from SMM only), a **TPM 2.0** (Debian's
+    `swtpm`, one per machine, sandboxed; new exception in AGENTS.md), Hyper-V enlightenments, the clock in local time,
+    4 GB, 2 vCPUs and 64 GB at least, virtio disk and network with the CD/DVD drives on SATA and a USB tablet.
+  - **virtio-win drivers** (0.1.271, from the virtio-win project's own server, pinned by SHA-256): Setup loads the disk's
+    and network's drivers by itself from `$WinPEDriver$` on a small seed disk, so no "Load driver" step, in both modes.
+  - **Install without questions** (`Autounattend.xml`, Microsoft's documented settings): your local account and optional
+    password, the computer's name, the edition (Pro, Home, Education, Pro Education, Pro for Workstations) with your key,
+    or Microsoft's own published KMS client key so it installs unactivated, no Microsoft account asked, privacy options
+    off, this computer's language, keyboard and time zone (CLDR's table, `assets/machines/windows-zones.json`), then the
+    virtio-win guest tools at the first sign-in. When their agent first answers, Machines zeroes and removes the seed
+    disk (it held the password in Setup's own encoding) and takes both discs out. Or **Windows' own installer**, guided,
+    with the drivers already there.
+  - Choosing a Windows ISO with "Install from an ISO file" goes the same way.
+- **The TPM's state goes with the machine**: offline snapshots keep a copy of it, reverts put it back, clones take it
+  along, and memory snapshots restore it through QEMU.
+- **Machines downloads files its catalog pins** (`vm-image-get`): an entry whose maker signs no list names each file with
+  its https URL, SHA-256 and size; the helper takes only the id, architecture, name and hash from the app and checks them
+  against the catalog.
+- **The systems' own logos** on the Debian, Fedora and Kali cards, unmodified, with their licenses and trademark notices
+  in `assets/machines/logos/README.md`. Ubuntu (Canonical asks for written permission) and Windows (Microsoft allows no
+  use of its logos or of designs like them, four panes included) get Machines' own drawn marks instead
+  (`assets/machines/marks`): an orange tile with a "U" and a generic app window on a blue tile.
+- `lord-vm --sha256 FILE` and `lord.vm.hash(path)`: an ISO's SHA-256 with progress, to check the one you downloaded.
+- **The Store is arranged by where apps come from** (`apps/store/index.jsx`). The sidebar has **Where apps come from**
+  (Linux apps from Debian, Flathub, Web apps, LordOS apps, and Wine and Android said as coming soon) and **Picked by
+  LordOS** (Artificial Intelligence, Commercial, Remote access, Third-party apps). Choosing an origin opens a second
+  column with All and its categories, each with how many apps it has (in a small window they are a row of buttons above
+  the list). Debian's cards carry a "Debian" tag and the catalog's own a "Linux app" one, beside Flathub's and the web
+  apps'. The pages that opened by name before (from Settings, Search and Lord Workspaces) open the origin's page.
+- **Machines: sound and microphone.** A machine's sound plays on this computer's speakers, and a machine can hear this
+  computer's microphone. lord-vmdisplay copies the guest's sound, with the guest's own mute and volume, into a sealed
+  ring that lord-server plays from its own PipeWire stream named after the machine (60 ms buffer; the helper never runs
+  more than 80 ms ahead and drops rather than waits; it never gets the PipeWire socket). The microphone opens only while
+  the machine's Microphone setting is on, LordOS's microphone permission allows Machines (asked with the system prompt,
+  checked again in C), the guest is recording and the machine runs; otherwise the guest hears silence. A microphone
+  light shows on the bar and in the menu bar. Every machine's sound card is now an HDA speaker-and-microphone codec, so
+  snapshots and saved states keep loading whatever the settings. Configure → Sound and input has sound on/off, a volume
+  and the microphone; the bar gets a mute button and the Devices menu Sound, Microphone and Sound Settings….
+- **Machines: each machine's own output and input.** Configure → Sound and input has an Output and an Input menu:
+  "System default" (as before: it follows whatever Settings → Sound picks, showing which device that is now) or any
+  output or microphone by the name Settings → Sound gives it (the same `lord.sound` state; the outputs' monitors are not
+  offered as inputs). The machine window's speaker button is now a menu with Mute / Turn Sound On, the outputs and the
+  inputs with a checkmark on the chosen ones, and Sound Settings…, so a machine can be switched without opening
+  Configure. The change applies at once while the machine runs: lord-server's stream connects again to the chosen device
+  with the same ring (`maudio_target` in `server/src/media/maudio.c`, the reconnection `maudio_retry` already did; the
+  stream is created with that device's name, which pipewire-pulse turns into `target.object`), and the microphone's
+  stream moves too when it is open. A chosen device that is unplugged sends the sound to the system's default and the
+  menu shows it as "(not connected)"; lord-server checks at every poll that Settings → Sound still lists it
+  (`snd_device_present`), so plugging it back moves the sound to it again. Saved in `machine.json` **schema 8**:
+  `sound_out` and `sound_in`, a PipeWire node.name each (1 to 96 printable ASCII characters, no spaces or control
+  characters), absent for the default; an older file loads unchanged and is written as schema 8 at its next save, as
+  before. While the machine runs they travel in `VM_SOUND` (`d = 1`, text `OUT\tIN`) to its lord-vm, which writes the
+  file; with it off, `lord-vm --set DIR --sound-out NODE|default --sound-in NODE|default`. `lord.vm.sound(dir, { output,
+  input })`, `lord.vm.list()`'s `soundOut`/`soundIn` and `lord.vm.poll()`'s `sound.output`/`sound.input` carry them.
+  Translated into every language. Tests: `vm-test` (the keys, their limits, the schema rule, the message's text),
+  `vm_model_test.mjs` (the menus' entries, the default with its current device, an unplugged choice). Checked on this
+  computer's PipeWire 1.4.2 with lord-server's own `maudio.c`: a stream moved live between Built-in Audio and a USB
+  output, back to the default (no `target.object`, following the default), and a name that isn't there played on the
+  default; a capture stream moved between the webcam's and the default microphone.
+- **Machines: forwarded ports, Bridged and Host-only networks.** Configure → Network has four modes:
+  - **Shared**, as before, now with up to 32 forwarded ports (TCP or UDP, this computer's port 1024–65535 to the
+    machine's), open to "Only this computer" (127.0.0.1, the default) or "The network" (with a warning). passt opens
+    them inside the machine's scope, so LordOS's firewall decides them; a port in use or refused stops the start with
+    its reason.
+  - **Bridged**: the machine joins a wired network of this computer as one more device and gets its address from that
+    network's DHCP. Two new closed admin actions (`vm-net-bridge`, `vm-net-unbridge`, `server/src/vm/vmnet_admin.c`)
+    make and remove a macvtap in bridge mode on a physical wired card checked on the root side (Wi-Fi, bridges, bonds
+    and virtual cards are refused with a reason); its `/dev/tapN` goes to the user and lord-vm hands QEMU only the
+    descriptor. Unused ones are removed when the machine stops and when a session starts or ends. This computer can't
+    reach a bridged guest, and LordOS's firewall doesn't see its traffic; Configure says both.
+  - **Host-only**, with no root: passt binds every socket it opens for the guest to 127.0.0.1 (IPv4 only), so the
+    machine reaches this computer (as 10.0.2.2) and nothing else. It also reaches services listening only on this
+    computer's 127.0.0.1; Configure says so.
+  - **Isolated**, as before.
+- **Machines: 3D graphics for Linux machines.** Configure → Display offers Graphics 2D or 3D, and the Design profile picks
+  3D where the computer can give it. A Linux machine with 3D gets a virgl GPU (`virtio-vga-gl`), drawn with this
+  computer's GPU through Mesa. Guests on the device set of the card in `docs/VIRTUALIZATION.md` 4.3 stay 2D (no stable
+  3D driver exists for them), and so does any machine on arm64 or on a desktop that draws without a GPU; the log says
+  why. QEMU's picture arrives as dmabufs: lord-vmdisplay checks them and passes only the descriptor on, and lord-server
+  imports each with EGL and reads the changed rows back, never waiting on the guest's GPU work. Only such a machine's
+  QEMU may open the GPU's render node (never the primary card node), list `/dev/dri` and read its GPU's sysfs folder.
+  virgl's state can't be saved, so a running 3D machine can't be suspended or snapshotted with its memory.
+- **Machines: files into a machine by dragging them.** Files dragged from Files onto a running machine's window are
+  copied into the Downloads folder of the person signed in to the guest, through the guest agent, with progress under
+  the picture and a notice saying where each landed. lord-server hands lord-vm only a descriptor of the person's file
+  and a name made safe for the guest's file systems; the guest never chooses a path on this computer. On Linux guests
+  root writes only into a fresh private folder and the move into the person's folder runs as that person; on the
+  other guests the file is written into a private folder only the system account and administrators can open, then
+  copied into the signed-in person's Downloads by a one-time task that runs as that person (with nobody signed in, the
+  copy is refused). When the
+  agent is off, isn't answering or can't write files, the hint says so before the files are let go. Files only go in; a
+  shared folder brings them out. Any answer from the guest agent now counts as its ping, so a long copy no longer makes
+  it look lost.
+- **Machines: full screen and Configure.** lord-vmdisplay logs each size it asks the guest for, the size the guest takes
+  and any refusal; the resolution menu says when the guest kept its size (some guests' display drivers don't follow
+  sizes asked while they run). Configure's boot section shows TPM 2.0 and Secure Boot; only the boot order is still
+  "in a later version".
+- **Machines: where a machine starts from, and at what size.** Configure → Boot keeps *Automatic* (the system disk,
+  then the CD/DVD drive) or takes a chosen order of the system disk, the CD/DVD drive and the network (PXE), moved with
+  Up and Down, plus *Show the boot menu at start* (the firmware waits 5 seconds for Esc). lord-vm turns the order into
+  QEMU `bootindex` values for UEFI and BIOS machines alike; `lord-vm --set DIR --boot-order auto|disk,cd,network
+  --boot-menu on|off`. Configure → Display has the resolution a machine starts with: *Follows the window* or a fixed
+  size, given to the virtual display as its preferred mode, which every system takes at boot, including those whose
+  display drivers don't follow the window while they run (`lord-vm --set DIR --resolution follow|WxH`). Checked: a
+  machine on the device set of the card in `docs/VIRTUALIZATION.md` 4.3 started at 1920 × 1080 instead of 1280 × 800.
+- **Machines: an off machine's window is black with its Play button**, and the library's card pictures are taken only
+  while the guest's system is up, never its firmware, boot or shutdown screens.
+- **Machines: LordOS guest tools, `lordos-guest-win`** (for the card in `docs/VIRTUALIZATION.md` 4.3; `tools/guest-win/lordos-guest-win.c`, `docs/VIRTUALIZATION.md` 7.1.2). A
+  small user-mode Win32 program built with mingw-w64 and shipped in `/usr/lib/lordos/guest/windows/`. Machines installs
+  it through the guest agent, from the agent's popover ("Install LordOS Tools") or by itself when an unattended install
+  finishes: SHA-256 checked, into `%ProgramFiles%\LordOS` with a protected ACL, started at every sign-in as the person
+  (never a service or SYSTEM), and the signed-in person gets access to the machine's own `org.lordos.agent` port and
+  nothing else. It brings the shared clipboard to these guests (text, HTML sanitized on the host, pictures) and makes
+  their **resolution follow the window**: the display driver keeps a custom mode that follows the window but the system
+  never switched to it, so a machine stayed at its boot size; lord-server now passes the window's size to lord-vm and
+  the tools apply it through the system's display configuration, as virtio-win's own tool does. Measured exact at
+  1784 × 830, 1920 × 1080, 1366 × 768, 1001 × 777 and 2000 × 1100, 0.25–0.5 s after each resize; no driver is patched
+  and secure boot keeps signed drivers. The guest side of apps mode (window list, icons, the programs list, window
+  actions, starting a program only by a token the guest itself listed) is in place, every frame checked to its last
+  byte by new parsers in `vmagent.c`.
+- **The Store doesn't freeze the pointer while browsing** (`apps/store/debian.js`): the package index's answers are kept
+  until the index or the language changes (each walked the whole index on lord-server's thread and built thousands of
+  objects on every render, and the heap grew until the Store was closed), and a category shows 60 cards at a time.
+  The Store's sidebar can be widened by dragging its edge (remembered), and Web apps are named "Web apps (PWA)".
+- **Lord Workspaces: the Store and Monitor on the Context Spine**, under Files, each with its own glyph (a bag, a pulse
+  line), in keyboard focus order too.
+- **Machines: apps mode (in development).** Each window of a guest with the LordOS guest tools (the card in
+  `docs/VIRTUALIZATION.md` 4.3) or of a LordOS guest (lordos-guest 3) becomes its own LordOS window, with the guest's
+  title and the machine's name, and its app's icon in the Dock, the taskbar and the switcher, while the guest's own
+  desktop, taskbar or Dock is hidden. The toolbar's Apps button or Actions → Apps Mode turns it on (kept per machine);
+  the machine's window becomes a small controller with an Applications menu (the guest's own programs) and Leave Apps
+  Mode. Each window shows its part of the machine's one picture (`<MediaView crop>`, copied one pixel per pixel and
+  repainted only where that part changed); pointer and keyboard go to the guest; moving, resizing, minimizing, focusing
+  or closing the window does the same in the guest, and a window the guest moves is followed; menus and tooltips are
+  small frameless windows. lord-vm checks every window list, icon and app list to its last byte and writes it again, and
+  the host can only launch a program the guest itself listed. Inside a LordOS guest, lordos-guest asks the guest's own
+  lord-server through a private same-user socket made only inside a Machines guest, and the guest's desktop leaves out
+  wallpaper, widgets, Dock and bars while apps mode is on. Other Linux systems don't list their windows, so the button
+  says apps mode needs LordOS or the guest tools. Not yet seen drawing on a real display.
+- **Machines: a transfer folder for each machine, fast both ways** (`docs/VIRTUALIZATION.md` 6.7.1). Every new machine has
+  `~/Machines/Transfer/<name>/`, shared into the machine with virtiofs (tag `LordOS`; Configure → Sharing → "Transfer
+  folder", `lord-vm --set DIR --transfer on|off`; existing machines keep their hardware until it's turned on). A Linux
+  machine mounts it by itself at `/mnt/LordOS`, with a `LordOS` folder in each person's home; the machines of the card in
+  4.3 get it as a drive once WinFsp 2.1 is installed ("Set Up the Transfer Folder" downloads the pinned installer, checks
+  its hash and signature in the guest and installs it; done by itself after an unattended install). Files dropped on a
+  machine's window go through it, each in a private folder of its own, and are named in the machine only after their
+  size and SHA-256 match the file dropped: 2 GB reaches an Ubuntu guest's Downloads in 17.6 s and the other card's guest
+  in 25.6 s, against about 75 s through the guest agent, which stays as the fallback. What the machine saves in its
+  LordOS folder or drive appears here at once (2 GB in about 2.5 s). The guests of the card in 4.3 find the drive by a
+  token only LordOS wrote; every account of such a guest can read a dropped file while it passes through (documented).
+  A transfer folder belongs to its machine: one left by another machine of the same name, or by a removed machine, is
+  kept aside as "<name> (old date)". Downloads through the admin helper now follow GitHub's long redirects. `machine.json`
+  goes to schema 7 (`transfer`).
+- **The desktop answers while it works** (`docs/MAIN-THREAD.md`). lord-server times every JavaScript run on its main
+  thread; a run past 50 ms goes to the session log with what it was, whose window and where (`stall: … ms js …`), native
+  `lord.*` calls past 20 ms and layout or paint past 50 ms are logged by name, and About shows how many pauses the
+  session had. The measurements found a design flaw: the theme's root re-rendered every open app on any setting, window
+  focus or notification, synchronously. Now `AppHost` is memoized, a window's focus is followed only by what reads it,
+  `ThemeProvider` keeps equal tokens, the themes' roots render only for the settings they read (`useTrackedSettings`),
+  the launcher's app list is sorted once and shared, name sorting keeps each name's pieces, and Files draws only what is
+  near the visible part of a big folder. With Store, Settings and Files open, changing a setting went from 161 to 20 ms
+  of frozen pointer and focusing a window from 241 to 31 ms; a folder of 2 220 files opens in 229 ms instead of 1 986 ms.
+  Switches and buttons that start something slow (Settings: displays, users, network and VPN, sharing, network time,
+  Bluetooth, battery, cooling, Flatpak, cloud, web apps; the Store's install, update and remove) flip at once with a
+  spinner and flip back with the error if it fails (SDK: `<Toggle pending>`, `<Button pending|busy>`, `usePending`).
+  Measured on a headless lord-server.
+- `machine.json` schema 6: `graphics`, `network` bridged/host-only, `bridge`, `ports`, `sound`, `volume`, `microphone`,
+  `resolution`, `boot_order`, `boot_menu`;
+  older files load unchanged.
+- **Machines looks like a native virtualization app** (the look of hypervisaur's screenshots, reimplemented: no code or
+  images of it are used; `apps/machines/kit.jsx`). The assistant, Configure, Requirements and the Raspberry Pi page open
+  as sheets over the window, which stays behind, dimmed. Configure has a glyph beside each section, a header with its
+  summary, grouped cards, sliders and Cancel/Done pills. The machine's toolbar is in pill groups of glyphs, and every
+  glyph (38 of LordOS's own, `assets/machines/symbols`) follows the accent chosen in Settings → Appearance.
+  - **Storage** ("where your space goes"): the volume on a card with its bar and an Available slice, each machine with
+    its system's mark, who it shares disk data with and a small bar of its size, and for the selected one three tiles
+    (takes up, frees if deleted, shared), the machines it shares storage with, and what it's made of. Downloaded
+    systems have a remove button on their row.
+  - **The agent's popover**: a light and the state in bold, the guest's system, then each thing the agent brings with a
+    green dot when it works; the agent button carries the light as a badge.
+  - **Logs**: pause, copy, save and clear as glyphs on one pill and a rounded filter field. **Snapshots** and **Clone**:
+    cards and pills in the same look; menus and alerts are rounded, with a hairline edge.
+- **Settings → Appearance → Desktop style is a gallery ready for many themes** (themes plan, stage 1;
+  `apps/settings/ThemeGallery.jsx`, `sdk/themegallery.js`, `docs/THEMES-GUIDE.md`). The single row of pictures is now a
+  search field (name, description, author and id, without accents), the filters All / Official / Community / Installed and
+  a grid of cards that wraps with the window, each with the style's picture, name, author and version. A theme whose
+  `theme.json` says `"community": true` carries the badge "Community · unofficial", and its page says LordOS didn't make or
+  review it. A card opens the theme's page: a picture twice the size, its description, author, license and version, its
+  own options (`theme.json` `options`, as before) and Apply, which still switches at once without logging out. The arrow
+  keys move over the cards (swapped right to left), Enter opens one, Escape goes back. In 35 languages.
+- **`theme.json` gains `community`, `author`, `license` and `version`**, checked by `sdk/thememeta.js`: the author is one
+  line of plain text up to 80 characters (no control or bidi-override characters; missing or `"author pending"` reads
+  "Unknown author"), the license an SPDX expression, the version `1.2.3` with an optional suffix. The official themes
+  declare none: Settings shows LordOS, MIT and the release's version for them.
+- **A theme that couldn't start says so, with Report**: when switching to a theme fails, lord-server goes back to the one
+  in use as before, and now also keeps why (the JavaScript exception and the first lines of its stack, or the verified-code
+  check's refusal; `ui.theme_failed_why`), which `lord.themes.list` gives as `failed` and `failedWhy`. The theme's card
+  says "Couldn't start — back on ‹the theme in use›", its Apply is off for the rest of the session, and Report opens the
+  GitHub bug form in the browser with the theme's id, the version and the error filled in (home paths replaced, under the
+  3000 characters `lord.apps.launchUri` takes). Nothing is sent until the person submits it there; without a browser it
+  points to `lordos-issue`.
+- Tests: `server/tests/theme_gallery_test.mjs` (41 cases: the new `theme.json` fields, search, filters, order, arrow keys,
+  the report's address), in `make -C server test`.
+- **Lord Celeste, a community theme** (`themes/celeste`, in development; not part of a release yet). A frame around each
+  display with rounded inner corners, a bar on its thick side and drawers that slide out of its edges: a dashboard on
+  top (the date, a month calendar, CPU, memory, battery and what is playing, with Media and Performance tabs), the app
+  launcher at the bottom (apps, `=` a calculator, `>` the theme's actions), a session drawer and a sidebar at the end
+  edge (Wi-Fi, Bluetooth, Do Not Disturb, Night Light, volume, brightness and the notifications with their buttons).
+  The layout is inspired by Caelestia (caelestia-dots/shell, GPL-3.0); no code or assets come from it, and the theme is
+  MIT (`THIRD_PARTY.md`). Its `theme.json` marks it `community: true` with its author pending confirmation. Made to
+  follow the theme rules (`docs/THEMES-GUIDE.md`): the system's notification banners are left alone (sticky alarms
+  and the code-signature notice behave as in Lord Flow); the bar shows the camera, microphone and screen indicators,
+  the apps' status items and the running apps (a click brings one forward or back from minimized, a right click opens
+  its Dock menu); an app's menus are in a strip under its title bar with Window and Help, and a right click on the
+  title opens the app menu and the Window menu; restart and shut down go through the system's confirmation and log
+  out asks first; every text is translated into the 35 languages; the frame, bar and drawers are mirrored in
+  right-to-left languages; dark and light modes, transparency off and reduce motion; a frame and a bar on every display unless
+  Settings → Desktop & Dock → "Show the menu bar on every display" is off or the displays are mirrored, and each
+  display's own wallpaper. Its options are in Settings → Appearance: colour scheme (Lavender, Rose, Sky, Mint, Sand),
+  frame (Clear, Glass, Solid, Opaque), the hover edges (off-able; small zones pushed against the screen's edge, with
+  a longer wait for the session drawer) and a wallpaper change effect (None, Fade, Curtain, Blinds, Shutter, Zoom).
+  The clock and the network status each share one timer (1 s and 5 s) and redraw only their own part; drawers and the
+  wallpaper effect animate with `lord.setStyle`, without a React render per frame. Tests:
+  `server/tests/celeste_model_test.mjs` (geometry, mirrored frame, hover zones, the calculator, `theme.json`'s options)
+  in `make test`, and `theme_cost_scene.mjs` now measures it too (426 native calls on the first render and 312 timer
+  wake-ups a minute at rest, against Lord Flow's 465 and 330). Seen in headless sessions on the development machine in
+  dark, light and Arabic; not yet on a real session with real monitors, a Linux app's own bar or the GPU path.
+
 ### Fixed
 
+- **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
+  by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
+  copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it
+  damaged: a blinking caret cost a full window each time. Now only the damaged box is copied, uploaded and repainted
+  (`wl_surface.damage` through the buffer scale and viewport, and `damage_buffer`); every partial frame equals a full
+  repaint (`LORD_PAINT_VERIFY=1`, 206 frames, 0 differing pixels). Headless, CPU path, lord-server's CPU over 20 s: a
+  10 × 10 square changed 60 times a second 1130–1250 ms before, 340 ms after; foot at 180 × 50 cells updating a few
+  characters ten times a second 1910–1920 ms before, 210–360 ms after. `wl_surface.set_buffer_transform` was ignored, so
+  a turned buffer showed turned and at the wrong size: shared memory is copied upright and a dmabuf's texture is drawn
+  with turned coordinates (`build/buftf-test` checks the eight transforms).
+
+- **A Linux app's new frame composes only the displays it is on, in development** (Wayland audit item 3, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). On the GPU path any app's new buffer made
+  every display compose and flip again; a video or a terminal on one monitor kept all of them busy. Now only the
+  displays the window (or its menu, the drag icon, a fullscreen app's display) is on present it; a window in the
+  Overview or not yet placed still marks every display.
+
+- **Linux apps' frame callbacks and presentation feedback follow their own display, in development** (Wayland audit
+  item 2, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every window's frame
+  callbacks went with any display's frame, so with displays of different refresh rates an app was paced by the fastest
+  one and drew frames nobody saw (three displays at 60, 60 and 144 Hz, simulated in `build/outpick-test`: 198
+  callbacks a second for a window on a 60 Hz display, now 61; 145 on the 144 Hz one). A window's callbacks now go with a
+  frame of its main display (the one with most of it) or when that display has nothing waiting, and its
+  `wp_presentation` feedback is answered by that display's flip with its own time and refresh, not the main
+  display's. A headless lord-server now answers presentation feedback at all (`wlperf-client frames`: 0 of 180 before,
+  180 of 180).
+
+- **A Linux app's title costs a JS event only when it changes, at most once a frame, in development** (Wayland audit item
+  1, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every
+  `xdg_toplevel.set_title`, even the same title again, went to the theme as a `title` event and re-rendered its window
+  list. Now an unchanged title is dropped, and a burst reaches JS once per 16 ms per window with its last title (Wayland
+  and X11 windows). `wlperf-client titles` against a headless lord-server: 1000 repeats of the current title give 0
+  events (1000 before), 1000 different titles in a burst give 2 (1000 before). The stall detector's `__lordWayland` and
+  `__lordTerm` lines now name the event (`js __lordWayland title`).
+
+- **The Terminal no longer re-renders whole windows for a program's title, in development** (Wayland and main-thread
+  audit, item 6, approved by the maintainer 2026-11-22; `docs/MAIN-THREAD.md`). A program that animates its title (Claude
+  Code's spinner, progress counters) sent a `__lordTerm` "title" event per change, and each one re-rendered the whole
+  Terminal window (it subscribed to every session's metadata) and the theme's root (the window title), about 270 React
+  updates each: the maintainer's session logged 1310 `__lordTerm` pauses in two hours, the longest 329 ms. Now the
+  window reads only the active session's profile and title, session titles are applied at most once per frame (the last
+  of each session), a metadata patch that changes nothing updates nothing, and the window's title goes to the window
+  manager at most four times a second. Measured headless (`tests/perf_headless.sh default terminal`, 1920 × 1080, CPU
+  path) with a title changed about 60 times a second: JavaScript 1043–1162 ms per 1.5 s step (29 160–36 990 React
+  updates, longest run 47 ms) before, 140–160 ms (3380–3424 updates, longest 19 ms) after; output alone (`yes | head -c
+  50M`) caused no React work before or after (the rows are drawn in C). The perf driver has `terminal` and
+  `terminalBg` plans for it.
+
+- **A microphone, camera or screen restriction keeps working with many Flatpak apps open** (`server/src/hw/hw.c`,
+  `server/src/main.c`; found by Claude Security, MEDIUM). Each running Flatpak app's Spawn helper took a slot in a
+  16-slot poll set ahead of pwguard's PipeWire socket, so with about 11 apps open pwguard stopped hearing new capture
+  streams and a restricted app could record (the polkit agent was starved too). pwguard and the polkit agent are now
+  polled before the helpers, and the set holds 48 (16 fixed + 32 helpers); a helper that doesn't fit is drained on the
+  tick.
+- **Apps that start their real process and leave no longer vanish: VS Code from Flathub opened a window and closed at
+  once** (`server/src/sec/sandbox.c`, `server/src/fpspawner.c`; found by the Flathub compatibility run of 2026-11-22).
+  VS Code's `code` runs `cli.js`, which starts Electron detached and exits. The view every Flatpak app (and every
+  restricted Linux app) runs in had its PID 1 leave as soon as that first process did, and the kernel then killed
+  everything else in the view. PID 1 now stays while anything the app started is still running, as bubblewrap's own
+  PID 1 does, and leaves with the app's status; stopping an app (a SIGTERM to the view) still ends what it left behind
+  at once. The app's Spawn helper no longer dies with the app's first process (its Electron keeps asking for
+  sub-sandboxes): PID 1 ends it once nothing else is left (`sandbox_view_helper`). Nothing in what the view, its scope
+  or Landlock allow changed. Test: `build/sandbox-view-lifetime-test` (a process left behind runs to its end, the helper
+  is ended, a stop still ends everything; it fails on the old PID 1).
+- **Steam from Flathub starts: LordOS's Spawn portal answers `org.freedesktop.DBus.Peer`** (`server/src/fpspawn.c`,
+  `fpak_bus_peer` in `server/src/fpak.c`). Steam's Flatpak pings the portal on "/" before anything else and, answered
+  "no such object", stopped on "The unofficial Steam Flatpak app requires a working D-Bus session bus and flatpak-portal
+  service". Every D-Bus connection answers `Peer.Ping` and `GetMachineId` on any path; now this one does too. Test:
+  `build/fpak-test`.
+- **Session restore opens a Flatpak app once, whatever its window count** (`sdk/sessionmodel.js` `launchesOnce`,
+  `sdk/sessionrestore.jsx`). Each launch of a Flatpak app is a view of its own, so a second launch never reaches the
+  first (Chromium's and Electron's single-instance lock, Firefox's profile lock): four saved VS Code windows became four
+  copies of VS Code on one profile ("argv.json contains errors"), Chromium showed "Profile error occurred". The frames
+  still go to the windows the app brings back. Test: `tests/session_model_test.mjs`.
+- **The screen-share chooser and its indicator name a Flatpak app, and each window's app** (`sdk/screencastmodel.js`
+  `castAskerName`, `castWindowOf`; `sdk/hardware.jsx`, `sdk/screencast.jsx`). They said
+  "flatpak:org.chromium.Chromium wants to see your screen", and every Linux window in the list was labelled "Linux".
+  Still only from lord-server's verified identity (the app's root-owned scope): a Flatpak app's name comes from its own
+  metadata, so it is always shown with that verified id ("Chromium · org.chromium.Chromium"; an app calling itself
+  "Firefox" still shows its real id), and it is looked up by that exact id only, never by a window class.
+  Test: `tests/screencast_model_test.mjs` (a spoofed name included).
+- **Flatpak apps built on Chromium or Electron no longer die at start** (Whatsie from Flathub: it showed its tray icon
+  and quit, with `trap int3` in libQt6WebEngineCore at every launch). Chromium (QtWebEngine, CEF, the browser) and zypak
+  (Electron) ask Flatpak's Spawn for a sub-sandbox that joins the app's own user and PID namespaces (EXPOSE_PIDS /
+  SHARE_PIDS). LordOS served the Spawn, but its `flatpak run` started in a new Landlock domain (Landlock's scoping applied
+  again), and the kernel lets only the app's own domain open the app's `/run/.userns` and PID namespace: bubblewrap ran
+  without them, stopped on "creation of new user namespaces was not disabled as requested", the zygote never started
+  and Chromium's CHECK ended the app. Now the launcher forks a small **Spawn helper** inside each Flatpak app's view
+  right after the app's Landlock scoping (`server/src/fpspawner.c`): same scope, namespaces and Landlock domain as the
+  app, no capabilities, not dumpable, executing only `/usr/bin/flatpak run` with the command line lord-server builds,
+  and talking only to lord-server over a socket pair. lord-server no longer enters any namespace for a Spawn; it checks
+  the caller as before, hands the helper the argv, environment and fds (a sealed memfd and SCM_RIGHTS), accepts the new
+  process only in the caller's scope and signals it through its pidfd. SpawnStarted waits for bubblewrap's
+  `bwrapinfo.json` (up to 3 s) so Chromium gets the real relative pid instead of 0 ("Already died").
+  `sandbox-expose-fd(-ro)` (the Chromium browser's WidevineCdm folder) is read and left out, as flatpak-portal does
+  with an fd it can't resolve: Flatpak would be given a path the app could swap for a link before the bind. Tests:
+  `build/fpspawner-test` (52 checks: header and payload rules, the helper over a real socket pair placing Chromium's fds
+  0-2 and its zygote socket, the instance fd, stdin on /dev/null, its own process group, exit statuses, refusals, no
+  capabilities) and the session test `server/tests/fwflatpak/spawn.sh` with `build/fpspawn-cli` (18 checks with
+  Whatsie, Chromium and FreeTube: Spawn served, bubblewrap joins the app's namespaces, helpers nested in the app's PID
+  namespace, the helper in the app's scope, a window drawn, no CHECK failure).
+- **Qt 6 apps open on the real display instead of a placeholder screen** ("qt.qpa.wayland: There are no outputs -
+  creating placeholder screen"): `zxdg_output_v1` version 3 now sends `name` and `description`, as version 2 did (only
+  its `done` gave way to `wl_output.done`); Qt waits for the name before it takes a display (`server/src/wl/wl.c`).
+
+- **Machines: a machine with an Intel graphics card (GVT-g) no longer takes most of a CPU core, in development**
+  (`docs/MACHINES-GPU.md`, "A vGPU's picture without a readback"). Live on the maintainer's computer (the new-card guest on
+  the vGPU at 1920 × 1080, an RX 580 drawing the desktop) lord-server's main thread used ~90 % of a core: QEMU's vfio
+  display sends the whole picture about 33 times a second, changed or not, and each time lord-server read all 8 MB back
+  from the iGPU on its main thread, scaled it into the window with the CPU and uploaded it to the desktop's GPU again.
+  - With the GPU composing, a machine's picture is now a GPU texture drawn below the UI like a Linux app's window and
+    scaled by the GPU (`wl_paint_media`, `media_paint_note`). An Intel vGPU's Y-tiled picture is copied on the iGPU into
+    one of two linear buffers that the desktop's GPU imports (PRIME, rows a multiple of 256 bytes), only the rows the
+    copy lacks; the main thread never waits: the copy's fence is in lord-server's poll. A Linux 3D machine is drawn
+    straight from the desktop GPU's import of QEMU's dmabuf (it was read back and uploaded again too). A new frame
+    presents only the displays its window is on, with no paint and no UI damage.
+  - Unchanged frames are found on the GPU (a pass that drops equal pixels, counted with
+    `GL_EXT_occlusion_query_boolean`) and acknowledged at once with nothing presented; on the CPU path (`LORD_GPU=0`)
+    the same test runs before the readback, and an unchanged frame isn't read.
+  - Measured with `build/dmaread-test bench` on that computer (1920 × 1080 at 33 frames a second, main-thread CPU):
+    13.4 ms a frame before (readback, CPU scaling and upload; 44 % of a core) → 0.37–0.38 ms on the GPU path, changed
+    or not (1.2–1.3 %); the CPU path 0.37 ms unchanged, 1.47 ms changing. The live session's numbers are still to
+    measure.
+  - The CPU's pixels are read back only when something needs them (a screenshot, a snapshot's thumbnail, a recording,
+    a rotated or transformed view). `LORD_VM_GPUTEX=0` goes back to the readback. `dmaread-test` checks the linear
+    copies on the other GPU, flipped too, and the change test.
+  - lord-vmdisplay answers an `UpdateDMABUF` that comes while there's no dmabuf picture without logging it (the vfio
+    display sends one every refresh during a mode change; the last picture stays).
+
+- **Machines: the pointer is shown over a machine with an Intel graphics card, in window, full screen and apps mode, in
+  development**. Intel's driver puts the guest's pointer on the vGPU's cursor plane, not in the picture, but LordOS hid its
+  own arrow over any machine with the new-card devices until the guest handed a shape over, which a vGPU machine didn't: there was no
+  pointer at all. A vGPU machine now shows the host's arrow until QEMU hands the plane's shape over (and again when
+  that shape is blank); lord-vmdisplay takes a cursor without a hotspot (VFIO's 0xffffffff) with its hotspot at the
+  top left instead of refusing it; Configure → Display → *Pointer drawn by* (the VirtIO driver's `HWCursor`) isn't
+  offered for a machine with an Intel graphics card.
+
+- **Machines: older LordOS tools in a machine are said, and Files explains a missing "Open with"** (`docs/FILES.md`,
+  `docs/VIRTUALIZATION.md` 7.3). A machine still running the first guest tools (hello `w1`) never appeared in
+  Files' Open with for a `.exe` (only tools that say `open`, `w3` and later, are listed), and nothing said why: the right
+  click on WinBox.exe had no Open with at all. Now lord-vm passes the tools' own version from their hello to lord-server
+  (`VM_AGENT_STATE` text `version\tsystem\ttools`, letters, digits and `. - _` only; `lord.vm.poll().agent.tools`).
+  Machines compares it with the tools this LordOS ships (`TOOLS_SHIPPED`: `w4` for `tools/guest-win`, `5` for
+  `tools/guest`, checked against their `VERSION` by `vm-model-test`; `toolsOutdated`): the agent's popover says "A newer
+  version of the LordOS tools is available" and its install button reads "Update LordOS Tools", and the bar's agent
+  button gets a small blue dot. "Open with" providers can now be hints (`{ id, hint(file) }`, `openHintsFor`): while
+  there is a machine whose app.json `os` is `windows` and none whose tools open files (`windowsNeedsTools`), Files' menu for a
+  `.exe`, `.msi`, `.bat`, `.cmd`, `.lnk`, `.com`, `.msix` or `.appx` shows Open with with a dim note (`machines.win.openWithUpdate`:
+  no machine can open it yet, update the LordOS tools in the machine, from its agent button), and a double click says
+  the same; with no such machine nothing changes. Context menus take a wrapping `{ note }` row. In all 35
+  languages. Tests: `vm-model-test`, `vm-openwith-test`, `openwith-model-test`.
+- **Machines: an apps mode window moved to another monitor no longer closes** (`docs/VIRTUALIZATION.md` 7.2). The
+  guest was asked to move its window to the LordOS window's place, off its own one screen (x ≥ the main display's width,
+  or negative); the guest hid it, stopped listing it, and its LordOS window closed. The place asked of the guest is now
+  always inside its screen (`guestPlace`, size kept as far as it fits) and the LordOS window stays where it was put,
+  following the guest's moves at that distance; a window the guest minimized right after such a move is restored; the
+  guest tools clamp a move to the screen too. Model tests (monitor 2 at x = 2500 → inside 0..1920, a monitor to the
+  left, a larger window, a scaled display, 2,000 random places) and checked on a test machine: moves to x = 2500 and
+  x = −1500 stayed on its screen.
+- **Machines: the clipboard in apps mode, a click that brings a new copy**: a click on a guest window that carried a new
+  clipboard offer reaches the guest 150 ms later, as on the machine's window, so a right-click's Paste finds it.
+  Checked end to end in apps mode on a test machine: LordOS → Notepad paste (one request, answered) and Notepad's copy
+  back.
+
+- **Machines: the close question fits a small window and Esc cancels it** (`apps/machines/vmwindow.jsx`): in apps mode
+  the controller window is small, so "Close ‹machine›?" was wider than it and its buttons were cut off, with the copy's
+  progress line drawn over them; Esc there left apps mode behind the card instead of cancelling it. Cards now fit the
+  window (buttons wrap), the copy's progress shows inside the close question instead of over it, and Esc is Cancel.
+- **Machines: "Ask before each paste" can't be clicked through or raced** (`apps/machines/clipask.jsx`,
+  `server/src/ui/js_vm.c`; found by Claude Security, two LOW). The guest chooses when the bar appears and sees where the
+  pointer is, so it could raise the bar under a click already on its way: Paste/Bring now answer only after the bar has
+  been in view for 0.7 s and only to a press that started after that (Don't paste/Ignore and Esc work at once). And a
+  guest flipping its on-demand capability could turn an offer into a full push nobody approved: in ask mode lord-server
+  now refuses a full push unless it carries the hash of the preview the person said yes to.
+- **Machines: "Ask before each paste" pastes only what it showed, and a click opens the clipboard for a moment only**
+  (`apps/machines/vmwindow.jsx`, `server/src/ui/js_vm.c`; found by the commit security review, two MEDIUM). A yes to
+  the bar's preview applied whatever the machine had copied by then, so a guest could swap the contents after the
+  preview: `clipboardApply`/`clipboardTake` now take the copy's number and refuse a later one, and a yes to push this
+  computer's clipboard checks it is still the one previewed. A click on a machine whose window wasn't in front opened
+  the clipboard's gate until the window's state next changed; it now opens it for the grace period only.
+- **Machines: the library is always one step away** (`apps/machines/index.jsx`; `sdk/dock.js` `registerDockActivate`,
+  `sdk/windowmenu.js` `registerWindowMenuItems`). With a machine's window open and the library closed there was no way
+  back to it without closing the machine. Now "Machines Library" is the first item of the app's Dock menu and of every
+  Machines window's Window menu (❖0 in a machine's window, which never reaches the guest), and a click on the Dock item
+  while only machines are open opens the library instead of raising a machine. The two SDK hooks are generic (any app
+  can add its own Window menu items or decide its Dock click) and every theme uses them through the shared Dock and
+  Window menu code. In all 35 languages.
+- **Machines: the Requirements sheet fits** (`apps/machines/library.jsx`, `model.js` `reqRows`). With the TPM row the
+  list was taller than the sheet and its buttons were cut off; the rows now scroll inside the sheet with Back and
+  Install Missing always visible. The TPM row showed its raw key ("machines.req.use.tpm"): it now says what swtpm is
+  for, in all 35 languages, and a test checks that every row the page can show has its title and line in English.
+- **Machines: a Clone's computer name, for a guest with the LordOS guest tools, is the one it will use**
+  (`apps/machines/clone.jsx`, `model.js` `winNameValid`, `cloneWinName`). The "Name inside the machine" field offered
+  a Linux hostname (for example 26 characters) that lord-vm then shortened to a 15-character computer name (first 10 +
+  "-" + 4 hex), so the name shown wasn't the one used. For a machine with the `windows` devices the default is now a
+  valid computer name (the machine's name cut to 9, then "-clone"), the field takes at most 15 letters, digits and
+  dashes and not only digits (lord-vm's own rule), and the note says what happens: the guest tools give the copy this
+  computer name, used from the guest's next restart, and its SID doesn't change. Linux machines are unchanged.
+- **Machines: a linked clone's card shows the frozen base it shares** (`ui/js_vm.c` `stats` `baseBytes`,
+  `apps/machines/library.jsx`). After a linked clone, both the original and the clone showed about 1 MB "on disk",
+  since only their own overlays were counted and the frozen base in `<library>/.shared/` was counted nowhere on the
+  cards. The card now shows the machine's own size with "own · 19 GB shared" under it; sorting by disk still uses the
+  own size.
+- **Machines: a machine whose description this LordOS can't read** (`apps/machines/library.jsx`, `vmwindow.jsx`,
+  `model.js` `unreadableOf`, `actionsOf`; `ui.jsx` `gb`, `bytes`). A `machine.json` written by a newer LordOS (a newer
+  schema) or damaged showed "undefined MB" in the list and its window tried to start it. The card and the list now say
+  "Needs a newer LordOS" or "Its description can't be read" instead of numbers, Start is disabled with that reason, and
+  the machine's window explains it without trying to start; sizes never print "undefined".
+
+- **Machines: a right-click Paste in a machine has what was just copied on this computer** (`apps/machines/vmwindow.jsx`):
+  this computer's clipboard went into the machine only when its window came to the front, so copying with a context
+  menu and then right-clicking Paste in the machine found the old clipboard (a keyboard paste worked, after the window's
+  focus). It is now also sent with a click on the machine's picture, and a click that carried a new clipboard reaches
+  the machine 150 ms later, so its Paste menu has it. A pass of the pointer sends nothing (found by the background
+  security review: a machine in the background must not read what was copied); contents that didn't change are not
+  sent again.
+- **Machines: copy and paste with a Linux guest that has no clipboard tool** (`tools/guest/lordos-guest.c`,
+  `server/src/vm/lordvm.c`, `vmagent.c`, `vmproto.h`, `server/src/ui/js_vm.c`, `apps/machines/model.js`, `vmwindow.jsx`).
+  The clipboard helper reads and writes the guest's clipboard only through `xclip` or `wl-paste`/`wl-copy`, and a stock
+  desktop install ships neither: every run failed in silence, nothing went either way, and the agent's popover still
+  said the clipboard worked (the helper's hello always said "clipboard"). Now:
+  - the helper (version 4) looks for the tools in PATH at the start, every 30 seconds and whenever one couldn't be
+    started, so installing `xclip` later starts working without a restart. It tells the guest's journal once which tool
+    it uses, or "no clipboard tool: install xclip or wl-clipboard". Without one its hello says `noclip` instead of
+    `clipboard clipx`, and again with `clipboard` once a tool appears;
+  - on GNOME with `DISPLAY` set it uses only `xclip`, through Xwayland, whose clipboard Mutter bridges: Mutter has no
+    data-control protocol, so `wl-paste` in the background needs a focus-stealing popup there. Elsewhere it keeps
+    `wl-clipboard` under Wayland first, then `xclip`. When the service starts before the session exported its display,
+    the helper reads `WAYLAND_DISPLAY`, `DISPLAY`, `XAUTHORITY` and `XDG_CURRENT_DESKTOP` from the user's systemd
+    manager (10 tries at most);
+  - lord-vm sets the clipboard capability only when the hello says `clipboard`, and a new `VAC_CLIP_NOTOOL` (2048) when it
+    says `noclip`; the log says when the guest gains or loses its tool. The popover's clipboard line says "Needs xclip"
+    with a hint (install the helper again, which installs it, or `sudo apt install xclip` in the machine), and the bar's
+    clipboard menu says it too, in every language;
+  - Install Clipboard Helper's fixed script also installs `xclip` and `wl-clipboard` through the guest's own package
+    manager (apt-get, dnf, zypper or pacman) when `xclip` is missing. It is best effort: offline or with the package
+    manager locked the helper is still installed and the popover says what is missing. It then restarts the helper in
+    each signed-in desktop session (`systemctl --user -M <user>@`, uids from 1000 with `graphical-session.target`
+    active), so the new version runs at once instead of from the next sign-in;
+  - the button could start the script many times (6 runs in 20 seconds in one guest's journal): lord-vm answered as
+    soon as the script started. It now follows the script with `guest-exec-status` and answers when it ends (10 minutes
+    at most; a failure carries the script's error output), answers `busy` to a second install meanwhile, and gives up
+    with an error when qemu-guest-agent stops answering. lord-server treats a click while an install is on its way as
+    the same request, so the button stays disabled until the end.
+  New test: `server/tests/guest_clip_test.sh` (in `make test`) runs the helper once with stub tools and a socket as its
+  port: no tool gives a `noclip` hello and the journal line; `xclip` alone, `wl-clipboard` alone, GNOME choosing `xclip`
+  over `wl-paste`, and another Wayland desktop choosing `wl-clipboard` first. Not yet tried on a real GNOME guest.
+- **Machines: a copy into a machine always shows its percentage** (`apps/machines/model.js`, `vmwindow.jsx`): a long file
+  name (an installer image, for one) pushed the percentage past the line's edge, so the copy looked stuck. The name is
+  now shortened in the middle, keeping its end, the line wraps instead of being cut, and a progress bar sits under it.
+- **Machines: a machine's input can't be an output's monitor** (`server/src/ui/js_vm.c`, `server/src/sound/snd.c`; found by
+  the commit security review, MEDIUM). The input chosen for a machine is used only when it is a microphone or line input,
+  never the monitor of an output (which would hand the guest everything this computer plays under the microphone
+  permission), and the default is used whenever the sound state isn't known yet (it used to pass the chosen name on).
+- **Machines: the agent's panel says when the clipboard is off** (`apps/machines/vmwindow.jsx`): a machine made before the
+  clipboard setting existed has it off, and the panel only offered to install the helper again, which changed nothing. It
+  now says the clipboard is off and opens Configure → Sharing. The duplicated `agent.st.needsTools` key in every language
+  is gone too.
+- **Machines: Configure's Done keeps changes made in any section** (`apps/machines/configure.jsx`): Done saved the draft
+  only when the pane showing at that moment was one that saves, so a choice made in another section was silently dropped
+  (Graphics 3D chosen under Display, then Done pressed from Sound, closed without it). Done now saves every change made in
+  any section; with the machine running and changes that need it off, it shows the running banner instead of closing, and
+  the pane's Cancel/Save footer shows whenever there are unsaved changes.
+- **Machines: the window of a machine that's starting no longer shows "Something went wrong"** (`apps/machines/model.js`):
+  between the start and the machine's first state, the window read the state of a session that had none yet and failed,
+  then said it couldn't connect. A session without its first state now counts as Starting. Model test added.
+- **Machines: a password manager's secret copied in a machine stays in the machine** (`tools/guest-win/lordos-guest-win.c`,
+  `tools/guest/lordos-guest.c`; found by Claude Security, LOW). With guest-to-host clipboard sharing on, a password copied
+  from a password manager inside a machine reached the host's clipboard history (kept 30 days) and outlived
+  the manager's own clearing. The guest tools now leave such a copy alone. The guest tools for the new card's guests check for the marks those
+  managers set ("ExcludeClipboardContentFromMonitorProcessing", "Clipboard Viewer Ignore", "CanIncludeInClipboardHistory"
+  holding 0). The Linux guest tool checks for `x-kde-passwordManagerHint`. Checked with a stub clipboard on Linux (the secret
+  is not sent; ordinary text still is); the other guest tools are built but not yet run in a guest.
+- **Apps mode: each Store app of the new card's guests is its own Dock entry, with its icon** (`tools/guest-win/lordos-guest-win.c`): every
+  Store app's window (Calculator, Settings…) belongs to `ApplicationFrameHost.exe`, so they all shared one Dock entry
+  "ApplicationFrameHost.exe (machine)" with a letter for an icon. The guest tools now resolve the app inside the frame
+  (its AppUserModelID, from the frame's property store or the hosted `CoreWindow`'s process) and report the Start menu's
+  name and picture for it. Checked on a guest of the new card (4.3): Calculator and Settings came as "Calculadora" and
+  "Configuración", each with its own 32 × 32 icon (`lordvm-dev` now saves each icon the guest sends as `icon-<id>.png`).
+- **Apps mode keeps a guest's window below the menu bar** (`apps/machines/appsmode.jsx`, `model.js` `insideWork`): a guest
+  window near the top of the guest's screen (Calculator opens at y = −10) got its LordOS title bar under the menu bar,
+  out of reach. It now opens, and follows the guest, just inside the work area, and the guest is asked to move its window
+  to the same place, so the picture stays the guest's window 1:1. `vm_model_test.mjs` covers it.
+- **A clone of the new card's guests gets its own computer name** (`server/src/vm/lordvm.c`, `vmops.c`): lord-vm ran its `/bin/sh` identity
+  script on a clone of the new card's guests (4.3), which failed at every start ("qemu-guest-agent couldn't run the script"), so the copy
+  kept the original's name. Such a guest now gets one fixed PowerShell script as SYSTEM: `Rename-Computer` to a name
+  checked on both sides against NetBIOS rules (at most 15 letters, digits and `-`, not only digits; a longer hostname
+  becomes its first 10 characters and 4 hex digits of the new id), with no forced restart: the guest uses it from its
+  next restart. It runs once. The machine SID isn't changed (sysprep's job; `docs/VIRTUALIZATION.md` says so). Checked on a
+  clone of such a machine: after Shut Down and a start, `hostname` gave the new name. `build/vm-test` covers the
+  names.
+- **A machine's sound comes back when PipeWire appears late** (`server/src/ui/js_vm.c`, `server/src/media/maudio.c`): a
+  machine window opened before PipeWire was reachable stayed silent ("media: no PipeWire to play", never tried again), and
+  so did one whose PipeWire restarted. The speakers' stream (and the microphone's) now connect again every 2 s while the
+  guest plays, with the same ring, logging only the first failure and the return. Checked with `lordvm-dev` and a private
+  PipeWire started after the guest began playing: back after 4 tries, at the real rate.
+- **The machine window's menus show their information lines whole** (`apps/machines/ui.jsx`, `vmwindow.jsx`): in the
+  Folders menu the transfer folder's line ("In the machine: a drive in This PC, usually Z:") and "No folder is shared with
+  this machine" were cut at the menu's edge, and so were long items in other languages. Information lines are now notes
+  that wrap under the items' text column (start-aligned, right to left too), and every item's text wraps instead of
+  running out of the menu; the resolution menu's notes use the same rows.
+- **Installing the guest tools says what went wrong in the person's language** (`apps/machines/vmwindow.jsx`, `model.js`
+  `installError`): the agent popover showed lord-vm's English error as it came ("the guest agent can't write files or run
+  commands"). Its known errors (tools missing on this computer, the agent busy, no file copies or programs allowed, too
+  slow, no private folder, the agent gone, the script failed) are now translated lines (`machines.agent.err.*`, all 35
+  languages), with lord-vm's text only as a detail when it adds something (a script's output, qemu-guest-agent's
+  error). `vm_model_test.mjs` covers the mapping.
+- **A bridged machine starts with one Play, showing Starting while its network is made** (`apps/machines/vmwindow.jsx`,
+  `library.jsx`, `model.js` `startPhase`, `playStarts`): while the admin helper made the macvtap the window kept the
+  earlier run's Off (title and Play included), and Play on the library's card only brought an open window forward, so a
+  second Play was needed. The window now shows Starting (no second Play) until the network is up and then starts the
+  machine itself, once, even if it was remounted meanwhile (and not if it was closed); Play on a card asks an open window
+  that shows Off to start. `vm_model_test.mjs` covers the phases; not run against the real admin helper here.
+- **Settings → Flatpak counts the Flathub apps installed elsewhere** (`sdk/flathub.js` `watchInstalled`,
+  `apps/settings/Flatpak.jsx`, `apps/store/flathubpages.js`): the count was read once when the page opened, so an app
+  installed outside the Store while it showed (a terminal's `flatpak install --user`, a `.flatpakref`) left it at 0, and
+  it said 0 before the first list came back. It now says "—" until the installation was listed, and while the page (or
+  the Store's Flathub updates) shows, the exported apps are compared every 3 s (cheap: the server reads its folders again
+  only when they changed) and the installation is listed again when they change.
+- **The remote desktop no longer crashes lord-server when a viewer connects after the last one left**
+  (`server/src/remote/mirror.c`, `server/src/media/mstream.c`): the mirror freed its copy of the screen while the video
+  encoder still held it, and the next viewer's encoder copied from the freed memory. A 1920 × 1080 headless session
+  drawing with nobody watching crashed on every third viewer (SIGSEGV in a paint thread); with a monitor the same read
+  happened whenever a viewer connected after the last one left. The encoder now drops the pointer before every free.
+- **Linux and Flathub apps start with a covered mount under the home** (`server/src/sec/sandbox.c`): the read-only view of
+  the home made every mount under it read-only from `/proc/self/mountinfo`, which also lists mounts no path reaches (one
+  covered by a later mount on a folder above it); that remount failed with ENOENT and no app started ("could not build
+  the app's view"). Such a mount is skipped, since the app can't reach it either; any other failure still stops the
+  launch, now with the mount and the reason in the app's log. `build/sandbox-home-mounts-test` covers it. Found with
+  Whatsie launched from the launcher in a session with a tmpfs and a bind mount in the home.
+- **Machines' window no longer pauses the desktop every 5 s** (`server/src/vm/vmthumb.c`): the card's picture was scaled,
+  PNG-encoded and written on the main thread at each snapshot (20 to 57 ms, `stall: call vm.snapshot` in
+  compositor.log). A thread of its own does it now from a copy; none of those stalls in a minute of a running machine.
+  `build/vmthumb-test` covers it.
+- **Open Transfer Folder opens the machine's own folder** (`apps/machines/`, `sdk/sysopen.js`): it showed
+  `~/Machines/Transfer`, every machine's folder, one level up. The library's menu, Configure → Sharing and the machine
+  window's folder menu (the transfer folder and each shared folder) open the folder itself (`openFolder`).
+- **The Store's sidebar edge drags from both sides of the line** (`apps/store/index.jsx`): the column after the sidebar
+  took presses on the outer half of the drag handle.
+- **Configure → Display saves its choices** (`apps/machines/configure.jsx`): the start resolution and 2D/3D picked there
+  were dropped when Done was pressed (the section wasn't one that saves); a machine set to 1920 × 1080 now starts at
+  1920 × 1080 (checked with a machine of the new card, `docs/VIRTUALIZATION.md` 4.3).
+- **The agent of a guest without systemd lists only what it does** (`server/src/vm/lordvm.c`, `apps/machines/model.js`):
+  on the new card's guests (`docs/VIRTUALIZATION.md` 4.3) the popover said "Logs: the system's journal" and "Kept awake
+  while it runs" worked, which are systemd's (`journalctl`, `systemd-inhibit`); lord-vm no longer claims or tries them
+  there, and the popover leaves those lines out.
+- **The machine's bar fits a narrow window** (`apps/machines/vmwindow.jsx`): between about 640 and 850 px wide (and
+  below 620) power, Configure and full screen went past the window's edge; the bar is compact up to 880 px, and the
+  smallest windows leave out the shell, logs, screenshot and record group (logs and screenshot are in Actions).
+- **Apps mode follows a guest window that keeps its own size** (`apps/machines/appsmode.jsx`, `model.js` `guestKept`):
+  a window made smaller than the guest allows (Calculator, Paint) stayed small here with the guest's picture squeezed
+  into it; 1.5 s after an unanswered move it goes back to the guest window's real size.
+- **Machines in full screen keep a menu open under the pointer** (`apps/machines/vmwindow.jsx`): the floating bar hid as
+  soon as the pointer left it to reach a menu's items (the resolution menu went away); it now stays while a menu is open.
+- **One pointer over a machine that draws its own** (`server/src/media/media.c`, `server/src/ui/js_vm.c`): guests on
+  the device set of the new card in `docs/VIRTUALIZATION.md` 4.3 draw their pointer into the picture and hand none over,
+  so LordOS's arrow showed beside it; it's hidden over their picture until the guest hands one over.
+- **The guest agent names the guest's system rightly** (`server/src/vm/lordvm.c`): a build of 22000 or more that still
+  calls itself "10" is shown as 11, and the clipboard helper (a Linux program) is no longer offered to such a guest,
+  where installing it failed on a path that doesn't exist there.
+- **An unattended install from the New Machine assistant no longer stops in the firmware's menu**
+  (`server/src/vm/lordvm.c`): the Enters that answer the install disc's "Press any key to boot from CD or DVD" were only
+  sent when lord-vm started the machine running, and Machines starts it paused until its window is there, so the
+  prompt timed out. They're now sent from when the machine first runs, for a guided install too. Machines also finds
+  the ISO in Downloads under its newer file name (`Windows11_Client_x64_<language>_<build>.iso`).
+- **Machines on compatible devices start in their window** (`server/src/vm/lordvm.c`; the device sets of imported machines
+  and of the new card in `docs/VIRTUALIZATION.md` 4.3): the window's sound output wasn't declared for them, and QEMU refused the sound card with "audiodev 'snd0' not found".
+- **Linux and Flathub apps start on a computer with a mount inside the home folder** (`server/src/sec/sandbox.c`): a
+  cloud drive (rclone's FUSE mount under `~/Cloud`) or a disk mounted in a folder made the kernel refuse the read-only
+  bind of the home in the app's user namespace (EINVAL), and no app with a read-only home started ("could not build
+  the app's view"). The home is now bound with what is mounted under it, and each of those mounts is made read-only
+  too. **Flathub apps start when the document portal runs** (`server/src/fpak.c`): `flatpak run` now gets
+  `--no-documents-portal`, since LordOS's view has no `/run/user/<uid>/doc` and bubblewrap stopped there. Found with
+  Whatsie on the maintainer's PC; checked there by launching it through LordOS's launcher.
+- **The desktop no longer stalls while the Store installs a Flathub app** (`sdk/flathub.js`, `apps/store/flathubpages.js`):
+  every line flatpak printed changed the Store's state, which redrew the 60 cards of the Flathub page and filtered and
+  sorted the 2 242 apps of the catalog again, several times a second. Progress now reaches the page at most every
+  250 ms and only its progress bar redraws; each card follows only whether its app is installed, the filtered list is
+  kept until the catalog, the search or the switch changes, and each name is folded once when sorting.
 - **Flatpak's Spawn portal compares fd handles as unsigned numbers** (`server/src/fpspawn.c`): a handle of 2³¹ or more read
   as a negative index before. Not reachable in practice, since LordOS's D-Bus client already refuses any message whose fd index
   is past the fds that came with it; fixed as defense in depth after an automated security review.
 - **No compiler warnings on arm64**: two Flatpak functions that only x86-64 PCs use in phase 1 were reported as unused on the
   Raspberry Pi build (`server/src/apps.c`).
+
+### Security
+
+- **Machines: the clipboard goes into and out of a machine only while you use it, and into it only when something
+  there pastes** (`docs/VIRTUALIZATION.md` 6.8; `server/src/vm/vmagent.[ch]`, `lordvm.c`, `ui/js_vm.c`,
+  `apps/machines/vmwindow.jsx`, `appsmode.jsx`, `model.js`, `tools/guest-win`, `tools/guest`). A guest is untrusted
+  (clipboard stealers, address swappers), and until now this computer's clipboard was pushed into a machine whenever
+  its window came to the front, where any program in it could read it later.
+  - **On demand.** The machine now gets an *offer* (which forms there are: text, rich text, picture; a generation
+    number; no contents) when its window comes to the front or is clicked. The guest's helper puts those forms on its
+    clipboard without data and asks for one only when a program there pastes. lord-server answers with the data only
+    while the machine is in use (its window in front, one of its apps mode windows in front, or 3 s after, so a paste
+    right after switching works) and only for the offer that is still this computer's clipboard; anything else gets
+    nothing. lord-vm checks each request first: it parses exactly, is for the last offer and one of its forms, the
+    machine's clipboard goes toward the guest, a window is open on the machine, and the guest asks at most 8 times a
+    second. Refusals go in the machine's log. Secrets are still never offered.
+  - **Guests with `lordos-guest-win`** (w2): the system's delayed rendering (`WM_RENDERFORMAT`), with the offer marked so
+    the guest's clipboard history and cloud clipboard skip it; a paste waits at most 2 s for the answer; leaving
+    empties the clipboard instead of fetching what nobody pasted.
+  - **Linux guests** (lordos-guest 5): the helper owns the X `CLIPBOARD` selection itself, speaking the X11 protocol
+    over the display's own socket with the session's cookie (no Xlib, no new package; `tools/guest/x11clip.c`), so it
+    works on X11 and through Xwayland, which GNOME, KDE and wlroots desktops bridge to their Wayland clipboard; large
+    pictures go as INCR. A guest without an X display and older helpers keep receiving the whole clipboard, at the same
+    moments only (window to the front, a click).
+  - **Guest → this computer, gated.** What a machine copies reaches this computer's clipboard only while the machine is
+    in use; a change in the background is ignored and logged.
+  - **Told once per burst.** A machine that asks for the clipboard or changes it in the background gets a notification:
+    "‹machine› tried to read your clipboard in the background: blocked" / "… tried to change your clipboard in the
+    background: ignored", again only after 30 s without one (or 5 minutes after the last notice). Configure → Sharing's
+    clipboard note says how it works. In all 35 languages.
+  - New agent frames `AGK_CLIPOFFER`, `AGK_CLIPREQ`, `AGK_CLIPDATA` and hello capability `clipreq`, with strict parsers
+    (exact lengths, generation ≥ 1, known forms and flags, UTF-8 or a believable PNG) covered by `vm-test` (cases and
+    50 000 random inputs); `tests/guest_clip_test.sh` drives the Linux helper against Xvfb with `xclip` (TARGETS, a
+    paste, a refusal, a 300 KB INCR picture, one request per form, giving the selection back).
+- **Machines: "Ask before each paste"** (Configure → Sharing → Clipboard trust; `machine.json` schema 9
+  `clipboard_ask`, `lord-vm --set --clipboard-ask on|off`; `apps/machines/clipask.jsx`, `model.js` `clipAsk*`,
+  `ui/js_vm.c` `clipboardAnswer`, `clipboardPreview`). "Trusted" (the default) is the on-demand clipboard above. "Ask"
+  puts a small bar over the machine's picture (over the guest window in front in apps mode) before anything crosses:
+  "Paste into ‹machine›?" with a one-line preview (80 characters of text, rich text's text, or "A picture, W×H") and
+  [Don't paste] [Paste] when a program in the machine pastes, the program waiting up to 25 s for the answer and getting
+  nothing on a no or no answer; one answer covers every form of the same copy. "‹machine› copied" with its preview and
+  [Ignore] [Bring to LordOS] for a copy out of the machine, ignored after a minute. With a guest helper that can't ask,
+  the bar asks before the clipboard is pushed. Esc says no; Enter says yes only on the focused button; while the bar
+  shows nothing typed goes to the machine. Right-to-left aware, in all 35 languages.
+- **Machines: "Needs xclip" reached the app** (`server/src/vm/vmproto.h`): lord-server refused every agent state that
+  carried the "no clipboard tool" bit (2048, at the limit of the check), so the hint and Install's xclip step never
+  showed. The check now allows every known bit.
+
+### Changed
+
+- **Chromium and Electron apps from Flathub install and work; the Store no longer marks them "not yet supported"**
+  (`apps/store/flathubpages.js`, `sdk/flathubmodel.js`, `docs/FLATPAK.md`). Their helpers' sub-sandboxes are now served
+  (see Fixed). Checked with Whatsie (QtWebEngine), the Chromium browser and FreeTube (Electron/zypak). The Store's
+  permission list no longer shows `org.freedesktop.portal.Flatpak` as "running programs outside its sandbox": it is
+  LordOS's own Spawn, which only starts the same app in a sub-sandbox (`org.freedesktop.Flatpak`, the host one, still
+  is). The texts of the old notice are removed from every language.
+
+- **Machines: a machine's picture at the guest's full rate, in development** (`docs/MACHINES-GPU.md` Part 1 steps 1
+  and 3). lord-server reads each machine's frames in its own loop and acknowledges a frame right after the paint that
+  showed it, instead of at the Machines app's poll after next; a frame repaints only the rectangle that changed, not
+  the whole picture. Measured on a viogpudo guest drawing 61 frames a second: 29.5 → 60.0 frames a second shown,
+  1.7 → 0.1 ms of paint a frame, lord-server 54 % → 17 % of a core.
+- **Monitor: the process list no longer stalls the desktop, in development** (`docs/MACHINES-GPU.md` Part 1 step 6).
+  `lord.monitor.processes` read every process's cgroup file and parsed a JSON list on lord-server's only thread
+  (~20 ms a second on a busy desktop, a third of the maintainer's stall lines). The monitor's thread now reads each
+  scope once and hands over rows that become objects directly: 382 processes 4.0 → 1.3 ms, 1,900 processes
+  19.6 → 4.5 ms a call.
 
 ## [0.8.9.4-beta] - 2026-11-20
 

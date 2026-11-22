@@ -30,7 +30,6 @@
   "msg.updateDone": "{name} is up to date.",
   "noResults": "No Flathub app matches.",
   "notSupported": "Flathub isn't available on this computer yet: for now it is only for PCs.",
-  "notYet": "Not yet supported",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Debugging other programs",
   "perm.devicesAll": "All devices: cameras, game controllers, USB",
@@ -75,8 +74,6 @@
   "showAllOff": "Only apps verified by Flathub. Hidden: {count}",
   "showAllOn": "Showing every Flathub app, verified or not",
   "showMore": "Show more ({count} left)",
-  "subsandbox.text": "This app is built on Chromium or Electron, whose helpers need Flatpak's sandboxes shared in a way LordOS doesn't offer yet, so it can't be installed here for now.",
-  "subsandbox.title": "Not yet supported on LordOS",
   "subtitle": "Linux apps from Flathub, run inside LordOS's own view under your Firewall.",
   "turnOff": "Turn off",
   "unverified": "Not verified by Flathub: the publisher may not be the app's developer.",
@@ -110,5 +107,6 @@
   "settings.removing": "Removing Flatpak…",
   "settings.removed": "Flatpak was removed, with its apps and Flathub.",
   "settings.failed": "Flatpak couldn't be removed.",
-  "settings.planRefused": "Flatpak can't be removed on its own: another installed package needs it. Nothing was changed."
+  "settings.planRefused": "Flatpak can't be removed on its own: another installed package needs it. Nothing was changed.",
+  "note.obsVideos": "In LordOS, OBS Studio saves recordings in your Videos folder: the other folders of your home are read-only for Flathub apps."
 }

@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import { Suggested } from './suggested.js';
 import { Card, CardGrid, Facts, Pill, Shelf } from './ui.js';
-import { sysPkgKey, snapshotDate } from './syspkg.js';
+import { sysPkgKey, snapshotDate, companionsOf } from './syspkg.js';
 import { AdminRescue, isNotAdmin } from './rescue.js';
 import { search } from './search.js';
 
@@ -126,11 +126,13 @@ function PlanView({ plan }) {
 // extras: packages installed with it (a catalog app's "with": Steam's steam-libs-i386:i386); withRemove: those
 // removed with it, when installed. When the app is installed and some extras are not (a catalog entry that gained
 // "with" packages after it was installed: Steam's 32-bit Vulkan drivers), Update installs the missing ones.
-function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
+// A few Debian packages bring others with them (syspkg.js companionsOf: OBS Studio's plugins and Qt's Wayland plugin).
+function Details({ name, onBack, onRemoved, extras: given = [], withRemove = [] }) {
   const th = useTheme();
   const { gen, job } = useStore(state);
   const [plan, setPlan] = useState(null);
   const info = ready() ? lord.pkg.info(name, { lang: lang2() }) : null;
+  const extras = [...given, ...companionsOf(name, (p) => !given.includes(p) && !!(ready() && lord.pkg.info(p, {})))];
   useEffect(() => setPlan(null), [name, gen]);
   const launcher = useLauncherApps();
   if (!info) return h(Text, { style: { color: th.textDim } }, t('store.debian.notFound', { name }));
@@ -155,7 +157,7 @@ function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
   const desc = (info.appDescription || info.description || '').trim();
   const busy = !!job;
   const primary = !info.installed
-    ? h(Button, { primary: true, label: t('store.install'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doInstall() })
+    ? h(Button, { primary: true, label: t('store.install'), disabled: !isAdmin, busy, pending: true, onClick: () => isAdmin && !job && doInstall() })
     : desk ? h(Button, { primary: true, label: t('store.open'), onClick: () => launchApp(desk.id) }) : null;
   return h(View, { style: { gap: spacing.xl } },
     onBack ? h(Button, { plain: true, small: true, label: `‹ ${t('store.back')}`, onClick: onBack, style: { alignSelf: 'flex-start', [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -6 } }) : null,
@@ -168,8 +170,8 @@ function Details({ name, onBack, onRemoved, extras = [], withRemove = [] }) {
         h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.35, textAlign: 'start' } }, app?.summary || info.summary),
         h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s, marginTop: spacing.s } },
           primary,
-          (info.upgradable || missing.length > 0) && h(Button, { label: t('store.upgrade'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doInstall() }),
-          info.installed && !info.essential && h(Button, { label: t('store.remove'), disabled: !isAdmin || busy, onClick: () => isAdmin && !job && doRemove() }),
+          (info.upgradable || missing.length > 0) && h(Button, { label: t('store.upgrade'), disabled: !isAdmin, busy, pending: true, onClick: () => isAdmin && !job && doInstall() }),
+          info.installed && !info.essential && h(Button, { label: t('store.remove'), disabled: !isAdmin, busy, pending: true, onClick: () => isAdmin && !job && doRemove() }),
           info.installed ? h(Text, { style: { fontSize: typeScale.caption, fontWeight: 500, color: '#30d158', marginLeft: spacing.xs } }, t('store.installedBadge')) : null))),
     !isAdmin && h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.debian.needAdmin')),
     h(Facts, { items: [
@@ -210,7 +212,7 @@ function DebCard({ a, onOpen }) {
   const cat = catOf(app);
   const action = desk ? h(Pill, { label: t('store.open'), onClick: () => launchApp(desk.id) })
     : h(Pill, { label: a.installed ? t('store.ai.view') : t('store.get'), onClick: () => onOpen(name) });
-  return h(Card, { icon: h(PkgIcon, { app, name, size: 56 }), name: app.name || name, kind: cat ? t(`store.cat.${cat}`) : '',
+  return h(Card, { icon: h(PkgIcon, { app, name, size: 56 }), name: app.name || name, tag: 'Debian', kind: cat ? t(`store.cat.${cat}`) : '',
     summary: app.summary || a.summary || '', note: a.size ? formatBytes(a.size) : '', action, onClick: () => onOpen(name) });
 }
 
@@ -225,8 +227,21 @@ function StoreGlyph() {
     h(View, { style: { position: 'absolute', left: 4, top: 12, width: 40, height: 34, borderRadius: 7, backgroundColor: c } }));
 }
 
+const CAT_PAGE = 60;
 export const CATS = ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'System', 'Utility'];
-const categoryCounts = () => (ready() ? lord.pkg.categories() : {});
+// The package index's answers, kept until it (or what is installed) changes (gen) or the language does: each one walks
+// the whole index on lord-server's thread and builds thousands of objects, and pages asked again on every render, so
+// a hover froze the pointer and the heap grew until the Store was closed (2026-11-20)
+const memo = new Map();
+let memoGen = -1;
+function cached(key, fn) {
+  const g = state.get().gen;
+  if (g !== memoGen) { memo.clear(); memoGen = g; }
+  const k = `${lang2()}|${key}`;
+  if (!memo.has(k)) { if (memo.size > 64) memo.clear(); memo.set(k, fn()); }
+  return memo.get(k);
+}
+const categoryCounts = () => (ready() ? cached('cats', () => lord.pkg.categories()) : {});
 
 // No index yet (or no engine): say so, with the button that fetches the lists.
 function NoIndex() {
@@ -240,7 +255,7 @@ function NoIndex() {
 // Search results: apps as cards, other packages as rows.
 function Results({ q, onOpen, more, hide = [] }) {
   const th = useTheme();
-  const res = lord.pkg.search(q, { limit: 60, lang: lang2() }).filter((r) => !hide.includes(r.name));
+  const res = cached(`q:${q}`, () => lord.pkg.search(q, { limit: 60, lang: lang2() })).filter((r) => !hide.includes(r.name));
   const apps = res.filter((r) => r.app), others = res.filter((r) => !r.app);
   return h(View, { style: { gap: spacing.l } },
     h(Progress),
@@ -271,7 +286,7 @@ function Discover({ query, onOpen, onCategory, top, hide }) {
     h(Progress),
     top,
     ...CATS.filter((c) => counts[c]).map((c) => h(Shelf, { key: c, title: t(`store.cat.${c}`), more: t('store.seeAll', { count: counts[c] }), onMore: () => onCategory(c) },
-      h(Grid, { items: lord.pkg.apps({ category: c, limit: 4, lang: lang2() }), onOpen }))));
+      h(Grid, { items: cached(`top:${c}`, () => lord.pkg.apps({ category: c, limit: 4, lang: lang2() })), onOpen }))));
 }
 
 // Store → For this computer: the hardware suggestions on their own page.
@@ -283,13 +298,19 @@ function SuggestedPage() {
 function Category({ cat, query, onOpen }) {
   const { gen } = useStore(state);
   void gen;
+  // a page of cards at a time: hundreds of cards redrawn on every change were most of the cost
+  const [limit, setLimit] = useState(CAT_PAGE);
+  useEffect(() => setLimit(CAT_PAGE), [cat, query]);
   if (!ready()) return h(NoIndex);
-  const all = lord.pkg.apps({ category: cat, limit: 2000, lang: lang2() });
+  const all = cached(`cat:${cat}`, () => lord.pkg.apps({ category: cat, limit: 2000, lang: lang2() }));
   const q = query.trim();
-  const list = q ? search(all, q, (a) => ({ names: [a.name, a.package], texts: [a.summary] })) : all;
+  const list = q ? cached(`cat:${cat}:${q}`, () => search(all, q, (a) => ({ names: [a.name, a.package], texts: [a.summary] }))) : all;
   return h(View, { style: { gap: spacing.l } },
     h(Progress),
-    list.length ? h(Grid, { items: list.slice(0, q ? 200 : 400), onOpen })
+    list.length ? h(Grid, { items: list.slice(0, limit), onOpen }) : null,
+    list.length > limit ? h(View, { style: { alignItems: 'center' } },
+      h(Button, { label: t('flathub.showMore', { count: list.length - limit }), onClick: () => setLimit(limit + CAT_PAGE) })) : null,
+    list.length ? null
       : h(EmptyState, { icon: h(StoreGlyph), title: t('store.debian.none'), hint: t('store.debian.noneHint'), style: { minHeight: 300 } }));
 }
 
@@ -315,7 +336,7 @@ function LordOSCard({ up }) {
         h(Text, { style: { fontSize: typeScale.title, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('store.system.available', { version: up.version })),
         h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, textAlign: 'start' } },
           t('store.system.availableDetail', { installed: up.installed, size: formatBytes(up.size || 0) }))),
-      h(Button, { primary: true, label: t('store.system.update'), disabled: !isAdmin || !!job,
+      h(Button, { primary: true, label: t('store.system.update'), disabled: !isAdmin, busy: !!job, pending: true,
         onClick: () => isAdmin && !job && setPlan(lord.pkg.plan({ install: ['lordos'] })) })),
     !isAdmin && h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.debian.needAdmin')),
     plan && h(View, { style: { gap: spacing.s } },

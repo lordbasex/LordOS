@@ -12,12 +12,13 @@
 //   components/QuickSettings.jsx, NotificationCenter.jsx, Menu.jsx
 //   placement.js                the work areas and the panels' places, with a taskbar on every display
 import {
-  startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows,
+  startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useTrackedSettings, useWindows, useStore, configureWindows,
   getApp, wm, t as tr, DesktopWidgets, displayAt, WidgetDropTarget, WidgetPicker, widgetPicker, startDeskWidgets, registerGestureActions, dockPrefs, mainDisplay, screenDisplays, dockDrag, dockPoof,
   emptyTrash, ConfirmDialog, PowerDialog, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, snapPreview, notifyHistory, setBannerPlacement, Text,
   useShortcuts, runShortcut, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, toggleShowDesktop, spotlight, launchApp, dockActivate,
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   menuBarPrefs, menuBarEveryDisplay, barDisplays, pointerDisplay, keepWindowsInWorkAreas,
+  guestAppsMode,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState, Fragment } from 'react';
@@ -58,7 +59,7 @@ function DragGhost({ t }) {
 // After an unpin: the button fades out where it was dropped (nothing with reduce motion).
 function PoofFade() {
   const poof = useStore(dockPoof);
-  const reduce = !!useStore(settings).reduceMotion;
+  const reduce = !!useStore(settings, (s) => s.reduceMotion);
   const [, tick] = useState(0);
   const p = poof ? Math.min(1, (Date.now() - poof.t0) / 300) : 1;
   useEffect(() => {
@@ -123,7 +124,7 @@ const classicTable = (ui) => {
 
 function App() {
   startDeskWidgets();      // the desktop widgets' grid and data (sdk/deskwidgets.jsx), as in Lord Workspaces
-  const [s] = useSettings();
+  const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
   const t = makeTheme(s);
   const { mounted, focused } = useWindows();
   const taskView = !!useStore(overview);
@@ -177,6 +178,8 @@ function App() {
     left: desktopSwipe('left'), right: desktopSwipe('right'),
   }), []);
 
+  // inside a Machines guest in apps mode (sdk/guestwin.js) only the windows are drawn: the host shows them one by one
+  const ga = useStore(guestAppsMode);
   const isOnBar = (x, y) => onBar(pos, x, y, bars);
   const preview = useStore(snapPreview);
   const top = mounted[mounted.length - 1];
@@ -188,14 +191,14 @@ function App() {
   const trashArea = (askEmpty != null && all.find((d) => d.id === askEmpty)) || m;
   return (
     <ThemeProvider tokens={t}>
-      <View style={{ width: '100%', height: '100%', backgroundColor: t.mode === 'dark' ? '#101216' : '#c9d3e0' }}>
-        {all.map((d) => (
+      <View style={{ width: '100%', height: '100%', backgroundColor: ga ? '#000' : t.mode === 'dark' ? '#101216' : '#c9d3e0' }}>
+        {!ga && all.map((d) => (
           <Image key={d.id + ':' + d.x} src={wallpaperSrc(findWallpaper(t.wallpapers, wallpaperIdFor(s, d)), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)}
             onContextMenu={(e) => setDesk({ x: e.x, y: e.y })}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}
-        {all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
-        <DesktopWidgets layer="below" />
+        {!ga && all.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
+        {!ga && <DesktopWidgets layer="below" />}
         <WidgetDropTarget />
         <OverviewBackdrop />
         {/* keyed on the window: raising one reorders this list, and it must move, not mount again */}
@@ -205,11 +208,11 @@ function App() {
             <Window win={w} t={t} focused={!taskView && w.id === focused} app={getApp(w.id)} />
           </Fragment>
         ))}
-        <DesktopWidgets layer="above" />
+        {!ga && <DesktopWidgets layer="above" />}
         <WidgetPicker />
         {/* a bar on each display and the panels above them: each in its layer (sdk/layers.js,
             docs/LAYERS.md), so the order and the clicks are the layers' */}
-        <Layer name="dock">
+        {!ga && <Layer name="dock">
           {bars.map((d) => (
             <View key={d.id + ':' + d.x} style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, pointerEvents: 'box-none' }}>
               <Taskbar t={t} pos={pos} align={align} area={d} start={open === 'start' && pd.id === d.id} onStart={() => { closeOverview(); toggle('start', d); }}
@@ -219,7 +222,7 @@ function App() {
                 onEmptyTrash={() => setAskEmpty(d.id)} />
             </View>
           ))}
-        </Layer>
+        </Layer>}
         {/* keyed on the display: another bar's button opens the panel anew on its own display */}
         {open === 'start' && <Layer name="overlay"><StartMenu key={pd.id} t={t} box={startBox(pos, align, pd)} onClose={close} isOnBar={isOnBar} /></Layer>}
         {open === 'quick' && <Layer name="popover"><QuickSettings key={pd.id} t={t} at={qsAt} onClose={close} isOnBar={isOnBar} /></Layer>}

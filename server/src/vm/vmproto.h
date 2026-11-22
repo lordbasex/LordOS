@@ -43,15 +43,69 @@
  *                   new one replaces the old. The serial log goes on as before.
  *     VM_AGENT      the guest agent (6.17; machine.json "agent"): a = VAG_SHUTDOWN (guest-shutdown), VAG_TIMESYNC
  *                   (guest-set-time from this computer's clock), VAG_INSTALL (copies lordos-guest, the clipboard helper,
- *                   into the guest through qemu-guest-agent and enables it) → VM_REPLY
+ *                   into a Linux guest through qemu-guest-agent and enables it; into a Windows guest, the LordOS guest
+ *                   tools, lordos-guest-win.exe, into %ProgramFiles%\LordOS, started at every sign-in), VAG_TRANSFER (the
+ *                   transfer folder, 6.7.1: a Linux guest mounts it again; a Windows guest gets WinFsp: one descriptor, its
+ *                   installer, which lord-server opened in the machines' image store, text = its SHA-256 (64 hex), checked
+ *                   again here and in the guest with its signature, installed by msiexec as SYSTEM from a private folder)
+ *                   → VM_REPLY
  *     VM_CLIP       the host's clipboard for the guest: one descriptor, a memfd of a bytes (at most VM_CLIP_MAX); b =
  *                   VCF_TEXT: UTF-8 text; VCF_CLIPX: text, HTML and/or a PNG in AGK_CLIPX's layout (vmagent.h), checked
  *                   and sanitized again here. Sent on only when machine.json's clipboard allows to-guest and
- *                   lordos-guest said hello (as text only to a helper without "clipx")
+ *                   lordos-guest said hello (as text only to a helper without "clipx"). c = 0: pushed as it is (a helper
+ *                   without "clipreq", VAC_CLIP_LAZY unset). c = an offer's generation, d = AGF_*: the answer to the
+ *                   guest's request (VM_CLIP_REQ) for that form of that offer: sent on as AGK_CLIPDATA, and only when
+ *                   that request is waiting
+ *     VM_CLIP_OFFER the host's clipboard on demand (6.8, VAC_CLIP_LAZY): a = the offer's generation (≥ 1, lord-server's
+ *                   counter), b = AGM_* forms it holds, c = AGO_* flags; sent on as AGK_CLIPOFFER, no contents
+ *     VM_CLIP_DENY  no clipboard for the guest: a = the offer's generation and b = the AGF_* form of a waiting request
+ *                   (answered AGK_CLIPDATA refused, or stale with VCD_STALE), or a = 0 and b = 0: the guest's last
+ *                   clipboard was ignored; c = VCD_* why. lord-vm writes it in the machine's log
+ *     VM_DISPLAY_SIZE a, b = the machine window's size (320..8192 × 200..8192), sent by lord-server with each VD_RESIZE.
+ *                   lord-vm remembers it and passes it to a guest helper that sets its own display's size (AGK_DISPLAY,
+ *                   the LordOS guest tools for Windows; again after each hello); others follow QEMU's ui_info → VM_REPLY
+ *     VM_FILE       a file dropped on the machine's window, for the guest: one descriptor, a regular file lord-server
+ *                   opened read-only for the person (never a path); text = its name (lord-vm makes it safe for the
+ *                   guest's file systems, ag_drop_name). lord-vm copies it through qemu-guest-agent, in pieces, one file
+ *                   at a time (at most 8 wait), into the Downloads folder of the guest's signed-in person: on Linux
+ *                   through a private temporary folder, then moved and owned by that person (runuser); on Windows
+ *                   through a private SYSTEM-only folder in %SystemRoot%\Temp, then copied into their Downloads by a
+ *                   one-shot scheduled task that runs as that person (refused when nobody is signed in).
+ *                   When the guest has the transfer folder mounted (VAC_TRANSFER, 6.7.1), the file is first copied by
+ *                   lord-vm into that folder on this computer (a reflink when the file system can; in a child process)
+ *                   in a 0700 folder of its own, with the file's SHA-256, and the person's own copy in the guest reads it
+ *                   from there and is named only when its size and hash match; if that way fails, the agent's way is
+ *                   tried once.
+ *                   a = 1: then open it there (Files' "Open with" a machine, 7.3): only for a guest whose tools said
+ *                   "open" (VAC_OPEN); lord-vm makes a random token for the drop, the person's copy step records where
+ *                   the file went under it, and once the copy is done lord-vm sends the guest tools AGK_OPEN (the token,
+ *                   the size and SHA-256 it measured); the VM_REPLY then waits for AGK_OPENED (or AG_OPEN_WAIT_MS).
+ *                   a = 2: then hand it to an apps mode window (files dropped on it, 7.2.1): b = the guest window's id
+ *                   (one of its last LAG_WINDOWS), c = x | y << 16 (the drop point in the guest's screen, each
+ *                   0..LAG_DIM_MAX), d = batch << 16 | index << 8 | count (batch 1..32767, index < count ≤ 8): only for
+ *                   a guest whose tools said "place" (VAC_PLACE); lord-vm sends AGK_PLACE once the copy is done and the
+ *                   VM_REPLY waits for AGK_PLACED; its b then says how the guest took it (AGP_*).
+ *                   VM_FILE_PROGRESS on the way; → VM_REPLY with the file's path in the guest (the guest's words, text only) or why not
  *     VM_SNAPSHOT   a = VSN_TAKE, VSN_REVERT or VSN_DELETE; text = "TAG\tNAME" (take) or "TAG". qcow2 internal
  *                   snapshots of every writable disk at once (system disk and UEFI variables), with the machine's
  *                   memory (QMP snapshot-save, snapshot-load, snapshot-delete jobs), under operation.json; the entry
  *                   in snapshots.json is written last (6.2). VM_JOB reports it; → VM_REPLY when it's done
+ *     VM_SOUND      machine.json's sound choices while the machine runs (lord-vm holds the lock, so it writes the file):
+ *                   a = sound (1 plays on this computer, 0 muted), b = volume 0..100, c = microphone (1 allowed, 0 not);
+ *                   d = 1: text = "OUT\tIN", the output and input (machine.json sound_out, sound_in: a node.name each, or
+ *                   empty for the default; vm_sound_dev_valid), d = 0: they stay as they are.
+ *                   They change nothing in QEMU: lord-server applies them itself (6.9) → VM_REPLY
+ *     VM_APPS       apps mode (7.2): a = 1 on, 0 off; sent on to the guest's helper (LAG_APPS) only when the machine's
+ *                   agent is on and the helper said "windows" (LAG_CAP_WINDOWS) → VM_REPLY
+ *     VM_WINACT     a window of the guest: a = its id (as the guest named it), b = LAGA_* (focus, close, minimize,
+ *                   restore, move); move: text = "x y w h" (decimal, the new area in the guest's pixels, lag_rect_ok)
+ *                   → VM_REPLY. lord-vm builds the LAG_WINACT frame itself (lag_act_write)
+ *     VM_CAPTURE    "Capture mouse" (docs/VIRTUALIZATION.md 6.25): a = 1, the guest's pointer becomes a relative mouse (QMP
+ *                   query-mice, then human-monitor-command "mouse_set N" with the USB or virtio mouse lord-vm adds beside
+ *                   the tablet); a = 0, the absolute tablet again. lord-vm checks every second while the machine runs that
+ *                   the one wanted is still the active one (a guest's driver that starts later takes it) → VM_REPLY
+ *     VM_LAUNCH     a = an app's place in the guest's list, b = that list's generation (VM_WINDATA c): lord-vm sends the
+ *                   guest that app's token from its own copy of the list; refused when the list changed since → VM_REPLY
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -60,18 +114,29 @@
  *                   text = the machine's id. Sent once QEMU runs, so it can follow the first VM_STATEs
  *                   (starting, paused); lord-server asks for the display once it has both.
  *     VM_DISPLAY_FD seq of the VM_DISPLAY; the descriptor; a = console width, b = height if known (else 0)
- *     VM_AGENT_STATE a = VAS_* (off, waiting, connected), b = VAC_* (what works now), text = "version\tsystem" as
- *                   the guest reported them (untrusted, shown as text only). Sent on each change and after VM_STATUS
+ *     VM_AGENT_STATE a = VAS_* (off, waiting, connected), b = VAC_* and LAG_CAP_WINDOWS (what works now), text = "version\tsystem\ttools" as
+ *                   the guest reported them (untrusted, shown as text only; tools: the LordOS tools' version from their
+ *                   hello, letters, digits and . - _ only, empty until they said it). Sent on each change and after VM_STATUS
  *     VM_CLIP_DATA  the guest's clipboard (machine.json allows from-guest): a sealed memfd of a bytes; b = VCF_TEXT
  *                   (UTF-8) or VCF_CLIPX (AGK_CLIPX's layout, every part already checked: UTF-8 text, sanitized HTML,
  *                   a PNG whose header is sane; lord-server still re-encodes the picture before it's used)
+ *     VM_FILE_PROGRESS seq of the VM_FILE; a = percent copied (0..100); b = 1 through the transfer folder, 0 the agent's
+ *                   way; text = the file's name as the guest gets it.
+ *                   Sent to the client that asked, at most every 250 ms
+ *     VM_CLIP_REQ   a program in the guest pastes: a = the offer's generation, b = AGF_* form (lord-vm checked that it's
+ *                   the last offer's and one of its forms). Sent to every client; one answers with VM_CLIP (c, d) or
+ *                   VM_CLIP_DENY
+ *     VM_WINDATA    apps mode: what the guest's helper said, checked (vmagent.h's parsers) and written again by lord-vm:
+ *                   a sealed memfd of a bytes (≤ VM_WINDATA_MAX), b = LAG_WINDOWS, LAG_WINICON or LAG_APPLIST, in that
+ *                   kind's layout; c = the list of apps' generation (1, 2, ...). lord-server parses it again before use
  *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
  *                   failed), c = percent (0..100, -1 unknown), text = detail
  *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (VMN_NET_LOST: passt ended while
  *                   the machine runs, a new one is being attached, or, after 5 in a minute, the machine has no network
  *                   until it starts again; VMN_NET_BACK: a new passt is attached, b = milliseconds without network;
  *                   VMN_RECOVERED: an interrupted operation was finished or rolled back at this start; VMN_IDENTITY: a
- *                   Clone's guest got its own hostname and machine-id), b = detail number (a signal or exit status),
+ *                   Clone's guest got its own hostname and machine-id; b = 1: a Windows guest's computer name, from its next
+ *                   restart), b = detail number (a signal or exit status),
  *                   text = detail.
  *                   Sent to every client, and again to one that connects later (VM_STATUS)
  *
@@ -94,9 +159,21 @@
  *   VD_STATE a = VDS_*, b = VDR_*: connected, picture lost (Disable), or the QEMU side went away.
  *   VD_STATS a = messages refused since the last VD_STATS, b = updates received, c = copies made, d = width,
  *   e = height: every 5 s while something changed, for Logs and tests.
+ *   VD_DMABUF (3D, a machine with graphics "3d"): the picture is a dmabuf QEMU draws with the GPU. One descriptor;
+ *   a, b = width, height (also sent as VD_SIZE: the shared picture is still made), c = stride, with VD_DMABUF_FLIP set
+ *   when its first row in memory is the picture's bottom, d = DRM fourcc (one of VD_FOURCC_*, one plane), e, f = the
+ *   modifier's low and high 32 bits. The helper copies nothing then: on each VD_FRAME lord-server imports the dmabuf
+ *   with its GPU context (EGL) and reads the damaged rows back into the shared picture, and answers VD_FRAME_DONE as
+ *   before; it never waits on the dmabuf's fence (it polls it, and tries again later). Without a GPU path lord-server
+ *   can't read it: the picture stays black (lord-vm starts 3D machines with 2D graphics there, --render-node none).
+ *   a = 0 (no descriptor): the picture isn't a dmabuf any more.
  *
  *   Input (server → helper): VD_KEY a = Linux evdev key code (KEY_*), b = 1 down / 0 up.
  *   VD_MOTION a, b = absolute position in picture coordinates (clamped). VD_BUTTON a = VDB_*, b = 1 / 0.
+ *   VD_REL a, b = relative motion (each within ±VD_REL_MAX), only while captured (VD_CAPTURE a = 1: "Capture mouse",
+ *   lord-vm made the guest's mouse relative, VM_CAPTURE): sent as Mouse.RelMotion; while QEMU still says the mouse is
+ *   absolute, the helper moves its own position by it and sends that. VD_CAPTURE a = 1 / 0: VD_MOTION is ignored while
+ *   captured, and IsAbsolute is asked again sooner for the next 3 s.
  *   VD_WHEEL a = vertical steps (+ up, − down), b = horizontal steps (+ right). VD_RELEASE_ALL lets go of every
  *   key and button held (window lost focus). VD_RESIZE a, b = the window's size in pixels: the guest is asked
  *   to use it (Console.SetUIInfo), at most every 100 ms. VD_RATE a = the display's refresh rate (1..240; 60 by
@@ -107,6 +184,16 @@
  *   (sealed memfd, 48 kHz, 16-bit, one channel) that lord-media reads; the helper writes the guest's sound into it,
  *   mixed to one channel, and silence for the time the guest plays nothing, so the sound keeps time with the picture.
  *   a = 0: the recording ended.
+ *   VD_AUDIO_OUT a = 1 with one descriptor: the speakers' ring (aring.h: sealed memfd, 48 kHz, 16-bit, two channels)
+ *   that lord-server plays from its own PipeWire stream (media/maudio.c); the helper copies the guest's sound into it as
+ *   it comes, and drops what would put it more than VD_AUDIO_AHEAD_MS ahead of what lord-server read, so a slow reader
+ *   never adds delay and the helper never waits. a = 0: the sound is off (muted, or the machine's "sound" is off).
+ *   VD_MIC a = 1 with one descriptor: the microphone's ring (aring.h, 48 kHz, 16-bit, one channel) that lord-server
+ *   fills from the person's microphone, sent only while the machine's "microphone" is on, LordOS's microphone
+ *   permission allows Machines and the guest is recording. a = 0: no microphone. Whenever there is none, the guest
+ *   reads silence at the real rate, so a guest that records never stalls and never hears this computer.
+ *   VD_GUEST_AUDIO (helper → server) a = VDG_OUT or VDG_IN, b = 1 the guest started that stream / 0 stopped it: the
+ *   microphone opens only while the guest records, and the speakers' stream only plays while the guest plays.
  */
 #ifndef LORD_VM_PROTO_H
 #define LORD_VM_PROTO_H
@@ -128,20 +215,38 @@
 
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
-    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP,
-    VM_REQ_LAST = VM_CLIP,
+    VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE,
+    VM_REQ_LAST = VM_CAPTURE,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
-    VM_AGENT_STATE, VM_CLIP_DATA,
+    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ,
 };
+/* VM_CLIP_DENY c: why. BACKGROUND: the machine wasn't in use (its window not in front, nor a few seconds after);
+ * STALE: the host's clipboard changed since that offer, or the offer isn't the last; NONE: that form isn't there now
+ * (or it's a secret); DECLINED: the person said no (ask mode), or didn't answer in time */
+enum { VCD_BACKGROUND = 1, VCD_STALE, VCD_NONE, VCD_DECLINED, VCD_LAST = VCD_DECLINED };
 /* VM_NOTICE a */
 enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_COUNT };
 /* VM_JOB a, b */
 enum { VJ_NONE = 0, VJ_SUSPEND, VJ_RESUME, VJ_SNAPSHOT, VJ_REVERT, VJ_DELETE, VJ_COUNT };
 enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
 /* VM_AGENT a, VM_AGENT_STATE a and b */
-enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL };
+enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER };
 enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
-enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64 };
+/* 256: LAG_CAP_WINDOWS (vmagent.h), the guest's helper does apps mode.
+ * VAC_TRANSFER: the guest has the transfer folder (6.7.1) mounted (Linux: /mnt/LordOS; Windows: VirtioFsSvc runs);
+ * VAC_XFER_SETUP: a Windows guest that can have it once WinFsp is installed (VAG_TRANSFER);
+ * VAC_CLIP_NOTOOL: the guest's helper is there but its clipboard can't work: the guest has no clipboard tool (the hello
+ * said "noclip": a Linux guest without xclip or wl-clipboard). VAC_CLIPBOARD is set only when the hello says "clipboard";
+ * VAC_CLIP_LAZY: it also said "clipreq": the host's clipboard goes in on demand (VM_CLIP_OFFER), never pushed;
+ * VAC_OPEN: the guest's tools said "open": a dropped file can be opened there (VM_FILE a = 1, AGK_OPEN);
+ * VAC_PLACE: they said "place": files dropped on an apps mode window go to that window (VM_FILE a = 2, AGK_PLACE) */
+enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
+       VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096, VAC_OPEN = 8192,
+       VAC_PLACE = 16384, VAC_ALL = 32767 };
+/* how long a VM_FILE with a = 1 waits for the guest tools' AGK_OPENED after the copy (a program may ask for consent) */
+#define AG_OPEN_WAIT_MS 120000
+#define VM_WINDATA_MAX (1u << 20)
 #define VM_CLIP_MAX (11u << 20)
 /* VM_CLIP and VM_CLIP_DATA b: what the memfd holds */
 enum { VCF_TEXT = 0, VCF_CLIPX = 1 };
@@ -178,6 +283,8 @@ enum {
 enum {
     VMS_LANDLOCK_FS = 1, VMS_LANDLOCK_NET = 2, VMS_LANDLOCK_SCOPE = 4, VMS_SECCOMP_OURS = 8, VMS_SECCOMP_QEMU = 16,
     VMS_NO_NEW_PRIVS = 32, VMS_KVM_FD = 64, VMS_SUPERVISOR_LANDLOCK = 128, VMS_PDEATHSIG = 256,
+    VMS_RENDER_NODE = 512,  /* 3D graphics: QEMU may open the GPU's render node (only a Linux machine with graphics "3d");
+                             * such a machine can't be suspended or snapshotted with its memory (virgl can't be migrated) */
 };
 /* VM_INFO d: cgroups */
 enum {
@@ -198,10 +305,14 @@ typedef struct {
 /* ---- lord-server ↔ lord-vmdisplay ---- */
 
 enum {
-    VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS,               /* helper → server */
+    VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS, VD_DMABUF, VD_GUEST_AUDIO,   /* helper → server */
     VD_SHM = 64, VD_FRAME_DONE, VD_KEY, VD_MOTION, VD_BUTTON, VD_WHEEL, VD_RELEASE_ALL,       /* server → helper */
-    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC,
+    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC, VD_REL, VD_CAPTURE,
 };
+/* VD_GUEST_AUDIO a: which of the guest's streams */
+enum { VDG_OUT = 0, VDG_IN = 1 };
+/* the most the helper keeps in the speakers' ring ahead of lord-server's reading (VD_AUDIO_OUT) */
+#define VD_AUDIO_AHEAD_MS 80
 enum { VDS_CONNECTED = 0, VDS_NO_PICTURE, VDS_LOST };
 enum { VDR_NONE = 0, VDR_DISABLED, VDR_REFUSED, VDR_QEMU_GONE, VDR_SERVER_GONE, VDR_SETUP };
 /* buttons, as QEMU's InputButton numbers */
@@ -218,7 +329,15 @@ typedef struct {
 #define VD_MAX_DIM      8192u
 #define VD_MAX_BYTES    (256u * 1024 * 1024)
 #define VD_MAX_CURSOR   256
+#define VD_REL_MAX      8192        /* VD_REL: the most one message moves, each way */
 #define VD_POLL_MAX     256         /* messages lord-server takes per poll, as Remote Desk */
+/* VD_DMABUF */
+#define VD_DMABUF_FLIP        0x40000000    /* in c: the first row in memory is the picture's bottom */
+#define VD_DMABUF_STRIDE_MAX  (VD_MAX_DIM * 4 * 2)
+#define VD_FOURCC_XRGB8888    0x34325258u   /* 'XR24' */
+#define VD_FOURCC_ARGB8888    0x34325241u   /* 'AR24' */
+#define VD_FOURCC_XBGR8888    0x34324258u   /* 'XB24' */
+#define VD_FOURCC_ABGR8888    0x34324241u   /* 'AB24' */
 
 /* ---- helpers shared by both ends ---- */
 
@@ -296,8 +415,20 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (m->version != VM_PROTO_VERSION) return 0;
     if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
-                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_INSTALL)) &&
-                      (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX)));
+                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_TRANSFER)) &&
+                      (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX) &&
+                                              m->c >= 0 && (!m->c || (m->b == VCF_CLIPX && m->d >= 1 && m->d <= 3)))) &&
+                      (m->type != VM_CLIP_OFFER || (m->a > 0 && m->b >= 1 && m->b <= 7 && (m->c == 0 || m->c == 1))) &&
+                      (m->type != VM_CLIP_DENY || (m->a >= 0 && m->c >= 1 && m->c <= VCD_LAST && (m->a ? m->b >= 1 && m->b <= 3 : m->b == 0))) &&
+                      (m->type != VM_SOUND || ((m->a == 0 || m->a == 1) && m->b >= 0 && m->b <= 100 && (m->c == 0 || m->c == 1) && (m->d == 0 || m->d == 1))) &&
+                      (m->type != VM_FILE || (m->text[0] && (m->a == 0 || m->a == 1 ||
+                                              (m->a == 2 && m->b != 0 && m->c >= 0 && (m->c & 0xffff) <= 16384 && (m->c >> 16) <= 16384 &&
+                                               (m->d >> 16) >= 1 && (m->d & 0xff) >= 1 && (m->d & 0xff) <= 8 && ((m->d >> 8) & 0xff) < (m->d & 0xff))))) &&
+                      (m->type != VM_DISPLAY_SIZE || (m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM)) &&
+                      (m->type != VM_APPS || m->a == 0 || m->a == 1) &&
+                      (m->type != VM_CAPTURE || m->a == 0 || m->a == 1) &&
+                      (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
+                      (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0));
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -305,8 +436,12 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_DISPLAY_FD: return m->a >= 0 && m->b >= 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VM_NOTICE: return m->a > VMN_NONE && m->a < VMN_COUNT;
     case VM_CONSOLE_FD: return 1;
-    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b < 128;
+    case VM_AGENT_STATE: return m->a >= VAS_OFF && m->a <= VAS_CONNECTED && m->b >= 0 && m->b <= VAC_ALL;
+    /* b: LAG_WINDOWS (6), LAG_WINICON (7) or LAG_APPLIST (10), vmagent.h; c: LAG_APPLIST's generation (VM_LAUNCH) */
+    case VM_WINDATA: return m->a > 0 && (uint32_t)m->a <= VM_WINDATA_MAX && (m->b == 6 || m->b == 7 || m->b == 10) && m->c >= 0;
     case VM_CLIP_DATA: return m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX);
+    case VM_FILE_PROGRESS: return m->a >= 0 && m->a <= 100;
+    case VM_CLIP_REQ: return m->a > 0 && m->b >= 1 && m->b <= 3;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }
@@ -324,7 +459,9 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_WHEEL: return m->a >= -32 && m->a <= 32 && m->b >= -32 && m->b <= 32;
     case VD_RESIZE: return m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VD_RATE: return m->a >= 1 && m->a <= 240;
-    case VD_AUDIO_REC: return m->a == 0 || m->a == 1;
+    case VD_REL: return m->a >= -VD_REL_MAX && m->a <= VD_REL_MAX && m->b >= -VD_REL_MAX && m->b <= VD_REL_MAX;
+    case VD_CAPTURE: return m->a == 0 || m->a == 1;
+    case VD_AUDIO_REC: case VD_AUDIO_OUT: case VD_MIC: return m->a == 0 || m->a == 1;
     default: return 0;
     }
     switch (m->type) {
@@ -337,6 +474,15 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_POINTER: return m->c == 0 || m->c == 1;
     case VD_STATE: return m->a >= VDS_CONNECTED && m->a <= VDS_LOST && m->b >= VDR_NONE && m->b <= VDR_SETUP;
     case VD_STATS: return m->a >= 0 && m->b >= 0 && m->c >= 0;
+    case VD_DMABUF: {
+        if (!m->a) return !m->b;
+        uint32_t f = (uint32_t)m->d;
+        int32_t st = m->c & ~VD_DMABUF_FLIP;
+        return m->a > 0 && m->b > 0 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM &&
+               (uint64_t)m->a * (uint64_t)m->b * 4 <= VD_MAX_BYTES && st >= m->a * 4 && st % 4 == 0 && (uint32_t)st <= VD_DMABUF_STRIDE_MAX &&
+               (f == VD_FOURCC_XRGB8888 || f == VD_FOURCC_ARGB8888 || f == VD_FOURCC_XBGR8888 || f == VD_FOURCC_ABGR8888);
+    }
+    case VD_GUEST_AUDIO: return (m->a == VDG_OUT || m->a == VDG_IN) && (m->b == 0 || m->b == 1);
     default: return 0;
     }
 }
@@ -344,6 +490,28 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
 /* a damage rectangle inside a w × h picture (lord-server checks every VD_FRAME with it) */
 static inline int vd_rect_inside(const VdMsg *m, int w, int h) {
     return m->a >= 0 && m->b >= 0 && m->c > 0 && m->d > 0 && (int64_t)m->a + m->c <= w && (int64_t)m->b + m->d <= h;
+}
+
+/* lord-vmdisplay, the speakers' ring (VD_AUDIO_OUT, 48 kHz stereo s16): may n more bytes go in without putting it more
+ * than VD_AUDIO_AHEAD_MS ahead of lord-server's reading? A reader cursor past the writer's, or further back than the
+ * ring holds (lord-server's side is not trusted), counts as full. 1 yes */
+static inline int vd_audio_fits(uint64_t rpos, uint64_t wpos, uint32_t size, size_t n) {
+    uint64_t used = (rpos > wpos || wpos - rpos > size) ? size : wpos - rpos;
+    uint64_t cap = (uint64_t)48000 * 4 * VD_AUDIO_AHEAD_MS / 1000;
+    if (cap > size) cap = size;
+    return used + n <= cap;
+}
+
+/* lord-vmdisplay, the guest's microphone (AudioInListener.Read): how many frames a stream started at t0_ms owes at
+ * now_ms, having been given *given: the real rate (48 per ms), at most `room` and 100 ms per answer. After a gap longer
+ * than 100 ms (a paused machine) the old time is forgotten (*given moves up), so no burst follows. */
+static inline size_t vd_mic_owed(long long t0_ms, long long now_ms, uint64_t *given, size_t room) {
+    uint64_t due = now_ms > t0_ms ? (uint64_t)(now_ms - t0_ms) * 48 : 0;
+    if (due > *given + 4800) *given = due - 4800;
+    uint64_t owed = due > *given ? due - *given : 0;
+    if (owed > room) owed = room;
+    if (owed > 4800) owed = 4800;
+    return (size_t)owed;
 }
 
 /* lord-server: the picture for VD_SIZE, sealed so the helper can't shrink it under lord-server's mapping */

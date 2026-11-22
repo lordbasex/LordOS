@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} sudah terkini.",
   "noResults": "Tiada apl Flathub yang sepadan.",
   "notSupported": "Flathub belum tersedia pada komputer ini: buat masa ini hanya untuk PC.",
-  "notYet": "Belum disokong",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Menyahpepijat program lain",
   "perm.devicesAll": "Semua peranti: kamera, pengawal permainan, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Hanya apl yang disahkan oleh Flathub. Tersembunyi: {count}",
   "showAllOn": "Menunjukkan setiap apl Flathub, disahkan atau tidak",
   "showMore": "Tunjuk lagi ({count} lagi)",
-  "subsandbox.text": "Apl ini dibina atas Chromium atau Electron, yang program pembantunya memerlukan kotak pasir Flatpak dikongsi dengan cara yang belum disediakan oleh LordOS, jadi buat masa ini ia tidak boleh dipasang di sini.",
-  "subsandbox.title": "Belum disokong pada LordOS",
   "subtitle": "Apl Linux daripada Flathub, berjalan di dalam ruang terhad LordOS sendiri di bawah Tembok api anda.",
   "turnOff": "Matikan",
   "unverified": "Tidak disahkan oleh Flathub: penerbit mungkin bukan pembangun apl ini.",
@@ -110,5 +107,6 @@
   "updates.button": "Kemas kini apl Flathub",
   "updates.text": "Dipasang daripada Flathub: {count}. Flatpak menyemak setiap satu dan memasang apa yang berubah; apl yang sedang terbuka selesai dikemas kini apabila anda membukanya semula.",
   "updates.title": "Apl Flathub",
-  "verified": "Disahkan: diterbitkan oleh {developer}"
+  "verified": "Disahkan: diterbitkan oleh {developer}",
+  "note.obsVideos": "Dalam LordOS, OBS Studio menyimpan rakaman dalam folder Video anda: folder lain dalam folder rumah anda adalah baca sahaja bagi apl Flathub."
 }

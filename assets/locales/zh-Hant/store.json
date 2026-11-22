@@ -128,7 +128,7 @@
   },
   "open": "開啟",
   "page.ai": "人工智慧",
-  "page.webapps": "網頁 App",
+  "page.webapps": "網頁 App (PWA)",
   "page.commercial": "商業軟體",
   "page.remote": "遠端存取",
   "page.suites": "第三方 App",
@@ -307,5 +307,12 @@
   "multiarch.enabling": "正在啟用…",
   "pkg32": "{name}（32 位元）",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak App"
+  "kind.flatpak": "Flatpak App",
+  "section.origin": "來源",
+  "section.picks": "LordOS 精選",
+  "src.debian": "Linux 應用程式 (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android 應用程式",
+  "soon": "即將推出",
+  "sub.all": "全部"
 }

@@ -51,7 +51,8 @@ async function buildTheme(name) {
     bundle: true,
     format: 'iife',
     target: 'es2020',
-    minify: true,
+    // LORD_NOMINIFY=1: readable names in stacks and in server/tests/perf's render counts (a diagnosis build)
+    minify: !process.env.LORD_NOMINIFY,
     jsx: 'automatic',
     alias: {
       '@lordos/runtime': path.join(root, 'runtime', 'index.js'),
@@ -61,8 +62,12 @@ async function buildTheme(name) {
     define: { 'process.env.NODE_ENV': '"production"' },
     metafile: true,
     logLevel: 'warning',
+    // LORD_SOURCEMAP=1: theme.bundle.js.map next to it, for tools/stall-where.mjs (the stall detector's stacks). The
+    // bundle's bytes are the same either way ('external' adds no comment to it), so a map made later from the same
+    // sources fits a bundle already installed.
+    sourcemap: process.env.LORD_SOURCEMAP ? 'external' : false,
   });
-  const bytes = Object.values(result.metafile.outputs)[0].bytes;
+  const bytes = Object.entries(result.metafile.outputs).find(([k]) => k.endsWith('.js'))[1].bytes;
   console.log(`theme ${name}: ${(bytes / 1024).toFixed(0)} KB in ${Date.now() - t0} ms`);
 }
 

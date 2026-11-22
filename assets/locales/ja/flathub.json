@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} は最新です。",
   "noResults": "一致する Flathub のアプリはありません。",
   "notSupported": "このコンピュータではまだ Flathub を使えません。現在は PC のみが対象です。",
-  "notYet": "まだ対応していません",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "ほかのプログラムのデバッグ",
   "perm.devicesAll": "すべてのデバイス：カメラ、ゲームコントローラー、USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Flathub が確認したアプリのみ。非表示：{count}",
   "showAllOn": "確認済みかどうかにかかわらず、すべての Flathub のアプリを表示しています",
   "showMore": "さらに表示（残り：{count}）",
-  "subsandbox.text": "このアプリは Chromium または Electron をベースにしており、その補助プロセスには LordOS がまだ提供していない方法で Flatpak のサンドボックスを共有する必要があるため、現時点ではここにインストールできません。",
-  "subsandbox.title": "LordOS ではまだ対応していません",
   "subtitle": "Flathub の Linux アプリを、LordOS 独自の隔離環境の中で、あなたのファイアウォールのもとで実行します。",
   "turnOff": "オフにする",
   "unverified": "Flathub による確認なし：公開者がアプリの開発者ではない可能性があります。",
@@ -110,5 +107,6 @@
   "updates.button": "Flathub のアプリをアップデート",
   "updates.text": "Flathub からインストール済み：{count}。Flatpak がそれぞれを確認して変更点をインストールします。開いているアプリは、次に開いたときにアップデートが完了します。",
   "updates.title": "Flathub のアプリ",
-  "verified": "確認済み：{developer} が公開"
+  "verified": "確認済み：{developer} が公開",
+  "note.obsVideos": "LordOS では、OBS Studio は録画を“ビデオ”フォルダに保存します。ホームのほかのフォルダは Flathub のアプリからは読み取り専用です。"
 }

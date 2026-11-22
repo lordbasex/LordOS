@@ -10,6 +10,7 @@
  *   build/vmcatalog-test ../assets/machines/systems.json tests/vmimage ../packaging/keys/machines */
 #include "../src/vm/vmcatalog.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -292,6 +293,36 @@ int main(int argc, char **argv) {
       e.sig_type == VMCAT_SIG_DETACHED && !strcmp(e.sig_name, "S.sig") && !strcmp(e.keys, "k.asc") && e.nfprs == 1 &&
       !strcmp(e.fprs[0], "DF9B9C49EAA9298432589D76DA87E80D6294BE9B"));
     T("pattern needs a whole name", !vmcat_match(e.file_re, "a.iso2") && vmcat_match(e.file_re, "a.iso"));
+
+    /* pinned entries (Windows' evaluation, virtio-win): the catalog names each file, its URL, hash and size */
+    {
+        const char *H = "8f344beaa1c84646534e35f416b2086f6bef54e521c09a997dc326a330e4c584";
+        char pj[1024];
+        snprintf(pj, sizeof pj, "{\"systems\":[{\"id\":\"w\",\"arch\":{\"amd64\":{\"pinned\":[{\"name\":\"w-es-ES.iso\",\"url\":\"https://m.example/d/x.iso\",\"sha256\":\"%s\",\"bytes\":8228114432}]}}}]}", H);
+        T("pinned: found", !vmcat_find(pj, strlen(pj), "w", "amd64", &e) && e.npins == 1 && e.max_bytes == 8228114432ull && !strcmp(e.pin[0].url, "https://m.example/d/x.iso"));
+        T("pinned: the file by name and hash", vmcat_pin_find(&e, "w-es-ES.iso", H) == 0);
+        char up[65];
+        for (int i = 0; i < 64; i++) up[i] = (char)toupper((unsigned char)H[i]);
+        up[64] = 0;
+        T("pinned: the hash in any case", vmcat_pin_find(&e, "w-es-ES.iso", up) == 0);
+        T("pinned: another hash refused", vmcat_pin_find(&e, "w-es-ES.iso", "0000000000000000000000000000000000000000000000000000000000000000") < 0);
+        T("pinned: another name refused", vmcat_pin_find(&e, "w-en-US.iso", H) < 0);
+        T("pinned: not on arm64", vmcat_find(pj, strlen(pj), "w", "arm64", &e) != 0);
+        const char *badpin[] = {
+            "{\"systems\":[{\"id\":\"w\",\"arch\":{\"amd64\":{\"pinned\":[{\"name\":\"a.iso\",\"url\":\"http://m.example/a.iso\",\"sha256\":\"8f344beaa1c84646534e35f416b2086f6bef54e521c09a997dc326a330e4c584\",\"bytes\":10}]}}}]}",
+            "{\"systems\":[{\"id\":\"w\",\"arch\":{\"amd64\":{\"pinned\":[{\"name\":\"../a.iso\",\"url\":\"https://m.example/a.iso\",\"sha256\":\"8f344beaa1c84646534e35f416b2086f6bef54e521c09a997dc326a330e4c584\",\"bytes\":10}]}}}]}",
+            "{\"systems\":[{\"id\":\"w\",\"arch\":{\"amd64\":{\"pinned\":[{\"name\":\"a.iso\",\"url\":\"https://m.example/a.iso\",\"sha256\":\"8f34\",\"bytes\":10}]}}}]}",
+            "{\"systems\":[{\"id\":\"w\",\"arch\":{\"amd64\":{\"pinned\":[{\"name\":\"a.iso\",\"url\":\"https://m.example/a.iso\",\"sha256\":\"8f344beaa1c84646534e35f416b2086f6bef54e521c09a997dc326a330e4c584\"}]}}}]}",
+            "{\"systems\":[{\"id\":\"w\",\"arch\":{\"amd64\":{\"pinned\":[{\"name\":\"a.iso\",\"url\":\"https://m.example/a b.iso\",\"sha256\":\"8f344beaa1c84646534e35f416b2086f6bef54e521c09a997dc326a330e4c584\",\"bytes\":10}]}}}]}",
+            "{\"systems\":[{\"id\":\"w\",\"arch\":{\"amd64\":{\"pinned\":[]}}}]}",
+            "{\"systems\":[{\"id\":\"w\",\"arch\":{\"amd64\":{\"pinned\":[{\"name\":\"a.iso\",\"url\":\"https://m.example/a.iso\",\"sha256\":\"8f344beaa1c84646534e35f416b2086f6bef54e521c09a997dc326a330e4c584\",\"bytes\":10},{\"name\":\"a.iso\",\"url\":\"https://m.example/b.iso\",\"sha256\":\"8f344beaa1c84646534e35f416b2086f6bef54e521c09a997dc326a330e4c584\",\"bytes\":10}]}}}]}",
+        };
+        for (size_t i = 0; i < sizeof badpin / sizeof badpin[0]; i++) {
+            char lab[48];
+            snprintf(lab, sizeof lab, "pinned: bad entry %zu refused", i);
+            T(lab, vmcat_find(badpin[i], strlen(badpin[i]), "w", "amd64", &e) && !e.npins);
+        }
+    }
 
     if (argc > 3) signatures(cat, n, argv[2], argv[3]); else T("signature fixtures given", 0);
 

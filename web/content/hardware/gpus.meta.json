@@ -1,0 +1,12 @@
+{
+  "draft": true,
+  "note": "DRAFT awaiting the maintainer's approval (2026-11-22). Not wired into web/build.mjs: approving it means adding this entry to the guides (web/content/guides/pages.json) or a page of its own, then building and deploying the site.",
+  "slug": "hardware/gpus",
+  "title": { "en": "Tested graphics cards", "es": "Tarjetas gráficas probadas", "pt": "Placas de vídeo testadas" },
+  "description": {
+    "en": "Which graphics cards LordOS has been tested on, by whom, and how NVIDIA cards go from experimental to verified with your reports.",
+    "es": "En qué tarjetas gráficas se probó LordOS, quién lo hizo y cómo las tarjetas NVIDIA pasan de experimentales a verificadas con tus informes.",
+    "pt": "Em quais placas de vídeo o LordOS foi testado, por quem, e como as placas NVIDIA passam de experimentais a verificadas com os seus relatórios."
+  },
+  "updated": "2026-11-22"
+}

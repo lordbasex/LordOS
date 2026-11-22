@@ -55,5 +55,9 @@
   "who.flatpak": "App Flatpak {id}",
   "who.program": "Programa {path}",
   "perm.shortcuts": "Dreceres de teclat",
-  "permHint.shortcuts": "Apps que poden quedar-se ❖, ⌥Tab i les altres dreceres de l’escriptori mentre estan en primer pla, com ara màquines virtuals, escriptoris remots i jocs. ❖Esc sempre les recupera; el bloqueig de pantalla i les tecles multimèdia continuen sent del sistema."
+  "permHint.shortcuts": "Apps que poden quedar-se ❖, ⌥Tab i les altres dreceres de l’escriptori mentre estan en primer pla, com ara màquines virtuals, escriptoris remots i jocs. ❖Esc sempre les recupera; el bloqueig de pantalla i les tecles multimèdia continuen sent del sistema.",
+  "ask.idle": "«{app}» vol saber quan no ets a l’ordinador",
+  "ask.idleNote": "Se li avisa quan deixes d’usar el teclat i el ratolí una estona, i quan tornes; res més. Pots canviar-ho després a Configuració → Privadesa.",
+  "perm.idle": "Absència de l’ordinador",
+  "permHint.idle": "Apps a les quals s’avisa quan deixes d’usar l’ordinador una estona i quan tornes, com les de xat que et mostren absent. No en saben res més; un vídeo o una presentació que manté la pantalla encesa compta com que hi ets."
 }

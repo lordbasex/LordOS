@@ -268,6 +268,8 @@ void mstream_frame(const uint32_t *px, int stride, int w, int h, const int *box)
     }
 }
 
+void mstream_frame_gone(void) { fpx = NULL; }
+
 void mstream_tick(void) {
     for (int c = 1; c < MS_CODECS; c++) if (E[c].viewers) feed(&E[c], c);
 }

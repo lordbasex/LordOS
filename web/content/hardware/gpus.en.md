@@ -1,0 +1,51 @@
+<!-- DRAFT: not published. Awaiting the maintainer's approval (gpus.meta.json). -->
+
+Which graphics cards LordOS runs on, who checked it and how. NVIDIA support is **experimental and verified by the
+community**: we don't own every card, so your compatibility reports are how a model gets verified.
+
+## Status
+
+| Status | What it means |
+|---|---|
+| ✓ **Verified** | The LordOS team tested it on its own hardware with this release line. |
+| ✓ **Community-verified** | At least two independent compatibility reports agree, and the team reviewed them. |
+| ◐ **Experimental** | One report or none: it may work, nobody has confirmed it yet. Every NVIDIA card starts here. |
+| ✗ **Not working** | Reported broken, with an open issue. |
+
+## Tested cards
+
+| Card | Kernel driver | What was tested | Status | Checked by |
+|---|---|---|---|---|
+| AMD Radeon RX 580 (Polaris, Ellesmere) | `amdgpu`, Mesa `radeonsi` | Desktop composed on the GPU, two DisplayPort monitors, Vulkan (RADV) | ✓ Verified | LordOS team |
+| Intel UHD Graphics 630 (Comet Lake) | `i915` with GVT-g | Shared with Machines as a virtual GPU (GVT-g), next to the RX 580 drawing the desktop | ✓ Verified | LordOS team |
+| NVIDIA GeForce RTX 3060 (GA106) | `nvidia` (the proprietary driver) | The desktop works, composed on the CPU: LordOS doesn't compose on NVIDIA's proprietary driver yet | ◐ Experimental | One community report ([#171](https://github.com/lordbasex/LordOS/issues/171)) |
+
+More Intel and AMD graphics run LordOS in the community's
+[hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md); this page lists the cards
+checked for graphics specifically.
+
+## NVIDIA: what works today
+
+- **Any NVIDIA card** shows the desktop: on Mesa's `nouveau` driver, or on NVIDIA's driver with the screen composed on
+  the CPU. Settings → Graphics cards marks it *Experimental — not verified on your card model yet*.
+- **AI and compute (CUDA)** and **the desktop on NVIDIA's driver** are planned, not available yet: installing NVIDIA's
+  driver from Settings and composing the desktop on it come after their system actions and the explicit-sync design
+  are approved.
+
+## Send a report
+
+1. On LordOS, open **Settings → Graphics cards** and choose **Send a compatibility report**.
+2. Read the whole report. It holds technical data only: the cards, their drivers, which one draws the desktop, how the
+   screen is composed, Mesa's and NVIDIA's versions, the Vulkan and video drivers installed and Secure Boot. Never
+   names, paths in your home folder, serial numbers or addresses.
+3. Choose **Open the Form on GitHub**, say what worked and what didn't, and submit it. Without a browser, run
+   `lordos-issue --gpu` in Terminal and paste its output into a
+   [new graphics report](https://github.com/lordbasex/LordOS/issues/new?template=gpu-report.yml).
+
+## How reports are reviewed
+
+- The team reads every report and checks that its data hangs together (the PCI ids, the driver and its version, which
+  card draws the desktop), and asks in the issue when something is missing.
+- A model moves to **Community-verified** when two independent reports for the same model and driver family agree;
+  a report that something is broken opens a bug and marks the model **Not working** until it is fixed.
+- Only the card, its driver and the outcome reach this page, with a link to the public issue. Nothing else is copied.

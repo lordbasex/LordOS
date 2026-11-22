@@ -19,7 +19,7 @@ import { settings } from './settings.js';
 import { locale, appName, t, direction } from './i18n.js';
 import { errorText } from './errors.js';
 import { notify } from './notify.js';
-import { compareNames } from './collate.js';
+import { sortByName } from './collate.js';
 import { iconSrc } from './iconsrc.js';
 import { listApps, wm, windows, appRegistry, getApp as registryApp, openAllowed } from './windows.js';
 import { appsOff } from './appsoff.js';
@@ -140,11 +140,30 @@ export function useLauncherApps({ all = false } = {}) {
   useStore(appRegistry);
   const web = useStore(webApps);
   useEffect(refreshWebApps, []);
-  const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));
-  const every = [...own, ...lin, ...fps, ...webItems(web)].sort((a, b) => compareNames(a.name, b.name));   // "go-link Desk" among the G's (#64)
+  return launcherList(lin, fps, web, all);
+}
+
+// The list is made once for what it depends on and shared by every caller: the Dock, the launcher, the Store's
+// cards (each one asked) and the start menu used to make and sort it on every render, ~1600 names with Linux
+// apps installed. Kept: the inputs it was made from (stores' values, which change identity when they change).
+let made = { deps: null, every: [], views: new Map() };
+function launcherList(lin, fps, web, all) {
+  const deps = [lin, fps, web, appRegistry.get(), locale.get()];
+  if (!made.deps || deps.some((d, i) => d !== made.deps[i])) {
+    const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));
+    // "go-link Desk" among the G's (#64)
+    made = { deps, every: sortByName([...own, ...lin, ...fps, ...webItems(web)], (a) => a.name), views: new Map() };
+  }
   const off = appsOff();
-  if (all) return off.length ? every.map((a) => (a.kind === 'lordos' && off.includes(a.id) ? { ...a, off: true } : a)) : every;
-  return launchable(every, off);
+  const key = `${all ? 1 : 0}\n${off.join('\n')}`;
+  let out = made.views.get(key);
+  if (!out) {
+    const every = made.every;
+    out = all ? (off.length ? every.map((a) => (a.kind === 'lordos' && off.includes(a.id) ? { ...a, off: true } : a)) : every) : launchable(every, off);
+    if (made.views.size > 8) made.views.clear();
+    made.views.set(key, out);
+  }
+  return out;
 }
 
 // Main freedesktop standard categories (the same as AppStream's in the Store).
@@ -262,8 +281,45 @@ function prettyAppId(appId) {
 
 // The app name of a window, never its title: a LordOS app's name; for a Linux window, the isolated
 // app's package name, its .desktop's short name or its app_id.
+// Icons an app hands for its own windows as pixels: window id → { width, height, data } (RGBA). Machines' apps mode
+// (docs/VIRTUALIZATION.md 7.2): a guest's window shows its app's icon in the Dock, the taskbar and the switcher.
+export const windowPixelIcons = createStore({});
+const pixelIconOf = new Map();
+function guestIcon(w) {
+  let C = pixelIconOf.get(w.id);
+  if (!C) {
+    const id = w.id, name = w.args?.guest?.app || w.title || '?';
+    C = ({ size = 32 }) => {
+      const px = useStore(windowPixelIcons, (m) => m[id] || null);
+      return px ? h(Image, { pixels: px, style: { width: size, height: size } }) : h(LetterIcon, { size, name });
+    };
+    pixelIconOf.set(id, C);
+    if (pixelIconOf.size > 256) pixelIconOf.delete(pixelIconOf.keys().next().value);
+  }
+  return C;
+}
+
+// A Linux window with no installed app: the icon it set itself (windowPixelIcons, filled by sdk/wayland.js), else a letter
+const ownIconOf = new Map();
+function linuxOwnIcon(w, name) {
+  const key = `${w?.id}\u0000${name}`;
+  let C = ownIconOf.get(key);
+  if (!C) {
+    const id = w?.id;
+    C = ({ size = 32 }) => {
+      const px = useStore(windowPixelIcons, (m) => m[id] || null);
+      return px ? h(Image, { pixels: px, style: { width: size, height: size } }) : h(LetterIcon, { size, name });
+    };
+    ownIconOf.set(key, C);
+    if (ownIconOf.size > 256) ownIconOf.delete(ownIconOf.keys().next().value);
+  }
+  return C;
+}
+
 export function windowAppName(w) {
   if (!w) return '';
+  // a guest's window (Machines' apps mode): its app's name as the guest said it, and the machine's
+  if (w.args?.guest) return t('shell.guestWindowName', { app: w.args.guest.app || w.title || '', machine: w.args.guest.machine || '' });
   if (!String(w.id).startsWith('linux#')) return appName(registryApp(w.id));
   const web = webAppOfWindow(w);
   if (web) {
@@ -277,7 +333,8 @@ export function windowAppName(w) {
 }
 
 // Icon of a window: its app's; for a Linux window, its .desktop's if one is found.
-export function windowIcon(w, getApp) {
+export function windowIcon(w, getApp = registryApp) {
+  if (w?.args?.guest) return guestIcon(w);
   const appId = w?.args?.appId;
   if (String(w?.id).startsWith('linux#')) {
     const web = webAppOfWindow(w);
@@ -286,7 +343,9 @@ export function windowIcon(w, getApp) {
     const pkg = appId ? registryApp(appId) : null;
     if (pkg && (pkg.package || pkg.isolated) && pkg.Icon) return pkg.Icon;
     const a = windowLinuxApp(appId);
-    return a ? a.Icon : ({ size }) => h(LetterIcon, { size, name: appId || w?.title || 'Linux' });
+    // the installed app's icon always wins; only a window whose app has none (an AppImage, Wine, a game) shows the
+    // icon it set itself (xdg-toplevel-icon, sdk/wayland.js), else a letter
+    return a ? a.Icon : linuxOwnIcon(w, appId || w?.title || 'Linux');
   }
   return getApp(w?.id)?.Icon || (({ size }) => h(LetterIcon, { size, name: w?.id }));
 }

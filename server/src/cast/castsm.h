@@ -37,10 +37,34 @@ typedef struct {
     char req[CSM_PATH_MAX];             /* the Request of the Start being answered, "" else */
     uint32_t types, cursor;
     int multiple;
-    uint32_t persist;                   /* asked for; never kept (no restore token is given) */
+    uint32_t persist;                   /* asked for; only ever a transient restore token (csm_token_issue) */
+    char restore[33];                   /* SelectSources' restore_token (32 hex), "" none */
+    int restored;                       /* this Start was answered from a token: no new one is given */
 } CsSess;
 
-typedef struct { CsSess s[CSM_MAX]; int seq; } CastSm;
+/* Restore tokens (approved by the maintainer 2026-11-22): a token is given only to an app LordOS verified (its
+ * launcher's scope), only in memory (never written anywhere), for the very sources the person picked, valid
+ * CSM_TOKEN_MS from when it was given and once: the same app's next session within that time starts on the same sources
+ * without the chooser (Chromium asks twice for one share; OBS restarts its capture right after the choice). A session
+ * answered from a token gets none, so a token never leads to another. The indicator shows the share as always. */
+#define CSM_TOKENS 8
+#define CSM_TOKEN_MS 10000
+#define CSM_TOKEN_BLOB 1024             /* the picked sources, as portal.c keeps them (opaque here) */
+typedef struct { char token[33], who[128]; uint64_t expires; int len; unsigned char blob[CSM_TOKEN_BLOB]; } CsToken;
+
+typedef struct { CsSess s[CSM_MAX]; int seq; CsToken tok[CSM_TOKENS]; } CastSm;
+
+/* A token as the spec's string: 32 lowercase hex. 1 yes. */
+int csm_token_ok(const char *t);
+/* A token for who (a verified identity, never "") and these sources (len bytes), from 16 random bytes, valid until
+ * now_ms + CSM_TOKEN_MS. The oldest token goes when all CSM_TOKENS are held. 0 (out set) or CSM_E_ARGS. */
+int csm_token_issue(CastSm *m, const char *who, const void *blob, int len, uint64_t now_ms, const unsigned char rnd[16], char out[33]);
+/* The sources of token, if it is who's and still valid: their length (copied to blob, at most cap), and the token is
+ * gone (once). -1: unknown, expired (then gone too) or another app's (kept: it isn't that app's to spend). */
+int csm_token_take(CastSm *m, const char *who, const char *token, uint64_t now_ms, void *blob, int cap);
+/* Revokes who's tokens (NULL: everyone's): the person stopped that app's share, or a lock, a user switch or the shell
+ * going ended every share (Claude Security F6/F7, 2026-11-22). How many went. */
+int csm_token_drop(CastSm *m, const char *who);
 
 void csm_init(CastSm *m);
 /* OBJ/<what>/<sender without ':' and with '.' as '_'>/<token> — the form the spec gives, so the app can listen before

@@ -129,7 +129,7 @@
   },
   "open": "खोलें",
   "page.ai": "आर्टिफ़िशियल इंटेलिजेंस",
-  "page.webapps": "वेब ऐप्स",
+  "page.webapps": "वेब ऐप्स (PWA)",
   "page.commercial": "व्यावसायिक",
   "page.remote": "रिमोट एक्सेस",
   "page.suites": "तृतीय-पक्ष ऐप्स",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "चालू किया जा रहा है…",
   "pkg32": "{name} (32-बिट)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak ऐप"
+  "kind.flatpak": "Flatpak ऐप",
+  "section.origin": "स्रोत",
+  "section.picks": "LordOS की पसंद",
+  "src.debian": "Linux ऐप (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android ऐप",
+  "soon": "जल्द",
+  "sub.all": "सभी"
 }

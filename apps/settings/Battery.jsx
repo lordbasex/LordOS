@@ -167,7 +167,7 @@ function Charging({ tr, bat, prefs, patch }) {
           onClick={() => patch({ fullOnce: !prefs.fullOnce })} />
       </SettingRow>
       <SettingRow label={tr('prefs.battery.pause')} hint={canPause ? tr('prefs.battery.pauseHint') : no} disabled={!isAdmin || !canPause}>
-        <Toggle small on={paused} onChange={(on) => { if (isAdmin && canPause) run('battery-behaviour', on ? 'inhibit-charge' : 'auto'); }} />
+        <Toggle small pending on={paused} onChange={(on) => (isAdmin && canPause ? run('battery-behaviour', on ? 'inhibit-charge' : 'auto') : undefined)} />
       </SettingRow>
       <SettingRow label={tr('prefs.battery.heat')} hint={canPause ? tr('prefs.battery.heatHint') : no} disabled={!isAdmin || !canPause}>
         <Toggle small on={prefs.heatGuard && canPause} onChange={(heatGuard) => { if (isAdmin && canPause) patch({ heatGuard }); }} />

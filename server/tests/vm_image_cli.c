@@ -29,12 +29,13 @@ void admin_say(const char *kind, const char *fmt, ...) {
 
 int main(int argc, char **argv) {
     prctl(PR_SET_NAME, "lord-admin");
-    if (argc != 3) { fprintf(stderr, "usage: vm-image-cli vm-image-list|vm-image-get|vm-image-remove ARG\n"); return 2; }
+    if (argc != 3) { fprintf(stderr, "usage: vm-image-cli vm-image-list|vm-image-get|vm-image-get-user|vm-image-remove ARG\n"); return 2; }
     struct passwd *pw = getpwnam(getenv("SUDO_USER") ? getenv("SUDO_USER") : "root");
     if (!pw) return 2;
     AdminReq r = { .id = 1, .user = pw->pw_name, .home = pw->pw_dir, .uid = pw->pw_uid, .gid = pw->pw_gid, .admin = 1 };
     if (!strcmp(argv[1], "vm-image-list")) vm_act_image_list(&r, argv[2], strlen(argv[2]));
     else if (!strcmp(argv[1], "vm-image-get")) vm_act_image_get(&r, argv[2], strlen(argv[2]));
+    else if (!strcmp(argv[1], "vm-image-get-user")) vm_act_image_get_user(&r, argv[2], strlen(argv[2]));
     else if (!strcmp(argv[1], "vm-image-remove")) vm_act_image_remove(&r, argv[2], strlen(argv[2]));
     else return 2;
     return 0;

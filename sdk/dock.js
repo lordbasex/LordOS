@@ -19,6 +19,8 @@
 // and quick actions at the top of it (Settings: one per section), from its module or its manifest
 // ("dockActions": [{ id, label: 'i18n.key', args }]); choosing one opens the app with those args:
 //   registerDockActions('settings', () => [{ id: 'network', label: 'settings.section.network', args: { section: 'network' } }])
+// and decide what a click on its Dock item does while it has windows (Machines: its library when only machines are open):
+//   registerDockActivate('machines', (entry) => true when it handled the click, false for the usual)
 import { createElement as h } from 'react';
 import { useEffect } from 'react';
 import { addListener } from '@lordos/runtime';
@@ -48,6 +50,8 @@ const menuProviders = new Map();
 export function registerDockMenu(appId, fn) { menuProviders.set(appId, fn); return () => menuProviders.delete(appId); }
 const actionProviders = new Map();
 export function registerDockActions(appId, fn) { actionProviders.set(appId, fn); return () => actionProviders.delete(appId); }
+const activateProviders = new Map();
+export function registerDockActivate(appId, fn) { activateProviders.set(appId, fn); return () => activateProviders.delete(appId); }
 
 // ---- ids ----
 
@@ -151,7 +155,7 @@ let openIds = new Set();
 windows.subscribe(() => {
   const now = new Set();
   for (const w of windows.get()) if (!(getApp(w.id)?.builtin && !String(w.id).startsWith('linux#'))) now.add(launcherIdOf(w));
-  const fresh = [...now].filter((id) => !openIds.has(id) && !id.startsWith('linux:'));
+  const fresh = [...now].filter((id) => !openIds.has(id) && !id.startsWith('linux:') && !id.startsWith('vm:'));
   openIds = now;
   if (!fresh.length) return;
   const cur = settings.get().dockRecentApps || [];
@@ -161,6 +165,8 @@ windows.subscribe(() => {
 
 // Which launcher app a window belongs to: its LordOS app, or the Linux app from its .desktop.
 export function launcherIdOf(w) {
+  // a guest's window (Machines' apps mode): one icon per app of that machine, never a launcher entry of this computer
+  if (w.args?.guest) return `vm:${w.args.guest.mid || ''}:${w.args.guest.key || w.args.guest.app || w.id}`;
   if (!String(w.id).startsWith('linux#')) return appIdOf(w.id);
   const web = webAppOfWindow(w);
   if (web) return `web:${web.entry.id}`;            // every profile's windows under the app
@@ -175,7 +181,7 @@ export function dockIdOfWindow(w) {
   const web = String(w.id).startsWith('linux#') ? webAppOfWindow(w) : null;
   if (web) return webDockId(web.entry, web.profile, webPrefs(settings.get(), web.entry.id).dockPerProfile);
   const k = launcherIdOf(w);
-  return k.startsWith('linux:') ? k : dockIdOf(k) || k;
+  return k.startsWith('linux:') || k.startsWith('vm:') ? k : dockIdOf(k) || k;
 }
 
 // opts.recents: how many recent apps (neither pinned nor open) are appended at the end, with recent: true.
@@ -264,6 +270,9 @@ export function launchDockItem(id) {
 export function dockActivate(e) {
   if (e.launcher) { e.onOpen?.(); return; }
   if (!e.windows.length) { if (!launchDockItem(e.id) && e.launcherId) launchApp(e.launcherId); return; }
+  const own = parseDockId(e.id);
+  const custom = own?.kind === 'app' ? activateProviders.get(own.key) : null;
+  try { if (custom && custom(e)) return; } catch (err) { /* the usual click */ }
   const wants = e.windows.find((w) => w.attention);
   if (wants) { wm.focus(wants.id); return; }
   const top = wm.focused();

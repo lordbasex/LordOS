@@ -15,6 +15,8 @@
 #define LORD_SEC_SANDBOX_H
 
 #include <stddef.h>
+#include <stdint.h>
+#include <sys/types.h>
 
 typedef struct {
     const char *id;             /* package id (already validated) */
@@ -142,7 +144,49 @@ typedef struct {
      * cookie), bound read-only. NULL: none (every other view). */
     const char *x11;
     const char *xauth;
+    /* A Flatpak app's runtime folders, shared by every view of the same app with the same restrictions (docs/FLATPAK.md,
+     * "Shared runtime folders"; approved by the maintainer 2026-11-22): share_src[i], a folder the launcher made under
+     * $XDG_RUNTIME_DIR/lordos/fpshare/ (owned by the user, mode 0700, no link on the way), is bound at
+     * runtime_dir/share_dst[i] (".flatpak/<id>", "app/<id>"), so Flatpak's per-app /tmp and $XDG_RUNTIME_DIR/app/<id>
+     * are the same folders in a second launch. NULL: none (every other view). */
+    const char *share_src[2], *share_dst[2];
+    /* Lending a file the person chose in LordOS's file dialog to a Flatpak app (fplend.h; approved by the maintainer
+     * 2026-11-22). lend_sock > 0: lord-server's socket at that number, kept by the view's PID 1 alone (closed in the app);
+     * lend_dir, relative to runtime_dir ("app/<id>/doc", inside a share_dst folder), is where the lent files appear,
+     * read-only to the app. 0 / NULL: nothing is lent. */
+    int lend_sock;
+    const char *lend_dir;
 } SandboxFilesCfg;
+
+/* ---- lending a chosen file into a running Flatpak app's view (lord-server ↔ the view's PID 1) ----
+ * The view's PID 1 owns a small tmpfs, runtime_dir/.lordos-lend (shared propagation), bound read-only at lend_dir;
+ * bubblewrap binds runtime_dir/app/<id> into the app (Flatpak 1.16: at /run/flatpak/app/<id>) with what is mounted under
+ * it, as a slave, so a grant mounted later in the tmpfs shows up in the running app at
+ * /run/flatpak/app/<id>/doc/<grant>/<name>. PID 1 opens the
+ * path itself, in the view, never following a link, and only lends it if it is the very file lord-server checked
+ * (device and inode). Revoked with the view: when the app's last process leaves, the mounts go with it.
+ *   view → lord-server  HELLO + PID 1's pidfd (lord-server learns which view the socket serves)
+ *   lord-server → view  LEND  (kind, rw, path, name, dev/ino)
+ *   view → lord-server  DONE  (status 0 and the grant's name, or the errno that stopped it) */
+#define SB_LEND_MAGIC 0x4c454e44u
+enum { SB_LEND_HELLO = 1, SB_LEND_LEND, SB_LEND_DONE };
+/* FILE: that file; DIR: that folder (and what is in it); SAVE: path is the target file (made by lord-server beforehand),
+ * lent writable and alone, as a FILE is: its folder is never lent (Claude Security F5, 2026-11-22), so the write is
+ * limited to that name and nothing next to it is seen. path is always canonical (sec/pathcanon.h). */
+enum { SB_LEND_FILE = 1, SB_LEND_DIR, SB_LEND_SAVE };
+#define SB_LEND_NAME_MAX 255
+#define SB_LEND_MAX 256                 /* grants per view */
+typedef struct SbLendMsg {
+    uint32_t magic, type, seq, kind, rw;
+    int32_t status;
+    uint64_t dev, ino;                  /* path's */
+    uint64_t tdev, tino;                /* the same as dev/ino (kept so the message's layout doesn't change) */
+    char path[4096];
+    char name[SB_LEND_NAME_MAX + 1];
+    char grant[33];                     /* DONE: the folder under lend_dir */
+} SbLendMsg;
+/* A name lend_dir may hold: one path element, 1 to SB_LEND_NAME_MAX bytes, not "." or "..", no '/'. 1 yes. */
+int sandbox_lend_name_ok(const char *name);
 
 /* "/tmp/.X11-unix/X<digits>" (1 to 4 digits): an X socket path the view may keep. */
 int sandbox_x11_path_ok(const char *path);
@@ -165,6 +209,12 @@ int sandbox_x11_path_ok(const char *path);
  * execve. -1 (and nothing launched) if the kernel refuses any step: the caller doesn't start the
  * app. Doesn't allocate. */
 int sandbox_files_isolate(const SandboxFilesCfg *cfg);
+/* In the app's process after sandbox_files_isolate: the pid of a helper it forked (a Flatpak app's Spawn helper), so
+ * PID 1 ends it once nothing else is left in the view; 0 when there is none. Once only. PID 1 otherwise stays while
+ * any process of the view runs (a launcher that starts its real process and leaves), as bubblewrap's PID 1 does. */
+void sandbox_view_helper(pid_t pid);
+/* 1 if a children list ("12 34 ") names a pid other than `except` (PID 1's test; exported for its unit test) */
+int sandbox_view_others_in(const char *list, pid_t except);
 int sandbox_apply_files(const SandboxFilesCfg *cfg);
 /* For keep_home views: Landlock with no filesystem rules, only its scoping (ABI 6): no abstract
  * unix socket and no signal outside the app (the view has no network namespace, so abstract

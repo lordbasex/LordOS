@@ -899,6 +899,20 @@ static int dev_exists(int kind, const char *name, uint32_t index) {
     return 0;
 }
 
+int snd_device_present(int kind, const char *name) {
+    if (!S.connected || (kind != SND_SINK && kind != SND_SOURCE) || !name || !*name) return -1;
+    return dev_exists(kind, name, 0);
+}
+
+/* a source that is a microphone or line input, never the monitor of an output: the machine's microphone permission
+ * covers what a person says, not what this computer plays (a monitor would hand the guest every app's sound) */
+int snd_source_is_input(const char *name) {
+    if (!S.connected || !name || !*name) return 0;
+    for (int i = 0; i < S.sources.n; i++)
+        if (!strcmp(S.sources.d[i].name, name)) return S.sources.d[i].monitor == PA_INVALID_INDEX;
+    return 0;
+}
+
 int snd_set_default(int kind, const char *name) {
     if (!S.connected || (kind != SND_SINK && kind != SND_SOURCE) || !dev_exists(kind, name, 0)) return -1;
     uint32_t c = kind == SND_SINK ? PA_CMD_SET_DEFAULT_SINK : PA_CMD_SET_DEFAULT_SOURCE;

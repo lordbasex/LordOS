@@ -91,6 +91,11 @@ export function restoreSplit(decision, list) {
   return { run: list.filter((e) => !asksFirst(e)), ask: list.filter(asksFirst) };
 }
 
+// A Flatpak app is launched once whatever its window count: each launch is a view of its own (docs/FLATPAK.md, open
+// question 4), so a second one never reaches the first (Chromium's and Electron's single-instance lock, Firefox's
+// profile lock) and became a second copy of the app on the same profile ("Profile error occurred", databases locked).
+export const launchesOnce = (id) => parseDockId(id)?.kind === 'flatpak';
+
 // The launches of a saved list, in order (bottom window first). open: Map dock id → windows already
 // open (Open at Login, the Terminal's live sessions): that many entries are skipped, nothing doubles.
 // once(id): ids that bring back all their windows from a single launch (isolated apps, .lpk packages,

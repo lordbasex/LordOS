@@ -27,7 +27,7 @@ export const SUB_GRACE = 400;
 // Letters typed further apart than this start a new search.
 export const TYPE_MS = 900;
 
-export const selectable = (it) => !!it && it !== '-' && typeof it === 'object' && !it.header && !it.swatches && !it.disabled;
+export const selectable = (it) => !!it && it !== '-' && typeof it === 'object' && !it.header && !it.swatches && !it.note && !it.disabled;
 
 export function stepIndex(items, active, dir) {
   const list = items || [];

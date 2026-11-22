@@ -3,7 +3,7 @@
 import {
   View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
-  Segmented, admin, canDeactivate, deactivateApp, activateApp, webAppEntry,
+  Segmented, admin, canDeactivate, deactivateApp, activateApp, webAppEntry, settings, addListener,
   suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,9 +11,9 @@ import { AiDetail, AiDiscover, AiPage, CatalogCategory, CatalogResults, catalogA
 import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
-import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits } from './webapps.js';
+import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits, webCategoryCounts } from './webapps.js';
 import { WebAppDetail } from './webdetail.js';
-import { FlathubCategory, FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub } from './flathubpages.js';
+import { FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts } from './flathubpages.js';
 import { flathub } from '@lordos/sdk';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
@@ -198,7 +198,7 @@ function InstallFile({ path, onDone }) {
       {!msg?.ok && <debian.Refused />}
       <View style={{ flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' }}>
         <Button label={tr('store.close')} onClick={() => onDone?.(true)} />
-        {(m || isDeb) && !msg?.ok && <Button primary label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}
+        {(m || isDeb) && !msg?.ok && <Button primary busy={busy} label={busy ? tr('store.working') : tr('store.install')} onClick={() => !busy && install()} />}
       </View>
     </View>
   );
@@ -338,11 +338,13 @@ function InstalledPage({ query, filter: initial }) {
 
 // ---- window ----
 
-// Where the window is: a page ('discover', 'installed', 'updates', 'ai', 'webapps', 'lordos' or 'cat:<Category>')
+// Where the window is: a page ('discover', 'installed', 'updates', 'ai', 'lordos', …) or an origin ('src:debian', 'src:flathub',
+// 'src:web') with `sub`, its category in the second column (null: all of it)
 // and, over it, an app page (`app`: a Debian package; `ai`: true for a catalog app; `web`: true for a web app, its id).
 // Back returns to the page.
 // a small window (a Lord Workspaces tile): below SIDE_AT the pages and categories hide behind a toolbar button
 const SIDE_AT = 720;
+const SIDE_W = 230, SIDE_MIN = 190, SIDE_MAX = 380;
 const PAGE_GLYPH = { flathub: GLYPH.flathub, suites: GLYPH.suites, remote: GLYPH.remote, commercial: GLYPH.commercial, suggested: GLYPH.suggested, discover: GLYPH.discover, installed: GLYPH.installed, updates: GLYPH.updates, ai: GLYPH.ai, webapps: GLYPH.webapps, lordos: GLYPH.lordos };
 
 export default function Store() {
@@ -350,18 +352,39 @@ export default function Store() {
   const { t: tr } = useLocale();
   const { args } = useAppWindow();
   const [page, setPage] = useState('discover');
+  const [sub, setSub] = useState(null);         // an origin page's category (its second column), or null for all
   const [app, setApp] = useState(null);
   const [query, setQuery] = useState('');
   const [file, setFile] = useState(null);
   const deb = useDebian();
   const fh = useFlathub();
   const launcher = useLauncherApps();
-  const go = (p) => { setApp(null); setPage(p); };
+  // the pages of before (Settings, Search and links open them by name) are now an origin's pages; a category of
+  // Discover's shelves is the Linux apps' one
+  const go = (p, c = null) => {
+    setApp(null);
+    if (p === 'flathub') p = 'src:flathub';
+    else if (p === 'webapps') p = 'src:web';
+    else if (p.startsWith('cat:')) { c = p.slice(4); p = 'src:debian'; }
+    setPage(p); setSub(c);
+  };
   const side = useSidebar(SIDE_AT);
+  // the sidebar's width: dragged at its edge between SIDE_MIN and SIDE_MAX, kept in settings (2026-11-20: long names
+  // such as "Linux apps (Debian)" were cut)
+  const savedW = useStore(settings, (st) => st.storeSideWidth);
+  const [dragW, setDragW] = useState(null);
+  const clampSide = (w) => Math.round(Math.max(SIDE_MIN, Math.min(SIDE_MAX, Number(w) || SIDE_W)));
+  const sideW = clampSide(dragW ?? savedW ?? SIDE_W);
+  const startSide = (e) => {
+    const x0 = e.x, w0 = sideW, rtl = direction() === 'rtl';
+    const at = (m) => clampSide(w0 + (rtl ? x0 - m.x : m.x - x0));
+    const off = [addListener('pointermove', (m) => setDragW(at(m))),
+      addListener('pointerup', (m) => { off.forEach((f) => f()); setDragW(null); settings.set((st) => ({ ...st, storeSideWidth: at(m) })); })];
+  };
   // Each page, search and app opens at the top (#20); back from an app returns to where the list was.
   const scroll = useRef(null);
   const listAt = useRef(null);
-  const listKey = `${page}|${query}`;
+  const listKey = `${page}|${sub}|${query}`;
   useEffect(() => {
     const at = listAt.current;
     if (app || !at) return;
@@ -384,29 +407,35 @@ export default function Store() {
     for (const [k, n] of Object.entries(catalogCategoryCounts())) c[k] = (c[k] || 0) + n;
     return c;
   })();
-  const cat = page.startsWith('cat:') ? page.slice(4) : null;
+  const src = page.startsWith('src:') ? page.slice(4) : null;
+  const fhCounts = useFlathubCounts();
+  const webCounts = useMemo(() => webCategoryCounts(), []);
+  // an origin's second column: All, then its categories with how many apps each has
+  const subCounts = src === 'debian' ? counts : src === 'flathub' ? fhCounts : src === 'web' ? webCounts : null;
+  const subTotal = subCounts ? CATS.reduce((a, c) => a + (subCounts[c] || 0), 0) : 0;
   const remember = () => { if (!app) listAt.current = { key: listKey, y: scroll.current?.offset() || 0 }; };
   const openDeb = (name) => { remember(); setApp({ name, ai: false }); };
   const openAi = (name) => { remember(); setApp({ name, ai: true }); };
   const openWeb = (id) => { remember(); setApp({ name: id, web: true }); };
   const openFlathub = (id) => { remember(); setApp({ name: id, flathub: true }); };
-  const pageTitle = cat ? tr(`store.cat.${cat}`) : tr(`store.page.${page}`);
+  const srcTitle = { debian: tr('store.src.debian'), flathub: tr('store.page.flathub'), web: tr('store.page.webapps') };
+  const pageTitle = src ? [srcTitle[src], sub ? tr(`store.cat.${sub}`) : null].filter(Boolean).join(' · ') : tr(`store.page.${page}`);
   const appTitle = app && (app.flathub ? flathub.catalogApp(app.name)?.name : app.web ? webCatalog().find((a) => a.id === app.name)?.name || webAppEntry(app.name)?.name
     : app.ai ? catalogApp(app.name)?.name : (lord.pkg?.info?.(app.name, {})?.app?.name)) || app?.name;
   const searchable = !app && page !== 'updates' && page !== 'suggested';
   const onSearch = (v) => { setQuery(v); if (v && !searchable) go('discover'); };
   let body;
   if (app) body = app.flathub ? <FlathubDetail id={app.name} /> : app.web ? <WebAppDetail id={app.name} /> : app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
-  else if (cat) {
-    body = (
+  else if (src === 'debian') {
+    body = sub ? (
       <View style={{ gap: 26 }}>
-        <CatalogCategory cat={cat} query={query} onOpen={openAi} />
-        <WebCategory cat={cat} query={query} onOpen={openWeb} />
-        <FlathubCategory cat={cat} query={query} onOpen={openFlathub} />
-        <debian.Category cat={cat} query={query} onOpen={openDeb} />
+        <CatalogCategory cat={sub} query={query} onOpen={openAi} />
+        <debian.Category cat={sub} query={query} onOpen={openDeb} />
       </View>
-    );
+    ) : <debian.Discover query={query} onOpen={openDeb} onCategory={(c) => go('src:debian', c)} top={null} hide={[]} />;
   }
+  else if (src === 'flathub') body = <FlathubPage query={query} onOpen={openFlathub} category={sub} />;
+  else if (src === 'web') body = sub ? <WebCategory cat={sub} query={query} onOpen={openWeb} /> : <WebAppsPage query={query} onOpen={openWeb} />;
   else if (page === 'discover') {
     // while searching, the catalog apps that match come first (#37), then the web apps that match
     // (and the package results leave them out)
@@ -425,7 +454,7 @@ export default function Store() {
         {fhHits ? <FlathubResults query={query} onOpen={openFlathub} onMore={() => go('flathub')} /> : null}
       </View>
     ) : null;
-    body = <debian.Discover query={query} onOpen={openDeb} onCategory={(c) => go(`cat:${c}`)} top={top} hide={hits.map((a) => a.package)} />;
+    body = <debian.Discover query={query} onOpen={openDeb} onCategory={(c) => go('src:debian', c)} top={top} hide={hits.map((a) => a.package)} />;
   }
   else if (page === 'suggested') body = <debian.SuggestedPage />;
   else if (page === 'ai') body = <AiPage query={query} onOpen={openAi} />;
@@ -433,32 +462,35 @@ export default function Store() {
   else if (page === 'remote') body = <AiPage section="remote" query={query} onOpen={openAi} />;
   else if (page === 'suites') body = <AiPage section="suites" query={query} onOpen={openAi} />;
   else if (page === 'lordos') body = <LordOSPage query={query} />;
-  else if (page === 'webapps') body = <WebAppsPage query={query} onOpen={openWeb} />;
-  else if (page === 'flathub') body = <FlathubPage query={query} onOpen={openFlathub} />;
   else if (page === 'installed') body = <InstalledPage query={query} filter={args?.filter} />;
   else body = <View><FlathubUpdates /><debian.Updates /></View>;
   const item = (id, label, detail, glyph) => (
     <SidebarItem key={id} icon={glyph} label={label} detail={detail || null} selected={!app && page === id} onClick={() => { go(id); if (side.narrow) side.close(); }} />
   );
   const sidebar = (
-      <View style={{ width: 210, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg }}>
+      // above the column after it: its edge handle reaches 3 px over that column, which would otherwise take the press
+      <View style={{ width: side.narrow ? undefined : sideW, flex: side.narrow ? 1 : undefined, backgroundColor: t.sidebarBg, zIndex: side.narrow ? 0 : 1 }}>
         <Hairline edge="end" />
+        {side.narrow ? null : <View onMouseDown={startSide} style={{ position: 'absolute', top: 0, bottom: 0, zIndex: 2, ...(direction() === 'rtl' ? { left: -3 } : { right: -3 }), width: 7, cursor: 'ew-resize' }} />}
         <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
           <SectionTitle>{tr('store.section.store')}</SectionTitle>
           {item('discover', tr('store.page.discover'), null, PAGE_GLYPH.discover)}
           {item('suggested', tr('store.page.suggested'), unseen, PAGE_GLYPH.suggested)}
           {item('installed', tr('store.page.installed'), launcher.length, PAGE_GLYPH.installed)}
           {item('updates', tr('store.page.updates'), deb.upgrades?.length, PAGE_GLYPH.updates)}
-          <SectionTitle>{tr('store.section.categories')}</SectionTitle>
+          <SectionTitle>{tr('store.section.origin')}</SectionTitle>
+          {item('src:debian', tr('store.src.debian'), null, GLYPH.debian)}
+          {fh.supported ? item('src:flathub', tr('store.page.flathub'), null, PAGE_GLYPH.flathub) : null}
+          {item('src:web', tr('store.page.webapps'), webCatalog().length, PAGE_GLYPH.webapps)}
+          {item('lordos', tr('store.page.lordos'), null, PAGE_GLYPH.lordos)}
+          {/* what comes later, said as such and not clickable */}
+          <View style={{ opacity: 0.45 }}><SidebarItem icon={GLYPH.wine} label={tr('store.src.wine')} detail={tr('store.soon')} /></View>
+          <View style={{ opacity: 0.45 }}><SidebarItem icon={GLYPH.android} label={tr('store.src.android')} detail={tr('store.soon')} /></View>
+          <SectionTitle>{tr('store.section.picks')}</SectionTitle>
           {item('ai', tr('store.page.ai'), catalogApps('ai').length, PAGE_GLYPH.ai)}
-          {item('webapps', tr('store.page.webapps'), webCatalog().length, PAGE_GLYPH.webapps)}
-          {fh.supported ? item('flathub', tr('store.page.flathub'), null, PAGE_GLYPH.flathub) : null}
           {catalogApps('commercial').length ? item('commercial', tr('store.page.commercial'), catalogApps('commercial').length, PAGE_GLYPH.commercial) : null}
           {catalogApps('remote').length ? item('remote', tr('store.page.remote'), catalogApps('remote').length, PAGE_GLYPH.remote) : null}
           {catalogApps('suites').length ? item('suites', tr('store.page.suites'), catalogApps('suites').length, PAGE_GLYPH.suites) : null}
-          {CATS.filter((c) => counts[c]).map((c) => item(`cat:${c}`, tr(`store.cat.${c}`), counts[c], GLYPH[c]))}
-          <SectionTitle>LordOS</SectionTitle>
-          {item('lordos', tr('store.page.lordos'), null, PAGE_GLYPH.lordos)}
           <View style={{ height: 12 }} />
         </ScrollView>
         <View style={{ paddingHorizontal: 20, paddingBottom: 12, paddingTop: 6 }}><debian.Status /></View>
@@ -467,6 +499,19 @@ export default function Store() {
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
       {side.narrow ? null : sidebar}
+      {subCounts && !app && !side.narrow ? (
+        <View style={{ width: 190, backgroundColor: t.sidebarBg }}>
+          <Hairline edge="end" />
+          <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
+            <SectionTitle>{tr('store.section.categories')}</SectionTitle>
+            <SidebarItem label={tr('store.sub.all')} detail={subTotal || null} selected={!sub} onClick={() => setSub(null)} />
+            {CATS.filter((c) => subCounts[c]).map((c) => (
+              <SidebarItem key={c} icon={GLYPH[c]} label={tr(`store.cat.${c}`)} detail={subCounts[c]} selected={sub === c} onClick={() => setSub(c)} />
+            ))}
+            <View style={{ height: 12 }} />
+          </ScrollView>
+        </View>
+      ) : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Toolbar>
           {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
@@ -477,12 +522,22 @@ export default function Store() {
           {!app ? <SearchField value={query} onChange={onSearch} placeholder={tr('store.search')} width={side.narrow ? 150 : 200} /> : null}
         </Toolbar>
         <ScrollView scrollRef={scroll} resetKey={app ? `app:${app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
+          {subCounts && !app && side.narrow ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+              {[null, ...CATS.filter((c) => subCounts[c])].map((c) => (
+                <View key={c || 'all'} onClick={() => setSub(c)} style={{ height: 26, paddingHorizontal: 12, borderRadius: 13, justifyContent: 'center',
+                  backgroundColor: sub === c ? t.accent : t.hover }}>
+                  <Text style={{ fontSize: 12, fontWeight: 600, color: sub === c ? '#fff' : t.text }}>{c ? tr(`store.cat.${c}`) : tr('store.sub.all')}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
           {file && <InstallFile path={file} onDone={(cancel) => cancel && setFile(null)} />}
           {body}
           <View style={{ height: 24 }} />
         </ScrollView>
       </View>
-      {side.narrow && side.shown ? <SidebarOverlay width={210} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
+      {side.narrow && side.shown ? <SidebarOverlay width={sideW} onClose={side.close}>{sidebar}</SidebarOverlay> : null}
     </View>
   );
 }

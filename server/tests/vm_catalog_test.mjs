@@ -22,12 +22,31 @@ const eq = (name, got, want) => {
 const H = (c) => c.repeat(64);
 
 // ---- the cards ----
-eq('amd64 cards, Debian first', systemsFor(CAT, 'amd64').map((s) => s.id), ['debian', 'ubuntu', 'fedora', 'kali']);
+eq('amd64 cards, Debian first', systemsFor(CAT, 'amd64').map((s) => s.id), ['debian', 'ubuntu', 'fedora', 'kali', 'windows']);
 eq('arm64 cards', systemsFor(CAT, 'arm64').map((s) => s.id), ['debian', 'ubuntu', 'fedora', 'kali']);
 eq('no cards for another arch', systemsFor(CAT, 'riscv64'), []);
 eq('Debian 13', [systemsFor(CAT, 'amd64')[0].name, systemsFor(CAT, 'amd64')[0].release], ['Debian', '13']);
 eq('every entry has its hash source and date', CAT.systems.every((s) => s.hashSource && /^\d{4}-\d\d-\d\d$/.test(s.checked)), true);
-eq('every folder is https', CAT.systems.every((s) => Object.values(s.arch).every((a) => /^https:\/\/[^/]+\/.*\/$/.test(a.dir) && (!a.fileDir || /^https:\/\//.test(a.fileDir)))), true);
+// a pinned entry (Windows' evaluation, virtio-win; vmcatalog.h) names its files itself; every other entry has a folder
+const pinnedOf = (s) => Object.values(s.arch).some((a) => Array.isArray(a.pinned));
+eq('every folder is https', CAT.systems.filter((s) => !pinnedOf(s)).every((s) => Object.values(s.arch).every((a) => /^https:\/\/[^/]+\/.*\/$/.test(a.dir) && (!a.fileDir || /^https:\/\//.test(a.fileDir)))), true);
+for (const s of CAT.systems.filter(pinnedOf)) {
+  const files = Object.values(s.arch).flatMap((a) => a.pinned || []);
+  eq(`${s.id}: pinned files`, [files.length > 0, files.every((f) => /^https:\/\/[^/\s"<>\\]+\/\S+$/.test(f.url) && /^[0-9a-f]{64}$/.test(f.sha256) && Number.isInteger(f.bytes) && f.bytes > 0 &&
+    /^[A-Za-z0-9_+~][A-Za-z0-9._+~-]{0,94}$/.test(f.name)), Object.values(s.arch).every((a) => new Set((a.pinned || []).map((f) => f.name)).size === (a.pinned || []).length),
+    typeof s.hashSource === 'string' && typeof s.license === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.checked)], [true, true, true, true]);
+}
+// an official logo (opt-in, apps/machines/logos.js): a PNG of at most 512 KB, for a listed system, never the other system's
+for (const s of CAT.systems.filter((x) => x.kind === 'logo')) {
+  const files = Object.values(s.arch).flatMap((a) => a.pinned || []);
+  eq(`${s.id}: a logo is a small PNG of a listed system`, [s.hidden === true, /^logo-[a-z0-9-]+$/.test(s.id), s.for !== 'windows' && CAT.systems.some((x) => x.id === s.for && x.kind !== 'logo'),
+    files.every((f) => /\.png$/.test(f.name) && f.bytes <= 512 * 1024), typeof s.policy === 'string'], [true, true, true, true, true]);
+}
+const WIN = CAT.systems.find((s) => s.id === 'windows');
+eq('windows: every language of the page, hashes unique', [WIN.arch.amd64.isos.length >= 38, WIN.arch.amd64.isos.every((i) => /^[a-z]{2}(-Latn)?-[A-Z]{2}$/.test(i.lang) && /^[0-9a-f]{64}$/.test(i.sha256)),
+  new Set(WIN.arch.amd64.isos.map((i) => i.sha256)).size === WIN.arch.amd64.isos.length], [true, true, true]);
+eq('windows: editions with Microsoft\'s KMS client keys, Home without', [WIN.editions.find((e) => e.name === 'Windows 11 Pro').kms, WIN.editions.find((e) => e.name === 'Windows 11 Home').kms,
+  WIN.editions.every((e) => e.kms === '' || /^[A-Z0-9]{5}(-[A-Z0-9]{5}){4}$/.test(e.kms))], ['W269N-WFGWX-YVC9B-4J6C9-T83GX', '', true]);
 eq('Fedora list found in a listing', [systemsFor(CAT, 'amd64')[2].listed, systemsFor(CAT, 'amd64')[0].listed], [true, false]);
 eq('entryOf', [entryOf(CAT, 'debian', 'arm64').sums, entryOf(CAT, 'nothing', 'amd64'), entryOf(CAT, 'debian', 'riscv64')], ['SHA256SUMS', null, null]);
 eq('garbage catalog', systemsFor({ systems: [null, 3, { id: 'x' }] }, 'amd64'), []);
@@ -67,7 +86,7 @@ eq('sizes', [sizeMb(760, 0), sizeMb(760, 2925092864)], [760, 2790]);
 eq('resumed', [resumedOf('vm.downloadResumed from=412000000'), resumedOf('progress download 1 2'), resumedOf(null)], [412000000, 0, 0]);
 
 // ---- the makers' signed lists: every card names its signature, key file and fingerprints ----
-for (const s of CAT.systems) {
+for (const s of CAT.systems.filter((x) => !pinnedOf(x))) {
   eq(`${s.id}: signed`, [['detached', 'clearsigned'].includes(s.signature?.type), /^[a-z0-9-]+\.asc$/.test(s.keys), (s.fingerprints || []).every((f) => /^[0-9A-F]{40}$/.test(f)) && s.fingerprints.length > 0,
     typeof s.keySource === 'string' && typeof s.fingerprintChecked === 'string' && s.fingerprintChecked.includes('https://')], [true, true, true, true]);
   eq(`${s.id}: key file pinned in the package`, fs.existsSync(path.join(here, '../../packaging/keys/machines', s.keys)), true);
@@ -89,6 +108,8 @@ const imgs = downloadedImages(CAT, entries, (sha) => { if (!infos[sha]) throw ne
 eq('images: which', imgs.map((x) => [x.sha[0], x.partial, x.size]), [['a', false, 790626304], ['b', true, 1000], ['d', false, 5]]);
 eq('images: labels', imgs.map((x) => [x.label, x.arch, x.id]), [['Debian 13.7', 'amd64', 'debian'], ['Kali 2026.3', 'amd64', 'kali'], ['', '', 'other']]);
 eq('images: users and running', [imgs[0].users, imgs[0].dirs, imgs[0].running, imgs[1].users], [['Deb', 'Deb 2'], ['/h/Deb.lordvm', '/h/Deb 2.lordvm'], ['Deb'], []]);
+eq('images: a system the person added shows its file and site, never the query', downloadedImages(CAT, [{ name: `${'c'.repeat(64)}.iso`, size: 5 }],
+  () => ({ id: 'user', arch: '', file: 'mint-22.iso', from: 'https://u:pw@mirror.example.org/mint-22.iso?token=SECRET' }), []).map((x) => [x.id, x.label]), [['other', 'mint-22.iso · mirror.example.org']]);
 eq('images: a part next to its image', downloadedImages(CAT, [{ name: `${A}.iso.part`, size: 3 }, { name: `${A}.iso`, size: 9 }], () => null, []).map((x) => [x.partial, x.size]), [[false, 9]]);
 eq('images: a bad info file', downloadedImages(CAT, [{ name: `${A}.iso`, size: 9 }], () => ({ id: 'debian', arch: 'x', file: '../../etc' }), [])[0].file, '');
 const st = { total: 1000, free: 100, machines: [{ total: 300 }], bases: [], isos: 250, trash: 10 };

@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} नोड",
     "other": "{ms} ms · {count} नोड"
   },
+  "pauses": "50 ms से लंबे ठहराव",
+  "pausesValue": "{count} (सबसे लंबा: {ms} ms)",
   "server": "डिस्प्ले सर्वर",
   "systemApp": "सिस्टम ऐप",
   "systemReport": "सिस्टम रिपोर्ट…",
@@ -42,5 +44,6 @@
   "version": "संस्करण {v}",
   "versionChannel": "संस्करण {v} · {channel}",
   "case": "केस",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "उत्पादों के नाम और लोगो उनके संबंधित मालिकों के ट्रेडमार्क हैं; LordOS उनसे संबद्ध नहीं है और न ही उनके द्वारा समर्थित है। लोगो केवल आपके कहने पर, हर मालिक की साइट से डाउनलोड होते हैं और इसी कंप्यूटर पर दिखाए जाते हैं।"
 }

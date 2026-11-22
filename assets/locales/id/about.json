@@ -32,6 +32,8 @@
   "renderValue": {
     "other": "{ms} md · {count} node"
   },
+  "pauses": "Jeda lebih dari 50 md",
+  "pausesValue": "{count} (terlama: {ms} md)",
   "server": "Server tampilan",
   "systemApp": "Aplikasi sistem",
   "systemReport": "Laporan Sistem…",
@@ -40,5 +42,6 @@
   "version": "Versi {v}",
   "versionChannel": "Versi {v} · {channel}",
   "case": "Casing",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Nama produk dan logo adalah merek dagang dari pemiliknya masing-masing; LordOS tidak berafiliasi dengan maupun didukung oleh mereka. Logo hanya diunduh atas permintaan, dari situs tiap pemilik, dan ditampilkan di komputer ini."
 }

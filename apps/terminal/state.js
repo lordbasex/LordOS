@@ -42,7 +42,37 @@ function setRatioIn(n, id, ratio) {
 
 // ---- utilidades ----
 
-export const patchMeta = (sid, p) => meta.set((m) => ({ ...m, [sid]: { ...(m[sid] || {}), ...p } }));
+// (nothing changes when every field already has that value: no store update, no re-render)
+export const patchMeta = (sid, p) => meta.set((m) => {
+  const cur = m[sid];
+  if (cur && Object.keys(p).every((k) => Object.is(cur[k], p[k]))) return m;
+  return { ...m, [sid]: { ...(cur || {}), ...p } };
+});
+
+// A program that animates its title (a spinner, a progress count) sends one at every frame or faster: they are
+// applied at most once per frame, together, the last of each session (docs/MAIN-THREAD.md)
+const pendingTitles = new Map();
+let titleTimer = null;
+function flushTitles() {
+  titleTimer = null;
+  const list = [...pendingTitles];
+  pendingTitles.clear();
+  if (!list.length) return;
+  meta.set((m) => {
+    let out = m;
+    for (const [sid, title] of list) {
+      if (!m[sid] && !findSession(sid)) continue;
+      if (out[sid]?.title === title) continue;
+      if (out === m) out = { ...m };
+      out[sid] = { ...(out[sid] || {}), title };
+    }
+    return out;
+  });
+}
+function queueTitle(sid, title) {
+  pendingTitles.set(sid, title);
+  if (!titleTimer) titleTimer = setTimeout(flushTitles, 16);
+}
 export const patchWin = (wid, fn) => wins.set((w) => (w[wid] ? { ...w, [wid]: { ...w[wid], ...fn(w[wid]) } } : w));
 export const getWin = (wid) => wins.get()[wid];
 const basename = (p) => (p && p !== '/' ? p.replace(/\/+$/, '').split('/').pop() : p || '');
@@ -443,7 +473,7 @@ term.onAny((sid, type, data) => {
   const wid = f?.wid;
   const isActive = f && f.w.active === f.tab.id && f.tab.focus === sid && wm.focused() === wid;
   switch (type) {
-    case 'title': patchMeta(sid, { title: data }); break;
+    case 'title': queueTitle(sid, data); break;
     case 'cwd': {
       // while ssh runs, the directory is the server's (its shell reports OSC 7): kept apart, for uploads and Files mode
       const i = term.info(sid);

@@ -10,24 +10,27 @@ import { usePal, has, bytes, Btn, Sheet, markColors } from './ui.jsx';
 import { readMeta } from './meta.js';
 import { openMachine } from './library.jsx';
 import { CloneSheet } from './clone.jsx';
+import { Sym, Pill } from './kit.jsx';
 
 const when = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '' : `${formatDate(d)}, ${formatTime(d)}`; };
 const errOf = (out) => (out || '').trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || (out || '').trim();
 
 // the node on the timeline, over the line that joins one snapshot to the next
 function Node({ on, last }) {
+  const p = usePal();
   return (
     <View style={{ height: 25, marginTop: 6 }}>
-      <View style={{ position: 'absolute', left: 14, right: last ? undefined : -12, width: last ? 0 : undefined, top: 11, height: 3, backgroundColor: '#44444c' }} />
-      <View style={{ position: 'absolute', left: 14, top: 6, width: 13, height: 13, borderRadius: 7, backgroundColor: on ? '#0a84ff' : '#8a8a94' }} />
+      <View style={{ position: 'absolute', left: 14, right: last ? undefined : -12, width: last ? 0 : undefined, top: 11, height: 3, backgroundColor: p.track }} />
+      <View style={{ position: 'absolute', left: 14, top: 6, width: 13, height: 13, borderRadius: 7, backgroundColor: on ? p.accent : '#8a8a94', border: `2px solid ${p.dark ? '#1f1f23' : '#ffffff'}` }} />
     </View>
   );
 }
 
 function Pic({ src, colors, on }) {
+  const p = usePal();
   return (
-    <View style={{ height: 130, borderRadius: 10, overflow: 'hidden', background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`,
-      border: `2px solid ${on ? '#0a84ff' : 'transparent'}` }}>
+    <View style={{ height: 130, borderRadius: 12, overflow: 'hidden', background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})`,
+      border: `2px solid ${on ? p.accent : 'transparent'}`, boxShadow: on ? 'none' : '0 4px 14px rgba(0,0,0,0.25)' }}>
       {src ? <Image src={src} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, objectFit: 'cover' }} /> : null}
     </View>
   );
@@ -109,10 +112,13 @@ export function Snapshots({ dir, name: name0 }) {
 
   return (
     <View style={{ flex: 1, padding: short ? 12 : 22, gap: short ? 10 : 16, backgroundColor: p.bg }}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-        <Text style={{ flex: 1, minWidth: 160, fontSize: short ? 16 : 20, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.snap.title', { name: m.name })}</Text>
-        <Text style={{ fontSize: 12, color: list.length >= lim.warn ? '#ffc56e' : p.dim }}>{tr('machines.snap.count', { n: list.length, warn: lim.warn, size: bytes(total) })}</Text>
-        <Btn primary label={busy?.what === 'take' ? tr('machines.snap.taking') : tr('machines.snap.take')} disabled={!!busy || full || m.suspended}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+        <Sym name="snapshot" size={short ? 22 : 28} color={p.text} />
+        <View style={{ flex: 1, minWidth: 160 }}>
+          <Text style={{ fontSize: short ? 16 : 20, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.snap.title', { name: m.name })}</Text>
+          <Text style={{ fontSize: 12, color: list.length >= lim.warn ? '#ffc56e' : p.dim, textAlign: 'start' }}>{tr('machines.snap.count', { n: list.length, warn: lim.warn, size: bytes(total) })}</Text>
+        </View>
+        <Pill primary icon="plus" label={busy?.what === 'take' ? tr('machines.snap.taking') : tr('machines.snap.take')} disabled={!!busy || full || m.suspended}
           onClick={() => setTaking(snapName(list, tr('machines.snap.defaultName')))} />
       </View>
       {/* the timeline in rows of as many cards as the window's width takes, in the window's free height (no spacer beside
@@ -139,14 +145,15 @@ export function Snapshots({ dir, name: name0 }) {
       </ScrollView>
       {!list.length ? <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start' }}>{tr('machines.snap.none')}</Text> : null}
       {cur ? (
-        <View style={{ padding: 14, borderRadius: 12, backgroundColor: p.card, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ flex: 1 }}>
+        <View style={{ padding: 14, borderRadius: 14, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10,
+          backgroundColor: p.dark ? 'rgba(255,255,255,0.05)' : '#ffffff', border: `1px solid ${p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
+          <View style={{ flex: 1, minWidth: 200 }}>
             <Text style={{ fontSize: 14, fontWeight: 700, color: p.text, textAlign: 'start' }}>{cur.name}</Text>
             <Text style={{ marginTop: 2, fontSize: 13, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{tr(cur.memory ? 'machines.snap.aboutMemory' : 'machines.snap.aboutDisk')}</Text>
           </View>
-          <Btn label={tr('machines.snap.cloneHere')} disabled={!!busy || v.active} onClick={() => setCloning(cur)} />
-          <Btn label={tr('machines.snap.delete')} disabled={!!busy} onClick={() => setDel(cur)} />
-          <Btn primary label={tr('machines.snap.goBack')} disabled={!!busy || (!cur.memory && v.active)} onClick={() => { setFirst(!full); setGoBack(cur); }} />
+          <Pill icon="copy" label={tr('machines.snap.cloneHere')} disabled={!!busy || v.active} onClick={() => setCloning(cur)} />
+          <Pill danger icon="trash" label={tr('machines.snap.delete')} disabled={!!busy} onClick={() => setDel(cur)} />
+          <Pill primary label={tr('machines.snap.goBack')} disabled={!!busy || (!cur.memory && v.active)} onClick={() => { setFirst(!full); setGoBack(cur); }} />
         </View>
       ) : null}
       {cur && !cur.memory && v.active ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.snap.offOnly')}</Text> : null}

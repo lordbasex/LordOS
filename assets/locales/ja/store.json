@@ -128,7 +128,7 @@
   },
   "open": "開く",
   "page.ai": "人工知能",
-  "page.webapps": "Web アプリ",
+  "page.webapps": "Web アプリ (PWA)",
   "page.commercial": "商用",
   "page.remote": "リモートアクセス",
   "page.suites": "サードパーティのアプリ",
@@ -307,5 +307,12 @@
   "multiarch.enabling": "有効にしています…",
   "pkg32": "{name} (32 ビット)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak アプリ"
+  "kind.flatpak": "Flatpak アプリ",
+  "section.origin": "入手元",
+  "section.picks": "LordOS のおすすめ",
+  "src.debian": "Linux アプリ (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android アプリ",
+  "soon": "近日対応",
+  "sub.all": "すべて"
 }

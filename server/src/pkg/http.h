@@ -19,6 +19,9 @@ typedef struct {
     int resume;                         /* keep dest.part when the download is cut, and continue it next time with a
                                            Range request (a server that ignores it sends the whole file: started
                                            again); the SHA-256 is still over the whole file */
+    int public_only;                    /* an address a person typed (vm-image-get-user, pubhost.h): https:// on port 443
+                                           to a public DNS name only, also after every redirect, and a connection only to
+                                           a public address that name resolves to (pkg.http.notPublic otherwise) */
     /* result */
     int status;                         /* 200, 304, 404… or 0 if the connection failed */
     int64_t last_modified;

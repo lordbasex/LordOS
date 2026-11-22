@@ -14,13 +14,14 @@
 //                               ControlCenter, ActivityEditor (onboarding and edit), SnapAssist, Surface
 // The menus and the notification panel are Lord Classic's own components, restyled by these tokens.
 import {
-  startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
+  startShell, settings, View, Image, Layer, screen, addListener, ThemeProvider, useSettings, useTrackedSettings, useWindows, useStore, configureWindows, getApp, wm, t as tr,
   DesktopWidgets, registerGestureActions, screenDisplays, mainDisplay, displayFor, displayAt, startDeskWidgets, WidgetDropTarget, findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, SlideshowWallpapers, slideshowPrefs, snapPreview, notifyHistory,
   useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers, appSettingsItem,
   flowDesktopKeys, flowGrabs, desktopSwipe, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
   switchDesktop, windows as windowsStore, windowTitle, windowIcon, appName, removeDesktopById, renameDesktop, createStore, lordosWallpapers,
   VideoSetup, setDesktopDecor, setStatusPanelPlacer, WidgetPicker, widgetPicker, setPointerAccent,
+  guestAppsMode, startDisplayApps,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useFirstStartOpen } from '@lordos/sdk';   // (0.8.9) the activity onboarding waits for the first-start desktop chooser
@@ -31,9 +32,9 @@ import { wsPrefs, optPatch, effectiveSurface, needsOnboarding } from './model/ac
 import { minimizeStarts } from '../default/minimize.js';
 import { startGroups, groupHidden, showGroup } from './state.js';
 import { activities, panel, deleting, startActivities, updateActivity, setUpActivity, activityOf, noteLaunch, newActivity } from './state.js';
-import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked, aimLaunch } from './tiler.js';
+import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked, aimLaunch, tileApps } from './tiler.js';
 import { startMagnet } from './magnet.js';
-import { barFocus, setBarItems, enterBars, leaveBars, barKey } from './barfocus.js';
+import { barFocus, setBarItems, enterBars, leaveBars, barKey, cardBarItems } from './barfocus.js';
 import { SnapAssist } from './components/SnapAssist.jsx';
 import { GlassTarget, DropTarget, SnapFlyout, dropTarget, useDropTarget } from './components/SnapTargets.jsx';
 import { tween, EASE, reduceMotion } from './motion.js';
@@ -80,6 +81,8 @@ const H = {
   activities: () => { panel.set(null); toggleOverview(); },
   apps: (e) => { if (e) noteLaunch(e.x, e.y); panel.set((p) => (p?.name === 'search' && p.mode === 'apps' ? null : { name: 'search', mode: 'apps', display: pointerDisplay().id })); },
   files: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('files'); },
+  store: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('store'); },
+  monitor: (e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(e ? displayAt(e.x, e.y) || pointerDisplay() : pointerDisplay()); launchApp('monitor'); },
   control: () => panel.set((p) => (p?.name === 'control' ? null : { name: 'control', display: pointerDisplay().id })),
   notif: () => panel.set((p) => (p?.name === 'notif' ? null : { name: 'notif', display: mainDisplay().id })),
   volume: () => panel.set((p) => (p?.name === 'volume' ? null : { name: 'volume', display: mainDisplay().id })),
@@ -188,14 +191,22 @@ function useLeaving(list, spine) {
   return leaving;
 }
 
+// The apps used on each display (sdk/displayapps.js), keyed as the tiles are: the apps in tile order and the layout
+// (none for a display whose windows are free).
+const describeDisplay = (d, key, ids) => {
+  const desk = activeDesktop.get(), l = layoutOf(desk, key);
+  return { apps: tileApps(desk, key, ids), layout: l.layout === 'free' ? null : l.layout, ratio: l.layout === 'free' ? null : l.ratio };
+};
+
 function App() {
   startActivities();
   startGroups();
   startTiler();
   startMagnet();
   startDeskWidgets();
+  startDisplayApps({ keyOf: keyOfDisplay, describe: describeDisplay });
   useDropTarget();
-  const [s] = useSettings();
+  const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
   const prefs = wsPrefs(s);
   const surface = effectiveSurface(prefs, s);
   const t = useMemo(() => makeTheme({ mode: s.mode, accent: s.accent, effects: s.effects, surface, contrast: prefs.contrast }, lordosWallpapers),
@@ -250,10 +261,13 @@ function App() {
         ...(sp ? [
           { id: 'crown', run: () => H.crown(at) },
           { id: 'activities', run: H.activities }, { id: 'apps', run: () => H.apps() }, { id: 'files', run: () => H.files() },
+          { id: 'store', run: () => H.store() }, { id: 'monitor', run: () => H.monitor() },
           { id: 'help', run: H.help }, { id: 'settings', run: H.settings }, { id: 'control', run: H.control },
         ] : []),
         ...(main?.plan.top ? [...desktopList.get().map((id) => ({ id: `pill:${id}`, run: () => switchDesktop(id) })),
           ...(desktopList.get().length < 9 ? [{ id: 'new', run: () => newActivity() }] : [])] : []),
+        // each display's empty-activity card: its suggestion, Add window and its quick launch (GroupFrame.jsx)
+        ...cardBarItems(),
       ];
     });
   }, [main]);
@@ -274,6 +288,8 @@ function App() {
 
   const leaving = useLeaving(all, main?.plan.spine);
   const helpOpen = useStore(shortcutsHelp);
+  // inside a Machines guest in apps mode (sdk/guestwin.js) only the windows are drawn: the host shows them one by one
+  const ga = useStore(guestAppsMode);
   const spineActive = useMemo(() => ({ overview: inOverview, apps: open?.name === 'search' && open.mode === 'apps', control: open?.name === 'control', notif: open?.name === 'notif', help: helpOpen, menu: !!crown }),
     [inOverview, open, crown, helpOpen]);
   const stripRect = useMemo(() => (main?.plan.top ? { ...main.plan.top, w: main.plan.top.w - STATUS_W } : null), [main]);
@@ -313,17 +329,17 @@ function App() {
 
   return (
     <ThemeProvider tokens={t}>
-      <View style={{ width: '100%', height: '100%', backgroundColor: t.mode === 'dark' ? '#0F0D1C' : '#DCD6F2' }}>
+      <View style={{ width: '100%', height: '100%', backgroundColor: ga ? '#000' : t.mode === 'dark' ? '#0F0D1C' : '#DCD6F2' }}>
         {/* the still pictures, or the slideshow's (Settings → Wallpaper; sdk/slideshow.jsx) */}
-        {slideshowPrefs(s).on ? <SlideshowWallpapers list={t.wallpapers} displays={displays} onContextMenu={(e) => deskMenu.set({ x: e.x, y: e.y })} /> : displays.map((d) => (
+        {ga ? null : slideshowPrefs(s).on ? <SlideshowWallpapers list={t.wallpapers} displays={displays} onContextMenu={(e) => deskMenu.set({ x: e.x, y: e.y })} /> : displays.map((d) => (
           <Image key={d.id + ':' + d.x} src={wallpaperSrc(findWallpaper(t.wallpapers, wallpaperIdFor(s, d, t.defaultWallpaper), t.defaultWallpaper), d.w * (d.scale || 100) / 100, d.h * (d.scale || 100) / 100)}
             onContextMenu={(e) => deskMenu.set({ x: e.x, y: e.y })}
             style={{ position: 'absolute', left: d.x, top: d.y, width: d.w, height: d.h, objectFit: 'cover' }} />
         ))}
-        {displays.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
-        <DesktopWidgets layer="below" />
+        {!ga && displays.map((d) => <MotionWallpaper key={d.id + ':' + d.x} display={d} />)}
+        {!ga && <DesktopWidgets layer="below" />}
         <WidgetDropTarget />
-        {plans.map(({ d, key, label: dname, plan }) => (
+        {!ga && plans.map(({ d, key, label: dname, plan }) => (
           <GroupFrame key={d.id} t={t} plan={plan} d={d} dkey={key} dname={dname} desk={desktop} meta={deskMeta} multi={plans.length > 1} canMove={canMove}
             onAddWindow={H.addWindow} onAddWidget={H.addWidget} onAddWebApp={H.addWebApp} onEdit={H.edit} showEmpty={!onboarding} />
         ))}
@@ -346,11 +362,11 @@ function App() {
         <SnapFlyout t={t} />
         <WidgetPicker t={t} Panel={Surface} />
         <VideoSetup />
-        <DesktopWidgets layer="above" />
-        <Layer name="dock">
+        {!ga && <DesktopWidgets layer="above" />}
+        {!ga && <Layer name="dock">
           {plans.map(({ d, plan }) => (plan.spine ? (
             <Spine key={d.id} t={t} rect={plan.spine} mode={plan.mode} rtl={rtl} active={spineActive} controlRef={d.main ? controlRef : undefined}
-              onCrown={H.crown} onActivities={H.activities} onApps={H.apps} onFiles={H.files} onControl={H.control} onToggle={toggleSpine}
+              onCrown={H.crown} onActivities={H.activities} onApps={H.apps} onFiles={H.files} onStore={H.store} onMonitor={H.monitor} onControl={H.control} onToggle={toggleSpine}
               onSettings={H.settings} onHelp={H.help} />
           ) : null))}
           {main?.plan.top ? (
@@ -360,7 +376,7 @@ function App() {
               <StatusCluster t={t} rect={main.plan.top} rtl={rtl} screenW={screen.width} unread={unread} onControl={H.control} onNotif={H.notif} onVolume={H.volume} />
             </>
           ) : null}
-        </Layer>
+        </Layer>}
         {open?.name === 'search' ? (
           <Layer name="overlay"><Search key={panelDisplay.id} t={t} display={panelDisplay} onClose={() => panel.set(null)} isOnChrome={isOnChrome} /></Layer>
         ) : null}

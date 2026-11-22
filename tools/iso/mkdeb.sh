@@ -17,11 +17,15 @@
 #                                         docs/BENCHMARK.md): a link to /usr/lib/lordos/bin/lordos-sysreport,
 #                                         which starts the lord-bench and lord-media next to it
 #   /usr/bin/lordos-fetch                 the crown and a summary of the computer (a link to the same binary)
+#   /usr/bin/machines                     Machines from the terminal (docs/VIRTUALIZATION.md "From the terminal"): a link to
+#                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
+#                                         in /usr/share/bash-completion/completions/machines
 #   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
 #   /usr/lib/lordos/themes/<theme>/       theme.json, theme.bundle.js and their resources (greeter: the
 #                                         login screen)
+#   /usr/lib/lordos/firmware/lordos-gvt-gop.rom  the GVT-g GOP option ROM Machines gives a vGPU (amd64; firmware/gvt-gop)
 #   /usr/lib/lordos/assets/               fonts, texts (locales), icons, shell integration, cloud/providers.json (the
 #                                         Cloud providers verified on LordOS: without it every one read "not verified", #195)
 #   /usr/lib/lordos/code-manifest.json    SHA-256 of every bundle LordOS runs as its own code, and
@@ -81,6 +85,7 @@ fi
 [ -x server/build/lord-browser-prefs ] || { echo "missing server/build/lord-browser-prefs (make -C server)" >&2; exit 1; }
 [ -x server/build/lordos-lid-wake ] || { echo "missing server/build/lordos-lid-wake (make -C server)" >&2; exit 1; }
 [ -x server/build/lordos-sysreport ] || { echo "missing server/build/lordos-sysreport (make -C server)" >&2; exit 1; }
+[ -x server/build/machines ] || { echo "missing server/build/machines (make -C server)" >&2; exit 1; }
 [ -x server/build/lord-sessiond ] || { echo "missing server/build/lord-sessiond (make -C server, with libssl-dev, libsrtp2-dev and libusrsctp-dev)" >&2; exit 1; }
 # The helpers make builds only when their -dev packages are installed (docs/VM-SETUP.md). A package without one of
 # them loses a feature with no error anywhere (0.8.8.6 shipped without lord-media: Screenshots saved and copied
@@ -91,7 +96,7 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
          lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-appstream:"" \
-         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lordos-guest:""; do
+         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-pgpv:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
     case " ${ALLOW_MISSING:-} " in *" $b "*) echo "mkdeb: leaving out $b (ALLOW_MISSING)" >&2; continue ;; esac
@@ -137,6 +142,13 @@ install -m 755 server/build/lordos-sysreport "$L/bin/lordos-sysreport"
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-sysreport"
 ln -s ../lib/lordos/bin/lordos-sysreport "$PKG/usr/bin/lordos-fetch"
 install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
+# Machines from the terminal: in the LordOS folder because it runs the lord-vm next to its own binary (/proc/self/exe)
+# and reads its texts from ../assets
+install -m 755 server/build/machines "$L/bin/machines"
+"$STRIP" --strip-unneeded "$L/bin/machines" 2>/dev/null || true
+ln -s ../lib/lordos/bin/machines "$PKG/usr/bin/machines"
+install -d "$PKG/usr/share/bash-completion/completions"
+install -m 644 packaging/bash-completion/machines "$PKG/usr/share/bash-completion/completions/machines"
 # the visual test bench: a plain Wayland client, launched like any Linux app
 [ -x server/build/lordos-testbench ] && {
     install -m 755 server/build/lordos-testbench "$PKG/usr/bin/lordos-testbench"
@@ -210,9 +222,32 @@ if [ -x server/build/lordos-guest ]; then
     install -m 755 server/build/lordos-guest "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}"
     "$STRIP" --strip-unneeded "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}" 2>/dev/null || true
 fi
+# lordos-guest-win.exe: the LordOS guest tools Machines installs into a Windows guest (x86-64), cross-built with mingw-w64
+# on the build machine (server/mk/vm.mk); an amd64 package without it can't give Windows guests their clipboard, display
+# size or apps mode, so it's required there (ALLOW_MISSING="lordos-guest-win.exe" to leave it out on purpose)
+if [ -f server/build/lordos-guest-win.exe ]; then
+    install -d "$L/guest/windows"
+    install -m 644 server/build/lordos-guest-win.exe "$L/guest/windows/lordos-guest-win.exe"
+elif [ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ]; then
+    case " ${ALLOW_MISSING:-} " in *" lordos-guest-win.exe "*) echo "mkdeb: leaving out lordos-guest-win.exe (ALLOW_MISSING)" >&2 ;;
+    *) echo "missing server/build/lordos-guest-win.exe (make -C server, with gcc-mingw-w64-x86-64-posix)" >&2; exit 1 ;; esac
+fi
+# lordos-gvt-gop.rom: LordOS's own UEFI GOP option ROM for Intel GVT-g vGPUs (firmware/gvt-gop, MIT), which lord-vm gives
+# QEMU for a machine with a graphics card (docs/MACHINES-GPU.md, Mode A). Building it needs EDK2 (a download and a few
+# minutes), so the package takes the reproducible build committed in firmware/gvt-gop/prebuilt, checked against its
+# SHA256SUMS; tools/firmware/build-gvt-gop.sh makes the same bytes (firmware/gvt-gop/README.md, "Prebuilt")
+if [ "${DEB_ARCH:-$(dpkg --print-architecture)}" = amd64 ]; then
+    (cd firmware/gvt-gop/prebuilt && sha256sum -c --quiet SHA256SUMS) || { echo "firmware/gvt-gop/prebuilt: the ROM doesn't match its SHA256SUMS" >&2; exit 1; }
+    install -d "$L/firmware"
+    install -m 644 firmware/gvt-gop/prebuilt/lordos-gvt-gop.rom "$L/firmware/lordos-gvt-gop.rom"
+fi
 # lord-sql (0.8.8.7): the Databases app's MySQL / MariaDB client, sandboxed (docs/DATABASES.md)
 [ -x server/build/lord-sql ] && install -m 755 server/build/lord-sql "$L/bin/lord-sql"
 [ -x "$L/bin/lord-sql" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-sql" 2>/dev/null || true; }
+# lord-pgpv (0.8.9, approved 2026-11-22): checks the OpenPGP signature of a system the person added to Machines, in its
+# sandbox, on memfds lord-server hands it (docs/VIRTUALIZATION.md 5.6.1)
+[ -x server/build/lord-pgpv ] && install -m 755 server/build/lord-pgpv "$L/bin/lord-pgpv"
+[ -x "$L/bin/lord-pgpv" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-pgpv" 2>/dev/null || true; }
 # lord-sftp (0.8.8.7): the Terminal's Files mode, SFTP over the tab's own ssh session, sandboxed (docs/TERMINAL.md)
 [ -x server/build/lord-sftp ] && install -m 755 server/build/lord-sftp "$L/bin/lord-sftp"
 [ -x "$L/bin/lord-sftp" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-sftp" 2>/dev/null || true; }

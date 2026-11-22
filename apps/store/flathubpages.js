@@ -1,9 +1,10 @@
 // flathubpages.js — the Store's Flathub section (docs/FLATPAK.md, phase 1 step 5): turning Flathub on (the `flatpak`
 // package through the Store's package job, then the remote and the catalog), the catalog as cards (Flathub's verified
 // apps unless the setting shows the rest), each app's page with what it declares and what LordOS changes before it is
-// installed, the apps that need Flatpak's sub-sandboxes (Chromium, Electron) marked "not yet supported", and the
-// installed ones with Update and Remove. The jobs and state are sdk/flathub.js's; the logic sdk/flathubmodel.js's.
-import { createElement as h, useEffect, useState } from 'react';
+// installed, and the installed ones with Update and Remove. Chromium and Electron apps install like any other: their
+// helpers' sub-sandboxes are served by LordOS (docs/FLATPAK.md, "Sub-sandboxes"). The jobs and state are
+// sdk/flathub.js's; the logic sdk/flathubmodel.js's.
+import { createElement as h, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, Image, Button, GroupBox, Toggle, LetterIcon, useTheme, useStore, useLauncherApps, launchApp, admin, formatBytes, errorText, settings,
   flathubModel as M, typeScale, spacing, t,
@@ -23,7 +24,9 @@ const Header = ({ th, children }) => h(Text, { style: { fontSize: typeScale.body
 
 // The section is shown when this PC can have Flathub and the user turned it on.
 export const useFlathub = () => {
-  useStore(F.state);
+  // redrawn when a job starts or ends, or the catalog or the installed apps change (whether Flatpak is there may
+  // change then), never on a job's progress lines
+  useStore(F.state, (x) => `${x.loaded}|${x.installed.length}|${x.job ? 1 : 0}|${x.busy}|${x.catalog.length}`);
   const p = M.prefsOf(useStore(settings, (st) => st.flathub));
   return { supported: F.supported(), on: p.on && F.available(), prefs: p };
 };
@@ -46,8 +49,8 @@ const catLabel = (a) => {
 const openApp = (id) => launchApp(`flatpak:${id}`);
 
 export function FlathubCard({ a, onOpen }) {
-  const s = useStore(F.state);
-  const installed = s.installed.some((x) => x.id === a.id);
+  // only whether this app is installed: a job's progress doesn't redraw every card
+  const installed = useStore(F.state, (s) => s.installed.some((x) => x.id === a.id));
   return h(Card, {
     icon: h(FlathubIcon, { a, size: 56 }), name: a.name, tag: 'Flathub', kind: [catLabel(a), a.developer].filter(Boolean).join(' · '), summary: a.summary,
     note: a.verified ? '' : t('flathub.unverifiedShort'),
@@ -121,7 +124,7 @@ function TurnOn() {
     step === 'idle' && s.msg && !s.msg.ok ? h(Line, { th, color: '#ff453a' }, s.msg.text) : null,
     h(View, { style: { flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end' } },
       step === 'plan' ? h(Button, { label: t('store.cancel'), onClick: () => setStep('idle') }) : null,
-      step === 'idle' ? h(Button, { primary: true, label: t('flathub.setup.turnOn'), onClick: start }) : null,
+      step === 'idle' ? h(Button, { primary: true, label: t('flathub.setup.turnOn'), pending: true, onClick: start }) : null,
       step === 'plan' && sizes ? h(Button, { primary: true, label: t('flathub.setup.install'), disabled: !isAdmin || !!deb.job, onClick: confirm }) : null));
 }
 
@@ -142,30 +145,34 @@ function InstalledList({ onOpen }) {
           h(Text, { onClick: () => onOpen(x.id), style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' } }, a.name),
           h(Text, { style: { fontSize: typeScale.caption, color: th.textDim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' } },
             x.version ? t('store.version', { version: x.version }) : x.id)),
-        h(Button, { small: true, label: t('flathub.remove'), disabled: busy, onClick: () => !busy && F.uninstall({ ...x, name: a.name }) }),
+        h(Button, { small: true, label: t('flathub.remove'), busy, pending: true, onClick: () => !busy && F.uninstall({ ...x, name: a.name }) }),
         h(Button, { small: true, label: t('store.open'), onClick: () => openApp(x.id) }));
     })));
 }
 
-export function FlathubPage({ query, onOpen }) {
+export function FlathubPage({ query, onOpen, category = null }) {
   const th = useTheme();
-  const s = useStore(F.state);
+  // what the page itself shows; a job's progress is JobProgress's own (it changes several times a second)
+  const catalog = useStore(F.state, (x) => x.catalog);
+  const loaded = useStore(F.state, (x) => x.loaded);
+  const working = useStore(F.state, (x) => !!x.busy || !!x.job);
+  const s = { catalog, loaded };
   const fh = useFlathub();
   const [limit, setLimit] = useState(PAGE);
-  useEffect(() => { setLimit(PAGE); }, [query, fh.prefs.showAll]);
+  useEffect(() => { setLimit(PAGE); }, [query, fh.prefs.showAll, category]);
   useEffect(() => { if (fh.on) { if (!s.loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
+  const list = useMemo(() => M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll, category }), [s.catalog, query, fh.prefs.showAll, category]);
+  const hidden = useMemo(() => (fh.prefs.showAll ? 0 : s.catalog.length - s.catalog.filter((a) => a.verified).length), [s.catalog, fh.prefs.showAll]);
   if (!fh.supported) return h(Line, { th }, t('flathub.notSupported'));
   if (!fh.on) return h(View, null, h(TurnOn));
-  const list = M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll });
-  const hidden = fh.prefs.showAll ? 0 : s.catalog.length - s.catalog.filter((a) => a.verified).length;
   return h(View, null,
     h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.l, textAlign: 'start' } }, t('flathub.subtitle')),
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l } },
       h(Toggle, { on: fh.prefs.showAll, onChange: (v) => F.setPrefs({ showAll: v }) }),
       h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } },
         fh.prefs.showAll ? t('flathub.showAllOn') : t('flathub.showAllOff', { count: hidden })),
-      h(Button, { small: true, label: t('flathub.refresh'), disabled: !!s.busy || !!s.job, onClick: () => F.loadCatalog({ fetch: true }) }),
-      h(Button, { small: true, label: t('flathub.turnOff'), onClick: F.turnOff })),
+      h(Button, { small: true, label: t('flathub.refresh'), busy: working, onClick: () => F.loadCatalog({ fetch: true }) }),
+      h(Button, { small: true, label: t('flathub.turnOff'), pending: true, onClick: F.turnOff })),
     h(JobProgress),
     h(InstalledList, { onOpen }),
     s.loaded ? h(Header, { th }, query ? t('flathub.results', { count: list.length }) : t('flathub.catalogTitle', { count: list.length })) : null,
@@ -173,6 +180,13 @@ export function FlathubPage({ query, onOpen }) {
     h(CardGrid, null, ...list.slice(0, limit).map((a) => h(FlathubCard, { key: a.id, a, onOpen }))),
     list.length > limit ? h(View, { style: { alignItems: 'center', marginTop: spacing.l } },
       h(Button, { label: t('flathub.showMore', { count: list.length - limit }), onClick: () => setLimit(limit + PAGE) })) : null);
+}
+
+// How many shown Flathub apps each category has (the Store's second column)
+export function useFlathubCounts() {
+  const catalog = useStore(F.state, (x) => x.catalog);
+  const showAll = useStore(settings, (st) => M.prefsOf(st.flathub).showAll);
+  return useMemo(() => M.categoryCounts(catalog, showAll), [catalog, showAll]);
 }
 
 // Discover's search: the Flathub apps that match, as their own shelf (when Flathub is on).
@@ -205,6 +219,7 @@ export function FlathubUpdates() {
   const s = useStore(F.state);
   const fh = useFlathub();
   useEffect(() => { if (fh.on) F.refreshInstalled(); }, [fh.on]);
+  useEffect(() => (fh.on ? F.watchInstalled() : undefined), [fh.on]);      // installs made elsewhere show too
   if (!fh.on || !s.installed.length) return null;
   return h(View, { style: box(th) },
     h(Title, { th }, t('flathub.updates.title')),
@@ -256,15 +271,14 @@ export function FlathubDetail({ id }) {
   useEffect(() => { if (fh.on) { if (!s.loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
   if (!fh.on) return h(View, null, h(TurnOn));
   if (!a) return h(Line, { th }, s.loaded ? t('flathub.gone') : t('flathub.busy.catalog'));
-  const sub = meta && !meta.error && M.needsSubsandbox(meta);
   const busy = !!s.job;
   const mine = s.job && s.job.id === a.id;
   const buttons = inst
     ? [h(Button, { key: 'rm', label: t('flathub.remove'), disabled: busy, onClick: () => !busy && F.uninstall({ ...inst, name: a.name }) }),
       h(Button, { key: 'up', label: t('flathub.update'), disabled: busy, onClick: () => !busy && F.update({ ...inst, name: a.name }) }),
       h(Button, { key: 'open', primary: true, label: t('store.open'), onClick: () => openApp(a.id) })]
-    : [h(Button, { key: 'in', primary: true, label: sub ? t('flathub.notYet') : t('store.install'), disabled: busy || sub || !meta || !!meta.error,
-      onClick: () => !busy && !sub && meta && !meta.error && F.install(a) })];
+    : [h(Button, { key: 'in', primary: true, label: t('store.install'), disabled: busy || !meta || !!meta.error,
+      onClick: () => !busy && meta && !meta.error && F.install(a) })];
   return h(View, { style: { gap: spacing.xl } },
     h(View, { style: { flexDirection: 'row', gap: spacing.l, alignItems: 'center' } },
       h(FlathubIcon, { a, size: 96 }),
@@ -277,9 +291,6 @@ export function FlathubDetail({ id }) {
             a.verified ? t('flathub.verified', { developer: a.developer || a.id }) : t('flathub.unverified')))),
       h(View, { style: { flexDirection: 'row', gap: spacing.s, alignItems: 'center' } }, ...buttons)),
     mine || (!s.job && s.msg && s.msg.id === a.id) ? h(JobProgress, { forId: a.id }) : null,
-    sub ? h(View, { style: box(th, { marginBottom: 0, border: '1px solid rgba(255,159,10,0.6)' }) },
-      h(Title, { th }, t('flathub.subsandbox.title')),
-      h(Line, { th, color: th.text }, t('flathub.subsandbox.text'))) : null,
     h(Facts, { items: [
       [t('flathub.fact.developer'), a.developer],
       [t('flathub.fact.license'), a.license],
@@ -289,6 +300,7 @@ export function FlathubDetail({ id }) {
     h(View, null,
       h(Header, { th }, t('flathub.perm.title')),
       h(Permissions, { meta })),
+    M.appNote(a.id) ? h(Line, { th, color: th.text }, t(`flathub.note.${M.appNote(a.id)}`)) : null,
     h(Line, { th }, t('flathub.howItRuns')),
     h(Text, { style: { fontSize: typeScale.caption, color: th.textDim, direction: 'ltr', textAlign: 'start' } }, a.id));
 }

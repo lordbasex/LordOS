@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} is bijgewerkt.",
   "noResults": "Geen Flathub-app gevonden.",
   "notSupported": "Flathub is nog niet beschikbaar op deze computer: voorlopig is het alleen voor pc's.",
-  "notYet": "Nog niet ondersteund",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Andere programma's debuggen",
   "perm.devicesAll": "Alle apparaten: camera's, gamecontrollers, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Alleen apps die Flathub heeft geverifieerd. Verborgen: {count}",
   "showAllOn": "Alle Flathub-apps worden getoond, geverifieerd of niet",
   "showMore": "Toon meer (resterend: {count})",
-  "subsandbox.text": "Deze app is gebouwd op Chromium of Electron, waarvan de hulpprogramma's de sandboxes van Flatpak gedeeld nodig hebben op een manier die LordOS nog niet biedt, dus de app kan hier voorlopig niet worden geïnstalleerd.",
-  "subsandbox.title": "Nog niet ondersteund op LordOS",
   "subtitle": "Linux-apps van Flathub, uitgevoerd in de eigen afgeschermde omgeving van LordOS onder je Firewall.",
   "turnOff": "Zet uit",
   "unverified": "Niet geverifieerd door Flathub: de uitgever is misschien niet de ontwikkelaar van de app.",
@@ -110,5 +107,6 @@
   "updates.button": "Werk Flathub-apps bij",
   "updates.text": "Geïnstalleerd vanaf Flathub: {count}. Flatpak controleert elke app en installeert wat er veranderd is; een geopende app is klaar met bijwerken wanneer je hem opnieuw opent.",
   "updates.title": "Flathub-apps",
-  "verified": "Geverifieerd: gepubliceerd door {developer}"
+  "verified": "Geverifieerd: gepubliceerd door {developer}",
+  "note.obsVideos": "In LordOS bewaart OBS Studio opnames in je map Video's: de andere mappen van je thuismap zijn alleen-lezen voor Flathub-apps."
 }

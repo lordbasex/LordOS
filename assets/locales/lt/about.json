@@ -36,6 +36,8 @@
     "few": "{ms} ms · {count} mazgai",
     "other": "{ms} ms · {count} mazgų"
   },
+  "pauses": "Pauzės ilgesnės nei 50 ms",
+  "pausesValue": "{count} (ilgiausia: {ms} ms)",
   "server": "Ekrano serveris",
   "systemApp": "Sistemos programa",
   "systemReport": "Sistemos ataskaita…",
@@ -44,5 +46,6 @@
   "version": "Versija {v}",
   "versionChannel": "Versija {v} · {channel}",
   "case": "Korpusas",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Produktų pavadinimai ir logotipai yra atitinkamų savininkų prekių ženklai; LordOS nėra su jais susijusi ir jų nėra patvirtinta. Logotipai atsisiunčiami tik paprašius, iš kiekvieno savininko svetainės, ir rodomi tik šiame kompiuteryje."
 }

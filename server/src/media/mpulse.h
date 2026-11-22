@@ -9,7 +9,7 @@
 typedef struct {
     int fd, version, killed, underflows;
     int want, ready, failed;            /* 1 play / 2 record; stream created; PipeWire said no */
-    char app_name[64], app_id[64], media_name[128], role[32], source[256];
+    char app_name[64], app_id[64], media_name[128], role[32], source[256], sink[256];   /* source, sink: "" the default */
     uint32_t tag;
     uint8_t *in, *out;
     size_t in_len, in_cap, out_len, out_cap;
@@ -19,6 +19,7 @@ typedef struct {
     /* playback */
     uint32_t play_ch, play_index, frame_bytes;
     int rate, channels, corked;
+    int tlength_ms;                     /* the stream's target buffer (0: 200 ms); set after lmp_playback */
     int64_t requested;                  /* bytes the server asked for that weren't sent */
     int64_t written;                    /* bytes sent since the stream was created */
     /* latency (GET_PLAYBACK_LATENCY) */
@@ -36,7 +37,7 @@ typedef struct {
 /* Starts the handshake (doesn't wait). Then lmp_playback or lmp_record say which stream to create;
  * it becomes ready on its own, as the replies arrive in lmp_dispatch. */
 int  lmp_connect(LmPulse *p, int fd, const char *app_name, const char *app_id);
-int  lmp_playback(LmPulse *p, int rate, int ch, const char *media_name, const char *role);
+int  lmp_playback(LmPulse *p, int rate, int ch, const char *media_name, const char *role, const char *sink);
 int  lmp_record(LmPulse *p, const char *source, int rate, int ch, const char *media_name);
 int  lmp_dispatch(LmPulse *p);          /* reads what arrived; -1 if the connection dropped */
 int  lmp_write(LmPulse *p, const void *d, size_t n);

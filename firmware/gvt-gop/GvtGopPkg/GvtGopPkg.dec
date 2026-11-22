@@ -1,0 +1,13 @@
+## @file
+#  LordOS GVT-g GOP package: a UEFI Graphics Output Protocol option ROM for
+#  Intel GVT-g virtual GPUs (gen9 display).
+#
+#  Copyright (c) 2026 iPERFEX and the LordOS contributors
+#  SPDX-License-Identifier: MIT
+##
+
+[Defines]
+  DEC_SPECIFICATION              = 0x00010005
+  PACKAGE_NAME                   = GvtGopPkg
+  PACKAGE_GUID                   = a1443fb8-b8bf-430b-8042-a47c356159fe
+  PACKAGE_VERSION                = 1.0

@@ -40,6 +40,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | Document | What it covers |
 |---|---|
 | [WAYLAND.md](WAYLAND.md) | Linux apps (GTK, Qt, browsers) on our Wayland compositor |
+| [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md) | Plan for explicit sync (`linux-drm-syncobj-v1`), for the maintainer's review |
 | [WEBAPPS.md](WEBAPPS.md) | Web apps and PWAs: the LordOS Web Runtime (`lord-web`, WPE WebKit), profiles, isolation (0.8.8.8) |
 | [WINDOWS.md](WINDOWS.md) | Moving and resizing windows, the Window menu, cursors |
 | [DISPLAYS.md](DISPLAYS.md) | Several displays and HiDPI |
@@ -51,6 +52,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [WALLPAPERS.md](WALLPAPERS.md) | Moving wallpapers on the desktop and the login screen |
 | [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md) | The on-screen keyboard, for a computer with no physical keyboard |
 | [THEMES-GUIDE.md](THEMES-GUIDE.md) | How to build a LordOS appearance (theme): anatomy, tokens, frames, building, verified code, testing |
+| [THEMES-PLAN.md](THEMES-PLAN.md) | Plan: many appearances, community themes from a file, a theme store with review and signing |
 | [WORKSPACES.md](WORKSPACES.md) | Lord Workspaces (in development): activities, tiling per display, effects styles, performance, what is deferred |
 | [LAYERS.md](LAYERS.md) | The desktop's stacking order: what is drawn and clicked above what |
 | [SPOTLIGHT.md](SPOTLIGHT.md) | Search and the advanced clipboard |
@@ -105,6 +107,8 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [CLEANER-ROADMAP.md](CLEANER-ROADMAP.md) | The state of each Cleaner feature |
 | [DISK-HEALTH.md](DISK-HEALTH.md) | Disk life: how much life each disk has left; a design, not built |
 | [VIRTUALIZATION.md](VIRTUALIZATION.md) | Machines, the virtualization app: design and status (the MVP shipped in 0.8.8.5) |
+| [TRADEMARKS.md](TRADEMARKS.md) | Trademarks: LordOS ships no third-party logo; the opt-in official logos of Machines and which projects are listed, and why |
+| [MACHINES-GPU.md](MACHINES-GPU.md) | Machines: plan for a smoother picture and a real GPU for a machine (Intel GVT-g, full passthrough) |
 | [GO-LINK.md](GO-LINK.md) | go-link Desk on LordOS and the public screen-sharing API: design, API since 0.8.8, status in the document |
 | [FLATPAK.md](FLATPAK.md) | Flatpak and Flathub: a design review, not planned for any release |
 
@@ -127,6 +131,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [PAPER-VALIDATION.md](PAPER-VALIDATION.md) | Each claim of the paper, how it is checked and its state |
 | [RESULTS.md](RESULTS.md) | Versioned results: measurements per version and machine, with the commands that produced them |
 | [PERFORMANCE-0.8.9.md](PERFORMANCE-0.8.9.md) | Performance of 0.8.9 and 0.8.9.1 on the maintainer's PC and a Raspberry Pi 5: memory and processor at rest, the slideshow's cost, the floor, widgets and a Terminal, the memory work's runs (data in `perf/`) |
+| [MAIN-THREAD.md](MAIN-THREAD.md) | The main thread's pauses (0.8.9.5): the stall detector and its log lines, `tools/stall-where.mjs`, `server/tests/perf_headless.sh`, the rules that keep the desktop answering (store subscriptions, memoized apps, pending controls) and what was measured |
 | [perf/MEMORY-HEAPTRACK.md](perf/MEMORY-HEAPTRACK.md) | Measuring a session's memory down to the line of code: session-sample.sh, the memory report, heaptrack; the 0.8.9.1 results |
 
 ## Images and assets

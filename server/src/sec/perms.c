@@ -13,12 +13,12 @@
 
 static const char *const names[PERM_COUNT] = {
     "files", "clipboard", "notifications", "network", "camera", "microphone",
-    "screen", "listen", "usb", "bluetooth", "apps", "status-item", "shortcuts",
+    "screen", "listen", "usb", "bluetooth", "apps", "status-item", "shortcuts", "idle",
 };
 
 const char *perm_name(Perm p) { return (p >= 0 && p < PERM_COUNT) ? names[p] : "?"; }
 int perm_from_name(const char *s) { for (int i = 0; i < PERM_COUNT; i++) if (!strcmp(names[i], s)) return i; return -1; }
-int perm_declarable(const char *s) { int p = perm_from_name(s); return p >= 0 && p != PERM_SHORTCUTS; }
+int perm_declarable(const char *s) { int p = perm_from_name(s); return p >= 0 && p != PERM_SHORTCUTS && p != PERM_IDLE; }
 
 #define MAX_ENTRIES 512
 typedef struct { char app[PERM_APP_MAX]; unsigned char state[PERM_COUNT]; long long when[PERM_COUNT]; int used; } Row;

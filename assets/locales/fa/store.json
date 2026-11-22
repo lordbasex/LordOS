@@ -129,7 +129,7 @@
   },
   "open": "باز کردن",
   "page.ai": "هوش مصنوعی",
-  "page.webapps": "برنامه‌های وب",
+  "page.webapps": "برنامه‌های وب (PWA)",
   "page.commercial": "تجاری",
   "page.remote": "دسترسی از راه دور",
   "page.suites": "برنامه‌های شخص ثالث",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "در حال فعال کردن…",
   "pkg32": "{name} (۳۲ بیتی)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "برنامهٔ Flatpak"
+  "kind.flatpak": "برنامهٔ Flatpak",
+  "section.origin": "منبع",
+  "section.picks": "انتخاب LordOS",
+  "src.debian": "برنامه‌های Linux ‏(Debian)",
+  "src.wine": "Wine",
+  "src.android": "برنامه‌های Android",
+  "soon": "به‌زودی",
+  "sub.all": "همه"
 }

@@ -1,9 +1,10 @@
 /* pgp.c — OpenPGP v4 keyrings and signatures to verify repositories (see pgp.h).
  *
- * The keyring is taken as trusted (it's a root file installed by the debian-archive-keyring
- * package, just as gpgv does): from it we read the keys, their subkeys, what they're for
- * (key flags), when they expire and whether they're revoked, according to the signatures the
- * key itself made over itself. What arrives from the network (InRelease) is verified: a v4
+ * A keyring loaded with pgp_keyring_add_mem/_file is taken as trusted (it's a root file installed by the
+ * debian-archive-keyring package, just as gpgv does): from it we read the keys, their subkeys, what they're for
+ * (key flags), when they expire and whether they're revoked, according to the signatures the key itself made over
+ * itself, without checking them. Key material that comes from a person or a file (pgp_keyring_add_untrusted, Machines'
+ * own systems) has every one of those self-signatures, subkey bindings and back-signatures verified first. What arrives from the network (InRelease) is verified: a v4
  * signature over the canonical text, the key has to exist, be able to sign, not be revoked or
  * expired, and the signature can't be expired or come from the future. */
 #include "pgp.h"
@@ -116,6 +117,8 @@ typedef struct {
     int key_flags, has_created;
     uint8_t issuer_fpr[20], issuer_id[8];
     int has_fpr, has_id;
+    const uint8_t *emb;                 /* an embedded signature (subpacket 32: a subkey's 0x19 back-signature) */
+    size_t emblen;
 } Sig;
 
 static void parse_subpackets(Sig *s, const uint8_t *p, const uint8_t *end, int hashed) {
@@ -137,6 +140,7 @@ static void parse_subpackets(Sig *s, const uint8_t *p, const uint8_t *end, int h
         }
         if (type == 33 && vl == 21 && v[0] == 4) { memcpy(s->issuer_fpr, v + 1, 20); s->has_fpr = 1; }
         else if (type == 16 && vl == 8) { memcpy(s->issuer_id, v, 8); s->has_id = 1; }
+        else if (type == 32 && !s->emb) { s->emb = v; s->emblen = vl; }   /* verified by whoever reads it */
         p += l;
     }
 }
@@ -206,7 +210,59 @@ long pgp_dearmor(const char *in, size_t len, uint8_t **out) {
     return len >= 5 && !memcmp(in, "-----", 5) ? dearmor(in, len, out) : -1;
 }
 
-int pgp_keyring_add_mem(PgpKeyring *kr, const char *data, size_t len) {
+static int verify_sig(const PgpKey *k, const Sig *s, const uint8_t *digest);
+
+/* Untrusted key material: does signer's signature s really cover the primary key packet `key`, then the subkey packet
+ * `sub` (bindings and their revocations) or the user ID / attribute `uid` (certifications)? RFC 4880 5.2.4 / RFC 9580
+ * 5.2.4: each key packet hashed as 0x99 + 2-byte length + body, a user ID as 0xB4 (an attribute 0xD1) + 4-byte length +
+ * body, then the signature's hashed part and the v4 trailer. SHA-256 and SHA-512 only: a SHA-1 binding can be forged
+ * (chosen-prefix collisions) and isn't taken. */
+static int self_sig_ok(const PgpKey *signer, const Sig *s, const uint8_t *key, size_t keylen, const uint8_t *sub, size_t sublen,
+                       int uidtag, const uint8_t *uid, size_t uidlen) {
+    if ((s->hashalg != HASH_SHA256 && s->hashalg != HASH_SHA512) || keylen > 0xffff || sublen > 0xffff || !s->has_created) return 0;
+    uint8_t kh[3] = { 0x99, (uint8_t)(keylen >> 8), (uint8_t)keylen }, sh[3] = { 0x99, (uint8_t)(sublen >> 8), (uint8_t)sublen };
+    uint8_t uh[5] = { uidtag == 17 ? 0xD1 : 0xB4, (uint8_t)(uidlen >> 24), (uint8_t)(uidlen >> 16), (uint8_t)(uidlen >> 8), (uint8_t)uidlen };
+    uint8_t tr[6] = { 4, 0xff, (uint8_t)(s->headlen >> 24), (uint8_t)(s->headlen >> 16), (uint8_t)(s->headlen >> 8), (uint8_t)s->headlen };
+    const uint8_t *parts[8];
+    size_t lens[8];
+    int n = 0;
+    parts[n] = kh; lens[n++] = 3; parts[n] = key; lens[n++] = keylen;
+    if (sub) { parts[n] = sh; lens[n++] = 3; parts[n] = sub; lens[n++] = sublen; }
+    if (uid) { parts[n] = uh; lens[n++] = 5; parts[n] = uid; lens[n++] = uidlen; }
+    parts[n] = s->head; lens[n++] = s->headlen; parts[n] = tr; lens[n++] = 6;
+    uint8_t dig[64];
+    if (s->hashalg == HASH_SHA256) {
+        Sha256 h;
+        sha256_init(&h);
+        for (int i = 0; i < n; i++) sha256_update(&h, parts[i], lens[i]);
+        sha256_final(&h, dig);
+    } else {
+        Sha512 h;
+        sha512_init(&h);
+        for (int i = 0; i < n; i++) sha512_update(&h, parts[i], lens[i]);
+        sha512_final(&h, dig);
+    }
+    return dig[0] == s->left16[0] && dig[1] == s->left16[1] && verify_sig(signer, s, dig);
+}
+
+/* A revocation the primary key issued counts unless it can be checked and fails: one with a hash this code doesn't
+ * verify (SHA-1, SHA-224, SHA-384, ...) or without a creation time revokes (fail closed); only a checkable one that
+ * doesn't verify is ignored as forged. */
+static int rev_checkable(const Sig *s) { return (s->hashalg == HASH_SHA256 || s->hashalg == HASH_SHA512) && s->has_created; }
+
+/* A self-signature of untrusted key material that may count: made by the key, not before it, not from the future, not
+ * expired. */
+static int self_sig_time_ok(const Sig *s, const PgpKey *k, int64_t now) {
+    return s->has_created && s->created >= k->created && s->created <= now + 86400 &&
+           !(s->sig_expires && s->created + s->sig_expires <= now);
+}
+
+/* Trusted keyrings (strict 0, root's APT keyrings): the self-signatures' flags, expiry and revocations are read without
+ * checking them, as gpgv does with a keyring it was told to trust. Untrusted key material (strict 1): only verified
+ * self-signatures count, a primary key without one is dropped, a subkey without a verified binding (0x18) is dropped,
+ * and a subkey may sign only when its newest binding says so (key flag 0x02) and carries a verified back-signature
+ * (0x19) made by the subkey itself. */
+static int keyring_add(PgpKeyring *kr, const char *data, size_t len, int strict, int64_t now) {
     uint8_t *buf;
     long n;
     if (len >= 5 && !memcmp(data, "-----", 5)) {
@@ -225,17 +281,21 @@ int pgp_keyring_add_mem(PgpKeyring *kr, const char *data, size_t len) {
 
     size_t pos = 0;
     Pkt p;
-    int primary = -1, cur = -1, r;
+    int primary = -1, cur = -1, r, first = kr->n;
     int64_t best_self = -1, best_bind = -1;
+    const uint8_t *pkb = NULL, *skb = NULL, *uid = NULL;    /* bodies of the primary key, the subkey, the user ID */
+    size_t pkl = 0, skl = 0, uidl = 0;
+    int uidtag = 0;
     while ((r = next_packet(buf, (size_t)n, &pos, &p)) > 0) {
         if (p.tag == 6 || p.tag == 14) {
             PgpKey k;
             if (p.tag == 6) primary = -1;
             cur = -1;
+            uid = NULL;
             if (p.tag == 14 && primary < 0) continue;      /* subkey without a valid primary */
             if (parse_key(p.body, p.len, &k)) continue;
             k.primary = p.tag == 6;
-            k.can_sign = 1;
+            k.can_sign = !strict || k.primary;
             if (kr->n == kr->cap) {
                 int cap = kr->cap ? kr->cap * 2 : 32;
                 PgpKey *nk = realloc(kr->keys, sizeof *nk * (size_t)cap);
@@ -245,27 +305,46 @@ int pgp_keyring_add_mem(PgpKeyring *kr, const char *data, size_t len) {
             }
             kr->keys[kr->n] = k;
             cur = kr->n++;
-            if (p.tag == 6) { primary = cur; best_self = -1; }
-            else best_bind = -1;
+            if (p.tag == 6) { primary = cur; best_self = -1; pkb = p.body; pkl = p.len; }
+            else { best_bind = -1; skb = p.body; skl = p.len; }
+        } else if ((p.tag == 13 || p.tag == 17) && cur >= 0 && cur == primary) {
+            uid = p.body; uidl = p.len; uidtag = p.tag;
         } else if (p.tag == 2 && cur >= 0 && primary >= 0) {
             Sig s;
             if (parse_sig(p.body, p.len, &s) || !issued_by(&s, &kr->keys[primary])) continue;
             PgpKey *k = &kr->keys[cur];
+            const PgpKey *pk = &kr->keys[primary];
             if (cur == primary) {
-                if (s.type == 0x20) k->revoked = 1;
-                else if ((s.type >= 0x10 && s.type <= 0x13) || s.type == 0x1f) {
-                    if (s.created < best_self) continue;
-                    best_self = s.created;
-                    k->expires = s.key_expires ? k->created + s.key_expires : 0;
-                    if (s.key_flags >= 0) k->can_sign = (s.key_flags & 0x02) != 0;
+                if (s.type == 0x20) {
+                    if (!strict || !rev_checkable(&s) || (self_sig_ok(pk, &s, pkb, pkl, NULL, 0, 0, NULL, 0) && s.created >= k->created))
+                        k->revoked = 1;
+                } else if ((s.type >= 0x10 && s.type <= 0x13) || s.type == 0x1f) {
+                    if (s.created >= best_self &&
+                        (!strict || (self_sig_time_ok(&s, k, now) && (s.type == 0x1f || uid) &&
+                                     self_sig_ok(pk, &s, pkb, pkl, NULL, 0, uidtag, s.type == 0x1f ? NULL : uid, uidl)))) {
+                        best_self = s.created;
+                        k->expires = s.key_expires ? k->created + s.key_expires : 0;
+                        if (s.key_flags >= 0) k->can_sign = (s.key_flags & 0x02) != 0;
+                        k->bound = 1;
+                    }
                 }
             } else {
-                if (s.type == 0x28) k->revoked = 1;
-                else if (s.type == 0x18) {
-                    if (s.created < best_bind) continue;
+                if (s.type == 0x28) {
+                    if (!strict || !rev_checkable(&s) || (self_sig_ok(pk, &s, pkb, pkl, skb, skl, 0, NULL, 0) && s.created >= k->created))
+                        k->revoked = 1;
+                } else if (s.type == 0x18 && s.created >= best_bind &&
+                           (!strict || (self_sig_time_ok(&s, k, now) && self_sig_ok(pk, &s, pkb, pkl, skb, skl, 0, NULL, 0)))) {
                     best_bind = s.created;
                     k->expires = s.key_expires ? k->created + s.key_expires : 0;
-                    k->can_sign = s.key_flags >= 0 ? (s.key_flags & 0x02) != 0 : 1;
+                    k->bound = 1;
+                    if (!strict) k->can_sign = s.key_flags >= 0 ? (s.key_flags & 0x02) != 0 : 1;
+                    else {
+                        /* a signing subkey proves it agreed to be bound: the back-signature, by the subkey, over the same
+                         * two keys (otherwise anyone could bind someone else's subkey to their key, RFC 9580 5.2.1.6) */
+                        Sig b;
+                        k->can_sign = s.key_flags >= 0 && (s.key_flags & 0x02) && s.emb && !parse_sig(s.emb, s.emblen, &b) &&
+                                      b.type == 0x19 && self_sig_time_ok(&b, k, now) && self_sig_ok(k, &b, pkb, pkl, skb, skl, 0, NULL, 0);
+                    }
                 }
             }
         }
@@ -273,8 +352,25 @@ int pgp_keyring_add_mem(PgpKeyring *kr, const char *data, size_t len) {
         if (primary >= 0 && kr->keys[primary].revoked)
             for (int i = primary; i < kr->n; i++) kr->keys[i].revoked = 1;
     }
+    if (strict) {
+        /* drop what no verified signature vouches for; a subkey lives no longer than its primary key */
+        int w = first, keep = 0;
+        const PgpKey *pk = NULL;
+        for (int i = first; i < kr->n; i++) {
+            PgpKey k = kr->keys[i];
+            if (k.primary) { keep = k.bound; if (keep) { kr->keys[w] = k; pk = &kr->keys[w++]; } continue; }
+            if (!keep || !k.bound) continue;
+            if (pk->expires && (!k.expires || k.expires > pk->expires)) k.expires = pk->expires;
+            kr->keys[w++] = k;
+        }
+        kr->n = w;
+    }
     return r < 0 ? -1 : 0;
 }
+
+int pgp_keyring_add_mem(PgpKeyring *kr, const char *data, size_t len) { return keyring_add(kr, data, len, 0, 0); }
+
+int pgp_keyring_add_untrusted(PgpKeyring *kr, const char *data, size_t len, int64_t now) { return keyring_add(kr, data, len, 1, now); }
 
 int pgp_keyring_add_file(PgpKeyring *kr, const char *path) {
     FILE *f = fopen(path, "rb");

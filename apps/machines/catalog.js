@@ -2,13 +2,16 @@
 // 4.1 and 3.9, "The Linux download cards"): pure functions, tested by server/tests/vm_catalog_test.mjs. The admin
 // helper fetches the makers' lists and the images (vm-image-list, vm-image-get) and checks again everything chosen
 // here: the app only reads a list and names the newest file in it, with its SHA-256.
+import { hostOf, redactUrl } from './systems.js';
 
 // the cards for an architecture, in the catalog's order: { id, name, release, approxMb, kind }
 export function systemsFor(cat, arch) {
   const out = [];
   for (const s of Array.isArray(cat?.systems) ? cat.systems : []) {
     const a = s?.arch?.[arch];
-    if (!a || s.hidden || typeof s.id !== 'string' || typeof a.file !== 'string') continue;
+    // Windows (4.3) has no folder of its own: the person's ISO from Microsoft's page, or the pinned evaluation
+    const win = s?.kind === 'windows' && Array.isArray(a?.isos);
+    if (!a || s.hidden || typeof s.id !== 'string' || (typeof a.file !== 'string' && !win)) continue;
     out.push({ id: s.id, name: String(s.name || s.id), release: String(s.release || ''), approxMb: Number(a.approxMb) || 0, kind: s.kind || 'iso', listed: !a.sums });
   }
   return out;
@@ -115,6 +118,8 @@ export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m)
     let info = null;
     try { info = infoOf(m[1]); } catch (x) { info = null; }
     const sys = (cat?.systems || []).find((s) => s?.id === info?.id);
+    // an official logo (opt-in, logos.js) is no system image: the Storage window doesn't list it
+    if (sys?.kind === 'logo' || /^logo-/.test(String(info?.id || ''))) continue;
     const file = typeof info?.file === 'string' && NAME.test(info.file) ? info.file : '';
     const version = sys && file ? versionIn(file, sys.release) : '';
     const users = [], dirs = [], running = [];
@@ -123,8 +128,11 @@ export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m)
       users.push(x.name); dirs.push(x.dir);
       if (runningOf(x)) running.push(x.name);
     }
+    // a system the person added (vm-image-get-user): its file and the site it came from (the helper wrote the address
+    // without its query; redacted again here all the same)
+    const from = info?.id === 'user' && typeof info.from === 'string' ? hostOf(redactUrl(info.from)) : '';
     out.set(m[1], { sha: m[1], path, partial, size: Number(e.size) || 0, id: sys ? sys.id : 'other', arch: info?.arch === 'arm64' || info?.arch === 'amd64' ? info.arch : '',
-      file, version, label: sys ? [sys.name, version].filter(Boolean).join(' ') : '', users, dirs, running });
+      file, version, label: sys ? [sys.name, version].filter(Boolean).join(' ') : file && from ? `${file} · ${from}` : '', users, dirs, running });
   }
   return [...out.values()].sort((a, b) => b.size - a.size || a.sha.localeCompare(b.sha));
 }
@@ -165,4 +173,16 @@ export function hostnameFor(name) {
 export function userFor(home) {
   const u = String(home || '').split('/').filter(Boolean).pop() || '';
   return /^[a-z_][a-z0-9_-]{0,31}$/.test(u) && !RESERVED.includes(u) ? u : 'user';
+}
+
+// ---- official logos (opt-in; logos.js) ----
+// the catalog's logo of a system (an entry of kind "logo" whose "for" names it), pinned like any download: { id, file,
+// sha, bytes } or null. Only systems whose owners' policies allow it to identify them are listed (docs/TRADEMARKS.md);
+// a system of the other kind never has one.
+export function logoEntry(cat, sysId, arch) {
+  if (!sysId || sysId === 'windows') return null;
+  const s = (cat?.systems || []).find((x) => x?.kind === 'logo' && x.for === sysId && typeof x.id === 'string' && /^logo-[a-z0-9-]+$/.test(x.id));
+  const pin = s?.arch?.[arch]?.pinned?.[0];
+  if (!pin || !/^[0-9a-f]{64}$/.test(pin.sha256 || '') || !/\.png$/.test(pin.name || '') || !/^https:\/\//.test(pin.url || '')) return null;
+  return { id: s.id, file: pin.name, sha: pin.sha256, bytes: pin.bytes | 0 };
 }

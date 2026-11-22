@@ -9,8 +9,8 @@ import { cleanThemeMeta } from './thememeta.js';
 export { View, Text, Image, Terminal, Surface, MediaView, screen, addListener, useClock, system, layouts, getLayout, modifiers } from '@lordos/runtime';
 export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox } from '@lordos/runtime';
 export { createStore, useStore } from './store.js';
-export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch } from './thememeta.js';   // theme.json's sketch and options (0.8.9)
-export { settings, useSettings } from './settings.js';
+export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch, themeAuthor } from './thememeta.js';   // theme.json's sketch and options (0.8.9)
+export { settings, useSettings, useTrackedSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
 export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage } from './localename.js';   // glibc region names (installer, Settings)
@@ -31,7 +31,7 @@ export { OskPanel, OskIcon, OskStatus, oskLift } from './osk.jsx';
 export { trackpad, useTrackpads, hasTouchpad, registerGestureActions, lastSwipe, TRACKPAD_DEFAULTS, trackpadConfig, setTrackpad } from './trackpad.js';
 export { ime, useIme } from './ime.js';
 export { wayland, x11SelfScale, setX11Scaling } from './wayland.js';
-export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, LetterIcon, iconFromFile, webAppIcon, webProfileIcon, APP_CATEGORIES, appCategory } from './apps.js';
+export { useLauncherApps, launchApp, refreshApps, isLinuxApp, linuxAppFor, shortAppName, windowAppName, windowPixelIcons, LetterIcon, iconFromFile, webAppIcon, webProfileIcon, APP_CATEGORIES, appCategory } from './apps.js';
 // Web apps (docs/WEBAPPS.md): the registry through lord.webapps, profiles, the probe, the permission questions
 export { webApps, useWebApps, refreshWebApps, webAppsAvailable, webAppEntry, webRunning, launchWebApp, probeWebApp, installWebApp, webAppCall, webAppOfWindow, webAppMemory, webEngine,
   webBadges, siteIcons, wantSiteIcon, refreshSiteIcon, siteIconBusy, webDeveloper, setWebDeveloperMode } from './webapps.js';
@@ -87,10 +87,12 @@ export { DesktopWidgets, registerWidgetType, setWidgets, desktopWidgets } from '
 export { BATTERY_DEFAULTS, batteryPrefs, batteryStep } from './batterypolicy.js';
 export { useDevices, deviceList, deviceName, deviceShort, deviceValue, deviceVia } from './devices.js';
 export { devicesFrom, fractionOf as deviceFraction, toneOf as deviceTone, kindOf as deviceKind } from './devicesmodel.js';
+// (0.8.9.5) the apps used on each display: a theme's quick launch and its suggestion of the usual apps (sdk/displayapps.js)
+export { startDisplayApps, useQuickApps, useDisplaySuggestion, quietDisplayApps, forgetDisplayApps, setDisplayAppsOn, displayAppsOn, displayAppsStored, openDisplayApps } from './displayapps.js';
 export { registerWidgetKind, widgetKinds, widgetCatalog, addDeskWidget, removeDeskWidget, setDeskWidget, resizeDeskWidget, startDeskWidgets, deskWidgetSize, kindSizes, WidgetDropTarget, widgetDrag, deskWidgetsShown, widgetDisplayKey } from './deskwidgets.jsx';
 export { Markdown, markdownHeadings, parseMarkdown, parseInline, toggleTask } from './markdown.jsx';
 export {
-  dock, useDockEntries, dockActivate, dockMenu, registerDockMenu, registerDockActions, dockQuickActions, launcherIdOf, dockIdOf, dockIdOfWindow,
+  dock, useDockEntries, dockActivate, dockMenu, registerDockMenu, registerDockActions, registerDockActivate, dockQuickActions, launcherIdOf, dockIdOf, dockIdOfWindow,
   launchDockItem, dockPrefs, DOCK_DEFAULTS, dockHideSettings, DOCK_HIDE_MODES, DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX, dockBadgeMetrics, useDockCovered, quitApp, DOCK_LAUNCHER, useTrash, trashState, refreshTrash, openTrash, emptyTrash, trashMenu,
   dockDrag, dockPoof, beginDockDrag, registerDockTarget, dockDragJustEnded,
 } from './dock.js';
@@ -105,7 +107,7 @@ import { refreshPackages, forgetGonePackaged, packageList as packageListOf } fro
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, windowMenuTitle, windowAccent, appRegistry, appMenuClick,
   registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, isWindowLocked, moveGrab, SNAP_DWELL_MS, locksChanged, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
-  keepWindowsInWorkAreas, pointerDisplay,
+  keepWindowsInWorkAreas, pointerDisplay, windowChrome,
 } from './windows.js';
 // Desktops and the Overview (docs/DESKTOPS.md)
 export { desktopName, switchDesktop, nextDesktopBy, addDesktopAndShow, closeActiveDesktop, removeDesktopById, moveToDesktopItems, flowDesktopKeys, classicDesktopKeys, flowGrabs, ctrlArrowsOn, desktopSwipe, DesktopHud } from './desktops.js';
@@ -147,7 +149,7 @@ export * as fs from './fs.js';
 export { useDirectory } from './fs.js';
 export { ThemeProvider, useTheme, DEFAULT_TOKENS, solidOver } from './theme.js';
 export {
-  Button, Toggle, Segmented, SidebarItem, SectionTitle, ScrollView, TextInput, TextArea, FormFields, hasTextFocus, takeTextFocus, releaseTextFocus, textFocusOwner, Stepper, Slider,
+  Button, Toggle, Spinner, usePending, afterPaint, useAppFocused, Segmented, SidebarItem, SectionTitle, ScrollView, TextInput, TextArea, FormFields, hasTextFocus, takeTextFocus, releaseTextFocus, textFocusOwner, Stepper, Slider,
   AppHost, useAppWindow, useKeyboard, focusToken, restoreFocus, pasteIntoFocused, FloatingWindows, useWindowState, useFilesDrop, FilesDropHint,
 } from './components.jsx';
 export { sortDrop, dropCount } from './filedrop.js';
@@ -191,10 +193,10 @@ export { mailAvailable, mailRequest, onMailEvent, mailConfig, mailAccounts, mail
 export { calendars, events as calendarEvents, reminders, usePim, usePimQuery, pimRev, startOfDay } from './calendar.js';
 export { FilePicker } from './filepicker.jsx';
 import { PortalFilePrompt } from './filepicker.jsx';
-import { ScreenCastPrompt } from './screencast.jsx';
+import { ScreenCastPrompt, ShotOverlay } from './screencast.jsx';
 import { VoicePlayer, VoiceSavePrompt } from './voiceplayer.jsx';
 import { LiveSpeechPanel } from './livespeech.jsx';
-export { openFileWithApps, openUrl, revealPath, openCalendarApp } from './sysopen.js';   // opening files/apps for the isolated system apps
+export { openFileWithApps, openUrl, revealPath, openFolder, openCalendarApp } from './sysopen.js';   // opening files/apps for the isolated system apps
 export { books as addressBooks, contacts, displayName as contactName, initials as contactInitials, ContactPhoto } from './contacts.js';
 import { startMail } from './mail.js';
 import { startReminders } from './calendar.js';
@@ -216,11 +218,15 @@ export { displayNumbers, snapDisplay, resolveDrop, placementOk as displayPlaceme
 // Fans and cooling (lord-fand, docs/FANS.md): Settings → Cooling and Monitor → Cooling
 export { useFan, fanStatus, fanHistory, fanCase, fanControl, refreshFan, coolingVariant, heatColor, CoolingArt, GpuArt, FanCurveChart, formatTemp, FAN_HISTORY } from './cooling.jsx';
 export { DEFAULT_CATEGORIES, defaultFor, defaultInfo, setDefaultFor, resetDefaultFor, candidatesFor, defaultOpenerId, nativeOf } from './defaults.js';
+export { registerOpenProvider, registerOpenProviders, openProvidersFor, openHintsFor, suggestedProviderFor, defaultProviderFor, setDefaultProvider, openExtOf } from './openwith.js';   // "Open with" providers (machines; later LordBridge, Wine)
 // deactivated built-in apps (Store → Installed; docs/PACKAGES.md, "Deactivating LordOS apps")
 export { appsOff, isAppOff, useAppsOff } from './appsoff.js';
 export { DEACTIVATABLE, CORE_APPS, canDeactivate, isCoreApp, openersAvailable } from './appsoffmodel.js';
 export { deactivateApp, activateApp, offerActivate } from './appsoffactions.js';
 import { startAppsOff } from './appsoffactions.js';
+// apps mode's guest side: inside a Machines guest, this desktop's windows go to the host one by one (guestwin.js)
+export { guestAppsMode } from './guestwin.js';
+import { startGuestWin } from './guestwin.js';
 export { notifyPrefs, appNotifyPrefs, setAppNotifyPrefs, dndActive, NOTIFY_DEFAULTS } from './notify.js';
 
 // ---- installed themes ----
@@ -232,7 +238,9 @@ export const themes = {
     // translated name and description (shell.theme.<id>.*) or those from theme.json
     // (0.8.9) sketch, options and desktopArrows: what Settings shows for a theme it doesn't know by id (sdk/thememeta.js)
     return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || meta.name || t.id,
-      description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '', ...cleanThemeMeta(meta) };
+      description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '', ...cleanThemeMeta(meta),
+      // it couldn't start in this session (lord-server went back to the one before): Settings → Appearance says why
+      failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '' };
   }).filter((t) => !t.hidden),         // the login screen (themes/greeter) can't be chosen
   current: () => lord.themes.list().find((t) => t.current)?.id || null,
   // the current theme's entry (null on the login screen or without lord.themes)
@@ -283,6 +291,7 @@ export function startShell(element) {
   try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
+  startGuestWin();                      // inside a Machines guest only: apps mode's endpoint (guestwin.js)
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
   resetShortcuts();                     // the dispatcher exists only in the session (sdk/shortcuts.js)
   reopenAfterThemeSwitch();
@@ -367,7 +376,7 @@ function LocaleRoot({ children }) {
     at('popover', ClipboardPanel, EmojiPanel),
     at('modal', PrintDialog, RestorePrompt, FirstStart),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, ShareBadge, DisplayIdentify, VoicePlayer),
-    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
+    at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
     at('input', OskPanel, ImeOverlay));
 }
 // the wallpaper slideshow (0.8.9; a theme turns it on in theme.json: sdk/thememeta.js)
@@ -376,7 +385,7 @@ export { setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, 
 export { userVideoProblem, motionCodecs, MAX_SECONDS } from './motionmodel.js';
 export { lordosWallpapers, userWallpaperName, wallpaperSrc, wallpaperThumb, findWallpaper, wallpaperIdFor, wallpaperPatch, displayWallpaperKey, displayLabel, DEFAULT_WALLPAPER, GREETER_WALLPAPER, WALLPAPER_CATEGORIES } from './wallpapers.js';
 export { appGroup, appMenuItems, runningApps, forceQuit, recentItems, storeUpdates, hideApp, hideOthers, toggleShowDesktop, appSettingsItem, webHelpItems, webAppearanceItem, webUserAgentItem } from './appcontrol.js';
-export { windowMenuItems, moveResizeItems } from './windowmenu.js';
+export { windowMenuItems, moveResizeItems, registerWindowMenuItems } from './windowmenu.js';
 export { setDesktopCount } from './desktops.js';
 // Apps in a small window (a Workspaces tile): the window's width, a breakpoint and a sidebar that hides (sdk/narrow.jsx)
 export { useWindowWidth, useWindowHeight, useNarrow, useSidebar, SidebarToggle, SidebarOverlay, NARROW, MIN_W, MIN_H } from './narrow.jsx';

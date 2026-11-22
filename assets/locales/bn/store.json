@@ -129,7 +129,7 @@
   },
   "open": "খুলুন",
   "page.ai": "কৃত্রিম বুদ্ধিমত্তা",
-  "page.webapps": "ওয়েব অ্যাপ",
+  "page.webapps": "ওয়েব অ্যাপ (PWA)",
   "page.commercial": "বাণিজ্যিক",
   "page.remote": "রিমোট অ্যাক্সেস",
   "page.suites": "তৃতীয় পক্ষের অ্যাপ",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "চালু করা হচ্ছে…",
   "pkg32": "{name} (৩২-বিট)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak অ্যাপ"
+  "kind.flatpak": "Flatpak অ্যাপ",
+  "section.origin": "উৎস",
+  "section.picks": "LordOS-এর বাছাই",
+  "src.debian": "Linux অ্যাপ (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android অ্যাপ",
+  "soon": "শীঘ্রই",
+  "sub.all": "সব"
 }

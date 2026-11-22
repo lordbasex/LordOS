@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { sysPkgKey, snapshotDate } = await import(path.join(here, '../../apps/store/syspkg.js'));
+const { sysPkgKey, snapshotDate, companionsOf } = await import(path.join(here, '../../apps/store/syspkg.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -34,6 +34,13 @@ for (const lang of ['en', 'es', 'pt', 'fr', 'it']) {
   eq(`${lang} name`, typeof cat['updates.hwdata.name'] === 'string' && cat['updates.hwdata.name'].length > 0, true);
   eq(`${lang} summary has {date}`, /\{date\}/.test(cat['updates.hwdata.summary'] || ''), true);
 }
+
+// OBS Studio from Debian brings its plugins and Qt's Wayland plugin; nothing else brings anything
+eq('obs-studio companions', JSON.stringify(companionsOf('obs-studio')), JSON.stringify(['obs-plugins', 'qt6-wayland']));
+eq('only those the index has', JSON.stringify(companionsOf('obs-studio', (p) => p !== 'qt6-wayland')), JSON.stringify(['obs-plugins']));
+eq('other packages none', JSON.stringify(companionsOf('vlc')), '[]');
+eq('no name none', JSON.stringify(companionsOf(undefined)), '[]');
+eq('not an own property', JSON.stringify(companionsOf('toString')), '[]');
 
 console.log(`store-syspkg-test: ${n - bad}/${n} checks passed`);
 process.exit(bad ? 1 : 0);

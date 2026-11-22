@@ -36,6 +36,8 @@
     "few": "{ms} ms · {count} noduri",
     "other": "{ms} ms · {count} de noduri"
   },
+  "pauses": "Pauze de peste 50 ms",
+  "pausesValue": "{count} (cea mai lungă: {ms} ms)",
   "server": "Server de afișare",
   "systemApp": "Aplicație de sistem",
   "systemReport": "Raport de sistem…",
@@ -44,5 +46,6 @@
   "version": "Versiunea {v}",
   "versionChannel": "Versiunea {v} · {channel}",
   "case": "Carcasă",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Numele și siglele produselor sunt mărci ale proprietarilor lor respectivi; LordOS nu este afiliat cu aceștia și nici susținut de ei. Siglele se descarcă doar la cerere, de pe site-ul fiecărui proprietar, și se afișează pe acest computer."
 }

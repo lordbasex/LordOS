@@ -130,7 +130,7 @@
   },
   "open": "Deschide",
   "page.ai": "Inteligență artificială",
-  "page.webapps": "Aplicații web",
+  "page.webapps": "Aplicații web (PWA)",
   "page.commercial": "Comerciale",
   "page.remote": "Acces la distanță",
   "page.suites": "Aplicații terțe",
@@ -323,5 +323,12 @@
   "multiarch.enabling": "Se activează…",
   "pkg32": "{name} (32 de biți)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Aplicație Flatpak"
+  "kind.flatpak": "Aplicație Flatpak",
+  "section.origin": "Proveniență",
+  "section.picks": "Alese de LordOS",
+  "src.debian": "Aplicații Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Aplicații Android",
+  "soon": "În curând",
+  "sub.all": "Toate"
 }

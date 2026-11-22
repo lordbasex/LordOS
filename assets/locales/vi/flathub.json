@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} đã được cập nhật.",
   "noResults": "Không có ứng dụng Flathub nào khớp.",
   "notSupported": "Flathub chưa có trên máy tính này: hiện chỉ dành cho PC.",
-  "notYet": "Chưa được hỗ trợ",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Gỡ lỗi các chương trình khác",
   "perm.devicesAll": "Mọi thiết bị: camera, tay cầm chơi game, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Chỉ ứng dụng được Flathub xác minh. Đã ẩn: {count}",
   "showAllOn": "Đang hiển thị mọi ứng dụng Flathub, đã xác minh hay chưa",
   "showMore": "Xem thêm (còn {count})",
-  "subsandbox.text": "Ứng dụng này được xây dựng trên Chromium hoặc Electron, mà các tiến trình phụ của chúng cần chia sẻ hộp cát của Flatpak theo cách LordOS chưa cung cấp, nên hiện chưa thể cài ứng dụng này ở đây.",
-  "subsandbox.title": "Chưa được hỗ trợ trên LordOS",
   "subtitle": "Ứng dụng Linux từ Flathub, chạy bên trong không gian giới hạn riêng của LordOS dưới Tường lửa của bạn.",
   "turnOff": "Tắt",
   "unverified": "Chưa được Flathub xác minh: người phát hành có thể không phải nhà phát triển của ứng dụng.",
@@ -110,5 +107,6 @@
   "updates.button": "Cập nhật ứng dụng Flathub",
   "updates.text": "Đã cài từ Flathub: {count}. Flatpak kiểm tra từng ứng dụng và cài những gì đã thay đổi; ứng dụng đang mở sẽ hoàn tất cập nhật khi bạn mở lại.",
   "updates.title": "Ứng dụng Flathub",
-  "verified": "Đã xác minh: phát hành bởi {developer}"
+  "verified": "Đã xác minh: phát hành bởi {developer}",
+  "note.obsVideos": "Trong LordOS, OBS Studio lưu bản ghi vào thư mục Video của bạn: các thư mục khác trong thư mục nhà chỉ đọc đối với ứng dụng Flathub."
 }

@@ -151,8 +151,16 @@
   "vm.imageRemoved": "イメージを削除しました",
   "vm.downloadResumed": "停止したダウンロードを再開しています ({from} バイトは保持)",
   "vm.kvmReady": "許可しました: 仮想マシンでハードウェア仮想化を使用できるようになりました",
+  "vm.bridgeReady": "ブリッジネットワークの準備ができました（{name}）",
+  "vm.bridgeGone": "ブリッジネットワークを削除しました",
   "vm.kvmNextLogin": "次回のログインから許可されます",
   "pkg.foreignArchAdded": "32 ビット ({arch}) パッケージを有効にしました",
   "pkg.foreignArchPresent": "32 ビット ({arch}) パッケージはすでに有効です",
-  "pkg.why.multiarchPair": "{name} と同じバージョン"
+  "pkg.why.multiarchPair": "{name} と同じバージョン",
+  "gpu.roleSet": "グラフィックカードの用途を保存しました（{card}）：適用するには再起動してください",
+  "vm.gvtReady": "グラフィックカードの割り当てが準備できました（{name}）",
+  "vm.gvtGone": "グラフィックカードの割り当てを削除しました",
+  "gpu.freqSet": "グラフィックカードの最低周波数を設定しました",
+  "gpu.memlockSet": "マシンがロックできるメモリを保存しました",
+  "vm.memlockSet": "マシンのメモリをロックしました"
 }

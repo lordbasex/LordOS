@@ -27,12 +27,14 @@ struct MAudio {
     uint64_t pos;                   /* own cursor: write (recording) or read (playback) */
     LmPulse pa;
     int started, want_play;
+    int lat_ms;                     /* playback's target buffer (maudio_latency), 0 the default */
     double volume;
     int volume_sent;
     uint32_t serial_seen;
     int64_t delta;                  /* ring byte = stream byte + delta */
+    int tries;                      /* connections that failed in a row (maudio_retry): only the first is logged */
     double flush_ms, last_lat_req, last_lat_at;
-    char app[64], title[128], role[16], source[256];
+    char app[64], title[128], role[16], source[256], sink[256];   /* source, sink: "" the default (maudio_target) */
 };
 
 static double now_ms(void) {
@@ -71,15 +73,20 @@ static int start(MAudio *a) {
     a->started = 1;
     int fd = media_pulse_fd();
     if (fd < 0 || lmp_connect(&a->pa, fd, a->app, "org.lordos.Media")) {
-        fprintf(stderr, "media: no PipeWire to %s\n", a->rec ? "record" : "play");
+        if (!a->tries++) fprintf(stderr, "media: no PipeWire to %s\n", a->rec ? "record" : "play");
         a->pa.failed = 1;
         return -1;
     }
+    if (a->tries) fprintf(stderr, "media: PipeWire is there now (%s, after %d tries)\n", a->rec ? "record" : "play", a->tries);
+    a->tries = 0;
     if (a->rec) {
         lmp_record(&a->pa, a->source, AR_RATE, 1, a->title);
         a->pa.on_record = on_mic;
         a->pa.ud = a;
-    } else lmp_playback(&a->pa, AR_RATE, 2, a->title, a->role);
+    } else {
+        lmp_playback(&a->pa, AR_RATE, 2, a->title, a->role, a->sink);
+        a->pa.tlength_ms = a->lat_ms;
+    }
     return 0;
 }
 
@@ -185,6 +192,48 @@ void maudio_volume(MAudio *a, double v) {
     maudio_service(a);
 }
 
+void maudio_latency(MAudio *a, int ms) { if (a && !a->rec && !a->started) a->lat_ms = ms; }
+uint64_t maudio_bytes(const MAudio *a) { return a ? a->pos : 0; }
+int maudio_ring_fd(const MAudio *a) { return a ? a->ring_fd : -1; }
 int maudio_overruns(const MAudio *a) { return a && a->ring ? (int)atomic_load(&a->ring->overruns) : 0; }
 void maudio_mic_drain(MAudio *a) { if (a && a->ring && a->rec) atomic_store(&a->ring->rpos, atomic_load(&a->ring->wpos)); }
 int maudio_failed(const MAudio *a) { return !a || a->pa.failed; }
+
+/* A stream whose PipeWire wasn't there (or went away) connects again, with the same ring: whoever writes or reads it
+ * keeps going. Playback drops what waited in the ring meanwhile (it would be heard late) and starts at its next
+ * service; recording starts now. 0 asked again (still failed if PipeWire still isn't there), -1 it wasn't failed. */
+static void reconnect(MAudio *a) {
+    lmp_close(&a->pa);
+    memset(&a->pa, 0, sizeof a->pa);
+    a->pa.fd = -1;
+    a->volume_sent = 0;
+    a->serial_seen = a->ring ? atomic_load(&a->ring->serial) : 0;
+    if (!a->rec && a->ring) {
+        a->pos = atomic_load(&a->ring->wpos);
+        atomic_store(&a->ring->rpos, a->pos);
+        ar_clock_write(a->ring, 0, 0, 0, 0, 0);
+    }
+    a->delta = (int64_t)a->pos;
+    a->started = 0;
+    if (a->rec) start(a);
+}
+
+int maudio_retry(MAudio *a) {
+    if (!a || !a->pa.failed) return -1;
+    reconnect(a);
+    return 0;
+}
+
+/* Where the stream plays (an output's node.name) or records from (an input's), "" or NULL the default one, which then
+ * follows whatever Settings → Sound picks. A stream already connected moves at once: it connects again with the same
+ * ring, as maudio_retry (a new stream asks PipeWire for that device; the old one goes). 1 moved, 0 nothing changed. */
+int maudio_target(MAudio *a, const char *node) {
+    if (!a) return 0;
+    char *cur = a->rec ? a->source : a->sink;
+    const char *want = node ? node : "";
+    if (!strcmp(cur, want) || strlen(want) >= sizeof a->sink) return 0;
+    snprintf(cur, sizeof a->sink, "%s", want);
+    if (!a->started) return 0;                          /* playback not connected yet: it takes it when it starts */
+    reconnect(a);
+    return 1;
+}

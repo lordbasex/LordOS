@@ -42,6 +42,8 @@ int vm_missing_packages(int arches, char *out, size_t n) {
     if (arches && !have("/usr/bin/passt")) add(out, n, &k, "passt");
     /* shared folders (6.7): one virtiofsd per folder, only for machines that share one */
     if (arches && !have("/usr/libexec/virtiofsd")) add(out, n, &k, "virtiofsd");
+    /* Windows 11 machines (4.3): a TPM 2.0 served by swtpm (amd64 for now) */
+    if ((arches & 2) && !have("/usr/bin/swtpm")) add(out, n, &k, "swtpm");
     return k;
 }
 

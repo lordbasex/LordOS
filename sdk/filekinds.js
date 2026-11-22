@@ -95,6 +95,9 @@ export const isTextual = (e) => ['text', 'code'].includes(kindOf(e));
 // A program downloaded as an AppImage (issue #159): not text, so it never opens in TextEdit; an app that declares its
 // type (application/vnd.appimage) may still open it. Files doesn't run programs.
 export const isProgram = (e) => !e.dir && !e.app && extOf(e.name) === 'appimage';
+// a program or installer for another system (nothing here runs it; a machine's guest tools can, "Open with", 7.3)
+export const FOREIGN_PROGRAMS = ['exe', 'msi', 'bat', 'cmd', 'lnk', 'com', 'msix', 'appx'];
+export const isForeignProgram = (e) => !!e && !e.dir && !e.app && FOREIGN_PROGRAMS.includes(extOf(e.name));
 export const isImage = (e) => kindOf(e) === 'image' && !/\.(svg|heic|avif|tiff?|webp)$/i.test(e.name);   // the ones stb_image draws (the rest: lord-media thumbnail)
 
 // The src of a picture shown small (Files' icons and preview): "thumb:<px>:<path>", which lord-server decodes off the

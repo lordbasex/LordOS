@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} düyün",
     "other": "{ms} ms · {count} düyün"
   },
+  "pauses": "50 ms-dən uzun fasilələr",
+  "pausesValue": "{count} (ən uzunu: {ms} ms)",
   "server": "Ekran serveri",
   "systemApp": "Sistem tətbiqi",
   "systemReport": "Sistem hesabatı…",
@@ -42,5 +44,6 @@
   "version": "Versiya {v}",
   "versionChannel": "Versiya {v} · {channel}",
   "case": "Korpus",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Məhsul adları və loqoları müvafiq sahiblərinin ticarət nişanlarıdır; LordOS onlarla əlaqəli deyil və onlar tərəfindən təsdiqlənməyib. Loqolar yalnız istək üzrə, hər sahibin saytından endirilir və bu kompüterdə göstərilir."
 }

@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} està al dia.",
   "noResults": "Cap aplicació de Flathub no coincideix.",
   "notSupported": "Flathub encara no està disponible en aquest ordinador: de moment només és per a PC.",
-  "notYet": "Encara no compatible",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Depurar altres programes",
   "perm.devicesAll": "Tots els dispositius: càmeres, comandaments de joc, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Només aplicacions verificades per Flathub. Ocultes: {count}",
   "showAllOn": "Es mostren totes les aplicacions de Flathub, verificades o no",
   "showMore": "Mostra’n més (en queden: {count})",
-  "subsandbox.text": "Aquesta aplicació està feta amb Chromium o Electron, els ajudants dels quals necessiten compartir els entorns aïllats de Flatpak d’una manera que LordOS encara no ofereix, així que de moment no s’hi pot instal·lar.",
-  "subsandbox.title": "Encara no compatible amb LordOS",
   "subtitle": "Aplicacions de Linux de Flathub, que s’executen dins de l’entorn aïllat de LordOS sota el teu tallafoc.",
   "turnOff": "Desactiva",
   "unverified": "No verificada per Flathub: qui la publica pot no ser el desenvolupador de l’aplicació.",
@@ -110,5 +107,6 @@
   "updates.button": "Actualitza les aplicacions de Flathub",
   "updates.text": "Instal·lades des de Flathub: {count}. Flatpak revisa cadascuna i instal·la el que ha canviat; una aplicació oberta acaba d’actualitzar-se quan la tornes a obrir.",
   "updates.title": "Aplicacions de Flathub",
-  "verified": "Verificada: publicada per {developer}"
+  "verified": "Verificada: publicada per {developer}",
+  "note.obsVideos": "A LordOS, l’OBS Studio desa els enregistraments a la carpeta Vídeos: les altres carpetes de la teva carpeta personal són només de lectura per a les apps de Flathub."
 }

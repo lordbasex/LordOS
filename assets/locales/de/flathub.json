@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} ist aktuell.",
   "noResults": "Keine App von Flathub passt.",
   "notSupported": "Flathub ist auf diesem Computer noch nicht verfügbar: Vorerst gibt es das nur für PCs.",
-  "notYet": "Noch nicht unterstützt",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Andere Programme debuggen",
   "perm.devicesAll": "Alle Geräte: Kameras, Gamecontroller, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Nur von Flathub geprüfte Apps. Ausgeblendet: {count}",
   "showAllOn": "Alle Apps von Flathub werden angezeigt, geprüft oder nicht",
   "showMore": "Mehr anzeigen (übrig: {count})",
-  "subsandbox.text": "Diese App basiert auf Chromium oder Electron, deren Hilfsprozesse die abgeschotteten Umgebungen von Flatpak auf eine Weise teilen müssen, die LordOS noch nicht anbietet, daher lässt sie sich hier vorerst nicht installieren.",
-  "subsandbox.title": "Unter LordOS noch nicht unterstützt",
   "subtitle": "Linux-Apps von Flathub, ausgeführt in der abgeschotteten Umgebung von LordOS unter deiner Firewall.",
   "turnOff": "Ausschalten",
   "unverified": "Nicht von Flathub geprüft: Der Herausgeber ist vielleicht nicht der Entwickler der App.",
@@ -110,5 +107,6 @@
   "updates.button": "Apps von Flathub aktualisieren",
   "updates.text": "Von Flathub installiert: {count}. Flatpak prüft jede und installiert, was sich geändert hat; eine geöffnete App wird fertig aktualisiert, wenn du sie erneut öffnest.",
   "updates.title": "Apps von Flathub",
-  "verified": "Geprüft: veröffentlicht von {developer}"
+  "verified": "Geprüft: veröffentlicht von {developer}",
+  "note.obsVideos": "In LordOS speichert OBS Studio Aufnahmen in deinem Ordner „Videos“: Die anderen Ordner deines persönlichen Ordners sind für Flathub-Apps schreibgeschützt."
 }

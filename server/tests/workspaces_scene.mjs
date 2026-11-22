@@ -786,4 +786,68 @@ check('idle again: still no timer every second', intervals(1000), 0);
   await flush();
 }
 
+// (0.8.9.5) the apps of each display (sdk/displayapps.js): an empty activity's card shows the display's quick launch and,
+// once, its usual apps as a suggestion; nothing opens until it is accepted, then the apps open there in their usual
+// tiles; "Don't suggest on this display" is kept for that display only
+{
+  const visibleNode = (id) => { for (let n = id; n; n = parents.get(n)) if (styles.get(n)?.display === 'none') return false; return attached(id); };
+  const textOn = (D, v) => [...texts].some(([id, x]) => {
+    if (x !== v || !visibleNode(id)) return false;
+    for (let n = parents.get(id); n; n = parents.get(n)) { const st = styles.get(n); if (st?.position === 'absolute' && st.left >= D.x && st.left < D.x + D.w) return true; }
+    return false;
+  });
+  const now = Date.now();
+  sdk.settings.set({ displayApps: { v: 1, displays: {
+    'DP-1': { apps: [{ id: 'calculator', n: 4, t: now }, { id: 'terminal', n: 2, t: now }], sets: [{ apps: ['extra10', 'extra11'], layout: 'halves', ratio: 0.5, n: 3, t: now }] },
+    'HDMI-A-1': { apps: [{ id: 'store', n: 1, t: now }], sets: [{ apps: ['store'], n: 1, t: now }] },
+  } } });
+  const nd2 = state.newActivity();
+  await flush();
+  const usualT = sdk.t('shell.ws.usual.title'), quickT = sdk.t('shell.ws.quick.title');
+  check('display apps: no suggestion before the moment with nothing open', textOn(L, usualT), false);
+  await new Promise((res) => setTimeout(res, 1300));
+  await flush();
+  const opened = sdk.windows.get().length;
+  check('display apps: the left display suggests its usual apps', textOn(L, usualT), true);
+  check('display apps: a set seen once is no suggestion (right display)', textOn(R, usualT), false);
+  check('display apps: each display its own quick launch', [textOn(L, quickT), textOn(R, quickT), textOn(M, quickT)], [true, true, false]);
+  check('display apps: the quick launch keeps Add window', textOn(L, sdk.t('shell.ws.layout.add')), true);
+  check('display apps: the card\'s controls in the bars\' keyboard', ['card:DP-1:open', 'card:DP-1:later', 'card:DP-1:never', 'card:DP-1:add', 'card:DP-1:q:calculator'].every((id) => bars.cardBarItems().some((x) => x.id === id)), true);
+  await new Promise((res) => setTimeout(res, 300));
+  await flush();
+  check('display apps: nothing opens by itself', sdk.windows.get().length, opened);
+  // accepted from the keyboard (⌃F2, then Enter on it)
+  bars.enterBars('card:DP-1:open');
+  check('display apps: the keyboard on Open', bars.barFocus.get(), 'card:DP-1:open');
+  bars.barKey({ key: 'Enter' });
+  for (let i = 0; i < 4; i++) await flush();
+  const mine = sdk.windows.get().filter((w) => w.desktop === nd2);
+  const fw = mine.find((w) => w.id.split('#')[0] === 'extra10'), tw = mine.find((w) => w.id.split('#')[0] === 'extra11');
+  check('display apps: accepted, its apps open on that display', [!!fw, !!tw, fw && sdk.displayFor(frameOf(fw.id))?.id, tw && sdk.displayFor(frameOf(tw.id))?.id], [true, true, L.id, L.id]);
+  check('display apps: in its usual layout and order', [tiler.layoutOf(nd2, 'DP-1').layout, fw && tw && frameOf(fw.id).x < frameOf(tw.id).x], ['halves', true]);
+  check('display apps: offered once', [state.offered.get().has(`${nd2}|DP-1`), textOn(L, usualT)], [true, false]);
+  // "Don't suggest on this display": that display, kept in the record
+  const nd3 = state.newActivity();
+  await new Promise((res) => setTimeout(res, 1300));
+  await flush();
+  check('display apps: a new activity suggests again', textOn(L, usualT), true);
+  bars.enterBars('card:DP-1:never');
+  bars.barKey({ key: ' ' });
+  await flush();
+  check('display apps: "Don\'t suggest" kept for that display only', [sdk.settings.get().displayApps.displays['DP-1'].quiet, !!sdk.settings.get().displayApps.displays['HDMI-A-1'].quiet, textOn(L, usualT), textOn(L, quickT)], [true, false, false, true]);
+  // Settings → Clear forgets every display; off records nothing and shows nothing
+  sdk.forgetDisplayApps();
+  await flush();
+  check('display apps: cleared', [sdk.displayAppsStored(sdk.settings.get()), textOn(L, quickT)], [false, false]);
+  sdk.setDisplayAppsOn(false);
+  check('display apps: off', [sdk.displayAppsOn(sdk.settings.get()), sdk.settings.get().displayApps.off], [false, true]);
+  sdk.setDisplayAppsOn(true);
+  for (const w of mine) sdk.wm.close(w.id, true);
+  sdk.switchDesktop(desk);
+  await flush();
+  sdk.removeDesktopById(nd3);
+  sdk.removeDesktopById(nd2);
+  await flush();
+}
+
 process.exit(0);

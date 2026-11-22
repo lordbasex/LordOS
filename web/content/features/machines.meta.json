@@ -1,0 +1,90 @@
+{
+  "slug": "machines",
+  "order": 11,
+  "title": {
+    "en": "Machines",
+    "es": "Máquinas",
+    "pt": "Máquinas"
+  },
+  "tagline": {
+    "en": "Other systems in windows of your desktop, at native speed: Linux since 0.8.8.5, and in development Windows 11, sound, real networks, 3D for Linux and a clipboard that only moves when you paste.",
+    "es": "Otros sistemas en ventanas de tu escritorio, a velocidad nativa: Linux desde la 0.8.8.5, y en desarrollo Windows 11, sonido, redes de verdad, 3D para Linux y un portapapeles que solo se mueve cuando pegás.",
+    "pt": "Outros sistemas em janelas do seu desktop, em velocidade nativa: Linux desde a 0.8.8.5, e em desenvolvimento Windows 11, som, redes de verdade, 3D para Linux e uma área de transferência que só se move quando você cola."
+  },
+  "lumo": {
+    "pose": "three-quarter",
+    "intro": {
+      "en": "I keep every machine in a room of its own. What you copy here goes in only when something there pastes, and what it copies comes out only while you are using it.",
+      "es": "Guardo cada máquina en un cuarto propio. Lo que copiás acá entra solo cuando algo ahí pega, y lo que ella copia sale solo mientras la estás usando.",
+      "pt": "Eu guardo cada máquina num quarto próprio. O que você copia aqui entra só quando algo lá cola, e o que ela copia sai só enquanto você a está usando."
+    }
+  },
+  "screenshots": [
+    {
+      "file": "docs/screenshots/machines.png",
+      "caption": {
+        "en": "The New Machine assistant as released in 0.8.9.4: download cards for Linux systems, your own ISO, a migration from another app or a disk image. The Windows 11 card and the new look are in development.",
+        "es": "El asistente Nueva máquina tal como salió en la 0.8.9.4: tarjetas de descarga de sistemas Linux, tu propia ISO, una migración desde otra app o una imagen de disco. La tarjeta de Windows 11 y el aspecto nuevo están en desarrollo.",
+        "pt": "O assistente Nova máquina como saiu na 0.8.9.4: cartões de download de sistemas Linux, a sua própria ISO, uma migração de outro app ou uma imagem de disco. O cartão do Windows 11 e o visual novo estão em desenvolvimento."
+      }
+    }
+  ],
+  "sources": [
+    {
+      "path": "apps/machines/",
+      "what": {
+        "en": "The Machines app: library, assistant, Configure, apps mode",
+        "es": "La app Máquinas: biblioteca, asistente, Configurar, modo apps",
+        "pt": "O app Máquinas: biblioteca, assistente, Configurar, modo apps"
+      }
+    },
+    {
+      "path": "server/src/vm/lordvm.c",
+      "what": {
+        "en": "lord-vm, the sandboxed supervisor that starts QEMU",
+        "es": "lord-vm, el supervisor aislado que arranca QEMU",
+        "pt": "lord-vm, o supervisor em sandbox que inicia o QEMU"
+      }
+    },
+    {
+      "path": "server/src/vm/vmagent.c",
+      "what": {
+        "en": "The strict parsers for every frame the guest tools send",
+        "es": "Los analizadores estrictos de cada cuadro que mandan las herramientas del invitado",
+        "pt": "Os analisadores estritos de cada quadro que as ferramentas do convidado enviam"
+      }
+    },
+    {
+      "path": "server/src/vm/vmnet_admin.c",
+      "what": {
+        "en": "The two closed admin actions of the bridged network",
+        "es": "Las dos acciones de administrador cerradas de la red en puente",
+        "pt": "As duas ações de administrador fechadas da rede em ponte"
+      }
+    },
+    {
+      "path": "tools/guest-win/lordos-guest-win.c",
+      "what": {
+        "en": "The LordOS tools for Windows",
+        "es": "Las herramientas de LordOS para Windows",
+        "pt": "As ferramentas do LordOS para Windows"
+      }
+    },
+    {
+      "path": "docs/VIRTUALIZATION.md",
+      "what": {
+        "en": "The full design, its status and every measurement",
+        "es": "El diseño completo, su estado y cada medición",
+        "pt": "O projeto completo, o estado e cada medição"
+      }
+    },
+    {
+      "path": "docs/MACHINES-GPU.md",
+      "what": {
+        "en": "The smoother picture: causes, fixes and numbers",
+        "es": "La imagen más fluida: causas, arreglos y números",
+        "pt": "A imagem mais fluida: causas, correções e números"
+      }
+    }
+  ]
+}

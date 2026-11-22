@@ -31,12 +31,14 @@ void gpu_info(GpuInfo *i) { *i = (GpuInfo){ .why = "not-built", .renderer = "", 
 int  gpu_formats(GpuFormat *out, int max) { (void)out; (void)max; return 0; }
 int  gpu_device(dev_t *dev) { (void)dev; return -1; }
 GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque) { (void)t; (void)px; (void)w; (void)h; (void)opaque; return NULL; }
+GpuTex *gpu_tex_pixels_rect(GpuTex *t, const uint32_t *px, int w, int h, int opaque, Rect r) { (void)t; (void)px; (void)w; (void)h; (void)opaque; (void)r; return NULL; }
 GpuTex *gpu_tex_dmabuf(const GpuDmabuf *d) { (void)d; return NULL; }
 void gpu_tex_free(GpuTex *t) { (void)t; }
 int  gpu_tex_current(const GpuTex *t) { (void)t; return 0; }
 unsigned gpu_generation(void) { return 0; }
 void gpu_set_hooks(void (*lost)(void), void (*changed)(void)) { (void)lost; (void)changed; }
 int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) { (void)t; (void)px; (void)w; (void)h; return -1; }
+int  gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) { (void)t; (void)px; (void)y; (void)h; (void)flip; return -1; }
 int  gpu_add_output(Kms *k) { (void)k; return -1; }
 int  gpu_frame(int out, const Canvas *s, Rect d, void (*f)(int)) { (void)out; (void)s; (void)d; (void)f; return -1; }
 int  gpu_gdrag_ready(int out) { (void)out; return 0; }
@@ -58,6 +60,9 @@ void gpu_fence_on(int on) { (void)on; }
 int  gpu_fence_time(int out, uint64_t *ns) { (void)out; *ns = 0; return 0; }
 void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh, Rect c, float o) {
     (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy; (void)sw; (void)sh; (void)c; (void)o;
+}
+void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float uv[8], Rect c, float o) {
+    (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)uv; (void)c; (void)o;
 }
 int  gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) { (void)d; (void)done; (void)data; return -1; }
 int  gpu_can_scanout(const GpuDmabuf *d, int w, int h) { (void)d; (void)w; (void)h; return 0; }
@@ -687,6 +692,24 @@ GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque) 
     return t;
 }
 
+static long upload_rect(const uint32_t *px, int stride, int sw, int texw, Rect r);
+
+/* A Linux app's damage (wl.c): only r is sent to a live texture of the same size; anything else is a whole upload. */
+GpuTex *gpu_tex_pixels_rect(GpuTex *t, const uint32_t *px, int w, int h, int opaque, Rect r) {
+    if (!G.on || !px || w <= 0 || h <= 0) return t;
+    if (r.x0 < 0) r.x0 = 0;
+    if (r.y0 < 0) r.y0 = 0;
+    if (r.x1 > w) r.x1 = w;
+    if (r.y1 > h) r.y1 = h;
+    if (!t || t->external || t->gen != G.gen || t->w != w || t->h != h || (r.x0 == 0 && r.y0 == 0 && r.x1 == w && r.y1 == h))
+        return gpu_tex_pixels(t, px, w, h, opaque);
+    if (r.x1 <= r.x0 || r.y1 <= r.y0) { t->opaque = opaque; return t; }
+    glBindTexture(GL_TEXTURE_2D, t->id);
+    upload_rect(px, w, w, t->w, r);
+    t->opaque = opaque;
+    return t;
+}
+
 static EGLImageKHR import_image(const GpuDmabuf *d, int with_mod);
 
 GpuTex *gpu_tex_dmabuf(const GpuDmabuf *d) {
@@ -794,10 +817,77 @@ int gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h) {
     return ok ? 0 : -1;
 }
 
+/* gpu_tex_read_rows' framebuffer: kept between calls, made again for another size or context */
+static struct { GLuint tex, fbo; int w, h; unsigned gen; } vrb;
+
+int gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) {
+    if (!gpu_tex_current(t) || !px || t->w <= 0 || t->h <= 0 || t->w > 8192 || t->h > 8192 || y < 0 || h <= 0 || y + h > t->h) return -1;
+    if (eglGetCurrentContext() != G.ctx) {
+        int ok = 0;
+        for (int i = 0; i < OUT_MAX && !ok; i++) if (G.out[i].used && eglMakeCurrent(G.dpy, G.out[i].surf, G.out[i].surf, G.ctx)) ok = 1;
+        if (!ok) return -1;
+    }
+    while (glGetError() != GL_NO_ERROR) {}
+    if (vrb.fbo && (vrb.w != t->w || vrb.h != t->h || vrb.gen != G.gen)) {
+        if (vrb.gen == G.gen) { glDeleteFramebuffers(1, &vrb.fbo); glDeleteTextures(1, &vrb.tex); }
+        vrb.fbo = vrb.tex = 0;
+    }
+    if (!vrb.fbo) {
+        glGenTextures(1, &vrb.tex);
+        glBindTexture(GL_TEXTURE_2D, vrb.tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, t->w, t->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glGenFramebuffers(1, &vrb.fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, vrb.fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, vrb.tex, 0);
+        vrb.w = t->w; vrb.h = t->h; vrb.gen = G.gen;
+    } else glBindFramebuffer(GL_FRAMEBUFFER, vrb.fbo);
+    int ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    if (ok) {
+        glViewport(0, 0, t->w, t->h);
+        glDisable(GL_BLEND);
+        glDisable(GL_SCISSOR_TEST);
+        int p = t->external ? 1 : 0;
+        glUseProgram(G.prog[p]);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(t->external ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D, t->id);
+        glUniform1i(G.u_tex[p], 0);
+        glUniform1f(G.u_op[p], 1.0f);
+        glUniform1f(G.u_opaque[p], 1.0f);
+        glUniform1f(G.u_swap[p], t->swap ? 1.0f : 0.0f);
+        /* the picture's first row at y = -1: glReadPixels returns it first */
+        GLfloat t0 = flip ? 1.0f : 0.0f, t1 = flip ? 0.0f : 1.0f;
+        const GLfloat v[] = { -1, -1, 0, t0,  1, -1, 1, t0,  -1, 1, 0, t1,  1, 1, 1, t1 };
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        uint8_t *rows = px + (size_t)y * (size_t)t->w * 4;
+        glReadPixels(0, y, t->w, h, GL_RGBA, GL_UNSIGNED_BYTE, rows);
+        ok = glGetError() == GL_NO_ERROR;
+        for (size_t i = 0, n = (size_t)t->w * (size_t)h; ok && i < n; i++) {    /* R, G, B, A → B, G, R, X */
+            uint8_t r = rows[i * 4];
+            rows[i * 4] = rows[i * 4 + 2];
+            rows[i * 4 + 2] = r;
+            rows[i * 4 + 3] = 255;
+        }
+        glEnable(GL_BLEND);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    return ok ? 0 : -1;
+}
+
 /* ---- drawing ---- */
 
 void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh, Rect clip, float op) {
-    if (!G.on || !G.cur || !t || t->gen != G.gen || dw <= 0 || dh <= 0 || op <= 0.004f) return;
+    const float uv[8] = { sx, sy, sx + sw, sy, sx, sy + sh, sx + sw, sy + sh };
+    gpu_draw_uv(t, dx, dy, dw, dh, uv, clip, op);
+}
+
+void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float uv[8], Rect clip, float op) {
+    if (!G.on || !G.cur || !t || t->gen != G.gen || dw <= 0 || dh <= 0 || op <= 0.004f || t->w <= 0 || t->h <= 0) return;
     const int W = G.cur->W, H = G.cur->H;           /* the display being drawn */
     if (clip.x0 < 0) clip.x0 = 0;
     if (clip.y0 < 0) clip.y0 = 0;
@@ -816,8 +906,9 @@ void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float
     glScissor(clip.x0, H - clip.y1, clip.x1 - clip.x0, clip.y1 - clip.y0);
     float x0 = dx / W * 2 - 1, x1 = (dx + dw) / W * 2 - 1;
     float y0 = 1 - dy / H * 2, y1 = 1 - (dy + dh) / H * 2;
-    float u0 = sx / t->w, u1 = (sx + sw) / t->w, v0 = sy / t->h, v1 = (sy + sh) / t->h;
-    const GLfloat v[] = { x0, y0, u0, v0,  x1, y0, u1, v0,  x0, y1, u0, v1,  x1, y1, u1, v1 };
+    const float tw = (float)t->w, th = (float)t->h;
+    const GLfloat v[] = { x0, y0, uv[0] / tw, uv[1] / th,  x1, y0, uv[2] / tw, uv[3] / th,
+                          x0, y1, uv[4] / tw, uv[5] / th,  x1, y1, uv[6] / tw, uv[7] / th };
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
     glEnableVertexAttribArray(0);

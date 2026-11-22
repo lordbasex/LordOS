@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} är uppdaterad.",
   "noResults": "Ingen Flathub-app matchar.",
   "notSupported": "Flathub är inte tillgängligt på den här datorn än: för tillfället är det bara för PC.",
-  "notYet": "Stöds inte än",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Felsöka andra program",
   "perm.devicesAll": "Alla enheter: kameror, spelkontroller, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Bara appar som verifierats av Flathub. Dolda: {count}",
   "showAllOn": "Visar alla Flathub-appar, verifierade eller inte",
   "showMore": "Visa fler (kvar: {count})",
-  "subsandbox.text": "Den här appen bygger på Chromium eller Electron, vars hjälpprogram behöver dela Flatpaks sandlådor på ett sätt som LordOS inte erbjuder än, så den kan inte installeras här för tillfället.",
-  "subsandbox.title": "Stöds inte på LordOS än",
   "subtitle": "Linux-appar från Flathub, körda i LordOS egen isolerade miljö under din Brandvägg.",
   "turnOff": "Stäng av",
   "unverified": "Inte verifierad av Flathub: utgivaren kanske inte är appens utvecklare.",
@@ -110,5 +107,6 @@
   "updates.button": "Uppdatera Flathub-appar",
   "updates.text": "Installerade från Flathub: {count}. Flatpak kontrollerar var och en och installerar det som har ändrats; en öppen app blir färdiguppdaterad när du öppnar den igen.",
   "updates.title": "Flathub-appar",
-  "verified": "Verifierad: publicerad av {developer}"
+  "verified": "Verifierad: publicerad av {developer}",
+  "note.obsVideos": "I LordOS sparar OBS Studio inspelningar i mappen Filmer: hemmappens andra mappar är skrivskyddade för appar från Flathub."
 }

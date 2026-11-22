@@ -45,6 +45,8 @@ int  gpu_device(dev_t *dev);
 
 /* Textures: from premultiplied ARGB pixels (shm) or from a dmabuf (EGLImage). */
 GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque);
+/* Only the rect r of px changed: uploaded alone into the live texture of the same size (else all of px, as above). */
+GpuTex *gpu_tex_pixels_rect(GpuTex *t, const uint32_t *px, int w, int h, int opaque, Rect r);
 GpuTex *gpu_tex_dmabuf(const GpuDmabuf *d);
 void    gpu_tex_free(GpuTex *t);
 
@@ -61,6 +63,11 @@ void gpu_set_hooks(void (*lost)(void), void (*changed)(void));
 /* Reads a texture back as premultiplied ARGB pixels (t->w × t->h, rows top to bottom), for the
  * last good frame of a dmabuf window when the GPU goes away. 0 on success. */
 int  gpu_tex_read(const GpuTex *t, uint32_t *px, int w, int h);
+/* Rows [y, y + h) of a texture into px, the texture's own size (t->w × t->h, rows top to bottom), as the B, G, R, X
+ * bytes of x8r8g8b8 (alpha 255), through a framebuffer kept between calls; flip: the texture's first row is the
+ * picture's bottom. For Machines' 3D pictures (js_vm.c, a dmabuf QEMU draws into). 0 on success; -1 without a GPU
+ * context, a stale texture or a GL error. Never waits on anything but the GPU's own work on that texture. */
+int  gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip);
 
 /* One frame: what changed in the UI canvas is uploaded, the layers are drawn and the flip is done.
  * draw_layer(0) = app windows (below the UI), draw_layer(1) = app menus and
@@ -136,6 +143,9 @@ void gpu_gdrag_stats(long *below_px, long *layer_px, long *quads);
 int  gpu_add_output(Kms *k);
 void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh,
               float sx, float sy, float sw, float sh, Rect clip, float opacity);
+/* The same with each corner's texture point given (texture pixels: top-left, top-right, bottom-left, bottom-right as x, y
+ * pairs): a turned or flipped buffer (wl_surface.set_buffer_transform) drawn upright. */
+void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float uv[8], Rect clip, float opacity);
 
 /* The remote desktop's copy of the next composed frame (docs/REMOTE.md, "Video (WebRTC)"): the
  * next gpu_frame of a w×h display reads the whole frame back into px (0xAARRGGBB, rows top to

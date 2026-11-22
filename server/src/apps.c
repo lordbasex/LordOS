@@ -43,6 +43,9 @@
 #include "wl/xdgact.h"
 #include "term/termapp.h"
 #include "fpak.h"
+#include "fpspawner.h"
+#include "fplend.h"
+#include "sec/pathcanon.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -54,6 +57,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -500,6 +504,7 @@ static int open_log(const char *id, const char *action, const char *file) {
 typedef struct {
     SandboxFilesCfg cfg;
     char home[PATH_MAX], runtime[PATH_MAX], wayland[64], opened[PATH_MAX], cwd[PATH_MAX], x11[32], xauth[64];
+    char share[2][PATH_MAX], share_dst[2][FPAK_ID_MAX + 16], lend_dir[FPAK_ID_MAX + 16];   /* a Flatpak app's (flatpak_share) */
     char buf[2 * SANDBOX_FILES_MAX][PATH_MAX];
     int nbuf, nrw, nro;
 } FilesPlan;
@@ -556,6 +561,13 @@ static const char *const sensitive[] = { "/.ssh", "/.gnupg", "/.config/systemd",
                                          "/.local/bin", "/bin", "/.config/autostart", "/.local/share/applications",
                                          "/.config/lordos", "/.local/share/lordos", "/.config/fish", "/.bin",
                                          "/.local/share/flatpak", "/.config/dbus-1", NULL };
+/* What a Flatpak app is never lent writable, as a folder or as a save (fplend.c), besides those: credential stores and
+ * browser and mail profiles (Claude Security F5, 2026-11-22). Not in sensitive[]: an isolated Firefox keeps ~/.mozilla
+ * as its own data folder. */
+static const char *const lend_sensitive[] = { "/.aws", "/.kube", "/.password-store", "/.local/share/keyrings", "/.docker",
+                                              "/.netrc", "/.pki", "/.mozilla", "/.thunderbird", "/.config/google-chrome",
+                                              "/.config/chromium", "/.config/BraveSoftware", "/.config/microsoft-edge",
+                                              "/.var/app", NULL };
 
 static int path_under(const char *path, const char *dir) {
     size_t n = strlen(dir);
@@ -581,6 +593,20 @@ static int grant_ok(const char *path) {
     for (int i = 0; startup[i]; i++) if (!strcmp(base, startup[i])) return 0;
     struct stat st;
     if (!lstat(path, &st) && S_ISREG(st.st_mode) && st.st_nlink > 1) return 0;   /* maybe another name of one of those */
+    return 1;
+}
+
+/* fplend.h. grant_ok compares strings, so only a canonical path (no "/./", "//", "..", or '/' at the end): any other
+ * spelling of a sensitive folder would match none of the entries (Claude Security F1/F2, 2026-11-22). */
+int apps_grant_ok(const char *path) {
+    if (!path_canonical(path) || !grant_ok(path)) return 0;
+    const char *h = getenv("HOME");
+    char home[PATH_MAX], full[PATH_MAX + 64];
+    if (!h || !realpath(h, home)) return 0;
+    for (int i = 0; lend_sensitive[i]; i++) {
+        snprintf(full, sizeof full, "%s%s", home, lend_sensitive[i]);
+        if (path_under(path, full) || path_under(full, path)) return 0;
+    }
     return 1;
 }
 
@@ -1013,6 +1039,42 @@ static void flatpak_x11(FilesPlan *p) {
     }
 }
 
+/* A folder of ours in the runtime folder: made if missing, then only if it is a real folder (no link), the user's, and
+ * nobody else's to read (0700). 0 ok. */
+static int own_rt_dir(const char *path) {
+    mkdir(path, 0700);
+    struct stat st;
+    return !lstat(path, &st) && S_ISDIR(st.st_mode) && st.st_uid == getuid() && !(st.st_mode & 077) ? 0 : -1;
+}
+
+/* The runtime folders every view of this app shares (docs/FLATPAK.md, "Shared runtime folders"; approved by the
+ * maintainer 2026-11-22): $XDG_RUNTIME_DIR/lordos/fpshare/<id>.<restrictions>/{flatpak,app}, bound in the view at
+ * .flatpak/<id> (Flatpak's per-app /tmp) and app/<id> (the app's $XDG_RUNTIME_DIR), so a second launch reaches the first
+ * instance's single-instance socket and lock. Only views of the same app id, the same user and the same restrictions
+ * share them (a restriction added later never shares a folder with an instance started without it). lend: the folder
+ * lent files appear in (fplend.h), inside app/<id>. Nothing is shared when a folder can't be made as it must be. */
+static void flatpak_share(FilesPlan *p, const char *id, uint32_t restricted, int lend) {
+    char base[PATH_MAX], sub[PATH_MAX];
+    if (snprintf(base, sizeof base, "%s/lordos", p->runtime) >= (int)sizeof base || own_rt_dir(base)) return;
+    strcat(base, "/fpshare");
+    if (own_rt_dir(base) || snprintf(sub, sizeof sub, "%s/%s.%x", base, id, (unsigned)restricted) >= (int)sizeof sub ||
+        own_rt_dir(sub))
+        return;
+    static const char *const part[2] = { "flatpak", "app" };
+    static const char *const dst[2] = { ".flatpak/%s", "app/%s" };
+    for (int i = 0; i < 2; i++)
+        if (snprintf(p->share[i], sizeof p->share[i], "%s/%s", sub, part[i]) >= (int)sizeof p->share[i] || own_rt_dir(p->share[i])) return;
+    for (int i = 0; i < 2; i++) {
+        snprintf(p->share_dst[i], sizeof p->share_dst[i], dst[i], id);
+        p->cfg.share_src[i] = p->share[i];
+        p->cfg.share_dst[i] = p->share_dst[i];
+    }
+    if (lend) {
+        snprintf(p->lend_dir, sizeof p->lend_dir, "app/%s/doc", id);
+        p->cfg.lend_dir = p->lend_dir;
+    }
+}
+
 __attribute__((unused))   /* unused off x86-64: phase 1 launches Flatpak apps only there */
 static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *opened) {
     FilesPlan *p = view_plan(NULL);
@@ -1024,6 +1086,7 @@ static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *
         if (n < 7) { p->cfg.sockets[n++] = "bus"; p->cfg.sockets[n] = NULL; }
     }
     if (!dev) flatpak_x11(p);
+    flatpak_share(p, id, restricted, !dev);         /* lending only where the app has the bus (and so the file dialog) */
     if (!(restricted & FW_R_NO_FILES)) {
         /* the real home, read-only: writable only its own ~/.var/app/<id> and the person's folders (Desktop,
          * Documents, Downloads, Music, Pictures, Videos, Public, Templates of ~/.config/user-dirs.dirs) and the opened
@@ -1055,7 +1118,12 @@ static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *
     return p;
 }
 
-static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const char *prog, char *const argv[]);
+static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const char *prog, char *const argv[], int spawner);
+
+static void (*spawn_hook)(int fd, const char *id);
+void apps_set_spawn_hook(void (*hook)(int fd, const char *id)) { spawn_hook = hook; }
+static void (*lend_hook)(int fd, const char *id);
+void apps_set_lend_hook(void (*hook)(int fd, const char *id)) { lend_hook = hook; }
 
 static int launch_flatpak(const char *id, const char *opened) {
     last_error[0] = 0;
@@ -1098,8 +1166,25 @@ static int launch_flatpak(const char *id, const char *opened) {
     const char *tk = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, id);
     if (tk) snprintf(token, sizeof token, "%s", tk);
     int logfd = open_log(id, NULL, opened);
+    /* the app's Spawn helper (fpspawner.h): lord-server keeps one end, the view's helper the other */
+    int sw[2] = { -1, -1 };
+    /* (a device-restricted app has no session bus, so no Spawn to serve) */
+    if (spawn_hook && !(restricted & (FW_R_NO_FILES | FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_USB | FW_R_NO_BLUETOOTH)) &&
+        socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sw))
+        sw[0] = sw[1] = -1;
+    /* lending the chosen file (fplend.h): lord-server keeps one end, the view's PID 1 the other; only with the bus */
+    int ln[2] = { -1, -1 };
+    if (lend_hook && sw[1] >= 0 && plan->cfg.lend_dir && socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, ln))
+        ln[0] = ln[1] = -1;
     pid_t pid = fork();
     if (pid == 0) {
+        if (sw[0] >= 0) close(sw[0]);
+        if (ln[0] >= 0) close(ln[0]);
+        /* everything kept moved out of the way first, then the helper's end at FPSW_FD and PID 1's at FPLEND_FD (kept
+         * through the exec of --launch-view, the only fds besides LV_FD) */
+        if (logfd >= 0 && logfd <= FPLEND_FD) logfd = fcntl(logfd, F_DUPFD_CLOEXEC, 16);
+        int s1 = sw[1] >= 0 ? fcntl(sw[1], F_DUPFD_CLOEXEC, 16) : -1, l1 = ln[1] >= 0 ? fcntl(ln[1], F_DUPFD_CLOEXEC, 16) : -1;
+        if ((sw[1] >= 0 && (s1 < 0 || dup2(s1, FPSW_FD) < 0)) || (ln[1] >= 0 && (l1 < 0 || dup2(l1, FPLEND_FD) < 0))) _exit(126);
         setsid();                                   /* its own session: never signals for lord-server's group */
         if (fork() != 0) _exit(0);
         sigset_t none;
@@ -1109,7 +1194,10 @@ static int launch_flatpak(const char *id, const char *opened) {
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); }
         if (logfd >= 0) { dup2(logfd, 1); dup2(logfd, 2); }
-        syscall(SYS_close_range, 3, ~0u, 0);
+        if (sw[1] >= 0) {
+            syscall(SYS_close_range, 3, FPSW_FD - 1, 0);
+            syscall(SYS_close_range, ln[1] >= 0 ? FPLEND_FD + 1 : FPSW_FD + 1, ~0u, 0);
+        } else syscall(SYS_close_range, 3, ~0u, 0);
         const char *home = getenv("HOME");
         if (home && chdir(home)) {}
         /* its root-owned scope (not app_scope_reserved: "fp-" is reserved for this path alone) */
@@ -1124,7 +1212,9 @@ static int launch_flatpak(const char *id, const char *opened) {
         if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
         /* the view, then Landlock's scoping only (its file rules would forbid the mounts bubblewrap makes), in a clean
          * process image (apps_launch_view_main): never returns on success */
-        apps_view_exec(&plan->cfg, 0, FPAK_FLATPAK, argv);
+        if (ln[1] < 0) plan->cfg.lend_dir = NULL;
+        else plan->cfg.lend_sock = FPLEND_FD;
+        apps_view_exec(&plan->cfg, 0, FPAK_FLATPAK, argv, sw[1] >= 0);
         static const char msg[] = "apps: could not build the Flatpak app's view: not launched\n";
         if (write(2, msg, sizeof msg - 1) < 0) {}
         _exit(126);
@@ -1132,7 +1222,11 @@ static int launch_flatpak(const char *id, const char *opened) {
     if (logfd >= 0) close(logfd);
     free(plan);
     free(buf);
-    if (pid < 0) return -1;
+    if (sw[1] >= 0) close(sw[1]);
+    if (ln[1] >= 0) close(ln[1]);
+    if (pid < 0) { if (sw[0] >= 0) close(sw[0]); if (ln[0] >= 0) close(ln[0]); return -1; }
+    if (sw[0] >= 0) spawn_hook(sw[0], id);          /* it owns the fd now */
+    if (ln[0] >= 0) lend_hook(ln[0], id);           /* fplend owns it now */
     waitpid(pid, NULL, 0);
     return 0;
 #endif
@@ -1344,7 +1438,7 @@ static int lv_put(int fd, const char *k, const char *v) {
 }
 
 /* In the launcher's child, after its scope and environment: never returns on success. */
-static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const char *prog, char *const argv[]) {
+static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const char *prog, char *const argv[], int spawner) {
     int fd = memfd_create("lordos-launch-view", MFD_ALLOW_SEALING);
     if (fd < 0) return;
     char num[32];
@@ -1357,12 +1451,32 @@ static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const cha
     bad = bad || lv_put(fd, "odev", num);
     snprintf(num, sizeof num, "%llu", cfg->opened_ino);
     bad = bad || lv_put(fd, "oino", num) || lv_put(fd, "keephome", cfg->keep_home ? "1" : "0") ||
-          lv_put(fd, "homero", cfg->home_ro ? "1" : "0") || lv_put(fd, "rules", file_rules ? "files" : "scope");
+          lv_put(fd, "homero", cfg->home_ro ? "1" : "0") || lv_put(fd, "rules", file_rules ? "files" : "scope") ||
+          (spawner && lv_put(fd, "spawner", "1"));
+    for (int i = 0; !bad && i < 2; i++)
+        if (cfg->share_src[i] && cfg->share_dst[i]) bad = lv_put(fd, "sharesrc", cfg->share_src[i]) || lv_put(fd, "sharedst", cfg->share_dst[i]);
+    if (!bad && cfg->lend_sock == FPLEND_FD && cfg->lend_dir) bad = lv_put(fd, "lenddir", cfg->lend_dir);
     for (int i = 0; !bad && argv[i]; i++) bad = lv_put(fd, "arg", argv[i]);
     if (bad || fcntl(fd, F_ADD_SEALS, F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL) || lseek(fd, 0, SEEK_SET)) { close(fd); return; }
     if (fd != LV_FD) { if (dup2(fd, LV_FD) < 0) { close(fd); return; } close(fd); }
     static char *const self[] = { "lord-server", "--launch-view", NULL };
     execve("/proc/self/exe", self, environ);
+}
+
+/* ".flatpak/<id>" or "app/<id>" (flatpak_share) */
+static int share_dst_ok(const char *v) {
+    if (!strncmp(v, ".flatpak/", 9)) return fpak_id_ok(v + 9);
+    return !strncmp(v, "app/", 4) && fpak_id_ok(v + 4);
+}
+
+/* "app/<id>/doc" (flatpak_share) */
+static int lend_dir_ok(const char *v) {
+    char id[FPAK_ID_MAX + 2];
+    size_t n = strlen(v);
+    if (n < 9 || strncmp(v, "app/", 4) || strcmp(v + n - 4, "/doc") || n - 8 > FPAK_ID_MAX) return 0;
+    memcpy(id, v + 4, n - 8);
+    id[n - 8] = 0;
+    return fpak_id_ok(id);
 }
 
 int apps_launch_view_main(void) {
@@ -1380,6 +1494,7 @@ int apps_launch_view_main(void) {
     SandboxFilesCfg cfg;
     memset(&cfg, 0, sizeof cfg);
     const char *prog = NULL, *rules = NULL;
+    int spawner = 0, nss = 0, nsd = 0;
     char *args[MAX_ARGS + 1];
     int na = 0, nrw = 0, nro = 0, ns = 0, bad = 0;
     for (char *p = buf; p < buf + got && !bad;) {
@@ -1402,14 +1517,38 @@ int apps_launch_view_main(void) {
         else if (!strcmp(k, "ro")) { if (nro < SANDBOX_FILES_MAX) cfg.ro[nro++] = v; else bad = 1; }
         else if (!strcmp(k, "sock")) { if (ns < 7) cfg.sockets[ns++] = v; else bad = 1; }
         else if (!strcmp(k, "arg")) { if (na < MAX_ARGS) args[na++] = v; else bad = 1; }
+        else if (!strcmp(k, "spawner")) spawner = !strcmp(v, "1");
+        else if (!strcmp(k, "sharesrc")) { if (nss < 2) cfg.share_src[nss++] = v; else bad = 1; }
+        else if (!strcmp(k, "sharedst")) { if (nsd < 2 && share_dst_ok(v)) cfg.share_dst[nsd++] = v; else bad = 1; }
+        else if (!strcmp(k, "lenddir")) { if (lend_dir_ok(v)) cfg.lend_dir = v; else bad = 1; }
         else bad = 1;
     }
+    if (nss != nsd) bad = 1;
+    /* lending: only with the folder named and a socket at FPLEND_FD (PID 1 keeps it, the app never sees it); else closed */
+    struct stat lst;
+    if (cfg.lend_dir && !fstat(FPLEND_FD, &lst) && S_ISSOCK(lst.st_mode)) { cfg.lend_sock = FPLEND_FD; fcntl(FPLEND_FD, F_SETFD, FD_CLOEXEC); }
+    else { cfg.lend_dir = NULL; close(FPLEND_FD); }
     args[na] = NULL;
+    /* a Flatpak app's Spawn helper: only on the scope rules (never with file rules: bubblewrap couldn't mount), and only
+     * a socket at FPSW_FD; anything else there is closed */
+    struct stat sst;
+    if (spawner && (!rules || strcmp(rules, "scope") || fstat(FPSW_FD, &sst) || !S_ISSOCK(sst.st_mode))) bad = 1;
+    if (!spawner) close(FPSW_FD);
+    else fcntl(FPSW_FD, F_SETFD, FD_CLOEXEC);
     if (bad || !prog || prog[0] != '/' || !na || !rules || !cfg.home || cfg.home[0] != '/' ||
         sandbox_files_isolate(&cfg) || (!strcmp(rules, "files") ? sandbox_apply_files(&cfg) : sandbox_apply_scope())) {
         if (write(2, fail, sizeof fail - 1) < 0) {}
         return 126;
     }
+    /* the helper: in the app's scope, view and Landlock domain (the one just made), so a sub-sandbox may join the app's
+     * namespaces as Flatpak's own portal would let it, and never with more than the app has */
+    if (spawner) {
+        pid_t h = fork();
+        if (h < 0) { if (write(2, fail, sizeof fail - 1) < 0) {} return 126; }
+        if (h == 0) fpsw_main(FPSW_FD);
+        close(FPSW_FD);
+        sandbox_view_helper(h);                     /* PID 1 ends it once nothing else of the app is left */
+    } else sandbox_view_helper(0);
     execve(prog, args, environ);
     return 127;
 }
@@ -1499,7 +1638,7 @@ static int launch(const char *id, const char *file, const char *action) {
         if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
         if (plan) {
             /* the view and Landlock in a clean process image (apps_launch_view_main): never returns on success */
-            apps_view_exec(&plan->cfg, !plan->cfg.keep_home, prog, argv);
+            apps_view_exec(&plan->cfg, !plan->cfg.keep_home, prog, argv, 0);
             static const char msg[] = "apps: could not start the restricted app's view: not launched\n";
             if (write(2, msg, sizeof msg - 1) < 0) {}
             _exit(126);

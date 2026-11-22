@@ -193,6 +193,8 @@ EOF
     run "portal-check-test" build/portal-check-test
     if have dbus-run-session; then run "portal-gs-test (GlobalShortcuts over a private bus)" dbus-run-session -- build/portal-gs-test
     else skip "portal-gs-test" "dbus-run-session"; fi
+    if have dbus-run-session; then run "portal-cast-test (ScreenCast restore token, Screenshot, FileChooser lending)" dbus-run-session -- build/portal-cast-test
+    else skip "portal-cast-test" "dbus-run-session"; fi
     run "fsasync-test" build/fsasync-test
     run "sign-test" build/sign-test
     # migration 008: a tablet's power-button defaults (packaging/migrations, issue #131)
@@ -222,6 +224,12 @@ EOF
     if have node; then run "editor-scrollbar-test (apps/editor/scrollbar.js)" node tests/editor_scrollbar_test.mjs; fi
     if have node; then run "editor-recent-test (apps/editor/recent.js, File → Open Recent, #113)" node tests/editor_recent_test.mjs; fi
     if have node; then run "mem-figure-test (sdk/memfigure.js)" node tests/mem_figure_test.mjs; fi
+    if have node; then run "openwith-model-test (sdk/openwithmodel.js, Files' Open with providers)" node tests/openwith_model_test.mjs; fi
+    if have node; then run "vm-openwith-test (apps/machines/openwith.js, a machine in Open with)" node tests/vm_openwith_test.mjs; fi
+    if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
+    if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
+    if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
+    if have node; then run "vm-profiles-test (apps/machines/profiles.js, systems.js: .lordprofile import, your systems, PNG logos, library chips)" node tests/vm_profiles_test.mjs; fi
     if have node; then run "photos-places-test (apps/photos/places.js)" node tests/photos_places_test.mjs; fi
     if have node; then run "photos-trash-test (apps/photos/trash.js)" node tests/photos_trash_test.mjs; fi
     if have node; then run "bt-power-model-test (sdk/btpowermodel.js)" node tests/bt_power_model_test.mjs; fi
@@ -230,6 +238,7 @@ EOF
     if have node; then run "bt-list-model-test (sdk/btlistmodel.js)" node tests/bt_list_model_test.mjs; fi
     if have node; then run "kbinhibit-model-test (sdk/kbinhibitmodel.js)" node tests/kbinhibit_model_test.mjs; fi
     if have node; then run "windowbuttons-test (sdk/windowbuttons.js)" node tests/windowbuttons_test.mjs; fi
+    if have node; then run "celeste-model-test (themes/celeste/model.js)" node tests/celeste_model_test.mjs; fi
     if have node; then run "login-model-test (sdk/loginmodel.js)" node tests/login_model_test.mjs; fi
     if have node; then run "diskplaces-test (sdk/diskplaces.js, #122)" node tests/diskplaces_test.mjs; fi
     if have node; then run "jsx-undeclared-test (every JSX component is declared, #174)" node tests/jsx_undeclared_test.mjs; fi
@@ -240,6 +249,35 @@ EOF
         0) ok "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
+    esac
+    # frames, titles and damage of a Linux window, against a headless lord-server (docs/WAYLAND.md)
+    sh tests/wlperf_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames, protocols, transform, damage)" ;;
+        77) skip "wlperf" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames, protocols, transform, damage)" ;;
+    esac
+    # apps mode's guest side: lord-server's window endpoint, directly and through lordos-guest (tests/guestwin_client.c)
+    sh tests/guestwin_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guestwin (tests/guestwin_client.c, headless lord-server and lordos-guest, apps mode)" ;;
+        77) skip "guestwin" "build/lord-server, build/lordos-guest and the default theme (make, npm run build)" ;;
+        *) bad "guestwin (tests/guestwin_client.c, headless lord-server and lordos-guest, apps mode)" ;;
+    esac
+    # the machines command's session channel: start, open and poweroff of a throwaway machine through a headless
+    # lord-server's Machines app, and the requests the channel refuses (tests/machinescli_headless.sh)
+    sh tests/machinescli_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "machines-cli (tests/machinescli_headless.sh, headless lord-server, a throwaway machine)" ;;
+        77) skip "machines-cli" "build/lord-server, build/machines, build/lord-vm, KVM, QEMU and the default theme (make, npm run build)" ;;
+        *) bad "machines-cli (tests/machinescli_headless.sh, headless lord-server, a throwaway machine)" ;;
+    esac
+    # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
+    sh tests/guest_clip_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-clip (tests/guest_clip_test.sh, lordos-guest's clipboard tools)" ;;
+        77) skip "guest-clip" "build/lordos-guest and python3" ;;
+        *) bad "guest-clip (tests/guest_clip_test.sh, lordos-guest's clipboard tools)" ;;
     esac
     # a getter that destroys the node lord.setProp / lord.setStyle are writing (Claude Security, 0.8.9)
     sh tests/js_getter_destroy.sh >"$T/out" 2>&1
@@ -287,6 +325,8 @@ EOF
     if have node; then run "voicecatalog-test (sdk/voicecatalog.js)" node tests/voicecatalog_test.mjs; fi
     if have node; then run "voicerec-model-test (sdk/voicerecmodel.js)" node tests/voicerec_model_test.mjs; fi
     if have node; then run "vm-catalog-test (apps/machines/catalog.js)" node tests/vm_catalog_test.mjs; fi
+    if have node; then run "vm-windows-test (apps/machines/windows.js)" node tests/vm_windows_test.mjs; fi
+    if have node; then run "vm-capture-test (apps/machines/capture.js, Capture mouse)" node tests/vm_capture_test.mjs; fi
     # Machines: crafted images the import must refuse (needs qemu-img and this computer's qemu-system)
     if have qemu-img && { have qemu-system-x86_64 || have qemu-system-aarch64; } && [ -x build/lord-vm ]; then run "vm-import-test" sh tests/vm_import_test.sh build
     else skip "vm-import-test" "qemu-img, qemu-system"; fi
@@ -296,6 +336,7 @@ EOF
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
     if have node; then run "motion-model-test (sdk/motionmodel.js)" node tests/motion_model_test.mjs; else skip "motion-model-test" node; fi
     if have node; then run "wallpaper-model-test (sdk/wallpapermodel.js)" node tests/wallpaper_model_test.mjs; else skip "wallpaper-model-test" node; fi
+    if have node; then run "display-apps-model-test (sdk/displayappsmodel.js)" node tests/display_apps_model_test.mjs; else skip "display-apps-model-test" node; fi
     if have node; then run "slideshow-model-test (sdk/slideshowmodel.js)" node tests/slideshow_model_test.mjs; else skip "slideshow-model-test" node; fi
     if have node; then run "widget-grid-test (sdk/widgetgrid.js)" node tests/widget_grid_test.mjs; else skip "widget-grid-test" node; fi
     if have node; then run "poll-same-test (sdk/samevalue.js)" node tests/poll_same_test.mjs; else skip "poll-same-test" node; fi
@@ -508,6 +549,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "password-field-scene (sdk/components.jsx TextInput secure)" node tests/textfield_menu_test.mjs password_field_scene.mjs
     else skip "password-field-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.5, docs/MAIN-THREAD.md) <Toggle pending> and <Button pending> answer the press before the action, flip back on a
+    # failure; useTrackedSettings renders only for the keys read; ThemeProvider keeps equal tokens; sortByName's order
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "pending-scene (sdk/components.jsx Toggle/Button pending, sdk/settings.js, sdk/theme.js, sdk/collate.js)" node tests/textfield_menu_test.mjs pending_scene.mjs
+    else skip "pending-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) the ScreenCast chooser: the app's name, the pictures, Share only with a pick, Cancel, the app closing it (sdk/screencast.jsx)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "screencast-scene (sdk/screencast.jsx)" node tests/textfield_menu_test.mjs screencast_scene.mjs

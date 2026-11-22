@@ -55,5 +55,9 @@
   "who.flatpak": "App Flatpak {id}",
   "who.program": "Programa {path}",
   "perm.shortcuts": "Atalhos de teclado",
-  "permHint.shortcuts": "Apps que podem tomar ❖, ⌥Tab e os outros atalhos da área de trabalho enquanto estão na frente, como máquinas virtuais, áreas de trabalho remotas e jogos. ❖Esc sempre os devolve; bloquear a tela e as teclas de mídia continuam com o sistema."
+  "permHint.shortcuts": "Apps que podem tomar ❖, ⌥Tab e os outros atalhos da área de trabalho enquanto estão na frente, como máquinas virtuais, áreas de trabalho remotas e jogos. ❖Esc sempre os devolve; bloquear a tela e as teclas de mídia continuam com o sistema.",
+  "ask.idle": "«{app}» quer saber quando você está longe do computador",
+  "ask.idleNote": "Ele é avisado quando você para de usar o teclado e o mouse por um tempo, e quando volta; nada mais. Você pode mudar isso depois em Ajustes → Privacidade.",
+  "perm.idle": "Ausência do computador",
+  "permHint.idle": "Apps avisados quando você para de usar o computador por um tempo e quando volta, como apps de chat que mostram você como ausente. Não sabem de mais nada; um vídeo ou uma apresentação que mantém a tela ligada conta como você presente."
 }

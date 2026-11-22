@@ -10,7 +10,9 @@
 #include <linux/seccomp.h>
 #include <sched.h>
 #include <stddef.h>
+#include <limits.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -18,6 +20,7 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <sys/sysmacros.h>
 #include <unistd.h>
 
 #if defined(__x86_64__)
@@ -92,7 +95,7 @@ static const int deny_eperm[] = {
 
 #define CLONE_NS_FLAGS (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET | CLONE_NEWCGROUP)
 
-static int qemu_filter(struct sock_filter *f, int cap) {
+static int qemu_filter(struct sock_filter *f, int cap, int threads_only) {
     int n = 0;
 #define EMIT(s) do { if (n < cap) f[n] = (struct sock_filter)s; n++; } while (0)
 #define LDNR() EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)))
@@ -105,13 +108,31 @@ static int qemu_filter(struct sock_filter *f, int cap) {
     /* socket: never (its sockets are the ones lord-vm passed) */
     EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_socket, 0, 1));
     RET_ERR(EACCES);
-    /* clone: no new namespaces. [0]jeq [1]ld flags [2]and [3]jeq 0 → ok [4]EPERM [5]ALLOW */
-    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_clone, 0, 5));
+    /* clone: no new namespaces; for QEMU (threads_only) also no new process, only threads: QEMU never makes one (its own
+     * -sandbox spawn=deny says the same), and a process it can't make can't inherit its limits (the locked memory root
+     * grants a vGPU machine's QEMU, vmgpu_admin.c). [0]jeq [1]ld flags [2]and NS [3]jeq 0 → [5] [4]EPERM [5]ld flags
+     * [6]and THREAD (or 0) [7]jeq mask → [9] [8]EPERM [9]ALLOW */
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_clone, 0, 9));
     EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[0])));
     EMIT(BPF_STMT(BPF_ALU | BPF_AND | BPF_K, (unsigned)CLONE_NS_FLAGS));
     EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, 0));
     RET_ERR(EPERM);
+    EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[0])));
+    EMIT(BPF_STMT(BPF_ALU | BPF_AND | BPF_K, threads_only ? (unsigned)CLONE_THREAD : 0u));
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, threads_only ? (unsigned)CLONE_THREAD : 0u, 1, 0));
+    RET_ERR(EPERM);
     RET_OK();
+    LDNR();
+    /* fork and vfork: QEMU none (threads_only) */
+#ifdef SYS_fork
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_fork, 0, 1));
+    if (threads_only) RET_ERR(EPERM); else RET_OK();
+#endif
+#ifdef SYS_vfork
+    LDNR();
+    EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_vfork, 0, 1));
+    if (threads_only) RET_ERR(EPERM); else RET_OK();
+#endif
     LDNR();
     /* clone3: its flags are in memory seccomp can't read: ENOSYS, glibc falls back to clone */
     EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_clone3, 0, 1));
@@ -134,6 +155,45 @@ static int qemu_filter(struct sock_filter *f, int cap) {
 #undef RET_ERR
 #undef RET_OK
     return n;
+}
+
+/* 3D graphics (vmsandbox.h): the render node read, write and ioctl; what Mesa reads to know the GPU behind it. A path
+ * that isn't a DRM render node is refused (-1), and nothing is allowed then. */
+static int render_rules(int rs, const char *node, uint64_t h) {
+    struct stat st;
+    if (strncmp(node, "/dev/dri/renderD", 16) || stat(node, &st) || !S_ISCHR(st.st_mode) || major(st.st_rdev) != 226 || minor(st.st_rdev) < 128) return -1;
+    uint64_t dev = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE;
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+    dev |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
+#endif
+    if (rule(rs, node, dev, h)) return -1;
+    /* libdrm's drmGetDevice2 lists /dev/dri and reads the GPU's PCI folder in sysfs; without either Mesa's EGL doesn't
+     * start (measured 2026-11-20, amdgpu). Listing /dev/dri shows names only: opening card0 or another node is still
+     * refused. The way through /sys/dev/char is a link and needs no rule. */
+    if (rule(rs, "/dev/dri", LANDLOCK_ACCESS_FS_READ_DIR, h)) return -1;
+    char sys[64], real[PATH_MAX];
+    snprintf(sys, sizeof sys, "/sys/dev/char/%u:%u/device", major(st.st_rdev), minor(st.st_rdev));
+    if (!realpath(sys, real) || strncmp(real, "/sys/devices/", 13)) return -1;
+    if (rule(rs, real, LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR, h)) return -1;
+    return 0;
+}
+
+/* an Intel vGPU (vmsandbox.h): the VFIO container and the vGPU's own group, nothing else of /dev/vfio; the mdev's sysfs
+ * folder read. -1 when the paths aren't what they must be, and nothing is allowed then */
+static int vgpu_rules(int rs, const char *sysdev, int group, uint64_t h) {
+    if (group < 0 || strncmp(sysdev, "/sys/bus/mdev/devices/", 22) || strlen(sysdev) != 22 + 36 || strchr(sysdev + 22, '/')) return -1;
+    uint64_t dev = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE;
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+    dev |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
+#endif
+    char g[32], real[PATH_MAX];
+    snprintf(g, sizeof g, "/dev/vfio/%d", group);
+    struct stat st;
+    if (stat(g, &st) || !S_ISCHR(st.st_mode)) return -1;
+    if (rule(rs, "/dev/vfio/vfio", dev, h) || rule(rs, g, dev, h)) return -1;
+    if (!realpath(sysdev, real) || strncmp(real, "/sys/devices/", 13)) return -1;
+    if (rule(rs, real, LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR, h)) return -1;
+    return 0;
 }
 
 int vm_jail_qemu(const VmQemuJail *j) {
@@ -170,7 +230,14 @@ int vm_jail_qemu(const VmQemuJail *j) {
 #endif
                 rule(rs, "/dev/kvm", dev, h);
             }
+            /* 3D: a render node that doesn't check out gets no rule (QEMU's EGL then fails and it exits); it never costs
+             * the rest of the sandbox */
+            if (j->render && j->render[0]) render_rules(rs, j->render, h);
+            /* a vGPU whose paths don't check out costs the whole sandbox: QEMU doesn't run (the caller refuses) */
+            if (j->vgpu_dev && j->vgpu_dev[0] && vgpu_rules(rs, j->vgpu_dev, j->vgpu_group, h)) ok = 0;
+            if (j->vgpu_dev && j->vgpu_rom && j->vgpu_rom[0] && rule(rs, j->vgpu_rom, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (j->iso && j->iso[0] && rule(rs, j->iso, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
+            if (j->drivers && j->drivers[0] && rule(rs, j->drivers, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (j->base && j->base[0] && rule(rs, j->base, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             if (ok && !syscall(SYS_landlock_restrict_self, rs, 0U)) {
                 mask |= VMS_LANDLOCK_FS;
@@ -183,7 +250,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
 
     if (VM_AUDIT_ARCH) {
         static struct sock_filter filt[256];
-        int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]));
+        int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]), 1);
         if (n <= (int)(sizeof filt / sizeof filt[0])) {
             struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
             if (!syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog)) mask |= VMS_SECCOMP_OURS;
@@ -195,7 +262,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
 static int apply_seccomp(void) {
     if (!VM_AUDIT_ARCH) return 0;
     static struct sock_filter filt[256];
-    int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]));
+    int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]), 0);
     if (n > (int)(sizeof filt / sizeof filt[0])) return 0;
     struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
     return !syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog) ? VMS_SECCOMP_OURS : 0;
@@ -240,7 +307,7 @@ int vm_jail_tool_n(const char *const *reads, int nreads, const char *rw_dir) {
     return mask;
 }
 
-int vm_jail_self(const char *machine_dir, const char *runtime_dir) {
+int vm_jail_self(const char *machine_dir, const char *runtime_dir, const char *xfer_dir) {
     int abi = vm_landlock_abi();
     if (abi < 1) return 0;
     struct landlock_ruleset_attr attr;
@@ -253,6 +320,10 @@ int vm_jail_self(const char *machine_dir, const char *runtime_dir) {
                   LANDLOCK_ACCESS_FS_MAKE_REG | LANDLOCK_ACCESS_FS_REMOVE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE;
     int ok = !rule(rs, machine_dir, rw, h);
     if (runtime_dir && runtime_dir[0]) rule(rs, runtime_dir, LANDLOCK_ACCESS_FS_REMOVE_FILE, h);
+    /* without it the drops go the agent's way (lord-vm can't make the file there) */
+    if (xfer_dir && xfer_dir[0]) rule(rs, xfer_dir, LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_MAKE_REG |
+                                      LANDLOCK_ACCESS_FS_REMOVE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE | LANDLOCK_ACCESS_FS_MAKE_DIR |
+                                      LANDLOCK_ACCESS_FS_REMOVE_DIR | LANDLOCK_ACCESS_FS_READ_DIR, h);
     rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
     int r = ok && !prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) && !syscall(SYS_landlock_restrict_self, rs, 0U);
     close(rs);

@@ -35,7 +35,6 @@
   "msg.updateDone": "Updated na ang {name}.",
   "noResults": "Walang tumutugmang app ng Flathub.",
   "notSupported": "Hindi pa available ang Flathub sa computer na ito: sa ngayon ay para lang ito sa mga PC.",
-  "notYet": "Hindi pa suportado",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Pag-debug ng ibang program",
   "perm.devicesAll": "Lahat ng device: mga camera, game controller, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Mga app lang na na-verify ng Flathub. Nakatago: {count}",
   "showAllOn": "Ipinapakita ang bawat app ng Flathub, verified man o hindi",
   "showMore": "Magpakita pa ({count} ang natitira)",
-  "subsandbox.text": "Nakabatay ang app na ito sa Chromium o Electron, na ang mga helper ay nangangailangang ibahagi ang mga sandbox ng Flatpak sa paraang hindi pa iniaalok ng LordOS, kaya hindi ito mai-install dito sa ngayon.",
-  "subsandbox.title": "Hindi pa suportado sa LordOS",
   "subtitle": "Mga Linux app mula sa Flathub, pinapatakbo sa loob ng sariling nakahiwalay na espasyo ng LordOS, sakop ng iyong Firewall.",
   "turnOff": "I-off",
   "unverified": "Hindi na-verify ng Flathub: maaaring hindi ang developer ng app ang naglathala.",
@@ -110,5 +107,6 @@
   "updates.button": "I-update ang mga app ng Flathub",
   "updates.text": "Naka-install mula sa Flathub: {count}. Sinusuri ng Flatpak ang bawat isa at ini-install ang nagbago; matatapos ang pag-update ng nakabukas na app kapag binuksan mo ulit ito.",
   "updates.title": "Mga app ng Flathub",
-  "verified": "Verified: inilathala ng {developer}"
+  "verified": "Verified: inilathala ng {developer}",
+  "note.obsVideos": "Sa LordOS, sine-save ng OBS Studio ang mga recording sa iyong folder na Videos: read-only para sa mga app ng Flathub ang iba pang folder ng iyong home."
 }

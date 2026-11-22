@@ -1,7 +1,8 @@
 // ops.js — what the Files windows share: the file clipboard, copy jobs in progress, color tags
 // and opening files with the right app.
-import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard, appsOff, openersAvailable, offerActivate } from '@lordos/sdk';
-import { kindOf, mimesOf, appOpens, isTextual, isImage, isProgram } from './kinds.js';
+import { createStore, fs, wm, launchApp, archive, defaultOpenerId, nativeOf, errorText, clipboard, appsOff, openersAvailable, offerActivate,
+  openProvidersFor, suggestedProviderFor, defaultProviderFor, openHintsFor } from '@lordos/sdk';
+import { kindOf, mimesOf, appOpens, isTextual, isImage, isProgram, isForeignProgram } from './kinds.js';
 import { pasteFrom, offerable } from './clipfiles.js';
 import { createJobQueue } from './jobqueue.js';
 import { toggledTags, withComment, movedKey } from './tags.js';
@@ -141,7 +142,7 @@ function openersOf(e, linuxApps, t) {
   // media (M9): images in Photos; audio and video in the Player (the defaults)
   if (k === 'image') all.push({ id: 'photos', label: t('apps.photos'), run: () => wm.open('photos', { new: true, args: { path: e.path } }) });
   if (k === 'audio' || k === 'video') all.push({ id: 'player', label: t('apps.player'), run: () => wm.open('player', { args: { path: e.path } }) });
-  if (isTextual(e) || (k === 'other' && !isProgram(e))) all.push({ id: 'editor', label: t('apps.editor'), run: () => wm.open('editor', { args: { path: e.path } }) });
+  if (isTextual(e) || (k === 'other' && !isProgram(e) && !isForeignProgram(e))) all.push({ id: 'editor', label: t('apps.editor'), run: () => wm.open('editor', { args: { path: e.path } }) });
   // the system's MIME database's type first (lord.mime.guess), then Files' own table: an app that
   // declares either one opens the file (issue #49: an .xlsx had no type of its own here, so WPS and
   // GridCraft, which declare it, were never offered)
@@ -159,9 +160,17 @@ function openersOf(e, linuxApps, t) {
   for (const m of mimes) if ((def = defaultOpenerId(m))) break;
   const native = nativeOf(def);
   const i = def ? out.findIndex((o) => (native ? o.id === native : o.desktopId && `${o.desktopId}.desktop` === def)) : -1;
-  if (i >= 0) {
+  // "Open with" providers after the apps (sdk/openwith.js: a machine whose guest tools open files…); the person's
+  // "Always open .ext files with …" one goes first, marked, ahead of any app's default
+  const chosen = defaultProviderFor(e);
+  if (i >= 0 && !chosen) {
     const [d] = out.splice(i, 1);
     out.unshift({ ...d, label: t('prefs.defaults.tag', { name: d.label }), isDefault: true });
+  }
+  for (const p of openProvidersFor(e)) {
+    const o = { id: p.id, label: p.label, run: () => p.open(e), provider: p };
+    if (chosen && chosen.id === p.id) out.unshift({ ...o, label: t('prefs.defaults.tag', { name: p.label }), isDefault: true });
+    else out.push(o);
   }
   return { list: out, off };
 }
@@ -173,10 +182,24 @@ export function openEntry(e, ctx) {
   if (e.dir) { ctx.navigate({ type: 'dir', path: e.path }); return; }
   if (!e.trash && archive.isArchive(e.name)) { ctx.navigate({ type: 'archive', path: e.path, inner: '' }); return; }
   const { list, off } = openersOf(e, ctx.linuxApps, ctx.t);
+  // the person's "Always open .ext files with …" provider; one that starts something first (an off machine) asks
+  const chosen = list[0]?.provider && list[0].isDefault ? list[0].provider : null;
+  if (chosen) {
+    if (ctx.askProvider && chosen.needsStart && chosen.needsStart() === true) ctx.askProvider(e, chosen, { start: true });
+    else chosen.open(e);
+    return;
+  }
+  const apps = list.filter((o) => !o.provider);
+  // no app here opens it, but a provider is its natural handler (a program for another system and a machine that runs
+  // it): offered, with "Always open .ext files with …"
+  const suggested = !apps.length ? suggestedProviderFor(e) : null;
+  if (suggested && ctx.askProvider) { ctx.askProvider(e, suggested, { start: suggested.needsStart?.() === true, offerAlways: true }); return; }
   // only a deactivated LordOS app opens it (Photos, PDF Viewer…): the notice offers to activate it
   if (off.length && !list.some((o) => o.id !== 'editor')) { offerActivate(off[0], () => openEntry(e, ctx)); return; }
-  if (isImage(e) && !list.some((o) => o.id !== 'editor')) { ctx.quickLook(e); return; }    // no viewer: Quick Preview
-  if (list.length) list[0].run();
+  if (isImage(e) && !apps.some((o) => o.id !== 'editor')) { ctx.quickLook(e); return; }    // no viewer: Quick Preview
+  if (apps.length) apps[0].run();
   else if (isProgram(e) && ctx.say) ctx.say(ctx.t('files.programNoOpener', { name: e.name }));  // not TextEdit (#159)
+  // a provider says why none opens it yet (a Windows machine whose LordOS tools are too old): that, else the general line
+  else if (isForeignProgram(e) && ctx.say) ctx.say(openHintsFor(e)[0] || ctx.t('files.foreignProgramNoOpener', { name: e.name }));
   else ctx.quickLook(e);
 }

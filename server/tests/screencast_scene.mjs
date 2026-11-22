@@ -6,7 +6,7 @@
 // away, and every picture is closed with it. Prints one line per check: "ok <name>" or "FAIL <name> <detail>".
 import React from 'react';
 import * as rt from '@lordos/runtime';
-import { ScreenCastPrompt, castEvent, castRuns, castNames } from '../../sdk/screencast.jsx';
+import { ScreenCastPrompt, ShotOverlay, castEvent, castRuns, castNames, shotTaken } from '../../sdk/screencast.jsx';
 import { enableShellLayers } from '../../sdk/layers.js';
 
 const { parents, texts, removed } = globalThis.__lordTest;
@@ -14,13 +14,15 @@ const h = React.createElement;
 const flush = async () => { for (let i = 0; i < 20; i++) await new Promise((res) => setImmediate(res)); };
 const check = (name, ok, detail = '') => console.log(ok ? `ok ${name}` : `FAIL ${name} ${detail}`);
 
-const calls = { cast: [], thumbs: [], closed: [] };
+const calls = { cast: [], thumbs: [], closed: [], shot: [], color: [] };
 let thumbId = 100;
 lord.portal = {
   cast: (id, sources) => { calls.cast.push([id, sources]); },
   castThumb: (id, src) => { calls.thumbs.push([id, src]); return ++thumbId; },
   castShown: () => {},
   castStop: () => {},
+  shot: (id, src, path) => { calls.shot.push([id, src, path]); },
+  color: (id, p) => { calls.color.push([id, p]); },
 };
 lord.media = { close: (id) => { calls.closed.push(id); } };
 
@@ -31,9 +33,9 @@ const shows = (s) => !!textId(s);
 const click = async (id) => { const t = parents.get(id) || id; __lordEvent('down', t, 5, 5, 0); __lordEvent('up', t, 5, 5, 0); await flush(); };
 
 // as sdk/hardware.jsx names a verified app (its launcher's scope)
-castNames({ app: (p) => (p.who === 'desktop:meetclient' ? 'Meet Client' : p.who) });
+castNames({ app: (p) => (p.who === 'desktop:meetclient' ? 'Meet Client' : p.who), shotPath: () => '/home/x/Pictures/Screenshots/Shot.png' });
 enableShellLayers();
-rt.render(h(ScreenCastPrompt));
+rt.render(h(React.Fragment, null, h(ScreenCastPrompt), h(ShotOverlay)));
 await flush();
 check('nothing before a request', !shows('Share'));
 
@@ -79,3 +81,34 @@ check('the indicator\'s list, with the verified name', castRuns.get().length ===
 check('and an unknown program for the other, not its process name', castRuns.get()[1].name === 'An unknown program', JSON.stringify(castRuns.get()));
 castEvent('portal-casts', null);
 check('an empty list', castRuns.get().length === 0);
+
+// the Screenshot portal (approved 2026-11-22): the same chooser with Take Screenshot and Select Area…; the picture is
+// asked for only after the chooser (or the overlay) is gone; PickColor is the overlay alone
+castEvent('portal-shot', { id: 21, shot: true, color: false, monitor: true, window: true, multiple: false, who: 'flatpak:org.ksnip.ksnip' });
+await flush();
+check('shot: the title names the verified app', shows('“flatpak:org.ksnip.ksnip” wants to take a screenshot'), [...texts.values()].join(' | '));
+check('shot: Select Area… and Take Screenshot', shows('Select Area…') && shows('Take Screenshot'));
+await click(textId('Take Screenshot'));
+check('shot: nothing with nothing picked', calls.shot.length === 0);
+await click(textId('Screen 1'));
+await click(textId('Take Screenshot'));
+check('shot: the display picked, into a new file', calls.shot.length === 1 && calls.shot[0][0] === 21 && JSON.stringify(calls.shot[0][1]) === '{"display":0}' &&
+  calls.shot[0][2] === '/home/x/Pictures/Screenshots/Shot.png', JSON.stringify(calls.shot));
+check('shot: the chooser is gone', !shows('Take Screenshot'));
+castEvent('portal-shot', { id: 22, shot: true, color: false, monitor: true, window: true, multiple: false, who: 'flatpak:org.ksnip.ksnip' });
+await flush();
+await click(textId('Select Area…'));
+check('shot: Select Area… closes the chooser for the overlay', !shows('Take Screenshot') && shows('Drag over the area to give to flatpak:org.ksnip.ksnip. Esc cancels.'),
+  [...texts.values()].join(' | '));
+castEvent('portal-shot-gone', { id: 22 });
+await flush();
+check('shot: the app closed its request: the overlay goes', !shows('Drag over the area to give to flatpak:org.ksnip.ksnip. Esc cancels.'));
+check('shot: no answer for it', calls.shot.length === 1);
+castEvent('portal-shot', { id: 23, shot: true, color: true, monitor: true, window: false, multiple: false, who: '' });
+await flush();
+check('color: the overlay alone, an unknown program said so', shows('Click the color to give to An unknown program. Esc cancels.') && !shows('Take Screenshot'),
+  [...texts.values()].join(' | '));
+await click(textId('Click the color to give to An unknown program. Esc cancels.'));
+check('color: a click answers with the point', calls.color.length === 1 && calls.color[0][0] === 23 && calls.color[0][1].x === 5 && calls.color[0][1].y === 5, JSON.stringify(calls.color));
+castEvent('portal-shot-taken', { who: 'flatpak:org.ksnip.ksnip', color: false });
+check('the indicator: a pill for the screenshot', shotTaken.get().length === 1 && shotTaken.get()[0].name === 'flatpak:org.ksnip.ksnip', JSON.stringify(shotTaken.get()));

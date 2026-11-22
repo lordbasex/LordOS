@@ -32,6 +32,8 @@
   "renderValue": {
     "other": "{ms} 毫秒 · {count} 个节点"
   },
+  "pauses": "超过 50 毫秒的停顿",
+  "pausesValue": "{count} 次(最长 {ms} 毫秒)",
   "server": "显示服务器",
   "systemApp": "系统应用",
   "systemReport": "系统报告…",
@@ -40,5 +42,6 @@
   "version": "版本 {v}",
   "versionChannel": "版本 {v} · {channel}",
   "case": "机箱",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "产品名称和标志是其各自所有者的商标；LordOS 与它们没有关联，也未获得其认可。标志仅在请求时从各所有者的网站下载，并且只在这台电脑上显示。"
 }

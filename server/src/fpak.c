@@ -7,10 +7,17 @@
 
 #include <ctype.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <unistd.h>
+#ifdef __has_include
+#  if __has_include(<linux/openat2.h>)
+#    include <linux/openat2.h>
+#  endif
+#endif
 
 int fpak_id_ok(const char *id) {
     size_t n = id ? strlen(id) : 0;
@@ -129,6 +136,13 @@ static int str_ok(const char *v, int option) {
 
 static int list_len(const char *const *l) { int n = 0; while (l && l[n]) n++; return n; }
 
+int fpak_bus_peer(const char *iface, const char *member) {
+    if (!member || (iface && strcmp(iface, "org.freedesktop.DBus.Peer"))) return 0;
+    if (!strcmp(member, "Ping")) return 1;
+    if (!strcmp(member, "GetMachineId") && iface) return 2;
+    return 0;
+}
+
 int fpak_spawn_ok(const FpakSpawn *s) {
     if (!s || (s->flags & ~FPAK_SPAWN_FLAGS_ALL) || (s->sandbox_flags & ~FPAK_SANDBOX_FLAGS_ALL)) return 0;
     if ((s->flags & (FPAK_SPAWN_EXPOSE_PIDS | FPAK_SPAWN_SHARE_PIDS)) && s->parent_pid <= 0) return 0;
@@ -149,7 +163,78 @@ int fpak_spawn_ok(const FpakSpawn *s) {
     /* no expose names at all (Claude Security F1, 2026-11-20): ~/.var/app/<id>/sandbox is the app's own to write, so a
      * name there may be a link to the session bus socket or the home, which Flatpak would follow */
     if (list_len(s->expose) || list_len(s->expose_ro)) return 0;
+    /* usr-fd / app-fd (Steam only, checked by the caller): a number for flatpak run, never with an empty /app too */
+    if (s->usr_fd < 0 || s->usr_fd == 1 || s->usr_fd == 2 || s->usr_fd > 1023 || s->app_fd < 0 || s->app_fd == 1 ||
+        s->app_fd == 2 || s->app_fd > 1023 || (s->usr_fd && s->usr_fd == s->app_fd) || (s->app_fd && (s->flags & FPAK_SPAWN_EMPTY_APP)))
+        return 0;
     return 1;
+}
+
+/* ---- Steam's usr-fd / app-fd ---- */
+
+static int open_dir_nolink(const char *path) {
+#if defined(SYS_openat2) && defined(RESOLVE_NO_SYMLINKS)
+    struct open_how how;
+    memset(&how, 0, sizeof how);
+    how.flags = O_PATH | O_DIRECTORY | O_CLOEXEC;
+    how.resolve = RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS;
+    return (int)syscall(SYS_openat2, AT_FDCWD, path, &how, sizeof how);
+#else
+    (void)path;
+    return -1;
+#endif
+}
+
+static int mnt_of(int fd, uint64_t *mnt, struct stat *st) {
+    struct statx sx;
+    if (fstat(fd, st) || statx(fd, "", AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW, STATX_MNT_ID, &sx) || !(sx.stx_mask & STATX_MNT_ID)) return -1;
+    *mnt = sx.stx_mnt_id;
+    return 0;
+}
+
+int fpak_steam_fd_ok(int fd, const char *home) {
+    struct stat st;
+    if (fd < 0 || !home || home[0] != '/' || fstat(fd, &st) || !S_ISDIR(st.st_mode)) return 0;
+    int fl = fcntl(fd, F_GETFL);
+    if (fl < 0 || (fl & O_ACCMODE) != O_RDONLY) return 0;
+    /* the folders it may be in, opened here with no link on their way */
+    char roots[5][PATH_MAX];
+    int nr = 0;
+    snprintf(roots[nr++], PATH_MAX, "%s/.var/app/%s", home, FPAK_STEAM_ID);
+    snprintf(roots[nr++], PATH_MAX, "%s/.local/share/flatpak/app/%s", home, FPAK_STEAM_ID);
+    snprintf(roots[nr++], PATH_MAX, "%s/.local/share/flatpak/runtime", home);
+    snprintf(roots[nr++], PATH_MAX, "/var/lib/flatpak/app/%s", FPAK_STEAM_ID);
+    snprintf(roots[nr++], PATH_MAX, "/var/lib/flatpak/runtime");
+    dev_t rdev[5];
+    ino_t rino[5];
+    int have = 0;
+    for (int i = 0; i < nr; i++) {
+        int r = open_dir_nolink(roots[i]);
+        struct stat rs;
+        if (r < 0) continue;
+        if (!fstat(r, &rs)) { rdev[have] = rs.st_dev; rino[have] = rs.st_ino; have++; }
+        close(r);
+    }
+    if (!have) return 0;
+    int cur = openat(fd, ".", O_PATH | O_DIRECTORY | O_CLOEXEC);
+    uint64_t mnt0, mnt;
+    if (cur < 0 || mnt_of(cur, &mnt0, &st)) { if (cur >= 0) close(cur); return 0; }
+    int ok = 0;
+    for (int step = 0; step < 256; step++) {
+        for (int i = 0; i < have && !ok; i++) ok = st.st_dev == rdev[i] && st.st_ino == rino[i];
+        if (ok) break;
+        int up = openat(cur, "..", O_PATH | O_DIRECTORY | O_CLOEXEC);
+        struct stat ps;
+        if (up < 0 || mnt_of(up, &mnt, &ps) || mnt != mnt0 || (ps.st_dev == st.st_dev && ps.st_ino == st.st_ino)) {
+            if (up >= 0) close(up);
+            break;                              /* another mount on the way, or the top: not inside those folders */
+        }
+        close(cur);
+        cur = up;
+        st = ps;
+    }
+    close(cur);
+    return ok;
 }
 
 static int build_argv(const FpakRun *r, const FpakSpawn *sp, char **argv, int max, char *buf, size_t cap) {
@@ -170,6 +255,9 @@ static int build_argv(const FpakRun *r, const FpakSpawn *sp, char **argv, int ma
     ARG("run");
     ARG("--arch=%s", r->arch);
     ARG("--branch=%s", r->branch);
+    /* no document portal: LordOS's view of the app has no /run/user/<uid>/doc, and when something on the desktop started
+     * xdg-document-portal, flatpak asked bubblewrap for it and the app never started (2026-11-20) */
+    ARG("--no-documents-portal");
     if (sp) {
         /* what the app asked for its new instance (flatpak-portal's mapping); everything after this can only take away */
         uint32_t f = sp->flags, sf = sp->sandbox_flags;
@@ -184,6 +272,8 @@ static int build_argv(const FpakRun *r, const FpakSpawn *sp, char **argv, int ma
         }
         if (f & FPAK_SPAWN_NO_NETWORK) ARG("--unshare=network");
         if (f & FPAK_SPAWN_EMPTY_APP) ARG("--app-path=");
+        if (sp->usr_fd) ARG("--usr-fd=%d", sp->usr_fd);       /* Steam's, checked (fpak_steam_fd_ok) */
+        if (sp->app_fd) ARG("--app-fd=%d", sp->app_fd);
         if (f & (FPAK_SPAWN_EXPOSE_PIDS | FPAK_SPAWN_SHARE_PIDS)) {
             ARG("--parent-pid=%d", sp->parent_pid);
             ARG(f & FPAK_SPAWN_SHARE_PIDS ? "--parent-share-pids" : "--parent-expose-pids");

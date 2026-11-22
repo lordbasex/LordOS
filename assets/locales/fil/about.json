@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} node",
     "other": "{ms} ms · {count} node"
   },
+  "pauses": "Mga hinto na lampas 50 ms",
+  "pausesValue": "{count} (pinakamatagal: {ms} ms)",
   "server": "Display server",
   "systemApp": "App ng system",
   "systemReport": "Ulat ng System…",
@@ -42,5 +44,6 @@
   "version": "Bersyon {v}",
   "versionChannel": "Bersyon {v} · {channel}",
   "case": "Case",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Ang mga pangalan ng produkto at logo ay mga trademark ng kani-kanilang may-ari; ang LordOS ay hindi kaanib o ineendorso nila. Dina-download lang ang mga logo kapag hiniling, mula sa site ng bawat may-ari, at ipinapakita sa computer na ito."
 }

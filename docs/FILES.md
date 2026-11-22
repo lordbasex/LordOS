@@ -121,6 +121,18 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   offered for it, an app that declares `application/vnd.appimage` still is, and with none Files says that it is a
   program and that Files doesn't run programs (0.8.8.9, #159; `isProgram` in
   `sdk/filekinds.js`).
+- **Open with providers** (in development, 2026-11-21): after the apps, the menu lists what `sdk/openwith.js` providers
+  offer: today a machine in Machines whose guest tools open files (the file is copied into it and opened there,
+  `VIRTUALIZATION.md` 7.3). A program for another system (`.exe`, `.msi`, `.bat`, `.cmd`, `.lnk`, `.com`, `.msix`,
+  `.appx`: `isForeignProgram`) is never offered to the Text Editor; a double click offers the provider that suggests
+  itself, with "Always open .exe files with …" (settings `openWithDefaults`, per extension, kept apart from
+  `mimeapps.list` because a provider names no `.desktop` file; the menu then has "Ask Each Time for .exe Files").
+  Providers are `{ id, label, icon?, accepts(file), suggests?(file), available?(), needsStart?(), open(file) }`,
+  registered with `registerOpenProvider` / `registerOpenProviders` by the session's own code only. A provider can
+  also be a hint, `{ id, hint(file) }`: it opens nothing, and when no provider opens the file its text closes Open with
+  as a dim note (`openHintsFor`; a context menu row `{ note }`). Machines adds one for a Windows program while it has a
+  Windows machine whose LordOS tools are too old to open files ("No machine can open it yet: update the LordOS tools…");
+  a double click on the program says the same.
 - **Recents:** the files in the home folder modified in the last 30 days. It is a bounded walk: 5
   levels, 60,000 entries, no hidden files and no `node_modules`.
 - **Applications:** those from `useLauncherApps()` (LordOS, packages, Linux and, since 0.8.8.8, web apps); double-click

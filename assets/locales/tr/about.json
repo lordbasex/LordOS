@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} düğüm",
     "other": "{ms} ms · {count} düğüm"
   },
+  "pauses": "50 ms'yi aşan duraklamalar",
+  "pausesValue": "{count} (en uzunu: {ms} ms)",
   "server": "Görüntü sunucusu",
   "systemApp": "Sistem uygulaması",
   "systemReport": "Sistem Raporu…",
@@ -42,5 +44,6 @@
   "version": "Sürüm {v}",
   "versionChannel": "Sürüm {v} · {channel}",
   "case": "Kasa",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Ürün adları ve logoları ilgili sahiplerinin ticari markalarıdır; LordOS onlarla bağlantılı değildir ve onlar tarafından onaylanmamıştır. Logolar yalnızca istek üzerine, her sahibin sitesinden indirilir ve bu bilgisayarda gösterilir."
 }

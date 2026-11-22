@@ -56,4 +56,9 @@ double cast_timeout(void);              /* ms until cast_tick has work, -1 none 
  * source isn't there. */
 int  cast_thumb(const CastSource *src, int max);
 
+/* A still picture of src for the Screenshot portal (ui/portalshot.c), painted as a stream is (protected windows black)
+ * at the source's own resolution; area (x, y, w, h in logical px of the global space, or NULL) keeps only that part.
+ * Opaque pixels (malloc, *w × *h), or NULL. */
+uint32_t *cast_still(const CastSource *src, const int *area, int *w, int *h);
+
 #endif

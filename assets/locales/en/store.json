@@ -129,7 +129,7 @@
   },
   "open": "Open",
   "page.ai": "Artificial Intelligence",
-  "page.webapps": "Web apps",
+  "page.webapps": "Web apps (PWA)",
   "page.commercial": "Commercial",
   "page.remote": "Remote access",
   "page.suites": "Third-party apps",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "Enabling…",
   "pkg32": "{name} (32-bit)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak app"
+  "kind.flatpak": "Flatpak app",
+  "section.origin": "Where apps come from",
+  "section.picks": "Picked by LordOS",
+  "src.debian": "Linux apps (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android apps",
+  "soon": "Soon",
+  "sub.all": "All"
 }

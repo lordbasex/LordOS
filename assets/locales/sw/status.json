@@ -160,8 +160,16 @@
   "vm.imageRemoved": "Taswira imefutwa",
   "vm.downloadResumed": "Inaendeleza upakuaji uliosimamishwa (baiti {from} zimehifadhiwa)",
   "vm.kvmReady": "Imeruhusiwa: mashine sasa zinaweza kutumia uigaji wa maunzi",
+  "vm.bridgeReady": "Mtandao wa daraja uko tayari ({name})",
+  "vm.bridgeGone": "Mtandao wa daraja umeondolewa",
   "vm.kvmNextLogin": "Imeruhusiwa kuanzia kuingia kwako kujako",
   "pkg.foreignArchAdded": "Vifurushi vya biti 32 ({arch}) vimewezeshwa",
   "pkg.foreignArchPresent": "Vifurushi vya biti 32 ({arch}) vilikuwa vimewezeshwa tayari",
-  "pkg.why.multiarchPair": "Toleo sawa na {name}"
+  "pkg.why.multiarchPair": "Toleo sawa na {name}",
+  "gpu.roleSet": "Matumizi ya kadi ya michoro yamehifadhiwa ({card}): anzisha upya ili kutekeleza",
+  "vm.gvtReady": "Sehemu ya kadi ya michoro iko tayari ({name})",
+  "vm.gvtGone": "Sehemu ya kadi ya michoro imeondolewa",
+  "gpu.freqSet": "Masafa ya chini ya kadi ya michoro yamewekwa",
+  "gpu.memlockSet": "Kumbukumbu ambayo mashine zinaweza kufunga imehifadhiwa",
+  "vm.memlockSet": "Kumbukumbu ya mashine imefungwa"
 }

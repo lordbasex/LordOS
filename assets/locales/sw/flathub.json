@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} imesasishwa.",
   "noResults": "Hakuna programu ya Flathub inayolingana.",
   "notSupported": "Flathub bado haipatikani kwenye kompyuta hii: kwa sasa ni kwa ajili ya PC tu.",
-  "notYet": "Bado haitumiki",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Kutatua hitilafu za programu nyingine",
   "perm.devicesAll": "Vifaa vyote: kamera, vidhibiti vya michezo, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Programu zilizothibitishwa na Flathub tu. Zilizofichwa: {count}",
   "showAllOn": "Inaonyesha kila programu ya Flathub, iwe imethibitishwa au la",
   "showMore": "Onyesha zaidi (zimebaki: {count})",
-  "subsandbox.text": "Programu hii imejengwa juu ya Chromium au Electron, ambazo programu zao saidizi zinahitaji sandbox za Flatpak zishirikiwe kwa njia ambayo LordOS bado haitoi, kwa hiyo haiwezi kusakinishwa hapa kwa sasa.",
-  "subsandbox.title": "Bado haitumiki kwenye LordOS",
   "subtitle": "Programu za Linux kutoka Flathub, zinazoendeshwa ndani ya mazingira yaliyotengwa ya LordOS yenyewe chini ya Ngome yako.",
   "turnOff": "Zima",
   "unverified": "Haijathibitishwa na Flathub: mchapishaji huenda si msanidi wa programu.",
@@ -110,5 +107,6 @@
   "updates.button": "Sasisha programu za Flathub",
   "updates.text": "Zilizosakinishwa kutoka Flathub: {count}. Flatpak hukagua kila moja na kusakinisha kilichobadilika; programu iliyo wazi humaliza kusasishwa utakapoifungua tena.",
   "updates.title": "Programu za Flathub",
-  "verified": "Imethibitishwa: imechapishwa na {developer}"
+  "verified": "Imethibitishwa: imechapishwa na {developer}",
+  "note.obsVideos": "Katika LordOS, OBS Studio huhifadhi rekodi kwenye folda yako ya Video: folda nyingine za nyumbani kwako ni za kusoma tu kwa programu za Flathub."
 }

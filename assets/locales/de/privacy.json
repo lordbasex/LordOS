@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak-App {id}",
   "who.program": "Programm {path}",
   "perm.shortcuts": "Tastaturkurzbefehle",
-  "permHint.shortcuts": "Apps, die ❖, ⌥Tab und die anderen Kurzbefehle des Schreibtischs übernehmen dürfen, solange sie im Vordergrund sind, etwa virtuelle Maschinen, Remote-Desktops und Spiele. ❖Esc gibt sie immer zurück; das Sperren des Bildschirms und die Medientasten bleiben beim System."
+  "permHint.shortcuts": "Apps, die ❖, ⌥Tab und die anderen Kurzbefehle des Schreibtischs übernehmen dürfen, solange sie im Vordergrund sind, etwa virtuelle Maschinen, Remote-Desktops und Spiele. ❖Esc gibt sie immer zurück; das Sperren des Bildschirms und die Medientasten bleiben beim System.",
+  "ask.idle": "„{app}“ möchte wissen, wann du nicht am Computer bist",
+  "ask.idleNote": "Es erfährt, wenn du Tastatur und Maus eine Weile nicht benutzt und wenn du zurück bist – sonst nichts. Du kannst das später unter Einstellungen → Datenschutz ändern.",
+  "perm.idle": "Abwesenheit vom Computer",
+  "permHint.idle": "Apps, die erfahren, wenn du den Computer eine Weile nicht benutzt und wenn du zurückkommst, etwa Chat-Apps, die dich als abwesend zeigen. Sonst erfahren sie nichts; ein Video oder eine Präsentation, die den Bildschirm anlässt, zählt als anwesend."
 }

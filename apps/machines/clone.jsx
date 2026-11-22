@@ -5,15 +5,22 @@
 import { View, Text, TextInput, Toggle, t as tr } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { usePal, Btn, Sheet } from './ui.jsx';
-import { cloneMethod, cloneHostname, hostnameValid } from './model.js';
+import { Sym } from './kit.jsx';
+import { cloneMethod, cloneHostname, hostnameValid, cloneWinName, winNameValid, isWindowsMachine, WIN_NAME_MAX } from './model.js';
 import { writeMeta } from './meta.js';
 
-function Kind({ on, title, text, foot, onClick }) {
+function Kind({ on, icon, title, text, foot, onClick }) {
   const p = usePal();
   return (
-    <View onClick={onClick} style={{ flex: 1, minHeight: 150, padding: 14, gap: 6, borderRadius: 12, backgroundColor: on ? (p.dark ? '#1d3049' : '#e6f1ff') : p.card,
-      border: `2px solid ${on ? '#0a84ff' : p.line}` }}>
-      <Text style={{ fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
+    <View onClick={onClick} style={{ flex: 1, minHeight: 150, padding: 14, gap: 6, borderRadius: 14,
+      backgroundColor: p.dark ? 'rgba(255,255,255,0.05)' : '#ffffff', border: `2px solid ${on ? p.accent : p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Sym name={icon} size={22} color={on ? p.accent : p.dim} />
+        <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
+        <View style={{ width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', border: `2px solid ${on ? p.accent : p.dim}` }}>
+          {on ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: p.accent }} /> : null}
+        </View>
+      </View>
       <Text style={{ fontSize: 13, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{text}</Text>
       <View style={{ flex: 1 }} />
       <Text style={{ fontSize: 12, fontWeight: 700, color: p.text, textAlign: 'start' }}>{foot}</Text>
@@ -31,9 +38,11 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
   const [fail, setFail] = useState('');
   // the Clone's own identity inside the guest (6.3): a hostname, a new machine-id and SSH keys at its first start
   const [keepId, setKeepId] = useState(false);
-  const [host, setHost] = useState(() => cloneHostname(m.name));
+  // a Windows guest takes it as its computer name (NetBIOS, at most 15): the field asks for one that is used as it is
+  const win = isWindowsMachine(m);
+  const [host, setHost] = useState(() => (win ? cloneWinName(m.name) : cloneHostname(m.name)));
   const isClone = fromSnapshot || kind === 'clone';
-  const hostBad = isClone && !keepId && !hostnameValid(host);
+  const hostBad = isClone && !keepId && !(win ? winNameValid(host) : hostnameValid(host));
   const how = cloneMethod(info, fromSnapshot ? 'clone' : kind, !!fromSnapshot);
   useEffect(() => {
     if (!job) return undefined;
@@ -64,9 +73,9 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
     ]}>
       {!fromSnapshot ? (
         <View style={{ flexDirection: 'row', gap: 12 }}>
-          <Kind on={kind === 'clone'} onClick={() => setKind('clone')} title={tr('machines.clone.clone')} text={tr('machines.clone.cloneText')}
+          <Kind icon="copy" on={kind === 'clone'} onClick={() => setKind('clone')} title={tr('machines.clone.clone')} text={tr('machines.clone.cloneText')}
             foot={tr(info.reflink || cloneMethod(info, 'clone') === 'linked' ? 'machines.clone.changesOnly' : 'machines.clone.fullCopy')} />
-          <Kind on={kind === 'duplicate'} onClick={() => setKind('duplicate')} title={tr('machines.clone.duplicate')} text={tr('machines.clone.duplicateText')}
+          <Kind icon="disks" on={kind === 'duplicate'} onClick={() => setKind('duplicate')} title={tr('machines.clone.duplicate')} text={tr('machines.clone.duplicateText')}
             foot={tr(info.reflink ? 'machines.clone.alsoShares' : 'machines.clone.fullCopy')} />
         </View>
       ) : null}
@@ -83,15 +92,17 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
           {!keepId ? (
             <View style={{ gap: 4 }}>
               <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.clone.hostname')}</Text>
-              <TextInput value={host} onChange={(x) => setHost(x.trim().toLowerCase())} />
+              <TextInput value={host} onChange={(x) => setHost(win ? x.trim().toLowerCase().slice(0, WIN_NAME_MAX) : x.trim().toLowerCase())} />
             </View>
           ) : null}
           <Text style={{ fontSize: 12, lineHeight: 1.45, color: hostBad ? '#ff453a' : p.dim, textAlign: 'start' }}>
-            {hostBad ? tr('machines.clone.hostnameBad') : keepId ? tr('machines.clone.keepIdentityNote') : m.agent ? tr('machines.clone.identityAgent') : tr('machines.clone.identityNoAgent')}
+            {hostBad ? tr(win ? 'machines.clone.winNameBad' : 'machines.clone.hostnameBad') : keepId ? tr('machines.clone.keepIdentityNote')
+              : win ? tr('machines.win.cloneIdentity') : m.agent ? tr('machines.clone.identityAgent') : tr('machines.clone.identityNoAgent')}
           </Text>
         </View>
       ) : null}
-      <View style={{ paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, backgroundColor: blocked ? p.warnBg : p.card }}>
+      <View style={{ paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, backgroundColor: blocked ? p.warnBg : p.dark ? 'rgba(255,255,255,0.05)' : '#ffffff',
+        border: `1px solid ${p.dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}` }}>
         <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>
           {blocked || tr(`machines.clone.how.${how}`, { fs: info.fs || '', name: m.name })}
         </Text>

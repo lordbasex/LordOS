@@ -33,7 +33,9 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            unstable/text-input/text-input-unstable-v3 staging/xdg-activation/xdg-activation-v1 \
            unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 \
            staging/security-context/security-context-v1 \
-           unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1
+           unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
+           staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
+           staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
 
@@ -59,13 +61,13 @@ MEDIA_SRC := src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/m
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
 # App mode: lord-server --app <id> runs an .lpk app as an isolated Wayland client (src/app)
 APP_SRC := src/app/appclient.c src/app/appspawn.c src/app/companion.c src/app/probe.c src/ui/js_broker.c src/ui/js_brokercam.c src/ui/js_brokermail.c src/app/apphost_bc.c
-SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \
+SRC := src/hw/wallpaper_admin.c src/hw/wallpaper_find.c src/hw/wallpaper_image.c src/main.c src/fpipe.c src/kms.c src/gpu/gpu.c src/gpu/gscissor.c src/input.c src/canvas.c src/par.c src/wdog.c src/admin.c src/install/install.c src/install/freepart.c src/install/freespace.c src/install/manual.c src/install/manualpart.c src/apps.c src/fpak.c src/fpakrun.c src/fpakas.c src/fpspawn.c src/fpspawner.c src/fplend.c src/ui/js_flatpak.c src/iconfind.c src/lpk.c src/fsops.c src/fsasync.c src/remote/mirror.c src/remote/share.c src/remote/sharewire.c src/remote/sharegrant.c src/remote/sgrant_admin.c src/ui/js_share.c src/remote/remote_admin.c src/remote/ipnet.c src/remote/rtcwire.c src/remote/ssh_admin.c src/remote/ssh_root.c src/users/users_admin.c src/users/admin_rescue.c src/users/admingroups.c src/users/homedirs.c src/keyboard.c src/keylag.c src/ime.c src/wl/wl.c src/wl/keygrab.c src/wl/kbinhibit.c src/wl/xdgact.c src/wl/urilist.c src/wl/dndgate.c src/wl/secctx.c src/wl/x11wire.c src/wl/xwm.c src/wl/xwscale.c src/wl/xauth.c src/wl/xwayland.c src/osk.c \
        src/ui/wave.c src/sound/spectrum.c src/ui/node.c src/ui/style.c src/ui/layout.c src/ui/transform.c src/ui/text.c src/ui/image.c \
        src/ui/paint.c src/ui/js.c src/ui/js_sys.c src/ui/js_term.c src/ui/js_wasm.c src/wasm/wasm.c src/wasm/wasm_run.c src/ui/js_sound.c src/ui/js_net.c src/sound/snd.c src/sound/sndcard.c src/sound/pulse.c src/ui/otf.c src/ui/fonts.c \
        src/ui/unicode.c src/ui/bidi.c src/ui/shape.c src/ui/shape_indic.c src/ui/shape_syl.c src/ui/shape_khmer.c src/ui/shape_myanmar.c src/ui/shape_use.c src/ui/thbrk.c src/ui/textlayout.c src/ui/caret.c src/ui/grapheme.c \
        src/term/vt.c src/term/pty.c src/term/term.c src/term/termapp.c src/term/pastefilter.c src/term/termfill.c src/term/tsecret.c src/term/tcapture.c src/term/term_paint.c src/term/hold.c \
        src/net/nl.c src/net/crypto.c src/net/state.c src/net/sys.c src/net/dhcp.c src/net/wifi.c src/net/wg.c src/net/ovpn.c src/net/vpn.c src/net/forti.c src/net/vici.c src/net/ipsec.c src/net/vpnproc.c src/net/actions.c src/net/ifwatch.c src/net/wake.c \
-       src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pkg.c src/pkg/browserprefs.c src/pkg/sources_admin.c src/ui/js_pkg.c src/ui/js_sec.c \
+       src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pubhost.c src/pkg/pkg.c src/pkg/browserprefs.c src/pkg/sources_admin.c src/ui/js_pkg.c src/ui/js_sec.c \
        $(SEC_SRC) $(APP_SRC) $(MON_SRC) $(MEDIA_SRC)
 # Documents and printing (M9): lord-doc helper sessions and our own IPP/mDNS/eSCL client
 # (src/doc, src/print; see docs/DOCUMENTS.md and docs/PRINTING.md). No Poppler or libarchive here.
@@ -75,6 +77,12 @@ SRC += $(DOC_SRC)
 # Per-app firewall (src/fw, docs/FIREWALL.md): rules, decision and names learned from DNS
 FW_SRC := src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/fw/fwlists.c src/fw/fwsub.c src/ui/js_fw.c src/sec/netconn.c src/media/streamurl.c src/fetch/weather.c src/fetch/wxsvc.c src/fetch/geocities.c src/ui/js_weather.c
 SRC += $(FW_SRC)
+# Apps mode's guest side (ui/js_guestwin.c): this lord-server's windows for lordos-guest, inside a Machines guest
+SRC += src/ui/js_guestwin.c
+# The machines command's session channel (ui/js_vmcli.c, vm/vmcli.c): start and open a machine as the Machines app does
+SRC += src/ui/js_vmcli.c src/vm/vmcli.c
+# Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
+SRC += src/gpu/dmaread.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
@@ -88,7 +96,7 @@ SRC += $(TP_SRC)
 # cursor-shape-v1 needs the tablet-v2 interfaces (they're only linked, not advertised).
 # GTK/GNOME/Qt apps: our own org.freedesktop.portal.Settings (src/ui/portal.c) with the D-Bus client from
 # Passwords (src/vault/dbus.c, docs/PASSWORDS.md).
-WM_SRC := src/cursor.c src/shake.c src/ui/grab.c src/ui/js_wm.c src/ui/portal.c src/ui/portalcheck.c src/ui/gshort.c src/vault/dbus.c
+WM_SRC := src/cursor.c src/shake.c src/pointerlock.c src/ui/grab.c src/ui/js_wm.c src/ui/portal.c src/ui/portalshot.c src/ui/portalcheck.c src/ui/gshort.c src/vault/dbus.c
 # the tray of Linux apps: org.kde.StatusNotifierWatcher and dbusmenu (src/ui/sni.c, docs/WAYLAND.md "Tray icons")
 WM_SRC += src/ui/sni.c src/ui/snimodel.c
 SRC += $(WM_SRC)
@@ -309,7 +317,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/popup-client build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/wlperf-client build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -323,7 +331,7 @@ build/wasm-js-test: tests/wasm_js_test.c src/ui/js_wasm.c src/ui/js_wasm.h $(WAS
 build/wasm-test: tests/wasm_test.c $(WASM_SRC) src/wasm/wasm.h src/wasm/wasm_int.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/wasm_test.c $(WASM_SRC) -lm
-PKG_SRC := src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pkg.c src/pkg/browserprefs.c src/pkg/sources_admin.c src/sec/json.c
+PKG_SRC := src/pkg/crypto.c src/pkg/pgp.c src/pkg/xz.c src/pkg/deb.c src/pkg/idx.c src/pkg/pin.c src/pkg/status.c src/pkg/resolve.c src/pkg/match.c src/pkg/http.c src/pkg/pubhost.c src/pkg/pkg.c src/pkg/browserprefs.c src/pkg/sources_admin.c src/sec/json.c
 build/pkg-test: tests/pkg_test.c $(PKG_SRC) src/sec/cgroup.c build/obj/ui/stb.o src/admin.h $(wildcard src/pkg/*.h)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/pkg_test.c $(PKG_SRC) src/sec/cgroup.c build/obj/ui/stb.o -lm
@@ -384,6 +392,30 @@ test: build/framegate-test
 build/framegate-test: tests/framegate_test.c src/wl/framegate.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/framegate_test.c
+	./$@ || { rm -f $@; exit 1; }
+# a Linux window's display for its frame callbacks, presentation and new content (src/wl/outpick.h, docs/WAYLAND.md)
+test: build/outpick-test
+build/outpick-test: tests/outpick_test.c src/wl/outpick.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/outpick_test.c
+	./$@ || { rm -f $@; exit 1; }
+# a Linux window's buffer transform and damage in buffer pixels (src/wl/buftf.h, docs/WAYLAND.md)
+test: build/buftf-test
+build/buftf-test: tests/buftf_test.c src/wl/buftf.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/buftf_test.c
+	./$@ || { rm -f $@; exit 1; }
+# ext-idle-notify with the person's permission (src/wl/idlenotify.h, docs/WAYLAND.md "Idle notifications")
+test: build/idlenotify-test
+build/idlenotify-test: tests/idlenotify_test.c src/wl/idlenotify.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/idlenotify_test.c
+	./$@ || { rm -f $@; exit 1; }
+# an app's own window icon, copied and size-limited (src/wl/wlicon.h, docs/WAYLAND.md "Window icons")
+test: build/wlicon-test
+build/wlicon-test: tests/wlicon_test.c src/wl/wlicon.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/wlicon_test.c
 	./$@ || { rm -f $@; exit 1; }
 # the repeat of a held key in an isolated app (src/app/keyrepeat.h; the compositor sends its clients no repeats)
 test: build/keyrepeat-test
@@ -460,6 +492,13 @@ build/gshort-test: tests/gshort_test.c src/ui/gshort.c src/ui/gshort.h src/wl/ke
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/gshort_test.c src/ui/gshort.c src/wl/keygrab.c src/hw/jbuf.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
 # the same portal over a private session bus, a second connection as the app (tests/run_suites.sh, needs dbus-run-session)
+# the ScreenCast restore token, the Screenshot portal and the FileChooser's lending to Flatpak apps over a private bus
+# (tests/run_suites.sh, needs dbus-run-session)
+test: build/portal-cast-test
+build/portal-cast-test: tests/portal_cast_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h src/fplend.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/portal_cast_test.c src/ui/portal.c src/ui/gshort.c src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c -lpthread
+
 test: build/portal-gs-test
 build/portal-gs-test: tests/portal_gs_test.c src/ui/portal.c src/ui/portal.h src/ui/webask.h src/ui/gshort.c src/ui/gshort.h src/wl/keygrab.c src/vault/dbus.c src/hw/jbuf.c src/sec/json.c src/ui/portalcheck.c src/fsops.c src/cast/castsm.c src/cast/castsm.h
 	@mkdir -p build
@@ -579,12 +618,18 @@ build/brokermail-test: tests/brokermail_test.c src/sec/brokermail.c src/sec/json
 	./$@ || { rm -f $@; exit 1; }
 # tests/launch_cli.c: the real Linux app launcher outside the desktop, for tests/fwlinux/files.sh
 # (built by `make test`, run by that script in the VM)
-LAUNCH_CLI_SRC := src/lordlog.c src/apps.c src/fpak.c src/iconfind.c src/term/termapp.c src/wl/xdgact.c src/fsops.c src/hw/defaults.c src/hw/mimeapps.c src/sec/cgroup.c src/sec/sandbox.c \
+LAUNCH_CLI_SRC := src/lordlog.c src/apps.c src/fpak.c src/fpspawner.c src/iconfind.c src/term/termapp.c src/wl/xdgact.c src/fsops.c src/hw/defaults.c src/hw/mimeapps.c src/sec/cgroup.c src/sec/sandbox.c \
                   src/sec/restrict.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c
 test: build/launch-cli
 build/launch-cli: tests/launch_cli.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/launch_cli.c $(LAUNCH_CLI_SRC)
+# tests/fpspawn_cli.c: a Flatpak app with lord-server's Spawn portal and the app's Spawn helper, for
+# tests/fwflatpak/spawn.sh in a session (built by `make test`, run by that script)
+test: build/fpspawn-cli
+build/fpspawn-cli: tests/fpspawn_cli.c $(LAUNCH_CLI_SRC) src/fpspawn.c src/vault/dbus.c src/sec/appid.c src/apps.h src/fpspawn.h src/fpspawner.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fpspawn_cli.c $(LAUNCH_CLI_SRC) src/fpspawn.c src/vault/dbus.c src/sec/appid.c
 # tests/apps_actions_test.c: desktop actions (Actions= and [Desktop Action …]) in the real launcher
 test: build/apps-actions-test
 build/apps-actions-test: tests/apps_actions_test.c $(LAUNCH_CLI_SRC) src/apps.h $(wildcard src/sec/*.h src/fw/*.h src/hw/*.h)
@@ -794,7 +839,9 @@ CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoratio
                 stable/tablet/tablet-v2 staging/cursor-shape/cursor-shape-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1 \
                 unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 unstable/text-input/text-input-unstable-v3 \
                 staging/security-context/security-context-v1 \
-                unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1
+                unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
+                staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
+                staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
 CLIENT_GEN := $(foreach p,$(CLIENT_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 define wl_client_proto
 build/gen/client/$(notdir $(1))-client-protocol.h: $(WLPROTO)/$(1).xml
@@ -818,6 +865,14 @@ build/dialog-client: tests/dialog_client.c $(CLIENT_GEN)
 # A popup opened again on the same wl_surface, as GTK 4's popovers (GitHub #159): every opening gets its configure
 # (tests/popup_client.c; inside a session: WAYLAND_DISPLAY=wayland-0 build/popup-client; tests/run_suites.sh runs it
 # against a headless lord-server)
+# Apps mode's guest side (tests/guestwin_client.c): lord-server's window endpoint and lordos-guest's relay, run by
+# tests/guestwin_headless.sh against a headless lord-server
+build/guestwin-client: tests/guestwin_client.c src/vm/vmagent.c src/vm/vmagent.h
+	$(CC) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/guestwin_client.c src/vm/vmagent.c
+# Frames, titles and damage (tests/wlperf_client.c, docs/WAYLAND.md "Frames, titles and damage"): run by
+# tests/wlperf_headless.sh against a headless lord-server
+build/wlperf-client: tests/wlperf_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlperf_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag
@@ -853,6 +908,15 @@ build/lock-seat: tests/lock_seat.c
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/lock_seat.c
 
+# the second EGL reader (src/gpu/dmaread.c): an Intel Y-tiled and a linear dmabuf made on the Intel render node,
+# read back on it while another context is current; "skipped: needs an Intel render node" without one
+ifeq ($(GPU),1)
+test: build/dmaread-test
+build/dmaread-test: tests/dmaread_test.c src/gpu/dmaread.c src/gpu/dmaread.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/dmaread_test.c src/gpu/dmaread.c $(shell pkg-config --libs gbm egl glesv2)
+	./$@ || { rm -f $@; exit 1; }
+endif
 # what slows the GPU under CPU load (tests/gpu_contention.c, docs/GPU.md): a test tool, never installed
 GC_PKGS := gbm egl glesv2
 build/gpu-contention: tests/gpu_contention.c src/gpu/gcontend.c src/gpu/gcontend.h
@@ -963,6 +1027,14 @@ build/cursor-test: tests/cursor_test.c src/cursor.c src/cursor.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
 	    -o $@ tests/cursor_test.c src/cursor.c -lm
+	./$@ || { rm -f $@; exit 1; }
+
+# the pointer lock of LordOS's own windows (src/pointerlock.c; Machines' "Capture mouse"). Wayland clients' is src/wl/ptrlock.h
+test: build/pointerlock-test
+build/pointerlock-test: tests/pointerlock_test.c src/pointerlock.c src/pointerlock.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g $(WARN) -std=c11 -D_GNU_SOURCE -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer \
+	    -o $@ tests/pointerlock_test.c src/pointerlock.c -lm
 	./$@ || { rm -f $@; exit 1; }
 
 build/shake-test: tests/shake_test.c src/shake.c src/shake.h

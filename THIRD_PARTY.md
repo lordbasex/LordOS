@@ -25,6 +25,16 @@ its Pocket TTS family only, and the `lordos` package installs the libraries in `
 | SentencePiece 0.2.1, with its Abseil, protobuf-lite and darts-clone (`external/sentencepiece`) | the model's tokenizer, linked into `libaudiocpp` | Apache-2.0 (SentencePiece, Abseil), BSD-3-Clause (protobuf-lite, darts-clone) |
 | cJSON 1.7.19, libyaml 0.2.5 (`external/cJSON`, `external/libyaml`) | reading audio.cpp's model descriptions, linked into `libaudiocpp` | MIT |
 
+## Fetched at build time for the GVT-g option ROM (in development)
+
+`tools/firmware/build-gvt-gop.sh` downloads EDK2 at one pinned tag (tarball SHA-256 and embedded commit checked) into
+a work folder outside the repository and builds LordOS's own GVT-g GOP driver (`firmware/gvt-gop`, MIT, sources in
+its `NOTICE.md`) against it. The option ROM links EDK2 library code; nothing else in LordOS does. Unmodified.
+
+| Component (version) | Used for | License |
+|---|---|---|
+| EDK2 `edk2-stable202502` (commit `fbe0805b2091393406952e84724188f8c1941837`, https://github.com/tianocore/edk2) | BaseTools (GenFw, EfiRom) and the MdePkg/MdeModulePkg libraries linked into the ROM (BaseLib, UefiLib, FrameBufferBltLib…); OvmfPkg's debug-port library in DEBUG builds | BSD-2-Clause-Patent |
+
 ## Data files
 
 | Data | Used for | License |
@@ -70,6 +80,12 @@ Kyutai forbids cloning a voice without the person's explicit consent, impersonat
 a real recording; LordOS shows that notice where voices are created. Voices whose recording does not allow
 redistribution and commercial use are left out (jean, from EARS: non-commercial only; cosette, javert and marius: their
 recordings' origin isn't documented).
+
+## Community themes
+
+| Theme | Credit | License |
+|---|---|---|
+| Lord Celeste (`themes/celeste`) | Layout inspired by Caelestia (caelestia-dots/shell, GPL-3.0); no code or assets from it. Author pending confirmation | MIT |
 
 ## npm packages (bundled into the theme JavaScript at build time)
 

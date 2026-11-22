@@ -17,7 +17,14 @@ import { SUB_DELAY, SUB_GRACE, selectable, stepIndex, edgeIndex, menuAction, typ
 
 const inside = (inst, ref) => { for (let n = inst; n; n = n.parent) if (n === ref?.current) return true; return false; };
 const ITEM_H = 24;
-const rowH = (it) => (it === '-' ? 9 : it.header ? 20 : it.swatches ? ITEM_H + 4 : ITEM_H);
+// a note: a few lines of dim text that say why something isn't there (Files' Open with for a program no machine opens
+// yet); it wraps, so a menu with one is as wide as menus get
+const MENU_MAX_W = 320, NOTE_PAD = 14, NOTE_LINE = 16;
+const noteLines = (s) => {
+  const w = typeof lord !== 'undefined' && lord.measureText ? lord.measureText(s, 12, 400) : String(s).length * 6;
+  return Math.max(1, Math.ceil((w * 1.1) / (MENU_MAX_W - 2 * NOTE_PAD)));
+};
+const rowH = (it) => (it === '-' ? 9 : it.header ? 20 : it.note ? 8 + NOTE_LINE * noteLines(it.note) : it.swatches ? ITEM_H + 4 : ITEM_H);
 const heightOf = (items) => items.reduce((s, it) => s + rowH(it), 10);
 const rowTop = (items, i) => 5 + items.slice(0, i).reduce((s, q) => s + rowH(q), 0);
 // where a box of this size goes, inside the bounds
@@ -34,6 +41,7 @@ function MenuBox({ items, left, top, width, active, onRow, onPick, onMove, onEnt
       {items.map((it, i) => {
         if (it === '-') return <View key={i} style={{ height: 1, marginVertical: 4, marginHorizontal: 8, backgroundColor: t.separator }} />;
         if (it.header) return <Text key={i} style={{ height: 20, paddingHorizontal: 14, paddingTop: 4, fontSize: 11, fontWeight: 600, color: t.textDim }}>{it.header}</Text>;
+        if (it.note) return <Text key={i} onMouseEnter={() => onRow(i)} style={{ paddingHorizontal: NOTE_PAD, paddingVertical: 4, fontSize: 12, lineHeight: NOTE_LINE, color: t.textDim, textAlign: 'start', whiteSpace: 'normal' }}>{it.note}</Text>;
         if (it.swatches) {
           return (
             <View key={i} onMouseEnter={() => onRow(i)} style={{ flexDirection: 'row', gap: 8, height: ITEM_H + 4, alignItems: 'center', paddingHorizontal: 14 }}>
@@ -61,14 +69,14 @@ function MenuBox({ items, left, top, width, active, onRow, onPick, onMove, onEnt
   );
 }
 
-// Context menu: items [{ label, onClick, hint, checked, dot (a color), disabled, danger, submenu } | '-' | { header } | { swatches }]
+// Context menu: items [{ label, onClick, hint, checked, dot (a color), disabled, danger, submenu } | '-' | { header } | { note } | { swatches }]
 export function ContextMenu({ x, y, items, onClose, bounds = { w: 4000, h: 4000 } }) {
   const ref = useRef(null), subRef = useRef(null);
   const [sub, setSub] = useState(null);           // { items, left, top, width, side, row, keys }
   const [active, setActive] = useState(-1);
   const [subActive, setSubActive] = useState(-1);
   items = items.filter(Boolean);
-  const width = (list) => Math.min(320, Math.max(190, ...list.filter((i) => i && i.label).map((i) => 46 + lord.measureText(i.label, 13, 400) + (i.hint ? 16 + lord.measureText(i.hint, 11, 400) : 0))));
+  const width = (list) => (list.some((i) => i && i.note) ? MENU_MAX_W : 0) || Math.min(MENU_MAX_W, Math.max(190, ...list.filter((i) => i && i.label).map((i) => 46 + lord.measureText(i.label, 13, 400) + (i.hint ? 16 + lord.measureText(i.hint, 11, 400) : 0))));
   const w = width(items);
   const { left, top } = boxAt(items, x, y, w, bounds);
   const st = useRef({});

@@ -34,7 +34,7 @@ const fitsHere = (a, here) => !here || !a.arches || a.arches.includes(here);
 function AiCard({ a, here, onOpen }) {
   const fits = fitsHere(a, here);
   const inst = installed(a.package);
-  return h(Card, { icon: h(AiIcon, { a, size: 56 }), name: a.name, kind: `${kindOf(a)} · ${a.vendor || ''}`, summary: summary(a), dim: !fits,
+  return h(Card, { icon: h(AiIcon, { a, size: 56 }), name: a.name, tag: t('store.kind.linux'), kind: `${kindOf(a)} · ${a.vendor || ''}`, summary: summary(a), dim: !fits,
     note: !fits ? t('store.ai.notForArch', { arch: here }) : sizeOf(a),
     action: fits ? h(Pill, { label: inst ? t('store.ai.view') : t('store.get'), onClick: () => onOpen(a.package) }) : null,
     onClick: () => fits && onOpen(a.package) });

@@ -194,6 +194,36 @@ void vm_hostname_from_name(const char *name, char *out, size_t n) {
     if (!o) snprintf(out, n, "machine");
 }
 
+int vm_winname_valid(const char *s) {
+    size_t n = s ? strlen(s) : 0;
+    int letter = 0;
+    if (!n || n > VM_WINNAME_MAX || s[0] == '-') return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = s[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-') letter = 1;
+        else if (!(c >= '0' && c <= '9')) return 0;
+    }
+    return letter;
+}
+
+int vm_winname_from_host(const char *host, const char *id, char out[VM_WINNAME_MAX + 1]) {
+    out[0] = 0;
+    if (!vm_hostname_valid(host)) return -1;
+    size_t n = strlen(host);
+    if (n <= VM_WINNAME_MAX) snprintf(out, VM_WINNAME_MAX + 1, "%s", host);
+    else {
+        char hex[5];
+        size_t k = 0;
+        for (const char *p = id ? id : ""; *p && k < 4; p++) if ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f')) hex[k++] = *p;
+        hex[k] = 0;
+        size_t m = 10;
+        while (m && host[m - 1] == '-') m--;
+        snprintf(out, VM_WINNAME_MAX + 1, "%.*s%s%s", (int)m, host, k ? "-" : "", hex);
+    }
+    if (!vm_winname_valid(out)) { out[0] = 0; return -1; }
+    return 0;
+}
+
 int vm_identity_write(const char *dir, const char *hostname) {
     if (!vm_hostname_valid(hostname)) return -1;
     char tmp[VM_PATH_MAX + 64], path[VM_PATH_MAX + 64], buf[128];

@@ -160,8 +160,16 @@
   "vm.imageRemoved": "امیج حذف کر دی گئی",
   "vm.downloadResumed": "رکا ہوا ڈاؤن لوڈ جاری ہے ({from} بائٹس محفوظ)",
   "vm.kvmReady": "اجازت مل گئی: مشینیں اب ہارڈ ویئر ورچوئلائزیشن استعمال کر سکتی ہیں",
+  "vm.bridgeReady": "برج والا نیٹ ورک تیار ہے ({name})",
+  "vm.bridgeGone": "برج والا نیٹ ورک ہٹا دیا گیا",
   "vm.kvmNextLogin": "آپ کے اگلے لاگ ان سے اجازت ہے",
   "pkg.foreignArchAdded": "32 بٹ ({arch}) پیکیجز فعال کر دیے گئے",
   "pkg.foreignArchPresent": "32 بٹ ({arch}) پیکیجز پہلے سے فعال تھے",
-  "pkg.why.multiarchPair": "{name} جیسا ہی ورژن"
+  "pkg.why.multiarchPair": "{name} جیسا ہی ورژن",
+  "gpu.roleSet": "گرافکس کارڈ کا استعمال محفوظ ہو گیا ({card}): لاگو کرنے کے لیے ری اسٹارٹ کریں",
+  "vm.gvtReady": "گرافکس کارڈ کا حصہ تیار ہے ({name})",
+  "vm.gvtGone": "گرافکس کارڈ کا حصہ ہٹا دیا گیا",
+  "gpu.freqSet": "گرافکس کارڈ کی کم از کم فریکوئنسی مقرر ہو گئی",
+  "gpu.memlockSet": "وہ میموری جو مشینیں لاک کر سکتی ہیں محفوظ ہو گئی",
+  "vm.memlockSet": "مشین کی میموری لاک ہو گئی"
 }

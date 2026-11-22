@@ -169,8 +169,16 @@
   "vm.imageRemoved": "Imagine ștearsă",
   "vm.downloadResumed": "Se continuă o descărcare oprită ({from} octeți păstrați)",
   "vm.kvmReady": "Permis: mașinile pot folosi acum virtualizarea hardware",
+  "vm.bridgeReady": "Rețea în punte pregătită ({name})",
+  "vm.bridgeGone": "Rețea în punte eliminată",
   "vm.kvmNextLogin": "Permis de la următoarea autentificare",
   "pkg.foreignArchAdded": "Pachetele pe 32 de biți ({arch}) au fost activate",
   "pkg.foreignArchPresent": "Pachetele pe 32 de biți ({arch}) erau deja activate",
-  "pkg.why.multiarchPair": "Aceeași versiune ca {name}"
+  "pkg.why.multiarchPair": "Aceeași versiune ca {name}",
+  "gpu.roleSet": "Utilizarea plăcii video a fost salvată ({card}): reporniți pentru a aplica",
+  "vm.gvtReady": "Partea din placa video este gata ({name})",
+  "vm.gvtGone": "Partea din placa video a fost eliminată",
+  "gpu.freqSet": "Frecvența minimă a plăcii video a fost setată",
+  "gpu.memlockSet": "Memoria pe care mașinile o pot bloca a fost salvată",
+  "vm.memlockSet": "Memoria mașinii a fost blocată"
 }

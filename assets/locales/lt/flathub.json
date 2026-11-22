@@ -35,7 +35,6 @@
   "msg.updateDone": "Atnaujinta: {name}.",
   "noResults": "Neatitinka jokia Flathub programa.",
   "notSupported": "Flathub šiame kompiuteryje dar nepasiekiamas: kol kas jis skirtas tik asmeniniams kompiuteriams.",
-  "notYet": "Dar nepalaikoma",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Kitų programų derinimas",
   "perm.devicesAll": "Visi įrenginiai: kameros, žaidimų valdikliai, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Tik Flathub patikrintos programos. Paslėpta: {count}",
   "showAllOn": "Rodomos visos Flathub programos, patikrintos ar ne",
   "showMore": "Rodyti daugiau (liko: {count})",
-  "subsandbox.text": "Ši programa sukurta su Chromium arba Electron, kurių pagalbinėms programoms reikia, kad Flatpak smėlio dėžės būtų bendrinamos taip, kaip LordOS dar nesiūlo, todėl kol kas jos čia įdiegti negalima.",
-  "subsandbox.title": "LordOS dar nepalaikoma",
   "subtitle": "Linux programos iš Flathub, vykdomos pačios LordOS izoliuotoje aplinkoje pagal jūsų Užkardą.",
   "turnOff": "Išjungti",
   "unverified": "Flathub nepatikrinta: leidėjas gali būti ne programos kūrėjas.",
@@ -110,5 +107,6 @@
   "updates.button": "Atnaujinti Flathub programas",
   "updates.text": "Įdiegta iš Flathub: {count}. Flatpak patikrina kiekvieną ir įdiegia tai, kas pasikeitė; atidaryta programa baigia atsinaujinti, kai ją vėl atidarote.",
   "updates.title": "Flathub programos",
-  "verified": "Patikrinta: paskelbė {developer}"
+  "verified": "Patikrinta: paskelbė {developer}",
+  "note.obsVideos": "„LordOS“ sistemoje „OBS Studio“ įrašus išsaugo aplanke „Vaizdo įrašai“: kiti namų aplanko aplankai „Flathub“ programoms yra tik skaitomi."
 }

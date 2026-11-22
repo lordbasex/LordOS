@@ -42,6 +42,8 @@
     "many": "{ms} ms · {count} عقدة",
     "other": "{ms} ms · {count} عقدة"
   },
+  "pauses": "توقفات أطول من 50 ms",
+  "pausesValue": "{count} (الأطول: {ms} ms)",
   "server": "خادم العرض",
   "systemApp": "تطبيق نظام",
   "systemReport": "تقرير النظام…",
@@ -50,5 +52,6 @@
   "version": "الإصدار {v}",
   "versionChannel": "الإصدار {v} · {channel}",
   "case": "الهيكل",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "أسماء المنتجات وشعاراتها علامات تجارية لأصحابها؛ LordOS غير تابع لهم ولا يحظى بتأييدهم. لا تُنزَّل الشعارات إلا بطلبك، من موقع كل مالك، وتُعرض على هذا الحاسوب فقط."
 }

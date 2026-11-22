@@ -11,6 +11,7 @@
 #include "http.h"
 #include "../errcode.h"
 #include "crypto.h"
+#include "pubhost.h"
 #include "../sec/cgroup.h"
 
 #include <ctype.h>
@@ -80,6 +81,7 @@ typedef struct {
     int out;                            /* pipe to the parent */
     char dead[DEAD_MAX][264];           /* "host:port" that didn't answer in this batch */
     int ndead;
+    int public_only;                    /* the item's (FetchItem.public_only) */
 } Conn;
 
 static long long mono_ms(void) {
@@ -183,9 +185,11 @@ static int conn_open(Conn *c, const char *host, const char *port, int tls, char 
     int r = getaddrinfo(host, port, &hints, &res);
     if (r) { mark_dead(c, host, port); lerr_set(err, errlen, "pkg.http.hostNotFound", "host", host, NULL); return -1; }
     long long end = mono_ms() + CONNECT_TOTAL_MS;
+    int skipped = 0;
     for (struct addrinfo *a = res; a; a = a->ai_next) {
         long long left = end - mono_ms();
         if (left <= 0) break;
+        if (c->public_only && !pubhost_addr_ok(a->ai_addr, a->ai_addrlen)) { skipped++; continue; }   /* never a LAN or loopback */
         int fd = socket(a->ai_family, a->ai_socktype | SOCK_CLOEXEC | SOCK_NONBLOCK, a->ai_protocol);
         if (fd < 0) continue;
         if (connect(fd, a->ai_addr, a->ai_addrlen) && errno != EINPROGRESS) { close(fd); continue; }
@@ -197,6 +201,7 @@ static int conn_open(Conn *c, const char *host, const char *port, int tls, char 
         break;
     }
     freeaddrinfo(res);
+    if (c->fd < 0 && skipped) { lerr_set(err, errlen, "pkg.http.notPublic", "host", host, NULL); return -1; }
     if (c->fd < 0) { mark_dead(c, host, port); lerr_set(err, errlen, "pkg.http.connectFailed", "host", host, NULL); return -1; }
     c->tls = tls;
     if (tls && (c->fd = tls_start(c, c->fd, host, err, errlen)) < 0) return -1;
@@ -314,7 +319,9 @@ static void get_file(Conn *c, const FetchItem *it, uint32_t idx) {
 /* Downloads one item: sends H, D… and E. */
 static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
     if (!strncmp(it->url, "file:", 5)) { get_file(c, it, idx); return; }
-    char url[1100], err[200] = "", line[4096];
+    /* GitHub's release downloads redirect to a signed URL of about 900 bytes and send a Content-Security-Policy line of
+     * about 4.2 KB (WinFsp, 2026-11-20): a header line may be up to 12 KB (the connection's buffer holds 16) */
+    char url[2200], err[200] = "", line[12288];
     snprintf(url, sizeof url, "%s", it->url);
     int was_tls = 0;
     for (int redirects = 0;; redirects++) {
@@ -323,6 +330,8 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
         int tls;
         if (parse_url(url, host, sizeof host, port, sizeof port, &path, &tls)) { lerr_set(err, sizeof err, "pkg.http.badUrl", NULL); break; }
         if (was_tls && !tls) { lerr_set(err, sizeof err, "pkg.http.downgrade", NULL); break; }   /* https never back to http */
+        /* an address a person typed, and every redirect from it: https, port 443, a public DNS name */
+        if (it->public_only && (!tls || strcmp(port, "443") || !pubhost_name_ok(host))) { lerr_set(err, sizeof err, "pkg.http.notPublic", "host", host, NULL); break; }
         was_tls = tls;
         const char *defport = tls ? "443" : "80";
         int retry = c->fd >= 0;             /* a reused connection may have been closed */
@@ -359,7 +368,8 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
         if (sscanf(line, "HTTP/1.%d %d", &minor, &status) != 2) { conn_close(c); lerr_set(err, sizeof err, "pkg.http.badResponse", NULL); break; }
         int64_t clen = -1, lastmod = 0;
         int chunked = 0, close_after = minor == 0;
-        char location[1024] = "";
+        char location[2048] = "";
+        int location_cut = 0;
         unsigned long long cr_from = 0, cr_to = 0;
         int has_cr = 0;
         for (;;) {
@@ -372,7 +382,7 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
             if (!strcasecmp(line, "Content-Length")) clen = strtoll(v, NULL, 10);
             else if (!strcasecmp(line, "Transfer-Encoding") && strcasestr(v, "chunked")) chunked = 1;
             else if (!strcasecmp(line, "Connection") && strcasestr(v, "close")) close_after = 1;
-            else if (!strcasecmp(line, "Location")) snprintf(location, sizeof location, "%s", v);
+            else if (!strcasecmp(line, "Location")) location_cut = snprintf(location, sizeof location, "%s", v) >= (int)sizeof location;
             else if (!strcasecmp(line, "Last-Modified")) lastmod = http_parse_date(v);
             else if (!strcasecmp(line, "Content-Range")) has_cr = sscanf(v, "bytes %llu-%llu/", &cr_from, &cr_to) == 2;
         }
@@ -427,6 +437,7 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
         }
         if (close_after) conn_close(c);
         if (status == 416 && from) { from = 0; continue; }          /* the part is no use (the file changed): again */
+        if (redirect && location_cut) { lerr_set(err, sizeof err, "pkg.http.badHeaders", NULL); break; }   /* never a cut URL */
         if (redirect && redirects < 5) {
             if (location[0] == '/') snprintf(url, sizeof url, "%s://%s%s%s%s", tls ? "https" : "http", host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", location);
             else snprintf(url, sizeof url, "%s", location);
@@ -515,7 +526,11 @@ int fetch_batch_in(FetchItem *items, int n, FetchProgress cb, void *ud, const ch
         if (drop_to_nobody()) _exit(2);
         static Conn c;
         c.fd = -1; c.out = 3; c.tls = 0; c.helper = 0; c.ndead = 0;
-        for (int i = 0; i < n; i++) get_one(&c, &items[i], (uint32_t)i, items[i].resumed);
+        for (int i = 0; i < n; i++) {
+            if (c.public_only != items[i].public_only) conn_close(&c);   /* never reuse a connection across the rule */
+            c.public_only = items[i].public_only;
+            get_one(&c, &items[i], (uint32_t)i, items[i].resumed);
+        }
         conn_close(&c);
         _exit(0);
     }

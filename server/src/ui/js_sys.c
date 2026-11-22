@@ -481,6 +481,11 @@ static JSValue f_themes_list(JSContext *c, JSValueConst this_val, int argc, JSVa
         JS_SetPropertyStr(c, o, "id", JS_NewString(c, e->d_name));
         JS_SetPropertyStr(c, o, "meta", json ? JS_NewString(c, json) : JS_NULL);
         JS_SetPropertyStr(c, o, "current", JS_NewBool(c, realpath(meta, real) && !strcmp(real, cur)));
+        /* it failed to start in this session (lord.themes.use refuses it): Settings → Appearance says so */
+        if (!strcmp(bundle, ui.theme_failed)) {
+            JS_SetPropertyStr(c, o, "failed", JS_TRUE);
+            JS_SetPropertyStr(c, o, "failedWhy", JS_NewString(c, ui.theme_failed_why));
+        }
         JS_SetPropertyUint32(c, arr, i++, o);
         free(json);
     }
@@ -1666,6 +1671,7 @@ static JSValue f_wl_state(JSContext *c, JSValueConst this_val, int argc, JSValue
     if (argc > 4) wl_set_parked(id, JS_ToBool(c, argv[4]));
     if (argc > 5) wl_set_covered(id, JS_ToBool(c, argv[5]));
     if (argc > 6) wl_set_fixed(id, JS_ToBool(c, argv[6]));
+    if (argc > 7) { int32_t e = 0; JS_ToInt32(c, &e, argv[7]); wl_set_tiled(id, e); }
     return JS_UNDEFINED;
 }
 
@@ -1680,6 +1686,62 @@ static JSValue f_wl_info(JSContext *c, JSValueConst this_val, int argc, JSValueC
     JS_SetPropertyStr(c, o, "x11SelfScale", JS_NewBool(c, xwl_self_scaling()));
     JS_SetPropertyStr(c, o, "x11Scale", JS_NewInt32(c, xwl_running() ? wlx_scale() : 0));
     return o;
+}
+
+/* lord.wayland.icon(window) → { width, height, data: ArrayBuffer (RGBA) } | null: the icon a Linux window set for itself
+ * (xdg-toplevel-icon, already re-encoded and size-limited by wl.c), for <Image pixels>; sdk/apps.js shows it only for a
+ * window whose app has no installed icon */
+static JSValue f_wl_icon(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t id = 0;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0])) return JS_NULL;
+    int side = 0;
+    const uint8_t *px = wl_window_icon(id, &side);
+    if (!px || side <= 0) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "width", JS_NewInt32(c, side));
+    JS_SetPropertyStr(c, o, "height", JS_NewInt32(c, side));
+    JS_SetPropertyStr(c, o, "data", JS_NewArrayBufferCopy(c, px, (size_t)side * (size_t)side * 4));
+    return o;
+}
+
+/* lord.wayland.idleAnswer(app, allow) → bool: the person's answer to the "idle" prompt (ext-idle-notify) lord-server is
+ * waiting on for app; anything else is ignored (wl_idle_answer) */
+static JSValue f_wl_idle_answer(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2 || !JS_IsString(argv[0])) return JS_FALSE;
+    const char *app = JS_ToCString(c, argv[0]);
+    int ok = app && wl_idle_answer(app, JS_ToBool(c, argv[1]));
+    if (app) JS_FreeCString(c, app);
+    return JS_NewBool(c, ok);
+}
+
+/* lord.wayland.workAreas([{x, y, w, h}, …]): each display's work area as the theme computes it (sdk/wayland.js), for
+ * xdg_toplevel.configure_bounds; numbers only, at most one per display (wl_set_work_areas matches them) */
+static JSValue f_wl_work_areas(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1 || !JS_IsArray(c, argv[0])) return JS_FALSE;
+    int r[OUT_MAX][4], n = 0;
+    int64_t len = 0;
+    JSValue l = JS_GetPropertyStr(c, argv[0], "length");
+    JS_ToInt64(c, &len, l);
+    JS_FreeValue(c, l);
+    for (int64_t i = 0; i < len && n < OUT_MAX; i++) {
+        JSValue o = JS_GetPropertyUint32(c, argv[0], (uint32_t)i);
+        static const char *const k[4] = { "x", "y", "w", "h" };
+        int ok = JS_IsObject(o);
+        for (int j = 0; j < 4 && ok; j++) {
+            JSValue v = JS_GetPropertyStr(c, o, k[j]);
+            double d = 0;
+            ok = JS_IsNumber(v) && !JS_ToFloat64(c, &d, v) && d > -65536 && d < 65536;
+            r[n][j] = (int)d;
+            JS_FreeValue(c, v);
+        }
+        JS_FreeValue(c, o);
+        if (ok) n++;
+    }
+    wl_set_work_areas((const int (*)[4])r, n);
+    return JS_TRUE;
 }
 
 /* lord.wayland.x11SelfScale(on): Settings → Displays, X11 apps scale themselves (sharp) or LordOS
@@ -1820,7 +1882,10 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("focus", 2, f_wl_focus),
     JS_CFUNC_DEF("close", 1, f_wl_close),
     JS_CFUNC_DEF("kill", 1, f_wl_kill),
-    JS_CFUNC_DEF("state", 7, f_wl_state),
+    JS_CFUNC_DEF("state", 8, f_wl_state),
+    JS_CFUNC_DEF("workAreas", 1, f_wl_work_areas),
+    JS_CFUNC_DEF("idleAnswer", 2, f_wl_idle_answer),
+    JS_CFUNC_DEF("icon", 1, f_wl_icon),
     JS_CFUNC_DEF("info", 0, f_wl_info),
     JS_CFUNC_DEF("x11SelfScale", 1, f_wl_x11_self_scale),
 };
@@ -2420,6 +2485,7 @@ static const JSCFunctionListEntry users_funcs[] = {
 
 static int greeter_mode;
 void js_sys_set_greeter(int on) { greeter_mode = on; }
+int js_sys_greeter(void) { return greeter_mode; }
 
 /* is the session managed by lord-sessiond (is there a login screen to go back to)? */
 static JSValue f_session_managed(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {

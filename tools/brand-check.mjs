@@ -31,6 +31,9 @@ const ALLOW = [
   [/^assets\/locales\/ms\/(format|calendar|photos)\.json$/, '"Mac"', 'March in Malay (glibc ms_MY, CLDR ms): a month name, not the computer'],
   [/^assets\/locales\/sw\/(format|calendar|photos)\.json$/, '"Mac"', 'March in Swahili (glibc sw_KE, CLDR sw): a month name, not the computer'],
   [/^assets\/locales\/sw\/shell\.json$/, '"Safari ya', 'the Swahili word for journey (wallpaper names "Odyssey", "Voyage"), not the browser'],
+  [/^assets\/locales\/[a-zA-Z-]+\/machines\.json$/, /^\s*"(win\.[A-Za-z.]+|req\.row\.tpm)": ".*$/m,
+    'Machines installs Windows 11 and sends the person to Microsoft\'s own page for it: it has to say their names (docs/VIRTUALIZATION.md 4.3, approved 2026-11-20)'],
+  [/^CHANGELOG\.md$/, /^- \*\*Windows 11 in Machines, ready as it starts\*\*[\s\S]*?^- `lord-vm --sha256 FILE`.*$/m, 'the changelog entry of the Windows 11 card (the same approval)'],
 ];
 
 function files() {

@@ -8,6 +8,7 @@ import {
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl, Layer, shellLayers,
   wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText, useSidebar, SidebarToggle, SidebarOverlay,
+  ConfirmDialog, Checkbox, setDefaultProvider, openExtOf, openHintsFor,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -199,6 +200,7 @@ export default function Files() {
   const [quick, setQuick] = useState(false);
   const [info, setInfo] = useState(false);
   const [confirm, setConfirm] = useState(null);
+  const [providerAsk, setProviderAsk] = useState(null);     // { e, p, start, offerAlways, always }: "Open with" a provider (askProvider)
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState(() => (prefs.searchScope === 'last' ? prefs.lastScope : prefs.searchScope));
   const [sheet, setSheet] = useState(null);               // 'goto' | 'connect' | 'settings'
@@ -606,7 +608,10 @@ export default function Files() {
     setConfirm({ text: tr('files.confirm.pasteFrom', { count: ask.count, app }), detail: lines.join('\n'), ok: tr('files.menu.paste'), cautious: true,
       run: () => paste(dir, knownNames(dir), c) });
   };
-  const ctx = { navigate, linuxApps: launcherApps, t: tr, say: setMsg, quickLook: (e) => { setSelected(new Set([e.path])); setQuick(true); },
+  // a provider for a file no app here opens, or the person's choice that starts a machine first (ops.js openEntry):
+  // asked, with "Always open .ext files with …" when offerAlways
+  const askProvider = (e, p, o = {}) => setProviderAsk({ e, p, start: !!o.start, offerAlways: !!o.offerAlways, always: false });
+  const ctx = { navigate, linuxApps: launcherApps, t: tr, say: setMsg, askProvider, quickLook: (e) => { setSelected(new Set([e.path])); setQuick(true); },
     openArc: (e) => { setMsg(tr('docs.opening', { name: e.name })); extractEntry(e).then((real) => openEntry({ name: e.name, path: real, size: e.size, mtime: e.mtime }, ctx)).catch((err) => setMsg(tr('docs.extractError', { name: e.name, error: err.message }))); } };
   const arcReport = (m) => setMsg(m);
   // a computer: its best way in; connected shares open as folders
@@ -739,7 +744,7 @@ export default function Files() {
       setDrag(null); setDropTarget(null);
       tellOver(null);
       const other = !target && !p.favOnly ? filesDropOf(e.target) : null;
-      if (other) { try { other(p.paths, { alt: !!e.alt }); } catch (err) { console.warn('files drop:', err); } return; }
+      if (other) { try { other(p.paths, { alt: !!e.alt, x: e.x, y: e.y }); } catch (err) { console.warn('files drop:', err); } return; }
       if (target === 'fav:') { p.paths.forEach(addFavorite); return; }
       if (p.favOnly || !target || p.paths.includes(target)) return;      // a mounted volume is never moved
       if (target === 'trash:') { trashRef.current(p.paths); return; }       // (cloud paths are asked about and deleted there)
@@ -773,13 +778,27 @@ export default function Files() {
           archive.extract(e.arc.file, `${dir}/${name}`, { only: list.map((x) => x.arc.inner) }).then((r) => { bump(); setMsg(tr('docs.extracted', { name, count: r.files })); }).catch((err) => setMsg(tr('docs.extractError', { name, error: err.message }))); } }];
     }
     const openers = openersFor(e, launcherApps, tr);
+    // no provider opens it yet but one says why (a Windows program, a Windows machine with older LordOS tools): a note
+    // at the end of Open with, so the menu doesn't just leave it out
+    const hints = e.dir ? [] : openHintsFor(e);
+    // the apps, then the providers (a machine…); the person's "Always open .ext files with …" one can be forgotten here
+    const openWithItems = (f, list) => {
+      const items = [];
+      list.forEach((o, i) => {
+        if (o.provider && !o.isDefault && i > 0 && !(list[i - 1].provider && !list[i - 1].isDefault)) items.push('-');
+        items.push({ label: o.label, onClick: o.run });
+      });
+      if (list.some((o) => o.provider && o.isDefault)) items.push('-', { label: tr('files.openWith.forget', { ext: openExtOf(f.name) }), onClick: () => setDefaultProvider(f, null) });
+      hints.forEach((h, i) => { if (items.length && !i) items.push('-'); items.push({ note: h }); });
+      return items;
+    };
     // where Compress and New Folder with Selection put what they make: next to the item (a deeper column's own folder,
     // an unfolded folder's in the list)
     const here = wDir && (colItems || listItems) ? fs.parent(e.path) || wDir : wDir;
     return [
       { label: tr('files.menu.open'), hint: '❖↓', onClick: () => openSel(list) },
       ...(e.dir ? [prefs.favoriteFolders.some((f) => f.path === e.path) ? { label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(e.path) } : { label: tr('files.fav.add'), onClick: () => addFavorite(e.path) }, { label: tr('files.menu.openTab'), onClick: () => newTabAt({ type: 'dir', path: e.path }) }, { label: tr('files.menu.openTerminal'), onClick: () => openTerminal(e.path) }] : []),
-      ...(!e.dir && openers.length ? [{ label: tr('files.menu.openWith'), submenu: openers.map((o) => ({ label: o.label, onClick: o.run })) }] : []),
+      ...(!e.dir && (openers.length || hints.length) ? [{ label: tr('files.menu.openWith'), submenu: openWithItems(e, openers) }] : []),
       ...(() => { const ci = cloudMenuItems(list, cf, { onShare: setSharing, onMsg: setMsg }); return ci.length ? ['-', ...ci] : []; })(),
       '-',
       { label: tr('files.menu.trash'), hint: '❖⌫', onClick: () => toTrash(paths), disabled: readOnly && !roWhy },
@@ -1257,6 +1276,18 @@ export default function Files() {
         extra={cf.accountOf(infoEntry.path) ? <CloudInfo e={infoEntry} cf={cf} onShare={(x) => { setInfo(false); setSharing(x); }} /> : null} />}
       {sharing && cf.accountOf(sharing.path) && <ShareSheet e={sharing} cf={cf} onClose={() => setSharing(null)} />}
       {offlineAsk && <OfflineDialog e={offlineAsk} onClose={() => setOfflineAsk(null)} />}
+      {providerAsk && (
+        <ConfirmDialog title={tr('files.openWith.askTitle', { name: providerAsk.e.name, app: providerAsk.p.label })}
+          detail={[providerAsk.offerAlways ? tr('files.openWith.askDetail', { app: providerAsk.p.label }) : '', providerAsk.start ? tr('files.openWith.startNote') : ''].filter(Boolean).join(' ')}
+          okLabel={tr(providerAsk.start ? 'files.openWith.startOk' : 'files.openWith.ok')} cancelLabel={tr('files.cancel')}
+          onCancel={() => setProviderAsk(null)}
+          onOk={() => { const a = providerAsk; setProviderAsk(null); if (a.always) setDefaultProvider(a.e, a.p.id); a.p.open(a.e); }}>
+          {providerAsk.offerAlways && openExtOf(providerAsk.e.name) ? (
+            <Checkbox checked={providerAsk.always} onChange={(v) => setProviderAsk((a) => (a ? { ...a, always: !!v } : a))}
+              label={tr('files.openWith.always', { ext: openExtOf(providerAsk.e.name), app: providerAsk.p.label })} />
+          ) : null}
+        </ConfirmDialog>
+      )}
       {confirm && <Confirm text={confirm.text} detail={confirm.detail} okLabel={confirm.ok} destructive={!!confirm.destructive} cautious={!!confirm.cautious} onCancel={() => setConfirm(null)} onOk={() => { const c = confirm; setConfirm(null); c.run(); }} />}
       {sheet === 'goto' && <GoToFolder start={curDir ? `${curDir}/` : ''} onClose={() => setSheet(null)} onGo={(p) => { setSheet(null); navigate(dirLoc(p)); }} />}
       {sheet === 'connect' && <ConnectServer onClose={() => setSheet(null)} onConnect={connectTo} onBrowse={() => { setSheet(null); navigate({ type: 'network' }); }} />}

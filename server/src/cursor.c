@@ -327,13 +327,14 @@ int cursor_for_edges(int edges) {
     }
 }
 
-/* wp_cursor_shape_device_v1.shape (cursor-shape-v1.xml): 1 default … 34 zoom_out. */
+/* wp_cursor_shape_device_v1.shape (cursor-shape-v1.xml): 1 default … 34 zoom_out; version 2: 35 dnd_ask (the arrow,
+ * as copy and alias) and 36 all_resize (the four-way arrows, as move). */
 int cursor_from_wayland_shape(unsigned shape) {
     static const unsigned char map[] = {
         0, CUR_DEFAULT, CUR_DEFAULT, CUR_DEFAULT, CUR_POINTER, CUR_PROGRESS, CUR_WAIT, CUR_CROSSHAIR, CUR_CROSSHAIR,
         CUR_TEXT, CUR_TEXT, CUR_DEFAULT, CUR_DEFAULT, CUR_MOVE, CUR_NOT_ALLOWED, CUR_NOT_ALLOWED, CUR_GRAB, CUR_GRABBING,
         CUR_E, CUR_N, CUR_NE, CUR_NW, CUR_S, CUR_SE, CUR_SW, CUR_W, CUR_EW, CUR_NS, CUR_NESW, CUR_NWSE, CUR_EW, CUR_NS,
-        CUR_MOVE, CUR_DEFAULT, CUR_DEFAULT,
+        CUR_MOVE, CUR_DEFAULT, CUR_DEFAULT, CUR_DEFAULT, CUR_MOVE,
     };
     return shape < sizeof map ? map[shape] : CUR_DEFAULT;
 }

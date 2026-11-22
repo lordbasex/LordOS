@@ -23,8 +23,8 @@ import { PrintersSettings } from './Printers.jsx';
 import { TrackpadSettings } from './Trackpad.jsx';
 import { DockSettings } from './Dock.jsx';
 import { ThemeOptions } from './ThemeExtras.jsx';
+import { ThemeGallery } from './ThemeGallery.jsx';   // Desktop style: the gallery of themes (docs/THEMES-PLAN.md, stage 1)
 import { SlideshowSettings } from './Slideshow.jsx';
-import { DesktopStyleThumb } from '@lordos/sdk';   // Desktop style's pictures (sdk/stylethumb.jsx, also the first-start chooser's)
 import { SwitcherSettings } from './Switcher.jsx';
 import { GlobalShortcutsSettings } from './GlobalShortcuts.jsx';
 import { BrowserFrameSettings } from './BrowserFrame.jsx';
@@ -40,8 +40,8 @@ import { DefaultAppsSettings } from './DefaultApps.jsx';
 import { WebAppsSettings } from './WebApps.jsx';
 import { FlatpakSettings } from './Flatpak.jsx';
 import { FirmwareSettings } from './Firmware.jsx';
+import { GpusSettings, anyGpus } from './Gpus.jsx';
 import { Stack, Section, SettingRow, ValueRow, Badge, Note, Message, Actions, PopUp, shade } from './ui.jsx';
-import { compareNames } from '../../sdk/collate.js';
 
 export function Icon({ size: s }) {
   const dark = '#3b3e46';
@@ -103,45 +103,13 @@ function ModeThumb({ mode, accent }) {
   );
 }
 
-// Desktop style: every installed theme (Lord Flow and Lord Classic first; the login screen's is hidden),
-// switched live. The open app windows come back in the new one (sdk/index.js themes.use), Settings on
-// this page. Since 0.8.5 this is the only place to choose a theme (there is no separate Themes page).
-function StylePicker() {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const order = (id) => (id === 'default' ? 0 : id === 'classic' ? 1 : 2);
-  const list = [...themes.list()].sort((a, b) => order(a.id) - order(b.id) || compareNames(a.name, b.name));
-  if (!list.length) return null;
-  const pick = (id) => {
-    wm.open('settings', { args: { section: 'appearance' } });
-    themes.use(id);
-  };
-  return (
-    <Section title={tr('settings.style.title')} footer={tr('settings.style.hint')}>
-      <View style={{ flexDirection: 'row', gap: spacing.xxl, paddingVertical: spacing.m, justifyContent: 'center' }}>
-        {list.map((th) => {
-          const id = th.id;
-          return (
-            <View key={id} onClick={() => { if (!th.current) pick(id); }} style={{ alignItems: 'center', gap: 6 }}>
-              <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${th.current ? t.accent : 'transparent'}` }}>
-                <DesktopStyleThumb id={id} accent={t.accent} dark={t.mode === 'dark'} sketch={th.sketch} />
-              </View>
-              <Text style={{ fontSize: typeScale.callout, fontWeight: th.current ? 600 : 400, color: t.text }}>{th.name}</Text>
-            </View>
-          );
-        })}
-      </View>
-    </Section>
-  );
-}
-
 function Appearance() {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   return (
     <Stack>
-      <StylePicker />
+      <ThemeGallery />
       <ThemeOptions theme={themes.info()} />
       <Section title={tr('settings.mode')}>
         <View style={{ flexDirection: 'row', gap: spacing.xxl, paddingVertical: spacing.m, justifyContent: 'center' }}>
@@ -866,12 +834,23 @@ function ChipGlyph() {
   );
 }
 
+// A graphics card: a board with a fan and its connector's pins below.
+function GpuGlyph() {
+  return (
+    <View style={{ width: 14, height: 14, direction: 'ltr' }}>
+      <View style={{ position: 'absolute', left: 0, top: 3, width: 14, height: 7, borderRadius: 1.5, backgroundColor: '#fff' }} />
+      <View style={{ position: 'absolute', left: 6.5, top: 4.5, width: 4, height: 4, borderRadius: 2, backgroundColor: '#5e5ce6' }} />
+      <View style={{ position: 'absolute', left: 2, top: 10, width: 7, height: 2, backgroundColor: '#fff' }} />
+    </View>
+  );
+}
+
 // Sidebar groups (as in TangoOS): [id, component, icon color, symbol (a glyph or a component)].
 const GROUPS = [
   [['general', General, '#8e8e93', 'i'], ['appearance', Appearance, '#3a3a3c', '◐'], ['wallpaper', Wallpapers, '#30b0c7', '▣'], ['dock', DockSettings, '#3a3a3c', '▁'], ['displays', DisplaysSettings, '#0a84ff', '▭']],
   [['network', NetworkSettings, '#0a84ff', '⇅'], ['bluetooth', BluetoothSettings, '#0a84ff', 'ᛒ'], ['sound', SoundSettings, '#ff375f', '♪'], ['notifications', NotificationsSettings, '#ff3b30', '◉'], ['printers', PrintersSettings, '#636366', '⎙'], ['clipboard', ClipboardSettings, '#5e5ce6', '⎘'], ['sharing', SharingSettings, '#34c759', '⇄'], ['cloud', CloudSettings, '#0a84ff', '☁']],
   [['language', LanguageRegion, '#30b0c7', 'A'], ['datetime', DateTimeSettings, '#0a84ff', '◷'], ['keyboard', Keyboard, '#8e8e93', '⌨'], ['trackpad', TrackpadSettings, '#8e8e93', '▭'], ['defaultapps', DefaultAppsSettings, '#8e8e93', '◫'], ['webapps', WebAppsSettings, '#5e5ce6', '◎'], ['flatpak', FlatpakSettings, '#4a86cf', '◇'], ['ai', AISettings, '#bf5af2', '✦']],
-  [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
+  [['battery', BatterySettings, '#30d158', '▮'], ['power', PowerSettings, '#30d158', BoltGlyph], ['cooling', CoolingSettings, '#32ade6', FanGlyph], ['firmware', FirmwareSettings, '#5e5ce6', ChipGlyph], ['gpus', GpusSettings, '#5e5ce6', GpuGlyph], ['privacy', PrivacySettings, '#0a84ff', LockGlyph], ['users', UsersSettings, '#0a84ff', '☺'], ['updates', Updates, '#8e8e93', '↻'], ['session', Session, '#ff453a', '↪']],
 ];
 const SECTIONS = GROUPS.flat();
 // Board firmware
@@ -879,7 +858,9 @@ const SECTIONS = GROUPS.flat();
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
 // Battery: on a computer with one, or when something connected has a battery (docs/BATTERY.md)
 const hasAnyBattery = () => { try { return !!battery.get()?.hasBattery || deviceList().length > 0; } catch (e) { return false; } };
-const sectionShown = (id, hasPad, pi5 = isPi5()) => (id !== 'firmware' || pi5) && (id !== 'battery' || hasAnyBattery());
+// Graphics cards: with any GPU (lord.vm.gpus; docs/MACHINES-GPU.md): the compatibility report and NVIDIA's status are for every computer
+const sectionShown = (id, hasPad, pi5 = isPi5(), gpus = id === 'gpus' && anyGpus()) => (id !== 'firmware' || pi5) && (id !== 'battery' || hasAnyBattery())
+  && (id !== 'gpus' || gpus);
 
 // The Dock's right-click menu lists every section, in the sidebar's order and with its names; one
 // opens Settings on that page (sdk/dock.js, quick actions). Built from SECTIONS, so it never drifts.
@@ -938,7 +919,8 @@ export default function Settings() {
   // hasPad is still passed to sectionShown, which only hides Board firmware off a Raspberry Pi 5
   const hasPad = useTrackpads().some((d) => d.kind === 'touchpad');
   const [pi5] = useState(isPi5);
-  const visible = (id) => sectionShown(id, hasPad, pi5) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
+  const [gpus] = useState(anyGpus);
+  const visible = (id) => sectionShown(id, hasPad, pi5, gpus) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
   const groups = GROUPS.map((g) => g.filter(([id]) => visible(id))).filter((g) => g.length);
   const pad = side.narrow ? spacing.l : spacing.xxl;
   const sidebar = (

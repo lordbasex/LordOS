@@ -77,11 +77,12 @@ const mt = M.parseMetadata(marktext);
 eq('runtime', mt.runtime, 'org.freedesktop.Platform/x86_64/26.08');
 eq('context lists', mt.context, { shared: ['ipc', 'network'], sockets: ['wayland', 'x11'], devices: ['dri'], features: [], filesystems: ['/tmp', 'xdg-run/keyring', 'host'] });
 eq('session bus', mt.session, { 'com.canonical.AppMenu.Registrar': 'talk', 'org.freedesktop.Notifications': 'talk', 'org.freedesktop.secrets': 'talk' });
-eq('electron needs sub-sandboxes', M.needsSubsandbox(mt), true);
-eq('gtk app does not', M.needsSubsandbox(M.parseMetadata(calculator)), false);
-eq('chromium base', M.needsSubsandbox(M.parseMetadata(['[Application]', 'base=app/org.chromium.Chromium.BaseApp/x86_64/24.08'])), true);
-eq('a key outside [Application] is not the base', M.needsSubsandbox(M.parseMetadata(['[Context]', 'base=app/org.electronjs.Electron2.BaseApp/x86_64/1'])), false);
-eq('no metadata', M.needsSubsandbox(null), false);
+// Chromium and Electron apps are not set apart any more (their sub-sandboxes are served, docs/FLATPAK.md E9)
+eq('no sub-sandbox marking left', [M.needsSubsandbox, M.SUBSANDBOX_BASES], [undefined, undefined]);
+eq('the base is still read', M.parseMetadata(['[Application]', 'base=app/org.chromium.Chromium.BaseApp/x86_64/24.08']).base, 'app/org.chromium.Chromium.BaseApp/x86_64/24.08');
+// LordOS's Spawn portal is a portal like the others: never shown as "running programs outside its sandbox"
+eq('portal.Flatpak alone: no spawn row', M.permissionRows(M.parseMetadata(['[Session Bus Policy]', 'org.freedesktop.portal.Flatpak=talk'])), []);
+eq('org.freedesktop.Flatpak still is', M.permissionRows(M.parseMetadata(['[Session Bus Policy]', 'org.freedesktop.Flatpak=talk'])).map((r) => r.perm), ['spawn']);
 eq('empty and junk', M.parseMetadata(['', 'junk', '=x', '[Context', 'shared=network']).context.shared, []);
 
 // ---- permission rows ----
@@ -152,6 +153,10 @@ const day = 24 * 3600e3, now = 1_800_000_000_000;
 eq('stale', [M.appstreamStale(0, now), M.appstreamStale(now - day - 1, now), M.appstreamStale(now - 1000, now), M.appstreamStale(now + day, now)], [true, true, false, true]);
 eq('prefs', [M.prefsOf(null), M.prefsOf({ on: 1, showAll: 0, appstreamAt: '5' })], [{ on: false, showAll: false, appstreamAt: 0 }, { on: true, showAll: false, appstreamAt: 5 }]);
 
+// a note on an app's page: OBS Studio's recordings go to Videos (the home is read-only in a Flatpak app's view)
+eq('note: OBS', M.appNote('com.obsproject.Studio'), 'obsVideos');
+eq('note: none', [M.appNote('org.gnome.Calculator'), M.appNote('toString'), M.appNote(null)], [null, null, null]);
+
 // ---- every row's text in every language ----
 const perms = new Set(), changes = new Set();
 for (const md of [mt, M.parseMetadata(obs), big]) for (const r of M.permissionRows(md)) { perms.add(r.perm); if (r.change) changes.add(r.change); }
@@ -159,7 +164,7 @@ const dir = path.join(root, 'assets/locales');
 for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, d)).isDirectory())) {
   const f = path.join(dir, lang, 'flathub.json');
   const cat2 = fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : {};
-  const missing = [...[...perms].map((p) => `perm.${p}`), ...[...changes].map((c) => `change.${c}`)].filter((k) => typeof cat2[k] !== 'string' && typeof cat2[k] !== 'object');
+  const missing = [...[...perms].map((p) => `perm.${p}`), ...[...changes].map((c) => `change.${c}`), 'note.obsVideos'].filter((k) => typeof cat2[k] !== 'string' && typeof cat2[k] !== 'object');
   eq(`rows translated in ${lang}`, missing, []);
 }
 

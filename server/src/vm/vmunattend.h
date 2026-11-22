@@ -6,6 +6,9 @@
  *                          which the kernel unpacks too); no seed disk
  *   Ubuntu (autoinstall)   user-data and meta-data on a FAT seed disk labelled CIDATA (cloud-init's NoCloud)
  *   Fedora (kickstart)     ks.cfg on a FAT seed disk labelled OEMDRV
+ *   Windows (4.3)          Autounattend.xml on a FAT seed disk (USB, removable), with the virtio-win drivers Setup
+ *                          needs for its disk and network in $WinPEDriver$ (which Setup loads by itself, answers or
+ *                          not); no kernel: the machine boots its DVD. A guided install gets the drivers only.
  *
  * The first start boots the installer's own kernel and initrd, read from the ISO, with the kernel command line of the
  * catalog entry (QEMU -kernel/-initrd/-append; no boot menu to edit) and the ISO in the CD drive as usual. Its files are
@@ -20,7 +23,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum { VMU_PRESEED = 1, VMU_AUTOINSTALL, VMU_KICKSTART };
+enum { VMU_PRESEED = 1, VMU_AUTOINSTALL, VMU_KICKSTART, VMU_WINDOWS };
 
 typedef struct {
     int kind;
@@ -39,6 +42,17 @@ typedef struct {
     char initrd[128];
     char append[512];       /* the kernel command line; {label} is the ISO's volume label */
     int desktop;            /* install the system's own desktop (default 1) */
+    /* Windows only (VMU_WINDOWS): its answer file can't hold a hash, only the password Setup's own way (base64 of
+     * UTF-16LE text + "Password"), so the seed disk is wiped when the install is done (lord-vm, the guest agent's first
+     * answer) */
+    char wpass[256];        /* that base64, "" for no password */
+    char edition[64];       /* the install image's name ("Windows 11 Pro"), "" for the only one (evaluation media) */
+    char key[30];           /* a product key XXXXX-XXXXX-XXXXX-XXXXX-XXXXX, "" none */
+    char uilang[16];        /* Setup's and the system's language, ll-CC ("es-ES"): the media's */
+    char inputloc[32];      /* keyboard: "0409:00000409" */
+    char userloc[16];       /* formats (dates, numbers): this computer's, ll-CC ("es-AR"); "" the language's */
+    char wtz[64];           /* Windows' own time zone name ("Argentina Standard Time"), "" leaves Setup's */
+    int guided;             /* a guided install: only the drivers, Setup asks the rest */
 } VmUnattend;
 
 /* the spec lord-server writes (JSON, see the top of lordvm.c): 0, or -1 with why in err */
@@ -55,7 +69,8 @@ int vmu_cmdline(const VmUnattend *u, const char *label, char *out, size_t n);
 typedef struct { const char *name; const void *data; size_t len; } VmuFile;
 
 /* a FAT12 image (2 MiB) with this volume label (up to 11 of A-Z 0-9 _ -) and these files in its root, each with a long
- * (VFAT) name so "user-data" and "ks.cfg" read as such: 0 and *img (malloc), or -1 */
+ * (VFAT) name so "user-data" and "ks.cfg" read as such; a name "DIR/file" goes in that folder of the root (one level,
+ * one folder): 0 and *img (malloc), or -1 */
 int vmu_fat_image(const char *label, const VmuFile *files, int n, uint8_t **img, size_t *len);
 /* a cpio "newc" archive of these files (mode 0644, in the root) with its trailer: 0 and *out (malloc), or -1 */
 int vmu_cpio(const VmuFile *files, int n, uint8_t **out, size_t *len);
@@ -69,5 +84,9 @@ int vmu_iso_find(int fd, const char *path, uint64_t *off, uint64_t *size);
 /* what --create --unattended does: <disks>/unattended/{vmlinuz,initrd,cmdline[,seed.img]} from the ISO and the spec;
  * 0, or -1 with why in err (the folder is removed then) */
 int vmu_prepare(const char *disks, const char *iso, const VmUnattend *u, const char *instance, char *err, size_t errlen);
+
+/* Windows: <disks>/unattended/{windows,seed.img}: the seed with Autounattend.xml (not when guided) and the drivers of
+ * `drivers_iso` (virtio-win) for the architecture, in $WinPEDriver$; 0, or -1 with why in err */
+int vmu_prepare_windows(const char *disks, const char *drivers_iso, const VmUnattend *u, char *err, size_t errlen);
 
 #endif

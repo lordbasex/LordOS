@@ -32,6 +32,8 @@
   "renderValue": {
     "other": "{ms}ms · 노드 {count}개"
   },
+  "pauses": "50ms 넘는 멈춤",
+  "pausesValue": "{count}회 (최장 {ms}ms)",
   "server": "디스플레이 서버",
   "systemApp": "시스템 앱",
   "systemReport": "시스템 리포트…",
@@ -40,5 +42,6 @@
   "version": "버전 {v}",
   "versionChannel": "버전 {v} · {channel}",
   "case": "케이스",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "제품 이름과 로고는 각 소유자의 상표입니다. LordOS는 이들과 제휴 관계가 없으며 이들의 보증을 받지 않았습니다. 로고는 요청할 때만 각 소유자의 사이트에서 다운로드되며 이 컴퓨터에서만 표시됩니다."
 }

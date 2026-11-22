@@ -42,6 +42,32 @@ export function ControlGlyph({ color, bg, size = 20 }) {
   return <View style={{ width: size, height: size, direction: 'ltr' }}>{line(2.5 * k, 2 * k)}{line(10.5 * k, 9 * k)}</View>;
 }
 
+// The Store: a shopping bag with its handle.
+export function StoreGlyph({ color, size = 20 }) {
+  const k = size / 20;
+  return (
+    <View style={{ width: size, height: size, direction: 'ltr' }}>
+      <View style={abs({ left: 6.5 * k, top: 1.5 * k, width: 7 * k, height: 6 * k, borderTopLeftRadius: 3.5 * k, borderTopRightRadius: 3.5 * k,
+        borderTop: `${1.6 * k}px solid ${color}`, borderLeft: `${1.6 * k}px solid ${color}`, borderRight: `${1.6 * k}px solid ${color}` })} />
+      <View style={abs({ left: 2.5 * k, top: 6 * k, width: 15 * k, height: 12.5 * k, borderRadius: 2.6 * k, border: `${1.6 * k}px solid ${color}` })} />
+    </View>
+  );
+}
+
+// Monitor: a pulse line in a rounded frame.
+export function MonitorGlyph({ color, size = 20 }) {
+  const k = size / 20, w = 1.6 * k;
+  return (
+    <View style={{ width: size, height: size, direction: 'ltr' }}>
+      <View style={abs({ left: 1.5 * k, top: 2.5 * k, width: 17 * k, height: 15 * k, borderRadius: 3 * k, border: `${w}px solid ${color}` })} />
+      <View style={abs({ left: 4 * k, top: 9.2 * k, width: 3 * k, height: w, backgroundColor: color })} />
+      <View style={abs({ left: 6.6 * k, top: 6 * k, width: w, height: 8 * k, backgroundColor: color })} />
+      <View style={abs({ left: 9.4 * k, top: 7.5 * k, width: w, height: 6 * k, backgroundColor: color })} />
+      <View style={abs({ left: 12.2 * k, top: 9.2 * k, width: 3.8 * k, height: w, backgroundColor: color })} />
+    </View>
+  );
+}
+
 // A plus sign.
 export function PlusGlyph({ color, size = 12 }) {
   const w = Math.max(1.6, size / 7);

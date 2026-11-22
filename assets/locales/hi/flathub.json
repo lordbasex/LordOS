@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} अप टू डेट है।",
   "noResults": "कोई Flathub ऐप मेल नहीं खाता।",
   "notSupported": "Flathub अभी इस कंप्यूटर पर उपलब्ध नहीं है: फ़िलहाल यह केवल PC के लिए है।",
-  "notYet": "अभी समर्थित नहीं",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "दूसरे प्रोग्रामों को डीबग करना",
   "perm.devicesAll": "सभी डिवाइस: कैमरे, गेम कंट्रोलर, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "केवल Flathub द्वारा सत्यापित ऐप्स। छिपे हुए: {count}",
   "showAllOn": "हर Flathub ऐप दिखाया जा रहा है, सत्यापित हो या नहीं",
   "showMore": "और दिखाएँ (बाकी: {count})",
-  "subsandbox.text": "यह ऐप Chromium या Electron पर बना है, जिनके सहायक प्रोग्रामों को Flatpak के सैंडबॉक्स इस तरह साझा करने की ज़रूरत होती है जो LordOS अभी नहीं देता, इसलिए फ़िलहाल इसे यहाँ इंस्टॉल नहीं किया जा सकता।",
-  "subsandbox.title": "LordOS पर अभी समर्थित नहीं",
   "subtitle": "Flathub से Linux ऐप्स, जो LordOS के अपने सीमित दायरे के अंदर आपके फ़ायरवॉल के तहत चलते हैं।",
   "turnOff": "बंद करें",
   "unverified": "Flathub द्वारा सत्यापित नहीं: हो सकता है कि प्रकाशक ऐप का डेवलपर न हो।",
@@ -110,5 +107,6 @@
   "updates.button": "Flathub ऐप्स अपडेट करें",
   "updates.text": "Flathub से इंस्टॉल किए गए: {count}। Flatpak हर ऐप को जाँचता है और जो बदला है उसे इंस्टॉल करता है; खुला हुआ ऐप अगली बार खोलने पर अपडेट पूरा करता है।",
   "updates.title": "Flathub ऐप्स",
-  "verified": "सत्यापित: {developer} द्वारा प्रकाशित"
+  "verified": "सत्यापित: {developer} द्वारा प्रकाशित",
+  "note.obsVideos": "LordOS में OBS Studio रिकॉर्डिंग आपके वीडियो फ़ोल्डर में सहेजता है: आपके होम के अन्य फ़ोल्डर Flathub ऐप्स के लिए केवल पढ़ने योग्य हैं।"
 }

@@ -196,8 +196,16 @@
   "vm.imageRemoved": "تم حذف صورة القرص",
   "vm.downloadResumed": "جارٍ متابعة تنزيل متوقف (تم الاحتفاظ بـ {from} بايت)",
   "vm.kvmReady": "مسموح: يمكن للأجهزة استخدام المحاكاة الافتراضية للعتاد الآن",
+  "vm.bridgeReady": "الشبكة المتصلة بالجسر جاهزة ({name})",
+  "vm.bridgeGone": "أُزيلت الشبكة المتصلة بالجسر",
   "vm.kvmNextLogin": "مسموح بدءًا من تسجيل دخولك التالي",
   "pkg.foreignArchAdded": "فُعّلت حزم 32 بت ({arch})",
   "pkg.foreignArchPresent": "كانت حزم 32 بت ({arch}) مفعّلة من قبل",
-  "pkg.why.multiarchPair": "الإصدار نفسه مثل {name}"
+  "pkg.why.multiarchPair": "الإصدار نفسه مثل {name}",
+  "gpu.roleSet": "حُفظ استخدام بطاقة الرسوميات ({card}): أعد التشغيل للتطبيق",
+  "vm.gvtReady": "حصة بطاقة الرسوميات جاهزة ({name})",
+  "vm.gvtGone": "أُزيلت حصة بطاقة الرسوميات",
+  "gpu.freqSet": "عُيّن الحد الأدنى لتردد بطاقة الرسوميات",
+  "gpu.memlockSet": "تم حفظ الذاكرة التي يمكن للأجهزة قفلها",
+  "vm.memlockSet": "تم قفل ذاكرة الجهاز"
 }

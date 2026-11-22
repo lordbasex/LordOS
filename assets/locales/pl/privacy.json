@@ -55,5 +55,9 @@
   "who.flatpak": "Aplikacja Flatpak {id}",
   "who.program": "Program {path}",
   "perm.shortcuts": "Skróty klawiszowe",
-  "permHint.shortcuts": "Aplikacje, które mogą przejmować ❖, ⌥Tab i inne skróty pulpitu, gdy są na wierzchu, np. maszyny wirtualne, zdalne pulpity i gry. ❖Esc zawsze je odbiera; blokada ekranu i klawisze multimedialne pozostają przy systemie."
+  "permHint.shortcuts": "Aplikacje, które mogą przejmować ❖, ⌥Tab i inne skróty pulpitu, gdy są na wierzchu, np. maszyny wirtualne, zdalne pulpity i gry. ❖Esc zawsze je odbiera; blokada ekranu i klawisze multimedialne pozostają przy systemie.",
+  "ask.idle": "„{app}” chce wiedzieć, kiedy nie ma cię przy komputerze",
+  "ask.idleNote": "Dostaje informację, gdy przez chwilę nie używasz klawiatury i myszy oraz gdy wracasz; nic więcej. Możesz to później zmienić w Ustawienia → Prywatność.",
+  "perm.idle": "Nieobecność przy komputerze",
+  "permHint.idle": "Aplikacje informowane, gdy przez chwilę nie używasz komputera i gdy wracasz, np. komunikatory pokazujące cię jako nieobecnego. Niczego więcej się nie dowiadują; film lub prezentacja, która utrzymuje włączony ekran, liczy się jako obecność."
 }

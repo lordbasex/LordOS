@@ -35,7 +35,6 @@
   "msg.updateDone": "{name} güncel.",
   "noResults": "Eşleşen Flathub uygulaması yok.",
   "notSupported": "Flathub bu bilgisayarda henüz kullanılamıyor: şimdilik yalnızca PC’ler için.",
-  "notYet": "Henüz desteklenmiyor",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Başka programlarda hata ayıklama",
   "perm.devicesAll": "Tüm aygıtlar: kameralar, oyun kumandaları, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Yalnızca Flathub’ın doğruladığı uygulamalar. Gizli: {count}",
   "showAllOn": "Doğrulanmış olsun olmasın tüm Flathub uygulamaları gösteriliyor",
   "showMore": "Daha fazla göster (kalan: {count})",
-  "subsandbox.text": "Bu uygulama Chromium veya Electron üzerine kurulu; bunların yardımcı süreçleri, Flatpak’ın yalıtım alanlarının LordOS’un henüz sunmadığı bir şekilde paylaşılmasını gerektiriyor, bu yüzden şimdilik buraya yüklenemez.",
-  "subsandbox.title": "LordOS’ta henüz desteklenmiyor",
   "subtitle": "Flathub’dan Linux uygulamaları, LordOS’un kendi yalıtım alanında ve güvenlik duvarınızın altında çalışır.",
   "turnOff": "Kapat",
   "unverified": "Flathub tarafından doğrulanmadı: yayımcı, uygulamanın geliştiricisi olmayabilir.",
@@ -110,5 +107,6 @@
   "updates.button": "Flathub uygulamalarını güncelle",
   "updates.text": "Flathub’dan yüklenen: {count}. Flatpak her birini denetler ve değişeni yükler; açık bir uygulamanın güncellemesi onu yeniden açtığınızda tamamlanır.",
   "updates.title": "Flathub uygulamaları",
-  "verified": "Doğrulandı: {developer} tarafından yayımlandı"
+  "verified": "Doğrulandı: {developer} tarafından yayımlandı",
+  "note.obsVideos": "LordOS’ta OBS Studio kayıtları Videolar klasörünüze kaydeder: ana klasörünüzdeki diğer klasörler Flathub uygulamaları için salt okunurdur."
 }

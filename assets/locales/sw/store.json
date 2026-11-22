@@ -129,7 +129,7 @@
   },
   "open": "Fungua",
   "page.ai": "Akili Bandia",
-  "page.webapps": "Programu za wavuti",
+  "page.webapps": "Programu za wavuti (PWA)",
   "page.commercial": "Za kibiashara",
   "page.remote": "Ufikiaji wa mbali",
   "page.suites": "Programu za wahusika wengine",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "Inawezesha…",
   "pkg32": "{name} (biti 32)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Programu ya Flatpak"
+  "kind.flatpak": "Programu ya Flatpak",
+  "section.origin": "Chanzo",
+  "section.picks": "Zilizochaguliwa na LordOS",
+  "src.debian": "Programu za Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Programu za Android",
+  "soon": "Hivi karibuni",
+  "sub.all": "Zote"
 }

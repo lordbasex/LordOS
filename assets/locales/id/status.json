@@ -151,8 +151,16 @@
   "vm.imageRemoved": "Image dihapus",
   "vm.downloadResumed": "Melanjutkan unduhan yang terhenti ({from} byte disimpan)",
   "vm.kvmReady": "Diizinkan: mesin kini dapat menggunakan virtualisasi perangkat keras",
+  "vm.bridgeReady": "Jaringan bridged siap ({name})",
+  "vm.bridgeGone": "Jaringan bridged dihapus",
   "vm.kvmNextLogin": "Diizinkan mulai login Anda berikutnya",
   "pkg.foreignArchAdded": "Paket 32-bit ({arch}) diaktifkan",
   "pkg.foreignArchPresent": "Paket 32-bit ({arch}) sudah aktif",
-  "pkg.why.multiarchPair": "Versi yang sama dengan {name}"
+  "pkg.why.multiarchPair": "Versi yang sama dengan {name}",
+  "gpu.roleSet": "Penggunaan kartu grafis disimpan ({card}): mulai ulang untuk menerapkan",
+  "vm.gvtReady": "Bagian kartu grafis siap ({name})",
+  "vm.gvtGone": "Bagian kartu grafis dihapus",
+  "gpu.freqSet": "Frekuensi minimum kartu grafis diatur",
+  "gpu.memlockSet": "Memori yang boleh dikunci mesin disimpan",
+  "vm.memlockSet": "Memori mesin dikunci"
 }

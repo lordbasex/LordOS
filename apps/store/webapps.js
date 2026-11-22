@@ -101,6 +101,13 @@ export function WebCategory({ cat, query, onOpen }) {
   return h(Shelf, { title: t('store.page.webapps') }, h(CardGrid, null, ...list.map((a) => h(WebCard, { key: a.id, a, onOpen }))));
 }
 
+// How many catalog web apps each category has (the Store's second column)
+export function webCategoryCounts() {
+  const out = {};
+  for (const a of webCatalog()) if (a.category) out[a.category] = (out[a.category] || 0) + 1;
+  return out;
+}
+
 export function WebAppsPage({ query, onOpen }) {
   const th = useTheme();
   const installed = useWebApps();

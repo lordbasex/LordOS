@@ -129,7 +129,7 @@
   },
   "open": "Öppna",
   "page.ai": "Artificiell intelligens",
-  "page.webapps": "Webbappar",
+  "page.webapps": "Webbappar (PWA)",
   "page.commercial": "Kommersiellt",
   "page.remote": "Fjärråtkomst",
   "page.suites": "Appar från tredje part",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "Aktiverar…",
   "pkg32": "{name} (32 bitar)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak-app"
+  "kind.flatpak": "Flatpak-app",
+  "section.origin": "Ursprung",
+  "section.picks": "Utvalda av LordOS",
+  "src.debian": "Linux-appar (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android-appar",
+  "soon": "Snart",
+  "sub.all": "Alla"
 }

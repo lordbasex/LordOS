@@ -12,6 +12,7 @@
 
 #define MEDIA_MAX_SRC 48
 #define MEDIA_APP_MAX 48
+#define MEDIA_CROP_NODES 64       /* LAG_WIN_MAX: a machine's windows in apps mode */
 
 typedef struct MAudio MAudio;
 
@@ -49,19 +50,37 @@ typedef struct {
     /* drawing */
     MediaView view;
     int node, box_w, box_h, sent_w, sent_h;
+    int crop_nodes[MEDIA_CROP_NODES];   /* nodes that show a part of it (Node.crop): each one damaged for its part */
     uint32_t *cache;            /* scaled/rotated (when copying isn't enough) */
     int cache_w, cache_h;
     unsigned cache_seq, cache_gen;
     float cache_box[4];
     float shown_scale;          /* physical pixels per picture pixel at the last paint (the pointer follows it) */
+    /* where the last paint of its node put the picture, as fractions of the node's content box (so the logical and
+     * physical boxes agree): picture pixel (u, v) at (map_fx + u·map_kx, map_fy + v·map_ky). map_ok: neither rotated
+     * nor mirrored, and map_w × map_h is the picture's size then. A new frame damages only where it changed
+     * (media_src_damage_rect) */
+    int map_ok, map_w, map_h;
+    float map_fx, map_fy, map_kx, map_ky;
     /* the source's own pointer (a Machines guest's): drawn instead of the host's over its node */
     McurImage cur;              /* as the source sent it, premultiplied and cut */
     int cur_mode;               /* 0 none (the host's arrow), 1 the image, 2 hidden */
     int cur_off;                /* the source said its pointer is hidden right now */
+    int guest_draws;            /* the guest draws its pointer into the picture itself (Windows' display drivers): no
+                                 * host arrow over it until it hands one over (a second arrow beside its own) */
     McurImage cur_shown;        /* cur at cur_shown_f */
     float cur_shown_f;
     uint32_t *mip[8];           /* halvings (large photos) */
     int mip_w[8], mip_h[8], nmip;
+    /* a picture that is a GPU texture (a Machines 3D or vGPU picture; docs/MACHINES-GPU.md, "A vGPU's picture without
+     * a readback"): with the GPU composing it's drawn straight from gtex below the UI (wl_paint_media). map/px then
+     * hold an older frame (cpu_stale) until something needs the pixels (a capture, a recording, a rotation, the CPU
+     * path): media_src_need_cpu asks the owner (cpu_read) to read the picture back into them */
+    struct GpuTex *gtex;
+    int gtex_flip;                      /* its first row is the picture's bottom */
+    int cpu_stale;
+    int gpu_drawn;                      /* the last paint of its node(s) drew gtex: a new frame needs only a present */
+    int (*cpu_read)(int id);            /* 0 when map holds the shown frame now */
     /* player state */
     int64_t pos, dur;
     int playing;
@@ -91,6 +110,11 @@ MediaSrc *media_src_get(int id);
 MediaSrc *media_src_at(int i);          /* iterate: 0..MEDIA_MAX_SRC-1 (NULL if free) */
 void media_src_close(MediaSrc *s);
 void media_src_damage(MediaSrc *s);
+/* A new frame changed (x, y, w, h) of the picture: the node that shows all of it is damaged whole (as
+ * media_src_damage), each node showing a part only where its part changed. Returns how many nodes were damaged. */
+int  media_src_damage_rect(MediaSrc *s, int x, int y, int w, int h);
+/* how many nodes show a part of it now */
+int  media_src_crop_count(MediaSrc *s);
 int  media_spawn(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
 /* the same with lord-stream (0.8.8.10: network players and M3U lists, src/media/stream; streamurl.h) */
 int  media_spawn_stream(int kind, const char *params, const int *fds, int nfds, pid_t *pid);
@@ -102,7 +126,10 @@ void media_json_str(char *out, size_t n, const char *s);
 const char *media_home(void);
 
 /* worker jobs */
-enum { JP_EVENT = 0, JP_THUMB, JP_IMAGE, JP_PIXELS, JP_FILE, JP_CLIP, JP_SVG };    /* JP_SVG: svgicon.c (params = its key) */
+enum { JP_EVENT = 0, JP_THUMB, JP_IMAGE, JP_PIXELS, JP_FILE, JP_CLIP, JP_SVG, JP_PORTAL };    /* JP_SVG: svgicon.c (params = its key) */
+/* JP_PORTAL: a picture for the Screenshot portal (ui/portalshot.c): when the file is in place (or not), this is called
+ * with the job's src (the portal's request) and the final path (NULL when it failed) */
+extern void (*media_portal_saved)(int tag, int ok, const char *path);
 int  media_job(int bg, int kind, int purpose, const int *fds, int nfds, int64_t a, int64_t b, const char *params,
                const char *tmp, const char *dst, int src);
 /* Pixels of a ready poster (lord.media.take): returns RGBA in *out (malloc) or -1. */
@@ -128,6 +155,11 @@ void maudio_playing(MAudio *a, int on);
 void maudio_volume(MAudio *a, double v);
 int  maudio_overruns(const MAudio *a);
 int  maudio_failed(const MAudio *a);
+int  maudio_retry(MAudio *a);             /* a failed stream connects again, same ring (0), or -1 it hadn't failed */
+int  maudio_target(MAudio *a, const char *node);   /* the output or input it uses (node.name, "" the default); moves a live stream */
+void maudio_latency(MAudio *a, int ms);   /* playback: a lower target buffer (ms), before its first service */
+uint64_t maudio_bytes(const MAudio *a);   /* bytes taken from the ring (playback) or put in it (recording) */
+int  maudio_ring_fd(const MAudio *a);     /* the ring's memfd (still owned by a), to hand a helper again */
 
 /* mview.c */
 void media_view_reset(MediaSrc *s);
@@ -161,5 +193,10 @@ typedef struct {
     char text[512];
 } MediaOp;
 void media_annotate(uint32_t *px, int w, int h, const MediaOp *ops, int n, int opaque);
+
+/* map/px brought up to date with the frame gtex shows (a readback), when cpu_stale; mview.c and the users of px */
+void media_src_need_cpu(MediaSrc *s);
+/* a new frame of a picture drawn by the GPU (gpu_drawn): no UI damage, its node(s) presented again (main.c) */
+void media_src_present(MediaSrc *s);
 
 #endif

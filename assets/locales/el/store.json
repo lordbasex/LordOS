@@ -129,7 +129,7 @@
   },
   "open": "Άνοιγμα",
   "page.ai": "Τεχνητή νοημοσύνη",
-  "page.webapps": "Εφαρμογές web",
+  "page.webapps": "Εφαρμογές web (PWA)",
   "page.commercial": "Εμπορικές",
   "page.remote": "Απομακρυσμένη πρόσβαση",
   "page.suites": "Εφαρμογές τρίτων",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "Ενεργοποίηση…",
   "pkg32": "{name} (32 bit)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Εφαρμογή Flatpak"
+  "kind.flatpak": "Εφαρμογή Flatpak",
+  "section.origin": "Προέλευση",
+  "section.picks": "Επιλογές του LordOS",
+  "src.debian": "Εφαρμογές Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Εφαρμογές Android",
+  "soon": "Σύντομα",
+  "sub.all": "Όλες"
 }

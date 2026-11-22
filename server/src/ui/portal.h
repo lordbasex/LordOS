@@ -1,5 +1,5 @@
-/* portal.h — our own org.freedesktop.portal.Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts and
- * ScreenCast, and org.freedesktop.ScreenSaver, on the session bus (see portal.c). */
+/* portal.h — our own org.freedesktop.portal.Settings, FileChooser, OpenURI, Inhibit, GlobalShortcuts, ScreenCast and
+ * Screenshot, and org.freedesktop.ScreenSaver, on the session bus (see portal.c). */
 #ifndef LORD_PORTAL_H
 #define LORD_PORTAL_H
 
@@ -51,6 +51,22 @@ void portal_cast_streams(int id, const CastStreamInfo *info, int n);
 void portal_cast_failed(int id);
 void portal_cast_lost(int id);
 void portal_cast_remote(int id, uint32_t req, int fd);
+/* Every share ended (cast_end_all: a lock, a user switch, the shell going): every restore token is revoked. */
+void portal_cast_tokens_drop(void);
+/* The session is locked, switched away from or off the display (1; every restore token revoked, none honoured until it
+ * is back), or the person is at it again (0) (remote/mirror.c). */
+void portal_cast_away(int away);
+/* Screenshot and PickColor (org.freedesktop.portal.Screenshot; approved by the maintainer 2026-11-22), through the same
+ * chooser and indicator as ScreenCast. From the shell: the person's pick for request id (src NULL: Cancel), with area
+ * (x, y, w, h in logical px, or NULL for the whole source) and the file to write in the home folder (a new one); the
+ * point picked for a color (src NULL: Cancel). */
+void portal_shot_chosen(int id, const CastSource *src, const int *area, const char *path);
+void portal_color_chosen(int id, const CastSource *src, int x, int y);
+/* portalshot.c: the picture written (0: later portal_shot_saved) and the color under a point (0, rgb 0..1) */
+int  portal_shot_capture(int tag, const CastSource *src, const int *area, const char *path);
+int  portal_shot_pixel(const CastSource *src, int x, int y, double rgb[3]);
+/* the picture of request tag is in place at path (ok), or couldn't be made */
+void portal_shot_saved(int tag, int ok, const char *path);
 /* From JS (lord.portal.set): mode, accent (0..1), GNOME accent name and GTK button order. */
 void portal_set(int dark, const double rgb[3], const char *accent_name, const char *button_layout);
 

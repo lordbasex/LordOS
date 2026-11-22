@@ -35,7 +35,6 @@
   "msg.updateDone": "Zaktualizowano: {name}.",
   "noResults": "Żadna aplikacja z Flathub nie pasuje.",
   "notSupported": "Flathub nie jest jeszcze dostępny na tym komputerze: na razie tylko dla komputerów PC.",
-  "notYet": "Jeszcze nieobsługiwane",
   "perm.bluetooth": "Bluetooth",
   "perm.devel": "Debugowanie innych programów",
   "perm.devicesAll": "Wszystkie urządzenia: kamery, kontrolery do gier, USB",
@@ -100,8 +99,6 @@
   "showAllOff": "Tylko aplikacje zweryfikowane przez Flathub. Ukryte: {count}",
   "showAllOn": "Pokazywane są wszystkie aplikacje z Flathub, zweryfikowane lub nie",
   "showMore": "Pokaż więcej (pozostało: {count})",
-  "subsandbox.text": "Ta aplikacja jest zbudowana na Chromium lub Electron, których programy pomocnicze wymagają współdzielenia piaskownic Flatpaka w sposób, którego LordOS jeszcze nie oferuje, więc na razie nie można jej tu zainstalować.",
-  "subsandbox.title": "Jeszcze nieobsługiwane w LordOS",
   "subtitle": "Aplikacje dla Linuksa z Flathub, uruchamiane we własnym izolowanym środowisku LordOS pod twoją Zaporą.",
   "turnOff": "Wyłącz",
   "unverified": "Niezweryfikowana przez Flathub: wydawca może nie być deweloperem aplikacji.",
@@ -110,5 +107,6 @@
   "updates.button": "Aktualizuj aplikacje z Flathub",
   "updates.text": "Zainstalowane z Flathub: {count}. Flatpak sprawdza każdą z nich i instaluje to, co się zmieniło; otwarta aplikacja kończy aktualizację, gdy otworzysz ją ponownie.",
   "updates.title": "Aplikacje z Flathub",
-  "verified": "Zweryfikowana: opublikowana przez {developer}"
+  "verified": "Zweryfikowana: opublikowana przez {developer}",
+  "note.obsVideos": "W LordOS OBS Studio zapisuje nagrania w folderze Wideo: pozostałe foldery katalogu domowego są dla aplikacji z Flathub tylko do odczytu."
 }

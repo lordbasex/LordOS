@@ -38,6 +38,7 @@
 #define MAX_IF 32
 #define MAX_DISK 32
 #define MAX_PROC 8192
+#define SCOPE_RECHECK_MS 5000
 
 /* ---- utilities ------------------------------------------------------------------------ */
 
@@ -132,7 +133,8 @@ static struct {
     pthread_cond_t cv;
     int started, refs, want_procs, want_conns, want_geo, want_volt, want_gpu;
     double last_poll;
-    char *sample, *procs, *conns, *detail, *dtemps, *volt, *gpu;
+    char *sample, *conns, *detail, *dtemps, *volt, *gpu;
+    MonProcs *procs;                    /* the process list, as rows (mon_procs_take hands it over) */
     uint64_t sseq, pseq, cseq, dseq, tseq, vseq, gseq;
     char home[PATH_MAX];                /* lord-say's status notes (gpustat.c) */
     int watch_disks;                    /* background disk temperatures (notifications), see below */
@@ -508,7 +510,9 @@ static void sensors_sample(Buf *b) {
 
 /* ---- processes ---------------------------------------------------------------------------- */
 
-typedef struct { int pid; unsigned long long start, ticks; } ProcPrev;
+/* sk, sid: the process's app scope (mon_scope_of), kept while the pid and its start time stay the same; "none" is
+ * looked at again for SCOPE_RECHECK_MS (a companion joins its app's scope a moment after it starts) */
+typedef struct { int pid; char sk; double sat; unsigned long long start, ticks; char sid[MON_SCOPE_MAX]; } ProcPrev;
 static ProcPrev *pprev, *pcur;
 static int npprev;
 static double pprev_t;
@@ -527,6 +531,37 @@ static const char *user_name(unsigned uid) {
     return users[slot].name;
 }
 
+/* The app scope of a cgroup v2 path's leaf (app-lordos-<id>.scope, app-lordos-lpk-<id>.scope, app-lordos-fp-<id>.scope;
+ * docs/FIREWALL.md): 'd', 'l' or 'f' and the id, or 0 */
+char mon_scope_parse(const char *cgroup, char *id, size_t n) {
+    if (n) id[0] = 0;
+    for (const char *line = cgroup; line && *line; line = strchr(line, '\n') ? strchr(line, '\n') + 1 : NULL) {
+        if (strncmp(line, "0::", 3)) continue;
+        size_t ll = strcspn(line, "\n");
+        const char *leaf = line + 3;
+        for (const char *q = line + 3; q < line + ll; q++) if (*q == '/') leaf = q + 1;
+        size_t l = (size_t)(line + ll - leaf);
+        if (l <= 17 || strncmp(leaf, "app-lordos-", 11) || strncmp(leaf + l - 6, ".scope", 6)) return 0;
+        const char *b = leaf + 11;
+        size_t bl = l - 17;
+        char k = 'd';
+        if (bl > 4 && !strncmp(b, "lpk-", 4)) { k = 'l'; b += 4; bl -= 4; }
+        else if (bl > 3 && !strncmp(b, "fp-", 3)) { k = 'f'; b += 3; bl -= 3; }       /* a Flatpak app (docs/FLATPAK.md) */
+        if (bl + 1 > n) return 0;
+        memcpy(id, b, bl);
+        id[bl] = 0;
+        return k;
+    }
+    return 0;
+}
+
+char mon_scope_of(int pid, char *id, size_t n) {
+    char p[64], txt[1024];
+    snprintf(p, sizeof p, "/proc/%d/cgroup", pid);
+    if (n) id[0] = 0;
+    return mon_read_small(p, txt, sizeof txt) > 0 ? mon_scope_parse(txt, id, n) : 0;
+}
+
 static int cmp_pid(const void *a, const void *b) { return ((const ProcPrev *)a)->pid - ((const ProcPrev *)b)->pid; }
 
 /* The proportional set size (a page shared by n processes counts 1/n in each), in bytes, or 0 when unreadable:
@@ -542,17 +577,33 @@ static unsigned long long proc_pss(int pid) {
     return l ? strtoull(l + 5, NULL, 10) * 1024ull : 0;
 }
 
-static void procs_scan(Buf *b) {
+/* a string of the process list's pool: its offset (0 is "") */
+static unsigned pool_add(Buf *pool, const char *str) {
+    if (!str || !str[0]) return 0;
+    size_t at = pool->n, l = strlen(str);
+    mon_buf_grow(pool, l + 1);
+    if (pool->bad) return 0;
+    memcpy(pool->p + pool->n, str, l + 1);
+    pool->n += l + 1;
+    return (unsigned)at;
+}
+
+/* The process list as rows and a pool of their strings, one block (MonProcs): lord.monitor.processes makes the JS
+ * objects straight from it. Parsing it as JSON took 12 ms of the screen's thread for 1900 processes. */
+static MonProcs *procs_scan(void) {
     if (!pprev) pprev = calloc(MAX_PROC, sizeof *pprev);
     if (!pcur) pcur = calloc(MAX_PROC, sizeof *pcur);
-    if (!pprev || !pcur) { b->bad = 1; return; }
+    if (!pprev || !pcur) return NULL;
     double now = mon_now_ms(), dt = pprev_t > 0 ? (now - pprev_t) / 1000.0 : 0;
     long hz = sysconf(_SC_CLK_TCK), page = sysconf(_SC_PAGESIZE);
     unsigned me = (unsigned)getuid();
     int self = (int)getpid(), n = 0;
     DIR *d = opendir("/proc");
-    if (!d) { b->bad = 1; return; }
-    mon_buf_printf(b, "{\"t\":%.0f,\"list\":[", mon_wall_ms());
+    if (!d) return NULL;
+    Buf pool = { 0 };
+    pool_add(&pool, "-");                       /* offset 0 stands for "": nothing real starts there */
+    MonProc *rows = malloc(sizeof *rows * 256);
+    int cap = rows ? 256 : 0;
     struct dirent *e;
     while ((e = readdir(d)) && n < MAX_PROC) {
         if (!isdigit((unsigned char)e->d_name[0])) continue;
@@ -590,29 +641,35 @@ static void procs_scan(Buf *b) {
             exe[k > 0 ? k : 0] = 0;
         }
         double cpu = 0;
-        ProcPrev key = { pid, 0, 0 }, *old = npprev ? bsearch(&key, pprev, (size_t)npprev, sizeof key, cmp_pid) : NULL;
-        if (old && old->start == start && ticks >= old->ticks && dt > 0) cpu = (double)(ticks - old->ticks) / ((double)hz * dt);
-        pcur[n].pid = pid;
-        pcur[n].start = start;
-        pcur[n].ticks = ticks;
+        ProcPrev key = { .pid = pid }, *old = npprev ? bsearch(&key, pprev, (size_t)npprev, sizeof key, cmp_pid) : NULL;
+        if (old && old->start != start) old = NULL;
+        if (old && ticks >= old->ticks && dt > 0) cpu = (double)(ticks - old->ticks) / ((double)hz * dt);
+        ProcPrev *cur = &pcur[n];
+        cur->pid = pid;
+        cur->start = start;
+        cur->ticks = ticks;
+        /* its app scope: read here, in this thread, once per process (lord.monitor.processes used to read every
+         * process's cgroup file on the screen's thread, 20 ms a second with many processes) */
+        if (old && (old->sk || now - old->sat < SCOPE_RECHECK_MS)) { cur->sk = old->sk; cur->sat = old->sat; memcpy(cur->sid, old->sid, sizeof cur->sid); }
+        else { cur->sk = mon_scope_of(pid, cur->sid, sizeof cur->sid); cur->sat = now; }
         n++;
-        mon_buf_printf(b, "%s{\"pid\":%d,\"ppid\":%llu,\"uid\":%u,\"user\":", n > 1 ? "," : "", pid, v[0], uid);
-        mon_buf_str(b, user_name(uid));
-        mon_buf_printf(b, ",\"name\":");
-        mon_buf_str(b, comm);
-        mon_buf_printf(b, ",\"cmd\":");
-        mon_buf_str(b, cmd);
-        mon_buf_printf(b, ",\"exe\":");
-        mon_buf_str(b, exe);
-        /* why it may not be stopped (procctl.c); "st": the exact start time for proc_signal */
+        if (n > cap) {
+            MonProc *r2 = realloc(rows, sizeof *rows * (size_t)cap * 2);
+            if (!r2) { n--; break; }
+            rows = r2; cap *= 2;
+        }
+        MonProc *o = &rows[n - 1];
+        memset(o, 0, sizeof *o);
+        /* why it may not be stopped (procctl.c); st: the exact start time for proc_signal */
         const char *prot = proc_protect_reason(pid, (unsigned)v[5], comm, exe, argv1, self);
-        mon_buf_printf(b, ",\"state\":\"%c\",\"threads\":%llu,\"cpu\":%.4f,\"rss\":%llu,\"start\":%.0f,\"st\":%llu,\"self\":%s,\"prot\":",
-                   isalpha((unsigned char)state) ? state : '?', v[16], cpu, v[20] * (unsigned long long)page,
-                   (double)start / (double)hz, start, pid == self ? "true" : "false");
-        if (prot) mon_buf_str(b, prot); else mon_buf_printf(b, "null");
-        unsigned long long rss = v[20] * (unsigned long long)page, pss = uid == me && rss >= PSS_MIN_RSS ? proc_pss(pid) : 0;
-        if (pss) mon_buf_printf(b, ",\"pss\":%llu", pss);
-        mon_buf_printf(b, "}");
+        unsigned long long rss = v[20] * (unsigned long long)page;
+        o->pid = pid; o->ppid = (int)v[0]; o->uid = uid; o->self = pid == self;
+        o->state = isalpha((unsigned char)state) ? state : '?';
+        o->threads = (long long)v[16]; o->cpu = cpu; o->rss = rss; o->start = (double)start / (double)hz; o->st = start;
+        o->pss = uid == me && rss >= PSS_MIN_RSS ? proc_pss(pid) : 0;
+        o->sk = cur->sk;
+        o->user = pool_add(&pool, user_name(uid)); o->name = pool_add(&pool, comm); o->cmd = pool_add(&pool, cmd);
+        o->exe = pool_add(&pool, exe); o->prot = pool_add(&pool, prot); o->sid = pool_add(&pool, cur->sid);
     }
     closedir(d);
     qsort(pcur, (size_t)n, sizeof *pcur, cmp_pid);
@@ -621,7 +678,19 @@ static void procs_scan(Buf *b) {
     pcur = t;
     npprev = n;
     pprev_t = now;
-    mon_buf_printf(b, "],\"total\":%d,\"hz\":%ld}", n, hz);
+    MonProcs *r = NULL;
+    if (rows && !pool.bad) r = malloc(sizeof *r + sizeof *rows * (size_t)n + pool.n);
+    if (r) {
+        r->t = mon_wall_ms(); r->hz = hz; r->n = n;
+        r->rows = (MonProc *)(r + 1);
+        r->pool = (char *)(r->rows + n);
+        if (n) memcpy(r->rows, rows, sizeof *rows * (size_t)n);
+        memcpy(r->pool, pool.p, pool.n);
+        r->pool[0] = 0;
+    }
+    free(rows);
+    mon_buf_free(&pool);
+    return r;
 }
 
 /* ---- thread ------------------------------------------------------------------------------ */
@@ -730,9 +799,14 @@ static void *worker(void *arg) {
         if (temps) publish_temps();
         if (wv && t0 >= next_volt) { publish_volt(); next_volt = t0 + VOLT_MS; }
         if (wp && tick % 4 == 0) {
-            Buf p = { 0 };
-            procs_scan(&p);
-            publish(&M.procs, &M.pseq, &p);
+            MonProcs *pl = procs_scan();
+            if (pl) {
+                pthread_mutex_lock(&M.mu);
+                free(M.procs);
+                M.procs = pl;
+                M.pseq++;
+                pthread_mutex_unlock(&M.mu);
+            }
         }
         if (dpid > 0 && tick % 4 == 1) {
             /* Get Info: full details only for the user's own processes (the kernel decides what
@@ -866,7 +940,15 @@ static char *take(char *slot, uint64_t have, uint64_t *seq) {
 }
 
 char *mon_sample_json(uint64_t *seq) { return take(M.sample, M.sseq, seq); }
-char *mon_procs_json(uint64_t *seq) { return take(M.procs, M.pseq, seq); }
+MonProcs *mon_procs_take(uint64_t *seq) {
+    pthread_mutex_lock(&M.mu);
+    M.last_poll = mon_now_ms();
+    pthread_cond_signal(&M.cv);
+    MonProcs *r = NULL;
+    if (M.procs && M.pseq != *seq) { r = M.procs; M.procs = NULL; *seq = M.pseq; }
+    pthread_mutex_unlock(&M.mu);
+    return r;
+}
 char *mon_conns_json(uint64_t *seq) { return take(M.conns, M.cseq, seq); }
 char *mon_detail_json(uint64_t *seq) { return take(M.detail, M.dseq, seq); }
 char *mon_voltage_json(uint64_t *seq) { return take(M.volt, M.vseq, seq); }

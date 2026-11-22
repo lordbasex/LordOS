@@ -129,7 +129,7 @@
   },
   "open": "Buksan",
   "page.ai": "Artificial Intelligence",
-  "page.webapps": "Mga web app",
+  "page.webapps": "Mga web app (PWA)",
   "page.commercial": "Komersyal",
   "page.remote": "Remote access",
   "page.suites": "Mga third-party na app",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "Ine-enable…",
   "pkg32": "{name} (32-bit)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak app"
+  "kind.flatpak": "Flatpak app",
+  "section.origin": "Pinagmulan",
+  "section.picks": "Pinili ng LordOS",
+  "src.debian": "Mga app ng Linux (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Mga app ng Android",
+  "soon": "Malapit na",
+  "sub.all": "Lahat"
 }

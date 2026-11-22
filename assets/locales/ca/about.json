@@ -34,6 +34,8 @@
     "one": "{ms} ms · {count} node",
     "other": "{ms} ms · {count} nodes"
   },
+  "pauses": "Pauses de més de 50 ms",
+  "pausesValue": "{count} (la més llarga: {ms} ms)",
   "server": "Servidor de pantalla",
   "systemApp": "App del sistema",
   "systemReport": "Informe del sistema…",
@@ -42,5 +44,6 @@
   "version": "Versió {v}",
   "versionChannel": "Versió {v} · {channel}",
   "case": "Caixa",
-  "caseArgonV5": "Argon ONE V5"
+  "caseArgonV5": "Argon ONE V5",
+  "trademarks": "Els noms i logotips de productes són marques dels seus respectius propietaris; LordOS no hi està afiliat ni compta amb el seu aval. Els logotips només es baixen si ho demanes, del lloc de cada propietari, i es mostren en aquest ordinador."
 }

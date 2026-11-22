@@ -11,6 +11,14 @@ build/fpak-test: tests/fpak_test.c src/fpak.c src/fpak.h src/fw/rules.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/fpak_test.c src/fpak.c
 	./$@ || (rm -f $@; exit 1)
 
+# A Flatpak app's Spawn helper (src/fpspawner.c): its checks, and the helper over a socket pair as lord-server drives it,
+# with this test standing in for /usr/bin/flatpak (fds placed, instance fd, process group, exit status, refusals)
+test: build/fpspawner-test
+build/fpspawner-test: tests/fpspawner_test.c src/fpspawner.c src/fpspawner.h src/fpak.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE '-DFPSW_EXEC="/proc/self/exe"' -fsanitize=address,undefined -fno-sanitize-recover=all -o $@ tests/fpspawner_test.c src/fpspawner.c
+	./$@ || (rm -f $@; exit 1)
+
 # tests/fpak_cli.c: one Flathub management command through the real runner (src/fpakrun.c), for the VM; never installed
 build/fpak-cli: tests/fpak_cli.c src/fpakrun.c src/fpakrun.h src/fpak.c src/fpak.h src/sec/cgroup.c src/sec/cgroup.h
 	@mkdir -p build
@@ -29,3 +37,40 @@ build/lord-appstream: $(LORD_APPSTREAM_SRC) src/fpakas.h src/fpak.h src/sec/sand
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ $(LORD_APPSTREAM_SRC) -lpthread
 all: build/lord-appstream
+
+# the launcher's view of a home with mounts under it (tests/sandbox_home_mounts_test.c; 77: no user namespaces here)
+test: build/sandbox-home-mounts-test
+build/sandbox-home-mounts-test: tests/sandbox_home_mounts_test.c src/sec/sandbox.c src/sec/cgroup.c src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/sandbox_home_mounts_test.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
+	./$@; r=$$?; [ $$r = 0 ] || [ $$r = 77 ] || { rm -f $@; exit 1; }
+
+# how long the launcher's view lives: what an app leaves behind keeps running, its Spawn helper is ended after it
+# (tests/sandbox_view_lifetime_test.c; 77: no user namespaces here)
+test: build/sandbox-view-lifetime-test
+build/sandbox-view-lifetime-test: tests/sandbox_view_lifetime_test.c src/sec/sandbox.c src/sec/cgroup.c src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/sandbox_view_lifetime_test.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
+	./$@; r=$$?; [ $$r = 0 ] || [ $$r = 77 ] || { rm -f $@; exit 1; }
+
+# a Flatpak app's shared runtime folders and the chosen file lent into its running view, with a fake app (and inside
+# bubblewrap when it is installed) (tests/sandbox_lend_test.c; 77: no user namespaces here)
+test: build/sandbox-lend-test
+build/sandbox-lend-test: tests/sandbox_lend_test.c src/sec/sandbox.c src/sec/cgroup.c src/sec/sandbox.h src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/sandbox_lend_test.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
+	./$@; r=$$?; [ $$r = 0 ] || [ $$r = 77 ] || { rm -f $@; exit 1; }
+
+# lord-server's checks before a chosen file is lent: only canonical paths reach the policy, a save names its file alone
+# (tests/fplend_test.c; Claude Security F1/F2/F5, 2026-11-22)
+test: build/fplend-test
+build/fplend-test: tests/fplend_test.c src/fplend.c src/fplend.h src/fpak.c src/fpak.h src/fsops.c src/fsops.h src/sec/sandbox.c src/sec/cgroup.c src/sec/sandbox.h src/sec/pathcanon.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/fplend_test.c src/fplend.c src/fpak.c src/fsops.c src/sec/sandbox.c src/sec/cgroup.c -lpthread
+	./$@ || (rm -f $@; exit 1)
+
+# tests/fpportal_probe.c: a fake Flatpak app's side of the portals, run inside a real sandbox for the end-to-end checks
+# (docs/FLATPAK.md, "Lending a chosen file"); static, so it runs on any runtime. A test tool: never installed.
+build/fpportal-probe: tests/fpportal_probe.c src/vault/dbus.c src/vault/dbus.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -static -o $@ tests/fpportal_probe.c src/vault/dbus.c

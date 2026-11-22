@@ -18,6 +18,7 @@
 #include "../fsops.h"
 #include "../pkg/crypto.h"
 #include "../ui/ui.h"
+#include "../gpu/gpu.h"
 #include "../ui/js_sys.h"
 #include "../errcode.h"
 #include "../sec/json.h"
@@ -341,13 +342,121 @@ MediaSrc *media_src_get(int id) {
     return NULL;
 }
 
+/* a node in crop_nodes still shows a part of this source? */
+static Node *crop_node(MediaSrc *s, int i) {
+    Node *n = s->crop_nodes[i] ? node_get(s->crop_nodes[i]) : NULL;
+    if (n && n->type == NODE_MEDIA && n->term == s->id && n->crop) return n;
+    s->crop_nodes[i] = 0;
+    return NULL;
+}
+
+int media_src_crop_count(MediaSrc *s) {
+    int k = 0;
+    for (int i = 0; i < MEDIA_CROP_NODES; i++) if (crop_node(s, i)) k++;
+    return k;
+}
+
+/* The part of a node that shows the picture's pixels x, y, w × h (where its last paint put them, media_paint), in the
+ * node's logical coordinates, one pixel wider on each side for the scaled picture's filter; the whole node when that
+ * paint is unknown, rotated or mirrored, or was of another size. 0 when nothing of it is in the box. */
+static int node_part(const MediaSrc *s, const Node *n, int x, int y, int w, int h, Box *out) {
+    const float *pd = node_padding(n);
+    float bl = node_border(n, EDGE_L), bt = node_border(n, EDGE_T), br = node_border(n, EDGE_R), bb = node_border(n, EDGE_B);
+    float cx = n->ax + pd[EDGE_L] + bl, cy = n->ay + pd[EDGE_T] + bt;
+    float cw = n->w - pd[EDGE_L] - pd[EDGE_R] - bl - br, ch = n->h - pd[EDGE_T] - pd[EDGE_B] - bt - bb;
+    *out = (Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) };
+    if (!s->map_ok || s->map_w != s->w || s->map_h != s->h || cw <= 0 || ch <= 0) return 1;
+    float x0 = cx + cw * (s->map_fx + (float)(x - 1) * s->map_kx), x1 = cx + cw * (s->map_fx + (float)(x + w + 1) * s->map_kx);
+    float y0 = cy + ch * (s->map_fy + (float)(y - 1) * s->map_ky), y1 = cy + ch * (s->map_fy + (float)(y + h + 1) * s->map_ky);
+    x0 = fmaxf(floorf(x0) - 1, cx); y0 = fmaxf(floorf(y0) - 1, cy);
+    x1 = fminf(ceilf(x1) + 1, cx + cw); y1 = fminf(ceilf(y1) + 1, cy + ch);
+    if (x1 <= x0 || y1 <= y0) return 0;
+    *out = (Box){ floorf(x0), floorf(y0), ceilf(x1), ceilf(y1) };
+    return 1;
+}
+
+int media_src_damage_rect(MediaSrc *s, int x, int y, int w, int h) {
+    int k = 0;
+    Node *n = s->node ? node_get(s->node) : NULL;
+    if (n && n->type == NODE_MEDIA && n->term == s->id && !n->crop && n->prev_box.x1 > n->prev_box.x0) {
+        /* only where the picture changed (Machines: a pointer, a clock), as the crop nodes below: the rest of the
+         * node keeps its pixels (docs/MACHINES-GPU.md, Part 1 step 3) */
+        Box b;
+        if (node_part(s, n, x, y, w, h, &b)) { damage_add(b); k++; }
+    } else s->node = 0;
+    for (int i = 0; i < MEDIA_CROP_NODES; i++) {
+        Node *c = crop_node(s, i);
+        if (!c || c->prev_box.x1 <= c->prev_box.x0 || c->w <= 0 || c->h <= 0) continue;
+        const float *r = c->crop;
+        /* the changed area inside this node's part, in the node's coordinates (the part is stretched over the box) */
+        float x0 = fmaxf((float)x, r[0]), y0 = fmaxf((float)y, r[1]), x1 = fminf((float)(x + w), r[0] + r[2]), y1 = fminf((float)(y + h), r[1] + r[3]);
+        if (x1 <= x0 || y1 <= y0) continue;
+        float sx = c->w / r[2], sy = c->h / r[3];
+        damage_add((Box){ floorf(c->ax + (x0 - r[0]) * sx) - 1, floorf(c->ay + (y0 - r[1]) * sy) - 1,
+                          ceilf(c->ax + (x1 - r[0]) * sx) + 1, ceilf(c->ay + (y1 - r[1]) * sy) + 1 });
+        k++;
+    }
+    ui.dirty = 1;
+    return k;
+}
+
 void media_src_damage(MediaSrc *s) {
     Node *n = s->node ? node_get(s->node) : NULL;
     /* only the node's box (not the shadow margin): that way a new frame falls inside it (media_cover_node) */
     if (n && n->type == NODE_MEDIA && n->term == s->id && n->prev_box.x1 > n->prev_box.x0)
         damage_add((Box){ floorf(n->ax), floorf(n->ay), ceilf(n->ax + n->w), ceilf(n->ay + n->h) });
     else s->node = 0;
+    if (s->w > 0 && s->h > 0) for (int i = 0; i < MEDIA_CROP_NODES; i++) if (s->crop_nodes[i] && crop_node(s, i)) { media_src_damage_rect(s, 0, 0, s->w, s->h); break; }
     ui.dirty = 1;
+}
+
+/* ---- pictures that are GPU textures (Machines: docs/MACHINES-GPU.md, "A vGPU's picture without a readback") ---- */
+
+struct GpuTex *media_gpu_tex(int id, int *flip) {
+    MediaSrc *s = media_src_get(id);
+    if (!s || !s->gtex || !gpu_tex_current(s->gtex)) return NULL;
+    if (flip) *flip = s->gtex_flip;
+    return s->gtex;
+}
+
+void media_src_need_cpu(MediaSrc *s) {
+    if (!s || !s->cpu_stale || !s->cpu_read) return;
+    if (!s->cpu_read(s->id)) s->cpu_stale = 0;
+}
+
+static Box present_box;
+static int present_on;
+
+void media_src_present(MediaSrc *s) {
+    Box b = { 0, 0, 0, 0 };
+    int k = 0;
+    Node *n = s->node ? node_get(s->node) : NULL;
+    if (n && n->type == NODE_MEDIA && n->term == s->id && !n->crop && n->prev_box.x1 > n->prev_box.x0) { b = n->prev_box; k = 1; }
+    for (int i = 0; i < MEDIA_CROP_NODES; i++) {
+        Node *c = crop_node(s, i);
+        if (!c || c->prev_box.x1 <= c->prev_box.x0) continue;
+        if (!k) b = c->prev_box;
+        else { b.x0 = fminf(b.x0, c->prev_box.x0); b.y0 = fminf(b.y0, c->prev_box.y0); b.x1 = fmaxf(b.x1, c->prev_box.x1); b.y1 = fmaxf(b.y1, c->prev_box.y1); }
+        k = 1;
+    }
+    if (!k) { s->painted_seq = s->frame_seq; return; }      /* not shown anywhere: nothing to present */
+    if (!present_on) present_box = b;
+    else {
+        present_box.x0 = fminf(present_box.x0, b.x0); present_box.y0 = fminf(present_box.y0, b.y0);
+        present_box.x1 = fmaxf(present_box.x1, b.x1); present_box.y1 = fmaxf(present_box.y1, b.y1);
+    }
+    present_on = 1;
+    /* the frame counts as read: the present that follows draws the texture it is in (js_vm_painted acknowledges it) */
+    s->painted_seq = s->frame_seq;
+}
+
+int media_present_pending(void) { return present_on; }
+
+int media_present_take(float *x0, float *y0, float *x1, float *y1) {
+    if (!present_on) return 0;
+    *x0 = present_box.x0; *y0 = present_box.y0; *x1 = present_box.x1; *y1 = present_box.y1;
+    present_on = 0;
+    return 1;
 }
 
 /* ---- a source's own pointer (Machines: the guest's CursorDefine) ---- */
@@ -381,8 +490,17 @@ void media_src_cursor_visible(int id, int on) {
     cursor_serial++;
 }
 
+void media_src_cursor_guest_draws(int id, int on) {
+    MediaSrc *s = media_src_get(id);
+    if (!s || s->guest_draws == !!on) return;
+    s->guest_draws = !!on;
+    cursor_serial++;
+}
+
 int media_node_cursor(int id, const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *gen) {
     MediaSrc *s = media_src_get(id);
+    /* a guest that draws its own pointer into the picture and never handed one over: no second arrow */
+    if (s && !s->cur_mode && s->guest_draws) { *gen = 0xe0000000u + (cursor_serial & 0x0fffffffu); return 2; }
     /* the guest turned its pointer off (its cursor plane: a text console, or X just quit): the host's arrow, so
      * there's always a pointer to aim with; a fully transparent image is an app hiding it on purpose */
     if (!s || !s->cur_mode || s->cur_off) return 0;
@@ -668,6 +786,8 @@ static void job_free(Job *j) {
 
 static void thumb_done(const char *key, int ok);
 
+void (*media_portal_saved)(int tag, int ok, const char *path);
+
 static void job_finish(Job *j, int status, int fd) {
     char esc[PATH_MAX * 2 + 8], res[MP_PAYLOAD_MAX * 2 + 8];
     int ok = status == 0;
@@ -687,6 +807,11 @@ static void job_finish(Job *j, int status, int fd) {
         media_json_str(esc, sizeof esc, ok ? j->dst : "");
         media_event(0, "job", "{\"id\":%d,\"ok\":%s,\"path\":%s,\"result\":%s}", j->id, ok ? "true" : "false", esc,
                     ok && payload[0] == '{' ? payload : "null");
+        break;
+    case JP_PORTAL:
+        ok = ok && !media_finish_output(j->tmp, j->dst, 1);
+        if (!ok && j->tmp) media_finish_output(j->tmp, j->dst, 0);
+        if (media_portal_saved) media_portal_saved(j->src, ok, ok ? j->dst : NULL);
         break;
     case JP_CLIP: {
         ok = ok && !media_finish_output(j->tmp, j->dst, 1);

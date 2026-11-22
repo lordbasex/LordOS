@@ -133,7 +133,7 @@
   },
   "open": "فتح",
   "page.ai": "الذكاء الاصطناعي",
-  "page.webapps": "تطبيقات الويب",
+  "page.webapps": "تطبيقات الويب (PWA)",
   "page.commercial": "تجارية",
   "page.remote": "الوصول عن بُعد",
   "page.suites": "تطبيقات الجهات الخارجية",
@@ -347,5 +347,12 @@
   "multiarch.enabling": "جارٍ التفعيل…",
   "pkg32": "{name} (32 بت)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "تطبيق Flatpak"
+  "kind.flatpak": "تطبيق Flatpak",
+  "section.origin": "مصدر التطبيقات",
+  "section.picks": "مختارة من LordOS",
+  "src.debian": "تطبيقات Linux ‏(Debian)",
+  "src.wine": "Wine",
+  "src.android": "تطبيقات Android",
+  "soon": "قريبًا",
+  "sub.all": "الكل"
 }

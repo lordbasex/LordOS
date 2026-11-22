@@ -7,7 +7,8 @@
 //                                  the default app for the rest, otherwise reveal it in Files. Used by
 //                                  Mail in-process and, for the isolated Mail, on a cached attachment
 //                                  lord-server validated ("mailopen" broker event).
-//   revealPath(path)
+//   revealPath(path)               Files on the folder that holds path
+//   openFolder(path)               Files on the folder itself (Machines' Open Transfer Folder)
 //   "launch" broker event          one of these apps opens another one with args (no paths).
 import { wm, getApp } from './windows.js';
 import * as fs from './fs.js';
@@ -16,6 +17,7 @@ import { events as calendarEvents } from './calendar.js';
 import { books as addressBooks, contacts } from './contacts.js';
 
 export const revealPath = (path) => wm.open('files', { new: true, args: { path: fs.parent(path), select: fs.basename(path), nonce: Date.now() } });
+export const openFolder = (path) => wm.open('files', { new: true, args: { path, nonce: Date.now() } });
 
 // A web address, in the default browser. False if there isn't one, or the address has characters that aren't allowed.
 export function openUrl(url) {

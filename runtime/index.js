@@ -4,7 +4,7 @@ import Reconciler from 'react-reconciler';
 import { ConcurrentRoot, DefaultEventPriority, NoEventPriority } from 'react-reconciler/constants';
 import { createContext, useEffect, useState } from 'react';
 import { flatten, normalize, applyStyle } from './style.js';
-import { register, unregister, currentPriority, addListener, setKeyFilter, setKeyFocus } from './events.js';
+import { register, unregister, ops, wrapTick, currentPriority, addListener, setKeyFilter, setKeyFocus } from './events.js';
 
 export { addListener, setKeyFilter, setKeyFocus };
 export { setLayout, getLayout, layouts, modifiers, capsLock } from './keymap.js';
@@ -113,6 +113,9 @@ function applyProps(inst, prev, next) {
   if (prev.session !== next.session) lord.setProp(inst.id, 'session', next.session ?? 0);
   if (prev.surface !== next.surface) lord.setProp(inst.id, 'surface', next.surface ?? 0);
   if (prev.media !== next.media) lord.setProp(inst.id, 'media', next.media ?? 0);
+  // <MediaView crop={[x, y, w, h]}>: only that part of the picture (Machines' apps mode); compared by value
+  const pc = prev.crop, nc = next.crop;
+  if (pc !== nc && !(Array.isArray(pc) && Array.isArray(nc) && pc.length === 4 && nc.length === 4 && pc.every((v, i) => v === nc[i]))) lord.setProp(inst.id, 'crop', Array.isArray(nc) ? nc : null);
   if (next.wave && JSON.stringify(prev.wave) !== JSON.stringify(next.wave)) lord.setProp(inst.id, 'wave', next.wave);
   // protected: the node (and what's inside) comes out black in screenshots, recordings and remote desktop
   if (!!prev.protected !== !!next.protected) lord.setProp(inst.id, 'protected', !!next.protected);
@@ -166,6 +169,8 @@ const host = {
   createInstance(type, props) {
     const inst = { id: lord.createNode(type), type, props, style: {}, parent: null, ...treeLinks() };
     register(inst);
+    ops.created++;
+    ops.last = inst;
     applyProps(inst, {}, props);
     return inst;
   },
@@ -187,8 +192,8 @@ const host = {
 
   finalizeInitialChildren: () => false,
   // React 19: no prepareUpdate; commitUpdate receives the type and the old and new props
-  commitUpdate(inst, _type, prev, next) { applyProps(inst, prev, next); inst.props = next; },
-  commitTextUpdate(inst, _old, text) { lord.setText(inst.id, text); },
+  commitUpdate(inst, _type, prev, next) { applyProps(inst, prev, next); inst.props = next; ops.updated++; ops.total++; ops.last = inst; },
+  commitTextUpdate(inst, _old, text) { lord.setText(inst.id, text); ops.updated++; },
   resetTextContent() {},
   shouldSetTextContent: () => false,
   hideInstance(inst) { inst.hidden = true; lord.setStyle(inst.id, 'display', 'none'); },
@@ -316,6 +321,7 @@ export function createPortal(children, container, key = null) {
 }
 
 export function render(element) {
+  wrapTick();
   const rootId = lord.createNode('view');
   rootNode = rootId;
   lord.setStyle(rootId, 'width', screen.width);

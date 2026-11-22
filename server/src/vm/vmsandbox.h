@@ -6,8 +6,18 @@
  *   - Landlock: read and execute /usr; read /etc/ld.so.cache; read and write only <machine>/disks; read the
  *     attached ISO; read its own /proc/<pid>; /dev/null; /dev/kvm on KVM machines (it arrives as a descriptor, but on
  *     arm64 QEMU also opens it by path to read the host CPU's features). No other file, no other device. ABI 4+: no TCP bind or connect. ABI 6+: no abstract unix sockets or signals outside itself.
+ *     A machine with 3D graphics (VmQemuJail.render: only a Linux machine with graphics "3d") also gets, for
+ *     virglrenderer and Mesa: read, write and (ABI 5+) ioctls on that render node only; list the folder /dev/dri (names
+ *     only); read its GPU's PCI device folder in sysfs (vendor, device, revision, uevent). Never card0 or another
+ *     device: the primary node stays refused. Every other machine gets none of it.
+ *     A machine with an Intel vGPU (VmQemuJail.vgpu_dev) gets: read, write and ioctls on /dev/vfio/vfio and its own
+ *     /dev/vfio/<group> only; read on that mdev's sysfs folder (the real /sys/devices/... path); the iGPU's render node
+ *     as above. Our GOP option ROM is under /usr. The VFIO ioctls need nothing from seccomp (a denylist: only TIOCSTI
+ *     and TIOCLINUX are refused).
  *   - seccomp, ours: no socket(2) at all (EACCES), no connect, bind, listen or accept (its sockets are the
- *     socketpairs lord-vm passed), no namespaces (unshare, setns, clone with CLONE_NEW*), no mount, ptrace,
+ *     socketpairs lord-vm passed), no namespaces (unshare, setns, clone with CLONE_NEW*), no new process (fork,
+ *     vfork, clone without CLONE_THREAD: QEMU only makes threads, and a vGPU machine's raised locked-memory limit
+ *     can't pass to a child), no mount, ptrace,
  *     process_vm_*, bpf, perf_event_open, keyctl, io_uring, userfaultfd, module or kexec calls, no TIOCSTI.
  *     A denylist: QEMU's own allowlist (-sandbox on,...) is applied by QEMU after it starts.
  * lord-vm itself, once QEMU and passt run: Landlock with read and write in the machine's folder and removal in
@@ -20,8 +30,15 @@ typedef struct {
     const char *iso;            /* attached ISO or NULL, read */
     const char *fw_code;        /* UEFI code file or NULL (already under /usr) */
     const char *base;           /* a linked clone's shared base (6.3), read only, or NULL */
+    const char *drivers;        /* a second disc with the guest's drivers (virtio-win), read, or NULL */
     int kvm;                    /* KVM machine: /dev/kvm may be opened again (arm64's -cpu host makes a scratch vCPU
                                  * by path to read the host's features); QEMU holds a KVM descriptor already */
+    const char *render;         /* 3D graphics (6.10, only a Linux machine with graphics "3d"): the GPU's render node,
+                                 * /dev/dri/renderD<N>, never a primary card node; NULL for every other machine.
+                                 * With an Intel vGPU, the iGPU's render node (QEMU's GL display makes its dmabufs) */
+    const char *vgpu_dev;       /* an Intel GVT-g vGPU (docs/MACHINES-GPU.md Mode A): /sys/bus/mdev/devices/<uuid>, or NULL */
+    int vgpu_group;             /* its IOMMU group: /dev/vfio/<group> and the container /dev/vfio/vfio; -1 none */
+    const char *vgpu_rom;       /* its option ROM, read (the package's is under /usr already; a test build's may not be) */
 } VmQemuJail;
 
 /* In the child, before execve. Returns the VMS_* bits that applied; the caller refuses to exec without
@@ -37,8 +54,9 @@ int vm_jail_tool2(const char *read_file, const char *read_file2, const char *rw_
 /* the same with any number of files it may read (an import: a VMDK descriptor and its extents, a chain of snapshot
  * layers); every one must exist, or nothing is allowed */
 int vm_jail_tool_n(const char *const *reads, int nreads, const char *rw_dir);
-/* lord-vm, after its children started: VMS_SUPERVISOR_LANDLOCK when applied */
-int vm_jail_self(const char *machine_dir, const char *runtime_dir);
+/* lord-vm, after its children started: VMS_SUPERVISOR_LANDLOCK when applied. xfer_dir (or NULL): the machine's transfer
+ * folder (6.7.1), where lord-vm makes, writes and removes the files dropped on the window and the one folder each sits in (never links or renames) */
+int vm_jail_self(const char *machine_dir, const char *runtime_dir, const char *xfer_dir);
 /* the kernel's Landlock ABI (0 none) */
 int vm_landlock_abi(void);
 

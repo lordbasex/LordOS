@@ -9,15 +9,56 @@
  * stdin, one command per line:
  *   png PATH            write the current picture (and print how much of it isn't black)
  *   type TEXT           type ASCII ("\n" = Enter)        key CODE          one evdev key, press and release
+ *   combo MOD CODE      MOD held while CODE is pressed (29 30: Ctrl+A)
  *   move X Y            pointer, picture coordinates     click X Y [B]     move, press and release button B (0)
  *   wheel N             N steps (+ up)                   resize W H        ask the guest for a size
  *   rate HZ             copy rate                        release           let go of everything
- *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON
+ *   capture 0|1         "Capture mouse" (6.25): VM_CAPTURE to lord-vm, VD_CAPTURE to lord-vmdisplay
+ *   rel DX DY           relative motion while captured (VD_REL, as lord-server's pointer lock sends it)
+ *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON | qmpf FILE (a longer command, from a file)
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
+ *   agent install       the guest agent's Install (VAG_INSTALL: lordos-guest, or the LordOS guest tools on Windows)
+ *   clip-text TEXT | clip-html HTML | clip-png PATH    the host's clipboard for the guest (VM_CLIP); the guest's comes
+ *                       back as "clip" events (a picture is saved as clip-in.png in the current folder)
+ *   clip-offer TEXT     the host's clipboard on demand (VM_CLIP_OFFER, a helper with "clipreq"): an offer of that text;
+ *                       the guest's requests come as "clipreq" events and are answered as clip-answer says:
+ *   clip-answer give|deny|stale|wait   give the text (default), refuse as lord-server does in the background, as
+ *                       stale, or not at all (the guest's own time limit)
+ *   raw-apps 0|1 | raw-winact ID N [X Y W H] | raw-launch TOKEN    apps mode straight to the guest (lord-vm --dev-qmp: lord-vm logs what the
+ *                       guest sends: the window list, icons, the program list)
+ *   file PATH           copy a file into the guest through its agent (VM_FILE, as a drop on the window does)
+ *   open PATH           the same, then the guest tools open it there (VM_FILE a = 1, Files' "Open with", 7.3)
+ *   place ID X Y PATH   the same, then the guest tools hand it to the apps mode window ID at X, Y (VM_FILE a = 2, 7.2.1)
+ *   transfer [SHA PATH] the transfer folder (VAG_TRANSFER): looked at again; a Windows guest gets WinFsp's installer
  *   wait-frames N [S]   wait until N more frames arrived (at most S seconds, default 30)
+ *   lat N X0 Y0 X1 Y1   the pointer moved N times between two points, 200 ms apart: the time from each move to the next
+ *                       frame and to the guest's next pointer position (VD_POINTER), median, 90th percentile and most
+ *                       (docs/MACHINES-GPU.md: a guest that draws its pointer answers a move with a frame; with a
+ *                       hardware pointer it answers with a position and no frame)
+ *   fps S               frames that arrived in the next S seconds, a second at a time
+ *   sound play [VOL]    the guest's sound through lord-server's own code (media/maudio.c, a PipeWire stream) at VOL
+ *                       percent (default 0: the stream runs and nothing is heard); sound off: no speakers' ring
+ *   sound-stats         bytes the stream took from the ring, the loudest sample in them, the guest's streams
+ *   mic tone|silence|off   the microphone's ring, filled here at the real rate with a 440 Hz tone or silence (as
+ *                       lord-server's capture stream would), or none
+ *   agent install       copies lordos-guest into the guest (VAG_INSTALL, as Install Helper does)
+ *   apps on|off         apps mode (VM_APPS): the guest's helper hides its desktop and lists its windows
+ *   windows             the guest's last window list (VM_WINDATA); apps-list: its apps; each icon the guest sends is
+ *                       saved as icon-<id>.png in the current folder
+ *   winact ID ACTION [X Y W H]   focus | close | minimize | restore | move (VM_WINACT)
+ *   launch TOKEN|NAME   one of the guest's apps, by its place in the list (VM_LAUNCH; lord-vm refuses another)
  *   quit
- * stdout: one JSON line per event or answer. Binaries are looked for next to this one, or in $LORDVM_BIN. */
+ * LORDVM_DEV_CURSOR_PNG=FILE: each pointer shape the guest hands over (VD_CURSOR) is saved there.
+ * LORDVM_DEV_NODISPLAY=1 with attach: only the control channel (lord-server shows the picture; this one sends commands).
+ * stdout: one JSON line per event or answer. Binaries are looked for next to this one, or in $LORDVM_BIN.
+ *
+ * 3D machines (VD_DMABUF): built with Mesa (LORD_GPU), it plays lord-server's GPU part too: the dmabuf is imported on
+ * the first render node with EGL and the damaged rows are read back into the picture on each frame, so `png` shows what
+ * the guest drew with virgl. Without Mesa it only counts those frames. */
 #include "vm/vmproto.h"
+#include "vm/vmagent.h"
+#include "media/media_int.h"
+#include "media/aring.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -36,6 +77,14 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifdef LORD_GPU
+#include <gbm.h>
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
+#endif
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STBIW_ONLY_PNG
 #include "stb_image_write.h"
@@ -49,11 +98,21 @@ static uint8_t *pic;
 static int pw, ph;
 static size_t plen;
 static long frames, frames_target = -1;
+static struct { int left, x[2], y[2], k, waiting_f, waiting_p; long long t0, next; int nf, np; double f[512], p[512]; } lat;
+static struct { int left; long long next; long base; } fpsm;
 static long long frames_deadline;
 static uint32_t seq = 100;
 static int vm_state = -1;
 static int cursor_w, cursor_h;
+static MAudio *spk;
+static ARingHdr *spk_ring;          /* our read-only view of the stream's ring, to look at what it took */
+static size_t spk_len;
+static uint64_t spk_seen;
+static int spk_peak;
+static long long spk_loud;          /* samples above 1/100 of full scale */
+static int guest_out, guest_in;
 
+static void vdsend_fd(int type, int a, int fd);
 static void out(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 static void out(const char *fmt, ...) {
     va_list ap;
@@ -104,13 +163,112 @@ static void spawn_vmdisplay(int dbus_fd) {
     out("{\"ev\":\"vmdisplay\",\"pid\":%d}", (int)p);
 }
 
+/* ---- 3D: the dmabuf read back with EGL, as lord-server's GPU path does (gpu_tex_read_rows) ---- */
+static struct { int fd, w, h, stride, flip; uint32_t fourcc; uint64_t mod; long reads, fails; } dmab = { .fd = -1 };
+#ifdef LORD_GPU
+static struct { int ok, tried; EGLDisplay dpy; EGLContext ctx; GLuint prog, fbo, rtex, tex; EGLImageKHR img; int iw, ih; } egl;
+static void egl_setup(void) {
+    if (egl.tried) return;
+    egl.tried = 1;
+    int fd = -1;
+    for (int i = 128; i < 192 && fd < 0; i++) { char p[32]; snprintf(p, sizeof p, "/dev/dri/renderD%d", i); fd = open(p, O_RDWR | O_CLOEXEC); }
+    struct gbm_device *g = fd >= 0 ? gbm_create_device(fd) : NULL;
+    PFNEGLGETPLATFORMDISPLAYEXTPROC gpd = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
+    egl.dpy = g && gpd ? gpd(EGL_PLATFORM_GBM_KHR, g, NULL) : EGL_NO_DISPLAY;
+    EGLint maj, min;
+    if (egl.dpy == EGL_NO_DISPLAY || !eglInitialize(egl.dpy, &maj, &min) || !eglBindAPI(EGL_OPENGL_ES_API)) { out("{\"ev\":\"egl\",\"ok\":false}"); return; }
+    static const EGLint ca[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+    egl.ctx = eglCreateContext(egl.dpy, EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, ca);
+    if (egl.ctx == EGL_NO_CONTEXT || !eglMakeCurrent(egl.dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, egl.ctx)) { out("{\"ev\":\"egl\",\"ok\":false,\"why\":\"context\"}"); return; }
+    static const char *vs = "attribute vec2 p; attribute vec2 t; varying vec2 v; void main() { v = t; gl_Position = vec4(p, 0.0, 1.0); }";
+    static const char *fs = "#extension GL_OES_EGL_image_external : require\nprecision mediump float; varying vec2 v; uniform samplerExternalOES s;"
+                            " void main() { gl_FragColor = vec4(texture2D(s, v).rgb, 1.0); }";
+    GLuint sh[2] = { glCreateShader(GL_VERTEX_SHADER), glCreateShader(GL_FRAGMENT_SHADER) };
+    glShaderSource(sh[0], 1, &vs, NULL); glCompileShader(sh[0]);
+    glShaderSource(sh[1], 1, &fs, NULL); glCompileShader(sh[1]);
+    egl.prog = glCreateProgram();
+    glAttachShader(egl.prog, sh[0]); glAttachShader(egl.prog, sh[1]);
+    glBindAttribLocation(egl.prog, 0, "p"); glBindAttribLocation(egl.prog, 1, "t");
+    glLinkProgram(egl.prog);
+    GLint linked = 0;
+    glGetProgramiv(egl.prog, GL_LINK_STATUS, &linked);
+    egl.ok = linked;
+    out("{\"ev\":\"egl\",\"ok\":%s,\"renderer\":\"%s\"}", linked ? "true" : "false", (const char *)glGetString(GL_RENDERER));
+}
+static void egl_drop_image(void) {
+    if (!egl.ok) return;
+    if (egl.tex) { glDeleteTextures(1, &egl.tex); egl.tex = 0; }
+    if (egl.img) { ((PFNEGLDESTROYIMAGEKHRPROC)eglGetProcAddress("eglDestroyImageKHR"))(egl.dpy, egl.img); egl.img = NULL; }
+}
+static int egl_import(void) {
+    egl_setup();
+    if (!egl.ok || dmab.fd < 0) return -1;
+    if (egl.img) return 0;
+    EGLint at[32];
+    int n = 0;
+    at[n++] = EGL_WIDTH; at[n++] = dmab.w; at[n++] = EGL_HEIGHT; at[n++] = dmab.h;
+    at[n++] = EGL_LINUX_DRM_FOURCC_EXT; at[n++] = (EGLint)dmab.fourcc;
+    at[n++] = EGL_DMA_BUF_PLANE0_FD_EXT; at[n++] = dmab.fd;
+    at[n++] = EGL_DMA_BUF_PLANE0_OFFSET_EXT; at[n++] = 0;
+    at[n++] = EGL_DMA_BUF_PLANE0_PITCH_EXT; at[n++] = dmab.stride;
+    if (dmab.mod != 0x00ffffffffffffffULL) {
+        at[n++] = EGL_DMA_BUF_PLANE0_MODIFIER_LO_EXT; at[n++] = (EGLint)(dmab.mod & 0xffffffff);
+        at[n++] = EGL_DMA_BUF_PLANE0_MODIFIER_HI_EXT; at[n++] = (EGLint)(dmab.mod >> 32);
+    }
+    at[n] = EGL_NONE;
+    egl.img = ((PFNEGLCREATEIMAGEKHRPROC)eglGetProcAddress("eglCreateImageKHR"))(egl.dpy, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, NULL, at);
+    if (!egl.img) { out("{\"ev\":\"dmabuf_import\",\"ok\":false,\"egl\":\"0x%x\"}", eglGetError()); return -1; }
+    glGenTextures(1, &egl.tex);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, egl.tex);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    ((PFNGLEGLIMAGETARGETTEXTURE2DOESPROC)eglGetProcAddress("glEGLImageTargetTexture2DOES"))(GL_TEXTURE_EXTERNAL_OES, (GLeglImageOES)egl.img);
+    if (egl.iw != dmab.w || egl.ih != dmab.h) {
+        if (egl.fbo) { glDeleteFramebuffers(1, &egl.fbo); glDeleteTextures(1, &egl.rtex); }
+        glGenTextures(1, &egl.rtex);
+        glBindTexture(GL_TEXTURE_2D, egl.rtex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, dmab.w, dmab.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glGenFramebuffers(1, &egl.fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, egl.fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, egl.rtex, 0);
+        egl.iw = dmab.w; egl.ih = dmab.h;
+    }
+    out("{\"ev\":\"dmabuf_import\",\"ok\":true}");
+    return 0;
+}
+/* rows [y, y + h) of the dmabuf into the picture (B, G, R, X bytes) */
+static int egl_read(int y, int h) {
+    if (egl_import() || !pic || pw != dmab.w || ph != dmab.h) return -1;
+    glBindFramebuffer(GL_FRAMEBUFFER, egl.fbo);
+    glViewport(0, 0, dmab.w, dmab.h);
+    glUseProgram(egl.prog);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, egl.tex);
+    float t0 = dmab.flip ? 1.0f : 0.0f, t1 = dmab.flip ? 0.0f : 1.0f;
+    const GLfloat v[] = { -1, -1, 0, t0,  1, -1, 1, t0,  -1, 1, 0, t1,  1, 1, 1, t1 };
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
+    glEnableVertexAttribArray(0); glEnableVertexAttribArray(1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    uint8_t *rows = pic + (size_t)y * pw * 4;
+    glReadPixels(0, y, dmab.w, h, GL_RGBA, GL_UNSIGNED_BYTE, rows);
+    if (glGetError() != GL_NO_ERROR) return -1;
+    for (size_t i = 0, n = (size_t)pw * h; i < n; i++) { uint8_t r = rows[i * 4]; rows[i * 4] = rows[i * 4 + 2]; rows[i * 4 + 2] = r; }
+    return 0;
+}
+#else
+static void egl_drop_image(void) {}
+static int egl_read(int y, int h) { (void)y; (void)h; return -1; }
+#endif
+
 static void picture_for(int w, int h) {
     if (pic) munmap(pic, plen);
     pic = NULL;
     size_t len = (size_t)w * h * 4;
     int fd = vm_picture_memfd(len);
     if (fd < 0) return;
-    pic = mmap(NULL, len, PROT_READ, MAP_SHARED, fd, 0);
+    /* writable: a 3D machine's frames are read back into it here */
+    pic = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (pic == MAP_FAILED) { pic = NULL; close(fd); return; }
     pw = w; ph = h; plen = len;
     VdMsg m = vd_msg(VD_SHM, 0, 0, 0, 0, 0, 0);
@@ -119,6 +277,53 @@ static void picture_for(int w, int h) {
     out("{\"ev\":\"picture\",\"w\":%d,\"h\":%d}", w, h);
 }
 
+/* apps mode: what lord-vm passed on (VM_WINDATA), parsed again here as lord-server does */
+static LagWinList dev_wins;
+static LagAppList dev_apps;
+static int dev_icons, dev_apps_gen;
+static void jstr(char *o, size_t cap, const char *s) {
+    size_t k = 0;
+    for (; *s && k + 7 < cap; s++) {
+        unsigned char ch = (unsigned char)*s;
+        if (ch == '"' || ch == '\\') { o[k++] = '\\'; o[k++] = (char)ch; }
+        else if (ch < 0x20) k += (size_t)snprintf(o + k, cap - k, "\\u%04x", ch);
+        else o[k++] = (char)ch;
+    }
+    o[k] = 0;
+}
+static void print_windows(void) {
+    out("{\"ev\":\"windows\",\"serial\":%u,\"count\":%d,\"icons\":%d}", dev_wins.serial, dev_wins.n, dev_icons);
+    for (int i = 0; i < dev_wins.n; i++) {
+        const LagWinEntry *w = &dev_wins.w[i];
+        char t[LAG_TITLE_MAX * 6 + 8], a[LAG_APPNAME_MAX * 6 + 8];
+        jstr(t, sizeof t, w->title); jstr(a, sizeof a, w->app);
+        out("{\"ev\":\"window\",\"id\":%u,\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"flags\":%u,\"owner\":%u,\"pid\":%u,\"title\":\"%s\",\"app\":\"%s\"}",
+            w->id, w->x, w->y, w->w, w->h, w->flags, w->owner, w->pid, t, a);
+    }
+}
+static void windata(const VmMsg *m, int fd) {
+    static uint8_t b[VM_WINDATA_MAX];
+    if (fd < 0 || pread(fd, b, (size_t)m->a, 0) != m->a) { out("{\"ev\":\"error\",\"what\":\"VM_WINDATA unreadable\"}"); return; }
+    if (m->b == LAG_WINDOWS) { if (lag_winlist_read(b, (size_t)m->a, &dev_wins)) out("{\"ev\":\"error\",\"what\":\"window list refused\"}"); else print_windows(); }
+    else if (m->b == LAG_WINICON) {
+        uint32_t id; uint16_t w, h; const uint8_t *px;
+        if (!lag_winicon_parse(b, (size_t)m->a, &id, &w, &h, &px)) {
+            /* saved as icon-<id>.png in the current folder, to look at */
+            char f[40];
+            snprintf(f, sizeof f, "icon-%u.png", id);
+            stbi_write_png(f, w, h, 4, px, w * 4);
+            dev_icons++;
+            out("{\"ev\":\"icon\",\"id\":%u,\"w\":%d,\"h\":%d,\"png\":\"%s\"}", id, w, h, f);
+        }
+    } else if (m->b == LAG_APPLIST) {
+        dev_apps_gen = m->c;
+        if (lag_applist_read(b, (size_t)m->a, &dev_apps)) { out("{\"ev\":\"error\",\"what\":\"app list refused\"}"); return; }
+        out("{\"ev\":\"apps\",\"count\":%d}", dev_apps.n);
+    }
+}
+
+static void clip_got(const VmMsg *m, int fd);
+static void clip_req(const VmMsg *m);
 static void from_vm(void) {
     for (int k = 0; k < VD_POLL_MAX; k++) {
         VmMsg m;
@@ -136,7 +341,12 @@ static void from_vm(void) {
             vm_state = m.a;
             out("{\"ev\":\"state\",\"state\":\"%s\",\"reason\":%d,\"code\":%d,\"qemu_pid\":%d,\"detail\":\"%s\"}", STATES[m.a], m.b, m.c, m.d, m.text);
             if ((m.a == VS_RUNNING || m.a == VS_PAUSED) && !display_asked && machine_id[0]) { display_asked = 1; ask(VM_DISPLAY, 0, NULL); }
-        } else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
+        } else if (m.type == VM_FILE_PROGRESS) out("{\"ev\":\"file\",\"seq\":%u,\"pct\":%d,\"via\":%d,\"name\":\"%s\"}", m.seq, m.a, m.b, m.text);
+        else if (m.type == VM_AGENT_STATE) out("{\"ev\":\"agent\",\"state\":%d,\"caps\":%d}", m.a, m.b);
+        else if (m.type == VM_WINDATA) windata(&m, fd);
+        else if (m.type == VM_CLIP_DATA) clip_got(&m, fd);
+        else if (m.type == VM_CLIP_REQ) clip_req(&m);
+        else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
         else if (m.type == VM_DISPLAY_FD) {
             if (fd < 0) { out("{\"ev\":\"error\",\"what\":\"VM_DISPLAY_FD without a descriptor\"}"); continue; }
             out("{\"ev\":\"display_fd\"}");
@@ -162,23 +372,128 @@ static void from_vd(void) {
         case VD_FRAME:
             if (!vd_rect_inside(&m, pw, ph)) { out("{\"ev\":\"refused\",\"what\":\"frame outside the picture\"}"); break; }
             frames++;
-            if (frames == 1) out("{\"ev\":\"first_frame\",\"w\":%d,\"h\":%d}", pw, ph);
+            if (lat.waiting_f) { lat.waiting_f = 0; if (lat.nf < 512) lat.f[lat.nf++] = (double)(now_ms() - lat.t0); }
+            if (dmab.fd >= 0) { if (egl_read(m.b, m.d)) dmab.fails++; else dmab.reads++; }
+            if (frames == 1) out("{\"ev\":\"first_frame\",\"w\":%d,\"h\":%d,\"dmabuf\":%s}", pw, ph, dmab.fd >= 0 ? "true" : "false");
             if (!noack) { VdMsg a = vd_msg(VD_FRAME_DONE, 0, 0, 0, 0, m.e, 0); vd_send(vd, &a, -1); }
             break;
         case VD_CURSOR:
             if (fd < 0 || vm_cursor_check(fd, m.a, m.b)) { out("{\"ev\":\"refused\",\"what\":\"cursor memfd\"}"); break; }
             cursor_w = m.a; cursor_h = m.b;
+            if (getenv("LORDVM_DEV_CURSOR_PNG")) {
+                /* the shape the guest handed over (BGRA, premultiplied), over a checkerboard, for a look at it */
+                uint8_t *cp = mmap(NULL, (size_t)m.a * m.b * 4, PROT_READ, MAP_SHARED, fd, 0), *rgb = malloc((size_t)m.a * m.b * 3);
+                if (cp != MAP_FAILED && rgb) {
+                    for (int i = 0; i < m.a * m.b; i++) {
+                        int bg = ((i % m.a) / 4 + (i / m.a) / 4) % 2 ? 200 : 120, a = cp[i * 4 + 3];
+                        for (int k = 0; k < 3; k++) rgb[i * 3 + k] = (uint8_t)(cp[i * 4 + 2 - k] + bg * (255 - a) / 255);
+                    }
+                    stbi_write_png(getenv("LORDVM_DEV_CURSOR_PNG"), m.a, m.b, 3, rgb, m.a * 3);
+                }
+                if (cp != MAP_FAILED) munmap(cp, (size_t)m.a * m.b * 4);
+                free(rgb);
+            }
             out("{\"ev\":\"cursor\",\"w\":%d,\"h\":%d,\"hot_x\":%d,\"hot_y\":%d}", m.a, m.b, m.c, m.d);
             break;
-        case VD_POINTER: break;
+        case VD_POINTER: if (lat.waiting_p) { lat.waiting_p = 0; if (lat.np < 512) lat.p[lat.np++] = (double)(now_ms() - lat.t0); } break;
+        case VD_DMABUF:
+            egl_drop_image();
+            if (dmab.fd >= 0) close(dmab.fd);
+            dmab.fd = -1;
+            if (m.a && fd >= 0) {
+                dmab.fd = fd; fd = -1;
+                dmab.w = m.a; dmab.h = m.b; dmab.stride = m.c & ~VD_DMABUF_FLIP; dmab.flip = (m.c & VD_DMABUF_FLIP) != 0;
+                dmab.fourcc = (uint32_t)m.d; dmab.mod = (uint64_t)(uint32_t)m.e | (uint64_t)(uint32_t)m.f << 32;
+                out("{\"ev\":\"dmabuf\",\"w\":%d,\"h\":%d,\"stride\":%d,\"flip\":%d,\"fourcc\":\"0x%08x\",\"modifier\":\"0x%016llx\"}", dmab.w, dmab.h,
+                    dmab.stride, dmab.flip, dmab.fourcc, (unsigned long long)dmab.mod);
+            }
+            break;
         case VD_STATE: out("{\"ev\":\"display_state\",\"state\":%d,\"reason\":%d}", m.a, m.b); break;
-        case VD_STATS: out("{\"ev\":\"display_stats\",\"refused\":%d,\"updates\":%d,\"copies\":%d,\"w\":%d,\"h\":%d,\"frame\":%d,\"frames_here\":%ld}", m.a, m.b, m.c, m.d, m.e, m.f, frames); break;
+        case VD_GUEST_AUDIO:
+            if (m.a == VDG_OUT) { guest_out = m.b; if (spk) maudio_playing(spk, m.b); } else guest_in = m.b;
+            out("{\"ev\":\"guest_audio\",\"stream\":\"%s\",\"on\":%d}", m.a == VDG_OUT ? "out" : "in", m.b);
+            break;
+        case VD_STATS: out("{\"ev\":\"display_stats\",\"refused\":%d,\"updates\":%d,\"copies\":%d,\"w\":%d,\"h\":%d,\"frame\":%d,\"frames_here\":%ld,\"dmabuf_reads\":%ld,\"dmabuf_fails\":%ld}",
+                           m.a, m.b, m.c, m.d, m.e, m.f, frames, dmab.reads, dmab.fails); break;
         }
         if (fd >= 0) close(fd);
     }
 }
 
+/* ---- sound (6.9): lord-server's part, with lord-server's own code for the speakers (media/maudio.c) ---- */
+int media_pulse_fd(void) {
+    char path[sizeof ((struct sockaddr_un *)0)->sun_path];
+    const char *ps = getenv("PULSE_SERVER"), *rt = getenv("XDG_RUNTIME_DIR");
+    if (ps && !strncmp(ps, "unix:", 5)) snprintf(path, sizeof path, "%s", ps + 5);
+    else snprintf(path, sizeof path, "%s/pulse/native", rt ? rt : "/nonexistent");
+    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    struct sockaddr_un a = { .sun_family = AF_UNIX };
+    memcpy(a.sun_path, path, strlen(path) + 1);
+    if (fd >= 0 && connect(fd, (struct sockaddr *)&a, sizeof a)) { close(fd); fd = -1; }
+    return fd;
+}
+static ARingHdr *mic;
+static size_t mic_len;
+static uint64_t mic_w, mic_samples;
+static long long mic_t0;
+static int mic_tone;
+static void spk_look(void) {
+    if (!spk || !spk_ring) return;
+    uint64_t now = maudio_bytes(spk);
+    uint32_t size = spk_ring->size;
+    if (now - spk_seen > size) spk_seen = now - size;
+    for (uint64_t p = spk_seen & ~(uint64_t)1; p + 2 <= now; p += 2) {
+        int16_t v;
+        memcpy(&v, ar_data(spk_ring) + (p & (size - 1)), 2);
+        int a = v < 0 ? -v : v;
+        if (a > spk_peak) spk_peak = a;
+        if (a > 327) spk_loud++;
+    }
+    spk_seen = now;
+}
+static void sound_off(void) {
+    if (!spk) return;
+    vdsend_fd(VD_AUDIO_OUT, 0, -1);
+    spk_look();
+    munmap(spk_ring, spk_len);
+    maudio_close(spk);
+    spk = NULL; spk_ring = NULL;
+}
+static void mic_off(void) {
+    if (!mic) return;
+    vdsend_fd(VD_MIC, 0, -1);
+    munmap(mic, mic_len);
+    mic = NULL;
+}
+static void mic_on(int tone) {
+    mic_off();
+    uint32_t size = 1u << 17;
+    mic_len = ar_bytes(size);
+    int fd = (int)syscall(SYS_memfd_create, "lordos-audio", 3u);
+    if (fd < 0 || ftruncate(fd, (off_t)mic_len) || fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL)) { if (fd >= 0) close(fd); return; }
+    mic = mmap(NULL, mic_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (mic == MAP_FAILED) { mic = NULL; close(fd); return; }
+    memset(mic, 0, AR_HDR);
+    mic->rate = AR_RATE; mic->channels = 1; mic->size = size; mic->magic = AR_MAGIC;
+    mic_w = 0; mic_samples = 0; mic_t0 = now_ms(); mic_tone = tone;
+    vdsend_fd(VD_MIC, 1, fd);
+    close(fd);
+}
+/* the microphone's ring at the real rate, as lord-server's capture stream writes it */
+static void mic_feed(void) {
+    if (!mic) return;
+    uint64_t due = (uint64_t)(now_ms() - mic_t0) * 48;
+    static int16_t buf[4800];
+    while (mic_samples < due) {
+        size_t k = due - mic_samples > 4800 ? 4800 : (size_t)(due - mic_samples);
+        for (size_t i = 0; i < k; i++) buf[i] = mic_tone ? (int16_t)(8000 * sin(2 * 3.14159265358979 * 440 * (double)(mic_samples + i) / 48000)) : 0;
+        ar_write_t(mic, mic->size, &mic_w, buf, k * 2);
+        mic_samples += k;
+    }
+}
+
 static void vdsend(int type, int a, int b) { if (vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, b, 0, 0, 0, 0); vd_send(vd, &m, -1); } }
+static void vdsend_fd(int type, int a, int fd) { if (vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, 0, 0, 0, 0, 0); vd_send(vd, &m, fd); } }
 
 /* ASCII to evdev (US layout); bit 8: shift */
 static int ascii_key(char c) {
@@ -229,6 +544,118 @@ static void save_png(const char *path) {
     out("{\"ok\":%s,\"cmd\":\"png\",\"w\":%d,\"h\":%d,\"lit_pct\":%.2f}", ok ? "true" : "false", pw, ph, 100.0 * lit / ((double)pw * ph));
 }
 
+/* the host's clipboard for the guest, as lord-server sends it (VM_CLIP: a sealed memfd) */
+static void clip_send_host(const void *p, size_t n, int form) {
+    int fd = (int)syscall(SYS_memfd_create, "lordos-vm-clipboard", 3u);
+    VmMsg m = vm_msg(VM_CLIP, ++seq, (int)n, form, 0, 0, NULL);
+    int ok = fd >= 0 && write(fd, p, n) == (ssize_t)n && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) && !vm_send(vm, &m, fd);
+    if (fd >= 0) close(fd);
+    out("{\"ok\":%s,\"cmd\":\"clip\",\"seq\":%u,\"bytes\":%zu}", ok ? "true" : "false", seq, n);
+}
+static void clip_part(uint8_t **b, size_t *n, uint8_t form, const void *d, size_t l) {
+    *b = realloc(*b, *n + 5 + l);
+    (*b)[*n] = form;
+    for (int i = 0; i < 4; i++) (*b)[*n + 1 + i] = (uint8_t)(l >> (8 * i));
+    memcpy(*b + *n + 5, d, l);
+    *n += 5 + l;
+}
+static void clip_png_host(const char *path) {
+    FILE *f = fopen(path, "rb");
+    static uint8_t png[8 << 20];
+    size_t pn = f ? fread(png, 1, sizeof png, f) : 0;
+    if (f) fclose(f);
+    if (!pn) { out("{\"ok\":false,\"cmd\":\"clip-png\"}"); return; }
+    uint8_t *b = NULL;
+    size_t n = 0;
+    clip_part(&b, &n, 3, png, pn);
+    clip_send_host(b, n, VCF_CLIPX);
+    free(b);
+}
+static void clip_html_host(const char *html) {
+    uint8_t *b = NULL;
+    size_t n = 0;
+    clip_part(&b, &n, 1, "rich text", 9);
+    clip_part(&b, &n, 2, html, strlen(html));
+    clip_send_host(b, n, VCF_CLIPX);
+    free(b);
+}
+/* the host's clipboard on demand: the offered text, the offer's generation, and how requests are answered */
+static char offer_text[4096];
+static uint32_t offer_gen;
+static int offer_answer;                /* 0 give, 1 deny (background), 2 stale, 3 no answer */
+static void clip_offer(const char *t) {
+    snprintf(offer_text, sizeof offer_text, "%s", t);
+    VmMsg m = vm_msg(VM_CLIP_OFFER, ++seq, (int)++offer_gen, AGM_TEXT, 0, 0, NULL);
+    int ok = !vm_send(vm, &m, -1);
+    out("{\"ok\":%s,\"cmd\":\"clip-offer\",\"gen\":%u}", ok ? "true" : "false", offer_gen);
+}
+static void clip_req(const VmMsg *m) {
+    out("{\"ev\":\"clipreq\",\"gen\":%d,\"form\":%d,\"answer\":%d}", m->a, m->b, offer_answer);
+    if (offer_answer == 3) return;
+    if (offer_answer || m->b != AGF_TEXT || (uint32_t)m->a != offer_gen) {
+        VmMsg d = vm_msg(VM_CLIP_DENY, ++seq, m->a, m->b, offer_answer == 2 || (uint32_t)m->a != offer_gen ? VCD_STALE : offer_answer == 1 ? VCD_BACKGROUND : VCD_NONE, 0, NULL);
+        vm_send(vm, &d, -1);
+        return;
+    }
+    uint8_t *b = NULL;
+    size_t n = 0;
+    clip_part(&b, &n, AGF_TEXT, offer_text, strlen(offer_text));
+    int fd = (int)syscall(SYS_memfd_create, "lordos-vm-clipboard", 3u);
+    if (fd >= 0 && write(fd, b, n) == (ssize_t)n && fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL) == 0) {
+        VmMsg c = vm_msg(VM_CLIP, ++seq, (int)n, VCF_CLIPX, m->a, AGF_TEXT, NULL);
+        vm_send(vm, &c, fd);
+    }
+    if (fd >= 0) close(fd);
+    free(b);
+}
+
+/* the guest's clipboard (VM_CLIP_DATA): printed (text) or saved as clip-in.png next to the picture files */
+static void clip_got(const VmMsg *m, int fd) {
+    static uint8_t buf[VM_CLIP_MAX];
+    ssize_t n = fd >= 0 ? pread(fd, buf, (size_t)m->a, 0) : -1;
+    if (n != m->a) { out("{\"ev\":\"clip\",\"ok\":false}"); return; }
+    if (m->b == VCF_TEXT) { out("{\"ev\":\"clip\",\"text\":\"%.*s\"}", (int)(n < 300 ? n : 300), (const char *)buf); return; }
+    size_t o = 0;
+    while (o + 5 <= (size_t)n) {
+        uint8_t form = buf[o];
+        size_t l = (size_t)buf[o + 1] | (size_t)buf[o + 2] << 8 | (size_t)buf[o + 3] << 16 | (size_t)buf[o + 4] << 24;
+        if (l > (size_t)n - o - 5) break;
+        const uint8_t *d = buf + o + 5;
+        if (form == 3) {
+            FILE *f = fopen("clip-in.png", "wb");
+            if (f) { fwrite(d, 1, l, f); fclose(f); }
+            out("{\"ev\":\"clip\",\"png\":%zu,\"saved\":\"clip-in.png\"}", l);
+        } else out("{\"ev\":\"clip\",\"%s\":\"%.*s\"}", form == 1 ? "text" : "html", (int)(l < 300 ? l : 300), (const char *)d);
+        o += 5 + l;
+    }
+}
+
+static int cmp_d(const void *a, const void *b) { double x = *(const double *)a, y = *(const double *)b; return x < y ? -1 : x > y; }
+static void lat_stats(const char *what, double *v, int n, int asked) {
+    qsort(v, (size_t)n, sizeof *v, cmp_d);
+    out("{\"ev\":\"lat\",\"to\":\"%s\",\"moves\":%d,\"answered\":%d,\"median_ms\":%.0f,\"p90_ms\":%.0f,\"max_ms\":%.0f}", what, asked, n,
+        n ? v[n / 2] : -1, n ? v[(n * 9) / 10 < n ? (n * 9) / 10 : n - 1] : -1, n ? v[n - 1] : -1);
+}
+/* lat: one move every 200 ms; a frame or a position that hasn't come by then is not counted */
+static void lat_pump(void) {
+    static int asked;
+    if (!lat.left && !lat.waiting_f && !lat.waiting_p) return;
+    long long now = now_ms();
+    if (now < lat.next) return;
+    if (!lat.left) {
+        lat.waiting_f = lat.waiting_p = 0;
+        lat_stats("frame", lat.f, lat.nf, asked);
+        lat_stats("pointer", lat.p, lat.np, asked);
+        out("{\"ok\":true,\"cmd\":\"lat\"}");
+        asked = 0;
+        return;
+    }
+    lat.k ^= 1;
+    vdsend(VD_MOTION, lat.x[lat.k], lat.y[lat.k]);
+    lat.t0 = now; lat.next = now + 200; lat.waiting_f = lat.waiting_p = 1;
+    lat.left--; asked++;
+}
+
 static int handle(char *line) {
     char a1[1024];
     int x, y, b;
@@ -244,6 +671,7 @@ static int handle(char *line) {
             if (k & 0x100) kpush(42, 0);
         }
         out("{\"ok\":true,\"cmd\":\"type\"}");
+    } else if (sscanf(line, "combo %d %d", &x, &y) == 2) { kpush(x, 1); kpush(y, 1); kpush(y, 0); kpush(x, 0); out("{\"ok\":true,\"cmd\":\"combo\"}");
     } else if (sscanf(line, "key %d", &x) == 1) { kpush(x, 1); kpush(x, 0); out("{\"ok\":true,\"cmd\":\"key\"}"); }
     else if (sscanf(line, "move %d %d", &x, &y) == 2) { vdsend(VD_MOTION, x, y); out("{\"ok\":true,\"cmd\":\"move\"}"); }
     else if (sscanf(line, "click %d %d %d", &x, &y, &b) >= 2) {
@@ -251,9 +679,56 @@ static int handle(char *line) {
         vdsend(VD_MOTION, x, y); vdsend(VD_BUTTON, b, 1); vdsend(VD_BUTTON, b, 0);
         out("{\"ok\":true,\"cmd\":\"click\"}");
     } else if (sscanf(line, "wheel %d", &x) == 1) { VdMsg m = vd_msg(VD_WHEEL, x, 0, 0, 0, 0, 0); if (vd >= 0) vd_send(vd, &m, -1); out("{\"ok\":true,\"cmd\":\"wheel\"}"); }
-    else if (sscanf(line, "resize %d %d", &x, &y) == 2) { vdsend(VD_RESIZE, x, y); out("{\"ok\":true,\"cmd\":\"resize\"}"); }
+    else if (sscanf(line, "resize %d %d", &x, &y) == 2) {
+        /* as lord-server: to lord-vmdisplay (QEMU's ui_info) and to lord-vm (a guest helper that sets its own size) */
+        vdsend(VD_RESIZE, x, y);
+        VmMsg m = vm_msg(VM_DISPLAY_SIZE, ++seq, x, y, 0, 0, NULL);
+        if (vm >= 0) vm_send(vm, &m, -1);
+        out("{\"ok\":true,\"cmd\":\"resize\"}");
+    }
+    else if (!strcmp(line, "agent install")) ask(VM_AGENT, VAG_INSTALL, NULL);
+    else if (sscanf(line, "raw-apps %d", &x) == 1) { snprintf(a1, sizeof a1, "lag-apps %d", x ? 1 : 0); ask(VM_QMP, 0, a1); }
+    else if (!strncmp(line, "raw-winact ", 11)) { snprintf(a1, sizeof a1, "lag-winact %.150s", line + 11); ask(VM_QMP, 0, a1); }
+    else if (!strncmp(line, "raw-launch ", 11)) { snprintf(a1, sizeof a1, "lag-launch %.180s", line + 11); ask(VM_QMP, 0, a1); }
+    else if (!strncmp(line, "clip-text ", 10)) clip_send_host(line + 10, strlen(line + 10), VCF_TEXT);
+    else if (!strncmp(line, "clip-png ", 9)) clip_png_host(line + 9);
+    else if (!strncmp(line, "clip-html ", 10)) clip_html_host(line + 10);
+    else if (!strncmp(line, "clip-offer ", 11)) clip_offer(line + 11);
+    else if (!strncmp(line, "clip-answer ", 12)) {
+        const char *w = line + 12;
+        offer_answer = !strcmp(w, "deny") ? 1 : !strcmp(w, "stale") ? 2 : !strcmp(w, "wait") ? 3 : 0;
+        out("{\"ok\":true,\"cmd\":\"clip-answer\",\"answer\":%d}", offer_answer);
+    }
     else if (sscanf(line, "rate %d", &x) == 1) { vdsend(VD_RATE, x, 0); out("{\"ok\":true,\"cmd\":\"rate\"}"); }
+    else if (sscanf(line, "capture %d", &x) == 1) { vdsend(VD_CAPTURE, x ? 1 : 0, 0); ask(VM_CAPTURE, x ? 1 : 0, NULL); }
+    else if (sscanf(line, "rel %d %d", &x, &y) == 2) { vdsend(VD_REL, x, y); out("{\"ok\":true,\"cmd\":\"rel\"}"); }
     else if (sscanf(line, "noack %d", &x) == 1) { noack = x; out("{\"ok\":true,\"cmd\":\"noack\"}"); }
+    else if (sscanf(line, "sound play %d", &x) >= 0 && !strncmp(line, "sound play", 10)) {
+        if (sscanf(line, "sound play %d", &x) < 1) x = 0;
+        sound_off();
+        int ring = -1;
+        spk = maudio_open(0, "Machines", "lordvm-dev", "video", &ring);
+        if (spk) {
+            maudio_latency(spk, 60);
+            maudio_volume(spk, x / 100.0);
+            spk_len = ar_bytes(1u << 18);
+            spk_ring = mmap(NULL, spk_len, PROT_READ, MAP_SHARED, maudio_ring_fd(spk), 0);
+            if (spk_ring == MAP_FAILED) spk_ring = NULL;
+            spk_seen = 0; spk_peak = 0; spk_loud = 0;
+            vdsend_fd(VD_AUDIO_OUT, 1, maudio_ring_fd(spk));
+            if (guest_out) maudio_playing(spk, 1);
+        }
+        out("{\"ok\":%s,\"cmd\":\"sound play\",\"volume\":%d}", spk ? "true" : "false", x);
+    } else if (!strcmp(line, "sound off")) { sound_off(); out("{\"ok\":true,\"cmd\":\"sound off\"}"); }
+    else if (!strcmp(line, "sound-stats")) {
+        spk_look();
+        uint64_t fill = spk_ring ? atomic_load(&spk_ring->wpos) - maudio_bytes(spk) : 0;
+        out("{\"ev\":\"sound\",\"ring_ms\":%.1f,\"bytes\":%llu,\"peak\":%d,\"loud\":%lld,\"pipewire\":%s,\"guest_out\":%d,\"guest_in\":%d,\"mic\":%s,\"mic_read\":%llu}",
+            fill / 192.0, (unsigned long long)maudio_bytes(spk), spk_peak, spk_loud, spk && !maudio_failed(spk) ? "true" : "false", guest_out, guest_in,
+            mic ? (mic_tone ? "\"tone\"" : "\"silence\"") : "null", mic ? (unsigned long long)atomic_load(&mic->rpos) : 0ULL);
+    } else if (!strcmp(line, "mic tone")) { mic_on(1); out("{\"ok\":%s,\"cmd\":\"mic tone\"}", mic ? "true" : "false"); }
+    else if (!strcmp(line, "mic silence")) { mic_on(0); out("{\"ok\":%s,\"cmd\":\"mic silence\"}", mic ? "true" : "false"); }
+    else if (!strcmp(line, "mic off")) { mic_off(); out("{\"ok\":true,\"cmd\":\"mic off\"}"); }
     else if (!strcmp(line, "release")) { vdsend(VD_RELEASE_ALL, 0, 0); out("{\"ok\":true,\"cmd\":\"release\"}"); }
     else if (!strcmp(line, "status")) ask(VM_STATUS, 0, NULL);
     else if (!strcmp(line, "pause")) ask(VM_PAUSE, 0, NULL);
@@ -261,7 +736,66 @@ static int handle(char *line) {
     else if (!strcmp(line, "reset")) ask(VM_RESET, 0, NULL);
     else if (!strncmp(line, "shutdown", 8)) ask(VM_SHUTDOWN, atoi(line + 8), NULL);
     else if (!strcmp(line, "poweroff")) ask(VM_POWEROFF, 0, NULL);
-    else if (!strncmp(line, "qmp ", 4)) { snprintf(a1, sizeof a1, "%s", line + 4); ask(VM_QMP, 0, a1); }
+    else if (!strncmp(line, "file ", 5) || !strncmp(line, "open ", 5)) {
+        int op = line[0] == 'o';
+        int fd = open(line + 5, O_RDONLY | O_CLOEXEC);
+        const char *slash = strrchr(line + 5, '/');
+        VmMsg m = vm_msg(VM_FILE, ++seq, op, 0, 0, 0, slash ? slash + 1 : line + 5);
+        if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"%s\"}", op ? "open" : "file");
+        else out("{\"ok\":true,\"cmd\":\"%s\",\"seq\":%u}", op ? "open" : "file", seq);
+        if (fd >= 0) close(fd);
+    } else if (!strncmp(line, "place ", 6)) {
+        static int batch;
+        unsigned id = 0; int px = 0, py = 0, used = 0;
+        if (sscanf(line + 6, "%u %d %d %n", &id, &px, &py, &used) < 3 || !used) { out("{\"ok\":false,\"cmd\":\"place\"}"); return 0; }
+        const char *path = line + 6 + used, *slash = strrchr(path, '/');
+        int fd = open(path, O_RDONLY | O_CLOEXEC);
+        batch = batch % 32767 + 1;
+        VmMsg m = vm_msg(VM_FILE, ++seq, 2, (int)id, px | py << 16, batch << 16 | 0 << 8 | 1, slash ? slash + 1 : path);
+        if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"place\"}");
+        else out("{\"ok\":true,\"cmd\":\"place\",\"seq\":%u}", seq);
+        if (fd >= 0) close(fd);
+    } else if (!strncmp(line, "transfer", 8)) {
+        char sha[80] = "", path[1024] = "";
+        int fd = sscanf(line + 8, " %79s %1023s", sha, path) == 2 ? open(path, O_RDONLY | O_CLOEXEC) : -1;
+        VmMsg m = vm_msg(VM_AGENT, ++seq, VAG_TRANSFER, 0, 0, 0, sha);
+        if (vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"transfer\"}");
+        else out("{\"ok\":true,\"cmd\":\"transfer\",\"seq\":%u}", seq);
+        if (fd >= 0) close(fd);
+    } else if (!strncmp(line, "qmpf ", 5)) {
+        /* a QMP or guest agent command longer than a message's text, from a file (lord-vm --dev-qmp only) */
+        int fd = open(line + 5, O_RDONLY | O_CLOEXEC);
+        VmMsg m = vm_msg(VM_QMP, ++seq, 0, 0, 0, 0, "file");
+        if (fd < 0 || vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"qmpf\"}");
+        if (fd >= 0) close(fd);
+    } else if (!strncmp(line, "qmp ", 4)) { snprintf(a1, sizeof a1, "%s", line + 4); ask(VM_QMP, 0, a1); }
+    else if (!strcmp(line, "agent install")) ask(VM_AGENT, VAG_INSTALL, NULL);
+    else if (!strcmp(line, "apps on") || !strcmp(line, "apps off")) ask(VM_APPS, !strcmp(line, "apps on"), NULL);
+    else if (!strcmp(line, "windows")) print_windows();
+    else if (!strcmp(line, "apps-list")) {
+        for (int i = 0; i < dev_apps.n; i++) { char nm[LAG_APPNAME_MAX * 6 + 8], tk[LAG_TOKEN_MAX * 6 + 8]; jstr(nm, sizeof nm, dev_apps.a[i].name); jstr(tk, sizeof tk, dev_apps.a[i].token); out("{\"ev\":\"app\",\"name\":\"%s\",\"token\":\"%s\"}", nm, tk); }
+        out("{\"ok\":true,\"cmd\":\"apps-list\",\"count\":%d}", dev_apps.n);
+    } else if (!strncmp(line, "winact ", 7)) {
+        unsigned id = 0; char act[16] = ""; int wx = 0, wy = 0, ww = 0, wh = 0;
+        int k = sscanf(line + 7, "%u %15s %d %d %d %d", &id, act, &wx, &wy, &ww, &wh);
+        int an = !strcmp(act, "focus") ? 1 : !strcmp(act, "close") ? 2 : !strcmp(act, "minimize") ? 3 : !strcmp(act, "restore") ? 4 : !strcmp(act, "move") ? 5 : 0;
+        char t[64] = "";
+        if (an == 5) snprintf(t, sizeof t, "%d %d %d %d", wx, wy, ww, wh);
+        if (k < 2 || !an || (an == 5 && k < 6)) out("{\"ok\":false,\"cmd\":\"winact\"}");
+        else { VmMsg m = vm_msg(VM_WINACT, ++seq, (int)id, an, 0, 0, t); vm_send(vm, &m, -1); }
+    } else if (!strncmp(line, "launch ", 7)) {
+        /* by its place in the list lord-vm passed on (VM_LAUNCH takes the place and the list's generation) */
+        int at = -1;
+        for (int i = 0; i < dev_apps.n && at < 0; i++) if (!strcmp(dev_apps.a[i].token, line + 7) || !strcmp(dev_apps.a[i].name, line + 7)) at = i;
+        if (at < 0) at = 255;          /* not listed: lord-vm says no */
+        VmMsg m = vm_msg(VM_LAUNCH, ++seq, at, dev_apps_gen > 0 ? dev_apps_gen : 1, 0, 0, NULL);
+        vm_send(vm, &m, -1);
+    }
+    else if (!strncmp(line, "lat ", 4)) {
+        memset(&lat, 0, sizeof lat);
+        if (sscanf(line + 4, "%d %d %d %d %d", &lat.left, &lat.x[0], &lat.y[0], &lat.x[1], &lat.y[1]) != 5 || lat.left < 1 || lat.left > 500) { lat.left = 0; out("{\"ok\":false,\"cmd\":\"lat\"}"); }
+        else lat.next = now_ms();
+    } else if (sscanf(line, "fps %d", &x) == 1 && x > 0) { fpsm.left = x; fpsm.base = frames; fpsm.next = now_ms() + 1000; }
     else if (sscanf(line, "wait-frames %d %d", &x, &y) >= 1) {
         if (sscanf(line, "wait-frames %d %d", &x, &y) < 2) y = 30;
         frames_target = frames + x;
@@ -302,6 +836,7 @@ int main(int argc, char **argv) {
         vm = connect_runtime(argv[2]);
         if (vm < 0) { out("{\"ev\":\"error\",\"what\":\"not running\"}"); return 3; }
         ask(VM_STATUS, 0, NULL);
+        if (getenv("LORDVM_DEV_NODISPLAY")) display_asked = 1;      /* lord-server shows it: commands only */
     } else {
         int sv[2];
         if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return 1;
@@ -340,10 +875,25 @@ int main(int argc, char **argv) {
             out("{\"ok\":%s,\"cmd\":\"wait-frames\",\"frames\":%ld}", frames >= frames_target ? "true" : "false", frames);
             frames_target = -1;
         }
+        lat_pump();
+        if (fpsm.left && now_ms() >= fpsm.next) {
+            out("{\"ev\":\"fps\",\"frames\":%ld}", frames - fpsm.base);
+            fpsm.base = frames; fpsm.next += 1000;
+            if (!--fpsm.left) out("{\"ok\":true,\"cmd\":\"fps\"}");
+        }
         if (vm < 0 && vd < 0) break;
-        struct pollfd p[3] = { { vm, POLLIN, 0 }, { vd, POLLIN, 0 }, { stdin_open ? 0 : -1, POLLIN, 0 } };
+        short aev = 0;
+        int afd = spk ? maudio_pollfd(spk, &aev) : -1;
+        struct pollfd p[4] = { { vm, POLLIN, 0 }, { vd, POLLIN, 0 }, { stdin_open ? 0 : -1, POLLIN, 0 }, { afd, aev, 0 } };
         int to = kq_h != kq_t ? 12 : frames_target >= 0 ? 50 : 500;
-        poll(p, 3, to);
+        if (lat.left || lat.waiting_f || lat.waiting_p || fpsm.left) to = 1;
+        if ((spk || mic) && to > 10) to = 10;
+        poll(p, 4, to);
+        /* PipeWire not there when the stream opened, or gone: tried again every 2 s while the guest plays (js_vm.c) */
+        static long long spk_retry_at;
+        if (spk && guest_out && maudio_failed(spk) && now_ms() >= spk_retry_at) { spk_retry_at = now_ms() + 2000; maudio_retry(spk); }
+        if (spk) { maudio_service(spk); spk_look(); }
+        mic_feed();
         if (p[0].revents) from_vm();
         if (p[1].revents) from_vd();
         if (p[2].revents) {
@@ -359,6 +909,8 @@ int main(int argc, char **argv) {
             if (quit) break;
         }
     }
+    sound_off();
+    mic_off();
     if (vd >= 0) { vdsend(VD_CLOSE, 0, 0); close(vd); }
     if (vd_pid > 0) waitpid(vd_pid, NULL, 0);
     if (vm >= 0) close(vm);          /* lord-vm shuts the machine down when its control channel closes */

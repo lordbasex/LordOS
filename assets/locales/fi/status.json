@@ -160,8 +160,16 @@
   "vm.imageRemoved": "Levykuva poistettu",
   "vm.downloadResumed": "Jatketaan pysäytettyä latausta ({from} tavua säilytetty)",
   "vm.kvmReady": "Sallittu: koneet voivat nyt käyttää laitteistovirtualisointia",
+  "vm.bridgeReady": "Siltattu verkko valmis ({name})",
+  "vm.bridgeGone": "Siltattu verkko poistettu",
   "vm.kvmNextLogin": "Sallittu seuraavasta kirjautumisestasi alkaen",
   "pkg.foreignArchAdded": "32-bittiset ({arch}) paketit otettu käyttöön",
   "pkg.foreignArchPresent": "32-bittiset ({arch}) paketit olivat jo käytössä",
-  "pkg.why.multiarchPair": "Sama versio kuin {name}"
+  "pkg.why.multiarchPair": "Sama versio kuin {name}",
+  "gpu.roleSet": "Näytönohjaimen käyttö tallennettu ({card}): käynnistä uudelleen ottaaksesi käyttöön",
+  "vm.gvtReady": "Näytönohjaimen osuus valmis ({name})",
+  "vm.gvtGone": "Näytönohjaimen osuus poistettu",
+  "gpu.freqSet": "Näytönohjaimen vähimmäistaajuus asetettu",
+  "gpu.memlockSet": "Koneiden lukittavissa oleva muisti tallennettu",
+  "vm.memlockSet": "Koneen muisti lukittu"
 }

@@ -129,7 +129,7 @@
   },
   "open": "Aç",
   "page.ai": "Yapay Zekâ",
-  "page.webapps": "Web uygulamaları",
+  "page.webapps": "Web uygulamaları (PWA)",
   "page.commercial": "Ticari",
   "page.remote": "Uzaktan erişim",
   "page.suites": "Üçüncü taraf uygulamaları",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "Etkinleştiriliyor…",
   "pkg32": "{name} (32 bit)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak uygulaması"
+  "kind.flatpak": "Flatpak uygulaması",
+  "section.origin": "Kaynak",
+  "section.picks": "LordOS seçkisi",
+  "src.debian": "Linux uygulamaları (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android uygulamaları",
+  "soon": "Yakında",
+  "sub.all": "Tümü"
 }

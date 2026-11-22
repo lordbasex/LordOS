@@ -129,7 +129,7 @@
   },
   "open": "Avaa",
   "page.ai": "Tekoäly",
-  "page.webapps": "Verkkosovellukset",
+  "page.webapps": "Verkkosovellukset (PWA)",
   "page.commercial": "Kaupalliset",
   "page.remote": "Etäkäyttö",
   "page.suites": "Kolmannen osapuolen sovellukset",
@@ -315,5 +315,12 @@
   "multiarch.enabling": "Otetaan käyttöön…",
   "pkg32": "{name} (32-bittinen)",
   "page.flathub": "Flathub",
-  "kind.flatpak": "Flatpak-sovellus"
+  "kind.flatpak": "Flatpak-sovellus",
+  "section.origin": "Lähde",
+  "section.picks": "LordOSin valinnat",
+  "src.debian": "Linux-sovellukset (Debian)",
+  "src.wine": "Wine",
+  "src.android": "Android-sovellukset",
+  "soon": "Tulossa",
+  "sub.all": "Kaikki"
 }

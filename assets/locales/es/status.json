@@ -160,8 +160,16 @@
   "vm.imageRemoved": "Imagen borrada",
   "vm.downloadResumed": "Continuando una descarga detenida ({from} bytes guardados)",
   "vm.kvmReady": "Listo: las máquinas ya pueden usar la virtualización por hardware",
+  "vm.bridgeReady": "Red en puente lista ({name})",
+  "vm.bridgeGone": "Red en puente quitada",
   "vm.kvmNextLogin": "Listo a partir de tu próximo inicio de sesión",
   "pkg.foreignArchAdded": "Paquetes de 32 bits ({arch}) habilitados",
   "pkg.foreignArchPresent": "Los paquetes de 32 bits ({arch}) ya estaban habilitados",
-  "pkg.why.multiarchPair": "La misma versión que {name}"
+  "pkg.why.multiarchPair": "La misma versión que {name}",
+  "gpu.roleSet": "Uso de la tarjeta gráfica guardado ({card}): reiniciá para aplicarlo",
+  "vm.gvtReady": "Parte de la tarjeta gráfica lista ({name})",
+  "vm.gvtGone": "Parte de la tarjeta gráfica quitada",
+  "gpu.freqSet": "Frecuencia mínima de la tarjeta gráfica fijada",
+  "gpu.memlockSet": "Memoria que las máquinas pueden bloquear guardada",
+  "vm.memlockSet": "Memoria de la máquina bloqueada"
 }

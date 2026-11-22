@@ -32,11 +32,25 @@ void media_shutdown(void);              /* close everything (theme change or exi
 
 /* drawing of a media node (paint.c) */
 void media_paint(Canvas *c, int handle, int node, float x, float y, float w, float h, float radius, float op);
+/* GPU path: a media node whose picture is a GPU texture noted again for layer 0 without painting (paint.c's
+ * layer_register, as wl_paint for an app window inside a moved layer) */
+void media_paint_note(Canvas *c, int handle, int node, float x, float y, float w, float h, float op);
+/* GPU path: the texture a media source's picture is now (wl.c draws it below the UI), NULL if none; *flip: its first
+ * row is the picture's bottom */
+struct GpuTex *media_gpu_tex(int id, int *flip);
+/* GPU path: a picture drawn by the GPU changed and nothing else did: the box (logical px) of the displays to present
+ * again, since the last take; 0 if none (main.c) */
+int  media_present_take(float *x0, float *y0, float *x1, float *y1);
+int  media_present_pending(void);
 
 /* The pointer of a source that brings its own (a Machines guest): b, g, r, a bytes with straight alpha, w × h,
  * hotspot; NULL: none (the host's arrow). media_src_cursor_visible: the source hid or showed it. */
 void media_src_cursor(int id, const uint8_t *bgra, int w, int h, int hx, int hy);
 void media_src_cursor_visible(int id, int on);
+/* where picture pixel (u, v) is on the screen (logical coordinates), as its node showed it at the last paint; 0 ok, -1 not
+ * shown, or rotated or mirrored (Machines' "Capture mouse" shows the guest's pointer there) */
+int  media_src_to_screen(int id, float u, float v, float *x, float *y);
+void media_src_cursor_guest_draws(int id, int on);
 /* Over a media node of source id (main.c, cursor_now): 0 the host's pointer (none sent, or the source turned its own
  * off), 1 *px… (premultiplied, at the size the picture is shown, at most 64 × 64), 2 hidden (a fully transparent
  * image). *gen changes when the image does. */

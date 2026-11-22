@@ -23,6 +23,8 @@
 #include <unistd.h>
 #include "../fpak.h"
 #include "../fpspawn.h"
+#include "../fplend.h"
+#include "../apps.h"
 
 static const DisplayHost *host;
 static PowerState power;
@@ -88,6 +90,8 @@ void hw_start(const DisplayHost *h, int with_bus) {
     if (with_bus && notifyd_start(hw_emit)) fprintf(stderr, "hw: no notification server for Linux apps\n");
     if (with_bus && mpris_start(hw_emit)) fprintf(stderr, "hw: no session bus for the Linux players (Now Playing)\n");
     fpspawn_bus = with_bus;
+    apps_set_spawn_hook(fpspawn_add_view);         /* each Flatpak app's Spawn helper (fpspawner.h) */
+    apps_set_lend_hook(fplend_add_view);           /* each Flatpak view's lending socket (fplend.h) */
     fpspawn_try();
     if (with_bus && pwguard_start()) fprintf(stderr, "hw: PipeWire not reachable yet (the microphone and camera restrictions of Linux apps apply once it is)\n");
     if (with_bus && sysbus_start() == 0) {
@@ -112,8 +116,13 @@ int hw_pollfds(struct pollfd *p, int max) {
     if (n < max && mpris_fd() >= 0) p[n++] = (struct pollfd){ mpris_fd(), (short)(POLLIN | (mpris_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && sysbus_fd() >= 0) p[n++] = (struct pollfd){ sysbus_fd(), (short)(POLLIN | (sysbus_wants_write() ? POLLOUT : 0)), 0 };
     if (n < max && fpspawn_fd() >= 0) p[n++] = (struct pollfd){ fpspawn_fd(), (short)(POLLIN | (fpspawn_wants_write() ? POLLOUT : 0)), 0 };
+    /* the security-critical fds first: pwguard enforces each app's microphone, camera and screen restrictions and the
+     * polkit agent answers admin prompts, so a growing list (one Spawn helper per running Flatpak app) must never push
+     * them out of the poll set (a restriction would fail open). The helpers come last; those that don't fit are
+     * drained by fpspawn_tick */
     if (n < max && pwguard_fd() >= 0) p[n++] = (struct pollfd){ pwguard_fd(), (short)(POLLIN | (pwguard_wants_write() ? POLLOUT : 0)), 0 };
     n += pkagent_pollfds(p + n, max - n);
+    n += fpspawn_pollfds(p + n, max - n);
     return n;
 }
 
@@ -132,6 +141,7 @@ void hw_dispatch(const struct pollfd *p, int n) {
         else if (p[i].fd == fpspawn_fd()) fpspawn_dispatch();
     }
     pkagent_dispatch(p, n);
+    fpspawn_dispatch_views();
 }
 
 void hw_events(void) {

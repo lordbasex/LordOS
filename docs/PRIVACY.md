@@ -454,6 +454,10 @@ Permissions: `files`, `clipboard`, `notifications`, `network`, `camera`, `microp
 (known by what lord-server checks it is, never by the app_id it sets: `flatpak:<app id>` or `program:<path>`) or
 Machines' VM window taking ❖, ⌥Tab and the rest while in front, asked once and listed under Keyboard shortcuts with
 that identity under its name; ❖Esc always gives them back ([WAYLAND.md](WAYLAND.md), "Keyboard shortcuts inhibit").
+Also not for a manifest or the broker: `idle` (0.8.9.5, approved by the maintainer 2026-11-22), an app that wants to be
+told when the person is away from the computer (`ext-idle-notify-v1`): a Linux app by the same checked identity, an
+isolated LordOS app by its id, asked once by lord-server's own prompt, never granted without it, listed under Away from
+the computer; a denied app is never told ([WAYLAND.md](WAYLAND.md), "Idle notifications").
 
 | | |
 |---|---|

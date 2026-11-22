@@ -163,6 +163,11 @@ files; Open at Login and, with more than one display, Assign To, see below), the
 keyboard navigable (↑ ↓ Home End, Enter or Space, → opens a submenu and ← closes it, Escape) and
 scrolls when it is taller than the screen.
 
+**An app's own click (0.8.9).** `registerDockActivate(appId, fn)` lets an app decide what a click on its item does
+while it has windows: `fn(entry)` returns true when it handled the click. Machines uses it to open its library when only
+machines are open; every other app keeps the usual click. Its Window menu can start with the app's own items too
+(`registerWindowMenuItems(appId, fn)` in `sdk/windowmenu.js`, Machines: "Machines Library", ❖0).
+
 **Open at Login and Assign To (0.8.5).** Options › **Open at Login** (every item except the
 shell's own) adds the item to `settings.loginApps`; once per session, about 3 s after it starts, each
 one is opened through `launchDockItem`, the same paths as a Dock click (never in the live system's

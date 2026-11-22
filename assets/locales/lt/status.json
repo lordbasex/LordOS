@@ -169,8 +169,16 @@
   "vm.imageRemoved": "Atvaizdas ištrintas",
   "vm.downloadResumed": "Tęsiamas sustabdytas atsisiuntimas (išsaugota baitų: {from})",
   "vm.kvmReady": "Leidžiama: mašinos dabar gali naudoti aparatinę virtualizaciją",
+  "vm.bridgeReady": "Tiltinis tinklas paruoštas ({name})",
+  "vm.bridgeGone": "Tiltinis tinklas pašalintas",
   "vm.kvmNextLogin": "Leidžiama nuo kito jūsų prisijungimo",
   "pkg.foreignArchAdded": "32 bitų ({arch}) paketai įjungti",
   "pkg.foreignArchPresent": "32 bitų ({arch}) paketai jau buvo įjungti",
-  "pkg.why.multiarchPair": "Ta pati versija kaip {name}"
+  "pkg.why.multiarchPair": "Ta pati versija kaip {name}",
+  "gpu.roleSet": "Vaizdo plokštės paskirtis išsaugota ({card}): paleiskite iš naujo, kad būtų pritaikyta",
+  "vm.gvtReady": "Vaizdo plokštės dalis paruošta ({name})",
+  "vm.gvtGone": "Vaizdo plokštės dalis pašalinta",
+  "gpu.freqSet": "Nustatytas mažiausias vaizdo plokštės dažnis",
+  "gpu.memlockSet": "Atmintis, kurią mašinos gali užrakinti, išsaugota",
+  "vm.memlockSet": "Mašinos atmintis užrakinta"
 }

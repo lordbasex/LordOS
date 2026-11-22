@@ -9,7 +9,7 @@ import { tagsOf, commentOf } from './ops.js';
 import { visible, resize, moveColumn, dropBefore, totalWidth, NAME_MIN } from './columns.js';
 import { sortEntries } from './locations.js';
 import { colWidth, clampCol, fitCol, colStrip, chainFolder } from './colview.js';
-import { iconMetrics, listMetrics } from './viewprefs.js';
+import { iconMetrics, listMetrics, iconColumns } from './viewprefs.js';
 import { when, listRowStyle, listHeaderCell, listCell } from '../../sdk/fileparts.jsx';
 
 // folder of a search or Recents result (the last segment of the path)
@@ -57,19 +57,59 @@ function GroupTitle({ g, t }) {
   );
 }
 
+// ---- what is in sight (big folders) ----
+// A folder of thousands of files drew every card or row at once: /usr/share/doc (2220 entries) made 18 000 nodes in
+// one run of 1.4 s with the pointer stopped, and 70 MB of heap. Past LIVE_ALL entries, only what is within two
+// screens of the visible part is drawn; the rest are empty boxes of the same size, so the scroll bar and the
+// positions don't change, and they are drawn as they come near. The icon view's boxes are a card's tallest (a
+// two-line name); the list's rows all have the same height.
+const LIVE_ALL = 300;
+const SIGHT_STEP = 120;                   // the offset is followed in steps: a wheel notch doesn't draw anything again
+const GROUP_TITLE_H = 44;                 // GroupTitle: 14 + 6 padding, a line of text, 6 gap and the rule
+function useSight() {
+  const [sight, setSight] = useState({ y: 0, h: 1200 });
+  const onScroll = (y, h) => {
+    const q = Math.floor(y / SIGHT_STEP) * SIGHT_STEP;
+    setSight((v) => (v.y === q && v.h === h ? v : { y: q, h: h || v.h }));
+  };
+  return [sight, onScroll];
+}
+const inSight = (sight, top, height) => top + height >= sight.y - 2 * sight.h && top <= sight.y + 3 * sight.h;
+
 // ---- icons ----
 
 export function IconView({ groups, ctx }) {
   const t = useTheme();
   const m = iconMetrics(ctx.zoom);
+  const [sight, onScroll] = useSight();
+  const total = groups.reduce((n, g) => n + g.items.length, 0);
+  const windowed = total > LIVE_ALL;
+  // the cards per row: from the grid's own width once it is laid out (a scroll bar's gutter changes it), the window's before
+  const grid = useRef(null);
+  const [gridW, setGridW] = useState(0);
+  useEffect(() => {
+    if (!windowed) return undefined;
+    const look = () => { try { const w = grid.current ? lord.getLayout(grid.current.id)[2] : 0; if (w > 0 && Math.abs(w - gridW) > 1) setGridW(w); } catch (e) { /* not laid out */ } };
+    const id = setTimeout(look, 50);
+    return () => clearTimeout(id);
+  });
+  const cols = gridW ? Math.max(1, Math.floor((gridW + 8) / (m.cell + 8))) : iconColumns(ctx.contentW || 800, ctx.zoom);
+  const cardH = 12 + m.icon + 8 + 5 + 2 + 2 * m.line;          // paddings, the icon's box, the gap, the name's two lines
+  const rowH = cardH + 8;
+  let top = 12;
   return (
-    <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} focusable={false} style={{ flex: 1 }}>
+    <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} onScroll={windowed ? onScroll : undefined} focusable={false} style={{ flex: 1 }}>
       <View style={{ padding: 12, paddingBottom: 32 }}>
-        {groups.map((g) => (
+        {groups.map((g) => {
+          if (g.label) top += GROUP_TITLE_H;
+          const at = top;
+          top += Math.ceil(g.items.length / cols) * rowH;
+          return (
           <View key={g.key}>
             <GroupTitle g={g} t={t} />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {g.items.map((e) => {
+            <View ref={grid} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {g.items.map((e, i) => {
+                if (windowed && !inSight(sight, at + Math.floor(i / cols) * rowH, rowH)) return <View key={e.path} style={{ width: m.cell, height: cardH }} />;
                 const sel = ctx.selected.has(e.path);
                 return (
                   <View key={e.path} {...itemHandlers(e, ctx)}
@@ -87,7 +127,8 @@ export function IconView({ groups, ctx }) {
               })}
             </View>
           </View>
-        ))}
+          );
+        })}
         {groups.every((g) => !g.items.length) && <EmptyState title={ctx.emptyText} hint={ctx.emptyHint} action={ctx.emptyAction} style={{ minHeight: 260 }} />}
       </View>
     </ScrollView>
@@ -229,6 +270,23 @@ export function ListView({ groups, ctx, sort, onSort }) {
   const inner = { ...ctx, nameW };
   const thumb = over ? Math.max(40, room * (room / need)) : 0;
   const bar = useRef(null);
+  const [sight, onScroll] = useSight();
+  const rowH = listMetrics(ctx.zoom).row;
+  const windowed = groups.reduce((n, g) => n + g.items.length, 0) > LIVE_ALL;
+  let top = 4;
+  // a group's rows (its expanded folders' too), with the ones out of sight as one empty box above and one below
+  const rowsOf = (g) => {
+    const rows = ListRows({ items: g.items, depth: 0, ctx: inner, t, sort, alt });
+    if (g.label) top += GROUP_TITLE_H;
+    const at = top;
+    top += rows.length * rowH;
+    if (!windowed) return rows;
+    let from = 0, to = rows.length;
+    while (from < to && !inSight(sight, at + from * rowH, rowH)) from++;
+    while (to > from && !inSight(sight, at + (to - 1) * rowH, rowH)) to--;
+    return [from ? <View key="above" style={{ height: from * rowH }} /> : null, ...rows.slice(from, to),
+      to < rows.length ? <View key="below" style={{ height: (rows.length - to) * rowH }} /> : null];
+  };
   useEffect(() => {
     const mv = addListener('pointermove', (e) => { const b = bar.current; if (b) setSx(Math.max(0, Math.min(b.over, b.x0 + (e.x - b.at) * b.k))); });
     const up = addListener('pointerup', () => { bar.current = null; });
@@ -238,12 +296,12 @@ export function ListView({ groups, ctx, sort, onSort }) {
     <View onWheel={(e) => { if (over && e.deltaX) setSx(Math.max(0, Math.min(over, x + e.deltaX))); }} style={{ flex: 1, overflow: 'hidden' }}>
       <View style={{ flex: 1, width: Math.max(room, need), [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -x }}>
         <Header sort={sort} onSort={onSort} t={t} ctx={ctx} columns={cols} onColumns={ctx.onColumns} nameW={nameW} />
-        <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} focusable={false} style={{ flex: 1 }}>
+        <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} onScroll={windowed ? onScroll : undefined} focusable={false} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 32 }}>
             {groups.map((g) => (
               <View key={g.key}>
                 <GroupTitle g={g} t={t} />
-                {ListRows({ items: g.items, depth: 0, ctx: inner, t, sort, alt })}
+                {rowsOf(g)}
               </View>
             ))}
             {groups.every((g) => !g.items.length) && <EmptyState title={ctx.emptyText} hint={ctx.emptyHint} action={ctx.emptyAction} style={{ minHeight: 240 }} />}

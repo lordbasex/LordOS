@@ -679,6 +679,8 @@ sudo usermod -aG lpadmin lord        # manage printers (LordOS administrators ha
 | `cups-ipp-utils` | 2.4.10 | tests only: `ippeveprinter`, an IPP Everywhere printer "on the network" |
 | `samba`, `nfs-kernel-server` | 0.8.7 | VM 125, for an hour on 2026-10-31: the test servers of Files → Network, inside a network namespace, with every unit masked so nothing listened on the LAN; purged afterwards (`FILES.md`, "Network") |
 | `samba` (`--no-install-recommends`) | 4.22.11 | VM 127, for about ten minutes on 2026-11-11 (GitHub #101): `smbd` run by hand on `127.0.0.1:4445` only, with its own `smb.conf`, passdb and folders in `/tmp`, every unit masked before installing; `build/lan-list` signed in with `server signing` set to default, disabled and mandatory, directly and through a loopback proxy that leaves the final session setup answer unsigned as a server that doesn't require signing does. Purged with its dependencies and the units unmasked afterwards |
+| `qemu-system-x86`, `qemu-utils`, `ovmf`, `passt`, `swtpm`, `qemu-system-modules-opengl` (`--no-install-recommends`) | Debian 13's | VM 127, 2026-11-20: Machines' own packages (what `vm-enable` installs), to see the New Machine sheet and Configure on a test machine (`~/Machines/Prueba.lordvm`, never started; no nested KVM). Windows 11 itself was tested on the maintainer's PC (125 GB of RAM), not here |
+| `gcc-mingw-w64-x86-64-posix` (with `binutils-mingw-w64-x86-64`, `mingw-w64-x86-64-dev`) | 14.2.0-19+27 | the build machine (the maintainer's PC), 2026-11-20: cross-builds `lordos-guest-win.exe`, the LordOS guest tools Machines installs into Windows guests (`server/mk/vm.mk`, `tools/guest-win`); the rule is skipped with a note when it is missing, and `mkdeb.sh` then refuses an amd64 package without it. Tested against the Windows 11 clone `~/lordos-test/vms/win-tools.lordvm` (virtio-win 0.1.271 drivers) with `lordvm-dev` |
 | `avahi-daemon`, `avahi-utils` | 0.8 | CUPS announces and finds printers; in the tests, announcing the scanner (`avahi-publish`). LordOS's mDNS doesn't need it |
 | `libarchive-tools`, `zstd` | 3.7.4, 1.5.7 | tests only: building `.7z` and `.tar.zst` in `tests/doc_evil.sh` |
 | `strace` | — | only for debugging the helper |
@@ -1956,3 +1958,21 @@ through an overlay), the same helpers' build packages for aarch64 were added, so
 `lord-ocr`, `lord-tts` and `lord-screencast` like the packages: `sudo chroot /var/tmp/lordos-arm64-br apt-get install -y
 --no-install-recommends libpipewire-0.3-dev libtesseract-dev cmake glslc libvulkan-dev spirv-headers` (with `/proc`
 mounted for the call).
+
+## Step — Machines' clipboard tests on the development computer (2026-11-21)
+
+`server/tests/guest_clip_test.sh` drives the Linux guest helper (`tools/guest/lordos-guest.c`, `tools/guest/x11clip.c`)
+against a private X server. Installed on the development computer (Debian 13, the maintainer's LordOS desktop):
+`sudo apt-get install -y --no-install-recommends xvfb xclip` (xvfb 2:21.1.16-1.3+deb13u4, xclip 0.13-4). Without them
+the suite prints "skipped: needs Xvfb and xclip".
+
+## Step — Intel GVT-g option ROM tests on the development computer (2026-11-21)
+
+For the hands-on tests in `MACHINES-GPU.md` (building i915ovmfPkg against EDK2, signing it, enrolling a db certificate
+in a machine's NVRAM): `sudo apt-get install -y --no-install-recommends nasm acpica-tools sbsigntool
+python3-virt-firmware` (nasm 2.16.03-1, acpica-tools 20250404-1, sbsigntool 0.9.4-3.2+deb13u1, python3-virt-firmware
+24.11-2, which pulled in python3-pefile). GVT-g itself was turned on by the maintainer with
+`/etc/modprobe.d/i915-gvt.conf` (`options i915 enable_gvt=1 enable_guc=0`) and `/etc/modules-load.d/kvmgt.conf`
+(`kvmgt`), then `update-initramfs -u`; the iGPU was enabled in the firmware ("iGPU Multi-Monitor").
+LordOS's own GVT-g GOP driver (`tools/firmware/build-gvt-gop.sh`, 2026-11-21) needs nothing new: nasm, gcc,
+uuid-dev, python3, curl and git were already there; the tests used the same sbsigntool and python3-virt-firmware.

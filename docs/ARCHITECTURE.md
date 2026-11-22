@@ -221,6 +221,12 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   that drives QEMU over QMP with cgroup limits and owns the machine's folder; `lord-vmdisplay`, also one per machine,
   receives and checks its picture and input through QEMU's D-Bus display, sandboxed, with no files and no network.
   See `VIRTUALIZATION.md`.
+- **`lord-pgpv`** (0.8.9, approved by the maintainer on 2026-11-22): checks the OpenPGP signature of a system the person
+  added to Machines. Fixed path next to lord-server, no arguments, an empty environment; it gets the key, the checksum file
+  and the detached signature as three sealed memfds and the fingerprint on a pipe, applies `sandbox_apply_helper` (no
+  network, no files, no exec) before reading them, verifies with LordOS's own `pkg/pgp.c` (libc only) and prints one line,
+  `valid <fingerprint>` or `invalid <reason>`, which lord-server reads strictly before it looks for the image's SHA-256 in
+  the checksum file itself. See `VIRTUALIZATION.md` 5.6.1.
 - **`lord-screencast`** (0.8.8.8): one per screen-sharing session, the only binary that links `libpipewire-0.3`.
   lord-server connects the user's PipeWire socket and hands the fds over, and the frames come through a sealed memfd
   ring; it applies `sandbox_apply_helper` (scope `lordos-screencast`, no socket, `connect`, `bind`, process `clone`

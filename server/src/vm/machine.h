@@ -20,29 +20,62 @@
 #include <stdint.h>
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
- * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. An older file is read as is and written as the current schema, with a copy of the old
+ * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). An older file is read as
+ * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 4
+#define VM_SCHEMA 12
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
 enum { VM_FW_UEFI = 0, VM_FW_BIOS };
 enum { VM_DISPLAY_WINDOW = 0, VM_DISPLAY_NONE };
-enum { VM_NET_SHARED = 0, VM_NET_ISOLATED };
+/* the machine's network (6.5): shared (passt, out only, plus the forwarded ports), isolated (no card's backend), bridged
+ * (a macvtap on one of this computer's wired cards: the guest is another device on that network, by its DHCP), host-only
+ * (passt whose sockets are bound to 127.0.0.1: the guest reaches this computer and nothing else) */
+enum { VM_NET_SHARED = 0, VM_NET_ISOLATED, VM_NET_BRIDGED, VM_NET_HOSTONLY };
+extern const char *const VM_NET_NAMES[];   /* "shared", "isolated", "bridged", "hostonly" */
+/* forwarded ports (6.5): a port of this computer that passt opens and forwards to one of the guest's */
+enum { VM_PROTO_TCP = 0, VM_PROTO_UDP };
+enum { VM_OPEN_LOCAL = 0, VM_OPEN_LAN };    /* "this-computer" binds 127.0.0.1, "lan" 0.0.0.0 */
+#define VM_PORTS        32
+#define VM_PORT_HOST_MIN 1024           /* below it a port is root's: never offered */
+typedef struct { int proto, host, guest, open; } VmPort;
+/* the guest's addresses in host-only mode: passt hands them by DHCP; this computer is the gateway */
+#define VM_HOSTONLY_ADDR "10.0.2.15"
+#define VM_HOSTONLY_GW   "10.0.2.2"
+#define VM_IFNAME_MAX    15             /* IFNAMSIZ - 1 */
 /* the shared clipboard's direction (6.8): off unless chosen */
 enum { VM_CLIP_OFF = 0, VM_CLIP_TO_GUEST, VM_CLIP_FROM_GUEST, VM_CLIP_BOTH };
 /* the disks' and the pointer's devices (6.22): virtio (fast, needs the guest's drivers) or compat, the ones every system has
  * drivers for: SATA (AHCI) disks and CD/DVD, a USB tablet. The network card has its own model (nic_model). */
-enum { VM_DEV_VIRTIO = 0, VM_DEV_COMPAT };
+enum { VM_DEV_VIRTIO = 0, VM_DEV_COMPAT, VM_DEV_WINDOWS };
+/* VM_DEV_WINDOWS (schema 5): virtio disks and network with the CD/DVD drives on SATA and a USB tablet, so Windows Setup
+ * reads its DVD and the virtio-win drivers' with the drivers it has, and loads virtio's from them */
+extern const char *const VM_DEV_NAMES[];   /* "virtio", "compat", "windows" */
 /* network card models: virtio-net-pci and the emulated cards an imported machine may have had */
 enum { VM_NIC_VIRTIO = 0, VM_NIC_E1000E, VM_NIC_E1000, VM_NIC_E1000_82545EM, VM_NIC_E1000_82544GC, VM_NIC_VMXNET3, VM_NIC_RTL8139, VM_NIC_PCNET, VM_NIC_COUNT };
 extern const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1];   /* "virtio", "e1000e", ... (machine.json's names) */
 enum { VM_RTC_UTC = 0, VM_RTC_LOCAL };
+/* the guest's graphics (schema 5): 2D, a virtio GPU whose picture QEMU draws in shared memory; 3D, virgl (virtio-vga-gl),
+ * which opens the host GPU's render node from QEMU's sandbox: Linux guests only (no device set "windows") */
+enum { VM_GFX_2D = 0, VM_GFX_3D };
+/* a real GPU for the machine (schema 11, docs/MACHINES-GPU.md Mode A): none; an Intel GVT-g vGPU of the largest type the
+ * iGPU lists ("intel-whole", close to the whole iGPU for this machine), or of the smallest that shows the machine's
+ * resolution ("intel-shared", so several machines can have one). The vGPU is then the machine's only display */
+enum { VM_VGPU_NONE = 0, VM_VGPU_WHOLE, VM_VGPU_SHARED };
+extern const char *const VM_VGPU_NAMES[];  /* "", "intel-whole", "intel-shared" */
+/* the boot order (schema 6): the devices the firmware tries, each once; none listed is "auto" */
+enum { VM_BOOT_DISK = 0, VM_BOOT_CD, VM_BOOT_NET, VM_BOOT_DEVS };
+extern const char *const VM_BOOT_NAMES[];  /* "disk", "cd", "network" */
 #define VM_EXTRA_NICS  7            /* cards beyond the first, carried from an import: present with their MAC, not connected */
 #define VM_DATA_DISKS  4            /* disks/data-1.qcow2 ... data-4.qcow2 */
 #define VM_SMBIOS_MAX  64           /* bytes of printable ASCII per SMBIOS string */
 #define VM_SERIAL_MAX  20           /* a disk's serial: ATA's 20 characters */
 #define VM_SHARES      4            /* shared folders (6.7), each a vhost-user-fs device on PCI slots 0xb to 0xe */
+#define VM_SOUND_DEV_MAX 96         /* sound_out, sound_in: a node.name; two fit one VM_SOUND message (6.9) */
+#define VM_XFER_TAG    "LordOS"     /* the transfer folder's mount tag (6.7.1); its device is on slot 0xf */
+#define VM_XFER_DIR    "Transfer"   /* <library>/Transfer/<machine folder's name without .lordvm>: the transfer folders */
 #define VM_TAG_MAX     32           /* a share's mount tag: letters, digits, '-', '_' (virtio-fs allows 36 bytes) */
 
 /* Limits that hold on every computer */
@@ -81,6 +114,7 @@ typedef struct {
     int agent;                          /* the guest agent channels (6.17): qemu-guest-agent and org.lordos.agent; off
                                          * unless turned on (schema 2) */
     int clipboard;                      /* VM_CLIP_*, through org.lordos.agent (schema 2) */
+    int clipboard_ask;                  /* "ask before each paste" into and copy out of the machine (schema 9; false: trusted) */
     /* schema 3: what an imported machine keeps of its source's hardware (6.22) */
     int devices;                        /* VM_DEV_* */
     int nic_model;                      /* VM_NIC_* */
@@ -101,6 +135,47 @@ typedef struct {
     char share_tag[VM_SHARES][VM_TAG_MAX + 1];
     char share_path[VM_SHARES][VM_PATH_MAX];
     int share_rw[VM_SHARES];
+    /* schema 5: what Windows 11 asks of a machine (docs/VIRTUALIZATION.md 4.3), amd64 only for now */
+    int secure_boot;                    /* UEFI with secure boot and Microsoft's keys enrolled (OVMF .secboot + .ms) */
+    int tpm;                            /* a TPM 2.0, served by swtpm; its state in disks/tpm */
+    int hyperv;                         /* Hyper-V enlightenments, for Windows guests */
+    char drivers[VM_PATH_MAX];          /* a second CD/DVD with the guest's drivers (virtio-win), read-only; "" none */
+    int graphics;                       /* VM_GFX_*; "graphics": "3d" is written only when chosen (schema 5) */
+    int res_w, res_h;                   /* "resolution": "WxH", the display the guest starts with (its EDID's preferred
+                                         * mode, which every driver reads at boot); 0 x 0: it follows the window (schema 6) */
+    /* schema 6: the network's details (6.5) */
+    char bridge[VM_IFNAME_MAX + 1];     /* the wired card a bridged machine joins ("" none); kept when the mode changes */
+    int n_ports;
+    VmPort ports[VM_PORTS];             /* used in shared and host-only modes; kept in the others */
+    /* schema 6: sound and microphone (6.9). Host-side choices, changed while the machine runs too: the guest's sound
+     * card stays the same either way. A file without them reads as sound on at full volume, microphone off */
+    int sound;                          /* 1: the guest's sound plays on this computer's speakers; 0 muted */
+    int volume;                         /* 0..100, the machine's own stream volume */
+    int microphone;                     /* 1: the guest may hear this computer's microphone, once LordOS's microphone
+                                         * permission for Machines allows it too (checked by lord-server); 0 silence */
+    /* schema 6: where the machine starts from. n_boot 0 is "auto" (no "boot_order" in the file): the system disk, then
+     * the CD/DVD drive; an empty disk doesn't boot, so a new machine starts from its ISO until a system is installed.
+     * Else the firmware tries boot_order[0..n_boot-1] in that order (QEMU's bootindex); what isn't listed gets no boot
+     * index (SeaBIOS and OVMF may still try it after the listed ones). boot_menu: the firmware waits a few seconds at each start for Esc and its boot menu */
+    int n_boot;
+    int boot_order[VM_BOOT_DEVS];       /* VM_BOOT_*, each at most once */
+    int boot_menu;
+    /* schema 7: the transfer folder (6.7.1), <library>/Transfer/<name>, shared writable under the tag VM_XFER_TAG. On for
+     * new machines; a file without it reads as off, so a machine made before keeps its hardware (and its saved states) */
+    int transfer;
+    /* schema 8: the output the guest's sound plays on and the input its microphone hears (6.9), each a PipeWire node.name
+     * (vm_sound_dev_valid); "" (or no key) the system's default, which follows what Settings → Sound picks. A device that
+     * isn't there when used falls back to the default (lord-server), it isn't an error */
+    char sound_out[VM_SOUND_DEV_MAX + 1], sound_in[VM_SOUND_DEV_MAX + 1];
+    /* schema 10: who draws a Windows guest's pointer (docs/VIRTUALIZATION.md 7.1.2): "pointer": "guest" its display driver,
+     * into the picture (viogpudo's HWCursor 0, upstream's default); missing or "lordos": LordOS, from the shape the guest
+     * hands over (HWCursor 1, set by lord-vm through the guest tools' agent when they say "pointer") */
+    int pointer_guest;
+    /* schema 11: VM_VGPU_* ("gpu": "intel-whole" | "intel-shared", written only then); amd64 UEFI machines with 2D graphics */
+    int vgpu;
+    /* schema 12: "Capture mouse" (docs/VIRTUALIZATION.md 6.25): "capture_fullscreen": true, the window captures the mouse
+     * when it goes full screen (written only then; missing: no) */
+    int capture_fullscreen;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -130,6 +205,51 @@ int vm_tag_valid(const char *t);
  * and neither inside nor holding the machines' library (a guest could otherwise rewrite its own machine.json) nor the
  * machine's own folder. home and library are real paths. 0 allowed, else -1 and why in err */
 int vm_share_allowed(const char *path, const char *home, const char *user, const char *library, char *err, size_t errlen);
+/* the transfer folder of the machine in `dir` (6.7.1): <library>/Transfer/<folder name without .lordvm>, where the library
+ * is the folder that holds `dir`. 0, or -1 when the machine's folder name can't give one (not <name>.lordvm, hidden, too
+ * long) */
+int vm_transfer_path(const char *dir, char *out, size_t n);
+/* the transfer folder of the machine `id` in `dir`, made when it isn't there (<library>/Transfer 0700, the folder 0777)
+ * and tied to the machine: its owner record, <library>/Transfer/.<name>.machine, holds the machine's id. A folder there
+ * that another machine owns (a deleted, renamed or remade machine of the same name), or that nobody owns and isn't
+ * empty, is moved aside to "<name> (old YYYY-MM-DD)" (its new name in moved), never deleted. 0 and the path in out,
+ * else -1 */
+int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char *moved, size_t mn);
+/* the machine goes (to the Trash): its transfer folder, when it's this machine's, moves aside as above. 0 moved, 1 there
+ * was none of this machine's, -1 it couldn't be moved */
+int vm_transfer_aside(const char *dir, const char *id, char *moved, size_t mn);
+
+/* a sound device's name as machine.json keeps it (sound_out, sound_in): 1 to VM_SOUND_DEV_MAX printable ASCII characters
+ * other than space (a PipeWire node.name such as "alsa_output.pci-0000_00_1f.3.analog-stereo"); 1 valid */
+int vm_sound_dev_valid(const char *s);
+/* VM_SOUND's text "OUT\tIN" (each "" for the default, or valid as above) into out and in; 0 ok, -1 refused (both kept) */
+int vm_sound_devs_parse(const char *text, char *out, size_t on, char *in, size_t inn);
+/* a network interface's name as Linux allows it: 1 to 15 of [A-Za-z0-9_.-], not "." or ".." */
+int vm_ifname_valid(const char *s);
+/* a display size a machine may start with: 640x480 to 7680x4320, both even; "WxH" → 0, else -1 */
+int vm_resolution_ok(int w, int h);
+int vm_resolution_parse(const char *s, int *w, int *h);
+/* the forwarded ports' rules: proto, a host port VM_PORT_HOST_MIN..65535, a guest port 1..65535, open; at most
+ * VM_PORTS; one rule per protocol and host port; host-only machines open ports to this computer only. 0 ok, else -1 and
+ * why in err (English) */
+int vm_ports_check(const VmPort *p, int n, int network, char *err, size_t errlen);
+/* one rule from the command line's text, "tcp|udp:HOST:GUEST[:this-computer|lan]" (this-computer when left out); 0 ok */
+int vm_port_parse(const char *s, VmPort *p);
+/* the same rule as that text (out: at least 40 bytes) */
+void vm_port_spec(const VmPort *p, char *out, size_t n);
+/* passt's forwarding options for the machine's rules of one protocol: "-t"/"-u" values like "127.0.0.1/2222:22", in
+ * out[] (each 48 bytes); "none" when there are none. Returns how many values */
+int vm_passt_ports(const VmMachine *m, int proto, char out[][48], int max);
+/* the name of a bridged machine's macvtap: "lvm" and the first 12 hex digits of its id (15 characters); -1 for a bad id */
+int vm_bridge_ifname(const char *id, char out[VM_IFNAME_MAX + 1]);
+
+/* the command line's boot order: "auto", or 1 to 3 different names of VM_BOOT_NAMES joined by commas ("network,disk").
+ * Returns how many (0 for auto) with them in order[], or -1 */
+int vm_boot_parse(const char *s, int order[VM_BOOT_DEVS]);
+/* the same as that text: "auto" or "network,disk" (out: at least 24 bytes) */
+void vm_boot_spec(const VmMachine *m, char *out, size_t n);
+/* QEMU's bootindex for each device (VM_BOOT_*), counting from first (1 while an installer's kernel has 0), or -1 for none. Auto: the system disk, then the CD/DVD drive, the network card none */
+void vm_boot_indexes(const VmMachine *m, int first, int idx[VM_BOOT_DEVS]);
 
 /* parses machine.json text; err (optional) gets the reason in English. VM_OK or VM_E_* */
 int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size_t errlen);
@@ -188,5 +308,12 @@ void vm_now_iso(char out[21]);
 /* new random id and MAC */
 int vm_new_id(char out[37]);
 int vm_new_mac(char out[18]);
+
+/* "Capture mouse" (6.25): which of QEMU's mice (query-mice's "return", untrusted: checked here) should be the active one.
+ * relative 1: one that isn't absolute, the USB or virtio mouse before the PS/2 one; 0: the tablet (absolute, "Tablet" in
+ * its name first). Returns that mouse's index, or -1 when there is none; *current: it is the active one already;
+ * *added: the active one is a relative mouse other than PS/2 (one lord-vm added, which took over by itself) */
+struct JVal;
+int vm_mouse_pick(const struct JVal *list, int relative, int *current, int *added);
 
 #endif

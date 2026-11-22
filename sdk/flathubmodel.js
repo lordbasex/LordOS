@@ -1,6 +1,6 @@
 // flathubmodel.js — the Store's Flathub section as plain data (docs/FLATPAK.md, phase 1 step 5): an app's declared
 // permissions from `flatpak remote-info --show-metadata` (lord.flatpak.start('info', ref)) in plain language with what
-// LordOS changes, the apps that need Flatpak's sub-sandboxes (Chromium and Electron, "not yet supported"), the catalog
+// LordOS changes, the catalog
 // filtered (verified only unless the setting shows the rest), the installed list (`flatpak list`) and the progress of a
 // job. Only for showing: how a Flatpak app is launched never reads its metadata (server/src/fpak.c fpak_argv sets the
 // never-granted options and LordOS's restrictions whatever the app declares).
@@ -9,10 +9,6 @@
 
 export const ARCH = 'x86_64';                 // phase 1: PCs only (lord.flatpak.available() is false elsewhere)
 export const APPSTREAM_EVERY = 24 * 3600e3;   // the catalog is fetched again when the Store opens after a day
-
-// Bases whose apps run their helpers through Flatpak's sub-sandboxes (zypak and flatpak-spawn), which LordOS doesn't
-// serve yet (flatpak-portal is masked, E5): they are marked "not yet supported" and not installed.
-export const SUBSANDBOX_BASES = ['org.electronjs.Electron2.BaseApp', 'org.chromium.Chromium.BaseApp', 'io.atom.electron.BaseApp'];
 
 const ID_RE = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_-]*){2,}$/;
 export const idOk = (id) => typeof id === 'string' && id.length <= 59 && ID_RE.test(id) && !/-.*\./.test(id);
@@ -45,14 +41,11 @@ export function parseMetadata(lines) {
   return out;
 }
 
-// The base's id: "app/org.electronjs.Electron2.BaseApp/x86_64/24.08" → "org.electronjs.Electron2.BaseApp".
-const baseId = (base) => { const p = String(base || '').split('/'); return p.length === 4 ? p[1] : p[0]; };
-export const needsSubsandbox = (meta) => !!meta && SUBSANDBOX_BASES.includes(baseId(meta.base));
-
 // Session bus names LordOS never lets a Flatpak app reach (fpak.c never_talk) and the ones it always may (talk_only);
-// the rest of the declared names are "other apps".
+// the rest of the declared names are "other apps". org.freedesktop.portal.Flatpak is LordOS's own Spawn (sub-sandboxes
+// of the same app, E9): a portal like the others, never a way out of the sandbox.
 const NEVER_TALK = {
-  'org.freedesktop.Flatpak': 'spawn', 'org.freedesktop.portal.Flatpak': 'spawn', 'org.freedesktop.systemd1': 'systemd', 'org.freedesktop.secrets': 'secrets',
+  'org.freedesktop.Flatpak': 'spawn', 'org.freedesktop.systemd1': 'systemd', 'org.freedesktop.secrets': 'secrets',
 };
 const QUIET_TALK = ['org.freedesktop.Notifications', 'org.kde.StatusNotifierWatcher', 'org.freedesktop.ScreenSaver', 'com.canonical.AppMenu.Registrar', 'org.a11y.Bus'];
 const quiet = (name) => QUIET_TALK.includes(name) || name.startsWith('org.freedesktop.portal.');
@@ -126,14 +119,11 @@ export function filterCatalog(cat, { query = '', showAll = false, category = nul
     && (!category || String(a.categories || '').split(';').includes(category))
     && (!words.length || words.every((w) => fold(`${a.name} ${a.summary} ${a.developer} ${a.id}`).includes(w))));
   // by name; while searching, the apps whose name starts with the first word come first
+  // each name folded once, not in every comparison (thousands of apps)
   const first = words[0];
-  return out.sort((a, b) => {
-    if (first) {
-      const sa = fold(a.name).startsWith(first) ? 0 : 1, sb = fold(b.name).startsWith(first) ? 0 : 1;
-      if (sa !== sb) return sa - sb;
-    }
-    return fold(a.name) < fold(b.name) ? -1 : fold(a.name) > fold(b.name) ? 1 : 0;
-  });
+  const keyed = out.map((a) => { const n = fold(a.name); return { a, n, s: first && n.startsWith(first) ? 0 : 1 }; });
+  keyed.sort((x, y) => (x.s !== y.s ? x.s - y.s : x.n < y.n ? -1 : x.n > y.n ? 1 : 0));
+  return keyed.map((x) => x.a);
 }
 
 // How many shown apps each category has (the sidebar's counts).
@@ -175,3 +165,9 @@ export const appstreamStale = (at, now) => !(at > 0) || now - at > APPSTREAM_EVE
 
 // The Flathub settings (settings.flathub): { on, showAll, appstreamAt }.
 export const prefsOf = (s) => ({ on: !!(s && s.on), showAll: !!(s && s.showAll), appstreamAt: (s && Number(s.appstreamAt)) || 0 });
+
+// A note on an app's page about how it works in LordOS (the Flathub compatibility run, 2026-11-22): a key under
+// "flathub.note.", or null. OBS Studio: the home folder is read-only in a Flatpak app's view (docs/FLATPAK.md, E2), so
+// recordings can only go to the person's folders; OBS's Flatpak asks for Videos, where they go.
+const NOTES = { 'com.obsproject.Studio': 'obsVideos' };
+export const appNote = (id) => (typeof id === 'string' && Object.prototype.hasOwnProperty.call(NOTES, id) ? NOTES[id] : null);

@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak uygulaması {id}",
   "who.program": "Program {path}",
   "perm.shortcuts": "Klavye kısayolları",
-  "permHint.shortcuts": "Öndeyken ❖, ⌥Tab ve masaüstünün diğer kısayollarını alabilen uygulamalar; örneğin sanal makineler, uzak masaüstleri ve oyunlar. ❖Esc bunları her zaman geri verir; ekranı kilitleme ve medya tuşları sistemde kalır."
+  "permHint.shortcuts": "Öndeyken ❖, ⌥Tab ve masaüstünün diğer kısayollarını alabilen uygulamalar; örneğin sanal makineler, uzak masaüstleri ve oyunlar. ❖Esc bunları her zaman geri verir; ekranı kilitleme ve medya tuşları sistemde kalır.",
+  "ask.idle": "“{app}” bilgisayardan uzakta olduğunuzu bilmek istiyor",
+  "ask.idleNote": "Klavye ve fareyi bir süre kullanmadığınızda ve döndüğünüzde ona haber verilir; başka bir şey değil. Bunu daha sonra Ayarlar → Gizlilik bölümünden değiştirebilirsiniz.",
+  "perm.idle": "Bilgisayardan uzakta olma",
+  "permHint.idle": "Bilgisayarı bir süre kullanmadığınızda ve döndüğünüzde haber alan uygulamalar; örneğin sizi uzakta gösteren sohbet uygulamaları. Başka bir şey öğrenmezler; ekranı açık tutan bir video veya sunum orada olduğunuz sayılır."
 }

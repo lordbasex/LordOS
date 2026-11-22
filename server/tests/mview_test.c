@@ -17,6 +17,12 @@ int mp_sendv(int sock, uint32_t type, uint32_t id, int64_t a, int64_t b, int64_t
 }
 
 void media_cursor_touch(void) {}
+int wl_paint_media(Canvas *c, int sid, int node, float bx, float by, float bw, float bh, float px, float py, float pw, float ph,
+                   float sx, float sy, float sw, float sh, float op) {
+    (void)c; (void)sid; (void)node; (void)bx; (void)by; (void)bw; (void)bh; (void)px; (void)py; (void)pw; (void)ph; (void)sx; (void)sy; (void)sw; (void)sh; (void)op;
+    return 0;
+}
+void media_src_need_cpu(MediaSrc *s) { (void)s; }
 
 static int fails, checks;
 #define CHECK(cond, what) do { checks++; if (!(cond)) { fails++; fprintf(stderr, "FAIL: %s\n", what); } } while (0)
@@ -73,6 +79,16 @@ int main(void) {
     src.frame_seq++;
     media_paint(&c, 7, 1, 0, 0, W, H, 0, 1);
     CHECK(lit(&c, 0x123456) > 0, "a new frame in the same picture: drawn again");
+
+    /* 4b. where the paint put the picture, as fractions of the box (media_src_damage_rect damages only the part of
+     * the node a frame changed): 100 × 50 in 320 × 200 is scaled 3.2 times, 20 px down */
+    CHECK(src.map_ok && src.map_w == 100 && src.map_h == 50, "the picture's place: known after a paint");
+    CHECK(fabsf(src.map_fx) < 1e-4f && fabsf(src.map_fy - 0.1f) < 1e-4f, "the picture's place: its corner");
+    CHECK(fabsf(src.map_kx - 3.2f / W) < 1e-6f && fabsf(src.map_ky - 3.2f / H) < 1e-6f, "the picture's place: its scale");
+    src.view.rot = 90;
+    media_paint(&c, 7, 1, 0, 0, W, H, 0, 1);
+    CHECK(!src.map_ok, "the picture's place: unknown when rotated (the whole node is damaged)");
+    src.view.rot = 0;
 
     /* 5. an x8r8g8b8 picture (alpha byte 0) is drawn opaque, copied as is and scaled */
     picture(W, H, 0x00336699u);

@@ -88,6 +88,7 @@ int wl_draws_meet(Rect r) {
     return 0;
 }
 void media_paint(Canvas *c, int id, int node, float x, float y, float w, float h, float r, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)r; (void)op; }
+void media_paint_note(Canvas *c, int id, int node, float x, float y, float w, float h, float op) { (void)c; (void)id; (void)node; (void)x; (void)y; (void)w; (void)h; (void)op; }
 int media_cover_node(float x0, float y0, float x1, float y1) { (void)x0; (void)y0; (void)x1; (void)y1; return 0; }
 int gpu_active(void) { return test_gpu; }
 void lbf_input(uint64_t ev_ns) { (void)ev_ns; }   /* bench/lbinput.c: only lbi_path is used */
@@ -3920,6 +3921,39 @@ static void bench_slideshow(void) {
 }
 #endif
 
+/* canvas_blit_scaled at one source pixel per pixel (a part of a Machines guest's picture in apps mode, media/mview.c):
+ * the rows-copied path gives the source's pixels, opaque, inside the clip only, and agrees with the bilinear path */
+static void test_blit_crop(void) {
+    enum { SWP = 64, SHP = 48, W = 80, H = 60 };
+    static uint32_t src[SWP * SHP], a[W * H], b[W * H];
+    for (int i = 0; i < SWP * SHP; i++) src[i] = (uint32_t)(i * 2654435761u) & 0x00ffffffu;   /* x8r8g8b8: no alpha */
+    Canvas ca, cb;
+    canvas_init(&ca, a, W, H, W);
+    canvas_init(&cb, b, W, H, W);
+    memset(a, 0, sizeof a);
+    memset(b, 0, sizeof b);
+    Rect oa = canvas_push_clip(&ca, 5, 5, 60, 40);
+    canvas_blit_scaled(&ca, src, SWP, SWP, SHP, 10, 7, 30, 20, 12, 9, 30, 20, 1, 1);        /* the copied rows */
+    canvas_set_clip(&ca, oa);
+    Rect ob = canvas_push_clip(&cb, 5, 5, 60, 40);
+    canvas_blit_scaled(&cb, src, SWP, SWP, SHP, 10, 7, 30, 20, 12, 9, 30, 20, 0.9999f, 1);  /* the bilinear path */
+    canvas_set_clip(&cb, ob);
+    int bad = 0, outside = 0;
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) {
+            int in = x >= 12 && x < 42 && y >= 9 && y < 29;
+            uint32_t want = in ? (src[(y - 9 + 7) * SWP + (x - 12 + 10)] | 0xff000000u) : 0;
+            if (a[y * W + x] != want) bad++;
+            if (!in && a[y * W + x]) outside++;
+            if (in && ((a[y * W + x] ^ b[y * W + x]) & 0x00fefefeu)) bad++;
+        }
+    CHECK(!bad && !outside, "blit of a part at 1:1: %d pixels wrong, %d outside", bad, outside);
+    /* a part reaching past the picture's edge isn't copied as rows (the caller cuts it to the picture first) */
+    memset(a, 0, sizeof a);
+    canvas_blit_scaled(&ca, src, SWP, SWP, SHP, 50, 40, 20, 20, 0, 0, 20, 20, 1, 1);
+    CHECK(a[0] == (src[40 * SWP + 50] | 0xff000000u), "a part past the edge: clamped by the bilinear path");
+}
+
 int main(int argc, char **argv) {
     const char *dir = getenv("LORD_FONTS") ? getenv("LORD_FONTS") : "../assets/fonts";
     fonts_set_builtin_dir(dir);
@@ -3936,6 +3970,7 @@ int main(int argc, char **argv) {
     CHECK(!gc_all.bad, "scissor over the GPU drag runs: %d frames differ", gc_all.bad);
     printf("scissor over the GPU drag runs: %d frames, %d partial, %.1f %% of the pixels composed, %d differ\n", gc_all.frames, gc_all.partial, gc_all.px * 100.0 / (gc_all.px_all ? gc_all.px_all : 1), gc_all.bad);
     test_drag_corners();
+    test_blit_crop();
     test_scale_below_100();
     test_ellipsis();
     test_carets();

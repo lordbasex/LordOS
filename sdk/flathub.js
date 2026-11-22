@@ -17,10 +17,11 @@ export const available = () => { const a = api(); return !!a && a.available(); }
 export const prefs = () => M.prefsOf(settings.get().flathub);
 export const setPrefs = (p) => settings.set((s) => ({ ...s, flathub: { ...M.prefsOf(s.flathub), ...p } }));
 
-// catalog: the last read (lord.flatpak.catalog()); installed: `flatpak list` ({ id, branch, version }); job: the
+// catalog: the last read (lord.flatpak.catalog()); installed: `flatpak list` ({ id, branch, version }); listed: that
+// list was read at least once (before, its 0 means "not known yet"); job: the
 // running install, removal or update ({ kind, id, name, pct, line }); busy: the catalog or setup step running ('' when
 // none); msg: the last outcome ({ ok, text }).
-export const state = createStore({ catalog: [], loaded: false, installed: [], job: null, busy: '', msg: null });
+export const state = createStore({ catalog: [], loaded: false, installed: [], listed: false, job: null, busy: '', msg: null });
 const patch = (p) => state.set((s) => ({ ...s, ...p }));
 
 // ---- the job pump: lord.flatpak.take() while something runs ----
@@ -103,8 +104,26 @@ locale.subscribe(() => { if (state.get().loaded) loadCatalog(); });
 
 export async function refreshInstalled() {
   const r = await run('list');
-  if (r.code === 0) patch({ installed: M.parseList(r.lines) });
+  if (r.code === 0) patch({ installed: M.parseList(r.lines), listed: true });
   return state.get().installed;
+}
+
+// While a page shows what's installed (Settings → Flatpak, the Store's Installed): an app installed or removed outside
+// the Store (a terminal's `flatpak install --user`, a .flatpakref, another program) is seen within a few seconds. Every
+// 3 s it compares the exported apps' ids (lord.apps.flatpak: the server reads its folders again only when they changed)
+// and lists the installation again only when they did. Returns the function that stops it.
+const exportedIds = () => { try { return lord.apps.flatpak('en').map((a) => a.id).sort().join(' '); } catch (e) { return ''; } };
+export function watchInstalled() {
+  if (!available() || typeof lord.apps?.flatpak !== 'function') return () => {};
+  let last = exportedIds();
+  const id = setInterval(() => {
+    const now = exportedIds();
+    if (now === last) return;
+    last = now;
+    refreshApps();
+    refreshInstalled();
+  }, 3000);
+  return () => clearInterval(id);
 }
 
 // Turning Flathub on, once flatpak is installed: the remote (if it isn't there), the catalog, what is installed.
@@ -126,15 +145,26 @@ async function job(kind, app, steps) {
   if (state.get().job) return false;
   const since = Date.now();
   patch({ job: { kind, id: app ? app.id : '', name: app ? app.name : '', pct: null, line: '' }, msg: null });
+  // flatpak prints many progress lines a second: they are gathered and the state changes at most every 250 ms (each
+  // change redraws the Store's Flathub page; one per line froze the desktop while a big app downloaded)
+  let pend = null, timer = 0;
+  const flush = () => {
+    timer = 0;
+    const p = pend;
+    pend = null;
+    if (p) state.set((s) => (s.job ? { ...s, job: { ...s.job, line: p.line || s.job.line, pct: p.pct == null ? s.job.pct : p.pct } } : s));
+  };
   const onLine = (line) => {
     const pct = M.progressOf(line);
-    state.set((s) => ({ ...s, job: s.job && { ...s.job, line: line.trim().slice(0, 200) || s.job.line, pct: pct == null ? s.job.pct : pct } }));
+    pend = { line: line.trim().slice(0, 200) || pend?.line || '', pct: pct == null ? pend?.pct ?? null : pct };
+    if (!timer) timer = setTimeout(flush, 250);
   };
   let last = { code: 0, lines: [] };
   for (const [name, ref] of steps) {
     last = await run(name, ref, onLine);
     if (last.code !== 0) break;
   }
+  if (timer) { clearTimeout(timer); timer = 0; pend = null; }
   await refreshInstalled();
   refreshApps();
   const ok = last.code === 0;

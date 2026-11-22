@@ -160,8 +160,16 @@
   "vm.imageRemoved": "Image gelöscht",
   "vm.downloadResumed": "Ein angehaltener Download wird fortgesetzt ({from} Bytes behalten)",
   "vm.kvmReady": "Erlaubt: Maschinen können jetzt Hardwarevirtualisierung verwenden",
+  "vm.bridgeReady": "Überbrücktes Netzwerk bereit ({name})",
+  "vm.bridgeGone": "Überbrücktes Netzwerk entfernt",
   "vm.kvmNextLogin": "Ab deiner nächsten Anmeldung erlaubt",
   "pkg.foreignArchAdded": "32-Bit-Pakete ({arch}) aktiviert",
   "pkg.foreignArchPresent": "32-Bit-Pakete ({arch}) waren bereits aktiviert",
-  "pkg.why.multiarchPair": "Gleiche Version wie {name}"
+  "pkg.why.multiarchPair": "Gleiche Version wie {name}",
+  "gpu.roleSet": "Verwendung der Grafikkarte gespeichert ({card}): zum Übernehmen neu starten",
+  "vm.gvtReady": "Anteil der Grafikkarte bereit ({name})",
+  "vm.gvtGone": "Anteil der Grafikkarte entfernt",
+  "gpu.freqSet": "Mindestfrequenz der Grafikkarte festgelegt",
+  "gpu.memlockSet": "Sperrbarer Speicher für Maschinen gespeichert",
+  "vm.memlockSet": "Arbeitsspeicher der Maschine gesperrt"
 }
