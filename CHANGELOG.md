@@ -12,6 +12,42 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Linux apps: tab tear-off, window tags, the bell, session management and blur behind windows, in development**
+  (approved by the maintainer 2026-11-22; five Wayland protocols, one file each in `server/src/wl/`, `wlshell.h`;
+  `docs/WAYLAND.md`, "Shell extras"; the latest release is 0.8.9.4).
+  - **Tab tear-off (`xdg-toplevel-drag-v1` 1, `tldrag.c`):** a tab dragged out of Firefox or Chromium becomes a window
+    that follows the pointer during the drag (at the point of the window the browser gave), is never the drag's target
+    (the hit test leaves its frame out, so it can be dropped back onto another window of the browser), and stays where
+    it is let go: a drop nothing takes ends with `dnd_drop_performed` and `dnd_finished`, not `cancelled` (the browser
+    would take the tab back), as Mutter and KWin do, and such a drag never hands files to LordOS. Only a window of the app
+    that owns the drag follows; `invalid_source`, `toplevel_attached` and `ongoing_drag` as the protocol says. Checked
+    with Chromium 156 on a headless lord-server (the pointer driven through the session's `remote.sock`): a tab torn off
+    followed the pointer, stayed on the desktop as its own window, and dragged back onto the first window it was
+    reattached (`docs/wayland-tab-tearoff.png`, `docs/wayland-tab-dropped.png`). Firefox not yet tried.
+  - **Window tags (`xdg-toplevel-tag-v1` 1, `tltag.c`):** a window's tag keys its own remembered place
+    (`sdk/windowmemory.js`: the app's Dock id plus `#<tag>`), so each kind of window of a multi-window app reopens where
+    that kind was; its description names it while it has no title. Both kept as text only, cut and cleaned in C and
+    again in the shell (`sdk/shellxmodel.js`).
+  - **The bell (`xdg-system-bell-v1` 1, `sysbell.c`):** LordOS's alert sound (silent in Do Not Disturb; the system volume
+    and mute apply) and, for a window that isn't in front, the Dock's and taskbar's attention mark. At most one ring
+    every 250 ms and five in 10 s per app (`bellgate.h`).
+  - **Session management (`xdg-session-management-v1` 1, `xsession.c`, `xsstore.c`):** an app's windows come back at
+    their place and size (and maximized) when it starts again, ahead of session restore's frame and the remembered
+    place, fitted on today's displays. Session ids are random (getrandom), scoped to the program lord-server checked the
+    app runs (or its Flatpak id, or the isolated LordOS app), never to an id the app sent: another app's id finds
+    nothing. Kept in `~/.config/lordos/wl-sessions/sessions` (0600), written by lord-server only and protected from
+    `lord.fs` (`fsops_protected`); limits of 128 sessions, 16 per app, 32 windows each.
+  - **Blur behind windows (`ext-background-effect-v1` 1, `bgeffect.c`, `bgregion.h`):** the region an app asks for is
+    blurred with the UI's own backdrop blur, under the window. Offered honestly: only on the CPU path with transparency
+    and blur on; with GPU compositing (no blur there yet) or effects off the capabilities are none and every app is told
+    when that changes.
+  - The protocol files for `ext-background-effect-v1` and `xdg-session-management-v1`, newer than Debian 13's
+    wayland-protocols 1.44, are copied unchanged from wayland-protocols 1.50 into `server/protocols/` (MIT).
+  - New native calls, for the shell only: `lord.wayland.toplevelDrag`, `tag`, `sessionFrame` and `effects`.
+  - Tests: `build/shellx-units-test`, `tests/shellx_model_test.mjs`, `tests/shellx_headless.sh` (all five against a
+    headless lord-server, `tests/shellx_client.c`; the pointer-driven tear-off with `SHELLX_DRAG=1`), and
+    `build/fsops-test` for the protected folder.
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).

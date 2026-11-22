@@ -11,6 +11,7 @@ the components below, each under its own license.
 | stb_image, stb_image_write, stb_truetype | image decoding/encoding, font rasterization | MIT or public domain (dual) |
 | Monocypher 4 | vault and keyring cryptography | CC0-1.0 or BSD-2-Clause (`third_party/monocypher/LICENCE.md`) |
 | EFF large wordlist, SecLists common passwords | passphrase generator, weak-password check | CC BY 3.0 (EFF), MIT (SecLists, `third_party/wordlists/LICENSE-SecLists`) |
+| wayland-protocols 1.50: `ext-background-effect-v1.xml`, `xdg-session-management-v1.xml` (in `server/protocols/`, unchanged; newer than Debian 13's 1.44) | protocol descriptions wayland-scanner turns into code for lord-server | MIT (the notice is in each file) |
 
 ## Fetched at build time (`third_party/audiocpp`, ignored by git)
 

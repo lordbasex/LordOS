@@ -257,6 +257,15 @@ EOF
         77) skip "wlperf" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "wlperf (tests/wlperf_client.c, headless lord-server: titles, frames, protocols, transform, damage)" ;;
     esac
+    # the shell extras: tab tear-off errors, window tags, the bell, blur behind windows, session management, against a
+    # headless lord-server (tests/shellx_headless.sh; the pointer-driven tear-off with SHELLX_DRAG=1, as root)
+    if have node; then run "shellx-model-test (sdk/shellxmodel.js)" node tests/shellx_model_test.mjs; fi
+    sh tests/shellx_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "shellx (tests/shellx_client.c, headless lord-server: globals, tag, bell, blur, session)" ;;
+        77) skip "shellx" "build/lord-server, build/shellx-client and the default theme (make, npm run build)" ;;
+        *) bad "shellx (tests/shellx_client.c, headless lord-server: globals, tag, bell, blur, session)" ;;
+    esac
     # apps mode's guest side: lord-server's window endpoint, directly and through lordos-guest (tests/guestwin_client.c)
     sh tests/guestwin_headless.sh >"$T/out" 2>&1
     case $? in

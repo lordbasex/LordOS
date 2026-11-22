@@ -36,8 +36,14 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
            staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
            staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
+# shell extras (src/wl/wlshell.h, docs/WAYLAND.md "Shell extras"): tab tear-off, window tags, the bell
+WL_MORE += staging/xdg-toplevel-drag/xdg-toplevel-drag-v1 staging/xdg-toplevel-tag/xdg-toplevel-tag-v1 staging/xdg-system-bell/xdg-system-bell-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
+# newer than Debian 13's wayland-protocols (1.44): copied unchanged from wayland-protocols 1.50 into protocols/ (MIT)
+WL_LOCAL := ext-background-effect-v1 xdg-session-management-v1
+WL_GEN  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.h)
+WL_OBJ  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.o)
 
 # GPU compositing (src/gpu): Mesa (GBM + EGL + GLES2) if its -dev packages are present; otherwise (or with
 # GPU=0) it's built without GPU and lord-server always composites on the CPU. See docs/GPU.md.
@@ -83,6 +89,9 @@ SRC += src/ui/js_guestwin.c
 SRC += src/ui/js_vmcli.c src/vm/vmcli.c
 # Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
 SRC += src/gpu/dmaread.c
+# Shell extras (src/wl/wlshell.h): xdg-toplevel-drag, xdg-toplevel-tag, xdg-system-bell, xdg-session-management,
+# ext-background-effect, one file each
+SRC += src/wl/wlshell.c src/wl/tldrag.c src/wl/tltag.c src/wl/sysbell.c src/wl/xsession.c src/wl/xsstore.c src/wl/bgeffect.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
@@ -873,6 +882,18 @@ build/guestwin-client: tests/guestwin_client.c src/vm/vmagent.c src/vm/vmagent.h
 # tests/wlperf_headless.sh against a headless lord-server
 build/wlperf-client: tests/wlperf_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlperf_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# The shell extras (tests/shellx_client.c, src/wl/wlshell.h): run by tests/shellx_headless.sh against a headless lord-server;
+# their pure parts (the bell's limit, blur regions, the session store and its file) in tests/shellx_units_test.c
+test: build/shellx-client build/shellx-units-test
+build/shellx-units-test: tests/shellx_units_test.c src/wl/xsstore.c src/wl/xsstore.h src/wl/bgregion.h src/wl/bellgate.h src/wl/wlregion.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/shellx_units_test.c src/wl/xsstore.c
+	./$@ || { rm -f $@; exit 1; }
+SHELLX_PROTO := staging/xdg-toplevel-drag/xdg-toplevel-drag-v1 staging/xdg-toplevel-tag/xdg-toplevel-tag-v1 staging/xdg-system-bell/xdg-system-bell-v1
+$(foreach p,$(SHELLX_PROTO),$(eval $(call wl_client_proto,$(p))))
+SHELLX_GEN := $(foreach p,$(notdir $(SHELLX_PROTO)) $(WL_LOCAL),build/gen/client/$(p)-client-protocol.h build/gen/client/$(p)-protocol.c)
+build/shellx-client: tests/shellx_client.c $(CLIENT_GEN) $(SHELLX_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/shellx_client.c $(filter build/gen/client/xdg-shell-protocol.c,$(CLIENT_GEN)) $(filter %.c,$(SHELLX_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag
@@ -1070,6 +1091,21 @@ build/gen/$(notdir $(1))-protocol.c: $(WLPROTO)/$(1).xml
 	wayland-scanner private-code $$< $$@
 endef
 $(foreach p,$(WL_MORE),$(eval $(call wl_proto,$(p))))
+define wl_local_proto
+build/gen/$(1)-protocol.h: protocols/$(1).xml
+	@mkdir -p build/gen
+	wayland-scanner server-header $$< $$@
+build/gen/$(1)-protocol.c: protocols/$(1).xml
+	@mkdir -p build/gen
+	wayland-scanner private-code $$< $$@
+build/gen/client/$(1)-client-protocol.h: protocols/$(1).xml
+	@mkdir -p build/gen/client
+	wayland-scanner client-header $$< $$@
+build/gen/client/$(1)-protocol.c: protocols/$(1).xml
+	@mkdir -p build/gen/client
+	wayland-scanner private-code $$< $$@
+endef
+$(foreach p,$(WL_LOCAL),$(eval $(call wl_local_proto,$(p))))
 
 build/gen/%.o: build/gen/%.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -w -c -o $@ $<

@@ -100,6 +100,7 @@
 #include "../ui/ui.h"
 #include "../sec/broker.h"
 #include "wlregion.h"
+#include "wlshell.h"
 #include "urilist.h"
 
 enum { R_NONE, R_TOPLEVEL, R_POPUP, R_SUB, R_CURSOR, R_DNDICON };
@@ -1029,6 +1030,7 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
         s->p_geom = 0;
     }
     if (s->role == R_SUB) { s->sx = s->p_sx; s->sy = s->p_sy; }
+    wlshell_commit(s->id);              /* double-buffered state of the shell extras (a blur region) */
     surface_commit_role(s);
 }
 
@@ -2508,6 +2510,7 @@ static void dev_set_selection(struct wl_client *c, struct wl_resource *r, struct
     (void)c; (void)serial;
     Source *s = src ? wl_resource_get_user_data(src) : NULL;
     if (s && s->used == 2) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_USED_SOURCE, "the source started a drag"); return; }
+    if (s && tldrag_claims(src)) return;     /* a toplevel drag's source (tldrag.c posted the error) */
     if (s) s->used = 1;
     if (selection && selection != s) wl_data_source_send_cancelled(selection->res);
     selection = s;
@@ -3213,6 +3216,7 @@ static void emit_map(Surf *s, int w, int h) {
              t, a, fp, w, h, s->csd ? "true" : "false", s->owner || s->dlg ? "true" : "false", fixed ? "true" : "false",
              s->owner ? s->owner->id : 0, s->modal ? "true" : "false");
     }
+    wlshell_mapped(s->id);              /* its tag, a drag it follows (wlshell.h) */
 }
 
 /* A new JS context (the theme was switched live): the windows that are still mapped are announced
@@ -4188,6 +4192,7 @@ static int dnd_files_in(void) {
         return 0;
     }
     if (!drag.src || drag.contained || !(dnd_source_actions() & DND_COPY)) return 0;
+    if (tldrag_following()) return 0;   /* a tab torn off is a window, not files for LordOS (tldrag.c) */
     for (int i = 0; i < drag.src->nmimes; i++) if (!strcmp(drag.src->mimes[i], "text/uri-list")) return 1;
     return 0;
 }
@@ -4242,6 +4247,7 @@ static void dnd_focus(Surf *t, float lx, float ly) {
 
 static void dnd_end(void) {
     dnd_icon_damage();
+    tldrag_ended();
     memset(&drag, 0, sizeof drag);
 }
 static void dnd_cancel(void) {
@@ -4374,6 +4380,16 @@ static void dnd_drop(void) {
         dnd_end();
         return;
     }
+    /* a window following the drag (a tab torn off) let go where nothing took it: dropped there, as a move that ended,
+     * not cancelled (the app would take the tab back); as Mutter and KWin do (tldrag.c) */
+    if (!ok && drag.src && tldrag_following() && wl_resource_get_version(drag.src->res) >= 3) {
+        Source *src = drag.src;
+        dnd_leave();
+        wl_data_source_send_dnd_drop_performed(src->res);
+        wl_data_source_send_dnd_finished(src->res);
+        dnd_end();
+        return;
+    }
     if (!ok) { dnd_cancel(); return; }
     wl_data_device_send_drop(drag.dev);
     if (o) o->dropped = 1;
@@ -4390,7 +4406,8 @@ static int dnd_pointer(float x, float y, Node *hit, int nbuttons, const int *dow
     last_x = x;
     last_y = y;
     dnd_icon_damage();
-    Surf *t = surface_under(x, y, hit, &lx, &ly);
+    /* the window following the drag is no target (tldrag.c); once dropped, the pointer is over it again */
+    Surf *t = surface_under(x, y, tldrag_hit(x, y, hit), &lx, &ly);
     dnd_focus(t, lx, ly);
     int released = 0;
     for (int i = 0; i < nbuttons; i++) {
@@ -4460,6 +4477,7 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
     drag.src = src;
     drag.icon = icon;
     drag.contained = dnd_contained(c);
+    tldrag_started(src_res);            /* a window attached to this source follows the pointer (tldrag.c) */
     float ox, oy;
     if (under && origin(under, &ox, &oy)) dnd_focus(under, last_x - ox, last_y - oy);
     dnd_icon_damage();
@@ -5461,6 +5479,7 @@ static void wl_gpu_changed(void) {
     new_on(OUTPICK_ALL);
     ui.dirty = 1;
     damage_add((Box){ 0, 0, ui.width, ui.height });
+    bgeffect_caps_changed();            /* blur behind windows is drawn only off the GPU (bgeffect.c) */
     GpuFormat f[256];
     int n = dmabuf_formats(f, 256);
     if (formats_sig(f, n, feedback_dev()) != feedback_sig) {
@@ -5993,6 +6012,11 @@ int wl_start(void) {
     wl_global_create(dpy, &kde_mgr_interface, 1, NULL, bind_kde_deco);   /* theme frame for GTK 3 (Firefox) */
     wl_input_globals(dpy);              /* zwp_pointer_gestures_v1 (wl_input.c) */
     wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */
+    tldrag_globals(dpy);                /* shell extras (wlshell.h): a window that follows a drag, */
+    tltag_globals(dpy);                 /* window tags, */
+    sysbell_globals(dpy);               /* the bell, */
+    xsession_globals(dpy);              /* windows back where they were, */
+    bgeffect_globals(dpy);              /* and blur behind a window where it can be drawn */
     secctx_init(dpy, may_secctx);       /* a sandbox's own socket per app (secctx.c) */
     /* inherited by apps opened from the LordOS terminal */
     setenv("WAYLAND_DISPLAY", socket_name, 1);
@@ -6032,6 +6056,66 @@ void wl_flush(void) {
     wl_display_flush_clients(dpy);
     if (keylag_enabled) keylag_flushed();
 }
+
+/* ---- for the shell extras (wlshell.h: tldrag.c, tltag.c, sysbell.c, xsession.c, bgeffect.c) ---- */
+int wl__surface_id(struct wl_resource *r) {
+    Surf *s = r && wl_resource_instance_of(r, &wl_surface_interface, &surface_impl) ? wl_resource_get_user_data(r) : NULL;
+    return s ? s->id : 0;
+}
+int wl__toplevel_id(struct wl_resource *r) {
+    Surf *s = r && wl_resource_instance_of(r, &xdg_toplevel_interface, &toplevel_impl) ? wl_resource_get_user_data(r) : NULL;
+    return s && s->top == r ? s->id : 0;
+}
+int wl__window_of(int id) {
+    Surf *s = find(id);
+    while (s && s->role != R_TOPLEVEL && s->parent) s = s->parent;
+    return s && s->role == R_TOPLEVEL ? s->id : 0;
+}
+int wl__surface_state(int id, int *mapped, int *committed, int *toplevel) {
+    Surf *s = find(id);
+    if (!s) return 0;
+    *mapped = s->mapped;
+    *committed = s->sent_configure;
+    *toplevel = s->role == R_TOPLEVEL && s->top;
+    return 1;
+}
+int wl__window_rect(int id, int r[4], int *maximized, int *fullscreen) {
+    Surf *s = find(id);
+    Node *n = s && s->role == R_TOPLEVEL && s->node ? node_get(s->node) : NULL;
+    if (!n || n->prev_box.x1 <= n->prev_box.x0) return 0;
+    int w, h;
+    geometry(s, &w, &h);
+    r[0] = (int)lroundf(n->ax); r[1] = (int)lroundf(n->ay); r[2] = w; r[3] = h;
+    *maximized = s->maximized;
+    *fullscreen = s->fullscreen || s == fs_surf;
+    return 1;
+}
+int wl__surface_geom(int id, int g[4], int *lw, int *lh) {
+    Surf *s = find(id);
+    if (!s) return 0;
+    int w, h;
+    geometry(s, &w, &h);
+    g[0] = s->has_geom ? s->gx : 0; g[1] = s->has_geom ? s->gy : 0; g[2] = w; g[3] = h;
+    *lw = s->lw; *lh = s->lh;
+    return 1;
+}
+int wl__surface_node(int id) { Surf *s = find(id); return s ? s->node : 0; }
+struct wl_client *wl__surface_client(int id) { Surf *s = find(id); return s ? s->client : NULL; }
+const char *wl__client_owner(struct wl_client *c) {
+    static char out[KBI_ID_MAX + 8];
+    if (!c || c == xwl_client || greeter) return "";
+    const char *iso = app_of_client(c);
+    if (iso) { snprintf(out, sizeof out, "app:%s", iso); return lpk_valid_id(iso) ? out : ""; }
+    const char *who = client_identity(c);
+    return kbi_key_valid(who) ? who : "";
+}
+int wl__source_used(struct wl_resource *r) {
+    Source *s = r ? wl_resource_get_user_data(r) : NULL;
+    return s ? s->used : 0;
+}
+void wl__emit(int id, const char *type, const char *json) { emit_id(id, type, json); }
+void wl__pointer(float *x, float *y) { *x = last_x; *y = last_y; }
+void wl__json_str(char *out, size_t size, const char *s) { json_str(out, size, s); }
 
 /* ---- for wl_input.c (gestures, fine scrolling and touches) ---- */
 struct wl_display *wl__display(void) { return dpy; }
