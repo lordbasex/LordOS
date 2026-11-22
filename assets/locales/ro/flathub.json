@@ -22,6 +22,8 @@
   "job.uninstall": "Se elimină {name}",
   "job.update": "Se actualizează {name}",
   "job.updateAll": "Se actualizează aplicațiile Flathub",
+  "license.open": "Deschide licența în browser",
+  "license.proprietary": "Proprietară",
   "msg.failed": "Flatpak nu a putut termina: {reason}",
   "msg.fwBlocked": "Firewallul blochează Flathub, așa că nu s-a putut descărca nimic. Pentru a instala sau actualiza aplicații Flathub, permiteți „Flathub” în Monitor → Rețea.",
   "msg.fwDenied": "Firewallul a blocat o conexiune de care Flathub avea nevoie ({host}). Verificați regulile Flathub în Monitor → Rețea.",

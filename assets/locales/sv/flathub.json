@@ -22,6 +22,8 @@
   "job.uninstall": "Tar bort {name}",
   "job.update": "Uppdaterar {name}",
   "job.updateAll": "Uppdaterar Flathub-appar",
+  "license.open": "Öppna licensen i webbläsaren",
+  "license.proprietary": "Proprietär",
   "msg.failed": "Flatpak kunde inte slutföra: {reason}",
   "msg.fwBlocked": "Brandväggen blockerar Flathub, så inget kunde laddas ned. Tillåt ”Flathub” i Monitor → Nätverk för att installera eller uppdatera Flathub-appar.",
   "msg.fwDenied": "Brandväggen blockerade en anslutning som Flathub behövde ({host}). Kontrollera Flathubs regler i Monitor → Nätverk.",

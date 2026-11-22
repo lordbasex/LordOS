@@ -22,6 +22,8 @@
   "job.uninstall": "Eltávolítás: {name}",
   "job.update": "Frissítés: {name}",
   "job.updateAll": "A Flathub-alkalmazások frissítése",
+  "license.open": "Licenc megnyitása a böngészőben",
+  "license.proprietary": "Zárt",
   "msg.failed": "A Flatpak nem tudta befejezni: {reason}",
   "msg.fwBlocked": "A Tűzfal letiltja a Flathubot, ezért semmit sem lehetett letölteni. Flathub-alkalmazások telepítéséhez vagy frissítéséhez engedélyezze a „Flathub” elemet itt: Figyelő → Hálózat.",
   "msg.fwDenied": "A Tűzfal letiltott egy kapcsolatot, amelyre a Flathubnak szüksége volt ({host}). Ellenőrizze a Flathub szabályait itt: Figyelő → Hálózat.",

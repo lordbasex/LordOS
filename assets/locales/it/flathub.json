@@ -22,6 +22,8 @@
   "job.uninstall": "Rimozione di {name}",
   "job.update": "Aggiornamento di {name}",
   "job.updateAll": "Aggiornamento delle app di Flathub",
+  "license.open": "Apri la licenza nel browser",
+  "license.proprietary": "Proprietaria",
   "msg.failed": "Flatpak non è riuscito a completare: {reason}",
   "msg.fwBlocked": "Il firewall blocca Flathub, quindi non è stato possibile scaricare nulla. Per installare o aggiornare app di Flathub, consenti «Flathub» in Monitor → Rete.",
   "msg.fwDenied": "Il firewall ha bloccato una connessione che serviva a Flathub ({host}). Controlla le regole di Flathub in Monitor → Rete.",

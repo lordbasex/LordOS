@@ -22,6 +22,8 @@
   "job.uninstall": "Inaalis ang {name}",
   "job.update": "Ina-update ang {name}",
   "job.updateAll": "Ina-update ang mga app ng Flathub",
+  "license.open": "Buksan ang lisensya sa browser",
+  "license.proprietary": "Proprietary",
   "msg.failed": "Hindi natapos ng Flatpak: {reason}",
   "msg.fwBlocked": "Bina-block ng Firewall ang Flathub, kaya walang na-download. Para mag-install o mag-update ng mga app ng Flathub, payagan ang “Flathub” sa Monitor → Network.",
   "msg.fwDenied": "Nag-block ang Firewall ng koneksyong kailangan ng Flathub ({host}). Suriin ang mga patakaran ng Flathub sa Monitor → Network.",

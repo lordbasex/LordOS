@@ -168,5 +168,20 @@ for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, 
   eq(`rows translated in ${lang}`, missing, []);
 }
 
+// ---- the license row ----
+{
+  const L = M.licenseView;
+  eq('license: proprietary with its address', L('LicenseRef-proprietary=https://gitlab.com/warlordsoftwares/4ktube/-/raw/main/LICENSE'),
+    { kind: 'proprietary', text: '', url: 'https://gitlab.com/warlordsoftwares/4ktube/-/raw/main/LICENSE' });
+  eq('license: proprietary alone', L('LicenseRef-proprietary'), { kind: 'proprietary', text: '', url: null });
+  eq('license: proprietary with a plain-http, spaced or odd address: no link',
+    [L('LicenseRef-proprietary=http://x.org/l').url, L('LicenseRef-proprietary=https://x.org/a b').url, L('LicenseRef-proprietary=javascript:alert(1)').url,
+      L('LicenseRef-proprietary=https://x.org/' + 'a'.repeat(600)).url, L('LicenseRef-proprietary=https:///x').url], [null, null, null, null, null]);
+  eq('license: one SPDX id links to its page', L('GPL-3.0-or-later'), { kind: 'spdx', text: 'GPL-3.0-or-later', url: 'https://spdx.org/licenses/GPL-3.0-or-later.html' });
+  eq('license: an expression shows as given, no one page', L('MIT AND Apache-2.0'), { kind: 'spdx', text: 'MIT AND Apache-2.0', url: null });
+  eq('license: another LicenseRef has no page', L('LicenseRef-Freeware').url, null);
+  eq('license: nothing', [L(''), L(null)], [{ kind: null, text: '', url: null }, { kind: null, text: '', url: null }]);
+}
+
 console.log(bad ? `flathub-model: ${bad} of ${n} failed` : `flathub-model: ${n}/${n} ok`);
 process.exit(bad ? 1 : 0);

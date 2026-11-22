@@ -22,6 +22,8 @@
   "job.uninstall": "{name} silinir",
   "job.update": "{name} yenilənir",
   "job.updateAll": "Flathub tətbiqləri yenilənir",
+  "license.open": "Lisenziyanı brauzerdə aç",
+  "license.proprietary": "Mülkiyyətli",
   "msg.failed": "Flatpak başa çatdıra bilmədi: {reason}",
   "msg.fwBlocked": "Təhlükəsizlik divarı Flathub bağlantılarını bloklayır, ona görə heç nə endirilə bilmədi. Flathub tətbiqlərini quraşdırmaq və ya yeniləmək üçün Monitor → Şəbəkə bölməsində “Flathub” komponentinə icazə verin.",
   "msg.fwDenied": "Təhlükəsizlik divarı Flathub üçün lazım olan bir bağlantını blokladı ({host}). Monitor → Şəbəkə bölməsində Flathub qaydalarını yoxlayın.",

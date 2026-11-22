@@ -22,6 +22,8 @@
   "job.uninstall": "{name} verwijderen",
   "job.update": "{name} bijwerken",
   "job.updateAll": "Flathub-apps bijwerken",
+  "license.open": "Licentie openen in de browser",
+  "license.proprietary": "Propriëtair",
   "msg.failed": "Flatpak kon niet afronden: {reason}",
   "msg.fwBlocked": "De Firewall blokkeert Flathub, dus er kon niets worden gedownload. Sta “Flathub” toe in Monitor → Netwerk om apps van Flathub te installeren of bij te werken.",
   "msg.fwDenied": "De Firewall heeft een verbinding geblokkeerd die Flathub nodig had ({host}). Controleer de regels van Flathub in Monitor → Netwerk.",

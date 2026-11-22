@@ -21,6 +21,8 @@
   "job.uninstall": "Removing {name}",
   "job.update": "Updating {name}",
   "job.updateAll": "Updating Flathub apps",
+  "license.open": "Open the license in the browser",
+  "license.proprietary": "Proprietary",
   "msg.failed": "Flatpak couldn't finish: {reason}",
   "msg.installDone": "{name} is installed.",
   "msg.noCatalog": "Flathub's catalog isn't here yet. Check your connection and try Refresh.",

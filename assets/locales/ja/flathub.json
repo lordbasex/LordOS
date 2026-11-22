@@ -22,6 +22,8 @@
   "job.uninstall": "{name} を削除しています",
   "job.update": "{name} をアップデートしています",
   "job.updateAll": "Flathub のアプリをアップデートしています",
+  "license.open": "ライセンスをブラウザで開く",
+  "license.proprietary": "プロプライエタリ",
   "msg.failed": "Flatpak が完了できませんでした：{reason}",
   "msg.fwBlocked": "ファイアウォールが Flathub をブロックしているため、何もダウンロードできませんでした。Flathub のアプリをインストールまたはアップデートするには、モニタ → ネットワークで「Flathub」を許可してください。",
   "msg.fwDenied": "ファイアウォールが Flathub に必要な接続をブロックしました（{host}）。モニタ → ネットワークで Flathub のルールを確認してください。",

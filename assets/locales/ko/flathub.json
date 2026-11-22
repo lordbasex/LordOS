@@ -22,6 +22,8 @@
   "job.uninstall": "{name} 제거 중",
   "job.update": "{name} 업데이트 중",
   "job.updateAll": "Flathub 앱 업데이트 중",
+  "license.open": "브라우저에서 라이선스 열기",
+  "license.proprietary": "독점",
   "msg.failed": "Flatpak이 완료하지 못했습니다: {reason}",
   "msg.fwBlocked": "방화벽이 Flathub를 차단하고 있어 아무것도 다운로드할 수 없었습니다. Flathub 앱을 설치하거나 업데이트하려면 모니터 → 네트워크에서 “Flathub”를 허용하세요.",
   "msg.fwDenied": "방화벽이 Flathub에 필요한 연결을 차단했습니다({host}). 모니터 → 네트워크에서 Flathub 규칙을 확인하세요.",

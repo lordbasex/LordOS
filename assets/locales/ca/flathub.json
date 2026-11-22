@@ -22,6 +22,8 @@
   "job.uninstall": "S’està suprimint {name}",
   "job.update": "S’està actualitzant {name}",
   "job.updateAll": "S’estan actualitzant les aplicacions de Flathub",
+  "license.open": "Obre la llicència al navegador",
+  "license.proprietary": "Privativa",
   "msg.failed": "Flatpak no ha pogut acabar: {reason}",
   "msg.fwBlocked": "El tallafoc bloqueja Flathub, així que no s’ha pogut baixar res. Per instal·lar o actualitzar aplicacions de Flathub, permet «Flathub» a Monitor → Xarxa.",
   "msg.fwDenied": "El tallafoc ha bloquejat una connexió que Flathub necessitava ({host}). Revisa les regles de Flathub a Monitor → Xarxa.",

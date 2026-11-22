@@ -22,6 +22,8 @@
   "job.uninstall": "{name} हटाया जा रहा है",
   "job.update": "{name} अपडेट हो रहा है",
   "job.updateAll": "Flathub ऐप्स अपडेट हो रहे हैं",
+  "license.open": "ब्राउज़र में लाइसेंस खोलें",
+  "license.proprietary": "मालिकाना",
   "msg.failed": "Flatpak पूरा नहीं कर सका: {reason}",
   "msg.fwBlocked": "फ़ायरवॉल Flathub को ब्लॉक करता है, इसलिए कुछ भी डाउनलोड नहीं हो सका। Flathub ऐप्स इंस्टॉल या अपडेट करने के लिए मॉनिटर → नेटवर्क में “Flathub” को अनुमति दें।",
   "msg.fwDenied": "फ़ायरवॉल ने एक कनेक्शन ब्लॉक किया जिसकी Flathub को ज़रूरत थी ({host})। मॉनिटर → नेटवर्क में Flathub के नियम जाँचें।",

@@ -22,6 +22,8 @@
   "job.uninstall": "Mengalih keluar {name}",
   "job.update": "Mengemas kini {name}",
   "job.updateAll": "Mengemas kini apl Flathub",
+  "license.open": "Buka lesen dalam pelayar",
+  "license.proprietary": "Proprietari",
   "msg.failed": "Flatpak tidak dapat selesai: {reason}",
   "msg.fwBlocked": "Tembok api menyekat Flathub, jadi tiada apa yang dapat dimuat turun. Untuk memasang atau mengemas kini apl Flathub, benarkan “Flathub” dalam Monitor → Rangkaian.",
   "msg.fwDenied": "Tembok api menyekat sambungan yang diperlukan oleh Flathub ({host}). Semak peraturan Flathub dalam Monitor → Rangkaian.",

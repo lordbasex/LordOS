@@ -22,6 +22,8 @@
   "job.uninstall": "กำลังเอา {name} ออก",
   "job.update": "กำลังอัปเดต {name}",
   "job.updateAll": "กำลังอัปเดตแอปจาก Flathub",
+  "license.open": "เปิดสัญญาอนุญาตในเบราว์เซอร์",
+  "license.proprietary": "กรรมสิทธิ์",
   "msg.failed": "Flatpak ทำงานไม่สำเร็จ: {reason}",
   "msg.fwBlocked": "ไฟร์วอลล์บล็อก Flathub อยู่ จึงดาวน์โหลดอะไรไม่ได้ หากต้องการติดตั้งหรืออัปเดตแอปจาก Flathub ให้อนุญาต “Flathub” ใน ตัวตรวจสอบ → เครือข่าย",
   "msg.fwDenied": "ไฟร์วอลล์บล็อกการเชื่อมต่อที่ Flathub ต้องใช้ ({host}) ตรวจสอบกฎของ Flathub ใน ตัวตรวจสอบ → เครือข่าย",

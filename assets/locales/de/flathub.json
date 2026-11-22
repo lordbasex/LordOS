@@ -22,6 +22,8 @@
   "job.uninstall": "{name} wird entfernt",
   "job.update": "{name} wird aktualisiert",
   "job.updateAll": "Apps von Flathub werden aktualisiert",
+  "license.open": "Lizenz im Browser öffnen",
+  "license.proprietary": "Proprietär",
   "msg.failed": "Flatpak konnte nicht abschließen: {reason}",
   "msg.fwBlocked": "Die Firewall sperrt Flathub, daher konnte nichts heruntergeladen werden. Um Apps von Flathub zu installieren oder zu aktualisieren, erlaube „Flathub“ unter Monitor → Netzwerk.",
   "msg.fwDenied": "Die Firewall hat eine Verbindung gesperrt, die Flathub brauchte ({host}). Prüfe die Regeln für Flathub unter Monitor → Netzwerk.",

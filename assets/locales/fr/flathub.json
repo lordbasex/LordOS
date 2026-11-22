@@ -22,6 +22,8 @@
   "job.uninstall": "Suppression de {name}",
   "job.update": "Mise à jour de {name}",
   "job.updateAll": "Mise à jour des apps de Flathub",
+  "license.open": "Ouvrir la licence dans le navigateur",
+  "license.proprietary": "Propriétaire",
   "msg.failed": "Flatpak n’a pas pu terminer : {reason}",
   "msg.fwBlocked": "Le pare-feu bloque Flathub, donc rien n’a pu être téléchargé. Pour installer ou mettre à jour des apps de Flathub, autorisez « Flathub » dans Moniteur → Réseau.",
   "msg.fwDenied": "Le pare-feu a bloqué une connexion dont Flathub avait besoin ({host}). Vérifiez les règles de Flathub dans Moniteur → Réseau.",

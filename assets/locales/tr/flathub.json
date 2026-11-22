@@ -22,6 +22,8 @@
   "job.uninstall": "{name} kaldırılıyor",
   "job.update": "{name} güncelleniyor",
   "job.updateAll": "Flathub uygulamaları güncelleniyor",
+  "license.open": "Lisansı tarayıcıda aç",
+  "license.proprietary": "Tescilli",
   "msg.failed": "Flatpak tamamlayamadı: {reason}",
   "msg.fwBlocked": "Güvenlik duvarı Flathub’ı engelliyor, bu yüzden hiçbir şey indirilemedi. Flathub uygulamalarını yüklemek veya güncellemek için Monitör → Ağ bölümünde “Flathub”a izin verin.",
   "msg.fwDenied": "Güvenlik duvarı Flathub’ın ihtiyaç duyduğu bir bağlantıyı engelledi ({host}). Monitör → Ağ bölümünde Flathub kurallarını denetleyin.",

@@ -22,6 +22,8 @@
   "job.uninstall": "جارٍ إزالة {name}",
   "job.update": "جارٍ تحديث {name}",
   "job.updateAll": "جارٍ تحديث تطبيقات Flathub",
+  "license.open": "فتح الترخيص في المتصفح",
+  "license.proprietary": "احتكارية",
   "msg.failed": "تعذّر على Flatpak الإكمال: {reason}",
   "msg.fwBlocked": "جدار الحماية يحظر Flathub، لذا تعذّر تنزيل أي شيء. لتثبيت تطبيقات Flathub أو تحديثها، اسمح بـ«Flathub» في المراقبة → الشبكة.",
   "msg.fwDenied": "حظر جدار الحماية اتصالًا كان Flathub يحتاج إليه ({host}). راجع قواعد Flathub في المراقبة → الشبكة.",
