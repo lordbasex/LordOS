@@ -3307,7 +3307,7 @@ static void on_qga_reply(const JVal *root, int ok) {
         gvt_begin();
         /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
          * is asked to say it again (once; its answer gets the plain hello) */
-        if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx clipreq ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
+        if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx clipreq elevated ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
         break;
     }
     case AQ_PING: if (ok) S.ping_at = now_ms(); break;
@@ -4593,7 +4593,7 @@ static void drain_lag(void) {
                             (notool ? VAC_CLIP_NOTOOL : 0) | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0) |
                             (S.lag_open && S.ag_windows ? VAC_OPEN : 0) | (S.lag_place && S.ag_windows ? VAC_PLACE : 0);
                 if (!S.lag_open && !S.lag_place) open_all_end();
-                static const char me[] = "lord-vm 2 clipboard clipx clipreq";
+                static const char me[] = "lord-vm 2 clipboard clipx clipreq elevated";   /* elevated: LAGW_ELEVATED is understood */
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
                 ag_broadcast();
@@ -4628,6 +4628,18 @@ static void drain_lag(void) {
             uint32_t w, h;
             if (ag_display_parse(f.data, f.len, &w, &h)) vlog("agent: the guest's display size: malformed");
             else vlog("agent: the guest's display is %ux%u%s", w, h, w == S.disp_w && h == S.disp_h ? "" : " (not the size asked for)");
+        } else if (f.kind == LAG_WINREFUSED && S.lag_hello && S.lag_windows) {
+            /* an apps mode action the guest couldn't do (LordOS shows why from LAGW_ELEVATED in the list): logged */
+            static const char *const act[] = { "", "focus", "close", "minimize", "restore", "move" };
+            uint32_t id;
+            uint8_t a, why;
+            if (lag_winrefused_parse(f.data, f.len, &id, &a, &why)) vlog("agent: a refused window action: malformed");
+            else {
+                vlog("agent: the guest couldn't %s its window %u: %s", act[a], id,
+                     why == LAGR_ELEVATED ? "it runs as administrator (close it from inside the machine)" : "the system refused");
+                VmMsg m = vm_msg(VM_WINREFUSED, 0, (int)id, a, why, 0, "");
+                for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
+            }
         } else if (f.kind == AGK_DISPLAYS && S.lag_hello) {
             /* the guest's displays (lordos-guest-win w7 and later), for this log only: logged when they change */
             AgDisplay d[AG_DISPLAYS_MAX];

@@ -12,7 +12,7 @@ import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
 import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
-import { ListHead, AppsSearch, RunningList, LaunchList } from './appslist.jsx';
+import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { ClipAskBar } from './clipask.jsx';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
@@ -32,7 +32,7 @@ const THUMB_MS = 5000;
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}.${x.output}.${x.input}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'captured', 'captureEnds'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'closeRefusedSeq', 'captured', 'captureEnds'].every((k) => a[k] === b[k])
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
@@ -358,7 +358,6 @@ function AppsController({ name, g, onLeave }) {
   const p = usePal();
   const [query, setQuery] = useState('');
   const apps = launcherApps(g?.apps || [], query, g?.appIcons);
-  const launch = (a) => { if (g?.sid && a) lord.vm.launch(g.sid, a.token); };
   return (
     <View style={{ flex: 1, padding: 16, gap: 10, backgroundColor: p.bg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -371,9 +370,9 @@ function AppsController({ name, g, onLeave }) {
         <RunningList g={g} />
       </ScrollView>
       <ListHead label={tr('machines.apps.launch')} />
-      <AppsSearch value={query} onChange={setQuery} onSubmit={() => launch(apps[0])} onCancel={onLeave} />
+      <AppsSearch value={query} onChange={setQuery} onSubmit={() => launchFirst(g, apps)} onCancel={onLeave} />
       <ScrollView style={{ flex: 1, borderRadius: 10, backgroundColor: p.raised }} contentStyle={{ padding: 4 }}>
-        <LaunchList g={g} apps={apps} onLaunch={launch} />
+        <LaunchList g={g} apps={apps} />
       </ScrollView>
     </View>
   );

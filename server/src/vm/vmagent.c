@@ -531,6 +531,47 @@ size_t ag_displays_write(const AgDisplay *d, int n, int shown, uint8_t *out, siz
     return o;
 }
 
+static int ag_size_is(const AgDisplay *d, uint32_t w, uint32_t h) {
+    return w && h && d->w <= w && d->h <= h && w - d->w < 8 && h - d->h < 8;
+}
+
+int ag_shown_pick(const AgDisplay *d, int n, uint32_t want_w, uint32_t want_h, int locked, int *lock) {
+    if (lock) *lock = -1;
+    if (!d || n < 1) return -1;
+    int anyhw = 0;
+    for (int i = 0; i < n; i++) anyhw |= (d[i].flags & AGDS_HW) != 0;
+#define AG_CAND(i) (!anyhw || (d[i].flags & AGDS_HW))
+    if (locked >= 0 && locked < n && AG_CAND(locked)) { if (lock) *lock = locked; return locked; }
+    int best = -1;
+    for (int i = 0; i < n; i++) {
+        if (!AG_CAND(i) || !ag_size_is(&d[i], want_w, want_h)) continue;
+        if (best < 0 || ((d[i].flags & AGDS_PRIMARY) && !(d[best].flags & AGDS_PRIMARY))) best = i;
+    }
+    if (best >= 0) { if (lock) *lock = best; return best; }
+    for (int i = 0; i < n; i++) if (AG_CAND(i) && (d[i].flags & AGDS_PRIMARY)) return i;
+    for (int i = 0; i < n; i++) if (AG_CAND(i)) return i;
+#undef AG_CAND
+    return 0;
+}
+
+int lag_winrefused_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *action, uint8_t *reason) {
+    if (!p || n != LAG_WINREFUSED_BYTES) return -1;
+    uint32_t i = le32(p);
+    if (!i || p[4] < LAGA_FOCUS || p[4] > LAGA_MOVE || p[5] < LAGR_ELEVATED || p[5] > LAGR_LAST) return -1;
+    if (id) *id = i;
+    if (action) *action = p[4];
+    if (reason) *reason = p[5];
+    return 0;
+}
+
+int lag_winrefused_write(uint8_t out[LAG_WINREFUSED_BYTES], uint32_t id, uint8_t action, uint8_t reason) {
+    if (!out || !id || action < LAGA_FOCUS || action > LAGA_MOVE || reason < LAGR_ELEVATED || reason > LAGR_LAST) return -1;
+    ag_put32(out, id);
+    out[4] = action;
+    out[5] = reason;
+    return 0;
+}
+
 void ag_displays_text(const AgDisplay *d, int n, int shown, char *out, size_t cap) {
     if (!out || !cap) return;
     size_t o = 0;

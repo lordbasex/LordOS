@@ -15,13 +15,14 @@ import {
 import { useEffect, useRef } from 'react';
 import { ClipAskBar } from './clipask.jsx';
 import { menus } from './ui.jsx';
-import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch } from './model.js';
+import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune } from './model.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
 export const CLIP_HOLD_MS = 150;
 // dir → { dir, sid, name, mid, home (the machine's own window), gw, gh, media, list: [guest window], apps: [{ name, token }],
-// appIcons (token → pixels, once the guest sends them), wins: { gid: LordOS window id }, leave() }
+// appIcons (token → pixels, once the guest sends them), wins: { gid: LordOS window id }, launches and closes (the rows'
+// Opening… and Closing…: launchGuest, closeGuest), closeRefused (closeGuest), leave() }
 export const guests = createStore({});
 // dir → the LordOS window id of that machine's guest window in front, if one is: the machine counts as in use then (its
 // clipboard's gate, 6.8)
@@ -69,7 +70,7 @@ function placeOf(x, w, sid, k, d, have) {
 // guest's list. on: the person wants it; ready: the agent says the guest's helper lists its windows.
 export function useAppsMode({ dir, sid, st, name, mid, home, on, ready, onLeave, onTouch }) {
   const sent = useRef(false);
-  const seen = useRef({ w: -1, i: -1, a: -1 });
+  const seen = useRef({ w: -1, i: -1, a: -1, r: -1 });
   // a pause keeps the windows (their pictures stay as they were); stopping, or the agent going, ends it
   const active = !!(on && ready && sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused'));
   useEffect(() => {
@@ -78,8 +79,8 @@ export function useAppsMode({ dir, sid, st, name, mid, home, on, ready, onLeave,
     // the guest's screen as large as this display: its windows are never cut by a smaller one
     const [gw, gh] = appsGuestSize(display());
     lord.vm.resize(sid, gw, gh);
-    seen.current = { w: -1, i: -1, a: -1 };
-    publish(dir, { dir, sid, name, mid, home, leave: onLeave, touch: onTouch, list: [], apps: [], wins: {} });
+    seen.current = { w: -1, i: -1, a: -1, r: -1 };
+    publish(dir, { dir, sid, name, mid, home, leave: onLeave, touch: onTouch, list: [], apps: [], wins: {}, closeRefused: {} });
     return () => {
       if (sent.current) lord.vm.apps(sid, false);
       sent.current = false;
@@ -103,6 +104,12 @@ export function useAppsMode({ dir, sid, st, name, mid, home, on, ready, onLeave,
       windowPixelIcons.set((m) => ({ ...m, ...icons }));
     }
   }, [active, st?.windowsSeq, st?.iconsSeq, st?.guestAppsSeq]);
+  // a close the guest refused (its window runs as administrator in Windows): the windows' side says so
+  useEffect(() => {
+    if (!active || st.closeRefusedSeq === seen.current.r) return;
+    seen.current.r = st.closeRefusedSeq;
+    publish(dir, { closeRefused: closeRefusedOf(lord.vm.closeRefusals(sid)) });
+  }, [active, st?.closeRefusedSeq]);
   return active;
 }
 
@@ -166,10 +173,27 @@ export function focusGuest(dir, gid) {
   if (g?.sid) { lord.vm.winAct(g.sid, gid, 'restore'); lord.vm.winAct(g.sid, gid, 'focus'); }
 }
 // A guest window closed from the Running list: asked of the guest, as the window's own close button does (it may ask
-// about unsaved work); its LordOS window goes once the guest's list says so
+// about unsaved work); its LordOS window goes once the guest's list says so. The row says "Closing…" meanwhile, and why
+// not when the window stays (g.closes, model.js closeView): the guest may refuse, e.g. a Windows window that runs as
+// administrator. A refusal the guest reports goes in g.closeRefused (gid → { reason: 'elevated' | '', at }); nothing fills
+// it until the guest's tools report refusals, and until then the row's note comes after CLOSE_WAIT_MS.
 export function closeGuest(dir, gid) {
   const g = guests.get()[dir];
-  if (g?.sid) lord.vm.winAct(g.sid, gid, 'close');
+  if (!g?.sid) return;
+  publish(dir, { closes: closeStart(closePrune(g.closes, g.list), gid, Date.now()) });
+  lord.vm.winAct(g.sid, gid, 'close');
+}
+// One of the guest's apps opened (lord.vm.launch sends only a token the guest listed itself), at most once while it waits
+// for its window (model.js launchPending: a new window of that app, or LAUNCH_WAIT_MS): a window that opens where the
+// person doesn't look must not lead to the app opened six times. True when it was sent.
+export function launchGuest(dir, a) {
+  const g = guests.get()[dir];
+  if (!g?.sid || !a?.token) return false;
+  const now = Date.now();
+  if (launchPending(g.launches?.[a.token], g.list, now)) return false;
+  publish(dir, { launches: launchStart(launchPrune(g.launches, g.list, now), a, g.list, now) });
+  lord.vm.launch(g.sid, a.token);
+  return true;
 }
 
 // The Applications menu's items: the guest's windows (Running: a click brings one to the front), then the guest's apps,
@@ -181,7 +205,7 @@ export function appsMenuItems(g) {
     ...running.map((w) => ({ label: w.title || tr('machines.apps.untitled'), checked: w.focused, onClick: () => focusGuest(g.dir, w.id) })),
     '-', { label: tr('machines.apps.launch'), disabled: true }] : [];
   if (!g?.apps?.length) return [...head, { label: tr('machines.apps.noApps'), disabled: true }];
-  return [...head, ...g.apps.map((a) => ({ label: a.name, onClick: () => lord.vm.launch(g.sid, a.token) }))];
+  return [...head, ...g.apps.map((a) => ({ label: a.name, onClick: () => launchGuest(g.dir, a) }))];
 }
 
 // One guest window as a LordOS window: its part of the picture, the pointer and keyboard to the guest, and what the

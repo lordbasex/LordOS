@@ -1510,6 +1510,9 @@ typedef struct {
     struct { uint32_t id; int w, h; uint8_t *rgba; } icons[LAG_WIN_MAX];
     LagAppList *gapps;
     int wins_seq, icons_seq, gapps_seq, gapps_gen, apps_mode;
+    /* closes the guest refused (VM_WINREFUSED with LAGA_CLOSE): the last per window, newest last; closeRefusedSeq */
+    struct { uint32_t gid; int reason; double at; } refused[8];
+    int refused_n, refused_seq;
     /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
      * did (PTRLOCK_END_*), for the window */
     int captured, cap_ends, cap_why;
@@ -1520,6 +1523,21 @@ static void win_free(Sess *s) {
     free(s->wins); s->wins = NULL;
     free(s->gapps); s->gapps = NULL;
     for (int i = 0; i < LAG_WIN_MAX; i++) { free(s->icons[i].rgba); s->icons[i].rgba = NULL; s->icons[i].id = 0; }
+    s->refused_n = 0;
+}
+
+/* a close the guest refused, kept for closeRefusals(): the same window's earlier one goes, the oldest when full */
+static void refused_add(Sess *s, uint32_t gid, int reason) {
+    int n = 0;
+    for (int i = 0; i < s->refused_n; i++) if (s->refused[i].gid != gid) s->refused[n++] = s->refused[i];
+    if (n == (int)(sizeof s->refused / sizeof *s->refused)) { memmove(s->refused, s->refused + 1, (size_t)(n - 1) * sizeof *s->refused); n--; }
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    s->refused[n].gid = gid;
+    s->refused[n].reason = reason;
+    s->refused[n].at = (double)ts.tv_sec * 1000.0 + (double)(ts.tv_nsec / 1000000);
+    s->refused_n = n + 1;
+    s->refused_seq++;
 }
 
 /* lord-vm processes whose window closed before they exited */
@@ -2320,6 +2338,9 @@ static void from_vm(Sess *s) {
         case VM_WINDATA:
             if (fd >= 0) windata(s, &m, fd);
             break;
+        case VM_WINREFUSED:
+            if (m.b == LAGA_CLOSE) refused_add(s, (uint32_t)m.a, m.c);
+            break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
                 if (s->console_term) { Session *old = term_get(s->console_term); if (old) term_close(old); }
@@ -2710,6 +2731,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "windowsSeq", s->wins_seq);
     set_int(c, o, "iconsSeq", s->icons_seq);
     set_int(c, o, "guestAppsSeq", s->gapps_seq);
+    set_int(c, o, "closeRefusedSeq", s->refused_seq);
     return o;
 }
 
@@ -3274,7 +3296,9 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
  * top to bottom, in the guest's pixels (poll's windowsSeq counts changes). winIcon(session, id) → { width, height, data }
  * (RGBA, at most 64 × 64) or null (iconsSeq). winAct(session, id, 'focus'|'close'|'minimize'|'restore'|'move'[, x, y, w,
  * h]) → bool. guestApps(session) → [{ name, token }] (guestAppsSeq); launch(session, token) → bool: lord-vm sends only a
- * token the guest listed. Everything the guest said is shown as text only. */
+ * token the guest listed. closeRefusals(session) → [{ gid, reason: 'elevated'|'other', at }] (closeRefusedSeq): the guest
+ * couldn't close that window (it runs as administrator in Windows, or the system refused), at (ms since 1970) when it
+ * said so; the last per window. Everything the guest said is shown as text only. */
 static JSValue f_apps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
@@ -3282,6 +3306,20 @@ static JSValue f_apps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     int on = JS_ToBool(c, argv[1]) > 0;
     s->apps_mode = on;
     return JS_NewBool(c, ask(s, VM_APPS, on) >= 0);
+}
+
+static JSValue f_close_refusals(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 1 ? get(c, argv[0]) : NULL;
+    JSValue a = JS_NewArray(c);
+    for (int i = 0; s && i < s->refused_n; i++) {
+        JSValue o = JS_NewObject(c);
+        JS_SetPropertyStr(c, o, "gid", JS_NewFloat64(c, s->refused[i].gid));
+        set_str(c, o, "reason", s->refused[i].reason == LAGR_ELEVATED ? "elevated" : "other");
+        JS_SetPropertyStr(c, o, "at", JS_NewFloat64(c, s->refused[i].at));
+        JS_SetPropertyUint32(c, a, (uint32_t)i, o);
+    }
+    return a;
 }
 
 static JSValue f_windows(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -3297,6 +3335,7 @@ static JSValue f_windows(JSContext *c, JSValueConst t, int argc, JSValueConst *a
         JS_SetPropertyStr(c, o, "focused", JS_NewBool(c, w->flags & LAGW_FOCUSED));
         JS_SetPropertyStr(c, o, "minimized", JS_NewBool(c, w->flags & LAGW_MINIMIZED));
         JS_SetPropertyStr(c, o, "topmost", JS_NewBool(c, w->flags & LAGW_TOPMOST));
+        JS_SetPropertyStr(c, o, "elevated", JS_NewBool(c, w->flags & LAGW_ELEVATED));   /* runs as administrator in the guest */
         JS_SetPropertyStr(c, o, "owner", JS_NewFloat64(c, w->owner));
         JS_SetPropertyStr(c, o, "pid", JS_NewFloat64(c, w->pid));
         set_str(c, o, "title", w->title);
@@ -4303,7 +4342,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
-    JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act),
+    JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act), JS_CFUNC_DEF("closeRefusals", 1, f_close_refusals),
     JS_CFUNC_DEF("guestApps", 1, f_guest_apps), JS_CFUNC_DEF("gpus", 0, f_gpus), JS_CFUNC_DEF("launch", 2, f_launch),
 };
 
