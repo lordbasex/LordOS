@@ -118,8 +118,8 @@ export function validate(d) {
 }
 
 export const RE_X11 = /^[a-z][a-z0-9]*(\.[a-z0-9_]+)?$/;   // an X11 item: ewmh.wm_state, xdnd
-export const RE_PNG = /^[a-z0-9][a-z0-9_.-]{0,80}\.png$/;     // a proof screenshot in docs/wayland-proofs/
-export const RE_PROOF = /^[a-z0-9][a-z0-9_.-]{0,80}$/;
+export const RE_PNG = /^[a-z0-9][a-z0-9_.-]{0,120}\.png$/;    // a proof screenshot in docs/wayland-proofs/ (named after the globals it proves)
+export const RE_PROOF = /^[a-z0-9][a-z0-9_.-]{0,120}$/;
 export const RE_COMMIT = /^[0-9a-f]{7,40}$/;
 export const RE_PKGVER = /^[0-9A-Za-z.:+~-]{1,40}$/;          // a Debian package version: 2:24.1.6-1
 const isScore = (x) => typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= 100;
@@ -195,7 +195,7 @@ export function validateWeb(w) {
 // ---------- conformance (docs/wayland-conformance.json, written by tools/wl-conformance.mjs --record) ----------
 export function confDepth(g) {
   if (g.complete) return 'complete';
-  if (g.depth === 'protocol-specific') return 'partial';
+  if (String(g.depth).startsWith('protocol-specific')) return 'partial';   /* "(test hooks)": not advertised to a normal client */
   if (g.depth === 'generic only') return 'general';
   return 'code';
 }
@@ -328,7 +328,7 @@ export function confMarkdown(d, C) {
   if (!W) return `${CBEGIN}\n\nNo run recorded (docs/wayland-conformance.json).\n\n${CEND}`;
   const S = W.summary, E = W.env;
   const pts = (x) => `${x.points}/${x.total}${x.skipped ? ` (${x.skipped} skipped)` : ''}`;
-  const g = W.globals.map((x) => `| \`${x.global}\`${x.advertised ? '' : ' (not advertised headless)'} | ${x.row ? `\`${x.row}\`` : '—'} | ${x.version ?? '—'} | ${pct(x.score)} | ${pts(x)} | ${DEPTH_MD[x.depth]} |`);
+  const g = W.globals.map((x) => `| \`${x.global}\`${x.advertised ? '' : ' (not advertised to an ordinary client; run through the test hooks)'} | ${x.row ? `\`${x.row}\`` : '—'} | ${x.version ?? '—'} | ${pct(x.score)} | ${pts(x)} | ${DEPTH_MD[x.depth]} |`);
   const x = W.x11.map((i) => `| \`${i.id}\` | ${cell(i.title)} | ${pct(i.score)} | ${pts(i)} | ${DEPTH_MD[i.depth]} |`);
   return [
     CBEGIN,
@@ -336,10 +336,10 @@ export function confMarkdown(d, C) {
     `Every item of the recorded run: ${W.date}, \`${W.tool}\` (report schema ${W.schema}) at commit \`${W.commit}\`${W.dirty ? ' with uncommitted changes' : ''};`,
     `wayland-protocols ${E.waylandProtocols}, libwayland ${E.libwayland}, Xwayland ${E.xwayland}; ${E.mode}. Published with the screenshots on`,
     '[lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/#conformance). **Depth**: *complete* = protocol-specific',
-    'tests of every request, event and error, all passed and nothing skipped; *partial* = protocol-specific tests, with a point',
-    'skipped headless; *general* = the static code check and the generic bind at every version (X11: the static check and',
-    'the unit tests), no flow of its own yet; *code only* = the static code check alone (not advertised headless: drm-lease',
-    'needs a headset, xwayland_shell is offered to Xwayland only; X11: nothing to run headless).',
+    'tests of every request, event and error, all passed and nothing skipped (pointer, graphics tablet, VR headset and',
+    'Xwayland\'s connection come from the test build `lord-server-test --test-hooks`, never the installed one); *partial* = protocol-specific tests, with',
+    'a point skipped headless; *general* = the static code check and the generic bind at every version (X11: the static',
+    'check and the unit tests), no flow of its own yet; *code only* = the static code check alone (X11: nothing to run headless).',
     '',
     `**Wayland: ${S.protocols} globals, mean ${pct(S.mean)}, ${S.complete} complete.**`,
     '',

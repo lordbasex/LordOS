@@ -758,8 +758,9 @@ build/wl-globals: tests/wl_globals.c
 	$(CC) $(CFLAGS) $(WARN) -std=c11 -o $@ $< -lwayland-client
 # Wayland and Xwayland conformance, point by point, scored 0–100 % per protocol (tools/wl-conformance.mjs, docs/WAYLAND.md,
 # "Conformance"): a headless lord-server, build/wl-conformance-client and build/x11-conformance-client (built by the tool).
-# Needs the theme bundle (npm run build). WLCONF_ARGS=--record writes docs/wayland-conformance.json.
-wl-conformance: build/lord-server build/wl-globals
+# Needs the theme bundle (npm run build). WLCONF_ARGS=--record writes docs/wayland-conformance.json. It runs
+# build/lord-server-test (the test hooks, below), never the installed lord-server.
+wl-conformance: build/lord-server-test build/wl-globals
 	node ../tools/wl-conformance.mjs $(WLCONF_ARGS)
 .PHONY: wl-conformance
 build/fw-rules-test: tests/fw_rules_test.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c $(wildcard src/fw/*.h) src/sec/json.h
@@ -1240,6 +1241,22 @@ build/gen/%.o: build/gen/%.c
 
 build/lord-server: $(OBJ) build/obj/ui/stb.o $(QJS_OBJ) $(WL_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+	@printf '%s\n' $^ > build/lord-server.objs
+
+# The conformance tool's server (tools/wl-conformance.mjs, tools/wl-proof.mjs; docs/WAYLAND.md "Conformance"): the same
+# objects as lord-server, but main.c, wl/wl.c and wl/drmlease.c built again with -DLORD_TEST_HOOKS, plus testhooks.c
+# (src/testhooks.h: --test-hooks, a socket for a synthetic pointer, a fake tablet, a fake VR headset and an Xwayland-like
+# connection). A test tool only: never installed (tools/iso/mkdeb.sh packs build/lord-server, and refuses one that
+# holds the hooks). The installed lord-server has no --test-hooks flag, no socket and none of that code.
+TESTHOOK_SWAP := build/obj/main.o build/obj/wl/wl.o build/obj/wl/drmlease.o
+TESTHOOK_OBJ := build/obj-testhooks/main.o build/obj-testhooks/wl/wl.o build/obj-testhooks/wl/drmlease.o build/obj-testhooks/testhooks.o
+build/obj-testhooks/%.o: src/%.c $(HDR)
+	@mkdir -p $(dir $@)
+	$(CC) $(CPPFLAGS) -DLORD_TEST_HOOKS $(CFLAGS) $(WARN) -std=c11 -c -o $@ $<
+build/obj-testhooks/main.o: build/gen/lord_version.h
+build/lord-server-test: build/lord-server $(TESTHOOK_OBJ)
+	$(CC) $(LDFLAGS) -o $@ $(TESTHOOK_OBJ) $(filter-out $(TESTHOOK_SWAP),$(shell cat build/lord-server.objs)) $(LDLIBS)
+all: build/lord-server-test
 
 SESSIOND_OBJ := build/obj/remote/sessiond.o build/obj/remote/sess.o build/obj/remote/monitor.o build/obj/remote/blackfb.o build/obj/remote/conn.o \
                 build/obj/remote/enc.o build/obj/remote/pages.o build/obj/sec/cgroup.o build/obj/remote/netsup.o build/obj/remote/cgsup.o \

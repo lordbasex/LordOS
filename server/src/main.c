@@ -23,6 +23,9 @@
 #include "lordlog.h"
 #include "keylag.h"
 #include "bench/lbinput.h"
+#ifdef LORD_TEST_HOOKS
+#include "testhooks.h"           /* build/lord-server-test only */
+#endif
 #include "net/net.h"
 #include "disk/disk.h"
 #include "backup/backup.h"
@@ -1495,6 +1498,65 @@ static void tablet_gone(Server *s, const InputDevice *d) {
     if (d->tab && tablet_caps(d->tab)->kind == TAB_KIND_PEN && tablet_leave(d->tab, &f)) tablet_pen(s, d, &f);
 }
 
+#ifdef LORD_TEST_HOOKS
+/* build/lord-server-test only (-DLORD_TEST_HOOKS, testhooks.h; never in the installed lord-server): the conformance tool's fake graphics tablet, a pen and a pad made
+ * with tablet.c's own tablet_new and fed evdev events through tablet_input, as a real device's are. */
+static InputDevice test_tab[2] = { { .fd = -1 }, { .fd = -1 } };
+static int test_tablet(int add) {
+    for (int i = 0; i < 2; i++) {
+        InputDevice *d = &test_tab[i];
+        if (!add) {
+            if (d->tab) { tablet_gone(remote_server, d); tablet_free(d->tab); d->tab = NULL; }
+            continue;
+        }
+        if (d->tab) continue;
+        TabCaps c = { 0 };
+        c.kind = i ? TAB_KIND_PAD : TAB_KIND_PEN;
+        snprintf(c.name, sizeof c.name, "LordOS test tablet %s", i ? "Pad" : "Pen");
+        snprintf(c.phys, sizeof c.phys, "lordos-test-tablet");
+        snprintf(c.path, sizeof c.path, "/dev/input/lordos-test-%s", i ? "pad" : "pen");     /* no such node: a name only */
+        c.bus = BUS_USB;
+        c.vendor = 0x056a;
+        c.product = 0x0001;
+        if (!i) {
+            c.x = (struct input_absinfo){ .minimum = 0, .maximum = 10000, .resolution = 100 };
+            c.y = (struct input_absinfo){ .minimum = 0, .maximum = 10000, .resolution = 100 };
+            c.pressure = (struct input_absinfo){ .minimum = 0, .maximum = 1023 };
+            c.distance = (struct input_absinfo){ .minimum = 0, .maximum = 63 };
+            c.tilt_x = c.tilt_y = (struct input_absinfo){ .minimum = -64, .maximum = 63 };
+            c.rotation = (struct input_absinfo){ .minimum = 0, .maximum = 359 };
+            c.slider = (struct input_absinfo){ .minimum = -100, .maximum = 100 };
+            c.caps = TAB_CAP_PRESSURE | TAB_CAP_DISTANCE | TAB_CAP_TILT | TAB_CAP_ROTATION | TAB_CAP_SLIDER;
+            c.tools = TAB_TOOL_BIT(BTN_TOOL_PEN) | TAB_TOOL_BIT(BTN_TOOL_RUBBER) | TAB_TOOL_BIT(BTN_TOOL_BRUSH) |
+                      TAB_TOOL_BIT(BTN_TOOL_PENCIL) | TAB_TOOL_BIT(BTN_TOOL_AIRBRUSH) | TAB_TOOL_BIT(BTN_TOOL_MOUSE);
+            c.has_touch = 1;
+            c.wheel = 1;                                    /* the mouse tool's wheel (REL_WHEEL) */
+        } else {
+            c.nbuttons = 4;
+            for (int b = 0; b < 4; b++) c.button[b] = (unsigned short)(BTN_0 + b);
+            c.nrings = 1; c.ring_code[0] = ABS_WHEEL; c.ring[0] = (struct input_absinfo){ .minimum = 0, .maximum = 71 };
+            c.nstrips = 1; c.strip_code[0] = ABS_RX; c.strip[0] = (struct input_absinfo){ .minimum = 0, .maximum = 4096 };
+            c.ndials = 1; c.dial_code[0] = REL_WHEEL;
+        }
+        d->tab = tablet_new(&c);
+        if (!d->tab) return -1;
+        tablet_announce(d->tab);
+    }
+    return 0;
+}
+static int test_tablet_event(int pad, unsigned type, unsigned code, int value) {
+    InputDevice *d = &test_tab[pad ? 1 : 0];
+    if (!d->tab) return -1;
+    struct input_event ev = { .type = (unsigned short)type, .code = (unsigned short)code, .value = value };
+    tablet_input(remote_server, d, &ev);
+    return 0;
+}
+static void remote_pointer(int fx, int fy);
+static void remote_button(int button, int down);
+static void remote_wheel(int steps);
+static void test_pointer(int x, int y) { remote_pointer(x, y); }
+#endif
+
 /* pointer-warp-v1 (wl/wl_warp.c): the app in front moves the pointer on its window. No relative motion: a game sees
  * a jump, not a move. */
 static int warp_move(float x, float y) {
@@ -2759,9 +2821,14 @@ const char *lord_composition(void) {
  * apps) get the default SIGPIPE back, as execve resets caught signals. */
 static void on_sigpipe(int sig) { (void)sig; }
 
+#ifdef LORD_TEST_HOOKS
+#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter | --test-hooks]]"
+#else
+#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter]]"
+#endif
 static void usage(const char *argv0) {
     fprintf(stderr, "usage: %s [--theme bundle.js] [--fonts dir] [--shell dir] [--user name] [--card /dev/dri/cardN]\n"
-                    "          [--headless WIDTHxHEIGHT [--greeter]] [--timeout s] [--debug] [--profile]\n", argv0);
+                    "          " USAGE_HEADLESS " [--timeout s] [--debug] [--profile]\n", argv0);
 }
 
 /* SIGINT or SIGTERM that reached a worker thread: to the main loop's signalfd */
@@ -2891,6 +2958,9 @@ int main(int argc, char **argv) {
     const char *shell = "../assets/shell";     /* integración de la terminal con bash */
     const char *user = NULL;
     double timeout_ms = 0;
+#ifdef LORD_TEST_HOOKS
+    int test_hooks = 0;
+#endif
     static Server s;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--timeout") && i + 1 < argc) timeout_ms = atof(argv[++i]) * 1000;
@@ -2908,12 +2978,18 @@ int main(int argc, char **argv) {
             s.H = h & ~1;
         }
         else if (!strcmp(argv[i], "--greeter")) s.greeter = 1;      /* pantalla de ingreso (lord-sessiond) */
+#ifdef LORD_TEST_HOOKS
+        else if (!strcmp(argv[i], "--test-hooks")) test_hooks = 1;  /* the conformance tool's socket (testhooks.h) */
+#endif
         else if (!strcmp(argv[i], "--debug")) s.debug = 1;
         else if (!strcmp(argv[i], "--profile")) paint_profile = 1;
         else { usage(argv[0]); return 2; }
     }
 
     if (s.greeter && !s.headless) { usage(argv[0]); return 2; }
+#ifdef LORD_TEST_HOOKS
+    if (test_hooks && (!s.headless || s.greeter)) { usage(argv[0]); return 2; }   /* never on a monitor or the login screen */
+#endif
     js_sys_set_greeter(s.greeter);
     wl_set_greeter(s.greeter);          /* the login screen never lets an app take the shortcuts */
     if (text_init(fonts)) return 1;
@@ -3039,6 +3115,10 @@ int main(int argc, char **argv) {
                                           share_text, js_share_event, share_no_taps, share_person, share_surface_up, share_key_protected,
                                           share_point_protected, share_restricted, share_displays_of, remote_refresh };
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
+#ifdef LORD_TEST_HOOKS
+    static const TestHooks test_host = { test_pointer, remote_button, remote_wheel, test_tablet, test_tablet_event, wl_test_xwl, drmlease_fake_card };
+    if (ok && test_hooks && testhooks_start(&test_host)) fprintf(stderr, "lord-server: no test hooks socket\n");
+#endif
     char current[sizeof ui.theme_request];
     svgicon_enable();                       /* SVG icons drawn by lord-media (media/svgicon.c); never in app mode */
     char first[sizeof ui.theme_request];
@@ -3295,7 +3375,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[190 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +8 machines, +40 Spawn helpers */
+        struct pollfd pfd[195 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +8 machines, +40 Spawn helpers, +5 test hooks (lord-server-test) */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -3331,6 +3411,10 @@ int main(int argc, char **argv) {
         if (lgbase >= 0) pfd[n++] = (struct pollfd){ logs_fd(), POLLIN, 0 };
         int lbibase = lbi_fd() >= 0 ? n : -1;                    /* LordBench's synthetic pointer, like a device */
         if (lbibase >= 0) pfd[n++] = (struct pollfd){ lbi_fd(), POLLIN, 0 };
+#ifdef LORD_TEST_HOOKS
+        int thbase = n, nth = testhooks_pollfds(pfd + n, 5);     /* build/lord-server-test's --test-hooks only (testhooks.h) */
+        n += nth;
+#endif
         int mbase = n, nm = mirror_pollfds(pfd + n, 12);
         n += nm;
         int shbase = n, nsh = share_pollfds(pfd + n, 8);
@@ -3442,6 +3526,9 @@ int main(int argc, char **argv) {
         if (imbase >= 0 && pfd[imbase].revents) image_async_dispatch();
         if (lgbase >= 0 && pfd[lgbase].revents) logs_dispatch(js_logs_event);
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */
+#ifdef LORD_TEST_HOOKS
+        if (nth) testhooks_dispatch(pfd + thbase, nth);
+#endif
         if (nm) mirror_dispatch(pfd + mbase, nm);
         if (nsh) share_dispatch(pfd + shbase, nsh);
         if (nca) cast_dispatch(pfd + cabase, nca);
@@ -3503,6 +3590,9 @@ int main(int argc, char **argv) {
     input_close(&s.input);
     cast_end_all();
     share_stop();
+#ifdef LORD_TEST_HOOKS
+    testhooks_stop();
+#endif
     mirror_stop();
     gpu_tex_free(s.cursor_tex);
     gpu_shutdown();

@@ -71,6 +71,7 @@ static void sh_get(struct wl_client *c, struct wl_resource *r, uint32_t id, stru
     if (!x) { if (xr) wl_resource_destroy(xr); wl_client_post_no_memory(c); return; }
     x->res = xr;
     x->sid = sid;
+    wlx_surface_role(surface);          /* no xdg_surface, subsurface, cursor or drag icon role after this one */
     x->gone.notify = surface_gone;
     wl_resource_add_destroy_listener(surface, &x->gone);
     wl_list_insert(&surfs, &x->link);

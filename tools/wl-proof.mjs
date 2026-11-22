@@ -56,8 +56,8 @@ const HOOK = `
 
 async function startServer() {
   const theme = path.join(ROOT, 'themes', 'default', 'theme.bundle.js');
-  const bin = path.join(BUILD, 'lord-server');
-  if (!fs.existsSync(bin) || !fs.existsSync(theme)) throw new Error('needs server/build/lord-server and the theme bundle (make -C server; npm run build)');
+  const bin = path.join(BUILD, 'lord-server-test');     // the conformance tool's build (same sources, -DLORD_TEST_HOOKS)
+  if (!fs.existsSync(bin) || !fs.existsSync(theme)) throw new Error('needs server/build/lord-server-test and the theme bundle (make -C server; npm run build)');
   const D = fs.mkdtempSync(path.join(os.tmpdir(), 'lwproof.'));
   fs.chmodSync(D, 0o700);
   const home = path.join(D, 'home');
@@ -127,6 +127,15 @@ const PROOFS = [
     app: 'vkcube (Vulkan)', ver: () => `vkcube ${pkgVersion('vulkan-tools')}, Mesa ${pkgVersion('mesa-vulkan-drivers')}`,
     shows: 'vkcube through the Vulkan WSI: its buffers pass the new zwp_linux_buffer_params_v1 out_of_bounds checks (offset + stride × height inside each dmabuf).',
     want: ['wl_surface#\\d+\\.commit'] },
+  { name: 'wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube', exe: 'vkcube', cmd: ['vkcube', '--wsi', 'wayland', '--c', '2000'], wait: 5000,
+    app: 'vkcube (Vulkan)', ver: () => `vkcube ${pkgVersion('vulkan-tools')}, Mesa ${pkgVersion('mesa-vulkan-drivers')}`,
+    shows: 'vkcube\'s FIFO present mode through Mesa\'s Vulkan WSI on the new protocols: every frame waits on the fifo-v1 barrier the one before set, carries a commit-timing-v1 target time, and explicit-sync acquire and release points (linux-drm-syncobj-v1) on timelines it imported; no protocol error.',
+    want: ['wp_fifo_v1#\\d+\\.set_barrier', 'wp_fifo_v1#\\d+\\.wait_barrier', 'wp_commit_timer_v1#\\d+\\.set_timestamp', 'wp_linux_drm_syncobj_manager_v1#\\d+\\.import_timeline',
+      'wp_linux_drm_syncobj_surface_v1#\\d+\\.set_acquire_point', 'wp_linux_drm_syncobj_surface_v1#\\d+\\.set_release_point'] },
+  { name: 'xdg_system_bell_v1-wp_color_manager_v1-foot', exe: 'foot', cmd: ['foot', '--override=colors.background=302820', 'sh', '-c', 'printf "LordOS: foot rings the bell (BEL)\\n"; sleep 1; printf "\\a"; sleep 30'], wait: 4000,
+    app: 'foot', ver: () => `foot ${pkgVersion('foot')}`,
+    shows: 'foot rang the terminal bell (BEL) through xdg-system-bell-v1 (its default bell.system=yes), on its own surface (LordOS plays its alert sound unless Do Not Disturb is on), and described its surfaces as sRGB through color-management-v1 (a parametric image description set on each). No protocol error.',
+    want: ['xdg_system_bell_v1#\\d+\\.ring', 'wp_color_manager_v1#\\d+\\.create_parametric_creator', 'wp_color_management_surface_v1#\\d+\\.set_image_description'] },
   { name: 'egl-es2gears', exe: 'es2gears_wayland', cmd: ['es2gears_wayland'], wait: 5000,
     app: 'es2gears_wayland (EGL / GLES2)', ver: () => `mesa-utils ${pkgVersion('mesa-utils-bin')}`,
     shows: 'An EGL client: its buffers (dmabuf or shm through Mesa\'s Wayland EGL) and xdg-shell flow pass the new checks.',
@@ -172,7 +181,15 @@ async function main() {
     await S.stop();
     if (!KEEP) fs.rmSync(S.D, { recursive: true, force: true }); else console.log(`kept ${S.D}`);
   }
-  fs.writeFileSync(path.join(OUT, 'proofs.json'), JSON.stringify({ date: new Date().toISOString().slice(0, 10), results }, null, 1) + '\n');
+  // --only: the other programs' results stay as they were recorded
+  let all = results;
+  if (ONLY.length) {
+    try {
+      const old = JSON.parse(fs.readFileSync(path.join(OUT, 'proofs.json'), 'utf8')).results || [];
+      all = PROOFS.map((p) => results.find((r) => r.name === p.name) || old.find((r) => r.name === p.name)).filter(Boolean);
+    } catch {}
+  }
+  fs.writeFileSync(path.join(OUT, 'proofs.json'), JSON.stringify({ date: new Date().toISOString().slice(0, 10), results: all }, null, 1) + '\n');
   process.exitCode = results.some((r) => r.result === 'fail') ? 1 : 0;
 }
 main().catch((e) => { console.error(e.message || e); process.exitCode = 2; });

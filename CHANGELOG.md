@@ -45,6 +45,77 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     catalog (`tests/data/flathub/catalog-2026-11-22.json`, 38 apps, public data only) for the collections, the banner
     and the subcategories, hostile entries (future, fractional, text, negative, NaN, infinite and missing dates, a
     category listed twice, entries that aren't objects) and every new text in every language.
+- **Every Wayland global "complete" in the conformance run: 48 of 48, in development (the latest release is 0.8.9.4;
+  branch `feat/wl-conformance-complete`; `docs/WAYLAND.md` "Conformance", `docs/wayland-conformance.json`).** Complete
+  means tests written for that protocol, all passed, nothing skipped. Before: 29 of 48 (15 checked only by the generic
+  bind, `wl_seat` and KDE's server decoration partial, drm-lease and xwayland-shell checked in the code only). Every
+  score stays 100 %, X11 too (28 items, 23 complete, unchanged).
+  - **Test hooks, in a test build only** (`server/src/testhooks.{c,h}`): compiled only into `build/lord-server-test`
+    (the same sources, `main.c`, `wl/wl.c` and `wl/drmlease.c` with `-DLORD_TEST_HOOKS`; `make -C server
+    build/lord-server-test`, part of `all`). The installed `lord-server` has no `--test-hooks` flag, no socket and none
+    of this code (checked with `strings` and `nm`), and `tools/iso/mkdeb.sh` refuses a `lord-server` that holds it.
+    In the test build, `--headless WxH --test-hooks` (refused on a monitor and on the login screen) opens a socket
+    `$XDG_RUNTIME_DIR/lordos-test-hooks.sock` (0600, SOCK_SEQPACKET, the same user only by SO_PEERCRED, at most 4
+    connections, one short text command per message, answered "ok" or "err") that gives a test session what it has no
+    device for. `ptr X Y`, `btn B 1|0` and `wheel N` use the remote desktop's injection (`remote_pointer`,
+    `remote_button`, `remote_wheel`), so a window really gets `wl_pointer.enter` and button serials; `tablet
+    add|remove`, `pen T C V` and `pad T C V` make a fake graphics tablet (a pen with pen, eraser, brush, pencil, airbrush
+    and mouse tools and every axis; a pad with 4 buttons, a ring, a strip and a dial) with `tablet.c`'s own `tablet_new`
+    and feed it evdev events through `tablet_input`, as a real device's; `xwl` makes a Wayland connection the way
+    lord-server makes Xwayland's (a socketpair, `wl_client_create`, `wl_test_xwl` in `wl.c`) and takes it as Xwayland's
+    while no Xwayland runs, so xwayland-shell-v1 is tested under the very rule that keeps it from every other client;
+    `lease plug|unplug` gives `drmlease.c` a fake card (`drmlease_fake_card`: a desktop display and a non-desktop
+    "LordOS test headset", memfds for `drm_fd` and every `lease_fd`, lessee ids counted, no ioctl), with the real
+    `drmlcore.c` rules, `vr` permission and the theme's prompt. `tools/wl-conformance.mjs` starts its server with it.
+  - **New flows in `server/tests/wl_conformance.c`** (about 160 more checks), each check's hint naming every request,
+    event and error it ran: ext-background-effect-v1 (capabilities, a region reaching the shell and removed, both
+    errors); wl_fixes (`destroy_registry`, the id reused, a wl_fixes named as a registry); fifo-v1 (a commit waiting on
+    the barrier applies a refresh later, 5 of 5; no barrier no wait; both errors); commit-timing-v1 (targets 100, 250 and
+    400 ms ahead never applied early; all four errors); tearing-control-v1 and content-type-v1 (every hint and type,
+    destroyed and made again, their errors); pointer-warp-v1 (a warp with the enter's serial moves the pointer; a stale
+    serial and a point outside are ignored); xdg-system-bell-v1 (ring with and without a surface, the shell told, the
+    rate limit); xdg-toplevel-tag-v1 (before the map and while mapped, a control character taken out, a long tag cut to
+    127 bytes); xdg-toplevel-drag-v1 (a tab torn off with a real press: the window follows, ends at the release; all
+    three errors, `invalid_source` both ways); xdg-session-management-v1 (created, add, rename, restored from a new
+    connection before the first commit, replaced, removed; all seven errors); tablet-v2 (tablet, pad, groups, ring,
+    strip, dial and tools announced; a mouse tool's wheel; a pen's proximity, down, pressure, distance, tilt, rotation,
+    button, up; an airbrush's slider; set_cursor and the `role` error; the pad's enter, mode_switch, buttons, ring,
+    strip and dial with their stops, set_feedback, leave; unplugged); color-management-v1 (every supported event, the
+    output's description and its information, preferred and preferred parametric, parametric descriptions with named
+    and numeric primaries and a power curve, `failed`, set and unset on a window, 14 errors in 18 cases);
+    color-representation-v1 (alpha modes, coefficients, chroma location, all five errors); linux-drm-syncobj-v1 (on a
+    render node's timelines and udmabufs: a frame held until its acquire point, release points, implicit sync after
+    destroy, all eight errors); drm-lease-v1 (the global only while the fake headset is plugged, drm_fd, only the
+    headset offered, the prompt answered "allow once" then "don't allow", withdrawn while leased, finished when
+    unplugged, release, all three errors); xwayland-shell-v1 (hidden from ordinary clients; role and serial, `role`
+    twice and on a subsurface, `invalid_serial`, `already_associated`); KDE's server decoration (request_mode Client,
+    Server and None); `wl_seat`'s pointer role (the pointer now really over the window).
+  - **The tool** (`tools/wl-conformance.mjs`): checks of what the shell got (the bell, the blur rectangles, a window's
+    tag at map and changed, a dragged tab following, the VR prompt keyed by the program lord-server checked); a global
+    not advertised to an ordinary client is complete when its own flow ran it through the test hooks (depth
+    "protocol-specific (test hooks)"); each global's `coverage` in the JSON report (which requests, events and errors a
+    flow named; the static checks still cover them all). Fixed: its XML reader dropped everything between a
+    self-closing `<description/>` and the next `</description>`, so color-management-v1's error enums and
+    `wl_touch.shape` were never scored.
+  - **Bugs found and fixed in lord-server:** a surface given the xwayland_surface role (xwayland-shell-v1) could still get
+    an xdg_surface, a subsurface, a cursor or a drag icon role, and `wlx_surface_free` also took a surface that already
+    had an xdg_surface or a subsurface (`Surf.xwrole`, `wlx_surface_role`); KDE's `request_mode(None)` was answered
+    with Client instead of the same mode; KDE's hand-written tables now carry the names wayland-scanner gives them, so
+    the tool checks them against KDE's XML.
+  - **KDE's `server-decoration.xml` vendored** (`third_party/plasma-wayland-protocols/`, unmodified, LGPL-2.1-or-later
+    with its text; `THIRD_PARTY.md`): only the conformance tool reads it; lord-server keeps its hand-written tables.
+  - **Exceptions the protocols allow**, with their words (`tools/wl-conformance/allow.json`): the ICC creator's five
+    errors and `get_preferred_parametric`'s `unsupported_feature` (ICC is an optional feature lord-server doesn't
+    advertise; every description it makes is parametric), and `wl_touch.shape` ("only sent ... if the touch device
+    supports shape reports"; LordOS doesn't read the touch shape yet).
+  - **Not covered by a flow, said in `docs/WAYLAND.md`:** `image_description_changed` and `preferred_changed` (one fixed
+    headless display), and the information events `tf_power`, `target_max_cll` and `target_max_fall` (the display's
+    description has none of them; a client's own may not be asked). Real hardware is still not tried: the tablet and
+    the headset are simulated, and there is no touchscreen.
+  - **Proof with real programs** (`docs/wayland-proofs/`, `tools/wl-proof.mjs`, which now keeps the other results when
+    run with `--only`): vkcube (Mesa 25.0.7) using fifo-v1, commit-timing-v1 and explicit sync on every frame, and foot
+    1.21 ringing the bell through xdg-system-bell-v1 and describing its surfaces with color-management-v1, no protocol
+    error. `tools/gen-wayland-table.mjs` takes proof names up to 121 characters (named after every global they prove).
 - **Always on top, in every theme, in development (the latest release is 0.8.9.4).** A window can be kept over every
   normal window, and X11 apps' `_NET_WM_STATE_ABOVE`, `_NET_WM_STATE_BELOW` and `_NET_WM_STATE_SKIP_PAGER` are now
   honoured and listed in `_NET_SUPPORTED`: the last X11 conformance point below 100 % (`ewmh.wm_state` 96.2 % → 100 %,

@@ -80,6 +80,8 @@ OUT=${1:?uso: mkdeb.sh salida.deb}
 ROOT=$(pwd)
 VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 [ -x server/build/lord-server ] || { echo "missing server/build/lord-server (make -C server)" >&2; exit 1; }
+# the conformance tool's test hooks live only in build/lord-server-test (-DLORD_TEST_HOOKS): never in a package
+if grep -q -a 'lordos-test-hooks' server/build/lord-server; then echo "server/build/lord-server holds the test hooks (a lord-server-test build?): refusing" >&2; exit 1; fi
 [ -x server/build/lord-netperm ] || { echo "missing server/build/lord-netperm (make -C server; clang for BPF)" >&2; exit 1; }
 # Without clang, make builds lord-netperm with no BPF programs: the firewall then enforces no rule at all, and only
 # Monitor → Firewall says so. 0.8.8.6 to 0.8.9.2 shipped like that. No ALLOW_MISSING for this one.

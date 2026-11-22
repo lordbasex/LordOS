@@ -54,6 +54,9 @@ int  wl_key(int code, int value, const KeyInfo *k);
 void wl_keymap_changed(void);
 int  wl_send_paste(void);               /* synthetic Ctrl+V to the Linux app with the keyboard */
 int  wl_has_key_focus(void);            /* does a Linux app have the keyboard? */
+#ifdef LORD_TEST_HOOKS
+int  wl_test_xwl(void);                /* build/lord-server-test only: a connection taken as Xwayland's (testhooks.h) */
+#endif
 /* Where the input method's candidate window goes: the caret of the Linux app's field that composes
  * (zwp_text_input_v3), on screen. 0 without one. */
 int  wl_text_caret(float *x, float *y, float *w, float *h);

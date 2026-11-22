@@ -44,6 +44,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 #include <sys/random.h>
 #include <limits.h>
 #include <time.h>
@@ -224,6 +225,7 @@ struct Surf {
     int logged_ratio;               /* buffer px per logical px ×100, last logged (docs/DISPLAYS.md) */
     /* an X11 window (Xwayland): its window manager record, and for a menu or tooltip its place */
     XWin *xw;
+    int xwrole;                     /* xwayland-shell-v1 gave it the xwayland_surface role (xwshell.c) */
     int xpop, xx, xy, xmin;
     char app_alt[128];              /* X11: the WM_CLASS instance (the class is app_id) */
     /* wl_surface.set_input_region: without one the whole surface takes input */
@@ -2268,7 +2270,7 @@ static void subc_get(struct wl_client *c, struct wl_resource *r, uint32_t id, st
     /* one wl_subsurface per wl_surface, and not for a surface that has another role (window, menu, cursor, drag icon) or
      * an xdg_surface that may take one: a subsurface that became a menu too was linked twice (kids[] and parent) */
     if (s->sub || s->xdg || s->top || s->popup || s->role == R_TOPLEVEL || s->role == R_POPUP || s->role == R_CURSOR ||
-        s->role == R_DNDICON) {
+        s->role == R_DNDICON || s->xwrole) {
         wl_resource_post_error(r, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE, "the wl_surface already has a role");
         return;
     }
@@ -2624,7 +2626,7 @@ static void ptr_set_cursor(struct wl_client *c, struct wl_resource *r, uint32_t 
     if (!pointer_focus || pointer_focus->client != c) return;
     Surf *s = surface ? wl_resource_get_user_data(surface) : NULL;
     /* a surface with another role (a window, a menu, a subsurface, a drag icon) is the role error (wayland.xml) */
-    if (s && ((s->role != R_NONE && s->role != R_CURSOR) || s->xdg || s->sub)) {
+    if (s && ((s->role != R_NONE && s->role != R_CURSOR) || s->xdg || s->sub || s->xwrole)) {
         wl_resource_post_error(r, WL_POINTER_ERROR_ROLE, "the cursor surface has another role");
         return;
     }
@@ -4142,7 +4144,7 @@ static void wm_get_xdg_surface(struct wl_client *c, struct wl_resource *r, uint3
     Surf *s = wl_resource_get_user_data(surface);
     /* one xdg_surface per wl_surface: a second one would keep pointing at the Surf after it is freed */
     if (!s || s->xdg) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface already has an xdg_surface"); return; }
-    if (s->role == R_SUB || s->role == R_CURSOR || s->role == R_DNDICON) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface has another role"); return; }
+    if (s->role == R_SUB || s->role == R_CURSOR || s->role == R_DNDICON || s->xwrole) { wl_resource_post_error(r, XDG_WM_BASE_ERROR_ROLE, "the wl_surface has another role"); return; }
     /* xdg-shell: not for a surface with a buffer attached or committed (Mutter's invalid_surface_state) */
     if (s->content || (s->p_attached && s->p_buf)) {
         wl_resource_post_error(r, XDG_WM_BASE_ERROR_INVALID_SURFACE_STATE, "the wl_surface already has a buffer");
@@ -4244,7 +4246,8 @@ static void bind_decm(struct wl_client *c, void *data, uint32_t ver, uint32_t id
  * GTK 3 does not speak xdg-decoration: if the compositor announces this protocol with «server» mode by
  * default, windows without their own bar (Firefox with the system title bar, GTK 3 apps
  * without a headerbar) ask for the theme's frame. It is a small protocol: the interface tables are
- * written here by hand (the wayland-scanner ones, without the plasma-wayland-protocols XML). */
+ * written here by hand, so lord-server needs no plasma-wayland-protocols; the conformance tool checks them against KDE's
+ * own XML (third_party/plasma-wayland-protocols/server-decoration.xml, tools/wl-conformance.mjs). */
 enum { KDE_DECO_NONE = 0, KDE_DECO_CLIENT = 1, KDE_DECO_SERVER = 2 };
 static const struct wl_interface kde_deco_interface;
 static const struct wl_interface *kde_types[] = { NULL, &kde_deco_interface, &wl_surface_interface };
@@ -4258,23 +4261,28 @@ static const struct wl_message kde_deco_events[] = { { "mode", "u", kde_types } 
 static const struct wl_interface kde_deco_interface = {
     "org_kde_kwin_server_decoration", 1, 2, kde_deco_requests, 1, kde_deco_events,
 };
-struct kde_deco_impl {
+/* the request tables and event opcodes under the names wayland-scanner would give them */
+struct org_kde_kwin_server_decoration_interface {
     void (*release)(struct wl_client *, struct wl_resource *);
     void (*request_mode)(struct wl_client *, struct wl_resource *, uint32_t);
 };
-struct kde_mgr_impl { void (*create)(struct wl_client *, struct wl_resource *, uint32_t, struct wl_resource *); };
+struct org_kde_kwin_server_decoration_manager_interface { void (*create)(struct wl_client *, struct wl_resource *, uint32_t, struct wl_resource *); };
+#define ORG_KDE_KWIN_SERVER_DECORATION_MANAGER_DEFAULT_MODE 0
+#define ORG_KDE_KWIN_SERVER_DECORATION_MODE 0
 
 static void kde_release(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static void kde_request_mode(struct wl_client *c, struct wl_resource *r, uint32_t mode) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
     int ssd = mode == KDE_DECO_SERVER;
-    wl_resource_post_event(r, 0, ssd ? KDE_DECO_SERVER : KDE_DECO_CLIENT);
+    /* "The server will acknowledge this by another event with the same mode": None (an undecorated surface: no frame
+     * from either side) is echoed as None; an unknown value is taken as Client (the protocol has no error for it) */
+    wl_resource_post_event(r, ORG_KDE_KWIN_SERVER_DECORATION_MODE, ssd || mode == KDE_DECO_NONE ? mode : KDE_DECO_CLIENT);
     if (!s) return;
     s->kde_ssd = ssd;
     if (s->role == R_TOPLEVEL && !s->deco) set_csd(s, !ssd);   /* live too: Firefox's «Title Bar» switch */
 }
-static const struct kde_deco_impl kde_deco_impl = { kde_release, kde_request_mode };
+static const struct org_kde_kwin_server_decoration_interface kde_deco_impl = { kde_release, kde_request_mode };
 static void kde_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (s && s->kde == r) s->kde = NULL;
@@ -4286,15 +4294,15 @@ static void kde_create(struct wl_client *c, struct wl_resource *r, uint32_t id, 
     wl_resource_set_implementation(d, &kde_deco_impl, s, kde_gone);
     if (s && s->kde) wl_resource_set_user_data(s->kde, NULL);   /* no error in this protocol: the old one is detached */
     if (s) s->kde = d;
-    wl_resource_post_event(d, 0, KDE_DECO_SERVER);
+    wl_resource_post_event(d, ORG_KDE_KWIN_SERVER_DECORATION_MODE, KDE_DECO_SERVER);
 }
-static const struct kde_mgr_impl kde_mgr_impl = { kde_create };
+static const struct org_kde_kwin_server_decoration_manager_interface kde_mgr_impl = { kde_create };
 static void bind_kde_deco(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
     (void)data;
     struct wl_resource *r = wl_resource_create(c, &kde_mgr_interface, (int)ver, id);
     if (!r) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(r, &kde_mgr_impl, NULL, NULL);
-    wl_resource_post_event(r, 0, KDE_DECO_SERVER);
+    wl_resource_post_event(r, ORG_KDE_KWIN_SERVER_DECORATION_MANAGER_DEFAULT_MODE, KDE_DECO_SERVER);
 }
 
 /* ---- commit by role ---- */
@@ -5736,7 +5744,7 @@ static void dev_drag(struct wl_client *c, struct wl_resource *r, struct wl_resou
                      struct wl_resource *icon_res, uint32_t serial) {
     Source *src = src_res ? wl_resource_get_user_data(src_res) : NULL;
     Surf *o = wl_resource_get_user_data(origin_res), *icon = icon_res ? wl_resource_get_user_data(icon_res) : NULL;
-    if (icon && icon->role != R_NONE && icon->role != R_DNDICON) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_ROLE, "the icon has another role"); return; }
+    if (icon && ((icon->role != R_NONE && icon->role != R_DNDICON) || icon->xwrole)) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_ROLE, "the icon has another role"); return; }
     if (src && src->used) { wl_resource_post_error(r, WL_DATA_DEVICE_ERROR_USED_SOURCE, "the source was already used"); return; }
     if (src) src->used = 2;
     /* the press it names: this client's, current (a button still down), on the window that got it; the serial is
@@ -7643,7 +7651,7 @@ void wl__tool_press(struct wl_resource *surface, float x, float y, int down, uin
 /* The cursor a tablet tool asked for over its app (zwp_tablet_tool_v2.set_cursor): as wl_pointer.set_cursor. */
 int wl__tool_cursor(struct wl_resource *surface, int32_t x, int32_t y) {
     Surf *s = surf_of(surface);
-    if (s && ((s->role != R_NONE && s->role != R_CURSOR) || s->xdg || s->sub)) return -1;
+    if (s && ((s->role != R_NONE && s->role != R_CURSOR) || s->xdg || s->sub || s->xwrole)) return -1;
     if (s) { s->role = R_CURSOR; s->cursor_hx = s->p_hx = x; s->cursor_hy = s->p_hy = y; }
     cursor_surf = s;
     cursor_mode = s ? 1 : 2;
@@ -7657,6 +7665,26 @@ void wl__pointer_leave(void) { if (dpy) pointer_enter(NULL, 0, 0); }
 
 struct wl_client *wlx_client(void) { return xwl_client; }
 void wlx_set_client(struct wl_client *c) { xwl_client = c; }
+
+#ifdef LORD_TEST_HOOKS
+/* build/lord-server-test only (-DLORD_TEST_HOOKS; testhooks.h, "xwl"), never in the installed lord-server: a connection lord-server makes itself, as it makes
+ * Xwayland's (xwayland.c), taken as Xwayland's while no Xwayland runs, so the conformance tool can speak
+ * xwayland-shell-v1 under the same rule. It stops being Xwayland's when it goes away or a real Xwayland starts. */
+static void test_xwl_gone(struct wl_listener *l, void *data) {
+    (void)l;
+    if (xwl_client == data) xwl_client = NULL;
+}
+static struct wl_listener test_xwl_l = { .notify = test_xwl_gone };
+int wl_test_xwl(void) {
+    int sv[2];
+    if (!dpy || xwl_client || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv)) return -1;
+    struct wl_client *c = wl_client_create(dpy, sv[0]);
+    if (!c) { close(sv[0]); close(sv[1]); return -1; }
+    xwl_client = c;
+    wl_client_add_destroy_listener(c, &test_xwl_l);
+    return sv[1];
+}
+#endif
 
 int wlx_begin_scale(int self) {
     int pct[OUT_MAX], n = 0;
@@ -7683,7 +7711,12 @@ int wlx_attach_id(int sid, XWin *w, const XWinInfo *in) {
 int wlx_surface_free(struct wl_resource *surface) {
     if (!surface || !wl_resource_instance_of(surface, &wl_surface_interface, &surface_impl)) return 0;
     Surf *s = wl_resource_get_user_data(surface);
-    return s && xwl_client && s->client == xwl_client && s->role == R_NONE && !s->xw;
+    return s && xwl_client && s->client == xwl_client && s->role == R_NONE && !s->xw && !s->xdg && !s->sub && !s->xwrole;
+}
+/* ... and from now on it has that role: no other role may be given to it (wayland.xml, wl_surface) */
+void wlx_surface_role(struct wl_resource *surface) {
+    Surf *s = surface && wl_resource_instance_of(surface, &wl_surface_interface, &surface_impl) ? wl_resource_get_user_data(surface) : NULL;
+    if (s) s->xwrole = 1;
 }
 static int xattach(Surf *s, XWin *w, const XWinInfo *in) {
     if (!s || s->role != R_NONE || s->xw) return 0;

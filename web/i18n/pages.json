@@ -369,10 +369,10 @@
           "code": "Code only"
         },
         "depthText": {
-          "complete": "Tests written for this protocol cover every request, event and error, and all of them passed with nothing skipped.",
+          "complete": "Tests written for this protocol cover every request, event and error, and all of them passed with nothing skipped. What a test session has no device for (a pointer over a window, a graphics tablet, a VR headset, Xwayland's own connection) is given by the test server itself, never by real hardware.",
           "partial": "Tests written for this protocol, but one point was skipped because it needs something a test without a screen doesn't have, such as a pointer over a window.",
           "general": "The source code was checked (every request handled, every event sent, every error raised) and a generic test bound the interface at every version; it has no flow of its own in the tool yet. For X11, the code check and unit tests.",
-          "code": "Only the source code was checked: the interface can't be used without real hardware or a particular client (DRM leases need a VR headset; xwayland_shell is offered to Xwayland only), or the X11 item has nothing to run without a screen."
+          "code": "Only the source code was checked: the item has nothing to run without a screen (X11)."
         },
         "barText": "The bar shows the score in tenths, as the tool prints it in a terminal.",
         "hItem": "X11 item",
@@ -380,7 +380,7 @@
         "x11Lead": "What LordOS's X11 window manager does for apps that still use X11: the ICCCM and EWMH conventions, Motif decoration hints, XDND drag and drop, the clipboard and primary selection, HiDPI scaling, the cursor and the isolation of Xwayland. The names are the standards' own, in English.",
         "proofsTitle": "Proof with real programs",
         "proofsLead": "Screenshots of real programs on a lord-server started for the test, taken the same day: {wayland} with Wayland apps (terminals, GTK and Qt, Vulkan, OpenGL and Chromium) and {x11} with X11 apps. The Wayland ones were checked in each program's protocol log, with no protocol error; the X11 ones show what xprop and xwininfo read from the windows.",
-        "limits": "Not checked here: Firefox and other programs that weren't installed on the test machine, and what needs hardware (a graphics tablet's wheel, a touchscreen, a VR headset). The descriptions of the screenshots are in English, like the tool's report.",
+        "limits": "Not checked here: Firefox and other programs that weren't installed on the test machine, and real hardware: the graphics tablet and the VR headset in these tests are simulated by the test server (the protocol and LordOS's own handling are real, the device isn't), and there is no touchscreen. The descriptions of the screenshots are in English, like the tool's report.",
         "docsLink": "How the score is made (docs/WAYLAND.md)",
         "jsonLink": "Every check and its result (JSON)"
       }
@@ -756,10 +756,10 @@
           "code": "Solo código"
         },
         "depthText": {
-          "complete": "Pruebas escritas para este protocolo cubren cada pedido, evento y error, y todas pasaron sin omitir nada.",
+          "complete": "Pruebas escritas para este protocolo cubren cada pedido, evento y error, y todas pasaron sin omitir nada. Lo que una sesión de prueba no tiene (un puntero sobre una ventana, una tableta gráfica, un visor de realidad virtual, la conexión propia de Xwayland) lo da el mismo servidor de prueba, nunca hardware real.",
           "partial": "Pruebas escritas para este protocolo, pero se omitió un punto porque necesita algo que una prueba sin pantalla no tiene, como un puntero sobre una ventana.",
           "general": "Se revisó el código fuente (cada pedido manejado, cada evento enviado, cada error señalado) y una prueba genérica enlazó la interfaz en cada versión; todavía no tiene un flujo propio en la herramienta. En X11, la revisión del código y pruebas unitarias.",
-          "code": "Solo se revisó el código fuente: la interfaz no se puede usar sin hardware real o un cliente en particular (los arrendamientos DRM necesitan un visor de realidad virtual; xwayland_shell se ofrece solo a Xwayland), o el ítem de X11 no tiene nada que ejecutar sin pantalla."
+          "code": "Solo se revisó el código fuente: el ítem no tiene nada que ejecutar sin pantalla (X11)."
         },
         "barText": "La barra muestra el puntaje en décimos, como lo imprime la herramienta en una terminal.",
         "hItem": "Ítem de X11",
@@ -767,7 +767,7 @@
         "x11Lead": "Lo que hace el gestor de ventanas X11 de LordOS para las apps que todavía usan X11: las convenciones ICCCM y EWMH, las indicaciones de decoración de Motif, arrastrar y soltar XDND, el portapapeles y la selección primaria, el escalado HiDPI, el cursor y el aislamiento de Xwayland. Los nombres son los de los propios estándares, en inglés.",
         "proofsTitle": "Prueba con programas reales",
         "proofsLead": "Capturas de programas reales en un lord-server iniciado para la prueba, tomadas el mismo día: {wayland} con apps Wayland (terminales, GTK y Qt, Vulkan, OpenGL y Chromium) y {x11} con apps X11. Las de Wayland se comprobaron en el registro de protocolo de cada programa, sin ningún error de protocolo; las de X11 muestran lo que xprop y xwininfo leen de las ventanas.",
-        "limits": "No se comprobó acá: Firefox y otros programas que no estaban instalados en la máquina de prueba, y lo que necesita hardware (la rueda de una tableta gráfica, una pantalla táctil, un visor de realidad virtual). Las descripciones de las capturas están en inglés, como el informe de la herramienta.",
+        "limits": "No se comprobó acá: Firefox y otros programas que no estaban instalados en la máquina de prueba, y hardware real: la tableta gráfica y el visor de realidad virtual de estas pruebas los simula el servidor de prueba (el protocolo y lo que hace LordOS son reales, el dispositivo no), y no hay pantalla táctil. Las descripciones de las capturas están en inglés, como el informe de la herramienta.",
         "docsLink": "Cómo se calcula el puntaje (docs/WAYLAND.md)",
         "jsonLink": "Cada comprobación y su resultado (JSON)"
       }
@@ -1143,10 +1143,10 @@
           "code": "Só código"
         },
         "depthText": {
-          "complete": "Testes escritos para este protocolo cobrem cada requisição, evento e erro, e todos passaram sem pular nada.",
+          "complete": "Testes escritos para este protocolo cobrem cada requisição, evento e erro, e todos passaram sem pular nada. O que uma sessão de teste não tem (um ponteiro sobre uma janela, uma mesa digitalizadora, um óculos de realidade virtual, a conexão própria do Xwayland) é dado pelo próprio servidor de teste, nunca por hardware real.",
           "partial": "Testes escritos para este protocolo, mas um ponto foi pulado porque precisa de algo que um teste sem tela não tem, como um ponteiro sobre uma janela.",
           "general": "O código-fonte foi verificado (cada requisição tratada, cada evento enviado, cada erro sinalizado) e um teste genérico vinculou a interface em cada versão; ainda não tem um fluxo próprio na ferramenta. No X11, a verificação do código e testes unitários.",
-          "code": "Só o código-fonte foi verificado: a interface não pode ser usada sem hardware real ou um cliente específico (os arrendamentos DRM precisam de um óculos de realidade virtual; xwayland_shell é oferecido só ao Xwayland), ou o item do X11 não tem nada para executar sem tela."
+          "code": "Só o código-fonte foi verificado: o item não tem nada para executar sem tela (X11)."
         },
         "barText": "A barra mostra a pontuação em décimos, como a ferramenta a imprime num terminal.",
         "hItem": "Item do X11",
@@ -1154,7 +1154,7 @@
         "x11Lead": "O que o gerenciador de janelas X11 do LordOS faz pelos apps que ainda usam X11: as convenções ICCCM e EWMH, as dicas de decoração do Motif, arrastar e soltar XDND, a área de transferência e a seleção primária, a escala HiDPI, o cursor e o isolamento do Xwayland. Os nomes são os dos próprios padrões, em inglês.",
         "proofsTitle": "Prova com programas reais",
         "proofsLead": "Capturas de programas reais num lord-server iniciado para o teste, tiradas no mesmo dia: {wayland} com apps Wayland (terminais, GTK e Qt, Vulkan, OpenGL e Chromium) e {x11} com apps X11. As do Wayland foram verificadas no registro de protocolo de cada programa, sem nenhum erro de protocolo; as do X11 mostram o que o xprop e o xwininfo leem das janelas.",
-        "limits": "Não verificado aqui: o Firefox e outros programas que não estavam instalados na máquina de teste, e o que precisa de hardware (a roda de uma mesa digitalizadora, uma tela sensível ao toque, um óculos de realidade virtual). As descrições das capturas estão em inglês, como o relatório da ferramenta.",
+        "limits": "Não verificado aqui: o Firefox e outros programas que não estavam instalados na máquina de teste, e hardware real: a mesa digitalizadora e o óculos de realidade virtual destes testes são simulados pelo servidor de teste (o protocolo e o que o LordOS faz são reais, o dispositivo não), e não há tela sensível ao toque. As descrições das capturas estão em inglês, como o relatório da ferramenta.",
         "docsLink": "Como a pontuação é calculada (docs/WAYLAND.md)",
         "jsonLink": "Cada verificação e seu resultado (JSON)"
       }

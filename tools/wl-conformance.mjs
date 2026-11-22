@@ -58,7 +58,9 @@ const log = (...a) => { if (OPTS.verbose) console.error(...a); };
 
 // ---------------------------------------------------------------- protocol XML
 function parseXml(text, file) {
-  text = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<description[\s\S]*?<\/description>/g, '').replace(/<description[^>]*\/>/g, '');
+  // a self-closing <description summary="…"/> goes first: the lazy match of a full one would otherwise run from it to the
+  // next </description> and swallow the requests, events and error entries between them (color-management-v1 has 7)
+  text = text.replace(/<!--[\s\S]*?-->/g, '').replace(/<description[^>]*\/>/g, '').replace(/<description[\s\S]*?<\/description>/g, '');
   const attrs = (s) => { const o = {}; for (const m of s.matchAll(/([\w-]+)="([^"]*)"/g)) o[m[1]] = m[2]; return o; };
   const proto = { name: '', file, interfaces: [] };
   let iface = null, msg = null, en = null;
@@ -328,11 +330,12 @@ const THEME_HOOK = `
 ;(() => {
   const orig = globalThis.__lordWayland;
   const titles = {};
+  let leaseAsks = 0;
   globalThis.__lordWayland = (id, type, d) => {
     try {
       if (type === 'map' || type === 'title') titles[id] = d && d.title;
       const t = titles[id] || '';
-      if (String(t).startsWith('wlconf') || type === 'map' || type === 'unmap' || type === 'title') {
+      if ((String(t).startsWith('wlconf') || type === 'map' || type === 'unmap' || type === 'title') && type !== 'bell') {
         let j = ''; try { j = JSON.stringify(d); } catch (e) { j = '?'; }
         console.log('WLCONF ' + JSON.stringify({ id: String(id), type, title: t, d: j.length > 600 ? j.slice(0, 600) : j }));
       }
@@ -341,6 +344,20 @@ const THEME_HOOK = `
       // dialog: an open prompt holds the keyboard and later checks need it
       if (type === 'idlenotify') { setTimeout(() => { try { lord.wayland.idleAnswer(d.app, true); } catch (e) {} }, 100); return undefined; }
       if (type === 'shortcuts') { setTimeout(() => { try { lord.wayland.shortcutsAnswer(d.app, true); } catch (e) {} }, 100); return undefined; }
+      // drm-lease-v1's "vr" prompt (the test hooks' fake headset): the first is answered "allow once", the next ones
+      // "don't allow" (saved, so a later request is refused with no prompt)
+      if (type === 'drmlease') {
+        leaseAsks++;
+        const how = leaseAsks === 1 ? 'once' : 'deny';
+        console.log('WLCONF ' + JSON.stringify({ id: '0', type: 'leasePrompt', title: '', d: JSON.stringify({ app: d && d.app, headset: d && d.headset, answer: how }) }));
+        setTimeout(() => { try { lord.wayland.leaseAnswer(d.app, how); } catch (e) {} }, 100);
+        return undefined;
+      }
+      if (type === 'bell') console.log('WLCONF ' + JSON.stringify({ id: String(id), type, title: titles[id] || '', d: '{}' }));
+      // xdg-toplevel-tag: what the shell reads with the window when it maps
+      if (type === 'map' && String(d && d.title).startsWith('wlconf')) {
+        try { const tg = lord.wayland.tag(id); if (tg) console.log('WLCONF ' + JSON.stringify({ id: String(id), type: 'tagAtMap', title: d.title, d: JSON.stringify(tg) })); } catch (e) {}
+      }
     } catch (e) {}
     return orig(id, type, d);
   };
@@ -349,8 +366,9 @@ const THEME_HOOK = `
 
 async function startServer() {
   const theme = path.join(ROOT, 'themes', 'default', 'theme.bundle.js');
-  const bin = path.join(BUILD, 'lord-server');
-  if (!fs.existsSync(bin) || !fs.existsSync(theme)) throw new Error(`needs ${path.relative(ROOT, bin)} and ${path.relative(ROOT, theme)} (make -C server; npm run build)`);
+  // the test build (same sources, -DLORD_TEST_HOOKS): the installed lord-server has no --test-hooks
+  const bin = path.join(BUILD, 'lord-server-test');
+  if (!fs.existsSync(bin) || !fs.existsSync(theme)) throw new Error(`needs ${path.relative(ROOT, bin)} and ${path.relative(ROOT, theme)} (make -C server build/lord-server-test; npm run build)`);
   const D = fs.mkdtempSync(path.join(os.tmpdir(), 'lwconf.'));
   fs.chmodSync(D, 0o700);
   fs.mkdirSync(path.join(D, 'home', '.config', 'lordos'), { recursive: true });
@@ -360,7 +378,8 @@ async function startServer() {
   for (const k of ['WAYLAND_DISPLAY', 'WAYLAND_SOCKET', 'DISPLAY', 'XAUTHORITY', 'LORD_SESSIOND', 'LORDOS_SESSIOND', 'DBUS_SESSION_BUS_ADDRESS']) delete env[k];
   const out = fs.openSync(path.join(D, 'server.log'), 'w');
   // --user: the session's services, among them the X socket (Xwayland starts on the first X11 connection)
-  const P = spawn(bin, ['--headless', '1280x800', '--theme', path.join(D, 'theme.js'), '--timeout', '900', '--user', os.userInfo().username],
+  // --test-hooks (build/lord-server-test only): the pointer, a graphics tablet, a VR headset and an Xwayland-like connection (src/testhooks.h)
+  const P = spawn(bin, ['--headless', '1280x800', '--theme', path.join(D, 'theme.js'), '--timeout', '900', '--user', os.userInfo().username, '--test-hooks'],
     { cwd: SERVER, env, stdio: ['ignore', out, out], detached: true });
   let sock = '';
   for (let i = 0; i < 120 && !sock; i++) { await sleep(250); sock = fs.readdirSync(D).find((n) => /^wayland-\d+$/.test(n)) || ''; }
@@ -389,6 +408,41 @@ function themeEvents(S) {
   return out;
 }
 
+// What the theme got from the flows' windows (the THEME_HOOK's log): the protocols whose effect is on the shell's side.
+// Each becomes a flow check of the global it is about (hint: the request that made it).
+function themeFlowChecks(ev) {
+  const out = [];
+  const add = (item, id, ok, hint, msg) => out.push({ item, id, result: ok ? 'pass' : 'fail', hint, msg, kind: 'flow' });
+  const of = (type, title) => ev.filter((e) => e.type === type && (title === undefined || e.title === title));
+  const bell = of('bell', 'wlconf-bell');
+  add('xdg_system_bell_v1', 'bell.reaches_theme', bell.length >= 1, 'xdg_system_bell_v1.ring', `the shell was told "bell" on the ringing window ${bell.length} time(s)`);
+  add('xdg_system_bell_v1', 'bell.rate_limited', bell.length >= 1 && bell.length <= 6, 'xdg_system_bell_v1.ring', `31 rings on the window in a second reach the shell ${bell.length} time(s), not 31 (bellgate.h)`);
+  const blur = of('blur', 'wlconf-blur').map((e) => e.d && e.d.rects);
+  const two = blur.some((r) => Array.isArray(r) && r.length === 2);
+  add('ext_background_effect_manager_v1', 'blur.reaches_theme', two, 'ext_background_effect_surface_v1.set_blur_region', `the shell got the two rectangles to blur behind the window (${JSON.stringify(blur)})`);
+  const last = blur[blur.length - 1];
+  add('ext_background_effect_manager_v1', 'blur.removed_reaches_theme', two && Array.isArray(last) && last.length === 0, 'ext_background_effect_surface_v1.set_blur_region',
+    `a null region, then the object destroyed: the shell's last rectangles are none (${JSON.stringify(last)})`);
+  const tm = of('tagAtMap', 'wlconf-tag')[0];
+  add('xdg_toplevel_tag_manager_v1', 'tag.at_map', !!tm && tm.d.tag === 'conformance window' && tm.d.description === 'Conformance window', 'xdg_toplevel_tag_manager_v1.set_toplevel_tag',
+    `set before the first frame, the shell reads them with the window: ${tm ? JSON.stringify(tm.d) : 'nothing'}`);
+  const tg = of('tag', 'wlconf-tag').map((e) => e.d);
+  const changed = tg.filter((d) => d && d.tag === 'conformance window, changed').pop();
+  add('xdg_toplevel_tag_manager_v1', 'tag.change_reaches_theme', !!changed && !/[\u0000-\u001f]/.test(changed.description || '') && /^Ventana ñ/.test(changed.description || ''),
+    'xdg_toplevel_tag_manager_v1.set_toplevel_description', `changed while mapped: a "tag" event, the control character out (${changed ? JSON.stringify(changed) : 'none'})`);
+  const long = tg.find((d) => d && /^x+$/.test(d.tag || ''));
+  add('xdg_toplevel_tag_manager_v1', 'tag.cut', !!long && long.tag.length === 127, 'xdg_toplevel_tag_manager_v1.set_toplevel_tag', `a 399-byte tag reaches the shell cut to ${long ? long.tag.length : '?'} bytes (127)`);
+  const td = of('tldrag', 'wlconf-tldrag').map((e) => e.d);
+  const on = td.find((d) => d && d.on === true);
+  add('xdg_toplevel_drag_manager_v1', 'tldrag.reaches_theme', !!on && on.ox === 20 && on.oy === 10, 'xdg_toplevel_drag_v1.attach',
+    `the attached window follows the pointer: the shell was told ${on ? JSON.stringify(on) : 'nothing'} (offset 20, 10)`);
+  add('xdg_toplevel_drag_manager_v1', 'tldrag.ends_reaches_theme', td.some((d) => d && d.on === false), 'xdg_toplevel_drag_v1.attach', `when the drag ends the shell is told it no longer follows (${JSON.stringify(td)})`);
+  const lp = ev.filter((e) => e.type === 'leasePrompt').map((e) => e.d);
+  add('wp_drm_lease_device_v1', 'lease.prompt', lp.length === 2 && lp.every((d) => /^program:\//.test(d.app || '') && /LordOS test headset/.test(d.headset || '')), 'wp_drm_lease_request_v1.submit',
+    `the system's "vr" prompt, keyed by the program lord-server checked, naming the headset: ${lp.length} prompt(s) (${lp.map((d) => `${d.answer}: ${d.headset}`).join('; ')}); none after "don't allow" was saved`);
+  return out;
+}
+
 // ---------------------------------------------------------------- building the test clients
 function sh(cmd, args, o = {}) { return spawnSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 << 20, ...o }); }
 
@@ -399,7 +453,9 @@ function buildWlClient(P, wantedIfaces) {
     'xdg-output-unstable-v1', 'primary-selection-unstable-v1', 'xdg-foreign-unstable-v2', 'xdg-dialog-v1', 'xdg-toplevel-icon-v1', 'ext-idle-notify-v1',
     'single-pixel-buffer-v1', 'alpha-modifier-v1', 'relative-pointer-unstable-v1', 'pointer-constraints-unstable-v1', 'cursor-shape-v1',
     'idle-inhibit-unstable-v1', 'keyboard-shortcuts-inhibit-unstable-v1', 'xdg-activation-v1', 'pointer-gestures-unstable-v1', 'text-input-unstable-v3',
-    'security-context-v1'];
+    'security-context-v1', 'wl-fixes', 'ext-background-effect-v1', 'fifo-v1', 'commit-timing-v1', 'tearing-control-v1', 'content-type-v1',
+    'pointer-warp-v1', 'xdg-system-bell-v1', 'xdg-toplevel-drag-v1', 'xdg-toplevel-tag-v1', 'xdg-session-management-v1', 'tablet-v2', 'color-management-v1',
+    'color-representation-v1', 'linux-drm-syncobj-v1', 'drm-lease-v1', 'xwayland-shell-v1', 'server-decoration'];
   const chosen = new Map();                         // base → proto (the best ranked copy of each file name)
   const pick = (p) => { if (p && p.name !== 'wayland' && !chosen.has(p.base)) chosen.set(p.base, p); };
   for (const b of flowBases) pick(P.protos.find((p) => p.base === b));
@@ -615,9 +671,29 @@ function score(checks) {
   return { score: tot ? Math.floor((got / tot) * 1000) / 10 : 0, points: got, total: tot, skipped: skips };
 }
 
+// Which of the requests, events and errors of the interfaces reachable from a global a protocol-specific flow check
+// names in its hint (comma-separated: "wp_fifo_v1.set_barrier,wp_fifo_v1.wait_barrier"). Allowed exceptions don't count.
+// Reported beside the score: the static checks cover every message; this says which ones a flow also exercised.
+function coverage(P, allow, ifaces, version, checks) {
+  const named = new Set();
+  for (const c of checks) if (c.kind === 'flow' && (c.result === 'pass' || c.result === 'allowed')) for (const h of String(c.what || '').split(',')) named.add(h.trim());
+  const want = [];
+  for (const name of ifaces) {
+    const I = P.byIface.get(name);
+    if (!I || LIBWAYLAND.has(name)) continue;
+    const ver = Math.min(version || 1, I.version);
+    for (const r of I.requests) if (r.since <= ver && !allow.requests?.[`${name}.${r.name}`]) want.push(`${name}.${r.name}`);
+    for (const e of I.events) if (e.since <= ver && !allow.events?.[`${name}.${e.name}`]) want.push(`${name}.${e.name}`);
+    for (const en of I.enums.find((x) => x.name === 'error')?.entries || []) if (en.since <= ver && !allow.errors?.[`${name}.error.${en.name}`]) want.push(`${name}.error.${en.name}`);
+  }
+  const missing = want.filter((m) => !named.has(m));
+  return { covered: want.length - missing.length, total: want.length, missing };
+}
+
 function hintWhere(hint, src) {
   // "xdg_surface.error.unconfigured_buffer" → where it's raised; "wl_surface.set_buffer_scale" → its handler
   if (!hint || hint === '-') return null;
+  hint = hint.split(',')[0];
   const e = hint.match(/^(\w+)\.error\.(\w+)$/);
   if (e) return src.find(new RegExp(`\\b${up(e[1])}_ERROR_${up(e[2])}\\b`));
   const r = hint.match(/^(\w+)\.(\w+)$/);
@@ -673,6 +749,8 @@ async function main() {
     const fl = runClient(built.bin, ['flows', ...(OPTS.only || [])], S.env, 600000);
     if (fl.signal || (fl.status !== 0 && fl.status !== null)) notes.push(`wl-conformance-client flows ended with ${fl.signal || fl.status}`);
     dynamic.push(...parseChecks(fl.out).map((c) => ({ ...c, kind: 'flow' })));
+    await sleep(500);
+    dynamic.push(...themeFlowChecks(themeEvents(S)));
     // the close request from the theme (xdg_toplevel.close): checked in the X11 run for X; for Wayland via the hook
     if (!S.alive()) notes.push('lord-server died during the dynamic checks');
   }
@@ -699,11 +777,14 @@ async function main() {
     }
     const s = score(checks);
     const hasFlow = checks.some((c) => c.kind === 'flow' && c.result !== 'skip');
-    const complete = s.score === 100 && !s.skipped && !!I && hasFlow && g.advertised !== false;
+    // a global a normal client never sees (drm-lease without a headset, xwayland-shell for Xwayland only) counts as
+    // complete when its own flow ran it, through lord-server's --test-hooks (a fake headset, an Xwayland-like connection)
+    const complete = s.score === 100 && !s.skipped && !!I && hasFlow;
     items.push({
       global: g.iface, protocol: I ? I.protocol.name : null, xml: I ? path.relative(ROOT, I.protocol.file).startsWith('..') ? I.protocol.file : path.relative(ROOT, I.protocol.file) : null,
       version: g.version ?? null, advertised: g.advertised ?? null, libwayland: g.libwayland || undefined, where: g.where, note: g.note,
-      interfaces: ifaces, ...s, complete, depth: hasFlow ? 'protocol-specific' : (checks.some((c) => c.kind === 'generic') ? 'generic only' : 'static only'),
+      interfaces: ifaces, ...s, complete, depth: hasFlow ? (g.advertised === false ? 'protocol-specific (test hooks)' : 'protocol-specific') : (checks.some((c) => c.kind === 'generic') ? 'generic only' : 'static only'),
+      coverage: coverage(P, allow, ifaces, g.version, checks),
       checks,
     });
   }
