@@ -55,5 +55,9 @@
   "who.flatpak": "Aplicația Flatpak {id}",
   "who.program": "Programul {path}",
   "perm.shortcuts": "Scurtături de tastatură",
-  "permHint.shortcuts": "Aplicațiile care pot prelua ❖, ⌥Tab și celelalte scurtături ale desktopului cât timp sunt în față, cum ar fi mașinile virtuale, desktopurile la distanță și jocurile. ❖Esc le redă întotdeauna; blocarea ecranului și tastele media rămân ale sistemului."
+  "permHint.shortcuts": "Aplicațiile care pot prelua ❖, ⌥Tab și celelalte scurtături ale desktopului cât timp sunt în față, cum ar fi mașinile virtuale, desktopurile la distanță și jocurile. ❖Esc le redă întotdeauna; blocarea ecranului și tastele media rămân ale sistemului.",
+  "ask.idle": "„{app}” vrea să știe când nu ești la calculator",
+  "ask.idleNote": "Este anunțată când nu mai folosești tastatura și mouse-ul o vreme și când revii; nimic altceva. Poți schimba asta mai târziu în Setări → Confidențialitate.",
+  "perm.idle": "Absența de la calculator",
+  "permHint.idle": "Aplicații anunțate când nu mai folosești calculatorul o vreme și când revii, precum aplicațiile de chat care te arată absent. Nu află nimic altceva; un videoclip sau o prezentare care ține ecranul aprins contează ca prezență."
 }

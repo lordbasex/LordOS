@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak-app {id}",
   "who.program": "Programma {path}",
   "perm.shortcuts": "Sneltoetsen",
-  "permHint.shortcuts": "Apps die ❖, ⌥Tab en de andere sneltoetsen van het bureaublad mogen overnemen zolang ze vooraan staan, zoals virtuele machines, externe bureaubladen en games. ❖Esc geeft ze altijd terug; het scherm vergrendelen en de mediatoetsen blijven van het systeem."
+  "permHint.shortcuts": "Apps die ❖, ⌥Tab en de andere sneltoetsen van het bureaublad mogen overnemen zolang ze vooraan staan, zoals virtuele machines, externe bureaubladen en games. ❖Esc geeft ze altijd terug; het scherm vergrendelen en de mediatoetsen blijven van het systeem.",
+  "ask.idle": "“{app}” wil weten wanneer je niet achter de computer zit",
+  "ask.idleNote": "Het hoort het wanneer je het toetsenbord en de muis een tijdje niet gebruikt en wanneer je terug bent; verder niets. Je kunt dit later wijzigen in Instellingen → Privacy.",
+  "perm.idle": "Afwezig van de computer",
+  "permHint.idle": "Apps die horen wanneer je de computer een tijdje niet gebruikt en wanneer je terugkomt, zoals chatapps die je als afwezig tonen. Verder horen ze niets; een video of presentatie die het scherm aan houdt, telt als aanwezig."
 }

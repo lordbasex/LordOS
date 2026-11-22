@@ -25,6 +25,7 @@ typedef enum {
     PERM_APPS,          /* launch other apps */
     PERM_STATUS,        /* an item by the clock (sec/statusitem.c) */
     PERM_SHORTCUTS,     /* take ❖ and ⌥Tab while in front: a Linux app or a LordOS window, never a manifest's (wl/kbinhibit.h) */
+    PERM_IDLE,          /* be told the person is away (ext-idle-notify): asked by lord-server only, never a manifest's (wl/idlenotify.h) */
     PERM_COUNT,
 } Perm;
 

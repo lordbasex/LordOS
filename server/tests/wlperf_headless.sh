@@ -6,6 +6,8 @@
 #   frames     a client drawing on its frame callbacks gets about the display's rate (50–75 a second here)
 #   protocols  the versions and events of the xdg-shell polish and the new globals; a single-pixel buffer at 50 %
 #   transform  a 200×100 buffer turned 90° maps as a 100×200 window
+#   idle       ext-idle-notify: the first notification asks ("idle" permission; the theme here answers WLPERF_IDLE,
+#              allow by default), an allowed one is told idled
 #   damage     a client damaging a 10×10 square: every frame painted with only that damage equals a full repaint
 #              (LORD_PAINT_VERIFY=1, the default here; WLPERF_VERIFY=0 turns it off)
 # Run from server/ (tests/run_suites.sh does). Exit 77 when something it needs is missing (the theme bundle: npm run
@@ -19,10 +21,16 @@ mkdir -p "$D/home/.config/lordos"
 chmod 700 "$D"
 printf '{"schema": 9, "desktopChosen": true, "language": "en"}\n' >"$D/home/.config/lordos/settings.json"
 # outside the repository: a development build runs a theme there unchecked
-{ cat "$THEME"; cat <<'EOF'
+{ cat "$THEME"; printf ';globalThis.WLPERF_IDLE = %s;\n' "'${WLPERF_IDLE:-allow}'"; cat <<'EOF'
 ;(() => {
   const orig = globalThis.__lordWayland;
   globalThis.__lordWayland = (id, type, d) => {
+    // the "idle" prompt (ext-idle-notify): logged, and answered as WLPERF_IDLE says (allow, deny, or left open)
+    if (type === 'idlenotify') {
+      console.log('WLPERF idlenotify ' + JSON.stringify(d.app));
+      if (globalThis.WLPERF_IDLE === 'allow' || globalThis.WLPERF_IDLE === 'deny') setTimeout(() => lord.wayland.idleAnswer(d.app, globalThis.WLPERF_IDLE === 'allow'), 3500);   // after the first client's 3 s
+      return undefined;
+    }
     if (type === 'title' || type === 'map') console.log('WLPERF ' + type + ' ' + JSON.stringify(type === 'map' ? { title: d.title, width: d.width, height: d.height } : d.title));
     return orig(id, type, d);
   };
@@ -75,6 +83,19 @@ if want transform; then
     m=$(events map | grep '"title":"transform"' | tail -1)
     echo "transform: $m"
     echo "$m" | grep -q '"width":100,"height":200' || fail "transform: a 200x100 buffer at 90 degrees maps as $m"
+fi
+if want idle; then
+    # the first notification asks (no "idled" before the answer); the theme here allows it, so a second run is told
+    out=$(client idle) || fail "idle: the client"
+    echo "idle (first, asked): $out"
+    echo "$out" | grep -q '^idle: 0 idled' || fail "idle: told before the person answered"
+    sleep 1
+    events idlenotify | grep -q 'program:' || fail "idle: no prompt with the program lord-server checked"
+    out=$(client idle) || fail "idle: the client"
+    echo "idle (allowed): $out"
+    echo "$out" | grep -q '^idle: [1-9]' || fail "idle: allowed, but never idled"
+    p=$(events idlenotify | wc -l)
+    [ "$p" -eq 1 ] || fail "idle: $p prompts for one app"
 fi
 if want damage; then
     client damage 30 || fail "damage: the client"

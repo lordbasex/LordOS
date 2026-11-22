@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak-sovellus {id}",
   "who.program": "Ohjelma {path}",
   "perm.shortcuts": "Pikanäppäimet",
-  "permHint.shortcuts": "Sovellukset, jotka saavat ottaa ❖:n, ⌥Tabin ja työpöydän muut pikanäppäimet ollessaan etualalla, kuten virtuaalikoneet, etätyöpöydät ja pelit. ❖Esc palauttaa ne aina; näytön lukitus ja medianäppäimet pysyvät järjestelmällä."
+  "permHint.shortcuts": "Sovellukset, jotka saavat ottaa ❖:n, ⌥Tabin ja työpöydän muut pikanäppäimet ollessaan etualalla, kuten virtuaalikoneet, etätyöpöydät ja pelit. ❖Esc palauttaa ne aina; näytön lukitus ja medianäppäimet pysyvät järjestelmällä.",
+  "ask.idle": "”{app}” haluaa tietää, milloin olet poissa tietokoneelta",
+  "ask.idleNote": "Sille kerrotaan, kun lopetat näppäimistön ja hiiren käytön hetkeksi ja kun palaat; ei mitään muuta. Voit muuttaa tämän myöhemmin kohdassa Asetukset → Tietosuoja.",
+  "perm.idle": "Poissaolo tietokoneelta",
+  "permHint.idle": "Sovellukset, joille kerrotaan, kun lopetat tietokoneen käytön hetkeksi ja kun palaat, kuten keskustelusovellukset, jotka näyttävät sinut poissaolevana. Muuta ne eivät saa tietää; näytön päällä pitävä video tai esitys lasketaan läsnäoloksi."
 }

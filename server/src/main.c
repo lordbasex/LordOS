@@ -3059,6 +3059,10 @@ int main(int argc, char **argv) {
         }
         /* a video or a presentation keeps the screen on: a Wayland surface's inhibitor or a portal hold (ui/portal.c) */
         if (wl_idle_inhibited() || portal_inhibited()) display_activity(now_ms());
+        {   /* apps the person let know they're away (ext-idle-notify; inhibitors count as activity above) */
+            double idd = wl_idle_tick(display_last_activity(), now_ms());
+            if (idd >= 0 && (delay < 0 || idd < delay)) delay = idd;
+        }
         display_tick(now_ms());             /* screen off, lock and sleep after N minutes (src/hw) */
         double hwd = display_timeout(now_ms());
         if (hwd >= 0 && (delay < 0 || hwd < delay)) delay = hwd;

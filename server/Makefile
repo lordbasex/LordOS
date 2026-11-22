@@ -34,7 +34,8 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 \
            staging/security-context/security-context-v1 \
            unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
-           staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1
+           staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
+           staging/ext-idle-notify/ext-idle-notify-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
 
@@ -403,6 +404,12 @@ test: build/buftf-test
 build/buftf-test: tests/buftf_test.c src/wl/buftf.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/buftf_test.c
+	./$@ || { rm -f $@; exit 1; }
+# ext-idle-notify with the person's permission (src/wl/idlenotify.h, docs/WAYLAND.md "Idle notifications")
+test: build/idlenotify-test
+build/idlenotify-test: tests/idlenotify_test.c src/wl/idlenotify.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/idlenotify_test.c
 	./$@ || { rm -f $@; exit 1; }
 # the repeat of a held key in an isolated app (src/app/keyrepeat.h; the compositor sends its clients no repeats)
 test: build/keyrepeat-test
@@ -820,7 +827,8 @@ CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoratio
                 unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 unstable/text-input/text-input-unstable-v3 \
                 staging/security-context/security-context-v1 \
                 unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
-                staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1
+                staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
+                staging/ext-idle-notify/ext-idle-notify-v1
 CLIENT_GEN := $(foreach p,$(CLIENT_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 define wl_client_proto
 build/gen/client/$(notdir $(1))-client-protocol.h: $(WLPROTO)/$(1).xml

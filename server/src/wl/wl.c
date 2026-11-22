@@ -30,6 +30,7 @@
 #include "../keylag.h"
 #include "../sec/perms.h"
 #include "../apps.h"
+#include "../lpk.h"
 
 #include <errno.h>
 #include <math.h>
@@ -85,6 +86,8 @@
 #include "ptrlock.h"
 #include "outpick.h"
 #include "buftf.h"
+#include "idlenotify.h"
+#include "ext-idle-notify-v1-protocol.h"
 #include "wl_input.h"
 #include "../gpu/gpu.h"
 #include "../media/media.h"
@@ -4901,6 +4904,102 @@ int wl_shortcuts_answer(const char *app, int allow) {
     return 1;
 }
 
+/* ---- ext_idle_notifier_v1: told when the person is away, with their permission (idlenotify.h) ---- */
+typedef struct {
+    struct wl_resource *res;
+    struct wl_list link;
+    IdnState st;
+    char app[KBI_ID_MAX];               /* whose decision: an isolated app's id or a checked identity ("" none) */
+    int never, allowed;
+} IdleN;
+static struct wl_list idle_notes;
+#define IDN_WAITING 8
+static char idn_waiting[IDN_WAITING][KBI_ID_MAX];   /* apps the shell is asking ("idle" prompt), one slot each */
+static int idn_waiting_at(const char *app) {
+    for (int i = 0; app[0] && i < IDN_WAITING; i++) if (!strcmp(idn_waiting[i], app)) return i;
+    return -1;
+}
+static void idn_gone(struct wl_resource *r) {
+    IdleN *n = wl_resource_get_user_data(r);
+    if (!n) return;
+    wl_list_remove(&n->link);
+    free(n);
+}
+static void idn_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct ext_idle_notification_v1_interface idn_impl = { .destroy = idn_destroy };
+static void idnm_get(struct wl_client *c, struct wl_resource *r, uint32_t id, uint32_t timeout, struct wl_resource *seat) {
+    (void)seat;                         /* one seat */
+    IdleN *n = calloc(1, sizeof *n);
+    struct wl_resource *res = n ? wl_resource_create(c, &ext_idle_notification_v1_interface, wl_resource_get_version(r), id) : NULL;
+    if (!res) { free(n); wl_client_post_no_memory(c); return; }
+    n->res = res;
+    n->st.timeout_ms = (double)timeout;
+    wl_list_insert(&idle_notes, &n->link);
+    wl_resource_set_implementation(res, &idn_impl, n, idn_gone);
+    /* whose: an isolated LordOS app by its id, any other client by who lord-server checked it is, never by an app_id it
+     * set; Xwayland speaks for every X11 app, so it is no one's */
+    const char *iso = app_of_client(c);
+    snprintf(n->app, sizeof n->app, "%s", iso ? iso : client_identity(c));
+    int named = iso ? lpk_valid_id(n->app) : kbi_key_valid(n->app);
+    if (!named) n->app[0] = 0;
+    int how = idn_decide(named ? (int)perm_get(n->app, PERM_IDLE) : PERM_ASK, c == xwl_client, greeter, named);
+    n->never = how == IDN_NEVER && (!named || c == xwl_client || greeter);
+    n->allowed = how == IDN_GRANT;
+    if (how != IDN_PROMPT || idn_waiting_at(n->app) >= 0) return;     /* one prompt per app */
+    static unsigned next;
+    int w;
+    for (w = 0; w < IDN_WAITING && idn_waiting[w][0]; w++) {}
+    if (w == IDN_WAITING) { w = (int)next; next = (next + 1) % IDN_WAITING; }
+    snprintf(idn_waiting[w], sizeof idn_waiting[w], "%s", n->app);
+    /* the shell asks (sdk/wayland.js); the name is an installed app's whose entry runs that program, never the client's */
+    char name[128] = "", a[300], json[600];
+    if (!iso) wl_shortcuts_name(n->app, "", name, sizeof name);
+    json_str(a, sizeof a, name);
+    snprintf(json, sizeof json, "{\"app\":\"%s\",\"name\":\"%s\",\"lpk\":%s}", n->app, a, iso ? "true" : "false");
+    emit_id(0, "idlenotify", json);
+}
+static void idnm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct ext_idle_notifier_v1_interface idnm_impl = { .destroy = idnm_destroy, .get_idle_notification = idnm_get };
+static void bind_idnm(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &ext_idle_notifier_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &idnm_impl, NULL, NULL);
+}
+
+/* An "idle" decision changed (asked, or changed in Settings → Privacy): the app's notifications follow it. */
+void wl_idle_changed(void) {
+    if (!dpy) return;
+    IdleN *n;
+    wl_list_for_each(n, &idle_notes, link) if (!n->never && n->app[0]) n->allowed = perm_get(n->app, PERM_IDLE) == PERM_ALLOW;
+}
+
+int wl_idle_answer(const char *app, int allow) {
+    int w = dpy && app ? idn_waiting_at(app) : -1;
+    if (w < 0) return 0;
+    idn_waiting[w][0] = 0;
+    perm_set(app, PERM_IDLE, allow ? PERM_ALLOW : PERM_DENY);
+    wl_idle_changed();
+    return 1;
+}
+
+/* Every pass of the main loop: last = lord-server's last activity (display.c, idle inhibitors included). Sends what is
+ * due; the ms until the next one, or -1. */
+double wl_idle_tick(double last, double now) {
+    if (!dpy) return -1;
+    double wait = -1;
+    int sent = 0;
+    IdleN *n;
+    wl_list_for_each(n, &idle_notes, link) {
+        int ev = idn_step(&n->st, n->allowed && !n->never, last, now, &wait);
+        if (ev == IDN_IDLED) ext_idle_notification_v1_send_idled(n->res);
+        else if (ev == IDN_RESUMED) ext_idle_notification_v1_send_resumed(n->res);
+        sent |= ev != IDN_NONE;
+    }
+    if (sent) wl_display_flush_clients(dpy);
+    return wait;
+}
+
 int wl_key(int code, int value, const KeyInfo *k) {
     if (!dpy) return 0;
     unsigned char *was_grabbed = code >= 0 && code < KEY_SLOTS ? &grabbed[code] : NULL;
@@ -5783,6 +5882,8 @@ int wl_start(void) {
     wl_global_create(dpy, &xdg_wm_dialog_v1_interface, 1, NULL, bind_wm_dialog);   /* modal dialogs */
     wl_list_init(&rel_pointers);
     wl_list_init(&feedbacks);
+    wl_list_init(&idle_notes);
+    wl_global_create(dpy, &ext_idle_notifier_v1_interface, 1, NULL, bind_idnm);   /* away from the computer, if allowed */
     if (gpu_active()) ngpu_fmt = gpu_formats(gpu_fmt_cache, 256);
     gpu_set_hooks(wl_gpu_lost, wl_gpu_changed);
     wl_global_create(dpy, &zwp_linux_dmabuf_v1_interface, 5, NULL, bind_dmabuf);   /* 5: one modifier for every plane */

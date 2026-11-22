@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak app {id}",
   "who.program": "Program {path}",
   "perm.shortcuts": "Keyboard shortcuts",
-  "permHint.shortcuts": "Apps that may take ❖, ⌥Tab and the desktop’s other shortcuts while they’re in front, such as virtual machines, remote desktops and games. ❖Esc always gives them back; locking the screen and the media keys stay the system’s."
+  "permHint.shortcuts": "Apps that may take ❖, ⌥Tab and the desktop’s other shortcuts while they’re in front, such as virtual machines, remote desktops and games. ❖Esc always gives them back; locking the screen and the media keys stay the system’s.",
+  "ask.idle": "“{app}” wants to know when you’re away from the computer",
+  "ask.idleNote": "It’s told when you stop using the keyboard and mouse for a while, and when you’re back; nothing else. You can change this later in Settings → Privacy.",
+  "perm.idle": "Away from the computer",
+  "permHint.idle": "Apps that are told when you stop using the computer for a while and when you come back, such as chat apps that show you as away. They learn nothing else; a video or presentation that keeps the screen on counts as you being there."
 }

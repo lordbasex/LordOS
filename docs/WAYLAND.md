@@ -46,6 +46,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `xdg_activation_v1` | 1 | a window asks to come to the front with a token: only one LordOS gave (a launch, a notification's button) or one the app in front asked for raises it; any other only marks it in the Dock and the taskbar (`xdgact.c`, see "Activation" below) |
 | `zwp_text_input_manager_v3` | 1 | a text field took focus and where its caret is: the on-screen keyboard's hint (0.8.7, see `ON-SCREEN-KEYBOARD.md`), and LordOS's input method composes into it: preedit, commit and done, the candidate window at its caret (0.8.8.8, checked on VM 127, `wl_textinput.c`, see "Input methods") |
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
+| `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
 | `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
 | `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
@@ -1366,6 +1367,30 @@ frame. `tests/wlperf_headless.sh` checks each part against a headless lord-serve
   Behind a window drawn with the multiplier on the GPU path is the compositor's black, not the desktop (the UI leaves a
   hole there, as for any translucent app pixel). `wlperf-client protocols` binds both and shows a one-pixel window at
   50 %.
+
+## Idle notifications (`ext_idle_notifier_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
+
+Chat apps show a person as away, and some apps pause work, with `ext-idle-notify-v1`: they ask to be told after N ms
+without input and again when the person is back. That says when someone is at the computer, so LordOS asks first.
+
+- **Whose decision.** An isolated LordOS app by its id; any other client by the identity lord-server checked when it
+  connected (`program:<path>` or `flatpak:<id>`, the same as the keyboard shortcuts permission, `kbinhibit.h`), never
+  by an app_id it set. Xwayland (it speaks for every X11 app), the login screen and a client with no identity are
+  never told. The answer is the `idle` permission in `permisos.json` (`PERM_IDLE`, `sec/perms.c`): not declarable in a
+  manifest (`perm_declarable`), refused to the broker (`BOP_PERM`), set by `lord.perms.set` only for those names, and
+  listed and changed in Settings → Privacy under Away from the computer.
+- **The prompt.** The first notification of an app with no decision makes lord-server emit `idlenotify`
+  (`{app, name, lpk}`, one prompt per app while it is up); `sdk/wayland.js` shows the system-drawn prompt
+  (`promptForServer`, perm `idle`) with the app's installed name and the checked identity under it, and the answer goes
+  back through `lord.wayland.idleAnswer(app, allow)`, which only answers a prompt lord-server is waiting on.
+- **Denied or undecided.** The global stays (clients that bind it unconditionally keep working), the notification
+  objects are made, and `idled` is never sent; a permission taken back while idled sends `resumed` once.
+- **Idle** is the time since lord-server's last activity for its own idle timers (`display_last_activity`, `hw/display.c`):
+  input, remote input, and every pass while a surface's idle inhibitor or a portal inhibit holds, so a video keeps
+  everyone "present". Version 1 only (version 2's input-only notifications ignore inhibitors).
+- **Tests.** `build/idlenotify-test` (the decision, idled and resumed, revoked while idled, an inhibitor holding) and
+  `wlperf-client idle` in `tests/wlperf_headless.sh`: the first notification asks and gets nothing before the answer,
+  an allowed one is told `idled`, a denied one never (`WLPERF_IDLE=deny`).
 
 ## Pending
 

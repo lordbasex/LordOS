@@ -55,5 +55,9 @@
   "who.flatpak": "Programu ya Flatpak {id}",
   "who.program": "Programu {path}",
   "perm.shortcuts": "Njia za mkato za kibodi",
-  "permHint.shortcuts": "Programu zinazoweza kuchukua ❖, ⌥Tab na njia nyingine za mkato za eneo-kazi zikiwa mbele, kama vile mashine pepe, kompyuta za mbali na michezo. ❖Esc huzirudisha kila wakati; kufunga skrini na vitufe vya midia hubaki kwa mfumo."
+  "permHint.shortcuts": "Programu zinazoweza kuchukua ❖, ⌥Tab na njia nyingine za mkato za eneo-kazi zikiwa mbele, kama vile mashine pepe, kompyuta za mbali na michezo. ❖Esc huzirudisha kila wakati; kufunga skrini na vitufe vya midia hubaki kwa mfumo.",
+  "ask.idle": "“{app}” inataka kujua lini huko kwenye kompyuta",
+  "ask.idleNote": "Huarifiwa unapoacha kutumia kibodi na kipanya kwa muda, na unaporudi; hakuna kingine. Unaweza kubadilisha hili baadaye katika Mipangilio → Faragha.",
+  "perm.idle": "Kutokuwepo kwenye kompyuta",
+  "permHint.idle": "Programu zinazoarifiwa unapoacha kutumia kompyuta kwa muda na unaporudi, kama programu za gumzo zinazokuonyesha haupo. Hazijui kitu kingine; video au wasilisho linaloweka skrini ikiwa imewaka huhesabiwa kama upo."
 }

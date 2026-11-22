@@ -193,6 +193,15 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       promptForServer({ app: d.app, perm: 'shortcuts', name: String(d.name || '') || who.short, done: (allow) => lord.wayland.shortcutsAnswer(d.app, allow) });
       break;
     }
+    // an app asks to be told when the person is away from the computer (ext-idle-notify, server/src/wl/idlenotify.h):
+    // asked once per app, lord-server keeps the answer as its "idle" permission. d.app is an isolated LordOS app's id
+    // (d.lpk) or who lord-server checked a Linux app is; d.name an installed app's name for it, or ''.
+    case 'idlenotify': {
+      const who = shortcutsWho(d.app);
+      if (!who || (who.kind === 'lord') !== !!d.lpk) break;
+      promptForServer({ app: d.app, perm: 'idle', name: String(d.name || '') || (who.kind === 'lord' ? '' : who.short), done: (allow) => lord.wayland.idleAnswer(d.app, allow) });
+      break;
+    }
     case 'activate': case 'attention': {
       const how = activationOutcome(win, wm.focused(), type === 'activate');
       if (how === 'focus') wm.focus(id); else if (how === 'attention' && !win.attention) wm.setAttention(id, true);

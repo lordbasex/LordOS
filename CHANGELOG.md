@@ -12,6 +12,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Linux apps may be told when you're away from the computer, only if you allow it, in development**
+  (`ext-idle-notify-v1`, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Idle notifications"). The first time
+  an app asks, LordOS shows its own prompt ("‹App› wants to know when you're away from the computer", Allow / Don't
+  allow), remembered per app by the identity lord-server checks itself (the program it runs, the Flatpak app, or an
+  isolated LordOS app's id) and changed in Settings → Privacy → Away from the computer. A denied app keeps working but is
+  never told; idle inhibitors (a video, a presentation) count as being there. The new `idle` permission can't be
+  declared in a manifest or requested through the broker. Texts in all 35 languages.
+
 - **`wp_single_pixel_buffer_manager_v1` and `wp_alpha_modifier_v1` for Linux apps, in development** (Wayland audit item
   7, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Apps (GTK 4, video
   players) can draw a solid colour from a one-pixel buffer stretched by a viewport instead of a full-size buffer, and
@@ -19,7 +27,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   anything of another client.
 
 - **xdg-shell 7 and newer protocol versions for Linux apps, in development** (Wayland audit item 4, approved by the
-  maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Windows are offered the window menu and
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Each window is offered the window menu and
   fullscreen (not during a screen share) besides maximize and minimize, told the work area of their display
   (`configure_bounds`, from the theme through `lord.wayland.workAreas`) so they never open larger than it, and told which
   edges are tiled and constrained when maximized or snapped to a half, quarter or third. `zwp_linux_dmabuf_v1` 5 (one

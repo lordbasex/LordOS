@@ -1688,6 +1688,17 @@ static JSValue f_wl_info(JSContext *c, JSValueConst this_val, int argc, JSValueC
     return o;
 }
 
+/* lord.wayland.idleAnswer(app, allow) → bool: the person's answer to the "idle" prompt (ext-idle-notify) lord-server is
+ * waiting on for app; anything else is ignored (wl_idle_answer) */
+static JSValue f_wl_idle_answer(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2 || !JS_IsString(argv[0])) return JS_FALSE;
+    const char *app = JS_ToCString(c, argv[0]);
+    int ok = app && wl_idle_answer(app, JS_ToBool(c, argv[1]));
+    if (app) JS_FreeCString(c, app);
+    return JS_NewBool(c, ok);
+}
+
 /* lord.wayland.workAreas([{x, y, w, h}, …]): each display's work area as the theme computes it (sdk/wayland.js), for
  * xdg_toplevel.configure_bounds; numbers only, at most one per display (wl_set_work_areas matches them) */
 static JSValue f_wl_work_areas(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -1856,6 +1867,7 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("kill", 1, f_wl_kill),
     JS_CFUNC_DEF("state", 8, f_wl_state),
     JS_CFUNC_DEF("workAreas", 1, f_wl_work_areas),
+    JS_CFUNC_DEF("idleAnswer", 2, f_wl_idle_answer),
     JS_CFUNC_DEF("info", 0, f_wl_info),
     JS_CFUNC_DEF("x11SelfScale", 1, f_wl_x11_self_scale),
 };

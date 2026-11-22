@@ -55,5 +55,9 @@
   "who.flatpak": "Ứng dụng Flatpak {id}",
   "who.program": "Chương trình {path}",
   "perm.shortcuts": "Phím tắt",
-  "permHint.shortcuts": "Các ứng dụng có thể chiếm ❖, ⌥Tab và các phím tắt khác của màn hình nền khi chúng ở phía trước, như máy ảo, máy tính từ xa và trò chơi. ❖Esc luôn lấy lại chúng; khóa màn hình và các phím đa phương tiện vẫn thuộc về hệ thống."
+  "permHint.shortcuts": "Các ứng dụng có thể chiếm ❖, ⌥Tab và các phím tắt khác của màn hình nền khi chúng ở phía trước, như máy ảo, máy tính từ xa và trò chơi. ❖Esc luôn lấy lại chúng; khóa màn hình và các phím đa phương tiện vẫn thuộc về hệ thống.",
+  "ask.idle": "“{app}” muốn biết khi nào bạn rời khỏi máy tính",
+  "ask.idleNote": "Ứng dụng được báo khi bạn ngừng dùng bàn phím và chuột một lúc, và khi bạn quay lại; không gì khác. Bạn có thể đổi điều này sau trong Cài đặt → Quyền riêng tư.",
+  "perm.idle": "Rời khỏi máy tính",
+  "permHint.idle": "Các ứng dụng được báo khi bạn ngừng dùng máy tính một lúc và khi bạn quay lại, như ứng dụng trò chuyện hiển thị bạn đang vắng mặt. Chúng không biết gì thêm; video hoặc bài trình chiếu giữ màn hình sáng được tính là bạn đang có mặt."
 }

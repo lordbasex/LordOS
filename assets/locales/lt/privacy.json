@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak programa {id}",
   "who.program": "Programa {path}",
   "perm.shortcuts": "Spartieji klavišai",
-  "permHint.shortcuts": "Programos, kurios gali perimti ❖, ⌥Tab ir kitus darbalaukio sparčiuosius klavišus, kol yra priekyje, pavyzdžiui, virtualios mašinos, nuotoliniai darbalaukiai ir žaidimai. ❖Esc visada juos grąžina; ekrano užrakinimas ir medijos klavišai lieka sistemos."
+  "permHint.shortcuts": "Programos, kurios gali perimti ❖, ⌥Tab ir kitus darbalaukio sparčiuosius klavišus, kol yra priekyje, pavyzdžiui, virtualios mašinos, nuotoliniai darbalaukiai ir žaidimai. ❖Esc visada juos grąžina; ekrano užrakinimas ir medijos klavišai lieka sistemos.",
+  "ask.idle": "„{app}“ nori žinoti, kada esate nutolę nuo kompiuterio",
+  "ask.idleNote": "Jai pranešama, kai kurį laiką nenaudojate klaviatūros ir pelės ir kai grįžtate; nieko daugiau. Vėliau tai galite pakeisti skiltyje Nustatymai → Privatumas.",
+  "perm.idle": "Nebuvimas prie kompiuterio",
+  "permHint.idle": "Programos, kurioms pranešama, kai kurį laiką nenaudojate kompiuterio ir kai grįžtate, pvz., pokalbių programos, rodančios jus kaip nesantį. Daugiau jos nieko nesužino; vaizdo įrašas ar pateiktis, laikanti ekraną įjungtą, laikomi buvimu."
 }

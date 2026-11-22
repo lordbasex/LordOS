@@ -25,7 +25,11 @@ int  wl_frame_unseen(unsigned time_ms);
 /* The frame callbacks of minimized windows and windows on a hidden desktop (wl/framegate.h): sent
  * once a second, here when no frame of lord-server's did. ms until the next one is due, -1 when none waits. */
 double wl_frame_hidden(unsigned time_ms);
-double wl_title_wait(void);              /* ms until a window title waiting to go to JS is due (-1: none) */
+double wl_title_wait(void);
+/* ext-idle-notify (wl/idlenotify.h): each loop with display.c's last activity; ms until the next is due, or -1 */
+double wl_idle_tick(double last_ms, double now_ms);
+void wl_idle_changed(void);             /* an "idle" decision changed (lord.perms.set) */
+int  wl_idle_answer(const char *app, int allow);   /* the person's answer to an "idle" prompt lord-server is waiting on */              /* ms until a window title waiting to go to JS is due (-1: none) */
 
 /* Input (main.c). hit = node under the pointer; down[i]/button[i] = buttons of this event
  * (0 left, 1 middle, 2 right). Returns 1 if the pointer is over a Wayland app and 2 if

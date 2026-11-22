@@ -9,6 +9,8 @@
  *   damage N [S] a 640×480 window that changes a 10×10 square N times a second for S s (3), damaging only that square
  *               (surface or buffer coordinates, alternately); prints the frames done
  *   transform   a 200×100 buffer with buffer_transform 90: the window is 100×200 (geometry checked by the script)
+ *   idle        a 300 ms ext-idle-notify notification for 3 s: prints how many "idled" came (none until the "idle"
+ *               permission is allowed; tests/wlperf_headless.sh answers the prompt)
  *   protocols   the globals and versions of items 4 and 7 (xdg_wm_base 7, linux-dmabuf 5, wp_presentation 2,
  *               cursor-shape 2, single-pixel-buffer, alpha-modifier): the capabilities, the bounds, a single-pixel
  *               buffer at 50 % opacity
@@ -27,6 +29,7 @@
 #include "client/linux-dmabuf-v1-client-protocol.h"
 #include "client/single-pixel-buffer-v1-client-protocol.h"
 #include "client/alpha-modifier-v1-client-protocol.h"
+#include "client/ext-idle-notify-v1-client-protocol.h"
 
 static struct wl_display *dpy;
 static struct wl_compositor *comp;
@@ -35,6 +38,8 @@ static struct xdg_wm_base *wmbase;
 static struct wp_presentation *pres;
 static struct wp_single_pixel_buffer_manager_v1 *spb;
 static struct wp_alpha_modifier_v1 *alpha;
+static struct ext_idle_notifier_v1 *idler;
+static struct wl_seat *seat;
 static uint32_t ver_wm, ver_dmabuf, ver_pres, ver_cursor, ver_spb, ver_alpha;
 static int fails;
 
@@ -64,7 +69,9 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
     else if (!strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name)) {
         ver_spb = ver;
         spb = wl_registry_bind(r, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
-    } else if (!strcmp(iface, wp_alpha_modifier_v1_interface.name)) {
+    } else if (!strcmp(iface, ext_idle_notifier_v1_interface.name)) idler = wl_registry_bind(r, name, &ext_idle_notifier_v1_interface, 1);
+    else if (!strcmp(iface, wl_seat_interface.name)) seat = wl_registry_bind(r, name, &wl_seat_interface, 1);
+    else if (!strcmp(iface, wp_alpha_modifier_v1_interface.name)) {
         ver_alpha = ver;
         alpha = wl_registry_bind(r, name, &wp_alpha_modifier_v1_interface, 1);
     }
@@ -309,8 +316,25 @@ static int run_protocols(void) {
     return fails ? 1 : 0;
 }
 
+/* ---- idle: a 300 ms notification; how many "idled" came in 3 s (the script answers the prompt first, or not) ---- */
+static int idled, resumed;
+static void on_idled(void *d, struct ext_idle_notification_v1 *n) { (void)d; (void)n; idled++; }
+static void on_resumed(void *d, struct ext_idle_notification_v1 *n) { (void)d; (void)n; resumed++; }
+static const struct ext_idle_notification_v1_listener idle_l = { on_idled, on_resumed };
+static int run_idle(void) {
+    if (!idler || !seat) { printf("FAIL no ext_idle_notifier_v1 or wl_seat\n"); return 1; }
+    struct ext_idle_notification_v1 *n = ext_idle_notifier_v1_get_idle_notification(idler, 300, seat);
+    ext_idle_notification_v1_add_listener(n, &idle_l, NULL);
+    wl_display_roundtrip(dpy);
+    pause_ms(3000);
+    printf("idle: %d idled, %d resumed\n", idled, resumed);
+    ext_idle_notification_v1_destroy(n);
+    wl_display_roundtrip(dpy);
+    return wl_display_get_error(dpy) ? 1 : 0;
+}
+
 int main(int argc, char **argv) {
-    if (argc < 2) { fprintf(stderr, "usage: wlperf-client titles|frames N|damage N|transform|protocols\n"); return 2; }
+    if (argc < 2) { fprintf(stderr, "usage: wlperf-client titles|frames N|damage N [S]|transform|protocols|idle\n"); return 2; }
     dpy = wl_display_connect(NULL);
     if (!dpy) { fprintf(stderr, "wlperf-client: no Wayland display\n"); return 2; }
     struct wl_registry *reg = wl_display_get_registry(dpy);
@@ -324,6 +348,7 @@ int main(int argc, char **argv) {
     else if (!strcmp(argv[1], "damage")) r = run_damage(argc > 2 ? atoi(argv[2]) : 2, argc > 3 ? atoi(argv[3]) : 3);
     else if (!strcmp(argv[1], "transform")) r = run_transform();
     else if (!strcmp(argv[1], "protocols")) r = run_protocols();
+    else if (!strcmp(argv[1], "idle")) r = run_idle();
     else { fprintf(stderr, "wlperf-client: unknown mode %s\n", argv[1]); return 2; }
     wl_display_disconnect(dpy);
     return r || fails ? 1 : 0;
