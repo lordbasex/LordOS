@@ -2,7 +2,7 @@
   "name": "Lord Celeste",
   "description": "A screen frame with a side bar and drawers that slide out of its edges. Inspired by Caelestia (caelestia-dots/shell).",
   "community": true,
-  "author": "pending confirmation",
+  "author": "author pending",
   "license": "MIT",
   "sketch": { "rail": true, "frame": true },
   "desktopArrows": true,
