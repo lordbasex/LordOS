@@ -990,6 +990,8 @@ static struct {
     int lag_display, lag_windows;
     uint32_t disp_w, disp_h;
     char lag_disps[AG_DISPLAYS_MAX * 128];   /* the guest's displays (AGK_DISPLAYS) as last logged, "" none yet */
+    int layout[6];                          /* where the picture sits in the guest's desktop (VM_GUEST_LAYOUT), 0s none */
+    int lag_extra, lag_extraoff, extra_avail; /* the tools turn off an extra display (AGK_EXTRA); one is off; one is there */
     /* "Open with" a machine (7.3): the helper said "open"; the drop's token and its hash on the agent's way (the
      * transfer folder's way has fx_dig); the drops waiting for the guest tools' answer */
     int lag_open, lag_place;
@@ -2881,7 +2883,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * every 10 s. lordos-guest answers on org.lordos.agent (vmagent.h) for the clipboard. Everything the guest sends is
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 /* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
-#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS)
+#define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS | VAC_EXTRA | VAC_EXTRA_OFF)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
@@ -4500,6 +4502,7 @@ static void lag_windows_off(void) {
 /* a guest frame of apps mode: parsed to its last byte (vmagent.c), written again (nothing the guest sent passes on as
  * it came), and given to every client as a sealed memfd (VM_WINDATA); the list of apps is kept, with a generation, for
  * VM_LAUNCH */
+static void layout_set(const int L[6]);
 static void lag_windata(const AgFrame *f) {
     static LagWinList wl;
     uint8_t *out = NULL;
@@ -4570,6 +4573,8 @@ static void drain_lag(void) {
                 S.lag_place = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_PLACE) != 0;
                 S.lag_pointer = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_POINTER) != 0;
                 S.lag_gvt = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_GVT) != 0;
+                S.lag_extra = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRA) != 0;
+                S.lag_extraoff = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRAOFF) != 0;
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
@@ -4585,7 +4590,8 @@ static void drain_lag(void) {
                 if (!S.lag_windows) lag_windows_off();
                 S.ag_caps = (S.ag_caps & ~VAC_LAG) | (clip ? VAC_CLIPBOARD : 0) | (clip && S.lag_clipreq ? VAC_CLIP_LAZY : 0) |
                             (notool ? VAC_CLIP_NOTOOL : 0) | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0) |
-                            (S.lag_open && S.ag_windows ? VAC_OPEN : 0) | (S.lag_place && S.ag_windows ? VAC_PLACE : 0);
+                            (S.lag_open && S.ag_windows ? VAC_OPEN : 0) | (S.lag_place && S.ag_windows ? VAC_PLACE : 0) |
+                            (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0) | (S.lag_extra && S.lag_extraoff ? VAC_EXTRA_OFF : 0);
                 if (!S.lag_open && !S.lag_place) open_all_end();
                 static const char me[] = "lord-vm 2 clipboard clipx clipreq elevated";   /* elevated: LAGW_ELEVATED is understood */
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
@@ -4643,6 +4649,13 @@ static void drain_lag(void) {
             else {
                 ag_displays_text(d, n, shown, t, sizeof t);
                 if (strcmp(t, S.lag_disps)) { memcpy(S.lag_disps, t, sizeof t); vlog("agent: guest displays: %s", t); }
+                int L[6];
+                ag_displays_layout(d, n, shown, L);
+                if (memcmp(L, S.layout, sizeof L)) layout_set(L);
+                /* a display the tools can turn off (Machines offers it) */
+                S.extra_avail = ag_displays_extra(d, n, shown);
+                int caps = (S.ag_caps & ~VAC_EXTRA) | (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0);
+                if (caps != S.ag_caps) { S.ag_caps = caps; ag_broadcast(); }
             }
         } else if ((f.kind == LAG_WINDOWS || f.kind == LAG_WINICON || f.kind == LAG_APPLIST) && S.lag_hello && S.lag_windows) {
             lag_windata(&f);
@@ -4653,6 +4666,15 @@ static void drain_lag(void) {
         memmove(S.lag_buf, S.lag_buf + k, S.lag_n - (size_t)k);
         S.lag_n -= (size_t)k;
     }
+}
+
+/* the guest's layout for the absolute tablet (VM_GUEST_LAYOUT), to every client; all 0s: none */
+static void layout_set(const int L[6]) {
+    memcpy(S.layout, L, sizeof S.layout);
+    if (L[4]) vlog("agent: the tablet points at the shown display: %dx%d at %d,%d of a %dx%d desktop", L[2], L[3], L[0], L[1], L[4], L[5]);
+    else vlog("agent: the tablet covers the picture (one display)");
+    VmMsg m = vm_msg(VM_GUEST_LAYOUT, 0, L[0], L[1], L[2] << 16 | L[3], L[4] << 16 | L[5], "");
+    for (int i = 0; i < MAX_CLIENTS; i++) send_to(i, &m, -1);
 }
 
 /* the agent's turn of the loop: sync, ping, the journal, the shutdown fallback */
@@ -4798,6 +4820,17 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
     case VM_AGENT:
         if (fd >= 0 && m->a != VAG_TRANSFER) { close(fd); fd = -1; }
         if (!S.m.agent) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_DENIED, "the guest agent is off for this machine"); return; }
+        if (m->a == VAG_EXTRA_OFF || m->a == VAG_EXTRA_ON) {
+            /* the guest's extra display, through its tools (not qemu-guest-agent): only when they can and it's there */
+            int off = m->a == VAG_EXTRA_OFF;
+            if (!S.lag_hello || !S.lag_extra) { reply(ci, m->seq, VME_WRONG_STATE, "the LordOS tools in the guest can't turn a display off (w9 and later)"); return; }
+            if (off ? !S.extra_avail : !S.lag_extraoff) { reply(ci, m->seq, VME_WRONG_STATE, off ? "the guest has no extra display" : "no display was turned off"); return; }
+            uint8_t b = (uint8_t)off;
+            lag_send(AGK_EXTRA, &b, 1);
+            vlog("agent: the guest's tools are asked to turn %s its extra display", off ? "off" : "back on");
+            reply(ci, m->seq, VME_OK, off ? "asked to turn it off" : "asked to turn it back on");
+            return;
+        }
         if (!S.qga_up) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
         if (m->a == VAG_TRANSFER) {
             /* the transfer folder (6.7.1): a Linux guest mounts it again; a Windows guest gets WinFsp, whose installer
@@ -5098,7 +5131,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;

@@ -1512,6 +1512,7 @@ typedef struct {
     int wins_seq, icons_seq, gapps_seq, gapps_gen, apps_mode;
     /* closes the guest refused (VM_WINREFUSED with LAGA_CLOSE): the last per window, newest last; closeRefusedSeq */
     struct { uint32_t gid; int reason; double at; } refused[8];
+    int layout[6];                      /* VM_GUEST_LAYOUT, handed to lord-vmdisplay (VD_LAYOUT); 0s none */
     int refused_n, refused_seq;
     /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
      * did (PTRLOCK_END_*), for the window */
@@ -1596,6 +1597,12 @@ static int mic_permitted(void) {
     uint32_t rf = restrict_flag_of(PERM_MICROPHONE);
     if (rf && restrict_blocks(BUILTIN_FWID, rf)) return 0;
     return perm_get("machines", PERM_MICROPHONE) == PERM_ALLOW;
+}
+/* the guest's layout to lord-vmdisplay (its tablet points at the shown display) */
+static void layout_send(Sess *s) {
+    if (s->vd < 0) return;
+    VdMsg m = vd_msg(VD_LAYOUT, s->layout[0], s->layout[1], s->layout[2], s->layout[3], s->layout[4], s->layout[5]);
+    vd_send(s->vd, &m, -1);
 }
 static void vdsend_fd(Sess *s, int type, int a, int fd) { if (s->vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, 0, 0, 0, 0, 0); vd_send(s->vd, &m, fd); } }
 
@@ -2338,6 +2345,11 @@ static void from_vm(Sess *s) {
         case VM_WINDATA:
             if (fd >= 0) windata(s, &m, fd);
             break;
+        case VM_GUEST_LAYOUT:
+            s->layout[0] = m.a; s->layout[1] = m.b; s->layout[2] = (m.c >> 16) & 0xffff; s->layout[3] = m.c & 0xffff;
+            s->layout[4] = (m.d >> 16) & 0xffff; s->layout[5] = m.d & 0xffff;
+            layout_send(s);
+            break;
         case VM_WINREFUSED:
             if (m.b == LAGA_CLOSE) refused_add(s, (uint32_t)m.a, m.c);
             break;
@@ -2453,7 +2465,7 @@ static void from_vd(Sess *s) {
         if (!r) break;
         if (!vd_msg_valid(&m, 0)) { if (fd >= 0) close(fd); continue; }
         switch (m.type) {
-        case VD_READY: s->vd_up = 1; snd_apply(s); break;
+        case VD_READY: s->vd_up = 1; snd_apply(s); layout_send(s); break;
         case VD_SIZE: set_picture(s, m.a, m.b); snd_apply(s); break;
         case VD_GUEST_AUDIO:
             if (m.a == VDG_OUT) s->guest_out = m.b; else s->guest_in = m.b;
@@ -3266,7 +3278,7 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
     const char *w = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
     int a = !w ? 0 : !strcmp(w, "install") ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN :
-            !strcmp(w, "transfer") ? VAG_TRANSFER : 0;
+            !strcmp(w, "transfer") ? VAG_TRANSFER : !strcmp(w, "extraOff") ? VAG_EXTRA_OFF : !strcmp(w, "extraOn") ? VAG_EXTRA_ON : 0;
     if (w) JS_FreeCString(c, w);
     if (!s || !a || s->vm < 0) return JS_FALSE;
     if (a == VAG_TRANSFER) {

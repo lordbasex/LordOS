@@ -194,6 +194,17 @@ void ag_displays_text(const AgDisplay *d, int n, int shown, char *out, size_t ca
  * than 8 pixels), the primary first; else the primary candidate; else the first. *lock gets what to remember: the
  * index chosen by size (or the kept lock), -1 otherwise. The index chosen, -1 for no display. */
 int ag_shown_pick(const AgDisplay *d, int n, uint32_t want_w, uint32_t want_h, int locked, int *lock);
+/* AGK_EXTRA host → guest (capability "extra" in the tools' hello): exactly 1 byte, 1 turn off every display that isn't on
+ * a PCI adapter while the shown one is (never the shown one, never the last), 0 turn them back on. The tools say
+ * "extraoff" in a new hello while they keep one off. 0 well formed */
+enum { AGK_EXTRA = 20 };
+int ag_extra_parse(const uint8_t *p, size_t n, int *off);
+/* 1 when the displays have one the tools may turn off: one not on a PCI adapter, other than the shown one, which is */
+int ag_displays_extra(const AgDisplay *d, int n, int shown);
+/* where the shown display sits in the box around all the displays (the guest's whole desktop): L = { its corner x, y from
+ * the box's top left, its width, height, the box's width, height }. 0 a layout to use (more than one display and the
+ * box larger than the shown one, every side ≤ 32767); 1 none (L all 0: the picture is the whole desktop) */
+int ag_displays_layout(const AgDisplay *d, int n, int shown, int L[6]);
 
 /* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
 #define LAG_CAP_WINDOWS 256u
@@ -285,7 +296,7 @@ int ag_drop_staging_ok(const char *p, int windows);
 #define LAG_APPNAME_MAX LAG_APP_MAX
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
 enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32, AG_HELLO_PLACE = 64,
-       AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256 };
+       AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;

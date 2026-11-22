@@ -81,7 +81,7 @@ function AgentPop({ ctl, onClose }) {
           <StateDot tone={tone} size={10} />
           <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : tr('machines.agent.waiting')}</Text>
         </View>
-        {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version })].filter(Boolean).join(' · ')}</Text>
+        {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version }), g.tools ? tr('machines.agent.toolsVersion', { v: g.tools }) : ''].filter(Boolean).join(' · ')}</Text>
           : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
         <View style={{ marginTop: 4, borderRadius: 12, backgroundColor: p.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.035)', paddingVertical: 4 }}>
           {lines.map(([k, st], i) => (
@@ -102,6 +102,17 @@ function AgentPop({ ctl, onClose }) {
             {ctl.xfer.state === 'setup' || ctl.xfer.state === 'settingUp'
               ? <Pill label={ctl.xfer.state === 'settingUp' ? tr('machines.tb.transferSettingUp') : tr('machines.tb.transferSetup')} disabled={ctl.xfer.state === 'settingUp'} onClick={ctl.xfer.setup} /> : null}
           </View>
+        ) : null}
+        {/* a second display in the guest that LordOS doesn't show (not on a PCI adapter): the tools turn it off when the
+            person says so, and back on */}
+        {on && (g.caps & AGENT_CAPS.extra) ? (
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.extraHint')}</Text>
+            <View style={{ flexDirection: 'row' }}><Pill label={tr('machines.agent.extraOff')} onClick={() => lord.vm.agent(ctl.sid, 'extraOff')} /></View>
+          </View>
+        ) : null}
+        {on && (g.caps & AGENT_CAPS.extraOff) ? (
+          <View style={{ flexDirection: 'row' }}><Pill label={tr('machines.agent.extraOn')} onClick={() => lord.vm.agent(ctl.sid, 'extraOn')} /></View>
         ) : null}
         {g?.install === 2 ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{guestWindows(g) ? tr('machines.agent.toolsInstalled') : tr('machines.agent.installed')}</Text> : null}
         {/* the clipboard is off in this machine's description (the default for machines made before 6.8): installing the

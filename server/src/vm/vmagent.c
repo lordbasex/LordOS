@@ -554,6 +554,36 @@ int ag_shown_pick(const AgDisplay *d, int n, uint32_t want_w, uint32_t want_h, i
     return 0;
 }
 
+int ag_displays_layout(const AgDisplay *d, int n, int shown, int L[6]) {
+    for (int i = 0; i < 6; i++) L[i] = 0;
+    if (!d || n < 2 || n > AG_DISPLAYS_MAX || shown < 0 || shown >= n) return 1;
+    long long x0 = d[0].x, y0 = d[0].y, x1 = (long long)d[0].x + d[0].w, y1 = (long long)d[0].y + d[0].h;
+    for (int i = 1; i < n; i++) {
+        if (d[i].x < x0) x0 = d[i].x;
+        if (d[i].y < y0) y0 = d[i].y;
+        if ((long long)d[i].x + d[i].w > x1) x1 = (long long)d[i].x + d[i].w;
+        if ((long long)d[i].y + d[i].h > y1) y1 = (long long)d[i].y + d[i].h;
+    }
+    long long w = x1 - x0, h = y1 - y0;
+    if (w > 32767 || h > 32767 || (w == d[shown].w && h == d[shown].h)) return 1;
+    L[0] = (int)(d[shown].x - x0); L[1] = (int)(d[shown].y - y0);
+    L[2] = (int)d[shown].w; L[3] = (int)d[shown].h;
+    L[4] = (int)w; L[5] = (int)h;
+    return 0;
+}
+
+int ag_extra_parse(const uint8_t *p, size_t n, int *off) {
+    if (!p || n != 1 || p[0] > 1) return -1;
+    if (off) *off = p[0];
+    return 0;
+}
+
+int ag_displays_extra(const AgDisplay *d, int n, int shown) {
+    if (!d || n < 2 || shown < 0 || shown >= n || !(d[shown].flags & AGDS_HW)) return 0;
+    for (int i = 0; i < n; i++) if (i != shown && !(d[i].flags & AGDS_HW)) return 1;
+    return 0;
+}
+
 int lag_winrefused_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *action, uint8_t *reason) {
     if (!p || n != LAG_WINREFUSED_BYTES) return -1;
     uint32_t i = le32(p);
@@ -851,6 +881,8 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 5 && !memcmp(p + s0, "place", 5)) caps |= AG_HELLO_PLACE;
         else if (l == 7 && !memcmp(p + s0, "pointer", 7)) caps |= AG_HELLO_POINTER;
         else if (l == 3 && !memcmp(p + s0, "gvt", 3)) caps |= AG_HELLO_GVT;
+        else if (l == 5 && !memcmp(p + s0, "extra", 5)) caps |= AG_HELLO_EXTRA;
+        else if (l == 8 && !memcmp(p + s0, "extraoff", 8)) caps |= AG_HELLO_EXTRAOFF;
     }
     return caps;
 }
