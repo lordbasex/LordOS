@@ -1,0 +1,79 @@
+name: Graphics card report
+description: How LordOS runs on your graphics card (made with Settings → Graphics cards → Send a compatibility report, or `lordos-issue --gpu`).
+title: "GPU report: "
+labels: ["gpu-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing LordOS on your graphics card. NVIDIA support is **experimental and verified by the community**: reports like this one are how a card model goes from *experimental* to *verified* on the list of tested graphics cards.
+
+        **Settings → Graphics cards → Send a compatibility report** fills in this form for you; on a computer without a browser, `lordos-issue --gpu` in Terminal prints the same report. It holds technical data only: the cards, their drivers, which one draws the desktop, how the screen is composed, Mesa's and NVIDIA's versions, the Vulkan and video drivers installed and Secure Boot. It never holds your name, the computer's name, paths in your home folder, serial numbers or addresses. Reports and this issue are public.
+  - type: input
+    id: version
+    attributes:
+      label: LordOS version
+      description: Filled in by Settings. `lordos-issue --gpu` prints it on the report's second line.
+      placeholder: 0.8.9.4-beta
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: Graphics card
+      description: Filled in by Settings with the card that draws the desktop (or the NVIDIA card). Maker, model and PCI ids.
+      placeholder: NVIDIA Corporation GA106 [GeForce RTX 3060] [10de:2504]
+    validations:
+      required: true
+  - type: input
+    id: driver
+    attributes:
+      label: Driver
+      description: The kernel driver and its version, filled in by Settings.
+      placeholder: nvidia 550.163.01 (proprietary) · nouveau (Mesa 25.0.7) · amdgpu (Mesa 25.0.7)
+  - type: dropdown
+    id: desktop
+    attributes:
+      label: Does the desktop work on this card?
+      options:
+        - "Yes: smooth, no glitches"
+        - "Partly: it works with problems (say which below)"
+        - "No: black screen, freezes or doesn't start"
+        - "This card doesn't draw the desktop (another one does)"
+    validations:
+      required: true
+  - type: dropdown
+    id: use
+    attributes:
+      label: What did you try on it?
+      multiple: true
+      options:
+        - Desktop and windows
+        - Video playback
+        - Games (Steam, Flatpak or native)
+        - Machines (virtual machines)
+        - AI or compute (CUDA, Vulkan, ROCm)
+        - Suspend and resume
+        - External monitors
+  - type: textarea
+    id: report
+    attributes:
+      label: Compatibility report
+      description: Filled in by Settings (a long report may be cut here; the whole one is in your clipboard, paste it over). Don't edit it.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: What worked and what didn't
+      description: Anything the report can't know, for example flicker, tearing, a monitor that stays dark or a game that crashed.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before you submit
+      options:
+        - label: I read the whole report and it holds nothing I don't want public.
+          required: true
+        - label: I understand the report and this issue are public.
+          required: true

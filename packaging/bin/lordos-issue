@@ -4,10 +4,25 @@
 # Addresses, the user's and the computer's names and home paths are replaced. Nothing is sent anywhere.
 # It never includes serial numbers (lsblk's and lsusb's are left out), Wi-Fi names, or paired devices.
 # Usage: lordos-issue [--print] [--no-root]     writes ~/lordos-issue-<date>.txt, and with --print shows it too
+#        lordos-issue --gpu                     prints the graphics compatibility report (the same as Settings → Graphics
+#                                               cards → "Send a compatibility report"): no root, nothing saved
 LC_ALL=C.UTF-8; export LC_ALL
 PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
-print=0; noroot=0
-for a in "$@"; do case "$a" in --print) print=1;; --no-root) noroot=1;; esac; done
+print=0; noroot=0; gpu=0
+for a in "$@"; do case "$a" in --print) print=1;; --no-root) noroot=1;; --gpu) gpu=1;; esac; done
+
+# --gpu: lordos-sysreport builds the report from world-readable files and scrubs the user's and the computer's names
+# and the home's path itself; it reads nothing that needs root, so no password is asked
+if [ "$gpu" = 1 ]; then
+    R=/usr/lib/lordos/bin/lordos-sysreport
+    [ -x "$R" ] || R=$(command -v lordos-sysreport 2>/dev/null)
+    if [ -z "$R" ] || ! "$R" gpu; then
+        echo "lordos-issue: this LordOS can't make the graphics report: its lordos-sysreport has no 'gpu' command yet" >&2
+        exit 1
+    fi
+    printf '\nRead it first, then paste it in a new graphics report: https://github.com/lordbasex/LordOS/issues/new?template=gpu-report.yml\n' >&2
+    exit 0
+fi
 
 # The complete report needs root. Asked only at a terminal; no password, or Ctrl+C, goes on with what the user can read.
 if [ "$(id -u)" != 0 ] && [ "$noroot" = 0 ] && [ -t 0 ] && command -v sudo >/dev/null 2>&1; then

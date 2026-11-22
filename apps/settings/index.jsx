@@ -40,7 +40,7 @@ import { DefaultAppsSettings } from './DefaultApps.jsx';
 import { WebAppsSettings } from './WebApps.jsx';
 import { FlatpakSettings } from './Flatpak.jsx';
 import { FirmwareSettings } from './Firmware.jsx';
-import { GpusSettings, manyGpus } from './Gpus.jsx';
+import { GpusSettings, anyGpus } from './Gpus.jsx';
 import { Stack, Section, SettingRow, ValueRow, Badge, Note, Message, Actions, PopUp, shade } from './ui.jsx';
 
 export function Icon({ size: s }) {
@@ -858,8 +858,8 @@ const SECTIONS = GROUPS.flat();
 const isPi5 = () => { try { return lord.system.info().board === 'pi5'; } catch (e) { return false; } };
 // Battery: on a computer with one, or when something connected has a battery (docs/BATTERY.md)
 const hasAnyBattery = () => { try { return !!battery.get()?.hasBattery || deviceList().length > 0; } catch (e) { return false; } };
-// Graphics cards: only with more than one GPU (lord.vm.gpus; docs/MACHINES-GPU.md)
-const sectionShown = (id, hasPad, pi5 = isPi5(), gpus = id === 'gpus' && manyGpus()) => (id !== 'firmware' || pi5) && (id !== 'battery' || hasAnyBattery())
+// Graphics cards: with any GPU (lord.vm.gpus; docs/MACHINES-GPU.md): the compatibility report and NVIDIA's status are for every computer
+const sectionShown = (id, hasPad, pi5 = isPi5(), gpus = id === 'gpus' && anyGpus()) => (id !== 'firmware' || pi5) && (id !== 'battery' || hasAnyBattery())
   && (id !== 'gpus' || gpus);
 
 // The Dock's right-click menu lists every section, in the sidebar's order and with its names; one
@@ -919,7 +919,7 @@ export default function Settings() {
   // hasPad is still passed to sectionShown, which only hides Board firmware off a Raspberry Pi 5
   const hasPad = useTrackpads().some((d) => d.kind === 'touchpad');
   const [pi5] = useState(isPi5);
-  const [gpus] = useState(manyGpus);
+  const [gpus] = useState(anyGpus);
   const visible = (id) => sectionShown(id, hasPad, pi5, gpus) && `${tr(`settings.section.${id}`)} ${tr(`settings.keywords.${id}`)}`.toLowerCase().includes(q);
   const groups = GROUPS.map((g) => g.filter(([id]) => visible(id))).filter((g) => g.length);
   const pad = side.narrow ? spacing.l : spacing.xxl;
