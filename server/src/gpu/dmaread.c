@@ -550,6 +550,16 @@ DmaOut *dmaread_out_new(const DmaImg *like) {
     glBindFramebuffer(GL_FRAMEBUFFER, o->fbo);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, o->tex, 0);
     int ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE && glGetError() == GL_NO_ERROR;
+    if (ok) {
+        /* a new buffer's memory holds whatever was there: opaque black until a copy fills it, never garbage, should a
+         * row be shown before it is copied (the whole picture is copied into a new copy: js_vm.c, gpu/gband.h) */
+        glDisable(GL_SCISSOR_TEST);
+        glViewport(0, 0, o->w, o->h);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glFlush();
+        ok = glGetError() == GL_NO_ERROR;
+    }
     if (ok && v->query) v->gen_q(1, &o->q);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     leave(v, &s);

@@ -400,8 +400,15 @@ lord-server passes `--render-node none` when it draws without a GPU, so the CPU 
   maintainer's session: those lines beside QEMU's.
 - **A closed display connection stays registered in QEMU** (seen the same day): after the machine's window closed, QEMU went on
   calling the dead listener and logged `Failed to call update: The connection is closed` twice every 30 ms (32,557 lines in
-  `lord-vm.log` in six minutes); the next window's connection is added beside it. That is QEMU's (its D-Bus display doesn't drop a
-  peer-to-peer listener whose connection closed); not fixed here.
+  `lord-vm.log` in six minutes); the next window's connection is added beside it. That is QEMU's: QEMU 10's
+  `dbus_console_register_listener` drops a listener on its connection's `closed` signal (`listener_vanished_cb`), yet the calls
+  went on, and the D-Bus display has no call to unregister a listener, so lord-vmdisplay closing its connection (it does) is all
+  this side can do; not fixed in QEMU. On 2026-11-22 the same flood filled `lord-vm.log`'s 4 MB cap and lord-vm wrote **nothing**
+  more for the rest of that run (no agent or display lines). Since then (`src/vm/vmlog.c`, `build/vmlog-test`): a child's stderr
+  is logged in whole lines (QEMU's timestamp and message no longer come out as two cut lines); a line that comes again with the
+  same text (QEMU's own timestamp aside) is logged once and then counted, with `qemu: (the line before came N more times in S s)`
+  at most every 10 s and when another line comes; and a full `lord-vm.log` is rotated (`lord-vm.log` → `.1` → `.2`, the oldest
+  dropped; at most 3 × 4 MB) with a first line that says so, never left silent.
 - lord-server imports each dmabuf once with EGL (`gpu_tex_dmabuf`; QEMU names the same few buffers again on each flip, known by
   inode, four kept) and reads the damaged rows back into the shared picture (`gpu_tex_read_rows`), so the rest of the picture's path
   (MediaView, thumbnails, recordings) is unchanged. It never waits on the guest's GPU work: the dmabuf's fence is polled, and a frame
@@ -515,7 +522,7 @@ compromised QEMU can't change `machine.json` (and through it, what the next star
 | `machine.json` | The description, schema 1 (`machine.h`; schema 2 added `base`, `agent`, `clipboard`, schema 3 an imported machine's hardware, 6.22; 4 `shares`; 5 `secure_boot`, `tpm`, `hyperv`, `drivers`, `graphics`; 6 the network's modes, `bridge`, `ports`, `resolution`, `sound`, `volume`, `microphone`, `boot_order`, `boot_menu`; 7 `transfer`; 8 `sound_out`, `sound_in`, 6.9; 9 `clipboard_ask`, 6.8; 10 `pointer`, 7.1.2): `schema`, `id` (UUID, QEMU's `-uuid`), `name`, `arch` (`arm64`, `amd64`), `accel` (`kvm`, `tcg`), `vcpus`, `memory_mb`, `disk_gb`, `firmware` (`uefi`, `bios`), `machine_type` (pinned at creation, `virt-10.0` or `pc-q35-10.0`, read from QEMU), `firmware_code` and `firmware_sha256` (the UEFI build the NVRAM was made with; a changed build is logged at start), `display` (`window`, `none`), `network` (`shared`, `isolated`), `mac`, optional `iso`, `created`, `updated`. Unknown keys, wrong types and values out of range are refused; a newer schema is refused before its other keys are read and is never rewritten. No password is ever stored |
 | `disks/system.qcow2` | System disk, made by `qemu-img` at creation (empty, or converted from an image with `--import`) |
 | `disks/nvram.qcow2` | UEFI variables as qcow2, converted from the firmware's template (6.2). arm64 always uses UEFI (`AAVMF_CODE.no-secboot.fd`); amd64 uses UEFI (`OVMF_CODE_4M.fd`) when the `ovmf` package is there and SeaBIOS otherwise, which is what a Pi gets for an emulated amd64 guest |
-| `log/lord-vm.log` | This run: lord-vm's lines, QEMU's and passt's stderr, the command line (credentials named, never their values); 4 MB at most. `lord-vm.1.log` and `lord-vm.2.log` are the two runs before (6.19) |
+| `log/lord-vm.log` | This run: lord-vm's lines, QEMU's and passt's stderr (whole lines; a repeated line once, then a count every 10 s), the command line (credentials named, never their values); 4 MB at most. `lord-vm.1.log` and `lord-vm.2.log` are the two runs before (6.19), or, when a run filled its log, that run's earlier parts: the log is rotated when full, never left silent, 12 MB at most in all |
 | `log/serial.log` | The guest's serial console, 1 MB at most per run (`serial.1.log`, the run before) |
 | `lock` | `flock`ed by the running lord-vm: a second one on the same machine is refused |
 | `run.json` | The last state lord-vm wrote: state, reason, code, pids, time, detail. Status and recovery read it |

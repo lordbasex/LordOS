@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/qmp.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/qmp.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -71,7 +71,7 @@ endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
-test: build/vm-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
+test: build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
 # and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage,
@@ -144,3 +144,10 @@ build/vm-net-cli: $(VMNET_CLI_SRC) src/vm/vmnet.h src/vm/vm_admin.h src/net/netp
 build/vm-gvt-cli: tests/vm_gvt_cli.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmgpu.h src/vm/vm_admin.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -Isrc -o $@ tests/vm_gvt_cli.c src/vm/vmgpu.c src/vm/vmgpu_admin.c
+
+# lord-vm's log (src/vm/vmlog.c): a child's output in whole lines, a repeated line counted (QEMU calling a closed
+# D-Bus listener every 30 ms filled the log on 2026-11-22), rotation when full; under ASan and UBSan
+build/vmlog-test: tests/vmlog_test.c src/vm/vmlog.c src/vm/vmlog.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmlog_test.c src/vm/vmlog.c
+	./$@ || { rm -f $@; exit 1; }

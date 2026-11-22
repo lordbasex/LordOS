@@ -1023,6 +1023,33 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **Machines: lord-vm's log no longer goes silent for the rest of a run, in development** (seen live on 2026-11-22).
+  After a machine's window closed, QEMU went on calling the closed D-Bus display listener and wrote `Failed to call
+  update: The connection is closed` twice every 30 ms; 32,000 such lines reached `lord-vm.log`'s 4 MB cap in 15 minutes,
+  and from then on lord-vm wrote nothing (no agent, display or state lines). Now a child's stderr (QEMU, passt) is logged
+  in whole lines (a QEMU message used to come out cut in two, its timestamp on one line); a line that comes again with
+  the same text, QEMU's own timestamp aside, is logged once and then counted (`qemu: (the line before came N more times
+  in S s)`, at most every 10 s and when another line comes); and a full log is rotated (`lord-vm.log` → `lord-vm.1.log`
+  → `lord-vm.2.log`, at most 12 MB in all) instead of stopping. QEMU's dead listener itself is QEMU's (its D-Bus display
+  has no call to drop one; lord-vmdisplay already closes its connection). `src/vm/vmlog.c`, test `build/vmlog-test`
+  (the incident's 60,000 lines give one line and a summary every 10 s; cut writes; rotation keeps three files).
+- **Machines' apps mode with an Intel vGPU: the two linear copies of the picture never show rows of an older frame, in
+  development** (`src/gpu/gband.h`, `ui/js_vm.c`; `docs/MACHINES-GPU.md`). The rows a copy lacked were added only to the
+  copy shown; with none shown (the shown copy had just been imported again by the desktop's GPU, e.g. after a new GPU
+  context) the other copy kept an old frame's rows and showed them next. They are now added to the other copy whether it
+  is shown or not; both copies are copied whole when the picture's dmabuf changes (a new attach, the guest flipping to
+  another buffer) and when lord-vmdisplay announces a picture (an attach or another size), when the texture of the
+  picture before is also dropped; and a new copy is cleared to black on the iGPU before its first use, so a row never
+  shows what its memory held. Seen as stripes of coloured noise in an apps mode window after lord-server restarted while
+  the machine ran; the cause on that computer isn't proven (no log: see above), **to be checked** on the maintainer's
+  RX 580 + UHD 630. Test `build/gband-test`: a model of both copies over 200,000 random frames with attaches, re-imports
+  and dmabuf changes (it caught the copy-not-shown bug).
+- **Machines' apps mode: a guest window's own icon in the Dock after a re-attach, in development** (`apps/machines/
+  appsmode.jsx`, `model.js` `iconsToAsk`; `src/vm/lordvm.c`). Icons were asked of the session only when the guest's icons
+  changed, so a window whose LordOS window opened from a later list (minimized in the guest when apps mode began, or
+  listed after its icon came, as when lord-server restarted while the machine ran) kept a letter tile for good. Now every
+  window without its icon asks on each new list. And lord-vm keeps the last icon of each listed window and gives them to
+  a client that turns apps mode on, since the guest sends each window's icon once. Checks in `tests/vm_model_test.mjs`.
 - **Firefox's drop-down lists and tooltips show and go away again, in development** (the open item of October 19,
   "Firefox ignored mouse clicks", checked on VM 127 on 2026-11-22; `docs/WAYLAND.md`, "Two wl_seat bindings (Firefox)").
   Firefox binds `wl_seat` twice (GTK 3's and its own) and gets two pointers and two keyboards: that was checked with
