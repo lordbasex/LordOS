@@ -32,7 +32,7 @@ We took the way the apps of popular desktop systems work, never their logos or t
 | ![picture in picture](video-picture-in-picture.png) | ![open with](media-open-with.png) |
 | Picture in picture over Files | Files: video thumbnails and "Open with → Player" |
 | ![panel](screenshots-panel.png) | ![permission](screenshots-permission.png) |
-| The Screenshots panel (❖⇧5) | The system asks for the screen permission the first time |
+| The old Screenshots panel (❖⇧5; now a floating toolbar, picture to be retaken) | The system asks for the screen permission the first time |
 | ![area](screenshots-area.png) | ![annotate](screenshots-annotate.png) |
 | Capturing an area over the frozen screen | Editor: arrow, box, blur and text, at full resolution |
 | ![recording](screen-recording-in-progress.png) | ![frame](screen-recording-frame.png) |
@@ -294,7 +294,7 @@ Screen, microphone and camera go through the system permissions (`sec/perms.c`, 
 |---|---|
 | ❖⇧3 or Print Screen | Capture the whole screen |
 | ❖⇧4 | Capture an area (Space: a window; Esc cancels) |
-| ❖⇧5 | Screenshots panel; if recording, stops the recording |
+| ❖⇧5 | Screenshots toolbar (`apps/screenshots/toolbar.jsx`); if recording, stops the recording |
 | Media keys (play/pause, next, previous, stop) | LordOS's Player while it plays; otherwise the Linux player that plays, or the one active last (see "Linux players") |
 | Player: Space, ← →, ⇧← ⇧→, ↑ ↓, F | Pause, ±5 s, ±30 s, volume, full screen |
 | Photos: ← →, + −, 0, 1, R, F, Space, ❖P | Previous/next, zoom, fit, 100 %, rotate, full screen, slideshow, print |
@@ -396,7 +396,7 @@ browser's screen-sharing test page. The details are in `WAYLAND.md` ("Sharing a 
 | `screenshot(app, { x, y, width, height, display, until, also })` → id, `crop`, `annotate(base, ops, dest)` | Screenshots (`screen` permission). `until`: a window's frame node (`wm.frameNode(id)`); the screen is painted up to that window and no further (`paint_capture_until`), so a window capture is the window whole, without the windows, menus or Dock that covered it (#70). `also`: up to 8 nodes painted over it afterwards, each only if it is still on screen: the window's sheets (`wm.sheetNodes(id)`, a `<Layer name="modal">` its app opened, such as Settings → Wallpaper's file dialog), which a window capture used to leave out (#58) |
 | `resize(id, width, height)`, `rotate(id, quarterTurns)` → id | The markup editor (0.8.8.4, issue #30): a new picture from a capture or a decoded image; whole sides 1..8192, turns -3..3, anything else refused in C (`server/src/media/imgops.c`) |
 | `saveImage(id, output, { format })`, `copyImage(id)` | PNG/JPEG to a file or to the clipboard |
-| `screenRecord(app, output.mp4, { mic, fps })`, `audioRecord(app, output.wav)`, `stop(id)` | Recordings (`screen`, `microphone` permissions) |
+| `screenRecord(app, output.mp4, { mic, source, fps, region: { x, y, w, h }, cursor })` (region: a part of the main display, logical px; cursor: 0 leaves the pointer out), `audioRecord(app, output.wav)`, `stop(id)` | Recordings (`screen`, `microphone` permissions) |
 | `cameras()`, `camera(app, device, { width, height })`, `photo(id, output, mirror)`, `cameraRecord(id, output \| null, { mic, mirror })` | Camera (`camera` permission) |
 | `info(id)`, `close(id)`, `protectedCount()`, `hwaccel()` | |
 

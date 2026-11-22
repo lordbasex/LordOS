@@ -19,7 +19,7 @@ shortcuts of the theme you are using.
 | ❖. | Emoji and symbols |
 | ❖⇧3 · Print Screen | Screenshot of the whole screen |
 | ❖⇧4 | Screenshot of an area (Space: of a window) |
-| ❖⇧5 | Screenshots panel and screen recording |
+| ❖⇧5 | Screenshot toolbar and screen recording |
 | ❖L · ❖⌃Q | Lock the screen |
 | ❖Q | Quit the app |
 | Media keys | Play, pause, next and previous in Player |

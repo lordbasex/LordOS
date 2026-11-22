@@ -3,7 +3,7 @@
 // ("inset") forms; and (0.8.8.8) the choice controls with their keys built in: Dropdown, Checkbox,
 // RadioGroup, Tabs, Popover, Tooltip and ProgressBar (their rules are in sdk/controlmodel.js; List
 // and Table are in sdk/lists.jsx). The spacing and type scale they follow is in docs/DESIGN.md.
-import { View, Text, addListener } from '@lordos/runtime';
+import { View, Text, addListener, displayAt } from '@lordos/runtime';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme, popupBg } from './theme.js';
 import { TextInput, ScrollView, useAppWindow, hasTextFocus, clearTextFocus } from './components.jsx';
@@ -25,10 +25,19 @@ export const typeScale = { caption: 11, body: 13, callout: 12, headline: 15, tit
 export const controlSize = { regular: 28, small: 22, toolbar: 44, radius: 7, radiusSmall: 6, groupRadius: 10 };
 
 // Is a point on the trailing half of the window? Tooltips and menus open toward the inside.
+// The box a control's menus, popovers and tooltips stay inside: its window's. A floating window (picture in picture,
+// Screenshots' toolbar) is too small for them, and they go anywhere on its display, as from the Dock.
+const boxOfWindow = (id) => {
+  const w = wm.get(id);
+  if (!w || !w.pip) return w;
+  const d = displayAt(w.pip.x + w.pip.w / 2, w.pip.y + w.pip.h / 2);
+  return d ? { x: d.x, y: d.y, w: d.w, h: d.h } : w.pip;
+};
+
 function nearEnd(winId, node) {
   try {
     const [x, , w] = lord.getLayout(node.id);
-    const f = wm.get(winId);
+    const f = boxOfWindow(winId);
     const mid = f ? f.x + f.w / 2 : 640;
     const end = x + w / 2 > mid;
     return direction() === 'rtl' ? !end : end;
@@ -47,7 +56,7 @@ export function opensUp(btn, win, height) {
 function nearBottom(winId, node, items) {
   try {
     const [x, y, w, h] = lord.getLayout(node.id);
-    return opensUp({ x, y, w, h }, wm.get(winId), menuHeight(items));
+    return opensUp({ x, y, w, h }, boxOfWindow(winId), menuHeight(items));
   } catch (e) { return false; }
 }
 
@@ -410,7 +419,7 @@ const refNode = (r) => (r && typeof r === 'object' && 'current' in r ? r.current
 // The area a popup stays inside: the window's frame (the window's own surface in an isolated app's process), or the
 // screen when there is none.
 function areaOf(win) {
-  const f = shellLayers() ? wm.get(win?.id) : win?.overlayHost ? boxOf(win.overlayHost) : null;
+  const f = shellLayers() ? boxOfWindow(win?.id) : win?.overlayHost ? boxOf(win.overlayHost) : null;
   if (f && f.w > 0 && f.h > 0) return { x: f.x, y: f.y, w: f.w, h: f.h };
   const sc = typeof lord !== 'undefined' && lord.screen ? lord.screen : { width: 1280, height: 800 };
   return { x: 0, y: 0, w: sc.width, h: sc.height };

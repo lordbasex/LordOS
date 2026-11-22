@@ -162,6 +162,8 @@ export { menuStep } from './focusmodel.js';
 import { FloatingWindows } from './components.jsx';
 // One stacking order for the desktop: <Layer name>, <Overlay anchor> (docs/LAYERS.md)
 export { LAYERS, Layer, Overlay, shellLayers } from './layers.js';
+// where a small floating bar goes and comes back (the reading-aloud player's rule; Screenshots' toolbar uses it too)
+export { placePlayer as placeFloatingBar, rememberPlace as rememberFloatingBar } from './voiceplayermodel.js';
 import { Layer, enableShellLayers } from './layers.js';
 export {
   ToolbarButton, ToolbarGroup, Toolbar, ToolbarSpacer, ToolbarDivider, Hairline, MenuButton, SearchField, EmptyState, GroupBox, FormRow, spacing, typeScale, controlSize, ConfirmDialog,
