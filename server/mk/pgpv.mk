@@ -15,7 +15,8 @@ build/vmurl-test: tests/vmurl_test.c src/vm/vmurl.c src/vm/vmurl.h src/vm/vmcata
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmurl_test.c src/vm/vmurl.c src/vm/vmcatalog.c src/pkg/pubhost.c src/sec/json.c src/pkg/pgp.c src/pkg/crypto.c
 	./$@ || { rm -f $@; exit 1; }
 # vmsig.c with keys and signatures made by the test itself (Ed25519): good, changed, another key, a key block with two
-# keys, a wrong fingerprint, a future signature; lord-server's reading of the answer; then lord-pgpv itself on memfds
+# keys, a wrong fingerprint, a future signature, grafted or badly bound subkeys (pgp_keyring_add_untrusted); lord-server's
+# reading of the answer; then lord-pgpv itself on memfds
 build/vmsig-test: tests/vmsig_test.c src/vm/vmsig.c src/vm/vmsig.h src/pkg/pgp.c src/pkg/crypto.c build/lord-pgpv
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmsig_test.c src/vm/vmsig.c src/pkg/pgp.c src/pkg/crypto.c

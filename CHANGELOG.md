@@ -79,6 +79,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     addresses) and `server/build/vmsig-test` (keys and signatures made by the test: good, changed, another key, a key block
     with two keys, a wrong fingerprint, a future signature, armored keys, every truncation; the answer read strictly; the
     checksum lookup; then `lord-pgpv` itself on memfds in its sandbox).
+  - **The pasted key is verified, not trusted** (Claude Security F3/F4, 2026-11-22): the key of an added system came into
+    the parser written for root's APT keyrings, which took any subkey after a primary key without checking its binding,
+    so a subkey grafted under a genuine primary key could sign a checksum list and be reported "verified by" that
+    fingerprint, with no key-changed warning. `lord-pgpv` now reads the key with the new `pgp_keyring_add_untrusted`
+    (`pkg/pgp.c`): every self-signature, subkey binding (0x18) and revocation is verified with the primary key (RFC 4880 /
+    RFC 9580 hashing; SHA-256/512; RSA or Ed25519) and only verified ones give flags, expiry and revocation; a primary
+    key with no verified self-signature and a subkey with no verified binding are dropped; a subkey signs only with the
+    sign flag and a valid back-signature (0x19) made by the subkey; a subkey lives no longer than its primary. APT keyrings
+    are read as before. `vmsig-test` adds a grafted subkey, a binding signed by another key, no back-signature, a
+    back-signature by another key, an encryption-only subkey, expired and revoked subkeys, a forged revocation, bindings
+    older than the subkey or from the future, a subkey of an expired primary, missing, forged and certify-only
+    self-signatures, every truncation of a block with a bound subkey, `lord-pgpv` on a grafted subkey, the real Debian CD,
+    Ubuntu and Kali lists with the pinned keys, and Debian's archive keyrings (signing subkeys) read the same way as
+    trusted.
 
 - **Machines: LordOS draws the pointer of a machine with the VirtIO GPU display-only driver, in development** (`docs/VIRTUALIZATION.md` 7.1.2,
   `docs/MACHINES-GPU.md` Part 1 step 2). The LordOS guest tools (`lordos-guest-win`) are now w5 and say `pointer`; lord-vm then sets
