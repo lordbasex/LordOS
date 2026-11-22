@@ -1,0 +1,17 @@
+{
+ "comment": "Justified exceptions for tools/wl-conformance.mjs. Keys: <interface>.<request> under requests, <interface>.<event> under events, <interface>.error.<name> under errors, <global>/<check-id> under dynamic; the value is the reason, shown in the report. An allowed check counts as passed. Only for what the protocol itself allows (a hint the compositor may ignore, an event it never needs to send); never to hide a gap.",
+ "requests": {
+  "wl_surface.set_opaque_region": "An optimization hint the protocol lets the compositor ignore; lord-server composites every surface with its alpha.",
+  "wl_data_offer.accept@offer_impl": "accept is drag-and-drop feedback (which mime type would be taken on drop); on a selection offer it has no meaning and the protocol defines no error for it.",
+  "zwp_locked_pointer_v1.set_cursor_position_hint": "'A compositor may use this information to warp the pointer upon unlock': optional; lord-server leaves the pointer where it was locked.",
+  "zwp_text_input_v3.set_text_change_cause": "Informational double-buffered state for the input method; LordOS's input method composes the same whatever the cause, so ignoring it changes nothing a client can see."
+ },
+ "events": {},
+ "errors": {
+  "wp_presentation.error.invalid_timestamp": "No request of presentation-time carries a timestamp: the error can't be triggered by a client.",
+  "wp_presentation.error.invalid_flag": "No request of presentation-time carries flags: the error can't be triggered by a client."
+ },
+ "dynamic": {
+  "xdg_wm_base/popup.grab_denied": "xdg_popup.grab: 'If the compositor denies the grab, the popup will be immediately dismissed' — denying a grab with a stale serial is the compositor's choice, not a requirement; lord-server grants it to the focused client."
+ }
+}

@@ -196,6 +196,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Maintainer's decisions of 2026-11-22 recorded:** the 13 KDE Plasma shell, output and settings protocols stay left
     out on purpose (confirmed); `drm-lease-v1` is in progress (a permission, non-desktop connectors only), shown as
     not offered yet with that note.
+- **Wayland and Xwayland conformance, scored point by point, in development** (`tools/wl-conformance.mjs`,
+  `make -C server wl-conformance`; `docs/WAYLAND.md`, "Conformance").
+  - Every advertised global, and every interface it creates, is checked against its protocol XML up to the advertised
+    version: each request has a real handler (not a stub, and a destructor that destroys), each event is sent somewhere,
+    each protocol error is raised somewhere. A new protocol is picked up with no change to the script.
+  - A test client (`server/tests/wl_conformance.c`) against a headless lord-server binds every global at every version
+    and runs each protocol's main flow and misuses (about 150 checks: configure order, maximize and fullscreen,
+    popups, the clipboard through the compositor, dmabuf feedback, security contexts, each error code the
+    specification names).
+  - An xcb client (`server/tests/x11_conformance.c`) against Xwayland checks ICCCM and EWMH (WM_STATE, WM_PROTOCOLS,
+    focus, `_NET_WM_STATE`, client list, frame extents, ...) and the selections both ways, with INCR at 1 and 2 MiB.
+  - Each item gets a weighted score from 0 to 100 % and is called complete only with a protocol-specific flow and nothing
+    skipped; justified exceptions are listed with their reason (`tools/wl-conformance/allow.json`). Installed real
+    clients (foot, vkcube, xterm, ...) are run and reported with the globals they bound.
+  - First results, 2026-11-22 (`docs/wayland-conformance.json`): 31 globals, mean 94 %, 19 complete; X11 74 %. The gaps
+    found (xdg-shell errors not raised, subsurface stacking and sync ignored, `_NET_WM_ICON`, `_NET_WORKAREA`,
+    xwayland-shell-v1, ...) are listed in `docs/WAYLAND.md`.
 
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
