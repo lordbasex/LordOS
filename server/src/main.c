@@ -2399,7 +2399,10 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
     int r = js_init(theme);
     if (r == 0) return 0;
     if (r != JS_REFUSED && codesig_state() != CODE_INVALID) return -1;
-    if (r == JS_REFUSED) snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);   /* lord.themes.use won't go back to it */
+    if (r == JS_REFUSED) {              /* lord.themes.use won't go back to it */
+        snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);
+        snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "refused by the verified-code check (sec/codesig.c)");
+    }
     if (!greeter && codesig_state() != CODE_INVALID) {
         char root[PATH_MAX], tmp[PATH_MAX];
         snprintf(tmp, sizeof tmp, "%s", theme);
@@ -2509,9 +2512,13 @@ static int switch_theme(const char *current) {
     js_shutdown();
     ui_reset();
     term_detach_all();
-    if (js_init(path)) {
+    int r = js_init(path);
+    if (r) {
         fprintf(stderr, "lord-server: the theme failed, going back to %s\n", current);
         snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", path);
+        const char *why = js_init_error();     /* kept before the old theme's own start can overwrite it */
+        snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", r == JS_REFUSED ? "refused by the verified-code check (sec/codesig.c)"
+                 : why[0] ? why : "the theme's code did not load (see the log)");
         js_shutdown();
         ui_reset();
         if (js_init(current)) fprintf(stderr, "lord-server: %s did not load again either\n", current);

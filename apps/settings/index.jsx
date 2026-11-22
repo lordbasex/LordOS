@@ -23,8 +23,8 @@ import { PrintersSettings } from './Printers.jsx';
 import { TrackpadSettings } from './Trackpad.jsx';
 import { DockSettings } from './Dock.jsx';
 import { ThemeOptions } from './ThemeExtras.jsx';
+import { ThemeGallery } from './ThemeGallery.jsx';   // Desktop style: the gallery of themes (docs/THEMES-PLAN.md, stage 1)
 import { SlideshowSettings } from './Slideshow.jsx';
-import { DesktopStyleThumb } from '@lordos/sdk';   // Desktop style's pictures (sdk/stylethumb.jsx, also the first-start chooser's)
 import { SwitcherSettings } from './Switcher.jsx';
 import { GlobalShortcutsSettings } from './GlobalShortcuts.jsx';
 import { BrowserFrameSettings } from './BrowserFrame.jsx';
@@ -41,7 +41,6 @@ import { WebAppsSettings } from './WebApps.jsx';
 import { FlatpakSettings } from './Flatpak.jsx';
 import { FirmwareSettings } from './Firmware.jsx';
 import { Stack, Section, SettingRow, ValueRow, Badge, Note, Message, Actions, PopUp, shade } from './ui.jsx';
-import { compareNames } from '../../sdk/collate.js';
 
 export function Icon({ size: s }) {
   const dark = '#3b3e46';
@@ -103,45 +102,13 @@ function ModeThumb({ mode, accent }) {
   );
 }
 
-// Desktop style: every installed theme (Lord Flow and Lord Classic first; the login screen's is hidden),
-// switched live. The open app windows come back in the new one (sdk/index.js themes.use), Settings on
-// this page. Since 0.8.5 this is the only place to choose a theme (there is no separate Themes page).
-function StylePicker() {
-  const t = useTheme();
-  const { t: tr } = useLocale();
-  const order = (id) => (id === 'default' ? 0 : id === 'classic' ? 1 : 2);
-  const list = [...themes.list()].sort((a, b) => order(a.id) - order(b.id) || compareNames(a.name, b.name));
-  if (!list.length) return null;
-  const pick = (id) => {
-    wm.open('settings', { args: { section: 'appearance' } });
-    themes.use(id);
-  };
-  return (
-    <Section title={tr('settings.style.title')} footer={tr('settings.style.hint')}>
-      <View style={{ flexDirection: 'row', gap: spacing.xxl, paddingVertical: spacing.m, justifyContent: 'center' }}>
-        {list.map((th) => {
-          const id = th.id;
-          return (
-            <View key={id} onClick={() => { if (!th.current) pick(id); }} style={{ alignItems: 'center', gap: 6 }}>
-              <View style={{ padding: 2, borderRadius: 10, border: `2px solid ${th.current ? t.accent : 'transparent'}` }}>
-                <DesktopStyleThumb id={id} accent={t.accent} dark={t.mode === 'dark'} sketch={th.sketch} />
-              </View>
-              <Text style={{ fontSize: typeScale.callout, fontWeight: th.current ? 600 : 400, color: t.text }}>{th.name}</Text>
-            </View>
-          );
-        })}
-      </View>
-    </Section>
-  );
-}
-
 function Appearance() {
   const t = useTheme();
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   return (
     <Stack>
-      <StylePicker />
+      <ThemeGallery />
       <ThemeOptions theme={themes.info()} />
       <Section title={tr('settings.mode')}>
         <View style={{ flexDirection: 'row', gap: spacing.xxl, paddingVertical: spacing.m, justifyContent: 'center' }}>

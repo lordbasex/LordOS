@@ -151,6 +151,7 @@ typedef struct {
     uint8_t rtl;                    /* interface direction (Arabic, Hebrew… language) */
     char theme_request[1024];       /* lord.themes.use(): bundle to load */
     char theme_failed[1024];        /* last bundle that failed to load */
+    char theme_failed_why[1024];    /* why (the exception, or the verified-code check): Settings → Appearance's report */
     uint64_t serial;                /* the last node's serial (node_new) */
 } Ui;
 

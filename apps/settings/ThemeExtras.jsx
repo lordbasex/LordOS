@@ -4,13 +4,14 @@
 import { useLocale, useSettings, Toggle, Segmented, themeOptionValue, themeOptionPatch } from '@lordos/sdk';
 import { Section, SettingRow } from './ui.jsx';
 
-// The current theme's own choices, named by itself (its name is the section's title).
-export function ThemeOptions({ theme }) {
+// A theme's own choices, named by itself (its name is the section's title, unless `title` is given: the theme's page in
+// the gallery, ThemeGallery.jsx).
+export function ThemeOptions({ theme, title }) {
   const { t: tr } = useLocale();
   const [s, set] = useSettings();
   if (!theme || !theme.options || !theme.options.length) return null;
   return (
-    <Section title={theme.name}>
+    <Section title={title || theme.name}>
       {theme.options.map((o) => {
         const v = themeOptionValue(s, theme.id, o);
         return (

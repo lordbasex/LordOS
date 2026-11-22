@@ -481,6 +481,11 @@ static JSValue f_themes_list(JSContext *c, JSValueConst this_val, int argc, JSVa
         JS_SetPropertyStr(c, o, "id", JS_NewString(c, e->d_name));
         JS_SetPropertyStr(c, o, "meta", json ? JS_NewString(c, json) : JS_NULL);
         JS_SetPropertyStr(c, o, "current", JS_NewBool(c, realpath(meta, real) && !strcmp(real, cur)));
+        /* it failed to start in this session (lord.themes.use refuses it): Settings → Appearance says so */
+        if (!strcmp(bundle, ui.theme_failed)) {
+            JS_SetPropertyStr(c, o, "failed", JS_TRUE);
+            JS_SetPropertyStr(c, o, "failedWhy", JS_NewString(c, ui.theme_failed_why));
+        }
         JS_SetPropertyUint32(c, arr, i++, o);
         free(json);
     }

@@ -58,9 +58,18 @@ its own layout (for example what the Super key alone does).
 [The login and lock screen](#the-login-and-lock-screen-are-not-your-theme)).
 
 **Switching.** The user switches themes live from **Settings → Appearance → Desktop style**, which
-since 0.8.5 lists every installed theme (the only place to choose one; `StylePicker` in
-`apps/settings/index.jsx`). Lord Flow and Lord Classic come first, the others by name; a theme with
-`"hidden": true` in its `theme.json` is not listed. Switching discards the JavaScript context and
+since 0.8.5 lists every installed theme (the only place to choose one). It is a gallery
+(`apps/settings/ThemeGallery.jsx`, with its pure parts in `sdk/themegallery.js`): a search field
+(name, description, author and id, without accents), the filters All / Official / Community /
+Installed and a grid of cards that wraps with the window; the arrow keys move over the cards and
+Enter opens one. The official themes come first (Lord Flow, Lord Classic, then by name), then the
+community ones by name; a theme with `"hidden": true` in its `theme.json` is not listed. A card opens
+the theme's page: a larger picture, its description, author, license and version, its own options
+and **Apply**. A theme that couldn't start in this session (lord-server went back to the one before,
+`ui.theme_failed` and `ui.theme_failed_why`, read by `lord.themes.list` as `failed` and `failedWhy`)
+says "Couldn't start — back on ‹the theme in use›" with **Report**, which opens the GitHub bug form in
+the browser with the theme's id and the error filled in; nothing is sent until the person submits it
+there. Switching discards the JavaScript context and
 loads the new bundle (`themes.use` in `sdk/index.js`, `lord.themes.use` in `server/src/ui/js_sys.c`,
 `switch_theme` in `server/src/main.c`): the LordOS app windows that were open (up to 8) reopen in
 the new theme with their frames, and Linux windows stay connected and get the new frame. The
@@ -75,7 +84,7 @@ it at once. If the chosen theme can't be loaded, the session stays on the theme 
 
 ```
 themes/<id>/
-  theme.json       name, description, hidden
+  theme.json       name, description, hidden, community, author, license, version, sketch, options…
   index.jsx        the entry point: puts the desktop together, ends with startShell(<App />)
   tokens.js        the colors and shapes (by convention; the bundled themes use makeTheme())
   components/      the frame, bars, Dock, menus… (by convention)
@@ -109,6 +118,28 @@ The theme's **id is its folder name**: letters, digits, `-` and `_`, at most 64 
     (the theme then uses `flowDesktopKeys` and `flowGrabs()`).
 
   Lord Workspaces' `theme.json` uses all three.
+- Four optional fields that Settings → Appearance shows on the theme's card and page (checked by
+  `cleanThemeMeta` in `sdk/thememeta.js`; an invalid value is dropped):
+
+  | Field | Value | Shown as |
+  |---|---|---|
+  | `community` | `true` for a theme LordOS didn't make | the badge **"Community · unofficial"**, the Community filter, and a note that LordOS didn't make or review it |
+  | `author` | plain text, one line, at most 80 characters, no control or bidi-override characters | the author; missing, invalid or the placeholder `"author pending"` reads **"Unknown author"** |
+  | `license` | an SPDX expression: `"MIT"`, `"GPL-3.0-or-later"`, `"MIT OR Apache-2.0"` (up to four terms joined by `OR`, `AND` or `WITH`) | the license; missing reads "Not stated" |
+  | `version` | `1`, `1.2`, `1.2.3` or `1.2.3.4`, with an optional `-beta.1` or `+build` suffix | "Version 1.2.3" |
+
+  The official themes (no `community: true`) declare none of them: Settings shows LordOS as their author, MIT as
+  their license and the release's version as theirs. A community theme should declare all four:
+
+  ```json
+  { "name": "Aurora", "description": "Soft colors and a floating dock.",
+    "community": true, "author": "Ana Pérez", "license": "MIT", "version": "1.0.0",
+    "sketch": { "dock": true, "menubar": true } }
+  ```
+
+  `community` is the author's own statement for now: an installed community theme still needs its bundle in the
+  code manifest to run (below). From stage 2 of the themes plan, a theme installed from a file is a community
+  theme whatever it says.
 
 ### `tokens.js`: the contract with the apps
 
