@@ -284,7 +284,7 @@ export function Configure({ dir, section: section0, onClose }) {
       </Row>
       {/* who draws a Windows guest's pointer (7.1.2): LordOS, from the shape the guest hands over (no round trip through
           the guest for each move), or its display driver, into the picture; applied by the guest tools at the next start */}
-      {m.windowsDevices ? <Row label={tr('machines.cfg.pointer')} last note={[tr('machines.cfg.pointerNote'), offNote].filter(Boolean).join(' ')}>
+      {m.windowsDevices ? <Row label={tr('machines.cfg.pointerDraw')} last note={[tr('machines.cfg.pointerDrawNote'), offNote].filter(Boolean).join(' ')}>
         <Off off={running}><Segmented small value={cur.pointer} onChange={(x) => set({ pointer: x })}
           options={[['lordos', tr('machines.cfg.pointerLordos')], ['guest', tr('machines.cfg.pointerGuest')]]} /></Off>
       </Row> : null}
