@@ -156,6 +156,10 @@ int  gpu_read_done(void);
 /* Direct scanout of a fullscreen dmabuf (without composing). done(data) is called when
  * the buffer leaves the screen. 0 if the flip was sent. */
 int  gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data);
+/* The same, and tear = 1 flips it without waiting for vblank when the driver can (tearing-control-v1's "async", a
+ * fullscreen game; docs/WAYLAND.md, "Frame timing"). gpu_flip_torn: the last flip was one (no vblank's time). */
+int  gpu_scanout_tear(const GpuDmabuf *d, void (*done)(void *), void *data, int tear);
+int  gpu_flip_torn(void);
 /* Can it be shown directly? (output size, format and primary plane modifier) */
 int  gpu_can_scanout(const GpuDmabuf *d, int w, int h);
 

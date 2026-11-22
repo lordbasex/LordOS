@@ -55,6 +55,10 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_color_representation_manager_v1` (color-representation-v1) | 1 | alpha modes premultiplied electrical, premultiplied optical and straight (converted); coefficients and range identity / full only, since lord-server imports no YUV buffer. Checked 2026-11-22 headless (`tests/color_headless.sh`); see "Colour management" (0.8.9.5, in development) |
 | `zwp_tablet_manager_v2` (tablet-v2) | 2 | graphics tablets (in development, 2026-11-22): pens with pressure, tilt, distance, rotation, slider and their buttons, pads with buttons, rings, strips and dials (2: `bustype`, dials), read from evdev by our own `tablet.c` (no libinput or libwacom). Supported: everything the protocol has but the tool's `wheel` (a Wacom mouse's) and pad modes beyond one. Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire); the global and Xwayland's `get_tablet_seat` seen with a headless lord-server; **not yet with a real tablet or on the VM**. See "Graphics tablets" |
 | `wp_pointer_warp_v1` (pointer-warp) | 1 | an app moves the pointer to a point of its own window (in development, 2026-11-22): only with the pointer over it, the serial of the enter it got and the keyboard, inside the surface, never while the pointer is locked or in a drag (`pwarp.h`). The XML is wayland-protocols 1.45's, kept in `server/protocols/`. Checked by `build/wltablet-test`; **not yet with an app on the VM**. See "Pointer warp" |
+| `wp_fifo_manager_v1` (fifo-v1) | 1 | an update waits until the display it is on has shown the one before it for a refresh: Mesa's Vulkan FIFO present mode without frame callbacks (`timing.c`, see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22 with vkcube on lavapipe and `wltiming-client`) |
+| `wp_commit_timing_manager_v1` (commit-timing-v1) | 1 | an update is not shown before its target time on `wp_presentation`'s clock (see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22: within 1 ms of the target, Mesa's FIFO uses it) |
+| `wp_tearing_control_manager_v1` (tearing-control-v1) | 1 | the hint is kept; "async" flips a fullscreen app's own buffer without waiting for vblank only when it is scanned out alone and the driver can (`DRM_CAP_ASYNC_PAGE_FLIP`); otherwise vsync (see "Frame timing"; 0.8.9.5, in development: the hint checked headless 2026-11-22, the torn flip not yet checked on hardware) |
+| `wp_content_type_manager_v1` (content-type-v1) | 1 | none, photo, video or game, kept per surface and applied on commit; nothing uses it yet (see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22) |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
 | `wp_linux_drm_syncobj_manager_v1` (explicit sync) | 1 | a dmabuf frame comes with an acquire point (its rendering is done) and a release point (LordOS is done with it): the frame is applied once its acquire point is signalled, without blocking, and the release point is signalled after the CPU copy or after the frame that replaced it on the GPU path; every protocol error, per-client limits. Offered when a render node has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), on the GPU and the CPU path (0.8.9.5, in development; checked 2026-11-22 with `tests/syncobj_client.c` against a headless lord-server on the CPU path, and Mesa 25.0.7's Vulkan WSI, `vkcube`, on an AMD RX 580: 600 frames at 60 fps in FIFO and 1500 at 330 fps in mailbox, every one with `set_acquire_point`/`set_release_point`; see "Explicit sync") |
 
@@ -1465,6 +1469,115 @@ frame. `tests/wlperf_headless.sh` checks each part against a headless lord-serve
   Behind a window drawn with the multiplier on the GPU path is the compositor's black, not the desktop (the UI leaves a
   hole there, as for any translucent app pixel). `wlperf-client protocols` binds both and shows a one-pixel window at
   50 %.
+
+## Frame timing (fifo-v1, commit-timing-v1, tearing-control-v1, content-type-v1; 0.8.9.5, in development)
+
+Approved by the maintainer on 2026-11-22 ("everything the compositor is missing"). The four globals are made in
+`server/src/wl/timing.c`; the decisions are pure functions in `server/src/wl/wltiming.h` (`build/wltiming-test`);
+`wl.c` holds and applies the updates. All four are version 1, generated from wayland-protocols 1.44, offered to every
+client (sandboxed ones too: they say something about the client's own surface and read nothing of others).
+
+**Held content updates, one queue with explicit sync.** A `wl_surface.commit` is one content update. One that may not
+apply yet is *held*: its whole pending state (buffer, damage, frame callbacks, presentation feedback, transform, scale,
+viewport, alpha, icon, input region, window geometry, subsurface position, the explicit-sync points, the colour
+management and representation state: `WlcPend`, `wlcolor.h`, its image description referenced) is moved out of
+the surface into a `Pend` (`pend_take`) with this commit's fifo, timing and hint values (`Pend.tu`), and every later
+commit of that surface queues behind it in the surface's one queue, the same one explicit sync uses (`s->sq`,
+`SobjQueue`, `syncobj.h`): updates always apply in the order they came. The first one applies only when **all** its
+conditions hold: its acquire point is signalled (else explicit sync's eventfd or poll timer waits for it, `sq_arm`,
+with its per-client and per-process limits and its fair share of the session's waits), its fifo barrier is down, and
+its target time has come (`sq_drain_at`). Applying one puts aside what the client set since, puts the held state back,
+runs the normal commit (`surface_apply`: the same color-management conversion, damage, role, frame callback and
+feedback code as any commit), and restores the newer state. The queue holds 8 (explicit sync's `SOBJ_MAX_PENDING`; past
+it explicit sync disconnects the client): when it is full and its first update waits only for its barrier or its time,
+that one applies at once instead, so fifo and commit timing never cost a client its connection.
+Held updates are tried at three points:
+
+- **the latch** — `main.c` calls `wl_latch(keys, immediate)` at the start of each frame it is about to paint, with the
+  displays not waiting for a flip; what applies there is in that frame;
+- **the frame done** — `wl_frame_done`, for each surface whose own display (`outpick.h`) just got a frame;
+- **the loop** — `wl_timing_wait` wakes the main loop for a held update's time (and, with the screen off, applies the
+  ones whose time has passed).
+
+A held update's frame callbacks and feedback go with it: they are answered for the frame that shows it. A buffer the
+client destroys while its update is held (Mesa does when it recreates a swapchain) makes that update keep what is shown
+instead of unmapping the window. When the surface is destroyed, its held updates are dropped: their feedback is
+`discarded`, their callbacks destroyed, their release points signalled. Subsurfaces apply their commits at once in
+LordOS (synchronized mode is not implemented), so each surface's queue is its own.
+
+**fifo-v1.** `set_barrier` and `wait_barrier` are double-buffered. When an update with `set_barrier` applies, the
+surface's barrier goes up; it is cleared right after the next frame of the surface's own display has been latched
+(`wl_frame_done` names it; a display waiting for a flip keeps it until its flip), and an update with `wait_barrier`
+waits while it is up. So an update stays on screen at least one refresh, and a client that sets and waits on every
+present runs at the display's rate. An update that sets the barrier also asks for a frame, so the barrier clears even
+if it drew nothing. Never a stall: a window nobody can see (minimized, on another desktop, wholly covered,
+`framegate.h`) clears it with its own once-a-second tick, as its frame callbacks; with the screen off every barrier
+clears once a second (`wl_frame_unseen`); a surface with no role (never on screen) follows any frame. The protocol's
+rule that a synchronized subsurface ignores `wait_barrier` is kept (`set_sync`/`set_desync` are tracked for it).
+Errors: a second `wp_fifo_v1` for a surface is `already_exists`; a request after its surface is gone is
+`surface_destroyed`.
+
+**commit-timing-v1.** `set_timestamp` gives a time on `wp_presentation`'s clock (`CLOCK_MONOTONIC`); the update is not
+presented before it. It applies at the latch of the first frame predicted to be shown at or after the target, less a
+slack of 1/16 of the refresh period (vblank times jitter a little). With a monitor, a frame latched now is shown at the
+display's next vblank, predicted from its last flip time and refresh (`wlt_next_vblank`, `wl_presented` keeps the
+grid); `wl_timing_wait` wakes the loop at the vblank before that one. Without a monitor, and on drivers whose flips
+complete at once (main.c paces those itself), a frame is shown when painted, which can't be known ahead: the latch's
+own time is used, so an update is never shown early, at worst a refresh late. Errors: `invalid_timestamp` (nanoseconds
+past 999 999 999), `timestamp_exists` (twice before a commit), `surface_destroyed`; a second timer for a surface is
+`commit_timer_exists`.
+
+**tearing-control-v1.** The hint (vsync or async) is double-buffered; destroying the object is vsync from the next
+commit. LordOS tears only in one case: the window is fullscreen and its own dmabuf goes straight to the screen (direct
+scanout: one display, no menus, no subsurfaces, the cursor on its plane, `wl_try_scanout`), its current hint is
+async, and the card's driver says it can flip asynchronously (`DRM_CAP_ASYNC_PAGE_FLIP`, read at `kms_setup`). That
+buffer is flipped with `DRM_MODE_PAGE_FLIP_ASYNC` (`kms_flip_fb`); a driver that refuses that flip (amdgpu does when
+the buffer's format, modifier or pitch differs from the one shown, as for the first one after a composed frame) gets
+the same flip at vblank instead. Every composed frame waits for vblank. A torn flip's presentation feedback has no
+`vsync` and no `hw_clock` flag, it doesn't move the display's vblank grid used above, and main.c's detector of drivers
+whose flips don't wait for vblank ignores it. Errors: a second object for a surface is `tearing_control_exists`.
+
+**content-type-v1.** The type (none, photo, video, game) is double-buffered and kept per surface (`WlTiming.ctype`);
+destroying the object is none from the next commit. Nothing uses it yet: it does not turn on tearing (only the tearing
+hint does), and LordOS doesn't set the connector's HDMI content type. Errors: a second object is
+`already_constructed`.
+
+**How it was checked (2026-11-22, headless lord-server on the CPU path, 1280 × 800, 60 Hz).**
+`tests/wltiming_headless.sh` (run by `tests/run_suites.sh`) with `build/wltiming-client` (`tests/wltiming_client.c`):
+
+- the four globals at version 1;
+- `fifo 3`: a client that sets and waits on the barrier on every commit, with no frame callbacks, at most three
+  waiting for their feedback: 182 commits in 3 s (60.5 a second), all presented, none in the same refresh as the one
+  before. The same client without fifo (the control) committed 180 a second and 2 of 3 shared a refresh, so the check
+  can fail;
+- `timing`: targets 17–400 ms ahead, presented between 0.9 ms before (within the slack) and 0.5 ms after them; an
+  update with no target queued behind a timed one is not shown first;
+- every protocol error above; a surface destroyed with updates held (behind the barrier, and 10 s ahead): their
+  feedback discarded, no error; a surface with no role using the barrier 30 times: no stall; both hints set, changed,
+  destroyed and made again: no error;
+- **vkcube** (Vulkan-Tools 1.4.304, Mesa 25.0.7 lavapipe, `--present_mode 2`, FIFO) with `WAYLAND_DEBUG=1`: it binds
+  `wp_fifo_manager_v1`, `wp_commit_timing_manager_v1` and `wp_tearing_control_manager_v1`, gets a `wp_fifo_v1` and a
+  `wp_commit_timer_v1` for its surface, and on each present sends `set_timestamp` (the last presentation time plus
+  whole refreshes), `set_barrier`, `wait_barrier` and a commit, then `wait_barrier` and an empty commit: 226 frames
+  presented in 4 s at 51–57 a second over several runs, no gap over 50 ms. Before the fix to the main loop's wake-up (held updates applied
+  while a frame was done must wake the loop again) it ran at about 25 a second with 100–200 ms stalls; before the fix
+  for destroyed buffers, each swapchain recreation unmapped and mapped the window again. On the headless path some
+  frames are a refresh late (about 1 in 12), because the latch's own time is used as the presentation time (above).
+
+- `vkcube --present_mode 0` (IMMEDIATE) gets a `wp_tearing_control_v1` and sends `set_presentation_hint(1)` (async):
+  the hint is taken, and the window, composed on the headless CPU path, stays vsync'd as described. MAILBOX
+  (`--present_mode 1`) uses fifo and the timer objects without barriers. ffplay 7.1 (SDL 2) binds none of the four.
+- With explicit sync too (2026-11-22, the queue shared with `linux-drm-syncobj-v1`): vkcube on Mesa 25.0.7's Intel
+  driver (anv, rendering on the machine's Intel render node, nothing on its monitor) against the same headless
+  lord-server. FIFO: on every present an acquire and a release point, `set_timestamp`, `set_barrier` and
+  `wait_barrier` (279 presents in 5 s), 271 frames presented at 55 a second, one gap over 50 ms (at the start), no
+  error. MAILBOX: an acquire and a release point on each of 16 896 commits in 5 s, no barriers (Mesa uses none there),
+  no error, no disconnection. `tests/syncobj_headless.sh` (its fairness case included) and `tests/color_headless.sh`
+  pass unchanged.
+
+**Not checked yet:** a real monitor's vblank path (the prediction from flip times); the torn flip on hardware (no card
+here was free to test it: the development machine's session must not be used and the VMs' virtio-gpu has no
+asynchronous flips); mpv (not installed here); several displays at different rates.
 
 ## Idle notifications (`ext_idle_notifier_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
 

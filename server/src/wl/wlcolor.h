@@ -30,6 +30,16 @@ void wlcolor_init(struct wl_display *dpy);
  * checked). 1 if the conversion changed (all of the surface must be drawn again), -1 if a protocol error was posted
  * (the client is gone: do nothing more for it), else 0. */
 int  wlcolor_commit(struct wl_resource *surface, int has_buffer);
+/* A commit's colour state, held with the rest of it while the commit waits (explicit sync's acquire point, the fifo
+ * barrier, a target time: wl.c's Pend), so it applies with what it was committed with, not with what the client set
+ * since. take: the surface's pending state into p (the values set stay pending; their "set" marks move); put: p back
+ * as the pending state (what was pending is replaced: take it first); free: a held commit that will never apply. A
+ * surface with no colour object holds nothing. */
+struct Desc;
+typedef struct { int has; struct Desc *desc; int desc_set, alpha, chroma, cr_set; } WlcPend;
+void wlcolor_pend_take(struct wl_resource *surface, WlcPend *p);
+void wlcolor_pend_put(struct wl_resource *surface, WlcPend *p);
+void wlcolor_pend_free(WlcPend *p);
 /* The conversion this surface's pixels need, or NULL (none: they are shown as they are) */
 const CcConv *wlcolor_conv(struct wl_resource *surface);
 /* A display in output slot `slot` (wl.c's: a wl_output resource's user data is slot + 1, 0 once the display is gone)

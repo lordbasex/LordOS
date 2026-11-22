@@ -65,6 +65,8 @@ void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float 
     (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)uv; (void)c; (void)o;
 }
 int  gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) { (void)d; (void)done; (void)data; return -1; }
+int  gpu_scanout_tear(const GpuDmabuf *d, void (*done)(void *), void *data, int tear) { (void)d; (void)done; (void)data; (void)tear; return -1; }
+int  gpu_flip_torn(void) { return 0; }
 int  gpu_can_scanout(const GpuDmabuf *d, int w, int h) { (void)d; (void)w; (void)h; return 0; }
 void gpu_read_next(uint32_t *px, int w, int h) { (void)px; (void)w; (void)h; }
 int  gpu_read_done(void) { return 0; }
@@ -162,7 +164,7 @@ static struct {
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC image_target;
     PFNEGLQUERYDMABUFFORMATSEXTPROC query_formats;
     PFNEGLQUERYDMABUFMODIFIERSEXTPROC query_modifiers;
-    long frames, scanouts;
+    long frames, scanouts, torn;        /* torn: direct scanouts flipped asynchronously (tearing-control) */
     char render_node[64];               /* where Mesa renders (on the Pi 5: v3d, not vc4) */
     unsigned gen;                       /* this context's generation (0 = none) */
     int scissor;                        /* the buffer-age scissor: LORD_GPU_SCISSOR=1 and EGL_EXT_buffer_age */
@@ -1521,7 +1523,7 @@ int gpu_can_scanout(const GpuDmabuf *d, int w, int h) {
            kms_scanout_ok(G.k, DRM_FORMAT_XRGB8888, d->modifier);
 }
 
-int gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) {
+int gpu_scanout_tear(const GpuDmabuf *d, void (*done)(void *), void *data, int tear) {
     GOut *o = &G.out[0];                /* one display only (wl_try_scanout) */
     if (!G.on || !o->used || o->first) return -1;
     Shown s = { .kind = 2, .done = done, .data = data };
@@ -1545,7 +1547,16 @@ int gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) {
     gsc_reset(&o->sc);                  /* the UI changed with nothing composed */
     o->sc_busy = 1;
     if (G.debug && (G.scanouts == 1 || G.scanouts % 300 == 0)) dbg("direct scanout: %ld frames (composed %ld)", G.scanouts, G.frames);
-    return present(o, s);
+    o->k->async_next = tear;            /* (kms_flip_fb: only when the driver can, and back at vblank if it refuses) */
+    int r = present(o, s);
+    o->k->async_next = 0;
+    if (tear && o->k->flip_async && !G.torn++ && G.debug) dbg("direct scanout: asynchronous page flips (tearing-control async)");
+    return r;
 }
+
+int gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) { return gpu_scanout_tear(d, done, data, 0); }
+
+/* The last flip of that display was asynchronous (its presentation feedback is not vsync'd). */
+int gpu_flip_torn(void) { return G.on && G.out[0].used && G.out[0].k && G.out[0].k->flip_async; }
 
 #endif

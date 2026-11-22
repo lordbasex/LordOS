@@ -6,6 +6,8 @@
 #   pixels     the same 200×100 pixels (0x80, 0x40, 0x20) shown as linear light and then with no description: the
 #              theme reads the screen after each one maps and counts both colours. Linear light must be on screen as
 #              (0xba, 0x88, 0x63), 255·(v/255)^(1/2.2), and the undescribed window as it was sent
+#   held       a linear-light commit held behind the fifo barrier, the description unset (pending) right after: it
+#              still shows as linear light (wl.c's Pend keeps a commit's colour state)
 # Run from server/ (tests/run_suites.sh does). Exit 77 when something it needs is missing (the theme bundle: npm run
 # build), 1 on a failure or if lord-server didn't survive. COLOR_ONLY=protocols runs one of them.
 cd "$(dirname "$0")/.." || exit 1
@@ -36,7 +38,7 @@ printf '{ "version": 1, "apps": { "screenshots": { "screen": { "state": "allow",
   };
   globalThis.__lordWayland = (id, type, d) => {
     const r = orig(id, type, d);
-    if (type === 'map' && /^color:(linear|plain)$/.test(d.title || '')) {
+    if (type === 'map' && /^color:(linear|plain|held)$/.test(d.title || '')) {
       setTimeout(() => {
         let n = [-1, -1];
         try { n = count([[0xba, 0x88, 0x63], [0x80, 0x40, 0x20]]); } catch (e) { console.log('WLPERF colorpx error ' + e); }
@@ -82,6 +84,14 @@ if want pixels; then
     [ -n "$c" ] && [ "$c" -ge 18000 ] && [ "$r" -eq 0 ] || fail "pixels: linear light shows $c converted and $r unconverted pixels"
     c=$(echo "$pla" | sed -n 's/.*"converted":\([0-9-]*\).*/\1/p'); r=$(echo "$pla" | sed -n 's/.*"raw":\([0-9-]*\).*/\1/p')
     [ -n "$r" ] && [ "$r" -ge 18000 ] && [ "$c" -eq 0 ] || fail "pixels: no description shows $r pixels as sent and $c converted"
+fi
+if want held; then
+    client held || fail "held: the client"
+    sleep 0.5
+    hel=$(events colorpx | grep '"color:held"' | tail -1)
+    echo "held: $hel"
+    c=$(echo "$hel" | sed -n 's/.*"converted":\([0-9-]*\).*/\1/p'); r=$(echo "$hel" | sed -n 's/.*"raw":\([0-9-]*\).*/\1/p')
+    [ -n "$c" ] && [ "$c" -ge 18000 ] && [ "$r" -eq 0 ] || fail "held: a held commit shows $c pixels converted and $r as sent (it must keep its description)"
 fi
 kill -0 $P 2>/dev/null || { echo "lord-server is gone"; tail -20 "$D/home/.cache/lordos/compositor.log" 2>/dev/null; R=1; }
 exit $R

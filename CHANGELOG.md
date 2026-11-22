@@ -165,6 +165,39 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     330 fps (mailbox), no protocol error, no stall; an ASan build runs the suite cleanly; on VM 116 the suite also
     passes with GPU composition on the monitor (llvmpipe). Not checked yet: a buffer sampled in place by a real GPU
     (virtio-gpu copies udmabufs), NVIDIA's driver (LordOS doesn't support it), Xwayland's own use.
+- **Linux apps: frame timing and presentation hints (`fifo-v1`, `commit-timing-v1`, `tearing-control-v1`,
+  `content-type-v1`), in development** (approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frame timing").
+  - **Held content updates, in explicit sync's queue.** A commit that may not apply yet is held with its whole pending
+    state in the surface's one queue, the one explicit sync (`linux-drm-syncobj-v1`) uses, and every later commit
+    queues behind it, in order: the first applies only when its acquire point is signalled, its fifo barrier is down
+    and its target time has come. The queue holds 8 (explicit sync's limit); full, a first update that waits only for
+    its barrier or its time applies at once, so these protocols never disconnect a client. Held updates apply at
+    the latch of the frame about to be painted for the surface's own display (`wl_latch`), when that display's frame is
+    done, or when the main loop wakes for their time (`wl_timing_wait`); their frame callbacks and presentation feedback
+    go with the frame that shows them. A buffer destroyed while held keeps what is shown; a surface destroyed drops its
+    held updates (feedback discarded). `server/src/wl/timing.c` (the objects), `wltiming.h` (the pure decisions).
+  - **`wp_fifo_manager_v1` 1:** an update with `wait_barrier` waits until the display has latched a frame since the
+    update that set the barrier: Mesa's Vulkan FIFO present mode runs at the display's rate without frame callbacks. A
+    window nobody can see clears it with its once-a-second tick, a screen that is off once a second, so no client is
+    left waiting; a synchronized subsurface ignores `wait_barrier`, as the protocol says.
+  - **`wp_commit_timing_manager_v1` 1:** an update is not shown before its target time on `wp_presentation`'s clock;
+    it applies at the latch of the first frame predicted at or after it (the next vblank from the display's last flip,
+    or, without a monitor or with flips that don't wait for vblank, the latch's own time), less 1/16 of a refresh.
+  - **`wp_tearing_control_manager_v1` 1:** the hint is kept. "async" tears only for a fullscreen app's own buffer
+    scanned out alone, when the driver reports `DRM_CAP_ASYNC_PAGE_FLIP`: that flip carries
+    `DRM_MODE_PAGE_FLIP_ASYNC`, and one the driver refuses goes at vblank. Composed frames always wait for vblank; a torn
+    flip's feedback is not marked vsync and doesn't count as a driver that never waits. Not yet checked on hardware.
+  - **`wp_content_type_manager_v1` 1:** none, photo, video or game, kept per surface and applied on commit; nothing uses
+    it yet.
+  - **Checked** against a headless lord-server (`tests/wltiming_headless.sh`, `build/wltiming-client`, run by
+    `tests/run_suites.sh`; `build/wltiming-test`): a FIFO client 60.5 updates a second with none sharing a refresh (180
+    a second and 2 in 3 sharing without fifo); targets 17–400 ms ahead shown within 1 ms of them; every protocol error;
+    vkcube (Mesa 25.0.7 lavapipe, FIFO) binds fifo and commit timing, sends `set_timestamp`, `set_barrier` and
+    `wait_barrier` on every present, and shows 51–57 frames a second with no gap over 50 ms; vkcube IMMEDIATE asks for
+    async. With explicit sync (Mesa's Intel driver): FIFO sends acquire and release points with the barrier and the
+    timestamp on every present, 55 frames a second; MAILBOX 16 896 commits with points in 5 s, no error. `tests/wlperf_headless.sh` now marks the welcome tour as shown, so the Help window no longer covers its test
+    windows (its frame test got 19 callbacks a second, the rate of a covered window), and so does
+    `tests/guestwin_headless.sh` (the Help window was one more window in the lists it checks).
 
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;

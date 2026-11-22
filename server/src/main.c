@@ -2352,6 +2352,13 @@ static int render_frame(Server *s) {
     ui.layout_ms = ui.paint_ms = 0;
     ui.damage_px = 0;
     if (keylag_enabled) keylag_render();
+    /* the latch: a Linux app's held content updates that may go in this frame (fifo-v1, commit-timing-v1; wl.c) */
+    if (!prep_only) {
+        unsigned lk = 0;
+        if (s->headless) lk = OUTPICK_ALL;
+        else for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && !s->out[i].kms.flip_pending) lk |= 1u << i;
+        wl_latch(lk, s->headless || flip_instant >= 3);
+    }
     /* GPU path: a Linux app's new frame is only a texture (wl.c damage_node), not UI damage. Every
      * GPU display must still present it: before 0.8.1 nothing was flipped until some other part of
      * the screen changed (the clock, the cursor...), so typing in Chromium or Firefox showed up to a
@@ -3250,6 +3257,12 @@ int main(int argc, char **argv) {
         double cad = cast_timeout();
         if (cad >= 0 && (delay < 0 || cad < delay)) delay = cad;
 
+        {   /* a Linux app's content updates held for a refresh or a time (fifo-v1, commit-timing-v1, wl.c): after the
+             * render, whose frame may have let some apply that now want the next one */
+            double twd = wl_timing_wait(unseen);
+            if (twd == 0 && all_busy(&s)) twd = -1;     /* (due now, every display waiting for its flip: the flip wakes it) */
+            if (twd >= 0 && (delay < 0 || twd < delay)) delay = twd;
+        }
         int wait = delay < 0 ? -1 : (int)ceil(delay);
         if ((wants && (!all_busy(&s) || ahead) && pace <= 0) || ui.theme_request[0] || ui.quit_requested) wait = 0;
         if (timeout_ms > 0) {
@@ -3338,7 +3351,7 @@ int main(int argc, char **argv) {
                 /* a flip waits for vblank, half a period on average; one that completes within an eighth
                  * of it, again and again, comes from a driver that doesn't wait (a virtual card) */
                 uint64_t period = mk->mode.vrefresh ? 1000000000ull / mk->mode.vrefresh : 16666667ull;
-                if (mk->flip_submit_ns && mk->flip_ns >= mk->flip_submit_ns) {
+                if (!mk->flip_async && mk->flip_submit_ns && mk->flip_ns >= mk->flip_submit_ns) {   /* (a torn flip: tearing-control) */
                     if (mk->flip_ns - mk->flip_submit_ns < period / 8) { if (flip_instant < 8) flip_instant++; }
                     else if (flip_instant > 0) flip_instant--;
                     if (flip_instant == 3 && !flip_told++) fprintf(stderr, "kms: page flips complete before vblank: pacing to %d Hz\n", mk->mode.vrefresh ? mk->mode.vrefresh : 60);

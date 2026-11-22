@@ -30,6 +30,10 @@ typedef struct {
     uint64_t flip_ns;
     uint64_t flip_submit_ns; /* when that flip was queued (CLOCK_MONOTONIC, ns) */
     unsigned flip_seq;
+    /* tearing (tearing-control-v1, docs/WAYLAND.md "Frame timing"): async_cap, the driver takes DRM_MODE_PAGE_FLIP_ASYNC
+     * on the legacy page flip (DRM_CAP_ASYNC_PAGE_FLIP); async_next, the next kms_flip_fb may tear (gpu_scanout sets it
+     * for a fullscreen game's own buffer); flip_async, the last flip queued was one (its time is no vblank's) */
+    int async_cap, async_next, flip_async;
     /* hardware cursor (cursor plane, legacy ioctl) */
     uint32_t cursor_handle, cursor_w, cursor_h, cursor_pitch;   /* plane size (the driver's cap) and row in pixels */
     uint32_t *cursor_map;

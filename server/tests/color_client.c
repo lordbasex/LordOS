@@ -8,6 +8,8 @@
  *   show        a 200×100 window "color:linear" whose pixels (0x80, 0x40, 0x20) are linear light (ext_linear, sRGB
  *               primaries) for 3 s, then the same pixels in "color:plain" with no description for 3 s: the theme of
  *               tests/color_headless.sh reads the screen and counts both colours
+ *   held        "color:held": a commit of those pixels as linear light held behind the fifo barrier, the description
+ *               unset (pending, never committed) right after: it must still show as linear light
  *
  *   WAYLAND_DISPLAY=… build/color-client MODE   (exit 0, or 1 on a failed check) */
 #include <errno.h>
@@ -21,6 +23,7 @@
 #include "client/xdg-shell-client-protocol.h"
 #include "client/color-management-v1-client-protocol.h"
 #include "client/color-representation-v1-client-protocol.h"
+#include "client/fifo-v1-client-protocol.h"
 
 static struct wl_display *dpy;
 static struct wl_compositor *comp;
@@ -28,6 +31,7 @@ static struct wl_shm *shm;
 static struct xdg_wm_base *wmbase;
 static struct wp_color_manager_v1 *cm;
 static struct wp_color_representation_manager_v1 *crm;
+static struct wp_fifo_manager_v1 *fifom;
 static struct wl_output *output;
 static unsigned intents, features, tfs, prims, alphas, cm_done, cr_done;
 static int ncoef, coef[16][2];
@@ -61,6 +65,8 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
     else if (!strcmp(iface, wp_color_manager_v1_interface.name)) {
         cm = wl_registry_bind(r, name, &wp_color_manager_v1_interface, 1);
         wp_color_manager_v1_add_listener(cm, &cm_l, NULL);
+    } else if (!strcmp(iface, wp_fifo_manager_v1_interface.name)) {
+        fifom = wl_registry_bind(r, name, &wp_fifo_manager_v1_interface, 1);
     } else if (!strcmp(iface, wp_color_representation_manager_v1_interface.name)) {
         crm = wl_registry_bind(r, name, &wp_color_representation_manager_v1_interface, 1);
         wp_color_representation_manager_v1_add_listener(crm, &cr_l, NULL);
@@ -476,12 +482,44 @@ static int run_show(void) {
     return no_error("show: no error") ? 0 : 1;
 }
 
+/* ---- held: a commit held behind the fifo barrier applies with the description it was committed with ---- */
+
+static int run_held(void) {
+    connect_all();
+    if (!fifom) { printf("FAIL no wp_fifo_manager_v1\n"); return 1; }
+    Img m;
+    struct wp_image_description_v1 *ld = params(WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR, WP_COLOR_MANAGER_V1_PRIMARIES_SRGB, &m);
+    Window w;
+    window(&w, "color:first");              /* (the session's first window takes longer to come up) */
+    show(&w, buffer(200, 100, 0xff102030u, WL_SHM_FORMAT_XRGB8888));
+    pause_ms(2000);
+    close_window(&w);
+    window(&w, "color:held");
+    struct wp_color_management_surface_v1 *cs = wp_color_manager_v1_get_surface(cm, w.s);
+    struct wp_fifo_v1 *f = wp_fifo_manager_v1_get_fifo(fifom, w.s);
+    struct wl_buffer *first = buffer(200, 100, 0xff102030u, WL_SHM_FORMAT_XRGB8888);
+    struct wl_buffer *lin = buffer(200, 100, 0xff804020u, WL_SHM_FORMAT_XRGB8888);
+    /* in one batch: 1 maps the window and sets the barrier; 2 (linear light) waits for it, so it is held; then the
+     * description is unset, pending and never committed. 2 must still apply as linear light. */
+    wp_fifo_v1_set_barrier(f);
+    show(&w, first);
+    wp_color_management_surface_v1_set_image_description(cs, ld, WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
+    wp_fifo_v1_wait_barrier(f);
+    show(&w, lin);
+    wp_color_management_surface_v1_unset_image_description(cs);
+    wl_display_flush(dpy);
+    pause_ms(3000);
+    close_window(&w);
+    return no_error("held: no error") ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
     const char *mode = argc > 1 ? argv[1] : "protocols";
     int r;
     if (!strcmp(mode, "protocols")) { r = run_protocols(); run_errors(); r |= fails != 0; }
     else if (!strcmp(mode, "show")) r = run_show();
-    else { fprintf(stderr, "usage: color-client protocols|show\n"); return 2; }
+    else if (!strcmp(mode, "held")) r = run_held();
+    else { fprintf(stderr, "usage: color-client protocols|show|held\n"); return 2; }
     if (dpy) wl_display_disconnect(dpy);
     return r;
 }

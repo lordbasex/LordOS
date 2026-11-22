@@ -564,6 +564,39 @@ int wlcolor_commit(struct wl_resource *surface, int has_buffer) {
     return 1;
 }
 
+void wlcolor_pend_take(struct wl_resource *surface, WlcPend *p) {
+    CmSurf *s = cs_find(surface);
+    memset(p, 0, sizeof *p);
+    if (!s) return;
+    p->has = 1;
+    p->desc = desc_ref(s->p_desc);          /* (a reference of its own: the pending one stays the surface's) */
+    p->desc_set = s->p_desc_set;
+    p->alpha = s->p_alpha;
+    p->chroma = s->p_chroma;
+    p->cr_set = s->p_cr_set;
+    s->p_desc_set = s->p_cr_set = 0;
+}
+
+void wlcolor_pend_put(struct wl_resource *surface, WlcPend *p) {
+    CmSurf *s = p->has ? cs_find(surface) : NULL;
+    if (s) {
+        desc_unref(s->p_desc);
+        s->p_desc = p->desc;                /* (its reference moves) */
+        p->desc = NULL;
+        s->p_desc_set = p->desc_set;
+        s->p_alpha = p->alpha;
+        s->p_chroma = p->chroma;
+        s->p_cr_set = p->cr_set;
+    }
+    wlcolor_pend_free(p);
+}
+
+void wlcolor_pend_free(WlcPend *p) {
+    desc_unref(p->desc);
+    p->desc = NULL;
+    p->has = 0;
+}
+
 const CcConv *wlcolor_conv(struct wl_resource *surface) {
     CmSurf *s = cs_find(surface);
     return s ? s->conv : NULL;

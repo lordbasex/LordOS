@@ -22,7 +22,7 @@ D=$(mktemp -d "${TMPDIR:-/tmp}/lwp.XXXXXX") || exit 1
 trap 'kill $P 2>/dev/null; [ -n "$KEEP" ] || rm -rf "$D"' EXIT
 mkdir -p "$D/home/.config/lordos"
 chmod 700 "$D"
-printf '{"schema": 9, "desktopChosen": true, "language": "en"}\n' >"$D/home/.config/lordos/settings.json"
+printf '{"schema": 9, "desktopChosen": true, "welcomeShown": true, "language": "en"}\n' >"$D/home/.config/lordos/settings.json"
 # outside the repository: a development build runs a theme there unchecked
 { cat "$THEME"; printf ';globalThis.WLPERF_IDLE = %s;\n' "'${WLPERF_IDLE:-allow}'"; cat <<'EOF'
 ;(() => {

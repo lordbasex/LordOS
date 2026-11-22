@@ -278,6 +278,14 @@ EOF
         77) skip "color" "build/lord-server, build/color-client and the default theme (make, npm run build)" ;;
         *) bad "color (tests/color_client.c, headless lord-server: what is advertised, errors, linear light on screen)" ;;
     esac
+    # fifo-v1, commit-timing-v1, tearing-control-v1, content-type-v1 against a headless lord-server, vkcube's FIFO if
+    # installed (docs/WAYLAND.md, "Frame timing")
+    sh tests/wltiming_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "wltiming (tests/wltiming_client.c, headless lord-server: fifo, commit timing, errors, vkcube)" ;;
+        77) skip "wltiming" "build/lord-server and the default theme (make, npm run build)" ;;
+        *) bad "wltiming (tests/wltiming_client.c, headless lord-server: fifo, commit timing, errors, vkcube)" ;;
+    esac
     # apps mode's guest side: lord-server's window endpoint, directly and through lordos-guest (tests/guestwin_client.c)
     sh tests/guestwin_headless.sh >"$T/out" 2>&1
     case $? in

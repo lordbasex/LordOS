@@ -26,6 +26,14 @@ int  wl_frame_unseen(unsigned time_ms);
  * once a second, here when no frame of lord-server's did. ms until the next one is due, -1 when none waits. */
 double wl_frame_hidden(unsigned time_ms);
 double wl_title_wait(void);
+/* fifo-v1 and commit-timing-v1 (wl/timing.h, docs/WAYLAND.md "Frame timing"). wl_latch: lord-server is about to paint a
+ * frame for the displays `keys` (the ones not waiting for a flip; OUTPICK_ALL without a monitor): the held content
+ * updates that may go in it apply now. immediate: the frame is shown when painted (no monitor, or flips that don't
+ * wait for vblank), not at the display's next vblank. wl_timing_wait: each loop, after the render; ms until a held
+ * update's target time is due, 0 also when held updates applied outside a client's request (they want the next
+ * frame), -1: none; with unseen (nothing is drawn), the ones whose time has come apply at once. */
+void wl_latch(unsigned keys, int immediate);
+double wl_timing_wait(int unseen);
 /* ext-idle-notify (wl/idlenotify.h): each loop with display.c's last activity; ms until the next is due, or -1 */
 double wl_idle_tick(double last_ms, double now_ms);
 void wl_idle_changed(void);

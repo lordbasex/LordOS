@@ -297,9 +297,16 @@ int kms_scanout_ok(const Kms *k, uint32_t fourcc, uint64_t modifier) {
     return 0;
 }
 
+/* Does the driver flip without waiting for vblank when asked (DRM_MODE_PAGE_FLIP_ASYNC on the legacy ioctl)? */
+static int async_flip_cap(int fd) {
+    struct drm_get_cap c = { .capability = DRM_CAP_ASYNC_PAGE_FLIP };
+    return !xioctl(fd, DRM_IOCTL_GET_CAP, &c) && c.value;
+}
+
 static int kms_setup(Kms *k, int keep) {
     if (pick_output(k)) return -1;
     read_scanout_formats(k);
+    k->async_cap = async_flip_cap(k->fd);
     k->saved.crtc_id = k->crtc_id;
     xioctl(k->fd, DRM_IOCTL_MODE_GETCRTC, &k->saved);
     if (create_buffer(k, &k->buf[0]) || create_buffer(k, &k->buf[1])) return -1;
@@ -343,6 +350,7 @@ int kms_head_open(Kms *k, int fd, uint32_t conn_id, const struct drm_mode_modein
     k->width = mode->hdisplay;
     k->height = mode->vdisplay;
     read_scanout_formats(k);
+    k->async_cap = async_flip_cap(fd);
     k->saved.crtc_id = k->crtc_id;
     xioctl(fd, DRM_IOCTL_MODE_GETCRTC, &k->saved);
     if (create_buffer(k, &k->buf[0]) || create_buffer(k, &k->buf[1])) { kms_close(k); return -1; }
@@ -418,6 +426,7 @@ int kms_flip(Kms *k) {
     };
     if (xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) {
         k->flip_pending = 1;
+        k->flip_async = 0;
         k->flip_submit_ns = kms_now_ns();
         return 0;
     }
@@ -516,6 +525,16 @@ int kms_flip_fb(Kms *k, uint32_t fb, void *data) {
         .crtc_id = k->crtc_id, .fb_id = fb, .flags = DRM_MODE_PAGE_FLIP_EVENT, .user_data = (uintptr_t)data,
     };
     k->custom = 1;
+    int async = k->async_next && k->async_cap && !k->modeset_pending;
+    k->async_next = 0;
+    /* a torn flip the driver refuses (amdgpu: a buffer of another format, modifier or pitch than the one shown, as the
+     * first one after a composed frame) goes at vblank instead */
+    if (async) {
+        pf.flags |= DRM_MODE_PAGE_FLIP_ASYNC;
+        if (xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) { k->flip_async = k->flip_pending = 1; k->flip_submit_ns = kms_now_ns(); return 0; }
+        pf.flags &= ~(uint32_t)DRM_MODE_PAGE_FLIP_ASYNC;
+    }
+    k->flip_async = 0;
     if (!k->modeset_pending && xioctl(k->fd, DRM_IOCTL_MODE_PAGE_FLIP, &pf) == 0) { k->flip_pending = 1; k->flip_submit_ns = kms_now_ns(); return 0; }
     /* no page flip: synchronous modeset and notify right away */
     if (kms_set_fb(k, fb)) return -1;

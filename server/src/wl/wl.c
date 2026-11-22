@@ -27,6 +27,7 @@
 #include "keygrab.h"
 #include "secctx.h"
 #include "kbinhibit.h"
+#include "timing.h"
 #include "wlfixes.h"
 #include "../keylag.h"
 #include "../sec/perms.h"
@@ -230,6 +231,8 @@ struct Surf {
     SobjQueue sq;
     struct wl_event_source *sq_src, *sq_timer, *sq_poll;   /* sq_poll: past the session's eventfds, a timer */
     int sq_fd, sq_logged;
+    WlTiming *tm;                   /* fifo, commit timing, tearing and content type (timing.h); its held updates are in sq */
+    int sub_sync;                   /* wl_subsurface: in synchronized mode (the default) */
 };
 
 /* Shape of a surface's hole in the UI: if it changes, the UI must be repainted. */
@@ -1050,7 +1053,8 @@ static void srf_input(struct wl_client *c, struct wl_resource *r, struct wl_reso
 
 /* ---- explicit sync: linux-drm-syncobj-v1 (syncobj.h, docs/SYNCOBJ-PLAN.md) ---- */
 
-/* The p_* fields of a Surf: a commit's state. Values the protocol keeps from one commit to the next (transform, scale,
+/* The p_* fields of a Surf: a commit's state, held in the surface's one queue while its acquire point (explicit sync),
+ * its fifo barrier or its target time (timing.h) isn't there yet. A new double-buffered field of Surf goes here too. Values the protocol keeps from one commit to the next (transform, scale,
  * opacity, the viewport's numbers, a subsurface's place, the cursor's hotspot) are copied; the rest is moved. */
 struct Pend {
     struct wl_resource *buf;
@@ -1069,6 +1073,8 @@ struct Pend {
     WlRgn input;
     int input_set, has_input;
     SobjPoint acq, rel;
+    WlcPend color;                      /* its colour state (wlcolor.h) */
+    WltUpdate tu;                       /* this commit's fifo barrier, target time and hints (timing.h) */
 };
 
 /* the per-client counts of the limits (syncobj.h); found by client, so a surface outliving its client's record (the
@@ -1100,10 +1106,13 @@ static SobjClient *sobj_client(struct wl_client *c) {
     return k;
 }
 
+/* The client destroyed a buffer a held commit attaches (Mesa does, recreating a swapchain): that commit keeps what is
+ * shown instead of emptying the window (attaching nothing would unmap it); its release point is still signalled. */
 static void pend_buf_gone(struct wl_listener *l, void *data) {
     (void)data;
     Pend *e = wl_container_of(l, e, buf_destroy);
     e->buf = NULL;
+    e->attached = 0;
     wl_list_remove(&l->link);
     wl_list_init(&l->link);
 }
@@ -1148,6 +1157,7 @@ static void pend_take(Surf *s, Pend *e) {
     s->p_input_set = 0;
     e->acq = s->p_acq; e->rel = s->p_rel;
     s->p_acq.tl = s->p_rel.tl = NULL;
+    wlcolor_pend_take(s->res, &e->color);
 }
 
 /* e back into the surface's pending state (what is left there of an applied commit is dropped) */
@@ -1184,6 +1194,7 @@ static void pend_put(Surf *s, Pend *e) {
     sobj_unref(s->p_rel.tl);
     s->p_acq = e->acq; s->p_rel = e->rel;
     e->acq.tl = e->rel.tl = NULL;
+    wlcolor_pend_put(s->res, &e->color);
 }
 
 /* A commit that will never be applied (its surface is gone): its callbacks are dropped, its presentation feedback
@@ -1197,6 +1208,7 @@ static void pend_free(Pend *e) {
     wlrgn_free(&e->input);
     sobj_unref(e->acq.tl);
     sobj_release(&e->rel);
+    wlcolor_pend_free(&e->color);
     free(e);
 }
 
@@ -1226,6 +1238,7 @@ static void sq_disarm(Surf *s) {
 }
 
 static void sq_drain(Surf *s);
+static void sq_drain_at(Surf *s, uint64_t present);
 static int sq_ready(int fd, uint32_t mask, void *data) {
     (void)fd; (void)mask;
     Surf *s = data;
@@ -1300,8 +1313,14 @@ static void sq_apply(Surf *s, Pend *e) {
     free(e);
 }
 
-/* Applies the queued commits whose acquire point is signalled, in order, up to the first one that still waits */
-static void sq_drain(Surf *s) {
+/* Applies the queued commits, in order, while the first is ready: its acquire point signalled (else it is armed and
+ * waits), then its fifo barrier down and its target time come (else a latch, a frame done or the loop's timer brings it
+ * back, timing.h). present: when a frame latched now is shown (0: not at a latch, now). */
+static void timing_applied(Surf *s, const WltUpdate *u);
+static int timing_ready(Surf *s, const WltUpdate *u, uint64_t present);
+static uint64_t mono_now(void);
+static int timing_kick;                 /* held updates applied outside a client's request: the loop must look again */
+static void sq_drain_at(Surf *s, uint64_t present) {
     Pend *e;
     while (!s->sq_src && !s->sq_poll && (e = sobjq_front(&s->sq))) {
         if (e->acq.tl && sobj_signalled(e->acq) != 1) {
@@ -1310,11 +1329,19 @@ static void sq_drain(Surf *s) {
             if (r == -2) { wl_client_post_no_memory(s->client); return; }
             static int told;
             if (!told++) fprintf(stderr, "wayland: explicit sync: could not wait for an acquire point; applied as it is\n");
+            sobj_unref(e->acq.tl);          /* (not tried again) */
+            e->acq.tl = NULL;
         }
+        if (!present) present = mono_now();
+        if (!timing_ready(s, &e->tu, present)) return;
         sobjq_pop(&s->sq);
+        WltUpdate tu = e->tu;
         sq_apply(s, e);
+        timing_applied(s, &tu);
+        timing_kick = 1;
     }
 }
+static void sq_drain(Surf *s) { sq_drain_at(s, 0); }
 
 /* The surface goes: its waiting commits are dropped (their release points signalled), its points forgotten */
 static void sobj_surface_gone(Surf *s) {
@@ -1424,7 +1451,8 @@ static void bind_sobjm(struct wl_client *c, void *data, uint32_t ver, uint32_t i
 }
 
 /* wl_surface.commit: with explicit sync, the protocol's rules first; then applied now, or queued while its acquire
- * point (or an earlier commit's) is not signalled. Without it, a commit still waits behind queued ones (order). */
+ * point, its fifo barrier or its target time (timing.h), or an earlier commit, isn't there yet (order). */
+static uint64_t timing_present(Surf *s, uint64_t now);
 static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
     if (keylag_enabled && key_focus && c == key_focus->client) keylag_commit();
@@ -1433,11 +1461,28 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
                                     s->p_rel.tl != NULL, s->p_acq.tl && s->p_acq.tl == s->p_rel.tl, s->p_acq.point, s->p_rel.point);
         if (err) { wl_resource_post_error(s->sobj, (uint32_t)err, "%s", sobj_err_text(err)); return; }
     }
+    WltUpdate tu = s->tm ? wlt_take(s->tm) : (WltUpdate){ 0 };
     int act = sobj_commit_action(s->sq.n > 0, s->p_acq.tl != NULL, s->p_acq.tl ? sobj_signalled(s->p_acq) == 1 : 1);
-    if (act == SOBJ_APPLY) { surface_apply(s); return; }
+    if (act == SOBJ_APPLY && timing_ready(s, &tu, timing_present(s, mono_now()))) {
+        surface_apply(s);
+        timing_applied(s, &tu);
+        return;
+    }
+    /* full: while the first waits only for its barrier or its time, it goes now (fifo and commit timing never cost a
+     * client its connection); one waiting for its acquire point keeps explicit sync's limit */
+    while (s->sq.n >= SOBJ_MAX_PENDING && s->tm && !s->sq_src && !s->sq_poll) {
+        Pend *f = sobjq_front(&s->sq);
+        if (f->acq.tl && sobj_signalled(f->acq) != 1) break;
+        int n = s->sq.n;
+        s->tm->barrier = 0;
+        f->tu.has_target = f->tu.wait_barrier = 0;
+        sq_drain(s);
+        if (s->sq.n == n) break;
+    }
     Pend *e = calloc(1, sizeof *e);
     if (!e) { wl_client_post_no_memory(c); return; }
     pend_take(s, e);
+    e->tu = tu;
     if (sobjq_push(&s->sq, e)) { pend_free(e); wl_client_post_no_memory(c); return; }
     if (s->sq.n == 1) sq_drain(s);
 }
@@ -1734,6 +1779,8 @@ static void dnd_surface_gone(Surf *s);
 static void kbi_surface_gone(struct wl_resource *ksi);
 static void surface_gone(struct wl_resource *r) {
     Surf *s = wl_resource_get_user_data(r);
+    wlt_gone(s->tm);                    /* (its held updates go with explicit sync's queue: sobj_surface_gone) */
+    s->tm = NULL;
     if (s->xw) { xwm_surface_gone(s->xw); s->xw = NULL; }
     if (pointer_focus == s) { pointer_focus = NULL; buttons_held = 0; }
     if (key_focus == s) { key_focus = NULL; wl_textinput_gone(); }
@@ -1856,10 +1903,12 @@ static void sub_position(struct wl_client *c, struct wl_resource *r, int32_t x, 
     if (s) { s->p_sx = x; s->p_sy = y; }
 }
 static void sub_place(struct wl_client *c, struct wl_resource *r, struct wl_resource *sibling) { (void)c; (void)r; (void)sibling; }
-static void sub_sync(struct wl_client *c, struct wl_resource *r) { (void)c; (void)r; }
+/* (its commits apply as a desynchronized one's; the mode only tells fifo-v1 to ignore wait_barrier, timing.h) */
+static void sub_sync(struct wl_client *c, struct wl_resource *r) { (void)c; Surf *s = wl_resource_get_user_data(r); if (s) s->sub_sync = 1; }
+static void sub_desync(struct wl_client *c, struct wl_resource *r) { (void)c; Surf *s = wl_resource_get_user_data(r); if (s) s->sub_sync = 0; }
 static const struct wl_subsurface_interface subsurface_impl = {
     .destroy = sub_destroy, .set_position = sub_position, .place_above = sub_place, .place_below = sub_place,
-    .set_sync = sub_sync, .set_desync = sub_sync,
+    .set_sync = sub_sync, .set_desync = sub_desync,
 };
 
 static void sub_gone(struct wl_resource *r) {
@@ -1888,6 +1937,7 @@ static void subc_get(struct wl_client *c, struct wl_resource *r, uint32_t id, st
     wl_resource_set_implementation(res, &subsurface_impl, s, sub_gone);
     s->role = R_SUB;
     s->sub = res;
+    s->sub_sync = 1;
     s->parent = p;
     if (p->nkids < 16) p->kids[p->nkids++] = s;
 }
@@ -4194,7 +4244,10 @@ void wl_paint_fullscreen(Canvas *out) {
 }
 
 int wl_fullscreen_active(void) { return fs_surf && fs_surf->content; }
-int wl_wants_frame(void) { return need_frame || frames_held; }
+static int timing_due(void);
+static int waits_frame(Surf *s);
+static void timing_refreshed(Surf *s);
+int wl_wants_frame(void) { return need_frame || frames_held || timing_due(); }
 unsigned wl_new_content(void) {
     unsigned k = need_frame ? new_keys : 0;
     new_keys = 0;
@@ -4223,7 +4276,10 @@ int wl_try_scanout(int cursor_free) {
     if (nused != 1 || fs_surf->viewport || fs_surf->gx || fs_surf->gy || !gpu_can_scanout(&d->d, pw, ph)) return 0;
     d->refs++;
     d->scanned = 1;
-    if (gpu_scanout(&d->d, scanout_done, d)) { d->scanned = 0; dm_unref(d); return 0; }
+    /* tearing-control-v1's "async" (a game that would rather tear than wait): this buffer, and only an app's own buffer
+     * alone on the screen, flips without waiting for vblank when the driver can (kms.c); every other frame waits */
+    int tear = fs_surf->tm && fs_surf->tm->hint == WLT_HINT_ASYNC;
+    if (gpu_scanout_tear(&d->d, scanout_done, d, tear)) { d->scanned = 0; dm_unref(d); return 0; }
     return 1;
 }
 
@@ -4249,13 +4305,13 @@ void wl_frame_done(unsigned t, unsigned keys) {
         Surf *s = surfs[i];
         if (!s) continue;
         int hidden = surf_hidden(s);
-        if (hidden && wl_list_empty(&s->frames)) continue;
+        if (hidden && !waits_frame(s)) continue;
         if (!framegate_due(&s->fgate, hidden, t)) continue;    /* minimized, a hidden desktop: once a second */
         if (hidden) framegate_sent(&s->fgate, t);
         /* shown: with a frame of its own display, not another one's (a 60 Hz display's windows paced by a 144 Hz one's
          * frames drew frames nobody saw); while that display waits for its flip, they wait too */
         else if (!outpick_due(slot_key(s->fslot), keys)) {
-            if (!wl_list_empty(&s->frames)) frames_held = 1;
+            if (waits_frame(s)) frames_held = 1;
             continue;
         }
         struct wl_resource *cb, *tmp;
@@ -4265,6 +4321,8 @@ void wl_frame_done(unsigned t, unsigned keys) {
         }
         wl_list_insert_list(s->sent_feedback.prev, &s->feedback);
         wl_list_init(&s->feedback);
+        /* its fifo barrier: the frame was latched (timing.h); what applies now is in the next frame, feedback too */
+        timing_refreshed(s);
     }
     wl_display_flush_clients(dpy);
     if (keylag_enabled) keylag_flushed();
@@ -4273,7 +4331,7 @@ void wl_frame_done(unsigned t, unsigned keys) {
 /* The hidden windows' own tick (framegate.h): their waiting callbacks, once a second, when no frame of
  * lord-server's sent them; nothing of them was shown, so their presentation feedback is discarded. */
 static int hidden_due(Surf *s, unsigned t, unsigned *wait) {
-    if (!surf_hidden(s) || wl_list_empty(&s->frames)) return 0;
+    if (!surf_hidden(s) || !waits_frame(s)) return 0;
     unsigned w = framegate_wait(&s->fgate, t);
     if (w && wait && w < *wait) *wait = w;
     return !w;
@@ -4290,6 +4348,7 @@ double wl_frame_hidden(unsigned t) {
         struct wl_resource *r, *tmp;
         wl_resource_for_each_safe(r, tmp, &s->frames) { wl_callback_send_done(r, t); wl_resource_destroy(r); }
         wl_resource_for_each_safe(r, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); }
+        timing_refreshed(s);
         sent = 1;
         if (wait > FRAMEGATE_HIDDEN_MS) wait = FRAMEGATE_HIDDEN_MS;
     }
@@ -4307,10 +4366,122 @@ int wl_frame_unseen(unsigned t) {
         wl_resource_for_each_safe(r, tmp, &s->frames) { wl_callback_send_done(r, t); wl_resource_destroy(r); waiting = 1; }
         wl_resource_for_each_safe(r, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); waiting = 1; }
         wl_resource_for_each_safe(r, tmp, &s->sent_feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); waiting = 1; }
+        if (s->tm && (s->tm->barrier || s->sq.n)) { if (s->sq.n) waiting = 1; timing_refreshed(s); }   /* (fifo, timing.h) */
+        wl_resource_for_each_safe(r, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); }
     }
     need_frame = frames_held = 0;
     if (waiting) wl_display_flush_clients(dpy);
     return waiting;
+}
+
+/* ---- fifo-v1 and commit-timing-v1 (timing.h, wltiming.h; docs/WAYLAND.md, "Frame timing") ----
+ * Their held updates are the same Pend entries in the same queue as explicit sync's (s->sq): an entry applies once its
+ * acquire point is signalled AND its fifo barrier is down AND its target time has come (sq_ready_now), in order. The
+ * helpers here say when, and wake the loop for it. */
+
+/* The display whose refresh paces the surface: its own, else the main one. */
+static const WltClock *surf_clock(Surf *s) {
+    int k = slot_key(s->fslot);
+    return wlt_clock(k >= 0 ? k : slot_key(out_main));
+}
+static uint64_t mono_now(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec;
+}
+/* A frame is shown as soon as it is painted (no monitor, or a driver whose flips don't wait for vblank: main.c paces
+ * them itself), not at the next vblank: wl_latch says which. */
+static int timing_immediate;
+/* When a frame latched at `now` is shown: at the next vblank; immediate, once painted, which takes as long as that
+ * frame does (a light one well under a millisecond, the first ones of a session many): not known ahead, so `now`, and
+ * an update is never shown before its time, at worst a refresh after it. */
+static uint64_t timing_present(Surf *s, uint64_t now) {
+    return timing_immediate ? now : wlt_next_vblank(surf_clock(s), now);
+}
+/* a subsurface in synchronized mode: fifo-v1 says its wait_barrier is ignored */
+static int timing_nowait(const Surf *s) { return s->role == R_SUB && s->sub_sync; }
+
+/* Is the timing part of update u ready for a frame shown at `present`? (no WlTiming: no constraint) */
+static int timing_ready(Surf *s, const WltUpdate *u, uint64_t present) {
+    if (!s->tm) return 1;
+    return wlt_ready(u, s->tm->barrier, timing_nowait(s), present, wlt_slack(surf_clock(s)));
+}
+
+/* an update became current: its barrier and hints */
+static void timing_applied(Surf *s, const WltUpdate *u) {
+    if (!s->tm) return;
+    wlt_applied(s->tm, u);
+    /* its barrier clears with the next frame of its display: there must be one even if this update drew nothing */
+    if (u->set_barrier && !surf_hidden(s)) need_frame = 1;
+}
+
+/* Its display latched a frame (or, unseen, its own tick came): the barrier clears, and what waited for it applies. */
+static void timing_refreshed(Surf *s) {
+    if (!s->tm) return;
+    s->tm->barrier = 0;
+    if (s->sq.n) sq_drain_at(s, 0);
+}
+
+/* Does the surface wait for a frame? Its frame callbacks, or a held update behind its barrier. */
+static int waits_frame(Surf *s) {
+    return !wl_list_empty(&s->frames) || (s->tm && s->tm->barrier && s->sq.n);
+}
+
+/* ns until the queue's first update is due by its time alone (UINT64_MAX: none, or it waits for its acquire point or
+ * its barrier, which wake the loop themselves) */
+static uint64_t timing_left(Surf *s, uint64_t now) {
+    Pend *e = sobjq_front(&s->sq);
+    if (!e || !s->tm || s->sq_src || s->sq_poll) return UINT64_MAX;
+    const WltUpdate *u = &e->tu;
+    if (u->wait_barrier && s->tm->barrier && !timing_nowait(s)) return UINT64_MAX;
+    if (!u->has_target) return 0;
+    if (timing_immediate) {                     /* the latch's frame is shown then */
+        uint64_t lead = wlt_slack(surf_clock(s)), at = u->target - lead;
+        return u->target <= lead || at <= now ? 0 : at - now;
+    }
+    return wlt_due_in(surf_clock(s), u->target, now);
+}
+static int timing_due(void) {
+    uint64_t now = 0;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->tm || !s->sq.n) continue;
+        if (!now) now = mono_now();
+        if (timing_left(s, now) == 0) return 1;
+    }
+    return 0;
+}
+
+void wl_latch(unsigned keys, int immediate) {
+    if (!dpy) return;
+    timing_immediate = immediate;
+    uint64_t now = 0;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->tm || !s->sq.n || !outpick_due(slot_key(s->fslot), keys)) continue;
+        if (!now) now = mono_now();
+        sq_drain_at(s, timing_present(s, now));
+    }
+}
+
+double wl_timing_wait(int unseen) {
+    if (!dpy) return -1;
+    uint64_t now = 0, wait = UINT64_MAX;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->tm || !s->sq.n) continue;
+        if (!now) now = mono_now();
+        if (unseen) sq_drain_at(s, now);        /* nothing is drawn: its time came, it applies */
+        uint64_t l = timing_left(s, now);
+        if (l < wait) wait = l;
+    }
+    if (timing_kick) { timing_kick = 0; wait = 0; }
+    return wait == UINT64_MAX ? -1 : (double)wait / 1e6;
+}
+
+static WlTiming **timing_slot(struct wl_resource *surface) {
+    Surf *s = wl_resource_get_user_data(surface);
+    return s ? &s->tm : NULL;
 }
 
 /* ---- input ---- */
@@ -5985,6 +6156,13 @@ static void bind_presentation(struct wl_client *c, void *data, uint32_t ver, uin
 /* The flip finished (main.c, with the KMS time and vblank number). */
 void wl_presented(int key, int main_key, uint64_t ns, unsigned seq, unsigned refresh_ns) {
     if (!dpy) return;
+    /* a torn flip (tearing-control, wl_try_scanout) was shown when it completed, not at a vblank: no vsync in its
+     * feedback, and the display's vblank grid (fifo, commit timing) stays the last vsync'd one's */
+    int torn = gpu_flip_torn();
+    if (!torn) wlt_clock_set(key, ns, refresh_ns);
+    uint32_t kind = torn ? WP_PRESENTATION_FEEDBACK_KIND_HW_COMPLETION
+                         : WP_PRESENTATION_FEEDBACK_KIND_VSYNC | WP_PRESENTATION_FEEDBACK_KIND_HW_CLOCK |
+                           WP_PRESENTATION_FEEDBACK_KIND_HW_COMPLETION;
     for (int i = 0; i < MAX_SURF; i++) {
         Surf *s = surfs[i];
         if (!s || wl_list_empty(&s->sent_feedback) || !outpick_presents(slot_key(s->fslot), key, main_key)) continue;
@@ -5996,9 +6174,7 @@ void wl_presented(int key, int main_key, uint64_t ns, unsigned seq, unsigned ref
                     FOR_CLIENT(&oslots[k].res, s->client, o) wp_presentation_feedback_send_sync_output(fb, o);
             uint64_t sec = ns / 1000000000ull;
             wp_presentation_feedback_send_presented(fb, (uint32_t)(sec >> 32), (uint32_t)sec, (uint32_t)(ns % 1000000000ull),
-                                                    refresh_ns, 0, seq,
-                                                    WP_PRESENTATION_FEEDBACK_KIND_VSYNC | WP_PRESENTATION_FEEDBACK_KIND_HW_CLOCK |
-                                                    WP_PRESENTATION_FEEDBACK_KIND_HW_COMPLETION);
+                                                    refresh_ns, 0, seq, kind);
             wl_resource_destroy(fb);
         }
     }
@@ -6496,6 +6672,7 @@ int wl_start(void) {
     wl_textinput_globals(dpy, text_field_report);    /* zwp_text_input_v3 (wl_textinput.c) */
     secctx_init(dpy, may_secctx);       /* a sandbox's own socket per app (secctx.c) */
     wlfixes_init(dpy);                  /* wl_fixes: a client destroys a registry it no longer needs (wlfixes.c) */
+    wlt_globals(dpy, timing_slot);      /* fifo, commit timing, tearing control, content type (timing.c) */
     /* inherited by apps opened from the LordOS terminal */
     setenv("WAYLAND_DISPLAY", socket_name, 1);
     setenv("XDG_SESSION_TYPE", "wayland", 1);
