@@ -785,6 +785,12 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         char dd[PATH_MAX + 64], why[300];
         snprintf(dd, sizeof dd, "%s/disks", real);
         if (un.kind == VMU_WINDOWS && !m.drivers[0]) { fprintf(stderr, "lord-vm: a Windows install needs --drivers (virtio-win)\n"); unlink(sys); return 2; }
+        /* LordOS (vmunattend.h): its installer erases only the disk the answers name, with exactly this size: the system
+         * disk just made (virtio-blk in slot 1, the guest's first: vda; SATA with the compatible devices: sda) */
+        if (un.kind == VMU_LORDOS) {
+            snprintf(un.disk, sizeof un.disk, "%s", m.devices == VM_DEV_COMPAT ? "sda" : "vda");
+            un.disk_bytes = (unsigned long long)m.disk_gb << 30;
+        }
         if (un.kind == VMU_WINDOWS ? vmu_prepare_windows(dd, m.drivers, &un, why, sizeof why) : vmu_prepare(dd, m.iso, &un, m.id, why, sizeof why)) {
             fprintf(stderr, "lord-vm: the unattended install can't be prepared: %s\n", why);
             unlink(sys);

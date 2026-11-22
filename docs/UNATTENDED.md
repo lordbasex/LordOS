@@ -98,6 +98,16 @@ plan) are refused when the plan comes from anywhere else: the graphical installe
 `LORDOSAUTO`, to attach to a virtual machine as a second CD drive. On a USB stick: a FAT file system labelled
 `LORDOSAUTO` (`mkfs.vfat -n LORDOSAUTO /dev/sdX1`) with the file in its top folder.
 
+## In Machines (the LordOS card)
+
+Machines' **LordOS** download card uses this same install for "Install without questions" (in development after 0.8.9;
+[VIRTUALIZATION.md](VIRTUALIZATION.md) 3.9, "The LordOS card"): `lord-vm` boots the ISO's `live/vmlinuz` and
+`live/initrd.img` with `lordos.auto=1` on the command line (no boot menu), with a small FAT disk labelled `LORDOSAUTO`
+that holds the `lordos-auto.conf` it wrote from the assistant's Set up step (`server/src/vm/vmunattend.c`): the
+machine's system disk with its exact size, `erase = yes`, the account with the password's SHA-512 hash, the computer's
+name, language, region, time zone and keyboard, `autologin = no` and `after = reboot`. The restart ends that first
+start; the kernel, the seed disk and the ISO are removed and the machine starts the installed system.
+
 ## On a virtual machine (Proxmox)
 
 1. A machine with the target disk, the live ISO and the `LORDOSAUTO` ISO as two CD drives, booting from the

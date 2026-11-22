@@ -61,6 +61,9 @@
 #   /usr/lib/systemd/system/smartmontools.service.d/lordos.conf  Debian's smartd stays off
 #   /usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf  gnome-keyring without the Secret Service
 #   /usr/lib/systemd/logind.conf.d/lordos-machines.conf  a shutdown waits up to 30 s for Machines to save running machines
+#   /usr/lib/systemd/user/lordos-guest.service (+ default.target.wants), /usr/lib/udev/rules.d/71-lordos-guest.rules
+#                                         LordOS as a Machines guest: lordos-guest for the signed-in person, only where the
+#                                         machine's agent port org.lordos.agent exists (docs/VIRTUALIZATION.md 7.2)
 #   /usr/lib/systemd/system-sleep/lordos-lid-wake  systemd-sleep's hook (root, pre/post only): on a laptop that goes
 #                                         to sleep with the lid open, the lid's ACPI wake source is off until it
 #                                         wakes (GitHub #172; src/hw/lidwake.h, docs/SETTINGS.md)
@@ -221,6 +224,13 @@ if [ -x server/build/lordos-guest ]; then
     install -d "$L/guest"
     install -m 755 server/build/lordos-guest "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}"
     "$STRIP" --strip-unneeded "$L/guest/lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}" 2>/dev/null || true
+    # and for LordOS itself as a Machines guest: lordos-guest.service (a user unit, on by default) runs it only where the
+    # machine's guest agent port exists (docs/VIRTUALIZATION.md 7.2), so a LordOS machine has its agent from the first boot
+    ln -sfn "lordos-guest-${DEB_ARCH:-$(dpkg --print-architecture)}" "$L/guest/lordos-guest"
+    install -D -m 644 packaging/systemd/lordos-guest.service "$PKG/usr/lib/systemd/user/lordos-guest.service"
+    install -d "$PKG/usr/lib/systemd/user/default.target.wants"
+    ln -sfn ../lordos-guest.service "$PKG/usr/lib/systemd/user/default.target.wants/lordos-guest.service"
+    install -D -m 644 packaging/udev/71-lordos-guest.rules "$PKG/usr/lib/udev/rules.d/71-lordos-guest.rules"
 fi
 # lordos-guest-win.exe: the LordOS guest tools Machines installs into a Windows guest (x86-64), cross-built with mingw-w64
 # on the build machine (server/mk/vm.mk); an amd64 package without it can't give Windows guests their clipboard, display

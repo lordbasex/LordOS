@@ -12,6 +12,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Machines: a LordOS download card, in development** (maintainer's decision 2026-11-22; `docs/VIRTUALIZATION.md` 3.9,
+  "The LordOS card"). The New Machine assistant's first card is now **LordOS**, with LordOS's own icon, for amd64 and
+  arm64: it downloads the **live ISO** of the release the card names (*LordOS 0.8.9*, about 1.1 GB), not the OVA.
+  - **Signed with the LordOS release key.** The catalog (`assets/machines/systems.json`) has a new signature kind,
+    `lordos-release`: the release's `SHA256SUMS.sig` (Ed25519) is checked with the release key compiled into LordOS
+    (`codesig_release_key`), by the same check the LordOS Imager uses for official images (`img_sig_verify`). No new
+    crypto, no new key, no key file. A missing signature is refused as unsigned, a bad one as a bad signature, and then
+    the ISO must have the SHA-256 that signed list gives, as for every card.
+  - **Which release:** the card names a pinned release tag (`v0.8.9-beta` today), moved by the release process whenever a
+    release ships new ISOs (`docs/RELEASING.md`, step 1); no GitHub API call. A test fails when the site's current ISO is
+    newer than the card's.
+  - **Install without questions:** the account, password (only its SHA-512 hash), computer name, time zone, keyboard,
+    locale and this LordOS's language go into `lordos-auto.conf` on a `LORDOSAUTO` seed disk, and the machine boots the
+    ISO's live kernel with `lordos.auto=1`: the live ISO's own unattended install (`docs/UNATTENDED.md`), which erases
+    only the machine's system disk, named with its exact size by `lord-vm`, then restarts into the installed LordOS.
+  - **Size:** a card can ask for a least size over the profile; LordOS's is 4 processors, 4 GB, 32 GB and 3D graphics.
+  - **The guest agent from the first boot:** the `lordos` package adds `lordos-guest.service` (a user unit, on by
+    default) and `71-lordos-guest.rules`, which run `lordos-guest` only inside a Machines guest whose agent is on (the
+    `org.lordos.agent` port exists): nothing runs anywhere else. The live ISO also gets `qemu-guest-agent`, which Debian
+    starts only when the host gives the `org.qemu.guest_agent.0` port. So a LordOS machine has its agent and apps mode
+    from the first boot (with the next ISO).
+  - Tests: `vmcatalog-test` (v0.8.9-beta's published list and signature: good, a changed hash, a line added, another
+    key, a missing, empty, garbage or OpenPGP signature, another list, malformed entries), `vmunattend-test`
+    (`lordos-auto.conf`, the seed disk read back), `vm_catalog_test.mjs` (the card, the live ISO from the real list, the
+    tag against `web/content/downloads.json`). Not run yet: a whole install on a machine, which needs the next ISO.
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).

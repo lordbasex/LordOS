@@ -89,6 +89,12 @@ guest's IP); its units have `ConditionVirtualization=vmware` and stay inactive e
 part (`open-vm-tools-desktop`, X11) and are not supported yet. GPU or CPU composition on VMware:
 see `GPU.md`.
 
+**QEMU/KVM guests** (in development, after 0.8.9) get `qemu-guest-agent` too: Debian's udev rule starts it only when the
+host gives the machine the `org.qemu.guest_agent.0` port, so it stays inactive on a computer and on a machine without an
+agent. With it, and `lordos-guest.service` from the `lordos` package (`VIRTUALIZATION.md` 7.2), a LordOS machine made by
+Machines' LordOS card has its guest agent and apps mode from the first boot. Installed systems keep getting it as the
+Store's suggestion (`PACKAGES.md`).
+
 **Typing lag in Chromium on VMware (0.8.0 and the first 0.8.1 ISOs):** it was a GPU-path
 presentation bug, not `open-vm-tools`, and it is fixed in 0.8.1. See
 [TROUBLESHOOTING.md](TROUBLESHOOTING.md), "Typing feels slow"; `tools/diag/keylag.sh` checks a
