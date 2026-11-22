@@ -48,6 +48,11 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
 | `xdg_toplevel_icon_manager_v1` | 1 | a window's own icon, shown only when its app has no installed icon (an AppImage, Wine, a game); buffers copied, re-encoded and size-limited, names ignored (see "Window icons", 0.8.9.5) |
 | `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
+| `xdg_toplevel_drag_manager_v1` | 1 | tab tear-off: during a drag a window follows the pointer at the app's offset, is never the drag's target and stays where it is let go (`tldrag.c`; checked 2026-11-22 with Chromium 156 on a headless lord-server, tear-off and reattach, and `tests/shellx_headless.sh`; see "Shell extras", in development) |
+| `xdg_toplevel_tag_manager_v1` | 1 | a window's untranslated tag keys its own remembered place (each kind of window of an app reopens where it was); its description names it while it has no title (`tltag.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
+| `xdg_system_bell_v1` | 1 | the bell: LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app (`sysbell.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
+| `xdg_session_manager_v1` | 1 | an app's windows come back where they were when it starts again: sessions with random ids, scoped to the program lord-server checked, kept in `~/.config/lordos/wl-sessions` (`xsession.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
+| `ext_background_effect_manager_v1` | 1 | blur behind a region of a window, drawn with the UI's own backdrop blur; offered only on the CPU path with transparency and blur on, none on the GPU path (`bgeffect.c`; checked 2026-11-22, headless CPU path; see "Shell extras", in development) |
 | `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
 | `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
 | `wl_fixes` | 1 | core protocol (wayland.xml 1.24): `destroy_registry` destroys a `wl_registry` the client no longer needs, so a long-lived client's registries don't pile up in lord-server and keep getting `global` events; lord-server sends `delete_id` and the id is reused. Debian 13's libwayland is 1.23, so the interface is generated from `third_party/wayland/wl-fixes.xml`, vendored from wayland.xml 1.24 (`wlfixes.c`, `mk/wlfixes.mk`). In development; checked 2026-11-22 against a headless lord-server (`tests/wlfixes_client.c`, the "fixes" part of `tests/wlperf_headless.sh`): the destroyed registry's id comes back for a new registry, which gets every global once, and a non-registry argument is a display error; not yet checked with a real app |
@@ -1773,6 +1778,93 @@ To call it complete, add its flow to `server/tests/wl_conformance.c` (a function
 NAME>`, in the `flows` table with the global it's scored under) with its main flow and one check per protocol error. An X11
 item or pattern goes in `tools/wl-conformance/xwayland.json`, its dynamic checks in `server/tests/x11_conformance.c`
 under the same item id.
+## Shell extras (in development, approved by the maintainer 2026-11-22)
+
+Five protocols that make Linux windows behave as on a full desktop, one file each in `server/src/wl/` (`wlshell.h`
+lists them and the few hooks `wl.c` calls; they read `wl.c`'s state only through its `wl__` helpers). The latest
+release is 0.8.9.4; these are in development. None of them reads another app's windows, the screen, the clipboard or
+input, so none is hidden from sandboxed clients (`secctx_hidden`).
+
+| | |
+|---|---|
+| ![tear-off](wayland-tab-tearoff.png) | ![dropped](wayland-tab-dropped.png) |
+| Chromium 156: a tab dragged out of the window follows the pointer as its own window (headless lord-server, CPU path) | Let go on the desktop, it stays there as a window; dragged back onto the first window's tabs, it is reattached |
+
+| Protocol | Version | Supported | How it was checked (2026-11-22) |
+|---|---|---|---|
+| `xdg_toplevel_drag_manager_v1` | 1 | yes | **Chromium 156** (Debian 13, `--ozone-platform=wayland`) on a headless lord-server, the pointer driven through the session's `remote.sock`: a tab dragged out became a window that followed the pointer, let go on the desktop it stayed there as its own window, and dragged back onto the first window's tab strip it was reattached (Chromium's `WAYLAND_DEBUG`: `attach`, `dnd_drop_performed`, `dnd_finished`, no error). `tests/shellx_headless.sh` with `SHELLX_DRAG=1`: a new window attached at (20, 10) follows the pointer, the drag never enters it (it entered the window under it twice), let go over nothing it is dropped (not cancelled) at the pointer less the offset; `invalid_source` and `toplevel_attached`. Firefox not yet tried |
+| `xdg_toplevel_tag_manager_v1` | 1 | yes | `tests/shellx_headless.sh`: the tag set before the first frame comes with the window, a later one as a `tag` event, a control character cleaned out |
+| `xdg_system_bell_v1` | 1 | yes | `tests/shellx_headless.sh`: a burst of ten rings is one, a ring with no window reaches window 0; `build/shellx-units-test` (the limits) |
+| `xdg_session_manager_v1` | 1 | yes | `tests/shellx_headless.sh`: a new session is saved with its window; a saved one is restored (`restored`, and the window's `restored` before its first configure) at its saved place and size; another program's session id gives a new session; `in_use`, `already_mapped`; the file is 0600 |
+| `ext_background_effect_manager_v1` | 1 | yes, CPU path | `tests/shellx_headless.sh`: blur offered on the CPU path, the region reaches the shell as rectangles in the window's coordinates, `background_effect_exists`; `build/shellx-units-test` (regions cut into rectangles) |
+
+- **Tab tear-off (`xdg-toplevel-drag-v1`, `tldrag.c`).** A browser starts an ordinary drag (`wl_data_device.start_drag`)
+  and attaches a window to the drag's source with the point of the window under the pointer (its offset, window
+  geometry coordinates): a new window for the torn tab, attached before it is mapped, or the whole window. From the
+  drag's start until it ends, lord-server sends `tldrag` to the shell (on, with the offset and the pointer; off), and
+  `sdk/wayland.js` moves the window so that point stays under the pointer (`lord.wayland.toplevelDrag(window,
+  frameNode)` gives the offset and where its geometry is now, so the theme's frame is accounted for exactly;
+  `sdk/shellxmodel.js` `dragFrameAt`). The window doesn't take part in choosing the drag's target: `tldrag_hit` runs
+  the UI's hit test again with the window's frame left out (its surface until the shell named the frame), so dropping
+  it over another window of the browser reattaches the tab there, and the drag's `enter`/`leave` go to that window.
+  Let go where nothing takes the drop, it stays there, as after a move: lord-server then ends the drag with
+  `dnd_drop_performed` and `dnd_finished` instead of `cancelled` (a browser takes a cancelled tab back), as Mutter and
+  KWin do; such a drag never hands files to LordOS (it is a window, not a file list). Rules: only a window of the client that owns the source
+  follows (no app moves another app's window); a source used as the selection, before or after, is `invalid_source`;
+  `attach` while an attached window still has its role is `toplevel_attached`; `destroy` while the drag runs is
+  `ongoing_drag`; a window unmapped while attached is detached; a maximized window is restored first; a locked window
+  (`isWindowLocked`) doesn't move.
+- **Window tags (`xdg-toplevel-tag-v1`, `tltag.c`).** The tag ("main window", "preferences") and the description are the
+  app's own words: kept per window as text only (at most 127 and 255 bytes of valid UTF-8, cut on a character,
+  control characters out). The shell reads them at `map` (`lord.wayland.tag`) and gets a `tag` event when they change.
+  The tag keys the window's **remembered place** (`sdk/windowmemory.js`, `settings.windowPlaces`): the key is the app's
+  Dock id plus `#<tag>` (`placeKeyOf`: letters, digits, spaces and `. _ : -`, at most 64 characters), so each kind of
+  window of a multi-window app (GIMP's toolboxes, an e-mail composer, a preferences window) reopens where that kind of
+  window was, instead of every window taking the last one's place. A tag can only ever name places beside its own
+  app's Dock id; the 200-place limit (`placemodel.js`) still applies. The description is the window's name while it
+  has no title.
+- **The bell (`xdg-system-bell-v1`, `sysbell.c`).** `ring` becomes a `bell` event on the window the surface belongs to
+  (its toplevel), or on window 0 with no surface. The shell plays LordOS's own alert sound (`lord.sound.play('error')`,
+  synthesized by lord-server and played as a PipeWire event sound, so the system volume and mute apply) unless Do Not
+  Disturb is on, and marks a window that isn't in front as wanting attention in the Dock and the taskbar (the visual
+  bell, as `xdg_activation_v1` does). LordOS has no separate "visual bell" setting; this is it. Rate limit
+  (`bellgate.h`): per app at most one ring every 250 ms and five in 10 s, at most one every 100 ms from all apps; a ring
+  held back is dropped.
+- **Session management (`xdg-session-management-v1`, `xsession.c`, `xsstore.c`).** An app gets a session (new, or by the
+  id it was given), adds its windows by name, and when it starts again restores each by name before its first commit.
+  LordOS keeps, per window of a session, its geometry on screen and whether it was maximized (updated every 2 s while
+  it is open and when it closes), and a restored window opens there: the shell asks once (`lord.wayland.sessionFrame`),
+  adds the theme's frame (`restoredFrame`) and fits it on today's displays with session restore's own `fitFrame`
+  (`sdk/sessionmodel.js`). With LordOS's session restore: that one relaunches the apps after a login; a window its app
+  then restores by name takes its own place first, ahead of session restore's frame and the remembered place.
+  - **Security.** Ids are 16 bytes from `getrandom`, as 32 hex characters. A session belongs to who lord-server checked
+    the app is (`program:<exe>`, `flatpak:<id>`, `app:<isolated LordOS app>`, the same identity as the `shortcuts` and
+    `idle` permissions), never to an app_id or id the app sent, and is found only by id **and** that owner: an app
+    that learns another app's id gets a new, empty session, and nothing of the other's is told. Xwayland, the login
+    screen and clients LordOS can't identify get sessions that live in memory only. The file
+    (`~/.config/lordos/wl-sessions/sessions`, 0600 in a 0700 folder, replaced whole by write and rename) is written by
+    lord-server only: the folder is on `fsops_protected`'s list, so `lord.fs` can't touch it. It holds window places for
+    windows that already exist and can't launch anything; every line is checked again when read (`xs_load`: a bad
+    line is skipped, a bad session with its windows). Limits: 128 sessions, 16 per app (the least recently used goes,
+    never one in use), 32 windows each, names up to 255 bytes without control characters (a longer name works while
+    the app runs, but isn't kept), 256 KB.
+  - Not kept: the desktop a window was on and its stacking order (the protocol's `recover` reason could use them).
+- **Blur behind windows (`ext-background-effect-v1`, `bgeffect.c`, `bgregion.h`).** The region (double-buffered, set on
+  the window's commit) is cut into at most 16 rectangles clipped to the window geometry (a region of more than 64
+  rectangles, or one needing more than 16, becomes its bounding box) and sent to the shell (`blur`), which draws a box
+  with the UI's own backdrop blur (`backdropFilter: blur(24px)`, as the theme's panels, with its damage rules and
+  cache in `ui/paint.c`) under the window's surface for each one (`LinuxWindow`, `sdk/wayland.js`). **The capability is
+  honest:** blur is offered (`capabilities` = `blur`) only while it can really be drawn, which is on the CPU path
+  (windows are painted into the same canvas as the UI, so the blur sees what is under them) with Settings →
+  transparency with blur on (`lord.wayland.effects`). With GPU compositing (windows are textures under the UI's
+  layer, and the GPU path has no blur shader yet) or effects off, the capabilities are none, the boxes go away and
+  every bound manager is told again when it changes (`bgeffect_caps_changed`, also on a GPU switch). Only a window's
+  main surface is blurred behind; a region on a popup or a subsurface is kept, never drawn.
+- **Tests:** `build/shellx-units-test` (the bell's limits, regions cut into rectangles, the session store and its file
+  read back and edited by hand, the per-app limit), `tests/shellx_model_test.mjs` (`sdk/shellxmodel.js`),
+  `tests/shellx_headless.sh` (all five against a headless lord-server, `build/shellx-client`; the pointer-driven
+  tear-off with `SHELLX_DRAG=1` and root for the session's `remote.sock`, through `tests/shellx_inject.py`) and
+  `build/fsops-test` (the sessions folder is protected).
 
 ## Pending
 

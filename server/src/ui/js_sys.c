@@ -41,6 +41,7 @@
 #include "../wl/xwayland.h"
 #include "../wl/xwm.h"
 #include "../wl/urilist.h"
+#include "../wl/wlshell.h"
 #include "../keyboard.h"
 #include "../fsops.h"
 #include "../fsasync.h"
@@ -1867,6 +1868,60 @@ static JSValue f_wl_dropped_files(JSContext *c, JSValueConst this_val, int argc,
     return arr;
 }
 
+/* ---- shell extras (wl/wlshell.h, docs/WAYLAND.md "Shell extras") ---- */
+
+/* lord.wayland.toplevelDrag(id, frameNode) → { ox, oy, gx?, gy? } | null: window id following a drag (xdg-toplevel-drag):
+ * the point of its geometry that stays under the pointer, and where its geometry is now when placed. frameNode, if it
+ * is that window's frame, is left out of the drag's hit test (the window isn't a drop target). */
+static JSValue f_wl_toplevel_drag(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t id = 0, node = 0;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0])) return JS_NULL;
+    if (argc > 1 && JS_ToInt32(c, &node, argv[1])) node = 0;
+    int ox, oy, gx, gy, placed;
+    if (!tldrag_follow(id, node, &ox, &oy, &gx, &gy, &placed)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "ox", JS_NewInt32(c, ox));
+    JS_SetPropertyStr(c, o, "oy", JS_NewInt32(c, oy));
+    if (placed) {
+        JS_SetPropertyStr(c, o, "gx", JS_NewInt32(c, gx));
+        JS_SetPropertyStr(c, o, "gy", JS_NewInt32(c, gy));
+    }
+    return o;
+}
+/* lord.wayland.tag(id) → { tag, description } | null (xdg-toplevel-tag: the app's own words, checked in C) */
+static JSValue f_wl_tag(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t id = 0;
+    const char *tag, *desc;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0]) || !tltag_get(id, &tag, &desc)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "tag", JS_NewString(c, tag));
+    JS_SetPropertyStr(c, o, "description", JS_NewString(c, desc));
+    return o;
+}
+/* lord.wayland.sessionFrame(id) → { x, y, w, h, max } | null: where a window its app restored (xdg-session-management)
+ * was, its geometry on screen; given once */
+static JSValue f_wl_session_frame(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    int32_t id = 0;
+    int r[4], max = 0;
+    if (argc < 1 || JS_ToInt32(c, &id, argv[0]) || !xsession_frame(id, r, &max)) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "x", JS_NewInt32(c, r[0]));
+    JS_SetPropertyStr(c, o, "y", JS_NewInt32(c, r[1]));
+    JS_SetPropertyStr(c, o, "w", JS_NewInt32(c, r[2]));
+    JS_SetPropertyStr(c, o, "h", JS_NewInt32(c, r[3]));
+    JS_SetPropertyStr(c, o, "max", JS_NewBool(c, max));
+    return o;
+}
+/* lord.wayland.effects(on): Settings → transparency with blur; blur behind Linux windows is offered only with it */
+static JSValue f_wl_effects(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc > 0) bgeffect_set_effects(JS_ToBool(c, argv[0]));
+    return JS_UNDEFINED;
+}
+
 static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("dragFiles", 1, f_wl_drag_files),
     JS_CFUNC_DEF("dragTaken", 0, f_wl_drag_taken),
@@ -1888,6 +1943,10 @@ static const JSCFunctionListEntry wayland_funcs[] = {
     JS_CFUNC_DEF("icon", 1, f_wl_icon),
     JS_CFUNC_DEF("info", 0, f_wl_info),
     JS_CFUNC_DEF("x11SelfScale", 1, f_wl_x11_self_scale),
+    JS_CFUNC_DEF("toplevelDrag", 2, f_wl_toplevel_drag),
+    JS_CFUNC_DEF("tag", 1, f_wl_tag),
+    JS_CFUNC_DEF("sessionFrame", 1, f_wl_session_frame),
+    JS_CFUNC_DEF("effects", 1, f_wl_effects),
 };
 
 /* ---- lord.apps: installed Linux apps (.desktop, apps.c) ---- */

@@ -39,10 +39,13 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            staging/linux-drm-syncobj/linux-drm-syncobj-v1
 # color-management-v1 and color-representation-v1 (src/wl/wlcolor.c, docs/WAYLAND.md "Colour management")
 WL_MORE += staging/color-management/color-management-v1 staging/color-representation/color-representation-v1
+# shell extras (src/wl/wlshell.h, docs/WAYLAND.md "Shell extras"): tab tear-off, window tags, the bell
+WL_MORE += staging/xdg-toplevel-drag/xdg-toplevel-drag-v1 staging/xdg-toplevel-tag/xdg-toplevel-tag-v1 staging/xdg-system-bell/xdg-system-bell-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
-# Newer than Debian 13's wayland-protocols (1.44): the XML is kept in protocols/, unmodified (THIRD_PARTY.md)
-WL_LOCAL := pointer-warp-v1
+# Newer than Debian 13's wayland-protocols (1.44): the XML is kept in protocols/, unmodified (THIRD_PARTY.md):
+# pointer-warp from 1.45, ext-background-effect and xdg-session-management from 1.50
+WL_LOCAL := pointer-warp-v1 ext-background-effect-v1 xdg-session-management-v1
 WL_GEN  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_LOCAL),build/gen/$(p)-protocol.o)
 
@@ -91,6 +94,9 @@ SRC += src/ui/js_vmcli.c src/vm/vmcli.c
 # Machines' pictures the desktop's GPU can't import (an Intel GVT-g machine's Y-tiled dmabufs): read on their own render node
 SRC += src/gpu/dmaread.c
 SRC += src/wl/wlcolor.c src/wl/colorconv.c
+# Shell extras (src/wl/wlshell.h): xdg-toplevel-drag, xdg-toplevel-tag, xdg-system-bell, xdg-session-management,
+# ext-background-effect, one file each
+SRC += src/wl/wlshell.c src/wl/tldrag.c src/wl/tltag.c src/wl/sysbell.c src/wl/xsession.c src/wl/xsstore.c src/wl/bgeffect.c
 OBJ := $(SRC:src/%.c=build/obj/%.o)
 HDR := $(wildcard src/*.h src/gpu/*.h src/ui/*.h src/term/*.h src/wl/*.h src/wasm/*.h src/sound/*.h src/pkg/*.h src/net/*.h src/install/*.h src/remote/*.h src/users/*.h src/sec/*.h src/monitor/*.h src/media/*.h src/app/*.h src/doc/*.h src/print/*.h src/fetch/*.h) $(WL_GEN) $(APP_CLIENT_HDR)
 HDR += $(wildcard src/fw/*.h)
@@ -939,6 +945,18 @@ build/syncobj-test: tests/syncobj_test.c src/wl/syncobj.h
 build/syncobj-kernel-test: tests/syncobj_kernel_test.c src/wl/syncobj.c src/wl/syncobj.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/syncobj_kernel_test.c src/wl/syncobj.c
+# The shell extras (tests/shellx_client.c, src/wl/wlshell.h): run by tests/shellx_headless.sh against a headless lord-server;
+# their pure parts (the bell's limit, blur regions, the session store and its file) in tests/shellx_units_test.c
+test: build/shellx-client build/shellx-units-test
+build/shellx-units-test: tests/shellx_units_test.c src/wl/xsstore.c src/wl/xsstore.h src/wl/bgregion.h src/wl/bellgate.h src/wl/wlregion.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/shellx_units_test.c src/wl/xsstore.c
+	./$@ || { rm -f $@; exit 1; }
+SHELLX_PROTO := staging/xdg-toplevel-drag/xdg-toplevel-drag-v1 staging/xdg-toplevel-tag/xdg-toplevel-tag-v1 staging/xdg-system-bell/xdg-system-bell-v1
+$(foreach p,$(SHELLX_PROTO),$(eval $(call wl_client_proto,$(p))))
+SHELLX_GEN := $(foreach p,$(notdir $(SHELLX_PROTO)) $(WL_LOCAL),build/gen/client/$(p)-client-protocol.h build/gen/client/$(p)-protocol.c)
+build/shellx-client: tests/shellx_client.c $(CLIENT_GEN) $(SHELLX_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/shellx_client.c $(filter build/gen/client/xdg-shell-protocol.c,$(CLIENT_GEN)) $(filter %.c,$(SHELLX_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag
