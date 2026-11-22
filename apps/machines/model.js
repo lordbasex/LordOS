@@ -544,6 +544,74 @@ export function toolsOutdated(agent, shipped = TOOLS_SHIPPED) {
   const want = toolsVer(have[1] ? shipped?.windows : shipped?.linux);
   return !!want && want[1] === have[1] && Number(have[2]) < Number(want[2]);
 }
+// the version this LordOS ships for that guest's tools when theirs is older ('' when it isn't, or nothing is known)
+export function toolsWant(agent, shipped = TOOLS_SHIPPED) {
+  if (!toolsOutdated(agent, shipped)) return '';
+  return toolsVer(agent.tools)[1] ? String(shipped.windows) : String(shipped.linux);
+}
+// the popover's line about the LordOS tools, apart from qemu-guest-agent's version: null (not connected, or no tools said
+// hello), { key: 'current', have } (the ones shipped, or newer), { key: 'old', have, want }, or { key: 'other', have } (a
+// version this LordOS can't compare)
+export function toolsLine(agent, shipped = TOOLS_SHIPPED) {
+  if (agent?.state !== 'connected' || !agent.tools) return null;
+  const have = String(agent.tools);
+  const want = toolsWant(agent, shipped);
+  if (want) return { key: 'old', have, want };
+  return toolsVer(have) ? { key: 'current', have } : { key: 'other', have };
+}
+
+// ---- the LordOS tools brought up to date by themselves (docs/VIRTUALIZATION.md "Keeping the LordOS tools up to date") ----
+// When a machine's agent is connected and its tools are older than the ones shipped, Machines asks for the same install
+// as the popover's button (lord.vm.agent 'update', which lord-vm logs), unless the person turned it off: the machine's
+// Configure → Agent (app.json toolsAuto) or, for machines that don't say, Machines settings (machinesDefaults.toolsAuto).
+// Only when it's safe: the agent connected for TOOLS_SETTLE_MS and nothing on its way (files copying, the transfer
+// folder's setup, an app of apps mode opening, an install the person asked for). At most TOOLS_TRIES attempts per run of
+// the machine and version, TOOLS_BACKOFF_MS apart; an attempt without an answer in TOOLS_WAIT_MS failed. Off, or given
+// up: one notification per run and version, with Update.
+export const TOOLS_SETTLE_MS = 20000;
+export const TOOLS_BACKOFF_MS = [2 * 60000, 10 * 60000];
+export const TOOLS_TRIES = 3;
+export const TOOLS_WAIT_MS = 10 * 60000;
+export const TOOLS_AUTO_IDLE = { want: '', since: 0, tries: 0, next: 0, pending: 0, done: 0, told: '' };
+// the machine's choice, else the default for all of them (on unless turned off)
+export const toolsAutoOn = (meta, defaults) => (typeof meta?.toolsAuto === 'boolean' ? meta.toolsAuto : defaults?.toolsAuto !== false);
+// an attempt that failed: the next one after its backoff, none after the last
+export function toolsAutoFailed(s, now) {
+  const k = Math.min(Math.max(s.tries - 1, 0), TOOLS_BACKOFF_MS.length - 1);
+  return { ...s, pending: 0, next: s.tries >= TOOLS_TRIES ? Infinity : now + TOOLS_BACKOFF_MS[k] };
+}
+// One step at every poll of a running machine: s (TOOLS_AUTO_IDLE for a new run), the poll's agent, on (toolsAutoOn),
+// busy (something on its way, see above), now. → { s, act: null | 'install' | 'notify', why: 'off' | 'failed' (with
+// notify), result: 'ok' | 'failed' (an attempt of ours ended) }. After 'install' the caller sends it and, when
+// lord-server refuses it at once, calls toolsAutoFailed.
+export function toolsAutoStep(s0, { agent, on, busy, now }, shipped = TOOLS_SHIPPED) {
+  let s = { ...TOOLS_AUTO_IDLE, ...(s0 || {}) };
+  const inst = agent?.install || 0;
+  // our attempt on its way: how it ended. lord.vm.agent sets the session's install to 1 as it sends, so a 2 or 3 after
+  // it is its answer; 0 (the window opened again on the machine, a new session) waits for TOOLS_WAIT_MS
+  if (s.pending) {
+    if (inst === 2) return { s: { ...s, pending: 0, done: now }, act: null, result: 'ok' };
+    if (inst !== 3 && now - s.pending <= TOOLS_WAIT_MS) return { s, act: null };
+    s = toolsAutoFailed(s, now);
+    if (s.tries < TOOLS_TRIES || s.told === s.want) return { s, act: null, result: 'failed' };
+    return { s: { ...s, told: s.want }, act: 'notify', why: 'failed', result: 'failed' };
+  }
+  if (agent?.state !== 'connected') return { s: s.since ? { ...s, since: 0 } : s, act: null };
+  const want = toolsWant(agent, shipped);
+  if (!want) return { s, act: null };
+  // another version to bring (the shipped one changed): a fresh count
+  if (want !== s.want) s = { ...TOOLS_AUTO_IDLE, want, since: s.since };
+  if (!s.since) s = { ...s, since: now };
+  if (now - s.since < TOOLS_SETTLE_MS) return { s, act: null };
+  if (!on) return s.told === want ? { s, act: null } : { s: { ...s, told: want }, act: 'notify', why: 'off' };
+  // installed, and the tools still say the older version a while later: said once, never tried again in this run
+  if (s.done) {
+    if (s.told === want || now - s.done < TOOLS_SETTLE_MS * 3) return { s, act: null };
+    return { s: { ...s, told: want }, act: 'notify', why: 'failed' };
+  }
+  if (s.tries >= TOOLS_TRIES || now < s.next || busy || inst === 1) return { s, act: null };
+  return { s: { ...s, tries: s.tries + 1, pending: now }, act: 'install' };
+}
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
 export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? 'run' : 'pause');
 

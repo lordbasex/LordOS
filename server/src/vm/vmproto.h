@@ -44,7 +44,8 @@
  *     VM_AGENT      the guest agent (6.17; machine.json "agent"): a = VAG_SHUTDOWN (guest-shutdown), VAG_TIMESYNC
  *                   (guest-set-time from this computer's clock), VAG_INSTALL (copies lordos-guest, the clipboard helper,
  *                   into a Linux guest through qemu-guest-agent and enables it; into a Windows guest, the LordOS guest
- *                   tools, lordos-guest-win.exe, into %ProgramFiles%\LordOS, started at every sign-in), VAG_TRANSFER (the
+ *                   tools, lordos-guest-win.exe, into %ProgramFiles%\LordOS, started at every sign-in; b = 1 when Machines asks
+ *                   by itself because the tools are older than the ones shipped, said in the log), VAG_TRANSFER (the
  *                   transfer folder, 6.7.1: a Linux guest mounts it again; a Windows guest gets WinFsp: one descriptor, its
  *                   installer, which lord-server opened in the machines' image store, text = its SHA-256 (64 hex), checked
  *                   again here and in the guest with its signature, installed by msiexec as SYSTEM from a private folder)

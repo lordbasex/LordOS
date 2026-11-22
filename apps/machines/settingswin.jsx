@@ -122,8 +122,12 @@ function General({ host }) {
     </Section>
     <Section title={tr('machines.set.gen.tools')}>
       <Row label={tr('machines.storage.menu')}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.set.open')} onClick={openStorage} /></View></Row>
-      <Row label={tr('machines.req.menu')} value={missing.length ? tr('machines.set.gen.reqMissing', { n: missing.length }) : tr('machines.set.gen.reqReady')} last>
+      <Row label={tr('machines.req.menu')} value={missing.length ? tr('machines.set.gen.reqMissing', { n: missing.length }) : tr('machines.set.gen.reqReady')}>
         <View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.set.open')} onClick={() => setReq(true)} /></View>
+      </Row>
+      {/* the default for every machine whose Configure → Agent doesn't say (model.js toolsAutoOn) */}
+      <Row label={tr('machines.set.gen.toolsAuto')} last note={tr('machines.set.gen.toolsAutoNote')}>
+        <View style={{ alignSelf: 'flex-start' }}><Toggle on={d.toolsAuto} onChange={(on) => setDefaults({ toolsAuto: on })} /></View>
       </Row>
     </Section>
     <Section title={tr('machines.set.logos.title')}>

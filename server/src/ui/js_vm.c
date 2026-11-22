@@ -3254,8 +3254,9 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     return JS_NewString(c, path);
 }
 
-/* agent(session, 'install'|'timesync'|'shutdown') → bool: a guest agent request (poll's agent.install says how
- * Install went) */
+/* agent(session, 'install'|'update'|'timesync'|'shutdown') → bool: a guest agent request (poll's agent.install says how
+ * Install went). 'update' is Install asked by Machines itself for older LordOS tools: the same install, marked so
+ * lord-vm's log says it */
 /* WinFsp's installer for agent(id, 'transfer', path): only a file the admin helper keeps in the machines' image store,
  * root's, named by its SHA-256 (images/<sha256>.iso), whose record there says it's the catalog's "winfsp" entry. The
  * descriptor, and the hash as text, go to lord-vm, which hashes the file again; the guest checks its signature too */
@@ -3289,7 +3290,8 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     (void)t;
     Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
     const char *w = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
-    int a = !w ? 0 : !strcmp(w, "install") ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN :
+    int upd = w && !strcmp(w, "update");
+    int a = !w ? 0 : !strcmp(w, "install") || upd ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN :
             !strcmp(w, "transfer") ? VAG_TRANSFER : !strcmp(w, "extraOff") ? VAG_EXTRA_OFF : !strcmp(w, "extraOn") ? VAG_EXTRA_ON : 0;
     if (w) JS_FreeCString(c, w);
     if (!s || !a || s->vm < 0) return JS_FALSE;
@@ -3308,7 +3310,9 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     /* one install at a time: a click while one is on its way (lord-vm answers when the guest's script ended) is the
      * same request, not another run of the script */
     if (a == VAG_INSTALL && s->ag_seq) return JS_TRUE;
-    int q = ask(s, VM_AGENT, a);
+    int q = -1;
+    if (upd) { VmMsg m = vm_msg(VM_AGENT, ++s->seq, VAG_INSTALL, 1, 0, 0, NULL); q = vm_send(s->vm, &m, -1) ? -1 : (int)s->seq; }
+    else q = ask(s, VM_AGENT, a);
     if (q < 0) return JS_FALSE;
     if (a == VAG_INSTALL) { s->ag_seq = (uint32_t)q; s->ag_result = 1; s->ag_msg[0] = 0; }
     return JS_TRUE;

@@ -6,14 +6,15 @@
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
   inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr, useSound, microphones,
-  hasTextFocus,
+  hasTextFocus, settings,
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys } from './model.js';
+import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta } from './meta.js';
+import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
@@ -28,6 +29,8 @@ const BAR = 48;
 const TOOLS_WIDE = 920, TOOLS_COMPACT = 660;
 const now = () => (typeof lord !== 'undefined' && lord.now ? lord.now() : Date.now());
 const THUMB_MS = 5000;
+// dir → the LordOS tools' automatic update (model.js toolsAutoStep) for the machine's current run
+const toolsRuns = new Map();
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}` : '');
@@ -70,6 +73,7 @@ function AgentPop({ ctl, onClose }) {
   }, []);
   const on = g?.state === 'connected';
   const old = toolsOutdated(g);
+  const tl = toolsLine(g);
   const lines = agentLines(g, cfg);
   const tone = ctl.a.start ? 'off' : agentTone(g, cfg.agent);
   const bg = p.dark ? '#34343c' : '#fbfbfd';
@@ -84,8 +88,13 @@ function AgentPop({ ctl, onClose }) {
           <StateDot tone={tone} size={10} />
           <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : tr('machines.agent.waiting')}</Text>
         </View>
-        {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version }), g.tools ? tr('machines.agent.toolsVersion', { v: g.tools }) : ''].filter(Boolean).join(' · ')}</Text>
+        {/* the system and qemu-guest-agent's version, then the LordOS tools' own line: up to date, or which version
+            this LordOS brings (and whether it's on its way) */}
+        {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version })].filter(Boolean).join(' · ')}</Text>
           : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
+        {on && tl ? <Text style={{ fontSize: 12, fontWeight: tl.key === 'old' ? 600 : 400, color: tl.key === 'old' ? '#0a84ff' : p.dim, textAlign: 'start' }}>
+          {tl.key === 'old' ? tr(g.install === 1 ? 'machines.agent.toolsUpdating' : 'machines.agent.toolsOld', { have: tl.have, want: tl.want })
+            : tr(tl.key === 'current' ? 'machines.agent.toolsCurrent' : 'machines.agent.toolsVersion', { v: tl.have })}</Text> : null}
         <View style={{ marginTop: 4, borderRadius: 12, backgroundColor: p.dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.035)', paddingVertical: 4 }}>
           {lines.map(([k, st], i) => (
             <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 6,
@@ -96,7 +105,6 @@ function AgentPop({ ctl, onClose }) {
             </View>
           ))}
         </View>
-        {old && g.install !== 1 && g.install !== 2 ? <Text style={{ fontSize: 12, lineHeight: 1.45, fontWeight: 600, color: '#0a84ff', textAlign: 'start' }}>{tr('machines.agent.toolsUpdate')}</Text> : null}
         {on ? (
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
             <Pill label={g.install === 1 ? tr('machines.agent.installing') : old ? tr('machines.agent.updateTools') : guestWindows(g) ? tr('machines.agent.installTools') : tr('machines.agent.installHelper')}
@@ -463,6 +471,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     setStarting(false);
     const id = active ? lord.vm.attach(dir) : lord.vm.start(dir, opts || {});
     if (!id) { setErr(active ? tr('machines.win.cantAttach') : vmRefusal(tr('machines.win.cantStart'))); return; }
+    if (!active) toolsRuns.delete(dir);            // a new run: the tools' automatic update starts over
     sized.current = { last: null, want: null, at: 0, rate: false, thumb: 0, asked: null, askedAt: 0 };
     setErr(''); setSt(null); setSid(id);
   };
@@ -535,6 +544,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       if (q.ended) {
         lord.vm.close(sid);
         setSid(0);
+        toolsRuns.delete(dir);                     // the run ended: the tools' automatic update starts over next time
         if (closingRef.current) { setClosing(false); wm.close(winId, true); return; }
         // an unattended install ended with the installer's restart: lord-vm took the installer and the seed disk away,
         // so starting again is the installed system (3.9, "Unattended install")
@@ -961,6 +971,38 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   // the machine's tools said whether they open files: kept, so Files lists it while it's off too
   const opensNow = opensOf(st?.agent);
   useEffect(() => { if (opensNow !== undefined && (readMeta(dir).opens ?? false) !== opensNow) writeMeta(dir, { opens: opensNow }); }, [opensNow]);
+  // The LordOS tools brought up to date by themselves (model.js toolsAutoStep): the same install as the popover's
+  // button, only while nothing is on its way; off or given up, a notification with Update. Its state lives for the
+  // machine's run (toolsRuns), so the window closed and opened again doesn't try again.
+  const toolsBusy = useRef(false);
+  const gl = guests.get()[dir];
+  toolsBusy.current = copies.length > 0 || opening.current.size > 0 || !!asks || xferBusy.current || xstate === 'settingUp' || st?.agent?.transfer === 1
+    || Object.values(gl?.launches || {}).some((e) => launchPending(e, gl.list, Date.now()));
+  useEffect(() => {
+    if (!sid) return undefined;
+    const say = (why, agent) => {
+      const have = agent?.tools || '', want = toolsWant(agent);
+      notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.agent.toolsOldTitle', { machine: name || dir.split('/').pop() }),
+        body: tr(why === 'off' ? 'machines.agent.toolsOldBody' : 'machines.agent.toolsAutoFailed', { have, want }), sound: false,
+        defaultAction: { id: 'show', run: () => wm.focus(winId) },
+        actions: [{ id: 'update', label: tr('machines.agent.toolsUpdateBtn'), run: () => { const x = sidRef.current; if (x) lord.vm.agent(x, 'install'); } }] });
+    };
+    const timer = setInterval(() => {
+      const q = stRef.current;
+      if (!q || q.ended || q.state !== 'running' || closingRef.current) return;
+      const t0 = Date.now();
+      const r = toolsAutoStep(toolsRuns.get(dir), { agent: q.agent, on: toolsAutoOn(readMeta(dir), defaultsOf(settings.get().machinesDefaults)), busy: toolsBusy.current, now: t0 });
+      let s = r.s, why = r.act === 'notify' ? r.why : null;
+      // lord-server didn't take it (the session is going away): a failed attempt
+      if (r.act === 'install' && !lord.vm.agent(sid, 'update')) {
+        s = toolsAutoFailed(s, t0);
+        if (s.tries >= TOOLS_TRIES && s.told !== s.want) { s = { ...s, told: s.want }; why = 'failed'; }
+      }
+      toolsRuns.set(dir, s);
+      if (why) say(why, q.agent);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [sid, name]);
   // apps mode (7.2): the guest's windows as LordOS windows (appsmode.jsx); this window becomes a small controller
   const appsBlocked = appsBlocker(st?.agent, cfg);
   appsBlockedRef.current = appsBlocked;
