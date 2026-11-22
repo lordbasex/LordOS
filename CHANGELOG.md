@@ -308,7 +308,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Fixed
 
 - **Machines: a machine with an Intel graphics card (GVT-g) no longer takes most of a CPU core, in development**
-  (`docs/MACHINES-GPU.md`, "A vGPU's picture without a readback"). Live on the maintainer's computer (Windows 11 on
+  (`docs/MACHINES-GPU.md`, "A vGPU's picture without a readback"). Live on the maintainer's computer (the new-card guest on
   the vGPU at 1920 × 1080, an RX 580 drawing the desktop) lord-server's main thread used ~90 % of a core: QEMU's vfio
   display sends the whole picture about 33 times a second, changed or not, and each time lord-server read all 8 MB back
   from the iGPU on its main thread, scaled it into the window with the CPU and uploaded it to the desktop's GPU again.
@@ -332,8 +332,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     display sends one every refresh during a mode change; the last picture stays).
 
 - **Machines: the pointer is shown over a machine with an Intel graphics card, in window, full screen and apps mode, in
-  development**. Intel's driver puts Windows' pointer on the vGPU's cursor plane, not in the picture, but LordOS hid its
-  own arrow over any Windows machine until the guest handed a shape over, which a vGPU machine didn't: there was no
+  development**. Intel's driver puts the guest's pointer on the vGPU's cursor plane, not in the picture, but LordOS hid its
+  own arrow over any machine with the new-card devices until the guest handed a shape over, which a vGPU machine didn't: there was no
   pointer at all. A vGPU machine now shows the host's arrow until QEMU hands the plane's shape over (and again when
   that shape is blank); lord-vmdisplay takes a cursor without a hotspot (VFIO's 0xffffffff) with its hotspot at the
   top left instead of refusing it; Configure → Display → *Pointer drawn by* (the VirtIO driver's `HWCursor`) isn't
