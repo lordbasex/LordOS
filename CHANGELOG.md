@@ -159,11 +159,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
       `~/.local/share/keyrings`, `~/.docker`, `~/.netrc`, `~/.pki`, `~/.mozilla`, `~/.thunderbird`, Chrome's, Chromium's,
       Brave's and Edge's folders under `~/.config`, `~/.var/app`; `lend_sensitive` in `apps.c`). A file there the person
       opens is lent read-only. Isolated apps' own data folders are unchanged (an isolated Firefox keeps `~/.mozilla`).
+    - Nothing under a hidden path is saved or lent writable (found by the review of the fix above): with a save lending
+      only its file, a save could create a new dot-file that runs code later (`~/.npmrc`, `~/.vimrc`, `~/.bashrc`,
+      `~/.config/mimeapps.list`, `~/.config/git/config`). A save to any path with a component starting with `.` is now
+      refused, and a dot-file or hidden folder the person chooses is lent read-only (`hidden_path` in `fplend.c`).
     - A screen-share restore token is revoked before it is spent: the indicator's Stop drops that app's tokens, a lock, a
       text console, a user switch or every share ending drops all of them (`csm_token_drop`, `portal_cast_away`,
       `portal_cast_tokens_drop`), and none is honoured while the session is locked. Only the app's own Close keeps it.
     - Tests: `build/fplend-test` (new: `/./`, `//`, `..`, a trailing `/` or `.` and links refused for files, folders and
-      saves even past a string-compared grant rule; a save names its file, never its folder), `build/sandbox-lend-test`
+      saves even past a string-compared grant rule; a save names its file, never its folder; saves of dot-files
+      refused, chosen dot-files and hidden folders lent read-only), `build/sandbox-lend-test`
       (a save's grant holds only the chosen name, the files and folders next to it can't be read; non-canonical paths
       refused by PID 1), `build/portal-cast-test` (a token dead after Stop, after every share ended and while locked, and
       working again for a new share after the unlock; non-canonical chosen paths dropped), `castsm-test`
@@ -251,7 +256,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     image store with the catalog's own downloader, with progress and Stop Download: root checks the address again in C
     (`vmurl.c`, `pkg/pubhost.c`: https, a public DNS name, never an IP literal, localhost or a local suffix such as
     `.local`, `.lan`, `.internal`, `.home.arpa`; port 443 only, no user name or password, plain path characters with no
-    `%00` or dot segment, no fragment, at most 1000 bytes), the SHA-256 (required) and the size (at most 16 GiB), keeps
+    `%00` or dot segment, no fragment, at most 1000 bytes; an IPv6 address counts as public only in global unicast
+    `2000::/3`, without `2001::/23` (Teredo, ORCHID…) and `3fff::/20`, so local NAT64 `64:ff9b:1::/48` and SIIT
+    `::ffff:0:0/96` are refused, found by the review of the Claude Security fixes), the SHA-256 (required) and the size (at most 16 GiB), keeps
     2 GiB free on the store, and the downloader connects only to public addresses and follows redirects only to addresses
     that pass the same rules (`FetchItem.public_only`, `pkg.http.notPublic`). The image is kept only with that SHA-256 and
     hashed again before a machine is made from it; its description keeps the address without its query (`vmurl_redact`),
@@ -286,12 +293,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     so a subkey grafted under a genuine primary key could sign a checksum list and be reported "verified by" that
     fingerprint, with no key-changed warning. `lord-pgpv` now reads the key with the new `pgp_keyring_add_untrusted`
     (`pkg/pgp.c`): every self-signature, subkey binding (0x18) and revocation is verified with the primary key (RFC 4880 /
-    RFC 9580 hashing; SHA-256/512; RSA or Ed25519) and only verified ones give flags, expiry and revocation; a primary
+    RFC 9580 hashing; SHA-256/512; RSA or Ed25519) and only verified ones give flags, expiry and revocation, except
+    that a revocation whose hash can't be checked revokes anyway; a primary
     key with no verified self-signature and a subkey with no verified binding are dropped; a subkey signs only with the
     sign flag and a valid back-signature (0x19) made by the subkey; a subkey lives no longer than its primary. APT keyrings
     are read as before. `vmsig-test` adds a grafted subkey, a binding signed by another key, no back-signature, a
     back-signature by another key, an encryption-only subkey, expired and revoked subkeys, a forged revocation, bindings
-    older than the subkey or from the future, a subkey of an expired primary, missing, forged and certify-only
+    older than the subkey or from the future, a revocation whose hash can't be checked (SHA-1, SHA-384) still revoking
+    (fail closed, found by the review of this fix), a subkey of an expired primary, missing, forged and certify-only
     self-signatures, every truncation of a block with a bound subkey, `lord-pgpv` on a grafted subkey, the real Debian CD,
     Ubuntu and Kali lists with the pinned keys, and Debian's archive keyrings (signing subkeys) read the same way as
     trusted.
