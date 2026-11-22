@@ -298,7 +298,7 @@ export function Configure({ dir, section: section0, onClose }) {
       const gnote = [tr('machines.cfg.gpuNote'), m.windowsDevices ? tr('machines.win.gpuDriverNote') : null,
         igpu ? tr('machines.cfg.gpuFreeLine', { whole: freeText(typeOf('intel-whole')), shared: freeText(typeOf('intel-shared')) }) : null,
         !igpu ? tr(spare ? 'machines.cfg.gpuTurnOn' : 'machines.cfg.gpuGone') : null, offNote].filter(Boolean).join(' ');
-      gpuRow = <Row label={tr('machines.cfg.gpu')} value={gname} last={!m.windowsDevices} note={gnote}>
+      gpuRow = <Row label={tr('machines.cfg.gpu')} value={gname} last={!m.windowsDevices || !!cur.gpu} note={gnote}>
         <Off off={running || (!igpu && !cur.gpu)}><Segmented small value={cur.gpu} onChange={pick}
           options={[['', tr('machines.cfg.gpuNone')], ['intel-whole', tr('machines.cfg.gpuWhole'), full('intel-whole')],
             ['intel-shared', tr('machines.cfg.gpuShared'), full('intel-shared')]]} /></Off>
@@ -323,9 +323,11 @@ export function Configure({ dir, section: section0, onClose }) {
           options={[['2d', tr('machines.cfg.graphics2d')], ['3d', tr('machines.cfg.graphics3d'), !!why3d && cur.graphics !== '3d']]} /></Off>
       </Row>
       {/* who draws a Windows guest's pointer (7.1.2): LordOS, from the shape the guest hands over (no round trip through
-          the guest for each move), or its display driver, into the picture; applied by the guest tools at the next start */}
+          the guest for each move), or its display driver, into the picture; applied by the guest tools at the next start.
+          Not with an Intel graphics card: HWCursor is the virtio driver's, and Intel's puts the pointer on the vGPU's cursor
+          plane, which LordOS always draws */}
       {gpuRow}
-      {m.windowsDevices ? <Row label={tr('machines.cfg.pointer')} last note={[tr('machines.cfg.pointerNote'), offNote].filter(Boolean).join(' ')}>
+      {m.windowsDevices && !cur.gpu ? <Row label={tr('machines.cfg.pointer')} last note={[tr('machines.cfg.pointerNote'), offNote].filter(Boolean).join(' ')}>
         <Off off={running}><Segmented small value={cur.pointer} onChange={(x) => set({ pointer: x })}
           options={[['lordos', tr('machines.cfg.pointerLordos')], ['guest', tr('machines.cfg.pointerGuest')]]} /></Off>
       </Row> : null}

@@ -70,6 +70,12 @@ DmaImg *dmaread_import(const char *node, int fd, int w, int h, int stride, uint3
     return NULL;
 }
 int  dmaread_rows(DmaImg *im, uint8_t *px, int y, int h, int flip) { (void)im; (void)px; (void)y; (void)h; (void)flip; return -1; }
+int  dmaread_rows_new(DmaImg *im, uint8_t *px, int y, int h, int flip, const void *key) { (void)im; (void)px; (void)y; (void)h; (void)flip; (void)key; return -1; }
+DmaOut *dmaread_out_new(const DmaImg *like) { (void)like; return NULL; }
+int  dmaread_out_fd(const DmaOut *o, int *stride) { (void)o; (void)stride; return -1; }
+int  dmaread_copy(DmaImg *src, DmaOut *dst, int y, int h, int flip, const DmaOut *prev) { (void)src; (void)dst; (void)y; (void)h; (void)flip; (void)prev; return -1; }
+int  dmaread_changed(DmaOut *o) { (void)o; return -1; }
+void dmaread_out_free(DmaOut *o) { (void)o; }
 void dmaread_free(DmaImg *im) { (void)im; }
 void dmaread_close_all(void) {}
 
@@ -92,6 +98,17 @@ void dmaread_close_all(void) {}
 #  define GL_BGRA_EXT 0x80E1
 #endif
 
+#ifndef GL_ANY_SAMPLES_PASSED_EXT
+#  define GL_ANY_SAMPLES_PASSED_EXT 0x8C2F
+#  define GL_QUERY_RESULT_EXT 0x8866
+#  define GL_QUERY_RESULT_AVAILABLE_EXT 0x8867
+#endif
+typedef void (*GenQueries)(GLsizei, GLuint *);
+typedef void (*DelQueries)(GLsizei, const GLuint *);
+typedef void (*BeginQuery)(GLenum, GLuint);
+typedef void (*EndQuery)(GLenum);
+typedef void (*GetQueryU)(GLuint, GLenum, GLuint *);
+
 #define DEV_MAX 2
 
 typedef struct {
@@ -104,6 +121,18 @@ typedef struct {
     GLuint prog, fbo, ftex;
     GLint u_tex;
     int fw, fh;
+    const void *fkey;                   /* whose picture the framebuffer holds (dmaread_rows_new), NULL: nobody's */
+    /* the change test (GL_EXT_occlusion_query_boolean): a pass that keeps only the pixels that differ from the last
+     * picture, drawn into a throwaway target of the picture's size; "any sample passed" is the answer */
+    int query;
+    GLuint dprog, dfbo, drb, rq;
+    GLint d_tex, d_prev, d_size;
+    int dw, dh;
+    GenQueries gen_q;
+    DelQueries del_q;
+    BeginQuery begin_q;
+    EndQuery end_q;
+    GetQueryU get_q;
     PFNEGLCREATEIMAGEKHRPROC create_image;
     PFNEGLDESTROYIMAGEKHRPROC destroy_image;
     PFNGLEGLIMAGETARGETTEXTURE2DOESPROC image_target;
@@ -114,6 +143,16 @@ struct DmaImg {
     EGLImageKHR img;
     GLuint tex;
     int w, h;
+};
+
+/* a linear copy on the reader's device, exported for the desktop's GPU */
+struct DmaOut {
+    Dev *dev;
+    struct gbm_bo *bo;
+    int fd, stride, w, h;
+    EGLImageKHR img;
+    GLuint tex, fbo, q;
+    int q_on;                           /* q holds the change test of the last copy */
 };
 
 static Dev devs[DEV_MAX];
@@ -152,6 +191,14 @@ static const char *fs_src =
     "varying vec2 v_uv; uniform samplerExternalOES u_tex;\n"
     "void main() { gl_FragColor = vec4(texture2D(u_tex, v_uv).rgb, 1.0); }\n";
 
+/* the change test: a pixel that's the same as the last picture's is dropped; prev holds that picture as drawn */
+static const char *dfs_src =
+    "#extension GL_OES_EGL_image_external : require\n"
+    "#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n"
+    "varying vec2 v_uv; uniform samplerExternalOES u_tex; uniform sampler2D u_prev; uniform vec2 u_size;\n"
+    "void main() { vec3 a = texture2D(u_tex, v_uv).rgb, b = texture2D(u_prev, gl_FragCoord.xy / u_size).rgb;\n"
+    "  if (all(equal(a, b))) discard; gl_FragColor = vec4(1.0); }\n";
+
 static GLuint shader(GLenum type, const char *src) {
     GLuint s = glCreateShader(type);
     glShaderSource(s, 1, &src, NULL);
@@ -162,21 +209,33 @@ static GLuint shader(GLenum type, const char *src) {
     return s;
 }
 
-static int make_prog(Dev *v) {
-    GLuint vs = shader(GL_VERTEX_SHADER, vs_src), fs = shader(GL_FRAGMENT_SHADER, fs_src);
-    if (!vs || !fs) { if (vs) glDeleteShader(vs); if (fs) glDeleteShader(fs); return -1; }
-    v->prog = glCreateProgram();
-    glAttachShader(v->prog, vs);
-    glAttachShader(v->prog, fs);
-    glBindAttribLocation(v->prog, 0, "a_pos");
-    glBindAttribLocation(v->prog, 1, "a_uv");
-    glLinkProgram(v->prog);
+static GLuint link_prog(const char *fsrc) {
+    GLuint vs = shader(GL_VERTEX_SHADER, vs_src), fs = shader(GL_FRAGMENT_SHADER, fsrc);
+    if (!vs || !fs) { if (vs) glDeleteShader(vs); if (fs) glDeleteShader(fs); return 0; }
+    GLuint p = glCreateProgram();
+    glAttachShader(p, vs);
+    glAttachShader(p, fs);
+    glBindAttribLocation(p, 0, "a_pos");
+    glBindAttribLocation(p, 1, "a_uv");
+    glLinkProgram(p);
     glDeleteShader(vs);
     glDeleteShader(fs);
     GLint ok = 0;
-    glGetProgramiv(v->prog, GL_LINK_STATUS, &ok);
-    if (!ok) { glDeleteProgram(v->prog); v->prog = 0; return -1; }
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) { glDeleteProgram(p); return 0; }
+    return p;
+}
+
+static int make_prog(Dev *v) {
+    v->prog = link_prog(fs_src);
+    if (!v->prog) return -1;
     v->u_tex = glGetUniformLocation(v->prog, "u_tex");
+    /* the change test is optional: without it every frame counts as changed */
+    if (v->query && (v->dprog = link_prog(dfs_src))) {
+        v->d_tex = glGetUniformLocation(v->dprog, "u_tex");
+        v->d_prev = glGetUniformLocation(v->dprog, "u_prev");
+        v->d_size = glGetUniformLocation(v->dprog, "u_size");
+    } else v->query = 0;
     return 0;
 }
 
@@ -188,6 +247,10 @@ static void dev_close(Dev *v) {
                 if (v->fbo) glDeleteFramebuffers(1, &v->fbo);
                 if (v->ftex) glDeleteTextures(1, &v->ftex);
                 if (v->prog) glDeleteProgram(v->prog);
+                if (v->dfbo) glDeleteFramebuffers(1, &v->dfbo);
+                if (v->drb) glDeleteRenderbuffers(1, &v->drb);
+                if (v->dprog) glDeleteProgram(v->dprog);
+                if (v->rq) v->del_q(1, &v->rq);
                 leave(v, &s);
             }
             eglDestroyContext(v->dpy, v->ctx);
@@ -242,6 +305,14 @@ static int dev_open(Dev *v, const char *node) {
     const char *gl_exts = (const char *)glGetString(GL_EXTENSIONS);
     int ext_ok = has_ext(gl_exts, "GL_OES_EGL_image_external");
     v->bgra = has_ext(gl_exts, "GL_EXT_read_format_bgra");
+    if (has_ext(gl_exts, "GL_EXT_occlusion_query_boolean")) {
+        v->gen_q = (GenQueries)eglGetProcAddress("glGenQueriesEXT");
+        v->del_q = (DelQueries)eglGetProcAddress("glDeleteQueriesEXT");
+        v->begin_q = (BeginQuery)eglGetProcAddress("glBeginQueryEXT");
+        v->end_q = (EndQuery)eglGetProcAddress("glEndQueryEXT");
+        v->get_q = (GetQueryU)eglGetProcAddress("glGetQueryObjectuivEXT");
+        v->query = v->gen_q && v->del_q && v->begin_q && v->end_q && v->get_q && !getenv("LORD_DMAREAD_NOTEST");
+    }
     int prog_ok = ext_ok && !make_prog(v);
     leave(v, &s);
     if (!ext_ok) { why = "no GL_OES_EGL_image_external"; goto fail; }
@@ -314,50 +385,105 @@ DmaImg *dmaread_import(const char *node, int fd, int w, int h, int stride, uint3
     return im;
 }
 
-int dmaread_rows(DmaImg *im, uint8_t *px, int y, int h, int flip) {
+/* The picture's rows [y, y + h) drawn with the bound program into the bound framebuffer (w × h of the import): its
+ * first row at y = -1, so glReadPixels returns it first; flip: the buffer's first row is the picture's bottom */
+static void draw_rows(const DmaImg *im, int y, int h, int flip) {
+    glViewport(0, 0, im->w, im->h);
+    glDisable(GL_BLEND);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(0, y, im->w, h);          /* only the rows asked for are drawn */
+    GLfloat t0 = flip ? 1.0f : 0.0f, t1 = flip ? 0.0f : 1.0f;
+    const GLfloat q[] = { -1, -1, 0, t0,  1, -1, 1, t0,  -1, 1, 0, t1,  1, 1, 1, t1 };
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, q);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, q + 2);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisable(GL_SCISSOR_TEST);
+}
+
+/* The change test of rows [y, y + h) of im against prev (a texture holding the last picture as draw_rows drew it), into
+ * query q: its answer says whether any pixel differs. The pass draws into a target of its own (no feedback loop with
+ * prev); 0 queued, -1 not possible (no query, a GL error) */
+static int diff_rows(Dev *v, const DmaImg *im, GLuint prev, int y, int h, int flip, GLuint q) {
+    if (!v->query || !q) return -1;
+    if (v->dfbo && (v->dw != im->w || v->dh != im->h)) {
+        glDeleteFramebuffers(1, &v->dfbo);
+        glDeleteRenderbuffers(1, &v->drb);
+        v->dfbo = v->drb = 0;
+    }
+    if (!v->dfbo) {
+        glGenRenderbuffers(1, &v->drb);
+        glBindRenderbuffer(GL_RENDERBUFFER, v->drb);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGB565, im->w, im->h);
+        glGenFramebuffers(1, &v->dfbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, v->dfbo);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, v->drb);
+        v->dw = im->w;
+        v->dh = im->h;
+    } else glBindFramebuffer(GL_FRAMEBUFFER, v->dfbo);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) return -1;
+    glUseProgram(v->dprog);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, prev);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, im->tex);
+    glUniform1i(v->d_tex, 0);
+    glUniform1i(v->d_prev, 1);
+    glUniform2f(v->d_size, (GLfloat)im->w, (GLfloat)im->h);
+    v->begin_q(GL_ANY_SAMPLES_PASSED_EXT, q);
+    draw_rows(im, y, h, flip);
+    v->end_q(GL_ANY_SAMPLES_PASSED_EXT);
+    return glGetError() == GL_NO_ERROR ? 0 : -1;
+}
+
+int dmaread_rows_new(DmaImg *im, uint8_t *px, int y, int h, int flip, const void *key) {
     if (!im || !px || y < 0 || h <= 0 || y + h > im->h) return -1;
     Dev *v = im->dev;
     Cur s;
     if (enter(v, &s)) return -1;
     while (glGetError() != GL_NO_ERROR) {}
-    /* the framebuffer the picture is drawn into: kept, made again for another size */
+    /* the framebuffer the picture is drawn into: kept, made again for another size; it holds the last picture read
+     * (fkey's), which the change test compares against */
     if (v->fbo && (v->fw != im->w || v->fh != im->h)) {
         glDeleteFramebuffers(1, &v->fbo);
         glDeleteTextures(1, &v->ftex);
         v->fbo = v->ftex = 0;
+        v->fkey = NULL;
     }
-    if (!v->fbo) {
-        glGenTextures(1, &v->ftex);
-        glBindTexture(GL_TEXTURE_2D, v->ftex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, im->w, im->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-        glGenFramebuffers(1, &v->fbo);
-        glBindFramebuffer(GL_FRAMEBUFFER, v->fbo);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, v->ftex, 0);
-        v->fw = im->w;
-        v->fh = im->h;
-    } else glBindFramebuffer(GL_FRAMEBUFFER, v->fbo);
-    int ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
-    if (ok) {
-        glViewport(0, 0, im->w, im->h);
-        glDisable(GL_BLEND);
-        glEnable(GL_SCISSOR_TEST);
-        glScissor(0, y, im->w, h);          /* only the rows asked for are drawn */
+    int same = 0;
+    if (v->fbo && key && v->fkey == key) {
+        /* its answer is waited for here: this path waits on glReadPixels anyway */
+        if (!v->rq && v->query) v->gen_q(1, &v->rq);
+        if (!diff_rows(v, im, v->ftex, y, h, flip, v->rq)) {
+            GLuint any = 1;
+            v->get_q(v->rq, GL_QUERY_RESULT_EXT, &any);
+            same = glGetError() == GL_NO_ERROR && !any;
+        }
+    }
+    int ok = 1;
+    if (!same) {
+        if (!v->fbo) {
+            glGenTextures(1, &v->ftex);
+            glBindTexture(GL_TEXTURE_2D, v->ftex);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, im->w, im->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+            glGenFramebuffers(1, &v->fbo);
+            glBindFramebuffer(GL_FRAMEBUFFER, v->fbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, v->ftex, 0);
+            v->fw = im->w;
+            v->fh = im->h;
+        } else glBindFramebuffer(GL_FRAMEBUFFER, v->fbo);
+        ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    }
+    if (ok && !same) {
         glUseProgram(v->prog);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_EXTERNAL_OES, im->tex);
         glUniform1i(v->u_tex, 0);
-        /* the picture's first row at y = -1: glReadPixels returns it first */
-        GLfloat t0 = flip ? 1.0f : 0.0f, t1 = flip ? 0.0f : 1.0f;
-        const GLfloat q[] = { -1, -1, 0, t0,  1, -1, 1, t0,  -1, 1, 0, t1,  1, 1, 1, t1 };
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, q);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, q + 2);
-        glEnableVertexAttribArray(0);
-        glEnableVertexAttribArray(1);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glDisable(GL_SCISSOR_TEST);
+        draw_rows(im, y, h, flip);
         glPixelStorei(GL_PACK_ALIGNMENT, 4);
         uint8_t *rows = px + (size_t)y * (size_t)im->w * 4;
         int done = 0;
@@ -376,10 +502,121 @@ int dmaread_rows(DmaImg *im, uint8_t *px, int y, int h, int flip) {
                 rows[i * 4 + 3] = 255;
             }
         }
+        /* only rows [y, y + h) are new in the framebuffer: it is key's picture only if the rest was key's already */
+        v->fkey = ok && key && (v->fkey == key || (y == 0 && h == im->h)) ? key : NULL;
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     leave(v, &s);
+    return !ok ? -1 : same ? 0 : 1;
+}
+
+int dmaread_rows(DmaImg *im, uint8_t *px, int y, int h, int flip) {
+    return dmaread_rows_new(im, px, y, h, flip, NULL) < 0 ? -1 : 0;
+}
+
+/* ---- linear copies for the desktop's GPU ---- */
+
+DmaOut *dmaread_out_new(const DmaImg *like) {
+    if (!like) return NULL;
+    Dev *v = like->dev;
+    /* the desktop's GPU takes a linear buffer whose rows are a multiple of 256 bytes (amdgpu's pitch); Intel's are of
+     * 64: the width is rounded up to 64 pixels and only the picture's own width is used */
+    int aw = (like->w + 63) & ~63;
+    struct gbm_bo *bo = gbm_bo_create(v->gbm, (uint32_t)aw, (uint32_t)like->h, GBM_FORMAT_XRGB8888, GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR);
+    if (!bo) return NULL;
+    DmaOut *o = calloc(1, sizeof *o);
+    if (!o) { gbm_bo_destroy(bo); return NULL; }
+    o->dev = v;
+    o->bo = bo;
+    o->w = like->w;
+    o->h = like->h;
+    o->stride = (int)gbm_bo_get_stride(bo);
+    o->fd = gbm_bo_get_fd(bo);
+    if (o->fd < 0 || o->stride % 256 || o->stride < like->w * 4 || gbm_bo_get_modifier(bo) != DRM_FORMAT_MOD_LINEAR) goto fail;
+    o->img = import_image(v, o->fd, o->w, o->h, o->stride, DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 1);
+    if (o->img == EGL_NO_IMAGE_KHR) o->img = import_image(v, o->fd, o->w, o->h, o->stride, DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0);
+    if (o->img == EGL_NO_IMAGE_KHR) goto fail;
+    Cur s;
+    if (enter(v, &s)) goto fail;
+    while (glGetError() != GL_NO_ERROR) {}
+    glGenTextures(1, &o->tex);
+    glBindTexture(GL_TEXTURE_2D, o->tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    v->image_target(GL_TEXTURE_2D, (GLeglImageOES)o->img);
+    glGenFramebuffers(1, &o->fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, o->fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, o->tex, 0);
+    int ok = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE && glGetError() == GL_NO_ERROR;
+    if (ok && v->query) v->gen_q(1, &o->q);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    leave(v, &s);
+    if (!ok) goto fail;
+    return o;
+fail:
+    dmaread_out_free(o);
+    return NULL;
+}
+
+int dmaread_out_fd(const DmaOut *o, int *stride) {
+    if (!o) return -1;
+    if (stride) *stride = o->stride;
+    return o->fd;
+}
+
+int dmaread_copy(DmaImg *src, DmaOut *dst, int y, int h, int flip, const DmaOut *prev) {
+    if (!src || !dst || src->dev != dst->dev || src->w != dst->w || src->h != dst->h || y < 0 || h <= 0 || y + h > src->h) return -1;
+    if (prev && (prev->dev != src->dev || prev->w != src->w || prev->h != src->h || prev == dst)) prev = NULL;
+    Dev *v = src->dev;
+    Cur s;
+    if (enter(v, &s)) return -1;
+    while (glGetError() != GL_NO_ERROR) {}
+    dst->q_on = prev && !diff_rows(v, src, prev->tex, y, h, flip, dst->q);
+    glBindFramebuffer(GL_FRAMEBUFFER, dst->fbo);
+    glUseProgram(v->prog);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, src->tex);
+    glUniform1i(v->u_tex, 0);
+    draw_rows(src, y, h, flip);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    int ok = glGetError() == GL_NO_ERROR;
+    glFlush();                          /* sent to the GPU now; the copy's fence is on dst's dmabuf (poll it) */
+    leave(v, &s);
     return ok ? 0 : -1;
+}
+
+int dmaread_changed(DmaOut *o) {
+    if (!o || !o->q_on) return -1;
+    Dev *v = o->dev;
+    Cur s;
+    if (enter(v, &s)) return -1;
+    GLuint avail = 0, any = 1;
+    v->get_q(o->q, GL_QUERY_RESULT_AVAILABLE_EXT, &avail);
+    if (avail) v->get_q(o->q, GL_QUERY_RESULT_EXT, &any);
+    int r = glGetError() != GL_NO_ERROR || !avail ? -1 : any ? 1 : 0;
+    leave(v, &s);
+    o->q_on = 0;
+    return r;
+}
+
+void dmaread_out_free(DmaOut *o) {
+    if (!o) return;
+    Dev *v = o->dev;
+    if (o->tex || o->fbo || o->q) {
+        Cur s;
+        if (!enter(v, &s)) {
+            if (o->fbo) glDeleteFramebuffers(1, &o->fbo);
+            if (o->tex) glDeleteTextures(1, &o->tex);
+            if (o->q) v->del_q(1, &o->q);
+            leave(v, &s);
+        }
+    }
+    if (o->img != EGL_NO_IMAGE_KHR && o->img) v->destroy_image(v->dpy, o->img);
+    if (o->fd >= 0) close(o->fd);
+    if (o->bo) gbm_bo_destroy(o->bo);
+    free(o);
 }
 
 void dmaread_free(DmaImg *im) {

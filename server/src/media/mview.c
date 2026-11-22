@@ -8,6 +8,7 @@
  * changes (moving the pointer doesn't recompute it). */
 #include "media_int.h"
 #include "../ui/ui.h"
+#include "../wl/wl.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -120,8 +121,16 @@ static void paint_crop(Canvas *c, MediaSrc *s, int node, const float *r, float x
     if (cx1 > cx0 && cy1 > cy0) {
         float dx = x + (cx0 - r[0]) * kx, dy = y + (cy0 - r[1]) * ky, dw = (cx1 - cx0) * kx, dh = (cy1 - cy0) * ky;
         if (fabsf(kx - 1) < 0.001f && fabsf(ky - 1) < 0.001f) { dx = roundf(dx); dy = roundf(dy); }
-        canvas_blit_scaled(c, px, sw, sw, sh, cx0, cy0, cx1 - cx0, cy1 - cy0, dx, dy, dw, dh, op, s->opaque || s->xrgb);
-        if (s->xrgb) force_alpha(c, (int)floorf(dx), (int)floorf(dy), (int)ceilf(dw), (int)ceilf(dh));
+        /* a GPU picture: drawn by the GPU below the UI, straight from its texture */
+        if (s->gtex && wl_paint_media(c, s->id, node, x, y, w, h, dx, dy, dw, dh, cx0, cy0, cx1 - cx0, cy1 - cy0, op)) s->gpu_drawn = 1;
+        else {
+            s->gpu_drawn = 0;
+            if (s->cpu_stale) { media_src_need_cpu(s); px = pixels_of(s, &sw, &sh); }
+            if (px && sw >= cx1 && sh >= cy1) {
+                canvas_blit_scaled(c, px, sw, sw, sh, cx0, cy0, cx1 - cx0, cy1 - cy0, dx, dy, dw, dh, op, s->opaque || s->xrgb);
+                if (s->xrgb) force_alpha(c, (int)floorf(dx), (int)floorf(dy), (int)ceilf(dw), (int)ceilf(dh));
+            }
+        }
     }
     if (s->shown_scale != kx) { s->shown_scale = kx; if (s->cur_mode == 1) media_cursor_touch(); }
     canvas_set_clip(c, old);
@@ -183,6 +192,23 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
                 if (ix1 < x + w) canvas_rrect(c, ix1, iy0, x + w - ix1, iy1 - iy0, 0, bg);
             }
         }
+    }
+    /* a GPU picture (a Machines 3D or vGPU picture): drawn by the GPU below the UI, scaled there, straight from its
+     * texture; no copy, no CPU scaling (docs/MACHINES-GPU.md, "A vGPU's picture without a readback") */
+    if (s->gtex && !rot && !s->view.mirror && !s->view.bright && !s->view.contrast) {
+        float gx = dx, gy = dy;
+        if (fabsf(sc - 1) < 0.001f) { gx = roundf(dx); gy = roundf(dy); }
+        if (wl_paint_media(c, s->id, node, x, y, w, h, gx, gy, dw, dh, 0, 0, (float)sw, (float)sh, op)) {
+            s->gpu_drawn = 1;
+            canvas_set_clip(c, old);
+            return;
+        }
+    }
+    s->gpu_drawn = 0;
+    if (s->cpu_stale) {                 /* the CPU's pixels are needed now: read back the frame the texture shows */
+        media_src_need_cpu(s);
+        px = pixels_of(s, &sw, &sh);
+        if (!px) { canvas_set_clip(c, old); return; }
     }
     if (!rot && !s->view.mirror && fabsf(sc - 1) < 0.001f && !s->view.bright && !s->view.contrast) {
         canvas_blit(c, px, sw, sh, (int)lroundf(dx), (int)lroundf(dy), 0, op, opaque);
@@ -247,6 +273,32 @@ void media_paint(Canvas *c, int handle, int node, float x, float y, float w, flo
     }
     canvas_blit(c, s->cache, vw, vh, vx0, vy0, 0, op, opaque);
     canvas_set_clip(c, old);
+}
+
+void media_paint_note(Canvas *c, int handle, int node, float x, float y, float w, float h, float op) {
+    MediaSrc *s = media_src_get(handle);
+    if (!s || !s->gtex || !s->gpu_drawn || w < 1 || h < 1 || op < 0.004f) return;
+    Node *nd = node_get(node);
+    int sw, sh;
+    if (!pixels_of(s, &sw, &sh)) return;
+    if (nd && nd->crop) {               /* as paint_crop places it */
+        const float *r = nd->crop;
+        float cx0 = fmaxf(r[0], 0), cy0 = fmaxf(r[1], 0), cx1 = fminf(r[0] + r[2], (float)sw), cy1 = fminf(r[1] + r[3], (float)sh);
+        if (cx1 <= cx0 || cy1 <= cy0) return;
+        float kx = w / r[2], ky = h / r[3];
+        float dx = x + (cx0 - r[0]) * kx, dy = y + (cy0 - r[1]) * ky;
+        if (fabsf(kx - 1) < 0.001f && fabsf(ky - 1) < 0.001f) { dx = roundf(dx); dy = roundf(dy); }
+        wl_paint_media(c, s->id, node, x, y, w, h, dx, dy, (cx1 - cx0) * kx, (cy1 - cy0) * ky, cx0, cy0, cx1 - cx0, cy1 - cy0, op);
+        return;
+    }
+    if (s->view.rot || s->view.mirror) return;
+    /* as media_paint places it */
+    float sc = s->view.zoom > 0 ? s->view.zoom : s->view.fit == 1 ? fmaxf(w / sw, h / sh) : fminf(w / sw, h / sh);
+    float dw = sw * sc, dh = sh * sc, dx, dy;
+    if (s->view.zoom > 0) { dx = x + w / 2 - s->view.cx * dw; dy = y + h / 2 - s->view.cy * dh; }
+    else { dx = x + (w - dw) / 2; dy = y + (h - dh) / 2; }
+    if (fabsf(sc - 1) < 0.001f) { dx = roundf(dx); dy = roundf(dy); }
+    wl_paint_media(c, s->id, node, x, y, w, h, dx, dy, dw, dh, 0, 0, (float)sw, (float)sh, op);
 }
 
 /* The frame of a video or of the camera covers its whole box (the bands are painted opaque): if everything

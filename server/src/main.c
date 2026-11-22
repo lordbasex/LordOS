@@ -2212,6 +2212,13 @@ static int render_frame(Server *s) {
      * second late and Chromium logged "buggy presentation feedback" (docs/TROUBLESHOOTING.md). */
     if (wl_wants_frame() && gpu_active())
         for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0) s->out[i].wl_new = 1;
+    /* a machine's new frame in the texture its window draws (media_src_present): only the displays it is on */
+    float mx0, my0, mx1, my1;
+    if (media_present_take(&mx0, &my0, &mx1, &my1) && gpu_active())
+        for (int i = 0; i < OUT_MAX; i++) {
+            Out *o = &s->out[i];
+            if (o->on && o->gpu >= 0 && mx0 < o->v.x + o->v.w && mx1 > o->v.x && my0 < o->v.y + o->v.h && my1 > o->v.y) o->wl_new = 1;
+        }
     Out *feed = feed_out(s), *mo = main_out(s);
     int main_shown = 0, main_built = 0;     /* the main display got this frame; built here (not prepared before) */
     int done[OUT_MAX] = { 0 };              /* submitted or built in this render */
@@ -3011,7 +3018,7 @@ int main(int argc, char **argv) {
             if (media_cursor_serial() != mcur) { mcur = media_cursor_serial(); if (s.over_media) s.cursor_dirty = 1; }
         }
         int ahead = !unseen && can_prepare(&s);
-        int wants = !unseen && (ui.dirty || s.cursor_dirty || js_wants_frame() || wl_wants_frame() || media_wants_frame() ||
+        int wants = !unseen && (ui.dirty || s.cursor_dirty || js_wants_frame() || wl_wants_frame() || media_wants_frame() || media_present_pending() ||
                                 outs_have_work(&s) || prep_ready(&s) || ahead);
         /* no monitor, no vblank: 60 frames a second, or as fast as the fastest remote viewer's screen
          * (120, 144 Hz…) */

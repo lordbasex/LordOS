@@ -775,6 +775,13 @@ static void layer_register(Canvas *c, Node *n, float op) {
         wl_paint(c, n->term, n->id, n->ax + pd[EDGE_L] + bl, n->ay + pd[EDGE_T] + bt,
                  n->w - pd[EDGE_L] - pd[EDGE_R] - bl - br, n->h - pd[EDGE_T] - pd[EDGE_B] - bt - bb, op);
     }
+    if (n->type == NODE_MEDIA) {        /* a machine's GPU picture: noted like an app window */
+        const float *pd = node_padding(n);
+        float bl = node_border(n, EDGE_L), bt = node_border(n, EDGE_T), br = node_border(n, EDGE_R), bb = node_border(n, EDGE_B);
+        const float k = paint_view.k;
+        media_paint_note(c, n->term, n->id, VX(n->ax + pd[EDGE_L] + bl), VY(n->ay + pd[EDGE_T] + bt),
+                         (n->w - pd[EDGE_L] - pd[EDGE_R] - bl - br) * k, (n->h - pd[EDGE_T] - pd[EDGE_B] - bt - bb) * k, op);
+    }
     if (n->type != NODE_TEXT) for (Node *k = n->first; k; k = k->next) layer_register(c, k, op);
 }
 

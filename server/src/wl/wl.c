@@ -83,6 +83,7 @@
 #include "ptrlock.h"
 #include "wl_input.h"
 #include "../gpu/gpu.h"
+#include "../media/media.h"
 #include <drm/drm_fourcc.h>
 #include <linux/dma-buf.h>
 #include <sys/ioctl.h>
@@ -213,7 +214,9 @@ static Surf *popups[32];
 static int npopups;
 
 /* GPU path: what is drawn below (layer 0) and above (layer 1) the UI, in order */
-typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; } Draw;   /* sx, sy: a transformed window's scale */
+/* sx, sy: a transformed window's scale. media: a media node's GPU picture (wl_paint_media) instead of a surface: the
+ * source's id, its size here (mw × mh, logical) and the part of its texture (msx, msy, msw × msh, picture pixels) */
+typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; int media; float mw, mh, msx, msy, msw, msh; } Draw;
 static Draw draws[2][128];
 static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
@@ -2888,7 +2891,7 @@ static Rect rect_and(Rect a, Rect b) {
 }
 
 static void add_draw(int layer, Surf *s, float x, float y, Rect clip, float op) {
-    if (ndraws[layer] < 128) draws[layer][ndraws[layer]++] = (Draw){ s->id, x, y, clip, op, 1, 1 };
+    if (ndraws[layer] < 128) draws[layer][ndraws[layer]++] = (Draw){ .sid = s->id, .x = x, .y = y, .clip = clip, .op = op, .sx = 1, .sy = 1 };
 }
 
 /* Is the node (or an ancestor) a protected window? (screenshots, media/capture.c) */
@@ -3058,10 +3061,11 @@ void wl_paint_restore(void) {
 int wl_draws_meet(Rect r) {
     for (int i = 0; i < ndraws[0]; i++) {
         const Draw *d = &draws[0][i];
-        const Surf *s = find(d->sid);
-        if (!s) continue;
+        const Surf *s = d->media ? NULL : find(d->sid);
+        if (!s && !d->media) continue;
+        float dw = d->media ? d->mw : s->lw, dh = d->media ? d->mh : s->lh;
         Rect b = rect_and(phys_rect(d->clip), (Rect){ (int)floorf(PVX(d->x)) - 1, (int)floorf(PVY(d->y)) - 1,
-                                                      (int)ceilf(PVX(d->x + s->lw * d->sx)) + 1, (int)ceilf(PVY(d->y + s->lh * d->sy)) + 1 });
+                                                      (int)ceilf(PVX(d->x + dw * d->sx)) + 1, (int)ceilf(PVY(d->y + dh * d->sy)) + 1 });
         if (b.x0 < r.x1 && r.x0 < b.x1 && b.y0 < r.y1 && r.y0 < b.y1) return 1;
     }
     return 0;
@@ -3146,6 +3150,60 @@ static void fs_box(float *x, float *y, float *sx, float *sy) {
     *y = fy - fs_surf->gy * *sy;
 }
 
+/* A media node's GPU picture, as noted by wl_paint_media; its texture is looked up now (the source may have a newer one,
+ * or none: then nothing is drawn, and the hole shows what is below until the next paint) */
+static void draw_media(const Draw *d) {
+    int flip = 0;
+    GpuTex *t = media_gpu_tex(d->media, &flip);
+    if (!t) return;
+    float sy = d->msy, sh = d->msh;
+    if (flip) { sy = d->msy + d->msh; sh = -d->msh; }     /* the texture's first row is the picture's bottom */
+    if (d->sx == 1 && d->sy == 1) {
+        gpu_draw(t, PVX(d->x), PVY(d->y), d->mw * paint_view.k, d->mh * paint_view.k, d->msx, sy, d->msw, sh, phys_rect(d->clip), d->op);
+        return;
+    }
+    Rect p = tf_pixels(d->x, d->y, d->mw * d->sx, d->mh * d->sy);
+    gpu_draw(t, (float)p.x0, (float)p.y0, (float)(p.x1 - p.x0), (float)(p.y1 - p.y0), d->msx, sy, d->msw, sh, phys_rect(d->clip), d->op);
+}
+
+/* A media node whose picture is a GPU texture (media/mview.c; docs/MACHINES-GPU.md, "A vGPU's picture without a
+ * readback"): noted for layer 0 and a hole opened in the UI, as paint_tree does for an app window, so the GPU draws the
+ * picture straight from its texture below the UI. Physical coordinates of the canvas being painted come in (the box of
+ * the node, bx…, and where the picture goes, px…) and are noted as logical ones. 0 when it can't be drawn that way (no
+ * GPU, a capture, inside a rotation): the caller paints the CPU's pixels. */
+int wl_paint_media(Canvas *c, int src, int node, float bx, float by, float bw, float bh, float px, float py, float pw, float ph,
+                   float sx, float sy, float sw, float sh, float op) {
+    if (!gpu_active() || paint_capture_mode || paint_view.k <= 0 || pw <= 0 || ph <= 0) return 0;
+    float k = paint_view.k;
+    /* physical → logical, the inverse of PVX / PVY */
+    float lx = (px - paint_view.dx) / k + paint_view.x, ly = (py - paint_view.dy) / k + paint_view.y;
+    float lbx = (bx - paint_view.dx) / k + paint_view.x, lby = (by - paint_view.dy) / k + paint_view.y;
+    Rect box = { (int)floorf(lbx), (int)floorf(lby), (int)ceilf(lbx + bw / k), (int)ceilf(lby + bh / k) };
+    Draw d = { .sid = 0, .x = lx, .y = ly, .clip = tfv.on ? box : rect_and(node_clip(node), box), .op = op, .sx = 1, .sy = 1,
+               .media = src, .mw = pw / k, .mh = ph / k, .msx = sx, .msy = sy, .msw = sw, .msh = sh };
+    Rect old = c->clip;
+    if (tfv.on) {
+        if (tfv.skip || ntf_holes >= TF_HOLES || ndraws[0] >= 128) return 0;
+        d.x = lx * tfv.sx + tfv.tx; d.y = ly * tfv.sy + tfv.ty; d.sx = tfv.sx; d.sy = tfv.sy;
+        d.clip = tf_map(d.clip); d.op *= tfv.op;
+        draws[0][ndraws[0]++] = d;
+        tf_holes[ntf_holes].x = d.x; tf_holes[ntf_holes].y = d.y; tf_holes[ntf_holes].w = d.mw * tfv.sx; tf_holes[ntf_holes].h = d.mh * tfv.sy;
+        tf_holes[ntf_holes++].clip = d.clip;
+        canvas_set_clip(c, rect_and(rect_and(old, phys_rect(box)), (Rect){ (int)floorf(px), (int)floorf(py), (int)ceilf(px + pw), (int)ceilf(py + ph) }));
+        canvas_clear(c, 0);
+        canvas_set_clip(c, old);
+        return 1;
+    }
+    if (ndraws[0] >= 128) return 0;
+    draws[0][ndraws[0]++] = d;
+    if (holes_off) return 1;
+    /* the hole: where the picture is, inside the node and the clip (the bands beside it keep the UI's background) */
+    canvas_set_clip(c, rect_and(rect_and(old, phys_rect(d.clip)), (Rect){ (int)floorf(px), (int)floorf(py), (int)ceilf(px + pw), (int)ceilf(py + ph) }));
+    canvas_clear(c, 0);
+    canvas_set_clip(c, old);
+    return 1;
+}
+
 int wl_gpu_layers_empty(void) { float x, y; return !ndraws[0] && !ndraws[1] && !fs_surf && !npopups && !dnd_icon_at(&x, &y); }
 
 void wl_gpu_draw_layer(int layer) {
@@ -3153,6 +3211,7 @@ void wl_gpu_draw_layer(int layer) {
     if (layer == 0) {
         for (int i = 0; i < ndraws[0]; i++) {
             Draw *d = &draws[0][i];
+            if (d->media) { draw_media(d); continue; }
             Surf *s = find(d->sid);
             if (!s || !s->content) continue;
             if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op); continue; }

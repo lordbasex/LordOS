@@ -108,6 +108,7 @@ static struct {
     sd_bus_message *upd;
     long long upd_ms;
     int dmabufs;
+    long upd_none;                      /* UpdateDMABUFs with no dmabuf picture to update */
 } D;
 
 static long long now_ms(void) {
@@ -654,7 +655,9 @@ static int on_update_dmabuf(sd_bus_message *m, void *u, sd_bus_error *e) {
     int32_t x, y, w, h;
     if (sd_bus_message_read(m, "iiii", &x, &y, &w, &h) < 0) { refuse("UpdateDMABUF", "malformed"); return ok(m); }
     D.updates++;
-    if (D.src != SRC_DMABUF) { refuse("UpdateDMABUF", "no dmabuf picture"); return ok(m); }
+    /* QEMU's vfio display (a GVT-g vGPU) sends one every refresh, also before its first ScanoutDMABUF and after the
+     * guest turned its plane off: nothing to show, the last picture stays; answered, counted, never logged */
+    if (D.src != SRC_DMABUF) { D.upd_none++; return ok(m); }
     if (!rect_ok("UpdateDMABUF", x, y, w, h)) return ok(m);
     damage(x, y, w, h);
     answer_update();
@@ -692,7 +695,10 @@ static int on_cursor_define(sd_bus_message *m, void *u, sd_bus_error *e) {
     if (r < 0) { refuse("CursorDefine", "malformed"); return ok(m); }
     if (w <= 0 || h <= 0 || w > VD_MAX_CURSOR || h > VD_MAX_CURSOR) { refuse("CursorDefine", "size %dx%d", w, h); return ok(m); }
     if (len != (size_t)w * (size_t)h * 4) { refuse("CursorDefine", "%zu bytes for %dx%d", len, w, h); return ok(m); }
-    if (hx < 0 || hy < 0 || hx >= w || hy >= h) { refuse("CursorDefine", "hotspot %d,%d outside %dx%d", hx, hy, w, h); return ok(m); }
+    /* a hotspot QEMU doesn't know: a vGPU's cursor plane (vfio display) has none, and VFIO says so with 0xffffffff
+     * (-1 here). Its image is drawn from its top left corner, where Windows' arrow has its tip: 0, 0. Refused, such a
+     * machine would have no pointer of its own (2026-11-22) */
+    if (hx < 0 || hy < 0 || hx >= w || hy >= h) { hx = 0; hy = 0; }
     int fd = memfd_create("lordos-vmcursor", MFD_CLOEXEC | MFD_ALLOW_SEALING);
     if (fd < 0) return ok(m);
     size_t off = 0;
