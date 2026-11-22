@@ -33,6 +33,7 @@ A small program LordOS builds, installed for you after an unattended install (or
 - **Apps mode**, **dropped files** and **Open with** (below).
 - **The pointer drawn by LordOS**, so moving it no longer waits for the machine. A switch per machine gives it back to the guest.
 - **A clone gets its own computer name**, used from its next restart.
+- **They stay up to date by themselves.** When this LordOS brings newer tools, Machines installs them while the machine runs and nothing is being copied; a switch in Machines settings and in each machine's Configure turns it off, and then a notification offers **Update**.
 
 ## The clipboard, only when you paste
 

@@ -12,6 +12,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Machines updates the LordOS tools in a machine by itself, in development** (`apps/machines/model.js`
+  `toolsAutoStep`/`toolsLine`/`toolsAutoOn`, `vmwindow.jsx`, `configure.jsx`, `settingswin.jsx`, `store.js`, `meta.js`;
+  `server/src/ui/js_vm.c`, `server/src/vm/lordvm.c`; `docs/VIRTUALIZATION.md` 7.1.3). A guest ran older
+  LordOS tools (w7, with a known bug) for hours because updating them needed a click on **Update LordOS Tools** in
+  the agent's popover that nobody knew was there. Now, when a running machine's agent has been connected for 20 s and
+  its tools are older than the ones this LordOS ships (`TOOLS_SHIPPED`: `w9` and the Linux helper's `5`), Machines asks for
+  the same install as the button, only while nothing is on its way (files copying, the transfer folder's setup, an
+  app of apps mode opening, an install the person started). At most three attempts per run of the machine and
+  version, 2 and 10 minutes apart, an attempt without an answer in 10 minutes counted as failed, never a loop; a run
+  where the install worked but the tools still say the old version isn't tried again. lord-vm logs each attempt
+  (`agent: Machines updates the LordOS tools in the guest by itself (they said w7)`): `lord.vm.agent(id, 'update')`
+  is the existing `VAG_INSTALL` with a flag, no new privilege or program. On by default, with **Update the LordOS
+  tools in machines automatically** in Machines settings → General and **Update the LordOS tools in this machine
+  automatically** in each machine's Configure → Guest agent. When it's off, or the attempts failed, one notification
+  per run and version says "The LordOS tools in ‹machine› are out of date" with an **Update** action; the agent
+  button keeps its dot. The agent's popover now shows the LordOS tools on their own line, "LordOS tools w9 (up to
+  date)" or "LordOS tools w7 → w9 available" ("updating…" while it runs), apart from the system and
+  "qemu-guest-agent ‹version›" (which said only "agent"). New texts in all 35 languages. Tested by
+  `server/tests/vm_model_test.mjs` (settling, deferral while busy, once per run, backoff, giving up, the notification
+  when off or failed, a newer shipped version starting a fresh count, the popover's line).
+
 - **The Store's long lists load as you scroll, in development** (`apps/store/endless.js`, `index.jsx`,
   `flathubpages.js`, `debian.js`). Flathub's catalog (thousands of apps) and each Debian category no longer end in
   "Show more (2183 left)": the next 60 cards are drawn when the list is scrolled within a screen of its end, and a tall

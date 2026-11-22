@@ -33,6 +33,7 @@ Um programa pequeno que o LordOS constrói, instalado sozinho depois de uma inst
 - **O modo apps**, **os arquivos soltos** e o **Abrir com** (abaixo).
 - **O ponteiro desenhado pelo LordOS**, então movê-lo não espera mais pela máquina. Uma chave por máquina o devolve ao convidado.
 - **Um clone ganha o próprio nome de computador**, usado a partir da próxima reinicialização.
+- **Elas se mantêm atualizadas sozinhas.** Quando este LordOS traz ferramentas mais novas, Máquinas as instala enquanto a máquina roda e nada está sendo copiado; uma chave nos ajustes de Máquinas e em Configurar de cada máquina desliga isso, e então uma notificação oferece **Atualizar**.
 
 ## A área de transferência, só quando você cola
 

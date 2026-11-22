@@ -4942,6 +4942,9 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         }
         if (m->a == VAG_SHUTDOWN) { qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1); reply(ci, m->seq, VME_OK, ""); return; }
         if (m->a == VAG_TIMESYNC) { ag_timesync(); reply(ci, m->seq, VME_OK, ""); return; }
+        /* Machines' own update of older LordOS tools (docs/VIRTUALIZATION.md "Keeping the LordOS tools up to date"):
+         * the same install as the button, and each attempt in this log */
+        if (m->b == 1) vlog("agent: Machines updates the LordOS tools in the guest by itself (they said %s)", S.lag_hello && S.lag_version[0] ? S.lag_version : "no version");
         if (S.ag_windows) { const char *why = NULL; if (wi_begin(ci, m->seq, &why)) reply(ci, m->seq, VME_WRONG_STATE, why); return; }
         if (S.inst_busy || S.helper_handle) { reply(ci, m->seq, VME_BUSY, "busy"); return; }      /* one install at a time */
         if (!S.helper || !(S.ag_caps & VAC_FILES) || !(S.ag_caps & VAC_EXEC)) { reply(ci, m->seq, VME_WRONG_STATE, S.helper ? "the guest agent can't write files or run commands" : "lordos-guest isn't available for this machine's architecture"); return; }

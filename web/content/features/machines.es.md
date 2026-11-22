@@ -33,6 +33,7 @@ Un programa chico que construye LordOS, que se instala solo después de una inst
 - **El modo apps**, **los archivos soltados** y **Abrir con** (más abajo).
 - **El puntero lo dibuja LordOS**, así moverlo ya no espera a la máquina. Un interruptor por máquina se lo devuelve al invitado.
 - **Un clon recibe su propio nombre de equipo**, que usa desde su próximo reinicio.
+- **Se mantienen al día solas.** Cuando este LordOS trae herramientas más nuevas, Máquinas las instala mientras la máquina corre y no se está copiando nada; un interruptor en los ajustes de Máquinas y en Configurar de cada máquina lo apaga, y entonces una notificación ofrece **Actualizar**.
 
 ## El portapapeles, solo cuando pegás
 

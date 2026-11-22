@@ -704,6 +704,94 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('unknown format: nothing to say', [M.toolsOutdated(on('x7'), S), M.toolsOutdated(on('w4.1'), S), M.toolsOutdated(on('w'), S)], [false, false, false]);
   eq('not connected: nothing to say', [M.toolsOutdated({ state: 'waiting', tools: 'w1' }, S), M.toolsOutdated(null, S)], [false, false]);
   eq('the default is what ships', M.toolsOutdated(on('w1')), true);
+  // the popover's line, apart from qemu-guest-agent's version
+  eq('tools line: older', M.toolsLine(on('w7'), { windows: 'w9', linux: '5' }), { key: 'old', have: 'w7', want: 'w9' });
+  eq('tools line: current', M.toolsLine(on('w9'), { windows: 'w9', linux: '5' }), { key: 'current', have: 'w9' });
+  eq('tools line: newer is current', M.toolsLine(on('w12'), { windows: 'w9', linux: '5' }), { key: 'current', have: 'w12' });
+  eq('tools line: Linux older', M.toolsLine(on('4'), S), { key: 'old', have: '4', want: '5' });
+  eq('tools line: unknown format', M.toolsLine(on('x1'), S), { key: 'other', have: 'x1' });
+  eq('tools line: none', [M.toolsLine(on(''), S), M.toolsLine({ state: 'waiting', tools: 'w1' }, S), M.toolsLine(null, S)], [null, null, null]);
+  eq('tools want', [M.toolsWant(on('w1'), S), M.toolsWant(on('w4'), S), M.toolsWant(on('3'), S)], ['w4', '', '5']);
+}
+
+// ---- the LordOS tools updated by themselves: when, once per run and version, backoff, settings, the notification ----
+{
+  const S = { windows: 'w9', linux: '5' };
+  const ag = (tools, install = 0, state = 'connected') => ({ state, caps: 0, tools, install });
+  const step = (s, agent, now, o = {}) => M.toolsAutoStep(s, { agent, on: true, busy: false, now, ...o }, S);
+  const T0 = 1000000, SET = M.TOOLS_SETTLE_MS;
+  // settings: the machine's own choice, else the default (on)
+  eq('auto: on by default', M.toolsAutoOn({}, {}), true);
+  eq('auto: the global default off', M.toolsAutoOn({}, { toolsAuto: false }), false);
+  eq('auto: the machine says on over the default', M.toolsAutoOn({ toolsAuto: true }, { toolsAuto: false }), true);
+  eq('auto: the machine says off', M.toolsAutoOn({ toolsAuto: false }, {}), false);
+  eq('auto: nothing known', M.toolsAutoOn(undefined, undefined), true);
+  // waits for the agent to settle, then installs once
+  let r = step(null, ag('w7'), T0);
+  eq('auto: just connected: waits', [r.act, r.s.since, r.s.want], [null, T0, 'w9']);
+  r = step(r.s, ag('w7'), T0 + SET - 1);
+  eq('auto: still settling', r.act, null);
+  r = step(r.s, ag('w7'), T0 + SET);
+  eq('auto: settled: install', [r.act, r.s.tries], ['install', 1]);
+  const sent = r.s;
+  r = step(sent, ag('w7', 1), T0 + SET + 20);
+  eq('auto: on its way', [r.act, r.s.pending], [null, T0 + SET]);
+  eq('auto: a new session (install 0) waits for the answer', step(sent, ag('w7', 0), T0 + SET + 60000).s.pending, T0 + SET);
+  eq('auto: refused at once counts', step(sent, ag('w7', 3), T0 + SET + 5).result, 'failed');
+  let ok = step(r.s, ag('w7', 2), T0 + SET + 30);
+  eq('auto: done', [ok.act, ok.result, ok.s.pending, ok.s.done], [null, 'ok', 0, T0 + SET + 30]);
+  eq('auto: the tools say w9: nothing more', step(ok.s, ag('w9', 2), T0 + SET + 40).act, null);
+  // installed but the tools still say w7 a while later: one notification, never another install in this run
+  r = step(ok.s, ag('w7', 2), T0 + SET + 40);
+  eq('auto: installed, still old, too soon to say', r.act, null);
+  r = step(r.s, ag('w7', 2), T0 + SET + 30 + SET * 3);
+  eq('auto: installed, still old: notify once', [r.act, r.why], ['notify', 'failed']);
+  r = step(r.s, ag('w7', 2), T0 + SET * 50);
+  eq('auto: and only once', r.act, null);
+  // failures: backoff, then given up with one notification
+  r = step(sent, ag('w7', 1), T0 + SET + 20);
+  r = step(r.s, ag('w7', 3), T0 + SET + 30);
+  eq('auto: failed: backoff', [r.act, r.result, r.s.next], [null, 'failed', T0 + SET + 30 + M.TOOLS_BACKOFF_MS[0]]);
+  let t = T0 + SET + 30;
+  eq('auto: not before the backoff', step(r.s, ag('w7', 3), t + M.TOOLS_BACKOFF_MS[0] - 1).act, null);
+  r = step(r.s, ag('w7', 3), t + M.TOOLS_BACKOFF_MS[0]);
+  eq('auto: second try', [r.act, r.s.tries], ['install', 2]);
+  t += M.TOOLS_BACKOFF_MS[0];
+  // no answer at all: counted as failed after TOOLS_WAIT_MS
+  eq('auto: waiting for its answer', step(r.s, ag('w7', 0), t + M.TOOLS_WAIT_MS).act, null);
+  r = step(r.s, ag('w7', 0), t + M.TOOLS_WAIT_MS + 1);
+  eq('auto: no answer: failed', [r.result, r.s.next], ['failed', t + M.TOOLS_WAIT_MS + 1 + M.TOOLS_BACKOFF_MS[1]]);
+  t = r.s.next;
+  r = step(r.s, ag('w7', 3), t);
+  eq('auto: third try', [r.act, r.s.tries], ['install', 3]);
+  r = step(r.s, ag('w7', 1), t + 5);
+  r = step(r.s, ag('w7', 3), t + 10);
+  eq('auto: the last failed: notify', [r.act, r.why, r.result], ['notify', 'failed', 'failed']);
+  let loop = 0, s = r.s;
+  for (let k = 1; k < 200; k++) { const x = step(s, ag('w7', 3), t + k * 3600000); s = x.s; if (x.act) loop++; }
+  eq('auto: never a loop after giving up', loop, 0);
+  // never while something is on its way, nor during an install the person asked for
+  r = step(null, ag('w7'), T0);
+  eq('auto: busy: deferred', step(r.s, ag('w7'), T0 + SET, { busy: true }).act, null);
+  eq('auto: the person\'s install on its way: deferred', step(r.s, ag('w7', 1), T0 + SET).act, null);
+  eq('auto: idle again: install', step(r.s, ag('w7'), T0 + SET + 5).act, 'install');
+  // off: one notification per run and version, with no install
+  r = step(null, ag('w7'), T0, { on: false });
+  r = step(r.s, ag('w7'), T0 + SET, { on: false });
+  eq('auto off: notify', [r.act, r.why, r.s.tries], ['notify', 'off', 0]);
+  eq('auto off: once', step(r.s, ag('w7'), T0 + SET * 9, { on: false }).act, null);
+  // the agent going away restarts the settling, nothing else
+  r = step(r.s, ag('w7', 0, 'waiting'), T0 + SET * 10, { on: false });
+  eq('auto: agent gone: settle again', r.s.since, 0);
+  eq('auto: back, still told', step(r.s, ag('w7'), T0 + SET * 12, { on: false }).act, null);
+  // nothing to do: current tools, a Linux helper current, a guest without the tools, not connected
+  eq('auto: current tools', step(null, ag('w9'), T0 + SET * 2).act, null);
+  eq('auto: no tools: never installs them by itself', step({ since: T0 }, ag(''), T0 + SET * 2).act, null);
+  eq('auto: Linux helper older', step({ since: T0, want: '5' }, ag('4'), T0 + SET).act, 'install');
+  // the shipped version changed (the host was upgraded): a fresh count
+  r = M.toolsAutoStep({ ...M.TOOLS_AUTO_IDLE, want: 'w8', tries: 3, told: 'w8', since: T0 }, { agent: ag('w7'), on: true, busy: false, now: T0 + SET }, S);
+  eq('auto: a newer version shipped: tried again', [r.act, r.s.want, r.s.tries], ['install', 'w9', 1]);
+  eq('auto: failed backoff stops after the last', M.toolsAutoFailed({ tries: M.TOOLS_TRIES }, 5).next, Infinity);
 }
 
 
