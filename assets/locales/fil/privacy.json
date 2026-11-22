@@ -59,5 +59,11 @@
   "ask.idle": "Gustong malaman ng “{app}” kung kailan ka wala sa computer",
   "ask.idleNote": "Sinasabihan ito kapag huminto ka sa paggamit ng keyboard at mouse nang ilang sandali, at kapag bumalik ka; wala nang iba. Mababago mo ito mamaya sa Setting → Privacy.",
   "perm.idle": "Wala sa computer",
-  "permHint.idle": "Mga app na sinasabihan kapag huminto ka sa paggamit ng computer nang ilang sandali at kapag bumalik ka, gaya ng mga chat app na nagpapakitang wala ka. Wala na silang ibang nalalaman; ang video o presentasyong nagpapanatiling bukas ang screen ay bilang na naroon ka."
+  "permHint.idle": "Mga app na sinasabihan kapag huminto ka sa paggamit ng computer nang ilang sandali at kapag bumalik ka, gaya ng mga chat app na nagpapakitang wala ka. Wala na silang ibang nalalaman; ang video o presentasyong nagpapanatiling bukas ang screen ay bilang na naroon ka.",
+  "allowOnce": "Payagan nang isang beses",
+  "allowAlways": "Laging payagan",
+  "ask.vr": "Gustong gamitin ng “{app}” ang VR headset na {headset}",
+  "ask.vrNote": "Ang display nito ay para lang sa app; hindi kailanman ipinapakita ng LordOS ang desktop mo roon. Binabawi ito kapag nagsara ang app, tinanggal ang headset o nag-lock ang screen. Mababago mo ito mamaya sa Setting → Privacy.",
+  "perm.vr": "Mga VR headset",
+  "permHint.vr": "Mga app na puwedeng direktang magpatakbo ng display ng VR headset. Mga headset lang ang ipinapahiram, hindi kailanman ang mga monitor mo, at binabawi kapag nag-lock ang screen, nagpalit ka ng user o pumili ka ng Tanggihan."
 }

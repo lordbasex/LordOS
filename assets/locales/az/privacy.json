@@ -59,5 +59,11 @@
   "ask.idle": "“{app}” kompüterdən uzaqda olduğunuzu bilmək istəyir",
   "ask.idleNote": "Klaviatura və siçandan bir müddət istifadə etmədikdə və qayıtdıqda ona xəbər verilir; başqa heç nə. Bunu sonra Parametrlər → Məxfilik bölməsində dəyişə bilərsiniz.",
   "perm.idle": "Kompüterdən uzaqda olmaq",
-  "permHint.idle": "Kompüterdən bir müddət istifadə etmədikdə və qayıtdıqda xəbər tutan tətbiqlər, məsələn sizi uzaqda göstərən söhbət tətbiqləri. Başqa heç nə öyrənmirlər; ekranı açıq saxlayan video və ya təqdimat sizin yerində olmağınız sayılır."
+  "permHint.idle": "Kompüterdən bir müddət istifadə etmədikdə və qayıtdıqda xəbər tutan tətbiqlər, məsələn sizi uzaqda göstərən söhbət tətbiqləri. Başqa heç nə öyrənmirlər; ekranı açıq saxlayan video və ya təqdimat sizin yerində olmağınız sayılır.",
+  "allowOnce": "Bir dəfə icazə ver",
+  "allowAlways": "Həmişə icazə ver",
+  "ask.vr": "“{app}” {headset} VR eynəyindən istifadə etmək istəyir",
+  "ask.vrNote": "Onun ekranı yalnız tətbiqə verilir; LordOS orada heç vaxt iş masanızı göstərmir. Tətbiq bağlananda, eynək ayrılanda və ya ekran kilidlənəndə geri alınır. Bunu sonra Parametrlər → Məxfilik bölməsində dəyişə bilərsiniz.",
+  "perm.vr": "VR eynəkləri",
+  "permHint.vr": "VR eynəyinin ekranını birbaşa idarə edə bilən tətbiqlər. Yalnız eynəklər verilir, monitorlarınız heç vaxt; ekran kilidlənəndə, istifadəçini dəyişəndə və ya Qadağan et seçəndə geri alınır."
 }

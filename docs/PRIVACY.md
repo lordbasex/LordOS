@@ -458,6 +458,11 @@ Also not for a manifest or the broker: `idle` (0.8.9.5, approved by the maintain
 told when the person is away from the computer (`ext-idle-notify-v1`): a Linux app by the same checked identity, an
 isolated LordOS app by its id, asked once by lord-server's own prompt, never granted without it, listed under Away from
 the computer; a denied app is never told ([WAYLAND.md](WAYLAND.md), "Idle notifications").
+Nor `vr` (0.8.9.5, approved by the maintainer 2026-11-22): a Linux app that wants to drive a VR headset's display through
+a DRM lease (`drm-lease-v1`): only by the identity lord-server checked, never for a sandboxed or isolated app or
+Xwayland, and only for connectors the kernel marks non-desktop (never a monitor). lord-server's prompt offers Don't
+allow, Allow once (not saved) and Always allow; listed under VR headsets. The lease is revoked when the app lets it go,
+the decision is taken back, the headset is unplugged or the screen locks ([WAYLAND.md](WAYLAND.md), "DRM leases").
 
 | | |
 |---|---|

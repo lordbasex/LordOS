@@ -11,6 +11,7 @@
 #include "../sec/codesig.h"
 #include "../wl/wl.h"
 #include "../wl/kbinhibit.h"
+#include "../wl/drmlease.h"
 
 #include <string.h>
 
@@ -35,11 +36,12 @@ static JSValue f_perm_set(JSContext *c, JSValueConst t, int argc, JSValueConst *
     int p = app && pn ? perm_from_name(pn) : -1;
     PermState ns = state_from(st);
     /* a Linux app's "shortcuts" goes by the identity lord-server checked (wl/kbinhibit.h); everything else by an .lpk id */
-    int named = app && (lpk_valid_id(app) || ((p == PERM_SHORTCUTS || p == PERM_IDLE) && kbi_key_valid(app)));
+    int named = app && (lpk_valid_id(app) || ((p == PERM_SHORTCUTS || p == PERM_IDLE || p == PERM_VR) && kbi_key_valid(app)));
     int ok = named && p >= 0 && perm_set(app, (Perm)p, ns) == 0;
     if (ok && ns != PERM_ALLOW) brokersrv_revoke(app, pn);      /* the isolated app releases the device instantly */
     if (ok && p == PERM_SHORTCUTS) wl_shortcuts_changed();      /* a window that holds them is told now */
     if (ok && p == PERM_IDLE) wl_idle_changed();                /* its notifications follow at once */
+    if (ok && p == PERM_VR) drmlease_perm_changed();            /* a lease it no longer may hold is revoked now */
     if (app) JS_FreeCString(c, app);
     if (pn) JS_FreeCString(c, pn);
     if (st) JS_FreeCString(c, st);

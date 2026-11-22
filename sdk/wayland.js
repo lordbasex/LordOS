@@ -216,6 +216,17 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       promptForServer({ app: d.app, perm: 'idle', name: String(d.name || '') || (who.kind === 'lord' ? '' : who.short), done: (allow) => lord.wayland.idleAnswer(d.app, allow) });
       break;
     }
+    // an app asks to lease a VR headset's connector (drm-lease-v1, server/src/wl/drmlease.c): lord-server offers only
+    // connectors the kernel marks non-desktop and asks every time until the person says "always" or "no" (its "vr"
+    // permission). d.app is who lord-server checked the app is (never an isolated or sandboxed app), d.headset the
+    // headset's name and connector, d.name an installed app's name for it, or ''.
+    case 'drmlease': {
+      const who = shortcutsWho(d.app);
+      if (!who || who.kind === 'lord') break;
+      promptForServer({ app: d.app, perm: 'vr', name: String(d.name || '') || who.short, headset: String(d.headset || ''), once: true,
+        done: (how) => lord.wayland.leaseAnswer(d.app, how) });
+      break;
+    }
     case 'activate': case 'attention': {
       const how = activationOutcome(win, wm.focused(), type === 'activate');
       if (how === 'focus') wm.focus(id); else if (how === 'attention' && !win.attention) wm.setAttention(id, true);

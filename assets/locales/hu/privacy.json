@@ -59,5 +59,11 @@
   "ask.idle": "„{app}” tudni szeretné, mikor nem vagy a számítógépnél",
   "ask.idleNote": "Értesítést kap, ha egy ideig nem használod a billentyűzetet és az egeret, és amikor visszatérsz; mást nem. Ezt később a Beállítások → Adatvédelem alatt módosíthatod.",
   "perm.idle": "Távollét a számítógéptől",
-  "permHint.idle": "Alkalmazások, amelyek értesítést kapnak, ha egy ideig nem használod a számítógépet és amikor visszatérsz, például a csevegők, amelyek távollévőnek mutatnak. Mást nem tudnak meg; a képernyőt ébren tartó videó vagy bemutató jelenlétnek számít."
+  "permHint.idle": "Alkalmazások, amelyek értesítést kapnak, ha egy ideig nem használod a számítógépet és amikor visszatérsz, például a csevegők, amelyek távollévőnek mutatnak. Mást nem tudnak meg; a képernyőt ébren tartó videó vagy bemutató jelenlétnek számít.",
+  "allowOnce": "Egyszer engedélyezem",
+  "allowAlways": "Mindig engedélyezem",
+  "ask.vr": "„{app}” használni szeretné a(z) {headset} VR-szemüveget",
+  "ask.vrNote": "A kijelzője csak az alkalmazásé lesz; a LordOS ott soha nem mutatja az asztalodat. Visszaveszi, amikor az alkalmazás bezárul, kihúzod a szemüveget vagy zárolódik a képernyő. Ezt később a Beállítások → Adatvédelem alatt módosíthatod.",
+  "perm.vr": "VR-szemüvegek",
+  "permHint.vr": "Alkalmazások, amelyek közvetlenül vezérelhetik egy VR-szemüveg kijelzőjét. Csak szemüvegeket ad kölcsön, a monitoraidat soha, és visszaveszi őket, amikor zárolódik a képernyő, felhasználót váltasz vagy a Tilt lehetőséget választod."
 }

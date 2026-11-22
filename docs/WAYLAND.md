@@ -48,6 +48,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
 | `xdg_toplevel_icon_manager_v1` | 1 | a window's own icon, shown only when its app has no installed icon (an AppImage, Wine, a game); buffers copied, re-encoded and size-limited, names ignored (see "Window icons", 0.8.9.5) |
 | `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
+| `wp_drm_lease_device_v1` | 1 | a VR headset's connector (one the kernel marks `non-desktop`) leased to an app the person allowed: Allow once, Always allow or Don't allow (the `vr` permission); only while a headset is plugged into lord-server's card, never to a sandboxed or isolated app or Xwayland, revoked on unplug, permission taken back, lock, user switch or text console (0.8.9.5, approved by the maintainer 2026-11-22, checked with `drmlease-test` and `drmlease-e2e-test`, not yet with a real headset; see "DRM leases") |
 | `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
 | `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
@@ -1392,6 +1393,72 @@ without input and again when the person is back. That says when someone is at th
 - **Tests.** `build/idlenotify-test` (the decision, idled and resumed, revoked while idled, an inhibitor holding) and
   `wlperf-client idle` in `tests/wlperf_headless.sh`: the first notification asks and gets nothing before the answer,
   an allowed one is told `idled`, a denied one never (`WLPERF_IDLE=deny`).
+
+## DRM leases (`wp_drm_lease_device_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
+
+A VR runtime (Monado, and anything built on it) drives the headset's display itself: it asks the compositor for a DRM
+lease of the headset's connector and gets a file descriptor that may modeset and page-flip only that connector, a CRTC
+and a plane. That hands an app direct control of a display, so LordOS gates it twice: only headsets, and only with the
+person's yes. Approved by the maintainer as a security exception (recorded in `AGENTS.md`).
+
+- **Only non-desktop connectors.** The kernel sets a connector's `non-desktop` property from the EDID (or a quirk) for
+  head-mounted displays. `kms.c` reads it (`drm_conn_non_desktop`, `drmcard.h`) and counts such a connector as not
+  connected (`KmsOutput.non_desktop`): no head, no Settings → Displays choice, no mirror and no hotplug plan ever lights
+  it, and `drm_card_score` doesn't take a card with only a headset for the display card. A connector LordOS drives as a
+  desktop display is never offered. The leased CRTCs are kept from LordOS's own heads (`kms_set_leased_crtcs`) while a
+  lease lasts.
+- **The global.** One `wp_drm_lease_device_v1` (version 1), for the card lord-server is DRM master of, and only while a
+  headset is plugged into it (`drmlease_card`, called after the card is attached and at every hotplug from
+  `outputs_apply`); with none it is removed (`wl_global_remove`, destroyed 5 s later). It is hidden by the display's
+  global filter (`secctx_set_gate`) from every client that may never lease: a sandboxed one (Flatpak, a security
+  context), an isolated LordOS app, Xwayland (it speaks for every X11 app, so an X11 VR runtime such as SteamVR's RandR
+  lease path can't be told apart; not supported), lord-server itself, and every client on the login screen. A client
+  that binds it anyway gets nothing and its leases end at once.
+- **`drm_fd`.** A fresh `open()` of the same `/dev/dri/cardN` (the session user is in `video`), done only while
+  lord-server is master (so the new file never becomes master), checked to be the same device and not master, never
+  authenticated, sent once per bind. A file that was ever master is never handed out (it could take master back later).
+  If it can't be made, `drm_fd` (and the connectors after it) wait for the next attach or hotplug, as the protocol allows.
+- **Connectors.** Each headset is offered with `name` (`DP-2`, as a `wl_output` would be named), `description` (the
+  EDID's name, else the connector) and `connector_id`, then `done`. A connector leased to anyone is `withdrawn` from
+  every client while the lease lasts and offered again after; an unplugged one is `withdrawn`.
+- **The request and the prompt.** `request_connector` checks the device (`wrong_device`) and duplicates
+  (`duplicate_connector`); `submit` with none is `empty_lease`; at most 4 connectors per lease. On submit
+  (`drml_submit`, `drmlcore.c`): the client must be trusted (above) and named by the identity lord-server checked when
+  it connected (`program:<path>`, `kbinhibit.h`, never an app_id it set). The `vr` permission (`PERM_VR`,
+  `permisos.json`) decides: **deny** → `finished` at once; **allow** → leased; **ask** → lord-server emits `drmlease`
+  (`{app, name, headset}`, one prompt per app while one waits) and `sdk/wayland.js` shows the system-drawn prompt
+  ("‹App› wants to use the VR headset ‹Valve Index (DP-2)›") with the checked identity under it and three answers:
+  **Don't allow** (saved as deny), **Allow once** (nothing saved: this request only) and **Always allow** (saved as
+  allow). The answer comes back through `lord.wayland.leaseAnswer(app, "once" | "always" | "deny")`, which only answers
+  a request lord-server is waiting on. `vr` can't be declared in a manifest (`perm_declarable`), is refused to the broker
+  (`BOP_PERM`), is set by `lord.perms.set` only for a checked identity, and is listed and changed in Settings → Privacy
+  under VR headsets.
+- **The lease.** `DRM_IOCTL_MODE_CREATE_LEASE` (no libdrm) with, per connector, the connector, a free CRTC that can
+  drive it (not a head's, not another lease's) and that CRTC's primary plane (`kms_lease_objects`; the card's fd has
+  `UNIVERSAL_PLANES`, so the plane is named), `O_CLOEXEC`; its fd goes out as `lease_fd`. No free CRTC or a refused
+  ioctl → `finished`.
+- **When it ends** (`DRM_IOCTL_MODE_REVOKE_LEASE`, then `finished` while the object is there): the client destroys the
+  lease object or disconnects; the permission is taken back in Settings (a lease from Always allow ends when it is set
+  to Ask or Deny, one from Allow once only on Deny); the headset is unplugged or no longer `non-desktop`; the session
+  leaves the monitor (`display_detach`: lock, Switch User, logging out, Ctrl+Alt+F*n*).
+- **Session switching and lord-sessiond.** `lord-sessiond` takes master away (`DROP_MASTER` on its copy of the lent
+  file) *before* it sends `RP_UNDISPLAY`, so on a lock or a user switch lord-server's revoke fails (`EACCES`, logged) and
+  only `finished` reaches the client. That still ends the lease: the kernel counts a lessee as master only while its
+  lessor is the device's current master (`drm_is_current_master`), and the lent file never is again (the next session,
+  or this one coming back, gets a freshly opened card); `black_out` in lord-sessiond also puts a black frame on every
+  lit CRTC it finds driving a connector, which should include the headset's (not checked with one). After the lock the
+  client must ask again (Always allow leases at once). A standalone lord-server on its own text console (VT_PROCESS)
+  revokes for real: `display_detach` runs while it is still master. Nothing in lord-sessiond changed.
+- **Tests.** `build/drmlease-test` (`drmlcore.c` against a fake DRM layer: only non-desktop connectors offered, who may
+  lease, the prompt once per app, Allow once / Always / Don't allow, revoked on destroy, Settings, unplug, a lost
+  `non-desktop`, leaving the monitor with and without master, no free CRTC, two headsets on two CRTCs) and
+  `build/drmlease-e2e-test` (`drmlease.c` end to end with two clients over socketpairs and the card faked: the global
+  only with a headset and only for the trusted client, `drm_fd`, the headset and never the desktop display, the prompt
+  before any lease, `lease_fd`, `withdrawn` while leased and offered again after, Always allow saved, `finished` and the
+  global removed when leaving the monitor and on unplug, `empty_lease`). `wlperf-client protocols` checks a headless
+  lord-server offers no lease device. **Not checked with a real headset:** no VR headset was available and neither the
+  dev VM (virtio-gpu, QXL) nor VKMS has a non-desktop connector, so the real `CREATE_LEASE`/`REVOKE_LEASE` path and a VR
+  runtime on top are untested.
 
 ## Window icons (`xdg_toplevel_icon_manager_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
 

@@ -59,5 +59,11 @@
   "ask.idle": "“{app}” mahu tahu bila anda tiada di komputer",
   "ask.idleNote": "Ia diberitahu apabila anda berhenti menggunakan papan kekunci dan tetikus seketika, dan apabila anda kembali; tiada lagi. Anda boleh menukarnya kemudian dalam Tetapan → Privasi.",
   "perm.idle": "Tiada di komputer",
-  "permHint.idle": "Apl yang diberitahu apabila anda berhenti menggunakan komputer seketika dan apabila anda kembali, seperti apl sembang yang menunjukkan anda tiada. Ia tidak tahu apa-apa lagi; video atau pembentangan yang memastikan skrin kekal hidup dikira sebagai anda ada."
+  "permHint.idle": "Apl yang diberitahu apabila anda berhenti menggunakan komputer seketika dan apabila anda kembali, seperti apl sembang yang menunjukkan anda tiada. Ia tidak tahu apa-apa lagi; video atau pembentangan yang memastikan skrin kekal hidup dikira sebagai anda ada.",
+  "allowOnce": "Benarkan sekali",
+  "allowAlways": "Sentiasa benarkan",
+  "ask.vr": "“{app}” mahu menggunakan set kepala VR {headset}",
+  "ask.vrNote": "Paparannya diberikan kepada apl itu sahaja; LordOS tidak pernah menunjukkan desktop anda di situ. Ia diambil semula apabila apl ditutup, set kepala dicabut atau skrin dikunci. Anda boleh menukarnya kemudian dalam Tetapan → Privasi.",
+  "perm.vr": "Set kepala VR",
+  "permHint.vr": "Apl yang boleh memacu paparan set kepala VR secara terus. Hanya set kepala yang dipinjamkan, tidak sekali-kali monitor anda, dan ia diambil semula apabila skrin dikunci, anda menukar pengguna atau memilih Tolak."
 }

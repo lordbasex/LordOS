@@ -12,6 +12,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **VR headsets for Linux apps, only if you allow it, in development** (`drm-lease-v1`, approved by the maintainer
+  2026-11-22; `docs/WAYLAND.md`, "DRM leases"). A VR runtime such as Monado can lease a headset's display from LordOS
+  and drive it directly. Only connectors the kernel marks as non-desktop (head-mounted displays) are ever offered, never
+  a monitor, and LordOS itself no longer lights such a connector as a desktop display (Settings → Displays lists it as
+  not connected). The first time an app asks, LordOS shows its own prompt ("‹App› wants to use the VR headset ‹name›",
+  Don't allow / Allow once / Always allow), remembered per app by the identity lord-server checks itself and changed in
+  Settings → Privacy → VR headsets (the new `vr` permission, which a manifest can't declare and the broker refuses).
+  Sandboxed (Flatpak) and isolated apps and X11 apps through Xwayland are never offered a lease. A lease ends when the
+  app lets it go, the permission is taken back, the headset is unplugged, or the session leaves the screen (lock, Switch
+  User, logging out, a text console). No libdrm: the lease is made with the kernel's own ioctls. Checked with a fake
+  card (`drmlease-test`, `drmlease-e2e-test`); not yet with a real headset. Texts in all 35 languages.
+
 - **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).
