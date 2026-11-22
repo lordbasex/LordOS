@@ -31,6 +31,7 @@ void gpu_info(GpuInfo *i) { *i = (GpuInfo){ .why = "not-built", .renderer = "", 
 int  gpu_formats(GpuFormat *out, int max) { (void)out; (void)max; return 0; }
 int  gpu_device(dev_t *dev) { (void)dev; return -1; }
 GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque) { (void)t; (void)px; (void)w; (void)h; (void)opaque; return NULL; }
+GpuTex *gpu_tex_pixels_rect(GpuTex *t, const uint32_t *px, int w, int h, int opaque, Rect r) { (void)t; (void)px; (void)w; (void)h; (void)opaque; (void)r; return NULL; }
 GpuTex *gpu_tex_dmabuf(const GpuDmabuf *d) { (void)d; return NULL; }
 void gpu_tex_free(GpuTex *t) { (void)t; }
 int  gpu_tex_current(const GpuTex *t) { (void)t; return 0; }
@@ -59,6 +60,9 @@ void gpu_fence_on(int on) { (void)on; }
 int  gpu_fence_time(int out, uint64_t *ns) { (void)out; *ns = 0; return 0; }
 void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh, Rect c, float o) {
     (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)sx; (void)sy; (void)sw; (void)sh; (void)c; (void)o;
+}
+void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float uv[8], Rect c, float o) {
+    (void)t; (void)dx; (void)dy; (void)dw; (void)dh; (void)uv; (void)c; (void)o;
 }
 int  gpu_scanout(const GpuDmabuf *d, void (*done)(void *), void *data) { (void)d; (void)done; (void)data; return -1; }
 int  gpu_can_scanout(const GpuDmabuf *d, int w, int h) { (void)d; (void)w; (void)h; return 0; }
@@ -688,6 +692,24 @@ GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque) 
     return t;
 }
 
+static long upload_rect(const uint32_t *px, int stride, int sw, int texw, Rect r);
+
+/* A Linux app's damage (wl.c): only r is sent to a live texture of the same size; anything else is a whole upload. */
+GpuTex *gpu_tex_pixels_rect(GpuTex *t, const uint32_t *px, int w, int h, int opaque, Rect r) {
+    if (!G.on || !px || w <= 0 || h <= 0) return t;
+    if (r.x0 < 0) r.x0 = 0;
+    if (r.y0 < 0) r.y0 = 0;
+    if (r.x1 > w) r.x1 = w;
+    if (r.y1 > h) r.y1 = h;
+    if (!t || t->external || t->gen != G.gen || t->w != w || t->h != h || (r.x0 == 0 && r.y0 == 0 && r.x1 == w && r.y1 == h))
+        return gpu_tex_pixels(t, px, w, h, opaque);
+    if (r.x1 <= r.x0 || r.y1 <= r.y0) { t->opaque = opaque; return t; }
+    glBindTexture(GL_TEXTURE_2D, t->id);
+    upload_rect(px, w, w, t->w, r);
+    t->opaque = opaque;
+    return t;
+}
+
 static EGLImageKHR import_image(const GpuDmabuf *d, int with_mod);
 
 GpuTex *gpu_tex_dmabuf(const GpuDmabuf *d) {
@@ -860,7 +882,12 @@ int gpu_tex_read_rows(const GpuTex *t, uint8_t *px, int y, int h, int flip) {
 /* ---- drawing ---- */
 
 void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float sy, float sw, float sh, Rect clip, float op) {
-    if (!G.on || !G.cur || !t || t->gen != G.gen || dw <= 0 || dh <= 0 || op <= 0.004f) return;
+    const float uv[8] = { sx, sy, sx + sw, sy, sx, sy + sh, sx + sw, sy + sh };
+    gpu_draw_uv(t, dx, dy, dw, dh, uv, clip, op);
+}
+
+void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float uv[8], Rect clip, float op) {
+    if (!G.on || !G.cur || !t || t->gen != G.gen || dw <= 0 || dh <= 0 || op <= 0.004f || t->w <= 0 || t->h <= 0) return;
     const int W = G.cur->W, H = G.cur->H;           /* the display being drawn */
     if (clip.x0 < 0) clip.x0 = 0;
     if (clip.y0 < 0) clip.y0 = 0;
@@ -879,8 +906,9 @@ void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh, float sx, float
     glScissor(clip.x0, H - clip.y1, clip.x1 - clip.x0, clip.y1 - clip.y0);
     float x0 = dx / W * 2 - 1, x1 = (dx + dw) / W * 2 - 1;
     float y0 = 1 - dy / H * 2, y1 = 1 - (dy + dh) / H * 2;
-    float u0 = sx / t->w, u1 = (sx + sw) / t->w, v0 = sy / t->h, v1 = (sy + sh) / t->h;
-    const GLfloat v[] = { x0, y0, u0, v0,  x1, y0, u1, v0,  x0, y1, u0, v1,  x1, y1, u1, v1 };
+    const float tw = (float)t->w, th = (float)t->h;
+    const GLfloat v[] = { x0, y0, uv[0] / tw, uv[1] / th,  x1, y0, uv[2] / tw, uv[3] / th,
+                          x0, y1, uv[4] / tw, uv[5] / th,  x1, y1, uv[6] / tw, uv[7] / th };
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, v);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, v + 2);
     glEnableVertexAttribArray(0);

@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak app na {id}",
   "who.program": "Programang {path}",
   "perm.shortcuts": "Mga keyboard shortcut",
-  "permHint.shortcuts": "Mga app na puwedeng kumuha ng ❖, ⌥Tab at iba pang shortcut ng desktop habang nasa harap sila, gaya ng mga virtual machine, remote desktop at laro. Laging ibinabalik ng ❖Esc ang mga ito; nananatili sa system ang pag-lock ng screen at ang mga media key."
+  "permHint.shortcuts": "Mga app na puwedeng kumuha ng ❖, ⌥Tab at iba pang shortcut ng desktop habang nasa harap sila, gaya ng mga virtual machine, remote desktop at laro. Laging ibinabalik ng ❖Esc ang mga ito; nananatili sa system ang pag-lock ng screen at ang mga media key.",
+  "ask.idle": "Gustong malaman ng “{app}” kung kailan ka wala sa computer",
+  "ask.idleNote": "Sinasabihan ito kapag huminto ka sa paggamit ng keyboard at mouse nang ilang sandali, at kapag bumalik ka; wala nang iba. Mababago mo ito mamaya sa Setting → Privacy.",
+  "perm.idle": "Wala sa computer",
+  "permHint.idle": "Mga app na sinasabihan kapag huminto ka sa paggamit ng computer nang ilang sandali at kapag bumalik ka, gaya ng mga chat app na nagpapakitang wala ka. Wala na silang ibang nalalaman; ang video o presentasyong nagpapanatiling bukas ang screen ay bilang na naroon ka."
 }

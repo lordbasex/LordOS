@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak tətbiqi {id}",
   "who.program": "Proqram {path}",
   "perm.shortcuts": "Klaviatura qısayolları",
-  "permHint.shortcuts": "Ön planda olarkən ❖, ⌥Tab və iş masasının digər qısayollarını götürə bilən tətbiqlər, məsələn virtual maşınlar, uzaq iş masaları və oyunlar. ❖Esc onları həmişə geri qaytarır; ekranın kilidlənməsi və media düymələri sistemdə qalır."
+  "permHint.shortcuts": "Ön planda olarkən ❖, ⌥Tab və iş masasının digər qısayollarını götürə bilən tətbiqlər, məsələn virtual maşınlar, uzaq iş masaları və oyunlar. ❖Esc onları həmişə geri qaytarır; ekranın kilidlənməsi və media düymələri sistemdə qalır.",
+  "ask.idle": "“{app}” kompüterdən uzaqda olduğunuzu bilmək istəyir",
+  "ask.idleNote": "Klaviatura və siçandan bir müddət istifadə etmədikdə və qayıtdıqda ona xəbər verilir; başqa heç nə. Bunu sonra Parametrlər → Məxfilik bölməsində dəyişə bilərsiniz.",
+  "perm.idle": "Kompüterdən uzaqda olmaq",
+  "permHint.idle": "Kompüterdən bir müddət istifadə etmədikdə və qayıtdıqda xəbər tutan tətbiqlər, məsələn sizi uzaqda göstərən söhbət tətbiqləri. Başqa heç nə öyrənmirlər; ekranı açıq saxlayan video və ya təqdimat sizin yerində olmağınız sayılır."
 }

@@ -840,6 +840,8 @@ void display_activity(double now) {
     if (D.off) display_wake();
 }
 
+double display_last_activity(void) { return D.last; }
+
 static double deadline(int secs, int done) { return secs && !done ? D.last + secs * 1000.0 : -1; }
 static double sleep_deadline(void) { return deadline(D.sleep_first_s ? D.sleep_first_s : D.sleep_s, D.done_sleep); }
 

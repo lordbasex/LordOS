@@ -47,6 +47,7 @@
 #include "ui/js_input.h"
 #include "ui/ui.h"
 #include "wl/wl.h"
+#include "wl/outpick.h"
 #include "gpu/gpu.h"
 #include "remote/mirror.h"
 #include "remote/share.h"
@@ -721,7 +722,7 @@ static void publish_displays(Server *s) {
         WlOutput *w = &wo[n];
         memset(w, 0, sizeof *w);
         *w = (WlOutput){ o->v.x, o->v.y, o->v.w, o->v.h, o->v.pw, o->v.ph, s->headless ? 60000 : mode_refresh_mhz(&o->kms.mode),
-                         out_scale(o), o->d.mm_w, o->d.mm_h, "", "" };
+                         out_scale(o), o->d.mm_w, o->d.mm_h, "", "", i };
         if (s->headless) { snprintf(w->name, sizeof w->name, "LORD-1"); snprintf(w->desc, sizeof w->desc, "LordOS display"); }
         else { snprintf(w->name, sizeof w->name, "%s", o->d.connector); snprintf(w->desc, sizeof w->desc, "%s", o->d.name); }
         if (len < (int)sizeof json - 300) {
@@ -2260,8 +2261,10 @@ static int render_frame(Server *s) {
      * GPU display must still present it: before 0.8.1 nothing was flipped until some other part of
      * the screen changed (the clock, the cursor...), so typing in Chromium or Firefox showed up to a
      * second late and Chromium logged "buggy presentation feedback" (docs/TROUBLESHOOTING.md). */
-    if (wl_wants_frame() && gpu_active())
-        for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0) s->out[i].wl_new = 1;
+    /* Only the displays the window is on (0.8.9.5): a video on one display made every display compose again. */
+    unsigned wlk = wl_new_content();
+    if (wlk && gpu_active())
+        for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && s->out[i].gpu >= 0 && (wlk >> i & 1)) s->out[i].wl_new = 1;
     /* a machine's new frame in the texture its window draws (media_src_present): only the displays it is on */
     float mx0, my0, mx1, my1;
     if (media_present_take(&mx0, &my0, &mx1, &my1) && gpu_active())
@@ -2383,8 +2386,14 @@ static int render_frame(Server *s) {
         par_light = ui.paint_ms < frame_ms * 0.25 && built < frame_ms * 0.45 ? par_light + 1 : 0;
         if (par_light >= 60) { par_on = 0; canvas_parallel(NULL); }
     }
-    /* the Linux apps' frame callbacks go with a frame submitted, not with one only painted ahead */
-    if (!prep_only) wl_frame_done((unsigned)now_ms());
+    /* the Linux apps' frame callbacks go with a frame submitted, not with one only painted ahead: each window's with its
+     * own display's, a display that just got a frame or has none waiting for a flip (wl.c, outpick.h) */
+    if (!prep_only) {
+        unsigned keys = 0;
+        if (s->headless) keys = OUTPICK_ALL;
+        else for (int i = 0; i < OUT_MAX; i++) if (s->out[i].on && (done[i] || !s->out[i].kms.flip_pending)) keys |= 1u << i;
+        wl_frame_done((unsigned)now_ms(), keys);
+    }
     if (s->headless) {                          /* no flip without a monitor: the frame is out now */
         struct timespec t;
         clock_gettime(CLOCK_MONOTONIC, &t);
@@ -2396,15 +2405,25 @@ static int render_frame(Server *s) {
         fph.submit = ns;
         fph.period = (uint32_t)(1000000000u / (unsigned)hz);
         headless_prev = ns;
+        wl_presented(-1, 0, ns, 0, (unsigned)(1000000000u / (unsigned)hz));   /* the apps' presentation feedback too */
     }
     /* No flip event will come (a modeset instead of a page flip: the first frame, or a driver
      * without page flip): the frame is on screen already, so its presentation feedback goes now.
      * Otherwise the apps' feedback would wait for some later flip. */
+    if (!s->headless)                           /* (each display: its windows' feedback, wl_presented) */
+        for (int i = 0; i < OUT_MAX; i++) {
+            const Out *o = &s->out[i];
+            if (!done[i] || !o->on || o->kms.flip_pending || o == mo) continue;
+            struct timespec t;
+            clock_gettime(CLOCK_MONOTONIC, &t);
+            wl_presented(i, s->main_out, (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec, o->kms.flip_seq,
+                         o->kms.mode.vrefresh ? 1000000000u / o->kms.mode.vrefresh : 16666667u);
+        }
     if (main_shown && !s->headless && !mo->kms.flip_pending) {
         struct timespec t;
         clock_gettime(CLOCK_MONOTONIC, &t);
         uint64_t ns = (uint64_t)t.tv_sec * 1000000000ull + (uint64_t)t.tv_nsec;
-        wl_presented(ns, mo->kms.flip_seq, mo->kms.mode.vrefresh ? 1000000000u / mo->kms.mode.vrefresh : 16666667u);
+        wl_presented(s->main_out, s->main_out, ns, mo->kms.flip_seq, mo->kms.mode.vrefresh ? 1000000000u / mo->kms.mode.vrefresh : 16666667u);
         lbf_presented(ns, mo->kms.mode.vrefresh ? 1000000000u / mo->kms.mode.vrefresh : 16666667u);
         if (keylag_enabled) keylag_presented(ns);
     }
@@ -3040,6 +3059,10 @@ int main(int argc, char **argv) {
         }
         /* a video or a presentation keeps the screen on: a Wayland surface's inhibitor or a portal hold (ui/portal.c) */
         if (wl_idle_inhibited() || portal_inhibited()) display_activity(now_ms());
+        {   /* apps the person let know they're away (ext-idle-notify; inhibitors count as activity above) */
+            double idd = wl_idle_tick(display_last_activity(), now_ms());
+            if (idd >= 0 && (delay < 0 || idd < delay)) delay = idd;
+        }
         display_tick(now_ms());             /* screen off, lock and sleep after N minutes (src/hw) */
         double hwd = display_timeout(now_ms());
         if (hwd >= 0 && (delay < 0 || hwd < delay)) delay = hwd;
@@ -3076,6 +3099,10 @@ int main(int argc, char **argv) {
         if (!unseen) {
             double hd = wl_frame_hidden((unsigned)now_ms());
             if (hd >= 0 && (delay < 0 || hd < delay)) delay = hd;
+        }
+        {   /* a Linux window's new title waiting for its frame slot (wl.c set_title) */
+            double td = wl_title_wait();
+            if (td >= 0 && (delay < 0 || td < delay)) delay = td;
         }
         /* nothing is drawn: the Linux apps waiting for a frame get it at most once a second (wl.c) */
         if (unseen) {
@@ -3197,9 +3224,18 @@ int main(int argc, char **argv) {
         loop_wake_flip = 0;
         if (pfd[0].revents & POLLIN) {
             Kms *heads[OUT_MAX], *mk = &main_out(&s)->kms;
-            int nh = 0, was = mk->flip_pending;
-            for (int i = 0; i < OUT_MAX; i++) if (s.out[i].on && s.out[i].kms.fd >= 0) heads[nh++] = &s.out[i].kms;
+            int nh = 0, was = mk->flip_pending, waswho[OUT_MAX];
+            for (int i = 0; i < OUT_MAX; i++) {
+                waswho[i] = s.out[i].on && s.out[i].kms.flip_pending;
+                if (s.out[i].on && s.out[i].kms.fd >= 0) heads[nh++] = &s.out[i].kms;
+            }
             if (nh) kms_dispatch_heads(heads, nh);
+            /* the other displays' flips: the presentation feedback of the windows on them (the main one's below) */
+            for (int i = 0; i < OUT_MAX; i++) {
+                const Kms *k = &s.out[i].kms;
+                if (!waswho[i] || k->flip_pending || k == mk) continue;
+                wl_presented(i, s.main_out, k->flip_ns, k->flip_seq, k->mode.vrefresh ? 1000000000u / k->mode.vrefresh : 16666667u);
+            }
             /* wp_presentation follows the main display's vblank */
             if (was && !mk->flip_pending) {
                 /* a flip waits for vblank, half a period on average; one that completes within an eighth
@@ -3210,7 +3246,7 @@ int main(int argc, char **argv) {
                     else if (flip_instant > 0) flip_instant--;
                     if (flip_instant == 3 && !flip_told++) fprintf(stderr, "kms: page flips complete before vblank: pacing to %d Hz\n", mk->mode.vrefresh ? mk->mode.vrefresh : 60);
                 }
-                wl_presented(mk->flip_ns, mk->flip_seq, mk->mode.vrefresh ? 1000000000u / mk->mode.vrefresh : 16666667u);
+                wl_presented(s.main_out, s.main_out, mk->flip_ns, mk->flip_seq, mk->mode.vrefresh ? 1000000000u / mk->mode.vrefresh : 16666667u);
                 lbf_presented(mk->flip_ns, mk->mode.vrefresh ? 1000000000u / mk->mode.vrefresh : 16666667u);
                 if (keylag_enabled) keylag_presented(mk->flip_ns);
                 if (lbf_recording()) {

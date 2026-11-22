@@ -33,7 +33,9 @@ WL_MORE := stable/linux-dmabuf/linux-dmabuf-v1 stable/presentation-time/presenta
            unstable/text-input/text-input-unstable-v3 staging/xdg-activation/xdg-activation-v1 \
            unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 \
            staging/security-context/security-context-v1 \
-           unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1
+           unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
+           staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
+           staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
 WL_GEN  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.h)
 WL_OBJ  += $(foreach p,$(WL_MORE),build/gen/$(notdir $(p))-protocol.o)
 
@@ -315,7 +317,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/popup-client build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/wlperf-client build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -390,6 +392,30 @@ test: build/framegate-test
 build/framegate-test: tests/framegate_test.c src/wl/framegate.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/framegate_test.c
+	./$@ || { rm -f $@; exit 1; }
+# a Linux window's display for its frame callbacks, presentation and new content (src/wl/outpick.h, docs/WAYLAND.md)
+test: build/outpick-test
+build/outpick-test: tests/outpick_test.c src/wl/outpick.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/outpick_test.c
+	./$@ || { rm -f $@; exit 1; }
+# a Linux window's buffer transform and damage in buffer pixels (src/wl/buftf.h, docs/WAYLAND.md)
+test: build/buftf-test
+build/buftf-test: tests/buftf_test.c src/wl/buftf.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/buftf_test.c
+	./$@ || { rm -f $@; exit 1; }
+# ext-idle-notify with the person's permission (src/wl/idlenotify.h, docs/WAYLAND.md "Idle notifications")
+test: build/idlenotify-test
+build/idlenotify-test: tests/idlenotify_test.c src/wl/idlenotify.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/idlenotify_test.c
+	./$@ || { rm -f $@; exit 1; }
+# an app's own window icon, copied and size-limited (src/wl/wlicon.h, docs/WAYLAND.md "Window icons")
+test: build/wlicon-test
+build/wlicon-test: tests/wlicon_test.c src/wl/wlicon.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/wlicon_test.c
 	./$@ || { rm -f $@; exit 1; }
 # the repeat of a held key in an isolated app (src/app/keyrepeat.h; the compositor sends its clients no repeats)
 test: build/keyrepeat-test
@@ -806,7 +832,9 @@ CLIENT_PROTO := stable/xdg-shell/xdg-shell unstable/xdg-decoration/xdg-decoratio
                 stable/tablet/tablet-v2 staging/cursor-shape/cursor-shape-v1 unstable/idle-inhibit/idle-inhibit-unstable-v1 \
                 unstable/xdg-foreign/xdg-foreign-unstable-v2 staging/xdg-dialog/xdg-dialog-v1 unstable/text-input/text-input-unstable-v3 \
                 staging/security-context/security-context-v1 \
-                unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1
+                unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1 \
+                staging/single-pixel-buffer/single-pixel-buffer-v1 staging/alpha-modifier/alpha-modifier-v1 \
+                staging/ext-idle-notify/ext-idle-notify-v1 staging/xdg-toplevel-icon/xdg-toplevel-icon-v1
 CLIENT_GEN := $(foreach p,$(CLIENT_PROTO),build/gen/client/$(notdir $(p))-client-protocol.h build/gen/client/$(notdir $(p))-protocol.c)
 define wl_client_proto
 build/gen/client/$(notdir $(1))-client-protocol.h: $(WLPROTO)/$(1).xml
@@ -834,6 +862,10 @@ build/dialog-client: tests/dialog_client.c $(CLIENT_GEN)
 # tests/guestwin_headless.sh against a headless lord-server
 build/guestwin-client: tests/guestwin_client.c src/vm/vmagent.c src/vm/vmagent.h
 	$(CC) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/guestwin_client.c src/vm/vmagent.c
+# Frames, titles and damage (tests/wlperf_client.c, docs/WAYLAND.md "Frames, titles and damage"): run by
+# tests/wlperf_headless.sh against a headless lord-server
+build/wlperf-client: tests/wlperf_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlperf_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
 # Drag and drop: start_drag's serial, offers, actions, drop and finish, a source or icon destroyed mid-drag

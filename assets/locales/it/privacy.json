@@ -55,5 +55,9 @@
   "who.flatpak": "App Flatpak {id}",
   "who.program": "Programma {path}",
   "perm.shortcuts": "Scorciatoie da tastiera",
-  "permHint.shortcuts": "App che possono prendere ❖, ⌥Tab e le altre scorciatoie della scrivania mentre sono in primo piano, come macchine virtuali, desktop remoti e giochi. ❖Esc te le restituisce sempre; il blocco dello schermo e i tasti multimediali restano al sistema."
+  "permHint.shortcuts": "App che possono prendere ❖, ⌥Tab e le altre scorciatoie della scrivania mentre sono in primo piano, come macchine virtuali, desktop remoti e giochi. ❖Esc te le restituisce sempre; il blocco dello schermo e i tasti multimediali restano al sistema.",
+  "ask.idle": "«{app}» vuole sapere quando sei lontano dal computer",
+  "ask.idleNote": "Viene avvisata quando smetti di usare tastiera e mouse per un po’ e quando torni; nient’altro. Puoi cambiarlo in seguito in Impostazioni → Privacy.",
+  "perm.idle": "Assenza dal computer",
+  "permHint.idle": "App avvisate quando smetti di usare il computer per un po’ e quando torni, come le app di chat che ti mostrano assente. Non sanno nient’altro; un video o una presentazione che tiene acceso lo schermo conta come presenza."
 }

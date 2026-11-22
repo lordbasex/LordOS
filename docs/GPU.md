@@ -373,7 +373,8 @@ before the flips themselves came every other vblank) and the rate can double.
 - **-2 (unshown)**, direct scanout of a fullscreen app, the remote desktop's read-back and the protected windows'
   black: decided at submission, by the same code as before.
 - **Frame callbacks and presentation:** the Linux apps' frame callbacks (`wl_frame_done`) go with a submitted frame,
-  never with one only prepared; presentation feedback still follows the main display's flip events. The theme's JS
+  never with one only prepared, and each window's only with its own display's (0.8.9.5, `docs/WAYLAND.md`, "Frames, titles and
+  damage"); presentation feedback follows the flip events of the window's display. The theme's JS
   frame callbacks (`requestAnimationFrame`) run once per frame shown: in the frame's prepare, or in the frame built
   after the flip. A prepare that painted nothing (`FPIPE_EMPTY`) still ran them; when they asked for another frame
   (an animation callback that changed nothing, while an app's frames or the cursor kept the display flipping), the
@@ -696,6 +697,6 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
   graphics newer than Whiskey Lake.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).
-- `linux-drm-syncobj` (explicit sync, the one Nvidia prefers), `xdg_activation`, tearing control (`wp_tearing_control`) and VRR.
+- `linux-drm-syncobj` (explicit sync, the one Nvidia prefers; designed in `SYNCOBJ-PLAN.md`, for review), `xdg_activation`, tearing control (`wp_tearing_control`) and VRR.
 - Letting JS know a window is fullscreen (today it receives the `fullscreen` event, but the themes
   ignore it).

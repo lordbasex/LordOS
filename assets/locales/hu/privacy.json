@@ -55,5 +55,9 @@
   "who.flatpak": "Flatpak-alkalmazás: {id}",
   "who.program": "Program: {path}",
   "perm.shortcuts": "Billentyűparancsok",
-  "permHint.shortcuts": "Alkalmazások, amelyek előtérben átvehetik a ❖, ⌥Tab és az asztal többi billentyűparancsát, például virtuális gépek, távoli asztalok és játékok. A ❖Esc mindig visszaadja őket; a képernyő zárolása és a médiabillentyűk a rendszernél maradnak."
+  "permHint.shortcuts": "Alkalmazások, amelyek előtérben átvehetik a ❖, ⌥Tab és az asztal többi billentyűparancsát, például virtuális gépek, távoli asztalok és játékok. A ❖Esc mindig visszaadja őket; a képernyő zárolása és a médiabillentyűk a rendszernél maradnak.",
+  "ask.idle": "„{app}” tudni szeretné, mikor nem vagy a számítógépnél",
+  "ask.idleNote": "Értesítést kap, ha egy ideig nem használod a billentyűzetet és az egeret, és amikor visszatérsz; mást nem. Ezt később a Beállítások → Adatvédelem alatt módosíthatod.",
+  "perm.idle": "Távollét a számítógéptől",
+  "permHint.idle": "Alkalmazások, amelyek értesítést kapnak, ha egy ideig nem használod a számítógépet és amikor visszatérsz, például a csevegők, amelyek távollévőnek mutatnak. Mást nem tudnak meg; a képernyőt ébren tartó videó vagy bemutató jelenlétnek számít."
 }

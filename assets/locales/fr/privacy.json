@@ -55,5 +55,9 @@
   "who.flatpak": "App Flatpak {id}",
   "who.program": "Programme {path}",
   "perm.shortcuts": "Raccourcis clavier",
-  "permHint.shortcuts": "Apps qui peuvent prendre ❖, ⌥Tab et les autres raccourcis du bureau lorsqu’elles sont au premier plan, comme les machines virtuelles, les bureaux à distance et les jeux. ❖Esc vous les rend toujours ; le verrouillage de l’écran et les touches multimédias restent au système."
+  "permHint.shortcuts": "Apps qui peuvent prendre ❖, ⌥Tab et les autres raccourcis du bureau lorsqu’elles sont au premier plan, comme les machines virtuelles, les bureaux à distance et les jeux. ❖Esc vous les rend toujours ; le verrouillage de l’écran et les touches multimédias restent au système.",
+  "ask.idle": "« {app} » veut savoir quand vous n’êtes pas devant l’ordinateur",
+  "ask.idleNote": "Il est prévenu quand vous cessez d’utiliser le clavier et la souris un moment, et quand vous revenez ; rien d’autre. Vous pourrez changer cela dans Réglages → Confidentialité.",
+  "perm.idle": "Absence de l’ordinateur",
+  "permHint.idle": "Apps prévenues quand vous cessez d’utiliser l’ordinateur un moment et quand vous revenez, comme les messageries qui vous affichent absent. Elles n’apprennent rien d’autre ; une vidéo ou une présentation qui garde l’écran allumé compte comme une présence."
 }

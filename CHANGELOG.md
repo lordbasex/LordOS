@@ -79,6 +79,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     nothing opened by itself, Open from the keyboard opening the apps on that display in the usual layout and order,
     offered once, "Don't suggest" kept for that display only, Clear and off); `workspaces_model_test.mjs` (theme.json).
 
+- **A Linux window's own icon for apps with no installed one, in development** (`xdg-toplevel-icon-v1`, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Window icons"). An AppImage, a Wine program or a game without a `.desktop`
+  entry now shows the icon it hands its window in the Dock, the switcher and the Overview instead of a letter. The
+  installed icon always wins for every other app, icon names are ignored (they could name another app's icon), and the
+  pixels are copied, re-encoded and size-limited by lord-server (square, at most 256 px, 16 MB for the whole session).
+
+- **Linux apps may be told when you're away from the computer, only if you allow it, in development**
+  (`ext-idle-notify-v1`, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Idle notifications"). The first time
+  an app asks, LordOS shows its own prompt ("‹App› wants to know when you're away from the computer", Allow / Don't
+  allow), remembered per app by the identity lord-server checks itself (the program it runs, the Flatpak app, or an
+  isolated LordOS app's id) and changed in Settings → Privacy → Away from the computer. A denied app keeps working but is
+  never told; idle inhibitors (a video, a presentation) count as being there. The new `idle` permission can't be
+  declared in a manifest or requested through the broker. Texts in all 35 languages.
+
+- **`wp_single_pixel_buffer_manager_v1` and `wp_alpha_modifier_v1` for Linux apps, in development** (Wayland audit item
+  7, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Apps (GTK 4, video
+  players) can draw a solid colour from a one-pixel buffer stretched by a viewport instead of a full-size buffer, and
+  fade a surface with an opacity the compositor applies (both paths). Offered to sandboxed clients too: neither reads
+  anything of another client.
+
+- **xdg-shell 7 and newer protocol versions for Linux apps, in development** (Wayland audit item 4, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Each window is offered the window menu and
+  fullscreen (not during a screen share) besides maximize and minimize, told the work area of their display
+  (`configure_bounds`, from the theme through `lord.wayland.workAreas`) so they never open larger than it, and told which
+  edges are tiled and constrained when maximized or snapped to a half, quarter or third. `zwp_linux_dmabuf_v1` 5 (one
+  modifier for every plane), `wp_presentation` 2 and `wp_cursor_shape_manager_v1` 2 (`dnd_ask`, `all_resize`). Checked
+  with `WAYLAND_DEBUG` on foot, FeatherPad (Qt 6.8) and zenity (GTK 4.18): no protocol error.
+
 - **Machines from the terminal: the `machines` command, in development** (approved by the maintainer 2026-11-21;
   `docs/VIRTUALIZATION.md` 6.15 "From the terminal"). `machines list [--json]` shows each machine of `~/Machines` with its
   system, state, vCPUs, memory, disk used and graphics; `status NAME [--json]`, `start NAME [--no-window]`, `open NAME`,
@@ -537,6 +565,54 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   dark, light and Arabic; not yet on a real session with real monitors, a Linux app's own bar or the GPU path.
 
 ### Fixed
+
+- **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
+  by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
+  copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it
+  damaged: a blinking caret cost a full window each time. Now only the damaged box is copied, uploaded and repainted
+  (`wl_surface.damage` through the buffer scale and viewport, and `damage_buffer`); every partial frame equals a full
+  repaint (`LORD_PAINT_VERIFY=1`, 206 frames, 0 differing pixels). Headless, CPU path, lord-server's CPU over 20 s: a
+  10 × 10 square changed 60 times a second 1130–1250 ms before, 340 ms after; foot at 180 × 50 cells updating a few
+  characters ten times a second 1910–1920 ms before, 210–360 ms after. `wl_surface.set_buffer_transform` was ignored, so
+  a turned buffer showed turned and at the wrong size: shared memory is copied upright and a dmabuf's texture is drawn
+  with turned coordinates (`build/buftf-test` checks the eight transforms).
+
+- **A Linux app's new frame composes only the displays it is on, in development** (Wayland audit item 3, approved by the
+  maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). On the GPU path any app's new buffer made
+  every display compose and flip again; a video or a terminal on one monitor kept all of them busy. Now only the
+  displays the window (or its menu, the drag icon, a fullscreen app's display) is on present it; a window in the
+  Overview or not yet placed still marks every display.
+
+- **Linux apps' frame callbacks and presentation feedback follow their own display, in development** (Wayland audit
+  item 2, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every window's frame
+  callbacks went with any display's frame, so with displays of different refresh rates an app was paced by the fastest
+  one and drew frames nobody saw (three displays at 60, 60 and 144 Hz, simulated in `build/outpick-test`: 198
+  callbacks a second for a window on a 60 Hz display, now 61; 145 on the 144 Hz one). A window's callbacks now go with a
+  frame of its main display (the one with most of it) or when that display has nothing waiting, and its
+  `wp_presentation` feedback is answered by that display's flip with its own time and refresh, not the main
+  display's. A headless lord-server now answers presentation feedback at all (`wlperf-client frames`: 0 of 180 before,
+  180 of 180).
+
+- **A Linux app's title costs a JS event only when it changes, at most once a frame, in development** (Wayland audit item
+  1, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every
+  `xdg_toplevel.set_title`, even the same title again, went to the theme as a `title` event and re-rendered its window
+  list. Now an unchanged title is dropped, and a burst reaches JS once per 16 ms per window with its last title (Wayland
+  and X11 windows). `wlperf-client titles` against a headless lord-server: 1000 repeats of the current title give 0
+  events (1000 before), 1000 different titles in a burst give 2 (1000 before). The stall detector's `__lordWayland` and
+  `__lordTerm` lines now name the event (`js __lordWayland title`).
+
+- **The Terminal no longer re-renders whole windows for a program's title, in development** (Wayland and main-thread
+  audit, item 6, approved by the maintainer 2026-11-22; `docs/MAIN-THREAD.md`). A program that animates its title (Claude
+  Code's spinner, progress counters) sent a `__lordTerm` "title" event per change, and each one re-rendered the whole
+  Terminal window (it subscribed to every session's metadata) and the theme's root (the window title), about 270 React
+  updates each: the maintainer's session logged 1310 `__lordTerm` pauses in two hours, the longest 329 ms. Now the
+  window reads only the active session's profile and title, session titles are applied at most once per frame (the last
+  of each session), a metadata patch that changes nothing updates nothing, and the window's title goes to the window
+  manager at most four times a second. Measured headless (`tests/perf_headless.sh default terminal`, 1920 × 1080, CPU
+  path) with a title changed about 60 times a second: JavaScript 1043–1162 ms per 1.5 s step (29 160–36 990 React
+  updates, longest run 47 ms) before, 140–160 ms (3380–3424 updates, longest 19 ms) after; output alone (`yes | head -c
+  50M`) caused no React work before or after (the rows are drawn in C). The perf driver has `terminal` and
+  `terminalBg` plans for it.
 
 - **A microphone, camera or screen restriction keeps working with many Flatpak apps open** (`server/src/hw/hw.c`,
   `server/src/main.c`; found by Claude Security, MEDIUM). Each running Flatpak app's Spawn helper took a slot in a

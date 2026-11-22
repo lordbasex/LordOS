@@ -55,5 +55,9 @@
   "who.flatpak": "Aplikasi Flatpak {id}",
   "who.program": "Program {path}",
   "perm.shortcuts": "Pintasan keyboard",
-  "permHint.shortcuts": "Aplikasi yang boleh mengambil ❖, ⌥Tab, dan pintasan desktop lainnya selama berada di depan, seperti mesin virtual, desktop jarak jauh, dan permainan. ❖Esc selalu mengembalikannya; mengunci layar dan tombol media tetap milik sistem."
+  "permHint.shortcuts": "Aplikasi yang boleh mengambil ❖, ⌥Tab, dan pintasan desktop lainnya selama berada di depan, seperti mesin virtual, desktop jarak jauh, dan permainan. ❖Esc selalu mengembalikannya; mengunci layar dan tombol media tetap milik sistem.",
+  "ask.idle": "“{app}” ingin tahu kapan Anda tidak di depan komputer",
+  "ask.idleNote": "Aplikasi ini diberi tahu saat Anda berhenti memakai keyboard dan mouse sebentar, dan saat Anda kembali; tidak lebih. Anda dapat mengubahnya nanti di Pengaturan → Privasi.",
+  "perm.idle": "Tidak di depan komputer",
+  "permHint.idle": "Aplikasi yang diberi tahu saat Anda berhenti memakai komputer sebentar dan saat Anda kembali, seperti aplikasi obrolan yang menampilkan Anda sedang pergi. Mereka tidak tahu hal lain; video atau presentasi yang menjaga layar tetap menyala dihitung sebagai Anda hadir."
 }

@@ -30,6 +30,7 @@
 #include "../keylag.h"
 #include "../sec/perms.h"
 #include "../apps.h"
+#include "../lpk.h"
 
 #include <errno.h>
 #include <math.h>
@@ -73,6 +74,8 @@
 #include "tiutf8.h"
 #include "xdg-foreign-unstable-v2-protocol.h"
 #include "xdg-dialog-v1-protocol.h"
+#include "single-pixel-buffer-v1-protocol.h"
+#include "alpha-modifier-v1-protocol.h"
 #include "keyboard-shortcuts-inhibit-unstable-v1-protocol.h"
 #include "xwm.h"
 #include "xwayland.h"
@@ -81,6 +84,12 @@
 #include "../outputs.h"
 #include "../cursor.h"
 #include "ptrlock.h"
+#include "outpick.h"
+#include "buftf.h"
+#include "idlenotify.h"
+#include "ext-idle-notify-v1-protocol.h"
+#include "xdg-toplevel-icon-v1-protocol.h"
+#include "wlicon.h"
 #include "wl_input.h"
 #include "../gpu/gpu.h"
 #include "../media/media.h"
@@ -123,7 +132,10 @@ struct Surf {
     int sent_configure, mapped, conf_w, conf_h;
     int gx, gy, gw, gh, has_geom;
     char title[256], app_id[128];
+    int title_pending;              /* a new title not told to JS yet (titles_flush: at most one event a frame) */
+    unsigned title_ms;              /* when its last title event went */
     int maximized, fullscreen, activated, csd;
+    int tiled;                      /* snapped by the theme: the edges against its work area (1 left, 2 right, 4 top, 8 bottom) */
     int min_w, min_h, max_w, max_h;             /* xdg_toplevel: its size limits */
     /* the window it belongs to: xdg_toplevel.set_parent, or xdg-foreign's set_parent_of (owner_by =
      * the zxdg_imported_v2 that set it); modal (xdg-dialog-v1): the owner takes no input while it is up */
@@ -147,6 +159,22 @@ struct Surf {
     Dmabuf *dmabuf;
     GpuTex *tex;                /* uploaded px (GPU path) */
     int tex_dirty;
+    /* damage (docs/WAYLAND.md, "Frames, titles and damage"): pending until commit, surface coordinates (damage) and
+     * buffer pixels (damage_buffer); the last commit's in upright buffer pixels (dmg, dmg_full: all of it), and what
+     * the texture still lacks (tex_dmg, tex_full) */
+    float p_ds[4];
+    int p_ds_on, p_db_on;
+    BufBox p_db, dmg, tex_dmg;
+    int dmg_full, tex_full;
+    int p_tf, tf;                   /* wl_surface.set_buffer_transform: pending and current (buftf.h) */
+    int tf_px;                      /* the transform px was turned from (px is always upright) */
+    /* wp_alpha_modifier_v1: its object, and the multiplier pending and current (UINT32_MAX: opaque as drawn) */
+    struct wl_resource *am;
+    uint32_t p_alpha, alpha;
+    /* xdg_toplevel_icon_v1: the icon the app set, pending until commit (p_icon_set) and current; RGBA, square
+     * (wlicon.h). The shell shows it only for a window with no installed app (sdk/apps.js windowIcon). */
+    WlIcon *p_icon, *icon;
+    int p_icon_set;
     int lw, lh;                 /* logical size (viewporter; otherwise the buffer's) */
     /* wp_viewporter: pending and current (vsw < 0 = no crop, vdw <= 0 = no scaling) */
     struct wl_resource *viewport;
@@ -170,6 +198,8 @@ struct Surf {
     int bscale, p_bscale;
     struct wl_resource *frac;
     unsigned outmask;
+    int tf_drawn;                   /* last drawn inside a transformed node (the Overview): it may be on any display */
+    int fslot;                      /* its main display (output slot, outpick_main; -1 none): its frames and presentation follow it */
     int pref_scale;
     int logged_ratio;               /* buffer px per logical px ×100, last logged (docs/DISPLAYS.md) */
     /* an X11 window (Xwayland): its window manager record, and for a menu or tooltip its place */
@@ -220,6 +250,8 @@ typedef struct { int sid; float x, y; Rect clip; float op; float sx, sy; int med
 static Draw draws[2][128];
 static int ndraws[2];
 static int need_frame;              /* an app changed its content: must present */
+static int frames_held;             /* frame callbacks wait for their own display's frame (wl_frame_done) */
+static unsigned new_keys;           /* the displays (WlOutput.key bits) new content must reach: wl_new_content */
 static Dmabuf *to_release[64];      /* replaced: released after the next frame */
 static int nrelease;
 
@@ -227,6 +259,8 @@ static int nrelease;
 static int oslots_used(int slot);
 static void oslot_rect(int slot, float *x, float *y, float *w, float *h);
 static Surf *fs_surf;
+static int fs_refused;                  /* wl_fullscreen_allow: a screen share refuses fullscreen */
+static void send_caps(Surf *s);
 static int fs_slot = -1;                /* the display it covers (output slot), -1 = the whole space */
 
 /* Logical rect of the display the fullscreen window covers. */
@@ -294,6 +328,8 @@ static unsigned now_ms(void) {
 
 /* ---- events for JS ---- */
 
+#define TITLE_MS 16                     /* a window's title goes to JS at most once a frame (set_title) */
+
 typedef struct { int id; char type[16]; char json[600]; } Ev;
 static Ev evq[64];
 static int nev;
@@ -330,7 +366,38 @@ static void emit_id(int id, const char *type, const char *json) {
     snprintf(e->json, sizeof e->json, "%s", json);
 }
 
+/* The titles due (TITLE_MS since the window's last one) join the queue; the others wait for wl_title_wait. */
+static void titles_flush(void) {
+    unsigned t = now_ms();
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->title_pending) continue;
+        if (!s->mapped) { s->title_pending = 0; continue; }
+        if (t - s->title_ms < TITLE_MS || nev == 64) continue;
+        char e[520];
+        json_str(e, sizeof e, s->title);
+        emit(s, "title", "{\"title\":\"%s\"}", e);
+        s->title_pending = 0;
+        s->title_ms = t;
+    }
+}
+
+/* ms until a waiting title is due (the main loop's poll), -1 if none waits */
+double wl_title_wait(void) {
+    unsigned t = now_ms();
+    double best = -1;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (!s || !s->title_pending) continue;
+        unsigned since = t - s->title_ms;
+        double d = since >= TITLE_MS ? 0 : (double)(TITLE_MS - since);
+        if (best < 0 || d < best) best = d;
+    }
+    return best;
+}
+
 void wl_events(WlEventFn fn) {
+    titles_flush();
     for (int i = 0; i < nev; i++) fn(evq[i].id, evq[i].type, evq[i].json);
     nev = 0;
 }
@@ -364,18 +431,57 @@ int wl_content_take(float *x0, float *y0, float *x1, float *y1) {
     return 1;
 }
 
+static unsigned box_keys(float x0, float y0, float x1, float y1);
+static unsigned surf_keys(Surf *top);
+
+/* GPU path: new content of a window, a menu or the drag icon is only a texture: the displays it is on present again
+ * (wl_new_content), not every display (main.c marked them all). */
+static void new_on(unsigned keys) { need_frame = 1; new_keys |= keys; }
+
+static void source_rect(const Surf *s, float *sx, float *sy, float *sw, float *sh);
+static int origin(Surf *s, float *x, float *y);
+
+/* Where on screen a window's last commit changed it (logical), from its damage (s->dmg, upright buffer pixels): 1 with
+ * *b set (empty: nothing changed), 0 when all of it must be taken (a new size or shape, a transform, fullscreen, not
+ * placed yet). Toplevels only: a subsurface's place comes with its parent's commit. */
+static int damage_box(Surf *s, Box *b) {
+    if (s->role != R_TOPLEVEL || s->parent || s->dmg_full || s == fs_surf || !s->content || hole_sig(s) != s->hole_sig ||
+        s->tf_drawn || s->lw <= 0 || s->lh <= 0)
+        return 0;
+    Node *n = s->node ? node_get(s->node) : NULL;
+    float ox, oy;
+    if (!n || n->has_tf || n->prev_box.x1 <= n->prev_box.x0 || !origin(s, &ox, &oy)) return 0;
+    if (s->dmg.x1 <= s->dmg.x0 || s->dmg.y1 <= s->dmg.y0) { *b = (Box){ 0, 0, 0, 0 }; return 1; }
+    float sx, sy, sw, sh;
+    source_rect(s, &sx, &sy, &sw, &sh);
+    if (sw <= 0 || sh <= 0) return 0;
+    float kx = (float)s->lw / sw, ky = (float)s->lh / sh;
+    Box r = { floorf(ox + ((float)s->dmg.x0 - sx) * kx) - 2, floorf(oy + ((float)s->dmg.y0 - sy) * ky) - 2,
+              ceilf(ox + ((float)s->dmg.x1 - sx) * kx) + 2, ceilf(oy + ((float)s->dmg.y1 - sy) * ky) + 2 };
+    if (r.x0 < n->prev_box.x0) r.x0 = n->prev_box.x0;
+    if (r.y0 < n->prev_box.y0) r.y0 = n->prev_box.y0;
+    if (r.x1 > n->prev_box.x1) r.x1 = n->prev_box.x1;
+    if (r.y1 > n->prev_box.y1) r.y1 = n->prev_box.y1;
+    *b = r.x1 > r.x0 && r.y1 > r.y0 ? r : (Box){ 0, 0, 0, 0 };
+    return 1;
+}
+
 static void damage_node(Surf *s) {
     Surf *top = s;
     while (top->parent && top->role != R_TOPLEVEL) top = top->parent;
+    Box part;
+    int have_part = top == s && damage_box(s, &part);
     if (content_on) {               /* a menu or a fullscreen app may be anywhere: all of it */
         Node *tn = top->node ? node_get(top->node) : NULL;
-        if (top->role == R_POPUP || top == fs_surf || !tn) content_note((Box){ 0, 0, ui.width, ui.height });
+        if (have_part) content_note(part);
+        else if (top->role == R_POPUP || top == fs_surf || !tn) content_note((Box){ 0, 0, ui.width, ui.height });
         else content_note(tn->prev_box);
     }
     /* GPU path: if only the content changed, presenting again is enough */
-    if (gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { need_frame = 1; return; }
+    if (gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { new_on(surf_keys(top)); return; }
     Node *n = top->node ? node_get(top->node) : NULL;
-    if (n && n->prev_box.x1 > n->prev_box.x0) damage_add(n->prev_box);
+    if (have_part) { if (part.x1 > part.x0) damage_add(part); }     /* CPU path: only what the app damaged */
+    else if (n && n->prev_box.x1 > n->prev_box.x0) damage_add(n->prev_box);
     ui.dirty = 1;
 }
 
@@ -419,7 +525,7 @@ static int origin(Surf *s, float *x, float *y) {
 
 static void popup_box_damage(Surf *s) {
     float x, y;
-    if (gpu_active()) { need_frame = 1; return; }          /* menus go above the UI */
+    if (gpu_active()) { new_on(surf_keys(s)); return; }    /* menus go above the UI */
     if (s->lw > 0 && origin(s, &x, &y)) damage_add((Box){ x - 2, y - 2, x + s->lw + 2, y + s->lh + 2 });
     ui.dirty = 1;
 }
@@ -441,6 +547,7 @@ static void x_configure(Surf *s) {
     s->sent_configure = 1;
 }
 
+static void work_bounds(Surf *s, int *w, int *h);
 static void send_toplevel_configure(Surf *s) {
     if (s->xw) { x_configure(s); return; }
     if (!s->top || !s->xdg) return;
@@ -453,10 +560,23 @@ static void send_toplevel_configure(Surf *s) {
     /* minimized, on a hidden desktop or covered: the app may stop drawing (framegate.h) */
     s->sent_suspended = (s->xmin || s->parked || s->covered) && wl_resource_get_version(s->top) >= XDG_TOPLEVEL_STATE_SUSPENDED_SINCE_VERSION;
     if (s->sent_suspended && (p = wl_array_add(&states, sizeof *p))) *p = XDG_TOPLEVEL_STATE_SUSPENDED;
-    if (s->maximized && wl_resource_get_version(s->top) >= 2) {
+    /* maximized: every edge against the work area's; snapped (wl_set_tiled): the edges the theme says. Tiled from
+     * xdg-shell 2, and from 7 also constrained (the app should not offer a resize from that edge) */
+    int ver = wl_resource_get_version(s->top), edges = s->maximized ? 15 : s->tiled;
+    if (edges && ver >= 2) {
         static const uint32_t tiled[] = { XDG_TOPLEVEL_STATE_TILED_LEFT, XDG_TOPLEVEL_STATE_TILED_RIGHT,
                                           XDG_TOPLEVEL_STATE_TILED_TOP, XDG_TOPLEVEL_STATE_TILED_BOTTOM };
-        for (int i = 0; i < 4; i++) if ((p = wl_array_add(&states, sizeof *p))) *p = tiled[i];
+        static const uint32_t constrained[] = { XDG_TOPLEVEL_STATE_CONSTRAINED_LEFT, XDG_TOPLEVEL_STATE_CONSTRAINED_RIGHT,
+                                                XDG_TOPLEVEL_STATE_CONSTRAINED_TOP, XDG_TOPLEVEL_STATE_CONSTRAINED_BOTTOM };
+        for (int i = 0; i < 4; i++) if ((edges >> i & 1) && (p = wl_array_add(&states, sizeof *p))) *p = tiled[i];
+        if (ver >= XDG_TOPLEVEL_STATE_CONSTRAINED_LEFT_SINCE_VERSION)
+            for (int i = 0; i < 4; i++) if ((edges >> i & 1) && (p = wl_array_add(&states, sizeof *p))) *p = constrained[i];
+    }
+    /* the largest a window can be: the work area (menu bar and Dock out, wl_set_work_areas) of its display */
+    if (ver >= XDG_TOPLEVEL_CONFIGURE_BOUNDS_SINCE_VERSION) {
+        int bw, bh;
+        work_bounds(s, &bw, &bh);
+        if (bw > 0 && bh > 0) xdg_toplevel_send_configure_bounds(s->top, bw, bh);
     }
     xdg_toplevel_send_configure(s->top, s->conf_w, s->conf_h, &states);
     wl_array_release(&states);
@@ -475,37 +595,74 @@ static void buffer_destroyed(struct wl_listener *l, void *data) {
     wl_list_init(&l->link);
 }
 
-static void copy_buffer(Surf *s, struct wl_resource *buf) {
+/* The shared-memory buffer into px, upright (buftf.h). Only the damaged box when the buffer keeps its size, format and
+ * transform (a caret blinking in foot copied the whole window, every blink); s->dmg says what was copied. */
+static void copy_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     struct wl_shm_buffer *b = buf ? wl_shm_buffer_get(buf) : NULL;
     if (!b) {                               /* no buffer (or one that is not shared memory) */
         free(s->px);
         s->px = NULL;
         s->w = s->h = 0;
         s->content = 0;
+        s->dmg_full = 1;
         if (buf) wl_buffer_send_release(buf);
         return;
     }
     s->content = 1;
-    int w = wl_shm_buffer_get_width(b), h = wl_shm_buffer_get_height(b), stride = wl_shm_buffer_get_stride(b);
+    int bw = wl_shm_buffer_get_width(b), bh = wl_shm_buffer_get_height(b), stride = wl_shm_buffer_get_stride(b);
     uint32_t fmt = wl_shm_buffer_get_format(b);
-    if (w <= 0 || h <= 0 || w > 8192 || h > 8192) { wl_buffer_send_release(buf); return; }
-    if (w != s->w || h != s->h || !s->px) {
+    if (bw <= 0 || bh <= 0 || bw > 8192 || bh > 8192 || stride < bw * 4 || stride % 4) { wl_buffer_send_release(buf); return; }
+    int tf = s->tf, w = buftf_swaps(tf) ? bh : bw, h = buftf_swaps(tf) ? bw : bh;
+    int opaque = fmt == WL_SHM_FORMAT_XRGB8888;
+    /* a part only into a px of the same size and format, upright already (no transform), with damage inside */
+    int part = s->px && w == s->w && h == s->h && opaque == s->opaque && !tf && s->tf_px == tf && buftf_partial(dmg, w, h, &dmg);
+    if (!part && (w != s->w || h != s->h || !s->px)) {
         uint32_t *np = realloc(s->px, (size_t)w * (size_t)h * 4);
         if (!np) { wl_buffer_send_release(buf); return; }
         s->px = np;
         s->w = w;
         s->h = h;
     }
-    s->opaque = fmt == WL_SHM_FORMAT_XRGB8888;
+    s->opaque = opaque;
+    s->tf_px = tf;
     wl_shm_buffer_begin_access(b);
     const uint8_t *d = wl_shm_buffer_get_data(b);
-    for (int y = 0; y < h; y++) {
-        uint32_t *dst = s->px + (size_t)y * w;
-        memcpy(dst, d + (size_t)y * stride, (size_t)w * 4);
-        if (s->opaque) for (int x = 0; x < w; x++) dst[x] |= 0xff000000u;
+    if (part) {
+        size_t n = (size_t)(dmg.x1 - dmg.x0) * 4;
+        for (int y = dmg.y0; y < dmg.y1; y++) {
+            uint32_t *dst = s->px + (size_t)y * w + dmg.x0;
+            memcpy(dst, d + (size_t)y * stride + (size_t)dmg.x0 * 4, n);
+            if (opaque) for (int x = 0; x < dmg.x1 - dmg.x0; x++) dst[x] |= 0xff000000u;
+        }
+        s->dmg = dmg;
+        s->dmg_full = 0;
+    } else if (tf) {
+        buftf_copy(tf, (const uint32_t *)d, bw, bh, stride / 4, s->px, opaque ? 0xff000000u : 0);
+        s->dmg_full = 1;
+    } else {
+        for (int y = 0; y < h; y++) {
+            uint32_t *dst = s->px + (size_t)y * w;
+            memcpy(dst, d + (size_t)y * stride, (size_t)w * 4);
+            if (opaque) for (int x = 0; x < w; x++) dst[x] |= 0xff000000u;
+        }
+        s->dmg_full = 1;
     }
     wl_shm_buffer_end_access(b);
     wl_buffer_send_release(buf);
+}
+
+/* A buffer's pixels read back (a dmabuf's texture) turned upright for its transform, in place of *px (buftf.h); on no
+ * memory it stays as it was. */
+static void upright(uint32_t **px, int *w, int *h, int tf) {
+    if (!tf || !*px) return;
+    int uw = buftf_swaps(tf) ? *h : *w, uh = buftf_swaps(tf) ? *w : *h;
+    uint32_t *u = malloc((size_t)uw * (size_t)uh * 4);
+    if (!u) return;
+    buftf_copy(tf, *px, *w, *h, *w, u, 0);
+    free(*px);
+    *px = u;
+    *w = uw;
+    *h = uh;
 }
 
 /* ---- dmabuf ---- */
@@ -554,19 +711,25 @@ static int map_linear(Surf *s, Dmabuf *d) {
     if (m == MAP_FAILED) return -1;
     struct dma_buf_sync sync = { .flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ };
     ioctl(g->fd[0], DMA_BUF_IOCTL_SYNC, &sync);
-    if (g->width != s->w || g->height != s->h || !s->px) {
-        uint32_t *np = realloc(s->px, (size_t)g->width * (size_t)g->height * 4);
+    int tf = s->tf, w = buftf_swaps(tf) ? g->height : g->width, h = buftf_swaps(tf) ? g->width : g->height;
+    if (w != s->w || h != s->h || !s->px) {
+        uint32_t *np = realloc(s->px, (size_t)w * (size_t)h * 4);
         if (!np) { munmap(m, size); return -1; }
         s->px = np;
-        s->w = g->width;
-        s->h = g->height;
+        s->w = w;
+        s->h = h;
     }
     s->opaque = g->fourcc == DRM_FORMAT_XRGB8888;
-    for (int y = 0; y < g->height; y++) {
-        uint32_t *dst = s->px + (size_t)y * s->w;
-        memcpy(dst, m + g->offset[0] + (size_t)y * g->stride[0], (size_t)s->w * 4);
-        if (s->opaque) for (int x = 0; x < s->w; x++) dst[x] |= 0xff000000u;
-    }
+    s->tf_px = tf;
+    s->dmg_full = 1;
+    if (tf && g->stride[0] % 4 == 0 && g->offset[0] % 4 == 0)       /* turned upright (buftf.h) */
+        buftf_copy(tf, (const uint32_t *)(m + g->offset[0]), g->width, g->height, (int)(g->stride[0] / 4), s->px, s->opaque ? 0xff000000u : 0);
+    else
+        for (int y = 0; y < g->height && y < h; y++) {
+            uint32_t *dst = s->px + (size_t)y * s->w;
+            memcpy(dst, m + g->offset[0] + (size_t)y * g->stride[0], (size_t)(s->w < g->width ? s->w : g->width) * 4);
+            if (s->opaque) for (int x = 0; x < s->w; x++) dst[x] |= 0xff000000u;
+        }
     sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
     ioctl(g->fd[0], DMA_BUF_IOCTL_SYNC, &sync);
     munmap(m, size);
@@ -579,10 +742,73 @@ static void queue_release(Dmabuf *d) {
     dm_unref(d);
 }
 
+/* ---- wp_single_pixel_buffer_manager_v1: a buffer of one pixel (its own wl_buffer kind) ---- */
+typedef struct { uint32_t argb; } Spb;
+static void spb_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct wl_buffer_interface spb_buffer_impl = { .destroy = spb_destroy };
+static const Spb *spb_of(struct wl_resource *buf) {
+    return buf && wl_resource_instance_of(buf, &wl_buffer_interface, &spb_buffer_impl) ? wl_resource_get_user_data(buf) : NULL;
+}
+static void spb_gone(struct wl_resource *r) { free(wl_resource_get_user_data(r)); }
+/* r, g, b, a: premultiplied, 0 … UINT32_MAX each; kept as one 8-bit premultiplied ARGB pixel (a colour above its
+ * alpha, which premultiplied can't be, is cut to it) */
+static void spbm_create(struct wl_client *c, struct wl_resource *r, uint32_t id, uint32_t R, uint32_t G, uint32_t B, uint32_t A) {
+    (void)r;
+    Spb *p = calloc(1, sizeof *p);
+    struct wl_resource *b = p ? wl_resource_create(c, &wl_buffer_interface, 1, id) : NULL;
+    if (!b) { free(p); wl_client_post_no_memory(c); return; }
+    uint32_t a = A >> 24, rr = R >> 24, gg = G >> 24, bb = B >> 24;
+    if (rr > a) rr = a;
+    if (gg > a) gg = a;
+    if (bb > a) bb = a;
+    p->argb = a << 24 | rr << 16 | gg << 8 | bb;
+    wl_resource_set_implementation(b, &spb_buffer_impl, p, spb_gone);
+}
+static void spbm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct wp_single_pixel_buffer_manager_v1_interface spbm_impl = { .destroy = spbm_destroy, .create_u32_rgba_buffer = spbm_create };
+static void bind_spbm(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &wp_single_pixel_buffer_manager_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &spbm_impl, NULL, NULL);
+}
+
+/* ---- wp_alpha_modifier_v1: a surface's opacity, double-buffered (applied with its draw, not to its subsurfaces) ---- */
+static void ams_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void ams_set(struct wl_client *c, struct wl_resource *r, uint32_t factor) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s) { wl_resource_post_error(r, WP_ALPHA_MODIFIER_SURFACE_V1_ERROR_NO_SURFACE, "the wl_surface is gone"); return; }
+    s->p_alpha = factor;
+}
+static const struct wp_alpha_modifier_surface_v1_interface ams_impl = { .destroy = ams_destroy, .set_multiplier = ams_set };
+static void ams_gone(struct wl_resource *r) {       /* as set_multiplier(UINT32_MAX), from the next commit */
+    Surf *s = wl_resource_get_user_data(r);
+    if (s && s->am == r) { s->am = NULL; s->p_alpha = UINT32_MAX; }
+}
+static void am_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void am_get(struct wl_client *c, struct wl_resource *r, uint32_t id, struct wl_resource *surface) {
+    Surf *s = wl_resource_get_user_data(surface);
+    if (s && s->am) { wl_resource_post_error(r, WP_ALPHA_MODIFIER_V1_ERROR_ALREADY_CONSTRUCTED, "the wl_surface has one"); return; }
+    struct wl_resource *a = wl_resource_create(c, &wp_alpha_modifier_surface_v1_interface, wl_resource_get_version(r), id);
+    if (!a) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(a, &ams_impl, s, ams_gone);
+    if (s) s->am = a;
+}
+static const struct wp_alpha_modifier_v1_interface am_impl = { .destroy = am_destroy, .get_surface = am_get };
+static void bind_am(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &wp_alpha_modifier_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &am_impl, NULL, NULL);
+}
+static float surf_alpha(const Surf *s) { return s->alpha == UINT32_MAX ? 1.0f : (float)((double)s->alpha / (double)UINT32_MAX); }
+
 /* The buffer the app just sent becomes the surface's content. */
-static void take_buffer(Surf *s, struct wl_resource *buf) {
+static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     Dmabuf *dm = dmabuf_of(buf), *old = s->dmabuf;
     s->dmabuf = NULL;
+    s->dmg_full = 1;                        /* a dmabuf or no buffer: all of it (copy_buffer says less) */
     if (dm && s->role != R_CURSOR && dm_tex(dm)) {
         dm->refs++;
         s->dmabuf = dm;
@@ -610,12 +836,31 @@ static void take_buffer(Surf *s, struct wl_resource *buf) {
         s->px = NULL;
         s->w = s->h = 0;
         wl_buffer_send_release(buf);
+    } else if (spb_of(buf)) {
+        /* wp_single_pixel_buffer_v1: one premultiplied pixel, its size set by a viewport (a background, a fade) */
+        const Spb *p = spb_of(buf);
+        uint32_t *np = s->w == 1 && s->h == 1 && s->px ? s->px : realloc(s->px, 4);
+        if (np) {
+            s->px = np;
+            s->w = s->h = 1;
+            s->px[0] = p->argb;
+            s->opaque = (p->argb >> 24) == 255;
+            s->content = 1;
+            s->tf_px = s->tf;
+            s->tex_dirty = 1;
+        }
+        wl_buffer_send_release(buf);
     } else {
-        copy_buffer(s, buf);
+        copy_buffer(s, buf, dmg);
         s->tex_dirty = 1;
     }
+    if (s->dmg_full) s->tex_full = 1;
+    else s->tex_dmg = buftf_union(s->tex_dmg, s->dmg);
     if (old) queue_release(old);
 }
+
+/* The transform its texture is drawn with: a dmabuf's own (shared memory is copied upright, buftf.h) */
+static int surf_tex_tf(const Surf *s) { return s->dmabuf && !s->px ? s->tf : 0; }
 
 /* Logical size: the viewport destination, else the crop, else the buffer. */
 static void apply_viewport(Surf *s) {
@@ -626,7 +871,12 @@ static void apply_viewport(Surf *s) {
     }
     if (s->viewport && s->vdw > 0 && s->vdh > 0) { s->lw = s->vdw; s->lh = s->vdh; }
     else if (s->viewport && s->vsw > 0 && s->vsh > 0) { s->lw = (int)s->vsw; s->lh = (int)s->vsh; }
-    else { int b = s->bscale > 0 ? s->bscale : 1; s->lw = s->w / b; s->lh = s->h / b; }
+    else {
+        int b = s->bscale > 0 ? s->bscale : 1, uw = s->w, uh = s->h;
+        if (surf_tex_tf(s) & 1) { uw = s->h; uh = s->w; }       /* a dmabuf turned a quarter: drawn upright */
+        s->lw = uw / b;
+        s->lh = uh / b;
+    }
     if (xw_scaled(s->client)) { s->lw = xws_from_x(s->lw, xw_pct); s->lh = xws_from_x(s->lh, xw_pct); }   /* an X window */
 }
 
@@ -650,8 +900,54 @@ static void srf_attach(struct wl_client *c, struct wl_resource *r, struct wl_res
     }
 }
 
+/* Damage, kept as one box each (surface coordinates; buffer pixels): applied on commit (commit_damage). */
 static void srf_damage(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) {
-    (void)c; (void)r; (void)x; (void)y; (void)w; (void)h;
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s || w <= 0 || h <= 0) return;
+    float x0 = (float)x, y0 = (float)y, x1 = (float)x + (float)w, y1 = (float)y + (float)h;
+    if (!s->p_ds_on) { s->p_ds[0] = x0; s->p_ds[1] = y0; s->p_ds[2] = x1; s->p_ds[3] = y1; s->p_ds_on = 1; return; }
+    if (x0 < s->p_ds[0]) s->p_ds[0] = x0;
+    if (y0 < s->p_ds[1]) s->p_ds[1] = y0;
+    if (x1 > s->p_ds[2]) s->p_ds[2] = x1;
+    if (y1 > s->p_ds[3]) s->p_ds[3] = y1;
+}
+static void srf_damage_buffer(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s || w <= 0 || h <= 0) return;
+    /* clamped: a client's INT32_MAX must not overflow the box (the buffer is at most 8192 px) */
+    int x0 = x < -16384 ? -16384 : x > 16384 ? 16384 : x, y0 = y < -16384 ? -16384 : y > 16384 ? 16384 : y;
+    int x1 = x0 + (w > 32768 ? 32768 : w), y1 = y0 + (h > 32768 ? 32768 : h);
+    BufBox b = { x0, y0, x1, y1 };
+    s->p_db = s->p_db_on ? buftf_union(s->p_db, b) : b;
+    s->p_db_on = 1;
+}
+
+/* This commit's damage in upright buffer pixels of the new buffer (bw × bh before its transform), from what the client
+ * damaged with the state this commit makes current; a full box when it can't be told (a transform, no damage at all
+ * with a new buffer, a size that isn't known). */
+static BufBox commit_damage(Surf *s, struct wl_resource *buf) {
+    BufBox none = { 0, 0, 0, 0 };
+    struct wl_shm_buffer *b = buf ? wl_shm_buffer_get(buf) : NULL;
+    if (!b) return none;                        /* (not shared memory: take_buffer takes all of it anyway) */
+    int uw = wl_shm_buffer_get_width(b), uh = wl_shm_buffer_get_height(b);
+    if (uw <= 0 || uh <= 0) return none;
+    BufBox all = { 0, 0, uw, uh };              /* the whole buffer, never past it (copy_buffer clamps again) */
+    if (s->p_tf || (!s->p_ds_on && !s->p_db_on)) return all;
+    BufBox r = none;
+    if (s->p_db_on) r = buftf_clamp(s->p_db, uw, uh);
+    if (s->p_ds_on) {
+        int vp = s->viewport != NULL;
+        float cx = vp ? (s->p_vp ? s->p_vsx : s->vsx) : 0, cy = vp ? (s->p_vp ? s->p_vsy : s->vsy) : 0;
+        float cw = vp ? (s->p_vp ? s->p_vsw : s->vsw) : -1, ch = vp ? (s->p_vp ? s->p_vsh : s->vsh) : -1;
+        int dw = vp ? (s->p_vp ? s->p_vdw : s->vdw) : 0, dh = vp ? (s->p_vp ? s->p_vdh : s->vdh) : 0;
+        if (xw_scaled(s->client)) return all;          /* (an X window: Xwayland damages its buffer itself) */
+        r = buftf_union(r, buftf_surface_damage(s->p_ds[0], s->p_ds[1], s->p_ds[2], s->p_ds[3], s->p_bscale, uw, uh,
+                                                cx, cy, cw, ch, dw, dh));
+    }
+    r = buftf_clamp(r, uw, uh);
+    return r.x1 > r.x0 ? r : all;
 }
 
 static void callback_gone(struct wl_resource *r) { wl_list_remove(wl_resource_get_link(r)); }
@@ -681,11 +977,23 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
     if (keylag_enabled && key_focus && c == key_focus->client) keylag_commit();
+    s->tf = s->p_tf;
     if (s->p_attached) {
-        take_buffer(s, s->p_buf);
+        take_buffer(s, s->p_buf, commit_damage(s, s->p_buf));
         if (s->p_buf) { wl_list_remove(&s->p_buf_destroy.link); wl_list_init(&s->p_buf_destroy.link); }
         s->p_buf = NULL;
         s->p_attached = 0;
+    }
+    else if (s->p_ds_on || s->p_db_on) s->dmg_full = 1;     /* damage with no new buffer: shown again as it is */
+    else { s->dmg_full = 0; s->dmg = (BufBox){ 0, 0, 0, 0 }; }  /* a commit of state only */
+    s->p_ds_on = s->p_db_on = 0;
+    if (s->p_alpha != s->alpha) { s->alpha = s->p_alpha; s->dmg_full = 1; }   /* a new opacity: all of it again */
+    if (s->p_icon_set) {                        /* xdg_toplevel_icon_manager_v1.set_icon, double-buffered */
+        wlicon_unref(s->icon);
+        s->icon = s->p_icon;
+        s->p_icon = NULL;
+        s->p_icon_set = 0;
+        if (s->mapped) emit(s, "icon", "{\"size\":%d}", s->icon ? s->icon->size : 0);
     }
     s->bscale = s->p_bscale;
     apply_viewport(s);
@@ -724,7 +1032,15 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     surface_commit_role(s);
 }
 
-static void srf_transform(struct wl_client *c, struct wl_resource *r, int32_t t) { (void)c; (void)r; (void)t; }
+static void srf_transform(struct wl_client *c, struct wl_resource *r, int32_t t) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (t < WL_OUTPUT_TRANSFORM_NORMAL || t > WL_OUTPUT_TRANSFORM_FLIPPED_270) {
+        wl_resource_post_error(r, WL_SURFACE_ERROR_INVALID_TRANSFORM, "buffer transform %d is not a wl_output.transform", t);
+        return;
+    }
+    if (s) s->p_tf = t;
+}
 static void srf_scale(struct wl_client *c, struct wl_resource *r, int32_t sc) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
@@ -741,7 +1057,7 @@ static void srf_offset(struct wl_client *c, struct wl_resource *r, int32_t x, in
 static const struct wl_surface_interface surface_impl = {
     .destroy = srf_destroy, .attach = srf_attach, .damage = srf_damage, .frame = srf_frame,
     .set_opaque_region = srf_opaque, .set_input_region = srf_input, .commit = srf_commit,
-    .set_buffer_transform = srf_transform, .set_buffer_scale = srf_scale, .damage_buffer = srf_damage,
+    .set_buffer_transform = srf_transform, .set_buffer_scale = srf_scale, .damage_buffer = srf_damage_buffer,
     .offset = srf_offset,
 };
 
@@ -974,6 +1290,9 @@ static void surface_gone(struct wl_resource *r) {
     if (s->viewport) wl_resource_set_user_data(s->viewport, NULL);
     if (s->sub) wl_resource_set_user_data(s->sub, NULL);
     if (s->frac) wl_resource_set_user_data(s->frac, NULL);
+    if (s->am) wl_resource_set_user_data(s->am, NULL);
+    wlicon_unref(s->p_icon);
+    wlicon_unref(s->icon);
     if (s->kde) wl_resource_set_user_data(s->kde, NULL);
     if (s->deco) wl_resource_set_user_data(s->deco, NULL);
     /* a client may destroy the wl_surface before its role objects: they must not keep the freed Surf, or set_parent,
@@ -1026,6 +1345,8 @@ static void comp_create_surface(struct wl_client *c, struct wl_resource *r, uint
     wl_list_init(&s->p_buf_destroy.link);
     s->vsw = s->p_vsw = -1;
     s->bscale = s->p_bscale = 1;
+    s->fslot = -1;
+    s->p_alpha = s->alpha = UINT32_MAX;
     surfs[slot] = s;
     wl_resource_set_implementation(res, &surface_impl, s, surface_gone);
     if (c == xwl_client) xwm_surface_created(id);   /* WL_SURFACE_ID may have come first */
@@ -1242,6 +1563,76 @@ static int slot_for_box(float x0, float y0, float x1, float y1) {
     return best;
 }
 
+/* The slots as outpick.h takes them. */
+static void pick_slots(OutPickSlot *p) {
+    for (int i = 0; i < OUT_MAX; i++)
+        p[i] = (OutPickSlot){ oslots[i].used, oslots[i].o.key, oslots[i].o.x, oslots[i].o.y, oslots[i].o.w, oslots[i].o.h };
+}
+static int slot_key(int slot) {
+    OutPickSlot p[OUT_MAX];
+    pick_slots(p);
+    return outpick_key(p, OUT_MAX, slot);
+}
+
+static unsigned box_keys(float x0, float y0, float x1, float y1) {
+    OutPickSlot p[OUT_MAX];
+    pick_slots(p);
+    return outpick_keys(p, OUT_MAX, x0, y0, x1, y1);
+}
+/* The displays a window (or a menu) is on: its box now, and the displays it was on at the last frame (enter/leave);
+ * fullscreen, the one it covers; drawn in the Overview or another transform, or nowhere known yet, every display. */
+static unsigned surf_keys(Surf *top) {
+    if (top == fs_surf) return fs_slot < 0 ? OUTPICK_ALL : slot_key(fs_slot) < 0 ? OUTPICK_ALL : 1u << slot_key(fs_slot);
+    if (top->tf_drawn) return OUTPICK_ALL;
+    float x, y;
+    if (!origin(top, &x, &y) || top->lw <= 0) return OUTPICK_ALL;
+    unsigned k = box_keys(x + (float)top->gx, y + (float)top->gy, x + (float)(top->gx + (top->gw > 0 ? top->gw : top->lw)),
+                          y + (float)(top->gy + (top->gh > 0 ? top->gh : top->lh)));
+    if (k == OUTPICK_ALL) return k;
+    for (int i = 0; i < OUT_MAX; i++)
+        if (top->outmask >> i & 1) { int key = slot_key(i); if (key < 0) return OUTPICK_ALL; k |= 1u << key; }
+    return k;
+}
+
+/* The work area of each display (logical, the menu bar and the Dock left out), as the theme computes it
+ * (sdk/wayland.js → lord.wayland.workAreas); w 0: not known, the display's whole rect is used. */
+static struct { int x, y, w, h; } warea[OUT_MAX];
+
+void wl_set_work_areas(const int (*r)[4], int n) {
+    memset(warea, 0, sizeof warea);
+    for (int j = 0; j < n; j++) {
+        if (r[j][2] <= 0 || r[j][3] <= 0) continue;
+        for (int i = 0; i < OUT_MAX; i++) {              /* the display holding its middle */
+            const WlOutput *o = &oslots[i].o;
+            int cx = r[j][0] + r[j][2] / 2, cy = r[j][1] + r[j][3] / 2;
+            if (!oslots[i].used || cx < o->x || cy < o->y || cx >= o->x + o->w || cy >= o->y + o->h) continue;
+            warea[i].x = r[j][0]; warea[i].y = r[j][1];
+            warea[i].w = r[j][2] < o->w ? r[j][2] : o->w;
+            warea[i].h = r[j][3] < o->h ? r[j][3] : o->h;
+            break;
+        }
+    }
+}
+
+/* the display under the pointer (where a new window opens), -1 before the pointer moved */
+static int pointer_slot(void) {
+    if (ptr_last_x < 0) return -1;
+    OutPickSlot p[OUT_MAX];
+    pick_slots(p);
+    return outpick_main(p, OUT_MAX, ptr_last_x, ptr_last_y, ptr_last_x + 1, ptr_last_y + 1);
+}
+
+/* configure_bounds: the work area of the window's display (a new window's: the one under the pointer, where it opens),
+ * in the window's own coordinates (an X11 window's are X pixels; Xwayland gets no xdg_toplevel, so none here) */
+static void work_bounds(Surf *s, int *w, int *h) {
+    int slot = s->fslot >= 0 && oslots[s->fslot].used ? s->fslot : pointer_slot();
+    if (slot < 0 || !oslots[slot].used) slot = out_main;
+    *w = *h = 0;
+    if (slot < 0 || slot >= OUT_MAX || !oslots[slot].used) return;
+    *w = warea[slot].w > 0 ? warea[slot].w : oslots[slot].o.w;
+    *h = warea[slot].h > 0 ? warea[slot].h : oslots[slot].o.h;
+}
+
 void wl_set_outputs(const WlOutput *list, int n, int main) {
     if (!dpy) return;
     int keep[OUT_MAX] = { 0 };
@@ -1303,8 +1694,14 @@ static void set_pref_scale(Surf *s, int pct) {
     if (wl_resource_get_version(s->res) >= 6) wl_surface_send_preferred_buffer_scale(s->res, int_scale(pct));
 }
 
-static void surface_outputs(Surf *s, float x, float y, int depth) {
+static void surface_outputs(Surf *s, float x, float y, int depth, int fslot) {
     if (depth > 8) return;
+    if (!depth && s->lw > 0) {                      /* the window's main display: its frames follow it */
+        OutPickSlot p[OUT_MAX];
+        pick_slots(p);
+        fslot = outpick_main(p, OUT_MAX, x, y, x + s->lw, y + s->lh);
+    }
+    s->fslot = fslot;
     unsigned mask = 0;
     int best = 0;
     for (int i = 0; i < OUT_MAX; i++) {
@@ -1318,7 +1715,7 @@ static void surface_outputs(Surf *s, float x, float y, int depth) {
     if (mask != s->outmask) send_enter_leave(s, mask);
     if (best) set_pref_scale(s, best);
     else if (!s->pref_scale) set_pref_scale(s, pointer_scale);
-    for (int k = 0; k < s->nkids; k++) surface_outputs(s->kids[k], x + s->kids[k]->sx, y + s->kids[k]->sy, depth + 1);
+    for (int k = 0; k < s->nkids; k++) surface_outputs(s->kids[k], x + s->kids[k]->sx, y + s->kids[k]->sy, depth + 1, fslot);
 }
 
 static void update_surface_outputs(void) {
@@ -1326,11 +1723,11 @@ static void update_surface_outputs(void) {
         Surf *s = surfs[i];
         if (!s || s->parent || (s->role != R_TOPLEVEL && s->role != R_POPUP) || !s->content) continue;
         float x, y;
-        if (origin(s, &x, &y)) surface_outputs(s, x, y, 0);
+        if (origin(s, &x, &y)) surface_outputs(s, x, y, 0, -1);
     }
     for (int i = 0; i < npopups; i++) {
         float x, y;
-        if (origin(popups[i], &x, &y)) surface_outputs(popups[i], x, y, 0);
+        if (origin(popups[i], &x, &y)) surface_outputs(popups[i], x, y, 0, -1);
     }
 }
 
@@ -1359,7 +1756,8 @@ static void res_release(struct wl_client *c, struct wl_resource *r) { (void)c; w
 static unsigned cursor_shape;
 static void csd_set_shape(struct wl_client *c, struct wl_resource *r, uint32_t serial, uint32_t shape) {
     (void)serial;
-    if (shape < 1 || shape > 36) {
+    /* 1 default … 34 zoom_out; version 2 adds 35 dnd_ask and 36 all_resize */
+    if (shape < 1 || shape > (wl_resource_get_version(r) >= 2 ? WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ALL_RESIZE : WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ZOOM_OUT)) {
         wl_resource_post_error(r, WP_CURSOR_SHAPE_DEVICE_V1_ERROR_INVALID_SHAPE, "invalid shape %u", shape);
         return;
     }
@@ -2385,12 +2783,20 @@ static void top_parent(struct wl_client *c, struct wl_resource *r, struct wl_res
     Surf *s = wl_resource_get_user_data(r), *o = p ? wl_resource_get_user_data(p) : NULL;
     if (s) set_owner(s, o && o->role == R_TOPLEVEL && o->top ? o : NULL, NULL);     /* only a live toplevel parents */
 }
+/* A window's title: only a different one counts, and JS hears it at most once a frame (TITLE_MS), the last one of a
+ * burst: a terminal or a player that sets its title on every redraw (a spinner, a position) re-rendered the theme's
+ * window list each time (docs/WAYLAND.md, "Titles"). */
+static void set_title(Surf *s, const char *t) {
+    char cut[sizeof s->title];
+    snprintf(cut, sizeof cut, "%s", t);
+    if (!strcmp(cut, s->title)) return;             /* the same (once cut to fit): nothing to tell */
+    memcpy(s->title, cut, sizeof cut);
+    if (s->mapped) s->title_pending = 1;
+}
 static void top_title(struct wl_client *c, struct wl_resource *r, const char *t) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
-    if (!s) return;
-    snprintf(s->title, sizeof s->title, "%s", t);
-    if (s->mapped) { char e[520]; json_str(e, sizeof e, s->title); emit(s, "title", "{\"title\":\"%s\"}", e); }
+    if (s) set_title(s, t);
 }
 /* The window's app id: the one it set, else the one the sandbox engine gave its client's security context
  * (cut to fit; "" if neither) */
@@ -2449,7 +2855,6 @@ static void top_unmaximize(struct wl_client *c, struct wl_resource *r) {
     if (s && s->mapped) emit(s, "unmaximize", "{}");
 }
 /* Fullscreen: presented by the compositor on top of everything (and straight to the card if possible). */
-static int fs_refused;                  /* wl_fullscreen_allow */
 static void leave_fullscreen(Surf *s);
 
 /* A fullscreen surface is drawn over every layer, the sharing indicator included, so a share and a fullscreen surface can't
@@ -2458,6 +2863,12 @@ void wl_fullscreen_allow(int on) {
     if (fs_refused == !on) return;
     fs_refused = !on;
     if (fs_refused && dpy && fs_surf) leave_fullscreen(fs_surf);
+    for (int i = 0; dpy && i < MAX_SURF; i++) {     /* the apps hide or show their fullscreen button */
+        Surf *s = surfs[i];
+        if (!s || !s->top || s->role != R_TOPLEVEL) continue;
+        send_caps(s);
+        if (s->xdg && s->sent_configure) send_toplevel_configure(s);
+    }
 }
 
 static void enter_fullscreen(Surf *s) {
@@ -2569,13 +2980,17 @@ static void pop_gone(struct wl_resource *r) {
 /* ---- xdg_surface / xdg_wm_base ---- */
 
 static void xs_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
-/* What the window manager offers this toplevel (xdg-shell 5): maximize and minimize, none while it is locked. */
+/* What the window manager offers this toplevel (xdg-shell 5): the window menu (the theme's, at the app's own bar,
+ * top_menu), maximize unless it is locked, fullscreen unless a screen share refuses it (wl_fullscreen_allow), and
+ * minimize even locked. A new list takes effect with the next configure. */
 static void send_caps(Surf *s) {
     if (!s || !s->top || wl_resource_get_version(s->top) < 5) return;
     struct wl_array caps;
     wl_array_init(&caps);
     uint32_t *p;
+    if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_WINDOW_MENU;
     if (!s->fixed && (p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MAXIMIZE;
+    if (!fs_refused && (p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_FULLSCREEN;
     if ((p = wl_array_add(&caps, sizeof *p))) *p = XDG_TOPLEVEL_WM_CAPABILITIES_MINIMIZE;   /* offered even locked */
     xdg_toplevel_send_wm_capabilities(s->top, &caps);
     wl_array_release(&caps);
@@ -2779,6 +3194,7 @@ static void geometry(Surf *s, int *w, int *h) {
 /* JS learns about a window: title, app id, content size and whether it draws its own frame. */
 static void emit_map(Surf *s, int w, int h) {
     char t[520], a[260];
+    s->title_pending = 0;                       /* the map carries it */
     json_str(t, sizeof t, s->title);
     json_str(a, sizeof a, s->app_id);
     if (s->xw) {                    /* X11: WM_CLASS class, and its instance for the .desktop match */
@@ -2920,6 +3336,7 @@ static Rect phys_rect(Rect r) {
 /* Source rect of a surface's buffer (the viewport crop is in surface coordinates: × buffer scale). */
 static void source_rect(const Surf *s, float *sx, float *sy, float *sw, float *sh) {
     *sx = 0; *sy = 0; *sw = (float)s->w; *sh = (float)s->h;
+    if (surf_tex_tf(s) & 1) { *sw = (float)s->h; *sh = (float)s->w; }    /* a dmabuf turned a quarter: upright size */
     if (s->viewport && s->vsw > 0) {
         float b = (float)(s->bscale > 0 ? s->bscale : 1);
         *sx = s->vsx * b; *sy = s->vsy * b; *sw = s->vsw * b; *sh = s->vsh * b;
@@ -2986,19 +3403,23 @@ static uint32_t *capture_readback(const Surf *s) {
     int w = s->dmabuf->d.width, h = s->dmabuf->d.height;
     if (!gpu_tex_current(t) || w <= 0 || h <= 0 || w > 8192 || h > 8192) return NULL;
     uint32_t *px = malloc((size_t)w * (size_t)h * 4);
-    if (px && gpu_tex_read(t, px, w, h) == 0) return px;
+    if (px && gpu_tex_read(t, px, w, h) == 0) { upright(&px, &w, &h, s->tf); return px; }
     free(px);
     return NULL;
 }
 
-static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip) {
+static void paint_tree(Canvas *c, Surf *s, float x, float y, float op_tree, Rect clip) {
     uint32_t *tmp;
+    float op = op_tree * surf_alpha(s);         /* wp_alpha_modifier_v1: this surface only, not its subsurfaces */
+    s->hole_sig = hole_sig(s);          /* the shape it was painted with: damage_box and the GPU path compare it */
     if (gpu_active() && !paint_capture_mode) {          /* in a screenshot they are always copied */
+        Surf *tt = toplevel_of(s);
+        if (tt) tt->tf_drawn = tfv.on;
         if (tfv.on) {
             if (s->content && !tfv.skip && ntf_holes < TF_HOLES && ndraws[0] < 128) {
                 float X = x * tfv.sx + tfv.tx, Y = y * tfv.sy + tfv.ty, W = s->lw * tfv.sx, H = s->lh * tfv.sy;
                 Rect m = tf_map(clip);
-                add_draw(0, s, X, Y, m, op * tfv.op);
+                add_draw(0, s, X, Y, m, op_tree * tfv.op);   /* (its opacity at draw time: surf_alpha) */
                 draws[0][ndraws[0] - 1].sx = tfv.sx;
                 draws[0][ndraws[0] - 1].sy = tfv.sy;
                 tf_holes[ntf_holes].x = X; tf_holes[ntf_holes].y = Y; tf_holes[ntf_holes].w = W; tf_holes[ntf_holes].h = H;
@@ -3009,9 +3430,9 @@ static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip
                 canvas_clear(c, 0);
                 canvas_set_clip(c, old);
             }
-        } else if (s->content && holes_off) add_draw(0, s, x, y, clip, op);
+        } else if (s->content && holes_off) add_draw(0, s, x, y, clip, op_tree);
         else if (s->content) {
-            add_draw(0, s, x, y, clip, op);
+            add_draw(0, s, x, y, clip, op_tree);
             /* hole in the UI: what was painted below shows the window */
             Rect old = c->clip;
             Rect h = rect_and(rect_and(old, phys_rect(clip)),
@@ -3020,7 +3441,6 @@ static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip
             canvas_clear(c, 0);
             canvas_set_clip(c, old);
         }
-        s->hole_sig = hole_sig(s);
     } else if (s->px) blit_surface(c, s, x, y, 1, 1, op);
     else if ((tmp = capture_readback(s))) {
         s->px = tmp;
@@ -3028,7 +3448,7 @@ static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip
         s->px = NULL;
         free(tmp);
     }
-    for (int i = 0; i < s->nkids; i++) paint_tree(c, s->kids[i], x + s->kids[i]->sx, y + s->kids[i]->sy, op, clip);
+    for (int i = 0; i < s->nkids; i++) paint_tree(c, s->kids[i], x + s->kids[i]->sx, y + s->kids[i]->sy, op_tree, clip);
 }
 
 void wl_paint_begin(void) { ndraws[0] = ndraws[1] = 0; }
@@ -3119,23 +3539,37 @@ static GpuTex *surface_tex(Surf *s) {
         /* this context does not import it: the last good frame (px) is drawn instead */
     }
     if (s->px && (s->tex_dirty || !s->tex)) {
-        s->tex = gpu_tex_pixels(s->tex, s->px, s->w, s->h, s->opaque);
-        s->tex_dirty = 0;
+        /* only what the app damaged since the last upload (GL_EXT_unpack_subimage, gpu_tex_pixels_rect) */
+        if (!s->tex || s->tex_full) s->tex = gpu_tex_pixels(s->tex, s->px, s->w, s->h, s->opaque);
+        else s->tex = gpu_tex_pixels_rect(s->tex, s->px, s->w, s->h, s->opaque,
+                                          (Rect){ s->tex_dmg.x0, s->tex_dmg.y0, s->tex_dmg.x1, s->tex_dmg.y1 });
+        s->tex_dirty = s->tex_full = 0;
+        s->tex_dmg = (BufBox){ 0, 0, 0, 0 };
     }
     return s->tex;
+}
+
+/* A surface's texture at a physical rect: its source rect (upright pixels), turned back to the buffer's own for a
+ * transformed dmabuf (shared memory is already upright, buftf.h) */
+static void draw_tex(Surf *s, GpuTex *t, float px, float py, float pw, float ph, Rect pclip, float op) {
+    float sx, sy, sw, sh, uv[8];
+    source_rect(s, &sx, &sy, &sw, &sh);
+    int tf = s->dmabuf && t == s->dmabuf->tex ? s->tf : 0;
+    if (!tf) { gpu_draw(t, px, py, pw, ph, sx, sy, sw, sh, pclip, op); return; }
+    float uw = (float)(buftf_swaps(tf) ? s->h : s->w), uh = (float)(buftf_swaps(tf) ? s->w : s->h);
+    buftf_corners(tf, uw, uh, sx, sy, sx + sw, sy + sh, uv);
+    gpu_draw_uv(t, px, py, pw, ph, uv, pclip, op);
 }
 
 static void draw_surface(Surf *s, float x, float y, float dw, float dh, Rect clip, float op) {
     /* x, y, dw, dh and clip are logical; the GPU draws in the display's physical pixels (paint_view) */
     GpuTex *t = s->content ? surface_tex(s) : NULL;
     if (!t) return;
-    float sx, sy, sw, sh;
-    source_rect(s, &sx, &sy, &sw, &sh);
-    gpu_draw(t, PVX(x), PVY(y), dw * paint_view.k, dh * paint_view.k, sx, sy, sw, sh, phys_rect(clip), op);
+    draw_tex(s, t, PVX(x), PVY(y), dw * paint_view.k, dh * paint_view.k, phys_rect(clip), op);
 }
 
 static void draw_tree(Surf *s, float x, float y, float scale_x, float scale_y, Rect clip) {
-    draw_surface(s, x, y, s->lw * scale_x, s->lh * scale_y, clip, 1);
+    draw_surface(s, x, y, s->lw * scale_x, s->lh * scale_y, clip, surf_alpha(s));
     for (int i = 0; i < s->nkids; i++)
         draw_tree(s->kids[i], x + s->kids[i]->sx * scale_x, y + s->kids[i]->sy * scale_y, scale_x, scale_y, clip);
 }
@@ -3216,12 +3650,10 @@ void wl_gpu_draw_layer(int layer) {
             if (d->media) { draw_media(d); continue; }
             Surf *s = find(d->sid);
             if (!s || !s->content) continue;
-            if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op); continue; }
+            if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op * surf_alpha(s)); continue; }
             Rect p = tf_pixels(d->x, d->y, s->lw * d->sx, s->lh * d->sy);
             GpuTex *t = surface_tex(s);
-            float sx, sy, sw, sh;
-            source_rect(s, &sx, &sy, &sw, &sh);
-            if (t) gpu_draw(t, (float)p.x0, (float)p.y0, (float)(p.x1 - p.x0), (float)(p.y1 - p.y0), sx, sy, sw, sh, phys_rect(d->clip), d->op);
+            if (t) draw_tex(s, t, (float)p.x0, (float)p.y0, (float)(p.x1 - p.x0), (float)(p.y1 - p.y0), phys_rect(d->clip), d->op * surf_alpha(s));
         }
         return;
     }
@@ -3245,7 +3677,7 @@ static void blit_tree(Canvas *c, Surf *s, float x, float y, float sxk, float syk
     if (s->content) {
         uint32_t *tmp = s->px ? NULL : capture_readback(s);      /* a GPU app in a screenshot */
         if (tmp) s->px = tmp;
-        if (s->px) blit_surface(c, s, x, y, sxk, syk, 1);
+        if (s->px) blit_surface(c, s, x, y, sxk, syk, surf_alpha(s));
         if (tmp) { s->px = NULL; free(tmp); }
     }
     for (int i = 0; i < s->nkids; i++)
@@ -3280,7 +3712,12 @@ void wl_paint_fullscreen(Canvas *out) {
 }
 
 int wl_fullscreen_active(void) { return fs_surf && fs_surf->content; }
-int wl_wants_frame(void) { return need_frame; }
+int wl_wants_frame(void) { return need_frame || frames_held; }
+unsigned wl_new_content(void) {
+    unsigned k = need_frame ? new_keys : 0;
+    new_keys = 0;
+    return k;
+}
 
 /* Direct scanout: the fullscreen window has a dmabuf the size of the output, there are no
  * menus on top and the cursor does not need to be drawn (cursor plane or hidden). */
@@ -3312,9 +3749,10 @@ static int surf_hidden(Surf *s) {
     return top && (top->xmin || top->parked || top->covered);
 }
 
-void wl_frame_done(unsigned t) {
+void wl_frame_done(unsigned t, unsigned keys) {
     if (!dpy) return;
     need_frame = 0;
+    frames_held = 0;
     update_surface_outputs();
     for (int i = 0; i < nrelease; i++) {
         Dmabuf *d = to_release[i];
@@ -3329,6 +3767,12 @@ void wl_frame_done(unsigned t) {
         if (hidden && wl_list_empty(&s->frames)) continue;
         if (!framegate_due(&s->fgate, hidden, t)) continue;    /* minimized, a hidden desktop: once a second */
         if (hidden) framegate_sent(&s->fgate, t);
+        /* shown: with a frame of its own display, not another one's (a 60 Hz display's windows paced by a 144 Hz one's
+         * frames drew frames nobody saw); while that display waits for its flip, they wait too */
+        else if (!outpick_due(slot_key(s->fslot), keys)) {
+            if (!wl_list_empty(&s->frames)) frames_held = 1;
+            continue;
+        }
         struct wl_resource *cb, *tmp;
         wl_resource_for_each_safe(cb, tmp, &s->frames) {
             wl_callback_send_done(cb, t);
@@ -3379,7 +3823,7 @@ int wl_frame_unseen(unsigned t) {
         wl_resource_for_each_safe(r, tmp, &s->feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); waiting = 1; }
         wl_resource_for_each_safe(r, tmp, &s->sent_feedback) { wp_presentation_feedback_send_discarded(r); wl_resource_destroy(r); waiting = 1; }
     }
-    need_frame = 0;
+    need_frame = frames_held = 0;
     if (waiting) wl_display_flush_clients(dpy);
     return waiting;
 }
@@ -3554,7 +3998,7 @@ static void dnd_icon_damage(void) {
     float x, y;
     Surf *icon = dnd_icon_at(&x, &y);
     if (!icon) return;
-    if (gpu_active()) { need_frame = 1; return; }          /* above the UI, like the menus */
+    if (gpu_active()) { new_on(box_keys(x, y, x + icon->lw, y + icon->lh)); return; }   /* above the UI, like the menus */
     damage_add((Box){ x - 2, y - 2, x + icon->lw + 2, y + icon->lh + 2 });
     ui.dirty = 1;
 }
@@ -4475,6 +4919,177 @@ int wl_shortcuts_answer(const char *app, int allow) {
     return 1;
 }
 
+/* ---- xdg_toplevel_icon_manager_v1: an app's own icon for its window (wlicon.h) ----
+ * Buffers are copied at add_buffer (shared memory only, square, 1…WLICON_MAX px, ARGB/XRGB8888) into lord-server's own
+ * RGBA, the one closest to WLICON_WANT kept; an icon name is ignored (a name would let an app show another app's
+ * icon). The shell uses the result only for a window whose app has no installed icon. */
+typedef struct { WlIcon *ic; int immutable; } IconObj;
+static void icon_obj_gone(struct wl_resource *r) {
+    IconObj *o = wl_resource_get_user_data(r);
+    if (!o) return;
+    wlicon_unref(o->ic);
+    free(o);
+}
+static void icon_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void icon_set_name(struct wl_client *c, struct wl_resource *r, const char *name) {
+    (void)c; (void)name;
+    IconObj *o = wl_resource_get_user_data(r);
+    if (o && o->immutable) wl_resource_post_error(r, XDG_TOPLEVEL_ICON_V1_ERROR_IMMUTABLE, "the icon was already set");
+}
+static void icon_add_buffer(struct wl_client *c, struct wl_resource *r, struct wl_resource *buffer, int32_t scale) {
+    (void)c;
+    IconObj *o = wl_resource_get_user_data(r);
+    if (!o) return;
+    if (o->immutable) { wl_resource_post_error(r, XDG_TOPLEVEL_ICON_V1_ERROR_IMMUTABLE, "the icon was already set"); return; }
+    struct wl_shm_buffer *b = buffer ? wl_shm_buffer_get(buffer) : NULL;
+    int w = b ? wl_shm_buffer_get_width(b) : 0, h = b ? wl_shm_buffer_get_height(b) : 0;
+    if (!b || w != h || w <= 0) { wl_resource_post_error(r, XDG_TOPLEVEL_ICON_V1_ERROR_INVALID_BUFFER, "not a square shared-memory buffer"); return; }
+    uint32_t fmt = wl_shm_buffer_get_format(b);
+    int stride = wl_shm_buffer_get_stride(b);
+    if ((fmt != WL_SHM_FORMAT_ARGB8888 && fmt != WL_SHM_FORMAT_XRGB8888) || stride < w * 4) return;   /* not taken, no error */
+    if (!wlicon_better(o->ic ? o->ic->size : 0, o->ic ? o->ic->scale : 1, w, scale)) return;
+    wl_shm_buffer_begin_access(b);
+    WlIcon *ic = wlicon_from_argb(wl_shm_buffer_get_data(b), w, stride, scale, fmt == WL_SHM_FORMAT_XRGB8888);
+    wl_shm_buffer_end_access(b);
+    if (!ic) return;                                /* past the limits (size, the total kept): not taken */
+    wlicon_unref(o->ic);
+    o->ic = ic;
+}
+static const struct xdg_toplevel_icon_v1_interface icon_impl = {
+    .destroy = icon_destroy, .set_name = icon_set_name, .add_buffer = icon_add_buffer,
+};
+static void iconm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static void iconm_create(struct wl_client *c, struct wl_resource *r, uint32_t id) {
+    IconObj *o = calloc(1, sizeof *o);
+    struct wl_resource *res = o ? wl_resource_create(c, &xdg_toplevel_icon_v1_interface, wl_resource_get_version(r), id) : NULL;
+    if (!res) { free(o); wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(res, &icon_impl, o, icon_obj_gone);
+}
+static void iconm_set(struct wl_client *c, struct wl_resource *r, struct wl_resource *toplevel, struct wl_resource *icon) {
+    (void)c; (void)r;
+    Surf *s = toplevel ? wl_resource_get_user_data(toplevel) : NULL;
+    IconObj *o = icon ? wl_resource_get_user_data(icon) : NULL;
+    if (o) o->immutable = 1;
+    if (!s || s->top != toplevel) return;
+    wlicon_unref(s->p_icon);
+    s->p_icon = o && o->ic ? wlicon_ref(o->ic) : NULL;     /* no pixels (or only a name): back to the default icon */
+    s->p_icon_set = 1;
+}
+static const struct xdg_toplevel_icon_manager_v1_interface iconm_impl = { .destroy = iconm_destroy, .create_icon = iconm_create, .set_icon = iconm_set };
+static void bind_iconm(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &xdg_toplevel_icon_manager_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &iconm_impl, NULL, NULL);
+    xdg_toplevel_icon_manager_v1_send_icon_size(r, 64);       /* the sizes the Dock draws at (54 to 86 px, 2x displays) */
+    xdg_toplevel_icon_manager_v1_send_icon_size(r, 128);
+    xdg_toplevel_icon_manager_v1_send_done(r);
+}
+
+/* The window's own icon (RGBA, side × side), or NULL: for lord.wayland.icon. */
+const uint8_t *wl_window_icon(int id, int *side) {
+    Surf *s = find(id);
+    if (!s || !s->icon) return NULL;
+    *side = s->icon->size;
+    return s->icon->rgba;
+}
+
+/* ---- ext_idle_notifier_v1: told when the person is away, with their permission (idlenotify.h) ---- */
+typedef struct {
+    struct wl_resource *res;
+    struct wl_list link;
+    IdnState st;
+    char app[KBI_ID_MAX];               /* whose decision: an isolated app's id or a checked identity ("" none) */
+    int never, allowed;
+} IdleN;
+static struct wl_list idle_notes;
+#define IDN_WAITING 8
+static char idn_waiting[IDN_WAITING][KBI_ID_MAX];   /* apps the shell is asking ("idle" prompt), one slot each */
+static int idn_waiting_at(const char *app) {
+    for (int i = 0; app[0] && i < IDN_WAITING; i++) if (!strcmp(idn_waiting[i], app)) return i;
+    return -1;
+}
+static void idn_gone(struct wl_resource *r) {
+    IdleN *n = wl_resource_get_user_data(r);
+    if (!n) return;
+    wl_list_remove(&n->link);
+    free(n);
+}
+static void idn_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct ext_idle_notification_v1_interface idn_impl = { .destroy = idn_destroy };
+static void idnm_get(struct wl_client *c, struct wl_resource *r, uint32_t id, uint32_t timeout, struct wl_resource *seat) {
+    (void)seat;                         /* one seat */
+    IdleN *n = calloc(1, sizeof *n);
+    struct wl_resource *res = n ? wl_resource_create(c, &ext_idle_notification_v1_interface, wl_resource_get_version(r), id) : NULL;
+    if (!res) { free(n); wl_client_post_no_memory(c); return; }
+    n->res = res;
+    n->st.timeout_ms = (double)timeout;
+    wl_list_insert(&idle_notes, &n->link);
+    wl_resource_set_implementation(res, &idn_impl, n, idn_gone);
+    /* whose: an isolated LordOS app by its id, any other client by who lord-server checked it is, never by an app_id it
+     * set; Xwayland speaks for every X11 app, so it is no one's */
+    const char *iso = app_of_client(c);
+    snprintf(n->app, sizeof n->app, "%s", iso ? iso : client_identity(c));
+    int named = iso ? lpk_valid_id(n->app) : kbi_key_valid(n->app);
+    if (!named) n->app[0] = 0;
+    int how = idn_decide(named ? (int)perm_get(n->app, PERM_IDLE) : PERM_ASK, c == xwl_client, greeter, named);
+    n->never = how == IDN_NEVER && (!named || c == xwl_client || greeter);
+    n->allowed = how == IDN_GRANT;
+    if (how != IDN_PROMPT || idn_waiting_at(n->app) >= 0) return;     /* one prompt per app */
+    static unsigned next;
+    int w;
+    for (w = 0; w < IDN_WAITING && idn_waiting[w][0]; w++) {}
+    if (w == IDN_WAITING) { w = (int)next; next = (next + 1) % IDN_WAITING; }
+    snprintf(idn_waiting[w], sizeof idn_waiting[w], "%s", n->app);
+    /* the shell asks (sdk/wayland.js); the name is an installed app's whose entry runs that program, never the client's */
+    char name[128] = "", a[300], json[600];
+    if (!iso) wl_shortcuts_name(n->app, "", name, sizeof name);
+    json_str(a, sizeof a, name);
+    snprintf(json, sizeof json, "{\"app\":\"%s\",\"name\":\"%s\",\"lpk\":%s}", n->app, a, iso ? "true" : "false");
+    emit_id(0, "idlenotify", json);
+}
+static void idnm_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
+static const struct ext_idle_notifier_v1_interface idnm_impl = { .destroy = idnm_destroy, .get_idle_notification = idnm_get };
+static void bind_idnm(struct wl_client *c, void *data, uint32_t ver, uint32_t id) {
+    (void)data;
+    struct wl_resource *r = wl_resource_create(c, &ext_idle_notifier_v1_interface, (int)ver, id);
+    if (!r) { wl_client_post_no_memory(c); return; }
+    wl_resource_set_implementation(r, &idnm_impl, NULL, NULL);
+}
+
+/* An "idle" decision changed (asked, or changed in Settings → Privacy): the app's notifications follow it. */
+void wl_idle_changed(void) {
+    if (!dpy) return;
+    IdleN *n;
+    wl_list_for_each(n, &idle_notes, link) if (!n->never && n->app[0]) n->allowed = perm_get(n->app, PERM_IDLE) == PERM_ALLOW;
+}
+
+int wl_idle_answer(const char *app, int allow) {
+    int w = dpy && app ? idn_waiting_at(app) : -1;
+    if (w < 0) return 0;
+    idn_waiting[w][0] = 0;
+    perm_set(app, PERM_IDLE, allow ? PERM_ALLOW : PERM_DENY);
+    wl_idle_changed();
+    return 1;
+}
+
+/* Every pass of the main loop: last = lord-server's last activity (display.c, idle inhibitors included). Sends what is
+ * due; the ms until the next one, or -1. */
+double wl_idle_tick(double last, double now) {
+    if (!dpy) return -1;
+    double wait = -1;
+    int sent = 0;
+    IdleN *n;
+    wl_list_for_each(n, &idle_notes, link) {
+        int ev = idn_step(&n->st, n->allowed && !n->never, last, now, &wait);
+        if (ev == IDN_IDLED) ext_idle_notification_v1_send_idled(n->res);
+        else if (ev == IDN_RESUMED) ext_idle_notification_v1_send_resumed(n->res);
+        sent |= ev != IDN_NONE;
+    }
+    if (sent) wl_display_flush_clients(dpy);
+    return wait;
+}
+
 int wl_key(int code, int value, const KeyInfo *k) {
     if (!dpy) return 0;
     unsigned char *was_grabbed = code >= 0 && code < KEY_SLOTS ? &grabbed[code] : NULL;
@@ -4576,7 +5191,7 @@ int wl_key(int code, int value, const KeyInfo *k) {
 
 /* ---- zwp_linux_dmabuf_v1 (v4): apps' GPU buffers ---- */
 
-typedef struct { int fd[4]; uint32_t off[4], stride[4]; uint64_t mod; int set[4], used; } Params;
+typedef struct { int fd[4]; uint32_t off[4], stride[4]; uint64_t mod; int set[4], used, nset; } Params;
 
 static void dmabuf_buffer_destroy(struct wl_client *c, struct wl_resource *r) { (void)c; wl_resource_destroy(r); }
 static const struct wl_buffer_interface dmabuf_buffer_impl = { .destroy = dmabuf_buffer_destroy };
@@ -4602,10 +5217,18 @@ static void params_add(struct wl_client *c, struct wl_resource *r, int32_t fd, u
     if (p->used) { close(fd); wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED, "already used"); return; }
     if (idx >= 4) { close(fd); wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_IDX, "invalid plane"); return; }
     if (p->set[idx]) { close(fd); wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_SET, "repeated plane"); return; }
+    uint64_t mod = (uint64_t)mod_hi << 32 | mod_lo;
+    /* version 5: every plane with the same modifier (a mix was taken as the last plane's before) */
+    if (p->nset && mod != p->mod && wl_resource_get_version(r) >= 5) {
+        close(fd);
+        wl_resource_post_error(r, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT, "planes with different modifiers");
+        return;
+    }
+    p->nset++;
     p->fd[idx] = fd;
     p->off[idx] = off;
     p->stride[idx] = stride;
-    p->mod = (uint64_t)mod_hi << 32 | mod_lo;
+    p->mod = mod;
     p->set[idx] = 1;
 }
 
@@ -4794,10 +5417,12 @@ static void wl_gpu_lost(void) {
             int w = d->d.width, h = d->d.height;
             uint32_t *px = w <= 8192 && h <= 8192 ? malloc((size_t)w * (size_t)h * 4) : NULL;
             if (px && gpu_tex_read(d->tex, px, w, h) == 0) {
+                upright(&px, &w, &h, s->tf);
                 free(s->px);
                 s->px = px;
                 s->w = w;
                 s->h = h;
+                s->tf_px = s->tf;
             } else {
                 free(px);
                 if (map_linear(s, d)) { free(s->px); s->px = NULL; }
@@ -4806,7 +5431,7 @@ static void wl_gpu_lost(void) {
         if (d) { gpu_tex_free(d->tex); d->tex = NULL; }
         gpu_tex_free(s->tex);
         s->tex = NULL;
-        s->tex_dirty = 1;
+        s->tex_dirty = s->tex_full = 1;
     }
 }
 
@@ -4829,10 +5454,11 @@ static void wl_gpu_changed(void) {
             s->px = NULL;
             apply_viewport(s);
         }
-        s->tex_dirty = 1;
+        s->tex_dirty = s->tex_full = 1;
+        s->dmg_full = 1;
         if (s->node) damage_node(s);
     }
-    need_frame = 1;
+    new_on(OUTPICK_ALL);
     ui.dirty = 1;
     damage_add((Box){ 0, 0, ui.width, ui.height });
     GpuFormat f[256];
@@ -4852,7 +5478,7 @@ static void feedback_link_gone(struct wl_resource *r) { wl_list_remove(wl_resour
 static void pres_feedback(struct wl_client *c, struct wl_resource *r, struct wl_resource *surface, uint32_t id) {
     (void)r;
     Surf *s = wl_resource_get_user_data(surface);
-    struct wl_resource *fb = wl_resource_create(c, &wp_presentation_feedback_interface, 1, id);
+    struct wl_resource *fb = wl_resource_create(c, &wp_presentation_feedback_interface, wl_resource_get_version(r), id);
     if (!fb) { wl_client_post_no_memory(c); return; }
     wl_resource_set_implementation(fb, NULL, NULL, feedback_link_gone);
     wl_list_insert(s->p_feedback.prev, wl_resource_get_link(fb));
@@ -4867,15 +5493,15 @@ static void bind_presentation(struct wl_client *c, void *data, uint32_t ver, uin
 }
 
 /* The flip finished (main.c, with the KMS time and vblank number). */
-void wl_presented(uint64_t ns, unsigned seq, unsigned refresh_ns) {
+void wl_presented(int key, int main_key, uint64_t ns, unsigned seq, unsigned refresh_ns) {
     if (!dpy) return;
     for (int i = 0; i < MAX_SURF; i++) {
         Surf *s = surfs[i];
-        if (!s) continue;
+        if (!s || wl_list_empty(&s->sent_feedback) || !outpick_presents(slot_key(s->fslot), key, main_key)) continue;
         struct wl_resource *fb, *tmp;
         wl_resource_for_each_safe(fb, tmp, &s->sent_feedback) {
             struct wl_resource *o;
-            for (int k = 0; k < OUT_MAX; k++)          /* the display it is on (the main one if none) */
+            for (int k = 0; k < OUT_MAX; k++)          /* the displays it is on (the main one if none) */
                 if (oslots[k].used && ((s->outmask >> k & 1) || (!s->outmask && k == out_main)))
                     FOR_CLIENT(&oslots[k].res, s->client, o) wp_presentation_feedback_send_sync_output(fb, o);
             uint64_t sec = ns / 1000000000ull;
@@ -5202,6 +5828,15 @@ void wl_set_fixed(int id, int fixed) {
     if (s->xdg && s->sent_configure) send_toplevel_configure(s);
 }
 
+/* Snapped by the theme (a half, a quarter, a third): the edges against its work area, told as tiled (and constrained). */
+void wl_set_tiled(int id, int edges) {
+    Surf *s = find(id);
+    edges &= 15;
+    if (!s || !s->top || s->tiled == edges) return;
+    s->tiled = edges;
+    if (s->xdg && s->sent_configure) send_toplevel_configure(s);
+}
+
 void wl_set_state(int id, int maximized, int fullscreen) {
     Surf *s = find(id);
     (void)fullscreen;                           /* fullscreen is handled by the compositor */
@@ -5275,7 +5910,7 @@ void wl_set_covered(int id, int covered) {
 void wl_output_resized(void) {
     if (!dpy) return;
     int w = (int)ui.width, h = (int)ui.height;
-    WlOutput o = { 0, 0, w, h, w, h, 60000, 100, w * 254 / 960, h * 254 / 960, "LORD-1", "LordOS display" };
+    WlOutput o = { 0, 0, w, h, w, h, 60000, 100, w * 254 / 960, h * 254 / 960, "LORD-1", "LordOS display", 0 };
     wl_set_outputs(&o, 1, 0);
 }
 
@@ -5328,7 +5963,7 @@ int wl_start(void) {
     wl_list_init(&prim_devices);
     wl_list_init(&inhibitors);
     wl_global_create(dpy, &zwp_primary_selection_device_manager_v1_interface, 1, NULL, bind_pdm);   /* middle-click paste */
-    wl_global_create(dpy, &xdg_wm_base_interface, 6, NULL, bind_wm_base);
+    wl_global_create(dpy, &xdg_wm_base_interface, 7, NULL, bind_wm_base);   /* 7: constrained_* states */
     wl_global_create(dpy, &zxdg_decoration_manager_v1_interface, 1, NULL, bind_decm);
     wl_list_init(&exports);
     wl_list_init(&imports);
@@ -5337,14 +5972,19 @@ int wl_start(void) {
     wl_global_create(dpy, &xdg_wm_dialog_v1_interface, 1, NULL, bind_wm_dialog);   /* modal dialogs */
     wl_list_init(&rel_pointers);
     wl_list_init(&feedbacks);
+    wl_list_init(&idle_notes);
+    wl_global_create(dpy, &xdg_toplevel_icon_manager_v1_interface, 1, NULL, bind_iconm);   /* an app's own icon, for windows with no installed one */
+    wl_global_create(dpy, &ext_idle_notifier_v1_interface, 1, NULL, bind_idnm);   /* away from the computer, if allowed */
     if (gpu_active()) ngpu_fmt = gpu_formats(gpu_fmt_cache, 256);
     gpu_set_hooks(wl_gpu_lost, wl_gpu_changed);
-    wl_global_create(dpy, &zwp_linux_dmabuf_v1_interface, 4, NULL, bind_dmabuf);
-    wl_global_create(dpy, &wp_presentation_interface, 1, NULL, bind_presentation);
+    wl_global_create(dpy, &zwp_linux_dmabuf_v1_interface, 5, NULL, bind_dmabuf);   /* 5: one modifier for every plane */
+    wl_global_create(dpy, &wp_presentation_interface, 2, NULL, bind_presentation);
     wl_global_create(dpy, &wp_viewporter_interface, 1, NULL, bind_viewporter);
+    wl_global_create(dpy, &wp_single_pixel_buffer_manager_v1_interface, 1, NULL, bind_spbm);   /* one-pixel buffers (backgrounds) */
+    wl_global_create(dpy, &wp_alpha_modifier_v1_interface, 1, NULL, bind_am);                   /* a surface's opacity */
     wl_global_create(dpy, &zwp_relative_pointer_manager_v1_interface, 1, NULL, bind_relm);
     wl_global_create(dpy, &zwp_pointer_constraints_v1_interface, 1, NULL, bind_consm);
-    wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 1, NULL, bind_csm);   /* cursors by name */
+    wl_global_create(dpy, &wp_cursor_shape_manager_v1_interface, 2, NULL, bind_csm);   /* cursors by name (2: dnd_ask, all_resize) */
     wl_global_create(dpy, &zwp_idle_inhibit_manager_v1_interface, 1, NULL, bind_iim);  /* video keeps the screen on */
     wl_global_create(dpy, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1, NULL, bind_ksim);   /* VMs take ❖ and ⌥Tab, once allowed */
     wl_global_create(dpy, &xdg_activation_v1_interface, 1, NULL, bind_activation);   /* a window comes forward with a token */
@@ -5471,8 +6111,8 @@ void wlx_detach(int sid) {
 void wlx_set_title(int sid, const char *t) {
     Surf *s = find(sid);
     if (!s) return;
-    snprintf(s->title, sizeof s->title, "%s", t);
-    if (s->mapped && s->role == R_TOPLEVEL) { char e[520]; json_str(e, sizeof e, s->title); emit(s, "title", "{\"title\":\"%s\"}", e); }
+    if (s->role == R_TOPLEVEL) set_title(s, t);
+    else snprintf(s->title, sizeof s->title, "%s", t);
 }
 
 void wlx_popup_moved(int sid, int x, int y) {

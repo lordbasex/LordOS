@@ -68,7 +68,9 @@ PERF_OUT=/tmp/stalls.txt tests/perf_headless.sh …           # the stall lines 
 Plans: `idle`, `settingsSet` (one setting changed six times, no window open), `mixed` (Store, Settings and
 Files open: a setting changed six times, then each window focused in turn, then idle), `store`, `settings`,
 `files` (the app alone, every sidebar item clicked), `idle<App>` (the app alone for 30 s: its background work and
-heap), `natives` (the native calls apps make while rendering, each timed alone), `launcher`.
+heap), `natives` (the native calls apps make while rendering, each timed alone), `launcher`, `terminal` and
+`terminalBg` (`yes | head -c 50M`, then titles changed in a loop, with the Terminal in front or behind a window; the
+`__lordTerm` events per step are logged), `titles` (a window's title set four times a step).
 
 ## Rules
 
@@ -119,6 +121,16 @@ Before, the run that changed a setting with three apps open re-rendered all thre
 components that read that setting. The heap stays flat over repeated actions (Store, Settings, focus, idle: a
 few tens of KB up and down); Monitor's grows by ~600 KB in its first minute (its 60-second sample history) and
 then stays.
+
+## The Terminal's titles (0.8.9.5, in development)
+
+A program that animates its title (Claude Code's spinner) re-rendered the whole Terminal window and the theme's root for
+every change: 1310 `__lordTerm` pauses in two hours of the maintainer's session, the longest 329 ms. The window now
+subscribes only to its active session's profile and title, titles are applied once per frame, and the window manager
+gets the title at most four times a second (`apps/terminal/index.jsx`, `state.js`). `tests/perf_headless.sh default
+terminal`, title changed about 60 times a second: 1043–1162 ms of JavaScript per 1.5 s step before, 140–160 ms after;
+longest run 47 → 19 ms. A window title still costs the theme about 240 React updates (its root follows `useWindows()`);
+moving the title out of the root's subscription is left for the themes.
 
 ## What remains
 

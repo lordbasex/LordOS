@@ -121,9 +121,10 @@ export function PermissionPrompt() {
   const name = item.name || appName(getApp(item.app)) || item.app;
   const owner = item.owner ? appName(getApp(item.owner)) || item.owner : '';
   const msg = t(`privacy.ask.${item.perm}`, { app: name, owner });
-  const note = item.perm === 'keyring' ? 'privacy.ask.keyringNote' : item.perm === 'shortcuts' ? 'privacy.ask.shortcutsNote' : 'privacy.ask.where';
-  // a Linux app's "shortcuts": who lord-server checked it is, under its name (the name alone could be anyone's)
-  const who = item.done && item.perm === 'shortcuts' ? shortcutsWhoText(item.app) : '';
+  const note = item.perm === 'keyring' ? 'privacy.ask.keyringNote' : item.perm === 'shortcuts' ? 'privacy.ask.shortcutsNote'
+    : item.perm === 'idle' ? 'privacy.ask.idleNote' : 'privacy.ask.where';
+  // a Linux app's "shortcuts" or "idle": who lord-server checked it is, under its name (the name alone could be anyone's)
+  const who = item.done && (item.perm === 'shortcuts' || item.perm === 'idle') ? shortcutsWhoText(item.app) : '';
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'flex-start',
     backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100000 } },
     h(View, { style: { marginTop: 80, width: 320, borderRadius: 14, padding: 20, gap: 14, backgroundColor: '#2b2b30',
@@ -144,7 +145,7 @@ function Btn({ label, primary, onClick }) {
     h(Text, { style: { fontSize: 13, fontWeight: 600, color: '#fff' } }, label));
 }
 
-const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p === 'screen' ? '▦' : p === 'network' ? '⇅' : p === 'keyring' ? '🔑' : p === 'shortcuts' ? '❖' : '●');
+const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p === 'screen' ? '▦' : p === 'network' ? '⇅' : p === 'keyring' ? '🔑' : p === 'shortcuts' ? '❖' : p === 'idle' ? '☾' : '●');
 
 // ---- camera/microphone indicators ----
 // Own source (isolated .lpk apps: the broker knows and reflects it here with markDeviceUse) +

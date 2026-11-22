@@ -289,6 +289,7 @@ export function toggleFiles(wid, tabId) {
 // ---- ventana Perfiles (❖O): terminal#profiles, un clic abre el perfil ----
 
 const PROFILES_ID = 'terminal#profiles';
+const TITLE_MS = 250;
 export function openProfilesWindow() {
   if (wm.get(PROFILES_ID)) { wm.focus(PROFILES_ID); return; }
   const a = pointerWorkArea();
@@ -310,15 +311,30 @@ function TerminalWindow() {
   const { id: wid, focused, args } = useAppWindow();
   if (!getWin(wid)) ensureWin(wid, args);
   const w = useStore(wins, (x) => x[wid]);
-  const allMeta = useStore(meta);
   const root = useRef(null);
   const [ctx, setCtx] = useState(null);
   const tab = w ? activeTab(w) : null;
   const sid = tab?.focus ?? null;
-  const profile = getProfile(allMeta[sid]?.profile);
+  // only what this component shows: a session's title, activity or busy state changing (a program that animates its
+  // title, output in another tab) re-renders the panes and the tab that read it, not the whole window
+  // (docs/MAIN-THREAD.md, rule 1)
+  const profile = getProfile(useStore(meta, (x) => x[sid]?.profile));
+  const title = useStore(meta, () => (tab ? windowTitle(tab) : ''));
 
   // título de la ventana = el de la pestaña activa
-  useEffect(() => { if (tab) wm.setTitle(wid, windowTitle(tab)); });
+  // (at most four times a second: the theme re-renders its frame, Dock and menus for every window title, and a program
+  // that animates its title, as Claude Code's spinner does, would otherwise cost that at every frame)
+  const titleAt = useRef({ at: 0, timer: null });
+  useEffect(() => {
+    if (!tab) return undefined;
+    const r = titleAt.current;
+    clearTimeout(r.timer);
+    const put = () => { r.at = Date.now(); r.timer = null; wm.setTitle(wid, title); };
+    const wait = r.at + TITLE_MS - Date.now();
+    if (wait <= 0) put(); else r.timer = setTimeout(put, wait);
+    return undefined;
+  }, [wid, title]);
+  useEffect(() => () => clearTimeout(titleAt.current.timer), []);
   useEffect(() => { if (focused) noteTermFocus(wid); }, [focused]);
   useEffect(() => { startForwards(); }, []);      // the profiles' port forwards follow each tab's ssh (forwards.js)
 

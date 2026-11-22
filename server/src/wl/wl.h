@@ -15,7 +15,9 @@ int  wl_fd(void);                       /* for poll; -1 if it did not start */
 void wl_dispatch(void);                 /* there is something on wl_fd */
 void wl_flush(void);                    /* sends what is pending to the clients */
 const char *wl_socket(void);            /* "wayland-0" */
-void wl_frame_done(unsigned time_ms);   /* after presenting a frame */
+/* after presenting a frame: keys = the displays (WlOutput.key bits) that just got one or have none waiting for a flip;
+ * a window's frame callbacks go only with its own display's (OUTPICK_ALL: every window, no monitor) */
+void wl_frame_done(unsigned time_ms, unsigned keys);
 /* Nothing is being drawn (screen off, the session away from the monitor, nobody watching): apps
  * still waiting for a frame callback get it and their presentation feedback is discarded, so
  * none stalls. 1 if some app was waiting. */
@@ -23,6 +25,13 @@ int  wl_frame_unseen(unsigned time_ms);
 /* The frame callbacks of minimized windows and windows on a hidden desktop (wl/framegate.h): sent
  * once a second, here when no frame of lord-server's did. ms until the next one is due, -1 when none waits. */
 double wl_frame_hidden(unsigned time_ms);
+double wl_title_wait(void);
+/* ext-idle-notify (wl/idlenotify.h): each loop with display.c's last activity; ms until the next is due, or -1 */
+double wl_idle_tick(double last_ms, double now_ms);
+void wl_idle_changed(void);
+#include <stdint.h>
+const uint8_t *wl_window_icon(int id, int *side);   /* xdg-toplevel-icon: a window's own icon, RGBA side × side, or NULL */             /* an "idle" decision changed (lord.perms.set) */
+int  wl_idle_answer(const char *app, int allow);   /* the person's answer to an "idle" prompt lord-server is waiting on */              /* ms until a window title waiting to go to JS is due (-1: none) */
 
 /* Input (main.c). hit = node under the pointer; down[i]/button[i] = buttons of this event
  * (0 left, 1 middle, 2 right). Returns 1 if the pointer is over a Wayland app and 2 if
@@ -62,6 +71,8 @@ void wl_close(int id);                  /* asks the app to close the window */
 void wl_close_all(int ms);              /* every app asked to close, then waits for them: at most ms */
 const char *wl_kill(int id);            /* Force Quit: SIGKILL to its client (same user only); NULL or an error code */
 void wl_set_state(int id, int maximized, int fullscreen);
+void wl_set_tiled(int id, int edges);   /* snapped: its edges against the work area (1 left, 2 right, 4 top, 8 bottom) */
+void wl_set_work_areas(const int (*rects)[4], int n);   /* each display's work area (x, y, w, h): configure_bounds */
 void wl_set_fixed(int id, int fixed);     /* locked by the theme: no maximize or minimize offered or done */
 void wl_set_minimized(int id, int minimized);   /* X11 windows: iconic and at the bottom of X's stack */
 void wl_set_parked(int id, int parked);         /* on a hidden desktop: no keyboard and no fullscreen until back */
@@ -76,6 +87,7 @@ void wl_remap_all(void);                    /* a new JS context (theme switched)
 typedef struct {
     int x, y, w, h, pw, ph, refresh, scale, mm_w, mm_h;
     char name[32], desc[96];
+    int key;                    /* main.c's index of the display: the bit wl_frame_done and wl_presented name it by */
 } WlOutput;
 void wl_set_outputs(const WlOutput *o, int n, int main);
 void wl_set_pointer_scale(int pct);         /* the display under the pointer: cursor-shape images */               /* ui.width/ui.height changed */
@@ -112,8 +124,13 @@ void wl_content_track(int on);
 int  wl_content_take(float *x0, float *y0, float *x1, float *y1);
 void wl_fullscreen_allow(int on);           /* 0 while the sharing indicator must stay on screen */
 int  wl_try_scanout(int cursor_free);       /* GPU path: 1 if fullscreen went straight to the card */
-int  wl_wants_frame(void);                  /* an app changed its content */
-void wl_presented(uint64_t ns, unsigned seq, unsigned refresh_ns);   /* a flip finished (wp_presentation) */
+int  wl_wants_frame(void);                  /* an app changed its content, or frame callbacks wait for their display */
+/* the displays (WlOutput.key bits, OUTPICK_ALL for every one) where an app's new content must be presented, 0 if none;
+ * taken once (the next call says only what is newer) */
+unsigned wl_new_content(void);
+/* display `key`'s flip finished (wp_presentation): the feedback of the windows on it (-1: every window, no monitor);
+ * main_key: the main display, whose flips answer the windows on no known display */
+void wl_presented(int key, int main_key, uint64_t ns, unsigned seq, unsigned refresh_ns);
 void wl_set_drm_device(dev_t dev);          /* DRM device for linux-dmabuf (CPU path) */
 
 /* Pointer: relative motion (games), locking and confinement (pointer-constraints). */

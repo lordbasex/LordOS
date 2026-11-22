@@ -119,6 +119,7 @@ int  display_sun(const char *zone, int y, int m, int d, double *rise, double *se
  * first sleep deadline, until the next input: a locked session's time left, kept by the login screen. */
 void display_set_idle(int off_s, int lock_s, int sleep_s, int sleep_first_s);
 void display_activity(double now_ms);   /* any activity (input, a video keeping the screen on, remote input) */
+double display_last_activity(void);      /* when the last one was (ms, now_ms's clock): ext-idle-notify (wl.c) */
 void display_input(double now_ms);      /* local input: a lock already due goes first (issue #36) */
 double display_timeout(double now_ms);  /* ms to the next idle deadline, or -1 */
 void display_tick(double now_ms);
