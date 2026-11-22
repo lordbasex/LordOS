@@ -26,7 +26,7 @@
 #define GF_R   2                     /* guided filter radius at a quarter of the frame (8 pixels at full size) */
 #define GF_EPS 1e-3f
 #define FACE_EVERY 6                 /* BlazeFace on every 6th frame: 5 a second is enough with the 1€ filter (plan 3.2) */
-#define FACE_KEEP_MS 2000            /* no face for 2 s: Center Stage eases back to the whole frame (plan 5.2) */
+#define FACE_KEEP_MS 2000            /* no face for 2 s: Auto Framing eases back to the whole frame (plan 5.2) */
 #define KEY_DILATE 3                 /* the person's mask dilated by 3 guide cells (12 pixels) for the green screen */
 
 struct StFx {
@@ -49,14 +49,14 @@ struct StFx {
     int *xi; float *xl;                          /* per output column: guide column and weight */
     float *rowa, *rowb, *rowbl, *rowd;           /* one guide row interpolated (gw, gw, gw × 4, gw) */
     float *al, *bg, *fg;                         /* one output row: alpha (W), background and person (W × 3) */
-    float *dil, *diltmp, *glight;                /* gw × gh: the dilated person (green screen); Studio Light's gain */
+    float *dil, *diltmp, *glight;                /* gw × gh: the dilated person (green screen); Face Light's gain */
     float *bgg, *bgy;                            /* gw × gh × 3 and gw × gh: the picture's guide cells (colour match) */
-    uint8_t *work;                               /* W × H × 4: the frame after Center Stage and Retouch */
+    uint8_t *work;                               /* W × H × 4: the frame after Auto Framing and Retouch */
     /* the picture */
     uint8_t *pic; int pw, ph;
     uint8_t *pic_fit;                            /* W × H, for the CPU */
     int pic_dirty, pic_gpu_dirty, pic_stats_dirty;
-    /* faces and Center Stage */
+    /* faces and Auto Framing */
     int face_every, frame_no;
     float face[4], eyes_y;                       /* the last face seen, in the camera frame's pixels */
     double face_at, now;                         /* when it was seen; this frame's time (ms) */
@@ -381,14 +381,14 @@ ST_HOT static void compose_cpu(StFx *s, const uint8_t *in, int istride, uint8_t 
     }
 }
 
-/* Studio Light's lift of the person: a soft one, so highlights roll off instead of clipping (c·g / (1 + (g−1)·c)) */
+/* Face Light's lift of the person: a soft one, so highlights roll off instead of clipping (c·g / (1 + (g−1)·c)) */
 static inline float lift(float c, float g) {
     float x = c * (1.0f / 255);
     return 255 * x * g / (1 + (g - 1) * x);
 }
 
-/* The CPU composite with phase 3's looks: the green screen, the colour match, Studio Light and the filter. The same
- * arithmetic as stgl.c's shader (Studio Light's gain comes from its plane at the guide's size, s->glight), done as
+/* The CPU composite with phase 3's looks: the green screen, the colour match, Face Light and the filter. The same
+ * arithmetic as stgl.c's shader (Face Light's gain comes from its plane at the guide's size, s->glight), done as
  * passes over a row of floats (RGB) so the loops stay simple. */
 ST_HOT static void compose_cpu_fx(StFx *s, const uint8_t *in, int istride, uint8_t *out, int ostride) {
     const int W = s->W, H = s->H, gw = s->gw, gh = s->gh, mode = s->cfg.mode, mirror = s->cfg.mirror;
@@ -542,7 +542,7 @@ static void detect_face(StFx *s, const uint8_t *in, int istride, int W, int H) {
     s->face_at = s->now;
 }
 
-/* Center Stage: the crop moves toward the target smoothly (1€ filter), not at all within the dead zone (4 %), never
+/* Auto Framing: the crop moves toward the target smoothly (1€ filter), not at all within the dead zone (4 %), never
  * faster than about half the frame a second; with no face for 2 s it eases back to the whole frame */
 static void update_crop(StFx *s) {
     const int W = s->W, H = s->H;
@@ -607,7 +607,7 @@ int stfx_frame(StFx *s, const uint8_t *in, int istride, int W, int H, uint8_t *o
     double t0 = now_ms();
     s->now = t0;
     s->st.frames++;
-    /* 0. faces, Center Stage and Retouch */
+    /* 0. faces, Auto Framing and Retouch */
     const int want_face = s->face_nn && (s->cfg.framing || s->cfg.light || s->cfg.retouch);
     if (want_face && (s->frame_no % s->face_every == 0)) detect_face(s, in, istride, W, H);
     s->frame_no++;
@@ -691,7 +691,7 @@ int stfx_frame(StFx *s, const uint8_t *in, int istride, int W, int H, uint8_t *o
         }
         if (pictured && s->cfg.match) update_match(s);
         if (s->cfg.light) {
-            /* Studio Light's gain on the guide's cells (the CPU interpolates it like the matte; the GPU computes it
+            /* Face Light's gain on the guide's cells (the CPU interpolates it like the matte; the GPU computes it
              * per pixel: it is smooth, the two agree within a level) */
             float kx = (float)W / s->gw, ky = (float)H / s->gh;
             for (int gy = 0; gy < s->gh; gy++) for (int gx = 0; gx < s->gw; gx++)

@@ -18,7 +18,7 @@ Facts are labelled the way `GO-LINK.md` does it:
 The maintainer's wish (2026-11-22): from the camera status item next to the clock (built on another branch), a popover
 like macOS's Video Effects and Mic Mode menu, whose effects reach the webcam of **any** app: Meet in a browser, OBS,
 go-link Desk and the others. The effects are background blur, background replacement (pictures and short loops),
-chroma key with a real green screen, virtual chroma without one, Center Stage, light and colour matching, filters,
+chroma key with a real green screen, virtual chroma without one, Auto Framing, light and colour matching, filters,
 retouch and mirror. The mic modes are Standard and Voice Isolation. Then an app, "Studio", in the spirit of Camo
 Studio, with our own design and assets.
 
@@ -31,7 +31,7 @@ Studio, with our own design and assets.
 | GPU or CPU | GLES 2/3 on the render node through GBM and a surfaceless EGL context, the way `bench/lbgpu.c` already works in a sandbox. The CPU path always works too, which the project requires. Segmentation runs on the CPU in both cases. |
 | Segmentation model | **MediaPipe Selfie Segmenter, landscape 144×256** (Apache-2.0, model card by Google, a 250 KB float16 `.tflite`). Converted offline to our own flat weight file. |
 | Inference runtime | **Our own small inference code in C** for exactly the operators this model and BlazeFace use. There is no new library; output is checked against ONNX Runtime on the dev machine only, the way `hb_compare.py` checks shaping against HarfBuzz. The fallback is Debian's `libonnxruntime1.21` (MIT, in Debian 13 main), linked only by `lord-studio`. That fallback is a decision for the maintainer (D3). |
-| Faces (Center Stage, Studio Light, Retouch) | **BlazeFace short range** (Apache-2.0, 128×128). It uses the same operators as the segmenter, so it runs on the same inference code. |
+| Faces (Auto Framing, Face Light, Retouch) | **BlazeFace short range** (Apache-2.0, 128×128). It uses the same operators as the segmenter, so it runs on the same inference code. |
 | Mic modes | PipeWire's own **`module-echo-cancel` with WebRTC Audio Processing** (BSD-3, already in Debian 13's `libspa-0.2-modules`; **Seen** installed): noise suppression, high-pass filter and AGC as a "Voice Isolation" source. There is no new library. RNNoise (BSD-3) is not packaged in Debian, so it waits for a later phase. |
 | Backgrounds | Only **CC0 and public domain** first (Wikimedia Commons, NASA, Poly Haven, ambientCG), then CC BY and CC BY-SA with credit in the catalog, exactly like `motion.json`. Our own renders are welcome. **Not Unsplash, Pexels or Pixabay** (section 6). The catalog and thumbnails ship in the package; full files download on demand, like moving wallpapers. |
 
@@ -175,7 +175,7 @@ Fedora already defaults Firefox to it. They also give a cleaner permission story
 3. **Segment**: the network gives a 256×144 person probability.
 4. **Refine** (3.4): temporal smoothing, then a guided filter upsampled to the output size with full-resolution luma as
    the guide.
-5. **Frame** (Center Stage): crop and scale the camera picture and the matte with the same smoothed rectangle.
+5. **Frame** (Auto Framing): crop and scale the camera picture and the matte with the same smoothed rectangle.
 6. **Compose**: background (blur, picture, video frame or chroma), relight, filters and LUT, retouch, mirror, overlays.
 7. **Out**: write to the loopback and the ring. The ring gets only the frames a reader asked for (preview open, or
    `BOP_CAMERA` consumers).
@@ -298,11 +298,11 @@ absolute error below 1e-3. That mirrors `tests/hb_compare.py`.
 
 | Option | License | Notes | Verdict |
 |---|---|---|---|
-| **BlazeFace short range** (MediaPipe) | Apache-2.0 (Google's model card, "Short Range" PDF) | 128×128 SSD with anchors. It gives 6 keypoints (eyes, nose, mouth, ears), which Studio Light and the framing headroom need. The same operators as the segmenter. | **Chosen** |
+| **BlazeFace short range** (MediaPipe) | Apache-2.0 (Google's model card, "Short Range" PDF) | 128×128 SSD with anchors. It gives 6 keypoints (eyes, nose, mouth, ears), which Face Light and the framing headroom need. The same operators as the segmenter. | **Chosen** |
 | libfacedetection (Shiqi Yu) | BSD-3 (its LICENSE) | Pure C++ with no dependencies. 2.1 ms at 128×96 on an i7-7820X and 15 ms on a Pi 4 (its README). Its weights are compiled into C arrays. | Good fallback. It adds a C++ file set. |
 | Haar cascades (OpenCV) | Apache-2.0 (4.x) / BSD-3 | Old, frontal only, many false positives, and OpenCV as a dependency | Rejected |
 
-### 5.2 Center Stage (auto-framing)
+### 5.2 Auto Framing (auto-framing)
 
 - **Target box.** The union of the face boxes, widened by a shoulders factor of 2.2× the face width and with headroom
   that puts the eyes at 1/3 of the height. Output aspect is 16:9.
@@ -321,9 +321,9 @@ absolute error below 1e-3. That mirrors `tests/hb_compare.py`.
   measured on the background region near the person, with a Strength slider (default 30 %, at most 60 %). The
   statistics are smoothed over about 1 s so that the person doesn't flicker when the video background changes.
 - **Exposure match.** The luma median of the person is matched towards the background's, clamped to ±1 EV.
-- **Studio Light** (in the spirit of Apple's). Lift the face region (an ellipse from the BlazeFace box, feathered) by
+- **Face Light** (our own name for a face relight). Lift the face region (an ellipse from the BlazeFace box, feathered) by
   +0.3 to +0.6 EV and dim the background by −0.5 EV.
-- **Spotlight** (Camo's name). A radial vignette centred on the face.
+- **Face spotlight**. A radial vignette centred on the face.
 - **Edge light (rim).** Add the background's blurred colour along the alpha gradient (4.3's light wrap, but stronger
   and coloured).
 - **Adjustments** (Camo's "Adjust"): exposure, contrast, saturation, temperature and tint, sharpness, and highlights
@@ -477,8 +477,8 @@ shared features in the SDK"). It follows `textAlign: 'start'/'end'` for right-to
 │────────────────────────────────────────────────────│
 │ ◐ Portrait (blur)                      [on ]   ›   │
 │ ▣ Background                           [off]   ›   │
-│ ✦ Studio Light                         [off]   ›   │
-│ ⌖ Center Stage                         [on ]   ›   │
+│ ✦ Face Light                         [off]   ›   │
+│ ⌖ Auto Framing                         [on ]   ›   │
 │ ◑ Filters          Warm                        ›   │
 │ ☺ Retouch                              [off]   ›   │
 │ ⇋ Mirror my video                      [off]       │
@@ -493,8 +493,8 @@ shared features in the SDK"). It follows `textAlign: 'start'/'end'` for right-to
 
 - **Portrait**: blur amount.
 - **Background**: None, Blur, Picture, Video, Green screen; then the thumbnails grid, "Add your own…" and Download.
-- **Studio Light**: intensity.
-- **Center Stage**: wide ↔ tight.
+- **Face Light**: intensity.
+- **Auto Framing**: wide ↔ tight.
 - **Filters**: the grid of LUTs with strength.
 - **Retouch**: strength.
 
@@ -514,10 +514,10 @@ Its name is a decision: "Studio" (D6).
 │   ○ Video        │                                              │ │      ││Greet │ │
 │   ○ Green screen │       [ before | after ]  toggle             │ └──────┘└──────┘ │
 │ ▸ Light          │                                              │ ┌──────┐┌──────┐ │
-│   Studio Light ━━│                                              │ │Presen-││ Off  │ │
+│   Face Light ━━│                                              │ │Presen-││ Off  │ │
 │   Match colours ━│                                              │ │tation ││camera│ │
 │ ▸ Framing        │                                              │ └──────┘└──────┘ │
-│   Center Stage ☑ │                                              │ + Save scene      │
+│   Auto Framing ☑ │                                              │ + Save scene      │
 │   Zoom ━━━ Pan ✥ │                                              │───────────────────│
 │ ▸ Adjust         │                                              │ Overlays          │
 │   Exposure ━━━━  ├──────────────────────────────────────────────┤ ☐ Name and title  │
@@ -532,8 +532,8 @@ Its name is a decision: "Studio" (D6).
 - **Camo-inspired sections**, our own layout and names:
   - Device;
   - Background (Blur and Privacy blur, Replace, Green screen);
-  - Light (Studio Light / Spotlight, colour match, rim);
-  - Framing (Center Stage, manual zoom and pan, rotate);
+  - Light (Face Light / face spotlight, colour match, rim);
+  - Framing (Auto Framing, manual zoom and pan, rotate);
   - Adjust (exposure, contrast, saturation, temperature, tint, sharpness);
   - Filters, Retouch and Microphone;
   - on the right, Scenes and Overlays;
@@ -582,7 +582,7 @@ The effort is for one developer with the existing patterns. These are **estimate
 | **0. Measure** | Prototype `nn.c` plus the converter. Time the segmenter and BlazeFace on the i9 and the Pi 5. Compare against ONNX Runtime on the dev machine. Load v4l2loopback on the **VM** (not this PC) and check that Chromium 156, Chrome 158, Firefox ESR and Flatpak OBS see it. | 4–5 days | Real numbers replace section 3.3's estimates, written into this file. |
 | **1. Pipeline and LordOS ring** | `lord-studio`: capture, segmentation, guided filter, blur and picture backgrounds, mirror, GPU and CPU paths. The "LordOS Studio" camera in `media.cameras()` (the Camera app, go-link Desk, `.lpk`). The popover with preview, Portrait and Background. | 2–3 weeks | `build/studio-nn-test`, `build/studio-test` (pipeline on fixed frames), `studio_model_test.mjs`, engine damage tests unchanged |
 | **2. Loopback and "any app"** | `lordos-studio-camera` package, the idle card, the client-usage event, reader attribution, the indicator text, the `dkms-mok-enroll` reuse, Pi kernel module | 1–2 weeks | Meet in Chromium and in Chrome shows the effects. The no-camera restriction blocks `/dev/video50` (`tests/fwlinux/devices.sh`). The camera light goes off with no reader. |
-| **3. More effects and mic** | Video backgrounds, green screen, Center Stage, Studio Light, colour match, filters, retouch. Voice Isolation drop-in and Mic Mode. Background catalog plus `studio-bg-get`. Curation of about 70 stills and 50 loops. | 3 weeks plus 2 days of curation | each effect checked against reference frames; Mic Mode heard in a Meet call; credits page |
+| **3. More effects and mic** | Video backgrounds, green screen, Auto Framing, Face Light, colour match, filters, retouch. Voice Isolation drop-in and Mic Mode. Background catalog plus `studio-bg-get`. Curation of about 70 stills and 50 loops. | 3 weeks plus 2 days of curation | each effect checked against reference frames; Mic Mode heard in a Meet call; credits page |
 | **4. PipeWire camera** | Camera portal plus lord-screencast camera mode | 1–2 weeks | OBS Flatpak "Video Capture Device (PipeWire)" and Firefox with the pref on see "LordOS Studio"; the guard hides it from a restricted app |
 | **5. Studio app** | the full app, scenes, overlays from lord-server, recording, user LUTs | 2–3 weeks | screenshots in every theme and language direction |
 
@@ -593,7 +593,7 @@ The effort is for one developer with the existing patterns. These are **estimate
   `assets/studio/models/*.lnn` (hashes in `server/src/media/studio/models.h`), the original files and Google's model
   cards in `third_party/studio-models/`. `tools/studio/ort-ref.c` makes the reference outputs with ONNX Runtime on the
   dev machine (from `tflite2lnn.mjs --onnx`); it is not built by `server/Makefile`. BlazeFace's decoding (`face.c`) is
-  written and tested but not used by the pipeline yet (Center Stage is phase 3).
+  written and tested but not used by the pipeline yet (Auto Framing is phase 3).
 - **The pipeline** (`st.h`, `stfx.c`, `stgf.c`, `stgl.c`): Portrait (blur), Background (a picture), Mirror; the matte's
   temporal smoothing and the guided filter as in 4.3 (no light wrap yet). The segmenter runs on the frame's own thread
   (no second thread yet: at 3.7 ms it doesn't need one on the PC).
@@ -610,7 +610,7 @@ The effort is for one developer with the existing patterns. These are **estimate
 - **The popover** (`sdk/studio.jsx`, `sdk/studiomodel.js`): from the camera capture item by the clock
   (`sdk/capturestatus.jsx`, "Video effects" when a camera is in use): the live preview, the camera, who uses it, Portrait,
   Background (None, Blur, Picture; LordOS's wallpapers or "Choose a picture…") and Mirror. Settings in
-  `settings.studio`. The other rows of 9.1 (Studio Light, Center Stage, Filters, Retouch, Mic Mode, Open Studio…) come
+  `settings.studio`. The other rows of 9.1 (Face Light, Auto Framing, Filters, Retouch, Mic Mode, Open Studio…) come
   with their phases.
 - **Not verified yet:** the live camera through lord-studio on real hardware (the dev PC's camera was not opened in this
   pass; the pipeline, the helper inside its sandbox with the GPU, the popover and the broker path are tested without
@@ -668,14 +668,14 @@ The effort is for one developer with the existing patterns. These are **estimate
   - **Video backgrounds**: lord-studio decodes the file with libavcodec inside its sandbox (two threads), one picture
     per camera picture at most, paced by the file's timestamps, looped at its end, cover-fitted to the camera's size by
     swscale, so the composite takes it as it is. A still file is a picture, anything else a video.
-  - **Center Stage** (5.2): BlazeFace (already converted in phase 0) every 6th frame on a 128×128 letterboxed copy;
+  - **Auto Framing** (5.2): BlazeFace (already converted in phase 0) every 6th frame on a 128×128 letterboxed copy;
     the largest face; a crop of the frame's shape whose height is 4.2 (wide) to 2 (tight) face heights, the eyes at a
     third, at most 2×; a dead zone of 4 %; a 1€ filter (mincut 0.4 Hz, β 0.004) and at most half the frame a second;
     back to the whole frame after 2 s without a face. The crop is scaled back to the frame (bilinear, fixed point)
     before everything else, so the matte, the light and the retouch see the framed picture.
-  - **Studio Light** (5.3): +0.15 EV on the whole person and up to +0.6 EV inside the face's feathered ellipse (a soft
+  - **Face Light** (5.3): +0.15 EV on the whole person and up to +0.6 EV inside the face's feathered ellipse (a soft
     lift that rolls highlights off instead of clipping), the background −0.5 EV, scaled by Intensity. Without a face it
-    still dims the background. Spotlight and rim light are not built.
+    still dims the background. The face spotlight and rim light are not built.
   - **Colour match** (5.3): Reinhard et al.'s transfer in a linear opponent space (so it is one 3×3 matrix and an
     offset per frame), statistics of the person (weighted by the matte) and of the visible background on the guide
     cells, the exposure within ±1 EV, the colour channels only 60 % of the way, smoothed over about a second; 0..60 %.
@@ -686,7 +686,7 @@ The effort is for one developer with the existing patterns. These are **estimate
     mixed in by a skin weight (the YCbCr skin range, feathered) inside the face's ellipse; nothing else changes. No
     under-eye lift and no reshaping.
 - **Measured** on the maintainer's PC (i9-10900, RX 580 with radeonsi), 1280×720, one thread, medians of 40 frames
-  (`build/studio-fx-test time`; Center Stage and Retouch include BlazeFace's share, about 3.7–4.3 ms every 6th frame):
+  (`build/studio-fx-test time`; Auto Framing and Retouch include BlazeFace's share, about 3.7–4.3 ms every 6th frame):
 
   | Effects on | CPU path | GPU path |
   |---|---|---|
@@ -695,13 +695,13 @@ The effort is for one developer with the existing patterns. These are **estimate
   | video (a new 720p picture every frame; decode not included) | 13.4 ms | 10.8 ms |
   | green screen + picture | 20.5 ms | 11.1 ms |
   | colour match + picture | 15.6 ms | 10.6 ms |
-  | Studio Light alone (the matte is needed to dim the background) | 16.0 ms | 11.4 ms |
-  | Studio Light + blur | 19.3 ms | 12.3 ms |
+  | Face Light alone (the matte is needed to dim the background) | 16.0 ms | 11.4 ms |
+  | Face Light + blur | 19.3 ms | 12.3 ms |
   | filter (Film) alone | 8.0 ms | 2.5 ms |
   | filter (Film) + blur | 21.4 ms | 11.5 ms |
-  | Center Stage alone (crop and scale 4.4 ms) | 4.6 ms | 6.8 ms |
+  | Auto Framing alone (crop and scale 4.4 ms) | 4.6 ms | 6.8 ms |
   | Retouch alone | 4.0 ms | 6.4 ms |
-  | everything (blur, light, Film, Center Stage, Retouch) | 36.2 ms | 23.9 ms |
+  | everything (blur, light, Film, Auto Framing, Retouch) | 36.2 ms | 23.9 ms |
 
   A video background's own decode, measured with `ffmpeg -benchmark` on an 8 s H.264 clip (CRF 23): 1.8 ms a picture
   at 720p and 3.6 ms at 1080p on one thread, plus its swscale conversion (about 1–2 ms, **Estimate**). Inside
@@ -709,11 +709,11 @@ The effort is for one developer with the existing patterns. These are **estimate
   CPU, 6.9 ms with the GPU. So at 720p30 the PC keeps every single effect within one frame on both paths; everything at
   once fits only with the GPU (24 ms of the 33 ms), which D10's GPU-only 1080p already assumes. The Pi 5 is not
   measured yet.
-- **Accuracy** (`build/studio-fx-test` on the CC0 frames of `tests/data/studio` and frames made from them): Studio Light
+- **Accuracy** (`build/studio-fx-test` on the CC0 frames of `tests/data/studio` and frames made from them): Face Light
   lifts the person and dims the background by half a stop at full Intensity (0.70–0.72); the colour match moves the
   person toward a blue picture; Mono is grey, a filter at 0 % changes nothing and at 50 % is halfway within 0.25
   levels; a person in front of a painted green screen keeps every sure-person pixel within 0.1 level while the screen
-  becomes the picture with no green left; every frame of a video background shows; Center Stage converges to its target
+  becomes the picture with no green left; every frame of a video background shows; Auto Framing converges to its target
   and then moves less than 3 pixels in 10 frames, and goes back to the whole frame without a face; Retouch removes
   35–46 % of the face's fine detail and changes nothing away from it. CPU and GPU agree within 0.16 levels on average
   for every look.
@@ -741,10 +741,10 @@ The effort is for one developer with the existing patterns. These are **estimate
   `wallpaper-get` (`build/studio-bg-admin-test`). The popover's Background page shows the catalog by category
   (pictures and videos), LordOS's wallpapers (without the Cyberpunk City pictures, which show people), "Add your own…"
   (a picture or a short video) and Credits; a ↓ marks what downloads when chosen.
-- **The popover** (9.1): the main page's rows Portrait, Background, Studio Light, Center Stage, Filters, Retouch and
-  Mirror, then Mic Mode; detail pages for each (Center Stage's slider is "Wide ↔ Tight") and the green screen's. All
+- **The popover** (9.1): the main page's rows Portrait, Background, Face Light, Auto Framing, Filters, Retouch and
+  Mirror, then Mic Mode; detail pages for each (Auto Framing's slider is "Wide ↔ Tight") and the green screen's. All
   35 languages.
-- **Not built in phase 3:** the light wrap and rim light, Spotlight, the eyedropper for the key colour, the indicator
+- **Not built in phase 3:** the light wrap and rim light, the face spotlight, the eyedropper for the key colour, the indicator
   naming "Voice Isolation" next to the app, UVC pan/tilt/zoom, the segmenter on a second thread, and RNNoise (D9).
   Hardware decode of video backgrounds (the Pi's HEVC) is not used: lord-studio decodes in software.
 

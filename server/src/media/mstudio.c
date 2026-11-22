@@ -40,7 +40,7 @@ static struct {
 
 static struct { long long frames, seg_us, fx_us, frame_us, vid_us; int gpu; double fps; double at; long long at_frames; } stats;
 static int model_state;              /* 0 unknown, 1 good, -1 refused */
-static int face_state;               /* the same for BlazeFace (optional: without it, no Center Stage, face light or Retouch) */
+static int face_state;               /* the same for BlazeFace (optional: without it, no Auto Framing, face light or Retouch) */
 
 /* the hub: the session's one lord-studio writing the loopback */
 #define HUB_MAX_READERS 32

@@ -3,7 +3,7 @@
  * The network gives 896 anchors (a 16×16 grid with 2 anchors per cell, then an 8×8 grid with 6), each with 16
  * regressors (box centre and size, 6 keypoints) in input pixels and one score logit. The anchors are MediaPipe's
  * short-range SSD layout (strides 8, 16, 16, 16; fixed size), written here from the published configuration. Used by
- * Center Stage, Studio Light and Retouch (later phases); phase 1 only checks it in build/studio-nn-test. */
+ * Auto Framing, Face Light and Retouch (later phases); phase 1 only checks it in build/studio-nn-test. */
 #ifndef LORD_STUDIO_FACE_H
 #define LORD_STUDIO_FACE_H
 

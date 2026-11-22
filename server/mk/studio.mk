@@ -41,7 +41,7 @@ build/studio-test: tests/studio_test.c $(STUDIO_OBJ) $(STUDIO_GL_SRC) $(STUDIO_H
 	$(CC) $(CPPFLAGS) $(STUDIO_GL_FLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/studio_test.c $(STUDIO_OBJ) $(STUDIO_GL_SRC) \
 	    src/pkg/crypto.c build/obj/ui/stb.o $(STUDIO_GL_LIBS) -lm -lpthread
 
-# phase 3's looks on fixed frames: Studio Light, colour match, filters, the green screen, a video background, Center
+# phase 3's looks on fixed frames: Face Light, colour match, filters, the green screen, a video background, Center
 # Stage and Retouch; CPU always, GPU when there is a render node (tests/run_suites.sh runs it)
 test: build/studio-fx-test
 build/studio-fx-test: tests/studio_fx_test.c $(STUDIO_OBJ) $(STUDIO_GL_SRC) $(STUDIO_HDR) build/obj/ui/stb.o

@@ -1,6 +1,6 @@
 // studio.jsx — LordOS Studio's popover (docs/CAMERA-STUDIO-PLAN.md 9.1; phases 1 to 3): a live preview, the camera it
 // uses, Portrait (the background blurred), Background (a picture or a short loop behind the person, with a real green
-// screen if there is one, and the colours matched), Studio Light, Center Stage, Filters, Retouch, Mirror, Mic Mode
+// screen if there is one, and the colours matched), Face Light, Auto Framing, Filters, Retouch, Mirror, Mic Mode
 // (Standard, Voice Isolation, Wide Spectrum) and "Every app": the "LordOS Studio" camera that browsers, OBS and every
 // other Linux app see once the Store's LordOS Studio Camera item (the lordos-studio-camera package, v4l2loopback) is
 // installed. It opens from the camera capture item by the clock (sdk/capturestatus.jsx) in every theme, in the same
@@ -241,8 +241,8 @@ function MainPage({ th, cfg, status, pv, go, onBack }) {
       <Row th={th} label={t('studio.portrait')} toggle={portraitOn(cfg)} onToggle={(v) => update((c) => withPortrait(c, v))} onOpen={() => go('portrait')} />
       <Row th={th} label={t('studio.background')} toggle={backgroundOn(cfg)} onToggle={(v) => update((c) => withBackground(c, v, lordosWallpapers))}
         onOpen={() => go('background')} />
-      <Row th={th} label={t('studio.light')} toggle={cfg.light} onToggle={(v) => set({ light: !!v })} onOpen={() => go('light')} />
-      <Row th={th} label={t('studio.stage')} toggle={cfg.stage} onToggle={(v) => set({ stage: !!v })} onOpen={() => go('stage')} />
+      <Row th={th} label={t('studio.faceLight')} toggle={cfg.light} onToggle={(v) => set({ light: !!v })} onOpen={() => go('light')} />
+      <Row th={th} label={t('studio.autoFraming')} toggle={cfg.stage} onToggle={(v) => set({ stage: !!v })} onOpen={() => go('stage')} />
       <Row th={th} label={t('studio.filters')} detail={t(`studio.filter.${cfg.filter}`)} onOpen={() => go('filters')} />
       <Row th={th} label={t('studio.retouch')} toggle={cfg.retouch} onToggle={(v) => set({ retouch: !!v })} onOpen={() => go('retouch')} />
       <Row th={th} label={t('studio.mirror')} toggle={cfg.mirror} onToggle={(v) => set({ mirror: !!v })} />
@@ -298,15 +298,15 @@ function EffectPage({ th, cfg, status, go, title, on, onToggle, slider, hint, fa
 }
 
 const LightPage = ({ th, cfg, status, go }) => (
-  <EffectPage th={th} cfg={cfg} status={status} go={go} title={t('studio.light')} on={cfg.light} onToggle={(v) => set({ light: !!v })} faces
+  <EffectPage th={th} cfg={cfg} status={status} go={go} title={t('studio.faceLight')} on={cfg.light} onToggle={(v) => set({ light: !!v })} faces
     slider={<SliderRow th={th} label={t('studio.intensity')} value={cfg.lightAmount} onChange={(v) => set({ lightAmount: v, light: true })} />}
-    hint={t('studio.lightHint')} />
+    hint={t('studio.faceLightHint')} />
 );
 const StagePage = ({ th, cfg, status, go }) => (
-  <EffectPage th={th} cfg={cfg} status={status} go={go} title={t('studio.stage')} on={cfg.stage} onToggle={(v) => set({ stage: !!v })} faces
+  <EffectPage th={th} cfg={cfg} status={status} go={go} title={t('studio.autoFraming')} on={cfg.stage} onToggle={(v) => set({ stage: !!v })} faces
     slider={<SliderRow th={th} label={t('studio.framing')} value={cfg.stageAmount} onChange={(v) => set({ stageAmount: v, stage: true })}
       from={t('studio.wide')} to={t('studio.tight')} />}
-    hint={t('studio.stageHint')} />
+    hint={t('studio.autoFramingHint')} />
 );
 const RetouchPage = ({ th, cfg, status, go }) => (
   <EffectPage th={th} cfg={cfg} status={status} go={go} title={t('studio.retouch')} on={cfg.retouch} onToggle={(v) => set({ retouch: !!v })} faces

@@ -15,7 +15,7 @@
  *                                  whichever it is); camera '/dev/videoN' or '' (the first one); phase 3: key 'none' |
  *                                  'green' | 'blue' (a real green screen), filter 'none' | 'warm' | 'cool' | 'vivid' |
  *                                  'mono' | 'noir' | 'film' | 'fade' | 'sepia', match 0..60, the rest 0..100 (framing:
- *                                  Center Stage, light: Studio Light; 0 off); throws studio.invalid for anything else
+ *                                  Auto Framing, light: Face Light; 0 off); throws studio.invalid for anything else
  *   setBackground(path | null)     'asset:wallpapers/…', 'asset:studio/backgrounds/…', a catalog download
  *                                  ('/var/lib/lordos/studio/<sha256>.jpg|.mp4', studio-bg-get) or a picture or short
  *                                  video inside lord.fs's roots; throws studio.badPicture

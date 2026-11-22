@@ -17,8 +17,8 @@
 //   green       a real green (or blue: greenKey) screen behind the person, with a picture or a video; similarity,
 //               smoothness and spill are its sliders, 0..100
 //   match       colour match of the person to the picture or video, 0..60 %
-//   stage       Center Stage, stageAmount 0..100 from wide to tight
-//   light       Studio Light, lightAmount 0..100
+//   stage       Auto Framing, stageAmount 0..100 from wide to tight
+//   light       Face Light, lightAmount 0..100
 //   filter      'none' | 'warm' | 'cool' | 'vivid' | 'mono' | 'noir' | 'film' | 'fade' | 'sepia', filterStrength 0..100
 //   retouch     Retouch, retouchAmount 0..100
 //   mic         Mic Mode: 'standard' | 'voice' (Voice Isolation) | 'wide' (Wide Spectrum); micSource: the real

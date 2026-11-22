@@ -1,5 +1,5 @@
 /* stlook.c — LordOS Studio's looks (see st.h; docs/CAMERA-STUDIO-PLAN.md 4.4, 5.3, 5.4): the filters' 3D LUTs, the
- * colour match, the chroma key, Studio Light's gains and Retouch. All our own code. The filters are built here from a
+ * colour match, the chroma key, Face Light's gains and Retouch. All our own code. The filters are built here from a
  * few numbers each (no file is read or parsed); the colour transfer is Reinhard, Ashikhmin, Gooch and Shirley's
  * ("Color Transfer between Images", IEEE CG&A 2001) moved into a linear opponent space so that it is one affine map
  * of RGB; the chroma key is the usual distance in the CbCr plane (none of OBS's GPL code is used). */
@@ -248,7 +248,7 @@ void st_despill(float c[3], int key, float amount) {
     }
 }
 
-/* ---- Studio Light ------------------------------------------------------------------------------------------------ */
+/* ---- Face Light ------------------------------------------------------------------------------------------------ */
 
 /* how much of the face's lift a point gets: 1 inside the face's ellipse (a little above the box's centre, where the
  * forehead and eyes are), fading to 0 at 1.7 times its radii */

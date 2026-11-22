@@ -234,7 +234,7 @@ static void test_pieces(void) {
     st_despill(sp, ST_KEY_GREEN, 1.0f);
     CHECK(fabsf(sp[1] - 100) < 0.5f, "despill left green %.1f", sp[1]);
 
-    /* Studio Light: the face lifted more than the rest of the person; the background dimmed half a stop at full */
+    /* Face Light: the face lifted more than the rest of the person; the background dimmed half a stop at full */
     float face[4] = { 100, 100, 40, 50 };
     CHECK(st_light_person(100, 96, face, 100) > st_light_person(300, 300, face, 100), "the face isn't lifted more");
     CHECK(fabsf(st_light_background(100) - 0.7071f) < 0.01f && st_light_background(0) == 1.0f && st_light_person(1, 1, face, 0) == 1.0f, "light gains");
@@ -294,7 +294,7 @@ static void test_light(const char *name, const uint8_t *in, const float *ref) {
     region_mean(in, ref, 0, &bi, NULL);
     region_mean(out, ref, 0, &bo, NULL);
     printf("  light: the person %.1f → %.1f, the background %.1f → %.1f\n", pi, po, bi, bo);
-    CHECK(po > pi * 1.04, "%s: Studio Light didn't lift the person (%.1f → %.1f)", name, pi, po);
+    CHECK(po > pi * 1.04, "%s: Face Light didn't lift the person (%.1f → %.1f)", name, pi, po);
     CHECK(bi < 8 || fabs(bo / bi - 0.7071) < 0.06, "%s: the background wasn't dimmed half a stop (%.3f)", name, bo / bi);
     save(name, "light", out);
     cpu_vs_gpu("light", &c, in, NULL, 0, 0, out, 1.5);
@@ -432,7 +432,7 @@ static void test_video(const char *name, const uint8_t *in, const float *ref) {
     free(a); free(b); free(out);
 }
 
-/* Center Stage on a frame whose person is off to one side: the crop closes in on the face, the eyes at a third,
+/* Auto Framing on a frame whose person is off to one side: the crop closes in on the face, the eyes at a third,
  * steady once there; with no face for 2 s it goes back to the whole frame */
 static int test_framing(const char *name, const uint8_t *src) {
     if (!face_model) return 0;
@@ -475,7 +475,7 @@ static int test_framing(const char *name, const uint8_t *src) {
     double t0 = now_ms();
     while (now_ms() - t0 < 4200) run(s, &c, in, out, 1);
     stfx_framing(s, &r, NULL);
-    CHECK(r.h > H * 0.98f && r.x < 2 && r.y < 2, "%s: Center Stage didn't go back to the whole frame without a face (%.0f)", name, r.h);
+    CHECK(r.h > H * 0.98f && r.x < 2 && r.y < 2, "%s: Auto Framing didn't go back to the whole frame without a face (%.0f)", name, r.h);
     free(in); free(out);
     stfx_free(s);
     return 1;
@@ -524,13 +524,13 @@ static void timing(const uint8_t *in, const uint8_t *frame2) {
         { "video (a new 720p picture every frame)", { .mode = ST_MODE_VIDEO }, 2 },
         { "green screen + picture", { .mode = ST_MODE_PICTURE, .key = ST_KEY_GREEN, .similarity = 40, .smoothness = 20, .spill = 50 }, 1 },
         { "colour match + picture", { .mode = ST_MODE_PICTURE, .match = 30 }, 1 },
-        { "Studio Light (no background)", { .mode = ST_MODE_NONE, .light = 50 }, 0 },
-        { "Studio Light + blur", { .mode = ST_MODE_BLUR, .blur = 50, .light = 50 }, 0 },
+        { "Face Light (no background)", { .mode = ST_MODE_NONE, .light = 50 }, 0 },
+        { "Face Light + blur", { .mode = ST_MODE_BLUR, .blur = 50, .light = 50 }, 0 },
         { "filter (Film) only", { .mode = ST_MODE_NONE, .filter = ST_FILTER_FILM, .filter_amt = 100 }, 0 },
         { "filter (Film) + blur", { .mode = ST_MODE_BLUR, .blur = 50, .filter = ST_FILTER_FILM, .filter_amt = 100 }, 0 },
-        { "Center Stage only", { .mode = ST_MODE_NONE, .framing = 60 }, 0 },
+        { "Auto Framing only", { .mode = ST_MODE_NONE, .framing = 60 }, 0 },
         { "Retouch only", { .mode = ST_MODE_NONE, .retouch = 60 }, 0 },
-        { "everything (blur, light, film, Center Stage, retouch)", { .mode = ST_MODE_BLUR, .blur = 50, .light = 50, .filter = ST_FILTER_FILM, .filter_amt = 80, .framing = 60, .retouch = 50 }, 0 },
+        { "everything (blur, light, film, Auto Framing, retouch)", { .mode = ST_MODE_BLUR, .blur = 50, .light = 50, .filter = ST_FILTER_FILM, .filter_amt = 80, .framing = 60, .retouch = 50 }, 0 },
     };
     uint8_t *pic = gradient(1920, 1080, 1), *vid = gradient(W, H, 0), *vid2 = gradient(W, H, 1), *out = malloc((size_t)W * H * 4);
     for (int p = 0; p < 2; p++) {
@@ -551,7 +551,7 @@ static void timing(const uint8_t *in, const uint8_t *frame2) {
             }
             double *arr[3] = { t, fr, fa };
             for (int a = 0; a < 3; a++) for (int i = 1; i < 40; i++) { double v = arr[a][i]; int j = i - 1; while (j >= 0 && arr[a][j] > v) { arr[a][j + 1] = arr[a][j]; j--; } arr[a][j + 1] = v; }
-            printf("time %s 1280x720 %-55s total %6.2f ms (Center Stage and Retouch %.2f ms, BlazeFace %.2f ms when it runs)\n", p ? "GPU" : "CPU",
+            printf("time %s 1280x720 %-55s total %6.2f ms (Auto Framing and Retouch %.2f ms, BlazeFace %.2f ms when it runs)\n", p ? "GPU" : "CPU",
                    cases[k].name, t[20], fr[20], fa[39]);
             stfx_free(s);
         }
@@ -602,7 +602,7 @@ int main(int argc, char **argv) {
         free(in);
         free(ref);
     }
-    CHECK(framed >= 2, "Center Stage found a face in only %d frames", framed);
+    CHECK(framed >= 2, "Auto Framing found a face in only %d frames", framed);
     CHECK(retouched >= 2, "Retouch found a face in only %d frames", retouched);
     if (time_it) {
         uint8_t *a = frame_of("f04"), *b = frame_of("f08");

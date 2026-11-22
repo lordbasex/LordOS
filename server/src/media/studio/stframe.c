@@ -1,4 +1,4 @@
-/* stframe.c — Center Stage's pieces (see st.h; docs/CAMERA-STUDIO-PLAN.md 5.2): the 1€ filter that smooths the crop,
+/* stframe.c — Auto Framing's pieces (see st.h; docs/CAMERA-STUDIO-PLAN.md 5.2): the 1€ filter that smooths the crop,
  * the crop that frames a face and the bilinear crop-and-scale. The face itself comes from BlazeFace (stfx.c). */
 #include "st.h"
 

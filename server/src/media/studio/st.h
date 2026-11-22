@@ -1,13 +1,13 @@
 /* st.h — LordOS Studio's frame pipeline (docs/CAMERA-STUDIO-PLAN.md 3.2, 4.3, 4.4, 5; phases 1 and 3).
  *
  * One frame in (BGRA, the camera's size), one frame out (BGRA, the same size):
- *   0. Center Stage (stframe.c): BlazeFace every few frames on a 128×128 letterboxed copy, a 1€ filter on the box, and
+ *   0. Auto Framing (stframe.c): BlazeFace every few frames on a 128×128 letterboxed copy, a 1€ filter on the box, and
  *      the frame cropped and scaled back to its size around the person; then Retouch (stlook.c) on the face's skin;
  *   1. a box-averaged 256×144 RGB copy feeds the Selfie Segmenter (nn.c) → a person probability;
  *   2. temporal smoothing at that size (an average per pixel weighted by motion, with hysteresis);
  *   3. the fast guided filter (He and Sun, 2015): its coefficients at a quarter of the frame, guided by the luma;
  *   4. the composite at full size: alpha = a·luma + b (or, with a green screen, the chroma key inside the dilated
- *      person), the person with colour match and Studio Light, over a blurred copy of the frame (the person's own
+ *      person), the person with colour match and Face Light, over a blurred copy of the frame (the person's own
  *      pixels kept out of the blur so no halo), a picture or a video frame; then the filter (a 3D LUT) and the mirror.
  * Steps 0–3 run on the CPU; step 4 on the GPU when lord-studio got a render node and GLES 3 works there (stgl.c), on
  * the CPU otherwise. Both paths give the same picture within a few levels (build/studio-test).
@@ -38,19 +38,19 @@ typedef struct {
     int mirror;                  /* 1: the output is mirrored left to right */
     int key;                     /* ST_KEY_*: a green or blue screen (only with a picture or a video behind) */
     int similarity, smoothness, spill;   /* the chroma key's sliders, 0..100 each */
-    int framing;                 /* Center Stage: 0 off, 1..100 from wide to tight */
-    int light;                   /* Studio Light: 0 off, 1..100 its intensity */
+    int framing;                 /* Auto Framing: 0 off, 1..100 from wide to tight */
+    int light;                   /* Face Light: 0 off, 1..100 its intensity */
     int match;                   /* colour match: 0..ST_MATCH_MAX % (a picture or a video behind) */
     int filter, filter_amt;      /* ST_FILTER_* and its strength 0..100 */
     int retouch;                 /* 0 off, 1..100 its strength */
 } StCfg;
 
-/* the crop Center Stage uses now, in the camera's pixels */
+/* the crop Auto Framing uses now, in the camera's pixels */
 typedef struct { float x, y, w, h; } StRect;
 
 typedef struct {
     double seg_ms, refine_ms, compose_ms;   /* the last frame's steps */
-    double face_ms, frame_ms;               /* BlazeFace (the last time it ran) and Center Stage's crop with Retouch */
+    double face_ms, frame_ms;               /* BlazeFace (the last time it ran) and Auto Framing's crop with Retouch */
     int gpu;                     /* 1: the composite ran on the GPU */
     int frames;
 } StStats;
@@ -60,8 +60,8 @@ typedef struct StFx StFx;
 /* model: the segmenter's .lnn bytes (already hash-checked by lord-server); render_fd: a render node or -1 (not taken
  * over: the caller keeps it). NULL on failure, with a reason in err. */
 StFx *stfx_new(const void *model, size_t len, int render_fd, char *err, size_t errlen);
-/* BlazeFace's .lnn bytes (hash-checked by lord-server): Center Stage, Studio Light's face and Retouch need it; without
- * it they do nothing (Studio Light still dims the background). 0 on success. */
+/* BlazeFace's .lnn bytes (hash-checked by lord-server): Auto Framing, Face Light's face and Retouch need it; without
+ * it they do nothing (Face Light still dims the background). 0 on success. */
 int   stfx_face_model(StFx *s, const void *model, size_t len, char *err, size_t errlen);
 void  stfx_free(StFx *s);
 /* Out-of-range values are clamped; returns 0. */
@@ -78,7 +78,7 @@ const float *stfx_matte(const StFx *s, int *w, int *h);
 void  stfx_reset(StFx *s);
 /* force the CPU composite even with a render node (tests compare both) */
 void  stfx_force_cpu(StFx *s, int cpu);
-/* Center Stage's crop now (the whole frame when it is off) and the face it follows (cx, cy, w, h normalised to the
+/* Auto Framing's crop now (the whole frame when it is off) and the face it follows (cx, cy, w, h normalised to the
  * camera's frame); 1 when a face was seen within the last 2 s */
 int   stfx_framing(const StFx *s, StRect *crop, float face[4]);
 /* the tests: run BlazeFace every n frames instead of every 6 */
@@ -136,7 +136,7 @@ float st_chroma_alpha(const float rgb[3], const float key[2], int similarity, in
 void st_chroma_key(const uint8_t *bgra, int stride, int w, int h, int key, float out[2]);
 /* spill suppression of the key's colour on the person, amount 0..1 */
 void st_despill(float rgb[3], int key, float amount);
-/* Studio Light: the person's gain at (x, y) (lifted inside the face's feathered ellipse; face cx, cy, w, h in the same
+/* Face Light: the person's gain at (x, y) (lifted inside the face's feathered ellipse; face cx, cy, w, h in the same
  * units, or NULL) and the background's, as factors; intensity 0..100 */
 float st_light_person(float x, float y, const float *face, int intensity);
 float st_light_background(int intensity);
@@ -145,7 +145,7 @@ float st_light_background(int intensity);
  * memory ran out (the frame is then unchanged). */
 int  st_retouch(uint8_t *bgra, int stride, int w, int h, const float face[4], int strength, float **tmp, size_t *cap);
 
-/* ---- stframe.c: Center Stage, exposed for the tests ---- */
+/* ---- stframe.c: Auto Framing, exposed for the tests ---- */
 /* the 1€ filter (Casiez, Roussel and Vogel, CHI 2012) */
 typedef struct { float x, dx; int primed; float mincut, beta, dcut; } StEuro;
 float st_euro(StEuro *f, float x, float dt);

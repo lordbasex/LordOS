@@ -5,7 +5,7 @@
  * Mesa's driver loads from /usr/lib (read-only) and reaches the device only through that fd (DRM ioctls). Textures
  * keep BGRA's byte order (the shader works in RGB and writes BGRA back), so nothing is swizzled on the CPU. Phase 3
  * adds the green screen (the dilated mask as one more small plane), the colour match (a 3×3 matrix and an offset),
- * Studio Light (the face as four numbers) and the filter (its 3D LUT as a 33³ texture). */
+ * Face Light (the face as four numbers) and the filter (its 3D LUT as a 33³ texture). */
 #include "stgl.h"
 #include "st.h"
 

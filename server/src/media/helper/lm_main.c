@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
 #ifdef LM_STUDIO
     /* lord-studio: the camera with LordOS Studio's effects, nothing else. Its fds, in order (mp_send skips the missing
      * ones): the camera (none with probe=1 or loopback=1), the render node (when render=1), the segmenter's model,
-     * BlazeFace (when face=1, phase 3: Center Stage, Studio Light and Retouch) and,
+     * BlazeFace (when face=1, phase 3: Auto Framing, Face Light and Retouch) and,
      * with loopback=1 the "LordOS Studio" loopback device (the real camera then comes later, by MM_STUDIO_CAM) */
     if (m.v[0] != MK_CAMERA) { LM_LOG("lord-studio: only the camera"); return 1; }
     int st_probe = mp_param_int(payload, "probe", 0) == 1, st_hub = !st_probe && mp_param_int(payload, "loopback", 0) == 1, sk = 0;

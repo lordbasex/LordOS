@@ -411,7 +411,7 @@ EOF
     run "studio-nn-test (segmenter and BlazeFace against ONNX Runtime, the .lnn loader's fuzz)" build/studio-nn-test
     run "studio-test (matte, guided filter, blur, picture, mirror; CPU and GPU agree)" build/studio-test
     run "studio-hub-test (the loopback: what it shows, its readers, the cards, YUYV; phase 3's settings and names)" build/studio-hub-test
-    # phase 3: each look against the reference frames (Studio Light, colour match, filters, green screen, video, Center
+    # phase 3: each look against the reference frames (Face Light, colour match, filters, green screen, video, Center
     # Stage, Retouch; CPU and GPU agree), the background catalog's closed actions and the shipped catalog, the voice drop-in
     run "studio-fx-test (phase 3's effects on fixed frames)" build/studio-fx-test
     run "studio-bg-admin-test (studio-bg-get, studio-bg-remove, the catalog)" build/studio-bg-admin-test

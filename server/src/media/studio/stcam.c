@@ -57,7 +57,7 @@ int stcam_init(int model_fd, int face_fd, int render) {
     fx = stfx_new(m, len, render, err, sizeof err);
     free(m);
     if (!fx) { LM_LOG("the model was refused: %s", err); if (face_fd >= 0) close(face_fd); return -1; }
-    /* BlazeFace: Center Stage, Studio Light's face and Retouch; without it they do nothing */
+    /* BlazeFace: Auto Framing, Face Light's face and Retouch; without it they do nothing */
     if (face_fd >= 0) {
         m = read_model(face_fd, &len);
         close(face_fd);
@@ -299,7 +299,7 @@ AVFrame *stcam_frame(AVFrame *f) {
     return out_bgra;
 }
 
-/* once a second: frames done, the steps' times (µs), whether the GPU composites, Center Stage with Retouch and the
+/* once a second: frames done, the steps' times (µs), whether the GPU composites, Auto Framing with Retouch and the
  * video background's decode (µs) */
 void stcam_tick(void) {
     double now = lm_now_ms();
@@ -325,7 +325,7 @@ void stcam_probe(int bg) {
     for (int i = 0; ok && i < 10; i++) ok = !stfx_frame(fx, in, w * 4, w, h, out, w * 4);
     StStats s = { 0 };
     if (ok) stfx_stats(fx, &s);
-    /* phase 3: every look at once (a green screen over a picture, Studio Light, a filter, Center Stage, Retouch) */
+    /* phase 3: every look at once (a green screen over a picture, Face Light, a filter, Auto Framing, Retouch) */
     int looks = ok;
     StStats s3 = { 0 };
     if (ok) {

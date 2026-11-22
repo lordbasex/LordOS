@@ -39,7 +39,7 @@ int  mstudio_open(void *src, int w, int h, const char **code);
 
 /* the settings (lord.studio.set): on, camera "/dev/videoN" ("" = the first), mode 0 none, 1 blur, 2 picture, 3 video
  * (2 and 3 both mean "the background file", whichever it is), blur 0..100, mirror, and phase 3's: key 0 none, 1 green,
- * 2 blue; similarity, smoothness, spill, framing (Center Stage), light (Studio Light), filter_amt and retouch 0..100;
+ * 2 blue; similarity, smoothness, spill, framing (Auto Framing), light (Face Light), filter_amt and retouch 0..100;
  * match 0..60; filter 0..STUDIO_FILTERS. Out-of-range values are clamped. Every running source gets them now; a new
  * camera applies to sources opened from now on (and to the hub's next open). */
 typedef struct {

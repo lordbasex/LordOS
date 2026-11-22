@@ -144,7 +144,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     "LordOS Studio" and showing the effects in a video call, the camera's light going off with no reader, the
     indicator naming the app, `devices.sh` step 6, and the Pi kernel build.
 
-- **LordOS Studio: video backgrounds, green screen, Center Stage, Studio Light, colour match, filters, Retouch, Mic
+- **LordOS Studio: video backgrounds, green screen, Auto Framing, Face Light, colour match, filters, Retouch, Mic
   Mode and a background catalog, in development (phase 3 of `docs/CAMERA-STUDIO-PLAN.md`, section 11.3; exceptions E-S4
   and E-S6 approved by the maintainer on 2026-11-22).** Every effect reaches every app that chose the "LordOS Studio"
   camera, like phases 1 and 2.
@@ -154,10 +154,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
       sandbox, paced by the file's own timestamps, looped and scaled to the camera's size.
     - **Green screen:** a real green or blue screen is cut out by colour (the key from the frame's border, Similarity,
       Smoothness and Spill sliders), but only near the person, and never with holes where the person is sure.
-    - **Center Stage:** BlazeFace finds the face every sixth frame, and the picture is cropped around the person (eyes
+    - **Auto Framing:** BlazeFace finds the face every sixth frame, and the picture is cropped around the person (eyes
       at a third, from Wide to Tight, at most 2×) with a 1€ filter, a dead zone and a speed limit, so the frame moves
       like a camera operator, not in jumps. With no face for two seconds it goes back to the whole picture.
-    - **Studio Light:** lifts the face (up to +0.6 EV, softly, without clipping) and dims the background half a stop.
+    - **Face Light:** lifts the face (up to +0.6 EV, softly, without clipping) and dims the background half a stop.
     - **Colour match:** tints the person toward the picture or video behind them (Reinhard's colour transfer, up to
       60 %, smoothed over a second).
     - **Filters:** Warm, Cool, Vivid, Mono, Noir, Film, Fade and Sepia, with a strength slider, built from LordOS's own
@@ -184,7 +184,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     no longer counts the filter's own link to the microphone (only when PipeWire itself owns it); the app that records
     Voice Isolation is shown as before.
   - **The popover** (`sdk/studio.jsx`, logic in `sdk/studiomodel.js`, downloads in `sdk/studiobg.js`): new rows Studio
-    Light, Center Stage, Filters and Retouch, each with its page; the Background page has None, Blur, Picture and Video,
+    Light, Auto Framing, Filters and Retouch, each with its page; the Background page has None, Blur, Picture and Video,
     the green screen and colour match, the catalog by category, "Add your own…" (a picture or a short video) and
     Credits. LordOS's Cyberpunk City wallpapers are no longer offered as camera backgrounds (some show people). New
     `settings.studio` keys with defaults (no migration). Text in all 35 languages.
