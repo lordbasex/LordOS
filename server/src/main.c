@@ -328,10 +328,17 @@ static int out_rects(const Server *s, ORect *r, int *idx) {
         if (s->out[i].on) { const OutView *v = &s->out[i].v; idx[n] = i; r[n++] = (ORect){ v->x, v->y, v->w, v->h }; }
     return n;
 }
-/* the display under the pointer (-1 headless or none) */
+/* where the pointer's image is drawn: at the pointer, or where a pointer lock's owner shows it (pointerlock.h: a
+ * machine's guest pointer, inside its picture; the pointer itself stays put) */
+static void cursor_at(const Server *s, int *x, int *y) {
+    if (!ptrlock_cursor(x, y)) { *x = s->cx; *y = s->cy; }
+}
+/* the display under the pointer's image (-1 headless or none) */
 static int out_at_pointer(const Server *s) {
     ORect r[OUT_MAX];
-    int idx[OUT_MAX], n = out_rects(s, r, idx), k = out_at(r, n, s->cx, s->cy);
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    int idx[OUT_MAX], n = out_rects(s, r, idx), k = out_at(r, n, cx, cy);
     return k >= 0 ? idx[k] : -1;
 }
 /* a pointer lock's node, where it is now (pointerlock.h) */
@@ -422,7 +429,9 @@ static void cursor_local(const Server *s, Cur *c, int pct) {
 /* The pointer in a display's physical pixels. */
 static void pointer_phys(const Server *s, const Out *o, int *x, int *y) {
     double px, py;
-    out_to_phys(&o->v, s->cx, s->cy, &px, &py);
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    out_to_phys(&o->v, cx, cy, &px, &py);
     *x = (int)lround(px);
     *y = (int)lround(py);
 }
@@ -655,12 +664,14 @@ static void remote_pointer(int fx, int fy) {
 
 static void remote_button(int button, int down) {
     Server *s = remote_server;
+    if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
     remote_settle(s);
 }
 
 static void remote_wheel(int steps) {
     Server *s = remote_server;
+    if (ptrlock_wheel(steps, 0)) return;
     s->wheel += steps;
     remote_settle(s);
 }
@@ -1291,6 +1302,12 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         }
         /* ruedas: la de alta resolución y la horizontal van como scroll fino (tp/tp_route.c, value120);
          * los pasos enteros de siempre, solo si el mouse no tiene la de alta resolución */
+        /* a pointer lock with a wheel sink: whole steps straight to it (pointerlock.h) */
+        if (ptrlock_wants_wheel()) {
+            if (ev->code == REL_WHEEL) ptrlock_wheel(tp_config()->mouse_natural ? -ev->value : ev->value, 0);
+            if (ev->code == REL_HWHEEL) ptrlock_wheel(0, ev->value);
+            break;
+        }
         if (ev->code == REL_WHEEL && !d->wheel_hires) s->wheel += tp_config()->mouse_natural ? -ev->value : ev->value;
         if (ev->code == REL_WHEEL_HI_RES) tp_route_wheel120(tp_config()->mouse_natural ? -ev->value : ev->value, 0);
         if (ev->code == REL_HWHEEL_HI_RES) tp_route_wheel120(0, ev->value);
@@ -1347,6 +1364,8 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         int button = input_dom_button(ev->code);
         /* Settings → Mouse & Trackpad, primary button on the right: a mouse's (not a touchpad's) */
         if ((button == 0 || button == 2) && !d->tp && d->fd >= 0 && tp_config()->mouse_left_handed) button = 2 - button;
+        /* a pointer lock with a button sink takes them straight, with no hit test (pointerlock.h) */
+        if (button >= 0 && ev->value != 2 && ptrlock_button(button, ev->value == 1)) break;
         if (button >= 0 && ev->value != 2 && s->nbuttons < MAX_BUTTONS)
             s->buttons[s->nbuttons++] = (ButtonEvent){ ev->value == 1, button };
         else if (ev->code < BTN_MISC) {
@@ -1417,6 +1436,7 @@ static void tp_warp(double x, double y) {
 }
 static void tp_button(int button, int down) {
     Server *s = remote_server;
+    if (ptrlock_button(button, down)) return;
     if (s->nbuttons < MAX_BUTTONS) s->buttons[s->nbuttons++] = (ButtonEvent){ down, button };
 }
 static void tp_position(double *x, double *y, int *w, int *h) {
@@ -1637,7 +1657,9 @@ static Rect cursor_rect(const Server *s, const Out *o, const Cur *k) {
     if (r.x1 <= 0 || r.y1 <= 0 || r.x0 >= o->v.pw || r.y0 >= o->v.ph) return (Rect){ 0, 0, 0, 0 };
     /* in a gap next to it the pointer belongs to another display */
     ORect me = { o->v.x, o->v.y, o->v.w, o->v.h };
-    if (out_at(&me, 1, s->cx, s->cy) < 0 && !(o->v.dx || o->v.dy)) return (Rect){ 0, 0, 0, 0 };
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    if (out_at(&me, 1, cx, cy) < 0 && !(o->v.dx || o->v.dy)) return (Rect){ 0, 0, 0, 0 };
     return r;
 }
 
@@ -1961,7 +1983,9 @@ static int out_needs(const Server *s, const Out *o) {
     if (!o->cdirty) return 0;
     if (o->cur_on) return 1;
     ORect me = { o->v.x, o->v.y, o->v.w, o->v.h };
-    return out_at(&me, 1, s->cx, s->cy) >= 0 || o->v.dx || o->v.dy;
+    int cx, cy;
+    cursor_at(s, &cx, &cy);
+    return out_at(&me, 1, cx, cy) >= 0 || o->v.dx || o->v.dy;
 }
 static int outs_have_work(const Server *s) {
     for (int i = 0; i < OUT_MAX; i++) if (!s->out[i].kms.flip_pending && out_needs(s, &s->out[i])) return 1;
@@ -2928,7 +2952,7 @@ int main(int argc, char **argv) {
             if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
             wdog_expect(0);
         }
-        {   /* a pointer lock started, ended, or its owner moved the pointer it shows (pointerlock.h) */
+        {   /* a pointer lock started, ended, or its owner moved the pointer image it shows (pointerlock.h) */
             static unsigned plk;
             int px, py;
             /* checked each time round: the node may have moved, or gone (then the lock ends here) */
@@ -2944,6 +2968,7 @@ int main(int argc, char **argv) {
                 plk = ptrlock_serial();
                 s.cursor_dirty = 1;
                 if (gpu_active()) update_cursor(&s);
+                if (s.hw_cursor) hw_cursor_move(&s);     /* the shown image moved, or the lock ended */
             }
             js_pointer_lock_flush();        /* JavaScript's lock: its motion, once a frame (js_input.c) */
         }

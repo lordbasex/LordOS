@@ -114,14 +114,31 @@ int ptrlock_where(int *x, int *y) {
         return 0;
     }
     L.gone_at = 0;
-    float px = r[0] + r[2] / 2, py = r[1] + r[3] / 2;
-    if (L.shown) {
-        /* inside the node, a pixel from its far edges */
-        px = L.sx < r[0] ? r[0] : L.sx > r[0] + r[2] - 1 ? r[0] + r[2] - 1 : L.sx;
-        py = L.sy < r[1] ? r[1] : L.sy > r[1] + r[3] - 1 ? r[1] + r[3] - 1 : L.sy;
-    }
+    *x = (int)lroundf(r[0] + r[2] / 2);
+    *y = (int)lroundf(r[1] + r[3] / 2);
+    return 1;
+}
+
+int ptrlock_cursor(int *x, int *y) {
+    float r[4];
+    if (!L.on || !L.shown || node_rect(L.node, r)) return 0;
+    /* inside the node, a pixel from its far edges */
+    float px = L.sx < r[0] ? r[0] : L.sx > r[0] + r[2] - 1 ? r[0] + r[2] - 1 : L.sx;
+    float py = L.sy < r[1] ? r[1] : L.sy > r[1] + r[3] - 1 ? r[1] + r[3] - 1 : L.sy;
     *x = (int)lroundf(px);
     *y = (int)lroundf(py);
+    return 1;
+}
+
+int ptrlock_button(int button, int down) {
+    if (!L.on || !L.sink.button) return 0;
+    L.sink.button(L.sink.ud, button, down);
+    return 1;
+}
+int ptrlock_wants_wheel(void) { return L.on && L.sink.wheel != NULL; }
+int ptrlock_wheel(int dy, int dx) {
+    if (!ptrlock_wants_wheel()) return 0;
+    if (dy || dx) L.sink.wheel(L.sink.ud, dy, dx);
     return 1;
 }
 

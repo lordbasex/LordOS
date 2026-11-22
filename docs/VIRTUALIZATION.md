@@ -732,7 +732,8 @@ it to the size the picture is shown at (the factor `media_paint` used, at most 6
 main.c remembers which media node the pointer is over (`over_media`, from the same hit test that picks the CSS cursor) and `cursor_now`
 shows the guest's image there instead of the host's arrow, in the CPU composition, the GPU's texture and the cursor plane alike. Where
 the guest puts its pointer (VD_POINTER's position) isn't used: the host's pointer drives the absolute tablet, so the image is drawn at
-the host's pointer (except while the mouse is captured, 6.25: then the hidden host pointer is kept where the guest reports its own). VD_POINTER's *hidden* (the guest turned its cursor plane off: a text console, or X just quit) brings the host's arrow
+the host's pointer (except while the mouse is captured, 6.25: then only the image is drawn where the guest reports its pointer,
+inside the picture; the host's pointer itself never moves by what the guest says). VD_POINTER's *hidden* (the guest turned its cursor plane off: a text console, or X just quit) brings the host's arrow
 back, so there's always a pointer to aim with; a fully transparent image (an app hiding it on purpose) hides it. A new display helper
 starts with the host's arrow until QEMU defines the cursor again. `tests/mcursor_test.c` (21 checks). Seen on VM 125: the installed
 Debian 13 guest (below) running X with an xterm showed X's I-beam over the xterm and its X-shaped root cursor elsewhere, with the hotspot
@@ -2209,9 +2210,11 @@ pointer is hidden and held inside the picture, and the guest gets relative motio
   there, a click in the picture captures again. A capture asked for with the button stays across full screen (the lock moves to the
   rebuilt window's picture). The floating bar doesn't open while captured.
 - **Apps mode**: not offered (the button says why): the guest's windows are LordOS windows that share this computer's pointer.
-- **The pointer lock** (`server/src/pointerlock.c`, generic, not Machines'): while held the pointer stays inside the owner's node, the
-  evdev motion (after Settings → Mouse's speed, before clamping to the screen) goes to the owner's sink, buttons and wheel go where the
-  pointer is. It ends on ❖Esc or Ctrl+Alt (`on_input`, before JavaScript), when its owner ends it, when its node has been gone for
+- **The pointer lock** (`server/src/pointerlock.c`, generic, not Machines'): while held the pointer stays at the centre of the
+  owner's node and nothing the owner says moves it; the evdev motion (after Settings → Mouse's speed, before clamping to the screen)
+  goes to the owner's sink. An owner with a button sink (Machines) gets buttons and wheel steps straight, with no hit test; others
+  get them at the centre. An owner may show a pointer image somewhere in its node (`ptrlock_show`, kept inside it): only the image
+  is drawn there. It ends on ❖Esc or Ctrl+Alt (`on_input`, before JavaScript), when its owner ends it, when its node has been gone for
   half a second (a rebuilt window names its new node meanwhile), or when the input goes (another console, the display detached). One
   lock at a time. Other native apps and games get it as `lord.input.lockPointer(node)` / `unlockPointer()` with the motion as
   `'pointerlock'` listener events once a frame; isolated apps don't have it (no broker call). Wayland clients keep their own
@@ -2227,8 +2230,12 @@ pointer is hidden and held inside the picture, and the guest gets relative motio
   the boot and was set back within a second). A saved state or snapshot from before this change loads with the new mouse in its
   reset state (**to test**: reverting a running machine to such a snapshot). lord-vmdisplay sends `Mouse.RelMotion`; until QEMU says the mouse is relative it moves its own
   position by the motion and sends that, so the pointer still works without a relative mouse. With a guest that hands its pointer over
-  (`MouseSet`), the hidden host pointer is kept where the guest has its own, so the guest's shape shows there; otherwise none shows
-  (games draw their own). `tests/vm_capture_test.mjs` (the window's decisions), `vm_test` (machine.json schema 12, the choice among
+  (`MouseSet`), its image is drawn where the guest has it, kept inside the picture; otherwise none shows (games draw their own).
+  **Security** (the commit review, 2026-11-22): a guest's reported position never moves the host's pointer: clicks and the wheel go
+  straight to lord-vmdisplay (`VD_BUTTON`, `VD_WHEEL`) from lord-server's input path, so a guest can't steer a click onto anything
+  of this computer's; at the end lord-vmdisplay lets go of everything held (`VD_RELEASE_ALL`) and the pointer is where the lock put
+  it, the picture's centre. `pointerlock_test` checks that no guest position takes the pointer, or its image, out of the picture.
+  A touchpad's two-finger scroll is a gesture and still reaches the window's `onWheel` while captured. `tests/vm_capture_test.mjs` (the window's decisions), `vm_test` (machine.json schema 12, the choice among
   QEMU's mice). `lordvm-dev`: `capture 0|1`, `rel DX DY`.
 - **Measured** on 2026-11-22 (amd64, KVM, a Debian 13 nocloud guest under `lordvm-dev` with a unit that prints every mouse's evdev
   events to the serial line): with virtio devices, captured, `rel 10 5` moves arrived on the guest's *QEMU Virtio Mouse* as REL_X /

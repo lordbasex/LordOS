@@ -22,13 +22,17 @@ static int rect(int node, float r[4]) {
 static int mx, my, moves, ends, why = -1;
 static void motion(void *ud, int dx, int dy) { (void)ud; mx += dx; my += dy; moves++; }
 static void ended(void *ud, int w) { (void)ud; ends++; why = w; }
-static int tag_a, tag_b;
+static int tag_a, tag_b, tag_c;
+static int btn[8], btn_down[8], nbtn, wy, wx;
+static void button(void *ud, int b, int down) { (void)ud; if (nbtn < 8) { btn[nbtn] = b; btn_down[nbtn] = down; nbtn++; } }
+static void wheel(void *ud, int dy, int dx) { (void)ud; wy += dy; wx += dx; }
 
 static void sleep_ms(int ms) { struct timespec t = { 0, ms * 1000000L }; nanosleep(&t, NULL); }
 
 int main(void) {
     ptrlock_init(rect);
-    PtrLockSink a = { motion, ended, &tag_a }, js = { NULL, ended, &tag_b };
+    PtrLockSink a = { .motion = motion, .ended = ended, .ud = &tag_a }, js = { .motion = NULL, .ended = ended, .ud = &tag_b };
+    PtrLockSink vm = { .motion = motion, .ended = ended, .ud = &tag_c, .button = button, .wheel = wheel };
     int x, y;
     unsigned s0 = ptrlock_serial();
 
@@ -44,17 +48,29 @@ int main(void) {
     ptrlock_motion(-5000, 9000);
     check(mx == -4996 && my == 8997, "no clamping to any edge");
 
-    /* the owner shows a pointer: kept inside the node */
+    /* the owner shows a pointer's image: drawn inside the node; the real pointer (hit tests, clicks) never moves */
     unsigned s1 = ptrlock_serial();
+    int cx, cy;
+    check(!ptrlock_cursor(&cx, &cy), "nothing shown: the image is at the pointer");
     ptrlock_show(1, 150.4f, 60.6f);
-    check(!ptrlock_hidden() && ptrlock_serial() != s1 && ptrlock_where(&x, &y) && x == 150 && y == 61, "shown where the owner says");
+    check(!ptrlock_hidden() && ptrlock_serial() != s1 && ptrlock_cursor(&cx, &cy) && cx == 150 && cy == 61, "the image where the owner says");
+    check(ptrlock_where(&x, &y) && x == 300 && y == 200, "the pointer itself stays at the centre");
+    /* a guest's position can't take the pointer, or even its image, outside the machine's picture */
+    const float far[][2] = { { 9000, -40 }, { -1e9f, 1e9f }, { 99, 49 }, { 500, 350 }, { 1e30f, -1e30f } };
+    for (int i = 0; i < 5; i++) {
+        ptrlock_show(1, far[i][0], far[i][1]);
+        check(ptrlock_cursor(&cx, &cy) && cx >= 100 && cx <= 499 && cy >= 50 && cy <= 349, "the image is kept inside the node");
+        check(ptrlock_where(&x, &y) && x == 300 && y == 200, "a guest's position never moves the pointer");
+    }
     ptrlock_show(1, 9000, -40);
-    check(ptrlock_where(&x, &y) && x == 499 && y == 50, "kept inside the node");
+    check(ptrlock_cursor(&cx, &cy) && cx == 499 && cy == 50, "kept a pixel from the far edges");
     s1 = ptrlock_serial();
     ptrlock_show(1, 9000, -40);
     check(ptrlock_serial() == s1, "the same place again changes nothing");
     ptrlock_show(0, 0, 0);
-    check(ptrlock_hidden() && ptrlock_where(&x, &y) && x == 300 && y == 200, "hidden again: back at the centre");
+    check(ptrlock_hidden() && !ptrlock_cursor(&cx, &cy) && ptrlock_where(&x, &y) && x == 300 && y == 200, "hidden again");
+    /* no button sink: buttons and wheel go to the centre as usual */
+    check(!ptrlock_button(0, 1) && !ptrlock_wants_wheel() && !ptrlock_wheel(1, 0), "no button sink: not taken");
 
     /* keys: ❖Esc ends it and is taken; Esc alone, a repeat or a release don't; Ctrl+Alt ends it and goes on */
     check(!ptrlock_key(KEY_ESC, 1, 0, 0, 0) && ptrlock_active(), "Esc alone goes to the owner");
@@ -98,12 +114,21 @@ int main(void) {
     check(!ptrlock_where(&x, &y) && !ptrlock_active() && why == PTRLOCK_END_GONE && ends == 6, "gone for good: ended");
     gone[7] = 0;
 
+    /* a button sink (Machines): buttons and wheel straight to the owner, no hit test */
+    check(ptrlock_begin(7, &vm) == 0 && ptrlock_wants_wheel(), "a lock with a button sink");
+    check(ptrlock_button(0, 1) && ptrlock_button(0, 0) && ptrlock_button(2, 1) && nbtn == 3 && btn[0] == 0 && btn_down[0] == 1 && btn_down[1] == 0 && btn[2] == 2,
+          "buttons taken by the owner, in order");
+    check(ptrlock_wheel(-3, 0) && ptrlock_wheel(0, 2) && ptrlock_wheel(0, 0) && wy == -3 && wx == 2, "wheel steps taken");
+    ptrlock_end_owner(&tag_c);
+    check(ends == 7 && why == PTRLOCK_END_OWNER, "its owner ends it");
+    check(!ptrlock_button(0, 1) && !ptrlock_wheel(1, 0) && nbtn == 3, "after the end, nothing is taken");
+
     /* the input went away (main.c's display_detach) */
     check(ptrlock_begin(9, &a) == 0, "again");
     ptrlock_end(PTRLOCK_END_INPUT);
-    check(!ptrlock_active() && why == PTRLOCK_END_INPUT && ends == 7, "the input left: ended");
+    check(!ptrlock_active() && why == PTRLOCK_END_INPUT && ends == 8, "the input left: ended");
     ptrlock_end(PTRLOCK_END_INPUT);
-    check(ends == 7, "ending twice tells once");
+    check(ends == 8, "ending twice tells once");
     ptrlock_motion(5, 5);
     ptrlock_show(1, 1, 1);
     check(!ptrlock_hidden() && !ptrlock_take(&dx, &dy), "no lock: motion and show do nothing");

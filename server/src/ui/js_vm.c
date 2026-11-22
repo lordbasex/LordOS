@@ -2312,7 +2312,8 @@ static void from_vd(Sess *s) {
             break;
         case VD_POINTER:
             /* where the guest puts it doesn't matter (the host's pointer drives an absolute tablet); whether it shows does.
-             * Captured, the pointer stays where the guest has it, so its own (or the host's arrow) shows there */
+             * Captured, the guest's pointer image is drawn where the guest has it, inside the picture; the real pointer stays
+             * at the picture's centre and clicks go straight to the guest (pointerlock.h), so this steers nothing */
             if (s->media) media_src_cursor_visible(s->media, m.c != 0);
             if (s->captured && s->media) {
                 float x, y;
@@ -2782,9 +2783,24 @@ static void cap_motion(void *ud, int dx, int dy) {
         dx -= a; dy -= b;
     }
 }
-/* ended by the window, ❖Esc or Ctrl+Alt, the picture's node going away or the input leaving: the tablet again */
+/* buttons and the wheel straight to the guest, with no hit test: whatever the guest says about its pointer, a click
+ * never lands on anything of this computer's (pointerlock.h) */
+static void cap_button(void *ud, int b, int down) {
+    Sess *s = ud;
+    int q = b == 0 ? VDB_LEFT : b == 1 ? VDB_MIDDLE : b == 2 ? VDB_RIGHT : b == 3 ? VDB_SIDE : b == 4 ? VDB_EXTRA : -1;
+    if (q >= 0) vdsend(s, VD_BUTTON, q, down ? 1 : 0);
+}
+static void cap_wheel(void *ud, int dy, int dx) {
+    Sess *s = ud;
+    dy = dy < -32 ? -32 : dy > 32 ? 32 : dy;
+    dx = dx < -32 ? -32 : dx > 32 ? 32 : dx;
+    if (dy || dx) vdsend(s, VD_WHEEL, dy, dx);
+}
+/* ended by the window, ❖Esc or Ctrl+Alt, the picture's node going away or the input leaving: the tablet again, and
+ * nothing left held in the guest (a button pressed while captured is released here, out of the window's sight) */
 static void cap_ended(void *ud, int why) {
     Sess *s = ud;
+    vdsend(s, VD_RELEASE_ALL, 0, 0);
     s->captured = 0;
     s->cap_ends++;
     s->cap_why = why;
@@ -2801,7 +2817,7 @@ static JSValue f_capture(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     int node = argc >= 3 ? ival(c, argv[2]) : 0;
     if (s->captured) return JS_NewBool(c, !ptrlock_retarget(s, node));     /* the window was rebuilt (full screen) */
     if (s->vd < 0 || !s->media || s->vm < 0 || (s->state != VS_RUNNING && s->state != VS_PAUSED) || node <= 0) return JS_FALSE;
-    PtrLockSink k = { cap_motion, cap_ended, s };
+    PtrLockSink k = { .motion = cap_motion, .ended = cap_ended, .ud = s, .button = cap_button, .wheel = cap_wheel };
     /* lord-vmdisplay first: from now on it takes only relative motion */
     vdsend(s, VD_CAPTURE, 1, 0);
     if (ptrlock_begin(node, &k)) { vdsend(s, VD_CAPTURE, 0, 0); return JS_FALSE; }

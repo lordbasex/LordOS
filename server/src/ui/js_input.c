@@ -213,7 +213,7 @@ static JSValue f_lock_pointer(JSContext *c, JSValueConst t, int argc, JSValueCon
     (void)t;
     int node = 0;
     if (argc < 1 || JS_ToInt32(c, &node, argv[0]) || node <= 0) return JS_FALSE;
-    PtrLockSink k = { NULL, js_lock_ended, &js_lock_tag };
+    PtrLockSink k = { .motion = NULL, .ended = js_lock_ended, .ud = &js_lock_tag };
     if (ptrlock_begin(node, &k)) return JS_FALSE;
     js_lock_node = node;
     return JS_TRUE;
