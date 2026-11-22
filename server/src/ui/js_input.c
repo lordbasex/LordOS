@@ -19,7 +19,17 @@
  *                               loop sends it down js_key, the path of a physical key, so it goes
  *                               to the focused client or field, through the layout and the input
  *                               method. level: 1 Shift, 2 AltGr. No Ctrl, Alt or Super: a tap
- *                               can't be a shortcut. Nothing here logs or keeps what is typed. */
+ *                               can't be a shortcut. Nothing here logs or keeps what is typed.
+ *
+ * Pointer lock (pointerlock.h; a game, or anything that wants the mouse's motion rather than a position):
+ *   lord.input.lockPointer(node) → true: the pointer stays inside that node, hidden, and its motion comes as
+ *                               __lordEvent("lockmove", node, dx, dy) once a frame (the runtime's 'pointerlock'
+ *                               listeners), until unlockPointer(), ❖Esc or Ctrl+Alt, or the node goes away:
+ *                               __lordEvent("lockend", node, why) then, for any lock's end (Machines' "Capture
+ *                               mouse" too; why: 0 asked, 1 the keys, 2 the node is gone, 3 the input went away,
+ *                               4 another lock took its place)
+ *   lord.input.unlockPointer()  → ends the lock this context holds
+ *   lord.input.pointerLocked()  → the node holding it, or 0 */
 #include "js_input.h"
 #include "js.h"
 #include "../hw/pkagent.h"
@@ -28,6 +38,7 @@
 #include "../tp/tp.h"
 #include "../cursor.h"
 #include "../wl/wl.h"
+#include "../pointerlock.h"
 
 #include <linux/input.h>
 
@@ -194,6 +205,37 @@ void js_input_flush(void) {
 
 void js_input_drop(void) { osk_clear(); }
 
+/* ---- pointer lock (pointerlock.h) for JavaScript: the motion goes out once a frame, the end after the call that ended it ---- */
+static int js_lock_node;
+static int js_lock_tag;                 /* the sink's identity (ud) */
+static void js_lock_ended(void *ud, int why) { (void)ud; (void)why; js_lock_node = 0; }
+static JSValue f_lock_pointer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    int node = 0;
+    if (argc < 1 || JS_ToInt32(c, &node, argv[0]) || node <= 0) return JS_FALSE;
+    PtrLockSink k = { NULL, js_lock_ended, &js_lock_tag };
+    if (ptrlock_begin(node, &k)) return JS_FALSE;
+    js_lock_node = node;
+    return JS_TRUE;
+}
+static JSValue f_unlock_pointer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)c; (void)t; (void)argc; (void)argv;
+    ptrlock_end_owner(&js_lock_tag);
+    return JS_UNDEFINED;
+}
+static JSValue f_pointer_locked(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return JS_NewInt32(c, ptrlock_owned_by(&js_lock_tag) ? ptrlock_node() : 0);
+}
+
+void js_pointer_lock_flush(void) {
+    int dx, dy;
+    if (js_lock_node && ptrlock_owned_by(&js_lock_tag) && ptrlock_take(&dx, &dy)) js_pointer("lockmove", js_lock_node, (float)dx, (float)dy, 0);
+    /* any lock's end (Machines' too): the shell learns that ❖ of ❖Esc wasn't alone (sdk/shortcuts.js) */
+    int node, why;
+    if (ptrlock_take_end(&node, &why)) js_pointer("lockend", node, (float)why, 0, 0);
+}
+
 static const JSCFunctionListEntry input_funcs[] = {
     JS_CFUNC_DEF("devices", 0, f_devices),
     JS_CFUNC_DEF("config", 0, f_config),
@@ -202,6 +244,9 @@ static const JSCFunctionListEntry input_funcs[] = {
     JS_CFUNC_DEF("keyLabels", 0, f_key_labels),
     JS_CFUNC_DEF("tap", 2, f_tap),
     JS_CFUNC_DEF("pointerAccent", 1, f_pointer_accent),
+    JS_CFUNC_DEF("lockPointer", 1, f_lock_pointer),
+    JS_CFUNC_DEF("unlockPointer", 0, f_unlock_pointer),
+    JS_CFUNC_DEF("pointerLocked", 0, f_pointer_locked),
 };
 
 void js_input_register(JSContext *c, JSValue lord) {

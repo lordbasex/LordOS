@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 11
+#define VM_SCHEMA 12
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -173,6 +173,9 @@ typedef struct {
     int pointer_guest;
     /* schema 11: VM_VGPU_* ("gpu": "intel-whole" | "intel-shared", written only then); amd64 UEFI machines with 2D graphics */
     int vgpu;
+    /* schema 12: "Capture mouse" (docs/VIRTUALIZATION.md 6.25): "capture_fullscreen": true, the window captures the mouse
+     * when it goes full screen (written only then; missing: no) */
+    int capture_fullscreen;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -305,5 +308,12 @@ void vm_now_iso(char out[21]);
 /* new random id and MAC */
 int vm_new_id(char out[37]);
 int vm_new_mac(char out[18]);
+
+/* "Capture mouse" (6.25): which of QEMU's mice (query-mice's "return", untrusted: checked here) should be the active one.
+ * relative 1: one that isn't absolute, the USB or virtio mouse before the PS/2 one; 0: the tablet (absolute, "Tablet" in
+ * its name first). Returns that mouse's index, or -1 when there is none; *current: it is the active one already;
+ * *added: the active one is a relative mouse other than PS/2 (one lord-vm added, which took over by itself) */
+struct JVal;
+int vm_mouse_pick(const struct JVal *list, int relative, int *current, int *added);
 
 #endif
