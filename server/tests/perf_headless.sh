@@ -36,4 +36,4 @@ while kill -0 $P 2>/dev/null; do
 done
 LOG=$(ls "$D/home/.cache/lordos/shell.log" "$D/home/.cache/lordos/compositor.log" "$D/server.log" 2>/dev/null)
 [ -n "$PERF_OUT" ] && cat $LOG | grep -a "stall:" >"$PERF_OUT"
-cat $LOG | grep -a 'PERF ' | sed 's/.*PERF //' | node "$ROOT/server/tests/perf/table.mjs"
+cat $LOG | grep -a "PERF " | tee ${PERF_RAW:-/dev/null} | sed 's/.*PERF //' | node "$ROOT/server/tests/perf/table.mjs"

@@ -451,6 +451,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **The Terminal no longer re-renders whole windows for a program's title, in development** (Wayland and main-thread
+  audit, item 6, approved by the maintainer 2026-11-22; `docs/MAIN-THREAD.md`). A program that animates its title (Claude
+  Code's spinner, progress counters) sent a `__lordTerm` "title" event per change, and each one re-rendered the whole
+  Terminal window (it subscribed to every session's metadata) and the theme's root (the window title), about 270 React
+  updates each: the maintainer's session logged 1310 `__lordTerm` pauses in two hours, the longest 329 ms. Now the
+  window reads only the active session's profile and title, session titles are applied at most once per frame (the last
+  of each session), a metadata patch that changes nothing updates nothing, and the window's title goes to the window
+  manager at most four times a second. Measured headless (`tests/perf_headless.sh default terminal`, 1920 × 1080, CPU
+  path) with a title changed about 60 times a second: JavaScript 1043–1162 ms per 1.5 s step (29 160–36 990 React
+  updates, longest run 47 ms) before, 140–160 ms (3380–3424 updates, longest 19 ms) after; output alone (`yes | head -c
+  50M`) caused no React work before or after (the rows are drawn in C). The perf driver has `terminal` and
+  `terminalBg` plans for it.
+
 - **A microphone, camera or screen restriction keeps working with many Flatpak apps open** (`server/src/hw/hw.c`,
   `server/src/main.c`; found by Claude Security, MEDIUM). Each running Flatpak app's Spawn helper took a slot in a
   16-slot poll set ahead of pwguard's PipeWire socket, so with about 11 apps open pwguard stopped hearing new capture

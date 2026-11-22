@@ -188,12 +188,46 @@
       });
       end();
     },
+    // the Terminal while a program prints fast (`yes | head -c 50M`): the __lordTerm events and what React does for them
+    // (docs/MAIN-THREAD.md); terminalBg: the same with another window in front (the tab marks activity)
+    terminal() { termPlan(false); },
+    terminalBg() { termPlan(true); },
+    // a window's title changing (what a terminal program's title escapes end in): what the theme re-renders for it
+    titles() {
+      begin('Terminal open: wm.setTitle 4 times a step');
+      step('close the others', closeAll);
+      step('open', () => sdk.wm.open('terminal'));
+      step('wait', () => {});
+      for (let i = 0; i < 6; i++) step(`titles ${i}`, () => { const w = sdk.windows.get().find((x) => x.id.startsWith('terminal')); for (let k = 0; k < 4; k++) sdk.wm.setTitle(w.id, `t${i}.${k}`); });
+      end();
+    },
     launcher() {
       begin('Launcher F4 (4 times)');
       for (let i = 0; i < 4; i++) step(`F4 ${i}`, () => key('F4', 62));
       end();
     },
   };
+  const termPlan = (bg) => {
+    const name = bg ? 'Terminal behind a window: yes | head -c 50M' : 'Terminal: yes | head -c 50M';
+    begin(name + ' (open)');
+    step('close the others', closeAll);
+    step('open', () => sdk.wm.open('terminal'));
+    step('wait', () => {});
+    step('wait', () => {});
+    if (bg) step('open settings in front', () => { sdk.wm.open('settings'); sdk.wm.focus('settings'); });
+    end();
+    begin(name);
+    step('run', () => {
+      const sids = lord.term.list();
+      if (!sids.length) return false;
+      for (const sid of sids) lord.term.write(sid, 'yes | head -c 50M; for i in $(seq 1 20); do printf "\\033]0;t$i\\007"; yes | head -c 2M; done; for i in $(seq 1 300); do printf "\\033]0;s$i\\007"; sleep 0.01; done\r');
+      return true;
+    });
+    for (let i = 0; i < 18; i++) step('printing', () => { log({ termEvents: { ...termCounts } }); for (const k in termCounts) delete termCounts[k]; });
+    end();
+  };
+  const termCounts = {};
+  sdk.term.onAny((sid, type) => { termCounts[type] = (termCounts[type] || 0) + 1; });
   // idleX: app X alone, then 20 idle steps (30 s): what it does in the background, and whether its heap grows
   const idleApp = (app) => {
     begin(`${app} alone: open`);
