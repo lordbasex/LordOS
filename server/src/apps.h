@@ -49,6 +49,9 @@ int apps_launch_uri(const char *id, const char *uri);    /* vnc://, rdp://, http
  * command line built in C, in its root-owned app-lordos-fp-<id>.scope and the launcher's view. With: one real path in
  * the home folder or the user's mounts. 0 started; -1 refused (apps_last_error says why when it can). */
 int apps_launch_flatpak(const char *id);
+/* Who takes the lord-server end of a Flatpak app's Spawn helper (fpspawner.h): fpspawn_add_view in lord-server. Without
+ * one, a Flatpak app starts with no helper (its Spawn calls are refused). */
+void apps_set_spawn_hook(void (*hook)(int fd, const char *id));
 int apps_launch_flatpak_with(const char *id, const char *path);
 int apps_flatpak_installed(const char *id);
 /* The installed Flatpak apps (id = the Flatpak id) from their exported .desktop files: name, comment, categories,

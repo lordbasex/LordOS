@@ -451,6 +451,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Flatpak apps built on Chromium or Electron no longer die at start** (Whatsie from Flathub: it showed its tray icon
+  and quit, with `trap int3` in libQt6WebEngineCore at every launch). Chromium (QtWebEngine, CEF, the browser) and zypak
+  (Electron) ask Flatpak's Spawn for a sub-sandbox that joins the app's own user and PID namespaces (EXPOSE_PIDS /
+  SHARE_PIDS). LordOS served the Spawn, but its `flatpak run` started in a new Landlock domain (Landlock's scoping applied
+  again), and the kernel lets only the app's own domain open the app's `/run/.userns` and PID namespace: bubblewrap ran
+  without them, stopped on "creation of new user namespaces was not disabled as requested", the zygote never started
+  and Chromium's CHECK ended the app. Now the launcher forks a small **Spawn helper** inside each Flatpak app's view
+  right after the app's Landlock scoping (`server/src/fpspawner.c`): same scope, namespaces and Landlock domain as the
+  app, no capabilities, not dumpable, executing only `/usr/bin/flatpak run` with the command line lord-server builds,
+  and talking only to lord-server over a socket pair. lord-server no longer enters any namespace for a Spawn; it checks
+  the caller as before, hands the helper the argv, environment and fds (a sealed memfd and SCM_RIGHTS), accepts the new
+  process only in the caller's scope and signals it through its pidfd. SpawnStarted waits for bubblewrap's
+  `bwrapinfo.json` (up to 3 s) so Chromium gets the real relative pid instead of 0 ("Already died").
+  `sandbox-expose-fd(-ro)` (the Chromium browser's WidevineCdm folder) is read and left out, as flatpak-portal does
+  with an fd it can't resolve: Flatpak would be given a path the app could swap for a link before the bind. Tests:
+  `build/fpspawner-test` (52 checks: header and payload rules, the helper over a real socket pair placing Chromium's fds
+  0-2 and its zygote socket, the instance fd, stdin on /dev/null, its own process group, exit statuses, refusals, no
+  capabilities) and the session test `server/tests/fwflatpak/spawn.sh` with `build/fpspawn-cli` (18 checks with
+  Whatsie, Chromium and FreeTube: Spawn served, bubblewrap joins the app's namespaces, helpers nested in the app's PID
+  namespace, the helper in the app's scope, a window drawn, no CHECK failure).
+- **Qt 6 apps open on the real display instead of a placeholder screen** ("qt.qpa.wayland: There are no outputs -
+  creating placeholder screen"): `zxdg_output_v1` version 3 now sends `name` and `description`, as version 2 did (only
+  its `done` gave way to `wl_output.done`); Qt waits for the name before it takes a display (`server/src/wl/wl.c`).
+
 - **Machines: a machine with an Intel graphics card (GVT-g) no longer takes most of a CPU core, in development**
   (`docs/MACHINES-GPU.md`, "A vGPU's picture without a readback"). Live on the maintainer's computer (the new-card guest on
   the vGPU at 1920 × 1080, an RX 580 drawing the desktop) lord-server's main thread used ~90 % of a core: QEMU's vfio
@@ -779,6 +803,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   showed. The check now allows every known bit.
 
 ### Changed
+
+- **Chromium and Electron apps from Flathub install and work; the Store no longer marks them "not yet supported"**
+  (`apps/store/flathubpages.js`, `sdk/flathubmodel.js`, `docs/FLATPAK.md`). Their helpers' sub-sandboxes are now served
+  (see Fixed). Checked with Whatsie (QtWebEngine), the Chromium browser and FreeTube (Electron/zypak). The Store's
+  permission list no longer shows `org.freedesktop.portal.Flatpak` as "running programs outside its sandbox": it is
+  LordOS's own Spawn, which only starts the same app in a sub-sandbox (`org.freedesktop.Flatpak`, the host one, still
+  is). The texts of the old notice are removed from every language.
 
 - **Machines: a machine's picture at the guest's full rate, in development** (`docs/MACHINES-GPU.md` Part 1 steps 1
   and 3). lord-server reads each machine's frames in its own loop and acknowledges a frame right after the paint that

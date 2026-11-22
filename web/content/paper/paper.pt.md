@@ -396,7 +396,7 @@ Nem todo programa no LordOS fica em sandbox. Isto é exatamente o que vale para 
 | Programas do Terminal | filhos do shell do Terminal | não | o escopo de componente do próprio Terminal (0.8.5) | não | como "Terminal": regras de rede, com os nomes dos programas no Monitor |
 | Apps X11 | sob o Xwayland | como a sua entrada no lançador | próprio, como os apps Wayland | não | o mesmo que os apps Linux |
 
-Um programa iniciado de outro jeito, fora do lançador de apps, não está em nenhum escopo de app e não recebe regras por app. O isolamento próprio do LordOS não usa Flatpak nem bubblewrap (os apps do Flathub, desde a 0.8.9.4, rodam através deles dentro da visão do LordOS).
+Um programa iniciado de outro jeito, fora do lançador de apps, não está em nenhum escopo de app e não recebe regras por app. O isolamento próprio do LordOS não usa Flatpak nem bubblewrap (os apps do Flathub, desde a 0.8.9.4, rodam através deles dentro da visão do LordOS). Em desenvolvimento depois da 0.8.9.4: os apps do Flathub baseados em Chromium e Electron também rodam; os sandboxes internos que os processos auxiliares deles pedem são iniciados por um pequeno auxiliar de Spawn que o lançador cria dentro da visão de cada app Flatpak, no mesmo escopo, namespaces e domínio do Landlock do app, sem capacidades e executando só `flatpak run` do mesmo app (`docs/FLATPAK.md`, "Sub-sandboxes").
 
 Cada app `.lpk`, e o app Senhas, roda como `lord-server --app <id>`: o mesmo binário em "modo app", iniciado pelo `lord-server` com um id de pacote validado como único argumento. O processo se conecta ao compositor como cliente Wayland e abre o socket do broker, depois aplica o sandbox e só então carrega o código do app (`server/src/sec/sandbox.c`):
 

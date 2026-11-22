@@ -1,8 +1,9 @@
 // flathubpages.js — the Store's Flathub section (docs/FLATPAK.md, phase 1 step 5): turning Flathub on (the `flatpak`
 // package through the Store's package job, then the remote and the catalog), the catalog as cards (Flathub's verified
 // apps unless the setting shows the rest), each app's page with what it declares and what LordOS changes before it is
-// installed, the apps that need Flatpak's sub-sandboxes (Chromium, Electron) marked "not yet supported", and the
-// installed ones with Update and Remove. The jobs and state are sdk/flathub.js's; the logic sdk/flathubmodel.js's.
+// installed, and the installed ones with Update and Remove. Chromium and Electron apps install like any other: their
+// helpers' sub-sandboxes are served by LordOS (docs/FLATPAK.md, "Sub-sandboxes"). The jobs and state are
+// sdk/flathub.js's; the logic sdk/flathubmodel.js's.
 import { createElement as h, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, Image, Button, GroupBox, Toggle, LetterIcon, useTheme, useStore, useLauncherApps, launchApp, admin, formatBytes, errorText, settings,
@@ -270,15 +271,14 @@ export function FlathubDetail({ id }) {
   useEffect(() => { if (fh.on) { if (!s.loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
   if (!fh.on) return h(View, null, h(TurnOn));
   if (!a) return h(Line, { th }, s.loaded ? t('flathub.gone') : t('flathub.busy.catalog'));
-  const sub = meta && !meta.error && M.needsSubsandbox(meta);
   const busy = !!s.job;
   const mine = s.job && s.job.id === a.id;
   const buttons = inst
     ? [h(Button, { key: 'rm', label: t('flathub.remove'), disabled: busy, onClick: () => !busy && F.uninstall({ ...inst, name: a.name }) }),
       h(Button, { key: 'up', label: t('flathub.update'), disabled: busy, onClick: () => !busy && F.update({ ...inst, name: a.name }) }),
       h(Button, { key: 'open', primary: true, label: t('store.open'), onClick: () => openApp(a.id) })]
-    : [h(Button, { key: 'in', primary: true, label: sub ? t('flathub.notYet') : t('store.install'), disabled: busy || sub || !meta || !!meta.error,
-      onClick: () => !busy && !sub && meta && !meta.error && F.install(a) })];
+    : [h(Button, { key: 'in', primary: true, label: t('store.install'), disabled: busy || !meta || !!meta.error,
+      onClick: () => !busy && meta && !meta.error && F.install(a) })];
   return h(View, { style: { gap: spacing.xl } },
     h(View, { style: { flexDirection: 'row', gap: spacing.l, alignItems: 'center' } },
       h(FlathubIcon, { a, size: 96 }),
@@ -291,9 +291,6 @@ export function FlathubDetail({ id }) {
             a.verified ? t('flathub.verified', { developer: a.developer || a.id }) : t('flathub.unverified')))),
       h(View, { style: { flexDirection: 'row', gap: spacing.s, alignItems: 'center' } }, ...buttons)),
     mine || (!s.job && s.msg && s.msg.id === a.id) ? h(JobProgress, { forId: a.id }) : null,
-    sub ? h(View, { style: box(th, { marginBottom: 0, border: '1px solid rgba(255,159,10,0.6)' }) },
-      h(Title, { th }, t('flathub.subsandbox.title')),
-      h(Line, { th, color: th.text }, t('flathub.subsandbox.text'))) : null,
     h(Facts, { items: [
       [t('flathub.fact.developer'), a.developer],
       [t('flathub.fact.license'), a.license],

@@ -45,14 +45,6 @@
       }
     },
     {
-      "file": "docs/flatpak-store-electron.png",
-      "caption": {
-        "en": "An Electron app: marked \"Not yet supported\", with the reason, and what it declares, including what LordOS never grants (your saved passwords).",
-        "es": "Una app de Electron: marcada «Todavía no compatible con LordOS», con el motivo, y lo que declara, incluido lo que LordOS nunca da (tus contraseñas guardadas).",
-        "pt": "Um app Electron: marcado “Ainda não suportado no LordOS”, com o motivo, e o que declara, incluindo o que o LordOS nunca concede (as suas senhas salvas)."
-      }
-    },
-    {
       "file": "docs/flatpak-settings.png",
       "caption": {
         "en": "Settings → Flatpak: installed or not, Flathub shown in the Store or not, how many apps and how much space they and their data take, and Remove Flatpak completely.",

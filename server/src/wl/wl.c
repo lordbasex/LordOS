@@ -1147,7 +1147,9 @@ static void send_xdg_output(struct wl_resource *x, const WlOutput *o) {
         zxdg_output_v1_send_logical_size(x, o->w, o->h);
     }
     int ver = wl_resource_get_version(x);
-    if (ver >= 2 && ver < 3) { zxdg_output_v1_send_name(x, o->name); zxdg_output_v1_send_description(x, o->desc[0] ? o->desc : o->name); }
+    /* name and description from version 2 on, version 3 included (only xdg_output.done gave way to wl_output.done):
+     * Qt 6 waits for the name on 2 and later before it takes the display, or it opens on a placeholder screen */
+    if (ver >= 2) { zxdg_output_v1_send_name(x, o->name); zxdg_output_v1_send_description(x, o->desc[0] ? o->desc : o->name); }
     if (ver < 3) zxdg_output_v1_send_done(x);
 }
 

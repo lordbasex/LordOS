@@ -77,11 +77,12 @@ const mt = M.parseMetadata(marktext);
 eq('runtime', mt.runtime, 'org.freedesktop.Platform/x86_64/26.08');
 eq('context lists', mt.context, { shared: ['ipc', 'network'], sockets: ['wayland', 'x11'], devices: ['dri'], features: [], filesystems: ['/tmp', 'xdg-run/keyring', 'host'] });
 eq('session bus', mt.session, { 'com.canonical.AppMenu.Registrar': 'talk', 'org.freedesktop.Notifications': 'talk', 'org.freedesktop.secrets': 'talk' });
-eq('electron needs sub-sandboxes', M.needsSubsandbox(mt), true);
-eq('gtk app does not', M.needsSubsandbox(M.parseMetadata(calculator)), false);
-eq('chromium base', M.needsSubsandbox(M.parseMetadata(['[Application]', 'base=app/org.chromium.Chromium.BaseApp/x86_64/24.08'])), true);
-eq('a key outside [Application] is not the base', M.needsSubsandbox(M.parseMetadata(['[Context]', 'base=app/org.electronjs.Electron2.BaseApp/x86_64/1'])), false);
-eq('no metadata', M.needsSubsandbox(null), false);
+// Chromium and Electron apps are not set apart any more (their sub-sandboxes are served, docs/FLATPAK.md E9)
+eq('no sub-sandbox marking left', [M.needsSubsandbox, M.SUBSANDBOX_BASES], [undefined, undefined]);
+eq('the base is still read', M.parseMetadata(['[Application]', 'base=app/org.chromium.Chromium.BaseApp/x86_64/24.08']).base, 'app/org.chromium.Chromium.BaseApp/x86_64/24.08');
+// LordOS's Spawn portal is a portal like the others: never shown as "running programs outside its sandbox"
+eq('portal.Flatpak alone: no spawn row', M.permissionRows(M.parseMetadata(['[Session Bus Policy]', 'org.freedesktop.portal.Flatpak=talk'])), []);
+eq('org.freedesktop.Flatpak still is', M.permissionRows(M.parseMetadata(['[Session Bus Policy]', 'org.freedesktop.Flatpak=talk'])).map((r) => r.perm), ['spawn']);
 eq('empty and junk', M.parseMetadata(['', 'junk', '=x', '[Context', 'shared=network']).context.shared, []);
 
 // ---- permission rows ----

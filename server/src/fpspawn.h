@@ -11,6 +11,12 @@ int  fpspawn_fd(void);                  /* -1 when not running */
 int  fpspawn_wants_write(void);
 void fpspawn_dispatch(void);
 void fpspawn_tick(void);                /* children that exited, callers that left the bus, instance ids */
-void fpspawn_stop(void);                /* flatpak was removed: the name is given up (processes already started go on) */
+void fpspawn_stop(void);
+/* A Flatpak app's Spawn helper (fpspawner.h): lord-server's end of its socket (fpspawn owns it from now on), and the
+ * app it was started for (apps_set_spawn_hook). Its messages come through fpspawn_pollfds / fpspawn_dispatch_views. */
+struct pollfd;
+void fpspawn_add_view(int fd, const char *id);
+int  fpspawn_pollfds(struct pollfd *p, int max);
+void fpspawn_dispatch_views(void);                /* flatpak was removed: the name is given up (processes already started go on) */
 
 #endif

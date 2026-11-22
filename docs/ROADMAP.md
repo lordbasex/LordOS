@@ -1110,9 +1110,9 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   `flatpak:<id>`, and the VM test plan (run 2026-11-20; automated as `server/tests/fwflatpak/flatpak.sh`). Built after
   the test plan: LordOS's own sub-sandbox service (E9; GNOME apps that load images through glycin need it), X11 for
   unrestricted apps, Settings → Flatpak with "Remove Flatpak completely". Phase 2: LordOS's portals for Flatpak callers,
-  **Electron/Chromium apps** (zypak's Spawn reaches LordOS's service, then bubblewrap refuses to join the caller's
-  namespaces: "creation of new user namespaces was not disabled as requested"; until then they stay marked "not yet
-  supported" in the Store), the Raspberry Pi 5. History: a Flathub section in the Store. On
+  the Raspberry Pi 5. **Electron/Chromium apps: done in development after 0.8.9.4 (2026-11-22)**: the Spawn runs through
+  the app's Spawn helper in its own view and Landlock domain, so bubblewrap joins the app's namespaces; the Store marks
+  them no more (checked with Whatsie, Chromium and FreeTube; `docs/FLATPAK.md`, "Sub-sandboxes"). History: a Flathub section in the Store. On
   2026-10-27 the maintainer decided not to implement it for now: the priority is the system's stability, and Flatpak
   would add complexity (bubblewrap, OSTree, portals, seven new exceptions to `AGENTS.md`) and future problems. The
   design review is kept as documentation (`FLATPAK.md`); nothing is built until the maintainer decides whether to

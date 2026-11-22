@@ -22,9 +22,7 @@ It works on **64-bit PCs** (x86-64) today; the Raspberry Pi will come later.
 
 **Installing, updating, removing.** One button each, with the progress on the page. Removing an app also removes the runtimes no other app uses any more.
 
-**Not yet supported** apps say so before you try: apps built on Chromium or Electron are marked, and their Install button is off.
-
-[[shot:3]]
+**Chromium and Electron apps** (in development after 0.8.9.4): they install like any other. Until 0.8.9.4 they were marked "not yet supported"; now the sub-sandboxes their helpers need are served inside the app's own sandbox.
 
 ## Settings → Flatpak
 
@@ -32,29 +30,29 @@ Settings has a **Flatpak** page of its own: whether Flatpak is installed, Flathu
 
 **Remove Flatpak completely** takes away every Flathub app, the runtimes they used, Flathub itself and the `flatpak` package, with the packages listed before anything happens and the administrator password asked, and optionally moves the apps' own data to the Trash. Afterwards nothing of Flatpak is left on the computer.
 
-[[shot:4]]
+[[shot:3]]
 
-[[shot:5]]
+[[shot:4]]
 
 ## In your desktop, like any app
 
 Flathub apps show in search, in the launcher and in Files' **Open With**, and you can keep them in the **Dock**. They get LordOS's window frame, its menu bar and its notifications with the app's own name and icon.
 
-[[shot:6]]
+[[shot:5]]
 
-[[shot:7]]
+[[shot:6]]
 
 When you open a file with a Flathub app, **it gets that one file**, nothing else of your home.
 
-[[shot:8]]
+[[shot:7]]
 
 GTK 4 and GTK 3, Qt and KDE, X11-only apps and Firefox's own sandbox all work:
+
+[[shot:8]]
 
 [[shot:9]]
 
 [[shot:10]]
-
-[[shot:11]]
 
 ## Under your Firewall and your rules
 
@@ -66,9 +64,9 @@ Each Flathub app runs in **its own root-owned scope** (`flatpak:<id>` in the Fir
 
 Flathub's own downloads (the catalog, installs and updates) are a row of their own too, **Flathub**, which you can see and block.
 
-[[shot:12]]
+[[shot:11]]
 
-[[shot:13]]
+[[shot:12]]
 
 ## What LordOS never grants
 
@@ -91,7 +89,7 @@ Whatever an app declares, or an override file asks for later:
 | Flatpak's own portal and session helper masked | What they start runs outside the app's sandbox. LordOS serves the sub-sandboxes GNOME apps need itself, inside the same app's sandbox. |
 | The catalog read in a sandbox of its own | Flathub's catalog is parsed by a small helper with no network and no files, never by the desktop itself. |
 | Its own Firewall row for Flathub | Downloads are visible, and you can stop them like any app. |
-| Electron and Chromium apps marked | Their helpers need a kind of sandbox sharing LordOS doesn't offer yet. Marked rather than broken. |
+| Chromium and Electron helpers in the app's own sandbox | Their sub-sandboxes are started by a small helper inside the app's view, with the app's own limits and no more (in development after 0.8.9.4). |
 | Nothing in the background | No Flatpak service runs unless an app is open; LordOS's own part exists only while `flatpak` is installed. |
 | x86-64 first | Tested there; the Raspberry Pi comes after. |
 
@@ -99,6 +97,6 @@ Whatever an app declares, or an override file asks for later:
 
 On a test machine on 20 November 2026, an **automated test plan** of 31 checks runs every time (`server/tests/fwflatpak/flatpak.sh`): Flathub's Firewall row, each app's identity, what is never granted even with an override, no files, no internet, the sub-sandboxes, X11 with and without a restriction, and the microphone restriction between two apps. The apps tried by hand: **GNOME Text Editor, Decibels, Shortwave, Meld, KCalc, Firefox and GNU Emacs**. A security review of the whole change found four problems, all fixed before the release.
 
-**Not yet:** Electron and Chromium-based apps; Spotify starts only with its own Wayland flags (its developer's choice, not LordOS's); the Raspberry Pi.
+**In development after 0.8.9.4:** Chromium- and Electron-based apps, checked on 22 November 2026 with Whatsie (Qt WebEngine), Chromium and FreeTube (Electron); DRM video (Widevine) isn't available to them. **Not yet:** Spotify starts only with its own Wayland flags (its developer's choice, not LordOS's); the Raspberry Pi.
 
 The full design, every decision and every test result are in `docs/FLATPAK.md`.
