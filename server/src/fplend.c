@@ -223,6 +223,14 @@ static int ask(int v, SbLendMsg *q, char *grant) {
     }
 }
 
+/* A path with a hidden segment ("/.x"): home and config dot-files and folders, many of which run code later (shell and
+ * editor startup files, .npmrc, mimeapps.list, ~/.config/git, …). Nothing there is lent writable or saved. */
+static int hidden_path(const char *path) {
+    for (const char *p = path; (p = strchr(p, '/')); p++)
+        if (p[1] == '.') return 1;
+    return 0;
+}
+
 int fplend_check(const char *id, const char *path, int kind, SbLendMsg *q) {
     if (!id || !path || !q || kind < FPLEND_FILE || kind > FPLEND_SAVE) return -1;
     /* every check below compares strings: only a path written the one way realpath writes it */
@@ -246,7 +254,7 @@ int fplend_check(const char *id, const char *path, int kind, SbLendMsg *q) {
         if (pfd < 0) { fprintf(stderr, "fplend: %s: the save's folder isn't the one named\n", id); goto out; }
         /* only a name the person may write, never a protected or sensitive one (the launcher's grant rules). Only that
          * file is lent, never its folder (F5): nothing else in the folder is seen. */
-        if (fsops_protected_resolved(path) || !apps_grant_ok(path)) {
+        if (fsops_protected_resolved(path) || !apps_grant_ok(path) || hidden_path(path)) {
             fprintf(stderr, "fplend: %s: a save there isn't lent\n", id);
             goto out;
         }
@@ -263,7 +271,7 @@ int fplend_check(const char *id, const char *path, int kind, SbLendMsg *q) {
             fprintf(stderr, "fplend: %s: that %s isn't lent\n", id, kind == FPLEND_DIR ? "folder" : "file");
             goto out;
         }
-        q->rw = (uint32_t)apps_grant_ok(path);
+        q->rw = (uint32_t)(apps_grant_ok(path) && !hidden_path(path));
     }
     snprintf(q->path, sizeof q->path, "%s", path);
     q->dev = q->tdev = (uint64_t)st.st_dev;
