@@ -77,16 +77,42 @@ static void draw(Conn *c, struct wl_surface *s, uint32_t color) {
     wl_surface_commit(s);
 }
 
+static struct xdg_surface *last_xs;         /* the last window's xdg_surface */
+
 /* a mapped window: the root the subsurfaces hang from */
 static struct wl_surface *window(Conn *c) {
     struct wl_surface *s = wl_compositor_create_surface(c->comp);
     struct xdg_surface *xs = xdg_wm_base_get_xdg_surface(c->wm, s);
+    last_xs = xs;
     xdg_surface_add_listener(xs, &xs_l, NULL);
     struct xdg_toplevel *t = xdg_surface_get_toplevel(xs);
     xdg_toplevel_set_app_id(t, "cycle-client");
     wl_surface_commit(s);
     wl_display_roundtrip(c->dpy);
     draw(c, s, 0xffd0d0d0u);
+    wl_display_roundtrip(c->dpy);
+    return s;
+}
+
+static void pop_configure(void *d, struct xdg_popup *p, int32_t x, int32_t y, int32_t w, int32_t h) { (void)d; (void)p; (void)x; (void)y; (void)w; (void)h; }
+static void pop_done(void *d, struct xdg_popup *p) { (void)d; (void)p; }
+static void pop_repositioned(void *d, struct xdg_popup *p, uint32_t t) { (void)d; (void)p; (void)t; }
+static const struct xdg_popup_listener pop_l = { pop_configure, pop_done, pop_repositioned };
+
+/* a mapped menu of parent */
+static struct wl_surface *popup(Conn *c, struct xdg_surface *parent) {
+    struct wl_surface *s = wl_compositor_create_surface(c->comp);
+    struct xdg_surface *xs = xdg_wm_base_get_xdg_surface(c->wm, s);
+    xdg_surface_add_listener(xs, &xs_l, NULL);
+    struct xdg_positioner *pos = xdg_wm_base_create_positioner(c->wm);
+    xdg_positioner_set_size(pos, 64, 48);
+    xdg_positioner_set_anchor_rect(pos, 0, 0, 10, 10);
+    struct xdg_popup *p = xdg_surface_get_popup(xs, parent, pos);
+    xdg_popup_add_listener(p, &pop_l, NULL);
+    xdg_positioner_destroy(pos);
+    wl_surface_commit(s);
+    wl_display_roundtrip(c->dpy);
+    draw(c, s, 0xffeeeeeeu);
     wl_display_roundtrip(c->dpy);
     return s;
 }
@@ -205,6 +231,63 @@ int main(void) {
         wl_display_roundtrip(c.dpy);
         check("a subsurface of a subsurface is still fine", wl_display_get_error(c.dpy), 0);
         wl_display_disconnect(c.dpy);
+    }
+    alive("a valid subsurface tree");
+
+    /* 7. a surface with an xdg_surface (no role yet) made a subsurface: it could become a menu as well, linked twice */
+    connect_to(&c);
+    {
+        struct wl_surface *w = window(&c), *s = wl_compositor_create_surface(c.comp);
+        xdg_wm_base_get_xdg_surface(c.wm, s);
+        wl_subcompositor_get_subsurface(c.subc, s, w);
+        expect_error(&c, "a subsurface that has an xdg_surface", &wl_subcompositor_interface, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE);
+    }
+    alive("a subsurface that has an xdg_surface");
+
+    /* 8. a subsurface given an xdg_surface (to make it a menu): refused, it already has a role */
+    connect_to(&c);
+    {
+        struct wl_surface *w = window(&c), *s = wl_compositor_create_surface(c.comp);
+        wl_subcompositor_get_subsurface(c.subc, s, w);
+        xdg_wm_base_get_xdg_surface(c.wm, s);
+        expect_error(&c, "a subsurface given a popup's xdg_surface", &xdg_wm_base_interface, XDG_WM_BASE_ERROR_ROLE);
+    }
+    alive("a subsurface given a popup's xdg_surface");
+
+    /* 9. a subsurface of a menu made a menu whose parent is that subsurface's own parent menu: its xdg_surface is
+     *    refused first (a subsurface has a role); the menu's own subsurface may not become its parent either */
+    connect_to(&c);
+    {
+        struct wl_surface *w = window(&c);
+        struct wl_surface *ps = popup(&c, last_xs), *q = wl_compositor_create_surface(c.comp);
+        wl_subcompositor_get_subsurface(c.subc, q, ps);
+        draw(&c, q, 0xff2a6fd6u);
+        wl_surface_commit(ps);
+        wl_display_roundtrip(c.dpy);
+        check("a menu with a subsurface is fine", wl_display_get_error(c.dpy), 0);
+        wl_subcompositor_get_subsurface(c.subc, ps, q);
+        (void)w;
+        expect_error(&c, "a menu made a subsurface of its own subsurface", &wl_subcompositor_interface, WL_SUBCOMPOSITOR_ERROR_BAD_SURFACE);
+    }
+    alive("a menu made a subsurface of its own subsurface");
+
+    /* 10. a mixed chain: window → menu → subsurface b → subsurface d; then b (its subsurface object destroyed) under d */
+    connect_to(&c);
+    {
+        window(&c);
+        struct wl_surface *ps = popup(&c, last_xs), *b = wl_compositor_create_surface(c.comp), *d = wl_compositor_create_surface(c.comp);
+        struct wl_subsurface *sb = wl_subcompositor_get_subsurface(c.subc, b, ps);
+        wl_subcompositor_get_subsurface(c.subc, d, b);
+        wl_subsurface_set_desync(sb);
+        draw(&c, d, 0xff6fd62au);
+        draw(&c, b, 0xff2a6fd6u);
+        wl_surface_commit(ps);
+        wl_display_roundtrip(c.dpy);
+        check("window, menu, subsurface, subsurface: fine", wl_display_get_error(c.dpy), 0);
+        wl_subsurface_destroy(sb);
+        wl_subcompositor_get_subsurface(c.subc, b, d);
+        draw(&c, b, 0xff2a6fd6u);
+        expect_error(&c, "a menu's subsurface under its own child", &wl_subcompositor_interface, WL_SUBCOMPOSITOR_ERROR_BAD_PARENT);
     }
     alive("the last case");
 
