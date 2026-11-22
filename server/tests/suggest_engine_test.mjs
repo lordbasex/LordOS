@@ -27,7 +27,7 @@ const facts = (patch) => ({ ...base(), ...patch });
 
 // ---- fake index: name → { installed } ; absent = not in the configured sources ----
 const MAIN = ['open-vm-tools', 'qemu-guest-agent', 'linux-headers-amd64', 'hplip', 'libsane-hpaio', 'printer-driver-escpr', 'printer-driver-brlaser',
-  'printer-driver-splix', 'printer-driver-gutenprint', 'ipp-usb', 'gpiod', 'lordos-studio-camera'];
+  'printer-driver-splix', 'printer-driver-gutenprint', 'ipp-usb', 'gpiod', 'lordos-studio-camera', 'mokutil'];
 const NONFREE = ['nvidia-driver', 'firmware-misc-nonfree', 'firmware-realtek', 'firmware-iwlwifi', 'firmware-atheros', 'firmware-brcm80211',
   'firmware-mediatek', 'firmware-amd-graphics', 'firmware-intel-graphics', 'bluez-firmware', 'firmware-libertas', 'firmware-nvidia-graphics'];
 const RPI = ['rpi-eeprom', 'raspi-utils'];
