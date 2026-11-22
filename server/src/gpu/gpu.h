@@ -45,6 +45,8 @@ int  gpu_device(dev_t *dev);
 
 /* Textures: from premultiplied ARGB pixels (shm) or from a dmabuf (EGLImage). */
 GpuTex *gpu_tex_pixels(GpuTex *t, const uint32_t *px, int w, int h, int opaque);
+/* Only the rect r of px changed: uploaded alone into the live texture of the same size (else all of px, as above). */
+GpuTex *gpu_tex_pixels_rect(GpuTex *t, const uint32_t *px, int w, int h, int opaque, Rect r);
 GpuTex *gpu_tex_dmabuf(const GpuDmabuf *d);
 void    gpu_tex_free(GpuTex *t);
 
@@ -141,6 +143,9 @@ void gpu_gdrag_stats(long *below_px, long *layer_px, long *quads);
 int  gpu_add_output(Kms *k);
 void gpu_draw(GpuTex *t, float dx, float dy, float dw, float dh,
               float sx, float sy, float sw, float sh, Rect clip, float opacity);
+/* The same with each corner's texture point given (texture pixels: top-left, top-right, bottom-left, bottom-right as x, y
+ * pairs): a turned or flipped buffer (wl_surface.set_buffer_transform) drawn upright. */
+void gpu_draw_uv(GpuTex *t, float dx, float dy, float dw, float dh, const float uv[8], Rect clip, float opacity);
 
 /* The remote desktop's copy of the next composed frame (docs/REMOTE.md, "Video (WebRTC)"): the
  * next gpu_frame of a w×h display reads the whole frame back into px (0xAARRGGBB, rows top to

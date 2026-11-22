@@ -82,6 +82,7 @@
 #include "../cursor.h"
 #include "ptrlock.h"
 #include "outpick.h"
+#include "buftf.h"
 #include "wl_input.h"
 #include "../gpu/gpu.h"
 #include "../media/media.h"
@@ -151,6 +152,15 @@ struct Surf {
     Dmabuf *dmabuf;
     GpuTex *tex;                /* uploaded px (GPU path) */
     int tex_dirty;
+    /* damage (docs/WAYLAND.md, "Frames, titles and damage"): pending until commit, surface coordinates (damage) and
+     * buffer pixels (damage_buffer); the last commit's in upright buffer pixels (dmg, dmg_full: all of it), and what
+     * the texture still lacks (tex_dmg, tex_full) */
+    float p_ds[4];
+    int p_ds_on, p_db_on;
+    BufBox p_db, dmg, tex_dmg;
+    int dmg_full, tex_full;
+    int p_tf, tf;                   /* wl_surface.set_buffer_transform: pending and current (buftf.h) */
+    int tf_px;                      /* the transform px was turned from (px is always upright) */
     int lw, lh;                 /* logical size (viewporter; otherwise the buffer's) */
     /* wp_viewporter: pending and current (vsw < 0 = no crop, vdw <= 0 = no scaling) */
     struct wl_resource *viewport;
@@ -414,18 +424,50 @@ static unsigned surf_keys(Surf *top);
  * (wl_new_content), not every display (main.c marked them all). */
 static void new_on(unsigned keys) { need_frame = 1; new_keys |= keys; }
 
+static void source_rect(const Surf *s, float *sx, float *sy, float *sw, float *sh);
+static int origin(Surf *s, float *x, float *y);
+
+/* Where on screen a window's last commit changed it (logical), from its damage (s->dmg, upright buffer pixels): 1 with
+ * *b set (empty: nothing changed), 0 when all of it must be taken (a new size or shape, a transform, fullscreen, not
+ * placed yet). Toplevels only: a subsurface's place comes with its parent's commit. */
+static int damage_box(Surf *s, Box *b) {
+    if (s->role != R_TOPLEVEL || s->parent || s->dmg_full || s == fs_surf || !s->content || hole_sig(s) != s->hole_sig ||
+        s->tf_drawn || s->lw <= 0 || s->lh <= 0)
+        return 0;
+    Node *n = s->node ? node_get(s->node) : NULL;
+    float ox, oy;
+    if (!n || n->has_tf || n->prev_box.x1 <= n->prev_box.x0 || !origin(s, &ox, &oy)) return 0;
+    if (s->dmg.x1 <= s->dmg.x0 || s->dmg.y1 <= s->dmg.y0) { *b = (Box){ 0, 0, 0, 0 }; return 1; }
+    float sx, sy, sw, sh;
+    source_rect(s, &sx, &sy, &sw, &sh);
+    if (sw <= 0 || sh <= 0) return 0;
+    float kx = (float)s->lw / sw, ky = (float)s->lh / sh;
+    Box r = { floorf(ox + ((float)s->dmg.x0 - sx) * kx) - 2, floorf(oy + ((float)s->dmg.y0 - sy) * ky) - 2,
+              ceilf(ox + ((float)s->dmg.x1 - sx) * kx) + 2, ceilf(oy + ((float)s->dmg.y1 - sy) * ky) + 2 };
+    if (r.x0 < n->prev_box.x0) r.x0 = n->prev_box.x0;
+    if (r.y0 < n->prev_box.y0) r.y0 = n->prev_box.y0;
+    if (r.x1 > n->prev_box.x1) r.x1 = n->prev_box.x1;
+    if (r.y1 > n->prev_box.y1) r.y1 = n->prev_box.y1;
+    *b = r.x1 > r.x0 && r.y1 > r.y0 ? r : (Box){ 0, 0, 0, 0 };
+    return 1;
+}
+
 static void damage_node(Surf *s) {
     Surf *top = s;
     while (top->parent && top->role != R_TOPLEVEL) top = top->parent;
+    Box part;
+    int have_part = top == s && damage_box(s, &part);
     if (content_on) {               /* a menu or a fullscreen app may be anywhere: all of it */
         Node *tn = top->node ? node_get(top->node) : NULL;
-        if (top->role == R_POPUP || top == fs_surf || !tn) content_note((Box){ 0, 0, ui.width, ui.height });
+        if (have_part) content_note(part);
+        else if (top->role == R_POPUP || top == fs_surf || !tn) content_note((Box){ 0, 0, ui.width, ui.height });
         else content_note(tn->prev_box);
     }
     /* GPU path: if only the content changed, presenting again is enough */
     if (gpu_active() && (top->role == R_POPUP || top == fs_surf || hole_sig(s) == s->hole_sig)) { new_on(surf_keys(top)); return; }
     Node *n = top->node ? node_get(top->node) : NULL;
-    if (n && n->prev_box.x1 > n->prev_box.x0) damage_add(n->prev_box);
+    if (have_part) { if (part.x1 > part.x0) damage_add(part); }     /* CPU path: only what the app damaged */
+    else if (n && n->prev_box.x1 > n->prev_box.x0) damage_add(n->prev_box);
     ui.dirty = 1;
 }
 
@@ -539,37 +581,75 @@ static void buffer_destroyed(struct wl_listener *l, void *data) {
     wl_list_init(&l->link);
 }
 
-static void copy_buffer(Surf *s, struct wl_resource *buf) {
+/* The shared-memory buffer into px, upright (buftf.h). Only the damaged box when the buffer keeps its size, format and
+ * transform (a caret blinking in foot copied the whole window, every blink); s->dmg says what was copied. */
+static void copy_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     struct wl_shm_buffer *b = buf ? wl_shm_buffer_get(buf) : NULL;
     if (!b) {                               /* no buffer (or one that is not shared memory) */
         free(s->px);
         s->px = NULL;
         s->w = s->h = 0;
         s->content = 0;
+        s->dmg_full = 1;
         if (buf) wl_buffer_send_release(buf);
         return;
     }
     s->content = 1;
-    int w = wl_shm_buffer_get_width(b), h = wl_shm_buffer_get_height(b), stride = wl_shm_buffer_get_stride(b);
+    int bw = wl_shm_buffer_get_width(b), bh = wl_shm_buffer_get_height(b), stride = wl_shm_buffer_get_stride(b);
     uint32_t fmt = wl_shm_buffer_get_format(b);
-    if (w <= 0 || h <= 0 || w > 8192 || h > 8192) { wl_buffer_send_release(buf); return; }
-    if (w != s->w || h != s->h || !s->px) {
+    if (bw <= 0 || bh <= 0 || bw > 8192 || bh > 8192 || stride < bw * 4 || stride % 4) { wl_buffer_send_release(buf); return; }
+    int tf = s->tf, w = buftf_swaps(tf) ? bh : bw, h = buftf_swaps(tf) ? bw : bh;
+    int opaque = fmt == WL_SHM_FORMAT_XRGB8888;
+    /* a part only into a px of the same size and format, upright already (no transform), with damage inside */
+    int part = s->px && w == s->w && h == s->h && opaque == s->opaque && !tf && s->tf_px == tf && dmg.x1 > dmg.x0 &&
+               !(dmg.x0 == 0 && dmg.y0 == 0 && dmg.x1 == w && dmg.y1 == h);
+    if (!part && (w != s->w || h != s->h || !s->px)) {
         uint32_t *np = realloc(s->px, (size_t)w * (size_t)h * 4);
         if (!np) { wl_buffer_send_release(buf); return; }
         s->px = np;
         s->w = w;
         s->h = h;
     }
-    s->opaque = fmt == WL_SHM_FORMAT_XRGB8888;
+    s->opaque = opaque;
+    s->tf_px = tf;
     wl_shm_buffer_begin_access(b);
     const uint8_t *d = wl_shm_buffer_get_data(b);
-    for (int y = 0; y < h; y++) {
-        uint32_t *dst = s->px + (size_t)y * w;
-        memcpy(dst, d + (size_t)y * stride, (size_t)w * 4);
-        if (s->opaque) for (int x = 0; x < w; x++) dst[x] |= 0xff000000u;
+    if (part) {
+        size_t n = (size_t)(dmg.x1 - dmg.x0) * 4;
+        for (int y = dmg.y0; y < dmg.y1; y++) {
+            uint32_t *dst = s->px + (size_t)y * w + dmg.x0;
+            memcpy(dst, d + (size_t)y * stride + (size_t)dmg.x0 * 4, n);
+            if (opaque) for (int x = 0; x < dmg.x1 - dmg.x0; x++) dst[x] |= 0xff000000u;
+        }
+        s->dmg = dmg;
+        s->dmg_full = 0;
+    } else if (tf) {
+        buftf_copy(tf, (const uint32_t *)d, bw, bh, stride / 4, s->px, opaque ? 0xff000000u : 0);
+        s->dmg_full = 1;
+    } else {
+        for (int y = 0; y < h; y++) {
+            uint32_t *dst = s->px + (size_t)y * w;
+            memcpy(dst, d + (size_t)y * stride, (size_t)w * 4);
+            if (opaque) for (int x = 0; x < w; x++) dst[x] |= 0xff000000u;
+        }
+        s->dmg_full = 1;
     }
     wl_shm_buffer_end_access(b);
     wl_buffer_send_release(buf);
+}
+
+/* A buffer's pixels read back (a dmabuf's texture) turned upright for its transform, in place of *px (buftf.h); on no
+ * memory it stays as it was. */
+static void upright(uint32_t **px, int *w, int *h, int tf) {
+    if (!tf || !*px) return;
+    int uw = buftf_swaps(tf) ? *h : *w, uh = buftf_swaps(tf) ? *w : *h;
+    uint32_t *u = malloc((size_t)uw * (size_t)uh * 4);
+    if (!u) return;
+    buftf_copy(tf, *px, *w, *h, *w, u, 0);
+    free(*px);
+    *px = u;
+    *w = uw;
+    *h = uh;
 }
 
 /* ---- dmabuf ---- */
@@ -618,19 +698,25 @@ static int map_linear(Surf *s, Dmabuf *d) {
     if (m == MAP_FAILED) return -1;
     struct dma_buf_sync sync = { .flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ };
     ioctl(g->fd[0], DMA_BUF_IOCTL_SYNC, &sync);
-    if (g->width != s->w || g->height != s->h || !s->px) {
-        uint32_t *np = realloc(s->px, (size_t)g->width * (size_t)g->height * 4);
+    int tf = s->tf, w = buftf_swaps(tf) ? g->height : g->width, h = buftf_swaps(tf) ? g->width : g->height;
+    if (w != s->w || h != s->h || !s->px) {
+        uint32_t *np = realloc(s->px, (size_t)w * (size_t)h * 4);
         if (!np) { munmap(m, size); return -1; }
         s->px = np;
-        s->w = g->width;
-        s->h = g->height;
+        s->w = w;
+        s->h = h;
     }
     s->opaque = g->fourcc == DRM_FORMAT_XRGB8888;
-    for (int y = 0; y < g->height; y++) {
-        uint32_t *dst = s->px + (size_t)y * s->w;
-        memcpy(dst, m + g->offset[0] + (size_t)y * g->stride[0], (size_t)s->w * 4);
-        if (s->opaque) for (int x = 0; x < s->w; x++) dst[x] |= 0xff000000u;
-    }
+    s->tf_px = tf;
+    s->dmg_full = 1;
+    if (tf && g->stride[0] % 4 == 0 && g->offset[0] % 4 == 0)       /* turned upright (buftf.h) */
+        buftf_copy(tf, (const uint32_t *)(m + g->offset[0]), g->width, g->height, (int)(g->stride[0] / 4), s->px, s->opaque ? 0xff000000u : 0);
+    else
+        for (int y = 0; y < g->height && y < h; y++) {
+            uint32_t *dst = s->px + (size_t)y * s->w;
+            memcpy(dst, m + g->offset[0] + (size_t)y * g->stride[0], (size_t)(s->w < g->width ? s->w : g->width) * 4);
+            if (s->opaque) for (int x = 0; x < s->w; x++) dst[x] |= 0xff000000u;
+        }
     sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
     ioctl(g->fd[0], DMA_BUF_IOCTL_SYNC, &sync);
     munmap(m, size);
@@ -644,9 +730,10 @@ static void queue_release(Dmabuf *d) {
 }
 
 /* The buffer the app just sent becomes the surface's content. */
-static void take_buffer(Surf *s, struct wl_resource *buf) {
+static void take_buffer(Surf *s, struct wl_resource *buf, BufBox dmg) {
     Dmabuf *dm = dmabuf_of(buf), *old = s->dmabuf;
     s->dmabuf = NULL;
+    s->dmg_full = 1;                        /* a dmabuf or no buffer: all of it (copy_buffer says less) */
     if (dm && s->role != R_CURSOR && dm_tex(dm)) {
         dm->refs++;
         s->dmabuf = dm;
@@ -675,11 +762,16 @@ static void take_buffer(Surf *s, struct wl_resource *buf) {
         s->w = s->h = 0;
         wl_buffer_send_release(buf);
     } else {
-        copy_buffer(s, buf);
+        copy_buffer(s, buf, dmg);
         s->tex_dirty = 1;
     }
+    if (s->dmg_full) s->tex_full = 1;
+    else s->tex_dmg = buftf_union(s->tex_dmg, s->dmg);
     if (old) queue_release(old);
 }
+
+/* The transform its texture is drawn with: a dmabuf's own (shared memory is copied upright, buftf.h) */
+static int surf_tex_tf(const Surf *s) { return s->dmabuf && !s->px ? s->tf : 0; }
 
 /* Logical size: the viewport destination, else the crop, else the buffer. */
 static void apply_viewport(Surf *s) {
@@ -690,7 +782,12 @@ static void apply_viewport(Surf *s) {
     }
     if (s->viewport && s->vdw > 0 && s->vdh > 0) { s->lw = s->vdw; s->lh = s->vdh; }
     else if (s->viewport && s->vsw > 0 && s->vsh > 0) { s->lw = (int)s->vsw; s->lh = (int)s->vsh; }
-    else { int b = s->bscale > 0 ? s->bscale : 1; s->lw = s->w / b; s->lh = s->h / b; }
+    else {
+        int b = s->bscale > 0 ? s->bscale : 1, uw = s->w, uh = s->h;
+        if (surf_tex_tf(s) & 1) { uw = s->h; uh = s->w; }       /* a dmabuf turned a quarter: drawn upright */
+        s->lw = uw / b;
+        s->lh = uh / b;
+    }
     if (xw_scaled(s->client)) { s->lw = xws_from_x(s->lw, xw_pct); s->lh = xws_from_x(s->lh, xw_pct); }   /* an X window */
 }
 
@@ -714,8 +811,58 @@ static void srf_attach(struct wl_client *c, struct wl_resource *r, struct wl_res
     }
 }
 
+/* Damage, kept as one box each (surface coordinates; buffer pixels): applied on commit (commit_damage). */
 static void srf_damage(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) {
-    (void)c; (void)r; (void)x; (void)y; (void)w; (void)h;
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s || w <= 0 || h <= 0) return;
+    float x0 = (float)x, y0 = (float)y, x1 = (float)x + (float)w, y1 = (float)y + (float)h;
+    if (!s->p_ds_on) { s->p_ds[0] = x0; s->p_ds[1] = y0; s->p_ds[2] = x1; s->p_ds[3] = y1; s->p_ds_on = 1; return; }
+    if (x0 < s->p_ds[0]) s->p_ds[0] = x0;
+    if (y0 < s->p_ds[1]) s->p_ds[1] = y0;
+    if (x1 > s->p_ds[2]) s->p_ds[2] = x1;
+    if (y1 > s->p_ds[3]) s->p_ds[3] = y1;
+}
+static void srf_damage_buffer(struct wl_client *c, struct wl_resource *r, int32_t x, int32_t y, int32_t w, int32_t h) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (!s || w <= 0 || h <= 0) return;
+    /* clamped: a client's INT32_MAX must not overflow the box (the buffer is at most 8192 px) */
+    int x0 = x < -16384 ? -16384 : x > 16384 ? 16384 : x, y0 = y < -16384 ? -16384 : y > 16384 ? 16384 : y;
+    int x1 = x0 + (w > 32768 ? 32768 : w), y1 = y0 + (h > 32768 ? 32768 : h);
+    BufBox b = { x0, y0, x1, y1 };
+    s->p_db = s->p_db_on ? buftf_union(s->p_db, b) : b;
+    s->p_db_on = 1;
+}
+
+/* This commit's damage in upright buffer pixels of the new buffer (bw × bh before its transform), from what the client
+ * damaged with the state this commit makes current; a full box when it can't be told (a transform, no damage at all
+ * with a new buffer, a size that isn't known). */
+static BufBox commit_damage(Surf *s, struct wl_resource *buf) {
+    BufBox none = { 0, 0, 0, 0 }, all = { 0, 0, 1 << 14, 1 << 14 };
+    struct wl_shm_buffer *b = buf ? wl_shm_buffer_get(buf) : NULL;
+    if (!b || s->p_tf) return all;
+    int uw = wl_shm_buffer_get_width(b), uh = wl_shm_buffer_get_height(b);
+    if (!s->p_ds_on && !s->p_db_on) return all;
+    BufBox r = none;
+    if (s->p_db_on) {
+        r = s->p_db;
+        if (r.x0 < 0) r.x0 = 0;
+        if (r.y0 < 0) r.y0 = 0;
+        if (r.x1 > uw) r.x1 = uw;
+        if (r.y1 > uh) r.y1 = uh;
+        if (r.x1 <= r.x0 || r.y1 <= r.y0) r = none;
+    }
+    if (s->p_ds_on) {
+        int vp = s->viewport != NULL;
+        float cx = vp ? (s->p_vp ? s->p_vsx : s->vsx) : 0, cy = vp ? (s->p_vp ? s->p_vsy : s->vsy) : 0;
+        float cw = vp ? (s->p_vp ? s->p_vsw : s->vsw) : -1, ch = vp ? (s->p_vp ? s->p_vsh : s->vsh) : -1;
+        int dw = vp ? (s->p_vp ? s->p_vdw : s->vdw) : 0, dh = vp ? (s->p_vp ? s->p_vdh : s->vdh) : 0;
+        if (xw_scaled(s->client)) return all;          /* (an X window: Xwayland damages its buffer itself) */
+        r = buftf_union(r, buftf_surface_damage(s->p_ds[0], s->p_ds[1], s->p_ds[2], s->p_ds[3], s->p_bscale, uw, uh,
+                                                cx, cy, cw, ch, dw, dh));
+    }
+    return r.x1 > r.x0 ? r : all;
 }
 
 static void callback_gone(struct wl_resource *r) { wl_list_remove(wl_resource_get_link(r)); }
@@ -745,12 +892,16 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
     if (keylag_enabled && key_focus && c == key_focus->client) keylag_commit();
+    s->tf = s->p_tf;
     if (s->p_attached) {
-        take_buffer(s, s->p_buf);
+        take_buffer(s, s->p_buf, commit_damage(s, s->p_buf));
         if (s->p_buf) { wl_list_remove(&s->p_buf_destroy.link); wl_list_init(&s->p_buf_destroy.link); }
         s->p_buf = NULL;
         s->p_attached = 0;
     }
+    else if (s->p_ds_on || s->p_db_on) s->dmg_full = 1;     /* damage with no new buffer: shown again as it is */
+    else { s->dmg_full = 0; s->dmg = (BufBox){ 0, 0, 0, 0 }; }  /* a commit of state only */
+    s->p_ds_on = s->p_db_on = 0;
     s->bscale = s->p_bscale;
     apply_viewport(s);
     if (s->p_input_set) {
@@ -788,7 +939,15 @@ static void srf_commit(struct wl_client *c, struct wl_resource *r) {
     surface_commit_role(s);
 }
 
-static void srf_transform(struct wl_client *c, struct wl_resource *r, int32_t t) { (void)c; (void)r; (void)t; }
+static void srf_transform(struct wl_client *c, struct wl_resource *r, int32_t t) {
+    (void)c;
+    Surf *s = wl_resource_get_user_data(r);
+    if (t < WL_OUTPUT_TRANSFORM_NORMAL || t > WL_OUTPUT_TRANSFORM_FLIPPED_270) {
+        wl_resource_post_error(r, WL_SURFACE_ERROR_INVALID_TRANSFORM, "buffer transform %d is not a wl_output.transform", t);
+        return;
+    }
+    if (s) s->p_tf = t;
+}
 static void srf_scale(struct wl_client *c, struct wl_resource *r, int32_t sc) {
     (void)c;
     Surf *s = wl_resource_get_user_data(r);
@@ -805,7 +964,7 @@ static void srf_offset(struct wl_client *c, struct wl_resource *r, int32_t x, in
 static const struct wl_surface_interface surface_impl = {
     .destroy = srf_destroy, .attach = srf_attach, .damage = srf_damage, .frame = srf_frame,
     .set_opaque_region = srf_opaque, .set_input_region = srf_input, .commit = srf_commit,
-    .set_buffer_transform = srf_transform, .set_buffer_scale = srf_scale, .damage_buffer = srf_damage,
+    .set_buffer_transform = srf_transform, .set_buffer_scale = srf_scale, .damage_buffer = srf_damage_buffer,
     .offset = srf_offset,
 };
 
@@ -3080,6 +3239,7 @@ static Rect phys_rect(Rect r) {
 /* Source rect of a surface's buffer (the viewport crop is in surface coordinates: × buffer scale). */
 static void source_rect(const Surf *s, float *sx, float *sy, float *sw, float *sh) {
     *sx = 0; *sy = 0; *sw = (float)s->w; *sh = (float)s->h;
+    if (surf_tex_tf(s) & 1) { *sw = (float)s->h; *sh = (float)s->w; }    /* a dmabuf turned a quarter: upright size */
     if (s->viewport && s->vsw > 0) {
         float b = (float)(s->bscale > 0 ? s->bscale : 1);
         *sx = s->vsx * b; *sy = s->vsy * b; *sw = s->vsw * b; *sh = s->vsh * b;
@@ -3146,13 +3306,14 @@ static uint32_t *capture_readback(const Surf *s) {
     int w = s->dmabuf->d.width, h = s->dmabuf->d.height;
     if (!gpu_tex_current(t) || w <= 0 || h <= 0 || w > 8192 || h > 8192) return NULL;
     uint32_t *px = malloc((size_t)w * (size_t)h * 4);
-    if (px && gpu_tex_read(t, px, w, h) == 0) return px;
+    if (px && gpu_tex_read(t, px, w, h) == 0) { upright(&px, &w, &h, s->tf); return px; }
     free(px);
     return NULL;
 }
 
 static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip) {
     uint32_t *tmp;
+    s->hole_sig = hole_sig(s);          /* the shape it was painted with: damage_box and the GPU path compare it */
     if (gpu_active() && !paint_capture_mode) {          /* in a screenshot they are always copied */
         Surf *tt = toplevel_of(s);
         if (tt) tt->tf_drawn = tfv.on;
@@ -3182,7 +3343,6 @@ static void paint_tree(Canvas *c, Surf *s, float x, float y, float op, Rect clip
             canvas_clear(c, 0);
             canvas_set_clip(c, old);
         }
-        s->hole_sig = hole_sig(s);
     } else if (s->px) blit_surface(c, s, x, y, 1, 1, op);
     else if ((tmp = capture_readback(s))) {
         s->px = tmp;
@@ -3281,19 +3441,33 @@ static GpuTex *surface_tex(Surf *s) {
         /* this context does not import it: the last good frame (px) is drawn instead */
     }
     if (s->px && (s->tex_dirty || !s->tex)) {
-        s->tex = gpu_tex_pixels(s->tex, s->px, s->w, s->h, s->opaque);
-        s->tex_dirty = 0;
+        /* only what the app damaged since the last upload (GL_EXT_unpack_subimage, gpu_tex_pixels_rect) */
+        if (!s->tex || s->tex_full) s->tex = gpu_tex_pixels(s->tex, s->px, s->w, s->h, s->opaque);
+        else s->tex = gpu_tex_pixels_rect(s->tex, s->px, s->w, s->h, s->opaque,
+                                          (Rect){ s->tex_dmg.x0, s->tex_dmg.y0, s->tex_dmg.x1, s->tex_dmg.y1 });
+        s->tex_dirty = s->tex_full = 0;
+        s->tex_dmg = (BufBox){ 0, 0, 0, 0 };
     }
     return s->tex;
+}
+
+/* A surface's texture at a physical rect: its source rect (upright pixels), turned back to the buffer's own for a
+ * transformed dmabuf (shared memory is already upright, buftf.h) */
+static void draw_tex(Surf *s, GpuTex *t, float px, float py, float pw, float ph, Rect pclip, float op) {
+    float sx, sy, sw, sh, uv[8];
+    source_rect(s, &sx, &sy, &sw, &sh);
+    int tf = s->dmabuf && t == s->dmabuf->tex ? s->tf : 0;
+    if (!tf) { gpu_draw(t, px, py, pw, ph, sx, sy, sw, sh, pclip, op); return; }
+    float uw = (float)(buftf_swaps(tf) ? s->h : s->w), uh = (float)(buftf_swaps(tf) ? s->w : s->h);
+    buftf_corners(tf, uw, uh, sx, sy, sx + sw, sy + sh, uv);
+    gpu_draw_uv(t, px, py, pw, ph, uv, pclip, op);
 }
 
 static void draw_surface(Surf *s, float x, float y, float dw, float dh, Rect clip, float op) {
     /* x, y, dw, dh and clip are logical; the GPU draws in the display's physical pixels (paint_view) */
     GpuTex *t = s->content ? surface_tex(s) : NULL;
     if (!t) return;
-    float sx, sy, sw, sh;
-    source_rect(s, &sx, &sy, &sw, &sh);
-    gpu_draw(t, PVX(x), PVY(y), dw * paint_view.k, dh * paint_view.k, sx, sy, sw, sh, phys_rect(clip), op);
+    draw_tex(s, t, PVX(x), PVY(y), dw * paint_view.k, dh * paint_view.k, phys_rect(clip), op);
 }
 
 static void draw_tree(Surf *s, float x, float y, float scale_x, float scale_y, Rect clip) {
@@ -3381,9 +3555,7 @@ void wl_gpu_draw_layer(int layer) {
             if (d->sx == 1 && d->sy == 1) { draw_surface(s, d->x, d->y, (float)s->lw, (float)s->lh, d->clip, d->op); continue; }
             Rect p = tf_pixels(d->x, d->y, s->lw * d->sx, s->lh * d->sy);
             GpuTex *t = surface_tex(s);
-            float sx, sy, sw, sh;
-            source_rect(s, &sx, &sy, &sw, &sh);
-            if (t) gpu_draw(t, (float)p.x0, (float)p.y0, (float)(p.x1 - p.x0), (float)(p.y1 - p.y0), sx, sy, sw, sh, phys_rect(d->clip), d->op);
+            if (t) draw_tex(s, t, (float)p.x0, (float)p.y0, (float)(p.x1 - p.x0), (float)(p.y1 - p.y0), phys_rect(d->clip), d->op);
         }
         return;
     }
@@ -4976,10 +5148,12 @@ static void wl_gpu_lost(void) {
             int w = d->d.width, h = d->d.height;
             uint32_t *px = w <= 8192 && h <= 8192 ? malloc((size_t)w * (size_t)h * 4) : NULL;
             if (px && gpu_tex_read(d->tex, px, w, h) == 0) {
+                upright(&px, &w, &h, s->tf);
                 free(s->px);
                 s->px = px;
                 s->w = w;
                 s->h = h;
+                s->tf_px = s->tf;
             } else {
                 free(px);
                 if (map_linear(s, d)) { free(s->px); s->px = NULL; }
@@ -4988,7 +5162,7 @@ static void wl_gpu_lost(void) {
         if (d) { gpu_tex_free(d->tex); d->tex = NULL; }
         gpu_tex_free(s->tex);
         s->tex = NULL;
-        s->tex_dirty = 1;
+        s->tex_dirty = s->tex_full = 1;
     }
 }
 
@@ -5011,7 +5185,8 @@ static void wl_gpu_changed(void) {
             s->px = NULL;
             apply_viewport(s);
         }
-        s->tex_dirty = 1;
+        s->tex_dirty = s->tex_full = 1;
+        s->dmg_full = 1;
         if (s->node) damage_node(s);
     }
     new_on(OUTPICK_ALL);

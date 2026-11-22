@@ -459,6 +459,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
+  by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
+  copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it
+  damaged: a blinking caret cost a full window each time. Now only the damaged box is copied, uploaded and repainted
+  (`wl_surface.damage` through the buffer scale and viewport, and `damage_buffer`); every partial frame equals a full
+  repaint (`LORD_PAINT_VERIFY=1`, 206 frames, 0 differing pixels). Headless, CPU path, lord-server's CPU over 20 s: a
+  10 × 10 square changed 60 times a second 1130–1250 ms before, 340 ms after; foot at 180 × 50 cells updating a few
+  characters ten times a second 1910–1920 ms before, 210–360 ms after. `wl_surface.set_buffer_transform` was ignored, so
+  a turned buffer showed turned and at the wrong size: shared memory is copied upright and a dmabuf's texture is drawn
+  with turned coordinates (`build/buftf-test` checks the eight transforms).
+
 - **A Linux app's new frame composes only the displays it is on, in development** (Wayland audit item 3, approved by the
   maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). On the GPU path any app's new buffer made
   every display compose and flip again; a video or a terminal on one monitor kept all of them busy. Now only the

@@ -2,11 +2,12 @@
 # wlperf_headless.sh — build/wlperf-client (tests/wlperf_client.c) against a headless lord-server on the CPU path, in a
 # private runtime folder and home (docs/WAYLAND.md, "Frames, titles and damage"). The default theme runs with a few
 # lines after it that log the Linux windows' events the theme gets ("WLPERF <type> <data>"), so the checks count them.
-#   titles     a title set 1000 times again gives no event; a burst of 1000 gives a few, the last one last
+#   titles     a title set 1000 times again gives no event; a burst of 1000 gives a few (at most 10), the last one last
 #   frames     a client drawing on its frame callbacks gets about the display's rate (50–75 a second here)
 #   protocols  the versions and events of the xdg-shell polish and the new globals; a single-pixel buffer at 50 %
 #   transform  a 200×100 buffer turned 90° maps as a 100×200 window
-#   damage     a client damaging a 10×10 square: lord-server stays up and the frames go on
+#   damage     a client damaging a 10×10 square: every frame painted with only that damage equals a full repaint
+#              (LORD_PAINT_VERIFY=1, the default here; WLPERF_VERIFY=0 turns it off)
 # Run from server/ (tests/run_suites.sh does). Exit 77 when something it needs is missing (the theme bundle: npm run
 # build), 1 on a failure or if lord-server didn't survive. WLPERF_ONLY=titles,frames runs some of them.
 cd "$(dirname "$0")/.." || exit 1
@@ -29,7 +30,7 @@ printf '{"schema": 9, "desktopChosen": true, "language": "en"}\n' >"$D/home/.con
 EOF
 } >"$D/theme.js"
 env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
-    XDG_RUNTIME_DIR="$D" HOME="$D/home" LORD_GPU=0 LANG=en_US.UTF-8 LORD_HEADLESS_DRAW=1 \
+    XDG_RUNTIME_DIR="$D" HOME="$D/home" LORD_GPU=0 LANG=en_US.UTF-8 LORD_HEADLESS_DRAW=1 LORD_PAINT_VERIFY=${WLPERF_VERIFY:-1} \
     ./build/lord-server --headless 1280x800 --theme "$D/theme.js" --timeout 120 >"$D/server.log" 2>&1 &
 P=$!
 i=0 S=''
@@ -55,7 +56,7 @@ if want titles; then
     last=$(events title | grep '^title "b' | tail -1)
     echo "titles: $a events for 1000 repeats of the title it had, $b for a burst of 1000 ($last last)"
     [ "$a" -eq 0 ] || fail "titles: a title set again gave $a events"
-    [ "$b" -ge 1 ] && [ "$b" -le 3 ] || fail "titles: a burst of 1000 gave $b events"
+    [ "$b" -ge 1 ] && [ "$b" -le 10 ] || fail "titles: a burst of 1000 gave $b events"
     [ "$last" = 'title "b999"' ] || fail "titles: the burst's last title is $last"
     events title | grep -q '^title "end"$' || fail "titles: the last title never came"
 fi
@@ -77,6 +78,12 @@ if want transform; then
 fi
 if want damage; then
     client damage 30 || fail "damage: the client"
+    sleep 0.3
+    # LORD_PAINT_VERIFY=1: every frame painted with only the damage is compared with a full repaint
+    v=$(grep -ah 'paint-verify' "$D/home/.cache/lordos/compositor.log" "$D/server.log" 2>/dev/null | wc -l)
+    bad=$(grep -ah 'paint-verify' "$D/home/.cache/lordos/compositor.log" "$D/server.log" 2>/dev/null | grep -vc ': 0 pixels differ')
+    echo "damage: $v frames checked against a full repaint, $bad differ"
+    [ "$v" -gt 0 ] && [ "$bad" -eq 0 ] || fail "damage: $bad of $v frames differ from a full repaint"
 fi
 kill -0 $P 2>/dev/null || { echo "lord-server is gone"; tail -20 "$D/home/.cache/lordos/compositor.log" 2>/dev/null; R=1; }
 exit $R

@@ -25,7 +25,7 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 
 | Protocol | Version | What it does |
 |---|---|---|
-| `wl_compositor`, `wl_region` | 6 | surfaces; the buffer is copied on commit and released right away; `set_input_region` is applied on commit and the pointer hit test obeys it (`wlregion.h`). A surface with an empty region takes no input and the pointer goes to what is below: Firefox's content is such a subsurface, and GTK only knows the toplevel below it. `set_opaque_region` is ignored |
+| `wl_compositor`, `wl_region` | 6 | surfaces; the buffer is copied on commit (only its damage when the size stays, 0.8.9.5) and released right away; `set_buffer_transform` is applied; `set_input_region` is applied on commit and the pointer hit test obeys it (`wlregion.h`). A surface with an empty region takes no input and the pointer goes to what is below: Firefox's content is such a subsurface, and GTK only knows the toplevel below it. `set_opaque_region` is ignored |
 | `wl_shm` | (libwayland) | ARGB8888/XRGB8888 shared memory |
 | `wl_subcompositor` | 1 | subsurfaces (composited on top of their parent) |
 | `wl_output` | 4 | one per display: logical position, physical mode, scale rounded up, name and description (`DISPLAYS.md`) |
@@ -1337,6 +1337,23 @@ frame. `tests/wlperf_headless.sh` checks each part against a headless lord-serve
   foot 1.21, FeatherPad (Qt 6.8) and zenity (GTK 4.18) against a headless lord-server: each binds what it knows (GTK 4
   binds dmabuf 5), gets the four capabilities and `configure_bounds(1280, 690)` on a 1280 × 800 desktop, no protocol
   error; `wlperf-client protocols` checks the versions, the capabilities and the bounds.
+- **Surface damage for shared memory.** `wl_surface.damage` (surface coordinates, through the buffer scale and the
+  viewport: `buftf_surface_damage`) and `damage_buffer` (buffer pixels) are kept as one box each and applied on commit
+  (`commit_damage`). A buffer of the same size, format and transform is copied only in that box (`copy_buffer`); the
+  texture gets only what changed since its last upload (`gpu_tex_pixels_rect`, `glTexSubImage2D` with
+  `GL_EXT_unpack_subimage`); on the CPU path only the box on screen is repainted (`damage_box`: a toplevel whose shape
+  didn't change, not fullscreen, not in a transform; anything else repaints the whole window as before). A commit with a
+  new buffer and no damage, or a new size, is all of it. `LORD_PAINT_VERIFY=1` compares every frame painted with only
+  that damage against a full repaint: `wlperf-client damage 30` gave 206 frames, 0 differing pixels. Measured headless
+  (CPU path, 1280 × 800, lord-server's CPU over 20 s): `wlperf-client damage 60` (a 10 × 10 square in a 640 × 480
+  window, 60 times a second) 1130–1250 ms before, 340 ms after; foot at 180 × 50 cells printing a few characters ten
+  times a second 1910–1920 ms before, 210–360 ms after (idle: 20–30 ms).
+- **Buffer transform.** `wl_surface.set_buffer_transform` is applied (it was ignored, so a turned buffer showed turned
+  and at the wrong size): shared memory and mapped dmabufs are copied upright (`buftf_copy`), so everything after the
+  copy is unchanged; a dmabuf drawn from its texture gets its corners' texture coordinates turned (`gpu_draw_uv`); the
+  logical size swaps for a quarter turn. The mapping is weston's and wlroots' (`buftf_point`); `build/buftf-test`
+  checks all eight transforms pixel by pixel, and `wlperf-client transform` a 200 × 100 buffer at 90° mapping as a
+  100 × 200 window. A transform out of range is `invalid_transform`.
 
 ## Pending
 

@@ -6,7 +6,7 @@
  *               (tests/wlperf_headless.sh counts the events the theme gets)
  *   frames N    redraws on every frame callback for N seconds and prints the callbacks per second (and the
  *               presentation feedback it got)
- *   damage N    a 640×480 window that changes a 10×10 square N times a second for 3 s, damaging only that square
+ *   damage N [S] a 640×480 window that changes a 10×10 square N times a second for S s (3), damaging only that square
  *               (surface or buffer coordinates, alternately); prints the frames done
  *   transform   a 200×100 buffer with buffer_transform 90: the window is 100×200 (geometry checked by the script)
  *   protocols   the globals and versions of items 4 and 7 (xdg_wm_base 7, linux-dmabuf 5, wp_presentation 2,
@@ -203,12 +203,12 @@ static int run_frames(int secs) {
 }
 
 /* ---- damage ---- */
-static int run_damage(int per_sec) {
+static int run_damage(int per_sec, int secs) {
     Buf b = buffer(640, 480, 0xff202020u);
     window("damage", &b, 0);
     double t0 = now_s(), step = 1.0 / per_sec;
     int n = 0;
-    while (now_s() < t0 + 3) {
+    while (now_s() < t0 + secs) {
         int x = 20 + (n * 13) % 600, y = 20 + (n * 7) % 440;
         for (int yy = 0; yy < 10; yy++)
             for (int xx = 0; xx < 10; xx++) b.px[(y + yy) * 640 + x + xx] = 0xff000000u | (uint32_t)(n * 40503u);
@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
     int r;
     if (!strcmp(argv[1], "titles")) r = run_titles();
     else if (!strcmp(argv[1], "frames")) r = run_frames(argc > 2 ? atoi(argv[2]) : 3);
-    else if (!strcmp(argv[1], "damage")) r = run_damage(argc > 2 ? atoi(argv[2]) : 2);
+    else if (!strcmp(argv[1], "damage")) r = run_damage(argc > 2 ? atoi(argv[2]) : 2, argc > 3 ? atoi(argv[3]) : 3);
     else if (!strcmp(argv[1], "transform")) r = run_transform();
     else if (!strcmp(argv[1], "protocols")) r = run_protocols();
     else { fprintf(stderr, "wlperf-client: unknown mode %s\n", argv[1]); return 2; }
