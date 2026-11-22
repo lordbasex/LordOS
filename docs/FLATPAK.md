@@ -11,6 +11,12 @@ sub-sandbox, and for the problems found to be fixed.** lord-server now serves `o
 (E9, "Sub-sandboxes" below): GNOME 49+ apps that load images through glycin work (Meld, Emacs). Electron apps still
 don't start (they stay marked) and Flatpak's own `flatpak-portal` stays masked.
 
+**Update (2026-11-22): Chromium and Electron apps work, and the Store no longer marks them** (the maintainer: every app
+blocked for Electron or Chromium must become installable and work). The Spawn of a Flatpak app now runs through the
+app's own Spawn helper, forked inside its view and Landlock domain ("Sub-sandboxes" below), so a sub-sandbox can join
+the app's user and PID namespaces as Chromium (QtWebEngine, CEF, the Chromium browser) and zypak (Electron) ask.
+Checked on this machine with Whatsie (QtWebEngine), Chromium and FreeTube (Electron): `server/tests/fwflatpak/spawn.sh`.
+
 **Earlier status (2026-10-27, rechecked 2026-11-19 against LordOS 0.8.9.1 and Debian 13's current packages): design review kept for the future; not planned for any release.** On 2026-10-27 the
 maintainer decided not to implement Flatpak for now, to keep the system stable and avoid the complexity and
 future problems it would add; this document stays as the reference if that is ever reconsidered (2026-11-15, GitHub #164: it may be looked at for 1.0.0, not before). No Flathub or Flatpak launcher integration has been built. Since 0.8.8.8 lord-server does recognise
@@ -523,9 +529,11 @@ LordOS change: never (session or system bus, `org.freedesktop.Flatpak` / `portal
 limited (home or host: read-only but for the person's folders, LordOS's folders hidden; X11 off under any restriction;
 other bus names cut off under a device restriction) or blockable in Monitor → Firewall (network, microphone, camera,
 USB, Bluetooth: restrictions are set there, not in Settings → Privacy). Unknown sockets, devices and features are
-listed as "other". An app whose `[Application] base=` is `org.electronjs.Electron2.BaseApp`,
-`org.chromium.Chromium.BaseApp` or `io.atom.electron.BaseApp` is "Not yet supported" and its Install is disabled
-(open question 2, the maintainer's choice: mark them). Checked on VM 127 with GNOME Calculator and MarkText.
+listed as "other". Until 2026-11-22 an app whose `[Application] base=` was `org.electronjs.Electron2.BaseApp`,
+`org.chromium.Chromium.BaseApp` or `io.atom.electron.BaseApp` was "Not yet supported" and its Install disabled (open
+question 2); since the Spawn helper ("Sub-sandboxes") they install like any other app.
+`org.freedesktop.portal.Flatpak` is not a "never" row any more: it is LordOS's own Spawn, which only starts the same
+app in a sub-sandbox. Checked on VM 127 with GNOME Calculator and MarkText.
 
 ## Problem 4: installing
 
@@ -752,8 +760,8 @@ library.
 
 - LordOS's portal frontends (E8) for Flatpak apps: FileChooser with a document store, Notification;
   identity by cgroup. OpenURI and Inhibit are already served for Linux apps (see "Portals").
-- Sub-sandboxes: served since 2026-11-20 (E9); what Chromium/Electron still need (sharing the caller's PID namespace
-  through bubblewrap, see "Sub-sandboxes") is left.
+- Sub-sandboxes: served since 2026-11-20 (E9); Chromium's and zypak's EXPOSE_PIDS / SHARE_PIDS since 2026-11-22
+  (the app's Spawn helper). Left: `sandbox-expose-fd(-ro)` (see "Sub-sandboxes").
 - A session-bus filter for device-restricted apps (shared with Linux apps, already the "next step"
   in FIREWALL.md).
 - Per-app Flatpak permission editor in Settings.
@@ -951,13 +959,27 @@ lord-server serves the name itself (`server/src/fpspawn.c`, the argument rules i
 - **What**: `flatpak run` of the same app id, with the app's command and arguments after the id (never read as
   flatpak options), its environment as `--env=` (names checked), `--sandbox` and the sandbox flags as flatpak-portal
   maps them, `--die-with-parent`, and then LordOS's never-granted options and current restrictions, so they win.
-  `usr-fd`, `app-fd`, the expose-fd options and `sandbox-expose`/`sandbox-expose-ro` are refused (the last two since
-  the security review below: the path is in a folder the app writes, and Flatpak follows a link there).
-- **Where**: a waiter forked by lord-server enters the app's scope, then the user, IPC, mount and PID namespaces of
-  that app's view (taken from the view's first process), applies Landlock's scoping again with `no_new_privs`, and starts
-  `flatpak run`, which is born in the view. The app's fds go to the numbers it asked for (at most 16, 0-1023); everything
-  else lord-server holds closes at exec. SpawnExited goes to the caller alone; WATCH_BUS ends the process group when the
-  caller leaves the bus; SpawnSignal only reaches the caller's own processes. At most 32 per app.
+  `usr-fd`, `app-fd` and `sandbox-expose`/`sandbox-expose-ro` are refused (the last two since the security review
+  below: the path is in a folder the app writes, and Flatpak follows a link there). `sandbox-expose-fd(-ro)` is read
+  and left out (since 2026-11-22, as flatpak-portal does with an fd it can't resolve): Flatpak would be handed the
+  fd's path, which the app can swap for a link between the check and the bind. The Chromium browser asks it for its
+  `WidevineCdm` folder only, and runs without it (no DRM video).
+- **Where (since 2026-11-22): the app's Spawn helper** (`server/src/fpspawner.c`). When the launcher builds a Flatpak
+  app's view it applies Landlock's scoping and then, before `flatpak run` of the app, forks a small helper in the same
+  process: it is in the app's scope, view namespaces and the very same Landlock domain, holds no capability (bounding
+  set dropped too), is not dumpable, and talks only to lord-server over a socket pair lord-server made (the app's end
+  closes at exec; the app's own processes are in nested namespaces and can't see it). lord-server checks the caller as
+  before, builds `flatpak run`'s argv and environment, and sends them in a sealed memfd with the fds to place; the
+  helper checks them again (only `/usr/bin/flatpak run`, at most 16 fds at 0-1023, the instance fd not on one of them),
+  forks, places the fds and executes; it answers with the new process's pidfd (lord-server checks it is in the
+  caller's scope) and later its wait status. Why a helper: `flatpak run --parent-pid` opens the app's
+  `/run/.userns` and `/proc/<pid>/ns/pid`, which the kernel allows only from the app's own Landlock domain or one
+  above it; the earlier waiter applied Landlock's scoping again (a new, sibling domain), bubblewrap then ran without
+  the app's user namespace and stopped on "creation of new user namespaces was not disabled as requested", and
+  Chromium's zygote never started (a CHECK failure: Whatsie died after showing its tray icon). lord-server no longer
+  enters any namespace. SpawnExited goes to the caller alone; WATCH_BUS ends the process group when the caller leaves
+  the bus; SpawnSignal only reaches the caller's own processes (through the pidfd). At most 32 per app. SpawnStarted
+  waits (on each tick, up to 3 s) for bubblewrap's `bwrapinfo.json`, so the relative pid Chromium needs isn't 0.
 - **Nothing in the background**: lord-server takes the name only while `flatpak` is installed (checked every 30 s, so
   turning Flathub on needs no restart). Without Flatpak nothing is on the bus and nothing runs.
 
@@ -967,6 +989,13 @@ only `/dev/null`-class devices and an empty home. Electron (MarkText) reaches th
 "creation of new user namespaces was not disabled as requested" when it joins the caller's namespaces
 (`--parent-pid` with `--parent-expose-pids`); left for later, so Electron apps stay marked.
 
+Fixed on 2026-11-22 with the app's Spawn helper (above). Checked on the maintainer's PC (LordOS 0.8.9.4, Debian 13,
+kernel 6.12) with the branch's launcher and Spawn portal (`build/fpspawn-cli` on a private bus,
+`server/tests/fwflatpak/spawn.sh`, 18 checks): Whatsie 6.2.0 (QtWebEngine 6.11.3), Chromium (org.chromium.Chromium) and
+FreeTube (Electron, zypak) each start their zygote in a sandbox nested in the app's PID namespace, SpawnStarted gives
+Chromium the right relative pid, renderers run with seccomp-bpf, a window draws, and nothing traps. Before: Whatsie
+died at every start (`trap int3` in libQt6WebEngineCore).
+
 ## Open questions
 
 1. **Long ids.** The scope name allows 62 bytes for the id part; Flatpak ids may be 255. Refuse
@@ -974,7 +1003,9 @@ only `/dev/null`-class devices and an empty home. Electron (MarkText) reaches th
    name the scope by a hash and keep a root-readable map?
 2. **Sub-sandboxes.** Masking `flatpak-portal` likely breaks most Chromium/Electron apps (zypak).
    Accept that in phase 1 and mark them in the Store, or ship phase 2's own Spawn implementation
-   first? **Decided 2026-11-19: mark them; 2026-11-20: LordOS's own Spawn built (E9) because glycin needs it.**
+   first? **Decided 2026-11-19: mark them; 2026-11-20: LordOS's own Spawn built (E9) because glycin needs it;
+   2026-11-22: the maintainer asked for every Chromium/Electron app to install and work: the app's Spawn helper, the
+   marking removed.**
 3. **`~/.ssh`, `~/.gnupg` and the `ssh-auth`/`gpg-agent` sockets.** Hide them from Flatpak apps that
    declare `home` by default (as the launcher's grant rules do for Linux apps with no-files), or
    honour the declaration and show it in the Store?

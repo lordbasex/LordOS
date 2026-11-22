@@ -11,6 +11,14 @@ build/fpak-test: tests/fpak_test.c src/fpak.c src/fpak.h src/fw/rules.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE -o $@ tests/fpak_test.c src/fpak.c
 	./$@ || (rm -f $@; exit 1)
 
+# A Flatpak app's Spawn helper (src/fpspawner.c): its checks, and the helper over a socket pair as lord-server drives it,
+# with this test standing in for /usr/bin/flatpak (fds placed, instance fd, process group, exit status, refusals)
+test: build/fpspawner-test
+build/fpspawner-test: tests/fpspawner_test.c src/fpspawner.c src/fpspawner.h src/fpak.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE '-DFPSW_EXEC="/proc/self/exe"' -fsanitize=address,undefined -fno-sanitize-recover=all -o $@ tests/fpspawner_test.c src/fpspawner.c
+	./$@ || (rm -f $@; exit 1)
+
 # tests/fpak_cli.c: one Flathub management command through the real runner (src/fpakrun.c), for the VM; never installed
 build/fpak-cli: tests/fpak_cli.c src/fpakrun.c src/fpakrun.h src/fpak.c src/fpak.h src/sec/cgroup.c src/sec/cgroup.h
 	@mkdir -p build

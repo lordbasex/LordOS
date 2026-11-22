@@ -43,6 +43,7 @@
 #include "wl/xdgact.h"
 #include "term/termapp.h"
 #include "fpak.h"
+#include "fpspawner.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -54,6 +55,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -1055,7 +1057,10 @@ static FilesPlan *flatpak_plan(const char *id, uint32_t restricted, const char *
     return p;
 }
 
-static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const char *prog, char *const argv[]);
+static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const char *prog, char *const argv[], int spawner);
+
+static void (*spawn_hook)(int fd, const char *id);
+void apps_set_spawn_hook(void (*hook)(int fd, const char *id)) { spawn_hook = hook; }
 
 static int launch_flatpak(const char *id, const char *opened) {
     last_error[0] = 0;
@@ -1098,8 +1103,19 @@ static int launch_flatpak(const char *id, const char *opened) {
     const char *tk = xact_issue(xact_now(), XACT_LAUNCH_MS, 1, id);
     if (tk) snprintf(token, sizeof token, "%s", tk);
     int logfd = open_log(id, NULL, opened);
+    /* the app's Spawn helper (fpspawner.h): lord-server keeps one end, the view's helper the other */
+    int sw[2] = { -1, -1 };
+    /* (a device-restricted app has no session bus, so no Spawn to serve) */
+    if (spawn_hook && !(restricted & (FW_R_NO_FILES | FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_USB | FW_R_NO_BLUETOOTH)) &&
+        socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sw))
+        sw[0] = sw[1] = -1;
     pid_t pid = fork();
     if (pid == 0) {
+        if (sw[0] >= 0) close(sw[0]);
+        if (logfd == FPSW_FD) logfd = fcntl(logfd, F_DUPFD_CLOEXEC, FPSW_FD + 1);
+        /* the helper's end at FPSW_FD (kept through the exec of --launch-view, the only fd besides LV_FD) */
+        if (sw[1] >= 0 && (sw[1] == FPSW_FD ? fcntl(sw[1], F_SETFD, 0) : dup2(sw[1], FPSW_FD)) < 0) _exit(126);
+        if (sw[1] >= 0 && sw[1] != FPSW_FD) close(sw[1]);
         setsid();                                   /* its own session: never signals for lord-server's group */
         if (fork() != 0) _exit(0);
         sigset_t none;
@@ -1109,7 +1125,8 @@ static int launch_flatpak(const char *id, const char *opened) {
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); }
         if (logfd >= 0) { dup2(logfd, 1); dup2(logfd, 2); }
-        syscall(SYS_close_range, 3, ~0u, 0);
+        if (sw[1] >= 0) { syscall(SYS_close_range, 3, FPSW_FD - 1, 0); syscall(SYS_close_range, FPSW_FD + 1, ~0u, 0); }
+        else syscall(SYS_close_range, 3, ~0u, 0);
         const char *home = getenv("HOME");
         if (home && chdir(home)) {}
         /* its root-owned scope (not app_scope_reserved: "fp-" is reserved for this path alone) */
@@ -1124,7 +1141,7 @@ static int launch_flatpak(const char *id, const char *opened) {
         if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
         /* the view, then Landlock's scoping only (its file rules would forbid the mounts bubblewrap makes), in a clean
          * process image (apps_launch_view_main): never returns on success */
-        apps_view_exec(&plan->cfg, 0, FPAK_FLATPAK, argv);
+        apps_view_exec(&plan->cfg, 0, FPAK_FLATPAK, argv, sw[1] >= 0);
         static const char msg[] = "apps: could not build the Flatpak app's view: not launched\n";
         if (write(2, msg, sizeof msg - 1) < 0) {}
         _exit(126);
@@ -1132,7 +1149,9 @@ static int launch_flatpak(const char *id, const char *opened) {
     if (logfd >= 0) close(logfd);
     free(plan);
     free(buf);
-    if (pid < 0) return -1;
+    if (sw[1] >= 0) close(sw[1]);
+    if (pid < 0) { if (sw[0] >= 0) close(sw[0]); return -1; }
+    if (sw[0] >= 0) spawn_hook(sw[0], id);          /* it owns the fd now */
     waitpid(pid, NULL, 0);
     return 0;
 #endif
@@ -1344,7 +1363,7 @@ static int lv_put(int fd, const char *k, const char *v) {
 }
 
 /* In the launcher's child, after its scope and environment: never returns on success. */
-static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const char *prog, char *const argv[]) {
+static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const char *prog, char *const argv[], int spawner) {
     int fd = memfd_create("lordos-launch-view", MFD_ALLOW_SEALING);
     if (fd < 0) return;
     char num[32];
@@ -1357,7 +1376,8 @@ static void apps_view_exec(const SandboxFilesCfg *cfg, int file_rules, const cha
     bad = bad || lv_put(fd, "odev", num);
     snprintf(num, sizeof num, "%llu", cfg->opened_ino);
     bad = bad || lv_put(fd, "oino", num) || lv_put(fd, "keephome", cfg->keep_home ? "1" : "0") ||
-          lv_put(fd, "homero", cfg->home_ro ? "1" : "0") || lv_put(fd, "rules", file_rules ? "files" : "scope");
+          lv_put(fd, "homero", cfg->home_ro ? "1" : "0") || lv_put(fd, "rules", file_rules ? "files" : "scope") ||
+          (spawner && lv_put(fd, "spawner", "1"));
     for (int i = 0; !bad && argv[i]; i++) bad = lv_put(fd, "arg", argv[i]);
     if (bad || fcntl(fd, F_ADD_SEALS, F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL) || lseek(fd, 0, SEEK_SET)) { close(fd); return; }
     if (fd != LV_FD) { if (dup2(fd, LV_FD) < 0) { close(fd); return; } close(fd); }
@@ -1380,6 +1400,7 @@ int apps_launch_view_main(void) {
     SandboxFilesCfg cfg;
     memset(&cfg, 0, sizeof cfg);
     const char *prog = NULL, *rules = NULL;
+    int spawner = 0;
     char *args[MAX_ARGS + 1];
     int na = 0, nrw = 0, nro = 0, ns = 0, bad = 0;
     for (char *p = buf; p < buf + got && !bad;) {
@@ -1402,13 +1423,28 @@ int apps_launch_view_main(void) {
         else if (!strcmp(k, "ro")) { if (nro < SANDBOX_FILES_MAX) cfg.ro[nro++] = v; else bad = 1; }
         else if (!strcmp(k, "sock")) { if (ns < 7) cfg.sockets[ns++] = v; else bad = 1; }
         else if (!strcmp(k, "arg")) { if (na < MAX_ARGS) args[na++] = v; else bad = 1; }
+        else if (!strcmp(k, "spawner")) spawner = !strcmp(v, "1");
         else bad = 1;
     }
     args[na] = NULL;
+    /* a Flatpak app's Spawn helper: only on the scope rules (never with file rules: bubblewrap couldn't mount), and only
+     * a socket at FPSW_FD; anything else there is closed */
+    struct stat sst;
+    if (spawner && (!rules || strcmp(rules, "scope") || fstat(FPSW_FD, &sst) || !S_ISSOCK(sst.st_mode))) bad = 1;
+    if (!spawner) close(FPSW_FD);
+    else fcntl(FPSW_FD, F_SETFD, FD_CLOEXEC);
     if (bad || !prog || prog[0] != '/' || !na || !rules || !cfg.home || cfg.home[0] != '/' ||
         sandbox_files_isolate(&cfg) || (!strcmp(rules, "files") ? sandbox_apply_files(&cfg) : sandbox_apply_scope())) {
         if (write(2, fail, sizeof fail - 1) < 0) {}
         return 126;
+    }
+    /* the helper: in the app's scope, view and Landlock domain (the one just made), so a sub-sandbox may join the app's
+     * namespaces as Flatpak's own portal would let it, and never with more than the app has */
+    if (spawner) {
+        pid_t h = fork();
+        if (h < 0) { if (write(2, fail, sizeof fail - 1) < 0) {} return 126; }
+        if (h == 0) fpsw_main(FPSW_FD);
+        close(FPSW_FD);
     }
     execve(prog, args, environ);
     return 127;
@@ -1499,7 +1535,7 @@ static int launch(const char *id, const char *file, const char *action) {
         if (token[0]) setenv("XDG_ACTIVATION_TOKEN", token, 1); else unsetenv("XDG_ACTIVATION_TOKEN");
         if (plan) {
             /* the view and Landlock in a clean process image (apps_launch_view_main): never returns on success */
-            apps_view_exec(&plan->cfg, !plan->cfg.keep_home, prog, argv);
+            apps_view_exec(&plan->cfg, !plan->cfg.keep_home, prog, argv, 0);
             static const char msg[] = "apps: could not start the restricted app's view: not launched\n";
             if (write(2, msg, sizeof msg - 1) < 0) {}
             _exit(126);
