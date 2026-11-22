@@ -58,6 +58,7 @@ const DEFAULTS = {
   storeSideWidth: null,       // 0.8.9.5, the Store's sidebar width (dragged at its edge; null: the default); new key, no migration
   cloudColors: {},            // 0.8.8.10 (#184), Settings → Cloud: a color chosen per account id (cloudmodel.js accountColor); new key, no migration
   themeOptions: {},           // 0.8.9, a theme's own choices from its theme.json "options", by theme id (thememeta.js); new key, no migration
+  displayApps: null,          // 0.8.9.5, the apps used on each display, by connector: { v, off, displays } (sdk/displayappsmodel.js); new key, no migration
   workspaces: null,           // 0.8.9, Lord Workspaces' activities: { v, activities } (themes/workspaces/model/activities.js); new key, no migration
   desktopChosen: false,       // 0.8.9, the first-start desktop chooser was finished (sdk/firststart.jsx); migration 5 sets it for existing users
   firstStart: null,           // 0.8.9, that chooser's step while it is open, across its live theme switches (sdk/firststartmodel.js cleanState)

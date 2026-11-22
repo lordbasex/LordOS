@@ -21,7 +21,7 @@ import {
   PowerDialog, ConfirmDialog, session, launchApp, direction, pointerDisplay, registerSpotlightSource, desktopList, desktopName, activeDesktop,
   switchDesktop, windows as windowsStore, windowTitle, windowIcon, appName, removeDesktopById, renameDesktop, createStore, lordosWallpapers,
   VideoSetup, setDesktopDecor, setStatusPanelPlacer, WidgetPicker, widgetPicker, setPointerAccent,
-  guestAppsMode,
+  guestAppsMode, startDisplayApps,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useFirstStartOpen } from '@lordos/sdk';   // (0.8.9) the activity onboarding waits for the first-start desktop chooser
@@ -32,9 +32,9 @@ import { wsPrefs, optPatch, effectiveSurface, needsOnboarding } from './model/ac
 import { minimizeStarts } from '../default/minimize.js';
 import { startGroups, groupHidden, showGroup } from './state.js';
 import { activities, panel, deleting, startActivities, updateActivity, setUpActivity, activityOf, noteLaunch, newActivity } from './state.js';
-import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked, aimLaunch } from './tiler.js';
+import { startTiler, areasChanged, keyOfDisplay, setLayout, layoutOf, tiled, windowLocked, aimLaunch, tileApps } from './tiler.js';
 import { startMagnet } from './magnet.js';
-import { barFocus, setBarItems, enterBars, leaveBars, barKey } from './barfocus.js';
+import { barFocus, setBarItems, enterBars, leaveBars, barKey, cardBarItems } from './barfocus.js';
 import { SnapAssist } from './components/SnapAssist.jsx';
 import { GlassTarget, DropTarget, SnapFlyout, dropTarget, useDropTarget } from './components/SnapTargets.jsx';
 import { tween, EASE, reduceMotion } from './motion.js';
@@ -191,12 +191,20 @@ function useLeaving(list, spine) {
   return leaving;
 }
 
+// The apps used on each display (sdk/displayapps.js), keyed as the tiles are: the apps in tile order and the layout
+// (none for a display whose windows are free).
+const describeDisplay = (d, key, ids) => {
+  const desk = activeDesktop.get(), l = layoutOf(desk, key);
+  return { apps: tileApps(desk, key, ids), layout: l.layout === 'free' ? null : l.layout, ratio: l.layout === 'free' ? null : l.ratio };
+};
+
 function App() {
   startActivities();
   startGroups();
   startTiler();
   startMagnet();
   startDeskWidgets();
+  startDisplayApps({ keyOf: keyOfDisplay, describe: describeDisplay });
   useDropTarget();
   const [s] = useTrackedSettings();   // the desktop renders again only for the settings it reads (sdk/settings.js)
   const prefs = wsPrefs(s);
@@ -258,6 +266,8 @@ function App() {
         ] : []),
         ...(main?.plan.top ? [...desktopList.get().map((id) => ({ id: `pill:${id}`, run: () => switchDesktop(id) })),
           ...(desktopList.get().length < 9 ? [{ id: 'new', run: () => newActivity() }] : [])] : []),
+        // each display's empty-activity card: its suggestion, Add window and its quick launch (GroupFrame.jsx)
+        ...cardBarItems(),
       ];
     });
   }, [main]);

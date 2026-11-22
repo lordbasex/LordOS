@@ -153,16 +153,17 @@ const cm = cleanThemeMeta(tj);
 eq('theme.json sketch', cm.sketch, { rail: true, pills: true, frame: true });
 eq('theme.json options', cm.options.map((o) => o.key), ['surface', 'spine', 'spineEvery', 'contrast']);
 eq('theme.json arrows', cm.desktopArrows, true);
+eq('theme.json apps per display (sdk/displayapps.js)', cm.displayApps, true);
 eq('theme.json under 4 KB', readFileSync(new URL('../../themes/workspaces/theme.json', import.meta.url)).length < 4096, true);
 eq('bundled themes declare nothing', ['default', 'classic'].map((id) => cleanThemeMeta(JSON.parse(readFileSync(new URL(`../../themes/${id}/theme.json`, import.meta.url))))),
-  [{ sketch: null, options: [], desktopArrows: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', license: '', version: '' },
-    { sketch: null, options: [], desktopArrows: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', license: '', version: '' }]);
+  [{ sketch: null, options: [], desktopArrows: false, displayApps: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', license: '', version: '' },
+    { sketch: null, options: [], desktopArrows: false, displayApps: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', license: '', version: '' }]);
 eq('junk meta', cleanThemeMeta({ sketch: 'x', options: [{ key: '__proto__', label: 'shell.x' }, { key: 'a', label: 'evil', toggle: true }, { key: 'b', label: 'shell.b', choices: [['x', 'shell.x']] }], desktopArrows: 1 }),
-  { sketch: null, options: [], desktopArrows: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', license: '', version: '' });
+  { sketch: null, options: [], desktopArrows: false, displayApps: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', license: '', version: '' });
 eq('theme.json wallpaper', [cm.wallpaperDefault, cm.wallpaperSlideshow], ['cyberpunk-panorama', true]);
 eq('tokens name the same default wallpaper', [makeTheme({ mode: 'dark' }).defaultWallpaper, makeTheme({ mode: 'light', contrast: true }).defaultWallpaper], [cm.wallpaperDefault, cm.wallpaperDefault]);
 eq('the default wallpaper is in the collection', JSON.parse(readFileSync(new URL('../../assets/wallpapers/index.json', import.meta.url))).some((e) => e.id === cm.wallpaperDefault), true);
-eq('junk wallpaper', cleanThemeMeta({ wallpaper: { default: '../x', slideshow: 'yes' } }), { sketch: null, options: [], desktopArrows: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', license: '', version: '' });
+eq('junk wallpaper', cleanThemeMeta({ wallpaper: { default: '../x', slideshow: 'yes' } }), { sketch: null, options: [], desktopArrows: false, displayApps: false, wallpaperDefault: null, wallpaperSlideshow: false, community: false, author: '', license: '', version: '' });
 const surfaceOpt = cm.options[0];
 eq('option default', themeOptionValue({}, 'workspaces', surfaceOpt), 'crystal');
 eq('option stored', themeOptionValue({ themeOptions: { workspaces: { surface: 'opaque' } } }, 'workspaces', surfaceOpt), 'opaque');

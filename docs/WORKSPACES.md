@@ -223,6 +223,21 @@ default:
   the status cluster are on the main display. **Search, the Control Center and Add window open on the display under
   the pointer** (or the one whose button was used).
 - **Mirrored displays** show one picture, laid out for the main display.
+- **The apps of each display** (0.8.9.5, in development; `sdk/displayapps.js`, rules in `sdk/displayappsmodel.js`, for
+  every theme). The SDK keeps, per display by connector, the apps opened there (counted once per half hour) and the
+  apps open there together for a minute and a half, in tile order with the display's layout and divider
+  (`describeDisplay` in `index.jsx`, `tileApps` in `tiler.js`). Small and pruned: 8 displays, 12 apps and 6 sets per
+  display, 6 apps per set, use that halves every 14 days and is forgotten after 90; a few KB in `settings.displayApps`,
+  on this computer only. An empty activity's card on a display (`GroupFrame.jsx`) keeps Add window and adds **Used
+  most on this display**, up to five apps, one click each, opened on that display. **The usual apps are suggested,
+  never opened by themselves** (the maintainer's decision, 2026-11-22): a set seen at least twice shows in the card,
+  "Open your usual apps here?", with its apps and its layout, after a moment with nothing open (windows coming back
+  with the session don't flash it), once per activity and display in a session: when the session starts or a new
+  activity shows there. **Open them** sets the layout (unless the padlock is closed) and opens the apps aimed at that
+  display, each window put in its usual tile as it arrives (`openUsual`, `tiler.js`); **Not now** hides it for the
+  session; **Don't suggest on this display** is kept for that display only. Settings → Desktop style (with the theme's
+  options) turns the record off, which forgets it, or clears it (suggestions come back where they were turned off). The
+  card's buttons are in the bars' keyboard (⌃F2) after the strip.
 
 What needs SDK or compositor work, not the theme:
 
@@ -363,7 +378,8 @@ then what the pointer and the touchpad do in this theme. Search, a filter by gro
 
 **The bars' keyboard** (`barfocus.js`). ⌃F2 gives the keyboard to the Context Spine and the activity strip: an empty
 overlay layer holds it (no app gets the keys), the arrows, Tab, Home and End go from the crown down the spine and along
-the strip's pills (starting at the activity in view), the control with the keyboard draws a ring (only the ring re-renders), Enter or Space presses it,
+the strip's pills (starting at the activity in view), then the controls of each display's empty-activity card (its
+suggestion, Add window, its quick launch), the control with the keyboard draws a ring (only the ring re-renders), Enter or Space presses it,
 Escape or a press of the pointer gives the keyboard back.
 
 **High contrast** (the theme's option, also in the Control Atlas): solid black or white surfaces, text at 21:1, dim
@@ -384,6 +400,8 @@ anything else dropped):
 - `desktopArrows`: the Desktops section shows Settings → Keyboard's ⌃-arrows switch, as for Lord Flow.
 - `wallpaper`: `{ "default": <id>, "slideshow": true }`, the picture of a user who never chose one and the slideshow's
   controls in Settings → Wallpaper ("Wallpaper and slideshow" above).
+- `displayApps` (0.8.9.5): `true` when the theme uses the apps of each display (`sdk/displayapps.js`); with its options,
+  Settings shows "Remember the apps used on each display" and "Forget the apps of every display" (Clear).
 
 On Desktop & Dock, such a theme gets the desktops (here: activities), its options and the title bars' buttons, with no
 Dock or taskbar section. Lord Flow and Lord Classic declare none of the four and see exactly what they did.

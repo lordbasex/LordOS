@@ -87,6 +87,8 @@ export { DesktopWidgets, registerWidgetType, setWidgets, desktopWidgets } from '
 export { BATTERY_DEFAULTS, batteryPrefs, batteryStep } from './batterypolicy.js';
 export { useDevices, deviceList, deviceName, deviceShort, deviceValue, deviceVia } from './devices.js';
 export { devicesFrom, fractionOf as deviceFraction, toneOf as deviceTone, kindOf as deviceKind } from './devicesmodel.js';
+// (0.8.9.5) the apps used on each display: a theme's quick launch and its suggestion of the usual apps (sdk/displayapps.js)
+export { startDisplayApps, useQuickApps, useDisplaySuggestion, quietDisplayApps, forgetDisplayApps, setDisplayAppsOn, displayAppsOn, displayAppsStored, openDisplayApps } from './displayapps.js';
 export { registerWidgetKind, widgetKinds, widgetCatalog, addDeskWidget, removeDeskWidget, setDeskWidget, resizeDeskWidget, startDeskWidgets, deskWidgetSize, kindSizes, WidgetDropTarget, widgetDrag, deskWidgetsShown, widgetDisplayKey } from './deskwidgets.jsx';
 export { Markdown, markdownHeadings, parseMarkdown, parseInline, toggleTask } from './markdown.jsx';
 export {

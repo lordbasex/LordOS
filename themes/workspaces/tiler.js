@@ -18,7 +18,7 @@
 // and an app that answers with another size (a minimum size, a character grid) keeps it and stays in its tile
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
-import { windows, locksChanged, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm } from '@lordos/sdk';
+import { windows, locksChanged, activeDesktop, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm, openDisplayApps } from '@lordos/sdk';
 import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt, dropSlot, slotLimits, trimSlots } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { activities, activityOf, updateActivity } from './state.js';
@@ -40,6 +40,9 @@ export function aimLaunch(display, n = 1) {
   if (!display) return;
   aim = { dk: keyOfDisplay(display), n: Math.max(1, n), before: new Set(windows.get().map((w) => w.id)), t: Date.now() };
 }
+// The usual apps of a display opened from its suggestion (openUsual): their windows take the tiles in that order as
+// they arrive, whatever order the apps show in. dk → { desk, apps: launcher ids, t }
+const usual = new Map();
 const prefer = new Set();            // windows to show in their slot at the next pass (maximized into One at a time)           // window id → minimized at the last pass (a window brought back takes its slot again)
 // windows whose tile is smaller than their minimum size (the frame says so), and a revision for the UI
 export const tiled = createStore({ rev: 0, tight: [], counts: {}, holes: {} });
@@ -291,7 +294,15 @@ export function retile() {
     // the saved apps decide the order of windows the tiler hasn't placed yet; the others keep their slots
     const live = orderFor(ids, keyOf, prevStacks.length ? null : saved[dk]?.apps);
     const freeLayout = cleanLayout(layout) === 'free';
-    const { stacks, swapOut } = freeLayout ? { stacks: live.filter((id) => !isMin(id)).map((id) => [id]), swapOut: [] } : slotStacks(prevStacks, live, isMin, back, { min, max });
+    let { stacks, swapOut } = freeLayout ? { stacks: live.filter((id) => !isMin(id)).map((id) => [id]), swapOut: [] } : slotStacks(prevStacks, live, isMin, back, { min, max });
+    const u = usual.get(dk);
+    if (u && (u.desk !== desk || now - u.t >= AIM_MS || now < u.t)) usual.delete(dk);
+    else if (u && !freeLayout) {
+      // the slots in the usual order (the free ones last); done once every app of it is here
+      const rank = (st) => { const i = st.length ? u.apps.indexOf(keyOf(st[st.length - 1])) : -1; return i < 0 ? (st.length ? u.apps.length : u.apps.length + 1) : i; };
+      stacks = stacks.map((st, i) => ({ st, i })).sort((a, b) => rank(a.st) - rank(b.st) || a.i - b.i).map((x) => x.st);
+      if (u.apps.every((k) => stacks.some((st) => st.length && keyOf(st[st.length - 1]) === k))) usual.delete(dk);
+    }
     for (const id of swapOut) toMin.add(id);
     const shownOf = (st) => (st.some((id) => toMin.has(id)) ? st.filter((id) => !toMin.has(id) && !isMin(id)).pop() || null : shownIn(st, isMin));
     order.set(k, stacks);
@@ -329,6 +340,33 @@ export function retile() {
     windows.set((ws) => ws.map((w) => (toMin.has(w.id) ? { ...w, minimized: true }
       : moves.has(w.id) ? { ...w, ...moves.get(w.id), maximized: false, snapped: null, restore: null, oskFrame: null } : w)));
   } finally { applying = false; }
+}
+
+// The apps of display dk's tiles in order (the window shown in each; floating ones after), for the record of the apps
+// used on each display (sdk/displayapps.js). ids: the windows open there.
+export function tileApps(desk, dk, ids) {
+  const live = new Set(ids);
+  const out = (order.get(`${desk}|${dk}`) || []).map((st) => st.filter((id) => live.has(id)).pop()).filter(Boolean);
+  for (const id of ids) if (!out.includes(id)) out.push(id);
+  return out.map((id) => windows.get().find((w) => w.id === id)).filter(Boolean).map(launcherIdOf);
+}
+
+// A display's usual apps, opened from its suggestion (a click: nothing opens by itself): its usual layout first (unless
+// the padlock is closed), then the apps, aimed at that display and put in their usual tiles as they arrive.
+// sug: { apps: [launcher ids], layout, ratio } (sdk/displayapps.js useDisplaySuggestion).
+export function openUsual(desk, d, sug) {
+  const dk = keyOfDisplay(d);
+  const apps = (sug?.apps || []).filter((k) => typeof k === 'string' && k);
+  if (!apps.length) return;
+  const l = cleanLayout(sug.layout);
+  if (sug.layout && l === sug.layout && !isLocked(desk, dk)) {
+    updateActivity(desk, (m) => ({ ...m, layouts: { ...m.layouts, [dk]: { ...(m.layouts[dk] || {}), ...savedDisplay(l, sug.ratio ?? undefined, apps) } } }));
+    for (const w of windows.get()) if (w.desktop === desk && home.get(w.id) === dk) floating.delete(w.id);
+  }
+  usual.set(dk, { desk, apps, t: Date.now() });
+  aimLaunch(d, apps.length);
+  openDisplayApps(apps);
+  schedule();
 }
 
 // The tile order of one display (the frame's splitter needs the count).

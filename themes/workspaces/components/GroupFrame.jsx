@@ -3,17 +3,22 @@
 // activity (and the display, with several) and holds the activity's pinned apps and its actions: Change layout, Add
 // window, Save layout and Move to another activity (the window in front). In a split layout a divider sits in the gap
 // between the tiles: dragging it shows a line (moved with lord.setStyle, no React render per pointer move) and the
-// tiles change once, on release. With no window on the display, a short empty state offers the same two ways in.
+// tiles change once, on release. With no window on the display, a short empty state offers the same two ways in, the
+// apps used most on that display (its quick launch) and, once per activity and display in a session, its usual apps
+// with their layout as a suggestion: one click opens them, nothing opens by itself (sdk/displayapps.js).
 import {
   View, Text, Layer, addListener, useStore, windows, wm, windowTitle, windowIcon, desktopList, desktopName, displayFor, launchApp, useLauncherApps, deskWidgetsShown, widgetDisplayKey, t as tr,
+  useQuickApps, useDisplaySuggestion, quietDisplayApps,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SaveGlyph, MoveGlyph, LockGlyph, LayoutMini, LAYOUT_CELLS } from '../glyphs.jsx';
 import { LAYOUTS, splitterAt, ratioFrom, TILE_GAP } from '../model/layouts.js';
-import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled, aimLaunch } from '../tiler.js';
+import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled, aimLaunch, openUsual } from '../tiler.js';
 import { Surface } from './Surface.jsx';
-import { noteLaunch, groupHidden, activities } from '../state.js';
+import { FocusRing } from './BarButton.jsx';
+import { setCardItems } from '../barfocus.js';
+import { noteLaunch, groupHidden, activities, offered, markOffered } from '../state.js';
 
 const alpha = (hex, a) => `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`;
 
@@ -135,6 +140,77 @@ function MinimizedTray({ t, d, ids }) {
   );
 }
 
+// A button of the empty-activity card: filled in the accent (primary), outlined, or plain text; fid: its place in the
+// bars' keyboard (⌃F2, barfocus.js), where it draws the ring.
+function CardButton({ t, label, onClick, primary, plain, fid, children, title }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <View onClick={onClick} title={title} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ height: 32, paddingHorizontal: plain ? 8 : 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6,
+        backgroundColor: primary ? t.accent : plain ? (hover ? t.hover : 'transparent') : t.hover, ...(primary || plain ? null : { border: `1px solid ${t.separator}` }) }}>
+      {children}
+      <Text style={{ fontSize: 12.5, fontWeight: plain ? 500 : 600, color: primary ? t.onAccent : plain ? t.textDim : t.frameText, whiteSpace: 'nowrap' }}>{label}</Text>
+      {fid ? <FocusRing t={t} fid={fid} radius={10} /> : null}
+    </View>
+  );
+}
+
+// The suggestion of the display's usual apps: what they are (and their layout), Open, Not now, Don't suggest here.
+function UsualApps({ t, sug, fid, onOpen, onLater, onNever }) {
+  const showLayout = sug.layout && sug.layout !== 'free' && LAYOUT_CELLS[sug.layout];
+  return (
+    <View style={{ alignSelf: 'stretch', gap: 10, padding: 12, borderRadius: 14, backgroundColor: alpha(t.accent, 0.12), border: `1px solid ${alpha(t.accent, 0.35)}` }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        {showLayout ? (
+          <View title={tr(`shell.ws.layout.${sug.layout}`)}>
+            <LayoutMini cells={LAYOUT_CELLS[sug.layout]} w={30} h={20} color={t.frameText} fill={t.frameText} active />
+          </View>
+        ) : null}
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ fontSize: 13.5, fontWeight: 600, color: t.frameText, textAlign: 'start' }}>{tr('shell.ws.usual.title')}</Text>
+          <Text style={{ fontSize: 12, color: t.textDim, textAlign: 'start' }}>{tr('shell.ws.usual.body')}</Text>
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        {sug.apps.map((a) => (
+          <View key={a.id} style={{ height: 28, flexDirection: 'row', alignItems: 'center', gap: 6, paddingStart: 6, paddingEnd: 10, borderRadius: 8, backgroundColor: t.chipBg }}>
+            <a.Icon size={18} />
+            <Text style={{ fontSize: 12, color: t.frameText, whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 160 }}>{a.name}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+        <CardButton t={t} primary label={tr('shell.ws.usual.open')} onClick={onOpen} fid={`${fid}:open`} />
+        <CardButton t={t} label={tr('shell.ws.usual.later')} onClick={onLater} fid={`${fid}:later`} />
+        <CardButton t={t} plain label={tr('shell.ws.usual.never')} onClick={onNever} fid={`${fid}:never`} />
+      </View>
+    </View>
+  );
+}
+
+// The display's quick launch: the apps used most there, recent ones first (one click opens one, on this display).
+function QuickLaunch({ t, apps, fid, onLaunch }) {
+  return (
+    <View style={{ alignSelf: 'stretch', gap: 6, marginTop: 4 }}>
+      <Text style={{ fontSize: 11, fontWeight: 600, color: t.textDim, textAlign: 'start', marginHorizontal: 4 }}>{tr('shell.ws.quick.title')}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 }}>
+        {apps.map((a) => <QuickApp key={a.id} t={t} a={a} fid={`${fid}:${a.id}`} onClick={(e) => onLaunch(a, e)} />)}
+      </View>
+    </View>
+  );
+}
+function QuickApp({ t, a, fid, onClick }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <View title={a.name} onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ width: 84, paddingVertical: 8, paddingHorizontal: 4, borderRadius: 12, alignItems: 'center', gap: 6, backgroundColor: hover ? t.hover : 'transparent' }}>
+      <a.Icon size={32} />
+      <Text style={{ fontSize: 11.5, color: t.frameText, textAlign: 'center', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 76 }}>{a.name}</Text>
+      <FocusRing t={t} fid={fid} radius={12} />
+    </View>
+  );
+}
+
 const countOn = (desk, d) => (ws) => ws.filter((w) => w.desktop === desk && !w.minimized && !w.fullscreen && !w.pip && tileable({ ...w, maximized: false }) && displayFor(w)?.id === d.id).length;
 
 export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, desk, meta, multi, canMove, onAddWindow, onAddWidget, onAddWebApp, onEdit, showEmpty }) {
@@ -168,6 +244,42 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
   const locked = isLocked(desk, dkey);
   const f = plan.frame, hd = plan.header, area = plan.work;
   useEffect(() => { if (!saved) return undefined; const id = setTimeout(() => setSaved(false), 1600); return () => clearTimeout(id); }, [saved]);
+  // the apps of this display (sdk/displayapps.js): its quick launch and its usual apps, offered once per activity here
+  const quick = useQuickApps(dkey);
+  const sug = useDisplaySuggestion(dkey);
+  const wasOffered = useStore(offered, (o) => o.has(`${desk}|${dkey}`));
+  // the suggestion waits a moment with nothing open (the session's windows coming back don't flash it)
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(false);
+    if (!empty) return undefined;
+    const id = setTimeout(() => setReady(true), 1200);
+    return () => clearTimeout(id);
+  }, [empty, desk]);
+  // a window on this display of this activity: the suggestion is no longer offered here this session
+  useEffect(() => { if (!bare) markOffered(desk, dkey); }, [bare, desk, dkey]);
+  const cardShown = !!showEmpty && empty;
+  const showUsual = cardShown && ready && !wasOffered && !!sug && sug.apps.length > 0;
+  const fid = `card:${dkey}`;
+  const launchHere = (a, e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(d); launchApp(a.id); };
+  const openTheUsual = (e) => {
+    if (!sug) return;
+    if (e) noteLaunch(e.x, e.y);
+    markOffered(desk, dkey);
+    openUsual(desk, d, { apps: sug.apps.map((a) => a.id), layout: sug.layout, ratio: sug.ratio });
+  };
+  const later = () => markOffered(desk, dkey);
+  const never = () => { markOffered(desk, dkey); quietDisplayApps(dkey); };
+  // the card's controls in the bars' keyboard (⌃F2), after the strip
+  useEffect(() => {
+    if (!cardShown) { setCardItems(dkey, []); return undefined; }
+    setCardItems(dkey, [
+      ...(showUsual ? [{ id: `${fid}:open`, run: () => openTheUsual() }, { id: `${fid}:later`, run: later }, { id: `${fid}:never`, run: never }] : []),
+      { id: `${fid}:add`, run: () => onAddWindow(d) },
+      ...quick.map((a) => ({ id: `${fid}:q:${a.id}`, run: () => launchHere(a) })),
+    ]);
+    return () => setCardItems(dkey, []);
+  });
   const pins = meta.pins.map((k) => apps.find((a) => a.id === k)).filter(Boolean);
   const openPicker = () => {
     const n = layoutBtn.current;
@@ -235,27 +347,23 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
         <View style={{ position: 'absolute', left: area.x, top: area.y, width: area.w, height: area.h, alignItems: 'center', justifyContent: 'center', pointerEvents: 'box-none',
           display: empty ? 'flex' : 'none' }}>
           <Surface t={t} radius={18} still style={{ alignItems: 'center', gap: 10, width: Math.min(560, area.w - 48), paddingHorizontal: 24, paddingVertical: 20 }}>
+            {showUsual ? <UsualApps t={t} sug={sug} fid={fid} onOpen={openTheUsual} onLater={later} onNever={never} /> : null}
             <Text style={{ fontSize: 15, fontWeight: 600, color: t.frameText, textAlign: 'center' }}>{tr('shell.ws.empty.title')}</Text>
             <Text style={{ fontSize: 12.5, color: t.textDim, textAlign: 'center' }}>{tr('shell.ws.empty.body')}</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 4, alignSelf: 'stretch' }}>
-              <View onClick={(e) => onAddWindow(d, e)} style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: t.accent }}>
+              <CardButton t={t} primary label={tr('shell.ws.layout.add')} onClick={(e) => onAddWindow(d, e)} fid={`${fid}:add`}>
                 <PlusGlyph color={t.onAccent} size={11} />
-                <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.onAccent }}>{tr('shell.ws.layout.add')}</Text>
-              </View>
+              </CardButton>
               {onAddWidget ? (
-                <View onClick={() => onAddWidget(d)} style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6,
-                  backgroundColor: t.hover, border: `1px solid ${t.separator}` }}>
+                <CardButton t={t} label={tr('shell.widgets.add')} onClick={() => onAddWidget(d)}>
                   <PlusGlyph color={t.frameText} size={11} />
-                  <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.frameText }}>{tr('shell.widgets.add')}</Text>
-                </View>
+                </CardButton>
               ) : null}
               {pins.length ? (
-                <View onClick={(e) => { noteLaunch(e.x, e.y); aimLaunch(d, pins.length); for (const a of pins) launchApp(a.id); }}
-                  style={{ height: 32, paddingHorizontal: 14, borderRadius: 10, justifyContent: 'center', backgroundColor: t.hover, border: `1px solid ${t.separator}` }}>
-                  <Text style={{ fontSize: 12.5, fontWeight: 600, color: t.frameText }}>{tr('shell.ws.empty.openPins')}</Text>
-                </View>
+                <CardButton t={t} label={tr('shell.ws.empty.openPins')} onClick={(e) => { noteLaunch(e.x, e.y); aimLaunch(d, pins.length); for (const a of pins) launchApp(a.id); }} />
               ) : null}
             </View>
+            {quick.length ? <QuickLaunch t={t} apps={quick} fid={`${fid}:q`} onLaunch={launchHere} /> : null}
           </Surface>
         </View>
       ) : null}

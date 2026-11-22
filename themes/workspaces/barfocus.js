@@ -8,12 +8,19 @@
 //   setBarItems(fn)         fn() → [{ id, run }] the controls in order (index.jsx: they depend on the activities)
 //   enterBars(), leaveBars()
 //   barKey(e)               a key while it is on: true when used
+//   setCardItems(dk, items) the controls of display dk's empty-activity card (its suggestion, Add window, its quick
+//                           launch), after the bars' own: [] while the card is hidden
+//   cardBarItems()          all of them, display after display
 import { createStore } from '@lordos/sdk';
 import { barStep } from './model/activities.js';
 
 export const barFocus = createStore(null);
 let itemsOf = () => [];
 export function setBarItems(fn) { itemsOf = fn; }
+
+const cards = new Map();
+export function setCardItems(dk, items) { if (items && items.length) cards.set(dk, items); else cards.delete(dk); }
+export const cardBarItems = () => [...cards.values()].flat();
 
 export function enterBars(start) {
   const list = itemsOf();
