@@ -10,6 +10,7 @@
 #define XACT_LAUNCH_MS 60000            /* issued by LordOS when it launches something (a cold start can be slow) */
 #define XACT_CLIENT_MS 10000            /* asked for by an app (xdg_activation_token_v1.commit); the most it gets */
 #define XACT_SERIAL_MS 10000            /* an input serial counts this long after it was sent */
+#define XACT_HANDOFF_MS 10000           /* a launch the copy already running took over (xact_take_launch) */
 
 enum { XACT_OK = 0, XACT_DENIED, XACT_STALE, XACT_UNKNOWN };
 
@@ -35,6 +36,14 @@ int xact_focus_moved(const void *client);
  * (expired) or XACT_UNKNOWN (never issued, already used, or not a token). app_id gets what it was
  * issued for ("" if nothing), when not NULL. */
 int xact_take(const char *token, double now_ms, char *app_id, size_t n);
+
+/* The copy of an app already running took the launch over (a browser's single instance: Google Chrome hands its
+ * command line to the running process and exits, and that process asks for a token of its own, with no keyboard and
+ * no input serial, to bring its window forward, without the launch's token). The newest token LordOS issued (never an
+ * app's), still granting, unused and issued at most within_ms ago, whose app id is_app(app_id, ctx) says is the asking
+ * app's, is used up: 1, and the app's own token may grant, once per launch; 0 if there is none. An empty app id never
+ * matches (a notification's button names no app). */
+int xact_take_launch(double now_ms, int within_ms, int (*is_app)(const char *app_id, void *ctx), void *ctx);
 
 /* Input serials (wl_pointer.button, wl_keyboard.key and enter): which client got each one, for the
  * set_serial an app sends with its request. client is only compared, never used. */

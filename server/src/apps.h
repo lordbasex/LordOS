@@ -97,6 +97,11 @@ int apps_launch_action(const char *id, const char *action);
  * the launcher would, is exe (a resolved path); or, with flatpak_id, if it is "flatpak run" for that app id. hint
  * (a window's app_id, or NULL) only says which entries to look at first. out = "" if none runs it. */
 void apps_name_of_program(const char *exe, const char *flatpak_id, const char *hint, char *out, size_t n);
+/* Does a window with this app_id (xdg_toplevel.set_app_id, or an X11 WM_CLASS) name the listed app with this desktop
+ * id, as the shell matches them: the id itself, its StartupWMClass, or the last part of a reverse-DNS id, ignoring
+ * case. 1 or 0. What the app chose, never an identity: wl.c takes it only beside a launch LordOS made a moment ago
+ * (xact_take_launch). */
+int apps_window_names(const char *desktop_id, const char *app_id);
 /* The .desktop file of a listed system app (from /usr/share/applications, never the user's
  * ~/.local/share/applications: those are no package's), as the system sees it (without the test root),
  * for lord.pkg.ownerOfApp (which package brought it). The id is validated and looked up as the launcher

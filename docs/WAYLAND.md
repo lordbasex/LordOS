@@ -153,7 +153,8 @@ shell. The user approved it for M7. Limits:
   Tested by `build/apps-term-test`.
 - **Activation:** every launch gets `XDG_ACTIVATION_TOKEN` in its environment (see "Activation"
   below), so the window it opens, or the window of the copy already running it hands the link to,
-  comes to the front.
+  comes to the front. That includes a copy that takes the launch over without the token (Google
+  Chrome): see "A launch the copy already running took over" below.
 - The app starts as an orphaned grandchild, in its own session, with normal signals and no other
   descriptors. Its output goes to its own `apps/<id>.log` in the user's log folder (`/var/log/lordos/users/<user>`,
   docs/SYSTEM.md "Log files"), after a stamped "starting" line; capped at 16 MB by its writers (the part moved aside in `apps/<id>.log.old`).
@@ -200,6 +201,29 @@ protocol is in `wl.c`.
   as soon as the keyboard moves to another app or to the desktop itself, or that app disconnects,
   its tokens stop granting (KWin and Mutter do the same), so an app cannot ask while in front and
   use the token later to steal the front. LordOS's own tokens are not revoked this way.
+- **A launch the copy already running took over** (2026-11-23, in development; the latest release
+  is 0.8.9.5). Google Chrome 158 runs once per profile: a second `google-chrome` hands its command line to the running process
+  over its own socket ("Opening in existing browser session") and exits without using its token.
+  The running process then asks for a token of its own with no `set_serial`, no surface and no app
+  id, and activates the window it already shows (its profile chooser, or a window on a desktop that
+  isn't in view). Such a request is not granted by the rules above, so the window only wanted
+  attention and nothing came forward: on 2026-11-23 session restore had put Chrome's only window
+  back on the desktop it was saved on, and launching Chrome again from another one did nothing
+  visible. Now an app's ungranted request is granted once when LordOS issued a launch token for that
+  app at most 10 s earlier that is still unused (`xact_take_launch`, `XACT_HANDOFF_MS`): the newest
+  one is used up, so one launch grants once. "For that app" is `launch_was_for` in `wl.c`: a Flatpak
+  app by the identity lord-server checked itself (`flatpak:<id>`); any other app by a window it
+  already shows whose `app_id` names that `.desktop` entry, the same match the Dock uses (the id,
+  its `StartupWMClass`, or the last part of a reverse-DNS id: `apps_window_names`). Never Xwayland,
+  an isolated LordOS app or a client of another sandbox's security context. The `app_id` is the
+  app's own choice, but only beside a launch the person just made: an app that set another's
+  `app_id` could already take the front by opening a new window then. A handoff nobody launched
+  from LordOS still only asks for attention. Tested by `build/xdgact-test` and
+  `tests/handoff_headless.sh` (`tests/handoff_client.c`, a client that runs once as Chrome does;
+  Lord Flow and Lord Workspaces): restored on a hidden desktop, launched again, its desktop comes
+  into view with the window in front; a copy with no window maps a new one; the same handoff without
+  a launch stays attention. Checked with Google Chrome 158 and a throwaway profile on a headless
+  `lord-server-test`.
 - **`activate(token, surface)`.** A granted token raises and focuses the surface's window (a menu or
   subsurface counts as its window). An ungranted, expired, unknown or reused token never takes the
   focus: the window is marked as wanting attention, a larger dot in the accent under its Dock icon
