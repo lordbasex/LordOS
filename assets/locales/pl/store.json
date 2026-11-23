@@ -354,5 +354,8 @@
   "suggest.mok.passwordHint": "Zapisz je teraz: jest pokazywane tylko raz i nigdzie nie jest zapisywane.",
   "suggest.mok.steps": "Uruchom ponownie i gdy pojawi się niebieski ekran, w ciągu 10 sekund naciśnij dowolny klawisz. Potem wybierz Enroll MOK → Continue → Yes, wpisz to hasło i wybierz Reboot.",
   "suggest.mok.newPassword": "Nowe hasło",
-  "suggest.mok.cancel": "Anuluj rejestrację"
+  "suggest.mok.cancel": "Anuluj rejestrację",
+  "installed.noneDebian": "Nie zainstalowano jeszcze żadnych aplikacji Linux z Debiana. Znajdziesz je w Wszystkie lub w kategorii.",
+  "installed.noneFlathub": "Nie zainstalowano jeszcze żadnych aplikacji z Flathub. Znajdziesz je w Wszystkie lub w kategorii.",
+  "installed.noneWeb": "Nie zainstalowano jeszcze żadnych aplikacji internetowych. Znajdziesz je w Wszystkie lub w kategorii albo dodaj z adresu."
 }

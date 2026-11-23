@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Kirjoita se muistiin nyt: se näytetään vain kerran eikä sitä tallenneta minnekään.",
   "suggest.mok.steps": "Käynnistä uudelleen ja paina sinisen näytön tullessa jotain näppäintä 10 sekunnin kuluessa. Valitse sitten Enroll MOK → Continue → Yes, kirjoita tämä salasana ja valitse Reboot.",
   "suggest.mok.newPassword": "Uusi salasana",
-  "suggest.mok.cancel": "Peruuta rekisteröinti"
+  "suggest.mok.cancel": "Peruuta rekisteröinti",
+  "installed.noneDebian": "Debianin Linux-sovelluksia ei ole vielä asennettu. Löydät ne kohdasta Kaikki tai luokasta.",
+  "installed.noneFlathub": "Flathubin sovelluksia ei ole vielä asennettu. Löydät ne kohdasta Kaikki tai luokasta.",
+  "installed.noneWeb": "Verkkosovelluksia ei ole vielä asennettu. Löydät ne kohdasta Kaikki tai luokasta, tai lisää sovellus sen osoitteesta."
 }

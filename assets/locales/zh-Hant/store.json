@@ -330,5 +330,8 @@
   "suggest.mok.passwordHint": "請現在記下來：它只會顯示一次，不會儲存在任何地方。",
   "suggest.mok.steps": "重新啟動，藍色畫面出現後請在 10 秒內按任意鍵。接著選擇 Enroll MOK → Continue → Yes，輸入這組密碼並選擇 Reboot。",
   "suggest.mok.newPassword": "新密碼",
-  "suggest.mok.cancel": "取消登錄"
+  "suggest.mok.cancel": "取消登錄",
+  "installed.noneDebian": "尚未安裝來自 Debian 的 Linux 應用程式。可在「全部」或某個類別中尋找。",
+  "installed.noneFlathub": "尚未安裝來自 Flathub 的應用程式。可在「全部」或某個類別中尋找。",
+  "installed.noneWeb": "尚未安裝網頁應用程式。可在「全部」或某個類別中尋找，或透過網址新增。"
 }

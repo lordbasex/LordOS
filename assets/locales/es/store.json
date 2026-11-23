@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Anotala ahora: se muestra una sola vez y no se guarda en ningún lado.",
   "suggest.mok.steps": "Reiniciá y, cuando aparezca la pantalla azul, presioná una tecla antes de 10 segundos. Después elegí Enroll MOK → Continue → Yes, escribí esta contraseña y elegí Reboot.",
   "suggest.mok.newPassword": "Nueva contraseña",
-  "suggest.mok.cancel": "Cancelar inscripción"
+  "suggest.mok.cancel": "Cancelar inscripción",
+  "installed.noneDebian": "Todavía no hay apps de Linux de Debian instaladas. Buscalas en Todas o en una categoría.",
+  "installed.noneFlathub": "Todavía no hay apps de Flathub instaladas. Buscalas en Todas o en una categoría.",
+  "installed.noneWeb": "Todavía no hay apps web instaladas. Buscalas en Todas o en una categoría, o agregá una desde su dirección."
 }

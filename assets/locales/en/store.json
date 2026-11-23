@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Write it down now: it’s shown only once and isn’t saved anywhere.",
   "suggest.mok.steps": "Restart, and when the blue screen appears, press a key within 10 seconds. Then choose Enroll MOK → Continue → Yes, type this password and choose Reboot.",
   "suggest.mok.newPassword": "New Password",
-  "suggest.mok.cancel": "Cancel Enrolment"
+  "suggest.mok.cancel": "Cancel Enrolment",
+  "installed.noneDebian": "No Linux apps from Debian are installed yet. Find them in All or in a category.",
+  "installed.noneFlathub": "No apps from Flathub are installed yet. Find them in All or in a category.",
+  "installed.noneWeb": "No web apps are installed yet. Find them in All or in a category, or add one from its address."
 }

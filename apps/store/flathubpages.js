@@ -3,7 +3,7 @@
 // the categories, the collections; docs/FLATPAK.md, "The Store's home"; with Flathub's rankings when they are on, E10,
 // "Rankings from Flathub's API": ids only, shown with the catalog's names and icons) over the catalog as cards (Flathub's verified
 // apps unless the setting shows the rest), a category's subcategories, each app's page with what it declares and what LordOS changes before it is
-// installed, and the installed ones with Update and Remove. Chromium and Electron apps install like any other: their
+// installed, and (the second column's Installed, FlathubInstalled) the installed ones with Update, Remove and Open. Chromium and Electron apps install like any other: their
 // helpers' sub-sandboxes are served by LordOS (docs/FLATPAK.md, "Sub-sandboxes"). The jobs and state are
 // sdk/flathub.js's; the logic sdk/flathubmodel.js's.
 import { createElement as h, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -134,15 +134,19 @@ function TurnOn() {
 
 // ---- the section's page ----
 
-function InstalledList({ onOpen }) {
+// The installed apps with Remove and Open (the section's Installed), those whose name or id has the search's words.
+function InstalledList({ onOpen, query = '' }) {
   const th = useTheme();
   const s = useStore(F.state);
-  if (!s.installed.length) return null;
+  const q = String(query || '').trim().toLowerCase();
+  const list = s.installed.map((x) => ({ x, a: F.catalogApp(x.id) || { id: x.id, name: x.id, summary: '', icon: '' } }))
+    .filter(({ x, a }) => !q || q.split(/\s+/).every((w) => `${a.name} ${x.id}`.toLowerCase().includes(w)));
+  if (!s.installed.length) return h(Line, { th }, t('store.installed.noneFlathub'));
+  if (!list.length) return h(Line, { th }, t('store.debian.none'));
   const busy = !!s.job;
   return h(View, { style: { marginBottom: spacing.xl } },
     h(Header, { th }, t('flathub.installedTitle', { count: s.installed.length })),
-    h(GroupBox, null, ...s.installed.map((x) => {
-      const a = F.catalogApp(x.id) || { id: x.id, name: x.id, summary: '', icon: '' };
+    h(GroupBox, null, ...list.map(({ x, a }) => {
       return h(View, { key: x.id, style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: spacing.s + 2 } },
         h(FlathubIcon, { a, size: 32 }),
         h(View, { style: { flex: 1, minWidth: 0, gap: 2 } },
@@ -263,7 +267,6 @@ export function FlathubPage({ query, onOpen, category = null, sub = null, coll =
       h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } },
         fh.prefs.rankings ? t('flathub.rankingsOn') : t('flathub.rankingsOff'))),
     h(JobProgress),
-    mode === 'home' || mode === 'search' ? h(InstalledList, { onOpen }) : null,
     s.loaded && mode === 'home' ? h(View, { style: { gap: 26, marginBottom: 26 } },
       h(Spotlight, { b: spot, onOpen: open }),
       h(CategoryTiles, { counts, onCategory }),
@@ -274,6 +277,26 @@ export function FlathubPage({ query, onOpen, category = null, sub = null, coll =
     s.loaded && !list.length ? h(Line, { th }, t('flathub.noResults')) : null,
     h(CardGrid, null, ...list.slice(0, limit).map((a) => h(FlathubCard, { key: a.id, a, onOpen: open }))),
     h(MoreButton, { left: list.length - limit, onMore: more }));
+}
+
+// The section's Installed (its second column's first item, 2026-11-23): Update all, then the installed apps with Remove
+// and Open. The shop (All, the categories) no longer lists them: its cards say Open for an installed app.
+export function FlathubInstalled({ query, onOpen }) {
+  const th = useTheme();
+  const fh = useFlathub();
+  const count = useStore(F.state, (x) => x.installed.length);
+  const job = useStore(F.state, (x) => !!x.job);
+  useEffect(() => { if (fh.on) { if (!F.state.get().loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
+  useEffect(() => (fh.on ? F.watchInstalled() : undefined), [fh.on]);      // installs made elsewhere show too
+  if (!fh.supported) return h(Line, { th }, t('flathub.notSupported'));
+  if (!fh.on) return h(View, null, h(TurnOn));
+  return h(View, null,
+    h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.l, textAlign: 'start' } }, t('flathub.subtitle')),
+    count ? h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l } },
+      h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.textDim, textAlign: 'start' } }, t('flathub.updates.text', { count })),
+      h(Button, { small: true, label: t('flathub.updates.button'), disabled: job, onClick: () => F.updateAll() })) : null,
+    h(JobProgress),
+    h(InstalledList, { onOpen, query }));
 }
 
 // How many shown Flathub apps each category has (the Store's second column)

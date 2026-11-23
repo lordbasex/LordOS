@@ -691,6 +691,20 @@ above, so nothing about where data comes from changed:
   `lord.flatpak.catalog()` gives it as `updated` (seconds). The model ignores a date before 2000, more than a day in
   the future or not a whole number. On the catalog of 2026-11-22 every one of the 3381 x86-64 apps has one.
 
+### Installed in the section's second column (in development; the latest release is 0.8.9.5)
+
+The maintainer asked on 2026-11-23 that each package system's section open on its shop and keep its installed apps
+apart, the way the Store's own sidebar has Installed among its pages. The section's second column now starts with
+**Installed** (with how many Flathub apps are installed), then **Categories** (All, the home above, and each
+category). Installed shows the Flathub subtitle, **Update Flathub apps** (`F.updateAll`, the same job as Store →
+Updates), the job's progress and the installed apps with **Remove** and **Open**, filtered by the toolbar's search
+(name or id); with none, it says where to find them. The home and the search no longer list the installed apps
+above the catalog (an installed app's card says **Open**). `FlathubInstalled` in `apps/store/flathubpages.js`; the
+column is `apps/store/origincol.js` (`tests/store_origin_scene.mjs`). The general Store → Installed lists the Flatpak
+apps with every other installed app and has a **Flathub** filter (`apps/store/installedmodel.js`,
+`tests/store_installed_test.mjs`). Screenshots: `STORE_SCENE=installed tests/store_rankings_headless.sh OUT_DIR`
+(`tests/store_scene/installed.js`; it seeds two Flatpak apps and two web apps, installs nothing).
+
 ### Rankings from Flathub's API (E10, approved by the maintainer on 2026-11-22; since 0.8.9.5)
 
 Bazaar's Popular, Trending, Recently added and the app of the day/week come from Flathub's web API
@@ -868,7 +882,8 @@ library.
    file. Masks per E5. x86-64 only.
 2. Catalog: `update --appstream`, the sandboxed parser, a Flathub section in Discover and search,
    app pages with declared permissions and LordOS's changes.
-3. Install, uninstall, update for user installations; Flathub in Store → Installed and Updates.
+3. Install, uninstall, update for user installations; Flathub in Store → Installed (with a Flathub filter), in the
+   Flathub section's own Installed (since 2026-11-23) and in Updates.
 4. The launch path (E1) with the scope and view (E2), the never-granted table, LordOS's restrictions
    mapped as above; Dock, search, launcher grid and "Open with".
 5. Firewall, Monitor, Settings → Privacy for `flatpak:<id>` and `lordos:flathub`.

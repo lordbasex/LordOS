@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Anota-la ara: només es mostra una vegada i no es desa enlloc.",
   "suggest.mok.steps": "Reinicia i, quan aparegui la pantalla blava, prem una tecla abans de 10 segons. Després tria Enroll MOK → Continue → Yes, escriu aquesta contrasenya i tria Reboot.",
   "suggest.mok.newPassword": "Contrasenya nova",
-  "suggest.mok.cancel": "Cancel·la la inscripció"
+  "suggest.mok.cancel": "Cancel·la la inscripció",
+  "installed.noneDebian": "Encara no hi ha cap app de Linux de Debian instal·lada. Cerqueu-les a Totes o en una categoria.",
+  "installed.noneFlathub": "Encara no hi ha cap app de Flathub instal·lada. Cerqueu-les a Totes o en una categoria.",
+  "installed.noneWeb": "Encara no hi ha cap app web instal·lada. Cerqueu-les a Totes o en una categoria, o afegiu-ne una des de la seva adreça."
 }

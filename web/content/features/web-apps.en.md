@@ -27,6 +27,8 @@ The middle column describes how such apps work in general, not any one product; 
 
 The Store has a **Web apps** section, a banner and a shelf in Discover, and web apps in search and in their category. Every card says "Web app", so you can tell them from LordOS apps and Linux apps.
 
+The section opens on its shop: *Add from an address* and the catalog (in development; the latest release is 0.8.9.5). The web apps you installed are under **Installed**, at the top of the section's second column above its categories, each with See more, Manage and Open; Store → Installed also lists them with every other app, with a Web apps filter.
+
 [[shot:0]]
 
 - **A catalog of 37 apps ships with LordOS**: chat, mail and calendar, office, notes and tasks, music and video, graphics. Each passed LordOS's automatic check on 11 November 2026 (it loaded and gave its name). To be honest about where this stands: **only one of them is marked tested on LordOS so far**, a chat app the maintainer uses with two accounts. The others say "Not checked yet" until someone checks them, and the Store warns you before you install one.

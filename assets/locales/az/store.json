@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "İndi qeyd edin: o yalnız bir dəfə göstərilir və heç yerdə saxlanmır.",
   "suggest.mok.steps": "Yenidən başladın və mavi ekran görünəndə 10 saniyə ərzində bir düyməyə basın. Sonra Enroll MOK → Continue → Yes seçin, bu parolu yazın və Reboot seçin.",
   "suggest.mok.newPassword": "Yeni parol",
-  "suggest.mok.cancel": "Qeydiyyatı ləğv et"
+  "suggest.mok.cancel": "Qeydiyyatı ləğv et",
+  "installed.noneDebian": "Hələ Debian-dan heç bir Linux tətbiqi quraşdırılmayıb. Onları Hamısı bölməsində və ya kateqoriyada tapın.",
+  "installed.noneFlathub": "Hələ Flathub-dan heç bir tətbiq quraşdırılmayıb. Onları Hamısı bölməsində və ya kateqoriyada tapın.",
+  "installed.noneWeb": "Hələ heç bir veb tətbiq quraşdırılmayıb. Onları Hamısı bölməsində və ya kateqoriyada tapın, ya da ünvanından birini əlavə edin."
 }

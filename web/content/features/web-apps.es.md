@@ -27,6 +27,8 @@ La columna del medio describe cómo funcionan en general esas apps, no un produc
 
 La Tienda tiene una sección **Apps web**, un banner y un estante en Descubrir, y las apps web aparecen en la búsqueda y en su categoría. Cada tarjeta dice "App web", así las distinguís de las apps de LordOS y de las apps de Linux.
 
+La sección abre en su tienda: *Agregar desde una dirección* y el catálogo (en desarrollo; la última versión publicada es la 0.8.9.5). Las apps web que instalaste están en **Instaladas**, arriba de todo en la segunda columna de la sección, sobre sus categorías, cada una con Ver más, Administrar y Abrir; Tienda → Instaladas también las muestra junto a todas las demás apps, con un filtro Apps web.
+
 [[shot:0]]
 
 - **Un catálogo de 37 apps viene con LordOS**: chat, correo y calendario, oficina, notas y tareas, música y video, gráficos. Cada una pasó el control automático de LordOS el 11 de noviembre de 2026 (cargó y dio su nombre). Para ser honestos con dónde estamos: **por ahora solo una está marcada como probada en LordOS**, una app de chat que el mantenedor usa con dos cuentas. Las demás dicen "Sin probar todavía" hasta que alguien las pruebe, y la Tienda te avisa antes de instalar una.
