@@ -157,6 +157,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     memory 2 MB pages too; it's a system setting, proposed in docs/VIRTUALIZATION.md 3.7.1 and not built.
   - Tests: `build/vmmem-test` (`/proc/meminfo`'s fields, hugetlb only when it all fits).
 
+- **Machines: a machine's disks get an I/O thread of their own and bypass the host's cache on ext4 and XFS** (in
+  development). The system disk and the data disks (virtio-blk) are served by one QEMU I/O thread instead of its main
+  loop (which also runs the display, QMP and the other devices). On ext4 and XFS, when the file takes `O_DIRECT`, the
+  disk files are opened with `cache.direct` and Linux native AIO, so the guest's data isn't cached twice; elsewhere
+  (btrfs, tmpfs, a network file system) as before. Discard stays on; io_uring stays off (QEMU's seccomp filter refuses
+  it). Snapshots with memory (take, revert while running, delete) checked with both. A guest's device set is unchanged,
+  so installs need no other drivers (`lordvm.c` `blockdev_disk`, `disk_direct`, `virtio_disks`; docs/VIRTUALIZATION.md
+  6.4.1).
+  - **Measured** (NVMe, ext4; a guest reading and writing its disk with `O_DIRECT`, the same `-blockdev` options): the
+    I/O thread alone took 4 KB random reads from 59.5k to 104k IOPS one at a time and from 190k to 250k four at a time,
+    and random writes from 55k to 93k; bypassing the host's cache took sequential writes from 1.59 to 2.0–2.6 GB/s
+    and reads of data not in the host's cache from 1.62 to 2.46–2.53 GB/s. Random requests then go to the disk (14k
+    IOPS one at a time, 60k four at a time on that NVMe) where a working set still in the host's memory was served from
+    it before.
+- **Machines: a snapshot that was taken, gone back to or deleted no longer adds "failed:" to the machine's log.** The
+  log line meant for a failure followed every success but a deletion (`lordvm.c` `snap_end`).
+
 - **Store → LordOS apps is LordOS's own store** (asked by the maintainer on 2026-11-23: "we are going to build a store
   of native apps the person can install, like the other package systems'"). The section opens on a shop of LordOS's
   own installable apps and components, as cards (icon, name, "LordOS component", summary, Get / Open / View), each

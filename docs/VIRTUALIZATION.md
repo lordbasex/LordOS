@@ -2062,9 +2062,45 @@ The app picks by file system and says which one it used. Templates are read-only
 - **qcow2** by default: thin, snapshots, compression, encryption.
 - **raw** optional: fastest, no snapshots.
 - **Reflink** on btrfs and XFS: instant copies.
-- `io_uring` where seccomp and kernel allow; `virtio-blk` by default for speed, `virtio-scsi` for discard and many disks. `iothread` per disk.
+- `virtio-blk` by default (the compatible devices: SATA), served by an I/O thread of its own, the host's cache bypassed on ext4 and XFS: 6.4.1.
 - TRIM from guest is passed to shrink. "Reclaim space" compacts offline.
 - Export, with the machine shut down: a `.lordvm` bundle with or without snapshots, OVA, or a bare disk image, optionally encrypted. Import: 6.22.
+
+### 6.4.1 The disk path (2026-11-23, in development)
+
+How lord-vm gives QEMU a machine's disks (`lordvm.c` `blockdev_disk`, `disk_direct`, `virtio_disks`):
+
+| Piece | Now | Before |
+|---|---|---|
+| Device | `virtio-blk-pci` for the system disk and the data disks (Linux and the virtio-win device set; Windows Setup loads `viostor` from the drivers' disc as before); SATA for the compatible devices | the same |
+| I/O thread | one `iothread` (`disks`) serves every virtio-blk disk, off QEMU's main loop (which also runs the display, QMP, sound and the other devices) | the main loop |
+| Host cache | bypassed (`cache.direct`, `O_DIRECT`) when the disk file is on ext4 or XFS and takes `O_DIRECT`; the guest caches for itself. Flushes still reach the disk (`no-flush` off) | the host's page cache (writeback) |
+| AIO | Linux native AIO (`aio=native`) with `cache.direct`; QEMU's thread pool otherwise | the thread pool |
+| Elsewhere (btrfs, tmpfs, a network file system, `O_DIRECT` refused) | the host's page cache and the thread pool, as before. Not on btrfs: `O_DIRECT` there checksums buffers a guest may still change in flight | — |
+| Discard | `unmap` on the file and the qcow2 node (TRIM shrinks the file) | the same |
+| `detect-zeroes` | not set (it checks every write for zeroes; not measured) | the same |
+| io_uring | **not used**: QEMU's seccomp filter refuses `io_uring_*` (`vmsandbox.c`), and loosening it is a sandbox change for the maintainer to approve | the same |
+
+The firmware, the installer's and the drivers' discs and the seed disk keep the plain file node. Snapshots with memory
+(take, revert while running, delete) were checked on a running machine with the I/O thread and `cache.direct` (QEMU 10.0.13).
+
+**Measured** (2026-11-23, Kingston NV3 NVMe, ext4, i9-10900; a throwaway guest of the host's kernel whose init writes
+and reads `/dev/vda` with `O_DIRECT` (no fio in a guest without network); a fresh 8 GB qcow2 opened with the same
+`-blockdev` options lord-vm gives; 4 vCPUs; two runs each, which agreed within 10 %):
+
+| | Today (page cache, threads, main loop) | + I/O thread | + I/O thread, `cache.direct`, native AIO (new default) | + I/O thread, `cache.direct`, threads |
+|---|---|---|---|---|
+| Sequential write, 1 MB | 1.59 GB/s | 1.56 GB/s | **2.0–2.6 GB/s** | 2.3–2.6 GB/s |
+| Sequential read, 1 MB, data not in the host's cache | 1.62 GB/s | 1.62 GB/s | **2.46–2.53 GB/s** | 2.47–2.49 GB/s |
+| Random read 4 KB, 1 at a time / 4 at a time, data in the host's cache | 59.5k / 190k IOPS | **104k / 250k** | — | — |
+| Random read 4 KB, 1 / 4 at a time, from the disk | — | — | 13.6–14.4k / 60k | 13.5k / 55k |
+| Random write 4 KB, 1 / 4 at a time | 55k / 176k (into the host's cache) | **93k / 232k** | 35k / 103k (to the disk) | 35k / 138k |
+
+What it means: the I/O thread is a gain everywhere (+60–75 % at one request at a time, +25–35 % at four). Bypassing
+the host's cache gives 55–60 % more sequential throughput and keeps a machine's disk from filling the host's memory with
+a second copy of what the guest already caches; random requests then go to the disk at its own speed (a 4 KB read in
+~70 µs on this NVMe), where before a working set that still sat in the host's cache came back from memory. A guest's
+own cache (its memory) serves those repeats first, so the second copy mostly helped a guest that restarts.
 
 ### 6.5 Network
 

@@ -49,6 +49,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <linux/magic.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <linux/fs.h>
@@ -59,6 +60,7 @@
 #include <sys/signalfd.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/vfs.h>
 #include <sys/sysmacros.h>
 #include <sys/statvfs.h>
 #include <sys/sysmacros.h>
@@ -1640,6 +1642,28 @@ static char *blockdev_file(const char *node, const char *path, int ro) {
     jb_printf(&b, ",\"read-only\":%s%s}", ro ? "true" : "false", ro ? "" : ",\"discard\":\"unmap\"");
     return b.oom ? NULL : b.p;
 }
+/* The machine's own disk files (docs/VIRTUALIZATION.md 6.4.1): with the host's page cache bypassed (cache.direct) and
+ * Linux native AIO where the file system is ext4 or XFS and takes O_DIRECT (the guest caches for itself; a second copy in
+ * the host's cache only costs memory and a copy). Not on btrfs (O_DIRECT with checksums and buffers a guest can change
+ * in flight) or anything else, nor when O_DIRECT is refused: there the host's cache and QEMU's thread pool, as before.
+ * io_uring stays refused by QEMU's seccomp (vmsandbox.c). */
+static int disk_direct(const char *path) {
+    struct statfs f;
+    if (statfs(path, &f) || (f.f_type != EXT4_SUPER_MAGIC && f.f_type != XFS_SUPER_MAGIC)) return 0;
+    int fd = open(path, O_RDONLY | O_DIRECT | O_CLOEXEC);
+    if (fd < 0) return 0;
+    close(fd);
+    return 1;
+}
+static char *blockdev_disk(const char *node, const char *path, int ro) {
+    JBuf b;
+    jb_init(&b);
+    jb_raw(&b, "{\"driver\":\"file\",\"node-name\":"); jb_str(&b, node);
+    jb_raw(&b, ",\"filename\":"); jb_str(&b, path);
+    jb_printf(&b, ",\"read-only\":%s%s%s}", ro ? "true" : "false", ro ? "" : ",\"discard\":\"unmap\"",
+              disk_direct(path) ? ",\"cache\":{\"direct\":true,\"no-flush\":false},\"aio\":\"native\"" : "");
+    return b.oom ? NULL : b.p;
+}
 static char *blockdev_fmt(const char *drv, const char *node, const char *file, int ro) {
     JBuf b;
     jb_init(&b);
@@ -1691,6 +1715,17 @@ static void argf(const char *fmt, ...) {
     arg(buf);
 }
 static void argj(char *json) { if (json) { arg(json); free(json); } }
+
+/* The system disk and the data disks as virtio-blk (docs/VIRTUALIZATION.md 6.4.1), served by one I/O thread of their
+ * own (iothread "disks") instead of QEMU's main loop, which also runs the display, QMP and the other devices */
+static void virtio_disks(const VmMachine *m, const char *bi_sys, const char *ser) {
+    arg("-object"); arg("iothread,id=disks");
+    arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys%s,addr=0x1%s,iothread=disks", bi_sys, ser);
+    for (int i = 0; i < m->n_data; i++) {
+        arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s,iothread=disks", i + 1, i + 1, 0x10 + i,
+                             m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
+    }
+}
 
 /* ---- 3D graphics (6.10) ---- */
 
@@ -1879,12 +1914,12 @@ static void build_qemu_args(void) {
     }
     snprintf(p, sizeof p, "%s/system.qcow2", S.disks);
     if (m->base[0]) {
-        arg("-blockdev"); argj(blockdev_file("base-file", m->base, 1));
+        arg("-blockdev"); argj(blockdev_disk("base-file", m->base, 1));
         arg("-blockdev"); argj(blockdev_fmt("qcow2", "base", "base-file", 1));
-        arg("-blockdev"); argj(blockdev_file("sys-file", p, 0));
+        arg("-blockdev"); argj(blockdev_disk("sys-file", p, 0));
         arg("-blockdev"); argj(blockdev_overlay("sys", "sys-file", "base"));
     } else {
-        arg("-blockdev"); argj(blockdev_file("sys-file", p, 0));
+        arg("-blockdev"); argj(blockdev_disk("sys-file", p, 0));
         arg("-blockdev"); argj(blockdev_fmt("qcow2", "sys", "sys-file", 0));
     }
     for (int i = 0; i < m->n_data; i++) {
@@ -1892,7 +1927,7 @@ static void build_qemu_args(void) {
         snprintf(p, sizeof p, "%s/data-%d.qcow2", S.disks, i + 1);
         snprintf(fn, sizeof fn, "data%d-file", i + 1);
         snprintf(nn, sizeof nn, "data%d", i + 1);
-        arg("-blockdev"); argj(blockdev_file(fn, p, 0));
+        arg("-blockdev"); argj(blockdev_disk(fn, p, 0));
         arg("-blockdev"); argj(blockdev_fmt("qcow2", nn, fn, 0));
     }
     /* Every PCI device has a fixed slot: with the slots QEMU picks, taking an ISO out after an install moved the
@@ -1928,10 +1963,7 @@ static void build_qemu_args(void) {
     } else if (m->devices == VM_DEV_WINDOWS) {
         /* Windows (4.3): virtio disks (Setup loads viostor from the drivers), the CD/DVD drives on q35's own SATA (ide.4
          * the drivers' disc, ide.5 the installer's), which Setup reads with the drivers it has */
-        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys%s,addr=0x1%s", bi_sys, ser);
-        for (int i = 0; i < m->n_data; i++) {
-            arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s", i + 1, i + 1, 0x10 + i, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
-        }
+        virtio_disks(m, bi_sys, ser);
         if (m->iso[0]) {
             arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
             arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
@@ -1946,10 +1978,7 @@ static void build_qemu_args(void) {
             arg("-device"); arg("ide-cd,id=cd1,bus=ide.4,drive=drv");
         }
     } else {
-        arg("-device"); argf("virtio-blk-pci,id=sysdisk,drive=sys%s,addr=0x1%s", bi_sys, ser);
-        for (int i = 0; i < m->n_data; i++) {
-            arg("-device"); argf("virtio-blk-pci,id=datadisk%d,drive=data%d,addr=0x%x%s%s", i + 1, i + 1, 0x10 + i, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
-        }
+        virtio_disks(m, bi_sys, ser);
         /* the CD/DVD drive is always there (slot 8, after the ones a machine always had), so a disc can go in and out while
          * the machine runs (VM_CDROM); the ISO of machine.json is in it at start */
         arg("-device"); arg("virtio-scsi-pci,id=scsi0,addr=0x8");
@@ -2899,7 +2928,7 @@ static void snap_end(int ok, const char *why) {
      * needs nothing here; the copy is for taking it back with the machine off */
     if (ok && S.snap_kind == VSN_TAKE && tpm_snap(S.dir, &S.m, TPMS_TAKE, S.snap_tag)) vlog("snapshot: %s: the TPM's copy couldn't be kept", S.snap_tag);
     if (ok && S.snap_kind == VSN_DELETE) tpm_snap(S.dir, &S.m, TPMS_DROP, S.snap_tag);
-    else vlog("snapshot: %s failed: %s", S.snap_tag, why);
+    if (!ok) vlog("snapshot: %s failed: %s", S.snap_tag, why);
     send_job(kind, ok ? VJS_DONE : VJS_FAILED, ok ? 100 : -1, ok ? S.snap_tag : why);
     reply(S.snap_client, S.snap_seq, ok ? VME_OK : VME_QMP, ok ? S.snap_tag : why);
     S.snap_kind = 0;
