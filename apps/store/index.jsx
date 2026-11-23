@@ -14,7 +14,7 @@ import { GLYPH } from './ui.js';
 import { EndsContext, MoreButton, makeEnds, usePaged } from './endless.js';
 import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits, webCategoryCounts } from './webapps.js';
 import { WebAppDetail } from './webdetail.js';
-import { FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts } from './flathubpages.js';
+import { FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts, useFlathubTotal } from './flathubpages.js';
 import { flathub } from '@lordos/sdk';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
@@ -424,7 +424,9 @@ export default function Store() {
   const webCounts = useMemo(() => webCategoryCounts(), []);
   // an origin's second column: All, then its categories with how many apps each has
   const subCounts = src === 'debian' ? counts : src === 'flathub' ? fhCounts : src === 'web' ? webCounts : null;
-  const subTotal = subCounts ? CATS.reduce((a, c) => a + (subCounts[c] || 0), 0) : 0;
+  // All: how many apps the origin shows (a Flathub app may be in several categories, so not the categories' sum)
+  const fhTotal = useFlathubTotal();
+  const subTotal = src === 'flathub' ? fhTotal : subCounts ? CATS.reduce((a, c) => a + (subCounts[c] || 0), 0) : 0;
   const remember = () => { if (!app) listAt.current = { key: listKey, y: scroll.current?.offset() || 0 }; };
   const openDeb = (name) => { remember(); setApp({ name, ai: false }); };
   const openAi = (name) => { remember(); setApp({ name, ai: true }); };

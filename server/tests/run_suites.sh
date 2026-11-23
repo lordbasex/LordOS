@@ -664,6 +664,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-endless-scene (apps/store/endless.js)" node tests/textfield_menu_test.mjs store_endless_scene.mjs
     else skip "store-endless-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.5) a Store card's one-line texts end in an ellipsis, never cut through a letter
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "store-card-scene (apps/store/ui.js)" node tests/textfield_menu_test.mjs store_card_scene.mjs
+    else skip "store-card-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs
