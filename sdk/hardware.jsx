@@ -56,6 +56,7 @@ import { castAskerName, shotFreeName, shotStamp } from './screencastmodel.js';
 import { mkdir as fsMkdir, stat as fsStat } from './fs.js';
 import { linuxCapture, studioUse } from './privacy.js';
 import { studioUseOf } from './studiomodel.js';
+import { camerasChanged } from './cameras.js';
 
 const has = (name) => typeof lord !== 'undefined' && lord[name] && typeof lord[name] === 'object';
 const call = (fn, fallback) => { try { return fn(); } catch (e) { return fallback; } };
@@ -812,6 +813,7 @@ globalThis.__lordHw = (kind, data) => {
     case 'sni': case 'sni-gone': case 'sni-menu': trayEvent(kind, data); break;   // Linux apps' tray icons (trayitems.jsx)
     case 'notify-close': { const own = fromLinux.get(data?.id); if (own) dismissNotification(own, 'remote'); break; }
     case 'mpris': linuxPlayersChanged(data); break;
+    case 'cameras': camerasChanged(); break;              // a camera plugged in or out (kernel uevents: sdk/cameras.js)
     default: break;
   }
 };

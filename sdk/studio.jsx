@@ -6,7 +6,7 @@
 // installed. It opens from the capture item by the clock (sdk/capturestatus.jsx) in every theme, in the same panel and
 // style: "Video effects" while an app uses the camera, Mic Mode alone (MicModePanel, no preview) while one uses the
 // microphone. The LordOS Studio app (apps/studio, StudioWindow) shows the same controls in a window of their own, any
-// time, and shares the preview with the popover (one open of the camera). The effects reach every app that chose the "LordOS Studio" camera (lord.media.cameras(), device
+// time, and shares the preview with the popover (one open of the camera). The effects reach every app that chose the "LordOS Studio" camera (sdk/cameras.js, device
 // "studio": the Camera app, isolated .lpk apps, go-link Desk; and /dev/video50 for Linux apps), all at once; lord-server
 // runs them in the sandboxed lord-studio helper. Each row's "›" opens its detail page in the same popover.
 // Plain logic: sdk/studiomodel.js. Settings: settings.studio, applied to lord-server at start and on every change.
@@ -20,6 +20,7 @@ import { Toggle, Slider, Segmented, ScrollView } from './components.jsx';
 import { Layer } from './layers.js';
 import { FilePicker } from './filepicker.jsx';
 import { media } from './media.js';
+import { useCameras, camerasNow, onCameras } from './cameras.js';
 import { markDeviceUse } from './privacy.js';
 import { getApp, wm } from './windows.js';
 import { castAppName } from './screencast.jsx';
@@ -34,20 +35,22 @@ import {
 
 const has = () => typeof lord !== 'undefined' && !!lord.studio;
 const FILES = /\.(jpe?g|png|webp|mp4|webm|mkv|mov|m4v)$/i;
-const cameras = () => { try { return media.cameras(); } catch (e) { return []; } };
 
 // ---- settings → lord-server (the desktop's own process only: lord.studio exists nowhere else) ----
-// Runs on every settings change: when LordOS Studio's own settings are as last applied it stops there, and the cameras
-// are listed only when one was chosen. lord.media.cameras opens every /dev/video* (60–70 ms with two webcams), and
-// calling it on each settings write added that pause to every switch in Settings (2026-11-23, docs/MAIN-THREAD.md).
+// Runs on every settings change: when LordOS Studio's own settings are as last applied it stops there (2026-11-23,
+// docs/MAIN-THREAD.md: it listed the cameras on every settings write). The cameras come from sdk/cameras.js (listed on
+// a worker, again when one is plugged in or out); a chosen camera waits for the first list, and a new list applies
+// again (the chosen camera may have another /dev/video number now).
 let applied = null, appliedBg, appliedCfg = null;
 function apply(s) {
   if (!has()) return;
   const cfg = normalizeStudio(s.studio);
   const ck = JSON.stringify(cfg);
   if (ck === appliedCfg) return;
+  const cams = cfg.camera ? camerasNow() : [];
+  if (!cams) return;              // being listed: onCameras applies it
   appliedCfg = ck;
-  const server = serverConfig(cfg, cfg.camera ? cameras() : []);
+  const server = serverConfig(cfg, cams);
   const key = JSON.stringify(server);
   const bg = activeBackground(cfg);
   if (key === applied && bg === appliedBg) return;
@@ -61,6 +64,7 @@ function apply(s) {
 if (has()) {
   apply(settings.get());
   settings.subscribe(() => apply(settings.get()));
+  onCameras(() => { appliedCfg = null; apply(settings.get()); });
 }
 const update = (fn) => settings.set((s) => ({ ...s, studio: fn(normalizeStudio(s.studio)) }));
 const set = (patch) => update((c) => ({ ...c, ...patch }));
@@ -258,7 +262,7 @@ const userName = (a) => (a === 'studio' ? '' : linuxId(a) ? castAppName({ who: a
 
 // the camera it takes the picture from and who uses it
 function Source({ th, cfg, status, go }) {
-  const cams = realCameras(cameras());
+  const cams = realCameras(useCameras() || []);
   const cam = chosenCamera(cfg.camera, cams);
   const users = usersOf(status, userName, t('shell.cast.unknownApp'));
   return (
@@ -304,7 +308,7 @@ function MainPage({ th, cfg, status, pv, go, onBack, onOpenApp, wide }) {
 }
 
 function CameraPage({ th, cfg, go }) {
-  const cams = realCameras(cameras());
+  const cams = realCameras(useCameras() || []);
   const cur = chosenCamera(cfg.camera, cams);
   return (
     <View style={{ gap: 8 }}>

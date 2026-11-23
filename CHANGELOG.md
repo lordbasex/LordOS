@@ -97,6 +97,45 @@ In development; the latest release is 0.8.9.5-beta.
   - Tests: `build/studio-hub-test` (the label, 0.8.9.5's label, OBS's device both ways, near misses),
     `tests/studio_package_test.sh` (one quoted value, no `","`; the postinst reloads from 0.8.9.5's labels when unused,
     leaves them when in use or when the person kept 0.8.9.5's file).
+
+- **Files → Get Info, the Store's web-app pages, Imager's cache size, the Camera app and LordOS Studio no longer
+  stop the desktop while they measure a folder or list the cameras** (the follow-up to the Settings fix below, from
+  the same audit; `docs/MAIN-THREAD.md`, "Other apps").
+  - **Files → Get Info** measured a folder with `lord.fs.du` on lord-server's main thread, up to 900 ms on a big
+    folder. It now uses `fs.duAsync` (at most 3 s, on a worker): the size says "calculating…" until the answer comes, and
+    an answer for an item the card no longer shows is dropped (`apps/files/panels.jsx`). Headless, the home folder
+    with 200 000 files: opening the card 146–189 ms → 8–11 ms, and no `fs.du` on the main thread.
+  - **The Store's page of an installed web app** measured each profile's data with `lord.fs.du` (up to 300 ms per
+    profile) on every visit; now `fs.duAsync`, "calculating…" until it answers, and an answer for another app or
+    another set of profiles is dropped (`apps/store/webdetail.js`).
+  - **Imager → Options** measured the download cache with `lord.fs.du`; on LordOS `platform.cacheSize()` is now a
+    promise from `fs.duAsync` (the desktop app keeps its number), and the dialog says "calculating…" until it answers.
+  - **The Camera app listed the cameras every 3 s** (`lord.media.cameras` opens every `/dev/video*`: 62–68 ms each time
+    here with one webcam, which suspends after 2 s and wakes up to answer), and **LordOS Studio's panel listed them on
+    every render**. The list now comes from `sdk/cameras.js` (`useCameras`, `refreshCameras`): made on one of the
+    `fsasync.c` workers by the new `lord.media.camerasAsync()` (the same code as `lord.media.cameras`, run through the
+    new `fsasync_submit_fn`; LordOS Studio's own entry is made on the main thread and handed over), when a picker shows,
+    and again when a camera is plugged in or out: lord-server now follows the kernel's `video4linux` uevents on the
+    socket it already had for displays and batteries (`server/src/hw/uevent.c` `UEV_VIDEO`, `__lordHw('cameras')`), and
+    lists twice (after 0.3 s and 2 s, as udev gives access after the kernel's event). Nothing polls. On the main thread:
+    62–68 ms → under 0.3 ms per listing. LordOS Studio also applies its configuration again when the list changes (a
+    camera plugged back in may have another `/dev/video` number). No new permission, helper or root action: the same
+    `open` and `VIDIOC_QUERYCAP` lord-server already made, on another thread.
+  - **A copy or move to or from a Cloud account or a network share** looked up both names (`lstat`) on the main thread
+    before the job started; a name that isn't there is a question to the server. On those mounts the two checks now
+    run first on the job's thread, with the same refusals as the job's error, and nothing removed (`fsjob_start`,
+    `job_main` in `server/src/fsops.c`). Local copies keep their immediate answer. The destination folder's path is
+    still resolved (`realpath`) on the main thread before the job, guarded by the existing check for a share that
+    stopped answering.
+  - **The other native apps, opened one by one headless** (Files, Store, Mail, Photos, Player, Notes, Terminal,
+    Machines, Monitor, Voice Recorder, Imager, Settings, Calendar, Contacts, Editor, Databases, Passwords, Logs, System
+    Information, Disks): no native call over 50 ms on opening any of them; what remains over 50 ms is React building the
+    Store's first page (~195 ms) and System Information's (45–79 ms). The table is in `docs/MAIN-THREAD.md`.
+  - Tests: `server/tests/files_info_nofreeze.sh` (in `make test`, about 30 s) opens Get Info twice on a home folder of
+    100 000 files in a headless lord-server and fails on a `call fs.du` stall line, a card that never shows the size,
+    or an opening over 250 ms; it fails on the code before this fix. `tests/perf_headless.sh` has the plans
+    `filesInfo`, `cameraNatives` (the camera list both ways, each after the camera suspended) and `appsOpen` (each
+    native app alone; `PERF_APPS`). `build/uevent-test` covers `video4linux`, `build/fsasync-test` `fsasync_submit_fn`.
 ### Added
 
 - **LordOS Studio is an app, and the capture item reaches it with the microphone too.** Until now LordOS Studio's

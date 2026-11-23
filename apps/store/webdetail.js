@@ -29,19 +29,23 @@ function Lock({ color }) {
     h(View, { style: { position: 'absolute', left: 0, bottom: 0, width: 10, height: 7, borderRadius: 1.5, backgroundColor: color } }));
 }
 
-// Each profile's data, measured on each visit and after a change of profiles (bounded: lord.fs.du stops after 300 ms).
+// Each profile's data, measured on each visit and after a change of profiles, on one of lord-server's workers
+// (fs.duAsync, at most 5 s): a browser profile's cache holds thousands of files, and lord.fs.du here kept the pointer
+// still for up to 300 ms per profile (2026-11-23). null until the first answer ("calculating…"); an answer for another
+// app or set of profiles is dropped.
 function useSizes(entry) {
-  const [sizes, setSizes] = useState({});
-  const key = entry ? entry.profiles.map((p) => p.id).join(',') : '';
+  const [got, setGot] = useState(null);   // { key, sizes }: the answer and what it was measured for
+  const key = entry ? `${entry.id}:${entry.profiles.map((p) => p.id).join(',')}` : '';
   useEffect(() => {
-    if (!entry) { setSizes({}); return; }
-    const out = {};
-    for (const p of entry.profiles) {
-      try { out[p.id] = fs.du(`${fs.home()}/${M.dataDir(entry.id, p.id)}`, 300); } catch (e) { out[p.id] = null; }
-    }
-    setSizes(out);
-  }, [entry && entry.id, key]);
-  return sizes;
+    if (!entry) return undefined;
+    let live = true;
+    const home = fs.home();
+    Promise.all(entry.profiles.map((p) => fs.duAsync(`${home}/${M.dataDir(entry.id, p.id)}`, 5000).then((r) => [p.id, r], () => [p.id, null])))
+      .then((pairs) => { if (live) setGot({ key, sizes: Object.fromEntries(pairs) }); });
+    return () => { live = false; };
+  }, [key]);
+  if (!entry) return {};
+  return got && got.key === key ? got.sizes : null;
 }
 
 // The memory it takes now, read every 5 s while the page is open (cheap: lord-server sums smaps_rollup of its processes).
@@ -97,7 +101,8 @@ export function WebAppDetail({ id }) {
   const testedText = !tested ? t('webapps.detail.testedAddress')
     : tested.state === 'verified' ? t('webapps.detail.testedOn', { date: dateText(tested.date) })
       : tested.state === 'tested' ? t('webapps.detail.testedYes') : t('webapps.detail.testedNo');
-  const sizeText = !disk.installed ? t('webapps.detail.sizeNew')
+  const calculating = t('files.info.calculating');
+  const sizeText = !disk.installed ? t('webapps.detail.sizeNew') : !sizes ? calculating
     : disk.complete ? formatBytes(disk.total) : t('webapps.settings.sizeAtLeast', { size: formatBytes(disk.total) });
   const memText = memory.kind === 'live' ? formatBytes(memory.bytes)
     : memory.kind === 'typical' ? t('webapps.detail.memTypical', { size: formatBytes(memory.bytes) }) : t('webapps.detail.memUnknown');
@@ -157,7 +162,8 @@ export function WebAppDetail({ id }) {
         ...(d.entry ? disk.profiles.map((p) => h(InfoRow, { key: p.id, th, label: p.name },
           h(View, { style: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: spacing.s } },
             h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.textDim, textAlign: 'end', whiteSpace: 'nowrap', overflow: 'hidden' } },
-              memOf(p.id) ? t('webapps.detail.profileUseRunning', { size: formatBytes(p.bytes), memory: formatBytes(memOf(p.id).bytes) }) : t('webapps.detail.profileUse', { size: formatBytes(p.bytes) })),
+              memOf(p.id) ? t('webapps.detail.profileUseRunning', { size: sizes ? formatBytes(p.bytes) : calculating, memory: formatBytes(memOf(p.id).bytes) })
+                : t('webapps.detail.profileUse', { size: sizes ? formatBytes(p.bytes) : calculating })),
             h(Button, { small: true, label: t('store.open'), onClick: () => { try { launchWebApp(id, p.id); } catch (e) { setMsg({ ok: false, text: errorText(e) }); } } }))))
           : [h(InfoRow, { key: 'first', th, label: t('webapps.profile.default'), value: t('webapps.detail.profileFirst') })]),
         d.entry && M.canAddProfile(d.entry) ? h(View, { style: { flexDirection: 'row', justifyContent: 'flex-end', paddingVertical: spacing.s } },

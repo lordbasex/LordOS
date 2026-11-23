@@ -73,6 +73,10 @@ globalThis.__lordFsReply = (req, res) => {
   const done = waiting.get(req);
   if (done) { waiting.delete(req); done(res); }
 };
+// the answer to a request another native call put on the same workers (lord.media.camerasAsync: sdk/cameras.js)
+export function workerReply(req) {
+  return new Promise((resolve, reject) => waiting.set(req, (r) => (r && r.error ? reject(codeError(r.error)) : resolve(r || {}))));
+}
 function later(fn, sync, path) {
   if (typeof lord.fs[fn] !== 'function') return Promise.resolve().then(() => sync(path));
   let req;

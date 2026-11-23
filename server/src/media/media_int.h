@@ -148,6 +148,8 @@ int  media_finish_output(const char *tmp, const char *dst, int ok);
 /* Thumbnail: the path in ~/.cache/lordos/thumbs if it's already there; otherwise it requests it and returns NULL. */
 const char *media_thumb(const char *path, int size, char *out, size_t n);
 int  media_cameras(char *json, size_t n);
+/* the same list on an fsasync worker: a request id, answered as __lordFsReply(req, { cameras: [...] }); -1 + err */
+int  media_cameras_async(char *err, size_t errlen);
 
 /* maudio.c: the media's PipeWire streams (lord-media doesn't have the socket) */
 MAudio *maudio_open(int rec, const char *app, const char *title, const char *role_or_source, int *ring_fd);

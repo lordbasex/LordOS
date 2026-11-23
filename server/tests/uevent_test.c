@@ -36,6 +36,7 @@ int main(void) {
     CHECK(parse(INTEL_HP) == UEV_DRM, "drm of any card by default");
     CHECK(parse("change@/devices/LNXSYSTM:00/BAT0/power_supply/BAT0|ACTION=change|SUBSYSTEM=power_supply|POWER_SUPPLY_CAPACITY=50") == UEV_POWER, "power_supply");
     CHECK(parse("change@/devices/pci0000:00/0000:00:02.0/drm/card0/card0-eDP-1/intel_backlight|ACTION=change|SUBSYSTEM=backlight") == UEV_BACKLIGHT, "backlight (its path names card0, it still counts)");
+    CHECK(parse("add@/devices/pci0000:00/0000:00:14.0/usb1/1-2/1-2:1.0/video4linux/video0|ACTION=add|SUBSYSTEM=video4linux|DEVNAME=video0") == UEV_VIDEO, "video4linux (a webcam plugged in)");
     CHECK(parse("add@/devices/virtual/net/lo|ACTION=add|SUBSYSTEM=net") == 0, "net");
     CHECK(parse("add@/devices/virtual/mdev|ACTION=add|SUBSYSTEM=mdev") == 0, "mdev");
     CHECK(parse("libudev|SUBSYSTEM=drm|DEVNAME=dri/card1") == 0, "udev's own message (no '@')");

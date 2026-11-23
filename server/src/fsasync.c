@@ -11,7 +11,9 @@
  * the synchronous lord.fs calls use (fsops_resolve_readable / _target / _stat: the roots, the pseudo-filesystems, the
  * protected folders, a share that stopped answering), then fstrash_put adds its own checks (fsops_protected_below).
  * Nothing new is reachable: the operations are a closed list (list, stat, free, du, and three writes lord.fs already had:
- * move to the Trash, new folder, rename), each the synchronous call's own checks and code on another thread. */
+ * move to the Trash, new folder, rename), each the synchronous call's own checks and code on another thread.
+ * FSA_FN runs a function of lord-server's own that a native call names in C (lord.media.camerasAsync: the camera list
+ * lord.media.cameras makes), never one chosen from JS: the same code as the synchronous call, on another thread. */
 #include "fsasync.h"
 #include "fsops.h"
 #include "errcode.h"
@@ -33,7 +35,7 @@
 void (*fsasync_test_hook)(int op, const char *path);
 #endif
 
-typedef struct Req { int req, op; double ms; char *path, *path2, *json; struct Req *next; } Req;
+typedef struct Req { int req, op; double ms; char *path, *path2, *json; FsaFn fn; struct Req *next; } Req;
 
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
@@ -235,11 +237,12 @@ static char *op_du(const char *path, double ms) {
     return strdup(b);
 }
 
-static char *run(int op, const char *path, const char *path2, double ms) {
+static char *run(int op, const char *path, const char *path2, double ms, FsaFn fn) {
 #ifdef FSASYNC_TEST
     if (fsasync_test_hook) fsasync_test_hook(op, path);
 #endif
     switch (op) {
+    case FSA_FN: return fn ? fn(path) : error_json("sys.badArgument");
     case FSA_LIST: return op_list(path);
     case FSA_STAT: return op_stat(path);
     case FSA_TRASH: return op_trash(path);
@@ -263,7 +266,7 @@ static void *worker(void *arg) {
         if (!todo) todo_tail = NULL;
         ntodo--;
         pthread_mutex_unlock(&mu);
-        r->json = run(r->op, r->path, r->path2, r->ms);
+        r->json = run(r->op, r->path, r->path2, r->ms, r->fn);
         r->next = NULL;
         pthread_mutex_lock(&mu);
         if (done_tail) done_tail->next = r; else done = r;
@@ -292,6 +295,7 @@ static int spawn(void) {
 }
 
 static int submit(int op, const char *path, const char *path2, double ms, char *err, size_t errlen);
+static int enqueue(int op, const char *path, const char *path2, double ms, FsaFn fn, char *err, size_t errlen);
 
 int fsasync_submit(int op, const char *path, char *err, size_t errlen) {
     return op == FSA_DU ? fsasync_submit_du(path, 0, err, errlen) : submit(op, path, NULL, 0, err, errlen);
@@ -307,12 +311,21 @@ int fsasync_submit_du(const char *path, double ms, char *err, size_t errlen) {
     return submit(FSA_DU, path, NULL, ms, err, errlen);
 }
 
+int fsasync_submit_fn(FsaFn fn, const char *arg, char *err, size_t errlen) {
+    if (!fn || !arg || strlen(arg) >= PATH_MAX) { lerr_set(err, errlen, "sys.badArgument", NULL); return -1; }
+    return enqueue(FSA_FN, arg, NULL, 0, fn, err, errlen);
+}
+
 static int submit(int op, const char *path, const char *path2, double ms, char *err, size_t errlen) {
     if (op < FSA_LIST || op > FSA_DU || !path || !path[0] || strlen(path) >= PATH_MAX ||
         (op == FSA_RENAME) != (path2 != NULL) || (path2 && (!path2[0] || strlen(path2) >= PATH_MAX))) {
         lerr_set(err, errlen, "sys.badArgument", NULL);
         return -1;
     }
+    return enqueue(op, path, path2, ms, NULL, err, errlen);
+}
+
+static int enqueue(int op, const char *path, const char *path2, double ms, FsaFn fn, char *err, size_t errlen) {
     pthread_mutex_lock(&mu);
     if (efd < 0) efd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (efd < 0) { pthread_mutex_unlock(&mu); lerr_set(err, errlen, "sys.errno", "errno", lerr_errno(errno), NULL); return -1; }
@@ -331,6 +344,7 @@ static int submit(int op, const char *path, const char *path2, double ms, char *
     if (!nthreads) { free(r->path); free(r->path2); free(r); pthread_mutex_unlock(&mu); lerr_set(err, errlen, "sys.errno", "errno", lerr_errno(EAGAIN), NULL); return -1; }
     r->op = op;
     r->ms = ms;
+    r->fn = fn;
     r->req = next_req++;
     if (next_req <= 0) next_req = 1;
     if (todo_tail) todo_tail->next = r; else todo = r;

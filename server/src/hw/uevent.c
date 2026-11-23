@@ -69,7 +69,8 @@ int uevent_parse(const char *buf, int len) {
         else if (n > 10 && !strncmp(s, "SUBSYSTEM=", 10)) {
             const char *v = s + 10;
             seen = 1;
-            kind = !strcmp(v, "drm") ? UEV_DRM : !strcmp(v, "power_supply") ? UEV_POWER : !strcmp(v, "backlight") ? UEV_BACKLIGHT : 0;
+            kind = !strcmp(v, "drm") ? UEV_DRM : !strcmp(v, "power_supply") ? UEV_POWER : !strcmp(v, "backlight") ? UEV_BACKLIGHT
+                 : !strcmp(v, "video4linux") ? UEV_VIDEO : 0;
         } else if (n > 8 && !strncmp(s, "DEVNAME=", 8)) {
             if (n > 12 && !strncmp(s + 8, "dri/", 4)) card_name = card_at(s + 12, s + n);
         } else if (n > 8 && !strncmp(s, "DEVPATH=", 8)) card_path = card_of_path(s + 8, s + n);

@@ -71,6 +71,13 @@ static void put(const char *rel, const char *text) {
 static int exists(const char *rel) { char p[512]; struct stat st; snprintf(p, sizeof p, "%s/%s", H, rel); return lstat(p, &st) == 0; }
 static int has(const char *json, const char *s) { return json && strstr(json, s) != NULL; }
 
+static char *fn_echo(const char *arg) {
+    char *j = malloc(strlen(arg) + 16);
+    if (j) sprintf(j, "{\"arg\":\"%s\"}", arg);
+    return j;
+}
+static char *fn_null(const char *arg) { (void)arg; return NULL; }
+
 static int submit(int op, const char *rel) {
     char p[512], err[256] = "";
     if (rel[0] == '/') snprintf(p, sizeof p, "%s", rel); else snprintf(p, sizeof p, "%s/%s", H, rel);
@@ -148,6 +155,16 @@ int main(void) {
     CHECK(fsasync_submit2(FSA_DU, p, p, derr, sizeof derr) < 0);
     du = submit(FSA_DU, "missing-folder");
     CHECK(has(wait_for(du, 3000), "\"error\":"));
+    /* FSA_FN: one of lord-server's own functions on a worker (lord.media.camerasAsync); "" is a valid argument, a
+     * function that runs out of memory answers sys.outOfMemory, and FSA_FN is never reachable through fsasync_submit */
+    int fn = fsasync_submit_fn(fn_echo, "abc", derr, sizeof derr);
+    CHECK(has(wait_for(fn, 3000), "{\"arg\":\"abc\"}"));
+    fn = fsasync_submit_fn(fn_echo, "", derr, sizeof derr);
+    CHECK(has(wait_for(fn, 3000), "{\"arg\":\"\"}"));
+    fn = fsasync_submit_fn(fn_null, "x", derr, sizeof derr);
+    CHECK(has(wait_for(fn, 3000), "sys.outOfMemory"));
+    CHECK(fsasync_submit_fn(NULL, "x", derr, sizeof derr) < 0 && fsasync_submit_fn(fn_echo, NULL, derr, sizeof derr) < 0);
+    CHECK(fsasync_submit(FSA_FN, p, derr, sizeof derr) < 0);
 
     /* 3. the checks are lord.fs's own */
     int r = submit(FSA_LIST, "/proc/self");

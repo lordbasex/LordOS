@@ -134,6 +134,70 @@
       }
       end();
     },
+    // Files → Get Info on a big folder, twice (2026-11-23): its size was lord.fs.du on the main thread, up to 900 ms.
+    // perf_headless.sh fills the test home first (PERF_FLATPAK_FILES files under ~/.local/share/flatpak and ~/.var/app);
+    // Files opens the home folder, and ❖I with nothing selected shows the folder open
+    filesInfo() {
+      begin('Files → Get Info on a big folder');
+      step('close the others', closeAll);
+      step('open files', () => sdk.wm.open('files', { args: { path: lord.fs.home() } }));
+      step('wait', () => {});
+      const sizes = () => log({ infoSizes: labels(frameOf('files') || { x: 0, y: 0, w: 0, h: 0 }).map((x) => x.text)
+        .filter((t) => /\d ?[KMGT]?B\+? · |calculating/.test(t)) });
+      const info = () => {          // Ctrl+I in the Files window (flag 2: Ctrl)
+        const w = sdk.windows.get().find((x) => x.id === 'files' || x.id.startsWith('files#'));
+        if (!w) return false;
+        sdk.wm.focus(w.id);
+        globalThis.__lordKey(23, 1, 'i', '', 'i', 2);
+        globalThis.__lordKey(23, 0, 'i', '', 'i', 2);
+        return true;
+      };
+      for (let i = 0; i < 2; i++) {
+        step(`open info ${i}`, info);
+        step('wait', sizes);
+        step('wait', sizes);
+        step('close info', info);
+      }
+      end();
+    },
+    // the camera list from a worker (sdk/cameras.js), then lord.media.cameras on the main thread, each timed after 4.5 s
+    // of nothing (a USB camera suspends after 2 s and wakes up to answer: the cost the Camera app's 3 s poll paid each
+    // time). Only VIDIOC_QUERYCAP: no camera is opened for a picture
+    cameraNatives() {
+      begin('Camera list');
+      for (let i = 0; i < 2; i++) {
+        step(`camerasAsync ${i}`, () => {
+          if (!sdk.refreshCameras || typeof lord.media.camerasAsync !== 'function') return false;
+          const t0 = lord.now();
+          sdk.refreshCameras().then((r) => log({ native: `refreshCameras answered (${r ? r.length : 'none'}) after`, ms: +(lord.now() - t0).toFixed(1) }));
+          log({ native: 'media.camerasAsync (the call)', ms: +(lord.now() - t0).toFixed(1) });
+          return true;
+        });
+        for (let k = 0; k < 3; k++) step('wait', () => {});
+        step(`media.cameras ${i}`, () => {
+          const t0 = lord.now();
+          const r = lord.media.cameras();
+          log({ native: `media.cameras (${r.length})`, ms: +(lord.now() - t0).toFixed(1) });
+        });
+        for (let k = 0; k < 3; k++) step('wait', () => {});
+      }
+      end();
+    },
+    // each native app opened alone (PERF_APPS, or the list below), then two quiet steps: the worst run on opening it and
+    // in the 3 s after; with PERF_MARK=1 and PERF_OUT the stall lines fall under each step. Not Camera and LordOS Studio:
+    // they would turn a real webcam on (cameraNatives times their list instead)
+    appsOpen() {
+      const apps = globalThis.PERF_APPS || ['files', 'store', 'mail', 'photos', 'player', 'notes', 'terminal', 'machines', 'monitor',
+        'recorder', 'imager', 'settings', 'calendar', 'contacts', 'editor', 'databases', 'passwords', 'logs', 'sysinfo', 'disks'];
+      for (const a of apps) {
+        begin(`open ${a}`);
+        step('close the others', closeAll);
+        step(`open ${a}`, () => { if (!sdk.getApp || sdk.getApp(a)) sdk.wm.open(a); });
+        step(`after ${a}`, () => {});
+        step(`after ${a} 2`, () => {});
+        end();
+      }
+    },
     files() {
       begin('Files: open');
       step('close the others', closeAll);

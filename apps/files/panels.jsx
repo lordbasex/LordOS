@@ -46,7 +46,7 @@ function Row({ k, v, t }) {
   );
 }
 
-// Get Info (❖I): the file's card; folder sizes are computed with a bound.
+// Get Info (❖I): the file's card; folder sizes are computed off the main thread, with a bound.
 // extra: what another part adds between the header and the facts, which then leave out Size and Where (Cloud's
 // status, account, sizes and Keep switch: cloud.jsx CloudInfo)
 export function InfoPanel({ e, onClose, openers, extra }) {
@@ -67,9 +67,12 @@ export function InfoPanel({ e, onClose, openers, extra }) {
     }
     try { setSt(lord.fs.stat(e.path)); } catch (err) { setSt({ error: err.message }); }
     if (!e.dir) return undefined;
-    // a cloud or network mount answers { remote: true } without walking it: the listing's size, or nothing
-    const id = setTimeout(() => { try { setDu(lord.fs.du(e.path, 900) || { remote: true }); } catch (err) { setDu({ failed: true }); } }, 30);
-    return () => clearTimeout(id);
+    // the folder's size is walked on one of lord-server's workers (fs.duAsync, at most 3 s): lord.fs.du here kept the
+    // pointer still for up to 900 ms on a big folder (2026-11-23). "calculating…" until it answers; an answer for an item
+    // the card no longer shows is dropped. A cloud or network mount answers { remote: true } without walking it.
+    let live = true;
+    fs.duAsync(e.path, 3000).then((r) => { if (live) setDu(r || { remote: true }); }, () => { if (live) setDu({ failed: true }); });
+    return () => { live = false; };
   }, [e?.path]);
   if (!e) return null;
   const size = e.dir ? (!du ? tr('files.info.calculating') : du.remote || du.failed || du.size == null ? (e.size > 0 ? formatBytes(e.size) : '—')

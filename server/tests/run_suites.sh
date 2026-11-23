@@ -259,6 +259,13 @@ EOF
         77) skip "settings-nofreeze" "build/lord-server, node and the default theme (make, npm run build)" ;;
         *) bad "settings-nofreeze (tests/settings_nofreeze.sh, headless lord-server: Settings → Flatpak)" ;;
     esac
+    # Files → Get Info on a folder of 100 000 files: its size never on the main thread (2026-11-23)
+    sh tests/files_info_nofreeze.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "files-info-nofreeze (tests/files_info_nofreeze.sh, headless lord-server: Files → Get Info)" ;;
+        77) skip "files-info-nofreeze" "build/lord-server, node and the default theme (make, npm run build)" ;;
+        *) bad "files-info-nofreeze (tests/files_info_nofreeze.sh, headless lord-server: Files → Get Info)" ;;
+    esac
     # a popup opened again on the same wl_surface, as GTK 4's popovers, against a headless lord-server (#159)
     sh tests/popup_headless.sh >"$T/out" 2>&1
     case $? in

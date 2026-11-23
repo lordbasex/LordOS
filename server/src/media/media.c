@@ -16,6 +16,7 @@
 #include "hwdec.h"
 #include "svgicon.h"
 #include "../fsops.h"
+#include "../fsasync.h"
 #include "../pkg/crypto.h"
 #include "../ui/ui.h"
 #include "../gpu/gpu.h"
@@ -1113,9 +1114,10 @@ const char *media_thumb(const char *path, int size, char *out, size_t n) {
 
 /* ---- cameras ---- */
 
-int media_cameras(char *json, size_t n) {
-    size_t o = 0;
-    o += (size_t)snprintf(json + o, n - o, "[");
+/* The real cameras as JSON objects separated by commas, from json[o] (no brackets, no LordOS Studio entry): opens every
+ * /dev/video* and asks VIDIOC_QUERYCAP (60-70 ms with two webcams: a USB camera wakes up to answer). Touches no
+ * lord-server state, so media_cameras_async runs it on a worker. Returns the new length; *any: one was written. */
+static size_t scan_cameras(char *json, size_t n, size_t o, int *any) {
     int first = 1;
     for (int i = 0; i < 64 && o + 300 < n; i++) {
         char dev[32];
@@ -1126,7 +1128,7 @@ int media_cameras(char *json, size_t n) {
         memset(&cap, 0, sizeof cap);
         if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
             uint32_t caps = (cap.capabilities & V4L2_CAP_DEVICE_CAPS) ? cap.device_caps : cap.capabilities;
-            /* LordOS Studio's own loopback is its "studio" entry below, never a real camera */
+            /* LordOS Studio's own loopback is its "studio" entry, never a real camera */
             if ((caps & V4L2_CAP_VIDEO_CAPTURE) && (caps & V4L2_CAP_STREAMING) && !mstudio_is_loopback_card((const char *)cap.card)) {
                 char name[80], bus[80];
                 media_json_str(name, sizeof name, (const char *)cap.card);
@@ -1137,10 +1139,39 @@ int media_cameras(char *json, size_t n) {
         }
         close(fd);
     }
+    *any = !first;
+    return o;
+}
+
+int media_cameras(char *json, size_t n) {
+    size_t o = 0;
+    int any = 0;
+    o += (size_t)snprintf(json + o, n - o, "[");
+    o = scan_cameras(json, n, o, &any);
     /* LordOS Studio: one more camera, over the real ones (docs/CAMERA-STUDIO-PLAN.md) */
-    if (!first && o + 200 < n) { mstudio_camera_entry(json + o, n - o, 0); o += strlen(json + o); }
+    if (any && o + 200 < n) { mstudio_camera_entry(json + o, n - o, 0); o += strlen(json + o); }
     snprintf(json + o, n - o, "]");
     return 0;
+}
+
+/* on an fsasync worker: { "cameras": [ ...as media_cameras ] }; studio: LordOS Studio's entry, made on the main thread
+ * (mstudio's state is the main thread's), "" for none */
+#define CAMERAS_JSON 8192
+static char *cameras_job(const char *studio) {
+    char *json = malloc(CAMERAS_JSON);
+    if (!json) return NULL;
+    int any = 0;
+    size_t o = (size_t)snprintf(json, CAMERAS_JSON, "{\"cameras\":[");
+    o = scan_cameras(json, CAMERAS_JSON, o, &any);
+    if (any && studio[0] && o + strlen(studio) + 8 < CAMERAS_JSON) o += (size_t)snprintf(json + o, CAMERAS_JSON - o, ",%s", studio);
+    snprintf(json + o, CAMERAS_JSON - o, "]}");
+    return json;
+}
+
+int media_cameras_async(char *err, size_t errlen) {
+    char studio[256];
+    mstudio_camera_entry(studio, sizeof studio, 1);
+    return fsasync_submit_fn(cameras_job, studio, err, errlen);
 }
 
 /* ---- main loop ---- */

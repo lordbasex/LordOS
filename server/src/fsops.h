@@ -36,6 +36,7 @@ int  fsops_rename(const char *from, const char *to, char *err, size_t errlen);
 typedef struct {
     int id, used, move, done, failed, cancel;
     int try_rename;                 /* a move on a slow mount: the rename is tried on the job's thread, not the caller's */
+    int check;                      /* on a slow mount: the source's and the destination's lstat on the job's thread too */
     char src[4096], dst[4096];
     volatile uint64_t bytes, total, files;
     char error[256];
