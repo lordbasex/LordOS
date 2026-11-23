@@ -1936,7 +1936,7 @@ after, with what its flow checks:
 | `wp_linux_drm_syncobj_manager_v1` | general | complete | timelines imported on a render node, a frame held until its acquire point is signalled, release points (the replaced buffer's, and the last one's when the surface goes), implicit sync again after destroy, and all 8 errors |
 | `wp_pointer_warp_v1` | general | complete | the pointer over the window (test hooks), a warp with the enter's serial moves it there; a stale serial and a point outside are ignored |
 | `wp_tearing_control_manager_v1` | general | complete | the async hint on a window and back to vsync, frames shown, destroyed and made again, `tearing_control_exists` |
-| `xdg_session_manager_v1` | general | complete | created, a window added and renamed, restored from a new connection with `restore_toplevel` before the first commit, replaced by another connection, removed, and all 7 errors |
+| `xdg_session_manager_v1` | general | complete | created, a window added and renamed, restored from a new connection with `restore_toplevel` before the first commit (also a window maximized from its first frame to its close and restored right away), replaced by another connection, removed, and all 7 errors |
 | `xdg_system_bell_v1` | general | complete | ring on a window and with no surface, the shell told "bell", 30 more held back by the rate limit |
 | `xdg_toplevel_drag_manager_v1` | general | complete | a tab torn off with a real press (test hooks): the attached window follows ("tldrag" to the shell), ends at the release, `invalid_source` (twice, and a selection's source), `toplevel_attached`, `ongoing_drag` |
 | `xdg_toplevel_tag_manager_v1` | general | complete | tag and description before the map (read with the window), changed later (a control character taken out), a long tag cut to 127 bytes |
@@ -2192,7 +2192,9 @@ input, so none is hidden from sandboxed clients (`secctx_hidden`).
 - **Session management (`xdg-session-management-v1`, `xsession.c`, `xsstore.c`).** An app gets a session (new, or by the
   id it was given), adds its windows by name, and when it starts again restores each by name before its first commit.
   LordOS keeps, per window of a session, its geometry on screen and whether it was maximized (updated every 2 s while
-  it is open and when it closes), and a restored window opens there: the shell asks once (`lord.wayland.sessionFrame`),
+  it is open and when it closes; a maximized or fullscreen window keeps its last normal geometry, and one that was
+  never normal, opened maximized, keeps the geometry it has, so it comes back too: `xs_top_note`), and a restored
+  window opens there: the shell asks once (`lord.wayland.sessionFrame`),
   adds the theme's frame (`restoredFrame`) and fits it on today's displays with session restore's own `fitFrame`
   (`sdk/sessionmodel.js`). With LordOS's session restore: that one relaunches the apps after a login; a window its app
   then restores by name takes its own place first, ahead of session restore's frame and the remembered place.

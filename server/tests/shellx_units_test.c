@@ -153,10 +153,48 @@ static void store(void) {
     xs_clear(&back);
 }
 
+/* xs_top_note, what xsession.c's snapshots do: the regression of a window maximized from its first frame to its close
+ * (its app remembered maximized), which never got a place, so it was neither restored nor saved. */
+static void note(void) {
+    XsStore st = { 0 }, back = { 0 };
+    char id[XS_ID_LEN + 1];
+    unsigned char rnd[16];
+    for (int i = 0; i < 16; i++) rnd[i] = (unsigned char)(200 - i);
+    xs_new_id(rnd, id);
+    XsSess *s = xs_new(&st, id, "program:/usr/bin/editor", 1);
+    CHECK(s);
+    /* maximized at every snapshot (each tick and the close): it still has a place, and it is maximized */
+    XsTop *t = xs_top_put(s, "primary");
+    CHECK(xs_top_note(t, (int[]){ 0, 28, 1280, 690 }, 1, 0) == 1);
+    CHECK(xs_top_has(t) && t->max == 1 && t->r[0] == 0 && t->r[1] == 28 && t->r[2] == 1280 && t->r[3] == 690);
+    CHECK(xs_top_note(t, (int[]){ 0, 28, 1280, 690 }, 1, 0) == 0);           /* nothing new: not dirty */
+    size_t len = 0;
+    char *text = xs_dump(&st, &len);
+    CHECK(text && strstr(text, "T 0 28 1280 690 1 primary\n"));             /* saved, so it outlives lord-server too */
+    CHECK(xs_load(&back, text, len) == 1 && xs_top_has(xs_top(xs_find(&back, id, "program:/usr/bin/editor"), "primary")));
+    free(text);
+    /* back to normal: its own place, not maximized; maximized again: that normal place is kept */
+    CHECK(xs_top_note(t, (int[]){ 100, 120, 800, 600 }, 0, 0) == 1 && t->max == 0 && t->r[0] == 100 && t->r[2] == 800);
+    CHECK(xs_top_note(t, (int[]){ 0, 28, 1280, 690 }, 1, 0) == 1 && t->max == 1 && t->r[0] == 100 && t->r[2] == 800);
+    /* fullscreen: the entry as it was */
+    CHECK(xs_top_note(t, (int[]){ 0, 0, 1280, 800 }, 1, 1) == 0 && t->max == 1 && t->r[2] == 800);
+    CHECK(xs_top_note(t, (int[]){ 0, 0, 1280, 800 }, 0, 1) == 0 && t->r[2] == 800);
+    /* fullscreen since it opened: its rect, so it can come back, not marked maximized */
+    XsTop *f = xs_top_put(s, "game");
+    CHECK(xs_top_note(f, (int[]){ 0, 0, 1280, 800 }, 0, 1) == 1 && xs_top_has(f) && f->max == 0);
+    /* a normal window: as before */
+    XsTop *n = xs_top_put(s, "prefs");
+    CHECK(xs_top_note(n, (int[]){ 5, 6, 300, 200 }, 0, 0) == 1 && xs_top_has(n) && n->max == 0);
+    CHECK(xs_top_note(NULL, (int[]){ 5, 6, 300, 200 }, 0, 0) == 0);          /* xs_top_put full or name not storable */
+    xs_clear(&st);
+    xs_clear(&back);
+}
+
 int main(void) {
     bell();
     region();
     store();
+    note();
     if (fails) { printf("shellx-units: %d failed\n", fails); return 1; }
     printf("shellx-units: ok\n");
     return 0;

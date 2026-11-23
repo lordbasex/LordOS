@@ -2840,6 +2840,59 @@ static void f_session(void) {
         } else skip(item, "session.replaced", "xdg_session_v1.replaced", "no second connection");
         cx_close(c);
     }
+    /* A window maximized as soon as it maps, closed and restored by name from a new connection right away (no 2 s tick
+     * wait: its close is its only snapshot, as an app closed and opened again quickly). A window LordOS opens
+     * maximized because it remembered its app so never has a normal place; it must come back all the same
+     * (xs_top_note; tests/shellx_units_test.c has the deterministic case). */
+    {
+        OPEN_OR_SKIP("session.toplevel_restored_maximized");
+        struct xdg_session_manager_v1 *m = bindv(c, &xdg_session_manager_v1_interface, 0);
+        SessEv e = { 0 };
+        struct xdg_session_v1 *s = xdg_session_manager_v1_get_session(m, XDG_SESSION_MANAGER_V1_REASON_LAUNCH, NULL);
+        xdg_session_v1_add_listener(s, &se_l, &e);
+        cx_sync(c);
+        char msid[128];
+        snprintf(msid, sizeof msid, "%s", e.id);
+        Win w;
+        win_uncommitted(c, &w, "wlconf-session-max");
+        struct xdg_toplevel_session_v1 *ts = xdg_session_v1_add_toplevel(s, w.top, "maximized");
+        win_first_commit_map(c, &w, 300, 200);
+        if (!w.maximized) {
+            int before = w.top_configs;
+            xdg_toplevel_set_maximized(w.top);
+            double end = now_ms() + 3000;
+            while (!(w.top_configs > before && w.maximized) && now_ms() < end) cx_wait(c, NULL, 30);
+            if (w.maximized) win_ack_commit(c, &w, w.cw > 0 ? w.cw : 200, w.ch > 0 ? w.ch : 150);
+        }
+        cx_wait(c, NULL, 200);                   /* painted at its maximized place */
+        int wasmax = w.maximized;
+        close_win(c, &w);
+        xdg_toplevel_session_v1_destroy(ts);
+        xdg_session_v1_destroy(s);
+        cx_sync(c);
+        cx_close(c);
+        Conn *c2 = msid[0] ? cx_open() : NULL;
+        if (!c2) skip(item, "session.toplevel_restored_maximized", "xdg_toplevel_session_v1.restored", "no session or no second connection");
+        else {
+            struct xdg_session_manager_v1 *m2 = bindv(c2, &xdg_session_manager_v1_interface, 0);
+            SessEv e2 = { 0 };
+            struct xdg_session_v1 *s2 = xdg_session_manager_v1_get_session(m2, XDG_SESSION_MANAGER_V1_REASON_LAUNCH, msid);
+            xdg_session_v1_add_listener(s2, &se_l, &e2);
+            cx_sync(c2);
+            Win w2;
+            win_uncommitted(c2, &w2, "wlconf-session-max-restored");
+            tse_restored = 0;
+            struct xdg_toplevel_session_v1 *ts2 = xdg_session_v1_restore_toplevel(s2, w2.top, "maximized");
+            xdg_toplevel_session_v1_add_listener(ts2, &tse_l, NULL);
+            cx_sync(c2);
+            check(item, "session.toplevel_restored_maximized", wasmax && e2.restored == 1 && tse_restored == 1 && cx_ok(c2), "xdg_session_v1.restore_toplevel,xdg_toplevel_session_v1.restored",
+                  "a window maximized as it mapped (%s), closed, then restored by name from a new connection right away: session restored %d, window restored %d time(s): %s",
+                  wasmax ? "it was" : "never maximized", e2.restored, tse_restored, cx_errtext(c2));
+            xdg_session_v1_remove(s2);
+            cx_sync(c2);
+            cx_close(c2);
+        }
+    }
     {
         OPEN_OR_SKIP("session.in_use");
         struct xdg_session_manager_v1 *m = bindv(c, &xdg_session_manager_v1_interface, 0);

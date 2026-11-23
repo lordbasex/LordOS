@@ -1860,6 +1860,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **Wayland session management: a window that was maximized the whole time it was open comes back too, in development
+  (the latest release is 0.8.9.4).** With `xdg-session-management-v1` an app names its windows in a session and, when
+  it starts again, asks for each by name before its first commit; LordOS answers `restored` only for a window it kept
+  a place for. It kept a window's place only while the window was in its normal state (a maximized or fullscreen one
+  keeps its last normal place), so a window that was never normal got an entry with no place: it was neither restored
+  nor written to the file. That happens when LordOS opens the window maximized because its app's remembered place
+  (`settings.windowPlaces`) is maximized, or when the app maximizes it at once and closes it before the next
+  snapshot (every 2 s). An app closed and opened again quickly did not get its window back. On the maintainer's PC
+  the conformance tool showed it as an intermittent `flow.session.toplevel_restored` failure (restored 0 times,
+  xdg_session_manager_v1 at 96.8 %): the earlier `xdg_toplevel` flow maximizes and unmaximizes a window of the same
+  app id, and whether the shell's remembered place for that app (saved 800 ms after a change) ended up maximized
+  depended on timing, more so under load. It was not the file: the sessions live in memory, and the file is only read
+  at start. Now a snapshot (`xs_top_note`, `xsstore.c`, pure) keeps the last normal place as before, and a maximized
+  or fullscreen window with no place yet takes its current one, marked maximized when it is, so it is restored
+  (maximized again) and saved. The store's rules are unchanged (per-user file, atomic write, limits, names checked).
+  **Tests:** `tests/shellx_units_test.c` (`note`, in `make test`) checks it deterministically (4 checks fail with the
+  old rule); a new conformance check, `session.toplevel_restored_maximized`, maximizes a session window as it maps,
+  closes it and restores it from a new connection right away. Under 24 busy loops on 20 cores, the old code failed
+  that check 12 runs out of 12; with the fix all 35 runs were at 100 %.
 - **Files: dragging in a big folder no longer draws the whole window on every pointer move (GitHub #218), in
   development (the latest release is 0.8.9.4).** Each move of a drag set the Files window's own state (where the
   ghost is, which place it is over), so React drew the whole window again, many times a second: every card or row in
