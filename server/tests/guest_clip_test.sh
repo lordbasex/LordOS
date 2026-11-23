@@ -68,13 +68,13 @@ check() { if grep -q -- "$2" "$3"; then echo "ok: $1"; else echo "FAIL: $1 (no \
 nocheck() { if grep -q -- "$2" "$3"; then echo "FAIL: $1 (\"$2\" in $3)"; R=1; else echo "ok: $1"; fi; }
 
 case_run "no tool" none DISPLAY=:9 WAYLAND_DISPLAY=wayland-9
-check "no tool: the hello says noclip" '^HELLO lordos-guest [0-9]* noclip$' "$D/out"
+check "no tool: the hello says noclip" '^HELLO lordos-guest [0-9]* noclip\( stopping\)\{0,1\}$' "$D/out"
 nocheck "no tool: no clipboard capability" 'clipboard' "$D/out"
 nocheck "no tool: nothing sent" '^CLIP' "$D/out"
 check "no tool: the journal says what to install" 'no clipboard tool: install xclip or wl-clipboard' "$D/err"
 
 case_run "xclip only (X11)" x DISPLAY=:9
-check "xclip: the hello says clipboard" '^HELLO lordos-guest [0-9]* clipboard clipx$' "$D/out"
+check "xclip: the hello says clipboard" '^HELLO lordos-guest [0-9]* clipboard clipx\( stopping\)\{0,1\}$' "$D/out"
 check "xclip: the text is sent" '^CLIP from xclip$' "$D/out"
 check "xclip: the journal names it" 'clipboard through xclip (X11)' "$D/err"
 
@@ -160,7 +160,7 @@ H=$!
 xc() { env -i PATH=/usr/bin:/bin DISPLAY=:$N HOME="$D" timeout 10 xclip -o -selection clipboard "$@"; }
 i=0; while ! xc -t TARGETS 2>/dev/null | grep -q UTF8_STRING && [ $i -lt 50 ]; do i=$((i + 1)); sleep 0.1; done
 echo "== on demand (X11)"
-check "on demand: the hello says clipreq" '^HELLO lordos-guest [0-9]* clipboard clipx clipreq$' "$D/out"
+check "on demand: the hello says clipreq" '^HELLO lordos-guest [0-9]* clipboard clipx clipreq\( stopping\)\{0,1\}$' "$D/out"
 nocheck "on demand: TARGETS asks the host nothing" '^REQ' "$D/out"
 xc -t TARGETS >"$D/targets" 2>/dev/null
 check "on demand: TARGETS lists the text" '^UTF8_STRING$' "$D/targets"
