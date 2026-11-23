@@ -995,6 +995,16 @@ build/shellx-client: tests/shellx_client.c $(CLIENT_GEN) $(SHELLX_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/shellx_client.c $(filter build/gen/client/xdg-shell-protocol.c,$(CLIENT_GEN)) $(filter %.c,$(SHELLX_GEN)) -lwayland-client
 build/popup-client: tests/popup_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/popup_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+# ❖ + drag anywhere in a Linux window (GitHub #219): a Wayland app and an X11 app (Xwayland) against build/lord-server-test's
+# test hooks (tests/moddrag_headless.sh, run by tests/run_suites.sh); the X client only where libxcb's headers are
+build/moddrag-client: tests/moddrag_client.c $(CLIENT_GEN)
+	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/moddrag_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client
+build/moddrag-x11: tests/moddrag_x11.c
+	$(CC) $(CFLAGS) -D_GNU_SOURCE $(WARN) -std=c11 -o $@ tests/moddrag_x11.c -lxcb
+test: build/moddrag-client build/lord-server-test
+ifneq ($(wildcard /usr/include/xcb/xcb.h),)
+test: build/moddrag-x11
+endif
 # Subsurface order and viewport crop/scale shown in pixels, for tools/wl-proof.mjs's screenshots (docs/wayland-proofs/)
 build/wlproof-client: tests/wlproof_client.c $(CLIENT_GEN)
 	$(CC) $(CFLAGS) -D_GNU_SOURCE -Ibuild/gen $(WARN) -std=c11 -o $@ tests/wlproof_client.c $(filter %.c,$(CLIENT_GEN)) -lwayland-client

@@ -19,6 +19,7 @@ import {
   classicDesktopKeys, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, overview, LevelHud,
   menuBarPrefs, menuBarEveryDisplay, barDisplays, pointerDisplay, keepWindowsInWorkAreas,
   guestAppsMode,
+  titleBarPx,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useEffect, useRef, useState, Fragment } from 'react';
@@ -38,7 +39,7 @@ const alignOf = (s) => (s.taskbarAlign === 'start' ? 'start' : 'center');
 const areaFn = (d) => { const s = settings.get(); return workAreaFor(dockPrefs(s).taskbarPosition, d, menuBarEveryDisplay(s)); };
 
 // chrome: borders (1 + 1) and the title bar of Window.jsx's frame
-configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2, menu: MENU_H }, snap: true });
+configureWindows({ apps, workArea: areaFn, chrome: () => ({ w: 2, h: titleBarPx(TITLE_H) + 2, menu: MENU_H }), snap: true });
 
 // What is being dragged (from the bar or the start menu), and the remove cue.
 function DragGhost({ t }) {

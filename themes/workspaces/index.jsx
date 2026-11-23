@@ -22,6 +22,7 @@ import {
   switchDesktop, windows as windowsStore, windowTitle, windowIcon, appName, removeDesktopById, renameDesktop, createStore, lordosWallpapers,
   VideoSetup, setDesktopDecor, setStatusPanelPlacer, WidgetPicker, widgetPicker, setPointerAccent,
   guestAppsMode, startDisplayApps,
+  titleBarPx,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { useFirstStartOpen } from '@lordos/sdk';   // (0.8.9) the activity onboarding waits for the first-start desktop chooser
@@ -57,7 +58,7 @@ const planFor = (d, s) => { const p = wsPrefs(s); return displayPlan(d, { spine:
 const areaFn = (d) => planFor(d, settings.get()).work;
 
 // chrome: borders (1 + 1) and the title bar of Window.jsx's frame; snapping on for windows that float
-configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 2, menu: MENU_H }, snap: true, locked: windowLocked, snapThirds: true });
+configureWindows({ apps, workArea: areaFn, chrome: () => ({ w: 2, h: titleBarPx(TITLE_H) + 2, menu: MENU_H }), snap: true, locked: windowLocked, snapThirds: true });
 
 // Search, the Control Center and the notifications open on the display under the pointer (or the main one).
 const togglePanel = (name, extra = {}) => panel.set((p) => (p && p.name === name && (!extra.mode || p.mode === extra.mode) ? null : { name, display: pointerDisplay().id, ...extra }));

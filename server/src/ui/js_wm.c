@@ -10,6 +10,9 @@
  *       with no button held; pointer input or cancel() stops it. No end notice: the scene's window closes.
  *   lord.wm.pointer() → { x, y, active, edges }: the pointer now and the drag in progress (no
  *       arguments, read only). The theme polls it while a window moves, for the snapping preview.
+ *   lord.wm.dragModifier('super' | 'alt' | 'off') → bool
+ *       the modifier that makes a press anywhere in a window its move (left) or resize (right, middle): main.c offers
+ *       such a press to __lordEvent('modgrab', …) before the app under it sees it (sdk/moddrag.js, GitHub #219).
  * On release: __lordWm('end', { node, edges, dx, dy, dw, dh }) with the node's change.
  *
  *   lord.portal.set({ dark, accent: '#rrggbb', accentName, buttons })
@@ -87,6 +90,18 @@ static JSValue f_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     return JS_UNDEFINED;
 }
 
+/* lord.wm.dragModifier('super' | 'alt' | 'off') → bool: which modifier makes a press anywhere in a window its move or
+ * resize (grab.h GRAB_MOD_*). Anything else is refused and changes nothing. */
+static JSValue f_drag_modifier(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *s = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    int mod = !s ? -1 : !strcmp(s, "super") ? GRAB_MOD_SUPER : !strcmp(s, "alt") ? GRAB_MOD_ALT : !strcmp(s, "off") ? GRAB_MOD_OFF : -1;
+    if (s) JS_FreeCString(c, s);
+    if (mod < 0) return JS_FALSE;
+    grab_set_mod(mod);
+    return JS_TRUE;
+}
+
 static JSValue f_pointer(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     float x = 0, y = 0;
@@ -140,6 +155,7 @@ static const JSCFunctionListEntry wm_funcs[] = {
     JS_CFUNC_DEF("cancel", 0, f_cancel),
     JS_CFUNC_DEF("pointer", 0, f_pointer),
     JS_CFUNC_DEF("script", 2, f_script),
+    JS_CFUNC_DEF("dragModifier", 1, f_drag_modifier),
 };
 
 void js_wm_register(JSContext *c, JSValue lord) {

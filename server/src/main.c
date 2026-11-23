@@ -512,6 +512,25 @@ static int node_cursor(const Node *n) {
 
 static int out_scale(const Out *o);
 static int out_at_pointer(const Server *s);
+
+/* The window drag modifier's state came from the remote desktop or the test hooks (remote_key), not a keyboard here. */
+static int mods_injected;
+/* ❖ and Alt are tracked from every keyboard and a release can be lost (another console, a keyboard that sleeps or is
+ * unplugged with the key down): before a press becomes a window drag, the kernel is asked whether one of this
+ * computer's keyboards really holds the modifier (EVIOCGKEY), so a stale state never turns every click into a move.
+ * What the remote desktop injected is taken as it is. */
+static int drag_mod_really_held(Server *s) {
+    if (mods_injected) return 1;
+    int key1 = grab_mod() == GRAB_MOD_SUPER ? KEY_LEFTMETA : KEY_LEFTALT, key2 = grab_mod() == GRAB_MOD_SUPER ? KEY_RIGHTMETA : KEY_RIGHTALT;
+    for (int i = 0; i < s->input.count; i++) {
+        unsigned char keys[KEY_MAX / 8 + 1];
+        memset(keys, 0, sizeof keys);
+        if (s->input.dev[i].fd < 0 || ioctl(s->input.dev[i].fd, EVIOCGKEY(sizeof keys), keys) < 0) continue;
+        if (((keys[key1 / 8] >> (key1 % 8)) & 1) || ((keys[key2 / 8] >> (key2 % 8)) & 1)) return 1;
+    }
+    if (grab_mod() == GRAB_MOD_SUPER) s->meta = 0; else s->alt = 0;
+    return 0;
+}
 /* shake the pointer to find it (shake.h): every motion, from any device, feeds it */
 static Shake pointer_shake;
 static void dispatch_pointer(Server *s) {
@@ -544,7 +563,22 @@ static void dispatch_pointer(Server *s) {
     for (int i = 0; i < s->nbuttons; i++) { down[i] = s->buttons[i].down; button[i] = s->buttons[i].button; }
     double t0 = now_ms();
     int over = 0;
-    if (grabbing && !ended) wl_pointer_grab(s->nbuttons, down, button);
+    /* ❖ (or Alt, Settings → Appearance → Window options) + a press anywhere in a window: its move (left) or resize (right,
+     * middle), offered to the shell before the app under the pointer or the theme's own handlers see it (grab.h,
+     * sdk/moddrag.js, GitHub #219). Never while an app holds the pointer or the shortcuts (wl_moddrag_allowed) or
+     * LordOS's own pointer lock runs. Once the shell took it, every button stays the drag's until all are released:
+     * the app gets neither that press nor its release, and the theme only the moves and the releases. */
+    static int mod_swallow;
+    if (!grabbing && !mod_swallow && s->nbuttons && grab_mod_held(s->meta, s->alt, s->ctrl) && !ptrlock_active())
+        for (int i = 0; i < s->nbuttons; i++) {
+            if (!s->buttons[i].down || s->buttons[i].button > 2) continue;
+            if (wl_moddrag_allowed(x, y, target) && drag_mod_really_held(s) && js_pointer_modgrab(id, x, y, s->buttons[i].button))
+                mod_swallow = 1;
+            break;
+        }
+    int swallowed = mod_swallow;
+    if (mod_swallow && !s->held) mod_swallow = 0;
+    if ((grabbing && !ended) || swallowed) wl_pointer_grab(s->nbuttons, down, button);
     else over = wl_pointer(x, y, target, s->moved, s->nbuttons, down, button, s->wheel);
     if (over == 2) id = 0;                  /* sobre un menú de una app Linux: el árbol no lo ve */
     if (ended) js_wm_end(gnode, gedges, gdx, gdy, gdw, gdh);
@@ -555,7 +589,7 @@ static void dispatch_pointer(Server *s) {
     if (om != s->over_media) { s->over_media = om; s->cursor_dirty = 1; }
     if (s->moved && !grabbing) js_pointer("move", id, x, y, 0);
     for (int i = 0; i < s->nbuttons; i++)          /* sobre un menú, solo los "up" (terminan arrastres) */
-        if (over != 2 || !s->buttons[i].down) js_pointer(s->buttons[i].down ? "down" : "up", id, x, y, s->buttons[i].button);
+        if ((over != 2 && !swallowed) || !s->buttons[i].down) js_pointer(s->buttons[i].down ? "down" : "up", id, x, y, s->buttons[i].button);
     wl_drop_release_done();                 /* a Linux app's files dropped at this release: claimed by now, or cancelled */
     if (s->wheel && over != 2) js_pointer("wheel", id, x, y, s->wheel);
     if (dstat.held && s->moved) {
@@ -704,6 +738,8 @@ static void remote_key(int code, int value) {
     if (value == 1 && code >= KEY_Q && code <= KEY_M && !remote_typed) { remote_typed = 1; keyboards_check(s); }
     if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) s->ctrl = value != 0;
     if (code == KEY_LEFTALT || code == KEY_RIGHTALT) s->alt = value != 0;
+    if (code == KEY_LEFTMETA || code == KEY_RIGHTMETA) s->meta = value != 0;   /* ❖ + drag moves a window (grab.h) */
+    if (code == KEY_LEFTMETA || code == KEY_RIGHTMETA || code == KEY_LEFTALT || code == KEY_RIGHTALT) mods_injected = value != 0;
     js_key(code, value);
 }
 static void remote_clip(const char *text, unsigned len) { term_set_clipboard(text, len); }
@@ -1358,6 +1394,7 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) s->alt = ev->value != 0;
         if (ev->code == KEY_LEFTSHIFT || ev->code == KEY_RIGHTSHIFT) s->shift = ev->value != 0;
         if (ev->code == KEY_LEFTMETA || ev->code == KEY_RIGHTMETA) s->meta = ev->value != 0;
+        if (ev->code == KEY_LEFTMETA || ev->code == KEY_RIGHTMETA || ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) mods_injected = 0;
         /* Ctrl+Alt+Backspace ends the session at once. The modifiers are tracked from every keyboard and a release can
          * be lost (another console, a keyboard that sleeps or reconnects), so the kernel is asked whether Ctrl and Alt
          * are really held on this keyboard: a stale state must never end a session on a lone Backspace. */
@@ -1555,6 +1592,8 @@ static void remote_pointer(int fx, int fy);
 static void remote_button(int button, int down);
 static void remote_wheel(int steps);
 static void test_pointer(int x, int y) { remote_pointer(x, y); }
+/* a modifier key only (testhooks.c checks the code), as the remote desktop types it: the window drag modifier's test */
+static void test_key(int code, int value) { remote_key(code, value); }
 #endif
 
 /* pointer-warp-v1 (wl/wl_warp.c): the app in front moves the pointer on its window. No relative motion: a game sees
@@ -3116,7 +3155,7 @@ int main(int argc, char **argv) {
                                           share_point_protected, share_restricted, share_displays_of, remote_refresh };
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
 #ifdef LORD_TEST_HOOKS
-    static const TestHooks test_host = { test_pointer, remote_button, remote_wheel, test_tablet, test_tablet_event, wl_test_xwl, drmlease_fake_card };
+    static const TestHooks test_host = { test_pointer, remote_button, remote_wheel, test_tablet, test_tablet_event, wl_test_xwl, drmlease_fake_card, test_key };
     if (ok && test_hooks && testhooks_start(&test_host)) fprintf(stderr, "lord-server: no test hooks socket\n");
 #endif
     char current[sizeof ui.theme_request];

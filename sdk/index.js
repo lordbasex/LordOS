@@ -122,8 +122,10 @@ export { LevelHud, showLevel } from './levelhud.js';
 export { overview, OverviewBackdrop, OverviewChrome, openOverview, closeOverview, toggleOverview, toggleAppWindows, overviewOpen, setDesktopDecor } from './overview.jsx';
 export { codeStatus } from './codesig.js';
 import { reportRefusedCode } from './codesig.js';
-export { WindowShell, WINDOW_EDGE, useWindowButtons, SeamCover } from './windowshell.jsx';
-export { WINDOW_BUTTON_SIDES, windowButtonsPref } from './windowbuttons.js';   // title bar buttons' side (issue #58)
+export { WindowShell, WINDOW_EDGE, useWindowButtons, titleBarPx, SeamCover } from './windowshell.jsx';
+export { WINDOW_BUTTON_SIDES, windowButtonsPref, WINDOW_BUTTON_SIZES, windowButtonSizePref, buttonSizeScale, scaledBar, windowMenuTiling } from './windowbuttons.js';   // title bar buttons' side (issue #58), size (#151, #219), the Window menu's layouts (#151)
+export { DRAG_MODIFIERS, dragModifierPref } from './moddragmodel.js';   // ❖ or Alt + drag anywhere in a window (#219)
+import { startModDrag } from './moddrag.js';
 export { term } from './terminal.js';
 export { clipboard, clipboardHistory, clipboardPanel, clipboardKind, toast } from './clipboard.js';
 export { restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers } from './sessionrestore.jsx';
@@ -301,6 +303,7 @@ export function startShell(element) {
   startGuestWin();                      // inside a Machines guest only: apps mode's endpoint (guestwin.js)
   enableShellLayers();                  // menus, popovers and prompts go to their layer (sdk/layers.js)
   resetShortcuts();                     // the dispatcher exists only in the session (sdk/shortcuts.js)
+  startModDrag();                       // ❖ (or Alt) + drag anywhere in a window moves or resizes it (moddrag.js, #219)
   reopenAfterThemeSwitch();
   render(createElement(LocaleRoot, null, element));
   // live ISO: the installation assistant opens by itself, in front, or System Information for the

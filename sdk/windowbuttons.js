@@ -28,3 +28,21 @@ export function gtkButtonLayout(pref, themeLayout) {
   if (pref === 'right') return ':minimize,maximize,close';
   return themeLayout || 'close,minimize,maximize:';
 }
+
+// ---- The size of the title bar and its buttons (Settings → Appearance → Window options, GitHub #151 and #219) ----
+// 'normal', 'large' or 'extra large', apart from the display's scale: every theme draws its bar, its buttons, their
+// glyphs and their hit areas this much bigger, and tells the window manager its new frame (configureWindows' chrome).
+export const WINDOW_BUTTON_SIZES = ['normal', 'large', 'xlarge'];
+const SIZE_SCALE = { normal: 1, large: 1.25, xlarge: 1.5 };
+
+// The saved choice (settings.windowButtonSize), 'normal' for anything else.
+export const windowButtonSizePref = (s) => (WINDOW_BUTTON_SIZES.includes(s && s.windowButtonSize) ? s.windowButtonSize : 'normal');
+export const buttonSizeScale = (pref) => SIZE_SCALE[pref] || 1;
+// A length of the theme's title bar (its height, a button, a glyph, a gap) at that size: in whole pixels when larger,
+// exactly as the theme wrote it at the normal size (a glyph's 1.5 px stroke stays 1.5).
+export const scaledBar = (px, pref) => { const k = buttonSizeScale(pref); return k === 1 ? px : Math.round(px * k); };
+
+// ---- The Window menu's tiling layouts (Settings → Appearance → Window options, GitHub #151) ----
+// On unless the person turned them off: Move & Resize (halves, quarters, thirds, arrangements, previous size) in the
+// Window menu, and each theme's own snap items in its title bar's menu. Dragging to the edges is a separate switch.
+export const windowMenuTiling = (s) => !(s && s.windowMenuTiling === false);

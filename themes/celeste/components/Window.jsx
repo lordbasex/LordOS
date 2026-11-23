@@ -1,5 +1,6 @@
 // Lord Celeste's window frame: a 38 px title bar with round lights (close, minimize, maximize, in the order and on the
-// side Settings → Desktop & Dock → Title bars asks, useWindowButtons) and the title in the middle. Lord Celeste has no
+// side Settings → Desktop & Dock → Title bars asks, useWindowButtons; its Size makes the bar, the lights, their glyphs and
+// their hit areas larger, px, GitHub #151 and #219, and index.jsx's chrome follows it) and the title in the middle. Lord Celeste has no
 // global menu bar, so an app that declares menus (useAppMenus, via useMenusWithSpeech) gets them in a strip under the
 // title bar, with Window and Help, as Lord Classic and Lord Workspaces do; F10, or ⌥ pressed and released alone, opens
 // the focused window's first menu (addMenuBarKeys). A right click on the title opens the app menu (About, Settings…,
@@ -15,7 +16,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
 
-export const TITLE_H = 38;
+export const TITLE_H = 38;          // at the normal size: px(TITLE_H) is the bar now (useWindowButtons)
 export const MENU_H = 26;
 const DRAG_START = 6;
 const LIGHT = 13;
@@ -27,25 +28,30 @@ const LIGHTS = {
 };
 
 // ×, − and + as bars centred on the light (text glyphs sit off-centre by their font metrics)
-function LightGlyph({ l, color }) {
-  const w = 1.5;
-  return l.bars.map(([len, deg], i) => (
-    <View key={i} style={{ position: 'absolute', left: (LIGHT - len) / 2, top: (LIGHT - w) / 2, width: len, height: w, borderRadius: w / 2,
-      backgroundColor: color, pointerEvents: 'none', transform: deg ? `rotate(${deg}deg)` : undefined }} />
-  ));
+function LightGlyph({ l, color, px }) {
+  const w = px(1.5), size = px(LIGHT);
+  return l.bars.map(([n, deg], i) => {
+    const len = px(n);
+    return (
+      <View key={i} style={{ position: 'absolute', left: (size - len) / 2, top: (size - w) / 2, width: len, height: w, borderRadius: w / 2,
+        backgroundColor: color, pointerEvents: 'none', transform: deg ? `rotate(${deg}deg)` : undefined }} />
+    );
+  });
 }
 
-function Lights({ win, t, focused, order }) {
+// px: the title bar's size (Settings → Appearance → Window options → Window buttons): the lights and their hit areas grow with it
+function Lights({ win, t, focused, order, px }) {
   const [hover, setHover] = useState(false);
+  const size = px(LIGHT);
   return (
     <View onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ flexDirection: 'row', gap: 8, paddingVertical: 6, direction: 'ltr' }}>
+      style={{ flexDirection: 'row', gap: px(8), paddingVertical: px(6), direction: 'ltr' }}>
       {order.map((key) => {
         const l = LIGHTS[key];
         return (
           <View key={key} title={tr(l.label)} onMouseDown={(e) => e.stopPropagation()} onClick={() => l.act(win.id)}
-            style={{ width: LIGHT, height: LIGHT, borderRadius: LIGHT / 2, backgroundColor: focused || hover ? l.color : t.lightOff }}>
-            {hover ? <LightGlyph l={l} color={solidOver('rgba(0,0,0,0.55)', l.color)} /> : null}
+            style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: focused || hover ? l.color : t.lightOff }}>
+            {hover ? <LightGlyph l={l} px={px} color={solidOver('rgba(0,0,0,0.55)', l.color)} /> : null}
           </View>
         );
       })}
@@ -117,7 +123,8 @@ function fxStyle(fx, geo) {
 export function Window({ win, app, t, focused, fx }) {
   const drag = useRef(null);
   const [menu, setMenu] = useState(null);
-  const { atStart, order } = useWindowButtons(true);
+  const { atStart, order, px } = useWindowButtons(true);
+  const bar = px(TITLE_H);
   const geo = wm.frame(win);
   const fxs = fxStyle(fx, geo);
   const radius = win.maximized || win.snapped ? 0 : 16;
@@ -130,7 +137,7 @@ export function Window({ win, app, t, focused, fx }) {
         if (Math.abs(e.x - d.x0) + Math.abs(e.y - d.y0) < DRAG_START) return;
         d.moving = true;
         d.dx = Math.round(d.rel * win.w);
-        d.dy = Math.min(TITLE_H / 2, d.y0 - geo.y);
+        d.dy = Math.min(bar / 2, d.y0 - geo.y);
       }
       wm.move(win.id, e.x - d.dx, e.y - d.dy);
     });
@@ -140,7 +147,7 @@ export function Window({ win, app, t, focused, fx }) {
       if (d && d.moving) { const z = snapZoneAt(e.x, e.y); if (z) wm.snap(win.id, z); }
     });
     return () => { offMove(); offUp(); };
-  }, [win.id, win.w, geo.y]);
+  }, [win.id, win.w, geo.y, bar]);
 
   if (win.args?.csd || app.ownFrame) {
     const wmenu = win.windowMenu;
@@ -149,9 +156,9 @@ export function Window({ win, app, t, focused, fx }) {
         style={{ ...(app.ownFrame ? { borderRadius: radius, overflow: 'hidden' } : null), boxShadow: focused ? t.shadow : t.shadowDim, ...fxs }}>
         <AppHost id={win.id} focused={focused} />
         {app.ownFrame && !atStart ? (
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, pointerEvents: 'box-none' }}>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: bar, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, pointerEvents: 'box-none' }}>
             <View style={{ flex: 1, pointerEvents: 'none' }} />
-            <Lights win={win} t={t} focused={focused} order={order} />
+            <Lights win={win} t={t} focused={focused} order={order} px={px} />
           </View>
         ) : null}
         {wmenu ? <Menu t={t} x={wmenu.x} y={wmenu.y} onClose={() => wm.closeWindowMenu(win.id)} items={titleItems(win)} /> : null}
@@ -170,12 +177,12 @@ export function Window({ win, app, t, focused, fx }) {
     }}>
       <View onMouseDown={(e) => { if (e.button) return; if (!wm.beginMove(win.id)) drag.current = { x0: e.x, y0: e.y, rel: geo.w ? (e.x - geo.x) / geo.w : 0.5, moving: false }; }}
         onDoubleClick={() => wm.toggleMaximize(win.id)} onContextMenu={(e) => setMenu({ x: e.x, y: e.y })}
-        style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
+        style={{ height: bar, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
         {app.transparent ? <SeamCover color={focused ? t.titleBg : t.titleBgBlur} below={2} /> : null}
-        <Text style={{ position: 'absolute', left: 0, right: 0, top: 0, lineHeight: TITLE_H, textAlign: 'center', fontSize: 12, fontWeight: 600,
-          color: focused ? t.text : t.textDim, pointerEvents: 'none', whiteSpace: 'nowrap', textOverflow: 'ellipsis', paddingHorizontal: 84 }}>{windowTitle(win)}</Text>
+        <Text style={{ position: 'absolute', left: 0, right: 0, top: 0, lineHeight: bar, textAlign: 'center', fontSize: 12, fontWeight: 600,
+          color: focused ? t.text : t.textDim, pointerEvents: 'none', whiteSpace: 'nowrap', textOverflow: 'ellipsis', paddingHorizontal: px(84) }}>{windowTitle(win)}</Text>
         {atStart ? null : <View style={{ flex: 1 }} />}
-        <Lights win={win} t={t} focused={focused} order={order} />
+        <Lights win={win} t={t} focused={focused} order={order} px={px} />
       </View>
       <View style={{ height: 1, backgroundColor: app.transparent ? solidOver(t.separator, t.titleBg) : t.separator }} />
       <AppMenuStrip t={t} win={win} focused={focused} transparent={!!app.transparent} />

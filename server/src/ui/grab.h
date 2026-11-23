@@ -42,6 +42,15 @@ int  grab_script_begin(int node, const GrabLimits *lim, float rx, float ry, floa
 int  grab_scripted(void);
 void grab_script_tick(double now_ms);
 
+/* Moving or resizing a window from anywhere in it (docs/WINDOWS.md, "Modifier drag"; GitHub #219): with the modifier
+ * held, a press is offered to the shell (js_pointer_modgrab) before the app under the pointer sees it. The modifier is
+ * the person's choice (Settings → Appearance → Window options, lord.wm.dragModifier): GRAB_MOD_OFF until the shell says. */
+enum { GRAB_MOD_OFF, GRAB_MOD_SUPER, GRAB_MOD_ALT };
+void grab_set_mod(int mod);
+int  grab_mod(void);
+/* Is the chosen modifier held, alone (Shift may join it: ❖⇧ still moves), with these keys down? */
+int  grab_mod_held(int meta, int alt, int ctrl);
+
 /* paint.c: layer of the moving window and of what is below. When resizing (resize = 1) the
  * window is repainted every frame, but what is below is still saved. */
 void paint_layer_begin(int node, int resize);
