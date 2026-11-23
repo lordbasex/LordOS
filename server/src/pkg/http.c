@@ -444,8 +444,11 @@ static void get_one(Conn *c, const FetchItem *it, uint32_t idx, uint64_t from) {
         if (status == 416 && from) { from = 0; continue; }          /* the part is no use (the file changed): again */
         if (redirect && location_cut) { lerr_set(err, sizeof err, "pkg.http.badHeaders", NULL); break; }   /* never a cut URL */
         if (redirect && redirects < 5) {
-            if (location[0] == '/') snprintf(url, sizeof url, "%s://%s%s%s%s", tls ? "https" : "http", host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", location);
-            else snprintf(url, sizeof url, "%s", location);
+            int ul = location[0] == '/'
+                ? snprintf(url, sizeof url, "%s://%s%s%s%s", tls ? "https" : "http", host, strcmp(port, defport) ? ":" : "", strcmp(port, defport) ? port : "", location)
+                : snprintf(url, sizeof url, "%s", location);
+            /* a resolved URL that doesn't fit is refused like a cut Location, never followed cut */
+            if (ul < 0 || ul >= (int)sizeof url) { lerr_set(err, sizeof err, "pkg.http.badHeaders", NULL); break; }
             continue;
         }
         /* a signed URL an origin redirected to (GitHub's release downloads: release-assets.githubusercontent.com, a
