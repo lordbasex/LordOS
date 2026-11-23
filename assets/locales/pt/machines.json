@@ -710,6 +710,8 @@
   "cfg.agentNote": "Dois canais privados para a máquina: um para o qemu-guest-agent (estado, desligamento limpo, relógio, diário) e outro para o ajudante da área de transferência. Nada passa pela rede.",
   "cfg.agentInstall": "Na máquina",
   "cfg.agentInstallNote": "Instale o qemu-guest-agent com o gerenciador de pacotes da máquina. O ajudante é instalado pelo botão Agente da barra da máquina quando o qemu-guest-agent responder.",
+  "win.perfProfile": "Perfil de desempenho",
+  "win.perfProfileNote": "Enquanto a máquina funciona, as ferramentas do LordOS no Windows mudam para o plano de energia Alto desempenho e desligam animações, sombras e transparência. Tudo volta ao que era quando isto é desligado ou as ferramentas param. Requer as ferramentas do LordOS w11 ou posterior.",
   "cfg.toolsAuto": "Atualizar automaticamente as ferramentas do LordOS nesta máquina",
   "cfg.toolsAutoNote": "Quando este LordOS traz ferramentas mais novas, elas são instaladas enquanto a máquina roda e nada está sendo copiado. Desligado: uma notificação oferece a atualização.",
   "cfg.agentOn": "Ativado, não conectado",

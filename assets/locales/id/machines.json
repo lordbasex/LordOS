@@ -710,6 +710,8 @@
   "cfg.agentNote": "Dua saluran pribadi ke dalam mesin: satu untuk qemu-guest-agent (statusnya, mematikan dengan bersih, jam, jurnal) dan satu untuk helper papan klip. Tidak ada yang melewati jaringan.",
   "cfg.agentInstall": "Di dalam mesin",
   "cfg.agentInstallNote": "Pasang qemu-guest-agent dengan pengelola paket mesin. Helper papan klip dipasang dari tombol Agen di bilah mesin setelah qemu-guest-agent merespons.",
+  "win.perfProfile": "Profil performa",
+  "win.perfProfileNote": "Selama mesin berjalan, alat LordOS di Windows mengalihkannya ke rencana daya Performa tinggi dan mematikan animasi, bayangan, dan transparansi. Semuanya kembali saat opsi ini dimatikan atau alat berhenti. Memerlukan alat LordOS w11 atau lebih baru.",
   "cfg.toolsAuto": "Perbarui alat LordOS di mesin ini secara otomatis",
   "cfg.toolsAutoNote": "Saat LordOS ini membawa alat yang lebih baru, alat itu dipasang selagi mesin berjalan dan tidak ada yang sedang disalin. Mati: notifikasi menawarkan pembaruan.",
   "cfg.agentOn": "Aktif, tidak terhubung",

@@ -21,7 +21,7 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: cpu_pin (3.7.1). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
 #define VM_SCHEMA 13
@@ -179,6 +179,9 @@ typedef struct {
     /* schema 12: "Capture mouse" (docs/VIRTUALIZATION.md 6.25): "capture_fullscreen": true, the window captures the mouse
      * when it goes full screen (written only then; missing: no) */
     int capture_fullscreen;
+    /* schema 13: the guest's performance profile (docs/VIRTUALIZATION.md 7.1.4): "perf_profile": true, lord-vm asks the
+     * guest tools that say "perf" to apply it (AGK_PERF) while the machine runs (written only then; missing: no) */
+    int perf_profile;
     /* schema 13: vCPU pinning (docs/VIRTUALIZATION.md 3.7.1): "cpu_pin": "off" | "auto", written only when chosen; missing
      * is this computer's default for the machine (vmpin_default_on) */
     int cpu_pin;                        /* VM_PIN_* */

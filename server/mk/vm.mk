@@ -42,7 +42,7 @@ build/lordos-guest-win.exe: ../tools/guest-win/lordos-guest-win.c ../tools/guest
 	@mkdir -p build
 	$(dir $(MINGW_CC))x86_64-w64-mingw32-windres -I ../tools/guest-win ../tools/guest-win/lordos-guest-win.rc -O coff -o build/lordos-guest-win.res
 	$(MINGW_CC) -O2 $(WARN) -std=gnu11 -municode -mwindows -static -static-libgcc -s -o $@ ../tools/guest-win/lordos-guest-win.c src/vm/vmagent.c \
-		build/lordos-guest-win.res -lole32 -loleaut32 -luuid -lwindowscodecs -ldwmapi -lwtsapi32 -lshell32 -lgdi32 -luser32 -lbcrypt
+		build/lordos-guest-win.res -lole32 -loleaut32 -luuid -lwindowscodecs -ldwmapi -lwtsapi32 -lshell32 -lgdi32 -luser32 -lbcrypt -lpowrprof
 else
 all: lordos-guest-win-skipped
 lordos-guest-win-skipped:

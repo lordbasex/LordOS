@@ -32,7 +32,9 @@
  *     is associated): a program runs, as the person, like a double click in Explorer. It answers AGK_OPENED;
  *   - files dropped on an apps mode window (AGK_PLACE, 7.2.1): each checked the same way; once a drop's batch is all
  *     there they go to the window they were dropped on, and nowhere else: moved into the folder an Explorer window shows,
- *     WM_DROPFILES to a window that takes dropped files, or the clipboard (CF_HDROP) for any other, to paste.
+ *     WM_DROPFILES to a window that takes dropped files, or the clipboard (CF_HDROP) for any other, to paste;
+ *   - the machine's performance profile (AGK_PERF, 7.1.4), only while the host holds the port and only what the person
+ *     may change: the High performance power plan, visual effects for the session, transparency; put back after.
  * It never runs anything the host names, and validates every frame (vmagent.c's parsers) before acting on it.
  *
  * The port can be held by one process at a time: the helper of the session at the computer's console takes it and
@@ -58,6 +60,7 @@
 #include <servprov.h>
 #include <shlguid.h>
 #include <oleidl.h>
+#include <powrprof.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,8 +87,11 @@
  * the display configuration is asked twice at most per size, not every 250 ms; a size Windows changes by itself right
  * after (a monitor that reappears with a new EDID) is asked again, twice at most; apps mode's list follows a change of
  * the displays at once (the shown display's corner looked up for every list) */
-#define VERSION "w10"
-#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt extra tablet"
+/* w11 (2026-11-23): "perf": the machine's performance profile (AGK_PERF, docs/VIRTUALIZATION.md 7.1.4), as the person:
+ * the High performance power plan, visual effects and transparency at their minimum while the host holds the port, and
+ * everything put back after (AGK_PERFSTATE says what was done) */
+#define VERSION "w11"
+#define HELLO "lordos-guest " VERSION " clipboard clipx clipreq display windows open place pointer gvt extra tablet perf"
 
 enum { WM_APP_FRAME = WM_APP + 1, WM_APP_LOST, WM_APP_OPENED };
 enum { T_PORT = 1, T_CLIP, T_DISP, T_APPS, T_MONS, T_TABLET };
@@ -238,6 +244,7 @@ static DWORD WINAPI reader_main(LPVOID arg) {
 }
 
 static void apps_stop(void);
+static void perf_restore(const char *why, int say);
 static int mons_sent;               /* the displays went to the host (AGK_DISPLAYS) since the port opened */
 static int tablet_mode, tablet_sent; /* how Windows maps the tablet (AG_TABLET_*, 0 not seen yet); said to the host */
 static int apps_on, apps_dirty, apps_force;   /* apps mode (below); apps_force: the next list goes even if the same */
@@ -254,6 +261,7 @@ static void port_close(const char *why) {
     mons_sent = 0;
     tablet_sent = 0;
     SetEvent(ans_ev);                   /* a paste waiting for the host stops waiting */
+    perf_restore(why, 0);               /* the performance profile lasts only while the host holds the port */
 }
 
 static int send_frame(uint16_t kind, const uint8_t *p, uint32_t n);
@@ -2228,6 +2236,188 @@ static void open_done(OpenJob *j) {
     free(j);
 }
 
+/* ---- the performance profile (AGK_PERF, w11; docs/VIRTUALIZATION.md 7.1.4) ----
+ * Only what this person may change without elevation, nothing named by the host (one bit: on or off):
+ *   - the power plan: High performance (PowerSetActiveScheme, powrprof; a standard user may switch plans unless a
+ *     policy says otherwise; when Windows refuses, or the plan isn't there, the part is said refused);
+ *   - visual effects: the animations, fades, shadows and window contents while dragging that "Adjust for best
+ *     performance" turns off, set for this session only (SystemParametersInfo without SPIF_UPDATEINIFILE: the person's
+ *     profile keeps its own values);
+ *   - transparency (Personalize's EnableTransparency in the person's own registry).
+ * What was there before is kept in HKCU\Software\LordOS\GuestWin PerfSaved (a fixed record, read back checked) and put
+ * back when the host says off, when the port is let go (log off, another session at the console, exit) and when these
+ * tools start and find a record (a crash): a part goes back only while it is still what this side set, so a change the
+ * person made in between stays. Windows Search's indexing isn't paused: its service needs administrator rights, which
+ * these tools never have. */
+static const GUID PERF_HIGH = { 0x8c5e7fda, 0xe8bf, 0x4a96, { 0x9a, 0x85, 0xa6, 0xe2, 0x3a, 0x8c, 0x63, 0x5c } };  /* GUID_MIN_POWER_SAVINGS */
+#define PERF_KEY L"Software\\LordOS\\GuestWin"
+#define PERF_VAL L"PerfSaved"
+#define PERF_PERSONALIZE L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"
+#define PERF_MAGIC 0x3146504cu                  /* "LPF1" */
+typedef struct {
+    uint32_t magic, size;
+    uint32_t parts;                             /* AGPF_* this side changed and puts back */
+    uint32_t done;                              /* AGPF_* at their minimum (changed or already so) */
+    GUID scheme_was;                            /* the plan before (AGPF_POWER) */
+    uint32_t fx_was;                            /* bit i: effect FX[i] was on before and this side turned it off */
+    uint32_t transp_was, transp_had;            /* EnableTransparency before, and whether there was one */
+} PerfSaved;
+static PerfSaved perf;                          /* magic 0: nothing applied */
+enum { FX_BOOL, FX_UIPARAM, FX_ANIMINFO };
+static const struct { UINT get, set; int how; const char *name; } FX[] = {
+    { SPI_GETCLIENTAREAANIMATION, SPI_SETCLIENTAREAANIMATION, FX_BOOL, "animations inside windows" },
+    { SPI_GETANIMATION, SPI_SETANIMATION, FX_ANIMINFO, "minimize and maximize animation" },
+    { SPI_GETMENUANIMATION, SPI_SETMENUANIMATION, FX_BOOL, "menu animation" },
+    { SPI_GETCOMBOBOXANIMATION, SPI_SETCOMBOBOXANIMATION, FX_BOOL, "combo box animation" },
+    { SPI_GETLISTBOXSMOOTHSCROLLING, SPI_SETLISTBOXSMOOTHSCROLLING, FX_BOOL, "smooth list scrolling" },
+    { SPI_GETTOOLTIPANIMATION, SPI_SETTOOLTIPANIMATION, FX_BOOL, "tooltip animation" },
+    { SPI_GETSELECTIONFADE, SPI_SETSELECTIONFADE, FX_BOOL, "selection fade" },
+    { SPI_GETCURSORSHADOW, SPI_SETCURSORSHADOW, FX_BOOL, "pointer shadow" },
+    { SPI_GETDROPSHADOW, SPI_SETDROPSHADOW, FX_BOOL, "window shadows" },
+    { SPI_GETDRAGFULLWINDOWS, SPI_SETDRAGFULLWINDOWS, FX_UIPARAM, "window contents while dragging" },
+};
+#define FX_N ((int)(sizeof FX / sizeof FX[0]))
+
+/* 1 on, 0 off, -1 the system didn't say */
+static int fx_get(int i) {
+    if (FX[i].how == FX_ANIMINFO) {
+        ANIMATIONINFO ai = { sizeof ai, 0 };
+        return SystemParametersInfoW(FX[i].get, sizeof ai, &ai, 0) ? ai.iMinAnimate != 0 : -1;
+    }
+    BOOL v = FALSE;
+    return SystemParametersInfoW(FX[i].get, 0, &v, 0) ? v != 0 : -1;
+}
+/* this session only: no SPIF_UPDATEINIFILE */
+static int fx_set(int i, int on) {
+    if (FX[i].how == FX_ANIMINFO) {
+        ANIMATIONINFO ai = { sizeof ai, on };
+        return SystemParametersInfoW(FX[i].set, sizeof ai, &ai, SPIF_SENDCHANGE) ? 0 : -1;
+    }
+    if (FX[i].how == FX_UIPARAM) return SystemParametersInfoW(FX[i].set, (UINT)on, NULL, SPIF_SENDCHANGE) ? 0 : -1;
+    return SystemParametersInfoW(FX[i].set, 0, (PVOID)(INT_PTR)(on ? TRUE : FALSE), SPIF_SENDCHANGE) ? 0 : -1;
+}
+
+/* EnableTransparency: 1 there (*v its value), 0 not there */
+static int transp_get(DWORD *v) {
+    DWORD n = sizeof *v;
+    return RegGetValueW(HKEY_CURRENT_USER, PERF_PERSONALIZE, L"EnableTransparency", RRF_RT_REG_DWORD, NULL, v, &n) == ERROR_SUCCESS;
+}
+static void transp_changed(void) {
+    DWORD_PTR r;
+    SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, 0, (LPARAM)L"ImmersiveColorSet", SMTO_ABORTIFHUNG, 1000, &r);
+}
+
+static void perf_save(void) {
+    if (perf.magic) RegSetKeyValueW(HKEY_CURRENT_USER, PERF_KEY, PERF_VAL, REG_BINARY, &perf, sizeof perf);
+    else RegDeleteKeyValueW(HKEY_CURRENT_USER, PERF_KEY, PERF_VAL);
+}
+
+static void perf_say(int on, unsigned done, unsigned failed) {
+    uint8_t b[AG_PERFSTATE_BYTES];
+    if (port == INVALID_HANDLE_VALUE || !host_hello || ag_perfstate_write(b, on, done, failed)) return;
+    send_frame(AGK_PERFSTATE, b, sizeof b);
+}
+
+static void perf_apply(void) {
+    if (perf.magic) { lg("performance profile: already on"); perf_say(1, perf.done, 0); return; }
+    PerfSaved s;
+    memset(&s, 0, sizeof s);
+    s.magic = PERF_MAGIC;
+    s.size = sizeof s;
+    unsigned failed = 0;
+    /* the power plan */
+    GUID *cur = NULL;
+    DWORD e = PowerGetActiveScheme(NULL, &cur);
+    if (e == ERROR_SUCCESS && cur && IsEqualGUID(cur, &PERF_HIGH)) { s.done |= AGPF_POWER; lg("performance profile: the power plan is High performance already"); }
+    else if (e == ERROR_SUCCESS && cur) {
+        s.scheme_was = *cur;
+        e = PowerSetActiveScheme(NULL, &PERF_HIGH);
+        if (e == ERROR_SUCCESS) { s.parts |= AGPF_POWER; s.done |= AGPF_POWER; lg("performance profile: power plan set to High performance"); }
+        else { failed |= AGPF_POWER; lg("performance profile: Windows refused the High performance power plan (error %lu)", (unsigned long)e); }
+    } else { failed |= AGPF_POWER; lg("performance profile: the power plan can't be read (error %lu)", (unsigned long)e); }
+    if (cur) LocalFree(cur);
+    /* the visual effects, for this session */
+    int fx_bad = 0, fx_n = 0;
+    for (int i = 0; i < FX_N; i++) {
+        int on = fx_get(i);
+        if (on < 0) { fx_bad = 1; continue; }
+        if (!on) continue;
+        if (fx_set(i, 0)) { fx_bad = 1; lg("performance profile: %s not turned off (error %lu)", FX[i].name, (unsigned long)GetLastError()); continue; }
+        s.fx_was |= 1u << i;
+        fx_n++;
+    }
+    if (s.fx_was) s.parts |= AGPF_EFFECTS;
+    if (fx_bad) failed |= AGPF_EFFECTS; else s.done |= AGPF_EFFECTS;
+    lg("performance profile: %d visual effect%s turned off for this session", fx_n, fx_n == 1 ? "" : "s");
+    /* transparency */
+    DWORD tv = 1;
+    s.transp_had = (uint32_t)transp_get(&tv);
+    s.transp_was = tv;
+    if (s.transp_had && !tv) s.done |= AGPF_TRANSPARENCY;
+    else {
+        DWORD z = 0;
+        LSTATUS r = RegSetKeyValueW(HKEY_CURRENT_USER, PERF_PERSONALIZE, L"EnableTransparency", REG_DWORD, &z, sizeof z);
+        if (r == ERROR_SUCCESS) { s.parts |= AGPF_TRANSPARENCY; s.done |= AGPF_TRANSPARENCY; transp_changed(); lg("performance profile: transparency turned off"); }
+        else { failed |= AGPF_TRANSPARENCY; lg("performance profile: transparency not turned off (error %ld)", (long)r); }
+    }
+    perf = s;
+    perf_save();
+    perf_say(1, s.done, failed);
+}
+
+/* puts back what perf_apply changed, only where it is still what this side set */
+static void perf_restore(const char *why, int say) {
+    if (!perf.magic) { if (say) perf_say(0, 0, 0); return; }
+    unsigned done = 0, failed = 0;
+    if (perf.parts & AGPF_POWER) {
+        GUID *cur = NULL;
+        DWORD e = PowerGetActiveScheme(NULL, &cur);
+        if (e == ERROR_SUCCESS && cur && IsEqualGUID(cur, &PERF_HIGH)) {
+            e = PowerSetActiveScheme(NULL, &perf.scheme_was);
+            if (e == ERROR_SUCCESS) done |= AGPF_POWER;
+            else { failed |= AGPF_POWER; lg("performance profile: the earlier power plan wasn't put back (error %lu)", (unsigned long)e); }
+        } else done |= AGPF_POWER;              /* changed since: the person's choice stays */
+        if (cur) LocalFree(cur);
+    }
+    if (perf.parts & AGPF_EFFECTS) {
+        int bad = 0;
+        for (int i = 0; i < FX_N; i++)
+            if ((perf.fx_was & (1u << i)) && fx_get(i) == 0 && fx_set(i, 1)) bad = 1;
+        if (bad) failed |= AGPF_EFFECTS; else done |= AGPF_EFFECTS;
+    }
+    if (perf.parts & AGPF_TRANSPARENCY) {
+        DWORD tv = 1;
+        if (transp_get(&tv) && !tv) {
+            LSTATUS r = perf.transp_had ? RegSetKeyValueW(HKEY_CURRENT_USER, PERF_PERSONALIZE, L"EnableTransparency", REG_DWORD, &perf.transp_was, sizeof perf.transp_was)
+                                        : RegDeleteKeyValueW(HKEY_CURRENT_USER, PERF_PERSONALIZE, L"EnableTransparency");
+            if (r == ERROR_SUCCESS || r == ERROR_FILE_NOT_FOUND) { done |= AGPF_TRANSPARENCY; transp_changed(); }
+            else failed |= AGPF_TRANSPARENCY;
+        } else done |= AGPF_TRANSPARENCY;
+    }
+    lg("performance profile: put back (%s)%s", why, failed ? ", some parts refused" : "");
+    memset(&perf, 0, sizeof perf);
+    perf_save();
+    if (say) perf_say(0, done, failed);
+}
+
+/* at start: a record left by a run that didn't end (a crash, the process killed) is put back now */
+static void perf_recover(void) {
+    PerfSaved s;
+    DWORD n = sizeof s, type = 0;
+    memset(&s, 0, sizeof s);
+    LSTATUS r = RegGetValueW(HKEY_CURRENT_USER, PERF_KEY, PERF_VAL, RRF_RT_REG_BINARY, &type, &s, &n);
+    if (r == ERROR_FILE_NOT_FOUND) return;
+    if (r != ERROR_SUCCESS || n != sizeof s || s.magic != PERF_MAGIC || s.size != sizeof s || (s.parts & ~(uint32_t)AGPF_ALL) ||
+        (s.fx_was >> FX_N) || s.transp_had > 1) {
+        lg("performance profile: an unreadable record was dropped");
+        RegDeleteKeyValueW(HKEY_CURRENT_USER, PERF_KEY, PERF_VAL);
+        return;
+    }
+    s.done &= AGPF_ALL;
+    perf = s;
+    perf_restore("left by an earlier run", 0);
+}
+
 /* ---- frames from the host ---- */
 static void on_frame(const Frame *f) {
     switch (f->kind) {
@@ -2287,6 +2477,12 @@ static void on_frame(const Frame *f) {
         if (!host_hello || ag_extra_parse(f->data, f->len, &off)) break;
         if (off ? !extra_off() : !extra_on("the host asked")) { mons_stale = 1; SetTimer(win, T_MONS, 1500, NULL); }
         say_hello();                    /* "extraoff" or not: Machines offers the other button */
+        break;
+    }
+    case AGK_PERF: {
+        int on;
+        if (!host_hello || ag_perf_parse(f->data, f->len, &on)) break;
+        if (on) perf_apply(); else perf_restore("the host turned it off", 1);
         break;
     }
     case LAG_APPS: {
@@ -2435,6 +2631,7 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
     if (!RegisterRawInputDevices(&rid, 1, sizeof rid)) lg("tablet: raw input refused (%lu): the host assumes the primary display", (unsigned long)GetLastError());
     WTSRegisterSessionNotification(win, NOTIFY_FOR_THIS_SESSION);
     lg("lordos-guest-win %s in session %lu", VERSION, my_session);
+    perf_recover();                     /* a performance profile an earlier run didn't put back */
     SetTimer(win, T_PORT, 2000, NULL);
     SetTimer(win, T_MONS, 3000, NULL);  /* the displays once the session settles: the primary, windows brought back */
     port_try_open();

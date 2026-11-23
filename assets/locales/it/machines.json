@@ -710,6 +710,8 @@
   "cfg.agentNote": "Due canali privati verso la macchina: uno per qemu-guest-agent (il suo stato, uno spegnimento pulito, l’ora, il journal) e uno per l’aiuto degli appunti. Niente passa dalla rete.",
   "cfg.agentInstall": "Nella macchina",
   "cfg.agentInstallNote": "Installa qemu-guest-agent con il gestore di pacchetti della macchina. L’aiuto per gli appunti si installa dal pulsante Agente della barra della macchina quando qemu-guest-agent risponde.",
+  "win.perfProfile": "Profilo prestazioni",
+  "win.perfProfileNote": "Mentre la macchina è in funzione, gli strumenti LordOS in Windows la passano alla combinazione per il risparmio di energia Prestazioni elevate e disattivano animazioni, ombre e trasparenza. Tutto torna com'era quando l'opzione è disattivata o gli strumenti si fermano. Richiede gli strumenti LordOS w11 o successivi.",
   "cfg.toolsAuto": "Aggiorna automaticamente gli strumenti di LordOS in questa macchina",
   "cfg.toolsAutoNote": "Quando questo LordOS porta strumenti più recenti, vengono installati mentre la macchina è in funzione e non si sta copiando nulla. Disattivato: una notifica propone l'aggiornamento.",
   "cfg.agentOn": "Attivo, non connesso",

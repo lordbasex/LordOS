@@ -710,6 +710,8 @@
   "cfg.agentNote": "Dwa prywatne kanały do maszyny: jeden dla qemu-guest-agent (jej stan, poprawne wyłączenie, zegar, dziennik systemowy) i jeden dla pomocnika schowka. Nic nie przechodzi przez sieć.",
   "cfg.agentInstall": "W maszynie",
   "cfg.agentInstallNote": "Zainstaluj qemu-guest-agent menedżerem pakietów maszyny. Pomocnika schowka instaluje się przyciskiem Agent na pasku maszyny, gdy qemu-guest-agent odpowie.",
+  "win.perfProfile": "Profil wydajności",
+  "win.perfProfileNote": "Gdy maszyna działa, narzędzia LordOS w systemie Windows przełączają ją na plan zasilania Wysoka wydajność i wyłączają animacje, cienie i przezroczystość. Wszystko wraca do poprzedniego stanu, gdy ta opcja jest wyłączona lub narzędzia się zatrzymają. Wymaga narzędzi LordOS w11 lub nowszych.",
   "cfg.toolsAuto": "Automatycznie aktualizuj narzędzia LordOS w tej maszynie",
   "cfg.toolsAutoNote": "Gdy ten LordOS przynosi nowsze narzędzia, są instalowane, gdy maszyna działa i nic nie jest kopiowane. Wyłączone: powiadomienie proponuje aktualizację.",
   "cfg.agentOn": "Włączony, niepołączony",

@@ -710,6 +710,8 @@
   "cfg.agentNote": "兩個通往虛擬機器的私有通道：一個給 qemu-guest-agent（狀態、正常關機、時鐘、日誌），一個給剪貼簿輔助程式。不經由網路傳輸任何東西。",
   "cfg.agentInstall": "在虛擬機器中",
   "cfg.agentInstallNote": "使用虛擬機器的套件管理程式安裝 qemu-guest-agent。qemu-guest-agent 回應後，可從虛擬機器工具列上的「代理程式」按鈕安裝剪貼簿輔助程式。",
+  "win.perfProfile": "效能設定檔",
+  "win.perfProfileNote": "機器執行期間，Windows 中的 LordOS 工具會切換到「高效能」電源計畫，並關閉動畫、陰影與透明效果。關閉此項或工具停止後，一切都會恢復原狀。需要 LordOS 工具 w11 或更新版本。",
   "cfg.toolsAuto": "自動更新此虛擬機器中的 LordOS 工具",
   "cfg.toolsAutoNote": "當此 LordOS 附有較新的工具時，會在虛擬機器執行且沒有正在複製的內容時安裝。關閉：由通知提供更新。",
   "cfg.agentOn": "開啟，未連線",

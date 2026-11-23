@@ -1059,6 +1059,8 @@ static struct {
     char lag_disps[AG_DISPLAYS_MAX * 128];   /* the guest's displays (AGK_DISPLAYS) as last logged, "" none yet */
     int layout[6];                          /* where the picture sits in the guest's desktop (VM_GUEST_LAYOUT), 0s none */
     int lag_extra, lag_extraoff, extra_avail; /* the tools turn off an extra display (AGK_EXTRA); one is off; one is there */
+    int lag_perf;                           /* the tools apply the performance profile (AGK_PERF, "perf", w11) */
+    unsigned perf_said;                     /* the last AGK_PERFSTATE logged, as 1 << 24 | on << 16 | done << 8 | failed; 0 none */
     AgDisplay disp_list[AG_DISPLAYS_MAX];   /* the guest's displays (AGK_DISPLAYS) as last said, for the tablet's layout */
     int disp_n, disp_shown;
     int tablet;                             /* how the guest maps the tablet (AGK_TABLET, AG_TABLET_*; 0 not said yet) */
@@ -4777,6 +4779,7 @@ static void drain_lag(void) {
                 S.lag_extra = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRA) != 0;
                 S.lag_extraoff = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRAOFF) != 0;
                 if (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_STOPPING) stop_announces = 1;
+                S.lag_perf = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_PERF) != 0;
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
@@ -4798,6 +4801,9 @@ static void drain_lag(void) {
                 static const char me[] = "lord-vm 2 clipboard clipx clipreq elevated";   /* elevated: LAGW_ELEVATED is understood */
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
+                /* the performance profile (7.1.4): said after every hello, off too, so tools that kept it from an
+                 * earlier run (a crash) put the guest's own settings back */
+                if (S.lag_perf) { uint8_t b = S.m.perf_profile ? 1 : 0; lag_send(AGK_PERF, &b, 1); }
                 ag_broadcast();
                 ptr_begin();                    /* the tools say "pointer": the display driver's pointer, once per run */
                 gvt_begin();                    /* the tools say "gvt": Intel's driver for the vGPU, once per run */
@@ -4870,6 +4876,21 @@ static void drain_lag(void) {
                 S.extra_avail = ag_displays_extra(d, n, shown);
                 int caps = (S.ag_caps & ~VAC_EXTRA) | (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0);
                 if (caps != S.ag_caps) { S.ag_caps = caps; ag_broadcast(); }
+            }
+        } else if (f.kind == AGK_PERFSTATE && S.lag_hello && S.lag_perf) {
+            /* what the tools did with the performance profile: for the log only */
+            int on;
+            unsigned done, failed;
+            if (ag_perfstate_parse(f.data, f.len, &on, &done, &failed)) vlog("agent: the guest's performance profile: malformed");
+            else if ((1u << 24 | (unsigned)on << 16 | done << 8 | failed) != S.perf_said) {
+                S.perf_said = 1u << 24 | (unsigned)on << 16 | done << 8 | failed;
+                char d[64], x[64];
+                snprintf(d, sizeof d, "%s%s%s", done & AGPF_POWER ? " power plan" : "", done & AGPF_EFFECTS ? " visual effects" : "",
+                         done & AGPF_TRANSPARENCY ? " transparency" : "");
+                snprintf(x, sizeof x, "%s%s%s", failed & AGPF_POWER ? " power plan" : "", failed & AGPF_EFFECTS ? " visual effects" : "",
+                         failed & AGPF_TRANSPARENCY ? " transparency" : "");
+                vlog("agent: the guest's performance profile is %s (%s:%s; refused:%s)", on ? "on" : "off", on ? "applied" : "put back",
+                     d[0] ? d : " nothing", x[0] ? x : " nothing");
             }
         } else if (f.kind == AGK_TABLET && S.lag_hello) {
             /* how the guest maps the absolute tablet (tools w10, from the tablet's own raw input) */
@@ -5391,7 +5412,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = S.lag_perf = 0; S.perf_said = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -6604,7 +6625,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, pin = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -6657,6 +6678,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         }
         if (!strcmp(a, "--cpu-pin")) { pin = !strcmp(v, "off") ? VM_PIN_OFF : !strcmp(v, "auto") ? VM_PIN_AUTO : !strcmp(v, "default") ? VM_PIN_DEFAULT : -1; if (pin < 0) { fprintf(stderr, "lord-vm: --cpu-pin off|auto|default\n"); return 2; } continue; }
         if (!strcmp(a, "--capture-fullscreen")) { capfs = parse_enum(v, "off", "on"); if (capfs < 0) { fprintf(stderr, "lord-vm: --capture-fullscreen on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--perf-profile")) { perf = parse_enum(v, "off", "on"); if (perf < 0) { fprintf(stderr, "lord-vm: --perf-profile on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
@@ -6740,6 +6762,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (cask >= 0) { m.clipboard_ask = cask; if (cask) m.schema = VM_SCHEMA; }
     if (ptr >= 0) { m.pointer_guest = ptr; if (ptr) m.schema = VM_SCHEMA; }
     if (capfs >= 0) { m.capture_fullscreen = capfs; if (capfs) m.schema = VM_SCHEMA; }
+    if (perf >= 0) { m.perf_profile = perf; if (perf) m.schema = VM_SCHEMA; }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
@@ -8330,6 +8353,7 @@ static int usage(void) {
             "                         [--clipboard-ask on|off]   (ask before each paste into and copy out of the machine)\n"
             "                         [--pointer lordos|guest]   (who draws a Windows guest's pointer: LordOS, or its display driver)\n"
             "                         [--capture-fullscreen on|off]   (the window captures the mouse when it goes full screen)\n"
+            "                         [--perf-profile on|off]   (the guest tools switch the guest to its performance profile while it runs)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"

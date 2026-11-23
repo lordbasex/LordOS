@@ -710,6 +710,8 @@
   "cfg.agentNote": "Két privát csatorna a gépbe: egy a qemu-guest-agent számára (állapot, szabályos leállítás, óra, journal) és egy a vágólap-segédprogramnak. Semmi sem megy át a hálózaton.",
   "cfg.agentInstall": "A gépen",
   "cfg.agentInstallNote": "Telepítse a qemu-guest-agent csomagot a gép csomagkezelőjével. A vágólap-segédprogram a gép sávjának Ügynök gombjáról telepíthető, amint a qemu-guest-agent válaszol.",
+  "win.perfProfile": "Teljesítményprofil",
+  "win.perfProfileNote": "Amíg a gép fut, a Windowsban lévő LordOS-eszközök a Nagy teljesítmény energiasémára váltanak, és kikapcsolják az animációkat, az árnyékokat és az átlátszóságot. Minden visszaáll, ha ez ki van kapcsolva vagy az eszközök leállnak. LordOS-eszközök w11 vagy újabb szükséges.",
   "cfg.toolsAuto": "A LordOS-eszközök automatikus frissítése ebben a gépben",
   "cfg.toolsAutoNote": "Ha ez a LordOS újabb eszközöket hoz, azok a gép futása közben települnek, amikor épp nincs másolás. Ki: egy értesítés felajánlja a frissítést.",
   "cfg.agentOn": "Bekapcsolva, nincs csatlakozva",

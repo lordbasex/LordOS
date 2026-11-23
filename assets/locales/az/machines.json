@@ -710,6 +710,8 @@
   "cfg.agentNote": "Maşına iki şəxsi kanal: biri qemu-guest-agent üçün (vəziyyəti, düzgün sönmə, saat, jurnal), biri də mübadilə buferi köməkçisi üçün. Şəbəkədən heç nə keçmir.",
   "cfg.agentInstall": "Maşında",
   "cfg.agentInstallNote": "qemu-guest-agent-i maşının paket meneceri ilə quraşdırın. qemu-guest-agent cavab verəndən sonra mübadilə buferi köməkçisi maşın panelindəki Agent düyməsindən quraşdırılır.",
+  "win.perfProfile": "Performans profili",
+  "win.perfProfileNote": "Maşın işləyərkən Windows-dakı LordOS alətləri onu Yüksək performans enerji planına keçirir və animasiyaları, kölgələri və şəffaflığı söndürür. Bu söndürüldükdə və ya alətlər dayandıqda hər şey əvvəlki halına qayıdır. LordOS alətləri w11 və ya daha yenisi lazımdır.",
   "cfg.toolsAuto": "Bu maşındakı LordOS alətlərini avtomatik yeniləyin",
   "cfg.toolsAutoNote": "Bu LordOS daha yeni alətlər gətirəndə onlar maşın işləyərkən və heç nə kopyalanmayanda quraşdırılır. Söndürülüb: bildiriş yeniləməni təklif edir.",
   "cfg.agentOn": "Yanılı, qoşulmayıb",

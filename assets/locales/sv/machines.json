@@ -710,6 +710,8 @@
   "cfg.agentNote": "Två privata kanaler in i maskinen: en för qemu-guest-agent (dess tillstånd, korrekt avstängning, klockan, journalen) och en för urklippshjälpen. Inget går via nätverket.",
   "cfg.agentInstall": "I maskinen",
   "cfg.agentInstallNote": "Installera qemu-guest-agent med maskinens pakethanterare. Urklippshjälpen installeras från knappen Agent i maskinens fält när qemu-guest-agent svarar.",
+  "win.perfProfile": "Prestandaprofil",
+  "win.perfProfileNote": "Medan maskinen kör växlar LordOS-verktygen i Windows till energischemat Hög prestanda och stänger av animeringar, skuggor och genomskinlighet. Allt återställs när detta är av eller verktygen stoppas. Kräver LordOS-verktygen w11 eller senare.",
   "cfg.toolsAuto": "Uppdatera LordOS-verktygen i den här maskinen automatiskt",
   "cfg.toolsAutoNote": "När detta LordOS har med sig nyare verktyg installeras de medan maskinen kör och inget kopieras. Av: en avisering erbjuder uppdateringen.",
   "cfg.agentOn": "På, inte ansluten",

@@ -216,6 +216,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `web`.
 - Three new texts (`store.installed.noneDebian`, `noneFlathub`, `noneWeb`), in all 35 languages.
 
+### Documentation
+
+- **Machines: `docs/VIRTUALIZATION.md` audited against the code** (asked by the maintainer on 2026-11-23: "the source
+  code is the absolute truth"). A new "Status checklist" near the top lists every feature the design describes, each
+  with its mark (done, done but not checked on real hardware, partial, not built), a percentage and the file that
+  implements it, in 14 weighted areas; the Machines app scores **66 %** overall (engine 82 %, getting a system in
+  76 %, the app 74 %, snapshots and storage 54 %, network 83 %, devices 56 %, host integration 68 %, graphics 46 %,
+  guest tools 75 %, command line 50 %, system ties 50 %, security 70 %, performance 7 %, tests 56 %). The six
+  performance items being worked on (unchanged frames and hidden displays, huge pages, a vCPU recommendation, the disk
+  path with an iothread, io_uring and O_DIRECT, a guest-side profile, vCPU pinning) are listed as planned. Statements
+  the code contradicts were fixed: the admin actions (no `vm-usb-allow` or usbredir exists; the real list is named),
+  the cgroup scope name, Landlock's writable folder (`disks/` only), our seccomp filter (a built denylist, not "to
+  test"), the files on disk, the schema (12), the credentials' descriptors, the New Machine steps (five, automatic
+  virtio-win guest setup on by default), the machine window's menus, Configure's sections, Host only (passt on 127.0.0.1) and
+  Bridged (a macvtap with `vhost=off`), what a snapshot holds, live linked clones (the source must be off), the agent's
+  state light, Install Agent (through qemu-guest-agent, no disc), tool updates (automatic), the Shell (the serial
+  console), the Logs window, file copy (drops only), edition selection in virtio-win guests (by image name with the KMS client key),
+  virtio-win guests on arm64 (not built), the packaging (inside `lordos`, QEMU installed on demand), the tests that run, and the
+  open questions the code has settled. Features the doc didn't describe were added. `docs/MACHINES-GPU.md`: no longer
+  called a plan; Settings → Graphics cards offers only Machines (shared), and its admin actions are built.
+
 ### Tests
 
 - **Sentinela** (`docs/SENTINELA.md`): `build/llm-engine-test` runs a stand-in engine in lord-llm's real sandbox and
@@ -314,6 +335,34 @@ In development; the latest release is 0.8.9.5-beta.
     `filesInfo`, `cameraNatives` (the camera list both ways, each after the camera suspended) and `appsOpen` (each
     native app alone; `PERF_APPS`). `build/uevent-test` covers `video4linux`, `build/fsasync-test` `fsasync_submit_fn`.
 ### Added
+
+- **A performance profile per machine, applied inside a guest by the LordOS guest tools** (in development; the latest
+  release is 0.8.9.5-beta). Approved by the maintainer on 2026-11-23 (Machines performance, item 5). Configure → Guest
+  agent → **Performance profile**, shown for guests that use the LordOS guest tools for their system (w11), off by default (machine.json
+  `perf_profile`, schema 13, written only when on; `lord-vm --set DIR --perf-profile on|off`; `lord.vm.set`
+  `perfProfile`). Details in `docs/VIRTUALIZATION.md` 7.1.4.
+  - **How it gets there.** Tools that say `perf` in their hello (guest tools w11) get one frame after every hello:
+    `AGK_PERF` (kind 23), exactly one byte, 1 on or 0 off, so tools that kept the profile from an earlier run put
+    the guest's own settings back. They answer `AGK_PERFSTATE` (kind 24, exactly 3 bytes: on, the parts done and the
+    parts the system refused, each within `AGPF_ALL`, never a part in both), which lord-vm parses with
+    `ag_perfstate_parse` and only logs ("the guest's performance profile is on (applied: power plan visual effects
+    transparency; refused: nothing)"). Nothing else comes from the host: no command, path or value.
+  - **What the tools do, as the signed-in person and nothing more:** the High performance power plan
+    (`PowerSetActiveScheme`, powrprof; a standard user may switch plans unless a policy says otherwise), the visual
+    effects "Adjust for best performance" turns off (animations in and of windows, menus, combo boxes, tooltips,
+    smooth list scrolling, selection fade, pointer and window shadows, window contents while dragging) for this
+    session only (`SystemParametersInfo` without `SPIF_UPDATEINIFILE`), and transparency (`EnableTransparency` in
+    the person's own registry). What was there before is kept in `HKCU\Software\LordOS\GuestWin` `PerfSaved` and
+    put back when the host says off, when the tools let the port go (log off, another session at the console, exit),
+    and when they start after a crash; a part goes back only while it is still what the tools set.
+  - **Not done, for a review first:** pausing the guest's search indexing service while idle (a service needs
+    administrator rights; the tools never run elevated) and the profile in Linux guests (power-profiles-daemon over the system D-Bus or
+    `powerprofilesctl`, and a desktop's animations through `gsettings`, are a new connection or new programs for the
+    Linux helper, whose approved list is `xclip`, `wl-clipboard` and `systemctl --user show-environment`).
+  - **Tests:** `build/vm-test` (machine.json schema 13: true, false, wrong types, below 13, the round trip; `AGK_PERF`
+    and every one of the 16 777 216 three-byte `AGK_PERFSTATE` payloads against the rule; the `perf` hello word),
+    `tests/vm_model_test.mjs` (the shipped guest tools are w11). The guest tools build with mingw-w64 with no
+    warning and import only system DLLs (powrprof added). Not yet checked in a running guest.
 
 - **Renaming a machine renames its folder and its transfer folder too** (in development; the latest release is
   0.8.9.5-beta). Asked by the maintainer on 2026-11-23: a guest machine renamed in Configure → General kept its folder

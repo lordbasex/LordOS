@@ -710,6 +710,8 @@
   "cfg.agentNote": "Două canale private către mașină: unul pentru qemu-guest-agent (starea ei, o oprire curată, ceasul, jurnalul) și unul pentru asistentul de clipboard. Nimic nu trece prin rețea.",
   "cfg.agentInstall": "În mașină",
   "cfg.agentInstallNote": "Instalați qemu-guest-agent cu managerul de pachete al mașinii. Asistentul de clipboard se instalează din butonul Agent de pe bara mașinii după ce qemu-guest-agent răspunde.",
+  "win.perfProfile": "Profil de performanță",
+  "win.perfProfileNote": "Cât timp mașina rulează, instrumentele LordOS din Windows o trec pe planul de alimentare Performanță ridicată și dezactivează animațiile, umbrele și transparența. Totul revine când opțiunea este dezactivată sau instrumentele se opresc. Necesită instrumentele LordOS w11 sau mai noi.",
   "cfg.toolsAuto": "Actualizați automat instrumentele LordOS din această mașină",
   "cfg.toolsAutoNote": "Când acest LordOS aduce instrumente mai noi, ele se instalează cât timp mașina rulează și nu se copiază nimic. Dezactivat: o notificare oferă actualizarea.",
   "cfg.agentOn": "Activat, neconectat",

@@ -710,6 +710,8 @@
   "cfg.agentNote": "Dua saluran peribadi ke dalam mesin: satu untuk qemu-guest-agent (keadaannya, penutupan bersih, jam, jurnal) dan satu untuk pembantu papan keratan. Tiada apa yang melalui rangkaian.",
   "cfg.agentInstall": "Dalam mesin",
   "cfg.agentInstallNote": "Pasang qemu-guest-agent dengan pengurus pakej mesin. Pembantu papan keratan dipasang daripada butang Ejen pada bar mesin setelah qemu-guest-agent menjawab.",
+  "win.perfProfile": "Profil prestasi",
+  "win.perfProfileNote": "Semasa mesin berjalan, alat LordOS dalam Windows menukarnya kepada pelan kuasa Prestasi tinggi dan mematikan animasi, bayang dan ketelusan. Semuanya kembali seperti asal apabila ini dimatikan atau alat berhenti. Memerlukan alat LordOS w11 atau lebih baharu.",
   "cfg.toolsAuto": "Kemas kini alatan LordOS dalam mesin ini secara automatik",
   "cfg.toolsAutoNote": "Apabila LordOS ini membawa alatan yang lebih baharu, ia dipasang semasa mesin berjalan dan tiada apa-apa sedang disalin. Mati: pemberitahuan menawarkan kemas kini.",
   "cfg.agentOn": "Hidup, tidak disambungkan",

@@ -164,11 +164,11 @@ export function Configure({ dir, section: section0, onClose }) {
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
-    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, cpuPin: m.cpuPin || 'off', ...draft };
+    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -492,6 +492,11 @@ export function Configure({ dir, section: section0, onClose }) {
         <Off off={running}><Toggle on={!!cur.agent} onChange={(x) => set({ agent: x, ...(!x ? { clipboard: 'off' } : {}) })} /></Off>
       </Row>
       <Row label={tr('machines.cfg.agentInstall')} note={tr('machines.cfg.agentInstallNote')} />
+      {/* the guest's performance profile (7.1.4, machine.json perf_profile): applied by the LordOS tools for Windows (w11)
+          while the machine runs, put back after; off by default */}
+      {m.windowsDevices ? <Row label={tr('machines.win.perfProfile')} note={[tr('machines.win.perfProfileNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running}><Toggle on={cur.perfProfile} onChange={(x) => set({ perfProfile: x })} /></Off>
+      </Row> : null}
       {/* the LordOS tools brought up to date by themselves (model.js toolsAutoStep): app.json, at once, also while it runs */}
       <Row label={tr('machines.cfg.toolsAuto')} last note={tr('machines.cfg.toolsAutoNote')}>
         <Toggle on={toolsAutoOn(meta, defaultsOf(settings.get().machinesDefaults))} onChange={(x) => { writeMeta(dir, { toolsAuto: x }); setMeta(readMeta(dir)); }} />
