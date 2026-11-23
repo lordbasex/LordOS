@@ -10,6 +10,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+- **Machines: a restart or shutdown of the computer handles a running machine at once, and inside logind's delay.**
+  Seen on the maintainer's PC (2026-11-23): with a Windows 11 machine running (an Intel GVT-g vGPU, started paused),
+  `reboot` waited the whole 30 s ("Delay lock is active (… lord-vm) but inhibitor timeout is reached"), lord-vm only
+  then logged *the computer is shutting down*, and systemd's last kill took QEMU and its VFIO device down hard (a
+  suspect for the restarts that stayed on the boot splash that week).
+  - **The cause** (`server/src/vm/lordvm.c`, the main loop): lord-vm polled the system bus with the events
+    `sd_bus_get_events()` asked for and called `sd_bus_process()` only when poll said the descriptor was ready. The
+    synchronous AddMatch and Inhibit calls at the start read the bus's NameAcquired into sd-bus's own queue; while that
+    queue isn't empty sd-bus leaves POLLIN out (and its timeout says "now", which the loop ignored), so the descriptor
+    was polled for nothing and PrepareForShutdown sat unread until the bus hung up at the end of the shutdown.
+  - **The fix**: the bus code moved to `server/src/vm/vmlogind.c` (new), which dispatches what's queued before every
+    poll and adds sd-bus's own deadline to the loop's. PrepareForShutdown is handled in under a millisecond.
+  - **The whole stop fits in logind's delay** (`server/src/vm/vmhoststop.h`, new): lord-vm reads logind's
+    `InhibitDelayMaxUSec` (30 s with LordOS's drop-in) and plans the stop from it: a save to disk until +18 s, the
+    guest's own shutdown (ACPI or the agent) until +26 s, then QEMU is told to quit (a clean exit: disks flushed, VFIO
+    closed), and SIGKILL at +29 s; the delay inhibitor is let go as soon as QEMU is gone, before logind gives up on it.
+    Before, a save could take 30 s and the shutdown another 30 + 5, past the delay. A machine with a vGPU or 3D
+    graphics goes straight to the guest's shutdown (a paused one is resumed first, as before); a machine started
+    paused that never ran is turned off at once (nothing to save, and a firmware that only starts then ignores the
+    power button). SIGTERM (the session ending) and lord-server going away follow the same plan.
+  - **Tests**: `build/vmlogind-test` (new, in `make test`) runs vmlogind.c against a fake logind on a private
+    dbus-daemon: PrepareForShutdown(true) handled within 250 ms (0 ms measured; the old dispatch on a second
+    connection didn't see it in 1.5 s), PrepareForShutdown(false) ignored, the delay inhibitor seen released, the bus
+    going away. `vm-test` checks the plan for 0 to 120 s delays. With a fake logind and a scratch machine, the real
+    lord-vm saved the machine 278 ms after PrepareForShutdown and let go of the inhibitor (the old binary reacted only
+    when the bus went away, 46 s later); with an 8 s delay (no time to save) the guest got the power button and QEMU
+    quit at +4.0 s; a never-run paused machine was off in 124 ms.
+
 ## [0.8.9.5-beta] - 2026-11-23
 
 An update of the package through the Store and `apt`, with no new images. Linux apps: every Wayland global LordOS

@@ -11,6 +11,7 @@ LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 ||
 ifeq ($(LORDVM_LOGIND),1)
 LORDVM_FLAGS := -DVM_LOGIND $(shell pkg-config --cflags libsystemd)
 LORDVM_LIBS := $(shell pkg-config --libs libsystemd)
+LORDVM_SRC += src/vm/vmlogind.c
 endif
 all: build/lord-vm build/lordos-guest
 build/lord-vm: $(LORDVM_SRC) $(VM_HDR)
@@ -113,6 +114,16 @@ build/vmimport-test: tests/vmimport_test.c src/vm/vmimport.c src/vm/vmxml.c src/
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmimport_test.c src/vm/vmimport.c src/vm/vmxml.c src/vm/machine.c src/sec/json.c src/doc/wire.c
 	./$@ || { rm -f $@; exit 1; }
+# lord-vm's logind side (vmlogind.c) against a fake logind on a private dbus-daemon: PrepareForShutdown handled at once
+# (it waited ~30 s on 2026-11-23), the delay inhibitor's descriptor, the bus going away. Skipped without libsystemd's
+# -dev package (lord-vm then has no logind side) or, when it runs, without dbus-daemon
+ifeq ($(LORDVM_LOGIND),1)
+test: build/vmlogind-test
+build/vmlogind-test: tests/vmlogind_test.c src/vm/vmlogind.c src/vm/vmlogind.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ tests/vmlogind_test.c src/vm/vmlogind.c $(shell pkg-config --libs libsystemd)
+	./$@ || { rm -f $@; exit 1; }
+endif
 build/vm-test: tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c $(VM_COMMON) $(VM_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c $(VM_COMMON)

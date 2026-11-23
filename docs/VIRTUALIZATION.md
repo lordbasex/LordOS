@@ -1003,10 +1003,21 @@ app, measured on the build VM, and on the Pi 5 below.
   answered ("computer name WINDOWS-11-71FE from the next restart (now WIN-PRUEBA)"), and after Shut Down and a start `hostname`
   said `windows-11-71fe`; no identity line at that second start.
 - *Host shutdown, restart and logout (6.1).* lord-vm holds a logind *delay* inhibitor (`shutdown`) while it runs. PrepareForShutdown, a
-  SIGTERM (the session's units stopping) or lord-server going away without Keep Running starts a suspend to disk; if it isn't done in
-  30 s, or can't be, the machine is shut down (ACPI, 30 s), then turned off. QEMU is started with SIGTERM, SIGINT and SIGHUP blocked, so
-  stopping the machine's scope doesn't kill it first. The package has `/usr/lib/systemd/logind.conf.d/lordos-machines.conf`
-  (`InhibitDelayMaxSec=30`). Seen on VM 125: a machine with text on its screen, the host restarted (`systemctl reboot`):
+  SIGTERM (the session's units stopping) or lord-server going away without Keep Running starts a suspend to disk. The package has
+  `/usr/lib/systemd/logind.conf.d/lordos-machines.conf` (`InhibitDelayMaxSec=30`), and the whole stop fits inside that delay, read
+  from logind's `InhibitDelayMaxUSec` (30 s when it can't be read, SIGTERM included; `server/src/vm/vmhoststop.h`): the save may run
+  until delay − 12 s (+18 s), else it's cancelled and the guest is shut down (ACPI, or the agent first) until delay − 4 s (+26 s),
+  then QEMU is told to quit (a clean exit: disks flushed, a vGPU's VFIO device closed), and it's killed at delay − 1 s (+29 s). The
+  delay inhibitor is let go as soon as QEMU is gone, so systemd's last kill never meets a running QEMU. A machine with a vGPU or 3D
+  graphics can't be saved and goes straight to the guest's shutdown (a paused one is resumed first: a paused guest ignores the power
+  button); a machine started paused that never ran is turned off at once; with less than 3 s of save time left (logind's default 5 s
+  delay, our drop-in missing) no save is tried. QEMU is started with SIGTERM, SIGINT and SIGHUP blocked, so stopping the machine's
+  scope doesn't kill it first. The system bus is polled after dispatching whatever sd-bus has queued already (`vmlogind.c`): before
+  2026-11-23 a message read during the synchronous calls at the start (the bus's NameAcquired) kept POLLIN out of
+  `sd_bus_get_events()`, and PrepareForShutdown was handled only when the bus hung up after logind's 30 s had run out (seen on the
+  maintainer's PC with a Windows 11 vGPU machine: QEMU was then killed by systemd at the very end). The vGPU's mdev is still removed
+  the usual way (lord-server's `vm-gvt-remove` once the machine reads stopped, or the admin helper's sweep); lord-vm has no admin
+  channel of its own. Seen on VM 125: a machine with text on its screen, the host restarted (`systemctl reboot`):
   *the computer is shutting down: saving the machine to disk*, the SIGTERM 1.1 s later absorbed, 496 MB saved in 2.3 s; after the
   restart the card said Suspended, and Start resumed it in 1.2 s with the text on its screen. The recovery gate sends SIGTERM to lord-vm
   and QEMU at once and checks the machine is saved, then resumed.

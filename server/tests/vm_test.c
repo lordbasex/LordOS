@@ -14,6 +14,7 @@
 #include "vm/vmagent.h"
 #include "vm/vmnet.h"
 #include "vm/vmgvtwin.h"
+#include "vm/vmhoststop.h"
 
 #include <limits.h>
 #include <stdio.h>
@@ -2143,6 +2144,27 @@ static void test_open_with(void) {
     }
 }
 
+/* a host stop's steps (vmhoststop.h, 6.1): everything, SIGKILL included, inside logind's delay with a margin */
+static void test_host_stop_plan(void) {
+    VmHostStopPlan p = vm_host_stop_plan(30000);            /* LordOS's InhibitDelayMaxSec=30 */
+    CHECK(p.kill_at == 29000 && p.quit_at == 26000 && p.save_until == 18000);
+    CHECK(p.quit_at - p.save_until >= VM_HOST_ACPI_MIN_MS);
+    VmHostStopPlan d = vm_host_stop_plan(-1);               /* unknown (no logind, SIGTERM only): the shipped 30 s */
+    CHECK(d.kill_at == p.kill_at && d.quit_at == p.quit_at && d.save_until == p.save_until);
+    VmHostStopPlan s = vm_host_stop_plan(5000);             /* logind's own default, our drop-in missing: no save */
+    CHECK(s.kill_at == 4000 && s.quit_at == 1000 && s.save_until == 0);
+    VmHostStopPlan z = vm_host_stop_plan(0);
+    CHECK(z.kill_at == 500 && z.quit_at == 0 && z.save_until == 0);
+    VmHostStopPlan big = vm_host_stop_plan(3600000);        /* capped at 10 minutes */
+    CHECK(big.kill_at == 599000 && big.save_until == 599000 - VM_HOST_QUIT_MS - VM_HOST_ACPI_MIN_MS);
+    for (long long ms = 0; ms <= 120000; ms += 500) {
+        VmHostStopPlan q = vm_host_stop_plan(ms);
+        CHECK(q.save_until <= q.quit_at && q.quit_at <= q.kill_at);
+        CHECK(ms < 2000 || q.kill_at <= ms - VM_HOST_MARGIN_MS);
+        CHECK(!q.save_until || q.save_until >= VM_HOST_SAVE_MIN_MS);
+    }
+}
+
 int main(void) {
     test_gvtwin();
     test_open_with();
@@ -2163,6 +2185,7 @@ int main(void) {
     test_agent();
     test_drop_names();
     test_host();
+    test_host_stop_plan();
     test_messages();
     test_qmp();
     test_keys();

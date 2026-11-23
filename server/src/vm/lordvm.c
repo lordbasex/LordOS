@@ -28,6 +28,7 @@
 #include "vmagent.h"
 #include "vmimport.h"
 #include "vmunattend.h"
+#include "vmhoststop.h"
 #include "vmgvtwin.h"
 #include "vmlog.h"
 #include "../sec/cgroup.h"
@@ -68,7 +69,7 @@
 #include <time.h>
 #include <unistd.h>
 #ifdef VM_LOGIND
-#include <systemd/sd-bus.h>
+#include "vmlogind.h"
 #endif
 
 #define VM_DNS_ADDR "169.254.0.53"     /* the guest's nameserver in Shared mode (passt answers for it) */
@@ -1006,8 +1007,10 @@ static struct {
     long long net_lost_at, net_retry_at, net_window_at;
     char net_err[160];
     /* the computer stops or the session ends (6.1): the machine is saved to disk, else shut down, else turned off */
-    int host_stopping;
-    long long host_stop_deadline;
+    int host_stopping, host_quit, ran;        /* ran: its vCPUs ran, or it holds a saved guest (a paused fresh start doesn't) */
+    int susp_cancelled;                       /* the host stop's save was given up (migrate_cancel sent) */
+    long long host_t0;                        /* when the stop began (now_ms) */
+    VmHostStopPlan hplan;                     /* each step's time from host_t0 (vmhoststop.h) */
     char host_stop_why[96];
     /* a Clone's first start (6.3): the guest gets its own hostname and machine-id through the agent (identity.json) */
     char id_hostname[64];
@@ -1097,6 +1100,7 @@ static void notify_parent(int ok) {
 
 static void set_state(int st, int why, int code, const char *detail) {
     int changed = st != S.state || why != S.reason;
+    if (st == VS_RUNNING) S.ran = 1;
     S.state = st;
     S.reason = why;
     S.code = code;
@@ -2318,6 +2322,15 @@ static void vgpu_memlock_tick(long long now) {
 /* ---- requests ---- */
 
 static int qga_do(const char *cmd, const char *args, int kind);
+
+/* a host stop's SIGKILL comes before logind's delay ends (vmhoststop.h), and never sooner than 1 s after the quit */
+static void host_kill_cap(void) {
+    if (!S.host_stopping) return;
+    long long now = now_ms(), at = S.host_t0 + S.hplan.kill_at;
+    if (at < now + 1000) at = now + 1000;
+    if (!S.kill_deadline || at < S.kill_deadline) S.kill_deadline = at;
+}
+
 static void begin_shutdown(int secs) {
     if (S.state == VS_PAUSED) qmp_do("cont", NULL, P_IGNORE, -1, 0, -1, -1);
     S.host_shutdown = 1;
@@ -2339,7 +2352,17 @@ static void begin_poweroff(void) {
     S.poweroff = 1;
     if (qmp_do("quit", NULL, P_IGNORE, -1, 0, -1, -1)) { kill(S.qemu, SIGKILL); S.killed = 1; }
     S.kill_deadline = now_ms() + 5000;
+    host_kill_cap();
     set_state(VS_STOPPING, VR_POWEROFF, 0, "turning off");
+}
+
+/* a host stop's shutdown: the guest's own (ACPI or the agent; begin_shutdown resumes a paused machine first) until
+ * the plan's quit time, then QEMU quits; with no time left for the guest, QEMU quits now */
+static void host_shutdown(void) {
+    long long left = S.host_t0 + S.hplan.quit_at - now_ms();
+    if (left < 1000) { vlog("no time left for the guest to shut down: turning it off"); begin_poweroff(); return; }
+    begin_shutdown((int)((left + 999) / 1000));
+    S.shut_deadline = S.host_t0 + S.hplan.quit_at;
 }
 
 /* VM_CDROM: the disc out (open the tray, take the medium, delete its nodes), then the new one in (its descriptor into an
@@ -2499,7 +2522,7 @@ static void suspend_failed(const char *why) {
     }
     send_job(VJ_SUSPEND, VJS_FAILED, -1, why);
     reply(S.susp_client, S.susp_seq, VME_QMP, why);
-    if (S.host_stopping && S.qmp_up && !S.qemu_done) { vlog("the machine couldn't be saved: shutting it down instead"); begin_shutdown(30); }
+    if (S.host_stopping && S.qmp_up && !S.qemu_done) { vlog("the machine couldn't be saved: shutting it down instead"); host_shutdown(); }
 }
 
 static void suspend_done(void) {
@@ -2590,6 +2613,7 @@ static void resume_done(void) {
     S.resumed = 1;
     vlog("resume: loaded in %lld ms", now_ms() - S.susp_t0);
     send_job(VJ_RESUME, VJS_DONE, 100, "");
+    S.ran = 1;
     if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "resumed");
     else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
 }
@@ -2694,81 +2718,90 @@ static void net_attached(int ok, const char *desc) {
 }
 
 /* ---- the computer stops, or the session ends (6.1) ----
- * The machine is saved to disk (a suspend: the next start resumes it), within 30 s; if it can't be, it's shut down
- * (ACPI, 30 s), then turned off. Comes from logind's PrepareForShutdown (lord-vm holds a delay inhibitor), from
- * SIGTERM (the session's units stopping) and from lord-server going away without saying Keep Running. */
-#define HOST_STOP_SAVE_MS 30000
+ * The machine is saved to disk (a suspend: the next start resumes it); if it can't be, or the save takes too long,
+ * it's shut down (ACPI or the agent), then QEMU quits, then it's killed: all inside logind's shutdown delay
+ * (vmhoststop.h), so systemd's last kill never meets a QEMU (or a vGPU's VFIO device) still running. Comes from
+ * logind's PrepareForShutdown (lord-vm holds a delay inhibitor), from SIGTERM (the session's units stopping) and from
+ * lord-server going away without saying Keep Running. */
+
+static long long host_delay_ms(void);
 
 static void host_stop(const char *why) {
     if (S.qemu_done || S.suspended) return;
     if (!S.host_stopping) {
         S.host_stopping = 1;
+        S.host_t0 = now_ms();
+        S.hplan = vm_host_stop_plan(host_delay_ms());
         snprintf(S.host_stop_why, sizeof S.host_stop_why, "%s", why);
-        S.host_stop_deadline = now_ms() + HOST_STOP_SAVE_MS;
-        vlog("%s: saving the machine to disk", why);
+        vlog("%s: saving the machine to disk (save until +%lld ms, QEMU quits at +%lld ms, killed at +%lld ms)", why,
+             S.hplan.save_until, S.hplan.quit_at, S.hplan.kill_at);
     }
     if (S.suspending) return;                                   /* already saving */
     if (!S.qmp_up || S.state == VS_STARTING) { begin_poweroff(); return; }
-    if (S.state == VS_STOPPING) return;                         /* already shutting down */
-    char err[160];
-    int ok_state = S.state == VS_RUNNING || S.state == VS_PAUSED;
-    if (ok_state && (S.gl || S.vgpu)) { vlog("a machine with %s can't be saved to disk: shutting it down", S.vgpu ? "a graphics card" : "3D graphics (virgl can't be migrated)"); begin_shutdown(30); return; }
-    if (ok_state && !S.snap_kind && !S.cd_busy) { begin_suspend(-1, 0); return; }
-    if (ok_state && (S.snap_kind || S.cd_busy)) return;         /* tried again from the loop once that's done */
-    snprintf(err, sizeof err, "the machine can't be saved now (%s): shutting it down", STATE_NAME[S.state]);
-    vlog("%s", err);
-    begin_shutdown(30);
-}
-
-/* the loop's turn: a save that takes too long is given up for a shutdown */
-static void host_stop_tick(long long now) {
-    if (!S.host_stopping || S.qemu_done) return;
-    if (S.suspending && now >= S.host_stop_deadline) {
-        vlog("suspend: not done in %d s: shutting the machine down instead", HOST_STOP_SAVE_MS / 1000);
-        qmp_do("migrate_cancel", NULL, P_IGNORE, -1, 0, -1, -1);
-        S.host_stop_deadline = now + 600000;
+    if (S.state == VS_STOPPING) {                               /* already shutting down: within the plan */
+        if (!S.shut_deadline || S.shut_deadline > S.host_t0 + S.hplan.quit_at) S.shut_deadline = S.host_t0 + S.hplan.quit_at;
+        if (S.kill_deadline) host_kill_cap();
         return;
     }
-    if (!S.suspending && S.state != VS_STOPPING && (S.state == VS_RUNNING || S.state == VS_PAUSED) && !S.snap_kind && !S.cd_busy) {
-        if (now < S.host_stop_deadline && !S.gl && !S.vgpu) begin_suspend(-1, 0);
-        else begin_shutdown(30);
+    int ok_state = S.state == VS_RUNNING || S.state == VS_PAUSED;
+    /* started paused and never run (Machines starts a machine paused until its window is there): no guest yet, nothing
+     * to save, and a firmware that only now boots ignores the power button */
+    if (S.state == VS_PAUSED && !S.ran) { vlog("the machine never ran: turning it off"); begin_poweroff(); return; }
+    if (ok_state && (S.gl || S.vgpu)) { vlog("a machine with %s can't be saved to disk: shutting it down", S.vgpu ? "a graphics card" : "3D graphics (virgl can't be migrated)"); host_shutdown(); return; }
+    if (ok_state && !S.hplan.save_until) { vlog("logind's delay leaves no time to save the machine: shutting it down"); host_shutdown(); return; }
+    if (ok_state && !S.snap_kind && !S.cd_busy) { begin_suspend(-1, 0); return; }
+    if (ok_state && (S.snap_kind || S.cd_busy)) return;         /* tried again from the loop once that's done */
+    vlog("the machine can't be saved now (%s): shutting it down", STATE_NAME[S.state]);
+    host_shutdown();
+}
+
+/* the loop's turn: a save that takes too long is given up for a shutdown, and at the plan's quit time QEMU quits
+ * whatever is still going on (a save, a snapshot, a guest that ignores the button) */
+static void host_stop_tick(long long now) {
+    if (!S.host_stopping || S.qemu_done) return;
+    if (now >= S.host_t0 + S.hplan.quit_at) {
+        if (S.host_quit || S.poweroff || S.forced) return;      /* QEMU was told to quit already */
+        S.host_quit = 1;
+        S.forced = 1;
+        S.shut_deadline = 0;
+        vlog("the machine didn't stop in time for the computer: turning it off");
+        if (S.suspending) qmp_do("migrate_cancel", NULL, P_IGNORE, -1, 0, -1, -1);
+        if (qmp_do("quit", NULL, P_IGNORE, -1, 0, -1, -1)) { kill(S.qemu, SIGKILL); S.killed = 1; }
+        S.kill_deadline = 0;
+        host_kill_cap();
+        return;
+    }
+    if (S.suspending) {
+        if (now >= S.host_t0 + S.hplan.save_until && !S.susp_cancelled) {
+            S.susp_cancelled = 1;
+            vlog("suspend: not done in %lld ms: shutting the machine down instead", S.hplan.save_until);
+            qmp_do("migrate_cancel", NULL, P_IGNORE, -1, 0, -1, -1);
+        }
+        return;
+    }
+    if (S.state != VS_STOPPING && (S.state == VS_RUNNING || S.state == VS_PAUSED) && !S.snap_kind && !S.cd_busy) {
+        if (S.state == VS_PAUSED && !S.ran) begin_poweroff();
+        else if (now < S.host_t0 + S.hplan.save_until && !S.gl && !S.vgpu) begin_suspend(-1, 0);
+        else host_shutdown();
     }
 }
 
 #ifdef VM_LOGIND
-/* ---- logind (6.1, 6.14): while the machine runs, the computer's shutdown waits for it to be saved (a delay
- * inhibitor), and it doesn't go to sleep when idle (an idle block inhibitor, while running and "Keep this computer
- * awake" is on). Both are logind's, so `systemd-inhibit --list` names them; closing the descriptor lets go. ---- */
-static sd_bus *sysbus;
-static int inh_shutdown = -1, inh_idle = -1;
+/* ---- logind (6.1, 6.14): while the machine runs, the computer's shutdown waits for it (a delay inhibitor, within
+ * logind's InhibitDelayMaxUSec: vmhoststop.h), and it doesn't go to sleep when idle (an idle block inhibitor, while
+ * running and "Keep this computer awake" is on). Both are logind's, so `systemd-inhibit --list` names them; closing the
+ * descriptor lets go. The bus itself is vmlogind.c's. ---- */
+static int logind_on, inh_shutdown = -1, inh_idle = -1;
 
-static int inhibit(const char *what, const char *why, const char *mode) {
-    sd_bus_message *rep = NULL;
-    sd_bus_error e = SD_BUS_ERROR_NULL;
-    int fd = -1, got = -1;
-    if (sd_bus_call_method(sysbus, "org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "Inhibit", &e, &rep,
-                           "ssss", what, "LordOS Machines", why, mode) >= 0 && sd_bus_message_read(rep, "h", &got) >= 0)
-        fd = fcntl(got, F_DUPFD_CLOEXEC, 3);
-    else vlog("logind: no %s inhibitor: %s", what, e.message ? e.message : "?");
-    sd_bus_error_free(&e);
-    sd_bus_message_unref(rep);
-    return fd;
-}
-
-static int on_prepare_shutdown(sd_bus_message *m, void *u, sd_bus_error *e) {
-    (void)u; (void)e;
-    int start = 0;
-    if (sd_bus_message_read(m, "b", &start) >= 0 && start) host_stop("the computer is shutting down");
-    return 0;
-}
+static void on_prepare_shutdown(void) { host_stop("the computer is shutting down"); }
 
 static void awake_update(void) {
-    if (!sysbus) return;
+    if (!logind_on) return;
     int want = S.keep_awake && S.state == VS_RUNNING && !S.qemu_done && !S.host_stopping;
     if (want && inh_idle < 0) {
         char why[160];
         snprintf(why, sizeof why, "The machine \"%.80s\" is running", S.m.name);
-        inh_idle = inhibit("idle", why, "block");
+        inh_idle = vml_inhibit("idle", why, "block");
         if (inh_idle >= 0) vlog("logind: this computer doesn't go to sleep when idle while the machine runs");
     } else if (!want && inh_idle >= 0) {
         close(inh_idle);
@@ -2778,37 +2811,39 @@ static void awake_update(void) {
 }
 
 static void logind_open(void) {
-    if (sd_bus_open_system(&sysbus) < 0) { vlog("logind: no system bus: host shutdown isn't waited for"); sysbus = NULL; return; }
-    sd_bus_match_signal(sysbus, NULL, "org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "PrepareForShutdown",
-                        on_prepare_shutdown, NULL);
+    if (vml_open(vlog, on_prepare_shutdown) < 0) { vlog("logind: no system bus: host shutdown isn't waited for"); return; }
+    logind_on = 1;
     char why[160];
     snprintf(why, sizeof why, "The machine \"%.80s\" is saved to disk first", S.m.name);
-    inh_shutdown = inhibit("shutdown", why, "delay");
-    if (inh_shutdown >= 0) vlog("logind: a shutdown or restart of this computer waits for the machine to be saved");
+    inh_shutdown = vml_inhibit("shutdown", why, "delay");
+    if (inh_shutdown >= 0) vlog("logind: a shutdown or restart of this computer waits for the machine to be saved (up to %lld ms)", vml_delay_ms());
     awake_update();
 }
 
-static int logind_fd(void) { return sysbus ? sd_bus_get_fd(sysbus) : -1; }
-static short logind_events(void) { return sysbus ? (short)sd_bus_get_events(sysbus) : 0; }
-static void logind_process(void) {
-    if (!sysbus) return;
-    int r;
-    while ((r = sd_bus_process(sysbus, NULL)) > 0) ;
-    if (r < 0) { vlog("logind: the system bus went away"); sd_bus_flush_close_unref(sysbus); sysbus = NULL; }
+static long long host_delay_ms(void) { return logind_on ? vml_delay_ms() : -1; }
+static int logind_poll(struct pollfd *p, long long now, long long *next) { return logind_on && vml_poll(p, now, next); }
+static void logind_process(void) { if (logind_on) vml_process(); }
+/* QEMU is gone: the computer's shutdown needn't wait for the rest of lord-vm's cleanup */
+static void logind_release_shutdown(void) {
+    if (inh_shutdown < 0) return;
+    close(inh_shutdown);
+    inh_shutdown = -1;
+    if (S.host_stopping) vlog("logind: the computer's shutdown no longer waits for this machine (%lld ms after the stop began)", now_ms() - S.host_t0);
 }
 static void logind_close(void) {
     if (inh_idle >= 0) close(inh_idle);
     if (inh_shutdown >= 0) close(inh_shutdown);
     inh_idle = inh_shutdown = -1;
-    if (sysbus) sd_bus_flush_close_unref(sysbus);
-    sysbus = NULL;
+    vml_close();
+    logind_on = 0;
 }
 #else
 static void awake_update(void) {}
 static void logind_open(void) { vlog("logind: not built in: host shutdown isn't waited for"); }
-static int logind_fd(void) { return -1; }
-static short logind_events(void) { return 0; }
+static long long host_delay_ms(void) { return -1; }
+static int logind_poll(struct pollfd *p, long long now, long long *next) { (void)p; (void)now; (void)next; return 0; }
 static void logind_process(void) {}
+static void logind_release_shutdown(void) {}
 static void logind_close(void) {}
 #endif
 
@@ -2855,6 +2890,7 @@ static void snap_concluded(const JVal *root, int ok) {
             if (err) { snap_end(0, err); fail_start("the snapshot couldn't be loaded: %.100s", err); kill(S.qemu, SIGKILL); S.killed = 1; return; }
             vm_op_end(S.dir);
             snap_end(1, "");
+            S.ran = 1;
             if (S.paused_start) set_state(VS_PAUSED, VR_NONE, 0, "started from a snapshot");
             else qmp_do("cont", NULL, P_CONT_START, -1, 0, -1, -1);
             return;
@@ -5592,6 +5628,11 @@ static void loop(void) {
     while (!S.qemu_done) {
         struct pollfd p[MAX_CLIENTS + 8];
         int ci[MAX_CLIENTS + 8], n = 0;
+        /* the system bus first: what's queued already is dispatched here (PrepareForShutdown included, before the
+         * deadlines below are read), so its POLLIN is asked for again (vmlogind.h: a queued message left it out and
+         * the signal waited ~30 s, until the bus hung up at the end of the shutdown, 2026-11-23) */
+        long long bus_next = -1;
+        if (logind_poll(&p[n], now_ms(), &bus_next)) { ci[n] = -11; n++; }
 #define WATCH(f, tag) do { if ((f) >= 0) { p[n] = (struct pollfd){ (f), POLLIN, 0 }; ci[n] = (tag); n++; } } while (0)
         WATCH(S.sig_fd, -1);
         WATCH(S.qmp_up ? S.qmp.fd : -1, -2);
@@ -5605,7 +5646,6 @@ static void loop(void) {
         if (S.lag_fd >= 0 && lag_out_off < lag_out_n) p[n - 1].events |= POLLOUT;
         WATCH(S.passt_pidfd, -10);
         WATCH(S.fx_cpipe, -12);
-        if (logind_fd() >= 0) { p[n] = (struct pollfd){ logind_fd(), logind_events(), 0 }; ci[n] = -11; n++; }
         for (int i = 0; i < MAX_CLIENTS; i++) WATCH(S.cl[i].fd, i);
 #undef WATCH
         long long now = now_ms(), next = -1;
@@ -5626,6 +5666,7 @@ static void loop(void) {
         if (mice_watched() && S.mice_at && (next < 0 || S.mice_at < next)) next = S.mice_at;
         long long cl = child_logs_next();
         if (cl >= 0 && (next < 0 || cl < next)) next = cl;
+        if (bus_next >= 0 && (next < 0 || bus_next < next)) next = bus_next;
         int to = next < 0 ? -1 : next <= now ? 0 : (int)(next - now);
         if (poll(p, (nfds_t)n, to) < 0 && errno != EINTR) { vlog("poll: %s", strerror(errno)); break; }
         now = now_ms();
@@ -5658,6 +5699,7 @@ static void loop(void) {
             S.forced = 1;
             if (qmp_do("quit", NULL, P_IGNORE, -1, 0, -1, -1)) { kill(S.qemu, SIGKILL); S.killed = 1; }
             S.kill_deadline = now + 5000;
+            host_kill_cap();
         }
         if (S.kill_deadline && now >= S.kill_deadline && !S.qemu_done) {
             S.kill_deadline = 0;
@@ -5714,6 +5756,7 @@ static void loop(void) {
             }
         }
     }
+    logind_release_shutdown();
     /* what QEMU said last */
     for (int k = 0; k < 20 && S.qemu_err >= 0; k++) pump_fd(&S.qemu_err, "qemu");
     for (int k = 0; k < 20 && S.passt_err >= 0; k++) pump_fd(&S.passt_err, "passt");
