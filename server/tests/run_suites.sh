@@ -363,6 +363,13 @@ EOF
         77) skip "guest-clip" "build/lordos-guest and python3" ;;
         *) bad "guest-clip (tests/guest_clip_test.sh, lordos-guest's clipboard tools)" ;;
     esac
+    # lordos-guest --stopping: the guest's shutdown hook says power off or restart, waits for lord-vm's echo (QEMU issue 4918)
+    sh tests/guest_stop_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-stop (tests/guest_stop_test.sh, lordos-guest's shutdown notice)" ;;
+        77) skip "guest-stop" "build/lordos-guest and python3" ;;
+        *) bad "guest-stop (tests/guest_stop_test.sh, lordos-guest's shutdown notice)" ;;
+    esac
     # a getter that destroys the node lord.setProp / lord.setStyle are writing (Claude Security, 0.8.9)
     sh tests/js_getter_destroy.sh >"$T/out" 2>&1
     case $? in

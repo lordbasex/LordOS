@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 const D = await import(path.join(here, '../../apps/machines/diag.js'));
-const { stateView, offers2d, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
+const { stateView, offers2d, restartsAgain, offHint, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -25,6 +25,16 @@ eq('crashed no why', stateView('crashed', 'none').why, 'qemu-failed');
 eq('QEMU 3D abort keeps its why', stateView('crashed', 'qemu-3d-crash'), { key: 'crashed', tone: 'bad', active: false, why: 'qemu-3d-crash' });
 eq('QEMU 3D abort, recorded as off', stateView('stopped', 'qemu-3d-crash').why, 'qemu-3d-crash');
 eq('2D offered after the 3D abort only', [offers2d('qemu-3d-crash'), offers2d('qemu-signal'), offers2d(null)], [true, false, false]);
+// the guest's own stop with 3D (QEMU issue 4918, vmlog_3d_abort_end): a shutdown reads as one, a restart starts again,
+// a stop nobody could name is off with its own hint and no error, an abort not tied to a stop keeps the error screen
+eq('3D abort at a shutdown: a plain stop', stateView('stopped', 'guest-shutdown').why, null);
+eq('3D abort at a stop LordOS asked for: a plain stop', stateView('stopped', 'host-shutdown').why, null);
+eq('3D abort, guest stop without tools: off, no error', stateView('stopped', 'qemu-3d-stop'), { key: 'stopped', tone: 'off', active: false, why: null });
+eq('3D abort, guest stop without tools: no 2D offer', offers2d(stateView('stopped', 'qemu-3d-stop').why), false);
+eq('restart again: stopped by a reset only', [restartsAgain('stopped', 'reset'), restartsAgain('crashed', 'qemu-3d-crash'), restartsAgain('stopped', 'qemu-3d-stop'),
+  restartsAgain('stopped', 'guest-shutdown'), restartsAgain('running', 'reset'), restartsAgain('stopped', 'installed')], [true, false, false, false, false, false]);
+eq('off hint after a guest stop without tools', [offHint('qemu-3d-stop'), offHint('guest-shutdown'), offHint(undefined)],
+  ['machines.win.stopped3dHint', 'machines.win.playHint', 'machines.win.playHint']);
 eq('stopped clean', stateView('stopped', 'guest-shutdown'), { key: 'stopped', tone: 'off', active: false, why: null });
 eq('stopped after forced', stateView('stopped', 'forced').why, 'forced');
 eq('start failed', stateView('stopped', 'start-failed').why, 'start-failed');

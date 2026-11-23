@@ -81,7 +81,7 @@ static const char *const STATES[VS_COUNT] = { "stopped", "starting", "running", 
 static const char *const REASONS[VR_COUNT] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
     "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed",
-    "qemu-3d-crash",
+    "qemu-3d-crash", "qemu-3d-stop",
 };
 
 static void reap_orphans(void);

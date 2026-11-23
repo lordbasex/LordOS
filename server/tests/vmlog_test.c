@@ -144,10 +144,41 @@ static void qemu_3d_abort(void) {
     for (int i = 0; i < 4; i++) CHECK(!vmlog_qemu_3d_abort(other[i], strlen(other[i])), "[%s] taken for the 3D abort", other[i]);
 }
 
+/* how a run that ended in that abort is recorded (vmlog_3d_abort_end): asked, what the guest's tools said (0, 1 power
+ * off, 2 restart), whether tools that say were there, how long it ran */
+static void qemu_3d_end(void) {
+    const long long up = 5LL * 60 * 1000, early = 10000;
+    /* a stop asked from LordOS: a shutdown, whatever else, even right after the start */
+    CHECK(vmlog_3d_abort_end(1, 0, 0, up) == VMLOG_3D_SHUTDOWN, "asked, no tools");
+    CHECK(vmlog_3d_abort_end(1, 2, 1, up) == VMLOG_3D_SHUTDOWN, "asked wins over the guest's restart");
+    CHECK(vmlog_3d_abort_end(1, 0, 0, 0) == VMLOG_3D_SHUTDOWN, "asked before it ran");
+    /* the guest's tools said */
+    CHECK(vmlog_3d_abort_end(0, 1, 1, up) == VMLOG_3D_SHUTDOWN, "the guest powers off");
+    CHECK(vmlog_3d_abort_end(0, 1, 0, early) == VMLOG_3D_SHUTDOWN, "a power off, early, the hello never came");
+    CHECK(vmlog_3d_abort_end(0, 2, 1, up) == VMLOG_3D_RESTART, "the guest restarts");
+    CHECK(vmlog_3d_abort_end(0, 2, 0, VMLOG_3D_MIN_RUN_MS) == VMLOG_3D_RESTART, "a restart said by the hook only (no one signed in)");
+    /* a restart that aborts again right away (a restart loop): the error screen, never another start */
+    CHECK(vmlog_3d_abort_end(0, 2, 1, early) == VMLOG_3D_CRASH, "a restart right after the start");
+    CHECK(vmlog_3d_abort_end(0, 2, 1, VMLOG_3D_MIN_RUN_MS - 1) == VMLOG_3D_CRASH, "just under the minimum");
+    /* nothing said */
+    CHECK(vmlog_3d_abort_end(0, 0, 1, up) == VMLOG_3D_CRASH, "tools that would say said nothing: not a stop");
+    CHECK(vmlog_3d_abort_end(0, 0, 0, up) == VMLOG_3D_GUEST_STOP, "no tools, up a while: stopped by the guest");
+    CHECK(vmlog_3d_abort_end(0, 0, 0, early) == VMLOG_3D_CRASH, "no tools, right after the start");
+    CHECK(vmlog_3d_abort_end(0, 0, 0, 0) == VMLOG_3D_CRASH, "never ran");
+    /* only an explicit restart restarts */
+    for (int asked = 0; asked < 2; asked++)
+        for (int notice = 0; notice < 3; notice++)
+            for (int ann = 0; ann < 2; ann++)
+                for (long long t = 0; t <= up; t += 5000)
+                    if (vmlog_3d_abort_end(asked, notice, ann, t) == VMLOG_3D_RESTART)
+                        CHECK(!asked && notice == 2 && t >= VMLOG_3D_MIN_RUN_MS, "a restart from asked %d notice %d", asked, notice);
+}
+
 int main(void) {
     lines();
     key();
     qemu_3d_abort();
+    qemu_3d_end();
     repeats();
     rotation();
     if (fails) { fprintf(stderr, "vmlog-test: %d failure(s)\n", fails); return 1; }

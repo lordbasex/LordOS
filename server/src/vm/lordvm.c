@@ -117,7 +117,7 @@ static const char *const STATE_NAME[VS_COUNT] = { "stopped", "starting", "runnin
 static const char *const REASON_NAME[VR_COUNT] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
     "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed",
-    "qemu-3d-crash",
+    "qemu-3d-crash", "qemu-3d-stop",
 };
 
 /* ---- log ---- */
@@ -172,8 +172,12 @@ static ChildLog *child_of(const char *who) {
     return &child_log[CHILD_LOGS - 1];
 }
 
-/* this run's QEMU wrote its known 3D abort (vmlog_qemu_3d_abort): its end is VR_QEMU_3D_ABORT, not a plain crash */
-static int qemu_3d_abort_seen;
+/* this run's QEMU wrote its known 3D abort (vmlog_qemu_3d_abort): its end is named by vmlog_3d_abort_end (a shutdown, a
+ * restart, a stop by the guest, or VR_QEMU_3D_ABORT), not a plain crash. What that needs from the run: the guest's
+ * tools said they power off or restart (AGK_STOPPING, AG_STOP_*; 0 nothing), tools that would say so were connected
+ * (their hello said "stopping"), and when the run first ran (now_ms, 0 never) */
+static int qemu_3d_abort_seen, stop_notice, stop_announces;
+static long long run_t0;
 
 static void child_line(void *ctx, const char *line, size_t n) {
     ChildLog *c = ctx;
@@ -1106,6 +1110,7 @@ static void notify_parent(int ok) {
 static void set_state(int st, int why, int code, const char *detail) {
     int changed = st != S.state || why != S.reason;
     if (st == VS_RUNNING) S.ran = 1;
+    if (st == VS_RUNNING && !run_t0) run_t0 = now_ms();
     S.state = st;
     S.reason = why;
     S.code = code;
@@ -2110,7 +2115,8 @@ static int start_machine(void) {
     if (S.m.drivers[0] && !file_exists(S.m.drivers)) { vlog("note: the drivers disc is gone (%s): the machine starts without it", S.m.drivers); S.m.drivers[0] = 0; }
     S.unattended = 0;
     S.install_done = 0;
-    qemu_3d_abort_seen = 0;
+    qemu_3d_abort_seen = stop_notice = stop_announces = 0;
+    run_t0 = 0;
     S.win_seed = 0;
     S.win_armed = 0;
     {
@@ -3498,7 +3504,9 @@ static void on_qga_reply(const JVal *root, int ok) {
 }
 
 /* the steps of VAG_INSTALL: lordos-guest written in 32 KB pieces through guest-file-write, then one fixed script (no
- * argument, nothing the host or the person names): the helper, its udev rule and user service; then, best effort and
+ * argument, nothing the host or the person names): the helper, its udev rule and user service, and systemd-shutdown's hook
+ * that runs `lordos-guest --stopping <verb>` (lordos-guest-local, best effort: a read-only /usr skips it; "Graphics 3D"
+ * in docs/VIRTUALIZATION.md); then, best effort and
  * never failing the install (offline, a locked or unknown package manager), the clipboard tool through the guest's own
  * package manager when xclip isn't there (xclip and wl-clipboard: apt-get, dnf, zypper or pacman); then the helper
  * started again in each signed-in desktop session (uid ≥ 1000 with graphical-session.target active), so the new one
@@ -3510,6 +3518,9 @@ static const char INSTALL_SH[] =
     "'[Service]' 'ExecStart=/usr/local/bin/lordos-guest' 'Restart=on-failure' 'RestartSec=3' '[Install]' 'WantedBy=graphical-session.target' "
     "> /etc/systemd/user/lordos-guest.service; udevadm control --reload || true; udevadm trigger --subsystem-match=virtio-ports || true; "
     "systemctl --global enable lordos-guest.service || true; "
+    "{ mkdir -p /usr/lib/systemd/system-shutdown && "
+      "printf '%s\\n' '#!/bin/sh' 'exec /usr/local/bin/lordos-guest --stopping \"$1\"' > /usr/lib/systemd/system-shutdown/lordos-guest-local && "
+      "chmod 755 /usr/lib/systemd/system-shutdown/lordos-guest-local; } 2>/dev/null || true; "
     "command -v xclip >/dev/null 2>&1 || { "
       "if command -v apt-get >/dev/null 2>&1; then export DEBIAN_FRONTEND=noninteractive; "
         "apt-get install -y -q -o DPkg::Lock::Timeout=120 --no-install-recommends xclip wl-clipboard || "
@@ -4705,6 +4716,7 @@ static void drain_lag(void) {
                 S.lag_gvt = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_GVT) != 0;
                 S.lag_extra = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRA) != 0;
                 S.lag_extraoff = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRAOFF) != 0;
+                if (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_STOPPING) stop_announces = 1;
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
@@ -4729,6 +4741,17 @@ static void drain_lag(void) {
                 ag_broadcast();
                 ptr_begin();                    /* the tools say "pointer": the display driver's pointer, once per run */
                 gvt_begin();                    /* the tools say "gvt": Intel's driver for the vGPU, once per run */
+            }
+        } else if (f.kind == AGK_STOPPING) {
+            /* the guest's last shutdown step (its tools' systemd-shutdown hook, no hello: a fresh open of the port):
+             * it powers off or restarts now. Kept only to name the end of a run whose QEMU then aborts on the
+             * guest's virtio-gpu reset (QEMU issue 4918); the echo lets the guest go on */
+            int mode;
+            if (!ag_stopping_parse(f.data, f.len, &mode)) {
+                if (stop_notice != mode) vlog("agent: the guest says it %s now", mode == AG_STOP_REBOOT ? "restarts" : "powers off");
+                stop_notice = mode;
+                uint8_t b = (uint8_t)mode;
+                lag_send(AGK_STOPPING, &b, 1);
             }
         } else if (f.kind == AGK_CLIP && S.lag_hello && clip_allows(0) && f.len && ag_utf8_ok(f.data, f.len)) {
             int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
@@ -5280,6 +5303,7 @@ static void on_qmp_event(const JVal *root) {
         else if (S.vgpu && why && strstr(why, "reset")) { S.vgpu_reset = 1; vlog("graphics card: the machine restarted (%s): QEMU ends and Machines starts it again", why); }
         if (S.state != VS_STOPPING) set_state(VS_STOPPING, guest ? VR_GUEST_SHUTDOWN : VR_POWEROFF, 0, why ? why : "");
     } else if (!strcmp(ev, "RESET")) {
+        stop_notice = 0;                /* the guest's restart happened inside QEMU: what it said is done with */
         if (S.state == VS_RUNNING || S.state == VS_PAUSED) set_state(S.state, VR_GUEST_RESET, 0, "");
     } else if (!strcmp(ev, "GUEST_PANICKED")) { S.panic = 1; vlog("qemu: the guest panicked"); }
     else if (!strcmp(ev, "POWERDOWN")) vlog("qemu: power button pressed");
@@ -5456,6 +5480,12 @@ static void qemu_exited(int status) {
         if (poll(&pf, 1, 0) <= 0) break;
         pump_fd(&S.qemu_err, "qemu");
     }
+    /* and what the guest's tools said last (AGK_STOPPING: QEMU may have passed it on just before it ended) */
+    for (int k = 0; k < 20 && S.lag_fd >= 0; k++) {
+        struct pollfd pf = { .fd = S.lag_fd, .events = POLLIN };
+        if (poll(&pf, 1, 0) <= 0 || !(pf.revents & POLLIN)) break;
+        drain_lag();
+    }
     S.qemu_done = 1;
     S.qemu_status = status;
     int st = VS_STOPPED, why = VR_POWEROFF, code = 0;
@@ -5484,9 +5514,28 @@ static void qemu_exited(int status) {
         if (S.killed && (S.forced || S.poweroff)) why = S.forced ? VR_FORCED : VR_POWEROFF;
         else if (code == SIGABRT && qemu_3d_abort_seen) {
             /* QEMU issue 4918: the guest reset its virtio-gpu-gl (a Linux guest's shutdown or restart, Debian 6.12.117+)
-             * and QEMU's D-Bus display asserted. The guest had finished shutting down; Machines offers 2D graphics */
-            st = VS_CRASHED; why = VR_QEMU_3D_ABORT;
-            snprintf(d, sizeof d, "QEMU's 3D display aborted when the guest reset its graphics (QEMU issue 4918)");
+             * and QEMU's D-Bus display asserted. A shutdown or restart is recorded as one (vmlog_3d_abort_end); else
+             * Machines offers 2D graphics. code stays SIGABRT: the next start checks the disks either way */
+            long long ran = run_t0 ? now_ms() - run_t0 : 0;
+            int end = vmlog_3d_abort_end(S.host_shutdown, stop_notice, stop_announces, ran);
+            static const char *const said[] = { "nothing", "it powers off", "it restarts" };
+            vlog("qemu: the 3D abort (QEMU issue 4918) after %lld s running; asked to shut down: %s; the guest's tools said %s%s",
+                 ran / 1000, S.host_shutdown ? "yes" : "no", said[stop_notice >= 0 && stop_notice <= 2 ? stop_notice : 0],
+                 stop_announces ? "" : " (no hello of theirs said \"stopping\")");
+            if (end == VMLOG_3D_SHUTDOWN) {
+                why = S.host_shutdown ? VR_HOST_SHUTDOWN : VR_GUEST_SHUTDOWN;
+                snprintf(d, sizeof d, "the guest shut down; QEMU's 3D display aborted at its last graphics reset (QEMU issue 4918)");
+            } else if (end == VMLOG_3D_RESTART) {
+                why = VR_GUEST_RESET;
+                snprintf(d, sizeof d, "the guest restarted; QEMU's 3D display aborted at its graphics reset (QEMU issue 4918)");
+            } else if (end == VMLOG_3D_GUEST_STOP) {
+                why = VR_QEMU_3D_STOP;
+                snprintf(d, sizeof d, "the guest shut down or restarted, without LordOS tools to say which; QEMU's 3D display aborted (QEMU issue 4918)");
+            } else {
+                st = VS_CRASHED; why = VR_QEMU_3D_ABORT;
+                snprintf(d, sizeof d, "QEMU's 3D display aborted when the guest reset its graphics (QEMU issue 4918)");
+            }
+            vlog("qemu: recorded as %s (%s)", STATE_NAME[st], REASON_NAME[why]);
         }
         else if (oom > S.oom0) { st = VS_CRASHED; why = VR_OUT_OF_MEMORY; snprintf(d, sizeof d, "the machine went over its memory limit (%ld MB)", vm_mem_limit_mb(&S.m)); }
         else { st = VS_CRASHED; why = VR_QEMU_SIGNAL; snprintf(d, sizeof d, "QEMU died from signal %d (%s)", code, strsignal(code)); }
@@ -6106,9 +6155,15 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         if (!discard && file_exists(st) && !suspend_meta_read(S.dir, &sm)) S.xfer_on = sm.transfer;
     }
     RunInfo prev;
-    int crashed = !runinfo_read(S.dir, &prev) && prev.state == VS_CRASHED &&
-                  (prev.reason == VR_QEMU_SIGNAL || prev.reason == VR_QEMU_3D_ABORT || prev.reason == VR_OUT_OF_MEMORY ||
-                   prev.reason == VR_SUPERVISOR_LOST);
+    /* QEMU's 3D abort recorded as the guest's shutdown or restart (state stopped, code SIGABRT) is checked too: QEMU
+     * didn't close the disks itself */
+    int crashed = !runinfo_read(S.dir, &prev) &&
+                  ((prev.state == VS_CRASHED &&
+                    (prev.reason == VR_QEMU_SIGNAL || prev.reason == VR_QEMU_3D_ABORT || prev.reason == VR_OUT_OF_MEMORY ||
+                     prev.reason == VR_SUPERVISOR_LOST)) ||
+                   (prev.state == VS_STOPPED && prev.code == SIGABRT &&
+                    (prev.reason == VR_GUEST_SHUTDOWN || prev.reason == VR_HOST_SHUTDOWN || prev.reason == VR_GUEST_RESET ||
+                     prev.reason == VR_QEMU_3D_STOP)));
     int lost = recover();
     ops_recover(S.dir, 1);
     if (lost || crashed) {

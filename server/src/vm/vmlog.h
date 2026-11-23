@@ -60,6 +60,23 @@ int vmlog_repeat_tick(VmLogRep *r, long long now, char *sum, size_t cap);
  * docs/VIRTUALIZATION.md "Graphics 3D"). 1 it is. */
 int vmlog_qemu_3d_abort(const char *line, size_t n);
 
+/* How a run that ended in that abort (SIGABRT after vmlog_qemu_3d_abort's line) is recorded. The abort itself says
+ * nothing of why the guest reset its graphics; what lord-vm knew just before does:
+ *   asked      LordOS asked the guest to shut down (Shut Down, closing the window, the computer's own stop)
+ *   notice     the guest's tools said, from the guest's last shutdown step, it powers off (1, AG_STOP_POWEROFF) or
+ *              restarts (2, AG_STOP_REBOOT); 0 nothing said (no tools, older tools, not shutting down)
+ *   announces  tools that would have said so were connected in this run (their hello said "stopping")
+ *   ran_ms     how long the guest had run (from the first time the run's state was running; 0 never)
+ * VMLOG_3D_SHUTDOWN: a shutdown (asked, or the guest said poweroff): a stop like any other. VMLOG_3D_RESTART: the guest
+ * said it restarts and had run VMLOG_3D_MIN_RUN_MS: Machines starts it again. VMLOG_3D_GUEST_STOP: nothing said, no
+ * tools that would have, and it had run VMLOG_3D_MIN_RUN_MS: most likely the guest's own shutdown or restart, recorded
+ * as stopped by the guest (never started again: which of the two isn't known). VMLOG_3D_CRASH otherwise: not tied to a
+ * stop (the tools said nothing), or right after the start (a restart that aborts again before the guest is up): the
+ * error screen that offers 2D graphics. */
+enum { VMLOG_3D_CRASH = 0, VMLOG_3D_SHUTDOWN = 1, VMLOG_3D_RESTART = 2, VMLOG_3D_GUEST_STOP = 3 };
+#define VMLOG_3D_MIN_RUN_MS 30000
+int vmlog_3d_abort_end(int asked, int notice, int announces, long long ran_ms);
+
 /* dir/base.log → dir/base.1.log, …, base.(keep-1).log (the oldest dropped), and a new, empty dir/base.log opened for
  * appending (0600, O_CLOEXEC, O_NOFOLLOW). Its fd, or -1. keep 1..9. */
 int vmlog_rotate(const char *dir, const char *base, int keep);

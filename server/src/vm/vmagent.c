@@ -590,6 +590,19 @@ int ag_tablet_layout(const AgDisplay *d, int n, int shown, int mode, int L[6]) {
     return 2;
 }
 
+int ag_stopping_parse(const uint8_t *p, size_t n, int *mode) {
+    if (!p || n != 1 || (p[0] != AG_STOP_POWEROFF && p[0] != AG_STOP_REBOOT)) return -1;
+    if (mode) *mode = p[0];
+    return 0;
+}
+
+int ag_stop_verb(const char *verb) {
+    if (!verb) return 0;
+    if (!strcmp(verb, "poweroff") || !strcmp(verb, "halt")) return AG_STOP_POWEROFF;
+    if (!strcmp(verb, "reboot") || !strcmp(verb, "kexec")) return AG_STOP_REBOOT;
+    return 0;
+}
+
 int ag_extra_parse(const uint8_t *p, size_t n, int *off) {
     if (!p || n != 1 || p[0] > 1) return -1;
     if (off) *off = p[0];
@@ -901,6 +914,7 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 3 && !memcmp(p + s0, "gvt", 3)) caps |= AG_HELLO_GVT;
         else if (l == 5 && !memcmp(p + s0, "extra", 5)) caps |= AG_HELLO_EXTRA;
         else if (l == 8 && !memcmp(p + s0, "extraoff", 8)) caps |= AG_HELLO_EXTRAOFF;
+        else if (l == 8 && !memcmp(p + s0, "stopping", 8)) caps |= AG_HELLO_STOPPING;
     }
     return caps;
 }

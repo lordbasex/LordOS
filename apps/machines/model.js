@@ -28,6 +28,16 @@ export function stateView(state, reason) {
 // 4918, docs/VIRTUALIZATION.md "Graphics 3D"); the window offers "Use 2D Graphics" (lord.vm.set) before Start Again
 export function offers2d(why) { return why === 'qemu-3d-crash'; }
 
+// a run that ended with the guest's own restart, which QEMU couldn't do in place: Machines starts the machine again.
+// lord-vm says stopped/'reset' only then: a machine with a graphics card (every reset ends QEMU, docs/MACHINES-GPU.md
+// Mode A), or with 3D graphics when the guest's tools said it restarts and QEMU then aborted (QEMU issue 4918,
+// vmlog_3d_abort_end). A restart that aborts again right after the start comes back as 'qemu-3d-crash' instead
+export function restartsAgain(state, reason) { return state === 'stopped' && reason === 'reset'; }
+
+// the off card's hint: after the 3D abort with no tools in the guest to say why ('qemu-3d-stop': most likely its own
+// shutdown or restart), what happened and that a restart needs Start; otherwise the usual one
+export function offHint(reason) { return reason === 'qemu-3d-stop' ? 'machines.win.stopped3dHint' : 'machines.win.playHint'; }
+
 // which actions a state allows (the list's buttons and the window's menu)
 export function actionsFor(state) {
   const on = state === 'running' || state === 'paused';
@@ -539,7 +549,7 @@ export function clipState(agent, cfg) {
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w10', linux: '5' };
+export const TOOLS_SHIPPED = { windows: 'w10', linux: '6' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older

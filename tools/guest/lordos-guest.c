@@ -32,9 +32,19 @@
  * again: the windows, their icons and the launcher's app list toward the host; apps mode on or off, an action on a
  * listed window and the launch of a listed app toward lord-server (which checks them again). Nothing here runs an app.
  *
+ * The guest's shutdown (docs/VIRTUALIZATION.md "Graphics 3D"): systemd-shutdown runs every program in
+ * /usr/lib/systemd/system-shutdown/ with poweroff, halt, reboot or kexec once all services have stopped and the file
+ * systems are read-only. The hook there (packaging/systemd/lordos-guest-shutdown, or the one Install Agent writes)
+ * runs `lordos-guest --stopping <verb>`, as root: it opens the port (free again: this helper's own run has ended),
+ * sends AGK_STOPPING (vmagent.h) and waits up to AG_STOP_WAIT_MS for lord-vm's echo, then the guest goes on. No port
+ * (a computer that isn't a Machines guest, or its agent is off): it ends at once. The hello says "stopping" while such
+ * a hook is installed, so Machines knows a shutdown or restart would have been said.
+ *
  *   lordos-guest [--port PATH] [--windows PATH] [--once]
+ *   lordos-guest [--port PATH] --stopping poweroff|halt|reboot|kexec
  *     --port: the agent's port (a character device; a Unix socket path for tests); --windows: lord-server's socket
- *     (default $XDG_RUNTIME_DIR/lordos-guestwin.sock); --once: one look at the clipboard and the port, for tests */
+ *     (default $XDG_RUNTIME_DIR/lordos-guestwin.sock); --once: one look at the clipboard and the port, for tests;
+ *     --stopping: say the guest powers off or restarts now (above) and end */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -56,7 +66,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define VERSION "5"
+#define VERSION "6"
 #define PORT "/dev/virtio-ports/org.lordos.agent"
 #define CLIP_MAX AG_TEXT_MAX
 
@@ -258,11 +268,19 @@ static int unix_connect(const char *path) {
     return s;
 }
 
+/* the shutdown hooks that run `lordos-guest --stopping` (the package's, Install Agent's): one there and executable */
+static const char *const STOP_HOOKS[] = { "/usr/lib/systemd/system-shutdown/lordos-guest",
+                                          "/usr/lib/systemd/system-shutdown/lordos-guest-local", NULL };
+static int stop_hook(void) {
+    for (int i = 0; STOP_HOOKS[i]; i++) if (!access(STOP_HOOKS[i], X_OK)) return 1;
+    return 0;
+}
+
 static void say_hello(int fd) {
-    char h[96];
+    char h[112];
     /* "noclip": the helper is there but the guest has no clipboard tool (Machines says what to install) */
-    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s", tool_n ? " clipboard clipx" : " noclip", tool_n && xc_fd() >= 0 ? " clipreq" : "",
-             wfd >= 0 ? " windows" : "");
+    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s%s", tool_n ? " clipboard clipx" : " noclip", tool_n && xc_fd() >= 0 ? " clipreq" : "",
+             wfd >= 0 ? " windows" : "", stop_hook() ? " stopping" : "");
     send_frame(fd, AGK_HELLO, (const uint8_t *)h, (uint32_t)strlen(h));
 }
 
@@ -326,20 +344,59 @@ static int open_port(const char *port) {
     return open(port, O_RDWR | O_CLOEXEC | O_NOCTTY);
 }
 
+/* --stopping: AGK_STOPPING, then lord-vm's echo for at most AG_STOP_WAIT_MS. Always 0 once the verb is one (the
+ * guest's shutdown never waits on this beyond that), 2 when it isn't */
+static int say_stopping(const char *port, const char *verb) {
+    int mode = ag_stop_verb(verb);
+    if (!mode) { fprintf(stderr, "lordos-guest: --stopping takes poweroff, halt, reboot or kexec\n"); return 2; }
+    int fd = open_port(port);
+    if (fd < 0) return 0;                       /* no agent port: not a Machines guest, or its agent is off */
+    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);     /* never stuck in a write: the shutdown goes on */
+    uint8_t b = (uint8_t)mode, in[AG_HEAD + 64];
+    size_t have = 0;
+    if (send_frame(fd, AGK_STOPPING, &b, 1)) { close(fd); return 0; }
+    long long end = now_ms() + AG_STOP_WAIT_MS;
+    for (;;) {
+        long long left = end - now_ms();
+        struct pollfd p = { fd, POLLIN, 0 };
+        if (left <= 0 || poll(&p, 1, (int)left) <= 0) break;
+        ssize_t r = read(fd, in + have, sizeof in - have);
+        if (r <= 0) { if (r < 0 && errno == EINTR) continue; break; }
+        have += (size_t)r;
+        int done = 0;
+        for (;;) {
+            AgFrame f;
+            int used = ag_frame_next(in, have, &f);
+            if (used < 0 || (!used && have == sizeof in)) { have = 0; break; }   /* a big frame of something else: dropped */
+            if (!used) break;
+            int m;
+            if (f.kind == AGK_STOPPING && !ag_stopping_parse(f.data, f.len, &m) && m == mode) done = 1;
+            memmove(in, in + used, have - (size_t)used);
+            have -= (size_t)used;
+        }
+        if (done) break;
+    }
+    close(fd);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     const char *port = PORT;
     char wpath[256] = "";
     const char *rt = getenv("XDG_RUNTIME_DIR");
     if (rt && rt[0] == '/') snprintf(wpath, sizeof wpath, "%s/lordos-guestwin.sock", rt);
     int once = 0;
+    const char *stopping = NULL;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--port") && i + 1 < argc) port = argv[++i];
         else if (!strcmp(argv[i], "--windows") && i + 1 < argc) snprintf(wpath, sizeof wpath, "%s", argv[++i]);
         else if (!strcmp(argv[i], "--once")) once = 1;
+        else if (!strcmp(argv[i], "--stopping") && i + 1 < argc) stopping = argv[++i];
         else if (!strcmp(argv[i], "--version")) { printf("lordos-guest %s\n", VERSION); return 0; }
-        else { fprintf(stderr, "usage: lordos-guest [--port PATH] [--windows PATH] [--once]\n"); return 2; }
+        else { fprintf(stderr, "usage: lordos-guest [--port PATH] [--windows PATH] [--once] | [--port PATH] --stopping VERB\n"); return 2; }
     }
     signal(SIGPIPE, SIG_IGN);
+    if (stopping) return say_stopping(port, stopping);
     win_in = malloc(WIN_BUF); win_tmp = malloc(WIN_BUF); app_list = calloc(1, sizeof *app_list); win_list = calloc(1, sizeof *win_list);
     if (!win_in || !win_tmp || !app_list || !win_list) return 1;
     long long win_try = 0;
