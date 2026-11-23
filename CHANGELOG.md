@@ -184,6 +184,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `web`.
 - Three new texts (`store.installed.noneDebian`, `noneFlathub`, `noneWeb`), in all 35 languages.
 
+### Documentation
+
+- **Machines: `docs/VIRTUALIZATION.md` audited against the code** (asked by the maintainer on 2026-11-23: "the source
+  code is the absolute truth"). A new "Status checklist" near the top lists every feature the design describes, each
+  with its mark (done, done but not checked on real hardware, partial, not built), a percentage and the file that
+  implements it, in 14 weighted areas; the Machines app scores **66 %** overall (engine 82 %, getting a system in
+  76 %, the app 74 %, snapshots and storage 54 %, network 83 %, devices 56 %, host integration 68 %, graphics 46 %,
+  guest tools 75 %, command line 50 %, system ties 50 %, security 70 %, performance 7 %, tests 56 %). The six
+  performance items being worked on (unchanged frames and hidden displays, huge pages, a vCPU recommendation, the disk
+  path with an iothread, io_uring and O_DIRECT, a guest-side profile, vCPU pinning) are listed as planned. Statements
+  the code contradicts were fixed: the admin actions (no `vm-usb-allow` or usbredir exists; the real list is named),
+  the cgroup scope name, Landlock's writable folder (`disks/` only), our seccomp filter (a built denylist, not "to
+  test"), the files on disk, the schema (12), the credentials' descriptors, the New Machine steps (five, automatic
+  virtio-win guest setup on by default), the machine window's menus, Configure's sections, Host only (passt on 127.0.0.1) and
+  Bridged (a macvtap with `vhost=off`), what a snapshot holds, live linked clones (the source must be off), the agent's
+  state light, Install Agent (through qemu-guest-agent, no disc), tool updates (automatic), the Shell (the serial
+  console), the Logs window, file copy (drops only), edition selection in virtio-win guests (by image name with the KMS client key),
+  virtio-win guests on arm64 (not built), the packaging (inside `lordos`, QEMU installed on demand), the tests that run, and the
+  open questions the code has settled. Features the doc didn't describe were added. `docs/MACHINES-GPU.md`: no longer
+  called a plan; Settings → Graphics cards offers only Machines (shared), and its admin actions are built.
+
 ### Tests
 
 - **Sentinela** (`docs/SENTINELA.md`): `build/llm-engine-test` runs a stand-in engine in lord-llm's real sandbox and
