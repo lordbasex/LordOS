@@ -60,12 +60,12 @@ export function Card({ icon, name, kind, tag, summary, note, action, onClick, di
     h(View, { style: { flex: 1, minWidth: 0, gap: 1 } },
       h(Text, { style: { fontSize: 14, fontWeight: 650, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' } }, name),
       tag ? h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 } }, h(Tag, { label: tag }),
-        kind ? h(Text, { style: { flex: 1, minWidth: 0, fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, kind) : null)
-        : kind ? h(Text, { style: { fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, kind) : null,
+        kind ? h(Text, { style: { flex: 1, minWidth: 0, fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' } }, kind) : null)
+        : kind ? h(Text, { style: { fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' } }, kind) : null,
       summary ? h(Text, { style: { height: 34, fontSize: 12, lineHeight: 1.42, color: th.textDim, marginTop: 5, numberOfLines: 2, overflow: 'hidden', textAlign: 'start' } }, summary) : null)),
   h(View, { style: { flex: 1 } }),
   h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, minHeight: 24, flexShrink: 0 } },
-    h(Text, { style: { flex: 1, minWidth: 0, fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, note || ''),
+    h(Text, { style: { flex: 1, minWidth: 0, fontSize: 11.5, color: th.textDim, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' } }, note || ''),
     action || null));
 }
 

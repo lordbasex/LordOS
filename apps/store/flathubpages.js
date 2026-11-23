@@ -277,6 +277,12 @@ export function useFlathubCounts() {
   const showAll = useStore(settings, (st) => M.prefsOf(st.flathub).showAll);
   return useMemo(() => M.categoryCounts(catalog, showAll), [catalog, showAll]);
 }
+// How many Flathub apps are shown in all (the second column's "All"; an app in two categories is one app)
+export function useFlathubTotal() {
+  const catalog = useStore(F.state, (x) => x.catalog);
+  const showAll = useStore(settings, (st) => M.prefsOf(st.flathub).showAll);
+  return useMemo(() => M.shownCount(catalog, showAll), [catalog, showAll]);
+}
 
 // Discover's search: the Flathub apps that match, as their own shelf (when Flathub is on).
 export function FlathubResults({ query, onOpen, onMore }) {

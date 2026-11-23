@@ -1699,6 +1699,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **Store, Flathub: the counts agree with the lists, and a card's one-line texts end in an ellipsis, in development
+  (the latest release is 0.8.9.4).** Found on the screenshots of Flathub's home with the rankings (E10), taken in a
+  headless lord-server with this machine's Flathub catalog (3381 apps, 2243 verified) and Flathub's recorded answers of
+  2026-11-22 (`server/tests/store_rankings_headless.sh`, new; en and es, 1600x900; a live fetch from flathub.org in the
+  same setup filled all six lists).
+  - **All in the second column** said 2734 over a list of 2243 apps: it was the sum of the categories' counts, and a
+    Flathub app is often in several. It is now how many apps the section shows (`flathubModel.shownCount`,
+    `useFlathubTotal`); Debian's and the web apps' counts are unchanged (one category per app).
+  - **A category listed twice by an app** (some of Flathub's catalog has `Graphics;…;Graphics;`) counted twice:
+    Graphics said 217 while its page and its All chip said 216. `categoryCounts` counts each app once per category,
+    as `subcategoryCounts` already did.
+  - **The kind line and the foot's note of a Store card** (category · developer, "✓ Verified") were cut through a
+    letter ("Utilities · Ronnie Nis"); they now end in "…" like the name above them (`apps/store/ui.js`).
+  - Tests: `flathub_model_test.mjs` (a category listed twice, `shownCount` against the list on the recorded catalog),
+    `store_card_scene.mjs` (new, in `make test`).
 - **The capture indicator names what it called "an unknown program", in development (the latest release is
   0.8.9.4).** Found on the maintainer's ws126 (Lord Flow): the panel by the clock said "An unknown program — Screen"
   (with Stop sharing) and "An unknown program — Microphone" while Google Chrome shared the screen in a call.

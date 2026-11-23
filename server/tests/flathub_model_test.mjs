@@ -284,6 +284,8 @@ for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, 
   eq('subcategories of Game (all)', M.subcategoryCounts(real, 'Game', true), { ArcadeGame: 1, Emulator: 3 });
   eq('subcategories in SUBCATS order', Object.keys(M.subcategoryCounts(real, 'Graphics', true)), ['2DGraphics', 'Viewer', 'RasterGraphics', '3DGraphics', 'VectorGraphics']);
   eq('a subcategory needs its main category', M.subcategoryCounts(real, 'Utility', true).Viewer, undefined);
+  eq('shown apps = the catalog list, not the categories\' sum', [M.shownCount(real, false), M.filterCatalog(real).length,
+    Object.values(M.categoryCounts(real, false)).reduce((a, n) => a + n, 0) > M.shownCount(real, false)], [M.filterCatalog(real).length, M.filterCatalog(real).length, true]);
   eq('filter by subcategory', ids(M.filterCatalog(real, { category: 'Game', sub: 'Emulator', showAll: true })), ['dolphin-emu', 'PCSX2', 'RetroArch']);
   eq('subcategory checks', [M.subOk('Game', 'Emulator'), M.subOk('Game', 'Viewer'), M.subOk('toString', 'x'), M.subOk('__proto__', 'Audio'), M.subcatsOf('constructor')],
     [true, false, false, false, []]);
@@ -311,6 +313,11 @@ for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, 
   eq('spotlight skips an app without icon or summary', M.spotlight(hostile, { now }).name, 'Okay');
   eq('spotlight: none', M.spotlight([], { now }), null);
   eq('a category listed twice counts once', M.subcategoryCounts(hostile, 'Game', false), { Emulator: 1 });
+  eq('a main category listed twice counts once, as its page shows the app once',
+    [M.categoryCounts([...hostile, { id: 'org.x.Twice', name: 'Twice', verified: true, categories: 'Graphics;Viewer;Graphics;' }], false).Graphics,
+      M.filterCatalog([{ id: 'org.x.Twice', name: 'Twice', verified: true, categories: 'Graphics;Viewer;Graphics;' }], { category: 'Graphics' }).length], [1, 1]);
+  eq('shown apps: each app once, whatever its categories', [M.shownCount(hostile, false), M.shownCount(hostile, true), M.shownCount(null, true), M.shownCount([null, 5], true)],
+    [hostile.length - 1, hostile.length, 0, 0]);
   eq('verified apps: dated first, then by name', M.verifiedApps(hostile, { now }).map((a) => a.name).slice(0, 4), ['Ok', 'Okay', 'Float', 'Future']);
   eq('nothing at all', [M.recentlyUpdated(null), M.homeRows(undefined), M.subcategoryCounts(null, 'Game', true), M.collection(null, 'updated')], [[], [], {}, []]);
 }

@@ -160,15 +160,20 @@ export function filterCatalog(cat, { query = '', showAll = false, category = nul
   return keyed.map((x) => x.a);
 }
 
-// How many shown apps each category has (the sidebar's counts).
+// How many shown apps each category has (the sidebar's counts). An app that lists a category twice (Flathub's catalog
+// has some: "Graphics;Graphics;") counts once, as filterCatalog shows it once (2026-11-22: Graphics said 217, its page 216).
 export function categoryCounts(cat, showAll) {
   const out = {};
   for (const a of cat || []) {
-    if (!showAll && !a.verified) continue;
-    for (const c of String(a.categories || '').split(';')) if (c) out[c] = (out[c] || 0) + 1;
+    if (!a || (!showAll && !a.verified)) continue;
+    for (const c of new Set(String(a.categories || '').split(';'))) if (c) out[c] = (out[c] || 0) + 1;
   }
   return out;
 }
+
+// How many apps the catalog shows (the second column's "All": the sum of the categories counts an app in several of
+// them more than once; 2026-11-22: All said 2734 over a list of 2243).
+export const shownCount = (cat, showAll) => (Array.isArray(cat) ? cat : []).filter((a) => a && typeof a === 'object' && (showAll || a.verified)).length;
 
 // `flatpak list --app --columns=application,branch,version,origin` → [{ id, branch, version, origin }]; a line that
 // isn't one (a header, a warning) is skipped. Columns are tab-separated when the output is not a terminal.
