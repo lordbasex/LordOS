@@ -32,6 +32,7 @@
 #include "vmgvtwin.h"
 #include "vmpin.h"
 #include "vmlog.h"
+#include "vmcpu.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -1076,6 +1077,9 @@ static struct {
     char fx_otok[AG_OPEN_TOKEN + 1];
     Sha256 fx_hs;
     OpWait opw[OP_MAX];
+    /* what the vCPUs use (vmcpu.h): their threads' stat files, opened before lord-vm's own Landlock; the next sample */
+    int cpu_fd[VMCPU_FDS], cpu_nfd;
+    long long cpu_at;
     /* vCPU pinning (3.7.1): the plan, /proc/<qemu>/task opened before the Landlock, the vCPU threads last set */
     VmPinPlan pin;
     int pin_on, pin_q, pin_dfd, pin_n;
@@ -5569,6 +5573,44 @@ static void drain_qmp(void) {
     }
 }
 
+/* ---- what the vCPUs use (vmcpu.h, the Machines app's vCPU recommendation) ---- */
+
+static VmCpu cpu_use;
+
+/* the vCPU threads' stat files, while lord-vm may still open them, and the summary of earlier runs */
+static void cpu_begin(void) {
+    S.cpu_nfd = vmcpu_open((long)S.qemu, S.cpu_fd, VMCPU_FDS);
+    vmcpu_init(&cpu_use, S.m.vcpus);
+    if (S.cpu_nfd <= 0) { S.cpu_nfd = 0; vlog("vCPU use: QEMU's vCPU threads weren't found: not measured"); return; }
+    char path[PATH_MAX + 32];
+    snprintf(path, sizeof path, "%s/%s", S.dir, VMCPU_FILE);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd >= 0) {
+        static char buf[64 + VMCPU_KEEP * 64];
+        ssize_t n = read(fd, buf, sizeof buf);
+        close(fd);
+        if (n > 0 && vmcpu_load(&cpu_use, buf, (size_t)n, (long long)time(NULL))) vlog("vCPU use: %s isn't readable: starting over", VMCPU_FILE);
+    }
+    S.cpu_at = now_ms() + VMCPU_SAMPLE_MS;
+}
+
+/* once a minute: the vCPUs' time while they run; a window of five minutes closed is saved */
+static void cpu_tick(long long now) {
+    S.cpu_at = now + VMCPU_SAMPLE_MS;
+    if (S.state != VS_RUNNING) { vmcpu_hold(&cpu_use); return; }
+    if (vmcpu_sample(&cpu_use, now, vmcpu_ticks(S.cpu_fd, S.cpu_nfd), sysconf(_SC_CLK_TCK), (long long)time(NULL)) && vmcpu_save(&cpu_use, S.dir))
+        vlog("vCPU use: can't write %s", VMCPU_FILE);
+}
+
+/* QEMU ended: what's left of the last window, and the files closed */
+static void cpu_end(void) {
+    if (!S.cpu_nfd) return;
+    if (vmcpu_flush(&cpu_use, (long long)time(NULL)) && vmcpu_save(&cpu_use, S.dir)) vlog("vCPU use: can't write %s", VMCPU_FILE);
+    for (int i = 0; i < S.cpu_nfd; i++) close(S.cpu_fd[i]);
+    S.cpu_nfd = 0;
+    S.cpu_at = 0;
+}
+
 /* ---- QEMU's end ---- */
 
 static void unattended_done(void);
@@ -5588,6 +5630,7 @@ static void qemu_exited(int status) {
     }
     S.qemu_done = 1;
     S.qemu_status = status;
+    cpu_end();
     int st = VS_STOPPED, why = VR_POWEROFF, code = 0;
     char d[160] = "";
     long oom = read_oom_kills();
@@ -5830,6 +5873,7 @@ static void loop(void) {
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
         if (S.win_key_at && (next < 0 || S.win_key_at < next)) next = S.win_key_at;
+        if (S.cpu_at && (next < 0 || S.cpu_at < next)) next = S.cpu_at;
         if (mice_watched() && S.mice_at && (next < 0 || S.mice_at < next)) next = S.mice_at;
         long long cl = child_logs_next();
         if (cl >= 0 && (next < 0 || cl < next)) next = cl;
@@ -5838,6 +5882,7 @@ static void loop(void) {
         if (poll(p, (nfds_t)n, to) < 0 && errno != EINTR) { vlog("poll: %s", strerror(errno)); break; }
         now = now_ms();
         child_logs_tick(now, 0);
+        if (S.cpu_at && now >= S.cpu_at) cpu_tick(now);
         if (S.migq_next && now >= S.migq_next) { S.migq_next = now + 500; qmp_do("query-migrate", NULL, P_MIGQ, -1, 0, -1, -1); }
         if (S.qga_fd >= 0 && S.ag_next && now >= S.ag_next) ag_tick(now);
         if (S.win_key_at && now >= S.win_key_at) {
@@ -6363,6 +6408,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
             if (S.keeper < 0) { S.keeper = 0; vlog("network: no keeper: a passt that ends isn't replaced"); }
         }
         logind_open();
+        cpu_begin();
         S.sandbox |= vm_jail_self(S.dir, S.rundir, S.xfer_on && S.xfer_dfd >= 0 ? S.xfer_path : NULL);
         vlog("lord-vm: own Landlock %s", S.sandbox & VMS_SUPERVISOR_LANDLOCK ? "applied (machine folder only)" : "not available");
         VmMsg i = info_msg();

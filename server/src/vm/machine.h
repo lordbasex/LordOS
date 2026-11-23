@@ -322,6 +322,8 @@ const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing);
 
 /* reads this computer: arch, CPUs online, RAM, /dev/kvm access */
 void vm_host_probe(VmHost *h);
+/* its physical cores (each core's first thread in /sys/devices/system/cpu), at most cpus; cpus when it can't tell */
+int vm_host_cores(int cpus);
 
 /* An image to import: its format from its first bytes and its name, never QEMU's probing (a crafted qcow2 can name
  * a backing file or an external data file, and the import would copy that file into the new disk; a raw file can

@@ -995,5 +995,46 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('rename: no JSON', [M.renameOutcome(''), M.renameOutcome('lord-vm: boom'), M.renameOutcome('{"set":true,"vcpus":2}')], [{}, {}, {}]);
 }
 
+// ---- vCPU recommendation (cpu-usage.json from lord-vm, vcpuAdvice) ----
+{
+  const now = 1800000000;
+  // windows of 5 minutes: hours of them at `avg`/`peak` cores (cpu-usage.json keeps hundredths)
+  const run = (hours, vcpus, avg, peak, end = now) => Array.from({ length: Math.round(hours * 12) }, (_, i) => [end - i * 300, 300, vcpus, Math.round(avg * 100), Math.round(peak * 100)]);
+  const file = (ws) => JSON.stringify({ format: 1, windows: ws });
+  const pc = { cpus: 20, cores: 10, vcpusRecommended: 19 };
+  const W = (text) => M.cpuWindows(text);
+  eq('cpu file: read, in cores', W(file([[now, 300, 4, 37, 120]])), [{ t: now, secs: 300, vcpus: 4, avg: 0.37, peak: 1.2 }]);
+  eq('cpu file: not one', [W(''), W('{'), W('{"format":2,"windows":[]}'), W('{"format":1}')], [[], [], [], []]);
+  eq('cpu file: bad windows dropped', W(file([[now, 300, 4, 37], [now, 0, 4, 1, 1], [now, 300, 0, 1, 1], [now, 300, 2, 300, 1], [now, 300, 4, -1, 1], [now, 300, 4, 'x', 1], [now, 300, 4, 10, 5]])),
+    [{ t: now, secs: 300, vcpus: 4, avg: 0.1, peak: 0.1 }]);
+  // the maintainer's case: 10 vCPUs, Notepad in apps mode, 10–28 % of one core
+  const idle = W(file([...run(3, 10, 0.15, 0.28), ...run(3, 10, 0.2, 1.1, now - 3 * 3600)]));
+  const a = M.vcpuAdvice(idle, 10, pc, now);
+  eq('idle Windows guest: fewer', [a?.kind, a?.n, a?.vcpus, Math.round(a?.hours)], ['fewer', 2, 10, 6]);
+  eq('idle: its average', Math.round(a.avg * 100) / 100, 0.18);
+  eq('busy minutes set the count (95th percentile of the peaks / 60 %)', M.vcpuAdvice(W(file(run(4, 10, 0.5, 2.3))), 10, pc, now).n, 4);
+  eq('less than 2 h: nothing yet', M.vcpuAdvice(W(file(run(1.9, 10, 0.1, 0.2))), 10, pc, now), null);
+  eq('windows of another count are not this one\'s', M.vcpuAdvice(W(file(run(5, 8, 0.1, 0.2))), 10, pc, now), null);
+  eq('older than 30 days: not counted', M.vcpuAdvice(W(file(run(5, 10, 0.1, 0.2, now - 31 * 86400))), 10, pc, now), null);
+  eq('never under two', M.vcpuAdvice(W(file(run(3, 3, 0.05, 0.1))), 3, pc, now).n, 2);
+  eq('two already: nothing', M.vcpuAdvice(W(file(run(3, 2, 0.05, 0.1))), 2, pc, now), null);
+  eq('a middle use: nothing', M.vcpuAdvice(W(file(run(3, 4, 2, 3.5))), 4, pc, now), null);
+  // a busy spell now and then (a build) keeps its vCPUs: "low" is 95 % of the time, and "saturated" half of it
+  eq('busy 10 % of the time: nothing', M.vcpuAdvice(W(file([...run(2.7, 4, 0.2, 0.5), ...run(0.3, 4, 3.8, 4, now - 2.7 * 3600)])), 4, pc, now), null);
+  eq('busy 30 % of the time: nothing', M.vcpuAdvice(W(file([...run(2, 4, 0.2, 0.5), ...run(1, 4, 3.8, 4, now - 2 * 3600)])), 4, pc, now), null);
+  eq('busy 3 % of the time: fewer, enough for the rest', M.vcpuAdvice(W(file([...run(2.9, 8, 0.2, 0.5), ...run(0.1, 8, 7.8, 8, now - 2.9 * 3600)])), 8, pc, now)?.n, 2);
+  eq('saturated 60 % of the time: more', M.vcpuAdvice(W(file([...run(1.2, 4, 0.5, 1), ...run(1.8, 4, 3.6, 4, now - 1.2 * 3600)])), 4, pc, now)?.kind, 'more');
+  // saturated: half again, at most the computer less its reserve
+  const sat = M.vcpuAdvice(W(file(run(3, 4, 3.8, 4))), 4, pc, now);
+  eq('saturated: more', [sat?.kind, sat?.n], ['more', 6]);
+  eq('saturated 2: one more', M.vcpuAdvice(W(file(run(3, 2, 1.9, 2))), 2, pc, now).n, 3);
+  eq('saturated on a 4-CPU computer: up to 3', M.vcpuAdvice(W(file(run(3, 2, 1.9, 2))), 2, { cpus: 4, vcpusRecommended: 3 }, now).n, 3);
+  eq('saturated at the ceiling: nothing', M.vcpuAdvice(W(file(run(3, 3, 2.9, 3))), 3, { cpus: 4, vcpusRecommended: 3 }, now), null);
+  eq('ceiling: one in eight kept for the desktop', [M.vcpuCeiling({ cpus: 20, vcpusRecommended: 19 }), M.vcpuCeiling({ cpus: 8, vcpusRecommended: 7 }), M.vcpuCeiling({ cpus: 4, vcpusRecommended: 3 }), M.vcpuCeiling({ cpus: 1, vcpusRecommended: 1 })], [17, 7, 3, 1]);
+  eq('no windows, no count', [M.vcpuAdvice([], 4, pc, now), M.vcpuAdvice(null, 4, pc, now), M.vcpuAdvice(idle, 0, pc, now)], [null, null, null]);
+  // new machines' default for 'half': half the physical cores, six at most
+  eq('default vCPUs', [M.vcpuDefault({ cpus: 20, cores: 10 }), M.vcpuDefault({ cpus: 64, cores: 32 }), M.vcpuDefault({ cpus: 4, cores: 4 }), M.vcpuDefault({ cpus: 2, cores: 1 }), M.vcpuDefault({ cpus: 20, cores: 10 }, 3)], [5, 6, 2, 1, 3]);
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

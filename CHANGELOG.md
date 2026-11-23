@@ -363,6 +363,25 @@ In development; the latest release is 0.8.9.5-beta.
     and every one of the 16 777 216 three-byte `AGK_PERFSTATE` payloads against the rule; the `perf` hello word),
     `tests/vm_model_test.mjs` (the shipped guest tools are w11). The guest tools build with mingw-w64 with no
     warning and import only system DLLs (powrprof added). Not yet checked in a running guest.
+- **Machines suggests a vCPU count from what a machine really uses** (in development; the latest release is
+  0.8.9.5-beta). Approved by the maintainer on 2026-11-23, after his guest with 10 vCPUs idled at 10 to 28 % of one
+  core in apps mode with a text editor. Details in `docs/VIRTUALIZATION.md` 6.27.
+  - **Measured by lord-vm**: the CPU time of QEMU's vCPU threads (`CPU <n>/KVM`), read once a minute while the machine
+    runs from their `/proc/<qemu>/task/<tid>/stat` files, opened before lord-vm's own Landlock and re-read with `pread`
+    (no Landlock rule added). A rolling summary goes to `<machine>/cpu-usage.json`: one entry per 5 minutes of running
+    time with the vCPU count, the average and the busiest minute, at most 24 h of running time and 30 days
+    (`server/src/vm/vmcpu.c`).
+  - **The suggestion** (`apps/machines/model.js` `vcpuAdvice`), after 2 h of running time at the current count: fewer
+    when 95 % of the time it used under 30 % of its vCPUs (enough for its busy minutes at about 60 %, never under 2);
+    more when half the time it used 85 % or over (half again, up to the computer's processors less one in eight for the
+    desktop). Configure → CPU & memory shows it with the reason ("over its last 6 h of running time it used 0.2 of its
+    10 vCPU on average, and 1.1 in its busiest minutes") and **Use N**: at once when the machine is off, at its next
+    start while it runs or is suspended. The library's card and row say "Suggested: N vCPU". Nothing changes by itself.
+  - **New machines get fewer vCPUs by default**: the profiles that asked for "half" (Development, Games, Design) now give
+    half of the computer's physical cores, 6 at most, instead of half its threads (5 instead of 10 on a 10-core,
+    20-thread PC). `lord.vm.host()` gains `cores`.
+  - Texts in all 35 languages (Machines settings' "half" note updated to say cores, 6 at most).
+  - Tests: `build/vmcpu-test` (new, in `make -C server test`), `tests/vm_model_test.mjs`, `tests/vm_profiles_test.mjs`.
 
 - **Renaming a machine renames its folder and its transfer folder too** (in development; the latest release is
   0.8.9.5-beta). Asked by the maintainer on 2026-11-23: a guest machine renamed in Configure → General kept its folder

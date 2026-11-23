@@ -9,7 +9,7 @@ import { View, Text, TextInput, TextArea, Toggle, Segmented, Slider, ScrollView,
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, unattendedOf } from './catalog.js';
-import { LIB_VIEWS, LIB_SORTS, libView, NET_MODES, GPU_CHOICES, PORT_HOST_MIN, newPortRule, portProblems, portInput, usesPorts, CLOSE_CHOICES, gvtGpu, no3dReason, missingFor } from './model.js';
+import { LIB_VIEWS, LIB_SORTS, libView, NET_MODES, GPU_CHOICES, PORT_HOST_MIN, newPortRule, portProblems, portInput, usesPorts, CLOSE_CHOICES, gvtGpu, no3dReason, missingFor, vcpuDefault } from './model.js';
 import { BUILTIN, DEFAULT_PROFILE, CLIPBOARDS, MOUSE, SHORTCUTS, allProfiles, builtinProfile, blankProfile, readProfile, writeProfile, onHost, cpuCap, memCap,
   defaultProfileId, exportName, shareRel, exposureOf, PROFILE_FILE_MAX } from './profiles.js';
 import { CARD_COLORS, COLOR_HEX, SYSTEM_KINDS, INSTALLS, validateSystem, newId, systemState, signatureState, fileOfUrl, hostOf, keyOf, KEY_MAX } from './systems.js';
@@ -298,7 +298,7 @@ function ProfileEdit({ host, gpus, start, fresh, taken, onClose, onSaved }) {
   const systems = loadSystems();
   const set = (part, patch) => setPr((x) => ({ ...x, [part]: { ...x[part], ...patch } }));
   const cap = cpuCap(host), mcap = memCap(host);
-  const cpusNum = pr.resources.cpus === 'half' ? cap : Math.min(cap, pr.resources.cpus);
+  const cpusNum = pr.resources.cpus === 'half' ? vcpuDefault(host, cap) : Math.min(cap, pr.resources.cpus);
   const issues = usesPorts(pr.network.mode) ? portProblems(pr.network.ports, pr.network.mode) : [];
   const nameBad = !pr.name.trim() ? 'empty' : taken.includes(pr.name.trim().toLowerCase()) ? 'taken' : '';
   const save = () => {
@@ -368,7 +368,7 @@ function ProfileEdit({ host, gpus, start, fresh, taken, onClose, onSaved }) {
             {section('resources', <>
               <Field label={tr('machines.set.prof.cpus')}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, direction: 'ltr' }}>
-                  <Slider value={cpusNum} min={1} max={Math.max(1, cap)} step={1} width={260} onChange={(v) => set('resources', { cpus: Math.round(v) >= cap ? 'half' : Math.max(1, Math.round(v)) })} />
+                  <Slider value={cpusNum} min={1} max={Math.max(1, cap)} step={1} width={260} onChange={(v) => set('resources', { cpus: Math.max(1, Math.round(v)) })} />
                   <Text style={{ fontSize: 13, fontWeight: 600, color: p.text }}>{pr.resources.cpus === 'half' ? tr('machines.set.edit.halfPc') : tr('machines.lib.spec.cpu', { n: cpusNum })}</Text>
                 </View>
               </Field>

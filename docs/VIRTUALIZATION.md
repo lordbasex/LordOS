@@ -769,6 +769,7 @@ What the code writes (`machine.h`, audited 2026-11-23): the NVRAM is `disks/nvra
 (with one `snap-<tag>.permall` per snapshot), the last picture is `thumb.png`, the logs are `log/lord-vm.log` (with `.1` and `.2`),
 `serial.log` and `journal.log`, and there are `lock`, `run.json`, `operation.json` (while an operation runs) and `snapshots.json`.
 Everything QEMU may write is in `disks/`.
+`cpu-usage.json` is what the vCPUs used over the machine's runs, written by lord-vm for the vCPU recommendation (6.27).
 Files shows the folder as one item. It moves to another LordOS computer only under the conditions of 3.6. `machine.json` never holds passwords.
 Keys go to the keyring.
 
@@ -3132,6 +3133,49 @@ old name in Files. Now they follow the name while the machine is off.
 - **Tests**: `build/vm-test` (names and folders, `vm_rename_plan` on a scratch library, `vm_transfer_adopt` with a
   Duplicate, a folder put aside and two candidates), `tests/vm_model_test.mjs` (`windowMachineId`, `followDir`,
   `renameNote`, `folderOffer`, `renameOutcome`) and `tests/vm_rename.sh` (`make test`; scratch machines only).
+
+### 6.27 vCPU recommendation (built 2026-11-23, in development; approved by the maintainer 2026-11-23)
+
+The maintainer's Windows 11 guest had 10 vCPUs and idled at 10 to 28 % of one core in apps mode with a text
+editor open. Every vCPU is a host thread QEMU schedules, so a guest with many it doesn't use still costs the desktop. Machines
+now measures what a machine's vCPUs really use and suggests a count; it never changes one by itself.
+
+- **What lord-vm measures** (`server/src/vm/vmcpu.c`, `lordvm.c` `cpu_begin`/`cpu_tick`/`cpu_end`). QEMU runs with
+  `-name ...,debug-threads=on`, so each vCPU thread is named `CPU <n>/KVM` (or `/TCG`). Right after the QMP handshake,
+  before lord-vm's own Landlock (which allows only the machine's folder), lord-vm opens `/proc/<qemu>/task/<tid>/stat`
+  of each of those threads and keeps the descriptors; once a minute it re-reads them with `pread` from offset 0 (nothing
+  new is opened, so the Landlock rules don't change) and adds their user and system time. Only while the machine is
+  running: a pause, a save to disk, a sample more than three minutes after the last (the computer slept) or one with
+  fewer ticks than the last only starts the count over. The cost is one small read per vCPU a minute. QMP's
+  `query-cpus-fast` gives thread ids, but in QEMU's own PID namespace, and no CPU time.
+- **What it keeps**: `<machine>/cpu-usage.json`, `{"format":1,"windows":[[end, seconds, vcpus, avg, peak], ...]}`, one
+  entry per 5 minutes of running time (the last of a run kept when it has a minute or more): its end in Unix seconds,
+  its length, the vCPU count it ran with, the cores used on average and in its busiest minute, both in hundredths of a
+  core. At most 288 entries (24 h of running time, about 9 KB), none older than 30 days, written as `.tmp` and renamed
+  when a window closes and when QEMU ends. A clone doesn't copy it. Malformed entries are dropped on reading, in C and
+  in the app.
+- **The suggestion** (`apps/machines/model.js` `vcpuAdvice`, only windows at the machine's current count, of the last
+  30 days, weighted by their length): nothing before 2 h of running time. **Fewer** when 95 % of the time it used under
+  30 % of its vCPUs: enough for its busy minutes (95th percentile of the busiest minutes) at about 60 %, never under 2.
+  **More** when half the time or more it used 85 % of them or over (a build now and then doesn't count): half again,
+  at least one more, up to this computer's processors less one in eight for the desktop (at least one, never more than
+  lord-vm recommends; `vcpuCeiling`). After a change the count starts over, since the old windows were at another count.
+- **Where it shows.** Configure → CPU & memory: what it suggests, the reason ("over its last 6 h of running time it used
+  0.2 of its 10 vCPU on average, and 1.1 in its busiest minutes") and **Use N**. With the machine off that is
+  `lord-vm --set --vcpus N` at once; running or suspended it's kept in `app.json` as `nextVcpus` and written by
+  `startPrep` (ui.jsx) just before the next start, whichever way it starts (window, without a window, the `machines`
+  command); a suspended machine keeps it until a start after a full shutdown, since lord-vm refuses to change a saved
+  machine's vCPUs. **Keep N** drops it. The library's card and list row show "Suggested: N vCPU" (or the count waiting
+  for the next start), which opens that section.
+- **New machines' defaults.** The profiles whose processors are "half" (Development, Games, Design) now give half of
+  this computer's physical cores, at most 6 (`vcpuDefault`; `lord.vm.host().cores`, counted from
+  `/sys/devices/system/cpu/cpu*/topology/thread_siblings_list` by `vm_host_cores`), instead of half its threads: 5
+  on a 10-core, 20-thread PC instead of 10. Productivity stays at 4 and Light at 2; a Windows guest still gets
+  at least 2, and a profile's own number is kept (up to half the processors, as before).
+- Tests: `build/vmcpu-test` (the stat line, the vCPU thread names, the windows, the sleep and pause rules, the rolling
+  limit, the file read back and refused; its own thread named `CPU 0/KVM` read through `vmcpu_open`/`vmcpu_ticks`),
+  `tests/vm_model_test.mjs` (`cpuWindows`, `vcpuAdvice`: the maintainer's idle case, too little time, another count,
+  old windows, the floor, a busy spell, saturation, the ceiling; `vcpuDefault`) and `tests/vm_profiles_test.mjs`.
 
 ## 7. Guest tools
 

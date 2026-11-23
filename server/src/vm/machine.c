@@ -1186,6 +1186,24 @@ void vm_machine_defaults(VmMachine *m, const VmHost *h, int arch) {
     memcpy(m->updated, m->created, sizeof m->updated);
 }
 
+int vm_host_cores(int cpus) {
+    int n = 0, seen = 0;
+    for (int i = 0; i < 4096 && seen < cpus; i++) {
+        char p[96], buf[64];
+        snprintf(p, sizeof p, "/sys/devices/system/cpu/cpu%d/topology/thread_siblings_list", i);
+        int fd = open(p, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) continue;
+        ssize_t k = read(fd, buf, sizeof buf - 1);
+        close(fd);
+        if (k <= 0) continue;
+        buf[k] = 0;
+        seen++;
+        /* a core is counted once, at its first thread ("0,10", "0-1") */
+        if (atoi(buf) == i) n++;
+    }
+    return n > 0 && n <= cpus ? n : cpus;
+}
+
 void vm_host_probe(VmHost *h) {
     struct utsname u;
     h->arch = -1;
