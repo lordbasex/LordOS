@@ -32,7 +32,8 @@ run_postinst() {
     sed -e "s#/sys/#$C/sys/#g" -e "s#/etc/modprobe.d/#$C/etc/modprobe.d/#g" "$P" > "$C/postinst"
     PATH="$C/bin:$PATH" sh "$C/postinst" "$@" 2>/dev/null
 }
-# fake state: <case folder> <loaded 0|1> <our device there 0|1> <OBS's device there 0|1> <refcnt>, and the conffile
+# fake state: <case folder> <loaded 0|1> <our device there 0|1, or 2 with 0.8.9.5's quoted labels> <OBS's device there
+# 0|1> <refcnt>, and the conffile
 fake_sys() {
     C=$1
     rm -rf "$C/sys" "$C/etc"
@@ -40,7 +41,11 @@ fake_sys() {
     cp "$X/etc/modprobe.d/lordos-studio.conf" "$C/etc/modprobe.d/"
     if [ "$2" = 1 ]; then mkdir -p "$C/sys/module/v4l2loopback"; echo "$5" > "$C/sys/module/v4l2loopback/refcnt"; fi
     if [ "$3" = 1 ]; then mkdir -p "$C/sys/class/video4linux/video$NR"; echo "$CARD" > "$C/sys/class/video4linux/video$NR/name"; fi
-    if [ "$4" = 1 ]; then mkdir -p "$C/sys/class/video4linux/video$OBSNR"; echo "$OBSCARD" > "$C/sys/class/video4linux/video$OBSNR/name"; fi
+    if [ "$3" = 2 ]; then mkdir -p "$C/sys/class/video4linux/video$NR"; echo "$CARD\"" > "$C/sys/class/video4linux/video$NR/name"; fi
+    if [ "$4" = 1 ]; then
+        mkdir -p "$C/sys/class/video4linux/video$OBSNR"
+        if [ "$3" = 2 ]; then echo "\"$OBSCARD" > "$C/sys/class/video4linux/video$OBSNR/name"; else echo "$OBSCARD" > "$C/sys/class/video4linux/video$OBSNR/name"; fi
+    fi
 }
 for A in amd64 arm64; do
     echo "$A:"
@@ -60,7 +65,10 @@ for A in amd64 arm64; do
         '[ "$FILES" = "./etc/modprobe.d/lordos-studio.conf ./etc/modules-load.d/lordos-studio.conf ./usr/share/doc/lordos-studio-camera/copyright " ]'
     OPT=$(grep '^options' "$X/etc/modprobe.d/lordos-studio.conf")
     check "two devices, video_nr=$NR,$OBSNR: ours as lord-server expects, then OBS's" 'echo "$OPT" | grep -q "devices=2 video_nr=$NR,$OBSNR "'
-    check "card_label \"$CARD\",\"$OBSCARD\" (ours as lord-server checks)" 'echo "$OPT" | grep -q "card_label=\"$CARD\",\"$OBSCARD\" "'
+    # the kernel (lib/cmdline.c next_arg) strips only the quotes around a whole value, then module_param_array splits it
+    # at the commas: card_label="A","B" gives «A"» and «"B» (0.8.9.5's bug); one quoted value gives A and B
+    check "card_label \"$CARD,$OBSCARD\": one quoted value (ours as lord-server checks)" 'echo "$OPT" | grep -q "card_label=\"$CARD,$OBSCARD\" "'
+    check "no quote inside a value (\",\" would end up in the labels)" '! echo "$OPT" | grep -q "\",\""'
     check "exclusive_caps=1,1 (browsers list each only while something writes it)" 'echo "$OPT" | grep -q " exclusive_caps=1,1 "'
     check "OBS's device sorts before ours (OBS takes the first idle loopback in version order)" '[ "$OBSNR" -lt "$NR" ]'
     check "nothing else in modprobe.d (no install or remove commands)" '[ "$(grep -v "^#" "$X/etc/modprobe.d/lordos-studio.conf" | grep -c .)" = 1 ]'
@@ -79,6 +87,13 @@ for A in amd64 arm64; do
     check "update from one device, in use: leaves it (next restart)" '[ ! -s "$C/calls" ]'
     fake_sys "$C" 1 1 1 0; run_postinst "$X/DEBIAN/postinst" "$C" configure 0.8.9.4
     check "update with both devices already there: nothing" '[ ! -s "$C/calls" ]'
+    fake_sys "$C" 1 2 1 0; run_postinst "$X/DEBIAN/postinst" "$C" configure 0.8.9.5
+    check "update from 0.8.9.5's quoted labels, unused: reloads it" '[ "$(tr "\n" "|" < "$C/calls")" = "-r v4l2loopback|v4l2loopback|" ]'
+    fake_sys "$C" 1 2 1 1; run_postinst "$X/DEBIAN/postinst" "$C" configure 0.8.9.5
+    check "update from 0.8.9.5's quoted labels, in use: leaves it (next restart)" '[ ! -s "$C/calls" ]'
+    fake_sys "$C" 1 2 1 0; sed -i 's/card_label="[^"]*"/card_label="LordOS Studio","OBS Virtual Camera"/' "$C/etc/modprobe.d/lordos-studio.conf"
+    run_postinst "$X/DEBIAN/postinst" "$C" configure 0.8.9.5
+    check "update, the person kept 0.8.9.5's file: left alone (reloading would change nothing)" '[ ! -s "$C/calls" ]'
     fake_sys "$C" 1 0 0 0; run_postinst "$X/DEBIAN/postinst" "$C" configure 0.8.9.4
     check "a v4l2loopback someone else loaded (no LordOS Studio device): left alone" '[ ! -s "$C/calls" ]'
     fake_sys "$C" 1 1 0 0; run_postinst "$X/DEBIAN/postinst" "$C" configure
@@ -96,6 +111,7 @@ USES=$(grep -rlE "video$OBSNR|STUDIO_OBS_DEV|STUDIO_OBS_CARD|OBS Virtual Camera"
 check "OBS's device is named only in mstudiohub.h ($USES)" '[ "$USES" = "server/src/media/mstudiohub.h " ]'
 check "lord-server opens the loopback only by STUDIO_LOOPBACK_DEV" \
     '[ "$(grep -c "open(STUDIO_LOOPBACK_DEV" server/src/media/mstudio.c)" = 1 ] && [ "$(grep -rl "STUDIO_LOOPBACK_DEV" server/src | sort | tr "\n" " ")" = "server/src/media/mstudio.c server/src/media/mstudiohub.h " ]'
-check "lord-studio checks the card too (stcam_hub)" 'grep -q "strcmp((const char \*)cap.card, STUDIO_LOOPBACK_CARD)" server/src/media/studio/stcam.c'
+check "lord-studio checks the card too (stcam_hub)" 'grep -q "!studio_card_is_ours((const char \*)cap.card)" server/src/media/studio/stcam.c'
+check "lord-server checks it with the same rule" 'grep -q "return studio_card_is_ours(card);" server/src/media/mstudio.c'
 [ "$fails" = 0 ] || { echo "studio-package-test: $fails failures"; exit 1; }
 echo "studio-package-test: ok"

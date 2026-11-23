@@ -431,7 +431,7 @@ void stcam_hub(const char *params, int loop, int render) {
     memset(&cap, 0, sizeof cap);
     /* lord-server checked it already; the helper doesn't trust that either */
     if (loop < 0 || ioctl(loop, VIDIOC_QUERYCAP, &cap) || strcmp((const char *)cap.driver, STUDIO_LOOPBACK_DRIVER) ||
-        strcmp((const char *)cap.card, STUDIO_LOOPBACK_CARD)) {        /* never OBS's device or another loopback */
+        !studio_card_is_ours((const char *)cap.card)) {        /* never OBS's device or another loopback */
         LM_LOG("not LordOS Studio's v4l2loopback device");
         lm_error("studio.failed");
         mp_sendv(LM_SOCK, MM_STATE, 0, MS_FAILED, 0, 0, 0);

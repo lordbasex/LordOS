@@ -70,6 +70,33 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   and the general Installed with its Flathub and Web apps filters in a headless lord-server (`tests/store_scene/installed.js`;
   `pre.js` seeds two Flatpak and two web apps and installs nothing). Checked in Spanish, light and dark, on 2026-11-23,
   and the second column in Arabic (right to left). Not yet on a real display or the VM.
+In development; the latest release is 0.8.9.5-beta.
+
+### Fixed
+
+- **LordOS Studio's camera now appears in Chrome, Chromium, Meet and every other app** (`lordos-studio-camera`).
+  0.8.9.5's `/etc/modprobe.d/lordos-studio.conf` gave the two devices' labels as `card_label="LordOS
+  Studio","OBS Virtual Camera"`. The kernel strips only the quotes around a whole value (`lib/cmdline.c`
+  `next_arg`) and v4l2loopback's `module_param_array` then splits it at the comma, so the devices came up as
+  `LordOS Studio"` (`/dev/video50`) and `"OBS Virtual Camera` (`/dev/video49`). lord-server checks the card before it
+  starts the session's lord-studio on the loopback, didn't recognise its own device, and never started it. With
+  `exclusive_caps=1` a loopback advertises capture only while something writes it, so no app could list "LordOS
+  Studio" (found on the maintainer's PC with a Logitech C930e: Meet listed only the real camera).
+  - The package now writes `card_label="LordOS Studio,OBS Virtual Camera"`, one quoted value. The conffile is
+    replaced on the update like any unmodified conffile (the package engine runs dpkg with `--force-confold`, which
+    keeps only files the person edited). Checked against v4l2loopback 0.15.0's source (`module_param_array(card_label,
+    charp, …)`) and Linux 6.12's `next_arg`, whose parsing gives exactly the stray quotes seen in sysfs for the old line
+    and the two clean labels for the new one.
+  - Its postinst loads the module again on an update from 0.8.9.5's labels, as it already did on an update from the
+    one-device file, only when the file is the package's own and nothing holds the devices (refcnt 0, and `modprobe -r`
+    itself refuses a module in use). Otherwise the new labels apply at the next restart.
+  - lord-server and lord-studio accept 0.8.9.5's label (`LordOS Studio"`) as theirs too
+    (`studio_card_is_ours()` in `server/src/media/mstudiohub.h`), so the camera works right after the update even
+    before the module is loaded again: apps then list it with the stray quote until the restart. OBS's device, either
+    way it is labelled, is still never ours.
+  - Tests: `build/studio-hub-test` (the label, 0.8.9.5's label, OBS's device both ways, near misses),
+    `tests/studio_package_test.sh` (one quoted value, no `","`; the postinst reloads from 0.8.9.5's labels when unused,
+    leaves them when in use or when the person kept 0.8.9.5's file).
 
 ## [0.8.9.5-beta] - 2026-11-23
 
