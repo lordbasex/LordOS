@@ -68,7 +68,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "13", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "14", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -111,7 +111,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":13,\"whatever\":true}";
+    const char newer[] = "{\"schema\":14,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -480,6 +480,35 @@ static void test_schema(void) {
             m.capture_fullscreen = 2; m.schema = VM_SCHEMA;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 12);
+        }
+        /* schema 13: cpu_pin (vCPU pinning, 3.7.1), "off" or "auto", written only when chosen, never below 13 */
+        {
+            struct { const char *add; int schema, want, pin; } s13[] = {
+                { "\"cpu_pin\":\"off\"", 13, VM_OK, VM_PIN_OFF }, { "\"cpu_pin\":\"auto\"", 13, VM_OK, VM_PIN_AUTO },
+                { "\"agent\":true", 13, VM_OK, VM_PIN_DEFAULT }, { "\"cpu_pin\":\"\"", 13, VM_OK, VM_PIN_DEFAULT },
+                { "\"cpu_pin\":\"on\"", 13, VM_E_RANGE, 0 }, { "\"cpu_pin\":\"default\"", 13, VM_E_RANGE, 0 }, { "\"cpu_pin\":true", 13, VM_E_FIELD, 0 },
+                { "\"cpu_pin\":\"auto\"", 12, VM_E_FIELD, 0 }, { "\"cpu_pin\":\"off\"", 12, VM_E_FIELD, 0 },
+            };
+            for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s13[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s13[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s13[i].want) fprintf(stderr, "  schema 13 %s (%d): got %d (%s)\n", s13[i].add, s13[i].schema, r, err);
+                CHECK(r == s13[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.cpu_pin == s13[i].pin);
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"cpu_pin\"") == (s13[i].pin != VM_PIN_DEFAULT));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.cpu_pin == VM_PIN_DEFAULT);
+            m.cpu_pin = VM_PIN_AUTO;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.cpu_pin = 3; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 13);
         }
         /* which of QEMU's mice "Capture mouse" makes the active one (query-mice's answer, untrusted) */
         {

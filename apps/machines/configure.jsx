@@ -164,11 +164,11 @@ export function Configure({ dir, section: section0, onClose }) {
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
-    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, ...draft };
+    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, cpuPin: m.cpuPin || 'off', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -299,6 +299,14 @@ export function Configure({ dir, section: section0, onClose }) {
             <View style={{ flex: 1 }}><Slider value={cur.memoryMb} min={256} max={memMax} step={256} width={340} onChange={(x) => set({ memoryMb: Math.round(x / 256) * 256 })} /></View>
             <Stepper value={cur.memoryMb} min={256} max={memMax} step={256} width={80} format={(x) => `${x} MB`} onChange={(x) => set({ memoryMb: x })} />
           </View></Off>
+        </Row>
+      </Group>
+      {/* vCPU pinning (machine.json cpu_pin, docs/VIRTUALIZATION.md 3.7.1): lord-vm gives each vCPU a core of its own,
+          away from the desktop's; a machine without a choice shows what this computer gives it */}
+      <Group>
+        <Row label={tr('machines.cfg.pin')} last note={[tr('machines.cfg.pinNote'), offNote].filter(Boolean).join(' ')}>
+          <Off off={running}><Segmented small value={cur.cpuPin} onChange={(x) => set({ cpuPin: x })}
+            options={[['off', tr('machines.cfg.off')], ['auto', tr('machines.cfg.pinAuto')]]} /></Off>
         </Row>
       </Group>
       <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>

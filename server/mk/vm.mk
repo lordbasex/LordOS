@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/qmp.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -130,7 +130,7 @@ build/vm-test: tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c $(VM_COMMON) $(VM_
 	./$@ || { rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
-VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c
+VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmpin.c
 VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
 $(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
 build/lord-server: $(VM_SRV_OBJ)

@@ -566,6 +566,60 @@ What a machine promises, so that updates don't break it.
 
 Limits per machine aren't enough: three reasonable machines can starve the desktop. All machines sit under one parent cgroup slice, with a memory ceiling for the sum, lower CPU and I/O weight than the session, and a floor kept for the desktop: **target** 2 GB, or 1 GB on a 4 GB board. Starting a machine that doesn't fit asks first: pause another, start with less, or cancel. Memory pressure (PSI) warns before swap does, and the summary header shows the budget, not only host use. Whether `lord-sessiond`'s scopes can nest under one slice is **To test** in Phase 1.
 
+### 3.7.1 vCPU pinning
+
+Built (in development, after 0.8.9.5). Configure → CPU & memory → **Pin cores**: Off or Automatic (`machine.json`
+`"cpu_pin": "off" | "auto"`, schema 13, written only when chosen; `lord-vm --set DIR --cpu-pin off|auto|default`).
+
+**Who does it.** `lord-vm`, to its own child: QEMU runs as the same user, so `sched_setaffinity` on its threads needs no
+root and no new privilege. The code is `server/src/vm/vmpin.c`; `lordvm.c` only calls it.
+
+**When.** Right after QEMU's control socket is up (before a vCPU runs, QEMU starts with `-S`), and before lord-vm's own
+Landlock: lord-vm reads the topology from `/sys/devices/system/cpu`, takes the CPUs QEMU may run on from its affinity
+(that is the cgroup's cpuset, so a restricted scope is respected), notes the cores other machines' vCPUs are already
+pinned to (any `qemu-system-*` of the same user with single-CPU threads), and opens `/proc/<qemu>/task`. QEMU names its
+vCPU threads in `query-cpus-fast` (`thread-id`); a thread id that isn't one of QEMU's own threads is refused. The list is
+asked again after every reset and every resume, and set again only if the threads changed (or their number: then the
+plan is made again).
+
+**The choice** (`vmpin_plan`, tested with invented computers in `build/vmpin-test`):
+
+1. Physical cores are `(physical_package_id, core_id)` pairs; SMT siblings share one. Fewer than 3 allowed: nothing.
+2. The desktop keeps 1 core (2 when 6 or more are allowed), with their siblings: the lowest-numbered P cores (CPU 0 takes
+   most interrupts), or E cores when keeping P cores would leave the machine fewer than 2.
+3. The other free cores are ranked P before E, faster first, then by number. Hybrid CPUs are found generically: a core
+   under 80 % of the fastest core's capacity is an E core; capacity is `cpu_capacity` (arm64), else the `cpu_core` /
+   `cpu_atom` lists (Intel hybrid), else `cpuinfo_max_freq`.
+4. One vCPU per physical core while there are cores, then the siblings in the same order. More vCPUs than those CPUs:
+   nothing is pinned (two vCPUs on one CPU is worse than the scheduler's own choice), and the log says why.
+5. QEMU's other threads (main loop, I/O thread, workers) get every allowed CPU no vCPU uses, without the siblings of the
+   vCPUs' cores and other machines' cores while that still leaves some. Threads QEMU makes later inherit that.
+
+On the i9-10900 (10 cores, CPU n and n + 10 siblings) a 4-vCPU machine gets CPUs 2–5 and its other threads 0–1, 6–11,
+16–19; a second one started meanwhile gets 6–9 (the first one's cores are left alone) and 0–1, 10–11. The log line:
+`cpu pinning: 4 vCPUs on 4 physical cores, 2 kept for the desktop; vCPUs on CPUs 2,3,4,5, QEMU's other 5 threads on
+0-1,6-11,16-19`.
+
+**Default.** A machine without a choice of its own gets Automatic with 4 vCPUs or more on a computer with 8 physical
+cores or more (allowed ones), else Off (`vmpin_default_on`; Configure shows what the machine gets). **Measured**
+2026-11-23 on the i9-10900 with the session running: a scratch KVM guest (host kernel, a static `/init` that runs a
+fixed integer loop on every vCPU, 20 rounds, first 2 dropped) while a desktop-like load ran on the host (6 threads, each
+a 60 Hz frame of 6 ms CPU, measured from tick to done), 4 runs each, pinned and unpinned alternated. Other work was
+running on the computer, so the spread is wide:
+
+| vCPUs | guest round, unpinned → pinned | host frame p99 | host frames over 16.7 ms |
+|---|---|---|---|
+| 2 | 0.522 → 0.531 s (1.7 % slower) | 7.71 → 6.15 ms | 0.040 → 0.010 % |
+| 4 | 0.533 → 0.536 s (0.6 % slower) | 7.46 → 6.12 ms | 0.019 → 0.005 % |
+| 8 | 0.582 → 0.566 s (2.7 % faster) | 15.20 → 9.86 ms | 1.709 → 0.124 % |
+
+Pinned, the guest's rounds were steadier (4 vCPUs: 0.535–0.537 s against 0.517–0.557 s). With few vCPUs the scheduler
+has room enough and a pinned vCPU can't move to an idle faster core, so small machines stay unpinned by default; from 4
+vCPUs the desktop's worst frames improve, and with 8 both sides gain.
+
+**Not done.** A guest topology that tells the guest which vCPUs are siblings (`-smp threads=2` matched to the pinning);
+pinning QEMU's I/O to the desktop's cores only; NUMA memory placement (one package here).
+
 ### 3.8 Why direct QMP, and not libvirt
 
 Decided on 2026-11-01: `lord-vm` drives QEMU directly through QMP.
@@ -694,6 +748,8 @@ lordvm-dev run|attach DIR      plays lord-server: picture memfd, frames, PNG, ty
   When lord-vm runs in a cgroup it may divide (a delegated scope), it makes leaves `supervisor`, `qemu` (the machine's memory limit,
   swap 0, its CPU limit) and `passt` (128 MB, 200 %); the test below runs that way. One slice for all machines, the sum of 3.7,
   needs lord-sessiond to create nested scopes: not done.
+- vCPU pinning (3.7.1): after QEMU starts, lord-vm may pin each vCPU thread to its own host CPU and QEMU's other threads
+  to the rest.
 - lord-vm's own Landlock covers files only; it keeps the right to signal QEMU and passt.
 
 **Isolation test** (`server/tests/vm_isolation.sh BUILD_DIR IMAGE`, Phase 1's "done when"). It makes a machine from a Debian 13

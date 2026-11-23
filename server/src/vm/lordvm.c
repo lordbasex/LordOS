@@ -30,6 +30,7 @@
 #include "vmunattend.h"
 #include "vmhoststop.h"
 #include "vmgvtwin.h"
+#include "vmpin.h"
 #include "vmlog.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
@@ -868,7 +869,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 typedef struct { int fd, control; } Client;
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
-       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET };
+       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 /* a file dropped on the machine's window, for the guest (VM_FILE) */
@@ -1073,6 +1074,10 @@ static struct {
     char fx_otok[AG_OPEN_TOKEN + 1];
     Sha256 fx_hs;
     OpWait opw[OP_MAX];
+    /* vCPU pinning (3.7.1): the plan, /proc/<qemu>/task opened before the Landlock, the vCPU threads last set */
+    VmPinPlan pin;
+    int pin_on, pin_q, pin_dfd, pin_n;
+    int pin_tids[VMPIN_VCPUS];
 } S;
 
 /* what the guest said of the transfer folder */
@@ -1149,6 +1154,60 @@ static int qmp_do(const char *cmd, const char *args, int kind, int client, uint3
     if (qmp_command(&S.qmp, cmd, args, pass_fd)) { vlog("QMP %s: can't send", cmd); return -1; }
     pq_push(kind, client, seq, keep_fd);
     return 0;
+}
+
+/* ---- vCPU pinning (docs/VIRTUALIZATION.md 3.7.1, vmpin.c) ----
+ * Made at start, before lord-vm's own Landlock: the topology from /sys, the CPUs QEMU may run on (its affinity: the
+ * cgroup's cpuset), the cores other machines' vCPUs hold, and /proc/<qemu>/task kept open. QEMU names its vCPU threads
+ * in query-cpus-fast; asked again after a reset and a resume, and set again when they changed. */
+static VmTopo pin_topo;
+static cpu_set_t pin_allowed, pin_held;
+
+static void pin_query(void) {
+    if (S.pin_on && !S.pin_q && !qmp_do("query-cpus-fast", NULL, P_PINQ, -1, 0, -1, -1)) S.pin_q = 1;
+}
+
+static void pin_prepare(void) {
+    if (vmpin_topo_read("/sys", &pin_topo) || sched_getaffinity(S.qemu, sizeof pin_allowed, &pin_allowed)) {
+        vlog("cpu pinning: this computer's topology can't be read: not pinned");
+        return;
+    }
+    int on = S.m.cpu_pin == VM_PIN_AUTO || (S.m.cpu_pin == VM_PIN_DEFAULT && vmpin_default_on(&pin_topo, &pin_allowed, S.m.vcpus));
+    if (!on) { vlog("cpu pinning: off (%s)", S.m.cpu_pin == VM_PIN_OFF ? "chosen" : "this computer's default for the machine"); return; }
+    vmpin_taken(S.qemu, &pin_held);
+    if (vmpin_plan(&pin_topo, &pin_allowed, &pin_held, S.m.vcpus, &S.pin) != VMPIN_EACH) { vlog("cpu pinning: not pinned: %s", S.pin.why); return; }
+    char p[64];
+    snprintf(p, sizeof p, "/proc/%d/task", (int)S.qemu);
+    S.pin_dfd = open(p, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (S.pin_dfd < 0) { vlog("cpu pinning: %s: %s: not pinned", p, strerror(errno)); return; }
+    S.pin_on = 1;
+    pin_query();
+}
+
+static void pin_reply(const JVal *ret, int ok, const char *desc) {
+    S.pin_q = 0;
+    if (!ok || !ret || ret->type != J_ARR) { vlog("cpu pinning: query-cpus-fast: %.120s", ok ? "not a list" : desc); return; }
+    int tids[VMPIN_VCPUS], n = 0;
+    for (const JVal *c = ret->kid; c; c = c->next) {
+        double idx = json_num(c, "cpu-index", -1), tid = json_num(c, "thread-id", -1);
+        if (n >= VMPIN_VCPUS || idx != n || tid < 1 || tid > 1e9) { vlog("cpu pinning: QEMU's vCPU list isn't usable"); return; }
+        tids[n++] = (int)tid;
+    }
+    if (n == S.pin_n && !memcmp(tids, S.pin_tids, sizeof tids[0] * (size_t)n)) return;     /* the same threads, still set */
+    if (n != S.pin.nv && vmpin_plan(&pin_topo, &pin_allowed, &pin_held, n, &S.pin) != VMPIN_EACH) {
+        vlog("cpu pinning: %d vCPUs now: %s", n, S.pin.why);
+        return;
+    }
+    int r = vmpin_apply(&S.pin, S.pin_dfd, tids, n);
+    if (r < 0) { vlog("cpu pinning: QEMU's vCPU threads couldn't be set: %s", strerror(errno)); return; }
+    char cpus[256], rest[256];
+    size_t o = 0;
+    cpus[0] = 0;
+    for (int i = 0; i < n && o < sizeof cpus - 8; i++) o += (size_t)snprintf(cpus + o, sizeof cpus - o, "%s%d", i ? "," : "", S.pin.vcpu_cpu[i]);
+    vmpin_list(&S.pin.rest, rest, sizeof rest);
+    vlog("cpu pinning: %s; vCPUs on CPUs %s, QEMU's other %d threads on %s%s", S.pin.why, cpus, r - n, rest, S.pin_n ? " (again: the threads changed)" : "");
+    S.pin_n = n;
+    memcpy(S.pin_tids, tids, sizeof tids[0] * (size_t)n);
 }
 
 /* ---- cgroups ---- */
@@ -2288,6 +2347,7 @@ static int start_machine(void) {
     S.qmp_up = 1;
     S.oom0 = read_oom_kills();
     qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
+    pin_prepare();
     if (S.resuming) return 0;
     /* a vGPU: its vCPUs run once QEMU may lock the machine's memory (vm-memlock, asked by lord-server) */
     if (S.vgpu && !vgpu_memlock_ok()) {
@@ -5306,7 +5366,8 @@ static void on_qmp_event(const JVal *root) {
     if (!strcmp(ev, "STOP")) { if (S.state == VS_RUNNING) set_state(VS_PAUSED, VR_USER, 0, ""); }
     else if (!strcmp(ev, "RESUME")) {
         if (S.state == VS_PAUSED || S.state == VS_STARTING) set_state(VS_RUNNING, S.state == VS_STARTING ? VR_NONE : VR_USER, 0, "");
-        ag_timesync();                  /* the guest's clock stood still while it was paused or saved */
+        ag_timesync();
+        pin_query();                    /* the vCPU threads are still the ones set (checked) */                  /* the guest's clock stood still while it was paused or saved */
     }
     else if (!strcmp(ev, "SHUTDOWN")) {
         int guest = data ? json_bool(data, "guest", 0) : 0;
@@ -5320,6 +5381,7 @@ static void on_qmp_event(const JVal *root) {
         if (S.state != VS_STOPPING) set_state(VS_STOPPING, guest ? VR_GUEST_SHUTDOWN : VR_POWEROFF, 0, why ? why : "");
     } else if (!strcmp(ev, "RESET")) {
         stop_notice = 0;                /* the guest's restart happened inside QEMU: what it said is done with */
+        pin_query();
         if (S.state == VS_RUNNING || S.state == VS_PAUSED) set_state(S.state, VR_GUEST_RESET, 0, "");
     } else if (!strcmp(ev, "GUEST_PANICKED")) { S.panic = 1; vlog("qemu: the guest panicked"); }
     else if (!strcmp(ev, "POWERDOWN")) vlog("qemu: power button pressed");
@@ -5430,6 +5492,7 @@ static void on_qmp_reply(const JVal *root, int ok) {
         break;
     case P_JOBQ: if (S.snap_kind) snap_concluded(root, ok); break;
     case P_NET: break;                                  /* the old backend may already be gone */
+    case P_PINQ: pin_reply(ok ? json_get(root, "return") : NULL, ok, desc); break;
     case P_MICE: S.mice_q = 0; mice_answer(ok ? json_get(root, "return") : NULL, p.client, p.seq, desc); break;
     case P_MOUSE_SET:
         /* human-monitor-command answers HMP's own words as "return" (empty when mouse_set took it) */
@@ -6541,7 +6604,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, pin = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -6592,6 +6655,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
             if (gpu < 0) { fprintf(stderr, "lord-vm: --gpu none|intel-whole|intel-shared\n"); return 2; }
             continue;
         }
+        if (!strcmp(a, "--cpu-pin")) { pin = !strcmp(v, "off") ? VM_PIN_OFF : !strcmp(v, "auto") ? VM_PIN_AUTO : !strcmp(v, "default") ? VM_PIN_DEFAULT : -1; if (pin < 0) { fprintf(stderr, "lord-vm: --cpu-pin off|auto|default\n"); return 2; } continue; }
         if (!strcmp(a, "--capture-fullscreen")) { capfs = parse_enum(v, "off", "on"); if (capfs < 0) { fprintf(stderr, "lord-vm: --capture-fullscreen on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
@@ -6676,6 +6740,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (cask >= 0) { m.clipboard_ask = cask; if (cask) m.schema = VM_SCHEMA; }
     if (ptr >= 0) { m.pointer_guest = ptr; if (ptr) m.schema = VM_SCHEMA; }
     if (capfs >= 0) { m.capture_fullscreen = capfs; if (capfs) m.schema = VM_SCHEMA; }
+    if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
     if (gpu >= 0) { m.vgpu = gpu; if (gpu) { m.schema = VM_SCHEMA; if (gfx < 0) m.graphics = VM_GFX_2D; } }
@@ -8265,6 +8330,7 @@ static int usage(void) {
             "                         [--clipboard-ask on|off]   (ask before each paste into and copy out of the machine)\n"
             "                         [--pointer lordos|guest]   (who draws a Windows guest's pointer: LordOS, or its display driver)\n"
             "                         [--capture-fullscreen on|off]   (the window captures the mouse when it goes full screen)\n"
+            "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"

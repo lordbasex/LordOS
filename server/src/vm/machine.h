@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: cpu_pin (3.7.1). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 12
+#define VM_SCHEMA 13
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -57,6 +57,9 @@ extern const char *const VM_DEV_NAMES[];   /* "virtio", "compat", "windows" */
 enum { VM_NIC_VIRTIO = 0, VM_NIC_E1000E, VM_NIC_E1000, VM_NIC_E1000_82545EM, VM_NIC_E1000_82544GC, VM_NIC_VMXNET3, VM_NIC_RTL8139, VM_NIC_PCNET, VM_NIC_COUNT };
 extern const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1];   /* "virtio", "e1000e", ... (machine.json's names) */
 enum { VM_RTC_UTC = 0, VM_RTC_LOCAL };
+/* vCPU pinning (schema 13): this computer's default, off, or auto (lord-vm picks the cores, vmpin.c) */
+enum { VM_PIN_DEFAULT = 0, VM_PIN_OFF, VM_PIN_AUTO };
+extern const char *const VM_PIN_NAMES[];   /* "", "off", "auto" */
 /* the guest's graphics (schema 5): 2D, a virtio GPU whose picture QEMU draws in shared memory; 3D, virgl (virtio-vga-gl),
  * which opens the host GPU's render node from QEMU's sandbox: Linux guests only (no device set "windows") */
 enum { VM_GFX_2D = 0, VM_GFX_3D };
@@ -176,6 +179,9 @@ typedef struct {
     /* schema 12: "Capture mouse" (docs/VIRTUALIZATION.md 6.25): "capture_fullscreen": true, the window captures the mouse
      * when it goes full screen (written only then; missing: no) */
     int capture_fullscreen;
+    /* schema 13: vCPU pinning (docs/VIRTUALIZATION.md 3.7.1): "cpu_pin": "off" | "auto", written only when chosen; missing
+     * is this computer's default for the machine (vmpin_default_on) */
+    int cpu_pin;                        /* VM_PIN_* */
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 

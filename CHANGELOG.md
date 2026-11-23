@@ -10,6 +10,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+- **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
+  Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
+  threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores
+  and SMT siblings (docs/VIRTUALIZATION.md 3.7.1).
+  - **How.** `lord-vm` does it to its own child with `sched_setaffinity`: no root, no new privilege, no admin action.
+    Right after QEMU starts (paused) and before lord-vm's own Landlock it reads the topology from
+    `/sys/devices/system/cpu` (package, core and SMT siblings; capacity from `cpu_capacity`, the hybrid `cpu_core` /
+    `cpu_atom` lists or the maximum frequency, so P and E cores are told apart on any vendor), takes the CPUs QEMU may
+    use from its affinity (the cgroup's cpuset is respected), notes the cores other machines' vCPUs already hold, and
+    keeps `/proc/<qemu>/task` open. QEMU's `query-cpus-fast` names the vCPU threads; a thread id that isn't QEMU's own
+    is refused. Asked again after each reset and resume, set again when the threads changed.
+  - **The choice** (`server/src/vm/vmpin.c`): the desktop keeps 1 physical core (2 from 6 cores), with its siblings,
+    the lowest-numbered P cores (E cores when that would leave the machine fewer than 2 P cores); the others are ranked
+    P before E, faster first; one vCPU per physical core, then the siblings; more vCPUs than those CPUs, or fewer than
+    3 cores, and nothing is pinned. QEMU's other threads get the CPUs no vCPU uses, without the vCPUs' siblings and
+    other machines' cores while some are left. A second machine started meanwhile takes other cores.
+  - **Default**, measured on a 10-core, 20-thread desktop with a desktop-like load on the host (6 threads, each a 60 Hz
+    frame of 6 ms) and a CPU loop on every vCPU of a scratch guest, 4 alternated runs each: with 8 vCPUs pinning cut
+    the host's frame p99 from 15.2 to 9.9 ms and its frames over 16.7 ms from 1.7 % to 0.12 %, and the guest ran 2.7 %
+    faster; with 4 vCPUs the p99 went from 7.5 to 6.1 ms with the guest 0.6 % slower and steadier; with 2 vCPUs the
+    guest was 1.7 % slower. So a machine without a choice of its own gets Automatic with 4 vCPUs or more on a computer
+    with 8 physical cores or more, and Off otherwise; Configure shows which.
+  - `machine.json` schema 13: `"cpu_pin": "off" | "auto"`, written only when chosen; a file without it reads as before
+    (the machine's default), and an older file is upgraded on its next write as with every schema. `lord-vm --set DIR --cpu-pin off|auto|default`; `lord.vm.set(dir, { cpuPin })`, and
+    `lord.vm.list()` gives `cpuPin` (what the machine gets) and `cpuPinChosen`. Texts in all 35 languages.
+  - Tests: `build/vmpin-test` (in `make test`, under ASan and UBSan): the choice on invented computers (SMT, hybrid
+    6P+8E and 2P+8E, big.LITTLE, two packages, 2-, 4- and 6-core hosts, restricted cpusets, cores held by another
+    machine), the sysfs reader over invented trees (offline CPUs, malformed lists) and setting it on the test's own
+    threads; `vm-test` for schema 13. Checked with KVM on scratch machines: `taskset` shows each `CPU n/KVM` thread on
+    its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
+
 ### Fixed
 - **Launching an app that is already running brings its window forward, even when it runs once and takes the launch
   over (Google Chrome).** Seen on the maintainer's PC (2026-11-23): session restore started Chrome at login and its
