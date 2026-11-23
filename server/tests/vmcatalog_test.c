@@ -279,6 +279,17 @@ int main(int argc, char **argv) {
           vmcat_match(e.file_re, arches[a][0] == 'a' && arches[a][1] == 'm' ? "lordos-live-0.8.10.1-amd64.iso" : "lordos-live-0.8.10.1-arm64.iso"));
         snprintf(lab, sizeof lab, "lordos %s: a size limit", arches[a]);
         T(lab, e.max_bytes >= (2ull << 30) && e.max_bytes <= (8ull << 30));
+        /* its signed list read first from lordos.org (the same tag), then from the release on GitHub; the ISO from GitHub */
+        const char *tag = e.dir + 54;                        /* "v…/" */
+        char want[VMCAT_URL], lu[VMCAT_URL + 160], su[VMCAT_URL + 160], u2[VMCAT_URL + 160], s2[VMCAT_URL + 160];
+        snprintf(want, sizeof want, "https://lordos.org/releases/%.300s", tag);
+        snprintf(lab, sizeof lab, "lordos %s: the list's copy on lordos.org, same tag", arches[a]);
+        T(lab, !strcmp(e.list_dir, want) && !strcmp(e.list_sums, "SHA256SUMS.txt") && !strcmp(e.list_sig, "SHA256SUMS.sig"));
+        snprintf(lab, sizeof lab, "lordos %s: lordos.org first, GitHub second, nothing third", arches[a]);
+        T(lab, !vmcat_list_source(&e, "SHA256SUMS", 0, lu, su, sizeof lu) && !strncmp(lu, want, strlen(want)) && !strcmp(lu + strlen(want), "SHA256SUMS.txt") &&
+          !strncmp(su, want, strlen(want)) && !strcmp(su + strlen(want), "SHA256SUMS.sig") &&
+          !vmcat_list_source(&e, "SHA256SUMS", 1, u2, s2, sizeof u2) && !strncmp(u2, e.dir, strlen(e.dir)) && !strcmp(u2 + strlen(e.dir), "SHA256SUMS") &&
+          !strncmp(s2, e.dir, strlen(e.dir)) && !strcmp(s2 + strlen(e.dir), "SHA256SUMS.sig") && vmcat_list_source(&e, "SHA256SUMS", 2, u2, s2, sizeof u2));
     }
     /* Android (docs/VIRTUALIZATION.md 4.2): one pinned ISO for amd64, none for arm64; the helper keeps only that name and hash */
     T("android: pinned, one ISO", !vmcat_find(cat, n, "android", "amd64", &e) && e.npins == 1 && !e.dir[0] &&
@@ -293,6 +304,13 @@ int main(int argc, char **argv) {
       !vmcat_match(e.sums_re, "Fedora-Workstation-Live-45-1.4.x86_64.iso") && !vmcat_match(e.sums_re, "Fedora-Workstation-45-1.4-aarch64-CHECKSUM"));
     T("fedora: images from the mirrors", !strncmp(e.file_dir, "https://download.fedoraproject.org/", 35));
     T("debian: SHA256SUMS", !vmcat_find(cat, n, "debian", "arm64", &e) && !strcmp(e.sums, "SHA256SUMS") && !e.sums_re[0]);
+    {
+        char lu[VMCAT_URL + 160], su[VMCAT_URL + 160];
+        T("debian: its own folder only, no copy elsewhere", !e.list_dir[0] && !vmcat_list_source(&e, "SHA256SUMS", 0, lu, su, sizeof lu) &&
+          !strcmp(lu, "https://cdimage.debian.org/debian-cd/current/arm64/iso-cd/SHA256SUMS") &&
+          !strcmp(su, "https://cdimage.debian.org/debian-cd/current/arm64/iso-cd/SHA256SUMS.sign") && vmcat_list_source(&e, "SHA256SUMS", 1, lu, su, sizeof lu));
+        T("debian: a list name that isn't plain", vmcat_list_source(&e, "../SHA256SUMS", 0, lu, su, sizeof lu));
+    }
     T("debian: not the edu or mac image", !vmcat_match(e.file_re, "debian-edu-13.7.0-arm64-netinst.iso") && !vmcat_match(e.file_re, "debian-mac-13.7.0-amd64-netinst.iso"));
     T("ubuntu: 26.04 and 26.04.1", !vmcat_find(cat, n, "ubuntu", "amd64", &e) && vmcat_match(e.file_re, "ubuntu-26.04-desktop-amd64.iso") &&
       vmcat_match(e.file_re, "ubuntu-26.04.1-desktop-amd64.iso") && !vmcat_match(e.file_re, "ubuntu-26.04.1-live-server-amd64.iso"));
@@ -386,6 +404,54 @@ int main(int argc, char **argv) {
     const char *goodl = "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"lordos-release\",\"name\":\"SHA256SUMS.sig\"},\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"SHA256SUMS\",\"file\":\"^a\\\\.iso$\",\"maxMb\":10}}}]}";
     T("good LordOS release entry", !vmcat_find(goodl, strlen(goodl), "x", "amd64", &e) && e.sig_type == VMCAT_SIG_LORDOS && !strcmp(e.sig_name, "SHA256SUMS.sig") &&
       !e.keys[0] && !e.nfprs);
+    T("good LordOS release entry: no copy of its list", !e.list_dir[0]);
+
+    /* "list": LordOS's signed list also on lordos.org, tried first; the release folder is the fallback (vmcat_list_source) */
+    {
+#define LE(sig, list) "{\"systems\":[{\"id\":\"x\",\"signature\":" sig ",\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"SHA256SUMS\"," list "\"file\":\"^a\\\\.iso$\",\"maxMb\":10}}}]}"
+#define LR "{\"type\":\"lordos-release\",\"name\":\"SHA256SUMS.sig\"}"
+        const char *gl = LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1.2.3-beta/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},");
+        char lu[VMCAT_URL + 160], su[VMCAT_URL + 160];
+        T("list copy: found", !vmcat_find(gl, strlen(gl), "x", "amd64", &e) && !strcmp(e.list_dir, "https://lordos.org/releases/v1.2.3-beta/") &&
+          !strcmp(e.list_sums, "SHA256SUMS.txt") && !strcmp(e.list_sig, "SHA256SUMS.sig") && !strcmp(e.dir, "https://a.example/r/") && !strcmp(e.file_dir, e.dir));
+        T("list copy: first", !vmcat_list_source(&e, "SHA256SUMS", 0, lu, su, sizeof lu) && !strcmp(lu, "https://lordos.org/releases/v1.2.3-beta/SHA256SUMS.txt") &&
+          !strcmp(su, "https://lordos.org/releases/v1.2.3-beta/SHA256SUMS.sig"));
+        T("list copy: the folder's list as the fallback", !vmcat_list_source(&e, "SHA256SUMS", 1, lu, su, sizeof lu) && !strcmp(lu, "https://a.example/r/SHA256SUMS") &&
+          !strcmp(su, "https://a.example/r/SHA256SUMS.sig"));
+        T("list copy: then nothing", vmcat_list_source(&e, "SHA256SUMS", 2, lu, su, sizeof lu) && vmcat_list_source(&e, "SHA256SUMS", -1, lu, su, sizeof lu));
+        T("list copy: only for the entry's own list name", !vmcat_list_source(&e, "OTHER", 0, lu, su, sizeof lu) && !strcmp(lu, "https://a.example/r/OTHER") &&
+          vmcat_list_source(&e, "OTHER", 1, lu, su, sizeof lu));
+        T("list copy: a buffer too small", vmcat_list_source(&e, "SHA256SUMS", 0, lu, su, 20));
+        static const char *const badlist[] = {
+            /* not LordOS's release signature */
+            "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"detached\",\"name\":\"S.sig\"},\"keys\":\"k.asc\",\"fingerprints\":[\"DF9B9C49EAA9298432589D76DA87E80D6294BE9B\"],\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sums\":\"S\",\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"S.txt\",\"signature\":\"S.sig\"},\"file\":\"^a$\",\"maxMb\":10}}}]}",
+            /* another host, or not under releases/ */
+            LE(LR, "\"list\":{\"dir\":\"https://evil.example/releases/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org.evil.example/releases/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"http://lordos.org/releases/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/../v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/?a/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            /* names that aren't plain, or missing */
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"../SHA256SUMS\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"SHA256SUMS.txt\",\"signature\":\"a/SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"SHA256SUMS.txt\"},"),
+            LE(LR, "\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":{\"sums\":\"SHA256SUMS.txt\",\"signature\":\"SHA256SUMS.sig\"},"),
+            LE(LR, "\"list\":\"https://lordos.org/releases/v1/\","),
+            /* a list found in the folder's listing (sumsPattern) has no fixed name to copy */
+            "{\"systems\":[{\"id\":\"x\",\"signature\":{\"type\":\"lordos-release\",\"name\":\"S.sig\"},\"arch\":{\"amd64\":{\"dir\":\"https://a.example/r/\",\"sumsPattern\":\"^S$\",\"list\":{\"dir\":\"https://lordos.org/releases/v1/\",\"sums\":\"S.txt\",\"signature\":\"S.sig\"},\"file\":\"^a$\",\"maxMb\":10}}}]}",
+        };
+        for (size_t i = 0; i < sizeof badlist / sizeof badlist[0]; i++) {
+            char lab[48];
+            snprintf(lab, sizeof lab, "bad list copy %zu refused", i);
+            T(lab, vmcat_find(badlist[i], strlen(badlist[i]), "x", "amd64", &e) && !e.dir[0] && !e.list_dir[0]);
+        }
+#undef LE
+#undef LR
+    }
 
     /* pinned entries (Windows' evaluation, virtio-win): the catalog names each file, its URL, hash and size */
     {
