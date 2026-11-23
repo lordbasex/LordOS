@@ -78,7 +78,7 @@ eighth of a refresh period (`flip_instant`); from three on it paces frames itsel
 on a fixed grid (`src/softpace.h`), as headless sessions already were. A flip that really waits for vblank
 lowers the count again, so real graphics cards are unaffected. Measured on the VMware Fusion guest when
 it was fixed: 59.8 frames a second at 60 Hz, p99 18.4 ms. The same grid paces sessions without a monitor, so waiting in whole
-milliseconds no longer turns 60 frames a second into 57. After 0.8.9.5 (in development) a frame that starts more than an
+milliseconds no longer turns 60 frames a second into 57. Since 0.8.9.5 a frame that starts more than an
 eighth of a period late (at least 2 ms) starts the grid again from itself, so two frames never start closer than
 seven eighths of a refresh: kept on the old grid, the next frame came a few milliseconds later and an app's update was on screen
 for that long instead of one refresh (fifo-v1, `tests/softpace_test.c`). Frames are shown when painted, so after a

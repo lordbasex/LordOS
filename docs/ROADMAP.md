@@ -951,10 +951,6 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   (`mkdeb-voice.mjs`), sign and publish them on the maintainer's Mac (`tools/release/apt-repo.sh`), then merge the
   branch and add `fr`, `de`, `it`, `nl` to the closed lists in AGENTS.md (lord-tts, `lord.voice`). Also a whisper
   round trip for the four languages, as was done for Spanish and Portuguese.
-- [ ] **Two intermittent Wayland conformance checks**: on real hardware under load `wp_fifo_manager_v1` scores about
-  91 % and `xdg_session_manager_v1` about 97 % in some runs (the recorded headless run, `docs/wayland-conformance.json`,
-  has both at 100 %). Find why, make both flows independent of the machine's timing and rerun on a loaded PC until
-  they pass every time.
 - [ ] **The five X11 items at 100 % but not "complete"** (`docs/WAYLAND.md`, "Conformance"): `ewmh.wm_pid`, `xdnd`,
   `xwayland.hidpi`, `xwayland.cursor` and `xwayland.security` need tests written for each that cover every point, so
   all 28 X11 items are complete as the 48 Wayland globals are.
@@ -973,7 +969,15 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   `fifo-v1`, `commit-timing-v1`, tearing control, content type, tablets, `drm-lease` for VR headsets only if allowed,
   pointer warp, toplevel icons, idle notify, tab tear-off, toplevel tags, the bell, session management, background
   blur, `wl_fixes`, xdg-shell 7 and newer versions); X11 at 100 % for 28 items (23 complete); the results on
-  lordos.org's protocol table. Left: two checks intermittent on real hardware and five X11 items not complete (above).
+  lordos.org's protocol table and its conformance page (lordos.org/wayland-conformance/). Left: five X11 items not
+  complete ("Next release after 0.8.9.5").
+- [x] **`wp_fifo_manager_v1` passes every conformance run** (it was about 91 % in some runs on a loaded PC): without a
+  monitor a frame drawn late let the next come 1 to 7 ms after it; the software vblank (`server/src/softpace.h`,
+  `GPU.md`) restarts its grid from a late frame and waits half a refresh after a frame painted slowly. Old pacing 12
+  of 12 runs failed; fixed, 35 of 35 with a busy loop on every core (`tests/softpace_test.c`).
+- [x] **`xdg_session_manager_v1` passes every conformance run** (it was about 97 % in some runs on a loaded PC): a
+  window maximized the whole time it was open is restored too (`xs_top_note`, `server/src/wl/xsstore.c`); the new
+  check `session.toplevel_restored_maximized` failed 12 of 12 runs under load before and passed 35 of 35 after.
 - [x] **Always on top in every theme** (`WINDOWS.md`): stacking apart from focus in the SDK; X11's ABOVE/BELOW honoured.
 - [x] **LordOS Studio** (`CAMERA-STUDIO-PLAN.md`, phases 0–3; exceptions E-S1 to E-S7): background blur and pictures,
   video backgrounds, green screen, Auto Framing, Face Light, filters, Retouch, Mic Mode with Noise Reduction, the

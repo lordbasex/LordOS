@@ -10,43 +10,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
-### Fixed
-- **Without a monitor, and on cards whose page flips complete at once, two frames never come less than a refresh
-  apart; the fifo-v1 conformance check passes every time, in development (the latest release is 0.8.9.5).** Seen on the
-  maintainer's PC, where `make -C server wl-conformance` failed `wp_fifo_manager_v1: flow.fifo.barrier` in some runs
-  ("4 of 5 a refresh later, closest 3.2 ms", "closest 7.1 ms") and passed in others.
-  - **The software vblank** (`server/src/softpace.h`, new; `main.c`): frames are paced by lord-server itself on a grid
-    of one refresh when no flip paces them (headless sessions, remote desktop without a monitor, `vmwgfx` and other
-    virtual cards). A frame wanted after its slot had passed (nothing needed the slot, or lord-server was busy) was
-    drawn at once and the next one still came on the old grid, a few milliseconds later. With fifo-v1 that is a frame
-    lost: the update that set the barrier was on screen for 1 to 7 ms and the one waiting on it replaced it, where a
-    monitor shows each for a whole refresh (games and video players in Mesa's FIFO mode). The barrier and the held
-    queue (`timing.c`, `wl.c`) were right: the barrier clears at the frame after the one that latched the update; the
-    frames themselves came too close. A frame that starts more than an eighth of a refresh late (at least 2 ms) now
-    starts the grid again from itself, so two frames are always at least seven eighths of a refresh apart; a frame a
-    millisecond late (the wait rounded up to whole milliseconds) keeps the grid, so 60 frames a second stay 60.
-    A frame is shown when it is painted, so one painted slowly (lord-server preempted on a loaded machine) was shown
-    late and the next, on its slot, came right after it (1 ms apart with a busy loop on every core); the next frame
-    now waits at least half a refresh after the one before was shown (`softpace_shown`), which only a frame taking
-    more than half a refresh to paint (or preempted that long) ever moves, so a VM painting 6 ms frames keeps 60 a
-    second. Physical monitors are paced by their flips and
-    are unchanged. `tests/softpace_test.c` (new, in `make test`) checks
-    every lateness across a refresh and every paint time, and fails on the old rule.
-  - **The fifo check** (`server/tests/wl_conformance.c`) measures with the frames' own times (`wl_callback.done`,
-    lord-server's clock), not when the client read them (a client woken late read both callbacks together), and now
-    sends its pairs at different points of the refresh (20 to 29 ms after the last frame), so it catches the old
-    pacing in an idle run too instead of only when the machine was busy. Its threshold is unchanged (8 ms at 60 Hz,
-    half a refresh, the least the software vblank now guarantees even for a preempted frame). With the old pacing it
-    failed 12 of 12 runs (6 idle, 6 with a busy loop on every core); with the fix it passed 35 of 35 runs with a busy
-    loop on every core (load average about 48 on 20 threads) and every idle run.
-
 ## [0.8.9.5-beta] - 2026-11-23
 
 An update of the package through the Store and `apt`, with no new images. Linux apps: every Wayland global LordOS
-offers passes its conformance run (48 of 48, 29 of them "complete"; `docs/WAYLAND.md`, "Conformance"), with new
-protocols (explicit sync, frame timing, colour management, graphics tablets, VR headsets only if you allow it, tab
-tear-off, session management, the bell, `wl_fixes`), X11 apps handled as GNOME and KDE handle them (28 items at 100 %),
-and the results published on lordos.org's protocol table; always on top in every theme. LordOS Studio: background blur
+offers passes its conformance run (48 of 48, all "complete"; `docs/WAYLAND.md`, "Conformance") on every run, frame
+pacing (`wp_fifo_manager_v1`) and session management (`xdg_session_manager_v1`) included, which failed in some runs on
+a loaded machine until two last fixes (the software vblank, `softpace.h`, and maximized windows in a session; each
+passed 35 of 35 runs with every core busy), with new protocols (explicit sync, frame timing, colour management,
+graphics tablets, VR headsets only if you allow it, tab tear-off, session management, the bell, `wl_fixes`), X11 apps
+handled as GNOME and KDE handle them (28 items at 100 %, 23 complete), and the results published on lordos.org's
+protocol table and its new conformance page (/wayland-conformance/); always on top in every theme. LordOS Studio: background blur
 and pictures, video backgrounds, Noise Reduction and Mic Mode for LordOS's apps, and its camera for every app as a
 virtual camera (v4l2loopback, with a guided Secure Boot key enrolment, and OBS beside it). Machines: apps mode, the
 `machines` command, new system cards (LordOS, Android 13 and more), Intel GVT-g graphics, sound, networks and much more. The
@@ -83,8 +56,6 @@ Mode in a video call, and the Raspberry Pi with this release.
     check by check (versions, scores, every result that differs with both messages); exit status 0 when they match;
     globals left out by `--only` or `--no-x11` are listed, not counted.
 
-- **Backups: the destination and the exclusions can be chosen in the file dialog, in development (the latest release is
-  0.8.9.4; from [#200](https://github.com/lordbasex/LordOS/issues/200)'s second idea).** Settings → Destination has
 - **Backups: the destination and the exclusions can be chosen in the file dialog (from [#200](https://github.com/lordbasex/LordOS/issues/200)'s second idea).** Settings → Destination has
   a **Choose…** button next to **Use Folder**, and Exclusions one next to **Add**. Each opens the system file dialog
   (`FilePicker` in folder mode, `sdk/filepicker.jsx`) over the app; typing a path keeps working as before.
@@ -1925,6 +1896,34 @@ Mode in a video call, and the Raspberry Pi with this release.
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **Without a monitor, and on cards whose page flips complete at once, two frames never come less than a refresh
+  apart; the fifo-v1 conformance check passes every time.** Seen on the
+  maintainer's PC, where `make -C server wl-conformance` failed `wp_fifo_manager_v1: flow.fifo.barrier` in some runs
+  ("4 of 5 a refresh later, closest 3.2 ms", "closest 7.1 ms") and passed in others.
+  - **The software vblank** (`server/src/softpace.h`, new; `main.c`): frames are paced by lord-server itself on a grid
+    of one refresh when no flip paces them (headless sessions, remote desktop without a monitor, `vmwgfx` and other
+    virtual cards). A frame wanted after its slot had passed (nothing needed the slot, or lord-server was busy) was
+    drawn at once and the next one still came on the old grid, a few milliseconds later. With fifo-v1 that is a frame
+    lost: the update that set the barrier was on screen for 1 to 7 ms and the one waiting on it replaced it, where a
+    monitor shows each for a whole refresh (games and video players in Mesa's FIFO mode). The barrier and the held
+    queue (`timing.c`, `wl.c`) were right: the barrier clears at the frame after the one that latched the update; the
+    frames themselves came too close. A frame that starts more than an eighth of a refresh late (at least 2 ms) now
+    starts the grid again from itself, so two frames are always at least seven eighths of a refresh apart; a frame a
+    millisecond late (the wait rounded up to whole milliseconds) keeps the grid, so 60 frames a second stay 60.
+    A frame is shown when it is painted, so one painted slowly (lord-server preempted on a loaded machine) was shown
+    late and the next, on its slot, came right after it (1 ms apart with a busy loop on every core); the next frame
+    now waits at least half a refresh after the one before was shown (`softpace_shown`), which only a frame taking
+    more than half a refresh to paint (or preempted that long) ever moves, so a VM painting 6 ms frames keeps 60 a
+    second. Physical monitors are paced by their flips and
+    are unchanged. `tests/softpace_test.c` (new, in `make test`) checks
+    every lateness across a refresh and every paint time, and fails on the old rule.
+  - **The fifo check** (`server/tests/wl_conformance.c`) measures with the frames' own times (`wl_callback.done`,
+    lord-server's clock), not when the client read them (a client woken late read both callbacks together), and now
+    sends its pairs at different points of the refresh (20 to 29 ms after the last frame), so it catches the old
+    pacing in an idle run too instead of only when the machine was busy. Its threshold is unchanged (8 ms at 60 Hz,
+    half a refresh, the least the software vblank now guarantees even for a preempted frame). With the old pacing it
+    failed 12 of 12 runs (6 idle, 6 with a busy loop on every core); with the fix it passed 35 of 35 runs with a busy
+    loop on every core (load average about 48 on 20 threads) and every idle run.
 - **Wayland session management: a window that was maximized the whole time it was open comes back too.**
   With `xdg-session-management-v1` an app names its windows in a session and, when
   it starts again, asks for each by name before its first commit; LordOS answers `restored` only for a window it kept
