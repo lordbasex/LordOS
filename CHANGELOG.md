@@ -173,6 +173,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `build/vmpace-test` (the rules, the message check), `build/vmdisplay-test` (rates, holds inside QEMU's 1 s,
     input ending idle, the helper's CPU while paced), `desktop-model-test` (`outOfSight`). docs/MACHINES-GPU.md "Pacing a
     machine's picture", docs/VIRTUALIZATION.md.
+  - **The machine window's own reads:** the window read its machine's state (`lord.vm.poll`) every 16 ms for as long as
+    the machine ran, hidden or not, and each read woke lord-server's loop: ~60 wakes a second. Measured on the
+    maintainer's PC with a temporary loop trace: ~70 timer wakes a second with a guest running, visible or minimized,
+    against ~14 without it, all from this timer. It now reads every 100 ms (50 ms while a resize settles, the machine
+    starts or stops, or the window closes), every 500 ms while no window shows the guest, and at once when one shows it
+    again (`apps/machines/vmwindow.jsx`). With the timer gone, lord-server's main thread spent ~2.5 % of a core with
+    that guest on screen or minimized.
 
 - **Machines: a guest's memory uses 2 MB hugetlb pages when the administrator reserved enough of them** (in
   development). lord-vm reads `/proc/meminfo` at start: when all of the machine's memory fits in free, unreserved 2 MB

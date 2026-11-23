@@ -542,11 +542,29 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // the window went away (not a remount): let go of the machine; one this window started is shut down by lord-vm
   useEffect(() => () => { if (sid && !windows.get().some((w) => w.id === winId)) lord.vm.close(sid); }, [sid]);
 
+  // How often the machine's state is read: lord.vm.poll is cheap, but every read wakes lord-server's loop. 50 ms while
+  // something is quick to change (a resize being settled, starting, stopping, closing), 100 ms otherwise, 500 ms while no
+  // window shows the guest (minimized, another desktop, covered); shown again, at once. It was 16 ms: 60 wakes a second
+  // for as long as a machine ran, hidden or not.
+  const hiddenRef = useRef(false);
+  const kickRef = useRef(null);
   useEffect(() => {
     if (!sid) return undefined;
-    const timer = setInterval(() => {
+    let timer = 0, gone = false;
+    const next = (q) => {
+      if (gone) return;
+      const z = sized.current;
+      const busy = !q || z.want || q.state !== 'running' || closingRef.current;
+      timer = setTimeout(tick, hiddenRef.current ? (q ? 500 : 100) : busy ? 50 : 100);
+    };
+    const tick = () => {
+      timer = 0;
       const q = lord.vm.poll(sid);
-      if (!q) return;
+      if (!q) { next(null); return; }
+      if (pollOnce(q) !== false) next(q);
+    };
+    kickRef.current = () => { if (timer) { clearTimeout(timer); tick(); } };
+    const pollOnce = (q) => {
       setSt((prev) => (same(prev, q) ? prev : q));
       snapJobs.current = snapJobs.current.filter((j) => { const r = lord.vm.job(j); if (r?.done && !r.ok) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.snap.failed'), body: r.out.trim().split('\n').pop() || '', sound: false }); return r && !r.done; });
       if (q.cd === 2 || q.cd === 3) setCdWant((w) => { if (w !== null) { if (q.cd === 2) setIso(w); else setCdErr(q.cdMessage || '?'); } return null; });
@@ -572,26 +590,33 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         lord.vm.close(sid);
         setSid(0);
         toolsRuns.delete(dir);                     // the run ended: the tools' automatic update starts over next time
-        if (closingRef.current) { setClosing(false); wm.close(winId, true); return; }
+        if (closingRef.current) { setClosing(false); wm.close(winId, true); return false; }
         // an unattended install ended with the installer's restart: lord-vm took the installer and the seed disk away,
         // so starting again is the installed system (3.9, "Unattended install")
-        if (q.state === 'stopped' && q.reason === 'installed') { setTimeout(() => begin(), 300); return; }
+        if (q.state === 'stopped' && q.reason === 'installed') { setTimeout(() => begin(), 300); return false; }
         // the guest restarted and QEMU couldn't do it in place, so Machines starts it again: a machine with an Intel
         // graphics card (a reset crashes a GVT-g guest, so QEMU ends on one; docs/MACHINES-GPU.md, Mode A), or one with
         // 3D graphics whose QEMU aborted at the guest's restart (QEMU issue 4918; lord-vm says 'reset' only when the
         // guest's tools said it restarts)
-        if (restartsAgain(q.state, q.reason)) { setTimeout(() => begin(), 300); return; }
+        if (restartsAgain(q.state, q.reason)) { setTimeout(() => begin(), 300); return false; }
         if (q.state !== 'stopped' || !['guest-shutdown', 'host-shutdown', 'poweroff', 'installed'].includes(q.reason)) setLog(lord.vm.log(dir, 'vm', 16384));
+        return false;
       }
-    }, 16);
-    return () => clearInterval(timer);
+      return true;
+    };
+    timer = setTimeout(tick, 0);
+    return () => { gone = true; kickRef.current = null; if (timer) clearTimeout(timer); };
   }, [sid]);
 
   // whether any window shows the guest's picture (this one, or one of its apps mode windows): when none does, lord-server
   // stops reading its frames and takes them less often (server/src/vm/vmpace.h); shown again, at once
   const sightIds = useStore(windows, (ws) => [winId, ...ws.filter((w) => w.args?.guestWin?.dir === dir).map((w) => w.id)].join('\n'));
   const outOfSight = useWindowsOutOfSight(sightIds.split('\n'));
-  useEffect(() => { if (sid && typeof lord.vm.shown === 'function') lord.vm.shown(sid, !outOfSight); }, [sid, outOfSight]);
+  useEffect(() => {
+    hiddenRef.current = outOfSight;
+    if (sid && typeof lord.vm.shown === 'function') lord.vm.shown(sid, !outOfSight);
+    if (!outOfSight) kickRef.current?.();      // shown again: its state at once, then the visible pace
+  }, [sid, outOfSight]);
 
   // Closing the window (5.3): Suspend, Shut Down or Keep Running, asked unless the machine's Configure says which. A
   // shutdown resumes a paused machine first, so it can hear the power button; Keep Running tells lord-vm to stay when
