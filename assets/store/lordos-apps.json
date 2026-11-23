@@ -2,7 +2,7 @@
   "schema": 1,
   "about": "Store -> Apps LordOS: LordOS's own installable apps and components (apps/store/lordosmodel.js, docs/PACKAGES.md). A new one is an entry here plus its two texts, store.native.<id>.name and store.native.<id>.summary, in every language. kind: deb (a package of LordOS's signed repository, installed by the package engine after its plan), catalog (an apt/catalog.json item with its own page, such as Disk Formats with its licenses) or settings (installed from a Settings page; the Store links to it). installed: package (the default: the package is installed) or voices (a voice model is there, sdk/voicemanager.js). open: what Open does once it is installed: an app ({app, args}) or a Store page ({page}). category: shown in the section's second column once the list has six entries or more (store.native.cat.<category>).",
   "apps": [
-    { "id": "studioCamera", "kind": "deb", "package": "lordos-studio-camera", "icon": "camera", "category": "media", "open": { "app": "camera" } },
+    { "id": "studioCamera", "kind": "deb", "package": "lordos-studio-camera", "icon": "camera", "category": "media", "open": { "app": "studio" } },
     { "id": "diskFormats", "kind": "catalog", "package": "lordos-disk-formats", "icon": "disk", "category": "system", "open": { "app": "disks" } },
     { "id": "webRuntime", "kind": "deb", "package": "lordos-web", "icon": "web", "category": "system", "open": { "page": "src:web" } },
     { "id": "voices", "kind": "settings", "installed": "voices", "icon": "voice", "category": "voice", "open": { "app": "settings", "args": { "section": "ai" } } }

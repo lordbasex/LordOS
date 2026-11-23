@@ -24,7 +24,7 @@ const eq = (name, got, want) => {
 const items = M.nativeItems(DATA);
 eq('every shipped entry is read', items.length, DATA.apps.length);
 eq('in the file\'s order', items.map((a) => a.id), ['studioCamera', 'diskFormats', 'webRuntime', 'voices']);
-eq('Studio Camera first: its package, Open shows the Camera app', [items[0].kind, items[0].package, items[0].open], ['deb', 'lordos-studio-camera', { app: 'camera', args: null }]);
+eq('Studio Camera first: its package, Open shows the LordOS Studio app', [items[0].kind, items[0].package, items[0].open], ['deb', 'lordos-studio-camera', { app: 'studio', args: null }]);
 eq('Disk Formats keeps its catalog page (licenses first)', [items[1].kind, items[1].package], ['catalog', 'lordos-disk-formats']);
 eq('the Web Runtime opens the Web apps section', items[2].open, { page: 'src:web' });
 eq('the voices: Settings → AI, installed when a model is there', [items[3].kind, items[3].package, items[3].installed, items[3].open],

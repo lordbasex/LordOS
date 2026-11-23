@@ -48,7 +48,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Voices** (the `lordos-voice-*` models). Nothing installs differently: a package of LordOS's repository opens the
   usual package page (the plan, then `pkg-install` through LordOS's package engine; with the item's own icon, name and
   summary, and Open once it is in), Disk Formats keeps its page with every driver's license first, and the voices'
-  page sends you to Settings → AI, where each voice is heard before it is downloaded. Open shows the Camera app, Disks,
+  page sends you to Settings → AI, where each voice is heard before it is downloaded. Open shows the LordOS Studio app, Disks,
   the Web apps section or Settings → AI. The catalog is data, `assets/store/lordos-apps.json` (read by
   `apps/store/lordosmodel.js`, drawn by `apps/store/lordospages.js`): a future native app is one entry and its two
   texts. What moved and what stayed: Studio Camera was only a hardware suggestion (Store → For this computer, when a
