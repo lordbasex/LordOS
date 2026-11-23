@@ -389,6 +389,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   virtio-win guests on arm64 (not built), the packaging (inside `lordos`, QEMU installed on demand), the tests that run, and the
   open questions the code has settled. Features the doc didn't describe were added. `docs/MACHINES-GPU.md`: no longer
   called a plan; Settings → Graphics cards offers only Machines (shared), and its admin actions are built.
+- **Machines: the status checklist audited again** (against `965a10f6e`, after the six performance items landed). Every
+  row was checked against the code again, not only the changed ones: 108 rows now, the total **66 % → 68 %** (engine
+  77 %, getting a system in 75 %, the app 75 %, snapshots and storage 56 %, network 80 %, devices 56 %, host integration
+  68 %, graphics 46 %, guest tools 75 %, command line 48 %, system ties 52 %, security 72 %, performance 7 → 79 %, tests
+  55 %). The six performance items are rated as built (pacing, hugetlb pages, the vCPU recommendation, the disk path, the
+  guest profile for virtio-win guests, pinning). Ratings the code didn't support went down (the resource budget is checked
+  only by the window, "Guest can see" is notes on the sandbox, the sandbox has no user namespace, recording has no test,
+  ISO recognition reads only the volume label, `machines set` misses three options) and ratings the code beat went up (the
+  failure page's nine causes, the requirements check before the download, Configure, the storage window, compaction,
+  Monitor, GPU-scaled dmabuf pictures). Rows added for claims or code that had none. False statements fixed: section 8's
+  "everything shared is off in every profile" (four of the five profiles turn the clipboard on) and `vm-state-size` as an
+  admin action (also in 3); section 9's "none of the performance items is in the code"; the note that dmabuf pictures are
+  still copied; 3.3's user namespace and "Weaker isolation" notice (not built); schema 13 in 3.9; the tests that run (12).
+  The "How the score is made" section shows the arithmetic, and the same table is in `docs/machines-checklist.json`
+  (items, areas with weight and score, total) for tools.
 
 ### Tests
 

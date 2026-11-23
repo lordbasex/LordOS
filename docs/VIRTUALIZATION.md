@@ -18,221 +18,248 @@ How to read it:
 
 Mocks of every screen: https://claude.ai/artifact/WNiELGEazSqnr68SFWuyPz (private to the maintainer).
 
-## Status checklist (audited 2026-11-23, against commit f322f87c0)
+## Status checklist (audited 2026-11-23, against commit 965a10f6e)
 
-Every feature this document describes, checked against the source code of `test/integration-1125` at `f322f87c0`. The code is
-the truth: where this document said otherwise, it was fixed in the same commit. Latest release: **0.8.9.5-beta**; what came
+Every feature this document describes, checked against the source code of `test/integration-1125` at `965a10f6e`. The code is
+the truth: where this document said otherwise, it was fixed in the same commit. This is the second audit of the day; the first
+was against `f322f87c0` (66 %), before the six performance items, the window's slower state reads, the library's placeholders
+and the download retry landed. Work still on other branches (pausing the search indexer, the Linux performance profile, THP
+for shared memory, the LordOS list from lordos.org, machine groups) isn't counted. Latest release: **0.8.9.5-beta**; what came
 after it is marked *in development*. Marks: ✅ done (in code, with a test or a recorded on-screen check) · 🧪 done, but not
 checked on real hardware (headless, nested or `lordvm-dev` only) · 🟡 partial (what's missing is named) · ❌ not built. The
-percentage is how much of the item exists in code.
+percentage is how much of the item exists in code. The same table, machine-readable: [machines-checklist.json](machines-checklist.json).
 
 ### How the score is made
 
-Each area gets a weight by how much a person using Machines feels it (sum 100). Its score is the rounded mean of its items
-below. The total is Σ weight × score.
+Each area gets a weight by how much a person using Machines feels it (sum 100). Its score is the mean of its items'
+percentages, rounded half up. The total is Σ weight × score / 100, rounded. The script that writes this table and the JSON
+recomputes both from the rows; the arithmetic:
 
-| Area | Weight | Score | Points |
-|---|---:|---:|---:|
-| A. Engine, lifecycle, sandbox, display | 14 | 82 % | 11.5 |
-| B. Getting a system in (cards, unattended, import) | 12 | 70 % | 8.4 |
-| C. The app (library, assistant, window, Configure, profiles) | 11 | 74 % | 8.1 |
-| D. Snapshots, clones, storage | 9 | 54 % | 4.9 |
-| E. Network | 6 | 83 % | 5.0 |
-| F. Devices (USB, sound, microphone, camera, printers) | 6 | 56 % | 3.4 |
-| G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 68 % | 8.2 |
-| H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 46 % | 3.2 |
-| I. Guest tools and agent (state, shell, logs) | 7 | 75 % | 5.2 |
-| J. Command line and automation | 3 | 50 % | 1.5 |
-| K. System ties (Monitor, power, Cleaner, Backups) | 3 | 50 % | 1.5 |
-| L. Privacy and security model | 4 | 70 % | 2.8 |
-| M. Performance (targets and the six planned items) | 3 | 7 % | 0.2 |
-| N. Tests and validation on hardware | 3 | 56 % | 1.7 |
-| **Total** | **100** | | **66 %** |
+| Area | Weight | Items | Mean | Score | Points (weight × score) | Before |
+|---|---:|---:|---:|---:|---:|---:|
+| A. Engine, lifecycle, sandbox, display | 14 | 22 | 77.05 | 77 % | 14 × 77 % = 10.78 | 82 % |
+| B. Getting a system in (cards, unattended, import) | 12 | 14 | 70.00 | 70 % | 12 × 70 % = 8.40 | 76 % |
+| C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 74.58 | 75 % | 11 × 75 % = 8.25 | 74 % |
+| D. Snapshots, clones, storage | 9 | 6 | 55.83 | 56 % | 9 × 56 % = 5.04 | 54 % |
+| E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 83 % |
+| F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
+| G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 68.33 | 68 % | 12 × 68 % = 8.16 | 68 % |
+| H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
+| I. Guest tools and agent (state, shell, logs) | 7 | 6 | 75.00 | 75 % | 7 × 75 % = 5.25 | 75 % |
+| J. Command line and automation | 3 | 2 | 47.50 | 48 % | 3 × 48 % = 1.44 | 50 % |
+| K. System ties (Monitor, power, Cleaner, Backups) | 3 | 3 | 51.67 | 52 % | 3 × 52 % = 1.56 | 50 % |
+| L. Privacy and security model | 4 | 6 | 71.67 | 72 % | 4 × 72 % = 2.88 | 70 % |
+| M. Performance (targets and the six items) | 3 | 7 | 79.29 | 79 % | 3 × 79 % = 2.37 | 7 % |
+| N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 56 % |
+| **Total** | **100** | **109** | | | **67.16 → 67 %** | 66 % |
 
-An item's share of the total is its area's weight divided by the area's item count. What would raise the total most: the six
-performance items together (M, +2.6); raw disks, encryption, export and backups, then disposable sessions (D, +1.5 each);
-the smoother picture and venus (H, +1.4 each); guest → host links, the file copy panel with drag out, guest apps before a
-machine runs (G, +1.3, +1.2, +0.8); USB, then camera and printers (F, +1.2 each); the agent shell (I, +1.0); Migrate from
-another PC and Windows on arm64 (B, +0.9 and +0.8); Picture in Picture with several displays (C, +0.9).
-The Whonix group (B, planned 2026-11-23, section 19) was added as a new item at 0 %: it took area B from 76 % to 70 %
-(9.1 to 8.4 points), the total stays 66 % (65.6), and building it would add +0.9.
+Σ = 10.78 + 8.40 + 8.25 + 5.04 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 1.44 + 1.56 + 2.88 + 2.37 + 1.65 = 67.16, rounded **67 %** (before: 66 %, against `f322f87c0`). Without the planned Whonix group row (B, 0 %, section 19) it is 67.76 (68 %); building it adds +0.9.
 
-### A. Engine, lifecycle, sandbox, display (82 %)
+An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
+/ items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); raw disks, encryption, export and backups,
+then disposable sessions (D, +1.5 each); guest → host links (G, +1.3); the file copy panel with drag out, USB, then camera
+and printers (G and F, +1.2 each); the system ties (K, +1.0); the agent shell (I, +1.0); Migrate from another PC and Picture
+in Picture with several displays (B and C, +0.9 each); venus, whole-GPU passthrough and several damage rectangles (H, +0.9
+each); virtio-win guests on arm64 (B, +0.8).
+
+**What this audit changed.** From the code since `f322f87c0`: the six performance items (M, 7 → 79 %: pacing, hugetlb
+pages, the vCPU recommendation, the disk path, the guest profile for virtio-win guests, pinning), schema 13, `lordos-guest-win`
+w11, Configure's new rows (C), the download retry (B). Ratings the code didn't support: the resource budget is checked only by
+the window (A, 50 → 35); "Guest can see" is six notes on the sandbox, not a list of channels (L, 60 → 40); the sandbox lacks
+the user namespace and a non-dumpable QEMU that 3.3 names (A, 95 → 90); recording has no test or recorded check (F, ✅ → 🧪);
+`isoInfo` reads only the volume label (B, 100 → 85); the library's card has no agent or disk lights (C, 95 → 90); `machines
+set` doesn't pass three options (J, 100 → 95). Ratings the code beat: the failure page names nine causes (A, 60 → 65), the
+requirements check runs before the download (B, 70 → 80), Configure grows the disk and pins cores (C, 50 → 60), the storage
+window (D, 70 → 75), compaction's estimate and rollback (D, 80 → 85), Monitor's network and GPU views (K, 60 → 65), half of
+Part 1 step 5 (H, 0 → 40), the targets now measured (M, 50 → 60). Rows added for claims or code without one: the jailed
+helpers, the sandbox state and its cgroup leaves, the weaker-isolation notice, the firmware identity (A); the network card
+model (E); Part 1 steps 1, 2, 3, 6 split from steps 4 and 5, venus and passthrough split (H); the root password hash (L);
+the end-to-end bench (N). Statements fixed: section 8 said everything shared is off "in every profile"
+(Productivity, Development and Design turn the clipboard and the transfer folder on, Games the clipboard; only Light keeps
+both off) and listed `vm-state-size` as an admin action (it is a QMP field read by lord-vm), as did 3; section 9 said none of
+the performance items was in the code; `lord-vmdisplay`'s note said dmabuf pictures are still copied (they are GPU textures
+when the desktop composes on the GPU); 3.3 named a user namespace for QEMU and a
+"Weaker isolation" notice, neither built; 12's list of tests lacked `vmpace-test`, `vmmem-test`, `vmcpu-test`, `vmpin-test` and
+`http-retry-test`.
+
+### A. Engine, lifecycle, sandbox, display (77 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lord-vm` supervisor over direct QMP, `machine.json` schema 12, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 12`); `vm-test` | |
+| `lord-vm` supervisor over direct QMP, `machine.json` schema 13, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 13`); `vm-test` | Schema 13 since `cpu_pin` and `perf_profile` |
 | KVM amd64 and arm64, TCG labelled Emulated (2.1–2.4) | ✅ | 100 | `lordvm.c` (`-accel`), `assistant.jsx` ("Other architecture…") | Pi 5, nested amd64, Xeon and the i9 PC |
-| Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2) | ✅ | 100 | `machine.c`, `js_vm.c` | |
-| `/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4) | ✅ | 100 | `vm_admin.c` | |
-| Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp denylist on top of QEMU's (3.3) | ✅ | 95 | `vmsandbox.h`, `vmsandbox.c`; `vm_isolation.sh` | An allowlist of our own is open |
-| Render node by descriptor; one slice for all machines (3.3, 3.7) | ❌ | 0 | `lordvm.c` passes a path; one scope per machine | QEMU's `rendernode=` takes a path |
-| Resource budget (3.7) | 🟡 | 50 | `model.js` `budgetCheck`, cgroup limits | No common slice, no pressure warning |
+| Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2) | ✅ | 100 | `machine.c`, `js_vm.c` |  |
+| `/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4) | ✅ | 100 | `vm_admin.c` |  |
+| Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp denylist on top of QEMU's (3.3) | ✅ | 90 | `vmsandbox.c`, `lordvm.c`; `vm_isolation.sh` | No allowlist of our own; no user namespace for QEMU (3.3 says "if available": `unshare` is denied, nothing creates one); QEMU gets `RLIMIT_CORE` 0 but not `PR_SET_DUMPABLE` 0 (only lord-vm and lord-vmdisplay) |
+| Every helper jailed too: lord-vm's own Landlock, `qemu-img`, `swtpm`, `passt`, `virtiofsd`; lord-vmdisplay sandboxed with a self-test; render node and VFIO confined by Landlock (3.3) | ✅ | 100 | `lordvm.c` `vm_jail_self`, `vmsandbox.c` `vm_jail_tool*`, `render_rules`, `vgpu_rules`, `vmdisplay.c` `--selftest`; `vm_isolation.sh` | Added by this audit |
+| Sandbox and cgroup state reported (`lord-vm --status`: Landlock, our seccomp, KVM fd, scope), nested cgroup leaves per process (3.3, 3.7) | ✅ | 100 | `lordvm.c` (`setup_cgroups`, `--status`), `diag.js`, `logs.jsx` | Added by this audit |
+| "Weaker isolation on this kernel" notice when Landlock is missing (3.3) | ❌ | 0 |  | Only the log's "Sandbox:" line says it; lord-vm refuses to start only without seccomp or `no_new_privs`. Added by this audit |
+| Render node by descriptor; one slice for all machines (3.3, 3.7) | ❌ | 0 | `lordvm.c` passes a path (`rendernode=`); one scope per machine | QEMU's `rendernode=` takes a path; Landlock limits it to that node (row above) |
+| Resource budget (3.7) | 🟡 | 35 | `model.js` `budgetCheck`, `vmwindow.jsx`, cgroup `memory.max` and CPU limits | Only the window checks it: `startDetached` and `machines start` skip it, and `vm_budget_fits` (`machine.c`) is called only by `vm-test`. No common slice, no pressure warning, no "pause another or start with less" |
 | Files and contracts: `operation.json`, newer schema read-only, suspended-state check (3.5, 3.6) | ✅ | 90 | `vmops.h` `vm_op_begin`, `machine.c`, `lordvm.c` | Export manifest not built |
-| `lord-vmdisplay`: Unix.Map, SIGBUS guard, rate, dmabuf, cursor, audio (3.2) | ✅ | 95 | `vmdisplay.c`; `vmdisplay-test` | dmabuf still copied, not zero copy |
-| Start, pause, suspend, resume, shut down through the agent then ACPI, force off (6.1) | ✅ | 100 | `lordvm.c`; release gates | |
+| Firmware identity kept with the machine; the old code file kept in the folder (3.6) | 🟡 | 40 | `machine.c` (`firmware_sha256`), `lordvm.c` | Only the hash is recorded and a mismatch logged; the old code file isn't kept. Added by this audit |
+| `lord-vmdisplay`: Unix.Map, SIGBUS guard, rate, dmabuf, cursor, audio (3.2) | ✅ | 95 | `vmdisplay.c`, `js_vm.c`; `vmdisplay-test` | Zero copy when the desktop composes on the GPU (the dmabuf is a texture); read back only for a recording, the CPU path or a failed import |
+| Start, pause, suspend, resume, shut down through the agent then ACPI, force off (6.1) | ✅ | 100 | `lordvm.c`; release gates |  |
 | Keep Running, Start Without Window, keep awake (5.3, 6.1) | ✅ | 100 | `js_vm.c` `startDetached`, `awake` | The idle hold wasn't watched on screen |
 | Host shutdown inside logind's 45 s delay (6.1) | 🧪 | 100 | `vmhoststop.h`, `vmlogind.c`; `vmlogind-test`; migration 010 | *In development*; fake logind plus the maintainer's PC |
 | A 3D guest's stop named (`qemu-3d-stop`, `qemu-3d-crash`), unattended starts in 2D (3.2, 6.10) | 🧪 | 90 | `vmlog.c`, `lordos-guest --stopping`; `guest_stop_test.sh` | *In development*; no real 6.12.117 3D guest yet |
-| Self-healing network (passt restarted while running) | ✅ | 100 | `lordvm.c` (keeper, `NET_MAX_RESTARTS`) | |
-| Failure page with a cause and a fix (6.1) | 🟡 | 60 | `vmwindow.jsx` | Generic causes only |
-| A state saved by another QEMU: Resume anyway or discard (6.1) | 🟡 | 60 | `lordvm.c`, `vmwindow.jsx` | No Store warning; devices that can't be saved aren't unplugged |
-| Direct kernel boot (13.8 item 9) | 🟡 | 30 | `lordvm.c` | Unattended installs only |
+| Self-healing network (passt restarted while running) | ✅ | 100 | `lordvm.c` (keeper, `NET_MAX_RESTARTS`) |  |
+| Failure page with a cause and a fix (6.1) | 🟡 | 65 | `vmwindow.jsx`, `machines.why.*` and `fix.*` | Nine named causes, each with a fix line, lord-vm's own reason, Use 2D and Resume anyway buttons; no "start with less memory" or "go back to a snapshot" action, no locked-file cause |
+| A state saved by another QEMU or CPU: Resume anyway or discard (6.1) | 🟡 | 60 | `lordvm.c` (`--resume-anyway`), `vmwindow.jsx` | No Store warning; devices that can't be saved (HDA) aren't unplugged |
+| Direct kernel boot (13.8 item 9) | 🟡 | 30 | `lordvm.c` | Unattended installs only; none for an installed Linux guest |
 | Rename a machine with its folder and transfer folder (6.26) | 🧪 | 100 | `machine.c` (`renameat2`); `vm_rename.sh` | *In development*; headless |
 
 ### B. Getting a system in (70 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows and Android on amd64 (4.1, 5.2) | ✅ | 95 | `assets/machines/systems.json`, `catalog.js`; `vmcatalog-test`, `vm_catalog_test.mjs` | Kali never run end to end |
-| Makers' OpenPGP signatures, SHA-256, resumed downloads, removal (3.9) | ✅ | 100 | `vmcatalog.c`, `vmimage_admin.c`, `pgp.h`; `http-resume-test` | |
-| Any ISO, recognized (5.2) | ✅ | 100 | `js_vm.c` `isoInfo` | No drop on the tile |
-| Unattended Linux: Debian and Ubuntu desktops to login (3.9) | ✅ | 100 | `vmunattend.c`; `vmunattend-test`; VM 116, 2026-11-07 | |
-| Unattended Fedora to login, Ubuntu console, the arm64 cards on the Pi | 🟡 | 60 | same code | Never recorded through login |
+| Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows and Android on amd64 (4.1, 5.2) | ✅ | 95 | `assets/machines/systems.json`, `catalog.js`; `vmcatalog-test`, `vm_catalog_test.mjs` | Kali has no unattended install and was never run end to end |
+| Makers' OpenPGP signatures, SHA-256, resumed downloads, removal (3.9) | ✅ | 100 | `vmcatalog.c`, `vmimage_admin.c`, `pgp.h`; `http-resume-test`, `http-retry-test` | A redirect refused with 403 or 5xx starts again from the original URL (*in development*) |
+| Any ISO, recognized (5.2) | ✅ | 85 | `js_vm.c` `isoInfo`, `model.js` `systemOf`, `archOf` | Only the 32-byte volume label is read; the architecture comes from the name or label, not the boot files. No drop on the tile |
+| Unattended Linux: Debian and Ubuntu desktops to login (3.9) | ✅ | 100 | `vmunattend.c`; `vmunattend-test`; VM 116, 2026-11-07 |  |
+| Unattended Fedora to login, Ubuntu console, the arm64 cards on the Pi | 🟡 | 60 | same code (`VMU_KICKSTART`) | Never recorded through login |
 | LordOS card, `lordos-auto.conf` (3.9) | 🧪 | 80 | `vmunattend.c` (`VMU_LORDOS`) | Not run from the card |
 | Windows 11 amd64: ISO by hash, unattended, drivers, TPM, Secure Boot, KMS client key (4.3.1) | ✅ | 100 | `windows.js`, `vmunattend.c`, `lordvm.c`; `vm_windows_test.mjs` | On the maintainer's PC |
 | virtio-win guests on arm64 (4.3) | ❌ | 10 | `machine.c` refuses the Windows devices on arm64 | `vmunattend.c` writes arm64 answers already |
 | Android 13 card, Bliss OS 16.9.7 pinned (4.2) | 🧪 | 80 | `systems.json` `android` | Booting under Machines still to test |
-| A person's own systems: `vm-image-get-user`, `lord-pgpv` (5.6.1) | ✅ | 95 | `systems.js`, `vmurl.c`, `vmsig.c`, `lordpgpv.c`; `vmurl-test`, `vmsig-test` | |
-| Import from other apps with identity kept (6.22) | ✅ | 95 | `vmimport.c`, `vmxml.c`, `lordvm.c` `--import-machine`; `vmimport-test`, `vm_import_test.sh` | No libvirt XML, no driver injection, no real Windows from Fusion |
-| Requirements check (5.2) | 🟡 | 70 | `library.jsx` What's Missing, `vm-enable` | Not before a download, not through the Store |
-| Migrate from another PC (6.11) | ❌ | 0 | | Phase 4 |
-| Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | ❌ | 0 | | Planned 2026-11-23; design only, approvals in 19.12 |
+| A person's own systems: `vm-image-get-user`, `lord-pgpv` (5.6.1) | ✅ | 95 | `systems.js`, `vmurl.c`, `vmsig.c`, `lordpgpv.c`; `vmurl-test`, `vmsig-test` |  |
+| Import from other apps with identity kept (6.22) | ✅ | 95 | `vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`; `vmimport-test`, `vm_import_test.sh` | No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion |
+| Requirements check (5.2) | 🟡 | 80 | `library.jsx` `Requirements`, `model.js` `reqRows`, `missingFor`, `assistant.jsx`, `vm-enable` | Create, which starts the download, waits until the parts are in (one click through the package engine). No per-system page of drivers and tools; not through the Store |
+| Migrate from another PC (6.11) | ❌ | 0 |  | Phase 4 (the assistant's Migrate tile is the import of 6.22) |
+| Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | ❌ | 0 |  | Planned 2026-11-23; approved by the maintainer, design in section 19 |
 
-### C. The app (74 %)
+### C. The app (75 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Library: toolbar, chips, grid or list, sort, search, status line, live card (5.1) | ✅ | 95 | `library.jsx`, `model.js`; `vm_model_test.mjs` | |
-| Machines settings: General, Profiles, Systems, Network, Graphics cards, Keyboard and mouse (5.1) | ✅ | 100 | `settingswin.jsx` | |
-| New Machine assistant (5.2) | 🟡 | 70 | `assistant.jsx` (5 steps) | No Detect step, folder choice or **Fresh install** snapshot |
-| Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu (5.3) | 🟡 | 75 | `vmwindow.jsx` | No View or Info menus, Scale, Actual Size, device dots, Start in Full Screen, aspect lock |
-| Display modes: Window, Full Screen, Apps (5.4) | ✅ | 100 | `vmwindow.jsx`, `appsmode.jsx` | |
-| All Displays (multi-head), Picture in Picture of a machine (5.4) | ❌ | 0 | `setPip` only for apps-mode popups | |
-| Configure, one window with summaries (5.5) | 🟡 | 50 | `configure.jsx` (11 sections) | No search, dots, Backup, hugepages, ballooning, CPU model, USB rules, disk add or resize |
-| Profiles and `.lordprofile` (5.6) | ✅ | 95 | `profiles.js`; `vm_profiles_test.mjs` | |
-| Official logos, opt-in (5.6.2) | ✅ | 90 | `logos.js` | |
-| What this computer can run (5.7) | 🟡 | 30 | `library.jsx` (the Pi page) | No amd64 page, no sensors, not in Help or first run |
+| Library: toolbar, chips, grid or list, sort, search, status line, live card (5.1) | ✅ | 90 | `library.jsx`, `model.js` (`skeletonPlan`); `vm_model_test.mjs` | Placeholders from the first frame (*in development*). No agent or disk lights on the card, no Export or Templates in ··· |
+| Machines settings: General, Profiles, Systems, Network, Graphics cards, Keyboard and mouse (5.1) | ✅ | 100 | `settingswin.jsx` |  |
+| New Machine assistant (5.2) | 🟡 | 70 | `assistant.jsx` (5 steps) | No Detect step, folder choice, **Fresh install** snapshot or file drop |
+| Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu (5.3) | 🟡 | 75 | `vmwindow.jsx` | No View or Info menus, Scale, Actual Size, device dots, Start in Full Screen, aspect lock; no USB, Network or Camera in Devices |
+| Display modes: Window, Full Screen, Apps (5.4) | ✅ | 100 | `vmwindow.jsx`, `appsmode.jsx` |  |
+| All Displays (multi-head), Picture in Picture of a machine (5.4) | ❌ | 0 | `setPip` only for apps-mode popups |  |
+| Configure, one window with summaries (5.5) | 🟡 | 60 | `configure.jsx` (11 sections) | Built since the last audit: Pin cores, the vCPU advice, the performance profile; the disk grows. No search, dots, Backup, ballooning, CPU model, USB rules, disk add or encryption, printers, icon and tags, MAC, speed limit; huge pages are automatic, no switch |
+| Profiles and `.lordprofile` (5.6) | ✅ | 95 | `profiles.js`; `vm_profiles_test.mjs` |  |
+| Official logos, opt-in (5.6.2) | ✅ | 90 | `logos.js` |  |
+| What this computer can run (5.7) | 🟡 | 30 | `library.jsx` (the Pi page, the first-run page) | The first-run page covers KVM and Emulated only. No amd64 page, no sensors, not in Help |
 | ❖ shortcuts, Keys panel, focus gate (5.8) | ✅ | 95 | `keys.jsx`; `vm_keys_scene.mjs` | The release combination is fixed |
 | Capture mouse (6.25) | 🧪 | 90 | `capture.js`, `pointerlock.h`; `vm_capture_test.mjs` | Through `lordvm-dev` only |
 
-### D. Snapshots, clones, storage (54 %)
+### D. Snapshots, clones, storage (56 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | Snapshots with memory, NVRAM and TPM, timeline, revert, sweep, at most 64 (6.2) | ✅ | 85 | `lordvm.c` (`tpm_snap`), `snapshots.jsx`, `vmops.h` | No `fsfreeze`, no copy of `machine.json`, no notes, no snapshot before a tools update |
-| Disposable sessions (6.2) | ❌ | 0 | | |
-| Clone, Duplicate, linked clone, Clone from Here, new identity (6.3) | ✅ | 90 | `lordvm.c` `--clone`, `vmops.c` | The source must be off; no templates |
-| Disks: qcow2, discard, Reclaim space (6.4) | ✅ | 80 | `lordvm.c` (`blockdev_*`) | |
-| Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6) | ❌ | 0 | | |
-| Storage window: shared extents, frees-if-deleted, downloads (6.16) | 🟡 | 70 | `storage.jsx`, `js_vm.c` (FIEMAP) | Never seen on btrfs or XFS; no "about" figures |
+| Disposable sessions (6.2) | ❌ | 0 |  |  |
+| Clone, Duplicate, linked clone, Clone from Here, new identity (6.3) | ✅ | 90 | `lordvm.c` `--clone`, `vmops.c`, `clone.jsx` | The source must be off; no templates |
+| Disks: qcow2, discard, Reclaim space, grow (6.4, 6.4.1) | ✅ | 85 | `lordvm.c` (`blockdev_disk`, `--compact --estimate`, `qemu-img resize`) | An interrupted compaction is rolled back. No qcow2 compression; the disk path itself is scored in M |
+| Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6) | ❌ | 0 |  | Raw only for imports and read-only nodes; encrypted imports refused |
+| Storage window: shared extents, frees-if-deleted, downloads (6.16) | 🟡 | 75 | `storage.jsx`, `js_vm.c` (FIEMAP) | Trash, Reclaim with an estimate, the unused shared base. Never seen on btrfs or XFS; no "about" figures; no "delete old snapshots" or "remove unused media" |
 
-### E. Network (83 %)
+### E. Network (80 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Shared (passt over a socketpair), Isolated (6.5) | ✅ | 100 | `lordvm.c` (`vm_passt_argv`) | |
+| Shared (passt over a socketpair), Isolated (6.5) | ✅ | 100 | `lordvm.c` (`vm_passt_argv`) |  |
 | Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5) | 🧪 | 90 | `vmnet_admin.c`, `vmnet.c`, `lordvm.c` | Headless checks; `vhost=off`, no `vhost-net` |
-| Each machine named in the firewall (6.5) | 🟡 | 60 | `fw/rules.h` (`lordos:machines`) | One component for every machine |
+| Each machine named in the firewall (6.5) | 🟡 | 60 | `fw/rules.h` (`lordos:machines`), `apps/monitor/Network.jsx` | One component for every machine (Monitor names them); a forwarded port isn't shown as its own rule |
+| Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22) | 🧪 | 70 | `machine.h` (`nic_model`, `VM_EXTRA_NICS`) | An import's extra cards are kept but never connected. Added by this audit |
 
 ### F. Devices (56 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Speakers and microphone, output and input per machine (6.9) | ✅ | 90 | `lordvm.c` (`hda-micro`), `vmdisplay.c` | Windows guest sound not checked |
-| Recording with sound, screenshot (6.20) | ✅ | 90 | `js_vm.c` | No automated test |
-| CD/DVD change while running | ✅ | 100 | `lordvm.c` (`cd_change`) | |
-| USB passthrough, auto-connect rules, `vm-usb-allow` (6.6) | ❌ | 0 | no usbredir anywhere | |
-| Camera (6.9), printers (5.5) | ❌ | 0 | | |
+| Speakers and microphone, output and input per machine (6.9) | ✅ | 90 | `lordvm.c` (`hda-micro`), `vmdisplay.c`; microphone permission checked in `js_vm.c` | Windows guest sound not checked |
+| Recording with sound, screenshot (6.20) | 🧪 | 90 | `js_vm.c`, `vmwindow.jsx` | No automated test or recorded on-screen check (was ✅) |
+| CD/DVD change while running | ✅ | 100 | `lordvm.c` (`cd_change`) |  |
+| USB passthrough, auto-connect rules, `vm-usb-allow` (6.6) | ❌ | 0 | no usbredir anywhere |  |
+| Camera (6.9), printers (5.5) | ❌ | 0 |  |  |
 
 ### G. Host integration (68 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Shared folders, virtiofs, read-only by default (6.7) | ✅ | 90 | `lordvm.c` (`vhost-user-fs-pci`) | Not checked on the Pi or Windows; no SMB fallback |
-| Transfer folder (6.7.1) | 🧪 | 90 | `machine.h` (`VM_XFER_*`), `lordvm.c` | Through `lordvm-dev` |
-| Clipboard: text, rich text, pictures, by direction, ask mode, secrets kept out (6.8) | ✅ | 95 | `vmagent.c`, `js_vm.c`, `x11clip.c`; `guest_clip_test.sh` | |
-| Files dropped on a machine or an apps-mode window (6.21, 7.2.1) | ✅ | 100 | `lordvm.c` (`.lordos-drop-*.part`), `AGK_PLACE` | |
-| File copy panel, flow control, resume, drag out, Send to LordOS, quarantine (6.21) | ❌ | 10 | one progress line | |
+| Shared folders, virtiofs, read-only by default (6.7) | ✅ | 90 | `lordvm.c` (`vhost-user-fs-pci`) | Not checked on the Pi or in a Windows guest on arm64; no SMB fallback |
+| Transfer folder (6.7.1) | 🧪 | 90 | `machine.h` (`VM_XFER_*`), `lordvm.c`, `configure.jsx` | Through `lordvm-dev` |
+| Clipboard: text, rich text, pictures, by direction, ask mode, secrets kept out (6.8) | ✅ | 95 | `vmagent.c`, `js_vm.c`, `x11clip.c`; `guest_clip_test.sh` |  |
+| Files dropped on a machine or an apps-mode window (6.21, 7.2.1) | ✅ | 100 | `lordvm.c` (`.lordos-drop-*.part`), `AGK_PLACE` |  |
+| File copy panel, flow control, resume, drag out, Send to LordOS, quarantine (6.21) | ❌ | 10 | one progress line |  |
 | Open with a machine (7.3) | ✅ | 100 | `openwith.js`; `vm_openwith_test.mjs` | Windows guests |
-| Apps mode: Windows and LordOS guests (7.2) | ✅ | 90 | `appsmode.jsx`, `js_guestwin.c`; `guestwin_headless.sh` | Not other Linux desktops |
-| Guest apps in the launcher before the machine runs (6.12) | 🟡 | 40 | Dock `vm:<machine>:<app>` while apps mode runs | |
-| Guest → host links and notifications (6.12) | ❌ | 0 | | |
+| Apps mode: Windows and LordOS guests (7.2) | ✅ | 90 | `appsmode.jsx`, `appsstatus.jsx`, `js_guestwin.c`; `guestwin_headless.sh` | Not other Linux desktops; no window shapes |
+| Guest apps in the launcher before the machine runs (6.12) | 🟡 | 40 | Dock `vm:<machine>:<app>` while apps mode runs | No saved list, no launcher entries, no "launch starts the machine" |
+| Guest → host links and notifications (6.12) | ❌ | 0 |  | No agent message kind for either |
 
 ### H. Graphics (46 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | virgl 3D for Linux guests on amd64 (6.10) | ✅ | 85 | `lordvm.c` (`decide_graphics`) | RX 580; off on arm64 by decision |
-| Intel GVT-g vGPU with our GOP ROM, Windows guest (6.10.1, MACHINES-GPU.md) | ✅ | 85 | `vmgpu*.c`, `vmgvtwin.c`; `vmgpu-test` | No Linux guest on a vGPU; only device 0x9BC5 |
+| Intel GVT-g vGPU with our GOP ROM, Windows guest (6.10.1, MACHINES-GPU.md) | ✅ | 85 | `vmgpu*.c`, `vmgvtwin.c`; `vmgpu-test` | No Linux guest on a vGPU; tested on device 0x9BC5 only |
 | Settings → Graphics cards: Machines (shared) (MACHINES-GPU.md) | 🟡 | 60 | `apps/settings/Gpus.jsx`, `vmgpu_admin.c` | Dedicated and AI answer `gpu.roleNotYet` |
-| A smoother picture, Part 1 steps 4 and 5 (MACHINES-GPU.md) | ❌ | 0 | `vmdisplay.c` merges damage into one box | |
-| venus (Vulkan), whole-GPU passthrough (6.10) | ❌ | 0 | | |
+| A smoother picture, Part 1 steps 1, 2, 3, 6: frames in lord-server's loop, hardware pointer, damage, Monitor (MACHINES-GPU.md) | ✅ | 100 | `js_vm.c`, `media.c`; `engine-test`, `mview-test` | Released in 0.8.9.5. Added by this audit (was folded into the "steps 4 and 5" row) |
+| A smoother picture, Part 1 step 4: several damage rectangles (MACHINES-GPU.md) | ❌ | 0 | `vmdisplay.c` `damage()` merges into one box | Pacing (M) changed when pictures are taken, not their damage |
+| A smoother picture, Part 1 step 5: scaled on the GPU (MACHINES-GPU.md) | 🟡 | 40 | `js_vm.c` (`gtex`, `gout`), `gpu/dmaread.c`, `media/mview.c` | dmabuf pictures (virgl, vGPU) are GPU textures; a 2D picture is still scaled per pixel on the CPU over the whole frame (was ❌ 0) |
+| venus (Vulkan) (6.10) | ❌ | 0 |  |  |
+| Whole-GPU passthrough (Mode B) (6.10, MACHINES-GPU.md) | ❌ | 0 | `vmgpu_admin.c` refuses a dedicated card | "Whole" in Configure is the largest GVT-g type, not passthrough |
 
 ### I. Guest tools and agent (75 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lordos-guest` 6: clipboard, apps-mode relay, `--stopping` (6.17, 7) | ✅ | 100 | `tools/guest/lordos-guest.c` | |
-| `lordos-guest-win` w10: clipboard, display, apps, open, place, pointer, gvt (7.1.2) | ✅ | 95 | `tools/guest-win/lordos-guest-win.c` | Real Windows 11 guest |
-| Install Agent through qemu-guest-agent; tools updated by themselves (6.17, 7.1.3) | ✅ | 90 | `lordvm.c` (`guest-file-write`), `model.js` | No guest with older tools tried |
+| `lordos-guest` 6: clipboard, apps-mode relay, `--stopping` (6.17, 7) | ✅ | 100 | `tools/guest/lordos-guest.c` | No `perf` (7.1.4: the Linux side isn't built) |
+| `lordos-guest-win` w11: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf (7.1.2, 7.1.4) | ✅ | 95 | `tools/guest-win/lordos-guest-win.c` (`VERSION "w11"`); `vm-test` (`AGK_PERF`) | Was w10; `perf` not yet checked in a running guest |
+| Install Agent through qemu-guest-agent; tools updated by themselves (6.17, 7.1.3) | ✅ | 90 | `lordvm.c` (`guest-file-write`), `model.js` (`TOOLS_SHIPPED`, `toolsAutoStep`) | No guest with older tools tried |
 | Agent state light and capability list (6.17) | 🟡 | 85 | `model.js` (`agentTone`, `agentLines`) | No red state |
-| Shell over the agent as the signed-in user (6.18) | ❌ | 15 | the Shell is the serial console | |
-| Logs: journal, serial, machine log, Overview (6.19) | 🟡 | 65 | `logs.jsx`, `lordvm.c` (journal through qemu-ga) | No Windows event logs, unit filter or time zone |
+| Shell over the agent as the signed-in user (6.18) | ❌ | 15 | the Shell is the serial console |  |
+| Logs: journal, serial, machine log, Overview (6.19) | 🟡 | 65 | `logs.jsx`, `lordvm.c` (journal through qemu-ga) | No Windows event logs, unit filter (a column only), time zone or Clear view |
 
-### J. Command line and automation (50 %)
-
-| Feature (section) | Status | % | Evidence | Note |
-|---|---|---:|---|---|
-| `machines` list, status, start, open, stop…, snapshot, clone, set; 35 languages, `--json`, completion (6.15) | 🧪 | 100 | `server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh` | `rename` and ids *in development* |
-| `lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24) | ❌ | 0 | | |
-
-### K. System ties (50 %)
+### J. Command line and automation (48 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Monitor: a machine as one row (6.14) | 🟡 | 60 | `apps/monitor/Processes.jsx` | No drill-in |
-| Idle block while a machine runs (6.14) | ✅ | 90 | `lord.vm.awake`, `vmlogind.c` | |
-| Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, balloon (6.14, 16) | ❌ | 0 | | |
+| `machines` list, status, start, open, stop…, snapshot, clone, set, rename, ids; 35 languages, `--json`, completion (6.15) | 🧪 | 95 | `server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh` | `set` doesn't pass `--cpu-pin`, `--perf-profile` or `--capture-fullscreen` (`mcli.c` `PASS[]`); no start from a memory snapshot, create, import or console |
+| `lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24) | ❌ | 0 |  |  |
 
-### L. Privacy and security (70 %)
-
-| Feature (section) | Status | % | Evidence | Note |
-|---|---|---:|---|---|
-| No telemetry; signed catalog; downloads only when asked (8) | ✅ | 100 | `vmsig.c`, `vmcatalog.c` | |
-| Guest data treated as hostile: logs cleaned, parsers fuzzed (8) | ✅ | 90 | `logclean.h`; `vm-test` fuzz passes | No fuzz of lord-vmdisplay's D-Bus side |
-| Closed admin actions only (8) | ✅ | 100 | `vm_admin.c`, `vmnet_admin.c`, `vmgpu_admin.c`, `vmimage_admin.c` | |
-| "Guest can see" (8, 16) | 🟡 | 60 | Configure → Security | No single panel with an on/off per channel |
-| Encrypted machines (8) | ❌ | 0 | encrypted imports are refused | |
-
-### M. Performance (7 %)
+### K. System ties (52 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Targets measured: CPU, network, idle CPU, the Pi desktop (9) | 🟡 | 50 | section 13 | Disk, pause, suspend, latency, app memory not measured; amd64 figures nested |
-| 1. Skip unchanged frames; pace or pause a hidden machine's display | ❌ | 0 | | Planned, `perf/machines` |
-| 2. Huge pages for guest RAM | ❌ | 0 | | Planned, `perf/machines` |
-| 3. vCPU recommendation | ❌ | 0 | | Planned, `perf/machines` |
-| 4. Disks: virtio-blk with an iothread, io_uring, O_DIRECT | ❌ | 0 | `vmsandbox.c` refuses `io_uring` | Planned, `perf/machines`; changes the sandbox |
-| 5. Guest-side performance profile through the guest tools | ❌ | 0 | | Planned, `perf/machines` |
-| 6. vCPU pinning | ❌ | 0 | | Planned, `perf/machines` |
+| Monitor: a machine as one row (6.14) | 🟡 | 65 | `apps/monitor/Processes.jsx`, `Network.jsx`, `Gpu.jsx` | Network and GPU name machines too; no drill-in |
+| Idle block while a machine runs (6.14) | ✅ | 90 | `lord.vm.awake`, `vmlogind.c` |  |
+| Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, balloon (6.14, 16) | ❌ | 0 |  | No `virtio-balloon`; Cleaner, Backups and Files don't know `.lordvm` |
 
-### N. Tests and validation (56 %)
+### L. Privacy and security (72 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Unit and headless suites in `make test` (12) | ✅ | 90 | `server/mk/vm.mk`, `tests/run_suites.sh` | No settings → QEMU arguments table test |
+| No telemetry; signed catalog; downloads only when asked (8) | ✅ | 100 | `vmsig.c`, `vmcatalog.c` |  |
+| Guest data treated as hostile: logs cleaned, parsers fuzzed (8) | ✅ | 90 | `logclean.h`; `vm-test` fuzz passes, `vmimport-test` mutations | No fuzz of lord-vmdisplay's D-Bus side or of `lordos-guest`'s parser |
+| Closed admin actions only (8) | ✅ | 100 | `vm_admin.c`, `vmnet_admin.c`, `vmgpu_admin.c`, `vmimage_admin.c` | `vm-state-size` was listed but isn't one (fixed) |
+| Root password only as a hash in the unattended files (8) | ✅ | 100 | `vmunattend.c`; `vmunattend-test` | Added by this audit |
+| "Guest can see" (8, 16) | 🟡 | 40 | `configure.jsx` (Security: six notes on the sandbox) | It doesn't list the guest's channels; each one's switch is in its own section; no single panel, no live state (was 60) |
+| Encrypted machines (8) | ❌ | 0 | encrypted imports are refused | Nor the line in Security that host swap can hold guest memory |
+
+### M. Performance (79 %)
+
+| Feature (section) | Status | % | Evidence | Note |
+|---|---|---:|---|---|
+| Targets measured: CPU, network, idle CPU, the Pi desktop, disk (9, 6.4.1) | 🟡 | 60 | sections 6.4.1, 3.7.1, 13 | Disk and the host frame under pinning measured on the i9 since; pause, suspend, latency to the screen, app memory not measured; amd64 Phase 0 figures nested |
+| 1. Skip unchanged frames; pace or pause a hidden machine's picture | 🧪 | 90 | `vmpace.h`, `vmdisplay.c` (`VD_PACE`), `sdk/desktopmodel.js`; `vmpace-test`, `vmdisplay-test` | *In development*; measured with QEMU's vfio refresh imitated, not on the live vGPU |
+| 2. Huge pages for guest RAM | 🧪 | 85 | `vmmem.h`, `lordvm.c` (`mem_backing`); `vmmem-test` | *In development*; hugetlb only when the administrator reserved pages; THP for shared memory (`shmem_enabled`) waits for approval |
+| 3. vCPU recommendation | 🧪 | 90 | `vmcpu.c`, `model.js` `vcpuAdvice`, `configure.jsx`; `vmcpu-test`, `vm_model_test.mjs` | *In development*; Configure and the library card, not the assistant (it uses the host's default) |
+| 4. Disks: virtio-blk with an iothread, O_DIRECT, native AIO | 🟡 | 80 | `lordvm.c` (`blockdev_disk`, `disk_direct`, `virtio_disks`) | *In development*; measured on the i9 NVMe; `io_uring` stays refused by `vmsandbox.c` (a sandbox change to approve) |
+| 5. Guest-side performance profile through the guest tools | 🟡 | 55 | `lordvm.c` (`AGK_PERF`), `configure.jsx`, `lordos-guest-win.c` w11; `vm-test` | *In development*; Windows guests only (power plan, effects, transparency); no Windows Search pause, no Linux side, not checked in a running guest |
+| 6. vCPU pinning | ✅ | 95 | `vmpin.c`, `lordvm.c`, `configure.jsx` (Pin cores); `vmpin-test` | *In development*; measured on the i9 (8 vCPUs: host frame p99 15.2 → 9.9 ms) |
+
+### N. Tests and validation (55 %)
+
+| Feature (section) | Status | % | Evidence | Note |
+|---|---|---:|---|---|
+| Unit and headless suites in `make test` (12) | ✅ | 90 | `server/mk/vm.mk`, `vmpin.mk`, `tests/run_suites.sh` | 18 C programs, 6 scripts, 8 node tests. No settings → QEMU arguments table test (`build_qemu_args` is static in `lordvm.c`) |
 | Release gates: isolation, integrity, recovery, leaks (12) | ✅ | 85 | `vm_*.sh`, `tools/vm/bare-metal-gates.sh` | Manual; never run on the i9 PC |
-| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | ❌ | 0 | | |
+| End-to-end bench: a headless session driven over `remote.sock` (12) | 🟡 | 50 | `tools/vm/e2e/` | Manual, not in `make test`; not every flow of 12 is scripted. Added by this audit |
+| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | ❌ | 0 |  | No QEMU or KVM job in `.github/workflows` |
 | Hardware matrix: Pi 5 and Xeon bare metal (gates), the i9 with RX 580 and UHD 630 (3D, GVT-g) | 🟡 | 50 | CHANGELOG | No Pi 4, no 4K Pi kernel, no Intel 3D, no NVIDIA |
-
-**In the code but not described before this audit** (added in their sections): the `lord.vmcli` session channel and
-`lordos-machines.sock` (3.1, 6.15); `lord-pgpv` and `vmgvtwin.c` among the parts (3.1); the real admin actions (3, 8); the
-files on disk (`thumb.png`, `disks/tpm/`, `journal.log`, 3.5); schema 11 and 12, fd 9 with the agent, `virtio-mouse-pci`,
-`MESA_SHADER_CACHE_DISABLE`, the PCI slots, the newer messages and `lord-vm` options (3.9); the Windows and Android cards
-in 4.1; Configure's real sections (5.5); Clone from a snapshot, the 64-snapshot limit, Resume anyway (6.1, 6.2); the options
-`machines set` passes (6.15); the popover's buttons (6.17); the Logs window's sources and Overview (6.19);
-`lordos-guest-win`'s `gvt` capability, delayed clipboard rendering and its DLLs (7.1.2); the tests that run (12).
 
 ## Status and how to continue (read this first)
 
@@ -523,7 +550,7 @@ lord-server (the person's user, never root)
 
 Admin helper (closed actions, root)
   vm-enable, vm-kvm, vm-net-bridge, vm-net-unbridge, vm-memlock, vm-gvt-create, vm-gvt-remove,
-  vm-image-get, vm-image-get-user, vm-image-list, vm-image-remove, vm-image-cancel, vm-state-size
+  vm-image-get, vm-image-get-user, vm-image-list, vm-image-remove, vm-image-cancel
 ```
 
 (Audited 2026-11-23: there is no usbredir and no USB action yet; USB passthrough is not built, 6.6.)
@@ -719,9 +746,9 @@ lord-server passes `--render-node none` when it draws without a GPU, so the CPU 
 
 QEMU parses guest-controlled data all day, so **assume it can be compromised**. What a compromised QEMU may reach is the design:
 
-- Own user namespace if available, no capabilities, `no_new_privs`, in `app-lordos-lordos-vm-<id>.scope` (`setup_cgroups`, `lordvm.c`) with memory and CPU limits.
+- Own user namespace if available (**not built**, audited again 2026-11-23: `unshare` is denied and nothing creates one), no capabilities, `no_new_privs`, in `app-lordos-lordos-vm-<id>.scope` (`setup_cgroups`, `lordvm.c`) with memory and CPU limits.
 - **Landlock:** read and execute `/usr`, read the ISO attached to this VM; read-write only that VM's `disks/` folder (`vmsandbox.h`). On kernels without
-  Landlock (see 2.3) the app shows "Weaker isolation on this kernel".
+  Landlock (see 2.3) the app shows "Weaker isolation on this kernel" (**not built**: only the machine log's "Sandbox:" line says it).
 - **Seccomp:** QEMU's own `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny` plus ours. Ours is a **denylist** (`vmsandbox.c`): no
   `socket`, `connect`, `bind`, namespaces, new processes, mount, ptrace, `io_uring`, `userfaultfd`, modules, kexec or `TIOCSTI`; QEMU's own
   allowlist is applied by QEMU after it starts. An allowlist of our own is still open. QEMU's own filter costs nothing measurable: boot
@@ -738,7 +765,8 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
 - Files are opened by the supervisor and passed by descriptor wherever QEMU allows (`/dev/fdset`).
 - No shell, no `-readconfig` from the guest's folder: arguments are built from validated settings.
 - A machine can't outlive `lord-vm`: `PR_SET_PDEATHSIG` is set before exec. QEMU's newer `-run-with exit-with-parent=on` isn't in Debian 13's version (**Measured**: the 10.0 manual lists only `async-teardown`, `chroot` and `user`). swtpm exits with QEMU.
-- `-M dump-guest-core=off`, no core dumps, and non-dumpable processes, so that guest memory doesn't land in a host file.
+- `-M dump-guest-core=off`, no core dumps, and non-dumpable processes, so that guest memory doesn't land in a host file. (Audited
+  2026-11-23: QEMU gets `RLIMIT_CORE` 0; `PR_SET_DUMPABLE` 0 is set only in lord-vm and lord-vmdisplay.)
 - One VM can't read another's folder: one process tree and one Landlock domain per VM.
 - A guest's disk file isn't encrypted by default; see 8.
 
@@ -893,7 +921,7 @@ It stays only as a fallback, if the technical proof finds a blocker in direct QM
 
 This section is the build log of Phases 1 to 3, kept with its dates; later work changed some of what it says. Where it and the
 code differ, the code wins and the sections 5 to 7 describe what is there now. Corrections made by the audit of 2026-11-23:
-`machine.json` is at schema 12 (11 `gpu`, 12 `capture_fullscreen`) and `network` also takes `bridged` and `hostonly`; with the agent on,
+`machine.json` is at schema 13 (11 `gpu`, 12 `capture_fullscreen`, 13 `cpu_pin` and `perf_profile`) and `network` also takes `bridged` and `hostonly`; with the agent on,
 the credential memfds start at fd 9, not 7; QEMU also gets `virtio-mouse-pci` (slot 0x14, Capture mouse), `usb-tablet` on xHCI for
 the Windows devices and a `vfio-pci` display for an Intel vGPU, and `MESA_SHADER_CACHE_DISABLE` with 3D or a vGPU; the fixed PCI
 slots now go past 8 (xHCI 0x5, HDA 0x9, seed disk 0xa, shared folders 0xb to 0xe, transfer folder 0xf, data disks 0x10 and up);
@@ -3605,11 +3633,14 @@ will register itself the same way, with no change to Files.
 
 - **Machines itself** makes no connection, except downloads the person starts: choosing a download card reads that one maker's checksum list, and Create downloads the image (3.9, "The Linux download cards"). The catalog is a file in the signed package, read with no connection. No telemetry.
 - **A guest's connectivity is a separate thing:** the default network mode is Shared, because a machine with no network surprises people, and the assistant shows that. Testing is Isolated.
-- Everything shared with a guest is **off** until the person turns it on, in every profile (5.6).
-- Guest → host channels: virtio devices, the virtio-serial port of `lordos-guest`, clipboard, folders, the transfer folder. Each has an on/off in Configure. **Not built:** the **Guest can see** panel; USB (no usbredir).
+- What a guest shares is chosen by its profile and shown on the assistant's Review step before it is made (5.6): Productivity,
+  Development and Design turn the clipboard (both ways) and the transfer folder on, Games the clipboard, Light neither; shared
+  folders and the microphone stay off until the person turns them on. (Corrected by the audit of 2026-11-23: this line said
+  "off in every profile".)
+- Guest → host channels: virtio devices, the virtio-serial port of `lordos-guest`, clipboard, folders, the transfer folder. Each has an on/off in Configure. **Not built:** the **Guest can see** panel (Configure → Security holds six notes on the sandbox, not the channels); USB (no usbredir).
 - `lordos-guest` traffic is treated as untrusted: strict parser, size limits, fuzz target. A guest can't start a host process, read host files beyond its folder, or inject input into other windows.
 - **An encrypted machine has to be encrypted whole,** or the disk is the only safe part. **Not built (audited 2026-11-23):** no encrypted machines exist yet; an encrypted machine from another app is refused at import. The plan: disks use qcow2 LUKS, with the key in the keyring. Also covered: suspended state and snapshot memory, written inside the encrypted qcow2 and never as a separate file (**To test**); TPM state, through swtpm's own state encryption (**To test**, to confirm in Debian's build); NVRAM; recordings and screenshots stay out of the folder. Thumbnails, and persistent logs, are off, and logs stay in memory. Host swap can still hold guest memory, and only encrypted swap solves that, so Security says so. Bridged mode and encrypted disks each state what they mean in one line.
-- `vm-enable`, `vm-kvm`, `vm-net-bridge`, `vm-net-unbridge`, `vm-memlock`, `vm-gvt-create`, `vm-gvt-remove`, `vm-state-size` and `vm-image-get`, `-get-user`, `-list`, `-remove`, `-cancel` are closed actions with fixed arguments, on the list maintainers review (AGENTS.md). There is no `vm-usb-allow` yet.
+- `vm-enable`, `vm-kvm`, `vm-net-bridge`, `vm-net-unbridge`, `vm-memlock`, `vm-gvt-create`, `vm-gvt-remove` and `vm-image-get`, `-get-user`, `-list`, `-remove`, `-cancel` are closed actions with fixed arguments, on the list maintainers review (AGENTS.md). There is no `vm-usb-allow` yet.
 - Catalog of images and tools: signed with the LordOS release key path, verified before use.
 - A hostile ISO can only attack the guest, then QEMU, which is why the sandbox exists. QEMU updates arrive with Debian's.
 
@@ -3643,17 +3674,19 @@ real link. The Pi's boot misses its target with UEFI firmware, which takes two t
 
 The LordOS rule holds: this app must not slow the desktop. It's idle until opened and runs nothing in the background without a running VM.
 
-**Performance work planned (branch `perf/machines`, not merged, audited 2026-11-23: none of it is in the code yet):**
+**Performance work (approved 2026-11-23; all six built on `test/integration-1125`, in development; status in the checklist's area M):**
 1. Skip frames that didn't change, and pace or pause the display of a machine whose window is hidden. **Built** (in
    development): 3.9 "Pacing the picture", docs/MACHINES-GPU.md "Pacing a machine's picture".
 2. Huge pages for guest memory. **Built** where no privilege is needed (hugetlb pages when reserved; private memory already
    has THP); shared memory's THP (`shmem_enabled=advise`) waits for approval: 3.7.2.
-3. A vCPU recommendation in the assistant and Configure, from the host's cores (today: Pi default 3, `machine.c`).
+3. A vCPU recommendation. **Built** (in development): from what the machine's vCPUs really used (`vmcpu.c`,
+   `cpu-usage.json`), in Configure → CPU & memory and on the library's card; the assistant still uses the host's default (6.27).
 4. The disk path. **Built** (in development): an iothread, `cache.direct` with `aio=native` on ext4 and XFS (6.4.1).
    `io_uring` stays off: our seccomp denylist refuses `io_uring_*` (`vmsandbox.c`) and loosening it needs the maintainer's
    review (not measured against it).
-5. A guest-side performance profile applied by the guest tools.
-6. vCPU pinning to host cores.
+5. A guest-side performance profile applied by the guest tools. **Built** for Windows guests (tools w11, 7.1.4); pausing
+   Windows Search and the Linux side are not built.
+6. vCPU pinning to host cores. **Built** (in development): Configure → CPU & memory → Pin cores (3.7.1).
 
 ## 10. Packaging
 
@@ -3676,9 +3709,9 @@ doesn't say so yet. Built: `machines.json` in every UI language and `machinescli
 
 ## 12. Tests
 
-What runs (audited 2026-11-23): `make -C server test` builds and runs `vm-test` (about 840 checks: schema and migration, messages,
-fuzz passes over the guest → host parsers), `vmlog`, `vmgpu`, `vmimport`, `vmcatalog`, `http-resume`, `vmunattend`, `vmthumb`,
-`vmlogind`, `vmdisplay-test`, `vmurl`, `vmsig`, `mcli-test`, the scripts `vm_import_test.sh`, `vm_rename.sh`, `guest_clip_test.sh`,
+What runs (audited 2026-11-23, again at `965a10f6e`): `make -C server test` builds and runs `vm-test` (about 870 checks: schema and
+migration, messages, fuzz passes over the guest → host parsers), `vmlog`, `vmgpu`, `vmimport`, `vmcatalog`, `http-resume`,
+`http-retry`, `vmunattend`, `vmthumb`, `vmlogind`, `vmdisplay-test`, `vmpace`, `vmmem`, `vmcpu`, `vmpin`, `vmurl`, `vmsig`, `mcli-test`, the scripts `vm_import_test.sh`, `vm_rename.sh`, `guest_clip_test.sh`,
 `guest_stop_test.sh`, `guestwin_headless.sh` and `machinescli_headless.sh` (each skips without QEMU or KVM), and the node tests
 `vm_model`, `vm_catalog`, `vm_windows`, `vm_capture`, `vm_openwith`, `vm_cli`, `vm_profiles` and `vm_keys_scene`. Manual: the four
 gates below, `vm_import_identity.sh`, `build/vm-image-cli`, `vm-net-cli`, `vm-gvt-cli` and `lordvm-dev` (`tests/vm_dev.c`). Not
