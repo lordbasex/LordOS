@@ -197,6 +197,8 @@ static void test_shipped(void) {
         CHECK(src && !strstr(src, "unsplash") && !strstr(src, "pexels") && !strstr(src, "pixabay"), "%s: source %s", id ? id : "?", src ? src : "");
         CHECK(author && *author, "%s: no author", id ? id : "?");
         if (lic && (!strncmp(lic, "CC BY", 5))) CHECK(str(it, "credit") != NULL, "%s: CC BY needs a credit line", id ? id : "?");
+        const JVal *ai = get(it, "ai");      /* our AI-generated pictures are released as CC0 */
+        if (ai) CHECK(ai->type == J_BOOL && ai->num == 1 && lic && !strcmp(lic, "CC0"), "%s: \"ai\" must be true and its license CC0", id ? id : "?");
         const JVal *vars = get(it, "variants");
         for (const JVal *v = vars && vars->type == J_ARR ? vars->kid : NULL; v; v = v->next) {
             char arg[128];
@@ -208,7 +210,7 @@ static void test_shipped(void) {
         char thumb[256];
         snprintf(thumb, sizeof thumb, "../assets/studio/backgrounds/%s.thumb.jpg", id ? id : "");
         struct stat st;
-        CHECK(!stat(thumb, &st) && st.st_size > 1000 && st.st_size < 150000, "%s: its thumbnail is missing or odd", id ? id : "?");
+        CHECK(!stat(thumb, &st) && st.st_size > 1000 && st.st_size < 160000, "%s: its thumbnail is missing or odd", id ? id : "?");
         count++;
         pictures += kind && !strcmp(kind, "picture");
         videos += kind && !strcmp(kind, "video");

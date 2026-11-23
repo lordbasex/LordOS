@@ -171,13 +171,13 @@ export const filterOf = (cfg) => { const c = normalizeStudio(cfg); return c.filt
 export const BG_CATEGORIES = Object.freeze(['office', 'home', 'studio', 'nature', 'city', 'abstract', 'space']);
 export const bgItems = (catalog, kind) => (catalog && Array.isArray(catalog.items) ? catalog.items.filter((it) => it && it.kind === kind) : []);
 export const bgThumb = (it) => `asset:studio/backgrounds/${it.id}.thumb.jpg`;
-// The variant to fetch: a loop comes at 3840×2160 and 1920×1080, a picture at 1920×1080 (maybe bigger too). A
-// picture is decoded once, so `big` (lord-studio composites on the GPU) takes its biggest and the CPU path 1920×1080.
+// The variant to fetch: a loop comes at 3840×2160 and 1920×1080; a picture has the variants it has (the AI-generated
+// ones one, "full", 1672×941). A picture is decoded once, so `big` (lord-studio composites on the GPU) takes its
+// biggest and the CPU path the one at 1080 lines or the biggest under it.
 // A loop is decoded on every camera
 // picture, in software: 3840×2160 costs about 19 ms a picture on the development PC against 8 ms at 1920×1080 (H.264
 // has no scaled decode), which no 30 fps budget with effects leaves room for, so a loop is always 1920×1080 here
 // (docs/CAMERA-STUDIO-PLAN.md 6.2); its 4K file stays in the catalog.
-export const BG_BUILTIN_VARIANT = '1080';             // the size of the pictures that ship in the package
 export function bgVariant(it, { big = false } = {}) {
   const vs = (it && Array.isArray(it.variants) ? it.variants : []).filter((v) => v && typeof v.name === 'string');
   if (!vs.length) return null;
@@ -186,8 +186,9 @@ export function bgVariant(it, { big = false } = {}) {
   return by.find((v) => v.h === 1080) || by.filter((v) => (v.h || 0) <= 1080).pop() || by[0];
 }
 // What choosing an item does: { src } when a file it can use is already here (what was downloaded, if it is the
-// variant wanted or, for a picture, bigger; else a built-in picture when 1080 is wanted), or { fetch } the variant to
-// download, with `fallback` the file to show if that fails (a built-in picture, or a smaller download)
+// variant wanted or, for a picture, bigger; else a built-in picture when no more than 1080 lines are wanted), or
+// { fetch } the variant to download, with `fallback` the file to show if that fails (a built-in picture, or a smaller
+// download)
 export function bgPick(it, files, { big = false } = {}) {
   if (!it) return { src: null, fetch: null, fallback: null };
   const want = bgVariant(it, { big });
@@ -198,10 +199,11 @@ export function bgPick(it, files, { big = false } = {}) {
   if (!want) return { src: builtin, fetch: null, fallback: null };
   return { src: null, fetch: want, fallback: builtin || (have ? bgSrc(it, have.name) : null) };
 }
-// the file the background reads, once it is on disk (a built-in picture always is: its 1080 variant)
+// the file the background reads, once it is on disk (a built-in picture always is: the variant the CPU path takes,
+// bgVariant(it), ships in the package)
 export function bgSrc(it, variantName) {
   if (!it) return null;
-  if (it.kind === 'picture' && it.builtin && (!variantName || variantName === BG_BUILTIN_VARIANT)) return `asset:studio/backgrounds/${it.id}.jpg`;
+  if (it.kind === 'picture' && it.builtin && (!variantName || variantName === bgVariant(it)?.name)) return `asset:studio/backgrounds/${it.id}.jpg`;
   const v = (it.variants || []).find((x) => x.name === variantName);
   if (!v || !/^[0-9a-f]{64}$/.test(v.sha256 || '')) return null;
   return `${STUDIO_STORE}/${v.sha256}.${it.kind === 'video' ? 'mp4' : 'jpg'}`;
@@ -213,6 +215,8 @@ export function bgCredit(it) {
   if (!it) return '';
   return [it.name, it.credit || it.author, it.license, it.source].filter(Boolean).join(' — ');
 }
+// an item generated with AI (the catalog's "ai"), which the credits page says in the person's language
+export const bgAi = (it) => !!(it && it.ai === true);
 // which catalog item a background path is (null for the person's own files)
 export function bgItemOf(catalog, path) {
   if (typeof path !== 'string') return null;

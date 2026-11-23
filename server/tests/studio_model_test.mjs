@@ -5,7 +5,7 @@ import {
   normalizeStudio, STUDIO_DEFAULTS, realCameras, hasStudioCamera, deviceFor, chosenCamera, serverConfig, portraitOn, backgroundOn,
   withPortrait, withBackground, withPicture, withMode, previewSize, usersOf, previewSource, perfLine,
   loopbackState, studioUseOf, studioWhat, MATCH_MAX, STUDIO_FILTERS, effectsOn, filterOf, isVideoPath, isPicturePath, activeBackground,
-  BG_CATEGORIES, bgItems, bgThumb, bgVariant, bgPick, bgSrc, bgReady, bgItemOf, bgCredit, VOICE_SOURCE, VOICE_CAPTURE, voiceAvailable, hardwareMics,
+  BG_CATEGORIES, bgItems, bgThumb, bgVariant, bgPick, bgSrc, bgReady, bgItemOf, bgCredit, bgAi, VOICE_SOURCE, VOICE_CAPTURE, voiceAvailable, hardwareMics,
   micModeOf, micPlan, withoutVoiceInternals,
 } from '../../sdk/studiomodel.js';
 import { captureRows, rowStops, captureGlyph } from '../../sdk/capturemodel.js';
@@ -248,6 +248,21 @@ t('phase 3: the background catalog', () => {
   assert.equal(bgItemOf(cat, '/home/a/me.jpg'), null);
   assert.equal(bgCredit(cat.items[1]), 'B — Video: Y, CC BY 4.0 — CC BY 4.0 — https://commons.wikimedia.org/x');
   assert.equal(bgCredit(cat.items[0]), 'A — X — CC0 — https://polyhaven.com/a/x');
+  assert.equal(bgAi(cat.items[0]), false);
+  assert.equal(bgAi({ ...cat.items[0], ai: true }), true);
+  assert.equal(bgAi({ ...cat.items[0], ai: 'yes' }), false);
+  assert.equal(bgAi(null), false);
+  // an AI-generated picture: one variant, "full" (1672×941); a built-in one ships that variant
+  const ai = { id: 'home-ai', kind: 'picture', category: 'home', builtin: true, ai: true, name: 'C', author: 'X', license: 'CC0',
+    source: 'https://x', variants: [{ name: 'full', w: 1672, h: 941, sha256: 'a'.repeat(64) }] };
+  assert.equal(bgVariant(ai).name, 'full');
+  assert.equal(bgVariant(ai, { big: true }).name, 'full');
+  assert.equal(bgSrc(ai), 'asset:studio/backgrounds/home-ai.jpg');
+  assert.equal(bgSrc(ai, 'full'), 'asset:studio/backgrounds/home-ai.jpg');
+  assert.deepEqual(bgPick(ai, {}, { big: true }), { src: 'asset:studio/backgrounds/home-ai.jpg', fetch: null, fallback: null });
+  const ai2 = { ...ai, id: 'home-ai2', builtin: false };
+  assert.equal(bgPick(ai2, {}).fetch.name, 'full');
+  assert.equal(bgPick(ai2, { 'home-ai2': 'full' }, { big: true }).src, `/var/lib/lordos/studio/${'a'.repeat(64)}.jpg`);
   assert.deepEqual(normalizeStudio({ bgFiles: { 'sky-b': '720.h264', '../x': 'y', ok: 'a b' } }).bgFiles, { 'sky-b': '720.h264' });
   assert.ok(BG_CATEGORIES.includes('office') && BG_CATEGORIES.includes('space'));
 });

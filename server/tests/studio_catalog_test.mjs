@@ -1,17 +1,18 @@
 // studio_catalog_test.mjs — LordOS Studio's background catalog (assets/studio/backgrounds.json, docs/CAMERA-STUDIO-PLAN.md
-// 6.2) against its curation record (tools/studio/bg-sources.json) and, when they are on this machine, the staged loops
-// for the LordOS-wallpapers repository. Every entry is one studio-bg-get accepts (E-S4: names, files, a whole size of at
-// most 100 MB, a SHA-256) and every license is an allowed one with a credit where it needs one. Every loop has a
-// 3840×2160 variant made from an original at least that big, a 1920×1080 one and a 640×360 thumbnail; the pictures (a
-// set of their own) have a 1920×1080 variant and a thumbnail, and the built-in ones are that variant byte for byte. With
-// LORDOS_STUDIO_STAGE (the staged studio/ folder) it also checks every staged loop's size, hash and real resolution (MP4
-// avc1 sample entry, H.264 High) and videos/MANIFEST.txt and videos/README.md. Run from server/.
+// 6.2) against its loops' curation record (tools/studio/bg-sources.json) and, when it is on this machine, the folder
+// published as the LordOS-wallpapers repository's studio/. Every entry is one studio-bg-get accepts (E-S4: names, files,
+// a whole size of at most 100 MB, a SHA-256) and every license is an allowed one with a credit where it needs one. Every
+// loop has a 3840×2160 variant made from an original at least that big, a 1920×1080 one and a 640×360 thumbnail; every
+// picture is AI-generated (CC0, "ai": true) with one variant, "full", and a 640×360 thumbnail, and the built-in ones are
+// that variant byte for byte. With LORDOS_STUDIO_STAGE (the publish folder, tools/studio/publish-studio.py's --out) it
+// also checks every published file's size, hash and real resolution (JPEG frame header; MP4 avc1 sample entry, H.264
+// High), MANIFEST.json and README.md, and that nothing else is there. Run from server/.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, statSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BG_CATEGORIES } from '../../sdk/studiomodel.js';
+import { BG_CATEGORIES, bgVariant } from '../../sdk/studiomodel.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const cat = JSON.parse(readFileSync(join(ROOT, 'assets/studio/backgrounds.json'), 'utf8'));
@@ -19,6 +20,7 @@ const src = JSON.parse(readFileSync(join(ROOT, 'tools/studio/bg-sources.json'), 
 const ALLOWED = new Set(['CC0', 'Public domain', 'CC BY 2.0', 'CC BY 3.0', 'CC BY 4.0', 'CC BY-SA 2.0', 'CC BY-SA 3.0', 'CC BY-SA 4.0', 'MIT']);
 const MAX_FILE = 100 * 1000 * 1000;
 const SIZES = { video: [['2160.h264', 3840, 2160], ['1080.h264', 1920, 1080]] };
+const AI_AUTHOR = 'Generated with ChatGPT for LordOS';
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 
 // a JPEG's size from its first frame header (SOF0..SOF15 but DHT, JPG and DAC)
@@ -90,31 +92,37 @@ for (const it of cat.items) {
   ok(typeof it.author === 'string' && it.author.length > 0, `${id}: no author`);
   ok(typeof it.name === 'string' && it.name.length > 0, `${id}: no name`);
   if (/^CC BY/.test(it.license)) ok(typeof it.credit === 'string' && it.credit.includes(it.license), `${id}: CC BY needs a credit line naming its license`);
-  // a loop: 3840×2160 and 1920×1080; a picture: the variants it has, one of them 1920×1080 named 1080
+  // a loop: 3840×2160 and 1920×1080; a picture: AI-generated, CC0, one variant "full" at the generator's 1672×941 (or 940)
   const want = SIZES[it.kind] || (it.variants || []).map((v) => [v.name, v.w, v.h]);
-  if (it.kind === 'picture') ok(it.variants.some((v) => v.name === '1080' && v.w === 1920 && v.h === 1080), `${id}: no 1080 variant`);
+  if (it.kind === 'picture') {
+    ok(it.ai === true && it.license === 'CC0' && it.author === AI_AUTHOR && !it.credit, `${id}: a picture is AI-generated and CC0`);
+    ok(it.variants.length === 1 && it.variants[0].name === 'full' && it.variants[0].w === 1672 && [940, 941].includes(it.variants[0].h),
+      `${id}: the picture's variant`);
+  } else {
+    ok(it.ai === undefined, `${id}: a loop isn't AI-generated`);
+  }
   ok(Array.isArray(it.variants) && it.variants.length === want.length, `${id}: ${want.length} variants`);
   want.forEach(([name, w, h], k) => {
     const v = it.variants[k];
     ok(v.name === name && v.w === w && v.h === h, `${id}: variant ${k} is ${v.name} ${v.w}x${v.h}, not ${name} ${w}x${h}`);
     ok(/^[a-z0-9.-]{1,48}$/.test(v.name), `${id}: variant name`);
-    ok(v.file === `${it.kind === 'picture' ? 'pictures' : 'videos'}/${id}.${name}.${it.kind === 'picture' ? 'jpg' : 'mp4'}`, `${id}: file ${v.file}`);
+    ok(v.file === (it.kind === 'picture' ? `pictures/${id}.jpg` : `videos/${id}.${name}.mp4`), `${id}: file ${v.file}`);
     ok(Number.isInteger(v.size) && v.size > 1000 && v.size <= MAX_FILE, `${id}: ${name} size ${v.size} (E-S4: at most 100 MB)`);
     ok(/^[0-9a-f]{64}$/.test(v.sha256), `${id}: ${name} hash`);
     if (it.kind === 'video') ok(v.codec === 'h264' && v.fps > 0 && v.fps <= 30.01 && v.seconds >= 4 && v.seconds <= 10, `${id}: ${name} codec/fps/length`);
   });
   if (it.kind === 'video') ok(it.variants.some((v) => v.w >= 3840 && v.h >= 2160), `${id}: no 4K variant`);
-  // the thumbnail ships: a 16:9 JPEG, 640×360 for a loop
+  // the thumbnail ships: a 640×360 JPEG
   const tf = join(ROOT, 'assets/studio/backgrounds', `${id}.thumb.jpg`);
   ok(existsSync(tf), `${id}: thumbnail missing`);
   const tb = readFileSync(tf);
   const ts = jpegSize(tb);
-  ok(ts && (it.kind === 'picture' ? ts.w * 9 === ts.h * 16 && ts.w >= 320 : ts.w === 640 && ts.h === 360) && tb.length > 1000 && tb.length < 150000,
-    `${id}: thumbnail ${ts && `${ts.w}x${ts.h}`} ${tb.length} bytes`);
+  ok(ts && ts.w === 640 && ts.h === 360 && tb.length > 1000 && tb.length < 160000, `${id}: thumbnail ${ts && `${ts.w}x${ts.h}`} ${tb.length} bytes`);
   if (it.builtin) {
+    // the package ships the variant the CPU path takes (bgVariant), which bgSrc reads from assets/
     const b = readFileSync(join(ROOT, 'assets/studio/backgrounds', `${id}.jpg`));
-    const v = it.variants.find((x) => x.name === '1080');
-    ok(it.kind === 'picture' && v && b.length === v.size && sha256(b) === v.sha256, `${id}: the built-in picture isn't its 1080 variant`);
+    const v = bgVariant(it);
+    ok(it.kind === 'picture' && v && b.length === v.size && sha256(b) === v.sha256, `${id}: the built-in picture isn't its ${v && v.name} variant`);
     perCat[it.category] = (perCat[it.category] || 0) + 1;
   }
   counts[it.kind]++;
@@ -126,15 +134,17 @@ for (const f of readdirSync(join(ROOT, 'assets/studio/backgrounds'))) {
   ok(m && ids.has(m[1]) && (m[2] || cat.items.find((x) => x.id === m[1]).builtin), `assets/studio/backgrounds/${f} isn't in the catalog`);
 }
 
-// ---- the curation record: the same items, each loop's original at least 3840×2160 (never upscaled)
+// ---- the curation record: the same loops (the pictures are build-ai-backgrounds.py's), each one's original at least
+// 3840×2160 (never upscaled)
 const rec = new Map(src.items.map((x) => [x.id, x]));
-ok(rec.size === cat.items.length && cat.items.every((x) => rec.has(x.id)), 'bg-sources.json and the catalog list the same items');
-for (const it of cat.items) {
+const loops = cat.items.filter((x) => x.kind === 'video');
+ok(src.items.every((x) => x.kind === 'video'), 'bg-sources.json records only loops');
+ok(rec.size === loops.length && loops.every((x) => rec.has(x.id)), 'bg-sources.json and the catalog list the same loops');
+for (const it of loops) {
   const r = rec.get(it.id);
   for (const k of ['kind', 'category', 'name', 'author', 'license', 'licenseUrl', 'source']) ok(r[k] === it[k], `${it.id}: ${k} differs from bg-sources.json`);
   const o = r.origin, p = r.process, og = o.original;
   ok(typeof o.verifiedLicense === 'string' && o.verifiedLicense.length > 0, `${it.id}: no license check recorded`);
-  if (it.kind === 'picture') continue;
   ok(og && og.w > 0 && og.h > 0, `${it.id}: the original's resolution isn't recorded`);
   if (o.type === 'polyhaven') {
     // a perspective view needs at least one panorama pixel per output pixel at its centre
@@ -153,23 +163,24 @@ for (const it of cat.items) {
   }
 }
 
-// ---- the staged loops (LORDOS_STUDIO_STAGE: the folder for the LordOS-wallpapers repository's studio/)
+// ---- the publish folder (LORDOS_STUDIO_STAGE: the LordOS-wallpapers repository's studio/, publish-studio.py's --out)
 const stage = process.env.LORDOS_STUDIO_STAGE;
 let staged = 0, bytes = 0;
 if (stage && existsSync(stage)) {
-  const manifest = readFileSync(join(stage, 'videos', 'MANIFEST.txt'), 'utf8').split('\n').filter((l) => l && !l.startsWith('#'));
-  const listed = new Map(manifest.map((l) => { const [size, h, f] = l.split(' '); return [f, { size: Number(size), sha256: h }]; }));
-  const readme = readFileSync(join(stage, 'videos', 'README.md'), 'utf8');
+  const listed = new Map(JSON.parse(readFileSync(join(stage, 'MANIFEST.json'), 'utf8')).files.map((x) => [x.file, x]));
+  const readme = readFileSync(join(stage, 'README.md'), 'utf8');
+  ok(/CC0 1\.0/.test(readme) && /AI-generated/.test(readme), 'README.md: the pictures\' license');
   const files = new Set();
-  for (const it of cat.items.filter((x) => x.kind === 'video')) {
-    ok(readme.includes(it.source) && readme.includes(it.credit || it.author), `${it.id}: README.md doesn't credit it`);
+  for (const it of cat.items) {
+    if (it.kind === 'video') ok(readme.includes(it.source) && readme.includes(it.credit || it.author) && readme.includes(it.license), `${it.id}: README.md doesn't credit it`);
     for (const v of it.variants) {
       const f = join(stage, v.file);
-      ok(existsSync(f), `${v.file}: not staged`);
+      ok(existsSync(f), `${v.file}: not published`);
+      ok(readme.includes(it.kind === 'picture' ? v.file : v.file.slice('videos/'.length)), `${v.file}: not in README.md`);
       const b = readFileSync(f);
       ok(b.length === v.size && sha256(b) === v.sha256, `${v.file}: size or hash isn't the catalog's`);
       const m = listed.get(v.file);
-      ok(m && m.size === v.size && m.sha256 === v.sha256, `${v.file}: MANIFEST.txt differs`);
+      ok(m && m.id === it.id && m.size === v.size && m.sha256 === v.sha256, `${v.file}: MANIFEST.json differs`);
       if (it.kind === 'picture') {
         const s = jpegSize(b);
         ok(s && s.w === v.w && s.h === v.h, `${v.file}: ${s && `${s.w}x${s.h}`} isn't ${v.w}x${v.h}`);
@@ -182,9 +193,11 @@ if (stage && existsSync(stage)) {
       bytes += b.length;
     }
   }
-  for (const f of readdirSync(join(stage, 'videos')).filter((x) => x.endsWith('.mp4'))) ok(files.has(`videos/${f}`), `videos/${f} is staged but not in the catalog`);
-  ok(listed.size === files.size, 'MANIFEST.txt lists other files');
+  const top = readdirSync(stage).filter((x) => !x.startsWith('.')).sort();
+  ok(JSON.stringify(top) === JSON.stringify(['MANIFEST.json', 'README.md', 'pictures', 'videos']), `the publish folder holds ${top}`);
+  for (const d of ['pictures', 'videos']) for (const f of readdirSync(join(stage, d))) ok(files.has(`${d}/${f}`), `${d}/${f} is published but not in the catalog`);
+  ok(listed.size === files.size, 'MANIFEST.json lists other files');
 }
 
 console.log(`studio catalog: ${cat.items.length} backgrounds (${counts.picture} pictures, ${counts.video} loops, every loop with a 3840x2160 ` +
-  `variant from a big enough original); ${checks} checks` + (stage ? `; ${staged} staged loop files (${(bytes / 1e6).toFixed(1)} MB) match` : '; staged loops: skipped: needs LORDOS_STUDIO_STAGE'));
+  `variant from a big enough original); ${checks} checks` + (stage ? `; ${staged} published files (${(bytes / 1e6).toFixed(1)} MB) match` : '; publish folder: skipped: needs LORDOS_STUDIO_STAGE'));

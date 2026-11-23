@@ -27,7 +27,7 @@ import { studioCatalog, bgDownloads, fetchBackground, removeBackground } from '.
 import {
   normalizeStudio, realCameras, chosenCamera, cameraKey, serverConfig, portraitOn, backgroundOn, withPortrait, withBackground,
   withPicture, withMode, previewSize, usersOf, previewSource, perfLine, loopbackState, activeBackground, STUDIO_FILTERS,
-  BG_CATEGORIES, bgItems, bgThumb, bgReady, bgCredit, bgItemOf, micModeOf, micPlan, voiceAvailable, hardwareMics, MATCH_MAX,
+  BG_CATEGORIES, bgItems, bgThumb, bgReady, bgCredit, bgAi, bgItemOf, micModeOf, micPlan, voiceAvailable, hardwareMics, MATCH_MAX,
 } from './studiomodel.js';
 
 const has = () => typeof lord !== 'undefined' && !!lord.studio;
@@ -455,6 +455,7 @@ function CreditsPage({ th, cfg, go }) {
           {items.map((it) => (
             <View key={it.id} style={{ gap: 2 }}>
               <Text style={{ fontSize: 11, color: th.textDim, textAlign: 'start', direction: 'ltr' }}>{bgCredit(it)}</Text>
+              {bgAi(it) ? <Text style={{ fontSize: 11, color: th.textDim, textAlign: 'start' }}>{t('studio.aiGenerated')}</Text> : null}
               {cfg.bgFiles[it.id] ? <Link th={th} label={t('studio.remove')} onClick={() => removeBackground(it).catch((e) => setNote(t(`errors.${e?.code || 'studio.removeFailed'}`)))} /> : null}
             </View>
           ))}

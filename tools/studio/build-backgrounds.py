@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Build LordOS Studio's background loops (the videos of assets/studio/backgrounds.json) from tools/studio/bg-sources.json.
 
+The catalog's pictures are AI-generated since 2026-11-22 and are made by tools/studio/build-ai-backgrounds.py.
+
 Every loop is made at 3840x2160 from an original at least that big (never upscaled), plus a 1920x1080 variant. The
 catalog's pictures are not built here: they are carried over from assets/studio/backgrounds.json as they are, and
 their files are not touched. Inputs are the downloads kept outside the repository (one folder per source):
@@ -10,7 +12,8 @@ their files are not touched. Inputs are the downloads kept outside the repositor
 Outputs:
   <stage>/videos/<id>.{2160,1080}.h264.mp4, <stage>/videos/README.md (credits), <stage>/videos/MANIFEST.txt (size
   and SHA-256 of every loop), assets/studio/backgrounds/<id>.thumb.jpg (640x360) for each loop,
-  assets/studio/backgrounds.json
+  assets/studio/backgrounds.json. tools/studio/publish-studio.py then assembles the published studio/ folder (pictures
+  and loops, one README.md and one MANIFEST.json).
 
 The downloads are untrusted data: run with `python3 -I`, never from inside the download folders.
 

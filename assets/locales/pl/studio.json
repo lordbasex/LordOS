@@ -47,6 +47,7 @@
   "pickAny": "Wybierz obraz lub krótkie wideo",
   "credits": "Autorzy",
   "creditsHint": "Tytuł, autor, licencja i źródło każdego tła.",
+  "aiGenerated": "Wygenerowane przez AI",
   "remove": "Usuń pobrany plik",
   "greenScreen": "Zielony ekran",
   "greenHint": "Do prawdziwego zielonego lub niebieskiego ekranu za tobą: jego kolor jest wycinany dokładniej niż bez niego.",

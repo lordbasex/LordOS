@@ -367,20 +367,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Measured** at 1280×720 on an i9-10900 with an RX 580 (`build/studio-fx-test time`): each single effect fits one
     frame at 30 fps on both paths (10–12 ms with the GPU, 4–21 ms on the CPU); all of them at once take 24 ms with the
     GPU and 36 ms on the CPU. A 720p H.264 loop decodes in 1.8 ms a picture.
-  - **The background catalog** (`assets/studio/backgrounds.json`, E-S4): 109 backgrounds in seven categories (Office,
-    Home, Studio, Nature, City, Abstract, Space), 72 pictures and 37 loops (every loop at 3840×2160 and 1920×1080). Each
-    license was checked on the file's own page: Poly Haven and ambientCG (CC0), NASA (public domain), Wikimedia Commons
-    (CC0, CC BY and CC BY-SA with credit) and LordOS's own renders (MIT). Nothing comes from Unsplash, Pexels or
-    Pixabay, and nothing shows people, logos or readable text. The thumbnails and one picture per category ship in the
-    package (3.2 MB);
+  - **The background catalog** (`assets/studio/backgrounds.json`, E-S4): 158 backgrounds in seven categories (Office,
+    Home, Studio, Nature, City, Abstract, Space), 121 pictures and 37 loops (every loop at 3840×2160 and 1920×1080). The
+    pictures are AI-generated and released as CC0 (see "Changed"). Each loop's license was checked on the file's own
+    page: Wikimedia Commons (CC0, CC BY and CC BY-SA with credit) and LordOS's own renders (MIT). Nothing comes from
+    Unsplash, Pexels or Pixabay, and nothing shows people, logos or readable text. The thumbnails and one picture per
+    category ship in the package (12.6 MB);
     the rest download when chosen through two new closed admin actions, `studio-bg-get "<id> <variant>"` (anyone) and
     `studio-bg-remove` (administrators), the twins of `wallpaper-get`: JS names a catalog entry, never a URL or a path,
     the download runs as `nobody` in the Store's scope, and a file whose size or SHA-256 isn't the catalog's is never
     kept (`/var/lib/lordos/studio/<sha256>.jpg` or `.mp4`). A Credits page lists every author and license.
-  - **Mic Mode** (E-S6): Standard, Noise Reduction and Full Range in the popover. Noise Reduction is one more
-    microphone, "LordOS Noise Reduction", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
-  - **The loops at 4K** (the maintainer asked for at least 4K on 2026-11-22; the pictures are a set of their own and are
-    unchanged here; `docs/CAMERA-STUDIO-PLAN.md` 6.2, "Loops at 4K"). Every loop now has a 3840×2160 variant and a
+  - **The loops at 4K** (the maintainer asked for at least 4K on 2026-11-22; the pictures are a set of their own, now
+    AI-generated, see "Changed"; `docs/CAMERA-STUDIO-PLAN.md` 6.2, "Loops at 4K"). Every loop now has a 3840×2160 variant and a
     1920×1080 one, both made from an original at least 3840×2160; nothing is upscaled. Our 16 renders are rendered again
     at 3840×2160 with a bicubic field and dithered, with a light grain on luma at encode so slow gradients don't band.
     Loops are H.264 High (2160p at level 5.1), the biggest 43.7 MB. Of the 33 Wikimedia Commons loops, 22 had only a
@@ -398,15 +396,20 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     - **lord-studio** keeps a still background at up to 3840×2160 (it was cut to 1920×1080) and cover-fits it to the
       camera's size with an area average, again whenever that size changes, so a 4K camera gets a sharp background and
       a 720p one a clean average instead of a bilinear one.
-    - **Staged** for the `LordOS-wallpapers` repository's `studio/videos/`: 74 files, 1028 MB, with their own README
-      (credits and each original's size) and a `MANIFEST.txt` of sizes and SHA-256s.
+    - **Published** in the `LordOS-wallpapers` repository's `studio/videos/`: 74 files, 1028 MB, next to the 121
+      pictures in `studio/pictures/` (76 MB). `tools/studio/publish-studio.py` (new) assembles that `studio/` folder
+      from both builders, checks every file against the catalog and writes one README (the pictures' CC0 and each
+      loop's credit, license, source, original size and what we did) and one `MANIFEST.json` (path, size and SHA-256 of
+      all 195 files).
     - **Tests:** `tests/studio_catalog_test.mjs` (new; every entry accepted, licenses and credits, both loop variants,
-      each loop's original at least 3840×2160 from the curation record, thumbnails, built-ins identical to their 1080
-      variant, and with `LORDOS_STUDIO_STAGE` every staged loop's size, hash and real resolution read from the MP4),
-      new cases in `tests/studio_model_test.mjs` (`bgPick`) and `build/studio-helper-test` (a 3840×2160 picture inside
+      each loop's original at least 3840×2160 from the curation record, every picture AI-generated and CC0 with one
+      `full` variant, 640×360 thumbnails, built-ins identical to the variant they stand for, and with
+      `LORDOS_STUDIO_STAGE` every published file's size, hash and real resolution read from the JPEG or MP4, the
+      README and `MANIFEST.json`),
+      new cases in `tests/studio_model_test.mjs` (`bgPick`, an AI picture's single `full` variant) and `build/studio-helper-test` (a 3840×2160 picture inside
       lord-studio's sandbox).
-  - **Mic Mode** (E-S6): Standard, Voice Isolation and Wide Spectrum in the popover. Voice Isolation is one more
-    microphone, "LordOS Voice Isolation", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
+  - **Mic Mode** (E-S6): Standard, Noise Reduction and Full Range in the popover. Noise Reduction is one more
+    microphone, "LordOS Noise Reduction", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
     static drop-in (`/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf`); choosing a mode only sets the default
     microphone through LordOS's existing sound client. There is no echo cancellation (nothing is routed to its echo
     reference), no module loaded at runtime and no new privilege. Standard and Full Range both use the microphone
@@ -2584,6 +2587,36 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   showed. The check now allows every known bit.
 
 ### Changed
+
+- **LordOS Studio's pictures are AI-generated, in development (the latest release is 0.8.9.4; approved by the
+  maintainer on 2026-11-22, decision D7 of `docs/CAMERA-STUDIO-PLAN.md`).** Every picture of the background catalog
+  (`assets/studio/backgrounds.json`) is now a new picture generated with ChatGPT for LordOS from the project's own
+  prompts (empty scenes: no people, animals in the foreground, logos, brands or readable text).
+  - **What changed in the catalog:** the 72 pictures keep their ids, names and categories, so a choice made before
+    still points at the same scene; 49 new pictures, `still-<loop>`, show the scenes of the 49 loops the catalog had
+    then, in the same categories and with the same names. They are pictures of their own and keep their ids although
+    25 of those loops were replaced by 4K clips (see "The loops at 4K" under "Added"). The catalog has 158 items: 121
+    pictures and 37 loops. A built-in picture is its `full` variant (`bgSrc` in `sdk/studiomodel.js` now takes the
+    variant the CPU path picks instead of a fixed `1080`). Each picture has one
+    file, `pictures/<id>.jpg` (variant `full`): JPEG quality 92 with 4:4:4 chroma at the size the generator made,
+    1672×941 (one is 1672×940; nothing is upscaled or padded), about 0.63 MB on average and 75.8 MB for all 121.
+  - **License:** OpenAI's terms assign the output to the user, and LordOS releases the pictures under **CC0 1.0**.
+    Each entry has the author "Generated with ChatGPT for LordOS", the source `LordOS-wallpapers/studio` and
+    `"ai": true`; Background → Credits adds the line **"Generated with AI"** under them, translated into all 35
+    languages (`studio.aiGenerated`; `bgAi` in `sdk/studiomodel.js`). The ChatGPT conversations are not published:
+    they stay in a private manifest outside the repository. The old photographs' credits (Poly Haven, ambientCG and
+    NASA) are gone from `THIRD_PARTY.md` and from `tools/studio/bg-sources.json`, which now records only the loops.
+  - **In the package:** the thumbnails are now 640×360 (quality 85, about 64 KB each) and the seven built-in pictures
+    (one per category, same ids) are the AI ones in full: `assets/studio/backgrounds/` grows from 2.5 MB to 12.6 MB
+    (with the loops' 640×360 thumbnails). The full files are published in the `LordOS-wallpapers` repository's
+    `studio/pictures/` folder, next to the loops, with one README (the pictures AI-generated, CC0, by LordOS; each
+    loop's credit) and one `MANIFEST.json` (path, size and SHA-256 of each file), and download through `studio-bg-get`
+    as before.
+  - **Tools and tests:** `tools/studio/build-ai-backgrounds.py` makes every file from the originals after checking each
+    PNG's SHA-256; `tools/studio/build-backgrounds.py` now rebuilds only the loops and keeps the catalog's pictures.
+    `build/studio-bg-admin-test` accepts every shipped entry, allows 640×360 thumbnails and requires an `"ai"` entry to
+    be `true` and CC0; `tests/studio_model_test.mjs` covers `bgAi`; `tests/studio_catalog_test.mjs` requires every
+    picture to be AI-generated and CC0.
 
 - **What is captured now: one green pill by the clock, in development** (`sdk/capturestatus.jsx`, `sdk/capturemodel.js`,
   `sdk/privacy.js`, `sdk/share.js`, `sdk/media.js`, `sdk/hardware.jsx`, `server/src/sec/pwguard.c`,

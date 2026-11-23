@@ -47,6 +47,7 @@
   "pickAny": "Choisir une image ou une courte vidéo",
   "credits": "Crédits",
   "creditsHint": "Le titre, l’auteur, la licence et la source de chaque arrière-plan.",
+  "aiGenerated": "Générée par IA",
   "remove": "Supprimer le téléchargement",
   "greenScreen": "Fond vert",
   "greenHint": "Pour un vrai fond vert ou bleu derrière vous : sa couleur est détourée plus précisément que sans fond.",
