@@ -656,8 +656,9 @@ int fstrash_empty(void) {
 
 /* ---- bounded walks ---- */
 
-static FsDu *du_out;
-static double du_deadline;
+/* per thread: lord.fs.du walks on the interface's thread, lord.fs.duAsync on fsasync.c's workers (nftw has no user data) */
+static _Thread_local FsDu *du_out;
+static _Thread_local double du_deadline;
 static int du_cb(const char *p, const struct stat *st, int flag, struct FTW *f) {
     (void)p; (void)f;
     if (flag == FTW_D) du_out->dirs++;

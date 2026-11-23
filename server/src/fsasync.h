@@ -5,22 +5,26 @@
  *   fsasync_dispatch(fn, ud);                                     // fn(ud, req, json) once per finished request
  *
  * The answer is JSON: { "entries": [...] } (list), { "stat": {...} } (stat), { "ok": true } (trash, mkdir, rename),
- * { "total", "free" } (free), or { "error": "<code line>" } (errcode.h). Paths are resolved and checked on the worker
+ * { "total", "free" } (free),
+ * { "size", "files", "dirs", "complete", "remote" } (du, as lord.fs.du), or { "error": "<code line>" } (errcode.h). Paths are resolved and checked on the worker
  * by the same fsops.c functions lord.fs's synchronous calls use: nothing is checked less because it runs later. */
 #ifndef LORD_FSASYNC_H
 #define LORD_FSASYNC_H
 
 #include <stddef.h>
 
-enum { FSA_LIST = 1, FSA_STAT, FSA_TRASH, FSA_FREE, FSA_MKDIR, FSA_RENAME };
+enum { FSA_LIST = 1, FSA_STAT, FSA_TRASH, FSA_FREE, FSA_MKDIR, FSA_RENAME, FSA_DU };
 
 #define FSA_THREADS 6            /* at most this many requests wait on file systems at once */
 #define FSA_QUEUE 256            /* queued plus running; more is refused at once with fs.busy */
 #define FSA_LIST_MAX 5000        /* as lord.fs.list (apps/files/locations.js LIST_CAP) */
+#define FSA_DU_MAX_MS 10000      /* a size walk stops after this long (lord.fs.du: 3000, on the interface's thread) */
 
 int  fsasync_submit(int op, const char *path, char *err, size_t errlen);
 /* FSA_RENAME takes a second path (the new name), as lord.fs.rename(from, to) */
 int  fsasync_submit2(int op, const char *path, const char *path2, char *err, size_t errlen);
+/* FSA_DU: the folder's size, walked for at most ms (FSA_DU_MAX_MS) */
+int  fsasync_submit_du(const char *path, double ms, char *err, size_t errlen);
 int  fsasync_fd(void);           /* -1 until the first request */
 typedef void (*FsaReplyFn)(void *ud, int req, const char *json);
 int  fsasync_dispatch(FsaReplyFn fn, void *ud);   /* answers delivered */

@@ -168,6 +168,37 @@ In development; the latest release is 0.8.9.5-beta.
   **Use 2D Graphics and Start**, in every language. `docs/VIRTUALIZATION.md` (3.2 and 6.10) has the code path and the
   upstream status. Tests: `build/vmlog-test`, `build/vm-test`, `tests/vm_model_test.mjs`.
 
+- **Opening Settings → Flatpak froze the whole desktop for up to 2 seconds; no Settings page waits on the disk or a
+  camera any more** (maintainer, 2026-11-23: the pointer stopped until the page showed). Every Settings page was then
+  opened one by one in a headless session and timed with the stall detector (`docs/MAIN-THREAD.md`, "Settings, page by
+  page").
+  - **Settings → Flatpak** measured `~/.local/share/flatpak` and `~/.var/app` with `lord.fs.du` on lord-server's main
+    thread, allowed up to 2 s, on every visit: hundreds of thousands of files once a few apps and their runtimes are
+    installed. The sizes are now measured by the new `lord.fs.duAsync(path, ms)` (`server/src/fsasync.c`, `FSA_DU`: the
+    same path checks and walk as `lord.fs.du`, on one of the workers `lord.fs.listAsync` already uses, at most 10 s,
+    never into another filesystem nor on a cloud or network mount) through `fs.duAsync` (`sdk/fs.js`); the rows say
+    "calculating…" until the answer comes, and the answer is kept for 30 s, so going back to the page shows it at once.
+    Headless with 200 000 files: opening the page 148–154 ms → 14–23 ms.
+  - **Every switch in Settings (and every other settings change) paused the desktop for 60–70 ms on a computer with
+    webcams**: LordOS Studio applied its configuration on each settings write and listed the cameras each time
+    (`lord.media.cameras` opens every `/dev/video*`). It now stops when its own settings are as last applied, and lists
+    the cameras only when one was chosen (`sdk/studio.jsx`): `settings.set` of one key 65 ms → 0.3 ms with two webcams.
+  - **Settings → Web apps** measured each profile's data with `lord.fs.du` (up to 300 ms per profile, every 30 s while
+    the page shows); now `fs.duAsync`.
+  - **Settings → Cloud → Check This Account** listed, created, read and removed files in the account's folder (a
+    FUSE mount: each a call to the provider) on the main thread, and reading the freed file back downloaded it there.
+    The check now uses `fs.listAsync`, `statAsync`, `mkdirAsync` and `trashAsync`, and writes and reads its file through
+    a scratch file in `~/.cache` and a copy job (`sdk/cloudcheck.js` awaits every call; `cloud_model_test.mjs` runs it
+    with calls that answer later). Not measured headless: it needs a real cloud account.
+  - **Settings → Language** listed Downloads and the home folder for language packs on every render of the page, and
+    **Network → VPN → Add** seven folders when the sheet opened; both now with `fs.listAsync`, once.
+  - Tests: `server/tests/settings_nofreeze.sh` (in `make test`) opens Settings → Flatpak twice in a headless
+    lord-server with 200 000 files in the test home and fails on a `call fs.du` stall line, a page that never shows a
+    size, or an opening over 250 ms; it fails on the code before this fix. `fsasync-test` covers `FSA_DU`.
+    `tests/perf_headless.sh` has the plans `settingsPanes` (every page by id), `flatpak` and `settingsNatives` (the
+    native calls Settings makes, each timed alone), `PERF_FLATPAK_FILES` and `PERF_MARK` (step marks for the stall
+    lines).
+
 ## [0.8.9.5-beta] - 2026-11-23
 
 An update of the package through the Store and `apt`, with no new images. Linux apps: every Wayland global LordOS

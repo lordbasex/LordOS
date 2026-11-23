@@ -37,11 +37,17 @@ const FILES = /\.(jpe?g|png|webp|mp4|webm|mkv|mov|m4v)$/i;
 const cameras = () => { try { return media.cameras(); } catch (e) { return []; } };
 
 // ---- settings → lord-server (the desktop's own process only: lord.studio exists nowhere else) ----
-let applied = null, appliedBg;
+// Runs on every settings change: when LordOS Studio's own settings are as last applied it stops there, and the cameras
+// are listed only when one was chosen. lord.media.cameras opens every /dev/video* (60–70 ms with two webcams), and
+// calling it on each settings write added that pause to every switch in Settings (2026-11-23, docs/MAIN-THREAD.md).
+let applied = null, appliedBg, appliedCfg = null;
 function apply(s) {
   if (!has()) return;
   const cfg = normalizeStudio(s.studio);
-  const server = serverConfig(cfg, cameras());
+  const ck = JSON.stringify(cfg);
+  if (ck === appliedCfg) return;
+  appliedCfg = ck;
+  const server = serverConfig(cfg, cfg.camera ? cameras() : []);
   const key = JSON.stringify(server);
   const bg = activeBackground(cfg);
   if (key === applied && bg === appliedBg) return;

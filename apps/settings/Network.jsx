@@ -268,15 +268,14 @@ function WifiPage({ net }) {
 
 // ---- VPN ----
 
-// Configurations found in the home folder (Downloads, Documents, Desktop).
+// Configurations found in the home folder (Downloads, Documents, Desktop): seven folders listed off the main thread
+// (fs.listAsync), each with every file it holds.
+const VPN_DIRS = ['', 'Descargas', 'Downloads', 'Documentos', 'Documents', 'Escritorio', 'Desktop'];
 function findVpnFiles() {
-  const out = [];
-  for (const dir of ['', 'Descargas', 'Downloads', 'Documentos', 'Documents', 'Escritorio', 'Desktop']) {
-    let list = [];
-    try { list = fs.list(dir || '.'); } catch (e) { continue; }
-    for (const e of list) if (!e.dir && /\.(conf|ovpn)$/i.test(e.name) && e.size < 256 * 1024) out.push({ rel: dir ? `${dir}/${e.name}` : e.name, name: e.name });
-  }
-  return out;
+  const home = fs.home();
+  return Promise.all(VPN_DIRS.map((dir) => fs.listAsync(dir ? `${home}/${dir}` : home).then((list) => list
+    .filter((e) => !e.dir && /\.(conf|ovpn)$/i.test(e.name) && e.size < 256 * 1024)
+    .map((e) => ({ rel: dir ? `${dir}/${e.name}` : e.name, name: e.name })), () => []))).then((lists) => lists.flat());
 }
 
 const cleanName = (s) => s.replace(/\.(conf|ovpn)$/i, '').replace(/[^A-Za-z0-9_-]/g, '-').slice(0, 24) || 'vpn';
@@ -331,7 +330,8 @@ function VpnImport({ onDone, edit }) {
   const { t: tr } = useLocale();
   const types = has() && lord.net.vpnTypes ? lord.net.vpnTypes() : FILE_TYPES.map((type) => ({ type, available: true }));
   const [type, setType] = useState(edit ? edit.type : null);
-  const [files] = useState(findVpnFiles);
+  const [files, setFiles] = useState([]);
+  useEffect(() => { let live = true; findVpnFiles().then((f) => { if (live) setFiles(f); }); return () => { live = false; }; }, []);
   const [file, setFile] = useState(null);
   const [name, setName] = useState(edit ? edit.name : '');
   const [form, setForm] = useState(edit ? formFromConfig(edit, FORM_DEFAULTS[edit.type]) : {});

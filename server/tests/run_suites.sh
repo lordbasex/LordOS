@@ -252,6 +252,13 @@ EOF
     if have node; then run "diskplaces-test (sdk/diskplaces.js, #122)" node tests/diskplaces_test.mjs; fi
     if have node; then run "jsx-undeclared-test (every JSX component is declared, #174)" node tests/jsx_undeclared_test.mjs; fi
     if have node; then run "greeter-inbox-test (themes/greeter/inbox.js, #172)" node tests/greeter_inbox_test.mjs; fi
+    # Settings → Flatpak with 200 000 files to measure: never on the main thread (the 2 s freeze of 2026-11-23)
+    sh tests/settings_nofreeze.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "settings-nofreeze (tests/settings_nofreeze.sh, headless lord-server: Settings → Flatpak)" ;;
+        77) skip "settings-nofreeze" "build/lord-server, node and the default theme (make, npm run build)" ;;
+        *) bad "settings-nofreeze (tests/settings_nofreeze.sh, headless lord-server: Settings → Flatpak)" ;;
+    esac
     # a popup opened again on the same wl_surface, as GTK 4's popovers, against a headless lord-server (#159)
     sh tests/popup_headless.sh >"$T/out" 2>&1
     case $? in

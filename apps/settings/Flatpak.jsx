@@ -6,7 +6,7 @@
 // lets a person who tried it leave nothing behind.
 import {
   View, Text, useLocale, useTheme, useAppWindow, useStore, Button, Toggle, ConfirmDialog, Layer, formatBytes, errorText, wm,
-  spacing, typeScale, flathub as F, admin, useSettings,
+  spacing, typeScale, flathub as F, admin, useSettings, fs,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, ValueRow, Note, Actions, Message } from './ui.jsx';
@@ -20,7 +20,22 @@ function Over({ children }) {
   return <Layer name="modal">{children({ x: g.x || 0, y: g.y || 0, w: g.w || 640, h: g.h || 480 })}</Layer>;
 }
 
-const du = (path) => { try { const r = lord.fs.du(path, 2000); return r && typeof r.size === 'number' ? r : null; } catch (e) { return null; } };
+// The folders' sizes, measured on one of lord-server's workers (fs.duAsync): ~/.local/share/flatpak holds hundreds of
+// thousands of files, and walking it here froze the pointer for up to 2 s on every visit (2026-11-23). Each answer is
+// kept for SIZE_TTL, so leaving the page and coming back shows it at once; a request still running is shared.
+const SIZE_TTL = 30000;
+const sizes = new Map();          // path → { at, p: Promise<{ size, complete } | null>, r (once answered) }
+function measure(path) {
+  const c = sizes.get(path);
+  if (c && (!('r' in c) || Date.now() - c.at < SIZE_TTL)) return c;
+  const e = { at: Date.now() };
+  e.p = fs.duAsync(path, 10000).then((r) => (r && typeof r.size === 'number' ? r : null), () => null)
+    .then((r) => { e.r = r; e.at = Date.now(); return r; });
+  sizes.set(path, e);
+  return e;
+}
+const known = (path) => { const c = path && sizes.get(path); return c && 'r' in c && Date.now() - c.at < SIZE_TTL ? c.r : undefined; };
+const homeDir = () => { try { return lord.fs.home(); } catch (e) { return ''; } };
 const installed = (name) => { try { return !!lord.pkg.info(name, {})?.installed; } catch (e) { return false; } };
 
 // The plan that removes flatpak (and the libraries it brought, when nothing else needs them), or null when the package
@@ -51,18 +66,28 @@ export function FlatpakSettings() {
   const [msg, setMsg] = useState(null);
   const has = F.available();
   const prefs = F.prefs();
-  const [sizes, setSizes] = useState({ apps: null, data: null });
+  // undefined: being measured; null: not known
+  const [home] = useState(homeDir);
+  const appsPath = has && home ? `${home}/.local/share/flatpak` : '', dataPath = home ? `${home}/.var/app` : '';
+  const [appsSize, setAppsSize] = useState(() => (appsPath ? known(appsPath) : null));
+  const [dataSize, setDataSize] = useState(() => (dataPath ? known(dataPath) : null));
   useEffect(() => {
     if (has) F.refreshInstalled();
-    // measured once per visit (and after a removal), not on every render: the folders can hold gigabytes
-    const home = (() => { try { return lord.fs.home(); } catch (e) { return ''; } })();
-    const id = setTimeout(() => setSizes({ apps: has && home ? du(`${home}/.local/share/flatpak`) : null, data: home ? du(`${home}/.var/app`) : null }), 0);
-    return () => clearTimeout(id);
+    // measured once per visit (or kept from the last one) and after a removal, never on this thread
+    let live = true;
+    const want = (path, set) => {
+      if (!path) { set(null); return; }
+      if (gen) sizes.delete(path);
+      const c = measure(path);
+      if ('r' in c) set(c.r); else { set(undefined); c.p.then((r) => { if (live) set(r); }); }
+    };
+    want(appsPath, setAppsSize);
+    want(dataPath, setDataSize);
+    return () => { live = false; };
   }, [has, gen]);
   // an app installed or removed elsewhere (a terminal, a .flatpakref) changes the count while this page shows
   useEffect(() => (has ? F.watchInstalled() : undefined), [has]);
-  const appsSize = sizes.apps, dataSize = sizes.data;
-  const size = (r) => (r ? `${formatBytes(r.size)}${r.complete === false ? '+' : ''}` : '—');
+  const size = (r) => (r === undefined ? tr('files.info.calculating') : r ? `${formatBytes(r.size)}${r.complete === false ? '+' : ''}` : '—');
 
   const start = () => {
     setMsg(null);

@@ -6,7 +6,7 @@
 import {
   View, Text, Button, Toggle, TextInput, SearchField, Segmented, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
   formatBytes, formatDate, formatTime, tOptional, spacing, typeScale, wm, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText,
-  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, cloudState, askKeyringUnlock, systemInfo, lordosVersion, AutofillButton,
+  AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, cloudState, askKeyringUnlock, systemInfo, lordosVersion, AutofillButton, fs,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, Section, SettingRow, Note, Actions, PopUp, tint } from './ui.jsx';
@@ -743,11 +743,42 @@ const ownOpts = (c) => (c && c.own && c.id ? { clientId: c.id, clientSecret: c.s
 
 // Check This Account (docs/CLOUD.md 19): its steps, then a report with nothing personal, to copy or send.
 const checks = new Map();          // account id → { running, steps, report } (survives leaving the page)
-// what the check uses of lord.fs (its own names; move is lord.fs.copy's move job)
+// What the check uses of lord.fs (its own names; move is lord.fs.copy's move job). Everything that touches the account's
+// folder runs off lord-server's main thread (docs/MAIN-THREAD.md, rule 6): each is a call to the provider through rclone,
+// and reading the freed file back downloads it, which held the pointer still for as long (2026-11-23). list, mkdir,
+// stat and trash are fs's Async calls; the file is written and read through a scratch file in ~/.cache and a copy job.
+const COPY_TIMEOUT = 120e3;
+const copyDone = (id) => new Promise((resolve, reject) => {
+  const end = Date.now() + COPY_TIMEOUT;
+  const tick = () => {
+    const j = (lord.fs.jobs() || []).find((x) => x.id === id);
+    if (j && !j.done && !j.failed && Date.now() < end) { setTimeout(tick, 100); return; }
+    try { lord.fs.jobForget(id); } catch (e) { /* still running: it ends on its own */ }
+    if (j && j.done && !j.failed) resolve();
+    else reject(Object.assign(new Error(''), { code: j && j.failed ? String(j.error || '').split(' ')[0] || 'sys.unknown' : 'cloud.checkTimeout' }));
+  };
+  tick();
+});
+const scratchFile = (what) => `${lord.fs.home()}/.cache/lordos-cloud-check-${what}-${Date.now()}.bin`;
+const dropLocal = async (p) => {
+  try {
+    await fs.trashAsync(p);
+    const t = (lord.fs.trashList() || []).find((x) => x.original === p);
+    if (t) lord.fs.removeFromTrash(t.id);
+  } catch (e) { /* only in ~/.cache */ }
+};
 const checkFs = {
-  home: () => lord.fs.home(), list: (p) => lord.fs.list(p), mkdir: (p) => lord.fs.mkdir(p), write: (p, d) => lord.fs.write(p, d),
-  read: (p, m) => lord.fs.read(p, m), stat: (p) => lord.fs.stat(p), move: (a, b) => lord.fs.copy(a, b, true), jobs: () => lord.fs.jobs(),
-  forgetJob: (id) => lord.fs.jobForget(id), trash: (p) => lord.fs.trash(p), trashList: () => lord.fs.trashList(), removeFromTrash: (id) => lord.fs.removeFromTrash(id),
+  home: () => lord.fs.home(), list: (p) => fs.listAsync(p), mkdir: (p) => fs.mkdirAsync(p), stat: (p) => fs.statAsync(p),
+  // written here, then moved into the account by a copy job (its thread waits for rclone)
+  async write(p, d) { const tmp = scratchFile('w'); lord.fs.write(tmp, d); await copyDone(lord.fs.copy(tmp, p, true)); },
+  // copied out of the account by a job (the download), then read here
+  async read(p, m) {
+    const tmp = scratchFile('r');
+    await copyDone(lord.fs.copy(p, tmp, false));
+    try { return lord.fs.read(tmp, m); } finally { await dropLocal(tmp); }
+  },
+  move: (a, b) => lord.fs.copy(a, b, true), jobs: () => lord.fs.jobs(),
+  forgetJob: (id) => lord.fs.jobForget(id), trash: (p) => fs.trashAsync(p), trashList: () => lord.fs.trashList(), removeFromTrash: (id) => lord.fs.removeFromTrash(id),
 };
 const checkRev = createStore(0);
 function CheckAccount({ a, st, p, verified }) {
