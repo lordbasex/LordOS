@@ -149,9 +149,11 @@ const colBox = (c) => (c.flex ? { flex: c.flex, minWidth: 0 } : { width: c.width
 // (the header sorts it), dim (dimmer text) }]; rows: the data; rowKey(row, i) its key; renderCell(row, column,
 // { selected, color, dim }) draws one cell: a string or a number (drawn as text), or an element. sort ({ key, dir })
 // and onSort(key): the header of a sortable column sorts by it. textOf(row): its text for type-to-find (the first
-// column's text if left out). The rest as a List. The columns follow the reading direction.
+// column's text if left out). onRowEnter(row, e) and onRowLeave(row): the pointer comes onto a row and leaves it (a
+// row's hover summary). rowStyle(row): more style for a row (a greyed one). The rest as a List. The columns follow the
+// reading direction.
 export function Table({ columns, rows, rowKey = (r, i) => i, renderCell, textOf, sort, onSort, selection, onSelectionChange, multiple = false,
-  onActivate, onContextMenu, rowHeight = 26, striped = true, focusable = true, style }) {
+  onActivate, onContextMenu, onRowEnter, onRowLeave, rowStyle, rowHeight = 26, striped = true, focusable = true, style }) {
   const t = useTheme();
   const box = useRef(null);
   const first = columns[0];
@@ -176,7 +178,8 @@ export function Table({ columns, rows, rowKey = (r, i) => i, renderCell, textOf,
         const rp = s.rowProps(r, i);
         return (
           <View key={String(rowKey(r, i))} {...rp} onContextMenu={onContextMenu ? (e) => { if (!on) rp.onMouseDown({ button: 0 }); onContextMenu(r, e); } : undefined}
-            style={{ flexDirection: 'row', height: rowHeight, alignItems: 'center', paddingHorizontal: 10, backgroundColor: col.bg, ...leadEdge(t, s.isLead(i)) }}>
+            onMouseEnter={onRowEnter ? (e) => onRowEnter(r, e) : undefined} onMouseLeave={onRowLeave ? () => onRowLeave(r) : undefined}
+            style={{ flexDirection: 'row', height: rowHeight, alignItems: 'center', paddingHorizontal: 10, backgroundColor: col.bg, ...leadEdge(t, s.isLead(i)), ...rowStyle?.(r) }}>
             {columns.map((c) => {
               const v = renderCell(r, c, { selected: on, color: col.fg, dim: col.dim });
               return (

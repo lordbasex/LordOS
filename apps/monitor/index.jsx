@@ -325,7 +325,7 @@ function MemTop() {
   const procs = useStore(monitorProcesses);
   const top = useMemo(() => memTop(procs?.list, 8), [procs]);
   if (!top.length) return null;
-  const label = (p) => (p.app === 'lordos' ? tr('monitor.lordos') : isolatedAppOf(p) ? appName(isolatedAppOf(p)) : p.appName || p.name);
+  const label = (p) => (p.app === 'lordos' ? tr('monitor.lordos') : isolatedAppOf(p) ? appName(isolatedAppOf(p)) : componentName(tr, p.app) || p.appName || p.name);
   return (
     <Card icon="memory" title={tr('monitor.memTop')}>
       {top.map((g) => (
@@ -386,6 +386,8 @@ export function Cell({ col, children, color, bold }) {
 // An isolated LordOS app (its own process and scope, "lpk:<id>"): a package or a built-in app such
 // as Mail or Passwords; the process is shown with the app's name and icon.
 export const isolatedAppOf = (item) => (typeof item?.app === 'string' && item.app.startsWith('lpk:') ? getApp(item.app.slice(4)) : null);
+// (0.8.9.6) one of LordOS's components (lordos:terminal, lordos:mail…: the process runs in its lordos-net-<name>.scope)
+export const componentName = (tr, app) => { const c = sdk.netModel?.COMPONENTS?.[app]; return c ? tr(c.label) : null; };
 
 // (0.8.5) LordOS's own components: the built-in app's icon (Mail, Store, Terminal) or a glyph
 function ComponentGlyph({ comp, size }) {

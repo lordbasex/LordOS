@@ -631,6 +631,9 @@ EOF
     # (0.8.8.6) Monitor → Memory: the processes grouped by app (apps/monitor/memtop.js)
     if have node; then run "monitor-memtop-test (apps/monitor/memtop.js)" node tests/monitor_memtop_test.mjs
     else skip "monitor-memtop-test" "node"; fi
+    # (0.8.9.6) Monitor → Processes: Grouped, the steady list, who started it and the origin badges (apps/monitor/procgroupmodel.js)
+    if have node; then run "monitor-procgroup-test (apps/monitor/procgroupmodel.js, seal.js)" node tests/monitor_procgroup_test.mjs
+    else skip "monitor-procgroup-test" "node"; fi
     # (0.8.6) LordBench's model (apps/sysinfo/perf.js): references, verdicts, comparisons
     if have node; then run "sysinfo-perf-test (apps/sysinfo/perf.js)" node tests/sysinfo_perf_test.mjs
     else skip "sysinfo-perf-test" "node"; fi
@@ -779,6 +782,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-colview-scene (apps/files/views.jsx ColumnView)" node tests/menubar_test.mjs files_colview_scene.mjs
     else skip "files-colview-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6) Monitor → Processes grouped: the groups, a hover summary, Quit All on a snapshot, a child's Quit, the badges,
+    # the chain and the held order
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-grouped-scene (apps/monitor/Processes.jsx)" node tests/menubar_test.mjs monitor_grouped_scene.mjs
+    else skip "monitor-grouped-scene" "node and the repository's node_modules (npm install)"; fi
     # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs

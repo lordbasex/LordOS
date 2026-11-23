@@ -38,6 +38,7 @@
 #include "../monitor/mon.h"
 #include "../monitor/map.h"
 #include "../monitor/procctl.h"
+#include "../monitor/exeown.h"
 #include "../monitor/netrec.h"
 #include "../apps.h"
 #include "js_sys.h"
@@ -187,6 +188,7 @@ static void app_props(JSContext *c, JSValue e, AppSet *as, int is_self, char sk,
     char id[200];
     const DesktopApp *a = NULL;
     if (sk == 'l') { snprintf(id, sizeof id, "lpk:%s", sid); JS_SetPropertyStr(c, e, "app", JS_NewString(c, id)); return; }
+    if (sk == 'n') { snprintf(id, sizeof id, "lordos:%s", sid); JS_SetPropertyStr(c, e, "app", JS_NewString(c, id)); return; }   /* a component's scope */
     if (sk == 'f') {                                /* every process of a Flatpak app: bubblewrap, its proxy, the app */
         if (as->nfps < 0) as->nfps = apps_flatpak_list(as->lang, &as->fps);
         snprintf(id, sizeof id, "flatpak:%s", sid);
@@ -569,7 +571,33 @@ static JSValue f_net_totals(JSContext *c, JSValueConst t, int argc, JSValueConst
     return o;
 }
 
+/* exeOwners([path, …]) → { path: package | "" }: the installed package that owns each executable, "" when none does
+ * (exeown.h: dpkg's file lists, read by a worker thread). A path not known yet is left out and asked about; the next
+ * call has it. At most 512 paths, each absolute (the Monitor passes the processes' exe). */
+static JSValue f_exe_owners(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1 || !JS_IsArray(c, argv[0])) return js_throw_code(c, "sys.badArgument", NULL);
+    uint32_t len = 0;
+    JSValue lv = JS_GetPropertyStr(c, argv[0], "length");
+    JS_ToUint32(c, &len, lv);
+    JS_FreeValue(c, lv);
+    if (len > 512) len = 512;
+    JSValue o = JS_NewObject(c);
+    for (uint32_t i = 0; i < len; i++) {
+        JSValue v = JS_GetPropertyUint32(c, argv[0], i);
+        const char *p = JS_IsString(v) ? JS_ToCString(c, v) : NULL;
+        JS_FreeValue(c, v);
+        if (!p) continue;
+        char pkg[EXEOWN_PKG_MAX];
+        int r = exeown_lookup(p, pkg, sizeof pkg);
+        if (r >= 0) JS_SetPropertyStr(c, o, p, JS_NewString(c, r ? pkg : ""));
+        JS_FreeCString(c, p);
+    }
+    return o;
+}
+
 static const JSCFunctionListEntry monitor_funcs[] = {
+    JS_CFUNC_DEF("exeOwners", 1, f_exe_owners),
     JS_CFUNC_DEF("netTotals", 0, f_net_totals),
     JS_CFUNC_DEF("start", 0, f_start),
     JS_CFUNC_DEF("stop", 0, f_stop),

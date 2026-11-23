@@ -273,6 +273,53 @@ In development; the latest release is 0.8.9.5-beta.
     native app alone; `PERF_APPS`). `build/uevent-test` covers `video4linux`, `build/fsasync-test` `fsasync_submit_fn`.
 ### Added
 
+- **Monitor → Processes: Grouped, a steady list, who started each process, origin badges, filters and rolling
+  statistics** (in development; the latest release is 0.8.9.5-beta). Asked by the maintainer: a browser shows as
+  twenty rows, and ending it meant ending each one. Details in `docs/MONITOR.md` ("Grouped view" to "Rolling
+  statistics").
+  - **Grouped** (next to Mine | All, combined with either, remembered): one row per app with an arrow that opens its
+    processes, showing the app's icon and name, total % CPU, memory (proportional, so shared pages count once),
+    threads, number of processes and user. Groups come from the app's root-owned scope (a Linux app, an isolated app,
+    a Flatpak app, a web app, a machine, and now LordOS's components: the Terminal's programs are one "Terminal"
+    group), else LordOS itself, else the process tree (trees of the same program together). A browser's zygotes,
+    renderers and double-forked crash reporter stay in its group. Pure logic in `apps/monitor/procgroupmodel.js`.
+  - **Quit All** on a group (the selected row's button, the toolbar, Delete, or the right-click menu with Force Quit
+    All…) lists the processes the group had when it was chosen and signals only those that are still the same process
+    (PID and start time): a PID reused meanwhile is skipped and counted, protected processes are never signalled. After
+    three seconds it offers Force Quit for the ones still open. It uses the same paths as one process (lord-server for
+    the user's own, the root helper's existing `proc-signal` for an administrator): no new privilege, no
+    `cgroup.kill`. LordOS's and the kernel's groups can't be ended as a group. A child row has its own ✕ and a menu with
+    Quit…, Force Quit… (new for single processes too) and Get Info.
+  - **A hover summary** on a group row, taken when it opens: the number of processes, the busiest and the largest child
+    (name and PID), and the last minute's CPU and memory with sparklines. Information only.
+  - **A steady list**: while the pointer is over the table, a menu or a sheet is open, and for two seconds after, the
+    order is held; values update in place, new processes go at the end of their group, exited ones stay greyed as
+    "ended" until it is released, and an "Order paused" note shows. The selection follows the process (PID and start
+    time), never a row number.
+  - **Who started it**: each child row shows its chain of ancestors dimmed ("Terminal › bash › claude › sh"; each link
+    selects that process), and Get Info → Statistics shows it as "Started by" with the apps' icons.
+  - **Origin badges**, each on a checkable fact and with a tooltip saying why: a blue verified seal for LordOS itself
+    (the executable belongs to the `lordos` package), a pink one for LordOS apps (an isolated app's scope, with its
+    signer), and small labels for Flatpak (app id), a package with its repository's name (Debian or a vendor's;
+    "installed from a file" when no index lists it), Web app (its site), Machine (its name), Unpackaged (no package
+    owns the executable) and Restart (the executable was replaced on disk). The seals are our own drawing
+    (`apps/monitor/seal.js`). Package ownership comes from dpkg's own file lists, read by a worker thread in
+    lord-server and cached (`server/src/monitor/exeown.c`, `lord.monitor.exeOwners`); it never blocks the screen.
+  - **Filters**: chips by origin (System, LordOS apps, Flatpak, Debian, Web apps, Machines, Unpackaged) and a Program
+    picker, combined with Mine | All, Grouped and the search; remembered with the sort.
+  - **Sorting by every column**, including the number of processes in the grouped view; groups sort by their totals
+    and their processes by the same column; remembered.
+  - **Rolling statistics** (`apps/monitor/procstatsmodel.js`): for every process (by PID and start time, so a restart
+    starts over) and group, the average and peak CPU and memory over 1, 5 and 15 minutes and the CPU's 95th percentile
+    over the last minute, from the process list Monitor already gets once a second; O(1) per sample and bounded (a ring
+    of 60 samples and 15 one-minute buckets per series, dropped 15 minutes after the process is gone). A Statistics
+    picker (Off, 1, 5, 15 min) adds four sortable columns; Get Info shows all three windows and the sparklines.
+  - lord-server reads LordOS's component scopes (`lordos-net-<name>.scope`) for the process list as `lordos:<name>`
+    (`mon_scope_parse`), the identity the firewall already used; the SDK's `Table` gained `onRowEnter`, `onRowLeave`
+    and `rowStyle`.
+  - Strings in all 35 languages. Tests: `tests/monitor_procgroup_test.mjs` (87 checks), `tests/monitor_grouped_scene.mjs`
+    (22 checks), `build/procctl-test` (the owner lookup and the component scopes); screenshots with
+    `tests/monitor_headless.sh` (a made-up list, nothing signalled).
 - **LordOS Studio is an app, and the capture item reaches it with the microphone too.** Until now LordOS Studio's
   controls opened only from the capture item by the clock, and only while an app used the camera.
   - **The LordOS Studio app** (`apps/studio`, new; in the launcher, the start menu and search of Lord Flow, Lord
