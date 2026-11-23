@@ -15,12 +15,14 @@ turned off there; without a model it says so.
 | 1 | `lord-tts` (the engine) and `say` (the command) | done |
 | 2 | Read the selection anywhere: Edit → Speech and the right-click menu, ❖Esc, the player, saving as a sound file | done |
 | 3 | Settings → AI → Voice: models (standard and HD) and 23 voices per language as signed packages, heard before downloading; Personal Voice (read six phrases or speak freely); Live Speech | done |
-| 4 | LordOS's own voice; more languages | to do |
+| 4 | More languages: French, German, Italian and Dutch ([#215](https://github.com/lordbasex/LordOS/issues/215), approved on 2026-11-22) | in development (after 0.8.9.4) |
+| 5 | LordOS's own voice | to do |
 
 ## `say`
 
 ```sh
-say "Hola, ¿cómo estás?"          # the language's chosen voice (else its own: Lola, Rafael, Alba)
+say "Hola, ¿cómo estás?"          # the language's chosen voice (else its own: Lola, Rafael, Alba, Estelle, Juergen, Giovanni, Daan)
+say -l fr "Bonjour"                # es, en, pt, fr, de, it or nl; without -l, the text's own
 say -v juergen "Hola"              # an installed voice
 say -l es -v mi_voz "Hola"         # a voice to clone: ~/.local/share/lordos/voice/voices/mi_voz.wav
 echo texto | say                   # stdin; terminal colors and control characters are dropped
@@ -36,7 +38,9 @@ Defaults: `~/.config/lordos/voice.json` (`voices` per language, `voice`, `langua
 
 - **Models**, root being `/usr/share/lordos/voice` (packages) or `~/.local/share/lordos/voice`: standard
   `<root>/models/<lang>/standard.gguf`, HD `<root>/models/<lang>/hd/` (Kyutai's `model.safetensors`, `tokenizer.model`).
-- **Voices:** `<root>/models/<lang>/[hd/]embeddings/<voice>.safetensors` (Kyutai's prepared voices), or
+  Dutch's standard model is Kyutai's own 6-layer folder, `<root>/models/nl/standard/` (with its `embeddings/`):
+  audio.cpp publishes no Dutch GGUF, and lord-tts reads that folder as it reads an HD one (language `dutch`).
+- **Voices:** `<root>/models/<lang>/[hd/|standard/]embeddings/<voice>.safetensors` (Kyutai's prepared voices), or
   `<root>/voices/<name>.wav` (16-bit or float WAV, 0.5–30 s; the voice is cloned from it). A voice asked for that isn't
   installed for the model falls back to the language's own, then to any installed one.
 - **Speed:** a sentence at a time; each one plays (PipeWire's `pw-cat`) while the next is synthesized. Measured on an
@@ -48,13 +52,13 @@ Defaults: `~/.config/lordos/voice.json` (`voices` per language, `voice`, `langua
   voice runs on (`docs/MONITOR.md`, "GPU"): lord-tts itself is sandboxed and not dumpable, so its `/proc` isn't
   readable. It is not lord-tts's folder: the helper can't write it.
 
-## Text normalization (Spanish and Portuguese, since 0.8.8.10)
+## Text normalization (Spanish and Portuguese since 0.8.8.10; French, German, Italian and Dutch in development)
 
 Pocket TTS's Spanish and Portuguese models, HD and standard, never learned to read digits or symbols: "Tengo 88 años y
 nací en 1987" came out as "Tengo bronce proteaños y nací en Crombiquit…" with every HD voice, while the same sentence
 written in words was read perfectly. audio.cpp's text preparation (`prepare_pocket_tts_text`) normalizes no numbers in
 any language; the English models read digits because they learned them. So `say` writes them out as words itself,
-for `es` and `pt` only (English text is left exactly as it is): `say_normalize()` in `server/src/tts/saytext.c`, a pure
+for every language but English (`es` and `pt` first; `fr`, `de`, `it` and `nl` below; English text is left exactly as it is): `say_normalize()` in `server/src/tts/saytext.c`, a pure
 function with its own tables and no dependency, run on the whole text once the language is known and before it is
 split into sentences (so pieces are measured on what is spoken). Portuguese uses the Brazilian forms where the two
 differ (dezesseis, dezenove, bilhão, "1.º de maio" → primeiro de maio). The rules follow the usual ones (num2words,
@@ -110,8 +114,9 @@ Not covered: units (`5 km`, `10 GB` keep their abbreviation), fractions (`1/2` i
 numbers above 999 999 999 999, the feminine of a count before a feminine noun (`1 casa` is "un casa"; money in libras
 and hours are feminine), and the European Portuguese forms.
 
-Tests: `server/tests/saytext_test.c` (267 checks, 242 of them normalization: 126 Spanish, 82 Portuguese, 4 with
-English and other languages left untouched, and 30 for `$` by region).
+Tests: `server/tests/saytext_test.c` (267 checks in 0.8.8.10, 242 of them normalization: 126 Spanish, 82 Portuguese,
+4 with English and other languages left untouched, and 30 for `$` by region; 541 with French, German, Italian and
+Dutch, below).
 
 Round trip, measured on 2026-11-15 on an i9-10900 with an RX 580: every installed Spanish and Portuguese voice (23 HD
 and 22 standard each) said two sentences with the `say` of 0.8.8.9 and with this one, and whisper.cpp's `small` model
@@ -129,6 +134,60 @@ percent, 25,50, 14:30, 2.º, 15 November, 2026, 21), each with its Portuguese tr
 | Portuguese standard | 70/88 → 85/88 | 49/176 → 176/176 |
 
 Most of what is left is whisper's own spelling of what was said right ("80 e 8" for oitenta e oito, "20 e um").
+
+### French, German, Italian and Dutch (in development, after 0.8.9.4)
+
+Kyutai's French, German, Italian and Dutch models were trained like the Spanish and Portuguese ones, on text with the
+numbers written out, so `say` writes them out for these four too, with the same function, the same rules for what a
+number is (separators, phone numbers, digits inside words, addresses, ranges, `$` by region) and tables of each
+language's own. French is France's (soixante-dix, quatre-vingts, quatre-vingt-dix; not Belgium's or Switzerland's
+septante, huitante, nonante), with the traditional hyphens. German and Dutch say years from 1100 to 1999 in hundreds
+(`1987` neunzehnhundertsiebenundachtzig, negentienhonderdzevenentachtig), as they are spoken; with a separator (`1.987`)
+it is a count.
+
+| Written | French | German | Italian | Dutch |
+|---|---|---|---|---|
+| `21`, `22`, `71`, `80`, `91` | vingt et un, vingt-deux, soixante et onze, quatre-vingts, quatre-vingt-onze | einundzwanzig, zweiundzwanzig, … | ventuno, ventidue, settantuno, ottanta, novantuno | eenentwintig, tweeëntwintig, … |
+| `100`, `101`, `200`, `1000`, `2026` | cent, cent un, deux cents, mille, deux mille vingt-six | hundert, hunderteins, zweihundert, tausend, zweitausendsechsundzwanzig | cento, centouno, duecento, mille, duemilaventisei | honderd, honderdeen, tweehonderd, duizend, tweeduizend zesentwintig |
+| `23`, `103`, `1.000.000`, `2.000.000` | vingt-trois, cent trois, un million, deux millions | dreiundzwanzig, …, eine Million, zwei Millionen | ventitré, centotré, un milione, due milioni | drieëntwintig, …, één miljoen, twee miljoen |
+| `1 Buch`, `1 libro`, `21 ans` (a count before a noun) | vingt et un ans | ein Buch (a capitalized noun) | un libro | één boek |
+| `3,5`, `25 %` | trois virgule cinq, vingt-cinq pour cent | drei Komma fünf, … Prozent | tre virgola cinque, … per cento | drie komma vijf, … procent |
+| ordinals | `1er` `1re` `2e` `2nd` `3ème` `21e`: premier, première, deuxième, second, troisième, vingt et unième | `3.` after an article or before a month: `am 3. Mai` am dritten Mai, `der 1. Platz` der erste Platz, `3. Oktober` dritter Oktober | `1º` `1ª` `11º` `23º`: primo, prima, undicesimo, ventitreesimo | `1e` `2de` `8ste` `21ste`: eerste, tweede, achtste, eenentwintigste |
+| `14:30`, `14:00`, `1:02:03` | quatorze heures trente (also `14h30`, `14 h 30`), quatorze heures, une heure, deux minutes et trois secondes | vierzehn Uhr dreißig (also `14.30 Uhr`), vierzehn Uhr, eine Stunde, zwei Minuten und drei Sekunden | quattordici e trenta, quattordici, … | veertien uur dertig, veertien uur, … |
+| `15/11/2026`, `15.11.2026`, `2026-11-15` | quinze novembre deux mille vingt-six (`01/05` premier mai; `1 janvier` premier janvier) | fünfzehnter November … (`am 15.11.` am fünfzehnten) | quindici novembre duemilaventisei (`1 maggio` primo maggio) | vijftien november tweeduizend zesentwintig |
+| `25,50 €`, `1.000.000 €`, `£1`, `$10` | vingt-cinq euros cinquante, un million d'euros, une livre, dix dollars | fünfundzwanzig Euro fünfzig, eine Million Euro, ein Pfund, zehn Dollar | venticinque euro e cinquanta, un milione di euro, una sterlina, dieci dollari | vijfentwintig euro vijftig, één miljoen euro, één pond, tien dollar |
+| `21 °C`, `1 °C` | vingt et un degrés Celsius, un degré | einundzwanzig Grad Celsius, ein Grad | ventuno gradi Celsius, un grado | eenentwintig graden Celsius, één graad |
+| `#5`, `n° 5`, `@`, `&`, `10-20` | numéro cinq, arobase, et, dix à vingt | Nummer fünf, at, und, zehn bis zwanzig | numero cinque (`n. 5` too), chiocciola, e, dieci a venti | nummer vijf, at, en, tien tot twintig |
+
+**Abbreviations** (new with these four; written as they are, at the start of a word): French `M.` and `MM.` (only
+before a capitalized name), `Mme`, `Mlle`, `Dr`, `etc.`, `p. ex.`, `c.-à-d.`, `env.`, `av. J.-C.`; German `z. B.`,
+`d. h.`, `u. a.`, `usw.`, `bzw.`, `ca.`, `Nr.`, `Dr.`, `Prof.`, `evtl.`, `ggf.`, `inkl.`, `vgl.`, `bzgl.`, `Str.`;
+Italian `Sig.`, `Sig.ra`, `Dott.`, `Dott.ssa`, `Prof.`, `ecc.`, `pag.`, `p.es.`, `ad es.`, `tel.`; Dutch `bijv.`,
+`d.w.z.`, `enz.`, `o.a.`, `m.b.t.`, `i.p.v.`, `nr.`, `ca.`, `dhr.`, `mevr.`, `blz.`, `incl.`, `t/m`. One that can end
+a sentence (`etc.`, `usw.`, `ecc.`, `enz.`) keeps its period for it when a capital or the end of the text follows.
+
+French's elisions keep their apostrophe: `l'11e` is l'onzième. Not covered, besides what Spanish leaves out: Roman
+numerals (`XXIe siècle` stays), Belgian and Swiss French, German ordinals without an article or a month (`Er wurde 3.`
+is "drei", as a sentence's end can't be told from an ordinal), the declension of German ordinals beyond -e, -en and
+-er, and grammatical gender before a noun (`1 maison` is "un maison").
+
+Which language a text is in (`say_language`) now weighs seven lists of common words and the letters only one or two of
+them use (ß ä ö for German, ì ò for Italian, ê î û œ for French, ç for French and Portuguese); the curly apostrophe
+splits French words as `'` does. Without `-l`, a text too short to tell goes on being read in the person's interface
+language when it is one of the seven.
+
+Tests: 274 new checks in `saytext_test.c` (541 in all): French 86, German 70, Italian 59 and Dutch 46 for normalization,
+13 for telling the languages apart (Spanish and Portuguese sentences full of numbers stay Spanish and Portuguese).
+`tts_test.sh` says a sentence with numbers, a time and a date in each new language, HD and standard, where the models
+are installed.
+
+**Listen-free check, 2026-11-22**, on an i9-10900 with an RX 580: every new model (HD and standard), with Estelle and
+Alba, said a sentence of 10–13 s with a number, a time, a date and a price, on the CPU and on the GPU, and the WAV was
+measured: voiced 45–82 % of the time, spectral flatness 0.000–0.001 where speech is (white noise: 0.56), 89–100 % of the
+energy in 80 Hz–4 kHz, and 4.4–5.9 syllables a second of the normalized text, the same as the Spanish models with the
+same sentence (4.6–5.8). Synthesis took 1.5–2.1 s on the GPU and 3.1–4.3 s on the CPU with a standard model, 5.9–6.6 s
+and 8.7–11.9 s with an HD one (model loading included). A transcription round trip (whisper.cpp) as above is still to
+be done on the maintainer's machine.
 
 ## Reading aloud from the desktop
 
@@ -178,34 +237,45 @@ Every place with text has **Speech** (`sdk/voice.js`, `speechMenu`):
 
 Two qualities per language, both Kyutai's Pocket TTS:
 
-| Quality | What | Size (es / pt / en) |
+| Quality | What | Size |
 |---|---|---|
-| Standard | the 6-layer model, audio.cpp's Q8_0 GGUF: fast anywhere | 128 MB each |
-| HD | Kyutai's 24-layer model (`spanish_24l`, `portuguese_24l`, `english_2026-09_24l`), read as Kyutai ships it: more natural | 672 / 672 / 1304 MB |
+| Standard | the 6-layer model, audio.cpp's Q8_0 GGUF: fast anywhere. Dutch: Kyutai's own 6-layer folder (`dutch`), as audio.cpp publishes no Dutch GGUF | 128 MB (French 129, Dutch 220) |
+| HD | Kyutai's 24-layer model (`spanish_24l`, `portuguese_24l`, `english_2026-09_24l`, `french_24l`, `german_24l`, `italian_24l`, `dutch_24l`), read as Kyutai ships it: more natural | 672 MB (English 1304) |
 
 **23 voices** (`sdk/voicecatalog.js`), each speaking every language: Kyutai's prepared voice states (21–31 MB in HD,
 4–8 MB standard). Only voices whose recording allows redistribution and commercial use: Kyutai's own (lola, juergen,
 rafael, estelle, giovanni, daan), voice-zero (CC0), Alba McKenna and VCTK (CC-BY-4.0). Left out: jean (EARS,
-non-commercial) and cosette, javert, marius (origin not documented). Daan exists only in HD. Each language's own voice
-is the default: Lola (es), Rafael (pt), Alba (en).
+non-commercial) and cosette, javert, marius (origin not documented). Daan exists only in HD, but in French (audio.cpp's
+GGUF has it) and Dutch (Kyutai's own folder). Each language's own voice is the default: Lola (es), Rafael (pt), Alba
+(en), and Kyutai's voice of each new language, Estelle (fr), Juergen (de), Giovanni (it) and Daan (nl).
+
+**Licenses of the new languages** (checked on 2026-11-22): Kyutai's `french_24l`, `german_24l`, `italian_24l`,
+`dutch_24l` and `dutch` are in the same `kyutai/pocket-tts` repository, under the same CC-BY-4.0 model card and the
+same gated conditions as the three before; audio.cpp's French, German and Italian Q8_0 GGUFs are in
+`audio-cpp/audio.cpp-gguf` as the Spanish one (conversions of Kyutai's weights, CC-BY-4.0). The voices are the same 23
+recordings, so their licenses don't change.
 
 **Packages** (`tools/voice/mkdeb-voice.mjs`, `Architecture: all`, into `/usr/share/lordos/voice`), published in the
 signed APT repository, never fetched from Hugging Face by a LordOS system:
 
 - `lordos-voice-<lang>` and `lordos-voice-<lang>-hd`: the models;
 - `lordos-voice-<lang>-<voice>` and `…-hd`: one voice, depending on its model;
-- `lordos-voice-previews`: a recorded sample of every voice in every language (5 MB), so a voice is heard before it is
+- `lordos-voice-previews`: a recorded sample of every voice in every language (45 MB with the seven languages), so a voice is heard before it is
   downloaded (`say --preview`, `lord.voice.preview`).
 
 Building them, on the maintainer's machine: `tools/voice/fetch-voices.sh <dir>` (Kyutai's gated repository needs its
-conditions accepted and a read token; each file checked against the SHA-256 Hugging Face publishes), then
+conditions accepted and a read token; each file checked against the SHA-256 Hugging Face publishes, and a file it
+publishes none for is refused), then
 `tools/voice/make-previews.sh <dir>`, then `node tools/voice/mkdeb-voice.mjs <dir> <out> <YYYY.MM.DD>`. The packages
-are reproducible; `tools/release/apt-repo.sh build … <the .debs>` publishes them like any other.
+are reproducible; `tools/release/apt-repo.sh build … <the .debs>` publishes them like any other. With the seven
+languages it is 332 packages (14 models, 161 HD voices, 156 standard voices, the previews); the three steps were run
+end to end on 2026-11-22 on the development PC (every file matched Hugging Face's SHA-256; 161 samples), the packages
+left unsigned and unpublished.
 
 **What lord-tts does like Kyutai's own code** (`pocket_tts`, checked against it): temperature 0.3 for every model
 (audio.cpp defaults to 0.7 outside English, which made Spanish drag and stumble), and the model's character
 replacements before synthesis (quotes, brackets and, in Spanish, `¡ ¿` dropped; curly apostrophes to `'`; a dash to a
-comma). The model starts every text with 0.3–0.9 s of silence (Kyutai's code too); `say` cuts it from the first
+comma, in German the em dash too; in French `:` to a comma, and in French and German `;` to a comma). The model starts every text with 0.3–0.9 s of silence (Kyutai's code too); `say` cuts it from the first
 sentence, keeping 50 ms.
 
 ## Settings → AI → Voice
@@ -244,7 +314,8 @@ Protocol (`src/doc/proto.h`): `DQ_INIT_FD` with the models folder (role `ro`) an
 `DQ_INIT_GO {"mode":"tts","gpu":bool}`, then `DQ_TTS {"slot","file","text","backend","threads","voice_id","seed","language"}`
 plus, optionally, the voice WAV's fd → `DR_BLOB`: a 16-bit mono WAV in a sealed memfd. The model is loaded by the
 first request and kept; another file, backend or language is refused. With `language` (only `spanish_24l`,
-`portuguese_24l`, `english_2026-09_24l`), `file` is an HD model's folder, read with `lib/tts/pocket_tts_dir.json`
+`portuguese_24l`, `english_2026-09_24l`, `french_24l`, `german_24l`, `italian_24l`, `dutch_24l` and `dutch`, the
+Dutch standard model), `file` is a model's folder, read with `lib/tts/pocket_tts_dir.json`
 (audio.cpp's own description of the model, generated at build time to read that folder).
 
 **Its sandbox** (`sandbox_apply_helper`, scope `lordos-tts`), checked by `tests/tts_test.sh`:
@@ -265,11 +336,12 @@ by git; the image builders run it). `server/mk/tts.mk` builds its Pocket TTS fam
 `glslc`, `libvulkan-dev` and `spirv-headers`; without them `make` skips lord-tts.
 
 Tests: `server/tests/saytext_test.c` (cleaning terminal output, splitting sentences, telling the language, writing
-Spanish and Portuguese numbers and symbols out as words),
+numbers, symbols and abbreviations out as words in every language but English),
 `server/tests/levels_test.c` (the wave's bands), `server/tests/voiceplayer_model_test.mjs` (where the player goes, the
 wave's motion; all three in `make test`) and
-`server/tests/tts_test.sh` (speech in es/en/pt on the CPU and the GPU, the confinement in both, a voice file that
-isn't audio, a voice name that is a path; `make test-full` when a model is installed).
+`server/tests/tts_test.sh` (speech in es/en/pt, and fr/de/it/nl, HD and standard, where installed, on the CPU and the
+GPU, the confinement in both, a voice file that isn't audio, a voice name that is a path; `make test-full` when a model
+is installed).
 
 Not yet tested: the Raspberry Pi (aarch64: ggml's CPU variants and the Pi 5's Vulkan driver).
 

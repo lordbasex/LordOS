@@ -1,5 +1,5 @@
 /* saytext_test.c — say's text (src/tts/saytext.c): cleaning terminal output, splitting into sentences, telling the
- * language and writing Spanish and Portuguese numbers and symbols out as words. */
+ * language and writing numbers, symbols and abbreviations out as words (all but English). */
 #include "tts/saytext.h"
 
 #include <stdio.h>
@@ -325,10 +325,331 @@ static void normalize_pt(void) {
     norm("pt", "http://exemplo.com.br/a_b-c", "exemplo ponto com ponto br barra a sublinhado b hífen c");
 }
 
+static void normalize_fr(void) {
+    norm("fr", "J'ai 88 ans et je suis né en 1987. J'ai acheté 3 livres pour 25 euros. #LordOS est génial.",
+         "J'ai quatre-vingt-huit ans et je suis né en mille neuf cent quatre-vingt-sept. J'ai acheté trois livres pour "
+         "vingt-cinq euros. LordOS est génial.");
+    /* cardinals */
+    norm("fr", "0", "zéro");
+    norm("fr", "1", "un");
+    norm("fr", "16", "seize");
+    norm("fr", "17", "dix-sept");
+    norm("fr", "21", "vingt et un");
+    norm("fr", "22", "vingt-deux");
+    norm("fr", "61", "soixante et un");
+    norm("fr", "70", "soixante-dix");
+    norm("fr", "71", "soixante et onze");
+    norm("fr", "77", "soixante-dix-sept");
+    norm("fr", "80", "quatre-vingts");
+    norm("fr", "81", "quatre-vingt-un");
+    norm("fr", "90", "quatre-vingt-dix");
+    norm("fr", "91", "quatre-vingt-onze");
+    norm("fr", "99", "quatre-vingt-dix-neuf");
+    norm("fr", "100", "cent");
+    norm("fr", "101", "cent un");
+    norm("fr", "200", "deux cents");
+    norm("fr", "280", "deux cent quatre-vingts");
+    norm("fr", "1000", "mille");
+    norm("fr", "2026", "deux mille vingt-six");
+    norm("fr", "80000", "quatre-vingt mille");
+    norm("fr", "200000", "deux cent mille");
+    norm("fr", "1 000 000", "un million");
+    norm("fr", "200\xe2\x80\xaf" "000\xe2\x80\xaf" "000", "deux cents millions");
+    norm("fr", "1.000.000.000", "un milliard");
+    norm("fr", "-5", "moins cinq");
+    /* a count before a noun and feminine money */
+    norm("fr", "21 ans", "vingt et un ans");
+    norm("fr", "1 £", "une livre");
+    norm("fr", "21 £", "vingt et une livres");
+    /* decimals, percent, groups */
+    norm("fr", "3,5", "trois virgule cinq");
+    norm("fr", "3.5", "trois point cinq");
+    norm("fr", "1\xe2\x80\xaf" "234,56", "mille deux cent trente-quatre virgule cinquante-six");
+    norm("fr", "25 %", "vingt-cinq pour cent");
+    norm("fr", "192.168.0.1", "cent quatre-vingt-douze point cent soixante-huit point zéro point un");
+    /* ordinals */
+    norm("fr", "le 1er", "le premier");
+    norm("fr", "la 1re fois", "la première fois");
+    norm("fr", "la 1ère fois", "la première fois");
+    norm("fr", "le 2e", "le deuxième");
+    norm("fr", "le 2nd", "le second");
+    norm("fr", "le 3ème", "le troisième");
+    norm("fr", "le 5e", "le cinquième");
+    norm("fr", "le 9e", "le neuvième");
+    norm("fr", "le 21e", "le vingt et unième");
+    norm("fr", "le 80e", "le quatre-vingtième");
+    norm("fr", "le 100e", "le centième");
+    norm("fr", "le XXIe siècle", "le XXIe siècle");
+    /* times */
+    norm("fr", "14:30", "quatorze heures trente");
+    norm("fr", "14h30", "quatorze heures trente");
+    norm("fr", "14 h 30", "quatorze heures trente");
+    norm("fr", "14:00", "quatorze heures");
+    norm("fr", "1:00", "une heure");
+    norm("fr", "21:05", "vingt et une heures cinq");
+    norm("fr", "1:02:03", "une heure, deux minutes et trois secondes");
+    norm("fr", "4h", "quatre heures");
+    /* dates */
+    norm("fr", "15/11/2026", "quinze novembre deux mille vingt-six");
+    norm("fr", "01/05/2026", "premier mai deux mille vingt-six");
+    norm("fr", "le 1 janvier", "le premier janvier");
+    norm("fr", "le 14 juillet 1789", "le quatorze juillet mille sept cent quatre-vingt-neuf");
+    /* money */
+    norm("fr", "25 €", "vingt-cinq euros");
+    norm("fr", "1 €", "un euro");
+    norm("fr", "25,50 €", "vingt-cinq euros cinquante");
+    norm("fr", "1 000 000 €", "un million d'euros");
+    norm("fr", "2 000 000 $", "deux millions de dollars");
+    norm("fr", "$10", "dix dollars");
+    norm("fr", "R$ 10", "dix reais");
+    /* degrees */
+    norm("fr", "21 °C", "vingt et un degrés Celsius");
+    norm("fr", "1°C", "un degré Celsius");
+    /* symbols */
+    norm("fr", "n° 5", "numéro cinq");
+    norm("fr", "#5", "numéro cinq");
+    norm("fr", "A & B", "A et B");
+    norm("fr", "2+2 = 4", "deux plus deux égale quatre");
+    norm("fr", "10-20", "dix à vingt");
+    norm("fr", "info@lordos.org", "info arobase lordos point org");
+    /* abbreviations */
+    norm("fr", "M. Dupont et Mme Martin", "monsieur Dupont et madame Martin");
+    norm("fr", "Mlle Durand", "mademoiselle Durand");
+    norm("fr", "Dr Martin", "docteur Martin");
+    norm("fr", "des fruits, p. ex. des pommes", "des fruits, par exemple des pommes");
+    norm("fr", "c.-à-d. demain", "c'est-à-dire demain");
+    norm("fr", "pommes, poires, etc. Puis", "pommes, poires, et cetera. Puis");
+    norm("fr", "pommes, poires, etc.", "pommes, poires, et cetera.");
+    norm("fr", "Mmenard", "Mmenard");
+    norm("fr", "le point M.", "le point M.");
+    norm("fr", "l'11e édition", "l'onzième édition");
+    norm("fr", "l\xe2\x80\x99" "11e édition", "l\xe2\x80\x99onzième édition");
+}
+
+static void normalize_de(void) {
+    norm("de", "Ich bin 88 Jahre alt und wurde 1987 geboren. Ich kaufte 3 Bücher für 25 Euro. #LordOS ist toll.",
+         "Ich bin achtundachtzig Jahre alt und wurde neunzehnhundertsiebenundachtzig geboren. Ich kaufte drei Bücher für "
+         "fünfundzwanzig Euro. LordOS ist toll.");
+    /* cardinals */
+    norm("de", "0", "null");
+    norm("de", "1", "eins");
+    norm("de", "12", "zwölf");
+    norm("de", "17", "siebzehn");
+    norm("de", "21", "einundzwanzig");
+    norm("de", "30", "dreißig");
+    norm("de", "99", "neunundneunzig");
+    norm("de", "100", "hundert");
+    norm("de", "101", "hunderteins");
+    norm("de", "121", "hunderteinundzwanzig");
+    norm("de", "1000", "tausend");
+    norm("de", "1001", "tausendeins");
+    norm("de", "2026", "zweitausendsechsundzwanzig");
+    norm("de", "21.000", "einundzwanzigtausend");
+    norm("de", "100.000", "hunderttausend");
+    norm("de", "1.000.000", "eine Million");
+    norm("de", "1.200.000", "eine Million zweihunderttausend");
+    norm("de", "2.000.000", "zwei Millionen");
+    norm("de", "1.000.000.000", "eine Milliarde");
+    norm("de", "-5", "minus fünf");
+    /* a year in hundreds; with a separator it is a count */
+    norm("de", "im Jahr 1990", "im Jahr neunzehnhundertneunzig");
+    norm("de", "1100", "elfhundert");
+    norm("de", "1.987", "tausendneunhundertsiebenundachtzig");
+    norm("de", "2000", "zweitausend");
+    /* a count before a noun (nouns are capitalized) */
+    norm("de", "1 Buch", "ein Buch");
+    norm("de", "1 und 2", "eins und zwei");
+    norm("de", "1 mal", "eins mal");
+    /* decimals, percent, groups */
+    norm("de", "3,5", "drei Komma fünf");
+    norm("de", "1.234,56", "tausendzweihundertvierunddreißig Komma sechsundfünfzig");
+    norm("de", "25 %", "fünfundzwanzig Prozent");
+    norm("de", "0.8.8.10", "null Punkt acht Punkt acht Punkt zehn");
+    /* ordinals: after an article or before a month */
+    norm("de", "am 3. Mai", "am dritten Mai");
+    norm("de", "der 1. Platz", "der erste Platz");
+    norm("de", "den 7. Tag", "den siebten Tag");
+    norm("de", "3. Oktober", "dritter Oktober");
+    norm("de", "die 20. Ausgabe", "die zwanzigste Ausgabe");
+    norm("de", "Er kam um 3. Dann ging er.", "Er kam um drei. Dann ging er.");
+    /* times */
+    norm("de", "14:30", "vierzehn Uhr dreißig");
+    norm("de", "14:30 Uhr", "vierzehn Uhr dreißig");
+    norm("de", "14.30 Uhr", "vierzehn Uhr dreißig");
+    norm("de", "14:00", "vierzehn Uhr");
+    norm("de", "1:00", "ein Uhr");
+    norm("de", "um 8 Uhr", "um acht Uhr");
+    norm("de", "1:02:03", "eine Stunde, zwei Minuten und drei Sekunden");
+    norm("de", "4h", "vier Stunden");
+    /* dates */
+    norm("de", "15.11.2026", "fünfzehnter November zweitausendsechsundzwanzig");
+    norm("de", "am 15.11.2026", "am fünfzehnten November zweitausendsechsundzwanzig");
+    norm("de", "am 9. November 1989", "am neunten November neunzehnhundertneunundachtzig");
+    /* money */
+    norm("de", "25 €", "fünfundzwanzig Euro");
+    norm("de", "1 €", "ein Euro");
+    norm("de", "25,50 €", "fünfundzwanzig Euro fünfzig");
+    norm("de", "1.000.000 €", "eine Million Euro");
+    norm("de", "$10", "zehn Dollar");
+    norm("de", "1 £", "ein Pfund");
+    /* degrees */
+    norm("de", "21 °C", "einundzwanzig Grad Celsius");
+    norm("de", "1 °C", "ein Grad Celsius");
+    /* symbols */
+    norm("de", "#5", "Nummer fünf");
+    norm("de", "A & B", "A und B");
+    norm("de", "2+2 = 4", "zwei plus zwei gleich vier");
+    norm("de", "10-20", "zehn bis zwanzig");
+    norm("de", "info@lordos.org", "info at lordos Punkt org");
+    /* abbreviations */
+    norm("de", "z. B. Äpfel", "zum Beispiel Äpfel");
+    norm("de", "z.B. Äpfel", "zum Beispiel Äpfel");
+    norm("de", "d. h. morgen", "das heißt morgen");
+    norm("de", "Nr. 5", "Nummer fünf");
+    norm("de", "ca. 20 Leute", "circa zwanzig Leute");
+    norm("de", "Äpfel, Birnen usw. Dann", "Äpfel, Birnen und so weiter. Dann");
+    norm("de", "Dr. Müller und Prof. Weber", "Doktor Müller und Professor Weber");
+    norm("de", "bzw. morgen", "beziehungsweise morgen");
+}
+
+static void normalize_it(void) {
+    norm("it", "Ho 88 anni e sono nato nel 1987. Ho comprato 3 libri per 25 euro. #LordOS è fantastico.",
+         "Ho ottantotto anni e sono nato nel millenovecentottantasette. Ho comprato tre libri per venticinque euro. "
+         "LordOS è fantastico.");
+    /* cardinals */
+    norm("it", "0", "zero");
+    norm("it", "1", "uno");
+    norm("it", "3", "tre");
+    norm("it", "17", "diciassette");
+    norm("it", "21", "ventuno");
+    norm("it", "23", "ventitré");
+    norm("it", "28", "ventotto");
+    norm("it", "33", "trentatré");
+    norm("it", "100", "cento");
+    norm("it", "101", "centouno");
+    norm("it", "103", "centotré");
+    norm("it", "108", "centotto");
+    norm("it", "180", "centottanta");
+    norm("it", "1000", "mille");
+    norm("it", "1003", "milletré");
+    norm("it", "2026", "duemilaventisei");
+    norm("it", "23.000", "ventitremila");
+    norm("it", "1.000.000", "un milione");
+    norm("it", "2.500.000", "due milioni cinquecentomila");
+    norm("it", "1.000.000.000", "un miliardo");
+    norm("it", "-5", "meno cinque");
+    /* a count before a noun */
+    norm("it", "1 libro", "un libro");
+    norm("it", "1 e 2", "uno e due");
+    /* decimals, percent */
+    norm("it", "3,5", "tre virgola cinque");
+    norm("it", "1.234,56", "milleduecentotrentaquattro virgola cinquantasei");
+    norm("it", "25%", "venticinque per cento");
+    /* ordinals */
+    norm("it", "1º", "primo");
+    norm("it", "1ª", "prima");
+    norm("it", "il 10º", "il decimo");
+    norm("it", "l'11º", "l'undicesimo");
+    norm("it", "il 23º", "il ventitreesimo");
+    norm("it", "il 26º", "il ventiseiesimo");
+    norm("it", "la 21ª", "la ventunesima");
+    norm("it", "il 100º", "il centesimo");
+    /* times */
+    norm("it", "14:30", "quattordici e trenta");
+    norm("it", "alle 14:00", "alle quattordici");
+    norm("it", "1:02:03", "una ora, due minuti e tre secondi");
+    norm("it", "4h", "quattro ore");
+    /* dates */
+    norm("it", "15/11/2026", "quindici novembre duemilaventisei");
+    norm("it", "01/05/2026", "primo maggio duemilaventisei");
+    norm("it", "il 1 maggio", "il primo maggio");
+    /* money */
+    norm("it", "25 €", "venticinque euro");
+    norm("it", "1 €", "un euro");
+    norm("it", "25,50 €", "venticinque euro e cinquanta");
+    norm("it", "1.000.000 €", "un milione di euro");
+    norm("it", "$10", "dieci dollari");
+    norm("it", "1 £", "una sterlina");
+    /* degrees */
+    norm("it", "21 °C", "ventuno gradi Celsius");
+    norm("it", "1 °C", "un grado Celsius");
+    /* symbols */
+    norm("it", "n. 5", "numero cinque");
+    norm("it", "#5", "numero cinque");
+    norm("it", "A & B", "A e B");
+    norm("it", "10-20", "dieci a venti");
+    norm("it", "info@lordos.org", "info chiocciola lordos punto org");
+    /* abbreviations */
+    norm("it", "il Sig. Rossi e la Sig.ra Bianchi", "il signor Rossi e la signora Bianchi");
+    norm("it", "Dott. Verdi", "dottor Verdi");
+    norm("it", "mele, pere ecc. Poi", "mele, pere eccetera. Poi");
+    norm("it", "a pag. 5", "a pagina cinque");
+}
+
+static void normalize_nl(void) {
+    norm("nl", "Ik ben 88 jaar oud en ben geboren in 1987. Ik kocht 3 boeken voor 25 euro. #LordOS is geweldig.",
+         "Ik ben achtentachtig jaar oud en ben geboren in negentienhonderdzevenentachtig. Ik kocht drie boeken voor "
+         "vijfentwintig euro. LordOS is geweldig.");
+    /* cardinals */
+    norm("nl", "0", "nul");
+    norm("nl", "1", "één");
+    norm("nl", "13", "dertien");
+    norm("nl", "21", "eenentwintig");
+    norm("nl", "22", "tweeëntwintig");
+    norm("nl", "23", "drieëntwintig");
+    norm("nl", "80", "tachtig");
+    norm("nl", "100", "honderd");
+    norm("nl", "101", "honderdeen");
+    norm("nl", "1000", "duizend");
+    norm("nl", "2026", "tweeduizend zesentwintig");
+    norm("nl", "1.200.000", "één miljoen tweehonderdduizend");
+    norm("nl", "2.000.000", "twee miljoen");
+    norm("nl", "1.000.000.000", "één miljard");
+    norm("nl", "-5", "min vijf");
+    norm("nl", "in 1990", "in negentienhonderdnegentig");
+    /* decimals, percent */
+    norm("nl", "3,5", "drie komma vijf");
+    norm("nl", "25%", "vijfentwintig procent");
+    /* ordinals */
+    norm("nl", "de 1e", "de eerste");
+    norm("nl", "de 2de", "de tweede");
+    norm("nl", "de 3e", "de derde");
+    norm("nl", "de 8ste", "de achtste");
+    norm("nl", "de 19e", "de negentiende");
+    norm("nl", "de 21ste", "de eenentwintigste");
+    norm("nl", "de 100ste", "de honderdste");
+    /* times */
+    norm("nl", "14:30", "veertien uur dertig");
+    norm("nl", "14:00 uur", "veertien uur");
+    norm("nl", "1:02:03", "één uur, twee minuten en drie seconden");
+    /* dates */
+    norm("nl", "15-11-2026", "vijftien november tweeduizend zesentwintig");
+    norm("nl", "01/05/2026", "één mei tweeduizend zesentwintig");
+    /* money */
+    norm("nl", "25 €", "vijfentwintig euro");
+    norm("nl", "25,50 €", "vijfentwintig euro vijftig");
+    norm("nl", "1.000.000 €", "één miljoen euro");
+    norm("nl", "$10", "tien dollar");
+    /* degrees */
+    norm("nl", "21 °C", "eenentwintig graden Celsius");
+    norm("nl", "1 °C", "één graad Celsius");
+    /* symbols */
+    norm("nl", "#5", "nummer vijf");
+    norm("nl", "A & B", "A en B");
+    norm("nl", "10-20", "tien tot twintig");
+    /* abbreviations */
+    norm("nl", "bijv. appels", "bijvoorbeeld appels");
+    norm("nl", "d.w.z. morgen", "dat wil zeggen morgen");
+    norm("nl", "appels, peren enz. Dan", "appels, peren enzovoort. Dan");
+    norm("nl", "nr. 5", "nummer vijf");
+    norm("nl", "dhr. Jansen en mevr. De Vries", "de heer Jansen en mevrouw De Vries");
+    norm("nl", "1 t/m 5", "één tot en met vijf");
+}
+
 static void normalize_others(void) {
     /* English is left as it is: its models read digits */
     norm("en", "I am 88 years old, born in 1987. #LordOS costs $10 & 25%.", "I am 88 years old, born in 1987. #LordOS costs $10 & 25%.");
-    norm("fr", "J'ai 88 ans.", "J'ai 88 ans.");
+    norm("ru", "88", "88");
     norm(NULL, "88", "88");
     norm("en", "", "");
 }
@@ -357,10 +678,27 @@ int main(void) {
     lang("too little to tell", "OK", "es", "es");
     lang("a command keeps the fallback", "make -C server test 2>&1 | tail", "pt", "pt");
     lang("empty", "", "en", "en");
-    lang("a language without voices", "OK", "fr", "en");
+    lang("a language without voices", "OK", "ru", "en");
     lang("terminal output in English", "Error: the file was not found in the folder and it can not be opened", "es", "en");
+    lang("French", "Bonjour, je suis l'une des voix de LordOS. Je peux lire à voix haute tout texte que vous sélectionnez.", "en", "fr");
+    lang("French with its elisions", "C'est l'été, qu'il fait beau et j'ai le temps.", "es", "fr");
+    lang("French with curly apostrophes", "C\xe2\x80\x99est l\xe2\x80\x99été, qu\xe2\x80\x99il fait beau.", "es", "fr");
+    lang("French over a Spanish fallback", "Le fichier est dans le dossier et il ne peut pas être ouvert.", "es", "fr");
+    lang("German", "Hallo, ich bin eine der Stimmen von LordOS. Ich kann jeden Text, den du auswählst, laut vorlesen.", "en", "de");
+    lang("German by its letters", "Größe und Maße", "en", "de");
+    lang("Italian", "Ciao, sono una delle voci di LordOS. Posso leggere ad alta voce qualsiasi testo che selezioni.", "en", "it");
+    lang("Italian over a Spanish fallback", "Il file non è nella cartella e non si può aprire.", "es", "it");
+    lang("Dutch", "Hallo, ik ben een van de stemmen van LordOS. Ik kan elke tekst die je selecteert hardop voorlezen.", "en", "nl");
+    lang("Dutch over a German fallback", "Het bestand is niet in de map en kan niet worden geopend.", "de", "nl");
+    lang("too little to tell, a French fallback", "OK", "fr", "fr");
+    lang("Spanish stays Spanish", "La inflación fue del 3,5% y el libro cuesta 25,50 €. La reunión es a las 14:30.", "en", "es");
+    lang("Portuguese stays Portuguese", "A inflação foi de 3,5% e o livro custa R$ 25,50. A reunião é às 14:30.", "en", "pt");
     normalize_es();
     normalize_pt();
+    normalize_fr();
+    normalize_de();
+    normalize_it();
+    normalize_nl();
     normalize_others();
     normalize_region();
     printf("saytext_test: %d/%d\n", n - bad, n);

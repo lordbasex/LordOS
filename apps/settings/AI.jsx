@@ -4,7 +4,7 @@
 // signed lordos-voice-* packages (sdk/voicemanager.js), the one used chosen; and the person's own voices, recorded
 // with the microphone or taken from a file, cloned by the model (CloneSheet).
 import {
-  View, Text, Button, Toggle, Segmented, TextInput, Layer, FilePicker, useTheme, useLocale, useSettings, useStore, useAppWindow,
+  View, Text, Button, Toggle, Segmented, Dropdown, TextInput, Layer, FilePicker, useTheme, useLocale, useSettings, useStore, useAppWindow,
   wm, media, formatBytes, spacing, typeScale, VOICE_DEFAULTS, speakAvailable, previewVoice, tryVoice, player as voicePlayer,
   VOICE_LANGS, VOICES, voiceLabel, voicePackage, modelPackage, hasVoice, PREVIEWS_PACKAGE, scanVoices, installVoices, removeVoices,
   packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName, takeName, errorText, fs,
@@ -66,7 +66,7 @@ export function AISettings() {
         {busyLabel(key) ? <Text style={{ fontSize: typeScale.caption, color: th.textDim }}>{busyLabel(key)}</Text>
           : on ? <Button small destructive label={tr('settings.ai.remove')} disabled={!!job}
             onClick={() => remove(key, [modelPackage(lang, q === 'hd'),
-              ...VOICES.filter((x) => hasVoice(x.id, q === 'hd') && st.voices[q].has(x.id)).map((x) => voicePackage(lang, x.id, q === 'hd'))])} />
+              ...VOICES.filter((x) => hasVoice(x.id, q === 'hd', lang) && st.voices[q].has(x.id)).map((x) => voicePackage(lang, x.id, q === 'hd'))])} />
             : <Button small label={tr('settings.ai.download')} disabled={!!job} onClick={() => install(key, packagesFor(lang, L.own, q === 'hd', scan))} />}
       </SettingRow>
     );
@@ -120,7 +120,8 @@ export function AISettings() {
       </Section>
 
       <View style={{ alignItems: 'flex-start' }}>
-        <Segmented value={lang} onChange={setLang} options={VOICE_LANGS.map((l) => [l.id, tr(`settings.ai.lang.${l.id}`)])} />
+        {/* seven languages don't fit a segmented control in every interface language: a pop-up */}
+        <Dropdown value={lang} onChange={setLang} width={220} options={VOICE_LANGS.map((l) => [l.id, tr(`settings.ai.lang.${l.id}`)])} />
       </View>
 
       <Section title={tr('settings.ai.models')} footer={tr('settings.ai.modelsFooter')}>
@@ -135,7 +136,7 @@ export function AISettings() {
               : <Button small label={tr('settings.ai.download')} disabled={!!job} onClick={() => install('previews', [PREVIEWS_PACKAGE])} />}
           </SettingRow>
         ) : null}
-        {VOICES.filter((x) => hasVoice(x.id, hd)).map(voiceRow)}
+        {VOICES.filter((x) => hasVoice(x.id, hd, lang)).map(voiceRow)}
       </Section>
 
       <Section title={tr('settings.ai.own')} footer={tr('settings.ai.ownFooter')}>

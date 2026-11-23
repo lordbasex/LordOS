@@ -34,7 +34,12 @@ export function scanVoices() {
     const r = { standard: false, hd: false, voices: { standard: new Set(), hd: new Set() } };
     for (const root of roots) {
       const m = `${root}/models/${L.id}`;
-      if (isFile(`${m}/standard.gguf`)) { r.standard = true; for (const v of names(`${m}/embeddings`, '.safetensors')) r.voices.standard.add(v); }
+      // a standard model is audio.cpp's GGUF, or Kyutai's own folder where there is no GGUF (Dutch)
+      const std = L.standardDir ? `${m}/standard` : m;
+      if (isFile(L.standardDir ? `${std}/model.safetensors` : `${m}/standard.gguf`)) {
+        r.standard = true;
+        for (const v of names(`${std}/embeddings`, '.safetensors')) r.voices.standard.add(v);
+      }
       if (isFile(`${m}/hd/model.safetensors`)) { r.hd = true; for (const v of names(`${m}/hd/embeddings`, '.safetensors')) r.voices.hd.add(v); }
     }
     out[L.id] = r;

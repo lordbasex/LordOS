@@ -52,7 +52,7 @@ Medido en una PC, un Intel i9-10900 con una Radeon RX 580: unos 10 segundos de v
 
 ## Límites honestos
 
-- **Tres idiomas:** español, inglés y portugués.
+- **Tres idiomas en la última versión (0.8.9.4):** español, inglés y portugués. Francés, alemán, italiano y neerlandés están en desarrollo: las mismas dos calidades y 23 voces, con los números, fechas, horas e importes leídos con las palabras de cada idioma.
 - **Primero descargás un modelo.** Hasta entonces, Habla avisa que no hay ninguna voz instalada.
 - **No se probó en la Raspberry Pi** (los caminos de código de su procesador y el driver gráfico de la Pi 5).
 - **Lee lo que seleccionás; no es un lector de pantalla.** Un lector de pantalla, el zoom y el alto contraste siguen en la hoja de ruta.

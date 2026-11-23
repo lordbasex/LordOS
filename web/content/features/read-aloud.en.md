@@ -52,7 +52,7 @@ Measured on one PC, an Intel i9-10900 with a Radeon RX 580: about 10 seconds of 
 
 ## Honest limits
 
-- **Three languages:** Spanish, English and Portuguese.
+- **Three languages in the latest release (0.8.9.4):** Spanish, English and Portuguese. French, German, Italian and Dutch are in development: the same two qualities and 23 voices, with numbers, dates, times and money read in each language's own words.
 - **You download a model first.** Until then, Speech says that no voice is installed.
 - **Not tested on the Raspberry Pi** (its processor's code paths and the Pi 5's graphics driver).
 - **It reads what you select; it is not a screen reader.** A screen reader, zoom and high contrast are still on the roadmap.

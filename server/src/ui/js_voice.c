@@ -2,7 +2,7 @@
  *
  *   lord.voice.available()              → lord-say and lord-tts are installed
  *   lord.voice.speak(text, lang?, voice?) → true when it started; ends the reading before. lord-say tells the text's
- *                                         language; lang ('es', 'en' or 'pt', the interface's) is for a text too short;
+ *                                         language; lang (es, en, pt, fr, de, it or nl, the interface's) is for a text too short;
  *                                         voice, a plain name, is say's -v (Settings' "Try this voice")
  *   lord.voice.speakSelection(lang?)    → true when it started, false when the app with the keyboard (a Linux app)
  *                                         has selected nothing: its primary selection, read here, never given to JS
@@ -12,7 +12,7 @@
  *                                         here for saveSelection, as the dialog that asks where takes the keyboard
  *   lord.voice.saveSelection(path, lang?)   the same as save, with the selection kept; forgets it
  *   lord.voice.preview(lang, voice)     → true when it started: a voice's recorded sample (say --preview), heard as a
- *                                         reading is, with the wave; lang is es, en or pt, voice a plain name
+ *                                         reading is, with the wave; lang is es, en, pt, fr, de, it or nl, voice a plain name
  *   lord.voice.pause(on)                → freezes the reading where it is, or goes on
  *   lord.voice.replay()                 → reads the last text again from the start
  *   lord.voice.stop()
@@ -44,7 +44,7 @@ static const char *lang_arg(JSContext *c, int argc, JSValueConst *argv, int i, c
     out[0] = 0;
     if (argc <= i || !JS_IsString(argv[i])) return NULL;
     const char *s = JS_ToCString(c, argv[i]);
-    if (s && (!strcmp(s, "es") || !strcmp(s, "en") || !strcmp(s, "pt"))) { out[0] = s[0]; out[1] = s[1]; out[2] = 0; }
+    if (s && speak_lang_ok(s)) { out[0] = s[0]; out[1] = s[1]; out[2] = 0; }
     if (s) JS_FreeCString(c, s);
     return out[0] ? out : NULL;
 }

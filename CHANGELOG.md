@@ -12,6 +12,45 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Voice: French, German, Italian and Dutch, in development (the latest release is 0.8.9.4).** Reading aloud, `say`,
+  Live Speech and Personal Voice now speak seven languages: French ([#215](https://github.com/lordbasex/LordOS/issues/215),
+  approved by the maintainer on 2026-11-22), German, Italian and Dutch join Spanish, English and Portuguese. See
+  `docs/VOICE.md`, phase 4.
+  - **Models**, Kyutai's Pocket TTS as before (CC-BY-4.0), each language in two qualities: **HD** is Kyutai's 24-layer
+    model (`french_24l`, `german_24l`, `italian_24l`, `dutch_24l`, 672 MB each); **Standard** is audio.cpp's Q8_0 GGUF
+    for French, German and Italian (128–129 MB) and, as audio.cpp publishes no Dutch GGUF, Kyutai's own 6-layer Dutch
+    model (`dutch`, 220 MB), read as a folder like the HD ones (`models/nl/standard/`). The same 23 voices speak every
+    language (Daan in French's and Dutch's standard models too); each new language's own voice is Kyutai's voice of it:
+    Estelle, Juergen, Giovanni and Daan. They come as signed `lordos-voice-fr*`, `-de*`, `-it*` and `-nl*` packages from
+    LordOS's APT repository, built by `tools/voice/fetch-voices.sh` and `tools/voice/mkdeb-voice.mjs` from
+    `sdk/voicecatalog.js` as the others; the previews package gets a sample of every voice in each new language.
+  - **Numbers written out as words** for the four, as for Spanish and Portuguese (`say_normalize()`,
+    `server/src/tts/saytext.c`): cardinals (French soixante-dix, soixante et onze, quatre-vingts, quatre-vingt-onze;
+    German einundzwanzig, zweitausendsechsundzwanzig; Italian ventuno, ventitré, centottanta, duemilaventisei; Dutch
+    eenentwintig, tweeëntwintig, tweeduizend zesentwintig), German and Dutch years in hundreds (1987
+    neunzehnhundertsiebenundachtzig), decimals, percentages, ordinals (1er, 2e, 21e; am 3. Mai, der 1. Platz; 1º, 11º;
+    1e, 2de, 8ste), times (quatorze heures trente, 14h30, 14 h 30; vierzehn Uhr dreißig, 14.30 Uhr; quattordici e
+    trenta; veertien uur dertig), dates (premier mai, am fünfzehnten November, primo maggio), money (vingt-cinq euros
+    cinquante, un million d'euros, eine Million Euro, una sterlina), degrees, ranges and symbols, and common
+    abbreviations (M., Mme, p. ex., etc.; z. B., d. h., usw., Nr.; Sig., Dott., ecc.; bijv., d.w.z., enz., t/m).
+  - **Telling the language:** `say_language` weighs common words of all seven and the letters only one or two use; the
+    curly apostrophe splits French words. lord-server's closed list of languages (`speak_lang_ok`, `speak.c`, and
+    `lord.voice`'s `lang`) has the four new ones, so a French, German, Italian or Dutch interface is the fallback for a
+    text too short to tell.
+  - **lord-tts:** its closed list of folder models (`DIR_LANGUAGES`, `server/src/doc/h_tts.c`) has the four HD models and
+    Dutch's standard one; it applies Kyutai's own text replacements for them (French `:` and `;` to a comma, German `;`
+    and the em dash). No new helper, library, host or permission: the same sandboxed lord-tts and the same signed
+    repository.
+  - **Settings → AI → Voice:** the language is now a pop-up with the seven (a segmented control didn't fit them in
+    every interface language); the four names are translated into all 35 interface languages. Monitor → GPU names the
+    new languages too.
+  - **Tests:** `saytext_test.c` goes from 267 to 541 checks (French 86, German 70, Italian 59, Dutch 46, and 13 that
+    tell the languages apart); `voicecatalog_test.mjs` 30; `tts_test.sh` says a sentence with numbers, a time and a date
+    in each new language, HD and standard, where its models are installed (all passed on the CPU and the GPU).
+    `fetch-voices.sh` now refuses a file Hugging Face publishes no SHA-256 for. `make-previews.sh` keeps its temporary
+    home next to the source folder: with the source on another filesystem than `/tmp`, its copy of the models failed
+    halfway and the samples were made with the installed system models instead (or not at all for a new language).
+
 - **Store: a Flathub home with collections, categories and subcategories, in development (the latest release is
   0.8.9.4).** Flathub's section no longer opens on one long list: like the app centres on other desktops it opens on a
   home, and every page keeps the install rules as they were (Flathub's verified apps unless the section's switch shows
