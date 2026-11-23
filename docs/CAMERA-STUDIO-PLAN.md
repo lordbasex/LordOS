@@ -100,8 +100,11 @@ Fedora already defaults Firefox to it. They also give a cleaner permission story
   the image. Until then, Studio offers only the LordOS ring there.
 - **Configuration, static and root-owned, shipped by an optional package `lordos-studio-camera`.** The module's
   options live in `/etc/modprobe.d/lordos-studio.conf`:
-  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`
-  (the second device since 11.4: OBS Studio's own virtual camera, which LordOS never writes). The file
+  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio,OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`
+  (the second device since 11.4: OBS Studio's own virtual camera, which LordOS never writes). The labels are **one**
+  quoted value: the kernel strips only the quotes around a whole value (`lib/cmdline.c` `next_arg`) and
+  `module_param_array` splits it at the commas. 0.8.9.5 shipped `card_label="LordOS Studio","OBS Virtual Camera"`,
+  which came up as `LordOS Studio"` and `"OBS Virtual Camera`; see 11.5. The file
   `/etc/modules-load.d/lordos-studio.conf` loads it at boot. There is **no runtime root action** to create or remove
   devices: `/dev/v4l2loopback`'s control ioctls stay unused. Installing and removing the package goes through the
   Store's existing package engine.
@@ -813,6 +816,25 @@ NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
 - **To verify on a VM** (never on the maintainer's PC): OBS (Debian's and Flathub's) starting its virtual camera on
   `/dev/video49` with LordOS Studio's camera both off and on, Meet seeing both cameras, the update reloading the module
   when unused, and the whole MOK flow with Secure Boot on (OVMF with enrolled keys).
+
+### 11.5 Fix: the camera wasn't listed (2026-11-23, in development; the latest release is 0.8.9.5)
+
+- **Seen** on the maintainer's PC with 0.8.9.5 (v4l2loopback-dkms 0.15.0, a Logitech C930e): Chrome and Meet listed
+  only the real camera; no lord-studio ran; sysfs named `/dev/video50` `LordOS Studio"` and `/dev/video49`
+  `"OBS Virtual Camera`.
+- **Cause**: the quoting of 2.2's `card_label`. lord-server's `loopback_open` (and lord-studio's `stcam_hub`) require the
+  card "LordOS Studio", so the device counted as missing, the hub never started, nothing wrote the loopback and, with
+  `exclusive_caps=1`, it never advertised capture. The hub's rule (`studio_hub_wanted`) was not the cause: `on` is the
+  popover's "every app" switch, true by default (`sdk/studiomodel.js`), not the effects; with it on and no effect chosen
+  a reader gets the plain camera. With it off the device is not written, so apps don't list it, and a reader still
+  attached gets the off card (8.2): both stay as designed.
+- **Fix**: one quoted value in the package's file (2.2); its postinst reloads the module on an update from 0.8.9.5's
+  labels when the file is the package's and nothing holds the module, else at the next restart; and
+  `studio_card_is_ours()` (`mstudiohub.h`) accepts 0.8.9.5's label too, so the camera works after the update before the
+  restart (listed with the stray quote until then). Verified: Linux 6.12's `next_arg` and the comma split, run in user
+  space on both lines, give exactly sysfs's names for the old one and the clean labels for the new one; v4l2loopback
+  0.15.0 declares `module_param_array(card_label, charp, NULL, 0000)`. **To verify on a VM**: loading the module with the
+  new file (`v4l2-ctl --list-devices` showing both labels without quotes) and Meet listing "LordOS Studio".
 
 ## 12. Risks
 

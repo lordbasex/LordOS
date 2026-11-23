@@ -20,6 +20,24 @@
  * (mstudio.c loopback_open, and the helper checks the card again). studio_package_test.sh keeps these in step. */
 #define STUDIO_OBS_DEV "/dev/video49"
 #define STUDIO_OBS_CARD "OBS Virtual Camera"
+/* Our label as 0.8.9.5's package left it. Its modprobe.d line said card_label="LordOS Studio","OBS Virtual Camera";
+ * the kernel strips only the quotes around the whole value before it splits it at the commas, so the devices came up
+ * as «LordOS Studio"» and «"OBS Virtual Camera», lord-server didn't recognise its device and lord-studio never ran.
+ * The package now says card_label="LordOS Studio,OBS Virtual Camera"; until v4l2loopback is loaded again (the
+ * package's postinst when nothing uses it, else the next restart) the old label is still ours. */
+#define STUDIO_LOOPBACK_CARD_0895 "LordOS Studio\""
+
+/* card (a V4L2 capability's card) is LordOS Studio's loopback: STUDIO_LOOPBACK_CARD or 0.8.9.5's label. Inline, so
+ * lord-studio (media/studio/stcam.c) checks with the same rule. */
+static inline int studio_card_is_ours(const char *card) {
+    static const char *const ours[2] = { STUDIO_LOOPBACK_CARD, STUDIO_LOOPBACK_CARD_0895 };
+    for (int k = 0; card && k < 2; k++) {
+        size_t i = 0;
+        while (ours[k][i] && card[i] == ours[k][i]) i++;
+        if (!ours[k][i] && !card[i]) return 1;
+    }
+    return 0;
+}
 
 enum { STUDIO_SHOW_IDLE = 0, STUDIO_SHOW_CAMERA = 1, STUDIO_SHOW_OFF = 2 };
 
