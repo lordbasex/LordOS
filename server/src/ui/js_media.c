@@ -802,6 +802,15 @@ static JSValue f_cameras(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     media_cameras(json, sizeof json);
     return JS_ParseJSON(c, json, strlen(json), "<cameras>");
 }
+/* camerasAsync() -> req; the same list made on an fsasync worker, answered as __lordFsReply(req, { cameras: [...] }):
+ * cameras() opens every /dev/video* on this thread (60-70 ms with two webcams, docs/MAIN-THREAD.md) */
+static JSValue f_cameras_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    char err[256] = "";
+    int req = media_cameras_async(err, sizeof err);
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
+}
 
 static int dev_ok(const char *d) {
     if (!d || strncmp(d, "/dev/video", 10)) return 0;
@@ -959,6 +968,7 @@ static const JSCFunctionListEntry media_funcs[] = {
     JS_CFUNC_DEF("audioRecord", 3, f_audio_record),
     JS_CFUNC_DEF("stop", 1, f_stop),
     JS_CFUNC_DEF("cameras", 0, f_cameras),
+    JS_CFUNC_DEF("camerasAsync", 0, f_cameras_async),
     JS_CFUNC_DEF("camera", 3, f_camera),
     JS_CFUNC_DEF("photo", 3, f_photo),
     JS_CFUNC_DEF("cameraRecord", 3, f_camera_record),

@@ -435,7 +435,7 @@ browser's screen-sharing test page. The details are in `WAYLAND.md` ("Sharing a 
 | `resize(id, width, height)`, `rotate(id, quarterTurns)` → id | The markup editor (0.8.8.4, issue #30): a new picture from a capture or a decoded image; whole sides 1..8192, turns -3..3, anything else refused in C (`server/src/media/imgops.c`) |
 | `saveImage(id, output, { format })`, `copyImage(id)` | PNG/JPEG to a file or to the clipboard |
 | `screenRecord(app, output.mp4, { mic, source, fps, region: { x, y, w, h }, cursor })` (region: a part of the main display, logical px; cursor: 0 leaves the pointer out), `audioRecord(app, output.wav)`, `stop(id)` | Recordings (`screen`, `microphone` permissions) |
-| `cameras()`, `camera(app, device, { width, height })`, `photo(id, output, mirror)`, `cameraRecord(id, output \| null, { mic, mirror })` | Camera (`camera` permission) |
+| `cameras()`, `camerasAsync()` → req (the same list from an `fsasync.c` worker, answered through `__lordFsReply`; the SDK's `useCameras()`, `sdk/cameras.js`, lists again on a `video4linux` uevent), `camera(app, device, { width, height })`, `photo(id, output, mirror)`, `cameraRecord(id, output \| null, { mic, mirror })` | Camera (`camera` permission) |
 | `info(id)`, `close(id)`, `protectedCount()`, `hwaccel()` | |
 
 Events: `__lordMedia(id, type, data)`. Types: `info`, `pos`, `state`, `sub`, `stats`, `level`,

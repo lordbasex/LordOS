@@ -147,7 +147,9 @@ export const platform = {
   saveOptions(o) { settings.set((s) => ({ ...s, imager: { ...(s.imager || {}), ...o } })); },
   loadProfiles() { try { const p = JSON.parse(fs.read('.config/lordos/imager-profiles.json')); return Array.isArray(p) ? p : []; } catch { return []; } },
   saveProfiles(list) { fs.mkdir('.config/lordos'); fs.write('.config/lordos/imager-profiles.json', JSON.stringify(list, null, 2)); },
-  cacheSize() { try { return fs.du(CACHE, 200)?.size || 0; } catch { return 0; } },
+  // a promise here (the desktop app answers a number): the cache holds whole images, measured on one of lord-server's
+  // workers (fs.duAsync) instead of the main thread
+  cacheSize() { return fs.duAsync(CACHE, 3000).then((r) => r?.size || 0, () => 0); },
   async clearCache() { await admin.run('imager-cache-clear', '', null, { quiet: true }); },
   // the language and theme follow LordOS; updates come with LordOS itself
   followsSystem: true,

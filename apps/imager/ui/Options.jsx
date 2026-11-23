@@ -1,7 +1,7 @@
 // App options: sound and eject when finished, updates of the app, language and theme (the desktop
 // app; on LordOS they follow the system), the download cache. No telemetry, ever.
 import { View, Text, Button, useTheme, useLocale, typeScale, spacing } from '@lordos/sdk';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { platform } from '../platform.js';
 import { set, setOptions } from '../state.js';
 import { LANGUAGES } from '../core/catalog.js';
@@ -12,7 +12,12 @@ export function OptionsDialog({ s }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const o = s.options;
-  const [cache, setCache] = useState(() => platform.cacheSize());
+  // the cache's size: a number (the desktop app) or a promise (LordOS measures it on a worker); null while it measures
+  const [first] = useState(() => platform.cacheSize());
+  const [cache, setCache] = useState(typeof first === 'number' ? first : null);
+  const settle = (v) => Promise.resolve(v).then(setCache, () => setCache(0));
+  const measure = () => settle(platform.cacheSize());
+  useEffect(() => { if (typeof first !== 'number') settle(first); }, []);
   const [clearing, setClearing] = useState(false);
   const close = () => set({ dialog: null });
   return (
@@ -50,10 +55,10 @@ export function OptionsDialog({ s }) {
         <Group title={tr('imager.options.cache')}>
           <KeyValue label={tr('imager.options.cacheWhere')} value={platform.cacheDir()} mono />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: 8 }}>
-            <Text style={{ flex: 1, fontSize: typeScale.body, color: t.text }}>{tr('imager.options.cacheSize', { size: formatSize(cache) })}</Text>
-            {platform.chooseCacheDir ? <Button small label={tr('imager.options.cacheMove')} onClick={async () => { await platform.chooseCacheDir(); setCache(platform.cacheSize()); }} /> : null}
+            <Text style={{ flex: 1, fontSize: typeScale.body, color: t.text }}>{cache == null ? tr('files.info.calculating') : tr('imager.options.cacheSize', { size: formatSize(cache) })}</Text>
+            {platform.chooseCacheDir ? <Button small label={tr('imager.options.cacheMove')} onClick={async () => { await platform.chooseCacheDir(); measure(); }} /> : null}
             <Button small label={tr(clearing ? 'imager.options.clearing' : 'imager.options.clear')} disabled={clearing || !cache}
-              onClick={async () => { setClearing(true); try { await platform.clearCache(); } finally { setClearing(false); setCache(platform.cacheSize()); } }} />
+              onClick={async () => { setClearing(true); try { await platform.clearCache(); } finally { setClearing(false); measure(); } }} />
           </View>
         </Group>
         <Text style={{ fontSize: typeScale.caption, color: t.textDim, lineHeight: 1.45 }}>{tr('imager.options.privacy')}</Text>

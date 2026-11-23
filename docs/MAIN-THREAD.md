@@ -72,9 +72,12 @@ heap), `natives` (the native calls apps make while rendering, each timed alone),
 `terminalBg` (`yes | head -c 50M`, then titles changed in a loop, with the Terminal in front or behind a window; the
 `__lordTerm` events per step are logged), `titles` (a window's title set four times a step), `settingsPanes` (every
 Settings page opened by its id, each followed by a quiet step), `flatpak` (Settings → Flatpak opened twice, with
-`PERF_FLATPAK_FILES` files, 200 000 by default, put in the test home's Flatpak folders first) and `settingsNatives`
-(the native calls Settings makes, each timed alone). `PERF_MARK=1` logs a line before each step, so the stall lines
-of `PERF_OUT` can be put under the step they happened in.
+`PERF_FLATPAK_FILES` files, 200 000 by default, put in the test home's Flatpak folders first), `settingsNatives`
+(the native calls Settings makes, each timed alone), `filesInfo` (Files → Get Info on the home folder twice, with the
+same seeded files), `cameraNatives` (the camera list from a worker and from the main thread, each after the camera
+suspended) and `appsOpen` (each native app opened alone, then two quiet steps; `PERF_APPS=files,store,…` picks them).
+`PERF_MARK=1` logs a line before each step, so the stall lines of `PERF_OUT` can be put under the step they happened
+in.
 
 ## Rules
 
@@ -98,10 +101,14 @@ of `PERF_OUT` can be put under the step they happened in.
    once, shows a spinner on its knob while `onChange` (a promise, or a call that blocks) runs, follows `on`
    when it ends, and flips back with `onError` when it fails; `<Button pending>` and `<Button busy>` show a
    spinner and ignore presses. `<Spinner>` is the ring they use (still with Reduce motion).
-6. **No disk, network or process wait on the main thread** when an asynchronous call exists (`lord.fs.*Async`,
-   the admin calls, the helpers' replies). A folder's size is `fs.duAsync(path, ms)` (`lord.fs.duAsync`, 2026-11-23:
+6. **No disk, network, device or process wait on the main thread** when an asynchronous call exists (`lord.fs.*Async`,
+   `lord.media.camerasAsync`, the admin calls, the helpers' replies). A folder's size is `fs.duAsync(path, ms)` (`lord.fs.duAsync`, 2026-11-23:
    `lord.fs.du`'s checks and walk on an `fsasync.c` worker, at most 10 s), never `lord.fs.du` on a folder that can
-   hold many files; a page shows "calculating…" until it answers and may keep the answer a little while. Anything in
+   hold many files; a page shows "calculating…" until it answers, may keep the answer a little while, and drops an answer
+   for something it no longer shows. The cameras come from `useCameras()` (`sdk/cameras.js`: listed on a worker, again
+   when one is plugged in or out), never `media.cameras()` while rendering or on a timer. A native call of lord-server's
+   own that waits on the disk or a device and touches no shared state can run on the same workers with
+   `fsasync_submit_fn` (`server/src/fsasync.h`). Anything in
    a cloud or network folder (`fs.isRemote`) goes through the Async calls or a copy job (`lord.fs.copy`), reads and
    writes included.
 7. **Code that runs on every settings change does nothing costly** unless its own settings changed: a subscriber to
@@ -203,9 +210,66 @@ other builds, so a few tens of ms move between runs; the second run was the busi
 - Test: `tests/settings_nofreeze.sh` (in `make test`) opens Settings → Flatpak twice with the 200 000 files and fails
   on a `call fs.du` stall line, a page that never shows a size, or an opening over 250 ms.
 
+## Other apps (2026-11-23)
+
+The rest of the audit, outside Settings. Longest single run of the main thread, ms, headless on this PC (the home
+seeded with 200 000 small files for Get Info; one USB webcam); "before" is the code of 0.8.9.5-beta.
+
+| What | Before | After | What it was |
+|---|---|---|---|
+| Files → Get Info on a folder of 200 000 files (`filesInfo`) | 146 / 189 | 11 / 8 | `lord.fs.du` (up to 900 ms on a big folder, cold cache): now `fs.duAsync` |
+| The Camera app's camera list, every 3 s while open (`cameraNatives`) | 62–68 per listing | 0.3 (the call; the answer 62 ms later from a worker) | `lord.media.cameras` opens every `/dev/video*`, and a USB camera suspended after 2 s wakes up to answer: now `lord.media.camerasAsync`, when a picker shows and on a `video4linux` uevent, never on a timer |
+| LordOS Studio's panel and window | 62–68 on every render with the camera asleep | 0.3 | the same list, now `useCameras()` |
+| The Store's page of an installed web app | up to 300 per profile (audit) | — (not measured: needs an installed web app) | `lord.fs.du` per profile: now `fs.duAsync` |
+| Imager → Options, the cache size | up to 200 (audit) | — (not measured: needs a downloaded image) | `lord.fs.du`: now `fs.duAsync` |
+| A copy or move on a Cloud account or a network share | one `lstat` per name, as long as the server takes | 0 (on the job's thread) | `fsjob_start`'s checks: on those mounts, now the job's first step |
+
+Each native app opened alone (`appsOpen`; nothing in the test home, so no mail account, photo library or machine), the
+longest run on opening it or in the 3 s after, two runs (before, after; a few tens of ms move between runs, the machine
+was shared with builds). No native call over 50 ms in any of them; the only native call over 20 ms was
+`sysinfo.report` (30–34 ms):
+
+| App | Run 1 | Run 2 | What it is |
+|---|---|---|---|
+| Files | 36.8 | 33 | rendering |
+| Store | 199 | 194 | rendering its first page (1006 nodes made, 3168 changed): "What remains" |
+| Mail | 26.6 | 21.2 | |
+| Photos | 28.6 | 28.4 | |
+| Player | 34.9 | 35 | |
+| Notes | 57.1 | 22.6 | rendering (60 nodes made, 348 changed) |
+| Terminal | 26 | 36.8 | |
+| Machines | 21 | 38.6 | |
+| Monitor | 16.2 | 38.9 | its charts |
+| Voice Recorder | 11 | 39.7 | |
+| Imager | 14.8 | 21.4 | |
+| Settings | 30.5 | 34 | |
+| Calendar | 21.3 | 35.9 | |
+| Contacts | 21.2 | 36.3 | |
+| Editor | 19.4 | 45.1 | |
+| Databases | 21.2 | 20.6 | |
+| Passwords | 33.7 | 22.6 | |
+| Logs | 47.7 | 20.9 | rendering |
+| System Information | 78.5 | 45.5 | rendering and `sysinfo.report` (30–34 ms) |
+| Disks | 36.1 | 36.8 | |
+
+- Camera and LordOS Studio were not opened headless: both would turn a real webcam on (Studio's preview, the Camera's
+  viewfinder). Their list is what `cameraNatives` times; their other calls open the camera through lord-media, which
+  already answers later (`media.camera` is a promise).
+- The stall lines of `appsOpen` between steps (`__lordTick [shell; react made 0, changed 0]`, 50–67 ms) are the driver's
+  own full garbage collection at each scenario's start and end (`lord.stats(2)`), not an app.
+- At the session's start, `media.hwDecode` costs ~65 ms once per boot and user: the first call probes the render nodes
+  and every `/dev/video*` for a hardware decoder (`server/src/media/hwdec.c` `start`, `v4l2_probe`; the webcam wakes up
+  for it), then caches the answer in `~/.cache/lordos/video-hw.json` for the rest of the boot. Not moved: it writes
+  the probe's shared state, and it happens once, before anything is open.
+- The Cloud copy's destination folder is still resolved (`realpath`) on the main thread before the job starts (the
+  security check needs the real path); the existing check for a share that stopped answering guards it.
+- Test: `tests/files_info_nofreeze.sh` (in `make test`, about 30 s) opens Get Info twice on a home folder of 100 000
+  files and fails on a `call fs.du` stall line, a card that never shows the size, or an opening over 250 ms.
+
 ## What remains
 
 - Opening the Store builds its first page (about 1000 nodes) in one run of about 200 ms.
+- The first `media.hwDecode` of a boot (~65 ms, once, at the session's start; "Other apps" above).
 - Monitor redraws its charts in JavaScript four times a second while it has the focus (about 10 % of the main
   thread with the Overview tab shown).
 - Components that read `settings.get()` while rendering and rely on a parent's re-render to see a change keep

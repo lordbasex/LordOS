@@ -13,7 +13,7 @@
 
 #include <stddef.h>
 
-enum { FSA_LIST = 1, FSA_STAT, FSA_TRASH, FSA_FREE, FSA_MKDIR, FSA_RENAME, FSA_DU };
+enum { FSA_LIST = 1, FSA_STAT, FSA_TRASH, FSA_FREE, FSA_MKDIR, FSA_RENAME, FSA_DU, FSA_FN };
 
 #define FSA_THREADS 6            /* at most this many requests wait on file systems at once */
 #define FSA_QUEUE 256            /* queued plus running; more is refused at once with fs.busy */
@@ -25,6 +25,11 @@ int  fsasync_submit(int op, const char *path, char *err, size_t errlen);
 int  fsasync_submit2(int op, const char *path, const char *path2, char *err, size_t errlen);
 /* FSA_DU: the folder's size, walked for at most ms (FSA_DU_MAX_MS) */
 int  fsasync_submit_du(const char *path, double ms, char *err, size_t errlen);
+/* FSA_FN: one of lord-server's own functions (never anything JS names) run on a worker: fn(arg) returns the answer as
+ * malloc'd JSON (NULL: out of memory). For a native call that may wait on a device and touches no lord-server state
+ * (media.c: lord.media.camerasAsync, which opens every /dev/video*). arg is copied; it may be "". */
+typedef char *(*FsaFn)(const char *arg);
+int  fsasync_submit_fn(FsaFn fn, const char *arg, char *err, size_t errlen);
 int  fsasync_fd(void);           /* -1 until the first request */
 typedef void (*FsaReplyFn)(void *ud, int req, const char *json);
 int  fsasync_dispatch(FsaReplyFn fn, void *ud);   /* answers delivered */

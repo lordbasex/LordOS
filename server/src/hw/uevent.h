@@ -1,10 +1,11 @@
 /* uevent.h — kernel uevents (NETLINK_KOBJECT_UEVENT) for Settings: DRM connector changes
- * (hotplugged displays), power_supply (battery, charger) and backlight. One socket in the main
+ * (hotplugged displays), power_supply (battery, charger), backlight and video4linux (a camera plugged in or out:
+ * __lordHw("cameras"), sdk/cameras.js). One socket in the main
  * loop's poll: nothing is polled. Receiving kernel uevents needs no privileges. */
 #ifndef LORD_HW_UEVENT_H
 #define LORD_HW_UEVENT_H
 
-enum { UEV_DRM = 1, UEV_POWER = 2, UEV_BACKLIGHT = 4 };
+enum { UEV_DRM = 1, UEV_POWER = 2, UEV_BACKLIGHT = 4, UEV_VIDEO = 8 };
 
 int  uevent_open(void);                 /* 0 or -1 */
 int  uevent_fd(void);                   /* -1 if closed */

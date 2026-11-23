@@ -308,6 +308,22 @@ static int copy_tree(const char *s, const char *d, FsJob *j, int depth) {
 
 static void *job_main(void *arg) {
     FsJob *j = arg;
+    if (j->check) {
+        /* fsjob_start's two lstat calls, here for a Cloud account or a network share: a name that isn't there is a
+         * question to its server (rclone asks the provider), which the interface's thread never waits for (2026-11-23).
+         * The same refusals, as the job's error; nothing was written, so nothing is removed */
+        struct stat st;
+        const char *code = NULL;
+        int e = 0;
+        if (lstat(j->src, &st)) e = errno;
+        else if (!lstat(j->dst, &st)) code = "fs.exists";
+        if (e || code) {
+            if (code) seterr(j->error, sizeof j->error, code); else seterrno(j->error, sizeof j->error, e);
+            j->failed = 1;
+            __atomic_store_n(&j->done, 1, __ATOMIC_RELEASE);
+            return NULL;
+        }
+    }
     if (j->try_rename) {
         if (!rename(j->src, j->dst)) { __atomic_store_n(&j->done, 1, __ATOMIC_RELEASE); return NULL; }   /* same disk */
         if (errno != EXDEV) {
@@ -334,8 +350,11 @@ static void *job_main(void *arg) {
 int fsjob_start(const char *src, const char *dst, int move, char *err, size_t errlen) {
     struct stat st;
     if ((move && fsops_protected_below(src)) || fsops_protected_below(dst)) { seterr(err, errlen, "fs.protected"); return -1; }
-    if (lstat(src, &st)) { seterrno(err, errlen, errno); return -1; }
-    if (!lstat(dst, &st)) { seterr(err, errlen, "fs.exists"); return -1; }
+    /* a Cloud account or a network share (from the mount table, without touching the paths): the lstat calls go to
+     * the job's thread (job_main), so a missing name's lookup never waits on the server here */
+    int remote = fsops_remote_path(src) || fsops_remote_path(dst);
+    if (!remote && lstat(src, &st)) { seterrno(err, errlen, errno); return -1; }
+    if (!remote && !lstat(dst, &st)) { seterr(err, errlen, "fs.exists"); return -1; }
     size_t n = strlen(src);
     if (!strncmp(dst, src, n) && dst[n] == '/') { seterr(err, errlen, "fs.copyIntoItself"); return -1; }
     FsJob *j = NULL;
@@ -349,7 +368,8 @@ int fsjob_start(const char *src, const char *dst, int move, char *err, size_t er
     pathf(j->dst, sizeof j->dst, "%s", dst);
     /* a move inside a Cloud account or a network share is a call to its server (rclone moves the file there): the
      * rename goes to the job's thread, so the interface's never waits for it (0.8.8.7) */
-    j->try_rename = move && (fsops_remote_path(src) || fsops_remote_path(dst));
+    j->try_rename = move && remote;
+    j->check = remote;
     if (move && !j->try_rename && rename(src, dst) == 0) { j->done = 1; return j->id; }   /* same disk: instant */
     if (move && !j->try_rename && errno != EXDEV) { int e = errno; j->used = 0; seterrno(err, errlen, e); return -1; }
     pthread_t t;

@@ -6,7 +6,7 @@
 // light theme.
 import {
   View, Text, Image, MediaView, Toggle, useTheme, useKeyboard, wm,
-  t as tr, errorText, media, usePlayer, useThumb, userDirs, fs, mediaFormatTime, useSettings,
+  t as tr, errorText, media, usePlayer, useThumb, userDirs, fs, mediaFormatTime, useSettings, useCameras,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -90,8 +90,11 @@ export default function Camera() {
   const th = useTheme();
   const [s, update] = useSettings();
   const mirror = (s.camera?.mirror ?? true);
-  const [cams, setCams] = useState(() => media.cameras());
-  const [dev, setDev] = useState(() => s.camera?.device || media.cameras()[0]?.device || null);
+  // the cameras, listed on a worker when the window opens and again when one is plugged in or out (sdk/cameras.js;
+  // it was lord.media.cameras every 3 s, 60–70 ms on the main thread with two webcams). null while the first list runs
+  const listed = useCameras();
+  const cams = listed || [];
+  const [dev, setDev] = useState(() => s.camera?.device || null);
   const [id, setId] = useState(0);
   const [mode, setMode] = useState('photo');
   const [flash, setFlash] = useState(false);
@@ -119,8 +122,6 @@ export default function Camera() {
   }, [dev]);
   useEffect(() => () => media.close(idRef.current), []);
   useEffect(() => { if (id) media.view(id, { mirror: mirror ? 1 : 0, fit: 'contain', background: 0xff000000 }); }, [id, mirror]);
-  // a camera that was just plugged in
-  useEffect(() => { const tmr = setInterval(() => setCams(media.cameras()), 3000); return () => clearInterval(tmr); }, []);
   useEffect(() => { if (!dev && cams.length) setDev(cams[0].device); }, [cams]);
   useEffect(() => { if (!recStart) return undefined; const tmr = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(tmr); }, [recStart]);
 
@@ -152,8 +153,8 @@ export default function Camera() {
     <View style={{ flex: 1, backgroundColor: '#0b0b0d' }}>
       <View style={{ flex: 1 }}>
         <MediaView media={id} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} />
-        {(!cams.length || denied || p.error) && (
-          !cams.length ? <NoCamera title={tr('camera.none')} hint={tr('camera.noneHint')} />
+        {((listed && !cams.length) || denied || p.error) && (
+          listed && !cams.length ? <NoCamera title={tr('camera.none')} hint={tr('camera.noneHint')} />
             : <NoCamera title={denied ? tr('camera.deniedTitle') : tr('camera.errorTitle')} hint={denied ? tr('camera.denied') : tr('camera.error', { error: errorText(p.error) })} />
         )}
         {flash && <View style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.85)' }} />}
