@@ -6,6 +6,9 @@
 static int fails;
 #define CHECK(x) do { if (!(x)) { printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #x); fails++; } } while (0)
 
+static int is_chrome(const char *app_id, void *ctx) { (void)ctx; return !strcmp(app_id, "google-chrome"); }
+static int any_app(const char *app_id, void *ctx) { (void)app_id; (void)ctx; return 1; }
+
 int main(void) {
     char app[128], tok[XACT_TOKEN_LEN + 1], other[XACT_TOKEN_LEN + 1];
 
@@ -112,6 +115,33 @@ int main(void) {
     CHECK(xact_take(t1, 4001, NULL, 0) == XACT_DENIED);
     CHECK(xact_take(launch, 4001, NULL, 0) == XACT_OK);
     xact_client_gone(NULL);
+
+    /* a launch the copy already running took over (xact_take_launch): the newest unused LordOS token whose app is the
+     * asker's, once, only shortly after the launch; never an app's own token, an ungranted one or one naming no app */
+    xact_reset();
+    char chrome[XACT_TOKEN_LEN + 1];
+    snprintf(chrome, sizeof chrome, "%s", xact_issue(10000, XACT_LAUNCH_MS, 1, "google-chrome"));
+    CHECK(xact_take_launch(10100, XACT_HANDOFF_MS, is_chrome, NULL) == 1);
+    CHECK(xact_take(chrome, 10200, NULL, 0) == XACT_UNKNOWN);                     /* used up by the handoff */
+    CHECK(!xact_take_launch(10300, XACT_HANDOFF_MS, is_chrome, NULL));            /* one launch, one grant */
+    xact_issue(20000, XACT_LAUNCH_MS, 1, "firefox-esr");
+    CHECK(!xact_take_launch(20100, XACT_HANDOFF_MS, is_chrome, NULL));            /* another app's launch */
+    xact_issue(30000, XACT_LAUNCH_MS, 1, "google-chrome");
+    CHECK(!xact_take_launch(30001 + XACT_HANDOFF_MS, XACT_HANDOFF_MS, is_chrome, NULL));   /* too long after it */
+    CHECK(!xact_take_launch(29999, XACT_HANDOFF_MS, is_chrome, NULL));            /* issued after "now" */
+    xact_reset();
+    xact_issue_for(40000, XACT_CLIENT_MS, 1, "google-chrome", &c1);                 /* an app's own token */
+    xact_issue(40000, XACT_LAUNCH_MS, 0, "google-chrome");                          /* not granting */
+    xact_issue(40000, XACT_LAUNCH_MS, 1, "");                                       /* a notification's button */
+    CHECK(!xact_take_launch(40100, XACT_HANDOFF_MS, any_app, NULL));
+    CHECK(!xact_take_launch(40100, 0, is_chrome, NULL));
+    CHECK(!xact_take_launch(40100, XACT_HANDOFF_MS, NULL, NULL));
+    /* two launches: the newest is used, the other stays for its own handoff */
+    xact_reset();
+    snprintf(chrome, sizeof chrome, "%s", xact_issue(50000, XACT_LAUNCH_MS, 1, "google-chrome"));
+    xact_issue(50500, XACT_LAUNCH_MS, 1, "google-chrome");
+    CHECK(xact_take_launch(51000, XACT_HANDOFF_MS, is_chrome, NULL));
+    CHECK(xact_take(chrome, 51000, NULL, 0) == XACT_OK);
 
     if (fails) { printf("xdgact-test: %d failure(s)\n", fails); return 1; }
     printf("xdgact-test: ok\n");

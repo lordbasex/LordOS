@@ -273,6 +273,14 @@ EOF
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
     esac
+    # launching an app that already runs (a browser's single instance) shows its window, even on a desktop not in view,
+    # and a copy running with no window shows a new one (the 2026-11-23 Google Chrome case)
+    sh tests/handoff_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app, Lord Flow and Lord Workspaces)" ;;
+        77) skip "handoff" "build/lord-server, build/handoff-client and the default theme (make, npm run build)" ;;
+        *) bad "handoff (tests/handoff_client.c, headless lord-server: relaunch of a running app)"; cat "$T/out" ;;
+    esac
     # surfaces made children of themselves or of their descendants: refused, lord-server goes on
     sh tests/popup_headless.sh cycle-client >"$T/out" 2>&1
     case $? in

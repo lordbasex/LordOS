@@ -11,6 +11,41 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Fixed
+- **Launching an app that is already running brings its window forward, even when it runs once and takes the launch
+  over (Google Chrome).** Seen on the maintainer's PC (2026-11-23): session restore started Chrome at login and its
+  window (1024×758) went away; launching Chrome again from the launcher logged "Opening in existing browser session"
+  and no window appeared on any display, while the Chrome process kept running.
+  - **What happened.** The window was Chrome's profile chooser (four profiles, "Show on startup"), and session restore
+    gave it the saved place of a Chrome window, which was on another activity (desktop 2) than the one in view, so it
+    was open but out of sight. Launching Chrome again ran a new `google-chrome` that handed its command line to the
+    running process and exited without using the `XDG_ACTIVATION_TOKEN` LordOS gave it. The running process then asked
+    for a token of its own, with no input serial, no surface and no app id, and activated the profile chooser with it.
+    That request is not granted (Chrome didn't have the keyboard and named no click or key), so the window was only
+    marked as wanting attention, on a desktop not in view: nothing showed. Reproduced with Google Chrome 158, a
+    throwaway profile with two profiles and Lord Workspaces on a headless `lord-server-test`; the Wayland log shows
+    `get_activation_token`, `commit` and `activate` from the old process 60 ms after the launch, and "activate:
+    attention". The old process's Wayland connection was never cut, and Chrome was not windowless (its GPU process and
+    renderers run under its zygote).
+  - **The fix** (`server/src/wl/xdgact.c` `xact_take_launch`, `server/src/wl/wl.c` `tok_commit` and `launch_was_for`,
+    `server/src/apps.c` `apps_window_names`): an app's ungranted token request is granted once when LordOS issued a
+    launch token for that app at most 10 s earlier (`XACT_HANDOFF_MS`) and it is still unused; that launch token is
+    used up, so one launch grants once. "For that app": a Flatpak app by the identity lord-server checked itself; any
+    other by a window it already shows whose `app_id` names the launched `.desktop` entry (the Dock's match: the id,
+    its `StartupWMClass`, or the last part of a reverse-DNS id). Never Xwayland, an isolated LordOS app or a client of
+    another sandbox's security context. With the grant the theme focuses the window and brings its desktop into view
+    (`wm.focus`), in every theme. A handoff with no launch from LordOS still only asks for attention. With the fix,
+    Chrome 158 relaunched on the same headless session switches to activity 2 with the profile chooser in front.
+  - A copy that runs with no window (Chrome kept alive by its background apps) and maps a new one on a launch already
+    worked: checked with Chrome's `--keep-alive-for-test`, and now in the test below.
+  - Tests: `build/xdgact-test` (the launch's token used once, only for the app it names, only within 10 s, never an
+    app's own token, an ungranted one or one naming no app, the newest of two launches first);
+    `server/tests/handoff_headless.sh` with `server/tests/handoff_client.c` (new, in `make test`), an app that runs
+    once as Chrome does, on a headless `lord-server` in Lord Flow and Lord Workspaces: session restore puts it on
+    desktop 2 while desktop 1 shows; launched again, desktop 2 comes into view with its window in front (this check
+    fails without the fix: "events attention, desktop 1 shown"); the same handoff run without a launch stays
+    "attention"; a copy that closed its last window maps a new one in front. Not yet checked with the maintainer's
+    Chrome on his PC.
+  - `docs/WAYLAND.md` ("Activation": a launch the copy already running took over).
 - **Machines: a restart or shutdown of the computer handles a running machine at once, and inside logind's delay.**
   Seen on the maintainer's PC (2026-11-23): with a guest machine running (an Intel GVT-g vGPU, started paused),
   `reboot` waited the whole 30 s ("Delay lock is active (… lord-vm) but inhibitor timeout is reached"), lord-vm only

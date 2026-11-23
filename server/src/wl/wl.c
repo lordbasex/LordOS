@@ -2730,9 +2730,29 @@ static void tok_surface(struct wl_client *c, struct wl_resource *r, struct wl_re
     Surf *s = surface ? wl_resource_get_user_data(surface) : NULL;
     if (q) q->surf = s ? s->id : -1;
 }
+static const char *client_identity(struct wl_client *c);
+/* Was the launch with this id (xact_take_launch: a .desktop id from apps.c, a Flatpak id from its launcher) for the
+ * asking client? A Flatpak app by the identity lord-server checked itself (its .flatpak-info or security context); any
+ * other app by a window it already shows whose app_id names that entry (apps_window_names), the same match that puts
+ * its windows under the app in the Dock. Never for Xwayland (it speaks for every X11 app), an isolated LordOS app, or a
+ * client of another sandbox's security context. Only beside a launch the person made, never alone: any app could set
+ * any app_id, but one that did could already take the front by opening a new window. */
+static int launch_was_for(const char *id, void *ctx) {
+    struct wl_client *c = ctx;
+    if (!c || c == xwl_client || app_of_client(c)) return 0;
+    const char *who = client_identity(c);
+    if (!strncmp(who, "flatpak:", 8)) return !strcmp(who + 8, id);
+    if (secctx_of(c)) return 0;
+    for (int i = 0; i < MAX_SURF; i++) {
+        Surf *s = surfs[i];
+        if (s && s->client == c && s->role == R_TOPLEVEL && s->mapped && !s->xw && apps_window_names(id, s->app_id)) return 1;
+    }
+    return 0;
+}
 /* Granted when the asking app has the keyboard (and the surface it names, if any, is that window or one of its
- * menus), or the serial it names is a click or key LordOS sent it a moment ago; otherwise the token exists but only
- * asks for attention. The grant ends when the keyboard leaves that app (wl_set_focus) or after XACT_CLIENT_MS. */
+ * menus), or the serial it names is a click or key LordOS sent it a moment ago, or the person just launched it and
+ * this copy took the launch over (launch_was_for); otherwise the token exists but only asks for attention. The grant
+ * ends when the keyboard leaves that app (wl_set_focus) or after XACT_CLIENT_MS. */
 static void tok_commit(struct wl_client *c, struct wl_resource *r) {
     ActReq *q = wl_resource_get_user_data(r);
     if (q->committed) { wl_resource_post_error(r, XDG_ACTIVATION_TOKEN_V1_ERROR_ALREADY_USED, "token already committed"); return; }
@@ -2741,6 +2761,11 @@ static void tok_commit(struct wl_client *c, struct wl_resource *r) {
     Surf *asker = q->surf > 0 ? find(q->surf) : NULL;
     int focused = key_focus && key_focus->client == c && (!q->surf || (asker && toplevel_of(asker) == key_focus));
     int granted = focused || (q->has_serial && xact_serial_recent(q->serial, c, now));
+    /* the person launched this app a moment ago and the copy already running took the launch over: Google Chrome's
+     * process hands its command line to the running one and exits without using the launch's token, and the running
+     * one asks here with no keyboard and no input to bring back the window it already had (its profile chooser, a
+     * window on a desktop not in view). That launch's unused token grants this request instead, once. */
+    if (!granted) granted = xact_take_launch(now, XACT_HANDOFF_MS, launch_was_for, c);
     const char *t = xact_issue_for(now, XACT_CLIENT_MS, granted, q->app_id, c);
     xdg_activation_token_v1_send_done(r, t ? t : "none");
 }

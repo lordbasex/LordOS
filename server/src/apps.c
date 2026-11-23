@@ -28,7 +28,9 @@
  *
  * Every launch carries an xdg-activation token (XDG_ACTIVATION_TOKEN, wl/xdgact.c): the new window, or
  * the window of the copy already running that the new process hands the link or file to (a browser),
- * comes to the front, because the person asked for it. */
+ * comes to the front, because the person asked for it. A copy that takes the launch over without the token
+ * (Google Chrome asks for one of its own) is granted once by that unused launch token (wl/xdgact.h
+ * xact_take_launch, wl.c launch_was_for, apps_window_names below). */
 #include "apps.h"
 #include "lordlog.h"
 #include "iconfind.h"
@@ -884,6 +886,12 @@ void apps_name_of_program(const char *exe, const char *flatpak_id, const char *h
     }
     free(e);
     free(buf);
+}
+
+int apps_window_names(const char *desktop_id, const char *app_id) {
+    if (!app_id || !app_id[0]) return 0;
+    const DesktopApp *a = find_app(desktop_id);
+    return a && entry_hinted(a, app_id);
 }
 
 /* Opening a file with an app: only an app that declares MimeType (accepts files), a real
