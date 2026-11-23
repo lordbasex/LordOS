@@ -3,18 +3,20 @@
 import {
   View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
-  Segmented, admin, canDeactivate, deactivateApp, activateApp, webAppEntry, settings, addListener,
-  suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay,
+  admin, canDeactivate, deactivateApp, activateApp, webAppEntry, settings, addListener,
+  useWebApps, suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AiDetail, AiDiscover, AiPage, CatalogCategory, CatalogResults, catalogApp, catalogApps, catalogCategoryCounts, searchCatalog } from './ai.js';
 import { matches } from './search.js';
 import { CATS, debian, useDebian } from './debian.js';
 import { GLYPH } from './ui.js';
+import { isMine, installedFilters, filterInstalled, filterOk, systemOf } from './installedmodel.js';
+import { FilterChips, OriginChips, OriginColumn } from './origincol.js';
 import { EndsContext, MoreButton, makeEnds, usePaged } from './endless.js';
-import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits, webCategoryCounts } from './webapps.js';
+import { WebAppsPage, WebCategory, WebDiscover, WebInstalled, WebResults, webCatalog, webHits, webCategoryCounts } from './webapps.js';
 import { WebAppDetail } from './webdetail.js';
-import { FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts, useFlathubTotal } from './flathubpages.js';
+import { FlathubDetail, FlathubInstalled, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts, useFlathubTotal } from './flathubpages.js';
 import { flathub } from '@lordos/sdk';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
@@ -281,25 +283,27 @@ function PkgManage({ pkg, onMsg }) {
 }
 const pkgManifest = (pkg) => ({ name: pkg.name, description: pkg.description, icon: 'icon.png', size: pkg.size, minSize: pkg.minSize, permissions: pkg.permissions });
 
-// ---- installed apps (all of them: LordOS, packages and Linux) ----
+// ---- installed apps (all of them: LordOS, packages, Linux, Flatpak and web apps) ----
 
-// Every installed app. A LordOS app LordOS can do without is deactivated here, and activated again
-// (sdk/appsoffactions.js; the core keeps "System app — part of LordOS"); a Linux app a Debian package
-// brought is removed after its plan (debian.RemoveSheet). "Deactivated" lists the apps turned off.
-function InstalledPage({ query, filter: initial }) {
+// Every installed app, whatever its package system, each marked with it (its kind line), with a filter per system
+// that has apps (installedmodel.js): All, LordOS apps, Linux apps (Debian), Flathub, Web apps, Deactivated. A LordOS
+// app LordOS can do without is deactivated here, and activated again (sdk/appsoffactions.js; the core keeps "System
+// app — part of LordOS"); a Linux app a Debian package brought is removed after its plan (debian.RemoveSheet).
+// `only`: one system's apps and no filters (Linux apps (Debian) → Installed, in its second column).
+function InstalledPage({ query, filter: initial, only = null, empty = null }) {
   const t = useTheme();
   const { t: tr } = useLocale();
   const apps = useLauncherApps({ all: true });
-  const [filter, setFilter] = useState(initial === 'off' ? 'off' : 'all');
+  const [filter, setFilter] = useState(() => filterOk(initial));
   const [removing, setRemoving] = useState(null);
   const [msg, setMsg] = useState(null);
-  useEffect(() => { if (initial === 'off') setFilter('off'); }, [initial]);
+  useEffect(() => { if (initial) setFilter(filterOk(initial)); }, [initial]);
   useStore(debian.state);
   const fhJob = useStore(flathub.state, (st) => st.job);
-  const offCount = apps.filter((a) => a.off).length;
-  const shown = apps.filter((a) => (filter === 'off' ? a.off : true) && matches(query, [a.name, a.id, a.genericName], [a.comment]));
+  const mine = only ? apps.filter((a) => systemOf(a) === only) : apps;
+  const shown = filterInstalled(mine, only ? 'all' : filter).filter((a) => matches(query, [a.name, a.id, a.genericName], [a.comment]));
   // hundreds of apps with Debian's and Flathub's: a page of rows at a time as the list is scrolled (endless.js)
-  const { limit, more } = usePaged(shown.length, `${filter}|${query}`);
+  const { limit, more } = usePaged(shown.length, `${only}|${filter}|${query}`);
   // the kind, and a LordOS app's or package's own version (manifest "version")
   const kind = (a) => (a.version && a.kind !== 'linux' ? tr('store.kindVersion', { kind: tr(`store.kind.${a.kind}`), v: a.version }) : tr(`store.kind.${a.kind}`));
   const builtin = (a) => a.kind === 'lordos' && isSystemApp(a.id);
@@ -310,13 +314,10 @@ function InstalledPage({ query, filter: initial }) {
   const activate = (a) => { activateApp(a.id); setMsg({ ok: true, text: tr('store.off.activated', { name: a.name }) }); };
   return (
     <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginBottom: spacing.l }}>
-        <Segmented small appearance="neutral" value={filter} onChange={setFilter}
-          options={[['all', tr('store.off.filterAll')], ['off', offCount ? tr('store.off.filterOffCount', { count: offCount }) : tr('store.off.filterOff')]]} />
-      </View>
+      {only ? null : <FilterChips value={filter} filters={installedFilters(apps, filter)} onChange={setFilter} />}
       <debian.Progress />
       <Message msg={msg} />
-      <List count={null} empty={filter === 'off' ? tr('store.off.none') : tr('store.debian.none')}>
+      <List count={null} empty={!only && filter === 'off' ? tr('store.off.none') : query.trim() || !empty ? tr('store.debian.none') : empty}>
         {shown.slice(0, limit).map((a) => (
           <AppRow key={a.id} icon={<View style={{ opacity: a.off ? 0.45 : 1 }}><a.Icon size={32} /></View>} name={a.name} detail={a.comment || a.genericName || ''}
             extra={a.off ? `${kind(a)} · ${tr('store.off.badge')}` : kind(a)}
@@ -405,7 +406,7 @@ export default function Store() {
   }, [app]);
   useEffect(() => {
     if (args?.install) setFile(args.install);
-    if (args?.page) go(args.page);
+    if (args?.page) go(args.page, args.sub || null);
     if (args?.app) openAi(args.app);
     if (args?.webapp) openWeb(args.webapp);
     if (args?.search) { setQuery(args.search); go('discover'); }       // from Search
@@ -427,13 +428,19 @@ export default function Store() {
   // All: how many apps the origin shows (a Flathub app may be in several categories, so not the categories' sum)
   const fhTotal = useFlathubTotal();
   const subTotal = src === 'flathub' ? fhTotal : subCounts ? CATS.reduce((a, c) => a + (subCounts[c] || 0), 0) : 0;
+  // how many of the origin's apps are installed (its second column's Installed)
+  const fhInstalled = useStore(flathub.state, (st) => st.installed.length);
+  const webInstalled = useWebApps().length;
+  const allApps = useLauncherApps({ all: true });
+  const debInstalled = useMemo(() => allApps.filter((a) => systemOf(a) === 'debian').length, [allApps]);
+  const mineCount = src === 'flathub' ? fhInstalled : src === 'web' ? webInstalled : src === 'debian' ? debInstalled : 0;
   const remember = () => { if (!app) listAt.current = { key: listKey, y: scroll.current?.offset() || 0 }; };
   const openDeb = (name) => { remember(); setApp({ name, ai: false }); };
   const openAi = (name) => { remember(); setApp({ name, ai: true }); };
   const openWeb = (id) => { remember(); setApp({ name: id, web: true }); };
   const openFlathub = (id) => { remember(); setApp({ name: id, flathub: true }); };
   const srcTitle = { debian: tr('store.src.debian'), flathub: tr('store.page.flathub'), web: tr('store.page.webapps') };
-  const pageTitle = src ? [srcTitle[src], sub ? tr(`store.cat.${sub}`) : null, src === 'flathub' && sub && fhSub ? tr(`flathub.sub.${fhSub}`) : null,
+  const pageTitle = src ? [srcTitle[src], isMine(sub) ? tr('store.page.installed') : sub ? tr(`store.cat.${sub}`) : null, src === 'flathub' && sub && fhSub ? tr(`flathub.sub.${fhSub}`) : null,
     src === 'flathub' && !sub && fhColl ? tr(`flathub.coll.${fhColl}`) : null].filter(Boolean).join(' · ') : tr(`store.page.${page}`);
   const appTitle = app && (app.flathub ? flathub.catalogApp(app.name)?.name : app.web ? webCatalog().find((a) => a.id === app.name)?.name || webAppEntry(app.name)?.name
     : app.ai ? catalogApp(app.name)?.name : (lord.pkg?.info?.(app.name, {})?.app?.name)) || app?.name;
@@ -441,6 +448,12 @@ export default function Store() {
   const onSearch = (v) => { setQuery(v); if (v && !searchable) go('discover'); };
   let body;
   if (app) body = app.flathub ? <FlathubDetail id={app.name} /> : app.web ? <WebAppDetail id={app.name} /> : app.ai ? <AiDetail pkg={app.name} /> : <debian.Details name={app.name} />;
+  else if (src && isMine(sub)) {
+    // the origin's own installed apps, with their usual actions (Installed, at the top of its second column)
+    body = src === 'flathub' ? <FlathubInstalled query={query} onOpen={openFlathub} />
+      : src === 'web' ? <WebInstalled query={query} onOpen={openWeb} />
+      : <InstalledPage query={query} only="debian" empty={tr('store.installed.noneDebian')} />;
+  }
   else if (src === 'debian') {
     body = sub ? (
       <View style={{ gap: 26 }}>
@@ -517,19 +530,7 @@ export default function Store() {
   return (
     <View style={{ flex: 1, flexDirection: 'row' }}>
       {side.narrow ? null : sidebar}
-      {subCounts && !app && !side.narrow ? (
-        <View style={{ width: 190, backgroundColor: t.sidebarBg }}>
-          <Hairline edge="end" />
-          <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
-            <SectionTitle>{tr('store.section.categories')}</SectionTitle>
-            <SidebarItem label={tr('store.sub.all')} detail={subTotal || null} selected={!sub} onClick={() => pickSub(null)} />
-            {CATS.filter((c) => subCounts[c]).map((c) => (
-              <SidebarItem key={c} icon={GLYPH[c]} label={tr(`store.cat.${c}`)} detail={subCounts[c]} selected={sub === c} onClick={() => pickSub(c)} />
-            ))}
-            <View style={{ height: 12 }} />
-          </ScrollView>
-        </View>
-      ) : null}
+      {subCounts && !app && !side.narrow ? <OriginColumn sub={sub} cats={CATS} counts={subCounts} total={subTotal} mine={mineCount} onPick={pickSub} /> : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         <Toolbar>
           {side.narrow ? <SidebarToggle small shown={side.shown} onClick={side.toggle} /> : null}
@@ -541,16 +542,7 @@ export default function Store() {
         </Toolbar>
         <EndsContext.Provider value={ends}>
         <ScrollView scrollRef={scroll} onScroll={ends.check} resetKey={app ? `app:${app.flathub ? 'flathub' : app.web ? 'web' : app.ai ? 'ai' : 'deb'}:${app.name}` : listKey} style={{ flex: 1, paddingHorizontal: side.narrow ? 16 : 24, paddingTop: side.narrow ? 14 : 20 }}>
-          {subCounts && !app && side.narrow ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-              {[null, ...CATS.filter((c) => subCounts[c])].map((c) => (
-                <View key={c || 'all'} onClick={() => pickSub(c)} style={{ height: 26, paddingHorizontal: 12, borderRadius: 13, justifyContent: 'center',
-                  backgroundColor: sub === c ? t.accent : t.hover }}>
-                  <Text style={{ fontSize: 12, fontWeight: 600, color: sub === c ? '#fff' : t.text }}>{c ? tr(`store.cat.${c}`) : tr('store.sub.all')}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
+          {subCounts && !app && side.narrow ? <OriginChips sub={sub} cats={CATS} counts={subCounts} onPick={pickSub} /> : null}
           {file && <InstallFile path={file} onDone={(cancel) => cancel && setFile(null)} />}
           {body}
           <View style={{ height: 24 }} />

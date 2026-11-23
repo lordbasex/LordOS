@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Schreib es jetzt auf: Es wird nur einmal angezeigt und nirgends gespeichert.",
   "suggest.mok.steps": "Starte neu und drücke, wenn der blaue Bildschirm erscheint, innerhalb von 10 Sekunden eine Taste. Wähle dann Enroll MOK → Continue → Yes, gib dieses Passwort ein und wähle Reboot.",
   "suggest.mok.newPassword": "Neues Passwort",
-  "suggest.mok.cancel": "Registrierung abbrechen"
+  "suggest.mok.cancel": "Registrierung abbrechen",
+  "installed.noneDebian": "Noch keine Linux-Apps von Debian installiert. Du findest sie unter „Alle“ oder in einer Kategorie.",
+  "installed.noneFlathub": "Noch keine Apps von Flathub installiert. Du findest sie unter „Alle“ oder in einer Kategorie.",
+  "installed.noneWeb": "Noch keine Web-Apps installiert. Du findest sie unter „Alle“ oder in einer Kategorie, oder füge eine über ihre Adresse hinzu."
 }

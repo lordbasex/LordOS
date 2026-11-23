@@ -330,5 +330,8 @@
   "suggest.mok.passwordHint": "今すぐ書き留めてください。表示は 1 回だけで、どこにも保存されません。",
   "suggest.mok.steps": "再起動し、青い画面が表示されたら 10 秒以内に任意のキーを押します。次に Enroll MOK → Continue → Yes を選び、このパスワードを入力して Reboot を選びます。",
   "suggest.mok.newPassword": "新しいパスワード",
-  "suggest.mok.cancel": "登録をキャンセル"
+  "suggest.mok.cancel": "登録をキャンセル",
+  "installed.noneDebian": "Debian の Linux アプリはまだインストールされていません。「すべて」またはカテゴリから探せます。",
+  "installed.noneFlathub": "Flathub のアプリはまだインストールされていません。「すべて」またはカテゴリから探せます。",
+  "installed.noneWeb": "Web アプリはまだインストールされていません。「すべて」またはカテゴリから探すか、アドレスから追加できます。"
 }

@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Isulat ito ngayon: isang beses lang itong ipinapakita at hindi ito sine-save kahit saan.",
   "suggest.mok.steps": "Mag-restart, at kapag lumabas ang asul na screen, pumindot ng key sa loob ng 10 segundo. Pagkatapos piliin ang Enroll MOK → Continue → Yes, i-type ang password na ito at piliin ang Reboot.",
   "suggest.mok.newPassword": "Bagong Password",
-  "suggest.mok.cancel": "Kanselahin ang Pag-enroll"
+  "suggest.mok.cancel": "Kanselahin ang Pag-enroll",
+  "installed.noneDebian": "Wala pang naka-install na Linux app mula sa Debian. Hanapin ang mga ito sa Lahat o sa isang kategorya.",
+  "installed.noneFlathub": "Wala pang naka-install na app mula sa Flathub. Hanapin ang mga ito sa Lahat o sa isang kategorya.",
+  "installed.noneWeb": "Wala pang naka-install na web app. Hanapin ang mga ito sa Lahat o sa isang kategorya, o magdagdag mula sa address nito."
 }

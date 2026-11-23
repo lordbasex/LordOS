@@ -38,6 +38,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     lord-vm saved the machine 278 ms after PrepareForShutdown and let go of the inhibitor (the old binary reacted only
     when the bus went away, 46 s later); with an 8 s delay (no time to save) the guest got the power button and QEMU
     quit at +4.0 s; a never-run paused machine was off in 124 ms.
+### Changed
+
+- **Store: each package system's shop first, its installed apps under Installed** (asked by the maintainer on
+  2026-11-23). Linux apps (Debian), Flathub and Web apps (PWA) open on their shop: Flathub's home with its
+  collections and categories, the web apps' "Add from an address" and catalog, Debian's Discover. Each one's second
+  column now starts with **Installed**, with how many of that system's apps are installed, and its **Categories**
+  below it (All, then each category), the way the Store's own sidebar has Installed among its pages; in a narrow
+  window the same choices are chips, Installed first. Installed shows only that system's installed apps with their
+  usual actions and the toolbar's search: Flathub's with Update Flathub apps, Remove and Open (and the job's
+  progress); the web apps with See more, Manage and Open; Debian's Linux apps with Remove (through the plan sheet)
+  and Open. With none, it says where to find them. The shops no longer list the installed apps above their catalog
+  (an installed app's card says Open). The title says where you are ("Flathub · Installed").
+  `apps/store/origincol.js` (the column and the chips), `FlathubInstalled` (`apps/store/flathubpages.js`),
+  `WebInstalled` (`apps/store/webapps.js`). Links can open an origin's Installed with `{ page: 'src:flathub', sub:
+  'installed' }`.
+- **Store → Installed lists every installed app, whatever its package system**, each marked with it (LordOS app,
+  Linux app, Flatpak app, Web app, as before), and its filters are now chips with counts: All, LordOS apps, Linux
+  apps (Debian), Flathub, Web apps (PWA), each only when it has apps, and Deactivated (was a two-way switch, All or
+  Deactivated). `apps/store/installedmodel.js`; the `filter` argument also takes `lordos`, `debian`, `flathub` and
+  `web`.
+- Three new texts (`store.installed.noneDebian`, `noneFlathub`, `noneWeb`), in all 35 languages.
+
+### Tests
+
+- `server/tests/store_installed_test.mjs` (23 checks: each entry's system, the filters and what each keeps) and
+  `server/tests/store_origin_scene.mjs` (13 checks: Installed first with its count, then Categories, All and the
+  categories with apps; choosing Installed selects it; the narrow chips; the filter chips), both in `make test`.
+- `STORE_SCENE=installed server/tests/store_rankings_headless.sh OUT_DIR [theme] [language]` (with `STORE_MODE=light`
+  for the light appearance) shoots Flathub's shop and Installed, the web apps' shop and Installed, Debian's Installed
+  and the general Installed with its Flathub and Web apps filters in a headless lord-server (`tests/store_scene/installed.js`;
+  `pre.js` seeds two Flatpak and two web apps and installs nothing). Checked in Spanish, light and dark, on 2026-11-23,
+  and the second column in Arabic (right to left). Not yet on a real display or the VM.
 
 ## [0.8.9.5-beta] - 2026-11-23
 

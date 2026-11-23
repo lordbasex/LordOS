@@ -346,5 +346,8 @@
   "suggest.mok.passwordHint": "Užsirašykite jį dabar: jis rodomas tik kartą ir niekur neišsaugomas.",
   "suggest.mok.steps": "Paleiskite iš naujo ir, kai pasirodys mėlynas ekranas, per 10 sekundžių paspauskite bet kurį klavišą. Tada pasirinkite Enroll MOK → Continue → Yes, įveskite šį slaptažodį ir pasirinkite Reboot.",
   "suggest.mok.newPassword": "Naujas slaptažodis",
-  "suggest.mok.cancel": "Atšaukti registraciją"
+  "suggest.mok.cancel": "Atšaukti registraciją",
+  "installed.noneDebian": "Dar neįdiegta jokių Debian Linux programų. Raskite jas skiltyje „Visos“ arba kategorijoje.",
+  "installed.noneFlathub": "Dar neįdiegta jokių Flathub programų. Raskite jas skiltyje „Visos“ arba kategorijoje.",
+  "installed.noneWeb": "Dar neįdiegta jokių žiniatinklio programų. Raskite jas skiltyje „Visos“ arba kategorijoje, arba pridėkite pagal adresą."
 }

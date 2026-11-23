@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Skriv ner det nu: det visas bara en gång och sparas ingenstans.",
   "suggest.mok.steps": "Starta om och tryck på valfri tangent inom 10 sekunder när den blå skärmen visas. Välj sedan Enroll MOK → Continue → Yes, skriv lösenordet och välj Reboot.",
   "suggest.mok.newPassword": "Nytt lösenord",
-  "suggest.mok.cancel": "Avbryt registreringen"
+  "suggest.mok.cancel": "Avbryt registreringen",
+  "installed.noneDebian": "Inga Linux-appar från Debian är installerade än. Hitta dem under Alla eller i en kategori.",
+  "installed.noneFlathub": "Inga appar från Flathub är installerade än. Hitta dem under Alla eller i en kategori.",
+  "installed.noneWeb": "Inga webbappar är installerade än. Hitta dem under Alla eller i en kategori, eller lägg till en från dess adress."
 }

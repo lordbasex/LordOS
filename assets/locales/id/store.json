@@ -330,5 +330,8 @@
   "suggest.mok.passwordHint": "Catat sekarang: hanya ditampilkan sekali dan tidak disimpan di mana pun.",
   "suggest.mok.steps": "Mulai ulang, dan saat layar biru muncul, tekan tombol apa saja dalam 10 detik. Lalu pilih Enroll MOK → Continue → Yes, ketik kata sandi ini, dan pilih Reboot.",
   "suggest.mok.newPassword": "Kata Sandi Baru",
-  "suggest.mok.cancel": "Batalkan Pendaftaran"
+  "suggest.mok.cancel": "Batalkan Pendaftaran",
+  "installed.noneDebian": "Belum ada aplikasi Linux dari Debian yang terpasang. Temukan di Semua atau di sebuah kategori.",
+  "installed.noneFlathub": "Belum ada aplikasi dari Flathub yang terpasang. Temukan di Semua atau di sebuah kategori.",
+  "installed.noneWeb": "Belum ada aplikasi web yang terpasang. Temukan di Semua atau di sebuah kategori, atau tambahkan dari alamatnya."
 }

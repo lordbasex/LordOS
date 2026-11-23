@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Liandike sasa: linaonyeshwa mara moja tu na halihifadhiwi popote.",
   "suggest.mok.steps": "Washa upya, na skrini ya bluu ikitokea, bonyeza kitufe chochote ndani ya sekunde 10. Kisha chagua Enroll MOK → Continue → Yes, andika nenosiri hili na uchague Reboot.",
   "suggest.mok.newPassword": "Nenosiri Jipya",
-  "suggest.mok.cancel": "Ghairi Usajili"
+  "suggest.mok.cancel": "Ghairi Usajili",
+  "installed.noneDebian": "Bado hakuna programu za Linux kutoka Debian zilizosakinishwa. Zitafute katika Zote au katika kategoria.",
+  "installed.noneFlathub": "Bado hakuna programu kutoka Flathub zilizosakinishwa. Zitafute katika Zote au katika kategoria.",
+  "installed.noneWeb": "Bado hakuna programu za wavuti zilizosakinishwa. Zitafute katika Zote au katika kategoria, au ongeza moja kutoka kwa anwani yake."
 }

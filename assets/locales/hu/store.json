@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Írd fel most: csak egyszer jelenik meg, és sehol sincs elmentve.",
   "suggest.mok.steps": "Indítsd újra, és amikor megjelenik a kék képernyő, 10 másodpercen belül nyomj meg egy billentyűt. Ezután válaszd ezt: Enroll MOK → Continue → Yes, írd be ezt a jelszót, és válaszd a Reboot lehetőséget.",
   "suggest.mok.newPassword": "Új jelszó",
-  "suggest.mok.cancel": "Regisztrálás megszakítása"
+  "suggest.mok.cancel": "Regisztrálás megszakítása",
+  "installed.noneDebian": "Még nincs telepítve Linux-alkalmazás a Debianból. Keresd őket a Mind menüben vagy egy kategóriában.",
+  "installed.noneFlathub": "Még nincs telepítve alkalmazás a Flathubról. Keresd őket a Mind menüben vagy egy kategóriában.",
+  "installed.noneWeb": "Még nincs telepítve webalkalmazás. Keresd őket a Mind menüben vagy egy kategóriában, vagy adj hozzá egyet a címéről."
 }

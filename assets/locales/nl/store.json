@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Schrijf het nu op: het wordt maar één keer getoond en nergens bewaard.",
   "suggest.mok.steps": "Start opnieuw op en druk, wanneer het blauwe scherm verschijnt, binnen 10 seconden op een toets. Kies daarna Enroll MOK → Continue → Yes, typ dit wachtwoord en kies Reboot.",
   "suggest.mok.newPassword": "Nieuw wachtwoord",
-  "suggest.mok.cancel": "Registratie annuleren"
+  "suggest.mok.cancel": "Registratie annuleren",
+  "installed.noneDebian": "Er zijn nog geen Linux-apps van Debian geïnstalleerd. Vind ze onder Alle of in een categorie.",
+  "installed.noneFlathub": "Er zijn nog geen apps van Flathub geïnstalleerd. Vind ze onder Alle of in een categorie.",
+  "installed.noneWeb": "Er zijn nog geen web-apps geïnstalleerd. Vind ze onder Alle of in een categorie, of voeg er een toe via het adres."
 }

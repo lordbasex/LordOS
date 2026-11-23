@@ -346,5 +346,8 @@
   "suggest.mok.passwordHint": "Noteaz-o acum: apare o singură dată și nu este salvată nicăieri.",
   "suggest.mok.steps": "Repornește și, când apare ecranul albastru, apasă o tastă în cel mult 10 secunde. Apoi alege Enroll MOK → Continue → Yes, tastează această parolă și alege Reboot.",
   "suggest.mok.newPassword": "Parolă nouă",
-  "suggest.mok.cancel": "Anulează înregistrarea"
+  "suggest.mok.cancel": "Anulează înregistrarea",
+  "installed.noneDebian": "Încă nu este instalată nicio aplicație Linux din Debian. Găsește-le în Toate sau într-o categorie.",
+  "installed.noneFlathub": "Încă nu este instalată nicio aplicație din Flathub. Găsește-le în Toate sau într-o categorie.",
+  "installed.noneWeb": "Încă nu este instalată nicio aplicație web. Găsește-le în Toate sau într-o categorie ori adaugă una de la adresa ei."
 }

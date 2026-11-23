@@ -379,6 +379,14 @@ edition says that is new.
 | 10.3 | After 1.0, Android only as a machine (the Android 13 card since 0.8.9.5; a newer image and arm64 later) and no Android container in LordOS: Android apps in the Store are for LordBridge, a separate project | The maintainer's decision of 2026-11-22; `docs/ROADMAP.md` ("Android"), `docs/VIRTUALIZATION.md` 4.2 and open question 6, `docs/LORDBRIDGE.md` | Design (replaces the earlier "Android container with LineageOS" plan) |
 | 5.1, 6.7 | Not yet tried on real hardware: LordOS Studio's virtual camera in browsers and OBS, the Secure Boot (MOK) enrolment, Mic Mode's Noise Reduction in a real call, the Raspberry Pi with this release | `CHANGELOG.md` "0.8.9.5-beta" (the release summary and the Studio entries) | Not yet |
 
+## In development after 0.8.9.5
+
+The paper marks this work "in development (the latest release is 0.8.9.5)".
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 5.1 | The Store: each origin (Linux apps (Debian), Flathub, Web apps) opens on its shop and its second column starts with Installed, only that origin's installed apps with their usual actions, above the categories; Store → Installed lists every installed app, each marked with its system, with a filter per system | `server/tests/store_installed_test.mjs` (`apps/store/installedmodel.js`), `server/tests/store_origin_scene.mjs` (`apps/store/origincol.js`); headless screenshots with `STORE_SCENE=installed server/tests/store_rankings_headless.sh` (two Flatpak and two web apps seeded, 2026-11-23, Spanish, light and dark) | Tested headless; not yet on a real display or the VM |
+
 ## Work that became 0.8.9.5 (the paper's editions of 2026-11-21 and 2026-11-22, then "in development after 0.8.9.4")
 
 The paper marked this work "in development" until the release (§0, §5.1, §5.3, §6.3, §6.7, §7.2, §10.1–§10.3); since

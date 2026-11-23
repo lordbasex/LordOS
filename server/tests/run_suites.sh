@@ -615,6 +615,9 @@ EOF
     # (0.8.8.4, #37) the Store's search (apps/store/search.js): words in any order, joined or apart, accents, keywords
     if have node; then run "store-search-test (apps/store/search.js)" node tests/store_search_test.mjs
     else skip "store-search-test" "node"; fi
+    # (after 0.8.9.5) the Store's installed apps by package system (apps/store/installedmodel.js): the filters, the systems
+    if have node; then run "store-installed-test (apps/store/installedmodel.js)" node tests/store_installed_test.mjs
+    else skip "store-installed-test" "node"; fi
     # (0.8.7) what the live ISO opens by itself, the "Check this computer" boot entry and the menu's height
     if have node; then run "livestart-test (sdk/livestart.js, the ISO's boot menu)" node tests/livestart_test.mjs
     else skip "livestart-test" "node"; fi
@@ -696,6 +699,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-card-scene (apps/store/ui.js)" node tests/textfield_menu_test.mjs store_card_scene.mjs
     else skip "store-card-scene" "node and the repository's node_modules (npm install)"; fi
+    # (after 0.8.9.5) an origin's second column: Installed first, then its categories; the general Installed page's filters
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "store-origin-scene (apps/store/origincol.js)" node tests/textfield_menu_test.mjs store_origin_scene.mjs
+    else skip "store-origin-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs

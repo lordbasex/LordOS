@@ -541,6 +541,13 @@ that was probed.
 - **Where web apps show:** the Web apps section, a banner and a shelf in Discover (the catalog's first apps; "See all"
   opens the section), Discover's search, and their category's page. Every card has a "Web app" tag, so web apps are
   told apart from LordOS apps and Linux apps (`apps/store/webapps.js`).
+- **The section's shop and its Installed** (in development; the latest release is 0.8.9.5; asked by the maintainer
+  on 2026-11-23): the Web apps section opens on its shop (the subtitle, "Add from an address" and the catalog's
+  cards); its second column starts with **Installed** (with how many are installed), then its categories. Installed
+  lists the installed web apps with See more, Manage (Settings → Web apps) and Open, filtered by the search (name or
+  origin); the shop no longer lists them above the catalog (an installed app's card says Open). `WebInstalled` in
+  `apps/store/webapps.js`, the column in `apps/store/origincol.js`. The general Store → Installed lists the web apps
+  with every other installed app and has a **Web apps** filter (`apps/store/installedmodel.js`).
 - **The first web app installs the engine first.** Without `lordos-web` the list is still shown (only "Add from an
   address" waits, since the probe is lord-web's). Get / Install says LordOS's web engine is needed once and shows the
   package plan's download and disk size (`lord.pkg.plan({ install: ['lordos-web'] })`); its Install runs the Store's

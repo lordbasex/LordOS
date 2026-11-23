@@ -1,6 +1,7 @@
 // webapps.js — the Store's Web apps section (0.8.8.8, docs/WEBAPPS.md): LordOS's list of web apps
 // (assets/webapps/catalog.json, bundled at build time; lord-server installs an entry from its own copy, never from
-// what JS says), "Add from an address" (addweb.js) and the installed ones; each app's page is webdetail.js. Web apps
+// what JS says) and "Add from an address" (addweb.js) as the shop, and the installed ones under the second column's
+// Installed (WebInstalled); each app's page is webdetail.js. Web apps
 // also show in Discover (a banner and a shelf), in its search and in their category, always as cards with a "Web app"
 // tag. Without the lordos-web package (lord-web missing) the list is still there: the first Get installs the engine
 // first, in the same sheet (getweb.js).
@@ -115,7 +116,6 @@ export function WebAppsPage({ query, onOpen }) {
   const [sheet, setSheet] = useState(null);
   const sec = M.storeSection({ available, installed });
   const list = M.catalogApps(catalog, installed, query);
-  const mine = installed.filter((e) => !query || e.name.toLowerCase().includes(query.trim().toLowerCase()));
   return h(View, null,
     h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.xl, textAlign: 'start' } }, t('webapps.store.subtitle')),
     sec.needsEngine ? h(View, { style: box(th) },
@@ -123,7 +123,24 @@ export function WebAppsPage({ query, onOpen }) {
       h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, lineHeight: 1.45, textAlign: 'start' } }, t('webapps.store.engineBody'))) : null,
     sheet ? h(CatalogSheet, { key: sheet.id, a: sheet, onDone: () => setSheet(null), onMore: onOpen }) : null,
     sec.canAdd ? h(AddFromAddress) : null,
-    mine.length ? h(View, { style: { marginBottom: spacing.xl, gap: 6 } },
+    h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start', paddingHorizontal: spacing.xs, marginBottom: 6 } }, t('webapps.store.catalogTitle')),
+    h(CardGrid, null, ...list.map((a) => h(WebCard, { key: a.id, a, onOpen, onGet: setSheet }))),
+    h(TrademarkNote, { style: { marginTop: spacing.xl } }));
+}
+
+// The section's Installed (its second column's first item, 2026-11-23): the installed web apps, each with See more,
+// Manage (Settings → Web apps) and Open; the shop (All, the categories, Add from an address) no longer lists them.
+export function WebInstalled({ query, onOpen }) {
+  const th = useTheme();
+  const installed = useWebApps();
+  const q = String(query || '').trim().toLowerCase();
+  const mine = installed.filter((e) => !q || e.name.toLowerCase().includes(q) || String(e.origin || '').toLowerCase().includes(q));
+  const line = (key) => h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, lineHeight: 1.45, textAlign: 'start' } }, t(key));
+  if (!installed.length) return line('store.installed.noneWeb');
+  if (!mine.length) return line('store.debian.none');
+  return h(View, null,
+    h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.xl, textAlign: 'start' } }, t('webapps.store.subtitle')),
+    h(View, { style: { marginBottom: spacing.xl, gap: 6 } },
       h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start', paddingHorizontal: spacing.xs } }, t('webapps.store.installedTitle')),
       h(GroupBox, null, ...mine.map((e) => h(View, { key: e.id, style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: spacing.s + 2 } },
         h(webAppIcon(e), { size: 32 }),
@@ -132,8 +149,5 @@ export function WebAppsPage({ query, onOpen }) {
           h(Text, { style: { fontSize: typeScale.caption, color: th.textDim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' } }, e.origin)),
         h(Button, { small: true, label: t('webapps.store.seeMore'), onClick: () => onOpen(e.id) }),
         h(Button, { small: true, label: t('webapps.store.manage'), onClick: () => wm.open('settings', { args: { section: 'webapps', app: e.id, nonce: Date.now() } }) }),
-        h(Button, { small: true, label: t('store.open'), onClick: () => open(e.id) }))))) : null,
-    h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start', paddingHorizontal: spacing.xs, marginBottom: 6 } }, t('webapps.store.catalogTitle')),
-    h(CardGrid, null, ...list.map((a) => h(WebCard, { key: a.id, a, onOpen, onGet: setSheet }))),
-    h(TrademarkNote, { style: { marginTop: spacing.xl } }));
+        h(Button, { small: true, label: t('store.open'), onClick: () => open(e.id) }))))));
 }

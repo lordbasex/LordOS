@@ -338,5 +338,8 @@
   "suggest.mok.passwordHint": "Notez-le maintenant : il ne s’affiche qu’une fois et n’est enregistré nulle part.",
   "suggest.mok.steps": "Redémarrez et, quand l’écran bleu apparaît, appuyez sur une touche dans les 10 secondes. Choisissez ensuite Enroll MOK → Continue → Yes, saisissez ce mot de passe et choisissez Reboot.",
   "suggest.mok.newPassword": "Nouveau mot de passe",
-  "suggest.mok.cancel": "Annuler l’inscription"
+  "suggest.mok.cancel": "Annuler l’inscription",
+  "installed.noneDebian": "Aucune app Linux de Debian n’est encore installée. Trouvez-les dans Toutes ou dans une catégorie.",
+  "installed.noneFlathub": "Aucune app de Flathub n’est encore installée. Trouvez-les dans Toutes ou dans une catégorie.",
+  "installed.noneWeb": "Aucune app web n’est encore installée. Trouvez-les dans Toutes ou dans une catégorie, ou ajoutez-en une depuis son adresse."
 }
