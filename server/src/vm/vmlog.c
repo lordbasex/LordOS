@@ -29,6 +29,16 @@ static int digits(const char *p, size_t n) {
     return 1;
 }
 
+static int has_text(const char *p, size_t n, const char *w) {
+    size_t wn = strlen(w);
+    for (size_t i = 0; i + wn <= n; i++) if (!memcmp(p + i, w, wn)) return 1;
+    return 0;
+}
+
+int vmlog_qemu_3d_abort(const char *line, size_t n) {
+    return has_text(line, n, "dbus_scanout_texture") && has_text(line, n, "Assertion") && has_text(line, n, "tex_id");
+}
+
 const char *vmlog_key(const char *line, size_t n, size_t *kn) {
     /* YYYY-MM-DDTHH:MM:SS, then an optional fraction, 'Z' or not, then one space */
     size_t i = 0;

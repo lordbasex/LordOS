@@ -764,6 +764,19 @@ static void test_host(void) {
     VmMachine e;
     vm_machine_defaults(&e, &pi, VM_ARCH_ARM64);
     CHECK(strcmp(d.id, e.id) && d.id[14] == '4');
+    /* Graphics 3D (vm_gl_refusal): a Linux amd64 machine in a window on amd64 may have it, except on an unattended
+     * install's start (QEMU issue 4918: its D-Bus display aborts at the installer's restart) */
+    VmMachine g = e;
+    g.arch = VM_ARCH_AMD64; g.devices = VM_DEV_VIRTIO; g.display = VM_DISPLAY_WINDOW; g.graphics = VM_GFX_3D;
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 0) == NULL);
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 1) && strstr(vm_gl_refusal(&g, VM_ARCH_AMD64, 1), "installs the system"));
+    CHECK(vm_gl_refusal(&g, VM_ARCH_ARM64, 0) != NULL);
+    g.devices = VM_DEV_WINDOWS;
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 0) != NULL);
+    g.devices = VM_DEV_VIRTIO; g.display = VM_DISPLAY_NONE;
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 0) != NULL);
+    g.display = VM_DISPLAY_WINDOW; g.arch = VM_ARCH_ARM64;
+    CHECK(vm_gl_refusal(&g, VM_ARCH_AMD64, 0) != NULL);
 }
 
 static void test_messages(void) {

@@ -423,6 +423,35 @@ lord-server passes `--render-node none` when it draws without a GPU, so the CPU 
   does) saved the login screen right side up; 23 frames read back of 23, no refusals. A UEFI reset (QMP `system_reset`) didn't
   abort QEMU on amd64. Mesa in QEMU warns `os_same_file_description couldn't determine...` because our seccomp refuses `kcmp`: kept
   refused.
+- **Known issue (QEMU, amd64 too, found 2026-11-23): a guest that resets its virtio-gpu-gl aborts QEMU.** On the maintainer's PC
+  (RX 580, renderD129, Debian 13's QEMU 1:10.0.13+ds-0+deb13u1) an unattended install of LordOS 0.8.9 with Graphics 3D ended
+  ~45 s in with `qemu-system-x86_64: ui/dbus-listener.c:511: dbus_scanout_texture: Assertion 'tex_id' failed.` and signal 6,
+  right after the installer's `update-initramfs`, i.e. at the installer's restart. The path, read in Debian's 10.0.13 source and
+  unchanged in 11.1.3: the guest writes 0 to the virtio status register from a vCPU, so `virtio_gpu_gl_reset()`
+  (`hw/display/virtio-gpu-gl.c:116`) runs in the vCPU thread and calls `virtio_gpu_virgl_reset_scanout()`
+  (`hw/display/virtio-gpu-virgl.c:1158`) → `dpy_gfx_replace_surface(con, NULL)` (`ui/console.c:838`) makes the "Display output
+  is not active" placeholder and its texture with `dbus_create_texture` → `surface_gl_create_texture` (`ui/console-gl.c:75`),
+  whose `glGenTextures` has no GL context current in that thread and leaves the texture 0; the D-Bus listener's
+  `dbus_gl_gfx_switch` (`ui/dbus-listener.c:782`) passes it to `dbus_scanout_texture`, which asserts (`:511`). The comment
+  above the call says GL must run in the main thread; `virtio_gpu_reset()` itself already defers to it (QEMU commit
+  a41e2d97f92b, "virtio-gpu: reset gfx resources in main thread"), the GL reset of the scanouts doesn't. A host reset (QMP
+  `system_reset`) runs in the main thread and is fine (above). **Which guests do it:** Linux guests whose kernel has
+  `virtio_dev_shutdown` (`drivers/virtio/virtio.c`: break the device, then `config->reset`, on every shutdown and restart),
+  backported into Debian's **6.12.117** (absent from 6.12.107 and 6.12.113): every Debian 13 guest updated to it, LordOS 0.8.9's
+  installer and installed system among them, and any guest that unbinds its GPU driver. The guest has finished shutting down
+  by then (file systems synced and read-only), so its disk is safe, but QEMU dies instead of powering off or restarting.
+  **Upstream:** QEMU issue 4918 (https://gitlab.com/qemu-project/qemu/-/work_items/4918, opened 2026-11-20 against 11.1.3,
+  open, same analysis); no fix in QEMU's tree: 11.1.3 has `assert(tex_id)` at `ui/dbus-listener.c:600`, and master (checked
+  2026-11-23; last `ui/dbus-listener.c` change e12c1693, last `virtio-gpu-gl.c` change 4eb0aace) still calls the scanout reset
+  from `virtio_gpu_gl_reset`, in the vCPU thread; no Debian bug against `qemu` (checked 2026-11-23); no QEMU option or guest kernel parameter
+  turns the reset off. **What LordOS does:** an unattended install's start is always 2D (`vm_gl_refusal` in `machine.c`: the
+  installer is a text console, and its restart is exactly this reset); the next start, the installed system's, has the
+  machine's 3D again. A normal 3D start can still hit it at the guest's shutdown or restart: lord-vm recognises QEMU's line
+  (`vmlog_qemu_3d_abort`, `vmlog.c`) and ends the run as `crashed` with the reason `qemu-3d-crash` (not a bare `qemu-signal`),
+  and the machine's window says what happened, that the disk is safe, and offers **Use 2D Graphics and Start** (`lord.vm.set`
+  `graphics: "2d"`, then a start). Until QEMU moves the scanout reset to the main loop, 3D on a 6.12.117+ guest means its
+  every shutdown or restart ends this way; tests: `build/vmlog-test` (the line), `build/vm-test` (`vm_gl_refusal`),
+  `tests/vm_model_test.mjs` (the reason and the offer).
 
 ### 3.3 Sandbox
 
@@ -2265,6 +2294,11 @@ for Linux machines only, the Design profile picks it where it can.
 
 **Decision (changed): 3D isn't offered on arm64 hosts with Debian 13's QEMU** until the reset abort of 3.2 is fixed there, by Debian, by
 a patch of ours (open decision 5) or upstream. The fault is guest-triggerable, so a direct-kernel-boot workaround isn't enough to ship it.
+
+**Known issue (2026-11-23): the same abort on amd64 at a Linux guest's shutdown or restart.** Linux guests with Debian's kernel
+6.12.117 or later reset virtio-gpu-gl from a vCPU on every shutdown and restart (`virtio_dev_shutdown`), which is the abort above
+(QEMU issue 4918, open; 3.2, "3D graphics (built)", has the code path). An unattended install's start therefore always has 2D
+graphics, and a 3D machine that ends this way says so and offers **Use 2D Graphics and Start**.
 
 #### 6.10.1 A real graphics card: Intel GVT-g (built 2026-11-21, since 0.8.9.5)
 

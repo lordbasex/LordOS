@@ -6,7 +6,7 @@
 // 'pause' (amber), 'off' (gray), 'busy' (accent), 'bad' (red). The text key is under `machines.state.*`, and the
 // reason, when it's worth saying, under `machines.why.*`.
 import { compareNames } from '../../sdk/collate.js';
-const BAD_REASONS = ['qemu-failed', 'qemu-signal', 'out-of-memory', 'start-failed', 'guest-panic', 'supervisor-lost', 'forced', 'resume-failed'];
+const BAD_REASONS = ['qemu-failed', 'qemu-signal', 'qemu-3d-crash', 'out-of-memory', 'start-failed', 'guest-panic', 'supervisor-lost', 'forced', 'resume-failed'];
 export function stateView(state, reason) {
   const r = reason || 'none';
   switch (state) {
@@ -23,6 +23,10 @@ export function stateView(state, reason) {
       return { key: 'stopped', tone: 'off', active: false, why: BAD_REASONS.includes(r) ? r : null };
   }
 }
+
+// a stop the machine's Graphics 2D avoids: QEMU's 3D display aborts when a guest resets its virtio-gpu-gl (QEMU issue
+// 4918, docs/VIRTUALIZATION.md "Graphics 3D"); the window offers "Use 2D Graphics" (lord.vm.set) before Start Again
+export function offers2d(why) { return why === 'qemu-3d-crash'; }
 
 // which actions a state allows (the list's buttons and the window's menu)
 export function actionsFor(state) {

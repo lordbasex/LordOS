@@ -291,6 +291,7 @@ enum {
     VR_SUSPENDED,           /* VM_SUSPEND: the memory is in suspend.state, the next start resumes from it */
     VR_RESUME_FAILED,       /* the saved state couldn't be loaded (text says why); it's kept: try again or discard */
     VR_INSTALLED,           /* an unattended install's first start ended with the installer's restart (vmunattend.h) */
+    VR_QEMU_3D_ABORT,       /* QEMU aborted on its known 3D bug when the guest reset virtio-gpu-gl (vmlog_qemu_3d_abort) */
     VR_COUNT
 };
 /* VM_REPLY codes */

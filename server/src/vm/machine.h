@@ -277,6 +277,12 @@ long vm_mem_limit_mb(const VmMachine *m);
 /* Resource budget (3.7): does a machine of `want_mb` fit beside running machines using `running_mb` in total
  * (each as vm_mem_limit_mb)? 1 yes. */
 int vm_budget_fits(const VmHost *h, long running_mb, long want_mb);
+/* Graphics 3D (virgl) for this start, the part that needs no probe of the host's files: why a machine that asks for 3D
+ * starts with 2D graphics instead, or NULL (lord-vm then checks QEMU's GL modules and the render node). An unattended
+ * install's start (installing: lord-vm's disks/unattended) is always 2D: the installer is a text console, and QEMU
+ * 10.0-11.1 with -display dbus,gl=on aborts when the guest resets virtio-gpu-gl, which the installed kernel (Debian's
+ * 6.12.117 and later: virtio_dev_shutdown) does at the installer's restart (docs/VIRTUALIZATION.md, "Graphics 3D") */
+const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing);
 
 /* reads this computer: arch, CPUs online, RAM, /dev/kvm access */
 void vm_host_probe(VmHost *h);

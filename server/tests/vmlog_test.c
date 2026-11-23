@@ -127,9 +127,27 @@ static void rotation(void) {
     rmdir(dir);
 }
 
+/* QEMU's 3D abort at a guest's virtio-gpu-gl reset (QEMU issue 4918): the line as lord-vm logged it on 2026-11-23, and
+ * the same message with QEMU's timestamp; nothing else of QEMU's */
+static void qemu_3d_abort(void) {
+    const char *l = "qemu-system-x86_64: ui/dbus-listener.c:511: dbus_scanout_texture: Assertion `tex_id' failed.";
+    CHECK(vmlog_qemu_3d_abort(l, strlen(l)), "the abort line not recognised");
+    l = "2026-11-23T10:01:02.123456Z qemu-system-x86_64: ../ui/dbus-listener.c:600: dbus_scanout_texture: Assertion `tex_id' failed.";
+    CHECK(vmlog_qemu_3d_abort(l, strlen(l)), "with a timestamp, QEMU 11's line number");
+    CHECK(!vmlog_qemu_3d_abort(l, 40), "cut before the words");
+    const char *other[] = {
+        "qemu-system-x86_64: Failed to call update: The connection is closed",
+        "qemu-system-x86_64: dbus_scanout_texture: failed to get fd for texture",
+        "qemu-system-x86_64: ui/console.c:1: foo: Assertion `tex_id' failed.",
+        "",
+    };
+    for (int i = 0; i < 4; i++) CHECK(!vmlog_qemu_3d_abort(other[i], strlen(other[i])), "[%s] taken for the 3D abort", other[i]);
+}
+
 int main(void) {
     lines();
     key();
+    qemu_3d_abort();
     repeats();
     rotation();
     if (fails) { fprintf(stderr, "vmlog-test: %d failure(s)\n", fails); return 1; }

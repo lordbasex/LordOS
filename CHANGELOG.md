@@ -155,6 +155,18 @@ In development; the latest release is 0.8.9.5-beta.
     switch, the client stays connected, and a theme that can't be switched to answers `false` and leaves the choice
     alone. Its two older cases now check that a refused theme never stops the running one and that a failed switch
     comes back to the running theme instead of the recovery screen.
+- **Machines: an unattended install with Graphics 3D no longer ends with QEMU aborted.** On an RX 580 with Debian 13's
+  QEMU 10.0.13, installing LordOS 0.8.9 in a machine with 3D stopped about 45 s in with
+  `ui/dbus-listener.c:511: dbus_scanout_texture: Assertion 'tex_id' failed` (signal 6), at the installer's restart. The
+  cause is QEMU's: when a guest resets its virtio-gpu-gl from a vCPU, `virtio_gpu_gl_reset()` resets the scanouts in that
+  thread, the "display output is not active" surface gets texture 0 (no GL context there), and the D-Bus display asserts
+  (QEMU issue 4918, open; not fixed in 11.1.3 or master). Linux guests with Debian's kernel 6.12.117 or later do that reset on
+  every shutdown and restart (`virtio_dev_shutdown`). An unattended install's start now always has 2D graphics (the
+  installer is a text console; `vm_gl_refusal`), and the installed system's first start has the machine's 3D again. A 3D
+  machine whose guest still hits it at a shutdown or restart now ends as `qemu-3d-crash` instead of a bare QEMU crash
+  (lord-vm recognises QEMU's line, `vmlog_qemu_3d_abort`): its window says what happened, that the disk is safe, and offers
+  **Use 2D Graphics and Start**, in every language. `docs/VIRTUALIZATION.md` (3.2 and 6.10) has the code path and the
+  upstream status. Tests: `build/vmlog-test`, `build/vm-test`, `tests/vm_model_test.mjs`.
 
 ## [0.8.9.5-beta] - 2026-11-23
 

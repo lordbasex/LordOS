@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
+import { installError, startPhase, playStarts, stateView, offers2d, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta } from './meta.js';
@@ -340,7 +340,7 @@ function OffView({ dir, name, title, hint, label, onPlay, picture }) {
 }
 
 // BootFailed: why, a likely fix, Start Again, Settings, and the machine's log
-function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard }) {
+function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard, onUse2d, busy }) {
   const p = usePal();
   const neverRan = v.why === 'start-failed';
   const lines = (log || '').split('\n').filter(Boolean).slice(-60);
@@ -353,8 +353,9 @@ function Failed({ name, v, st, log, onStart, onSettings, onAnyway, onDiscard }) 
         <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{`${tr('machines.fail.likely')} ${tr(`machines.fix.${v.why}`, { code: st?.code })}`}</Text>
         {st?.detail ? <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start', direction: 'ltr' }}>{st.detail}</Text> : null}
       </View>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Btn big primary label={tr('machines.fail.startAgain')} onClick={onStart} />
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {offers2d(v.why) ? <Btn big primary label={tr('machines.fail.use2d')} disabled={busy} onClick={onUse2d} /> : null}
+        <Btn big primary={!offers2d(v.why)} label={tr('machines.fail.startAgain')} disabled={busy} onClick={onStart} />
         {v.why === 'resume-failed' ? <>
           <Btn big label={tr('machines.fail.resumeAnyway')} onClick={onAnyway} />
           <Btn big danger label={tr('machines.fail.discardState')} onClick={onDiscard} />
@@ -505,6 +506,25 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
       startPrep(m).then(() => { bridging.delete(dir); if (windows.get().some((w) => w.id === winId)) startNow.current(false, opts); },
         (e) => { bridging.delete(dir); setStarting(false); setErr(e.message); });
     } else startNow.current(active, opts);
+  };
+  const beginRef = useRef(begin);
+  beginRef.current = begin;
+  // QEMU's 3D display aborted (why 'qemu-3d-crash', QEMU issue 4918): Graphics 2D for this machine (lord-vm --set, a
+  // job), then it starts again
+  const [to2d, setTo2d] = useState(0);
+  useEffect(() => {
+    if (!to2d) return undefined;
+    const timer = setInterval(() => {
+      const r = lord.vm.job(to2d);
+      if (!r || !r.done) return;
+      setTo2d(0);
+      if (r.ok) beginRef.current(); else setErr(tr('machines.cfg.refused'));
+    }, 300);
+    return () => clearInterval(timer);
+  }, [to2d]);
+  const use2d = () => {
+    const id = has() ? lord.vm.set(dir, { graphics: '2d' }) : 0;
+    if (!id) setErr(vmRefusal(tr('machines.cfg.refused'))); else setTo2d(id);
   };
   // Play on the library's card while this window is open: the machine starts if it's off here
   const asked = useStore(playAsks, (x) => x[dir] || 0);
@@ -1147,7 +1167,7 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   else if (closing) card = <Card title={tr('machines.win.shuttingDown', { name })} text={tr('machines.win.shuttingDownHint')} actions={[<Btn key="f" danger label={tr('machines.cmd.poweroff')} onClick={() => cmd('poweroff')} />]} />;
   else if (startPhase(sid, st, starting) === 'off') {
     if (v.why) failed = <Failed name={name} v={v} st={st} log={log || [st.detail, st.lastError, st.stderr].filter(Boolean).join('\n')} onStart={() => begin()} onSettings={() => setCfgSheet({})}
-      onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })} />;
+      onUse2d={use2d} busy={!!to2d} onAnyway={() => begin({ resumeAnyway: true })} onDiscard={() => begin({ discardState: true })} />;
     else if (v.key === 'suspended') card = <OffView picture dir={dir} name={name} title={tr('machines.state.suspended')} hint={tr('machines.win.suspendedHint')} label={tr('machines.cmd.resume')} onPlay={() => begin()} />;
     else card = <OffView dir={dir} name={name} title={tr(`machines.state.${v.key}`)} hint={tr('machines.win.playHint')} label={tr('machines.start')} onPlay={() => begin()} />;
   } else if (startPhase(sid, st, starting) === 'starting' || st.state === 'starting' || (st.display !== 'up' && st.display !== 'none' && st.display !== 'lost' && (st.state === 'running' || st.state === 'paused'))) {
