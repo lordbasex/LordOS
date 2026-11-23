@@ -88,5 +88,8 @@
   "micHint.voice": "Yalnızca sesinizin duyulması için çevrenizdeki gürültüyü kaldırır. Sesiniz robot gibi geliyorsa, arama uygulamasının kendi gürültü engellemesini kapatın.",
   "micHint.wide": "Hiçbir işleme uygulanmamış mikrofonunuz: müzik ve odadaki her ses için.",
   "micUnavailable": "Gürültü Azaltma, oturumu kapatıp yeniden açtıktan sonra görünür.",
-  "noMic": "Bağlı mikrofon yok."
+  "noMic": "Bağlı mikrofon yok.",
+  "effects": "Efektler",
+  "openApp": "LordOS Studio’yu Aç…",
+  "micApps": "Mikrofon Modu, uygulamaların varsayılan olarak kullandığı mikrofonu değiştirir. Belirli bir mikrofona ayarlanmış bir uygulama onu korur: o uygulamada “LordOS Noise Reduction” seçin."
 }

@@ -35,5 +35,6 @@
   "sysinfo": "सिस्टम जानकारी",
   "sysprobe": "सैंडबॉक्स जाँच",
   "terminal": "टर्मिनल",
-  "databases": "डेटाबेस"
+  "databases": "डेटाबेस",
+  "studio": "LordOS Studio"
 }

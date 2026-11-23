@@ -10,6 +10,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+
+- **LordOS Studio is an app, and the capture item reaches it with the microphone too.** Until now LordOS Studio's
+  controls opened only from the capture item by the clock, and only while an app used the camera.
+  - **The LordOS Studio app** (`apps/studio`, new; in the launcher, the start menu and search of Lord Flow, Lord
+    Classic, Lord Workspaces and Celeste, category Audio & video): the camera's live preview large on one side with the
+    camera it uses, who uses it and Every app (with "Get it in the Store…" for LordOS Studio Camera when that isn't
+    installed); Portrait, Background, Face Light, Auto Framing, Filters, Retouch, Mirror and Mic Mode on the other, each
+    row's page opening in place. The controls are the popover's own (`sdk/studio.jsx` `StudioWindow`, the same
+    `settings.studio`), so the window, the popover and every app that chose the "LordOS Studio" camera agree. It runs
+    in the desktop's own process like Settings and uses the desktop-only `lord.studio`: no new native call and no new
+    broker permission. It is listed only where LordOS Studio can work (`lord.studio.status().available`: lord-studio
+    and its model installed); an app may now export `available()` for that (`tools/build-theme.mjs`,
+    `sdk/windows.js` `listApps`). It can be deactivated in Store → Installed, and a session reopens it only when asked
+    (it turns the camera on). Its icon is our own drawing (a lens under a studio light).
+  - **One preview for every Studio view.** The popover and the app's window share the desktop's own preview source,
+    opened once and closed when the last view goes, so the camera is never opened twice for them.
+  - **Mic Mode from the capture item.** While an app uses the microphone, the panel shows a **Mic Mode** row with the
+    current mode (Standard, Noise Reduction or Full Range); it opens Mic Mode alone in the same popover, with no camera
+    preview, so the camera never turns on for it. While an app uses the camera, "Video effects" shows as before (and
+    Mic Mode too when the microphone is also in use). Both pages link to the LordOS Studio app.
+  - **What Mic Mode reaches, said plainly.** A mode sets the default microphone (Noise Reduction is the "LordOS Noise
+    Reduction" microphone), so it reaches the apps that record from the default microphone; an app set to a particular
+    microphone keeps it, and the new line under Mic Mode says to choose "LordOS Noise Reduction" in that app. Mic Mode
+    in a browser call is still to be tried on real hardware.
+  - **Text** in all 35 languages (`studio.effects`, `studio.openApp`, `studio.micApps`; `apps.studio`).
+  - **Tests:** `tests/capture_studio_scene.mjs` (new, 29 checks, in `make test`): the microphone alone shows the Mic
+    Mode entry and no Video effects, Mic Mode opens without asking for a preview, says which apps it reaches and makes
+    Noise Reduction the default microphone, Back returns; the camera shows Video effects with its preview as before;
+    the app's window renders the effects, Mic Mode, the camera and the Store link; the app is listed only with LordOS
+    Studio installed. `tests/studio_headless.sh` takes `STUDIO_SCENE=mic` and `STUDIO_SCENE=app` for screenshots.
+
 ## [0.8.9.5-beta] - 2026-11-23
 
 An update of the package through the Store and `apt`, with no new images. Linux apps: every Wayland global LordOS

@@ -88,5 +88,8 @@
   "micHint.voice": "Entfernt die Geräusche um dich herum, sodass nur deine Stimme zu hören ist. Wenn deine Stimme roboterhaft klingt, schalte die Rauschunterdrückung der Anruf-App selbst aus.",
   "micHint.wide": "Dein Mikrofon ganz ohne Bearbeitung: für Musik und jeden Klang im Raum.",
   "micUnavailable": "Die Rauschminderung erscheint, nachdem du dich ab- und wieder angemeldet hast.",
-  "noMic": "Kein Mikrofon angeschlossen."
+  "noMic": "Kein Mikrofon angeschlossen.",
+  "effects": "Effekte",
+  "openApp": "LordOS Studio öffnen …",
+  "micApps": "Der Mikrofonmodus ändert das Mikrofon, das Apps standardmäßig verwenden. Eine App, die auf ein bestimmtes Mikrofon eingestellt ist, behält es: Wählen Sie dort „LordOS Noise Reduction“."
 }

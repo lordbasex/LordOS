@@ -9,7 +9,7 @@
 // The built-in apps a person may deactivate.
 export const DEACTIVATABLE = Object.freeze([
   'remote-desk', 'machines', 'databases', 'imager', 'scanner', 'recorder', 'camera', 'characters', 'calculator', 'clock',
-  'calendar', 'contacts', 'mail', 'notes', 'reminders', 'photos', 'player', 'pdf', 'fonts', 'cleaner', 'backup',
+  'calendar', 'contacts', 'mail', 'notes', 'reminders', 'photos', 'player', 'pdf', 'fonts', 'cleaner', 'backup', 'studio',
 ]);
 // The core: LordOS needs them to manage itself (files, settings, the Store that turns apps back on, the
 // terminal, the system tools, the keyring) or they are part of another app's window. Never deactivated.

@@ -88,5 +88,8 @@
   "micHint.voice": "Yalnız səsiniz eşidilsin deyə ətrafınızdakı küyü silir. Səsiniz robot kimi səslənirsə, zəng tətbiqinin öz küy azaltmasını söndürün.",
   "micHint.wide": "Heç bir emal olmadan mikrofonunuz: musiqi və otaqdakı hər səs üçün.",
   "micUnavailable": "Küyün azaldılması sistemdən çıxıb yenidən daxil olduqdan sonra görünür.",
-  "noMic": "Heç bir mikrofon qoşulmayıb."
+  "noMic": "Heç bir mikrofon qoşulmayıb.",
+  "effects": "Effektlər",
+  "openApp": "LordOS Studio-nu aç…",
+  "micApps": "Mikrofon rejimi tətbiqlərin defolt istifadə etdiyi mikrofonu dəyişir. Müəyyən mikrofona qurulmuş tətbiq onu saxlayır: həmin tətbiqdə “LordOS Noise Reduction” seçin."
 }

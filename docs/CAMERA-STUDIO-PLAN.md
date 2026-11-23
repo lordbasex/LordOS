@@ -6,7 +6,8 @@ device and phase 3's Mic Mode are still to verify on a VM.**
 The maintainer approved the whole plan and the exceptions E-S1 to E-S7 on 2026-11-22; E-S8 (ONNX Runtime linked) was
 **not** approved: D3 is our own C inference, and ONNX Runtime is only the dev machine's reference in tests. The name is
 "LordOS Studio" and the status item's label "Camera" (D6); D5 and D7 to D10 take this plan's recommendations. D4: the
-package is an optional Store item (approved 2026-11-22). Phases 4 and 5 (the portal, the app) are not built yet.
+package is an optional Store item (approved 2026-11-22). Phases 4 and 5 (the portal, the app) are not built yet;
+a first LordOS Studio app with the popover's controls, and Mic Mode from the capture item, are in development (11.5).
 Sections 3.3 and 11.3 have measured numbers.
 Facts are labelled the way `GO-LINK.md` does it:
 
@@ -813,6 +814,39 @@ NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
 - **To verify on a VM** (never on the maintainer's PC): OBS (Debian's and Flathub's) starting its virtual camera on
   `/dev/video49` with LordOS Studio's camera both off and on, Meet seeing both cameras, the update reloading the module
   when unused, and the whole MOK flow with Secure Boot on (OVMF with enrolled keys).
+
+### 11.5 Ways in: the app and Mic Mode from the capture item (2026-11-23, in development; asked by the maintainer)
+
+The maintainer installed LordOS Studio Camera and found no app to open, and with Chrome using only the microphone the
+capture panel offered nothing of LordOS Studio (only "Turn off for this app" and the settings link).
+
+- **The LordOS Studio app** (`apps/studio`), a first step of 9.2: the popover's controls in a window of their own, not
+  yet the scenes, overlays, adjustments or recording of 9.2. One column has the preview (large), the camera, In use and
+  Every app with its Store link; the other the effects rows and Mic Mode, each row's page in place. It is
+  `StudioWindow` in `sdk/studio.jsx`, built from the popover's own parts (`Preview`, `Source`, `MainPage wide`, the
+  detail pages, `MicMode`, `EveryApp`), with the same `settings.studio`. It runs in the desktop's own process and uses
+  `lord.studio` (registered only there), like the popover: no new native call, no broker permission, and isolated apps
+  still never control LordOS Studio. It is listed in every theme's launcher, start menu and search only where
+  `lord.studio.status().available` is true: `apps/studio/index.jsx` exports `available()`, which
+  `tools/build-theme.mjs` passes on and `sdk/windows.js` `listApps` honours (an app without it is always listed).
+  Without lord-studio the window says "LordOS Studio is not available on this computer" and still offers Mic Mode.
+  It is deactivatable (`sdk/appsoffmodel.js`) and reopened by a restored session only when asked (`ASK_FIRST`), since
+  it turns the camera on.
+- **One preview.** The popover's preview source is now the desktop's, shared by every Studio view on screen with a
+  count and closed when the last one goes (`ownPreview` in `sdk/studio.jsx`), so the popover and the window never open
+  the camera twice. A native app's LordOS Studio source is still used first when one runs.
+- **Mic Mode from the capture item** (like Control Center's Mic Mode): while any app uses the microphone the panel
+  shows a "Mic Mode" row with the current mode; it opens `MicModePanel`, Mic Mode alone with no preview, so the camera
+  never turns on for it. With the camera in use "Video effects" shows as before, and both rows when both are in use.
+  Mic Mode needs only LordOS's sound client, not lord-studio, so the row doesn't wait for `studioAvailable()`. Both
+  pages link to the app ("Open LordOS Studio…").
+- **What Mic Mode reaches.** A mode sets the default microphone (section 7, `micPlan`): it reaches the apps that
+  record from the default microphone, LordOS's own and Linux apps alike; an app set to a particular microphone keeps
+  it. The line under Mic Mode now says so and names "LordOS Noise Reduction" to choose in such an app. Whether a
+  browser that already records follows the new default at once, and the sound in a Meet call, are still to verify on a
+  VM (11.3).
+- **Tests:** `server/tests/capture_studio_scene.mjs` (29 checks, `make test`); `tests/studio_headless.sh` with
+  `STUDIO_SCENE=mic` and `STUDIO_SCENE=app` for screenshots.
 
 ## 12. Risks
 

@@ -518,6 +518,44 @@
       ]
     }
   },
+  "studio": {
+    "category": "media",
+    "isolated": false,
+    "icon": "apps/studio/index.jsx",
+    "name": {
+      "en": "LordOS Studio",
+      "es": "LordOS Studio",
+      "pt": "LordOS Studio"
+    },
+    "tagline": {
+      "en": "Camera effects and Mic Mode for your calls",
+      "es": "Efectos de cámara y modo de micrófono para tus llamadas",
+      "pt": "Efeitos de câmera e Modo de Microfone para suas chamadas"
+    },
+    "features": {
+      "en": [
+        "In development (after 0.8.9.5)",
+        "A live preview with background blur, a picture or a short video behind you, Face Light, Auto Framing, filters and retouch",
+        "Mic Mode: Standard, Noise Reduction or Full Range",
+        "Browsers and other apps get the effects by choosing the “LordOS Studio” camera (LordOS Studio Camera, from the Store)",
+        "Also from the capture indicator by the clock, while an app uses the camera or the microphone"
+      ],
+      "es": [
+        "En desarrollo (después de la 0.8.9.5)",
+        "Vista en vivo con fondo desenfocado, una imagen o un video corto detrás tuyo, Luz para el rostro, Encuadre automático, filtros y retoque",
+        "Modo de micrófono: Estándar, Reducción de ruido o Rango completo",
+        "Los navegadores y otras apps reciben los efectos eligiendo la cámara «LordOS Studio» (LordOS Studio Camera, desde la Tienda)",
+        "También desde el indicador de captura junto al reloj, mientras una app usa la cámara o el micrófono"
+      ],
+      "pt": [
+        "Em desenvolvimento (depois da 0.8.9.5)",
+        "Visualização ao vivo com fundo desfocado, uma imagem ou um vídeo curto atrás de você, Luz no rosto, Enquadramento automático, filtros e retoque",
+        "Modo de Microfone: Padrão, Redução de ruído ou Faixa completa",
+        "Navegadores e outros apps recebem os efeitos escolhendo a câmera “LordOS Studio” (LordOS Studio Camera, pela Loja)",
+        "Também pelo indicador de captura ao lado do relógio, enquanto um app usa a câmera ou o microfone"
+      ]
+    }
+  },
   "recorder": {
     "category": "media",
     "isolated": false,

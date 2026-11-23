@@ -1,0 +1,11 @@
+{
+  "id": "studio",
+  "version": "0.8.9",
+  "name": "LordOS Studio",
+  "description": "Camera effects and Mic Mode, with a live preview",
+  "size": [860, 600],
+  "minSize": [700, 480],
+  "dock": false,
+  "category": "AudioVideo",
+  "permissions": ["camera", "microphone"]
+}

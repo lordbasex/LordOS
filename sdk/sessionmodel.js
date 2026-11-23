@@ -19,8 +19,8 @@ export const NEVER = ['forcequit', 'appabout', 'installer', 'sysprobe', 'screens
 
 // Reopened only when the person says so, even with restore set to Always: apps whose windows hold a live session or
 // private data (a shell, the passwords, another computer's screen, a virtual machine, a database connection, the
-// camera and the recorder). The rest of the list reopens by itself.
-export const ASK_FIRST = ['terminal', 'passwords', 'remote-desk', 'machines', 'databases', 'camera', 'recorder'];
+// camera, the recorder and LordOS Studio). The rest of the list reopens by itself.
+export const ASK_FIRST = ['terminal', 'passwords', 'remote-desk', 'machines', 'databases', 'camera', 'recorder', 'studio'];
 export const asksFirst = (e) => { const p = e && parseDockId(e.id); return !!p && p.kind === 'app' && ASK_FIRST.includes(p.key); };
 
 const text = (v) => typeof v === 'string' && v.length > 0 && v.length <= 80 && /^[A-Za-z0-9._:-]+$/.test(v);

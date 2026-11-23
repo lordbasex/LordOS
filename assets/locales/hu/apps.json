@@ -35,5 +35,6 @@
   "sysinfo": "Rendszerinformáció",
   "sysprobe": "Elszigetelés-próba",
   "terminal": "Terminál",
-  "databases": "Adatbázisok"
+  "databases": "Adatbázisok",
+  "studio": "LordOS Studio"
 }

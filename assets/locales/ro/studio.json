@@ -88,5 +88,8 @@
   "micHint.voice": "Elimină zgomotul din jurul tău, ca să se audă doar vocea ta. Dacă vocea ta sună robotic, dezactivează reducerea zgomotului din aplicația de apeluri.",
   "micHint.wide": "Microfonul tău fără nicio procesare: pentru muzică și orice sunet din cameră.",
   "micUnavailable": "Reducerea zgomotului apare după ce te deconectezi și te conectezi din nou.",
-  "noMic": "Niciun microfon nu este conectat."
+  "noMic": "Niciun microfon nu este conectat.",
+  "effects": "Efecte",
+  "openApp": "Deschide LordOS Studio…",
+  "micApps": "Modul microfon schimbă microfonul pe care aplicațiile îl folosesc implicit. O aplicație setată pe un anumit microfon îl păstrează: alegeți „LordOS Noise Reduction” în acea aplicație."
 }

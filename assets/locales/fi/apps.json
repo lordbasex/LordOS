@@ -35,5 +35,6 @@
   "sysinfo": "Järjestelmätiedot",
   "sysprobe": "Hiekkalaatikkotesti",
   "terminal": "Pääte",
-  "databases": "Tietokannat"
+  "databases": "Tietokannat",
+  "studio": "LordOS Studio"
 }

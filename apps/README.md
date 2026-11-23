@@ -35,6 +35,10 @@ changed since the previous release while its version stayed the same (`node tool
 Optional fields: `"transparent": true` (the theme paints no background under the content; the
 app draws its own, e.g. the Terminal with transparency) and `"minSize": [width, height]`.
 
+An app built into the theme may also export `available()` from its `index.jsx`: where it returns false the app is
+left out of every launcher, start menu and search (`sdk/windows.js` `listApps`). LordOS Studio (`apps/studio`) uses it
+to show only where `lord-studio` is installed.
+
 **index.jsx**
 
 ```jsx

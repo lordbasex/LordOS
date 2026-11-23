@@ -88,5 +88,8 @@
   "micHint.voice": "去除你周围的噪音，只让你的声音被听到。如果你的声音听起来像机器人，请关闭通话应用自身的降噪功能。",
   "micHint.wide": "完全不经处理的麦克风声音：适合音乐和房间里的所有声音。",
   "micUnavailable": "注销并重新登录后会出现“降噪”。",
-  "noMic": "没有连接麦克风。"
+  "noMic": "没有连接麦克风。",
+  "effects": "效果",
+  "openApp": "打开 LordOS Studio…",
+  "micApps": "麦克风模式会更改应用默认使用的麦克风。已设为特定麦克风的应用会继续使用它：请在该应用中选择“LordOS Noise Reduction”。"
 }
