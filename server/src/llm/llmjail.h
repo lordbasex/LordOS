@@ -11,7 +11,8 @@
  *      scoped to itself (ABI 6);
  *   3. seccomp (all threads): socket only AF_UNIX SOCK_STREAM, never connect, no io_uring (it would bypass the socket
  *      filter), no new namespaces, no ptrace or reading other processes' memory, no mounts, no BPF, no keys, no
- *      modules; execve never, execveat only of the descriptor LLMJAIL_ENGINE_FD with AT_EMPTY_PATH.
+ *      modules; execve never, execveat only of the descriptor LLMJAIL_ENGINE_FD with AT_EMPTY_PATH; signals only to
+ *      itself (kill, tgkill, rt_*sigqueueinfo with its own pid; no tkill, pidfd_open or pidfd_send_signal).
  * Network is denied three times (no interface, Landlock, seccomp), so the only way in or out is the unix socket the
  * engine makes in its runtime folder, which only the session's user can open (0700 folder, 0600 socket). */
 #ifndef LORD_LLM_JAIL_H
@@ -20,6 +21,7 @@
 #define LLMJAIL_MODEL_FD 3      /* the model, opened read-only by lord-server */
 #define LLMJAIL_DIR_FD 4        /* $XDG_RUNTIME_DIR/lordos/llm, the user's, 0700 */
 #define LLMJAIL_ENGINE_FD 5     /* the engine's executable (O_PATH) */
+#define LLMJAIL_LANDLOCK_ABI 6  /* required: files, TCP (4) and signal/abstract-socket scoping (6); Linux 6.12 */
 
 enum { LJ_USERNS = 1, LJ_NETNS = 2, LJ_LANDLOCK_FS = 4, LJ_LANDLOCK_NET = 8, LJ_LANDLOCK_SCOPE = 16, LJ_SECCOMP = 32, LJ_NOPRIV = 64 };
 
@@ -28,9 +30,10 @@ typedef struct {
     int need_netns;             /* 1: fail when the network namespace can't be made (tests); 0: go on with the rest */
 } LlmJailCfg;
 
-/* Applies the three layers. Returns the mask of what is on (LJ_*), or -1 when seccomp or no_new_privs could not be
- * applied (the caller must not exec then). Landlock and the namespaces are best effort on a kernel without them,
- * reported in the mask; the seccomp filter alone already keeps the engine off the network. Doesn't allocate. */
+/* Applies the three layers. Returns the mask of what is on (LJ_*), or -1 when Landlock (all of files, TCP and scoping:
+ * ABI LLMJAIL_LANDLOCK_ABI, every rule the engine depends on), seccomp or no_new_privs could not be applied: the caller
+ * must not exec then (fails closed; on an older kernel Sentinela has rule alerts only). The namespaces are best effort,
+ * reported in the mask (unprivileged user namespaces may be off). Doesn't allocate. */
 int llmjail_apply(const LlmJailCfg *cfg);
 
 /* The fixed argument list lord-llm runs the engine with (no caller argument ever reaches it). */

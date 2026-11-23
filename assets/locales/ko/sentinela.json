@@ -39,6 +39,7 @@
   "analysis.failed": "로컬 모델이 응답하지 않았습니다: 규칙만 사용.",
   "analysis.rejected": "로컬 모델의 답변이 올바르지 않아 폐기했습니다.",
   "analysis.done": "로컬 모델이 분석했습니다.",
+  "modelNormal": "Lumo는 이상한 점을 찾지 못했지만 규칙은 작동했습니다. 직접 확인해 보세요.",
   "done": "완료: {action}",
   "youDecide": "Lumo는 제안만 하고, 결정은 사용자가 합니다. 어떤 작업도 저절로 실행되지 않습니다.",
   "engine.off": "중지됨(필요할 때 시작)",

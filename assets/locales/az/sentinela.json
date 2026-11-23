@@ -39,6 +39,7 @@
   "analysis.failed": "Yerli model cavab vermədi: yalnız qaydalar.",
   "analysis.rejected": "Yerli modelin cavabı etibarsız idi və atıldı.",
   "analysis.done": "Yerli model tərəfindən təhlil edildi.",
+  "modelNormal": "Lumo qeyri-adi bir şey görmədi, amma qayda yenə də işə düşdü: özünüz yoxlayın.",
   "done": "Hazırdır: {action}",
   "youDecide": "Lumo təklif edir, siz qərar verirsiniz. Heç bir əməliyyat öz-özünə işləmir.",
   "engine.off": "Dayandırılıb (lazım olanda başlayır)",

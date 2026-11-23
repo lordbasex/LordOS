@@ -159,6 +159,10 @@ export function clean(s, max = 120) {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
+// a value that came from the process (its name, a path, a package): cleaned, bounded and JSON-encoded, so its own quotes,
+// backslashes or line breaks can never close its field and read as text of ours
+export const field = (s, max = 120) => JSON.stringify(clean(s, max));
+
 export function shortPath(p, home, user) {
   let s = String(p || '');
   if (home && home.length > 1 && (s === home || s.startsWith(`${home}/`))) s = `~${s.slice(home.length)}`;
@@ -184,20 +188,20 @@ export function buildSummary(ev, facts, { home = '', user = '', cores = 0, langu
   const exe = shortPath(f ? f.exe : ev.exe, home, user);
   const place = f ? f.place : placeOf(ev.exe, home);
   const lines = [RULE_TEXT[ev.rule] || 'Trigger: unknown.'];
-  lines.push(`Process name: "${clean(ev.name, 40)}"${ev.pid ? `, ${ev.threads || 1} threads` : ''}.`);
-  lines.push(`Program: "${clean(exe, 160)}"${(f ? f.deleted : ev.deleted) ? ' (deleted or replaced since it started)' : ''}.`);
-  lines.push(`Installed by package: ${f && f.pkg ? `"${clean(f.pkg, 60)}"` : 'none (not from any package)'}. Location: ${PLACE_TEXT[place] || 'unknown'}.`);
+  lines.push(`Process name: ${field(ev.name, 40)}${ev.pid ? `, ${ev.threads || 1} threads` : ''}.`);
+  lines.push(`Program: ${field(exe, 160)}${(f ? f.deleted : ev.deleted) ? ' (deleted or replaced since it started)' : ''}.`);
+  lines.push(`Installed by package: ${f && f.pkg ? field(f.pkg, 60) : 'none (not from any package)'}. Location: ${PLACE_TEXT[place] || 'unknown'}.`);
   if (f && f.exeUid != null) lines.push(`Program file owner: ${f.exeUid === 0 ? 'root' : 'the user'}${f.exeWritable ? ', writable by the user' : ''}.`);
   if (f && Array.isArray(f.chain) && f.chain.length) {
-    const chain = f.chain.slice(0, 5).map((c) => `"${clean(c.name, 30)}"${c.pkg ? ` (package ${clean(c.pkg, 40)})` : ' (no package)'}`);
+    const chain = f.chain.slice(0, 5).map((c) => `${field(c.name, 30)}${c.pkg ? ` (package ${field(c.pkg, 40)})` : ' (no package)'}`);
     lines.push(`Started by: ${chain.join(' < ')}.`);
   }
   if (ev.cpuAvg != null && ev.rule === 'cpu') lines.push(`CPU: ${ev.minutes || 5}-minute average ${pct(ev.cpuAvg)}, peak ${pct(ev.cpuPeak)} (100% = one core${cores ? `; this computer has ${cores} cores` : ''}).`);
   else if (ev.cpuAvg != null) lines.push(`CPU now: ${pct(ev.cpuAvg)} (100% = one core).`);
   if (ev.rule === 'memory') lines.push(`Memory: ${mb(ev.rssStart)} ${ev.minutes || 10} minutes ago, ${mb(ev.rss)} now.`);
   else if (ev.rss) lines.push(`Memory: ${mb(ev.rss)}.`);
-  if (ev.rule === 'autostart' && ev.file) lines.push(`Autostart entry: "${clean(ev.file, 80)}".`);
-  if (ev.app) lines.push(`Desktop app: "${clean(ev.app, 60)}".`);
+  if (ev.rule === 'autostart' && ev.file) lines.push(`Autostart entry: ${field(ev.file, 80)}.`);
+  if (ev.app) lines.push(`Desktop app: ${field(ev.app, 60)}.`);
   let text = lines.join('\n');
   if (text.length > SUMMARY_MAX - 60) text = `${text.slice(0, SUMMARY_MAX - 61)}…`;
   // the last line is ours, not the process's: small models follow the language best when it is asked last
@@ -241,6 +245,20 @@ export function parseVerdict(text) {
 }
 
 // ---- what an alert shows ----
+
+// A rule raised it, so it is always shown: the model only adds its reason and may raise it (suspicious, dangerous);
+// "normal" never silences or lowers it, it only adds a note that Lumo saw nothing unusual (an attacker who picks a
+// process's name and path could talk a model into "normal").
+export function presentAlert(a) {
+  const raised = a && (a.verdict === 'dangerous' || a.verdict === 'suspicious');
+  return {
+    title: raised ? `sentinela.title.${a.verdict}` : `sentinela.title.${a ? a.rule : 'cpu'}`,
+    reason: raised ? a.reason : null,
+    note: a && a.verdict === 'normal' ? 'sentinela.modelNormal' : null,
+    sticky: !!a && a.verdict === 'dangerous',
+    notify: true,
+  };
+}
 
 // the facts lines of "What Lumo analyzed" (keys and values for t())
 export function factLines(ev, facts, { home = '', user = '' } = {}) {

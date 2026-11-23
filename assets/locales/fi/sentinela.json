@@ -39,6 +39,7 @@
   "analysis.failed": "Paikallinen malli ei vastannut: vain säännöt.",
   "analysis.rejected": "Paikallisen mallin vastaus ei ollut kelvollinen, joten se hylättiin.",
   "analysis.done": "Paikallisen mallin analysoima.",
+  "modelNormal": "Lumo ei nähnyt mitään tavallisesta poikkeavaa, mutta sääntö laukesi silti: tarkista itse.",
   "done": "Tehty: {action}",
   "youDecide": "Lumo ehdottaa, sinä päätät. Mikään ei tapahdu itsestään.",
   "engine.off": "Pysäytetty (käynnistyy tarvittaessa)",

@@ -16,6 +16,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
@@ -66,6 +67,21 @@ static void checks(void) {
     if (p > 0) waitpid(p, &st, 0);
     note("exec_sh", p > 0 && WIFEXITED(st) && WEXITSTATUS(st) == 0);
     note("signal_parent", kill(getppid(), 0) == 0 && getppid() > 1);
+    /* a process of its own (same Landlock domain, so only seccomp stands in the way): refused too */
+    pid_t kid = fork();
+    if (kid == 0) { alarm(1); pause(); _exit(0); }          /* ends by itself (SIGALRM) after the checks */
+    note("signal_own_child", kid > 0 && kill(kid, 0) == 0);
+    note("tgkill_child", kid > 0 && syscall(SYS_tgkill, kid, kid, 0) == 0);
+    note("tkill_child", kid > 0 && syscall(SYS_tkill, kid, 0) == 0);
+    siginfo_t si = { .si_code = SI_QUEUE };
+    note("sigqueue_parent", syscall(SYS_rt_sigqueueinfo, getppid(), 0, &si) == 0);
+    int pfd = (int)syscall(SYS_pidfd_open, getppid(), 0);
+    note("pidfd_open", pfd >= 0);
+    if (pfd >= 0) close(pfd);
+    if (kid > 0) { int st2; waitpid(kid, &st2, 0); }
+    /* its own threads and itself: allowed (llama-server signals its own threads) */
+    note("tgkill_self", syscall(SYS_tgkill, getpid(), (pid_t)syscall(SYS_gettid), 0) == 0);
+    note("kill_self", kill(getpid(), 0) == 0);
     note("unshare", unshare(CLONE_NEWNS) == 0);
     rn += (size_t)snprintf(report + rn, sizeof report - rn, "}");
 }

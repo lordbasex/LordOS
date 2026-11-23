@@ -39,6 +39,7 @@
   "analysis.failed": "The local model didn’t answer: rules only.",
   "analysis.rejected": "The local model’s answer wasn’t valid and was discarded.",
   "analysis.done": "Analyzed by the local model.",
+  "modelNormal": "Lumo saw nothing unusual, but the rule still fired: take a look yourself.",
   "done": "Done: {action}",
   "youDecide": "Lumo suggests; you decide. No action runs by itself.",
   "engine.off": "Stopped (starts when needed)",

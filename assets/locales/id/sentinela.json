@@ -39,6 +39,7 @@
   "analysis.failed": "Model lokal tidak menjawab: hanya aturan.",
   "analysis.rejected": "Jawaban model lokal tidak valid dan dibuang.",
   "analysis.done": "Dianalisis oleh model lokal.",
+  "modelNormal": "Lumo tidak melihat hal yang aneh, tetapi aturannya tetap terpicu: periksa sendiri.",
   "done": "Selesai: {action}",
   "youDecide": "Lumo menyarankan; Anda yang memutuskan. Tidak ada tindakan yang berjalan sendiri.",
   "engine.off": "Berhenti (dimulai saat diperlukan)",

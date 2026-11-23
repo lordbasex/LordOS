@@ -161,13 +161,15 @@ int main(int argc, char **argv) {
     CHECK(!get(sock, "/jail", jail, sizeof jail), "jail report");
     printf("jail %s\n", jail);
     static const char *const denied[] = { "tcp4", "udp4", "tcp6", "netlink", "packet", "unix_dgram", "connect_unix", "read_etc",
-                                          "read_home", "write_tmp", "exec_sh", "signal_parent", "unshare", NULL };
+                                          "read_home", "write_tmp", "exec_sh", "signal_parent", "unshare",
+                                          "signal_own_child", "tgkill_child", "tkill_child", "sigqueue_parent", "pidfd_open", NULL };
     for (const char *const *d = denied; *d; d++) {
         char want[64];
         snprintf(want, sizeof want, "\"%s\":\"denied\"", *d);
         CHECK(strstr(jail, want), "%s must be denied", *d);
     }
     CHECK(strstr(jail, "\"read_usr\":\"ALLOWED\""), "/usr readable");
+    CHECK(strstr(jail, "\"tgkill_self\":\"ALLOWED\"") && strstr(jail, "\"kill_self\":\"ALLOWED\""), "its own threads can be signalled");
     CHECK(strstr(jail, "\"model\":\"GGUF\""), "model read through fd 3");
     struct stat mine;
     stat("/proc/self/ns/net", &mine);
@@ -197,6 +199,21 @@ int main(int argc, char **argv) {
     r = wait_take(id, 5000);
     CHECK(r && strstr(r, "llm.noModel"), "writable model refused %s", r ? r : "");
     free(r);
+
+    /* fail closed: a lord-llm built to see a kernel without Landlock's scoping (ABI 5), and one whose model rule is
+     * refused, start no engine at all */
+    static const char *const broken[] = { "lord-llm-abi5", "lord-llm-norule" };
+    for (int b = 0; b < 2; b++) {
+        char l[PATH_MAX + 32];
+        snprintf(l, sizeof l, "%s/%s", bindir, broken[b]);
+        llm_set_paths(NULL, NULL, l, NULL);
+        id = llm_submit_analyze("qwen-test", "system", "Process: miner");
+        r = wait_take(id, 10000);
+        CHECK(r && strstr(r, "\"ok\":false") && strstr(r, "llm.start"), "%s: no engine (%s)", broken[b], r ? r : "(none)");
+        free(r);
+        CHECK(access(sock, F_OK) != 0, "%s: no socket was made", broken[b]);
+    }
+    llm_set_paths(NULL, NULL, launcher, NULL);
 
     /* facts: this process, owned by a fake package (the /usr-merged twin too) */
     snprintf(p, sizeof p, "%s/lordos-test.list", info);

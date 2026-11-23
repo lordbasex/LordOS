@@ -148,7 +148,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   checks that TCP, UDP, IPv6, netlink and packet sockets, Unix datagrams, `connect`, reading `/etc` or `/home`, writing
   `/tmp`, exec, signals outside and namespaces are all refused, that it has its own network namespace and reads the
   model only through its descriptor, the socket 0600 in a 0700 folder, idling, refused models and texts, and the facts
-  of a process; `tests/sentinela_model_test.mjs` (rules, summary without secrets, 16 malformed or injected answers
+  of a process; signals to its parent or its own child refused, its own threads allowed; test builds of lord-llm
+  without Landlock's scoping or with a refused rule start no engine; `tests/sentinela_model_test.mjs` (rules, summary without secrets, 16 malformed or injected answers
   refused); `tests/sentinela_notify_scene.mjs` (a triggered rule makes a desktop notification with the right actions,
   End from the notification, battery, Do Not Disturb, "It's mine"); `tests/sentinela_settings_scene.mjs` (off by
   default, the model download through `pkg-install`); `tests/sentinela_real_e2e.sh` (one real analysis, by hand).
@@ -267,13 +268,19 @@ In development; the latest release is 0.8.9.5-beta.
     abstract sockets and signals scoped) and seccomp (only `AF_UNIX` stream sockets, no `connect`, no `io_uring`, no
     exec but the engine's descriptor, no namespaces, ptrace, mounts, BPF or keys), and runs LordOS's `llama-server`
     (the `llama.cpp` package, 0.7.0) on the CPU with fixed arguments, listening only on `engine.sock` (0600). It starts
-    when an analysis is needed and stops 2 minutes after its last answer or when Sentinela is turned off.
+    when an analysis is needed and stops 2 minutes after its last answer or when Sentinela is turned off. The sandbox
+    fails closed: without Landlock ABI 6 (files, TCP and scoping) or any rule the engine depends on, lord-llm exits
+    before running anything and Sentinela keeps its rule alerts. Signals reach only the engine itself (seccomp: `kill`,
+    `tgkill` and `rt_*sigqueueinfo` only with its own pid; no `tkill` or pidfds).
     `lord.sentinela` (`server/src/ui/js_sentinela.c`, desktop context only) queues jobs for the engine's thread; the
     request's parameters and its JSON schema are fixed in C.
   - **The answer is untrusted.** `parseVerdict` accepts only `{verdict, reason, action}` with a verdict of
     `normal`/`suspicious`/`dangerous`, a reason of at most 400 characters and an action of the closed list (End and
     block its network, Pause, Limit, See in Monitor, It's mine); anything else is discarded and the alert keeps the
-    rule's own words. The model only suggests; nothing runs without the person's click.
+    rule's own words. The model only suggests; nothing runs without the person's click. It can't silence an alert
+    either: a rule's alert is always notified, the model's verdict only adds its reason and may raise it, and a
+    "normal" verdict keeps the rule's words with a note that Lumo saw nothing unusual. Every value taken from the process
+    (name, paths, packages, parents) goes into the summary as a bounded JSON string, so it can't leave its field.
   - **A desktop notification**, like any other system alert: banner, sound, Do Not Disturb and the notification
     history, with the model's reason (or the rule's), "What Lumo analyzed" and up to three actions that work from the
     notification itself; a click opens the alert in Settings with every action, Resume after Pause, and the facts. On

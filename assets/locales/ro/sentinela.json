@@ -39,6 +39,7 @@
   "analysis.failed": "Modelul local nu a răspuns: doar reguli.",
   "analysis.rejected": "Răspunsul modelului local nu era valid și a fost respins.",
   "analysis.done": "Analizat de modelul local.",
+  "modelNormal": "Lumo nu a văzut nimic neobișnuit, dar regula s-a declanșat totuși: verifică tu.",
   "done": "Gata: {action}",
   "youDecide": "Lumo propune; dumneavoastră decideți. Nicio acțiune nu se face singură.",
   "engine.off": "Oprit (pornește când e nevoie)",

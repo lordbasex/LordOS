@@ -39,6 +39,7 @@
   "analysis.failed": "本地模型没有回应：仅规则。",
   "analysis.rejected": "本地模型的回答无效，已丢弃。",
   "analysis.done": "已由本地模型分析。",
+  "modelNormal": "Lumo 没有发现异常，但规则仍被触发：请自行查看。",
   "done": "已完成：{action}",
   "youDecide": "Lumo 只提建议，由你来决定。不会有任何操作自行执行。",
   "engine.off": "已停止（需要时启动）",
