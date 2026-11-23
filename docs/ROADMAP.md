@@ -938,6 +938,19 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [x] **Raspberry Pi with 0.8.9.1** in the same report (2026-11-19): Lord Flow 113 MB and 6.2 % of one core, as 0.8.9;
   Lord Workspaces, measured on the Pi for the first time, 99 MB and 0.06 %.
 
+## Next release after 0.8.9.5
+
+- [ ] **Voice in French, German, Italian and Dutch** ([#215](https://github.com/lordbasex/LordOS/issues/215),
+  maintainer's decision 2026-11-23: moved out of 0.8.9.5 so it can close). The code is done on branch
+  `feat/voice-languages` (89f59f25): Standard and HD models from Kyutai (Dutch Standard is Kyutai's own 6-layer
+  `dutch` model, since audio.cpp publishes no Dutch GGUF), own voices Estelle, Juergen, Giovanni and Daan, number,
+  date and time reading in each language (274 new `saytext_test` checks), and a pop-up language picker in Settings →
+  AI → Voice. Left before it ships: download the models (`tools/voice/fetch-voices.sh`), make the previews
+  (`make-previews.sh`, the previews package now covers seven languages), build the `lordos-voice-*` packages
+  (`mkdeb-voice.mjs`), sign and publish them on the maintainer's Mac (`tools/release/apt-repo.sh`), then merge the
+  branch and add `fr`, `de`, `it`, `nl` to the closed lists in AGENTS.md (lord-tts, `lord.voice`). Also a whisper
+  round trip for the four languages, as was done for Spanish and Portuguese.
+
 ## Release 0.8.9.4 (released 2026-11-20)
 
 - [x] **Flatpak apps from Flathub** (`FLATPAK.md`, `CHANGELOG.md`): Store → Flathub (turn on, verified catalog, what
