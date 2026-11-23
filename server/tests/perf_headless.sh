@@ -21,11 +21,18 @@ mkdir -p "$ROOT/themes/zperf"
 cp -r "$ROOT/themes/$THEME" "$T"
 PLANJS=$(printf '%s' "$PLAN" | sed "s/[^a-zA-Z,]//g; s/,/','/g")
 # PERF_BUNDLE: another build of the theme (an older checkout's, to compare)
-{ printf "globalThis.PERF_PLAN = ['%s'];\n" "$PLANJS"; cat tests/perf/pre.js "${PERF_BUNDLE:-$ROOT/themes/$THEME/theme.bundle.js}" tests/perf/driver.js; } >"$T/theme.bundle.js"
+# PERF_MARK=1: a line before each step, to tell which step a stall line (PERF_OUT) belongs to
+{ printf "globalThis.PERF_PLAN = ['%s'];\nglobalThis.PERF_MARK = %s;\n" "$PLANJS" "$([ -n "$PERF_MARK" ] && echo 1 || echo 0)"; cat tests/perf/pre.js "${PERF_BUNDLE:-$ROOT/themes/$THEME/theme.bundle.js}" tests/perf/driver.js; } >"$T/theme.bundle.js"
 node tests/perf/manifest.mjs "$ROOT" "themes/zperf/$THEME/theme.bundle.js" || exit 1
 mkdir -p "$D/home/.config/lordos"
 chmod 700 "$D"
 printf '{"schema": 9, "desktopChosen": true, "language": "en"}\n' >"$D/home/.config/lordos/settings.json"
+# PERF_FLATPAK_FILES=N (the flatpak plan: 200000 by default): that many small files in the test home's
+# ~/.local/share/flatpak and ~/.var/app, about what a few Flathub apps and their runtimes leave there
+case ",$PLAN," in *,flatpak,*) : "${PERF_FLATPAK_FILES:=200000}" ;; esac
+if [ "${PERF_FLATPAK_FILES:-0}" -gt 0 ]; then
+    node "$ROOT/server/tests/perf/seed.mjs" "$D/home" "$PERF_FLATPAK_FILES" || exit 1
+fi
 env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
     XDG_RUNTIME_DIR="$D" HOME="$D/home" LORD_GPU=0 LANG=en_US.UTF-8 LORD_HEADLESS_DRAW=1 \
     ./build/lord-server --headless 1920x1080 --theme "$T/theme.bundle.js" --timeout 900 >"$D/server.log" 2>&1 &

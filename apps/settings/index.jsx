@@ -643,13 +643,20 @@ function AddLanguage({ langs, have, onAdd }) {
   );
 }
 
-// LordOS language pack (built by tools/i18n-pack.mjs): lordos-lang-<id>.json in Downloads.
+// LordOS language pack (built by tools/i18n-pack.mjs): lordos-lang-<id>.json in Downloads. The folders are listed off
+// the main thread, once per visit (they were listed on every render of the page, with every file in them).
+const PACK_DIRS = ['Descargas', 'Downloads', '.'];
 function PackImport({ onDone }) {
   const { t: tr } = useLocale();
-  const found = [];
-  for (const d of ['Descargas', 'Downloads', '.']) {
-    try { for (const e of fs.list(d)) if (/^lordos-lang-[\w-]+\.json$/.test(e.name)) found.push(d === '.' ? e.name : `${d}/${e.name}`); } catch (e) { /* does not exist */ }
-  }
+  const [found, setFound] = useState([]);
+  useEffect(() => {
+    let live = true;
+    const home = fs.home();
+    Promise.all(PACK_DIRS.map((d) => fs.listAsync(d === '.' ? home : `${home}/${d}`).then((list) => list
+      .filter((e) => /^lordos-lang-[\w-]+\.json$/.test(e.name)).map((e) => (d === '.' ? e.name : `${d}/${e.name}`)), () => [])))
+      .then((lists) => { if (live) setFound(lists.flat()); });
+    return () => { live = false; };
+  }, []);
   if (!found.length) return null;
   const install = (p) => {
     try {

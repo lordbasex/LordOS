@@ -361,7 +361,9 @@ resolution and checks as the synchronous calls, and answer through `__lordFsRepl
 each folder's last listing (shown while a new one comes), lists a folder once at a time, and hides items while a delete
 or a move to the Trash runs until a new listing says whether they are gone. A move inside such a mount renames on the
 copy job's thread. Still on the interface's thread there: the path checks and `lstat`s `lord.fs.copy` makes before starting a job, a
-thumbnail of a file already downloaded, Quick Preview's text, and Go to Folder.
+thumbnail of a file already downloaded, Quick Preview's text, and Go to Folder. Since 2026-11-23 the same workers also measure a folder's size
+(`lord.fs.duAsync(path, ms)`, `FSA_DU`: `lord.fs.du`'s checks and walk, at most 10 s, never on a cloud or network mount),
+which Settings → Flatpak and Web apps use instead of `lord.fs.du` (`docs/MAIN-THREAD.md`).
 
 **The traffic of a mounted share isn't in the firewall.** The kernel's client opens its own sockets, outside any
 app's cgroup, and reconnects from a kernel thread, so it can't be a firewall app as `ROADMAP.md` first said.

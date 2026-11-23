@@ -86,6 +86,14 @@ export const statAsync = (path) => later('statAsync', (p) => ({ stat: lord.fs.st
 export const trashAsync = (path) => later('trashAsync', (p) => ({ ok: lord.fs.trash(p) }), path).then(() => true);
 export const freeAsync = (path) => later('freeAsync', (p) => lord.fs.free(p), path).then((r) => ({ total: r.total, free: r.free }));
 export const mkdirAsync = (path) => later('mkdirAsync', (p) => ({ ok: lord.fs.mkdir(p) }), path).then(() => true);
+// a folder's size, as du() but walked on a worker (for at most ms, 10 s at most): for a page that shows how much a big
+// folder holds (Settings → Flatpak, Web Apps), which du() would measure while the pointer waits
+export function duAsync(path, ms) {
+  if (typeof lord.fs.duAsync !== 'function') return Promise.resolve().then(() => lord.fs.du(path, Math.min(ms || 800, 3000)));
+  let req;
+  try { req = lord.fs.duAsync(path, ms); } catch (e) { return Promise.reject(e); }
+  return new Promise((resolve, reject) => waiting.set(req, (r) => (r && r.error ? reject(codeError(r.error)) : resolve(r))));
+}
 export function renameAsync(from, to) {
   if (typeof lord.fs.renameAsync !== 'function') return Promise.resolve().then(() => lord.fs.rename(from, to));
   let req;

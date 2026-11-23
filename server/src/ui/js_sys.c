@@ -1534,8 +1534,9 @@ static JSValue f_fs_volumes(JSContext *c, JSValueConst this_val, int argc, JSVal
 }
 
 /* ---- lord.fs: the calls that may wait on a slow file system, off this thread (fsasync.c) ----
- * listAsync(path) / statAsync(path) / trashAsync(path) / freeAsync(path) / mkdirAsync(path) / renameAsync(from, to)
- * → req; the answer comes as __lordFsReply(req, { entries } | { stat } | { ok } | { total, free } | { error: code line }).
+ * listAsync(path) / statAsync(path) / trashAsync(path) / freeAsync(path) / mkdirAsync(path) / renameAsync(from, to) /
+ * duAsync(path, ms) → req; the answer comes as __lordFsReply(req, { entries } | { stat } | { ok } | { total, free } |
+ * { size, files, dirs, complete, remote } | { error: code line }).
  * The worker resolves and checks the paths with the same fsops.c functions as list / stat / trash / free / mkdir /
  * rename above. */
 static JSValue fs_async(JSContext *c, JSValueConst arg, int op) {
@@ -1552,6 +1553,20 @@ static JSValue f_fs_stat_async(JSContext *c, JSValueConst t, int argc, JSValueCo
 static JSValue f_fs_trash_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_TRASH); }
 static JSValue f_fs_free_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_FREE); }
 static JSValue f_fs_mkdir_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) { (void)t; (void)argc; return fs_async(c, argv[0], FSA_MKDIR); }
+/* duAsync(path, ms) → req; { size, files, dirs, complete, remote } as lord.fs.du, walked on a worker for at most ms
+ * (FSA_DU_MAX_MS) */
+static JSValue f_fs_du_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    double ms = 0;
+    if (argc > 1 && JS_IsNumber(argv[1])) JS_ToFloat64(c, &ms, argv[1]);
+    const char *p = JS_ToCString(c, argv[0]);
+    if (!p) return JS_EXCEPTION;
+    char err[256] = "";
+    int req = fsasync_submit_du(p, ms, err, sizeof err);
+    JS_FreeCString(c, p);
+    if (req < 0) return js_throw_line(c, err);
+    return JS_NewInt32(c, req);
+}
 static JSValue f_fs_rename_async(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     const char *a = JS_ToCString(c, argv[0]), *b = JS_ToCString(c, argv[1]);
@@ -1586,6 +1601,7 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("statAsync", 1, f_fs_stat_async),
     JS_CFUNC_DEF("trashAsync", 1, f_fs_trash_async),
     JS_CFUNC_DEF("freeAsync", 1, f_fs_free_async),
+    JS_CFUNC_DEF("duAsync", 2, f_fs_du_async),
     JS_CFUNC_DEF("mkdirAsync", 1, f_fs_mkdir_async),
     JS_CFUNC_DEF("renameAsync", 2, f_fs_rename_async),
     JS_CFUNC_DEF("mounts", 0, f_fs_mounts),

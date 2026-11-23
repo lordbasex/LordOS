@@ -479,6 +479,17 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   w.env.fs.mkdir = () => { throw Object.assign(new Error('EACCES /home/ana/Cloud/Ana Secret'), { code: 'sys.errno' }); };
   out = await runCheck(w.acc, w.env);
   eq('an error\'s text never becomes a note (it can hold a path)', [out.find((x) => x.id === 'folder').note, out.some((x) => /Ana|home/.test(x.note))], ['sys.errno', false]);
+  // 2026-11-23: Settings hands the check calls that answer later (off lord-server's main thread); every one is awaited
+  w = world({ links: true });
+  const later = (fn) => (...a) => Promise.resolve().then(() => Promise.resolve()).then(() => fn(...a));         // answers a few turns later
+  for (const k of ['list', 'mkdir', 'stat', 'write', 'read', 'trash']) w.env.fs[k] = later(w.env.fs[k]);
+  out = await runCheck(w.acc, w.env);
+  eq('calls that answer later: every step passes, nothing left', [res(out), [...w.files.keys()].filter((k) => k.includes('lordos-check'))],
+    [CHECK_STEPS.map((id) => `${id}:pass`).join(' '), []]);
+  const cloudSrc = fs.readFileSync(path.join(root, 'apps/settings/Cloud.jsx'), 'utf8');
+  const checkFsSrc = cloudSrc.slice(cloudSrc.indexOf('const checkFs = {'), cloudSrc.indexOf('const checkRev'));
+  eq('Settings: the check touches the account only off the main thread', [/fs\.listAsync/.test(checkFsSrc), /fs\.statAsync/.test(checkFsSrc), /fs\.mkdirAsync/.test(checkFsSrc),
+    /list: \(p\) => lord\.fs\.list|stat: \(p\) => lord\.fs\.stat|read: \(p, m\) => lord\.fs\.read\(p/.test(checkFsSrc)], [true, true, true, false]);
 }
 
 

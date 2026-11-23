@@ -135,6 +135,20 @@ int main(void) {
     j = wait_for(fr, 3000);
     CHECK(has(j, "\"total\":") && has(j, "\"free\":"));
 
+    /* a folder's size (Settings → Flatpak): as lord.fs.du, on a worker; fast/ holds a.txt (5) and del.txt (3) */
+    char derr[256] = "";
+    snprintf(p, sizeof p, "%s/fast", H);
+    int du = fsasync_submit_du(p, 2000, derr, sizeof derr);
+    j = wait_for(du, 3000);
+    CHECK(has(j, "\"size\":8,\"files\":2,\"dirs\":2,\"complete\":true,\"remote\":false"));
+    du = fsasync_submit_du(p, 1e9, derr, sizeof derr);            /* the limit is capped, not refused */
+    CHECK(has(wait_for(du, 3000), "\"complete\":true"));
+    du = fsasync_submit(FSA_DU, p, derr, sizeof derr);              /* lord.fs.du's default limit */
+    CHECK(has(wait_for(du, 3000), "\"size\":8"));
+    CHECK(fsasync_submit2(FSA_DU, p, p, derr, sizeof derr) < 0);
+    du = submit(FSA_DU, "missing-folder");
+    CHECK(has(wait_for(du, 3000), "\"error\":"));
+
     /* 3. the checks are lord.fs's own */
     int r = submit(FSA_LIST, "/proc/self");
     CHECK(has(wait_for(r, 3000), "\"error\":\"fs.systemFolder\""));
