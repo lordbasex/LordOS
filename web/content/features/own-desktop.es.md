@@ -157,7 +157,7 @@ Publicada el 9 de noviembre de 2026.
 Publicada el 8 de noviembre de 2026.
 
 - **Leer en voz alta.** Voz en toda app con texto, ❖Esc para la selección, un reproductor pequeño con la onda de la voz, Voz en tiempo real y una Voz personal, todo en el equipo y sin internet (mirá *Leer en voz alta* en las funciones).
-- **Capturas en todas las pantallas.** ❖⇧3 guarda un archivo por pantalla y ❖⇧4 selecciona en todas a la vez, con lupa y selector de color; T copia el texto del área, que lee un ayudante aislado. Toda captura también queda en el portapapeles.
+- **Capturas en todas las pantallas.** ❖⇧3 guarda un archivo por pantalla y ❖⇧4 selecciona en todas a la vez, con lupa y selector de color; T copia el texto del área, que lee un ayudante aislado. Toda captura también queda en el portapapeles. En desarrollo (la última versión publicada es 0.8.9.4), las Opciones eligen qué hace Imprimir pantalla: toda la pantalla, un área, una ventana, la barra o nada.
 - **Sacudir el puntero para encontrarlo.** Unos trazos rápidos agrandan el cursor por un momento; viene activado en Ajustes → Mouse y trackpad.
 - **Teclado.** Las luces de Bloq Mayús, Bloq Num y Bloq Despl siguen al teclado, y un usuario que nunca eligió una distribución escribe con la del equipo en lugar de una latinoamericana predeterminada.
 

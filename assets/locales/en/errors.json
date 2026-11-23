@@ -925,5 +925,6 @@
   "dkms.mokNotNeeded": "This computer doesn't need the key enrolled now.",
   "dkms.mokNothingPending": "No key is waiting to be enrolled at the next restart.",
   "dkms.mokNoTool": "The mokutil program isn't installed.",
-  "dkms.mokFailed": "The key couldn't be prepared for the next restart."
+  "dkms.mokFailed": "The key couldn't be prepared for the next restart.",
+  "media.protectedWindow": "This window is protected, so it can't be captured on its own. In captures of the screen it shows black."
 }

@@ -935,5 +935,6 @@
   "capture.what.viaStudio": "Camera qua LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "Camera qua LordOS Studio",
   "capture.what.effectsOn": "đang bật hiệu ứng",
-  "capture.what.effectsOff": "không hiệu ứng"
+  "capture.what.effectsOff": "không hiệu ứng",
+  "shortcuts.captureWindow": "Chụp một cửa sổ"
 }

@@ -925,5 +925,6 @@
   "dkms.mokNotNeeded": "Aquest ordinador no necessita inscriure la clau ara.",
   "dkms.mokNothingPending": "No hi ha cap clau esperant inscriure’s al proper reinici.",
   "dkms.mokNoTool": "El programa mokutil no està instal·lat.",
-  "dkms.mokFailed": "No s’ha pogut preparar la clau per al proper reinici."
+  "dkms.mokFailed": "No s’ha pogut preparar la clau per al proper reinici.",
+  "media.protectedWindow": "Aquesta finestra està protegida: no es pot capturar sola. A les captures de la pantalla surt en negre."
 }

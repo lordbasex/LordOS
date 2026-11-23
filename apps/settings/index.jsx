@@ -336,7 +336,7 @@ function UserImages({ login, curId, onChoose, onDefault, setNote }) {
         return (
           <Layer name="modal">
             <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
-              <FilePicker title={tr('settings.wallpaperImage.pick')} filter={/\.(png|jpe?g)$/i} onClose={() => setPicking(false)} onPick={(p) => add([].concat(p)[0])} />
+              <FilePicker computer title={tr('settings.wallpaperImage.pick')} filter={/\.(png|jpe?g)$/i} onClose={() => setPicking(false)} onPick={(p) => add([].concat(p)[0])} />
             </View>
           </Layer>
         );

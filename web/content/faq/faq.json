@@ -702,6 +702,19 @@
           }
         },
         {
+          "id": "print-screen",
+          "q": {
+            "en": "Can I choose what the Print Screen key does?",
+            "es": "¿Puedo elegir qué hace la tecla Imprimir pantalla?",
+            "pt": "Posso escolher o que a tecla Print Screen faz?"
+          },
+          "a": {
+            "en": "Yes, in development (the latest release is 0.8.9.4). Open the Screenshots toolbar with ❖⇧5, then Options → Print Screen Key: the whole screen (the default), an area, a window, the toolbar or nothing. Screenshots may capture the screen without asking, since pressing the key is the request; you can still set it to Deny in Settings → Privacy, and protected windows such as Passwords stay black.",
+            "es": "Sí, en desarrollo (la última versión publicada es 0.8.9.4). Abrí la barra de Capturas con ❖⇧5 y elegí Opciones → Tecla Imprimir pantalla: toda la pantalla (por defecto), un área, una ventana, la barra o nada. Capturas puede capturar la pantalla sin preguntar, porque apretar la tecla ya es el pedido; igual podés ponerlo en Denegar en Ajustes → Privacidad, y las ventanas protegidas como Contraseñas siguen en negro.",
+            "pt": "Sim, em desenvolvimento (a última versão publicada é 0.8.9.4). Abra a barra de Capturas com ❖⇧5 e escolha Opções → Tecla Print Screen: a tela inteira (o padrão), uma área, uma janela, a barra ou nada. Capturas pode capturar a tela sem perguntar, porque apertar a tecla já é o pedido; você ainda pode pôr em Negar em Ajustes → Privacidade, e as janelas protegidas como Senhas continuam pretas."
+          }
+        },
+        {
           "id": "camera-effects",
           "q": {
             "en": "Can I blur my background in video calls?",

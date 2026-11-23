@@ -924,5 +924,6 @@
   "dkms.mokNotNeeded": "このコンピュータでは、今はキーを登録する必要はありません。",
   "dkms.mokNothingPending": "次回の再起動で登録を待っているキーはありません。",
   "dkms.mokNoTool": "mokutil プログラムがインストールされていません。",
-  "dkms.mokFailed": "次回の再起動に向けてキーを準備できませんでした。"
+  "dkms.mokFailed": "次回の再起動に向けてキーを準備できませんでした。",
+  "media.protectedWindow": "このウインドウは保護されているため、単独では取り込めません。画面の取り込みでは黒く表示されます。"
 }

@@ -1,9 +1,12 @@
 // Screenshots: screen captures and screen recording (a thin floating toolbar, toolbar.jsx, with our own design).
 //
 // Shortcuts (global, also with a Linux app in front):
-//   ❖⇧3 / Print Screen  entire screen        ❖⇧4  area (or window, with Space)
+//   ❖⇧3                 entire screen        ❖⇧4  area (or window, with Space)
 //   ❖⇧5                 the Screenshots toolbar (and stop a recording in progress)
-// Protected windows (wm.setProtected) come out black: the server does that, not this app.
+//   Print Screen        what Options → Print Screen Key says (GitHub #202): the entire screen by default
+// The screen permission starts allowed for this app (pressing the key is the request, GitHub #219; perms.c
+// perm_builtin_default), and a "Don't Allow" saved in Settings → Privacy wins.
+// Protected windows (wm.setProtected) come out black, and one is never captured alone: the server does that, not this app.
 // After each capture a floating thumbnail shows up; a click opens the markup editor (editor.jsx: arrow,
 // box, line, text, blur, pixelate and solid-fill redaction, crop, resize, turns). Photos and Files'
 // Quick Preview open the same editor on any picture (media.js openMarkup). Captures are saved in
@@ -18,7 +21,7 @@ import { captureRect, displaysToCapture, displayAt, dragRect, capturePixel, magn
 import { ocrLangs, cleanText } from './ocr.js';
 import { Editor } from './editor.jsx';
 import { APP, recording, recent, bar, options, setOptions, addRecent } from './state.js';
-import { saveDirFor, barStops, stepStop, keepRect, restoreRect, hitHandle, adjustRect, handlePoints } from './toolbarmodel.js';
+import { saveDirFor, barStops, stepStop, keepRect, restoreRect, hitHandle, adjustRect, handlePoints, printKeyLabel, refusal } from './toolbarmodel.js';
 import { Toolbar, barFrame, menuRows, selectable } from './toolbar.jsx';
 
 export function Icon({ size: s }) {
@@ -128,17 +131,17 @@ function withTimer(fn) {
   setTimeout(() => { wm.close(id, true); setTimeout(fn, 180); }, secs * 1000);
 }
 
-// The screen permission is denied (no answer here means that) or the app is restricted (an exception):
-// nothing is captured, and the person who pressed the key is told why. Do Not Disturb or this app's
-// notification settings would hide a banner, so then it is a toast.
+// Nothing was captured: the screen permission is denied (no answer here means the prompt was answered no), the app is
+// restricted, or lord-server could not (a failed capture, a protected window alone…; the SDK passes its code on, GitHub
+// #219). The person who pressed the key is told the real reason. Do Not Disturb or this app's notification settings would
+// hide a banner, so then it is a toast.
 function refused(err) {
-  const body = errorText(err || { code: 'media.denied.screen', params: { app: tr('apps.screenshots') } });
-  // Privacy is offered only when a permission is the reason: lord-media missing or a recording that didn't
-  // start is not fixed there (issue #77)
-  const code = err && typeof err === 'object' ? String(err.code || '') : String(err || '');
-  const denied = !err || !code || code.startsWith('media.denied') || code.startsWith('fw.restricted');
+  // Privacy is offered only when a permission is the reason: lord-media missing, a capture that failed or a recording
+  // that didn't start is not fixed there (issue #77, GitHub #219)
+  const why = refusal(err);
+  const body = errorText(err || { code: why.code, params: { app: tr('apps.screenshots') } });
   const banner = notify({ app: APP, label: tr('apps.screenshots'), title: tr('screenshots.refused'), body,
-    actions: !denied ? [] : [{ id: 'privacy', label: tr('screenshots.refused.open'), run: () => wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } }) }] });
+    actions: !why.permission ? [] : [{ id: 'privacy', label: tr('screenshots.refused.open'), run: () => wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } }) }] });
   if (!banner || dndActive() || appNotifyPrefs(APP).style === 'none') toast.set(body);
 }
 async function allowed(ask) {
@@ -164,11 +167,16 @@ function endArea(keep) {
 // A window alone (issue #70): the screen painted again up to that window and no further, so what covered it
 // (other windows, a menu, the Dock) is left out and the window is whole. Its sheets are painted over it (a dialog
 // its app opened in the modal layer, such as Settings → Wallpaper's file dialog, issue #58). null when lord-server
-// can't (a window the theme draws without a frame node, or one gone meanwhile): the still is cropped as before.
+// can't (a window the theme draws without a frame node, or one gone meanwhile): the still is cropped as before. A
+// protected window (the vault, a password prompt, "Protect front window") is refused alone: 'protected', and nothing of it
+// is kept (the still around it already has it in black).
 async function windowAlone(r, shot) {
   const node = r && r.win ? wm.frameNode(r.win) : 0;
   if (!node) return null;
-  try { return await media.screenshot(APP, { ...(shot.display ? { display: shot.display.id } : null), until: node, also: wm.sheetNodes(r.win) }); } catch { return null; }
+  try { return await media.screenshot(APP, { ...(shot.display ? { display: shot.display.id } : null), until: node, also: wm.sheetNodes(r.win) }); } catch (e) {
+    if (e?.code === 'media.protectedWindow') { refused(e); return 'protected'; }
+    return null;
+  }
 }
 async function areaDone(r, at) {
   const a = area.get();
@@ -180,6 +188,7 @@ async function areaDone(r, at) {
   if (a.mode === 'record') { media.close(shot.handle); capture.record(r); return; }
   if (a.mode === 'window') {
     const alone = await windowAlone(r, shot);
+    if (alone === 'protected') { media.close(shot.handle); return; }
     if (alone) { media.close(shot.handle); shot = { ...shot, handle: alone }; }
   }
   // r is in logical pixels; the capture is at its display's physical resolution (2× at 200 %)
@@ -286,6 +295,15 @@ const toggleWindowMode = () => area.set((x) => (x ? { ...x, mode: x.mode === 'ar
 const copyUnderPointer = () => { const l = area.get()?.loupe; if (l) { copyColor(l.color); endArea(); } };
 const captureFull = () => capture.full();
 const captureArea = () => capture.area('area');
+// the Print Screen key (GitHub #202): Options → Print Screen Key; 'none' leaves the key to the app in front
+const printKey = () => opts().printKey;
+function pressPrintKey() {
+  const a = printKey();
+  if (a === 'area') capture.area('area');
+  else if (a === 'window') capture.area('window');
+  else if (a === 'toolbar') { if (barShown()) closeToolbar(); else openToolbar(); }
+  else if (a !== 'none') capture.full();
+}
 
 // ---- the toolbar (toolbar.jsx) ----
 
@@ -371,7 +389,10 @@ function confirmArea() {
 }
 
 addShortcuts([
-  { id: 'capture.full', keys: ['Meta+Shift+3', 'PrintScreen'], when: hasMedia, run: captureFull, label: 'shell.shortcuts.captureFull', group: 'system' },
+  { id: 'capture.full', keys: ['Meta+Shift+3'], when: hasMedia, run: captureFull, label: 'shell.shortcuts.captureFull', group: 'system' },
+  // its row in Settings → Keyboard follows the choice (the whole screen shares ❖⇧3's row); not listed when it does nothing
+  { id: 'capture.printKey', keys: ['PrintScreen'], when: () => hasMedia() && printKey() !== 'none', run: pressPrintKey,
+    get label() { return printKeyLabel(printKey()) || 'shell.shortcuts.captureFull'; }, listed: () => printKey() !== 'none', group: 'system' },
   { id: 'capture.area', keys: ['Meta+Shift+4'], when: hasMedia, run: captureArea, label: 'shell.shortcuts.captureArea', group: 'system' },
   { id: 'capture.panel', keys: ['Meta+Shift+5'], when: hasMedia, run: () => { if (barShown()) closeToolbar(); else openToolbar(); }, label: 'shell.shortcuts.capturePanel', group: 'system' },
   { id: 'capture.confirm', keys: ['Enter'], when: adjusting, run: confirmArea, listed: () => false },

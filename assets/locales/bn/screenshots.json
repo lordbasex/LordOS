@@ -97,5 +97,11 @@
   "hintAdjust": "ঠিক করতে হ্যান্ডেল টানুন · Enter: ক্যাপচার · Esc: বাতিল",
   "hintAdjustRecord": "ঠিক করতে হ্যান্ডেল টানুন · Enter: রেকর্ড · Esc: বাতিল",
   "hintRecord": "রেকর্ডের এলাকা বাছতে টানুন · Esc: বাতিল",
-  "thumbOpen": "মার্কআপ এডিটরে খুলুন"
+  "thumbOpen": "মার্কআপ এডিটরে খুলুন",
+  "opt.printKey": "প্রিন্ট স্ক্রিন কী",
+  "opt.printKey.full": "পুরো স্ক্রিন ক্যাপচার করুন",
+  "opt.printKey.area": "বেছে নেওয়া অংশ ক্যাপচার করুন",
+  "opt.printKey.window": "বেছে নেওয়া উইন্ডো ক্যাপচার করুন",
+  "opt.printKey.toolbar": "টুলবার দেখান",
+  "opt.printKey.none": "কিছু করবেন না"
 }

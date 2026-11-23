@@ -464,6 +464,32 @@ Xwayland, and only for connectors the kernel marks non-desktop (never a monitor)
 allow, Allow once (not saved) and Always allow; listed under VR headsets. The lease is revoked when the app lets it go,
 the decision is taken back, the headset is unplugged or the screen locks ([WAYLAND.md](WAYLAND.md), "DRM leases").
 
+**One permission starts allowed** (in development, approved by the maintainer 2026-11-22, GitHub #219): the built-in
+Screenshots app's `screen`. Pressing Print Screen, ❖⇧3, ❖⇧4 or ❖⇧5 is the person asking for the capture, so it is not asked
+again. It is a default under the saved decisions, not a decision written for anyone (`perm_builtin_default` and
+`perm_get_builtin` in `server/src/sec/perms.c`): only for the id `screenshots` (no package may take it) and only the
+`screen` permission (its microphone is still asked), read only by the desktop's own contexts (`js_media.c`'s check and
+`lord.perms.get`), never by the broker. Settings → Privacy → Screen lists Screenshots with **Allow** and **Don't Allow**;
+a "Don't Allow" saved there wins and stays, and the "no screen capture" restriction of LordOS's built-in apps still
+refuses it before any permission. Settings → Privacy also lists every built-in app whose manifest declares a permission,
+before it ever asked.
+
+The default changes nothing for **protected windows**: they are painted black by lord-server itself in every capture
+of the screen or of an area, in screen recordings, in a shared screen or window and on the remote desktop, and
+Screenshots never captures a protected window alone (its window capture is refused, `media.protectedWindow`). Passwords' window, the
+on-screen keyboard, a window marked with "Protect the front window" and a Linux window marked so are protected; the lock
+screen is another process that a capture of the desktop never sees.
+
+**A password is never captured** (the maintainer's rule, 2026-11-22). Every password surface LordOS draws is protected:
+every password field (`TextInput secure`, `sdk/components.jsx`: Wi-Fi, VPN, SSH and Terminal servers, Cloud, Mail,
+Users, Sharing, the remote desktop, Databases, Backup, Passwords and the login and lock screens), the keyring's unlock
+prompt (`sdk/vault.js`) and the administrator prompt a Linux app asks for through polkit (`sdk/hardware.jsx`, whose dots
+count the keys), these two whole. LordOS's own administrator actions ask for no password (`admin.c` checks the session
+user's group). A field is black in every capture of the screen or an area, in recordings, on the remote desktop and in
+shared screens, and the window that holds it is refused captured alone while it does. While anything protected is on
+screen, a remote desktop viewer is composed on the CPU and a visitor of the screen-sharing API can't type into LordOS's
+own windows (`share_key_protected`), as for any protected window. See [MEDIA.md](MEDIA.md), "Protected windows".
+
 | | |
 |---|---|
 | ![prompt requested by an isolated app](privacy-prompt-broker.png) | ![microphone in use](privacy-indicator-broker.png) |

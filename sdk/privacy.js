@@ -29,6 +29,9 @@ export const perms = {
   get: (app, perm) => { try { return api() ? lord.perms.get(app, perm) : 'ask'; } catch (e) { return 'ask'; } },
   set(app, perm, state) { try { return api() ? lord.perms.set(app, perm, state) : false; } finally { permsRev.set((v) => v + 1); } },
   list: () => { try { return api() ? lord.perms.list() : []; } catch (e) { return []; } },
+  // 'allow' for a permission a built-in app starts with (only Screenshots' screen, GitHub #219; perms.c
+  // perm_builtin_default), else 'ask'. get() already counts it while nothing is saved; a saved 'deny' wins.
+  builtinDefault: (app, perm) => { try { return api() && lord.perms.builtinDefault ? lord.perms.builtinDefault(app, perm) : 'ask'; } catch (e) { return 'ask'; } },
 };
 export const permsRev = createStore(0);   // goes up when something changes (to redraw Privacy)
 

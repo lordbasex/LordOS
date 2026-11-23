@@ -942,5 +942,6 @@
   "capture.what.viaStudio": "Kamera über LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "Kamera über LordOS Studio",
   "capture.what.effectsOn": "Effekte an",
-  "capture.what.effectsOff": "ohne Effekte"
+  "capture.what.effectsOff": "ohne Effekte",
+  "shortcuts.captureWindow": "Bildschirmfoto eines Fensters"
 }

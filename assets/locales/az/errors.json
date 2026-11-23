@@ -925,5 +925,6 @@
   "dkms.mokNotNeeded": "Bu kompüterin indi açarı qeydiyyata salmağa ehtiyacı yoxdur.",
   "dkms.mokNothingPending": "Növbəti yenidən başlatmada qeydiyyat gözləyən açar yoxdur.",
   "dkms.mokNoTool": "mokutil proqramı quraşdırılmayıb.",
-  "dkms.mokFailed": "Açarı növbəti yenidən başlatma üçün hazırlamaq alınmadı."
+  "dkms.mokFailed": "Açarı növbəti yenidən başlatma üçün hazırlamaq alınmadı.",
+  "media.protectedWindow": "Bu pəncərə qorunur, ona görə ayrıca çəkilə bilməz. Ekran şəkillərində qara görünür."
 }

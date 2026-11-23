@@ -96,5 +96,11 @@
   "hintAdjust": "ลากที่จับเพื่อปรับ · Enter: จับภาพ · Esc: ยกเลิก",
   "hintAdjustRecord": "ลากที่จับเพื่อปรับ · Enter: บันทึก · Esc: ยกเลิก",
   "hintRecord": "ลากเพื่อเลือกพื้นที่ที่จะบันทึก · Esc: ยกเลิก",
-  "thumbOpen": "เปิดในตัวแก้ไขมาร์กอัป"
+  "thumbOpen": "เปิดในตัวแก้ไขมาร์กอัป",
+  "opt.printKey": "ปุ่ม Print Screen",
+  "opt.printKey.full": "จับภาพทั้งหน้าจอ",
+  "opt.printKey.area": "จับภาพส่วนที่เลือก",
+  "opt.printKey.window": "จับภาพหน้าต่างที่เลือก",
+  "opt.printKey.toolbar": "แสดงแถบ",
+  "opt.printKey.none": "ไม่ต้องทำอะไร"
 }

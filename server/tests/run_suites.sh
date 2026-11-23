@@ -401,6 +401,10 @@ EOF
     if have node; then run "screenshots-model-test (apps/screenshots)" node tests/screenshots_model_test.mjs; fi
     # the Screenshots toolbar (❖⇧5): options kept and read back, modes, keys, Save to, the remembered selection's handles
     if have node; then run "screenshots-toolbar-model-test (apps/screenshots/toolbarmodel.js)" node tests/screenshots_toolbar_model_test.mjs; fi
+    # Settings → Privacy's rows: a built-in app that declares a permission is listed before it asked (GitHub #219)
+    if have node; then run "privacy-model-test (apps/settings/privacymodel.js)" node tests/privacy_model_test.mjs; fi
+    # the clipboard history panels: keys, scrolling to the selection only, a pointer at rest never takes it (GitHub #203, #204)
+    if have node; then run "clipboard-panel-model-test (sdk/clipboardpanelmodel.js)" node tests/clipboard_panel_model_test.mjs; fi
     if have node; then run "imageedit-model-test (sdk/imageeditmodel.js)" node tests/imageedit_model_test.mjs; fi
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
@@ -641,6 +645,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "password-field-scene (sdk/components.jsx TextInput secure)" node tests/textfield_menu_test.mjs password_field_scene.mjs
     else skip "password-field-scene" "node and the repository's node_modules (npm install)"; fi
+    # every password surface LordOS draws is protected (black in captures): password fields, the keyring and polkit prompts
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "password-protect-scene (TextInput secure, KeyringPrompt, PolkitPrompt)" node tests/textfield_menu_test.mjs password_protect_scene.mjs
+    else skip "password-protect-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.9.5, docs/MAIN-THREAD.md) <Toggle pending> and <Button pending> answer the press before the action, flip back on a
     # failure; useTrackedSettings renders only for the keys read; ThemeProvider keeps equal tokens; sortByName's order
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then

@@ -924,5 +924,6 @@
   "dkms.mokNotNeeded": "Máy tính này hiện không cần đăng ký khóa.",
   "dkms.mokNothingPending": "Không có khóa nào đang chờ đăng ký ở lần khởi động lại tới.",
   "dkms.mokNoTool": "Chưa cài đặt chương trình mokutil.",
-  "dkms.mokFailed": "Không thể chuẩn bị khóa cho lần khởi động lại tới."
+  "dkms.mokFailed": "Không thể chuẩn bị khóa cho lần khởi động lại tới.",
+  "media.protectedWindow": "Cửa sổ này được bảo vệ nên không thể chụp riêng. Trong ảnh chụp màn hình, nó hiện màu đen."
 }

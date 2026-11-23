@@ -15,7 +15,7 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef } from 'react';
 import { APP, bar, recent, setOptions } from './state.js';
-import { normalizeOptions, isRecordMode, SAVE_TO, TIMERS } from './toolbarmodel.js';
+import { normalizeOptions, isRecordMode, SAVE_TO, TIMERS, PRINT_KEY } from './toolbarmodel.js';
 
 const H = 50, PAD = 7, GAP = 2, BTN = 34, SMALL = 30, SEP = 13, GRIP = 16;
 const FG = '#f2f2f5', DIM = 'rgba(242,242,245,0.62)', LIT = 'rgba(255,255,255,0.17)', RING = '#7fb2ff';
@@ -147,6 +147,11 @@ export function menuRows(o, page, { mics, recents, front, protectedCount, action
   rows.push({ key: 'thumbnail', label: tr('screenshots.opt.thumbnail'), checked: o.thumbnail, run: () => setOptions({ thumbnail: !o.thumbnail }), keep: true });
   rows.push({ key: 'remember', label: tr('screenshots.opt.remember'), checked: o.remember, run: () => setOptions({ remember: !o.remember, ...(o.remember ? { lastRect: null } : null) }), keep: true });
   rows.push({ key: 'pointer', label: tr('screenshots.opt.pointer'), checked: o.pointer, run: () => setOptions({ pointer: !o.pointer }), keep: true });
+  rows.push({ sep: true });
+  // what the Print Screen key does (GitHub #202)
+  rows.push({ header: tr('screenshots.opt.printKey') });
+  const pk = o.printKey || 'full';
+  for (const a of PRINT_KEY) rows.push({ key: `print.${a}`, label: tr(`screenshots.opt.printKey.${a}`), checked: pk === a, run: () => setOptions({ printKey: a }), keep: true });
   rows.push({ sep: true });
   rows.push({ key: 'protect', label: tr('screenshots.menu.protect'), checked: !!front?.protected, disabled: !front, run: () => actions.protectFront(), keep: true });
   if (protectedCount > 0) rows.push({ note: tr('screenshots.protectedNote', { count: protectedCount }) });

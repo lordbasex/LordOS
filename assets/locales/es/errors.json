@@ -925,5 +925,6 @@
   "dkms.mokNotNeeded": "Esta computadora no necesita inscribir la clave ahora.",
   "dkms.mokNothingPending": "No hay ninguna clave esperando inscribirse en el próximo reinicio.",
   "dkms.mokNoTool": "El programa mokutil no está instalado.",
-  "dkms.mokFailed": "No se pudo preparar la clave para el próximo reinicio."
+  "dkms.mokFailed": "No se pudo preparar la clave para el próximo reinicio.",
+  "media.protectedWindow": "Esta ventana está protegida: no se puede capturar sola. En las capturas de la pantalla sale en negro."
 }

@@ -98,5 +98,11 @@
   "hintAdjust": "Перетягніть маркери, щоб налаштувати · Enter: зняти · Esc: скасувати",
   "hintAdjustRecord": "Перетягніть маркери, щоб налаштувати · Enter: записати · Esc: скасувати",
   "hintRecord": "Виділіть область для запису · Esc: скасувати",
-  "thumbOpen": "Відкрити в редакторі позначок"
+  "thumbOpen": "Відкрити в редакторі позначок",
+  "opt.printKey": "Клавіша Print Screen",
+  "opt.printKey.full": "Знімок усього екрана",
+  "opt.printKey.area": "Знімок вибраної області",
+  "opt.printKey.window": "Знімок вибраного вікна",
+  "opt.printKey.toolbar": "Показати панель",
+  "opt.printKey.none": "Нічого не робити"
 }

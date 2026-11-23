@@ -97,5 +97,11 @@
   "hintAdjust": "समायोजित करने के लिए हैंडल खींचें · Enter: कैप्चर · Esc: रद्द करें",
   "hintAdjustRecord": "समायोजित करने के लिए हैंडल खींचें · Enter: रिकॉर्ड · Esc: रद्द करें",
   "hintRecord": "रिकॉर्ड करने का क्षेत्र चुनने के लिए खींचें · Esc: रद्द करें",
-  "thumbOpen": "मार्कअप एडिटर में खोलें"
+  "thumbOpen": "मार्कअप एडिटर में खोलें",
+  "opt.printKey": "प्रिंट स्क्रीन कुंजी",
+  "opt.printKey.full": "पूरी स्क्रीन कैप्चर करें",
+  "opt.printKey.area": "चुना गया भाग कैप्चर करें",
+  "opt.printKey.window": "चुनी गई विंडो कैप्चर करें",
+  "opt.printKey.toolbar": "टूलबार दिखाएँ",
+  "opt.printKey.none": "कुछ न करें"
 }

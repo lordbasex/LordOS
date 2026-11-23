@@ -64,6 +64,13 @@ const call = (name, ...a) => {
   if (!m) return null;
   try { return m[name](...a); } catch (e) { console.error(`media: ${name}: ${e?.message || e}`); return null; }
 };
+// A capture of the screen keeps lord-server's reason (GitHub #219): a permission denied or restricted, a capture that
+// failed, a protected window, … thrown with its code, so the app says what happened instead of "no permission".
+const callOrThrow = (name, ...a) => {
+  const m = api();
+  if (!m) return null;
+  return m[name](...a);
+};
 
 export const media = {
   available: () => !!api(),
@@ -112,10 +119,12 @@ export const media = {
   transcode: (app, path, out, opts) => job(() => call('transcode', app, path, out, opts)),
   // screenshots (with protected windows in black). rect: { x, y, width, height } (logical), display (its id),
   // until (wm.frameNode(id): the screen up to that window and nothing above it, the window alone) and also (with
-  // until: wm.sheetNodes(id), that window's sheets painted over it)
+  // until: wm.sheetNodes(id), that window's sheets painted over it). null: the permission prompt was answered no (or
+  // there is no lord.media); anything lord-server refuses or can't do throws its code (media.denied.screen,
+  // media.captureFailed, media.protectedWindow for a protected window asked for alone…).
   async screenshot(app, rect) {
     if (!(await requestPermission(app, 'screen'))) return null;
-    return call('screenshot', app, rect || {});
+    return callOrThrow('screenshot', app, rect || {});
   },
   // radius (optional, image px): the corners outside a rounded rectangle become transparent (a window capture)
   crop: (id, x, y, w, hh, radius = 0) => call('crop', id, Math.round(x), Math.round(y), Math.round(w), Math.round(hh), Math.round(radius) || 0),
@@ -138,7 +147,7 @@ export const media = {
   async screenRecord(app, path, opts = {}) {
     if (!(await requestPermission(app, 'screen'))) return null;
     if (opts.mic && !(await requestPermission(app, 'microphone'))) opts = { ...opts, mic: false };
-    const id = call('screenRecord', app, path, opts);
+    const id = callOrThrow('screenRecord', app, path, opts);
     if (id) track(id);
     if (id && opts.mic) trackDevice(id, app, 'microphone');
     return id;

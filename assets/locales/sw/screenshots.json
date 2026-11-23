@@ -97,5 +97,11 @@
   "hintAdjust": "Buruta vishikio kurekebisha · Enter: piga picha · Esc: ghairi",
   "hintAdjustRecord": "Buruta vishikio kurekebisha · Enter: rekodi · Esc: ghairi",
   "hintRecord": "Buruta kuchagua eneo la kurekodi · Esc: ghairi",
-  "thumbOpen": "Fungua kwenye kihariri cha alama"
+  "thumbOpen": "Fungua kwenye kihariri cha alama",
+  "opt.printKey": "Kitufe cha Print Screen",
+  "opt.printKey.full": "Piga picha ya skrini nzima",
+  "opt.printKey.area": "Piga picha ya sehemu iliyochaguliwa",
+  "opt.printKey.window": "Piga picha ya dirisha lililochaguliwa",
+  "opt.printKey.toolbar": "Onyesha upau",
+  "opt.printKey.none": "Usifanye chochote"
 }

@@ -75,6 +75,20 @@ PermState perm_get(const char *app_id, Perm p) {
     return r ? (PermState)r->state[p] : PERM_ASK;
 }
 
+/* The built-in permissions that start allowed (approved by the maintainer 2026-11-22, GitHub #219): only Screenshots'
+ * "screen", because pressing its key or shortcut is the person asking for the capture. Nothing is written for it: with no
+ * saved decision it is allowed, and a decision the person saves in Settings → Privacy (deny) wins. Only the built-in
+ * contexts read this (js_media.c's permitted, lord.perms.get in the desktop's own JS); the broker never does, and no
+ * package may take the id "screenshots" (js_sys.c lpk_reserved: it is a namespace of LordOS's locales). */
+PermState perm_builtin_default(const char *app_id, Perm p) {
+    return app_id && p == PERM_SCREEN && !strcmp(app_id, "screenshots") ? PERM_ALLOW : PERM_ASK;
+}
+
+PermState perm_get_builtin(const char *app_id, Perm p) {
+    PermState s = perm_get(app_id, p);
+    return s == PERM_ASK ? perm_builtin_default(app_id, p) : s;
+}
+
 static int save(void) {
     char tmp[PATH_MAX + 8];
     snprintf(tmp, sizeof tmp, "%s.tmp", file_path);

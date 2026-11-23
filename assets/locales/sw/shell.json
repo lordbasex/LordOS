@@ -942,5 +942,6 @@
   "capture.what.viaStudio": "Kamera kupitia LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "Kamera kupitia LordOS Studio",
   "capture.what.effectsOn": "madoido yamewashwa",
-  "capture.what.effectsOff": "bila madoido"
+  "capture.what.effectsOff": "bila madoido",
+  "shortcuts.captureWindow": "Picha ya dirisha"
 }

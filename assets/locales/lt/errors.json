@@ -926,5 +926,6 @@
   "dkms.mokNotNeeded": "Šiam kompiuteriui dabar nereikia užregistruoti rakto.",
   "dkms.mokNothingPending": "Joks raktas nelaukia registracijos kito paleidimo iš naujo metu.",
   "dkms.mokNoTool": "Programa mokutil neįdiegta.",
-  "dkms.mokFailed": "Nepavyko paruošti rakto kitam paleidimui iš naujo."
+  "dkms.mokFailed": "Nepavyko paruošti rakto kitam paleidimui iš naujo.",
+  "media.protectedWindow": "Šis langas apsaugotas, todėl jo negalima užfiksuoti atskirai. Ekrano kopijose jis rodomas juodas."
 }

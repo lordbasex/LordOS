@@ -96,5 +96,11 @@
   "hintAdjust": "Kéo các tay cầm để điều chỉnh · Enter: chụp · Esc: hủy",
   "hintAdjustRecord": "Kéo các tay cầm để điều chỉnh · Enter: quay · Esc: hủy",
   "hintRecord": "Kéo để chọn vùng cần quay · Esc: hủy",
-  "thumbOpen": "Mở trong trình chỉnh sửa đánh dấu"
+  "thumbOpen": "Mở trong trình chỉnh sửa đánh dấu",
+  "opt.printKey": "Phím Print Screen",
+  "opt.printKey.full": "Chụp toàn màn hình",
+  "opt.printKey.area": "Chụp phần đã chọn",
+  "opt.printKey.window": "Chụp cửa sổ đã chọn",
+  "opt.printKey.toolbar": "Hiện thanh công cụ",
+  "opt.printKey.none": "Không làm gì"
 }

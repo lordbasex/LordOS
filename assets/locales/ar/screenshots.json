@@ -101,5 +101,11 @@
   "hintAdjust": "اسحب المقابض للضبط · Enter: التقاط · Esc: إلغاء",
   "hintAdjustRecord": "اسحب المقابض للضبط · Enter: تسجيل · Esc: إلغاء",
   "hintRecord": "اسحب لتحديد المنطقة المراد تسجيلها · Esc: إلغاء",
-  "thumbOpen": "فتح في محرر التعليقات"
+  "thumbOpen": "فتح في محرر التعليقات",
+  "opt.printKey": "مفتاح Print Screen",
+  "opt.printKey.full": "التقاط الشاشة بأكملها",
+  "opt.printKey.area": "التقاط الجزء المحدد",
+  "opt.printKey.window": "التقاط النافذة المحددة",
+  "opt.printKey.toolbar": "إظهار الشريط",
+  "opt.printKey.none": "عدم فعل شيء"
 }

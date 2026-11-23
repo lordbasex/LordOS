@@ -96,5 +96,11 @@
   "hintAdjust": "拖移控制柄以调整 · Enter：截取 · Esc：取消",
   "hintAdjustRecord": "拖移控制柄以调整 · Enter：录制 · Esc：取消",
   "hintRecord": "拖移以选择要录制的区域 · Esc：取消",
-  "thumbOpen": "在标记编辑器中打开"
+  "thumbOpen": "在标记编辑器中打开",
+  "opt.printKey": "Print Screen 键",
+  "opt.printKey.full": "截取整个屏幕",
+  "opt.printKey.area": "截取所选部分",
+  "opt.printKey.window": "截取所选窗口",
+  "opt.printKey.toolbar": "显示工具栏",
+  "opt.printKey.none": "不执行任何操作"
 }

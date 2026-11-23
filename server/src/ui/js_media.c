@@ -118,7 +118,7 @@ static int permitted(JSContext *c, const char *app, Perm p) {
         js_throw_code(c, restrict_code(rf), "app", app, NULL);
         return 0;
     }
-    if (perm_get(app, p) == PERM_ALLOW) return 1;
+    if (perm_get_builtin(app, p) == PERM_ALLOW) return 1;     /* Screenshots' screen starts allowed (perms.h) */
     char code[48];
     snprintf(code, sizeof code, "media.denied.%s", perm_name(p));    /* media.denied.camera, .microphone, .screen */
     js_throw_code(c, code, "app", app, NULL);
@@ -451,7 +451,7 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     if (!permitted(c, app, PERM_SCREEN)) ret = JS_EXCEPTION;
     else {
         JSValueConst o = argc > 1 ? argv[1] : JS_UNDEFINED;
-        int also[PAINT_ALSO_MAX], nalso = 0;
+        int also[PAINT_ALSO_MAX], nalso = 0, refused = 0;
         if (JS_IsObject(o)) {
             JSValue a = JS_GetPropertyStr(c, o, "also");
             if (JS_IsArray(c, a)) {
@@ -471,8 +471,9 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
         MediaSrc *s = media_screenshot(app, opt_int(c, o, "x", 0, -65536, 65536), opt_int(c, o, "y", 0, -65536, 65536),
                                        opt_int(c, o, "width", 0, 0, 65536), opt_int(c, o, "height", 0, 0, 65536),
                                        (uint32_t)opt_int(c, o, "display", 0, 0, 1 << 30), opt_int(c, o, "until", 0, 0, 1 << 30),
-                                       also, nalso);
-        ret = s ? JS_NewInt32(c, s->id) : js_throw_code(c, "media.captureFailed", NULL);
+                                       also, nalso, &refused);
+        /* a protected window asked for alone is refused as such (the app must not crop a capture of it instead) */
+        ret = s ? JS_NewInt32(c, s->id) : js_throw_code(c, refused ? "media.protectedWindow" : "media.captureFailed", NULL);
     }
     JS_FreeCString(c, app);
     return ret;

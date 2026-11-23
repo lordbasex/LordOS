@@ -925,5 +925,6 @@
   "dkms.mokNotNeeded": "Deze computer hoeft de sleutel nu niet te registreren.",
   "dkms.mokNothingPending": "Er wacht geen sleutel om bij de volgende herstart geregistreerd te worden.",
   "dkms.mokNoTool": "Het programma mokutil is niet geïnstalleerd.",
-  "dkms.mokFailed": "De sleutel kon niet worden voorbereid voor de volgende herstart."
+  "dkms.mokFailed": "De sleutel kon niet worden voorbereid voor de volgende herstart.",
+  "media.protectedWindow": "Dit venster is beveiligd en kan niet apart worden vastgelegd. In opnamen van het scherm is het zwart."
 }

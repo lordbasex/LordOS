@@ -680,6 +680,12 @@ build/broker-restrict-test: tests/broker_restrict_test.c $(BROKER_RESTRICT_SRC) 
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/broker_restrict_test.c $(BROKER_RESTRICT_SRC) -Wl,--wrap=open
 	./$@ || { rm -f $@; exit 1; }
+# the built-in permission that starts allowed (Screenshots' screen, GitHub #219): only that one, never the broker's, a saved deny wins
+test: build/perms-default-test
+build/perms-default-test: tests/perms_default_test.c src/sec/perms.c src/sec/json.c src/sec/perms.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/perms_default_test.c src/sec/perms.c src/sec/json.c
+	./$@ || { rm -f $@; exit 1; }
 # an isolated app's own copy on the clipboard: status, a secret's countdown, Keep (src/sec/brokerclip.c)
 test: build/brokerclip-test
 build/brokerclip-test: tests/brokerclip_test.c src/sec/brokerclip.c src/sec/brokerclip.h

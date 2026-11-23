@@ -97,5 +97,11 @@
   "hintAdjust": "Sleep de grepen om aan te passen · Enter: vastleggen · Esc: annuleren",
   "hintAdjustRecord": "Sleep de grepen om aan te passen · Enter: opnemen · Esc: annuleren",
   "hintRecord": "Sleep om het op te nemen gebied te kiezen · Esc: annuleren",
-  "thumbOpen": "Openen in de markeringseditor"
+  "thumbOpen": "Openen in de markeringseditor",
+  "opt.printKey": "Print Screen-toets",
+  "opt.printKey.full": "Hele scherm vastleggen",
+  "opt.printKey.area": "Gekozen gedeelte vastleggen",
+  "opt.printKey.window": "Gekozen venster vastleggen",
+  "opt.printKey.toolbar": "Balk tonen",
+  "opt.printKey.none": "Niets doen"
 }

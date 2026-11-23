@@ -98,5 +98,11 @@
   "hintAdjust": "Vilkite rankenėles, kad pakoreguotumėte · Enter: fiksuoti · Esc: atšaukti",
   "hintAdjustRecord": "Vilkite rankenėles, kad pakoreguotumėte · Enter: įrašyti · Esc: atšaukti",
   "hintRecord": "Vilkite, kad pasirinktumėte įrašomą sritį · Esc: atšaukti",
-  "thumbOpen": "Atverti žymėjimo redaktoriuje"
+  "thumbOpen": "Atverti žymėjimo redaktoriuje",
+  "opt.printKey": "Klavišas Print Screen",
+  "opt.printKey.full": "Fiksuoti visą ekraną",
+  "opt.printKey.area": "Fiksuoti pasirinktą dalį",
+  "opt.printKey.window": "Fiksuoti pasirinktą langą",
+  "opt.printKey.toolbar": "Rodyti juostą",
+  "opt.printKey.none": "Nieko nedaryti"
 }

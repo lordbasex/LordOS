@@ -97,5 +97,11 @@
   "hintAdjust": "Trascina le maniglie per regolare · Invio: cattura · Esc: annulla",
   "hintAdjustRecord": "Trascina le maniglie per regolare · Invio: registra · Esc: annulla",
   "hintRecord": "Trascina per scegliere l’area da registrare · Esc: annulla",
-  "thumbOpen": "Apri nell’editor di annotazioni"
+  "thumbOpen": "Apri nell’editor di annotazioni",
+  "opt.printKey": "Tasto Stamp",
+  "opt.printKey.full": "Cattura tutto lo schermo",
+  "opt.printKey.area": "Cattura la parte scelta",
+  "opt.printKey.window": "Cattura la finestra scelta",
+  "opt.printKey.toolbar": "Mostra la barra",
+  "opt.printKey.none": "Non fare nulla"
 }

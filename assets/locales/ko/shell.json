@@ -935,5 +935,6 @@
   "capture.what.viaStudio": "LordOS Studio를 통한 카메라 ({camera})",
   "capture.what.viaStudioPlain": "LordOS Studio를 통한 카메라",
   "capture.what.effectsOn": "효과 켜짐",
-  "capture.what.effectsOff": "효과 없음"
+  "capture.what.effectsOff": "효과 없음",
+  "shortcuts.captureWindow": "윈도우 스크린샷"
 }

@@ -75,6 +75,14 @@ await clickText('USB Headset', () => settings.get().screenshots.mic === true);
 check('the microphone is on, that one', settings.get().screenshots.mic === true && settings.get().screenshots.micSource === 'alsa_input.usb');
 await clickText('Remember Last Selection', () => settings.get().screenshots.remember === true);
 check('Remember Last Selection is saved', settings.get().screenshots.remember === true);
+// GitHub #202: what the Print Screen key does, the whole screen by default
+check('the Print Screen Key section is listed', shown('Print Screen Key') && shown('Show the Toolbar') && shown('Do Nothing'));
+check('the whole screen is checked by default', menuRows({ ...settings.get().screenshots }, 'main', { mics: [], recents: [], front: null, protectedCount: 0, actions })
+  .find((r) => r.key === 'print.full')?.checked === true);
+await clickText('Do Nothing', () => settings.get().screenshots.printKey === 'none');
+check('Do Nothing is saved', settings.get().screenshots.printKey === 'none', JSON.stringify(settings.get().screenshots.printKey));
+await clickText('Show the Toolbar', () => settings.get().screenshots.printKey === 'toolbar');
+check('the toolbar is saved', settings.get().screenshots.printKey === 'toolbar');
 await clickText('Other Location…', () => ran.includes('folder'));
 check('Other Location asks for a folder', ran.includes('folder'));
 check('and the menu closes for the dialog', !shown('Save to'));

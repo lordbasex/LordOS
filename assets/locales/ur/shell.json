@@ -942,5 +942,6 @@
   "capture.what.viaStudio": "LordOS Studio کے ذریعے کیمرا ({camera})",
   "capture.what.viaStudioPlain": "LordOS Studio کے ذریعے کیمرا",
   "capture.what.effectsOn": "اثرات آن",
-  "capture.what.effectsOff": "کوئی اثر نہیں"
+  "capture.what.effectsOff": "کوئی اثر نہیں",
+  "shortcuts.captureWindow": "ایک ونڈو کا اسکرین شاٹ"
 }

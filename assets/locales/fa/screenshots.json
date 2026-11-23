@@ -97,5 +97,11 @@
   "hintAdjust": "برای تنظیم، دستگیره‌ها را بکشید · Enter: گرفتن · Esc: لغو",
   "hintAdjustRecord": "برای تنظیم، دستگیره‌ها را بکشید · Enter: ضبط · Esc: لغو",
   "hintRecord": "برای انتخاب ناحیهٔ ضبط بکشید · Esc: لغو",
-  "thumbOpen": "باز کردن در ویرایشگر نشانه‌گذاری"
+  "thumbOpen": "باز کردن در ویرایشگر نشانه‌گذاری",
+  "opt.printKey": "کلید Print Screen",
+  "opt.printKey.full": "گرفتن کل صفحه",
+  "opt.printKey.area": "گرفتن بخش انتخاب‌شده",
+  "opt.printKey.window": "گرفتن پنجرهٔ انتخاب‌شده",
+  "opt.printKey.toolbar": "نمایش نوار",
+  "opt.printKey.none": "هیچ کاری نکن"
 }

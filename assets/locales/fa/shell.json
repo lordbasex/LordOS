@@ -942,5 +942,6 @@
   "capture.what.viaStudio": "دوربین از طریق LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "دوربین از طریق LordOS Studio",
   "capture.what.effectsOn": "جلوه‌ها روشن",
-  "capture.what.effectsOff": "بدون جلوه"
+  "capture.what.effectsOff": "بدون جلوه",
+  "shortcuts.captureWindow": "عکس از یک پنجره"
 }

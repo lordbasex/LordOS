@@ -970,5 +970,6 @@
   "capture.what.viaStudio": "الكاميرا عبر LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "الكاميرا عبر LordOS Studio",
   "capture.what.effectsOn": "التأثيرات مفعّلة",
-  "capture.what.effectsOff": "بلا تأثيرات"
+  "capture.what.effectsOff": "بلا تأثيرات",
+  "shortcuts.captureWindow": "لقطة لنافذة"
 }

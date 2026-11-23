@@ -1,6 +1,6 @@
 // The system file dialog without a screen. node server/tests/filepicker_model_test.mjs
 import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction, imagesOnly, viewFor, saveView, liveRange, gridStep,
-  ZOOM_MIN, ZOOM_MAX, clampZoom, thumbMetrics, zoomFor, saveZoom, cloudPlaces } from '../../sdk/filepickermodel.js';
+  ZOOM_MIN, ZOOM_MAX, clampZoom, thumbMetrics, zoomFor, saveZoom, cloudPlaces, locationPlaces } from '../../sdk/filepickermodel.js';
 import { ZOOM_MIN as FILES_MIN, ZOOM_MAX as FILES_MAX } from '../../apps/files/viewprefs.js';
 
 let ok = 0;
@@ -28,6 +28,15 @@ eq('a doubled slash', startFolder(`${home}//.ssh`, home), home);
 eq('a doubled slash, relative', startFolder('Documents//x', home), home);
 eq('a dot at the end', startFolder(`${home}/.config/.`, home), home);
 eq('a plain hidden folder still opens', startFolder(`${home}/.config`, home), `${home}/.config`);
+// the whole computer, read only (Settings → Wallpaper, GitHub #219)
+eq('computer: a system folder may be the start', startFolder('/usr/share/backgrounds', home, [], true), '/usr/share/backgrounds');
+eq('computer: still not a path with dots', startFolder('/usr/share/../../etc', home, [], true), home);
+eq('computer: still not a doubled slash', startFolder('/usr//share', home, [], true), home);
+eq('without computer: home', startFolder('/usr/share/backgrounds', home, []), home);
+eq('locations: the disks', locationPlaces([usb]), [{ name: 'USB', path: usb.path, kind: 'disk' }]);
+eq('locations with computer: the computer first', locationPlaces([usb], { computer: true }).map((x) => x.path), ['/', usb.path]);
+eq('never in a save dialog', locationPlaces([usb], { computer: true, mode: 'save' }).map((x) => x.path), [usb.path]);
+eq('no disks, no computer: nothing', locationPlaces([]), []);
 
 const labels = (p) => pathCrumbs(p, home).map((c) => c.label);
 eq('home crumb', pathCrumbs(home, home), [{ label: 'ana', path: home, home: true }]);

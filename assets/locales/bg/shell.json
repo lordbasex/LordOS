@@ -942,5 +942,6 @@
   "capture.what.viaStudio": "Камера чрез LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "Камера чрез LordOS Studio",
   "capture.what.effectsOn": "ефектите са включени",
-  "capture.what.effectsOff": "без ефекти"
+  "capture.what.effectsOff": "без ефекти",
+  "shortcuts.captureWindow": "Снимка на прозорец"
 }

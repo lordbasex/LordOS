@@ -942,5 +942,6 @@
   "capture.what.viaStudio": "LordOS Studio-র মাধ্যমে ক্যামেরা ({camera})",
   "capture.what.viaStudioPlain": "LordOS Studio-র মাধ্যমে ক্যামেরা",
   "capture.what.effectsOn": "এফেক্ট চালু",
-  "capture.what.effectsOff": "কোনো এফেক্ট নেই"
+  "capture.what.effectsOff": "কোনো এফেক্ট নেই",
+  "shortcuts.captureWindow": "একটি উইন্ডোর স্ক্রিনশট"
 }
