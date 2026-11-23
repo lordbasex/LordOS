@@ -174,13 +174,18 @@ function CategoryTiles({ counts, onCategory }) {
   const cats = M.MAIN_CATS.filter((c) => counts[c]);
   if (!cats.length) return null;
   return h(Shelf, { title: t('flathub.home.categories') },
-    h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s } }, ...cats.map((c) => h(Tile, { key: c, th, c, n: counts[c], onClick: () => onCategory(c) }))));
+    h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s } },
+      ...cats.map((c) => h(Tile, { key: c, th, c, n: counts[c], onClick: () => onCategory(c) })),
+      // empty, zero-height cells with the tiles' own flex: the last row's tiles keep the first row's width instead of
+      // stretching over the rest of it (five: a row holds at most six tiles at the Store's widest)
+      ...[0, 1, 2, 3, 4].map((i) => h(View, { key: `pad-${i}`, style: { ...TILE_FLEX, height: 0 } }))));
 }
+const TILE_FLEX = { flexGrow: 1, flexBasis: 160, minWidth: 140 };
 function Tile({ th, c, n, onClick }) {
   const [hover, setHover] = useState(false);
   return h(View, {
     onClick, onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false),
-    style: { flexGrow: 1, flexBasis: 160, minWidth: 140, height: 52, paddingHorizontal: spacing.m, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.s,
+    style: { ...TILE_FLEX, height: 52, paddingHorizontal: spacing.m, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.s,
       backgroundColor: hover ? tint(th.accent, 0.16) : tint(th.accent, 0.08), border: `1px solid ${tint(th.accent, 0.22)}` },
   },
   h(Text, { style: { fontSize: 18, color: th.accent, width: 22, textAlign: 'center' } }, GLYPH[c] || '•'),

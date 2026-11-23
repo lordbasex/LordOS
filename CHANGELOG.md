@@ -1699,6 +1699,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **Store: the Flathub home's category tiles keep one width on every row** (`apps/store/flathubpages.js`,
+  `CategoryTiles`). The tiles grew to fill their row, so a last row with fewer tiles (four of ten at 1600 px) made each
+  of them wider than the ones above; five empty, zero-height cells with the tiles' own flex now fill that row. Seen in
+  `server/tests/store_rankings_headless.sh`'s screenshots.
 - **Store, Flathub: the counts agree with the lists, and a card's one-line texts end in an ellipsis, in development
   (the latest release is 0.8.9.4).** Found on the screenshots of Flathub's home with the rankings (E10), taken in a
   headless lord-server with this machine's Flathub catalog (3381 apps, 2243 verified) and Flathub's recorded answers of
