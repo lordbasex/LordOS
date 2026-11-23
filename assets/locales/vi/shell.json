@@ -16,6 +16,7 @@
   "category.Graphics": "Đồ họa",
   "category.Network": "Internet",
   "category.Office": "Văn phòng",
+  "category.Other": "Khác",
   "category.Science": "Khoa học",
   "category.Settings": "Cài đặt",
   "category.System": "Hệ thống",
@@ -73,6 +74,8 @@
   "classic.start": "Bắt đầu",
   "classic.trash": "Thùng rác",
   "classic.unpinStart": "Bỏ ghim khỏi Bắt đầu",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Danh mục",
   "clipboard.chars": {
     "other": "· {count} ký tự"
   },

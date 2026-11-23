@@ -16,6 +16,7 @@
   "category.Graphics": "Графика",
   "category.Network": "Интернет",
   "category.Office": "Офис",
+  "category.Other": "Други",
   "category.Science": "Наука",
   "category.Settings": "Настройки",
   "category.System": "Система",
@@ -74,6 +75,8 @@
   "classic.start": "Старт",
   "classic.trash": "Кошче",
   "classic.unpinStart": "Откачи от „Старт“",
+  "classic.viewAz": "А–Я",
+  "classic.viewCategories": "Категории",
   "clipboard.chars": {
     "one": "· {count} знак",
     "other": "· {count} знака"

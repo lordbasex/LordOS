@@ -16,6 +16,7 @@
   "category.Graphics": "Grafika",
   "category.Network": "Internet",
   "category.Office": "Iroda",
+  "category.Other": "Egyéb",
   "category.Science": "Tudomány",
   "category.Settings": "Beállítások",
   "category.System": "Rendszer",
@@ -74,6 +75,8 @@
   "classic.start": "Start",
   "classic.trash": "Kuka",
   "classic.unpinStart": "Rögzítés feloldása a Startból",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Kategóriák",
   "clipboard.chars": {
     "one": "· {count} karakter",
     "other": "· {count} karakter"

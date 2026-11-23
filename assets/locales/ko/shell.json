@@ -16,6 +16,7 @@
   "category.Graphics": "그래픽",
   "category.Network": "인터넷",
   "category.Office": "오피스",
+  "category.Other": "기타",
   "category.Science": "과학",
   "category.Settings": "설정",
   "category.System": "시스템",
@@ -73,6 +74,8 @@
   "classic.start": "시작",
   "classic.trash": "휴지통",
   "classic.unpinStart": "시작에서 고정 해제",
+  "classic.viewAz": "이름순",
+  "classic.viewCategories": "카테고리",
   "clipboard.chars": {
     "other": "· {count}자"
   },

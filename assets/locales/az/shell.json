@@ -16,6 +16,7 @@
   "category.Graphics": "Qrafika",
   "category.Network": "İnternet",
   "category.Office": "Ofis",
+  "category.Other": "Digər",
   "category.Science": "Elm",
   "category.Settings": "Parametrlər",
   "category.System": "Sistem",
@@ -74,6 +75,8 @@
   "classic.start": "Başlat",
   "classic.trash": "Zibil qutusu",
   "classic.unpinStart": "Başlat menyusundan ayır",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Kateqoriyalar",
   "clipboard.chars": {
     "one": "· {count} simvol",
     "other": "· {count} simvol"

@@ -16,6 +16,7 @@
   "category.Graphics": "Grafisch",
   "category.Network": "Internet",
   "category.Office": "Kantoor",
+  "category.Other": "Overig",
   "category.Science": "Wetenschap",
   "category.Settings": "Instellingen",
   "category.System": "Systeem",
@@ -74,6 +75,8 @@
   "classic.start": "Start",
   "classic.trash": "Prullenmand",
   "classic.unpinStart": "Van Start losmaken",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Categorieën",
   "clipboard.chars": {
     "one": "· {count} teken",
     "other": "· {count} tekens"

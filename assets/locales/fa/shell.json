@@ -16,6 +16,7 @@
   "category.Graphics": "گرافیک",
   "category.Network": "اینترنت",
   "category.Office": "اداری",
+  "category.Other": "سایر",
   "category.Science": "علوم",
   "category.Settings": "تنظیمات",
   "category.System": "سیستم",
@@ -74,6 +75,8 @@
   "classic.start": "شروع",
   "classic.trash": "سطل زباله",
   "classic.unpinStart": "برداشتن سنجاق از «شروع»",
+  "classic.viewAz": "الف–ی",
+  "classic.viewCategories": "دسته‌ها",
   "clipboard.chars": {
     "one": "· {count} نویسه",
     "other": "· {count} نویسه"

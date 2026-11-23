@@ -16,6 +16,7 @@
   "category.Graphics": "Grafik",
   "category.Network": "İnternet",
   "category.Office": "Ofis",
+  "category.Other": "Diğer",
   "category.Science": "Bilim",
   "category.Settings": "Ayarlar",
   "category.System": "Sistem",
@@ -74,6 +75,8 @@
   "classic.start": "Başlat",
   "classic.trash": "Çöp Kutusu",
   "classic.unpinStart": "Başlat’tan kaldır",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Kategoriler",
   "clipboard.chars": {
     "one": "· {count} karakter",
     "other": "· {count} karakter"

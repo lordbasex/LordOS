@@ -16,6 +16,7 @@
   "category.Graphics": "Grafika",
   "category.Network": "Internetas",
   "category.Office": "Biuras",
+  "category.Other": "Kita",
   "category.Science": "Mokslas",
   "category.Settings": "Nustatymai",
   "category.System": "Sistema",
@@ -75,6 +76,8 @@
   "classic.start": "Pradžia",
   "classic.trash": "Šiukšlinė",
   "classic.unpinStart": "Atsegti nuo pradžios",
+  "classic.viewAz": "A–Ž",
+  "classic.viewCategories": "Kategorijos",
   "clipboard.chars": {
     "one": "· {count} simbolis",
     "few": "· {count} simboliai",

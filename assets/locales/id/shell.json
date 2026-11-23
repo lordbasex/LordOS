@@ -16,6 +16,7 @@
   "category.Graphics": "Grafis",
   "category.Network": "Internet",
   "category.Office": "Perkantoran",
+  "category.Other": "Lainnya",
   "category.Science": "Sains",
   "category.Settings": "Pengaturan",
   "category.System": "Sistem",
@@ -73,6 +74,8 @@
   "classic.start": "Mulai",
   "classic.trash": "Sampah",
   "classic.unpinStart": "Lepas sematan dari Mulai",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Kategori",
   "clipboard.chars": {
     "other": "· {count} karakter"
   },

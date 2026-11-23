@@ -16,6 +16,7 @@
   "category.Graphics": "Grafică",
   "category.Network": "Internet",
   "category.Office": "Birou",
+  "category.Other": "Altele",
   "category.Science": "Știință",
   "category.Settings": "Setări",
   "category.System": "Sistem",
@@ -75,6 +76,8 @@
   "classic.start": "Start",
   "classic.trash": "Coș de gunoi",
   "classic.unpinStart": "Anulează fixarea la Start",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Categorii",
   "clipboard.chars": {
     "one": "· {count} caracter",
     "few": "· {count} caractere",

@@ -16,6 +16,7 @@
   "category.Graphics": "গ্রাফিক্স",
   "category.Network": "ইন্টারনেট",
   "category.Office": "অফিস",
+  "category.Other": "অন্যান্য",
   "category.Science": "বিজ্ঞান",
   "category.Settings": "সেটিংস",
   "category.System": "সিস্টেম",
@@ -74,6 +75,8 @@
   "classic.start": "স্টার্ট",
   "classic.trash": "ট্র্যাশ",
   "classic.unpinStart": "স্টার্ট থেকে আনপিন করুন",
+  "classic.viewAz": "নাম অনুসারে",
+  "classic.viewCategories": "বিভাগ",
   "clipboard.chars": {
     "one": "· {count}টি অক্ষর",
     "other": "· {count}টি অক্ষর"

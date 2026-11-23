@@ -16,6 +16,7 @@
   "category.Graphics": "گرافکس",
   "category.Network": "انٹرنیٹ",
   "category.Office": "آفس",
+  "category.Other": "دیگر",
   "category.Science": "سائنس",
   "category.Settings": "ترتیبات",
   "category.System": "سسٹم",
@@ -74,6 +75,8 @@
   "classic.start": "اسٹارٹ",
   "classic.trash": "ردی کی ٹوکری",
   "classic.unpinStart": "اسٹارٹ سے ان پن کریں",
+  "classic.viewAz": "ا–ی",
+  "classic.viewCategories": "زمرے",
   "clipboard.chars": {
     "one": "· {count} حرف",
     "other": "· {count} حروف"

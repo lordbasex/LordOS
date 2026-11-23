@@ -16,6 +16,7 @@
   "category.Graphics": "Grafik",
   "category.Network": "Internet",
   "category.Office": "Kontor",
+  "category.Other": "Övrigt",
   "category.Science": "Vetenskap",
   "category.Settings": "Inställningar",
   "category.System": "System",
@@ -74,6 +75,8 @@
   "classic.start": "Start",
   "classic.trash": "Papperskorg",
   "classic.unpinStart": "Lossa från Start",
+  "classic.viewAz": "A–Ö",
+  "classic.viewCategories": "Kategorier",
   "clipboard.chars": {
     "one": "· {count} tecken",
     "other": "· {count} tecken"

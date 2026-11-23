@@ -16,6 +16,7 @@
   "category.Graphics": "Grafika",
   "category.Network": "Internet",
   "category.Office": "Biuro",
+  "category.Other": "Inne",
   "category.Science": "Nauka",
   "category.Settings": "Ustawienia",
   "category.System": "System",
@@ -75,6 +76,8 @@
   "classic.start": "Start",
   "classic.trash": "Kosz",
   "classic.unpinStart": "Odepnij od menu Start",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Kategorie",
   "clipboard.chars": {
     "one": "· {count} znak",
     "few": "· {count} znaki",

@@ -16,6 +16,7 @@
   "category.Graphics": "ग्राफ़िक्स",
   "category.Network": "इंटरनेट",
   "category.Office": "ऑफ़िस",
+  "category.Other": "अन्य",
   "category.Science": "विज्ञान",
   "category.Settings": "सेटिंग्स",
   "category.System": "सिस्टम",
@@ -74,6 +75,8 @@
   "classic.start": "स्टार्ट",
   "classic.trash": "ट्रैश",
   "classic.unpinStart": "स्टार्ट से अनपिन करें",
+  "classic.viewAz": "नाम से",
+  "classic.viewCategories": "श्रेणियाँ",
   "clipboard.chars": {
     "one": "· {count} वर्ण",
     "other": "· {count} वर्ण"

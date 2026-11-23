@@ -689,6 +689,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs
     else skip "classic-startmenu-power-test" "node and the repository's node_modules (npm install)"; fi
+    # (#210) Lord Classic's start menu by category: the groups and counts, mouse and keyboard, RTL, the remembered view
+    if have node; then run "app-groups-model-test (sdk/appgroupsmodel.js)" node tests/app_groups_model_test.mjs; fi
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "classic-startmenu-categories-scene (themes/classic StartMenu, sdk/appgroupsmodel.js)" node tests/classic_startmenu_power_test.mjs classic_startmenu_categories_scene.mjs
+    else skip "classic-startmenu-categories-scene" "node and the repository's node_modules (npm install)"; fi
     # (#159) a mouse's back and forward buttons go to the Linux app, never to the desktop's own press handlers
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "side-buttons-test (runtime/events.js)" node tests/side_buttons_test.mjs

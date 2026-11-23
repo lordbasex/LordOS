@@ -16,6 +16,7 @@
   "category.Graphics": "Graphisme",
   "category.Network": "Internet",
   "category.Office": "Bureautique",
+  "category.Other": "Autres",
   "category.Science": "Sciences",
   "category.Settings": "Réglages",
   "category.System": "Système",
@@ -74,6 +75,8 @@
   "classic.start": "Démarrer",
   "classic.trash": "Corbeille",
   "classic.unpinStart": "Désépingler de Démarrer",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Catégories",
   "clipboard.chars": {
     "one": "· {count} caractère",
     "other": "· {count} caractères"
