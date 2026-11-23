@@ -12,6 +12,29 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **lordos.org/wayland-conformance/: the Wayland and X11 conformance run in full, with comparisons and the steps to
+  run it yourself, in development (the latest release is 0.8.9.4).** A new page, in en, es and pt, publishes everything
+  `tools/wl-conformance.mjs` recorded in `docs/wayland-conformance.json`, rendered from that data (nothing typed by
+  hand): the run (date, commit, uncommitted changes, wayland-protocols, libwayland and Xwayland versions, headless CPU
+  path, duration); a summary with each number's limits (the X11 items at 100 % that aren't complete and why, the 19
+  allowed exceptions with the protocol's words, the protocols complete here but "Partly" in the table, the globals only
+  the test hooks reach, timing checks that can fail once on a loaded machine, and that KWin and Mutter were never put
+  through the tool); every Wayland global and X11 item with its version, score, depth, checks by kind and screenshot;
+  every one of the 1,294 checks with its result, points, message and file:line; the real programs the run started;
+  LordOS against KWin and Mutter as wayland.app lists them (by category, the protocols LordOS offers with their
+  versions, the ones only KDE or GNOME offer, and the ones left out on purpose grouped by reason); copy-and-paste
+  steps for Debian 13 (packages, clone, build, run, read, compare, one protocol at a time, a live session, the
+  screenshots), each one run on this machine with Debian's Node.js 20; and what to attach to a GitHub issue. Linked
+  from the protocol table, the footer, the search and the sitemap, with a FAQ entry.
+  - **Data:** `tools/gen-wayland-table.mjs` also writes `web/content/wayland/conformance.json` (every check, the
+    notes, the real programs). `validateDetail()` holds each value to a strict shape and refuses the build when an
+    item's checks don't add up to the points `protocols.json` shows for it; `--check` and
+    `server/tests/wayland_table_test.mjs` catch a stale copy, and the test refuses hostile values (markup in an id, a
+    path with `..`, a bad result, a points mismatch).
+  - **`tools/wl-conformance/compare.mjs`:** compares your `server/build/wl-conformance.json` with the recorded run
+    check by check (versions, scores, every result that differs with both messages); exit status 0 when they match;
+    globals left out by `--only` or `--no-x11` are listed, not counted.
+
 - **Backups: the destination and the exclusions can be chosen in the file dialog, in development (the latest release is
   0.8.9.4; from [#200](https://github.com/lordbasex/LordOS/issues/200)'s second idea).** Settings → Destination has
   a **Choose…** button next to **Use Folder**, and Exclusions one next to **Add**. Each opens the system file dialog
