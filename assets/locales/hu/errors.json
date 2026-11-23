@@ -46,6 +46,7 @@
   "backup.destMissing": "A cél nem létezik",
   "backup.destNotAllowed": "Ez a cél nem engedélyezett",
   "backup.destOutside": "A célnak a saját mappájában vagy az egyik lemezén kell lennie",
+  "backup.destCloud": "Felhőmappa nem lehet a mentés célja: a pillanatképekhez rögzített hivatkozások kellenek, amelyek egy felhőfiókban nincsenek, és a fájljai a mentés leállítása után is tovább töltődnek fel. Válasszon lemezt vagy mappát ezen a számítógépen",
   "backup.destUnwritable": "A cél nem írható",
   "backup.interrupted": "Megszakadt",
   "backup.locked": "A biztonsági mentések titkosítottak: előbb oldja fel őket",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Ez a kép nem használható háttérként.",
   "studio.invalid": "Ez a LordOS Studio-beállítás érvénytelen.",
   "studio.noCamera": "Nincs csatlakoztatott kamera.",
-  "studio.unavailable": "A LordOS Studio nem érhető el ezen a számítógépen."
+  "studio.unavailable": "A LordOS Studio nem érhető el ezen a számítógépen.",
+  "studio.downloadFailed": "A hátteret nem sikerült letölteni.",
+  "studio.removeFailed": "A hátteret nem sikerült eltávolítani.",
+  "dkms.mokInvalid": "Ez a Secure Boot-kulcskérés érvénytelen.",
+  "dkms.mokNotNeeded": "Ennek a számítógépnek most nem kell regisztrálnia a kulcsot.",
+  "dkms.mokNothingPending": "Nincs kulcs, amely a következő újraindításkor regisztrálásra vár.",
+  "dkms.mokNoTool": "A mokutil program nincs telepítve.",
+  "dkms.mokFailed": "A kulcsot nem sikerült előkészíteni a következő újraindításra.",
+  "media.protectedWindow": "Ez az ablak védett, ezért önmagában nem rögzíthető. A képernyőképeken feketén jelenik meg."
 }

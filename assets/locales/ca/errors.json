@@ -46,6 +46,7 @@
   "backup.destMissing": "La destinació no existeix",
   "backup.destNotAllowed": "Aquesta destinació no està permesa",
   "backup.destOutside": "La destinació ha de ser a la carpeta personal o en un dels teus discos",
+  "backup.destCloud": "Una carpeta del núvol no pot ser la destinació de la còpia: les instantànies necessiten enllaços durs, que un compte del núvol no té, i els seus fitxers continuen pujant després d’aturar la còpia. Tria un disc o una carpeta d’aquest ordinador",
   "backup.destUnwritable": "No es pot escriure a la destinació",
   "backup.interrupted": "S’ha interromput",
   "backup.locked": "Les còpies de seguretat estan xifrades: primer desbloqueja-les",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Aquesta imatge no es pot fer servir de fons.",
   "studio.invalid": "Aquest ajust de LordOS Studio no és vàlid.",
   "studio.noCamera": "No hi ha cap càmera connectada.",
-  "studio.unavailable": "LordOS Studio no està disponible en aquest ordinador."
+  "studio.unavailable": "LordOS Studio no està disponible en aquest ordinador.",
+  "studio.downloadFailed": "No s’ha pogut baixar el fons.",
+  "studio.removeFailed": "No s’ha pogut eliminar el fons.",
+  "dkms.mokInvalid": "Aquesta sol·licitud de clau de Secure Boot no és vàlida.",
+  "dkms.mokNotNeeded": "Aquest ordinador no necessita inscriure la clau ara.",
+  "dkms.mokNothingPending": "No hi ha cap clau esperant inscriure’s al proper reinici.",
+  "dkms.mokNoTool": "El programa mokutil no està instal·lat.",
+  "dkms.mokFailed": "No s’ha pogut preparar la clau per al proper reinici.",
+  "media.protectedWindow": "Aquesta finestra està protegida: no es pot capturar sola. A les captures de la pantalla surt en negre."
 }

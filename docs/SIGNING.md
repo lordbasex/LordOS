@@ -211,7 +211,18 @@ but cannot run anything; phase 3 (fs-verity over the whole system image) covers 
   LordOS folder, verify the signature with the compiled-in key, then parse the manifest with the
   strict JSON reader (format 1, the right kind, relative paths without `.`/`..`, sorted and unique,
   64 lowercase hex digits, at most 4096 files and 1 MB). An isolated app's process does this before
-  its sandbox is applied.
+  its sandbox is applied. Both files are read directly in that folder, never through a link
+  (`O_NOFOLLOW`), regular files only.
+- **After a package update under a running session** (in development after 0.8.9.4): before each
+  bundle check lord-server compares the pair's identity (device, inode, size, change and modification
+  times) with the one it read; when it changed, or when a bundle no longer matches, `codesig_reload`
+  reads the pair again with the same reader and the same signature check, from the folder opened at
+  login. The new manifest is used only if the session was verified, it is signed with the compiled-in
+  key, the folder and both files are owned by root and writable by nobody else, and its `version` is
+  not older (dpkg's order) than the one in use. Each pair on disk is read at most once, reads are at
+  least a second apart, and at most 32 manifests replace the login one in a session. Otherwise the
+  manifest read before stays and the refusal says why. The bundle is checked once more with the bytes
+  already read. A development session (unsigned manifest) never reads a changed one: log in again.
 - **Per bundle, lazily, when it is loaded:** the file is opened under the LordOS folder with
   `openat2(RESOLVE_BENEATH)` (no `..`, no link out of it), read whole from that one descriptor, and
   the SHA-256 of **exactly those bytes** is compared with the manifest; the same buffer is what
@@ -244,7 +255,8 @@ development state: without a valid signature nothing is loaded.
   (`classic`); on a theme switch it keeps the last theme that loaded (since 0.8.5, so two refused
   switches in a row no longer leave the session without a theme). The desktop
   shows a notification: **"This LordOS component was modified and was not loaded"**, naming the file,
-  with a Details button (About). The broken theme is not offered again in this session.
+  with a Details button (About). The broken theme is not offered again in this session, unless a
+  newer signed manifest is put in use (a package update, above).
 - **Nothing left to load** (every theme, the login screen, or a bad manifest/signature): the built-in
   **recovery screen** — compiled into lord-server, so it is as trusted as lord-server itself — says
   what happened, lists the files and how to repair it (`sudo apt install --reinstall lordos`); in a

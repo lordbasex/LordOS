@@ -46,6 +46,7 @@
   "backup.destMissing": "الوجهة غير موجودة",
   "backup.destNotAllowed": "هذه الوجهة غير مسموح بها",
   "backup.destOutside": "يجب أن تكون الوجهة في مجلد المنزل أو على أحد أقراصك",
+  "backup.destCloud": "لا يمكن أن يكون مجلد سحابي وجهةً للنسخ الاحتياطي: اللقطات تحتاج إلى روابط صلبة لا يدعمها حساب السحابة، وتستمر ملفاتها في الرفع حتى بعد إيقاف النسخ الاحتياطي. اختر قرصًا أو مجلدًا على هذا الحاسوب",
   "backup.destUnwritable": "لا يمكن الكتابة في الوجهة",
   "backup.interrupted": "تمت مقاطعته",
   "backup.locked": "النسخ الاحتياطية مشفّرة: افتح قفلها أولًا",
@@ -921,5 +922,13 @@
   "studio.badPicture": "لا يمكن استخدام هذه الصورة كخلفية.",
   "studio.invalid": "إعداد LordOS Studio هذا غير صالح.",
   "studio.noCamera": "لا توجد كاميرا متصلة.",
-  "studio.unavailable": "LordOS Studio غير متاح على هذا الكمبيوتر."
+  "studio.unavailable": "LordOS Studio غير متاح على هذا الكمبيوتر.",
+  "studio.downloadFailed": "تعذّر تنزيل الخلفية.",
+  "studio.removeFailed": "تعذّرت إزالة الخلفية.",
+  "dkms.mokInvalid": "طلب مفتاح Secure Boot هذا غير صالح.",
+  "dkms.mokNotNeeded": "لا يحتاج هذا الكمبيوتر إلى تسجيل المفتاح الآن.",
+  "dkms.mokNothingPending": "لا يوجد مفتاح ينتظر التسجيل عند إعادة التشغيل القادمة.",
+  "dkms.mokNoTool": "برنامج mokutil غير مثبّت.",
+  "dkms.mokFailed": "تعذّر تجهيز المفتاح لإعادة التشغيل القادمة.",
+  "media.protectedWindow": "هذه النافذة محمية، لذا لا يمكن التقاطها وحدها. وتظهر سوداء في لقطات الشاشة."
 }

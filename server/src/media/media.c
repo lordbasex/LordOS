@@ -710,7 +710,7 @@ static void on_src_msg(MediaSrc *s, const MediaMsg *m, int *fds) {
                     (long long)m->v[2], (long long)m->v[3]);
         break;
     case MM_STUDIO_STATS:
-        if (s->studio == STUDIO_SRC_OWN || s->studio == STUDIO_SRC_HUB) mstudio_stats(s->id, m->v[0], m->v[1], m->v[2], m->v[3]);
+        if (s->studio == STUDIO_SRC_OWN || s->studio == STUDIO_SRC_HUB) mstudio_stats(s->id, m->v);
         break;
     case MM_STUDIO_READERS:
         if (s->studio == STUDIO_SRC_HUB) mstudio_readers(s->id, m->v[0], m->v[1], m->v[2]);

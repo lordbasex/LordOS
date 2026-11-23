@@ -14,6 +14,7 @@ the components below, each under its own license.
 | EFF large wordlist, SecLists common passwords | passphrase generator, weak-password check | CC BY 3.0 (EFF), MIT (SecLists, `third_party/wordlists/LICENSE-SecLists`) |
 | `pointer-warp-v1.xml` from wayland-protocols 1.45 (`staging/pointer-warp`, commit `b3f29d8a41320a9231587835ee5e485f4a5f6eba`; Debian 13 ships 1.44 without it), in `server/protocols/`, unmodified | `wp_pointer_warp_v1` (wayland-scanner generates the code) | MIT (copyright notice in the file) |
 | wayland-protocols 1.50: `ext-background-effect-v1.xml`, `xdg-session-management-v1.xml` (in `server/protocols/`, unchanged; newer than Debian 13's 1.44) | protocol descriptions wayland-scanner turns into code for lord-server | MIT (the notice is in each file) |
+| KDE's `server-decoration.xml` (plasma-wayland-protocols, as shipped in the KDE Platform 6.11 runtime; SHA-256 `c5f857734bb190dc9adfb65fb05550a6245f12af1a2be5eefd05be199805a68c`), in `third_party/plasma-wayland-protocols/`, unmodified | only the Wayland conformance tool's test client (`tools/wl-conformance.mjs` runs wayland-scanner on it); lord-server's `org_kde_kwin_server_decoration_manager` stays hand-written in `wl.c` | LGPL-2.1-or-later (`third_party/plasma-wayland-protocols/LGPL-2.1.txt`; the notice is in the file) |
 
 ## Fetched at build time (`third_party/audiocpp`, ignored by git)
 
@@ -66,6 +67,29 @@ updated. Nothing else in `third_party/` differs from upstream.
 Downloaded on demand, not in this repository; each clip's author, license and source are in Settings → Wallpaper → Credits
 and in the README of the `LordOS-wallpapers` repository. NASA material (public domain), CC0, CC BY 3.0 and CC BY-SA 4.0
 works; see `docs/WALLPAPERS.md`. The built-in clip is the project's own.
+
+## LordOS Studio's backgrounds
+
+The catalog `assets/studio/backgrounds.json` lists 158 backgrounds (121 pictures, 37 short loops) with each one's title,
+author, license, license URL, source page and, for CC BY and CC BY-SA works, its credit line; the camera popover shows
+them under Background → Credits. Their thumbnails and seven pictures (one per category) ship in
+`assets/studio/backgrounds/`; the full files are downloaded on demand from the `LordOS-wallpapers` repository's
+`studio/` folder, whose README credits every file.
+
+The 121 pictures (72 backgrounds and 49 stills of moving scenes) were generated with ChatGPT for LordOS from the
+project's own prompts on 2026-11-22 and approved by the maintainer the same day. OpenAI's terms assign the output to
+the user; the LordOS project releases them under CC0 1.0 (`"ai": true` in the catalog; the credits page says
+"Generated with AI"). No photograph, person, logo or readable text was used or asked for. They are made by
+`tools/studio/build-ai-backgrounds.py`.
+
+Every loop is published at 3840×2160 and 1920×1080, made from an original at least 3840×2160. The loops come from
+Wikimedia Commons (CC0, CC BY 2.0/3.0/4.0 and CC BY-SA 4.0; the share-alike applies to those files only) and the
+project's own renders (MIT, `tools/studio/gen-studio-loops.py`). The record of each loop's license check is
+`tools/studio/bg-sources.json`. Nothing from Unsplash, Pexels or Pixabay (`docs/CAMERA-STUDIO-PLAN.md` 6.1).
+
+LordOS Studio's Noise Reduction uses PipeWire's own echo-cancel module with WebRTC Audio Processing (BSD-3-Clause), both
+Debian packages LordOS already installs (`libspa-0.2-modules`, `libwebrtc-audio-processing-1-3`); LordOS ships only the
+configuration file that loads them.
 
 ## Voices
 

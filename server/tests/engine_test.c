@@ -674,6 +674,68 @@ static void test_capture_until(void) {
     free(px);
 }
 
+/* Protected windows (wm.setProtected: the vault, a password prompt, the lock screen's fields, "Protect front window") with
+ * Screenshots' screen permission allowed by default (GitHub #219, approved 2026-11-22): nothing about the capture changed
+ * for them. In a capture of the whole screen (and so of an area, a crop of it) the protected window is black and what
+ * covers it still shows; asked for alone (the window capture) it is refused with nothing painted. */
+static void test_capture_protected(void) {
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xffffffff);
+    Node *base = view(root);
+    sn(base, "width", 160); sn(base, "height", 100);
+    Node *other = box_in(base, 0, 0, 50, 50, 0xff00ffff);           /* another window: cyan */
+    Node *vault = box_in(base, 60, 10, 80, 60, 0xff0000ff);         /* the vault's frame: blue */
+    Node *content = box_in(vault, 5, 5, 70, 50, 0xffffff00);        /* its content, protected: yellow on screen */
+    content->protect = 1;
+    box_in(base, 120, 50, 30, 40, 0xffff0000);                      /* a window above it: red */
+    render(root, 160, 100);
+    CHECK(pix(80, 30) == 0xffff00, "on the screen the protected window looks normal: %06x", pix(80, 30));
+    uint32_t *px = calloc(160 * 100, 4);
+    Canvas c;
+    canvas_init(&c, px, 160, 100, 160);
+    paint_capture(&c, root);
+    CHECK((px[30 * 160 + 80] & 0xffffff) == 0x000000, "the whole screen: the protected content is black: %06x", px[30 * 160 + 80]);
+    CHECK((px[60 * 160 + 130] & 0xffffff) == 0xff0000, "a window above it still shows: %06x", px[60 * 160 + 130]);
+    CHECK((px[20 * 160 + 20] & 0xffffff) == 0x00ffff, "another window is captured: %06x", px[20 * 160 + 20]);
+    CHECK(!paint_capture_mode, "capture mode is over");
+    for (int i = 0; i < 160 * 100; i++) px[i] = 0xff123456u;
+    CHECK(paint_capture_until(&c, root, vault->id, NULL, 0) == -1, "the protected window alone is refused");
+    int untouched = 1;
+    for (int i = 0; i < 160 * 100; i++) if (px[i] != 0xff123456u) untouched = 0;
+    CHECK(untouched, "and nothing of the screen was painted for it");
+    CHECK(!paint_capture_mode, "capture mode is over");
+    CHECK(paint_capture_until(&c, root, other->id, NULL, 0) == 1, "another window alone is captured");
+    CHECK(paint_node_protected(vault) && paint_node_protected(content) && !paint_node_protected(other), "which windows are protected");
+    /* a protected ancestor (a whole layer marked) protects every window in it */
+    content->protect = 0;
+    base->protect = 1;
+    CHECK(paint_capture_until(&c, root, other->id, NULL, 0) == -1, "a window inside a protected node is refused too");
+    base->protect = 0;
+    CHECK(paint_capture_until(&c, root, vault->id, NULL, 0) == 1, "unprotected again: captured");
+
+    /* the system's password prompts (keyring, polkit) are protected dialogs in a high layer over every window, and a
+     * password field is a protected node inside an ordinary window: both black in a capture of the screen, the rest of
+     * that window still captured, and that window refused alone (GitHub #219 follow-up: a password is never captured) */
+    Node *modal = layer_node(root, 100, 160, 100);
+    Node *prompt = box_in(modal, 20, 20, 60, 40, 0xffff00ff);       /* the keyring prompt: magenta */
+    box_in(prompt, 5, 25, 50, 10, 0xffffffff);                      /* its password field */
+    prompt->protect = 1;
+    Node *field = box_in(other, 5, 30, 40, 10, 0xff00ff00);        /* a Wi-Fi password field in a window: green */
+    field->protect = 1;
+    render(root, 160, 100);
+    CHECK(pix(30, 25) == 0xff00ff, "on screen the prompt shows: %06x", pix(30, 25));
+    memset(px, 0, 160 * 100 * 4);
+    paint_capture(&c, root);
+    CHECK((px[25 * 160 + 30] & 0xffffff) == 0x000000 && (px[50 * 160 + 40] & 0xffffff) == 0x000000,
+          "the prompt and its field are black: %06x %06x", px[25 * 160 + 30], px[50 * 160 + 40]);
+    CHECK((px[35 * 160 + 10] & 0xffffff) == 0x000000, "the password field in the window is black: %06x", px[35 * 160 + 10]);
+    CHECK((px[5 * 160 + 5] & 0xffffff) == 0x00ffff, "the rest of that window is captured: %06x", px[5 * 160 + 5]);
+    CHECK(paint_capture_until(&c, root, other->id, NULL, 0) == -1, "a window holding a password field is refused alone");
+    free(px);
+}
+
 /* A node's id goes to the next node once it is destroyed; its serial never does (node_ref, what a shared window holds
  * on to in cast/cast.c): the id names another window, the id with the serial names nothing, and the destroy hook is
  * told of the node that went with its serial, even when the whole tree goes (a theme change). */
@@ -3985,6 +4047,7 @@ int main(int argc, char **argv) {
     test_transform_self_restyle();
     test_layers();
     test_capture_until();
+    test_capture_protected();
     test_node_ref();
     test_backdrop_band();
     test_multi_damage();

@@ -15,6 +15,7 @@ import {
   openSwitcher, registerGestureActions, screen, screenDisplays, session, setNightManual, settings, snapPreview, startDeskWidgets,
   startShell, switcherGrabs, switcherHold, switcherKeys, t as tr, themeOptionPatch, toggleOverview, toggleShowDesktop, useSettings,
   useShortcuts, useStore, useWindows, wallpaperIdFor, wallpaperSrc, widgetPicker, wm,
+  titleBarPx,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
 import { Fragment, useEffect, useRef, useState } from 'react';
@@ -37,7 +38,7 @@ const framed = (d, s) => hasBar(d, menuBarEveryDisplay(s), screen.mirror);
 const areaFn = (d) => workArea(d, framed(d, settings.get()), rtlNow());
 
 // chrome: borders (1 + 1) and the title bar with its separator; snapping on (Settings → Desktop & Dock → Windows)
-configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: TITLE_H + 3 }, snap: true });
+configureWindows({ apps, workArea: areaFn, chrome: () => ({ w: 2, h: titleBarPx(TITLE_H) + 3 }), snap: true });
 
 // The minimize effect: a window that was just minimized shrinks towards the bar for MIN_MS (none with reduce motion).
 function useMinimizing(windows) {

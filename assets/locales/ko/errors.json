@@ -46,6 +46,7 @@
   "backup.destMissing": "대상이 없습니다",
   "backup.destNotAllowed": "그 대상은 허용되지 않습니다",
   "backup.destOutside": "대상은 홈 폴더나 사용자의 디스크 중 하나에 있어야 합니다",
+  "backup.destCloud": "클라우드 폴더는 백업 대상이 될 수 없습니다. 스냅숏에는 하드 링크가 필요한데 클라우드 계정에는 없으며, 백업을 멈춘 뒤에도 그 파일은 계속 올라갑니다. 이 컴퓨터의 디스크나 폴더를 고르세요",
   "backup.destUnwritable": "대상에 쓸 수 없습니다",
   "backup.interrupted": "중단되었습니다",
   "backup.locked": "백업이 암호화되어 있습니다. 먼저 잠금을 해제하세요",
@@ -916,5 +917,13 @@
   "studio.badPicture": "이 사진은 배경으로 사용할 수 없습니다.",
   "studio.invalid": "해당 LordOS Studio 설정이 올바르지 않습니다.",
   "studio.noCamera": "연결된 카메라가 없습니다.",
-  "studio.unavailable": "이 컴퓨터에서는 LordOS Studio를 사용할 수 없습니다."
+  "studio.unavailable": "이 컴퓨터에서는 LordOS Studio를 사용할 수 없습니다.",
+  "studio.downloadFailed": "배경을 다운로드할 수 없습니다.",
+  "studio.removeFailed": "배경을 제거할 수 없습니다.",
+  "dkms.mokInvalid": "이 Secure Boot 키 요청은 올바르지 않습니다.",
+  "dkms.mokNotNeeded": "이 컴퓨터는 지금 키를 등록할 필요가 없습니다.",
+  "dkms.mokNothingPending": "다음 재시동 때 등록을 기다리는 키가 없습니다.",
+  "dkms.mokNoTool": "mokutil 프로그램이 설치되어 있지 않습니다.",
+  "dkms.mokFailed": "다음 재시동을 위한 키를 준비하지 못했습니다.",
+  "media.protectedWindow": "이 윈도우는 보호되어 있어 따로 캡처할 수 없습니다. 화면 캡처에서는 검게 표시됩니다."
 }

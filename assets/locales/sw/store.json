@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Inapa programu zote, pamoja na vivinjari na simu za video, kamera ya “LordOS Studio” yenye madoido yako: mandharinyuma yenye ukungu au picha nyuma yako ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} haipo kwenye vyanzo vya vifurushi vya kompyuta hii.",
   "suggest.studioCamera.note.dkms": "Kwenye PC, moduli yake ya kerneli hujengwa kwa ajili ya kerneli yako kwenye kompyuta hii (DKMS), jambo linaloleta takriban MB 500 za vikusanyaji na vichwa vya kerneli, na hujengwa upya baada ya kila sasisho la kerneli. Kwenye Raspberry Pi huja na kerneli ya LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Secure Boot ikiwa imewashwa, lazima usajili ufunguo wa kutia sahihi wa moduli unapowasha upya tena, la sivyo kamera haitaonekana."
+  "suggest.studioCamera.note.secureBoot": "Secure Boot ikiwa imewashwa, lazima usajili ufunguo wa kutia sahihi wa moduli unapowasha upya tena, la sivyo kamera haitaonekana.",
+  "suggest.studioCamera.note.obs": "Pia huongeza kifaa cha pili cha kamera, “OBS Virtual Camera”, ili kamera pepe ya OBS Studio yenyewe ifanye kazi kando ya LordOS Studio.",
+  "suggest.mok.title": "Hatua moja zaidi wakati wa kuwasha upya ujao",
+  "suggest.mok.body": "Secure Boot imewashwa, kwa hiyo kilichosakinishwa na kipengee hiki kinapakiwa tu baada ya ufunguo wake wa kutia sahihi kusajiliwa. LordOS huandaa ufunguo na kukupa nenosiri la mara moja la kuandika kwenye skrini ya bluu wakati wa kuwasha upya ujao.",
+  "suggest.mok.prepare": "Andaa Ufunguo",
+  "suggest.mok.pending": "Ufunguo utasajiliwa wakati wa kuwasha upya ujao. Ikiwa huna tena nenosiri, pata jipya.",
+  "suggest.mok.passwordTitle": "Nenosiri lako la mara moja",
+  "suggest.mok.passwordHint": "Liandike sasa: linaonyeshwa mara moja tu na halihifadhiwi popote.",
+  "suggest.mok.steps": "Washa upya, na skrini ya bluu ikitokea, bonyeza kitufe chochote ndani ya sekunde 10. Kisha chagua Enroll MOK → Continue → Yes, andika nenosiri hili na uchague Reboot.",
+  "suggest.mok.newPassword": "Nenosiri Jipya",
+  "suggest.mok.cancel": "Ghairi Usajili"
 }

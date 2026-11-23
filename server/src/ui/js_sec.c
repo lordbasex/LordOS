@@ -24,7 +24,20 @@ static JSValue f_perm_get(JSContext *c, JSValueConst t, int argc, JSValueConst *
     (void)t; (void)argc;
     const char *app = JS_ToCString(c, argv[0]), *pn = JS_ToCString(c, argv[1]);
     int p = app && pn ? perm_from_name(pn) : -1;
-    JSValue r = JS_NewString(c, p < 0 ? "ask" : state_name(perm_get(app, (Perm)p)));
+    /* the desktop's own context: a built-in app's default is part of its state (Screenshots' screen, perms.h) */
+    JSValue r = JS_NewString(c, p < 0 ? "ask" : state_name(perm_get_builtin(app, (Perm)p)));
+    if (app) JS_FreeCString(c, app);
+    if (pn) JS_FreeCString(c, pn);
+    return r;
+}
+
+/* builtinDefault(app, perm) → "allow" when that built-in permission starts allowed (Settings → Privacy lists it with
+ * Allow and Don't Allow only: "ask" would be the default again), else "ask" */
+static JSValue f_perm_builtin_default(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *app = argc > 1 ? JS_ToCString(c, argv[0]) : NULL, *pn = argc > 1 ? JS_ToCString(c, argv[1]) : NULL;
+    int p = app && pn ? perm_from_name(pn) : -1;
+    JSValue r = JS_NewString(c, p < 0 ? "ask" : state_name(perm_builtin_default(app, (Perm)p)));
     if (app) JS_FreeCString(c, app);
     if (pn) JS_FreeCString(c, pn);
     return r;
@@ -76,6 +89,7 @@ static const JSCFunctionListEntry perms_funcs[] = {
     JS_CFUNC_DEF("set", 3, f_perm_set),
     JS_CFUNC_DEF("list", 0, f_perm_list),
     JS_CFUNC_DEF("names", 0, f_perm_names),
+    JS_CFUNC_DEF("builtinDefault", 2, f_perm_builtin_default),
 };
 
 /* ---- lord.sign ---- */

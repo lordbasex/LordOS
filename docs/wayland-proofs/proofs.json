@@ -106,6 +106,66 @@
    "png": "linux-dmabuf-vkcube.png"
   },
   {
+   "name": "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube",
+   "result": "pass",
+   "app": "vkcube (Vulkan)",
+   "version": "vkcube 1.4.304.0+dfsg1-1, Mesa 25.0.7-2+deb13u1",
+   "shows": "vkcube's FIFO present mode through Mesa's Vulkan WSI on the new protocols: every frame waits on the fifo-v1 barrier the one before set, carries a commit-timing-v1 target time, and explicit-sync acquire and release points (linux-drm-syncobj-v1) on timelines it imported; no protocol error.",
+   "alive": true,
+   "errors": [],
+   "found": [
+    {
+     "w": "wp_fifo_v1#\\d+\\.set_barrier",
+     "n": 311
+    },
+    {
+     "w": "wp_fifo_v1#\\d+\\.wait_barrier",
+     "n": 614
+    },
+    {
+     "w": "wp_commit_timer_v1#\\d+\\.set_timestamp",
+     "n": 303
+    },
+    {
+     "w": "wp_linux_drm_syncobj_manager_v1#\\d+\\.import_timeline",
+     "n": 12
+    },
+    {
+     "w": "wp_linux_drm_syncobj_surface_v1#\\d+\\.set_acquire_point",
+     "n": 311
+    },
+    {
+     "w": "wp_linux_drm_syncobj_surface_v1#\\d+\\.set_release_point",
+     "n": 311
+    }
+   ],
+   "png": "wp_fifo_manager_v1-wp_commit_timing_manager_v1-wp_linux_drm_syncobj_manager_v1-vkcube.png"
+  },
+  {
+   "name": "xdg_system_bell_v1-wp_color_manager_v1-foot",
+   "result": "pass",
+   "app": "foot",
+   "version": "foot 1.21.0-2",
+   "shows": "foot rang the terminal bell (BEL) through xdg-system-bell-v1 (its default bell.system=yes), on its own surface (LordOS plays its alert sound unless Do Not Disturb is on), and described its surfaces as sRGB through color-management-v1 (a parametric image description set on each). No protocol error.",
+   "alive": true,
+   "errors": [],
+   "found": [
+    {
+     "w": "xdg_system_bell_v1#\\d+\\.ring",
+     "n": 1
+    },
+    {
+     "w": "wp_color_manager_v1#\\d+\\.create_parametric_creator",
+     "n": 1
+    },
+    {
+     "w": "wp_color_management_surface_v1#\\d+\\.set_image_description",
+     "n": 2
+    }
+   ],
+   "png": "xdg_system_bell_v1-wp_color_manager_v1-foot.png"
+  },
+  {
    "name": "egl-es2gears",
    "result": "pass",
    "app": "es2gears_wayland (EGL / GLES2)",

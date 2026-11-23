@@ -46,6 +46,7 @@
   "backup.destMissing": "La destinazione non esiste",
   "backup.destNotAllowed": "Quella destinazione non è consentita",
   "backup.destOutside": "La destinazione deve trovarsi nella tua cartella home o su uno dei tuoi dischi",
+  "backup.destCloud": "Una cartella del cloud non può essere la destinazione del backup: le istantanee richiedono collegamenti fisici, che un account cloud non ha, e i suoi file continuano a essere caricati anche dopo che il backup è stato fermato. Scegli un disco o una cartella di questo computer",
   "backup.destUnwritable": "Impossibile scrivere nella destinazione",
   "backup.interrupted": "È stato interrotto",
   "backup.locked": "I backup sono cifrati: sbloccali prima",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Questa immagine non può essere usata come sfondo.",
   "studio.invalid": "Questa impostazione di LordOS Studio non è valida.",
   "studio.noCamera": "Nessuna fotocamera collegata.",
-  "studio.unavailable": "LordOS Studio non è disponibile su questo computer."
+  "studio.unavailable": "LordOS Studio non è disponibile su questo computer.",
+  "studio.downloadFailed": "Impossibile scaricare lo sfondo.",
+  "studio.removeFailed": "Impossibile rimuovere lo sfondo.",
+  "dkms.mokInvalid": "Questa richiesta di chiave Secure Boot non è valida.",
+  "dkms.mokNotNeeded": "Questo computer non ha bisogno di registrare la chiave ora.",
+  "dkms.mokNothingPending": "Nessuna chiave è in attesa di essere registrata al prossimo riavvio.",
+  "dkms.mokNoTool": "Il programma mokutil non è installato.",
+  "dkms.mokFailed": "Non è stato possibile preparare la chiave per il prossimo riavvio.",
+  "media.protectedWindow": "Questa finestra è protetta: non si può catturare da sola. Nelle catture dello schermo appare nera."
 }

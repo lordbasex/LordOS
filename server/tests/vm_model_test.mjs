@@ -116,6 +116,8 @@ eq('itself does not count', budgetCheck([run('a', 4096, 'kvm')], { dir: 'a', mem
 eq('system from label', systemOf('Debian 13.1.0 amd64 n').id, 'debian');
 eq('system from file', systemOf('', 'ubuntu-24.04-desktop-arm64.iso'), { id: 'ubuntu', name: 'Ubuntu' });
 eq('system unknown', systemOf('MYDISK').id, 'other');
+eq('Android by Bliss OS\'s label and file name, Android-x86, LineageOS', [systemOf('BlissOS-16.9.7 (x86_64)').id, systemOf('', 'Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso').id,
+  systemOf('', 'android-x86_64-9.0-r2.iso').id, systemOf('', 'lineage-23.0-x86_64.iso').id, systemOf('', 'blissful-notes.iso').id], ['android', 'android', 'android', 'android', 'other']);
 eq('version', versionOf('debian-13.1.0-amd64-netinst.iso'), '13.1');
 eq('version none', versionOf('netinst.iso'), '');
 eq('arch arm', archOf('debian-13-nocloud-arm64.qcow2'), 'arm64');

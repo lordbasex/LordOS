@@ -1,6 +1,6 @@
 /* codesig_test.c — verified system code (src/sec/codesig.c, docs/SIGNING.md "Verified system code"):
  * the manifest parser, the signature, the per-file check, reading under the root, the development
- * and release policies, and that the compiled-in key is tools/release/lordos-release.pub.pem.
+ * and release policies, a new manifest under a running session (codesig_reload), and that the compiled-in key is tools/release/lordos-release.pub.pem.
  *
  *   build/codesig-test [path to lordos-release.pub.pem]      (make test passes it) */
 #include "sec/codesig.h"
@@ -248,6 +248,201 @@ static void test_root(void) {
     rmdir(root);
 }
 
+/* ---- a package update under a running session: the manifest pair is read again ---- */
+
+/* a manifest of a/one.js = a and b.js = b, with this version */
+static void manifest_of(char *out, size_t n, const char *version, const char *a, const char *b) {
+    char ha[65], hb[65];
+    hexsha(a, strlen(a), ha);
+    hexsha(b, strlen(b), hb);
+    snprintf(out, n, "{\n  \"format\": 1,\n  \"kind\": \"" CODE_KIND "\",\n  \"version\": \"%s\",\n  \"files\": [\n"
+                     "    { \"path\": \"a/one.js\", \"size\": %zu, \"sha256\": \"%s\" },\n"
+                     "    { \"path\": \"b.js\", \"size\": %zu, \"sha256\": \"%s\" }\n  ]\n}\n",
+             version, strlen(a), ha, strlen(b), hb);
+}
+
+/* as dpkg does: a new file next to it, then rename over (a new inode); mode as given */
+static void replace(const char *rel, const char *data, mode_t mode) {
+    char p[512], t[sizeof p + 16];
+    snprintf(p, sizeof p, "%s/%s", root, rel);
+    snprintf(t, sizeof t, "%s.dpkg-new", p);
+    unlink(t);
+    FILE *f = fopen(t, "wb");
+    if (f) { fputs(data, f); fclose(f); }
+    chmod(t, mode);
+    rename(t, p);
+}
+
+/* a new manifest (signed by sig_of, or with the given signature text) */
+static void new_pair(const char *json, const char *sig) {
+    replace(CODE_SIGNATURE, sig, 0644);
+    replace(CODE_MANIFEST, json, 0644);
+}
+
+static const char *in_use(void) { return codesig_manifest() ? codesig_manifest()->version : ""; }
+
+static void test_versions(void) {
+    CHECK(codesig_version_cmp("0.8.9.4", "0.8.9.4") == 0, "version: equal");
+    CHECK(codesig_version_cmp("0.8.9.5", "0.8.9.4") > 0, "version: newer");
+    CHECK(codesig_version_cmp("0.8.9", "0.8.9.4") < 0, "version: shorter is older");
+    CHECK(codesig_version_cmp("0.8.10", "0.8.9.4") > 0, "version: numbers, not text");
+    CHECK(codesig_version_cmp("0.8.6+v087.22", "0.8.6+v087.21") > 0, "version: build suffix");
+    CHECK(codesig_version_cmp("0.8.6+v087.21", "0.8.6") > 0, "version: a suffix is after the bare one");
+    CHECK(codesig_version_cmp("0.8.7", "0.8.6+v087.27.1") > 0, "version: next release after the suffixed ones");
+    CHECK(codesig_version_cmp("0.9~rc1", "0.9") < 0, "version: ~ is before the release");
+    CHECK(codesig_version_cmp("", "0.1") < 0, "version: empty is oldest");
+}
+
+static void test_reload(void) {
+    umask(022);
+    snprintf(root, sizeof root, "%s/codesig-reload.XXXXXX", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+    if (!mkdtemp(root)) { fail++; printf("FAILED: mkdtemp\n"); return; }
+    chmod(root, 0755);
+    char p[512];
+    snprintf(p, sizeof p, "%s/a", root);
+    mkdir(p, 0755);
+    /* the session's files belong to this user here; in a real one, root (the default policy) */
+    codesig_test_policy(getuid(), 0);
+    static const char B2[] = "globalThis.x = 3; /* the updated package */\n";
+    char j[2048], sig[100], j2[2048], sig2[100], why[200];
+    manifest_of(j, sizeof j, "0.8.2", A, B);
+    sign_text(j, sig);
+    put("a/one.js", A);
+    put("b.js", B);
+    new_pair(j, sig);
+    CHECK(codesig_init_root(root, pub, 1) == CODE_VERIFIED && codesig_generation() == 0, "reload: verified at login");
+    CHECK(loads("b.js", B) && codesig_reload() == 0, "reload: nothing changed, nothing read");
+
+    /* dpkg replaced the bundle but not yet the manifest: refused, nothing new to read */
+    replace("b.js", B2, 0644);
+    CHECK(!loads("b.js", B2) && codesig_generation() == 0, "reload: updated bundle without a new manifest is refused");
+
+    /* the new manifest with a bad signature (the old one's): refused, the old manifest stays */
+    manifest_of(j2, sizeof j2, "0.8.3", A, B2);
+    sign_text(j2, sig2);
+    new_pair(j2, sig);
+    CHECK(codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: bad signature refused, old kept");
+    CHECK(codesig_reload() == 0, "reload: the same refused pair is not read again");
+    CHECK(!loads("b.js", B2) && loads("a/one.js", A), "reload: after a bad signature the old manifest still checks");
+    {
+        snprintf(p, sizeof p, "%s/b.js", root);
+        size_t n;
+        char *b = codesig_load(p, CODE_FILE_MAX, &n, why, sizeof why);
+        CHECK(!b && strstr(why, "updated manifest was not accepted") && strstr(why, "signature"), "reload: the refusal says why");
+        free(b);
+    }
+
+    /* signed by another key */
+    {
+        uint8_t s2[32], k[64];
+        memcpy(s2, SEED, 32);
+        s2[0] ^= 0xff;
+        char other[100];
+        ed25519_sign(s2, (const uint8_t *)j2, strlen(j2), k);
+        b64(k, 64, other);
+        new_pair(j2, other);
+        CHECK(codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: another key refused");
+    }
+
+    /* truncated manifest (with the full one's signature) */
+    {
+        char t[2048];
+        snprintf(t, sizeof t, "%.*s", (int)(strlen(j2) / 2), j2);
+        new_pair(t, sig2);
+        CHECK(codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: truncated manifest refused");
+    }
+
+    /* no signature at all */
+    snprintf(p, sizeof p, "%s/%s", root, CODE_SIGNATURE);
+    unlink(p);
+    replace(CODE_MANIFEST, j2, 0644);
+    CHECK(codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: unsigned manifest refused");
+
+    /* a link to a good signed manifest inside the folder */
+    replace(CODE_SIGNATURE, sig2, 0644);
+    replace("other.json", j2, 0644);
+    snprintf(p, sizeof p, "%s/%s", root, CODE_MANIFEST);
+    unlink(p);
+    CHECK(symlink("other.json", p) == 0 && codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: symlinked manifest refused");
+    unlink(p);
+
+    /* writable by others (the manifest, then the signature) */
+    replace(CODE_MANIFEST, j2, 0666);
+    chmod(p, 0666);                                       /* the umask took the bits off */
+    CHECK(codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: manifest writable by others refused");
+    replace(CODE_MANIFEST, j2, 0644);
+    replace(CODE_SIGNATURE, sig2, 0644);
+    snprintf(p, sizeof p, "%s/%s", root, CODE_SIGNATURE);
+    chmod(p, 0646);
+    CHECK(codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: signature writable by others refused");
+    /* the folder writable by others */
+    replace(CODE_SIGNATURE, sig2, 0644);
+    chmod(root, 0777);
+    CHECK(codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: folder writable by others refused");
+    chmod(root, 0755);
+
+    /* not owned by the trusted owner (root, in lord-server) */
+    codesig_test_policy(getuid() + 1, 0);
+    replace(CODE_SIGNATURE, sig2, 0644);
+    CHECK(codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: manifest not owned by root refused");
+    codesig_test_policy(getuid(), 0);
+
+    /* an older version, well signed */
+    {
+        char old[2048], osig[100];
+        manifest_of(old, sizeof old, "0.8.1", A, B2);
+        sign_text(old, osig);
+        new_pair(old, osig);
+        CHECK(codesig_reload() == -1 && !strcmp(in_use(), "0.8.2"), "reload: older version refused");
+        CHECK(!loads("b.js", B2), "reload: older version: the updated bundle is still refused");
+    }
+
+    /* the rate limit: a good pair, but too soon after the last read */
+    codesig_test_policy(getuid(), 60000);
+    new_pair(j2, sig2);
+    CHECK(codesig_reload() == 0 && !strcmp(in_use(), "0.8.2"), "reload: rate limited");
+    codesig_test_policy(getuid(), 0);
+
+    /* the good pair: accepted when the switch loads the updated bundle (the check fails against the
+     * old manifest, the new one verifies, the same bytes are checked again) */
+    CHECK(loads("b.js", B2) && !strcmp(in_use(), "0.8.3") && codesig_generation() == 1, "reload: valid new manifest accepted, updated bundle loads");
+    CHECK(loads("a/one.js", A), "reload: unchanged bundle still loads");
+    replace("b.js", B, 0644);
+    CHECK(!loads("b.js", B), "reload: the replaced bundle no longer passes");
+    CHECK(codesig_reload() == 0 && codesig_state() == CODE_VERIFIED, "reload: the accepted pair is not read again");
+
+    /* the same version signed again (a rebuild) is accepted */
+    {
+        char same[2048], ssig[100];
+        manifest_of(same, sizeof same, "0.8.3", A, B);
+        sign_text(same, ssig);
+        new_pair(same, ssig);
+        CHECK(loads("b.js", B) && codesig_generation() == 2, "reload: same version re-signed accepted");
+    }
+
+    /* a development session (unsigned manifest at login) never reloads */
+    snprintf(p, sizeof p, "%s/%s", root, CODE_SIGNATURE);
+    unlink(p);
+    replace(CODE_MANIFEST, j, 0644);
+    CHECK(codesig_init_root(root, pub, 0) == CODE_DEVELOPMENT, "reload: development session");
+    new_pair(j2, sig2);
+    replace("b.js", B2, 0644);
+    CHECK(codesig_reload() == 0 && !strcmp(in_use(), "0.8.2") && !loads("b.js", B2), "reload: never in a development session");
+
+    /* a link as the manifest at login is refused too (the same reader) */
+    replace("other.json", j, 0644);
+    snprintf(p, sizeof p, "%s/%s", root, CODE_MANIFEST);
+    unlink(p);
+    if (symlink("other.json", p) == 0) CHECK(codesig_init_root(root, pub, 1) == CODE_INVALID && strstr(codesig_reason(), "link"), "login: symlinked manifest refused");
+
+    codesig_test_policy(0, 1000);
+    const char *rm[] = { "a/one.js", "b.js", "other.json", CODE_MANIFEST, CODE_SIGNATURE };
+    for (size_t i = 0; i < sizeof rm / sizeof rm[0]; i++) { snprintf(p, sizeof p, "%s/%s", root, rm[i]); unlink(p); }
+    snprintf(p, sizeof p, "%s/a", root);
+    rmdir(p);
+    rmdir(root);
+}
+
 /* The compiled-in key is the last 32 bytes of the PEM's DER. */
 static void test_release_key(const char *pem) {
     FILE *f = pem ? fopen(pem, "r") : NULL;
@@ -342,6 +537,8 @@ int main(int argc, char **argv) {
     test_sha256();
     test_parser();
     test_root();
+    test_versions();
+    test_reload();
     test_release_key(argc > 1 ? argv[1] : NULL);
     printf("codesig: %d/%d\n", pass, pass + fail);
     return fail ? 1 : 0;

@@ -136,12 +136,12 @@ void lm_live(const char *params, int link, int ring);                   /* lm_li
 void lm_vbench(const char *params);                                     /* lm_vbench.c */
 #ifdef LM_STUDIO
 /* lord-studio (../studio/stcam.c): LordOS Studio's pipeline on the camera's pictures */
-int  stcam_init(int model_fd, int render);      /* reads and checks the model; the render node stays the caller's */
+int  stcam_init(int model_fd, int face_fd, int render);   /* reads and checks the models (BlazeFace: -1 none); the render node stays the caller's */
 void stcam_config(const MediaMsg *m);           /* MM_STUDIO */
 void stcam_background(int fd);                  /* MM_STUDIO_BG: takes the fd */
 AVFrame *stcam_frame(AVFrame *f);               /* the picture with the effects (BGRA), or f itself */
 void stcam_tick(void);                          /* MM_STUDIO_STATS once a second */
-void stcam_probe(void);                         /* probe=1: a self-test without a camera */
+void stcam_probe(int bg);                        /* probe=1: a self-test without a camera; bg: a background file to play, or -1 */
 /* loopback=1: LordOS Studio's camera for every app (docs/CAMERA-STUDIO-PLAN.md 2.2): the loopback's output, the idle
  * card, the readers (MM_STUDIO_READERS) and the real camera only when lord-server sends it (MM_STUDIO_CAM) */
 void stcam_hub(const char *params, int loop, int render);

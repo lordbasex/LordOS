@@ -46,6 +46,7 @@
   "backup.destMissing": "Hedef yok",
   "backup.destNotAllowed": "Bu hedefe izin verilmiyor",
   "backup.destOutside": "Hedef ana klasörünüzde ya da disklerinizden birinde olmalı",
+  "backup.destCloud": "Bir bulut klasörü yedekleme hedefi olamaz: anlık görüntüler bir bulut hesabında olmayan sabit bağlantılara ihtiyaç duyar ve dosyaları yedekleme durdurulduktan sonra bile yüklenmeye devam eder. Bu bilgisayarda bir disk ya da klasör seçin",
   "backup.destUnwritable": "Hedefe yazılamıyor",
   "backup.interrupted": "Yarıda kesildi",
   "backup.locked": "Yedekler şifreli: önce kilidini açın",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Bu resim arka plan olarak kullanılamaz.",
   "studio.invalid": "Bu LordOS Studio ayarı geçerli değil.",
   "studio.noCamera": "Bağlı kamera yok.",
-  "studio.unavailable": "LordOS Studio bu bilgisayarda kullanılamıyor."
+  "studio.unavailable": "LordOS Studio bu bilgisayarda kullanılamıyor.",
+  "studio.downloadFailed": "Arka plan indirilemedi.",
+  "studio.removeFailed": "Arka plan kaldırılamadı.",
+  "dkms.mokInvalid": "Bu Secure Boot anahtarı isteği geçerli değil.",
+  "dkms.mokNotNeeded": "Bu bilgisayarın şu anda anahtarı kaydetmesi gerekmiyor.",
+  "dkms.mokNothingPending": "Bir sonraki yeniden başlatmada kaydedilmeyi bekleyen anahtar yok.",
+  "dkms.mokNoTool": "mokutil programı yüklü değil.",
+  "dkms.mokFailed": "Anahtar bir sonraki yeniden başlatma için hazırlanamadı.",
+  "media.protectedWindow": "Bu pencere korumalı olduğundan tek başına yakalanamaz. Ekran görüntülerinde siyah görünür."
 }

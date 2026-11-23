@@ -75,10 +75,15 @@ Test Bench measured 59.8 frames a second at 60 Hz (p99 17.9 ms).
 next vblank, so before 0.8.5 the compositor and every app followed it at 500–580 frames a second on a
 60 Hz display, burning CPU on frames nobody sees. `main.c` now counts flips that complete within an
 eighth of a refresh period (`flip_instant`); from three on it paces frames itself to the mode's refresh
-on a fixed grid (`pace_next`), as headless sessions already were. A flip that really waits for vblank
+on a fixed grid (`src/softpace.h`), as headless sessions already were. A flip that really waits for vblank
 lowers the count again, so real graphics cards are unaffected. Measured on the VMware Fusion guest when
 it was fixed: 59.8 frames a second at 60 Hz, p99 18.4 ms. The same grid paces sessions without a monitor, so waiting in whole
-milliseconds no longer turns 60 frames a second into 57.
+milliseconds no longer turns 60 frames a second into 57. Since 0.8.9.5 a frame that starts more than an
+eighth of a period late (at least 2 ms) starts the grid again from itself, so two frames never start closer than
+seven eighths of a refresh: kept on the old grid, the next frame came a few milliseconds later and an app's update was on screen
+for that long instead of one refresh (fifo-v1, `tests/softpace_test.c`). Frames are shown when painted, so after a
+frame painted in more than half a refresh (a loaded machine) the next one waits at least half a refresh after it was shown;
+lighter frames never move the grid.
 
 ## How it composites
 

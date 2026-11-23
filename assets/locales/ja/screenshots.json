@@ -96,5 +96,11 @@
   "hintAdjust": "ハンドルをドラッグして調整 · Enter: 取り込む · Esc: キャンセル",
   "hintAdjustRecord": "ハンドルをドラッグして調整 · Enter: 収録 · Esc: キャンセル",
   "hintRecord": "ドラッグして収録範囲を選択 · Esc: キャンセル",
-  "thumbOpen": "マークアップエディタで開く"
+  "thumbOpen": "マークアップエディタで開く",
+  "opt.printKey": "PrintScreen キー",
+  "opt.printKey.full": "画面全体を取り込む",
+  "opt.printKey.area": "選択部分を取り込む",
+  "opt.printKey.window": "選択したウインドウを取り込む",
+  "opt.printKey.toolbar": "バーを表示",
+  "opt.printKey.none": "何もしない"
 }

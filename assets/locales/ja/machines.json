@@ -783,6 +783,8 @@
   "dl.sizeAbout": "{arch}、約 {size}",
   "dl.reading": "{name} のサイトでイメージの一覧を読み込み中…",
   "dl.found": "{file}、配布元の署名済み一覧より（署名と SHA-256 を確認済み）",
+  "dl.pinned": "{file}（SHA-256 は LordOS の署名付きカタログに固定、ダウンロード後に確認）",
+  "dl.notice.archived": "{maker} は公開イメージの提供を停止しています。これは {date} の最後のイメージで、今後セキュリティ更新はありません。Google のアプリは含まれません。",
   "dl.noList": "イメージの一覧を読み取れませんでした：{why}",
   "dl.noImage": "現在、一覧にはこのアーキテクチャ向けのこのリリースのイメージがありません",
   "dl.retry": "再試行",

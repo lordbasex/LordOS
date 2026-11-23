@@ -8,13 +8,15 @@
 // ones Lord Flow shows on top, useAppMenus) gets them in a strip under its title bar, with Window and
 // Help, as desktop apps do on a taskbar layout. Apps without menus of their own get no strip.
 // Settings → Desktop & Dock → Title bars can put the buttons at the start instead (close, minimize, maximize; the
-// icon and title follow them), and the snap layouts then open from there (useWindowButtons, issue #58).
-import { View, Text, Layer, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, alwaysOnTopItem, solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, SeamCover, t as tr } from '@lordos/sdk';
+// icon and title follow them), and the snap layouts then open from there (useWindowButtons, issue #58). Its Size makes
+// the bar, the buttons, their glyphs and their hit areas larger (px, GitHub #151 and #219); index.jsx's chrome follows.
+// Settings → Appearance → Window options can leave the snap items out of the title bar's menu (windowMenuTiling, #151).
+import { View, Text, Layer, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, snapZoneAt, screen, useMenusWithSpeech, getApp, appGroup, windowMenuItems, moveToDesktopItems, alwaysOnTopItem, solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, SeamCover, t as tr, buttonSizeScale, windowMenuTiling, settings } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LayoutGlyph } from '../glyphs.jsx';
 import { Menu } from './Menu.jsx';
 
-export const TITLE_H = 34;
+export const TITLE_H = 34;          // at the normal size: px(TITLE_H) is the bar now (useWindowButtons)
 export const MENU_H = 26;
 const BTN_W = 44;
 
@@ -82,10 +84,10 @@ const LAYOUTS_W = 4 * 72 + 3 * 8 + 24;
 
 // at: { x, y } under the maximize button (the flyout ends there), or { left, y } where it starts
 // (opened from the window menu of an app that draws its own bar).
-function SnapLayouts({ t, win, at, onEnter, onLeave, onDone }) {
+function SnapLayouts({ t, win, at, onEnter, onLeave, onDone, bw = BTN_W }) {
   const [hover, setHover] = useState(null);         // [layout, cell]
   const W = LAYOUTS_W;
-  const left = at.left != null ? Math.min(at.left, screen.width - W - 6) : at.x - W + BTN_W * 1.5;
+  const left = at.left != null ? Math.min(at.left, screen.width - W - 6) : at.x - W + bw * 1.5;
   return (
     <Layer name="popover">
       <View onMouseEnter={onEnter} onMouseLeave={onLeave}
@@ -107,14 +109,17 @@ function SnapLayouts({ t, win, at, onEnter, onLeave, onDone }) {
   );
 }
 
-function FrameButton({ t, focused, onClick, danger, children, anchor, onEnter, onLeave }) {
+// size: Settings → Appearance → Window options → Window buttons: the button (its hit area) and its glyph grow with the bar
+function FrameButton({ t, focused, onClick, danger, children, anchor, onEnter, onLeave, size = 'normal' }) {
   const [hover, setHover] = useState(false);
+  const k = buttonSizeScale(size);
+  const glyph = children(hover && danger ? '#ffffff' : t.text);
   return (
     <View ref={anchor} onMouseDown={(e) => e.stopPropagation()} onClick={onClick}
       onMouseEnter={() => { setHover(true); onEnter?.(); }} onMouseLeave={() => { setHover(false); onLeave?.(); }}
-      style={{ width: BTN_W, height: TITLE_H, alignItems: 'center', justifyContent: 'center', opacity: focused || hover ? 1 : 0.55,
+      style={{ width: Math.round(BTN_W * k), height: Math.round(TITLE_H * k), alignItems: 'center', justifyContent: 'center', opacity: focused || hover ? 1 : 0.55,
         backgroundColor: hover ? (danger ? t.closeHover : t.hover) : 'transparent' }}>
-      {children(hover && danger ? '#ffffff' : t.text)}
+      {k === 1 ? glyph : <View style={{ transform: `scale(${k})`, pointerEvents: 'none' }}>{glyph}</View>}
     </View>
   );
 }
@@ -134,7 +139,8 @@ export function Window({ win, t, focused, app }) {
   const [menu, setMenu] = useState(null);
   const hoverTimer = useRef(0), leaveTimer = useRef(0);
   const flat = win.maximized || !!win.snapped;
-  const { atStart, order } = useWindowButtons(false);
+  const { atStart, order, size, px } = useWindowButtons(false);
+  const bar = px(TITLE_H), bw = px(BTN_W);
   useEffect(() => {
     const offMove = addListener('pointermove', (e) => {
       const d = drag.current;
@@ -144,7 +150,7 @@ export function Window({ win, t, focused, app }) {
         d.moving = true;
         // out of the maximized place: back to its own size, under the pointer where it was grabbed
         d.dx = Math.round(d.rel * win.w);
-        d.dy = Math.min(TITLE_H / 2, d.y0 - geo.y);
+        d.dy = Math.min(bar / 2, d.y0 - geo.y);
       }
       wm.move(win.id, e.x - d.dx, e.y - d.dy);
     });
@@ -154,7 +160,7 @@ export function Window({ win, t, focused, app }) {
       if (d && d.moving) { const z = snapZoneAt(e.x, e.y); if (z) wm.snap(win.id, z); }
     });
     return () => { offMove(); offUp(); clearTimeout(hoverTimer.current); clearTimeout(leaveTimer.current); };
-  }, [win.id, win.w, geo.y]);
+  }, [win.id, win.w, geo.y, bar]);
 
   const shadow = focused ? t.shadow : (t.mode === 'dark' ? '0 8px 22px rgba(0,0,0,0.4)' : '0 8px 22px rgba(0,0,0,0.16)');
 
@@ -169,10 +175,12 @@ export function Window({ win, t, focused, app }) {
     alwaysOnTopItem(win.id),
     { label: tr('shell.desktops.moveTo'), submenu: moveToDesktopItems(win.id) },
     '-',
-    ...(extra || []),
-    { label: tr('shell.classic.snapLeft'), onClick: () => wm.snap(win.id, 'left') },
-    { label: tr('shell.classic.snapRight'), onClick: () => wm.snap(win.id, 'right') },
-    '-',
+    ...(windowMenuTiling(settings.get()) ? [
+      ...(extra || []),
+      { label: tr('shell.classic.snapLeft'), onClick: () => wm.snap(win.id, 'left') },
+      { label: tr('shell.classic.snapRight'), onClick: () => wm.snap(win.id, 'right') },
+      '-',
+    ] : []),
     { label: tr('shell.classic.close'), hint: 'Alt+F4', onClick: () => wm.close(win.id) },
   ];
 
@@ -184,11 +192,11 @@ export function Window({ win, t, focused, app }) {
       <WindowShell win={win} onMouseDown={() => wm.focus(win.id)} style={{ ...(app.ownFrame ? { borderRadius: win.maximized ? 0 : 12, overflow: 'hidden' } : null), boxShadow: shadow }}>
         <AppHost id={win.id} focused={focused} />
         {app.ownFrame ? (
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: TITLE_H, flexDirection: 'row', pointerEvents: 'box-none' }}>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: bar, flexDirection: 'row', pointerEvents: 'box-none' }}>
             {atStart ? null : <View style={{ flex: 1, pointerEvents: 'none' }} />}
-            {order.map((k) => (k === 'close' ? <FrameButton key={k} t={t} focused={focused} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
-              : k === 'minimize' ? <FrameButton key={k} t={t} focused={focused} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>
-                : <FrameButton key={k} t={t} focused={focused} onClick={() => wm.toggleMaximize(win.id)}>{(c) => (win.maximized || win.snapped ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}</FrameButton>))}
+            {order.map((k) => (k === 'close' ? <FrameButton key={k} t={t} focused={focused} size={size} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
+              : k === 'minimize' ? <FrameButton key={k} t={t} focused={focused} size={size} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>
+                : <FrameButton key={k} t={t} focused={focused} size={size} onClick={() => wm.toggleMaximize(win.id)}>{(c) => (win.maximized || win.snapped ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}</FrameButton>))}
             {atStart ? <View style={{ flex: 1, pointerEvents: 'none' }} /> : null}
           </View>
         ) : null}
@@ -197,7 +205,7 @@ export function Window({ win, t, focused, app }) {
             { label: tr('shell.classic.snapLayouts'), onClick: () => { setLayouts({ left: wmenu.x, y: wmenu.y }); leaveMax(3000); } },
           ])} />
         )}
-        {layouts && <SnapLayouts t={t} win={win} at={layouts} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
+        {layouts && <SnapLayouts t={t} win={win} at={layouts} bw={bw} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
       </WindowShell>
     );
   }
@@ -207,18 +215,18 @@ export function Window({ win, t, focused, app }) {
     if (!maxRef.current) return;
     const [x, y, w, h] = lord.getLayout(maxRef.current.id);
     // under the button: ending there when the buttons are on the window's right, starting there when on its left
-    setLayouts(x + w / 2 < geo.x + geo.w / 2 ? { left: x, y: y + h + 4 } : { x: x + w / 2 - BTN_W / 2, y: y + h + 4 });
+    setLayouts(x + w / 2 < geo.x + geo.w / 2 ? { left: x, y: y + h + 4 } : { x: x + w / 2 - bw / 2, y: y + h + 4 });
   };
   const enterMax = () => { clearTimeout(leaveTimer.current); clearTimeout(hoverTimer.current); hoverTimer.current = setTimeout(openLayouts, 550); };
   const titleMenu = (e) => setMenu({ x: e.x, y: e.y });
-  const button = (k) => (k === 'close' ? <FrameButton key={k} t={t} focused={focused} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
-    : k === 'minimize' ? <FrameButton key={k} t={t} focused={focused} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>
+  const button = (k) => (k === 'close' ? <FrameButton key={k} t={t} focused={focused} size={size} danger onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} />}</FrameButton>
+    : k === 'minimize' ? <FrameButton key={k} t={t} focused={focused} size={size} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>
       : (
-        <FrameButton key={k} t={t} focused={focused} anchor={maxRef} onClick={() => { setLayouts(null); wm.toggleMaximize(win.id); }} onEnter={enterMax} onLeave={leaveMax}>
+        <FrameButton key={k} t={t} focused={focused} size={size} anchor={maxRef} onClick={() => { setLayouts(null); wm.toggleMaximize(win.id); }} onEnter={enterMax} onLeave={leaveMax}>
           {(c) => (win.maximized || win.snapped ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}
         </FrameButton>
       ));
-  const buttons = <View style={{ flexDirection: 'row', gap: 8 }}>{order.map(button)}</View>;
+  const buttons = <View style={{ flexDirection: 'row', gap: px(8) }}>{order.map(button)}</View>;
   return (
     <WindowShell win={win} onMouseDown={() => wm.focus(win.id)} style={{
       borderRadius: flat ? 0 : 8, backgroundColor: app.transparent ? 'transparent' : t.windowBg, overflow: 'hidden',
@@ -230,7 +238,7 @@ export function Window({ win, t, focused, app }) {
         if (!wm.beginMove(win.id)) drag.current = { x0: e.x, y0: e.y, rel: geo.w ? (e.x - geo.x) / geo.w : 0.5, moving: false };
       }}
         onDoubleClick={() => wm.toggleMaximize(win.id)} onContextMenu={titleMenu}
-        style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', ...(atStart ? { paddingEnd: 12 } : { paddingStart: 12 }), gap: 8,
+        style={{ height: bar, flexDirection: 'row', alignItems: 'center', ...(atStart ? { paddingEnd: 12 } : { paddingStart: 12 }), gap: 8,
           backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
         {/* a transparent app: under the bar and the next one's first row, so their edges let nothing through (GitHub #162) */}
         {app.transparent ? <SeamCover color={focused ? t.titleBg : t.titleBgBlur} /> : null}
@@ -243,7 +251,7 @@ export function Window({ win, t, focused, app }) {
       <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused} /></View>
       {/* a web app's profile: a thin strip in its color on top of the frame */}
       {windowAccent(win) ? <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: windowAccent(win), pointerEvents: 'none' }} /> : null}
-      {layouts && <SnapLayouts t={t} win={win} at={layouts} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
+      {layouts && <SnapLayouts t={t} win={win} at={layouts} bw={bw} onEnter={() => clearTimeout(leaveTimer.current)} onLeave={() => leaveMax()} onDone={() => setLayouts(null)} />}
       {menu && (
         <Menu t={t} x={menu.x} y={menu.y} onClose={() => setMenu(null)} items={windowMenuItems()} />
       )}

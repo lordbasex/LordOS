@@ -3,12 +3,13 @@
 // borders on all 4 sides and 4 corners, <WindowShell>) is done by lord-server in C
 // (docs/WINDOWS.md); the JS drag below is only kept for a maximized window.
 // The lights go at the start of the bar (close, minimize, maximize), or at the end (minimize, maximize, close) when
-// Settings → Desktop & Dock → Title bars puts the buttons on that side (useWindowButtons, issue #58).
+// Settings → Desktop & Dock → Title bars puts the buttons on that side (useWindowButtons, issue #58). Its Size makes the
+// bar, the lights, their glyphs and their hit areas larger (px, GitHub #151 and #219); index.jsx's chrome follows it.
 import { View, Text, addListener, wm, snapZoneAt, AppHost, windowTitle, windowAccent, WindowShell, moveToDesktopItems, alwaysOnTopItem, t as tr, solidOver, useWindowButtons, SeamCover } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
 
-const TITLE_H = 40;
+export const TITLE_H = 40;   // at the normal size (px(TITLE_H) is the bar now)
 const DRAG_START = 6;      // px the pointer moves before a maximized window is dragged out
 const LIGHT = 13;          // a traffic light's diameter
 // bars: the glyph shown on hover, as [length, angle] bars crossing the light's center
@@ -20,27 +21,31 @@ const LIGHTS = {
 
 // The ×, − and + drawn as bars centered on the light (issue #69: text glyphs sat off-center by their
 // font metrics). Solid colors, so where two bars cross the color does not darken twice.
-function LightGlyph({ l }) {
-  const color = solidOver('rgba(0,0,0,0.6)', l.color), w = 1.5;
-  return l.bars.map(([len, deg], i) => (
-    <View key={i} style={{ position: 'absolute', left: (LIGHT - len) / 2, top: (LIGHT - w) / 2, width: len, height: w, borderRadius: w / 2,
+function LightGlyph({ l, px }) {
+  const color = solidOver('rgba(0,0,0,0.6)', l.color), w = px(1.5), size = px(LIGHT);
+  return l.bars.map(([n, deg], i) => {
+    const len = px(n);
+    return (
+    <View key={i} style={{ position: 'absolute', left: (size - len) / 2, top: (size - w) / 2, width: len, height: w, borderRadius: w / 2,
       backgroundColor: color, pointerEvents: 'none', transform: deg ? `rotate(${deg}deg)` : undefined }} />
-  ));
+    );
+  });
 }
 
-// The three lights in `order` (useWindowButtons); hovering the group shows every glyph.
-function Lights({ win, t, focused, order, style }) {
+// The three lights in `order` (useWindowButtons); hovering the group shows every glyph. px: the title bar's size.
+function Lights({ win, t, focused, order, style, px }) {
   const [hover, setHover] = useState(false);
+  const size = px(LIGHT);
   return (
     <View onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ flexDirection: 'row', gap: 8, paddingVertical: 6, ...style }}>
+      style={{ flexDirection: 'row', gap: px(8), paddingVertical: px(6), ...style }}>
       {order.map((key) => {
         const l = LIGHTS[key];
         return (
           <View key={key} onMouseDown={(e) => e.stopPropagation()} onClick={() => l.act(win.id)}
-            style={{ width: LIGHT, height: LIGHT, borderRadius: LIGHT / 2, direction: 'ltr',
+            style={{ width: size, height: size, borderRadius: size / 2, direction: 'ltr',
               backgroundColor: focused || hover ? l.color : t.lightOff }}>
-            {hover && <LightGlyph l={l} />}
+            {hover && <LightGlyph l={l} px={px} />}
           </View>
         );
       })}
@@ -58,7 +63,8 @@ function fxStyle(fx, geo) {
 
 export function Window({ win, app, t, focused, fx }) {
   const drag = useRef(null);
-  const { atStart, order } = useWindowButtons(true);
+  const { atStart, order, px } = useWindowButtons(true);
+  const bar = px(TITLE_H);
   const geo = wm.frame(win);
   const fxs = fxStyle(fx, geo);
 
@@ -74,7 +80,7 @@ export function Window({ win, app, t, focused, fx }) {
         d.moving = true;
         // back to its own size, under the pointer where it was grabbed
         d.dx = Math.round(d.rel * win.w);
-        d.dy = Math.min(TITLE_H / 2, d.y0 - geo.y);
+        d.dy = Math.min(bar / 2, d.y0 - geo.y);
       }
       wm.move(win.id, e.x - d.dx, e.y - d.dy);
     });
@@ -85,7 +91,7 @@ export function Window({ win, app, t, focused, fx }) {
       if (d && d.moving) { const z = snapZoneAt(e.x, e.y); if (z) wm.snap(win.id, z); }
     });
     return () => { offMove(); offUp(); };
-  }, [win.id, win.w, geo.y]);
+  }, [win.id, win.w, geo.y, bar]);
 
   // Linux app that draws its own frame (GTK, Chromium and Firefox with their own bar): only the
   // content, with the theme's shadow. A right click on its bar asks for the window menu
@@ -98,9 +104,9 @@ export function Window({ win, app, t, focused, fx }) {
         <AppHost id={win.id} focused={focused} />
         {/* an app that draws its own frame (Cleaner) draws its lights at the start; at the end they are the theme's */}
         {app.ownFrame && !atStart ? (
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, pointerEvents: 'box-none' }}>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: bar, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, pointerEvents: 'box-none' }}>
             <View style={{ flex: 1, pointerEvents: 'none' }} />
-            <Lights win={win} t={t} focused={focused} order={order} />
+            <Lights win={win} t={t} focused={focused} order={order} px={px} />
           </View>
         ) : null}
         {wmenu && (
@@ -127,15 +133,15 @@ export function Window({ win, app, t, focused, fx }) {
     }}>
       <View onMouseDown={(e) => { if (!wm.beginMove(win.id)) drag.current = { x0: e.x, y0: e.y, rel: geo.w ? (e.x - geo.x) / geo.w : 0.5, moving: false }; }}
         onDoubleClick={() => wm.toggleMaximize(win.id)}
-        style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, backgroundColor: t.titleBg }}>
+        style={{ height: bar, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, backgroundColor: t.titleBg }}>
         {/* a transparent app: under the bar, the separator and the app's first row, so their edges let nothing through
             at 125 % or 150 % (GitHub #162) */}
         {app.transparent ? <SeamCover color={t.titleBg} below={2} /> : null}
-        <Text style={{ position: 'absolute', left: 0, right: 0, top: 0, lineHeight: TITLE_H, textAlign: 'center',
+        <Text style={{ position: 'absolute', left: 0, right: 0, top: 0, lineHeight: bar, textAlign: 'center',
           fontSize: 13, fontWeight: 600, color: focused ? t.text : t.textDim, pointerEvents: 'none', whiteSpace: 'nowrap',
-          paddingHorizontal: 80 }}>{windowTitle(win)}</Text>
+          paddingHorizontal: px(80) }}>{windowTitle(win)}</Text>
         {atStart ? null : <View style={{ flex: 1 }} />}
-        <Lights win={win} t={t} focused={focused} order={order} />
+        <Lights win={win} t={t} focused={focused} order={order} px={px} />
       </View>
       <View style={{ height: 1, backgroundColor: app.transparent ? solidOver(t.separator, t.titleBg) : t.separator }} />
       <View style={{ flex: 1 }}><AppHost id={win.id} focused={focused} /></View>

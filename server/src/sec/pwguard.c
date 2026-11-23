@@ -54,14 +54,20 @@ typedef struct {
     int pid_sec, pid_app, pulse;/* pipewire.sec.pid (kernel), application.process.id (app-reported), a client of the real pipewire-pulse */
     int unverified;             /* who it is can't be established: treated as restricted while restricted apps run */
     int daemon;                 /* pipewire-pulse's own connection: the streams of modules a pulse client loaded */
+    int main_daemon;            /* the session's pipewire itself (its modules: LordOS's Noise Reduction filter) */
+    int sound;                  /* another of the sound system's own processes (PipeWire's filter-chain, WirePlumber) */
     int resolved;               /* app worked out (needs the client's info) */
+    int pid_ok;                 /* the PID it was worked out from (resolve_as's pid_out): 0 when none could be */
+    /* the capture indicator's name for a client with no verified app (pwguard_on_use), worked out again every 5 s */
+    char seen[FW_APP_MAX], exe[32];
+    double seen_until;
     char fpid[64];              /* pipewire.access.portal.app_id: the Flatpak app pipewire-pulse says it is (checked) */
     char app[FW_APP_MAX];
     uint32_t want, applied;     /* restrictions (FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_SCREEN) to apply / applied */
     int live;
 } PgClient;
 
-typedef struct { uint32_t id, client, flag, stream; int live; } PgNode;   /* flag: capture node; stream: capture stream */
+typedef struct { uint32_t id, client, flag, stream; int live, voice; } PgNode;   /* flag: capture node; stream: capture stream; voice: Noise Reduction's own capture */
 typedef struct { uint32_t id, node; int live; } PgPort;
 /* a link from a capture node (a microphone, a camera, a shared screen) into an app's capture stream: what the capture
  * indicator says is in use (pwguard_on_use) */
@@ -250,6 +256,10 @@ uint32_t pwguard_node_flag(const char *mc, const char *role, const char *name) {
     if (mc && !strncmp(mc, "Video/Source", 12) && ((role && !strcmp(role, "Screen")) || (name && !strncmp(name, "lordos-screencast-", 18))))
         return FW_R_NO_SCREEN;
     return pwguard_capture_flag(mc);
+}
+
+int pwguard_voice_capture(const char *mc, const char *name) {
+    return mc && name && !strcmp(mc, "Stream/Input/Audio") && !strcmp(name, "lordos_voice_capture");
 }
 
 uint32_t pwguard_stream_flag(const char *mc) {
@@ -600,9 +610,8 @@ static void resolve_as(PgClient *c, int verify, char *app, size_t n, int *unveri
 }
 
 static void resolve(PgClient *c) {
-    int pid;
     c->resolved = 1;
-    resolve_as(c, guard_armed, c->app, sizeof c->app, &c->unverified, &pid);
+    resolve_as(c, guard_armed, c->app, sizeof c->app, &c->unverified, &c->pid_ok);
 }
 
 static int guarded(const char *app, void *u) {
@@ -621,8 +630,18 @@ static int use_dirty;
 
 void pwguard_on_use(void (*emit)(const char *kind, const char *json)) { use_emit = emit; }
 
-/* "[{"app":"desktop:obs","mic":1,"camera":0,"screen":1},...]": one entry per app ("" an unknown program), its flags
- * merged; -1 when it doesn't fit or an id isn't plain (the caller then says an unknown program captures). */
+static int use_same(const PwUse *a, const PwUse *b) {
+    return !strcmp(a->app, b->app) && (a->app[0] || (!strcmp(a->sys, b->sys) && !strcmp(a->exe, b->exe)));
+}
+
+static int plain(const char *s) {
+    for (; *s; s++) if (*s == '"' || *s == '\\' || (unsigned char)*s < 0x20) return 0;
+    return 1;
+}
+
+/* "[{"app":"desktop:obs","mic":1,"camera":0,"screen":1},...]": one entry per app, its flags merged; with no app, one per
+ * sound-system part ("sys":"sound") or program ("exe":"<name>"), "" and neither an unknown program. -1 when it doesn't
+ * fit or a field isn't plain (the caller then says an unknown program captures). */
 int pwguard_use_format(const PwUse *u, int n, char *out, size_t cap) {
     int w = snprintf(out, cap, "[");
     if (w < 0 || (size_t)w >= cap) return -1;
@@ -630,14 +649,15 @@ int pwguard_use_format(const PwUse *u, int n, char *out, size_t cap) {
     int first = 1;
     for (int i = 0; i < n; i++) {
         int seen = 0;
-        for (int k = 0; k < i && !seen; k++) if (!strcmp(u[k].app, u[i].app)) seen = 1;
+        for (int k = 0; k < i && !seen; k++) if (use_same(&u[k], &u[i])) seen = 1;
         if (seen) continue;
         uint32_t f = 0;
-        for (int k = i; k < n; k++) if (!strcmp(u[k].app, u[i].app)) f |= u[k].flags;
+        for (int k = i; k < n; k++) if (use_same(&u[k], &u[i])) f |= u[k].flags;
         if (!(f & (FW_R_NO_MIC | FW_R_NO_CAMERA | FW_R_NO_SCREEN))) continue;
-        for (const char *q = u[i].app; *q; q++)          /* app ids are plain; anything else is not named */
-            if (*q == '"' || *q == '\\' || (unsigned char)*q < 0x20) return -1;
-        w = snprintf(out + at, cap - at, "%s{\"app\":\"%s\",\"mic\":%d,\"camera\":%d,\"screen\":%d}", first ? "" : ",", u[i].app,
+        const char *sys = u[i].app[0] ? "" : u[i].sys, *exe = u[i].app[0] || sys[0] ? "" : u[i].exe;
+        if (!plain(u[i].app) || !plain(sys) || !plain(exe)) return -1;   /* ids and names are plain; anything else is not named */
+        w = snprintf(out + at, cap - at, "%s{\"app\":\"%s\",%s%s%s%s%s%s\"mic\":%d,\"camera\":%d,\"screen\":%d}", first ? "" : ",", u[i].app,
+                     sys[0] ? "\"sys\":\"" : "", sys, sys[0] ? "\"," : "", exe[0] ? "\"exe\":\"" : "", exe, exe[0] ? "\"," : "",
                      !!(f & FW_R_NO_MIC), !!(f & FW_R_NO_CAMERA), !!(f & FW_R_NO_SCREEN));
         if (w < 0 || (size_t)w >= cap - at) return -1;
         at += (size_t)w;
@@ -648,20 +668,86 @@ int pwguard_use_format(const PwUse *u, int n, char *out, size_t cap) {
     return 0;
 }
 
-/* Who owns a capture stream, for the indicator: always checked (resolve_as with verify), never a pulse client's word
- * alone. 1 when it is lord-server itself (its own recordings: the shell already shows them under the app they are for). */
-static int capture_owner(PgClient *c, char *app, size_t n) {
+int pwguard_sandbox_pick(const PwCand *c, int n, int claims, char *out, size_t cap) {
+    if (!out || !cap) return -1;
+    out[0] = 0;
+    if (claims < 1) return -1;
+    const char *pick = NULL;
+    for (int i = 0; i < n; i++) {
+        if (c[i].conns < claims || !c[i].app[0]) continue;
+        if (!pick) pick = c[i].app;
+        else if (strcmp(pick, c[i].app)) return -1;           /* two apps could be it: neither is named */
+    }
+    if (!pick || strlen(pick) + 1 > cap) return -1;
+    memcpy(out, pick, strlen(pick) + 1);
+    return 0;
+}
+
+typedef struct { const PgClient *c; PwCand cand[16]; int n; } SandboxScan;
+
+static void sandbox_each(void *ctx, const char *cg, unsigned pid) {
+    SandboxScan *s = ctx;
+    char app[FW_APP_MAX];
+    if (s->n >= (int)(sizeof s->cand / sizeof s->cand[0]) || appid_session_owner(cg, app, sizeof app) != 0) return;
+    if (strncmp(app, "desktop:", 8) && strncmp(app, "flatpak:", 8) && strncmp(app, "lpk:", 4)) return;
+    if (same_pidns((int)pid) || inner_pid((int)pid) != s->c->pid_app) return;
+    int conns = pulse_connections(s->c->pid_sec, (int)pid);
+    if (conns <= 0) return;
+    snprintf(s->cand[s->n].app, sizeof s->cand[s->n].app, "%s", app);
+    s->cand[s->n].conns = conns;
+    s->n++;
+}
+
+/* A pulse client in a sandbox of its own (WebKit's bubblewrap in LordOS's web apps, which says it is Flatpak app
+ * "org.webkit.app-<hash>"; an app in its own PID namespace) reports its pid inside it, so resolve_as can't verify it.
+ * Only to name it: the app whose root-owned scope holds a process with that inner pid, in another PID namespace, holding
+ * at least as many connections to pipewire-pulse as there are clients claiming that pid and Flatpak id; when two apps
+ * could be it, neither. */
+static void sandbox_owner(const PgClient *c, char *app, size_t n) {
     app[0] = 0;
-    if (!c || c->daemon || !c->resolved) return 0;          /* untracked, or a module pipewire-pulse loaded: unknown */
+    if (c->pid_app <= 0 || c->pid_sec <= 0) return;
+    int claims = 0;
+    for (int i = 0; i < MAX_CLIENTS; i++)
+        if (P.cl[i].live && P.cl[i].pulse && P.cl[i].pid_app == c->pid_app && !strcmp(P.cl[i].fpid, c->fpid)) claims++;
+    SandboxScan s = { .c = c };
+    appid_session_procs(sandbox_each, &s);
+    if (pwguard_sandbox_pick(s.cand, s.n, claims, app, n)) app[0] = 0;
+}
+
+/* Who owns a capture stream, for the indicator: always checked (resolve_as with verify), never a pulse client's word
+ * alone. 1 when it is lord-server itself (its own recordings: the shell already shows them under the app they are for).
+ * A stream with no verified app is still named when the kernel can tell (appid.h, "only to show it"): the app a process
+ * that left its scope comes from, the app of a sandboxed pulse client (sandbox_owner), the sound system's own processes;
+ * else the program's executable. None of this changes what the restrictions decide. */
+static int capture_owner(PgClient *c, PwUse *w) {
+    w->app[0] = w->exe[0] = w->sys[0] = 0;
+    if (!c) return 0;                                       /* untracked: unknown */
+    if (c->daemon || c->main_daemon || c->sound) { snprintf(w->sys, sizeof w->sys, "sound"); return 0; }
+    if (!c->resolved) return 0;
     int unverified = 0, pid = 0;
-    if (c->pulse && !guard_armed) resolve_as(c, 1, app, n, &unverified, &pid);
+    if (c->pulse && !guard_armed) resolve_as(c, 1, w->app, sizeof w->app, &unverified, &pid);
     else {
         unverified = c->unverified;
-        snprintf(app, n, "%s", c->app);
-        pid = c->pulse ? (c->fpid[0] ? 0 : c->pid_app) : c->pid_sec;
+        snprintf(w->app, sizeof w->app, "%s", c->app);
+        pid = c->pid_ok;
     }
-    if (unverified) { app[0] = 0; return 0; }
-    return pid > 0 && pid == (int)getpid();
+    /* pid: the process it really is, also when it is "unverified" only because it runs in the user's manager while
+     * restricted apps run (resolve_as); 0 when even that can't be established */
+    if (unverified) w->app[0] = 0;
+    else if (pid > 0 && pid == (int)getpid()) return 1;
+    if (w->app[0]) return 0;
+    double t = now_ms();
+    if (t >= c->seen_until) {
+        c->seen[0] = c->exe[0] = 0;
+        if (pid > 0) {
+            if (appid_of_lineage((unsigned)pid, c->seen, sizeof c->seen)) c->seen[0] = 0;
+            if (!c->seen[0] && appid_exe_name((unsigned)pid, c->exe, sizeof c->exe)) c->exe[0] = 0;
+        } else if (c->pulse) sandbox_owner(c, c->seen, sizeof c->seen);
+        c->seen_until = t + 5000;
+    }
+    snprintf(w->app, sizeof w->app, "%s", c->seen);
+    snprintf(w->exe, sizeof w->exe, "%s", c->exe);
+    return 0;
 }
 
 static void use_report(void) {
@@ -673,9 +759,12 @@ static void use_report(void) {
         if (!l->live) continue;
         PgNode *src = node_by_id(l->out), *dst = node_by_id(l->in);
         if (!src || !dst || !src->flag || !dst->stream) continue;
-        char app[FW_APP_MAX];
-        if (capture_owner(client_by_id(dst->client), app, sizeof app)) continue;
-        snprintf(u[n].app, sizeof u[n].app, "%s", app);
+        PgClient *owner = client_by_id(dst->client);
+        /* Noise Reduction's own capture (lordos-voice.conf, a module of the session's pipewire itself): the microphone
+         * goes into the filter, not to an app; the app that reads the "LordOS Noise Reduction" source is the use, and its
+         * own link (that source is an Audio/Source) is counted. Only when the node really is the daemon's. */
+        if (dst->voice && (!dst->client || (owner && owner->main_daemon))) continue;
+        if (capture_owner(owner, &u[n])) continue;
         u[n].flags = src->flag;
         n++;
     }
@@ -738,6 +827,7 @@ static void on_global(PwPod body) {
         nd->flag = flag;
         nd->stream = stream;
         nd->client = cid ? (uint32_t)strtoul(cid, NULL, 10) : 0;
+        nd->voice = pwguard_voice_capture(mc, dict_get(props, "node.name"));
         if (flag)                                               /* a new microphone or camera: hidden from the restricted at once */
             for (int i = 0; i < MAX_CLIENTS; i++) if (P.cl[i].live && (P.cl[i].applied & flag)) apply_permissions(&P.cl[i], P.cl[i].applied);
         if (stream) kill_streams();
@@ -791,6 +881,11 @@ static void on_client_info(uint32_t proxy, PwPod body) {
     int pulse_conn = c->pid_sec > 0 && is_pulse_daemon(c->pid_sec);
     c->pulse = dict_get(props, "pulse.server.type") != NULL && pulse_conn;
     c->daemon = pulse_conn && !c->pulse;
+    c->main_daemon = c->pid_sec > 0 && runs_exe(c->pid_sec, "/usr/bin/pipewire") && in_user_unit(c->pid_sec, "pipewire.service");
+    /* only to name it in the capture indicator: the exact unit and the root-owned executable, as in_user_manager */
+    c->sound = c->pid_sec > 0 && !c->main_daemon && !pulse_conn &&
+               ((runs_exe(c->pid_sec, "/usr/bin/pipewire") && in_user_unit(c->pid_sec, "filter-chain.service")) ||
+                (runs_exe(c->pid_sec, "/usr/bin/wireplumber") && in_user_unit(c->pid_sec, "wireplumber.service")));
     arm();
     resolve(c);
     evaluate(c);

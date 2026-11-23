@@ -588,7 +588,7 @@
   "comp.weather": "Cuaca",
   "comp.weatherHint": "Prakiraan widget cuaca dari Open-Meteo, setelah kamu aktifkan.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Aplikasi Flatpak dari Flathub: katalog, pemasangan, dan pembaruannya.",
+  "comp.flathubHint": "Aplikasi Flatpak dari Flathub: katalog, pemasangan, pembaruannya, dan peringkat Toko dari flathub.org.",
   "comp.streams": "Kamera dan TV",
   "comp.streamsHint": "Widget video dan alamat Pemutar: kamera, siaran, dan saluran TV (lord-stream)."
 }

@@ -1,7 +1,8 @@
 // windowmenu.js — the Window menu for the window in front, the same in every theme (0.8.5):
 //
 //   Minimize · Zoom · Fill · Center · Always on Top
-//   Move & Resize ›  halves, quarters, thirds, arrangements of two or four windows, previous size
+//   Move & Resize ›  halves, quarters, thirds, arrangements of two or four windows, previous size (left out while
+//                    Settings → Appearance → Window options → Show tiling options is off, GitHub #151)
 //   Move to <display>  (one item per other display)
 //   Move to Desktop ›  the other desktops and a new one
 //   Overview
@@ -16,6 +17,8 @@ import { t } from './i18n.js';
 import { moveToDesktopItems, desktopSuffix } from './desktops.js';
 import { openOverview } from './overview.jsx';
 import { webInspectItem } from './webapps.js';
+import { settings } from './settings.js';
+import { windowMenuTiling } from './windowbuttons.js';
 
 // An app's own items at the top of its windows' Window menu (Machines: its library):
 //   registerWindowMenuItems('machines', (window) => [{ label, hint, onClick }])
@@ -72,8 +75,7 @@ export function windowMenuItems(id, { close = true } = {}) {
     { label: t('shell.window.fill'), disabled: !w, onClick: () => wm.snap(id, 'max') },
     { label: t('shell.window.center'), disabled: !w, onClick: () => wm.center(id) },
     alwaysOnTopItem(id),
-    '-',
-    { label: t('shell.window.moveResize'), disabled: !w, submenu: w ? moveResizeItems(id) : [] },
+    ...(windowMenuTiling(settings.get()) ? ['-', { label: t('shell.window.moveResize'), disabled: !w, submenu: w ? moveResizeItems(id) : [] }] : []),
   ];
   if (w && screen.displays.length > 1) {
     const here = displayFor(wm.frame(w));

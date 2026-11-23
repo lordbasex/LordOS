@@ -26,7 +26,9 @@ import { View, Text, mainBox, addListener, screen } from '@lordos/runtime';
 import { createStore, useStore } from './store.js';
 import { settings } from './settings.js';
 import { useTheme } from './theme.js';
-import { t, formatDate, formatTime, weekdayName } from './i18n.js';
+import { t, formatDate, formatTime, weekdayName, appName } from './i18n.js';
+import { monitor } from './monitor.js';
+import { COMPONENTS } from './netmodel.js';
 import { notify, dismissNotification } from './notify.js';
 import { linuxAppFor, flatpakAppFor, shortAppName, windowAppName } from './apps.js';
 import { admin } from './admin.js';
@@ -45,11 +47,11 @@ import { lockBeforeSleep, lockAfterWake } from './idlemodel.js';
 import { btPowerAction } from './btpowermodel.js';
 import { openPlan, urlHost, splitPath } from './portalopenmodel.js';
 import { openUrl, openFileWithApps, revealPath } from './sysopen.js';
-import { wm } from './windows.js';
+import { wm, getApp } from './windows.js';
 import { linuxPlayersChanged, userDirs } from './media.js';
 import { trayEvent } from './trayitems.jsx';
 import { globalShortcutsEvent } from './globalshortcuts.jsx';
-import { castEvent, castNames } from './screencast.jsx';
+import { castEvent, castNames, unknownAppName } from './screencast.jsx';
 import { castAskerName, shotFreeName, shotStamp } from './screencastmodel.js';
 import { mkdir as fsMkdir, stat as fsStat } from './fs.js';
 import { linuxCapture, studioUse } from './privacy.js';
@@ -483,6 +485,13 @@ function castAsker(p) {
     linux: (id) => { const app = linuxAppFor(id); return app ? shortAppName(app) : ''; },
     // by the verified Flatpak id only (flatpakAppFor also matches a window class the app chooses)
     flatpak: (id) => { const a = flatpakAppFor(id); return a && a.flatpakId === id ? a.name : ''; },
+    // a running machine: "Machines — Windows 11 Pro" (its QEMU runs in the machine's own scope)
+    machine: (id) => {
+      const m = monitor.machineNames([id])[id];
+      const app = appName(getApp('machines')) || t('machines.title');
+      return m ? t('shell.capture.appDetail', { app, detail: m }) : app;
+    },
+    lordos: (id) => (id === 'lordos' ? t('monitor.lordos') : COMPONENTS[id] ? t(COMPONENTS[id].label) : ''),
   });
 }
 // a Screenshot portal request's picture: a new file in the person's Screenshots folder, named as the Screenshots app
@@ -495,10 +504,16 @@ function shotPath() {
 }
 castNames({ app: castAsker, window: windowAppName, shotPath });
 
-// lord-server's list of what Linux apps capture, named as the ScreenCast chooser names an app ('' an unknown program)
+// lord-server's list of what Linux apps capture, named as the ScreenCast chooser names an app; with no app, the sound
+// system's own processes (sys "sound") or the program's executable (exe), '' and neither an unknown program
+const plainText = (s, max) => (typeof s === 'string' && s.length <= max && /^[A-Za-z0-9._+-]*$/.test(s) ? s : '');
 function captureUseList(data) {
   return (Array.isArray(data) ? data : []).filter((u) => u && typeof u.app === 'string')
-    .map((u) => ({ app: u.app, name: u.app ? castAsker({ who: u.app }) : '', mic: !!u.mic, camera: !!u.camera, screen: !!u.screen }));
+    .map((u) => {
+      const sys = u.app ? '' : plainText(u.sys, 15), exe = u.app || sys ? '' : plainText(u.exe, 31);
+      const name = u.app ? castAsker({ who: u.app }) : sys === 'sound' ? t('shell.capture.who.sound') : exe ? unknownAppName(exe) : '';
+      return { app: u.app, sys, exe, name, mic: !!u.mic, camera: !!u.camera, screen: !!u.screen };
+    });
 }
 
 export function PolkitPrompt() {
@@ -521,7 +536,8 @@ export function PolkitPrompt() {
       : p.local ? t('passwords.polkit.typeHere') : t('passwords.polkit.noKeyboard');
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100002 } },
-  h(View, { style: { width: 420, padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`,
+  // the whole prompt is protected: black in every capture, recording, remote desktop and share (the dots count the keys)
+  h(View, { protected: true, style: { width: 420, padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`,
     boxShadow: '0 20px 60px rgba(0,0,0,0.5)' } },
   h(Text, { style: { fontSize: 15, fontWeight: 700, color: th.text } }, t('passwords.polkit.title', { app: asker(p) })),
   h(Text, { style: { fontSize: 12, color: th.textDim, lineHeight: 1.4 } }, p.message),

@@ -7,9 +7,9 @@
     "pt": "Máquinas"
   },
   "tagline": {
-    "en": "Other systems in windows of your desktop, at native speed: Linux since 0.8.8.5, and in development Windows 11, sound, real networks, 3D for Linux and a clipboard that only moves when you paste.",
-    "es": "Otros sistemas en ventanas de tu escritorio, a velocidad nativa: Linux desde la 0.8.8.5, y en desarrollo Windows 11, sonido, redes de verdad, 3D para Linux y un portapapeles que solo se mueve cuando pegás.",
-    "pt": "Outros sistemas em janelas do seu desktop, em velocidade nativa: Linux desde a 0.8.8.5, e em desenvolvimento Windows 11, som, redes de verdade, 3D para Linux e uma área de transferência que só se move quando você cola."
+    "en": "Other systems in windows of your desktop, at native speed: Linux since 0.8.8.5, and since 0.8.9.5 Windows 11, sound, real networks, 3D for Linux and a clipboard that only moves when you paste.",
+    "es": "Otros sistemas en ventanas de tu escritorio, a velocidad nativa: Linux desde la 0.8.8.5, y desde la 0.8.9.5 Windows 11, sonido, redes de verdad, 3D para Linux y un portapapeles que solo se mueve cuando pegás.",
+    "pt": "Outros sistemas em janelas do seu desktop, em velocidade nativa: Linux desde a 0.8.8.5, e desde a 0.8.9.5 Windows 11, som, redes de verdade, 3D para Linux e uma área de transferência que só se move quando você cola."
   },
   "lumo": {
     "pose": "three-quarter",
@@ -23,9 +23,9 @@
     {
       "file": "docs/screenshots/machines.png",
       "caption": {
-        "en": "The New Machine assistant as released in 0.8.9.4: download cards for Linux systems, your own ISO, a migration from another app or a disk image. The Windows 11 card and the new look are in development.",
-        "es": "El asistente Nueva máquina tal como salió en la 0.8.9.4: tarjetas de descarga de sistemas Linux, tu propia ISO, una migración desde otra app o una imagen de disco. La tarjeta de Windows 11 y el aspecto nuevo están en desarrollo.",
-        "pt": "O assistente Nova máquina como saiu na 0.8.9.4: cartões de download de sistemas Linux, a sua própria ISO, uma migração de outro app ou uma imagem de disco. O cartão do Windows 11 e o visual novo estão em desenvolvimento."
+        "en": "The New Machine assistant as released in 0.8.9.4: download cards for Linux systems, your own ISO, a migration from another app or a disk image. The Windows 11 card and the new look came in 0.8.9.5.",
+        "es": "El asistente Nueva máquina tal como salió en la 0.8.9.4: tarjetas de descarga de sistemas Linux, tu propia ISO, una migración desde otra app o una imagen de disco. La tarjeta de Windows 11 y el aspecto nuevo llegaron en la 0.8.9.5.",
+        "pt": "O assistente Nova máquina como saiu na 0.8.9.4: cartões de download de sistemas Linux, a sua própria ISO, uma migração de outro app ou uma imagem de disco. O cartão do Windows 11 e o visual novo chegaram na 0.8.9.5."
       }
     }
   ],

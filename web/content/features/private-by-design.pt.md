@@ -50,8 +50,9 @@ O projeto mantém um app de teste propositalmente malicioso (`tests/lpk-evil`). 
 ## O que você vê e decide
 
 - **O aviso.** Na primeira vez que um app pede algo, o sistema mostra: *"App" quer usar o microfone — Permitir / Não permitir*. A resposta fica salva para aquele app.
-- **Ajustes → Privacidade** lista cada permissão com os apps que a pediram e um controle Permitir / Perguntar / Negar.
-- **Indicadores.** Um ponto verde na barra de menus enquanto a câmera está em uso, e um laranja para o microfone. Ao tocar nele, aparece qual app está usando. Em desenvolvimento (último lançamento 0.8.9.4): uma só pílula verde ao lado do relógio substitui os pontos e a pílula de compartilhamento de tela. Seu ícone diz o que está sendo capturado neste momento (a tela, a câmera, o microfone ou dois deles), não pode ser escondida, e ao tocá-la mostra cada app com Parar de compartilhar e Desativar para este app.
+- **Ajustes → Privacidade** lista cada permissão com os apps que a pediram, e os apps integrados que a declaram, com um controle Permitir / Perguntar / Negar.
+- **Uma permissão começa permitida** (desde a 0.8.9.5): a tela para o app Capturas integrado, porque apertar Print Screen já é pedir a captura. Se você a puser em Negar em Ajustes → Privacidade, fica assim. As janelas protegidas, como Senhas, continuam saindo pretas em toda captura, e Capturas se recusa a capturar uma sozinha. Cada campo e aviso de senha é protegido do mesmo jeito, então uma senha nunca é capturada.
+- **Indicadores.** Um ponto verde na barra de menus enquanto a câmera está em uso, e um laranja para o microfone. Ao tocar nele, aparece qual app está usando. Desde a 0.8.9.5, uma só pílula verde ao lado do relógio substitui os pontos e a pílula de compartilhamento de tela. Seu ícone diz o que está sendo capturado neste momento (a tela, a câmera, o microfone ou dois deles), não pode ser escondida, e ao tocá-la mostra cada app com Parar de compartilhar e Desativar para este app.
 
 Permissões que um app pode declarar: arquivos, área de transferência, notificações, rede, câmera, microfone, tela, escuta de portas, USB, Bluetooth e apps. Um app não consegue uma permissão que não declarou.
 
@@ -104,7 +105,7 @@ Uma janela pode ser marcada como protegida. A de Senhas é. Os pixels dela saem 
 ## Limites honestos
 
 - **Os apps Linux não têm sandbox por padrão.** Para eles valem as regras de rede, a atribuição e as restrições que você definir; as restrições não cobrem a área de transferência, o Bluetooth através do BlueZ no barramento do sistema, o barramento do sistema em geral nem programas iniciados fora do lançador de apps.
-- **O uso de câmera e microfone por apps Linux não aparece** nos indicadores da 0.8.9.4. Em desenvolvimento, a pílula verde mostra o que eles capturam pelo PipeWire; um programa que abre a câmera ou a placa de som por conta própria, sem PipeWire, ainda não aparece.
+- **O uso de câmera e microfone por apps Linux só aparece pelo PipeWire.** Desde a 0.8.9.5 a pílula verde mostra o que eles capturam pelo PipeWire (antes não aparecia nada); um programa que abre a câmera ou a placa de som por conta própria, sem PipeWire, ainda não aparece.
 - **O broker ainda não cobre tudo.** Permissões como Bluetooth ou abrir outros apps podem ser declaradas, mas não há chamada do broker para elas, então um app isolado simplesmente não consegue fazer essas coisas.
 - **A falta de um recurso do kernel enfraquece o sandbox dos apps sem alarde.** Se faltar o Landlock ou um controlador de cgroup, os apps iniciam mesmo assim, com um aviso no log. Já os ajudantes se recusam a rodar sem seccomp.
 

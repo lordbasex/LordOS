@@ -603,7 +603,7 @@
   "comp.weather": "Tempo",
   "comp.weatherHint": "As previsões do widget do tempo, do Open-Meteo, quando você as ativa.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Os apps Flatpak do Flathub: o catálogo, as instalações e as atualizações.",
+  "comp.flathubHint": "Os apps Flatpak do Flathub: o catálogo, as instalações, as atualizações e as classificações da Loja vindas do flathub.org.",
   "comp.streams": "Câmeras e TV",
   "comp.streamsHint": "O widget de vídeo e os endereços do Player: câmeras, transmissões e canais de TV (lord-stream)."
 }

@@ -112,18 +112,14 @@ static void save(void) {
 
 /* ---- places ---- */
 
-/* The window's place now, into its session's entry (a maximized or fullscreen window keeps its last normal place). */
+/* The window's place now, into its session's entry (xs_top_note: a maximized or fullscreen window keeps its last normal
+ * place, and takes its current one when it never had one, so a window maximized from its first frame to its close
+ * still comes back). */
 static void snap(TopSess *t) {
     if (!t->hold || !t->hold->s || !t->name[0] || !t->top) return;
     int r[4], mx = 0, fs = 0;
     if (!wl__window_rect(t->id, r, &mx, &fs)) return;
-    XsTop *e = xs_top_put(t->hold->s, t->name);
-    if (!e) return;
-    int was[4] = { e->r[0], e->r[1], e->r[2], e->r[3] }, wasmax = e->max;
-    if (fs) return;
-    if (mx) e->max = 1;
-    else xs_top_set(e, r, 0);
-    if (memcmp(was, e->r, sizeof was) || wasmax != e->max) dirty = 1;
+    if (xs_top_note(xs_top_put(t->hold->s, t->name), r, mx, fs)) dirty = 1;
 }
 
 static int on_tick(void *data) {

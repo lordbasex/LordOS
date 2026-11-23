@@ -36,6 +36,24 @@ export function findAttachments(body, repo) {
   return out.sort((a, b) => (a.endsWith('.json') ? 0 : 1) - (b.endsWith('.json') ? 0 : 1));
 }
 
+// The version the issue form's "LordOS version" field holds (.github/ISSUE_TEMPLATE/hardware-report.yml), or '':
+// the first line under its heading, when it starts like a version. System Information fills it in with the version
+// it runs; a file attached from an older report then says another one (issue #224: the form 0.8.9.4, the file a
+// 0.8.8.9 report). Only compared with the file's version, never shown as it is.
+export function formVersion(body) {
+  const lines = String(body || '').slice(0, 65536).split(/\r?\n/);
+  const at = lines.findIndex((l) => /^###\s+LordOS version\s*$/.test(l));
+  if (at < 0) return '';
+  for (const l of lines.slice(at + 1, at + 6)) {
+    const t = l.trim();
+    if (!t) continue;
+    if (t.startsWith('###')) return '';
+    const m = /^v?(\d{1,3}\.\d{1,3}\.\d{1,3}(?:\.\d{1,3})?(?:-[a-z0-9.]{1,16})?)$/i.exec(t);
+    return m ? m[1] : '';
+  }
+  return '';
+}
+
 // The report a System Information page carries (apps/sysinfo/share.js embedReport): the text of its one
 // <script type="application/json" id="lordos-hwreport"> block, or null. The JSON is then checked like any attached one.
 export function embeddedReport(html) {
@@ -153,7 +171,7 @@ export function privacyScan(v) {
 const CEILING = { 'MB/s': 200000, 'GB/s': 2000, 'GFLOP/s': 100000, 'runs/s': 10000000, fps: 100000, 'Mpx/s': 10000000, IOPS: 50000000, ns: 100000, ms: 100000, '%': 100 };
 export const REF_FACTOR = 50;
 
-export function plausibility(rep, { today = new Date().toISOString().slice(0, 10) } = {}) {
+export function plausibility(rep, { today = new Date().toISOString().slice(0, 10), form = '' } = {}) {
   const flags = [];
   const flag = (id, detail = '') => flags.push({ id, detail: String(detail) });
   const s = rep.system || {};
@@ -163,6 +181,8 @@ export function plausibility(rep, { today = new Date().toISOString().slice(0, 10
   if (kb != null && (kb < 256 * 1024 || kb > 64 * 1024 * 1024 * 1024)) flag('memory-size', kb);
   if (rep.createdAt > today) flag('date-future', rep.createdAt);
   if (s.software && s.software.lordos && !sameVersion(s.software.lordos, rep.lordos)) flag('version-mismatch', `${s.software.lordos} / ${rep.lordos}`);
+  // the issue's form names another version than the file: an older report attached again (issue #224)
+  if (form && !sameVersion(form, rep.lordos)) flags.push({ id: 'form-version', detail: `form ${form} / file ${rep.lordos}`, form, file: String(rep.lordos || '') });
   // the boot medium (0.8.7): a copy to memory only exists in a live session, a link speed only for USB
   const boot = bootInfo(rep);
   if (boot.toRam && rep.live !== true) flag('boot-mismatch', 'toram, installed');
@@ -276,6 +296,10 @@ export function commentBody(result, { fileName = '' } = {}) {
     L.push('**It holds something that looks personal** (a report never carries addresses, identifiers or home-folder paths), so it was not accepted. Please don’t edit the file by hand; create it again:', '');
     for (const p of result.privacy.slice(0, 10)) L.push(`- ${code(p.path)}: ${code(p.kind)}`);
     L.push('');
+  }
+  const form = (result.flags || []).find((f) => f.id === 'form-version');
+  if (form) {
+    L.push(`**The form says LordOS ${code(form.form)}, but the attached file was made on ${code(form.file)}.** It may be an older report. If you made a new one on ${code(form.form)}, attach the new \`.json\` file (its name carries the day it was made); otherwise a maintainer will file this one under ${code(form.file)}.`, '');
   }
   if (result.flags && result.flags.length) {
     L.push('**Numbers to look at:**', '');

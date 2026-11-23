@@ -58,6 +58,11 @@ XsTop *xs_top_put(XsSess *s, const char *name);   /* found or added (empty: r al
 void   xs_top_del(XsSess *s, const char *name);
 void   xs_top_set(XsTop *t, const int r[4], int max);   /* clamped */
 int    xs_top_has(const XsTop *t);                  /* a place was ever stored */
+/* The window's place now, into its entry: 1 if the entry changed. A normal window: its rect, not maximized. A maximized
+ * one keeps its last normal place and is marked maximized; a fullscreen one keeps the entry as it was. Either, when it
+ * has no place yet (it was maximized or fullscreen since it opened), takes its rect as that place, so it can still
+ * be restored: without one the entry would be neither restored (xs_top_has) nor saved (xs_dump). */
+int    xs_top_note(XsTop *t, const int r[4], int maximized, int fullscreen);
 
 char *xs_dump(const XsStore *st, size_t *len);      /* malloc'd file text (sessions with an owner only) */
 int   xs_load(XsStore *st, const char *buf, size_t len);   /* sessions read; st is cleared first */

@@ -46,6 +46,7 @@
   "backup.destMissing": "目的地不存在",
   "backup.destNotAllowed": "不允許使用該目的地",
   "backup.destOutside": "目的地必須位於你的個人資料夾或你的某個磁碟上",
+  "backup.destCloud": "雲端資料夾不能作為備份目的地：快照需要硬連結，而雲端帳號不支援，而且即使停止備份，其中的檔案仍會繼續上傳。請選擇這台電腦上的磁碟或資料夾",
   "backup.destUnwritable": "無法寫入目的地",
   "backup.interrupted": "已中斷",
   "backup.locked": "備份已加密：請先解鎖",
@@ -916,5 +917,13 @@
   "studio.badPicture": "這張圖片無法用作背景。",
   "studio.invalid": "這項 LordOS Studio 設定無效。",
   "studio.noCamera": "未連接相機。",
-  "studio.unavailable": "這部電腦無法使用 LordOS Studio。"
+  "studio.unavailable": "這部電腦無法使用 LordOS Studio。",
+  "studio.downloadFailed": "無法下載背景。",
+  "studio.removeFailed": "無法移除背景。",
+  "dkms.mokInvalid": "此 Secure Boot 金鑰要求無效。",
+  "dkms.mokNotNeeded": "這台電腦現在不需要登錄金鑰。",
+  "dkms.mokNothingPending": "沒有金鑰在等待下次重新啟動時登錄。",
+  "dkms.mokNoTool": "未安裝 mokutil 程式。",
+  "dkms.mokFailed": "無法為下次重新啟動準備金鑰。",
+  "media.protectedWindow": "此視窗受保護，無法單獨擷取。在螢幕截圖中它會顯示為黑色。"
 }

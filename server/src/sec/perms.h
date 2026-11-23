@@ -42,6 +42,11 @@ int         perm_declarable(const char *s); /* can it be declared in the manifes
 
 /* Saved state (O(1)); PERM_ASK if there's no decision. */
 PermState perm_get(const char *app_id, Perm p);
+/* A built-in app's permission allowed until the person decides otherwise (only Screenshots' "screen", GitHub #219;
+ * AGENTS.md), PERM_ASK for everything else; and perm_get with that default under it: what the desktop's own contexts
+ * (built-in apps, never the broker) check. A saved decision always wins, so a deny saved in Privacy sticks. */
+PermState perm_builtin_default(const char *app_id, Perm p);
+PermState perm_get_builtin(const char *app_id, Perm p);
 /* Saves a decision (and persists it in permisos.json). Revoking = PERM_ASK or PERM_DENY. */
 int perm_set(const char *app_id, Perm p, PermState state);
 /* Forgets all of an app's permissions (on uninstall). */

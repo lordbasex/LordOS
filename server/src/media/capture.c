@@ -170,7 +170,8 @@ void media_capture_size(int *w, int *h) {
     *h = (m ? m->v.ph : (int)ui.height) & ~1;
 }
 
-MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display, int until, const int *also, int nalso) {
+MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display, int until, const int *also, int nalso, int *refused) {
+    if (refused) *refused = 0;
     int W = (int)ui.width, H = (int)ui.height;
     if (W <= 0 || H <= 0 || !ui.root) return NULL;
     /* one display asked for (Screenshots: a file per display, an area on any of them) */
@@ -196,7 +197,8 @@ MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t
         paint_capture_mode = 0;
     }
     paint_view = keep;
-    if (!ok) { free(full); return NULL; }       /* not a node on the screen: the caller crops a capture instead */
+    if (ok < 0 && refused) *refused = 1;        /* a protected window alone: never captured (paint_capture_until) */
+    if (ok <= 0) { free(full); return NULL; }   /* not a node on the screen: the caller crops a capture instead */
     if (w <= 0 || h <= 0) { x = 0; y = 0; w = W; h = H; }
     if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }

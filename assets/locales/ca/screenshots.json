@@ -97,5 +97,11 @@
   "hintAdjust": "Arrossega les nanses per ajustar · Retorn: captura · Esc: cancel·la",
   "hintAdjustRecord": "Arrossega les nanses per ajustar · Retorn: grava · Esc: cancel·la",
   "hintRecord": "Arrossega per triar l'àrea a gravar · Esc: cancel·la",
-  "thumbOpen": "Obre a l'editor de marcatge"
+  "thumbOpen": "Obre a l'editor de marcatge",
+  "opt.printKey": "Tecla Impr Pant",
+  "opt.printKey.full": "Captura tota la pantalla",
+  "opt.printKey.area": "Captura la part triada",
+  "opt.printKey.window": "Captura la finestra triada",
+  "opt.printKey.toolbar": "Mostra la barra",
+  "opt.printKey.none": "No facis res"
 }

@@ -46,6 +46,7 @@
   "backup.destMissing": "Miejsce docelowe nie istnieje",
   "backup.destNotAllowed": "To miejsce docelowe jest niedozwolone",
   "backup.destOutside": "Miejsce docelowe musi być w katalogu domowym lub na jednym z twoich dysków",
+  "backup.destCloud": "Folder w chmurze nie może być miejscem kopii zapasowej: migawki wymagają twardych dowiązań, których konto w chmurze nie ma, a jego pliki są wysyłane nawet po zatrzymaniu kopii. Wybierz dysk lub folder na tym komputerze",
   "backup.destUnwritable": "Nie można zapisywać w miejscu docelowym",
   "backup.interrupted": "Przerwano",
   "backup.locked": "Kopie zapasowe są zaszyfrowane: najpierw je odblokuj",
@@ -918,5 +919,13 @@
   "studio.badPicture": "Tego obrazu nie można użyć jako tła.",
   "studio.invalid": "To ustawienie LordOS Studio jest nieprawidłowe.",
   "studio.noCamera": "Nie podłączono żadnej kamery.",
-  "studio.unavailable": "LordOS Studio nie jest dostępne na tym komputerze."
+  "studio.unavailable": "LordOS Studio nie jest dostępne na tym komputerze.",
+  "studio.downloadFailed": "Nie udało się pobrać tła.",
+  "studio.removeFailed": "Nie udało się usunąć tła.",
+  "dkms.mokInvalid": "To żądanie klucza Secure Boot jest nieprawidłowe.",
+  "dkms.mokNotNeeded": "Ten komputer nie musi teraz rejestrować klucza.",
+  "dkms.mokNothingPending": "Żaden klucz nie czeka na rejestrację przy następnym ponownym uruchomieniu.",
+  "dkms.mokNoTool": "Program mokutil nie jest zainstalowany.",
+  "dkms.mokFailed": "Nie udało się przygotować klucza na następne ponowne uruchomienie.",
+  "media.protectedWindow": "To okno jest chronione, więc nie można go przechwycić osobno. Na zrzutach ekranu jest czarne."
 }

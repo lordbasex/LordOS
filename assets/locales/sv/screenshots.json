@@ -97,5 +97,11 @@
   "hintAdjust": "Dra i handtagen för att justera · Retur: ta bild · Esc: avbryt",
   "hintAdjustRecord": "Dra i handtagen för att justera · Retur: spela in · Esc: avbryt",
   "hintRecord": "Dra för att välja området att spela in · Esc: avbryt",
-  "thumbOpen": "Öppna i markeringsredigeraren"
+  "thumbOpen": "Öppna i markeringsredigeraren",
+  "opt.printKey": "Print Screen-tangenten",
+  "opt.printKey.full": "Ta bild av hela skärmen",
+  "opt.printKey.area": "Ta bild av vald del",
+  "opt.printKey.window": "Ta bild av valt fönster",
+  "opt.printKey.toolbar": "Visa fältet",
+  "opt.printKey.none": "Gör ingenting"
 }

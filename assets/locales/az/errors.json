@@ -46,6 +46,7 @@
   "backup.destMissing": "Təyinat yeri mövcud deyil",
   "backup.destNotAllowed": "Bu təyinat yerinə icazə verilmir",
   "backup.destOutside": "Təyinat yeri ev qovluğunuzda və ya disklərinizdən birində olmalıdır",
+  "backup.destCloud": "Bulud qovluğu ehtiyat nüsxə təyinatı ola bilməz: snapşotlar bulud hesabının dəstəkləmədiyi sərt keçidlərə ehtiyac duyur və onun faylları ehtiyat nüsxə dayandırıldıqdan sonra da yüklənməyə davam edir. Bu kompüterdə disk və ya qovluq seçin",
   "backup.destUnwritable": "Təyinat yerinə yazmaq mümkün deyil",
   "backup.interrupted": "Kəsildi",
   "backup.locked": "Ehtiyat nüsxələr şifrələnib: əvvəlcə onların kilidini açın",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Bu şəkil arxa fon kimi istifadə oluna bilməz.",
   "studio.invalid": "Bu LordOS Studio ayarı etibarlı deyil.",
   "studio.noCamera": "Heç bir kamera qoşulmayıb.",
-  "studio.unavailable": "LordOS Studio bu kompüterdə mövcud deyil."
+  "studio.unavailable": "LordOS Studio bu kompüterdə mövcud deyil.",
+  "studio.downloadFailed": "Fon endirilə bilmədi.",
+  "studio.removeFailed": "Fon silinə bilmədi.",
+  "dkms.mokInvalid": "Bu Secure Boot açarı sorğusu etibarlı deyil.",
+  "dkms.mokNotNeeded": "Bu kompüterin indi açarı qeydiyyata salmağa ehtiyacı yoxdur.",
+  "dkms.mokNothingPending": "Növbəti yenidən başlatmada qeydiyyat gözləyən açar yoxdur.",
+  "dkms.mokNoTool": "mokutil proqramı quraşdırılmayıb.",
+  "dkms.mokFailed": "Açarı növbəti yenidən başlatma üçün hazırlamaq alınmadı.",
+  "media.protectedWindow": "Bu pəncərə qorunur, ona görə ayrıca çəkilə bilməz. Ekran şəkillərində qara görünür."
 }

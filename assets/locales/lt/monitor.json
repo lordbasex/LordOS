@@ -618,7 +618,7 @@
   "comp.weather": "Orai",
   "comp.weatherHint": "Orų valdiklio prognozės iš Open-Meteo, kai jas įjungiate.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Flatpak programos iš Flathub: katalogas, diegimas ir naujinimai.",
+  "comp.flathubHint": "Flatpak programos iš Flathub: katalogas, diegimas, naujinimai ir Parduotuvės reitingai iš flathub.org.",
   "comp.streams": "Kameros ir TV",
   "comp.streamsHint": "Vaizdo valdiklis ir Grotuvo adresai: kameros, transliacijos ir TV kanalai (lord-stream)."
 }

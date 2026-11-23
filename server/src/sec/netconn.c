@@ -18,7 +18,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-static const char *const NAMES[NC_COUNT] = { "mail", "print", "lists", "lan", "sql", "weather" };
+static const char *const NAMES[NC_COUNT] = { "mail", "print", "lists", "lan", "sql", "weather", "flathub" };
 
 const char *netconn_name(NcComponent c) { return (unsigned)c < NC_COUNT ? NAMES[c] : NULL; }
 
@@ -87,12 +87,15 @@ int netconn_serve_one(const NcReq *r) {
 
 /* ---- lord-server's side ---- */
 
-static struct { int fd; pid_t pid; } conn[NC_COUNT] = { { -1, 0 }, { -1, 0 }, { -1, 0 }, { -1, 0 }, { -1, 0 } };
+/* fd is the channel + 1, so the table starts with every connector off (0) whatever NC_COUNT is: a hand-written
+ * initializer once left the weather connector's slot at fd 0 (lord-server's stdin), closed on its first request */
+static struct { int fd1; pid_t pid; } conn[NC_COUNT];
+#define CONN_FD(c) (conn[c].fd1 - 1)
 static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
 
 static void drop(NcComponent c) {
-    if (conn[c].fd >= 0) close(conn[c].fd);
-    conn[c].fd = -1;
+    if (CONN_FD(c) >= 0) close(CONN_FD(c));
+    conn[c].fd1 = 0;
     if (conn[c].pid > 0) { kill(conn[c].pid, SIGKILL); waitpid(conn[c].pid, NULL, 0); }
     conn[c].pid = 0;
 }
@@ -127,21 +130,21 @@ static int spawn(NcComponent c) {
     }
     close(sv[1]);
     if (p < 0) { close(sv[0]); return -1; }
-    conn[c].fd = sv[0];
+    conn[c].fd1 = sv[0] + 1;
     conn[c].pid = p;
     return 0;
 }
 
 /* One round trip; 0 with *out the fd, or -errno. */
 static int ask(NcComponent c, const NcReq *r, int *out) {
-    if (send(conn[c].fd, r, sizeof *r, MSG_NOSIGNAL) != (ssize_t)sizeof *r) return -EPIPE;
-    struct pollfd p = { conn[c].fd, POLLIN, 0 };
+    if (send(CONN_FD(c), r, sizeof *r, MSG_NOSIGNAL) != (ssize_t)sizeof *r) return -EPIPE;
+    struct pollfd p = { CONN_FD(c), POLLIN, 0 };
     if (poll(&p, 1, 5000) != 1) return -ETIMEDOUT;      /* a first request also waits for its placement */
     int err = 0;
     struct iovec iov = { &err, sizeof err };
     union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
     struct msghdr m = { .msg_iov = &iov, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
-    ssize_t n = recvmsg(conn[c].fd, &m, MSG_CMSG_CLOEXEC);
+    ssize_t n = recvmsg(CONN_FD(c), &m, MSG_CMSG_CLOEXEC);
     if (n != (ssize_t)sizeof err) return -EPIPE;
     int fd = -1;
     for (struct cmsghdr *h = CMSG_FIRSTHDR(&m); h; h = CMSG_NXTHDR(&m, h))
@@ -173,7 +176,7 @@ int netconn_socket(NcComponent comp, int fam, int type, const struct sockaddr *t
     pthread_mutex_lock(&mu);
     int fd = -1, rc = -EPIPE;
     for (int attempt = 0; attempt < 2 && (rc == -EPIPE || rc == -ETIMEDOUT); attempt++) {
-        if (conn[comp].fd < 0 && spawn(comp)) { rc = -EAGAIN; break; }
+        if (CONN_FD(comp) < 0 && spawn(comp)) { rc = -EAGAIN; break; }
         rc = ask(comp, &r, &fd);
         if (rc == -EPIPE || rc == -ETIMEDOUT) {
             fprintf(stderr, "netconn: the %s connector did not answer (%s)%s\n", NAMES[comp], strerror(-rc), attempt ? "" : "; starting it again");

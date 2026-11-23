@@ -1,6 +1,8 @@
 // flathubpages.js — the Store's Flathub section (docs/FLATPAK.md, phase 1 step 5): turning Flathub on (the `flatpak`
-// package through the Store's package job, then the remote and the catalog), the catalog as cards (Flathub's verified
-// apps unless the setting shows the rest), each app's page with what it declares and what LordOS changes before it is
+// package through the Store's package job, then the remote and the catalog), a home like other app centres' (a banner,
+// the categories, the collections; docs/FLATPAK.md, "The Store's home"; with Flathub's rankings when they are on, E10,
+// "Rankings from Flathub's API": ids only, shown with the catalog's names and icons) over the catalog as cards (Flathub's verified
+// apps unless the setting shows the rest), a category's subcategories, each app's page with what it declares and what LordOS changes before it is
 // installed, and the installed ones with Update and Remove. Chromium and Electron apps install like any other: their
 // helpers' sub-sandboxes are served by LordOS (docs/FLATPAK.md, "Sub-sandboxes"). The jobs and state are
 // sdk/flathub.js's; the logic sdk/flathubmodel.js's.
@@ -10,7 +12,7 @@ import {
   flathubModel as M, typeScale, spacing, t,
 } from '@lordos/sdk';
 import { debian } from './debian.js';
-import { Card, CardGrid, Facts, Pill, Shelf, Tag } from './ui.js';
+import { Card, CardGrid, Facts, Featured, GLYPH, Pill, Shelf, Tag, nameColor, tint } from './ui.js';
 import { MoreButton, usePaged } from './endless.js';
 import { DisplayToolkit } from './fhlook.js';
 import { flathub as F } from '@lordos/sdk';
@@ -55,7 +57,7 @@ export const FlathubCard = memo(function FlathubCard({ a, onOpen }) {
   const installed = useStore(F.state, (s) => s.installed.some((x) => x.id === a.id));
   return h(Card, {
     icon: h(FlathubIcon, { a, size: 56 }), name: a.name, tag: 'Flathub', kind: [catLabel(a), a.developer].filter(Boolean).join(' · '), summary: a.summary,
-    note: a.verified ? '' : t('flathub.unverifiedShort'),
+    note: a.verified ? `✓ ${t('flathub.verifiedShort')}` : t('flathub.unverifiedShort'),
     action: installed ? h(Pill, { label: t('store.open'), onClick: () => openApp(a.id) }) : h(Pill, { label: t('store.get'), onClick: () => onOpen(a.id) }),
     onClick: () => onOpen(a.id),
   });
@@ -152,7 +154,69 @@ function InstalledList({ onOpen }) {
     })));
 }
 
-export function FlathubPage({ query, onOpen, category = null }) {
+// ---- the home's pieces (Bazaar-like: a banner, the categories, the collections, then every app) ----
+
+// The banner (M.banner): Flathub's app of the day when the rankings have it, else the app released most recently, each
+// said as such. Name, icon and summary from the catalog either way.
+function Spotlight({ b, onOpen }) {
+  if (!b) return null;
+  const a = b.app;
+  return h(Featured, {
+    icon: h(FlathubIcon, { a, size: 96 }), glow: nameColor(a.name), kicker: t(b.kind === 'day' ? 'flathub.home.appOfTheDay' : 'flathub.home.spotlight'),
+    title: a.name, text: a.summary,
+    action: h(Pill, { big: true, onDark: true, label: t('store.get'), onClick: () => onOpen(a.id) }), onClick: () => onOpen(a.id),
+  });
+}
+
+// The main categories as tiles (glyph, name, how many apps), each opening its page.
+function CategoryTiles({ counts, onCategory }) {
+  const th = useTheme();
+  const cats = M.MAIN_CATS.filter((c) => counts[c]);
+  if (!cats.length) return null;
+  return h(Shelf, { title: t('flathub.home.categories') },
+    h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.s } },
+      ...cats.map((c) => h(Tile, { key: c, th, c, n: counts[c], onClick: () => onCategory(c) })),
+      // empty, zero-height cells with the tiles' own flex: the last row's tiles keep the first row's width instead of
+      // stretching over the rest of it (five: a row holds at most six tiles at the Store's widest)
+      ...[0, 1, 2, 3, 4].map((i) => h(View, { key: `pad-${i}`, style: { ...TILE_FLEX, height: 0 } }))));
+}
+const TILE_FLEX = { flexGrow: 1, flexBasis: 160, minWidth: 140 };
+function Tile({ th, c, n, onClick }) {
+  const [hover, setHover] = useState(false);
+  return h(View, {
+    onClick, onMouseEnter: () => setHover(true), onMouseLeave: () => setHover(false),
+    style: { ...TILE_FLEX, height: 52, paddingHorizontal: spacing.m, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: spacing.s,
+      backgroundColor: hover ? tint(th.accent, 0.16) : tint(th.accent, 0.08), border: `1px solid ${tint(th.accent, 0.22)}` },
+  },
+  h(Text, { style: { fontSize: 18, color: th.accent, width: 22, textAlign: 'center' } }, GLYPH[c] || '•'),
+  h(View, { style: { flex: 1, minWidth: 0 } },
+    h(Text, { style: { fontSize: typeScale.callout, fontWeight: 650, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, t(`store.cat.${c}`)),
+    h(Text, { style: { fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' } }, String(n))));
+}
+
+// A category's subcategories as chips: All, then each one that has apps (with how many).
+function SubChips({ sub, counts, total, onSub }) {
+  const th = useTheme();
+  const subs = Object.keys(counts);
+  if (!subs.length) return null;
+  const chip = (s, label, n) => h(View, { key: s || 'all', onClick: () => onSub(s),
+    style: { height: 28, paddingHorizontal: 12, borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: sub === s ? th.accent : th.hover } },
+  h(Text, { style: { fontSize: 12, fontWeight: 600, color: sub === s ? '#fff' : th.text, whiteSpace: 'nowrap' } }, label),
+  h(Text, { style: { fontSize: 11, color: sub === s ? 'rgba(255,255,255,0.8)' : th.textDim } }, String(n)));
+  return h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: spacing.l } },
+    chip(null, t('store.sub.all'), total), ...subs.map((s) => chip(s, t(`flathub.sub.${s}`), counts[s])));
+}
+
+// The collections as shelves of SHELF cards, each with "See all" to its own page.
+function CollectionRows({ rows, onOpen, onCollection }) {
+  return h(View, { style: { gap: 26 } }, ...rows.map((r) => h(Shelf, {
+    key: r.key, title: t(`flathub.coll.${r.key}`), more: t('store.seeAll', { count: r.apps.length }), onMore: r.apps.length > SHELF ? () => onCollection(r.key) : null,
+  }, h(CardGrid, null, ...r.apps.slice(0, SHELF).map((a) => h(FlathubCard, { key: a.id, a, onOpen }))))));
+}
+
+// The section's page. With no search, category or collection, the home: the banner, the categories, the collections,
+// then every app; a category shows its subcategories over its apps; a collection ("See all") its apps in its order.
+export function FlathubPage({ query, onOpen, category = null, sub = null, coll = null, onCategory = () => {}, onSub = () => {}, onCollection = () => {} }) {
   const th = useTheme();
   // what the page itself shows; a job's progress is JobProgress's own (it changes several times a second)
   const catalog = useStore(F.state, (x) => x.catalog);
@@ -160,10 +224,26 @@ export function FlathubPage({ query, onOpen, category = null }) {
   const working = useStore(F.state, (x) => !!x.busy || !!x.job);
   const s = { catalog, loaded };
   const fh = useFlathub();
+  const showAll = fh.prefs.showAll;
+  // Flathub's rankings (E10): ids only, empty when off, offline or failed
+  const ranks = useStore(F.state, (x) => x.ranks);
   useEffect(() => { if (fh.on) { if (!s.loaded) F.loadCatalog(); F.refreshInstalled(); } }, [fh.on]);
-  const list = useMemo(() => M.filterCatalog(s.catalog, { query, showAll: fh.prefs.showAll, category }), [s.catalog, query, fh.prefs.showAll, category]);
+  const q = String(query || '').trim();
+  const mode = q ? 'search' : coll && M.collectionOk(coll) ? 'coll' : category ? 'cat' : 'home';
+  useEffect(() => { if (fh.on && fh.prefs.rankings && (mode === 'home' || mode === 'coll')) F.loadRanks(); }, [fh.on, fh.prefs.rankings, mode]);
+  const subKey = mode === 'cat' && M.subOk(category, sub) ? sub : null;
+  // "now" for the release dates: once per catalog read
+  const now = useMemo(() => Date.now(), [s.catalog]);
+  const list = useMemo(() => (mode === 'coll' ? M.collection(s.catalog, coll, { showAll, now, ranks })
+    : M.filterCatalog(s.catalog, { query, showAll, category: mode === 'home' ? null : category, sub: subKey })),
+  [s.catalog, query, showAll, category, subKey, mode, coll, now, ranks]);
+  const rows = useMemo(() => (mode === 'home' ? M.homeRows(s.catalog, { showAll, now, ranks }) : []), [s.catalog, showAll, now, mode, ranks]);
+  const spot = useMemo(() => (mode === 'home' ? M.banner(s.catalog, { showAll, now, ranks }) : null), [s.catalog, showAll, now, mode, ranks]);
+  const counts = useMemo(() => (mode === 'home' ? M.categoryCounts(s.catalog, showAll) : {}), [s.catalog, showAll, mode]);
+  const subCounts = useMemo(() => (mode === 'cat' ? M.subcategoryCounts(s.catalog, category, showAll) : {}), [s.catalog, category, showAll, mode]);
+  const catTotal = useMemo(() => (mode === 'cat' && subKey ? M.filterCatalog(s.catalog, { showAll, category }).length : list.length), [s.catalog, showAll, category, subKey, list, mode]);
   // the next page comes when the list is scrolled near its end (endless.js)
-  const { limit, more } = usePaged(list.length, `${query}|${fh.prefs.showAll}|${category}`);
+  const { limit, more } = usePaged(list.length, `${query}|${showAll}|${category}|${subKey}|${mode === 'coll' ? coll : ''}`);
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
   const open = useCallback((id) => openRef.current(id), []);
@@ -178,9 +258,19 @@ export function FlathubPage({ query, onOpen, category = null }) {
         fh.prefs.showAll ? t('flathub.showAllOn') : t('flathub.showAllOff', { count: hidden })),
       h(Button, { small: true, label: t('flathub.refresh'), busy: working, onClick: () => F.loadCatalog({ fetch: true }) }),
       h(Button, { small: true, label: t('flathub.turnOff'), pending: true, onClick: F.turnOff })),
+    h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: spacing.s, marginTop: -spacing.s, marginBottom: spacing.l } },
+      h(Toggle, { on: fh.prefs.rankings, onChange: F.setRankings }),
+      h(Text, { style: { flex: 1, minWidth: 0, fontSize: typeScale.callout, color: th.text, textAlign: 'start' } },
+        fh.prefs.rankings ? t('flathub.rankingsOn') : t('flathub.rankingsOff'))),
     h(JobProgress),
-    h(InstalledList, { onOpen }),
-    s.loaded ? h(Header, { th }, query ? t('flathub.results', { count: list.length }) : t('flathub.catalogTitle', { count: list.length })) : null,
+    mode === 'home' || mode === 'search' ? h(InstalledList, { onOpen }) : null,
+    s.loaded && mode === 'home' ? h(View, { style: { gap: 26, marginBottom: 26 } },
+      h(Spotlight, { b: spot, onOpen: open }),
+      h(CategoryTiles, { counts, onCategory }),
+      h(CollectionRows, { rows, onOpen: open, onCollection })) : null,
+    s.loaded && mode === 'cat' ? h(SubChips, { sub: subKey, counts: subCounts, total: catTotal, onSub }) : null,
+    s.loaded ? h(Header, { th }, mode === 'search' ? t('flathub.results', { count: list.length })
+      : t('flathub.catalogTitle', { count: list.length })) : null,
     s.loaded && !list.length ? h(Line, { th }, t('flathub.noResults')) : null,
     h(CardGrid, null, ...list.slice(0, limit).map((a) => h(FlathubCard, { key: a.id, a, onOpen: open }))),
     h(MoreButton, { left: list.length - limit, onMore: more }));
@@ -191,6 +281,12 @@ export function useFlathubCounts() {
   const catalog = useStore(F.state, (x) => x.catalog);
   const showAll = useStore(settings, (st) => M.prefsOf(st.flathub).showAll);
   return useMemo(() => M.categoryCounts(catalog, showAll), [catalog, showAll]);
+}
+// How many Flathub apps are shown in all (the second column's "All"; an app in two categories is one app)
+export function useFlathubTotal() {
+  const catalog = useStore(F.state, (x) => x.catalog);
+  const showAll = useStore(settings, (st) => M.prefsOf(st.flathub).showAll);
+  return useMemo(() => M.shownCount(catalog, showAll), [catalog, showAll]);
 }
 
 // Discover's search: the Flathub apps that match, as their own shelf (when Flathub is on).

@@ -46,6 +46,7 @@
   "backup.destMissing": "Paskirties vietos nėra",
   "backup.destNotAllowed": "Ši paskirties vieta neleidžiama",
   "backup.destOutside": "Paskirties vieta turi būti jūsų namų aplanke arba viename iš jūsų diskų",
+  "backup.destCloud": "Debesies aplankas negali būti atsarginės kopijos paskirtis: momentinėms kopijoms reikia kietųjų nuorodų, kurių debesies paskyra neturi, o jos failai toliau įkeliami net sustabdžius atsarginį kopijavimą. Pasirinkite diską ar aplanką šiame kompiuteryje",
   "backup.destUnwritable": "Į paskirties vietą rašyti negalima",
   "backup.interrupted": "Darbas buvo nutrauktas",
   "backup.locked": "Atsarginės kopijos užšifruotos: pirmiausia jas atrakinkite",
@@ -918,5 +919,13 @@
   "studio.badPicture": "Šio paveikslėlio negalima naudoti kaip fono.",
   "studio.invalid": "Šis LordOS Studio nustatymas netinkamas.",
   "studio.noCamera": "Neprijungta jokia kamera.",
-  "studio.unavailable": "LordOS Studio šiame kompiuteryje nepasiekiama."
+  "studio.unavailable": "LordOS Studio šiame kompiuteryje nepasiekiama.",
+  "studio.downloadFailed": "Nepavyko atsisiųsti fono.",
+  "studio.removeFailed": "Nepavyko pašalinti fono.",
+  "dkms.mokInvalid": "Ši Secure Boot rakto užklausa netinkama.",
+  "dkms.mokNotNeeded": "Šiam kompiuteriui dabar nereikia užregistruoti rakto.",
+  "dkms.mokNothingPending": "Joks raktas nelaukia registracijos kito paleidimo iš naujo metu.",
+  "dkms.mokNoTool": "Programa mokutil neįdiegta.",
+  "dkms.mokFailed": "Nepavyko paruošti rakto kitam paleidimui iš naujo.",
+  "media.protectedWindow": "Šis langas apsaugotas, todėl jo negalima užfiksuoti atskirai. Ekrano kopijose jis rodomas juodas."
 }

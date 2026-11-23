@@ -181,7 +181,10 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   arguments, minimal environment, `sandbox_apply_helper` after loading the CA bundle, no sockets of
   its own); it lives for one download job, gets each list's already-connected socket, speaks TLS
   and one HTTP GET with a size limit, parses the list strictly and returns normalized lines in a
-  sealed memfd. See `FIREWALL.md`, "Blocklists".
+  sealed memfd. See `FIREWALL.md`, "Blocklists". Two more jobs, each approved on its own: the weather widget's
+  forecast (`FQ_WEATHER`, `api.open-meteo.com` only, numbers back) and the Store's rankings from Flathub's API
+  (`FQ_FLATHUB`, E10, `flathub.org` only, a number from a closed list of paths in, app ids out; `FLATPAK.md`,
+  "Rankings from Flathub's API").
 
 - **`lord-clean`** (0.8.7): Cleaner's read-only scanner. Same rules as `lord-doc` (fixed path, no
   arguments, minimal environment, `sandbox_apply_helper` in scope `lordos-cleaner` before reading anything, and it

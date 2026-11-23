@@ -7,9 +7,10 @@ import {
   View, Text, ScrollView, Segmented, Toggle, Button, TextInput, useTheme, useBackup, backup, fs, wm, t as tr, errorText,
   formatBytes, formatDate, formatTime, formatNumber, direction,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SidebarItem, SectionTitle, EmptyState, GroupBox, FormRow, Hairline, spacing, typeScale,
-  useSidebar, SidebarToggle, SidebarOverlay,
+  useSidebar, SidebarToggle, SidebarOverlay, cloudModel, FilePicker,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { exclusionFor, addExclusion } from './model.js';
 
 // ---- icon: a clock with a returning arrow (drawn with View) ----
 export function Icon({ size }) {
@@ -171,6 +172,8 @@ function Settings({ st }) {
   const [folder, setFolder] = useState('');
   const [ex, setEx] = useState('');
   const [err, setErr] = useState('');
+  const [exErr, setExErr] = useState('');
+  const [picking, setPicking] = useState(null);   // 'dest' | 'exclude': the system file dialog, in folder mode (#200)
   const home = useMemo(() => { try { return fs.home(); } catch (e) { return ''; } }, []);
   const save = (c) => {
     setErr('');
@@ -179,72 +182,101 @@ function Settings({ st }) {
   const expand = (p) => (p.startsWith('~') ? home + p.slice(1) : p);
   const short = (p) => (home && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
   useEffect(() => { const id = setInterval(() => { try { setVols(fs.volumes()); } catch (e) { /* no disks */ } }, 5000); return () => clearInterval(id); }, []);
-  const removable = vols.filter((v) => v.path !== home && v.path !== '/');
-  const addExclude = () => { const v = ex.trim().replace(/^~\/?/, '').replace(/\/+$/, ''); if (v) { save({ ...cfg, exclude: [...(cfg.exclude || []), v] }); setEx(''); } };
+  // a Cloud account's mount is never offered: lord-server refuses it as a destination (#208, backup.destCloud)
+  const removable = vols.filter((v) => v.path !== home && v.path !== '/' && !cloudModel.isCloudVolume(v, home));
+  // an exclusion, typed or chosen: a folder inside the home folder, which is what Backups copies (apps/backup/model.js)
+  const exclude = (input) => {
+    const r = exclusionFor(input, home);
+    if (!r) return false;
+    if (r.error) { setExErr(tr(r.error)); return false; }
+    setExErr('');
+    save({ ...cfg, exclude: addExclusion(cfg.exclude, r.rel) });
+    return true;
+  };
+  const addExclude = () => { if (exclude(ex)) setEx(''); };
   const useFolder = () => folder && save({ ...cfg, dest: expand(folder.trim()) });
+  const picked = (p) => {
+    const path = Array.isArray(p) ? p[0] : p;
+    const what = picking;
+    setPicking(null);
+    if (typeof path !== 'string' || !path) return;
+    if (what === 'dest') { setFolder(''); save({ ...cfg, dest: path }); } else exclude(path);
+  };
   return (
-    <ScrollView style={{ flex: 1 }}>
-      <View style={{ alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.l, paddingBottom: spacing.xxl }}>
-        <View style={{ width: '100%', maxWidth: 640, gap: spacing.xxl }}>
-          <GroupBox title={tr('backup.dest')} footer={tr('backup.destHelp')}>
-            {removable.map((v) => {
-              const on = cfg.dest === v.path;
-              return (
-                <View key={v.path} onClick={() => save({ ...cfg, dest: v.path })}
-                  style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: spacing.s }}>
-                  <DriveGlyph color={th.mode === 'dark' ? '#8e8e93' : '#aeaeb2'} />
-                  <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
-                    <Label weight={500} style={{ whiteSpace: 'nowrap', overflow: 'hidden' }}>{v.name || v.path}</Label>
-                    <Label dim size={typeScale.caption}>{tr('backup.volFree', { free: formatBytes(v.free || 0), total: formatBytes(v.total || 0), fs: v.fs || '' })}</Label>
-                    {['vfat', 'exfat', 'msdos', 'ntfs', 'ntfs3', 'fuseblk'].includes(v.fs) ? <Label size={typeScale.caption} style={{ color: '#d29922' }}>{tr('backup.noLinks')}</Label> : null}
+    <View style={{ flex: 1 }}>
+      <ScrollView style={{ flex: 1 }}>
+        <View style={{ alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.l, paddingBottom: spacing.xxl }}>
+          <View style={{ width: '100%', maxWidth: 640, gap: spacing.xxl }}>
+            <GroupBox title={tr('backup.dest')} footer={tr('backup.destHelp')}>
+              {removable.map((v) => {
+                const on = cfg.dest === v.path;
+                return (
+                  <View key={v.path} onClick={() => save({ ...cfg, dest: v.path })}
+                    style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: spacing.s }}>
+                    <DriveGlyph color={th.mode === 'dark' ? '#8e8e93' : '#aeaeb2'} />
+                    <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                      <Label weight={500} style={{ whiteSpace: 'nowrap', overflow: 'hidden' }}>{v.name || v.path}</Label>
+                      <Label dim size={typeScale.caption}>{tr('backup.volFree', { free: formatBytes(v.free || 0), total: formatBytes(v.total || 0), fs: v.fs || '' })}</Label>
+                      {['vfat', 'exfat', 'msdos', 'ntfs', 'ntfs3', 'fuseblk'].includes(v.fs) ? <Label size={typeScale.caption} style={{ color: '#d29922' }}>{tr('backup.noLinks')}</Label> : null}
+                    </View>
+                    <Text style={{ width: 18, fontSize: 15, fontWeight: 600, color: th.accent, textAlign: 'center' }}>{on ? '✓' : ''}</Text>
                   </View>
-                  <Text style={{ width: 18, fontSize: 15, fontWeight: 600, color: th.accent, textAlign: 'center' }}>{on ? '✓' : ''}</Text>
-                </View>
-              );
-            })}
-            {!removable.length ? <View style={{ minHeight: 36, justifyContent: 'center' }}><Label dim size={typeScale.callout}>{tr('backup.noDisks')}</Label></View> : null}
-            <Row style={{ minHeight: 44, gap: spacing.s }}>
-              <TextInput value={folder} onChange={setFolder} placeholder={tr('backup.folderPlaceholder')} style={{ flex: 1 }} onSubmit={useFolder} />
-              <Button label={tr('backup.useFolder')} onClick={useFolder} />
-            </Row>
-            {cfg.dest ? (
+                );
+              })}
+              {!removable.length ? <View style={{ minHeight: 36, justifyContent: 'center' }}><Label dim size={typeScale.callout}>{tr('backup.noDisks')}</Label></View> : null}
               <Row style={{ minHeight: 44, gap: spacing.s }}>
-                <Label size={typeScale.callout} style={{ flex: 1, minWidth: 0 }}>{tr('backup.current', { path: short(cfg.dest) })}{st && st.destTotal > 0 ? ` · ${tr('backup.free', { free: formatBytes(st.destFree), total: formatBytes(st.destTotal) })}` : ''}</Label>
-                <Button small label={tr('backup.stopUsing')} onClick={() => save({ ...cfg, dest: '' })} />
+                <TextInput value={folder} onChange={setFolder} placeholder={tr('backup.folderPlaceholder')} style={{ flex: 1 }} onSubmit={useFolder} />
+                <Button label={tr('backup.useFolder')} onClick={useFolder} />
+                <Button label={tr('backup.choose')} onClick={() => setPicking('dest')} />
               </Row>
-            ) : null}
-          </GroupBox>
-          <GroupBox title={tr('backup.schedule')} footer={tr('backup.retention')}>
-            <Row style={{ minHeight: 44 }}>
-              <Segmented appearance="neutral" fill style={{ flex: 1 }} value={cfg.interval} onChange={(v) => save({ ...cfg, interval: v })}
-                options={[['hourly', tr('backup.hourly')], ['daily', tr('backup.daily')], ['weekly', tr('backup.weekly')], ['manual', tr('backup.manual')]]} />
-            </Row>
-            <Row style={{ minHeight: 48, gap: spacing.m, paddingVertical: spacing.s }}>
-              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                <Label>{tr('backup.battery')}</Label>
-                <Label dim size={typeScale.caption} style={{ lineHeight: 1.35 }}>{tr('backup.priority')}</Label>
-              </View>
-              <Toggle small on={cfg.pauseOnBattery !== false} onChange={(v) => save({ ...cfg, pauseOnBattery: v })} />
-            </Row>
-          </GroupBox>
-          <GroupBox title={tr('backup.exclude')} footer={tr('backup.excludeHelp')}>
-            {(cfg.exclude || []).map((x) => (
-              <Row key={x} style={{ minHeight: 36 }}>
-                <FolderGlyph color={th.textDim} />
-                <Label style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden' }}>~/{x}</Label>
-                <Button small plain label={tr('backup.remove')} onClick={() => save({ ...cfg, exclude: cfg.exclude.filter((y) => y !== x) })} />
+              {cfg.dest ? (
+                <Row style={{ minHeight: 44, gap: spacing.s }}>
+                  <Label size={typeScale.callout} style={{ flex: 1, minWidth: 0 }}>{tr('backup.current', { path: short(cfg.dest) })}{st && st.destTotal > 0 ? ` · ${tr('backup.free', { free: formatBytes(st.destFree), total: formatBytes(st.destTotal) })}` : ''}</Label>
+                  <Button small label={tr('backup.stopUsing')} onClick={() => save({ ...cfg, dest: '' })} />
+                </Row>
+              ) : null}
+            </GroupBox>
+            <GroupBox title={tr('backup.schedule')} footer={tr('backup.retention')}>
+              <Row style={{ minHeight: 44 }}>
+                <Segmented appearance="neutral" fill style={{ flex: 1 }} value={cfg.interval} onChange={(v) => save({ ...cfg, interval: v })}
+                  options={[['hourly', tr('backup.hourly')], ['daily', tr('backup.daily')], ['weekly', tr('backup.weekly')], ['manual', tr('backup.manual')]]} />
               </Row>
-            ))}
-            <Row style={{ minHeight: 44, gap: spacing.s }}>
-              <TextInput value={ex} onChange={setEx} placeholder={tr('backup.excludePlaceholder')} style={{ flex: 1 }} onSubmit={addExclude} />
-              <Button label={tr('backup.add')} onClick={addExclude} />
-            </Row>
-          </GroupBox>
-          <Encryption st={st} cfg={cfg} save={save} />
-          {err ? <Label size={typeScale.callout} style={{ color: '#e5534b' }}>{err}</Label> : null}
+              <Row style={{ minHeight: 48, gap: spacing.m, paddingVertical: spacing.s }}>
+                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                  <Label>{tr('backup.battery')}</Label>
+                  <Label dim size={typeScale.caption} style={{ lineHeight: 1.35 }}>{tr('backup.priority')}</Label>
+                </View>
+                <Toggle small on={cfg.pauseOnBattery !== false} onChange={(v) => save({ ...cfg, pauseOnBattery: v })} />
+              </Row>
+            </GroupBox>
+            <GroupBox title={tr('backup.exclude')} footer={tr('backup.excludeHelp')}>
+              {(cfg.exclude || []).map((x) => (
+                <Row key={x} style={{ minHeight: 36 }}>
+                  <FolderGlyph color={th.textDim} />
+                  <Label style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden' }}>~/{x}</Label>
+                  <Button small plain label={tr('backup.remove')} onClick={() => save({ ...cfg, exclude: cfg.exclude.filter((y) => y !== x) })} />
+                </Row>
+              ))}
+              <Row style={{ minHeight: 44, gap: spacing.s }}>
+                <TextInput value={ex} onChange={(v) => { setEx(v); setExErr(''); }} placeholder={tr('backup.excludePlaceholder')} style={{ flex: 1 }} onSubmit={addExclude} />
+                <Button label={tr('backup.add')} onClick={addExclude} />
+                <Button label={tr('backup.choose')} onClick={() => { setExErr(''); setPicking('exclude'); }} />
+              </Row>
+              {exErr ? <View style={{ minHeight: 32, justifyContent: 'center' }}><Label size={typeScale.callout} style={{ color: '#e5534b', lineHeight: 1.35 }}>{exErr}</Label></View> : null}
+            </GroupBox>
+            <Encryption st={st} cfg={cfg} save={save} />
+            {err ? <Label size={typeScale.callout} style={{ color: '#e5534b' }}>{err}</Label> : null}
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+      {/* the destination's dialog never offers a Cloud account's folder (#208); the exclusions' one starts in the home folder */}
+      {picking ? (
+        <View onMouseDown={(e) => e.stopPropagation?.()} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <FilePicker mode="folder" cloud={false} title={tr(picking === 'dest' ? 'backup.pickDest' : 'backup.pickExclude')}
+            start={picking === 'dest' ? cfg.dest || '' : ''} onClose={() => setPicking(null)} onPick={picked} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 

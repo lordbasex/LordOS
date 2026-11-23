@@ -347,7 +347,8 @@ eq('labels', M.statusGlyph({ st: 'kept' }).key, 'cloud.status.kept');
   const v = Object.entries(data.verified || {});
   eq('verified: only tested kinds, each with since, date and evidence', v.every(([k, e]) => /^[a-z0-9]+$/.test(k) && /^\d+\.\d+\.\d+(\.\d+)?$/.test(e.since) && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
     && /^(maintainer test: .{20,}|issue #\d+)/.test(e.evidence)), true);
-  eq('verified today (#80, #81: issue reports; onedrive, iclouddrive: the maintainer\'s own accounts)', v.map(([k]) => k).sort(), ['filen', 'iclouddrive', 'mega', 'onedrive', 's3', 'sftp', 'webdav']);
+  eq('verified today (#80, #81, #216: issue reports; onedrive, iclouddrive: the maintainer\'s own accounts)', v.map(([k]) => k).sort(), ['filen', 'iclouddrive', 'mega', 'onedrive', 'protondrive', 's3', 'sftp', 'webdav']);
+  eq('Google Photos stays not verified (#217: it works only in part)', 'gphotos' in (data.verified || {}), false);
   eq('#80 #81 evidence names the issue', [data.verified.mega.evidence.startsWith('issue #80'), data.verified.filen.evidence.startsWith('issue #81')], [true, true]);
   eq('#195: filen confirmed again on 0.8.9', data.verified.filen.evidence.includes('issue #195'), true);
   // #195: the package carries the file lord-server reads (0.8.9's left it out: every provider read "not verified")
@@ -727,6 +728,29 @@ eq('known issue: others have none', [M.knownIssue('onedrive'), M.knownIssue(''),
   eq('rclone log: the last lines only', M.rcloneLogExcerpt(log, { kind: 'iclouddrive', max: 2 }).split('\n').length, 3);
   eq('rclone log: nothing about it says so', M.rcloneLogExcerpt('x', { kind: 'webdav' }), '\n(no lines about this provider)');
   eq('rclone log: no kind, nothing', M.rcloneLogExcerpt(log, {}), '');
+}
+
+// #206: each "Kept on this computer" row's size is lord-server's measure (keptSizes), never lord.fs.du's 0 on the mount;
+// #207: the whole account kept ("In sync") is told apart
+{
+  const a = acc('k1', 'Work', { kept: [`${H}/Cloud/Work`, `${H}/Cloud/Work/Projects`, `${H}/Cloud/Work/New`], keptSizes: [5000, 1200, null] });
+  eq('kept rows with their sizes', M.keptRows(a), [{ path: `${H}/Cloud/Work`, bytes: 5000 }, { path: `${H}/Cloud/Work/Projects`, bytes: 1200 }, { path: `${H}/Cloud/Work/New`, bytes: null }]);
+  eq('kept rows: not measured yet (an older lord-server) shows no size, not 0 B', M.keptRows(acc('k2', 'Home', { kept: [`${H}/Cloud/Home/a`] })), [{ path: `${H}/Cloud/Home/a`, bytes: null }]);
+  eq('kept rows: a measured 0 is 0', M.keptRows(acc('k3', 'Home', { kept: [`${H}/Cloud/Home/a`], keptSizes: [0] }))[0].bytes, 0);
+  eq('kept rows: junk sizes are unknown', M.keptRows(acc('k4', 'Home', { kept: ['x', 'y', 'z'], keptSizes: [-1, 'big', NaN] })).map((r) => r.bytes), [null, null, null]);
+  eq('kept rows of nothing', [M.keptRows(null), M.keptRows({})], [[], []]);
+  eq('in sync: the whole account kept', [M.keptAll(a), M.keptAll(acc('k5', 'Work', { kept: [`${H}/Cloud/Work/Projects`] })), M.keptAll(null)], [true, false, false]);
+  const before = globalThis.lord;
+  globalThis.lord = { fs: { home: () => H, mkdir: () => {}, write: () => {}, stat: () => { throw new Error('ENOENT'); } } };
+  installCloudMock(H);
+  const mc = globalThis.lord.cloud;
+  const ws = () => mc.state().accounts.find((x) => x.name === 'Work');
+  eq('the dev mock sizes its kept rows', M.keptRows(ws()).every((r) => r.bytes > 0), true);
+  mc.keep([`${H}/Cloud/Work/Fresh`]);
+  eq('the dev mock: a new kept entry is not measured yet', M.keptRows(ws()).map((r) => r.bytes > 0 ? 'n' : r.bytes), ['n', 'n', 'n', null]);
+  mc.unkeep([`${H}/Cloud/Work/Contracts`]);
+  eq('the dev mock: sizes follow unkeep', [ws().kept.length, ws().keptSizes.length, M.keptRows(ws())[1].path.endsWith('Templates')], [3, 3, true]);
+  globalThis.lord = before;
 }
 
 // #184: what each account takes on this computer, and the total that the rows add up to

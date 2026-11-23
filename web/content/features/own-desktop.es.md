@@ -73,7 +73,7 @@ LordOS apunta a máquinas modestas. Algunas mediciones reales de los registros d
 
 [[chart:memory-0891]]
 
-Estos números salen de máquinas virtuales, de una sola placa y de la PC del mantenedor. Los reportes de 22 máquinas reales, algunos con mediciones de LordBench, están en los [reportes de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). Son un punto de partida, no una promesa para cualquier máquina.
+Estos números salen de máquinas virtuales, de una sola placa y de la PC del mantenedor. Los reportes de 24 máquinas reales, algunos con mediciones de LordBench, están en los [reportes de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). Son un punto de partida, no una promesa para cualquier máquina.
 
 [[shot:2]]
 
@@ -149,6 +149,7 @@ Publicada el 9 de noviembre de 2026.
 - **La Terminal muestra los archivos de un servidor.** En una pestaña conectada con `ssh`, el modo Archivos pone este equipo a la izquierda y el servidor a la derecha, por la misma conexión, sin un segundo inicio de sesión. El protocolo SFTP lo habla `lord-sftp`, un ayudante aislado que recibe descriptores abiertos y nunca una ruta, y LordOS no ejecuta ningún programa para esto. Los Ajustes de la Terminal y una nueva ventana de Perfiles se abren en ventanas propias, y el pie de Claude Code ahora funciona dentro de `screen`, `tmux` y `ssh`.
 - **Bases de datos.** Una app nueva para MySQL y MariaDB, con cada conexión en su propio ayudante aislado, `lord-sql`, y su propia fila en el cortafuegos y el Monitor.
 - **Botones de ventana a cualquier lado.** Ajustes → Escritorio y Dock → Botones de ventana los pone a la izquierda o a la derecha en los dos temas, y las apps de Linux que dibujan su propia barra de título los siguen.
+- **Opciones de ventana (desde la 0.8.9.5; #151, #219).** Ajustes → Apariencia → Opciones de ventana: botones de ventana Normal, Grande o Muy grande, con vista previa en vivo; mover y cambiar el tamaño de una ventana desde cualquier parte con ❖ + arrastrar o Alt + arrastrar (apagado por defecto; también las apps de Linux); y las opciones de mosaico del menú de ventana a la vista u ocultas.
 - **Las pantallas siguen encendidas al bloquear, cerrar sesión e iniciarla.** Cada pantalla encendida recibe un cuadro negro propio antes de que la siguiente sesión tome el monitor, en lugar de que se le quiten los búferes de la sesión de abajo de la pantalla, cosa que algunas placas rechazaban y dejaba las pantallas a oscuras.
 - **El lituano está completo,** los CD y DVD se montan en solo lectura en Archivos, y las carpetas de la Nube y de red ya no congelan el escritorio.
 
@@ -157,7 +158,7 @@ Publicada el 9 de noviembre de 2026.
 Publicada el 8 de noviembre de 2026.
 
 - **Leer en voz alta.** Voz en toda app con texto, ❖Esc para la selección, un reproductor pequeño con la onda de la voz, Voz en tiempo real y una Voz personal, todo en el equipo y sin internet (mirá *Leer en voz alta* en las funciones).
-- **Capturas en todas las pantallas.** ❖⇧3 guarda un archivo por pantalla y ❖⇧4 selecciona en todas a la vez, con lupa y selector de color; T copia el texto del área, que lee un ayudante aislado. Toda captura también queda en el portapapeles.
+- **Capturas en todas las pantallas.** ❖⇧3 guarda un archivo por pantalla y ❖⇧4 selecciona en todas a la vez, con lupa y selector de color; T copia el texto del área, que lee un ayudante aislado. Toda captura también queda en el portapapeles. Desde la 0.8.9.5, las Opciones eligen qué hace Imprimir pantalla: toda la pantalla, un área, una ventana, la barra o nada.
 - **Sacudir el puntero para encontrarlo.** Unos trazos rápidos agrandan el cursor por un momento; viene activado en Ajustes → Mouse y trackpad.
 - **Teclado.** Las luces de Bloq Mayús, Bloq Num y Bloq Despl siguen al teclado, y un usuario que nunca eligió una distribución escribe con la del equipo en lugar de una latinoamericana predeterminada.
 
@@ -169,7 +170,7 @@ El compositor maneja varias pantallas a la vez, extendidas o en espejo, y dibuja
 
 ## Límites honestos
 
-- **Las placas NVIDIA todavía no están verificadas.** La composición por GPU funciona en gráficos Intel reales de 2010 (Ironlake) a 2019 (Whiskey Lake), Cherry Trail y Gemini Lake, y en cuatro generaciones de AMD de GCN 2 a RDNA 4, en las 22 máquinas de los [reportes de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md); nadie reportó todavía una placa NVIDIA, ni gráficos integrados de AMD, ni gráficos Intel más nuevos que Whiskey Lake (`docs/GPU.md`).
+- **Las placas NVIDIA se verificaron en una sola máquina.** La composición por GPU funciona en gráficos Intel reales de 2010 (Ironlake) a 2019 (Whiskey Lake), Cherry Trail y Gemini Lake, y en cinco generaciones de AMD de TeraScale 2 (una Radeon HD 5450) a RDNA 4, entre las 24 máquinas de los [reportes de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). Se reportó una placa NVIDIA, una RTX 3060 con el driver propietario de NVIDIA: ahí el escritorio funciona y se dibuja con la CPU, porque LordOS no compone con ese driver. nouveau y NVK de Mesa, que vienen incluidos, no se probaron en ninguna placa NVIDIA, y nadie reportó todavía gráficos integrados de AMD ni gráficos Intel más nuevos que Whiskey Lake (`docs/GPU.md`).
 - **GPU drag, encendido por defecto en la 0.8.7, está verificado solo en V3D y SVGA3D.** En una Raspberry Pi 5, en arrastres reales, reduce a la mitad el CPU de la sesión sin carga y lleva una carga de memoria de 29 a 35 cuadros por segundo. En cualquier otra GPU solo lo protege su autoprueba, y `LORD_GPU_DRAG=0` lo apaga (`docs/GPU.md`).
 - **Las pantallas múltiples se probaron con dos salidas virtuales y en una PC con una Radeon RX 580 y tres monitores** (`docs/DISPLAYS.md`), la máquina en la que el autor usa LordOS todos los días, instalado directo en el equipo desde noviembre de 2026. Esa PC trajo el tamaño del cursor por hardware y la pantalla de inicio de sesión en la pantalla principal elegida en la 0.8.8.6, y en la 0.8.8.7 el traspaso que mantiene encendidos los monitores DisplayPort al bloquear, cerrar e iniciar sesión. Además, [21 máquinas más de la comunidad](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md) (9 reportes de hardware y 12 máquinas nombradas en otros issues) cubren gráficos Intel (14) y AMD (3 más: una FirePro W6150M, una RX 7800 XT con dos monitores de 120 Hz y una RX 9060 XT), de notebooks a tablets x86; todavía nadie reportó una placa NVIDIA, y los hubs DisplayPort no se probaron.
 - **La Raspberry Pi 5 solo se probó con un monitor HDMI.** Desde la 0.8.4.1 la imagen muestra la pantalla de ingreso y el escritorio en un monitor HDMI desde el primer arranque, y LordBench la midió así; dos monitores y 4K todavía no se probaron en la placa (`docs/RASPBERRY.md`).

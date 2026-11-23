@@ -618,7 +618,7 @@
   "comp.weather": "Погода",
   "comp.weatherHint": "Прогнозы виджета погоды от Open-Meteo, когда вы их включите.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Приложения Flatpak из Flathub: каталог, их установка и обновления.",
+  "comp.flathubHint": "Приложения Flatpak из Flathub: каталог, их установка, обновления и рейтинги Магазина с flathub.org.",
   "comp.streams": "Камеры и ТВ",
   "comp.streamsHint": "Видеовиджет и адреса Плеера: камеры, трансляции и телеканалы (lord-stream)."
 }

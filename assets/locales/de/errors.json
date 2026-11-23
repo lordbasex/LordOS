@@ -46,6 +46,7 @@
   "backup.destMissing": "Das Ziel existiert nicht",
   "backup.destNotAllowed": "Dieses Ziel ist nicht erlaubt",
   "backup.destOutside": "Das Ziel muss in deinem Benutzerordner oder auf einem deiner Datenträger liegen",
+  "backup.destCloud": "Ein Cloud-Ordner kann kein Sicherungsziel sein: Schnappschüsse brauchen harte Links, die ein Cloud-Konto nicht hat, und seine Dateien werden weiter hochgeladen, auch nachdem die Sicherung gestoppt wurde. Wähle ein Laufwerk oder einen Ordner auf diesem Computer",
   "backup.destUnwritable": "Auf das Ziel kann nicht geschrieben werden",
   "backup.interrupted": "Es wurde unterbrochen",
   "backup.locked": "Backups sind verschlüsselt: Entsperre sie zuerst",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Dieses Bild kann nicht als Hintergrund verwendet werden.",
   "studio.invalid": "Diese Einstellung von LordOS Studio ist ungültig.",
   "studio.noCamera": "Es ist keine Kamera angeschlossen.",
-  "studio.unavailable": "LordOS Studio ist auf diesem Computer nicht verfügbar."
+  "studio.unavailable": "LordOS Studio ist auf diesem Computer nicht verfügbar.",
+  "studio.downloadFailed": "Der Hintergrund konnte nicht heruntergeladen werden.",
+  "studio.removeFailed": "Der Hintergrund konnte nicht entfernt werden.",
+  "dkms.mokInvalid": "Diese Anfrage für den Secure-Boot-Schlüssel ist ungültig.",
+  "dkms.mokNotNeeded": "Dieser Computer muss den Schlüssel jetzt nicht registrieren.",
+  "dkms.mokNothingPending": "Kein Schlüssel wartet darauf, beim nächsten Neustart registriert zu werden.",
+  "dkms.mokNoTool": "Das Programm mokutil ist nicht installiert.",
+  "dkms.mokFailed": "Der Schlüssel konnte nicht für den nächsten Neustart vorbereitet werden.",
+  "media.protectedWindow": "Dieses Fenster ist geschützt und kann nicht einzeln aufgenommen werden. In Bildschirmaufnahmen erscheint es schwarz."
 }

@@ -97,5 +97,11 @@
   "hintAdjust": "ٹھیک کرنے کے لیے ہینڈل کھینچیں · Enter: کیپچر · Esc: منسوخ",
   "hintAdjustRecord": "ٹھیک کرنے کے لیے ہینڈل کھینچیں · Enter: ریکارڈ · Esc: منسوخ",
   "hintRecord": "ریکارڈ کرنے کا حصہ چننے کے لیے کھینچیں · Esc: منسوخ",
-  "thumbOpen": "مارک اپ ایڈیٹر میں کھولیں"
+  "thumbOpen": "مارک اپ ایڈیٹر میں کھولیں",
+  "opt.printKey": "پرنٹ اسکرین کلید",
+  "opt.printKey.full": "پوری اسکرین کیپچر کریں",
+  "opt.printKey.area": "منتخب حصہ کیپچر کریں",
+  "opt.printKey.window": "منتخب ونڈو کیپچر کریں",
+  "opt.printKey.toolbar": "ٹول بار دکھائیں",
+  "opt.printKey.none": "کچھ نہ کریں"
 }

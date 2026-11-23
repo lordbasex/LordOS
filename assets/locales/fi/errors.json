@@ -46,6 +46,7 @@
   "backup.destMissing": "Kohdetta ei ole olemassa",
   "backup.destNotAllowed": "Kohde ei ole sallittu",
   "backup.destOutside": "Kohteen on oltava kotikansiossasi tai jollakin levyistäsi",
+  "backup.destCloud": "Pilvikansio ei voi olla varmuuskopion kohde: tilannevedokset tarvitsevat kovia linkkejä, joita pilvitilillä ei ole, ja sen tiedostot siirtyvät pilveen vielä varmuuskopioinnin pysäyttämisen jälkeenkin. Valitse levy tai kansio tältä tietokoneelta",
   "backup.destUnwritable": "Kohteeseen ei voi kirjoittaa",
   "backup.interrupted": "Se keskeytyi",
   "backup.locked": "Varmuuskopiot on salattu: avaa ne ensin",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Tätä kuvaa ei voi käyttää taustana.",
   "studio.invalid": "Tämä LordOS Studion asetus ei ole kelvollinen.",
   "studio.noCamera": "Kameraa ei ole liitetty.",
-  "studio.unavailable": "LordOS Studio ei ole käytettävissä tässä tietokoneessa."
+  "studio.unavailable": "LordOS Studio ei ole käytettävissä tässä tietokoneessa.",
+  "studio.downloadFailed": "Taustaa ei voitu ladata.",
+  "studio.removeFailed": "Taustaa ei voitu poistaa.",
+  "dkms.mokInvalid": "Tämä Secure Boot -avaimen pyyntö ei kelpaa.",
+  "dkms.mokNotNeeded": "Tämän tietokoneen ei tarvitse rekisteröidä avainta nyt.",
+  "dkms.mokNothingPending": "Mikään avain ei odota rekisteröintiä seuraavassa uudelleenkäynnistyksessä.",
+  "dkms.mokNoTool": "mokutil-ohjelmaa ei ole asennettu.",
+  "dkms.mokFailed": "Avainta ei voitu valmistella seuraavaa uudelleenkäynnistystä varten.",
+  "media.protectedWindow": "Tämä ikkuna on suojattu, joten sitä ei voi kaapata yksinään. Näytön kaappauksissa se näkyy mustana."
 }

@@ -71,6 +71,9 @@ int  cloud_key_ok(const char *key);          /* an rclone option name: [a-z0-9_]
 int  cloud_value_ok(const char *v);
 void cloud_session_summary(const char *trust, const char *cookies, char *out, size_t n);   /* lengths and names only */          /* a field's value: no control characters, at most CLOUD_VALUE_MAX */
 int  cloud_kept(const char *const *kept, int n, const char *rel);   /* rel is a kept folder or file, or inside one */
+/* #206: b bytes of rel added to per[i] of each kept entry that holds it (entries may overlap: each gets its own total).
+ * 1 if any did. Settings → Cloud's "Kept on this computer" shows per[i] for each row: the FUSE mount can't say it */
+int  cloud_kept_tally(const char *const *kept, int n, const char *rel, long long b, long long *per);
 /* #71: a folder still coming down as a whole: rel is inside a kept entry whose files aren't all here yet (busy[i]), or
  * holds one. Its glyph stays "coming down" between one file and the next instead of flipping to kept. */
 int  cloud_kept_busy(const char *const *kept, const unsigned char *busy, int n, const char *rel);

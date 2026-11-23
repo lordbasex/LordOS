@@ -2,7 +2,7 @@
 
 **Máquinas** (Machines) corre otros sistemas en ventanas de tu escritorio de LordOS, a velocidad nativa con KVM donde el hardware lo permite. Salió en la **0.8.8.5** (alfa): tarjetas de descarga para Debian, Ubuntu, Fedora y Kali que comprueban las firmas de sus fabricantes y pueden instalar sin preguntas, instantáneas, clones, migración desde otras apps de virtualización y, desde la 0.8.8.7, carpetas compartidas.
 
-**En desarrollo después de la 0.8.9.4.** Todo lo que sigue está en el repositorio y todavía no en un lanzamiento; el último lanzamiento es la **0.8.9.4**. Trae máquinas con Windows 11, las herramientas de LordOS para Windows, un portapapeles que solo se mueve cuando pegás, transferencias de archivos rápidas en los dos sentidos, el modo apps, sonido y micrófono, redes de verdad, 3D para máquinas Linux y la imagen a la velocidad completa del invitado.
+**Nuevo en la 0.8.9.5.** Todo lo que sigue llegó en la **0.8.9.5**, el último lanzamiento. Trae máquinas con Windows 11, las herramientas de LordOS para Windows, un portapapeles que solo se mueve cuando pegás, transferencias de archivos rápidas en los dos sentidos, el modo apps, sonido y micrófono, redes de verdad, 3D para máquinas Linux y la imagen a la velocidad completa del invitado.
 
 [[shot:0]]
 
@@ -18,7 +18,7 @@ Una tarjeta nueva del asistente Nueva máquina arma una máquina que Windows 11 
 
 ## LordOS en una máquina
 
-La primera tarjeta del asistente de Nueva máquina es el propio LordOS, en desarrollo:
+La primera tarjeta del asistente de Nueva máquina es el propio LordOS, desde la 0.8.9.5:
 
 - **La ISO live** de la versión que nombra la tarjeta, para PC de 64 bits y arm64, comprobada con la clave de publicación de LordOS incluida en LordOS antes de confiar en un solo byte.
 - **Instalación sin preguntas**: tu cuenta y contraseña (guardada solo como hash), el nombre del equipo, la zona horaria, el teclado y tu idioma. Solo se puede borrar el disco nuevo de la propia máquina.
@@ -92,11 +92,11 @@ El resto del escritorio recibió el mismo cuidado: Ajustes, la Tienda, Archivos 
 - **Resolución de inicio**: *Sigue a la ventana* o un tamaño fijo, que todo sistema toma al arrancar.
 - **Un aspecto nuevo**: hojas sobre la ventana, ajustes agrupados y 38 glifos propios de LordOS que siguen tu color de acento, y una vista Almacenamiento de dónde se va tu espacio.
 - **La Tienda, ordenada por el origen de las apps**: Debian, Flathub, Apps web y apps de LordOS, y las apps que eligió LordOS.
-- **Teclas** (en desarrollo): Ctrl, Alt, Mayús y Win mantenidas para la tecla siguiente, y combinaciones que tu computadora se quedaría para sí, como Ctrl+Alt+Supr, enviadas directo a la máquina.
-- **El modo apps, desde la barra de menús** (en desarrollo): un ítem junto al reloj para cada máquina, cuyo menú funciona como el menú Inicio de la máquina, y un panel con sus ventanas abiertas y sus apps.
-- **Capturar el mouse** (en desarrollo) para juegos y programas 3D; ❖Esc o Ctrl+Alt lo sueltan.
-- **Una tarjeta gráfica real para una máquina** (en desarrollo): una parte de una iGPU Intel (de Broadwell a Comet Lake) con GVT-g, con un controlador de arranque propio de LordOS para ella, escrito a partir de fuentes públicas.
-- **`machines` en la Terminal** (en desarrollo): listar, arrancar, detener, tomar instantáneas, clonar y cambiar máquinas desde una terminal.
+- **Teclas**: Ctrl, Alt, Mayús y Win mantenidas para la tecla siguiente, y combinaciones que tu computadora se quedaría para sí, como Ctrl+Alt+Supr, enviadas directo a la máquina.
+- **El modo apps, desde la barra de menús**: un ítem junto al reloj para cada máquina, cuyo menú funciona como el menú Inicio de la máquina, y un panel con sus ventanas abiertas y sus apps.
+- **Capturar el mouse** para juegos y programas 3D; ❖Esc o Ctrl+Alt lo sueltan.
+- **Una tarjeta gráfica real para una máquina**: una parte de una iGPU Intel (de Broadwell a Comet Lake) con GVT-g, con un controlador de arranque propio de LordOS para ella, escrito a partir de fuentes públicas.
+- **`machines` en la Terminal**: listar, arrancar, detener, tomar instantáneas, clonar y cambiar máquinas desde una terminal.
 
 ## Qué se probó y qué no
 

@@ -73,7 +73,7 @@ LordOS aims at modest machines. A few real measurements from the project's test 
 
 [[chart:memory-0891]]
 
-These numbers come from virtual machines, one board and the maintainer's PC. Reports from 22 real machines, some with LordBench runs, are in the [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). They are a starting point, not a promise for every machine.
+These numbers come from virtual machines, one board and the maintainer's PC. Reports from 24 real machines, some with LordBench runs, are in the [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). They are a starting point, not a promise for every machine.
 
 [[shot:2]]
 
@@ -149,6 +149,7 @@ Released on 9 November 2026.
 - **The Terminal shows a server's files.** In a tab connected with `ssh`, Files mode puts this computer on the left and the server on the right, over the same connection, with no second login. The SFTP protocol is spoken by `lord-sftp`, a sandboxed helper that gets open descriptors and never a path, and LordOS runs no program for it. The Terminal's Settings and a new Profiles window open in windows of their own, and Claude Code's footer now works inside `screen`, `tmux` and `ssh`.
 - **Databases.** A new app for MySQL and MariaDB, with each connection in its own sandboxed helper, `lord-sql`, and its own row in the firewall and the Monitor.
 - **Window buttons on either side.** Settings → Desktop & Dock → Window buttons puts them on the left or the right in both themes, and Linux apps that draw their own title bar follow.
+- **Window options (since 0.8.9.5; #151, #219).** Settings → Appearance → Window options: window buttons Normal, Large or Extra large, with a live preview; move and resize a window from anywhere in it with ❖ + drag or Alt + drag (off by default; Linux apps too); and the tiling options of the window menu shown or hidden.
 - **Displays stay lit across lock, logout and login.** Every lit display gets a black frame of its own before the next session takes the monitor, instead of the session's buffers being pulled from under the screen, which some cards refused and left the displays dark.
 - **Lithuanian is complete,** CDs and DVDs mount read-only in Files, and Cloud and network folders no longer freeze the desktop.
 
@@ -157,7 +158,7 @@ Released on 9 November 2026.
 Released on 8 November 2026.
 
 - **Read aloud.** Speech in every app with text, ❖Esc for the selection, a small player with the voice's wave, Live Speech and a Personal Voice, all on the computer and without the internet (see *Read aloud* in the features).
-- **Screenshots on every display.** ❖⇧3 saves one file per display and ❖⇧4 selects on all of them at once, with a magnifier and a color picker; T copies the text inside the area, read by a sandboxed helper. Every capture is also on the clipboard.
+- **Screenshots on every display.** ❖⇧3 saves one file per display and ❖⇧4 selects on all of them at once, with a magnifier and a color picker; T copies the text inside the area, read by a sandboxed helper. Every capture is also on the clipboard. Since 0.8.9.5, Options choose what Print Screen does: the whole screen, an area, a window, the toolbar or nothing.
 - **Shake the pointer to find it.** A few quick strokes make the cursor grow for a moment; on by default in Settings → Mouse & Trackpad.
 - **Keyboard.** The Caps Lock, Num Lock and Scroll Lock lights follow the keyboard, and a user who never chose a layout types with the computer's own instead of a Latin American default.
 
@@ -169,7 +170,7 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 
 ## Honest limits
 
-- **NVIDIA cards are not verified yet.** GPU composition works on real Intel graphics from 2010 (Ironlake) to 2019 (Whiskey Lake), Cherry Trail and Gemini Lake, and on four AMD generations from GCN 2 to RDNA 4, on the 22 machines in the [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md); no NVIDIA card has been reported, nor AMD integrated graphics or Intel graphics newer than Whiskey Lake (`docs/GPU.md`).
+- **NVIDIA cards are verified on one machine only.** GPU composition works on real Intel graphics from 2010 (Ironlake) to 2019 (Whiskey Lake), Cherry Trail and Gemini Lake, and on five AMD generations from TeraScale 2 (a Radeon HD 5450) to RDNA 4, among the 24 machines in the [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). One NVIDIA card has been reported, an RTX 3060 on NVIDIA's proprietary driver: the desktop works there and is drawn with the CPU, since LordOS doesn't compose with that driver. Mesa's nouveau and NVK, which are included, have not been tried on any NVIDIA card, and nobody has reported AMD integrated graphics or Intel graphics newer than Whiskey Lake yet (`docs/GPU.md`).
 - **GPU drag, on by default in 0.8.7, is verified on V3D and SVGA3D only.** On a Raspberry Pi 5, in real drags, it halves the session's CPU alone and takes a memory load from 29 to 35 frames a second. On any other GPU only its self-test guards it, and `LORD_GPU_DRAG=0` turns it off (`docs/GPU.md`).
 - **Multiple displays were tested with two virtual heads and on one PC with a Radeon RX 580 and three monitors** (`docs/DISPLAYS.md`), the author's own LordOS machine, used every day installed on bare metal since November 2026. That PC brought the hardware cursor's size and the login screen on the chosen main display in 0.8.8.6, and in 0.8.8.7 the hand-off that keeps DisplayPort monitors lit across lock, logout and login. Beyond it, [21 more machines from the community](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md) (9 hardware reports and 12 machines named in other issues) cover Intel (14) and AMD (3 more: a FirePro W6150M, an RX 7800 XT on two 120 Hz monitors and an RX 9060 XT) graphics, from laptops to x86 tablets; no NVIDIA card has been reported yet, and DisplayPort hubs are untested.
 - **The Raspberry Pi 5 has been tested with one HDMI monitor only.** Since 0.8.4.1 the image shows the login screen and the desktop on an HDMI monitor from the first boot, and LordBench measured it there; two monitors and 4K have not been tested on the board yet (`docs/RASPBERRY.md`).

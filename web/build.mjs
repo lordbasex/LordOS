@@ -26,7 +26,8 @@ import { chartFigure } from './lib/chartsvg.mjs';
 import { imagerGuide, writeBlock } from './lib/imager-guide.mjs';
 import { embassy } from './lib/embassy.mjs';
 import { readReports, buildModel, renderSections } from '../tools/hwreport/catalog.mjs';
-import { validateWeb } from '../tools/gen-wayland-table.mjs';
+import { validateWeb, validateDetail } from '../tools/gen-wayland-table.mjs';
+import { renderWlconf } from './lib/wlconf.mjs';
 
 const WEB = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(WEB, '..');
@@ -375,12 +376,29 @@ const HAS_HW = fs.existsSync(hwDir);
 const hwModel = HAS_HW ? buildModel(readReports(hwDir)) : null;
 const verNum = (v) => String(v).split('.').map(Number).reduce((a, x) => a * 1000 + (x || 0), 0);
 const HW_IN_DEV = verNum(PKG.version) < verNum('0.8.7');      // Share on GitHub ships with 0.8.7
+// the conformance screenshots (docs/wayland-proofs/*.png as WebP, in the lightbox), on both Wayland pages
+function wlProofFigs(CF, t) {
+  const proofCap = (pf) => (pf.kind === 'x11' ? `${pf.shows} (X11)` : `${pf.app}: ${pf.shows}`);
+  return CF.proofs.map((pf) => {
+    const f = r('docs/wayland-proofs', pf.png);
+    if (!fs.existsSync(f)) throw new Error(`web/content/wayland/protocols.json: docs/wayland-proofs/${pf.png} is missing`);
+    const thumb = webp(f, 480, 80, `wl-proof-${pf.id}`), full = webp(f, 1600, 85, `wl-proof-${pf.id}`);
+    const cap = proofCap(pf);
+    return `<figure class="wp-proof" id="proof-${esc(pf.id)}"><a class="g-card" href="${full.url}" data-w="${full.w}" data-h="${full.h}" data-cap="${esc(cap)}" aria-label="${esc(t.gallery.open + ': ' + cap)}"><img src="${thumb.url}" width="${thumb.w}" height="${thumb.h}" alt="${esc(cap)}" loading="lazy" decoding="async"></a><figcaption><strong lang="en">${esc(pf.kind === 'x11' ? pf.shows : pf.app)}</strong> <span class="wp-pver" lang="en">${esc(pf.version)}</span>${pf.kind === 'wayland' ? `<span class="wp-pshows" lang="en">${esc(pf.shows)}</span>` : ''}</figcaption></figure>`;
+  });
+}
 // the Wayland protocol table (/wayland-protocols-table/): tools/gen-wayland-table.mjs writes its data
 const waylandFile = path.join(CONTENT, 'wayland/protocols.json');
 const HAS_WAYLAND = fs.existsSync(waylandFile);
 const WAYLAND = HAS_WAYLAND ? JSON.parse(fs.readFileSync(waylandFile, 'utf8')) : null;
 // part of it comes from wayland.app: refuse the build on any value outside its strict shapes (every field is also escaped)
 if (WAYLAND) { const bad = validateWeb(WAYLAND); if (bad.length) throw new Error('web/content/wayland/protocols.json:\n  ' + bad.slice(0, 20).join('\n  ')); }
+// the conformance run in full (/wayland-conformance/): every check, written by the same generator; refused when its shapes
+// are off or its checks don't add up to the scores protocols.json shows
+const wlconfFile = path.join(CONTENT, 'wayland/conformance.json');
+const WLCONF = WAYLAND && WAYLAND.conformance && fs.existsSync(wlconfFile) ? JSON.parse(fs.readFileSync(wlconfFile, 'utf8')) : null;
+if (WLCONF) { const bad = validateDetail(WLCONF, WAYLAND.conformance); if (bad.length) throw new Error('web/content/wayland/conformance.json:\n  ' + bad.slice(0, 20).join('\n  ')); }
+const HAS_WLCONF = !!WLCONF;
 const faqFile = path.join(CONTENT, 'faq/faq.json');
 const faqJson = fs.existsSync(faqFile) ? readJson(faqFile) : null;
 let faqHeld = 0;
@@ -569,7 +587,7 @@ function linkBuilt(href) {
 }
 let _built = null;
 function builtPages() {
-  if (!_built) _built = new Set(['', 'explore', 'raspberry-pi', 'apps', 'gallery', 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...(HAS_WAYLAND ? ['wayland-protocols-table'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
+  if (!_built) _built = new Set(['', 'explore', 'raspberry-pi', 'apps', 'gallery', 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...(HAS_WAYLAND ? ['wayland-protocols-table'] : []), ...(HAS_WLCONF ? ['wayland-conformance'] : []), ...guidePages.map((x) => x.slug), ...legalPages.map((x) => 'legal/' + x.slug), ...(legalPages.length ? ['legal', ...LEGAL_MOVED.map((m) => 'legal/' + m[0])] : [])]);
   return _built;
 }
 // one-slot language picker: a <details> dropdown of plain links (works without JS; keeps the page)
@@ -734,7 +752,7 @@ ${icons}
 }
 
 const PI_ART = JSON.parse(src('pi-art.json'));   // the three drawings (our own, isometric): argon, pi500, pi5
-const tpl = { imager: src('imager.html'), home: src('home.html'), explore: src('explore.html'), raspberry: src('raspberry.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), language: src('language.html'), hardware: src('hardware.html'), guide: src('guide.html'), wayland: src('wayland.html') };
+const tpl = { imager: src('imager.html'), home: src('home.html'), explore: src('explore.html'), raspberry: src('raspberry.html'), notFound: src('404.html'), lightbox: src('lightbox.html'), feature: src('feature.html'), paper: src('paper.html'), legal: src('legal.html'), legalIndex: src('legal-index.html'), faq: src('faq.html'), about: src('about.html'), language: src('language.html'), hardware: src('hardware.html'), guide: src('guide.html'), wayland: src('wayland.html'), wlconf: src('wayland-conformance.html') };
 
 for (const l of LANGS) {
   const t = dict[l];
@@ -1228,6 +1246,7 @@ ${(c.items || []).map((it) => {
     if (HAS_FAQ) add('page', t.pages.faq.title, pageUrl(l, 'faq'), t.pages.faq.lead);
     if (HAS_HW) add('page', t.pages.hardware.title, pageUrl(l, 'hardware'), t.pages.hardware.lead);
     if (HAS_WAYLAND) add('page', t.pages.wayland.title, pageUrl(l, 'wayland-protocols-table'), `Wayland KWin Mutter KDE GNOME ${t.pages.wayland.lead}`);
+    if (HAS_WLCONF) add('page', t.pages.wlconf.title, pageUrl(l, 'wayland-conformance'), `Wayland X11 Xwayland conformance wl-conformance ${t.pages.wlconf.lead}`);
     if (HAS_GUIDE) add('guide', 'LordOS Imager', pageUrl(l, 'imager'), '');
     for (const m of featureList) add('feature', loc(m.title, l), pageUrl(l, 'features/' + m.slug), loc(m.tagline, l));
     for (const g of guidePages) add('guide', loc(g.title, l), pageUrl(l, g.slug), loc(g.description || g.lead, l));
@@ -1297,14 +1316,7 @@ ${(c.items || []).map((it) => {
 <th scope="row" data-label="${esc(W.conf.hItem)}"><span lang="en">${esc(x.title)}</span><code>${esc(x.id)}</code></th>
 <td data-label="${esc(W.conf.hConf)}" class="wp-cf"><div>${confCell(x)}</div></td>
 </tr>`).join('\n');
-      const proofCap = (pf) => (pf.kind === 'x11' ? `${pf.shows} (X11)` : `${pf.app}: ${pf.shows}`);
-      const figs = CF.proofs.map((pf) => {
-        const f = r('docs/wayland-proofs', pf.png);
-        if (!fs.existsSync(f)) throw new Error(`web/content/wayland/protocols.json: docs/wayland-proofs/${pf.png} is missing`);
-        const thumb = webp(f, 480, 80, `wl-proof-${pf.id}`), full = webp(f, 1600, 85, `wl-proof-${pf.id}`);
-        const cap = proofCap(pf);
-        return `<figure class="wp-proof" id="proof-${esc(pf.id)}"><a class="g-card" href="${full.url}" data-w="${full.w}" data-h="${full.h}" data-cap="${esc(cap)}" aria-label="${esc(t.gallery.open + ': ' + cap)}"><img src="${thumb.url}" width="${thumb.w}" height="${thumb.h}" alt="${esc(cap)}" loading="lazy" decoding="async"></a><figcaption><strong lang="en">${esc(pf.kind === 'x11' ? pf.shows : pf.app)}</strong> <span class="wp-pver" lang="en">${esc(pf.version)}</span>${pf.kind === 'wayland' ? `<span class="wp-pshows" lang="en">${esc(pf.shows)}</span>` : ''}</figcaption></figure>`;
-      });
+      const figs = wlProofFigs(CF, t);
       const nW = CF.proofs.filter((x) => x.kind === 'wayland').length;
       confHtml = `<section class="wp-sec" id="conformance" aria-labelledby="wp-h-conf">
 <h2 id="wp-h-conf">${esc(W.conf.title)}</h2>
@@ -1340,7 +1352,7 @@ ${x11Rows}
 ${figs.join('\n')}
 </div>
 <p class="hw-note">${esc(W.conf.limits)}</p>
-<p><a class="btn btn-ghost" href="${esc(`${GITHUB}/blob/main/docs/WAYLAND.md#conformance-toolswl-conformancemjs-in-development`)}" rel="noopener">${esc(W.conf.docsLink)}</a> <a class="btn btn-ghost" href="${esc(`${GITHUB}/blob/main/docs/wayland-conformance.json`)}" rel="noopener">${esc(W.conf.jsonLink)}</a></p>
+${HAS_WLCONF ? `<p class="wc-also">${esc(t.pages.wlconf.fromTable)} <a href="${pageUrl(l, 'wayland-conformance')}">${esc(t.pages.wlconf.title)}</a></p>\n` : ''}<p><a class="btn btn-ghost" href="${esc(`${GITHUB}/blob/main/docs/WAYLAND.md#conformance-toolswl-conformancemjs-in-development`)}" rel="noopener">${esc(W.conf.docsLink)}</a> <a class="btn btn-ghost" href="${esc(`${GITHUB}/blob/main/docs/wayland-conformance.json`)}" rel="noopener">${esc(W.conf.jsonLink)}</a></p>
 </section>`;
     }
     write(path.join(pageUrl(l, 'wayland-protocols-table'), 'index.html'), render(tpl.wayland, {
@@ -1363,6 +1375,23 @@ ${figs.join('\n')}
         `<div><dt><span class="wp-dev">${esc(W.inDev)}</span></dt><dd>${esc(fill(W.inDevNote, { release: LATEST_RELEASE }))}</dd></div>`,
         `<div><dt><span class="wp-no">—</span></dt><dd>${esc(W.notOfferedText)}</dd></div>`].join('\n'),
       waylandJs: waylandJsUrl, docsUrl: `${GITHUB}/blob/main/docs/WAYLAND.md#protocol-table-generated`, jsonUrl: `${GITHUB}/blob/main/docs/wayland-protocols.json`,
+    }, t));
+  }
+
+  // the conformance run in full (in development after 0.8.9.4): every check, the comparison and how to run it yourself
+  // (web/lib/wlconf.mjs; data web/content/wayland/conformance.json and protocols.json, both from tools/gen-wayland-table.mjs)
+  if (HAS_WLCONF) {
+    const T = t.pages.wlconf, CF = WAYLAND.conformance;
+    const fill = (str, o) => str.replace(/\{(\w+)\}/g, (m, k) => (o[k] != null ? o[k] : m));
+    const fmtD = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString(l === 'en' ? 'en-US' : l === 'es' ? 'es-AR' : 'pt-BR', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+    const nW = CF.proofs.filter((x) => x.kind === 'wayland').length;
+    const parts = renderWlconf({ t, l, D: WAYLAND, X: WLCONF, esc, fill, fmtD, GITHUB, repoUrl: GITHUB, tableUrl: pageUrl(l, 'wayland-protocols-table'), proofFigs: wlProofFigs(CF, t).join('\n') });
+    write(path.join(pageUrl(l, 'wayland-conformance'), 'index.html'), render(tpl.wlconf, {
+      ...common('wayland-conformance', [T.metaTitle, T.metaDescription], 'wayland'), ...parts,
+      tableUrl: pageUrl(l, 'wayland-protocols-table'),
+      proofsLead: esc(fill(t.pages.wayland.conf.proofsLead, { n: CF.proofs.length, wayland: nW, x11: CF.proofs.length - nW })),
+      issueUrl: `${GITHUB}/issues/new?template=bug_report.yml`, issuesUrl: `${GITHUB}/issues?q=is%3Aissue+wayland`,
+      docsUrl: `${GITHUB}/blob/main/docs/WAYLAND.md#conformance-toolswl-conformancemjs-in-development`, jsonUrl: `${GITHUB}/blob/main/docs/wayland-conformance.json`,
     }, t));
   }
 
@@ -1521,7 +1550,7 @@ if (fs.existsSync(secTxt)) {
   else log('security.txt held back: it still has placeholders');
 }
 write('robots.txt', `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`);
-const allPages = [...PAGES, ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...(HAS_WAYLAND ? ['wayland-protocols-table'] : []), 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
+const allPages = [...PAGES, ...featureList.map((m) => 'features/' + m.slug), ...(HAS_PAPER ? ['paper'] : []), ...(HAS_FAQ ? ['faq'] : []), ...(HAS_HW ? ['hardware'] : []), ...(HAS_WAYLAND ? ['wayland-protocols-table'] : []), ...(HAS_WLCONF ? ['wayland-conformance'] : []), 'about', 'language', ...(HAS_GUIDE ? ['imager'] : []), ...legalPages.map((p) => 'legal/' + p.slug), ...(legalPages.length ? ['legal'] : [])];
 const urls = allPages.flatMap((p) => LANGS.map((l) => `  <url>
     <loc>${SITE}${pageUrl(l, p)}</loc>
     <lastmod>${today}</lastmod>

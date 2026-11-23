@@ -46,6 +46,7 @@
   "backup.destMissing": "Destinasi tidak wujud",
   "backup.destNotAllowed": "Destinasi itu tidak dibenarkan",
   "backup.destOutside": "Destinasi mesti berada dalam folder rumah anda atau pada salah satu cakera anda",
+  "backup.destCloud": "Folder Awan tidak boleh menjadi destinasi sandaran: petikan memerlukan pautan keras, yang tiada pada akaun awan, dan failnya terus dimuat naik walaupun selepas sandaran dihentikan. Pilih cakera atau folder pada komputer ini",
   "backup.destUnwritable": "Tidak dapat menulis ke destinasi",
   "backup.interrupted": "Ia telah terganggu",
   "backup.locked": "Sandaran disulitkan: buka kuncinya dahulu",
@@ -916,5 +917,13 @@
   "studio.badPicture": "Gambar itu tidak boleh digunakan sebagai latar belakang.",
   "studio.invalid": "Tetapan LordOS Studio itu tidak sah.",
   "studio.noCamera": "Tiada kamera disambungkan.",
-  "studio.unavailable": "LordOS Studio tidak tersedia pada komputer ini."
+  "studio.unavailable": "LordOS Studio tidak tersedia pada komputer ini.",
+  "studio.downloadFailed": "Latar belakang tidak dapat dimuat turun.",
+  "studio.removeFailed": "Latar belakang tidak dapat dialih keluar.",
+  "dkms.mokInvalid": "Permintaan kunci Secure Boot ini tidak sah.",
+  "dkms.mokNotNeeded": "Komputer ini tidak perlu mendaftarkan kunci sekarang.",
+  "dkms.mokNothingPending": "Tiada kunci yang menunggu untuk didaftarkan pada mula semula seterusnya.",
+  "dkms.mokNoTool": "Program mokutil tidak dipasang.",
+  "dkms.mokFailed": "Kunci tidak dapat disediakan untuk mula semula seterusnya.",
+  "media.protectedWindow": "Tetingkap ini dilindungi, jadi ia tidak boleh ditangkap seorang diri. Dalam tangkapan skrin ia kelihatan hitam."
 }

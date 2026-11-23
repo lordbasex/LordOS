@@ -1,12 +1,13 @@
 # Camera Studio: plan and design for approval
 
-**Status (2026-11-22): approved by the maintainer; phases 0 and 1 built (branch `feat/camera-studio`) and phase 2 built
-(branch `feat/camera-studio-2`, 11.2), in development; phase 2's device is still to verify on a VM.**
+**Status (2026-11-22): approved by the maintainer; phases 0 and 1 built (branch `feat/camera-studio`), phase 2 built
+(branch `feat/camera-studio-2`, 11.2) and phase 3 built (branch `feat/camera-studio-3`, 11.3), in development; phase 2's
+device and phase 3's Mic Mode are still to verify on a VM.**
 The maintainer approved the whole plan and the exceptions E-S1 to E-S7 on 2026-11-22; E-S8 (ONNX Runtime linked) was
 **not** approved: D3 is our own C inference, and ONNX Runtime is only the dev machine's reference in tests. The name is
 "LordOS Studio" and the status item's label "Camera" (D6); D5 and D7 to D10 take this plan's recommendations. D4: the
-package is an optional Store item (approved 2026-11-22). Phases 3 to 5 (the other effects, the portal, the app) are not
-built yet. Section 3.3 now has measured numbers.
+package is an optional Store item (approved 2026-11-22). Phases 4 and 5 (the portal, the app) are not built yet.
+Sections 3.3 and 11.3 have measured numbers.
 Facts are labelled the way `GO-LINK.md` does it:
 
 - **Read**: checked in this repository or in the cited source on 2026-11-22.
@@ -17,8 +18,8 @@ Facts are labelled the way `GO-LINK.md` does it:
 The maintainer's wish (2026-11-22): from the camera status item next to the clock (built on another branch), a popover
 like macOS's Video Effects and Mic Mode menu, whose effects reach the webcam of **any** app: Meet in a browser, OBS,
 go-link Desk and the others. The effects are background blur, background replacement (pictures and short loops),
-chroma key with a real green screen, virtual chroma without one, Center Stage, light and colour matching, filters,
-retouch and mirror. The mic modes are Standard and Voice Isolation. Then an app, "Studio", in the spirit of Camo
+chroma key with a real green screen, virtual chroma without one, Auto Framing, light and colour matching, filters,
+retouch and mirror. The mic modes are Standard and Noise Reduction. Then an app, "Studio", in the spirit of Camo
 Studio, with our own design and assets.
 
 ## 0. Summary of the recommendation
@@ -30,8 +31,8 @@ Studio, with our own design and assets.
 | GPU or CPU | GLES 2/3 on the render node through GBM and a surfaceless EGL context, the way `bench/lbgpu.c` already works in a sandbox. The CPU path always works too, which the project requires. Segmentation runs on the CPU in both cases. |
 | Segmentation model | **MediaPipe Selfie Segmenter, landscape 144×256** (Apache-2.0, model card by Google, a 250 KB float16 `.tflite`). Converted offline to our own flat weight file. |
 | Inference runtime | **Our own small inference code in C** for exactly the operators this model and BlazeFace use. There is no new library; output is checked against ONNX Runtime on the dev machine only, the way `hb_compare.py` checks shaping against HarfBuzz. The fallback is Debian's `libonnxruntime1.21` (MIT, in Debian 13 main), linked only by `lord-studio`. That fallback is a decision for the maintainer (D3). |
-| Faces (Center Stage, Studio Light, Retouch) | **BlazeFace short range** (Apache-2.0, 128×128). It uses the same operators as the segmenter, so it runs on the same inference code. |
-| Mic modes | PipeWire's own **`module-echo-cancel` with WebRTC Audio Processing** (BSD-3, already in Debian 13's `libspa-0.2-modules`; **Seen** installed): noise suppression, high-pass filter and AGC as a "Voice Isolation" source. There is no new library. RNNoise (BSD-3) is not packaged in Debian, so it waits for a later phase. |
+| Faces (Auto Framing, Face Light, Retouch) | **BlazeFace short range** (Apache-2.0, 128×128). It uses the same operators as the segmenter, so it runs on the same inference code. |
+| Mic modes | PipeWire's own **`module-echo-cancel` with WebRTC Audio Processing** (BSD-3, already in Debian 13's `libspa-0.2-modules`; **Seen** installed): noise suppression, high-pass filter and AGC as a "Noise Reduction" source. There is no new library. RNNoise (BSD-3) is not packaged in Debian, so it waits for a later phase. |
 | Backgrounds | Only **CC0 and public domain** first (Wikimedia Commons, NASA, Poly Haven, ambientCG), then CC BY and CC BY-SA with credit in the catalog, exactly like `motion.json`. Our own renders are welcome. **Not Unsplash, Pexels or Pixabay** (section 6). The catalog and thumbnails ship in the package; full files download on demand, like moving wallpapers. |
 
 ## 1. What exists today (Read, Seen)
@@ -99,7 +100,8 @@ Fedora already defaults Firefox to it. They also give a cleaner permission story
   the image. Until then, Studio offers only the LordOS ring there.
 - **Configuration, static and root-owned, shipped by an optional package `lordos-studio-camera`.** The module's
   options live in `/etc/modprobe.d/lordos-studio.conf`:
-  `options v4l2loopback devices=1 video_nr=50 card_label="LordOS Studio" exclusive_caps=1 max_buffers=4`. The file
+  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`
+  (the second device since 11.4: OBS Studio's own virtual camera, which LordOS never writes). The file
   `/etc/modules-load.d/lordos-studio.conf` loads it at boot. There is **no runtime root action** to create or remove
   devices: `/dev/v4l2loopback`'s control ioctls stay unused. Installing and removing the package goes through the
   Store's existing package engine.
@@ -174,7 +176,7 @@ Fedora already defaults Firefox to it. They also give a cleaner permission story
 3. **Segment**: the network gives a 256×144 person probability.
 4. **Refine** (3.4): temporal smoothing, then a guided filter upsampled to the output size with full-resolution luma as
    the guide.
-5. **Frame** (Center Stage): crop and scale the camera picture and the matte with the same smoothed rectangle.
+5. **Frame** (Auto Framing): crop and scale the camera picture and the matte with the same smoothed rectangle.
 6. **Compose**: background (blur, picture, video frame or chroma), relight, filters and LUT, retouch, mirror, overlays.
 7. **Out**: write to the loopback and the ring. The ring gets only the frames a reader asked for (preview open, or
    `BOP_CAMERA` consumers).
@@ -297,11 +299,11 @@ absolute error below 1e-3. That mirrors `tests/hb_compare.py`.
 
 | Option | License | Notes | Verdict |
 |---|---|---|---|
-| **BlazeFace short range** (MediaPipe) | Apache-2.0 (Google's model card, "Short Range" PDF) | 128×128 SSD with anchors. It gives 6 keypoints (eyes, nose, mouth, ears), which Studio Light and the framing headroom need. The same operators as the segmenter. | **Chosen** |
+| **BlazeFace short range** (MediaPipe) | Apache-2.0 (Google's model card, "Short Range" PDF) | 128×128 SSD with anchors. It gives 6 keypoints (eyes, nose, mouth, ears), which Face Light and the framing headroom need. The same operators as the segmenter. | **Chosen** |
 | libfacedetection (Shiqi Yu) | BSD-3 (its LICENSE) | Pure C++ with no dependencies. 2.1 ms at 128×96 on an i7-7820X and 15 ms on a Pi 4 (its README). Its weights are compiled into C arrays. | Good fallback. It adds a C++ file set. |
 | Haar cascades (OpenCV) | Apache-2.0 (4.x) / BSD-3 | Old, frontal only, many false positives, and OpenCV as a dependency | Rejected |
 
-### 5.2 Center Stage (auto-framing)
+### 5.2 Auto Framing (auto-framing)
 
 - **Target box.** The union of the face boxes, widened by a shoulders factor of 2.2× the face width and with headroom
   that puts the eyes at 1/3 of the height. Output aspect is 16:9.
@@ -320,9 +322,9 @@ absolute error below 1e-3. That mirrors `tests/hb_compare.py`.
   measured on the background region near the person, with a Strength slider (default 30 %, at most 60 %). The
   statistics are smoothed over about 1 s so that the person doesn't flicker when the video background changes.
 - **Exposure match.** The luma median of the person is matched towards the background's, clamped to ±1 EV.
-- **Studio Light** (in the spirit of Apple's). Lift the face region (an ellipse from the BlazeFace box, feathered) by
+- **Face Light** (our own name for a face relight). Lift the face region (an ellipse from the BlazeFace box, feathered) by
   +0.3 to +0.6 EV and dim the background by −0.5 EV.
-- **Spotlight** (Camo's name). A radial vignette centred on the face.
+- **Face spotlight**. A radial vignette centred on the face.
 - **Edge light (rim).** Add the background's blurred colour along the alpha gradient (4.3's light wrap, but stronger
   and coloured).
 - **Adjustments** (Camo's "Adjust"): exposure, contrast, saturation, temperature and tint, sharpness, and highlights
@@ -361,7 +363,7 @@ absolute error below 1e-3. That mirrors `tests/hb_compare.py`.
 | **Pexels** (Pexels License) | Free use, **but** no selling unaltered copies and no redistribution on other stock, wallpaper or "similar" platforms | **No.** A distro catalog of backgrounds is exactly that. |
 | **Pixabay** (Content License) | Free use, **but** forbids "standalone" redistribution and sale | **No** |
 | Our own renders and pictures (the maintainer's, LordOS brand) | MIT or our own brand assets (like `assets/wallpapers/`) | **Yes.** Includes LordOS-branded "office" and "studio" scenes. |
-| AI-generated by us | as `assets/wallpapers/README.md` (the maintainer's own generator output) | Maintainer's decision (D7) |
+| AI-generated by us | Generated with ChatGPT for LordOS; OpenAI's terms assign the output to the user, and LordOS releases it as **CC0** | **Yes** (D7, approved 2026-11-22): every catalog picture since 2026-11-22, marked `"ai": true` and shown as "Generated with AI" in the credits |
 
 **Recommendation.** Use CC0 and PD first (Commons, NASA, Poly Haven, ambientCG), then CC BY and CC BY-SA with credit
 (Blender Studio, Commons), plus our own. **No Unsplash, Pexels or Pixabay.** Their licenses are free-to-use, not
@@ -372,8 +374,8 @@ releases, and a background with a brand reads as endorsement.
 ### 6.2 What to ship and how
 
 - **Catalog.** `assets/studio/backgrounds.json` uses the same shape as `assets/wallpapers/motion.json`: id, category,
-  author, license, source URL, credit line, sizes and a SHA-256 per file. Its 320×180 thumbnails ship in the package
-  (about 100 × 15 KB ≈ 1.5 MB).
+  author, license, source URL, credit line, sizes and a SHA-256 per file. Its thumbnails ship in the package
+  (planned at 320×180, about 100 × 15 KB ≈ 1.5 MB; the AI pictures' are 640×360, about 64 KB each).
 - **Stills.** 60–80 pictures in Office, Home, Studio, Nature, City, Abstract, Space and LordOS. 1920×1080 JPEG at
   quality 90 is about 0.4–0.8 MB each, so about 50 MB for 80. **Ship 12 in the package** (about 8 MB: the defaults of
   each category). The rest download on demand.
@@ -381,6 +383,25 @@ releases, and a background with a brand reads as endorsement.
   them download on demand. They play **without hardware decode too**: a 1080p30 software decode in `lord-studio` is
   affordable on the PC (**Estimate** 1 core at about 15 %). The Pi uses 720p HEVC with its hardware decoder, or
   stills only.
+- **Loops at 4K (the maintainer, 2026-11-22: "at least 4K"; the pictures are a set of their own).** Every loop comes
+  in two variants, 3840×2160 (`2160.h264`) and 1920×1080 (`1080.h264`), both made from an original at least 3840×2160;
+  nothing is upscaled, and a loop whose original is smaller was replaced or dropped. **The popover always fetches the
+  1920×1080 one** (`bgVariant`/`bgPick` in `sdk/studiomodel.js`): lord-studio decodes a loop in software on every
+  camera picture, and measured on the development PC (i9-10900; libavcodec with two threads plus the bilinear swscale
+  to 1280×720 BGRA, as `video_step` does) a 3840×2160 H.264 loop costs about 19 ms a picture (decoding alone 21–24 ms of
+  wall time on a busy clip, 43 ms of CPU) against 8 ms at 1920×1080. Added to the composite (11–24 ms with the GPU,
+  13–36 ms on the CPU) that leaves no 30 fps budget, and H.264 has no scaled decode, so the 4K files stay in the catalog
+  for a later hardware-decode path. **What it came to:** 37 loops, 16 of our renders (now rendered at 3840×2160 with a
+  bicubic field and dithered, with a light luma grain at encode so slow gradients don't band) and 21 Wikimedia Commons
+  clips whose originals are 3840×2160 or more. Of the previous 33 Commons loops, 22 had only 1920×1080 (or 1920×1440)
+  originals and three (`loop-sunset-afterglow`, `loop-granite-dusk`, `loop-sardine-school`) could not be closed without
+  a visible dissolve (light that keeps changing, a moving school); they were dropped, and 13 new 4K clips replace them.
+  Each loop starts where its two ends look alike (`tools/studio/pick-loop-start.py`) and is closed with a 1.5 s
+  crossfade. The loops are 1028 MB (the biggest file 43.7 MB, under E-S4's 100 MB), in the `LordOS-wallpapers`
+  repository's `studio/videos/`, next to the pictures, under the folder's one README and `MANIFEST.json`
+  (`tools/studio/publish-studio.py`); their thumbnails are 640×360. lord-studio
+  also keeps a still background at up to 3840×2160 and cover-fits it to the camera's size with an area average, again
+  whenever that size changes.
 - **Downloads.** Extend the existing closed admin action family (`server/src/hw/wallpaper_admin.c`) with
   `studio-bg-get "<id> <variant>"`, which writes `/var/lib/lordos/studio/<sha256>.<ext>`. The rules are the same: JS
   names an entry, never a URL; the base is the project's GitHub owner on `raw.githubusercontent.com`; it goes through
@@ -400,18 +421,18 @@ releases, and a background with a brand reads as endorsement.
 | Mode | What it is | How |
 |---|---|---|
 | **Standard** | the microphone as is | the hardware source |
-| **Voice Isolation** | removes steady and impulsive noise, keeps one voice | PipeWire `libpipewire-module-echo-cancel` with `library.name = aec/libspa-aec-webrtc`. WebRTC Audio Processing 1.3 (BSD-3) is in Debian 13 and already installed (**Seen**). Arguments: `webrtc.noise_suppression = true`, `webrtc.high_pass_filter = true`, `webrtc.gain_control = true`, `webrtc.transient_suppression = true`. Echo cancellation needs playback through its sink, so it is off unless the person enables "Echo cancellation" (D8). |
-| **Wide Spectrum** (Apple's third mode, optional) | no processing at all, for music | the hardware source with no filters |
+| **Noise Reduction** | removes steady and impulsive noise, keeps one voice | PipeWire `libpipewire-module-echo-cancel` with `library.name = aec/libspa-aec-webrtc`. WebRTC Audio Processing 1.3 (BSD-3) is in Debian 13 and already installed (**Seen**). Arguments: `webrtc.noise_suppression = true`, `webrtc.high_pass_filter = true`, `webrtc.gain_control = true`, `webrtc.transient_suppression = true`. Echo cancellation needs playback through its sink, so it is off unless the person enables "Echo cancellation" (D8). |
+| **Full Range** (a third mode, optional) | no processing at all, for music | the hardware source with no filters |
 
 - **The source.** A package drop-in, `/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf` (root-owned, static, like
-  `lordos-bluez-profiles.conf` in `SOUND.md`), creates the source "LordOS Voice Isolation" (`media.class` Audio/Source)
+  `lordos-bluez-profiles.conf` in `SOUND.md`), creates the source "LordOS Noise Reduction" (`media.class` Audio/Source)
   and keeps it paused while unused.
 - **Selecting a mode.** It uses lord-server's existing Pulse client (`SOUND.md`): set the default source, or move one
   app's source output, which the Control Center already does for outputs. Moving the echo-cancel capture stream to the
   chosen hardware microphone uses the same move command. There is **no new privilege**, no command run and no module
   loaded at runtime.
 - **Restrictions still hold.** The PipeWire guard hides every `Audio/Source` from a no-mic app, so the virtual source is
-  covered. The orange indicator names the app reading the virtual source, plus "Voice Isolation".
+  covered. The orange indicator names the app reading the virtual source, plus "Noise Reduction".
 - **RNNoise** (Xiph, BSD-3; a 48 kHz recurrent network, very light) is **not in Debian**. The LADSPA wrapper
   `noise-suppression-for-voice` is GPL-3.0 and not packaged either. If WebRTC's suppression isn't enough in tests, a
   later phase could ship our own LADSPA build of RNNoise, but that **runs inside the user's PipeWire daemon**, outside
@@ -476,13 +497,13 @@ shared features in the SDK"). It follows `textAlign: 'start'/'end'` for right-to
 │────────────────────────────────────────────────────│
 │ ◐ Portrait (blur)                      [on ]   ›   │
 │ ▣ Background                           [off]   ›   │
-│ ✦ Studio Light                         [off]   ›   │
-│ ⌖ Center Stage                         [on ]   ›   │
+│ ✦ Face Light                         [off]   ›   │
+│ ⌖ Auto Framing                         [on ]   ›   │
 │ ◑ Filters          Warm                        ›   │
 │ ☺ Retouch                              [off]   ›   │
 │ ⇋ Mirror my video                      [off]       │
 │────────────────────────────────────────────────────│
-│ Mic Mode   ( Standard | Voice Isolation | Wide )   │
+│ Mic Mode (Standard | Noise Reduction | Full Range) │
 │────────────────────────────────────────────────────│
 │ Open Studio…                                       │
 └────────────────────────────────────────────────────┘
@@ -492,8 +513,8 @@ shared features in the SDK"). It follows `textAlign: 'start'/'end'` for right-to
 
 - **Portrait**: blur amount.
 - **Background**: None, Blur, Picture, Video, Green screen; then the thumbnails grid, "Add your own…" and Download.
-- **Studio Light**: intensity.
-- **Center Stage**: wide ↔ tight.
+- **Face Light**: intensity.
+- **Auto Framing**: wide ↔ tight.
 - **Filters**: the grid of LUTs with strength.
 - **Retouch**: strength.
 
@@ -513,10 +534,10 @@ Its name is a decision: "Studio" (D6).
 │   ○ Video        │                                              │ │      ││Greet │ │
 │   ○ Green screen │       [ before | after ]  toggle             │ └──────┘└──────┘ │
 │ ▸ Light          │                                              │ ┌──────┐┌──────┐ │
-│   Studio Light ━━│                                              │ │Presen-││ Off  │ │
+│   Face Light ━━│                                              │ │Presen-││ Off  │ │
 │   Match colours ━│                                              │ │tation ││camera│ │
 │ ▸ Framing        │                                              │ └──────┘└──────┘ │
-│   Center Stage ☑ │                                              │ + Save scene      │
+│   Auto Framing ☑ │                                              │ + Save scene      │
 │   Zoom ━━━ Pan ✥ │                                              │───────────────────│
 │ ▸ Adjust         │                                              │ Overlays          │
 │   Exposure ━━━━  ├──────────────────────────────────────────────┤ ☐ Name and title  │
@@ -524,15 +545,15 @@ Its name is a decision: "Studio" (D6).
 │ ▸ Filters  Warm  │                                              │ ☐ "Be right back" │
 │ ▸ Retouch  ━━    │                                              │                   │
 │ ▸ Microphone     │                                              │                   │
-│   Voice Isolation│                                              │                   │
+│   Noise Reduction│                                              │                   │
 └──────────────────┴──────────────────────────────────────────────┴───────────────────┘
 ```
 
 - **Camo-inspired sections**, our own layout and names:
   - Device;
   - Background (Blur and Privacy blur, Replace, Green screen);
-  - Light (Studio Light / Spotlight, colour match, rim);
-  - Framing (Center Stage, manual zoom and pan, rotate);
+  - Light (Face Light / face spotlight, colour match, rim);
+  - Framing (Auto Framing, manual zoom and pan, rotate);
   - Adjust (exposure, contrast, saturation, temperature, tint, sharpness);
   - Filters, Retouch and Microphone;
   - on the right, Scenes and Overlays;
@@ -566,7 +587,7 @@ Its name is a decision: "Studio" (D6).
 | **E-S3** | Pi image: v4l2loopback built in the LordOS Pi kernel script and shipped prebuilt | kernel build only | no DKMS on the Pi |
 | **E-S4** | Admin action **`studio-bg-get "<id> <variant>"`** (and `studio-bg-remove`, admin only), the twin of `wallpaper-get` | same closed rules: catalog id, hash, size, `nobody` fetch, the Store's scope | on-demand backgrounds |
 | **E-S5** | `lord.studio.*` JS API in the desktop context only, plus a "studio" source in `media.cameras()` and `BOP_CAMERA` | camera permission checked as for devices; ACK validation unchanged | LordOS apps and go-link Desk |
-| **E-S6** | PipeWire drop-in `lordos-voice.conf` (module-echo-cancel with WebRTC; Debian's own module) | static file; mode selection through the existing Pulse client | Voice Isolation |
+| **E-S6** | PipeWire drop-in `lordos-voice.conf` (module-echo-cancel with WebRTC; Debian's own module) | static file; mode selection through the existing Pulse client | Noise Reduction |
 | **E-S7** (phase 4) | Serve **`org.freedesktop.portal.Camera`** (`IsCameraPresent`, `AccessCamera`, `OpenPipeWireRemote`), today "never offered", plus `lord-screencast` gaining a **camera mode** (a `Video/Source` with `media.role` Camera fed from Studio's ring; restricted remote with only that node) | prompt per app; the guard and the indicator as above; no persistent grant without the person | Flatpak apps, Firefox and Chromium on PipeWire |
 | (D3) **E-S8**, only if our own inference is refused | `libonnxruntime1.21` linked **only** by `lord-studio` | data: our own pinned models | runtime |
 
@@ -581,7 +602,7 @@ The effort is for one developer with the existing patterns. These are **estimate
 | **0. Measure** | Prototype `nn.c` plus the converter. Time the segmenter and BlazeFace on the i9 and the Pi 5. Compare against ONNX Runtime on the dev machine. Load v4l2loopback on the **VM** (not this PC) and check that Chromium 156, Chrome 158, Firefox ESR and Flatpak OBS see it. | 4–5 days | Real numbers replace section 3.3's estimates, written into this file. |
 | **1. Pipeline and LordOS ring** | `lord-studio`: capture, segmentation, guided filter, blur and picture backgrounds, mirror, GPU and CPU paths. The "LordOS Studio" camera in `media.cameras()` (the Camera app, go-link Desk, `.lpk`). The popover with preview, Portrait and Background. | 2–3 weeks | `build/studio-nn-test`, `build/studio-test` (pipeline on fixed frames), `studio_model_test.mjs`, engine damage tests unchanged |
 | **2. Loopback and "any app"** | `lordos-studio-camera` package, the idle card, the client-usage event, reader attribution, the indicator text, the `dkms-mok-enroll` reuse, Pi kernel module | 1–2 weeks | Meet in Chromium and in Chrome shows the effects. The no-camera restriction blocks `/dev/video50` (`tests/fwlinux/devices.sh`). The camera light goes off with no reader. |
-| **3. More effects and mic** | Video backgrounds, green screen, Center Stage, Studio Light, colour match, filters, retouch. Voice Isolation drop-in and Mic Mode. Background catalog plus `studio-bg-get`. Curation of about 70 stills and 50 loops. | 3 weeks plus 2 days of curation | each effect checked against reference frames; Mic Mode heard in a Meet call; credits page |
+| **3. More effects and mic** | Video backgrounds, green screen, Auto Framing, Face Light, colour match, filters, retouch. Noise Reduction drop-in and Mic Mode. Background catalog plus `studio-bg-get`. Curation of about 70 stills and 50 loops. | 3 weeks plus 2 days of curation | each effect checked against reference frames; Mic Mode heard in a Meet call; credits page |
 | **4. PipeWire camera** | Camera portal plus lord-screencast camera mode | 1–2 weeks | OBS Flatpak "Video Capture Device (PipeWire)" and Firefox with the pref on see "LordOS Studio"; the guard hides it from a restricted app |
 | **5. Studio app** | the full app, scenes, overlays from lord-server, recording, user LUTs | 2–3 weeks | screenshots in every theme and language direction |
 
@@ -592,7 +613,7 @@ The effort is for one developer with the existing patterns. These are **estimate
   `assets/studio/models/*.lnn` (hashes in `server/src/media/studio/models.h`), the original files and Google's model
   cards in `third_party/studio-models/`. `tools/studio/ort-ref.c` makes the reference outputs with ONNX Runtime on the
   dev machine (from `tflite2lnn.mjs --onnx`); it is not built by `server/Makefile`. BlazeFace's decoding (`face.c`) is
-  written and tested but not used by the pipeline yet (Center Stage is phase 3).
+  written and tested but not used by the pipeline yet (Auto Framing is phase 3).
 - **The pipeline** (`st.h`, `stfx.c`, `stgf.c`, `stgl.c`): Portrait (blur), Background (a picture), Mirror; the matte's
   temporal smoothing and the guided filter as in 4.3 (no light wrap yet). The segmenter runs on the frame's own thread
   (no second thread yet: at 3.7 ms it doesn't need one on the PC).
@@ -609,7 +630,7 @@ The effort is for one developer with the existing patterns. These are **estimate
 - **The popover** (`sdk/studio.jsx`, `sdk/studiomodel.js`): from the camera capture item by the clock
   (`sdk/capturestatus.jsx`, "Video effects" when a camera is in use): the live preview, the camera, who uses it, Portrait,
   Background (None, Blur, Picture; LordOS's wallpapers or "Choose a picture…") and Mirror. Settings in
-  `settings.studio`. The other rows of 9.1 (Studio Light, Center Stage, Filters, Retouch, Mic Mode, Open Studio…) come
+  `settings.studio`. The other rows of 9.1 (Face Light, Auto Framing, Filters, Retouch, Mic Mode, Open Studio…) come
   with their phases.
 - **Not verified yet:** the live camera through lord-studio on real hardware (the dev PC's camera was not opened in this
   pass; the pipeline, the helper inside its sandbox with the GPU, the popover and the broker path are tested without
@@ -624,8 +645,8 @@ The effort is for one developer with the existing patterns. These are **estimate
   architectures. It goes into the APT pool with each release like `lordos-disk-formats` (`docs/RELEASING.md`).
 - **The Store card**: rule `studioCamera` in `assets/store/suggestions.json` (Store → For this computer), shown when a USB
   device has a video-class interface (`usbClass: ["0e"]`, new in `sdk/suggestengine.js`), with the notes `dkms` and
-  `secureBoot`. The guided MOK enrolment (`dkms-mok-enroll`, NVIDIA plan A.5) is **not** built: like the NVIDIA card, the
-  `secureBoot` note explains the manual step until that action is approved.
+  `secureBoot`. The guided MOK enrolment (`dkms-mok-enroll`, NVIDIA plan A.5) was not built in phase 2; it is since
+  11.4.
 - **The hub** (`stcam_hub`, `loopback=1`): one lord-studio per session, fds = render node, model, loopback (opened by
   lord-server after checking major 81, driver `v4l2 loopback` and card "LordOS Studio"); the real camera arrives later by
   `MM_STUDIO_CAM` (v[0] 0 idle card, 1 camera with its fd, 2 off card; v[1] the preview's frames wanted) and leaves the
@@ -651,12 +672,147 @@ The effort is for one developer with the existing patterns. These are **estimate
   sandboxed browser's reader process is visible in `/proc` to the same uid; the Pi kernel with the module (v0.15.0 against
   6.18: if it doesn't build, a later 0.15.x tag).
 - **Known limits**: one streaming reader at a time (v4l2loopback 0.15's tokens), so a LordOS app and a browser can't read
-  LordOS Studio together; OBS's own virtual camera finds the module already loaded with our single device (it would need a
-  second device, `devices=2`, which is a change to E-S2's file); a same-uid process could still open `/dev/video50` as a
+  LordOS Studio together; OBS's own virtual camera found the module already loaded with our single device (fixed in 11.4
+  with a second device); a same-uid process could still open `/dev/video50` as a
   writer before lord-studio does (8.4: lord-studio then fails to set its format and stays off, logged).
+
+### 11.3 Phase 3 as built (2026-11-22, in development)
+
+- **The looks** (`server/src/media/studio/stlook.c`, `stframe.c`, the pipeline in `stfx.c`, the GPU composite in
+  `stgl.c`; one shader does them all, and the CPU path is the same arithmetic in row passes):
+  - **Green screen** (4.4): the key colour is the median of the frame's border in CbCr, taken when it is clearly green
+    (or blue), otherwise the preset; alpha is `smoothstep` of the CbCr distance with the Similarity and Smoothness
+    sliders; spill suppression pulls the key channel down to the mean of the other two by Spill; the "better cut-out"
+    keeps the chroma alpha only inside the person's mask dilated by 12 pixels, lets the matte decide where the chroma is
+    unsure, and never punches a hole where the matte is sure. It applies with a picture or a video behind.
+  - **Video backgrounds**: lord-studio decodes the file with libavcodec inside its sandbox (two threads), one picture
+    per camera picture at most, paced by the file's timestamps, looped at its end, cover-fitted to the camera's size by
+    swscale, so the composite takes it as it is. A still file is a picture, anything else a video.
+  - **Auto Framing** (5.2): BlazeFace (already converted in phase 0) every 6th frame on a 128×128 letterboxed copy;
+    the largest face; a crop of the frame's shape whose height is 4.2 (wide) to 2 (tight) face heights, the eyes at a
+    third, at most 2×; a dead zone of 4 %; a 1€ filter (mincut 0.4 Hz, β 0.004) and at most half the frame a second;
+    back to the whole frame after 2 s without a face. The crop is scaled back to the frame (bilinear, fixed point)
+    before everything else, so the matte, the light and the retouch see the framed picture.
+  - **Face Light** (5.3): +0.15 EV on the whole person and up to +0.6 EV inside the face's feathered ellipse (a soft
+    lift that rolls highlights off instead of clipping), the background −0.5 EV, scaled by Intensity. Without a face it
+    still dims the background. The face spotlight and rim light are not built.
+  - **Colour match** (5.3): Reinhard et al.'s transfer in a linear opponent space (so it is one 3×3 matrix and an
+    offset per frame), statistics of the person (weighted by the matte) and of the visible background on the guide
+    cells, the exposure within ±1 EV, the colour channels only 60 % of the way, smoothed over about a second; 0..60 %.
+  - **Filters** (5.4): Warm, Cool, Vivid, Mono, Noir, Film, Fade, Sepia, each a 3×3 matrix and a curve per channel
+    built from our own numbers (no file); the CPU applies that directly, the GPU samples it as a 33³ 3D texture. A
+    Strength slider. `tools/studio/gen-luts.mjs` and user `.cube` files were not needed (the latter is phase 5).
+  - **Retouch** (5.4): the fast guided filter with each channel as its own guide, at half the face region's size,
+    mixed in by a skin weight (the YCbCr skin range, feathered) inside the face's ellipse; nothing else changes. No
+    under-eye lift and no reshaping.
+- **Measured** on the maintainer's PC (i9-10900, RX 580 with radeonsi), 1280×720, one thread, medians of 40 frames
+  (`build/studio-fx-test time`; Auto Framing and Retouch include BlazeFace's share, about 3.7–4.3 ms every 6th frame):
+
+  | Effects on | CPU path | GPU path |
+  |---|---|---|
+  | blur (phase 1) | 16.4 ms | 11.3 ms |
+  | picture (phase 1) | 13.8 ms | 10.3 ms |
+  | video (a new 720p picture every frame; decode not included) | 13.4 ms | 10.8 ms |
+  | green screen + picture | 20.5 ms | 11.1 ms |
+  | colour match + picture | 15.6 ms | 10.6 ms |
+  | Face Light alone (the matte is needed to dim the background) | 16.0 ms | 11.4 ms |
+  | Face Light + blur | 19.3 ms | 12.3 ms |
+  | filter (Film) alone | 8.0 ms | 2.5 ms |
+  | filter (Film) + blur | 21.4 ms | 11.5 ms |
+  | Auto Framing alone (crop and scale 4.4 ms) | 4.6 ms | 6.8 ms |
+  | Retouch alone | 4.0 ms | 6.4 ms |
+  | everything (blur, light, Film, Auto Framing, Retouch) | 36.2 ms | 23.9 ms |
+
+  A video background's own decode, measured with `ffmpeg -benchmark` on an 8 s H.264 clip (CRF 23): 1.8 ms a picture
+  at 720p and 3.6 ms at 1080p on one thread, plus its swscale conversion (about 1–2 ms, **Estimate**). Inside
+  lord-studio's sandbox (`build/studio-helper-test`, 640×360, every look on at once, synthetic frames): 10.9 ms on the
+  CPU, 6.9 ms with the GPU. So at 720p30 the PC keeps every single effect within one frame on both paths; everything at
+  once fits only with the GPU (24 ms of the 33 ms), which D10's GPU-only 1080p already assumes. The Pi 5 is not
+  measured yet.
+- **Accuracy** (`build/studio-fx-test` on the CC0 frames of `tests/data/studio` and frames made from them): Face Light
+  lifts the person and dims the background by half a stop at full Intensity (0.70–0.72); the colour match moves the
+  person toward a blue picture; Mono is grey, a filter at 0 % changes nothing and at 50 % is halfway within 0.25
+  levels; a person in front of a painted green screen keeps every sure-person pixel within 0.1 level while the screen
+  becomes the picture with no green left; every frame of a video background shows; Auto Framing converges to its target
+  and then moves less than 3 pixels in 10 frames, and goes back to the whole frame without a face; Retouch removes
+  35–46 % of the face's fine detail and changes nothing away from it. CPU and GPU agree within 0.16 levels on average
+  for every look.
+- **Mic Mode** (section 7, E-S6): the drop-in `/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf`
+  (`tools/iso/rootfs/usr/share/…`, installed by `mkdeb.sh`) as planned, without echo cancellation (D8); the popover's
+  Standard, Noise Reduction and Full Range set the default microphone and point the filter's capture at the real
+  microphone through `lord.sound` (`micPlan`). Standard and Full Range are the same path: the microphone with no
+  processing. The sound lists hide the filter's own echo reference and streams. The capture indicator would have shown
+  the filter's own capture as "an unknown program" for as long as PipeWire runs, so `pwguard.c` skips that one link
+  when the node is really the session daemon's (checked by pid, executable and unit); the app reading Noise Reduction
+  is reported as before. `server/tests/studio_voice_test.mjs` parses the file and checks it against Debian's module
+  and plugin on the dev machine; it never touches this machine's PipeWire. **Not verified yet:** the filter loaded by a
+  real PipeWire (a VM), whether the hardware microphone stays open while nothing reads Noise Reduction, and the sound
+  heard in a Meet call.
+- **The background catalog** (section 6, E-S4): `assets/studio/backgrounds.json` (the shape of `motion.json`, plus
+  `kind`, `category`, `builtin` and `credit`), thumbnails in `assets/studio/backgrounds/`, one built-in picture per
+  category, the full files staged for the `LordOS-wallpapers` repository's `studio/` folder (not in this repository).
+  At first 121 backgrounds (72 pictures, 49 loops), each license checked on the file's own page or API: 56 rendered from
+  Poly Haven panoramas and 7 ambientCG textures (CC0), 9 NASA ISS photographs (public domain), 33 Wikimedia Commons clips
+  (CC0, public domain, CC BY and CC BY-SA, each with its credit line) and 19 of our own renders (MIT,
+  `tools/studio/gen-studio-loops.py`); no Unsplash, Pexels or Pixabay, nothing with people, logos or readable text
+  (looked at frame by frame). Two changes followed on 2026-11-22. **Every picture is AI-generated** (D7, approved by the
+  maintainer): the 72 pictures keep their ids, names and categories with a new picture each, and 49 new pictures
+  `still-<loop>` show the scenes of the 49 loops of that time (they stay pictures of their own, with their ids, after
+  the loops changed). They were generated with ChatGPT for LordOS from our own prompts, released as CC0 (`"ai": true`,
+  author "Generated with ChatGPT for LordOS"; the credits page adds "Generated with AI" in the person's language),
+  JPEG quality 92 with 4:4:4 chroma at the generator's 1672×941 (one 1672×940; never upscaled), one variant `full`,
+  640×360 thumbnails (quality 85). `tools/studio/build-ai-backgrounds.py` makes them from the originals, checking each
+  PNG's SHA-256; the conversations stay in a private manifest outside the repository. **The loops are at 4K** (6.2
+  "Loops at 4K"): 37 loops, each at 3840×2160 and 1920×1080 from an original at least 3840×2160, 21 Wikimedia Commons
+  clips (CC0, CC BY and CC BY-SA, each with its credit line) and 16 of our renders. The catalog now has 158 items (121
+  pictures, 37 loops). The loops' curation record is `tools/studio/bg-sources.json`, rebuilt by
+  `tools/studio/build-backgrounds.py` (which keeps the catalog's pictures); `tools/studio/publish-studio.py` assembles
+  the published `studio/` folder (`pictures/`, `videos/`, one README and one `MANIFEST.json`) and checks every file
+  against the catalog; `server/tests/studio_catalog_test.mjs` checks every entry, license, size and each loop's
+  resolution, and with `LORDOS_STUDIO_STAGE` every published file's size, hash and real resolution. About 12.6 MB ship
+  (121 picture thumbnails 7.8 MB, 37 loop thumbnails 1.1 MB, 7 built-in pictures 3.8 MB); the pictures to download
+  are 75.8 MB, the loops 1028 MB. The closed actions `studio-bg-get` and `studio-bg-remove` (`server/src/hw/studio_bg_admin.c`) follow
+  `wallpaper-get` (`build/studio-bg-admin-test`). The popover's Background page shows the catalog by category
+  (pictures and videos), LordOS's wallpapers (without the Cyberpunk City pictures, which show people), "Add your own…"
+  (a picture or a short video) and Credits; a ↓ marks what downloads when chosen.
+- **The popover** (9.1): the main page's rows Portrait, Background, Face Light, Auto Framing, Filters, Retouch and
+  Mirror, then Mic Mode; detail pages for each (Auto Framing's slider is "Wide ↔ Tight") and the green screen's. All
+  35 languages.
+- **Not built in phase 3:** the light wrap and rim light, the face spotlight, the eyedropper for the key colour, the indicator
+  naming "Noise Reduction" next to the app, UVC pan/tilt/zoom, the segmenter on a second thread, and RNNoise (D9).
+  Hardware decode of video backgrounds (the Pi's HEVC) is not used: lord-studio decodes in software.
 
 Every phase also updates CHANGELOG, the paper (en, es, pt), the site and `THIRD_PARTY.md` (model cards, Apache-2.0
 NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
+
+### 11.4 Follow-ups (2026-11-22, in development; approved by the maintainer the same day)
+
+- **OBS beside LordOS Studio.** `lordos-studio-camera`'s file now makes two devices:
+  `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`.
+  **Read** in OBS's `plugins/linux-v4l2/v4l2-output.c` (master, 2026-11-22): OBS runs `pkexec modprobe v4l2loopback
+  exclusive_caps=1 card_label='OBS Virtual Camera'` only when no v4l2loopback is loaded, and otherwise takes the first
+  `/dev/video*` in version order (`scandir` with `versionsort`) whose device caps include `V4L2_CAP_VIDEO_OUTPUT`; it never
+  looks at the card label. With `exclusive_caps` an idle loopback announces output, so with OBS's device after ours
+  (`video_nr=50,51`, the first proposal) OBS would take `/dev/video50` whenever LordOS Studio's camera is off, and
+  lord-studio could no longer write it. OBS's device is therefore **49**, before ours; ours stays `/dev/video50`.
+  lord-server still opens only `/dev/video50` after the major, driver and card checks, and lord-studio's `stcam_hub`
+  now checks the card too, so OBS's device is never written by LordOS (`studio_package_test.sh` checks that the number
+  and label appear only as constants in `mstudiohub.h`). While OBS streams, its device announces capture and is listed
+  as a camera like any other; the "no camera" restriction covers both (major 81; `tests/fwlinux/devices.sh` step 6b).
+  The postinst reloads the module on an update from the one-device file only when nothing uses it (`refcnt` 0, and
+  `modprobe -r` itself refuses a module in use); otherwise the second device appears at the next restart.
+- **Guided Secure Boot enrolment** (`dkms-mok-enroll`, NVIDIA plan A.5's `gpu-mok-enroll` renamed;
+  `server/src/hw/mok_admin.c`): one closed admin action, administrators only, `status|import|cancel`, shared by the Store
+  cards with the `secureBoot` note (`studioCamera`, `nvidiaDriver`). Once the item is installed, the card asks `status`;
+  with the key still needed it offers **Prepare the Key**, which makes an 8-digit one-time password root-side, gives it
+  to the fixed `/usr/bin/mokutil --import /var/lib/dkms/mok.pub` on standard input only and shows it once, with the
+  MokManager steps and **Restart Now**. The details are in `NVIDIA-PLAN.md` A.5. `lordos-studio-camera` now depends on
+  `mokutil` on amd64, and the card gained the `obs` note (the second device). Tests: `build/mok-admin-test`.
+- **Mic Mode's names** are our own: Standard, Noise Reduction and Full Range (the locale keys and the PipeWire node
+  names `lordos_voice_*` didn't change; the microphone other apps list is "LordOS Noise Reduction").
+- **To verify on a VM** (never on the maintainer's PC): OBS (Debian's and Flathub's) starting its virtual camera on
+  `/dev/video49` with LordOS Studio's camera both off and on, Meet seeing both cameras, the update reloading the module
+  when unused, and the whole MOK flow with Secure Boot on (OVMF with enrolled keys).
 
 ## 12. Risks
 
@@ -669,7 +825,7 @@ NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
 | Licenses of model weights drift (MODNet history) | legal | pin commits and file hashes; keep copies of model cards in `third_party/studio-models/` |
 | Matting edges on hair and glasses | quality vs Camo/Apple | guided filter, light wrap, optional MODNet on the PC, green screen |
 | Same-uid process feeding the loopback | spoofed video | hold the writer role, warn; documented as the Linux-app trust model |
-| Double noise suppression (Meet's own plus ours) | robotic voice | Voice Isolation off by default; a tip in the popover |
+| Double noise suppression (Meet's own plus ours) | robotic voice | Noise Reduction off by default; a tip in the popover |
 
 ## 13. Decisions for the maintainer
 
@@ -685,8 +841,9 @@ NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
    revocation in Settings → Privacy?
 6. **D6.** Name: "Studio" or "LordOS Studio"? Status item label "Camera"?
 7. **D7.** Backgrounds: CC0/PD plus CC BY and CC BY-SA with credit plus our own; no Unsplash, Pexels or Pixabay. Allow
-   our own AI-generated backgrounds, as the wallpapers already do?
-8. **D8.** Voice Isolation with or without echo cancellation (the latter needs playback through the echo-cancel sink)?
+   our own AI-generated backgrounds, as the wallpapers already do? **Answered 2026-11-22: yes**; every picture is now
+   AI-generated (CC0), the loops stay as curated (11.3).
+8. **D8.** Noise Reduction with or without echo cancellation (the latter needs playback through the echo-cancel sink)?
 9. **D9.** RNNoise later as a LADSPA plugin inside the user's PipeWire daemon (outside LordOS's sandboxes), only if
    WebRTC NS isn't good enough?
 10. **D10.** Default output 1280×720 at 30 fps, and 1080p offered only with the GPU path?

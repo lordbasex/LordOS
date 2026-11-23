@@ -203,6 +203,13 @@ int cloud_kept(const char *const *kept, int n, const char *rel) {
     return 0;
 }
 
+int cloud_kept_tally(const char *const *kept, int n, const char *rel, long long b, long long *per) {
+    int any = 0;
+    for (int i = 0; rel && per && i < n; i++)
+        if (cloud_kept(&kept[i], 1, rel)) { per[i] += b; any = 1; }
+    return any;
+}
+
 int cloud_kept_busy(const char *const *kept, const unsigned char *busy, int n, const char *rel) {
     size_t rl = rel ? strlen(rel) : 0;
     for (int i = 0; rel && busy && i < n; i++) {

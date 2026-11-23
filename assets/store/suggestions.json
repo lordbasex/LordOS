@@ -27,7 +27,7 @@
     {
       "id": "nvidiaDriver",
       "when": { "all": [ { "arch": ["x86_64"] }, { "pci": { "vendor": ["10de"], "class": ["0300", "0302", "0380"] } } ] },
-      "packages": ["linux-headers-amd64", "nvidia-driver", "firmware-misc-nonfree"],
+      "packages": ["linux-headers-amd64", "nvidia-driver", "firmware-misc-nonfree", "mokutil"],
       "installedWhen": ["nvidia-driver"],
       "free": false,
       "component": "non-free",
@@ -40,7 +40,7 @@
       "when": { "usbClass": ["0e"] },
       "packages": ["lordos-studio-camera"],
       "free": true,
-      "notes": ["dkms", "secureBoot"],
+      "notes": ["dkms", "secureBoot", "obs"],
       "icon": "camera"
     },
     {

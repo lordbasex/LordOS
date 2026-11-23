@@ -4,8 +4,9 @@
 reports**. That first part is built on `feat/gpu-reports` (in development): an NVIDIA card is marked experimental in
 Settings → Graphics cards and every computer can send a compatibility report. **Part A follows the maintainer's
 decision of 2026-11-22** (the driver as an opt-in from the Store's suggestion card, NVIDIA's own repository through the
-existing vendor-repository mechanism) and asks for one closed action only, `gpu-mok-enroll`. **Parts A and B are designs,
-FOR REVIEW**: nothing in them is built, no admin action is added and no package is installed until the maintainer
+existing vendor-repository mechanism) and asked for one closed action only, `gpu-mok-enroll`: **approved by the maintainer
+on 2026-11-22 and built as `dkms-mok-enroll`** (A.5), shared with LordOS Studio's camera card. **The rest of Parts A and B
+are designs, FOR REVIEW**: nothing else in them is built, no admin action is added and no package is installed until the maintainer
 approves (AGENTS.md: every root action needs the same review). Nothing here is claimed to work on any card until the
 test matrix says so; facts marked *to verify* were not checked.
 
@@ -47,7 +48,7 @@ firmware and printer cards). For current cards the driver comes from **NVIDIA's 
 the existing catalog-based `pkg-source-add <id>` (PACKAGES.md, "Vendor repositories") and removed with the last package
 by `pkg-source-remove`. The card picks by generation; CUDA is a separate optional choice; Settings → Graphics cards only
 opens that card. No new admin action for the repository or the install: of the four the earlier design proposed, only
-`gpu-mok-enroll` is still requested (A.9).
+`gpu-mok-enroll` was kept, approved and built as `dkms-mok-enroll` (A.5, A.9).
 
 ### A.1 Facts (checked 2026-11-22)
 
@@ -147,7 +148,7 @@ A catalog entry in `apt/catalog.json`, key in `apt/keys/nvidia-cuda.asc`, read o
   `linux-headers-amd64` keeps the headers in step with the kernel. A failed build leaves the card without NVIDIA's
   module; that `nouveau`'s blacklist and the initramfs are handled by NVIDIA's packages as by Debian's is to verify.
 
-### A.5 Secure Boot (MOK enrolment, guided)
+### A.5 Secure Boot (MOK enrolment, guided) — approved 2026-11-22, built as `dkms-mok-enroll`
 
 With Secure Boot on, an unsigned module doesn't load. Debian's DKMS (used by both sources) signs what it builds with its
 own key (`/var/lib/dkms/mok.key`, `mok.pub`, made at the first build); the key must be **enrolled in shim's MOK list**,
@@ -161,6 +162,36 @@ steps and a picture of MokManager: *Enroll MOK → Continue → Yes → type the
 check runs again with `/sys/module/nvidia`; if it failed, **Try Again** (a new import) or **Cancel** (`gpu-mok-enroll
 cancel`: `mokutil --revoke-import`). The password never touches disk outside root's temp file (removed at once), the
 log or the clipboard. Until this action is approved, the card's `secureBoot` note explains the manual step.
+
+**As built (2026-11-22, in development; `server/src/hw/mok_admin.c`, the Store's `apps/store/suggested.js`).** The
+maintainer approved it on 2026-11-22, renamed **`dkms-mok-enroll`** and shared by every Store card whose package DKMS
+builds (the cards with the `secureBoot` note: `nvidiaDriver` and LordOS Studio's `studioCamera`). Administrators only;
+its argument is one of three words:
+
+- `status` (read-only): `unsupported` (no EFI variables), `off`, `nokey` (DKMS made no key yet), `enrolled`, `pending`
+  (in shim's `MokNew` request) or `needed`. It runs no program: SecureBoot is read from its EFI variable, and the key's
+  exact DER bytes are searched for in `MokListRT*` (enrolled; also the split `MokListRT1`…) and `MokNew` (pending)
+  under `/sys/firmware/efi/efivars`, instead of `mokutil --test-key`.
+- `import`, only in `needed` or `pending`: the 8 digits come from `getrandom` (rejection-sampled, so no digit is more
+  likely) and go to the fixed `/usr/bin/mokutil --import /var/lib/dkms/mok.pub` **on standard input, twice** (mokutil
+  asks for the password and its confirmation). That is simpler than the design's hash file: the password is never
+  in argv, a file (not even root's temp file), a log or the UI's progress lines (mokutil's output is discarded).
+  A pending request is first withdrawn (`--revoke-import`), so the newest password is the only one that counts. It
+  answers the digits once only after `MokNew` really holds the key.
+- `cancel`, only in `pending`: `/usr/bin/mokutil --revoke-import` (it withdraws the whole request: mokutil has no
+  per-key withdrawal).
+
+The key pair must be DKMS's own at its fixed place (`mok.pub` and `mok.key`: regular files, not links, owned by root,
+not writable by group or others, in a root-owned folder only root writes), `mok.pub` one DER certificate under 8 KB, and
+mokutil a root-owned regular file nobody else can write. `mokutil` is now a dependency of `lordos-studio-camera` on amd64
+and one of the `nvidiaDriver` card's packages. The Store card of an installed item asks `status` and, when the key is
+needed, shows *One more step at the next restart* and **Prepare the Key**; the password is shown large once with the
+steps (the firmware's own words: *Enroll MOK → Continue → Yes*, the password, *Reboot*; press a key within 10 seconds),
+kept only in the card's state, with **Restart Now**, **New Password** and **Cancel Enrolment**. Settings → Graphics cards
+(A.7) doesn't show it yet. Tests: `build/mok-admin-test` (fake EFI variables, key and mokutil). **To verify on a VM with
+Secure Boot** (OVMF with the Microsoft keys and Debian's shim): MokManager enrolling the key with the password, the
+module loading after it, a skipped blue screen leaving the state `needed`, and that mokutil reads the password from a
+pipe as expected.
 
 ### A.6 Flatpak's GL.nvidia extension
 
@@ -203,7 +234,7 @@ Every text through `t()`, in en, es and pt.
 | `gpu-nvidia-sources "<on\|off>"` | **dropped** | NVIDIA's repository goes through `pkg-source-add nvidia-cuda` / `pkg-source-remove` (catalog, pinned fingerprint). Debian's `non-free`/`contrib` for older cards: the ISO already writes them, and on an `install.sh` system without them the card already explains instead of offering (`ifUnavailable: "explain"`) |
 | `gpu-nvidia-install "<pci address>"` | **dropped** | The set is installed by the Store's existing `pkg-install` after the plan and confirmation. The flavour is data in the card: an administrator who could pick a wrong set can already install any package through the same action, so a root-side choice added nothing. The packages handle `nouveau`'s blacklist and the initramfs (to verify); `nvidia-drm.modeset=1` is only needed to draw the desktop and moves to Part B. The role isn't recorded (A.7) |
 | `gpu-nvidia-remove` | **dropped** | `pkg-remove` on the set plus `pkg-source-remove` with the last package |
-| `gpu-mok-enroll "<import\|cancel>"` | **still requested, awaiting the maintainer's approval** | No existing action can run `mokutil --import` with a one-time password made and hashed root-side. `import` only when Secure Boot is on, the key pair exists at DKMS's fixed path, root-owned, not a link, and isn't enrolled; fixed `/usr/bin/mokutil` arguments; returns the password once. `cancel`: `mokutil --revoke-import`. Administrators only; `mokutil` becomes a dependency of the `lordos` package |
+| `gpu-mok-enroll "<import\|cancel>"` | **approved 2026-11-22, built as `dkms-mok-enroll "<status\|import\|cancel>"`** (A.5) | No existing action can run `mokutil --import` with a one-time password made and hashed root-side. `import` only when Secure Boot is on, the key pair exists at DKMS's fixed path, root-owned, not a link, and isn't enrolled; fixed `/usr/bin/mokutil` arguments; returns the password once. `cancel`: `mokutil --revoke-import`. Administrators only; `mokutil` comes with the cards that need it (`lordos-studio-camera` on amd64, the `nvidiaDriver` set), not with the `lordos` package |
 
 ## Part B — design: NVIDIA drawing the desktop — FOR REVIEW
 
@@ -275,7 +306,7 @@ site's "Tested graphics cards" page (draft: `web/content/hardware/gpus.*.md`) wi
 
 ## What needs the maintainer's OK
 
-1. **`gpu-mok-enroll "<import|cancel>"`** (A.5, A.9), the only new closed action Part A still asks for.
+1. ~~`gpu-mok-enroll "<import|cancel>"`~~ approved 2026-11-22 and built as `dkms-mok-enroll` (A.5, A.9).
 2. The pinned branch of NVIDIA's driver (A.4) and the CUDA toolkit box (A.2), once verified.
 3. The Flatpak GL.nvidia handling (A.6).
 4. Part B, after the explicit-sync design: the desktop role, `nvidia-drm.modeset=1` if the packages don't set it, and

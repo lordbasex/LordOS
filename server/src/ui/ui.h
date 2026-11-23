@@ -152,6 +152,8 @@ typedef struct {
     char theme_request[1024];       /* lord.themes.use(): bundle to load */
     char theme_failed[1024];        /* last bundle that failed to load */
     char theme_failed_why[1024];    /* why (the exception, or the verified-code check): Settings → Appearance's report */
+    int theme_failed_code;          /* it was the verified-code check: tried again once a newer manifest is in use */
+    unsigned theme_failed_gen;      /* codesig_generation() when it was refused */
     uint64_t serial;                /* the last node's serial (node_new) */
 } Ui;
 
@@ -421,7 +423,12 @@ void  paint_capture(Canvas *c, Node *root);
  * root's tree: the sheets and dialogs the window has in a shell layer (the file dialog of Settings → Wallpaper,
  * issue #58), which are painted after every window and would otherwise be left out. */
 enum { PAINT_ALSO_MAX = 8 };
+/* -1, with nothing painted, when `last` is a protected window (it, a node inside it or one it is inside is protected,
+ * wm.setProtected): a protected window is never captured alone (the vault, a password prompt…); a capture of the
+ * whole screen or an area still shows it black (paint_capture). */
 int   paint_capture_until(Canvas *c, Node *root, int last, const int *also, int n);
+/* n, a node inside it or one it is inside is protected (a protected window: black in every capture) */
+int   paint_node_protected(const Node *n);
 /* Only that window (node, a window's frame) and its sheets (also), each only if it is in root's tree and shown: what is
  * below it and above it is left out (sharing a window, cast/cast.c). 1 if it was painted. */
 int   paint_capture_node(Canvas *c, Node *root, int node, const int *also, int n);

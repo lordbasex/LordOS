@@ -8,6 +8,8 @@
 //   barStops(), stepStop(stops, cur, ±1)  the toolbar's items in the order ← → go through them
 //   keepRect(rect, display), restoreRect(saved, displays)   "Remember last selection"
 //   hitHandle(r, x, y), adjustRect(r, grab, dx, dy, bounds) the selection's eight handles and its inside
+//   PRINT_KEY, printKeyLabel(a)           what the Print Screen key does (GitHub #202) and its row in Settings → Keyboard
+//   refusal(err)                          why a capture was not taken: { code, permission } (GitHub #219)
 
 export const CAPTURE_MODES = ['full', 'window', 'area'];
 export const RECORD_MODES = ['recordFull', 'recordArea'];
@@ -17,9 +19,12 @@ export const MODES = [...CAPTURE_MODES, ...RECORD_MODES];
 // keep the file where captures go by default (Pictures/Screenshots).
 export const SAVE_TO = ['desktop', 'documents', 'pictures', 'clipboard', 'mail', 'editor', 'other'];
 export const TIMERS = [0, 5, 10];
+// What the Print Screen key does (GitHub #202): the whole screen (as before), an area, a window, the toolbar, or nothing
+// (the key then goes to the app in front, as any key LordOS doesn't take).
+export const PRINT_KEY = ['full', 'area', 'window', 'toolbar', 'none'];
 
 export const OPTION_DEFAULTS = Object.freeze({
-  mode: 'area', saveTo: 'pictures', otherDir: '', timer: 0, mic: false, micSource: '', thumbnail: true, remember: false, pointer: true, lastRect: null, barPos: null,
+  mode: 'area', saveTo: 'pictures', otherDir: '', timer: 0, mic: false, micSource: '', thumbnail: true, remember: false, pointer: true, lastRect: null, barPos: null, printKey: 'full',
 });
 
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -48,7 +53,28 @@ export function normalizeOptions(raw) {
     pointer: r.pointer !== false,
     lastRect: validRect(r.lastRect),
     barPos: validPos(r.barPos),
+    printKey: PRINT_KEY.includes(r.printKey) ? r.printKey : OPTION_DEFAULTS.printKey,
   };
+}
+
+// The Print Screen key's row in Settings → Keyboard: the same label as the shortcut that does the same thing (so the
+// whole screen shares ❖⇧3's row), a window its own; null when the key does nothing (not listed).
+export function printKeyLabel(a) {
+  if (a === 'area') return 'shell.shortcuts.captureArea';
+  if (a === 'window') return 'shell.shortcuts.captureWindow';
+  if (a === 'toolbar') return 'shell.shortcuts.capturePanel';
+  if (a === 'none') return null;
+  return 'shell.shortcuts.captureFull';
+}
+
+// Why nothing was captured (GitHub #219): err is what the capture threw (a code line such as "media.captureFailed", or
+// { code, params }), or nothing when the permission prompt was answered no. permission: the reason is the screen
+// permission or a restriction, so Settings → Privacy can change it; any other failure is told as it is.
+export function refusal(err) {
+  if (!err) return { code: 'media.denied.screen', permission: true };
+  const code = typeof err === 'object' ? String(err.code || '') : String(err);
+  if (!code) return { code: 'media.captureFailed', permission: false };
+  return { code, permission: code.startsWith('media.denied.') || code.startsWith('fw.restricted') };
 }
 
 export const isRecordMode = (m) => RECORD_MODES.includes(m);

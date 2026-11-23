@@ -14,7 +14,7 @@ Los tres corren sobre el mismo servidor gráfico, el mismo motor de interfaz y l
 - **La barra de menús** tiene los menús de la app, los ítems de estado y el reloj; el **Centro de control** junta red, sonido, brillo, No molestar y el resto.
 - **El lanzador de apps** muestra todas las apps, y la Búsqueda encuentra apps, ajustes y archivos.
 - **Acomodá ventanas** arrastrándolas a los bordes: media pantalla, un cuarto o la pantalla entera (en Lord Flow desde la 0.8.9).
-- **Siempre encima** en el menú de la ventana deja una ventana sobre las demás mientras escribís en otra (en desarrollo, en todos los escritorios de LordOS; las apps X11 también pueden pedirlo).
+- **Siempre encima** en el menú de la ventana deja una ventana sobre las demás mientras escribís en otra (desde la 0.8.9.5, en todos los escritorios de LordOS; las apps X11 también pueden pedirlo).
 - **Escritorios** con una Vista general, desde la 0.8.7, y un selector de apps con ❖Tab.
 
 **Para quién es:** quien quiere ponerse a trabajar sin aprender nada nuevo.
@@ -25,7 +25,7 @@ Los tres corren sobre el mismo servidor gráfico, el mismo motor de interfaz y l
 
 **Desde la 0.8.3.** Todo en una barra abajo: el botón de inicio, la búsqueda, las apps fijadas y abiertas, una bandeja con ajustes rápidos y el reloj.
 
-- **El menú de inicio** tiene un campo de búsqueda que busca como la búsqueda del sistema (apps, ajustes, archivos, notas, la calculadora, Ayuda), una grilla de apps fijadas que acomodás vos, las apps usadas hace poco, todas las apps de la A a la Z y el botón de apagado.
+- **El menú de inicio** tiene un campo de búsqueda que busca como la búsqueda del sistema (apps, ajustes, archivos, notas, la calculadora, Ayuda), una grilla de apps fijadas que acomodás vos, las apps usadas hace poco, todas las apps de la A a la Z o por categoría (Juegos, Gráficos, Internet, Oficina…, cada una con su cantidad y que se abre ahí mismo, también con el teclado; desde la 0.8.9.5) y el botón de apagado.
 - **Ajustes rápidos** junto al reloj: red, Bluetooth, No molestar, Luz nocturna, modo oscuro, volumen.
 - **Una barra de tareas en cada pantalla**, activada de fábrica; el menú de inicio y los paneles se abren en la pantalla donde hiciste clic.
 - **La barra de tareas** puede ir centrada o alineada al inicio, en cualquier lado de la pantalla.

@@ -199,6 +199,8 @@ EOF
     run "sign-test" build/sign-test
     # migration 008: a tablet's power-button defaults (packaging/migrations, issue #131)
     run "migration 008 tablet-power" sh tests/migration_tablet_power_test.sh
+    # (#187) another display manager enabled next to lordos.service: the package's postinst warns (packaging/bin)
+    run "dm-check-test (packaging/bin/lordos-dm-check)" sh tests/dm_check_test.sh
     # (0.8.8.9) the Chromium-based browsers' initial preferences (src/pkg/browserprefs.c) and migration 009
     run "browserprefs-test" build/browserprefs-test
     run "migration 009 chromium-family" sh tests/migration_chromium_family_test.sh
@@ -222,9 +224,11 @@ EOF
     if have node; then run "soundwave-model-test (sdk/soundwavemodel.js, widgetgrid.js pins)" node tests/soundwave_model_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
     if have node; then run "logfile-test (sdk/logfile.js)" node tests/logfile_test.mjs; fi
+    if have node; then run "browserframe-notes-test (sdk/browserframe.js, #222)" node tests/browserframe_notes_test.mjs; fi
     if have node; then run "menubar-model-test (sdk/menubarmodel.js, sdk/ticker.js)" node tests/menubar_model_test.mjs; fi
     if have node; then run "editor-scrollbar-test (apps/editor/scrollbar.js)" node tests/editor_scrollbar_test.mjs; fi
     if have node; then run "editor-recent-test (apps/editor/recent.js, File → Open Recent, #113)" node tests/editor_recent_test.mjs; fi
+    if have node; then run "backup-model-test (apps/backup/model.js exclusions, FilePicker cloud={false}, #200)" node tests/backup_model_test.mjs; fi
     if have node; then run "mem-figure-test (sdk/memfigure.js)" node tests/mem_figure_test.mjs; fi
     if have node; then run "openwith-model-test (sdk/openwithmodel.js, Files' Open with providers)" node tests/openwith_model_test.mjs; fi
     if have node; then run "vm-openwith-test (apps/machines/openwith.js, a machine in Open with)" node tests/vm_openwith_test.mjs; fi
@@ -242,6 +246,7 @@ EOF
     if have node; then run "bt-list-model-test (sdk/btlistmodel.js)" node tests/bt_list_model_test.mjs; fi
     if have node; then run "kbinhibit-model-test (sdk/kbinhibitmodel.js)" node tests/kbinhibit_model_test.mjs; fi
     if have node; then run "windowbuttons-test (sdk/windowbuttons.js)" node tests/windowbuttons_test.mjs; fi
+    if have node; then run "moddrag-model-test (sdk/moddragmodel.js, sdk/windowbuttons.js size and tiling, #151, #219)" node tests/moddrag_model_test.mjs; fi
     if have node; then run "celeste-model-test (themes/celeste/model.js)" node tests/celeste_model_test.mjs; fi
     if have node; then run "login-model-test (sdk/loginmodel.js)" node tests/login_model_test.mjs; fi
     if have node; then run "diskplaces-test (sdk/diskplaces.js, #122)" node tests/diskplaces_test.mjs; fi
@@ -253,6 +258,13 @@ EOF
         0) ok "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
+    esac
+    # (#219) Move and resize with: Off (the default) takes no press; ❖ + drag moves and resizes a Wayland and an X11 window
+    sh tests/moddrag_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test: off, move, resize, lock, shortcuts)" ;;
+        77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
+        *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
     esac
     # surfaces made children of themselves or of their descendants: refused, lord-server goes on
     sh tests/popup_headless.sh cycle-client >"$T/out" 2>&1
@@ -269,7 +281,8 @@ EOF
         77) skip "wayland-fuzz" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "wayland-fuzz (tests/wlfuzz_client.c, headless lord-server)"; cat "$T/out" ;;
     esac
-    # a theme switch where the new theme and the running one both fail: the recovery screen, never no JS at all
+    # a theme switch where the new theme and the running one both fail: the recovery screen, never no JS at all; and
+    # one after a package update under the session: the running theme comes back, a changed unsigned manifest is never taken
     sh tests/theme_switch_headless.sh >"$T/out" 2>&1
     case $? in
         0) ok "theme-switch-fails (tests/theme_switch_headless.sh, headless lord-server)" ;;
@@ -397,6 +410,12 @@ EOF
     if have node; then run "screenshots-model-test (apps/screenshots)" node tests/screenshots_model_test.mjs; fi
     # the Screenshots toolbar (❖⇧5): options kept and read back, modes, keys, Save to, the remembered selection's handles
     if have node; then run "screenshots-toolbar-model-test (apps/screenshots/toolbarmodel.js)" node tests/screenshots_toolbar_model_test.mjs; fi
+    # Settings → Privacy's rows: a built-in app that declares a permission is listed before it asked (GitHub #219)
+    if have node; then run "privacy-model-test (apps/settings/privacymodel.js)" node tests/privacy_model_test.mjs; fi
+    # the clipboard history panels: keys, scrolling to the selection only, a pointer at rest never takes it (GitHub #203, #204)
+    if have node; then run "clipboard-panel-model-test (sdk/clipboardpanelmodel.js)" node tests/clipboard_panel_model_test.mjs; fi
+    # the clipboard's Snippets: add, edit, rename, delete, reorder, search, the file and its limits (GitHub #205)
+    if have node; then run "snippets-model-test (sdk/snippetsmodel.js)" node tests/snippets_model_test.mjs; fi
     if have node; then run "imageedit-model-test (sdk/imageeditmodel.js)" node tests/imageedit_model_test.mjs; fi
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
@@ -411,10 +430,18 @@ EOF
     # fuzz; the frame pipeline on fixed frames (CPU, and GPU when a render node opens); the popover's plain logic
     run "studio-nn-test (segmenter and BlazeFace against ONNX Runtime, the .lnn loader's fuzz)" build/studio-nn-test
     run "studio-test (matte, guided filter, blur, picture, mirror; CPU and GPU agree)" build/studio-test
-    run "studio-hub-test (the loopback: what it shows, its readers, the cards, YUYV)" build/studio-hub-test
+    run "studio-hub-test (the loopback: what it shows, its readers, the cards, YUYV; phase 3's settings and names)" build/studio-hub-test
+    # phase 3: each look against the reference frames (Face Light, colour match, filters, green screen, video, Auto
+    # Framing, Retouch; CPU and GPU agree), the background catalog's closed actions and the shipped catalog, the voice drop-in
+    run "studio-fx-test (phase 3's effects on fixed frames)" build/studio-fx-test
+    run "studio-bg-admin-test (studio-bg-get, studio-bg-remove, the catalog)" build/studio-bg-admin-test
+    run "mok-admin-test (dkms-mok-enroll with fake firmware variables and a fake mokutil)" build/mok-admin-test
+    if have node; then run "studio-voice-test (the lordos-voice.conf drop-in, Mic Mode)" node tests/studio_voice_test.mjs; else skip "studio-voice-test" node; fi
     # phase 2's package, built and inspected (never installed; the device itself is checked on a VM)
     if have dpkg-deb; then run "studio-package-test (lordos-studio-camera)" sh tests/studio_package_test.sh; else skip "studio-package-test" dpkg-deb; fi
     if have node; then run "studio-model-test (sdk/studiomodel.js)" node tests/studio_model_test.mjs; else skip "studio-model-test" node; fi
+    # the background catalog at 4K: every entry, license, size, hash and resolution (the publish folder with LORDOS_STUDIO_STAGE)
+    if have node; then run "studio-catalog-test (assets/studio/backgrounds.json, tools/studio/bg-sources.json)" node tests/studio_catalog_test.mjs; else skip "studio-catalog-test" node; fi
     if have node; then run "widget-feed-test (sdk/widgetfeedmodel.js)" node tests/widget_feed_test.mjs; else skip "widget-feed-test" node; fi
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
@@ -624,11 +651,21 @@ EOF
         run "screenshots-newcapture-scene (apps/screenshots/editor.jsx)" node tests/textfield_menu_test.mjs screenshots_newcapture_scene.mjs
         # the Screenshots toolbar: modes, the primary button, the Options menu and its choices saved in settings
         run "screenshots-toolbar-scene (apps/screenshots/toolbar.jsx)" node tests/textfield_menu_test.mjs screenshots_toolbar_scene.mjs
+        # (#200) Backups: Choose… for the destination (no Cloud folder) and the exclusions (inside home), typing still works
+        run "backup-pickers-scene (apps/backup/index.jsx, FilePicker cloud={false})" node tests/textfield_menu_test.mjs backup_pickers_scene.mjs
     else skip "notes-editor-scene" "node and the repository's node_modules (npm install)"; fi
     # a password TextInput: the eye shows it and keeps the focus, copies nothing, hides on blur; ⇪ follows Caps Lock
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "password-field-scene (sdk/components.jsx TextInput secure)" node tests/textfield_menu_test.mjs password_field_scene.mjs
     else skip "password-field-scene" "node and the repository's node_modules (npm install)"; fi
+    # (#205) the clipboard's Snippets tab: search, paste, From clipboard, Save as snippet, reorder, delete, no password kept
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "clipboard-snippets-scene (sdk/clipboard.js FullPanel, sdk/snippetsmodel.js)" node tests/textfield_menu_test.mjs clipboard_snippets_scene.mjs
+    else skip "clipboard-snippets-scene" "node and the repository's node_modules (npm install)"; fi
+    # every password surface LordOS draws is protected (black in captures): password fields, the keyring and polkit prompts
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "password-protect-scene (TextInput secure, KeyringPrompt, PolkitPrompt)" node tests/textfield_menu_test.mjs password_protect_scene.mjs
+    else skip "password-protect-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.9.5, docs/MAIN-THREAD.md) <Toggle pending> and <Button pending> answer the press before the action, flip back on a
     # failure; useTrackedSettings renders only for the keys read; ThemeProvider keeps equal tokens; sortByName's order
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
@@ -655,6 +692,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "store-endless-scene (apps/store/endless.js)" node tests/textfield_menu_test.mjs store_endless_scene.mjs
     else skip "store-endless-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.5) a Store card's one-line texts end in an ellipsis, never cut through a letter
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "store-card-scene (apps/store/ui.js)" node tests/textfield_menu_test.mjs store_card_scene.mjs
+    else skip "store-card-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) Tab between the SDK's controls, the focus ring, Space and Enter, the arrows, a press that ends the focus (sdk/focus.js)
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "focus-scene-test (sdk/focus.js, sdk/components.jsx, sdk/controls.jsx)" node tests/focus_scene_test.mjs
@@ -676,6 +717,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-startmenu-power-test (themes/classic StartMenu)" node tests/classic_startmenu_power_test.mjs
     else skip "classic-startmenu-power-test" "node and the repository's node_modules (npm install)"; fi
+    # (#210) Lord Classic's start menu by category: the groups and counts, mouse and keyboard, RTL, the remembered view
+    if have node; then run "app-groups-model-test (sdk/appgroupsmodel.js)" node tests/app_groups_model_test.mjs; fi
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "classic-startmenu-categories-scene (themes/classic StartMenu, sdk/appgroupsmodel.js)" node tests/classic_startmenu_power_test.mjs classic_startmenu_categories_scene.mjs
+    else skip "classic-startmenu-categories-scene" "node and the repository's node_modules (npm install)"; fi
     # (#159) a mouse's back and forward buttons go to the Linux app, never to the desktop's own press handlers
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "side-buttons-test (runtime/events.js)" node tests/side_buttons_test.mjs
@@ -689,6 +735,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-colview-scene (apps/files/views.jsx ColumnView)" node tests/menubar_test.mjs files_colview_scene.mjs
     else skip "files-colview-scene" "node and the repository's node_modules (npm install)"; fi
+    # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs
+    else skip "files-drag-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6) Lord Classic's taskbar on every display: three monitors, panels on the clicked bar's display, one timer
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-taskbar-test (themes/classic on every display, sdk/dock.js drop targets)" node tests/classic_taskbar_test.mjs
@@ -712,6 +762,12 @@ EOF
             run "always-on-top-scene-$th (sdk/desktopmodel.js stackOrder over themes/$th)" node tests/workspaces_test.mjs always_on_top_scene.mjs "$th"
         done
     else skip "always-on-top-scene" "node and the repository's node_modules (npm install)"; fi
+    # (#151, #219) title bar sizes, ❖ + drag anywhere in a window, the Window menu's tiling switch, in every theme
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default classic workspaces celeste; do
+            run "window-requests-scene-$th (sdk/moddrag.js, sdk/windowbuttons.js over themes/$th)" node tests/workspaces_test.mjs window_requests_scene.mjs "$th"
+        done
+    else skip "window-requests-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8, #111) how many app buttons fit on a Classic taskbar, and how big
     if have node; then run "classic-taskbarfit-test (themes/classic/taskbarfit.js)" node tests/classic_taskbarfit_test.mjs; fi
     # (0.8.8.6) the Terminal's key mappings: iTerm2's keypad, "\n", settings migration 2

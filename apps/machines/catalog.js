@@ -11,10 +11,31 @@ export function systemsFor(cat, arch) {
     const a = s?.arch?.[arch];
     // Windows (4.3) has no folder of its own: the person's ISO from Microsoft's page, or the pinned evaluation
     const win = s?.kind === 'windows' && Array.isArray(a?.isos);
-    if (!a || s.hidden || typeof s.id !== 'string' || (typeof a.file !== 'string' && !win)) continue;
-    out.push({ id: s.id, name: String(s.name || s.id), release: String(s.release || ''), approxMb: Number(a.approxMb) || 0, kind: s.kind || 'iso', listed: !a.sums });
+    // an ISO whose maker signs no list (Android, 4.2): the catalog pins its one file and hash itself (pinnedImage)
+    const pinned = (s?.kind || 'iso') === 'iso' && !!pinnedImage(a);
+    if (!a || s.hidden || typeof s.id !== 'string' || (typeof a.file !== 'string' && !win && !pinned)) continue;
+    // family: what a profile's system kind suggests it for ('linux', 'windows'; Android is neither: "family" in its entry)
+    const family = s.kind === 'windows' ? 'windows' : /^[a-z]+$/.test(s.family || '') ? s.family : 'linux';
+    out.push({ id: s.id, name: String(s.name || s.id), release: String(s.release || ''), approxMb: Number(a.approxMb) || 0, kind: s.kind || 'iso', family,
+      listed: !a.sums && !pinned, ...(pinned ? { pinned: true } : {}) });
   }
   return out;
+}
+
+// the one image an entry pins (vmcatalog.h: no maker's list; the admin helper keeps the download only with this hash):
+// { name, sha, size, pinned: true } or null
+const PIN_ISO = /^[A-Za-z0-9_+~][A-Za-z0-9._+~-]{0,90}\.iso$/;
+export function pinnedImage(a) {
+  const f = Array.isArray(a?.pinned) && a.pinned.length === 1 ? a.pinned[0] : null;
+  if (!f || !PIN_ISO.test(f.name || '') || !/^[0-9a-f]{64}$/.test(f.sha256 || '') || !/^https:\/\/[^/\s"<>\\]+\/\S+$/.test(f.url || '') ||
+      !Number.isInteger(f.bytes) || f.bytes < 1) return null;
+  return { name: f.name, sha: f.sha256, size: f.bytes, pinned: true };
+}
+
+// what a card says under its download (machines.dl.notice.<key>): { key, maker, date } or null
+export function noticeOf(cat, id) {
+  const s = (cat?.systems || []).find((x) => x?.id === id);
+  return s && /^[a-z]+$/.test(s.notice || '') ? { key: s.notice, maker: String(s.maker || s.name || ''), date: String(s.imageDate || '') } : null;
 }
 
 export function entryOf(cat, id, arch) {
@@ -70,6 +91,8 @@ export function newest(names, re) {
 
 // the newest image of an entry in its list: { name, sha, size } or null
 export function pickImage(entry, sumsText) {
+  const pin = pinnedImage(entry);
+  if (pin) return pin;
   const files = parseSums(sumsText);
   const name = newest(files.map((f) => f.name), entry.file);
   return name ? files.find((f) => f.name === name) : null;
@@ -159,10 +182,21 @@ export function lordosLang(lang) {
   return /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(l) ? l : 'en';
 }
 
-// a card's own least size ("defaults" in the catalog: LordOS asks for 4 processors, 4 GB, 32 GB and 3D) over what the
-// profile gives: the processors never more than this computer has; size: { vcpus, memoryMb, diskGb, gfx, ... }
+// A card's machine over what the profile gives (size: { vcpus, memoryMb, diskGb, gfx, ... }); host: { cpus, memMaxMb }.
+// "machine" (Android, 4.2): what the card asks whatever the profile, fitted to this computer (never more processors
+// than it has, never more memory than machines may use here). "defaults" (LordOS: 4 processors, 4 GB, 32 GB, 3D):
+// the card's least size over the profile's, the processors never more than this computer has.
 export function cardSize(cat, id, size, host) {
-  const d = (cat?.systems || []).find((x) => x?.id === id)?.defaults;
+  const s = (cat?.systems || []).find((x) => x?.id === id);
+  const m = s?.machine, d = s?.defaults;
+  if (m && typeof m === 'object') {
+    const out = { ...size };
+    if (Number.isInteger(m.vcpus) && m.vcpus > 0) out.vcpus = Math.min(m.vcpus, Math.max(1, host?.cpus | 0 || m.vcpus));
+    if (Number.isInteger(m.memoryMb) && m.memoryMb >= 256) out.memoryMb = Math.min(m.memoryMb, Math.max(256, Math.floor((host?.memMaxMb || m.memoryMb) / 256) * 256));
+    if (Number.isInteger(m.diskGb) && m.diskGb > 0) out.diskGb = m.diskGb;
+    if (m.graphics === '3d' || m.graphics === '2d') out.gfx = m.graphics;
+    return out;
+  }
   if (!d || typeof d !== 'object') return size;
   const n = (v) => (Number.isInteger(v) && v > 0 ? v : 0);
   const want = n(d.vcpus);

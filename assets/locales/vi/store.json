@@ -320,5 +320,15 @@
   "suggest.studioCamera.detail": "Cho mọi ứng dụng, kể cả trình duyệt và cuộc gọi video, camera “LordOS Studio” với hiệu ứng của bạn: làm mờ nền hoặc một hình ảnh phía sau bạn ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} không có trong nguồn gói của máy tính này.",
   "suggest.studioCamera.note.dkms": "Trên PC, mô-đun nhân của nó được biên dịch cho nhân của bạn ngay trên máy này (DKMS), kéo theo khoảng 500 MB trình biên dịch và tệp tiêu đề nhân, và biên dịch lại sau mỗi lần cập nhật nhân. Trên Raspberry Pi, nó đi kèm nhân LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Khi bật Secure Boot, bạn phải đăng ký khóa ký của mô-đun ở lần khởi động lại tiếp theo, nếu không camera sẽ không xuất hiện."
+  "suggest.studioCamera.note.secureBoot": "Khi bật Secure Boot, bạn phải đăng ký khóa ký của mô-đun ở lần khởi động lại tiếp theo, nếu không camera sẽ không xuất hiện.",
+  "suggest.studioCamera.note.obs": "Đồng thời thêm thiết bị camera thứ hai, “OBS Virtual Camera”, để camera ảo riêng của OBS Studio hoạt động cùng LordOS Studio.",
+  "suggest.mok.title": "Thêm một bước ở lần khởi động lại tới",
+  "suggest.mok.body": "Secure Boot đang bật, nên thứ mà mục này đã cài chỉ được tải sau khi khóa ký của nó được đăng ký. LordOS chuẩn bị khóa và cho bạn một mật khẩu dùng một lần để nhập trên màn hình xanh ở lần khởi động lại tới.",
+  "suggest.mok.prepare": "Chuẩn bị khóa",
+  "suggest.mok.pending": "Khóa sẽ được đăng ký ở lần khởi động lại tới. Nếu bạn không còn mật khẩu, hãy lấy mật khẩu mới.",
+  "suggest.mok.passwordTitle": "Mật khẩu dùng một lần của bạn",
+  "suggest.mok.passwordHint": "Hãy ghi lại ngay: mật khẩu chỉ hiện một lần và không được lưu ở đâu cả.",
+  "suggest.mok.steps": "Khởi động lại, và khi màn hình xanh xuất hiện, hãy nhấn một phím bất kỳ trong vòng 10 giây. Sau đó chọn Enroll MOK → Continue → Yes, nhập mật khẩu này và chọn Reboot.",
+  "suggest.mok.newPassword": "Mật khẩu mới",
+  "suggest.mok.cancel": "Hủy đăng ký"
 }

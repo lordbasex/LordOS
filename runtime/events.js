@@ -104,9 +104,29 @@ function run(p, fn) {
   try { fn(); } catch (e) { console.error('evento:', e); } finally { priority = DefaultEventPriority; }
 }
 
+// A press with the window drag modifier held (❖ or Alt, lord-server's main.c, GitHub #219): fn(win, x, y, button) says
+// whether it is that window's move or resize (sdk/moddrag.js). Taken, it reaches no node's handlers and is no click; the
+// global 'pointerdown' listeners still hear it (a menu closes, ❖ held for it is not a tap). win: the window id of the
+// WindowShell under the press (its lordWin), never a press outside a window.
+let modGrab = null;
+export function setModGrab(fn) { modGrab = typeof fn === 'function' ? fn : null; }
+
 globalThis.__lordEvent = (type, id, x, y, button) => {
   resetOps();
   lastEventId = id;
+  if (type === 'modgrab') {
+    const chain = chainOf(id);
+    const target = chain[0] || null;
+    const win = target ? windowOf(target) : null;
+    let took = false;
+    run(DiscreteEventPriority, () => {
+      took = !!(win && modGrab && modGrab(win, x, y, button) === true);
+      if (!took) return;
+      down = null;
+      for (const fn of listeners.pointerdown) fn(makeEvent('pointerdown', target, x, y, button));
+    });
+    return took;
+  }
   // A mouse's back and forward buttons (3 and 4, issue #159) go to the Linux app under the pointer, not to the
   // desktop's own handlers: most onMouseDown handlers (title bars, buttons, sliders) don't look at ev.button.
   if ((type === 'down' || type === 'up') && button > 2) return;

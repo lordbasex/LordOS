@@ -23,6 +23,9 @@
 #include "lordlog.h"
 #include "keylag.h"
 #include "bench/lbinput.h"
+#ifdef LORD_TEST_HOOKS
+#include "testhooks.h"           /* build/lord-server-test only */
+#endif
 #include "net/net.h"
 #include "disk/disk.h"
 #include "backup/backup.h"
@@ -40,6 +43,7 @@
 #include "lord_version.h"
 #include "input.h"
 #include "inputkind.h"
+#include "softpace.h"
 #include "kms.h"
 #include "drmcard.h"
 #include <sys/resource.h>
@@ -313,7 +317,7 @@ static int out_count(const Server *s) {
 static Out *main_out(Server *s) { return &s->out[s->out[s->main_out].on ? s->main_out : 0]; }
 /* page flips that complete before vblank (see the main loop): consecutive early flips seen, 0..8 */
 static int flip_instant, flip_told;
-static double pace_next;                /* the next frame's slot when frames are paced in software, ms */
+static SoftPace pace_sw;                /* the next frame's slot when frames are paced in software (softpace.h) */
 
 static FPipe fpipe;                     /* LORD_PIPELINE (fpipe.h), read once at startup */
 static void prep_undo_all(Server *s) { for (int i = 0; i < OUT_MAX; i++) prep_undo(&s->out[i]); }
@@ -509,6 +513,25 @@ static int node_cursor(const Node *n) {
 
 static int out_scale(const Out *o);
 static int out_at_pointer(const Server *s);
+
+/* The window drag modifier's state came from the remote desktop or the test hooks (remote_key), not a keyboard here. */
+static int mods_injected;
+/* ❖ and Alt are tracked from every keyboard and a release can be lost (another console, a keyboard that sleeps or is
+ * unplugged with the key down): before a press becomes a window drag, the kernel is asked whether one of this
+ * computer's keyboards really holds the modifier (EVIOCGKEY), so a stale state never turns every click into a move.
+ * What the remote desktop injected is taken as it is. */
+static int drag_mod_really_held(Server *s) {
+    if (mods_injected) return 1;
+    int key1 = grab_mod() == GRAB_MOD_SUPER ? KEY_LEFTMETA : KEY_LEFTALT, key2 = grab_mod() == GRAB_MOD_SUPER ? KEY_RIGHTMETA : KEY_RIGHTALT;
+    for (int i = 0; i < s->input.count; i++) {
+        unsigned char keys[KEY_MAX / 8 + 1];
+        memset(keys, 0, sizeof keys);
+        if (s->input.dev[i].fd < 0 || ioctl(s->input.dev[i].fd, EVIOCGKEY(sizeof keys), keys) < 0) continue;
+        if (((keys[key1 / 8] >> (key1 % 8)) & 1) || ((keys[key2 / 8] >> (key2 % 8)) & 1)) return 1;
+    }
+    if (grab_mod() == GRAB_MOD_SUPER) s->meta = 0; else s->alt = 0;
+    return 0;
+}
 /* shake the pointer to find it (shake.h): every motion, from any device, feeds it */
 static Shake pointer_shake;
 static void dispatch_pointer(Server *s) {
@@ -541,7 +564,22 @@ static void dispatch_pointer(Server *s) {
     for (int i = 0; i < s->nbuttons; i++) { down[i] = s->buttons[i].down; button[i] = s->buttons[i].button; }
     double t0 = now_ms();
     int over = 0;
-    if (grabbing && !ended) wl_pointer_grab(s->nbuttons, down, button);
+    /* ❖ (or Alt, Settings → Appearance → Window options) + a press anywhere in a window: its move (left) or resize (right,
+     * middle), offered to the shell before the app under the pointer or the theme's own handlers see it (grab.h,
+     * sdk/moddrag.js, GitHub #219). Never while an app holds the pointer or the shortcuts (wl_moddrag_allowed) or
+     * LordOS's own pointer lock runs. Once the shell took it, every button stays the drag's until all are released:
+     * the app gets neither that press nor its release, and the theme only the moves and the releases. */
+    static int mod_swallow;
+    if (!grabbing && !mod_swallow && s->nbuttons && grab_mod_held(s->meta, s->alt, s->ctrl) && !ptrlock_active())
+        for (int i = 0; i < s->nbuttons; i++) {
+            if (!s->buttons[i].down || s->buttons[i].button > 2) continue;
+            if (wl_moddrag_allowed(x, y, target) && drag_mod_really_held(s) && js_pointer_modgrab(id, x, y, s->buttons[i].button))
+                mod_swallow = 1;
+            break;
+        }
+    int swallowed = mod_swallow;
+    if (mod_swallow && !s->held) mod_swallow = 0;
+    if ((grabbing && !ended) || swallowed) wl_pointer_grab(s->nbuttons, down, button);
     else over = wl_pointer(x, y, target, s->moved, s->nbuttons, down, button, s->wheel);
     if (over == 2) id = 0;                  /* sobre un menú de una app Linux: el árbol no lo ve */
     if (ended) js_wm_end(gnode, gedges, gdx, gdy, gdw, gdh);
@@ -552,7 +590,7 @@ static void dispatch_pointer(Server *s) {
     if (om != s->over_media) { s->over_media = om; s->cursor_dirty = 1; }
     if (s->moved && !grabbing) js_pointer("move", id, x, y, 0);
     for (int i = 0; i < s->nbuttons; i++)          /* sobre un menú, solo los "up" (terminan arrastres) */
-        if (over != 2 || !s->buttons[i].down) js_pointer(s->buttons[i].down ? "down" : "up", id, x, y, s->buttons[i].button);
+        if ((over != 2 && !swallowed) || !s->buttons[i].down) js_pointer(s->buttons[i].down ? "down" : "up", id, x, y, s->buttons[i].button);
     wl_drop_release_done();                 /* a Linux app's files dropped at this release: claimed by now, or cancelled */
     if (s->wheel && over != 2) js_pointer("wheel", id, x, y, s->wheel);
     if (dstat.held && s->moved) {
@@ -701,6 +739,8 @@ static void remote_key(int code, int value) {
     if (value == 1 && code >= KEY_Q && code <= KEY_M && !remote_typed) { remote_typed = 1; keyboards_check(s); }
     if (code == KEY_LEFTCTRL || code == KEY_RIGHTCTRL) s->ctrl = value != 0;
     if (code == KEY_LEFTALT || code == KEY_RIGHTALT) s->alt = value != 0;
+    if (code == KEY_LEFTMETA || code == KEY_RIGHTMETA) s->meta = value != 0;   /* ❖ + drag moves a window (grab.h) */
+    if (code == KEY_LEFTMETA || code == KEY_RIGHTMETA || code == KEY_LEFTALT || code == KEY_RIGHTALT) mods_injected = value != 0;
     js_key(code, value);
 }
 static void remote_clip(const char *text, unsigned len) { term_set_clipboard(text, len); }
@@ -1355,6 +1395,7 @@ static void on_input(void *ud, const InputDevice *d, const struct input_event *e
         if (ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) s->alt = ev->value != 0;
         if (ev->code == KEY_LEFTSHIFT || ev->code == KEY_RIGHTSHIFT) s->shift = ev->value != 0;
         if (ev->code == KEY_LEFTMETA || ev->code == KEY_RIGHTMETA) s->meta = ev->value != 0;
+        if (ev->code == KEY_LEFTMETA || ev->code == KEY_RIGHTMETA || ev->code == KEY_LEFTALT || ev->code == KEY_RIGHTALT) mods_injected = 0;
         /* Ctrl+Alt+Backspace ends the session at once. The modifiers are tracked from every keyboard and a release can
          * be lost (another console, a keyboard that sleeps or reconnects), so the kernel is asked whether Ctrl and Alt
          * are really held on this keyboard: a stale state must never end a session on a lone Backspace. */
@@ -1494,6 +1535,67 @@ static void tablet_gone(Server *s, const InputDevice *d) {
     TabFrame f;
     if (d->tab && tablet_caps(d->tab)->kind == TAB_KIND_PEN && tablet_leave(d->tab, &f)) tablet_pen(s, d, &f);
 }
+
+#ifdef LORD_TEST_HOOKS
+/* build/lord-server-test only (-DLORD_TEST_HOOKS, testhooks.h; never in the installed lord-server): the conformance tool's fake graphics tablet, a pen and a pad made
+ * with tablet.c's own tablet_new and fed evdev events through tablet_input, as a real device's are. */
+static InputDevice test_tab[2] = { { .fd = -1 }, { .fd = -1 } };
+static int test_tablet(int add) {
+    for (int i = 0; i < 2; i++) {
+        InputDevice *d = &test_tab[i];
+        if (!add) {
+            if (d->tab) { tablet_gone(remote_server, d); tablet_free(d->tab); d->tab = NULL; }
+            continue;
+        }
+        if (d->tab) continue;
+        TabCaps c = { 0 };
+        c.kind = i ? TAB_KIND_PAD : TAB_KIND_PEN;
+        snprintf(c.name, sizeof c.name, "LordOS test tablet %s", i ? "Pad" : "Pen");
+        snprintf(c.phys, sizeof c.phys, "lordos-test-tablet");
+        snprintf(c.path, sizeof c.path, "/dev/input/lordos-test-%s", i ? "pad" : "pen");     /* no such node: a name only */
+        c.bus = BUS_USB;
+        c.vendor = 0x056a;
+        c.product = 0x0001;
+        if (!i) {
+            c.x = (struct input_absinfo){ .minimum = 0, .maximum = 10000, .resolution = 100 };
+            c.y = (struct input_absinfo){ .minimum = 0, .maximum = 10000, .resolution = 100 };
+            c.pressure = (struct input_absinfo){ .minimum = 0, .maximum = 1023 };
+            c.distance = (struct input_absinfo){ .minimum = 0, .maximum = 63 };
+            c.tilt_x = c.tilt_y = (struct input_absinfo){ .minimum = -64, .maximum = 63 };
+            c.rotation = (struct input_absinfo){ .minimum = 0, .maximum = 359 };
+            c.slider = (struct input_absinfo){ .minimum = -100, .maximum = 100 };
+            c.caps = TAB_CAP_PRESSURE | TAB_CAP_DISTANCE | TAB_CAP_TILT | TAB_CAP_ROTATION | TAB_CAP_SLIDER;
+            c.tools = TAB_TOOL_BIT(BTN_TOOL_PEN) | TAB_TOOL_BIT(BTN_TOOL_RUBBER) | TAB_TOOL_BIT(BTN_TOOL_BRUSH) |
+                      TAB_TOOL_BIT(BTN_TOOL_PENCIL) | TAB_TOOL_BIT(BTN_TOOL_AIRBRUSH) | TAB_TOOL_BIT(BTN_TOOL_MOUSE);
+            c.has_touch = 1;
+            c.wheel = 1;                                    /* the mouse tool's wheel (REL_WHEEL) */
+        } else {
+            c.nbuttons = 4;
+            for (int b = 0; b < 4; b++) c.button[b] = (unsigned short)(BTN_0 + b);
+            c.nrings = 1; c.ring_code[0] = ABS_WHEEL; c.ring[0] = (struct input_absinfo){ .minimum = 0, .maximum = 71 };
+            c.nstrips = 1; c.strip_code[0] = ABS_RX; c.strip[0] = (struct input_absinfo){ .minimum = 0, .maximum = 4096 };
+            c.ndials = 1; c.dial_code[0] = REL_WHEEL;
+        }
+        d->tab = tablet_new(&c);
+        if (!d->tab) return -1;
+        tablet_announce(d->tab);
+    }
+    return 0;
+}
+static int test_tablet_event(int pad, unsigned type, unsigned code, int value) {
+    InputDevice *d = &test_tab[pad ? 1 : 0];
+    if (!d->tab) return -1;
+    struct input_event ev = { .type = (unsigned short)type, .code = (unsigned short)code, .value = value };
+    tablet_input(remote_server, d, &ev);
+    return 0;
+}
+static void remote_pointer(int fx, int fy);
+static void remote_button(int button, int down);
+static void remote_wheel(int steps);
+static void test_pointer(int x, int y) { remote_pointer(x, y); }
+/* a modifier key only (testhooks.c checks the code), as the remote desktop types it: the window drag modifier's test */
+static void test_key(int code, int value) { remote_key(code, value); }
+#endif
 
 /* pointer-warp-v1 (wl/wl_warp.c): the app in front moves the pointer on its window. No relative motion: a game sees
  * a jump, not a move. */
@@ -2589,6 +2691,8 @@ static int start_theme(const char *theme, int greeter, char *used, size_t n) {
     if (r == JS_REFUSED) {              /* lord.themes.use won't go back to it */
         snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", theme);
         snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "refused by the verified-code check (sec/codesig.c)");
+        ui.theme_failed_code = 1;
+        ui.theme_failed_gen = codesig_generation();
     }
     if (!greeter && codesig_state() != CODE_INVALID) {
         char root[PATH_MAX], tmp[PATH_MAX];
@@ -2706,11 +2810,13 @@ static int switch_theme(const char *current) {
         const char *why = js_init_error();     /* kept before the old theme's own start can overwrite it */
         snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", r == JS_REFUSED ? "refused by the verified-code check (sec/codesig.c)"
                  : why[0] ? why : "the theme's code did not load (see the log)");
+        ui.theme_failed_code = r == JS_REFUSED;
+        ui.theme_failed_gen = codesig_generation();
         js_shutdown();
         ui_reset();
         if (js_init(current)) {
             /* the theme that was running is refused too (its file changed under the running session: a package
-             * update rewrote it, and the code manifest checked is the one read at login). Never no JavaScript at
+             * update rewrote it and the new code manifest did not verify, sec/codesig.c codesig_reload). Never no JavaScript at
              * all: the main loop's next js_tick would call into a freed context (the 2026-11-22 13:41 crash,
              * JS_GetGlobalObject(NULL)). The recovery screen instead, as at start (start_theme). */
             fprintf(stderr, "lord-server: %s did not load again either: the recovery screen\n", current);
@@ -2755,9 +2861,14 @@ const char *lord_composition(void) {
  * apps) get the default SIGPIPE back, as execve resets caught signals. */
 static void on_sigpipe(int sig) { (void)sig; }
 
+#ifdef LORD_TEST_HOOKS
+#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter | --test-hooks]]"
+#else
+#define USAGE_HEADLESS "[--headless WIDTHxHEIGHT [--greeter]]"
+#endif
 static void usage(const char *argv0) {
     fprintf(stderr, "usage: %s [--theme bundle.js] [--fonts dir] [--shell dir] [--user name] [--card /dev/dri/cardN]\n"
-                    "          [--headless WIDTHxHEIGHT [--greeter]] [--timeout s] [--debug] [--profile]\n", argv0);
+                    "          " USAGE_HEADLESS " [--timeout s] [--debug] [--profile]\n", argv0);
 }
 
 /* SIGINT or SIGTERM that reached a worker thread: to the main loop's signalfd */
@@ -2887,6 +2998,9 @@ int main(int argc, char **argv) {
     const char *shell = "../assets/shell";     /* integración de la terminal con bash */
     const char *user = NULL;
     double timeout_ms = 0;
+#ifdef LORD_TEST_HOOKS
+    int test_hooks = 0;
+#endif
     static Server s;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--timeout") && i + 1 < argc) timeout_ms = atof(argv[++i]) * 1000;
@@ -2904,12 +3018,18 @@ int main(int argc, char **argv) {
             s.H = h & ~1;
         }
         else if (!strcmp(argv[i], "--greeter")) s.greeter = 1;      /* pantalla de ingreso (lord-sessiond) */
+#ifdef LORD_TEST_HOOKS
+        else if (!strcmp(argv[i], "--test-hooks")) test_hooks = 1;  /* the conformance tool's socket (testhooks.h) */
+#endif
         else if (!strcmp(argv[i], "--debug")) s.debug = 1;
         else if (!strcmp(argv[i], "--profile")) paint_profile = 1;
         else { usage(argv[0]); return 2; }
     }
 
     if (s.greeter && !s.headless) { usage(argv[0]); return 2; }
+#ifdef LORD_TEST_HOOKS
+    if (test_hooks && (!s.headless || s.greeter)) { usage(argv[0]); return 2; }   /* never on a monitor or the login screen */
+#endif
     js_sys_set_greeter(s.greeter);
     wl_set_greeter(s.greeter);          /* the login screen never lets an app take the shortcuts */
     if (text_init(fonts)) return 1;
@@ -3035,6 +3155,10 @@ int main(int argc, char **argv) {
                                           share_text, js_share_event, share_no_taps, share_person, share_surface_up, share_key_protected,
                                           share_point_protected, share_restricted, share_displays_of, remote_refresh };
     if (ok && !s.greeter && share_start(&share_host)) fprintf(stderr, "lord-server: no screen-sharing API (socket)\n");
+#ifdef LORD_TEST_HOOKS
+    static const TestHooks test_host = { test_pointer, remote_button, remote_wheel, test_tablet, test_tablet_event, wl_test_xwl, drmlease_fake_card, test_key };
+    if (ok && test_hooks && testhooks_start(&test_host)) fprintf(stderr, "lord-server: no test hooks socket\n");
+#endif
     char current[sizeof ui.theme_request];
     svgicon_enable();                       /* SVG icons drawn by lord-media (media/svgicon.c); never in app mode */
     char first[sizeof ui.theme_request];
@@ -3254,18 +3378,15 @@ int main(int argc, char **argv) {
          * is paced to the mode's refresh, or the compositor and every app draw hundreds of frames a second */
         int soft = !s.headless && flip_instant >= 3;
         if (soft) hz = main_out(&s)->kms.mode.vrefresh > 0 ? main_out(&s)->kms.mode.vrefresh : 60;
-        /* frames start on a fixed grid of 1000/hz ms (a software vblank): waiting in whole milliseconds
-         * then never adds up, so 60 Hz stays 60 frames a second, not 57 */
+        /* frames start on a fixed grid of 1000/hz ms (a software vblank, softpace.h): a late one starts the grid
+         * again, and the next frame waits half a refresh after one shown late (painted slowly) */
         double pace = 0, period = 1000.0 / hz, tnow = now_ms();
-        if (s.headless || soft) {
-            if (!pace_next || tnow - pace_next > period) pace_next = tnow;     /* idle, or fell behind */
-            pace = pace_next - tnow;
-        }
+        if (s.headless || soft) pace = softpace_wait(&pace_sw, tnow, period);
         if (wants && (!all_busy(&s) || ahead) && pace <= 0) {
             render(&s);
             js_vm_painted();                /* the machines' frames it showed: lord-vmdisplay may send the next ones */
             wants = 0;
-            if (s.headless || soft) pace_next += period;
+            if (s.headless || soft) { softpace_started(&pace_sw, period); softpace_shown(&pace_sw, now_ms(), period); }
         }
         if (wants && pace > 0 && (delay < 0 || pace < delay)) delay = pace;
         /* sharing a screen or a window with a Linux app (the ScreenCast portal): its frames, after this render's damage */
@@ -3291,7 +3412,7 @@ int main(int argc, char **argv) {
         wl_flush();
         mirror_clipboard(term_clipboard(), term_clipboard_gen());
         share_clipboard(term_clipboard(), term_clipboard_gen(), term_clipboard_sensitive());
-        struct pollfd pfd[190 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +8 machines, +40 Spawn helpers */
+        struct pollfd pfd[195 + INPUT_MAX_DEVICES + TERM_MAX];     /* +32 brokers of isolated apps, +40 media, +8 machines, +40 Spawn helpers, +5 test hooks (lord-server-test) */
         int term_ids[TERM_MAX];
         int n = 0;
         pfd[n++] = (struct pollfd){ K0(&s)->fd, POLLIN, 0 };
@@ -3327,6 +3448,10 @@ int main(int argc, char **argv) {
         if (lgbase >= 0) pfd[n++] = (struct pollfd){ logs_fd(), POLLIN, 0 };
         int lbibase = lbi_fd() >= 0 ? n : -1;                    /* LordBench's synthetic pointer, like a device */
         if (lbibase >= 0) pfd[n++] = (struct pollfd){ lbi_fd(), POLLIN, 0 };
+#ifdef LORD_TEST_HOOKS
+        int thbase = n, nth = testhooks_pollfds(pfd + n, 5);     /* build/lord-server-test's --test-hooks only (testhooks.h) */
+        n += nth;
+#endif
         int mbase = n, nm = mirror_pollfds(pfd + n, 12);
         n += nm;
         int shbase = n, nsh = share_pollfds(pfd + n, 8);
@@ -3438,6 +3563,9 @@ int main(int argc, char **argv) {
         if (imbase >= 0 && pfd[imbase].revents) image_async_dispatch();
         if (lgbase >= 0 && pfd[lgbase].revents) logs_dispatch(js_logs_event);
         if (lbibase >= 0 && pfd[lbibase].revents) lbi_drain();  /* taken once per frame by grab_script_tick */
+#ifdef LORD_TEST_HOOKS
+        if (nth) testhooks_dispatch(pfd + thbase, nth);
+#endif
         if (nm) mirror_dispatch(pfd + mbase, nm);
         if (nsh) share_dispatch(pfd + shbase, nsh);
         if (nca) cast_dispatch(pfd + cabase, nca);
@@ -3499,6 +3627,9 @@ int main(int argc, char **argv) {
     input_close(&s.input);
     cast_end_all();
     share_stop();
+#ifdef LORD_TEST_HOOKS
+    testhooks_stop();
+#endif
     mirror_stop();
     gpu_tex_free(s.cursor_tex);
     gpu_shutdown();

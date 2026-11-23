@@ -14,6 +14,8 @@ Hoy funciona en **PC de 64 bits** (x86-64); la Raspberry Pi viene después.
 
 **Recorrerlo.** Las apps de Flathub aparecen en su propia sección, en Descubrir y en la búsqueda, con los nombres, íconos y categorías del propio Flathub. De entrada la Tienda muestra **solo las apps que Flathub verificó como publicadas por sus propios desarrolladores**; un interruptor muestra el resto, marcadas como «No verificada».
 
+**Populares, Tendencias y la app del día** (desde la 0.8.9.5). El inicio de Flathub en la Tienda abre con la app del día del propio Flathub y filas de Apps de la semana, Populares, Tendencias, Añadidas recientemente y Actualizadas recientemente. LordOS le pide esas listas a `flathub.org` como mucho una vez por día, con un pedido fijo que no dice nada de vos, y guarda solo los identificadores de las apps: los nombres, íconos y descripciones siguen saliendo del catálogo firmado de Flathub, y las reglas de instalación no cambian. Un interruptor en la Tienda lo apaga; sin internet, las filas simplemente no están.
+
 **Antes de instalar**, la página de cada app dice quién la publica, su licencia y **lo que declara**: internet, sonido, tus archivos, dispositivos, otras apps en el bus. Al lado de cada cosa, lo que hace LordOS al respecto: lo que podés bloquear en el Firewall, lo que LordOS limita y lo que nunca da.
 
 [[shot:1]]
@@ -22,7 +24,7 @@ Hoy funciona en **PC de 64 bits** (x86-64); la Raspberry Pi viene después.
 
 **Instalar, actualizar, quitar.** Un botón para cada cosa, con el progreso en la página. Quitar una app también quita los runtimes que ninguna otra app usa.
 
-**Las apps de Chromium y Electron** (en desarrollo después de la 0.8.9.4) se instalan como cualquier otra. Hasta la 0.8.9.4 estaban marcadas como «todavía no compatibles»; ahora las cajas de arena internas que necesitan sus ayudantes se sirven dentro de la propia caja de arena de la app.
+**Las apps de Chromium y Electron** (desde la 0.8.9.5) se instalan como cualquier otra. En la 0.8.9.4 estaban marcadas como «todavía no compatibles»; ahora las cajas de arena internas que necesitan sus ayudantes se sirven dentro de la propia caja de arena de la app.
 
 ## Ajustes → Flatpak
 
@@ -89,7 +91,7 @@ Declare lo que declare una app, o lo que pida después un archivo de override:
 | El portal propio de Flatpak y su ayudante de sesión enmascarados | Lo que arrancan corre fuera de la caja de arena de la app. LordOS sirve él mismo los sub-sandbox que necesitan las apps de GNOME, dentro de la caja de arena de la misma app. |
 | El catálogo se lee en una caja de arena propia | El catálogo de Flathub lo interpreta un ayudante chico sin red ni archivos, nunca el propio escritorio. |
 | Una fila propia en el Firewall para Flathub | Las descargas se ven, y las podés frenar como a cualquier app. |
-| Los ayudantes de Chromium y Electron, en la caja de arena de la app | Sus cajas de arena internas las arranca un ayudante chico dentro de la vista de la app, con los mismos límites de la app y ninguno menos (en desarrollo después de la 0.8.9.4). |
+| Los ayudantes de Chromium y Electron, en la caja de arena de la app | Sus cajas de arena internas las arranca un ayudante chico dentro de la vista de la app, con los mismos límites de la app y ninguno menos (desde la 0.8.9.5). |
 | Nada en segundo plano | Ningún servicio de Flatpak corre si no hay una app abierta; la parte propia de LordOS existe solo mientras `flatpak` está instalado. |
 | Primero x86-64 | Ahí está probado; la Raspberry Pi viene después. |
 
@@ -97,6 +99,6 @@ Declare lo que declare una app, o lo que pida después un archivo de override:
 
 En una máquina de prueba el 20 de noviembre de 2026, un **plan de pruebas automatizado** de 31 verificaciones corre cada vez (`server/tests/fwflatpak/flatpak.sh`): la fila de Flathub en el Firewall, la identidad de cada app, lo que nunca se da aun con un override, sin archivos, sin internet, los sub-sandbox, X11 con y sin restricción, y la restricción del micrófono entre dos apps. Las apps probadas a mano: **Editor de texto de GNOME, Decibels, Shortwave, Meld, KCalc, Firefox y GNU Emacs**. Una revisión de seguridad de todo el cambio encontró cuatro problemas, todos corregidos antes de la versión.
 
-**En desarrollo después de la 0.8.9.4:** las apps basadas en Chromium y Electron, probadas el 22 de noviembre de 2026 con Whatsie (Qt WebEngine), Chromium y FreeTube (Electron); el video con DRM (Widevine) no está disponible para ellas. **Todavía no:** Spotify arranca solo con sus propios flags de Wayland (decisión de quien la desarrolla, no de LordOS); la Raspberry Pi.
+**Desde la 0.8.9.5:** las apps basadas en Chromium y Electron, probadas el 22 de noviembre de 2026 con Whatsie (Qt WebEngine), Chromium y FreeTube (Electron); el video con DRM (Widevine) no está disponible para ellas. **Todavía no:** Spotify arranca solo con sus propios flags de Wayland (decisión de quien la desarrolla, no de LordOS); la Raspberry Pi.
 
 El diseño completo, cada decisión y cada resultado de las pruebas están en `docs/FLATPAK.md`.

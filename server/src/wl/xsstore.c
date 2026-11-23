@@ -110,6 +110,16 @@ void xs_top_set(XsTop *t, const int r[4], int max) {
     t->max = !!max;
 }
 int xs_top_has(const XsTop *t) { return t && t->r[2] > 0 && t->r[3] > 0; }
+int xs_top_note(XsTop *t, const int r[4], int maximized, int fullscreen) {
+    if (!t) return 0;
+    int was[4] = { t->r[0], t->r[1], t->r[2], t->r[3] }, wasmax = t->max;
+    if (!fullscreen && !maximized) xs_top_set(t, r, 0);
+    else {
+        if (!xs_top_has(t)) xs_top_set(t, r, wasmax);
+        if (maximized && !fullscreen) t->max = 1;
+    }
+    return memcmp(was, t->r, sizeof was) || wasmax != t->max;
+}
 
 char *xs_dump(const XsStore *st, size_t *len) {
     size_t cap = 64, o = 0;

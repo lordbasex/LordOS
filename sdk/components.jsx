@@ -532,7 +532,8 @@ function FieldMenu({ anchor, at, items, onClose }) {
 }
 
 // onKeyDown(e) optional: return true if the key was already handled (e.g. Shift+Enter).
-// secure: password field (shows •, does not go through the input method and cannot be copied). An eye at its end shows the
+// secure: password field (shows •, does not go through the input method and cannot be copied; protected: black in every
+// capture, recording, remote desktop and share). An eye at its end shows the
 // text until the field loses focus (passwordfieldmodel.js); it stays a password field meanwhile: no history, no input
 // method, nothing copied. eye: false leaves the eye out (an app with its own Show). While it has focus with Caps Lock
 // on, ⇪ and "Caps Lock is on" (only ⇪ when the words do not fit) sit before the eye.
@@ -811,8 +812,11 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     </View>
   ) : null;
   return (
+    // a password field is protected (wm.setProtected's node flag): lord-server paints it black in every capture of the
+    // screen or an area, recordings, the remote desktop and shared screens, and refuses its window captured alone
+    // (paint_capture_until); the maintainer's rule: a password is never captured (GitHub #219 follow-up)
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
-      focusable focusRing={false} onFocus={onKeyFocus}
+      focusable focusRing={false} onFocus={onKeyFocus} protected={!!secure}
       style={[{ height: Math.max(28, size + 15), paddingHorizontal: 10, borderRadius: t.controlRadius, flexDirection: 'row', alignItems: 'center',
         // the cursor goes to the logical end: on the left if the text is Arabic or Hebrew
         direction: secure ? 'ltr' : value ? textDirection(value) : 'inherit',

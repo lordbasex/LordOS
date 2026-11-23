@@ -20,16 +20,22 @@ import { desktopFx } from './desktops.js';
 import { OverviewCover, OverviewPlaceholder, useOverviewPlace } from './overview.jsx';
 import { settings } from './settings.js';
 import { direction } from './i18n.js';
-import { windowButtonsPref, buttonsAtStart, buttonOrder } from './windowbuttons.js';
+import { windowButtonsPref, buttonsAtStart, buttonOrder, windowButtonSizePref, scaledBar } from './windowbuttons.js';
 
 // Where a title bar's buttons go (Settings → Desktop & Dock → Title bars, issue #58; sdk/windowbuttons.js).
 // themeStart: the theme's own place (Lord Flow true, Lord Classic false). atStart: first in the title bar's row;
 // order: the buttons in the row's order ('close', 'minimize', 'maximize').
+// size: Settings → Appearance → Window options → Window buttons ('normal', 'large', 'xlarge'; GitHub #151, #219), and px(n) a
+// length of the theme's bar at that size (its height, a button, a glyph, a gap): the hit areas grow with what is drawn.
 export function useWindowButtons(themeStart) {
-  const pref = useStore(settings, windowButtonsPref);      // every window's frame: only this setting, not all of them
+  const pref = useStore(settings, windowButtonsPref);      // every window's frame: only these settings, not all of them
+  const size = useStore(settings, windowButtonSizePref);
   const atStart = buttonsAtStart(pref, themeStart, direction() === 'rtl');
-  return { atStart, order: buttonOrder(atStart) };
+  return { atStart, order: buttonOrder(atStart), size, px: (n) => scaledBar(n, size) };
 }
+// The same outside React: a theme's chrome for configureWindows (sdk/windows.js), read when a window opens or the app
+// resizes itself, so a Linux window gets its content size for the bar's height now.
+export const titleBarPx = (n) => scaledBar(n, windowButtonSizePref(settings.get()));
 
 // <SeamCover color below />: the first child of a transparent app's title bar (the Terminal, manifest "transparent"),
 // and of a bar under it. At 125 %, 150 % or 175 % the edges where the frame's border, the title bar, the separator and

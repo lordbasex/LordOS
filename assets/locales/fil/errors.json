@@ -46,6 +46,7 @@
   "backup.destMissing": "Hindi umiiral ang destinasyon",
   "backup.destNotAllowed": "Hindi pinapayagan ang destinasyong iyan",
   "backup.destOutside": "Dapat nasa iyong home folder o sa isa sa iyong mga disk ang destinasyon",
+  "backup.destCloud": "Hindi puwedeng destinasyon ng backup ang isang folder sa cloud: kailangan ng mga snapshot ang mga hard link, na wala sa cloud account, at patuloy na ina-upload ang mga file nito kahit itinigil na ang backup. Pumili ng disk o folder sa computer na ito",
   "backup.destUnwritable": "Hindi makasulat sa destinasyon",
   "backup.interrupted": "Naantala ito",
   "backup.locked": "Naka-encrypt ang mga backup: i-unlock muna ang mga ito",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Hindi magagamit bilang background ang larawang iyon.",
   "studio.invalid": "Hindi valid ang setting na iyon ng LordOS Studio.",
   "studio.noCamera": "Walang nakakonektang camera.",
-  "studio.unavailable": "Hindi available ang LordOS Studio sa computer na ito."
+  "studio.unavailable": "Hindi available ang LordOS Studio sa computer na ito.",
+  "studio.downloadFailed": "Hindi ma-download ang background.",
+  "studio.removeFailed": "Hindi maalis ang background.",
+  "dkms.mokInvalid": "Hindi valid ang hiling na ito para sa susi ng Secure Boot.",
+  "dkms.mokNotNeeded": "Hindi kailangan ng computer na ito na i-enroll ang susi ngayon.",
+  "dkms.mokNothingPending": "Walang susing naghihintay na ma-enroll sa susunod na restart.",
+  "dkms.mokNoTool": "Hindi naka-install ang program na mokutil.",
+  "dkms.mokFailed": "Hindi naihanda ang susi para sa susunod na restart.",
+  "media.protectedWindow": "Protektado ang window na ito kaya hindi ito makukunan nang mag-isa. Itim ito sa mga kuha ng screen."
 }

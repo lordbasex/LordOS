@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Da a todas las apps, incluidos los navegadores y las videollamadas, la cámara «LordOS Studio» con tus efectos: fondo desenfocado o una imagen detrás de vos ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} no está en los orígenes de paquetes de este equipo.",
   "suggest.studioCamera.note.dkms": "En una PC su módulo del kernel se compila para tu kernel en este equipo (DKMS), lo que trae unos 500 MB de compiladores y encabezados del kernel, y de nuevo tras cada actualización del kernel. En una Raspberry Pi viene con el kernel de LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Con Secure Boot activado, tenés que registrar la clave de firma del módulo en el próximo reinicio; si no, la cámara no aparece."
+  "suggest.studioCamera.note.secureBoot": "Con Secure Boot activado, tenés que registrar la clave de firma del módulo en el próximo reinicio; si no, la cámara no aparece.",
+  "suggest.studioCamera.note.obs": "También agrega un segundo dispositivo de cámara, “OBS Virtual Camera”, para que la cámara virtual propia de OBS Studio funcione junto a LordOS Studio.",
+  "suggest.mok.title": "Un paso más en el próximo reinicio",
+  "suggest.mok.body": "Secure Boot está activado, así que lo que instaló este elemento solo carga después de inscribir su clave de firma. LordOS prepara la clave y te da una contraseña de un solo uso para escribir en una pantalla azul en el próximo reinicio.",
+  "suggest.mok.prepare": "Preparar la clave",
+  "suggest.mok.pending": "La clave se inscribirá en el próximo reinicio. Si ya no tenés la contraseña, pedí una nueva.",
+  "suggest.mok.passwordTitle": "Tu contraseña de un solo uso",
+  "suggest.mok.passwordHint": "Anotala ahora: se muestra una sola vez y no se guarda en ningún lado.",
+  "suggest.mok.steps": "Reiniciá y, cuando aparezca la pantalla azul, presioná una tecla antes de 10 segundos. Después elegí Enroll MOK → Continue → Yes, escribí esta contraseña y elegí Reboot.",
+  "suggest.mok.newPassword": "Nueva contraseña",
+  "suggest.mok.cancel": "Cancelar inscripción"
 }

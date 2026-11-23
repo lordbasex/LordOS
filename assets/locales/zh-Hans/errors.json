@@ -46,6 +46,7 @@
   "backup.destMissing": "目标位置不存在",
   "backup.destNotAllowed": "不允许使用该目标位置",
   "backup.destOutside": "目标位置必须在你的个人文件夹中或你的某个磁盘上",
+  "backup.destCloud": "云端文件夹不能作为备份目标：快照需要硬链接，而云端账户不支持，并且即使停止备份，其中的文件仍会继续上传。请选择这台电脑上的磁盘或文件夹",
   "backup.destUnwritable": "无法写入目标位置",
   "backup.interrupted": "已被中断",
   "backup.locked": "备份已加密：请先解锁",
@@ -916,5 +917,13 @@
   "studio.badPicture": "该图片无法用作背景。",
   "studio.invalid": "该 LordOS Studio 设置无效。",
   "studio.noCamera": "未连接摄像头。",
-  "studio.unavailable": "此电脑上无法使用 LordOS Studio。"
+  "studio.unavailable": "此电脑上无法使用 LordOS Studio。",
+  "studio.downloadFailed": "无法下载背景。",
+  "studio.removeFailed": "无法移除背景。",
+  "dkms.mokInvalid": "此 Secure Boot 密钥请求无效。",
+  "dkms.mokNotNeeded": "这台电脑现在不需要注册密钥。",
+  "dkms.mokNothingPending": "没有密钥在等待下次重新启动时注册。",
+  "dkms.mokNoTool": "未安装 mokutil 程序。",
+  "dkms.mokFailed": "无法为下次重新启动准备密钥。",
+  "media.protectedWindow": "此窗口受保护，无法单独截取。在屏幕截图中它显示为黑色。"
 }

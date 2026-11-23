@@ -14,7 +14,7 @@ import { GLYPH } from './ui.js';
 import { EndsContext, MoreButton, makeEnds, usePaged } from './endless.js';
 import { WebAppsPage, WebCategory, WebDiscover, WebResults, webCatalog, webHits, webCategoryCounts } from './webapps.js';
 import { WebAppDetail } from './webdetail.js';
-import { FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts } from './flathubpages.js';
+import { FlathubDetail, FlathubPage, FlathubResults, FlathubUpdates, removeInstalled, useFlathub, useFlathubCounts, useFlathubTotal } from './flathubpages.js';
 import { flathub } from '@lordos/sdk';
 
 // The user's Downloads folder relative to home ("Downloads/"), from xdg-user-dirs; without it, the
@@ -357,6 +357,9 @@ export default function Store() {
   const { args } = useAppWindow();
   const [page, setPage] = useState('discover');
   const [sub, setSub] = useState(null);         // an origin page's category (its second column), or null for all
+  // Flathub's page: a subcategory of its category (fhSub) or one of its home's collections opened by "See all" (fhColl)
+  const [fhSub, setFhSub] = useState(null);
+  const [fhColl, setFhColl] = useState(null);
   const [app, setApp] = useState(null);
   const [query, setQuery] = useState('');
   const [file, setFile] = useState(null);
@@ -370,8 +373,9 @@ export default function Store() {
     if (p === 'flathub') p = 'src:flathub';
     else if (p === 'webapps') p = 'src:web';
     else if (p.startsWith('cat:')) { c = p.slice(4); p = 'src:debian'; }
-    setPage(p); setSub(c);
+    setPage(p); setSub(c); setFhSub(null); setFhColl(null);
   };
+  const pickSub = (c) => { setSub(c); setFhSub(null); setFhColl(null); };
   const side = useSidebar(SIDE_AT);
   // the sidebar's width: dragged at its edge between SIDE_MIN and SIDE_MAX, kept in settings (2026-11-20: long names
   // such as "Linux apps (Debian)" were cut)
@@ -390,7 +394,7 @@ export default function Store() {
   // the long lists load their next page near the end of the scroll (endless.js)
   const ends = useMemo(() => makeEnds(scroll), []);
   const listAt = useRef(null);
-  const listKey = `${page}|${sub}|${query}`;
+  const listKey = `${page}|${sub}|${fhSub}|${fhColl}|${query}`;
   useEffect(() => { ends.reset(); }, [listKey, app]);
   useEffect(() => { ends.limits.clear(); }, [listKey]);      // a list is as long as it was only back from an app's page
   useEffect(() => {
@@ -420,14 +424,17 @@ export default function Store() {
   const webCounts = useMemo(() => webCategoryCounts(), []);
   // an origin's second column: All, then its categories with how many apps each has
   const subCounts = src === 'debian' ? counts : src === 'flathub' ? fhCounts : src === 'web' ? webCounts : null;
-  const subTotal = subCounts ? CATS.reduce((a, c) => a + (subCounts[c] || 0), 0) : 0;
+  // All: how many apps the origin shows (a Flathub app may be in several categories, so not the categories' sum)
+  const fhTotal = useFlathubTotal();
+  const subTotal = src === 'flathub' ? fhTotal : subCounts ? CATS.reduce((a, c) => a + (subCounts[c] || 0), 0) : 0;
   const remember = () => { if (!app) listAt.current = { key: listKey, y: scroll.current?.offset() || 0 }; };
   const openDeb = (name) => { remember(); setApp({ name, ai: false }); };
   const openAi = (name) => { remember(); setApp({ name, ai: true }); };
   const openWeb = (id) => { remember(); setApp({ name: id, web: true }); };
   const openFlathub = (id) => { remember(); setApp({ name: id, flathub: true }); };
   const srcTitle = { debian: tr('store.src.debian'), flathub: tr('store.page.flathub'), web: tr('store.page.webapps') };
-  const pageTitle = src ? [srcTitle[src], sub ? tr(`store.cat.${sub}`) : null].filter(Boolean).join(' · ') : tr(`store.page.${page}`);
+  const pageTitle = src ? [srcTitle[src], sub ? tr(`store.cat.${sub}`) : null, src === 'flathub' && sub && fhSub ? tr(`flathub.sub.${fhSub}`) : null,
+    src === 'flathub' && !sub && fhColl ? tr(`flathub.coll.${fhColl}`) : null].filter(Boolean).join(' · ') : tr(`store.page.${page}`);
   const appTitle = app && (app.flathub ? flathub.catalogApp(app.name)?.name : app.web ? webCatalog().find((a) => a.id === app.name)?.name || webAppEntry(app.name)?.name
     : app.ai ? catalogApp(app.name)?.name : (lord.pkg?.info?.(app.name, {})?.app?.name)) || app?.name;
   const searchable = !app && page !== 'updates' && page !== 'suggested';
@@ -442,7 +449,10 @@ export default function Store() {
       </View>
     ) : <debian.Discover query={query} onOpen={openDeb} onCategory={(c) => go('src:debian', c)} top={null} hide={[]} />;
   }
-  else if (src === 'flathub') body = <FlathubPage query={query} onOpen={openFlathub} category={sub} />;
+  else if (src === 'flathub') {
+    body = <FlathubPage query={query} onOpen={openFlathub} category={sub} sub={fhSub} coll={sub ? null : fhColl}
+      onCategory={pickSub} onSub={setFhSub} onCollection={setFhColl} />;
+  }
   else if (src === 'web') body = sub ? <WebCategory cat={sub} query={query} onOpen={openWeb} /> : <WebAppsPage query={query} onOpen={openWeb} />;
   else if (page === 'discover') {
     // while searching, the catalog apps that match come first (#37), then the web apps that match
@@ -512,9 +522,9 @@ export default function Store() {
           <Hairline edge="end" />
           <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 4 }}>
             <SectionTitle>{tr('store.section.categories')}</SectionTitle>
-            <SidebarItem label={tr('store.sub.all')} detail={subTotal || null} selected={!sub} onClick={() => setSub(null)} />
+            <SidebarItem label={tr('store.sub.all')} detail={subTotal || null} selected={!sub} onClick={() => pickSub(null)} />
             {CATS.filter((c) => subCounts[c]).map((c) => (
-              <SidebarItem key={c} icon={GLYPH[c]} label={tr(`store.cat.${c}`)} detail={subCounts[c]} selected={sub === c} onClick={() => setSub(c)} />
+              <SidebarItem key={c} icon={GLYPH[c]} label={tr(`store.cat.${c}`)} detail={subCounts[c]} selected={sub === c} onClick={() => pickSub(c)} />
             ))}
             <View style={{ height: 12 }} />
           </ScrollView>
@@ -534,7 +544,7 @@ export default function Store() {
           {subCounts && !app && side.narrow ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
               {[null, ...CATS.filter((c) => subCounts[c])].map((c) => (
-                <View key={c || 'all'} onClick={() => setSub(c)} style={{ height: 26, paddingHorizontal: 12, borderRadius: 13, justifyContent: 'center',
+                <View key={c || 'all'} onClick={() => pickSub(c)} style={{ height: 26, paddingHorizontal: 12, borderRadius: 13, justifyContent: 'center',
                   backgroundColor: sub === c ? t.accent : t.hover }}>
                   <Text style={{ fontSize: 12, fontWeight: 600, color: sub === c ? '#fff' : t.text }}>{c ? tr(`store.cat.${c}`) : tr('store.sub.all')}</Text>
                 </View>

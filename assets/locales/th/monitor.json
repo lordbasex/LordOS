@@ -588,7 +588,7 @@
   "comp.weather": "สภาพอากาศ",
   "comp.weatherHint": "พยากรณ์ของวิดเจ็ตสภาพอากาศจาก Open-Meteo เมื่อคุณเปิดใช้",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "แอป Flatpak จาก Flathub: แคตตาล็อก การติดตั้ง และการอัปเดต",
+  "comp.flathubHint": "แอป Flatpak จาก Flathub: แคตตาล็อก การติดตั้ง การอัปเดต และการจัดอันดับของสโตร์จาก flathub.org",
   "comp.streams": "กล้องและทีวี",
   "comp.streamsHint": "วิดเจ็ตวิดีโอและที่อยู่ของเครื่องเล่น: กล้อง สตรีม และช่องทีวี (lord-stream)"
 }

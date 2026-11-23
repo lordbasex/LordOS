@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Minden alkalmazásnak, a böngészőknek és a videohívásoknak is, megadja a „LordOS Studio” kamerát az effektusaiddal: elmosott háttér vagy egy kép mögötted ({packages}).",
   "suggest.studioCamera.unavailable": "A(z) {packages} nincs a számítógép csomagforrásai között.",
   "suggest.studioCamera.note.dkms": "PC-n a kernelmodul ezen a számítógépen készül el a kerneledhez (DKMS), ami nagyjából 500 MB fordítót és kernelfejlécet hoz magával, és minden kernelfrissítés után újra. Raspberry Pi-n a LordOS kernellel érkezik.",
-  "suggest.studioCamera.note.secureBoot": "Bekapcsolt Secure Boot mellett a következő újraindításkor regisztrálnod kell a modul aláírókulcsát, különben a kamera nem jelenik meg."
+  "suggest.studioCamera.note.secureBoot": "Bekapcsolt Secure Boot mellett a következő újraindításkor regisztrálnod kell a modul aláírókulcsát, különben a kamera nem jelenik meg.",
+  "suggest.studioCamera.note.obs": "Egy második kameraeszközt is hozzáad, „OBS Virtual Camera” néven, hogy az OBS Studio saját virtuális kamerája a LordOS Studio mellett is működjön.",
+  "suggest.mok.title": "Még egy lépés a következő újraindításkor",
+  "suggest.mok.body": "A Secure Boot be van kapcsolva, ezért az, amit ez az elem telepített, csak az aláírókulcsa regisztrálása után töltődik be. A LordOS előkészíti a kulcsot, és ad egy egyszer használatos jelszót, amelyet a következő újraindításkor egy kék képernyőn kell beírnod.",
+  "suggest.mok.prepare": "Kulcs előkészítése",
+  "suggest.mok.pending": "A kulcs a következő újraindításkor lesz regisztrálva. Ha már nincs meg a jelszó, kérj újat.",
+  "suggest.mok.passwordTitle": "Az egyszer használatos jelszavad",
+  "suggest.mok.passwordHint": "Írd fel most: csak egyszer jelenik meg, és sehol sincs elmentve.",
+  "suggest.mok.steps": "Indítsd újra, és amikor megjelenik a kék képernyő, 10 másodpercen belül nyomj meg egy billentyűt. Ezután válaszd ezt: Enroll MOK → Continue → Yes, írd be ezt a jelszót, és válaszd a Reboot lehetőséget.",
+  "suggest.mok.newPassword": "Új jelszó",
+  "suggest.mok.cancel": "Regisztrálás megszakítása"
 }

@@ -9,10 +9,15 @@ import { createStore, useStore } from './store.js';
 import { useEffect } from 'react';
 import { planDefault, planMic, pendingTarget, arrivals, micChoices } from './btaudiomodel.js';
 import { resolve as resolveWave } from './soundwavemodel.js';
+import { withoutVoiceInternals } from './studiomodel.js';
 
 const has = () => typeof lord.sound !== 'undefined';
 const EMPTY = { connected: false, sinks: [], sources: [], inputs: [], outputs: [] };
-export const soundState = createStore(has() ? { ...EMPTY, ...lord.sound.state() } : EMPTY);
+// LordOS Studio's Noise Reduction filter (sdk/studiomodel.js): its echo reference and its two streams are nobody's
+// outputs or apps, so the lists leave them out; Mic Mode reads the whole state (soundRaw).
+let raw = has() ? { ...EMPTY, ...lord.sound.state() } : EMPTY;
+export const soundRaw = () => raw;
+export const soundState = createStore(withoutVoiceInternals(raw));
 export const soundPeak = createStore({ source: -1, level: 0 });
 
 const call = (fn, ...a) => (has() && typeof lord.sound[fn] === 'function' ? lord.sound[fn](...a) : false);
@@ -41,7 +46,7 @@ function onState(st) {
 }
 
 globalThis.__lordSound = (type, data) => {
-  if (type === 'state') { soundState.set({ ...EMPTY, ...data }); onState(soundState.get()); }
+  if (type === 'state') { raw = { ...EMPTY, ...data }; soundState.set(withoutVoiceInternals(raw)); onState(soundState.get()); }
   else if (type === 'peak') soundPeak.set(data);
 };
 if (has()) onState(soundState.get());

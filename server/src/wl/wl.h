@@ -54,6 +54,9 @@ int  wl_key(int code, int value, const KeyInfo *k);
 void wl_keymap_changed(void);
 int  wl_send_paste(void);               /* synthetic Ctrl+V to the Linux app with the keyboard */
 int  wl_has_key_focus(void);            /* does a Linux app have the keyboard? */
+#ifdef LORD_TEST_HOOKS
+int  wl_test_xwl(void);                /* build/lord-server-test only: a connection taken as Xwayland's (testhooks.h) */
+#endif
 /* Where the input method's candidate window goes: the caret of the Linux app's field that composes
  * (zwp_text_input_v3), on screen. 0 without one. */
 int  wl_text_caret(float *x, float *y, float *w, float *h);
@@ -147,6 +150,10 @@ void wl_set_drm_device(dev_t dev);          /* DRM device for linux-dmabuf (CPU 
 void wl_pointer_relative(double dx, double dy);
 int  wl_pointer_locked(void);
 void wl_pointer_confine(int *x, int *y);
+/* May a press at (x, y) on node hit with the window drag modifier held be a window's move or resize (grab.h)? 0 while
+ * a client has the pointer locked or confined, the window with the keyboard holds the shortcuts, over a fullscreen
+ * window, an app's popup, or during a drag and drop. */
+int  wl_moddrag_allowed(float x, float y, struct Node *hit);
 /* Cursor requested by the app under the pointer: 0 = LordOS's, 1 = image (ARGB px), 2 = hidden.
  * gen changes when it must be redrawn. */
 int  wl_cursor(const uint32_t **px, int *w, int *h, int *hx, int *hy, unsigned *gen);

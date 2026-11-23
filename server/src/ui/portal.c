@@ -1285,7 +1285,17 @@ static CastSm csm;
 static int cast_away;                       /* the session is locked, switched away or not on the display */
 /* per session (the same index as csm.s): who asked (the app LordOS verified, "" when it can't tell: never the name a
  * process gives itself in /proc/<pid>/comm, which any process sets), and the bus's answer we wait for */
-static struct { char who[128]; uint32_t serial; CastSource src[CSM_MAX_SOURCES]; int nsrc; } cast_app[CSM_MAX];
+static struct { char who[128]; uint32_t serial; CastSource src[CSM_MAX_SOURCES]; int nsrc; char seen[128], exe[32]; } cast_app[CSM_MAX];
+
+/* When who is "": only to name it in the indicator (sec/appid.h, "only to show it"), the app a process that left its
+ * scope comes from (Chrome's browser process moves into the user's service manager), else its executable. Never for the
+ * gate, a restore token or the chooser. */
+static void who_seen(unsigned pid, char *seen, size_t sn, char *exe, size_t en) {
+    seen[0] = exe[0] = 0;
+    if (!pid) return;
+    if (appid_of_lineage(pid, seen, sn)) seen[0] = 0;
+    if (!seen[0] && appid_exe_name(pid, exe, en)) exe[0] = 0;
+}
 /* OpenPipeWireRemote calls answered when the helper hands the connection back */
 typedef struct { int sess; uint32_t req, serial; char sender[256]; } RCall;
 static RCall rcalls[MAX_RCALLS];
@@ -1360,6 +1370,10 @@ static void casts_changed(void) {
         }
         hb_printf(&j, "%s{\"id\":%d,\"screens\":%d,\"windows\":%d,\"who\":", first ? "" : ",", csm.s[i].id, screens, wins);
         hb_str(&j, cast_app[i].who);
+        hb_printf(&j, ",\"seen\":");
+        hb_str(&j, cast_app[i].seen);
+        hb_printf(&j, ",\"exe\":");
+        hb_str(&j, cast_app[i].exe);
         hb_printf(&j, "}");
         first = 0;
     }
@@ -1521,6 +1535,8 @@ static void cast_ask(CsSess *s, unsigned pid) {
     who[0] = 0;
     int known = pid && appid_of_pid(pid, who, sizeof cast_app[i].who) == 0 && who[0];
     if (!known) who[0] = 0;
+    if (!known) who_seen(pid, cast_app[i].seen, sizeof cast_app[i].seen, cast_app[i].exe, sizeof cast_app[i].exe);
+    else cast_app[i].seen[0] = cast_app[i].exe[0] = 0;
     int gate = csm_gate(known, known && restrict_blocks(who, FW_R_NO_SCREEN), !known && appid_running(screen_restricted, NULL));
     if (gate == CSM_GATE_REFUSE) {
         if (known) fprintf(stderr, "portal: %s may not share the screen (its restrictions)\n", who);
@@ -1815,9 +1831,15 @@ static void shot_ask(unsigned pid) {
 }
 
 static void shot_taken(void) {
+    char seen[128] = "", exe[32] = "";
+    if (!shot.who[0]) who_seen(shot.pid, seen, sizeof seen, exe, sizeof exe);
     HBuf j = { 0 };
     hb_printf(&j, "{\"who\":");
     hb_str(&j, shot.who);
+    hb_printf(&j, ",\"seen\":");
+    hb_str(&j, seen);
+    hb_printf(&j, ",\"exe\":");
+    hb_str(&j, exe);
     hb_printf(&j, ",\"color\":%s}", shot.color ? "true" : "false");
     char *json = hb_take(&j);
     if (json) hw_emit("portal-shot-taken", json);

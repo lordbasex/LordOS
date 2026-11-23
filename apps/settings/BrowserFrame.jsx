@@ -2,21 +2,17 @@
 // Settings"). On: Chromium, Brave and Firefox draw one bar with their tabs and LordOS's window buttons;
 // off: they use LordOS's frame. The SDK (sdk/browserframe.js) writes that one preference in the
 // user's own browser profiles through lord.browserFrame.
-import { View, Button, Toggle, useLocale, useSettings, useStore, browserFrameResult, browserFrameState, browserTabsInTitlebar, setBrowserTabsInTitlebar } from '@lordos/sdk';
+import { View, Button, Toggle, useLocale, useSettings, useStore, browserFrameResult, browserFrameNotes, browserFrameState, browserTabsInTitlebar, setBrowserTabsInTitlebar } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Section, SettingRow, Note, Actions } from './ui.jsx';
 
-// What the last change did, as notes under the switch.
+// What the last change did, as notes under the switch: only what needs the person (a browser open, a profile
+// that failed or that Firefox's user.js keeps). A change that simply worked says nothing (#222): the switch
+// shows it, and the footer already says it applies the next time each browser opens.
 function ResultNotes({ r, pending }) {
   const { t: tr } = useLocale();
-  if (!r) return null;
-  const failed = (r.chromium?.failed | 0) + (r.firefox?.failed | 0);
-  const out = [];
-  if (pending) out.push(<Note key="open" tone="warn">{tr('settings.browserTabs.chromiumOpen')}</Note>);
-  if (failed) out.push(<Note key="failed" tone="error">{tr('settings.browserTabs.failed', { count: failed })}</Note>);
-  if (r.firefox?.kept) out.push(<Note key="kept">{tr('settings.browserTabs.firefoxKept')}</Note>);
-  if (!pending && !failed && (r.chromium?.changed || r.firefox?.changed)) out.push(<Note key="ok" tone="ok">{tr('settings.browserTabs.done')}</Note>);
-  return out.length ? out : null;
+  const notes = browserFrameNotes(r, pending);
+  return notes.length ? notes.map((n) => <Note key={n.key} tone={n.tone}>{tr(n.text, n.vars)}</Note>) : null;
 }
 
 export function BrowserFrameSettings() {

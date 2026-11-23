@@ -29,6 +29,9 @@ export const perms = {
   get: (app, perm) => { try { return api() ? lord.perms.get(app, perm) : 'ask'; } catch (e) { return 'ask'; } },
   set(app, perm, state) { try { return api() ? lord.perms.set(app, perm, state) : false; } finally { permsRev.set((v) => v + 1); } },
   list: () => { try { return api() ? lord.perms.list() : []; } catch (e) { return []; } },
+  // 'allow' for a permission a built-in app starts with (only Screenshots' screen, GitHub #219; perms.c
+  // perm_builtin_default), else 'ask'. get() already counts it while nothing is saved; a saved 'deny' wins.
+  builtinDefault: (app, perm) => { try { return api() && lord.perms.builtinDefault ? lord.perms.builtinDefault(app, perm) : 'ask'; } catch (e) { return 'ask'; } },
 };
 export const permsRev = createStore(0);   // goes up when something changes (to redraw Privacy)
 
@@ -160,22 +163,25 @@ const glyph = (p) => (p === 'camera' ? '📷' : p === 'microphone' ? '🎙' : p 
 // LordOS's own: native apps (lord.media, sdk/media.js) and isolated .lpk apps (the broker reports it, brokerDevicesByApp);
 // and Linux apps' through PipeWire, as lord-server's PipeWire guard sees it (hw event "capture-use", sdk/hardware.jsx).
 // The capture indicator by the clock draws them (sdk/capturestatus.jsx); Settings → Privacy lists them (useIndicators).
-export const brokerDevices = createStore([]);    // [{ app, kind: 'camera'|'microphone', media? }]
-export const linuxCapture = createStore([]);     // [{ app, name, mic, camera, screen }]: app '' an unknown program
+export const brokerDevices = createStore([]);    // [{ app, kind: 'camera'|'microphone', media?, detail? }]
+export const linuxCapture = createStore([]);     // [{ app, name, sys, exe, mic, camera, screen }]: app '' not a verified app
 // the Linux apps reading LordOS Studio's camera device (hw event "studio-use", server/src/media/mstudio.c):
 // { apps: [id], camera, effects } (sdk/studiomodel.js studioUseOf)
 export const studioUse = createStore({ apps: [], camera: '', effects: false });
 
-// media: a native app's camera source (lord.media), so the indicator can show what it sees
-export function markDeviceUse(app, kind, on, media = null) {
+// media: a native app's camera source (lord.media), so the indicator can show what it sees. detail: what of the app
+// uses it, when an app has several (Machines: the machine's name, "Machines — Windows 11 Pro"); each detail is its own
+// entry, so one machine stopping leaves another's on
+export function markDeviceUse(app, kind, on, media = null, detail = '') {
   // Inside an isolated app, it is reported through the broker (lord-server shows the indicator).
   if (typeof lord !== 'undefined' && lord.broker && typeof lord.broker.device === 'function') {
     try { lord.broker.device(kind, !!on); } catch (e) { /* */ }
     return;
   }
+  const what = typeof detail === 'string' ? detail : '';
   brokerDevices.set((list) => {
-    const rest = list.filter((d) => !(d.app === app && d.kind === kind));
-    return on ? [...rest, { app, kind, ...(media ? { media } : null) }] : rest;
+    const rest = list.filter((d) => !(d.app === app && d.kind === kind && (d.detail || '') === what));
+    return on ? [...rest, { app, kind, ...(media ? { media } : null), ...(what ? { detail: what } : null) }] : rest;
   });
 }
 

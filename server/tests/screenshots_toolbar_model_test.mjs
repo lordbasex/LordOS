@@ -18,7 +18,7 @@ const eq = (name, got, want) => {
 
 // ---- options ----
 const def = M.normalizeOptions(undefined);
-eq('defaults', def, { mode: 'area', saveTo: 'pictures', otherDir: '', timer: 0, mic: false, micSource: '', thumbnail: true, remember: false, pointer: true, lastRect: null, barPos: null });
+eq('defaults', def, { mode: 'area', saveTo: 'pictures', otherDir: '', timer: 0, mic: false, micSource: '', thumbnail: true, remember: false, pointer: true, lastRect: null, barPos: null, printKey: 'full' });
 eq('the panel\'s "only copy" is Save to Clipboard', M.normalizeOptions({ clipboard: true, timer: 5, mic: true }).saveTo, 'clipboard');
 eq('the panel\'s timer and microphone are kept', [M.normalizeOptions({ clipboard: true, timer: 5, mic: true }).timer, M.normalizeOptions({ timer: 5, mic: true }).mic], [5, true]);
 eq('Save to wins over the old key', M.normalizeOptions({ clipboard: true, saveTo: 'desktop' }).saveTo, 'desktop');
@@ -65,6 +65,22 @@ eq('a recording with clipboard: the default folder', M.saveDirFor('clipboard', d
 eq('mail and the editor: the default folder', [M.saveDirFor('mail', dirs, 'S'), M.saveDirFor('editor', dirs, 'S')], ['/home/a/Pictures/S', '/home/a/Pictures/S']);
 eq('another folder', M.saveDirFor('other', dirs, 'S', false, '/home/a/Shots'), '/home/a/Shots');
 eq('another folder not chosen yet: the default', M.saveDirFor('other', dirs, 'S', false, ''), '/home/a/Pictures/S');
+
+// ---- the Print Screen key (GitHub #202) ----
+eq('the key takes the whole screen by default', M.normalizeOptions({}).printKey, 'full');
+eq('each choice is kept', M.PRINT_KEY.map((a) => M.normalizeOptions({ printKey: a }).printKey), ['full', 'area', 'window', 'toolbar', 'none']);
+eq('an unknown choice is the whole screen', M.normalizeOptions({ printKey: 'record' }).printKey, 'full');
+eq('its row in Settings → Keyboard follows the choice', M.PRINT_KEY.map(M.printKeyLabel),
+  ['shell.shortcuts.captureFull', 'shell.shortcuts.captureArea', 'shell.shortcuts.captureWindow', 'shell.shortcuts.capturePanel', null]);
+
+// ---- why nothing was captured (GitHub #219) ----
+eq('the prompt answered no: the permission', M.refusal(null), { code: 'media.denied.screen', permission: true });
+eq('denied by lord-server: the permission', M.refusal({ code: 'media.denied.screen', params: { app: 'screenshots' } }), { code: 'media.denied.screen', permission: true });
+eq('restricted: the permission', M.refusal({ code: 'fw.restricted.screen' }), { code: 'fw.restricted.screen', permission: true });
+eq('a capture that failed is not "no permission"', M.refusal({ code: 'media.captureFailed' }), { code: 'media.captureFailed', permission: false });
+eq('a protected window is not "no permission"', M.refusal({ code: 'media.protectedWindow' }), { code: 'media.protectedWindow', permission: false });
+eq('no helper is not "no permission"', M.refusal('media.noHelper'), { code: 'media.noHelper', permission: false });
+eq('an error with no code is a failed capture', M.refusal(new Error('boom')), { code: 'media.captureFailed', permission: false });
 
 // ---- remember last selection ----
 const two = [{ name: 'eDP-1', x: 0, y: 0, w: 1440, h: 900 }, { name: 'HDMI-A-1', x: 1440, y: 0, w: 1920, h: 1080 }];

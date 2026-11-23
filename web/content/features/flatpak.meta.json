@@ -7,9 +7,9 @@
     "pt": "Apps do Flathub"
   },
   "tagline": {
-    "en": "Thousands of Linux apps from Flathub, installed from the Store and run under LordOS's own rules: your Firewall, your restrictions, a read-only home. New in 0.8.9.4.",
-    "es": "Miles de apps de Linux de Flathub, instaladas desde la Tienda y corriendo con las reglas propias de LordOS: tu Firewall, tus restricciones, el home de solo lectura. Nuevo en la 0.8.9.4.",
-    "pt": "Milhares de apps Linux do Flathub, instalados pela Loja e rodando com as regras próprias do LordOS: o seu Firewall, as suas restrições, a home somente leitura. Novo na 0.8.9.4."
+    "en": "Thousands of Linux apps from Flathub, installed from the Store and run under LordOS's own rules: your Firewall, your restrictions, a read-only home. Since 0.8.9.4.",
+    "es": "Miles de apps de Linux de Flathub, instaladas desde la Tienda y corriendo con las reglas propias de LordOS: tu Firewall, tus restricciones, el home de solo lectura. Desde la 0.8.9.4.",
+    "pt": "Milhares de apps Linux do Flathub, instalados pela Loja e rodando com as regras próprias do LordOS: o seu Firewall, as suas restrições, a home somente leitura. Desde a 0.8.9.4."
   },
   "lumo": {
     "pose": "shield",

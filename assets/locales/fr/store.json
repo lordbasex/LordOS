@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Donne à toutes les apps, navigateurs et appels vidéo compris, la caméra « LordOS Studio » avec vos effets : arrière-plan flou ou une image derrière vous ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} ne figure pas dans les sources de paquets de cet ordinateur.",
   "suggest.studioCamera.note.dkms": "Sur un PC, son module noyau est compilé pour votre noyau sur cet ordinateur (DKMS), ce qui ajoute environ 500 Mo de compilateurs et d’en-têtes du noyau, puis de nouveau après chaque mise à jour du noyau. Sur un Raspberry Pi, il est fourni avec le noyau LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Avec Secure Boot activé, vous devez enregistrer la clé de signature du module au prochain redémarrage, sinon la caméra n’apparaîtra pas."
+  "suggest.studioCamera.note.secureBoot": "Avec Secure Boot activé, vous devez enregistrer la clé de signature du module au prochain redémarrage, sinon la caméra n’apparaîtra pas.",
+  "suggest.studioCamera.note.obs": "Ajoute aussi un second périphérique de caméra, « OBS Virtual Camera », pour que la caméra virtuelle d’OBS Studio fonctionne à côté de LordOS Studio.",
+  "suggest.mok.title": "Encore une étape au prochain redémarrage",
+  "suggest.mok.body": "Secure Boot est activé : ce que cet élément a installé ne se charge qu’une fois sa clé de signature inscrite. LordOS prépare la clé et vous donne un mot de passe à usage unique à saisir sur un écran bleu au prochain redémarrage.",
+  "suggest.mok.prepare": "Préparer la clé",
+  "suggest.mok.pending": "La clé sera inscrite au prochain redémarrage. Si vous n’avez plus le mot de passe, demandez-en un nouveau.",
+  "suggest.mok.passwordTitle": "Votre mot de passe à usage unique",
+  "suggest.mok.passwordHint": "Notez-le maintenant : il ne s’affiche qu’une fois et n’est enregistré nulle part.",
+  "suggest.mok.steps": "Redémarrez et, quand l’écran bleu apparaît, appuyez sur une touche dans les 10 secondes. Choisissez ensuite Enroll MOK → Continue → Yes, saisissez ce mot de passe et choisissez Reboot.",
+  "suggest.mok.newPassword": "Nouveau mot de passe",
+  "suggest.mok.cancel": "Annuler l’inscription"
 }

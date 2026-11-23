@@ -869,7 +869,9 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
   const micAsked = useRef(false);
   useEffect(() => { if (micAsk(st?.sound, micAsked.current)) { micAsked.current = true; requestPermission('machines', 'microphone'); } }, [st?.sound?.mic]);
   const micOn = micLive(st?.sound);
-  useEffect(() => { markDeviceUse('machines', 'microphone', micOn); return micOn ? () => markDeviceUse('machines', 'microphone', false) : undefined; }, [micOn]);
+  // the capture indicator names the machine: "Machines — Windows 11 Pro"
+  const micWho = name || '';
+  useEffect(() => { markDeviceUse('machines', 'microphone', micOn, null, micWho); return micOn ? () => markDeviceUse('machines', 'microphone', false, null, micWho) : undefined; }, [micOn, micWho]);
   // Files dragged from Files onto the picture (6.x): copied into the guest's Downloads by its agent, one at a time in
   // lord-vm; a line under the picture while they go, a notice when they're there. Only into the guest: nothing comes
   // out by dragging (a shared folder does that)

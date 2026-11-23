@@ -13,12 +13,23 @@ const inside = (path, root) => path === root || path.startsWith(`${root}/`);
 // start: empty, relative to the home folder, or absolute. Nothing above the home folder or a disk, and only a path written
 // the plain way: an empty, "." or ".." element ("/home/u/./.config", "/home/u//.ssh") would carry that spelling into the
 // path chosen, and the policy that lends it to a Flatpak app compares strings (fplend.c).
-export function startFolder(start, home, disks = []) {
+// computer: the dialog also offers the whole computer, read only (Settings → Wallpaper, GitHub #219): any plain absolute
+// path may be where it starts.
+export function startFolder(start, home, disks = [], computer = false) {
   const s = String(start || '').replace(/\/+$/, '');
   if (!s) return home;
   const path = s.startsWith('/') ? s : `${home}/${s}`;
   if (path.split('/').slice(1).some((e) => e === '' || e === '.' || e === '..')) return home;
+  if (computer) return path;
   return [home, ...disks.map((d) => d.path)].some((r) => inside(path, r)) ? path : home;
+}
+
+// The places under Locations: the local disks, and with computer (never in a save dialog: nothing outside the home and the
+// disks can be written) the whole computer, "/", read only (lord.fs reads it, fsops_readable; GitHub #219).
+export function locationPlaces(disks, { computer = false, mode = 'open' } = {}) {
+  const out = (disks || []).map((d) => ({ name: d.name, path: d.path, kind: 'disk' }));
+  if (computer && mode !== 'save') out.unshift({ name: '', path: '/', kind: 'computer' });
+  return out;
 }
 
 // A Cloud account's folder (~/Cloud/<name>, docs/CLOUD.md) holding path, or null: its crumbs start there, like a disk's.
@@ -93,6 +104,14 @@ export function primaryAction({ mode, multiple, dir, row, chosen = [], name = ''
   if (multiple) return chosen.length ? { pickMany: chosen } : row?.dir ? { go: row.path } : null;
   if (!row) return null;
   return row.dir ? { go: row.path } : { pick: row.path };
+}
+
+// A dialog that may not choose a Cloud account's folder (cloud={false}: Backups' destination, #200 and #208): an action that
+// would pick one, or a folder inside one, becomes null (the button disabled). Going into a folder stays allowed.
+export function refuseCloud(a, home) {
+  if (!a) return null;
+  const picks = a.pickMany || (a.pick ? [a.pick] : []);
+  return picks.some((p) => cloudRoot(p, home)) ? null : a;
 }
 
 // Enter opens the row under the cursor, as a double click; with no row, it is the primary button.

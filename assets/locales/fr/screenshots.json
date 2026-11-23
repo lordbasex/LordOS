@@ -97,5 +97,11 @@
   "hintAdjust": "Faites glisser les poignées pour ajuster · Entrée : capturer · Échap : annuler",
   "hintAdjustRecord": "Faites glisser les poignées pour ajuster · Entrée : enregistrer · Échap : annuler",
   "hintRecord": "Faites glisser pour choisir la zone à enregistrer · Échap : annuler",
-  "thumbOpen": "Ouvrir dans l’éditeur d’annotation"
+  "thumbOpen": "Ouvrir dans l’éditeur d’annotation",
+  "opt.printKey": "Touche Impr. écran",
+  "opt.printKey.full": "Capturer tout l’écran",
+  "opt.printKey.area": "Capturer la partie choisie",
+  "opt.printKey.window": "Capturer la fenêtre choisie",
+  "opt.printKey.toolbar": "Afficher la barre",
+  "opt.printKey.none": "Ne rien faire"
 }

@@ -618,7 +618,7 @@
   "comp.weather": "Vremea",
   "comp.weatherHint": "Prognozele widgetului Vremea de la Open-Meteo, după ce le activezi.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Aplicațiile Flatpak de pe Flathub: catalogul, instalările și actualizările lor.",
+  "comp.flathubHint": "Aplicațiile Flatpak de pe Flathub: catalogul, instalările, actualizările lor și clasamentele Magazinului de pe flathub.org.",
   "comp.streams": "Camere și TV",
   "comp.streamsHint": "Widgetul video și adresele Playerului: camere, fluxuri și canale TV (lord-stream)."
 }

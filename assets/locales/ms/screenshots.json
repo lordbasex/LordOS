@@ -96,5 +96,11 @@
   "hintAdjust": "Seret pemegang untuk melaras · Enter: tangkap · Esc: batal",
   "hintAdjustRecord": "Seret pemegang untuk melaras · Enter: rakam · Esc: batal",
   "hintRecord": "Seret untuk memilih kawasan untuk dirakam · Esc: batal",
-  "thumbOpen": "Buka dalam editor penanda"
+  "thumbOpen": "Buka dalam editor penanda",
+  "opt.printKey": "Kekunci Print Screen",
+  "opt.printKey.full": "Tangkap seluruh skrin",
+  "opt.printKey.area": "Tangkap bahagian dipilih",
+  "opt.printKey.window": "Tangkap tetingkap dipilih",
+  "opt.printKey.toolbar": "Tunjukkan bar",
+  "opt.printKey.none": "Jangan buat apa-apa"
 }

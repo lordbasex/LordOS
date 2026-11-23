@@ -4,7 +4,8 @@
  *   - PrepareForSleep(true) from logind tells the theme "suspend"; a lock asked for keeps the inhibitor
  *     until the monitor is taken, or at most 4 s; no lock lets it go at once;
  *   - a session that is not on the screen is not told and does not delay the sleep;
- *   - PrepareForSleep(false) tells "resume" with the seconds asleep, and asks for a new inhibitor;
+ *   - PrepareForSleep(false) tells "resume" with the seconds asleep, turns the screen back on (GitHub #214) and asks
+ *     for a new inhibitor;
  *   - the signal from anyone but logind's own connection, or with the wrong signature, is ignored. */
 #include "hw/sleeplock.h"
 #include "hw/sysbus.h"
@@ -54,6 +55,10 @@ static char last_idle[96];
 static int idle_events;
 int display_on_monitor(void) { return on_monitor; }
 double display_dark_ms(double now) { (void)now; return 2000; }
+/* display_activity: the screen turned back on (the real one calls display_wake when it was off) */
+static int activity_calls, idle_at_activity;
+static double activity_at;
+void display_activity(double now) { activity_calls++; activity_at = now; idle_at_activity = idle_events; }
 void hw_emit(const char *kind, const char *json) {
     if (strcmp(kind, "idle")) return;
     idle_events++;
@@ -122,6 +127,9 @@ int main(void) {
     prepare(":1.4", 0, "b");
     check(idle_events == 2 && strstr(last_idle, "\"resume\"") && strstr(last_idle, "\"slept\":2"), "the theme hears resume and how long");
     check(inhibit_calls == 2, "a new inhibitor for the next sleep");
+    /* GitHub #214: the screen is turned back on by the wake itself, after the theme heard resume (its lock first) */
+    check(activity_calls == 1 && activity_at > 0, "waking turns the screen back on (display_activity)");
+    check(idle_at_activity == 2, "after the theme heard resume, so a lock on waking is what shows");
     check(give_inhibitor(&wr) == 0 && sleeplock_inhibitor() >= 0, "kept again");
 
     /* the monitor is never taken: let go after at most 4 s */
@@ -151,6 +159,7 @@ int main(void) {
     close(wr);
     prepare(":1.4", 0, "b");
     check(idle_events == before, "not on the screen: no resume either");
+    check(activity_calls == 3, "not on the screen: its screen is not turned on (another session has the monitor)");
 
     /* logind restarts: a new owner, a new inhibitor */
     int calls = inhibit_calls;

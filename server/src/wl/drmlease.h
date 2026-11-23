@@ -27,5 +27,10 @@ void drmlease_card(int fd);
  * app. 0 when no request of app waits (the answer is ignored and nothing is saved). */
 int  drmlease_answer(const char *app, const char *how);
 void drmlease_perm_changed(void);           /* a "vr" decision changed (lord.perms.set) */
+#ifdef LORD_TEST_HOOKS
+/* Only in build/lord-server-test (testhooks.h, "lease"): a fake card with memfds instead of the real one, a headset
+ * plugged (1) or unplugged (0). Not compiled into the installed lord-server. 0 on success. */
+int  drmlease_fake_card(int plugged);
+#endif
 
 #endif

@@ -48,25 +48,25 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
 | `xdg_toplevel_icon_manager_v1` | 1 | a window's own icon, shown only when its app has no installed icon (an AppImage, Wine, a game); buffers copied, re-encoded and size-limited, names ignored (see "Window icons", 0.8.9.5) |
 | `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
-| `xdg_toplevel_drag_manager_v1` | 1 | tab tear-off: during a drag a window follows the pointer at the app's offset, is never the drag's target and stays where it is let go (`tldrag.c`; checked 2026-11-22 with Chromium 156 on a headless lord-server, tear-off and reattach, and `tests/shellx_headless.sh`; see "Shell extras", in development) |
-| `xdg_toplevel_tag_manager_v1` | 1 | a window's untranslated tag keys its own remembered place (each kind of window of an app reopens where it was); its description names it while it has no title (`tltag.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
-| `xdg_system_bell_v1` | 1 | the bell: LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app (`sysbell.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
-| `xdg_session_manager_v1` | 1 | an app's windows come back where they were when it starts again: sessions with random ids, scoped to the program lord-server checked, kept in `~/.config/lordos/wl-sessions` (`xsession.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
-| `ext_background_effect_manager_v1` | 1 | blur behind a region of a window, drawn with the UI's own backdrop blur; offered only on the CPU path with transparency and blur on, none on the GPU path (`bgeffect.c`; checked 2026-11-22, headless CPU path; see "Shell extras", in development) |
+| `xdg_toplevel_drag_manager_v1` | 1 | tab tear-off: during a drag a window follows the pointer at the app's offset, is never the drag's target and stays where it is let go (`tldrag.c`; checked 2026-11-22 with Chromium 156 on a headless lord-server, tear-off and reattach, and `tests/shellx_headless.sh`; see "Shell extras", 0.8.9.5) |
+| `xdg_toplevel_tag_manager_v1` | 1 | a window's untranslated tag keys its own remembered place (each kind of window of an app reopens where it was); its description names it while it has no title (`tltag.c`; checked 2026-11-22, headless; see "Shell extras", 0.8.9.5) |
+| `xdg_system_bell_v1` | 1 | the bell: LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app (`sysbell.c`; checked 2026-11-22, headless; see "Shell extras", 0.8.9.5) |
+| `xdg_session_manager_v1` | 1 | an app's windows come back where they were when it starts again: sessions with random ids, scoped to the program lord-server checked, kept in `~/.config/lordos/wl-sessions` (`xsession.c`; checked 2026-11-22, headless; see "Shell extras", 0.8.9.5) |
+| `ext_background_effect_manager_v1` | 1 | blur behind a region of a window, drawn with the UI's own backdrop blur; offered only on the CPU path with transparency and blur on, none on the GPU path (`bgeffect.c`; checked 2026-11-22, headless CPU path; see "Shell extras", 0.8.9.5) |
 | `wp_drm_lease_device_v1` | 1 | a VR headset's connector (one the kernel marks `non-desktop`) leased to an app the person allowed: Allow once, Always allow or Don't allow (the `vr` permission); only while a headset is plugged into lord-server's card, never to a sandboxed or isolated app or Xwayland, revoked on unplug, permission taken back, lock, user switch or text console (0.8.9.5, approved by the maintainer 2026-11-22, checked with `drmlease-test` and `drmlease-e2e-test`, not yet with a real headset; see "DRM leases") |
 | `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
 | `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
 | `wl_fixes` | 1 | core protocol (wayland.xml 1.24): `destroy_registry` destroys a `wl_registry` the client no longer needs, so a long-lived client's registries don't pile up in lord-server and keep getting `global` events; lord-server sends `delete_id` and the id is reused. Debian 13's libwayland is 1.23, so the interface is generated from `third_party/wayland/wl-fixes.xml`, vendored from wayland.xml 1.24 (`wlfixes.c`, `mk/wlfixes.mk`). In development; checked 2026-11-22 against a headless lord-server (`tests/wlfixes_client.c`, the "fixes" part of `tests/wlperf_headless.sh`): the destroyed registry's id comes back for a new registry, which gets every global once, and a non-registry argument is a display error; not yet checked with a real app |
-| `wp_color_manager_v1` (color-management-v1) | 1 | an app describes its pixels' colour and LordOS converts them to the SDR sRGB / gamma 2.2 it drives every display with: parametric descriptions only (`set_primaries`, `set_tf_power`; no ICC, no luminances or mastering metadata, no scRGB), perceptual and relative intents, transfer functions gamma22, srgb, ext_linear, bt1886, gamma28 and power curves, every named set of primaries; each output's description (target primaries from its EDID) and the surface's preferred one. No HDR. Checked 2026-11-22 headless (`tests/color_headless.sh`: everything advertised, every error, linear light on screen as converted) and with GTK 4.18.6 (`GDK_DEBUG=color-mgmt`); see "Colour management" (0.8.9.5, in development) |
-| `wp_color_representation_manager_v1` (color-representation-v1) | 1 | alpha modes premultiplied electrical, premultiplied optical and straight (converted); coefficients and range identity / full only, since lord-server imports no YUV buffer. Checked 2026-11-22 headless (`tests/color_headless.sh`); see "Colour management" (0.8.9.5, in development) |
-| `zwp_tablet_manager_v2` (tablet-v2) | 2 | graphics tablets (in development, 2026-11-22): pens with pressure, tilt, distance, rotation, slider and their buttons, pads with buttons, rings, strips and dials (2: `bustype`, dials), read from evdev by our own `tablet.c` (no libinput or libwacom). Supported: everything the protocol has but the tool's `wheel` (a Wacom mouse's) and pad modes beyond one. Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire); the global and Xwayland's `get_tablet_seat` seen with a headless lord-server; **not yet with a real tablet or on the VM**. See "Graphics tablets" |
-| `wp_pointer_warp_v1` (pointer-warp) | 1 | an app moves the pointer to a point of its own window (in development, 2026-11-22): only with the pointer over it, the serial of the enter it got and the keyboard, inside the surface, never while the pointer is locked or in a drag (`pwarp.h`). The XML is wayland-protocols 1.45's, kept in `server/protocols/`. Checked by `build/wltablet-test`; **not yet with an app on the VM**. See "Pointer warp" |
-| `wp_fifo_manager_v1` (fifo-v1) | 1 | an update waits until the display it is on has shown the one before it for a refresh: Mesa's Vulkan FIFO present mode without frame callbacks (`timing.c`, see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22 with vkcube on lavapipe and `wltiming-client`) |
-| `wp_commit_timing_manager_v1` (commit-timing-v1) | 1 | an update is not shown before its target time on `wp_presentation`'s clock (see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22: within 1 ms of the target, Mesa's FIFO uses it) |
-| `wp_tearing_control_manager_v1` (tearing-control-v1) | 1 | the hint is kept; "async" flips a fullscreen app's own buffer without waiting for vblank only when it is scanned out alone and the driver can (`DRM_CAP_ASYNC_PAGE_FLIP`); otherwise vsync (see "Frame timing"; 0.8.9.5, in development: the hint checked headless 2026-11-22, the torn flip not yet checked on hardware) |
-| `wp_content_type_manager_v1` (content-type-v1) | 1 | none, photo, video or game, kept per surface and applied on commit; nothing uses it yet (see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22) |
+| `wp_color_manager_v1` (color-management-v1) | 1 | an app describes its pixels' colour and LordOS converts them to the SDR sRGB / gamma 2.2 it drives every display with: parametric descriptions only (`set_primaries`, `set_tf_power`; no ICC, no luminances or mastering metadata, no scRGB), perceptual and relative intents, transfer functions gamma22, srgb, ext_linear, bt1886, gamma28 and power curves, every named set of primaries; each output's description (target primaries from its EDID) and the surface's preferred one. No HDR. Checked 2026-11-22 headless (`tests/color_headless.sh`: everything advertised, every error, linear light on screen as converted) and with GTK 4.18.6 (`GDK_DEBUG=color-mgmt`); see "Colour management" (0.8.9.5) |
+| `wp_color_representation_manager_v1` (color-representation-v1) | 1 | alpha modes premultiplied electrical, premultiplied optical and straight (converted); coefficients and range identity / full only, since lord-server imports no YUV buffer. Checked 2026-11-22 headless (`tests/color_headless.sh`); see "Colour management" (0.8.9.5) |
+| `zwp_tablet_manager_v2` (tablet-v2) | 2 | graphics tablets (0.8.9.5, 2026-11-22): pens with pressure, tilt, distance, rotation, slider and their buttons, pads with buttons, rings, strips and dials (2: `bustype`, dials), read from evdev by our own `tablet.c` (no libinput or libwacom). Supported: everything the protocol has but the tool's `wheel` (a Wacom mouse's) and pad modes beyond one. Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire); the global and Xwayland's `get_tablet_seat` seen with a headless lord-server; **not yet with a real tablet or on the VM**. See "Graphics tablets" |
+| `wp_pointer_warp_v1` (pointer-warp) | 1 | an app moves the pointer to a point of its own window (0.8.9.5, 2026-11-22): only with the pointer over it, the serial of the enter it got and the keyboard, inside the surface, never while the pointer is locked or in a drag (`pwarp.h`). The XML is wayland-protocols 1.45's, kept in `server/protocols/`. Checked by `build/wltablet-test`; **not yet with an app on the VM**. See "Pointer warp" |
+| `wp_fifo_manager_v1` (fifo-v1) | 1 | an update waits until the display it is on has shown the one before it for a refresh: Mesa's Vulkan FIFO present mode without frame callbacks (`timing.c`, see "Frame timing"; 0.8.9.5, checked headless 2026-11-22 with vkcube on lavapipe and `wltiming-client`) |
+| `wp_commit_timing_manager_v1` (commit-timing-v1) | 1 | an update is not shown before its target time on `wp_presentation`'s clock (see "Frame timing"; 0.8.9.5, checked headless 2026-11-22: within 1 ms of the target, Mesa's FIFO uses it) |
+| `wp_tearing_control_manager_v1` (tearing-control-v1) | 1 | the hint is kept; "async" flips a fullscreen app's own buffer without waiting for vblank only when it is scanned out alone and the driver can (`DRM_CAP_ASYNC_PAGE_FLIP`); otherwise vsync (see "Frame timing"; 0.8.9.5: the hint checked headless 2026-11-22, the torn flip not yet checked on hardware) |
+| `wp_content_type_manager_v1` (content-type-v1) | 1 | none, photo, video or game, kept per surface and applied on commit; nothing uses it yet (see "Frame timing"; 0.8.9.5, checked headless 2026-11-22) |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
-| `wp_linux_drm_syncobj_manager_v1` (explicit sync) | 1 | a dmabuf frame comes with an acquire point (its rendering is done) and a release point (LordOS is done with it): the frame is applied once its acquire point is signalled, without blocking, and the release point is signalled after the CPU copy or after the frame that replaced it on the GPU path; every protocol error, per-client limits. Offered when a render node has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), on the GPU and the CPU path (0.8.9.5, in development; checked 2026-11-22 with `tests/syncobj_client.c` against a headless lord-server on the CPU path, and Mesa 25.0.7's Vulkan WSI, `vkcube`, on an AMD RX 580: 600 frames at 60 fps in FIFO and 1500 at 330 fps in mailbox, every one with `set_acquire_point`/`set_release_point`; see "Explicit sync") |
+| `wp_linux_drm_syncobj_manager_v1` (explicit sync) | 1 | a dmabuf frame comes with an acquire point (its rendering is done) and a release point (LordOS is done with it): the frame is applied once its acquire point is signalled, without blocking, and the release point is signalled after the CPU copy or after the frame that replaced it on the GPU path; every protocol error, per-client limits. Offered when a render node has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), on the GPU and the CPU path (0.8.9.5; checked 2026-11-22 with `tests/syncobj_client.c` against a headless lord-server on the CPU path, and Mesa 25.0.7's Vulkan WSI, `vkcube`, on an AMD RX 580: 600 frames at 60 fps in FIFO and 1500 at 330 fps in mailbox, every one with `set_acquire_point`/`set_release_point`; see "Explicit sync") |
 
 Every protocol, with what lord-server offers next to KDE's KWin and GNOME's Mutter and why some are left out on
 purpose, is in "Protocol table (generated)" below and on [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/),
@@ -574,7 +574,7 @@ and
 session) checks a second inhibitor's error, destroy and ask again, a surface destroyed before its inhibitor and a
 client leaving with one; `hold 30` keeps a window with an inhibitor and prints `active`, `inactive` and its keys.
 
-### Graphics tablets (`zwp_tablet_manager_v2`, in development)
+### Graphics tablets (`zwp_tablet_manager_v2`, 0.8.9.5)
 
 Approved by the maintainer on 2026-11-22. Wacom, Huion, XP-Pen and pen displays reach Krita, GIMP, Inkscape, GTK 4 and
 Qt 6 apps with pressure and tilt, and X apps through Xwayland, which binds tablet-v2 itself (seen with a headless
@@ -643,7 +643,7 @@ middle, lifted) and dial (detents and high resolution). `build/wltablet-test` (`
 the wire (`WLTABLET_LOG=1` prints what the client heard). **Unverified:** a real Wacom (or other) tablet, and Krita or
 GTK 4 on the VM with a uinput tablet.
 
-### Pointer warp (`wp_pointer_warp_v1`, in development)
+### Pointer warp (`wp_pointer_warp_v1`, 0.8.9.5)
 
 Approved by the maintainer on 2026-11-22. An app asks to put the pointer at a point of its surface
 (`warp_pointer(surface, pointer, x, y, serial)`): a game or a 3D tool re-centring it, a VM's guest cursor. lord-server
@@ -1431,7 +1431,7 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   pipewire" without the daemon), `build/dbus-test` (fds sent with replies, in order), `build/pwguard-test` (a screen
   node is not a camera) and `tests/screencast_model_test.mjs` (the chooser's choices).
 
-## Frames, titles and damage (0.8.9.5, in development)
+## Frames, titles and damage (0.8.9.5)
 
 The Wayland audit of 2026-11-22 (items 1–7, approved by the maintainer that day) made the compositor do less per app
 frame. `tests/wlperf_headless.sh` checks each part against a headless lord-server with `build/wlperf-client`
@@ -1501,7 +1501,7 @@ frame. `tests/wlperf_headless.sh` checks each part against a headless lord-serve
   hole there, as for any translucent app pixel). `wlperf-client protocols` binds both and shows a one-pixel window at
   50 %.
 
-## Frame timing (fifo-v1, commit-timing-v1, tearing-control-v1, content-type-v1; 0.8.9.5, in development)
+## Frame timing (fifo-v1, commit-timing-v1, tearing-control-v1, content-type-v1; 0.8.9.5)
 
 Approved by the maintainer on 2026-11-22 ("everything the compositor is missing"). The four globals are made in
 `server/src/wl/timing.c`; the decisions are pure functions in `server/src/wl/wltiming.h` (`build/wltiming-test`);
@@ -1540,8 +1540,12 @@ LordOS (synchronized mode is not implemented), so each surface's queue is its ow
 surface's barrier goes up; it is cleared right after the next frame of the surface's own display has been latched
 (`wl_frame_done` names it; a display waiting for a flip keeps it until its flip), and an update with `wait_barrier`
 waits while it is up. So an update stays on screen at least one refresh, and a client that sets and waits on every
-present runs at the display's rate. An update that sets the barrier also asks for a frame, so the barrier clears even
-if it drew nothing. Never a stall: a window nobody can see (minimized, on another desktop, wholly covered,
+present runs at the display's rate. Without a monitor, and on drivers whose flips complete at once, that refresh is (since 0.8.9.5)
+lord-server's own software vblank (`softpace.h`): a frame drawn late starts the grid again, so the next one never comes
+less than seven eighths of a refresh after it, nor less than half a refresh after a frame painted slowly was
+shown (before, it could come 1 to 7 ms later and the update was on screen for that long; `tests/softpace_test.c`,
+`wl-conformance`'s `fifo.barrier`). An update that sets the barrier also asks for a
+frame, so the barrier clears even if it drew nothing. Never a stall: a window nobody can see (minimized, on another desktop, wholly covered,
 `framegate.h`) clears it with its own once-a-second tick, as its frame callbacks; with the screen off every barrier
 clears once a second (`wl_frame_unseen`); a surface with no role (never on screen) follows any frame. The protocol's
 rule that a synchronized subsurface ignores `wait_barrier` is kept (`set_sync`/`set_desync` are tracked for it).
@@ -1696,7 +1700,9 @@ person's yes. Approved by the maintainer as a security exception (recorded in `A
   only with a headset and only for the trusted client, `drm_fd`, the headset and never the desktop display, the prompt
   before any lease, `lease_fd`, `withdrawn` while leased and offered again after, Always allow saved, `finished` and the
   global removed when leaving the monitor and on unplug, `empty_lease`). `wlperf-client protocols` checks a headless
-  lord-server offers no lease device. **Not checked with a real headset:** no VR headset was available and neither the
+  lord-server offers no lease device; `make -C server wl-conformance` runs the whole protocol in a real headless
+  lord-server on the test hooks' fake card (`lease plug|unplug`, `drmlease_fake_card`: the theme's real prompt, the `vr`
+  permission saved in its home, every error; see "Conformance"). **Not checked with a real headset:** no VR headset was available and neither the
   dev VM (virtio-gpu, QXL) nor VKMS has a non-desktop connector, so the real `CREATE_LEASE`/`REVOKE_LEASE` path and a VR
   runtime on top are untested.
 
@@ -1846,7 +1852,7 @@ trusted programs show as not offered). The number is the version of the protocol
 | [text-input-unstable-v2](https://wayland.app/protocols/) (deprecated) | kde | — | 1 | — | KDE's older text input; text-input-unstable-v3 is offered. |
 
 <!-- END wayland-protocols table -->
-## Conformance (`tools/wl-conformance.mjs`, in development)
+## Conformance (`tools/wl-conformance.mjs`, 0.8.9.5)
 
 A script checks the compositor **point by point** against the protocol XML files and gives every advertised
 global, and every X11 area, a score from 0 to 100 %. The numbers below are from 2026-11-22 (X11 re-recorded after "Always on top", branch `feat/always-on-top`)
@@ -1860,10 +1866,27 @@ node tools/wl-conformance.mjs --only xdg_wm_base,wl_seat --verbose
 make -C server wl-conformance WLCONF_ARGS=--record     # rewrites docs/wayland-conformance.json
 ```
 
-It never touches a session: it starts its own `lord-server --headless 1280x800` on the CPU path, in a private
-runtime folder and home (with `--user`, so the X socket exists and Xwayland starts on the first X11 client), and the
-theme with a small hook that logs what it gets for the test windows, closes the one titled `wlconf-close` and answers
-the idle and shortcuts permission prompts (an open prompt holds the keyboard).
+It never touches a session: it starts its own `build/lord-server-test --headless 1280x800 --test-hooks` on the CPU path, in a
+private runtime folder and home (with `--user`, so the X socket exists and Xwayland starts on the first X11 client), and
+the theme with a small hook that logs what it gets for the test windows (the bell, the blur rectangles, a window's tag,
+a dragged tab), closes the one titled `wlconf-close` and answers the idle, shortcuts and VR headset permission prompts
+(an open prompt holds the keyboard; the first headset prompt is answered "allow once", the next "don't allow").
+
+**Test hooks** (`server/src/testhooks.{c,h}`): compiled only into `build/lord-server-test`, the same sources with
+`-DLORD_TEST_HOOKS` for `main.c`, `wl/wl.c` and `wl/drmlease.c` (`make -C server build/lord-server-test`; the
+conformance tool and `tools/wl-proof.mjs` run it). The installed `lord-server` has no `--test-hooks` flag, no socket and
+none of this code (`strings`/`nm` find none of it), and `tools/iso/mkdeb.sh` refuses a `lord-server` that holds it.
+Even in the test build, only with `--headless … --test-hooks` (refused on a monitor and on the login screen): a socket, `$XDG_RUNTIME_DIR/lordos-test-hooks.sock` (0600, the same
+user only), where the test client asks lord-server for what a session without a screen doesn't have, one short command
+at a time. `ptr`, `btn` and `wheel` go through the remote desktop's injection (the same path a viewer's mouse takes),
+so a window really gets `wl_pointer.enter`, motion and button serials; `tablet add|remove`, `pen` and `pad` make a
+graphics tablet's pen and pad with `tablet.c`'s own `tablet_new` and feed them evdev events through `tablet_input`, as
+a real device's (the tablet path is named `/dev/input/lordos-test-pen`, which doesn't exist); `xwl` makes a Wayland
+connection the way lord-server makes Xwayland's (a socketpair it creates itself) and takes it as Xwayland's while no
+Xwayland runs, so xwayland-shell-v1 is spoken under the very rule that keeps it from everyone else; `lease
+plug|unplug` gives `drmlease.c` a fake card (a desktop display and a non-desktop "LordOS test headset", memfds for
+`drm_fd` and every `lease_fd`, no ioctl) while the rest is real: `drmlcore.c`'s rules, the `vr` permission, the
+theme's prompt. None of it reaches a device, a card or another session.
 
 **What it reads.** The protocol XML files: the ones the build names in `server/Makefile` and `server/mk/*.mk` first, then
 copies vendored in the repository, then `/usr/share/wayland`, `/usr/share/wayland-protocols` and
@@ -1887,17 +1910,59 @@ advertised version. A protocol added to the compositor is picked up with no chan
 Score = points of the passed checks / points of all checks (skipped ones don't count). An item is **complete** only at
 100 % with nothing skipped, its XML found and at least one protocol-specific flow: a protocol checked only by the generic
 bind is never called complete. Exceptions the protocol itself allows (an optimization hint the compositor may ignore, an
-error no request can trigger) are listed with their reason in `tools/wl-conformance/allow.json`; they count as passed and
-the report shows them. Real programs that are installed (foot, vkcube, xterm here; `weston-simple-*`, `wayland-info`,
+error no request can trigger, an optional feature that isn't advertised) are listed with their reason in
+`tools/wl-conformance/allow.json`; they count as passed and the report shows them. A global an ordinary client never
+sees (drm-lease without a headset, xwayland-shell for Xwayland only) counts as complete when its own flow ran it through
+the test hooks. Each flow check names in its hint every request, event and error it exercised, and the JSON report
+gives each global a `coverage` (those named out of all, and the ones missing): the static checks cover every message,
+this says which ones a flow also ran. Real programs that are installed (foot, vkcube, xterm here; `weston-simple-*`, `wayland-info`,
 GTK and Qt demos when present) run for 6 s each and are reported with the globals they bound (`WAYLAND_DEBUG`), not
 scored (Chromium, GTK 4 and Qt 6 are run by `tools/wl-proof.mjs`, below). Not yet covered: Firefox (not installed
-here), and pointer/touch input (headless has no pointer over the windows, so checks that need a real enter serial are
-skipped).
+here) and touch input (no touchscreen; the test hooks give a pointer and a tablet, not touch).
 
-**Wayland (2026-11-22, after the conformance work): 48 globals, mean 100 %, 29 complete.** Every advertised global
+**Wayland (2026-11-23, after the conformance work): 48 globals, mean 100 %, 48 complete.** Every advertised global
 scores 100 %: every request has a real handler, every event is sent, every protocol error is raised where the
 specification names it, and every flow of `server/tests/wl_conformance.c` passes. Before that work (commit `a597e93c`):
-47 globals, mean 95.8 %, 19 complete.
+47 globals, mean 95.8 %, 19 complete; after its first part, 29 complete. The other 19 became complete with their own
+flows (branch `feat/wl-conformance-complete`): 15 had only the generic bind, `wl_seat`'s pointer role and KDE's server
+decoration were partial, and drm-lease and xwayland-shell were checked in the code only. The depth of each before and
+after, with what its flow checks:
+
+| Global | Before | After | Its flow (`server/tests/wl_conformance.c`) |
+|---|---|---|---|
+| `ext_background_effect_manager_v1` | general | complete | capabilities (blur on the CPU path), a two-rectangle region reaching the shell, null region, destroy, `background_effect_exists`, `surface_destroyed` |
+| `wl_fixes` | general | complete | `destroy_registry` (the id comes back for a new registry), a wl_fixes named as a registry (libwayland's `invalid_object`), destroy |
+| `wp_color_manager_v1` | general | complete | every supported_* event and done, the output's description and all its information, preferred and preferred parametric, parametric descriptions (named, power curve, primaries as numbers, max_cll/max_fall, same parameters same identity, `failed` for primaries on one line), set/unset on a window, and every error that can happen without ICC (14 errors, in 18 cases) |
+| `wp_color_representation_manager_v1` | general | complete | the three alpha modes, coefficients and range, chroma location, and `surface_exists`, `alpha_mode`, `coefficients`, `pixel_format`, `inert` |
+| `wp_commit_timing_manager_v1` | general | complete | targets 100, 250 and 400 ms ahead applied at or after them, the next commit not held, and `commit_timer_exists`, `invalid_timestamp`, `timestamp_exists`, `surface_destroyed` |
+| `wp_content_type_manager_v1` | general | complete | photo, video, game, none, destroyed and made again, `already_constructed` |
+| `wp_fifo_manager_v1` | general | complete | a commit waiting on the barrier the one before set applies a refresh later (5 of 5), a wait with no barrier doesn't hold, `already_exists`, `surface_destroyed` |
+| `wp_linux_drm_syncobj_manager_v1` | general | complete | timelines imported on a render node, a frame held until its acquire point is signalled, release points (the replaced buffer's, and the last one's when the surface goes), implicit sync again after destroy, and all 8 errors |
+| `wp_pointer_warp_v1` | general | complete | the pointer over the window (test hooks), a warp with the enter's serial moves it there; a stale serial and a point outside are ignored |
+| `wp_tearing_control_manager_v1` | general | complete | the async hint on a window and back to vsync, frames shown, destroyed and made again, `tearing_control_exists` |
+| `xdg_session_manager_v1` | general | complete | created, a window added and renamed, restored from a new connection with `restore_toplevel` before the first commit (also a window maximized from its first frame to its close and restored right away), replaced by another connection, removed, and all 7 errors |
+| `xdg_system_bell_v1` | general | complete | ring on a window and with no surface, the shell told "bell", 30 more held back by the rate limit |
+| `xdg_toplevel_drag_manager_v1` | general | complete | a tab torn off with a real press (test hooks): the attached window follows ("tldrag" to the shell), ends at the release, `invalid_source` (twice, and a selection's source), `toplevel_attached`, `ongoing_drag` |
+| `xdg_toplevel_tag_manager_v1` | general | complete | tag and description before the map (read with the window), changed later (a control character taken out), a long tag cut to 127 bytes |
+| `zwp_tablet_manager_v2` | general | complete | a fake tablet (test hooks): tablet, pad (group, ring, strip, dial, one mode) and tools announced; a mouse tool's wheel; a pen with a serial and a Wacom id: proximity, down, pressure, distance, tilt, rotation, button, up; an airbrush's slider; set_cursor; the pad's enter, mode_switch, buttons, ring, strip and dial with their stops, set_feedback, leave; unplugged (the tool with no serial removed, the one with a serial kept); `role` |
+| `wl_seat` | partial | complete | `pointer.role` now runs: the pointer is put over the window through the test hooks |
+| `org_kde_kwin_server_decoration_manager` | partial | complete | KDE's XML vendored (`third_party/plasma-wayland-protocols/`, LGPL-2.1-or-later): the static checks and the generic bind run; request_mode Client, Server and None each answered with the same mode |
+| `wp_drm_lease_device_v1` | code only | complete | a fake headset (test hooks): the global only while plugged, drm_fd, only the headset offered, the system's prompt ("allow once": lease_fd; "don't allow": finished, then finished with no prompt), withdrawn while leased, finished when unplugged, release/released, `wrong_device`, `duplicate_connector`, `empty_lease` |
+| `xwayland_shell_v1` | code only | complete | hidden from an ordinary client; on a connection made as Xwayland's (test hooks): the role and a serial, destroy, `role` (twice, and on a subsurface), an xwayland_surface given an xdg_surface after (`xdg_wm_base.error.role`), `invalid_serial`, `already_associated` |
+
+Bugs these flows found, fixed: a surface with the xwayland_surface role could still be given an xdg_surface, a
+subsurface, a cursor or a drag icon role (xwayland-shell-v1 never marked it; `wlx_surface_free` also took a surface that
+already had an xdg_surface or a subsurface); KDE's `request_mode(None)` was answered with Client (the protocol: "the
+same mode"); and the tool's own XML reader dropped everything between a self-closing `<description/>` and the next
+`</description>`, so color-management-v1's error enums (and `wl_touch.shape`) were never scored. Once read: the ICC
+creator's five errors and `get_preferred_parametric`'s `unsupported_feature` are allowed (ICC is an optional feature
+lord-server doesn't advertise, and every description it makes is parametric), and so is `wl_touch.shape` ("only sent
+by the compositor if the touch device supports shape reports": LordOS doesn't read the touch shape yet).
+
+What a flow can't make happen headless is left to the static checks and said here: `image_description_changed` and
+`preferred_changed` need a display whose colour description changes (one fixed headless display), and the information
+events `tf_power`, `target_max_cll` and `target_max_fall` only exist for a compositor description with them (the
+display's is gamma 2.2 with no light levels; a client's own description may not be asked for its information).
 
 | Global | Version | Before | After | Complete |
 |---|---|---|---|---|
@@ -1905,18 +1970,18 @@ specification names it, and every flow of `server/tests/wl_conformance.c` passes
 | `wl_subcompositor` | 1 | 75.6 % | 100 % | yes |
 | `zxdg_decoration_manager_v1` | 1 | 78.0 % | 100 % | yes |
 | `wp_viewporter` | 1 | 81.3 % | 100 % | yes |
-| `wp_linux_drm_syncobj_manager_v1` | 1 | 83.8 % | 100 % | no (generic bind only; its flow is `tests/syncobj_headless.sh`) |
+| `wp_linux_drm_syncobj_manager_v1` | 1 | 83.8 % | 100 % | yes (since `feat/wl-conformance-complete`) |
 | `xdg_activation_v1` | 1 | 84.2 % | 100 % | yes |
 | `wl_data_device_manager` | 3 | 85.2 % | 100 % | yes |
 | `zwp_pointer_constraints_v1` | 1 | 85.3 % | 100 % | yes |
 | `wl_compositor` | 6 | 86.2 % | 100 % | yes |
-| `zwp_tablet_manager_v2` | 2 | 89.1 % | 100 % | no (generic bind only; `build/wltablet-test`, no real tablet) |
-| `wp_color_manager_v1` | 1 | 92.3 % | 100 % | no (generic bind only; its flow is `tests/color_headless.sh`) |
-| `wl_seat` | 9 | 93.5 % | 100 % | no (`pointer.role` is skipped: headless has no pointer over the windows) |
+| `zwp_tablet_manager_v2` | 2 | 89.1 % | 100 % | yes (since `feat/wl-conformance-complete`: a fake tablet through the test hooks) |
+| `wp_color_manager_v1` | 1 | 92.3 % | 100 % | yes (since `feat/wl-conformance-complete`) |
+| `wl_seat` | 9 | 93.5 % | 100 % | yes (since `feat/wl-conformance-complete`: the pointer through the test hooks) |
 | `xdg_toplevel_icon_manager_v1` | 1 | 97.4 % | 100 % | yes |
 | `zwp_linux_dmabuf_v1` | 5 | 98.9 % | 100 % | yes |
-| `xwayland_shell_v1` (new) | 1 | — | 100 % | no (offered to Xwayland only: static checks; X11 `xwayland.startup` checks it in use) |
-| the 33 others | | 100 % | 100 % | 19 of them; the rest have no flow in this tool, only the generic bind (most have their own headless test) |
+| `xwayland_shell_v1` (new) | 1 | — | 100 % | yes (since `feat/wl-conformance-complete`, on an Xwayland-like connection of the test hooks; X11 `xwayland.startup` checks it in use) |
+| the 33 others | | 100 % | 100 % | all of them (19 then, the rest since `feat/wl-conformance-complete`) |
 
 What changed for each one is in `CHANGELOG.md` ([Unreleased]). The errors are raised where Mutter or wlroots raise them,
 never stricter where they are lenient; where the specification and the big compositors differ, the more lenient
@@ -1943,7 +2008,7 @@ own connection. lord-server answers every one, the window is never disconnected 
 and a new client maps a window afterwards. Also run on 2026-11-22 with six more seeds × 1,500 connections, and with three
 seeds × 800 against an AddressSanitizer/UBSan build of lord-server (no report).
 
-**Xwayland / X11 (2026-11-22, Xwayland 24.1.6, run headless): 28 items, mean 100 %** (74 % before the conformance
+**Xwayland / X11 (2026-11-23, Xwayland 24.1.6, run headless): 28 items, mean 100 %** (74 % before the conformance
 work, 99.9 % after it). Every item is at 100 %. The last one was `_NET_WM_STATE` (96.2 %): `_NET_WM_STATE_ABOVE` was
 kept in the property but not offered, because LordOS had no always-on-top layer (the keyboard always went to the window
 in front). Always on top (`docs/WINDOWS.md`, "Always on top") separated stacking from focus in the SDK, for every theme,
@@ -1962,61 +2027,61 @@ that isn't in front.
 
 <!-- BEGIN wayland-conformance table: generated by tools/gen-wayland-table.mjs from docs/wayland-conformance.json; record a new run, do not edit this -->
 
-Every item of the recorded run: 2026-11-22, `tools/wl-conformance.mjs` (report schema 1) at commit `de240de5` with uncommitted changes;
+Every item of the recorded run: 2026-11-23, `tools/wl-conformance.mjs` (report schema 1) at commit `535e79a0`;
 wayland-protocols 1.44, libwayland 1.23.1, Xwayland 2:24.1.6-1; static+dynamic (headless, CPU path). Published with the screenshots on
 [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/#conformance). **Depth**: *complete* = protocol-specific
-tests of every request, event and error, all passed and nothing skipped; *partial* = protocol-specific tests, with a point
-skipped headless; *general* = the static code check and the generic bind at every version (X11: the static check and
-the unit tests), no flow of its own yet; *code only* = the static code check alone (not advertised headless: drm-lease
-needs a headset, xwayland_shell is offered to Xwayland only; X11: nothing to run headless).
+tests of every request, event and error, all passed and nothing skipped (pointer, graphics tablet, VR headset and
+Xwayland's connection come from the test build `lord-server-test --test-hooks`, never the installed one); *partial* = protocol-specific tests, with
+a point skipped headless; *general* = the static code check and the generic bind at every version (X11: the static
+check and the unit tests), no flow of its own yet; *code only* = the static code check alone (X11: nothing to run headless).
 
-**Wayland: 48 globals, mean 100 %, 29 complete.**
+**Wayland: 48 globals, mean 100 %, 48 complete.**
 
 | Global | Protocol (table row) | Version | Score | Points | Depth |
 |---|---|---|---|---|---|
-| `ext_background_effect_manager_v1` | `ext-background-effect-v1` | 1 | 100 % | 15/15 | general |
+| `ext_background_effect_manager_v1` | `ext-background-effect-v1` | 1 | 100 % | 42/42 | complete |
 | `ext_idle_notifier_v1` | `ext-idle-notify-v1` | 1 | 100 % | 18/18 | complete |
-| `org_kde_kwin_server_decoration_manager` | `kde-server-decoration` | 1 | 100 % | 12/12 (1 skipped) | partial |
+| `org_kde_kwin_server_decoration_manager` | `kde-server-decoration` | 1 | 100 % | 32/32 | complete |
 | `wl_compositor` | `wayland-wl_compositor` | 6 | 100 % | 102/102 | complete |
 | `wl_data_device_manager` | `wayland-wl_data_device_manager` | 3 | 100 % | 95/95 | complete |
-| `wl_fixes` | `wayland-wl_fixes` | 1 | 100 % | 5/5 | general |
+| `wl_fixes` | `wayland-wl_fixes` | 1 | 100 % | 20/20 | complete |
 | `wl_output` | `wayland-wl_output` | 4 | 100 % | 42/42 | complete |
-| `wl_seat` | `wayland-wl_seat` | 9 | 100 % | 109/109 (1 skipped) | partial |
+| `wl_seat` | `wayland-wl_seat` | 9 | 100 % | 116/116 | complete |
 | `wl_shm` | `wayland-wl_shm` | 2 | 100 % | 43/43 | complete |
 | `wl_subcompositor` | `wayland-wl_subcompositor` | 1 | 100 % | 41/41 | complete |
 | `wp_alpha_modifier_v1` | `alpha-modifier-v1` | 1 | 100 % | 25/25 | complete |
-| `wp_color_manager_v1` | `color-management-v1` | 1 | 100 % | 118/118 | general |
-| `wp_color_representation_manager_v1` | `color-representation-v1` | 1 | 100 % | 19/19 | general |
-| `wp_commit_timing_manager_v1` | `commit-timing-v1` | 1 | 100 % | 18/18 | general |
-| `wp_content_type_manager_v1` | `content-type-v1` | 1 | 100 % | 15/15 | general |
+| `wp_color_manager_v1` | `color-management-v1` | 1 | 100 % | 236/236 | complete |
+| `wp_color_representation_manager_v1` | `color-representation-v1` | 1 | 100 % | 58/58 | complete |
+| `wp_commit_timing_manager_v1` | `commit-timing-v1` | 1 | 100 % | 39/39 | complete |
+| `wp_content_type_manager_v1` | `content-type-v1` | 1 | 100 % | 24/24 | complete |
 | `wp_cursor_shape_manager_v1` | `cursor-shape-v1` | 2 | 100 % | 26/26 | complete |
-| `wp_drm_lease_device_v1` (not advertised headless) | `drm-lease-v1` | 1 | 100 % | 43/43 | code only |
-| `wp_fifo_manager_v1` | `fifo-v1` | 1 | 100 % | 19/19 | general |
+| `wp_drm_lease_device_v1` (not advertised to an ordinary client; run through the test hooks) | `drm-lease-v1` | 1 | 100 % | 82/82 | complete |
+| `wp_fifo_manager_v1` | `fifo-v1` | 1 | 100 % | 34/34 | complete |
 | `wp_fractional_scale_manager_v1` | `fractional-scale-v1` | 1 | 100 % | 23/23 | complete |
-| `wp_linux_drm_syncobj_manager_v1` | `linux-drm-syncobj-v1` | 1 | 100 % | 31/31 | general |
-| `wp_pointer_warp_v1` | `pointer-warp-v1` | 1 | 100 % | 8/8 | general |
+| `wp_linux_drm_syncobj_manager_v1` | `linux-drm-syncobj-v1` | 1 | 100 % | 76/76 | complete |
+| `wp_pointer_warp_v1` | `pointer-warp-v1` | 1 | 100 % | 20/20 | complete |
 | `wp_presentation` | `presentation-time` | 2 | 100 % | 26/26 | complete |
 | `wp_security_context_manager_v1` | `security-context-v1` | 1 | 100 % | 46/46 | complete |
 | `wp_single_pixel_buffer_manager_v1` | `single-pixel-buffer-v1` | 1 | 100 % | 19/19 | complete |
-| `wp_tearing_control_manager_v1` | `tearing-control-v1` | 1 | 100 % | 15/15 | general |
+| `wp_tearing_control_manager_v1` | `tearing-control-v1` | 1 | 100 % | 27/27 | complete |
 | `wp_viewporter` | `viewporter` | 1 | 100 % | 43/43 | complete |
 | `xdg_activation_v1` | `xdg-activation-v1` | 1 | 100 % | 38/38 | complete |
-| `xdg_session_manager_v1` | `xdg-session-management-v1` | 1 | 100 % | 44/44 | general |
-| `xdg_system_bell_v1` | `xdg-system-bell-v1` | 1 | 100 % | 8/8 | general |
-| `xdg_toplevel_drag_manager_v1` | `xdg-toplevel-drag-v1` | 1 | 100 % | 17/17 | general |
+| `xdg_session_manager_v1` | `xdg-session-management-v1` | 1 | 100 % | 98/98 | complete |
+| `xdg_system_bell_v1` | `xdg-system-bell-v1` | 1 | 100 % | 26/26 | complete |
+| `xdg_toplevel_drag_manager_v1` | `xdg-toplevel-drag-v1` | 1 | 100 % | 44/44 | complete |
 | `xdg_toplevel_icon_manager_v1` | `xdg-toplevel-icon-v1` | 1 | 100 % | 39/39 | complete |
-| `xdg_toplevel_tag_manager_v1` | `xdg-toplevel-tag-v1` | 1 | 100 % | 11/11 | general |
+| `xdg_toplevel_tag_manager_v1` | `xdg-toplevel-tag-v1` | 1 | 100 % | 32/32 | complete |
 | `xdg_wm_base` | `xdg-shell` | 7 | 100 % | 248/248 | complete |
 | `xdg_wm_dialog_v1` | `xdg-dialog-v1` | 1 | 100 % | 24/24 | complete |
-| `xwayland_shell_v1` (not advertised headless) | `xwayland-shell-v1` | 1 | 100 % | 15/15 | code only |
+| `xwayland_shell_v1` (not advertised to an ordinary client; run through the test hooks) | `xwayland-shell-v1` | 1 | 100 % | 42/42 | complete |
 | `zwp_idle_inhibit_manager_v1` | `idle-inhibit-unstable-v1` | 1 | 100 % | 14/14 | complete |
 | `zwp_keyboard_shortcuts_inhibit_manager_v1` | `keyboard-shortcuts-inhibit-unstable-v1` | 1 | 100 % | 22/22 | complete |
 | `zwp_linux_dmabuf_v1` | `linux-dmabuf-v1` | 5 | 100 % | 96/96 | complete |
 | `zwp_pointer_constraints_v1` | `pointer-constraints-unstable-v1` | 1 | 100 % | 41/41 | complete |
-| `zwp_pointer_gestures_v1` | `pointer-gestures-unstable-v1` | 3 | 100 % | 39/39 | complete |
+| `zwp_pointer_gestures_v1` | `pointer-gestures-unstable-v1` | 3 | 100 % | 45/45 | complete |
 | `zwp_primary_selection_device_manager_v1` | `primary-selection-unstable-v1` | 1 | 100 % | 42/42 | complete |
-| `zwp_relative_pointer_manager_v1` | `relative-pointer-unstable-v1` | 1 | 100 % | 14/14 | complete |
-| `zwp_tablet_manager_v2` | `tablet-v2` | 2 | 100 % | 156/156 | general |
+| `zwp_relative_pointer_manager_v1` | `relative-pointer-unstable-v1` | 1 | 100 % | 16/16 | complete |
+| `zwp_tablet_manager_v2` | `tablet-v2` | 2 | 100 % | 201/201 | complete |
 | `zwp_text_input_manager_v3` | `text-input-unstable-v3` | 1 | 100 % | 50/50 | complete |
 | `zxdg_decoration_manager_v1` | `xdg-decoration-unstable-v1` | 1 | 100 % | 41/41 | complete |
 | `zxdg_exporter_v2` | `xdg-foreign-unstable-v2` | 1 | 100 % | 23/23 | complete |
@@ -2060,23 +2125,27 @@ needs a headset, xwayland_shell is offered to Xwayland only; X11: nothing to run
 
 **Proof with real programs** (`docs/wayland-proofs/`, its `README.md` lists each image): `tools/wl-proof.mjs` runs
 foot, zenity (GTK 4), FeatherPad (Qt 6), vkcube, es2gears and Chromium, and a purpose-built client for subsurface
-order and viewports, on a headless lord-server and screenshots each; `tools/wl-conformance/x11-proofs.sh` does the
+order and viewports, on a headless lord-server and screenshots each (vkcube also proves fifo-v1, commit-timing-v1 and
+explicit sync in use by Mesa's Vulkan WSI, foot the system bell and color-management-v1); `tools/wl-conformance/x11-proofs.sh` does the
 same for the X11 items with xterm, xprop, xwininfo and zenity on X11. Not installed here, so not tried: Firefox, mpv,
 GTK demos, xdotool and wmctrl (the `_NET_ACTIVE_WINDOW`, `_NET_CLOSE_WINDOW` and state requests are sent only by
-`x11-conformance-client`, whose `netstate` mode sends the ABOVE request in `x11-always-on-top.png`). Not checkable without hardware: the tablet wheel and pad feedback (no tablet), touch
-orientation (no touchscreen), and pointer-constraint regions with a real pointer (headless has no pointer over the
-windows; the region logic is covered by the fuzz client and the protocol checks).
+`x11-conformance-client`, whose `netstate` mode sends the ABOVE request in `x11-always-on-top.png`). Not checked with
+real hardware: a graphics tablet and a VR headset (the conformance run simulates both through the test hooks: the
+protocol and LordOS's handling are real, the device isn't) and a touchscreen (touch orientation and shape).
 
 **Adding to it.** A new global is scored as soon as it's advertised: static checks from its XML and the generic bind.
 To call it complete, add its flow to `server/tests/wl_conformance.c` (a function, under `#ifdef CONF_HAVE_<XML FILE
-NAME>`, in the `flows` table with the global it's scored under) with its main flow and one check per protocol error. An X11
+NAME>`, in the `flows` table with the global it's scored under, and the XML's file name in the tool's `flowBases`) with
+its main flow and one check per protocol error, each check's hint naming every request, event and error it ran
+(comma-separated). What the shell gets goes in the tool's `themeFlowChecks`; what needs input or hardware, in the test
+hooks. An X11
 item or pattern goes in `tools/wl-conformance/xwayland.json`, its dynamic checks in `server/tests/x11_conformance.c`
 under the same item id.
-## Shell extras (in development, approved by the maintainer 2026-11-22)
+## Shell extras (0.8.9.5, approved by the maintainer 2026-11-22)
 
 Five protocols that make Linux windows behave as on a full desktop, one file each in `server/src/wl/` (`wlshell.h`
-lists them and the few hooks `wl.c` calls; they read `wl.c`'s state only through its `wl__` helpers). The latest
-release is 0.8.9.4; these are in development. None of them reads another app's windows, the screen, the clipboard or
+lists them and the few hooks `wl.c` calls; they read `wl.c`'s state only through its `wl__` helpers). They ship
+since 0.8.9.5. None of them reads another app's windows, the screen, the clipboard or
 input, so none is hidden from sandboxed clients (`secctx_hidden`).
 
 | | |
@@ -2127,7 +2196,9 @@ input, so none is hidden from sandboxed clients (`secctx_hidden`).
 - **Session management (`xdg-session-management-v1`, `xsession.c`, `xsstore.c`).** An app gets a session (new, or by the
   id it was given), adds its windows by name, and when it starts again restores each by name before its first commit.
   LordOS keeps, per window of a session, its geometry on screen and whether it was maximized (updated every 2 s while
-  it is open and when it closes), and a restored window opens there: the shell asks once (`lord.wayland.sessionFrame`),
+  it is open and when it closes; a maximized or fullscreen window keeps its last normal geometry, and one that was
+  never normal, opened maximized, keeps the geometry it has, so it comes back too: `xs_top_note`), and a restored
+  window opens there: the shell asks once (`lord.wayland.sessionFrame`),
   adds the theme's frame (`restoredFrame`) and fits it on today's displays with session restore's own `fitFrame`
   (`sdk/sessionmodel.js`). With LordOS's session restore: that one relaunches the apps after a login; a window its app
   then restores by name takes its own place first, ahead of session restore's frame and the remembered place.
@@ -2160,7 +2231,7 @@ input, so none is hidden from sandboxed clients (`secctx_hidden`).
   tear-off with `SHELLX_DRAG=1` and root for the session's `remote.sock`, through `tests/shellx_inject.py`) and
   `build/fsops-test` (the sessions folder is protected).
 
-## Two wl_seat bindings (Firefox) and menus drawn as subsurfaces (0.8.9.5, in development, checked 2026-11-22)
+## Two wl_seat bindings (Firefox) and menus drawn as subsurfaces (0.8.9.5, checked 2026-11-22)
 
 The open item from October 19 ("Firefox ESR 153 ignored mouse clicks on VM 119 … two `wl_seat` bindings from the same
 client get the events twice") was checked again on VM 127 on 2026-11-22, with Firefox ESR 153.6 on Wayland
@@ -2204,7 +2275,7 @@ client get the events twice") was checked again on VM 127 on 2026-11-22, with Fi
   checks ran, the 0.8.9.4 build installed on VM 127 (`0.8.9.4+ws95`) crashed once in its render threads (`libc`,
   reading freed memory) as a `<select>` list closed; not seen again on the current build across a dozen opens.
 
-## Colour management (`wp_color_manager_v1`, `wp_color_representation_manager_v1`, 0.8.9.5, in development, approved by the maintainer 2026-11-22)
+## Colour management (`wp_color_manager_v1`, `wp_color_representation_manager_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
 
 LordOS drives every display as an **SDR sRGB display**: sRGB (BT.709) primaries, D65 white, encoded for a gamma 2.2
 display, 8 bits a channel. HDR output (PQ, HLG, more than 8 bits, the display's HDR metadata) is **out of scope**: it
@@ -2272,7 +2343,7 @@ advertised (`server/src/wl/wlcolor.c`, the conversion in `colorconv.c`).
   session was not used), mpv `--vo=gpu-next` and the Weston colour tools (not installed on the development machine), a
   real display's EDID primaries (to check on the dev VM, whose virtio display reports sRGB's).
 
-## Explicit sync (`linux-drm-syncobj-v1`, 0.8.9.5, approved by the maintainer 2026-11-22, in development)
+## Explicit sync (`linux-drm-syncobj-v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
 
 With implicit sync a GPU buffer's own fences (its dma-resv) make LordOS's reading of it wait for the app's rendering.
 With explicit sync the app hands over two timeline points with each buffer instead: NVIDIA's driver needs it (it has no

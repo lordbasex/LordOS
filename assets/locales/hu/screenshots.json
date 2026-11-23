@@ -97,5 +97,11 @@
   "hintAdjust": "Húzd a fogantyúkat az igazításhoz · Enter: rögzítés · Esc: mégse",
   "hintAdjustRecord": "Húzd a fogantyúkat az igazításhoz · Enter: felvétel · Esc: mégse",
   "hintRecord": "Húzással válaszd ki a felveendő területet · Esc: mégse",
-  "thumbOpen": "Megnyitás a jelölőszerkesztőben"
+  "thumbOpen": "Megnyitás a jelölőszerkesztőben",
+  "opt.printKey": "Print Screen billentyű",
+  "opt.printKey.full": "Teljes képernyő rögzítése",
+  "opt.printKey.area": "Kijelölt rész rögzítése",
+  "opt.printKey.window": "Kijelölt ablak rögzítése",
+  "opt.printKey.toolbar": "Sáv megjelenítése",
+  "opt.printKey.none": "Semmi"
 }

@@ -1,6 +1,7 @@
 // flathub_model_test.mjs — the Store's Flathub section as plain data (sdk/flathubmodel.js, docs/FLATPAK.md): metadata
 // from `flatpak remote-info --show-metadata` (real outputs from Flathub, 2026-11-19), the permission rows and LordOS's
-// changes, the Chromium/Electron apps marked "not yet supported", the catalog filter, `flatpak list`, progress lines;
+// changes, the Chromium/Electron apps marked "not yet supported", the catalog filter, `flatpak list`, progress lines; the
+// home's collections, categories and subcategories on a recorded piece of Flathub's real catalog and on hostile entries;
 // and every permission and change key in every language.
 //
 //   node tests/flathub_model_test.mjs        (from server/; run_suites.sh runs it when node exists)
@@ -171,7 +172,9 @@ eq('list', M.parseList(['Application ID\tBranch\tVersion\tOrigin', 'org.gnome.Ca
 eq('progress', ['Installing 1/3… ████ 45%  1.2 MB/s', '100%', 'Installation complete.', 'x 450% y', 'build 5%x', 'Installing 2/2…', 'Updating 3/4: app', 'x 5/0', 'app/org.a.B/x86_64/stable'].map(M.progressOf), [15, 100, null, null, null, 50, 50, null, null]);
 const day = 24 * 3600e3, now = 1_800_000_000_000;
 eq('stale', [M.appstreamStale(0, now), M.appstreamStale(now - day - 1, now), M.appstreamStale(now - 1000, now), M.appstreamStale(now + day, now)], [true, true, false, true]);
-eq('prefs', [M.prefsOf(null), M.prefsOf({ on: 1, showAll: 0, appstreamAt: '5' })], [{ on: false, showAll: false, appstreamAt: 0 }, { on: true, showAll: false, appstreamAt: 5 }]);
+eq('prefs', [M.prefsOf(null), M.prefsOf({ on: 1, showAll: 0, appstreamAt: '5' })],
+  [{ on: false, showAll: false, appstreamAt: 0, rankings: true }, { on: true, showAll: false, appstreamAt: 5, rankings: true }]);
+eq('prefs: rankings off only when set off', [M.prefsOf({ rankings: false }).rankings, M.prefsOf({ rankings: 0 }).rankings, M.prefsOf({ rankings: true }).rankings], [false, true, true]);
 
 // a note on an app's page: OBS Studio's recordings go to Videos (the home is read-only in a Flatpak app's view)
 eq('note: OBS', M.appNote('com.obsproject.Studio'), 'obsVideos');
@@ -222,6 +225,129 @@ for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, 
   eq('cut to the lines left', V(`a\n\n${longP}`).paras.map((p) => p.clamp), [0, 5]);
   eq('characters, not UTF-16 units', V('😀'.repeat(90 * 6)).long, false);
   eq('custom line budget', V('a\n\nb\n\nc', { lines: 2 }), { paras: [{ text: 'a', clamp: 0 }, { text: 'b', clamp: 0 }], long: true });
+}
+
+// ---- the home: collections, categories, subcategories ----
+// tests/data/flathub/catalog-2026-11-22.json: 38 apps of Flathub's real catalog as lord.flatpak.catalog() gives them
+// (read from Flathub's appstream.xml of 2026-11-22; public data only)
+{
+  const real = JSON.parse(fs.readFileSync(path.join(here, 'data/flathub/catalog-2026-11-22.json'), 'utf8'));
+  const at = Date.UTC(2026, 10, 22) + 12 * 3600e3;            // noon 2026-11-22 (the newest release, OBS's, is that day)
+  eq('fixture: real shape', real.every((a) => M.idOk(a.id) && M.branchOk(a.branch) && Number.isInteger(a.updated) && typeof a.verified === 'boolean'), true);
+  const upd = M.recentlyUpdated(real, { now: at });
+  eq('recently updated: verified only, newest first', upd.slice(0, 4).map((a) => a.id),
+    ['com.obsproject.Studio', 'com.discordapp.Discord', 'org.mozilla.firefox', 'org.gnome.Evince']);
+  eq('recently updated: no unverified while showAll is off', upd.some((a) => !a.verified), false);
+  eq('recently updated: showAll lets the unverified in', M.recentlyUpdated(real, { now: at, showAll: true })[1].id, 'org.signal.Signal');
+  eq('recently updated: every app has a date (the real catalog)', upd.length, real.filter((a) => a.verified).length);
+  eq('recently updated in a category', M.recentlyUpdated(real, { now: at, category: 'Game' }).map((a) => a.id),
+    ['net.pcsx2.PCSX2', 'org.libretro.RetroArch', 'net.supertuxkart.SuperTuxKart']);
+  eq('spotlight: newest with an icon and summary', M.spotlight(real, { now: at }).id, 'com.obsproject.Studio');
+  eq('verified collection only with showAll', [M.collection(real, 'verified', { now: at }).length, M.collection(real, 'verified', { now: at, showAll: true }).length],
+    [0, real.filter((a) => a.verified).length]);
+  eq('home rows', M.homeRows(real, { now: at }).map((r) => r.key), ['updated']);
+  eq('home rows with showAll', M.homeRows(real, { now: at, showAll: true }).map((r) => r.key), ['updated', 'verified']);
+  eq('unknown collection', [M.collection(real, 'nope', { now: at }), M.collectionOk('nope'), M.collectionOk('__proto__'), M.collectionOk('updated'), M.collectionOk('popular')],
+    [[], false, false, true, true]);
+  eq('rankings absent: their rows are too', [M.collection(real, 'popular', { now: at }), M.collection(real, 'week', { now: at, ranks: {} })], [[], []]);
+  eq('rankings absent: the banner is the latest release', M.banner(real, { now: at }), { kind: 'latest', app: M.spotlight(real, { now: at }) });
+
+  // ---- the rankings (E10) on Flathub's recorded answers of the same day (tests/data/flathub/api-2026-11-22) ----
+  const api = (f) => JSON.parse(fs.readFileSync(path.join(here, 'data/flathub/api-2026-11-22', `${f}.json`), 'utf8'));
+  const raw = {
+    popular: api('popular').hits.map((x) => x.app_id), trending: api('trending').hits.map((x) => x.app_id),
+    added: api('recently-added').hits.map((x) => x.app_id), updated: api('recently-updated').hits.map((x) => x.app_id),
+    day: [api('app-of-the-day').app_id], week: api('apps-of-the-week').apps.sort((a, b) => a.position - b.position).map((x) => x.app_id), busy: false,
+  };
+  const ranks = M.ranksOf(raw);
+  eq('ranks: the lists as they came', [ranks.popular.length, ranks.trending.length, ranks.day, ranks.week.length, 'busy' in ranks], [250, 40, ['nl.andreasknoben.Laser'], 5, false]);
+  const pop = M.collection(real, 'popular', { now: at, ranks });
+  eq('popular: Flathub\'s order, only apps in the catalog, verified only', pop.slice(0, 4).map((a) => a.id),
+    ['org.mozilla.firefox', 'com.discordapp.Discord', 'com.github.tchx84.Flatseal', 'org.telegram.desktop']);
+  eq('popular: no unverified app while the switch is off', pop.every((a) => a.verified), true);
+  eq('popular with every app', M.collection(real, 'popular', { now: at, ranks, showAll: true }).slice(0, 4).map((a) => a.id),
+    ['org.mozilla.firefox', 'com.discordapp.Discord', 'org.videolan.VLC', 'com.valvesoftware.Steam']);
+  eq('popular: names and icons are the catalog\'s', pop[0], real.find((a) => a.id === 'org.mozilla.firefox'));
+  eq('trending, added: none of them in this piece of the catalog', [M.collection(real, 'trending', { now: at, ranks }), M.collection(real, 'added', { now: at, ranks })], [[], []]);
+  eq('updated: Flathub\'s has 1 app here, under RANK_UPDATED_MIN: the catalog\'s', M.collection(real, 'updated', { now: at, ranks }).map((a) => a.id),
+    M.recentlyUpdated(real, { now: at }).map((a) => a.id));
+  const many = { updated: ['org.gnome.Evince', 'org.mozilla.firefox', 'com.discordapp.Discord', 'com.obsproject.Studio', 'org.x.NotInCatalog'] };
+  eq('updated: Flathub\'s when it has enough', M.collection(real, 'updated', { now: at, ranks: many }).map((a) => a.id),
+    ['org.gnome.Evince', 'org.mozilla.firefox', 'com.discordapp.Discord', 'com.obsproject.Studio']);
+  eq('app of the day not in the catalog: the latest release', M.banner(real, { now: at, ranks }).kind, 'latest');
+  eq('app of the day in the catalog', M.banner(real, { now: at, ranks: { day: ['org.gnome.Evince'] } }), { kind: 'day', app: real.find((a) => a.id === 'org.gnome.Evince') });
+  const unv = real.find((a) => !a.verified);
+  eq('an unverified app of the day only with the switch', [M.banner(real, { now: at, ranks: { day: [unv.id] } }).kind, M.banner(real, { now: at, showAll: true, ranks: { day: [unv.id] } }).kind], ['latest', 'day']);
+  eq('home rows with the rankings', M.homeRows(real, { now: at, ranks: { ...ranks, week: ['com.obsproject.Studio', 'org.gnome.Evince'] } }).map((r) => r.key), ['week', 'popular', 'updated']);
+  eq('home rows with the rankings and every app', M.homeRows(real, { now: at, showAll: true, ranks }).map((r) => r.key), ['popular', 'updated', 'verified']);
+  eq('subcategories of Game (verified)', M.subcategoryCounts(real, 'Game', false), { ArcadeGame: 1, Emulator: 2 });
+  eq('subcategories of Game (all)', M.subcategoryCounts(real, 'Game', true), { ArcadeGame: 1, Emulator: 3 });
+  eq('subcategories in SUBCATS order', Object.keys(M.subcategoryCounts(real, 'Graphics', true)), ['2DGraphics', 'Viewer', 'RasterGraphics', '3DGraphics', 'VectorGraphics']);
+  eq('a subcategory needs its main category', M.subcategoryCounts(real, 'Utility', true).Viewer, undefined);
+  eq('shown apps = the catalog list, not the categories\' sum', [M.shownCount(real, false), M.filterCatalog(real).length,
+    Object.values(M.categoryCounts(real, false)).reduce((a, n) => a + n, 0) > M.shownCount(real, false)], [M.filterCatalog(real).length, M.filterCatalog(real).length, true]);
+  eq('filter by subcategory', ids(M.filterCatalog(real, { category: 'Game', sub: 'Emulator', showAll: true })), ['dolphin-emu', 'PCSX2', 'RetroArch']);
+  eq('subcategory checks', [M.subOk('Game', 'Emulator'), M.subOk('Game', 'Viewer'), M.subOk('toString', 'x'), M.subOk('__proto__', 'Audio'), M.subcatsOf('constructor')],
+    [true, false, false, false, []]);
+}
+// hostile or broken catalog entries: never thrown on, never first
+{
+  const now = Date.UTC(2026, 10, 22);
+  const s = Math.floor(now / 1000);
+  const hostile = [
+    { id: 'org.x.Future', name: 'Future', summary: 's', icon: 'i.png', verified: true, updated: s + 10 * 86400 },
+    { id: 'org.x.Float', name: 'Float', verified: true, updated: s - 1.5 },
+    { id: 'org.x.Str', name: 'Str', verified: true, updated: String(s) },
+    { id: 'org.x.Neg', name: 'Neg', verified: true, updated: -5 },
+    { id: 'org.x.Old', name: 'Old', verified: true, updated: 12345 },
+    { id: 'org.x.NaN', name: 'NaN', verified: true, updated: NaN },
+    { id: 'org.x.Inf', name: 'Inf', verified: true, updated: Infinity },
+    { id: 'org.x.None', name: 'None', verified: true },
+    { id: 'org.x.Ok', name: 'Ok', summary: '', icon: '', verified: true, updated: s - 100 },
+    { id: 'org.x.Okay', name: 'Okay', summary: 'yes', icon: 'o.png', verified: true, updated: s - 200, categories: 'Game;Emulator;Emulator;' },
+    { id: 'org.x.Unv', name: 'Unv', summary: 'x', icon: 'u.png', verified: false, updated: s },
+    null, undefined, 5, 'org.x.String',
+  ].filter((a) => a && typeof a === 'object');
+  eq('hostile dates left out', M.recentlyUpdated(hostile, { now }).map((a) => a.name), ['Ok', 'Okay']);
+  eq('a release up to a day ahead counts', M.updatedAt({ updated: s + 3600 }, now) > 0, true);
+  eq('spotlight skips an app without icon or summary', M.spotlight(hostile, { now }).name, 'Okay');
+  eq('spotlight: none', M.spotlight([], { now }), null);
+  eq('a category listed twice counts once', M.subcategoryCounts(hostile, 'Game', false), { Emulator: 1 });
+  eq('a main category listed twice counts once, as its page shows the app once',
+    [M.categoryCounts([...hostile, { id: 'org.x.Twice', name: 'Twice', verified: true, categories: 'Graphics;Viewer;Graphics;' }], false).Graphics,
+      M.filterCatalog([{ id: 'org.x.Twice', name: 'Twice', verified: true, categories: 'Graphics;Viewer;Graphics;' }], { category: 'Graphics' }).length], [1, 1]);
+  eq('shown apps: each app once, whatever its categories', [M.shownCount(hostile, false), M.shownCount(hostile, true), M.shownCount(null, true), M.shownCount([null, 5], true)],
+    [hostile.length - 1, hostile.length, 0, 0]);
+  eq('verified apps: dated first, then by name', M.verifiedApps(hostile, { now }).map((a) => a.name).slice(0, 4), ['Ok', 'Okay', 'Float', 'Future']);
+  eq('nothing at all', [M.recentlyUpdated(null), M.homeRows(undefined), M.subcategoryCounts(null, 'Game', true), M.collection(null, 'updated')], [[], [], {}, []]);
+}
+// hostile rankings: whatever lord.flatpak.ranks() gave, only known lists of good ids, no duplicates, at most 250
+{
+  eq('ranks: not an object', [M.ranksOf(null), M.ranksOf('popular'), M.ranksOf(5), M.ranksOf([['org.a.B']])], [{}, {}, {}, {}]);
+  const r = M.ranksOf({ popular: ['org.a.B', 'org.a.B', '../../etc', 'org.ex ample.App', 7, null, { id: 'org.c.D' }, 'org.c.D', 'a.b', 'org.e-x.App', 'org.x.Y-z'],
+    trending: 'org.a.B', added: { 0: 'org.a.B', length: 1 }, updated: [], day: ['bad id'], week: ['org.w.One', 'org.w.Two'],
+    verified: ['org.a.B'], __proto__: { popular: ['org.evil.Proto'] }, busy: true });
+  eq('ranks: bad ids, duplicates and other types dropped', r, { popular: ['org.a.B', 'org.c.D', 'org.x.Y-z'], week: ['org.w.One', 'org.w.Two'] });
+  eq('ranks: own keys only', M.ranksOf(Object.create({ popular: ['org.evil.Proto'] })), {});
+  const long = Array.from({ length: 400 }, (_, i) => `org.app.N${i}`);
+  eq('ranks: at most 250', M.ranksOf({ popular: long }).popular.length, 250);
+  const cat = [{ id: 'org.a.B', name: 'A', verified: true }, { id: 'org.c.D', name: 'C', verified: false }, null, 5, { id: 'bad id', verified: true },
+    { id: 'org.a.B', name: 'A twice', verified: true }];
+  eq('ranked apps: catalog entries only, first of a duplicate id', M.rankedApps(cat, ['org.c.D', 'org.a.B', 'org.z.Z', 'bad id', 'org.a.B'], { showAll: true }).map((a) => a.name), ['C', 'A']);
+  eq('ranked apps: verified only', M.rankedApps(cat, ['org.c.D', 'org.a.B']).map((a) => a.name), ['A']);
+  eq('ranked apps: no list', [M.rankedApps(cat, null), M.rankedApps(cat, 'org.a.B'), M.rankedApps(null, ['org.a.B'])], [[], [], []]);
+  eq('app of the day: none', [M.appOfTheDay(cat, null), M.appOfTheDay(cat, {}), M.appOfTheDay(cat, { day: ['org.c.D'] })], [null, null, null]);
+}
+// every collection, subcategory and home text in every language
+{
+  const keys = ['verifiedShort', 'home.spotlight', 'home.categories', 'home.appOfTheDay', 'rankingsOn', 'rankingsOff', ...M.COLLECTIONS.map((k) => `coll.${k}`),
+    ...[...new Set(Object.values(M.SUBCATS).flat())].map((s) => `sub.${s}`)];
+  const dir = path.join(root, 'assets/locales');
+  for (const lang of fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, d)).isDirectory())) {
+    const cat2 = JSON.parse(fs.readFileSync(path.join(dir, lang, 'flathub.json'), 'utf8'));
+    eq(`home texts in ${lang}`, keys.filter((k) => typeof cat2[k] !== 'string' || !cat2[k].trim()), []);
+  }
+  eq('every main category has subcategories', M.MAIN_CATS.every((c) => M.subcatsOf(c).length > 0), true);
 }
 
 console.log(bad ? `flathub-model: ${bad} of ${n} failed` : `flathub-model: ${n}/${n} ok`);

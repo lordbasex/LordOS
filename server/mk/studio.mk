@@ -4,7 +4,7 @@
 # on the CPU. It links what lord-media links plus Mesa's GBM, EGL and GLES when GPU=1, and nothing else (AGENTS.md,
 # E-S1). Without FFmpeg's -dev packages it isn't built, like lord-media.
 STUDIO_NN_SRC := src/media/studio/nn.c src/media/studio/face.c
-STUDIO_FX_SRC := src/media/studio/stfx.c src/media/studio/stgf.c src/media/studio/stout.c
+STUDIO_FX_SRC := src/media/studio/stfx.c src/media/studio/stgf.c src/media/studio/stout.c src/media/studio/stlook.c src/media/studio/stframe.c
 STUDIO_GL_SRC := $(if $(filter 1,$(GPU)),src/media/studio/stgl.c)
 STUDIO_GL_FLAGS := $(if $(filter 1,$(GPU)),-DLORD_GPU $(shell pkg-config --cflags gbm egl glesv2))
 STUDIO_GL_LIBS := $(if $(filter 1,$(GPU)),$(shell pkg-config --libs gbm egl glesv2))
@@ -40,6 +40,23 @@ build/studio-test: tests/studio_test.c $(STUDIO_OBJ) $(STUDIO_GL_SRC) $(STUDIO_H
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(STUDIO_GL_FLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/studio_test.c $(STUDIO_OBJ) $(STUDIO_GL_SRC) \
 	    src/pkg/crypto.c build/obj/ui/stb.o $(STUDIO_GL_LIBS) -lm -lpthread
+
+# phase 3's looks on fixed frames: Face Light, colour match, filters, the green screen, a video background, Center
+# Stage and Retouch; CPU always, GPU when there is a render node (tests/run_suites.sh runs it)
+test: build/studio-fx-test
+build/studio-fx-test: tests/studio_fx_test.c $(STUDIO_OBJ) $(STUDIO_GL_SRC) $(STUDIO_HDR) build/obj/ui/stb.o
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(STUDIO_GL_FLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/studio_fx_test.c $(STUDIO_OBJ) $(STUDIO_GL_SRC) \
+	    build/obj/ui/stb.o $(STUDIO_GL_LIBS) -lm -lpthread
+
+# phase 3, the background catalog: the closed actions studio-bg-get and studio-bg-remove (E-S4) with a fake download,
+# their catalog lookup, and the shipped assets/studio/backgrounds.json (licenses, entries the action accepts, thumbnails)
+test: build/studio-bg-admin-test
+build/studio-bg-admin-test: tests/studio_bg_admin_test.c src/hw/studio_bg_admin.c src/hw/studio_bg_find.c src/hw/studio_bg_find.h src/sec/json.c src/pkg/crypto.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D'STUDIO_BG_CATALOG="build/studio-bg-test/catalog.json"' \
+	    -D'STUDIO_BG_STORE="build/studio-bg-test/store"' -D'STUDIO_BG_OWNER_OK(st)=((st).st_uid == getuid())' \
+	    -o $@ tests/studio_bg_admin_test.c src/hw/studio_bg_admin.c src/hw/studio_bg_find.c src/sec/json.c src/pkg/crypto.c
 
 # lord-studio itself without a camera: the pipeline inside its sandbox, refusals (tests/run_suites.sh full)
 test-full: build/studio-helper-test

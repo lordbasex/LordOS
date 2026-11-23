@@ -21,6 +21,7 @@ import { ClipboardSettings } from './Clipboard.jsx';
 import { PrivacySettings } from './Privacy.jsx';
 import { PrintersSettings } from './Printers.jsx';
 import { TrackpadSettings } from './Trackpad.jsx';
+import { WindowPrefs } from './WindowPrefs.jsx';
 import { DockSettings } from './Dock.jsx';
 import { ThemeOptions } from './ThemeExtras.jsx';
 import { ThemeGallery } from './ThemeGallery.jsx';   // Desktop style: the gallery of themes (docs/THEMES-PLAN.md, stage 1)
@@ -147,6 +148,7 @@ function Appearance() {
             options={[['auto', tr('settings.scrollBarsAuto')], ['scrolling', tr('settings.scrollBarsScrolling')], ['always', tr('settings.scrollBarsAlways')]]} />
         </SettingRow>
       </Section>
+      <WindowPrefs />
       <BrowserFrameSettings />
     </Stack>
   );
@@ -336,7 +338,7 @@ function UserImages({ login, curId, onChoose, onDefault, setNote }) {
         return (
           <Layer name="modal">
             <View style={{ position: 'absolute', left: g.x || 0, top: g.y || 0, width: g.w || 640, height: g.h || 480 }}>
-              <FilePicker title={tr('settings.wallpaperImage.pick')} filter={/\.(png|jpe?g)$/i} onClose={() => setPicking(false)} onPick={(p) => add([].concat(p)[0])} />
+              <FilePicker computer title={tr('settings.wallpaperImage.pick')} filter={/\.(png|jpe?g)$/i} onClose={() => setPicking(false)} onPick={(p) => add([].concat(p)[0])} />
             </View>
           </Layer>
         );

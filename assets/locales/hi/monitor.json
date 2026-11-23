@@ -603,7 +603,7 @@
   "comp.weather": "मौसम",
   "comp.weatherHint": "चालू करने पर मौसम विजेट के Open-Meteo से पूर्वानुमान।",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Flathub से Flatpak ऐप: कैटलॉग, उनका इंस्टॉल और उनके अपडेट।",
+  "comp.flathubHint": "Flathub से Flatpak ऐप: कैटलॉग, उनका इंस्टॉल, उनके अपडेट और flathub.org से स्टोर की रैंकिंग।",
   "comp.streams": "कैमरे और टीवी",
   "comp.streamsHint": "वीडियो विजेट और प्लेयर के पते: कैमरे, स्ट्रीम और टीवी चैनल (lord-stream)।"
 }

@@ -603,7 +603,7 @@
   "comp.weather": "Hava",
   "comp.weatherHint": "Açdıqda hava vidcetinin Open-Meteo proqnozları.",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Flathub-dan Flatpak tətbiqləri: kataloq, quraşdırmalar və yeniləmələr.",
+  "comp.flathubHint": "Flathub-dan Flatpak tətbiqləri: kataloq, quraşdırmalar, yeniləmələr və flathub.org-dan Mağazanın reytinqləri.",
   "comp.streams": "Kameralar və TV",
   "comp.streamsHint": "Video vidceti və Pleyerin ünvanları: kameralar, yayımlar və TV kanalları (lord-stream)."
 }

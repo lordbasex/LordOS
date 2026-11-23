@@ -46,6 +46,7 @@
   "backup.destMissing": "El destino no existe",
   "backup.destNotAllowed": "Ese destino no está permitido",
   "backup.destOutside": "El destino tiene que estar en tu carpeta personal o en uno de tus discos",
+  "backup.destCloud": "Una carpeta de la nube no puede ser el destino de la copia: las instantáneas necesitan enlaces duros, que una cuenta en la nube no tiene, y sus archivos siguen subiéndose aunque detengas la copia. Elegí un disco o una carpeta de este equipo",
   "backup.destUnwritable": "No se puede escribir en el destino",
   "backup.interrupted": "Se interrumpió",
   "backup.locked": "Las copias están cifradas: desbloquealas primero",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Esa imagen no se puede usar como fondo.",
   "studio.invalid": "Ese ajuste de LordOS Studio no es válido.",
   "studio.noCamera": "No hay ninguna cámara conectada.",
-  "studio.unavailable": "LordOS Studio no está disponible en esta computadora."
+  "studio.unavailable": "LordOS Studio no está disponible en esta computadora.",
+  "studio.downloadFailed": "No se pudo descargar el fondo.",
+  "studio.removeFailed": "No se pudo eliminar el fondo.",
+  "dkms.mokInvalid": "Esa solicitud de clave de Secure Boot no es válida.",
+  "dkms.mokNotNeeded": "Esta computadora no necesita inscribir la clave ahora.",
+  "dkms.mokNothingPending": "No hay ninguna clave esperando inscribirse en el próximo reinicio.",
+  "dkms.mokNoTool": "El programa mokutil no está instalado.",
+  "dkms.mokFailed": "No se pudo preparar la clave para el próximo reinicio.",
+  "media.protectedWindow": "Esta ventana está protegida: no se puede capturar sola. En las capturas de la pantalla sale en negro."
 }

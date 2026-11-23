@@ -2,6 +2,7 @@
  * request validation on both sides, the sockets the connector makes, the real connector process
  * (this binary re-executed with --net-connector, as lord-server is) and its fail-closed start. */
 #include "sec/netconn.h"
+#include "fw/rules.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -49,7 +50,8 @@ static void test_requests(void) {
     CHECK(!netconn_req_make(&y, AF_INET6, SOCK_DGRAM, (struct sockaddr *)&a6, sizeof a6) && y.fam == 6 && y.type == 2);
     x = r; x.magic = 0;
     CHECK(netconn_serve_one(&x) == -EINVAL);                         /* the connector checks again */
-    CHECK(!strcmp(netconn_name(NC_MAIL), "mail") && !strcmp(netconn_name(NC_LISTS), "lists") && !netconn_name(NC_COUNT));
+    CHECK(!strcmp(netconn_name(NC_MAIL), "mail") && !strcmp(netconn_name(NC_LISTS), "lists") && !strcmp(netconn_name(NC_WEATHER), "weather") && !strcmp(netconn_name(NC_FLATHUB), "flathub") && !netconn_name(NC_COUNT));
+    for (int i = 0; i < NC_COUNT; i++) CHECK(fw_component_ok(netconn_name((NcComponent)i)));   /* each connector is a firewall row */
 }
 
 static int listener(int *port) {

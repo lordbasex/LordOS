@@ -144,11 +144,13 @@ export function catalogLang(lang) {
 const fold = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 // The catalog the Store shows: the verified apps unless showAll, those in category cat ('Utility', a freedesktop main
-// category), those matching every word of query (name, summary, developer, id); by name.
-export function filterCatalog(cat, { query = '', showAll = false, category = null } = {}) {
+// category) and subcategory sub (one of SUBCATS[category]), those matching every word of query (name, summary,
+// developer, id); by name.
+export function filterCatalog(cat, { query = '', showAll = false, category = null, sub = null } = {}) {
   const words = fold(query).split(/\s+/).filter(Boolean);
   const out = (cat || []).filter((a) => (showAll || a.verified)
     && (!category || String(a.categories || '').split(';').includes(category))
+    && (!sub || String(a.categories || '').split(';').includes(sub))
     && (!words.length || words.every((w) => fold(`${a.name} ${a.summary} ${a.developer} ${a.id}`).includes(w))));
   // by name; while searching, the apps whose name starts with the first word come first
   // each name folded once, not in every comparison (thousands of apps)
@@ -158,15 +160,20 @@ export function filterCatalog(cat, { query = '', showAll = false, category = nul
   return keyed.map((x) => x.a);
 }
 
-// How many shown apps each category has (the sidebar's counts).
+// How many shown apps each category has (the sidebar's counts). An app that lists a category twice (Flathub's catalog
+// has some: "Graphics;Graphics;") counts once, as filterCatalog shows it once (2026-11-22: Graphics said 217, its page 216).
 export function categoryCounts(cat, showAll) {
   const out = {};
   for (const a of cat || []) {
-    if (!showAll && !a.verified) continue;
-    for (const c of String(a.categories || '').split(';')) if (c) out[c] = (out[c] || 0) + 1;
+    if (!a || (!showAll && !a.verified)) continue;
+    for (const c of new Set(String(a.categories || '').split(';'))) if (c) out[c] = (out[c] || 0) + 1;
   }
   return out;
 }
+
+// How many apps the catalog shows (the second column's "All": the sum of the categories counts an app in several of
+// them more than once; 2026-11-22: All said 2734 over a list of 2243).
+export const shownCount = (cat, showAll) => (Array.isArray(cat) ? cat : []).filter((a) => a && typeof a === 'object' && (showAll || a.verified)).length;
 
 // `flatpak list --app --columns=application,branch,version,origin` → [{ id, branch, version, origin }]; a line that
 // isn't one (a header, a warning) is skipped. Columns are tab-separated when the output is not a terminal.
@@ -195,8 +202,10 @@ export function progressOf(line) {
 // Does the catalog need fetching again (the Store opened and the last update --appstream is older than a day)?
 export const appstreamStale = (at, now) => !(at > 0) || now - at > APPSTREAM_EVERY || at > now + 60e3;
 
-// The Flathub settings (settings.flathub): { on, showAll, appstreamAt }.
-export const prefsOf = (s) => ({ on: !!(s && s.on), showAll: !!(s && s.showAll), appstreamAt: (s && Number(s.appstreamAt)) || 0 });
+// The Flathub settings (settings.flathub): { on, showAll, appstreamAt, rankings }. rankings (Flathub's Popular,
+// Trending… from flathub.org, E10) is on unless turned off: absent means on, so no migration is needed.
+export const prefsOf = (s) => ({ on: !!(s && s.on), showAll: !!(s && s.showAll), appstreamAt: (s && Number(s.appstreamAt)) || 0,
+  rankings: !(s && s.rankings === false) });
 
 // A note on an app's page about how it works in LordOS (the Flathub compatibility run, 2026-11-22): a key under
 // "flathub.note.", or null. OBS Studio: the home folder is read-only in a Flatpak app's view (docs/FLATPAK.md, E2), so
@@ -242,3 +251,157 @@ export function descriptionView(text, { open = false, lines = DESC_LINES, perLin
   }
   return { paras: out, long };
 }
+
+// ---- the Flathub home: collections, categories and subcategories (Bazaar-like, 2026-11-22) ----
+// Everything here comes from the catalog lord-appstream read from Flathub's signed AppStream (E7), never from another
+// download. An app's `updated` is its newest release's time in seconds (0 when it has none), checked in C
+// (fpakas_line: 1 to 11 digits, no sign).
+
+// The main categories the Store shows (freedesktop's) and, under each, the subcategories Flathub's catalog has most
+// apps in (counted on the catalog of 2026-11-22), in that order. A subcategory is a key under "flathub.sub." and is
+// shown only when it has apps.
+export const MAIN_CATS = ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'System', 'Utility'];
+export const SUBCATS = {
+  AudioVideo: ['Audio', 'Player', 'Video', 'Music', 'AudioVideoEditing', 'Recorder'],
+  Development: ['IDE', 'TextEditor', 'RevisionControl', 'WebDevelopment', 'Debugger'],
+  Education: ['Math', 'Languages', 'Geography', 'ComputerScience'],
+  Game: ['ArcadeGame', 'ActionGame', 'StrategyGame', 'Emulator', 'LogicGame', 'Shooter', 'KidsGame', 'Simulation', 'BoardGame',
+    'AdventureGame', 'RolePlaying', 'SportsGame', 'CardGame'],
+  Graphics: ['2DGraphics', 'Viewer', 'RasterGraphics', 'Photography', '3DGraphics', 'VectorGraphics', 'Scanning'],
+  Network: ['InstantMessaging', 'Chat', 'FileTransfer', 'WebBrowser', 'P2P', 'RemoteAccess', 'Feed', 'Email', 'VideoConference'],
+  Office: ['Finance', 'WordProcessor', 'Calendar', 'Viewer', 'ProjectManagement', 'Publishing'],
+  Science: ['Math', 'DataVisualization', 'Chemistry', 'Astronomy', 'Physics'],
+  System: ['TerminalEmulator', 'Monitor', 'Security'],
+  Utility: ['TextEditor', 'Security', 'FileTools', 'Calculator', 'Archiving', 'Clock'],
+};
+export const subcatsOf = (main) => (typeof main === 'string' && Object.prototype.hasOwnProperty.call(SUBCATS, main) ? SUBCATS[main] : []);
+export const subOk = (main, sub) => subcatsOf(main).includes(sub);
+
+const catsOf = (a) => String((a && a.categories) || '').split(';');
+
+// How many shown apps each subcategory of main has: { sub: n }, only those with apps, in SUBCATS order.
+export function subcategoryCounts(cat, main, showAll) {
+  const subs = subcatsOf(main);
+  const n = {};
+  for (const a of subs.length ? cat || [] : []) {
+    if (!showAll && !a.verified) continue;
+    const c = catsOf(a);
+    if (!c.includes(main)) continue;
+    for (const s of subs) if (c.includes(s)) n[s] = (n[s] || 0) + 1;
+  }
+  return Object.fromEntries(subs.filter((s) => n[s]).map((s) => [s, n[s]]));
+}
+
+// An app's newest release in ms, or 0: a whole number of seconds after 2000-01-01 and never more than a day after now
+// (a release dated in the future would stay first for ever).
+export const UPDATED_MIN = 946684800;
+export function updatedAt(a, now) {
+  const u = a && Number.isInteger(a.updated) ? a.updated : 0;
+  return u < UPDATED_MIN || u * 1000 > now + 24 * 3600e3 ? 0 : u * 1000;
+}
+
+// The shown apps (of category when given), newest release first, those without one left out; ties by name.
+export function recentlyUpdated(cat, { showAll = false, now = Date.now(), category = null } = {}) {
+  const keyed = [];
+  for (const a of cat || []) {
+    if (!showAll && !a.verified) continue;
+    if (category && !catsOf(a).includes(category)) continue;
+    const at = updatedAt(a, now);
+    if (at) keyed.push({ a, at, n: fold(a.name) });
+  }
+  keyed.sort((x, y) => y.at - x.at || (x.n < y.n ? -1 : x.n > y.n ? 1 : 0));
+  return keyed.map((x) => x.a);
+}
+
+// Flathub's verified apps: newest release first, then those without one by name.
+export function verifiedApps(cat, { now = Date.now() } = {}) {
+  const v = (cat || []).filter((a) => a.verified);
+  const dated = recentlyUpdated(v, { showAll: true, now });
+  const seen = new Set(dated.map((a) => a.id));
+  return [...dated, ...filterCatalog(v.filter((a) => !seen.has(a.id)), { showAll: true })];
+}
+
+// ---- the rankings from Flathub's API (E10, docs/FLATPAK.md "Rankings from Flathub's API") ----
+// lord.flatpak.ranks() gives app ids only (lord-fetch keeps nothing else of Flathub's answer, and lord-server checks
+// every id again): Popular, Trending, Recently added, Recently updated, the app of the day and the apps of the week.
+// Names, icons and summaries still come only from the signed catalog: an id the catalog hasn't is dropped, and the
+// install rules don't change (an unverified app only while the switch shows every app).
+export const RANK_LISTS = ['popular', 'trending', 'added', 'updated', 'day', 'week'];
+export const RANK_MAX = 250;
+// Flathub's Recently updated (its builds) replaces the catalog's (the newest <release> date an app declares, which many
+// apps forget to add) when at least this many of its apps are shown.
+export const RANK_UPDATED_MIN = 4;
+
+// What lord.flatpak.ranks() returned → { list: [ids] } with only the known lists, ids that pass idOk, no duplicates, at
+// most RANK_MAX each, in their order. Anything else (a missing list, another type) is left out.
+export function ranksOf(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const k of RANK_LISTS) {
+    const v = Object.prototype.hasOwnProperty.call(raw, k) ? raw[k] : null;
+    if (!Array.isArray(v)) continue;
+    const seen = new Set();
+    for (const id of v.slice(0, RANK_MAX)) if (idOk(id)) seen.add(id);
+    if (seen.size) out[k] = [...seen];
+  }
+  return out;
+}
+
+// the catalog by id, built once per catalog read
+const indexes = new WeakMap();
+function byId(cat) {
+  if (!Array.isArray(cat)) return new Map();
+  let m = indexes.get(cat);
+  if (!m) {
+    m = new Map();
+    for (const a of cat) if (a && typeof a === 'object' && idOk(a.id) && !m.has(a.id)) m.set(a.id, a);
+    indexes.set(cat, m);
+  }
+  return m;
+}
+
+// The catalog's apps for a ranked list of ids, in the list's order: only those in the catalog, and only the verified
+// ones unless showAll.
+export function rankedApps(cat, ids, { showAll = false } = {}) {
+  if (!Array.isArray(ids) || !ids.length) return [];
+  const m = byId(cat), out = [], seen = new Set();
+  for (const id of ids) {
+    const a = typeof id === 'string' ? m.get(id) : null;
+    if (a && !seen.has(id) && (showAll || a.verified)) { seen.add(id); out.push(a); }
+  }
+  return out;
+}
+
+// Flathub's app of the day, when it is in the catalog and shown, or null.
+export const appOfTheDay = (cat, ranks, { showAll = false } = {}) => rankedApps(cat, ranks && ranks.day, { showAll })[0] || null;
+
+// The home's banner: { kind: 'day', app } (Flathub's app of the day) or { kind: 'latest', app } (the app released most
+// recently, from the catalog alone), or null.
+export function banner(cat, { showAll = false, now = Date.now(), ranks = null } = {}) {
+  const day = appOfTheDay(cat, ranks, { showAll });
+  if (day) return { kind: 'day', app: day };
+  const latest = spotlight(cat, { showAll, now });
+  return latest ? { kind: 'latest', app: latest } : null;
+}
+
+// The home's collections: a key under "flathub.coll." → its apps, in this order. The rankings are there only when
+// lord.flatpak.ranks() had them (off, offline or failed: they are simply absent). 'updated' is Flathub's when it is good
+// enough (RANK_UPDATED_MIN), else the catalog's. 'verified' only while the unverified apps are shown too (otherwise every
+// app shown is verified and the row would repeat the catalog).
+export const COLLECTIONS = ['week', 'popular', 'trending', 'added', 'updated', 'verified'];
+export const collectionOk = (k) => COLLECTIONS.includes(k);
+export function collection(cat, key, { showAll = false, now = Date.now(), ranks = null } = {}) {
+  const r = ranks || {};
+  if (key === 'week' || key === 'popular' || key === 'trending' || key === 'added') return rankedApps(cat, r[key], { showAll });
+  if (key === 'updated') {
+    const api = rankedApps(cat, r.updated, { showAll });
+    return api.length >= RANK_UPDATED_MIN ? api : recentlyUpdated(cat, { showAll, now });
+  }
+  if (key === 'verified') return showAll ? verifiedApps(cat, { now }) : [];
+  return [];
+}
+// [{ key, apps }] in COLLECTIONS order, only those with apps.
+export const homeRows = (cat, opts = {}) => COLLECTIONS.map((key) => ({ key, apps: collection(cat, key, opts) })).filter((r) => r.apps.length);
+
+// The home's banner: the shown app released most recently that has an icon and a summary, or null.
+export const spotlight = (cat, opts = {}) => recentlyUpdated(cat, opts).find((a) => a.icon && a.summary) || null;

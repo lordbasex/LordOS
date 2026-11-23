@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Binibigyan ang lahat ng app, kasama ang mga browser at video call, ng camera na “LordOS Studio” na may mga effect mo: malabong background o larawan sa likod mo ({packages}).",
   "suggest.studioCamera.unavailable": "Wala ang {packages} sa mga package source ng computer na ito.",
   "suggest.studioCamera.note.dkms": "Sa PC, binubuo ang kernel module nito para sa kernel mo sa computer na ito (DKMS), na may kasamang mga 500 MB na compiler at kernel header, at muli pagkatapos ng bawat update ng kernel. Sa Raspberry Pi, kasama na ito sa kernel ng LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Kapag naka-on ang Secure Boot, kailangan mong i-enroll ang signing key ng module sa susunod na restart, o hindi lalabas ang camera."
+  "suggest.studioCamera.note.secureBoot": "Kapag naka-on ang Secure Boot, kailangan mong i-enroll ang signing key ng module sa susunod na restart, o hindi lalabas ang camera.",
+  "suggest.studioCamera.note.obs": "Nagdadagdag din ito ng pangalawang camera device, “OBS Virtual Camera”, para gumana ang sariling virtual camera ng OBS Studio katabi ng LordOS Studio.",
+  "suggest.mok.title": "Isa pang hakbang sa susunod na restart",
+  "suggest.mok.body": "Naka-on ang Secure Boot, kaya naglo-load lang ang na-install ng item na ito kapag na-enroll na ang signing key nito. Inihahanda ng LordOS ang susi at binibigyan ka ng isang beses na password na ita-type mo sa isang asul na screen sa susunod na restart.",
+  "suggest.mok.prepare": "Ihanda ang Susi",
+  "suggest.mok.pending": "Ie-enroll ang susi sa susunod na restart. Kung wala na sa iyo ang password, kumuha ng bago.",
+  "suggest.mok.passwordTitle": "Ang isang beses na password mo",
+  "suggest.mok.passwordHint": "Isulat ito ngayon: isang beses lang itong ipinapakita at hindi ito sine-save kahit saan.",
+  "suggest.mok.steps": "Mag-restart, at kapag lumabas ang asul na screen, pumindot ng key sa loob ng 10 segundo. Pagkatapos piliin ang Enroll MOK → Continue → Yes, i-type ang password na ito at piliin ang Reboot.",
+  "suggest.mok.newPassword": "Bagong Password",
+  "suggest.mok.cancel": "Kanselahin ang Pag-enroll"
 }

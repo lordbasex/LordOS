@@ -46,6 +46,7 @@
   "backup.destMissing": "The destination does not exist",
   "backup.destNotAllowed": "That destination is not allowed",
   "backup.destOutside": "The destination must be in your home folder or on one of your disks",
+  "backup.destCloud": "A Cloud folder can’t be a backup destination: snapshots need hard links, which a cloud account doesn’t have, and its files keep uploading even after the backup is stopped. Choose a disk or a folder on this computer",
   "backup.destUnwritable": "Cannot write to the destination",
   "backup.interrupted": "It was interrupted",
   "backup.locked": "Backups are encrypted: unlock them first",
@@ -917,5 +918,13 @@
   "studio.badPicture": "That picture can't be used as a background.",
   "studio.invalid": "That LordOS Studio setting isn't valid.",
   "studio.noCamera": "No camera is connected.",
-  "studio.unavailable": "LordOS Studio is not available on this computer."
+  "studio.unavailable": "LordOS Studio is not available on this computer.",
+  "studio.downloadFailed": "The background could not be downloaded.",
+  "studio.removeFailed": "The background could not be removed.",
+  "dkms.mokInvalid": "That Secure Boot key request isn't valid.",
+  "dkms.mokNotNeeded": "This computer doesn't need the key enrolled now.",
+  "dkms.mokNothingPending": "No key is waiting to be enrolled at the next restart.",
+  "dkms.mokNoTool": "The mokutil program isn't installed.",
+  "dkms.mokFailed": "The key couldn't be prepared for the next restart.",
+  "media.protectedWindow": "This window is protected, so it can't be captured on its own. In captures of the screen it shows black."
 }

@@ -369,10 +369,10 @@
           "code": "Code only"
         },
         "depthText": {
-          "complete": "Tests written for this protocol cover every request, event and error, and all of them passed with nothing skipped.",
+          "complete": "Tests written for this protocol cover every request, event and error, and all of them passed with nothing skipped. What a test session has no device for (a pointer over a window, a graphics tablet, a VR headset, Xwayland's own connection) is given by the test server itself, never by real hardware.",
           "partial": "Tests written for this protocol, but one point was skipped because it needs something a test without a screen doesn't have, such as a pointer over a window.",
           "general": "The source code was checked (every request handled, every event sent, every error raised) and a generic test bound the interface at every version; it has no flow of its own in the tool yet. For X11, the code check and unit tests.",
-          "code": "Only the source code was checked: the interface can't be used without real hardware or a particular client (DRM leases need a VR headset; xwayland_shell is offered to Xwayland only), or the X11 item has nothing to run without a screen."
+          "code": "Only the source code was checked: the item has nothing to run without a screen (X11)."
         },
         "barText": "The bar shows the score in tenths, as the tool prints it in a terminal.",
         "hItem": "X11 item",
@@ -380,9 +380,188 @@
         "x11Lead": "What LordOS's X11 window manager does for apps that still use X11: the ICCCM and EWMH conventions, Motif decoration hints, XDND drag and drop, the clipboard and primary selection, HiDPI scaling, the cursor and the isolation of Xwayland. The names are the standards' own, in English.",
         "proofsTitle": "Proof with real programs",
         "proofsLead": "Screenshots of real programs on a lord-server started for the test, taken the same day: {wayland} with Wayland apps (terminals, GTK and Qt, Vulkan, OpenGL and Chromium) and {x11} with X11 apps. The Wayland ones were checked in each program's protocol log, with no protocol error; the X11 ones show what xprop and xwininfo read from the windows.",
-        "limits": "Not checked here: Firefox and other programs that weren't installed on the test machine, and what needs hardware (a graphics tablet's wheel, a touchscreen, a VR headset). The descriptions of the screenshots are in English, like the tool's report.",
+        "limits": "Not checked here: Firefox and other programs that weren't installed on the test machine, and real hardware: the graphics tablet and the VR headset in these tests are simulated by the test server (the protocol and LordOS's own handling are real, the device isn't), and there is no touchscreen. The descriptions of the screenshots are in English, like the tool's report.",
         "docsLink": "How the score is made (docs/WAYLAND.md)",
         "jsonLink": "Every check and its result (JSON)"
+      }
+    },
+    "wlconf": {
+      "metaTitle": "Wayland and X11 conformance of LordOS, in full · LordOS",
+      "metaDescription": "Every check of LordOS's Wayland and X11 conformance run, with each result, a comparison with KDE and GNOME, and the steps to run the same tests yourself and check the numbers.",
+      "kicker": "Wayland · X11",
+      "title": "Wayland and X11 conformance, in full",
+      "lead": "Every check LordOS's conformance tool ran against lord-server, its Wayland compositor, and against the window manager that X11 apps use through Xwayland: each result, how the score is made, a comparison with KDE and GNOME, and the steps to run the same tests on your own machine and check our numbers.",
+      "alsoTable": "Which protocols LordOS, KDE and GNOME offer, one by one:",
+      "fromTable": "Every check of this run, the comparison and how to run the tests yourself:",
+      "toc": "On this page",
+      "nav": {
+        "summary": "Summary",
+        "wayland": "Wayland",
+        "x11": "X11 apps",
+        "checks": "Every check",
+        "programs": "Real programs",
+        "compare": "KDE and GNOME",
+        "reproduce": "Run it yourself",
+        "report": "Found a difference?"
+      },
+      "commit": "Commit",
+      "duration": "Duration",
+      "seconds": "{n} s",
+      "modeText": "Without a screen (headless), drawing on the CPU, on lord-server-test: the test build of lord-server, started just for the run",
+      "tileComplete": "Wayland globals complete",
+      "tileMean": "mean Wayland score",
+      "tileX11": "X11 items complete (mean {mean} %)",
+      "tileChecks": "checks in the run; {fail} failed",
+      "sumWayland": "{n} Wayland globals, the interfaces lord-server offers to apps from {rows} protocols, score a mean of {mean} %, and {complete} of them are complete.",
+      "sumX11": "The {n} X11 items score a mean of {mean} %, and {complete} are complete. The other {other} are at 100 % too, but part of what they cover can't be run without a screen, so they are not called complete:",
+      "sumX11All": "The {n} X11 items score a mean of {mean} %, and all of them are complete.",
+      "skippedBecause": "Skipped:",
+      "sumChecks": "In all, {total} checks: {pass} passed, {allowed} are exceptions the protocol itself allows (they count as passed; each one is listed below with its reason), {skip} were skipped and {fail} failed.",
+      "allowedTitle": "The {n} allowed exceptions, each with the protocol's own words",
+      "cavTitle": "What these numbers mean, and what they don't",
+      "cavComplete": "All {n} Wayland globals are complete: tests written for each protocol ran every request, event and error, all of them passed and nothing was skipped.",
+      "cavNotComplete": "{n} Wayland globals are not complete; the table below says how deep each one was tested.",
+      "cavPartial": "Complete means the protocol's own checks pass, not that every optional part of it is offered: {list} are complete here but marked “Partly” in the protocol table, because LordOS leaves out optional parts the protocol allows (the table's note says which).",
+      "cavHidden": "{list} are never offered to ordinary apps; they were tested through the test server's hooks, which stand in for the device or the connection they need.",
+      "cavTiming": "These numbers come from one run, on one machine, without a screen. Some checks measure time (fifo-v1's barriers, commit-timing-v1's target times) or juggle several connections at once (restoring a saved session), so a heavily loaded machine can slow them. The two that failed in some runs on a loaded PC before 0.8.9.5, fifo-v1's barrier and restoring a saved session, were fixed and passed 35 of 35 runs with every core busy. If a check fails, run it again on its own before reporting it, and report it if it keeps failing.",
+      "cavOthers": "The tool checks LordOS's lord-server only. It has not been run against KDE's KWin or GNOME's Mutter, so this page says nothing about how closely they follow each protocol: the comparison below is only about which protocols each one offers.",
+      "cavDirty": "The run was recorded at commit {commit} with changes in server/src that weren't committed yet, so that commit alone may score slightly differently.",
+      "notesTitle": "Notes from the run",
+      "noNotes": "The run left no notes: the test server stayed up to the end and the test clients ended normally.",
+      "waylandTitle": "Every Wayland global",
+      "waylandLead": "One row per global lord-server offers: the protocol it belongs to, the version offered, the score, how deep it was tested, its checks by kind (passed out of run) and a screenshot of a real program using it, where there is one.",
+      "hGlobal": "Global",
+      "hVersion": "Version",
+      "hDepth": "Depth",
+      "hChecks": "Checks by kind",
+      "hProof": "Screenshot",
+      "notAdvertised": "not offered to ordinary apps; tested through the test hooks",
+      "kind": {
+        "static": "code",
+        "flow": "flow",
+        "generic": "bind",
+        "claim": "version",
+        "dynamic": "run",
+        "unit": "unit test"
+      },
+      "kindText": {
+        "static": "Read from the source: every request has a real handler ({request} points), every event is sent ({event}) and every protocol error is raised ({error}). For X11, a pattern in the window manager's source ({x11static}).",
+        "flow": "A test client runs the protocol's own flow against the test server: the objects, the events and their order, and each misuse answered with exactly the error the specification names ({flow} points).",
+        "generic": "The interface bound at every version up to the one offered, and destroyed at each one, without an error ({generic} point).",
+        "claim": "The version LordOS's protocol table claims is the one offered ({claim} points).",
+        "dynamic": "X11: a test client against Xwayland on the test server, and what the desktop got for its windows ({x11dyn} points).",
+        "unit": "X11: a unit test of the window manager ({unit} point)."
+      },
+      "skippedN": "{n} skipped",
+      "allowedN": "{n} allowed",
+      "allChecks": "all {n} checks",
+      "result": {
+        "pass": "passed",
+        "fail": "failed",
+        "skip": "skipped",
+        "allowed": "allowed"
+      },
+      "resultText": {
+        "pass": "The check passed.",
+        "fail": "Counted as failed: the message, and the file and line, say where to look.",
+        "skip": "Not counted: a test without a screen has nothing to do it with, and the message says what's missing.",
+        "allowed": "Counts as passed: the protocol lets the compositor leave this out, and the message quotes why."
+      },
+      "legendTitle": "How to read it",
+      "checksLead": "Every check the tool recorded, protocol by protocol and item by item: its result, kind and name, the points it's worth and the tool's message, with the file and line it found. Open one to see them. The names and messages are the tool's own, in English.",
+      "checksWayland": "Wayland globals",
+      "checksX11": "X11 items",
+      "hResult": "Result",
+      "hKind": "Kind",
+      "hCheck": "Check",
+      "hPoints": "Points",
+      "hMsg": "Message",
+      "coverage": "{covered} of its {total} requests, events and errors are also run by a flow; the code check covers all of them.",
+      "coverageMissing": "Only in the code check:",
+      "createdAt": "Created at",
+      "interfaces": "interfaces:",
+      "programsLead": "Besides the scored checks, the run starts the real programs installed on the test machine for six seconds each and reports whether each one opened a window and which globals it bound. They are not scored; programs that weren't installed show as skipped.",
+      "hProgram": "Program",
+      "hBound": "Globals it bound (version)",
+      "compareLead": "Which protocols each desktop offers to apps: LordOS's own list against what wayland.app lists for KDE Plasma's KWin {kwin} and GNOME's Mutter {mutter} (their data of {kwinDate} and {mutterDate}). This compares what is offered, not how well it's followed: only LordOS was put through the conformance tests. Source:",
+      "cTotal": "protocols listed",
+      "cLordos": "offered by LordOS",
+      "cKwin": "offered by KDE (KWin {v})",
+      "cMutter": "offered by GNOME (Mutter {v})",
+      "cBoth": "of those both KDE and GNOME offer, offered by LordOS",
+      "catTitle": "By category",
+      "hListed": "Listed",
+      "offeredTitle": "The {n} protocols LordOS offers",
+      "offeredLead": "With the version each desktop offers (“—” is not offered) and LordOS's conformance score.",
+      "hConfLordos": "LordOS's conformance",
+      "othersTitle": "Offered by KDE or GNOME and not by LordOS ({n})",
+      "othersLead": "Each one is either left out on purpose or not offered yet; the note says why, in English like the protocol table.",
+      "purposeTitle": "Left out on purpose ({n})",
+      "purposeLead": "The protocols LordOS doesn't offer by decision, grouped by reason: each one would let a program read or control what belongs to the person or to the desktop.",
+      "tableLink": "The full protocol table, with search and filters",
+      "reproLead": "The same tool and the same tests, on your machine. The tool never touches a desktop session: it starts its own test server without a screen in a private temporary folder and stops it at the end, and it needs no root. These steps were run on Debian 13 (amd64), with Debian's own Node.js 20, before they were published here.",
+      "steps": {
+        "pkgs": {
+          "title": "Install what the build and the tests need",
+          "text": "On Debian 13 (trixie): a C compiler, Node.js, the Wayland and xkbcommon development files, and Xwayland and xcb for the X11 checks. Nothing of LordOS gets installed on your system: everything stays in the folder you clone.",
+          "after": "Without xwayland, the X11 checks that need Xwayland are reported as not run. Without Mesa's development files, lord-server is built for the CPU only, which is the path the tests use anyway."
+        },
+        "apps": {
+          "title": "Optional: the real programs",
+          "text": "The run also starts real programs when they are installed, six seconds each, and reports which globals they bound, without scoring them. Ours had {list}:",
+          "after": "It also tries weston-simple-shm, weston-simple-egl, weston-simple-dmabuf-feedback, wayland-info, gtk3-demo and gtk4-demo when they are present; our test machine didn't have them."
+        },
+        "clone": {
+          "title": "Get the code",
+          "text": "Clone LordOS's repository. Our run was recorded at commit {commit}: check it out to test the same code, or stay on the latest code to test what's newest (the comparison will then also show what changed).",
+          "afterDirty": "That run had changes in server/src that weren't committed yet, so the commit alone may score slightly differently from the numbers on this page."
+        },
+        "build": {
+          "title": "Build",
+          "text": "npm ci installs the tools that build the desktop bundle, and npm run build makes the bundle the test server loads. make builds lord-server and lord-server-test, the test build with the hooks the run needs: a simulated pointer, graphics tablet and VR headset, and a connection made the way Xwayland's is. The lord-server that LordOS installs never contains those hooks.",
+          "after": "It takes a few minutes, and it must finish without a single compiler warning."
+        },
+        "run": {
+          "title": "Run the conformance tests",
+          "text": "It builds anything missing, starts lord-server-test without a screen in a private temporary folder, runs the checks, the X11 checks and the real programs, and stops it. Our run took {s} s.",
+          "after": "It doesn't need a desktop session and never attaches to the one you're using."
+        },
+        "read": {
+          "title": "Read the result",
+          "text": "The terminal shows one line per global (its version, score, a bar, the number of failed checks and the depth), then the X11 items, the real programs, every failing check with the file and line to look at, and a summary line such as “48 protocols, mean 100 %, 48 complete”. The full report, with every check and its message, is written to server/build/wl-conformance.json, in the same format as our docs/wayland-conformance.json, the data of this page."
+        },
+        "compare": {
+          "title": "Compare it with ours",
+          "text": "compare.mjs reads your report and ours check by check, and prints both runs' versions, every score that differs and every check whose result differs, with both messages. It exits with 0 when every check matches.",
+          "after": "To compare any two reports: node tools/wl-conformance/compare.mjs yours.json theirs.json. Globals left out of your run (by --only or --no-x11) are listed, not counted as differences."
+        },
+        "one": {
+          "title": "One protocol at a time",
+          "text": "--only takes the names of globals (the first column of the Wayland table) and runs only their checks; --no-x11 leaves out the X11 checks, --no-smoke the real programs, and --verbose prints the test server's log and keeps its folder. Run a check that failed this way a few times before reporting it.",
+          "after": "--static-only only reads the source, in seconds, without starting anything. Its scores can't be compared with a full run's: no flow runs, so nothing is complete."
+        },
+        "session": {
+          "title": "On a running LordOS session",
+          "text": "The conformance tool can't be pointed at a running desktop, on purpose: its tests open windows, move a simulated pointer and make test clients fail with protocol errors. Every run starts its own test server. On a LordOS session you can check what it offers to apps: build the repository there as above and run wl-globals in LordOS's Terminal. It prints every global, with its version, as any app sees it; on our test server it lists {n}, since {hidden} are not offered to ordinary apps.",
+          "after": "Over ssh, set WAYLAND_DISPLAY=wayland-0 and XDG_RUNTIME_DIR=/run/user/$(id -u) first. WAYLAND_DEBUG=1 before an app's command prints its protocol messages, which is how the screenshots on this page were checked for protocol errors."
+        },
+        "proofs": {
+          "title": "The screenshots",
+          "text": "wl-proof.mjs runs the installed real programs on a test server without a screen and saves a screenshot of each one, with what its protocol log held, the way the screenshots on this page were made."
+        }
+      },
+      "reportText": "If a check fails on your machine and passes on ours, or a number here looks wrong, open an issue on LordOS's GitHub, with:",
+      "reportItems": {
+        "compare": "the output of node tools/wl-conformance/compare.mjs;",
+        "json": "your server/build/wl-conformance.json;",
+        "commit": "the commit you built (git rev-parse HEAD) and whether you changed anything;",
+        "system": "your Debian version, your processor, and whether the machine was busy during the run."
+      },
+      "reportButton": "Report a difference",
+      "reportSearch": "Wayland issues already reported",
+      "x11Why": {
+        "general": "Checked in the window manager's source and by unit tests; no test client runs it against Xwayland yet.",
+        "code": "Only the window manager's source was checked: nothing of it can be run without a screen."
       }
     }
   },
@@ -756,10 +935,10 @@
           "code": "Solo código"
         },
         "depthText": {
-          "complete": "Pruebas escritas para este protocolo cubren cada pedido, evento y error, y todas pasaron sin omitir nada.",
+          "complete": "Pruebas escritas para este protocolo cubren cada pedido, evento y error, y todas pasaron sin omitir nada. Lo que una sesión de prueba no tiene (un puntero sobre una ventana, una tableta gráfica, un visor de realidad virtual, la conexión propia de Xwayland) lo da el mismo servidor de prueba, nunca hardware real.",
           "partial": "Pruebas escritas para este protocolo, pero se omitió un punto porque necesita algo que una prueba sin pantalla no tiene, como un puntero sobre una ventana.",
           "general": "Se revisó el código fuente (cada pedido manejado, cada evento enviado, cada error señalado) y una prueba genérica enlazó la interfaz en cada versión; todavía no tiene un flujo propio en la herramienta. En X11, la revisión del código y pruebas unitarias.",
-          "code": "Solo se revisó el código fuente: la interfaz no se puede usar sin hardware real o un cliente en particular (los arrendamientos DRM necesitan un visor de realidad virtual; xwayland_shell se ofrece solo a Xwayland), o el ítem de X11 no tiene nada que ejecutar sin pantalla."
+          "code": "Solo se revisó el código fuente: el ítem no tiene nada que ejecutar sin pantalla (X11)."
         },
         "barText": "La barra muestra el puntaje en décimos, como lo imprime la herramienta en una terminal.",
         "hItem": "Ítem de X11",
@@ -767,9 +946,188 @@
         "x11Lead": "Lo que hace el gestor de ventanas X11 de LordOS para las apps que todavía usan X11: las convenciones ICCCM y EWMH, las indicaciones de decoración de Motif, arrastrar y soltar XDND, el portapapeles y la selección primaria, el escalado HiDPI, el cursor y el aislamiento de Xwayland. Los nombres son los de los propios estándares, en inglés.",
         "proofsTitle": "Prueba con programas reales",
         "proofsLead": "Capturas de programas reales en un lord-server iniciado para la prueba, tomadas el mismo día: {wayland} con apps Wayland (terminales, GTK y Qt, Vulkan, OpenGL y Chromium) y {x11} con apps X11. Las de Wayland se comprobaron en el registro de protocolo de cada programa, sin ningún error de protocolo; las de X11 muestran lo que xprop y xwininfo leen de las ventanas.",
-        "limits": "No se comprobó acá: Firefox y otros programas que no estaban instalados en la máquina de prueba, y lo que necesita hardware (la rueda de una tableta gráfica, una pantalla táctil, un visor de realidad virtual). Las descripciones de las capturas están en inglés, como el informe de la herramienta.",
+        "limits": "No se comprobó acá: Firefox y otros programas que no estaban instalados en la máquina de prueba, y hardware real: la tableta gráfica y el visor de realidad virtual de estas pruebas los simula el servidor de prueba (el protocolo y lo que hace LordOS son reales, el dispositivo no), y no hay pantalla táctil. Las descripciones de las capturas están en inglés, como el informe de la herramienta.",
         "docsLink": "Cómo se calcula el puntaje (docs/WAYLAND.md)",
         "jsonLink": "Cada comprobación y su resultado (JSON)"
+      }
+    },
+    "wlconf": {
+      "metaTitle": "Conformidad Wayland y X11 de LordOS, completa · LordOS",
+      "metaDescription": "Cada verificación de la prueba de conformidad Wayland y X11 de LordOS, con su resultado, una comparación con KDE y GNOME, y los pasos para correr las mismas pruebas vos mismo y comprobar los números.",
+      "kicker": "Wayland · X11",
+      "title": "Conformidad Wayland y X11, completa",
+      "lead": "Cada verificación que la herramienta de conformidad de LordOS corrió contra lord-server, su compositor Wayland, y contra el gestor de ventanas que usan las apps X11 a través de Xwayland: cada resultado, cómo se arma el puntaje, una comparación con KDE y GNOME, y los pasos para correr las mismas pruebas en tu máquina y comprobar nuestros números.",
+      "alsoTable": "Qué protocolos ofrecen LordOS, KDE y GNOME, uno por uno:",
+      "fromTable": "Cada verificación de esta prueba, la comparación y cómo correr las pruebas vos mismo:",
+      "toc": "En esta página",
+      "nav": {
+        "summary": "Resumen",
+        "wayland": "Wayland",
+        "x11": "Apps X11",
+        "checks": "Cada verificación",
+        "programs": "Programas reales",
+        "compare": "KDE y GNOME",
+        "reproduce": "Correla vos mismo",
+        "report": "¿Encontraste una diferencia?"
+      },
+      "commit": "Commit",
+      "duration": "Duración",
+      "seconds": "{n} s",
+      "modeText": "Sin pantalla (headless), dibujando con la CPU, en lord-server-test: la compilación de prueba de lord-server, iniciada solo para la prueba",
+      "tileComplete": "globals Wayland completos",
+      "tileMean": "puntaje Wayland promedio",
+      "tileX11": "ítems X11 completos (promedio {mean} %)",
+      "tileChecks": "verificaciones en la prueba; {fail} fallaron",
+      "sumWayland": "{n} globals Wayland, las interfaces que lord-server ofrece a las apps de {rows} protocolos, tienen un puntaje promedio de {mean} %, y {complete} de ellos están completos.",
+      "sumX11": "Los {n} ítems X11 tienen un promedio de {mean} %, y {complete} están completos. Los otros {other} también están en 100 %, pero parte de lo que cubren no se puede correr sin pantalla, así que no se los llama completos:",
+      "sumX11All": "Los {n} ítems X11 tienen un promedio de {mean} %, y todos están completos.",
+      "skippedBecause": "Omitida:",
+      "sumChecks": "En total, {total} verificaciones: {pass} pasaron, {allowed} son excepciones que el propio protocolo permite (cuentan como aprobadas; cada una aparece abajo con su motivo), {skip} se omitieron y {fail} fallaron.",
+      "allowedTitle": "Las {n} excepciones permitidas, cada una con las palabras del protocolo",
+      "cavTitle": "Qué significan estos números, y qué no",
+      "cavComplete": "Los {n} globals Wayland están completos: pruebas escritas para cada protocolo corrieron cada pedido, evento y error, todas pasaron y no se omitió nada.",
+      "cavNotComplete": "{n} globals Wayland no están completos; la tabla de abajo dice con qué profundidad se probó cada uno.",
+      "cavPartial": "Completo quiere decir que pasan las verificaciones propias del protocolo, no que se ofrezca cada parte opcional: {list} están completos acá pero marcados «En parte» en la tabla de protocolos, porque LordOS deja afuera partes opcionales que el protocolo permite (la nota de la tabla dice cuáles).",
+      "cavHidden": "{list} nunca se ofrecen a las apps comunes; se probaron con los ganchos del servidor de prueba, que hacen las veces del dispositivo o de la conexión que necesitan.",
+      "cavTiming": "Estos números salen de una sola prueba, en una sola máquina, sin pantalla. Algunas verificaciones miden tiempo (las barreras de fifo-v1, los tiempos objetivo de commit-timing-v1) o manejan varias conexiones a la vez (restaurar una sesión guardada), así que una máquina muy cargada puede demorarlas. Las dos que fallaban en algunas pruebas en una PC cargada antes de la 0.8.9.5, la barrera de fifo-v1 y restaurar una sesión guardada, se corrigieron y pasaron 35 de 35 pruebas con todos los núcleos ocupados. Si una verificación falla, volvé a correrla sola antes de reportarla, y reportala si sigue fallando.",
+      "cavOthers": "La herramienta verifica solo el lord-server de LordOS. No se corrió contra KWin de KDE ni contra Mutter de GNOME, así que esta página no dice nada sobre qué tan fielmente siguen cada protocolo: la comparación de abajo es solo sobre qué protocolos ofrece cada uno.",
+      "cavDirty": "La prueba se registró en el commit {commit} con cambios en server/src que todavía no estaban en un commit, así que ese commit solo puede dar un puntaje un poco distinto.",
+      "notesTitle": "Notas de la prueba",
+      "noNotes": "La prueba no dejó notas: el servidor de prueba siguió andando hasta el final y los clientes de prueba terminaron normalmente.",
+      "waylandTitle": "Cada global Wayland",
+      "waylandLead": "Una fila por cada global que ofrece lord-server: el protocolo al que pertenece, la versión ofrecida, el puntaje, con qué profundidad se probó, sus verificaciones por tipo (aprobadas sobre corridas) y una captura de un programa real que lo usa, cuando la hay.",
+      "hGlobal": "Global",
+      "hVersion": "Versión",
+      "hDepth": "Profundidad",
+      "hChecks": "Verificaciones por tipo",
+      "hProof": "Captura",
+      "notAdvertised": "no se ofrece a las apps comunes; probado con los ganchos de prueba",
+      "kind": {
+        "static": "código",
+        "flow": "flujo",
+        "generic": "enlace",
+        "claim": "versión",
+        "dynamic": "ejecución",
+        "unit": "prueba unitaria"
+      },
+      "kindText": {
+        "static": "Leído del código fuente: cada pedido tiene un manejador real ({request} puntos), cada evento se envía ({event}) y cada error de protocolo se emite ({error}). En X11, un patrón en el código del gestor de ventanas ({x11static}).",
+        "flow": "Un cliente de prueba corre el flujo propio del protocolo contra el servidor de prueba: los objetos, los eventos y su orden, y cada mal uso respondido con exactamente el error que nombra la especificación ({flow} puntos).",
+        "generic": "La interfaz enlazada en cada versión hasta la ofrecida, y destruida en cada una, sin error ({generic} punto).",
+        "claim": "La versión que dice la tabla de protocolos de LordOS es la que se ofrece ({claim} puntos).",
+        "dynamic": "X11: un cliente de prueba contra Xwayland en el servidor de prueba, y lo que recibió el escritorio por sus ventanas ({x11dyn} puntos).",
+        "unit": "X11: una prueba unitaria del gestor de ventanas ({unit} punto)."
+      },
+      "skippedN": "{n} omitidas",
+      "allowedN": "{n} permitidas",
+      "allChecks": "las {n} verificaciones",
+      "result": {
+        "pass": "pasó",
+        "fail": "falló",
+        "skip": "omitida",
+        "allowed": "permitida"
+      },
+      "resultText": {
+        "pass": "La verificación pasó.",
+        "fail": "Cuenta como fallida: el mensaje, y el archivo y la línea, dicen dónde mirar.",
+        "skip": "No cuenta: una prueba sin pantalla no tiene con qué hacerla, y el mensaje dice qué falta.",
+        "allowed": "Cuenta como aprobada: el protocolo deja que el compositor no lo haga, y el mensaje cita por qué."
+      },
+      "legendTitle": "Cómo leerla",
+      "checksLead": "Cada verificación que registró la herramienta, protocolo por protocolo e ítem por ítem: su resultado, tipo y nombre, los puntos que vale y el mensaje de la herramienta, con el archivo y la línea que encontró. Abrí uno para verlas. Los nombres y los mensajes son los de la herramienta, en inglés.",
+      "checksWayland": "Globals Wayland",
+      "checksX11": "Ítems X11",
+      "hResult": "Resultado",
+      "hKind": "Tipo",
+      "hCheck": "Verificación",
+      "hPoints": "Puntos",
+      "hMsg": "Mensaje",
+      "coverage": "{covered} de sus {total} pedidos, eventos y errores también los corre un flujo; la verificación del código los cubre a todos.",
+      "coverageMissing": "Solo en la verificación del código:",
+      "createdAt": "Creado en",
+      "interfaces": "interfaces:",
+      "programsLead": "Además de las verificaciones con puntaje, la prueba abre los programas reales instalados en la máquina de prueba durante seis segundos cada uno e informa si cada uno abrió una ventana y qué globals enlazó. No tienen puntaje; los programas que no estaban instalados aparecen como omitidos.",
+      "hProgram": "Programa",
+      "hBound": "Globals que enlazó (versión)",
+      "compareLead": "Qué protocolos ofrece cada escritorio a las apps: la lista propia de LordOS contra lo que wayland.app lista para KWin {kwin} de KDE Plasma y Mutter {mutter} de GNOME (sus datos del {kwinDate} y del {mutterDate}). Esto compara lo que se ofrece, no qué tan bien se sigue: solo LordOS pasó por las pruebas de conformidad. Fuente:",
+      "cTotal": "protocolos listados",
+      "cLordos": "ofrecidos por LordOS",
+      "cKwin": "ofrecidos por KDE (KWin {v})",
+      "cMutter": "ofrecidos por GNOME (Mutter {v})",
+      "cBoth": "de los que ofrecen tanto KDE como GNOME, ofrecidos por LordOS",
+      "catTitle": "Por categoría",
+      "hListed": "Listados",
+      "offeredTitle": "Los {n} protocolos que ofrece LordOS",
+      "offeredLead": "Con la versión que ofrece cada escritorio («—» es que no lo ofrece) y el puntaje de conformidad de LordOS.",
+      "hConfLordos": "Conformidad de LordOS",
+      "othersTitle": "Ofrecidos por KDE o GNOME y no por LordOS ({n})",
+      "othersLead": "Cada uno se deja afuera a propósito o todavía no se ofrece; la nota dice por qué, en inglés como la tabla de protocolos.",
+      "purposeTitle": "Afuera a propósito ({n})",
+      "purposeLead": "Los protocolos que LordOS no ofrece por decisión, agrupados por motivo: cada uno dejaría que un programa lea o controle lo que es de la persona o del escritorio.",
+      "tableLink": "La tabla de protocolos completa, con búsqueda y filtros",
+      "reproLead": "La misma herramienta y las mismas pruebas, en tu máquina. La herramienta nunca toca una sesión de escritorio: inicia su propio servidor de prueba sin pantalla en una carpeta temporal privada y lo detiene al final, y no necesita root. Estos pasos se corrieron en Debian 13 (amd64), con el Node.js 20 del propio Debian, antes de publicarlos acá.",
+      "steps": {
+        "pkgs": {
+          "title": "Instalá lo que necesitan la compilación y las pruebas",
+          "text": "En Debian 13 (trixie): un compilador de C, Node.js, los archivos de desarrollo de Wayland y xkbcommon, y Xwayland y xcb para las verificaciones X11. No se instala nada de LordOS en tu sistema: todo queda en la carpeta que clonás.",
+          "after": "Sin xwayland, las verificaciones X11 que necesitan Xwayland aparecen como no corridas. Sin los archivos de desarrollo de Mesa, lord-server se compila solo para la CPU, que es el camino que usan las pruebas de todos modos."
+        },
+        "apps": {
+          "title": "Opcional: los programas reales",
+          "text": "La prueba también abre programas reales cuando están instalados, seis segundos cada uno, e informa qué globals enlazaron, sin darles puntaje. La nuestra tenía {list}:",
+          "after": "También prueba weston-simple-shm, weston-simple-egl, weston-simple-dmabuf-feedback, wayland-info, gtk3-demo y gtk4-demo cuando están; nuestra máquina de prueba no los tenía."
+        },
+        "clone": {
+          "title": "Bajá el código",
+          "text": "Cloná el repositorio de LordOS. Nuestra prueba se registró en el commit {commit}: cambiá a ese commit para probar el mismo código, o quedate en el código más nuevo para probar lo último (la comparación también va a mostrar qué cambió).",
+          "afterDirty": "Esa prueba tenía cambios en server/src que todavía no estaban en un commit, así que el commit solo puede dar un puntaje un poco distinto de los números de esta página."
+        },
+        "build": {
+          "title": "Compilá",
+          "text": "npm ci instala las herramientas que arman el paquete del escritorio, y npm run build arma el paquete que carga el servidor de prueba. make compila lord-server y lord-server-test, la compilación de prueba con los ganchos que necesita la prueba: un puntero, una tableta gráfica y un casco de realidad virtual simulados, y una conexión hecha como la de Xwayland. El lord-server que instala LordOS nunca tiene esos ganchos.",
+          "after": "Tarda unos minutos, y tiene que terminar sin una sola advertencia del compilador."
+        },
+        "run": {
+          "title": "Corré las pruebas de conformidad",
+          "text": "Compila lo que falte, inicia lord-server-test sin pantalla en una carpeta temporal privada, corre las verificaciones, las de X11 y los programas reales, y lo detiene. Nuestra prueba tardó {s} s.",
+          "after": "No necesita una sesión de escritorio y nunca se conecta a la que estás usando."
+        },
+        "read": {
+          "title": "Leé el resultado",
+          "text": "La terminal muestra una línea por global (su versión, el puntaje, una barra, la cantidad de verificaciones fallidas y la profundidad), después los ítems X11, los programas reales, cada verificación fallida con el archivo y la línea donde mirar, y una línea de resumen como «48 protocols, mean 100 %, 48 complete». El informe completo, con cada verificación y su mensaje, se escribe en server/build/wl-conformance.json, con el mismo formato que nuestro docs/wayland-conformance.json, los datos de esta página."
+        },
+        "compare": {
+          "title": "Comparalo con el nuestro",
+          "text": "compare.mjs lee tu informe y el nuestro verificación por verificación, e imprime las versiones de las dos pruebas, cada puntaje que difiere y cada verificación cuyo resultado difiere, con los dos mensajes. Termina con 0 cuando coinciden todas.",
+          "after": "Para comparar dos informes cualesquiera: node tools/wl-conformance/compare.mjs tuyo.json otro.json. Los globals que tu prueba dejó afuera (con --only o --no-x11) se listan, no cuentan como diferencias."
+        },
+        "one": {
+          "title": "Un protocolo por vez",
+          "text": "--only recibe nombres de globals (la primera columna de la tabla Wayland) y corre solo sus verificaciones; --no-x11 deja afuera las verificaciones X11, --no-smoke los programas reales, y --verbose imprime el registro del servidor de prueba y conserva su carpeta. Corré así varias veces una verificación que falló antes de reportarla.",
+          "after": "--static-only solo lee el código, en segundos, sin iniciar nada. Sus puntajes no se pueden comparar con los de una prueba completa: no corre ningún flujo, así que nada queda completo."
+        },
+        "session": {
+          "title": "En una sesión de LordOS en uso",
+          "text": "La herramienta de conformidad no se puede apuntar a un escritorio en uso, a propósito: sus pruebas abren ventanas, mueven un puntero simulado y hacen fallar clientes de prueba con errores de protocolo. Cada prueba inicia su propio servidor de prueba. En una sesión de LordOS podés comprobar qué ofrece a las apps: compilá el repositorio ahí como arriba y corré wl-globals en la Terminal de LordOS. Imprime cada global, con su versión, como lo ve cualquier app; en nuestro servidor de prueba lista {n}, porque {hidden} no se ofrecen a las apps comunes.",
+          "after": "Por ssh, primero definí WAYLAND_DISPLAY=wayland-0 y XDG_RUNTIME_DIR=/run/user/$(id -u). WAYLAND_DEBUG=1 antes del comando de una app imprime sus mensajes de protocolo, que es como se comprobó que las capturas de esta página no tuvieran errores de protocolo."
+        },
+        "proofs": {
+          "title": "Las capturas",
+          "text": "wl-proof.mjs corre los programas reales instalados en un servidor de prueba sin pantalla y guarda una captura de cada uno, con lo que tenía su registro de protocolo, como se hicieron las capturas de esta página."
+        }
+      },
+      "reportText": "Si una verificación falla en tu máquina y pasa en la nuestra, o un número de acá parece estar mal, abrí un issue en el GitHub de LordOS, con:",
+      "reportItems": {
+        "compare": "la salida de node tools/wl-conformance/compare.mjs;",
+        "json": "tu server/build/wl-conformance.json;",
+        "commit": "el commit que compilaste (git rev-parse HEAD) y si cambiaste algo;",
+        "system": "tu versión de Debian, tu procesador, y si la máquina estaba ocupada durante la prueba."
+      },
+      "reportButton": "Reportar una diferencia",
+      "reportSearch": "Issues de Wayland ya reportados",
+      "x11Why": {
+        "general": "Verificado en el código del gestor de ventanas y con pruebas unitarias; todavía no lo corre ningún cliente de prueba contra Xwayland.",
+        "code": "Solo se verificó el código del gestor de ventanas: nada de esto se puede correr sin pantalla."
       }
     }
   },
@@ -1143,10 +1501,10 @@
           "code": "Só código"
         },
         "depthText": {
-          "complete": "Testes escritos para este protocolo cobrem cada requisição, evento e erro, e todos passaram sem pular nada.",
+          "complete": "Testes escritos para este protocolo cobrem cada requisição, evento e erro, e todos passaram sem pular nada. O que uma sessão de teste não tem (um ponteiro sobre uma janela, uma mesa digitalizadora, um óculos de realidade virtual, a conexão própria do Xwayland) é dado pelo próprio servidor de teste, nunca por hardware real.",
           "partial": "Testes escritos para este protocolo, mas um ponto foi pulado porque precisa de algo que um teste sem tela não tem, como um ponteiro sobre uma janela.",
           "general": "O código-fonte foi verificado (cada requisição tratada, cada evento enviado, cada erro sinalizado) e um teste genérico vinculou a interface em cada versão; ainda não tem um fluxo próprio na ferramenta. No X11, a verificação do código e testes unitários.",
-          "code": "Só o código-fonte foi verificado: a interface não pode ser usada sem hardware real ou um cliente específico (os arrendamentos DRM precisam de um óculos de realidade virtual; xwayland_shell é oferecido só ao Xwayland), ou o item do X11 não tem nada para executar sem tela."
+          "code": "Só o código-fonte foi verificado: o item não tem nada para executar sem tela (X11)."
         },
         "barText": "A barra mostra a pontuação em décimos, como a ferramenta a imprime num terminal.",
         "hItem": "Item do X11",
@@ -1154,9 +1512,188 @@
         "x11Lead": "O que o gerenciador de janelas X11 do LordOS faz pelos apps que ainda usam X11: as convenções ICCCM e EWMH, as dicas de decoração do Motif, arrastar e soltar XDND, a área de transferência e a seleção primária, a escala HiDPI, o cursor e o isolamento do Xwayland. Os nomes são os dos próprios padrões, em inglês.",
         "proofsTitle": "Prova com programas reais",
         "proofsLead": "Capturas de programas reais num lord-server iniciado para o teste, tiradas no mesmo dia: {wayland} com apps Wayland (terminais, GTK e Qt, Vulkan, OpenGL e Chromium) e {x11} com apps X11. As do Wayland foram verificadas no registro de protocolo de cada programa, sem nenhum erro de protocolo; as do X11 mostram o que o xprop e o xwininfo leem das janelas.",
-        "limits": "Não verificado aqui: o Firefox e outros programas que não estavam instalados na máquina de teste, e o que precisa de hardware (a roda de uma mesa digitalizadora, uma tela sensível ao toque, um óculos de realidade virtual). As descrições das capturas estão em inglês, como o relatório da ferramenta.",
+        "limits": "Não verificado aqui: o Firefox e outros programas que não estavam instalados na máquina de teste, e hardware real: a mesa digitalizadora e o óculos de realidade virtual destes testes são simulados pelo servidor de teste (o protocolo e o que o LordOS faz são reais, o dispositivo não), e não há tela sensível ao toque. As descrições das capturas estão em inglês, como o relatório da ferramenta.",
         "docsLink": "Como a pontuação é calculada (docs/WAYLAND.md)",
         "jsonLink": "Cada verificação e seu resultado (JSON)"
+      }
+    },
+    "wlconf": {
+      "metaTitle": "Conformidade Wayland e X11 do LordOS, completa · LordOS",
+      "metaDescription": "Cada verificação do teste de conformidade Wayland e X11 do LordOS, com o seu resultado, uma comparação com o KDE e o GNOME, e os passos para rodar os mesmos testes você mesmo e conferir os números.",
+      "kicker": "Wayland · X11",
+      "title": "Conformidade Wayland e X11, completa",
+      "lead": "Cada verificação que a ferramenta de conformidade do LordOS rodou contra o lord-server, o seu compositor Wayland, e contra o gerenciador de janelas que os apps X11 usam através do Xwayland: cada resultado, como a pontuação é feita, uma comparação com o KDE e o GNOME, e os passos para rodar os mesmos testes na sua máquina e conferir os nossos números.",
+      "alsoTable": "Quais protocolos o LordOS, o KDE e o GNOME oferecem, um por um:",
+      "fromTable": "Cada verificação deste teste, a comparação e como rodar os testes você mesmo:",
+      "toc": "Nesta página",
+      "nav": {
+        "summary": "Resumo",
+        "wayland": "Wayland",
+        "x11": "Apps X11",
+        "checks": "Cada verificação",
+        "programs": "Programas reais",
+        "compare": "KDE e GNOME",
+        "reproduce": "Rode você mesmo",
+        "report": "Encontrou uma diferença?"
+      },
+      "commit": "Commit",
+      "duration": "Duração",
+      "seconds": "{n} s",
+      "modeText": "Sem tela (headless), desenhando com a CPU, no lord-server-test: a compilação de teste do lord-server, iniciada só para o teste",
+      "tileComplete": "globals Wayland completos",
+      "tileMean": "pontuação Wayland média",
+      "tileX11": "itens X11 completos (média {mean} %)",
+      "tileChecks": "verificações no teste; {fail} falharam",
+      "sumWayland": "{n} globals Wayland, as interfaces que o lord-server oferece aos apps de {rows} protocolos, têm uma pontuação média de {mean} %, e {complete} deles estão completos.",
+      "sumX11": "Os {n} itens X11 têm média de {mean} %, e {complete} estão completos. Os outros {other} também estão em 100 %, mas parte do que cobrem não pode rodar sem tela, então não são chamados de completos:",
+      "sumX11All": "Os {n} itens X11 têm média de {mean} %, e todos estão completos.",
+      "skippedBecause": "Pulada:",
+      "sumChecks": "No total, {total} verificações: {pass} passaram, {allowed} são exceções que o próprio protocolo permite (contam como aprovadas; cada uma aparece abaixo com o seu motivo), {skip} foram puladas e {fail} falharam.",
+      "allowedTitle": "As {n} exceções permitidas, cada uma com as palavras do protocolo",
+      "cavTitle": "O que estes números significam, e o que não",
+      "cavComplete": "Os {n} globals Wayland estão completos: testes escritos para cada protocolo rodaram cada requisição, evento e erro, todos passaram e nada foi pulado.",
+      "cavNotComplete": "{n} globals Wayland não estão completos; a tabela abaixo diz com que profundidade cada um foi testado.",
+      "cavPartial": "Completo quer dizer que as verificações do próprio protocolo passam, não que cada parte opcional seja oferecida: {list} estão completos aqui mas marcados «Em parte» na tabela de protocolos, porque o LordOS deixa de fora partes opcionais que o protocolo permite (a nota da tabela diz quais).",
+      "cavHidden": "{list} nunca são oferecidos aos apps comuns; foram testados pelos ganchos do servidor de teste, que fazem as vezes do dispositivo ou da conexão de que precisam.",
+      "cavTiming": "Estes números vêm de um só teste, numa só máquina, sem tela. Algumas verificações medem tempo (as barreiras do fifo-v1, os tempos-alvo do commit-timing-v1) ou lidam com várias conexões ao mesmo tempo (restaurar uma sessão salva), então uma máquina muito carregada pode atrasá-las. As duas que falhavam em alguns testes num PC carregado antes da 0.8.9.5, a barreira do fifo-v1 e restaurar uma sessão salva, foram corrigidas e passaram em 35 de 35 testes com todos os núcleos ocupados. Se uma verificação falhar, rode-a de novo sozinha antes de reportá-la, e reporte se continuar falhando.",
+      "cavOthers": "A ferramenta verifica só o lord-server do LordOS. Ela não foi rodada contra o KWin do KDE nem contra o Mutter do GNOME, então esta página não diz nada sobre o quanto eles seguem cada protocolo: a comparação abaixo é só sobre quais protocolos cada um oferece.",
+      "cavDirty": "O teste foi registrado no commit {commit} com mudanças em server/src que ainda não estavam num commit, então esse commit sozinho pode dar uma pontuação um pouco diferente.",
+      "notesTitle": "Notas do teste",
+      "noNotes": "O teste não deixou notas: o servidor de teste continuou rodando até o fim e os clientes de teste terminaram normalmente.",
+      "waylandTitle": "Cada global Wayland",
+      "waylandLead": "Uma linha por global que o lord-server oferece: o protocolo a que pertence, a versão oferecida, a pontuação, com que profundidade foi testado, as suas verificações por tipo (aprovadas sobre rodadas) e uma captura de um programa real que o usa, quando existe.",
+      "hGlobal": "Global",
+      "hVersion": "Versão",
+      "hDepth": "Profundidade",
+      "hChecks": "Verificações por tipo",
+      "hProof": "Captura",
+      "notAdvertised": "não é oferecido aos apps comuns; testado pelos ganchos de teste",
+      "kind": {
+        "static": "código",
+        "flow": "fluxo",
+        "generic": "vínculo",
+        "claim": "versão",
+        "dynamic": "execução",
+        "unit": "teste unitário"
+      },
+      "kindText": {
+        "static": "Lido do código-fonte: cada requisição tem um tratador real ({request} pontos), cada evento é enviado ({event}) e cada erro de protocolo é emitido ({error}). No X11, um padrão no código do gerenciador de janelas ({x11static}).",
+        "flow": "Um cliente de teste roda o fluxo próprio do protocolo contra o servidor de teste: os objetos, os eventos e a sua ordem, e cada uso indevido respondido exatamente com o erro que a especificação nomeia ({flow} pontos).",
+        "generic": "A interface vinculada em cada versão até a oferecida, e destruída em cada uma, sem erro ({generic} ponto).",
+        "claim": "A versão que a tabela de protocolos do LordOS afirma é a oferecida ({claim} pontos).",
+        "dynamic": "X11: um cliente de teste contra o Xwayland no servidor de teste, e o que o desktop recebeu pelas suas janelas ({x11dyn} pontos).",
+        "unit": "X11: um teste unitário do gerenciador de janelas ({unit} ponto)."
+      },
+      "skippedN": "{n} puladas",
+      "allowedN": "{n} permitidas",
+      "allChecks": "as {n} verificações",
+      "result": {
+        "pass": "passou",
+        "fail": "falhou",
+        "skip": "pulada",
+        "allowed": "permitida"
+      },
+      "resultText": {
+        "pass": "A verificação passou.",
+        "fail": "Conta como falha: a mensagem, e o arquivo e a linha, dizem onde olhar.",
+        "skip": "Não conta: um teste sem tela não tem com o que fazê-la, e a mensagem diz o que falta.",
+        "allowed": "Conta como aprovada: o protocolo deixa o compositor não fazer isso, e a mensagem cita por quê."
+      },
+      "legendTitle": "Como ler",
+      "checksLead": "Cada verificação que a ferramenta registrou, protocolo por protocolo e item por item: o seu resultado, tipo e nome, os pontos que vale e a mensagem da ferramenta, com o arquivo e a linha que encontrou. Abra um para vê-las. Os nomes e as mensagens são os da ferramenta, em inglês.",
+      "checksWayland": "Globals Wayland",
+      "checksX11": "Itens X11",
+      "hResult": "Resultado",
+      "hKind": "Tipo",
+      "hCheck": "Verificação",
+      "hPoints": "Pontos",
+      "hMsg": "Mensagem",
+      "coverage": "{covered} das suas {total} requisições, eventos e erros também são rodados por um fluxo; a verificação do código cobre todos.",
+      "coverageMissing": "Só na verificação do código:",
+      "createdAt": "Criado em",
+      "interfaces": "interfaces:",
+      "programsLead": "Além das verificações com pontuação, o teste abre os programas reais instalados na máquina de teste por seis segundos cada um e informa se cada um abriu uma janela e quais globals vinculou. Eles não têm pontuação; os programas que não estavam instalados aparecem como pulados.",
+      "hProgram": "Programa",
+      "hBound": "Globals que vinculou (versão)",
+      "compareLead": "Quais protocolos cada desktop oferece aos apps: a lista própria do LordOS contra o que o wayland.app lista para o KWin {kwin} do KDE Plasma e o Mutter {mutter} do GNOME (os dados deles de {kwinDate} e de {mutterDate}). Isto compara o que é oferecido, não o quanto é seguido: só o LordOS passou pelos testes de conformidade. Fonte:",
+      "cTotal": "protocolos listados",
+      "cLordos": "oferecidos pelo LordOS",
+      "cKwin": "oferecidos pelo KDE (KWin {v})",
+      "cMutter": "oferecidos pelo GNOME (Mutter {v})",
+      "cBoth": "dos que tanto o KDE quanto o GNOME oferecem, oferecidos pelo LordOS",
+      "catTitle": "Por categoria",
+      "hListed": "Listados",
+      "offeredTitle": "Os {n} protocolos que o LordOS oferece",
+      "offeredLead": "Com a versão que cada desktop oferece («—» é não oferecido) e a pontuação de conformidade do LordOS.",
+      "hConfLordos": "Conformidade do LordOS",
+      "othersTitle": "Oferecidos pelo KDE ou pelo GNOME e não pelo LordOS ({n})",
+      "othersLead": "Cada um é deixado de fora de propósito ou ainda não é oferecido; a nota diz por quê, em inglês como a tabela de protocolos.",
+      "purposeTitle": "De fora de propósito ({n})",
+      "purposeLead": "Os protocolos que o LordOS não oferece por decisão, agrupados por motivo: cada um deixaria um programa ler ou controlar o que é da pessoa ou do desktop.",
+      "tableLink": "A tabela de protocolos completa, com busca e filtros",
+      "reproLead": "A mesma ferramenta e os mesmos testes, na sua máquina. A ferramenta nunca toca uma sessão de desktop: ela inicia o seu próprio servidor de teste sem tela numa pasta temporária privada e o para no fim, e não precisa de root. Estes passos foram rodados no Debian 13 (amd64), com o Node.js 20 do próprio Debian, antes de serem publicados aqui.",
+      "steps": {
+        "pkgs": {
+          "title": "Instale o que a compilação e os testes precisam",
+          "text": "No Debian 13 (trixie): um compilador C, o Node.js, os arquivos de desenvolvimento do Wayland e do xkbcommon, e o Xwayland e o xcb para as verificações X11. Nada do LordOS é instalado no seu sistema: tudo fica na pasta que você clonar.",
+          "after": "Sem o xwayland, as verificações X11 que precisam do Xwayland aparecem como não rodadas. Sem os arquivos de desenvolvimento do Mesa, o lord-server é compilado só para a CPU, que é o caminho que os testes usam de qualquer forma."
+        },
+        "apps": {
+          "title": "Opcional: os programas reais",
+          "text": "O teste também abre programas reais quando estão instalados, seis segundos cada um, e informa quais globals vincularam, sem dar pontuação. O nosso tinha {list}:",
+          "after": "Ele também tenta weston-simple-shm, weston-simple-egl, weston-simple-dmabuf-feedback, wayland-info, gtk3-demo e gtk4-demo quando estão presentes; a nossa máquina de teste não os tinha."
+        },
+        "clone": {
+          "title": "Baixe o código",
+          "text": "Clone o repositório do LordOS. O nosso teste foi registrado no commit {commit}: mude para esse commit para testar o mesmo código, ou fique no código mais novo para testar o mais recente (a comparação também vai mostrar o que mudou).",
+          "afterDirty": "Esse teste tinha mudanças em server/src que ainda não estavam num commit, então o commit sozinho pode dar uma pontuação um pouco diferente dos números desta página."
+        },
+        "build": {
+          "title": "Compile",
+          "text": "npm ci instala as ferramentas que montam o pacote do desktop, e npm run build monta o pacote que o servidor de teste carrega. make compila o lord-server e o lord-server-test, a compilação de teste com os ganchos de que o teste precisa: um ponteiro, uma mesa digitalizadora e um óculos de realidade virtual simulados, e uma conexão feita como a do Xwayland. O lord-server que o LordOS instala nunca tem esses ganchos.",
+          "after": "Leva alguns minutos, e tem que terminar sem nenhum aviso do compilador."
+        },
+        "run": {
+          "title": "Rode os testes de conformidade",
+          "text": "Ele compila o que faltar, inicia o lord-server-test sem tela numa pasta temporária privada, roda as verificações, as do X11 e os programas reais, e o para. O nosso teste levou {s} s.",
+          "after": "Ele não precisa de uma sessão de desktop e nunca se conecta à que você está usando."
+        },
+        "read": {
+          "title": "Leia o resultado",
+          "text": "O terminal mostra uma linha por global (a versão, a pontuação, uma barra, o número de verificações que falharam e a profundidade), depois os itens X11, os programas reais, cada verificação que falhou com o arquivo e a linha onde olhar, e uma linha de resumo como «48 protocols, mean 100 %, 48 complete». O relatório completo, com cada verificação e a sua mensagem, é escrito em server/build/wl-conformance.json, no mesmo formato do nosso docs/wayland-conformance.json, os dados desta página."
+        },
+        "compare": {
+          "title": "Compare com o nosso",
+          "text": "compare.mjs lê o seu relatório e o nosso verificação por verificação, e mostra as versões dos dois testes, cada pontuação que difere e cada verificação cujo resultado difere, com as duas mensagens. Termina com 0 quando todas coincidem.",
+          "after": "Para comparar dois relatórios quaisquer: node tools/wl-conformance/compare.mjs seu.json outro.json. Os globals que o seu teste deixou de fora (com --only ou --no-x11) são listados, não contam como diferenças."
+        },
+        "one": {
+          "title": "Um protocolo por vez",
+          "text": "--only recebe nomes de globals (a primeira coluna da tabela Wayland) e roda só as verificações deles; --no-x11 deixa de fora as verificações X11, --no-smoke os programas reais, e --verbose mostra o registro do servidor de teste e mantém a sua pasta. Rode assim várias vezes uma verificação que falhou antes de reportá-la.",
+          "after": "--static-only só lê o código, em segundos, sem iniciar nada. As suas pontuações não podem ser comparadas com as de um teste completo: nenhum fluxo roda, então nada fica completo."
+        },
+        "session": {
+          "title": "Numa sessão do LordOS em uso",
+          "text": "A ferramenta de conformidade não pode ser apontada para um desktop em uso, de propósito: os seus testes abrem janelas, movem um ponteiro simulado e fazem clientes de teste falharem com erros de protocolo. Cada teste inicia o seu próprio servidor de teste. Numa sessão do LordOS você pode conferir o que ela oferece aos apps: compile o repositório nela como acima e rode wl-globals no Terminal do LordOS. Ele mostra cada global, com a sua versão, como qualquer app o vê; no nosso servidor de teste ele lista {n}, porque {hidden} não são oferecidos aos apps comuns.",
+          "after": "Por ssh, defina antes WAYLAND_DISPLAY=wayland-0 e XDG_RUNTIME_DIR=/run/user/$(id -u). WAYLAND_DEBUG=1 antes do comando de um app mostra as suas mensagens de protocolo, que é como se conferiu que as capturas desta página não tinham erros de protocolo."
+        },
+        "proofs": {
+          "title": "As capturas",
+          "text": "wl-proof.mjs roda os programas reais instalados num servidor de teste sem tela e salva uma captura de cada um, com o que o seu registro de protocolo tinha, como as capturas desta página foram feitas."
+        }
+      },
+      "reportText": "Se uma verificação falhar na sua máquina e passar na nossa, ou se um número daqui parecer errado, abra uma issue no GitHub do LordOS, com:",
+      "reportItems": {
+        "compare": "a saída de node tools/wl-conformance/compare.mjs;",
+        "json": "o seu server/build/wl-conformance.json;",
+        "commit": "o commit que você compilou (git rev-parse HEAD) e se mudou alguma coisa;",
+        "system": "a sua versão do Debian, o seu processador, e se a máquina estava ocupada durante o teste."
+      },
+      "reportButton": "Reportar uma diferença",
+      "reportSearch": "Issues de Wayland já reportadas",
+      "x11Why": {
+        "general": "Verificado no código do gerenciador de janelas e com testes unitários; ainda nenhum cliente de teste o roda contra o Xwayland.",
+        "code": "Só o código do gerenciador de janelas foi verificado: nada disso pode rodar sem tela."
       }
     }
   }

@@ -328,5 +328,15 @@
   "suggest.studioCamera.detail": "Dona a totes les apps, navegadors i videotrucades inclosos, la càmera «LordOS Studio» amb els teus efectes: fons desenfocat o una imatge darrere teu ({packages}).",
   "suggest.studioCamera.unavailable": "{packages} no és als orígens de paquets d’aquest ordinador.",
   "suggest.studioCamera.note.dkms": "En un PC el seu mòdul del nucli es compila per al teu nucli en aquest ordinador (DKMS), cosa que porta uns 500 MB de compiladors i capçaleres del nucli, i de nou després de cada actualització del nucli. En una Raspberry Pi ve amb el nucli de LordOS.",
-  "suggest.studioCamera.note.secureBoot": "Amb Secure Boot activat, has de registrar la clau de signatura del mòdul al proper reinici; si no, la càmera no apareixerà."
+  "suggest.studioCamera.note.secureBoot": "Amb Secure Boot activat, has de registrar la clau de signatura del mòdul al proper reinici; si no, la càmera no apareixerà.",
+  "suggest.studioCamera.note.obs": "També afegeix un segon dispositiu de càmera, “OBS Virtual Camera”, perquè la càmera virtual pròpia d’OBS Studio funcioni al costat de LordOS Studio.",
+  "suggest.mok.title": "Un pas més al proper reinici",
+  "suggest.mok.body": "Secure Boot està activat, així que el que ha instal·lat aquest element només es carrega després d’inscriure la seva clau de signatura. LordOS prepara la clau i et dona una contrasenya d’un sol ús per escriure en una pantalla blava al proper reinici.",
+  "suggest.mok.prepare": "Prepara la clau",
+  "suggest.mok.pending": "La clau s’inscriurà al proper reinici. Si ja no tens la contrasenya, demana’n una de nova.",
+  "suggest.mok.passwordTitle": "La teva contrasenya d’un sol ús",
+  "suggest.mok.passwordHint": "Anota-la ara: només es mostra una vegada i no es desa enlloc.",
+  "suggest.mok.steps": "Reinicia i, quan aparegui la pantalla blava, prem una tecla abans de 10 segons. Després tria Enroll MOK → Continue → Yes, escriu aquesta contrasenya i tria Reboot.",
+  "suggest.mok.newPassword": "Contrasenya nova",
+  "suggest.mok.cancel": "Cancel·la la inscripció"
 }

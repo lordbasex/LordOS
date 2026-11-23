@@ -24,6 +24,7 @@
 #                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
 #                                         in /usr/share/bash-completion/completions/machines
 #   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
+#   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
 #   /usr/lib/lordos/themes/<theme>/       theme.json, theme.bundle.js and their resources (greeter: the
@@ -80,6 +81,8 @@ OUT=${1:?uso: mkdeb.sh salida.deb}
 ROOT=$(pwd)
 VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 [ -x server/build/lord-server ] || { echo "missing server/build/lord-server (make -C server)" >&2; exit 1; }
+# the conformance tool's test hooks live only in build/lord-server-test (-DLORD_TEST_HOOKS): never in a package
+if grep -q -a 'lordos-test-hooks' server/build/lord-server; then echo "server/build/lord-server holds the test hooks (a lord-server-test build?): refusing" >&2; exit 1; fi
 [ -x server/build/lord-netperm ] || { echo "missing server/build/lord-netperm (make -C server; clang for BPF)" >&2; exit 1; }
 # Without clang, make builds lord-netperm with no BPF programs: the firewall then enforces no rule at all, and only
 # Monitor → Firewall says so. 0.8.8.6 to 0.8.9.2 shipped like that. No ALLOW_MISSING for this one.
@@ -154,6 +157,7 @@ install -D -m 755 packaging/fallback-bin/fastfetch "$L/fallback-bin/fastfetch"
 ln -s fastfetch "$L/fallback-bin/neofetch"
 install -D -m 644 packaging/profile.d/lordos-fallback.sh "$PKG/etc/profile.d/lordos-fallback.sh"
 install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
+install -m 755 packaging/bin/lordos-dm-check "$L/lordos-dm-check"
 # Machines from the terminal: in the LordOS folder because it runs the lord-vm next to its own binary (/proc/self/exe)
 # and reads its texts from ../assets
 install -m 755 server/build/machines "$L/bin/machines"
@@ -366,6 +370,9 @@ install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-blu
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-bluez-profiles.conf"
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-volume.conf"
 install -D -m 644 tools/iso/rootfs/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf "$PKG/etc/pipewire/pipewire-pulse.conf.d/lordos-no-modules.conf"
+# LordOS Studio's Noise Reduction (E-S6, docs/CAMERA-STUDIO-PLAN.md 7): one more microphone from PipeWire's own echo-cancel
+# module with WebRTC; static, read by each user's pipewire at its next start
+install -D -m 644 tools/iso/rootfs/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf "$PKG/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf"
 # in a virtual machine only: more headroom for emulated sound cards (docs/SOUND.md, "Virtual machines")
 install -D -m 644 tools/iso/rootfs/etc/wireplumber/wireplumber.conf.d/lordos-vm-audio.conf "$PKG/etc/wireplumber/wireplumber.conf.d/lordos-vm-audio.conf"
 # vmwgfx only on VMware itself; elsewhere it removes the firmware framebuffer and fails (docs/ISO.md)
@@ -615,6 +622,12 @@ fi
 # boot loader (not a Raspberry Pi, not a container or an image being built without /boot/grub)
 if [ "$1" = configure ] && [ -e /boot/grub/grub.cfg ] && command -v update-grub >/dev/null 2>&1; then
     update-grub >/dev/null 2>&1 || true
+fi
+# another display manager enabled next to lordos.service (LightDM installed with another desktop, GitHub #187): both
+# start at boot and fight for the screen. Said, never changed here: which login screen to keep is the person's choice
+# (install.sh asks; lordos-issue shows it too). Printed on the terminal by apt; from the Store, among dpkg's output lines
+if [ "$1" = configure ] && [ -x /usr/lib/lordos/lordos-dm-check ]; then
+    /usr/lib/lordos/lordos-dm-check --warn >&2 || true
 fi
 # version-to-version system changes, each applied once (docs/UPDATES.md, "Migrations")
 if [ "$1" = configure ] && [ -x /usr/lib/lordos/migrate ]; then

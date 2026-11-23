@@ -644,12 +644,13 @@ file given as an fd, returning a compact index in a sealed memfd (id, name and s
 user's language, categories, licence, `flathub::verification::verified`, content rating, icon
 file name, sizes), which lord-server validates again before the Store reads it. Which helper
 (a new mode of an existing one, or a small new binary) is open question 5; the rule is the same as
-for every decoder. The website's API is never used.
+for every decoder. The website's API is never used for the catalog (only for the rankings, E10 below: app ids, nothing else).
 
 **Built on 2026-11-19 (E7):** the helper is a new small binary, `lord-appstream` (open question 5: not a mode of
 `lord-doc`, so it needs neither Poppler nor libarchive: only the C library), reading the uncompressed `appstream.xml`
 Flatpak keeps next to the `.gz`. Its index line: id, branch, name, summary, icon (`64x64/` or `128x128/<file>.png`),
-categories, license, developer, verified (`flathub::verification::verified`). The Store shows the verified ones by
+categories, license, developer, verified (`flathub::verification::verified`) and, since 2026-11-22, the newest release's
+date ("The Store's home" below). The Store shows the verified ones by
 default (maintainer's decision); the filter is the shell's, the index carries every app.
 
 **Descriptions (in development, after 0.8.9.4):** an app's page shows what it says about itself, AppStream's
@@ -667,6 +668,90 @@ which the Store reads at every load: the page asks for one app's with `lord.flat
 Flathub's catalog of 2026-11-22 (52 MB of XML, 3381 apps): the index grew from 0.6 MB to 2.5 MB, every app has a
 description, four were cut at 4 KB, and the helper still reads the whole file in about 0.1 s, far under its 512 MB cap
 (it keeps one 4 KB buffer per app being read, nothing more).
+
+### The Store's home (in development, after 0.8.9.4)
+
+The maintainer asked on 2026-11-22 for a larger catalog the way Bazaar (GNOME's Flatpak app centre) shows it:
+collections, categories and subcategories. The Store's Flathub section now opens on a home built only from the catalog
+above, so nothing about where data comes from changed:
+
+- **A banner** with the shown app released most recently (`spotlight`), the **ten main categories** as tiles with
+  their counts, the **Recently updated** row (newest release first; **See all** opens the whole collection, endless
+  scroll), and **Verified apps** while the unverified ones are shown too (otherwise every app shown is verified and
+  the row would repeat the catalog); then every app, as before.
+- **Subcategories**: a category page shows chips for the subcategories Flathub's catalog has most apps in under it
+  (`SUBCATS` in `sdk/flathubmodel.js`, counted on the catalog of 2026-11-22; 60 in all, each a `flathub.sub.*` text),
+  only those with apps, and a chip narrows the grid (`filterCatalog`'s `sub`).
+- **A verified badge** on every card (**✓ Verified** / **Not verified**).
+- The install rules are unchanged: the verified subset unless the setting shows every app, x86-64 only, and an app is
+  installed only from its own page after its metadata was read.
+- **The release date** comes from the same helper: `lord-appstream` writes each app's newest
+  `<releases><release timestamp>` (a direct child of the component's `<releases>`; 1 to 11 digits, no sign or
+  leading zero, else none) as the index line's tenth field, lord-server checks it again (`fpakas_line`) and
+  `lord.flatpak.catalog()` gives it as `updated` (seconds). The model ignores a date before 2000, more than a day in
+  the future or not a whole number. On the catalog of 2026-11-22 every one of the 3381 x86-64 apps has one.
+
+### Rankings from Flathub's API (E10, approved by the maintainer on 2026-11-22; in development)
+
+Bazaar's Popular, Trending, Recently added and the app of the day/week come from Flathub's web API
+(`https://flathub.org/api/v2/collection/{popular,trending,recently-added,recently-updated,verified}`,
+`collection/category/<cat>[/subcategories?subcategory=<sub>]`, `app-picks/app-of-the-day/<date>`,
+`app-picks/apps-of-the-week/<date>`; checked on 2026-11-22: a collection is a search result of up to 250 hits a page
+with `app_id`, `installs_last_month`, `trending`, `added_at`, `updated_at` and the app's texts; a pick is
+`{"app_id", "day"}` or `{"apps": [{"app_id", "position", …}]}`). Before E10 nothing in LordOS could reach that API:
+lord-server has no HTTP client of its own, and `lord-fetch` had only its two approved jobs. The maintainer approved a
+third `lord-fetch` job, E10, in this exact shape:
+
+- **`FQ_FLATHUB` with a number only** (`server/src/fetch/flathub.h`): `{"list": N}` and no other key, N one of a closed
+  list, `popular`, `trending`, `recently-added`, `recently-updated`, `app-of-the-day/<date>`, `apps-of-the-week/<date>`.
+  The helper builds the path itself (`fh_path`); the picks' date is today's in UTC from the helper's own clock, by
+  arithmetic (`fh_date`, no time zone file), never text from JS or lord-server. Any other number, a fraction, text,
+  another key or no socket is `bad-request`. Flathub's `verified` and category collections are not in the list (the
+  signed catalog already says which apps are verified and their categories).
+- **One host, through its own connector:** lord-server connects to `flathub.org:443` only (`FH_HOST`) through the
+  `flathub` connector (`sec/netconn.h`, `NC_FLATHUB`: `lordos-net-flathub.scope`, the firewall component
+  `lordos:flathub` that Flatpak's own downloads already use, so one row in the Firewall and Monitor → Network blocks or
+  shows both) and hands the connected socket to `lord-fetch`, which speaks TLS 1.2+ with the certificate checked against
+  the system CA store and the host name (the same `conn_tls` as the other jobs, never relaxed). One GET, **no redirect
+  followed** (any 3xx is the failure `redirect`), at most **1 MB** read (`FH_ANSWER_MAX`; a larger Content-Length,
+  chunked body or body until close is `big`), 20 s to connect and 30 s for the whole answer (`FH_TIMEOUT_MS`).
+- **Only app ids leave the helper** (`fh_parse`, strict `sec/json.h`: duplicate keys, more than 32 levels, `\u0000` or
+  trailing bytes refuse the whole answer): a collection's `hits[].app_id`, the day's `app_id`, the week's `apps[].app_id`
+  in `position` order (whole numbers 1 to 1000; only the first 1000 entries are looked at). Each must pass `fpak_id_ok`;
+  members of another type, bad ids and duplicates are skipped one by one; at most 250 per list, Flathub's order kept.
+  The answer is `{"ids": […]}` (`FR_FLATHUB`); no name, summary, icon address, number or any other text of Flathub's
+  answer ever leaves the helper, and an error carries only its code. lord-server reads it again (`fh_from_compact`:
+  nothing but `ids`, every id through `fpak_id_ok`, more than 250 refused).
+- **At most once a day per list** (`server/src/fetch/fhsvc.c`): a list is fetched when its last good copy is from another
+  UTC day; a failure waits 15 minutes, doubled after each failure in a row, at most a day. The lists are kept in
+  `~/.cache/lordos/flathub/<list>.json` (`{"at", "tried", "fails", "ids"}`; each folder made `0700` and checked to be the
+  user's own, no link followed, written to a new file and renamed), read back with every id checked again. A copy from
+  an earlier day is still shown until the new one comes.
+- **The Store** (`apps/store/flathubpages.js`, `sdk/flathub.js`, `sdk/flathubmodel.js`): `lord.flatpak.rankRequest()`
+  asks for the stale lists while Flathub's home or a collection page is shown and the rankings are on, and
+  `lord.flatpak.ranks()` gives the ids. The home gets an **App of the day** banner (else the latest release, as before),
+  and rows **Apps of the week**, **Popular**, **Trending**, **Recently added**, **Recently updated** and (with every app
+  shown) **Verified apps**, each with **See all**. Names, icons and summaries come only from the signed catalog
+  (`rankedApps`): an id the catalog hasn't is dropped, and an unverified app only shows while the switch shows every app.
+  **Recently updated** is Flathub's (its builds) when at least four of its apps are shown, else the catalog's (the
+  newest `<release>` an app declares, which many apps don't keep up to date). The install rules don't change: x86-64
+  only, the verified subset unless the switch, and installing only from the app's own page after its metadata was read.
+  Without network, with the component blocked or on any failure, the rows are simply absent and the home is the one
+  above.
+- **A switch to turn it off**, on by default, in the Store's Flathub section under the verified-apps switch
+  (`settings.flathub.rankings`; absent means on, so no migration). Off, the Store never asks and shows no rankings.
+- **What it reveals:** that this computer uses Flathub's site at most once a day per list (its address and the time),
+  nothing about the person's apps: no id, no language and no cookie is sent; the request is the same for everyone.
+- **Tests:** `build/flathub-rank-test` (the closed list of paths, every number outside it refused, the date, the recorded
+  answers of 2026-11-22 in `server/tests/data/flathub/api-2026-11-22/`, and hostile JSON: over 1 MB, 40 levels deep,
+  wrong types, ids with bad characters, too long, duplicates, more than 250, duplicate keys);
+  `build/flathub-fetch-test` (the exchange against a stand-in server: the exact GET path and Host, 301/302/303/307/308
+  not followed, the 1 MB cap with a Content-Length, chunked and until close, other statuses, non-JSON; then
+  `build/lord-fetch` itself refusing bad requests and failing on a peer without TLS); `build/fhsvc-test` (once a UTC
+  day, the wait after failures, the cache read back strictly: bad ids, more than 250, not strict JSON, a link);
+  `tests/flathub_model_test.mjs` (the rows on the recorded answers against the recorded catalog, hostile `ranks()`
+  values, every new text in every language).
+
 
 ### Updates (Design)
 
@@ -750,6 +835,10 @@ network exceptions:
   and install.
 - **E7. A sandboxed parser for Flathub's appstream data** (`sandbox_apply_helper`, file as an fd,
   sealed memfd back, validated again in lord-server), whichever binary hosts it.
+- **E10 (approved by the maintainer on 2026-11-22). A third `lord-fetch` job, `FQ_FLATHUB`, for the Store's rankings**:
+  a number from a closed list of six paths on `flathub.org:443` only, through the `flathub` connector
+  (`lordos-net-flathub.scope`, `lordos:flathub`), no redirect, 1 MB, once a day per list, only app ids back
+  ("Rankings from Flathub's API" above).
 
 Not requested now: **E8**, lord-server serving `org.freedesktop.portal.*` interfaces to Flatpak apps
 (portal option B, identity by cgroup), which gets its own review in a later phase. OpenURI and Inhibit

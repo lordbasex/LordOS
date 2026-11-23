@@ -783,6 +783,8 @@
   "dl.sizeAbout": "{arch}, about {size}",
   "dl.reading": "Reading the list of images on {name}'s site…",
   "dl.found": "{file}, from its maker's signed list (signature and SHA-256 checked)",
+  "dl.pinned": "{file}, its SHA-256 pinned in LordOS's signed catalog (checked after the download)",
+  "dl.notice.archived": "{maker} has paused its public images: this is its last one, from {date}, and it gets no more security updates. It comes without Google's apps.",
   "dl.noList": "The list of images couldn't be read: {why}",
   "dl.noImage": "its list has no image of this release for this architecture right now",
   "dl.retry": "Try Again",

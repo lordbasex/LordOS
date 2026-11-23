@@ -603,7 +603,7 @@
   "comp.weather": "আবহাওয়া",
   "comp.weatherHint": "চালু করার পর আবহাওয়া উইজেটের Open-Meteo পূর্বাভাস।",
   "comp.flathub": "Flathub",
-  "comp.flathubHint": "Flathub থেকে Flatpak অ্যাপ: ক্যাটালগ, ইনস্টল এবং আপডেট।",
+  "comp.flathubHint": "Flathub থেকে Flatpak অ্যাপ: ক্যাটালগ, ইনস্টল, আপডেট এবং flathub.org থেকে স্টোরের র‍্যাংকিং।",
   "comp.streams": "ক্যামেরা ও টিভি",
   "comp.streamsHint": "ভিডিও উইজেট ও প্লেয়ারের ঠিকানা: ক্যামেরা, স্ট্রিম ও টিভি চ্যানেল (lord-stream)।"
 }

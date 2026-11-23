@@ -6,7 +6,7 @@ import { createElement as h, useEffect, useState } from 'react';
 import {
   View, Text, Button, EmptyState, useTheme, useStore, admin, typeScale, spacing, t, direction,
   suggestions, refreshSuggestions, reevaluateSuggestions, dismissSuggestion, markSuggestionsSeen,
-  fanCase,
+  fanCase, session,
 } from '@lordos/sdk';
 
 // ---- drawn glyphs (monochrome on a tinted tile) ----
@@ -64,6 +64,53 @@ function Glyph({ kind, size: s = 40 }) {
     ...parts.map((p, i) => (p.key ? p : { ...p, key: i })));
 }
 
+// ---- Secure Boot: enrolling DKMS's signing key (dkms-mok-enroll, server/src/hw/mok_admin.h) ----
+// For an installed card whose package DKMS builds (the `secureBoot` note): asks the helper whether the key still has to
+// be enrolled; if so, "Prepare the Key" makes a one-time password root-side and gives it once. It lives only in this
+// component's state (no store, no log, no clipboard) and is gone when the card closes; a lost one is replaced by a new
+// request ("New Password"), which withdraws the old one.
+
+function askMok(set) {
+  admin.run('dkms-mok-enroll', 'status', null, { quiet: true })
+    .then((line) => { const m = /state=([a-z]+)/.exec(String(line)); set(m ? m[1] : 'unsupported'); }, () => set('unsupported'));
+}
+
+function MokStep({ th }) {
+  const [state, setState] = useState(null);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { askMok(setState); }, []);
+  if (state !== 'needed' && state !== 'pending') return null;
+  const run = (arg) => {
+    setBusy(true);
+    setError('');
+    admin.run('dkms-mok-enroll', arg, null, { quiet: true }).then((line) => {
+      const m = /password=([0-9]{8})$/.exec(String(line));
+      setPassword(m ? m[1] : '');
+      askMok(setState);
+    }, (e) => { setPassword(''); setError(e.message); askMok(setState); }).finally(() => setBusy(false));
+  };
+  const canRestart = typeof session.canPower === 'function' && session.canPower();
+  const text = (key, extra = {}) => h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, lineHeight: 1.4, textAlign: 'start', ...extra } }, t(key));
+  const shown = state === 'pending' && password;
+  return h(View, { style: { gap: spacing.s, marginTop: spacing.xs, paddingTop: spacing.s, borderTop: `1px solid ${th.separator}` } },
+    h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('store.suggest.mok.title')),
+    shown ? null : text(state === 'pending' ? 'store.suggest.mok.pending' : 'store.suggest.mok.body'),
+    shown ? h(View, { style: { gap: spacing.xs } },
+      text('store.suggest.mok.passwordTitle', { color: th.text, fontWeight: 500 }),
+      h(Text, { style: { fontSize: 34, fontWeight: 300, color: th.text, fontFamily: 'monospace', direction: 'ltr', textAlign: 'start', letterSpacing: 4 } }, password),
+      text('store.suggest.mok.passwordHint'),
+      text('store.suggest.mok.steps', { color: th.text })) : null,
+    error ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, error) : null,
+    shown && !canRestart ? text('store.restart.how') : null,
+    h(View, { style: { flexDirection: 'row', gap: spacing.s, justifyContent: 'flex-end', flexWrap: 'wrap' } },
+      state === 'pending' ? h(Button, { label: t('store.suggest.mok.cancel'), disabled: busy, onClick: () => run('cancel') }) : null,
+      state === 'pending' ? h(Button, { label: t('store.suggest.mok.newPassword'), disabled: busy, onClick: () => run('import') }) : null,
+      state === 'needed' ? h(Button, { primary: true, label: t('store.suggest.mok.prepare'), disabled: busy, onClick: () => run('import') }) : null,
+      shown && canRestart ? h(Button, { primary: true, label: t('store.restart.now'), onClick: () => session.restart() }) : null));
+}
+
 // ---- one card ----
 
 const loc = (s, part, extra = {}) => t(`store.suggest.${s.text}.${part}`, { ...s.params, ...extra });
@@ -119,6 +166,7 @@ function Card({ s, deb }) {
         s.state !== 'installed' ? h(Button, { plain: true, small: true, label: t('store.suggest.dismiss'), onClick: () => dismissSuggestion(s.id) }) : null)),
     error ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, error) : null,
     !isAdmin && s.state === 'install' ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', textAlign: 'start' } }, t('store.debian.needAdmin')) : null,
+    isAdmin && s.state === 'installed' && s.notes.includes('secureBoot') ? h(MokStep, { th }) : null,
     plan && h(View, { style: { gap: spacing.s, marginTop: spacing.xs, paddingTop: spacing.s, borderTop: `1px solid ${th.separator}` } },
       nonfree ? h(Text, { style: { fontSize: typeScale.caption, color: '#ff9f0a', lineHeight: 1.4, textAlign: 'start' } }, t('store.suggest.confirmNonfree')) : null,
       h(deb.PlanView, { plan }),

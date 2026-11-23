@@ -24,8 +24,8 @@ import { kindOf } from './filekinds.js';
 import { formatBytes } from './system.js';
 import { EntryIcon, FolderGlyph, DriveGlyph } from './fileglyphs.jsx';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, listRowStyle, listHeaderCell, listCell, when, useWidth, userDirs, ZoomControl } from './fileparts.jsx';
-import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction,
-  imagesOnly, viewFor, saveView, liveRange, gridStep, cloudPlaces, cloudRoot, thumbMetrics, zoomFor, saveZoom, clampZoom } from './filepickermodel.js';
+import { localDisks, startFolder, locationPlaces, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction,
+  imagesOnly, viewFor, saveView, liveRange, gridStep, cloudPlaces, cloudRoot, refuseCloud, thumbMetrics, zoomFor, saveZoom, clampZoom } from './filepickermodel.js';
 import { cloudState } from './cloud.js';
 import { windows, wm, workAreaOf, onActiveDesktop } from './windows.js';
 import { overParent } from './dialogmodel.js';
@@ -81,14 +81,20 @@ function Tile({ e, on, live, th, m, onDown, onOpen }) {
 // mode: 'open' (the default), 'folder' (the selected folder, or the one in view) or 'save' (a name, with a question before replacing a file;
 // askReplace={false}: no question, the caller asks its own, e.g. the Terminal's "use the file that is there").
 // modal: nothing else takes the keys while it is open (the portal's dialog, over everything).
-export function FilePicker({ onPick, onClose, filter = null, title = '', multiple = false, start = '', mode = 'open', name = '', accept = '', modal = false, askReplace = true }) {
+// computer: Locations also offers the whole computer ("/"), read only, for a dialog that only reads what is picked (Settings →
+// Wallpaper: a picture in /usr/share/backgrounds or on another partition, GitHub #219). Never in a save dialog, and never
+// for the portal (a Linux app is lent only what is in the home folder and the disks).
+// cloud={false}: no Cloud accounts in the sidebar, and nothing in a Cloud account's folder may be chosen, with a note saying so
+// (Backups' destination, #200 and #208: lord-server refuses one anyway).
+export function FilePicker({ onPick, onClose, filter = null, title = '', multiple = false, start = '', mode = 'open', name = '', accept = '', modal = false, askReplace = true, computer = false, cloud = true }) {
   const th = useTheme();
   const home = fs.home();
   const disks = useMemo(() => { try { return localDisks(fs.volumes(), home); } catch (e) { return []; } }, []);
+  const places = useMemo(() => locationPlaces(disks, { computer, mode }), [disks]);
   const dirs = useMemo(() => userDirs().filter((d) => d.label !== 'desktop'), []);
   const [nav, setNav] = useState(() => {
-    const dir = startFolder(start, home, disks);
-    return { dir: statOf(dir)?.dir ? dir : home, back: [], fwd: [] };
+    const dir = startFolder(start, home, disks, computer && mode !== 'save');
+    return { dir: statOf(dir)?.dir && (cloud || !cloudRoot(dir, home)) ? dir : home, back: [], fwd: [] };
   });
   const { dir } = nav;
   const [cursor, setCursor] = useState(null);        // the row selected, a path
@@ -168,7 +174,8 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
     else if (a.save) save();
   };
   const state = { mode, multiple, dir, row, chosen, name: saveName, writable };
-  const primary = primaryAction(state);
+  const gate = (a) => (cloud ? a : refuseCloud(a, home));
+  const primary = gate(primaryAction(state));
   const choose = (e) => setChosen((c) => (c.includes(e.path) ? c.filter((x) => x !== e.path) : [...c, e.path]));
   const select = (e, ev) => {
     setCursor(e.path);
@@ -192,7 +199,7 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
 
   const onKey = (e) => {
     if (e.key === 'Escape') { if (replacing) setReplacing(false); else onClose(); return; }
-    if (e.key === 'Enter') { act(enterAction(state)); return; }
+    if (e.key === 'Enter') { act(gate(enterAction(state))); return; }
     if (e.alt && e.key === 'ArrowLeft') { goBack(); return; }
     if (e.alt && e.key === 'ArrowRight') { goForward(); return; }
     // Ctrl + and Ctrl − change the thumbnails' size, as in Files
@@ -230,10 +237,12 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
   // Cloud's accounts (docs/CLOUD.md): their folders, between Favorites and Locations; in one, no thumbnails
   // (making one would bring each file down from the cloud)
   const cloudSt = useStore(cloudState);
-  const clouds = cloudPlaces(cloudSt && cloudSt.accounts, home, settings.get().cloudHidden || []);
-  const inCloud = !!cloudRoot(dir, home);
+  const clouds = cloud ? cloudPlaces(cloudSt && cloudSt.accounts, home, settings.get().cloudHidden || []) : [];
+  const inCloudOf = (p) => !!cloudRoot(p, home);
+  const inCloud = inCloudOf(dir);
+  const cloudRefused = !cloud && !primary && (inCloudOf(dir) || (row?.dir && inCloudOf(row.path)));
   const showDate = width - (narrow ? 0 : SIDE_W) > 520;
-  const crumbs = pathCrumbs(dir, home).map((c) => ({ label: c.home ? t('files.place.home') : c.label, folder: true, path: c.path }));
+  const crumbs = pathCrumbs(dir, home).map((c) => ({ label: c.home ? t('files.place.home') : c.path === '/' ? t('files.place.computer') : c.label, folder: true, path: c.path }));
   const shown = fitCrumbs(crumbs);
   const label = replacing ? t('shell.picker.replace')
     : accept || (mode === 'save' ? t('shell.picker.save') : mode === 'folder' ? t('shell.picker.chooseFolder')
@@ -254,8 +263,8 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
               {dirs.map((d) => place(t(`files.place.${d.label}`), d.path, <FolderGlyph size={16} />))}
               {clouds.length ? <SideTitle t={th}>{t('cloud.title')}</SideTitle> : null}
               {clouds.map((c) => place(c.name, c.path, <CloudGlyph kind="cloud" size={16} color={th.accent} />))}
-              {disks.length ? <SideTitle t={th}>{t('files.locations')}</SideTitle> : null}
-              {disks.map((v) => place(v.name, v.path, <DriveGlyph color={th.accent} />))}
+              {places.length ? <SideTitle t={th}>{t('files.locations')}</SideTitle> : null}
+              {places.map((v) => place(v.kind === 'computer' ? t('files.place.computer') : v.name, v.path, <DriveGlyph color={th.accent} />))}
             </View>
           </ScrollView>
         </View>
@@ -333,9 +342,9 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
           <Button label={t('shell.picker.cancel')} onClick={onClose} />
           <Button primary label={label} disabled={!primary} onClick={() => act(primary)} />
         </View>
-        {replacing || (mode === 'save' && !writable) ? (
+        {replacing || (mode === 'save' && !writable) || cloudRefused ? (
           <Text style={{ paddingHorizontal: spacing.m, paddingBottom: spacing.s, fontSize: typeScale.caption, color: th.textDim, textAlign: 'end', backgroundColor: th.mode === 'dark' ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.025)' }}>
-            {replacing ? t('shell.picker.exists') : t('shell.picker.readOnly')}
+            {replacing ? t('shell.picker.exists') : cloudRefused ? t('shell.picker.noCloud') : t('shell.picker.readOnly')}
           </Text>
         ) : null}
       </View>

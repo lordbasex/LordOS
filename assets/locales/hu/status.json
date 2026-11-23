@@ -171,5 +171,7 @@
   "vm.gvtGone": "A videokártya része eltávolítva",
   "gpu.freqSet": "A videokártya minimális frekvenciája beállítva",
   "gpu.memlockSet": "A gépek által zárolható memória mentve",
-  "vm.memlockSet": "A gép memóriája zárolva"
+  "vm.memlockSet": "A gép memóriája zárolva",
+  "dkms.mokState": "Secure Boot-kulcs: {state}",
+  "dkms.mokPassword": "A kulcs a következő újraindításkor lesz regisztrálva."
 }

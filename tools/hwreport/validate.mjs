@@ -1,6 +1,7 @@
 // validate.mjs — checks a shared hardware report (0.8.7, docs/BENCHMARK.md "0.8.7 — Community hardware reports").
 //
 //   node tools/hwreport/validate.mjs <report.json>...   check files; prints the result, exit 1 if any is invalid
+//   node tools/hwreport/validate.mjs --form=0.8.9.4-beta <report.json>...   the same, as if the issue's form named that version
 //   node tools/hwreport/validate.mjs --github           the workflow (.github/workflows/hardware-report.yml)
 //
 // --github reads the issue from the event file GitHub writes ($GITHUB_EVENT_PATH; never from the command line
@@ -11,17 +12,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { checkReport, commentBody, findAttachments, fetchAttachment, parseLimited, labelsFor, embeddedReport, STATUS_LABELS, MARKER, MAX_BYTES } from './lib.mjs';
+import { checkReport, commentBody, findAttachments, fetchAttachment, parseLimited, labelsFor, embeddedReport, formVersion, STATUS_LABELS, MARKER, MAX_BYTES } from './lib.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const schema = JSON.parse(fs.readFileSync(path.join(REPO, 'apps/sysinfo/hwreport.schema.json'), 'utf8'));
 
-// The result for one report's text (already downloaded).
-export function checkText(text) {
+// The result for one report's text (already downloaded). form: the version the issue's form names ('' if none);
+// a file made on another version is labelled report:check, with a note (issue #224).
+export function checkText(text, { form = '' } = {}) {
   let rep;
   try { rep = parseLimited(text); } catch (e) { return { status: 'invalid', errors: [{ path: '/', message: `not readable JSON: ${e.message}` }], labels: labelsFor('invalid', null) }; }
   if (!rep || typeof rep !== 'object' || Array.isArray(rep)) return { status: 'invalid', errors: [{ path: '/', message: 'not a report object' }], labels: labelsFor('invalid', null) };
-  return checkReport(rep, schema);
+  return checkReport(rep, schema, { form });
 }
 
 // ---- GitHub ----
@@ -61,7 +63,7 @@ async function github() {
       // System Information's page: the report inside it (issue #171)
       const inner = fileName.endsWith('.html') ? embeddedReport(text) : text;
       if (inner == null) throw new Error('this page has no report inside: attach the .json file System Information saved next to it');
-      result = checkText(inner);
+      result = checkText(inner, { form: formVersion(issue.body) });
     }
     catch (e) { result = { status: 'invalid', error: e.message, labels: labelsFor('invalid', null) }; }
   }
@@ -89,9 +91,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     process.exit(2);
   } else {
     let bad = 0;
-    for (const f of args) {
+    const formArg = args.find((a) => a.startsWith('--form='));
+    const form = formArg ? formVersion(`### LordOS version\n\n${formArg.slice(7)}`) : '';
+    for (const f of args.filter((a) => !a.startsWith('--form='))) {
       const st = fs.statSync(f);
-      const r = st.size > MAX_BYTES ? { status: 'invalid', errors: [{ path: '/', message: 'too big' }], labels: [] } : checkText(fs.readFileSync(f, 'utf8'));
+      const r = st.size > MAX_BYTES ? { status: 'invalid', errors: [{ path: '/', message: 'too big' }], labels: [] } : checkText(fs.readFileSync(f, 'utf8'), { form });
       console.log(`${f}: ${r.status}  [${r.labels.join(', ')}]`);
       for (const e of r.errors || []) console.log(`  error ${e.path}: ${e.message}`);
       for (const p of r.privacy || []) console.log(`  personal ${p.path}: ${p.kind}`);

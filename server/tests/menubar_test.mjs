@@ -4,7 +4,7 @@
 // `lord` with two sound outputs, a Wi-Fi radio and a Bluetooth adapter that records lord.sound calls, runs it, and
 // reads its checks. Needs node and the repository's node_modules (esbuild, react, react-reconciler).
 // An argument names another scene over the same stub and the whole SDK: tests/files_colview_scene.mjs (Files' column
-// view shows the tag dots, GitHub #99).
+// view shows the tag dots, GitHub #99), tests/files_drag_scene.mjs (a drag in a big folder, GitHub #218).
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';

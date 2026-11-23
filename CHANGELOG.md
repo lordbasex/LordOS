@@ -10,9 +10,359 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+## [0.8.9.5-beta] - 2026-11-23
+
+An update of the package through the Store and `apt`, with no new images. Linux apps: every Wayland global LordOS
+offers passes its conformance run (48 of 48, all "complete"; `docs/WAYLAND.md`, "Conformance") on every run, frame
+pacing (`wp_fifo_manager_v1`) and session management (`xdg_session_manager_v1`) included, which failed in some runs on
+a loaded machine until two last fixes (the software vblank, `softpace.h`, and maximized windows in a session; each
+passed 35 of 35 runs with every core busy), with new protocols (explicit sync, frame timing, colour management,
+graphics tablets, VR headsets only if you allow it, tab tear-off, session management, the bell, `wl_fixes`), X11 apps
+handled as GNOME and KDE handle them (28 items at 100 %, 23 complete), and the results published on lordos.org's
+protocol table and its new conformance page (/wayland-conformance/); always on top in every theme. LordOS Studio: background blur
+and pictures, video backgrounds, Noise Reduction and Mic Mode for LordOS's apps, and its camera for every app as a
+virtual camera (v4l2loopback, with a guided Secure Boot key enrolment, and OBS beside it). Machines: apps mode, the
+`machines` command, new system cards (LordOS, Android 13 and more), Intel GVT-g graphics, sound, networks and much more. The
+Store: Flathub's home with collections, categories and Flathub's own rankings (exception E10), and Chromium and
+Electron apps from Flathub. Theme switches after a package update without logging out (`codesig_reload`); the capture
+indicator names every program; password fields are never captured; Screenshots is allowed to record from the start;
+three window options in Appearance (#151, #219); backup destination and exclusions in the file dialog (#200);
+clipboard snippets (#205); Lord Celeste, a community theme; and fixes for GitHub issues #202–#208, #210, #214, #216–#219,
+#222 and #224. Not yet tried on real hardware: the virtual camera in browsers and OBS, the Secure Boot enrolment, Mic
+Mode in a video call, and the Raspberry Pi with this release.
+
 ### Added
 
-- **Always on top, in every theme, in development (the latest release is 0.8.9.4).** A window can be kept over every
+- **lordos.org/wayland-conformance/: the Wayland and X11 conformance run in full, with comparisons and the steps to
+  run it yourself.** A new page, in en, es and pt, publishes everything
+  `tools/wl-conformance.mjs` recorded in `docs/wayland-conformance.json`, rendered from that data (nothing typed by
+  hand): the run (date, commit, uncommitted changes, wayland-protocols, libwayland and Xwayland versions, headless CPU
+  path, duration); a summary with each number's limits (the X11 items at 100 % that aren't complete and why, the 19
+  allowed exceptions with the protocol's words, the protocols complete here but "Partly" in the table, the globals only
+  the test hooks reach, timing checks that can fail once on a loaded machine, and that KWin and Mutter were never put
+  through the tool); every Wayland global and X11 item with its version, score, depth, checks by kind and screenshot;
+  every one of the 1,295 checks with its result, points, message and file:line; the real programs the run started;
+  LordOS against KWin and Mutter as wayland.app lists them (by category, the protocols LordOS offers with their
+  versions, the ones only KDE or GNOME offer, and the ones left out on purpose grouped by reason); copy-and-paste
+  steps for Debian 13 (packages, clone, build, run, read, compare, one protocol at a time, a live session, the
+  screenshots), each one run on this machine with Debian's Node.js 20; and what to attach to a GitHub issue. Linked
+  from the protocol table, the footer, the search and the sitemap, with a FAQ entry.
+  - **Data:** `tools/gen-wayland-table.mjs` also writes `web/content/wayland/conformance.json` (every check, the
+    notes, the real programs). `validateDetail()` holds each value to a strict shape and refuses the build when an
+    item's checks don't add up to the points `protocols.json` shows for it; `--check` and
+    `server/tests/wayland_table_test.mjs` catch a stale copy, and the test refuses hostile values (markup in an id, a
+    path with `..`, a bad result, a points mismatch).
+  - **`tools/wl-conformance/compare.mjs`:** compares your `server/build/wl-conformance.json` with the recorded run
+    check by check (versions, scores, every result that differs with both messages); exit status 0 when they match;
+    globals left out by `--only` or `--no-x11` are listed, not counted.
+
+- **Backups: the destination and the exclusions can be chosen in the file dialog (from [#200](https://github.com/lordbasex/LordOS/issues/200)'s second idea).** Settings → Destination has
+  a **Choose…** button next to **Use Folder**, and Exclusions one next to **Add**. Each opens the system file dialog
+  (`FilePicker` in folder mode, `sdk/filepicker.jsx`) over the app; typing a path keeps working as before.
+  - **Destination:** the dialog starts at the current destination (or the home folder) and never offers a Cloud
+    account's folder, as #208 decided: it is called with the new `cloud={false}`, which takes the Cloud accounts out
+    of its sidebar, and in `~/Cloud/<account>` or a folder inside one its **Choose this folder** button is off, with
+    the note "A Cloud folder can't be chosen here." (`refuseCloud` in `sdk/filepickermodel.js`, which also covers
+    Enter; going into folders still works). lord-server's own refusal (`fsops_cloud_path`, `backup.destCloud`) is
+    unchanged and still the check that counts. A dialog that starts in a Cloud folder with `cloud={false}` starts at
+    home instead.
+  - **Exclusions:** a folder chosen or typed must be inside the home folder, which is what Backups copies. Anything
+    else (another user's folder, a disk, `/etc`, a path with `.` or `..`) shows "Only a folder inside your home folder
+    can be excluded…", and the home folder itself shows "…nothing would be left to back up." under the field, instead
+    of being stored. A chosen folder is stored relative to home like a typed one (`Videos/Large`), and the same one is
+    never added twice (`exclusionFor` and `addExclusion` in the new `apps/backup/model.js`).
+  - **Text:** five `backup.*` keys (`choose`, `pickDest`, `pickExclude`, `excludeOutside`, `excludeHome`) and
+    `shell.picker.noCloud`, in all 35 languages.
+  - **Tests:** `server/tests/backup_model_test.mjs` (in `make -C server test`): absolute, `~/` and relative paths,
+    extra slashes, outside paths and look-alike prefixes, `.` and `..`, the home folder itself, duplicates, and
+    `refuseCloud` for a Cloud account's folder, one inside it, `~/Cloud` itself and a disk; and
+    `backup_pickers_scene.mjs` (23 checks, over `textfield_menu_test.mjs`'s stub): the real app's Settings, both Choose…
+    buttons, the dialog without Cloud, its button off with the note in a Cloud account's folder, a disk's folder chosen
+    as destination, a home folder chosen and typed as exclusions, and the two errors with nothing stored.
+  - **Paper:** the Backups highlight says so, in en, es and pt.
+  - **Still on the roadmap** (docs/ROADMAP.md): several named jobs, a schedule per job, folders outside the home
+    folder, choosing source folders, keeping the computer awake and the jobs list.
+
+- **Snippets in the clipboard history (first step of #205).** The full
+  clipboard panel (❖⇧V) has two tabs, **History | Snippets**. Snippets are texts you keep to paste again, each with a
+  name, in the order you choose (a greeting, an address, a signature). Global keys that paste a snippet without opening
+  the panel are **not** part of this step: they need their own design and security review (a key must never take an
+  app's own shortcut, Linux apps included, or keys typed into another app) and stay on the roadmap with the rest of
+  #205 (conflict detection, per-snippet enable/disable).
+  - **Adding:** **+ New snippet** (typed), **+ From clipboard** (the text copied last), and **Save as snippet** on any
+    text in the history (a button in its preview and a new right-click menu on its row: Paste, Pin, Save as snippet,
+    Delete). Each opens an editor with a name (optional: the first line is used) and the text (plain text, several
+    lines allowed); Enter in the name field or Save keeps it first in the list.
+  - **Using:** Enter or a click pastes it the same way as a history entry: into the LordOS text field that had focus,
+    or into the frontmost Linux app with a Ctrl+V sent only to that app; otherwise it stays copied. A pasted snippet
+    isn't added to the history a second time.
+  - **Managing:** Edit (name and text, so renaming too), Move up / Move down or Alt+↑ ↓ (not while a search shows only
+    part of the list), Delete with a second confirmation (Del twice does the same), and the same actions on a right
+    click. ↑ ↓ select as in the history, the search filters both tabs and each tab shows its matches while searching,
+    Ctrl+Tab switches tabs, Escape closes the editor before the panel. A click on a tab, a filter or a button gives the
+    keys back to the search field (before, a click on a filter left the arrow keys without a target).
+  - **Rules** (`sdk/snippetsmodel.js`, pure): at most 200 snippets of up to 64 KB of UTF-8 text each, names of up to
+    80 characters; line breaks and tabs are kept, NUL and other control characters (escape sequences included) are
+    dropped; the same text can't be two snippets (the editor names the one that has it). The file is read back with
+    every rule applied again, so one edited by hand can't break the panel.
+  - **Passwords:** From clipboard refuses what a password field or a password manager copied (the same `sensitive`
+    mark that keeps it out of the history).
+  - **Storage:** `~/.local/share/lordos/clipboard/snippets.json`, next to the history, saved whatever the history's
+    settings say. A new native call, `lord.clipboard.saveStore(name, text)` (`server/src/ui/js_term.c`), writes it and
+    `history.json`: only those two names (no path from JS), atomically, the file 0600 and the folder 0700 (set back to
+    0700 when an older version made it 0755), at most 32 MB, never through a link put in place of the folder. So the
+    history is now readable by its owner only too; it is rewritten that way on its next save, with no migration. The
+    folder stays off `lord.fs`'s deny list, as the history always was: it holds no security decision and starts
+    nothing. Isolated apps don't get `saveStore` (their `lord.clipboard` is the broker's).
+  - **Text:** 28 new keys (`shell.clipboard.tab.*`, `shell.clipboard.snippets.*`, `saveAsSnippet`, `searchSnippets`)
+    in all 35 languages.
+  - **Tests:** `server/tests/snippets_model_test.mjs` (41 checks: add, edit and rename, delete, reorder, search, the
+    file's round trip and repair, the count and size limits, a full file below 32 MB) and
+    `clipboard_snippets_scene.mjs` (25 checks: the real panel over the stub `lord`: tabs, search, paste, From
+    clipboard, save through `saveStore`, Alt+↓, Del twice, a password refused, Save as snippet, Escape), both in
+    `run_suites.sh`. Docs: `docs/SPOTLIGHT.md` (Snippets, who can read the files), `docs/ROADMAP.md`.
+- **Lord Classic's start menu shows apps by category (from #210's
+  idea).** All apps now has a small switch next to its title, **A–Z | Categories**. A–Z is the list it always was;
+  Categories lists the groups that hold at least one app, each with its count, and a click opens or closes a group to
+  show its apps (by name) under it, so several can be open at once. The menu opens again on the view chosen last
+  (`settings.startMenuView`, `'az'` or `'categories'`; a new key with A–Z as its default, so no migration). Pinned,
+  Recent, right click (pin to Start or the taskbar) and dragging an app onto the taskbar work the same on both views.
+  - **The groups** (`sdk/appgroupsmodel.js`, pure, no `lord` and no React): Utilities, Development, Education, Games,
+    Graphics, Internet, Office, Audio & video, Science, System, Settings and **Other**, sorted by their translated
+    names with Other always last. They are the freedesktop main categories, so their names are the ones the Store and
+    Lord Flow's app launcher already use (`shell.category.*`). An app's group is its manifest's `category` (a LordOS app;
+    a web app is Internet), else the first main category in its `.desktop` `Categories` (a Linux or a Flatpak app;
+    `Audio` and `Video` count as Audio & video), else the first of the 112 additional categories the model knows
+    (`WebBrowser` → Internet, `TerminalEmulator` → System, `Spreadsheet` → Office, `Emulator` → Games, `Math` →
+    Science…), else Other. Lord Flow's app launcher keeps its own grouping (`appCategory`, unchanged).
+  - **Keyboard:** the search field keeps the keys, also after a click inside the menu (the release gives the focus
+    back to it), so typing always searches every app, settings, files and the rest exactly as before, whatever view
+    or open group is on screen. With the field empty, on All apps ↓/↑ walk the list (the first one selects the first
+    row), Home/End jump, Enter opens an app or opens and closes a group; in Categories → opens a group or goes to its
+    first app and ← goes back to the group or closes it, mirrored right to left. The selected row scrolls into sight.
+  - **Look:** LordOS's own: the SDK's small Segmented switch, a disclosure chevron per group (pointing to where the
+    text goes, so it flips right to left) and a count pill that takes the accent while the group is open; app rows are
+    indented under their group. All layout is start/end, so it mirrors right to left.
+  - **Text:** three new keys (`shell.category.Other`, `shell.classic.viewAz`, `shell.classic.viewCategories`) in all
+    35 languages; scripts without A–Z say it their way (А–Я, Α–Ω, أ–ي, ก–ฮ, 名前順, 이름순, 按名称…).
+  - **Tests:** `server/tests/app_groups_model_test.mjs` (62 checks: manifest, `.desktop` and Flatpak categories,
+    additional categories, Other, the sort, the remembered view, every key in both directions, the selection kept when
+    a group opens or closes) and `classic_startmenu_categories_scene.mjs` (22 checks: the real StartMenu over Linux and
+    Flatpak apps with the stub `lord`; A–Z by default, the switch saved, the groups and counts, open and close by
+    mouse and keyboard, Enter launching a Flatpak app, the last view coming back, a search finding an app of a closed
+    group, right to left), run by `classic_startmenu_power_test.mjs`, which now takes the scene as an argument. Both
+    in `run_suites.sh`. Not yet seen on screen on the VM.
+- **Screenshots: Options → Print Screen Key chooses what the key does (GitHub #202).** The toolbar's Options menu (❖⇧5) has a new section with five choices: **Capture Entire Screen** (the
+  default, as before), **Capture Selected Portion**, **Capture Selected Window**, **Show the Toolbar** and **Do Nothing**
+  (the key then goes to the app in front, as any key LordOS doesn't take). ❖⇧3 keeps the whole screen. Settings →
+  Keyboard lists the key on the row of the action it runs (with ❖⇧3, ❖⇧4 or ❖⇧5; a window on a row of its own) and not
+  at all when it does nothing. Copying the capture to the clipboard is the existing Save to → Clipboard. The choice is
+  `settings.screenshots.printKey` (`apps/screenshots/toolbarmodel.js` `PRINT_KEY`, `printKeyLabel`; an unknown value is
+  the whole screen, so no migration). New texts `screenshots.opt.printKey*` and `shell.shortcuts.captureWindow` in all
+  35 languages. Tests: `screenshots_toolbar_model_test.mjs` (the choices, their rows), `screenshots_toolbar_scene.mjs`
+  (the section shows, Entire Screen is checked by default, a choice is saved).
+- **Settings → Wallpaper: pictures from anywhere on the computer (GitHub #219).** The wallpaper's file dialog lists **This Computer** ("/") under Locations, read only, so a picture in
+  `/usr/share/backgrounds`, on another partition or anywhere else LordOS may read can be chosen; the picture is copied
+  into the person's own wallpapers by the existing root action as before. Only that dialog offers it (`<FilePicker
+  computer>`); never a save dialog, and never the file chooser Linux apps get through the portal, which still shows the
+  home folder and the disks only. `sdk/filepickermodel.js` `locationPlaces`, `startFolder(…, computer)`; tests in
+  `filepicker_model_test.mjs`.
+- **Three window options in Settings → Appearance, in every theme (GitHub #151, #219).** A new group in Appearance gathers three personal choices about every window. Each default is
+  how LordOS always behaved, so nothing changes for anyone who doesn't choose them; they are saved per user in
+  `settings.json` (new keys, no migration) and apply at once to the open windows. They live in the SDK, so Lord Flow,
+  Lord Classic, Lord Workspaces and Lord Celeste all get them. See `docs/WINDOWS.md`, "Settings → Appearance → Window options".
+  - **Window buttons: Normal, Large, Extra large** (#151, #219; `settings.windowButtonSize`, `sdk/windowbuttons.js`).
+    The title bar, its close, minimize and maximize buttons, their glyphs and their hit areas grow by 1.25 or 1.5
+    without changing the display's scale: Lord Flow's bar 40 → 50 → 60 px and lights 13 → 16 → 20 px, Lord Classic's bar
+    34 → 43 → 51 px and buttons 44 → 55 → 66 px wide, Lord Workspaces' bar 36 → 45 → 54 px and buttons 28 → 35 → 42 px,
+    Lord Celeste's bar 38 → 48 → 57 px and lights 13 → 16 → 20 px. A small live preview shows the buttons at the chosen
+    size. The window manager is told the new frame (`configureWindows`' `chrome` may now be a function, `titleBarPx`), so
+    a Linux window drawn with the theme's frame is configured to the content size left. Normal draws exactly what each
+    theme drew before: a scene test compares a fingerprint of every title bar node's style against the frames before
+    the option existed, in all four themes. Right to left as before.
+  - **Move and resize with: Off, ❖ + drag, Alt + drag** (#219; `settings.windowDragModifier`, `sdk/moddrag.js`,
+    `sdk/moddragmodel.js`). Off by default. Chosen, holding the key and dragging anywhere in a window moves it, and a
+    right (or middle) drag resizes it from the nearest corner, in LordOS's windows and in Linux apps, Wayland and X11
+    (Xwayland) alike: for a window whose title bar is off screen, or for anyone who finds the title bar hard to hit.
+    lord-server offers such a press to the shell before the app sees it (`server/src/main.c`, `js_pointer_modgrab`,
+    `__lordEvent('modgrab')`, `runtime/events.js` `setModGrab`), and once taken the app gets neither the press nor its
+    release; the move or resize is the same as from the title bar and the borders (`wm.beginMove`, `wm.beginResize`:
+    lord-server follows it in C, snapping applies, Lord Workspaces' tiler keeps its rules, a locked window stays). A
+    maximized window comes out of its place once the pointer moves, as from its title bar. Never while an app has the
+    pointer locked or confined (games), while the window with the keyboard holds the shortcuts (a virtual machine, a
+    remote desktop), over a fullscreen window or an app's menu, or during a drag and drop (`wl_moddrag_allowed` in
+    `wl.c`); before a press becomes a drag the kernel is asked whether a keyboard really holds the key (`EVIOCGKEY`), so
+    a lost key release never turns clicks into moves. With Off nothing is offered at all. Alt is a choice, not the
+    proposal: some drawing and 3D programs and terminals use Alt with a click; with ❖ chosen, Alt + click stays the
+    app's. New native call `lord.wm.dragModifier('off' | 'super' | 'alt')` (`ui/js_wm.c`, validated, no other argument).
+  - **Show tiling options in the window menu** (#151; `settings.windowMenuTiling`, `sdk/windowmenu.js`). On by default.
+    Off, the Window menu leaves out Move & Resize (halves, quarters, thirds, arrangements, previous size), Lord
+    Classic's title bar menu its Snap Left, Snap Right and Snap Layouts, and Lord Workspaces' its layout flyout.
+    Dragging a window to an edge keeps its own switch in Desktop & Dock.
+  - **Tests:** `server/tests/moddrag_model_test.mjs` (53 checks: the choices, corners, rules, sizes),
+    `server/tests/window_requests_scene.mjs` over each of the four themes (the default title bar unchanged, the sizes
+    and hit areas, the chrome, the modifier told to lord-server, Off never taking a press, move and resize from each
+    corner, full screen left to the app, a maximized window dragged out, the tiling switch in both menus), and
+    `server/tests/moddrag_headless.sh` against a headless `build/lord-server-test` in `make test`: with nothing saved, ❖
+    + drag, ❖ + right click and Alt + click reach a Wayland app and nothing moves; with ❖ chosen, a Wayland app
+    (`moddrag_client.c`) and an X11 app under Xwayland (`moddrag_x11.c`) get no press for ❖ + drag, the window follows
+    the pointer, ❖ + right drag resizes it by the drag, Alt + click stays the app's, and a locked pointer or held
+    shortcuts keep ❖ + click the app's. The test build's hooks (never in the installed lord-server) gained `key C 1|0`
+    for a modifier key (Ctrl, Shift, Alt, ❖ only). Checked headless on the development machine on 2026-11-22; not yet
+    on the VM with a screenshot.
+  - Not done: moving and resizing with the keyboard (Alt+F7 and Alt+F8 style), which needs new entries in lord-server's
+    fixed key tables so a Linux app with the keyboard doesn't take the arrows; left for a later version.
+
+- **Store: a Flathub home with collections, categories and subcategories.** Flathub's section no longer opens on one long list: like the app centres on other desktops it opens on a
+  home, and every page keeps the install rules as they were (Flathub's verified apps unless the section's switch shows
+  every app, x86-64 PCs only). See `docs/FLATPAK.md`, "The Store's home".
+  - **The home** (`apps/store/flathubpages.js`): a banner with the app released most recently (**Latest release on
+    Flathub**), the ten main categories as tiles with how many apps each has, the **Recently updated** row (eight
+    cards, **See all** opens the whole collection in release order with endless scroll) and, while the unverified apps
+    are shown too, a **Verified apps** row; then every app, as before. A category (the second column, or a tile) shows
+    its **subcategories** as chips with their counts (Games: Arcade, Action, Strategy, Emulators, Logic, Shooters,
+    Kids, Simulation, Board, Adventure, Role-playing, Sports, Card; Graphics: 2D, Viewers, Raster, Photography, 3D,
+    Vector, Scanning; and so on, 60 in all, those Flathub's catalog has most apps in), and a chip narrows the grid.
+    The toolbar's title says where you are (Flathub · Games · Emulators, Flathub · Recently updated).
+  - **Verified badge**: every Flathub card now says **✓ Verified** or **Not verified** at its foot.
+  - **Where the data comes from:** only the catalog LordOS already reads, Flathub's signed AppStream fetched by
+    Flatpak itself and parsed by the sandboxed `lord-appstream` (E7). No new download, host, helper or exception.
+    `lord-appstream` now also writes each app's newest `<release timestamp>` as a tenth field (1 to 11 digits; a
+    release nested in another element, a signed, zero-led or longer number is ignored), lord-server checks it again
+    (`fpakas_line`: exactly ten fields, digits only, no leading zero) and `lord.flatpak.catalog()` gives it as
+    `updated`. Measured on Flathub's catalog of 2026-11-22: 3381 x86-64 apps, every one with a release date, 2243
+    verified.
+  - **Popular, Trending, Recently added and the app of the day/week** come from Flathub's web API, which needed a new
+    network job: approved as E10 and built in the entry below.
+  - The logic is plain data in `sdk/flathubmodel.js` (`SUBCATS`, `subcategoryCounts`, `recentlyUpdated` (a release
+    more than a day in the future, before 2000 or not a whole number never counts), `verifiedApps`, `collection`,
+    `homeRows`, `spotlight`, `filterCatalog`'s `sub`). New texts `flathub.verifiedShort`, `flathub.home.*`,
+    `flathub.coll.*` and the 60 `flathub.sub.*` in all 35 languages.
+  - Tests: `build/fpakas-test` gains release dates (the newest wins, a release's nested one, 14 digits, a leading zero,
+    a sign, an exponent are left out) and index lines lord-server must refuse (no date, a leading zero, a sign, 12
+    digits, a space, an old nine-field line); `tests/flathub_model_test.mjs` gains a recorded piece of Flathub's real
+    catalog (`tests/data/flathub/catalog-2026-11-22.json`, 38 apps, public data only) for the collections, the banner
+    and the subcategories, hostile entries (future, fractional, text, negative, NaN, infinite and missing dates, a
+    category listed twice, entries that aren't objects) and every new text in every language.
+- **Store: Flathub's Popular, Trending, Recently added, Recently updated, app of the day and apps of the week.** Exception E10, approved by the maintainer on 2026-11-22: a third
+  `lord-fetch` job. See `docs/FLATPAK.md`, "Rankings from Flathub's API"; the `AGENTS.md` entry sits with lord-fetch's
+  other jobs.
+  - **What the Store shows** (`apps/store/flathubpages.js`): Flathub's home opens on Flathub's **App of the day** (else
+    the latest release, as before), then rows **Apps of the week**, **Popular**, **Trending**, **Recently added**,
+    **Recently updated** and, with every app shown, **Verified apps**, each with **See all**. Names, icons and summaries
+    come only from the signed catalog (`rankedApps` in `sdk/flathubmodel.js`): an id the catalog hasn't is dropped and
+    an unverified app shows only while the switch shows every app. Recently updated is Flathub's (its builds) when at
+    least four of its apps are shown, else the catalog's newest `<release>` dates. The install rules are unchanged
+    (x86-64 only, the verified subset unless the switch, installing only from the app's own page). Without network,
+    with Flathub blocked in the Firewall or on any failure the rows are simply absent.
+  - **A switch to turn it off**, on by default, under the verified-apps switch in the Store's Flathub section
+    (`settings.flathub.rankings`; absent means on, so no migration). Off, the Store never asks.
+  - **The request** (`server/src/fetch/flathub.c`, `fhget.c`, `fetch.c`): `FQ_FLATHUB` carries `{"list": N}` and
+    nothing else, N one of six: `collection/popular`, `trending`, `recently-added`, `recently-updated`,
+    `app-picks/app-of-the-day/<date>`, `app-picks/apps-of-the-week/<date>`; the helper builds the path, the date from its
+    own clock in UTC by arithmetic. Any other number, a fraction, text, another key or no socket is refused. The socket
+    is made by a new connector, `flathub` (`sec/netconn.h` `NC_FLATHUB`), to `flathub.org:443` only, in
+    `lordos-net-flathub.scope`: the firewall component `lordos:flathub` that Flatpak's downloads already use, so one row
+    blocks both (its Monitor hint says so now, in all 35 languages). TLS with the certificate checked as for the other
+    jobs, one GET, no redirect followed (a 3xx fails), at most 1 MB read, 20 s to connect and 30 s for the answer.
+  - **Only app ids come back:** the answer is parsed strictly (`sec/json.h`) and only `app_id`s that pass `fpak_id_ok`
+    leave the helper, at most 250 a list in Flathub's order (the week's in `position` order); members of another type,
+    bad ids and duplicates are skipped; no name, text, number or address of the answer leaves it, and an error carries
+    only its code. lord-server checks every id again (`fh_from_compact`).
+  - **At most once a day** (`server/src/fetch/fhsvc.c`): a list is fetched when its last copy is from another UTC day;
+    a failure waits 15 minutes, doubled after each failure in a row, at most a day. The lists are kept in
+    `~/.cache/lordos/flathub/<list>.json`, folders `0700` checked to be the user's, no link followed, written to a new
+    file then renamed, every id checked again when read. `lord.flatpak.rankRequest()` and `lord.flatpak.ranks()` (ids
+    only) exist only in the desktop's own JS context, as the rest of `lord.flatpak`.
+  - **Fixed on the way:** the connectors' table in `sec/netconn.c` was written by hand for five connectors after the
+    sixth (`weather`) was added, so the weather connector's slot started at fd 0 and its first request in a session
+    sent to and then closed lord-server's stdin before the connector was started again; the table now starts empty
+    whatever the number of connectors. `lord-fetch`'s start and the connect to a host by a connector are shared by the
+    weather widget and the rankings (`fetch/fetchspawn.c`).
+  - New texts `flathub.home.appOfTheDay`, `flathub.coll.{week,popular,trending,added}`, `flathub.rankingsOn`,
+    `flathub.rankingsOff` and the changed `monitor.comp.flathubHint`, in all 35 languages.
+  - Tests: `build/flathub-rank-test` (76 checks: the six paths and every number outside them refused, the UTC date,
+    Flathub's answers recorded on 2026-11-22 in `server/tests/data/flathub/api-2026-11-22/` (popular whole, 250 ids;
+    the other collections cut to 40 hits), and hostile JSON: over 1 MB, 40 levels deep, duplicate keys, wrong types,
+    ids with spaces, `../`, newlines, quotes, non-ASCII, a leading digit, a `-` before the last part, 60 bytes,
+    duplicates, 800 hits); `build/flathub-fetch-test` (63 checks: the exchange against a stand-in server: the exact GET
+    path and `Host: flathub.org`, 301/302/303/307/308 not followed, the cap with a Content-Length, chunked and until
+    close, 404/500, HTML; then `build/lord-fetch` refusing 14 bad requests and failing on a peer without TLS);
+    `build/fhsvc-test` (43 checks: once a UTC day, the doubling wait, the cache read back strictly, a link replaced and
+    its target untouched); `tests/flathub_model_test.mjs` (the rows on the recorded answers against the recorded
+    catalog, hostile `ranks()` values, every new text in every language); `build/netconn-test` checks that every
+    connector is a firewall component.
+- **Every Wayland global "complete" in the conformance run: 48 of 48 (branch `feat/wl-conformance-complete`; `docs/WAYLAND.md` "Conformance", `docs/wayland-conformance.json`).** Complete
+  means tests written for that protocol, all passed, nothing skipped. Before: 29 of 48 (15 checked only by the generic
+  bind, `wl_seat` and KDE's server decoration partial, drm-lease and xwayland-shell checked in the code only). Every
+  score stays 100 %, X11 too (28 items, 23 complete, unchanged).
+  - **Test hooks, in a test build only** (`server/src/testhooks.{c,h}`): compiled only into `build/lord-server-test`
+    (the same sources, `main.c`, `wl/wl.c` and `wl/drmlease.c` with `-DLORD_TEST_HOOKS`; `make -C server
+    build/lord-server-test`, part of `all`). The installed `lord-server` has no `--test-hooks` flag, no socket and none
+    of this code (checked with `strings` and `nm`), and `tools/iso/mkdeb.sh` refuses a `lord-server` that holds it.
+    In the test build, `--headless WxH --test-hooks` (refused on a monitor and on the login screen) opens a socket
+    `$XDG_RUNTIME_DIR/lordos-test-hooks.sock` (0600, SOCK_SEQPACKET, the same user only by SO_PEERCRED, at most 4
+    connections, one short text command per message, answered "ok" or "err") that gives a test session what it has no
+    device for. `ptr X Y`, `btn B 1|0` and `wheel N` use the remote desktop's injection (`remote_pointer`,
+    `remote_button`, `remote_wheel`), so a window really gets `wl_pointer.enter` and button serials; `tablet
+    add|remove`, `pen T C V` and `pad T C V` make a fake graphics tablet (a pen with pen, eraser, brush, pencil, airbrush
+    and mouse tools and every axis; a pad with 4 buttons, a ring, a strip and a dial) with `tablet.c`'s own `tablet_new`
+    and feed it evdev events through `tablet_input`, as a real device's; `xwl` makes a Wayland connection the way
+    lord-server makes Xwayland's (a socketpair, `wl_client_create`, `wl_test_xwl` in `wl.c`) and takes it as Xwayland's
+    while no Xwayland runs, so xwayland-shell-v1 is tested under the very rule that keeps it from every other client;
+    `lease plug|unplug` gives `drmlease.c` a fake card (`drmlease_fake_card`: a desktop display and a non-desktop
+    "LordOS test headset", memfds for `drm_fd` and every `lease_fd`, lessee ids counted, no ioctl), with the real
+    `drmlcore.c` rules, `vr` permission and the theme's prompt. `tools/wl-conformance.mjs` starts its server with it.
+  - **New flows in `server/tests/wl_conformance.c`** (about 160 more checks), each check's hint naming every request,
+    event and error it ran: ext-background-effect-v1 (capabilities, a region reaching the shell and removed, both
+    errors); wl_fixes (`destroy_registry`, the id reused, a wl_fixes named as a registry); fifo-v1 (a commit waiting on
+    the barrier applies a refresh later, 5 of 5; no barrier no wait; both errors); commit-timing-v1 (targets 100, 250 and
+    400 ms ahead never applied early; all four errors); tearing-control-v1 and content-type-v1 (every hint and type,
+    destroyed and made again, their errors); pointer-warp-v1 (a warp with the enter's serial moves the pointer; a stale
+    serial and a point outside are ignored); xdg-system-bell-v1 (ring with and without a surface, the shell told, the
+    rate limit); xdg-toplevel-tag-v1 (before the map and while mapped, a control character taken out, a long tag cut to
+    127 bytes); xdg-toplevel-drag-v1 (a tab torn off with a real press: the window follows, ends at the release; all
+    three errors, `invalid_source` both ways); xdg-session-management-v1 (created, add, rename, restored from a new
+    connection before the first commit, replaced, removed; all seven errors); tablet-v2 (tablet, pad, groups, ring,
+    strip, dial and tools announced; a mouse tool's wheel; a pen's proximity, down, pressure, distance, tilt, rotation,
+    button, up; an airbrush's slider; set_cursor and the `role` error; the pad's enter, mode_switch, buttons, ring,
+    strip and dial with their stops, set_feedback, leave; unplugged); color-management-v1 (every supported event, the
+    output's description and its information, preferred and preferred parametric, parametric descriptions with named
+    and numeric primaries and a power curve, `failed`, set and unset on a window, 14 errors in 18 cases);
+    color-representation-v1 (alpha modes, coefficients, chroma location, all five errors); linux-drm-syncobj-v1 (on a
+    render node's timelines and udmabufs: a frame held until its acquire point, release points, implicit sync after
+    destroy, all eight errors); drm-lease-v1 (the global only while the fake headset is plugged, drm_fd, only the
+    headset offered, the prompt answered "allow once" then "don't allow", withdrawn while leased, finished when
+    unplugged, release, all three errors); xwayland-shell-v1 (hidden from ordinary clients; role and serial, `role`
+    twice and on a subsurface, `invalid_serial`, `already_associated`); KDE's server decoration (request_mode Client,
+    Server and None); `wl_seat`'s pointer role (the pointer now really over the window).
+  - **The tool** (`tools/wl-conformance.mjs`): checks of what the shell got (the bell, the blur rectangles, a window's
+    tag at map and changed, a dragged tab following, the VR prompt keyed by the program lord-server checked); a global
+    not advertised to an ordinary client is complete when its own flow ran it through the test hooks (depth
+    "protocol-specific (test hooks)"); each global's `coverage` in the JSON report (which requests, events and errors a
+    flow named; the static checks still cover them all). Fixed: its XML reader dropped everything between a
+    self-closing `<description/>` and the next `</description>`, so color-management-v1's error enums and
+    `wl_touch.shape` were never scored.
+  - **Bugs found and fixed in lord-server:** a surface given the xwayland_surface role (xwayland-shell-v1) could still get
+    an xdg_surface, a subsurface, a cursor or a drag icon role, and `wlx_surface_free` also took a surface that already
+    had an xdg_surface or a subsurface (`Surf.xwrole`, `wlx_surface_role`); KDE's `request_mode(None)` was answered
+    with Client instead of the same mode; KDE's hand-written tables now carry the names wayland-scanner gives them, so
+    the tool checks them against KDE's XML.
+  - **KDE's `server-decoration.xml` vendored** (`third_party/plasma-wayland-protocols/`, unmodified, LGPL-2.1-or-later
+    with its text; `THIRD_PARTY.md`): only the conformance tool reads it; lord-server keeps its hand-written tables.
+  - **Exceptions the protocols allow**, with their words (`tools/wl-conformance/allow.json`): the ICC creator's five
+    errors and `get_preferred_parametric`'s `unsupported_feature` (ICC is an optional feature lord-server doesn't
+    advertise; every description it makes is parametric), and `wl_touch.shape` ("only sent ... if the touch device
+    supports shape reports"; LordOS doesn't read the touch shape yet).
+  - **Not covered by a flow, said in `docs/WAYLAND.md`:** `image_description_changed` and `preferred_changed` (one fixed
+    headless display), and the information events `tf_power`, `target_max_cll` and `target_max_fall` (the display's
+    description has none of them; a client's own may not be asked). Real hardware is still not tried: the tablet and
+    the headset are simulated, and there is no touchscreen.
+  - **Proof with real programs** (`docs/wayland-proofs/`, `tools/wl-proof.mjs`, which now keeps the other results when
+    run with `--only`): vkcube (Mesa 25.0.7) using fifo-v1, commit-timing-v1 and explicit sync on every frame, and foot
+    1.21 ringing the bell through xdg-system-bell-v1 and describing its surfaces with color-management-v1, no protocol
+    error. `tools/gen-wayland-table.mjs` takes proof names up to 121 characters (named after every global they prove).
+- **Always on top, in every theme.** A window can be kept over every
   normal window, and X11 apps' `_NET_WM_STATE_ABOVE`, `_NET_WM_STATE_BELOW` and `_NET_WM_STATE_SKIP_PAGER` are now
   honoured and listed in `_NET_SUPPORTED`: the last X11 conformance point below 100 % (`ewmh.wm_state` 96.2 % → 100 %,
   X11 mean 99.9 % → 100 %). See `docs/WINDOWS.md`, "Always on top".
@@ -61,7 +411,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     add,above` does, since xprop can't and wmctrl isn't installed).
   - Not saved between sessions; not yet tried in a real session or on the VM.
 
-- **LordOS Studio: background blur and background pictures for the camera of LordOS's apps, in development (phases 0
+- **LordOS Studio: background blur and background pictures for the camera of LordOS's apps (phases 0
   and 1 of `docs/CAMERA-STUDIO-PLAN.md`; the plan and its exceptions E-S1 to E-S7 approved by the maintainer on
   2026-11-22).** A new camera, "LordOS Studio", appears in `lord.media.cameras()` next to the real ones, so the Camera
   app, isolated `.lpk` apps (`BOP_CAMERA`) and go-link Desk can choose it; its picture is the real camera's with the
@@ -121,7 +471,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (phase 3), the PipeWire camera and its portal (phase 4) and the Studio app (phase 5). Each LordOS Studio camera
     starts its own lord-studio for now, so two apps can't read it at once, as with any camera.
 
-- **LordOS Studio's camera for every app, in development (phase 2 of `docs/CAMERA-STUDIO-PLAN.md`; exceptions E-S2
+- **LordOS Studio's camera for every app (phase 2 of `docs/CAMERA-STUDIO-PLAN.md`; exceptions E-S2
   and E-S3 approved by the maintainer on 2026-11-22).** Browsers (and video calls in them), OBS and every other Linux
   app can now choose a camera called "LordOS Studio" and get the person's effects (background blur or a picture),
   once the new optional Store item is installed. Nothing of it was tried with a real v4l2loopback device yet: the
@@ -129,15 +479,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   checked on a VM (open items below).
   - **The Store item `lordos-studio-camera`** (`tools/iso/mkdeb-studiocamera.sh`): two static, root-owned
     configuration files and nothing else. `/etc/modprobe.d/lordos-studio.conf` sets
-    `options v4l2loopback devices=1 video_nr=50 card_label="LordOS Studio" exclusive_caps=1 max_buffers=4` and
+    `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`
+    (the second device for OBS: see the follow-ups below) and
     `/etc/modules-load.d/lordos-studio.conf` loads the module at boot; its postinst loads it at once when nothing
     loaded it yet, its postrm unloads it when nothing uses it. On amd64 it depends on Debian's `v4l2loopback-dkms`
     (main, GPL-2.0, 0.13.0 or later) and `linux-headers-amd64`, so DKMS builds the module for the running kernel; on
     arm64 the module comes prebuilt in the LordOS Raspberry Pi kernel (below), so the package depends on nothing
     else. There is no runtime root action: lord-server never creates or removes loopback devices, and the Store's
     existing package engine installs and removes it. With Secure Boot on, the module's DKMS key has to be enrolled at
-    the next restart, which the card says, as the NVIDIA card does; the guided `dkms-mok-enroll` (NVIDIA plan A.5's
-    `gpu-mok-enroll`, renamed) is still awaiting its own approval and is not built.
+    the next restart, which the card says and now guides (`dkms-mok-enroll`, in the follow-ups below).
   - **The Store card** ("Suggested for your computer", `assets/store/suggestions.json`, rule `studioCamera`): shown
     when a USB camera is plugged in (a new `usbClass` condition in `sdk/suggestengine.js`: an interface of class `0e`,
     video), installs `lordos-studio-camera` through the usual plan and `pkg-install`, and explains in its "What
@@ -193,7 +543,130 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     "LordOS Studio" and showing the effects in a video call, the camera's light going off with no reader, the
     indicator naming the app, `devices.sh` step 6, and the Pi kernel build.
 
-- **`fastfetch` and `neofetch` run LordOS's `lordos-fetch` until the real package is installed, in development**
+- **LordOS Studio: video backgrounds, green screen, Auto Framing, Face Light, colour match, filters, Retouch, Mic
+  Mode and a background catalog (phase 3 of `docs/CAMERA-STUDIO-PLAN.md`, section 11.3; exceptions E-S4
+  and E-S6 approved by the maintainer on 2026-11-22).** Every effect reaches every app that chose the "LordOS Studio"
+  camera, like phases 1 and 2.
+  - **The effects** (`server/src/media/studio/stlook.c`, `stframe.c`, `stfx.c`; one OpenGL ES 3 shader in `stgl.c`,
+    and the same arithmetic on the CPU):
+    - **Video backgrounds:** lord-studio plays a short loop behind the person, decoded with libavcodec inside its
+      sandbox, paced by the file's own timestamps, looped and scaled to the camera's size.
+    - **Green screen:** a real green or blue screen is cut out by colour (the key from the frame's border, Similarity,
+      Smoothness and Spill sliders), but only near the person, and never with holes where the person is sure.
+    - **Auto Framing:** BlazeFace finds the face every sixth frame, and the picture is cropped around the person (eyes
+      at a third, from Wide to Tight, at most 2×) with a 1€ filter, a dead zone and a speed limit, so the frame moves
+      like a camera operator, not in jumps. With no face for two seconds it goes back to the whole picture.
+    - **Face Light:** lifts the face (up to +0.6 EV, softly, without clipping) and dims the background half a stop.
+    - **Colour match:** tints the person toward the picture or video behind them (Reinhard's colour transfer, up to
+      60 %, smoothed over a second).
+    - **Filters:** Warm, Cool, Vivid, Mono, Noir, Film, Fade and Sepia, with a strength slider, built from LordOS's own
+      numbers (no file is read).
+    - **Retouch:** smooths skin inside the face only; the shape of the face never changes.
+  - **Measured** at 1280×720 on an i9-10900 with an RX 580 (`build/studio-fx-test time`): each single effect fits one
+    frame at 30 fps on both paths (10–12 ms with the GPU, 4–21 ms on the CPU); all of them at once take 24 ms with the
+    GPU and 36 ms on the CPU. A 720p H.264 loop decodes in 1.8 ms a picture.
+  - **The background catalog** (`assets/studio/backgrounds.json`, E-S4): 158 backgrounds in seven categories (Office,
+    Home, Studio, Nature, City, Abstract, Space), 121 pictures and 37 loops (every loop at 3840×2160 and 1920×1080). The
+    pictures are AI-generated and released as CC0 (see "Changed"). Each loop's license was checked on the file's own
+    page: Wikimedia Commons (CC0, CC BY and CC BY-SA with credit) and LordOS's own renders (MIT). Nothing comes from
+    Unsplash, Pexels or Pixabay, and nothing shows people, logos or readable text. The thumbnails and one picture per
+    category ship in the package (12.6 MB);
+    the rest download when chosen through two new closed admin actions, `studio-bg-get "<id> <variant>"` (anyone) and
+    `studio-bg-remove` (administrators), the twins of `wallpaper-get`: JS names a catalog entry, never a URL or a path,
+    the download runs as `nobody` in the Store's scope, and a file whose size or SHA-256 isn't the catalog's is never
+    kept (`/var/lib/lordos/studio/<sha256>.jpg` or `.mp4`). A Credits page lists every author and license.
+  - **The loops at 4K** (the maintainer asked for at least 4K on 2026-11-22; the pictures are a set of their own, now
+    AI-generated, see "Changed"; `docs/CAMERA-STUDIO-PLAN.md` 6.2, "Loops at 4K"). Every loop now has a 3840×2160 variant and a
+    1920×1080 one, both made from an original at least 3840×2160; nothing is upscaled. Our 16 renders are rendered again
+    at 3840×2160 with a bicubic field and dithered, with a light grain on luma at encode so slow gradients don't band.
+    Loops are H.264 High (2160p at level 5.1), the biggest 43.7 MB. Of the 33 Wikimedia Commons loops, 22 had only a
+    1920×1080 (or 1920×1440) original and three couldn't be closed without a visible dissolve
+    (`loop-sunset-afterglow`, `loop-granite-dusk`, `loop-sardine-school`): all 25 were dropped and 13 new 4K clips
+    (mountains, creeks, snowfall, a lake, a beach, an aquarium tank, sea jellies, gulls, rooftops at dusk, stars over
+    an observatory) replace them, each with its credit. Each loop starts where its two ends look alike
+    (`tools/studio/pick-loop-start.py`, new) and closes with a 1.5 s crossfade. The 720p loops are gone; loop
+    thumbnails are 640×360.
+    - **Which file is fetched:** a loop always at 1920×1080. Measured on the development PC, a 4K H.264 loop costs about
+      19 ms a camera picture to decode and scale in software (two threads), against 8 ms at 1920×1080, which no 30 fps
+      budget with effects leaves room for; the 4K loops stay in the catalog. A picture with a 3840×2160 variant would be
+      fetched at that size when LordOS Studio composites on the GPU (`bgPick` in `sdk/studiomodel.js`, which also
+      falls back to a built-in picture if a download fails).
+    - **lord-studio** keeps a still background at up to 3840×2160 (it was cut to 1920×1080) and cover-fits it to the
+      camera's size with an area average, again whenever that size changes, so a 4K camera gets a sharp background and
+      a 720p one a clean average instead of a bilinear one.
+    - **Published** in the `LordOS-wallpapers` repository's `studio/videos/`: 74 files, 1028 MB, next to the 121
+      pictures in `studio/pictures/` (76 MB). `tools/studio/publish-studio.py` (new) assembles that `studio/` folder
+      from both builders, checks every file against the catalog and writes one README (the pictures' CC0 and each
+      loop's credit, license, source, original size and what we did) and one `MANIFEST.json` (path, size and SHA-256 of
+      all 195 files).
+    - **Tests:** `tests/studio_catalog_test.mjs` (new; every entry accepted, licenses and credits, both loop variants,
+      each loop's original at least 3840×2160 from the curation record, every picture AI-generated and CC0 with one
+      `full` variant, 640×360 thumbnails, built-ins identical to the variant they stand for, and with
+      `LORDOS_STUDIO_STAGE` every published file's size, hash and real resolution read from the JPEG or MP4, the
+      README and `MANIFEST.json`),
+      new cases in `tests/studio_model_test.mjs` (`bgPick`, an AI picture's single `full` variant) and `build/studio-helper-test` (a 3840×2160 picture inside
+      lord-studio's sandbox).
+  - **Mic Mode** (E-S6): Standard, Noise Reduction and Full Range in the popover. Noise Reduction is one more
+    microphone, "LordOS Noise Reduction", made by PipeWire's own echo-cancel module with WebRTC noise suppression from a
+    static drop-in (`/usr/share/pipewire/pipewire.conf.d/lordos-voice.conf`); choosing a mode only sets the default
+    microphone through LordOS's existing sound client. There is no echo cancellation (nothing is routed to its echo
+    reference), no module loaded at runtime and no new privilege. Standard and Full Range both use the microphone
+    with no processing. The sound lists hide the filter's own echo reference and streams, and the capture indicator
+    no longer counts the filter's own link to the microphone (only when PipeWire itself owns it); the app that records
+    Noise Reduction is shown as before. The modes carry our own names, Noise Reduction and Full Range, in all 35
+    languages (the locale keys `studio.micVoice` and `studio.micWide` and the PipeWire node names `lordos_voice_*`
+    are unchanged), and the microphone other apps list is "LordOS Noise Reduction".
+  - **The popover** (`sdk/studio.jsx`, logic in `sdk/studiomodel.js`, downloads in `sdk/studiobg.js`): new rows Face
+    Light, Auto Framing, Filters and Retouch, each with its page; the Background page has None, Blur, Picture and Video,
+    the green screen and colour match, the catalog by category, "Add your own…" (a picture or a short video) and
+    Credits. LordOS's Cyberpunk City wallpapers are no longer offered as camera backgrounds (some show people). New
+    `settings.studio` keys with defaults (no migration). Text in all 35 languages.
+  - **Tests:** `build/studio-fx-test` (every effect against reference frames, CPU and GPU agreeing within 0.16 levels),
+    `build/studio-bg-admin-test` (the admin actions' arguments, a wrong hash or a 404 never kept, the shipped catalog),
+    `tests/studio_voice_test.mjs` (the drop-in, without touching PipeWire), new cases in `build/studio-hub-test`,
+    `tests/pwguard_test.c`, `tests/studio_model_test.mjs` and `build/studio-helper-test` (every look, BlazeFace and a
+    looping video inside lord-studio's sandbox).
+  - **Still to verify on a VM:** Noise Reduction loaded by a real PipeWire and heard in a Meet call, and whether the
+    microphone stays open while nothing records it. Not built yet: light wrap, the face spotlight, the key-colour eyedropper.
+- **LordOS Studio follow-ups: OBS beside LordOS Studio, a guided Secure Boot step, and our own mic
+  mode names (approved by the maintainer on 2026-11-22; `docs/CAMERA-STUDIO-PLAN.md` 11.4, `docs/NVIDIA-PLAN.md` A.5).**
+  - **OBS's own virtual camera works beside LordOS Studio.** The `lordos-studio-camera` package now makes two
+    v4l2loopback devices: `/dev/video50` "LordOS Studio", as before, and `/dev/video49` "OBS Virtual Camera"
+    (`devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1`). Read in OBS's
+    source (`plugins/linux-v4l2/v4l2-output.c`): with v4l2loopback already loaded OBS loads nothing, takes the first
+    `/dev/video*` in version order that announces video output and never looks at the label; an idle loopback announces
+    output, so OBS's device has to come before ours, or OBS would take LordOS Studio's whenever LordOS Studio's camera
+    is off. That is why it is number 49, not 51 as first proposed. lord-server still opens only `/dev/video50` after the
+    device, driver and card checks, and lord-studio now refuses any loopback whose card isn't "LordOS Studio" too, so
+    nothing in LordOS writes OBS's device. While OBS streams, its device is listed as a camera like any other, and the
+    "no camera" restriction covers both (major 81; `tests/fwlinux/devices.sh` gained step 6b). On an update from the
+    one-device file the postinst reloads the module only when nothing uses it (otherwise the second device appears at
+    the next restart); it never touches a v4l2loopback someone else loaded or a file the person edited. The Store card
+    says so in a new "What changes" note, in all 35 languages.
+  - **Guided Secure Boot enrolment** (`dkms-mok-enroll`, NVIDIA plan A.5's `gpu-mok-enroll` renamed;
+    `server/src/hw/mok_admin.c`): one closed admin action, administrators only, shared by the Store cards whose
+    packages DKMS builds (LordOS Studio Camera and the NVIDIA driver). `status` reads the state with no program run
+    (Secure Boot from its EFI variable; DKMS's certificate searched for byte by byte in shim's `MokListRT*` and
+    `MokNew` variables). `import` makes an 8-digit one-time password from `getrandom` and gives it to the fixed
+    `/usr/bin/mokutil --import /var/lib/dkms/mok.pub` on standard input only, never in argv, a file or a log (mokutil's
+    output is discarded), checks that shim's request really holds the key and only then answers the password, once. A
+    pending request is withdrawn first, so a new password replaces a lost one; `cancel` runs
+    `mokutil --revoke-import`. The key pair must be DKMS's own (regular, root-owned, not links, nobody else can write
+    them or their folder, `mok.pub` one DER certificate). Once the item is installed, its card shows "One more step at
+    the next restart" with **Prepare the Key**, then the password in large type with the blue screen's steps (Enroll
+    MOK, Continue, Yes, the password, Reboot), **Restart Now**, **New Password** and **Cancel Enrolment**; the
+    password lives only in the card. `mokutil` is now a dependency of `lordos-studio-camera` on amd64 and one of the
+    NVIDIA card's packages. Text in all 35 languages.
+  - **Mic Mode's names are our own**: Noise Reduction and Full Range (see the phase 3 entry above).
+  - **Tests**: new `build/mok-admin-test` (fake EFI variables, key and mokutil: each state, refused keys and
+    arguments that run nothing, the password on standard input twice and never in argv, revoke before a new import,
+    digits evenly spread); `studio_package_test.sh` gained the two devices, the order OBS needs, the postinst run
+    against a fake `/sys` in eight cases and checks that OBS's device is named nowhere in the sources but
+    `mstudiohub.h`; `suggest_engine_test.mjs` the new note and package. **To verify on a VM** (never on the
+    maintainer's PC): OBS (Debian's and Flathub's) starting its virtual camera on `/dev/video49` with LordOS Studio's
+    camera off and on, the update reloading the module, and the MOK flow with Secure Boot on, including mokutil reading
+    the password from a pipe.
+- **`fastfetch` and `neofetch` run LordOS's `lordos-fetch` until the real package is installed**
   (`packaging/fallback-bin/fastfetch`, `packaging/profile.d/lordos-fallback.sh`, `server/src/remote/sess.c`,
   `tools/iso/mkdeb.sh`; `docs/BENCHMARK.md`). People type the command they know and got "command not found". The
   `lordos` package now ships `/usr/lib/lordos/fallback-bin/fastfetch` (a small sh wrapper) and `neofetch` (a link
@@ -211,7 +684,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   from `/usr/bin` and from a stale hash, the profile.d snippet appending last, once, and not at all without the
   folder, under dash and bash, and the session PATH). The new PATH reaches a session at its next sign-in; no
   migration (new files plus a session environment value).
-- **`lordos-fetch` shows what fastfetch shows and what About shows, in development** (`server/src/sysreport/fetch.c`,
+- **`lordos-fetch` shows what fastfetch shows and what About shows** (`server/src/sysreport/fetch.c`,
   `fetch.h`, `cli.c`, `server/mk/sysreport.mk`, `server/Makefile`; `docs/BENCHMARK.md`). New lines, all read locally
   without root or network (about 30 ms on a 20-thread desktop): **DE** (the LordOS desktop in use, settings.json's
   `theme` named by its `theme.json`: Lord Flow, Lord Classic, Lord Workspaces, Lord Celeste), **Compositor**
@@ -235,7 +708,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   dpkg versions without epoch or revision and only for installed packages, the lowest-metric default route, global
   and tentative IPv6 addresses, this boot's last boot-times line, VmRSS, the terminal's name in each case, the
   collapsed displays and the new rows), and each fixture machine now checks that `--share` leaves out the address.
-- **Machines updates the LordOS tools in a machine by itself, in development** (`apps/machines/model.js`
+- **Machines updates the LordOS tools in a machine by itself** (`apps/machines/model.js`
   `toolsAutoStep`/`toolsLine`/`toolsAutoOn`, `vmwindow.jsx`, `configure.jsx`, `settingswin.jsx`, `store.js`, `meta.js`;
   `server/src/ui/js_vm.c`, `server/src/vm/lordvm.c`; `docs/VIRTUALIZATION.md` 7.1.3). A guest ran older
   LordOS tools (w7, with a known bug) for hours because updating them needed a click on **Update LordOS Tools** in
@@ -256,7 +729,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `server/tests/vm_model_test.mjs` (settling, deferral while busy, once per run, backoff, giving up, the notification
   when off or failed, a newer shipped version starting a fresh count, the popover's line).
 
-- **The Store's long lists load as you scroll, in development** (`apps/store/endless.js`, `index.jsx`,
+- **The Store's long lists load as you scroll** (`apps/store/endless.js`, `index.jsx`,
   `flathubpages.js`, `debian.js`). Flathub's catalog (thousands of apps) and each Debian category no longer end in
   "Show more (2183 left)": the next 60 cards are drawn when the list is scrolled within a screen of its end, and a tall
   window fills itself. The same for every Store list that can grow long: Debian search results (now up to the
@@ -266,8 +739,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   never redrawn whole per page. A small "Show more" stays at the end for the keyboard. Back from an app's page, the list
   is as long as it was, so it returns to where it was. Tested by `server/tests/store_endless_scene.mjs` (run by
   `run_suites.sh`).
-- **A Flathub app's page says how it shows its windows and what it is built with, before installing, in
-  development** (`apps/store/fhlook.js`, `sdk/flathubmodel.js` `displayOf`/`toolkitOf`, `docs/FLATPAK.md`). A new
+- **A Flathub app's page says how it shows its windows and what it is built with, before installing** (`apps/store/fhlook.js`, `sdk/flathubmodel.js` `displayOf`/`toolkitOf`, `docs/FLATPAK.md`). A new
   **Display and toolkit** box, from the metadata the page already fetches: **Display** is Wayland, Wayland with X11
   only where there is no Wayland (`fallback-x11`: in LordOS it always gets Wayland, so no X11), Wayland and X11 (the
   toolkit chooses), or X11 through Xwayland (with the note that it gets no X11, so no windows, while its files or a
@@ -275,7 +747,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   own", from the base app and the runtime, with the runtime and its branch under it. Only on the app's page: the
   catalog doesn't carry the metadata. Text in every language (real English, Spanish and Portuguese). Tested in
   `server/tests/flathub_model_test.mjs` with real Flathub metadata.
-- **Machines: a Keys panel in the machine window, in development** (the maintainer's request, like the side keys of other
+- **Machines: a Keys panel in the machine window** (the maintainer's request, like the side keys of other
   remote consoles but richer; `apps/machines/keys.jsx`, `docs/VIRTUALIZATION.md` 5.8). A keyboard button on the toolbar and
   on the full-screen floating bar opens it:
   - **Hold down** Ctrl, Alt, Shift and Win (Super in a Linux guest): a click keeps the key down in the guest until the
@@ -294,7 +766,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Key names and descriptions in all 35 languages (Strg/Entf in German, Supr in Spanish, Suppr in French…). The tables
     of evdev codes and the hold logic are pure functions in `apps/machines/model.js`, with 24 new checks in
     `server/tests/vm_model_test.mjs` (codes checked against `linux/input-event-codes.h`).
-- **Machines: a status item by the clock for each machine in apps mode, in development** (the maintainer's request, like
+- **Machines: a status item by the clock for each machine in apps mode** (the maintainer's request, like
   VMware Fusion's Unity menu in the menu bar; `docs/VIRTUALIZATION.md` 7.2). While a machine is in apps mode, the bar's
   status area shows its mark (the machine's system mark, as in the Control Center), with the machine's name as its tooltip.
   A click opens a menu that works like the guest's Start menu:
@@ -324,7 +796,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (`launcherApps`, `appsStatusList`, `appsStatusDiff`, `machineOsId`), tested in `server/tests/vm_model_test.mjs`.
     Two new texts in all 35 languages.
 
-- **Machines: apps mode's controller is a panel of the guest's windows and apps, in development** (the maintainer's
+- **Machines: apps mode's controller is a panel of the guest's windows and apps** (the maintainer's
   request, like VMware Fusion's Unity mode; `docs/VIRTUALIZATION.md` 7.2). While a machine is in apps mode, its small
   window was only a hint and **Leave Apps Mode**; it now opens at about 420 × 520 with two scrolling lists:
   - **Running:** the guest's windows in apps mode (its own windows; popups, menus and windows another one owns are left
@@ -340,7 +812,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     lists the same **Running** windows above the apps; it is set again only when that list changes, not on every move.
   - The lists' logic is in `apps/machines/model.js` (`runningWindows`, `runningKey`, `appsMatching`, `appInitial`),
     tested in `server/tests/vm_model_test.mjs`. New texts in all 35 languages.
-- **Store: a Flathub app's page shows its description, in development.** Under the header, **About this app** shows
+- **Store: a Flathub app's page shows its description.** Under the header, **About this app** shows
   what the app says about itself (AppStream's `<description>`), as Flathub's site and other app centres do, in the
   person's language when the catalog has it (`es-AR`: `es_AR`, then `es`, then the untranslated one). Paragraphs are
   spaced and list items have a bullet (or their number); a long text is shut to about six lines with **Show more** /
@@ -361,7 +833,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     a word, on one long word, in a list), control characters and invalid UTF-8, deep nesting, description lines
     lord-server must refuse, and 3000 rounds of random markup whose every line must pass the check;
     `tests/flathub_model_test.mjs` covers `descriptionView`.
-- **Linux apps can describe their colours: `color-management-v1` and `color-representation-v1`, in development**
+- **Linux apps can describe their colours: `color-management-v1` and `color-representation-v1`**
   (approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Colour management").
   - **What LordOS converts.** Every display stays SDR sRGB (sRGB primaries, gamma 2.2, 8 bits); HDR output is not built
     and not advertised. An app that marks its pixels otherwise has them converted when lord-server takes the buffer
@@ -389,7 +861,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     (`GDK_DEBUG=color-mgmt`) binds the protocol, reads the preferred description and sets sRGB / gamma 2.2 on its window
     (`WAYLAND_DEBUG` checked). Not yet checked: the GPU read-back of a converted tiled dmabuf, mpv and the Weston colour
     tools, a real display's EDID primaries.
-- **Explicit sync for Linux apps (`linux-drm-syncobj-v1`), in development** (approved by the maintainer 2026-11-22: "do
+- **Explicit sync for Linux apps (`linux-drm-syncobj-v1`)** (approved by the maintainer 2026-11-22: "do
   everything the compositor is missing"; `docs/SYNCOBJ-PLAN.md`, `docs/WAYLAND.md` "Explicit sync"). lord-server now
   offers `wp_linux_drm_syncobj_manager_v1` version 1: an app hands over each GPU buffer (dmabuf) with an acquire point
   (its rendering is done) and a release point (LordOS is done with it), as NVIDIA's driver needs and as Mesa's Vulkan
@@ -424,7 +896,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     passes with GPU composition on the monitor (llvmpipe). Not checked yet: a buffer sampled in place by a real GPU
     (virtio-gpu copies udmabufs), NVIDIA's driver (LordOS doesn't support it), Xwayland's own use.
 - **Linux apps: frame timing and presentation hints (`fifo-v1`, `commit-timing-v1`, `tearing-control-v1`,
-  `content-type-v1`), in development** (approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frame timing").
+  `content-type-v1`)** (approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frame timing").
   - **Held content updates, in explicit sync's queue.** A commit that may not apply yet is held with its whole pending
     state in the surface's one queue, the one explicit sync (`linux-drm-syncobj-v1`) uses, and every later commit
     queues behind it, in order: the first applies only when its acquire point is signalled, its fifo barrier is down
@@ -456,7 +928,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     timestamp on every present, 55 frames a second; MAILBOX 16 896 commits with points in 5 s, no error. `tests/wlperf_headless.sh` now marks the welcome tour as shown, so the Help window no longer covers its test
     windows (its frame test got 19 callbacks a second, the rate of a covered window), and so does
     `tests/guestwin_headless.sh` (the Help window was one more window in the lists it checks).
-- **The Wayland protocol table, on lordos.org and in `docs/WAYLAND.md`, in development.** A new page,
+- **The Wayland protocol table, on lordos.org and in `docs/WAYLAND.md`.** A new page,
   [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/) (English, Spanish and Portuguese,
   linked from the footer, the sitemap and the site's search), lists 108 Wayland protocols (the core protocol's globals,
   every wayland-protocols one, wlroots', KDE's, and the others KWin, Mutter or LordOS offer) with the version LordOS,
@@ -487,7 +959,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Maintainer's decisions of 2026-11-22 recorded:** the 13 KDE Plasma shell, output and settings protocols stay left
     out on purpose (confirmed); `drm-lease-v1` is in progress (a permission, non-desktop connectors only), shown as
     not offered yet with that note.
-- **The Wayland protocol page shows the conformance results, in English, Spanish and Portuguese, in development**
+- **The Wayland protocol page shows the conformance results, in English, Spanish and Portuguese**
   ([lordos.org/wayland-protocols-table/#conformance](https://lordos.org/wayland-protocols-table/#conformance);
   `tools/gen-wayland-table.mjs`, `web/build.mjs`, `web/src/wayland.{html,js,css}`, `web/i18n/pages.json`).
   - **A Conformance column** in the protocol table: per protocol the score of its globals (0–100 %, with a ten-step bar
@@ -525,7 +997,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   apps now work and were checked on VM 127, and 3D through a share of an Intel GPU is built for guests that need it. The Linux
   apps and Machines pages and the FAQ (Linux apps, Machines, and a new "Can I blur my background in video calls?") say
   the same, in English, Spanish and Portuguese.
-- **Wayland and Xwayland conformance, scored point by point, in development** (`tools/wl-conformance.mjs`,
+- **Wayland and Xwayland conformance, scored point by point** (`tools/wl-conformance.mjs`,
   `make -C server wl-conformance`; `docs/WAYLAND.md`, "Conformance").
   - Every advertised global, and every interface it creates, is checked against its protocol XML up to the advertised
     version: each request has a real handler (not a stub, and a destructor that destroys), each event is sent somewhere,
@@ -542,7 +1014,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - First results, 2026-11-22 (`docs/wayland-conformance.json`): 31 globals, mean 94 %, 19 complete; X11 74 %. The gaps
     found (xdg-shell errors not raised, subsurface stacking and sync ignored, `_NET_WM_ICON`, `_NET_WORKAREA`,
     xwayland-shell-v1, ...) are listed in `docs/WAYLAND.md`.
-- **Wayland conformance at 100 % for all 48 globals, X11 at 99.9 %, in development** (`tools/wl-conformance.mjs`,
+- **Wayland conformance at 100 % for all 48 globals, X11 at 99.9 %** (`tools/wl-conformance.mjs`,
   `docs/wayland-conformance.json`, `docs/WAYLAND.md` "Conformance"; the maintainer asked for every gap to be closed).
   Every protocol error below is the one the specification names, raised only where Mutter or wlroots raise it too; most
   have a flow in `server/tests/wl_conformance.c` checking that a misbehaving client gets exactly that error, the rest
@@ -611,7 +1083,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Results (2026-11-22):** 48 globals, mean 100 %, 29 complete (before: 47, 95.8 %, 19); X11 mean 99.9 % (before 74 %).
     The globals that score 100 % without being "complete" have no protocol-specific flow in this tool (only the
     generic bind; most have their own headless test), or skip a check that needs a pointer over a window (`wl_seat`).
-- **X11 apps (Xwayland) handled as GNOME and KDE handle them, in development** (`server/src/wl/xwm.c`, new
+- **X11 apps (Xwayland) handled as GNOME and KDE handle them** (`server/src/wl/xwm.c`, new
   `xwshell.c`; `docs/WAYLAND.md`, "X11 apps" and "Conformance").
   - **Window matching:** lord-server offers `xwayland-shell-v1` to Xwayland only (hidden from every other client's
     registry; a bind by anyone else is an error). Each X window is matched to its surface by serial
@@ -643,9 +1115,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     answered, stacking order, above/modal/skip-taskbar add and remove, maximum size, urgency set and cleared, utility
     windows, `_NET_CLOSE_WINDOW`. Screenshots with xterm 398, xprop, xwininfo and zenity on X11
     (`tools/wl-conformance/x11-proofs.sh`, `docs/wayland-proofs/x11-*.png`).
-- **Linux apps: tab tear-off, window tags, the bell, session management and blur behind windows, in development**
+- **Linux apps: tab tear-off, window tags, the bell, session management and blur behind windows**
   (approved by the maintainer 2026-11-22; five Wayland protocols, one file each in `server/src/wl/`, `wlshell.h`;
-  `docs/WAYLAND.md`, "Shell extras"; the latest release is 0.8.9.4).
+  `docs/WAYLAND.md`, "Shell extras").
   - **Tab tear-off (`xdg-toplevel-drag-v1` 1, `tldrag.c`):** a tab dragged out of Firefox or Chromium becomes a window
     that follows the pointer during the drag (at the point of the window the browser gave), is never the drag's target
     (the hit test leaves its frame out, so it can be dropped back onto another window of the browser), and stays where
@@ -678,7 +1150,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `build/shellx-units-test`, `tests/shellx_model_test.mjs`, `tests/shellx_headless.sh` (all five against a
     headless lord-server, `tests/shellx_client.c`; the pointer-driven tear-off with `SHELLX_DRAG=1`), and
     `build/fsops-test` for the protected folder.
-- **VR headsets for Linux apps, only if you allow it, in development** (`drm-lease-v1`, approved by the maintainer
+- **VR headsets for Linux apps, only if you allow it** (`drm-lease-v1`, approved by the maintainer
   2026-11-22; `docs/WAYLAND.md`, "DRM leases"). A VR runtime such as Monado can lease a headset's display from LordOS
   and drive it directly. Only connectors the kernel marks as non-desktop (head-mounted displays) are ever offered, never
   a monitor, and LordOS itself no longer lights such a connector as a desktop display (Settings → Displays lists it as
@@ -689,7 +1161,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   app lets it go, the permission is taken back, the headset is unplugged, or the session leaves the screen (lock, Switch
   User, logging out, a text console). No libdrm: the lease is made with the kernel's own ioctls. Checked with a fake
   card (`drmlease-test`, `drmlease-e2e-test`); not yet with a real headset. Texts in all 35 languages.
-- **Machines: a LordOS download card, in development** (maintainer's decision 2026-11-22; `docs/VIRTUALIZATION.md` 3.9,
+- **Machines: a LordOS download card** (maintainer's decision 2026-11-22; `docs/VIRTUALIZATION.md` 3.9,
   "The LordOS card"). The New Machine assistant's first card is now **LordOS**, with LordOS's own icon, for amd64 and
   arm64: it downloads the **live ISO** of the release the card names (*LordOS 0.8.9*, about 1.1 GB), not the OVA.
   - **Signed with the LordOS release key.** The catalog (`assets/machines/systems.json`) has a new signature kind,
@@ -714,8 +1186,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     key, a missing, empty, garbage or OpenPGP signature, another list, malformed entries), `vmunattend-test`
     (`lordos-auto.conf`, the seed disk read back), `vm_catalog_test.mjs` (the card, the live ISO from the real list, the
     tag against `web/content/downloads.json`). Not run yet: a whole install on a machine, which needs the next ISO.
+- **Machines: an Android 13 card in New Machine, amd64 only** (asked by the maintainer 2026-11-22: one more system to install from an ISO in Machines' cards; docs/VIRTUALIZATION.md 4.2). The card downloads **Bliss OS 16.9.7, FOSS edition**
+  (no Google apps), the only installable Android ISO for PCs found: Android-x86 stopped at 9.0 in 2020, LineageOS's QEMU targets
+  are built by nobody as an ISO, and no installable Android ISO exists for arm64, so the card isn't shown on arm64 hosts.
+  - **Trust:** Bliss OS signs no list, so `assets/machines/systems.json` pins the one file, its SourceForge address and its
+    SHA-256 (`735cb962…a68e`, 2 342 518 784 bytes), checked on 2026-11-22 against the project's own `.sha256` file, a download
+    that day, and the MD5 SourceForge recorded at the upload (2024-10-12). The admin helper keeps the download only with that
+    hash (`vm-image-get`, as for the guest evaluation image and virtio-win); no address comes from the app.
+  - **The machine:** a new `"machine"` field gives the card 4 vCPUs, 4 GB, a 32 GB disk and 3D graphics (virgl) whatever the
+    profile, fitted to the computer (`cardSize`), on the usual q35 + UEFI virtio devices. Install is Bliss OS's own installer.
+  - **What it says:** choosing the card shows the file with "SHA-256 pinned in LordOS's signed catalog" and a warning that Bliss
+    OS paused its public images, that this is the last one (2024-10-11) and gets no more security updates, and that it has no
+    Google apps (`machines.dl.pinned`, `machines.dl.notice.archived`, in all 35 languages). Android ISOs chosen from a file
+    (Bliss OS, Android-x86, LineageOS) are now recognized and get Machines' own green "A" mark.
+  - **Code:** `apps/machines/catalog.js` (`pinnedImage`, `cardSize`, `noticeOf`; a pinned ISO is a card and needs no maker's
+    list), `assistant.jsx` and `download.js` (no `vm-image-list` for a pinned card), `model.js` and `ui.jsx` (the mark), `settingswin.jsx` (a card's `family`: a Linux profile never suggests Android). Tests:
+    `vm_catalog_test.mjs` (83), `vmcatalog-test` (242, the helper's view of the pin), `vm_model_test.mjs`.
+  - **Not yet:** booting it under Machines on the dev VM with a screenshot (**to test**); a maintained Android (LineageOS 24 /
+    Android 16, built by LordOS or as a prebuilt-disk card) and arm64 are open question 6 for the maintainer.
 
-- **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer, in development**
+- **Graphics cards: NVIDIA marked experimental, and a compatibility report for every computer**
   (approved by the maintainer 2026-11-22: NVIDIA support as "experimental, community-verified", with hardware reports;
   `docs/NVIDIA-PLAN.md`).
   - **Settings → Graphics cards** now shows on every computer with a GPU (before, only with two or more). Each card shows
@@ -756,7 +1246,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Flatpak's GL.nvidia extension) and NVIDIA drawing the desktop
     (`nvidia-drm.modeset=1`, GBM/EGL, explicit sync, a boot fallback, a test matrix by generation).
 
-- **Lord Workspaces: each display's quick launch and its usual apps, suggested, in development** (asked by the maintainer;
+- **Lord Workspaces: each display's quick launch and its usual apps, suggested** (asked by the maintainer;
   decision 2026-11-22: suggest, never open by itself; `docs/WORKSPACES.md`, "Several displays").
   - **The record, in the SDK for every theme** (`sdk/displayapps.js`, the rules in `sdk/displayappsmodel.js`): per display,
     keyed by its connector (`DP-2`, `HDMI-A-1`…, never the model, which identical monitors share), the apps opened there
@@ -787,7 +1277,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     nothing opened by itself, Open from the keyboard opening the apps on that display in the usual layout and order,
     offered once, "Don't suggest" kept for that display only, Clear and off); `workspaces_model_test.mjs` (theme.json).
 
-- **Graphics tablets for Linux apps: pressure, tilt and pads, in development** (`tablet-v2` version 2, approved by the
+- **Graphics tablets for Linux apps: pressure, tilt and pads** (`tablet-v2` version 2, approved by the
   maintainer 2026-11-22; `docs/WAYLAND.md`, "Graphics tablets"). lord-server reads pens and pads straight from evdev with
   its own code (`server/src/tablet.c`, no libinput or libwacom) and offers `zwp_tablet_manager_v2`: Krita, GIMP,
   Inkscape, GTK 4 and Qt 6 apps get the pen's proximity, tip, motion, pressure, distance, tilt, rotation, slider and
@@ -800,19 +1290,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire);
   not yet with a real tablet or on the VM.
 
-- **Apps may move the pointer on their own window, in development** (`pointer-warp-v1`, approved by the maintainer
+- **Apps may move the pointer on their own window** (`pointer-warp-v1`, approved by the maintainer
   2026-11-22; `docs/WAYLAND.md`, "Pointer warp"). `wp_pointer_warp_v1` lets a game, a 3D tool or a VM put the pointer at
   a point of its surface, only while the pointer is over that window and it has the keyboard, with the serial of the
   enter it got, inside the surface, and never while the pointer is locked or in a drag; a confinement still holds. The
   protocol's XML comes from wayland-protocols 1.45 (Debian 13 ships 1.44) and is kept unmodified in `server/protocols/`.
 
-- **A Linux window's own icon for apps with no installed one, in development** (`xdg-toplevel-icon-v1`, approved by the
+- **A Linux window's own icon for apps with no installed one** (`xdg-toplevel-icon-v1`, approved by the
   maintainer 2026-11-22; `docs/WAYLAND.md`, "Window icons"). An AppImage, a Wine program or a game without a `.desktop`
   entry now shows the icon it hands its window in the Dock, the switcher and the Overview instead of a letter. The
   installed icon always wins for every other app, icon names are ignored (they could name another app's icon), and the
   pixels are copied, re-encoded and size-limited by lord-server (square, at most 256 px, 16 MB for the whole session).
 
-- **Linux apps may be told when you're away from the computer, only if you allow it, in development**
+- **Linux apps may be told when you're away from the computer, only if you allow it**
   (`ext-idle-notify-v1`, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Idle notifications"). The first time
   an app asks, LordOS shows its own prompt ("‹App› wants to know when you're away from the computer", Allow / Don't
   allow), remembered per app by the identity lord-server checks itself (the program it runs, the Flatpak app, or an
@@ -820,13 +1310,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   never told; idle inhibitors (a video, a presentation) count as being there. The new `idle` permission can't be
   declared in a manifest or requested through the broker. Texts in all 35 languages.
 
-- **`wp_single_pixel_buffer_manager_v1` and `wp_alpha_modifier_v1` for Linux apps, in development** (Wayland audit item
+- **`wp_single_pixel_buffer_manager_v1` and `wp_alpha_modifier_v1` for Linux apps** (Wayland audit item
   7, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Apps (GTK 4, video
   players) can draw a solid colour from a one-pixel buffer stretched by a viewport instead of a full-size buffer, and
   fade a surface with an opacity the compositor applies (both paths). Offered to sandboxed clients too: neither reads
   anything of another client.
 
-- **xdg-shell 7 and newer protocol versions for Linux apps, in development** (Wayland audit item 4, approved by the
+- **xdg-shell 7 and newer protocol versions for Linux apps** (Wayland audit item 4, approved by the
   maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Each window is offered the window menu and
   fullscreen (not during a screen share) besides maximize and minimize, told the work area of their display
   (`configure_bounds`, from the theme through `lord.wayland.workAreas`) so they never open larger than it, and told which
@@ -834,7 +1324,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   modifier for every plane), `wp_presentation` 2 and `wp_cursor_shape_manager_v1` 2 (`dnd_ask`, `all_resize`). Checked
   with `WAYLAND_DEBUG` on foot, FeatherPad (Qt 6.8) and zenity (GTK 4.18): no protocol error.
 
-- **Flatpak apps: the maintainer's decisions of 2026-11-22, in development** (`docs/FLATPAK.md`, "Shared runtime
+- **Flatpak apps: the maintainer's decisions of 2026-11-22** (`docs/FLATPAK.md`, "Shared runtime
   folders", "Lending a chosen file", "Steam" and "Screenshots"; AGENTS.md, Flatpak entries; found by the Flathub
   compatibility run of 2026-11-22).
   - **A second launch reaches the first** (open question 4, decided): every view of the same app id, same user and same
@@ -919,7 +1409,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     in to Steam" with pv-adverb's `/usr` from its own runtime; Whatsie's `usr-fd` was refused.
   - The Spawn portal takes up to 128 environment variables (was 64): pressure-vessel passes 82.
 
-- **Machines from the terminal: the `machines` command, in development** (approved by the maintainer 2026-11-21;
+- **Machines from the terminal: the `machines` command** (approved by the maintainer 2026-11-21;
   `docs/VIRTUALIZATION.md` 6.15 "From the terminal"). `machines list [--json]` shows each machine of `~/Machines` with its
   system, state, vCPUs, memory, disk used and graphics; `status NAME [--json]`, `start NAME [--no-window]`, `open NAME`,
   `stop|poweroff|pause|resume|suspend|reset NAME`, `snapshot NAME list|take LABEL|revert TAG|delete TAG`, `clone NAME
@@ -941,7 +1431,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     started without a window and in its window, opened and powered off through a headless lord-server, and the
     requests the channel refuses).
 
-- **Machines: the library redesigned, Machines settings, profiles you can make and share, your own systems, in development**
+- **Machines: the library redesigned, Machines settings, profiles you can make and share, your own systems**
   (the approved mocks of 2026-11-22; `docs/VIRTUALIZATION.md` 5.1, 5.6, 5.6.1, 5.6.2; `docs/TRADEMARKS.md`).
   - **Library** (`apps/machines/library.jsx`): toolbar with the gear (Machines settings), search, grid or list and +; chips
     All, Running, Linux and the other system's, each with its count; the New machine card first; each card with its real
@@ -1027,7 +1517,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     Ubuntu and Kali lists with the pinned keys, and Debian's archive keyrings (signing subkeys) read the same way as
     trusted.
 
-- **Machines: Capture mouse, in development** (`docs/VIRTUALIZATION.md` 6.25; approved by the maintainer 2026-11-21). A
+- **Machines: Capture mouse** (`docs/VIRTUALIZATION.md` 6.25; approved by the maintainer 2026-11-21). A
   machine window's toolbar has a *Capture mouse* button (and *Actions → Capture mouse*): Automatic, as before (an absolute
   tablet, the pointer moves freely in and out), or Captured, for games and 3D programs: the host's pointer is hidden and held
   inside the picture and the guest gets relative motion that never stops at a screen's edge. ❖Esc or Ctrl+Alt releases it
@@ -1056,7 +1546,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `tests/vm_capture_test.mjs` (the window's decisions), `vm_test` (schema 12, the choice among QEMU's mice);
     `lordvm-dev` `capture 0|1` and `rel DX DY`.
 
-- **Machines: LordOS draws the pointer of a machine with the VirtIO GPU display-only driver, in development** (`docs/VIRTUALIZATION.md` 7.1.2,
+- **Machines: LordOS draws the pointer of a machine with the VirtIO GPU display-only driver** (`docs/VIRTUALIZATION.md` 7.1.2,
   `docs/MACHINES-GPU.md` Part 1 step 2). The LordOS guest tools (`lordos-guest-win`) are now w5 and say `pointer`; lord-vm then sets
   viogpudo's `HWCursor` value through qemu-guest-agent with one fixed SYSTEM script (`PTR_PS`: only `VioGpuDod`
   adapters' driver keys, restarting only an adapter whose value changed) and lord-server draws the shape the guest
@@ -1066,7 +1556,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   lordos|guest`. Machines with older tools are offered the update. `lordvm-dev`: `lat`, `fps`,
   `LORDVM_DEV_NODISPLAY`, `LORDVM_DEV_CURSOR_PNG`.
 
-- **Machines: a real graphics card for a machine (Intel GVT-g), and Settings → Graphics cards, in development**
+- **Machines: a real graphics card for a machine (Intel GVT-g), and Settings → Graphics cards**
   (`docs/MACHINES-GPU.md` Part 2 Mode A, "Mode A — built"; `docs/VIRTUALIZATION.md` 6.10.1). On a computer whose
   Intel iGPU (Broadwell to Comet Lake) is enabled in the firmware but doesn't show the desktop, a machine gets a share of
   it as its own GPU: the vendor's own driver in the guest, its 3D computed by the real iGPU, and the picture back in the
@@ -1111,7 +1601,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     restriction) and turns off hibernation and Fast Startup.
   - **Packaging**: the GOP option ROM ships at `/usr/lib/lordos/firmware/lordos-gvt-gop.rom` from the reproducible
     build committed in `firmware/gvt-gop/prebuilt` (SHA-256 checked by `mkdeb.sh`).
-- **Machines: LordOS's own UEFI GOP option ROM for Intel GVT-g vGPUs, in development** (`firmware/gvt-gop`,
+- **Machines: LordOS's own UEFI GOP option ROM for Intel GVT-g vGPUs** (`firmware/gvt-gop`,
   `tools/firmware/build-gvt-gop.sh`, `docs/MACHINES-GPU.md` "Our own GVT-g GOP driver"). An EDK2 UEFI driver, MIT,
   written from public, licensed sources only (MIT-licensed Linux i915/GVT-g files, QEMU's IGD and fw_cfg documents,
   UEFI/EDK2, VESA; listed file by file in `firmware/gvt-gop/NOTICE.md`), replacing the unlicensed i915ovmfPkg that the
@@ -1292,7 +1782,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   The Store's sidebar can be widened by dragging its edge (remembered), and Web apps are named "Web apps (PWA)".
 - **Lord Workspaces: the Store and Monitor on the Context Spine**, under Files, each with its own glyph (a bag, a pulse
   line), in keyboard focus order too.
-- **Machines: apps mode (in development).** Each window of a guest with the LordOS guest tools (the card in
+- **Machines: apps mode.** Each window of a guest with the LordOS guest tools (the card in
   `docs/VIRTUALIZATION.md` 4.3) or of a LordOS guest (lordos-guest 3) becomes its own LordOS window, with the guest's
   title and the machine's name, and its app's icon in the Dock, the taskbar and the switcher, while the guest's own
   desktop, taskbar or Dock is hidden. The toolbar's Apps button or Actions → Apps Mode turns it on (kept per machine);
@@ -1369,7 +1859,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   points to `lordos-issue`.
 - Tests: `server/tests/theme_gallery_test.mjs` (41 cases: the new `theme.json` fields, search, filters, order, arrow keys,
   the report's address), in `make -C server test`.
-- **Lord Celeste, a community theme** (`themes/celeste`, in development; not part of a release yet). A frame around each
+- **Lord Celeste, a community theme** (`themes/celeste`). A frame around each
   display with rounded inner corners, a bar on its thick side and drawers that slide out of its edges: a dashboard on
   top (the date, a month calendar, CPU, memory, battery and what is playing, with Media and Performance tabs), the app
   launcher at the bottom (apps, `=` a calculator, `>` the theme's actions), a session drawer and a sidebar at the end
@@ -1393,7 +1883,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   in `make test`, and `theme_cost_scene.mjs` now measures it too (426 native calls on the first render and 312 timer
   wake-ups a minute at rest, against Lord Flow's 465 and 330). Seen in headless sessions on the development machine in
   dark, light and Arabic; not yet on a real session with real monitors, a Linux app's own bar or the GPU path.
-- **Linux apps: the core `wl_fixes` global (version 1), in development.** `wl_registry` has no destructor, so until now
+- **Linux apps: the core `wl_fixes` global (version 1).** `wl_registry` has no destructor, so until now
   every registry a client asked for stayed in lord-server, and kept getting `global` and `global_remove` events, until
   the client disconnected. `wl_fixes.destroy_registry` (wayland.xml 1.24) destroys it: lord-server sends
   `wl_display.delete_id` and the client can reuse the id. Debian 13's libwayland is 1.23, which doesn't ship the
@@ -1406,8 +1896,232 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
-- **Machines: clicks with the mouse free, resolutions, and apps mode's windows on a guest with two displays, in
-  development** (LordOS guest tools **w10**; found on the maintainer's guest with an Intel GVT-g vGPU, ws126 and tools
+- **Without a monitor, and on cards whose page flips complete at once, two frames never come less than a refresh
+  apart; the fifo-v1 conformance check passes every time.** Seen on the
+  maintainer's PC, where `make -C server wl-conformance` failed `wp_fifo_manager_v1: flow.fifo.barrier` in some runs
+  ("4 of 5 a refresh later, closest 3.2 ms", "closest 7.1 ms") and passed in others.
+  - **The software vblank** (`server/src/softpace.h`, new; `main.c`): frames are paced by lord-server itself on a grid
+    of one refresh when no flip paces them (headless sessions, remote desktop without a monitor, `vmwgfx` and other
+    virtual cards). A frame wanted after its slot had passed (nothing needed the slot, or lord-server was busy) was
+    drawn at once and the next one still came on the old grid, a few milliseconds later. With fifo-v1 that is a frame
+    lost: the update that set the barrier was on screen for 1 to 7 ms and the one waiting on it replaced it, where a
+    monitor shows each for a whole refresh (games and video players in Mesa's FIFO mode). The barrier and the held
+    queue (`timing.c`, `wl.c`) were right: the barrier clears at the frame after the one that latched the update; the
+    frames themselves came too close. A frame that starts more than an eighth of a refresh late (at least 2 ms) now
+    starts the grid again from itself, so two frames are always at least seven eighths of a refresh apart; a frame a
+    millisecond late (the wait rounded up to whole milliseconds) keeps the grid, so 60 frames a second stay 60.
+    A frame is shown when it is painted, so one painted slowly (lord-server preempted on a loaded machine) was shown
+    late and the next, on its slot, came right after it (1 ms apart with a busy loop on every core); the next frame
+    now waits at least half a refresh after the one before was shown (`softpace_shown`), which only a frame taking
+    more than half a refresh to paint (or preempted that long) ever moves, so a VM painting 6 ms frames keeps 60 a
+    second. Physical monitors are paced by their flips and
+    are unchanged. `tests/softpace_test.c` (new, in `make test`) checks
+    every lateness across a refresh and every paint time, and fails on the old rule.
+  - **The fifo check** (`server/tests/wl_conformance.c`) measures with the frames' own times (`wl_callback.done`,
+    lord-server's clock), not when the client read them (a client woken late read both callbacks together), and now
+    sends its pairs at different points of the refresh (20 to 29 ms after the last frame), so it catches the old
+    pacing in an idle run too instead of only when the machine was busy. Its threshold is unchanged (8 ms at 60 Hz,
+    half a refresh, the least the software vblank now guarantees even for a preempted frame). With the old pacing it
+    failed 12 of 12 runs (6 idle, 6 with a busy loop on every core); with the fix it passed 35 of 35 runs with a busy
+    loop on every core (load average about 48 on 20 threads) and every idle run.
+- **Wayland session management: a window that was maximized the whole time it was open comes back too.**
+  With `xdg-session-management-v1` an app names its windows in a session and, when
+  it starts again, asks for each by name before its first commit; LordOS answers `restored` only for a window it kept
+  a place for. It kept a window's place only while the window was in its normal state (a maximized or fullscreen one
+  keeps its last normal place), so a window that was never normal got an entry with no place: it was neither restored
+  nor written to the file. That happens when LordOS opens the window maximized because its app's remembered place
+  (`settings.windowPlaces`) is maximized, or when the app maximizes it at once and closes it before the next
+  snapshot (every 2 s). An app closed and opened again quickly did not get its window back. On the maintainer's PC
+  the conformance tool showed it as an intermittent `flow.session.toplevel_restored` failure (restored 0 times,
+  xdg_session_manager_v1 at 96.8 %): the earlier `xdg_toplevel` flow maximizes and unmaximizes a window of the same
+  app id, and whether the shell's remembered place for that app (saved 800 ms after a change) ended up maximized
+  depended on timing, more so under load. It was not the file: the sessions live in memory, and the file is only read
+  at start. Now a snapshot (`xs_top_note`, `xsstore.c`, pure) keeps the last normal place as before, and a maximized
+  or fullscreen window with no place yet takes its current one, marked maximized when it is, so it is restored
+  (maximized again) and saved. The store's rules are unchanged (per-user file, atomic write, limits, names checked).
+  **Tests:** `tests/shellx_units_test.c` (`note`, in `make test`) checks it deterministically (4 checks fail with the
+  old rule); a new conformance check, `session.toplevel_restored_maximized`, maximizes a session window as it maps,
+  closes it and restores it from a new connection right away. Under 24 busy loops on 20 cores, the old code failed
+  that check 12 runs out of 12; with the fix all 35 runs were at 100 %.
+- **Files: dragging in a big folder no longer draws the whole window on every pointer move (GitHub #218).** Each move of a drag set the Files window's own state (where the
+  ghost is, which place it is over), so React drew the whole window again, many times a second: every card or row in
+  sight, the sidebar and the toolbar. In a folder of thousands of files that made the drag stutter. The drag now
+  lives in two small stores of its own (`apps/files/dnd.jsx`): the ghost (`DragGhost`) follows the pointer by itself,
+  and each place that takes a drop (a card, a list or column row, a sidebar item, a tab, "Add to Favorites") lights
+  through a small component (`DropHot`, `DropSideItem`, `FavDropSlot`) that draws again only when the place under the
+  pointer becomes it or stops being it. The main component no longer draws during a drag at all. This finishes #218
+  after the shared launcher list (`useLauncherApps`) and the windowed drawing of big folders. Measured by a new scene,
+  `server/tests/files_drag_scene.mjs` (in `make test`, through `tests/menubar_test.mjs`): the whole Files window over a
+  stub `lord.fs` with a folder of 2000 files and 20 folders, a drag over files and then onto a folder. Before, the
+  window drew again on 30 of 30 moves over files and 5 of 5 over a folder; now on none, while the ghost follows the
+  pointer, the folder under it lights and the ghost goes away on release (counted by the main component's reads of
+  `lord.fs.home` while it renders).
+- **Two login screens at boot: the `lordos` package now warns when another display manager is enabled next to
+  LordOS (GitHub #187).** On a reported machine LightDM, installed with another desktop, was enabled together with
+  `lordos.service`; both started at boot, and the person saw only LightDM's login screen, which took no keys. A new
+  read-only script, `/usr/lib/lordos/lordos-dm-check` (`packaging/bin/lordos-dm-check`), finds the other display
+  managers the way Debian's enable themselves: the `display-manager.service` link, or a target's `.wants` link, for
+  GDM, SDDM, LightDM, LXDM, XDM, SLiM, nodm, greetd and ly; a masked one doesn't count. The package's postinst runs
+  it on every configure and, only when `lordos.service` is enabled too, prints a warning that names the other one and
+  both ways out (`sudo systemctl disable <it>` to keep LordOS, `sudo systemctl disable lordos.service` to keep the
+  other); apt shows it on the terminal, and a Store update gets it among dpkg's output. Nothing is disabled by the
+  package: which login screen to keep is the person's choice (`tools/install/install.sh` asks the same question).
+  `lordos.service` does not take `display-manager.service` as an alias: Debian's display managers write that link
+  with `ln -sf` when they are installed (LightDM's postinst does it whenever `/etc/X11/default-display-manager` is
+  missing), so owning it would not keep another one from starting, and taking part in Debian's choice of display
+  manager needs debconf templates of its own, a separate decision. `lordos-issue` gets a section "Other display
+  managers enabled at boot". No migration: nothing on an installed system changes. Test:
+  `server/tests/dm_check_test.sh` (13 checks over fake system trees: LightDM through the alias as in #187, GDM and
+  SDDM together, a display manager kept by `install.sh --keep-display-manager` with LordOS not enabled, a masked one,
+  `display-manager.service` pointing at LordOS, an empty image tree), in `make test`. `docs/INSTALL-DEBIAN.md`,
+  Troubleshooting.
+- **Settings → Appearance → Browsers: no green "Done" note after the switch (#222).** Every change of "Browsers: tabs in the title bar" left "Done. The browsers use it the next time they
+  open." under it, and turning the switch back off kept it there, since the last result is kept for the page's
+  life. A change that simply worked now says nothing: the switch shows it, and the group's footer already says that
+  it applies the next time each browser opens. What needs the person still shows (Chromium or Brave open, a profile
+  that couldn't be changed, a Firefox profile whose own `user.js` sets it). The notes are chosen by
+  `browserFrameNotes` in `sdk/browserframe.js` (new, pure); `settings.browserTabs.done` is gone from the 35
+  languages. Test: `server/tests/browserframe_notes_test.mjs` (new, in `run_suites.sh`, 8 checks).
+- **Settings → Cloud: each row of "Kept on this computer" shows its real size (#206).** Every row said 0 B, the account's whole folder ("In sync with this computer") as well as a
+  folder added by hand: the rows asked `lord.fs.du`, which by design doesn't walk a cloud or network mount from the
+  interface's thread and answers `size: 0, remote: true` there. `lord-server` now sizes each kept entry itself, in the
+  walk of rclone's VFS cache that already gave the account's `keptBytes` (`cf_measure` in
+  `server/src/cloud/cloud_files.c`, once a minute and after each pass of the keeper), and the state gives them as
+  `keptSizes` (bytes in `kept`'s order, `null` for an entry kept since the last walk; `docs/CLOUD.md` 17 and 17.1).
+  Entries that overlap (the whole account and a folder in it) each count their own files (`cloud_kept_tally` in
+  `cloud_pure.c`). Settings shows that number (`keptRows` in `sdk/cloudmodel.js`) and never `lord.fs.du`'s on the
+  mount: a row not measured yet shows no size instead of 0 B. The dev mock gives sizes too. Tests: `build/cloud-test`
+  (per-entry tallies, overlapping entries, a path kept nowhere), `server/tests/cloud_model_test.mjs` (rows, unknown and
+  junk sizes, the mock through keep and unkeep), and a `keptSizes` check after Keep on This Computer in
+  `server/tests/cloud_integration.sh` (run by hand against rclone v1.75.2; not run for this change).
+- **Settings → Cloud: "Only in the cloud" says that folders can still be kept, and an account in sync has no "Add a
+  Folder…" (#207).** The choice's text ended "Nothing is kept on this
+  computer.", although folders added under "Kept on this computer" are kept here; it now ends "By default nothing is
+  kept on this computer; you can choose folders to keep." (`cloud.use.cloudOnlyHint`). An account "In sync with this
+  computer" keeps its whole folder, so the list's **Add a Folder…** did nothing useful: it is replaced there by "The
+  whole account is kept on this computer, so every folder in it is kept too." (`cloud.keptAllHint`, new; `keptAll` in
+  `sdk/cloudmodel.js`). Both texts in all 35 languages. Test: `server/tests/cloud_model_test.mjs`.
+- **Backups: a folder inside a Cloud account is refused as the destination (#208).** A person backed up their home into a OneDrive folder, stopped the backup and removed it, and rclone
+  kept uploading thousands of small files (browser and mail profiles) for hours, with OneDrive's rate-limit errors in
+  the log. A backup there can't work as designed: snapshots hard-link what didn't change, which rclone's mount can't
+  do, so every run copies every file again, and what a run wrote sits in rclone's upload queue, which a stopped backup
+  can't take back. Refused rather than warned about, because nothing the person can do there makes it work; the cloud
+  destination of `docs/CLOUD.md` 10 (an rclone sync job with versions) is still to be built.
+  - `valid_dest` (`server/src/backup/backup.c`) answers the new error `backup.destCloud` (35 languages: why, and to
+    choose a disk or a folder on this computer) for a folder on rclone's mount: `fsops_cloud_path`, the mount type
+    `fuse.rclone` of the longest mount point over the path in `/proc/self/mounts` (`fsops_mount_type_in` in
+    `server/src/fsops.c`, which `fsops_remote_path` now uses too). Network shares (SMB, NFS), other FUSE file systems
+    and NTFS disks (`fuseblk`) are not affected.
+  - A destination chosen before this change is not run: the run ends at once with that error under the app's header,
+    retried as a failed run (every 15 minutes) until another destination is chosen.
+  - The app no longer lists the Cloud accounts' mounts among the disks (`cloudModel.isCloudVolume`).
+  - **Cancelling an account's pending uploads in Settings → Cloud is not built.** rclone's remote control has no call
+    that drops what waits in the VFS upload queue (`vfs/queue` lists it, `vfs/queue-set-expiry` only delays it;
+    checked against rclone's rc reference on 2026-11-22); doing it would mean deleting files from rclone's cache behind
+    its back. Pause holds them, and removing the account past its warning about changes waiting drops them.
+  - Test: `build/fsops-test` (mount types from a mounts file: an rclone mount, one with a space in its name, a disk
+    mounted inside it, a folder whose name only starts like the mount's, SMB, `fuseblk`, a local FUSE pool, an
+    unreadable file).
+- **Print Screen said "Screenshots does not have permission to record the screen" with no way to allow it (GitHub
+  #219).** Three things together:
+  - **The real reason is shown.** `sdk/media.js` turned every exception from `lord.media.screenshot` and `screenRecord`
+    into `null`, and Screenshots took `null` as "the permission was refused", so any failure (`media.captureFailed`,
+    a capture lord-server could not make) read as a permission problem. The SDK now passes lord-server's code on, and
+    Screenshots shows the permission text and **Open Privacy** only for `media.denied.*` and `fw.restricted.*`; any
+    other failure is told as it is (`apps/screenshots/toolbarmodel.js` `refusal`, tested).
+  - **Screenshots starts with the screen permission allowed** (approved by the maintainer 2026-11-22): pressing Print
+    Screen or a capture shortcut is the person asking for the capture. It is a default under the saved decisions, not a
+    decision written for the person: `perm_builtin_default`/`perm_get_builtin` in `server/src/sec/perms.c`, read only by
+    the desktop's own contexts (`js_media.c`'s check, `lord.perms.get`), never by the broker, and only for the id
+    `screenshots` and the `screen` permission (no package can take that id, `lpk_reserved`). A "Don't Allow" saved in
+    Settings → Privacy wins and sticks across sessions; firewall restrictions (`no-screen`) still win over both. Tests:
+    `tests/perms_default_test.c` (new; only that pair, never perm_get's, a deny wins and survives a new session).
+  - **Settings → Privacy lists built-in apps** whose manifest declares a permission even before they ever asked (it
+    listed packages and saved decisions only, so Screenshots was missing), and a permission that starts allowed offers
+    Allow and Don't Allow (Ask would only bring the default back): `apps/settings/privacymodel.js`, tested by
+    `tests/privacy_model_test.mjs` (new); `lord.perms.builtinDefault`.
+  - **Protected windows are exactly as protected as before**, now checked by tests: in a capture of the whole screen or
+    an area, and in recordings and the remote desktop, a protected window (Passwords, the on-screen keyboard, "Protect
+    the front window", a Linux window marked so) is black, painted so by lord-server (`paint.c` capture mode,
+    `media/capture.c`, `wl.c`). And a protected window asked for alone (Screenshots' window capture) is now **refused**
+    (`media.protectedWindow`, new text in all 35 languages) with nothing painted for it, where before its frame came out
+    with its content black: `paint_capture_until` returns -1 for a window that is, holds or is inside a protected node,
+    and Screenshots does not fall back to cropping a capture of the screen. `engine-test`'s new
+    `test_capture_protected`.
+- **Clipboard history: the full panel (❖⇧V) no longer scrolls by itself, and the arrow keys work (GitHub #203, #204).** The list drew a window of 16 entries around the selection and a row
+  took the selection when the pointer entered it: with the pointer resting on the list, every arrow key moved that
+  window, another row slid under the still pointer and took the selection back, so the list crept up or down on its own
+  near the edges and the keys seemed to do nothing. It is now an ordinary scrolling list with every entry (the wheel,
+  its bar, the keys), the arrow keys move a highlighted selection that is scrolled into view, and only then, Enter pastes
+  it, and a row under the pointer takes the selection only when the pointer itself moves (both panels, ❖V too). Of up
+  to 500 entries only the rows in sight and a few around are made, the rest is empty space of their height.
+  `sdk/clipboardpanelmodel.js` (`stepSel`, `scrollFor`, `rowWindow`, `hoverGate`), tested by `tests/clipboard_panel_model_test.mjs`
+  (new).
+- **The screen comes back on when the computer wakes from sleep (GitHub #214).** Opening the lid (or the power button) woke the computer with the screen still dark until a key was pressed.
+  On logind's `PrepareForSleep(false)` the session on the monitor now counts it as activity
+  (`server/src/hw/sleeplock.c` `woke` → `display_activity`, which turns the displays on and restarts the idle timers),
+  right after the theme heard "resume", so the lock on waking (`lockAfterWake`, Settings' lock delay) still comes first and the
+  lock screen is what shows. A session that is not on the monitor does not touch the screen. `sleeplock-test` checks
+  both.
+- **Store: the Flathub home's category tiles keep one width on every row** (`apps/store/flathubpages.js`,
+  `CategoryTiles`). The tiles grew to fill their row, so a last row with fewer tiles (four of ten at 1600 px) made each
+  of them wider than the ones above; five empty, zero-height cells with the tiles' own flex now fill that row. Seen in
+  `server/tests/store_rankings_headless.sh`'s screenshots.
+- **Store, Flathub: the counts agree with the lists, and a card's one-line texts end in an ellipsis.** Found on the screenshots of Flathub's home with the rankings (E10), taken in a
+  headless lord-server with this machine's Flathub catalog (3381 apps, 2243 verified) and Flathub's recorded answers of
+  2026-11-22 (`server/tests/store_rankings_headless.sh`, new; en and es, 1600x900; a live fetch from flathub.org in the
+  same setup filled all six lists).
+  - **All in the second column** said 2734 over a list of 2243 apps: it was the sum of the categories' counts, and a
+    Flathub app is often in several. It is now how many apps the section shows (`flathubModel.shownCount`,
+    `useFlathubTotal`); Debian's and the web apps' counts are unchanged (one category per app).
+  - **A category listed twice by an app** (some of Flathub's catalog has `Graphics;…;Graphics;`) counted twice:
+    Graphics said 217 while its page and its All chip said 216. `categoryCounts` counts each app once per category,
+    as `subcategoryCounts` already did.
+  - **The kind line and the foot's note of a Store card** (category · developer, "✓ Verified") were cut through a
+    letter ("Utilities · Ronnie Nis"); they now end in "…" like the name above them (`apps/store/ui.js`).
+  - Tests: `flathub_model_test.mjs` (a category listed twice, `shownCount` against the list on the recorded catalog),
+    `store_card_scene.mjs` (new, in `make test`).
+- **The capture indicator names what it called "an unknown program".** Found on the maintainer's ws126 (Lord Flow): the panel by the clock said "An unknown program — Screen"
+  (with Stop sharing) and "An unknown program — Microphone" while Google Chrome shared the screen in a call.
+  - **The cause:** Chrome and Chromium move their browser process into a unit of the user's own service manager
+    (`user@<uid>.service/app.slice/app-com.google.Chrome-<pid>.scope`, Chromium's own systemd scope), and every
+    process it starts afterwards (the audio service that records the microphone) is created there too. The
+    ScreenCast portal's caller (the browser process, from the bus's credentials) and the PipeWire guard's capture
+    stream owner (the audio service, the pulse client's checked pid) were then in no app's scope. The renderers and
+    the zygote, made before the move, stay in Chrome's scope. Other paths that ended in "unknown": a LordOS web app's
+    WebKit process, a pulse client inside WebKit's own bubblewrap sandbox (it reports pid 2 and a made-up Flatpak id
+    `org.webkit.app-<hash>`, so the pid can't be verified); PipeWire's own processes (pipewire-pulse's modules, the
+    session's pipewire, `filter-chain.service`, WirePlumber); a program started from the Terminal; any process with
+    no app at all.
+  - **Named from what the kernel says, only to show it** (`sec/appid.c` `appid_of_lineage`, `appid_session_owner`):
+    a process is created in its parent's cgroup and only root puts one into the session's root-owned scopes, so a
+    process in the user's manager with a child in an app's scope, or whose parent is in one, was in that scope: it is
+    that app's. The walk goes up through the user's manager only (never its `init.scope`, never another user's
+    process, at most 16 steps) and names an app only when every such child agrees. A unit name under `user@` is never
+    trusted, and a process whose parent is lord-server is never called LordOS. A sandboxed pulse client is named by
+    the one app whose scope holds a process with its inner pid that holds enough connections to pipewire-pulse
+    (`pwguard_sandbox_pick`, the check the Flatpak path already makes); two candidates name neither. The sound
+    system's own processes are named by their exact unit and root-owned executable. What still can't be named shows
+    its executable (`/proc/<pid>/exe`, never the comm a process sets): "An unknown program (arecord)".
+  - **What each case shows now:** Chrome's share and microphone are one row, "Google Chrome", with Stop sharing and
+    Turn off (its no-mic, which the guard already enforces on processes that left a restricted app's scope); a web
+    app's microphone or camera, the web app's name and Turn off; "The sound system (PipeWire)"; a program started
+    from the Terminal, "Terminal"; a running machine's scope and Machines' own microphone, "Machines — <the
+    machine's name>" (`markDeviceUse` takes a detail; each machine its own entry); a screenshot taken by such a
+    program, its name too. Turn off is offered only for an app's own firewall restriction, never for a machine's
+    scope, a LordOS component or LordOS itself.
+  - **What is unchanged:** the restrictions, the ScreenCast and Screenshot gates, the restore token and the chooser
+    still use only the verified scope (`appid_of_pid`); the new names reach only the indicator (`capture-use` gains
+    `sys` and `exe`; `portal-casts` and `portal-shot-taken` gain `seen` and `exe`).
+  - **Tests:** `build/pwguard-test` (a fixture process table: Chrome's browser process and audio service, the user
+    manager and its children, a user unit named like an app's scope, children in two apps, a parent in an app's
+    scope, lord-server as a parent, the Terminal, a machine, another user's and another session's processes, a loop;
+    the session owner of a cgroup; the executable's name; the sandbox pick; the indicator's JSON with `sys` and
+    `exe`), `tests/capture_model_test.mjs` (the maintainer's case as one row with both buttons, a web app, the sound
+    system, executables, the Terminal, a machine, Machines' microphone with two machines),
+    `tests/screencast_model_test.mjs` (`castAskerName` for machines and LordOS's parts, `castWhoName`). New text in
+    all 35 languages (`shell.cast.unknownExe`, `shell.capture.who.sound`, `shell.capture.appDetail`).
+- **Machines: clicks with the mouse free, resolutions, and apps mode's windows on a guest with two displays** (LordOS guest tools **w10**; found on the maintainer's guest with an Intel GVT-g vGPU, ws126 and tools
   w9, whose desktop has the vGPU's output and a second display that isn't on a PCI adapter).
   - **Clicks land where they're aimed with the mouse free.** The guest maps QEMU's absolute tablet (a HID mouse) over
     its *primary* display only, not over its whole desktop: its tablet input carries no `MOUSE_VIRTUAL_DESKTOP`. The
@@ -1444,7 +2158,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     1 s for its answer; lord-vmdisplay answers within 250 ms in `vmdisplay-test`, so the wait is either QEMU's own main
     loop or lord-server reading the vGPU's picture. The changes above remove the mode sets and display flips that came
     after each change; whether the stutter goes with them is still to be checked on that guest.
-- **Machines: apps mode's windows have no LordOS frame, and the panel has the machine's bar, in development.** A guest
+- **Machines: apps mode's windows have no LordOS frame, and the panel has the machine's bar.** A guest
   window in apps mode is now only the guest's window, with its own title bar and caption buttons (`args.csd`, as a
   Linux app that draws its own bar; every theme then shows the content with its shadow; rounded 8 px unless it fills
   the guest's screen), as other hypervisors' seamless modes do: its own buttons minimize, maximize and close it in
@@ -1465,7 +2179,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   rows scroll when even that is too short, for example on a small screen with the bar dragged to the middle. Other
   popovers keep their behaviour. Tests: `control_model_test.mjs` (the room above a bar near the bottom, below a control
   near the top, a second display) and the toolbar scene.
-- **The Timer desktop widget fits its card at every size and in every language, in development**
+- **The Timer desktop widget fits its card at every size and in every language**
   (`sdk/deskwidgets.jsx` TimerBody, new `sdk/timerwidgetmodel.js`; `server/tests/timer_widget_test.mjs`,
   `server/tests/workspaces_scene.mjs`). At the small size (one 170 px cell) and on the timer half of the medium one,
   the three presets ("1 min", "5 min", "25 min") sat on a wrapping row of 30 px pills, so "25 min" fell to a second
@@ -1483,7 +2197,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   measure wider than the UI font, and checks that every part stays inside the card's content box, each row of pills
   inside its column, the columns apart and equal, and all three presets whole in English and Spanish; the workspaces
   scene checks the idle widget shows 5:00, the presets and the stopwatch.
-- **Machines: lord-vm's log no longer goes silent for the rest of a run, in development** (seen live on 2026-11-22).
+- **Machines: lord-vm's log no longer goes silent for the rest of a run** (seen live on 2026-11-22).
   After a machine's window closed, QEMU went on calling the closed D-Bus display listener and wrote `Failed to call
   update: The connection is closed` twice every 30 ms; 32,000 such lines reached `lord-vm.log`'s 4 MB cap in 15 minutes,
   and from then on lord-vm wrote nothing (no agent, display or state lines). Now a child's stderr (QEMU, passt) is logged
@@ -1493,8 +2207,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   → `lord-vm.2.log`, at most 12 MB in all) instead of stopping. QEMU's dead listener itself is QEMU's (its D-Bus display
   has no call to drop one; lord-vmdisplay already closes its connection). `src/vm/vmlog.c`, test `build/vmlog-test`
   (the incident's 60,000 lines give one line and a summary every 10 s; cut writes; rotation keeps three files).
-- **Machines' apps mode with an Intel vGPU: the two linear copies of the picture never show rows of an older frame, in
-  development** (`src/gpu/gband.h`, `ui/js_vm.c`; `docs/MACHINES-GPU.md`). The rows a copy lacked were added only to the
+- **Machines' apps mode with an Intel vGPU: the two linear copies of the picture never show rows of an older frame** (`src/gpu/gband.h`, `ui/js_vm.c`; `docs/MACHINES-GPU.md`). The rows a copy lacked were added only to the
   copy shown; with none shown (the shown copy had just been imported again by the desktop's GPU, e.g. after a new GPU
   context) the other copy kept an old frame's rows and showed them next. They are now added to the other copy whether it
   is shown or not; both copies are copied whole when the picture's dmabuf changes (a new attach, the guest flipping to
@@ -1504,13 +2217,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the machine ran; the cause on that computer isn't proven (no log: see above), **to be checked** on the maintainer's
   RX 580 + UHD 630. Test `build/gband-test`: a model of both copies over 200,000 random frames with attaches, re-imports
   and dmabuf changes (it caught the copy-not-shown bug).
-- **Machines' apps mode: a guest window's own icon in the Dock after a re-attach, in development** (`apps/machines/
+- **Machines' apps mode: a guest window's own icon in the Dock after a re-attach** (`apps/machines/
   appsmode.jsx`, `model.js` `iconsToAsk`; `src/vm/lordvm.c`). Icons were asked of the session only when the guest's icons
   changed, so a window whose LordOS window opened from a later list (minimized in the guest when apps mode began, or
   listed after its icon came, as when lord-server restarted while the machine ran) kept a letter tile for good. Now every
   window without its icon asks on each new list. And lord-vm keeps the last icon of each listed window and gives them to
   a client that turns apps mode on, since the guest sends each window's icon once. Checks in `tests/vm_model_test.mjs`.
-- **Firefox's drop-down lists and tooltips show and go away again, in development** (the open item of October 19,
+- **Firefox's drop-down lists and tooltips show and go away again** (the open item of October 19,
   "Firefox ignored mouse clicks", checked on VM 127 on 2026-11-22; `docs/WAYLAND.md`, "Two wl_seat bindings (Firefox)").
   Firefox binds `wl_seat` twice (GTK 3's and its own) and gets two pointers and two keyboards: that was checked with
   `WAYLAND_DEBUG` and is right, each resource gets every event once with its own `frame` and serial, and the page's
@@ -1526,7 +2239,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   pointer and keyboard, a third pointer made over the window) and `wlperf-client subsurface` in
   `tests/wlperf_headless.sh` (desync subsurfaces shown, redrawn, destroyed, made elsewhere and moved; every frame equals
   a full repaint; the old build's stale menus were shown with the same client on VM 127, captured step by step).
-- **Drag and drop with X11 apps works, in development** (XDND, built in 0.8.8.8, checked on VM 127 for the first time on
+- **Drag and drop with X11 apps works** (XDND, built in 0.8.8.8, checked on VM 127 for the first time on
   2026-11-22 with Firefox on X11 and on Wayland and with Files; `docs/WAYLAND.md`, "Drag and drop"). Wayland → X11 and
   Files → X11 already worked. X11 → anything never did: the X app's answer to the conversion of `XdndSelection` was
   ignored as forged because it came with `SendEvent`, which is how every selection owner answers (ICCCM), so no X drag
@@ -1554,6 +2267,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Test: `tests/theme_switch_headless.sh` (in `run_suites.sh`) switches a headless lord-server to a theme that throws,
   after the running theme's file was removed. The ws123 binary crashes there with the same `segfault at 170` at
   `2b8f60`. Now lord-server goes on with the recovery screen.
+- **Theme switches work after a package update, without logging out** (`server/src/sec/codesig.c` `codesig_reload`, approved by the maintainer on 2026-11-22). lord-server read
+  and verified the signed code manifest only once, at login, so after `dpkg` updated LordOS under a running session
+  every theme switch was refused ("size differs from the manifest") until the next log in; this is also what led to the
+  crash above. Now, before each bundle check, the verified-code check looks at the manifest pair's identity
+  (`code-manifest.json` and `code-manifest.sig`: device, inode, size, change and modification times), and when it
+  changed, or when a bundle does not match the manifest in use, it reads the pair again:
+  - From the same LordOS folder, through the descriptor opened at login (never a path the user can change), with the
+    same reader as the login check (now shared): each file read whole from one descriptor, `O_NOFOLLOW` (a link is
+    refused, at login too), regular files only, the same size limits.
+  - Only in a **verified** session (signed manifest at login), only a **signed** manifest whose signature verifies with
+    the key compiled into lord-server, through the same `codesig_parse` as at login, and only when the folder and both
+    files are owned by root and writable by nobody else.
+  - **Never an older version**: the manifest's `version` is compared in dpkg's order and an older one is refused; the
+    same version (a rebuild signed again) is accepted.
+  - **Rate-limited:** each pair on disk is read at most once (a pair caught half-written by `dpkg`, new manifest and
+    old signature, is refused, and read again when the signature arrives), and reads are at least one second apart.
+  - Only when everything verifies is the new manifest put in place, with one atomic pointer store (the app host's
+    bytecode thread sees the old one or the new one, never a mix; the replaced one is kept until the process ends, at
+    most 32 per session). The bundle is then checked once more, with the same bytes already read, so what is checked
+    is still what runs. Otherwise the manifest read before stays, and the refusal says why ("the updated manifest was
+    not accepted: …").
+  - A theme the check refused during an update can be chosen again once a newer manifest is in use
+    (`codesig_generation`; Settings → Appearance no longer marks it as failed). The running theme keeps working; a
+    development session (unsigned manifest) never reads a changed manifest.
+
+  Tests: `build/codesig-test` (100 checks, a throwaway key): a valid new manifest is accepted and the updated bundle
+  loads; a bad signature, another key, a truncated manifest, no signature, a symlinked manifest, a manifest, signature
+  or folder writable by others, a manifest not owned by the trusted owner and an older version are all refused with the
+  old manifest kept; the rate limit; no reload in a development session; a symlinked manifest at login; dpkg's version
+  order. `tests/theme_switch_headless.sh` adds "package updated under the session": a headless lord-server with a code
+  manifest, theme b and the manifest replaced as `dpkg` does, then the switch: b is refused, the changed unsigned
+  manifest is not taken, and the running theme comes back and keeps working.
 - **Two lord-server crashes in the maintainer's session: what was found, the fixes, and a crash report for the next
   one** (reported by the maintainer, 2026-11-22). Neither crash left a stack: the package's `lord-server` is stripped
   and no core is kept. What could be established, and what was changed:
@@ -1639,7 +2384,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display it opened on (a second, shorter monitor too). Tests: `vm_model_test.mjs` (placement below, above, too tall
   both ways, the screen's edges, a second display).
 
-- **Machines: a guest with more than one display shows the right one, in apps mode too, in development**
+- **Machines: a guest with more than one display shows the right one, in apps mode too**
   (`lordos-guest-win` **w7**; Machines offers the update). On a guest with an Intel GVT-g vGPU, the guest had a
   1022 × 724 primary display next to the 1920 × 1080 output the machine's window shows. `lordos-guest-win` measured and
   moved everything on the primary and the virtual desktop: lord-vm kept logging "the guest's display is 1022x724 (not
@@ -1649,7 +2394,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - The tools now pick the **shown display**: the only one; else the one they chose before while it stays; else the one
     whose mode is the size the host asked for (a PCI adapter first, then the primary); else the primary on a PCI
     adapter, the first on a PCI adapter, the primary. The size the host asks for is set on it.
-- **Machines: a guest with more than one display shows the right one, in apps mode too, in development** (the guest
+- **Machines: a guest with more than one display shows the right one, in apps mode too** (the guest
   tools `lordos-guest-win` **w9**; Machines offers the update). On the maintainer's guest with an Intel GVT-g vGPU, the
   guest system had a 1022 × 724 primary display that isn't on a PCI adapter (a basic or indirect display) next to the
   vGPU's output, the one the machine's window shows. The tools measured and moved everything on the primary and the
@@ -1696,8 +2441,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `extraoff`, `VAG_EXTRA_OFF` / `VAG_EXTRA_ON`, `VAC_EXTRA` / `VAC_EXTRA_OFF`; strict parsers with tests.
   - The popover shows the LordOS tools' version next to the agent's ("agent 109.1.0 · LordOS tools w9"): the first is
     qemu-guest-agent's.
-- **Machines: a guest window that runs as administrator can't be closed from LordOS, and LordOS is told, in
-  development** (tools w8). The tools run with the person's normal rights, so the guest system drops their close
+- **Machines: a guest window that runs as administrator can't be closed from LordOS, and LordOS is told** (tools w8). The tools run with the person's normal rights, so the guest system drops their close
   message to a program running as administrator (Computer Management, `mmc.exe`) and refuses its moves; the × in the
   Running list did nothing. The tools now tell: such a window is flagged in the list (`LAGW_ELEVATED`, 16, set only when
   the host's hello says `elevated`, so an older host never sees a flag it refuses), a refused close, move, minimize or
@@ -1708,7 +2452,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   (`closeRefusedOf` in `model.js`, tested), where the window says to close it from inside the machine. The tools are
   never elevated to get around it.
 
-- **Videos and songs with 44.1 kHz sound no longer freeze after about half a minute, in development** (lord-media's
+- **Videos and songs with 44.1 kHz sound no longer freeze after about half a minute** (lord-media's
   player, `src/media/helper/lm_aqlevel.h`). The player counted the decoded sound waiting for lord-server in
   milliseconds, rounded down every time a piece of it went into the audio ring. Sound at 44.1 kHz, resampled to the
   ring's 48 kHz, comes in chunks that never fit the ring's free space whole, so each one was split and the count lost
@@ -1719,7 +2463,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   plays in software at 59.9 frames a second past 75 s (it stopped at 31.5 s before), and `build/aqlevel-test` checks
   that the level comes back to zero after 70 s of 44.1 kHz chunks split as the ring takes them.
 
-- **GTK apps from Flathub use LordOS's font, in development** (`docs/FLATPAK.md`, "Fonts"). A GTK 3 app such as CPU-X
+- **GTK apps from Flathub use LordOS's font** (`docs/FLATPAK.md`, "Fonts"). A GTK 3 app such as CPU-X
   drew its text in DejaVu Sans 11, bigger, wider and softer than the desktop's: the settings portal gave GTK no font
   keys, so it fell back to its built-in `Adwaita Sans 11`, which isn't installed, and the sandbox couldn't see Inter
   (it sees only the host's `/usr/share/fonts`). Checked offline inside CPU-X's sandbox (`ReadAll` gave no font key;
@@ -1735,14 +2479,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   theme and size aren't served: GTK asks for cursors by shape and LordOS draws them. Tests: `build/portal-gs-test`
   (every key through `ReadOne` and `ReadAll`, and the keyfile) and `tests/gtk_defaults_test.mjs` (the font folder
   against `mkdeb.sh`, the values against Debian's schema).
-- **Machines: a click lands where the pointer is, in development** (`docs/VIRTUALIZATION.md` 6.25, "Buttons in both
+- **Machines: a click lands where the pointer is** (`docs/VIRTUALIZATION.md` 6.25, "Buttons in both
   modes"). On a guest with an Intel GVT-g vGPU, right-click did nothing while the mouse was free (the tablet)
   and worked while captured. lord-vmdisplay sent a button to QEMU as soon as it arrived, but the pointer's position that
   the machine's window sends just before it only at the end of its turn. So the tablet pressed at the previous position
   and then moved with the button down: a short drag, which the guest's shell doesn't take as a right-click. Now any motion
   gathered so far goes out before each button and wheel step, free and captured. To be confirmed on that machine.
-- **Machines: QEMU's "Failed to call update: Timeout was reached" explained, and lord-vmdisplay's answers measured, in
-  development** (`docs/VIRTUALIZATION.md` 3.2). QEMU gives each display listener call 1 s. lord-vmdisplay answers every
+- **Machines: QEMU's "Failed to call update: Timeout was reached" explained, and lord-vmdisplay's answers measured** (`docs/VIRTUALIZATION.md` 3.2). QEMU gives each display listener call 1 s. lord-vmdisplay answers every
   call from its loop at once, or holds an `UpdateDMABUF` for lord-server 250 ms at most, and never waits on QEMU. The new
   `build/vmdisplay-test` (a mock QEMU display and a mock lord-server, in `make test`) checks it: with lord-server reading
   every frame, reading none, slow with the picture after a resize to 1920x1080, and 200 updates at once with input
@@ -1752,7 +2495,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   machine that doesn't stop the picture. To tell the two causes apart in a real session, lord-vmdisplay now logs a turn of
   its loop that took 200 ms or more, and at the end how many answers it held and the longest. Not fixed, and noted: QEMU
   keeps calling a display connection after it closed, about 66 log lines a second in `lord-vm.log`.
-- **Linux apps' damage is honoured and their buffer transform applied, in development** (Wayland audit item 5, approved
+- **Linux apps' damage is honoured and their buffer transform applied** (Wayland audit item 5, approved
   by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every commit of a shared-memory app
   copied its whole buffer, uploaded the whole texture and, on the CPU path, repainted the whole window, whatever it
   damaged: a blinking caret cost a full window each time. Now only the damaged box is copied, uploaded and repainted
@@ -1763,13 +2506,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   a turned buffer showed turned and at the wrong size: shared memory is copied upright and a dmabuf's texture is drawn
   with turned coordinates (`build/buftf-test` checks the eight transforms).
 
-- **A Linux app's new frame composes only the displays it is on, in development** (Wayland audit item 3, approved by the
+- **A Linux app's new frame composes only the displays it is on** (Wayland audit item 3, approved by the
   maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). On the GPU path any app's new buffer made
   every display compose and flip again; a video or a terminal on one monitor kept all of them busy. Now only the
   displays the window (or its menu, the drag icon, a fullscreen app's display) is on present it; a window in the
   Overview or not yet placed still marks every display.
 
-- **Linux apps' frame callbacks and presentation feedback follow their own display, in development** (Wayland audit
+- **Linux apps' frame callbacks and presentation feedback follow their own display** (Wayland audit
   item 2, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every window's frame
   callbacks went with any display's frame, so with displays of different refresh rates an app was paced by the fastest
   one and drew frames nobody saw (three displays at 60, 60 and 144 Hz, simulated in `build/outpick-test`: 198
@@ -1779,7 +2522,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display's. A headless lord-server now answers presentation feedback at all (`wlperf-client frames`: 0 of 180 before,
   180 of 180).
 
-- **A Linux app's title costs a JS event only when it changes, at most once a frame, in development** (Wayland audit item
+- **A Linux app's title costs a JS event only when it changes, at most once a frame** (Wayland audit item
   1, approved by the maintainer 2026-11-22; `docs/WAYLAND.md`, "Frames, titles and damage"). Every
   `xdg_toplevel.set_title`, even the same title again, went to the theme as a `title` event and re-rendered its window
   list. Now an unchanged title is dropped, and a burst reaches JS once per 16 ms per window with its last title (Wayland
@@ -1787,7 +2530,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   events (1000 before), 1000 different titles in a burst give 2 (1000 before). The stall detector's `__lordWayland` and
   `__lordTerm` lines now name the event (`js __lordWayland title`).
 
-- **The Terminal no longer re-renders whole windows for a program's title, in development** (Wayland and main-thread
+- **The Terminal no longer re-renders whole windows for a program's title** (Wayland and main-thread
   audit, item 6, approved by the maintainer 2026-11-22; `docs/MAIN-THREAD.md`). A program that animates its title (Claude
   Code's spinner, progress counters) sent a `__lordTerm` "title" event per change, and each one re-rendered the whole
   Terminal window (it subscribed to every session's metadata) and the theme's root (the window title), about 270 React
@@ -1857,7 +2600,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   creating placeholder screen"): `zxdg_output_v1` version 3 now sends `name` and `description`, as version 2 did (only
   its `done` gave way to `wl_output.done`); Qt waits for the name before it takes a display (`server/src/wl/wl.c`).
 
-- **Machines: a machine with an Intel graphics card (GVT-g) no longer takes most of a CPU core, in development**
+- **Machines: a machine with an Intel graphics card (GVT-g) no longer takes most of a CPU core**
   (`docs/MACHINES-GPU.md`, "A vGPU's picture without a readback"). Live on the maintainer's computer (the new-card guest on
   the vGPU at 1920 × 1080, an RX 580 drawing the desktop) lord-server's main thread used ~90 % of a core: QEMU's vfio
   display sends the whole picture about 33 times a second, changed or not, and each time lord-server read all 8 MB back
@@ -1881,8 +2624,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - lord-vmdisplay answers an `UpdateDMABUF` that comes while there's no dmabuf picture without logging it (the vfio
     display sends one every refresh during a mode change; the last picture stays).
 
-- **Machines: the pointer is shown over a machine with an Intel graphics card, in window, full screen and apps mode, in
-  development**. Intel's driver puts the guest's pointer on the vGPU's cursor plane, not in the picture, but LordOS hid its
+- **Machines: the pointer is shown over a machine with an Intel graphics card, in window, full screen and apps mode**. Intel's driver puts the guest's pointer on the vGPU's cursor plane, not in the picture, but LordOS hid its
   own arrow over any machine with the new-card devices until the guest handed a shape over, which a vGPU machine didn't: there was no
   pointer at all. A vGPU machine now shows the host's arrow until QEMU hands the plane's shape over (and again when
   that shape is blank); lord-vmdisplay takes a cursor without a hotspot (VFIO's 0xffffffff) with its hotspot at the
@@ -2138,8 +2880,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Raspberry Pi build (`server/src/apps.c`).
 
 ### Security
+- **A password is never captured: every password surface LordOS draws is protected (the maintainer's rule of 2026-11-22, with GitHub #219).** Until now only Passwords' window,
+  the on-screen keyboard and windows marked by hand were protected; a password prompt or field came out in a screenshot,
+  a recording, the remote desktop or a shared screen (as dots, but with its length, and the eye could show it).
+  - **Every password field** (`TextInput secure`, `sdk/components.jsx`) is a protected node while it is one: Wi-Fi,
+    VPN, the Terminal's servers, Cloud, Mail, Users, Sharing, the remote desktop, Databases, Backup, Passwords and the
+    login and lock screens. Lord-server paints it black in every capture of the screen or an area, recordings, the
+    remote desktop and shared screens and windows, and refuses the window that holds it captured alone
+    (`media.protectedWindow`, above).
+  - **The keyring's unlock prompt** (`sdk/vault.js` `KeyringPrompt`) and **the administrator prompt a Linux app asks for
+    through polkit** (`sdk/hardware.jsx` `PolkitPrompt`, which draws a dot per key) are protected whole. LordOS's own
+    administrator actions ask for no password (`admin.c` checks the session user's group).
+  - While anything protected is on screen a remote desktop viewer is composed on the CPU and a visitor of the
+    screen-sharing API can't type into LordOS's own windows, as for any protected window.
+  - Tests: `password_protect_scene.mjs` (new: a password field is protected and stops being so with `secure` off, a
+    plain field never is, both prompts are protected whole) and `engine-test` (a protected prompt in a high layer and a
+    password field inside a window are black in a capture of the screen, the rest of the window is captured, and that
+    window is refused alone).
 - **The Wayland table importer no longer runs code from wayland.app** (`tools/wayland-app-import.mjs`, a maintainer
-  tool, new in development; found by the pre-merge security scan). It cut the protocol registry and each
+  tool, new in this release; found by the pre-merge security scan). It cut the protocol registry and each
   `JSON.parse('...')` module out of wayland.app's JavaScript bundle and evaluated them with `Function()`, so whoever
   controlled that third-party bundle could run code on the maintainer's machine when the table was refreshed; the
   string scan also let an escaped backslash before a quote end the literal early. The bundle is now read by a small
@@ -2148,7 +2907,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `__proto__`/`constructor` keys; anything else is refused and nothing in the bundle ever runs. Test:
   `server/tests/wayland_import_test.mjs` (both breakouts refused, nothing executed).
 
-- **Machines: keys typed in another window never reach a machine, in development** (`docs/VIRTUALIZATION.md` 5.8;
+- **Machines: keys typed in another window never reach a machine** (`docs/VIRTUALIZATION.md` 5.8;
   `sdk/components.jsx` `AppHost`/`FloatingWindows`, `sdk/windows.js` `wm.hasKeyboard`/`setFullscreen`,
   `sdk/desktopmodel.js` `keyboardWindow`, `sdk/kbinhibit.js`, `apps/machines/vmwindow.jsx`, `appsmode.jsx`, `model.js`).
   Reported on a real session: typing in LordOS's Terminal also typed into the guest of a running machine (its beeps were heard). Every
@@ -2221,7 +2980,67 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
-- **What is captured now: one green pill by the clock, in development** (`sdk/capturestatus.jsx`, `sdk/capturemodel.js`,
+- **Hardware reports: #221, #212 and #224 (`docs/HARDWARE-REPORT.md`, updated 2026-11-22).** #221 adds an ASUS
+  F1A55-M LX desktop with an AMD A4-3400 (Llano) and a Radeon HD 5450 (TeraScale 2, kernel `radeon`, Mesa r600) on
+  LordOS 0.8.9.4: GPU composition and everything else work, from a mechanical disk with legacy BIOS boot; the first
+  TeraScale 2 card and the first Llano APU in the reports. #212 updates #105's ASUS K72F to 0.8.9.2: all works, with an
+  external Dell P2418D on HDMI next to the panel, at 1920x1200 because the laptop's HDMI output stops at a 165 MHz
+  TMDS clock (the hardware's limit, not LordOS's). #224 brought the `.json` file #171 had left out (still the 0.8.8.9
+  capture). The counts are now 24 physical machines (11 with a report's data), 25 people, 14 Intel, 5 AMD and 1 NVIDIA
+  GPUs, 3 AMD CPUs and 5 desktops, with the version table, what works, the untested combinations and the thanks
+  updated. The site's claims that no NVIDIA card had been reported, and its "22 machines", are corrected in en, es and
+  pt: the paper (§3.2, §3.5, §10.2 and §10.3), the "Own desktop" feature page and the FAQ's release,
+  graphics and NVIDIA answers now say that one RTX 3060 on NVIDIA's proprietary driver reaches the desktop drawn with
+  the CPU, and that nouveau, NVK and AMD integrated graphics are untested. `docs/SESSIONS.md` and `docs/BENCHMARK.md`
+  follow.
+- **The hardware-report check notices a report made on another version than the form says (#224).** System
+  Information fills the issue form's "LordOS version" field with the version it runs; #224's form said 0.8.9.4 while
+  the attached file was the 0.8.8.9 report of 2026-11-16. `tools/hwreport/lib.mjs` reads that field
+  (`formVersion`: the first line under its heading, only when it looks like a version, never shown as typed) and, when
+  it names another version than the file (`-beta` or not), flags `form-version`: the issue is labelled `report:check`
+  instead of `report:valid`, and the workflow's comment says which version each one names and asks for the new file if
+  there is one. `node tools/hwreport/validate.mjs --form=<version> <file>` does the same on the command line. Test:
+  `server/tests/hwreport_test.mjs` (7 more checks: reading the field, an empty or non-version answer, the same
+  version with or without `-beta`, the label and the note). `docs/BENCHMARK.md`.
+- **Cloud: Proton Drive is verified, and Google Photos' limits are written down (#216, #217).** `protondrive` is in `assets/cloud/providers.json` (since 0.8.9.5, evidence
+  "issue #216") and in `docs/CLOUD.md` 19.1: a person's Check This Account report on LordOS 0.8.9.4 (x86_64) with
+  rclone v1.75.2, 8 steps passed and none failed; Free Up Space was skipped because that account was in sync with this
+  computer, and the link step because the backend has no public links, both right for it. Google Photos (#217) stays
+  **not verified**: the account lists, but Check This Account stops at making its folder, because rclone can only make
+  albums there, and since 2025 Google lets an app see only the media it uploaded. The new `docs/CLOUD.md` 19.6, "Known
+  limits of providers not verified", says so.
+
+- **LordOS Studio's pictures are AI-generated (approved by the
+  maintainer on 2026-11-22, decision D7 of `docs/CAMERA-STUDIO-PLAN.md`).** Every picture of the background catalog
+  (`assets/studio/backgrounds.json`) is now a new picture generated with ChatGPT for LordOS from the project's own
+  prompts (empty scenes: no people, animals in the foreground, logos, brands or readable text).
+  - **What changed in the catalog:** the 72 pictures keep their ids, names and categories, so a choice made before
+    still points at the same scene; 49 new pictures, `still-<loop>`, show the scenes of the 49 loops the catalog had
+    then, in the same categories and with the same names. They are pictures of their own and keep their ids although
+    25 of those loops were replaced by 4K clips (see "The loops at 4K" under "Added"). The catalog has 158 items: 121
+    pictures and 37 loops. A built-in picture is its `full` variant (`bgSrc` in `sdk/studiomodel.js` now takes the
+    variant the CPU path picks instead of a fixed `1080`). Each picture has one
+    file, `pictures/<id>.jpg` (variant `full`): JPEG quality 92 with 4:4:4 chroma at the size the generator made,
+    1672×941 (one is 1672×940; nothing is upscaled or padded), about 0.63 MB on average and 75.8 MB for all 121.
+  - **License:** OpenAI's terms assign the output to the user, and LordOS releases the pictures under **CC0 1.0**.
+    Each entry has the author "Generated with ChatGPT for LordOS", the source `LordOS-wallpapers/studio` and
+    `"ai": true`; Background → Credits adds the line **"Generated with AI"** under them, translated into all 35
+    languages (`studio.aiGenerated`; `bgAi` in `sdk/studiomodel.js`). The ChatGPT conversations are not published:
+    they stay in a private manifest outside the repository. The old photographs' credits (Poly Haven, ambientCG and
+    NASA) are gone from `THIRD_PARTY.md` and from `tools/studio/bg-sources.json`, which now records only the loops.
+  - **In the package:** the thumbnails are now 640×360 (quality 85, about 64 KB each) and the seven built-in pictures
+    (one per category, same ids) are the AI ones in full: `assets/studio/backgrounds/` grows from 2.5 MB to 12.6 MB
+    (with the loops' 640×360 thumbnails). The full files are published in the `LordOS-wallpapers` repository's
+    `studio/pictures/` folder, next to the loops, with one README (the pictures AI-generated, CC0, by LordOS; each
+    loop's credit) and one `MANIFEST.json` (path, size and SHA-256 of each file), and download through `studio-bg-get`
+    as before.
+  - **Tools and tests:** `tools/studio/build-ai-backgrounds.py` makes every file from the originals after checking each
+    PNG's SHA-256; `tools/studio/build-backgrounds.py` now rebuilds only the loops and keeps the catalog's pictures.
+    `build/studio-bg-admin-test` accepts every shipped entry, allows 640×360 thumbnails and requires an `"ai"` entry to
+    be `true` and CC0; `tests/studio_model_test.mjs` covers `bgAi`; `tests/studio_catalog_test.mjs` requires every
+    picture to be AI-generated and CC0.
+
+- **What is captured now: one green pill by the clock** (`sdk/capturestatus.jsx`, `sdk/capturemodel.js`,
   `sdk/privacy.js`, `sdk/share.js`, `sdk/media.js`, `sdk/hardware.jsx`, `server/src/sec/pwguard.c`,
   `server/src/ui/portal.c`, `docs/PRIVACY.md` "What is captured now", `docs/SCREEN-SHARING.md`, `docs/WAYLAND.md`). The
   red floating pill of each screen share ("● OBS Studio can see what you chose to share [Stop]") and the green and
@@ -2248,7 +3067,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   device itself, without PipeWire. Tested by `server/tests/capture_model_test.mjs` (the glyph for each combination, one
   row per app across sources, what each button does) and new cases in `build/pwguard-test`. The old pill's texts are
   removed from every language; the new ones are in all 35.
-- **Screenshots: a thin floating toolbar instead of the panel window, in development** (`apps/screenshots/toolbar.jsx`,
+- **Screenshots: a thin floating toolbar instead of the panel window** (`apps/screenshots/toolbar.jsx`,
   `toolbarmodel.js`, `state.js`; `docs/MEDIA.md`). ❖⇧5 (or opening Screenshots) no longer opens the big "Screenshots"
   window that covered the screen: a compact dark bar shows near the bottom center, translucent and
   blurred where the theme has blur (Settings' effects on), with a soft shadow and a hairline border. Left to right: a
@@ -2290,12 +3109,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   LordOS's own Spawn, which only starts the same app in a sub-sandbox (`org.freedesktop.Flatpak`, the host one, still
   is). The texts of the old notice are removed from every language.
 
-- **Machines: a machine's picture at the guest's full rate, in development** (`docs/MACHINES-GPU.md` Part 1 steps 1
+- **Machines: a machine's picture at the guest's full rate** (`docs/MACHINES-GPU.md` Part 1 steps 1
   and 3). lord-server reads each machine's frames in its own loop and acknowledges a frame right after the paint that
   showed it, instead of at the Machines app's poll after next; a frame repaints only the rectangle that changed, not
   the whole picture. Measured on a viogpudo guest drawing 61 frames a second: 29.5 → 60.0 frames a second shown,
   1.7 → 0.1 ms of paint a frame, lord-server 54 % → 17 % of a core.
-- **Monitor: the process list no longer stalls the desktop, in development** (`docs/MACHINES-GPU.md` Part 1 step 6).
+- **Monitor: the process list no longer stalls the desktop** (`docs/MACHINES-GPU.md` Part 1 step 6).
   `lord.monitor.processes` read every process's cgroup file and parsed a JSON list on lord-server's only thread
   (~20 ms a second on a busy desktop, a third of the maintainer's stall lines). The monitor's thread now reads each
   scope once and hands over rows that become objects directly: 382 processes 4.0 → 1.3 ms, 1,900 processes
@@ -9850,7 +10669,8 @@ we published. See [docs/SIGNING.md](docs/SIGNING.md).
 
 Never published; superseded by 0.8.0-beta.
 
-[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.4-beta...HEAD
+[Unreleased]: https://github.com/lordbasex/LordOS/compare/v0.8.9.5-beta...HEAD
+[0.8.9.5-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.4-beta...v0.8.9.5-beta
 [0.8.9.4-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.3-beta...v0.8.9.4-beta
 [0.8.9.3-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.2-beta...v0.8.9.3-beta
 [0.8.9.2-beta]: https://github.com/lordbasex/LordOS/compare/v0.8.9.1-beta...v0.8.9.2-beta

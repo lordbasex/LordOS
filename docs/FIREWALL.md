@@ -1118,7 +1118,9 @@ its own scope, `lordos-net-<name>.scope`, which lord-netperm reads as the firewa
 `lordos:<name>` (`fw_component_scope`, a fixed list: `mail`, `store`, `print`, `terminal`,
 `lists`, `lan`, `machines`, `sql`, and since 0.8.8.10 `weather`: the weather widget's forecasts from
 `api.open-meteo.com`, only once the person turns it on; see docs/WORKSPACES.md, "Weather"; and `streams`: lord-stream,
-the cameras and TV channels of the Video widget and the Player, docs/MEDIA.md "Network streams"). The kernel attributes a socket to the cgroup of the process that *created* it, so:
+the cameras and TV channels of the Video widget and the Player, docs/MEDIA.md "Network streams"; and `flathub`:
+Flatpak's own downloads from Flathub and, through the `flathub` connector, the Store's rankings from `flathub.org`'s API,
+docs/FLATPAK.md "Rankings from Flathub's API"). The kernel attributes a socket to the cgroup of the process that *created* it, so:
 
 - **Connectors** (`server/src/sec/netconn.c`): for Mail (lord-maild's servers: Mail, Calendar,
   Contacts, Reminders), printers and scanners (IPP and eSCL over TCP, the mDNS socket) and the

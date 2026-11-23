@@ -9,11 +9,16 @@
  *   lord.flatpak.take()           → [{ id, line } | { id, done: true, code }] since the last call
  *   lord.flatpak.cancel(id)       → stops that job (its whole process group)
  *   lord.flatpak.loadCatalog(lang) → a job id: Flathub's AppStream read by the sandboxed lord-appstream (E7)
- *   lord.flatpak.catalog()        → [{ id, branch, ref, name, summary, icon, categories, license, developer, verified }]
+ *   lord.flatpak.catalog()        → [{ id, branch, ref, name, summary, icon, categories, license, developer, verified,
+ *                                   updated }]
  *                                   of the last load, every line checked again here (fpakas_line)
  *   lord.flatpak.description(id)  → that app's description from the same load (plain text, paragraphs apart by an
  *                                   empty line), checked again here (fpakas_desc_line), or "": kept out of catalog()
  *                                   so the list the Store reads at every load stays small
+ *   lord.flatpak.rankRequest()    → true while Flathub's rankings are being fetched (E10, fetch/fhsvc.h: lord-fetch,
+ *                                   flathub.org only, each list at most once a day, through the flathub connector)
+ *   lord.flatpak.ranks()          → { busy, popular, trending, added, updated, day, week }: app ids only, the lists
+ *                                   that have a copy; names, icons and texts still come from catalog() only
  * Lines are the command's output, cut to printable UTF-8; nothing in them is acted on here. */
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
@@ -22,6 +27,7 @@
 #include "../fpak.h"
 #include "../fpakrun.h"
 #include "../fpakas.h"
+#include "../fetch/fhsvc.h"
 #include "../sec/cgroup.h"
 
 #include <errno.h>
@@ -361,6 +367,7 @@ static JSValue f_catalog(JSContext *c, JSValueConst t, int argc, JSValueConst *a
         JS_SetPropertyStr(c, o, "license", JS_NewString(c, a->license));
         JS_SetPropertyStr(c, o, "developer", JS_NewString(c, a->developer));
         JS_SetPropertyStr(c, o, "verified", JS_NewBool(c, a->verified));
+        JS_SetPropertyStr(c, o, "updated", JS_NewFloat64(c, (double)a->updated));
         JS_SetPropertyUint32(c, arr, (uint32_t)i, o);
     }
     pthread_mutex_unlock(&mu);
@@ -419,7 +426,52 @@ static JSValue f_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     return JS_NewBool(c, done);
 }
 
+/* ---- the rankings from Flathub's API (E10, fetch/fhsvc.h) ---- */
+
+static int ranks_ready(void) {
+    static int ready;
+    if (ready) return 1;
+    char self[PATH_MAX];
+    ssize_t n = readlink("/proc/self/exe", self, sizeof self - 1);
+    const char *home = getenv("HOME");
+    if (n <= 0 || !home) return 0;
+    self[n] = 0;
+    char *sl = strrchr(self, '/');
+    if (!sl) return 0;
+    *sl = 0;
+    if (!fhs_init(self, home)) ready = 1;
+    return ready;
+}
+
+/* lord.flatpak.rankRequest() → true while lists are being fetched (each at most once a day; a failure waits), false
+ * when nothing needed it or Flathub can't be used here */
+static JSValue f_rank_request(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    if (!fpak_native_arch() || !fpak_binary_ok() || !ranks_ready()) return JS_FALSE;
+    return JS_NewBool(c, fhs_request() == 1);
+}
+
+/* lord.flatpak.ranks() → { busy, popular: [ids], trending, added, updated, day, week }: only the lists with a good copy
+ * (app ids only, checked again in C) */
+static JSValue f_ranks(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "busy", JS_NewBool(c, fhs_busy()));
+    if (!ranks_ready()) return o;
+    static FhIds ids;
+    for (int l = 0; l < FH_LISTS; l++) {
+        long long at = 0;
+        if (fhs_get(l, &ids, &at) != 1) continue;
+        JSValue arr = JS_NewArray(c);
+        for (int i = 0; i < ids.n; i++) JS_SetPropertyUint32(c, arr, (uint32_t)i, JS_NewString(c, ids.id[i]));
+        JS_SetPropertyStr(c, o, fh_list_name(l), arr);
+    }
+    return o;
+}
+
 static const JSCFunctionListEntry funcs[] = {
+    JS_CFUNC_DEF("rankRequest", 0, f_rank_request),
+    JS_CFUNC_DEF("ranks", 0, f_ranks),
     JS_CFUNC_DEF("available", 0, f_available),
     JS_CFUNC_DEF("forget", 0, f_forget),
     JS_CFUNC_DEF("supported", 0, f_supported),

@@ -46,6 +46,7 @@
   "backup.destMissing": "Mahali pa kuhifadhi hapapo",
   "backup.destNotAllowed": "Mahali hapo pa kuhifadhi haparuhusiwi",
   "backup.destOutside": "Mahali pa kuhifadhi lazima pawe katika folda yako ya nyumbani au kwenye mojawapo ya diski zako",
+  "backup.destCloud": "Folda ya wingu haiwezi kuwa mahali pa nakala rudufu: picha za hali zinahitaji viungo vigumu, ambavyo akaunti ya wingu haina, na faili zake huendelea kupakiwa hata baada ya nakala rudufu kusimamishwa. Chagua diski au folda kwenye kompyuta hii",
   "backup.destUnwritable": "Haiwezi kuandika mahali pa kuhifadhi",
   "backup.interrupted": "Ilikatizwa",
   "backup.locked": "Nakala rudufu zimesimbwa kwa njia fiche: zifungue kwanza",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Picha hiyo haiwezi kutumika kama mandharinyuma.",
   "studio.invalid": "Mpangilio huo wa LordOS Studio si sahihi.",
   "studio.noCamera": "Hakuna kamera iliyounganishwa.",
-  "studio.unavailable": "LordOS Studio haipatikani kwenye kompyuta hii."
+  "studio.unavailable": "LordOS Studio haipatikani kwenye kompyuta hii.",
+  "studio.downloadFailed": "Mandharinyuma hayakuweza kupakuliwa.",
+  "studio.removeFailed": "Mandharinyuma hayakuweza kuondolewa.",
+  "dkms.mokInvalid": "Ombi hili la ufunguo wa Secure Boot si halali.",
+  "dkms.mokNotNeeded": "Kompyuta hii haihitaji kusajili ufunguo sasa.",
+  "dkms.mokNothingPending": "Hakuna ufunguo unaosubiri kusajiliwa wakati wa kuwasha upya ujao.",
+  "dkms.mokNoTool": "Programu ya mokutil haijasakinishwa.",
+  "dkms.mokFailed": "Ufunguo haukuweza kuandaliwa kwa ajili ya kuwasha upya ujao.",
+  "media.protectedWindow": "Dirisha hili limelindwa, kwa hivyo haliwezi kunaswa peke yake. Katika picha za skrini linaonekana jeusi."
 }

@@ -39,7 +39,7 @@ Not every program on LordOS is sandboxed. This is exactly what applies to each k
 | Other built-in apps | inside `lord-server` | no | `lord-server`'s | no broker: camera, microphone and screen are checked in C (`js_media.c`), notifications in `sdk/notify.js` | as "LordOS" (`lordos`): network rules; camera, microphone, screen and notifications restrictions |
 | Linux apps from the launcher | own process | no by default; with "no access to your files", or restricted from the microphone, camera, USB or Bluetooth, their own user, mount, PID and IPC namespaces plus Landlock (no seccomp), from the next launch | own (`app-lordos-<id>.scope`) | no | per app (`desktop:<id>`), when the owner sets them: network rules; camera, USB and screen (`/dev/fb*`) devices and Bluetooth sockets in the kernel (`lord-netperm`); microphone and PipeWire cameras (our PipeWire guard, plus ALSA capture nodes in the kernel); files (the launcher); notifications (our notification server). Not the clipboard, and not BlueZ over D-Bus |
 | Terminal programs | children of the Terminal's shell | no | `lordos-net-terminal.scope` (0.8.5; best effort, `lord-server`'s if it can't be placed) | no | as "Terminal" (`lordos:terminal`, 0.8.5): network rules, each program listed by name |
-| LordOS's network components (0.8.5): Mail's sync, the Store's downloads, printers and scanners, the blocklist downloads, the weather widget's forecasts (0.8.8.10, off until turned on; only `api.open-meteo.com`, the time zone's coordinates) | a connector (`lord-server --net-connector <name>`) or the package engine's download child | the connectors: no (fixed requests only, `no_new_privs`); `lord-fetch` and `lord-tls`: the helpers' sandbox | own, root-owned `lordos-net-<name>.scope` | no | per component (`lordos:mail`, `lordos:store`, `lordos:print`, `lordos:lists`, `lordos:weather`): network rules ([FIREWALL.md](FIREWALL.md), "LordOS components in their own scopes") |
+| LordOS's network components (0.8.5): Mail's sync, the Store's downloads, printers and scanners, the blocklist downloads, the weather widget's forecasts (0.8.8.10, off until turned on; only `api.open-meteo.com`, the time zone's coordinates), the Store's rankings from Flathub (E10: only `flathub.org`, a fixed request, app ids back, at most once a day per list; on unless turned off in the Store) | a connector (`lord-server --net-connector <name>`) or the package engine's download child | the connectors: no (fixed requests only, `no_new_privs`); `lord-fetch` and `lord-tls`: the helpers' sandbox | own, root-owned `lordos-net-<name>.scope` | no | per component (`lordos:mail`, `lordos:store`, `lordos:print`, `lordos:lists`, `lordos:weather`, `lordos:flathub`): network rules ([FIREWALL.md](FIREWALL.md), "LordOS components in their own scopes") |
 | Web apps (`lord-web`, 0.8.8.8, with the optional `lordos-web` package) | own process per app and profile, started only by `lord-server` | not LordOS's seccomp: `lord-web` has Landlock's scoping (no abstract unix socket, no signal outside its own processes) and `no_new_privs`; WebKit's web content and network processes run under WebKit's own bubblewrap + seccomp sandbox, never turned off | own, root-owned `app-lordos-lordos-web-<app>.scope`, with memory and CPU limits shared by the app's profiles | no broker: camera, microphone, screen, location and notifications are asked by `lord-server` once per app and kept in the app's registry ([WEBAPPS.md](WEBAPPS.md), "Permissions") | per app (`desktop:lordos-web-<app>`): network rules ([WEBAPPS.md](WEBAPPS.md), "Isolation") |
 
 Built-in apps reach files through `lord.fs`: since 0.8.5 its reading calls (`list`, `read`, `stat`,
@@ -464,6 +464,32 @@ Xwayland, and only for connectors the kernel marks non-desktop (never a monitor)
 allow, Allow once (not saved) and Always allow; listed under VR headsets. The lease is revoked when the app lets it go,
 the decision is taken back, the headset is unplugged or the screen locks ([WAYLAND.md](WAYLAND.md), "DRM leases").
 
+**One permission starts allowed** (in development, approved by the maintainer 2026-11-22, GitHub #219): the built-in
+Screenshots app's `screen`. Pressing Print Screen, ❖⇧3, ❖⇧4 or ❖⇧5 is the person asking for the capture, so it is not asked
+again. It is a default under the saved decisions, not a decision written for anyone (`perm_builtin_default` and
+`perm_get_builtin` in `server/src/sec/perms.c`): only for the id `screenshots` (no package may take it) and only the
+`screen` permission (its microphone is still asked), read only by the desktop's own contexts (`js_media.c`'s check and
+`lord.perms.get`), never by the broker. Settings → Privacy → Screen lists Screenshots with **Allow** and **Don't Allow**;
+a "Don't Allow" saved there wins and stays, and the "no screen capture" restriction of LordOS's built-in apps still
+refuses it before any permission. Settings → Privacy also lists every built-in app whose manifest declares a permission,
+before it ever asked.
+
+The default changes nothing for **protected windows**: they are painted black by lord-server itself in every capture
+of the screen or of an area, in screen recordings, in a shared screen or window and on the remote desktop, and
+Screenshots never captures a protected window alone (its window capture is refused, `media.protectedWindow`). Passwords' window, the
+on-screen keyboard, a window marked with "Protect the front window" and a Linux window marked so are protected; the lock
+screen is another process that a capture of the desktop never sees.
+
+**A password is never captured** (the maintainer's rule, 2026-11-22). Every password surface LordOS draws is protected:
+every password field (`TextInput secure`, `sdk/components.jsx`: Wi-Fi, VPN, SSH and Terminal servers, Cloud, Mail,
+Users, Sharing, the remote desktop, Databases, Backup, Passwords and the login and lock screens), the keyring's unlock
+prompt (`sdk/vault.js`) and the administrator prompt a Linux app asks for through polkit (`sdk/hardware.jsx`, whose dots
+count the keys), these two whole. LordOS's own administrator actions ask for no password (`admin.c` checks the session
+user's group). A field is black in every capture of the screen or an area, in recordings, on the remote desktop and in
+shared screens, and the window that holds it is refused captured alone while it does. While anything protected is on
+screen, a remote desktop viewer is composed on the CPU and a visitor of the screen-sharing API can't type into LordOS's
+own windows (`share_key_protected`), as for any protected window. See [MEDIA.md](MEDIA.md), "Protected windows".
+
 | | |
 |---|---|
 | ![prompt requested by an isolated app](privacy-prompt-broker.png) | ![microphone in use](privacy-indicator-broker.png) |
@@ -520,9 +546,25 @@ Where it knows from (`sdk/capturemodel.js`, `sdk/capturestatus.jsx`, `server/tes
 The PipeWire guard follows every link from a capture node (a microphone, a camera, lord-screencast's screen) into a
 capture stream, and names the stream's owner as it does for the restrictions: the PID's cgroup and the launcher's scope,
 a Flatpak app by its sandbox, and a PulseAudio client's own word (`application.process.id`) always checked against the
-connections it really holds. Anything it can't name is "an unknown program", shown and never hidden, with nothing to
-turn off from the panel. lord-server's own streams are left out: they are the recordings and calls it makes for an app,
-already shown under that app.
+connections it really holds. lord-server's own streams are left out: they are the recordings and calls it makes for an
+app, already shown under that app.
+
+When there is no verified app, the indicator (and only the indicator: never the restrictions, the portals' gates or the
+restore token) still names it from what the kernel says (`sec/appid.h`, "only to show it"; since 2026-11-22):
+
+- **A process that left its app's scope.** Chrome and Chromium move their browser process into a unit of the user's own
+  service manager, and the audio service it starts afterwards is created there too. A process is created in its
+  parent's cgroup and only root puts one into the session's scopes, so a process under `user@` with a child in an app's
+  scope, or whose parent is in one, is that app's: "Google Chrome", its share and its microphone on one row. A unit's
+  name under `user@` is never trusted; a process whose parent is lord-server is never called LordOS.
+- **A pulse client in a sandbox of its own** (WebKit's in LordOS's web apps): the one app whose scope holds a process
+  with the pid it claims, in another PID namespace, holding enough connections to pipewire-pulse; two candidates name
+  neither.
+- **The sound system's own processes** (pipewire, pipewire-pulse's modules, filter-chain, WirePlumber, by their exact
+  unit and root-owned executable): "The sound system (PipeWire)".
+- **The Terminal, a running machine:** "Terminal", "Machines — <the machine's name>".
+- **Anything else:** "An unknown program (<executable>)", from `/proc/<pid>/exe`, or "an unknown program" when not
+  even that is known; shown and never hidden, with nothing to turn off from the panel.
 
 Not covered: a program that opens `/dev/video*` or an ALSA capture device itself, without PipeWire (many browsers still
 read the camera through V4L2 directly), isn't seen by the indicator; "no camera" still blocks it through the device rules
@@ -936,7 +978,9 @@ Studio (the real camera) · effects on", and its Turn off sets that app's "no ca
 device like any camera (major 81, `lord-netperm`'s `cgroup/dev`). Turned off while an app reads it, the device shows a
 "camera off" card, never the raw camera. Known limit (plan 8.4): an unsandboxed program of the same user could open the
 device as a writer before lord-studio does; lord-studio then stays off, as any program of the user can already open
-the real camera.
+the real camera. The package's second device, `/dev/video49` "OBS Virtual Camera", is there for OBS Studio's own virtual
+camera (OBS takes the first idle loopback, so it sits before ours); LordOS never writes it (lord-studio refuses any
+loopback whose card isn't "LordOS Studio"), and the "no camera" restriction blocks it like any V4L2 device.
 
 ## Camera for isolated apps
 

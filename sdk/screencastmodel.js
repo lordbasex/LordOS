@@ -22,8 +22,15 @@ export const CAST_MAX = 4;              // CAST_MAX_STREAMS in server/src/cast/c
 // (org.evil.App may call itself "Firefox"), so it is never shown alone: "Firefox · org.mozilla.firefox", the verified
 // id always there; flatpak(id) must look the app up by that exact id only. Before 2026-11-22 a Flatpak app was named
 // "flatpak:org.chromium.Chromium".
-export function castAskerName(who, { linux = () => '', flatpak = () => '' } = {}) {
+// Since 2026-11-22 the capture indicator also names what lord-server tells from the kernel without a verified scope
+// (server/src/sec/appid.h, "only to show it"): a running machine's scope "desktop:lordos-vm-<uuid>" (machine(uuid): its
+// name with Machines', '' unknown), a LordOS component "lordos:<name>" and LordOS itself "lordos" (lordos(id): '' unknown).
+const VM_ID = /^desktop:lordos-vm-([0-9a-f-]{1,36})$/;
+export function castAskerName(who, { linux = () => '', flatpak = () => '', machine = () => '', lordos = () => '' } = {}) {
   const w = typeof who === 'string' ? who : '';
+  const vm = VM_ID.exec(w);
+  if (vm) return machine(vm[1]) || w.slice(8);
+  if (w === 'lordos' || w.startsWith('lordos:')) return lordos(w) || w;
   if (w.startsWith('desktop:')) return linux(w.slice(8)) || w.slice(8);
   if (w.startsWith('flatpak:')) {
     const id = w.slice(8), name = String(flatpak(id) || '').trim();
@@ -31,6 +38,13 @@ export function castAskerName(who, { linux = () => '', flatpak = () => '' } = {}
   }
   if (w.startsWith('lpk:')) return w.slice(4);
   return w;
+}
+
+// The indicator's name of a share or a screenshot (portal.c: who, the verified app; seen, what lord-server tells from the
+// kernel only to show it; exe, the executable of a program it can't name): app(id) names an id, unknown(exe) the rest.
+export function castWhoName(p, { app = () => '', unknown = () => '' } = {}) {
+  const pick = (id) => (typeof id === 'string' && id ? app(id) : '');
+  return pick(p?.who) || pick(p?.seen) || unknown(typeof p?.exe === 'string' ? p.exe : '');
 }
 
 // The live window a choice stands for (its app's name needs the window's args), or the choice when it is gone.

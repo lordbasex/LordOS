@@ -112,6 +112,10 @@ static int valid_dest(const char *in, char *real, size_t n, char *err, size_t en
     if (!in[0]) { real[0] = 0; return 0; }
     if (in[0] != '/' || !realpath(in, r) || stat(r, &st) || !S_ISDIR(st.st_mode)) { lerr_set(err, en, "backup.destMissing", NULL); return -1; }
     if (!fsops_allowed(r) || fsops_protected(r)) { lerr_set(err, en, "backup.destOutside", NULL); return -1; }
+    /* #208: not a Cloud account's folder. Snapshots hard-link what didn't change, which rclone's mount can't do (every
+     * file would be copied again each time), and what was written keeps going up from rclone's queue after the backup
+     * is stopped or its destination dropped: thousands of small files for hours, with the provider's rate limits */
+    if (fsops_cloud_path(r)) { lerr_set(err, en, "backup.destCloud", NULL); return -1; }
     if (access(r, W_OK)) { lerr_set(err, en, "backup.destUnwritable", NULL); return -1; }
     snprintf(real, n, "%s", r);
     return 0;
@@ -299,6 +303,14 @@ static void do_snapshot(void) {
         return;
     }
     if (pathf(backups_dir, sizeof backups_dir, "%s/" BK_DIRNAME, c.dest)) { state = S_NODEST; emit(); return; }
+    if (fsops_cloud_path(dreal)) {
+        /* #208: a destination chosen before 0.8.9.5 inside ~/Cloud: no run, and the reason in the app */
+        last.ok = 0;
+        last.when = last_try = time(NULL);
+        snprintf(last_error, sizeof last_error, "backup.destCloud");
+        emit();
+        return;
+    }
     memset(&run, 0, sizeof run);
     run.home = home;
     run.machine = machine;

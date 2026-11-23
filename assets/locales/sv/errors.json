@@ -46,6 +46,7 @@
   "backup.destMissing": "Målet finns inte",
   "backup.destNotAllowed": "Det målet är inte tillåtet",
   "backup.destOutside": "Målet måste ligga i din hemmapp eller på någon av dina diskar",
+  "backup.destCloud": "En molnmapp kan inte vara mål för säkerhetskopian: ögonblicksbilder behöver hårda länkar, som ett molnkonto saknar, och dess filer fortsätter att laddas upp även efter att säkerhetskopieringen stoppats. Välj en disk eller en mapp på den här datorn",
   "backup.destUnwritable": "Kan inte skriva till målet",
   "backup.interrupted": "Den avbröts",
   "backup.locked": "Säkerhetskopiorna är krypterade: lås upp dem först",
@@ -917,5 +918,13 @@
   "studio.badPicture": "Den bilden kan inte användas som bakgrund.",
   "studio.invalid": "Den inställningen för LordOS Studio är ogiltig.",
   "studio.noCamera": "Ingen kamera är ansluten.",
-  "studio.unavailable": "LordOS Studio är inte tillgängligt på den här datorn."
+  "studio.unavailable": "LordOS Studio är inte tillgängligt på den här datorn.",
+  "studio.downloadFailed": "Bakgrunden kunde inte hämtas.",
+  "studio.removeFailed": "Bakgrunden kunde inte tas bort.",
+  "dkms.mokInvalid": "Den här begäran om en Secure Boot-nyckel är ogiltig.",
+  "dkms.mokNotNeeded": "Den här datorn behöver inte registrera nyckeln nu.",
+  "dkms.mokNothingPending": "Ingen nyckel väntar på att registreras vid nästa omstart.",
+  "dkms.mokNoTool": "Programmet mokutil är inte installerat.",
+  "dkms.mokFailed": "Nyckeln kunde inte förberedas för nästa omstart.",
+  "media.protectedWindow": "Det här fönstret är skyddat och kan inte fångas ensamt. I skärmbilder visas det svart."
 }

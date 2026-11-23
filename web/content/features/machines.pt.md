@@ -2,7 +2,7 @@
 
 O **Máquinas** (Machines) roda outros sistemas em janelas do seu desktop LordOS, em velocidade nativa com KVM onde o hardware permite. Ele saiu na **0.8.8.5** (alfa): cartões de download para Debian, Ubuntu, Fedora e Kali que conferem as assinaturas dos fabricantes e podem instalar sem perguntas, snapshots, clones, migração de outros apps de virtualização e, desde a 0.8.8.7, pastas compartilhadas.
 
-**Em desenvolvimento depois da 0.8.9.4.** Tudo o que vem a seguir está no repositório e ainda não num lançamento; o último lançamento é a **0.8.9.4**. Traz máquinas com Windows 11, as ferramentas do LordOS para Windows, uma área de transferência que só se move quando você cola, transferências de arquivos rápidas nos dois sentidos, o modo apps, som e microfone, redes de verdade, 3D para máquinas Linux e a imagem na velocidade total do convidado.
+**Novo na 0.8.9.5.** Tudo o que vem a seguir chegou na **0.8.9.5**, o último lançamento. Traz máquinas com Windows 11, as ferramentas do LordOS para Windows, uma área de transferência que só se move quando você cola, transferências de arquivos rápidas nos dois sentidos, o modo apps, som e microfone, redes de verdade, 3D para máquinas Linux e a imagem na velocidade total do convidado.
 
 [[shot:0]]
 
@@ -18,7 +18,7 @@ Um cartão novo do assistente Nova máquina monta uma máquina que o Windows 11 
 
 ## O LordOS numa máquina
 
-O primeiro cartão do assistente de Nova máquina é o próprio LordOS, em desenvolvimento:
+O primeiro cartão do assistente de Nova máquina é o próprio LordOS, desde a 0.8.9.5:
 
 - **A ISO live** da versão que o cartão nomeia, para PCs de 64 bits e arm64, conferida com a chave de publicação do LordOS embutida no LordOS antes de confiar em um único byte.
 - **Instalação sem perguntas**: a sua conta e senha (guardada só como hash), o nome do computador, o fuso horário, o teclado e o seu idioma. Só o disco novo da própria máquina pode ser apagado.
@@ -92,11 +92,11 @@ O resto do desktop recebeu o mesmo cuidado: os Ajustes, a Loja, o Arquivos e o M
 - **Resolução inicial**: *Segue a janela* ou um tamanho fixo, que todo sistema adota ao iniciar.
 - **Um visual novo**: folhas sobre a janela, ajustes agrupados e 38 glifos próprios do LordOS que seguem a sua cor de destaque, e uma visão Armazenamento de para onde vai o seu espaço.
 - **A Loja, organizada pela origem dos apps**: Debian, Flathub, Apps web e apps do LordOS, e os apps que o LordOS escolheu.
-- **Teclas** (em desenvolvimento): Ctrl, Alt, Shift e Win mantidas para a próxima tecla, e combinações que o seu computador guardaria para si, como Ctrl+Alt+Del, enviadas direto à máquina.
-- **O modo apps, pela barra de menus** (em desenvolvimento): um item junto ao relógio para cada máquina, cujo menu funciona como o menu Iniciar da máquina, e um painel com suas janelas abertas e seus apps.
-- **Capturar o mouse** (em desenvolvimento) para jogos e programas 3D; ❖Esc ou Ctrl+Alt o soltam.
-- **Uma placa de vídeo real para uma máquina** (em desenvolvimento): uma parte de uma iGPU Intel (de Broadwell a Comet Lake) com GVT-g, com um driver de inicialização próprio do LordOS para ela, escrito a partir de fontes públicas.
-- **`machines` no Terminal** (em desenvolvimento): listar, iniciar, parar, tirar snapshots, clonar e mudar máquinas a partir de um terminal.
+- **Teclas**: Ctrl, Alt, Shift e Win mantidas para a próxima tecla, e combinações que o seu computador guardaria para si, como Ctrl+Alt+Del, enviadas direto à máquina.
+- **O modo apps, pela barra de menus**: um item junto ao relógio para cada máquina, cujo menu funciona como o menu Iniciar da máquina, e um painel com suas janelas abertas e seus apps.
+- **Capturar o mouse** para jogos e programas 3D; ❖Esc ou Ctrl+Alt o soltam.
+- **Uma placa de vídeo real para uma máquina**: uma parte de uma iGPU Intel (de Broadwell a Comet Lake) com GVT-g, com um driver de inicialização próprio do LordOS para ela, escrito a partir de fontes públicas.
+- **`machines` no Terminal**: listar, iniciar, parar, tirar snapshots, clonar e mudar máquinas a partir de um terminal.
 
 ## O que foi testado, e o que não
 

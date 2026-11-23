@@ -171,5 +171,7 @@
   "vm.gvtGone": "Part de la carte graphique retirée",
   "gpu.freqSet": "Fréquence minimale de la carte graphique définie",
   "gpu.memlockSet": "Mémoire verrouillable par les machines enregistrée",
-  "vm.memlockSet": "Mémoire de la machine verrouillée"
+  "vm.memlockSet": "Mémoire de la machine verrouillée",
+  "dkms.mokState": "Clé Secure Boot : {state}",
+  "dkms.mokPassword": "La clé sera inscrite au prochain redémarrage."
 }

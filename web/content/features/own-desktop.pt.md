@@ -73,7 +73,7 @@ O LordOS mira máquinas modestas. Algumas medições reais dos registros de test
 
 [[chart:memory-0891]]
 
-Esses números vêm de máquinas virtuais, de uma placa e do PC do mantenedor. Os relatórios de 22 máquinas reais, alguns com medições do LordBench, estão nos [relatórios de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). São um ponto de partida, não uma promessa para toda máquina.
+Esses números vêm de máquinas virtuais, de uma placa e do PC do mantenedor. Os relatórios de 24 máquinas reais, alguns com medições do LordBench, estão nos [relatórios de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). São um ponto de partida, não uma promessa para toda máquina.
 
 [[shot:2]]
 
@@ -149,6 +149,7 @@ Lançada em 9 de novembro de 2026.
 - **O Terminal mostra os arquivos de um servidor.** Numa aba conectada com `ssh`, o modo Arquivos põe este computador à esquerda e o servidor à direita, pela mesma conexão, sem um segundo login. O protocolo SFTP é falado pelo `lord-sftp`, um ajudante em sandbox que recebe descritores abertos e nunca um caminho, e o LordOS não executa nenhum programa para isso. Os Ajustes do Terminal e uma nova janela de Perfis abrem em janelas próprias, e o rodapé do Claude Code agora funciona dentro do `screen`, do `tmux` e do `ssh`.
 - **Bancos de dados.** Um app novo para MySQL e MariaDB, com cada conexão no seu próprio ajudante em sandbox, `lord-sql`, e uma linha própria no firewall e no Monitor.
 - **Botões da janela em qualquer lado.** Ajustes → Mesa e Dock → Botões da janela os coloca à esquerda ou à direita nos dois temas, e os apps Linux que desenham a própria barra de título acompanham.
+- **Opções de janela (desde a 0.8.9.5; #151, #219).** Ajustes → Aparência → Opções de janela: botões da janela Normal, Grande ou Muito grande, com prévia ao vivo; mover e redimensionar uma janela de qualquer parte com ❖ + arrastar ou Alt + arrastar (desligado por padrão; os apps Linux também); e as opções lado a lado do menu da janela à vista ou ocultas.
 - **As telas continuam acesas ao bloquear, sair e entrar.** Cada tela acesa recebe um quadro preto próprio antes que a próxima sessão assuma o monitor, em vez de os buffers da sessão serem tirados de baixo da tela, o que algumas placas recusavam e deixava as telas apagadas.
 - **O lituano está completo,** CDs e DVDs são montados só para leitura no Arquivos, e as pastas da Nuvem e de rede não congelam mais o desktop.
 
@@ -157,7 +158,7 @@ Lançada em 9 de novembro de 2026.
 Lançada em 8 de novembro de 2026.
 
 - **Ler em voz alta.** Fala em todo app com texto, ❖Esc para a seleção, um pequeno reprodutor com a onda da voz, Fala ao vivo e uma Voz pessoal, tudo no computador e sem internet (veja *Ler em voz alta* nos recursos).
-- **Capturas em todas as telas.** ❖⇧3 salva um arquivo por tela e ❖⇧4 seleciona em todas ao mesmo tempo, com lupa e seletor de cor; T copia o texto da área, lido por um ajudante em sandbox. Toda captura também fica na área de transferência.
+- **Capturas em todas as telas.** ❖⇧3 salva um arquivo por tela e ❖⇧4 seleciona em todas ao mesmo tempo, com lupa e seletor de cor; T copia o texto da área, lido por um ajudante em sandbox. Toda captura também fica na área de transferência. Desde a 0.8.9.5, as Opções escolhem o que Print Screen faz: a tela inteira, uma área, uma janela, a barra ou nada.
 - **Sacudir o ponteiro para achá-lo.** Alguns movimentos rápidos aumentam o cursor por um momento; vem ativado em Ajustes → Mouse e trackpad.
 - **Teclado.** As luzes de Caps Lock, Num Lock e Scroll Lock acompanham o teclado, e um usuário que nunca escolheu um layout digita com o do computador em vez de um latino-americano padrão.
 
@@ -169,7 +170,7 @@ O compositor controla várias telas ao mesmo tempo, estendidas ou espelhadas, e 
 
 ## Limites honestos
 
-- **Placas NVIDIA ainda não foram verificadas.** A composição pela GPU funciona em gráficos Intel reais de 2010 (Ironlake) a 2019 (Whiskey Lake), Cherry Trail e Gemini Lake, e em quatro gerações da AMD de GCN 2 a RDNA 4, nas 22 máquinas dos [relatórios de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md); ninguém relatou ainda uma placa NVIDIA, nem gráficos integrados da AMD, nem gráficos Intel mais novos que Whiskey Lake (`docs/GPU.md`).
+- **Placas NVIDIA foram verificadas numa só máquina.** A composição pela GPU funciona em gráficos Intel reais de 2010 (Ironlake) a 2019 (Whiskey Lake), Cherry Trail e Gemini Lake, e em cinco gerações da AMD, do TeraScale 2 (uma Radeon HD 5450) ao RDNA 4, entre as 24 máquinas dos [relatórios de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). Uma placa NVIDIA foi relatada, uma RTX 3060 com o driver proprietário da NVIDIA: ali o desktop funciona e é desenhado com a CPU, porque o LordOS não compõe com esse driver. O nouveau e o NVK do Mesa, que vêm incluídos, não foram testados em nenhuma placa NVIDIA, e ninguém relatou ainda gráficos integrados da AMD nem gráficos Intel mais novos que o Whiskey Lake (`docs/GPU.md`).
 - **O GPU drag, ligado por padrão na 0.8.7, está verificado só em V3D e SVGA3D.** Num Raspberry Pi 5, em arrastos reais, reduz pela metade a CPU da sessão sem carga e leva uma carga de memória de 29 para 35 quadros por segundo. Em qualquer outra GPU só o autoteste o protege, e `LORD_GPU_DRAG=0` o desliga (`docs/GPU.md`).
 - **Várias telas foram testadas com duas saídas virtuais e num PC com uma Radeon RX 580 e três monitores** (`docs/DISPLAYS.md`), a máquina em que o autor usa o LordOS todos os dias, instalado direto no computador desde novembro de 2026. Esse PC trouxe o tamanho do cursor por hardware e a tela de login na tela principal escolhida na 0.8.8.6, e na 0.8.8.7 a passagem que mantém os monitores DisplayPort acesos ao bloquear, sair e entrar na sessão. Além dele, [mais 21 máquinas da comunidade](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md) (9 relatórios de hardware e 12 máquinas citadas em outros issues) cobrem gráficos Intel (14) e AMD (mais 3: uma FirePro W6150M, uma RX 7800 XT com dois monitores de 120 Hz e uma RX 9060 XT), de notebooks a tablets x86; ninguém relatou uma placa NVIDIA ainda, e hubs DisplayPort não foram testados.
 - **O Raspberry Pi 5 só foi testado com um monitor HDMI.** Desde a 0.8.4.1 a imagem mostra a tela de login e o desktop num monitor HDMI desde o primeiro boot, e o LordBench o mediu assim; dois monitores e 4K ainda não foram testados na placa (`docs/RASPBERRY.md`).

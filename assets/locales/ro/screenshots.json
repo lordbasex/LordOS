@@ -98,5 +98,11 @@
   "hintAdjust": "Trage de mânere pentru a ajusta · Enter: capturează · Esc: anulează",
   "hintAdjustRecord": "Trage de mânere pentru a ajusta · Enter: înregistrează · Esc: anulează",
   "hintRecord": "Trage pentru a alege zona de înregistrat · Esc: anulează",
-  "thumbOpen": "Deschide în editorul de adnotări"
+  "thumbOpen": "Deschide în editorul de adnotări",
+  "opt.printKey": "Tasta Print Screen",
+  "opt.printKey.full": "Capturează tot ecranul",
+  "opt.printKey.area": "Capturează porțiunea aleasă",
+  "opt.printKey.window": "Capturează fereastra aleasă",
+  "opt.printKey.toolbar": "Arată bara",
+  "opt.printKey.none": "Nu face nimic"
 }

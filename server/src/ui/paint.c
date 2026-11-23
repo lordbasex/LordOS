@@ -2447,8 +2447,23 @@ static int in_tree(const Node *n, const Node *root) {
     return 0;
 }
 
+static int subtree_protected(const Node *n, int depth) {
+    if (n->protect) return 1;
+    if (depth > 4096) return 1;                     /* deeper than any real tree: treated as protected, never captured */
+    for (const Node *k = n->first; k; k = k->next) if (subtree_protected(k, depth + 1)) return 1;
+    return 0;
+}
+
+int paint_node_protected(const Node *n) {
+    if (!n) return 0;
+    for (const Node *a = n->parent; a; a = a->parent) if (a->protect) return 1;
+    return subtree_protected(n, 0);
+}
+
 int paint_capture_until(Canvas *c, Node *root, int last, const int *also, int n) {
     if (!root || last <= 0) return 0;
+    Node *w = node_get(last);
+    if (w && in_tree(w, root) && paint_node_protected(w)) return -1;    /* a protected window alone: refused */
     paint_capture_mode = 1;
     cap_last = last;
     cap_done = 0;

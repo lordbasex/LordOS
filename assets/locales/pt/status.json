@@ -171,5 +171,7 @@
   "vm.gvtGone": "Parte da placa de vídeo removida",
   "gpu.freqSet": "Frequência mínima da placa de vídeo definida",
   "gpu.memlockSet": "Memória que as máquinas podem bloquear salva",
-  "vm.memlockSet": "Memória da máquina bloqueada"
+  "vm.memlockSet": "Memória da máquina bloqueada",
+  "dkms.mokState": "Chave do Secure Boot: {state}",
+  "dkms.mokPassword": "A chave será inscrita na próxima reinicialização."
 }
