@@ -149,7 +149,7 @@ Released on 9 November 2026.
 - **The Terminal shows a server's files.** In a tab connected with `ssh`, Files mode puts this computer on the left and the server on the right, over the same connection, with no second login. The SFTP protocol is spoken by `lord-sftp`, a sandboxed helper that gets open descriptors and never a path, and LordOS runs no program for it. The Terminal's Settings and a new Profiles window open in windows of their own, and Claude Code's footer now works inside `screen`, `tmux` and `ssh`.
 - **Databases.** A new app for MySQL and MariaDB, with each connection in its own sandboxed helper, `lord-sql`, and its own row in the firewall and the Monitor.
 - **Window buttons on either side.** Settings → Desktop & Dock → Window buttons puts them on the left or the right in both themes, and Linux apps that draw their own title bar follow.
-- **Window options (in development; #151, #219).** Settings → Appearance → Window options: window buttons Normal, Large or Extra large, with a live preview; move and resize a window from anywhere in it with ❖ + drag or Alt + drag (off by default; Linux apps too); and the tiling options of the window menu shown or hidden.
+- **Window options (since 0.8.9.5; #151, #219).** Settings → Appearance → Window options: window buttons Normal, Large or Extra large, with a live preview; move and resize a window from anywhere in it with ❖ + drag or Alt + drag (off by default; Linux apps too); and the tiling options of the window menu shown or hidden.
 - **Displays stay lit across lock, logout and login.** Every lit display gets a black frame of its own before the next session takes the monitor, instead of the session's buffers being pulled from under the screen, which some cards refused and left the displays dark.
 - **Lithuanian is complete,** CDs and DVDs mount read-only in Files, and Cloud and network folders no longer freeze the desktop.
 
@@ -158,7 +158,7 @@ Released on 9 November 2026.
 Released on 8 November 2026.
 
 - **Read aloud.** Speech in every app with text, ❖Esc for the selection, a small player with the voice's wave, Live Speech and a Personal Voice, all on the computer and without the internet (see *Read aloud* in the features).
-- **Screenshots on every display.** ❖⇧3 saves one file per display and ❖⇧4 selects on all of them at once, with a magnifier and a color picker; T copies the text inside the area, read by a sandboxed helper. Every capture is also on the clipboard. In development (the latest release is 0.8.9.4), Options choose what Print Screen does: the whole screen, an area, a window, the toolbar or nothing.
+- **Screenshots on every display.** ❖⇧3 saves one file per display and ❖⇧4 selects on all of them at once, with a magnifier and a color picker; T copies the text inside the area, read by a sandboxed helper. Every capture is also on the clipboard. Since 0.8.9.5, Options choose what Print Screen does: the whole screen, an area, a window, the toolbar or nothing.
 - **Shake the pointer to find it.** A few quick strokes make the cursor grow for a moment; on by default in Settings → Mouse & Trackpad.
 - **Keyboard.** The Caps Lock, Num Lock and Scroll Lock lights follow the keyboard, and a user who never chose a layout types with the computer's own instead of a Latin American default.
 

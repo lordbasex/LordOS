@@ -1540,8 +1540,12 @@ LordOS (synchronized mode is not implemented), so each surface's queue is its ow
 surface's barrier goes up; it is cleared right after the next frame of the surface's own display has been latched
 (`wl_frame_done` names it; a display waiting for a flip keeps it until its flip), and an update with `wait_barrier`
 waits while it is up. So an update stays on screen at least one refresh, and a client that sets and waits on every
-present runs at the display's rate. An update that sets the barrier also asks for a frame, so the barrier clears even
-if it drew nothing. Never a stall: a window nobody can see (minimized, on another desktop, wholly covered,
+present runs at the display's rate. Without a monitor, and on drivers whose flips complete at once, that refresh is (in development, after 0.8.9.5)
+lord-server's own software vblank (`softpace.h`): a frame drawn late starts the grid again, so the next one never comes
+less than seven eighths of a refresh after it, nor less than half a refresh after a frame painted slowly was
+shown (before, it could come 1 to 7 ms later and the update was on screen for that long; `tests/softpace_test.c`,
+`wl-conformance`'s `fifo.barrier`). An update that sets the barrier also asks for a
+frame, so the barrier clears even if it drew nothing. Never a stall: a window nobody can see (minimized, on another desktop, wholly covered,
 `framegate.h`) clears it with its own once-a-second tick, as its frame callbacks; with the screen off every barrier
 clears once a second (`wl_frame_unseen`); a surface with no role (never on screen) follows any frame. The protocol's
 rule that a synchronized subsurface ignores `wait_barrier` is kept (`set_sync`/`set_desync` are tracked for it).

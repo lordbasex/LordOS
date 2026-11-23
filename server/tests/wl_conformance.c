@@ -2279,7 +2279,8 @@ static void f_bgeffect(void) {
 /* ---------------------------------------------------------------- frame timing: fifo, commit timing, tearing, content type */
 static double cbt[4];
 static int cbn[4];
-static void cbt_fire(void *d, struct wl_callback *cb, uint32_t t) { (void)t; int i = (int)(intptr_t)d; cbt[i] = now_ms(); cbn[i]++; wl_callback_destroy(cb); }
+static uint32_t cbs[4];                /* the frame's time as lord-server sent it (wl_callback.done, ms) */
+static void cbt_fire(void *d, struct wl_callback *cb, uint32_t t) { int i = (int)(intptr_t)d; cbs[i] = t; cbt[i] = now_ms(); cbn[i]++; wl_callback_destroy(cb); }
 static const struct wl_callback_listener cbt_l = { cbt_fire };
 static void frame_at(struct wl_surface *s, int i) { cbn[i] = 0; cbt[i] = 0; wl_callback_add_listener(wl_surface_frame(s), &cbt_l, (void *)(intptr_t)i); }
 static void commit_buf(Conn *c, Win *w, uint32_t color) {
@@ -2300,10 +2301,14 @@ static void f_fifo(void) {
         if (!m || win_map(c, &w, "wlconf-fifo", 200, 150)) { skip(item, "fifo.barrier", item, "not advertised or no window"); cx_close(c); return; }
         cx_wait(c, NULL, 300);
         struct wp_fifo_v1 *f = wp_fifo_manager_v1_get_fifo(m, w.s);
-        /* one commit sets the barrier, the next waits for it: the second can't apply in the same refresh as the first */
+        /* one commit sets the barrier, the next waits for it: the second can't apply in the same refresh as the first.
+         * Measured with the frames' own times (wl_callback.done's, lord-server's clock), not when this client read them:
+         * a client woken late reads both callbacks together. The pairs come at random points of the refresh (a client
+         * that was busy): a frame drawn off the grid must not let the next one come a few ms later (src/softpace.h). */
         int okn = 0;
         double worst = 1e9;
         for (int k = 0; k < 5; k++) {
+            if (k) usleep((useconds_t)(17000 + k * 3000));
             wp_fifo_v1_set_barrier(f);
             frame_at(w.s, 0);
             commit_buf(c, &w, 0xff204060);
@@ -2312,10 +2317,10 @@ static void f_fifo(void) {
             commit_buf(c, &w, 0xff406020);
             double end = now_ms() + 2000;
             while (!cbn[1] && now_ms() < end) cx_wait(c, NULL, 20);
-            if (cbn[0] && cbn[1]) { double dt = cbt[1] - cbt[0]; if (dt < worst) worst = dt; if (dt >= 8) okn++; }
+            if (cbn[0] && cbn[1]) { double dt = (double)(uint32_t)(cbs[1] - cbs[0]); if (dt < worst) worst = dt; if (dt >= 8) okn++; }
         }
         check(item, "fifo.barrier", okn == 5, "wp_fifo_manager_v1.get_fifo,wp_fifo_v1.set_barrier,wp_fifo_v1.wait_barrier",
-              "a commit waiting on the barrier the one before it set applied a refresh later: %d of 5 (closest %.1f ms; 60 Hz headless)", okn, worst);
+              "a commit waiting on the barrier the one before it set applied a refresh later: %d of 5 (closest %.0f ms apart by the frames' times; 60 Hz headless)", okn, worst);
         /* a wait with no barrier up doesn't hold */
         wp_fifo_v1_wait_barrier(f);
         frame_at(w.s, 2);

@@ -2,7 +2,7 @@
 
 **Machines** runs other systems in windows of your LordOS desktop, at native speed with KVM where the hardware allows it. It shipped in **0.8.8.5** (alpha): download cards for Debian, Ubuntu, Fedora and Kali that check their makers' signatures and can install with no questions, snapshots, clones, a migration from other virtualization apps, and since 0.8.8.7 shared folders.
 
-**In development after 0.8.9.4.** Everything below is in the repository and not in a release yet; the latest release is **0.8.9.4**. It brings Windows 11 machines, the LordOS tools for Windows, a clipboard that only moves when you paste, fast file transfers both ways, apps mode, sound and microphone, real networks, 3D for Linux machines and a picture at the guest's full rate.
+**New in 0.8.9.5.** Everything below arrived in **0.8.9.5**, the latest release. It brings Windows 11 machines, the LordOS tools for Windows, a clipboard that only moves when you paste, fast file transfers both ways, apps mode, sound and microphone, real networks, 3D for Linux machines and a picture at the guest's full rate.
 
 [[shot:0]]
 
@@ -18,7 +18,7 @@ A new card in the New Machine assistant makes a machine Windows 11 accepts as it
 
 ## LordOS in a machine
 
-The first card of the New Machine assistant is LordOS itself, in development:
+The first card of the New Machine assistant is LordOS itself, since 0.8.9.5:
 
 - **The live ISO** of the release the card names, for 64-bit PCs and arm64, checked with the LordOS release key built into LordOS before a byte of it is trusted.
 - **Install without questions**: your account and password (kept only as a hash), the computer's name, time zone, keyboard and your language. Only the machine's own new disk can be erased.
@@ -92,11 +92,11 @@ The rest of the desktop got the same care: Settings, the Store, Files and Monito
 - **Start resolution**: *Follows the window* or a fixed size, taken by every system at boot.
 - **A new look**: sheets over the window, grouped settings and 38 glyphs of LordOS's own that follow your accent color, and a Storage view of where your space goes.
 - **The Store, arranged by where apps come from**: Debian, Flathub, Web apps and LordOS apps, and the apps LordOS picked.
-- **Keys** (in development): Ctrl, Alt, Shift and Win held down for the next key, and combinations your computer would keep for itself, such as Ctrl+Alt+Del, sent straight to the machine.
-- **Apps mode, from the menu bar** (in development): an item by the clock for each machine, whose menu works like the machine's Start menu, and a panel with its open windows and its apps.
-- **Capture mouse** (in development) for games and 3D programs; ❖Esc or Ctrl+Alt lets it go.
-- **A real graphics card for a machine** (in development): a share of an Intel iGPU (Broadwell to Comet Lake) through GVT-g, with LordOS's own start-up driver for it, written from public sources.
-- **`machines` in the Terminal** (in development): list, start, stop, snapshot, clone and change machines from a terminal.
+- **Keys**: Ctrl, Alt, Shift and Win held down for the next key, and combinations your computer would keep for itself, such as Ctrl+Alt+Del, sent straight to the machine.
+- **Apps mode, from the menu bar**: an item by the clock for each machine, whose menu works like the machine's Start menu, and a panel with its open windows and its apps.
+- **Capture mouse** for games and 3D programs; ❖Esc or Ctrl+Alt lets it go.
+- **A real graphics card for a machine**: a share of an Intel iGPU (Broadwell to Comet Lake) through GVT-g, with LordOS's own start-up driver for it, written from public sources.
+- **`machines` in the Terminal**: list, start, stop, snapshot, clone and change machines from a terminal.
 
 ## What was tested, and what not
 

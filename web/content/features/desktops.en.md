@@ -14,7 +14,7 @@ The three run on the same display server, the same interface engine and the same
 - **The menu bar** holds the app's menus, the status items and the clock; the **Control Center** gathers network, sound, brightness, Do Not Disturb and the rest.
 - **The app launcher** shows every app, and Search finds apps, settings and files.
 - **Snap windows** by dragging them to the edges: a half, a quarter or the whole screen (in Lord Flow since 0.8.9).
-- **Always on Top** in the window menu keeps a window over the others while you type in another one (in development, in every LordOS desktop; X11 apps can ask for it too).
+- **Always on Top** in the window menu keeps a window over the others while you type in another one (since 0.8.9.5, in every LordOS desktop; X11 apps can ask for it too).
 - **Desktops** with an Overview, since 0.8.7, and an app switcher on ❖Tab.
 
 **Who it's for:** anyone who wants to start working without learning anything new.
@@ -25,7 +25,7 @@ The three run on the same display server, the same interface engine and the same
 
 **Since 0.8.3.** Everything in one bar at the bottom: the start button, search, the pinned and open apps, a tray with quick settings and the clock.
 
-- **The start menu** has a search field that searches like the system search (apps, settings, files, notes, the calculator, Help), a grid of pinned apps you arrange yourself, recently used apps, every app from A to Z or by category (Games, Graphics, Internet, Office…, each with its count and opened in place, with the keyboard too; in development), and the power button.
+- **The start menu** has a search field that searches like the system search (apps, settings, files, notes, the calculator, Help), a grid of pinned apps you arrange yourself, recently used apps, every app from A to Z or by category (Games, Graphics, Internet, Office…, each with its count and opened in place, with the keyboard too; since 0.8.9.5), and the power button.
 - **Quick settings** by the clock: network, Bluetooth, Do Not Disturb, Night Light, dark mode, volume.
 - **A taskbar on every display**, on by default; the start menu and the panels open on the display you clicked.
 - **The taskbar** can be centered or aligned to the start, on any side of the screen.

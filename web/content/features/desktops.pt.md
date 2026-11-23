@@ -14,7 +14,7 @@ Os três rodam sobre o mesmo servidor gráfico, o mesmo motor de interface e os 
 - **A barra de menus** tem os menus do app, os itens de status e o relógio; a **Central de controle** reúne rede, som, brilho, Não perturbe e o resto.
 - **O lançador de apps** mostra todos os apps, e a Busca encontra apps, ajustes e arquivos.
 - **Encaixe janelas** arrastando-as para as bordas: meia tela, um quarto ou a tela inteira (no Lord Flow desde a 0.8.9).
-- **Sempre no topo** no menu da janela deixa uma janela por cima das outras enquanto você digita em outra (em desenvolvimento, em todos os desktops do LordOS; os apps X11 também podem pedir isso).
+- **Sempre no topo** no menu da janela deixa uma janela por cima das outras enquanto você digita em outra (desde a 0.8.9.5, em todos os desktops do LordOS; os apps X11 também podem pedir isso).
 - **Desktops** com uma Visão geral, desde a 0.8.7, e um seletor de apps no ❖Tab.
 
 **Para quem é:** quem quer começar a trabalhar sem aprender nada novo.
@@ -25,7 +25,7 @@ Os três rodam sobre o mesmo servidor gráfico, o mesmo motor de interface e os 
 
 **Desde a 0.8.3.** Tudo numa barra embaixo: o botão iniciar, a busca, os apps fixados e abertos, uma bandeja com configurações rápidas e o relógio.
 
-- **O menu iniciar** tem um campo de busca que busca como a busca do sistema (apps, ajustes, arquivos, notas, a calculadora, Ajuda), uma grade de apps fixados que você mesmo organiza, os apps usados recentemente, todos os apps de A a Z ou por categoria (Jogos, Gráficos, Internet, Escritório…, cada uma com sua contagem e aberta ali mesmo, também pelo teclado; em desenvolvimento) e o botão de desligar.
+- **O menu iniciar** tem um campo de busca que busca como a busca do sistema (apps, ajustes, arquivos, notas, a calculadora, Ajuda), uma grade de apps fixados que você mesmo organiza, os apps usados recentemente, todos os apps de A a Z ou por categoria (Jogos, Gráficos, Internet, Escritório…, cada uma com sua contagem e aberta ali mesmo, também pelo teclado; desde a 0.8.9.5) e o botão de desligar.
 - **Configurações rápidas** junto ao relógio: rede, Bluetooth, Não perturbe, Luz noturna, modo escuro, volume.
 - **Uma barra de tarefas em cada tela**, ligada por padrão; o menu iniciar e os painéis abrem na tela onde você clicou.
 - **A barra de tarefas** pode ficar centralizada ou alinhada ao início, em qualquer lado da tela.
