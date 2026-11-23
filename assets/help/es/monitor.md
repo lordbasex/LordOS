@@ -11,7 +11,7 @@ Muestra qué pasa en el equipo: procesador, memoria, red, discos, procesos y las
 de cada app.
 
 - **CPU, memoria y discos:** gráficos en vivo, por núcleo y por proceso.
-- **Procesos:** ordenados por lo que más usan, con búsqueda.
+- **Procesos:** ordenados por cualquier columna, con búsqueda y filtros por origen y por programa. **Agrupados** muestra una fila por app con sus procesos adentro, y **Finalizar todo** cierra una app entera de una vez. Cada proceso muestra quién lo inició y una insignia de dónde viene (un sello azul para LordOS, uno rosa para las apps de LordOS), y Estadísticas agrega medias y picos de 1, 5 o 15 minutos. Mientras el puntero está sobre la lista, el orden queda quieto.
 - **Red:** una fila por app con su tráfico y sus conexiones, y un **mapa** con arcos hasta el país
   de cada servidor. El país sale de una base local: no se consulta a nadie.
 - **GPU:** cada tarjeta gráfica dibujada en vivo, su uso, temperatura, ventilador, memoria, relojes y consumo, las

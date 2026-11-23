@@ -59,7 +59,8 @@ char *mon_voltage_json(uint64_t *seq);
 void mon_want_gpu(int on);
 char *mon_gpu_json(uint64_t *seq);
 /* The app scope a process runs in (app-lordos-<id>.scope and its lpk- and fp- kinds, docs/FIREWALL.md): 'd' (a .desktop
- * app), 'l' (an isolated app), 'f' (a Flatpak app) or 0 (none), and its id in id. mon_scope_parse reads it from the text
+ * app), 'l' (an isolated app), 'f' (a Flatpak app), 'n' (one of LordOS's components, lordos-net-<name>.scope: the
+ * Terminal's programs, Mail's connector) or 0 (none), and its id in id. mon_scope_parse reads it from the text
  * of /proc/<pid>/cgroup; mon_scope_of reads that file. The process list (mon_procs_take) carries each one, read by the
  * thread. */
 #define MON_SCOPE_MAX 160

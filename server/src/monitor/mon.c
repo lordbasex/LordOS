@@ -541,6 +541,19 @@ char mon_scope_parse(const char *cgroup, char *id, size_t n) {
         const char *leaf = line + 3;
         for (const char *q = line + 3; q < line + ll; q++) if (*q == '/') leaf = q + 1;
         size_t l = (size_t)(line + ll - leaf);
+        /* one of LordOS's components (lordos-net-<name>.scope: the Terminal's programs, Mail's connector…), the
+         * firewall's lordos:<name> (fw_component_scope); a name of a-z, 0-9 and '-' */
+        if (l > 17 && !strncmp(leaf, "lordos-net-", 11) && !strncmp(leaf + l - 6, ".scope", 6)) {
+            size_t cl = l - 17;
+            if (cl >= 32 || cl + 1 > n) return 0;
+            for (size_t i = 0; i < cl; i++) {
+                char c = leaf[11 + i];
+                if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) return 0;
+            }
+            memcpy(id, leaf + 11, cl);
+            id[cl] = 0;
+            return 'n';
+        }
         if (l <= 17 || strncmp(leaf, "app-lordos-", 11) || strncmp(leaf + l - 6, ".scope", 6)) return 0;
         const char *b = leaf + 11;
         size_t bl = l - 17;

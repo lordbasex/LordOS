@@ -287,8 +287,48 @@ function machineNames(ids) {
   return vmNames.map;
 }
 
+// (0.8.9.6) Monitor → Processes' origin badges (docs/MONITOR.md, "Origin badges"): the package that owns each
+// executable, answered by lord-server's worker thread from dpkg's file lists (lord.monitor.exeOwners: a path not known
+// yet is asked about and comes back on a later call). ownerOf(exe): the package, '' for none, undefined while unknown.
+// askOwners(paths): asks about the ones not known (once a second at most, from the process list's redraw).
+const owners = new Map();
+let ownersAsked = 0;
+function askOwners(paths) {
+  if (!available() || typeof lord.monitor.exeOwners !== 'function') return;
+  const want = [...new Set(paths)].filter((p) => p && !owners.has(p)).slice(0, 512);
+  if (!want.length || Date.now() - ownersAsked < 900) return;
+  ownersAsked = Date.now();
+  try { for (const [k, v] of Object.entries(lord.monitor.exeOwners(want) || {})) owners.set(k, v); } catch (e) { /* an older lord-server */ }
+}
+// The repository a package comes from (the package index's label: "Debian", a vendor's), once per package; null when
+// no index lists it (installed from a file).
+const origins = new Map();
+function packageOrigin(pkg) {
+  if (!pkg) return null;
+  if (!origins.has(pkg)) {
+    let o = null;
+    try { o = typeof lord.pkg?.info === 'function' ? lord.pkg.info(pkg)?.origin || null : null; } catch (e) { o = null; }
+    origins.set(pkg, o);
+  }
+  return origins.get(pkg);
+}
+// An installed .lpk app's trust and signer (docs/SIGNING.md): { trust, signer } | null, once per app.
+const signers = new Map();
+function appSigner(id) {
+  if (!signers.has(id)) {
+    let s = null;
+    try { const st = lord.sign?.status?.(id); s = st && st.installed !== false ? { trust: st.trust || 'unsigned', signer: st.signer || null } : null; } catch (e) { s = null; }
+    signers.set(id, s);
+  }
+  return signers.get(id);
+}
+
 let infoCache = null;
 export const monitor = {
+  ownerOf: (exe) => owners.get(exe),
+  askOwners,
+  packageOrigin,
+  appSigner,
   machineNames,
   available,
   info: () => (infoCache ||= available() ? lord.monitor.info() : null),

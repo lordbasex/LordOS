@@ -489,6 +489,105 @@ protected list, a stale start time refused while the process survives, TERM and 
 children, the session and PID 1 refused, and the Get Info JSON (a pipe and a listening TCP socket
 among the open files; no private parts when not the owner; "gone" for another start time).
 
+### Grouped view (0.8.9.6, in development)
+
+**Grouped**, next to Mine | All (and combined with either), shows one row per app with an arrow that opens its
+processes (→ and ← or Enter, or the arrow). The choice is kept in `settings.monitor.procGrouped`. The groups
+(`apps/monitor/procgroupmodel.js`, pure) are one user's each, and every process is in exactly one:
+
+1. **The kernel's threads** (`prot` `kernel`): one group.
+2. **An app's scope**, read by lord-server from `/proc/<pid>/cgroup` (`p.app`): a Linux app's
+   `app-lordos-<id>.scope`, an isolated app's `lpk-`, a Flatpak app's `fp-`, a web app's
+   `app-lordos-lordos-web-<app>.scope`, a machine's `app-lordos-lordos-vm-<id>.scope`, and (new) one of LordOS's
+   components, `lordos-net-<name>.scope` (`lordos:<name>`: the Terminal's programs are one "Terminal" group, Mail's
+   connector its own). The scope is root-owned and inherited, so a browser's zygotes, renderers, GPU process and its
+   double-forked crash reporter (reparented to PID 1) all stay in the browser's group.
+3. **LordOS** itself (the session's lord-server, its helpers, any `lord-*` program): one group per user.
+4. Otherwise **the process tree**: the top ancestor below a boundary (PID 1, the kernel, a service manager,
+   LordOS, another app's scope, another user), and trees whose top process is the same program are one group
+   (several runs of the same program, orphans of the same executable).
+
+A group row shows the app's icon and name, its origin badge, the total % CPU, its memory (each process's
+proportional memory where lord-server read it, so a shared page counts once: the same number as Memory → "Using
+the most memory"), the total threads, the number of processes and the user. Hovering it shows, after a moment, a
+summary taken when it opens: the number of processes, the child using the most CPU and the one using the most memory
+(name and PID), and the last minute's statistics with two sparklines. It is information only: it holds no buttons.
+
+The search matches a group's name or any of its processes; a group that matched only through some processes opens
+with just those. Every column sorts (click again to reverse), the groups by their totals and the processes inside by
+the same column; the order is kept in `settings.monitor.procSort`.
+
+**Quit All** (the selected group row's button, the toolbar's ⓧ, Delete, or the right-click menu's Quit All… and
+Force Quit All…) works on a snapshot: the sheet lists the processes the group had when it was chosen, each by PID
+and start time. Running it signals, one by one and through the same paths as a single process
+(`lord.monitor.signal` for the user's own, the root helper's `proc-signal` for an administrator), only those that
+are still the same process: a PID now used by another process is skipped and the sheet says how many; protected
+processes are never signalled. It then waits: when all have exited it closes, and after three seconds it offers
+Force Quit for the ones still open. No new privilege: `cgroup.kill` is not used, since the scopes are root-owned.
+LordOS's and the kernel's groups can't be ended as a group (their members still can, one by one, under the usual
+rules). A child row has its own ⓧ, Quit… and Force Quit… in its menu, and Get Info.
+
+### A steady list (0.8.9.6, in development)
+
+While the pointer is over the table, a menu or a sheet is open, and for two seconds after the pointer leaves, the
+order is held (`holdOrder`, `holdGroups`): the values change in place, a new process goes at the end of its group (a
+new group at the end), and one that exited stays greyed, marked "ended", until the order is released. A small
+"Order paused" note shows meanwhile. Choosing another sort, filter or search applies at once. The selection is the
+process (PID and start time) or the group, never a row number, so it stays on the same process as rows move.
+
+### Who started it (0.8.9.6, in development)
+
+A process's chain of ancestors (`chainOf`): its parents from the same process list, up to the session's lord-server
+(named after the component the chain runs in: "Terminal › bash › claude › sh › sleep"), PID 1, a service manager or
+lord-sessiond. Each link is known by PID and start time, and a cached chain is made again when one of its processes
+changes. A child row shows it dimmed after its name (each link selects that process); Get Info → Statistics shows it
+in full as "Started by", with the apps' icons, each link opening that process.
+
+### Origin badges (0.8.9.6, in development)
+
+Each process and group carries a badge that stands on a fact LordOS can check, never on a name, with a tooltip
+saying why:
+
+| Badge | When |
+|---|---|
+| Blue verified seal: LordOS | the executable belongs to the `lordos` package (or a `lordos-*` one) |
+| Pink verified seal: LordOS app | an isolated `.lpk` app (its scope), with its signer (`lord.sign.status`) |
+| Flatpak | a Flatpak app's scope, with its app id |
+| Package (the repository's name, such as "Debian" or a vendor's) | another installed package owns the executable; the repository is the package index's label (`lord.pkg.info`); "installed from a file" when no index lists it |
+| Web app | a web app's scope, with its site |
+| Machine | a machine's QEMU and passt, with the machine's name |
+| Unpackaged | no installed package owns the executable (the home folder, an unpackaged `/opt`, an AppImage) |
+| Restart | the executable was replaced on disk while it runs (`(deleted)`): an update that needs a restart |
+
+The seals are our own drawing (`apps/monitor/seal.js`: eight rounded scallops and a check mark, as pixels). The
+owner comes from `lord.monitor.exeOwners(paths)` (`server/src/monitor/exeown.c`): dpkg's own file lists
+(`/var/lib/dpkg/info/*.list`, world-readable), read by a worker thread once for all the queued paths and cached
+(1024 paths); a lookup never blocks the screen, and an answer not in yet just shows no badge. The cache is looked
+at again when dpkg changes a list. Another user's process whose executable can't be read has no badge. Not shown
+yet: whether a Flatpak app is verified on Flathub (the Store's catalog isn't in the session).
+
+**Filters**: chips for System, LordOS apps, Flatpak, Debian, Web apps, Machines and Unpackaged (none chosen: all;
+grouped, a group's badge counts) and a **Program** picker that shows one group's processes; they combine with Mine
+| All, Grouped and the search, and are kept in `settings.monitor.procFilter`.
+
+### Rolling statistics (0.8.9.6, in development)
+
+`apps/monitor/procstatsmodel.js` keeps, for every process (PID and start time: a restart with the same PID starts
+over) and every group, the average and the peak of its CPU and memory over the last 1, 5 and 15 minutes and the
+95th percentile of its CPU over the last minute, from the process list lord-server builds once a second while
+Monitor shows Processes or Memory. A sample is O(1) per series: a ring of the last 60 samples with running sums,
+and a ring of 15 one-minute buckets with their sums and maximums; a series not fed for 15 minutes is dropped. The
+**Statistics** picker (Off, 1, 5 or 15 min, kept in `settings.monitor.procStats`) adds four sortable columns (CPU
+average and peak, memory average and peak over that window); a group's hover summary and Get Info → Statistics show
+the numbers and the last minute as sparklines.
+
+Tests: `tests/monitor_procgroup_test.mjs` (grouping with a browser's helpers, a Flatpak scope, a web app, orphans,
+another user; search, sort, the held order, the summary, Quit All's snapshot and a reused PID, the chain, the
+badges with made-up owners, the filters, the seal, the rolling statistics) and `tests/monitor_grouped_scene.mjs`
+(the tab over a made-up list: Grouped, the summary, Quit All skipping a reused PID, a child's Quit, the held order,
+the statistics' columns), in `make -C server test`; `build/procctl-test` covers `exeown.c` and the component
+scopes. Screenshots: `tests/monitor_headless.sh OUT_DIR default es` (a made-up list; nothing is signalled).
+
 ## Voltage (0.8.7)
 
 The first card draws the machine's board, a small single-board computer on the Pi and a motherboard elsewhere, with the way from the power input to the processor in the color of the power state: green, amber or red. It is our own drawing, with no maker's marks, and it doesn't move.
@@ -754,14 +853,15 @@ server/tests/mmdb_test.c, server/tests/map_bench.c   reader test and map benchma
 | `history({ from, step, n, app })` | the traffic history in `n` buckets (see "Traffic history"), or `null` |
 | `netTotals()` | (0.8.5) `{ t, rx, tx }`: the machine's byte counters now (every interface but `lo`), without the sampling thread (the menu bar item) |
 | `historyEnable(on)` / `historyClear()` | the "Keep a traffic history" setting; deletes the history |
+| `exeOwners([path, …])` | (0.8.9.6, in development) `{ path: package \| "" }`: the installed package that owns each executable, `""` for none; a path not known yet is left out and asked about (`monitor/exeown.c`, a worker thread over dpkg's file lists; at most 512 absolute paths, no control characters). Only reads world-readable files |
 
 Each disk in `sample().disk.disks` carries the same fields (`sensor`: `"nvme"`, `"drivetemp"` or
 `null`; `temp` in °C or `null`; `tempT`: when it was read; `tempIdle`: a spinning disk at rest, not
 read; `awake`: I/O in the last minute).
 
-No function takes paths or commands: the only arguments are booleans, a language code (letters,
-digits, `-` and `_`, up to 15), a PID with its start time (integers), `'TERM'` or `'KILL'`, and the
-history's integers and app id (`[A-Za-z0-9._:@+~/-]`, up to 127).
+No function takes commands, and only `exeOwners` takes paths (looked up in dpkg's lists, never opened): the other
+arguments are booleans, a language code (letters, digits, `-` and `_`, up to 15), a PID with its start time
+(integers), `'TERM'` or `'KILL'`, and the history's integers and app id (`[A-Za-z0-9._:@+~/-]`, up to 127).
 `lord-server` runs nothing for the Monitor.
 
 ### Sampling without slowing the screen

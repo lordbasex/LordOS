@@ -11,7 +11,7 @@ Shows what is going on in the computer: processor, memory, network, disks, proce
 app's network connections.
 
 - **CPU, memory and disks:** live graphs, per core and per process.
-- **Processes:** sorted by what uses the most, with search.
+- **Processes:** sorted by any column, with search, filters by origin and by program. **Grouped** shows one row per app with its processes inside, and **Quit All** ends a whole app at once. Each process shows who started it and a badge of where it comes from (a blue seal for LordOS itself, a pink one for LordOS apps), and Statistics adds averages and peaks over 1, 5 or 15 minutes. While the pointer is over the list its order stays still.
 - **Network:** one row per app with its traffic and connections, and a **map** with arcs to each
   server's country. The country comes from a local database: nobody is asked.
 - **GPU:** each graphics card drawn live, its load, temperature, fan, memory, clocks and power, the apps using it
