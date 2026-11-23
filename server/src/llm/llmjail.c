@@ -94,7 +94,11 @@ static int add_path(int rs, const char *path, uint64_t allow, int file) {
 
 static int landlock(const LlmJailCfg *cfg, int *mask) {
     int abi = (int)syscall(SYS_landlock_create_ruleset, NULL, 0U, LANDLOCK_CREATE_RULESET_VERSION);
-    if (abi < 1) return -1;
+#ifdef LLMJAIL_FAKE_ABI
+    if (abi > LLMJAIL_FAKE_ABI) abi = LLMJAIL_FAKE_ABI;     /* tests only (build/lord-llm-abi5): a kernel without scoping */
+#endif
+    /* all three layers or nothing: files, TCP (ABI 4) and the scoping of signals and abstract sockets (ABI 6) */
+    if (abi < LLMJAIL_LANDLOCK_ABI) return -1;
     uint64_t fs = LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_READ_FILE |
                   LANDLOCK_ACCESS_FS_READ_DIR | LANDLOCK_ACCESS_FS_REMOVE_DIR | LANDLOCK_ACCESS_FS_REMOVE_FILE |
                   LANDLOCK_ACCESS_FS_MAKE_CHAR | LANDLOCK_ACCESS_FS_MAKE_DIR | LANDLOCK_ACCESS_FS_MAKE_REG |
@@ -112,16 +116,24 @@ static int landlock(const LlmJailCfg *cfg, int *mask) {
     const uint64_t RD = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
     int bad = 0;
     bad |= add_path(rs, "/usr", RD, 0);                           /* libraries, ggml's CPU backends; never executable */
+    /* optional reads: without them the engine only loses a convenience (and a missing file grants nothing) */
     add_path(rs, "/etc/ld.so.cache", LANDLOCK_ACCESS_FS_READ_FILE, 1);
     add_path(rs, "/sys/devices/system/cpu", RD, 0);               /* CPU topology */
     add_path(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, 1);
     add_path(rs, "/dev/urandom", LANDLOCK_ACCESS_FS_READ_FILE, 1);
-    /* the dynamic loader is opened for execution with the engine: executable, nothing else in /usr is */
+    /* the dynamic loader is opened for execution with the engine: executable, nothing else in /usr is; this
+     * architecture's must be there */
     static const char *const loaders[] = { "/lib64/ld-linux-x86-64.so.2", "/lib/ld-linux-aarch64.so.1", NULL };
-    for (const char *const *l = loaders; *l; l++) add_path(rs, *l, LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE, 1);
-    bad |= add_fd(rs, cfg->engine_fd, LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE);
-    bad |= add_fd(rs, cfg->model_fd, LANDLOCK_ACCESS_FS_READ_FILE);
-    bad |= add_fd(rs, cfg->dir_fd, LANDLOCK_ACCESS_FS_MAKE_SOCK | LANDLOCK_ACCESS_FS_REMOVE_FILE);
+    int loader = 0;
+    for (const char *const *l = loaders; *l; l++) loader |= !add_path(rs, *l, LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE, 1);
+    bad |= !loader;
+    /* the rules everything else depends on: any one refused stops the start */
+    bad |= add_fd(rs, cfg->engine_fd, LANDLOCK_ACCESS_FS_EXECUTE | LANDLOCK_ACCESS_FS_READ_FILE) ? 1 : 0;
+#ifdef LLMJAIL_FAIL_MODEL_RULE
+    bad |= 1;                                                   /* tests only (build/lord-llm-norule) */
+#endif
+    bad |= add_fd(rs, cfg->model_fd, LANDLOCK_ACCESS_FS_READ_FILE) ? 1 : 0;
+    bad |= add_fd(rs, cfg->dir_fd, LANDLOCK_ACCESS_FS_MAKE_SOCK | LANDLOCK_ACCESS_FS_REMOVE_FILE) ? 1 : 0;
     if (bad) { close(rs); return -1; }
     if (syscall(SYS_landlock_restrict_self, rs, 0U)) { close(rs); return -1; }
     close(rs);
@@ -150,7 +162,7 @@ static int landlock(const LlmJailCfg *cfg, int *mask) { (void)cfg; (void)mask; r
 #define LD_NR BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr))
 #define LD_ARG(i) BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[i]))
 
-static int filter(struct sock_filter *f, int max) {
+static int filter(struct sock_filter *f, int max, unsigned self) {
     int n = 0;
     EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch)));
     EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, LJ_ARCH, 1, 0));
@@ -205,6 +217,22 @@ static int filter(struct sock_filter *f, int max) {
     EMIT(RET_ERR(EPERM));
     EMIT(RET_ALLOW);
     EMIT(LD_NR);
+    /* signals: only to itself (lord-llm's pid is the engine's after the exec, and the engine leads its own process
+     * group, so 0 is itself too). kill, rt_sigqueueinfo, tgkill and rt_tgsigqueueinfo: arg0 must be its own pid
+     * (or 0 for kill); tkill (a bare thread id, possibly another process's) and pidfds: never. Landlock's signal
+     * scoping already refuses other processes; this holds even for its own child processes. */
+    static const int self_only[] = { SYS_kill, SYS_rt_sigqueueinfo, SYS_tgkill, SYS_rt_tgsigqueueinfo };
+    for (size_t i = 0; i < sizeof self_only / sizeof self_only[0]; i++) {
+        /* [0]jeq nr [1]ld a0 [2]jeq self [3]jeq 0 (kill only) [4]EPERM [5]ALLOW [6]ld nr */
+        int kill0 = self_only[i] == SYS_kill;
+        EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, (unsigned)self_only[i], 0, kill0 ? 5 : 4));
+        EMIT(LD_ARG(0));
+        EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, self, kill0 ? 2 : 1, 0));
+        if (kill0) EMIT(BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 1, 0));
+        EMIT(RET_ERR(EPERM));
+        EMIT(RET_ALLOW);
+        EMIT(LD_NR);
+    }
     /* clone3 and io_uring: ENOSYS (glibc falls back to clone; io_uring's own socket and connect would bypass this) */
     static const int nosys[] = { SYS_clone3, SYS_io_uring_setup, SYS_io_uring_enter, SYS_io_uring_register };
     for (size_t i = 0; i < sizeof nosys / sizeof nosys[0]; i++) {
@@ -212,6 +240,7 @@ static int filter(struct sock_filter *f, int max) {
         EMIT(RET_ERR(ENOSYS));
     }
     static const int deny[] = {
+        SYS_tkill, SYS_pidfd_open, SYS_pidfd_send_signal,
         SYS_connect, SYS_execve, SYS_ptrace, SYS_process_vm_readv, SYS_process_vm_writev, SYS_pidfd_getfd,
         SYS_mount, SYS_umount2, SYS_pivot_root, SYS_chroot, SYS_unshare, SYS_setns, SYS_mount_setattr, SYS_open_tree,
         SYS_move_mount, SYS_fsopen, SYS_fsmount, SYS_fsconfig, SYS_fspick, SYS_bpf, SYS_perf_event_open, SYS_keyctl,
@@ -235,7 +264,7 @@ static int filter(struct sock_filter *f, int max) {
 static int seccomp(void) {
     if (!LJ_ARCH) return -1;
     static struct sock_filter f[256];
-    int n = filter(f, (int)(sizeof f / sizeof f[0]));
+    int n = filter(f, (int)(sizeof f / sizeof f[0]), (unsigned)getpid());
     if (n > (int)(sizeof f / sizeof f[0])) return -1;
     struct sock_fprog prog = { .len = (unsigned short)n, .filter = f };
     return (int)syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_TSYNC, &prog) ? -1 : 0;
@@ -250,7 +279,8 @@ int llmjail_apply(const LlmJailCfg *cfg) {
     }
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) return -1;
     mask |= LJ_NOPRIV;
-    landlock(cfg, &mask);
+    /* fail closed: no engine without every Landlock layer (LordOS's kernel, 6.12, has ABI 6) */
+    if (landlock(cfg, &mask)) return -1;
     if (seccomp()) return -1;
     mask |= LJ_SECCOMP;
     return mask;

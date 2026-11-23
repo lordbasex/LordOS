@@ -39,6 +39,7 @@
   "analysis.failed": "Mô hình cục bộ không trả lời: chỉ dùng quy tắc.",
   "analysis.rejected": "Câu trả lời của mô hình cục bộ không hợp lệ nên đã bị bỏ.",
   "analysis.done": "Đã được mô hình cục bộ phân tích.",
+  "modelNormal": "Lumo không thấy điều gì bất thường, nhưng quy tắc vẫn được kích hoạt: hãy tự kiểm tra.",
   "done": "Xong: {action}",
   "youDecide": "Lumo gợi ý; bạn quyết định. Không có thao tác nào tự chạy.",
   "engine.off": "Đã dừng (khởi động khi cần)",

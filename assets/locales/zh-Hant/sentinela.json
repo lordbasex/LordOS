@@ -39,6 +39,7 @@
   "analysis.failed": "本機模型沒有回應：僅規則。",
   "analysis.rejected": "本機模型的回答無效，已捨棄。",
   "analysis.done": "已由本機模型分析。",
+  "modelNormal": "Lumo 沒有發現異常，但規則仍被觸發：請自行查看。",
   "done": "已完成：{action}",
   "youDecide": "Lumo 只提供建議，由你決定。不會有任何動作自行執行。",
   "engine.off": "已停止（需要時啟動）",

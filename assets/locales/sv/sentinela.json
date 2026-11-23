@@ -39,6 +39,7 @@
   "analysis.failed": "Den lokala modellen svarade inte: bara regler.",
   "analysis.rejected": "Den lokala modellens svar var ogiltigt och kastades.",
   "analysis.done": "Analyserat av den lokala modellen.",
+  "modelNormal": "Lumo såg inget ovanligt, men regeln utlöstes ändå: titta själv.",
   "done": "Klart: {action}",
   "youDecide": "Lumo föreslår; du bestämmer. Inget görs av sig självt.",
   "engine.off": "Stoppad (startar vid behov)",

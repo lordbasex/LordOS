@@ -24,7 +24,7 @@ export { parseWav, levelDb, quietEnough, roomCheck, takeName, trimSilence, joinP
 export { scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName } from './voicemanager.js';
 // Sentinela, the process guard (docs/SENTINELA.md): its models, its rules and its session service
 export { LLM_MODELS, ENGINE_PACKAGE, llmModel, packagesForModel, llmPackageOk } from './llmcatalog.js';
-export { TRIGGERS, ACTIONS, SENTINELA_DEFAULTS, factLines } from './sentinelamodel.js';
+export { TRIGGERS, ACTIONS, SENTINELA_DEFAULTS, factLines, presentAlert } from './sentinelamodel.js';
 export {
   sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery,
   clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm,

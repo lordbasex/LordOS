@@ -4,7 +4,7 @@
 // list of actions, and the programs marked "It's mine".
 import {
   View, Text, Button, Toggle, useTheme, useLocale, useStore, formatBytes, formatTime, formatDate, spacing, typeScale,
-  LLM_MODELS, packagesForModel, TRIGGERS, ACTIONS, factLines, sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs,
+  LLM_MODELS, packagesForModel, TRIGGERS, ACTIONS, factLines, presentAlert, sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs,
   refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery, clearSentinelaAlerts, sentinelaActionLabel, installLlm, removeLlm,
   ShieldGlyph, settings, fs,
 } from '@lordos/sdk';
@@ -135,7 +135,8 @@ function AlertRow({ a, open, onToggle }) {
   const { t: tr } = useLocale();
   const th = useTheme();
   const when = new Date(a.time || 0);
-  const title = a.verdict === 'dangerous' || a.verdict === 'suspicious' ? tr(`sentinela.title.${a.verdict}`, { name: a.name }) : tr(`sentinela.title.${a.rule}`, { name: a.name });
+  const pres = presentAlert(a);
+  const title = tr(pres.title, { name: a.name });
   const home = (() => { try { return fs.home(); } catch (e) { return ''; } })();
   const lines = factLines(a.ev || a, a.facts, { home, user: home.split('/').filter(Boolean).pop() || '' });
   const acts = a.rule === 'autostart' ? ['monitor', 'ignore'] : [...ACTIONS.filter((x) => x !== 'pause' || a.done !== 'pause'), ...(a.done === 'pause' ? ['resume'] : [])];
@@ -149,7 +150,8 @@ function AlertRow({ a, open, onToggle }) {
       {open ? (
         <View style={{ gap: spacing.xs, paddingStart: 16 }}>
           <Text style={{ fontSize: typeScale.callout, color: th.text, lineHeight: 1.45, textAlign: 'start' }}>
-            {a.reason || tr(`sentinela.why.${a.rule}`, { name: a.name, place: tr(`sentinela.place.${a.place || 'none'}`) })}</Text>
+            {pres.reason || tr(`sentinela.why.${a.rule}`, { name: a.name, place: tr(`sentinela.place.${a.place || 'none'}`) })}</Text>
+          {pres.note ? <Text style={{ fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' }}>{tr(pres.note)}</Text> : null}
           <Text style={{ fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' }}>{tr('sentinela.analyzed')}</Text>
           {lines.map((l, i) => <Text key={i} style={{ fontSize: typeScale.caption, color: th.text, textAlign: 'start' }}>{tr(l.key, l.vars)}</Text>)}
           <Text style={{ fontSize: typeScale.caption, color: th.textDim, textAlign: 'start' }}>{tr(`sentinela.analysis.${a.analysis || 'none'}`)}</Text>

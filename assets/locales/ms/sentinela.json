@@ -39,6 +39,7 @@
   "analysis.failed": "Model setempat tidak menjawab: peraturan sahaja.",
   "analysis.rejected": "Jawapan model setempat tidak sah dan telah dibuang.",
   "analysis.done": "Dianalisis oleh model setempat.",
+  "modelNormal": "Lumo tidak nampak apa-apa yang luar biasa, tetapi peraturan tetap tercetus: semak sendiri.",
   "done": "Selesai: {action}",
   "youDecide": "Lumo mencadangkan; anda yang membuat keputusan. Tiada tindakan berjalan dengan sendiri.",
   "engine.off": "Berhenti (bermula apabila diperlukan)",

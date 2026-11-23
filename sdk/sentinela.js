@@ -31,7 +31,7 @@ import { admin } from './admin.js';
 import { llmPackageOk } from './llmcatalog.js';
 import {
   SENTINELA_DEFAULTS, TRIGGER_DEFAULTS, createTracker, buildSummary, systemPrompt, parseVerdict, ignoreMatch, ruleAction, factLines,
-  placeOf, clean,
+  placeOf, clean, presentAlert,
 } from './sentinelamodel.js';
 
 const TICK_MS = 10 * 1000, AUTOSTART_MS = 5 * 60 * 1000, ANSWER_WAIT_MS = 25 * 1000, ANSWER_MAX_MS = 200 * 1000;
@@ -162,16 +162,16 @@ function openAlert(a) { wm.open('settings', { args: { section: 'ai', page: 'sent
 
 function alertText(a) {
   const vars = { name: clean(a.name, 40) };
-  const title = a.verdict === 'dangerous' || a.verdict === 'suspicious' ? t(`sentinela.title.${a.verdict}`, vars) : t(`sentinela.title.${a.rule}`, vars);
+  const p = presentAlert(a);
   const lines = factLines(a.ev || a, a.facts, { home: home(), user: user() }).map((l) => t(l.key, l.vars));
-  const why = a.reason || t(`sentinela.why.${a.rule}`, { ...vars, place: t(`sentinela.place.${a.place || 'none'}`) });
-  return { title, body: [why, ...lines].join('\n') };
+  const why = p.reason || t(`sentinela.why.${a.rule}`, { ...vars, place: t(`sentinela.place.${a.place || 'none'}`) });
+  return { title: t(p.title, vars), body: [why, ...(p.note ? [t(p.note)] : []), ...lines].join('\n'), sticky: p.sticky };
 }
 
 function show(a) {
-  const { title, body } = alertText(a);
+  const { title, body, sticky } = alertText(a);
   return notify({
-    label: t('sentinela.name'), icon: ShieldGlyph, title, body, sticky: a.verdict === 'dangerous',
+    label: t('sentinela.name'), icon: ShieldGlyph, title, body, sticky,
     actions: noticeActions(a).map((id, i) => ({ id, label: actionLabel(id), primary: i === 0 && id !== 'monitor', run: () => runSentinelaAction(a, id) })),
     defaultAction: { id: 'open', run: () => openAlert(a) },
   });
@@ -218,9 +218,9 @@ async function handle(ev, prefs) {
     if (first !== undefined) Object.assign(alert, apply(first));
     else pending.then((r) => patchAlert(alert.id, apply(r)));      // too slow for the notice: it lands in the history
   }
-  // the model found it normal: kept in the history, no notice
+  // a rule raised it: always shown, whatever the model said (presentAlert)
   putAlert(alert);
-  if (alert.verdict !== 'normal') show(alert);
+  show(alert);
   return alert;
 }
 

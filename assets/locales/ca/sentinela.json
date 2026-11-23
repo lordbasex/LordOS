@@ -39,6 +39,7 @@
   "analysis.failed": "El model local no ha respost: només regles.",
   "analysis.rejected": "La resposta del model local no era vàlida i s’ha descartat.",
   "analysis.done": "Analitzat pel model local.",
+  "modelNormal": "En Lumo no ha vist res d’estrany, però la regla s’ha disparat igualment: revisa-ho tu.",
   "done": "Fet: {action}",
   "youDecide": "Lumo proposa; tu decideixes. Cap acció es fa sola.",
   "engine.off": "Aturat (s’inicia quan cal)",

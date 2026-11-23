@@ -39,6 +39,7 @@
   "analysis.failed": "Vietinis modelis neatsakė: tik taisyklės.",
   "analysis.rejected": "Vietinio modelio atsakymas buvo netinkamas ir atmestas.",
   "analysis.done": "Išanalizavo vietinis modelis.",
+  "modelNormal": "Lumo nepastebėjo nieko neįprasto, bet taisyklė vis tiek suveikė: patikrinkite patys.",
   "done": "Atlikta: {action}",
   "youDecide": "Lumo siūlo, o sprendžiate jūs. Jokie veiksmai nevykdomi savaime.",
   "engine.off": "Sustabdytas (paleidžiamas prireikus)",

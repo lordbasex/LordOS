@@ -39,6 +39,7 @@
   "analysis.failed": "A helyi modell nem válaszolt: csak szabályok.",
   "analysis.rejected": "A helyi modell válasza érvénytelen volt, ezért elvetettük.",
   "analysis.done": "A helyi modell elemezte.",
+  "modelNormal": "Lumo nem látott semmi szokatlant, de a szabály mégis jelzett: nézd meg te is.",
   "done": "Kész: {action}",
   "youDecide": "Lumo javasol, te döntesz. Semmi sem történik magától.",
   "engine.off": "Leállítva (szükség esetén elindul)",

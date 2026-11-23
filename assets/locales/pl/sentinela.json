@@ -39,6 +39,7 @@
   "analysis.failed": "Lokalny model nie odpowiedział: tylko reguły.",
   "analysis.rejected": "Odpowiedź lokalnego modelu była nieprawidłowa i została odrzucona.",
   "analysis.done": "Przeanalizowane przez lokalny model.",
+  "modelNormal": "Lumo nie zauważył nic dziwnego, ale reguła i tak zadziałała: sprawdź sam.",
   "done": "Gotowe: {action}",
   "youDecide": "Lumo proponuje; ty decydujesz. Nic nie dzieje się samo.",
   "engine.off": "Zatrzymany (uruchamia się w razie potrzeby)",

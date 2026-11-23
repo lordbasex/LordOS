@@ -21,7 +21,14 @@ build/llm-fake-engine: tests/llm_fake_engine.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $<
 	chmod g-w $@
+# lord-llm built to fail closed (tests only, never installed): a kernel without Landlock's scoping, a refused rule
+build/lord-llm-abi5: $(LLM_LAUNCHER_SRC) src/llm/llmjail.h src/sec/cgroup.h
+	$(CC) $(CPPFLAGS) -DLLMJAIL_FAKE_ABI=5 $(CFLAGS) $(WARN) -std=c11 -o $@ $(LLM_LAUNCHER_SRC)
+	chmod g-w $@
+build/lord-llm-norule: $(LLM_LAUNCHER_SRC) src/llm/llmjail.h src/sec/cgroup.h
+	$(CC) $(CPPFLAGS) -DLLMJAIL_FAIL_MODEL_RULE $(CFLAGS) $(WARN) -std=c11 -o $@ $(LLM_LAUNCHER_SRC)
+	chmod g-w $@
 LLM_TEST_SRC := tests/llm_engine_test.c src/llm/engine.c src/llm/facts.c src/sec/json.c
-build/llm-engine-test: $(LLM_TEST_SRC) src/llm/engine.h src/llm/llmjail.h src/sec/json.h build/lord-llm build/llm-fake-engine
+build/llm-engine-test: $(LLM_TEST_SRC) src/llm/engine.h src/llm/llmjail.h src/sec/json.h build/lord-llm build/llm-fake-engine build/lord-llm-abi5 build/lord-llm-norule
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LLM_TEST_SRC) -lpthread
 	./$@ || { rm -f $@; exit 1; }

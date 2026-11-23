@@ -39,6 +39,7 @@
   "analysis.failed": "Modeli ya ndani haikujibu: kanuni tu.",
   "analysis.rejected": "Jibu la modeli ya ndani halikuwa sahihi na limetupwa.",
   "analysis.done": "Imechanganuliwa na modeli ya ndani.",
+  "modelNormal": "Lumo haikuona jambo lisilo la kawaida, lakini kanuni bado ilianzishwa: angalia mwenyewe.",
   "done": "Imekamilika: {action}",
   "youDecide": "Lumo inapendekeza; wewe unaamua. Hakuna hatua inayojiendesha yenyewe.",
   "engine.off": "Imesimamishwa (inaanza inapohitajika)",

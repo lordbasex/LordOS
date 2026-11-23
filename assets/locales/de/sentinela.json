@@ -39,6 +39,7 @@
   "analysis.failed": "Das lokale Modell hat nicht geantwortet: nur Regeln.",
   "analysis.rejected": "Die Antwort des lokalen Modells war ungültig und wurde verworfen.",
   "analysis.done": "Vom lokalen Modell analysiert.",
+  "modelNormal": "Lumo hat nichts Ungewöhnliches gesehen, aber die Regel hat trotzdem ausgelöst: Sieh selbst nach.",
   "done": "Erledigt: {action}",
   "youDecide": "Lumo schlägt vor; du entscheidest. Nichts passiert von selbst.",
   "engine.off": "Gestoppt (startet bei Bedarf)",

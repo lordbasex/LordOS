@@ -39,6 +39,7 @@
   "analysis.failed": "Yerel model yanıt vermedi: yalnızca kurallar.",
   "analysis.rejected": "Yerel modelin yanıtı geçerli değildi ve atıldı.",
   "analysis.done": "Yerel model tarafından analiz edildi.",
+  "modelNormal": "Lumo olağan dışı bir şey görmedi, ama kural yine de tetiklendi: kendiniz bir göz atın.",
   "done": "Tamam: {action}",
   "youDecide": "Lumo önerir, siz karar verirsiniz. Hiçbir işlem kendiliğinden çalışmaz.",
   "engine.off": "Durduruldu (gerektiğinde başlar)",

@@ -39,6 +39,7 @@
   "analysis.failed": "Hindi sumagot ang lokal na modelo: mga patakaran lang.",
   "analysis.rejected": "Hindi wasto ang sagot ng lokal na modelo kaya itinapon ito.",
   "analysis.done": "Sinuri ng lokal na modelo.",
+  "modelNormal": "Walang nakitang kakaiba si Lumo, pero na-trigger pa rin ang patakaran: tingnan mo mismo.",
   "done": "Tapos na: {action}",
   "youDecide": "Nagmumungkahi si Lumo; ikaw ang magpapasya. Walang aksyong kusang tumatakbo.",
   "engine.off": "Nakahinto (nagsisimula kapag kailangan)",
