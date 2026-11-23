@@ -14,6 +14,7 @@
 #include "vm/vmagent.h"
 #include "vm/vmnet.h"
 #include "vm/vmgvtwin.h"
+#include "vm/vmperfwin.h"
 #include "vm/vmhoststop.h"
 
 #include <limits.h>
@@ -2261,6 +2262,59 @@ static void test_gvtwin(void) {
     CHECK(!strcmp(tiny, "intel d"));
 }
 
+/* Windows Search under the performance profile (vmperfwin.h): the two fixed scripts and every line they may print */
+static void test_perfwin(void) {
+    /* constants only: no printf conversion, no argument, nothing read from outside the two registry places */
+    CHECK(!strchr(PERFWIN_SEARCH_ON, '%') && !strchr(PERFWIN_SEARCH_OFF, '%'));
+    CHECK(!strstr(PERFWIN_SEARCH_ON, "$args") && !strstr(PERFWIN_SEARCH_OFF, "$args"));
+    CHECK(strstr(PERFWIN_SEARCH_ON, "$O='on'") && strstr(PERFWIN_SEARCH_OFF, "$O='off'"));
+    CHECK(strstr(PERFWIN_SEARCH_ON, "start= demand") && !strstr(PERFWIN_SEARCH_OFF, "start= demand"));
+    CHECK(strstr(PERFWIN_SEARCH_OFF, "'delayed-auto'") && !strstr(PERFWIN_SEARCH_ON, "Start-Service"));
+    CHECK(strstr(PERFWIN_SEARCH_ON, "HKLM:\\SOFTWARE\\LordOS\\GuestWin") && strstr(PERFWIN_SEARCH_ON, "Global\\LordOS-wsearch"));
+    /* every "<on|off> <start> <service>" against the rule written out again here */
+    static const char *const S[] = { "set", "ours", "manual", "disabled", "restored", "changed", "nothing", "dropped", "none", "busy" };
+    static const char *const V[] = { "stopped", "idle", "started", "notstarted", "-" };
+    static const char *const on_ok[] = { "set stopped", "set idle", "ours stopped", "ours idle", "manual stopped", "manual idle", "disabled idle", "none -", "busy -" };
+    static const char *const off_ok[] = { "restored started", "restored notstarted", "changed -", "nothing -", "dropped -", "none -", "busy -" };
+    PerfWinResult w;
+    char t[64], line[200];
+    int n_ok = 0;
+    for (int o = 0; o < 2; o++)
+        for (int s = 0; s < 10; s++)
+            for (int v = 0; v < 5; v++) {
+                char sv[32];
+                snprintf(sv, sizeof sv, "%s %s", S[s], V[v]);
+                int want = 0;
+                const char *const *ok = o ? on_ok : off_ok;
+                int nk = o ? (int)(sizeof on_ok / sizeof *on_ok) : (int)(sizeof off_ok / sizeof *off_ok);
+                for (int k = 0; k < nk; k++) if (!strcmp(ok[k], sv)) want = 1;
+                snprintf(t, sizeof t, "%s %s", o ? "on" : "off", sv);
+                int r = perfwin_parse(t, &w);
+                if ((r == 0) != want) fprintf(stderr, "  perfwin_parse \"%s\": got %d\n", t, r);
+                CHECK((r == 0) == want);
+                if (r) { CHECK(!w.on && !w.start && !w.svc); continue; }
+                n_ok++;
+                CHECK(w.on == o && w.start == s + 1 && w.svc == v + 1);
+                perfwin_describe(&w, line, sizeof line);
+                CHECK(!strncmp(line, "performance profile: ", 21) && !strchr(line, '?'));
+            }
+    CHECK(n_ok == 16);
+    static const char *const bad[] = { "", "on", "on set", "on set stopped ", " on set stopped", "on  set stopped", "on set stopped x",
+                                       "ON set stopped", "on Set stopped", "on set\tstopped", "onn set stopped", "of none -", "on set -",
+                                       "off restored -", "on none stopped", "off busy started", "on set stoppedx", "on sett stopped" };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+        if (perfwin_parse(bad[i], &w) != -1) fprintf(stderr, "  perfwin_parse \"%s\": accepted\n", bad[i]);
+        CHECK(perfwin_parse(bad[i], &w) == -1);
+    }
+    CHECK(perfwin_parse(NULL, &w) == -1);
+    perfwin_parse("on set stopped", &w);
+    perfwin_describe(&w, line, sizeof line);
+    CHECK(!strcmp(line, "performance profile: Windows Search set to start manually (its automatic start kept to put back), stopped"));
+    char tiny[8];
+    perfwin_describe(&w, tiny, sizeof tiny);
+    CHECK(!strcmp(tiny, "perform"));
+}
+
 static void test_open_with(void) {
     static const char tok[] = "0123456789abcdef0123456789abcdef";
     uint8_t sha[32], o[AG_OPEN_BYTES], back[32];
@@ -2384,6 +2438,7 @@ static void test_host_stop_plan(void) {
 
 int main(void) {
     test_gvtwin();
+    test_perfwin();
     test_open_with();
     test_clip_on_demand();
     test_resolution();

@@ -31,6 +31,7 @@
 #include "vmunattend.h"
 #include "vmhoststop.h"
 #include "vmgvtwin.h"
+#include "vmperfwin.h"
 #include "vmpin.h"
 #include "vmlog.h"
 #include "vmcpu.h"
@@ -918,6 +919,9 @@ static struct {
     long gvt_pid;                           /* Intel's driver for a GVT-g vGPU (GVTWIN_PS): as ptr_pid */
     long long gvt_poll_at;
     int gvt_done, lag_gvt;
+    long search_pid;                        /* Windows Search under the performance profile (vmperfwin.h): as ptr_pid */
+    long long search_poll_at;
+    int search_done;
     long long xfer_poll_at;
     /* "Capture mouse" (VM_CAPTURE, docs/VIRTUALIZATION.md 6.25): the mouse wanted (1 relative, 0 the tablet), whether this
      * start has a relative mouse lord-vm added (arm64: one that takes over when its driver starts), the next check of
@@ -3114,7 +3118,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
-       AQ_PEXEC, AQ_PSTATUS, AQ_GEXEC, AQ_GSTATUS };
+       AQ_PEXEC, AQ_PSTATUS, AQ_GEXEC, AQ_GSTATUS, AQ_SEXEC, AQ_SSTATUS };
 
 /* A Clone's first start (6.3): one fixed script, run as root by qemu-guest-agent, with the new hostname as its only
  * argument (checked: one DNS label). The machine-id is made again by systemd from the clone's new SMBIOS UUID (the old
@@ -3271,6 +3275,30 @@ static void ptr_reply(int kind, const JVal *root, const JVal *r, int ok) {
               n, n == 1 ? "" : "s", c ? ", restarted to take it" : ", already so");
 }
 
+/* ---- Windows Search under a Windows machine's performance profile (docs/VIRTUALIZATION.md 7.1.4; vmperfwin.h) ----
+ * Once per run, when the LordOS tools say "perf" in their hello (w11: the person installed them), one of two fixed
+ * scripts runs as SYSTEM by qemu-guest-agent: with machine.json perf_profile, WSearch to Manual and stopped (its
+ * automatic start kept in HKLM to put back); without, a start type kept earlier put back and the service started. Only
+ * the on/off bit picks the script; what it prints is logged only, after perfwin_parse. */
+static void search_begin(void) {
+    if (S.search_done || !S.ag_windows || !S.lag_perf || !S.qga_up || !(S.ag_caps & VAC_EXEC) || S.search_pid || S.search_poll_at) return;
+    if (fx_exec_ps(S.m.perf_profile ? PERFWIN_SEARCH_ON : PERFWIN_SEARCH_OFF, AQ_SEXEC)) { vlog("performance profile: the guest agent is busy: Windows Search is tried again when the tools say hello"); return; }
+    S.search_pid = -1;
+}
+static void search_reply(int kind, const JVal *root, const JVal *r, int ok) {
+    if (!ok) { S.search_pid = 0; S.search_poll_at = 0; S.search_done = 1; vlog("performance profile: qemu-guest-agent: %s", qmp_error_desc(root)); return; }
+    if (kind == AQ_SEXEC) { S.search_pid = (long)json_num(r, "pid", 0); S.search_poll_at = now_ms() + 500; return; }
+    if (!json_bool(r, "exited", 0)) { S.search_poll_at = now_ms() + 1000; return; }
+    S.search_poll_at = 0; S.search_pid = 0; S.search_done = 1;
+    int code = (int)json_num(r, "exitcode", -1);
+    char said[200], line[200];
+    PerfWinResult w;
+    ag_exec_text(json_str(r, code == 0 ? "out-data" : "err-data"), said, sizeof said);
+    if (code != 0 || perfwin_parse(said, &w) || w.on != !!S.m.perf_profile) { vlog("performance profile: the guest's Windows Search script failed (%d): %.150s", code, said); return; }
+    perfwin_describe(&w, line, sizeof line);
+    vlog("%s", line);
+}
+
 /* ---- Intel's driver for a Windows machine's GVT-g vGPU (docs/MACHINES-GPU.md Mode A; vmgvtwin.h) ----
  * Once per run, when the machine has a vGPU and the LordOS tools say "gvt" in their hello (w6: the person installed
  * them), the fixed GVTWIN_PS runs as SYSTEM by qemu-guest-agent: hibernation and Fast Startup off, Intel's
@@ -3373,6 +3401,7 @@ static void qga_sync(void) {
     S.xfer_pid = 0; S.xfer_poll_at = 0;
     S.ptr_pid = 0; S.ptr_poll_at = 0;
     S.gvt_pid = 0; S.gvt_poll_at = 0;
+    S.search_pid = 0; S.search_poll_at = 0;
     snprintf(a, sizeof a, "{\"id\":%ld}", ++S.sync_id);
     qga_do("guest-sync", a, AQ_SYNC);
     S.sync_at = now_ms();
@@ -3401,6 +3430,7 @@ static void ag_lost(const char *why) {
     S.xfer_pid = 0; S.xfer_poll_at = 0; S.xfer_guest = XG_UNKNOWN;
     S.ptr_pid = 0; S.ptr_poll_at = 0;
     S.gvt_pid = 0; S.gvt_poll_at = 0;
+    S.search_pid = 0; S.search_poll_at = 0;
     /* an install of lordos-guest on its way: its next step's answer won't come */
     if (S.inst_busy) inst_reply(VME_WRONG_STATE, "qemu-guest-agent stopped answering in the guest");
     if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
@@ -3445,6 +3475,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     case AQ_XEXEC: case AQ_XSTATUS: xfer_reply(kind, root, r, ok); break;
     case AQ_PEXEC: case AQ_PSTATUS: ptr_reply(kind, root, r, ok); break;
     case AQ_GEXEC: case AQ_GSTATUS: gvt_reply(kind, root, r, ok); break;
+    case AQ_SEXEC: case AQ_SSTATUS: search_reply(kind, root, r, ok); break;
     case AQ_WIEXEC: case AQ_WISTATUS: case AQ_WIOPEN: case AQ_WIWRITE: case AQ_WICLOSE: wi_on_reply(kind, root, r, ok); break;
     case AQ_DEVRAW: {
         /* --dev-qmp: a qemu-guest-agent command for the tests; a pid, or what a guest-exec printed */
@@ -3528,6 +3559,7 @@ static void on_qga_reply(const JVal *root, int ok) {
         xfer_begin();
         ptr_begin();
         gvt_begin();
+        search_begin();
         /* a machine that resumed from a saved state has a clipboard helper that said hello to the lord-vm before: it
          * is asked to say it again (once; its answer gets the plain hello) */
         if (!S.lag_hello && S.lag_fd >= 0) { static const char ask[] = "lord-vm 2 clipboard clipx clipreq elevated ask"; lag_send(AGK_HELLO, (const uint8_t *)ask, sizeof ask - 1); }
@@ -4864,6 +4896,7 @@ static void drain_lag(void) {
                 ag_broadcast();
                 ptr_begin();                    /* the tools say "pointer": the display driver's pointer, once per run */
                 gvt_begin();                    /* the tools say "gvt": Intel's driver for the vGPU, once per run */
+                search_begin();                 /* the tools say "perf": Windows Search under the profile, once per run */
             }
         } else if (f.kind == AGK_STOPPING) {
             /* the guest's last shutdown step (its tools' systemd-shutdown hook, no hello: a fresh open of the port):
@@ -4942,9 +4975,11 @@ static void drain_lag(void) {
             else if ((1u << 24 | (unsigned)on << 16 | done << 8 | failed) != S.perf_said) {
                 S.perf_said = 1u << 24 | (unsigned)on << 16 | done << 8 | failed;
                 char d[64], x[64];
-                snprintf(d, sizeof d, "%s%s%s", done & AGPF_POWER ? " power plan" : "", done & AGPF_EFFECTS ? " visual effects" : "",
+                /* a Linux guest's helper (tools 7): the power profile (power-profiles-daemon) and the desktop's animations */
+                const char *pw = S.ag_windows ? " power plan" : " power profile", *fx = S.ag_windows ? " visual effects" : " animations";
+                snprintf(d, sizeof d, "%s%s%s", done & AGPF_POWER ? pw : "", done & AGPF_EFFECTS ? fx : "",
                          done & AGPF_TRANSPARENCY ? " transparency" : "");
-                snprintf(x, sizeof x, "%s%s%s", failed & AGPF_POWER ? " power plan" : "", failed & AGPF_EFFECTS ? " visual effects" : "",
+                snprintf(x, sizeof x, "%s%s%s", failed & AGPF_POWER ? pw : "", failed & AGPF_EFFECTS ? fx : "",
                          failed & AGPF_TRANSPARENCY ? " transparency" : "");
                 vlog("agent: the guest's performance profile is %s (%s:%s; refused:%s)", on ? "on" : "off", on ? "applied" : "put back",
                      d[0] ? d : " nothing", x[0] ? x : " nothing");
@@ -5919,6 +5954,7 @@ static void loop(void) {
         if (S.xfer_poll_at && (next < 0 || S.xfer_poll_at < next)) next = S.xfer_poll_at;
         if (S.ptr_poll_at && (next < 0 || S.ptr_poll_at < next)) next = S.ptr_poll_at;
         if (S.gvt_poll_at && (next < 0 || S.gvt_poll_at < next)) next = S.gvt_poll_at;
+        if (S.search_poll_at && (next < 0 || S.search_poll_at < next)) next = S.search_poll_at;
         if (S.inst_poll_at && (next < 0 || S.inst_poll_at < next)) next = S.inst_poll_at;
         if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
         if (S.wi_poll_at && (next < 0 || S.wi_poll_at < next)) next = S.wi_poll_at;
@@ -5951,6 +5987,7 @@ static void loop(void) {
         if (S.id_poll_at && now >= S.id_poll_at) { char a[48]; S.id_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.id_pid); qga_do("guest-exec-status", a, AQ_IDSTATUS); }
         if (S.xfer_poll_at && now >= S.xfer_poll_at) { char a[48]; S.xfer_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.xfer_pid); if (qga_do("guest-exec-status", a, AQ_XSTATUS)) S.xfer_poll_at = now + 300; }
         if (S.ptr_poll_at && now >= S.ptr_poll_at) { char a[48]; S.ptr_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.ptr_pid); if (qga_do("guest-exec-status", a, AQ_PSTATUS)) S.ptr_poll_at = now + 300; }
+        if (S.search_poll_at && now >= S.search_poll_at) { char a[48]; S.search_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.search_pid); if (qga_do("guest-exec-status", a, AQ_SSTATUS)) S.search_poll_at = now + 1000; }
         if (S.gvt_poll_at && now >= S.gvt_poll_at) { char a[48]; S.gvt_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.gvt_pid); if (qga_do("guest-exec-status", a, AQ_GSTATUS)) S.gvt_poll_at = now + 1000; }
         if (S.inst_poll_at && now >= S.inst_poll_at) { char a[48]; S.inst_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.inst_pid); if (qga_do("guest-exec-status", a, AQ_INSTSTATUS)) S.inst_poll_at = now + 500; }
         fx_tick(now);

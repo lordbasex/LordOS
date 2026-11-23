@@ -3408,10 +3408,12 @@ Limits: only a machine whose window (or apps mode) Machines has open is watched;
 closed is updated the next time its window opens. Tested by `server/tests/vm_model_test.mjs` (when, once per run,
 backoff, never a loop, settings, the notification); not yet on the dev VM with a real w7 guest.
 
-### 7.1.4 The guest's performance profile (tools w11, in development)
+### 7.1.4 The guest's performance profile (tools w11, Linux helper 7, in development)
 
-Approved by the maintainer on 2026-11-23 (Machines performance, item 5). A per-machine switch, Configure → Guest
-agent → **Performance profile**, off by default and shown for Windows guests (`windowsDevices`): machine.json schema 13
+Approved by the maintainer on 2026-11-23 (Machines performance, item 5; Windows Search and Linux guests approved the
+same day, below). A per-machine switch, Configure → Guest agent → **Performance profile**, off by default and shown for
+every guest (its note says what happens in a Windows guest, `machines.win.perfProfileNote`, or in a Linux one,
+`machines.cfg.perfProfileNote`): machine.json schema 13
 `"perf_profile": true` (written only when on), `lord-vm --set DIR --perf-profile on|off`, `lord.vm.set(dir, {
 perfProfile })`, read back as `perfProfile` by `lord.vm.list`. Like the other Configure switches it changes while the
 machine is off. It isn't on by default in apps mode either: it changes how the guest looks to the person (no
@@ -3439,24 +3441,55 @@ port go (log off, another session at the console, the host gone, exit) and when 
 process was killed). A part goes back only while it is still what the tools set: a change the person made in between
 stays. A part already at its minimum counts as done and is left alone.
 
-**Not done (needs a review, AGENTS.md):**
-- *Windows Search's indexing while idle.* Stopping or lowering the `WSearch` service needs administrator rights; the
-  tools run as the person and may not run elevated or gain a service. A proposal: one more fixed PowerShell run as
-  SYSTEM through qemu-guest-agent, like `PTR_PS`, that sets `WSearch` to manual and stops it while the profile is on
-  and puts its start type back after; nothing from the guest, the person or JS.
-- *Linux guests.* `lordos-guest` runs as the person and may start only `xclip`, `wl-paste`/`wl-copy` and `systemctl
-  --user show-environment`, and connect only to its X display. Setting power-profiles-daemon's profile needs the system
-  D-Bus (`net.hadess.PowerProfiles` / `org.freedesktop.UPower.PowerProfiles` `ActiveProfile`, allowed by polkit to the
-  active session) or `powerprofilesctl`; the cpufreq governor needs root; GNOME's `enable-animations` needs `gsettings`
-  or the session D-Bus (dconf), KDE's `kwriteconfig`. Each is a new connection or a new program for the helper. A
-  proposal: the helper speaks D-Bus itself, on the system bus only for `ActiveProfile` (read, set to `performance`,
-  put back) and on the session bus only for `org.gnome.desktop.interface enable-animations`, with no new program.
-  Until then the Linux helper's hello has no `perf` and lord-vm sends it nothing.
+**Windows Search (built 2026-11-23, approved by the maintainer the same day).** Stopping or lowering the `WSearch`
+service needs administrator rights, which the tools never have. So lord-vm runs one more fixed PowerShell as SYSTEM
+through qemu-guest-agent, once per run when the tools say `perf` (like `PTR_PS`): `PERFWIN_SEARCH_ON` when machine.json
+has `perf_profile`, `PERFWIN_SEARCH_OFF` when it hasn't (`server/src/vm/vmperfwin.c`). Both are compile-time constants;
+the on/off bit picks one and nothing from the guest, the person, JS or machine.json goes in.
+
+| Script | What it does |
+|---|---|
+| On | When `WSearch` starts automatically (`Start` 2, `DelayedAutostart` or not), that start type goes into `HKLM\SOFTWARE\LordOS\GuestWin` `WSearchStartWas` (DWORD 2 automatic, 18 automatic delayed) and the service is set to Manual (`sc.exe config WSearch start= demand`; if that fails the value goes again). Manual with a value kept: ours from an earlier run. Manual without one, or Disabled: left as it is. Then the service is stopped if it runs (`Stop-Service -Force`; not when Disabled) |
+| Off | With a value kept and the service still Manual (what the script set): the start type goes back (`auto` or `delayed-auto`) and the service is started. A start type changed in between stays. The value goes either way; one that isn't 2 or 18 is dropped |
+
+A named mutex (`Global\LordOS-wsearch`) keeps two runs apart. Each prints one line, `on|off <start type> <service>`
+(`set|ours|manual|disabled|restored|changed|nothing|dropped|none|busy` and `stopped|idle|started|notstarted|-`, only the
+16 combinations the scripts can print), read by `perfwin_parse` and only logged, e.g. `performance profile: Windows
+Search set to start manually (its automatic start kept to put back), stopped`. So while the profile is on the indexer
+stays off; it comes back at the first start with the profile off (Windows may still start a Manual service on demand,
+for example when the person searches).
+
+**Linux guests (built 2026-11-23, approved by the maintainer the same day; `lordos-guest` 7).** The helper says `perf` in
+its hello and, on `AGK_PERF`, speaks D-Bus itself (`tools/guest/dbusmin.c`: a Unix socket only, never TCP or an abstract
+address; EXTERNAL authentication; method calls built from its own constants; every reply checked, lengths, padding,
+header fields and signatures, before a value is read; nothing else on the buses is answered). It starts no new
+program (`tools/guest/perf.c`):
+
+| Part (`AGPF_*`) | How | Put back |
+|---|---|---|
+| Power profile (`POWER`) | System bus only (`/run/dbus/system_bus_socket`): power-profiles-daemon's `ActiveProfile` (`org.freedesktop.UPower.PowerProfiles`, else the older `net.hadess.PowerProfiles`) read, then set to `performance` through `org.freedesktop.DBus.Properties.Set`; polkit lets the active session switch profiles. No daemon, or a refusal (a guest whose daemon has no `performance` profile, which is common in a VM): refused | The earlier profile, if `performance` is still the active one |
+| Animations (`EFFECTS`) | Session bus only (`DBUS_SESSION_BUS_ADDRESS` `unix:path=`, else `$XDG_RUNTIME_DIR/bus`), only when `XDG_CURRENT_DESKTOP` names GNOME: `org.gnome.desktop.interface` `enable-animations` read through the desktop portal (`org.freedesktop.portal.Settings.ReadOne`, else `Read`), and set to false through dconf's own service (`ca.desrt.dconf.Writer.Change` on `/ca/desrt/dconf/Writer/user`, the path GSettings takes; the change set is GVariant `a{smv}` built byte for byte as GLib builds it). KDE and other desktops: refused | Its earlier value, if it is still false |
+
+What was there before is kept in `~/.local/state/lordos-guest/perf` (0600 in a 0700 folder; a fixed three-line text
+record, `power <profile or ->`, `anim <0, 1 or ->`, read back strictly, an unreadable one is dropped). It goes back on
+`AGK_PERF` 0, when the port goes (the host's lord-vm gone), when the helper ends (SIGTERM at log off, SIGINT, SIGHUP;
+the helper used to die at once on these) and at its next start after a crash. A part that couldn't be put back (a bus
+not there any more) stays in the record and is tried again at the next start or the next 0. A part already at its
+value counts as done and is left alone; lord-vm logs them as "power profile" and "animations". The calls wait 3 s at
+most (5 s for the portal and dconf, which the session bus may start for the call). Built with `-DLG_NO_PERF`, the helper
+has none of this and its hello doesn't say `perf`.
 
 Tests: `build/vm-test` (schema 13 and its round trip; `AGK_PERF`; all 2^24 three-byte `AGK_PERFSTATE` payloads
-against the rule; the `perf` hello word), `tests/vm_model_test.mjs` (`TOOLS_SHIPPED.windows` is the source's w11).
-Built with mingw-w64 with no warning; it imports only system DLLs (powrprof.dll added). Not yet checked in a running
-Windows guest.
+against the rule; the `perf` hello word; both search scripts are constants with no format or argument; all 100
+`on|off <start type> <service>` lines against the rule written out again, and malformed ones), `build/guest-dbus-test`
+(the method calls, every reply prefix and single-byte change, nested variants, errors, big-endian replies, dconf's change
+set against GLib's bytes, the record), `tests/guest_perf_test.sh` (two private dbus-daemons, the real dconf-service for
+a temporary home, stand-ins for power-profiles-daemon and the portal: on, off, the port going, SIGTERM, a killed run put
+back at the next start, a part changed in between, a refused profile, the older bus name, the portal's `Read`, KDE, no
+buses), `tests/vm_model_test.mjs` (`TOOLS_SHIPPED` is the sources' w11 and 7). Built with mingw-w64 with no warning;
+it imports only system DLLs (powrprof.dll added). The tools' part was checked in the maintainer's Windows 11 guest on
+2026-11-23 (`performance profile is on (applied: power plan visual effects transparency; refused: nothing)`). Not yet
+checked in a running guest: the Windows Search scripts and the Linux helper's part.
 
 ### 7.2 Apps mode (seamless)
 

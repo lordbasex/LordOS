@@ -520,11 +520,12 @@ export function Configure({ dir, section: section0, onClose }) {
         <Off off={running}><Toggle on={!!cur.agent} onChange={(x) => set({ agent: x, ...(!x ? { clipboard: 'off' } : {}) })} /></Off>
       </Row>
       <Row label={tr('machines.cfg.agentInstall')} note={tr('machines.cfg.agentInstallNote')} />
-      {/* the guest's performance profile (7.1.4, machine.json perf_profile): applied by the LordOS tools for Windows (w11)
-          while the machine runs, put back after; off by default */}
-      {m.windowsDevices ? <Row label={tr('machines.win.perfProfile')} note={[tr('machines.win.perfProfileNote'), offNote].filter(Boolean).join(' ')}>
+      {/* the guest's performance profile (7.1.4, machine.json perf_profile): applied by the LordOS tools for Windows (w11;
+          Windows Search through lord-vm's fixed script) or the Linux clipboard helper (7) while the machine runs, put
+          back after; off by default */}
+      <Row label={tr('machines.cfg.perfProfile')} note={[tr(m.windowsDevices ? 'machines.win.perfProfileNote' : 'machines.cfg.perfProfileNote'), offNote].filter(Boolean).join(' ')}>
         <Off off={running}><Toggle on={cur.perfProfile} onChange={(x) => set({ perfProfile: x })} /></Off>
-      </Row> : null}
+      </Row>
       {/* the LordOS tools brought up to date by themselves (model.js toolsAutoStep): app.json, at once, also while it runs */}
       <Row label={tr('machines.cfg.toolsAuto')} last note={tr('machines.cfg.toolsAutoNote')}>
         <Toggle on={toolsAutoOn(meta, defaultsOf(settings.get().machinesDefaults))} onChange={(x) => { writeMeta(dir, { toolsAuto: x }); setMeta(readMeta(dir)); }} />
