@@ -43,7 +43,7 @@
     log(`shot ${n} ${name} ${r && r.ok !== false ? 'saved' : 'failed'}`);
   };
   // the main column: right of the Store's two side columns
-  const CONTENT_X = FRAME.x + 230 + 190 + 10;
+  const CONTENT_X = FRAME.x + 250 + 190 + 10;
   // a node inside the main column's scroll view: Flathub's subtitle, at the top of every Flathub page (its box may be
   // scrolled out of the window; the wheel goes to the node, and up its parents to the scroll view)
   const content = () => {

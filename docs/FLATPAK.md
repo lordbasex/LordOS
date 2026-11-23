@@ -691,6 +691,15 @@ above, so nothing about where data comes from changed:
   `lord.flatpak.catalog()` gives it as `updated` (seconds). The model ignores a date before 2000, more than a day in
   the future or not a whole number. On the catalog of 2026-11-22 every one of the 3381 x86-64 apps has one.
 
+### Settings in the section's second column (in development; the latest release is 0.8.9.5)
+
+Asked by the maintainer on 2026-11-23: the shop opens straight on its banner. The section's description, **Only apps
+verified by Flathub** (with how many it hides), Flathub's rankings, **Refresh** and **Turn off** moved to **Settings**,
+the second column's item under Installed (`FlathubSettings` in `apps/store/flathubpages.js`). Refresh is also the ↻ icon
+in the title bar, next to the search, whose field says "Search Flathub apps" and searches only Flathub's catalog; the
+section is called **Flathub apps** in the sidebar, the titles and Installed's filter. Installed no longer repeats the
+description.
+
 ### Installed in the section's second column (in development; the latest release is 0.8.9.5)
 
 The maintainer asked on 2026-11-23 that each package system's section open on its shop and keep its installed apps

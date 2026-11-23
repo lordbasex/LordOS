@@ -541,6 +541,12 @@ that was probed.
 - **Where web apps show:** the Web apps section, a banner and a shelf in Discover (the catalog's first apps; "See all"
   opens the section), Discover's search, and their category's page. Every card has a "Web app" tag, so web apps are
   told apart from LordOS apps and Linux apps (`apps/store/webapps.js`).
+- **The section's Settings** (in development; the latest release is 0.8.9.5; asked by the maintainer on
+  2026-11-23): the second column is Installed, **Settings**, then the categories. Settings has what sat above the shop:
+  what a web app is, whether LordOS's web engine is installed yet (the first Get installs it), and Settings → Web apps
+  for each app's profiles, permissions and space (`WebSettings` in `apps/store/webapps.js`). The shop opens on "Add from
+  an address" (an action, so it stays) and the catalog; the search field says "Search web apps" and searches only the
+  catalog. Web apps have nothing to fetch, so the title bar has no update icon.
 - **The section's shop and its Installed** (in development; the latest release is 0.8.9.5; asked by the maintainer
   on 2026-11-23): the Web apps section opens on its shop (the subtitle, "Add from an address" and the catalog's
   cards); its second column starts with **Installed** (with how many are installed), then its categories. Installed

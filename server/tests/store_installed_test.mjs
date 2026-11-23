@@ -21,6 +21,7 @@ const apps = [
   { id: 'desktop:gimp', kind: 'linux' }, { id: 'desktop:vlc', kind: 'linux' },
   { id: 'flatpak:org.libreoffice.LibreOffice', kind: 'flatpak' },
   { id: 'web:telegram', kind: 'web' }, { id: 'web:whatsapp', kind: 'web' }, { id: 'odd', kind: 'other' },
+  { id: 'native:studioCamera', kind: 'native' },
 ];
 
 eq('lordos app', M.systemOf(apps[0]), 'lordos');
@@ -29,18 +30,19 @@ eq('linux app', M.systemOf(apps[3]), 'debian');
 eq('flatpak app', M.systemOf(apps[5]), 'flathub');
 eq('web app', M.systemOf(apps[6]), 'web');
 eq('unknown kind', M.systemOf(apps[8]), null);
+eq('an Apps LordOS item is LordOS\'s', M.systemOf(apps[9]), 'lordos');
 eq('no app', M.systemOf(null), null);
 
 eq('filters: all, the systems with apps in order, deactivated', M.installedFilters(apps),
-  [['all', 9], ['lordos', 3], ['debian', 2], ['flathub', 1], ['web', 2], ['off', 1]]);
+  [['all', 10], ['lordos', 4], ['debian', 2], ['flathub', 1], ['web', 2], ['off', 1]]);
 const noWeb = apps.filter((a) => a.kind !== 'web');
 eq('a system without apps has no filter', M.installedFilters(noWeb).map(([k]) => k), ['all', 'lordos', 'debian', 'flathub', 'off']);
-eq('the chosen one stays, empty', M.installedFilters(noWeb, 'web').map(([k, c]) => `${k}=${c}`), ['all=7', 'lordos=3', 'debian=2', 'flathub=1', 'web=0', 'off=1']);
+eq('the chosen one stays, empty', M.installedFilters(noWeb, 'web').map(([k, c]) => `${k}=${c}`), ['all=8', 'lordos=4', 'debian=2', 'flathub=1', 'web=0', 'off=1']);
 eq('deactivated is always there', M.installedFilters([]), [['all', 0], ['off', 0]]);
 
 const ids = (l) => l.map((a) => a.id);
 eq('all keeps every app', M.filterInstalled(apps, 'all').length, apps.length);
-eq('lordos', ids(M.filterInstalled(apps, 'lordos')), ['files', 'notes', 'game']);
+eq('lordos', ids(M.filterInstalled(apps, 'lordos')), ['files', 'notes', 'game', 'native:studioCamera']);
 eq('debian', ids(M.filterInstalled(apps, 'debian')), ['desktop:gimp', 'desktop:vlc']);
 eq('flathub', ids(M.filterInstalled(apps, 'flathub')), ['flatpak:org.libreoffice.LibreOffice']);
 eq('web', ids(M.filterInstalled(apps, 'web')), ['web:telegram', 'web:whatsapp']);
@@ -53,7 +55,11 @@ eq('filterOk: anything else is all', [undefined, '', 'x', 'installed'].map(M.fil
 eq('the second column value', [M.isMine(M.MINE), M.isMine(null), M.isMine('Graphics')], [true, false, false]);
 eq('no category is called like it', ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'Settings', 'System', 'Utility']
   .includes(M.MINE), false);
-eq('origins', ['debian', 'flathub', 'web', 'lordos'].map(M.originOf), ['src:debian', 'src:flathub', 'src:web', null]);
+eq('the Settings value', [M.isSettings(M.SETTINGS), M.isSettings(M.MINE), M.isSettings(null)], [true, false, false]);
+eq('no category is called like Settings', ['AudioVideo', 'Development', 'Education', 'Game', 'Graphics', 'Network', 'Office', 'Science', 'Settings', 'System', 'Utility']
+  .includes(M.SETTINGS), false);
+eq('the shop is neither', [M.isShop(null), M.isShop('Graphics'), M.isShop(M.MINE), M.isShop(M.SETTINGS)], [true, true, false, false]);
+eq('origins', ['debian', 'flathub', 'web', 'lordos', 'other'].map(M.originOf), ['src:debian', 'src:flathub', 'src:web', 'src:lordos', null]);
 
 console.log(`store-installed-test: ${n} checks, ${bad} failures`);
 process.exit(bad ? 1 : 0);

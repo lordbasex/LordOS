@@ -47,7 +47,8 @@ const there = (path) => { try { stat(path); return true; } catch (e) { return fa
 // APFS's driver is the item's optional part: the item can be in without it, and it can be added later on the same page
 const apfsMissing = () => there('/usr/lib/lordos/disk-formats.apfs') && !there('/usr/share/doc/apfs-dkms');
 export const needsDiskFormats = (fstype) => COMMERCIAL_FORMATS.includes(fstype) && (!diskFormatsOn() || (fstype === 'apfs' && apfsMissing()));
-export const openDiskFormats = () => wm.open('store', { args: { page: 'commercial', app: 'lordos-disk-formats' } });
+// (2026-11-23) its page in Apps LordOS, LordOS's own store (apps/store/lordospages.js)
+export const openDiskFormats = () => wm.open('store', { args: { page: 'lordos', native: 'diskFormats', nonce: Date.now() } });
 
 export function useDisks() {
   const [list, setList] = useState(disks.list);

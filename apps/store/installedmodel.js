@@ -7,23 +7,30 @@
 // called that (the categories are freedesktop's: AudioVideo, Graphics, …).
 export const MINE = 'installed';
 export const isMine = (sub) => sub === MINE;
+// (2026-11-23) the item under it, "Settings": the system's own settings (what used to sit above its shop). No category
+// is called that either (freedesktop's "Settings" category is capitalised and not one of the Store's).
+export const SETTINGS = 'settings';
+export const isSettings = (sub) => sub === SETTINGS;
+// A page of the second column that isn't the shop (Installed, Settings): a search typed there goes to the shop.
+export const isShop = (sub) => sub !== MINE && sub !== SETTINGS;
 
 // The package systems, in the order the filters show them.
 export const SYSTEMS = ['lordos', 'debian', 'flathub', 'web'];
 
-// A launcher entry's system (sdk/apps.js's `kind`): LordOS's own apps and installed .lpk packages, the Linux apps
-// Debian's packages brought, the Flatpak apps, the web apps. Anything else: null.
+// A launcher entry's system (sdk/apps.js's `kind`): LordOS's own apps, installed .lpk packages and the items of
+// LordOS's own store once installed ("native", lordosmodel.js), the Linux apps Debian's packages brought, the Flatpak
+// apps, the web apps. Anything else: null.
 export function systemOf(a) {
   const k = a && a.kind;
-  if (k === 'lordos' || k === 'package') return 'lordos';
+  if (k === 'lordos' || k === 'package' || k === 'native') return 'lordos';
   if (k === 'linux') return 'debian';
   if (k === 'flatpak') return 'flathub';
   if (k === 'web') return 'web';
   return null;
 }
 
-// The origin page ('src:debian' | 'src:flathub' | 'src:web') whose system this is, the other way round.
-export const originOf = (system) => (system === 'debian' || system === 'flathub' || system === 'web' ? `src:${system}` : null);
+// The origin page ('src:lordos' | 'src:debian' | 'src:flathub' | 'src:web') whose system this is, the other way round.
+export const originOf = (system) => (SYSTEMS.includes(system) ? `src:${system}` : null);
 
 // The general Installed page's filters: [key, count] for All, each system that has installed apps (in SYSTEMS' order)
 // and Deactivated (always: it says how to turn a LordOS app off again). A filter that is chosen stays even when its

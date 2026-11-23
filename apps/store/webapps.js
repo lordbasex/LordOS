@@ -16,6 +16,7 @@ import { Card, CardGrid, Featured, Pill, Shelf } from './ui.js';
 import { AddFromAddress, Origin, box, open } from './addweb.js';
 import { GetSteps, useGetWebApp } from './getweb.js';
 import { TrademarkNote } from './trademark.js';
+import { SettingsPage, About, Group, Row } from './sectionsettings.js';
 
 export const webCatalog = () => M.catalogApps(catalog, []);
 export const webCatalogData = catalog;
@@ -116,11 +117,9 @@ export function WebAppsPage({ query, onOpen }) {
   const [sheet, setSheet] = useState(null);
   const sec = M.storeSection({ available, installed });
   const list = M.catalogApps(catalog, installed, query);
+  // (2026-11-23) straight on the shop: what web apps are and whether LordOS's web engine is installed are in its
+  // Settings (WebSettings, the second column's item under Installed); Add from an address is an action and stays here
   return h(View, null,
-    h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.xl, textAlign: 'start' } }, t('webapps.store.subtitle')),
-    sec.needsEngine ? h(View, { style: box(th) },
-      h(Text, { style: { fontSize: typeScale.headline, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('webapps.store.engineTitle')),
-      h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, lineHeight: 1.45, textAlign: 'start' } }, t('webapps.store.engineBody'))) : null,
     sheet ? h(CatalogSheet, { key: sheet.id, a: sheet, onDone: () => setSheet(null), onMore: onOpen }) : null,
     sec.canAdd ? h(AddFromAddress) : null,
     h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start', paddingHorizontal: spacing.xs, marginBottom: 6 } }, t('webapps.store.catalogTitle')),
@@ -139,7 +138,6 @@ export function WebInstalled({ query, onOpen }) {
   if (!installed.length) return line('store.installed.noneWeb');
   if (!mine.length) return line('store.debian.none');
   return h(View, null,
-    h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.45, maxWidth: 680, marginBottom: spacing.xl, textAlign: 'start' } }, t('webapps.store.subtitle')),
     h(View, { style: { marginBottom: spacing.xl, gap: 6 } },
       h(Text, { style: { fontSize: typeScale.body, fontWeight: 600, color: th.text, textAlign: 'start', paddingHorizontal: spacing.xs } }, t('webapps.store.installedTitle')),
       h(GroupBox, null, ...mine.map((e) => h(View, { key: e.id, style: { flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingVertical: spacing.s + 2 } },
@@ -150,4 +148,20 @@ export function WebInstalled({ query, onOpen }) {
         h(Button, { small: true, label: t('webapps.store.seeMore'), onClick: () => onOpen(e.id) }),
         h(Button, { small: true, label: t('webapps.store.manage'), onClick: () => wm.open('settings', { args: { section: 'webapps', app: e.id, nonce: Date.now() } }) }),
         h(Button, { small: true, label: t('store.open'), onClick: () => open(e.id) }))))));
+}
+
+// Web apps (PWA) → Settings (2026-11-23, the second column's item under Installed): what a web app is, LordOS's web
+// engine (installed or not: the first Get installs it) and Settings → Web apps, where profiles and permissions are.
+export function WebSettings() {
+  const th = useTheme();
+  const installed = useWebApps();
+  const sec = M.storeSection({ available: webAppsAvailable(), installed });
+  return h(SettingsPage, null,
+    h(About, null, t('webapps.store.subtitle')),
+    sec.needsEngine ? h(View, { style: { ...box(th), marginBottom: 0 } },
+      h(Text, { style: { fontSize: typeScale.headline, fontWeight: 600, color: th.text, textAlign: 'start' } }, t('webapps.store.engineTitle')),
+      h(Text, { style: { fontSize: typeScale.callout, color: th.textDim, lineHeight: 1.45, textAlign: 'start' } }, t('webapps.store.engineBody'))) : null,
+    h(Group, null,
+      h(Row, { label: t('store.settings.webManage'),
+        control: h(Button, { small: true, label: t('store.lordos.openSettings'), onClick: () => wm.open('settings', { args: { section: 'webapps', nonce: Date.now() } }) }) })));
 }
