@@ -1,0 +1,9 @@
+#!/bin/sh
+# LordOS inside a Machines virtual machine (docs/VIRTUALIZATION.md "Graphics 3D"): installed as
+# /usr/lib/systemd/system-shutdown/lordos-guest. systemd-shutdown runs it with poweroff, halt, reboot or kexec once every
+# service has stopped and the file systems are read-only; lordos-guest tells Machines which one (org.lordos.agent,
+# AGK_STOPPING) and waits at most 1.5 s for its answer. With 3D graphics QEMU aborts at the guest's next step (the
+# virtio-gpu reset of its device shutdown, QEMU issue 4918); knowing it was a restart, Machines starts the machine
+# again, and a shutdown reads as one. Anywhere else (no agent port: not a Machines guest) it ends at once.
+[ -x /usr/lib/lordos/guest/lordos-guest ] || exit 0
+exec /usr/lib/lordos/guest/lordos-guest --stopping "$1"

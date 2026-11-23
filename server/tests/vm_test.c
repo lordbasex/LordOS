@@ -1731,6 +1731,17 @@ static void test_tablet_layout(void) {
     CHECK(ag_hello_caps((const uint8_t *)"w9 gvt extra", 12) == (AG_HELLO_GVT | AG_HELLO_EXTRA));
     CHECK(ag_hello_caps((const uint8_t *)"w9 extra extraoff", 17) == (AG_HELLO_EXTRA | AG_HELLO_EXTRAOFF));
     CHECK(ag_hello_caps((const uint8_t *)"w9 extras extraof", 17) == 0);
+    /* AGK_STOPPING (the guest's shutdown hook, QEMU issue 4918): one byte, power off or restart; systemd-shutdown's verbs */
+    int sm = 0;
+    CHECK(!ag_stopping_parse((const uint8_t *)"\x01", 1, &sm) && sm == AG_STOP_POWEROFF);
+    CHECK(!ag_stopping_parse((const uint8_t *)"\x02", 1, &sm) && sm == AG_STOP_REBOOT);
+    CHECK(ag_stopping_parse((const uint8_t *)"\x00", 1, &sm) && ag_stopping_parse((const uint8_t *)"\x03", 1, &sm));
+    CHECK(ag_stopping_parse((const uint8_t *)"\x01\x01", 2, &sm) && ag_stopping_parse(NULL, 1, &sm) && ag_stopping_parse((const uint8_t *)"", 0, &sm));
+    CHECK(ag_stop_verb("poweroff") == AG_STOP_POWEROFF && ag_stop_verb("halt") == AG_STOP_POWEROFF);
+    CHECK(ag_stop_verb("reboot") == AG_STOP_REBOOT && ag_stop_verb("kexec") == AG_STOP_REBOOT);
+    CHECK(!ag_stop_verb("") && !ag_stop_verb(NULL) && !ag_stop_verb("Reboot") && !ag_stop_verb("reboot ") && !ag_stop_verb("suspend"));
+    CHECK(ag_hello_caps((const uint8_t *)"6 clipboard clipx stopping", 26) == (AG_HELLO_CLIPBOARD | AG_HELLO_CLIPX | AG_HELLO_STOPPING));
+    CHECK(ag_hello_caps((const uint8_t *)"6 stopped stoppings", 19) == 0);
     m = vm_msg(VM_AGENT, 1, VAG_EXTRA_OFF, 0, 0, 0, ""); CHECK(vm_msg_valid(&m, 1));
     m.a = VAG_EXTRA_ON; CHECK(vm_msg_valid(&m, 1));
     m.a = VAG_EXTRA_ON + 1; CHECK(!vm_msg_valid(&m, 1));
@@ -2159,11 +2170,18 @@ static void test_open_with(void) {
 
 /* a host stop's steps (vmhoststop.h, 6.1): everything, SIGKILL included, inside logind's delay with a margin */
 static void test_host_stop_plan(void) {
-    VmHostStopPlan p = vm_host_stop_plan(30000);            /* LordOS's InhibitDelayMaxSec=30 */
-    CHECK(p.kill_at == 29000 && p.quit_at == 26000 && p.save_until == 18000);
+    VmHostStopPlan p = vm_host_stop_plan(45000);            /* LordOS's InhibitDelayMaxSec=45 */
+    CHECK(p.kill_at == 44000 && p.quit_at == 41000 && p.save_until == 33000);
     CHECK(p.quit_at - p.save_until >= VM_HOST_ACPI_MIN_MS);
-    VmHostStopPlan d = vm_host_stop_plan(-1);               /* unknown (no logind, SIGTERM only): the shipped 30 s */
+    VmHostStopPlan d = vm_host_stop_plan(-1);               /* unknown (no logind, SIGTERM only): the shipped 45 s */
     CHECK(d.kill_at == p.kill_at && d.quit_at == p.quit_at && d.save_until == p.save_until);
+    VmHostStopPlan o = vm_host_stop_plan(30000);            /* 0.8.9.5's 30 s, still in logind until it reloads */
+    CHECK(o.kill_at == 29000 && o.quit_at == 26000 && o.save_until == 18000);
+    /* the file and the default agree */
+    FILE *cf = fopen("../packaging/systemd/logind-lordos-machines.conf", "r");
+    int secs = -1;
+    if (cf) { char ln[256]; while (fgets(ln, sizeof ln, cf)) sscanf(ln, "InhibitDelayMaxSec=%d", &secs); fclose(cf); }
+    CHECK(!cf || secs * 1000 == VM_HOST_DELAY_DEFAULT_MS);
     VmHostStopPlan s = vm_host_stop_plan(5000);             /* logind's own default, our drop-in missing: no save */
     CHECK(s.kill_at == 4000 && s.quit_at == 1000 && s.save_until == 0);
     VmHostStopPlan z = vm_host_stop_plan(0);

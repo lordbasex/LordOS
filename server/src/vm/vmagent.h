@@ -70,6 +70,8 @@
  *                            (printable ASCII, e.g. \\.\DISPLAY1); nothing after the last. Sent at hello and when
  *                            the guest's display configuration changes. Apps mode's rectangles (LAG_WINDOWS,
  *                            LAG_WINACT, AGK_PLACE) are relative to the shown display's top left corner.
+ *   AGK_STOPPING both ways  u8 AG_STOP_*: the guest powers off or restarts now; the host's echo says it was read
+ *                            (below; capability "stopping" in the hello: the guest's shutdown hook is installed).
  *   AGK_TABLET guest → host  u8 mode (AG_TABLET_PRIMARY or AG_TABLET_DESKTOP, below): how the guest maps the absolute
  *                            tablet with several displays; lord-vm uses it for where clicks land (ag_tablet_layout).
  *
@@ -221,6 +223,21 @@ int ag_tablet_parse(const uint8_t *p, size_t n, int *mode);
  * the primary, or the only one: the picture is all the tablet covers), 2 none either, but the tablet can't reach the
  * shown display at all (another display is the primary: the tools make the shown one primary again). 0 a layout. */
 int ag_tablet_layout(const AgDisplay *d, int n, int shown, int mode, int L[6]);
+/* AGK_STOPPING guest → host: exactly 1 byte, the guest's system is about to power off (AG_STOP_POWEROFF: poweroff or
+ * halt) or restart (AG_STOP_REBOOT: reboot or kexec). Sent by `lordos-guest --stopping <verb>`, which systemd-shutdown
+ * runs from /usr/lib/systemd/system-shutdown/ with its verb once every service has stopped and the file systems are
+ * read-only, just before the reboot(2) whose device shutdown resets virtio-gpu (QEMU issue 4918, docs/VIRTUALIZATION.md
+ * "Graphics 3D"); no hello first (a fresh open of the port, the helper's own run is over by then). host → guest: the
+ * same byte back once lord-vm has read it; the guest waits for it at most AG_STOP_WAIT_MS. lord-vm uses it only to name
+ * the end of a run whose QEMU then aborted on that reset (a restart Machines starts again, or a shutdown); a guest's
+ * tools whose hook is installed say "stopping" in their hello. 0 well formed */
+enum { AGK_STOPPING = 22 };
+enum { AG_STOP_POWEROFF = 1, AG_STOP_REBOOT = 2 };
+#define AG_STOP_WAIT_MS 1500
+int ag_stopping_parse(const uint8_t *p, size_t n, int *mode);
+/* systemd-shutdown's verb as AG_STOP_*: "poweroff" and "halt" AG_STOP_POWEROFF, "reboot" and "kexec" AG_STOP_REBOOT,
+ * anything else (NULL too) 0 */
+int ag_stop_verb(const char *verb);
 
 /* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
 #define LAG_CAP_WINDOWS 256u
@@ -312,7 +329,7 @@ int ag_drop_staging_ok(const char *p, int windows);
 #define LAG_APPNAME_MAX LAG_APP_MAX
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
 enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32, AG_HELLO_PLACE = 64,
-       AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024 };
+       AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024, AG_HELLO_STOPPING = 2048 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;

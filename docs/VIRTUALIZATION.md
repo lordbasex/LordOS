@@ -446,12 +446,49 @@ lord-server passes `--render-node none` when it draws without a GPU, so the CPU 
   from `virtio_gpu_gl_reset`, in the vCPU thread; no Debian bug against `qemu` (checked 2026-11-23); no QEMU option or guest kernel parameter
   turns the reset off. **What LordOS does:** an unattended install's start is always 2D (`vm_gl_refusal` in `machine.c`: the
   installer is a text console, and its restart is exactly this reset); the next start, the installed system's, has the
-  machine's 3D again. A normal 3D start can still hit it at the guest's shutdown or restart: lord-vm recognises QEMU's line
-  (`vmlog_qemu_3d_abort`, `vmlog.c`) and ends the run as `crashed` with the reason `qemu-3d-crash` (not a bare `qemu-signal`),
-  and the machine's window says what happened, that the disk is safe, and offers **Use 2D Graphics and Start** (`lord.vm.set`
-  `graphics: "2d"`, then a start). Until QEMU moves the scanout reset to the main loop, 3D on a 6.12.117+ guest means its
-  every shutdown or restart ends this way; tests: `build/vmlog-test` (the line), `build/vm-test` (`vm_gl_refusal`),
-  `tests/vm_model_test.mjs` (the reason and the offer).
+  machine's 3D again. A normal 3D start still hits it at every shutdown or restart of a 6.12.117+ guest, until QEMU moves
+  the scanout reset to the main loop. lord-vm recognises QEMU's line (`vmlog_qemu_3d_abort`, `vmlog.c`) and, since
+  2026-11-23 (in development after 0.8.9.5), names the end by what it knew just before (`vmlog_3d_abort_end`), so a
+  guest's own shutdown or restart behaves like one:
+  - **Which stop it was.** *LordOS asked* (Shut Down, closing the window, the computer's own stop: `begin_shutdown`)
+    → a shutdown. *The guest said* → what it said: the LordOS tools for Linux (`lordos-guest` 6) have a
+    systemd-shutdown hook (`/usr/lib/systemd/system-shutdown/lordos-guest` from the `lordos` package in a LordOS guest,
+    `lordos-guest-local` written by Install Agent in other guests). systemd-shutdown runs it with `poweroff`, `halt`,
+    `reboot` or `kexec` once every service has stopped and the file systems are read-only, just before the
+    `reboot(2)` whose device shutdown resets virtio-gpu. It runs `lordos-guest --stopping <verb>` as root, which opens
+    `org.lordos.agent` (free again: the person's helper has ended), sends `AGK_STOPPING` (kind 22, one byte: 1 power
+    off, 2 restart; `vmagent.h`) and waits at most 1.5 s for lord-vm's echo. lord-vm keeps it for the run (a QMP
+    `RESET` clears it: a restart QEMU did in place) and drains the port once more when QEMU ends. Helpers with the
+    hook installed say `stopping` in their hello. This works with nobody signed in (the hook isn't the person's
+    helper) and for every systemd guest; QMP has nothing to offer here: the abort comes before the guest's ACPI
+    power-off or reset reaches QEMU, so no `SHUTDOWN` or `RESET` event is seen.
+  - **What is recorded.** A shutdown: `stopped` with `guest-shutdown` (`host-shutdown` when LordOS asked), as any stop,
+    no error screen. A restart, when the guest had run 30 s (`VMLOG_3D_MIN_RUN_MS`): `stopped` with `reset`, and the
+    machine's window starts it again with the same settings, 3D kept (`restartsAgain`, `model.js`; the rule a machine
+    with a graphics card already had). A restart that aborts again within 30 s of its start (a guest that never got
+    up, or a restart loop) gets the error screen instead, so a restart happens once per boot that got somewhere. Nothing
+    said, no helper with the hook in this run, and 30 s of running: most likely the guest's own shutdown or restart, but
+    which isn't known: `stopped` with the new reason `qemu-3d-stop`, no error screen and never a restart; the off card
+    says so (`machines.win.stopped3dHint`: if it was restarting, start it; with the guest agent and the clipboard
+    helper a restart starts again by itself). Anything else, an abort not tied to a stop (a helper with the hook was
+    there and said nothing) or within 30 s of the start without a word, keeps `crashed` with `qemu-3d-crash`, the error
+    screen and **Use 2D Graphics and Start** (`lord.vm.set` `graphics: "2d"`, then a start).
+  - **The disks.** QEMU didn't close them, whatever the name: run.json keeps code 6 (SIGABRT), and the next start runs
+    the same `qemu-img check -r leaks` as after a crash for `stopped` with that code and `guest-shutdown`,
+    `host-shutdown`, `reset` or `qemu-3d-stop`, as it does for `qemu-3d-crash`.
+  - **Not covered.** A machine started from the command line, or kept running with its window closed, isn't started
+    again after a restart (the window does it, as for a graphics card). A guest without systemd, or with tools older
+    than 6, gets the "nothing said" rules. A Windows guest never has 3D (`vm_gl_refusal`).
+  - **Tests:** `build/vmlog-test` (the line; every combination of `vmlog_3d_abort_end`), `build/vm-test`
+    (`vm_gl_refusal`, `AGK_STOPPING`, the verbs, the hello word), `tests/guest_stop_test.sh` (`lordos-guest --stopping`
+    against a fake lord-vm on a socket: the frame, the echo, 1.5 s without one, no port, a bad verb),
+    `tests/vm_model_test.mjs` (the reasons, the offer, the restart, the hint). A scratch run of the real lord-vm with a
+    fake QEMU (QMP, the agent's port, the assertion line, `abort()`) gave all eight cases as above: restart said after
+    32 s → `stopped`/`reset`; power off said after 3 s → `guest-shutdown`; restart said after 3 s → `qemu-3d-crash`;
+    nothing said, no helper, 32 s → `qemu-3d-stop`; nothing said with a helper that would say → `qemu-3d-crash`; nothing
+    said after 3 s → `qemu-3d-crash`; Shut Down asked → `host-shutdown`; restart said by the hook alone (no hello) →
+    `reset`. The echo reached the fake each time, and each next start ran the disk check. A real 6.12.117 guest with
+    3D on real hardware is still to be checked.
 
 ### 3.3 Sandbox
 
@@ -1033,17 +1070,22 @@ app, measured on the build VM, and on the Pi 5 below.
   said `windows-11-71fe`; no identity line at that second start.
 - *Host shutdown, restart and logout (6.1).* lord-vm holds a logind *delay* inhibitor (`shutdown`) while it runs. PrepareForShutdown, a
   SIGTERM (the session's units stopping) or lord-server going away without Keep Running starts a suspend to disk. The package has
-  `/usr/lib/systemd/logind.conf.d/lordos-machines.conf` (`InhibitDelayMaxSec=30`), and the whole stop fits inside that delay, read
-  from logind's `InhibitDelayMaxUSec` (30 s when it can't be read, SIGTERM included; `server/src/vm/vmhoststop.h`): the save may run
-  until delay − 12 s (+18 s), else it's cancelled and the guest is shut down (ACPI, or the agent first) until delay − 4 s (+26 s),
-  then QEMU is told to quit (a clean exit: disks flushed, a vGPU's VFIO device closed), and it's killed at delay − 1 s (+29 s). The
+  `/usr/lib/systemd/logind.conf.d/lordos-machines.conf` (`InhibitDelayMaxSec=45`; 30 until 0.8.9.5, raised on 2026-11-23 so a
+  guest's ACPI shutdown has time when the machine can't be saved), and the whole stop fits inside that delay, read from logind's
+  `InhibitDelayMaxUSec` (45 s when it can't be read, SIGTERM included; `server/src/vm/vmhoststop.h`): the save may run
+  until delay − 12 s (+33 s), else it's cancelled and the guest is shut down (ACPI, or the agent first) until delay − 4 s (+41 s),
+  then QEMU is told to quit (a clean exit: disks flushed, a vGPU's VFIO device closed), and it's killed at delay − 1 s (+44 s). A
+  machine that can't be saved (a vGPU, 3D) has the whole +0 to +41 s for its guest's own shutdown (+26 s with 30). The plan
+  scales with whatever logind says (`vm-test` checks 0 to 120 s, and 45 and 30 exactly), so a computer that hasn't reloaded
+  logind since the upgrade still gets a plan that fits its 30 s; migration `010-0.8.9.6-machines-shutdown-delay` reloads it.
+  The drop-in is in `/usr/lib` (not a conffile): dpkg replaces it, and an administrator's own value in `/etc` wins. The
   delay inhibitor is let go as soon as QEMU is gone, so systemd's last kill never meets a running QEMU. A machine with a vGPU or 3D
   graphics can't be saved and goes straight to the guest's shutdown (a paused one is resumed first: a paused guest ignores the power
   button); a machine started paused that never ran is turned off at once; with less than 3 s of save time left (logind's default 5 s
   delay, our drop-in missing) no save is tried. QEMU is started with SIGTERM, SIGINT and SIGHUP blocked, so stopping the machine's
   scope doesn't kill it first. The system bus is polled after dispatching whatever sd-bus has queued already (`vmlogind.c`): before
   2026-11-23 a message read during the synchronous calls at the start (the bus's NameAcquired) kept POLLIN out of
-  `sd_bus_get_events()`, and PrepareForShutdown was handled only when the bus hung up after logind's 30 s had run out (seen on the
+  `sd_bus_get_events()`, and PrepareForShutdown was handled only when the bus hung up after logind's delay (then 30 s) had run out (seen on the
   maintainer's PC with a Windows 11 vGPU machine: QEMU was then killed by systemd at the very end). The vGPU's mdev is still removed
   the usual way (lord-server's `vm-gvt-remove` once the machine reads stopped, or the admin helper's sweep); lord-vm has no admin
   channel of its own. Seen on VM 125: a machine with text on its screen, the host restarted (`systemctl reboot`):
@@ -2196,7 +2238,7 @@ windows, so it never decides it.
   - Windows (`lordos-guest-win` w2): delayed rendering (`SetClipboardData(format, NULL)`, `WM_RENDERFORMAT`), with the
     offer marked so Windows' clipboard history and cloud clipboard skip it. The helper waits 2 s for the answer. When it
     exits (`WM_RENDERALLFORMATS`) it empties the clipboard instead of fetching what nobody pasted.
-  - Linux (`lordos-guest` 5): the helper owns the X `CLIPBOARD` selection itself (`tools/guest/x11clip.c`: the X11
+  - Linux (`lordos-guest` 5 and later): the helper owns the X `CLIPBOARD` selection itself (`tools/guest/x11clip.c`: the X11
     protocol over the display's Unix socket with the session's MIT-MAGIC-COOKIE-1, no Xlib, no tool), so it works on X11
     and through Xwayland, which GNOME, KDE and wlroots desktops bridge to the Wayland clipboard. Large data goes as
     INCR. A guest with no X display (a Wayland session without Xwayland) and older helpers keep the push: the whole
@@ -2298,7 +2340,8 @@ a patch of ours (open decision 5) or upstream. The fault is guest-triggerable, s
 **Known issue (2026-11-23): the same abort on amd64 at a Linux guest's shutdown or restart.** Linux guests with Debian's kernel
 6.12.117 or later reset virtio-gpu-gl from a vCPU on every shutdown and restart (`virtio_dev_shutdown`), which is the abort above
 (QEMU issue 4918, open; 3.2, "3D graphics (built)", has the code path). An unattended install's start therefore always has 2D
-graphics, and a 3D machine that ends this way says so and offers **Use 2D Graphics and Start**.
+graphics. A 3D machine whose guest shuts down or restarts reads as stopped, and a restart the LordOS tools announce starts
+it again (3.2, `vmlog_3d_abort_end`); an abort not tied to a stop says so and offers **Use 2D Graphics and Start**.
 
 #### 6.10.1 A real graphics card: Intel GVT-g (built 2026-11-21, since 0.8.9.5)
 
@@ -2419,7 +2462,7 @@ How it knows: backing-file chains are read from qcow2 headers; shared extents fr
 
 ### 6.17 Agent state
 
-`lordos-guest` is one small static binary with no Python or other runtime, so it runs on a minimal guest. It's separate from `qemu-ga`, which keeps doing time, shutdown and freeze.
+`lordos-guest` is one small static binary with no Python or other runtime, so it runs on a minimal guest. It's separate from `qemu-ga`, which keeps doing time, shutdown and freeze. From version 6 it also has `--stopping <verb>`, run as root by its systemd-shutdown hook at the guest's last step to say whether it powers off or restarts (`AGK_STOPPING`, 3.2 "3D graphics"); Install Agent writes that hook as `/usr/lib/systemd/system-shutdown/lordos-guest-local` (best effort: a read-only `/usr` skips it), the `lordos` package ships it as `.../lordos-guest`, and the helper's hello says `stopping` while one is there.
 
 The first icon on the bar shows its state: gray (not installed), amber (machine starting or agent reconnecting), green (connected), red (version too old or failing). Clicking it opens a popover:
 
@@ -2818,7 +2861,7 @@ virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent 
 ### 7.1.3 Keeping the LordOS tools up to date (since 0.8.9.5)
 
 A guest keeps the tools it was given: a LordOS upgrade ships newer ones (`TOOLS_SHIPPED` in `apps/machines/model.js`,
-`w9` and `5` today, checked against the sources by `vm_model_test`), but before this a guest ran its older tools, with
+`w10` and `6` today, checked against the sources by `vm_model_test`), but before this a guest ran its older tools, with
 their known bugs, until someone found **Update LordOS Tools** in the agent's popover. Now Machines updates them by
 itself (`toolsAutoStep`, run every second by the machine's window, `vmwindow.jsx`):
 

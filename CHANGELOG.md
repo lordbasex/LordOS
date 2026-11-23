@@ -73,6 +73,48 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     lord-vm saved the machine 278 ms after PrepareForShutdown and let go of the inhibitor (the old binary reacted only
     when the bus went away, 46 s later); with an 8 s delay (no time to save) the guest got the power button and QEMU
     quit at +4.0 s; a never-run paused machine was off in 124 ms.
+  - **The delay is now 45 s** (was 30 s; chosen by the maintainer on 2026-11-23), so a machine that can't be saved
+    (a graphics card, 3D graphics) gives its guest's own ACPI shutdown until +41 s instead of +26 s. The plan scales
+    with it: a save until +33 s, QEMU's quit at +41 s, SIGKILL at +44 s (`vmhoststop.h`, whose default when logind
+    can't be read is now 45 s too). `packaging/systemd/logind-lordos-machines.conf` is in `/usr/lib` (not a
+    conffile), so dpkg replaces it; the new migration `010-0.8.9.6-machines-shutdown-delay` reloads logind so the
+    restart right after the upgrade already gets 45 s (lord-vm plans from logind's live value either way). `vm-test`
+    checks 45 and 30 s exactly and that the shipped file and lord-vm's default agree.
+- **Machines: a guest's own shutdown or restart with Graphics 3D behaves like one, instead of a crash screen.** QEMU
+  10.0.13 still aborts at every shutdown and restart of a guest on Debian's kernel 6.12.117 or later with 3D (QEMU issue
+  4918, see the entry below about the unattended install); until now every such stop showed the error screen with
+  **Use 2D Graphics and Start**. lord-vm now names the end by what it knew just before the abort
+  (`vmlog_3d_abort_end`, `server/src/vm/vmlog.c`):
+  - **A stop asked from LordOS** (Shut Down, closing the window, the computer's own stop) reads as a normal stop.
+  - **The guest says what it does.** The LordOS tools for Linux (`lordos-guest` 6, `tools/guest/lordos-guest.c`) have
+    a systemd-shutdown hook (`/usr/lib/systemd/system-shutdown/lordos-guest` in the `lordos` package for LordOS guests,
+    `lordos-guest-local` written by Install Agent in other guests): at the guest's last step, once its services have
+    stopped and its file systems are read-only, it runs `lordos-guest --stopping poweroff|halt|reboot|kexec`, which
+    sends the new frame `AGK_STOPPING` (kind 22, one byte: power off or restart) on `org.lordos.agent` and waits at
+    most 1.5 s for lord-vm's echo. It works with nobody signed in. Tools with the hook say `stopping` in their hello.
+    Anywhere else (no agent port) the hook ends at once.
+  - **What it becomes.** A power off: `stopped` (`guest-shutdown`), no error. A restart, once the guest had run 30 s:
+    `stopped` (`reset`), and the machine's window starts it again with the same settings, 3D kept (the rule a machine
+    with a graphics card already had, now `restartsAgain` in `apps/machines/model.js`). A restart that aborts again
+    within 30 s of its start gets the error screen, so a restart loop can't go on. Nothing said and no tools that would
+    say, after 30 s: the new reason `qemu-3d-stop`, off with no error screen and never restarted, and the off card says
+    the guest shut down or restarted and to start it if it was restarting (`machines.win.stopped3dHint`, new). An abort
+    not tied to a stop (tools that would say said nothing, or right after the start) keeps `qemu-3d-crash`, the error
+    screen and the 2D button; its text no longer says the guest had finished (`machines.fix.qemu-3d-crash`, rewritten).
+    Both texts are in all 35 languages.
+  - **The disks** are still checked at the next start (`qemu-img check -r leaks`, as after a crash): run.json keeps code
+    6 for these stops.
+  - **Not covered:** a machine started from the `machines` command or kept running with its window closed isn't started
+    again after a restart (the window does it); guests without systemd or with older tools get the "nothing said"
+    rules until Machines updates their tools (it does by itself: `TOOLS_SHIPPED` is now Linux 6).
+  - **Tests:** `build/vmlog-test` (every combination of the rules), `build/vm-test` (the frame, the verbs, the hello
+    word), `tests/guest_stop_test.sh` (new, in `make test`: the frame, the echo, 1.5 s without one, no port, a bad
+    verb, against a fake lord-vm on a socket), `tests/vm_model_test.mjs` (the reasons, the restart, the hint). A
+    scratch run of the real lord-vm with a fake QEMU that speaks QMP, sends the frame on the agent's port, prints QEMU's
+    assertion line and aborts gave all eight cases the rules expect (restart said after 32 s → `reset`; power off said
+    → `guest-shutdown`; restart said after 3 s → `qemu-3d-crash`; nothing said without tools after 32 s →
+    `qemu-3d-stop`; nothing said with tools → `qemu-3d-crash`; Shut Down asked → `host-shutdown`; …), with lord-vm's
+    echo received each time and the disk check at each next start. Not yet checked with a real 6.12.117 guest with 3D.
 ### Changed
 
 - **Store → LordOS apps is LordOS's own store** (asked by the maintainer on 2026-11-23: "we are going to build a store

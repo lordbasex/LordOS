@@ -1,5 +1,5 @@
 /* vmhoststop.h — how long each step of a host stop may take (docs/VIRTUALIZATION.md 6.1). The computer's shutdown
- * waits for lord-vm only while logind's delay lasts (InhibitDelayMaxUSec; LordOS sets 30 s); what's still running after
+ * waits for lord-vm only while logind's delay lasts (InhibitDelayMaxUSec; LordOS sets 45 s); what's still running after
  * that is killed by systemd at the very end of the shutdown, QEMU and a vGPU's VFIO device included. So the whole
  * sequence fits inside the delay: the save to disk, then the guest's own shutdown (ACPI or the agent), then QEMU's quit
  * (a clean exit: disks flushed, VFIO closed), then SIGKILL, and lord-vm lets go of the inhibitor once QEMU is gone,
@@ -7,7 +7,7 @@
 #ifndef LORD_VM_HOSTSTOP_H
 #define LORD_VM_HOSTSTOP_H
 
-#define VM_HOST_DELAY_DEFAULT_MS 30000  /* packaging/systemd/logind-lordos-machines.conf; also SIGTERM's budget */
+#define VM_HOST_DELAY_DEFAULT_MS 45000  /* packaging/systemd/logind-lordos-machines.conf; also SIGTERM's budget */
 #define VM_HOST_MARGIN_MS 1000          /* QEMU gone and the inhibitor closed this long before logind's delay ends */
 #define VM_HOST_QUIT_MS 3000            /* QEMU's quit, before SIGKILL */
 #define VM_HOST_ACPI_MIN_MS 8000        /* a save given up still leaves the guest this long to shut down */
