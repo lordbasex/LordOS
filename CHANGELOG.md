@@ -307,6 +307,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **Machines: design for machine groups and a Whonix (Tor) card** (`docs/VIRTUALIZATION.md` section 19, planned, nothing
+  built; asked by the maintainer on 2026-11-23). Whonix-Gateway and Whonix-Workstation as one library card, started
+  Gateway first and stopped Workstation first, with the members reachable from the card's menu and one name for the
+  `machines` command. The Workstation's only network is a socketpair to the Gateway made by lord-server and handed to
+  both `lord-vm`s (`VM_LINK`), so QEMU's sandbox doesn't change and no other process can reach the link (Whonix's own
+  KVM files use UDP on 127.0.0.1). An anonymity profile: no clipboard, transfer folder, shared folders, guest agent,
+  microphone, 3D, suspend or thumbnails; no huge pages or KSM; random UUID and MACs per group with QEMU's stock SMBIOS;
+  the Gateway's passt without DNS forwarding. Whonix 18.2.4.3's official KVM archive verified with its SHA-512 list and
+  that list's OpenPGP signature (key `916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA`), unpacked (old-GNU sparse tar in xz)
+  by a proposed sandboxed helper `lord-vmunpack`, and turned into read-only bases by the jailed `qemu-img`. Start Fresh
+  (the Workstation only by default, to keep Tor's entry guards) and a disposable session. The threat model, QEMU
+  arguments per member, tests, a phased plan, the security exceptions that need approval and the open decisions are
+  listed. The status checklist gains the item at 0 % (area B 76 % → 70 %, total still 66 %).
 - **Machines: `docs/VIRTUALIZATION.md` audited against the code** (asked by the maintainer on 2026-11-23: "the source
   code is the absolute truth"). A new "Status checklist" near the top lists every feature the design describes, each
   with its mark (done, done but not checked on real hardware, partial, not built), a percentage and the file that
