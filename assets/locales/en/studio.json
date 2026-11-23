@@ -88,5 +88,8 @@
   "micHint.voice": "Removes the noise around you so only your voice is heard. If your voice sounds robotic, turn off the call app’s own noise suppression.",
   "micHint.wide": "Your microphone with no processing at all: for music and every sound in the room.",
   "micUnavailable": "Noise Reduction appears after you sign out and in again.",
-  "noMic": "No microphone is connected."
+  "noMic": "No microphone is connected.",
+  "effects": "Effects",
+  "openApp": "Open LordOS Studio…",
+  "micApps": "Mic Mode changes the microphone apps use by default. An app set to a particular microphone keeps it: choose “LordOS Noise Reduction” in that app."
 }

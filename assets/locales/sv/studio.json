@@ -88,5 +88,8 @@
   "micHint.voice": "Tar bort ljudet omkring dig så att bara din röst hörs. Om din röst låter robotaktig, stäng av samtalsappens egen brusreducering.",
   "micHint.wide": "Din mikrofon helt utan bearbetning: för musik och alla ljud i rummet.",
   "micUnavailable": "Brusreducering visas när du har loggat ut och in igen.",
-  "noMic": "Ingen mikrofon är ansluten."
+  "noMic": "Ingen mikrofon är ansluten.",
+  "effects": "Effekter",
+  "openApp": "Öppna LordOS Studio …",
+  "micApps": "Mikrofonläget ändrar mikrofonen som appar använder som standard. En app som är inställd på en viss mikrofon behåller den: välj ”LordOS Noise Reduction” i den appen."
 }

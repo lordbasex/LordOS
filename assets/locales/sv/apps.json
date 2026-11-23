@@ -35,5 +35,6 @@
   "sysinfo": "Systeminformation",
   "sysprobe": "Sandlådetest",
   "terminal": "Terminal",
-  "databases": "Databaser"
+  "databases": "Databaser",
+  "studio": "LordOS Studio"
 }

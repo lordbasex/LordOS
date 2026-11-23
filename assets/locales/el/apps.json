@@ -35,5 +35,6 @@
   "sysinfo": "Πληροφορίες συστήματος",
   "sysprobe": "Έλεγχος απομόνωσης",
   "terminal": "Τερματικό",
-  "databases": "Βάσεις δεδομένων"
+  "databases": "Βάσεις δεδομένων",
+  "studio": "LordOS Studio"
 }

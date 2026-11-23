@@ -35,5 +35,6 @@
   "sysinfo": "Informações do sistema",
   "sysprobe": "Teste do isolamento",
   "terminal": "Terminal",
-  "databases": "Bancos de dados"
+  "databases": "Bancos de dados",
+  "studio": "LordOS Studio"
 }

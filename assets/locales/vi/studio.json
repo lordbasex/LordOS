@@ -88,5 +88,8 @@
   "micHint.voice": "Loại bỏ tiếng ồn xung quanh để chỉ nghe thấy giọng của bạn. Nếu giọng bạn nghe như rô-bốt, hãy tắt tính năng khử ồn của chính ứng dụng gọi.",
   "micHint.wide": "Micrô của bạn hoàn toàn không qua xử lý: dành cho âm nhạc và mọi âm thanh trong phòng.",
   "micUnavailable": "Giảm tiếng ồn xuất hiện sau khi bạn đăng xuất rồi đăng nhập lại.",
-  "noMic": "Không có micrô nào được kết nối."
+  "noMic": "Không có micrô nào được kết nối.",
+  "effects": "Hiệu ứng",
+  "openApp": "Mở LordOS Studio…",
+  "micApps": "Chế độ micrô thay đổi micrô mà các ứng dụng dùng theo mặc định. Ứng dụng được đặt cho một micrô cụ thể sẽ giữ micrô đó: hãy chọn “LordOS Noise Reduction” trong ứng dụng ấy."
 }

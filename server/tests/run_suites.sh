@@ -678,6 +678,11 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "screencast-scene (sdk/screencast.jsx)" node tests/textfield_menu_test.mjs screencast_scene.mjs
     else skip "screencast-scene" "node and the repository's node_modules (npm install)"; fi
+    # LordOS Studio's ways in: the capture panel's Mic Mode entry with the microphone only (no preview), Video effects
+    # with the camera, the LordOS Studio app's window and its launcher listing (sdk/capturestatus.jsx, sdk/studio.jsx)
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "capture-studio-scene (sdk/capturestatus.jsx, sdk/studio.jsx, apps/studio)" node tests/textfield_menu_test.mjs capture_studio_scene.mjs
+    else skip "capture-studio-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8) the Store's "Add from an address" sheet: https only, the origin lord-web read, Install sends no URL
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "webapps-sheet-scene (apps/store/addweb.js)" node tests/textfield_menu_test.mjs webapps_sheet_scene.mjs

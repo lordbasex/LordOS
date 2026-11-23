@@ -31,7 +31,7 @@ import { closeDevicesOf } from './media.js';
 import { firewall } from './monitor.js';
 import { COMPONENTS } from './netmodel.js';
 import { captureRows, captureGlyph, captureSummary, rowStops } from './capturemodel.js';
-import { StudioPanel, studioAvailable } from './studio.jsx';
+import { StudioPanel, MicModePanel, studioAvailable, useMicModeName, openStudioApp } from './studio.jsx';
 import { studioWhat } from './studiomodel.js';
 
 const GREEN = '#30d158';
@@ -239,11 +239,32 @@ function Row({ r, th }) {
   );
 }
 
-function Panel({ rows, th, room, onClose, onStudio }) {
+// a LordOS Studio entry of the panel: its glyph, its name, what it is set to and a "›"
+function StudioEntry({ th, glyph, label, detail, onClick }) {
+  return (
+    <View onClick={onClick} focusable accessibilityLabel={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 24 }}>
+      <CaptureGlyph glyph={glyph} color={th.text} bg={th.control || '#3a3a40'} size={13} />
+      <Text style={{ flexShrink: 0, fontSize: 13, color: th.text, textAlign: 'start' }}>{label}</Text>
+      <Text style={{ flex: 1, minWidth: 0, fontSize: 12, color: th.textDim, textAlign: 'end', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{detail || ''}</Text>
+      <Text style={{ fontSize: 15, color: th.textDim }}>{direction() === 'rtl' ? '‹' : '›'}</Text>
+    </View>
+  );
+}
+
+function MicEntry({ th, onClick }) {
+  return <StudioEntry th={th} glyph="mic" label={t('studio.mic')} detail={useMicModeName()} onClick={onClick} />;
+}
+
+// Mic Mode is the default microphone (sdk/studiomodel.js micPlan): it needs LordOS's sound client and a microphone
+const hasMic = () => typeof lord !== 'undefined' && !!lord.sound;
+
+function Panel({ rows, th, room, onClose, onStudio, onMic }) {
   // a program LordOS can't name (the sound system's own processes it can)
   const unknown = rows.some((r) => !r.app && !r.sys && (r.camera || r.mic));
-  // LordOS Studio (docs/CAMERA-STUDIO-PLAN.md 9.1): the camera's effects, in this same panel
+  // LordOS Studio (docs/CAMERA-STUDIO-PLAN.md 9.1), in this same panel: the camera's effects while an app uses the
+  // camera, Mic Mode while one uses the microphone (both when both)
   const studio = rows.some((r) => r.camera) && studioAvailable();
+  const mic = rows.some((r) => r.mic) && hasMic();
   return (
     <View style={{ width: 320, padding: 12, gap: 10, maxHeight: room }}>
       <Text style={{ fontSize: 11, fontWeight: 700, color: th.textDim, textAlign: 'start' }}>{t('shell.capture.title')}</Text>
@@ -251,13 +272,8 @@ function Panel({ rows, th, room, onClose, onStudio }) {
         {rows.map((r) => <Row key={r.key} r={r} th={th} />)}
       </ScrollView>
       {unknown ? <Text style={{ fontSize: 11, color: th.textDim, lineHeight: 1.35, textAlign: 'start' }}>{t('shell.capture.unknownHint')}</Text> : null}
-      {studio ? (
-        <View onClick={onStudio} focusable accessibilityLabel={t('studio.open')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 24 }}>
-          <CaptureGlyph glyph="camera" color={th.text} bg={th.control || '#3a3a40'} size={13} />
-          <Text style={{ flex: 1, fontSize: 13, color: th.text, textAlign: 'start' }}>{t('studio.open')}</Text>
-          <Text style={{ fontSize: 15, color: th.textDim }}>{direction() === 'rtl' ? '‹' : '›'}</Text>
-        </View>
-      ) : null}
+      {studio ? <StudioEntry th={th} glyph="camera" label={t('studio.open')} onClick={onStudio} /> : null}
+      {mic ? <MicEntry th={th} onClick={onMic} /> : null}
       <View style={{ height: 1, backgroundColor: th.separator }} />
       <View onClick={() => { onClose(); wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } }); }} focusable accessibilityLabel={t('shell.capture.settings')}>
         <Text style={{ fontSize: 12, color: th.accent, textAlign: 'start' }}>{t('shell.capture.settings')}</Text>
@@ -276,8 +292,10 @@ export function PrivacyIndicators({ height = 22 }) {
   const glyph = captureGlyph(rows);
   const btn = useRef(null);
   const open = useStore(openAt) === btn;
-  const [studio, setStudio] = useState(false);
-  useEffect(() => { if (!open) setStudio(false); }, [open]);
+  // the page of the popover: the panel (null), LordOS Studio's 'video' effects or its 'mic' mode
+  const [studio, setStudio] = useState(null);
+  useEffect(() => { if (!open) setStudio(null); }, [open]);
+  const close = () => openAt.set(() => null);
   useEffect(() => { if (!glyph && openAt.get() === btn) openAt.set(() => null); }, [glyph]);
   if (!glyph) return null;
   return (
@@ -289,8 +307,9 @@ export function PrivacyIndicators({ height = 22 }) {
         <Overlay anchor={btn} onClose={() => openAt.set(() => null)}>
           <View style={{ ...statusPanelAt(btn), borderRadius: th.menuRadius || 10, backgroundColor: popupBg(th), border: `1px solid ${th.separator}`,
             boxShadow: '0 10px 30px rgba(0,0,0,0.35)' }}>
-            {studio ? <StudioPanel th={th} room={statusPanelRoom(btn)} onBack={() => setStudio(false)} />
-              : <Panel rows={rows} th={th} room={statusPanelRoom(btn)} onClose={() => openAt.set(() => null)} onStudio={() => setStudio(true)} />}
+            {studio === 'video' ? <StudioPanel th={th} room={statusPanelRoom(btn)} onBack={() => setStudio(null)} onOpenApp={() => { close(); openStudioApp(); }} />
+              : studio === 'mic' ? <MicModePanel th={th} room={statusPanelRoom(btn)} onBack={() => setStudio(null)} onOpenApp={() => { close(); openStudioApp(); }} />
+                : <Panel rows={rows} th={th} room={statusPanelRoom(btn)} onClose={close} onStudio={() => setStudio('video')} onMic={() => setStudio('mic')} />}
           </View>
         </Overlay>
       ) : null}

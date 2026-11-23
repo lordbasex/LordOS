@@ -88,5 +88,8 @@
   "micHint.voice": "Supprime le bruit autour de vous pour qu’on n’entende que votre voix. Si votre voix sonne robotique, désactivez la suppression du bruit de l’app d’appel elle-même.",
   "micHint.wide": "Votre micro sans aucun traitement : pour la musique et tous les sons de la pièce.",
   "micUnavailable": "La réduction du bruit apparaît après vous être déconnecté puis reconnecté.",
-  "noMic": "Aucun micro n’est connecté."
+  "noMic": "Aucun micro n’est connecté.",
+  "effects": "Effets",
+  "openApp": "Ouvrir LordOS Studio…",
+  "micApps": "Le mode micro change le micro que les apps utilisent par défaut. Une app réglée sur un micro précis le garde : choisissez « LordOS Noise Reduction » dans cette app."
 }

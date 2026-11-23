@@ -35,5 +35,6 @@
   "sysinfo": "معلومات النظام",
   "sysprobe": "اختبار العزل",
   "terminal": "الطرفية",
-  "databases": "قواعد البيانات"
+  "databases": "قواعد البيانات",
+  "studio": "LordOS Studio"
 }

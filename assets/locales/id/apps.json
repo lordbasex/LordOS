@@ -35,5 +35,6 @@
   "sysinfo": "Informasi Sistem",
   "sysprobe": "Uji Sandbox",
   "terminal": "Terminal",
-  "databases": "Basis Data"
+  "databases": "Basis Data",
+  "studio": "LordOS Studio"
 }

@@ -221,7 +221,10 @@ export const isLiveSystem = () => {
   if (live === null) { try { const i = lord.system.info(); live = !!(i.live || i.firstAccount); } catch (e) { live = false; } }
   return live;
 };
-export const listApps = () => [...registry.values()].filter((a) => !a.builtin && !a.hidden && (!a.live || isLiveSystem()));
+// An app may export available() (apps/studio: LordOS Studio installed): false keeps it out of the launcher and search on
+// this computer.
+const availableHere = (a) => { if (typeof a.available !== 'function') return true; try { return !!a.available(); } catch (e) { return false; } };
+export const listApps = () => [...registry.values()].filter((a) => !a.builtin && !a.hidden && (!a.live || isLiveSystem()) && availableHere(a));
 export const workArea = (d) => workAreaOf(d);
 
 function place(appId, count, frame) {

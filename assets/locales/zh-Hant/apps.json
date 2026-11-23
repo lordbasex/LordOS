@@ -35,5 +35,6 @@
   "sysinfo": "系統資訊",
   "sysprobe": "沙盒測試",
   "terminal": "終端機",
-  "databases": "資料庫"
+  "databases": "資料庫",
+  "studio": "LordOS Studio"
 }

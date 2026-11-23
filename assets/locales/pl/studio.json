@@ -88,5 +88,8 @@
   "micHint.voice": "Usuwa hałas wokół ciebie, by słychać było tylko twój głos. Jeśli twój głos brzmi jak robot, wyłącz redukcję szumów w samej aplikacji do rozmów.",
   "micHint.wide": "Twój mikrofon bez żadnego przetwarzania: do muzyki i wszystkich dźwięków w pomieszczeniu.",
   "micUnavailable": "Redukcja hałasu pojawi się, gdy wylogujesz się i zalogujesz ponownie.",
-  "noMic": "Nie podłączono mikrofonu."
+  "noMic": "Nie podłączono mikrofonu.",
+  "effects": "Efekty",
+  "openApp": "Otwórz LordOS Studio…",
+  "micApps": "Tryb mikrofonu zmienia mikrofon, którego aplikacje używają domyślnie. Aplikacja ustawiona na konkretny mikrofon zostaje przy nim: wybierz w niej „LordOS Noise Reduction”."
 }

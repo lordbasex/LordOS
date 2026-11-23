@@ -88,5 +88,8 @@
   "micHint.voice": "去除你周圍的噪音，只讓你的聲音被聽到。如果你的聲音聽起來像機器人，請關閉通話 App 本身的降噪功能。",
   "micHint.wide": "完全不經處理的麥克風聲音：適合音樂和房間裡的所有聲音。",
   "micUnavailable": "登出再重新登入後會出現「降噪」。",
-  "noMic": "沒有連接麥克風。"
+  "noMic": "沒有連接麥克風。",
+  "effects": "效果",
+  "openApp": "打開 LordOS Studio…",
+  "micApps": "麥克風模式會變更 App 預設使用的麥克風。已設定特定麥克風的 App 會繼續使用它：請在該 App 中選擇「LordOS Noise Reduction」。"
 }

@@ -88,5 +88,8 @@
   "micHint.voice": "Tinatanggal ang ingay sa paligid mo para boses mo lang ang marinig. Kung parang robot ang boses mo, i-off ang sariling noise suppression ng app sa pagtawag.",
   "micHint.wide": "Ang mikropono mo nang walang anumang pagproseso: para sa musika at bawat tunog sa silid.",
   "micUnavailable": "Lalabas ang Pagbawas ng Ingay pagkatapos mong mag-sign out at mag-sign in ulit.",
-  "noMic": "Walang nakakonektang mikropono."
+  "noMic": "Walang nakakonektang mikropono.",
+  "effects": "Mga effect",
+  "openApp": "Buksan ang LordOS Studio…",
+  "micApps": "Binabago ng Mode ng Mic ang mikropono na ginagamit ng mga app bilang default. Ang app na nakatakda sa isang partikular na mikropono ay mananatili roon: piliin ang “LordOS Noise Reduction” sa app na iyon."
 }

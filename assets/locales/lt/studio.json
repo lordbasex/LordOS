@@ -88,5 +88,8 @@
   "micHint.voice": "Pašalina aplinkos triukšmą, kad būtų girdimas tik jūsų balsas. Jei balsas skamba kaip roboto, išjunkite paties skambučių programos triukšmo slopinimą.",
   "micHint.wide": "Jūsų mikrofonas be jokio apdorojimo: muzikai ir visiems kambario garsams.",
   "micUnavailable": "Triukšmo mažinimas atsiranda, kai atsijungiate ir vėl prisijungiate.",
-  "noMic": "Neprijungtas joks mikrofonas."
+  "noMic": "Neprijungtas joks mikrofonas.",
+  "effects": "Efektai",
+  "openApp": "Atverti LordOS Studio…",
+  "micApps": "Mikrofono režimas pakeičia mikrofoną, kurį programos naudoja pagal numatymą. Programa, nustatyta konkrečiam mikrofonui, jį išlaiko: joje pasirinkite „LordOS Noise Reduction“."
 }

@@ -88,5 +88,8 @@
   "micHint.voice": "Elimina el soroll del teu voltant perquè només se senti la teva veu. Si la teva veu sona robòtica, desactiva la supressió de soroll de la mateixa app de trucades.",
   "micHint.wide": "El teu micròfon sense cap processament: per a música i tots els sons de la sala.",
   "micUnavailable": "La reducció de soroll apareix després de tancar la sessió i tornar a entrar.",
-  "noMic": "No hi ha cap micròfon connectat."
+  "noMic": "No hi ha cap micròfon connectat.",
+  "effects": "Efectes",
+  "openApp": "Obre LordOS Studio…",
+  "micApps": "El mode del micròfon canvia el micròfon que les apps fan servir per defecte. Una app configurada amb un micròfon concret el manté: tria «LordOS Noise Reduction» en aquesta app."
 }

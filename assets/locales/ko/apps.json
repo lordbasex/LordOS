@@ -35,5 +35,6 @@
   "sysinfo": "시스템 정보",
   "sysprobe": "샌드박스 테스트",
   "terminal": "터미널",
-  "databases": "데이터베이스"
+  "databases": "데이터베이스",
+  "studio": "LordOS Studio"
 }

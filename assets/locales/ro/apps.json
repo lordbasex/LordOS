@@ -35,5 +35,6 @@
   "sysinfo": "Informații de sistem",
   "sysprobe": "Test de izolare",
   "terminal": "Terminal",
-  "databases": "Baze de date"
+  "databases": "Baze de date",
+  "studio": "LordOS Studio"
 }

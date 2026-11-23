@@ -35,5 +35,6 @@
   "sysinfo": "Информация о системе",
   "sysprobe": "Проверка песочницы",
   "terminal": "Терминал",
-  "databases": "Базы данных"
+  "databases": "Базы данных",
+  "studio": "LordOS Studio"
 }
