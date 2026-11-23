@@ -16,6 +16,7 @@
   "category.Graphics": "الرسوميات",
   "category.Network": "الإنترنت",
   "category.Office": "المكتب",
+  "category.Other": "أخرى",
   "category.Science": "العلوم",
   "category.Settings": "الإعدادات",
   "category.System": "النظام",
@@ -78,6 +79,8 @@
   "classic.start": "ابدأ",
   "classic.trash": "سلة المهملات",
   "classic.unpinStart": "إلغاء التثبيت من «ابدأ»",
+  "classic.viewAz": "أ–ي",
+  "classic.viewCategories": "الفئات",
   "clipboard.chars": {
     "zero": "· {count} حرف",
     "one": "· حرف واحد",

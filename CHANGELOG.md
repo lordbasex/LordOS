@@ -12,6 +12,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Lord Classic's start menu shows apps by category, in development (the latest release is 0.8.9.4; from #210's
+  idea).** All apps now has a small switch next to its title, **A–Z | Categories**. A–Z is the list it always was;
+  Categories lists the groups that hold at least one app, each with its count, and a click opens or closes a group to
+  show its apps (by name) under it, so several can be open at once. The menu opens again on the view chosen last
+  (`settings.startMenuView`, `'az'` or `'categories'`; a new key with A–Z as its default, so no migration). Pinned,
+  Recent, right click (pin to Start or the taskbar) and dragging an app onto the taskbar work the same on both views.
+  - **The groups** (`sdk/appgroupsmodel.js`, pure, no `lord` and no React): Utilities, Development, Education, Games,
+    Graphics, Internet, Office, Audio & video, Science, System, Settings and **Other**, sorted by their translated
+    names with Other always last. They are the freedesktop main categories, so their names are the ones the Store and
+    Lord Flow's app launcher already use (`shell.category.*`). An app's group is its manifest's `category` (a LordOS app;
+    a web app is Internet), else the first main category in its `.desktop` `Categories` (a Linux or a Flatpak app;
+    `Audio` and `Video` count as Audio & video), else the first of the 112 additional categories the model knows
+    (`WebBrowser` → Internet, `TerminalEmulator` → System, `Spreadsheet` → Office, `Emulator` → Games, `Math` →
+    Science…), else Other. Lord Flow's app launcher keeps its own grouping (`appCategory`, unchanged).
+  - **Keyboard:** the search field keeps the keys, also after a click inside the menu (the release gives the focus
+    back to it), so typing always searches every app, settings, files and the rest exactly as before, whatever view
+    or open group is on screen. With the field empty, on All apps ↓/↑ walk the list (the first one selects the first
+    row), Home/End jump, Enter opens an app or opens and closes a group; in Categories → opens a group or goes to its
+    first app and ← goes back to the group or closes it, mirrored right to left. The selected row scrolls into sight.
+  - **Look:** LordOS's own: the SDK's small Segmented switch, a disclosure chevron per group (pointing to where the
+    text goes, so it flips right to left) and a count pill that takes the accent while the group is open; app rows are
+    indented under their group. All layout is start/end, so it mirrors right to left.
+  - **Text:** three new keys (`shell.category.Other`, `shell.classic.viewAz`, `shell.classic.viewCategories`) in all
+    35 languages; scripts without A–Z say it their way (А–Я, Α–Ω, أ–ي, ก–ฮ, 名前順, 이름순, 按名称…).
+  - **Tests:** `server/tests/app_groups_model_test.mjs` (62 checks: manifest, `.desktop` and Flatpak categories,
+    additional categories, Other, the sort, the remembered view, every key in both directions, the selection kept when
+    a group opens or closes) and `classic_startmenu_categories_scene.mjs` (22 checks: the real StartMenu over Linux and
+    Flatpak apps with the stub `lord`; A–Z by default, the switch saved, the groups and counts, open and close by
+    mouse and keyboard, Enter launching a Flatpak app, the last view coming back, a search finding an app of a closed
+    group, right to left), run by `classic_startmenu_power_test.mjs`, which now takes the scene as an argument. Both
+    in `run_suites.sh`. Not yet seen on screen on the VM.
+
 - **Store: a Flathub home with collections, categories and subcategories, in development (the latest release is
   0.8.9.4).** Flathub's section no longer opens on one long list: like the app centres on other desktops it opens on a
   home, and every page keeps the install rules as they were (Flathub's verified apps unless the section's switch shows

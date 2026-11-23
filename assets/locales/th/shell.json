@@ -16,6 +16,7 @@
   "category.Graphics": "กราฟิก",
   "category.Network": "อินเทอร์เน็ต",
   "category.Office": "สำนักงาน",
+  "category.Other": "อื่นๆ",
   "category.Science": "วิทยาศาสตร์",
   "category.Settings": "การตั้งค่า",
   "category.System": "ระบบ",
@@ -73,6 +74,8 @@
   "classic.start": "เริ่ม",
   "classic.trash": "ถังขยะ",
   "classic.unpinStart": "เลิกปักหมุดจากเริ่ม",
+  "classic.viewAz": "ก–ฮ",
+  "classic.viewCategories": "หมวดหมู่",
   "clipboard.chars": {
     "other": "· {count} อักขระ"
   },

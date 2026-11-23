@@ -25,7 +25,7 @@ Os três rodam sobre o mesmo servidor gráfico, o mesmo motor de interface e os 
 
 **Desde a 0.8.3.** Tudo numa barra embaixo: o botão iniciar, a busca, os apps fixados e abertos, uma bandeja com configurações rápidas e o relógio.
 
-- **O menu iniciar** tem um campo de busca que busca como a busca do sistema (apps, ajustes, arquivos, notas, a calculadora, Ajuda), uma grade de apps fixados que você mesmo organiza, os apps usados recentemente, todos os apps de A a Z e o botão de desligar.
+- **O menu iniciar** tem um campo de busca que busca como a busca do sistema (apps, ajustes, arquivos, notas, a calculadora, Ajuda), uma grade de apps fixados que você mesmo organiza, os apps usados recentemente, todos os apps de A a Z ou por categoria (Jogos, Gráficos, Internet, Escritório…, cada uma com sua contagem e aberta ali mesmo, também pelo teclado; em desenvolvimento) e o botão de desligar.
 - **Configurações rápidas** junto ao relógio: rede, Bluetooth, Não perturbe, Luz noturna, modo escuro, volume.
 - **Uma barra de tarefas em cada tela**, ligada por padrão; o menu iniciar e os painéis abrem na tela onde você clicou.
 - **A barra de tarefas** pode ficar centralizada ou alinhada ao início, em qualquer lado da tela.

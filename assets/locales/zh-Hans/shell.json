@@ -16,6 +16,7 @@
   "category.Graphics": "图形",
   "category.Network": "互联网",
   "category.Office": "办公",
+  "category.Other": "其他",
   "category.Science": "科学",
   "category.Settings": "设置",
   "category.System": "系统",
@@ -73,6 +74,8 @@
   "classic.start": "开始",
   "classic.trash": "废纸篓",
   "classic.unpinStart": "从“开始”取消固定",
+  "classic.viewAz": "按名称",
+  "classic.viewCategories": "类别",
   "clipboard.chars": {
     "other": "· {count} 个字符"
   },

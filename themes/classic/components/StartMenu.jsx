@@ -1,13 +1,16 @@
 // The Classic start menu: a search field, the pinned apps (a grid the user arranges), recently used
-// apps, every app A–Z, and at the bottom the user and the power button (Lock, Switch User, Log Out,
+// apps, every app A–Z or by category (#210; the groups and keys are sdk/appgroupsmodel.js, the view chosen last is
+// settings.startMenuView), and at the bottom the user and the power button (Lock, Switch User, Log Out,
 // Restart…, Shut Down…: the session's own power sheet, sdk/power.jsx). Typing searches like the
 // system search (apps, settings, files, notes, calculator, Help…; sdk/spotlight.js searchEverything).
 // Right click on an app: pin or unpin it in the start menu or the taskbar; drag it onto the taskbar to
-// pin it there. Keyboard: type to search, ↑/↓ and Enter, Escape closes.
+// pin it there. Keyboard: type to search, ↑/↓ and Enter, Escape closes; on All apps, ↑/↓, Home/End and Enter walk
+// the list, and in Categories → opens a group and ← closes it (mirrored right to left). Search stays global.
 import {
   View, Text, ScrollView, SearchField, addListener, t as tr, tOptional, useSettings, settings, useStore,
   useLauncherApps, launchApp, dockIdOf, dock, beginDockDrag, dockDragJustEnded, session, wm, useSystemInfo, searchEverything,
-  mainDisplay, direction, compareNames,
+  mainDisplay, direction, compareNames, formatNumber, Segmented, groupApps, startView, groupRows, groupKey, keepSelection,
+  focusToken, restoreFocus,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Menu } from './Menu.jsx';
@@ -59,10 +62,11 @@ function Row({ t, Icon, glyph, title, subtitle, selected, onClick, onMenu, onDra
   );
 }
 
-function Header({ t, title, action, onAction, back }) {
+function Header({ t, title, action, onAction, back, children }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', height: 32, paddingHorizontal: 8 }}>
-      <Text style={{ flex: 1, fontSize: 13, fontWeight: 600, color: t.text, textAlign: 'start' }}>{title}</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 32, paddingHorizontal: 8 }}>
+      <Text style={{ flex: 1, fontSize: 13, fontWeight: 600, color: t.text, textAlign: 'start', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{title}</Text>
+      {children}
       {action ? (
         <View onClick={onAction} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, height: 26, paddingHorizontal: 10, borderRadius: 4,
           backgroundColor: t.control, border: `1px solid ${t.tileBorder}` }}>
@@ -71,6 +75,26 @@ function Header({ t, title, action, onAction, back }) {
           {back ? null : <Chevron color={t.text} size={5} dir={direction() === 'rtl' ? 'left' : 'right'} />}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+// A category on All apps: a disclosure chevron, its name and how many apps it holds; a click opens or closes it.
+function GroupRow({ t, label, count, open, selected, onClick, onHover }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <View onClick={onClick} onMouseEnter={() => { setHover(true); onHover?.(); }} onMouseLeave={() => setHover(false)}
+      style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, borderRadius: 6,
+        backgroundColor: selected || hover ? t.hover : 'transparent' }}>
+      {selected ? <View style={{ position: 'absolute', insetInlineStart: 0, top: 12, width: 3, height: 16, borderRadius: 2, backgroundColor: t.accent }} /> : null}
+      <View style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+        <Chevron color={open ? t.accent : t.textDim} size={6} dir={open ? 'down' : direction() === 'rtl' ? 'left' : 'right'} />
+      </View>
+      <Text style={{ flex: 1, fontSize: 13, fontWeight: 600, color: t.text, whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'start' }}>{label}</Text>
+      <View style={{ minWidth: 26, height: 20, paddingHorizontal: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+        backgroundColor: open ? t.accent : t.control }}>
+        <Text style={{ fontSize: 11, fontWeight: 600, color: open ? '#fff' : t.textDim }}>{formatNumber(count)}</Text>
+      </View>
     </View>
   );
 }
@@ -97,6 +121,10 @@ export function StartMenu({ t, box, onClose, isOnBar }) {
   const [ctx, setCtx] = useState(null);                // { app, x, y }
   const [power, setPower] = useState(null);
   const [sel, setSel] = useState(0);
+  const [openGroups, setOpenGroups] = useState(() => new Set());   // the categories open on All apps
+  const [kSel, setKSel] = useState(-1);                // the row of All apps the keyboard is on (-1: none yet)
+  const follow = useRef(false);                        // the keyboard moved kSel: scroll it into sight
+  const listRef = useRef(null), listBox = useRef(null), selRow = useRef(null);
   useStore(searchEverything.version());
   useEffect(() => { searchEverything.prepare(); }, []);
   useEffect(() => addListener('pointerdown', (e) => {
@@ -104,12 +132,45 @@ export function StartMenu({ t, box, onClose, isOnBar }) {
     if (!isOnBar(e.x, e.y)) onClose();
   }), []);
   useEffect(() => setSel(0), [query]);
+  // the search field keeps the keys: a press anywhere in the menu (All apps, the view switch, a category) takes the
+  // text focus away, so on the release it goes back to the field (typing still searches; the arrows walk the list)
+  const searchTok = useRef(null);
+  useEffect(() => {
+    searchTok.current = focusToken();          // the field took it when it mounted (autoFocus)
+    return addListener('pointerup', () => { if (focusToken() === null && searchTok.current) restoreFocus(searchTok.current); });
+  }, []);
 
   const byId = new Map(list.map((a) => [a.id, a]));
   const pins = startPins(s, list).map((id) => byId.get(id)).filter(Boolean);
   const recent = (s.dockRecentApps || []).map((x) => list.find((a) => dockIdOf(a) === dockIdOf(x))).filter(Boolean)
     .filter((a, i, arr) => arr.indexOf(a) === i).slice(0, 6);
   const sorted = useMemo(() => [...list].sort((a, b) => compareNames(a.name, b.name)), [list]);
+  const allView = startView(s.startMenuView);
+  const groups = useMemo(() => groupApps(sorted, { label: (id) => tr(`shell.category.${id}`), compare: compareNames }), [sorted]);
+  const allRows = useMemo(() => (allView === 'categories' ? groupRows(groups, openGroups) : sorted.map((app) => ({ kind: 'app', app }))),
+    [allView, groups, openGroups, sorted]);
+  // a group opened or closed (or the list changed): the keyboard stays on the same row
+  const lastRows = useRef(allRows);
+  if (lastRows.current !== allRows) {
+    const k = kSel >= 0 ? keepSelection(lastRows.current, allRows, kSel) : -1;
+    lastRows.current = allRows;
+    if (k !== kSel) setKSel(k);
+  }
+  useEffect(() => {
+    if (!follow.current || kSel < 0) return undefined;
+    follow.current = false;
+    const id = setTimeout(() => {
+      const sc = listRef.current, row = selRow.current, view = listBox.current;
+      if (!sc || !row || !view || !sc.inner.current) return;
+      try {
+        const r = lord.getLayout(row.id), c = lord.getLayout(sc.inner.current.id), vh = lord.getLayout(view.id)[3];
+        const top = r[1] - c[1], off = sc.offset();
+        if (top < off) sc.scrollTo(top);
+        else if (top + r[3] > off + vh) sc.scrollTo(top + r[3] - vh);
+      } catch (e) { /* closed meanwhile */ }
+    }, 40);
+    return () => clearTimeout(id);
+  }, [kSel, allRows]);
   const sections = useMemo(() => (query.trim() ? searchEverything.results(query, list) : []), [query, list]);
   const flat = sections.flatMap((x) => x.items.map((it) => ({ it, sec: x.id })));
 
@@ -117,7 +178,25 @@ export function StartMenu({ t, box, onClose, isOnBar }) {
   const drag = (a) => (e) => { if (!e.button && dockIdOf(a)) beginDockDrag({ id: dockIdOf(a), Icon: a.Icon, x: e.x, y: e.y, source: 'launcher', onStart: onClose }); };
   const menu = (a) => (e) => setCtx({ app: a, x: e.x, y: e.y });
   const run = (it) => { if (!it) return; onClose(); searchEverything.run(it); };
+  const toggleGroup = (id) => setOpenGroups((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const chooseView = (v) => { setKSel(-1); if (v !== allView) settings.set({ startMenuView: v }); };
   const onKey = (e) => {
+    if (!query.trim() && view === 'all') {
+      // nothing selected yet: ↓, ↑ and Home select the first row, End the last; other keys do nothing
+      if (kSel < 0) {
+        if (!allRows.length || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return false;
+        follow.current = true;
+        setKSel(e.key === 'End' ? allRows.length - 1 : 0);
+        return true;
+      }
+      const r = groupKey(e.key, allRows, kSel, direction() === 'rtl');
+      if (!r) return false;
+      if (r.launch) { open(r.launch); return true; }
+      if (r.toggle) toggleGroup(r.toggle);
+      follow.current = true;
+      setKSel(r.sel);
+      return true;
+    }
     if (!query.trim()) return false;
     if (e.key === 'ArrowDown') { setSel((v) => Math.min(flat.length - 1, v + 1)); return true; }
     if (e.key === 'ArrowUp') { setSel((v) => Math.max(0, v - 1)); return true; }
@@ -154,21 +233,37 @@ export function StartMenu({ t, box, onClose, isOnBar }) {
     );
   } else if (view === 'all') {
     let letter = '';
+    const rowProps = (i) => ({ selected: i === kSel, onHover: () => setKSel(i) });
+    const appRow = (a, i, indent) => (
+      <View key={`${indent ? 'g' : 'a'}:${a.id}`} ref={i === kSel ? selRow : undefined} style={indent ? { paddingInlineStart: 28 } : undefined}>
+        <Row t={t} Icon={a.Icon} title={a.name} {...rowProps(i)} onClick={() => { if (!dockDragJustEnded()) open(a); }} onMenu={menu(a)} onDrag={drag(a)} />
+      </View>
+    );
     body = (
       <View style={{ height: bodyH }}>
-        <Header t={t} title={tr('shell.classic.allApps')} action={tr('shell.classic.back')} back onAction={() => setView('home')} />
-        <ScrollView style={{ flex: 1 }}>
-          {sorted.map((a) => {
-            const l = (a.name[0] || '#').toUpperCase();
-            const head = l !== letter ? (letter = l) : null;
-            return (
-              <View key={a.id}>
-                {head ? <Text style={{ fontSize: 12, fontWeight: 600, color: t.accent, marginHorizontal: 12, marginTop: 8, marginBottom: 2, textAlign: 'start' }}>{head}</Text> : null}
-                <Row t={t} Icon={a.Icon} title={a.name} onClick={() => { if (!dockDragJustEnded()) open(a); }} onMenu={menu(a)} onDrag={drag(a)} />
+        <Header t={t} title={tr('shell.classic.allApps')} action={tr('shell.classic.back')} back onAction={() => { setKSel(-1); setView('home'); }}>
+          <Segmented small focusable={false} value={allView} onChange={chooseView}
+            options={[['az', tr('shell.classic.viewAz')], ['categories', tr('shell.classic.viewCategories')]]} />
+        </Header>
+        <View ref={listBox} style={{ flex: 1 }}>
+          <ScrollView scrollRef={listRef} resetKey={allView} style={{ flex: 1 }}>
+            {allView === 'categories' ? allRows.map((r, i) => (r.kind === 'group' ? (
+              <View key={`c:${r.id}`} ref={i === kSel ? selRow : undefined} style={{ marginTop: i ? 2 : 4 }}>
+                <GroupRow t={t} label={tr(`shell.category.${r.id}`)} count={r.count} open={r.open} {...rowProps(i)}
+                  onClick={() => { setKSel(i); toggleGroup(r.id); }} />
               </View>
-            );
-          })}
-        </ScrollView>
+            ) : appRow(r.app, i, true))) : sorted.map((a, i) => {
+              const l = (a.name[0] || '#').toUpperCase();
+              const head = l !== letter ? (letter = l) : null;
+              return (
+                <View key={a.id}>
+                  {head ? <Text style={{ fontSize: 12, fontWeight: 600, color: t.accent, marginHorizontal: 12, marginTop: 8, marginBottom: 2, textAlign: 'start' }}>{head}</Text> : null}
+                  {appRow(a, i, false)}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
       </View>
     );
   } else {
@@ -176,7 +271,7 @@ export function StartMenu({ t, box, onClose, isOnBar }) {
     const gridH = Math.min(rows, recent.length ? 3 : 5) * 82;
     body = (
       <View style={{ height: bodyH, gap: 4 }}>
-        <Header t={t} title={tr('shell.classic.pinned')} action={tr('shell.classic.allApps')} onAction={() => setView('all')} />
+        <Header t={t} title={tr('shell.classic.pinned')} action={tr('shell.classic.allApps')} onAction={() => { setKSel(-1); setView('all'); }} />
         {pins.length ? (
           <ScrollView style={{ height: gridH, flex: 0 }}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 0, paddingHorizontal: 2 }}>

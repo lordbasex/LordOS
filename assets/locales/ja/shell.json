@@ -16,6 +16,7 @@
   "category.Graphics": "グラフィックス",
   "category.Network": "インターネット",
   "category.Office": "オフィス",
+  "category.Other": "その他",
   "category.Science": "科学",
   "category.Settings": "設定",
   "category.System": "システム",
@@ -73,6 +74,8 @@
   "classic.start": "スタート",
   "classic.trash": "ゴミ箱",
   "classic.unpinStart": "スタートからピン留めを外す",
+  "classic.viewAz": "名前順",
+  "classic.viewCategories": "カテゴリ",
   "clipboard.chars": {
     "other": "· {count} 文字"
   },

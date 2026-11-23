@@ -16,6 +16,7 @@
   "category.Graphics": "Γραφικά",
   "category.Network": "Διαδίκτυο",
   "category.Office": "Γραφείο",
+  "category.Other": "Άλλα",
   "category.Science": "Επιστήμη",
   "category.Settings": "Ρυθμίσεις",
   "category.System": "Σύστημα",
@@ -74,6 +75,8 @@
   "classic.start": "Έναρξη",
   "classic.trash": "Κάδος",
   "classic.unpinStart": "Ξεκαρφίτσωμα από την Έναρξη",
+  "classic.viewAz": "Α–Ω",
+  "classic.viewCategories": "Κατηγορίες",
   "clipboard.chars": {
     "one": "· {count} χαρακτήρας",
     "other": "· {count} χαρακτήρες"

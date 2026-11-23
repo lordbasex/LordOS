@@ -16,6 +16,7 @@
   "category.Graphics": "Grafik",
   "category.Network": "Internet",
   "category.Office": "Pejabat",
+  "category.Other": "Lain-lain",
   "category.Science": "Sains",
   "category.Settings": "Tetapan",
   "category.System": "Sistem",
@@ -73,6 +74,8 @@
   "classic.start": "Mula",
   "classic.trash": "Tong Sampah",
   "classic.unpinStart": "Nyahsemat daripada Mula",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Kategori",
   "clipboard.chars": {
     "other": "· {count} aksara"
   },

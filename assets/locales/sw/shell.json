@@ -16,6 +16,7 @@
   "category.Graphics": "Michoro",
   "category.Network": "Intaneti",
   "category.Office": "Ofisi",
+  "category.Other": "Nyingine",
   "category.Science": "Sayansi",
   "category.Settings": "Mipangilio",
   "category.System": "Mfumo",
@@ -74,6 +75,8 @@
   "classic.start": "Anza",
   "classic.trash": "Tupio",
   "classic.unpinStart": "Bandua kutoka Anza",
+  "classic.viewAz": "A–Z",
+  "classic.viewCategories": "Kategoria",
   "clipboard.chars": {
     "one": "· herufi {count}",
     "other": "· herufi {count}"

@@ -16,6 +16,7 @@
   "category.Graphics": "圖形",
   "category.Network": "網際網路",
   "category.Office": "辦公",
+  "category.Other": "其他",
   "category.Science": "科學",
   "category.Settings": "設定",
   "category.System": "系統",
@@ -73,6 +74,8 @@
   "classic.start": "開始",
   "classic.trash": "垃圾桶",
   "classic.unpinStart": "從「開始」取消釘選",
+  "classic.viewAz": "依名稱",
+  "classic.viewCategories": "類別",
   "clipboard.chars": {
     "other": "· {count} 個字元"
   },

@@ -16,6 +16,7 @@
   "category.Graphics": "Grafiikka",
   "category.Network": "Internet",
   "category.Office": "Toimisto",
+  "category.Other": "Muut",
   "category.Science": "Tiede",
   "category.Settings": "Asetukset",
   "category.System": "Järjestelmä",
@@ -74,6 +75,8 @@
   "classic.start": "Aloitus",
   "classic.trash": "Roskakori",
   "classic.unpinStart": "Irrota aloituksesta",
+  "classic.viewAz": "A–Ö",
+  "classic.viewCategories": "Luokat",
   "clipboard.chars": {
     "one": "· {count} merkki",
     "other": "· {count} merkkiä"

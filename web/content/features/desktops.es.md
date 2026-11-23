@@ -25,7 +25,7 @@ Los tres corren sobre el mismo servidor gráfico, el mismo motor de interfaz y l
 
 **Desde la 0.8.3.** Todo en una barra abajo: el botón de inicio, la búsqueda, las apps fijadas y abiertas, una bandeja con ajustes rápidos y el reloj.
 
-- **El menú de inicio** tiene un campo de búsqueda que busca como la búsqueda del sistema (apps, ajustes, archivos, notas, la calculadora, Ayuda), una grilla de apps fijadas que acomodás vos, las apps usadas hace poco, todas las apps de la A a la Z y el botón de apagado.
+- **El menú de inicio** tiene un campo de búsqueda que busca como la búsqueda del sistema (apps, ajustes, archivos, notas, la calculadora, Ayuda), una grilla de apps fijadas que acomodás vos, las apps usadas hace poco, todas las apps de la A a la Z o por categoría (Juegos, Gráficos, Internet, Oficina…, cada una con su cantidad y que se abre ahí mismo, también con el teclado; en desarrollo) y el botón de apagado.
 - **Ajustes rápidos** junto al reloj: red, Bluetooth, No molestar, Luz nocturna, modo oscuro, volumen.
 - **Una barra de tareas en cada pantalla**, activada de fábrica; el menú de inicio y los paneles se abren en la pantalla donde hiciste clic.
 - **La barra de tareas** puede ir centrada o alineada al inicio, en cualquier lado de la pantalla.

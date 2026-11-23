@@ -25,7 +25,7 @@ The three run on the same display server, the same interface engine and the same
 
 **Since 0.8.3.** Everything in one bar at the bottom: the start button, search, the pinned and open apps, a tray with quick settings and the clock.
 
-- **The start menu** has a search field that searches like the system search (apps, settings, files, notes, the calculator, Help), a grid of pinned apps you arrange yourself, recently used apps, every app from A to Z, and the power button.
+- **The start menu** has a search field that searches like the system search (apps, settings, files, notes, the calculator, Help), a grid of pinned apps you arrange yourself, recently used apps, every app from A to Z or by category (Games, Graphics, Internet, Office…, each with its count and opened in place, with the keyboard too; in development), and the power button.
 - **Quick settings** by the clock: network, Bluetooth, Do Not Disturb, Night Light, dark mode, volume.
 - **A taskbar on every display**, on by default; the start menu and the panels open on the display you clicked.
 - **The taskbar** can be centered or aligned to the start, on any side of the screen.
