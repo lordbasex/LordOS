@@ -464,7 +464,7 @@ Xwayland, and only for connectors the kernel marks non-desktop (never a monitor)
 allow, Allow once (not saved) and Always allow; listed under VR headsets. The lease is revoked when the app lets it go,
 the decision is taken back, the headset is unplugged or the screen locks ([WAYLAND.md](WAYLAND.md), "DRM leases").
 
-**One permission starts allowed** (in development, approved by the maintainer 2026-11-22, GitHub #219): the built-in
+**One permission starts allowed** (since 0.8.9.5, approved by the maintainer 2026-11-22, GitHub #219): the built-in
 Screenshots app's `screen`. Pressing Print Screen, ❖⇧3, ❖⇧4 or ❖⇧5 is the person asking for the capture, so it is not asked
 again. It is a default under the saved decisions, not a decision written for anyone (`perm_builtin_default` and
 `perm_get_builtin` in `server/src/sec/perms.c`): only for the id `screenshots` (no package may take it) and only the
@@ -506,7 +506,7 @@ its own section (see connections per app, locate them on the map) through
 
 ### What is captured now: the capture indicator
 
-(In development, 2026-11-22; before it, a green dot for the camera, an orange one for the microphone and a red pill per screen
+(Since 0.8.9.5, 2026-11-22; before it, a green dot for the camera, an orange one for the microphone and a red pill per screen
 share.) While anything captures the screen, the camera or the microphone, a **green pill** stays by the clock in every
 theme (where `<PrivacyIndicators />` is: Lord Flow's menu bar, the Lord Classic taskbar — also on the side, where the
 other status items are left out — Lord Workspaces' status cluster and Lord Celeste's bar). Its glyph says what, system-wide:
@@ -957,7 +957,7 @@ do it anyway (no D-Bus, no new sockets).
 Not tested this round: a second user over fast user switching and the remote desktop (no test
 password at hand). Their code path is the same `cgroup_delegate_session()` per uid.
 
-## LordOS Studio's camera (in development)
+## LordOS Studio's camera (since 0.8.9.5)
 
 "LordOS Studio" (docs/CAMERA-STUDIO-PLAN.md, section 8) is one more camera in the list apps see. It is a camera like
 any other for permissions: opening it needs the app's `camera` permission and is refused by the "no camera"

@@ -6,7 +6,7 @@ No es un cliente nativo de ningún servicio. **LordOS no cambia los sitios ni su
 
 [[shot:6]]
 
-Es nuevo en **LordOS 0.8.8.8**, publicada el 12 de noviembre de 2026; el último lanzamiento es la 0.8.9. Vive en un paquete opcional, `lordos-web`: sin él, el resto de LordOS funciona igual, y la Tienda lo instala por vos con tu primera app web.
+Es nuevo en **LordOS 0.8.8.8**, publicada el 12 de noviembre de 2026; el último lanzamiento es la 0.8.9.5. Vive en un paquete opcional, `lordos-web`: sin él, el resto de LordOS funciona igual, y la Tienda lo instala por vos con tu primera app web.
 
 [[figure:web-runtime]]
 

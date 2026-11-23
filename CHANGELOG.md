@@ -935,7 +935,7 @@ Mode in a video call, and the Raspberry Pi with this release.
   KDE Plasma's KWin 6.7 and GNOME's Mutter 51 advertise, compared on 2026-11-22 (KWin's and Mutter's data as
   wayland.app lists it: the globals each advertised to an ordinary client, from 2026-09-04 and 2026-09-06). For LordOS
   each row has a status (offered, partly, left out on purpose, not offered), a note, how it was checked and when, and
-  "in development" when it is in the code after the latest release (0.8.9.4). Today: LordOS offers 46 of the 108 (3 of them in part),
+  an "in development" tag when it is in the code after the latest release (0.8.9.4 when the page was made). Then: LordOS offers 46 of the 108 (3 of them in part),
   KWin 63 and Mutter 40; of the 37 both KWin and Mutter offer, LordOS offers all 37; 30 are left out on purpose, each with
   its reason (layer-shell, data-control, foreign-toplevel, session-lock, screencopy and image capture, virtual
   keyboard and pointer, input methods, Plasma's own shell protocols). The page has a search, filters by category,
@@ -989,8 +989,8 @@ Mode in a video call, and the Raspberry Pi with this release.
     with its items; `docs/WAYLAND.md`'s hand-written summary lines ("48 globals, mean 100 %, 29 complete", "28 items,
     mean 100 %") match the run; the generated conformance block is current; every screenshot named exists and every one
     in the folder is shown; and 24 hostile values in the new fields are refused.
-- **The paper and the site describe the work in development after 0.8.9.4** (paper edition of 2026-11-22, "0.8.9.4 Beta
-  + in development"; `docs/PAPER-VALIDATION.md`): conformance depths and the published table, the new Wayland protocols
+- **The paper and the site describe the work built after 0.8.9.4** (paper edition of 2026-11-22, labelled "0.8.9.4 Beta
+  + in development" until this release; `docs/PAPER-VALIDATION.md`): conformance depths and the published table, the new Wayland protocols
   and the X11 work, always on top, LordOS Studio and `lord-studio`, Machines' Keys panel, apps mode's status item and
   panel, Capture mouse, Intel GVT-g and the `machines` command, `fastfetch`/`neofetch` through `lordos-fetch`, the
   Store's endless lists and Flathub descriptions; corrected: the LordOS tools shipped are w10 (not w9), drags out of X11

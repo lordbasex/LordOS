@@ -213,7 +213,7 @@ but cannot run anything; phase 3 (fs-verity over the whole system image) covers 
   64 lowercase hex digits, at most 4096 files and 1 MB). An isolated app's process does this before
   its sandbox is applied. Both files are read directly in that folder, never through a link
   (`O_NOFOLLOW`), regular files only.
-- **After a package update under a running session** (in development after 0.8.9.4): before each
+- **After a package update under a running session** (since 0.8.9.5): before each
   bundle check lord-server compares the pair's identity (device, inode, size, change and modification
   times) with the one it read; when it changed, or when a bundle no longer matches, `codesig_reload`
   reads the pair again with the same reader and the same signature check, from the folder opened at

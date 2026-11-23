@@ -71,7 +71,7 @@ Cada janela da máquina vira a própria janela do LordOS, com o título do convi
 
 Com **Gráficos 3D** em Configurar → Tela, uma máquina Linux desenha com a sua placa de vídeo pelo virgl (OpenGL), em PCs de 64 bits. Os quadros da máquina chegam ao LordOS sem que ele espere nunca o trabalho gráfico do convidado. Só essa máquina pode usar o dispositivo de render da placa, nunca a tela em si.
 
-**As máquinas com Windows continuam em 2D**: não existe um driver 3D livre e estável para elas. O 3D para máquinas com Windows está em desenvolvimento, e ainda não há nada oferecido. As máquinas também são 2D no Raspberry Pi e num desktop que desenha sem placa de vídeo, e uma máquina 3D rodando não pode ser suspensa nem ter snapshots com a memória.
+**As máquinas com Windows continuam em 2D** a menos que recebam uma parte de uma placa de vídeo Intel (GVT-g, mais abaixo), onde o driver da Intel lhes dá Direct3D, OpenGL e Vulkan: não existe um driver 3D livre e estável para elas. O 3D para máquinas com Windows com uma segunda placa de vídeo dedicada está planejado, e ainda não há nada oferecido. As máquinas também são 2D no Raspberry Pi e num desktop que desenha sem placa de vídeo, e uma máquina 3D rodando não pode ser suspensa nem ter snapshots com a memória.
 
 ## Uma imagem mais fluida
 
@@ -102,6 +102,6 @@ O resto do desktop recebeu o mesmo cuidado: os Ajustes, a Loja, o Arquivos e o M
 
 Conferido num PC de 64 bits com KVM, principalmente com uma ferramenta de desenvolvimento que faz o papel do servidor gráfico do LordOS: a instalação desassistida do Windows 11 e as ferramentas dele (resolução, área de transferência nos dois sentidos, a lista de janelas, os ícones e as ações do modo apps), os números da pasta de transferência acima, os três modos de rede novos numa LAN real, o som e o microfone pelo PipeWire, e o 3D com um convidado Ubuntu numa Radeon RX 580.
 
-**Ainda não:** o modo apps desenhando num monitor real, todos os painéis do Configurar na tela, Windows no Raspberry Pi, o 3D para máquinas com Windows, dispositivos USB passados para uma máquina e arrastar arquivos para fora de uma máquina.
+**Ainda não:** o modo apps desenhando num monitor real, todos os painéis do Configurar na tela, Windows no Raspberry Pi, o 3D para máquinas com Windows sem uma parte de GVT-g da Intel, dispositivos USB passados para uma máquina e arrastar arquivos para fora de uma máquina.
 
 O projeto completo, as regras de segurança e cada medição estão em `docs/VIRTUALIZATION.md` e `docs/MACHINES-GPU.md`.

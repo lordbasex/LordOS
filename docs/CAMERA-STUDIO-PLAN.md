@@ -1,7 +1,7 @@
 # Camera Studio: plan and design for approval
 
 **Status (2026-11-22): approved by the maintainer; phases 0 and 1 built (branch `feat/camera-studio`), phase 2 built
-(branch `feat/camera-studio-2`, 11.2) and phase 3 built (branch `feat/camera-studio-3`, 11.3), in development; phase 2's
+(branch `feat/camera-studio-2`, 11.2) and phase 3 built (branch `feat/camera-studio-3`, 11.3), all released in 0.8.9.5; phase 2's
 device and phase 3's Mic Mode are still to verify on a VM.**
 The maintainer approved the whole plan and the exceptions E-S1 to E-S7 on 2026-11-22; E-S8 (ONNX Runtime linked) was
 **not** approved: D3 is our own C inference, and ONNX Runtime is only the dev machine's reference in tests. The name is
@@ -606,7 +606,7 @@ The effort is for one developer with the existing patterns. These are **estimate
 | **4. PipeWire camera** | Camera portal plus lord-screencast camera mode | 1–2 weeks | OBS Flatpak "Video Capture Device (PipeWire)" and Firefox with the pref on see "LordOS Studio"; the guard hides it from a restricted app |
 | **5. Studio app** | the full app, scenes, overlays from lord-server, recording, user LUTs | 2–3 weeks | screenshots in every theme and language direction |
 
-### 11.1 Phases 0 and 1 as built (2026-11-22, in development)
+### 11.1 Phases 0 and 1 as built (2026-11-22, released in 0.8.9.5)
 
 - **Inference and models.** `server/src/media/studio/nn.c` (our own; the 14 operators the two models use, nothing else),
   `tools/studio/tflite.mjs` and `tflite2lnn.mjs` (the converter, which refuses any other operator or option),
@@ -636,7 +636,7 @@ The effort is for one developer with the existing patterns. These are **estimate
   pass; the pipeline, the helper inside its sandbox with the GPU, the popover and the broker path are tested without
   one), the Pi 5, and the v4l2loopback matrix (phase 2, 11.2).
 
-### 11.2 Phase 2 as built (2026-11-22, in development)
+### 11.2 Phase 2 as built (2026-11-22, released in 0.8.9.5)
 
 - **The package** `lordos-studio-camera` (`tools/iso/mkdeb-studiocamera.sh`): only the two static files of 2.2 (plus its
   copyright), conffiles; amd64 depends on `v4l2loopback-dkms (>= 0.13.0)` and `linux-headers-amd64`, arm64 on nothing
@@ -676,7 +676,7 @@ The effort is for one developer with the existing patterns. These are **estimate
   with a second device); a same-uid process could still open `/dev/video50` as a
   writer before lord-studio does (8.4: lord-studio then fails to set its format and stays off, logged).
 
-### 11.3 Phase 3 as built (2026-11-22, in development)
+### 11.3 Phase 3 as built (2026-11-22, released in 0.8.9.5)
 
 - **The looks** (`server/src/media/studio/stlook.c`, `stframe.c`, the pipeline in `stfx.c`, the GPU composite in
   `stgl.c`; one shader does them all, and the CPU path is the same arithmetic in row passes):
@@ -785,7 +785,7 @@ The effort is for one developer with the existing patterns. These are **estimate
 Every phase also updates CHANGELOG, the paper (en, es, pt), the site and `THIRD_PARTY.md` (model cards, Apache-2.0
 NOTICE), as CLAUDE.md requires, and `PRIVACY.md` and `MEDIA.md` (new sections).
 
-### 11.4 Follow-ups (2026-11-22, in development; approved by the maintainer the same day)
+### 11.4 Follow-ups (2026-11-22, released in 0.8.9.5; approved by the maintainer the same day)
 
 - **OBS beside LordOS Studio.** `lordos-studio-camera`'s file now makes two devices:
   `options v4l2loopback devices=2 video_nr=50,49 card_label="LordOS Studio","OBS Virtual Camera" exclusive_caps=1,1 max_buffers=4`.

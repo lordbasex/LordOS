@@ -80,7 +80,7 @@ the connection over a type it doesn't know.
 
 ## The indicator
 
-The capture indicator by the clock (in development, `sdk/capturestatus.jsx`; before it, a red pill per share): a green pill in every theme's
+The capture indicator by the clock (since 0.8.9.5, `sdk/capturestatus.jsx`; before it, a red pill per share): a green pill in every theme's
 bar whose panel has a row per app with its name and **Stop sharing** ([PRIVACY.md](PRIVACY.md), "What is captured now"). It can't
 be hidden; while a window is full screen a copy of the pill stays in the corner of each display, in the `notification` layer. No
 frame leaves until the shell says it's on screen, and with no answer in 2 s the share ends with `no_indicator`. It ends the same way

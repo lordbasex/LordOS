@@ -48,7 +48,7 @@ The releases page is the project's public changelog: every release is documented
 
    Also bump `package.json` (`version`, `lordos.channel`) and commit both.
 
-   **Machines' LordOS card** (in development after 0.8.9): when this release ships new live ISOs, point the `lordos`
+   **Machines' LordOS card** (since 0.8.9.5): when this release ships new live ISOs, point the `lordos`
    entry of `assets/machines/systems.json` at it in the same commit: both `dir` folders
    (`https://github.com/lordbasex/LordOS/releases/download/v<version>/`), `release` (the version without its suffix),
    `approxMb` (each ISO's size in MiB, from the build), and `checked`. Its `SHA256SUMS` and `SHA256SUMS.sig` are the

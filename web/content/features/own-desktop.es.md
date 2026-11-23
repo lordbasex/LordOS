@@ -107,7 +107,7 @@ Todo en la 0.8.7, menos los dos puntos marcados 0.8.8.
 
 ## Nuevo en la 0.8.9
 
-El último lanzamiento, la 0.8.9 Beta, publicada el 18 de noviembre de 2026.
+Publicado en la 0.8.9 Beta, el 18 de noviembre de 2026; el último lanzamiento es la 0.8.9.5 Beta (23 de noviembre de 2026).
 
 - **Elegí tu escritorio.** La primera vez que una cuenta nueva inicia sesión en un sistema instalado, LordOS muestra Lord Flow, Lord Classic y Lord Workspaces uno al lado del otro, en un orden al azar y sin ninguno elegido por vos, te deja probar en vivo el que elegís y te muestra dónde cambiarlo después.
 - **Widgets de escritorio en todos los temas.** "Agregar widget" en el menú del fondo: un reloj (con segundero si querés), el clima de la ciudad que elegís de una lista que nunca sale de la computadora, un calendario, las baterías de tus dispositivos, una onda de sonido que sigue la música, una cámara o un canal de TV, los límites de Claude Code y más. Leen sus datos solo mientras los podés ver.

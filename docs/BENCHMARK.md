@@ -1200,7 +1200,7 @@ machine. `lordos-fetch` (the same binary under that name; `lordos-sysreport fetc
 the brand colors beside a short summary (system, computer, kernel, uptime, packages, shell, display, CPU,
 GPU, memory, disk, isolation); the user and host names appear only on screen and `--share` leaves them out
 for a screenshot to post; `--color=auto|always|never`, `NO_COLOR` respected, true color when `COLORTERM`
-says so, plain ASCII without color. **More lines (in development):** what fastfetch-style tools show plus what
+says so, plain ASCII without color. **More lines (since 0.8.9.5):** what fastfetch-style tools show plus what
 About shows, all read locally, without root or network, in about 30 ms: `Host` (the machine model, formerly
 "Computer"), one `Display` line per kind of monitor ("3 × S27F350, 1920 × 1080, 27""), `DE` (the LordOS desktop in
 use: settings.json's `theme`, named by its `theme.json`), `Compositor` (lord-server's version, "C · DRM/KMS · evdev",
@@ -1213,7 +1213,7 @@ build), `Build` (the build id and the system code's state: "signed by LordOS · 
 manifest), `Boot time` (this boot's line in `/var/lib/lordos/boot-times.jsonl`, as About) and `Server RAM` (the
 RSS of this user's session lord-server, not an `--app` one; the JS heap is only known inside lord-server, so it is
 not shown). The labels stay in English and there is still no `--json`. Parsing helpers in `fetch.h`, tested by
-`tests/sysreport_test.c` (`test_fetch_helpers`). **`fastfetch` and `neofetch` (in development):** typed in a terminal, they
+`tests/sysreport_test.c` (`test_fetch_helpers`). **`fastfetch` and `neofetch` (since 0.8.9.5):** typed in a terminal, they
 run `lordos-fetch` until the real package is installed. `/usr/lib/lordos/fallback-bin/fastfetch` (and `neofetch`,
 a link to it; source `packaging/fallback-bin/fastfetch`) is the LAST folder in PATH: `/etc/profile.d/lordos-fallback.sh`
 appends it for login shells (the Terminal's bash reads `/etc/profile`), and lord-sessiond's session PATH ends with

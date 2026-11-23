@@ -100,7 +100,7 @@ plan) are refused when the plan comes from anywhere else: the graphical installe
 
 ## In Machines (the LordOS card)
 
-Machines' **LordOS** download card uses this same install for "Install without questions" (in development after 0.8.9;
+Machines' **LordOS** download card uses this same install for "Install without questions" (since 0.8.9.5;
 [VIRTUALIZATION.md](VIRTUALIZATION.md) 3.9, "The LordOS card"): `lord-vm` boots the ISO's `live/vmlinuz` and
 `live/initrd.img` with `lordos.auto=1` on the command line (no boot menu), with a small FAT disk labelled `LORDOSAUTO`
 that holds the `lordos-auto.conf` it wrote from the assistant's Set up step (`server/src/vm/vmunattend.c`): the

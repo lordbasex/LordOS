@@ -603,7 +603,7 @@ Several displays and HiDPI (`DISPLAYS.md`): one GBM/EGL surface and UI texture p
 single context; app textures are shared and drawn at each display's scale; `wp_fractional_scale_v1`
 and `zxdg_output_manager_v1` are there. Direct scanout only with one display.
 
-Explicit sync (`linux-drm-syncobj-v1`): built 2026-11-22, in development (`SYNCOBJ-PLAN.md`, `WAYLAND.md` "Explicit
+Explicit sync (`linux-drm-syncobj-v1`): built 2026-11-22, since 0.8.9.5 (`SYNCOBJ-PLAN.md`, `WAYLAND.md` "Explicit
 sync"). An app that binds it gets its frame applied once its acquire point is signalled and its release point signalled
 with the buffer's own fences after the frame that replaced it; apps that don't keep dma-resv implicit sync.
 

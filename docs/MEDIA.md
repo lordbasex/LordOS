@@ -145,7 +145,7 @@ Cameras, streams and TV channels for the desktop's **Video** widget and the Play
   starts with a 1 s analysis, the first frame in about 4 s there; stopping VLC was noticed within a second). Not yet:
   ONVIF discovery; NDI (closed SDK: not possible).
 
-### LordOS Studio: `lord-studio` (in development, phases 0 and 1)
+### LordOS Studio: `lord-studio` (since 0.8.9.5, phases 0 and 1)
 
 The camera's effects (docs/CAMERA-STUDIO-PLAN.md): background blur, a background picture and the mirror, for every
 LordOS app that picks the "LordOS Studio" camera in `lord.media.cameras()` (device `studio`; isolated apps through
@@ -293,10 +293,10 @@ changing the output, so a compromised decoder must not have it. Audio goes throu
   none, the frame is used as is, at no cost. `media_composed` in `main.c` gives that canvas to the
   remote (`mirror_frame`) and to the recording.
 - **Password surfaces:** every password field (`TextInput secure`) and the keyring and polkit prompts are protected
-  nodes (in development; a password is never captured, PRIVACY.md).
+  nodes (since 0.8.9.5; a password is never captured, PRIVACY.md).
 - **A window alone** (Screenshots' window capture, `until`): a protected window is refused with nothing painted for it
   (`paint_capture_until` returns -1 when the window is, holds or is inside a protected node; `media.protectedWindow`),
-  and Screenshots does not crop a capture of the screen instead (in development, GitHub #219).
+  and Screenshots does not crop a capture of the screen instead (since 0.8.9.5, GitHub #219).
 - **Thumbnails:** the floating thumbnail and the Screenshots editor come from the same capture.
 - **Linux apps (Wayland):** the content, its popup menus and the full screen of a protected window
   also come out black (`wl.c`, `node_protected`).

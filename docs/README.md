@@ -40,7 +40,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | Document | What it covers |
 |---|---|
 | [WAYLAND.md](WAYLAND.md) | Linux apps (GTK, Qt, browsers) on our Wayland compositor; its point-by-point conformance scores are in [wayland-conformance.json](wayland-conformance.json) (`tools/wl-conformance.mjs`) |
-| [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md) | Plan for explicit sync (`linux-drm-syncobj-v1`), for the maintainer's review |
+| [SYNCOBJ-PLAN.md](SYNCOBJ-PLAN.md) | Plan for explicit sync (`linux-drm-syncobj-v1`): approved, built and released in 0.8.9.5 |
 | [WEBAPPS.md](WEBAPPS.md) | Web apps and PWAs: the LordOS Web Runtime (`lord-web`, WPE WebKit), profiles, isolation (0.8.8.8) |
 | [WINDOWS.md](WINDOWS.md) | Moving and resizing windows, the Window menu, cursors |
 | [DISPLAYS.md](DISPLAYS.md) | Several displays and HiDPI |
@@ -53,7 +53,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [ON-SCREEN-KEYBOARD.md](ON-SCREEN-KEYBOARD.md) | The on-screen keyboard, for a computer with no physical keyboard |
 | [THEMES-GUIDE.md](THEMES-GUIDE.md) | How to build a LordOS appearance (theme): anatomy, tokens, frames, building, verified code, testing |
 | [THEMES-PLAN.md](THEMES-PLAN.md) | Plan: many appearances, community themes from a file, a theme store with review and signing |
-| [WORKSPACES.md](WORKSPACES.md) | Lord Workspaces (in development): activities, tiling per display, effects styles, performance, what is deferred |
+| [WORKSPACES.md](WORKSPACES.md) | Lord Workspaces (since 0.8.9): activities, tiling per display, effects styles, performance, what is deferred |
 | [LAYERS.md](LAYERS.md) | The desktop's stacking order: what is drawn and clicked above what |
 | [SPOTLIGHT.md](SPOTLIGHT.md) | Search and the advanced clipboard |
 | [TRACKPAD.md](TRACKPAD.md) | Touchpads, gestures and touchscreens |
@@ -93,7 +93,7 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [DOCUMENTS.md](DOCUMENTS.md) | PDFs, archives, fonts and emoji |
 | [PRINTING.md](PRINTING.md) | Printing and scanning |
 | [MEDIA.md](MEDIA.md) | Photos, Player, Screenshots, Camera and Recorder |
-| [CAMERA-STUDIO-PLAN.md](CAMERA-STUDIO-PLAN.md) | Plan: Camera Studio, camera effects for any app (virtual camera, segmentation, backgrounds, mic modes), for the maintainer's review |
+| [CAMERA-STUDIO-PLAN.md](CAMERA-STUDIO-PLAN.md) | Plan: Camera Studio, camera effects for any app (virtual camera, segmentation, backgrounds, mic modes): approved; phases 0 to 3 released in 0.8.9.5 |
 | [VIDEO.md](VIDEO.md) | Video in the browser without hardware decoding (H.264 instead of VP9/AV1) |
 | [MAIL.md](MAIL.md) | Mail, Calendar, Contacts and Reminders |
 | [CLOUD.md](CLOUD.md) | Cloud: the person's cloud storage accounts (rclone) in Files, Settings and Backups (0.8.8.5) |
@@ -109,9 +109,10 @@ Website: [lordos.org](https://lordos.org) · Brand kit: [LORDOS-BRAND.md](LORDOS
 | [DISK-HEALTH.md](DISK-HEALTH.md) | Disk life: how much life each disk has left; a design, not built |
 | [VIRTUALIZATION.md](VIRTUALIZATION.md) | Machines, the virtualization app: design and status (the MVP shipped in 0.8.8.5) |
 | [TRADEMARKS.md](TRADEMARKS.md) | Trademarks: LordOS ships no third-party logo; the opt-in official logos of Machines and which projects are listed, and why |
-| [MACHINES-GPU.md](MACHINES-GPU.md) | Machines: plan for a smoother picture and a real GPU for a machine (Intel GVT-g, full passthrough) |
+| [MACHINES-GPU.md](MACHINES-GPU.md) | Machines: plan for a smoother picture and a real GPU for a machine (Intel GVT-g, full passthrough); Part 1 and Mode A since 0.8.9.5 |
+| [NVIDIA-PLAN.md](NVIDIA-PLAN.md) | NVIDIA graphics cards: marked experimental, with compatibility reports and the guided Secure Boot step (0.8.9.5); the rest of the plan for the maintainer's review |
 | [GO-LINK.md](GO-LINK.md) | go-link Desk on LordOS and the public screen-sharing API: design, API since 0.8.8, status in the document |
-| [FLATPAK.md](FLATPAK.md) | Flatpak and Flathub: a design review, not planned for any release |
+| [FLATPAK.md](FLATPAK.md) | Flatpak and Flathub: the design review and what is built (phase 1 since 0.8.9.4, x86-64; the Store's Flathub home and Chromium/Electron apps since 0.8.9.5) |
 
 ## System and hardware
 

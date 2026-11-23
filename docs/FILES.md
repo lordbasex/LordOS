@@ -121,7 +121,7 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   offered for it, an app that declares `application/vnd.appimage` still is, and with none Files says that it is a
   program and that Files doesn't run programs (0.8.8.9, #159; `isProgram` in
   `sdk/filekinds.js`).
-- **Open with providers** (in development, 2026-11-21): after the apps, the menu lists what `sdk/openwith.js` providers
+- **Open with providers** (2026-11-21, since 0.8.9.5): after the apps, the menu lists what `sdk/openwith.js` providers
   offer: today a machine in Machines whose guest tools open files (the file is copied into it and opened there,
   `VIRTUALIZATION.md` 7.3). A program for another system (`.exe`, `.msi`, `.bat`, `.cmd`, `.lnk`, `.com`, `.msix`,
   `.appx`: `isForeignProgram`) is never offered to the Text Editor; a double click offers the provider that suggests

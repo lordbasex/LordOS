@@ -1,7 +1,7 @@
 # NVIDIA graphics cards — plan and designs for approval
 
 **Status (2026-11-22).** The maintainer approved NVIDIA support as **"experimental, community-verified", with hardware
-reports**. That first part is built on `feat/gpu-reports` (in development): an NVIDIA card is marked experimental in
+reports**. That first part shipped in 0.8.9.5: an NVIDIA card is marked experimental in
 Settings → Graphics cards and every computer can send a compatibility report. **Part A follows the maintainer's
 decision of 2026-11-22** (the driver as an opt-in from the Store's suggestion card, NVIDIA's own repository through the
 existing vendor-repository mechanism) and asked for one closed action only, `gpu-mok-enroll`: **approved by the maintainer
@@ -163,7 +163,7 @@ check runs again with `/sys/module/nvidia`; if it failed, **Try Again** (a new i
 cancel`: `mokutil --revoke-import`). The password never touches disk outside root's temp file (removed at once), the
 log or the clipboard. Until this action is approved, the card's `secureBoot` note explains the manual step.
 
-**As built (2026-11-22, in development; `server/src/hw/mok_admin.c`, the Store's `apps/store/suggested.js`).** The
+**As built (2026-11-22, released in 0.8.9.5; `server/src/hw/mok_admin.c`, the Store's `apps/store/suggested.js`).** The
 maintainer approved it on 2026-11-22, renamed **`dkms-mok-enroll`** and shared by every Store card whose package DKMS
 builds (the cards with the `secureBoot` note: `nvidiaDriver` and LordOS Studio's `studioCamera`). Administrators only;
 its argument is one of three words:

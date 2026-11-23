@@ -71,7 +71,7 @@ Each window of the machine becomes its own LordOS window, with the guest's title
 
 With **Graphics 3D** in Configure → Display, a Linux machine draws with your graphics card through virgl (OpenGL), on 64-bit PCs. The machine's frames reach LordOS without it ever waiting for the guest's graphics work. Only that machine may use the graphics card's render device, never the display itself.
 
-**Windows machines stay 2D**: no stable free 3D driver exists for them. 3D for Windows machines is being worked on, and nothing is offered yet. Machines are also 2D on the Raspberry Pi and on a desktop drawn without a graphics card, and a running 3D machine can't be suspended or snapshotted with its memory.
+**Windows machines stay 2D** unless they get a share of an Intel graphics card (GVT-g, below), where Intel's own driver gives them Direct3D, OpenGL and Vulkan: no stable free 3D driver exists for them. 3D for Windows machines through a dedicated second graphics card is planned, and nothing is offered yet. Machines are also 2D on the Raspberry Pi and on a desktop drawn without a graphics card, and a running 3D machine can't be suspended or snapshotted with its memory.
 
 ## A smoother picture
 
@@ -102,6 +102,6 @@ The rest of the desktop got the same care: Settings, the Store, Files and Monito
 
 Checked on one 64-bit PC with KVM, mostly with a development tool that plays the part of LordOS's display server: the Windows 11 unattended install and its tools (resolution, clipboard both ways, apps mode's window list, icons and actions), the transfer folder's numbers above, the three new network modes against a real LAN, sound and microphone through PipeWire, and 3D with an Ubuntu guest on a Radeon RX 580.
 
-**Not yet:** apps mode drawing on a real display, every Configure pane on screen, Windows on the Raspberry Pi, 3D for Windows machines, USB devices passed to a machine, and dragging files out of a machine.
+**Not yet:** apps mode drawing on a real display, every Configure pane on screen, Windows on the Raspberry Pi, 3D for Windows machines without an Intel GVT-g share, USB devices passed to a machine, and dragging files out of a machine.
 
 The full design, the security rules and every measurement are in `docs/VIRTUALIZATION.md` and `docs/MACHINES-GPU.md`.

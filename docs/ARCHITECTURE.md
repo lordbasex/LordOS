@@ -155,7 +155,7 @@ Besides `lord-server`, these programs and helpers run (root services, then sandb
   camera and the render node), in `sandbox_apply_helper`. It decodes and encodes with FFmpeg; the
   frames come back through sealed shared memory and the audio goes to a ring whose PipeWire
   stream belongs to `lord-server`. See `MEDIA.md`.
-- **`lord-studio`** (LordOS Studio, in development; E-S1 approved by the maintainer on 2026-11-22): `lord-media`'s camera
+- **`lord-studio`** (LordOS Studio, since 0.8.9.5; E-S1 approved by the maintainer on 2026-11-22): `lord-media`'s camera
   built with `LM_STUDIO`, plus LordOS's own inference (`server/src/media/studio/nn.c`, MediaPipe's Selfie Segmenter
   converted to our `.lnn` file) and the guided filter, blur and picture composite, on the GPU (GBM + surfaceless EGL +
   GLES 3 on the render node fd, like `lord-bench`) or the CPU. Same rules as `lord-media`: fixed path, no arguments,

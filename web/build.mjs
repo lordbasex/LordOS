@@ -1378,7 +1378,7 @@ ${HAS_WLCONF ? `<p class="wc-also">${esc(t.pages.wlconf.fromTable)} <a href="${p
     }, t));
   }
 
-  // the conformance run in full (in development after 0.8.9.4): every check, the comparison and how to run it yourself
+  // the conformance run in full (0.8.9.5): every check, the comparison and how to run it yourself
   // (web/lib/wlconf.mjs; data web/content/wayland/conformance.json and protocols.json, both from tools/gen-wayland-table.mjs)
   if (HAS_WLCONF) {
     const T = t.pages.wlconf, CF = WAYLAND.conformance;
