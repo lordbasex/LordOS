@@ -24,6 +24,7 @@
 #include "../media/media_int.h"
 #include "../media/aring.h"
 #include "../vm/vmproto.h"
+#include "../vm/vmpace.h"
 #include "../vm/machine.h"
 #include "../vm/vm_admin.h"
 #include "../vm/vmthumb.h"
@@ -1487,6 +1488,11 @@ typedef struct {
     int gcopy_y0, gcopy_y1;             /* the frame's rows in the copy in flight */
     int db_more;                        /* frames came while a copy was in flight: another copy after it */
     long db_same;                       /* frames that changed nothing (not shown again) */
+    /* pacing (vm/vmpace.h, VD_PACE): what lord-vmdisplay was told, whether any window shows the picture (the app says,
+     * lord.vm.shown), frames not read while none did (the next one is read whole), and counters for Logs and tests */
+    VmPace pace;
+    int pic_hidden, db_skipped;
+    long pic_skipped;
     unsigned rkey;                      /* names the picture in map for dmaread_rows_new's change test */
     /* sound (6.9): machine.json's choices, what the guest does now (VD_GUEST_AUDIO), and what this side has open. The
      * speakers' stream and the microphone's belong to the picture's media source (m->audio, m->mic), so lord-server's
@@ -1561,7 +1567,25 @@ static int ask(Sess *s, uint16_t type, int a) {
     VmMsg m = vm_msg(type, ++s->seq, a, 0, 0, 0, NULL);
     return vm_send(s->vm, &m, -1) ? -1 : (int)s->seq;
 }
-static void vdsend(Sess *s, int type, int a, int b) { if (s->vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, b, 0, 0, 0, 0); vd_send(s->vd, &m, -1); } }
+static void vdsend(Sess *s, int type, int a, int b) {
+    if (s->vd < 0) return;
+    VdMsg m = vd_msg((uint16_t)type, a, b, 0, 0, 0, 0);
+    vd_send(s->vd, &m, -1);
+    /* input ends an idle pace (the helper ends it itself: vmpace.h) */
+    if (type == VD_KEY || type == VD_MOTION || type == VD_BUTTON || type == VD_WHEEL || type == VD_REL) vmpace_input(&s->pace);
+}
+
+/* VD_PACE when what the picture needs changed (vm/vmpace.h): a picture no window shows (and nothing records) is taken
+ * VMPACE_HIDDEN_MS apart, a vGPU's that keeps not changing VMPACE_IDLE_MS apart; a Linux 3D (virgl) one never in the
+ * helper */
+static void pace_tell(Sess *s) {
+    if (s->vd < 0 || !s->vd_up) return;
+    int ms = 0, kind = 0;
+    int virgl = s->db_cur >= 0 && !s->vgpu;
+    if (!vmpace_step(&s->pace, s->pic_hidden && !s->rec, virgl, &ms, &kind)) return;
+    VdMsg m = vd_msg(VD_PACE, ms, kind, 0, 0, 0, 0);
+    vd_send(s->vd, &m, -1);
+}
 
 static void init_sess(Sess *s, const char *dir) {
     memset(s, 0, sizeof *s);
@@ -2129,6 +2153,7 @@ static void drop_display(Sess *s, int close_helper) {
     }
     s->vd_up = 0;
     s->ack_pending = 0;
+    memset(&s->pace, 0, sizeof s->pace);      /* the next helper starts unpaced */
     db_drop_all(s);
     /* the next helper gets the rings again; until then nothing plays and the microphone is closed */
     s->guest_out = s->guest_in = 0;
@@ -2510,10 +2535,18 @@ static void from_vd(Sess *s) {
     }
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
     int gpu_frame = 0;
-    if (s->db_pending) {
+    if (s->db_pending && s->pic_hidden && !s->rec && s->gpend < 0) {
+        /* no window shows it: not read at all, acknowledged at once; the first frame shown again is read whole */
+        s->db_pending = 0;
+        s->db_skipped = 1;
+        s->pic_skipped++;
+        VdMsg a = vd_msg(VD_FRAME_DONE, 0, 0, 0, 0, s->db_frame, 0);
+        vd_send(s->vd, &a, -1);
+    } else if (s->db_pending) {
         int ry0 = 0, ry1 = s->h;
         int was_more = s->gpend >= 0 && s->db_more;
         int r = db_read(s, ms, &ry0, &ry1);
+        if (r == 1 || r == 2) vmpace_frame(&s->pace, r == 1);
         if (r == 2) {
             /* nothing changed (QEMU's vfio display repeats the picture every refresh): acknowledged at once, so the
              * next one comes without the 250 ms wait, and nothing is painted or presented */
@@ -2542,6 +2575,7 @@ static void from_vd(Sess *s) {
         s->frames += frames;
         s->ack_pending = 1; s->ack_frame = last; s->ack_seq = ms->frame_seq;
     }
+    pace_tell(s);
     /* the recording takes the picture as it changes, and at least once a second while it doesn't; with sound, every
      * frame's time (30 a second), so the picture's timeline runs as long as the sound's */
     if (s->rec && ms && ms->px) {
@@ -2677,6 +2711,11 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_str(c, o, "lastError", s->last_error);
     set_str(c, o, "stderr", s->errtail);
     set_int(c, o, "frames", s->frames);
+    /* the picture's pacing (vm/vmpace.h): reads made, reads that changed nothing, frames not read while hidden, the pace now */
+    set_int(c, o, "picReads", s->db_reads);
+    set_int(c, o, "picSame", s->db_same);
+    set_int(c, o, "picSkipped", s->pic_skipped);
+    set_int(c, o, "pace", s->pace.kind);
     set_int(c, o, "cd", s->cd_state);
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
     set_int(c, o, "console", s->console_term);
@@ -3059,6 +3098,24 @@ static JSValue f_rate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     (void)t; Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
     int hz = s ? ival(c, argv[1]) : 0;
     if (s && hz >= 1 && hz <= 240) vdsend(s, VD_RATE, hz, 0);
+    return JS_UNDEFINED;
+}
+
+/* lord.vm.shown(sid, on): whether any window shows the picture (the machine's, or one of its apps mode windows: the app
+ * decides with the SDK's windowsOutOfSight). Hidden, its frames aren't read and lord-vmdisplay takes them less often
+ * (vm/vmpace.h); shown again, the next frame is read whole, and a 3D picture's current one at once */
+static JSValue f_shown(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s) return JS_UNDEFINED;
+    int hidden = !JS_ToBool(c, argv[1]);
+    if (hidden == s->pic_hidden) return JS_UNDEFINED;
+    s->pic_hidden = hidden;
+    if (!hidden && s->db_skipped) {
+        s->db_skipped = 0;
+        s->gsrc = 0;                            /* both copies of a vGPU's picture lack the frames not read */
+        if (s->db_cur >= 0) { s->db_y0 = 0; s->db_y1 = s->h; s->db_pending = 1; }
+    }
+    pace_tell(s);
     return JS_UNDEFINED;
 }
 
@@ -4383,7 +4440,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
-    JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate),
+    JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),

@@ -22,6 +22,9 @@
  *   - Copy before forward: the damaged area goes from QEMU's buffer into the picture lord-server shared (sealed
  *     by lord-server against shrinking), at most VD_RATE times a second, and not again until lord-server said
  *     it read the last one (VD_FRAME_DONE) or 250 ms passed. lord-server never sees QEMU's live memory.
+ *   - Paced (VD_PACE, vmpace.h): lord-server says when a picture that keeps not changing (a vGPU's) or that no window
+ *     shows may be taken less often; the copy, the VD_FRAME and a held UpdateDMABUF's answer then wait for the interval.
+ *     Input to the guest ends an idle pace here at once.
  *   - It never makes a blocking call to QEMU after setup (QEMU calls the listener from its main loop): input goes
  *     out as method calls that expect no reply.
  *   - Sound (6.9, 6.20): an org.qemu.Display1.AudioOutListener on a third peer connection, registered before the
@@ -35,6 +38,7 @@
  *     helper never opens a device: the microphone is lord-server's stream, opened only after LordOS's permission. */
 #include "vmproto.h"
 #include "vmkeys.h"
+#include "vmpace.h"
 #include "../sec/sandbox.h"
 #include "../media/aring.h"
 
@@ -92,6 +96,7 @@ static struct {
     int frame, acked;
     long long sent_ms, next_ms;
     int rate;
+    int pace_ms, pace_kind;             /* VD_PACE: the least time between pictures, and why (vmpace.h) */
     /* cursor and pointer */
     int ptr_pending, ptr_x, ptr_y, ptr_on;
     /* input */
@@ -556,7 +561,7 @@ static void flush(long long now) {
     D.frame++;
     D.acked = 0;
     D.sent_ms = now;
-    D.next_ms = now + 1000 / (D.rate ? D.rate : 60);
+    D.next_ms = now + vmpace_interval(D.rate, D.pace_ms);
     say(vd_msg(VD_FRAME, x0, y0, x1 - x0, y1 - y0, D.frame, 0), -1);
 }
 
@@ -933,6 +938,19 @@ static void take_picture(int fd) {
 }
 
 /* 0 go on, 1 close */
+/* VD_PACE (vmpace.h): a shorter interval applies to the picture waiting now */
+static void pace_set(int ms, int kind) {
+    D.pace_ms = ms;
+    D.pace_kind = kind;
+    long long due = D.sent_ms + vmpace_interval(D.rate, ms);
+    if (due < D.next_ms) D.next_ms = due;
+}
+
+/* input to the guest ends an idle pace here and now: the picture it makes goes out at the display's rate */
+static void pace_input(void) {
+    if (D.pace_kind == VDP_IDLE) pace_set(0, VDP_NONE);
+}
+
 static int from_server(void) {
     for (int budget = 0; budget < VD_POLL_MAX; budget++) {
         VdMsg m;
@@ -956,12 +974,13 @@ static int from_server(void) {
             else { if (fd >= 0) close(fd); ring_drop(&A.mic); }
             break;
         case VD_FRAME_DONE: if (m.e == D.frame) D.acked = 1; break;
-        case VD_KEY: key(m.a, m.b); break;
-        case VD_MOTION: D.mx = m.a; D.my = m.b; D.motion_pending = 1; break;
-        case VD_BUTTON: send_motion(now_ms()); button(m.a, m.b); break;
-        case VD_WHEEL: send_motion(now_ms()); if (m.a) wheel(m.a, 3, 4); if (m.b) wheel(m.b, 8, 7); break;
+        case VD_KEY: pace_input(); key(m.a, m.b); break;
+        case VD_MOTION: pace_input(); D.mx = m.a; D.my = m.b; D.motion_pending = 1; break;
+        case VD_BUTTON: pace_input(); send_motion(now_ms()); button(m.a, m.b); break;
+        case VD_WHEEL: pace_input(); send_motion(now_ms()); if (m.a) wheel(m.a, 3, 4); if (m.b) wheel(m.b, 8, 7); break;
         case VD_REL:
             if (!D.capture) break;
+            pace_input();
             D.rdx = D.rdx + m.a > 65535 ? 65535 : D.rdx + m.a < -65535 ? -65535 : D.rdx + m.a;
             D.rdy = D.rdy + m.b > 65535 ? 65535 : D.rdy + m.b < -65535 ? -65535 : D.rdy + m.b;
             D.rel_pending = 1;
@@ -981,6 +1000,7 @@ static int from_server(void) {
         case VD_RELEASE_ALL: release_all(); break;
         case VD_RESIZE: D.rw = m.a; D.rh = m.b; D.resize_pending = 1; break;
         case VD_RATE: D.rate = m.a; break;
+        case VD_PACE: pace_set(m.a, m.b); break;
         case VD_CLOSE: return 1;
         }
     }
@@ -1170,7 +1190,7 @@ int main(int argc, char **argv) {
         send_input(now);
         flush(now);
         /* QEMU's held UpdateDMABUF: once lord-server read the frame, when there's nowhere to send it, or after 250 ms */
-        if (D.upd && ((D.acked && !D.dirty) || !D.shm || now - D.upd_ms >= ACK_WAIT_MS)) answer_update();
+        if (D.upd && ((D.acked && !D.dirty) || !D.shm || now - D.upd_ms >= vmpace_hold_ms(D.pace_ms, ACK_WAIT_MS))) answer_update();
         if (D.stats_changed && now - D.stats_ms >= STATS_MS) {
             say(vd_msg(VD_STATS, D.refused, D.updates, D.copies, (int)D.w, (int)D.h, D.frame), -1);
             D.refused = D.updates = D.copies = 0;
@@ -1192,10 +1212,11 @@ int main(int argc, char **argv) {
         if (A.rec.h && (to < 0 || to > 20)) to = 20;         /* silence keeps time while a recording runs */
         if (D.dirty && D.shm) {
             long long wake = D.acked ? D.next_ms : D.sent_ms + ACK_WAIT_MS;
+            if (wake < D.next_ms) wake = D.next_ms;         /* paced longer than the wait for an answer (vmpace.h) */
             int tf = wake <= now ? 0 : (int)(wake - now);
             if (to < 0 || tf < to) to = tf;
         }
-        if (D.upd) { int tu = (int)(D.upd_ms + ACK_WAIT_MS - now); if (tu < 0) tu = 0; if (to < 0 || tu < to) to = tu; }
+        if (D.upd) { int tu = (int)(D.upd_ms + vmpace_hold_ms(D.pace_ms, ACK_WAIT_MS) - now); if (tu < 0) tu = 0; if (to < 0 || tu < to) to = tu; }
         if (D.resize_pending) { int tr = (int)(D.resize_ms + RESIZE_GAP_MS - now); if (tr < 0) tr = 0; if (to < 0 || tr < to) to = tr; }
         if (D.stats_changed) { int ts = (int)(D.stats_ms + STATS_MS - now); if (ts < 0) ts = 0; if (to < 0 || ts < to) to = ts; }
         if (now < D.abs_fast_until && (to < 0 || to > 100)) to = 100;     /* send_input asks IsAbsolute again meanwhile */

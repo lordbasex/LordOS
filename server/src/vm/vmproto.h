@@ -195,6 +195,13 @@
  *   key and button held (window lost focus). VD_RESIZE a, b = the window's size in pixels: the guest is asked
  *   to use it (Console.SetUIInfo), at most every 100 ms. VD_RATE a = the display's refresh rate (1..240; 60 by
  *   default). VD_CLOSE: the helper exits.
+ *   VD_PACE a = the least time between two pictures in ms (1..VD_PACE_MAX_MS; 0 with b = VDP_NONE: the display's rate
+ *   only), b = VDP_IDLE (the picture hasn't changed for a while: the first key, button, wheel or motion sent to the
+ *   guest ends it at once, in the helper itself) or VDP_HIDDEN (no window shows the picture; lord-server ends it when
+ *   one does). The helper copies and forwards at most one picture per interval, and an UpdateDMABUF QEMU waits on is
+ *   answered no sooner: QEMU's console stays blocked meanwhile (graphic_hw_gl_block), so a vGPU's vfio display isn't
+ *   queried again either. lord-server sends it for 2D pictures and for an Intel vGPU's, never for a Linux 3D (virgl)
+ *   picture, whose held answer would hold the guest's own GPU work (vm/vmpace.h).
  *
  *   Sound (6.9, 6.20): QEMU's audio goes to the helper as org.qemu.Display1.AudioOutListener calls on a second peer
  *   connection. VD_AUDIO_REC a = 1 with one descriptor: a recording started; the descriptor is a ring of aring.h
@@ -330,8 +337,12 @@ typedef struct {
 enum {
     VD_READY = 1, VD_SIZE, VD_FRAME, VD_CURSOR, VD_POINTER, VD_STATE, VD_STATS, VD_DMABUF, VD_GUEST_AUDIO,   /* helper → server */
     VD_SHM = 64, VD_FRAME_DONE, VD_KEY, VD_MOTION, VD_BUTTON, VD_WHEEL, VD_RELEASE_ALL,       /* server → helper */
-    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC, VD_REL, VD_CAPTURE, VD_LAYOUT,
+    VD_RESIZE, VD_RATE, VD_CLOSE, VD_AUDIO_REC, VD_AUDIO_OUT, VD_MIC, VD_REL, VD_CAPTURE, VD_LAYOUT, VD_PACE,
 };
+/* VD_PACE b: why the pictures are spaced out (vm/vmpace.h) */
+enum { VDP_NONE = 0, VDP_IDLE = 1, VDP_HIDDEN = 2 };
+/* the longest VD_PACE: QEMU gives each listener call 1 s, and a held UpdateDMABUF must be answered well before */
+#define VD_PACE_MAX_MS 900
 /* VD_GUEST_AUDIO a: which of the guest's streams */
 enum { VDG_OUT = 0, VDG_IN = 1 };
 /* the most the helper keeps in the speakers' ring ahead of lord-server's reading (VD_AUDIO_OUT) */
@@ -506,6 +517,7 @@ static inline int vd_msg_valid(const VdMsg *m, int to_helper) {
     case VD_WHEEL: return m->a >= -32 && m->a <= 32 && m->b >= -32 && m->b <= 32;
     case VD_RESIZE: return m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM;
     case VD_RATE: return m->a >= 1 && m->a <= 240;
+    case VD_PACE: return m->a >= 0 && m->a <= VD_PACE_MAX_MS && m->b >= VDP_NONE && m->b <= VDP_HIDDEN && (m->a > 0) == (m->b != VDP_NONE);
     case VD_REL: return m->a >= -VD_REL_MAX && m->a <= VD_REL_MAX && m->b >= -VD_REL_MAX && m->b <= VD_REL_MAX;
     case VD_CAPTURE: return m->a == 0 || m->a == 1;
     case VD_LAYOUT: return vm_layout_ok(m->a, m->b, m->c, m->d, m->e, m->f);

@@ -12,7 +12,7 @@ import { webAppOfWindow } from './webapps.js';
 import { webWindowTitles, profileHex } from './webappsmodel.js';
 import { SNAP_ZONES, snapRect, zoneAt, snapNext, dwellZone, SNAP_DWELL_MS, snapAllowed } from './snap.js';
 import { settings } from './settings.js';
-import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, keyboardWindow, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo, cleanLayer } from './desktopmodel.js';
+import { FIRST_DESKTOP, onDesktop, visibleOn, mountedOn, focusedOn, keyboardWindow, windowHidden, addDesktop, removeDesktop, withName, moveDesktopTo, cleanLayer, outOfSight } from './desktopmodel.js';
 
 export { SNAP_ZONES, snapRect };
 
@@ -642,6 +642,18 @@ export function useWindows() {
 export function useWindowHidden(id) {
   const desktop = useStore(activeDesktop);
   return useStore(windows, (ws) => windowHidden(ws.find((w) => w.id === id), desktop));
+}
+
+// None of these windows is on screen (desktopmodel.js outOfSight): minimized, on a hidden desktop or wholly under an
+// opaque window. Opaque as for the Linux windows' pacing (wayland.js): a web app's window, or a LordOS window whose app
+// isn't transparent.
+const opaqueWindow = (w) => !!w.args?.web || (!w.args?.surface && !getApp(w.id)?.transparent);
+export const windowsOutOfSight = (ids, list = windows.get()) => outOfSight(list, activeDesktop.get(), overviewShowing.get(), ids, (w) => wm.frame(w), opaqueWindow);
+export function useWindowsOutOfSight(ids) {
+  const desktop = useStore(activeDesktop);
+  const overview = useStore(overviewShowing);
+  const key = (ids || []).join('\n');
+  return useStore(windows, (ws) => outOfSight(ws, desktop, overview, key ? key.split('\n') : [], (w) => wm.frame(w), opaqueWindow));
 }
 
 // ---- menus of an isolated app: serialize to the broker and receive the clicks ----

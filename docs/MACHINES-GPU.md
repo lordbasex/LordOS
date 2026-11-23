@@ -351,6 +351,50 @@ had no refused `CursorDefine`, so no shape came). A shape could also have been r
 arrow's tip); a vGPU machine never hides the host's arrow before a shape comes, and a blank shape from its plane shows
 the host's arrow; *Pointer drawn by* (viogpudo's `HWCursor`) isn't offered for a machine with an Intel graphics card.
 
+### Pacing a machine's picture (2026-11-23, in development)
+
+**Seen** on the maintainer's computer (Windows 11 in apps mode on an Intel GVT-g vGPU at 1920 × 1080, RX 580 desktop):
+lord-server ~28 % of a core and QEMU 10–28 % with a static Notepad, the host 92 % idle. QEMU's vfio display hands over
+the whole picture on every GUI refresh (~33 a second) whether anything changed or not (`hw/vfio/display.c` calls
+`dpy_gl_update` for the whole primary plane unconditionally), and lord-server copied and compared each one on the iGPU.
+The change test already kept unchanged frames off the screen, but every one of them still cost a copy, a compare, two
+context switches, a fence poll and the round trip through lord-vmdisplay, and QEMU's plane queries. Nothing paced a
+picture no window showed.
+
+**Changed** (`server/src/vm/vmpace.h`, `VD_PACE` in `vmproto.h`, `vmdisplay.c`, `ui/js_vm.c`, `sdk/desktopmodel.js`
+`outOfSight`, `sdk/windows.js` `useWindowsOutOfSight`, `apps/machines/vmwindow.jsx`):
+
+| Case | What happens |
+|---|---|
+| Every picture | At most one per refresh of the display (`VD_RATE`), the dmabuf paths included |
+| Idle (a vGPU's picture unchanged 30 frames in a row, about 1 s) | lord-vmdisplay takes it 100 ms apart. QEMU's console waits for each held `UpdateDMABUF` answer (`graphic_hw_gl_block` until the reply, `ui/dbus-listener.c`), so the vfio display isn't queried meanwhile either. The first changed frame ends it (lord-server), and so does the first key, button, wheel or motion sent to the guest (lord-vmdisplay, at once, without waiting for lord-server) |
+| Hidden (no window shows it: the machine's window and every apps mode window minimized, on another desktop or wholly under an opaque window) | lord-server reads none of its frames (acknowledged at once); a 2D or vGPU picture is taken 500 ms apart. Shown again: full rate, and the next frame (a 3D picture's current one at once) is read whole, both of a vGPU's copies |
+| A Linux 3D (virgl) picture | Never held longer in the helper: QEMU holds the guest's own GPU work while an `UpdateDMABUF` waits. Hidden, lord-server only stops reading it. It never turns idle (its frames come only when the guest draws) |
+| A recording of the machine | Never paced as hidden |
+
+Damage was already only the changed part: a 2D picture's rectangles (`UpdateMap`), and for a vGPU the rows each linear copy
+lacks (`gpu/gband.h`); a vfio display gives no damage of its own (always the whole plane).
+
+**Measured** (2026-11-23, this branch):
+
+| What | Before | After |
+|---|---|---|
+| A vfio-style display (an `UpdateDMABUF` for the whole 1920 × 1080 picture at every 30 ms refresh, the next one only after the answer, as QEMU does), pictures handed to lord-server in 2 s (`build/vmdisplay-test`) | 67 | 67 changing, **21** idle, **5** hidden (3 when lord-server doesn't answer) |
+| The same, QEMU refreshes let through a second | ~33 | ~33 changing, **~10** idle, **~2.5** hidden |
+| lord-server's main thread per vGPU frame, GPU path (`build/dmaread-test bench 3`, UHD 630 + RX 580) | 0.35 ms × 33 = 1.2 % of a core | 0.35 ms × 10 = 0.35 % idle, 0 hidden (no frame read) |
+| A key after idle: the next picture | — | 0 ms (`vmdisplay-test`: the held update goes out at once) |
+| 2D guest (Ubuntu's installer console writing random pixels to `/dev/fb0`, 4 frames a second as the guest makes them), headless lord-server from this build, window minimized: frames read in 10 s | 40 (as shown) | **20** (40 again once shown) |
+| The same, lord-server CPU minimized | 1.5 % | 1.2 % |
+
+A regression found while measuring is covered by `vmdisplay-test` now: with a pace longer than the 250 ms lord-vmdisplay
+waits for an acknowledgement, its loop woke with nothing to do until the interval ended (50 % of a core while minimized);
+it sleeps until the interval ends.
+
+**Not measured live:** the maintainer's vGPU machine (never touched) and a second vGPU instance for a test machine (none
+free). The 28 % seen there is far more than the copy path's own 1.2 % measured apart, so most of it is elsewhere (the
+round trips and the main loop's wake-ups per frame, the apps mode windows): with this change those happen 10 times a
+second while idle and 2 while hidden instead of 33; to be measured on that machine.
+
 ### Settings → Graphics cards (approved in principle 2026-11-21; built, "Mode A — built" above)
 
 The person never runs a command: a computer with more than one GPU is managed from **Settings → Graphics cards**.

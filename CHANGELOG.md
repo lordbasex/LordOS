@@ -117,6 +117,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     echo received each time and the disk check at each next start. Not yet checked with a real 6.12.117 guest with 3D.
 ### Changed
 
+- **Machines: a guest's picture is taken less often when it doesn't change or no window shows it** (in development;
+  the latest release is 0.8.9.5-beta). Seen on the maintainer's PC: a guest on an Intel GVT-g vGPU in apps mode with a
+  static window kept lord-server at ~28 % of a core and QEMU at 10–28 %, because QEMU's vfio display hands over the whole
+  picture on every refresh (~33 a second) whether anything changed or not, and each one was copied and compared on the
+  iGPU and went back and forth through lord-vmdisplay.
+  - **Idle:** after 30 unchanged frames in a row (about a second) the picture is taken 100 ms apart. QEMU's console waits
+    for each answer lord-vmdisplay holds, so its vfio display isn't queried meanwhile either. The first changed frame
+    ends it, and so does the first key, click, wheel step or pointer motion sent to the guest, at once, in lord-vmdisplay.
+  - **Hidden:** when neither the machine's window nor any of its apps mode windows is on screen (minimized, on another
+    desktop or wholly under an opaque window), lord-server reads none of its frames and a 2D or vGPU picture is taken
+    500 ms apart; shown again, the next frame is read whole. A recording of the machine is never paced.
+  - **Every picture** is taken at most once per refresh of the display, the dmabuf paths included. A Linux 3D (virgl)
+    picture is never held longer (the guest's GPU work waits on it); hidden, it is only not read.
+  - **How:** `VD_PACE` (lord-server → lord-vmdisplay; `server/src/vm/vmpace.h`, checked by `vd_msg_valid`),
+    `lord.vm.shown(sid, on)` (`server/src/ui/js_vm.c`), `outOfSight` in `sdk/desktopmodel.js` and
+    `useWindowsOutOfSight` / `windowsOutOfSight` in the SDK, used by `apps/machines/vmwindow.jsx`; `lord.vm.poll` also
+    reports `picReads`, `picSame`, `picSkipped` and `pace`.
+  - **Measured:** with QEMU's vfio refresh imitated (`build/vmdisplay-test`), pictures handed over in 2 s went from 67 to
+    21 idle and 5 hidden; a key after idle brings the next one in 0 ms. A 2D guest's frames read while minimized halved
+    (40 → 20 in 10 s); lord-vmdisplay sleeps through a long interval (a first version spun at 50 % of a core while
+    minimized; `vmdisplay-test` checks its CPU now).
+  - Tests: `build/vmpace-test` (the rules, the message check), `build/vmdisplay-test` (rates, holds inside QEMU's 1 s,
+    input ending idle, the helper's CPU while paced), `desktop-model-test` (`outOfSight`). docs/MACHINES-GPU.md "Pacing a
+    machine's picture", docs/VIRTUALIZATION.md.
+
 - **Store → LordOS apps is LordOS's own store** (asked by the maintainer on 2026-11-23: "we are going to build a store
   of native apps the person can install, like the other package systems'"). The section opens on a shop of LordOS's
   own installable apps and components, as cards (icon, name, "LordOS component", summary, Get / Open / View), each

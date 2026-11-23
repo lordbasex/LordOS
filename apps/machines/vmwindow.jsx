@@ -6,7 +6,7 @@
 import {
   View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
   inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr, useSound, microphones,
-  hasTextFocus, settings,
+  hasTextFocus, settings, useWindowsOutOfSight,
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
@@ -586,6 +586,12 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     }, 16);
     return () => clearInterval(timer);
   }, [sid]);
+
+  // whether any window shows the guest's picture (this one, or one of its apps mode windows): when none does, lord-server
+  // stops reading its frames and takes them less often (server/src/vm/vmpace.h); shown again, at once
+  const sightIds = useStore(windows, (ws) => [winId, ...ws.filter((w) => w.args?.guestWin?.dir === dir).map((w) => w.id)].join('\n'));
+  const outOfSight = useWindowsOutOfSight(sightIds.split('\n'));
+  useEffect(() => { if (sid && typeof lord.vm.shown === 'function') lord.vm.shown(sid, !outOfSight); }, [sid, outOfSight]);
 
   // Closing the window (5.3): Suspend, Shut Down or Keep Running, asked unless the machine's Configure says which. A
   // shutdown resumes a paused machine first, so it can hear the power button; Keep Running tells lord-vm to stay when

@@ -121,7 +121,7 @@ export { packages, packageList, refreshPackages, packageFile, loadWasm } from '.
 import { refreshPackages, forgetGonePackaged, packageList as packageListOf } from './packages.js';
 export {
   windows, wm, openedAt, useWindows, configureWindows, getApp, listApps, isLiveSystem, appIdOf, workArea, workAreaOf, pointerWorkArea, appMenus, useAppMenus, windowTitle, windowMenuTitle, windowAccent, appRegistry, appMenuClick,
-  registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, isWindowLocked, moveGrab, SNAP_DWELL_MS, locksChanged, snapEnabled, SNAP_ZONES, useWindowHidden, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
+  registerBuiltinApp, isSystemApp, snapPreview, snapRect, snapZoneAt, isWindowLocked, moveGrab, SNAP_DWELL_MS, locksChanged, snapEnabled, SNAP_ZONES, useWindowHidden, windowsOutOfSight, useWindowsOutOfSight, activeDesktop, desktopList, desktopNames, renameDesktop, moveDesktop,
   keepWindowsInWorkAreas, pointerDisplay, windowChrome,
 } from './windows.js';
 // Desktops and the Overview (docs/DESKTOPS.md)

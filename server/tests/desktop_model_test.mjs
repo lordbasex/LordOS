@@ -362,5 +362,27 @@ eq('notice: not a window with an app id, a title, a parent, a dialog or X11', [
   eq('pager: drawn on the desktop', ids(mountedOn([win('a', 1), sp], 1, false)), ['a', 'linux#9']);
 }
 
+{
+  // out of sight (Machines paces a guest's picture with it: server/src/vm/vmpace.h)
+  const { outOfSight } = M;
+  const N = (id, x, y, w, h, more = {}) => ({ id, x, y, w, h, desktop: 1, ...more });
+  const out = (list, ids, active = 1, overview = false, opaque = () => true) => outOfSight(list, active, overview, ids, (w) => w, opaque);
+  const vm = N('vm', 100, 100, 400, 300);
+  eq('sight: a window in front shows', out([N('a', 0, 0, 50, 50), vm], ['vm']), false);
+  eq('sight: minimized', out([{ ...vm, minimized: true }], ['vm']), true);
+  eq('sight: on another desktop', out([{ ...vm, desktop: 2 }], ['vm']), true);
+  eq('sight: missing', out([N('a', 0, 0, 50, 50)], ['vm']), true);
+  eq('sight: wholly under a window over it', out([vm, N('big', 0, 0, 1280, 800)], ['vm']), true);
+  eq('sight: partly under a window over it', out([vm, N('half', 0, 0, 300, 800)], ['vm']), false);
+  eq('sight: under a transparent window', out([vm, N('glass', 0, 0, 1280, 800)], ['vm'], 1, false, (w) => w.id !== 'glass'), false);
+  eq('sight: a window under it covers nothing', out([N('big', 0, 0, 1280, 800), vm], ['vm']), false);
+  eq('sight: the overview shows everything', out([vm, N('big', 0, 0, 1280, 800)], ['vm'], 1, true), false);
+  eq('sight: full screen shows', out([{ ...vm, fullscreen: true }, N('big', 0, 0, 1280, 800)], ['vm']), false);
+  eq('sight: picture in picture shows on every desktop', out([{ ...vm, desktop: 2, pip: { x: 0 } }], ['vm']), false);
+  eq('sight: one apps mode window shown is enough', out([{ ...vm, minimized: true }, N('g1', 10, 10, 50, 50)], ['vm', 'g1']), false);
+  eq('sight: every apps mode window hidden', out([{ ...vm, minimized: true }, N('g1', 10, 10, 50, 50, { minimized: true })], ['vm', 'g1']), true);
+  eq('sight: no window asked for', out([vm], []), true);
+}
+
 if (bad) { console.error(`desktop-model-test: ${bad} of ${n} failed`); process.exit(1); }
 console.log(`desktop-model-test: ${n} checks passed`);

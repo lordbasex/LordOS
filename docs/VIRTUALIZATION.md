@@ -647,6 +647,14 @@ lord-server ──fd 3, VdMsg──▶ lord-vmdisplay <id> (lordos-vmdisplay-<id
   Machines app's poll (`lord.vm.poll`, every 16 ms) only reports the state. Before, the frames waited for that poll and the
   acknowledgement for the poll after the next: a guest drawing 61 frames a second was shown at 29.5, now at 60.0, with 0.1 ms
   of paint a frame instead of 1.7 (**Measured**, the table in docs/MACHINES-GPU.md).
+- **Pacing the picture** (2026-11-23, in development; `vm/vmpace.h`, `VD_PACE`, docs/MACHINES-GPU.md "Pacing a machine's
+  picture"): at most one picture per refresh of the display, on every path. An Intel vGPU's picture that changed nothing 30
+  times in a row is taken 100 ms apart until it changes or the person types, clicks, scrolls or moves the pointer over it
+  (lord-vmdisplay ends that itself, at once). When no window shows the picture (the machine's window and all its apps mode
+  windows minimized, on another desktop or wholly under an opaque window: `outOfSight` in `sdk/desktopmodel.js`, sent with
+  `lord.vm.shown`), lord-server reads none of its frames and a 2D or vGPU picture is taken 500 ms apart; shown again, the
+  next frame is read whole. QEMU's console waits for each held `UpdateDMABUF` answer, so a vGPU's vfio display is queried
+  that much less too. A Linux 3D (virgl) picture is never held longer in the helper (the guest's GPU work waits on it).
 
 **Messages** (`server/src/vm/vmproto.h`, the full contract is its header comment). Both channels are `SOCK_SEQPACKET`, one fixed
 struct per packet, at most one descriptor per message; anything of another length or version drops the peer.
@@ -667,6 +675,7 @@ struct per packet, at most one descriptor per message; anything of another lengt
 | `VD_FRAME` → `VD_FRAME_DONE` | both | Damage x, y, w, h and a frame number; lord-server answers right after the paint that showed it |
 | `VD_CURSOR`, `VD_POINTER` | from lord-vmdisplay | Cursor image in a memfd sealed against writing (`vm_cursor_check`), hotspot; pointer position |
 | `VD_KEY`, `VD_MOTION`, `VD_BUTTON`, `VD_WHEEL`, `VD_RELEASE_ALL`, `VD_RESIZE`, `VD_RATE`, `VD_CLOSE` | to lord-vmdisplay | Input and window changes |
+| `VD_PACE` | to lord-vmdisplay | The least time between pictures and why (idle, hidden), `vm/vmpace.h` |
 
 **Command line, for development and tests:**
 

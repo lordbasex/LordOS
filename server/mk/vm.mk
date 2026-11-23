@@ -64,7 +64,7 @@ build/lordvm-dev: tests/vm_dev.c src/vm/vmproto.h src/vm/vmagent.c src/vm/vmagen
 # lord-vmdisplay against a mock QEMU (its D-Bus display) and a mock lord-server: QEMU's listener calls answered inside
 # its 1 s, and buttons after the pointer's position in both mouse modes. No QEMU, KVM or GPU
 test: build/vmdisplay-test
-build/vmdisplay-test: tests/vmdisplay_test.c src/vm/vmproto.h build/lord-vmdisplay
+build/vmdisplay-test: tests/vmdisplay_test.c src/vm/vmproto.h src/vm/vmpace.h build/lord-vmdisplay
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ tests/vmdisplay_test.c $(shell pkg-config --libs libsystemd)
 	./$@ build/lord-vmdisplay 2>build/vmdisplay-test.err || { cat build/vmdisplay-test.err; rm -f $@; exit 1; }
@@ -72,7 +72,7 @@ endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
-test: build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
+test: build/vmpace-test build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
 # and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage,
@@ -88,6 +88,11 @@ build/vmunattend-test: tests/vmunattend_test.c src/vm/vmunattend.c src/vm/vmunat
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmunattend_test.c src/vm/vmunattend.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
 # resumed downloads (pkg/http.c, FetchItem.resume) against a server on loopback: as the user who runs it
+# how often a machine's picture is taken (vmpace.h, VD_PACE)
+build/vmpace-test: tests/vmpace_test.c src/vm/vmpace.h src/vm/vmproto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmpace_test.c
+	./$@ || { rm -f $@; exit 1; }
 # the card's picture (vmthumb.c): the box filter and the write off the UI thread
 build/vmthumb-test: tests/vmthumb_test.c src/vm/vmthumb.c src/vm/vmthumb.h
 	@mkdir -p build

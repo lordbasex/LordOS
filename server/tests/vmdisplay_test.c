@@ -13,6 +13,7 @@
  *     the click where the pointer is.
  * No QEMU, no KVM, no GPU: a memfd stands in for the dmabuf. Exits 1 on the first failure. */
 #include "../src/vm/vmproto.h"
+#include "../src/vm/vmpace.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -285,6 +286,21 @@ static long long worst(int from, int *unanswered) {
     return w;
 }
 
+/* a process's CPU time so far, in ms (utime + stime) */
+static long long cpu_of(pid_t pid) {
+    char path[64], buf[1024];
+    snprintf(path, sizeof path, "/proc/%d/stat", (int)pid);
+    FILE *f = fopen(path, "r");
+    if (!f) return -1;
+    size_t n = fread(buf, 1, sizeof buf - 1, f);
+    fclose(f);
+    buf[n] = 0;
+    char *p = strrchr(buf, ')');
+    unsigned long ut = 0, st = 0;
+    if (!p || sscanf(p + 2, "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu", &ut, &st) != 2) return -1;
+    return (long long)(ut + st) * 1000 / sysconf(_SC_CLK_TCK);
+}
+
 static int find(const char *what, int a, int from) {
     for (int i = from; i < nev; i++) if (!strcmp(ev[i].what, what) && ev[i].a == a) return i;
     return -1;
@@ -366,6 +382,56 @@ int main(int argc, char **argv) {
     w = worst(c0, &un);
     check(!un && w < 250, "200 updates at once with input arriving: worst answer %lld ms", w);
     pump(200);
+
+    /* ---- pacing (VD_PACE, vmpace.h): QEMU as its vfio display does it, the console blocked until each answer, then the
+     * next update at its next 30 ms refresh. Frames handed to lord-server in 2 s, unpaced, idle and hidden; the
+     * answers always inside QEMU's 1 s; input ends idle at once ---- */
+    {
+        int rates[3];
+        long long cpu[3];
+        const int kinds[3][2] = { { 0, VDP_NONE }, { VMPACE_IDLE_MS, VDP_IDLE }, { VMPACE_HIDDEN_MS, VDP_HIDDEN } };
+        for (int k = 0; k < 3; k++) {
+            tell(VD_PACE, kinds[k][0], kinds[k][1]);
+            /* hidden, lord-server doesn't paint, so it never acknowledges a 2D frame: the helper goes on after 250 ms */
+            ack_frames = kinds[k][1] != VDP_HIDDEN;
+            pump(600);                           /* what the last pace held goes out first */
+            int f0 = frames_seen;
+            long long u0 = cpu_of(pid);
+            c0 = ncalls;
+            Call *open = NULL;
+            long long end = now_ms() + 2000, next = 0;
+            while (now_ms() < end) {
+                /* hidden: damage keeps coming while a frame waits (as a 2D picture's UpdateMap does) */
+                if ((!open || open->answered || kinds[k][1] == VDP_HIDDEN) && now_ms() >= next) { open = listener_call("UpdateDMABUF", "iiii", 0, 0, 1920, 1080); next = now_ms() + 30; }
+                pump(5);
+            }
+            pump(1000);
+            rates[k] = frames_seen - f0;
+            cpu[k] = cpu_of(pid) - u0;
+            ack_frames = 1;
+            w = worst(c0, &un);
+            check(!un && w < QEMU_TIMEOUT_MS - 50, "paced %d ms: worst answer %lld ms", kinds[k][0], w);
+        }
+        check(rates[0] >= 50 && rates[1] <= 22 && rates[1] >= 12 && rates[2] <= 5 && rates[2] >= 2,
+              "frames in 2 s: %d unpaced, %d idle (%d ms), %d hidden (%d ms)", rates[0], rates[1], VMPACE_IDLE_MS, rates[2], VMPACE_HIDDEN_MS);
+        /* paced longer than the 250 ms it waits for an answer, it sleeps until the interval ends (it once spun there) */
+        check(cpu[1] < 200 && cpu[2] < 200, "the helper's CPU in 3 s: %lld ms unpaced, %lld ms idle, %lld ms hidden", cpu[0], cpu[1], cpu[2]);
+        /* idle: a key ends it in the helper, without lord-server: the held update goes out at once */
+        tell(VD_PACE, VMPACE_IDLE_MS, VDP_IDLE);
+        pump(300);
+        Call *c = listener_call("UpdateDMABUF", "iiii", 0, 0, 1920, 1080);     /* goes out: the interval starts */
+        while (!c->answered) pump(2);
+        c = listener_call("UpdateDMABUF", "iiii", 0, 0, 1920, 1080);           /* held for the interval */
+        pump(20);
+        check(!c->answered, "idle: the next update is held for the interval");
+        long long t0 = now_ms();
+        tell(VD_KEY, 30, 1);
+        tell(VD_KEY, 30, 0);
+        while (!c->answered && now_ms() - t0 < 1000) pump(2);
+        check(c->answered && c->answered - t0 >= 0 && c->answered - t0 < 40, "idle: input brings the next picture at once (%lld ms)", c->answered ? c->answered - t0 : -1);
+        tell(VD_PACE, 0, VDP_NONE);
+        pump(200);
+    }
 
     /* ---- buttons, the mouse free: the tablet, absolute ---- */
     is_abs = 1;
