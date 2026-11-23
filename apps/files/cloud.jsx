@@ -5,8 +5,9 @@
 import { View, Text, Button, Segmented, useTheme, useCloud, cloud, cloudModel as M, clipboard, toast, openUrl, formatBytes, formatDate, formatTime, spacing, typeScale, t as tr,
   CloudGlyph, StatusGlyph, UsageRing, addListener, Toggle, errorText, tOptional, cloudState } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { SideItem, SideTitle } from '../../sdk/fileparts.jsx';
+import { SideTitle } from '../../sdk/fileparts.jsx';
 import { EntryIcon } from './glyphs.jsx';
+import { DropSideItem } from './dnd.jsx';
 
 // ---- status of the visible rows ----
 
@@ -37,18 +38,18 @@ export function useCloudFiles(paths) {
 
 // ---- the sidebar's Cloud section (mock Files) ----
 
-export function CloudSection({ t, accounts, hidden, sideSel, navigate, dropTarget, onContext }) {
+export function CloudSection({ t, accounts, hidden, sideSel, navigate, dnd, onContext }) {
   const items = M.cloudSideItems(accounts, hidden, (cloudState.get() || {}).service);
   if (!items.length) return null;
   return (
     <>
       <SideTitle t={t}>{tr('cloud.title')}</SideTitle>
       {items.map((it) => (
-        <SideItem key={it.id} t={t} label={it.name} dim={it.dim} selected={sideSel(it.path)} onClick={() => navigate(it.path)}
+        <DropSideItem key={it.id} dnd={dnd} t={t} label={it.name} dim={it.dim} selected={sideSel(it.path)} onClick={() => navigate(it.path)}
           icon={<View style={{ width: 18, height: 18, borderRadius: 5, backgroundColor: it.alert ? '#ff9f0a' : it.color, alignItems: 'center', justifyContent: 'center', opacity: it.dim ? 0.6 : 1 }}>
             {it.alert ? <Text style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>!</Text> : <CloudGlyph kind="cloud" size={13} color="#ffffff" />}</View>}
           accessory={it.pct != null ? <View title={tr('cloud.usedPct', { pct: Math.round(it.pct * 100) })} style={{ opacity: it.dim ? 0.5 : 1 }}><UsageRing size={14} parts={[{ frac: it.pct, color: it.color }]} /></View> : null}
-          drop={it.dim ? undefined : { dropPath: it.path }} hot={dropTarget === it.path} onContext={onContext ? (ev) => onContext(ev, it) : undefined} />
+          drop={it.dim ? undefined : { dropPath: it.path }} onContext={onContext ? (ev) => onContext(ev, it) : undefined} />
       ))}
     </>
   );

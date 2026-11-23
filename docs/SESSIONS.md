@@ -666,10 +666,10 @@ session. Everything that changes something goes through closed `admin.c` actions
   cycle with several real monitors was exercised on one PC with a Radeon RX 580 (amdgpu) and three monitors:
   it brought 0.8.8.6's login screen on the chosen main display and 0.8.8.7's hand-off with a black frame and
   CLOSEFB, so DisplayPort monitors keep their signal across lock, logout and login. Sessions on real hardware are
-  known from 22 machines ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)): Intel graphics from Ironlake to Whiskey Lake,
-  Cherry Trail and Gemini Lake, four AMD generations, laptop panels, three laptops with an external monitor and two
-  monitors at 120 Hz (RX 7800 XT). Untested: NVIDIA, AMD integrated graphics, Intel newer than Whiskey Lake,
-  DisplayPort MST hubs.
+  known from 24 machines ([HARDWARE-REPORT.md](HARDWARE-REPORT.md)): Intel graphics from Ironlake to Whiskey Lake,
+  Cherry Trail and Gemini Lake, five AMD generations (TeraScale 2 to RDNA 4), laptop panels, four laptops with an
+  external monitor, two monitors at 120 Hz (RX 7800 XT) and one NVIDIA RTX 3060 on the proprietary driver, drawn with
+  the CPU. Untested: nouveau and NVK, AMD integrated graphics, Intel newer than Whiskey Lake, DisplayPort MST hubs.
 - **Text consoles:** Ctrl+Alt+F2 doesn't switch consoles while LordOS is running, as before.
 - **Choosing the avatar image:** today it's a hand-typed path; the file picker is missing.
 - **Testing with more real cards:** in the VMs the GPU is tested only with `LORD_GPU=1` and llvmpipe; on

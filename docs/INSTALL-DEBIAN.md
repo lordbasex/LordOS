@@ -245,6 +245,7 @@ sudo reboot
 | `LordOS needs Debian 13 (trixie)` | Debian 12 and testing/unstable are not supported: the package depends on trixie's library versions. |
 | Black screen or back to text after the reboot | Switch to tty2 (Ctrl+Alt+F2), log in, and look at `journalctl -b -u lordos`. To go back to your desktop meanwhile, see "Switching back" above. |
 | The previous desktop still appears | The display manager was kept (`--keep-display-manager` or "no" to the question). Disable it as shown in the final message. |
+| Another login screen appears and takes no keys, after installing another desktop | Its display manager (LightDM, GDM, SDDM...) was enabled next to LordOS, and the two fight for the screen at boot (#187). After 0.8.9.4 (in development) the `lordos` package warns when it is configured, and `lordos-issue` lists it; `/usr/lib/lordos/lordos-dm-check` prints it. Keep one: `sudo systemctl disable lightdm.service` (or the one named) for LordOS, or `sudo systemctl disable lordos.service` for the other. Neither is uninstalled. |
 | No sound | Reboot (the new groups and linger apply on the next boot; a logout was not enough on a reported machine), and check `systemctl --user status pipewire wireplumber`. |
 | Network changed | It shouldn't: interfaces managed by NetworkManager, ifupdown or systemd-networkd are left alone. If an interface nobody managed now has a DHCP address, that is LordOS's DHCP (`NETWORK.md`); Settings → Network turns it off. |
 

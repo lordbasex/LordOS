@@ -11,6 +11,7 @@ import { sortEntries } from './locations.js';
 import { colWidth, clampCol, fitCol, colStrip, chainFolder } from './colview.js';
 import { iconMetrics, listMetrics, iconColumns } from './viewprefs.js';
 import { when, listRowStyle, listHeaderCell, listCell } from '../../sdk/fileparts.jsx';
+import { DropHot } from './dnd.jsx';
 
 // folder of a search or Recents result (the last segment of the path)
 const where = (p) => { const parts = String(p).split('/'); return parts[parts.length - 2] || '/'; };
@@ -114,10 +115,12 @@ export function IconView({ groups, ctx }) {
                 return (
                   <View key={e.path} {...itemHandlers(e, ctx)}
                     style={{ width: m.cell, paddingVertical: 6, alignItems: 'center', gap: 5, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }}>
-                    <View style={{ padding: 4, borderRadius: 7, backgroundColor: ctx.dropTarget === e.path ? t.accent : sel ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent' }}>
+                    <DropHot dnd={ctx.dnd} path={e.path}>{(hot) => (
+                    <View style={{ padding: 4, borderRadius: 7, backgroundColor: hot ? t.accent : sel ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent' }}>
                       <EntryIcon e={e} size={m.icon} dark={t.mode === 'dark'} thumb={!ctx.cloudOnly?.(e)} tint={tagTint(tagsOf(e.path))} />
                       {ctx.cloud?.status[e.path] ? <View style={{ position: 'absolute', insetInlineEnd: -4, bottom: -4 }}><StatusBadge s={ctx.cloud.status[e.path]} size={Math.max(20, Math.round(m.icon * 0.36))} /></View> : null}
                     </View>
+                    )}</DropHot>
                     <View style={{ maxWidth: m.cell - 4, paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, backgroundColor: sel ? t.accent : 'transparent', alignItems: 'center' }}>
                       <Name e={e} ctx={ctx} center lines={2} font={m.font} line={m.line} fieldW={m.cell + 10} color={sel ? '#fff' : t.text} />
                     </View>
@@ -229,8 +232,9 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
     const open = ctx.expanded.has(e.path);
     const odd = (alt.n++) % 2 === 1;
     rows.push(
-      <View key={e.path} {...itemHandlers(e, ctx)}
-        style={[listRowStyle(t, sel || ctx.dropTarget === e.path, odd), { height: m.row, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }]}>
+      <DropHot key={e.path} dnd={ctx.dnd} path={e.path}>{(hot) => (
+      <View {...itemHandlers(e, ctx)}
+        style={[listRowStyle(t, sel || hot, odd), { height: m.row, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }]}>
         <View style={{ width: ctx.nameW, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: depth * 16 }}>
           <Disclosure state={e.dir && !e.trash ? (open ? 'open' : 'closed') : 'none'} color={sel ? '#fff' : t.textDim} onDown height={m.row}
             onToggle={() => ctx.onToggleExpand(e.path)} />
@@ -245,7 +249,8 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
           ? <View key={k} style={{ width: ctx.columns.width.tags, paddingHorizontal: 8 }}><TagDots tags={tagsOf(e.path)} size={7} /></View>
           : <Text key={k} style={{ ...listCell(t, sel, ctx.columns.width[k], cellAlign(k)), fontSize: m.cell }}>{cellText(k, e, ctx)}</Text>))}
         {ctx.cloud?.on ? <View style={{ width: STATUS_W, alignItems: 'center', justifyContent: 'center' }}><StatusGlyph s={ctx.cloud.status[e.path]} size={18} /></View> : null}
-      </View>,
+      </View>
+      )}</DropHot>,
     );
     if (open) {
       let kids = ctx.kidsOf(e) || [];
@@ -414,10 +419,11 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort, widths
                   const inChain = chain[level] === e.path;
                   const sel = ctx.selected.has(e.path) || inChain;
                   return (
-                    <View key={e.path} {...itemHandlers(e, ctx)}
+                    <DropHot key={e.path} dnd={ctx.dnd} path={e.path}>{(hot) => (
+                    <View {...itemHandlers(e, ctx)}
                       onMouseDown={(ev) => { ev.stopPropagation(); setChain([...chain.slice(0, level), e.path]); ctx.onItemDown(e, ev); }}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 24, paddingHorizontal: 8, borderRadius: 5,
-                        backgroundColor: ctx.dropTarget === e.path || sel ? (ctx.selected.has(e.path) ? t.accent : t.hover) : 'transparent' }}>
+                        backgroundColor: hot || sel ? (ctx.selected.has(e.path) ? t.accent : t.hover) : 'transparent' }}>
                       <EntryIcon e={e} size={16} dark={t.mode === 'dark'} thumb={false} tint={tagTint(tagsOf(e.path))} />
                       {/* the tag dots right after the name, as in the list view (the tint shows only on folders, GitHub #99) */}
                       <View style={{ flexShrink: 1, minWidth: 0, ...(ctx.renaming?.path === e.path || !tagsOf(e.path).length ? { flex: 1 } : null) }}><Name e={e} ctx={ctx} color={ctx.selected.has(e.path) ? '#fff' : t.text} /></View>
@@ -425,6 +431,7 @@ export function ColumnView({ root, chain, setChain, entriesOf, ctx, sort, widths
                       {tagsOf(e.path).length && ctx.renaming?.path !== e.path ? <View style={{ flex: 1 }} /> : null}
                       {e.dir && <Text style={{ fontSize: 12, color: ctx.selected.has(e.path) ? '#fff' : t.textDim }}>›</Text>}
                     </View>
+                    )}</DropHot>
                   );
                 })}
               </View>

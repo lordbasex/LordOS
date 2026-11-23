@@ -1,0 +1,59 @@
+#!/bin/sh
+# lordos-dm-check — another display manager (LightDM, GDM, SDDM, ...) enabled at boot next to LordOS's own login screen
+# (lordos.service). Both start at boot and fight for the screen and the keyboard: the person may see only the other
+# one's login screen, unable to type (GitHub #187, LightDM installed with another desktop). It only reads the links
+# systemd keeps in /etc/systemd/system; it changes nothing and needs no root.
+#
+# Usage: lordos-dm-check [--root DIR]          prints the other display managers' units, one per line; exit 1 if any
+#        lordos-dm-check --warn [--root DIR]   only when lordos.service is enabled too: a warning with what to do
+# DIR: a system tree instead of / (tests). Run by the lordos package's postinst (--warn) and by lordos-issue.
+set -u
+R=""
+WARN=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --root) R=${2%/}; shift 2 ;;
+        --warn) WARN=1; shift ;;
+        *) echo "usage: lordos-dm-check [--warn] [--root DIR]" >&2; exit 2 ;;
+    esac
+done
+S="$R/etc/systemd/system"
+
+# the display managers Debian ships (the same list as tools/install/install.sh's KNOWN_DMS)
+KNOWN="gdm3 gdm sddm lightdm lxdm xdm slim nodm greetd ly"
+
+masked() { [ -L "$S/$1" ] && [ "$(readlink "$S/$1")" = /dev/null ]; }
+others=""
+add() {
+    case "$1" in lordos.service|display-manager.service|"") return ;; esac
+    masked "$1" && return
+    case " $others " in *" $1 "*) return ;; esac
+    others="$others${others:+ }$1"
+}
+# Debian's display managers enable themselves only through this alias (their [Install] is Alias=display-manager.service)
+if [ -L "$S/display-manager.service" ]; then add "$(basename "$(readlink "$S/display-manager.service")")"; fi
+# and any of them wanted by a target directly
+for dm in $KNOWN; do
+    for l in "$S"/*.wants/"$dm.service"; do [ -L "$l" ] && add "$dm.service"; done
+done
+
+lordos_on() {
+    for l in "$S"/*.wants/lordos.service; do [ -L "$l" ] && ! masked lordos.service && return 0; done
+    [ -L "$S/display-manager.service" ] && [ "$(basename "$(readlink "$S/display-manager.service")")" = lordos.service ]
+}
+
+[ -n "$others" ] || exit 0
+if [ "$WARN" = 0 ]; then
+    for u in $others; do echo "$u"; done
+    exit 1
+fi
+lordos_on || exit 0
+cat <<EOF
+lordos: WARNING: another login screen is enabled at boot next to LordOS's: $others.
+lordos: Two login screens start together and fight for the screen and the keyboard, so you may see only the
+lordos: other one's and be unable to type (https://github.com/lordbasex/LordOS/issues/187).
+lordos: To start only LordOS at boot:      sudo systemctl disable $others
+lordos: To start only the other one:       sudo systemctl disable lordos.service
+lordos: Nothing is uninstalled; "sudo systemctl enable <name>" turns either back on. Then restart.
+EOF
+exit 1

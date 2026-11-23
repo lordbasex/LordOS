@@ -24,6 +24,7 @@
 #                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
 #                                         in /usr/share/bash-completion/completions/machines
 #   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
+#   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
 #   /usr/share/applications/lordos-testbench.desktop   its launcher entry
 #   /usr/lib/lordos/themes/<theme>/       theme.json, theme.bundle.js and their resources (greeter: the
@@ -156,6 +157,7 @@ install -D -m 755 packaging/fallback-bin/fastfetch "$L/fallback-bin/fastfetch"
 ln -s fastfetch "$L/fallback-bin/neofetch"
 install -D -m 644 packaging/profile.d/lordos-fallback.sh "$PKG/etc/profile.d/lordos-fallback.sh"
 install -m 755 packaging/bin/lordos-issue "$PKG/usr/bin/lordos-issue"
+install -m 755 packaging/bin/lordos-dm-check "$L/lordos-dm-check"
 # Machines from the terminal: in the LordOS folder because it runs the lord-vm next to its own binary (/proc/self/exe)
 # and reads its texts from ../assets
 install -m 755 server/build/machines "$L/bin/machines"
@@ -620,6 +622,12 @@ fi
 # boot loader (not a Raspberry Pi, not a container or an image being built without /boot/grub)
 if [ "$1" = configure ] && [ -e /boot/grub/grub.cfg ] && command -v update-grub >/dev/null 2>&1; then
     update-grub >/dev/null 2>&1 || true
+fi
+# another display manager enabled next to lordos.service (LightDM installed with another desktop, GitHub #187): both
+# start at boot and fight for the screen. Said, never changed here: which login screen to keep is the person's choice
+# (install.sh asks; lordos-issue shows it too). Printed on the terminal by apt; from the Store, among dpkg's output lines
+if [ "$1" = configure ] && [ -x /usr/lib/lordos/lordos-dm-check ]; then
+    /usr/lib/lordos/lordos-dm-check --warn >&2 || true
 fi
 # version-to-version system changes, each applied once (docs/UPDATES.md, "Migrations")
 if [ "$1" = configure ] && [ -x /usr/lib/lordos/migrate ]; then

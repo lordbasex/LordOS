@@ -1731,6 +1731,39 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **Files: dragging in a big folder no longer draws the whole window on every pointer move (GitHub #218), in
+  development (the latest release is 0.8.9.4).** Each move of a drag set the Files window's own state (where the
+  ghost is, which place it is over), so React drew the whole window again, many times a second: every card or row in
+  sight, the sidebar and the toolbar. In a folder of thousands of files that made the drag stutter. The drag now
+  lives in two small stores of its own (`apps/files/dnd.jsx`): the ghost (`DragGhost`) follows the pointer by itself,
+  and each place that takes a drop (a card, a list or column row, a sidebar item, a tab, "Add to Favorites") lights
+  through a small component (`DropHot`, `DropSideItem`, `FavDropSlot`) that draws again only when the place under the
+  pointer becomes it or stops being it. The main component no longer draws during a drag at all. This finishes #218
+  after the shared launcher list (`useLauncherApps`) and the windowed drawing of big folders. Measured by a new scene,
+  `server/tests/files_drag_scene.mjs` (in `make test`, through `tests/menubar_test.mjs`): the whole Files window over a
+  stub `lord.fs` with a folder of 2000 files and 20 folders, a drag over files and then onto a folder. Before, the
+  window drew again on 30 of 30 moves over files and 5 of 5 over a folder; now on none, while the ghost follows the
+  pointer, the folder under it lights and the ghost goes away on release (counted by the main component's reads of
+  `lord.fs.home` while it renders).
+- **Two login screens at boot: the `lordos` package now warns when another display manager is enabled next to
+  LordOS (GitHub #187).** On a reported machine LightDM, installed with another desktop, was enabled together with
+  `lordos.service`; both started at boot, and the person saw only LightDM's login screen, which took no keys. A new
+  read-only script, `/usr/lib/lordos/lordos-dm-check` (`packaging/bin/lordos-dm-check`), finds the other display
+  managers the way Debian's enable themselves: the `display-manager.service` link, or a target's `.wants` link, for
+  GDM, SDDM, LightDM, LXDM, XDM, SLiM, nodm, greetd and ly; a masked one doesn't count. The package's postinst runs
+  it on every configure and, only when `lordos.service` is enabled too, prints a warning that names the other one and
+  both ways out (`sudo systemctl disable <it>` to keep LordOS, `sudo systemctl disable lordos.service` to keep the
+  other); apt shows it on the terminal, and a Store update gets it among dpkg's output. Nothing is disabled by the
+  package: which login screen to keep is the person's choice (`tools/install/install.sh` asks the same question).
+  `lordos.service` does not take `display-manager.service` as an alias: Debian's display managers write that link
+  with `ln -sf` when they are installed (LightDM's postinst does it whenever `/etc/X11/default-display-manager` is
+  missing), so owning it would not keep another one from starting, and taking part in Debian's choice of display
+  manager needs debconf templates of its own, a separate decision. `lordos-issue` gets a section "Other display
+  managers enabled at boot". No migration: nothing on an installed system changes. Test:
+  `server/tests/dm_check_test.sh` (13 checks over fake system trees: LightDM through the alias as in #187, GDM and
+  SDDM together, a display manager kept by `install.sh --keep-display-manager` with LordOS not enabled, a masked one,
+  `display-manager.service` pointing at LordOS, an empty image tree), in `make test`. `docs/INSTALL-DEBIAN.md`,
+  Troubleshooting.
 - **Store: the Flathub home's category tiles keep one width on every row** (`apps/store/flathubpages.js`,
   `CategoryTiles`). The tiles grew to fill their row, so a last row with fewer tiles (four of ten at 1600 px) made each
   of them wider than the ones above; five empty, zero-height cells with the tiles' own flex now fill that row. Seen in
@@ -2638,6 +2671,29 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   showed. The check now allows every known bit.
 
 ### Changed
+
+- **Hardware reports: #221, #212 and #224 (`docs/HARDWARE-REPORT.md`, updated 2026-11-22).** #221 adds an ASUS
+  F1A55-M LX desktop with an AMD A4-3400 (Llano) and a Radeon HD 5450 (TeraScale 2, kernel `radeon`, Mesa r600) on
+  LordOS 0.8.9.4: GPU composition and everything else work, from a mechanical disk with legacy BIOS boot; the first
+  TeraScale 2 card and the first Llano APU in the reports. #212 updates #105's ASUS K72F to 0.8.9.2: all works, with an
+  external Dell P2418D on HDMI next to the panel, at 1920x1200 because the laptop's HDMI output stops at a 165 MHz
+  TMDS clock (the hardware's limit, not LordOS's). #224 brought the `.json` file #171 had left out (still the 0.8.8.9
+  capture). The counts are now 24 physical machines (11 with a report's data), 25 people, 14 Intel, 5 AMD and 1 NVIDIA
+  GPUs, 3 AMD CPUs and 5 desktops, with the version table, what works, the untested combinations and the thanks
+  updated. The site's claims that no NVIDIA card had been reported, and its "22 machines", are corrected in en, es and
+  pt: the paper (§3.2, §3.5, §10.2 and §10.3), the "Own desktop" feature page and the FAQ's release,
+  graphics and NVIDIA answers now say that one RTX 3060 on NVIDIA's proprietary driver reaches the desktop drawn with
+  the CPU, and that nouveau, NVK and AMD integrated graphics are untested. `docs/SESSIONS.md` and `docs/BENCHMARK.md`
+  follow.
+- **The hardware-report check notices a report made on another version than the form says (#224).** System
+  Information fills the issue form's "LordOS version" field with the version it runs; #224's form said 0.8.9.4 while
+  the attached file was the 0.8.8.9 report of 2026-11-16. `tools/hwreport/lib.mjs` reads that field
+  (`formVersion`: the first line under its heading, only when it looks like a version, never shown as typed) and, when
+  it names another version than the file (`-beta` or not), flags `form-version`: the issue is labelled `report:check`
+  instead of `report:valid`, and the workflow's comment says which version each one names and asks for the new file if
+  there is one. `node tools/hwreport/validate.mjs --form=<version> <file>` does the same on the command line. Test:
+  `server/tests/hwreport_test.mjs` (7 more checks: reading the field, an empty or non-version answer, the same
+  version with or without `-beta`, the label and the note). `docs/BENCHMARK.md`.
 
 - **LordOS Studio's pictures are AI-generated, in development (the latest release is 0.8.9.4; approved by the
   maintainer on 2026-11-22, decision D7 of `docs/CAMERA-STUDIO-PLAN.md`).** Every picture of the background catalog

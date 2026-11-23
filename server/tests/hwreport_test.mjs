@@ -12,7 +12,7 @@ import { validate } from '../../tools/hwreport/jsonschema.mjs';
 import { pick, buildShareReport, summaryRows, summaryText, issueTitle, issueUrl, shareFileNames, sharePage, reportKind, gpuVendor, cpuVendor, TITLE_MAX } from '../../apps/sysinfo/share.js';
 import { deviceKeys, communityFor, communitySummary } from '../../apps/sysinfo/community.js';
 import { compatibility } from '../../apps/sysinfo/model.js';
-import { embeddedReport, findAttachments, allowedUrl, fetchAttachment, parseLimited, privacyScan, plausibility, checkReport, labelsFor, commentBody, code, MARKER, ALL_LABELS } from '../../tools/hwreport/lib.mjs';
+import { embeddedReport, findAttachments, allowedUrl, fetchAttachment, parseLimited, privacyScan, plausibility, checkReport, labelsFor, commentBody, code, formVersion, MARKER, ALL_LABELS } from '../../tools/hwreport/lib.mjs';
 import { readReports, buildSnapshot, snapshotText, buildModel, renderSections, SNAPSHOT_FILE, REPORTS_DIR } from '../../tools/hwreport/catalog.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -218,6 +218,17 @@ ok('the file name loses its backtick', cm.includes('`a b.json`'));
 eq('code(): empty and long', [code(''), code('x'.repeat(200)).length], ['—', 122]);
 const errComment = commentBody({ status: 'invalid', errors: [{ path: '/system/x`y', message: 'is not a field of the report' }], labels: [] });
 ok('error paths are code too', errComment.includes('`/system/x y`'));
+
+// (#224) the issue's form names the version System Information runs; a file from an older report says another one
+const form = (v) => `### LordOS version\n\n${v}\n\n### Summary\n\n\`\`\`text\nkind: laptop\n\`\`\`\n`;
+eq('form version: read from its field', [formVersion(form('0.8.9.4-beta')), formVersion(form('0.8.7')), formVersion('### LordOS version\r\n\r\nv0.8.9.4-beta\r\n')], ['0.8.9.4-beta', '0.8.7', '0.8.9.4-beta']);
+eq('form version: none, empty, not a version or another field', [formVersion(''), formVersion(form('_No response_')), formVersion(form('latest `x` @everyone')), formVersion('### LordOS version\n\n### Summary\n\n0.8.9.4'), formVersion('### Summary\n\n0.8.9.4')], ['', '', '', '', '']);
+eq('form version: the same version (beta suffix or not) passes', [checkReport(laptop, schema, { ...today, form: '0.8.7-beta' }).status, checkReport(laptop, schema, { ...today, form: '0.8.7' }).status, checkReport(laptop, schema, { ...today, form: '' }).status], ['valid', 'valid', 'valid']);
+const older = checkReport(laptop, schema, { ...today, form: '0.8.9.4-beta' });
+eq('form version: another version → report:check', [older.status, older.labels[1], older.flags.map((f) => f.id)], ['check', 'report:check', ['form-version']]);
+const olderNote = commentBody(older, { fileName: 'lordos-hwreport-2026-11-16.json' });
+ok('form version: the comment says which version each one names', olderNote.includes('The form says LordOS `0.8.9.4-beta`, but the attached file was made on `0.8.7-beta`.') && olderNote.includes('attach the new'));
+ok('form version: no note when they agree', !commentBody(checkReport(laptop, schema, { ...today, form: '0.8.7-beta' })).includes('The form says'));
 
 // ---- the catalogue (catalog.mjs) ----
 const entries = readReports(REPORTS_DIR, schema);

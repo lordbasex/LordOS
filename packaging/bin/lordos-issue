@@ -190,6 +190,11 @@ have() { command -v "$1" >/dev/null 2>&1; }
     if have systemctl; then systemctl --failed --no-legend --plain 2>/dev/null; fi
     end
 
+    # another login screen enabled at boot next to LordOS's fights it for the screen (GitHub #187)
+    section "Other display managers enabled at boot"
+    if [ -x /usr/lib/lordos/lordos-dm-check ]; then /usr/lib/lordos/lordos-dm-check && echo none; fi
+    end
+
     section "Firmware messages"
     { dmesg 2>/dev/null || journalctl -k -b --no-pager -o cat 2>/dev/null; } | grep -i -E 'firmware|direct firmware load' | grep -i -E 'fail|error|missing|unable|not found' | tail -n 30
     end
