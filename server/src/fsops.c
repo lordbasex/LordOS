@@ -734,12 +734,13 @@ static int remote_type(const char *ty) {
            !strcmp(ty, "9p") || !strcmp(ty, "ceph") || !strcmp(ty, "glusterfs") || !strcmp(ty, "davfs");
 }
 
-int fsops_remote_path(const char *real) {
-    FILE *f = fopen("/proc/self/mounts", "re");
-    if (!f) return 0;
+int fsops_mount_type_in(const char *mounts, const char *real, char *ty_out, size_t n) {
+    if (n) ty_out[0] = 0;
+    FILE *f = fopen(mounts, "re");
+    if (!f) return -1;
     char line[4096], dev[1024], mnt[2048], ty[64];
     size_t best = 0;
-    int remote = 0;
+    int found = 0;
     while (fgets(line, sizeof line, f)) {
         if (sscanf(line, "%1023s %2047s %63s", dev, mnt, ty) != 3) continue;
         unescape_mount(mnt);
@@ -747,10 +748,22 @@ int fsops_remote_path(const char *real) {
         int in = !strcmp(mnt, "/") || (!strncmp(real, mnt, l) && (real[l] == 0 || real[l] == '/'));
         if (!in || l < best) continue;
         best = l;
-        remote = remote_type(ty);
+        found = 1;
+        pathf(ty_out, n, "%s", ty);
     }
     fclose(f);
-    return remote;
+    return found ? 0 : -1;
+}
+
+int fsops_remote_path(const char *real) {
+    char ty[64];
+    return !fsops_mount_type_in("/proc/self/mounts", real, ty, sizeof ty) && remote_type(ty);
+}
+
+int fsops_cloud_type(const char *ty) { return ty && !strcmp(ty, "fuse.rclone"); }
+int fsops_cloud_path(const char *real) {
+    char ty[64];
+    return !fsops_mount_type_in("/proc/self/mounts", real, ty, sizeof ty) && fsops_cloud_type(ty);
 }
 
 void fs_mounts(FsMountFn fn, void *ud) {

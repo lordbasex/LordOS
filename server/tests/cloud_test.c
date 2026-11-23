@@ -111,6 +111,19 @@ static void t_paths(void) {
     const char *all[] = { "" };
     CHECK(cloud_kept(all, 1, "anything/at/all"));
     {
+        /* #206: each kept row's own size, from the cache walk (the whole account, a folder in it, one not holding the file) */
+        const char *k3[] = { "", "Projects", "Photos/2026" };
+        long long per[3] = { 0, 0, 0 };
+        CHECK(cloud_kept_tally(k3, 3, "Projects/a.odt", 4096, per) == 1);
+        CHECK(cloud_kept_tally(k3, 3, "Photos/2026/x.jpg", 8192, per) == 1);
+        CHECK(cloud_kept_tally(k3, 3, "Music/song.ogg", 512, per) == 1);
+        CHECK(per[0] == 4096 + 8192 + 512 && per[1] == 4096 && per[2] == 8192);
+        long long p2[2] = { 0, 0 };
+        CHECK(cloud_kept_tally(kept, 2, "Projectsx/a", 100, p2) == 0 && p2[0] == 0 && p2[1] == 0);   /* not kept: counts nowhere */
+        CHECK(cloud_kept_tally(kept, 2, "Projects", 100, p2) == 1 && p2[0] == 100);                 /* a kept file itself */
+        CHECK(cloud_kept_tally(kept, 2, NULL, 100, p2) == 0 && cloud_kept_tally(kept, 2, "Projects/b", 1, NULL) == 0);
+    }
+    {
         /* #71: which folders are still coming down as a whole */
         const char *k2[] = { "Projects", "Photos/2026" };
         unsigned char busy[2] = { 0, 1 };

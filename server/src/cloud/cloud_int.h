@@ -88,6 +88,7 @@ typedef struct {
     char *keep[KEEP_MAX];
     unsigned char keep_busy[KEEP_MAX];   /* #71: keep[i]'s files aren't all here yet (set when kept, or when the keeper
                                           * finds one missing; cleared when a pass of the keeper got them all) */
+    long long keep_bytes[KEEP_MAX];      /* #206: keep[i]'s bytes in the VFS cache (cf_measure), -1 not measured yet */
     int nkeep;
     CloudFails kfail;               /* #185: what the keeper couldn't read while the provider answered: gone around for an hour */
     char *errn[ERRN_MAX];           /* files whose last transfer failed */

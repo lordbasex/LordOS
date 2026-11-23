@@ -46,6 +46,7 @@
   "backup.destMissing": "O destino não existe",
   "backup.destNotAllowed": "Esse destino não é permitido",
   "backup.destOutside": "O destino precisa estar na sua pasta pessoal ou em um dos seus discos",
+  "backup.destCloud": "Uma pasta da nuvem não pode ser o destino do backup: os instantâneos precisam de links físicos, que uma conta na nuvem não tem, e os arquivos dela continuam sendo enviados mesmo depois que o backup é parado. Escolha um disco ou uma pasta deste computador",
   "backup.destUnwritable": "Não é possível gravar no destino",
   "backup.interrupted": "Foi interrompida",
   "backup.locked": "As cópias estão criptografadas: desbloqueie-as primeiro",

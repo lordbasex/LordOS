@@ -7,7 +7,6 @@
   "admin.unavailable": "The admin helper is not running: lord-server must start with sudo and the user must be in the sudo group.",
   "browserTabs.applyAll": "Change them",
   "browserTabs.chromiumOpen": "Chromium or Brave is open: its profiles change as soon as you quit it.",
-  "browserTabs.done": "Done. The browsers use it the next time they open.",
   "browserTabs.failed": {
     "one": "{count} browser profile could not be changed and was left as it was.",
     "other": "{count} browser profiles could not be changed and were left as they were."

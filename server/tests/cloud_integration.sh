@@ -354,6 +354,10 @@ r=$(cmd free "$M/Projects")
 r=$(cmd keep "$M/Projects")
 for i in $(seq 60); do r=$(cmd status "$M/Projects/big.bin"); has "$r" '"st":"kept"' && break; sleep 0.5; done
 check "Keep on This Computer brings it down: kept" has "$r" '"st":"kept"'
+# #206: the kept row's own size comes from the VFS cache (lord.fs.du answers 0 on the FUSE mount); measured after the
+# keeper's pass and every minute
+for i in $(seq 70); do r=$(cmd state); case $r in *'"keptSizes":['[1-9]*) break ;; esac; sleep 1; done
+check "#206: keptSizes gives the kept folder's bytes on this computer" sh -c 'case "$1" in *"\"keptSizes\":["[1-9]*) exit 0;; esac; exit 1' x "$r"
 r=$(cmd free "$M/Projects")
 check "Free Up Space leaves kept files" has "$r" '"reason":"kept"'
 r=$(cmd unkeep "$M/Projects")

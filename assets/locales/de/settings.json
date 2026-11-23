@@ -7,7 +7,6 @@
   "admin.unavailable": "Der Admin-Helfer läuft nicht: lord-server muss mit sudo starten und der Benutzer muss in der Gruppe sudo sein.",
   "browserTabs.applyAll": "Ändern",
   "browserTabs.chromiumOpen": "Chromium oder Brave ist geöffnet: Seine Profile ändern sich, sobald du es beendest.",
-  "browserTabs.done": "Fertig. Die Browser verwenden es beim nächsten Öffnen.",
   "browserTabs.failed": {
     "one": "{count} Browserprofil konnte nicht geändert werden und blieb unverändert.",
     "other": "{count} Browserprofile konnten nicht geändert werden und blieben unverändert."

@@ -46,6 +46,7 @@
   "backup.destMissing": "Mahali pa kuhifadhi hapapo",
   "backup.destNotAllowed": "Mahali hapo pa kuhifadhi haparuhusiwi",
   "backup.destOutside": "Mahali pa kuhifadhi lazima pawe katika folda yako ya nyumbani au kwenye mojawapo ya diski zako",
+  "backup.destCloud": "Folda ya wingu haiwezi kuwa mahali pa nakala rudufu: picha za hali zinahitaji viungo vigumu, ambavyo akaunti ya wingu haina, na faili zake huendelea kupakiwa hata baada ya nakala rudufu kusimamishwa. Chagua diski au folda kwenye kompyuta hii",
   "backup.destUnwritable": "Haiwezi kuandika mahali pa kuhifadhi",
   "backup.interrupted": "Ilikatizwa",
   "backup.locked": "Nakala rudufu zimesimbwa kwa njia fiche: zifungue kwanza",

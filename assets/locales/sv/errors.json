@@ -46,6 +46,7 @@
   "backup.destMissing": "Målet finns inte",
   "backup.destNotAllowed": "Det målet är inte tillåtet",
   "backup.destOutside": "Målet måste ligga i din hemmapp eller på någon av dina diskar",
+  "backup.destCloud": "En molnmapp kan inte vara mål för säkerhetskopian: ögonblicksbilder behöver hårda länkar, som ett molnkonto saknar, och dess filer fortsätter att laddas upp även efter att säkerhetskopieringen stoppats. Välj en disk eller en mapp på den här datorn",
   "backup.destUnwritable": "Kan inte skriva till målet",
   "backup.interrupted": "Den avbröts",
   "backup.locked": "Säkerhetskopiorna är krypterade: lås upp dem först",

@@ -46,6 +46,7 @@
   "backup.destMissing": "Destinasi tidak wujud",
   "backup.destNotAllowed": "Destinasi itu tidak dibenarkan",
   "backup.destOutside": "Destinasi mesti berada dalam folder rumah anda atau pada salah satu cakera anda",
+  "backup.destCloud": "Folder Awan tidak boleh menjadi destinasi sandaran: petikan memerlukan pautan keras, yang tiada pada akaun awan, dan failnya terus dimuat naik walaupun selepas sandaran dihentikan. Pilih cakera atau folder pada komputer ini",
   "backup.destUnwritable": "Tidak dapat menulis ke destinasi",
   "backup.interrupted": "Ia telah terganggu",
   "backup.locked": "Sandaran disulitkan: buka kuncinya dahulu",

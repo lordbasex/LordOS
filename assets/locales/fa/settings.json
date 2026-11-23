@@ -7,7 +7,6 @@
   "admin.unavailable": "دستیار مدیریت اجرا نمی‌شود: lord-server باید با sudo آغاز شود و کاربر باید عضو گروه sudo باشد.",
   "browserTabs.applyAll": "تغییرشان بده",
   "browserTabs.chromiumOpen": "Chromium یا Brave باز است: نمایه‌هایش به محض بستن آن تغییر می‌کنند.",
-  "browserTabs.done": "انجام شد. مرورگرها دفعهٔ بعد که باز شوند آن را به کار می‌برند.",
   "browserTabs.failed": {
     "one": "{count} نمایهٔ مرورگر تغییر نکرد و همان‌طور که بود ماند.",
     "other": "{count} نمایهٔ مرورگر تغییر نکردند و همان‌طور که بودند ماندند."

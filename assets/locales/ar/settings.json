@@ -7,7 +7,6 @@
   "admin.unavailable": "مساعد الإدارة لا يعمل: يجب أن يبدأ lord-server باستخدام sudo وأن يكون المستخدم ضمن مجموعة sudo.",
   "browserTabs.applyAll": "تغييرها",
   "browserTabs.chromiumOpen": "Chromium أو Brave مفتوح: تتغيّر ملفاته الشخصية فور إغلاقه.",
-  "browserTabs.done": "تم. تستخدمه المتصفحات في المرة التالية التي تُفتح فيها.",
   "browserTabs.failed": {
     "zero": "لم يتعذّر تغيير أي ملف شخصي للمتصفح.",
     "one": "تعذّر تغيير ملف شخصي واحد للمتصفح وتُرك كما هو.",

@@ -7,7 +7,6 @@
   "admin.unavailable": "Administratörshjälpen körs inte: lord-server måste starta med sudo och användaren måste vara med i gruppen sudo.",
   "browserTabs.applyAll": "Ändra dem",
   "browserTabs.chromiumOpen": "Chromium eller Brave är öppet: profilerna ändras så snart du avslutar det.",
-  "browserTabs.done": "Klart. Webbläsarna använder det nästa gång de öppnas.",
   "browserTabs.failed": {
     "one": "{count} webbläsarprofil kunde inte ändras och lämnades som den var.",
     "other": "{count} webbläsarprofiler kunde inte ändras och lämnades som de var."

@@ -46,6 +46,7 @@
   "backup.destMissing": "Hindi umiiral ang destinasyon",
   "backup.destNotAllowed": "Hindi pinapayagan ang destinasyong iyan",
   "backup.destOutside": "Dapat nasa iyong home folder o sa isa sa iyong mga disk ang destinasyon",
+  "backup.destCloud": "Hindi puwedeng destinasyon ng backup ang isang folder sa cloud: kailangan ng mga snapshot ang mga hard link, na wala sa cloud account, at patuloy na ina-upload ang mga file nito kahit itinigil na ang backup. Pumili ng disk o folder sa computer na ito",
   "backup.destUnwritable": "Hindi makasulat sa destinasyon",
   "backup.interrupted": "Naantala ito",
   "backup.locked": "Naka-encrypt ang mga backup: i-unlock muna ang mga ito",

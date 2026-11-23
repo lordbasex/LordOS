@@ -46,6 +46,7 @@
   "backup.destMissing": "Tujuan tidak ada",
   "backup.destNotAllowed": "Tujuan itu tidak diizinkan",
   "backup.destOutside": "Tujuan harus berada di folder rumah Anda atau di salah satu disk Anda",
+  "backup.destCloud": "Folder Cloud tidak dapat menjadi tujuan cadangan: snapshot memerlukan tautan keras, yang tidak dimiliki akun cloud, dan berkasnya terus diunggah bahkan setelah pencadangan dihentikan. Pilih disk atau folder di komputer ini",
   "backup.destUnwritable": "Tidak dapat menulis ke tujuan",
   "backup.interrupted": "Terputus",
   "backup.locked": "Cadangan dienkripsi: buka kuncinya dulu",

@@ -64,6 +64,12 @@ int  fs_search(const char *real, const char *needle, int limit, int depth, FsHit
 /* real is on a cloud, network or other FUSE mount (fuse.*, cifs, smb3, nfs*, 9p…), from the mount table: the interface's
  * thread mustn't walk it (lord.fs.du and search answer at once there) */
 int  fsops_remote_path(const char *real);
+/* the type of the mount that holds real ("ext4", "fuse.rclone"…): the longest mount point over it in that mounts file
+ * (/proc/self/mounts; a file for the tests). 0, or -1 with "" if the file can't be read or nothing holds it */
+int  fsops_mount_type_in(const char *mounts, const char *real, char *ty, size_t n);
+/* a Cloud account's mount (rclone's FUSE mount, "fuse.rclone"): Backup refuses it as a destination (#208) */
+int  fsops_cloud_type(const char *ty);
+int  fsops_cloud_path(const char *real);
 /* every mount point and whether it is one of those (the same test), from the mount table only */
 typedef void (*FsMountFn)(void *ud, const char *path, int remote);
 void fs_mounts(FsMountFn fn, void *ud);

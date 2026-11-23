@@ -335,7 +335,7 @@ char *cf_free(const char *const *paths, int n) {
 
 /* ---- space used, and the automatic pass ---- */
 
-typedef struct { const Snap *s; long long cache, kept; } MeasureCtx;
+typedef struct { const Snap *s; long long cache, kept; long long *per; } MeasureCtx;
 
 static void measure_one(const char *rel, void *arg) {
     MeasureCtx *m = arg;
@@ -345,7 +345,8 @@ static void measure_one(const char *rel, void *arg) {
     if (lstat(data, &st) || !S_ISREG(st.st_mode)) return;
     long long b = (long long)st.st_blocks * 512;
     m->cache += b;
-    if (cloud_kept((const char *const *)m->s->keep, m->s->nkeep, rel)) m->kept += b;
+    /* #206: and per kept entry, since lord.fs.du can't size a folder on the FUSE mount (it answers 0, remote) */
+    if (cloud_kept_tally((const char *const *)m->s->keep, m->s->nkeep, rel, b, m->per)) m->kept += b;
 }
 
 void cf_measure(void) {
@@ -359,11 +360,19 @@ void cf_measure(void) {
         if (snap(NULL, ids[i], &s)) continue;
         char base[PATH_MAX];
         cl_pf(base, sizeof base, "%s/vfs/%s", cl_cache, s.id);
-        MeasureCtx m = { &s, 0, 0 };
+        long long per[KEEP_MAX] = { 0 };
+        MeasureCtx m = { &s, 0, 0, per };
         walk_meta(base, "", 0, measure_one, &m);      /* the data tree has the same shape */
         pthread_mutex_lock(&cl_mu);
         Acc *a = cl_find(ids[i]);
-        if (a) { a->cache_bytes = m.cache; a->kept_bytes = m.kept; }
+        if (a) {
+            a->cache_bytes = m.cache;
+            a->kept_bytes = m.kept;
+            /* by name: the list may have changed while the walk ran; an entry kept meanwhile waits for the next pass */
+            for (int k = 0; k < a->nkeep; k++)
+                for (int j = 0; j < s.nkeep; j++)
+                    if (!strcmp(a->keep[k], s.keep[j])) { a->keep_bytes[k] = per[j]; break; }
+        }
         pthread_mutex_unlock(&cl_mu);
         snap_free(&s);
     }

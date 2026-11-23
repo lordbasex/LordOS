@@ -7,7 +7,6 @@
   "admin.unavailable": "管理辅助程序未运行：lord-server 必须通过 sudo 启动，且用户必须属于 sudo 组。",
   "browserTabs.applyAll": "更改",
   "browserTabs.chromiumOpen": "Chromium 或 Brave 正在运行：退出后其配置文件才会更改。",
-  "browserTabs.done": "完成。浏览器下次打开时生效。",
   "browserTabs.failed": {
     "other": "有 {count} 个浏览器配置文件无法更改，已保持原样。"
   },

@@ -7,7 +7,6 @@
   "admin.unavailable": "ตัวช่วยผู้ดูแลระบบไม่ได้ทำงาน: ต้องเริ่ม lord-server ด้วย sudo และผู้ใช้ต้องอยู่ในกลุ่ม sudo",
   "browserTabs.applyAll": "เปลี่ยน",
   "browserTabs.chromiumOpen": "Chromium หรือ Brave เปิดอยู่: โปรไฟล์จะเปลี่ยนทันทีที่คุณปิดเบราว์เซอร์",
-  "browserTabs.done": "เสร็จแล้ว เบราว์เซอร์จะใช้การตั้งค่านี้ในครั้งถัดไปที่เปิด",
   "browserTabs.failed": {
     "other": "เปลี่ยนโปรไฟล์เบราว์เซอร์ {count} รายการไม่ได้ จึงคงไว้ตามเดิม"
   },

@@ -167,6 +167,19 @@ export function here(accounts) {
   return { ...total, rows };
 }
 
+// "In sync with this computer": the account's whole folder is kept (cloud.keep([mount])), so every folder in it is too.
+export const keptAll = (acc) => !!acc && (acc.kept || []).includes(acc.mount);
+// Settings → Cloud's "Kept on this computer" rows: { path, bytes }, bytes from lord-server's measure of the VFS cache
+// (keptSizes, in kept's order; null until it measured an entry kept since). Never lord.fs.du: on the account's FUSE mount
+// it answers size 0 with remote: true, and every row read "0 B" (#206).
+export function keptRows(acc) {
+  const sizes = Array.isArray(acc && acc.keptSizes) ? acc.keptSizes : [];
+  return ((acc && acc.kept) || []).map((path, i) => {
+    const b = sizes[i];
+    return { path, bytes: typeof b === 'number' && Number.isFinite(b) && b >= 0 ? b : null };
+  });
+}
+
 // ---- on and off ----
 
 // An account turned off (lord-server's `disabled`, state 'off'): not mounted, nothing in Files, the file dialogs, the menu

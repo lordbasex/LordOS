@@ -46,6 +46,7 @@
   "backup.destMissing": "目标位置不存在",
   "backup.destNotAllowed": "不允许使用该目标位置",
   "backup.destOutside": "目标位置必须在你的个人文件夹中或你的某个磁盘上",
+  "backup.destCloud": "云端文件夹不能作为备份目标：快照需要硬链接，而云端账户不支持，并且即使停止备份，其中的文件仍会继续上传。请选择这台电脑上的磁盘或文件夹",
   "backup.destUnwritable": "无法写入目标位置",
   "backup.interrupted": "已被中断",
   "backup.locked": "备份已加密：请先解锁",

@@ -7,7 +7,6 @@
   "admin.unavailable": "Kisaidizi cha msimamizi hakiendeshwi: lord-server lazima ianze kwa sudo na mtumiaji lazima awe katika kundi la sudo.",
   "browserTabs.applyAll": "Zibadilishe",
   "browserTabs.chromiumOpen": "Chromium au Brave imefunguliwa: wasifu wake utabadilika mara tu utakapoifunga.",
-  "browserTabs.done": "Imekamilika. Vivinjari vitaitumia vitakapofunguliwa tena.",
   "browserTabs.failed": {
     "one": "Wasifu {count} wa kivinjari haukuweza kubadilishwa na umeachwa kama ulivyokuwa.",
     "other": "Wasifu {count} wa vivinjari haukuweza kubadilishwa na umeachwa kama ulivyokuwa."

@@ -7,7 +7,6 @@
   "admin.unavailable": "İdarəetmə köməkçisi işləmir: lord-server sudo ilə başlamalı və istifadəçi sudo qrupunda olmalıdır.",
   "browserTabs.applyAll": "Onları dəyiş",
   "browserTabs.chromiumOpen": "Chromium və ya Brave açıqdır: ondan çıxan kimi profilləri dəyişəcək.",
-  "browserTabs.done": "Hazırdır. Brauzerlər bunu növbəti dəfə açılanda istifadə edəcək.",
   "browserTabs.failed": {
     "one": "{count} brauzer profili dəyişdirilə bilmədi və olduğu kimi saxlanıldı.",
     "other": "{count} brauzer profili dəyişdirilə bilmədi və olduğu kimi saxlanıldı."

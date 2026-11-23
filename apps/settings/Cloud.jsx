@@ -5,7 +5,7 @@
 // rclone.
 import {
   View, Text, Button, Toggle, TextInput, SearchField, Segmented, ScrollView, useTheme, useLocale, useStore, useCloud, cloud, cloudModel, createStore,
-  formatBytes, formatDate, formatTime, tOptional, spacing, typeScale, wm, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText, fs,
+  formatBytes, formatDate, formatTime, tOptional, spacing, typeScale, wm, useAppWindow, FilePicker, openUrl, clipboard, toast, addListener, direction, errorText,
   AccountBadge, UsageRing, SpaceBar, CloudGlyph, useSettings, hasTextFocus, cloudState, askKeyringUnlock, systemInfo, lordosVersion, AutofillButton,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -463,32 +463,33 @@ function SpaceCard({ a, accounts }) {
 function KeptList({ a, onAdd }) {
   const t = useTheme();
   const { t: tr } = useLocale();
-  const [sizes, setSizes] = useState({});
-  useEffect(() => {
-    const id = setTimeout(() => {
-      const s = {};
-      for (const p of a.kept || []) { try { const d = fs.du(p, 300); if (d && d.size != null) s[p] = d.size; } catch (e) { /* not there yet */ } }
-      setSizes(s);
-    }, 50);
-    return () => clearTimeout(id);
-  }, [(a.kept || []).join('|')]);
+  // each row's size is lord-server's measure of what is here (#206); the whole account kept ("In sync") leaves no folder
+  // to add (#207)
+  const rows = M.keptRows(a);
+  const all = M.keptAll(a);
   return (
     <View aria-label={tr('cloud.keptTitle')} style={box(t)}>
       <BoxRow t={t}>
         <Text style={{ flex: 1, fontSize: typeScale.body, fontWeight: 600, color: t.text, textAlign: 'start' }}>{tr('cloud.keptTitle')}</Text>
         <Dim t={t}>{formatBytes(a.keptBytes || 0)}</Dim>
       </BoxRow>
-      {(a.kept || []).map((p) => (
-        <BoxRow key={p} t={t} pad={8}>
+      {rows.map((r) => (
+        <BoxRow key={r.path} t={t} pad={8}>
           <CloudGlyph kind="kept" size={16} />
-          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{M.relPath(p, a) || a.name}</Text>
-          {sizes[p] != null ? <Dim t={t}>{formatBytes(sizes[p])}</Dim> : null}
-          <Button small plain label={tr('cloud.stopKeeping')} onClick={() => cloud.unkeep([p])} />
+          <Text style={{ flex: 1, minWidth: 0, fontSize: typeScale.body, color: t.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{M.relPath(r.path, a) || a.name}</Text>
+          {r.bytes != null ? <Dim t={t}>{formatBytes(r.bytes)}</Dim> : null}
+          <Button small plain label={tr('cloud.stopKeeping')} onClick={() => cloud.unkeep([r.path])} />
         </BoxRow>
       ))}
-      <View onClick={onAdd} style={{ paddingHorizontal: 14, paddingVertical: 9 }}>
-        <Text style={{ fontSize: typeScale.body, color: t.accent, textAlign: 'start' }}>{tr('cloud.addFolder')}</Text>
-      </View>
+      {all ? (
+        <View style={{ paddingHorizontal: 14, paddingVertical: 9 }}>
+          <Text style={{ fontSize: typeScale.caption, color: t.textDim, textAlign: 'start' }}>{tr('cloud.keptAllHint')}</Text>
+        </View>
+      ) : (
+        <View onClick={onAdd} style={{ paddingHorizontal: 14, paddingVertical: 9 }}>
+          <Text style={{ fontSize: typeScale.body, color: t.accent, textAlign: 'start' }}>{tr('cloud.addFolder')}</Text>
+        </View>
+      )}
     </View>
   );
 }

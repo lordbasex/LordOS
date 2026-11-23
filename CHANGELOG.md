@@ -1764,6 +1764,56 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   SDDM together, a display manager kept by `install.sh --keep-display-manager` with LordOS not enabled, a masked one,
   `display-manager.service` pointing at LordOS, an empty image tree), in `make test`. `docs/INSTALL-DEBIAN.md`,
   Troubleshooting.
+- **Settings → Appearance → Browsers: no green "Done" note after the switch (#222), in development (the latest release
+  is 0.8.9.4).** Every change of "Browsers: tabs in the title bar" left "Done. The browsers use it the next time they
+  open." under it, and turning the switch back off kept it there, since the last result is kept for the page's
+  life. A change that simply worked now says nothing: the switch shows it, and the group's footer already says that
+  it applies the next time each browser opens. What needs the person still shows (Chromium or Brave open, a profile
+  that couldn't be changed, a Firefox profile whose own `user.js` sets it). The notes are chosen by
+  `browserFrameNotes` in `sdk/browserframe.js` (new, pure); `settings.browserTabs.done` is gone from the 35
+  languages. Test: `server/tests/browserframe_notes_test.mjs` (new, in `run_suites.sh`, 8 checks).
+- **Settings → Cloud: each row of "Kept on this computer" shows its real size (#206), in development (the latest
+  release is 0.8.9.4).** Every row said 0 B, the account's whole folder ("In sync with this computer") as well as a
+  folder added by hand: the rows asked `lord.fs.du`, which by design doesn't walk a cloud or network mount from the
+  interface's thread and answers `size: 0, remote: true` there. `lord-server` now sizes each kept entry itself, in the
+  walk of rclone's VFS cache that already gave the account's `keptBytes` (`cf_measure` in
+  `server/src/cloud/cloud_files.c`, once a minute and after each pass of the keeper), and the state gives them as
+  `keptSizes` (bytes in `kept`'s order, `null` for an entry kept since the last walk; `docs/CLOUD.md` 17 and 17.1).
+  Entries that overlap (the whole account and a folder in it) each count their own files (`cloud_kept_tally` in
+  `cloud_pure.c`). Settings shows that number (`keptRows` in `sdk/cloudmodel.js`) and never `lord.fs.du`'s on the
+  mount: a row not measured yet shows no size instead of 0 B. The dev mock gives sizes too. Tests: `build/cloud-test`
+  (per-entry tallies, overlapping entries, a path kept nowhere), `server/tests/cloud_model_test.mjs` (rows, unknown and
+  junk sizes, the mock through keep and unkeep), and a `keptSizes` check after Keep on This Computer in
+  `server/tests/cloud_integration.sh` (run by hand against rclone v1.75.2; not run for this change).
+- **Settings → Cloud: "Only in the cloud" says that folders can still be kept, and an account in sync has no "Add a
+  Folder…" (#207), in development (the latest release is 0.8.9.4).** The choice's text ended "Nothing is kept on this
+  computer.", although folders added under "Kept on this computer" are kept here; it now ends "By default nothing is
+  kept on this computer; you can choose folders to keep." (`cloud.use.cloudOnlyHint`). An account "In sync with this
+  computer" keeps its whole folder, so the list's **Add a Folder…** did nothing useful: it is replaced there by "The
+  whole account is kept on this computer, so every folder in it is kept too." (`cloud.keptAllHint`, new; `keptAll` in
+  `sdk/cloudmodel.js`). Both texts in all 35 languages. Test: `server/tests/cloud_model_test.mjs`.
+- **Backups: a folder inside a Cloud account is refused as the destination (#208), in development (the latest release
+  is 0.8.9.4).** A person backed up their home into a OneDrive folder, stopped the backup and removed it, and rclone
+  kept uploading thousands of small files (browser and mail profiles) for hours, with OneDrive's rate-limit errors in
+  the log. A backup there can't work as designed: snapshots hard-link what didn't change, which rclone's mount can't
+  do, so every run copies every file again, and what a run wrote sits in rclone's upload queue, which a stopped backup
+  can't take back. Refused rather than warned about, because nothing the person can do there makes it work; the cloud
+  destination of `docs/CLOUD.md` 10 (an rclone sync job with versions) is still to be built.
+  - `valid_dest` (`server/src/backup/backup.c`) answers the new error `backup.destCloud` (35 languages: why, and to
+    choose a disk or a folder on this computer) for a folder on rclone's mount: `fsops_cloud_path`, the mount type
+    `fuse.rclone` of the longest mount point over the path in `/proc/self/mounts` (`fsops_mount_type_in` in
+    `server/src/fsops.c`, which `fsops_remote_path` now uses too). Network shares (SMB, NFS), other FUSE file systems
+    and NTFS disks (`fuseblk`) are not affected.
+  - A destination chosen before this change is not run: the run ends at once with that error under the app's header,
+    retried as a failed run (every 15 minutes) until another destination is chosen.
+  - The app no longer lists the Cloud accounts' mounts among the disks (`cloudModel.isCloudVolume`).
+  - **Cancelling an account's pending uploads in Settings → Cloud is not built.** rclone's remote control has no call
+    that drops what waits in the VFS upload queue (`vfs/queue` lists it, `vfs/queue-set-expiry` only delays it;
+    checked against rclone's rc reference on 2026-11-22); doing it would mean deleting files from rclone's cache behind
+    its back. Pause holds them, and removing the account past its warning about changes waiting drops them.
+  - Test: `build/fsops-test` (mount types from a mounts file: an rclone mount, one with a space in its name, a disk
+    mounted inside it, a folder whose name only starts like the mount's, SMB, `fuseblk`, a local FUSE pool, an
+    unreadable file).
 - **Store: the Flathub home's category tiles keep one width on every row** (`apps/store/flathubpages.js`,
   `CategoryTiles`). The tiles grew to fill their row, so a last row with fewer tiles (four of ten at 1600 px) made each
   of them wider than the ones above; five empty, zero-height cells with the tiles' own flex now fill that row. Seen in
@@ -2694,6 +2744,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   there is one. `node tools/hwreport/validate.mjs --form=<version> <file>` does the same on the command line. Test:
   `server/tests/hwreport_test.mjs` (7 more checks: reading the field, an empty or non-version answer, the same
   version with or without `-beta`, the label and the note). `docs/BENCHMARK.md`.
+- **Cloud: Proton Drive is verified, and Google Photos' limits are written down (#216, #217), in development (the
+  latest release is 0.8.9.4).** `protondrive` is in `assets/cloud/providers.json` (since 0.8.9.5, evidence
+  "issue #216") and in `docs/CLOUD.md` 19.1: a person's Check This Account report on LordOS 0.8.9.4 (x86_64) with
+  rclone v1.75.2, 8 steps passed and none failed; Free Up Space was skipped because that account was in sync with this
+  computer, and the link step because the backend has no public links, both right for it. Google Photos (#217) stays
+  **not verified**: the account lists, but Check This Account stops at making its folder, because rclone can only make
+  albums there, and since 2025 Google lets an app see only the media it uploaded. The new `docs/CLOUD.md` 19.6, "Known
+  limits of providers not verified", says so.
 
 - **LordOS Studio's pictures are AI-generated, in development (the latest release is 0.8.9.4; approved by the
   maintainer on 2026-11-22, decision D7 of `docs/CAMERA-STUDIO-PLAN.md`).** Every picture of the background catalog

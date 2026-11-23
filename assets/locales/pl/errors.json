@@ -46,6 +46,7 @@
   "backup.destMissing": "Miejsce docelowe nie istnieje",
   "backup.destNotAllowed": "To miejsce docelowe jest niedozwolone",
   "backup.destOutside": "Miejsce docelowe musi być w katalogu domowym lub na jednym z twoich dysków",
+  "backup.destCloud": "Folder w chmurze nie może być miejscem kopii zapasowej: migawki wymagają twardych dowiązań, których konto w chmurze nie ma, a jego pliki są wysyłane nawet po zatrzymaniu kopii. Wybierz dysk lub folder na tym komputerze",
   "backup.destUnwritable": "Nie można zapisywać w miejscu docelowym",
   "backup.interrupted": "Przerwano",
   "backup.locked": "Kopie zapasowe są zaszyfrowane: najpierw je odblokuj",

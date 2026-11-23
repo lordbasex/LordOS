@@ -7,7 +7,6 @@
   "admin.unavailable": "Pembantu pentadbir tidak berjalan: lord-server mesti dimulakan dengan sudo dan pengguna mesti berada dalam kumpulan sudo.",
   "browserTabs.applyAll": "Tukarkannya",
   "browserTabs.chromiumOpen": "Chromium atau Brave sedang dibuka: profilnya berubah sebaik sahaja anda menutupnya.",
-  "browserTabs.done": "Selesai. Pelayar menggunakannya apabila dibuka kali seterusnya.",
   "browserTabs.failed": {
     "other": "{count} profil pelayar tidak dapat ditukar dan dibiarkan seperti asal."
   },

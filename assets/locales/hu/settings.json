@@ -7,7 +7,6 @@
   "admin.unavailable": "A rendszergazdai segédprogram nem fut: a lord-servert sudóval kell indítani, és a felhasználónak a sudo csoportban kell lennie.",
   "browserTabs.applyAll": "Módosítás",
   "browserTabs.chromiumOpen": "A Chromium vagy a Brave meg van nyitva: a profiljai akkor változnak meg, amikor kilépsz belőle.",
-  "browserTabs.done": "Kész. A böngészők a következő megnyitáskor használják.",
   "browserTabs.failed": {
     "one": "{count} böngészőprofilt nem sikerült módosítani, változatlan maradt.",
     "other": "{count} böngészőprofilt nem sikerült módosítani, változatlanok maradtak."

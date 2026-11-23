@@ -46,6 +46,7 @@
   "backup.destMissing": "Destinația nu există",
   "backup.destNotAllowed": "Destinația nu este permisă",
   "backup.destOutside": "Destinația trebuie să fie în dosarul personal sau pe unul dintre discurile dvs.",
+  "backup.destCloud": "Un dosar din cloud nu poate fi destinația copiei de rezervă: instantaneele au nevoie de legături fizice, pe care un cont cloud nu le are, iar fișierele lui continuă să se încarce chiar după oprirea copiei. Alegeți un disc sau un dosar de pe acest computer",
   "backup.destUnwritable": "Nu se poate scrie în destinație",
   "backup.interrupted": "A fost întreruptă",
   "backup.locked": "Copiile de rezervă sunt criptate: deblocați-le mai întâi",

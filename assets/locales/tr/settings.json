@@ -7,7 +7,6 @@
   "admin.unavailable": "Yönetici yardımcısı çalışmıyor: lord-server sudo ile başlamalı ve kullanıcı sudo grubunda olmalı.",
   "browserTabs.applyAll": "Değiştir",
   "browserTabs.chromiumOpen": "Chromium veya Brave açık: profilleri, ondan çıktığınızda değişir.",
-  "browserTabs.done": "Tamam. Tarayıcılar bunu bir sonraki açılışta kullanır.",
   "browserTabs.failed": {
     "one": "{count} tarayıcı profili değiştirilemedi ve olduğu gibi bırakıldı.",
     "other": "{count} tarayıcı profili değiştirilemedi ve olduğu gibi bırakıldı."

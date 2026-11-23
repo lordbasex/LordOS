@@ -93,6 +93,9 @@ export function installCloudMock(home, scenario = '') {
   st.accounts[1].trashSupported = true;
   st.accounts[1].kept = [`${mount('Work')}/Projects/2026`, `${mount('Work')}/Contracts`, `${mount('Work')}/Templates`];
   st.accounts[0].kept = [`${mount('Personal')}/Pictures/Family`];
+  // as lord-server measures them from the VFS cache (#206), in kept's order
+  st.accounts[1].keptSizes = [2.6 * GB, 1.1 * GB, 0.4 * GB];
+  st.accounts[0].keptSizes = [2.1 * GB];
   const status = {};
   const links = { m2: [{ path: `${mount('Work')}/Quarterly report.pdf`, url: 'https://share.example.test/s/XZk4p9QwT2', expires: (now + 7 * 864e5) / 1000, made: now / 1000 },
     { path: `${mount('Work')}/Templates`, url: 'https://share.example.test/s/Brand8kQ', expires: 0, made: now / 1000 }] };
@@ -275,11 +278,11 @@ export function installCloudMock(home, scenario = '') {
     },
     browse: () => undefined,      // a folder Files shows: nothing to list again here
     keep(paths) {
-      for (const p of paths) { const a = ofPath(p); if (a && !a.kept.includes(p)) { a.kept.push(p); status[p] = 'kept'; } }
+      for (const p of paths) { const a = ofPath(p); if (a && !a.kept.includes(p)) { a.kept.push(p); a.keptSizes = [...(a.keptSizes || []), null]; status[p] = 'kept'; } }
       push();
     },
     unkeep(paths) {
-      for (const p of paths) { const a = ofPath(p); if (a) { a.kept = a.kept.filter((k) => k !== p); if (status[p] === 'kept') status[p] = 'here'; } }
+      for (const p of paths) { const a = ofPath(p); if (a) { const i = a.kept.indexOf(p); a.kept = a.kept.filter((k) => k !== p); if (a.keptSizes) a.keptSizes = a.keptSizes.filter((_, j) => j !== i); if (status[p] === 'kept') status[p] = 'here'; } }
       push();
     },
     free(paths) {

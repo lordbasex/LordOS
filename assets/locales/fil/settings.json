@@ -7,7 +7,6 @@
   "admin.unavailable": "Hindi tumatakbo ang admin helper: dapat magsimula ang lord-server gamit ang sudo at dapat nasa sudo group ang user.",
   "browserTabs.applyAll": "Palitan ang mga ito",
   "browserTabs.chromiumOpen": "Bukas ang Chromium o Brave: magbabago ang mga profile nito sa sandaling isara mo ito.",
-  "browserTabs.done": "Tapos na. Gagamitin ito ng mga browser sa susunod na pagbukas nila.",
   "browserTabs.failed": {
     "one": "Hindi mabago ang {count} profile ng browser at iniwan ito gaya ng dati.",
     "other": "Hindi mabago ang {count} profile ng browser at iniwan ang mga ito gaya ng dati."

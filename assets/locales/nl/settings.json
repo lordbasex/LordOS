@@ -7,7 +7,6 @@
   "admin.unavailable": "De beheerhulp draait niet: lord-server moet met sudo starten en de gebruiker moet in de groep sudo zitten.",
   "browserTabs.applyAll": "Wijzig ze",
   "browserTabs.chromiumOpen": "Chromium of Brave is geopend: de profielen veranderen zodra je de browser afsluit.",
-  "browserTabs.done": "Klaar. De browsers gebruiken het de volgende keer dat ze openen.",
   "browserTabs.failed": {
     "one": "{count} browserprofiel kon niet worden gewijzigd en is gelaten zoals het was.",
     "other": "{count} browserprofielen konden niet worden gewijzigd en zijn gelaten zoals ze waren."

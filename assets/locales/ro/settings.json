@@ -7,7 +7,6 @@
   "admin.unavailable": "Asistentul de administrare nu rulează: lord-server trebuie pornit cu sudo, iar utilizatorul trebuie să fie în grupul sudo.",
   "browserTabs.applyAll": "Aplică modificarea",
   "browserTabs.chromiumOpen": "Chromium sau Brave este deschis: profilurile sale se schimbă imediat ce îl închideți.",
-  "browserTabs.done": "Gata. Browserele îl folosesc data viitoare când se deschid.",
   "browserTabs.failed": {
     "one": "{count} profil de browser nu a putut fi modificat și a rămas cum era.",
     "few": "{count} profiluri de browser nu au putut fi modificate și au rămas cum erau.",

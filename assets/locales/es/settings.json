@@ -7,7 +7,6 @@
   "admin.unavailable": "El ayudante de administración no está activo: lord-server tiene que arrancar con sudo y el usuario estar en el grupo sudo.",
   "browserTabs.applyAll": "Cambiarlos",
   "browserTabs.chromiumOpen": "Chromium o Brave está abierto: sus perfiles cambian en cuanto lo cierres.",
-  "browserTabs.done": "Listo. Los navegadores lo usan la próxima vez que se abren.",
   "browserTabs.failed": {
     "one": "No se pudo cambiar {count} perfil de navegador y quedó como estaba.",
     "other": "No se pudieron cambiar {count} perfiles de navegador y quedaron como estaban."

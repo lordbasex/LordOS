@@ -46,6 +46,7 @@
   "backup.destMissing": "La destination n’existe pas",
   "backup.destNotAllowed": "Cette destination n’est pas autorisée",
   "backup.destOutside": "La destination doit se trouver dans votre dossier personnel ou sur l’un de vos disques",
+  "backup.destCloud": "Un dossier du cloud ne peut pas être la destination de la sauvegarde : les instantanés ont besoin de liens physiques, qu’un compte cloud n’a pas, et ses fichiers continuent d’être envoyés même après l’arrêt de la sauvegarde. Choisissez un disque ou un dossier de cet ordinateur",
   "backup.destUnwritable": "Impossible d’écrire sur la destination",
   "backup.interrupted": "Elle a été interrompue",
   "backup.locked": "Les sauvegardes sont chiffrées : déverrouillez-les d’abord",

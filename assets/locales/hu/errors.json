@@ -46,6 +46,7 @@
   "backup.destMissing": "A cél nem létezik",
   "backup.destNotAllowed": "Ez a cél nem engedélyezett",
   "backup.destOutside": "A célnak a saját mappájában vagy az egyik lemezén kell lennie",
+  "backup.destCloud": "Felhőmappa nem lehet a mentés célja: a pillanatképekhez rögzített hivatkozások kellenek, amelyek egy felhőfiókban nincsenek, és a fájljai a mentés leállítása után is tovább töltődnek fel. Válasszon lemezt vagy mappát ezen a számítógépen",
   "backup.destUnwritable": "A cél nem írható",
   "backup.interrupted": "Megszakadt",
   "backup.locked": "A biztonsági mentések titkosítottak: előbb oldja fel őket",

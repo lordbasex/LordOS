@@ -46,6 +46,7 @@
   "backup.destMissing": "De bestemming bestaat niet",
   "backup.destNotAllowed": "Die bestemming is niet toegestaan",
   "backup.destOutside": "De bestemming moet in je thuismap of op een van je schijven staan",
+  "backup.destCloud": "Een cloudmap kan geen back-upbestemming zijn: momentopnamen hebben harde koppelingen nodig, die een cloudaccount niet heeft, en de bestanden worden nog geüpload nadat de back-up is gestopt. Kies een schijf of een map op deze computer",
   "backup.destUnwritable": "Er kan niet naar de bestemming worden geschreven",
   "backup.interrupted": "Het is onderbroken",
   "backup.locked": "Reservekopieën zijn versleuteld: ontgrendel ze eerst",
