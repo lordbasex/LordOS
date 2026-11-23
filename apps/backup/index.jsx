@@ -7,7 +7,7 @@ import {
   View, Text, ScrollView, Segmented, Toggle, Button, TextInput, useTheme, useBackup, backup, fs, wm, t as tr, errorText,
   formatBytes, formatDate, formatTime, formatNumber, direction,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SidebarItem, SectionTitle, EmptyState, GroupBox, FormRow, Hairline, spacing, typeScale,
-  useSidebar, SidebarToggle, SidebarOverlay,
+  useSidebar, SidebarToggle, SidebarOverlay, cloudModel,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -179,7 +179,8 @@ function Settings({ st }) {
   const expand = (p) => (p.startsWith('~') ? home + p.slice(1) : p);
   const short = (p) => (home && p.startsWith(home) ? `~${p.slice(home.length)}` : p);
   useEffect(() => { const id = setInterval(() => { try { setVols(fs.volumes()); } catch (e) { /* no disks */ } }, 5000); return () => clearInterval(id); }, []);
-  const removable = vols.filter((v) => v.path !== home && v.path !== '/');
+  // a Cloud account's mount is never offered: lord-server refuses it as a destination (#208, backup.destCloud)
+  const removable = vols.filter((v) => v.path !== home && v.path !== '/' && !cloudModel.isCloudVolume(v, home));
   const addExclude = () => { const v = ex.trim().replace(/^~\/?/, '').replace(/\/+$/, ''); if (v) { save({ ...cfg, exclude: [...(cfg.exclude || []), v] }); setEx(''); } };
   const useFolder = () => folder && save({ ...cfg, dest: expand(folder.trim()) });
   return (

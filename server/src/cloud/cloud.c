@@ -435,7 +435,7 @@ static void load_all(void) {
         for (const JVal *x = d.root->type == J_OBJ ? d.root->kid : NULL; x; x = x->next) {
             Acc *a = cl_find(x->key);
             for (const JVal *y = a && x->type == J_ARR ? x->kid : NULL; y && a->nkeep < KEEP_MAX; y = y->next)
-                if (y->type == J_STR && cloud_rel_ok(y->str)) a->keep[a->nkeep++] = strdup(y->str);
+                if (y->type == J_STR && cloud_rel_ok(y->str)) { a->keep_bytes[a->nkeep] = -1; a->keep[a->nkeep++] = strdup(y->str); }
         }
         json_free(&d);
     }
@@ -2662,6 +2662,12 @@ static char *state_json(int light) {
             if (k) jb_raw(&b, ",");
             jb_str(&b, kp);
         }
+        /* #206: each kept entry's bytes on this computer, in kept's order (null until the first measure after keeping it) */
+        jb_raw(&b, "],\"keptSizes\":[");
+        for (int k = 0; k < a->nkeep; k++) {
+            if (k) jb_raw(&b, ",");
+            if (a->keep_bytes[k] < 0) jb_raw(&b, "null"); else jb_printf(&b, "%lld", a->keep_bytes[k]);
+        }
         if (a->srv_port > 0) { jb_raw(&b, "],\"host\":"); jb_str(&b, a->srv_host); jb_printf(&b, ",\"port\":%d", a->srv_port); }
         else jb_raw(&b, "],\"host\":null,\"port\":null");
         jb_printf(&b, ",\"linksSupported\":%s,\"trashSupported\":%s,\"measuring\":%s,\"emptyingTrash\":%s,\"configuring\":%s,\"paused\":%s,\"ownClient\":%s}",
@@ -3441,12 +3447,13 @@ void cloud_keep(const char *const *paths, int n, int keep) {
         for (int k = 0; k < a->nkeep; k++) if (!strcmp(a->keep[k], rel)) at = k;
         /* a new kept entry is coming down until the keeper's first pass over it ends (#71) */
         /* #185: keeping again is the person asking for another try of what failed */
-        if (keep && at < 0 && a->nkeep < KEEP_MAX) { char *d = strdup(rel); if (d) { a->keep_busy[a->nkeep] = 1; a->keep[a->nkeep++] = d; changed = 1; cloud_fails_clear(&a->kfail); } }
+        if (keep && at < 0 && a->nkeep < KEEP_MAX) { char *d = strdup(rel); if (d) { a->keep_busy[a->nkeep] = 1; a->keep_bytes[a->nkeep] = -1; a->keep[a->nkeep++] = d; changed = 1; cloud_fails_clear(&a->kfail); } }
         else if (!keep && at >= 0) {
             free(a->keep[at]);
             a->keep[at] = a->keep[--a->nkeep];
             a->keep_busy[at] = a->keep_busy[a->nkeep];
             a->keep_busy[a->nkeep] = 0;
+            a->keep_bytes[at] = a->keep_bytes[a->nkeep];
             changed = 1;
         }
     }

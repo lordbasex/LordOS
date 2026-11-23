@@ -46,6 +46,7 @@
   "backup.destMissing": "La destinazione non esiste",
   "backup.destNotAllowed": "Quella destinazione non è consentita",
   "backup.destOutside": "La destinazione deve trovarsi nella tua cartella home o su uno dei tuoi dischi",
+  "backup.destCloud": "Una cartella del cloud non può essere la destinazione del backup: le istantanee richiedono collegamenti fisici, che un account cloud non ha, e i suoi file continuano a essere caricati anche dopo che il backup è stato fermato. Scegli un disco o una cartella di questo computer",
   "backup.destUnwritable": "Impossibile scrivere nella destinazione",
   "backup.interrupted": "È stato interrotto",
   "backup.locked": "I backup sono cifrati: sbloccali prima",

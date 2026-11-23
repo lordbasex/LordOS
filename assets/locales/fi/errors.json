@@ -46,6 +46,7 @@
   "backup.destMissing": "Kohdetta ei ole olemassa",
   "backup.destNotAllowed": "Kohde ei ole sallittu",
   "backup.destOutside": "Kohteen on oltava kotikansiossasi tai jollakin levyistäsi",
+  "backup.destCloud": "Pilvikansio ei voi olla varmuuskopion kohde: tilannevedokset tarvitsevat kovia linkkejä, joita pilvitilillä ei ole, ja sen tiedostot siirtyvät pilveen vielä varmuuskopioinnin pysäyttämisen jälkeenkin. Valitse levy tai kansio tältä tietokoneelta",
   "backup.destUnwritable": "Kohteeseen ei voi kirjoittaa",
   "backup.interrupted": "Se keskeytyi",
   "backup.locked": "Varmuuskopiot on salattu: avaa ne ensin",

@@ -7,7 +7,6 @@
   "admin.unavailable": "L’assistente di amministrazione non è in esecuzione: lord-server deve avviarsi con sudo e l’utente deve far parte del gruppo sudo.",
   "browserTabs.applyAll": "Modificali",
   "browserTabs.chromiumOpen": "Chromium o Brave è aperto: i suoi profili cambiano appena lo chiudi.",
-  "browserTabs.done": "Fatto. I browser lo useranno alla prossima apertura.",
   "browserTabs.failed": {
     "one": "{count} profilo del browser non è stato modificato ed è rimasto com’era.",
     "other": "{count} profili del browser non sono stati modificati e sono rimasti com’erano."

@@ -78,7 +78,7 @@ import { EmojiPanel } from './emoji.jsx';
 export { admin } from './admin.js';
 export { videoPrefs, setVideoPrefs, videoHardware, videoError, videoOptimizing, VIDEO_MODES, VIDEO_DEFAULTS } from './video.js';   // docs/VIDEO.md
 import { startVideo } from './video.js';
-export { browserFrameResult, browserFrameState, browserTabsInTitlebar, setBrowserTabsInTitlebar } from './browserframe.js';   // docs/WAYLAND.md
+export { browserFrameResult, browserFrameNotes, browserFrameState, browserTabsInTitlebar, setBrowserTabsInTitlebar } from './browserframe.js';   // docs/WAYLAND.md
 import { startBrowserFrame } from './browserframe.js';
 import { startNetStatus } from './netstatus.jsx';
 import { startCleanerStatus } from './cleanerstatus.jsx';

@@ -46,6 +46,7 @@
   "backup.destMissing": "目的地不存在",
   "backup.destNotAllowed": "不允許使用該目的地",
   "backup.destOutside": "目的地必須位於你的個人資料夾或你的某個磁碟上",
+  "backup.destCloud": "雲端資料夾不能作為備份目的地：快照需要硬連結，而雲端帳號不支援，而且即使停止備份，其中的檔案仍會繼續上傳。請選擇這台電腦上的磁碟或資料夾",
   "backup.destUnwritable": "無法寫入目的地",
   "backup.interrupted": "已中斷",
   "backup.locked": "備份已加密：請先解鎖",

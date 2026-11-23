@@ -7,7 +7,6 @@
   "admin.unavailable": "Ylläpitoapuri ei ole käynnissä: lord-serverin täytyy käynnistyä sudolla, ja käyttäjän täytyy kuulua sudo-ryhmään.",
   "browserTabs.applyAll": "Muuta ne",
   "browserTabs.chromiumOpen": "Chromium tai Brave on auki: sen profiilit muuttuvat heti, kun suljet sen.",
-  "browserTabs.done": "Valmis. Selaimet käyttävät tätä, kun ne seuraavan kerran avataan.",
   "browserTabs.failed": {
     "one": "{count} selainprofiilia ei voitu muuttaa, ja se jätettiin ennalleen.",
     "other": "{count} selainprofiilia ei voitu muuttaa, ja ne jätettiin ennalleen."

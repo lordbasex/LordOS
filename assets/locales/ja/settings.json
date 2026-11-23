@@ -7,7 +7,6 @@
   "admin.unavailable": "管理ヘルパーが動作していません：lord-server を sudo で起動し、ユーザーが sudo グループに属している必要があります。",
   "browserTabs.applyAll": "変更する",
   "browserTabs.chromiumOpen": "Chromium または Brave が開いています：終了するとすぐにプロファイルが変更されます。",
-  "browserTabs.done": "完了しました。ブラウザは次に開いたときに反映します。",
   "browserTabs.failed": {
     "other": "{count} 個のブラウザプロファイルを変更できず、そのままにしました。"
   },

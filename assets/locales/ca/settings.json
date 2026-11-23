@@ -7,7 +7,6 @@
   "admin.unavailable": "L’assistent d’administració no s’està executant: lord-server s’ha d’iniciar amb sudo i l’usuari ha de ser al grup sudo.",
   "browserTabs.applyAll": "Canvia’ls",
   "browserTabs.chromiumOpen": "Chromium o Brave és obert: els seus perfils canvien tan bon punt el tanquis.",
-  "browserTabs.done": "Fet. Els navegadors ho faran servir la propera vegada que s’obrin.",
   "browserTabs.failed": {
     "one": "{count} perfil de navegador no s’ha pogut canviar i s’ha deixat tal com estava.",
     "other": "{count} perfils de navegador no s’han pogut canviar i s’han deixat tal com estaven."

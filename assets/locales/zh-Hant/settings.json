@@ -7,7 +7,6 @@
   "admin.unavailable": "管理輔助程式未執行：lord-server 必須以 sudo 啟動，且使用者必須屬於 sudo 群組。",
   "browserTabs.applyAll": "變更它們",
   "browserTabs.chromiumOpen": "Chromium 或 Brave 正在開啟：結束它後，其描述檔就會變更。",
-  "browserTabs.done": "完成。瀏覽器下次開啟時就會使用它。",
   "browserTabs.failed": {
     "other": "有 {count} 個瀏覽器描述檔無法變更，已保持原樣。"
   },

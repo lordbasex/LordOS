@@ -46,6 +46,7 @@
   "backup.destMissing": "Təyinat yeri mövcud deyil",
   "backup.destNotAllowed": "Bu təyinat yerinə icazə verilmir",
   "backup.destOutside": "Təyinat yeri ev qovluğunuzda və ya disklərinizdən birində olmalıdır",
+  "backup.destCloud": "Bulud qovluğu ehtiyat nüsxə təyinatı ola bilməz: snapşotlar bulud hesabının dəstəkləmədiyi sərt keçidlərə ehtiyac duyur və onun faylları ehtiyat nüsxə dayandırıldıqdan sonra da yüklənməyə davam edir. Bu kompüterdə disk və ya qovluq seçin",
   "backup.destUnwritable": "Təyinat yerinə yazmaq mümkün deyil",
   "backup.interrupted": "Kəsildi",
   "backup.locked": "Ehtiyat nüsxələr şifrələnib: əvvəlcə onların kilidini açın",

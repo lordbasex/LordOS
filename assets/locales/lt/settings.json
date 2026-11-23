@@ -7,7 +7,6 @@
   "admin.unavailable": "Administravimo pagalbinė programa neveikia: lord-server turi būti paleistas su sudo, o naudotojas turi priklausyti sudo grupei.",
   "browserTabs.applyAll": "Pakeisti juos",
   "browserTabs.chromiumOpen": "Chromium arba Brave atidaryta: jos profiliai pasikeis, kai tik iš jos išeisite.",
-  "browserTabs.done": "Atlikta. Naršyklės tai naudos kitą kartą jas atidarius.",
   "browserTabs.failed": {
     "one": "{count} naršyklės profilio nepavyko pakeisti, jis paliktas toks, koks buvo.",
     "few": "{count} naršyklės profilių nepavyko pakeisti, jie palikti tokie, kokie buvo.",

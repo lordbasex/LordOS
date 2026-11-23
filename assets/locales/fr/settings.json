@@ -7,7 +7,6 @@
   "admin.unavailable": "L’assistant d’administration n’est pas lancé : lord-server doit démarrer avec sudo et l’utilisateur doit appartenir au groupe sudo.",
   "browserTabs.applyAll": "Les modifier",
   "browserTabs.chromiumOpen": "Chromium ou Brave est ouvert : ses profils seront modifiés dès que vous le quitterez.",
-  "browserTabs.done": "Terminé. Les navigateurs l’appliqueront à leur prochaine ouverture.",
   "browserTabs.failed": {
     "one": "{count} profil de navigateur n’a pas pu être modifié et est resté tel quel.",
     "other": "{count} profils de navigateur n’ont pas pu être modifiés et sont restés tels quels."

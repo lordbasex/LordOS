@@ -46,6 +46,7 @@
   "backup.destMissing": "The destination does not exist",
   "backup.destNotAllowed": "That destination is not allowed",
   "backup.destOutside": "The destination must be in your home folder or on one of your disks",
+  "backup.destCloud": "A Cloud folder can’t be a backup destination: snapshots need hard links, which a cloud account doesn’t have, and its files keep uploading even after the backup is stopped. Choose a disk or a folder on this computer",
   "backup.destUnwritable": "Cannot write to the destination",
   "backup.interrupted": "It was interrupted",
   "backup.locked": "Backups are encrypted: unlock them first",

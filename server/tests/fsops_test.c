@@ -73,8 +73,39 @@ static void test_remote_child(void) {
     CHECK(m.seen && m.dir && m.mtime == 0);        /* a folder, not stat'ed: no time */
 }
 
+/* #208: the mount that holds a path, from a mounts file: the longest mount point wins, "\040" is a space, and only
+ * rclone's own FUSE mount is a Cloud folder (Backup refuses it) */
+static void test_mount_type(void) {
+    char mf[128], ty[64];
+    snprintf(mf, sizeof mf, "/tmp/fsops-mounts-%d", (int)getpid());
+    FILE *f = fopen(mf, "w");
+    if (!f) { CHECK(0); return; }
+    fputs("/dev/sda2 / ext4 rw,relatime 0 0\n"
+          "Work: /home/ana/Cloud/Work fuse.rclone rw,nosuid,nodev 0 0\n"
+          "My\\040Drive: /home/ana/Cloud/My\\040Drive fuse.rclone rw 0 0\n"
+          "//nas/share /home/ana/nas cifs rw 0 0\n"
+          "/dev/sdb1 /media/ana/USB fuseblk rw 0 0\n"
+          "pool /home/ana/pool fuse.mergerfs rw 0 0\n"
+          "/dev/sdc1 /home/ana/Cloud/Work/inner ext4 rw 0 0\n", f);
+    fclose(f);
+    CHECK(!fsops_mount_type_in(mf, "/home/ana/Cloud/Work/Backups", ty, sizeof ty) && !strcmp(ty, "fuse.rclone") && fsops_cloud_type(ty));
+    CHECK(!fsops_mount_type_in(mf, "/home/ana/Cloud/Work", ty, sizeof ty) && fsops_cloud_type(ty));
+    CHECK(!fsops_mount_type_in(mf, "/home/ana/Cloud/My Drive/x", ty, sizeof ty) && fsops_cloud_type(ty));
+    CHECK(!fsops_mount_type_in(mf, "/home/ana/Cloud/Workshop", ty, sizeof ty) && !strcmp(ty, "ext4") && !fsops_cloud_type(ty));
+    CHECK(!fsops_mount_type_in(mf, "/home/ana/Cloud/Work/inner/b", ty, sizeof ty) && !strcmp(ty, "ext4"));   /* a disk inside it */
+    CHECK(!fsops_mount_type_in(mf, "/home/ana/nas/b", ty, sizeof ty) && !strcmp(ty, "cifs") && !fsops_cloud_type(ty));
+    CHECK(!fsops_mount_type_in(mf, "/media/ana/USB", ty, sizeof ty) && !strcmp(ty, "fuseblk") && !fsops_cloud_type(ty));
+    CHECK(!fsops_mount_type_in(mf, "/home/ana/pool/a", ty, sizeof ty) && !fsops_cloud_type(ty));            /* a local FUSE pool */
+    CHECK(!fsops_mount_type_in(mf, "/home/ana/Documents", ty, sizeof ty) && !strcmp(ty, "ext4"));
+    CHECK(!fsops_cloud_type(NULL) && !fsops_cloud_type("") && !fsops_cloud_type("fuse.rclone2"));
+    unlink(mf);
+    CHECK(fsops_mount_type_in(mf, "/x", ty, sizeof ty) == -1 && !ty[0]);
+    CHECK(!fsops_cloud_path("/tmp") && !fsops_cloud_path("/"));                    /* this machine's own tree */
+}
+
 int main(void) {
     test_remote_child();
+    test_mount_type();
     snprintf(H, sizeof H, "/tmp/fsops-test-%d", (int)getpid());
     mkdir(H, 0755);
     fsops_init(H, "nadie");

@@ -46,6 +46,7 @@
   "backup.destMissing": "La destinació no existeix",
   "backup.destNotAllowed": "Aquesta destinació no està permesa",
   "backup.destOutside": "La destinació ha de ser a la carpeta personal o en un dels teus discos",
+  "backup.destCloud": "Una carpeta del núvol no pot ser la destinació de la còpia: les instantànies necessiten enllaços durs, que un compte del núvol no té, i els seus fitxers continuen pujant després d’aturar la còpia. Tria un disc o una carpeta d’aquest ordinador",
   "backup.destUnwritable": "No es pot escriure a la destinació",
   "backup.interrupted": "S’ha interromput",
   "backup.locked": "Les còpies de seguretat estan xifrades: primer desbloqueja-les",

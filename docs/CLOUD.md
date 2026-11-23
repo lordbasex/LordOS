@@ -413,6 +413,18 @@ show **Open on Website** instead. The links made from LordOS are listed in Setti
 
 The Backups app gets a third kind of destination, **Cloud**: an account and a folder in it.
 
+**Not built yet.** Until it is, a disk backup into an account's folder under `~/Cloud` is refused (#208, since
+0.8.9.5): `valid_dest` in `server/src/backup/backup.c` answers `backup.destCloud` for a folder on rclone's mount
+(`fsops_cloud_path`, the mount type `fuse.rclone` from `/proc/self/mounts`), a destination chosen before is not run
+(the same error under the app's header), and the app no longer lists those mounts among the disks. The reasons, seen
+with OneDrive in #208: the mount has no hard links, so every run copied every file again; a home of thousands of small
+files (browser and mail profiles) went into rclone's upload queue, which kept sending them for hours, under the
+provider's rate limits, after the backup was stopped and its destination dropped. rclone's remote control has no call
+that drops what waits in that queue (`vfs/queue` lists it and `vfs/queue-set-expiry` only delays it; checked against
+rclone's rc reference on 2026-11-22), so Settings → Cloud has no "cancel pending uploads" (it would mean deleting files from rclone's cache behind its
+back): Pause holds them, and removing the account, past its warning about changes waiting (`discardPending`), drops
+them with it. Network shares (SMB, NFS) are not affected.
+
 - Clouds have no hard links, so the snapshot layout of docs/SYSTEM.md can't be used. The cloud layout:
 
 ```
@@ -585,7 +597,7 @@ State = {
   options: { bwUp, bwDown, pauseOnBattery, pauseOnMetered, autoFree, freeBelowGb },
   accounts: [{ id, name, kind, provider, mount, state: 'ok'|'syncing'|'paused'|'signin'|'offline'|'error'|'locked', message?,
                about: { total?, used, free?, trashed?, other? } | null, listed, cacheBytes, keptBytes,
-               up: { files, bytes, done, name? }, down: { files, bytes, done, name? }, kept: [path], linksSupported }],
+               up: { files, bytes, done, name? }, down: { files, bytes, done, name? }, kept: [path], keptSizes: [bytes|null], linksSupported }],
   signin: { id, kind, name, phase: 'waiting'|'done'|'failed', url, expiresAt, error? } | null,
   recent: [{ path, account, dir: 'up'|'down', at }]   (newest first, at most 20)
 }
@@ -599,8 +611,13 @@ Errors are codes (`errors.json` keys `cloud.*`), never rclone's text, except `me
 contract above leaves open, and the few places the core differs from it:
 
 - **Times** are milliseconds since the epoch (`expiresAt`, `recent[].at`, `links()[].made` and `expires`, `null` for never);
-  sizes are bytes (`about`, `cacheBytes`, `keptBytes`, `up`/`down`.`bytes` and `done`, `free()`'s `freed`); `bwUp`/`bwDown`
+  sizes are bytes (`about`, `cacheBytes`, `keptBytes`, `keptSizes`, `up`/`down`.`bytes` and `done`, `free()`'s `freed`); `bwUp`/`bwDown`
   are KiB/s, 0 for no limit, at most 10 GiB/s; `freeBelowGb` 5 to 100.
+- `keptSizes` (#206, since 0.8.9.5) is each `kept` entry's bytes on this computer, in `kept`'s order, from the same
+  walk of the VFS cache that gives `keptBytes` (`cf_measure`, once a minute and after each pass of the keeper; overlapping
+  entries each count their own files); `null` for an entry kept since the last walk. Settings → Cloud's "Kept on this
+  computer" rows show it (`keptRows` in `sdk/cloudmodel.js`). Before, they asked `lord.fs.du`, which doesn't walk a FUSE
+  mount (it answers `size: 0, remote: true`), so every row said 0 B.
 - `providers()` is `[]` until rclone has listed its backends once in the session (it starts rclone if needed); a state push
   follows, so call it again from `useCloud()`. Fields: rclone's non-advanced options of that backend, minus the ones a preset
   sets (Nextcloud's `vendor`…); `label` is the first line of rclone's help, in English; OAuth kinds have `fields: []`.
@@ -714,6 +731,7 @@ was really checked end to end. Today:
 | `filen` | issue #81 (since 0.8.8.7): a person's report on 0.8.8.6 (x86_64), rclone v1.75.2, 9 of 10 passed; the link step skipped (`noLinks`: the backend has no public links), which is right for it; issue #195: again on 0.8.9 (x86_64), rclone v1.75.2, 9 passed, link skipped (`noLinks`) |
 | `onedrive` | maintainer test (since 0.8.8.7) with the maintainer's own account on their bare-metal machine, rclone v1.75.2: browser sign-in, both ways of using it, files opened, copied up and deleted, pause and resume, across logouts and restarts |
 | `iclouddrive` | maintainer test (since 0.8.8.7) with the maintainer's own account (without the extra end-to-end encryption), rclone v1.75.2: password and device code, files listed, opened, copied up and deleted. Known limit: the code is asked again after each start of rclone (rclone issues 9658 and 9966); see 19.5 |
+| `protondrive` | issue #216 (since 0.8.9.5): a person's Check This Account report on 0.8.9.4 (x86_64), rclone v1.75.2, 8 passed and none failed; Free Up Space skipped (`kept`: the account was in sync with this computer, so nothing to free) and the link step skipped (`noLinks`: the backend has no public links), both right for it |
 
 `server/tests/cloud_providers_check.sh <build> <rclone> [webdav] [sftp] [s3]` runs Check This Account's steps through
 `build/cloud-harness` (the same `src/cloud`), with the files checked on the server's side too: 40/40 on VM 116 with rclone
@@ -1186,3 +1204,15 @@ Again, on Retry, or the next time rclone starts. While it waits:
 - **Files:** the account's folder shows that it needs a new sign-in instead of "Folder is empty", with **Sign In…**
   (which opens Settings → Cloud → the account) and the issue's button.
 
+### 19.6 Known limits of providers not verified
+
+A provider whose report shows it works only in part stays **Not verified yet**; its limits are written here so the
+answer on GitHub and in Settings is the same.
+
+- **Google Photos (`gphotos`)**, issue #217 (LordOS 0.8.9.4, x86_64, rclone v1.75.2): the account lists, but Check This
+  Account stops at **Make a check folder** (`sys.errno`), so nothing after it runs. These are limits of rclone's backend
+  and of Google's API, not of LordOS: rclone can't make an ordinary folder in Google Photos, only an album (a folder
+  under `album/`), and files go up only into an album or the upload area; there is no space information. Since
+  Google's change to the Photos Library API in 2025, an app such as rclone sees only the photos and albums it uploaded
+  itself, so the person's existing library doesn't show. Not marked verified. Google Takeout or the provider's own site
+  are the way to a whole library.

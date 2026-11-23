@@ -15,6 +15,19 @@ import { createStore } from './store.js';
 // The last result of lord.browserFrame.apply: { chromium: {...}, firefox: {...} } counts, or null.
 export const browserFrameResult = createStore(null);
 
+// The notes under the switch for the last result (pure, tested in server/tests/browserframe_notes_test.mjs):
+// [{ key, tone, text, vars }]. Nothing for a change that simply worked (#222: a green "Done" stayed after every
+// toggle, and the footer already says when it applies).
+export function browserFrameNotes(r, pending) {
+  if (!r) return [];
+  const failed = (r.chromium?.failed | 0) + (r.firefox?.failed | 0);
+  const out = [];
+  if (pending) out.push({ key: 'open', tone: 'warn', text: 'settings.browserTabs.chromiumOpen' });
+  if (failed) out.push({ key: 'failed', tone: 'error', text: 'settings.browserTabs.failed', vars: { count: failed } });
+  if (r.firefox?.kept) out.push({ key: 'kept', text: 'settings.browserTabs.firefoxKept' });
+  return out;
+}
+
 const api = () => typeof lord !== 'undefined' && lord.browserFrame;
 
 export const browserTabsInTitlebar = (s = settings.get()) => s.browserTabsInTitlebar !== false;

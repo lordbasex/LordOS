@@ -46,6 +46,7 @@
   "backup.destMissing": "Das Ziel existiert nicht",
   "backup.destNotAllowed": "Dieses Ziel ist nicht erlaubt",
   "backup.destOutside": "Das Ziel muss in deinem Benutzerordner oder auf einem deiner Datenträger liegen",
+  "backup.destCloud": "Ein Cloud-Ordner kann kein Sicherungsziel sein: Schnappschüsse brauchen harte Links, die ein Cloud-Konto nicht hat, und seine Dateien werden weiter hochgeladen, auch nachdem die Sicherung gestoppt wurde. Wähle ein Laufwerk oder einen Ordner auf diesem Computer",
   "backup.destUnwritable": "Auf das Ziel kann nicht geschrieben werden",
   "backup.interrupted": "Es wurde unterbrochen",
   "backup.locked": "Backups sind verschlüsselt: Entsperre sie zuerst",

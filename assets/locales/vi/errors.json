@@ -46,6 +46,7 @@
   "backup.destMissing": "Đích đến không tồn tại",
   "backup.destNotAllowed": "Đích đến đó không được phép",
   "backup.destOutside": "Đích đến phải nằm trong thư mục nhà của bạn hoặc trên một ổ đĩa của bạn",
+  "backup.destCloud": "Thư mục đám mây không thể là đích sao lưu: ảnh chụp nhanh cần liên kết cứng, thứ mà tài khoản đám mây không có, và các tệp của nó vẫn tiếp tục được tải lên ngay cả sau khi dừng sao lưu. Hãy chọn một ổ đĩa hoặc thư mục trên máy tính này",
   "backup.destUnwritable": "Không thể ghi vào đích đến",
   "backup.interrupted": "Đã bị gián đoạn",
   "backup.locked": "Bản sao lưu đã được mã hóa: hãy mở khóa trước",

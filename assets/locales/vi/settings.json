@@ -7,7 +7,6 @@
   "admin.unavailable": "Trình trợ giúp quản trị không chạy: lord-server phải được khởi động bằng sudo và người dùng phải thuộc nhóm sudo.",
   "browserTabs.applyAll": "Thay đổi",
   "browserTabs.chromiumOpen": "Chromium hoặc Brave đang mở: hồ sơ của chúng sẽ thay đổi ngay khi bạn thoát.",
-  "browserTabs.done": "Xong. Các trình duyệt sẽ dùng cài đặt này ở lần mở tiếp theo.",
   "browserTabs.failed": {
     "other": "Không thể thay đổi {count} hồ sơ trình duyệt và chúng được giữ nguyên."
   },

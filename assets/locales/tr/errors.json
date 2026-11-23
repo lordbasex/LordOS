@@ -46,6 +46,7 @@
   "backup.destMissing": "Hedef yok",
   "backup.destNotAllowed": "Bu hedefe izin verilmiyor",
   "backup.destOutside": "Hedef ana klasörünüzde ya da disklerinizden birinde olmalı",
+  "backup.destCloud": "Bir bulut klasörü yedekleme hedefi olamaz: anlık görüntüler bir bulut hesabında olmayan sabit bağlantılara ihtiyaç duyar ve dosyaları yedekleme durdurulduktan sonra bile yüklenmeye devam eder. Bu bilgisayarda bir disk ya da klasör seçin",
   "backup.destUnwritable": "Hedefe yazılamıyor",
   "backup.interrupted": "Yarıda kesildi",
   "backup.locked": "Yedekler şifreli: önce kilidini açın",
