@@ -86,7 +86,8 @@ function TooltipBubble({ text, end, top, bottom }) {
 // borderless until hovered.
 // title: tooltip text (required for icon-only buttons). active: a toggled-on state.
 // A Tab stop unless disabled (sdk/focus.js): Space and Enter press it. onKeyDown (optional) sees its keys first.
-export function ToolbarButton({ icon, label, title, onClick, active, disabled, small, iconSize, color, style, onKeyDown, focusable = true }) {
+// accessibilityLabel: what a screen reader says for an icon-only button (the Store's update icon); its tooltip otherwise.
+export function ToolbarButton({ icon, label, title, onClick, active, disabled, small, iconSize, color, style, onKeyDown, focusable = true, accessibilityLabel }) {
   const t = useTheme();
   const { id: winId } = useAppWindow();
   const ref = useRef(null);
@@ -96,6 +97,7 @@ export function ToolbarButton({ icon, label, title, onClick, active, disabled, s
   const fg = disabled ? t.textDim : active ? t.accent : color || t.text;
   return (
     <View ref={ref} onClick={() => { tipLeave(); if (!disabled) onClick?.(); }} focusable={focusable && !disabled} onKeyDown={onKeyDown}
+      accessibilityLabel={accessibilityLabel || (label ? undefined : title)}
       onFocus={tipEnter} onBlur={tipLeave} onMouseEnter={() => { setHover(true); tipEnter(); }} onMouseLeave={() => { setHover(false); tipLeave(); }}
       style={[{ height: h, minWidth: h, paddingHorizontal: label ? 8 : 0, borderRadius: t.controlRadiusSmall, flexDirection: 'row', gap: 6,
         alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.45 : 1, zIndex: tip ? 1000 : 0,

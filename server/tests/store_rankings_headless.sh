@@ -14,6 +14,10 @@
 # and the general Installed page with its filters), with a few installed Flatpak and web apps seeded by pre.js
 # (STORE_SEED_INSTALLED); STORE_MODE=light shoots it in the light appearance (dark otherwise, the default) →
 # OUT_DIR/<theme>-<language>-installed-<mode>-1.png …
+# With STORE_SCENE=lordos the driver is tests/store_scene/lordos.js: each section's shop with its update icon and own
+# search, its Settings (Flathub, GNU/Linux apps (Debian), Web apps), LordOS apps' shop, its Installed, LordOS Studio
+# Camera's page, the general Installed page's LordOS apps filter and Discover's search over every system, with this
+# machine's own installed items and the same seeded Flatpak and web apps → OUT_DIR/<theme>-<language>-lordos-<mode>-1.png …
 cd "$(dirname "$0")/.." || exit 1
 OUT=${1:?usage: tests/store_rankings_headless.sh OUT_DIR [theme] [language] [WxH] [live]}
 THEME=${2:-default}
@@ -23,7 +27,8 @@ LIVE=${5:-}
 SCENE=${STORE_SCENE:-rankings}
 MODE=${STORE_MODE:-dark}
 case "$SCENE" in rankings) DRIVER=driver.js; TAG= ;; installed) DRIVER=installed.js; TAG="-installed-$MODE" ;;
-    *) echo "STORE_SCENE: rankings or installed"; exit 2 ;; esac
+    lordos) DRIVER=lordos.js; TAG="-lordos-$MODE" ;;
+    *) echo "STORE_SCENE: rankings, installed or lordos"; exit 2 ;; esac
 ROOT=$(cd .. && pwd)
 [ -x build/lord-server ] && [ -x build/lord-appstream ] && [ -x build/lord-fetch ] && [ -f "$ROOT/themes/$THEME/theme.bundle.js" ] ||
     { echo "needs build/lord-server, build/lord-appstream, build/lord-fetch and themes/$THEME/theme.bundle.js"; exit 77; }
@@ -71,7 +76,7 @@ for (const [k, ids] of Object.entries(lists))
 fi
 { [ -n "$FIXTURE" ] && printf 'globalThis.STORE_FIXTURE = %s;\n' "$(cat "$FIXTURE")"
   [ "$LIVE" = live ] && printf 'globalThis.STORE_LIVE = true;\n'
-  [ "$SCENE" = installed ] && printf 'globalThis.STORE_SEED_INSTALLED = true;\n'
+  { [ "$SCENE" = installed ] || [ "$SCENE" = lordos ]; } && printf 'globalThis.STORE_SEED_INSTALLED = true;\n'
   cat tests/store_scene/pre.js "$ROOT/themes/$THEME/theme.bundle.js" "tests/store_scene/$DRIVER"; } >"$T/theme.bundle.js"
 node tests/perf/manifest.mjs "$ROOT" "themes/zstore/$THEME/theme.bundle.js" || exit 1
 chmod 700 "$D"
@@ -88,5 +93,5 @@ grep -ah 'STORE-SCENE' "$D/home/.cache/lordos/shell.log" 2>/dev/null | sed 's/.*
 if [ "$LIVE" = live ]; then
     for f in "$D"/home/.cache/lordos/flathub/*.json; do [ -f "$f" ] && echo "cache $(basename "$f"): $(head -c 160 "$f")"; done
 fi
-for k in $(seq 1 9); do [ -f "$D/home/shot-$k.png" ] && cp "$D/home/shot-$k.png" "$OUT/$THEME-$LANGID${LIVE:+-live}$TAG-$k.png"; done
+for k in $(seq 1 19); do [ -f "$D/home/shot-$k.png" ] && cp "$D/home/shot-$k.png" "$OUT/$THEME-$LANGID${LIVE:+-live}$TAG-$k.png"; done
 ls "$OUT"/"$THEME-$LANGID${LIVE:+-live}$TAG"-*.png 2>/dev/null

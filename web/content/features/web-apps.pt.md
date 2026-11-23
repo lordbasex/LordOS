@@ -29,6 +29,8 @@ A Loja tem uma seção **Apps web**, um banner e uma prateleira em Descobrir, e 
 
 A seção abre na loja dela: *Adicionar a partir de um endereço* e o catálogo (em desenvolvimento; a versão mais recente é a 0.8.9.5). Os apps web que você instalou ficam em **Instalados**, no topo da segunda coluna da seção, acima das categorias, cada um com Ver mais, Gerenciar e Abrir; Loja → Instalados também os mostra junto com todos os outros apps, com um filtro Apps web.
 
+Os **Ajustes**, abaixo de Instalados, dizem o que é um app web, se o motor web do LordOS já está instalado, e abrem Ajustes → Apps web para os perfis, permissões e espaço de cada app; o campo de busca ("Buscar apps web") procura só no catálogo (em desenvolvimento).
+
 [[shot:0]]
 
 - **Um catálogo de 37 apps vem com o LordOS**: chat, e-mail e calendário, escritório, notas e tarefas, música e vídeo, gráficos. Cada um passou na verificação automática do LordOS em 11 de novembro de 2026 (carregou e deu seu nome). Para ser honesto sobre onde estamos: **por enquanto só um deles está marcado como testado no LordOS**, um app de chat que o mantenedor usa com duas contas. Os demais dizem "Ainda não verificado" até alguém testá-los, e a Loja avisa antes de você instalar um.

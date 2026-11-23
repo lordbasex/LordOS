@@ -618,6 +618,9 @@ EOF
     # (after 0.8.9.5) the Store's installed apps by package system (apps/store/installedmodel.js): the filters, the systems
     if have node; then run "store-installed-test (apps/store/installedmodel.js)" node tests/store_installed_test.mjs
     else skip "store-installed-test" "node"; fi
+    # (after 0.8.9.5) Store → Apps LordOS, LordOS's own store (apps/store/lordosmodel.js, assets/store/lordos-apps.json)
+    if have node; then run "store-lordos-test (apps/store/lordosmodel.js)" node tests/store_lordos_test.mjs
+    else skip "store-lordos-test" "node"; fi
     # (0.8.7) what the live ISO opens by itself, the "Check this computer" boot entry and the menu's height
     if have node; then run "livestart-test (sdk/livestart.js, the ISO's boot menu)" node tests/livestart_test.mjs
     else skip "livestart-test" "node"; fi

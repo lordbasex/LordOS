@@ -35,7 +35,7 @@
   };
   // the first node with this text whose left edge is between minX and maxX (a column of the window)
   const byText = (text, minX = 0, maxX = 1e9) => allByText(text).find((id) => box(id)[0] >= minX && box(id)[0] < maxX) || null;
-  const SIDE_END = FRAME.x + 230;                  // the Store's sidebar
+  const SIDE_END = FRAME.x + 250;                  // the Store's sidebar
   const COL_END = SIDE_END + 190;                  // an origin's second column
   const has = (text, minX) => !!byText(text, minX);
   const gimp = () => (F.catalogApp('org.gimp.GIMP') || {}).name || 'org.gimp.GIMP';     // its name in the catalog's language

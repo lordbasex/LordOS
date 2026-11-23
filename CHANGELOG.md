@@ -12,6 +12,53 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Changed
 
+- **Store → LordOS apps is LordOS's own store** (asked by the maintainer on 2026-11-23: "we are going to build a store
+  of native apps the person can install, like the other package systems'"). The section opens on a shop of LordOS's
+  own installable apps and components, as cards (icon, name, "LordOS component", summary, Get / Open / View), each
+  with its page. It starts with four: **LordOS Studio Camera** (`lordos-studio-camera`, the "LordOS Studio" camera for
+  every app), **Disk Formats** (`lordos-disk-formats`), the **LordOS Web Runtime** (`lordos-web`) and **LordOS
+  Voices** (the `lordos-voice-*` models). Nothing installs differently: a package of LordOS's repository opens the
+  usual package page (the plan, then `pkg-install` through LordOS's package engine; with the item's own icon, name and
+  summary, and Open once it is in), Disk Formats keeps its page with every driver's license first, and the voices'
+  page sends you to Settings → AI, where each voice is heard before it is downloaded. Open shows the Camera app, Disks,
+  the Web apps section or Settings → AI. The catalog is data, `assets/store/lordos-apps.json` (read by
+  `apps/store/lordosmodel.js`, drawn by `apps/store/lordospages.js`): a future native app is one entry and its two
+  texts. What moved and what stayed: Studio Camera was only a hardware suggestion (Store → For this computer, when a
+  camera is found) and stays there too; Disk Formats stays in Commercial too (its formats are other makers'); the Web
+  Runtime was installed only by the first web app, which still does it; the voices were only in Settings → AI, which
+  still installs them. The NVIDIA driver and the other hardware drivers stay in For this computer; `lordos-rclone`
+  and `lordos-hwdata` are part of every install and aren't offered. LordOS Studio's "Get it in the Store…" link and
+  Files' and Disks' "get Disk Formats" now open the item's page in LordOS apps (`{ page: 'lordos', native: '<id>' }`).
+- **LordOS apps → Installed** (the top of its second column): LordOS's own items installed here, with View (their page,
+  where Remove is) and Open, and the installed `.lpk` apps as before (trust, Modified by you, Restore, Share my
+  version, Remove, Open). The `.lpk` packages found in the home folder, Downloads and Desktop are listed under the
+  shop's cards. With fewer than six items the column has no categories (Installed, Settings, All); each item already
+  names one for when it does. The general **Store → Installed** lists LordOS's installed items too ("LordOS
+  component", with View and Open) under its **LordOS apps** filter, and its sidebar count includes them.
+- **Every package system's section has the same shape, and a cleaner shop** (asked by the maintainer on 2026-11-23).
+  The second column is now **Installed**, **Settings**, then **Categories**. What sat above each shop moved into its
+  Settings, so the shop opens straight on its banner or its cards: Flathub's description, "Only apps verified by
+  Flathub" (with how many it hides), Flathub's rankings, Refresh and Turn off (`FlathubSettings`); the web apps'
+  description, whether LordOS's web engine is installed yet, and Settings → Web apps for profiles, permissions and space
+  (`WebSettings`); GNU/Linux apps (Debian): what they are, the package lists' last check with Check for updates, and
+  the automatic check (the same preference as Updates; `DebianSettings`); LordOS apps: what the section and `.lpk`
+  packages are, and the package lists its items come from (`LordOSSettings`; all in `apps/store/sectionsettings.js`
+  except Flathub's and the web apps'). "Add from an address" is an action and stays at the top of the web apps' shop.
+- **An update icon in the section's title bar**, next to the search (↻, with a tooltip and a screen reader label:
+  `ToolbarButton` takes `accessibilityLabel`, and an icon-only one says its tooltip): Flathub's refreshes its catalog,
+  GNU/Linux apps' and LordOS apps' fetch the package lists (an administrator's action, as before); the web apps have
+  nothing to fetch and show none.
+- **Each section searches only its own apps**, and its field says so ("Search Flathub apps", "Search GNU/Linux apps",
+  "Search web apps", "Search LordOS apps"); typed in a section's Settings, the search goes to its shop. The Store's own
+  pages search every system with "Search apps": Discover (now with LordOS's own items as a shelf of their own) and
+  Installed; on Updates, For this computer and the Picked by LordOS pages a search opens Discover's. Choosing another
+  page in the sidebar clears the search. The Store opened with `{ page, search }` searches that section.
+- **One name per package system everywhere** (sidebar, titles, search fields, Installed filters): **GNU/Linux apps
+  (Debian)** (was "Linux apps (Debian)"), **Flathub apps** (was "Flathub"), **Web apps (PWA)** and **LordOS apps**.
+  The sidebar is 250 points wide by default (was 230) so the longest name fits; it can still be dragged.
+- New texts in all 35 languages: the four items' names and summaries, the LordOS apps pages, Settings, the four
+  search fields, the update icon's two labels and the Settings pages (28 keys); `store.src.debian` and
+  `store.page.flathub` changed in every language.
 - **Store: each package system's shop first, its installed apps under Installed** (asked by the maintainer on
   2026-11-23). Linux apps (Debian), Flathub and Web apps (PWA) open on their shop: Flathub's home with its
   collections and categories, the web apps' "Add from an address" and catalog, Debian's Discover. Each one's second
@@ -34,6 +81,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Tests
 
+- `server/tests/store_lordos_test.mjs` (26 checks, in `make test`): the shipped catalog as the shop reads it, what a
+  hand-edited entry may not do (unknown kinds, a package or app id that isn't one, a settings entry with nothing to
+  open), installed items, the cards' action, no categories below six entries, the search (accents and case ignored)
+  and that every entry has its name and summary in every language. `store_installed_test.mjs` (27 checks) counts an
+  installed LordOS item as LordOS's and knows Settings; `store_origin_scene.mjs` (18 checks) has Settings under
+  Installed, in the column and the chips, and the short column (Installed, Settings, All).
+- `STORE_SCENE=lordos server/tests/store_rankings_headless.sh OUT_DIR default es` (`tests/store_scene/lordos.js`) shoots
+  Flathub's clean shop, its Settings and its own search, GNU/Linux apps → Settings, the web apps' shop and Settings,
+  LordOS apps' shop, its Installed, LordOS Studio Camera's page, the general Installed with its LordOS apps filter and
+  Discover's search over every system, and logs each section's column order, update icon and search placeholder.
+  Checked in Spanish, dark, on 2026-11-23 (the items installed on that machine). Not yet on a real display or the VM.
 - `server/tests/store_installed_test.mjs` (23 checks: each entry's system, the filters and what each keeps) and
   `server/tests/store_origin_scene.mjs` (13 checks: Installed first with its count, then Categories, All and the
   categories with apps; choosing Installed selects it; the narrow chips; the filter chips), both in `make test`.

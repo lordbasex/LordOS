@@ -186,7 +186,7 @@ function EveryApp({ th, cfg, status }) {
       <View style={{ gap: 4 }}>
         <Row th={th} label={t('studio.everyApp')} detail={t('studio.notInstalled')} />
         <Hint th={th}>{t('studio.everyAppHint')}</Hint>
-        <Link th={th} label={t('studio.getCamera')} onClick={() => wm.open('store', { args: { page: 'suggested', nonce: Date.now() } })} />
+        <Link th={th} label={t('studio.getCamera')} onClick={() => wm.open('store', { args: { page: 'lordos', native: 'studioCamera', nonce: Date.now() } })} />
       </View>
     );
   }

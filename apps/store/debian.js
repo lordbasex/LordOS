@@ -128,7 +128,9 @@ function PlanView({ plan }) {
 // removed with it, when installed. When the app is installed and some extras are not (a catalog entry that gained
 // "with" packages after it was installed: Steam's 32-bit Vulkan drivers), Update installs the missing ones.
 // A few Debian packages bring others with them (syspkg.js companionsOf: OBS Studio's plugins and Qt's Wayland plugin).
-function Details({ name, onBack, onRemoved, extras: given = [], withRemove = [] }) {
+// look (Apps LordOS's own items, lordospages.js): { icon, title, summary, open } in place of the package's icon, name
+// and summary, and open() for Open once it is installed (a component with no desktop entry of its own).
+function Details({ name, look = null, onBack, onRemoved, extras: given = [], withRemove = [] }) {
   const th = useTheme();
   const { gen, job } = useStore(state);
   const [plan, setPlan] = useState(null);
@@ -151,24 +153,25 @@ function Details({ name, onBack, onRemoved, extras: given = [], withRemove = [] 
   const doRemove = () => ask({ kind: 'remove', p: lord.pkg.plan({ remove: [name, ...alsoRemove] }) });
   const confirm = () => {
     const extra = plan.p.items.some((i) => i.action === 'remove' && !i.requested);
-    if (plan.kind === 'install') runJob('pkg-install', [...plan.names, ...(extra ? ['--allow-remove'] : [])].join(' '), t('store.job.install', { name: app?.name || name }));
-    else runJob('pkg-remove', [name, ...alsoRemove, ...(extra ? ['--cascade'] : [])].join(' '), t('store.job.remove', { name: app?.name || name })).then((ok) => { if (ok && onRemoved) onRemoved(name); });
+    if (plan.kind === 'install') runJob('pkg-install', [...plan.names, ...(extra ? ['--allow-remove'] : [])].join(' '), t('store.job.install', { name: (look && look.title) || app?.name || name }));
+    else runJob('pkg-remove', [name, ...alsoRemove, ...(extra ? ['--cascade'] : [])].join(' '), t('store.job.remove', { name: (look && look.title) || app?.name || name })).then((ok) => { if (ok && onRemoved) onRemoved(name); });
     setPlan(null);
   };
   const desc = (info.appDescription || info.description || '').trim();
   const busy = !!job;
   const primary = !info.installed
     ? h(Button, { primary: true, label: t('store.install'), disabled: !isAdmin, busy, pending: true, onClick: () => isAdmin && !job && doInstall() })
-    : desk ? h(Button, { primary: true, label: t('store.open'), onClick: () => launchApp(desk.id) }) : null;
+    : desk ? h(Button, { primary: true, label: t('store.open'), onClick: () => launchApp(desk.id) })
+    : look && look.open ? h(Button, { primary: true, label: t('store.open'), onClick: look.open }) : null;
   return h(View, { style: { gap: spacing.xl } },
     onBack ? h(Button, { plain: true, small: true, label: `‹ ${t('store.back')}`, onClick: onBack, style: { alignSelf: 'flex-start', [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -6 } }) : null,
     h(Progress),
     // header: icon, name, summary and the actions under them (App Store style)
     h(View, { style: { flexDirection: 'row', gap: spacing.l, alignItems: 'flex-start' } },
-      h(View, { style: { borderRadius: 22, overflow: 'hidden', boxShadow: '0 6px 14px rgba(0,0,0,0.22)' } }, h(PkgIcon, { app, name, size: 96 })),
+      h(View, { style: { borderRadius: 22, overflow: 'hidden', boxShadow: '0 6px 14px rgba(0,0,0,0.22)' } }, look && look.icon ? look.icon : h(PkgIcon, { app, name, size: 96 })),
       h(View, { style: { flex: 1, minWidth: 0, gap: spacing.xs } },
-        h(Text, { style: { ...titleStyle(th), textAlign: 'start' } }, app?.name || name),
-        h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.35, textAlign: 'start' } }, app?.summary || info.summary),
+        h(Text, { style: { ...titleStyle(th), textAlign: 'start' } }, (look && look.title) || app?.name || name),
+        h(Text, { style: { fontSize: typeScale.body, color: th.textDim, lineHeight: 1.35, textAlign: 'start' } }, (look && look.summary) || app?.summary || info.summary),
         h(View, { style: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.s, marginTop: spacing.s } },
           primary,
           (info.upgradable || missing.length > 0) && h(Button, { label: t('store.upgrade'), disabled: !isAdmin, busy, pending: true, onClick: () => isAdmin && !job && doInstall() }),

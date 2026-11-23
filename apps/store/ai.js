@@ -67,7 +67,7 @@ function AddSource({ a, onDone }) {
 
 // A LordOS-built app that isn't in the package lists yet (they were fetched before the catalog had it):
 // fetching them again (pkg-update) brings it, instead of the package page's "not found".
-function NotListed({ a, onDone }) {
+export function NotListed({ a, onDone }) {
   const th = useTheme();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -181,7 +181,8 @@ export const catalogApp = (pkg) => (catalog.apps || []).find((x) => x.package ==
 
 // A catalog app's page: add its maker's repository first, fetch the lists when LordOS's own package
 // isn't in them yet, else the usual package page.
-export function AiDetail({ pkg }) {
+// look: how Apps LordOS shows one of its own items (lordospages.js): its icon, name, summary and Open (debian.Details).
+export function AiDetail({ pkg, look = null }) {
   useStore(locale);
   const [, setTick] = useState(0);
   const [allowed, setAllowed] = useState(null);        // the optional packages chosen, once allowed
@@ -204,7 +205,7 @@ export function AiDetail({ pkg }) {
   };
   // "keep": "with" packages the system may also need (Steam's amd64 mesa-vulkan-drivers): installed with it, never removed with it
   const keep = (a && Array.isArray(a.keep)) ? a.keep : [];
-  const details = h(debian.Details, { name: pkg, onRemoved, extras: [...(allowed || []), ...withPkgs], withRemove: withPkgs.filter((p) => !keep.includes(p)) });
+  const details = h(debian.Details, { name: pkg, look, onRemoved, extras: [...(allowed || []), ...withPkgs], withRemove: withPkgs.filter((p) => !keep.includes(p)) });
   return a?.drivers && installed(pkg) ? h(View, { style: { gap: spacing.l } }, h(MoreDrivers, { a }), details) : details;
 }
 
