@@ -2443,6 +2443,41 @@ a second copy of what the guest already caches; random requests then go to the d
 ~70 µs on this NVMe), where before a working set that still sat in the host's cache came back from memory. A guest's
 own cache (its memory) serves those repeats first, so the second copy mostly helped a guest that restarts.
 
+**Host cache or not: measured with real work, decided** (2026-11-23; the maintainer felt no difference and asked for
+numbers). A Debian 13 cloud guest (4 vCPUs, 4 GB, UEFI, a 40 GB qcow2 on the same NVMe and ext4, `virtio-blk` on the
+I/O thread, the `-blockdev` options lord-vm gives) ran one sequence per start, each on a fresh copy of the same disk
+with the disk file dropped from the host's cache first: boot, unpack the Linux 6.12 sources (86,618 files), install
+GIMP and Inkscape from the local package cache (`apt-get install --no-download`, 456 packages, dpkg's fsyncs), build
+`kernel/ mm/ fs/ lib/` of that tree (`make -j4`), write a 6 GB file and read it at random (fio, `O_DIRECT` in the guest,
+so the guest's own cache doesn't serve it: a working set larger than the guest's memory that fits in the host's), copy
+that file with the guest's cache dropped, power off and boot again. (a) the host's cache (`cache.direct` off, QEMU's
+thread pool) against (b) `cache.direct` with native AIO, 4 runs each, alternating which went first; medians (range):
+
+| Work | (a) host cache | (b) `cache.direct` + native AIO | (b) against (a) |
+|---|---|---|---|
+| Boot to `systemctl is-system-running`, host cache empty | 5.06 s (5.05–5.28) | 5.25 s (5.03–5.31) | +4 % |
+| Boot again right after (host cache warm in (a)) | 4.86 s (4.85–5.17) | 5.17 s (5.06–5.28) | +6 % (0.3 s) |
+| Unpack 86,618 files + `sync` | 3.74 s (3.60–3.83) | **3.24 s** (3.19–3.39) | −13 % |
+| Install 456 packages + `sync` | 29.2 s (28.9–30.7) | **27.4 s** (26.7–28.2) | −6 % |
+| Compile (`make -j4`) | 78.4 s (78.0–80.8) | 78.2 s (75.4–80.2) | the same |
+| Write 6 GB, 1 MB requests | 4.64 s (4.38–5.89) | **2.63 s** (2.62–2.64) | −43 % |
+| Random 4 KB reads, 1 at a time, over those 6 GB | **74.0k IOPS** | 14.7k IOPS | ÷5 |
+| Random 4 KB reads, 16 at a time | **359k IOPS** | 170k IOPS | ÷2.1 |
+| Copy the 6 GB file + `sync` | 5.23 s (5.18–8.51) | 5.45 s (5.33–5.49) | +4 % |
+| The disk file in the host's page cache: after boot / unpack / install / compile / fio / copy | 0.14 / 2.0 / 3.4 / 3.6 / 9.7 / **15.9 GB** | 0 | — |
+
+**Decision: keep `cache.direct` with native AIO on ext4 and XFS for every disk, with no size or memory rule.** In the
+work a person does (boot, installs, unpacking, builds, copies) the two are within ±6 %, with (b) ahead where it writes
+(installs, unpacking, large writes) and (a) ahead by 0.2–0.3 s at boot and 4 % on a copy, which nobody notices,
+matching what the maintainer felt. The one clear win of the host's cache is random reads of data the guest's own memory
+can't hold but the host's can (5× one at a time); that same data in the guest's memory is faster still, so the fix
+for such a guest is more memory, not a second copy. The price of (a) is large and grows with use: a 4 GB guest left
+15.9 GB of its disk in the host's page cache after this sequence, four times its own memory, pushing out the
+desktop's and the apps' cache, and on a 16 GB computer that is most of it. A rule by disk size or free memory was
+considered and not built: the cache grows with what the guest touches, not with the disk's size, and a computer
+with memory to spare gains only in the random-read case above. Not tried with a Windows guest (no scratch Windows
+machine on this computer); Windows caches its disk in its own memory the same way. Nothing changes in lord-vm.
+
 ### 6.5 Network
 
 | Mode | How | Reach | Notes |
@@ -3617,7 +3652,8 @@ The LordOS rule holds: this app must not slow the desktop. It's idle until opene
    shared memory (shared folders, the transfer folder) gets THP with `shmem_enabled=advise`, set by the `lordos` package,
    and `memory-backend-ram,share=on`: 3.7.2.
 3. A vCPU recommendation in the assistant and Configure, from the host's cores (today: Pi default 3, `machine.c`).
-4. The disk path. **Built** (in development): an iothread, `cache.direct` with `aio=native` on ext4 and XFS (6.4.1).
+4. The disk path. **Built** (in development): an iothread, `cache.direct` with `aio=native` on ext4 and XFS (6.4.1);
+   kept after measuring real work against the host's cache (6.4.1, "Host cache or not").
    `io_uring` stays off: our seccomp denylist refuses `io_uring_*` (`vmsandbox.c`) and loosening it needs the maintainer's
    review (not measured against it).
 5. A guest-side performance profile applied by the guest tools.

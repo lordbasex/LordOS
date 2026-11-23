@@ -253,6 +253,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and reads of data not in the host's cache from 1.62 to 2.46–2.53 GB/s. Random requests then go to the disk (14k
     IOPS one at a time, 60k four at a time on that NVMe) where a working set still in the host's memory was served from
     it before.
+  - **Kept after measuring real work** (asked by the maintainer, who felt no difference): a Debian guest (4 vCPUs,
+    4 GB) booted, unpacked the Linux sources (86,618 files), installed 456 packages, built part of the kernel, wrote,
+    read at random and copied a 6 GB file, 4 runs with the host's cache and 4 without, alternating. Without it:
+    unpacking 13 % faster, installing 6 %, writing 6 GB 43 %, the build the same, boot 0.2–0.3 s slower (4–6 %) and
+    the copy 4 % slower; random 4 KB reads of data in the host's cache but not the guest's were 5× faster with it (74k
+    against 14.7k IOPS one at a time). With it, the host kept 15.9 GB of that guest's disk in its page cache, four times
+    the guest's memory. So `cache.direct` stays for every disk on ext4 and XFS, with no rule by size or memory
+    (docs/VIRTUALIZATION.md 6.4.1, "Host cache or not").
 - **Machines: a snapshot that was taken, gone back to or deleted no longer adds "failed:" to the machine's log.** The
   log line meant for a failure followed every success but a deletion (`lordvm.c` `snap_end`).
 

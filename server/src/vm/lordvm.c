@@ -1711,6 +1711,8 @@ static char *blockdev_file(const char *node, const char *path, int ro) {
  * Linux native AIO where the file system is ext4 or XFS and takes O_DIRECT (the guest caches for itself; a second copy in
  * the host's cache only costs memory and a copy). Not on btrfs (O_DIRECT with checksums and buffers a guest can change
  * in flight) or anything else, nor when O_DIRECT is refused: there the host's cache and QEMU's thread pool, as before.
+ * Kept for every disk after measuring real work against the host's cache (6.4.1, "Host cache or not"): boots, installs,
+ * builds and copies within 6 %, writes faster, and no second copy (16 GB of host cache for a 4 GB guest's work).
  * io_uring stays refused by QEMU's seccomp (vmsandbox.c). */
 static int disk_direct(const char *path) {
     struct statfs f;
