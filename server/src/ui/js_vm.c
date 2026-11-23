@@ -4,7 +4,7 @@
  * helper a sealed picture memfd that the engine shows as a media node, acknowledges frames once they were painted
  * and forwards input. Nothing here blocks: each poll takes at most VD_POLL_MAX messages per channel.
  *
- *   host() → { arch, cpus, ramMb, kvmDevice, kvm, vcpusRecommended, memMaxMb, missing: { amd64, arm64 }, ready,
+ *   host() → { arch, cpus, cores (physical), ramMb, kvmDevice, kvm, vcpusRecommended, memMaxMb, missing: { amd64, arm64 }, ready,
  *             cards: [{ name, kind: 'wired'|'wifi', up }] }   (cards: what a bridged machine may join, 6.5)
  *   list() → [{ dir, folder, name, id, arch, accel, vcpus, memoryMb, diskGb, firmware, tpm, secureBoot, network, iso, state, reason,
  *              code, detail, since, error }]   the machines in ~/Machines (<name>.lordvm)
@@ -154,6 +154,7 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     int a = host_arch();
     set_str(c, o, "arch", a == VM_ARCH_AMD64 ? "amd64" : a == VM_ARCH_ARM64 ? "arm64" : "");
     set_int(c, o, "cpus", h.cpus);
+    set_int(c, o, "cores", vm_host_cores(h.cpus));
     set_int(c, o, "ramMb", h.ram_mb);
     struct stat st;
     JS_SetPropertyStr(c, o, "kvmDevice", JS_NewBool(c, !stat("/dev/kvm", &st) && S_ISCHR(st.st_mode)));
