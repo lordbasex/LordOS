@@ -43,6 +43,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Downloads: a GitHub release file refused now and then with a 403 is asked for again** (in development; the latest
+  release is 0.8.9.5-beta). Reported by the maintainer: Machines → New machine → the LordOS 0.8.9 card said "Couldn't
+  download the list of images: the server answered 403". `vm-image-list` downloads the release's `SHA256SUMS` and
+  `SHA256SUMS.sig` from `github.com/…/releases/download/…`, which answers 302 to a signed URL of about 950 bytes on
+  `release-assets.githubusercontent.com` (an Azure SAS plus a JWT valid for 5 minutes).
+  - **What was found.** The same requests from a root harness over `fetch_batch_in` and the installed `lord-tls` were
+    refused intermittently (2 of about 10 in one burst, then 24 of 24 fine). Afterwards none could be reproduced: 200 of
+    200 and a burst of 300 with the old client, and 360 requests from a script with the signed URL's '+' sent as it
+    came, as %2B, or as %2B only in the path, on kept-alive and on new connections, all answered 200. So the CDN
+    accepts either spelling, and the refusals are the CDN's own transient ones, not a difference in our request.
+  - **The change** (`server/src/pkg/http.c` `get_one`). A request that a redirect led to and that is refused with 403
+    or a 5xx starts again from the original URL, for a freshly signed redirect, at most twice more, after 0.5 s and
+    then 1.5 s. A refusal without a redirect (an origin's own answer), a 404 and every other status are reported as
+    before; nothing was written yet when it starts again; and every check applies to each new chain as to the first
+    (https never back to http, `public_only` on every host, 5 redirects per chain, a cut `Location` refused). It
+    applies to every `fetch_batch` user: packages, Machines' images and lists, Flathub, wallpapers.
+  - The '+' → %2B of the request line (for S3 paths such as `kms++-utils`) now applies to the path only: a query goes
+    as it came, as a browser or curl sends it, since a '+' there already means a space and a signed URL's query is the
+    signer's.
+  - **Tests:** `build/http-retry-test` (new, in `make test`), against a small HTTP server on loopback: '+' in the
+    path as %2B and in the query as it came, also in a redirect's; a 403 after a redirect twice, then saved, with three
+    requests to the original URL and a new signed URL each time, after 2 s; a 503 once; always 403: one try and two
+    more, then the 403 reported; a 404 after a redirect and a 403 without one not asked again; a redirect loop still
+    stops after 5.
 - **Machines: the library draws its machines' place from the first frame, with placeholders until they are read**
   (in development; the latest release is 0.8.9.5-beta). Reported by the maintainer: opened again (after logging back
   in), the library with the New machine card, an Ubuntu machine and a guest of the other system took 1 to 2 seconds to
