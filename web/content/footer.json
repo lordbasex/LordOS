@@ -97,6 +97,14 @@
         },
         {
           "label": {
+            "en": "Wayland conformance",
+            "es": "Conformidad Wayland",
+            "pt": "Conformidade Wayland"
+          },
+          "href": "/wayland-conformance/"
+        },
+        {
+          "label": {
             "en": "Release notes",
             "es": "Notas de versión",
             "pt": "Notas de versão"

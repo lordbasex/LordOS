@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { load, validate, validateWeb, markdown, withSection, webData, loadConf, confMarkdown, withConfSection, DEPTHS, PROOFS } from '../../tools/gen-wayland-table.mjs';
+import { load, validate, validateWeb, markdown, withSection, webData, loadConf, confMarkdown, withConfSection, DEPTHS, PROOFS, confDetail, validateDetail, WEBCONF } from '../../tools/gen-wayland-table.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 let fails = 0;
@@ -84,6 +84,9 @@ if (withConfSection(md, confMarkdown(d, C)) !== md) bad('docs/WAYLAND.md\'s gene
 const webFile = path.join(REPO, 'web/content/wayland/protocols.json');
 const web = fs.existsSync(webFile) ? fs.readFileSync(webFile, 'utf8') : '';
 if (web !== JSON.stringify(webData(d, C), null, 1) + '\n') bad('web/content/wayland/protocols.json is stale: run node tools/gen-wayland-table.mjs');
+// every check, for lordos.org/wayland-conformance/
+const confWeb = fs.existsSync(WEBCONF) ? fs.readFileSync(WEBCONF, 'utf8') : '';
+if (confWeb !== (C ? JSON.stringify(confDetail(C)) + '\n' : '')) bad('web/content/wayland/conformance.json is stale: run node tools/gen-wayland-table.mjs');
 
 // the conformance run (docs/wayland-conformance.json) against the table, docs/WAYLAND.md's own words and the screenshots
 if (!C) bad('docs/wayland-conformance.json is missing: record a run (make -C server wl-conformance WLCONF_ARGS=--record)');
@@ -202,6 +205,37 @@ else {
     if (!validateWeb(w2).length) bad(`validateWeb() accepted a hostile conformance ${what}`);
   }
   if (validateWeb(web).length) bad('validateWeb() refused the real table: ' + validateWeb(web).join('; '));
+  // the conformance page's copy (every check): hostile values and numbers that don't add up are refused
+  if (C) {
+    const det = confDetail(C);
+    if (validateDetail(det, web.conformance).length) bad('validateDetail() refused the real run: ' + validateDetail(det, web.conformance).slice(0, 5).join('; '));
+    const detCases = [
+      ['commit', (x) => { x.commit = XSS; }],
+      ['short commit', (x) => { x.commit = x.commit.slice(0, 12); }],
+      ['note', (x) => { x.notes = ['a\u001b[31m']; }],
+      ['global name', (x) => { x.globals[0].global = XSS; }],
+      ['xml path', (x) => { x.globals[0].xml = '../../etc/passwd.xml'; }],
+      ['check id', (x) => { x.globals[0].checks[0].id = XSS; }],
+      ['check result', (x) => { x.globals[0].checks[0].result = 'pwned'; }],
+      ['check kind', (x) => { x.globals[0].checks[0].kind = XSS; }],
+      ['check where', (x) => { x.globals[0].checks[0].where = '../../../etc/shadow:1'; }],
+      ['check where absolute', (x) => { x.globals[0].checks[0].where = '/etc/shadow:1'; }],
+      ['check msg control', (x) => { x.globals[0].checks[0].msg = 'ok\nfake line'; }],
+      ['check msg length', (x) => { x.globals[0].checks[0].msg = 'x'.repeat(5000); }],
+      ['a pass turned into a fail', (x) => { const c = x.globals[0].checks.find((k) => k.result === 'pass'); c.result = 'fail'; }],
+      ['a check dropped', (x) => { x.globals[0].checks.pop(); }],
+      ['a global dropped', (x) => { x.globals.pop(); }],
+      ['x11 id', (x) => { x.x11[0].id = XSS; }],
+      ['x11 weight', (x) => { x.x11[0].checks[0].weight = 7; }],
+      ['client bound', (x) => { if (x.clients[0]) x.clients[0].bound = [XSS]; else x.clients = [{ client: 'x', result: 'pass', msg: 'm', bound: [XSS] }]; }],
+      ['client result', (x) => { x.clients = [{ client: 'x', result: XSS, msg: 'm', bound: [] }]; }],
+    ];
+    for (const [what, spoil] of detCases) {
+      const x = JSON.parse(JSON.stringify(det));
+      spoil(x);
+      if (!validateDetail(x, web.conformance).length) bad(`validateDetail() accepted a hostile ${what}`);
+    }
+  }
 }
 
 // the parser itself, on a known snippet

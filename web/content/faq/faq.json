@@ -598,6 +598,19 @@
           }
         },
         {
+          "id": "wayland-conformance",
+          "q": {
+            "en": "Can I check LordOS's Wayland conformance numbers myself?",
+            "es": "¿Puedo comprobar yo mismo los números de conformidad Wayland de LordOS?",
+            "pt": "Posso conferir eu mesmo os números de conformidade Wayland do LordOS?"
+          },
+          "a": {
+            "en": "Yes. In development after 0.8.9.4 (the latest release), the [Wayland and X11 conformance page](/wayland-conformance/) publishes the whole run of the conformance tool: every Wayland global and X11 item, every check with its result and message, the exceptions the protocols allow, a comparison with KDE and GNOME, and the commands to run the same tests on Debian 13. The tool starts its own lord-server without a screen, so it never touches your session, and a script compares your report with ours check by check. If a check fails on your machine, the page says what to send in a GitHub issue.",
+            "es": "Sí. En desarrollo después de la 0.8.9.4 (el último lanzamiento), la [página de conformidad Wayland y X11](/wayland-conformance/) publica la prueba completa de la herramienta de conformidad: cada global Wayland y cada ítem X11, cada verificación con su resultado y su mensaje, las excepciones que permiten los protocolos, una comparación con KDE y GNOME, y los comandos para correr las mismas pruebas en Debian 13. La herramienta inicia su propio lord-server sin pantalla, así que nunca toca tu sesión, y un script compara tu informe con el nuestro verificación por verificación. Si una verificación falla en tu máquina, la página dice qué mandar en un issue de GitHub.",
+            "pt": "Sim. Em desenvolvimento depois da 0.8.9.4 (o último lançamento), a [página de conformidade Wayland e X11](/wayland-conformance/) publica o teste completo da ferramenta de conformidade: cada global Wayland e cada item X11, cada verificação com o seu resultado e a sua mensagem, as exceções que os protocolos permitem, uma comparação com o KDE e o GNOME, e os comandos para rodar os mesmos testes no Debian 13. A ferramenta inicia o seu próprio lord-server sem tela, então nunca toca a sua sessão, e um script compara o seu relatório com o nosso verificação por verificação. Se uma verificação falhar na sua máquina, a página diz o que mandar numa issue do GitHub."
+          }
+        },
+        {
           "id": "web-apps",
           "q": {
             "en": "Can I install web apps?",
