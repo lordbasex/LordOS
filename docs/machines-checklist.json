@@ -1,0 +1,959 @@
+{
+ "commit": "965a10f6e",
+ "audited": "2026-11-23",
+ "method": "Each area's score is the rounded mean of its items' percentages; the total is the sum of weight x score / 100, rounded.",
+ "items": [
+  {
+   "area": "A",
+   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 13, lock, `run.json`, crash recovery (3.8, 3.9)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 13`); `vm-test`",
+   "note": "Schema 13 since `cpu_pin` and `perf_profile`"
+  },
+  {
+   "area": "A",
+   "item": "KVM amd64 and arm64, TCG labelled Emulated (2.1–2.4)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c` (`-accel`), `assistant.jsx` (\"Other architecture…\")",
+   "note": "Pi 5, nested amd64, Xeon and the i9 PC"
+  },
+  {
+   "area": "A",
+   "item": "Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`machine.c`, `js_vm.c`",
+   "note": ""
+  },
+  {
+   "area": "A",
+   "item": "`/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`vm_admin.c`",
+   "note": ""
+  },
+  {
+   "area": "A",
+   "item": "Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp denylist on top of QEMU's (3.3)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`vmsandbox.c`, `lordvm.c`; `vm_isolation.sh`",
+   "note": "No allowlist of our own; no user namespace for QEMU (3.3 says \"if available\": `unshare` is denied, nothing creates one); QEMU gets `RLIMIT_CORE` 0 but not `PR_SET_DUMPABLE` 0 (only lord-vm and lord-vmdisplay)"
+  },
+  {
+   "area": "A",
+   "item": "Every helper jailed too: lord-vm's own Landlock, `qemu-img`, `swtpm`, `passt`, `virtiofsd`; lord-vmdisplay sandboxed with a self-test; render node and VFIO confined by Landlock (3.3)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c` `vm_jail_self`, `vmsandbox.c` `vm_jail_tool*`, `render_rules`, `vgpu_rules`, `vmdisplay.c` `--selftest`; `vm_isolation.sh`",
+   "note": "Added by this audit"
+  },
+  {
+   "area": "A",
+   "item": "Sandbox and cgroup state reported (`lord-vm --status`: Landlock, our seccomp, KVM fd, scope), nested cgroup leaves per process (3.3, 3.7)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c` (`setup_cgroups`, `--status`), `diag.js`, `logs.jsx`",
+   "note": "Added by this audit"
+  },
+  {
+   "area": "A",
+   "item": "\"Weaker isolation on this kernel\" notice when Landlock is missing (3.3)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": "Only the log's \"Sandbox:\" line says it; lord-vm refuses to start only without seccomp or `no_new_privs`. Added by this audit"
+  },
+  {
+   "area": "A",
+   "item": "Render node by descriptor; one slice for all machines (3.3, 3.7)",
+   "status": "❌",
+   "pct": 0,
+   "file": "`lordvm.c` passes a path (`rendernode=`); one scope per machine",
+   "note": "QEMU's `rendernode=` takes a path; Landlock limits it to that node (row above)"
+  },
+  {
+   "area": "A",
+   "item": "Resource budget (3.7)",
+   "status": "🟡",
+   "pct": 35,
+   "file": "`model.js` `budgetCheck`, `vmwindow.jsx`, cgroup `memory.max` and CPU limits",
+   "note": "Only the window checks it: `startDetached` and `machines start` skip it, and `vm_budget_fits` (`machine.c`) is called only by `vm-test`. No common slice, no pressure warning, no \"pause another or start with less\""
+  },
+  {
+   "area": "A",
+   "item": "Files and contracts: `operation.json`, newer schema read-only, suspended-state check (3.5, 3.6)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`vmops.h` `vm_op_begin`, `machine.c`, `lordvm.c`",
+   "note": "Export manifest not built"
+  },
+  {
+   "area": "A",
+   "item": "Firmware identity kept with the machine; the old code file kept in the folder (3.6)",
+   "status": "🟡",
+   "pct": 40,
+   "file": "`machine.c` (`firmware_sha256`), `lordvm.c`",
+   "note": "Only the hash is recorded and a mismatch logged; the old code file isn't kept. Added by this audit"
+  },
+  {
+   "area": "A",
+   "item": "`lord-vmdisplay`: Unix.Map, SIGBUS guard, rate, dmabuf, cursor, audio (3.2)",
+   "status": "✅",
+   "pct": 95,
+   "file": "`vmdisplay.c`, `js_vm.c`; `vmdisplay-test`",
+   "note": "Zero copy when the desktop composes on the GPU (the dmabuf is a texture); read back only for a recording, the CPU path or a failed import"
+  },
+  {
+   "area": "A",
+   "item": "Start, pause, suspend, resume, shut down through the agent then ACPI, force off (6.1)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c`; release gates",
+   "note": ""
+  },
+  {
+   "area": "A",
+   "item": "Keep Running, Start Without Window, keep awake (5.3, 6.1)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`js_vm.c` `startDetached`, `awake`",
+   "note": "The idle hold wasn't watched on screen"
+  },
+  {
+   "area": "A",
+   "item": "Host shutdown inside logind's 45 s delay (6.1)",
+   "status": "🧪",
+   "pct": 100,
+   "file": "`vmhoststop.h`, `vmlogind.c`; `vmlogind-test`; migration 010",
+   "note": "*In development*; fake logind plus the maintainer's PC"
+  },
+  {
+   "area": "A",
+   "item": "A 3D guest's stop named (`qemu-3d-stop`, `qemu-3d-crash`), unattended starts in 2D (3.2, 6.10)",
+   "status": "🧪",
+   "pct": 90,
+   "file": "`vmlog.c`, `lordos-guest --stopping`; `guest_stop_test.sh`",
+   "note": "*In development*; no real 6.12.117 3D guest yet"
+  },
+  {
+   "area": "A",
+   "item": "Self-healing network (passt restarted while running)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c` (keeper, `NET_MAX_RESTARTS`)",
+   "note": ""
+  },
+  {
+   "area": "A",
+   "item": "Failure page with a cause and a fix (6.1)",
+   "status": "🟡",
+   "pct": 65,
+   "file": "`vmwindow.jsx`, `machines.why.*` and `fix.*`",
+   "note": "Nine named causes, each with a fix line, lord-vm's own reason, Use 2D and Resume anyway buttons; no \"start with less memory\" or \"go back to a snapshot\" action, no locked-file cause"
+  },
+  {
+   "area": "A",
+   "item": "A state saved by another QEMU or CPU: Resume anyway or discard (6.1)",
+   "status": "🟡",
+   "pct": 60,
+   "file": "`lordvm.c` (`--resume-anyway`), `vmwindow.jsx`",
+   "note": "No Store warning; devices that can't be saved (HDA) aren't unplugged"
+  },
+  {
+   "area": "A",
+   "item": "Direct kernel boot (13.8 item 9)",
+   "status": "🟡",
+   "pct": 30,
+   "file": "`lordvm.c`",
+   "note": "Unattended installs only; none for an installed Linux guest"
+  },
+  {
+   "area": "A",
+   "item": "Rename a machine with its folder and transfer folder (6.26)",
+   "status": "🧪",
+   "pct": 100,
+   "file": "`machine.c` (`renameat2`); `vm_rename.sh`",
+   "note": "*In development*; headless"
+  },
+  {
+   "area": "B",
+   "item": "Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows and Android on amd64 (4.1, 5.2)",
+   "status": "✅",
+   "pct": 95,
+   "file": "`assets/machines/systems.json`, `catalog.js`; `vmcatalog-test`, `vm_catalog_test.mjs`",
+   "note": "Kali has no unattended install and was never run end to end"
+  },
+  {
+   "area": "B",
+   "item": "Makers' OpenPGP signatures, SHA-256, resumed downloads, removal (3.9)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`vmcatalog.c`, `vmimage_admin.c`, `pgp.h`; `http-resume-test`, `http-retry-test`",
+   "note": "A redirect refused with 403 or 5xx starts again from the original URL (*in development*)"
+  },
+  {
+   "area": "B",
+   "item": "Any ISO, recognized (5.2)",
+   "status": "✅",
+   "pct": 85,
+   "file": "`js_vm.c` `isoInfo`, `model.js` `systemOf`, `archOf`",
+   "note": "Only the 32-byte volume label is read; the architecture comes from the name or label, not the boot files. No drop on the tile"
+  },
+  {
+   "area": "B",
+   "item": "Unattended Linux: Debian and Ubuntu desktops to login (3.9)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`vmunattend.c`; `vmunattend-test`; VM 116, 2026-11-07",
+   "note": ""
+  },
+  {
+   "area": "B",
+   "item": "Unattended Fedora to login, Ubuntu console, the arm64 cards on the Pi",
+   "status": "🟡",
+   "pct": 60,
+   "file": "same code (`VMU_KICKSTART`)",
+   "note": "Never recorded through login"
+  },
+  {
+   "area": "B",
+   "item": "LordOS card, `lordos-auto.conf` (3.9)",
+   "status": "🧪",
+   "pct": 80,
+   "file": "`vmunattend.c` (`VMU_LORDOS`)",
+   "note": "Not run from the card"
+  },
+  {
+   "area": "B",
+   "item": "Windows 11 amd64: ISO by hash, unattended, drivers, TPM, Secure Boot, KMS client key (4.3.1)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`windows.js`, `vmunattend.c`, `lordvm.c`; `vm_windows_test.mjs`",
+   "note": "On the maintainer's PC"
+  },
+  {
+   "area": "B",
+   "item": "virtio-win guests on arm64 (4.3)",
+   "status": "❌",
+   "pct": 10,
+   "file": "`machine.c` refuses the Windows devices on arm64",
+   "note": "`vmunattend.c` writes arm64 answers already"
+  },
+  {
+   "area": "B",
+   "item": "Android 13 card, Bliss OS 16.9.7 pinned (4.2)",
+   "status": "🧪",
+   "pct": 80,
+   "file": "`systems.json` `android`",
+   "note": "Booting under Machines still to test"
+  },
+  {
+   "area": "B",
+   "item": "A person's own systems: `vm-image-get-user`, `lord-pgpv` (5.6.1)",
+   "status": "✅",
+   "pct": 95,
+   "file": "`systems.js`, `vmurl.c`, `vmsig.c`, `lordpgpv.c`; `vmurl-test`, `vmsig-test`",
+   "note": ""
+  },
+  {
+   "area": "B",
+   "item": "Import from other apps with identity kept (6.22)",
+   "status": "✅",
+   "pct": 95,
+   "file": "`vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`; `vmimport-test`, `vm_import_test.sh`",
+   "note": "No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion"
+  },
+  {
+   "area": "B",
+   "item": "Requirements check (5.2)",
+   "status": "🟡",
+   "pct": 80,
+   "file": "`library.jsx` `Requirements`, `model.js` `reqRows`, `missingFor`, `assistant.jsx`, `vm-enable`",
+   "note": "Create, which starts the download, waits until the parts are in (one click through the package engine). No per-system page of drivers and tools; not through the Store"
+  },
+  {
+   "area": "B",
+   "item": "Migrate from another PC (6.11)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": "Phase 4 (the assistant's Migrate tile is the import of 6.22)"
+  },
+  {
+   "area": "C",
+   "item": "Library: toolbar, chips, grid or list, sort, search, status line, live card (5.1)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`library.jsx`, `model.js` (`skeletonPlan`); `vm_model_test.mjs`",
+   "note": "Placeholders from the first frame (*in development*). No agent or disk lights on the card, no Export or Templates in ···"
+  },
+  {
+   "area": "C",
+   "item": "Machines settings: General, Profiles, Systems, Network, Graphics cards, Keyboard and mouse (5.1)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`settingswin.jsx`",
+   "note": ""
+  },
+  {
+   "area": "C",
+   "item": "New Machine assistant (5.2)",
+   "status": "🟡",
+   "pct": 70,
+   "file": "`assistant.jsx` (5 steps)",
+   "note": "No Detect step, folder choice, **Fresh install** snapshot or file drop"
+  },
+  {
+   "area": "C",
+   "item": "Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu (5.3)",
+   "status": "🟡",
+   "pct": 75,
+   "file": "`vmwindow.jsx`",
+   "note": "No View or Info menus, Scale, Actual Size, device dots, Start in Full Screen, aspect lock; no USB, Network or Camera in Devices"
+  },
+  {
+   "area": "C",
+   "item": "Display modes: Window, Full Screen, Apps (5.4)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`vmwindow.jsx`, `appsmode.jsx`",
+   "note": ""
+  },
+  {
+   "area": "C",
+   "item": "All Displays (multi-head), Picture in Picture of a machine (5.4)",
+   "status": "❌",
+   "pct": 0,
+   "file": "`setPip` only for apps-mode popups",
+   "note": ""
+  },
+  {
+   "area": "C",
+   "item": "Configure, one window with summaries (5.5)",
+   "status": "🟡",
+   "pct": 60,
+   "file": "`configure.jsx` (11 sections)",
+   "note": "Built since the last audit: Pin cores, the vCPU advice, the performance profile; the disk grows. No search, dots, Backup, ballooning, CPU model, USB rules, disk add or encryption, printers, icon and tags, MAC, speed limit; huge pages are automatic, no switch"
+  },
+  {
+   "area": "C",
+   "item": "Profiles and `.lordprofile` (5.6)",
+   "status": "✅",
+   "pct": 95,
+   "file": "`profiles.js`; `vm_profiles_test.mjs`",
+   "note": ""
+  },
+  {
+   "area": "C",
+   "item": "Official logos, opt-in (5.6.2)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`logos.js`",
+   "note": ""
+  },
+  {
+   "area": "C",
+   "item": "What this computer can run (5.7)",
+   "status": "🟡",
+   "pct": 30,
+   "file": "`library.jsx` (the Pi page, the first-run page)",
+   "note": "The first-run page covers KVM and Emulated only. No amd64 page, no sensors, not in Help"
+  },
+  {
+   "area": "C",
+   "item": "❖ shortcuts, Keys panel, focus gate (5.8)",
+   "status": "✅",
+   "pct": 95,
+   "file": "`keys.jsx`; `vm_keys_scene.mjs`",
+   "note": "The release combination is fixed"
+  },
+  {
+   "area": "C",
+   "item": "Capture mouse (6.25)",
+   "status": "🧪",
+   "pct": 90,
+   "file": "`capture.js`, `pointerlock.h`; `vm_capture_test.mjs`",
+   "note": "Through `lordvm-dev` only"
+  },
+  {
+   "area": "D",
+   "item": "Snapshots with memory, NVRAM and TPM, timeline, revert, sweep, at most 64 (6.2)",
+   "status": "✅",
+   "pct": 85,
+   "file": "`lordvm.c` (`tpm_snap`), `snapshots.jsx`, `vmops.h`",
+   "note": "No `fsfreeze`, no copy of `machine.json`, no notes, no snapshot before a tools update"
+  },
+  {
+   "area": "D",
+   "item": "Disposable sessions (6.2)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": ""
+  },
+  {
+   "area": "D",
+   "item": "Clone, Duplicate, linked clone, Clone from Here, new identity (6.3)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`lordvm.c` `--clone`, `vmops.c`, `clone.jsx`",
+   "note": "The source must be off; no templates"
+  },
+  {
+   "area": "D",
+   "item": "Disks: qcow2, discard, Reclaim space, grow (6.4, 6.4.1)",
+   "status": "✅",
+   "pct": 85,
+   "file": "`lordvm.c` (`blockdev_disk`, `--compact --estimate`, `qemu-img resize`)",
+   "note": "An interrupted compaction is rolled back. No qcow2 compression; the disk path itself is scored in M"
+  },
+  {
+   "area": "D",
+   "item": "Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": "Raw only for imports and read-only nodes; encrypted imports refused"
+  },
+  {
+   "area": "D",
+   "item": "Storage window: shared extents, frees-if-deleted, downloads (6.16)",
+   "status": "🟡",
+   "pct": 75,
+   "file": "`storage.jsx`, `js_vm.c` (FIEMAP)",
+   "note": "Trash, Reclaim with an estimate, the unused shared base. Never seen on btrfs or XFS; no \"about\" figures; no \"delete old snapshots\" or \"remove unused media\""
+  },
+  {
+   "area": "E",
+   "item": "Shared (passt over a socketpair), Isolated (6.5)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c` (`vm_passt_argv`)",
+   "note": ""
+  },
+  {
+   "area": "E",
+   "item": "Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5)",
+   "status": "🧪",
+   "pct": 90,
+   "file": "`vmnet_admin.c`, `vmnet.c`, `lordvm.c`",
+   "note": "Headless checks; `vhost=off`, no `vhost-net`"
+  },
+  {
+   "area": "E",
+   "item": "Each machine named in the firewall (6.5)",
+   "status": "🟡",
+   "pct": 60,
+   "file": "`fw/rules.h` (`lordos:machines`), `apps/monitor/Network.jsx`",
+   "note": "One component for every machine (Monitor names them); a forwarded port isn't shown as its own rule"
+  },
+  {
+   "area": "E",
+   "item": "Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22)",
+   "status": "🧪",
+   "pct": 70,
+   "file": "`machine.h` (`nic_model`, `VM_EXTRA_NICS`)",
+   "note": "An import's extra cards are kept but never connected. Added by this audit"
+  },
+  {
+   "area": "F",
+   "item": "Speakers and microphone, output and input per machine (6.9)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`lordvm.c` (`hda-micro`), `vmdisplay.c`; microphone permission checked in `js_vm.c`",
+   "note": "Windows guest sound not checked"
+  },
+  {
+   "area": "F",
+   "item": "Recording with sound, screenshot (6.20)",
+   "status": "🧪",
+   "pct": 90,
+   "file": "`js_vm.c`, `vmwindow.jsx`",
+   "note": "No automated test or recorded on-screen check (was ✅)"
+  },
+  {
+   "area": "F",
+   "item": "CD/DVD change while running",
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c` (`cd_change`)",
+   "note": ""
+  },
+  {
+   "area": "F",
+   "item": "USB passthrough, auto-connect rules, `vm-usb-allow` (6.6)",
+   "status": "❌",
+   "pct": 0,
+   "file": "no usbredir anywhere",
+   "note": ""
+  },
+  {
+   "area": "F",
+   "item": "Camera (6.9), printers (5.5)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": ""
+  },
+  {
+   "area": "G",
+   "item": "Shared folders, virtiofs, read-only by default (6.7)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`lordvm.c` (`vhost-user-fs-pci`)",
+   "note": "Not checked on the Pi or in a Windows guest on arm64; no SMB fallback"
+  },
+  {
+   "area": "G",
+   "item": "Transfer folder (6.7.1)",
+   "status": "🧪",
+   "pct": 90,
+   "file": "`machine.h` (`VM_XFER_*`), `lordvm.c`, `configure.jsx`",
+   "note": "Through `lordvm-dev`"
+  },
+  {
+   "area": "G",
+   "item": "Clipboard: text, rich text, pictures, by direction, ask mode, secrets kept out (6.8)",
+   "status": "✅",
+   "pct": 95,
+   "file": "`vmagent.c`, `js_vm.c`, `x11clip.c`; `guest_clip_test.sh`",
+   "note": ""
+  },
+  {
+   "area": "G",
+   "item": "Files dropped on a machine or an apps-mode window (6.21, 7.2.1)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c` (`.lordos-drop-*.part`), `AGK_PLACE`",
+   "note": ""
+  },
+  {
+   "area": "G",
+   "item": "File copy panel, flow control, resume, drag out, Send to LordOS, quarantine (6.21)",
+   "status": "❌",
+   "pct": 10,
+   "file": "one progress line",
+   "note": ""
+  },
+  {
+   "area": "G",
+   "item": "Open with a machine (7.3)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`openwith.js`; `vm_openwith_test.mjs`",
+   "note": "Windows guests"
+  },
+  {
+   "area": "G",
+   "item": "Apps mode: Windows and LordOS guests (7.2)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`appsmode.jsx`, `appsstatus.jsx`, `js_guestwin.c`; `guestwin_headless.sh`",
+   "note": "Not other Linux desktops; no window shapes"
+  },
+  {
+   "area": "G",
+   "item": "Guest apps in the launcher before the machine runs (6.12)",
+   "status": "🟡",
+   "pct": 40,
+   "file": "Dock `vm:<machine>:<app>` while apps mode runs",
+   "note": "No saved list, no launcher entries, no \"launch starts the machine\""
+  },
+  {
+   "area": "G",
+   "item": "Guest → host links and notifications (6.12)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": "No agent message kind for either"
+  },
+  {
+   "area": "H",
+   "item": "virgl 3D for Linux guests on amd64 (6.10)",
+   "status": "✅",
+   "pct": 85,
+   "file": "`lordvm.c` (`decide_graphics`)",
+   "note": "RX 580; off on arm64 by decision"
+  },
+  {
+   "area": "H",
+   "item": "Intel GVT-g vGPU with our GOP ROM, Windows guest (6.10.1, MACHINES-GPU.md)",
+   "status": "✅",
+   "pct": 85,
+   "file": "`vmgpu*.c`, `vmgvtwin.c`; `vmgpu-test`",
+   "note": "No Linux guest on a vGPU; tested on device 0x9BC5 only"
+  },
+  {
+   "area": "H",
+   "item": "Settings → Graphics cards: Machines (shared) (MACHINES-GPU.md)",
+   "status": "🟡",
+   "pct": 60,
+   "file": "`apps/settings/Gpus.jsx`, `vmgpu_admin.c`",
+   "note": "Dedicated and AI answer `gpu.roleNotYet`"
+  },
+  {
+   "area": "H",
+   "item": "A smoother picture, Part 1 steps 1, 2, 3, 6: frames in lord-server's loop, hardware pointer, damage, Monitor (MACHINES-GPU.md)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`js_vm.c`, `media.c`; `engine-test`, `mview-test`",
+   "note": "Released in 0.8.9.5. Added by this audit (was folded into the \"steps 4 and 5\" row)"
+  },
+  {
+   "area": "H",
+   "item": "A smoother picture, Part 1 step 4: several damage rectangles (MACHINES-GPU.md)",
+   "status": "❌",
+   "pct": 0,
+   "file": "`vmdisplay.c` `damage()` merges into one box",
+   "note": "Pacing (M) changed when pictures are taken, not their damage"
+  },
+  {
+   "area": "H",
+   "item": "A smoother picture, Part 1 step 5: scaled on the GPU (MACHINES-GPU.md)",
+   "status": "🟡",
+   "pct": 40,
+   "file": "`js_vm.c` (`gtex`, `gout`), `gpu/dmaread.c`, `media/mview.c`",
+   "note": "dmabuf pictures (virgl, vGPU) are GPU textures; a 2D picture is still scaled per pixel on the CPU over the whole frame (was ❌ 0)"
+  },
+  {
+   "area": "H",
+   "item": "venus (Vulkan) (6.10)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": ""
+  },
+  {
+   "area": "H",
+   "item": "Whole-GPU passthrough (Mode B) (6.10, MACHINES-GPU.md)",
+   "status": "❌",
+   "pct": 0,
+   "file": "`vmgpu_admin.c` refuses a dedicated card",
+   "note": "\"Whole\" in Configure is the largest GVT-g type, not passthrough"
+  },
+  {
+   "area": "I",
+   "item": "`lordos-guest` 6: clipboard, apps-mode relay, `--stopping` (6.17, 7)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`tools/guest/lordos-guest.c`",
+   "note": "No `perf` (7.1.4: the Linux side isn't built)"
+  },
+  {
+   "area": "I",
+   "item": "`lordos-guest-win` w11: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf (7.1.2, 7.1.4)",
+   "status": "✅",
+   "pct": 95,
+   "file": "`tools/guest-win/lordos-guest-win.c` (`VERSION \"w11\"`); `vm-test` (`AGK_PERF`)",
+   "note": "Was w10; `perf` not yet checked in a running guest"
+  },
+  {
+   "area": "I",
+   "item": "Install Agent through qemu-guest-agent; tools updated by themselves (6.17, 7.1.3)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`lordvm.c` (`guest-file-write`), `model.js` (`TOOLS_SHIPPED`, `toolsAutoStep`)",
+   "note": "No guest with older tools tried"
+  },
+  {
+   "area": "I",
+   "item": "Agent state light and capability list (6.17)",
+   "status": "🟡",
+   "pct": 85,
+   "file": "`model.js` (`agentTone`, `agentLines`)",
+   "note": "No red state"
+  },
+  {
+   "area": "I",
+   "item": "Shell over the agent as the signed-in user (6.18)",
+   "status": "❌",
+   "pct": 15,
+   "file": "the Shell is the serial console",
+   "note": ""
+  },
+  {
+   "area": "I",
+   "item": "Logs: journal, serial, machine log, Overview (6.19)",
+   "status": "🟡",
+   "pct": 65,
+   "file": "`logs.jsx`, `lordvm.c` (journal through qemu-ga)",
+   "note": "No Windows event logs, unit filter (a column only), time zone or Clear view"
+  },
+  {
+   "area": "J",
+   "item": "`machines` list, status, start, open, stop…, snapshot, clone, set, rename, ids; 35 languages, `--json`, completion (6.15)",
+   "status": "🧪",
+   "pct": 95,
+   "file": "`server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh`",
+   "note": "`set` doesn't pass `--cpu-pin`, `--perf-profile` or `--capture-fullscreen` (`mcli.c` `PASS[]`); no start from a memory snapshot, create, import or console"
+  },
+  {
+   "area": "J",
+   "item": "`lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": ""
+  },
+  {
+   "area": "K",
+   "item": "Monitor: a machine as one row (6.14)",
+   "status": "🟡",
+   "pct": 65,
+   "file": "`apps/monitor/Processes.jsx`, `Network.jsx`, `Gpu.jsx`",
+   "note": "Network and GPU name machines too; no drill-in"
+  },
+  {
+   "area": "K",
+   "item": "Idle block while a machine runs (6.14)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`lord.vm.awake`, `vmlogind.c`",
+   "note": ""
+  },
+  {
+   "area": "K",
+   "item": "Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, balloon (6.14, 16)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": "No `virtio-balloon`; Cleaner, Backups and Files don't know `.lordvm`"
+  },
+  {
+   "area": "L",
+   "item": "No telemetry; signed catalog; downloads only when asked (8)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`vmsig.c`, `vmcatalog.c`",
+   "note": ""
+  },
+  {
+   "area": "L",
+   "item": "Guest data treated as hostile: logs cleaned, parsers fuzzed (8)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`logclean.h`; `vm-test` fuzz passes, `vmimport-test` mutations",
+   "note": "No fuzz of lord-vmdisplay's D-Bus side or of `lordos-guest`'s parser"
+  },
+  {
+   "area": "L",
+   "item": "Closed admin actions only (8)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`vm_admin.c`, `vmnet_admin.c`, `vmgpu_admin.c`, `vmimage_admin.c`",
+   "note": "`vm-state-size` was listed but isn't one (fixed)"
+  },
+  {
+   "area": "L",
+   "item": "Root password only as a hash in the unattended files (8)",
+   "status": "✅",
+   "pct": 100,
+   "file": "`vmunattend.c`; `vmunattend-test`",
+   "note": "Added by this audit"
+  },
+  {
+   "area": "L",
+   "item": "\"Guest can see\" (8, 16)",
+   "status": "🟡",
+   "pct": 40,
+   "file": "`configure.jsx` (Security: six notes on the sandbox)",
+   "note": "It doesn't list the guest's channels; each one's switch is in its own section; no single panel, no live state (was 60)"
+  },
+  {
+   "area": "L",
+   "item": "Encrypted machines (8)",
+   "status": "❌",
+   "pct": 0,
+   "file": "encrypted imports are refused",
+   "note": "Nor the line in Security that host swap can hold guest memory"
+  },
+  {
+   "area": "M",
+   "item": "Targets measured: CPU, network, idle CPU, the Pi desktop, disk (9, 6.4.1)",
+   "status": "🟡",
+   "pct": 60,
+   "file": "sections 6.4.1, 3.7.1, 13",
+   "note": "Disk and the host frame under pinning measured on the i9 since; pause, suspend, latency to the screen, app memory not measured; amd64 Phase 0 figures nested"
+  },
+  {
+   "area": "M",
+   "item": "1. Skip unchanged frames; pace or pause a hidden machine's picture",
+   "status": "🧪",
+   "pct": 90,
+   "file": "`vmpace.h`, `vmdisplay.c` (`VD_PACE`), `sdk/desktopmodel.js`; `vmpace-test`, `vmdisplay-test`",
+   "note": "*In development*; measured with QEMU's vfio refresh imitated, not on the live vGPU"
+  },
+  {
+   "area": "M",
+   "item": "2. Huge pages for guest RAM",
+   "status": "🧪",
+   "pct": 85,
+   "file": "`vmmem.h`, `lordvm.c` (`mem_backing`); `vmmem-test`",
+   "note": "*In development*; hugetlb only when the administrator reserved pages; THP for shared memory (`shmem_enabled`) waits for approval"
+  },
+  {
+   "area": "M",
+   "item": "3. vCPU recommendation",
+   "status": "🧪",
+   "pct": 90,
+   "file": "`vmcpu.c`, `model.js` `vcpuAdvice`, `configure.jsx`; `vmcpu-test`, `vm_model_test.mjs`",
+   "note": "*In development*; Configure and the library card, not the assistant (it uses the host's default)"
+  },
+  {
+   "area": "M",
+   "item": "4. Disks: virtio-blk with an iothread, O_DIRECT, native AIO",
+   "status": "🟡",
+   "pct": 80,
+   "file": "`lordvm.c` (`blockdev_disk`, `disk_direct`, `virtio_disks`)",
+   "note": "*In development*; measured on the i9 NVMe; `io_uring` stays refused by `vmsandbox.c` (a sandbox change to approve)"
+  },
+  {
+   "area": "M",
+   "item": "5. Guest-side performance profile through the guest tools",
+   "status": "🟡",
+   "pct": 55,
+   "file": "`lordvm.c` (`AGK_PERF`), `configure.jsx`, `lordos-guest-win.c` w11; `vm-test`",
+   "note": "*In development*; Windows guests only (power plan, effects, transparency); no Windows Search pause, no Linux side, not checked in a running guest"
+  },
+  {
+   "area": "M",
+   "item": "6. vCPU pinning",
+   "status": "✅",
+   "pct": 95,
+   "file": "`vmpin.c`, `lordvm.c`, `configure.jsx` (Pin cores); `vmpin-test`",
+   "note": "*In development*; measured on the i9 (8 vCPUs: host frame p99 15.2 → 9.9 ms)"
+  },
+  {
+   "area": "N",
+   "item": "Unit and headless suites in `make test` (12)",
+   "status": "✅",
+   "pct": 90,
+   "file": "`server/mk/vm.mk`, `vmpin.mk`, `tests/run_suites.sh`",
+   "note": "18 C programs, 6 scripts, 8 node tests. No settings → QEMU arguments table test (`build_qemu_args` is static in `lordvm.c`)"
+  },
+  {
+   "area": "N",
+   "item": "Release gates: isolation, integrity, recovery, leaks (12)",
+   "status": "✅",
+   "pct": 85,
+   "file": "`vm_*.sh`, `tools/vm/bare-metal-gates.sh`",
+   "note": "Manual; never run on the i9 PC"
+  },
+  {
+   "area": "N",
+   "item": "End-to-end bench: a headless session driven over `remote.sock` (12)",
+   "status": "🟡",
+   "pct": 50,
+   "file": "`tools/vm/e2e/`",
+   "note": "Manual, not in `make test`; not every flow of 12 is scripted. Added by this audit"
+  },
+  {
+   "area": "N",
+   "item": "Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12)",
+   "status": "❌",
+   "pct": 0,
+   "file": "",
+   "note": "No QEMU or KVM job in `.github/workflows`"
+  },
+  {
+   "area": "N",
+   "item": "Hardware matrix: Pi 5 and Xeon bare metal (gates), the i9 with RX 580 and UHD 630 (3D, GVT-g)",
+   "status": "🟡",
+   "pct": 50,
+   "file": "CHANGELOG",
+   "note": "No Pi 4, no 4K Pi kernel, no Intel 3D, no NVIDIA"
+  }
+ ],
+ "areas": [
+  {
+   "id": "A",
+   "name": "Engine, lifecycle, sandbox, display",
+   "weight": 14,
+   "score": 77
+  },
+  {
+   "id": "B",
+   "name": "Getting a system in",
+   "weight": 12,
+   "score": 75
+  },
+  {
+   "id": "C",
+   "name": "The app",
+   "weight": 11,
+   "score": 75
+  },
+  {
+   "id": "D",
+   "name": "Snapshots, clones, storage",
+   "weight": 9,
+   "score": 56
+  },
+  {
+   "id": "E",
+   "name": "Network",
+   "weight": 6,
+   "score": 80
+  },
+  {
+   "id": "F",
+   "name": "Devices",
+   "weight": 6,
+   "score": 56
+  },
+  {
+   "id": "G",
+   "name": "Host integration",
+   "weight": 12,
+   "score": 68
+  },
+  {
+   "id": "H",
+   "name": "Graphics",
+   "weight": 7,
+   "score": 46
+  },
+  {
+   "id": "I",
+   "name": "Guest tools and agent",
+   "weight": 7,
+   "score": 75
+  },
+  {
+   "id": "J",
+   "name": "Command line and automation",
+   "weight": 3,
+   "score": 48
+  },
+  {
+   "id": "K",
+   "name": "System ties",
+   "weight": 3,
+   "score": 52
+  },
+  {
+   "id": "L",
+   "name": "Privacy and security",
+   "weight": 4,
+   "score": 72
+  },
+  {
+   "id": "M",
+   "name": "Performance",
+   "weight": 3,
+   "score": 79
+  },
+  {
+   "id": "N",
+   "name": "Tests and validation",
+   "weight": 3,
+   "score": 55
+  }
+ ],
+ "total": 68,
+ "total_exact": 67.76
+}
