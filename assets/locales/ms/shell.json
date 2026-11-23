@@ -195,6 +195,7 @@
   "picker.exists": "Fail dengan nama ini sudah wujud.",
   "picker.viewList": "Senarai",
   "picker.viewThumbs": "Lakaran kecil",
+  "picker.noCloud": "Folder Awan tidak boleh dipilih di sini.",
   "portalOpen.titleUrl": "{app} mahu membuka halaman web",
   "portalOpen.titleFile": "{app} mahu membuka fail",
   "portalOpen.titleFolder": "{app} mahu membuka folder",

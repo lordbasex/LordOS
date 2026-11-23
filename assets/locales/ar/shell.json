@@ -215,6 +215,7 @@
   "picker.exists": "يوجد ملف بهذا الاسم بالفعل.",
   "picker.viewList": "قائمة",
   "picker.viewThumbs": "صور مصغّرة",
+  "picker.noCloud": "لا يمكن اختيار مجلد سحابي هنا.",
   "portalOpen.titleUrl": "يريد {app} فتح صفحة ويب",
   "portalOpen.titleFile": "يريد {app} فتح ملف",
   "portalOpen.titleFolder": "يريد {app} فتح مجلد",

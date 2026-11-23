@@ -199,6 +199,7 @@
   "picker.exists": "Bu adda bir dosya zaten var.",
   "picker.viewList": "Liste",
   "picker.viewThumbs": "Küçük resimler",
+  "picker.noCloud": "Burada bulut klasörü seçilemez.",
   "portalOpen.titleUrl": "{app} bir web sayfası açmak istiyor",
   "portalOpen.titleFile": "{app} bir dosya açmak istiyor",
   "portalOpen.titleFolder": "{app} bir klasör açmak istiyor",

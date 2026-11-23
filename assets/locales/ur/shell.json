@@ -199,6 +199,7 @@
   "picker.exists": "اس نام کی فائل پہلے سے موجود ہے۔",
   "picker.viewList": "فہرست",
   "picker.viewThumbs": "تھمب نیلز",
+  "picker.noCloud": "یہاں کلاؤڈ فولڈر منتخب نہیں کیا جا سکتا۔",
   "portalOpen.titleUrl": "{app} ایک ویب صفحہ کھولنا چاہتی ہے",
   "portalOpen.titleFile": "{app} ایک فائل کھولنا چاہتی ہے",
   "portalOpen.titleFolder": "{app} ایک فولڈر کھولنا چاہتی ہے",

@@ -195,6 +195,7 @@
   "picker.exists": "已有同名的檔案。",
   "picker.viewList": "列表",
   "picker.viewThumbs": "縮圖",
+  "picker.noCloud": "這裡不能選擇雲端資料夾。",
   "portalOpen.titleUrl": "{app} 想要打開一個網頁",
   "portalOpen.titleFile": "{app} 想要打開一個檔案",
   "portalOpen.titleFolder": "{app} 想要打開一個資料夾",

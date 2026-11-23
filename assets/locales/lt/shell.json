@@ -203,6 +203,7 @@
   "picker.exists": "Failas tokiu pavadinimu jau yra.",
   "picker.viewList": "Sąrašas",
   "picker.viewThumbs": "Miniatiūros",
+  "picker.noCloud": "Čia negalima pasirinkti debesies aplanko.",
   "portalOpen.titleUrl": "{app} nori atverti tinklalapį",
   "portalOpen.titleFile": "{app} nori atverti failą",
   "portalOpen.titleFolder": "{app} nori atverti aplanką",

@@ -203,6 +203,7 @@
   "picker.exists": "Plik o tej nazwie już istnieje.",
   "picker.viewList": "Lista",
   "picker.viewThumbs": "Miniatury",
+  "picker.noCloud": "Tutaj nie można wybrać folderu w chmurze.",
   "portalOpen.titleUrl": "{app} chce otworzyć stronę internetową",
   "portalOpen.titleFile": "{app} chce otworzyć plik",
   "portalOpen.titleFolder": "{app} chce otworzyć folder",

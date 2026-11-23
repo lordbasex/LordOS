@@ -199,6 +199,7 @@
   "picker.exists": "Υπάρχει ήδη αρχείο με αυτό το όνομα.",
   "picker.viewList": "Λίστα",
   "picker.viewThumbs": "Μικρογραφίες",
+  "picker.noCloud": "Εδώ δεν μπορείτε να επιλέξετε φάκελο στο cloud.",
   "portalOpen.titleUrl": "Η εφαρμογή {app} θέλει να ανοίξει μια ιστοσελίδα",
   "portalOpen.titleFile": "Η εφαρμογή {app} θέλει να ανοίξει ένα αρχείο",
   "portalOpen.titleFolder": "Η εφαρμογή {app} θέλει να ανοίξει έναν φάκελο",

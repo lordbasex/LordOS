@@ -195,6 +195,7 @@
   "picker.exists": "같은 이름의 파일이 이미 있습니다.",
   "picker.viewList": "목록",
   "picker.viewThumbs": "썸네일",
+  "picker.noCloud": "여기서는 클라우드 폴더를 선택할 수 없습니다.",
   "portalOpen.titleUrl": "{app}에서 웹 페이지를 열려고 합니다",
   "portalOpen.titleFile": "{app}에서 파일을 열려고 합니다",
   "portalOpen.titleFolder": "{app}에서 폴더를 열려고 합니다",

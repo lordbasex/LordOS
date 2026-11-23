@@ -199,6 +199,7 @@
   "picker.exists": "Det finns redan en fil med det här namnet.",
   "picker.viewList": "Lista",
   "picker.viewThumbs": "Miniatyrer",
+  "picker.noCloud": "En molnmapp kan inte väljas här.",
   "portalOpen.titleUrl": "{app} vill öppna en webbsida",
   "portalOpen.titleFile": "{app} vill öppna en fil",
   "portalOpen.titleFolder": "{app} vill öppna en mapp",

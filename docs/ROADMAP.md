@@ -856,7 +856,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
     second step after mounting by hand).
   - Backup with several jobs ([#200](https://github.com/lordbasex/LordOS/issues/200), maintainer's decision 2026-11-19,
     "en algún momento"): a named job each with its own source folders, exclusions, destination, schedule (time and day for
-    hourly, daily, weekly) and encryption; folders picked with the file browser; a job may keep the computer from
+    hourly, daily, weekly) and encryption; a job's source folders picked with the file browser (the destination and the
+    exclusions already are, in development after 0.8.9.4); a job may keep the computer from
     sleeping until it ends; a list of the jobs with their last run and pause, resume and delete. Review first: jobs in
     parallel (disk and processor), and folders outside the home folder (permissions).
   - Small towns in the weather's city search ([#193](https://github.com/lordbasex/LordOS/issues/193)): GeoNames'

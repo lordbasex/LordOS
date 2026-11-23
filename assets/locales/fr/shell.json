@@ -199,6 +199,7 @@
   "picker.exists": "Un fichier portant ce nom existe déjà.",
   "picker.viewList": "Liste",
   "picker.viewThumbs": "Vignettes",
+  "picker.noCloud": "Un dossier du cloud ne peut pas être choisi ici.",
   "portalOpen.titleUrl": "{app} veut ouvrir une page web",
   "portalOpen.titleFile": "{app} veut ouvrir un fichier",
   "portalOpen.titleFolder": "{app} veut ouvrir un dossier",

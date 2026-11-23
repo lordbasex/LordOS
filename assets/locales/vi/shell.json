@@ -195,6 +195,7 @@
   "picker.exists": "Đã có tệp trùng tên.",
   "picker.viewList": "Danh sách",
   "picker.viewThumbs": "Hình thu nhỏ",
+  "picker.noCloud": "Không thể chọn thư mục đám mây ở đây.",
   "portalOpen.titleUrl": "{app} muốn mở một trang web",
   "portalOpen.titleFile": "{app} muốn mở một tệp",
   "portalOpen.titleFolder": "{app} muốn mở một thư mục",

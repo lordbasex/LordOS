@@ -199,6 +199,7 @@
   "picker.exists": "Tämänniminen tiedosto on jo olemassa.",
   "picker.viewList": "Luettelo",
   "picker.viewThumbs": "Pikkukuvat",
+  "picker.noCloud": "Pilvikansiota ei voi valita tässä.",
   "portalOpen.titleUrl": "{app} haluaa avata verkkosivun",
   "portalOpen.titleFile": "{app} haluaa avata tiedoston",
   "portalOpen.titleFolder": "{app} haluaa avata kansion",

@@ -199,6 +199,7 @@
   "picker.exists": "Már létezik ilyen nevű fájl.",
   "picker.viewList": "Lista",
   "picker.viewThumbs": "Miniatűrök",
+  "picker.noCloud": "Itt nem választható felhőmappa.",
   "portalOpen.titleUrl": "{app} meg szeretne nyitni egy weboldalt",
   "portalOpen.titleFile": "{app} meg szeretne nyitni egy fájlt",
   "portalOpen.titleFolder": "{app} meg szeretne nyitni egy mappát",

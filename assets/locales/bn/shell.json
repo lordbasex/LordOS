@@ -199,6 +199,7 @@
   "picker.exists": "এই নামে একটি ফাইল আগে থেকেই আছে।",
   "picker.viewList": "তালিকা",
   "picker.viewThumbs": "থাম্বনেইল",
+  "picker.noCloud": "এখানে ক্লাউডের ফোল্ডার বেছে নেওয়া যায় না।",
   "portalOpen.titleUrl": "{app} একটি ওয়েব পেজ খুলতে চায়",
   "portalOpen.titleFile": "{app} একটি ফাইল খুলতে চায়",
   "portalOpen.titleFolder": "{app} একটি ফোল্ডার খুলতে চায়",

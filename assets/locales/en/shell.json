@@ -199,6 +199,7 @@
   "picker.exists": "A file with this name already exists.",
   "picker.viewList": "List",
   "picker.viewThumbs": "Thumbnails",
+  "picker.noCloud": "A Cloud folder can’t be chosen here.",
   "portalOpen.titleUrl": "{app} wants to open a web page",
   "portalOpen.titleFile": "{app} wants to open a file",
   "portalOpen.titleFolder": "{app} wants to open a folder",
