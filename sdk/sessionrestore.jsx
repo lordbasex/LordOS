@@ -142,6 +142,13 @@ export function markThemeSwitch() {
   timer = 0;
   settings.set({ sessionSaved: { windows: savedList(), clean: 'theme', active: activeIndex() } });
 }
+// The switch didn't happen (themes.use got false): this context goes on, and so does its autosave.
+export function unmarkThemeSwitch() {
+  if (!armed || frozen) return;
+  settings.set({ sessionSaved: { windows: savedList(), clean: false, active: activeIndex() } });
+  lastJson = '';
+  schedule();
+}
 
 // ---- restoring ----
 

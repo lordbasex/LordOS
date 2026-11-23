@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "LordOS Studio-র মাধ্যমে ক্যামেরা",
   "capture.what.effectsOn": "এফেক্ট চালু",
   "capture.what.effectsOff": "কোনো এফেক্ট নেই",
-  "shortcuts.captureWindow": "একটি উইন্ডোর স্ক্রিনশট"
+  "shortcuts.captureWindow": "একটি উইন্ডোর স্ক্রিনশট",
+  "themeSwitch.changing": "ডেস্কটপের স্টাইল বদলানো হচ্ছে…",
+  "themeSwitch.changingTo": "{name}-এ বদলানো হচ্ছে…",
+  "themeSwitch.failedTitle": "{name} প্রয়োগ করা যায়নি",
+  "themeSwitch.refusedBody": "এর কোড LordOS-এর স্বাক্ষরিত কপির সাথে মেলে না, তাই এটি লোড করা হয়নি। আপনার ডেস্কটপের স্টাইল আগের মতোই থাকবে।",
+  "themeSwitch.failedBody": "এটি চালু হয়নি। আপনার ডেস্কটপের স্টাইল আগের মতোই থাকবে।"
 }

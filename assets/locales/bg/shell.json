@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Камера чрез LordOS Studio",
   "capture.what.effectsOn": "ефектите са включени",
   "capture.what.effectsOff": "без ефекти",
-  "shortcuts.captureWindow": "Снимка на прозорец"
+  "shortcuts.captureWindow": "Снимка на прозорец",
+  "themeSwitch.changing": "Стилът на работния плот се променя…",
+  "themeSwitch.changingTo": "Превключване към {name}…",
+  "themeSwitch.failedTitle": "{name} не можа да бъде приложен",
+  "themeSwitch.refusedBody": "Кодът му не съвпада с подписаното копие на LordOS, затова не беше зареден. Стилът на работния плот остава какъвто беше.",
+  "themeSwitch.failedBody": "Не стартира. Стилът на работния плот остава какъвто беше."
 }

@@ -979,5 +979,10 @@
   "capture.what.viaStudioPlain": "Kamera przez LordOS Studio",
   "capture.what.effectsOn": "efekty włączone",
   "capture.what.effectsOff": "bez efektów",
-  "shortcuts.captureWindow": "Zrzut okna"
+  "shortcuts.captureWindow": "Zrzut okna",
+  "themeSwitch.changing": "Zmiana stylu pulpitu…",
+  "themeSwitch.changingTo": "Przełączanie na {name}…",
+  "themeSwitch.failedTitle": "Nie udało się zastosować {name}",
+  "themeSwitch.refusedBody": "Jego kod nie zgadza się z podpisaną kopią LordOS, więc nie został wczytany. Styl pulpitu pozostaje bez zmian.",
+  "themeSwitch.failedBody": "Nie uruchomił się. Styl pulpitu pozostaje bez zmian."
 }

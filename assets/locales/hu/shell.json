@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Kamera a LordOS Studión keresztül",
   "capture.what.effectsOn": "effektusok be",
   "capture.what.effectsOff": "effektusok nélkül",
-  "shortcuts.captureWindow": "Képernyőkép egy ablakról"
+  "shortcuts.captureWindow": "Képernyőkép egy ablakról",
+  "themeSwitch.changing": "Az asztal stílusának váltása…",
+  "themeSwitch.changingTo": "Váltás erre: {name}…",
+  "themeSwitch.failedTitle": "A(z) {name} nem alkalmazható",
+  "themeSwitch.refusedBody": "A kódja nem egyezik a LordOS aláírt példányával, ezért nem töltődött be. Az asztal stílusa marad a régi.",
+  "themeSwitch.failedBody": "Nem indult el. Az asztal stílusa marad a régi."
 }

@@ -447,8 +447,9 @@ validated again when it is read, the same rules (`server/tests/session_model_tes
 **The marker.** `sessionSaved.clean` is false from the moment a session starts. It turns true in `flushSession()`
 (`session.quit`, Search's Log Out, the power dialog before it asks lord-sessiond; a refusal undoes it) or in
 `__lordBeforeExit`, which `main.c` calls after the main loop. A session that never gets there leaves it false,
-and that is what "unclean" means. Switching theme is not an end: the marker says `'theme'` and `themeReopen`
-does the work.
+and that is what "unclean" means. Switching theme is not an end, and never logs out (it happens live in the same
+session, `docs/THEMES-GUIDE.md` "Switching"): the marker says `'theme'` and `themeReopen` does the work; a switch
+that `lord.themes.use` refuses puts the marker back to false (`unmarkThemeSwitch`) and the session goes on.
 
 Worker threads start before `main.c` blocks `SIGTERM`, so a signal used to end the process on one of them
 without leaving the loop (seen on VM 125: gone in under 300 ms, nothing written). A handler now forwards it to

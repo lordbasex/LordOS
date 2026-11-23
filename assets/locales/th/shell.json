@@ -965,5 +965,10 @@
   "capture.what.viaStudioPlain": "กล้องผ่าน LordOS Studio",
   "capture.what.effectsOn": "เปิดเอฟเฟกต์",
   "capture.what.effectsOff": "ไม่มีเอฟเฟกต์",
-  "shortcuts.captureWindow": "จับภาพหน้าต่าง"
+  "shortcuts.captureWindow": "จับภาพหน้าต่าง",
+  "themeSwitch.changing": "กำลังเปลี่ยนสไตล์เดสก์ท็อป…",
+  "themeSwitch.changingTo": "กำลังเปลี่ยนเป็น {name}…",
+  "themeSwitch.failedTitle": "ใช้ {name} ไม่ได้",
+  "themeSwitch.refusedBody": "โค้ดของธีมนี้ไม่ตรงกับสำเนาที่ลงนามของ LordOS จึงไม่ได้โหลด สไตล์เดสก์ท็อปของคุณยังคงเหมือนเดิม",
+  "themeSwitch.failedBody": "ธีมนี้ไม่เริ่มทำงาน สไตล์เดสก์ท็อปของคุณยังคงเหมือนเดิม"
 }

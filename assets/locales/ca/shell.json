@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Càmera a través de LordOS Studio",
   "capture.what.effectsOn": "efectes activats",
   "capture.what.effectsOff": "sense efectes",
-  "shortcuts.captureWindow": "Captura d’una finestra"
+  "shortcuts.captureWindow": "Captura d’una finestra",
+  "themeSwitch.changing": "S’està canviant l’estil de l’escriptori…",
+  "themeSwitch.changingTo": "S’està canviant a {name}…",
+  "themeSwitch.failedTitle": "No s’ha pogut aplicar {name}",
+  "themeSwitch.refusedBody": "El seu codi no coincideix amb la còpia signada de LordOS, així que no s’ha carregat. L’estil de l’escriptori es manté com estava.",
+  "themeSwitch.failedBody": "No s’ha iniciat. L’estil de l’escriptori es manté com estava."
 }

@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "LordOS Studio üzerinden kamera",
   "capture.what.effectsOn": "efektler açık",
   "capture.what.effectsOff": "efekt yok",
-  "shortcuts.captureWindow": "Bir pencerenin ekran görüntüsü"
+  "shortcuts.captureWindow": "Bir pencerenin ekran görüntüsü",
+  "themeSwitch.changing": "Masaüstü stili değiştiriliyor…",
+  "themeSwitch.changingTo": "{name} stiline geçiliyor…",
+  "themeSwitch.failedTitle": "{name} uygulanamadı",
+  "themeSwitch.refusedBody": "Kodu LordOS’un imzalı kopyasıyla eşleşmiyor, bu yüzden yüklenmedi. Masaüstü stiliniz olduğu gibi kalıyor.",
+  "themeSwitch.failedBody": "Başlamadı. Masaüstü stiliniz olduğu gibi kalıyor."
 }

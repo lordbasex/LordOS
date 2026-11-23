@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "LordOS Studio vasitəsilə kamera",
   "capture.what.effectsOn": "effektlər açıqdır",
   "capture.what.effectsOff": "effektsiz",
-  "shortcuts.captureWindow": "Pəncərənin skrinşotu"
+  "shortcuts.captureWindow": "Pəncərənin skrinşotu",
+  "themeSwitch.changing": "İş masası üslubu dəyişdirilir…",
+  "themeSwitch.changingTo": "{name} üslubuna keçilir…",
+  "themeSwitch.failedTitle": "{name} tətbiq edilə bilmədi",
+  "themeSwitch.refusedBody": "Onun kodu LordOS-un imzalı nüsxəsi ilə uyğun gəlmir, ona görə yüklənmədi. İş masası üslubunuz olduğu kimi qalır.",
+  "themeSwitch.failedBody": "Başlamadı. İş masası üslubunuz olduğu kimi qalır."
 }

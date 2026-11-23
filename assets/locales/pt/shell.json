@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Câmera via LordOS Studio",
   "capture.what.effectsOn": "efeitos ativados",
   "capture.what.effectsOff": "sem efeitos",
-  "shortcuts.captureWindow": "Captura de uma janela"
+  "shortcuts.captureWindow": "Captura de uma janela",
+  "themeSwitch.changing": "Mudando o estilo da área de trabalho…",
+  "themeSwitch.changingTo": "Mudando para {name}…",
+  "themeSwitch.failedTitle": "Não foi possível aplicar {name}",
+  "themeSwitch.refusedBody": "O código dele não corresponde à cópia assinada do LordOS, então não foi carregado. Seu estilo de área de trabalho continua como estava.",
+  "themeSwitch.failedBody": "Não iniciou. Seu estilo de área de trabalho continua como estava."
 }

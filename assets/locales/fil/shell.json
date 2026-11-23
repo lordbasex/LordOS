@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Camera sa pamamagitan ng LordOS Studio",
   "capture.what.effectsOn": "naka-on ang effects",
   "capture.what.effectsOff": "walang effects",
-  "shortcuts.captureWindow": "Screenshot ng isang window"
+  "shortcuts.captureWindow": "Screenshot ng isang window",
+  "themeSwitch.changing": "Binabago ang istilo ng desktop…",
+  "themeSwitch.changingTo": "Lumilipat sa {name}…",
+  "themeSwitch.failedTitle": "Hindi mailapat ang {name}",
+  "themeSwitch.refusedBody": "Hindi tugma ang code nito sa nilagdaang kopya ng LordOS, kaya hindi ito na-load. Mananatili ang istilo ng desktop mo gaya ng dati.",
+  "themeSwitch.failedBody": "Hindi ito nagsimula. Mananatili ang istilo ng desktop mo gaya ng dati."
 }

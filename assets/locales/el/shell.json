@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Κάμερα μέσω LordOS Studio",
   "capture.what.effectsOn": "εφέ ενεργά",
   "capture.what.effectsOff": "χωρίς εφέ",
-  "shortcuts.captureWindow": "Στιγμιότυπο ενός παραθύρου"
+  "shortcuts.captureWindow": "Στιγμιότυπο ενός παραθύρου",
+  "themeSwitch.changing": "Αλλαγή στυλ επιφάνειας εργασίας…",
+  "themeSwitch.changingTo": "Αλλαγή σε {name}…",
+  "themeSwitch.failedTitle": "Δεν ήταν δυνατή η εφαρμογή του {name}",
+  "themeSwitch.refusedBody": "Ο κώδικάς του δεν ταιριάζει με το υπογεγραμμένο αντίγραφο του LordOS, γι’ αυτό δεν φορτώθηκε. Το στυλ της επιφάνειας εργασίας μένει όπως ήταν.",
+  "themeSwitch.failedBody": "Δεν ξεκίνησε. Το στυλ της επιφάνειας εργασίας μένει όπως ήταν."
 }

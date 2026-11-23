@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "LordOS Studio के ज़रिए कैमरा",
   "capture.what.effectsOn": "इफ़ेक्ट चालू",
   "capture.what.effectsOff": "कोई इफ़ेक्ट नहीं",
-  "shortcuts.captureWindow": "एक विंडो का स्क्रीनशॉट"
+  "shortcuts.captureWindow": "एक विंडो का स्क्रीनशॉट",
+  "themeSwitch.changing": "डेस्कटॉप की शैली बदली जा रही है…",
+  "themeSwitch.changingTo": "{name} पर बदला जा रहा है…",
+  "themeSwitch.failedTitle": "{name} लागू नहीं हो सका",
+  "themeSwitch.refusedBody": "इसका कोड LordOS की हस्ताक्षरित प्रति से मेल नहीं खाता, इसलिए इसे लोड नहीं किया गया। आपके डेस्कटॉप की शैली पहले जैसी ही रहेगी।",
+  "themeSwitch.failedBody": "यह शुरू नहीं हुआ। आपके डेस्कटॉप की शैली पहले जैसी ही रहेगी।"
 }

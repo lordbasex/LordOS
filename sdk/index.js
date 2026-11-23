@@ -72,7 +72,8 @@ export { archive } from './archive.js';
 export { print, queueName } from './print.js';
 export { emoji, Grid as EmojiGrid, ToneBar as EmojiToneBar } from './emoji.jsx';
 import { PrintDialog } from './printdialog.jsx';
-import { RestorePrompt, startSessionRestore, markThemeSwitch, logOut } from './sessionrestore.jsx';
+import { RestorePrompt, startSessionRestore, markThemeSwitch, unmarkThemeSwitch, logOut } from './sessionrestore.jsx';
+import { ThemeSwitchOverlay, showThemeSwitch, hideThemeSwitch, notifyThemeNotApplied } from './themeswitch.jsx';
 import { askPower, canPower } from './power.jsx';
 export { PowerDialog, powerAsk, POWER_SECONDS } from './power.jsx';
 import { EmojiPanel } from './emoji.jsx';
@@ -250,25 +251,39 @@ export const themes = {
     return { id: t.id, current: t.current, hidden: !!meta.hidden, name: tOptional(`shell.theme.${t.id}.name`) || meta.name || t.id,
       description: tOptional(`shell.theme.${t.id}.description`) || meta.description || '', ...cleanThemeMeta(meta),
       // it couldn't start in this session (lord-server went back to the one before): Settings → Appearance says why
-      failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '' };
+      failed: t.failed === true, failedWhy: typeof t.failedWhy === 'string' ? t.failedWhy : '', failedCode: t.failedCode === true };
   }).filter((t) => !t.hidden),         // the login screen (themes/greeter) can't be chosen
   current: () => lord.themes.list().find((t) => t.current)?.id || null,
   // the current theme's entry (null on the login screen or without lord.themes)
   info: () => { try { return themes.list().find((t) => t.current) || null; } catch (e) { return null; } },
-  // Switches theme live: the server discards this JS context and loads the new one. The LordOS
-  // app windows that are open come back in the new theme (themeReopen, read once by startShell);
-  // Linux app windows stay connected and simply get the new theme's frame.
+  // Switches theme live, in the same session: lord-server checks the new theme's code first (the verified-code
+  // check), then discards this JS context and loads the new one behind a short "Changing the desktop style" overlay
+  // (themeswitch.jsx). The LordOS app windows that are open come back in the new theme (themeReopen, read once by
+  // startShell); Linux app windows stay connected and simply get the new theme's frame. false: it can't be switched
+  // to (refused or failed before): nothing changed, and a notification says so.
   use(id) {
+    const before = settings.get();
     let reopen = [];
     try {
       reopen = windowsStore.get().filter((w) => { const a = getAppOf(w.id); return a && !a.builtin; }).slice(-8)
         .map((w) => ({ app: w.app, id: w.id, args: w.args ? JSON.parse(JSON.stringify(w.args)) : null, minimized: !!w.minimized,
           frame: { x: w.x, y: w.y, w: w.w, h: w.h }, maximized: !!w.maximized, desk: indexOfDesktop(w.desktop) }));
     } catch (e) { reopen = []; }
+    let entry = null;
+    try { entry = themes.list().find((x) => x.id === id) || null; } catch (e) { entry = null; }
     markThemeSwitch();
     settings.set({ theme: id, themeReopen: reopen.length ? reopen : null, themeDesktops: desktopsForThemeSwitch() });
     lord.settings.save(JSON.stringify(settings.get(), null, 2));
-    return lord.themes.use(id);
+    showThemeSwitch(entry?.name || id);
+    if (lord.themes.use(id)) return true;
+    // not switched (lord-server answered before touching anything): the session goes on in this style
+    hideThemeSwitch();
+    settings.set({ theme: before.theme ?? null, themeReopen: before.themeReopen ?? null, themeDesktops: before.themeDesktops ?? null });
+    unmarkThemeSwitch();
+    lord.settings.save(JSON.stringify(settings.get(), null, 2));
+    try { entry = themes.list().find((x) => x.id === id) || entry; } catch (e) { /* keep the one read before */ }
+    notifyThemeNotApplied(entry || { id });
+    return false;
   },
 };
 
@@ -297,7 +312,17 @@ export function startShell(element) {
   startDesktops();
   const wanted = settings.get().theme;
   const current = themes.current();
-  if (wanted && current && wanted !== current && lord.themes.use(wanted)) return;
+  if (wanted && current && wanted !== current) {
+    if (lord.themes.use(wanted)) return;
+    // the chosen theme didn't start (it threw, or was refused at login) and lord-server kept this one: the choice
+    // goes back to the theme that runs, and the person is told why the style didn't change
+    let entry = null;
+    try { entry = themes.list().find((x) => x.id === wanted) || null; } catch (e) { entry = null; }
+    if (entry?.failed) {
+      settings.set({ theme: current });
+      notifyThemeNotApplied(entry);
+    }
+  }
   try { lord.input?.pointerAccent?.(null); } catch (e) { /* older server */ }   // LordOS's black arrow; a theme may tint it (setPointerAccent)
   refreshPackages();                    // after the theme's configureWindows
   startAppsOff();                       // deactivated apps open nothing; their background work stays off (appsoffactions.js)
@@ -388,7 +413,7 @@ function LocaleRoot({ children }) {
     at('modal', PrintDialog, RestorePrompt, FirstStart),
     at('notification', NotificationBanner, ClipboardToast, RemoteBadge, CaptureCorner, DisplayIdentify, VoicePlayer),
     at('system', PermissionPrompt, SharePrompt, Powerbox, KeyringPrompt, BluetoothPrompt, PolkitPrompt, PortalFilePrompt, PortalOpenPrompt, GlobalShortcutsPrompt, ScreenCastPrompt, ShotOverlay, WebAppAskPrompt, WebAppInspectPrompt, VoiceSavePrompt, DisplayConfirm, WebAppMenu),
-    at('input', OskPanel, ImeOverlay));
+    at('input', OskPanel, ImeOverlay, ThemeSwitchOverlay));   // the style changing: over everything (themeswitch.jsx)
 }
 // the wallpaper slideshow (0.8.9; a theme turns it on in theme.json: sdk/thememeta.js)
 export { SlideshowWallpapers, slideSrc, slideshowPrefs, slideshowPatch, slideshowStop, slideshowCategories, SLIDESHOW_EVERY } from './slideshow.jsx';

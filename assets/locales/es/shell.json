@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Cámara a través de LordOS Studio",
   "capture.what.effectsOn": "efectos activados",
   "capture.what.effectsOff": "sin efectos",
-  "shortcuts.captureWindow": "Captura de una ventana"
+  "shortcuts.captureWindow": "Captura de una ventana",
+  "themeSwitch.changing": "Cambiando el estilo del escritorio…",
+  "themeSwitch.changingTo": "Cambiando a {name}…",
+  "themeSwitch.failedTitle": "No se pudo aplicar {name}",
+  "themeSwitch.refusedBody": "Su código no coincide con la copia firmada de LordOS, así que no se cargó. Tu estilo de escritorio sigue como estaba.",
+  "themeSwitch.failedBody": "No arrancó. Tu estilo de escritorio sigue como estaba."
 }

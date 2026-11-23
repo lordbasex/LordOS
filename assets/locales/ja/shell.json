@@ -965,5 +965,10 @@
   "capture.what.viaStudioPlain": "LordOS Studio 経由のカメラ",
   "capture.what.effectsOn": "エフェクトオン",
   "capture.what.effectsOff": "エフェクトなし",
-  "shortcuts.captureWindow": "ウインドウのスクリーンショット"
+  "shortcuts.captureWindow": "ウインドウのスクリーンショット",
+  "themeSwitch.changing": "デスクトップのスタイルを変更しています…",
+  "themeSwitch.changingTo": "{name} に変更しています…",
+  "themeSwitch.failedTitle": "{name} を適用できませんでした",
+  "themeSwitch.refusedBody": "コードが LordOS の署名済みのコピーと一致しないため、読み込まれませんでした。デスクトップのスタイルは元のままです。",
+  "themeSwitch.failedBody": "起動しませんでした。デスクトップのスタイルは元のままです。"
 }

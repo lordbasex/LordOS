@@ -2790,6 +2790,8 @@ static int check_code(int argc, char **argv) {
     return bad ? 1 : 0;
 }
 
+static unsigned renders_done;          /* frames drawn: a theme switch waits for two (its overlay on screen) */
+
 /* 0 if the requested theme is running; -1 if it failed and `current` (the last one that loaded) was put
  * back: the caller keeps `current` then, so a second failed switch never falls back to a refused theme */
 static int switch_theme(const char *current) {
@@ -2803,7 +2805,8 @@ static int switch_theme(const char *current) {
     js_shutdown();
     ui_reset();
     term_detach_all();
-    int r = js_init(path);
+    /* the bytes lord.themes.use verified when it was asked (js_sys.c f_themes_use): a refused theme never gets here */
+    int r = js_init_prepared(path);
     if (r) {
         fprintf(stderr, "lord-server: the theme failed, going back to %s\n", current);
         snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", path);
@@ -2814,11 +2817,12 @@ static int switch_theme(const char *current) {
         ui.theme_failed_gen = codesig_generation();
         js_shutdown();
         ui_reset();
-        if (js_init(current)) {
-            /* the theme that was running is refused too (its file changed under the running session: a package
-             * update rewrote it and the new code manifest did not verify, sec/codesig.c codesig_reload). Never no JavaScript at
-             * all: the main loop's next js_tick would call into a freed context (the 2026-11-22 13:41 crash,
-             * JS_GetGlobalObject(NULL)). The recovery screen instead, as at start (start_theme). */
+        /* the theme that was running, from the bytes verified when it loaded: not its file again, which a package
+         * update may have replaced under the session (js.c js_init_previous) */
+        if (js_init_previous(current)) {
+            /* it did not start again either (it can only be read again from disk when it was never kept). Never no
+             * JavaScript at all: the main loop's next js_tick would call into a freed context (the 2026-11-22 13:41
+             * crash, JS_GetGlobalObject(NULL)). The recovery screen instead, as at start (start_theme). */
             fprintf(stderr, "lord-server: %s did not load again either: the recovery screen\n", current);
             js_shutdown();
             ui_reset();
@@ -3217,11 +3221,19 @@ int main(int argc, char **argv) {
     wdog_busy(mono_ns());
     while (!s.quit && !ui.quit_requested) {
         if (ui.theme_request[0]) {
-            char next[sizeof current];
-            snprintf(next, sizeof next, "%s", ui.theme_request);
-            wdog_expect(1);                 /* a theme loads for a second or more by design */
-            if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
-            wdog_expect(0);
+            /* two frames first (or 300 ms when none is drawn): the shell's "changing the desktop style" overlay (sdk
+             * themeswitch.jsx) gets on screen, and stays there while the new theme loads behind it */
+            static double asked;
+            static unsigned asked_renders;
+            if (!asked) { asked = now_ms(); asked_renders = renders_done; }
+            if (renders_done - asked_renders >= 2 || now_ms() - asked >= 300) {
+                asked = 0;
+                char next[sizeof current];
+                snprintf(next, sizeof next, "%s", ui.theme_request);
+                wdog_expect(1);                 /* a theme loads for a second or more by design */
+                if (!switch_theme(current)) snprintf(current, sizeof current, "%s", next);
+                wdog_expect(0);
+            }
         }
         {   /* a pointer lock started, ended, or its owner moved the pointer image it shows (pointerlock.h) */
             static unsigned plk;
@@ -3384,6 +3396,7 @@ int main(int argc, char **argv) {
         if (s.headless || soft) pace = softpace_wait(&pace_sw, tnow, period);
         if (wants && (!all_busy(&s) || ahead) && pace <= 0) {
             render(&s);
+            renders_done++;
             js_vm_painted();                /* the machines' frames it showed: lord-vmdisplay may send the next ones */
             wants = 0;
             if (s.headless || soft) { softpace_started(&pace_sw, period); softpace_shown(&pace_sw, now_ms(), period); }
@@ -3402,7 +3415,8 @@ int main(int argc, char **argv) {
             if (twd >= 0 && (delay < 0 || twd < delay)) delay = twd;
         }
         int wait = delay < 0 ? -1 : (int)ceil(delay);
-        if ((wants && (!all_busy(&s) || ahead) && pace <= 0) || ui.theme_request[0] || ui.quit_requested) wait = 0;
+        if ((wants && (!all_busy(&s) || ahead) && pace <= 0) || ui.quit_requested) wait = 0;
+        if (ui.theme_request[0] && (wait < 0 || wait > 16)) wait = 16;     /* a theme switch waits for its overlay's frames */
         if (timeout_ms > 0) {
             double left = start + timeout_ms - now_ms();
             if (left <= 0) break;

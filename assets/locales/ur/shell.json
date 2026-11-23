@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "LordOS Studio کے ذریعے کیمرا",
   "capture.what.effectsOn": "اثرات آن",
   "capture.what.effectsOff": "کوئی اثر نہیں",
-  "shortcuts.captureWindow": "ایک ونڈو کا اسکرین شاٹ"
+  "shortcuts.captureWindow": "ایک ونڈو کا اسکرین شاٹ",
+  "themeSwitch.changing": "ڈیسک ٹاپ کا انداز بدلا جا رہا ہے…",
+  "themeSwitch.changingTo": "{name} پر بدلا جا رہا ہے…",
+  "themeSwitch.failedTitle": "{name} لاگو نہیں ہو سکا",
+  "themeSwitch.refusedBody": "اس کا کوڈ LordOS کی دستخط شدہ نقل سے میل نہیں کھاتا، اس لیے اسے لوڈ نہیں کیا گیا۔ آپ کے ڈیسک ٹاپ کا انداز پہلے جیسا ہی رہے گا۔",
+  "themeSwitch.failedBody": "یہ شروع نہیں ہوا۔ آپ کے ڈیسک ٹاپ کا انداز پہلے جیسا ہی رہے گا۔"
 }

@@ -979,5 +979,10 @@
   "capture.what.viaStudioPlain": "Kamera per LordOS Studio",
   "capture.what.effectsOn": "efektai įjungti",
   "capture.what.effectsOff": "be efektų",
-  "shortcuts.captureWindow": "Lango ekrano kopija"
+  "shortcuts.captureWindow": "Lango ekrano kopija",
+  "themeSwitch.changing": "Keičiamas darbalaukio stilius…",
+  "themeSwitch.changingTo": "Keičiama į {name}…",
+  "themeSwitch.failedTitle": "Nepavyko pritaikyti {name}",
+  "themeSwitch.refusedBody": "Jo kodas nesutampa su pasirašyta LordOS kopija, todėl jis nebuvo įkeltas. Darbalaukio stilius lieka toks, koks buvo.",
+  "themeSwitch.failedBody": "Jis nepasileido. Darbalaukio stilius lieka toks, koks buvo."
 }
