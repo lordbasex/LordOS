@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -28,9 +28,9 @@ build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR)
 
 # lordos-guest: the clipboard helper Machines installs in a Linux guest of this computer's architecture (static: it
 # runs on whatever the guest has)
-build/lordos-guest: ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c ../tools/guest/x11clip.h src/vm/vmagent.c src/vm/vmagent.h
+build/lordos-guest: ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c ../tools/guest/x11clip.h ../tools/guest/perf.c ../tools/guest/perf.h ../tools/guest/dbusmin.c ../tools/guest/dbusmin.h src/vm/vmagent.c src/vm/vmagent.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c src/vm/vmagent.c
+	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c ../tools/guest/perf.c ../tools/guest/dbusmin.c src/vm/vmagent.c
 
 # lordos-guest-win.exe: LordOS guest tools for Windows guests (tools/guest-win), cross-built with mingw-w64
 # (gcc-mingw-w64-x86-64-posix, docs/VM-SETUP.md): Win32 only, libgcc and winpthread linked in, no DLL of ours. Skipped
@@ -72,7 +72,7 @@ endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
-test: build/vmpace-test build/vmmem-test build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/http-retry-test build/vmunattend-test build/vmthumb-test build/vmcpu-test test-vm-import
+test: build/vmpace-test build/vmmem-test build/vm-test build/guest-dbus-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/http-retry-test build/vmunattend-test build/vmthumb-test build/vmcpu-test test-vm-import
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
 # and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage,
@@ -145,9 +145,15 @@ build/vmlogind-test: tests/vmlogind_test.c src/vm/vmlogind.c src/vm/vmlogind.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ tests/vmlogind_test.c src/vm/vmlogind.c $(shell pkg-config --libs libsystemd)
 	./$@ || { rm -f $@; exit 1; }
 endif
-build/vm-test: tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c $(VM_COMMON) $(VM_HDR)
+build/vm-test: tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) $(VM_HDR)
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c $(VM_COMMON)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON)
+	./$@ || { rm -f $@; exit 1; }
+# lordos-guest's own D-Bus client and the performance profile's record (tools/guest/dbusmin.c, perf.c); the calls on
+# real buses are tests/guest_perf_test.sh (run_suites.sh)
+build/guest-dbus-test: tests/guest_dbus_test.c ../tools/guest/dbusmin.c ../tools/guest/dbusmin.h ../tools/guest/perf.c ../tools/guest/perf.h src/vm/vmagent.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/guest_dbus_test.c ../tools/guest/dbusmin.c ../tools/guest/perf.c
 	./$@ || { rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm

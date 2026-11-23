@@ -385,6 +385,14 @@ EOF
         77) skip "guest-stop" "build/lordos-guest and python3" ;;
         *) bad "guest-stop (tests/guest_stop_test.sh, lordos-guest's shutdown notice)" ;;
     esac
+    # lordos-guest's performance profile on private buses: the real dconf-service, stand-ins for power-profiles-daemon
+    # and the portal (tests/guest_perf_mock.py)
+    sh tests/guest_perf_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-perf (tests/guest_perf_test.sh, lordos-guest's performance profile over D-Bus)" ;;
+        77) skip "guest-perf" "build/lordos-guest, python3 with gi, dbus-daemon, dconf-service and gsettings" ;;
+        *) bad "guest-perf (tests/guest_perf_test.sh, lordos-guest's performance profile over D-Bus)" ;;
+    esac
     # a getter that destroys the node lord.setProp / lord.setStyle are writing (Claude Security, 0.8.9)
     sh tests/js_getter_destroy.sh >"$T/out" 2>&1
     case $? in

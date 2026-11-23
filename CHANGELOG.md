@@ -491,7 +491,7 @@ In development; the latest release is 0.8.9.5-beta.
 
 - **A performance profile per machine, applied inside a guest by the LordOS guest tools** (in development; the latest
   release is 0.8.9.5-beta). Approved by the maintainer on 2026-11-23 (Machines performance, item 5). Configure → Guest
-  agent → **Performance profile**, shown for guests that use the LordOS guest tools for their system (w11), off by default (machine.json
+  agent → **Performance profile**, shown for every guest (the guest tools w11, the Linux helper 7), off by default (machine.json
   `perf_profile`, schema 13, written only when on; `lord-vm --set DIR --perf-profile on|off`; `lord.vm.set`
   `perfProfile`). Details in `docs/VIRTUALIZATION.md` 7.1.4.
   - **How it gets there.** Tools that say `perf` in their hello (guest tools w11) get one frame after every hello:
@@ -508,14 +508,49 @@ In development; the latest release is 0.8.9.5-beta.
     the person's own registry). What was there before is kept in `HKCU\Software\LordOS\GuestWin` `PerfSaved` and
     put back when the host says off, when the tools let the port go (log off, another session at the console, exit),
     and when they start after a crash; a part goes back only while it is still what the tools set.
-  - **Not done, for a review first:** pausing the guest's search indexing service while idle (a service needs
-    administrator rights; the tools never run elevated) and the profile in Linux guests (power-profiles-daemon over the system D-Bus or
-    `powerprofilesctl`, and a desktop's animations through `gsettings`, are a new connection or new programs for the
-    Linux helper, whose approved list is `xclip`, `wl-clipboard` and `systemctl --user show-environment`).
+  - **The search indexer of a guest of the other system** (approved by the maintainer on 2026-11-23): its service
+    needs administrator rights, which the tools never have, so lord-vm runs one more fixed script as the system's own
+    account through qemu-guest-agent, once per run when the tools say `perf`, like the pointer's script. Two
+    compile-time constants (`PERFWIN_SEARCH_ON`, `PERFWIN_SEARCH_OFF`, `server/src/vm/vmperfwin.c`); only the
+    on/off bit picks one, nothing from the guest, the person, JS or machine.json goes in. On: when the indexer's
+    service (`WSearch`) starts automatically (delayed or not), that start type is kept in a fixed machine-wide
+    registry value (`HKLM\SOFTWARE\LordOS\GuestWin` `WSearchStartWas`, 2 or 18), the service is set to start
+    manually (`sc.exe config WSearch start= demand`) and stopped; one already manual or disabled is left as it is.
+    Off (the next start with the profile off): with a value kept and the service still manual, the start type goes
+    back (`auto` or `delayed-auto`) and the service is started; a start type changed in between stays; the value
+    goes either way. A named mutex keeps two runs apart. The script prints one line (`on|off <start type>
+    <service>`) that lord-vm reads with the strict `perfwin_parse` and only logs ("performance profile: … set to
+    start manually (its automatic start kept to put back), stopped").
+  - **Linux guests** (approved by the maintainer on 2026-11-23; the clipboard helper `lordos-guest` 7, which says
+    `perf` in its hello): the helper speaks D-Bus itself (`tools/guest/dbusmin.c`: a Unix socket only, EXTERNAL
+    authentication, method calls built from its own constants, every reply checked before a value is read) and starts
+    no new program. On the system bus only, power-profiles-daemon's `ActiveProfile`
+    (`org.freedesktop.UPower.PowerProfiles`, else the older `net.hadess.PowerProfiles`) to `performance`, which polkit
+    lets the active session switch. On the session bus only, GNOME's `org.gnome.desktop.interface`
+    `enable-animations` to false: read through the desktop portal's Settings (`ReadOne`, else `Read`), written
+    through dconf's own service (`ca.desrt.dconf.Writer.Change`, the path GSettings takes; the change set is built
+    byte for byte as GLib builds it). Another desktop (KDE and the rest) is reported refused. What was there before
+    is kept in `~/.local/state/lordos-guest/perf` (a fixed text record, read back strictly) and put back on `AGK_PERF`
+    0, when the port goes, when the helper ends (SIGTERM, SIGINT, SIGHUP; it used to die at once) and at its next
+    start after a crash, each part only while it is still what the helper set; a part that couldn't be put back
+    stays in the record for the next start. The parts go to the host in `AGK_PERFSTATE` (`POWER`, `EFFECTS`), which
+    lord-vm logs as "power profile" and "animations". Configure's switch now shows for every guest, with its own
+    note for Linux guests (`machines.cfg.perfProfile`, `machines.cfg.perfProfileNote`, in all 35 languages; the
+    other system's note also says its search indexer pauses). The helper's version is 7, so Machines offers the
+    update (`TOOLS_SHIPPED.linux`).
   - **Tests:** `build/vm-test` (machine.json schema 13: true, false, wrong types, below 13, the round trip; `AGK_PERF`
-    and every one of the 16 777 216 three-byte `AGK_PERFSTATE` payloads against the rule; the `perf` hello word),
-    `tests/vm_model_test.mjs` (the shipped guest tools are w11). The guest tools build with mingw-w64 with no
-    warning and import only system DLLs (powrprof added). Not yet checked in a running guest.
+    and every one of the 16 777 216 three-byte `AGK_PERFSTATE` payloads against the rule; the `perf` hello word; both
+    search scripts are constants without a format or an argument; every `on|off <start type> <service>` line, 100 of
+    them, against the rule written out again, and malformed ones), `build/guest-dbus-test` (the calls the helper
+    builds, every reply prefix and single-byte change, variants nested too deep, errors, big-endian replies, dconf's
+    change set against GLib's own bytes, the record's strict reading), `tests/guest_perf_test.sh` (in `make test`:
+    two private dbus-daemons, the real dconf-service for a temporary home, stand-ins for power-profiles-daemon and the
+    portal; on, off, the port going, SIGTERM, a run killed with the profile on put back at the next start, a part
+    changed in between, a refused profile, the older bus name, the portal's older `Read`, KDE, no buses),
+    `tests/vm_model_test.mjs` (the shipped guest tools are w11 and 7). The guest tools build with mingw-w64 with no
+    warning and import only system DLLs (powrprof added). The tools' part was checked in the maintainer's guest on
+    2026-11-23 ("performance profile is on (applied: power plan visual effects transparency; refused: nothing)"); the
+    search script and the Linux helper's part are not yet checked in a running guest.
 - **Machines suggests a vCPU count from what a machine really uses** (in development; the latest release is
   0.8.9.5-beta). Approved by the maintainer on 2026-11-23, after his guest with 10 vCPUs idled at 10 to 28 % of one
   core in apps mode with a text editor. Details in `docs/VIRTUALIZATION.md` 6.27.
