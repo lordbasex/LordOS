@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "دوربین از طریق LordOS Studio",
   "capture.what.effectsOn": "جلوه‌ها روشن",
   "capture.what.effectsOff": "بدون جلوه",
-  "shortcuts.captureWindow": "عکس از یک پنجره"
+  "shortcuts.captureWindow": "عکس از یک پنجره",
+  "themeSwitch.changing": "در حال تغییر سبک میز کار…",
+  "themeSwitch.changingTo": "در حال تغییر به {name}…",
+  "themeSwitch.failedTitle": "{name} اعمال نشد",
+  "themeSwitch.refusedBody": "کد آن با نسخهٔ امضاشدهٔ LordOS مطابقت ندارد، پس بارگذاری نشد. سبک میز کار شما همان‌طور که بود می‌ماند.",
+  "themeSwitch.failedBody": "اجرا نشد. سبک میز کار شما همان‌طور که بود می‌ماند."
 }

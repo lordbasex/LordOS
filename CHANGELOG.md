@@ -10,6 +10,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Changing the desktop style keeps the session.** Choosing Lord Flow, Lord Classic, Lord Workspaces or Lord Celeste
+  in Settings → Appearance or in the first-start chooser switches live again and never ends the session. Since
+  0.8.9.5 a switch tore the running theme down before it knew whether the new one could run: when the verified-code
+  check refused the new bundle, or the new theme threw while starting, `lord-server` read the running theme's file
+  again, and if that file had changed under the session (a package update) it was refused too and only the recovery
+  screen was left, whose one button is Log Out (`switch_theme` in `server/src/main.c`, from 2e2bc506; before that
+  commit the same case crashed `lord-server`, which also ended the session). Now:
+  - `lord.themes.use` reads and verifies the new bundle while the running theme still runs (`js_theme_prepare` in
+    `server/src/ui/js.c`). A refused or unreadable bundle is answered with `false` at once: nothing is discarded, the
+    choice goes back to the theme in use, the session-restore marker is put back, and a notification says the style
+    couldn't be applied and why (refused by the verified-code check, or didn't start), in every language. The check
+    itself is unchanged: the switch runs exactly the bytes that were checked (`js_init_prepared`).
+  - If the new theme throws while it starts, the theme that was running starts again from the bytes verified when it
+    was loaded (`js_init_previous`), never from its file on disk; its `startShell()` puts the choice back and shows
+    the same notification. The recovery screen is only for a theme that can't be run at all.
+  - While the style changes, a short overlay dims the desktop with a ring and "Changing to ‹name›…"
+    (`sdk/themeswitch.jsx`); `lord-server` draws two more frames after the switch is accepted (300 ms at most) so it
+    is on screen while the new theme loads behind it, and the new theme's first frame replaces it.
+  - `lord-server` no longer crashes when a theme starts in a session without Wayland (the background-blur
+    capabilities were sent to a list that was never set up, `server/src/wl/bgeffect.c`).
+  - Tests: `server/tests/theme_switch_headless.sh` now switches round the four desktops in one headless session
+    through the SDK's `themes.use` (driver in `server/tests/theme_switch_scene.mjs`), with Settings and Files open and
+    a Wayland client drawing: the process stays up, each desktop runs with both apps back, the overlay is up at each
+    switch, the client stays connected, and a theme that can't be switched to answers `false` and leaves the choice
+    alone. Its two older cases now check that a refused theme never stops the running one and that a failed switch
+    comes back to the running theme instead of the recovery screen.
+
 ## [0.8.9.5-beta] - 2026-11-23
 
 An update of the package through the Store and `apt`, with no new images. Linux apps: every Wayland global LordOS

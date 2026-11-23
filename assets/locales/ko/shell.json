@@ -965,5 +965,10 @@
   "capture.what.viaStudioPlain": "LordOS Studio를 통한 카메라",
   "capture.what.effectsOn": "효과 켜짐",
   "capture.what.effectsOff": "효과 없음",
-  "shortcuts.captureWindow": "윈도우 스크린샷"
+  "shortcuts.captureWindow": "윈도우 스크린샷",
+  "themeSwitch.changing": "데스크톱 스타일을 바꾸는 중…",
+  "themeSwitch.changingTo": "{name}(으)로 바꾸는 중…",
+  "themeSwitch.failedTitle": "{name}을(를) 적용할 수 없습니다",
+  "themeSwitch.refusedBody": "코드가 LordOS의 서명된 사본과 일치하지 않아 불러오지 않았습니다. 데스크톱 스타일은 그대로 유지됩니다.",
+  "themeSwitch.failedBody": "시작되지 않았습니다. 데스크톱 스타일은 그대로 유지됩니다."
 }

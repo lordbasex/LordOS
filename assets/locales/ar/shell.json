@@ -1000,5 +1000,10 @@
   "capture.what.viaStudioPlain": "الكاميرا عبر LordOS Studio",
   "capture.what.effectsOn": "التأثيرات مفعّلة",
   "capture.what.effectsOff": "بلا تأثيرات",
-  "shortcuts.captureWindow": "لقطة لنافذة"
+  "shortcuts.captureWindow": "لقطة لنافذة",
+  "themeSwitch.changing": "جارٍ تغيير نمط سطح المكتب…",
+  "themeSwitch.changingTo": "جارٍ التغيير إلى {name}…",
+  "themeSwitch.failedTitle": "تعذّر تطبيق {name}",
+  "themeSwitch.refusedBody": "لا تطابق شيفرته النسخة الموقّعة من LordOS، لذا لم يُحمَّل. يبقى نمط سطح المكتب كما كان.",
+  "themeSwitch.failedBody": "لم يبدأ. يبقى نمط سطح المكتب كما كان."
 }

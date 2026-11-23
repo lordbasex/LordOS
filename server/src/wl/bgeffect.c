@@ -173,6 +173,7 @@ void bgeffect_mapped(int id) {
 }
 
 void bgeffect_caps_changed(void) {
+    if (!mgrs.next) return;             /* no Wayland in this session (bgeffect_globals never ran): no one to tell */
     uint32_t c = caps();
     if (c == caps_sent) return;
     caps_sent = c;

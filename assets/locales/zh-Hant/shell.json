@@ -965,5 +965,10 @@
   "capture.what.viaStudioPlain": "透過 LordOS Studio 的相機",
   "capture.what.effectsOn": "效果已開啟",
   "capture.what.effectsOff": "無效果",
-  "shortcuts.captureWindow": "擷取一個視窗"
+  "shortcuts.captureWindow": "擷取一個視窗",
+  "themeSwitch.changing": "正在變更桌面風格…",
+  "themeSwitch.changingTo": "正在切換到 {name}…",
+  "themeSwitch.failedTitle": "無法套用 {name}",
+  "themeSwitch.refusedBody": "它的程式碼與 LordOS 的簽署副本不一致，因此未載入。你的桌面風格維持不變。",
+  "themeSwitch.failedBody": "它沒有啟動。你的桌面風格維持不變。"
 }

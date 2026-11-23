@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Kamera LordOS Studion kautta",
   "capture.what.effectsOn": "tehosteet käytössä",
   "capture.what.effectsOff": "ei tehosteita",
-  "shortcuts.captureWindow": "Kuvakaappaus ikkunasta"
+  "shortcuts.captureWindow": "Kuvakaappaus ikkunasta",
+  "themeSwitch.changing": "Työpöydän tyyliä vaihdetaan…",
+  "themeSwitch.changingTo": "Vaihdetaan tyyliin {name}…",
+  "themeSwitch.failedTitle": "Tyyliä {name} ei voitu ottaa käyttöön",
+  "themeSwitch.refusedBody": "Sen koodi ei vastaa LordOSin allekirjoitettua kopiota, joten sitä ei ladattu. Työpöytäsi tyyli pysyy ennallaan.",
+  "themeSwitch.failedBody": "Se ei käynnistynyt. Työpöytäsi tyyli pysyy ennallaan."
 }

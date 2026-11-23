@@ -979,5 +979,10 @@
   "capture.what.viaStudioPlain": "Cameră prin LordOS Studio",
   "capture.what.effectsOn": "efecte activate",
   "capture.what.effectsOff": "fără efecte",
-  "shortcuts.captureWindow": "Captură a unei ferestre"
+  "shortcuts.captureWindow": "Captură a unei ferestre",
+  "themeSwitch.changing": "Se schimbă stilul desktopului…",
+  "themeSwitch.changingTo": "Se trece la {name}…",
+  "themeSwitch.failedTitle": "{name} nu a putut fi aplicat",
+  "themeSwitch.refusedBody": "Codul său nu se potrivește cu copia semnată a LordOS, așa că nu a fost încărcat. Stilul desktopului rămâne cum era.",
+  "themeSwitch.failedBody": "Nu a pornit. Stilul desktopului rămâne cum era."
 }

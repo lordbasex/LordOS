@@ -965,5 +965,10 @@
   "capture.what.viaStudioPlain": "Kamera melalui LordOS Studio",
   "capture.what.effectsOn": "kesan dihidupkan",
   "capture.what.effectsOff": "tiada kesan",
-  "shortcuts.captureWindow": "Tangkapan skrin satu tetingkap"
+  "shortcuts.captureWindow": "Tangkapan skrin satu tetingkap",
+  "themeSwitch.changing": "Menukar gaya desktop…",
+  "themeSwitch.changingTo": "Bertukar kepada {name}…",
+  "themeSwitch.failedTitle": "{name} tidak dapat digunakan",
+  "themeSwitch.refusedBody": "Kodnya tidak sepadan dengan salinan LordOS yang ditandatangani, jadi ia tidak dimuatkan. Gaya desktop anda kekal seperti sebelumnya.",
+  "themeSwitch.failedBody": "Ia tidak bermula. Gaya desktop anda kekal seperti sebelumnya."
 }

@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Kamera über LordOS Studio",
   "capture.what.effectsOn": "Effekte an",
   "capture.what.effectsOff": "ohne Effekte",
-  "shortcuts.captureWindow": "Bildschirmfoto eines Fensters"
+  "shortcuts.captureWindow": "Bildschirmfoto eines Fensters",
+  "themeSwitch.changing": "Desktop-Stil wird gewechselt…",
+  "themeSwitch.changingTo": "Wechsel zu {name}…",
+  "themeSwitch.failedTitle": "{name} konnte nicht angewendet werden",
+  "themeSwitch.refusedBody": "Sein Code stimmt nicht mit der signierten Kopie von LordOS überein, daher wurde er nicht geladen. Ihr Desktop-Stil bleibt, wie er war.",
+  "themeSwitch.failedBody": "Er ist nicht gestartet. Ihr Desktop-Stil bleibt, wie er war."
 }

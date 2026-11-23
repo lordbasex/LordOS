@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Camera via LordOS Studio",
   "capture.what.effectsOn": "effecten aan",
   "capture.what.effectsOff": "geen effecten",
-  "shortcuts.captureWindow": "Schermafbeelding van een venster"
+  "shortcuts.captureWindow": "Schermafbeelding van een venster",
+  "themeSwitch.changing": "Bureaubladstijl wordt gewijzigd…",
+  "themeSwitch.changingTo": "Overschakelen naar {name}…",
+  "themeSwitch.failedTitle": "{name} kon niet worden toegepast",
+  "themeSwitch.refusedBody": "De code komt niet overeen met de ondertekende kopie van LordOS en is dus niet geladen. Je bureaubladstijl blijft zoals hij was.",
+  "themeSwitch.failedBody": "Hij is niet gestart. Je bureaubladstijl blijft zoals hij was."
 }

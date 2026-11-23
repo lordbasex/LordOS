@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Kamera kupitia LordOS Studio",
   "capture.what.effectsOn": "madoido yamewashwa",
   "capture.what.effectsOff": "bila madoido",
-  "shortcuts.captureWindow": "Picha ya dirisha"
+  "shortcuts.captureWindow": "Picha ya dirisha",
+  "themeSwitch.changing": "Inabadilisha mtindo wa eneo-kazi…",
+  "themeSwitch.changingTo": "Inabadilisha kuwa {name}…",
+  "themeSwitch.failedTitle": "{name} haikuweza kutumika",
+  "themeSwitch.refusedBody": "Msimbo wake haulingani na nakala iliyotiwa sahihi ya LordOS, kwa hivyo haukupakiwa. Mtindo wa eneo-kazi lako unabaki kama ulivyokuwa.",
+  "themeSwitch.failedBody": "Haikuanza. Mtindo wa eneo-kazi lako unabaki kama ulivyokuwa."
 }

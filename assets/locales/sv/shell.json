@@ -972,5 +972,10 @@
   "capture.what.viaStudioPlain": "Kamera via LordOS Studio",
   "capture.what.effectsOn": "effekter på",
   "capture.what.effectsOff": "inga effekter",
-  "shortcuts.captureWindow": "Skärmdump av ett fönster"
+  "shortcuts.captureWindow": "Skärmdump av ett fönster",
+  "themeSwitch.changing": "Skrivbordsstilen byts…",
+  "themeSwitch.changingTo": "Byter till {name}…",
+  "themeSwitch.failedTitle": "{name} kunde inte tillämpas",
+  "themeSwitch.refusedBody": "Dess kod stämmer inte med den signerade kopian av LordOS, så den lästes inte in. Din skrivbordsstil förblir som den var.",
+  "themeSwitch.failedBody": "Den startade inte. Din skrivbordsstil förblir som den var."
 }

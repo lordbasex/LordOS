@@ -18,6 +18,7 @@
 #include "../hw/sleeplock.h"
 #include "../hw/logindlock.h"
 #include "js_sys.h"
+#include "js.h"
 #include "../cloud/cloud.h"
 #include "js_err.h"
 #include "../termconf.h"
@@ -498,6 +499,7 @@ static JSValue f_themes_list(JSContext *c, JSValueConst this_val, int argc, JSVa
         if (theme_blocked(bundle)) {
             JS_SetPropertyStr(c, o, "failed", JS_TRUE);
             JS_SetPropertyStr(c, o, "failedWhy", JS_NewString(c, ui.theme_failed_why));
+            JS_SetPropertyStr(c, o, "failedCode", JS_NewBool(c, ui.theme_failed_code));   /* the verified-code check */
         }
         JS_SetPropertyUint32(c, arr, i++, o);
         free(json);
@@ -517,6 +519,19 @@ static JSValue f_themes_use(JSContext *c, JSValueConst this_val, int argc, JSVal
         snprintf(bundle, sizeof bundle, "%s/%s/theme.bundle.js", root, id);
         ok = access(bundle, R_OK) == 0 && strlen(bundle) < sizeof ui.theme_request &&
              !theme_blocked(bundle);
+        /* read and verified now, while this theme still runs (js.c js_theme_prepare): a bundle the verified-code check
+         * refuses is answered here with false and the session goes on in this theme, untouched; the switch itself
+         * (main.c switch_theme) runs exactly the bytes checked here */
+        int r = ok ? js_theme_prepare(bundle) : 0;
+        if (r) {
+            ok = 0;
+            snprintf(ui.theme_failed, sizeof ui.theme_failed, "%s", bundle);
+            snprintf(ui.theme_failed_why, sizeof ui.theme_failed_why, "%s", r == JS_REFUSED ? "refused by the verified-code check (sec/codesig.c)"
+                     : "its file could not be read");
+            ui.theme_failed_code = r == JS_REFUSED;
+            ui.theme_failed_gen = codesig_generation();
+            fprintf(stderr, "lord-server: theme %s not switched to (%s): the session stays in this one\n", bundle, ui.theme_failed_why);
+        }
         if (ok) snprintf(ui.theme_request, sizeof ui.theme_request, "%s", bundle);
     }
     JS_FreeCString(c, id);
