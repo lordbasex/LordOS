@@ -887,6 +887,7 @@
   "lib.importHint": "A qcow2 or raw disk image",
   "lib.viewGrid": "As Pictures",
   "lib.viewList": "As List",
+  "lib.loading": "Loading machines…",
   "lib.search": "Search",
   "agent.idle": "Machine agent: starts with the machine",
   "tb.foldersN": "Shared folders: {n}",

@@ -887,6 +887,7 @@
   "lib.importHint": "Een qcow2- of raw-schijfkopie",
   "lib.viewGrid": "Als afbeeldingen",
   "lib.viewList": "Als lijst",
+  "lib.loading": "Machines laden…",
   "lib.search": "Zoek",
   "agent.idle": "Machineagent: start met de machine",
   "tb.foldersN": "Gedeelde mappen: {n}",

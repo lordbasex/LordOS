@@ -887,6 +887,7 @@
   "lib.importHint": "Image disk qcow2 atau raw",
   "lib.viewGrid": "Sebagai Gambar",
   "lib.viewList": "Sebagai Daftar",
+  "lib.loading": "Memuat mesin…",
   "lib.search": "Cari",
   "agent.idle": "Agen mesin: dimulai bersama mesin",
   "tb.foldersN": "Folder bersama: {n}",

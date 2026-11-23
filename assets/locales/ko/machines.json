@@ -887,6 +887,7 @@
   "lib.importHint": "qcow2 또는 raw 디스크 이미지",
   "lib.viewGrid": "그림으로",
   "lib.viewList": "목록으로",
+  "lib.loading": "머신을 불러오는 중…",
   "lib.search": "검색",
   "agent.idle": "머신 에이전트: 머신과 함께 시작",
   "tb.foldersN": "공유 폴더: {n}",

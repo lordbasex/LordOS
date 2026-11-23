@@ -887,6 +887,7 @@
   "lib.importHint": "Bir qcow2 ya da ham disk görüntüsü",
   "lib.viewGrid": "Resim Olarak",
   "lib.viewList": "Liste Olarak",
+  "lib.loading": "Makineler yükleniyor…",
   "lib.search": "Ara",
   "agent.idle": "Makine aracısı: makineyle başlar",
   "tb.foldersN": "Paylaşılan klasörler: {n}",

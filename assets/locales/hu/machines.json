@@ -887,6 +887,7 @@
   "lib.importHint": "qcow2 vagy nyers lemezkép",
   "lib.viewGrid": "Képekként",
   "lib.viewList": "Listaként",
+  "lib.loading": "Gépek betöltése…",
   "lib.search": "Keresés",
   "agent.idle": "Gépügynök: a géppel együtt indul",
   "tb.foldersN": "Megosztott mappák: {n}",

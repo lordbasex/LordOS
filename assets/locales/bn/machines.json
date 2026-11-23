@@ -887,6 +887,7 @@
   "lib.importHint": "একটি qcow2 বা raw ডিস্ক ইমেজ",
   "lib.viewGrid": "ছবি হিসেবে",
   "lib.viewList": "তালিকা হিসেবে",
+  "lib.loading": "মেশিনগুলো লোড হচ্ছে…",
   "lib.search": "অনুসন্ধান",
   "agent.idle": "মেশিন এজেন্ট: মেশিনের সঙ্গে চালু হয়",
   "tb.foldersN": "শেয়ার করা ফোল্ডার: {n}",

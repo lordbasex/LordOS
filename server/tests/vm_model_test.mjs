@@ -266,6 +266,23 @@ eq('lib view defaults', M.libView(null), { view: 'grid', sort: 'name', show: 'al
 eq('lib view kept', M.libView({ view: 'list', sort: 'disk', show: 'linux' }), { view: 'list', sort: 'disk', show: 'linux' });
 eq('lib view: the old Off filter reads as all', M.libView({ show: 'off' }).show, 'all');
 eq('lib view junk', M.libView({ view: 'x', sort: 1, show: 'running' }), { view: 'grid', sort: 'name', show: 'running' });
+// the grid from the window's width (2026-11-23: one column in the first frames, the root not laid out yet)
+eq('lib grid 760', M.libGrid(760, false), { pad: 24, gap: 20, cols: 2, cardW: 346, picH: 166 });
+eq('lib grid 1280', M.libGrid(1280, false).cols, 3);
+eq('lib grid narrow', M.libGrid(560, true), { pad: 16, gap: 20, cols: 1, cardW: 528, picH: 253 });
+eq('lib grid unknown width', M.libGrid(0, false).cols, 1);
+eq('lib grid tiny picture floor', M.libGrid(200, true).picH, 120);
+// the first frame's placeholders (machinesSeen)
+eq('seen junk', M.libSeen({ count: 'x', shown: -2 }), { count: -1, shown: -1 });
+eq('skeleton never seen', M.skeletonPlan(null), { empty: false, cards: M.SKELETON_DEFAULT });
+eq('skeleton none last time: the empty library', M.skeletonPlan({ count: 0, shown: 0 }), { empty: true, cards: 0 });
+eq('skeleton as shown', M.skeletonPlan({ count: 5, shown: 3 }), { empty: false, cards: 3 });
+eq('skeleton count only', M.skeletonPlan({ count: 4 }), { empty: false, cards: 4 });
+eq('skeleton capped', M.skeletonPlan({ count: 40, shown: 40 }), { empty: false, cards: M.SKELETON_MAX });
+eq('skeleton chip left none', M.skeletonPlan({ count: 2, shown: 0 }), { empty: false, cards: 0 });
+eq('seen next: changed', M.seenNext(null, 2, 2, ''), { count: 2, shown: 2 });
+eq('seen next: same', M.seenNext({ count: 2, shown: 2 }, 2, 2, ''), null);
+eq('seen next: a search is never kept', M.seenNext({ count: 2, shown: 2 }, 2, 1, 'ubu'), null);
 const lib = [
   { name: 'Zeta', state: 'stopped', thumbTime: 50, diskBytes: 9, arch: 'amd64' },
   { name: 'Alpha', state: 'running', thumbTime: 10, diskBytes: 1, arch: 'amd64', meta: { osName: 'Ubuntu' } },

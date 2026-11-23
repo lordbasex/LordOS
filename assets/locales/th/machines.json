@@ -887,6 +887,7 @@
   "lib.importHint": "อิมเมจดิสก์ qcow2 หรือ raw",
   "lib.viewGrid": "แบบรูปภาพ",
   "lib.viewList": "แบบรายการ",
+  "lib.loading": "กำลังโหลดเครื่อง…",
   "lib.search": "ค้นหา",
   "agent.idle": "เอเจนต์ของเครื่อง: เริ่มพร้อมกับเครื่อง",
   "tb.foldersN": "โฟลเดอร์ที่แชร์: {n}",

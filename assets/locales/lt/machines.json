@@ -887,6 +887,7 @@
   "lib.importHint": "qcow2 arba neapdorotas disko atvaizdis",
   "lib.viewGrid": "Paveikslėliais",
   "lib.viewList": "Sąrašu",
+  "lib.loading": "Įkeliamos mašinos…",
   "lib.search": "Ieškoti",
   "agent.idle": "Mašinos agentas: pasileidžia kartu su mašina",
   "tb.foldersN": "Bendrinami aplankai: {n}",

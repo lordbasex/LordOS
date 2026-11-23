@@ -43,6 +43,31 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: the library draws its machines' place from the first frame, with placeholders until they are read**
+  (in development; the latest release is 0.8.9.5-beta). Reported by the maintainer: opened again (after logging back
+  in), the library with the New machine card, an Ubuntu machine and a guest of the other system took 1 to 2 seconds to
+  look right.
+  - **What made it slow.** Not the reads: on a headless `lord-server-test` with two machines every `lord.vm` call the
+    library makes (host, list, stats, gpus) took 0 to 3 ms. Two things in the library itself: its first frame had no
+    list yet and drew the empty library (the "No machines yet" page, which also read `lord.system.info`), and its grid's
+    columns came from the root's measured layout, which isn't there in the first frames, so the cards were drawn one
+    per row, the New machine card across the whole window, until the next 1.5 s poll drew them again in two or three
+    columns. At login, with the session's other windows starting, both lasted longer.
+  - **Now.** The grid's columns come from the window's width in the window store (`useWindowWidth`), known from the
+    first frame (`libGrid` in `apps/machines/model.js`). Until the first read is in, the library draws placeholders in
+    the view the person left it in (the settings' `machinesView`, read synchronously): in the grid, the real New
+    machine card and cards of the real size (picture, name, numbers line, ··· button); in the list, the real New
+    machine row and rows of the real height and columns; the chips' row and the status line as muted shapes of their
+    size, so nothing moves when the machines replace them. As many placeholders as cards were shown the last time (a
+    new setting, `machinesSeen: { count, shown }`, written only when it changes, never for a search; at most 6, 2 when
+    never seen); a library that was empty the last time shows the empty library at once. The blocks pulse slowly in
+    the theme's muted colors and are still with Reduce motion; they carry an accessible label, "Loading machines…"
+    (`machines.lib.loading`, in every language).
+  - **Checked** with `server/tests/vm_model_test.mjs` (the grid, the placeholders' count and when it is kept) and on a
+    headless `lord-server-test` with a private home and two scratch machines: screenshots 30, 150, 600 and 2000 ms
+    after opening show the two-column grid from the first one (before: one column until the 1.5 s poll), and, with the
+    first read held back 1.2 s in a test-only build, the grid and list placeholders lined up with the cards and rows
+    that replace them.
 - **Launching an app that is already running brings its window forward, even when it runs once and takes the launch
   over (Google Chrome).** Seen on the maintainer's PC (2026-11-23): session restore started Chrome at login and its
   window (1024×758) went away; launching Chrome again from the launcher logged "Opening in existing browser session"

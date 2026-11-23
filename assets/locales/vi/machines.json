@@ -887,6 +887,7 @@
   "lib.importHint": "Ảnh đĩa qcow2 hoặc thô",
   "lib.viewGrid": "Dạng ảnh",
   "lib.viewList": "Dạng danh sách",
+  "lib.loading": "Đang tải máy…",
   "lib.search": "Tìm kiếm",
   "agent.idle": "Tác tử máy ảo: khởi động cùng máy ảo",
   "tb.foldersN": "Thư mục chia sẻ: {n}",

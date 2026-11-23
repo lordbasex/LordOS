@@ -887,6 +887,7 @@
   "lib.importHint": "qcow2 یا raw ڈسک امیج",
   "lib.viewGrid": "تصاویر کے طور پر",
   "lib.viewList": "فہرست کے طور پر",
+  "lib.loading": "مشینیں لوڈ ہو رہی ہیں…",
   "lib.search": "تلاش کریں",
   "agent.idle": "مشین ایجنٹ: مشین کے ساتھ شروع ہوتا ہے",
   "tb.foldersN": "مشترکہ فولڈرز: {n}",

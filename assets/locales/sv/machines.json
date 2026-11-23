@@ -887,6 +887,7 @@
   "lib.importHint": "En qcow2- eller rå skivavbild",
   "lib.viewGrid": "Som bilder",
   "lib.viewList": "Som lista",
+  "lib.loading": "Läser in maskiner…",
   "lib.search": "Sök",
   "agent.idle": "Maskinagent: startar med maskinen",
   "tb.foldersN": "Delade mappar: {n}",

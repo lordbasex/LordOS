@@ -887,6 +887,7 @@
   "lib.importHint": "qcow2 或原始磁盘映像",
   "lib.viewGrid": "图标",
   "lib.viewList": "列表",
+  "lib.loading": "正在载入机器…",
   "lib.search": "搜索",
   "agent.idle": "虚拟机代理：随虚拟机启动",
   "tb.foldersN": "共享文件夹：{n}",

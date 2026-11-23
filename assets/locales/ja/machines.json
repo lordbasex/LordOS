@@ -887,6 +887,7 @@
   "lib.importHint": "qcow2 または raw のディスクイメージ",
   "lib.viewGrid": "アイコン表示",
   "lib.viewList": "リスト表示",
+  "lib.loading": "マシンを読み込み中…",
   "lib.search": "検索",
   "agent.idle": "マシンエージェント：マシンと一緒に起動します",
   "tb.foldersN": "共有フォルダ：{n}",

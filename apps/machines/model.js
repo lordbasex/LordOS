@@ -565,6 +565,38 @@ export function libView(v) {
     show: LIB_SHOWS.includes(o.show) ? o.show : 'all',
   };
 }
+// The library's grid for a window this wide (narrow: useNarrow): as many cards as fit at 300 px or more, the New
+// machine card first, each picture about half as tall as wide. From the window's width in the window store, known from
+// the first frame, never from the root's layout (not measured yet then: one column until the next read, 2026-11-23)
+export function libGrid(width, narrow) {
+  const pad = narrow ? 16 : 24, gap = 20;
+  const cw = Math.max(0, (Number(width) || 0) - pad * 2);
+  const cols = Math.max(1, Math.floor((cw + gap) / (300 + gap)));
+  const cardW = Math.floor((cw - gap * (cols - 1)) / cols);
+  return { pad, gap, cols, cardW, picH: Math.max(120, Math.round(cardW * 0.48)) };
+}
+// What the library showed the last time (settings.machinesSeen: { count, shown }, 2026-11-23): the machines there were
+// and the cards the chip left. Its first frame, before lord.vm.list has answered, draws that many placeholders (at most
+// SKELETON_MAX; SKELETON_DEFAULT when never seen) in the view's layout, or the empty library at once when there were none
+export const SKELETON_MAX = 6;
+export const SKELETON_DEFAULT = 2;
+export function libSeen(v) {
+  const o = v && typeof v === 'object' ? v : {};
+  const n = (x) => (Number.isInteger(x) && x >= 0 && x <= 9999 ? x : -1);
+  return { count: n(o.count), shown: n(o.shown) };
+}
+export function skeletonPlan(seen) {
+  const s = libSeen(seen);
+  if (s.count === 0) return { empty: true, cards: 0 };
+  const n = s.shown >= 0 ? s.shown : s.count >= 0 ? s.count : SKELETON_DEFAULT;
+  return { empty: false, cards: Math.min(SKELETON_MAX, n) };
+}
+// the next machinesSeen once the list is in, or null when it hasn't changed (a search doesn't count: never kept)
+export function seenNext(seen, count, shown, query) {
+  if ((query || '').trim() || !Number.isInteger(count) || !Number.isInteger(shown)) return null;
+  const s = libSeen(seen);
+  return s.count === count && s.shown === shown ? null : { count, shown };
+}
 // the systems a machine may run, as the chips group them: 'windows', 'linux' or 'other'
 const LINUX = ['lordos', 'debian', 'ubuntu', 'fedora', 'mint', 'arch', 'alpine', 'opensuse', 'kali', 'rocky', 'alma', 'centos', 'raspios', 'linux'];
 export function familyOf(m) {

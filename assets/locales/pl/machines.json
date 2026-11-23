@@ -887,6 +887,7 @@
   "lib.importHint": "Obraz dysku qcow2 lub surowy",
   "lib.viewGrid": "Jako obrazy",
   "lib.viewList": "Jako lista",
+  "lib.loading": "Wczytywanie maszyn…",
   "lib.search": "Szukaj",
   "agent.idle": "Agent maszyny: uruchamia się z maszyną",
   "tb.foldersN": "Foldery udostępnione: {n}",

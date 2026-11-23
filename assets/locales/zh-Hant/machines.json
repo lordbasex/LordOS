@@ -887,6 +887,7 @@
   "lib.importHint": "qcow2 或原始磁碟映像檔",
   "lib.viewGrid": "以圖示顯示",
   "lib.viewList": "以列表顯示",
+  "lib.loading": "正在載入機器…",
   "lib.search": "搜尋",
   "agent.idle": "虛擬機器代理程式：隨虛擬機器啟動",
   "tb.foldersN": "共享資料夾：{n}",

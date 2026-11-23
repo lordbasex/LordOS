@@ -887,6 +887,7 @@
   "lib.importHint": "qcow2 və ya xam disk obrazı",
   "lib.viewGrid": "Şəkillər kimi",
   "lib.viewList": "Siyahı kimi",
+  "lib.loading": "Maşınlar yüklənir…",
   "lib.search": "Axtar",
   "agent.idle": "Maşın agenti: maşınla birlikdə başlayır",
   "tb.foldersN": "Paylaşılan qovluqlar: {n}",

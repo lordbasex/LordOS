@@ -887,6 +887,7 @@
   "lib.importHint": "Taswira ya diski ya qcow2 au ghafi",
   "lib.viewGrid": "Kama Picha",
   "lib.viewList": "Kama Orodha",
+  "lib.loading": "Inapakia mashine…",
   "lib.search": "Tafuta",
   "agent.idle": "Wakala wa mashine: anaanza pamoja na mashine",
   "tb.foldersN": "Folda zinazoshirikiwa: {n}",

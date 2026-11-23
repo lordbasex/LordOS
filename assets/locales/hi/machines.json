@@ -887,6 +887,7 @@
   "lib.importHint": "qcow2 या raw डिस्क इमेज",
   "lib.viewGrid": "चित्रों के रूप में",
   "lib.viewList": "सूची के रूप में",
+  "lib.loading": "मशीनें लोड हो रही हैं…",
   "lib.search": "खोजें",
   "agent.idle": "मशीन एजेंट: मशीन के साथ शुरू होता है",
   "tb.foldersN": "साझा फ़ोल्डर: {n}",

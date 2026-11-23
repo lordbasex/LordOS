@@ -887,6 +887,7 @@
   "lib.importHint": "Isang qcow2 o raw na disk image",
   "lib.viewGrid": "Bilang Mga Larawan",
   "lib.viewList": "Bilang Listahan",
+  "lib.loading": "Nilo-load ang mga machine…",
   "lib.search": "Maghanap",
   "agent.idle": "Agent ng makina: nagsisimula kasama ng makina",
   "tb.foldersN": "Mga shared folder: {n}",

@@ -887,6 +887,7 @@
   "lib.importHint": "Uma imagem de disco qcow2 ou raw",
   "lib.viewGrid": "Como cartões",
   "lib.viewList": "Como lista",
+  "lib.loading": "Carregando máquinas…",
   "lib.search": "Buscar",
   "agent.idle": "Agente da máquina: inicia com a máquina",
   "tb.foldersN": "Pastas compartilhadas: {n}",

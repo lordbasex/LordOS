@@ -887,6 +887,7 @@
   "lib.importHint": "Ein qcow2- oder rohes Datenträger-Image",
   "lib.viewGrid": "Als Bilder",
   "lib.viewList": "Als Liste",
+  "lib.loading": "Maschinen werden geladen…",
   "lib.search": "Suchen",
   "agent.idle": "Maschinenagent: startet mit der Maschine",
   "tb.foldersN": "Freigegebene Ordner: {n}",

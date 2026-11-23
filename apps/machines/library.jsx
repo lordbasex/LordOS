@@ -7,11 +7,11 @@
 // Requirements and the Pi page are the other screens of this window.
 import {
   View, Text, Image, ScrollView, TextInput, useAppWindow, useStore, createStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
-  EmptyState, useNarrow, addListener, direction, Overlay, screen, t as tr,
+  EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
-  chipCounts, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
+  chipCounts, libGrid, skeletonPlan, seenNext, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet, Sym } from './kit.jsx';
@@ -288,6 +288,93 @@ function ListRow({ m, u, sel, onSelect, onMenu, windowed, host }) {
   );
 }
 
+// The library's placeholders until its first read is in (model.js skeletonPlan): cards or rows of the real ones' size,
+// muted blocks that pulse slowly, still with Reduce motion. A block's height is a line of the real text's size (an
+// invisible character in it), so nothing moves when the machines replace them.
+function usePulse() {
+  const still = useStore(settings, (s) => !!s.reduceMotion);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (still) return undefined;
+    const id = setInterval(() => setOn((v) => !v), 900);
+    return () => clearInterval(id);
+  }, [still]);
+  return still ? 0.8 : on ? 0.55 : 1;
+}
+function SkelLine({ size, width, top = 0, op }) {
+  const p = usePal();
+  return (
+    <View style={{ width, marginTop: top, borderRadius: 6, backgroundColor: p.btn, opacity: op }}>
+      <Text style={{ fontSize: size, color: 'transparent', whiteSpace: 'nowrap' }}>{' '}</Text>
+    </View>
+  );
+}
+function SkelCard({ picH, op }) {
+  const p = usePal();
+  return (
+    <View style={{ flex: 1, minWidth: 0, borderRadius: 16, overflow: 'hidden', backgroundColor: p.card, border: `1px solid ${p.line}` }}>
+      <View style={{ height: picH, backgroundColor: p.raised, opacity: op }} />
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 18 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <SkelLine size={18} width="45%" op={op} />
+          <SkelLine size={13} width="75%" top={4} op={op} />
+        </View>
+        <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: p.btn, opacity: op }} />
+      </View>
+    </View>
+  );
+}
+function SkelRow({ op }) {
+  const p = usePal();
+  const narrow = useNarrow();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18, padding: 12, borderRadius: 14, backgroundColor: p.card, border: `1px solid ${p.line}` }}>
+      <View style={{ width: narrow ? 96 : 132, height: narrow ? 58 : 78, borderRadius: 10, backgroundColor: p.raised, opacity: op }} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <SkelLine size={17} width="40%" op={op} />
+        <SkelLine size={13} width="70%" top={4} op={op} />
+      </View>
+      {narrow ? null : <View style={{ width: 180 }}><SkelLine size={12} width="60%" op={op} /></View>}
+      <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: p.btn, opacity: op }} />
+      <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: p.btn, opacity: op }} />
+    </View>
+  );
+}
+// the chips' row while loading: four muted pills of their height
+function SkelChips({ pad }) {
+  const p = usePal();
+  const op = usePulse();
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: pad, paddingTop: 8, paddingBottom: 4 }}>
+      {[64, 96, 80, 104].map((w, i) => <View key={i} style={{ width: w, height: 30, borderRadius: 15, backgroundColor: p.raised, opacity: op }} />)}
+    </View>
+  );
+}
+// the grid or the list as the person left it, the New machine card real (it needs nothing), n placeholders after it
+function Skeleton({ view, n, grid, onNew }) {
+  const op = usePulse();
+  const label = tr('machines.lib.loading');
+  if (view === 'list') return (
+    <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: grid.pad, paddingVertical: 16, gap: 12 }}>
+      <NewCard row onClick={onNew} />
+      <View accessibilityLabel={label} style={{ gap: 12 }}>{Array.from({ length: n }, (_, i) => <SkelRow key={i} op={op} />)}</View>
+    </ScrollView>
+  );
+  const cells = [{ isNew: true }, ...Array.from({ length: n }, (_, i) => ({ k: i }))];
+  const rows = [];
+  for (let i = 0; i < cells.length; i += grid.cols) rows.push(cells.slice(i, i + grid.cols));
+  return (
+    <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: grid.pad, paddingVertical: 16, gap: grid.gap }}>
+      {rows.map((r, i) => (
+        <View key={i} accessibilityLabel={i ? undefined : label} style={{ flexDirection: 'row', gap: grid.gap }}>
+          {r.map((c) => (c.isNew ? <NewCard key="new" picH={grid.picH} onClick={onNew} /> : <SkelCard key={c.k} picH={grid.picH} op={op} />))}
+          {Array.from({ length: grid.cols - r.length }, (_, k) => <View key={`f${k}`} style={{ flex: 1 }} />)}
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
 // FirstRun (empty library) and its "one step first" side when virtualization isn't usable yet
 function FirstRun({ host, onNew, onImport, onCheck }) {
   const p = usePal();
@@ -492,6 +579,9 @@ export function Library() {
   const { id: winId, focused } = useAppWindow();
   const [host, setHost] = useState(() => (has() ? lord.vm.host() : null));
   const [list, setList] = useState([]);
+  // false until the first read is in: the first frame draws placeholders in the view's layout (Skeleton), never the
+  // empty library (FirstRun) of a library that has machines
+  const [loaded, setLoaded] = useState(false);
   const [sel, setSel] = useState(null);
   const [page, setPage] = useState('main');          // main, new, requirements, pi: the last three as sheets over the library
   const [cfg, setCfg] = useState(null);              // Configure as a sheet: { dir, section }
@@ -508,6 +598,7 @@ export function Library() {
   useStore(storeRev);
   const narrow = useNarrow();
   const lv = libView(s0.machinesView);
+  const winW = useWindowWidth();
   const putView = (patch) => settings.set({ machinesView: { ...libView(settings.get().machinesView), ...patch } });
   const wins = useStore(windows, (ws) => ws.map((w) => w.id).join(' '));
   const prev = useRef({});
@@ -542,6 +633,7 @@ export function Library() {
     }
     setList(ms);
     setUsages(next);
+    setLoaded(true);
   };
   const refresh = () => { if (has()) { setHost(lord.vm.host()); read(); } };
   useEffect(() => {
@@ -569,6 +661,12 @@ export function Library() {
   }, [host?.arch, lv.view, lv.sort]);
 
   const sorted = host ? sortMachines(filterMachines(list, { query, show: lv.show }), lv.sort) : [];
+  // what it showed, for the next first frame's placeholders (only written when it changed)
+  useEffect(() => {
+    if (!loaded) return;
+    const s = seenNext(settings.get().machinesSeen, list.length, sorted.length, query);
+    if (s) settings.set({ machinesSeen: s });
+  }, [loaded, list.length, sorted.length, query]);
   // the keyboard: arrows move the selection, Return opens or starts it, Escape clears the search
   const keys = useRef(null);
   keys.current = (e) => {
@@ -625,13 +723,13 @@ export function Library() {
     ];
   };
   const rl = root.current ? lord.getLayout(root.current.id) : [0, 0, 1000, 700];
-  // as many cards as fit at 300 px or more, the New machine card first; each picture about half as tall as wide
-  const pad = narrow ? 16 : 24, gap = 20;
-  const cw = rl[2] - pad * 2;
-  const cols = Math.max(1, Math.floor((cw + gap) / (300 + gap)));
+  // as many cards as fit at 300 px or more, the New machine card first; each picture about half as tall as wide. The
+  // window's width from the window store: the root isn't laid out yet in the first frames
+  const grid = libGrid(winW > 0 ? winW : rl[2], narrow);
+  const { pad, gap, cols, picH } = grid;
   keys.cols = cols;
-  const cardW = Math.floor((cw - gap * (cols - 1)) / cols);
-  const picH = Math.max(120, Math.round(cardW * 0.48));
+  const skel = loaded ? null : skeletonPlan(s0.machinesSeen);
+  const shell = !!list.length || (skel && !skel.empty);     // the chips and the status line: with machines, or their placeholders
   const cells = [{ isNew: true }, ...sorted];
   const rows = [];
   for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
@@ -652,7 +750,8 @@ export function Library() {
   ) : page === 'pi' ? (
     <Sheet width={820} height={640} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><PiView host={host} list={list} onBack={() => setPage('main')} /></View></Sheet>
   ) : null;
-  if (!list.length) body = <FirstRun host={host} onNew={newMachine} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
+  if (skel && !skel.empty) body = <Skeleton view={lv.view} n={skel.cards} grid={grid} onNew={newMachine} />;
+  else if (!list.length) body = <FirstRun host={host} onNew={newMachine} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
   else if (!sorted.length) body = <EmptyState icon="⌕" hint={query.trim() ? tr('machines.lib.noMatch', { q: query.trim() }) : (lv.show === 'windows' ? tr('machines.win.lib.none') : tr(`machines.lib.none.${lv.show}`))} />;
   else if (lv.view === 'list') body = (
     <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: pad, paddingVertical: 16, gap: 12 }}>
@@ -700,14 +799,14 @@ export function Library() {
           {chip('linux', tr('machines.lib.chip.linux', { n: counts.linux }))}
           {chip('windows', tr('machines.win.lib.chip', { n: counts.windows }))}
         </View>
-      ) : null}
+      ) : shell ? <SkelChips pad={pad} /> : null}
       {error ? <Text style={{ marginHorizontal: pad, marginTop: 10, fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
       {body}
-      {list.length ? (
+      {shell ? (
         <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: narrow ? 14 : 24, paddingHorizontal: pad, borderTopWidth: 1, borderColor: p.line, overflow: 'hidden' }}>
-          <Summary label={tr('machines.sum.running')} value={tr('machines.sum.of', { a: sum.running.a, b: sum.running.b })} />
-          {sum.memory ? <Summary label={tr('machines.sum.memory')} value={tr('machines.sum.ofGb', { a: gib(sum.memory.a), b: gib(sum.memory.b) })} /> : null}
-          {sum.free ? <Summary label={tr('machines.lib.freeDisk')} value={bytes(sum.free.a)} onClick={openStorage} /> : null}
+          {list.length ? <Summary label={tr('machines.sum.running')} value={tr('machines.sum.of', { a: sum.running.a, b: sum.running.b })} /> : null}
+          {list.length && sum.memory ? <Summary label={tr('machines.sum.memory')} value={tr('machines.sum.ofGb', { a: gib(sum.memory.a), b: gib(sum.memory.b) })} /> : null}
+          {list.length && sum.free ? <Summary label={tr('machines.lib.freeDisk')} value={bytes(sum.free.a)} onClick={openStorage} /> : null}
         </View>
       ) : null}
       {menu ? <CardMenu at={menu} root={root} rl={rl} items={menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}

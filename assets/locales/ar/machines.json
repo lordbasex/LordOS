@@ -887,6 +887,7 @@
   "lib.importHint": "صورة قرص qcow2 أو خام",
   "lib.viewGrid": "كصور",
   "lib.viewList": "كقائمة",
+  "lib.loading": "جارٍ تحميل الأجهزة…",
   "lib.search": "بحث",
   "agent.idle": "وكيل الجهاز: يبدأ مع الجهاز",
   "tb.foldersN": "المجلدات المشتركة: {n}",

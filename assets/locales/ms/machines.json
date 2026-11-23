@@ -887,6 +887,7 @@
   "lib.importHint": "Imej cakera qcow2 atau mentah",
   "lib.viewGrid": "Sebagai Gambar",
   "lib.viewList": "Sebagai Senarai",
+  "lib.loading": "Memuatkan mesin…",
   "lib.search": "Cari",
   "agent.idle": "Ejen mesin: bermula bersama mesin",
   "tb.foldersN": "Folder dikongsi: {n}",

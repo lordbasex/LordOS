@@ -887,6 +887,7 @@
   "lib.importHint": "O imagine de disc qcow2 sau brută",
   "lib.viewGrid": "Ca imagini",
   "lib.viewList": "Ca listă",
+  "lib.loading": "Se încarcă mașinile…",
   "lib.search": "Căutare",
   "agent.idle": "Agentul mașinii: pornește odată cu mașina",
   "tb.foldersN": "Dosare partajate: {n}",
