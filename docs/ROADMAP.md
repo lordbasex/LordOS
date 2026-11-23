@@ -967,6 +967,15 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Before 1.0
 
+- [x] **Clipboard Snippets, first step of [#205](https://github.com/lordbasex/LordOS/issues/205)** (approved by the
+  maintainer on 2026-11-22; `SPOTLIGHT.md`, `CHANGELOG.md`): a Snippets tab in the full clipboard panel (❖⇧V) with
+  named texts the person keeps, edits, renames, reorders and deletes, pasted like a history entry; "Save as snippet" on
+  a history entry. Kept in `~/.local/share/lordos/clipboard/snippets.json`, 0600 in a 0700 folder.
+- [ ] **Global keys that paste a snippet** (the rest of
+  [#205](https://github.com/lordbasex/LordOS/issues/205)). Needs its own design and security review first: a key
+  must never override an app's own shortcut (Linux apps included), never capture keys typed into another app, detect
+  and refuse conflicts with the system's, the apps' and the other snippets' keys, and paste only into the focused
+  field through the same path as ❖V. Also per-snippet enable/disable.
 - [ ] **Monitors on a second graphics card** ([#186](https://github.com/lordbasex/LordOS/issues/186)). On laptops whose
   HDMI or DisplayPort is wired to the discrete GPU (Legion Y530: GTX 1060), lord-server drives one card, so that port
   stays dark. Drive the outputs of a second DRM device (scan out a copy of the shared buffer, or compose per card),

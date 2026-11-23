@@ -8,6 +8,7 @@
 // tests/screencast_scene.mjs (the ScreenCast chooser), tests/webapps_get_scene.mjs (Get of a web app, the engine first),
 // tests/webapps_sheet_scene.mjs (the Store's "Add from an address"
 // sheet), tests/store_trademark_scene.mjs (the trademark notice of the Store's web apps),tests/theme_portal_scene.mjs (only the theme's ThemeProvider sets the portal's colors),
+// tests/clipboard_snippets_scene.mjs (the clipboard's Snippets tab, GitHub #205),
 // tests/notes_editor_scene.mjs (Notes' Edit menu and right-click menu, GitHub #117), tests/notes_breaks_scene.mjs (Notes'
 // reading view keeps the typed line breaks, GitHub #169), tests/screenshots_newcapture_scene.mjs (New Screenshot in the
 // markup editor, GitHub #166), tests/screenshots_toolbar_scene.mjs (the Screenshots toolbar and its Options menu). A scene with a tests/<scene>_sdk.js next to it gets that file as '@lordos/sdk': the few SDK modules it needs,

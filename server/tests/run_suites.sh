@@ -405,6 +405,8 @@ EOF
     if have node; then run "privacy-model-test (apps/settings/privacymodel.js)" node tests/privacy_model_test.mjs; fi
     # the clipboard history panels: keys, scrolling to the selection only, a pointer at rest never takes it (GitHub #203, #204)
     if have node; then run "clipboard-panel-model-test (sdk/clipboardpanelmodel.js)" node tests/clipboard_panel_model_test.mjs; fi
+    # the clipboard's Snippets: add, edit, rename, delete, reorder, search, the file and its limits (GitHub #205)
+    if have node; then run "snippets-model-test (sdk/snippetsmodel.js)" node tests/snippets_model_test.mjs; fi
     if have node; then run "imageedit-model-test (sdk/imageeditmodel.js)" node tests/imageedit_model_test.mjs; fi
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi
@@ -645,6 +647,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "password-field-scene (sdk/components.jsx TextInput secure)" node tests/textfield_menu_test.mjs password_field_scene.mjs
     else skip "password-field-scene" "node and the repository's node_modules (npm install)"; fi
+    # (#205) the clipboard's Snippets tab: search, paste, From clipboard, Save as snippet, reorder, delete, no password kept
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "clipboard-snippets-scene (sdk/clipboard.js FullPanel, sdk/snippetsmodel.js)" node tests/textfield_menu_test.mjs clipboard_snippets_scene.mjs
+    else skip "clipboard-snippets-scene" "node and the repository's node_modules (npm install)"; fi
     # every password surface LordOS draws is protected (black in captures): password fields, the keyring and polkit prompts
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "password-protect-scene (TextInput secure, KeyringPrompt, PolkitPrompt)" node tests/textfield_menu_test.mjs password_protect_scene.mjs

@@ -19,12 +19,14 @@
 #include "js_sys.h"
 #include "js_err.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static Session *arg_session(JSContext *c, JSValueConst v) {
@@ -901,6 +903,59 @@ static JSValue f_clip_delete_saved(JSContext *c, JSValueConst this_val, int argc
     return JS_NewBool(c, ok && home && unlink(path) == 0);
 }
 
+/* lord.clipboard.saveStore(name, text): the history's or the Snippets' file (GitHub #205), written whole and atomically
+ * in ~/.local/share/lordos/clipboard. name is "history.json" or "snippets.json", nothing else (no path from JS). The file
+ * is 0600 and the folder is made, or set back to, 0700: what someone copied or kept as a snippet is theirs to read only,
+ * the history's images included. At most 32 MB, as lord.fs.write. true, or throws. */
+#define CLIP_STORE_MAX (32u << 20)
+static int clip_mkdir(const char *p) { return mkdir(p, 0700) && errno != EEXIST ? -1 : 0; }
+static JSValue f_clip_save_store(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2) return js_throw_code(c, "fs.protected", NULL);
+    const char *n = JS_ToCString(c, argv[0]);
+    if (!n) return JS_EXCEPTION;
+    char name[16] = "";
+    if (!strcmp(n, "history.json") || !strcmp(n, "snippets.json")) snprintf(name, sizeof name, "%s", n);
+    JS_FreeCString(c, n);
+    if (!name[0]) return js_throw_code(c, "fs.protected", NULL);
+    const char *home = getenv("HOME");
+    if (!home || home[0] != '/') return js_throw_code(c, "fs.outsideHome", NULL);
+    size_t len = 0;
+    const char *text = JS_ToCStringLen(c, &len, argv[1]);
+    if (!text) return JS_EXCEPTION;
+    if (len > CLIP_STORE_MAX) { JS_FreeCString(c, text); return js_throw_code(c, "fs.tooLarge", "max", "32 MB", NULL); }
+    char dir[PATH_MAX], tmp[PATH_MAX + 64], dst[PATH_MAX + 32];
+    static const char *const parts[] = { "/.local", "/.local/share", "/.local/share/lordos", "/.local/share/lordos/clipboard" };
+    int ok = 1;
+    for (size_t i = 0; ok && i < sizeof parts / sizeof parts[0]; i++)
+        ok = snprintf(dir, sizeof dir, "%s%s", home, parts[i]) < (int)sizeof dir && !clip_mkdir(dir);
+    /* the folder itself, never a link put in its place; made 0700 if lord.fs.mkdir made it 0755 before */
+    int dfd = ok ? open(dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) : -1;
+    struct stat st;
+    ok = dfd >= 0 && !fstat(dfd, &st) && st.st_uid == getuid() && (!(st.st_mode & 077) || !fchmod(dfd, 0700));
+    if (dfd >= 0) close(dfd);
+    ok = ok && snprintf(tmp, sizeof tmp, "%s/.%s.lordos-XXXXXX", dir, name) < (int)sizeof tmp
+            && snprintf(dst, sizeof dst, "%s/%s", dir, name) < (int)sizeof dst;
+    int fd = ok ? mkstemp(tmp) : -1;                /* mkstemp makes it 0600 */
+    ok = fd >= 0;
+    if (ok) {
+        if (fchmod(fd, 0600)) ok = 0;
+        for (size_t off = 0; ok && off < len;) {
+            ssize_t w = write(fd, text + off, len - off);
+            if (w < 0 && errno == EINTR) continue;
+            if (w <= 0) ok = 0; else off += (size_t)w;
+        }
+        if (ok && fsync(fd)) ok = 0;
+        if (close(fd)) ok = 0;
+        if (ok && rename(tmp, dst)) ok = 0;
+        if (!ok) unlink(tmp);
+    }
+    int err = errno;
+    JS_FreeCString(c, text);
+    if (!ok) return js_throw_code(c, "sys.errno", "errno", lerr_errno(err ? err : EIO), NULL);
+    return JS_TRUE;
+}
+
 /* lord.clipboard.setFiles(paths, { cut }): Files copied (or cut) these files. Only a list of absolute paths,
  * no other data: the clipboard's text becomes the paths, one per line, and Linux apps also get them as
  * text/uri-list and x-special/gnome-copied-files (wl.c, wl/urilist.c). false if a path isn't one (relative,
@@ -983,6 +1038,7 @@ static const JSCFunctionListEntry clip_funcs[] = {
     JS_CFUNC_DEF("useImage", 1, f_clip_use_image),
     JS_CFUNC_DEF("saveImage", 1, f_clip_save_image),
     JS_CFUNC_DEF("deleteSaved", 1, f_clip_delete_saved),
+    JS_CFUNC_DEF("saveStore", 2, f_clip_save_store),
     JS_CFUNC_DEF("setFiles", 2, f_clip_set_files),
     JS_CFUNC_DEF("files", 0, f_clip_files),
 };
