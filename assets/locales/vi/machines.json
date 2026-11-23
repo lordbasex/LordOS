@@ -707,6 +707,8 @@
   "cfg.agentNote": "Hai kênh riêng vào máy ảo: một cho qemu-guest-agent (trạng thái, tắt máy đúng cách, đồng hồ, nhật ký hệ thống) và một cho trình trợ giúp bảng nhớ tạm. Không có gì đi qua mạng.",
   "cfg.agentInstall": "Trong máy ảo",
   "cfg.agentInstallNote": "Cài qemu-guest-agent bằng trình quản lý gói của máy ảo. Trình trợ giúp bảng nhớ tạm được cài từ nút Tác tử trên thanh của máy ảo khi qemu-guest-agent phản hồi.",
+  "win.perfProfile": "Cấu hình hiệu năng",
+  "win.perfProfileNote": "Khi máy đang chạy, công cụ LordOS trong Windows chuyển sang gói nguồn Hiệu năng cao và tắt hiệu ứng động, bóng đổ và độ trong suốt. Mọi thứ trở lại như cũ khi tắt tùy chọn này hoặc công cụ dừng. Cần công cụ LordOS w11 trở lên.",
   "cfg.toolsAuto": "Tự động cập nhật công cụ LordOS trong máy này",
   "cfg.toolsAutoNote": "Khi LordOS này có công cụ mới hơn, chúng được cài đặt trong lúc máy chạy và không có gì đang được sao chép. Tắt: một thông báo đề nghị cập nhật.",
   "cfg.agentOn": "Bật, chưa kết nối",

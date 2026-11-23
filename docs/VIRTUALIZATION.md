@@ -2835,7 +2835,7 @@ Copy and paste, drag, resolution and shell are **agents**: ordinary programs in 
 
 One user-mode program, `tools/guest-win/lordos-guest-win.c`: Win32 only, cross-built with mingw-w64 on the build machine
 (`server/mk/vm.mk`; 137 KB, it imports only system DLLs: kernel32, user32, gdi32, shell32, ole32, WindowsCodecs,
-dwmapi, wtsapi32, msvcrt). It is the Windows twin of `lordos-guest`: it holds `org.lordos.agent`
+dwmapi, wtsapi32, powrprof (w11), msvcrt). It is the Windows twin of `lordos-guest`: it holds `org.lordos.agent`
 (`\\.\Global\org.lordos.agent`, vioserial) and speaks `vmagent.h`'s frames. lord-vm checks everything it sends as it
 checks the Linux helper (it is the guest: untrusted); the program checks every frame the host sends with the same
 parsers (`vmagent.c`) and never runs anything the host names.
@@ -2921,7 +2921,7 @@ virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent 
 ### 7.1.3 Keeping the LordOS tools up to date (since 0.8.9.5)
 
 A guest keeps the tools it was given: a LordOS upgrade ships newer ones (`TOOLS_SHIPPED` in `apps/machines/model.js`,
-`w10` and `6` today, checked against the sources by `vm_model_test`), but before this a guest ran its older tools, with
+`w11` and `6` today, checked against the sources by `vm_model_test`), but before this a guest ran its older tools, with
 their known bugs, until someone found **Update LordOS Tools** in the agent's popover. Now Machines updates them by
 itself (`toolsAutoStep`, run every second by the machine's window, `vmwindow.jsx`):
 
@@ -2951,6 +2951,56 @@ itself (`toolsAutoStep`, run every second by the machine's window, `vmwindow.jsx
 Limits: only a machine whose window (or apps mode) Machines has open is watched; one kept running with its window
 closed is updated the next time its window opens. Tested by `server/tests/vm_model_test.mjs` (when, once per run,
 backoff, never a loop, settings, the notification); not yet on the dev VM with a real w7 guest.
+
+### 7.1.4 The guest's performance profile (tools w11, in development)
+
+Approved by the maintainer on 2026-11-23 (Machines performance, item 5). A per-machine switch, Configure → Guest
+agent → **Performance profile**, off by default and shown for Windows guests (`windowsDevices`): machine.json schema 13
+`"perf_profile": true` (written only when on), `lord-vm --set DIR --perf-profile on|off`, `lord.vm.set(dir, {
+perfProfile })`, read back as `perfProfile` by `lord.vm.list`. Like the other Configure switches it changes while the
+machine is off. It isn't on by default in apps mode either: it changes how the guest looks to the person (no
+animations, no transparency, window outlines while dragging), which they should choose.
+
+**Channel.** Only the existing `org.lordos.agent` port, no new program or privilege. Tools that say `perf` in their
+hello get `AGK_PERF` (kind 23, exactly one byte: 1 on, 0 off; `ag_perf_parse`) after every hello, off included, so a
+guest whose tools kept the profile from an earlier run gets its own settings back. They answer `AGK_PERFSTATE` (kind
+24, exactly 3 bytes: on, the `AGPF_*` parts done, the parts the system refused; known bits only, never one part in
+both; `ag_perfstate_parse`), which lord-vm only logs: `agent: the guest's performance profile is on (applied: power
+plan visual effects transparency; refused: nothing)`. The host names no command, path, value or plan.
+
+**What `lordos-guest-win` w11 does**, as the signed-in person (it never runs elevated) and only while the host holds the
+port:
+
+| Part (`AGPF_*`) | How | Put back |
+|---|---|---|
+| Power plan (`POWER`) | `PowerGetActiveScheme`, then `PowerSetActiveScheme` to High performance (`8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c`, powrprof). A standard user may switch plans unless a policy forbids it; a refusal or a missing plan is "refused" | The earlier plan, if High performance is still the active one |
+| Visual effects (`EFFECTS`) | `SystemParametersInfo` without `SPIF_UPDATEINIFILE` (this session only; the person's profile keeps its own values): animations inside windows, minimize and maximize animation, menu, combo box and tooltip animation, smooth list scrolling, selection fade, pointer and window shadows, window contents while dragging | Each effect that was on and is still off |
+| Transparency (`TRANSPARENCY`) | `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize` `EnableTransparency` 0, then `WM_SETTINGCHANGE` "ImmersiveColorSet" | Its earlier value (or no value, as before) if it is still 0 |
+
+What was there before is kept in `HKCU\Software\LordOS\GuestWin` `PerfSaved` (a fixed binary record: magic, size,
+parts; read back checked, an unreadable one is dropped). It goes back when the host sends 0, when the tools let the
+port go (log off, another session at the console, the host gone, exit) and when they start and find a record (the
+process was killed). A part goes back only while it is still what the tools set: a change the person made in between
+stays. A part already at its minimum counts as done and is left alone.
+
+**Not done (needs a review, AGENTS.md):**
+- *Windows Search's indexing while idle.* Stopping or lowering the `WSearch` service needs administrator rights; the
+  tools run as the person and may not run elevated or gain a service. A proposal: one more fixed PowerShell run as
+  SYSTEM through qemu-guest-agent, like `PTR_PS`, that sets `WSearch` to manual and stops it while the profile is on
+  and puts its start type back after; nothing from the guest, the person or JS.
+- *Linux guests.* `lordos-guest` runs as the person and may start only `xclip`, `wl-paste`/`wl-copy` and `systemctl
+  --user show-environment`, and connect only to its X display. Setting power-profiles-daemon's profile needs the system
+  D-Bus (`net.hadess.PowerProfiles` / `org.freedesktop.UPower.PowerProfiles` `ActiveProfile`, allowed by polkit to the
+  active session) or `powerprofilesctl`; the cpufreq governor needs root; GNOME's `enable-animations` needs `gsettings`
+  or the session D-Bus (dconf), KDE's `kwriteconfig`. Each is a new connection or a new program for the helper. A
+  proposal: the helper speaks D-Bus itself, on the system bus only for `ActiveProfile` (read, set to `performance`,
+  put back) and on the session bus only for `org.gnome.desktop.interface enable-animations`, with no new program.
+  Until then the Linux helper's hello has no `perf` and lord-vm sends it nothing.
+
+Tests: `build/vm-test` (schema 13 and its round trip; `AGK_PERF`; all 2^24 three-byte `AGK_PERFSTATE` payloads
+against the rule; the `perf` hello word), `tests/vm_model_test.mjs` (`TOOLS_SHIPPED.windows` is the source's w11).
+Built with mingw-w64 with no warning; it imports only system DLLs (powrprof.dll added). Not yet checked in a running
+Windows guest.
 
 ### 7.2 Apps mode (seamless)
 

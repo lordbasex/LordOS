@@ -14,7 +14,8 @@
  *                            noclip: a helper whose guest has no clipboard tool, said instead of "clipboard clipx"; a
  *                            helper says hello again when that changes; pointer: the Windows tools are new enough for
  *                            lord-vm to set the display driver's hardware pointer, docs/VIRTUALIZATION.md 7.1.2; gvt:
- *                            new enough for lord-vm to install Intel's driver for a GVT-g vGPU, vmgvtwin.h); the
+ *                            new enough for lord-vm to install Intel's driver for a GVT-g vGPU, vmgvtwin.h; perf:
+ *                            they apply the performance profile, AGK_PERF); the
  *                            host answers with its own hello
  *   AGK_CLIP   both ways     the clipboard's text, UTF-8; only in the directions the machine allows (machine.json)
  *   AGK_CLIPX  both ways     the clipboard in up to three forms at once (capability "clipx" in both hellos): parts of
@@ -238,6 +239,21 @@ int ag_stopping_parse(const uint8_t *p, size_t n, int *mode);
 /* systemd-shutdown's verb as AG_STOP_*: "poweroff" and "halt" AG_STOP_POWEROFF, "reboot" and "kexec" AG_STOP_REBOOT,
  * anything else (NULL too) 0 */
 int ag_stop_verb(const char *verb);
+/* The guest's performance profile (docs/VIRTUALIZATION.md 7.1.4; machine.json perf_profile; tools w11, "perf" in their
+ * hello). AGK_PERF host → guest: exactly 1 byte, 1 on, 0 off; lord-vm sends it after each hello of tools that said
+ * "perf". With it on, the Windows tools, as the person and with nothing else from the host, switch the guest to the
+ * High performance power plan and turn its visual effects (animations, shadows, fades, window contents while dragging)
+ * and transparency to the minimum; they keep what was there before in the person's own registry and put it back when
+ * the host says 0, when they let the port go (log off, another session at the console, exit) and when they start
+ * after a crash. AGK_PERFSTATE guest → host, the outcome, for lord-vm's log only: exactly 3 bytes, u8 on (0 or 1), u8
+ * the AGPF_* parts done (applied, or put back when off), u8 the parts the system refused; never a part in both. 0 well
+ * formed */
+enum { AGK_PERF = 23, AGK_PERFSTATE = 24 };
+enum { AGPF_POWER = 1, AGPF_EFFECTS = 2, AGPF_TRANSPARENCY = 4, AGPF_ALL = 7 };
+#define AG_PERFSTATE_BYTES 3
+int ag_perf_parse(const uint8_t *p, size_t n, int *on);
+int ag_perfstate_parse(const uint8_t *p, size_t n, int *on, unsigned *done, unsigned *failed);
+int ag_perfstate_write(uint8_t out[AG_PERFSTATE_BYTES], int on, unsigned done, unsigned failed);
 
 /* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
 #define LAG_CAP_WINDOWS 256u
@@ -329,7 +345,8 @@ int ag_drop_staging_ok(const char *p, int windows);
 #define LAG_APPNAME_MAX LAG_APP_MAX
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
 enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32, AG_HELLO_PLACE = 64,
-       AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024, AG_HELLO_STOPPING = 2048 };
+       AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024, AG_HELLO_STOPPING = 2048,
+       AG_HELLO_PERF = 4096 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;

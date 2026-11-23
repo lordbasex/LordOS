@@ -707,6 +707,8 @@
   "cfg.agentNote": "Two private channels into the machine: one for qemu-guest-agent (its state, a clean shutdown, the clock, the journal) and one for the clipboard helper. Nothing goes through the network.",
   "cfg.agentInstall": "In the machine",
   "cfg.agentInstallNote": "Install qemu-guest-agent with the machine's package manager. The clipboard helper is installed from the Agent button on the machine's bar once qemu-guest-agent answers.",
+  "win.perfProfile": "Performance profile",
+  "win.perfProfileNote": "While the machine runs, the LordOS tools in Windows switch it to the High performance power plan and turn off animations, shadows and transparency. Everything goes back when this is off or the tools stop. Needs the LordOS tools w11 or later.",
   "cfg.toolsAuto": "Update the LordOS tools in this machine automatically",
   "cfg.toolsAutoNote": "When this LordOS brings newer tools, they're installed while the machine runs and nothing is being copied. Off: a notification offers the update.",
   "cfg.agentOn": "On, not connected",

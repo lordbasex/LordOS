@@ -707,6 +707,8 @@
   "cfg.agentNote": "Njia mbili za faragha kuingia kwenye mashine: moja kwa qemu-guest-agent (hali yake, uzimaji safi, saa, jarida) na moja kwa msaidizi wa ubao wa kunakili. Hakuna kinachopita kwenye mtandao.",
   "cfg.agentInstall": "Ndani ya mashine",
   "cfg.agentInstallNote": "Sakinisha qemu-guest-agent kwa kidhibiti cha vifurushi cha mashine. Msaidizi wa ubao wa kunakili husakinishwa kutoka kitufe cha Wakala kwenye upau wa mashine qemu-guest-agent ikishajibu.",
+  "win.perfProfile": "Wasifu wa utendaji",
+  "win.perfProfileNote": "Mashine ikiendelea kufanya kazi, zana za LordOS ndani ya Windows huibadilisha kwenda mpango wa nishati wa Utendaji wa juu na kuzima uhuishaji, vivuli na uwazi. Kila kitu hurudi kama kilivyokuwa hiki kikizimwa au zana zikisimama. Inahitaji zana za LordOS w11 au mpya zaidi.",
   "cfg.toolsAuto": "Sasisha zana za LordOS katika mashine hii kiotomatiki",
   "cfg.toolsAutoNote": "LordOS hii ikileta zana mpya zaidi, zinasakinishwa mashine ikiwa inafanya kazi na hakuna kinachonakiliwa. Imezimwa: arifa inapendekeza usasishaji.",
   "cfg.agentOn": "Amewashwa, hajaunganishwa",

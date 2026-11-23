@@ -707,6 +707,8 @@
   "cfg.agentNote": "Dos canals privats cap a la màquina: un per a qemu-guest-agent (el seu estat, una apagada neta, el rellotge, el diari) i un per a l’ajudant del porta-retalls. No passa res per la xarxa.",
   "cfg.agentInstall": "A la màquina",
   "cfg.agentInstallNote": "Instal·la qemu-guest-agent amb el gestor de paquets de la màquina. L’ajudant del porta-retalls s’instal·la des del botó Agent de la barra de la màquina quan qemu-guest-agent respon.",
+  "win.perfProfile": "Perfil de rendiment",
+  "win.perfProfileNote": "Mentre la màquina funciona, les eines de LordOS al Windows la passen al pla d'energia Alt rendiment i desactiven les animacions, les ombres i la transparència. Tot torna com era quan això es desactiva o les eines s'aturen. Cal tenir les eines de LordOS w11 o posteriors.",
   "cfg.toolsAuto": "Actualitza automàticament les eines de LordOS en aquesta màquina",
   "cfg.toolsAutoNote": "Quan aquest LordOS porta eines més noves, s'instal·len mentre la màquina funciona i no s'està copiant res. Desactivat: una notificació ofereix l'actualització.",
   "cfg.agentOn": "Activat, no connectat",
