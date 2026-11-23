@@ -24,6 +24,9 @@ int    js_stall_count(void);
 void   js_stall_begin(void);           /* a call into JS made outside js.c (js_wm_end): timed as one run */
 void   js_stall_end(const char *what);   /* (memory report) the session runtime's QuickJS usage, one line */
 void   js_pointer(const char *type, int target, float x, float y, int button);
+/* A press with the window drag modifier held (grab.h grab_mod_held): __lordEvent('modgrab', …), 1 when the shell took it
+ * for a window's move or resize (sdk/moddrag.js); the press then reaches neither the app nor the theme's handlers. */
+int    js_pointer_modgrab(int target, float x, float y, int button);
 /* Touchpad and remote desktop (tp/tp_route.c) → __lordGesture(kind, phase, id, x, y, a, b, c, d):
  * "scroll" (dx, dy, source), "pinch" (scale, rotation, dx, dy), "swipe" (dx, dy, fingers, system). */
 void   js_gesture(const char *kind, const char *phase, int target, float x, float y, double a, double b, double c, double d);

@@ -2,7 +2,8 @@
 // first with Settings → Desktop & Dock → Title bars → Left) and, for an app with menus of its own, a strip with them
 // under it, with Window and Help (there is no global menu bar: F10, or ⌥ pressed and released alone, opens the focused
 // window's first menu, sdk/shortcuts.js addMenuBarKeys). The buttons are real targets (28 px, a glyph that says what
-// they do, a fill on hover), never colour alone. Right click on the title: tile or float the window, move it to another
+// they do, a fill on hover), never colour alone; Settings → Appearance → Window options → Window buttons makes the bar, the buttons,
+// their glyphs and their hit areas larger (px, GitHub #151 and #219), and index.jsx's chrome follows it. Right click on the title: tile or float the window, move it to another
 // activity, minimize, maximize, close. The title starts with the window's group: its activity's icon in the activity's
 // colour, named on hover (the same mark as the activity's pill and spine tile).
 // A Linux app that draws its own bar (args.csd, decided on every render) gets no frame: the content with the shadow, and
@@ -12,6 +13,7 @@
 import {
   View, Text, addListener, wm, AppHost, windowTitle, windowAccent, WindowShell, windowIcon, useMenusWithSpeech, getApp, appGroup, windowMenuItems, alwaysOnTopItem,
   solidOver, useWindowButtons, addMenuBarKeys, barIndex, webHelpItems, desktopList, desktopName, activeDesktop, useStore, SeamCover, t as tr,
+  buttonSizeScale, windowMenuTiling, settings,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
 import { MinimizeGlyph, MaximizeGlyph, RestoreGlyph, CloseGlyph, LockGlyph, ActivityIcon } from '../glyphs.jsx';
@@ -21,7 +23,7 @@ import { setFloating, isFloating } from '../tiler.js';
 import { tween, EASE } from '../motion.js';
 import { launchOrigin, activities, windowGroups, moveWindowToGroup } from '../state.js';
 
-export const TITLE_H = 36;
+export const TITLE_H = 36;          // at the normal size: px(TITLE_H) is the bar now (useWindowButtons)
 export const MENU_H = 26;
 const BTN = 28;
 // the shell started a moment ago: the windows coming back (session restore, a theme switch) don't zoom in
@@ -77,15 +79,18 @@ function AppMenuStrip({ t, win, focused, transparent }) {
   return menus.length ? <MenuStrip t={t} win={win} focused={focused} menus={menus} transparent={transparent} /> : null;
 }
 
-function FrameButton({ t, focused, onClick, danger, children, label, onHover }) {
+// size: Settings → Appearance → Window options → Window buttons: the button (its hit area) and its glyph grow with the bar
+function FrameButton({ t, focused, onClick, danger, children, label, onHover, size = 'normal' }) {
   const [hover, setHover] = useState(false);
   const ref = useRef(null);
+  const k = buttonSizeScale(size), b = Math.round(BTN * k);
+  const glyph = children(hover && danger ? '#ffffff' : t.text);
   return (
     <View ref={ref} onMouseDown={(e) => e.stopPropagation()} onClick={onClick} title={onHover ? undefined : label}
       onMouseEnter={() => { setHover(true); onHover?.(true, ref.current); }} onMouseLeave={() => { setHover(false); onHover?.(false, ref.current); }}
-      style={{ width: BTN, height: BTN, borderRadius: BTN / 2, alignItems: 'center', justifyContent: 'center', opacity: focused || hover ? 1 : 0.6,
+      style={{ width: b, height: b, borderRadius: b / 2, alignItems: 'center', justifyContent: 'center', opacity: focused || hover ? 1 : 0.6,
         backgroundColor: hover ? (danger ? t.closeHover : t.hover) : 'transparent' }}>
-      {children(hover && danger ? '#ffffff' : t.text)}
+      {k === 1 ? glyph : <View style={{ transform: `scale(${k})`, pointerEvents: 'none' }}>{glyph}</View>}
     </View>
   );
 }
@@ -109,7 +114,8 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
   const drag = useRef(null);
   const geo = wm.frame(win);
   const [menu, setMenu] = useState(null);
-  const { atStart, order: buttonOrder } = useWindowButtons(false);
+  const { atStart, order: buttonOrder, size, px } = useWindowButtons(false);
+  const bar = px(TITLE_H), btn = px(BTN);
   // on a locked display (the frame's padlock): only minimize, no move, resize or window menu (the SDK refuses them too)
   const order = locked ? [] : buttonOrder;
   const floating = isFloating(win.id);
@@ -137,13 +143,13 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
         if (Math.abs(e.x - d.x0) + Math.abs(e.y - d.y0) < 6) return;
         d.moving = true;
         d.dx = Math.round(d.rel * win.w);
-        d.dy = Math.min(TITLE_H / 2, d.y0 - geo.y);
+        d.dy = Math.min(bar / 2, d.y0 - geo.y);
       }
       wm.move(win.id, e.x - d.dx, e.y - d.dy);
     });
     const offUp = addListener('pointerup', () => { drag.current = null; });
     return () => { offMove(); offUp(); };
-  }, [win.id, win.w, geo.y]);
+  }, [win.id, win.w, geo.y, bar]);
 
   // resting on the maximize button opens the layout flyout under it (SnapTargets.jsx), as in other systems' snap layouts
   const flyTimer = useRef(0);
@@ -164,7 +170,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
     { label: tr('shell.ws.layout.move'), submenu: moveItems(win) },
     ...(groupItems(win).length ? [{ label: tr('shell.ws.group.moveTo'), submenu: groupItems(win) }] : []),
     // the layout flyout from the window menu too: for Linux apps that draw their own maximize button (Chrome)
-    ...(locked ? [] : [{ label: tr('shell.ws.snapfly.open'), onClick: () => { const m = menu || win.windowMenu; flyout.set({ id: win.id, x: m ? m.x : win.x + 40, y: m ? m.y : win.y + 40, at: 'point' }); } }]),
+    ...(locked || !windowMenuTiling(settings.get()) ? [] : [{ label: tr('shell.ws.snapfly.open'), onClick: () => { const m = menu || win.windowMenu; flyout.set({ id: win.id, x: m ? m.x : win.x + 40, y: m ? m.y : win.y + 40, at: 'point' }); } }]),
     '-',
     ...(extra || []),
     { label: tr('shell.classic.minimize'), onClick: () => wm.minimize(win.id) },
@@ -183,7 +189,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
       <WindowShell win={win} leaving={leaving} resizable={!locked} onMouseDown={() => wm.focus(win.id)} style={{ borderRadius: win.fullscreen ? 0 : 12, overflow: 'hidden', boxShadow: shadow }}>
         <AppHost id={win.id} focused={focused} />
         {app.ownFrame ? (
-          <View style={{ position: 'absolute', left: 0, right: 0, top: 4, height: BTN, flexDirection: 'row', gap: 4, paddingHorizontal: 6, pointerEvents: 'box-none' }}>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 4, height: btn, flexDirection: 'row', gap: px(4), paddingHorizontal: 6, pointerEvents: 'box-none' }}>
             {atStart ? null : <View style={{ flex: 1, pointerEvents: 'none' }} />}
             {order.map((k) => button(k))}
             {atStart ? <View style={{ flex: 1, pointerEvents: 'none' }} /> : null}
@@ -195,10 +201,10 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
   }
 
   function button(k) {
-    if (k === 'close') return <FrameButton key={k} t={t} focused={focused} danger label={tr('shell.classic.close')} onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} size={11} />}</FrameButton>;
-    if (k === 'minimize') return <FrameButton key={k} t={t} focused={focused} label={tr('shell.classic.minimize')} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>;
+    if (k === 'close') return <FrameButton key={k} t={t} focused={focused} size={size} danger label={tr('shell.classic.close')} onClick={() => wm.close(win.id)}>{(c) => <CloseGlyph color={c} size={11} />}</FrameButton>;
+    if (k === 'minimize') return <FrameButton key={k} t={t} focused={focused} size={size} label={tr('shell.classic.minimize')} onClick={() => wm.minimize(win.id)}>{(c) => <MinimizeGlyph color={c} />}</FrameButton>;
     return (
-      <FrameButton key={k} t={t} focused={focused} label={tr(win.maximized ? 'shell.classic.restore' : 'shell.classic.maximize')} onClick={() => { flyout.set(null); wm.toggleMaximize(win.id); }} onHover={maxHover}>
+      <FrameButton key={k} t={t} focused={focused} size={size} label={tr(win.maximized ? 'shell.classic.restore' : 'shell.classic.maximize')} onClick={() => { flyout.set(null); wm.toggleMaximize(win.id); }} onHover={maxHover}>
         {(c) => (win.maximized ? <RestoreGlyph color={c} /> : <MaximizeGlyph color={c} />)}
       </FrameButton>
     );
@@ -209,12 +215,12 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
   const buttons = locked
     ? (
       // locked: minimize stays (another app can take the slot), then the padlock where maximize and close were
-      <View style={{ flexDirection: 'row', gap: 4 }}>
+      <View style={{ flexDirection: 'row', gap: px(4) }}>
         {button('minimize')}
-        <View style={{ width: BTN, height: BTN, alignItems: 'center', justifyContent: 'center', opacity: 0.55 }}><LockGlyph color={t.textDim} size={12} /></View>
+        <View style={{ width: btn, height: btn, alignItems: 'center', justifyContent: 'center', opacity: 0.55 }}><LockGlyph color={t.textDim} size={px(12)} /></View>
       </View>
     )
-    : <View style={{ flexDirection: 'row', gap: 4 }}>{order.map(button)}</View>;
+    : <View style={{ flexDirection: 'row', gap: px(4) }}>{order.map(button)}</View>;
   // a maximized window fills the group frame's work area, inside its margins: it keeps its rounded corners
   const flat = !!win.fullscreen;
   const border = focused ? t.windowBorder : t.separator;
@@ -228,7 +234,7 @@ export const Window = memo(function Window({ win, t, focused, app, tight, leavin
         if (!wm.beginMove(win.id)) drag.current = { x0: e.x, y0: e.y, rel: geo.w ? (e.x - geo.x) / geo.w : 0.5, moving: false };
       }}
         onDoubleClick={() => { if (!locked) wm.toggleMaximize(win.id); }} onContextMenu={(e) => { if (!locked) setMenu({ x: e.x, y: e.y }); }}
-        style={{ height: TITLE_H, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 8, backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
+        style={{ height: bar, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 8, backgroundColor: focused ? t.titleBg : t.titleBgBlur }}>
         {/* a transparent app: under the bar and the next one's first row, so their edges let nothing through (GitHub #162) */}
         {app.transparent ? <SeamCover color={focused ? t.titleBg : t.titleBgBlur} /> : null}
         {atStart ? buttons : <View style={{ width: 4 }} />}

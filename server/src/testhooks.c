@@ -81,6 +81,11 @@ static void command(int fd, char *line) {
     if (n >= 3 && !strcmp(verb, "ptr") && a >= 0 && b >= 0 && a < 16384 && b < 16384) { host.pointer((int)a, (int)b); reply(fd, "ok", -1); return; }
     if (n >= 3 && !strcmp(verb, "btn") && a >= 0 && a < 8 && (b == 0 || b == 1)) { host.button((int)a, (int)b); reply(fd, "ok", -1); return; }
     if (n >= 2 && !strcmp(verb, "wheel") && a >= -100 && a <= 100) { host.wheel((int)a); reply(fd, "ok", -1); return; }
+    if (n >= 3 && !strcmp(verb, "key") && (a == 29 || a == 42 || a == 56 || a == 125) && (b == 0 || b == 1) && host.key) {
+        host.key((int)a, (int)b);
+        reply(fd, "ok", -1);
+        return;
+    }
     if (n >= 4 && (!strcmp(verb, "pen") || !strcmp(verb, "pad")) && a >= 0 && a <= 0x1f && b >= 0 && b < 0x300) {
         int r = host.tablet_event(!strcmp(verb, "pad"), (unsigned)a, (unsigned)b, (int)c);
         reply(fd, r ? "err no tablet (tablet add first)" : "ok", -1);

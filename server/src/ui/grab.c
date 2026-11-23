@@ -27,6 +27,16 @@ void grab_note_pointer(float x, float y, int buttons) {
 
 int grab_active(void) { return g.active; }
 
+static int drag_mod = GRAB_MOD_OFF;
+void grab_set_mod(int mod) { drag_mod = mod == GRAB_MOD_SUPER || mod == GRAB_MOD_ALT ? mod : GRAB_MOD_OFF; }
+int grab_mod(void) { return drag_mod; }
+int grab_mod_held(int meta, int alt, int ctrl) {
+    if (ctrl) return 0;
+    if (drag_mod == GRAB_MOD_SUPER) return meta && !alt;
+    if (drag_mod == GRAB_MOD_ALT) return alt && !meta;
+    return 0;
+}
+
 int grab_state(float *x, float *y, int *edges) {
     *x = ptr_x;
     *y = ptr_y;

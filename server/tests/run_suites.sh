@@ -245,6 +245,7 @@ EOF
     if have node; then run "bt-list-model-test (sdk/btlistmodel.js)" node tests/bt_list_model_test.mjs; fi
     if have node; then run "kbinhibit-model-test (sdk/kbinhibitmodel.js)" node tests/kbinhibit_model_test.mjs; fi
     if have node; then run "windowbuttons-test (sdk/windowbuttons.js)" node tests/windowbuttons_test.mjs; fi
+    if have node; then run "moddrag-model-test (sdk/moddragmodel.js, sdk/windowbuttons.js size and tiling, #151, #219)" node tests/moddrag_model_test.mjs; fi
     if have node; then run "celeste-model-test (themes/celeste/model.js)" node tests/celeste_model_test.mjs; fi
     if have node; then run "login-model-test (sdk/loginmodel.js)" node tests/login_model_test.mjs; fi
     if have node; then run "diskplaces-test (sdk/diskplaces.js, #122)" node tests/diskplaces_test.mjs; fi
@@ -256,6 +257,13 @@ EOF
         0) ok "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
         77) skip "popup-reopen" "build/lord-server and the default theme (make, npm run build)" ;;
         *) bad "popup-reopen (tests/popup_client.c, headless lord-server, #159)" ;;
+    esac
+    # (#219) Move and resize with: Off (the default) takes no press; ❖ + drag moves and resizes a Wayland and an X11 window
+    sh tests/moddrag_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test: off, move, resize, lock, shortcuts)" ;;
+        77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
+        *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
     esac
     # surfaces made children of themselves or of their descendants: refused, lord-server goes on
     sh tests/popup_headless.sh cycle-client >"$T/out" 2>&1
@@ -745,6 +753,12 @@ EOF
             run "always-on-top-scene-$th (sdk/desktopmodel.js stackOrder over themes/$th)" node tests/workspaces_test.mjs always_on_top_scene.mjs "$th"
         done
     else skip "always-on-top-scene" "node and the repository's node_modules (npm install)"; fi
+    # (#151, #219) title bar sizes, ❖ + drag anywhere in a window, the Window menu's tiling switch, in every theme
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        for th in default classic workspaces celeste; do
+            run "window-requests-scene-$th (sdk/moddrag.js, sdk/windowbuttons.js over themes/$th)" node tests/workspaces_test.mjs window_requests_scene.mjs "$th"
+        done
+    else skip "window-requests-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8, #111) how many app buttons fit on a Classic taskbar, and how big
     if have node; then run "classic-taskbarfit-test (themes/classic/taskbarfit.js)" node tests/classic_taskbarfit_test.mjs; fi
     # (0.8.8.6) the Terminal's key mappings: iTerm2's keypad, "\n", settings migration 2

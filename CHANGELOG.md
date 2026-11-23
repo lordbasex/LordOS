@@ -60,6 +60,52 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   computer>`); never a save dialog, and never the file chooser Linux apps get through the portal, which still shows the
   home folder and the disks only. `sdk/filepickermodel.js` `locationPlaces`, `startFolder(…, computer)`; tests in
   `filepicker_model_test.mjs`.
+- **Three window options in Settings → Appearance, in every theme, in development (the latest release is 0.8.9.4;
+  GitHub #151, #219).** A new group in Appearance gathers three personal choices about every window. Each default is
+  how LordOS always behaved, so nothing changes for anyone who doesn't choose them; they are saved per user in
+  `settings.json` (new keys, no migration) and apply at once to the open windows. They live in the SDK, so Lord Flow,
+  Lord Classic, Lord Workspaces and Lord Celeste all get them. See `docs/WINDOWS.md`, "Settings → Appearance → Window options".
+  - **Window buttons: Normal, Large, Extra large** (#151, #219; `settings.windowButtonSize`, `sdk/windowbuttons.js`).
+    The title bar, its close, minimize and maximize buttons, their glyphs and their hit areas grow by 1.25 or 1.5
+    without changing the display's scale: Lord Flow's bar 40 → 50 → 60 px and lights 13 → 16 → 20 px, Lord Classic's bar
+    34 → 43 → 51 px and buttons 44 → 55 → 66 px wide, Lord Workspaces' bar 36 → 45 → 54 px and buttons 28 → 35 → 42 px,
+    Lord Celeste's bar 38 → 48 → 57 px and lights 13 → 16 → 20 px. A small live preview shows the buttons at the chosen
+    size. The window manager is told the new frame (`configureWindows`' `chrome` may now be a function, `titleBarPx`), so
+    a Linux window drawn with the theme's frame is configured to the content size left. Normal draws exactly what each
+    theme drew before: a scene test compares a fingerprint of every title bar node's style against the frames before
+    the option existed, in all four themes. Right to left as before.
+  - **Move and resize with: Off, ❖ + drag, Alt + drag** (#219; `settings.windowDragModifier`, `sdk/moddrag.js`,
+    `sdk/moddragmodel.js`). Off by default. Chosen, holding the key and dragging anywhere in a window moves it, and a
+    right (or middle) drag resizes it from the nearest corner, in LordOS's windows and in Linux apps, Wayland and X11
+    (Xwayland) alike: for a window whose title bar is off screen, or for anyone who finds the title bar hard to hit.
+    lord-server offers such a press to the shell before the app sees it (`server/src/main.c`, `js_pointer_modgrab`,
+    `__lordEvent('modgrab')`, `runtime/events.js` `setModGrab`), and once taken the app gets neither the press nor its
+    release; the move or resize is the same as from the title bar and the borders (`wm.beginMove`, `wm.beginResize`:
+    lord-server follows it in C, snapping applies, Lord Workspaces' tiler keeps its rules, a locked window stays). A
+    maximized window comes out of its place once the pointer moves, as from its title bar. Never while an app has the
+    pointer locked or confined (games), while the window with the keyboard holds the shortcuts (a virtual machine, a
+    remote desktop), over a fullscreen window or an app's menu, or during a drag and drop (`wl_moddrag_allowed` in
+    `wl.c`); before a press becomes a drag the kernel is asked whether a keyboard really holds the key (`EVIOCGKEY`), so
+    a lost key release never turns clicks into moves. With Off nothing is offered at all. Alt is a choice, not the
+    proposal: some drawing and 3D programs and terminals use Alt with a click; with ❖ chosen, Alt + click stays the
+    app's. New native call `lord.wm.dragModifier('off' | 'super' | 'alt')` (`ui/js_wm.c`, validated, no other argument).
+  - **Show tiling options in the window menu** (#151; `settings.windowMenuTiling`, `sdk/windowmenu.js`). On by default.
+    Off, the Window menu leaves out Move & Resize (halves, quarters, thirds, arrangements, previous size), Lord
+    Classic's title bar menu its Snap Left, Snap Right and Snap Layouts, and Lord Workspaces' its layout flyout.
+    Dragging a window to an edge keeps its own switch in Desktop & Dock.
+  - **Tests:** `server/tests/moddrag_model_test.mjs` (53 checks: the choices, corners, rules, sizes),
+    `server/tests/window_requests_scene.mjs` over each of the four themes (the default title bar unchanged, the sizes
+    and hit areas, the chrome, the modifier told to lord-server, Off never taking a press, move and resize from each
+    corner, full screen left to the app, a maximized window dragged out, the tiling switch in both menus), and
+    `server/tests/moddrag_headless.sh` against a headless `build/lord-server-test` in `make test`: with nothing saved, ❖
+    + drag, ❖ + right click and Alt + click reach a Wayland app and nothing moves; with ❖ chosen, a Wayland app
+    (`moddrag_client.c`) and an X11 app under Xwayland (`moddrag_x11.c`) get no press for ❖ + drag, the window follows
+    the pointer, ❖ + right drag resizes it by the drag, Alt + click stays the app's, and a locked pointer or held
+    shortcuts keep ❖ + click the app's. The test build's hooks (never in the installed lord-server) gained `key C 1|0`
+    for a modifier key (Ctrl, Shift, Alt, ❖ only). Checked headless on the development machine on 2026-11-22; not yet
+    on the VM with a screenshot.
+  - Not done: moving and resizing with the keyboard (Alt+F7 and Alt+F8 style), which needs new entries in lord-server's
+    fixed key tables so a Linux app with the keyboard doesn't take the arrows; left for a later version.
 
 - **Store: a Flathub home with collections, categories and subcategories, in development (the latest release is
   0.8.9.4).** Flathub's section no longer opens on one long list: like the app centres on other desktops it opens on a

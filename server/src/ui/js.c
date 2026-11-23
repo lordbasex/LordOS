@@ -1069,6 +1069,20 @@ void js_pointer(const char *type, int target, float x, float y, int button) {
     drain_jobs();
 }
 
+int js_pointer_modgrab(int target, float x, float y, int button) {
+    if (!ctx) return 0;
+    JSValueConst args[5] = {
+        JS_NewString(ctx, "modgrab"), JS_NewInt32(ctx, target),
+        JS_NewFloat64(ctx, x), JS_NewFloat64(ctx, y), JS_NewInt32(ctx, button),
+    };
+    JSValue r = call_global("__lordEvent", 5, args);
+    int took = JS_IsBool(r) && JS_ToBool(ctx, r) > 0;
+    JS_FreeValue(ctx, r);
+    JS_FreeValue(ctx, args[0]);
+    drain_jobs();
+    return took;
+}
+
 void js_gesture(const char *kind, const char *phase, int target, float x, float y, double a, double b, double c, double d) {
     if (!ctx) return;
     if (!ctx) return;

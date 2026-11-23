@@ -4,7 +4,8 @@
 // the work area. «Reset Dock to defaults» puts the theme's apps back (dock.reset), after a confirmation in the page.
 // Menu Bar (Taskbar in Lord Classic) and Control Center: what the bar and the panel show (issue #58,
 // sdk/menubarmodel.js); everything is on until the user turns it off. Title bars: the side of the window buttons in
-// both themes (sdk/windowbuttons.js, issue #58).
+// both themes (sdk/windowbuttons.js, issue #58). Their size, ❖ + drag and the Window menu's tiling options are in
+// Appearance → Window options (WindowPrefs.jsx, #151, #219).
 import {
   View, Text, Button, useTheme, useLocale, useSettings, Toggle, Slider, Segmented, dockPrefs, dockHideSettings, DOCK_HIDE_MODES, DOCK_SIZE_MIN, DOCK_SIZE_MAX, DOCK_MAGNIFY_MAX, dock, themes,
   spacing, typeScale, menuBarPrefs, menuBarPatch, cleanerItemShown, getApp, menuBarEveryDisplay, WINDOW_BUTTON_SIDES, windowButtonsPref,

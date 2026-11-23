@@ -7084,6 +7084,22 @@ static void bind_consm(struct wl_client *c, void *data, uint32_t ver, uint32_t i
 
 /* For main.c: pointer locked (does not move) or confined to the surface (clipped). */
 int wl_pointer_locked(void) { return constraint && constraint->active && constraint->lock; }
+
+/* For main.c, the window drag modifier (grab.h grab_mod_held): may ❖ or Alt + a press at (x, y) on node hit be the
+ * window manager's? Never while a client has the pointer locked or confined (a game), while the window with the
+ * keyboard holds the shortcuts (a virtual machine, a remote desktop: zwp_keyboard_shortcuts_inhibitor_v1 active), over
+ * a fullscreen window, on an app's own menu or popup, or during a drag and drop: the press is the app's then. */
+int wl_moddrag_allowed(float x, float y, struct Node *hit) {
+    if (!dpy) return 1;
+    if (constraint && constraint->active) return 0;
+    KbInhib *k = focus_inhibitor();
+    if (k && k->st.active) return 0;
+    if (on_fs(x, y) || drag.on) return 0;
+    float lx, ly;
+    Surf *s = surface_under(x, y, hit, &lx, &ly);
+    while (s && s->role == R_SUB) s = s->parent;
+    return !(s && s->role == R_POPUP);
+}
 void wl_pointer_confine(int *x, int *y) {
     Constraint *k = constraint;
     if (!k || !k->active || k->lock || !k->surf) return;

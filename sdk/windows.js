@@ -161,7 +161,8 @@ export function keepWindowsInWorkAreas() {
 // Menus of each window: id → [{ label, items: [{ label, hint, onClick, disabled, checked } | '-'] }]
 export const appMenus = createStore({});
 
-// chrome: what the theme's frame adds around the content (borders and title bar);
+// chrome: what the theme's frame adds around the content (borders and title bar), { w, h, menu }, or a function that
+// returns it now (the title bar's height follows Settings → Appearance → Window options → Window buttons, windowbuttons.js);
 // used to open Linux app windows at the size they requested.
 // snap: true turns on window snapping (dragging a window to an edge of the screen, see "Snapping"
 // below); Lord Flow, Lord Classic and Lord Workspaces do. The person can still turn it off (settings.windowSnap).
@@ -206,7 +207,7 @@ export function setPackageApps(list) {
   packageApps = list.filter((a) => !themeApps.some((t) => t.id === a.id)).map((a) => ({ ...a, system: false }));
   rebuild();
 }
-export const windowChrome = () => chrome;
+export const windowChrome = () => (typeof chrome === 'function' ? chrome() : chrome);
 
 export const appIdOf = (id) => String(id ?? '').split('#')[0];
 export const getApp = (id) => registry.get(appIdOf(id));

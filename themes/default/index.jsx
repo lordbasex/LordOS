@@ -9,7 +9,7 @@ import {
   findWallpaper, wallpaperIdFor, wallpaperSrc, MotionWallpaper, useShortcuts, AppSwitcher, openSwitcher, switcherKeys, switcherGrabs, switcherHold, cycleAppWindows, hideApp, hideOthers,
   toggleShowDesktop, appSettingsItem, flowDesktopKeys, flowGrabs, desktopSwipe, DesktopHud, OverviewBackdrop, OverviewChrome,
   openOverview, closeOverview, toggleOverview, LevelHud, useStore, notifyHistory, menuBarEveryDisplay, hasBar, displayAt, keepWindowsInWorkAreas,
-  snapPreview,
+  snapPreview, titleBarPx,
   guestAppsMode,
 } from '@lordos/sdk';
 import { apps } from '@lordos/apps';
@@ -18,7 +18,7 @@ import { makeTheme } from './tokens.js';
 import { minimizeStarts } from './minimize.js';
 import { MenuBars } from './components/MenuBar.jsx';
 import { Dock, LaunchpadIcon, dockThickness } from './components/Dock.jsx';
-import { Window } from './components/Window.jsx';
+import { Window, TITLE_H } from './components/Window.jsx';
 import { Launchpad } from './components/Launchpad.jsx';
 import { ControlCenter } from './components/ControlCenter.jsx';
 import { NotificationCenter } from './components/NotificationCenter.jsx';
@@ -45,10 +45,11 @@ function workAreaFor(p, d, every) {
 }
 const areaFn = (d) => { const s = settings.get(); return workAreaFor(dockPrefs(s), d, menuBarEveryDisplay(s)); };
 
-// chrome: borders (1 + 1) and title bar (40 + 1 separator) of Window.jsx's frame
+// chrome: borders (1 + 1) and title bar (40 + 1 separator) of Window.jsx's frame, the bar at the size Settings → Appearance →
+// Window options asks (titleBarPx)
 // snap (0.8.8.10, GitHub #182): a window dragged to a side of the screen takes that half, near a corner a quarter, to the
 // top it fills the screen (sdk/snap.js); Settings → Desktop & Dock → Windows turns it off (settings.windowSnap)
-configureWindows({ apps, workArea: areaFn, chrome: { w: 2, h: 43 }, snap: true });
+configureWindows({ apps, workArea: areaFn, chrome: () => ({ w: 2, h: titleBarPx(TITLE_H) + 3 }), snap: true });
 
 // Where a dragged window would snap: a translucent rounded rectangle with the accent's edge, under the window.
 function SnapPreview({ t }) {
