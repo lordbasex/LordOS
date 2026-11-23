@@ -534,19 +534,8 @@ typedef struct {
 static Job jobs[MAX_JOBS];
 
 /* the folder's name from the machine's: letters, digits, space, '-', '_', '.'; others become '-' */
-static void folder_name(const char *name, char *out, size_t n) {
-    size_t o = 0;
-    for (const unsigned char *p = (const unsigned char *)name; *p && o + 1 < n && o < 48; p++) {
-        int ok = (*p >= '0' && *p <= '9') || ((*p | 32) >= 'a' && (*p | 32) <= 'z') || *p == ' ' || *p == '-' || *p == '_' || (*p == '.' && o);
-        if (*p >= 0x80) { while ((p[1] & 0xc0) == 0x80) p++; ok = 0; }
-        char ch = ok ? (char)*p : '-';
-        if (ch == '-' && o && out[o - 1] == '-') continue;
-        out[o++] = ch;
-    }
-    while (o && (out[o - 1] == ' ' || out[o - 1] == '-' || out[o - 1] == '.')) o--;
-    out[o] = 0;
-    if (!o) snprintf(out, n, "Machine");
-}
+/* a new machine's folder: as machine.c names it (a rename gives the same) */
+static void folder_name(const char *name, char *out, size_t n) { vm_folder_name(name, out, n); }
 
 static int user_file(JSContext *c, JSValueConst v, char *out, size_t n) {
     const char *s = JS_ToCString(c, v);
@@ -2890,6 +2879,42 @@ static JSValue f_transfer_aside(JSContext *c, JSValueConst t, int argc, JSValueC
     return JS_NewBool(c, vm_transfer_aside(dir, id, moved, sizeof moved) >= 0);
 }
 
+/* renamePlan(dir, name) → { problem, moves, folder, other }: what renaming the machine to name does (6.26; vm_rename_plan,
+ * read-only): problem null or 'badName', 'nameTaken' (other: that machine's name), 'folderTaken', 'transferTaken';
+ * moves: its folder and transfer folder get the name folder. lord-vm checks it all again under the machine's lock */
+static JSValue f_rename_plan(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    if (argc < 2 || !JS_IsString(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NULL;
+    const char *name = JS_ToCString(c, argv[1]);
+    if (!name) return JS_NULL;
+    VmRenamePlan rp;
+    int pr = vm_rename_plan(dir, name, &rp);
+    JS_FreeCString(c, name);
+    static const char *const P[] = { NULL, "badName", "nameTaken", "folderTaken", "transferTaken", "badName" };
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "problem", pr > 0 && pr < (int)(sizeof P / sizeof P[0]) ? JS_NewString(c, P[pr]) : JS_NULL);
+    JS_SetPropertyStr(c, o, "moves", JS_NewBool(c, rp.moves));
+    set_str(c, o, "folder", rp.folder);
+    set_str(c, o, "other", rp.other);
+    return o;
+}
+/* rename(dir, name) → job id: lord-vm --rename. Off: the name, then its folder and transfer folder (the job's out:
+ * { dir, folder: 'moved'|'same'|'kept', why }); running: the name only (folder 'later' when it would move); exit 5 and
+ * { problem } when the name or a folder's name is taken */
+static JSValue f_rename(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX], name[VM_NAME_MAX + 1];
+    if (argc < 2 || !JS_IsString(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
+    const char *s = JS_ToCString(c, argv[1]);
+    int ok = s && vm_rename_name_ok(s);
+    if (ok) snprintf(name, sizeof name, "%s", s);
+    if (s) JS_FreeCString(c, s);
+    if (!ok) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--rename", dir, name, NULL };
+    return JS_NewInt32(c, spawn_job(args, dir));
+}
+
 /* cdrom(id, path | null) → bool: a disc into the running machine's drive (the file is opened here, for the person, and
  * handed to lord-vm), or out with null. poll's cd says how it went (1 waiting, 2 done, 3 failed: cdMessage). */
 static JSValue f_cdrom(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -4366,7 +4391,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),
-    JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 2, f_clip_take),
+    JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("renamePlan", 2, f_rename_plan), JS_CFUNC_DEF("rename", 2, f_rename), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 2, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 2, f_clip_send_host),
     JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),

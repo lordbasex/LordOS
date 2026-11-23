@@ -283,6 +283,48 @@ In development; the latest release is 0.8.9.5-beta.
     native app alone; `PERF_APPS`). `build/uevent-test` covers `video4linux`, `build/fsasync-test` `fsasync_submit_fn`.
 ### Added
 
+- **Renaming a machine renames its folder and its transfer folder too** (in development; the latest release is
+  0.8.9.5-beta). Asked by the maintainer on 2026-11-23: a guest machine renamed in Configure → General kept its folder
+  `~/Machines/<old name>.lordvm` and its transfer folder `~/Machines/Transfer/<old name>`, which Files kept showing
+  under the old name. Details in `docs/VIRTUALIZATION.md` 6.26.
+  - **With the machine off** the name, then the folder `<name>.lordvm` (named as a new machine's is, `vm_folder_name`)
+    and the transfer folder `Transfer/<name>` with its owner record, each moved with `renameat2(RENAME_NOREPLACE)`, so
+    nothing is ever overwritten. A folder that can't move keeps its name and the new name is still saved, with the
+    reason said. A name whose folder would read the same once made safe (`Ubuntu (dev)` and `Ubuntu [dev]`) keeps the
+    folder.
+  - **Nothing else needs rewriting**: the disks, the UEFI variables, the TPM's state, the snapshots (inside the qcow2
+    files, named in `snapshots.json`), a saved session (`suspend.json` has no paths), `run.json` and the logs are all
+    found from wherever the folder is; a linked clone's frozen base stays in `~/Machines/.shared`; the runtime socket
+    is named by the machine's id; the transfer folder's tag in the guest is always `LordOS`. Only an ISO or a drivers'
+    disc kept inside the folder is a path in `machine.json`, and it is rewritten. The app's `app.json` (system, notes,
+    apps mode, profile) is inside the folder and moves with it.
+  - **Refused, with nothing changed**: a name another machine of the library has (ASCII case ignored, as the machines
+    command finds them), a folder `<name>.lordvm` or `Transfer/<name>` that already exists (case ignored), a name
+    starting with a dot, and what a name never was allowed to have (control characters, `/`, more than 64 bytes).
+  - **While the machine runs** only the name changes: the machine's own lord-vm writes it (new request `VM_RENAME`,
+    since it holds the machine's lock), and the folders keep their names. Once it's off, Configure → General shows
+    **Rename Folder** under Folder (and `machines rename NAME NAME` does the same); renaming the folder of a running
+    machine from under QEMU, virtiofsd and the open windows is never done.
+  - **Its windows follow it**: the machine's window, Configure, Snapshots and Logs know the machine by its id, so they
+    show it again under its new folder (at once after a rename in Configure, within three seconds after one from the
+    terminal); a window that only follows never starts the machine.
+  - **A transfer folder left behind** (a folder renamed by hand in Files, or a rename stopped between its two steps)
+    joins its machine at the next start (`vm_transfer_adopt`): only one folder owned by the machine's id whose own
+    machine folder is gone, never one a Duplicate (same id) still has, never one put aside as `(old YYYY-MM-DD)`.
+  - **Configure → General**: the name can be changed while the machine runs; under it, "Its folder and its transfer
+    folder will be called …", or why the name can't be used, before Save.
+  - **`machines rename NAME NEW_NAME`** (NAME can also be the machine's id now, for every command): the same checks and
+    the same `lord-vm --rename`, exit 1 when a name or folder is taken, 2 for a name that can't be one. `lord-vm --set
+    --name` renames the folders the same way. Bash completion knows `rename`.
+  - Texts in all 35 languages (`machines.cfg.rn.*`, the command's `help.rename`, `renamed…`, `folderTaken`,
+    `transferTaken`, `badNewName`), and `help.name` says a machine's id works too.
+  - **Tests**: `build/vm-test` (the folder a name gives, the names a rename takes, `vm_rename_plan` on a scratch library,
+    `vm_transfer_adopt` with a Duplicate, a folder put aside and two candidates), `tests/vm_model_test.mjs` (the
+    windows' id, `followDir`, Configure's line, the folder offer, the job's outcome) and `tests/vm_rename.sh` (in `make
+    test`): a throwaway machine with a snapshot, a transfer folder and an apps-mode `app.json` renamed while off, the
+    refusals, found by its id; with KVM, started from its new folder, renamed while running, stopped, its folders
+    renamed and started again.
+
 - **Monitor → Processes: Grouped, a steady list, who started each process, origin badges, filters and rolling
   statistics** (in development; the latest release is 0.8.9.5-beta). Asked by the maintainer: a browser shows as
   twenty rows, and ending it meant ending each one. Details in `docs/MONITOR.md` ("Grouped view" to "Rolling

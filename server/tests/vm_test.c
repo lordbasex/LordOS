@@ -585,6 +585,97 @@ static void test_schema(void) {
             if (system(cmd)) {}
         }
     }
+    /* renaming a machine (6.26): the folder a name gives, the names a rename takes, what it would do (vm_rename_plan: another
+     * machine's name, a folder or transfer folder of that name, case ignored), and the transfer folder following its
+     * machine's folder (vm_transfer_adopt: never a Duplicate's, never one put aside, never a guess) */
+    {
+        char f[64];
+        vm_folder_name("Windows 11 Pro", f, sizeof f); CHECK(!strcmp(f, "Windows 11 Pro"));
+        vm_folder_name("Windows 11 Pro (prueba)", f, sizeof f); CHECK(!strcmp(f, "Windows 11 Pro -prueba"));
+        vm_folder_name("Débian/../x", f, sizeof f); CHECK(!strcmp(f, "D-bian-..-x"));
+        vm_folder_name("...", f, sizeof f); CHECK(!strcmp(f, "Machine"));
+        vm_folder_name(".hidden", f, sizeof f); CHECK(f[0] != '.');
+        vm_folder_name("日本語", f, sizeof f); CHECK(!strcmp(f, "Machine"));
+        char longn[200];
+        memset(longn, 'a', sizeof longn - 1); longn[sizeof longn - 1] = 0;
+        vm_folder_name(longn, f, sizeof f); CHECK(strlen(f) == 48);
+        CHECK(vm_rename_name_ok("Windows 11 Pro") && vm_rename_name_ok("Ubuntu 26.04 (dev)") && vm_rename_name_ok("Ñandú"));
+        CHECK(!vm_rename_name_ok(".x") && !vm_rename_name_ok("") && !vm_rename_name_ok("   ") && !vm_rename_name_ok("a/b") && !vm_rename_name_ok("a\\b") &&
+              !vm_rename_name_ok("a\nb") && !vm_rename_name_ok("a\x7f") && !vm_rename_name_ok(longn) && !vm_rename_name_ok("\xff"));
+        char lib[] = "/tmp/vm-rename.XXXXXX";
+        if (mkdtemp(lib)) {
+            /* machines as lord-vm writes them: GOOD with ids of their own */
+            VmMachine a, b;
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &a, NULL, 0) == VM_OK);
+            a.schema = VM_SCHEMA;
+            b = a;
+            vm_new_id(a.id); vm_new_id(b.id);
+            snprintf(a.name, sizeof a.name, "Windows 11 Pro (prueba)");
+            snprintf(b.name, sizeof b.name, "Other");
+            char da[PATH_MAX], db[PATH_MAX], p[PATH_MAX + 64], xp[PATH_MAX], from[NAME_MAX + 1];
+            snprintf(da, sizeof da, "%s/Windows 11 Pro (prueba).lordvm", lib);
+            snprintf(db, sizeof db, "%s/Other.lordvm", lib);
+            CHECK(!mkdir(da, 0700) && !mkdir(db, 0700) && !vm_machine_save(da, &a) && !vm_machine_save(db, &b));
+            VmRenamePlan rp;
+            CHECK(vm_rename_plan(da, "Windows 11 Pro", &rp) == VM_RN_OK && rp.moves && !strcmp(rp.folder, "Windows 11 Pro"));
+            /* the same characters once made safe: the folder stays */
+            CHECK(vm_rename_plan(da, "Windows 11 Pro [prueba]", &rp) == VM_RN_OK && !rp.moves && !strcmp(rp.folder, "Windows 11 Pro (prueba)"));
+            CHECK(vm_rename_plan(da, "other", &rp) == VM_RN_NAME_TAKEN && !strcmp(rp.other, "Other"));
+            CHECK(vm_rename_plan(da, ".x", &rp) == VM_RN_BAD_NAME);
+            CHECK(vm_rename_plan("/nowhere/x.img", "A", &rp) == VM_RN_NOT_MACHINE);
+            /* its own name, another case: not another machine's */
+            CHECK(vm_rename_plan(da, "WINDOWS 11 PRO (PRUEBA)", &rp) == VM_RN_OK && rp.moves);
+            snprintf(p, sizeof p, "%s/new box.lordvm", lib); CHECK(!mkdir(p, 0700));            /* any entry, case ignored */
+            CHECK(vm_rename_plan(da, "New Box", &rp) == VM_RN_FOLDER_TAKEN);
+            snprintf(p, sizeof p, "%s/Transfer", lib); CHECK(!mkdir(p, 0700));
+            snprintf(p, sizeof p, "%s/Transfer/fresh", lib); CHECK(!mkdir(p, 0700));
+            CHECK(vm_rename_plan(da, "Fresh", &rp) == VM_RN_TRANSFER_TAKEN);
+            CHECK(vm_rename_plan(db, "Other", &rp) == VM_RN_OK && !rp.moves);                     /* itself */
+            /* its transfer folder, then the machine folder renamed (as lord-vm does): the transfer folder follows */
+            CHECK(vm_transfer_claim(da, a.id, xp, sizeof xp, NULL, 0) == 0);
+            snprintf(p, sizeof p, "%s/keep.txt", xp);
+            FILE *fp = fopen(p, "w"); if (fp) { fputs("x\n", fp); fclose(fp); }
+            char na[PATH_MAX];
+            snprintf(na, sizeof na, "%s/Windows 11 Pro.lordvm", lib);
+            CHECK(!rename(da, na));
+            CHECK(vm_transfer_adopt(na, a.id, from, sizeof from) == 0 && !strcmp(from, "Windows 11 Pro (prueba)"));
+            snprintf(p, sizeof p, "%s/Transfer/Windows 11 Pro/keep.txt", lib); CHECK(!access(p, F_OK));
+            snprintf(p, sizeof p, "%s/Transfer/.Windows 11 Pro.machine", lib); CHECK(!access(p, F_OK));
+            snprintf(p, sizeof p, "%s/Transfer/.Windows 11 Pro (prueba).machine", lib); CHECK(access(p, F_OK));
+            CHECK(vm_transfer_adopt(na, a.id, from, sizeof from) == 1);                         /* there already */
+            /* a rename that stopped between its steps: the next start's claim brings it along */
+            char nb[PATH_MAX];
+            snprintf(nb, sizeof nb, "%s/Win.lordvm", lib);
+            CHECK(!rename(na, nb));
+            CHECK(vm_transfer_claim(nb, a.id, xp, sizeof xp, from, sizeof from) == 0 && !from[0]);
+            snprintf(p, sizeof p, "%s/Transfer/Win/keep.txt", lib); CHECK(!access(p, F_OK));
+            /* a Duplicate (the same id) beside the original: each keeps its own */
+            char dup[PATH_MAX];
+            snprintf(dup, sizeof dup, "%s/Win 2.lordvm", lib);
+            CHECK(!mkdir(dup, 0700) && !vm_machine_save(dup, &a));
+            CHECK(vm_transfer_adopt(dup, a.id, from, sizeof from) == 1);
+            CHECK(vm_transfer_claim(dup, a.id, xp, sizeof xp, from, sizeof from) == 0);
+            snprintf(p, sizeof p, "%s/Transfer/Win/keep.txt", lib); CHECK(!access(p, F_OK));
+            /* a folder put aside (the Trash, a remade machine) never comes back by itself */
+            VmMachine c = b;
+            vm_new_id(c.id);
+            char dc[PATH_MAX];
+            snprintf(dc, sizeof dc, "%s/Fed.lordvm", lib);
+            CHECK(!mkdir(dc, 0700) && !vm_machine_save(dc, &c) && vm_transfer_claim(dc, c.id, xp, sizeof xp, NULL, 0) == 0);
+            CHECK(vm_transfer_aside(dc, c.id, from, sizeof from) == 0 && !strncmp(from, "Fed (old ", 9));
+            CHECK(vm_transfer_adopt(dc, c.id, from, sizeof from) == 1);
+            /* two folders of the same machine left behind: never a guess */
+            snprintf(p, sizeof p, "%s/Transfer/A1", lib); CHECK(!mkdir(p, 0700));
+            snprintf(p, sizeof p, "%s/Transfer/.A1.machine", lib); fp = fopen(p, "w"); if (fp) { fprintf(fp, "%s\n", c.id); fclose(fp); }
+            snprintf(p, sizeof p, "%s/Transfer/A2", lib); CHECK(!mkdir(p, 0700));
+            snprintf(p, sizeof p, "%s/Transfer/.A2.machine", lib); fp = fopen(p, "w"); if (fp) { fprintf(fp, "%s\n", c.id); fclose(fp); }
+            CHECK(vm_transfer_adopt(dc, c.id, from, sizeof from) == 1);
+            CHECK(vm_transfer_adopt(dc, "bad", from, sizeof from) < 0);
+            char cmd[PATH_MAX + 16];
+            snprintf(cmd, sizeof cmd, "rm -rf '%s'", lib);
+            if (system(cmd)) {}
+        }
+    }
     /* schema 6's boot order: a list of 1 to 3 different devices (disk, cd, network), and boot_menu; neither in the file is
      * auto (the system disk, then the CD/DVD), which is how every older file reads and what a new machine writes */
     {

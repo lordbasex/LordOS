@@ -7,7 +7,7 @@ _machines() {
     cmd=${COMP_WORDS[1]}
     local IFS=$'\n'
     if [ "$COMP_CWORD" -eq 1 ]; then
-        COMPREPLY=($(compgen -W $'list\nstatus\nstart\nopen\nstop\npoweroff\npause\nresume\nsuspend\nreset\nsnapshot\nclone\nset\nhelp' -- "$cur"))
+        COMPREPLY=($(compgen -W $'list\nstatus\nstart\nopen\nstop\npoweroff\npause\nresume\nsuspend\nreset\nsnapshot\nclone\nrename\nset\nhelp' -- "$cur"))
         return
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then

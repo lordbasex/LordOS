@@ -7,11 +7,12 @@
  *   machines stop|poweroff|pause|resume|suspend|reset NAME
  *   machines snapshot NAME list [--json] | take LABEL | revert TAG | delete TAG
  *   machines clone NAME NEW_NAME [--duplicate] [--keep-identity]
+ *   machines rename NAME NEW_NAME
  *   machines set NAME [--memory 8G] [--cpus 6] [--disk 64G] [--clipboard both] [--network shared] ...
  *   machines help
  *
  * The library is the Machines app's: ~/Machines, each machine a <name>.lordvm folder (ui/js_vm.c library()). NAME is a
- * machine's name (ASCII case ignored, a unique start is enough) or a machine folder's path. Everything but start and open
+ * machine's name (ASCII case ignored, a unique start is enough), its id (machine.json "id") or a machine folder's path. Everything but start and open
  * runs lord-vm (the installed one beside this program) on the folder, as the person, exactly as the app does; nothing
  * here needs root, and no admin action is ever asked from here.
  *
@@ -259,6 +260,12 @@ static Machine *find(const char *q, int *rc) {
         return NULL;
     }
     load_library();
+    /* its id: the one name that never changes (a Duplicate shares it: then more than one) */
+    if (vm_uuid_valid(q)) {
+        int k = 0, at = -1;
+        for (int i = 0; i < nms; i++) if (ms[i].ok && !strcmp(ms[i].m.id, q)) { k++; at = i; }
+        if (k == 1) return &ms[at];
+    }
     const char *names[MAX_MACHINES];
     for (int i = 0; i < nms; i++) names[i] = ms[i].m.name;
     int idx[MAX_MACHINES];
@@ -715,6 +722,57 @@ static int cmd_clone(Machine *x, int argc, char **argv) {
     return 0;
 }
 
+/* why a rename can't be done, in the person's language (vm_rename_plan's problem) */
+static int rename_refused(int problem, const char *name, const char *folder, const char *other) {
+    if (problem == VM_RN_NAME_TAKEN) ERR("nameTaken", "name", other && other[0] ? other : name, NULL);
+    else if (problem == VM_RN_FOLDER_TAKEN) ERR("folderTaken", "folder", folder, NULL);
+    else if (problem == VM_RN_TRANSFER_TAKEN) ERR("transferTaken", "folder", folder, NULL);
+    else if (problem == VM_RN_NOT_MACHINE) { ERR("notInLibrary", NULL); return VMCLI_NO_MACHINE; }
+    else { ERR("badNewName", NULL); return VMCLI_USAGE; }
+    return VMCLI_FAILED;
+}
+
+/* rename NAME NEW_NAME (docs/VIRTUALIZATION.md 6.26): the app's rename, through lord-vm --rename. Off: the name, its
+ * folder and its transfer folder; running: the name now, the folders when it's renamed again with the machine off */
+static int cmd_rename(Machine *x, int argc, char **argv) {
+    if (argc < 1) { ERR("missing", "what", "NEW_NAME", NULL); return VMCLI_USAGE; }
+    if (argc > 1) { ERR("unknown", "arg", argv[1], NULL); return VMCLI_USAGE; }
+    const char *name = argv[0];
+    if (!vm_rename_name_ok(name)) { ERR("badNewName", NULL); return VMCLI_USAGE; }
+    char old[VM_NAME_MAX + 1];
+    snprintf(old, sizeof old, "%s", x->m.name);
+    VmRenamePlan rp;
+    int same = x->ok && !strcmp(name, x->m.name), pr = vm_rename_plan(x->dir, name, &rp);
+    if (pr && !same) return rename_refused(pr, name, rp.folder, rp.other);
+    if (same && (pr || !rp.moves)) { SAY("renameNothing", "name", name, NULL); return 0; }
+    char *a[] = { NULL, "--rename", x->dir, (char *)name, NULL };
+    Run r;
+    int st = run_lordvm(a, &r);
+    if (st < 0) return VMCLI_FAILED;
+    JDoc d;
+    int have = r.no && !json_parse(r.out, r.no, &d, NULL, 0);
+    const char *folder = have ? json_str(d.root, "folder") : NULL, *dir = have ? json_str(d.root, "dir") : NULL;
+    int rc = 0;
+    if (st == 5 && have) {
+        const char *p = json_str(d.root, "problem");
+        int pk = !p ? VM_RN_BAD_NAME : !strcmp(p, "name-taken") ? VM_RN_NAME_TAKEN : !strcmp(p, "folder-taken") ? VM_RN_FOLDER_TAKEN
+               : !strcmp(p, "transfer-taken") ? VM_RN_TRANSFER_TAKEN : !strcmp(p, "not-a-machine") ? VM_RN_NOT_MACHINE : VM_RN_BAD_NAME;
+        rc = rename_refused(pk, name, json_str(d.root, "folder"), json_str(d.root, "other"));
+    } else if (st) { ERR("opFailed", "name", old, "why", why_of(&r), NULL); rc = our_rc(st); }
+    else if (folder && !strcmp(folder, "later")) SAY(same ? "folderWhenOff" : "renamedLater", "old", old, "name", name, "folder", json_str(d.root, "to") ? json_str(d.root, "to") : "", NULL);
+    else if (folder && !strcmp(folder, "moved")) {
+        SAY(same ? "renamedFolderOnly" : "renamedFolder", "old", old, "name", name, "dir", dir ? dir : "", NULL);
+        const char *why = json_str(d.root, "why");
+        if (why && why[0]) ERR("renameNote", "why", why, NULL);
+    } else {
+        SAY("renamed", "old", old, "name", name, NULL);
+        const char *why = have ? json_str(d.root, "why") : NULL;
+        if (folder && !strcmp(folder, "kept")) ERR("folderKept", "why", why ? why : "", NULL);
+    }
+    if (have) json_free(&d);
+    return rc;
+}
+
 static int cmd_set(Machine *x, int argc, char **argv) {
     char *out[96];
     McliStore store;
@@ -746,6 +804,7 @@ static int cmd_help(void) {
         { "machines reset NAME", "help.reset" },
         { "machines snapshot NAME list | take LABEL | revert TAG | delete TAG", "help.snapshot" },
         { "machines clone NAME NEW_NAME [--duplicate] [--keep-identity]", "help.clone" },
+        { "machines rename NAME NEW_NAME", "help.rename" },
         { "machines set NAME [--memory 8G] [--cpus 6] [--disk 64G] [--network shared|isolated|bridged|hostonly] [--bridge CARD]\n"
           "             [--clipboard off|to-guest|from-guest|both] [--clipboard-ask on|off] [--graphics 2d|3d]\n"
           "             [--gpu none|intel-whole|intel-shared] [--name NAME] [--iso FILE|none] [--display window|none]\n"
@@ -775,7 +834,7 @@ int main(int argc, char **argv) {
         }
         return cmd_list(json, names);
     }
-    static const char *const KNOWN[] = { "status", "start", "open", "stop", "poweroff", "pause", "resume", "suspend", "reset", "snapshot", "clone", "set", NULL };
+    static const char *const KNOWN[] = { "status", "start", "open", "stop", "poweroff", "pause", "resume", "suspend", "reset", "snapshot", "clone", "rename", "set", NULL };
     int known = 0;
     for (int i = 0; KNOWN[i]; i++) if (!strcmp(cmd, KNOWN[i])) known = 1;
     if (!known) { ERR("unknown", "arg", cmd, NULL); return VMCLI_USAGE; }
@@ -795,6 +854,7 @@ int main(int argc, char **argv) {
     }
     if (!strcmp(cmd, "snapshot")) return cmd_snapshot(x, rest, rv);
     if (!strcmp(cmd, "clone")) return cmd_clone(x, rest, rv);
+    if (!strcmp(cmd, "rename")) return cmd_rename(x, rest, rv);
     if (!strcmp(cmd, "set")) return cmd_set(x, rest, rv);
     if (rest) { ERR("unknown", "arg", rv[0], NULL); return VMCLI_USAGE; }
     if (!strcmp(cmd, "open")) return cmd_open(x);

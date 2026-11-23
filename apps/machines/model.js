@@ -322,6 +322,58 @@ export const windowTitle = (name, stateText) => (stateText ? `${name} — ${stat
 // a folder name for display, from the machine's dir (".../Machines/Debian.lordvm" → "Debian")
 export const folderOf = (dir) => (dir || '').split('/').pop().replace(/\.lordvm$/, '');
 
+// ---- renaming a machine (docs/VIRTUALIZATION.md 6.26) ----
+// The name is machine.json's; its folder and transfer folder follow it while it's off (lord-vm --rename / --set --name,
+// lord.vm.renamePlan says what a name would do). A machine is the same machine by its id: its windows ('machines#vm-<id>',
+// 'cfg-', 'snap-', 'log-') find it again under its new folder.
+const RENAME_PROBLEMS = ['badName', 'nameTaken', 'folderTaken', 'transferTaken'];
+// the uuid in a Machines window's id, or null
+export function windowMachineId(winId) {
+  const m = /^machines#(?:vm|cfg|snap|log)-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(String(winId || ''));
+  return m ? m[1] : null;
+}
+// the folder a window shows now: dir while the library still has it, else the one machine with its id (a Duplicate
+// shares the id: two of them, and the window keeps dir)
+export function followDir(dir, id, list) {
+  if (!id || !Array.isArray(list) || list.some((m) => m && m.dir === dir)) return dir;
+  const same = list.filter((m) => m && m.id === id && typeof m.dir === 'string');
+  return same.length === 1 ? same[0].dir : dir;
+}
+// Configure → General's line under Nombre for the draft name, from lord.vm.renamePlan's answer: { tone: 'bad'|'dim',
+// key, vars } or null, and whether Save may go. Running: only the name changes now. A name that isn't the machine's yet
+// but whose folder stays is said by nothing at all.
+export function renameNote(plan, { name, current, running } = {}) {
+  const changed = typeof name === 'string' && name !== current;
+  if (!changed || !plan) return { note: null, ok: true };
+  if (!String(name).trim() || String(name).startsWith('.')) return { note: { tone: 'bad', key: 'machines.cfg.rn.badName', vars: {} }, ok: false };
+  if (RENAME_PROBLEMS.includes(plan.problem)) {
+    return { note: { tone: 'bad', key: `machines.cfg.rn.${plan.problem}`, vars: { name: plan.other || name, folder: plan.folder || '' } }, ok: false };
+  }
+  if (running) return { note: { tone: 'dim', key: plan.moves ? 'machines.cfg.rn.running' : 'machines.cfg.rn.runningSame', vars: { folder: plan.folder || '' } }, ok: true };
+  return { note: plan.moves ? { tone: 'dim', key: 'machines.cfg.rn.folderWillBe', vars: { folder: plan.folder } } : null, ok: true };
+}
+// the Folder row's offer while the machine is off: its folder still says another name (renamed while it ran, or by
+// hand) and that name is free: { folder } to offer Rename Folder, else null
+export function folderOffer(plan, running) {
+  return !running && plan && plan.moves && !plan.problem && plan.folder ? { folder: plan.folder } : null;
+}
+// what a rename (or a set with a name) did, from its job's output: lord-vm's JSON line { dir, folder: 'moved'|'same'|
+// 'kept'|'later', why, problem }, or {} when there is none
+export function renameOutcome(out) {
+  const lines = String(out || '').split('\n').map((l) => l.trim()).filter((l) => l.startsWith('{'));
+  for (let i = lines.length - 1; i >= 0; i--) {
+    try {
+      const j = JSON.parse(lines[i]);
+      if (j && typeof j === 'object' && ('folder' in j || 'problem' in j)) {
+        return { dir: typeof j.dir === 'string' ? j.dir : null, folder: typeof j.folder === 'string' ? j.folder : null, to: typeof j.to === 'string' ? j.to : null,
+          why: typeof j.why === 'string' ? j.why : null, problem: typeof j.problem === 'string' ? j.problem : null,
+          name: typeof j.name === 'string' ? j.name : null, other: typeof j.other === 'string' ? j.other : null };
+      }
+    } catch (e) { /* not JSON: lord-vm's words */ }
+  }
+  return {};
+}
+
 // ---- the Control Center (Main) ----
 
 // Systems recognized from an ISO's volume label or a file's name: an id for the card's mark, the name shown. Our own

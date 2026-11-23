@@ -1,11 +1,12 @@
 // Configure (the approved mock "Configure"): a sidebar of sections with a one-line summary each, and the section's
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
-// while the machine is off; what the app keeps (system, notes) is saved at once.
+// while the machine is off; what the app keeps (system, notes) is saved at once. The name is the exception (6.26): while
+// the machine runs it changes alone (`lord-vm --rename`), and its folders follow it once it's off.
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn } from './model.js';
-import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems } from './ui.jsx';
+  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn } from './model.js';
+import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta } from './meta.js';
 import { defaultsOf } from './store.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
@@ -97,6 +98,12 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues }) {
 
 // onClose: shown as a sheet over the library or the machine's window (kit.jsx), with Cancel and Done; without it, a
 // window of its own (args.configure) as before
+// what a rename's job said, kept for the Configure that opens on the machine's new folder (this one goes with the old)
+let carried = null;
+// lord-vm's problem ('name-taken') as Configure's text key
+const PROBLEMS = { 'name-taken': 'nameTaken', 'folder-taken': 'folderTaken', 'transfer-taken': 'transferTaken' };
+const problemKey = (pr) => `machines.cfg.rn.${PROBLEMS[pr] || 'badName'}`;
+
 export function Configure({ dir, section: section0, onClose }) {
   const p = usePal();
   const { id: winId } = useAppWindow();
@@ -108,7 +115,7 @@ export function Configure({ dir, section: section0, onClose }) {
   const [draft, setDraft] = useState({});
   const [meta, setMeta] = useState(() => readMeta(dir));
   const [job, setJob] = useState(0);
-  const [msg, setMsg] = useState(null);
+  const [msg, setMsg] = useState(() => { const c = carried && carried.dir === dir ? carried.msg : null; carried = null; return c; });
   const [picking, setPicking] = useState(false);
   const [pickShare, setPickShare] = useState(false);
   const [disk, setDisk] = useState(null);
@@ -135,7 +142,17 @@ export function Configure({ dir, section: section0, onClose }) {
       if (!r || !r.done) return;
       setJob(0);
       setSndDraft({});
-      if (r.ok) { setDraft({}); setMsg({ ok: true, text: tr('machines.cfg.saved') }); if (closing && onClose) onClose(); }
+      // a new name (6.26): where its folder went, or why it stayed
+      const out = renameOutcome(r.out);
+      if (r.ok) {
+        setDraft({});
+        const text = out.folder === 'moved' ? tr('machines.cfg.rn.moved', { folder: folderOf(out.dir) }) + (out.why ? ` ${tr('machines.cfg.rn.note', { why: out.why })}` : '')
+          : out.folder === 'kept' ? tr('machines.cfg.rn.kept', { why: out.why || '' })
+          : out.folder === 'later' ? tr('machines.cfg.rn.later', { folder: out.to || '' }) : tr('machines.cfg.saved');
+        setMsg({ ok: out.folder !== 'kept', text });
+        if (closing && onClose) onClose();
+        if (out.folder === 'moved' && out.dir && out.dir !== dir) { carried = { dir: out.dir, msg: { ok: true, text } }; noteMoved(dir, out.dir); return; }
+      } else if (out.problem) { setClosing(false); setMsg({ ok: false, text: tr(problemKey(out.problem), { name: out.other || out.name || '', folder: out.folder || '' }) }); }
       else { setClosing(false); setMsg({ ok: false, text: r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim() }); }
       load();
     }, 300);
@@ -156,10 +173,18 @@ export function Configure({ dir, section: section0, onClose }) {
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
   const dirty = Object.keys(draft).some((k) => differs(k, draft[k]));
+  // the name (6.26): what the draft's name would do (lord.vm.renamePlan reads the library), and while it's off whether
+  // its folder still says another name
+  const plan = has() && typeof lord.vm.renamePlan === 'function' && cur.name !== m.name ? lord.vm.renamePlan(dir, cur.name) : null;
+  const rn = renameNote(plan, { name: cur.name, current: m.name, running });
+  const offer = !running && !dirty && has() && typeof lord.vm.renamePlan === 'function' ? folderOffer(lord.vm.renamePlan(dir, m.name), running) : null;
+  // while it runs only the name may change, alone
+  const onlyName = Object.keys(draft).every((k) => k === 'name' || !differs(k, draft[k]));
   const save = (patch) => {
     const change = patch || Object.fromEntries(Object.entries(draft).filter(([k, val]) => differs(k, val)));
     if (!Object.keys(change).length) return;
-    const id = lord.vm.set(dir, change);
+    if (!rn.ok && 'name' in change) { setMsg({ ok: false, text: tr(rn.note.key, rn.note.vars) }); return; }
+    const id = running && 'name' in change ? lord.vm.rename(dir, change.name) : lord.vm.set(dir, change);
     if (!id) setMsg({ ok: false, text: vmRefusal(tr('machines.cfg.refused')) }); else { setJob(id); setMsg({ ok: true, text: tr('machines.cfg.saving') }); }
   };
   // sound (6.9): lord.vm.sound applies it to a running machine now, or writes it with lord-vm --set (a job) when it's off
@@ -207,8 +232,9 @@ export function Configure({ dir, section: section0, onClose }) {
   let pane = null;
   if (sec === 'general') pane = <>
     <Group>
-      <Row label={tr('machines.new.name')} note={offNote}>
-        <Off off={running}><TextInput value={cur.name} onChange={(x) => set({ name: x })} /></Off>
+      <Row label={tr('machines.new.name')}>
+        <TextInput value={cur.name} onChange={(x) => set({ name: x })} />
+        {rn.note ? <Text style={{ fontSize: 12, color: rn.note.tone === 'bad' ? '#ff453a' : p.dim, textAlign: 'start', lineHeight: 1.4 }}>{tr(rn.note.key, rn.note.vars)}</Text> : null}
       </Row>
       <Row label={tr('machines.cfg.system')}>
         <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
@@ -228,9 +254,10 @@ export function Configure({ dir, section: section0, onClose }) {
       {m.imported ? <Row label={tr('machines.cfg.importedFrom')} note={tr('machines.cfg.importedNote')}>
         <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{meta.importedFrom || '—'}</Text>
       </Row> : null}
-      <Row label={tr('machines.cfg.folder')} last>
+      <Row label={tr('machines.cfg.folder')} last note={offer ? tr('machines.cfg.rn.offer', { folder: offer.folder }) : null}>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
           <Text style={{ flex: 1, fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{dir}</Text>
+          {offer ? <Btn label={tr('machines.cfg.rn.renameFolder')} disabled={!!job} onClick={() => save({ name: m.name })} /> : null}
           <Btn label={tr('machines.cmd.showInFiles')} onClick={() => revealPath(dir)} />
         </View>
       </Row>
@@ -519,7 +546,8 @@ export function Configure({ dir, section: section0, onClose }) {
   const done = () => {
     if (!dirty) { onClose(); return; }
     if (netBad) return;
-    if (running) { setMsg({ ok: false, text: tr('machines.cfg.runningBanner') }); return; }
+    if (running && !onlyName) { setMsg({ ok: false, text: tr('machines.cfg.runningBanner') }); return; }
+    if (!rn.ok) { setMsg({ ok: false, text: tr(rn.note.key, rn.note.vars) }); return; }
     setClosing(true); save();
   };
   return (
@@ -538,12 +566,12 @@ export function Configure({ dir, section: section0, onClose }) {
         {onClose ? (
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
             <Pill label={tr('machines.cancel')} disabled={!!job} onClick={() => { setDraft({}); setMsg(null); onClose(); }} />
-            <Pill primary label={tr('machines.cfg.done')} disabled={!!job || (dirty && netBad)} onClick={done} />
+            <Pill primary label={tr('machines.cfg.done')} disabled={!!job || (dirty && (netBad || !rn.ok))} onClick={done} />
           </View>
         ) : savable || dirty ? (
           <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
             <Pill label={tr('machines.cancel')} disabled={!dirty || !!job} onClick={() => { setDraft({}); setMsg(null); }} />
-            <Pill primary label={tr('machines.cfg.save')} disabled={!dirty || running || !!job || netBad} onClick={() => save()} />
+            <Pill primary label={tr('machines.cfg.save')} disabled={!dirty || (running && !onlyName) || !!job || netBad || !rn.ok} onClick={() => save()} />
           </View>
         ) : null}
       </View>

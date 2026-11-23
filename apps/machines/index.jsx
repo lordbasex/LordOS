@@ -18,6 +18,7 @@ import { GuestWindow } from './appsmode.jsx';
 import { startAppsStatus } from './appsstatus.jsx';
 import { startMachinesCli } from './cli.js';
 import { MachinesSettings } from './settingswin.jsx';
+import { useMachineDir } from './ui.jsx';
 
 export function Icon({ size }) { return <AppMark size={size} />; }
 
@@ -65,12 +66,15 @@ export const isLibraryKey = (e) => !!e && !!e.meta && !e.ctrl && !e.alt && (e.ba
 export default function App() {
   const { args, focused } = useAppWindow();
   useEffect(() => (focused && args && Object.keys(args).length ? addListener('keydown', (e) => { if (isLibraryKey(e)) { e.preventDefault?.(); openLibrary(); } }) : undefined), [focused]);
+  // a machine renamed with its folder (6.26): its windows follow it there, by its id
+  const dir0 = args?.machine || args?.snapshots || args?.configure || args?.logs || '';
+  const dir = useMachineDir(dir0);
   if (args?.guestWin) return <GuestWindow dir={args.guestWin.dir} gid={args.guestWin.gid} />;
-  if (args?.machine) return <MachineWindow dir={args.machine} name={args.name || ''} loadvm={args.loadvm || ''} />;
+  if (args?.machine) return <MachineWindow key={dir} dir={dir} name={args.name || ''} loadvm={args.loadvm || ''} followed={dir !== dir0} />;
   if (args?.storage) return <Storage />;
   if (args?.settings) return <MachinesSettings section={args.settings} />;
-  if (args?.snapshots) return <Snapshots dir={args.snapshots} name={args.name || ''} />;
-  if (args?.configure) return <Configure dir={args.configure} section={args.section} />;
-  if (args?.logs) return <Logs dir={args.logs} name={args.name || ''} />;
+  if (args?.snapshots) return <Snapshots key={dir} dir={dir} name={args.name || ''} />;
+  if (args?.configure) return <Configure key={dir} dir={dir} section={args.section} />;
+  if (args?.logs) return <Logs key={dir} dir={dir} name={args.name || ''} />;
   return <Library />;
 }

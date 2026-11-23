@@ -1,10 +1,10 @@
 // Pieces the Machines windows share: the state dot, the system marks, the three lights, bars, a context menu and the
 // surfaces of the Control Center (docs/VIRTUALIZATION.md, "The app"; the approved mocks, Main and Toolbar).
-import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, useSettings, useStore, LordOSLogo, t as tr } from '@lordos/sdk';
+import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, useSettings, useStore, createStore, fs, useAppWindow, LordOSLogo, t as tr } from '@lordos/sdk';
 import { logoFor } from './logos.js';
 import { storeRev } from './store.js';
 import { COLOR_HEX } from './systems.js';
-import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg, memlockFits } from './model.js';
+import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg, memlockFits, windowMachineId, followDir } from './model.js';
 import { useEffect, useRef, useState } from 'react';
 
 export const TONE = { run: '#30d158', pause: '#ff9f0a', off: '#8e8e93', busy: '#0a84ff', bad: '#ff453a' };
@@ -12,6 +12,30 @@ export const has = () => typeof lord !== 'undefined' && !!lord.vm;
 // why lord.vm refused a start or a change (it returned 0), or the fallback text: a writable shared folder that holds a
 // protected file (vm.shareProtected) is said as such
 export const vmRefusal = (fallback) => { const r = lord.vm.refusal ? lord.vm.refusal() : null; return r ? errorText(r) : fallback; };
+// a machine renamed with its folder (6.26): old folder → new, set by the window that renamed it, so its other windows
+// (its own, Snapshots, Logs, Configure) follow at once; a rename from elsewhere (the machines command) is found by the
+// machine's id within a few seconds (useMachineDir)
+export const movedDirs = createStore({});
+export const noteMoved = (from, to) => { if (from && to && from !== to) movedDirs.set((x) => ({ ...x, [from]: to })); };
+const movedTo = (map, dir) => { let d = dir; for (let i = 0; i < 8 && map[d]; i++) d = map[d]; return d; };
+// the folder a Machines window shows: its args' folder, or where that machine is now
+export function useMachineDir(dir) {
+  const { id: winId } = useAppWindow();
+  const moved = useStore(movedDirs);
+  const [found, setFound] = useState(null);
+  const want = movedTo(moved, dir);
+  useEffect(() => {
+    const mid = dir ? windowMachineId(winId) : null;
+    if (!mid || !has()) return undefined;
+    const look = () => {
+      try { fs.stat(`${want}/machine.json`); return; } catch (e) { /* gone: renamed? */ }
+      try { const d = followDir(want, mid, lord.vm.list()); setFound(d !== want ? d : null); } catch (e) { /* the list isn't there */ }
+    };
+    const timer = setInterval(look, 3000);
+    return () => clearInterval(timer);
+  }, [want, winId]);
+  return found || want;
+}
 export const gb = (mb) => (mb == null || !Number.isFinite(+mb) ? '—' : mb >= 1024 ? `${Math.round((mb / 1024) * 10) / 10} GB` : `${mb} MB`);
 export const bytes = (b) => (b == null || !Number.isFinite(+b) ? '—' : b >= 1e12 ? `${Math.round(b / 1e11) / 10} TB` : b >= 1e9 ? `${Math.round(b / 1e8) / 10} GB` : `${Math.round(b / 1e6)} MB`);
 export const gib = (b) => `${Math.round((b / 1073741824) * 10) / 10}`;

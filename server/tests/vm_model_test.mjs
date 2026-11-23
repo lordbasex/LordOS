@@ -957,5 +957,43 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('front: the library keeps it', M.guestMayTakeFront({ app: 'machines', args: null }, dir), false);
 }
 
+// renaming a machine (6.26): its windows follow it by id, Configure's line under the name, the folder offer, the job's word
+{
+  const id = '0f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2b', other = '1f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2c';
+  eq('rename: the machine window names its id', M.windowMachineId(`machines#vm-${id}`), id);
+  eq('rename: Configure, Snapshots, Logs too', [M.windowMachineId(`machines#cfg-${id}`), M.windowMachineId(`machines#snap-${id}`), M.windowMachineId(`machines#log-${id}`)], [id, id, id]);
+  eq('rename: not a machine window', [M.windowMachineId('machines'), M.windowMachineId('machines#storage'), M.windowMachineId('machines#vm-Debian'), M.windowMachineId(`files#vm-${id}`), M.windowMachineId(null)], [null, null, null, null, null]);
+  const lib = '/home/u/Machines';
+  const list = [{ dir: `${lib}/Win.lordvm`, id }, { dir: `${lib}/Deb.lordvm`, id: other }];
+  eq('rename: a folder still there stays', M.followDir(`${lib}/Win.lordvm`, id, list), `${lib}/Win.lordvm`);
+  eq('rename: a folder gone follows the id', M.followDir(`${lib}/Win (prueba).lordvm`, id, list), `${lib}/Win.lordvm`);
+  eq('rename: no machine with the id: kept', M.followDir(`${lib}/Gone.lordvm`, '2f8e2c1a-3b4d-4e5f-8a6b-7c8d9e0f1a2d', list), `${lib}/Gone.lordvm`);
+  eq('rename: a Duplicate shares the id: never a guess', M.followDir(`${lib}/Old.lordvm`, id, [...list, { dir: `${lib}/Win 2.lordvm`, id }]), `${lib}/Old.lordvm`);
+  eq('rename: no id, no list', [M.followDir('/x.lordvm', null, list), M.followDir('/x.lordvm', id, null)], ['/x.lordvm', '/x.lordvm']);
+  const cur = 'Windows 11 Pro (prueba)';
+  eq('rename: the same name says nothing', M.renameNote({ moves: true, folder: 'x' }, { name: cur, current: cur }), { note: null, ok: true });
+  eq('rename: the folder will be', M.renameNote({ problem: null, moves: true, folder: 'Windows 11 Pro' }, { name: 'Windows 11 Pro', current: cur }),
+    { note: { tone: 'dim', key: 'machines.cfg.rn.folderWillBe', vars: { folder: 'Windows 11 Pro' } }, ok: true });
+  eq('rename: a folder that stays says nothing', M.renameNote({ problem: null, moves: false, folder: 'Win' }, { name: 'win', current: 'Win' }), { note: null, ok: true });
+  eq('rename: running, the folder later', M.renameNote({ problem: null, moves: true, folder: 'B' }, { name: 'B', current: 'A', running: true }),
+    { note: { tone: 'dim', key: 'machines.cfg.rn.running', vars: { folder: 'B' } }, ok: true });
+  eq('rename: running, the same folder', M.renameNote({ problem: null, moves: false, folder: 'A' }, { name: 'A!', current: 'A', running: true }).note.key, 'machines.cfg.rn.runningSame');
+  eq('rename: another machine has the name', M.renameNote({ problem: 'nameTaken', moves: true, folder: 'other', other: 'Other' }, { name: 'other', current: 'A' }),
+    { note: { tone: 'bad', key: 'machines.cfg.rn.nameTaken', vars: { name: 'Other', folder: 'other' } }, ok: false });
+  eq('rename: the folder is taken', M.renameNote({ problem: 'folderTaken', moves: true, folder: 'B' }, { name: 'B', current: 'A' }).note.key, 'machines.cfg.rn.folderTaken');
+  eq('rename: the transfer folder is taken', M.renameNote({ problem: 'transferTaken', moves: true, folder: 'B' }, { name: 'B', current: 'A', running: true }).ok, false);
+  eq('rename: a dot first, blank', [M.renameNote({}, { name: '.x', current: 'A' }).ok, M.renameNote({}, { name: '  ', current: 'A' }).note.key], [false, 'machines.cfg.rn.badName']);
+  eq('rename: no plan (no lord.vm)', M.renameNote(null, { name: 'B', current: 'A' }), { note: null, ok: true });
+  eq('rename: the folder offer while off', M.folderOffer({ problem: null, moves: true, folder: 'Win' }, false), { folder: 'Win' });
+  eq('rename: no offer running, taken or in line', [M.folderOffer({ moves: true, folder: 'W' }, true), M.folderOffer({ problem: 'folderTaken', moves: true, folder: 'W' }, false),
+    M.folderOffer({ problem: null, moves: false, folder: 'W' }, false), M.folderOffer(null, false)], [null, null, null, null]);
+  eq('rename: the job moved it', M.renameOutcome('lord-vm: note: x\n{"set":true,"name":"B","dir":"/l/B.lordvm","folder":"moved"}\n'),
+    { dir: '/l/B.lordvm', folder: 'moved', to: null, why: null, problem: null, name: 'B', other: null });
+  eq('rename: running, later', M.renameOutcome('{"renamed":true,"running":true,"name":"B","dir":"/l/A.lordvm","folder":"later","to":"B"}').to, 'B');
+  eq('rename: refused', M.renameOutcome('lord-vm: there\'s already a machine called "Other"\n{"renamed":false,"problem":"name-taken","name":"other","folder":"other","other":"Other"}').problem, 'name-taken');
+  eq('rename: kept, why', M.renameOutcome('{"set":true,"dir":"/l/A.lordvm","folder":"kept","why":"Permission denied"}').why, 'Permission denied');
+  eq('rename: no JSON', [M.renameOutcome(''), M.renameOutcome('lord-vm: boom'), M.renameOutcome('{"set":true,"vcpus":2}')], [{}, {}, {}]);
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

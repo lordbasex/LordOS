@@ -2148,6 +2148,11 @@ person's own shares are.
   in it (0777: virtiofsd can't take the guest's uids, so this lets a guest person with another uid than this account's write
   there; nothing outside the 0700 parent reaches it), then checks both are real folders of this account and opens the folder
   without following a link at any step (`open_share`).
+- **Follows its machine's folder** (6.26): a rename with the machine off moves `Transfer/<old>` to `Transfer/<new>` with
+  its owner record. One left behind (a machine folder renamed by hand, a rename stopped between its two steps) joins its
+  machine at the next claim (`vm_transfer_adopt`, run first by `vm_transfer_claim`): exactly one folder whose owner
+  record holds the machine's id and whose own `<x>.lordvm` is gone, never one a Duplicate (same id) still has, never one
+  put aside as `(old YYYY-MM-DD)`, never a guess between two.
 - **Tied to its machine** (`vm_transfer_claim`, security review 2026-11-20): the folder's name is readable, but an owner record
   beside it, `<library>/Transfer/.<name>.machine` (outside what the guest sees), holds the machine's id. A folder of that name
   owned by another machine (one deleted, renamed or made again with the same name), or owned by none and not empty, or not a
@@ -2387,15 +2392,18 @@ machines open NAME                           # its window on the desktop
 machines stop|poweroff|pause|resume|suspend|reset NAME
 machines snapshot NAME list [--json] | take LABEL | revert TAG | delete TAG     # TAG, or a snapshot's unique label
 machines clone NAME NEW_NAME [--duplicate] [--keep-identity]
+machines rename NAME NEW_NAME                # the name; off, its folder and transfer folder too (6.26)
 machines set NAME --memory 8G --cpus 6 --disk 64G --clipboard both --network bridged --bridge eno1 ...
 machines help
 ```
 
 - **NAME** is a machine's name, ASCII case ignored; its start is enough when only one machine has it (more than one:
-  the command lists them and exits 4). A path to a machine folder works too.
+  the command lists them and exits 4). A path to a machine folder works too, and so does its id (`machine.json` "id",
+  the name that never changes; a Duplicate shares it, so then it's the name).
 - **Everything but start and open runs `lord-vm`** (the one beside the command) on the machine's folder, exactly as the
   app does: `--status`, `--stop`, `--poweroff`, `--pause`, `--resume`, `--suspend`, `--reset`, `--snapshot`, `--clone`
-  (the new folder named as the app names it) and `--set`. `set` takes lord-vm's `--set` options with friendlier
+  (the new folder named as the app names it), `--rename` (6.26: the same checks as the app, in the person's language
+  before lord-vm checks them again) and `--set`. `set` takes lord-vm's `--set` options with friendlier
   values: sizes such as `8G`, `1.5G`, `512M` (a bare number is MB for memory, GB for the disk), `--cpus`, `host-only`;
   everything else is passed through and checked by lord-vm. `list` and `status` read `machine.json`, `run.json` (a
   state whose lord-vm is gone reads as off, as in the app) and `app.json` (the system's name); `status` of a running
@@ -2739,6 +2747,58 @@ pointer is hidden and held inside the picture, and the guest gets relative motio
   clicks, free and captured, and that release-all lets go of a right button. **To check** on the Windows 11 GVT-g machine: a
   right-click with the mouse free, on the desktop and in Explorer, in a window and in apps mode.
 - Hotkeys are fixed for now (❖Esc and Ctrl+Alt); choosing them is for later.
+
+### 6.26 Renaming a machine (built 2026-11-23, in development; asked by the maintainer 2026-11-23)
+
+A machine's name is `machine.json`'s `"name"`. Its folder `~/Machines/<folder>.lordvm` and its transfer folder
+`~/Machines/Transfer/<folder>` (6.7.1) were named once, at creation, so a machine renamed in Configure kept showing its
+old name in Files. Now they follow the name while the machine is off.
+
+- **The folder a name gives** is the one a new machine gets (`vm_folder_name`, machine.c; ui/js_vm.c and the machines
+  command use the same): letters, digits, space, `-`, `_` and `.` (not first), anything else one `-`, at most 48 bytes,
+  "Machine" when nothing is left. A name whose folder already reads the same once made safe keeps the folder (the
+  folder `Ubuntu (dev).lordvm` stays for `Ubuntu [dev]`, which would give `Ubuntu -dev`).
+- **The plan** (`vm_rename_plan`, read-only, from the library as it is): refused for a name that isn't one
+  (`vm_rename_name_ok`: `vm_name_valid`, and no leading dot), for a name another machine of the library has (ASCII case
+  ignored, as the command finds machines), and when the folder moves, for anything in the library called
+  `<folder>.lordvm` or a folder `Transfer/<folder>` other than its own (case ignored both: a library copied to a
+  case-insensitive disk must still work). `lord.vm.renamePlan(dir, name)` gives Configure the same answer as you type.
+- **With the machine off** (`lord-vm --rename DIR NAME`, or `lord-vm --set DIR --name NAME`, under the machine's lock,
+  after `operation.json`'s recovery): the plan again, refused with exit 5 and `{"renamed":false,"problem":...}`;
+  `machine.json` with the new name first; then the folder with `renameat2(RENAME_NOREPLACE)` (never over anything) and
+  an fsync of the library; then the transfer folder with its owner record (`vm_transfer_adopt`). A folder that can't
+  move keeps its name, the name is still saved, and lord-vm says why (`"folder":"kept","why"`); a transfer folder that
+  couldn't follow does at the next start. The answer: `{"set":true,...,"name","dir","folder":"moved"|"same"|"kept"}`.
+- **What doesn't need rewriting**, checked file by file: the disks, `disks/nvram.qcow2`, `disks/tpm/`, the snapshots
+  (internal to the qcow2 files; `snapshots.json` holds tags and names; their pictures are `snapshots/<tag>.png`), a
+  saved session (`suspend.json`: QEMU's version, machine type, CPU, sizes; the state's stream names devices, not
+  paths), `run.json`, `operation.json` (recovered first), `identity.json`, the logs and `thumb.png` are all found from
+  wherever the folder is. A linked clone's frozen base is in `<library>/.shared/` (6.3), outside the folder, and its
+  siblings keep naming it. The runtime socket is `$XDG_RUNTIME_DIR/lordos-vm/<id>.sock`, a bridged machine's macvtap
+  `lvm<id>`: by id. The transfer folder's tag in the guest is always `LordOS`, so the guest's mount (`/mnt/LordOS`, the
+  drive on the other system) doesn't change. A person's shares are outside the library (`vm_share_allowed`). Only an
+  ISO or a drivers' disc kept inside the folder is a path in `machine.json` that points into it: rewritten.
+- **While it runs** only the name changes: lord-vm holds the lock, so `lord-vm --rename` sends `VM_RENAME` to the
+  machine's own lord-vm, which reads `machine.json`, writes it with the new name and keeps it for its later writes
+  (sound). The answer says `"folder":"later"` when the folder would move. Moving the folder of a running machine (QEMU,
+  virtiofsd, swtpm and the open windows all hold it) is never done, and nothing moves it by itself when the machine
+  stops: once it's off, Configure → General shows **Rename Folder** under Folder whenever the name asks for another
+  folder that is free, and `machines rename NAME NAME` does the same. A machine's lord-vm from before this answers "bad
+  request": the command then says to shut it down first.
+- **The app**: Configure → General's name can be changed while the machine runs; under it, the folder it will get, or
+  why the name can't be used (Save waits). A rename's job says where the folder went (`machines.cfg.rn.*`). The
+  machine's windows (its own, Configure, Snapshots, Logs) are instances named by the machine's id (`vm-<id>`,
+  `cfg-<id>`…): they follow the machine to its new folder, at once after a rename here (`movedDirs`), within three
+  seconds after one from the terminal (`useMachineDir`: the folder is gone, the library has one machine with that id).
+  A machine window that only follows never starts the machine. Its `app.json` (system, notes, apps mode, profile) is
+  inside the folder; Files' Open with and the apps mode are by id or by session; the library's order is by name, state,
+  last use or size, not by folder; session restore doesn't reopen Machines windows. Nothing else stores the folder.
+- **The command**: `machines rename NAME NEW_NAME` (NAME may be the id): the plan first, in the person's language, then
+  `lord-vm --rename`; exit 1 when a name or folder is taken, 2 for a name that can't be one, 0 with "its folder is …",
+  or, running, "once it's off, `machines rename "NEW" "NEW"` names it …".
+- **Tests**: `build/vm-test` (names and folders, `vm_rename_plan` on a scratch library, `vm_transfer_adopt` with a
+  Duplicate, a folder put aside and two candidates), `tests/vm_model_test.mjs` (`windowMachineId`, `followDir`,
+  `renameNote`, `folderOffer`, `renameOutcome`) and `tests/vm_rename.sh` (`make test`; scratch machines only).
 
 ## 7. Guest tools
 

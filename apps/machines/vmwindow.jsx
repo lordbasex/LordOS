@@ -407,7 +407,7 @@ function AppsController({ name, g, onLeave, ctl }) {
 // machines whose bridged network the admin helper is making now (dir): one start at a time, whatever remounts
 const bridging = new Set();
 
-export function MachineWindow({ dir, name: name0, loadvm }) {
+export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const p = usePal();
   const { id: winId, focused } = useAppWindow();
   // full screen moves the app in the tree and remounts it: the session belongs to the window
@@ -535,7 +535,8 @@ export function MachineWindow({ dir, name: name0, loadvm }) {
     if (playStarts(sid, starting || bridging.has(dir), closing) && !askClose) { setErr(''); begin(); }
   }, [asked]);
   // a window opened to go back to a snapshot (with memory, the machine off) starts from it
-  useEffect(() => { if (!sid && !st && !err) begin(loadvm ? { loadvm } : undefined); }, []);
+  // (not when the machine was renamed with its folder and this window only follows it there)
+  useEffect(() => { if (!followed && !sid && !st && !err) begin(loadvm ? { loadvm } : undefined); }, []);
   const stRef = useRef(st);
   stRef.current = st;
   // the window went away (not a remount): let go of the machine; one this window started is shut down by lord-vm

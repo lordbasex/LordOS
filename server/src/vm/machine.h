@@ -218,6 +218,33 @@ int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char
 /* the machine goes (to the Trash): its transfer folder, when it's this machine's, moves aside as above. 0 moved, 1 there
  * was none of this machine's, -1 it couldn't be moved */
 int vm_transfer_aside(const char *dir, const char *id, char *moved, size_t mn);
+/* this machine's transfer folder under another name, left behind when its machine folder was renamed (by hand, or by a
+ * rename that stopped between its two steps): one <library>/Transfer/<x> whose owner record holds `id`, whose
+ * <library>/<x>.lordvm is gone (a Duplicate shares the id: its folder is still there) and that isn't a folder put aside
+ * ("<x> (old YYYY-MM-DD)"), moved to dir's transfer path with its record when that path is free. Exactly one such folder,
+ * never a guess. 0 moved (its old name in from), 1 nothing to move, -1 the move failed. vm_transfer_claim calls it first */
+int vm_transfer_adopt(const char *dir, const char *id, char *from, size_t fn);
+
+/* Renaming a machine (docs/VIRTUALIZATION.md 6.26): its name, and its folder <library>/<folder>.lordvm and transfer folder
+ * <library>/Transfer/<folder> with it, while it's off. */
+/* the folder a name gives (as a new machine gets it): letters, digits, ' ', '-', '_' and '.' (not first), anything else
+ * one '-', at most 48 bytes, none of ' ', '-', '.' at the end; "Machine" when nothing is left. out: at least 64 bytes */
+void vm_folder_name(const char *name, char *out, size_t n);
+/* a name a machine may be renamed to: vm_name_valid (1 to VM_NAME_MAX bytes of UTF-8, no control characters, no '/' or
+ * '\\', not only spaces) and not starting with '.' */
+int vm_rename_name_ok(const char *s);
+enum { VM_RN_OK = 0, VM_RN_BAD_NAME, VM_RN_NAME_TAKEN, VM_RN_FOLDER_TAKEN, VM_RN_TRANSFER_TAKEN, VM_RN_NOT_MACHINE };
+typedef struct {
+    int problem;                        /* VM_RN_* */
+    int moves;                          /* the folder gets a new name (its name, made safe, says something else now) */
+    char folder[256];                   /* the folder's name then, without .lordvm (the same as now when !moves) */
+    char other[VM_NAME_MAX + 1];        /* VM_RN_NAME_TAKEN: the other machine's name */
+} VmRenamePlan;
+/* what renaming the machine in dir (<library>/<x>.lordvm) to name would do, read from the library as it is: refused
+ * (problem) for a bad name, another machine of the library with that name (ASCII case ignored), or, when the folder moves,
+ * anything in the library called <folder>.lordvm or a folder <library>/Transfer/<folder> other than its own (case ignored
+ * both). Returns problem. Read-only: lord-vm checks it again under the machine's lock */
+int vm_rename_plan(const char *dir, const char *name, VmRenamePlan *p);
 
 /* a sound device's name as machine.json keeps it (sound_out, sound_in): 1 to VM_SOUND_DEV_MAX printable ASCII characters
  * other than space (a PipeWire node.name such as "alsa_output.pci-0000_00_1f.3.analog-stereo"); 1 valid */

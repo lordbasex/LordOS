@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/random.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -246,6 +247,127 @@ static int xfer_aside(const char *xp, char *moved, size_t mn) {
     return -1;
 }
 
+/* "<name> (old YYYY-MM-DD)" or "<name> (old YYYY-MM-DD) N": a folder xfer_aside put aside, never taken back by itself */
+static int xfer_aside_name(const char *s) {
+    const char *o = strstr(s, " (old ");
+    if (!o) return 0;
+    for (const char *q; (q = strstr(o + 1, " (old "));) o = q;
+    const char *d = o + 6;
+    for (int i = 0; i < 10; i++) if (i == 4 || i == 7 ? d[i] != '-' : d[i] < '0' || d[i] > '9') return 0;
+    if (d[10] != ')') return 0;
+    const char *t = d + 11;
+    if (!*t) return 1;
+    if (*t++ != ' ' || !*t) return 0;
+    for (; *t; t++) if (*t < '0' || *t > '9') return 0;
+    return 1;
+}
+
+int vm_transfer_adopt(const char *dir, const char *id, char *from, size_t fn) {
+    if (from && fn) from[0] = 0;
+    char want[PATH_MAX], top[PATH_MAX], lib[PATH_MAX];
+    if (!vm_uuid_valid(id) || vm_transfer_path(dir, want, sizeof want)) return -1;
+    snprintf(top, sizeof top, "%s", want);
+    char *sl = strrchr(top, '/');
+    if (!sl) return -1;
+    *sl = 0;
+    const char *wname = want + (sl + 1 - top);
+    snprintf(lib, sizeof lib, "%s", top);
+    if (!(sl = strrchr(lib, '/'))) return -1;
+    *sl = 0;
+    struct stat st;
+    if (!lstat(want, &st) || errno != ENOENT) return 1;          /* there already (or can't tell): nothing to take */
+    DIR *d = opendir(top);
+    if (!d) return 1;
+    char found[NAME_MAX + 1] = "";
+    int n = 0;
+    for (struct dirent *e; (e = readdir(d));) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] != '.' || l < 10 || strcmp(e->d_name + l - 8, ".machine")) continue;
+        char x[NAME_MAX + 1], p[PATH_MAX + 2 * NAME_MAX], who[37];
+        snprintf(x, sizeof x, "%.*s", (int)(l - 9), e->d_name + 1);
+        if (!x[0] || x[0] == '.' || !strcmp(x, wname) || xfer_aside_name(x)) continue;
+        snprintf(p, sizeof p, "%s/%s", top, e->d_name);
+        if (xfer_owner_read(p, who) || strcmp(who, id)) continue;
+        snprintf(p, sizeof p, "%s/%s", top, x);
+        if (lstat(p, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) continue;
+        /* its machine folder still there: that machine's (a Duplicate keeps the id), not one that moved */
+        snprintf(p, sizeof p, "%s/%s.lordvm", lib, x);
+        if (!lstat(p, &st) || errno != ENOENT) continue;
+        snprintf(found, sizeof found, "%s", x);
+        n++;
+    }
+    closedir(d);
+    if (n != 1) return 1;                                       /* none, or more than one: never a guess */
+    char a[PATH_MAX + NAME_MAX + 2], oa[PATH_MAX], ow[PATH_MAX];
+    snprintf(a, sizeof a, "%s/%s", top, found);
+    if (xfer_owner_of(a, oa, sizeof oa) || xfer_owner_of(want, ow, sizeof ow)) return -1;
+    if (renameat2(AT_FDCWD, a, AT_FDCWD, want, RENAME_NOREPLACE)) return -1;
+    if (rename(oa, ow)) { if (rename(want, a)) {} return -1; }
+    if (from && fn) snprintf(from, fn, "%s", found);
+    return 0;
+}
+
+void vm_folder_name(const char *name, char *out, size_t n) {
+    size_t o = 0;
+    for (const unsigned char *p = (const unsigned char *)name; *p && o + 1 < n && o < 48; p++) {
+        int ok = (*p >= '0' && *p <= '9') || ((*p | 32) >= 'a' && (*p | 32) <= 'z') || *p == ' ' || *p == '-' || *p == '_' || (*p == '.' && o);
+        if (*p >= 0x80) { while ((p[1] & 0xc0) == 0x80) p++; ok = 0; }
+        char ch = ok ? (char)*p : '-';
+        if (ch == '-' && o && out[o - 1] == '-') continue;
+        out[o++] = ch;
+    }
+    while (o && (out[o - 1] == ' ' || out[o - 1] == '-' || out[o - 1] == '.')) o--;
+    out[o] = 0;
+    if (!o) snprintf(out, n, "Machine");
+}
+
+int vm_rename_name_ok(const char *s) { return vm_name_valid(s) && s[0] != '.'; }
+
+int vm_rename_plan(const char *dir, const char *name, VmRenamePlan *p) {
+    memset(p, 0, sizeof *p);
+    char xp[PATH_MAX], lib[PATH_MAX], cur[NAME_MAX + 1];
+    if (!vm_rename_name_ok(name)) return p->problem = VM_RN_BAD_NAME;
+    if (vm_transfer_path(dir, xp, sizeof xp)) return p->problem = VM_RN_NOT_MACHINE;
+    size_t l = strlen(dir);
+    while (l > 1 && dir[l - 1] == '/') l--;
+    const char *b = memrchr(dir, '/', l);
+    snprintf(lib, sizeof lib, "%.*s", (int)(b - dir), dir);
+    snprintf(cur, sizeof cur, "%.*s", (int)(dir + l - (b + 1) - 7), b + 1);
+    /* the folder's name: kept while it already says the same (the same characters once made safe) */
+    char now[64];
+    vm_folder_name(cur, now, sizeof now);
+    vm_folder_name(name, p->folder, sizeof p->folder);
+    p->moves = strcmp(now, p->folder) != 0;
+    if (!p->moves) snprintf(p->folder, sizeof p->folder, "%s", cur);
+    DIR *d = opendir(lib);
+    if (!d) return p->problem = VM_RN_NOT_MACHINE;
+    char want[sizeof p->folder + 8];
+    snprintf(want, sizeof want, "%s.lordvm", p->folder);
+    for (struct dirent *e; (e = readdir(d));) {
+        size_t el = strlen(e->d_name);
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..") || (el == l - (size_t)(b + 1 - dir) && !strncmp(e->d_name, b + 1, el))) continue;
+        if (p->moves && !p->problem && !strcasecmp(e->d_name, want)) p->problem = VM_RN_FOLDER_TAKEN;
+        if (e->d_name[0] == '.' || el < 8 || strcmp(e->d_name + el - 7, ".lordvm")) continue;
+        /* another machine called the same, ASCII case ignored (the machines command finds machines that way) */
+        char od[PATH_MAX + NAME_MAX + 2];
+        snprintf(od, sizeof od, "%s/%s", lib, e->d_name);
+        VmMachine *o = malloc(sizeof *o);
+        if (o && vm_machine_load(od, o, NULL, 0) == VM_OK && !strcasecmp(o->name, name)) { snprintf(p->other, sizeof p->other, "%s", o->name); p->problem = VM_RN_NAME_TAKEN; }
+        free(o);
+        if (p->problem == VM_RN_NAME_TAKEN) break;
+    }
+    closedir(d);
+    if (p->problem || !p->moves) return p->problem;
+    /* its transfer folder follows: a folder of the new name there must be its own already (or none) */
+    char top[PATH_MAX + 16];
+    snprintf(top, sizeof top, "%s/" VM_XFER_DIR, lib);
+    if ((d = opendir(top))) {
+        for (struct dirent *e; (e = readdir(d));) if (e->d_name[0] != '.' && strcmp(e->d_name, cur) && !strcasecmp(e->d_name, p->folder)) p->problem = VM_RN_TRANSFER_TAKEN;
+        closedir(d);
+    }
+    return p->problem;
+}
+
 int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char *moved, size_t mn) {
     if (moved && mn) moved[0] = 0;
     if (!vm_uuid_valid(id) || vm_transfer_path(dir, out, n)) return -1;
@@ -258,6 +380,9 @@ int vm_transfer_claim(const char *dir, const char *id, char *out, size_t n, char
     if (mkdir(top, 0700) && errno != EEXIST) return -1;
     if (lstat(top, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid()) return -1;
     if (xfer_owner_of(out, op, sizeof op)) return -1;
+    /* none of that name: this machine's own folder from before its folder was renamed (by hand, or a rename that stopped
+     * half-way) comes along */
+    vm_transfer_adopt(dir, id, NULL, 0);
     if (!lstat(out, &st)) {
         int mine = S_ISDIR(st.st_mode) && st.st_uid == geteuid();
         int owner = !xfer_owner_read(op, who);

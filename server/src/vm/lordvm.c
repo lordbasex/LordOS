@@ -5175,6 +5175,22 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         reply(ci, m->seq, VME_OK, "");
         return;
     }
+    case VM_RENAME: {
+        /* the name while it runs (lord-vm --rename, 6.26): lord-vm holds the lock, so it writes machine.json; the folders
+         * keep their names until a rename with the machine off (nothing here may move the folder it runs from) */
+        if (!vm_rename_name_ok(m->text)) { reply(ci, m->seq, VME_BAD_REQUEST, "not a machine's name"); return; }
+        /* the file as it is (what this run changed for itself stays out of it), with the new name */
+        VmMachine nm;
+        char rerr[256];
+        if (vm_machine_load(S.dir, &nm, rerr, sizeof rerr)) { reply(ci, m->seq, VME_INTERNAL, rerr); return; }
+        snprintf(nm.name, sizeof nm.name, "%.*s", VM_NAME_MAX, m->text);
+        vm_now_iso(nm.updated);
+        if (vm_machine_check(&nm, NULL, 0) || vm_machine_save(S.dir, &nm)) { reply(ci, m->seq, VME_INTERNAL, "can't write machine.json"); return; }
+        snprintf(S.m.name, sizeof S.m.name, "%s", nm.name);
+        vlog("renamed: %s", nm.name);
+        reply(ci, m->seq, VME_OK, "");
+        return;
+    }
     case VM_FILE: {
         struct stat st;
         char nm[AG_NAME_MAX + 1];
@@ -6407,6 +6423,119 @@ static int cmd_client(const char *dir, int type, int argc, char **argv) {
     return rc;
 }
 
+/* ---- renaming a machine (6.26) ----
+ *
+ * The name is machine.json's; the machine's folder <library>/<folder>.lordvm and its transfer folder
+ * <library>/Transfer/<folder> follow it while the machine is off (vm_folder_name: as a new machine's folder is named).
+ * Nothing in the folder names the folder itself: the disks, the NVRAM, the TPM's state, snapshots.json, suspend.json,
+ * run.json and the logs are found from wherever it is, a linked clone's base is in <library>/.shared, the runtime socket
+ * is named by the id, the transfer folder's tag is always "LordOS". Only an ISO or a drivers' disc kept inside the folder
+ * is a path to rewrite. */
+
+static const char *rename_problem_key(int p) {
+    return p == VM_RN_BAD_NAME ? "bad-name" : p == VM_RN_NAME_TAKEN ? "name-taken" : p == VM_RN_FOLDER_TAKEN ? "folder-taken"
+         : p == VM_RN_TRANSFER_TAKEN ? "transfer-taken" : "not-a-machine";
+}
+static void print_json_str(const char *s);
+static int cmd_set(const char *dir, int argc, char **argv);
+/* why a rename can't be done: {"renamed":false,"problem":...} on stdout, the reason in English on stderr */
+static void rename_refused(const VmRenamePlan *rp, const char *name) {
+    if (rp->problem == VM_RN_NAME_TAKEN) fprintf(stderr, "lord-vm: there's already a machine called \"%s\"\n", rp->other);
+    else if (rp->problem == VM_RN_FOLDER_TAKEN) fprintf(stderr, "lord-vm: the library already has something called \"%s.lordvm\"\n", rp->folder);
+    else if (rp->problem == VM_RN_TRANSFER_TAKEN) fprintf(stderr, "lord-vm: the library's Transfer folder already has a folder \"%s\"\n", rp->folder);
+    else if (rp->problem == VM_RN_BAD_NAME) fprintf(stderr, "lord-vm: a machine's name is 1 to %d bytes of text, not starting with '.'\n", VM_NAME_MAX);
+    else fprintf(stderr, "lord-vm: not a machine folder <library>/<name>.lordvm\n");
+    printf("{\"renamed\":false,\"problem\":\"%s\",\"name\":", rename_problem_key(rp->problem));
+    print_json_str(name);
+    printf(",\"folder\":");
+    print_json_str(rp->folder);
+    if (rp->other[0]) { printf(",\"other\":"); print_json_str(rp->other); }
+    printf("}\n");
+}
+
+/* the machine in real (off, its lock held, m its machine.json with the new name already saved) gets its folder's new
+ * name, then its transfer folder: 0 moved (the new path in newdir, a note in why when the transfer folder couldn't
+ * follow now: it does at the next start, vm_transfer_claim), 1 nothing to move, -1 the folder keeps its name (why) */
+static int rename_folders(const char *real, VmMachine *m, char *newdir, size_t nn, char *why, size_t wn) {
+    VmRenamePlan rp;
+    if (vm_rename_plan(real, m->name, &rp)) { snprintf(why, wn, "%s", rename_problem_key(rp.problem)); return -1; }
+    if (!rp.moves) return 1;
+    char lib[PATH_MAX], to[PATH_MAX];
+    snprintf(lib, sizeof lib, "%s", real);
+    char *sl = strrchr(lib, '/');
+    if (!sl || sl == lib) { snprintf(why, wn, "not in a library"); return -1; }
+    *sl = 0;
+    if ((size_t)snprintf(to, sizeof to, "%s/%s.lordvm", lib, rp.folder) >= sizeof to || !dir_ok(to)) { snprintf(why, wn, "the new folder's path can't be used"); return -1; }
+    /* never over anything: a folder made since the check stays, and this one keeps its name */
+    if (renameat2(AT_FDCWD, real, AT_FDCWD, to, RENAME_NOREPLACE)) { snprintf(why, wn, "%s", strerror(errno)); return -1; }
+    vm_sync_dir(lib);
+    snprintf(newdir, nn, "%s", to);
+    /* an ISO or a drivers' disc kept inside the folder: its path follows */
+    size_t rl = strlen(real);
+    int fix = 0;
+    char *paths[] = { m->iso, m->drivers };
+    for (int i = 0; i < 2; i++) {
+        char t[VM_PATH_MAX];
+        if (strncmp(paths[i], real, rl) || paths[i][rl] != '/') continue;
+        if ((size_t)snprintf(t, sizeof t, "%s%s", to, paths[i] + rl) >= sizeof t) continue;
+        memcpy(paths[i], t, strlen(t) + 1);
+        fix = 1;
+    }
+    if (fix && (vm_machine_check(m, NULL, 0) || vm_machine_save(to, m))) snprintf(why, wn, "machine.json still names the disc inside the old folder");
+    /* the transfer folder, when the machine has one: Transfer/<old> → Transfer/<new> with its owner record */
+    char from[NAME_MAX + 1];
+    if (vm_transfer_adopt(to, m->id, from, sizeof from) < 0) snprintf(why, wn, "the transfer folder keeps its name until the next start: %s", strerror(errno));
+    return 0;
+}
+
+/* lord-vm --rename DIR NAME: the machine's new name. Off: as --set --name (the folders follow, exit 5 when the name or a
+ * folder name is taken). Running: only the name, through the machine's own lord-vm (VM_RENAME); "folder":"later" when
+ * the folder would get another name, which a rename with the machine off then does (the same name again is enough). */
+static int cmd_rename(const char *dir, int argc, char **argv) {
+    if (argc != 1) { fprintf(stderr, "lord-vm: --rename DIR NAME\n"); return 2; }
+    const char *name = argv[0];
+    if (!vm_rename_name_ok(name)) { fprintf(stderr, "lord-vm: a machine's name is 1 to %d bytes of text, not starting with '.'\n", VM_NAME_MAX); return 2; }
+    char real[PATH_MAX], err[256];
+    if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
+    VmMachine m;
+    if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+    int lock = open_lock(real);
+    if (lock >= 0) { close(lock); char *sv[] = { "--name", (char *)name }; return cmd_set(real, 2, sv); }
+    if (lock != -2) { fprintf(stderr, "lord-vm: can't take the machine's lock\n"); return 1; }
+    /* running */
+    VmRenamePlan rp;
+    int same = !strcmp(name, m.name);
+    if (vm_rename_plan(real, name, &rp) && !same) { rename_refused(&rp, name); return 5; }
+    if (!same) {
+        int fd = connect_machine(&m);
+        if (fd < 0) { fprintf(stderr, "lord-vm: the machine runs but its socket can't be reached\n"); return 1; }
+        VmMsg q = vm_msg(VM_RENAME, 11, 0, 0, 0, 0, name);
+        if (vm_send(fd, &q, -1)) { close(fd); fprintf(stderr, "lord-vm: can't talk to the machine\n"); return 1; }
+        int rc = 1;
+        long long end = now_ms() + 10000;
+        for (;;) {
+            VmMsg r;
+            long long left = end - now_ms();
+            int g = left > 0 ? wait_msg(fd, &r, (int)left) : 0;
+            if (g <= 0) { fprintf(stderr, "lord-vm: no answer from the machine\n"); break; }
+            if (r.type != VM_REPLY || r.seq != 11) continue;
+            if (r.a == VME_OK) rc = 0;
+            else fprintf(stderr, "lord-vm: %s\n", r.a == VME_BAD_REQUEST && !strcmp(r.text, "bad request") ? "this machine's lord-vm is older: shut it down first" : r.text);
+            break;
+        }
+        close(fd);
+        if (rc) return rc;
+    }
+    printf("{\"renamed\":true,\"running\":true,\"name\":");
+    print_json_str(name);
+    printf(",\"dir\":");
+    print_json_str(real);
+    printf(",\"folder\":\"%s\",\"to\":", rp.moves && !rp.problem ? "later" : "same");
+    print_json_str(rp.folder);
+    printf("}\n");
+    return 0;
+}
+
 /* Changes a machine that is off (Configure): the same checks as --create, under the machine's lock (exit 3 while it
  * runs). The disk only grows (qemu-img resize, jailed: it reads and writes the machine's disks/ only); an ISO is
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
@@ -6516,7 +6645,16 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
         if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
-    if (name) snprintf(m.name, sizeof m.name, "%s", name);
+    /* a new name (6.26): refused when another machine has it or, as the folder follows, when its folder's or transfer
+     * folder's new name is taken; the same name again only brings the folder in line when it can */
+    VmRenamePlan rp;
+    memset(&rp, 0, sizeof rp);
+    if (name) {
+        int same = !strcmp(name, m.name);
+        if (!vm_rename_name_ok(name)) { fprintf(stderr, "lord-vm: a machine's name is 1 to %d bytes of text, not starting with '.'\n", VM_NAME_MAX); rc = 2; goto out; }
+        if (vm_rename_plan(real, name, &rp) && !same) { rename_refused(&rp, name); rc = 5; goto out; }
+        snprintf(m.name, sizeof m.name, "%s", name);
+    }
     if (vcpus && vcpus != m.vcpus) {
         m.vcpus = vcpus;
         /* an imported topology follows: the same sockets and threads when the new count divides, else QEMU's default */
@@ -6607,11 +6745,25 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
+    /* the name is saved: now the folders follow it. A folder that can't move keeps its name, and says why */
+    char newdir[PATH_MAX] = "", why[256] = "";
+    const char *folder = "same";
+    if (name && rp.moves && !rp.problem) {
+        int fr = rename_folders(real, &m, newdir, sizeof newdir, why, sizeof why);
+        folder = fr == 0 ? "moved" : "kept";
+        if (fr) fprintf(stderr, "lord-vm: note: the folder keeps its name: %s\n", why);
+        else if (why[0]) fprintf(stderr, "lord-vm: note: %s\n", why);
+    }
     char bspec[32];
     vm_boot_spec(&m, bspec, sizeof bspec);
-    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\",\"gpu\":\"%s\",\"boot_order\":\"%s\",\"boot_menu\":%s,\"transfer\":%s}\n",
+    printf("{\"set\":true,\"vcpus\":%d,\"memory_mb\":%d,\"disk_gb\":%d,\"network\":\"%s\",\"ports\":%d,\"iso\":%s,\"agent\":%s,\"devices\":\"%s\",\"nic_model\":\"%s\",\"graphics\":\"%s\",\"gpu\":\"%s\",\"boot_order\":\"%s\",\"boot_menu\":%s,\"transfer\":%s",
            m.vcpus, m.memory_mb, m.disk_gb, VM_NET_NAMES[m.network], m.n_ports, m.iso[0] ? "true" : "false", m.agent ? "true" : "false", VM_DEV_NAMES[m.devices],
            VM_NIC_MODELS[m.nic_model], m.graphics == VM_GFX_3D ? "3d" : "2d", VM_VGPU_NAMES[m.vgpu], bspec, m.boot_menu ? "true" : "false", m.transfer ? "true" : "false");
+    printf(",\"name\":"); print_json_str(m.name);
+    printf(",\"dir\":"); print_json_str(newdir[0] ? newdir : real);
+    printf(",\"folder\":\"%s\"", folder);
+    if (why[0]) { printf(",\"why\":"); print_json_str(why); }
+    printf("}\n");
     rc = 0;
 out:
     close(lock);
@@ -8114,6 +8266,7 @@ static int usage(void) {
             "                         [--pointer lordos|guest]   (who draws a Windows guest's pointer: LordOS, or its display driver)\n"
             "                         [--capture-fullscreen on|off]   (the window captures the mouse when it goes full screen)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
+            "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"
             "                           [--resume-anyway] [--discard-state]\n"
@@ -8172,6 +8325,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--start")) return cmd_start(dir, rest, rv);
     if (!strcmp(cmd, "--check")) return cmd_check(dir);
     if (!strcmp(cmd, "--set")) return cmd_set(dir, rest, rv);
+    if (!strcmp(cmd, "--rename")) return cmd_rename(dir, rest, rv);
     if (!strcmp(cmd, "--discard-state")) return cmd_discard(dir);
     if (!strcmp(cmd, "--snapshot")) return cmd_snapshot(dir, rest, rv);
     if (!strcmp(cmd, "--clone")) return cmd_clone(dir, rest, rv);

@@ -436,6 +436,13 @@ EOF
     # Machines: crafted images the import must refuse (needs qemu-img and this computer's qemu-system)
     if have qemu-img && { have qemu-system-x86_64 || have qemu-system-aarch64; } && [ -x build/lord-vm ]; then run "vm-import-test" sh tests/vm_import_test.sh build
     else skip "vm-import-test" "qemu-img, qemu-system"; fi
+    # Machines: renaming a throwaway machine (folder, transfer folder, snapshot, app.json; refusals; running with KVM)
+    sh tests/vm_rename.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-rename (tests/vm_rename.sh, lord-vm --rename and machines rename on throwaway machines)" ;;
+        77) skip "vm-rename" "build/lord-vm, build/machines, qemu-img and python3" ;;
+        *) bad "vm-rename (tests/vm_rename.sh, lord-vm --rename and machines rename on throwaway machines)" ;;
+    esac
     if have node; then run "screenshots-model-test (apps/screenshots)" node tests/screenshots_model_test.mjs; fi
     # the Screenshots toolbar (❖⇧5): options kept and read back, modes, keys, Save to, the remembered selection's handles
     if have node; then run "screenshots-toolbar-model-test (apps/screenshots/toolbarmodel.js)" node tests/screenshots_toolbar_model_test.mjs; fi

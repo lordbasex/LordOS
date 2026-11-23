@@ -96,6 +96,9 @@
  *                   d = 1: text = "OUT\tIN", the output and input (machine.json sound_out, sound_in: a node.name each, or
  *                   empty for the default; vm_sound_dev_valid), d = 0: they stay as they are.
  *                   They change nothing in QEMU: lord-server applies them itself (6.9) → VM_REPLY
+ *     VM_RENAME     the machine's name while it runs (lord-vm --rename, 6.26): text = the new name (vm_rename_name_ok);
+ *                   lord-vm holds the lock, so it writes machine.json. Only the name: the folders keep theirs until a
+ *                   rename with the machine off → VM_REPLY
  *     VM_APPS       apps mode (7.2): a = 1 on, 0 off; sent on to the guest's helper (LAG_APPS) only when the machine's
  *                   agent is on and the helper said "windows" (LAG_CAP_WINDOWS) → VM_REPLY
  *     VM_WINACT     a window of the guest: a = its id (as the guest named it), b = LAGA_* (focus, close, minimize,
@@ -230,8 +233,8 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE,
-    VM_REQ_LAST = VM_CAPTURE,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME,
+    VM_REQ_LAST = VM_RENAME,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
 };
@@ -467,6 +470,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_DISPLAY_SIZE || (m->a >= 320 && m->b >= 200 && (uint32_t)m->a <= VD_MAX_DIM && (uint32_t)m->b <= VD_MAX_DIM)) &&
                       (m->type != VM_APPS || m->a == 0 || m->a == 1) &&
                       (m->type != VM_CAPTURE || m->a == 0 || m->a == 1) &&
+                      (m->type != VM_RENAME || m->text[0]) &&
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
                       (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0));
     switch (m->type) {
