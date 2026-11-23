@@ -23,6 +23,7 @@
 #include "vmgpu.h"
 #include "qmp.h"
 #include "vmproto.h"
+#include "vmmem.h"
 #include "vmsandbox.h"
 #include "vmops.h"
 #include "vmagent.h"
@@ -1656,6 +1657,26 @@ static char *blockdev_overlay(const char *node, const char *file, const char *ba
     return b.oom ? NULL : b.p;
 }
 
+/* the guest's memory (vmmem.h): hugetlb 2 MB pages when enough are free and unreserved now, else a shared memfd for a
+ * machine with a shared folder or the transfer folder, else QEMU's anonymous memory (with transparent huge pages) */
+static int mem_backing(const VmMachine *m) {
+    VmHuge h = { 0, 0, 0 };
+    char text[8192];
+    int fd = open("/proc/meminfo", O_RDONLY | O_CLOEXEC);
+    if (fd >= 0) {
+        ssize_t n = read(fd, text, sizeof text - 1);
+        close(fd);
+        text[n > 0 ? n : 0] = 0;
+        vmmem_parse(text, &h);
+    }
+    int b = vmmem_choose(m->memory_mb, sh_count() > 0, &h);
+    if (b == VMMEM_HUGETLB) vlog("memory: %d MB in 2 MB hugetlb pages (%ld free, %ld reserved before this machine)", m->memory_mb, h.free, h.rsvd);
+    else vlog("memory: %s%s", b == VMMEM_SHARED ? "a shared memfd (shared folders), 4 KB pages unless the system gives shared memory huge pages"
+                                               : "QEMU's own, with transparent huge pages",
+              h.free > 0 ? " (too few free hugetlb pages for all of it)" : "");
+    return b;
+}
+
 #define MAXARGS 192
 static char *qargv[MAXARGS];
 static int qargc;
@@ -1816,12 +1837,15 @@ static void build_qemu_args(void) {
     opt_escape(esc, sizeof esc, m->name);
     arg("-name"); argf("guest=%s,debug-threads=on", esc);
     arg("-uuid"); arg(m->id);
-    /* shared folders (6.7): vhost-user needs the guest's memory in a shared memfd; machines without one keep private memory */
-    arg("-machine"); argf("%s,dump-guest-core=off%s%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "", sh_count() ? ",memory-backend=mem" : "",
+    /* shared folders (6.7): vhost-user needs the guest's memory in a shared memfd; machines without one keep private memory.
+     * Either may be 2 MB hugetlb pages when the administrator reserved enough (mem_backing, vmmem.h) */
+    int mem = mem_backing(m);
+    arg("-machine"); argf("%s,dump-guest-core=off%s%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "", mem != VMMEM_ANON ? ",memory-backend=mem" : "",
                           m->secure_boot ? ",smm=on" : "");
     /* secure boot: the firmware's variables can be written only from SMM, so the guest's system can't change its own keys */
     if (m->secure_boot) { arg("-global"); arg("driver=cfi.pflash01,property=secure,value=on"); }
-    if (sh_count()) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=on", m->memory_mb); }
+    if (mem == VMMEM_SHARED) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=on", m->memory_mb); }
+    if (mem == VMMEM_HUGETLB) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=%s,hugetlb=on,hugetlbsize=2M,prealloc=on", m->memory_mb, sh_count() ? "on" : "off"); }
     if (kvm) { arg("-accel"); arg("kvm,device=/dev/fdset/1"); arg("-add-fd"); arg("fd=3,set=1,opaque=kvm"); }
     else { arg("-accel"); arg("tcg,thread=multi,tb-size=256"); }
     /* Hyper-V enlightenments: what Windows asks a hypervisor for (timers, interrupts, spinlocks); with KVM only */

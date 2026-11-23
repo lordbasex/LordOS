@@ -566,6 +566,37 @@ What a machine promises, so that updates don't break it.
 
 Limits per machine aren't enough: three reasonable machines can starve the desktop. All machines sit under one parent cgroup slice, with a memory ceiling for the sum, lower CPU and I/O weight than the session, and a floor kept for the desktop: **target** 2 GB, or 1 GB on a 4 GB board. Starting a machine that doesn't fit asks first: pause another, start with less, or cancel. Memory pressure (PSI) warns before swap does, and the summary header shows the budget, not only host use. Whether `lord-sessiond`'s scopes can nest under one slice is **To test** in Phase 1.
 
+### 3.7.1 Guest memory and huge pages (2026-11-23, in development)
+
+What backs a machine's memory (`lordvm.c` `mem_backing`, `server/src/vm/vmmem.h`; the session log says which):
+
+| Machine | Backing | 2 MB pages |
+|---|---|---|
+| No shared folder and the transfer folder off | QEMU's own anonymous memory (`-m`) | Yes, transparent huge pages: QEMU asks for them on all guest RAM (`MADV_HUGEPAGE` in `ram_block_add`) and Debian's kernel gives them with THP `always` or `madvise`. Checked: a running 2 GB guest had 1.94 GB of `AnonHugePages` |
+| A shared folder or the transfer folder (on by default) | `memory-backend-memfd,share=on` (vhost-user: virtiofsd maps the guest's memory) | **No** on a default system: shared memory gets huge pages only with `/sys/kernel/mm/transparent_hugepage/shmem_enabled` other than `never` (Debian's default) |
+| Either, when the administrator reserved enough 2 MB hugetlb pages (`vm.nr_hugepages`) and all of the machine's memory fits in the free, unreserved ones at start | `memory-backend-memfd,hugetlb=on,hugetlbsize=2M,prealloc=on` (`share=on` with a shared folder) | Yes, allocated whole at start, so a guest never faults on a page that isn't there; otherwise the backing above, never a failed start |
+
+virtiofs needs the shared memfd (vhost-user maps the guest's memory into virtiofsd), so a machine with a shared folder
+can't fall back to private memory. Nothing here needs a privilege or changes a system setting.
+
+**Measured** (2026-11-23, i9-10900, kernel 6.12.118; a throwaway guest of the host's kernel and a 9 KB init that does
+20 million dependent reads over a 1 GB random cycle, 3 runs of 3 each, the host in use; QEMU 10.0 with the same memory
+options lord-vm gives):
+
+| Guest memory | Guest uses huge pages too (THP) | Guest 4 KB pages | First touch + shuffle of 1 GB |
+|---|---|---|---|
+| QEMU's own (host THP) | **76 ns** a read (75–77) | 111 ns (102–124) | 3.0 s |
+| Shared memfd (host 4 KB pages: a machine with a shared folder or the transfer folder) | 112 ns (94–162) | 153 ns (112–234) | 4.1 s |
+
+So a machine with the transfer folder on reads memory at random about 30 % slower than it could, and touches new memory
+about a third slower.
+
+**Stopped for approval (system setting):** shared guest memory would get 2 MB pages with
+`shmem_enabled=advise`: only memory that asks for them (`MADV_HUGEPAGE`, which QEMU does on all guest RAM) gets them, so
+tmpfs, `/dev/shm` and other shared memory don't change. That is a system setting (sysfs, root): either a file the
+`lordos` package ships (`/usr/lib/tmpfiles.d/lordos-thp.conf`: `w /sys/kernel/mm/transparent_hugepage/shmem_enabled - - -
+- advise`), or a closed `admin.c` action that sets only that file to only `advise` or back to `never`. Not built.
+
 ### 3.8 Why direct QMP, and not libvirt
 
 Decided on 2026-11-01: `lord-vm` drives QEMU directly through QMP.

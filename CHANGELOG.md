@@ -142,6 +142,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     input ending idle, the helper's CPU while paced), `desktop-model-test` (`outOfSight`). docs/MACHINES-GPU.md "Pacing a
     machine's picture", docs/VIRTUALIZATION.md.
 
+- **Machines: a guest's memory uses 2 MB hugetlb pages when the administrator reserved enough of them** (in
+  development). lord-vm reads `/proc/meminfo` at start: when all of the machine's memory fits in free, unreserved 2 MB
+  hugetlb pages (`vm.nr_hugepages`), QEMU gets `memory-backend-memfd,hugetlb=on,hugetlbsize=2M,prealloc=on` (shared when
+  the machine has a shared folder or the transfer folder), allocated whole at start; otherwise the memory is backed as
+  before, never a failed start. The session log says which (`memory: …`). Nothing changes on a computer without
+  reserved pages, and no system setting is touched (`server/src/vm/vmmem.h`, `lordvm.c` `mem_backing`).
+  - **Found:** a machine without a shared folder already gets transparent huge pages (QEMU asks for them on all guest
+    memory; a running 2 GB guest had 1.94 GB in 2 MB pages), but the transfer folder is on by default and makes the
+    memory a shared memfd, which gets 4 KB pages only while `/sys/kernel/mm/transparent_hugepage/shmem_enabled` is
+    `never` (the kernel's default). **Measured** with the same QEMU memory options: dependent random reads over 1 GB
+    took 76 ns with host huge pages against 112 ns with the shared memfd (guest huge pages; 111 against 153 ns with guest
+    4 KB pages), and touching new memory took a third longer. Setting `shmem_enabled` to `advise` would give the shared
+    memory 2 MB pages too; it's a system setting, proposed in docs/VIRTUALIZATION.md 3.7.1 and not built.
+  - Tests: `build/vmmem-test` (`/proc/meminfo`'s fields, hugetlb only when it all fits).
+
 - **Store → LordOS apps is LordOS's own store** (asked by the maintainer on 2026-11-23: "we are going to build a store
   of native apps the person can install, like the other package systems'"). The section opens on a shop of LordOS's
   own installable apps and components, as cards (icon, name, "LordOS component", summary, Get / Open / View), each

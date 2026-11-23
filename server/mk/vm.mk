@@ -72,7 +72,7 @@ endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
-test: build/vmpace-test build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
+test: build/vmpace-test build/vmmem-test build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
 # and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage,
@@ -88,6 +88,11 @@ build/vmunattend-test: tests/vmunattend_test.c src/vm/vmunattend.c src/vm/vmunat
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmunattend_test.c src/vm/vmunattend.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
 # resumed downloads (pkg/http.c, FetchItem.resume) against a server on loopback: as the user who runs it
+# how a machine's memory is backed (vmmem.h): hugetlb only when it all fits in free 2 MB pages
+build/vmmem-test: tests/vmmem_test.c src/vm/vmmem.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmmem_test.c
+	./$@ || { rm -f $@; exit 1; }
 # how often a machine's picture is taken (vmpace.h, VD_PACE)
 build/vmpace-test: tests/vmpace_test.c src/vm/vmpace.h src/vm/vmproto.h
 	@mkdir -p build
