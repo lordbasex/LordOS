@@ -847,7 +847,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
     75 % and 80 % only, never 50 % (docs/DISPLAYS.md, "Below 100 %"); Wayland and X11 clients stay at 100 % and are drawn
     smaller. Still to check with a screenshot on the VM and on a real 1280 × 800 laptop.
   - Lord Flow personalisation ([#151](https://github.com/lordbasex/LordOS/issues/151)): the menu bar at the bottom,
-    window-button size, hiding the tiling submenu.
+    window-button size, hiding the tiling submenu. *Window-button size and the tiling menu's items shipped in 0.8.9.5*
+    (Settings → Appearance → Window options, every theme); the menu bar at the bottom is still open.
   - Copy and paste with a VMware host ([#76](https://github.com/lordbasex/LordOS/issues/76)): start Debian's
     `vmware-user` only inside VMware (a new AGENTS.md exception), then LordOS → host through an authenticated X
     requestor (`vmtoolsd -n vmusr` by X-Resource pid and `/proc/<pid>/exe`); the design is in WAYLAND.md, "Proposed for
@@ -857,7 +858,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   - Backup with several jobs ([#200](https://github.com/lordbasex/LordOS/issues/200), maintainer's decision 2026-11-19,
     "en algún momento"): a named job each with its own source folders, exclusions, destination, schedule (time and day for
     hourly, daily, weekly) and encryption; a job's source folders picked with the file browser (the destination and the
-    exclusions already are, in development after 0.8.9.4); a job may keep the computer from
+    exclusions already are, since 0.8.9.5); a job may keep the computer from
     sleeping until it ends; a list of the jobs with their last run and pause, resume and delete. Review first: jobs in
     parallel (disk and processor), and folders outside the home folder (permissions).
   - Small towns in the weather's city search ([#193](https://github.com/lordbasex/LordOS/issues/193)): GeoNames'
@@ -950,6 +951,52 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   (`mkdeb-voice.mjs`), sign and publish them on the maintainer's Mac (`tools/release/apt-repo.sh`), then merge the
   branch and add `fr`, `de`, `it`, `nl` to the closed lists in AGENTS.md (lord-tts, `lord.voice`). Also a whisper
   round trip for the four languages, as was done for Spanish and Portuguese.
+- [ ] **Two intermittent Wayland conformance checks**: on real hardware under load `wp_fifo_manager_v1` scores about
+  91 % and `xdg_session_manager_v1` about 97 % in some runs (the recorded headless run, `docs/wayland-conformance.json`,
+  has both at 100 %). Find why, make both flows independent of the machine's timing and rerun on a loaded PC until
+  they pass every time.
+- [ ] **The five X11 items at 100 % but not "complete"** (`docs/WAYLAND.md`, "Conformance"): `ewmh.wm_pid`, `xdnd`,
+  `xwayland.hidpi`, `xwayland.cursor` and `xwayland.security` need tests written for each that cover every point, so
+  all 28 X11 items are complete as the 48 Wayland globals are.
+- [ ] **Menus ([#209](https://github.com/lordbasex/LordOS/issues/209)) and Thunderbird's drag and drop
+  ([#188](https://github.com/lordbasex/LordOS/issues/188))**: not reproduced yet; reproduce each on the VM or the
+  reporter's setup, then fix.
+- [ ] **Moving and resizing a window with the keyboard only** (every theme, from the Window menu: arrows move or
+  resize, Enter keeps, Esc goes back), for people who can't use a pointer.
+
+## Release 0.8.9.5 (released 2026-11-23)
+
+An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-beta"); no new images.
+
+- [x] **Wayland conformance 48 of 48** (`WAYLAND.md`, "Conformance"; `tools/wl-conformance.mjs`): every advertised
+  global at 100 %, all 48 "complete", with new protocols (colour management and representation, explicit sync,
+  `fifo-v1`, `commit-timing-v1`, tearing control, content type, tablets, `drm-lease` for VR headsets only if allowed,
+  pointer warp, toplevel icons, idle notify, tab tear-off, toplevel tags, the bell, session management, background
+  blur, `wl_fixes`, xdg-shell 7 and newer versions); X11 at 100 % for 28 items (23 complete); the results on
+  lordos.org's protocol table. Left: two checks intermittent on real hardware and five X11 items not complete (above).
+- [x] **Always on top in every theme** (`WINDOWS.md`): stacking apart from focus in the SDK; X11's ABOVE/BELOW honoured.
+- [x] **LordOS Studio** (`CAMERA-STUDIO-PLAN.md`, phases 0–3; exceptions E-S1 to E-S7): background blur and pictures,
+  video backgrounds, green screen, Auto Framing, Face Light, filters, Retouch, Mic Mode with Noise Reduction, the
+  camera for every app through v4l2loopback with a guided Secure Boot (MOK) enrolment, OBS's virtual camera beside it.
+  Not yet tried on real hardware: the virtual camera in browsers and OBS, the MOK flow, Mic Mode in a real Meet call,
+  the Raspberry Pi.
+- [x] **Machines** (`VIRTUALIZATION.md`, `MACHINES-GPU.md`): Windows 11 machines with an unattended install and the
+  LordOS tools for Windows, apps mode with its status item and controller panel, a LordOS card and an Android 13 card,
+  sound and microphone, forwarded ports and Bridged and Host-only networks, 3D for Linux machines, Intel GVT-g with
+  LordOS's own GOP option ROM, the Keys panel, Capture mouse, the `machines` command, a transfer folder, the clipboard
+  on demand, and a picture at the guest's full rate.
+- [x] **The Store and Flathub** (`FLATPAK.md`): Flathub's home with collections, categories and subcategories;
+  Popular, Trending, Recently added and updated, app of the day and of the week through `lord-fetch` (E10); Chromium
+  and Electron apps from Flathub; the Store arranged by where apps come from; long lists that load as you scroll.
+- [x] **Security and privacy**: theme switches after a package update without logging out (`codesig_reload`); one
+  capture indicator that names every program; every password surface protected from capture; Screenshots' `screen`
+  permission allowed from the start (#219).
+- [x] **From GitHub requests and reports**: window options in Appearance (#151, #219), backup destination and
+  exclusions in the file dialog (#200), clipboard snippets (first step of #205), Print Screen's action (#202), the
+  clipboard panel's scrolling and arrows (#203, #204), the wallpaper from anywhere (#219), Lord Classic's apps by
+  category (#210's idea), Cloud fixes (#206–#208, #216, #217), the screen back after sleep (#214), Files' drag in big
+  folders (#218), Browsers' Done note (#222), hardware reports (#212, #221, #224).
+- [x] **Lord Celeste**, a community theme (`themes/celeste`); `lordos-fetch` behind `fastfetch` and `neofetch`.
 
 ## Release 0.8.9.4 (released 2026-11-20)
 
@@ -971,7 +1018,8 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 - [x] **A restricted Linux app starts from the desktop again** (released as 0.8.9.2 on 2026-11-19, `CHANGELOG.md`): the
   launcher's child re-executes itself (`lord-server --launch-view`) to build the view, since lord-server isn't dumpable
   after dropping from root. Found while testing Flatpak in a session on VM 127.
-- [ ] **Clipboard history scrolls by itself under the pointer** ([#204](https://github.com/lordbasex/LordOS/issues/204)).
+- [x] **Clipboard history scrolls by itself under the pointer** ([#204](https://github.com/lordbasex/LordOS/issues/204);
+  fixed in 0.8.9.5 with [#203](https://github.com/lordbasex/LordOS/issues/203), `CHANGELOG.md`).
   The full panel (❖⇧V, `sdk/clipboard.js`) draws a window of 16 entries around the selected one, and hovering an entry
   selects it: with the pointer resting near the top or bottom edge, the selection moves, the window slides, another
   entry comes under the pointer and the list keeps sliding. Make the list scroll as a list, and let hovering select
@@ -1138,7 +1186,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   `flatpak:<id>`, and the VM test plan (run 2026-11-20; automated as `server/tests/fwflatpak/flatpak.sh`). Built after
   the test plan: LordOS's own sub-sandbox service (E9; GNOME apps that load images through glycin need it), X11 for
   unrestricted apps, Settings → Flatpak with "Remove Flatpak completely". Phase 2: LordOS's portals for Flatpak callers,
-  the Raspberry Pi 5. **Electron/Chromium apps: done in development after 0.8.9.4 (2026-11-22)**: the Spawn runs through
+  the Raspberry Pi 5. **Electron/Chromium apps: done, released in 0.8.9.5 (2026-11-23)**: the Spawn runs through
   the app's Spawn helper in its own view and Landlock domain, so bubblewrap joins the app's namespaces; the Store marks
   them no more (checked with Whatsie, Chromium and FreeTube; `docs/FLATPAK.md`, "Sub-sandboxes"). History: a Flathub section in the Store. On
   2026-10-27 the maintainer decided not to implement it for now: the priority is the system's stability, and Flatpak

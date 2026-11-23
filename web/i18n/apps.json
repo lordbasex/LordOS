@@ -1227,7 +1227,7 @@
     "features": {
       "en": [
         "Since 0.8.8.5",
-        "In development after 0.8.9.4 (not in a release yet): Windows 11 machines with an install without questions, sound and microphone, Bridged and Host-only networks, 3D for Linux machines and apps mode",
+        "Since 0.8.9.5: Windows 11 machines with an install without questions, sound and microphone, Bridged and Host-only networks, 3D for Linux machines and apps mode",
         "Download a Linux system from one of four projects, checked against its maker's signed checksums",
         "Most of them install without questions",
         "Suspend, snapshots, Clone and Duplicate",
@@ -1237,7 +1237,7 @@
       ],
       "es": [
         "Desde la 0.8.8.5",
-        "En desarrollo después de la 0.8.9.4 (todavía no en una versión publicada): máquinas Windows 11 que se instalan sin preguntas, sonido y micrófono, redes En puente y Solo anfitrión, 3D para máquinas Linux y modo apps",
+        "Desde la 0.8.9.5: máquinas Windows 11 que se instalan sin preguntas, sonido y micrófono, redes En puente y Solo anfitrión, 3D para máquinas Linux y modo apps",
         "Descargá un sistema Linux de cuatro proyectos, verificado con las sumas firmadas de quien lo publica",
         "La mayoría se instala sin preguntas",
         "Suspender, instantáneas, Clonar y Duplicar",
@@ -1247,7 +1247,7 @@
       ],
       "pt": [
         "Desde a 0.8.8.5",
-        "Em desenvolvimento depois da 0.8.9.4 (ainda não numa versão publicada): máquinas Windows 11 que se instalam sem perguntas, som e microfone, redes Em ponte e Somente host, 3D para máquinas Linux e modo apps",
+        "Desde a 0.8.9.5: máquinas Windows 11 que se instalam sem perguntas, som e microfone, redes Em ponte e Somente host, 3D para máquinas Linux e modo apps",
         "Baixe um sistema Linux de quatro projetos, verificado com as somas assinadas de quem o publica",
         "A maioria se instala sem perguntas",
         "Suspender, snapshots, Clonar e Duplicar",

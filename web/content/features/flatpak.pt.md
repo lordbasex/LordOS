@@ -14,7 +14,7 @@ Hoje funciona em **PCs de 64 bits** (x86-64); o Raspberry Pi vem depois.
 
 **Percorrer.** Os apps do Flathub aparecem na própria seção, em Descobrir e na busca, com os nomes, ícones e categorias do próprio Flathub. Por padrão a Loja mostra **só os apps que o Flathub verificou como publicados pelos próprios desenvolvedores**; um interruptor mostra o resto, marcados como “Não verificado”.
 
-**Populares, Em alta e o app do dia** (em desenvolvimento depois da 0.8.9.4). O início do Flathub na Loja abre com o app do dia do próprio Flathub e linhas de Apps da semana, Populares, Em alta, Adicionados recentemente e Atualizados recentemente. O LordOS pede essas listas ao `flathub.org` no máximo uma vez por dia, com um pedido fixo que não diz nada sobre você, e guarda só os identificadores dos apps: nomes, ícones e descrições continuam vindo do catálogo assinado do Flathub, e as regras de instalação não mudam. Um interruptor na Loja desliga isso; sem internet, as linhas simplesmente não aparecem.
+**Populares, Em alta e o app do dia** (desde a 0.8.9.5). O início do Flathub na Loja abre com o app do dia do próprio Flathub e linhas de Apps da semana, Populares, Em alta, Adicionados recentemente e Atualizados recentemente. O LordOS pede essas listas ao `flathub.org` no máximo uma vez por dia, com um pedido fixo que não diz nada sobre você, e guarda só os identificadores dos apps: nomes, ícones e descrições continuam vindo do catálogo assinado do Flathub, e as regras de instalação não mudam. Um interruptor na Loja desliga isso; sem internet, as linhas simplesmente não aparecem.
 
 **Antes de instalar**, a página de cada app diz quem o publica, a licença e **o que ele declara**: internet, som, os seus arquivos, dispositivos, outros apps no barramento. Ao lado de cada item, o que o LordOS faz a respeito: o que você pode bloquear no Firewall, o que o LordOS limita e o que ele nunca concede.
 
@@ -24,7 +24,7 @@ Hoje funciona em **PCs de 64 bits** (x86-64); o Raspberry Pi vem depois.
 
 **Instalar, atualizar, remover.** Um botão para cada coisa, com o progresso na página. Remover um app também remove os runtimes que nenhum outro app usa.
 
-**Os apps de Chromium e Electron** (em desenvolvimento depois da 0.8.9.4) se instalam como qualquer outro. Até a 0.8.9.4 eles eram marcados como “ainda não suportados”; agora os sandboxes internos de que os auxiliares deles precisam são servidos dentro do próprio sandbox do app.
+**Os apps de Chromium e Electron** (desde a 0.8.9.5) se instalam como qualquer outro. Na 0.8.9.4 eles eram marcados como “ainda não suportados”; agora os sandboxes internos de que os auxiliares deles precisam são servidos dentro do próprio sandbox do app.
 
 ## Configurações → Flatpak
 
@@ -91,7 +91,7 @@ Declare o que declarar um app, ou o que um arquivo de override pedir depois:
 | O portal próprio do Flatpak e o seu auxiliar de sessão mascarados | O que eles iniciam roda fora do sandbox do app. O LordOS serve ele mesmo os sub-sandboxes de que os apps do GNOME precisam, dentro do sandbox do mesmo app. |
 | O catálogo é lido num sandbox próprio | O catálogo do Flathub é interpretado por um auxiliar pequeno sem rede nem arquivos, nunca pela própria área de trabalho. |
 | Uma linha própria no Firewall para o Flathub | Os downloads ficam visíveis, e você pode pará-los como qualquer app. |
-| Os auxiliares de Chromium e Electron, no sandbox do app | Os sandboxes internos deles são iniciados por um auxiliar pequeno dentro da visão do app, com os mesmos limites do app e nenhum a menos (em desenvolvimento depois da 0.8.9.4). |
+| Os auxiliares de Chromium e Electron, no sandbox do app | Os sandboxes internos deles são iniciados por um auxiliar pequeno dentro da visão do app, com os mesmos limites do app e nenhum a menos (desde a 0.8.9.5). |
 | Nada em segundo plano | Nenhum serviço do Flatpak roda se não houver um app aberto; a parte própria do LordOS só existe enquanto o `flatpak` está instalado. |
 | x86-64 primeiro | Testado ali; o Raspberry Pi vem depois. |
 
@@ -99,6 +99,6 @@ Declare o que declarar um app, ou o que um arquivo de override pedir depois:
 
 Numa máquina de teste em 20 de novembro de 2026, um **plano de testes automatizado** de 31 verificações roda toda vez (`server/tests/fwflatpak/flatpak.sh`): a linha do Flathub no Firewall, a identidade de cada app, o que nunca é concedido mesmo com um override, sem arquivos, sem internet, os sub-sandboxes, X11 com e sem restrição, e a restrição do microfone entre dois apps. Os apps testados à mão: **Editor de Texto do GNOME, Decibels, Shortwave, Meld, KCalc, Firefox e GNU Emacs**. Uma revisão de segurança de toda a mudança encontrou quatro problemas, todos corrigidos antes da versão.
 
-**Em desenvolvimento depois da 0.8.9.4:** apps baseados em Chromium e Electron, testados em 22 de novembro de 2026 com Whatsie (Qt WebEngine), Chromium e FreeTube (Electron); o vídeo com DRM (Widevine) não está disponível para eles. **Ainda não:** o Spotify só inicia com as próprias flags de Wayland (escolha de quem o desenvolve, não do LordOS); o Raspberry Pi.
+**Desde a 0.8.9.5:** apps baseados em Chromium e Electron, testados em 22 de novembro de 2026 com Whatsie (Qt WebEngine), Chromium e FreeTube (Electron); o vídeo com DRM (Widevine) não está disponível para eles. **Ainda não:** o Spotify só inicia com as próprias flags de Wayland (escolha de quem o desenvolve, não do LordOS); o Raspberry Pi.
 
 O design completo, cada decisão e cada resultado dos testes estão em `docs/FLATPAK.md`.

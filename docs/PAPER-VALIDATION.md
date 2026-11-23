@@ -361,9 +361,27 @@ pre-release that never shipped. The paper marks all of it "0.8.9, in development
 | 5.1 | A paused Cloud account sends nothing to its provider: no mount retries, check listing, quota call, background listing or change polling (#194) | Test (`cloud-test` `t_pause`: `cloud_bring_up_ok` and the `vfs/poll-interval` call) | Not yet with a real Google account or a packet capture |
 | 5.1 | The package installs `assets/cloud/providers.json`, so verified providers read verified (#195) | Test (`cloud_model_test.mjs`: mkdeb.sh installs `assets/cloud`, the fallback) | Not yet in a built .deb |
 
-## In development after 0.8.9.4 (not released; the paper's editions of 2026-11-21 and 2026-11-22)
+## 0.8.9.5 (released 2026-11-23; the paper's edition of that day)
 
-The paper marks this work "in development" (§0, §5.1, §5.3, §6.3, §6.7, §7.2, §10.1–§10.3). Most of the Machines rows
+The paper's edition of 2026-11-23 names 0.8.9.5 Beta as the latest release and turns every "in development after
+0.8.9.4" label into "since 0.8.9.5" (§0, §2.2, §3.3, §3.4, §5.1, §5.3, §6.3, §6.5–§6.7, §6.11, §7.2, §8, §10.1–§10.3).
+The claims themselves are the rows of the next section, checked as recorded there; this table adds what the release
+edition says that is new.
+
+| § | Claim | How | State |
+|---|---|---|---|
+| 0, 10.1 | 0.8.9.5 Beta, released on 2026-11-23, is the latest release: an update of the package through the Store and `apt`, with no new images | `CHANGELOG.md` "0.8.9.5-beta"; `package.json` 0.8.9.5 | Verified (the release is signed and published on the maintainer's Mac) |
+| 3.4, 10.2 | Two conformance checks are intermittent on a real computer under load: `wp_fifo_manager_v1` about 91 % and `xdg_session_manager_v1` about 97 % in some runs; the recorded headless run (`docs/wayland-conformance.json`) scores both 100 % | Repeated runs of `tools/wl-conformance.mjs` on real hardware under load before the release; `docs/ROADMAP.md`, "Next release after 0.8.9.5" | Open; the timing of both flows to be made robust |
+| 3.4, 10.2 | Five X11 items score 100 % without being "complete": `ewmh.wm_pid`, `xdnd`, `xwayland.hidpi`, `xwayland.cursor`, `xwayland.security` (23 of 28 complete) | `docs/wayland-conformance.json`; `docs/WAYLAND.md`, "Conformance" | Holds; open in the roadmap |
+| 5.1 | Machines' Android 13 card (amd64 only): Bliss OS 16.9.7 FOSS, the one file pinned by SHA-256 in `assets/machines/systems.json`, with the notice that it is the last public image | `CHANGELOG.md` "0.8.9.5-beta" ("an Android 13 card"); `vm-image-get` checks the hash | Design; the hash checked against the project's own file on 2026-11-22 |
+| 8 | Lord Celeste, a community theme, ships beside the three desktops; it is not in the first-start chooser (`sdk/firststartmodel.js` `DESKTOPS`) | `themes/celeste`; `server/tests/celeste_model_test.mjs`; `tools/iso/mkdeb.sh` installs every built theme | Holds; seen only headless, not on real monitors |
+| 5.1, 6.7 | Not yet tried on real hardware: LordOS Studio's virtual camera in browsers and OBS, the Secure Boot (MOK) enrolment, Mic Mode's Noise Reduction in a real call, the Raspberry Pi with this release | `CHANGELOG.md` "0.8.9.5-beta" (the release summary and the Studio entries) | Not yet |
+
+## Work that became 0.8.9.5 (the paper's editions of 2026-11-21 and 2026-11-22, then "in development after 0.8.9.4")
+
+The paper marked this work "in development" until the release (§0, §5.1, §5.3, §6.3, §6.7, §7.2, §10.1–§10.3); since
+the edition of 2026-11-23 it is "since 0.8.9.5". `CHANGELOG.md` Unreleased in the rows below is now its "0.8.9.5-beta"
+section. Most of the Machines rows
 were checked on one amd64 PC with KVM through `lordvm-dev` (`server/tests/vm_dev.c`), which plays `lord-server`'s part,
 not inside `lord-server`'s window on a real display.
 
@@ -426,7 +444,7 @@ not inside `lord-server`'s window on a real display.
 | 6.6 | Flathub apps are installed, updated and removed from the Store, and Settings → Flatpak removes Flatpak completely | VM 127, `0.8.9.4~ws84`–`ws87`: Flathub turned on from the Store twice (6 packages, 11 MB), apps installed and removed; Settings → Flatpak removed every app, the runtimes, the remote, the packages and Flatpak's folders (`docs/FLATPAK.md`, "Settings → Flatpak") | Verified |
 | 6.6 | Each Flatpak app runs in its own root-owned scope inside LordOS's view, under the Firewall and the restrictions, with a read-only home and the never-granted names refused even with an override | `server/tests/fwflatpak/flatpak.sh`, 31 checks, 31 passed on VM 127 (`0.8.9.3~ws86` with the security fixes) | Verified |
 | 6.6 | Apps tried: GNOME Text Editor, Decibels, Shortwave, Meld, KCalc, Firefox, GNU Emacs | VM 127, 2026-11-20, screenshots in `docs/flatpak-*.png` | Verified |
-| 6.6 | Electron and Chromium-based apps don't run yet and are marked in the Store | MarkText on VM 127: bubblewrap refuses the Spawn that joins the caller's namespaces | Outdated → in development after 0.8.9.4: they run and the Store no longer marks them (row below) |
+| 6.6 | Electron and Chromium-based apps don't run yet and are marked in the Store | MarkText on VM 127: bubblewrap refuses the Spawn that joins the caller's namespaces | Outdated → since 0.8.9.5: they run and the Store no longer marks them (row below) |
 | 6.6 | In development: Chromium- and Electron-based Flathub apps run, their sub-sandboxes started by the app's Spawn helper inside its view and Landlock domain | The maintainer's PC, 2026-11-22: `server/tests/fwflatpak/spawn.sh` 18/18 with Whatsie (QtWebEngine), org.chromium.Chromium and FreeTube (Electron); `build/fpspawner-test` 52/52 | Verified (one PC; not yet on VM 127 or with an installed package) |
 
 ## 0.8.9.3 (released 2026-11-20)
