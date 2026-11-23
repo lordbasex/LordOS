@@ -199,7 +199,8 @@ export function KeyringPrompt() {
   };
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100001 } },
-  h(View, { style: { width: 380, padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`,
+  // the whole prompt is protected: black in every capture, recording, remote desktop and share
+  h(View, { protected: true, style: { width: 380, padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`,
     boxShadow: '0 20px 60px rgba(0,0,0,0.5)' } },
   h(Text, { style: { fontSize: 15, fontWeight: 700, color: th.text } }, t('passwords.keyring.title')),
   h(Text, { style: { fontSize: 12, color: th.textDim } }, t('passwords.keyring.body')),

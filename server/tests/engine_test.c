@@ -714,6 +714,25 @@ static void test_capture_protected(void) {
     CHECK(paint_capture_until(&c, root, other->id, NULL, 0) == -1, "a window inside a protected node is refused too");
     base->protect = 0;
     CHECK(paint_capture_until(&c, root, vault->id, NULL, 0) == 1, "unprotected again: captured");
+
+    /* the system's password prompts (keyring, polkit) are protected dialogs in a high layer over every window, and a
+     * password field is a protected node inside an ordinary window: both black in a capture of the screen, the rest of
+     * that window still captured, and that window refused alone (GitHub #219 follow-up: a password is never captured) */
+    Node *modal = layer_node(root, 100, 160, 100);
+    Node *prompt = box_in(modal, 20, 20, 60, 40, 0xffff00ff);       /* the keyring prompt: magenta */
+    box_in(prompt, 5, 25, 50, 10, 0xffffffff);                      /* its password field */
+    prompt->protect = 1;
+    Node *field = box_in(other, 5, 30, 40, 10, 0xff00ff00);        /* a Wi-Fi password field in a window: green */
+    field->protect = 1;
+    render(root, 160, 100);
+    CHECK(pix(30, 25) == 0xff00ff, "on screen the prompt shows: %06x", pix(30, 25));
+    memset(px, 0, 160 * 100 * 4);
+    paint_capture(&c, root);
+    CHECK((px[25 * 160 + 30] & 0xffffff) == 0x000000 && (px[50 * 160 + 40] & 0xffffff) == 0x000000,
+          "the prompt and its field are black: %06x %06x", px[25 * 160 + 30], px[50 * 160 + 40]);
+    CHECK((px[35 * 160 + 10] & 0xffffff) == 0x000000, "the password field in the window is black: %06x", px[35 * 160 + 10]);
+    CHECK((px[5 * 160 + 5] & 0xffffff) == 0x00ffff, "the rest of that window is captured: %06x", px[5 * 160 + 5]);
+    CHECK(paint_capture_until(&c, root, other->id, NULL, 0) == -1, "a window holding a password field is refused alone");
     free(px);
 }
 

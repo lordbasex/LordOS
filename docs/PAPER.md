@@ -740,7 +740,7 @@ The private key lives only on the maintainer's machine, never in the repository 
 
 ### 6.11 Protected windows
 
-A window marked protected (Passwords is) is painted black in every path that copies pixels out: screenshots, recordings, thumbnails, the remote desktop, and Wayland menus and fullscreen. The real monitor shows it normally. Linux apps have no screen-capture protocol to begin with. Since 0.8.2, keys typed into LordOS's own prompts (the keyring, administrator passwords) never reach the Linux app in front. In 0.8.7, the on-screen keyboard's panel and System Information's window while serial numbers are showing are protected the same way.
+A window marked protected (Passwords is) is painted black in every path that copies pixels out: screenshots, recordings, thumbnails, the remote desktop, and Wayland menus and fullscreen. The real monitor shows it normally. Linux apps have no screen-capture protocol to begin with. Since 0.8.2, keys typed into LordOS's own prompts (the keyring, administrator passwords) never reach the Linux app in front. In 0.8.7, the on-screen keyboard's panel and System Information's window while serial numbers are showing are protected the same way. Every password surface LordOS draws is protected too (in development): every password field, and the keyring and polkit prompts whole, so a password is never captured (`password_protect_scene.mjs`).
 
 The Screenshots default above changes nothing here, and `engine-test` checks it: in a capture of the whole screen or an area a protected window is black and what covers it shows, and asked for alone (Screenshots' window capture) it is refused with nothing painted, rather than coming out with its content black as before (in development).
 

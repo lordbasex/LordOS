@@ -478,7 +478,17 @@ The default changes nothing for **protected windows**: they are painted black by
 of the screen or of an area, in screen recordings, in a shared screen or window and on the remote desktop, and
 Screenshots never captures a protected window alone (its window capture is refused, `media.protectedWindow`). Passwords' window, the
 on-screen keyboard, a window marked with "Protect the front window" and a Linux window marked so are protected; the lock
-screen is another process that a capture of the desktop never sees. See [MEDIA.md](MEDIA.md), "Protected windows".
+screen is another process that a capture of the desktop never sees.
+
+**A password is never captured** (the maintainer's rule, 2026-11-22). Every password surface LordOS draws is protected:
+every password field (`TextInput secure`, `sdk/components.jsx`: Wi-Fi, VPN, SSH and Terminal servers, Cloud, Mail,
+Users, Sharing, the remote desktop, Databases, Backup, Passwords and the login and lock screens), the keyring's unlock
+prompt (`sdk/vault.js`) and the administrator prompt a Linux app asks for through polkit (`sdk/hardware.jsx`, whose dots
+count the keys), these two whole. LordOS's own administrator actions ask for no password (`admin.c` checks the session
+user's group). A field is black in every capture of the screen or an area, in recordings, on the remote desktop and in
+shared screens, and the window that holds it is refused captured alone while it does. While anything protected is on
+screen, a remote desktop viewer is composed on the CPU and a visitor of the screen-sharing API can't type into LordOS's
+own windows (`share_key_protected`), as for any protected window. See [MEDIA.md](MEDIA.md), "Protected windows".
 
 | | |
 |---|---|

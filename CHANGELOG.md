@@ -2585,6 +2585,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Raspberry Pi build (`server/src/apps.c`).
 
 ### Security
+- **A password is never captured: every password surface LordOS draws is protected, in development (the
+  latest release is 0.8.9.4; the maintainer's rule of 2026-11-22, with GitHub #219).** Until now only Passwords' window,
+  the on-screen keyboard and windows marked by hand were protected; a password prompt or field came out in a screenshot,
+  a recording, the remote desktop or a shared screen (as dots, but with its length, and the eye could show it).
+  - **Every password field** (`TextInput secure`, `sdk/components.jsx`) is a protected node while it is one: Wi-Fi,
+    VPN, the Terminal's servers, Cloud, Mail, Users, Sharing, the remote desktop, Databases, Backup, Passwords and the
+    login and lock screens. Lord-server paints it black in every capture of the screen or an area, recordings, the
+    remote desktop and shared screens and windows, and refuses the window that holds it captured alone
+    (`media.protectedWindow`, above).
+  - **The keyring's unlock prompt** (`sdk/vault.js` `KeyringPrompt`) and **the administrator prompt a Linux app asks for
+    through polkit** (`sdk/hardware.jsx` `PolkitPrompt`, which draws a dot per key) are protected whole. LordOS's own
+    administrator actions ask for no password (`admin.c` checks the session user's group).
+  - While anything protected is on screen a remote desktop viewer is composed on the CPU and a visitor of the
+    screen-sharing API can't type into LordOS's own windows, as for any protected window.
+  - Tests: `password_protect_scene.mjs` (new: a password field is protected and stops being so with `secure` off, a
+    plain field never is, both prompts are protected whole) and `engine-test` (a protected prompt in a high layer and a
+    password field inside a window are black in a capture of the screen, the rest of the window is captured, and that
+    window is refused alone).
 - **The Wayland table importer no longer runs code from wayland.app** (`tools/wayland-app-import.mjs`, a maintainer
   tool, new in development; found by the pre-merge security scan). It cut the protocol registry and each
   `JSON.parse('...')` module out of wayland.app's JavaScript bundle and evaluated them with `Function()`, so whoever

@@ -292,6 +292,8 @@ changing the output, so a compromised decoder must not have it. Audio goes throu
   a second canvas is kept in capture mode, repainted only in the region that changed. If there is
   none, the frame is used as is, at no cost. `media_composed` in `main.c` gives that canvas to the
   remote (`mirror_frame`) and to the recording.
+- **Password surfaces:** every password field (`TextInput secure`) and the keyring and polkit prompts are protected
+  nodes (in development; a password is never captured, PRIVACY.md).
 - **A window alone** (Screenshots' window capture, `until`): a protected window is refused with nothing painted for it
   (`paint_capture_until` returns -1 when the window is, holds or is inside a protected node; `media.protectedWindow`),
   and Screenshots does not crop a capture of the screen instead (in development, GitHub #219).
