@@ -199,6 +199,8 @@ EOF
     run "sign-test" build/sign-test
     # migration 008: a tablet's power-button defaults (packaging/migrations, issue #131)
     run "migration 008 tablet-power" sh tests/migration_tablet_power_test.sh
+    # (#187) another display manager enabled next to lordos.service: the package's postinst warns (packaging/bin)
+    run "dm-check-test (packaging/bin/lordos-dm-check)" sh tests/dm_check_test.sh
     # (0.8.8.9) the Chromium-based browsers' initial preferences (src/pkg/browserprefs.c) and migration 009
     run "browserprefs-test" build/browserprefs-test
     run "migration 009 chromium-family" sh tests/migration_chromium_family_test.sh
@@ -702,6 +704,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-colview-scene (apps/files/views.jsx ColumnView)" node tests/menubar_test.mjs files_colview_scene.mjs
     else skip "files-colview-scene" "node and the repository's node_modules (npm install)"; fi
+    # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs
+    else skip "files-drag-scene" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.6) Lord Classic's taskbar on every display: three monitors, panels on the clicked bar's display, one timer
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "classic-taskbar-test (themes/classic on every display, sdk/dock.js drop targets)" node tests/classic_taskbar_test.mjs

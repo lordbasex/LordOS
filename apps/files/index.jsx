@@ -6,12 +6,12 @@
 import {
   needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
-  useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl, Layer, shellLayers,
+  useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl,
   wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText, useSidebar, SidebarToggle, SidebarOverlay,
   ConfirmDialog, Checkbox, setDefaultProvider, openExtOf, openHintsFor,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FolderGlyph, DocGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
+import { FolderGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
 import { IconView, ListView, ColumnView, GalleryView } from './views.jsx';
 import { ContextMenu, QuickLook, InfoPanel, Confirm } from './panels.jsx';
 import { loadEntries, sortEntries, groupEntries, sameLoc, userDirs, LIST_CAP } from './locations.js';
@@ -33,6 +33,7 @@ import { pathCrumbs } from '../../sdk/filepickermodel.js';
 import { pasteAsk } from './clipfiles.js';
 import { useCloudFiles, CloudSection, TransfersPill, footerLine, cloudMenuItems, ShareSheet, CloudInfo, OfflineDialog } from './cloud.jsx';
 import { createRemoteDirs } from './remotedirs.js';
+import { createDnd, DropHot, DropSideItem, FavDropSlot, DragGhost } from './dnd.jsx';
 
 export function Icon({ size: s }) {
   return (
@@ -210,8 +211,9 @@ export default function Files() {
   const [hidden, setHidden] = useState(false);
   const [expanded, setExpanded] = useState(() => new Set());
   const netExpanded = useRef(new Set());
-  const [drag, setDrag] = useState(null);                 // { paths, x, y, alt }
-  const [dropTarget, setDropTarget] = useState(null);
+  // the drag's ghost and drop place: stores, not this component's state, so a pointer move doesn't draw the whole
+  // window again (GitHub #218, dnd.jsx)
+  const dnd = useMemo(createDnd, []);
   const [volumes, setVolumes] = useState(() => fs.volumes());
   const [diskList] = useDisks();
   useEffect(() => { setTimeout(warmDocs, 800); }, []);             // PDF Quick Preview without waiting for the helper
@@ -327,6 +329,8 @@ export default function Files() {
   const groups = useMemo(() => (loc.type === 'network' ? netGroups(sorted, tr) : groupEntries(sorted, tab.group, tr)), [sorted, tab.group, loc.type]);
   const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
   const byPath = useMemo(() => new Map(flat.map((e) => [e.path, e])), [flat]);
+  const byPathRef = useRef(byPath);
+  byPathRef.current = byPath;
   // Cloud (docs/CLOUD.md): the statuses of what is shown, the account of this folder
   const cf = useCloudFiles(useMemo(() => flat.map((e) => e.path), [flat]));
   const curDir = baseLoc.type === 'dir' ? baseLoc.path : null;
@@ -719,13 +723,14 @@ export default function Files() {
       if (!p.moved && Math.hypot(e.x - p.x, e.y - p.y) < 6) return;
       // the drag starts: a Linux window it goes over gets the paths too (lord-server offers them as text/uri-list)
       if (!p.moved && !p.favOnly) p.linux = wayland.dragFiles(p.paths);
+      if (!p.moved) p.dir = !!byPathRef.current?.get(p.paths[0])?.dir;      // the ghost is a folder
       p.moved = true;
       const target = dropOf(e.target);
       // over another app's window that takes files, or a Linux window that agreed to: the ghost says so (a +)
       const takes = !target && !p.favOnly && (!!filesDropOf(e.target) || (p.linux && !!wayland.dragTaken()));
-      setDrag({ paths: p.paths, x: e.x, y: e.y, alt: e.alt, favOnly: p.favOnly, takes });
+      dnd.ghost.set({ paths: p.paths, x: e.x, y: e.y, alt: e.alt, favOnly: p.favOnly, takes, dir: p.dir });
       tellOver(!target && !p.favOnly ? filesOverOf(e.target) : null, p.paths, { alt: !!e.alt });
-      setDropTarget(target && !p.paths.includes(target) && (!p.favOnly || target === 'fav:') ? target : null);
+      dnd.target.set(target && !p.paths.includes(target) && (!p.favOnly || target === 'fav:') ? target : null);
     });
     const up = addListener('pointerup', (e) => {
       const p = press.current;
@@ -741,7 +746,7 @@ export default function Files() {
       if (!p.moved) return;
       if (p.linux) wayland.endDrag();       // released over a Linux window, lord-server already dropped it there
       const target = dropOf(e.target);
-      setDrag(null); setDropTarget(null);
+      dnd.ghost.set(null); dnd.target.set(null);
       tellOver(null);
       const other = !target && !p.favOnly ? filesDropOf(e.target) : null;
       if (other) { try { other(p.paths, { alt: !!e.alt, x: e.x, y: e.y }); } catch (err) { console.warn('files drop:', err); } return; }
@@ -1009,7 +1014,7 @@ export default function Files() {
   const known = waitAcc ? cloudModel.knownIssue(waitAcc.kind) : null;
   const viewCtx = {
     scrollKey: `${active}|${loc.type}|${loc.path || ''}|${loc.inner || ''}|${loc.color || ''}|${loc.root || ''}|${loc.query || ''}`,   // a new place opens at the top
-    selected, cut, renaming, dropTarget, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
+    selected, cut, renaming, dnd, hidden, expanded, showFolder: loc.type === 'search' || loc.type === 'recent' || loc.type === 'tag',
     emptyText: waitAcc ? tr('cloud.files.signin', { name: waitAcc.name }) : (error === 'archive-invalid' ? tr('docs.err.invalid') : error) || (entries.loading ? tr('files.loading') : null) || (loc.type === 'archive' && archiveState(loc.path)?.state === 'loading' ? tr('docs.loading') : null) || (loc.type === 'network' && netState.running ? lanStatus(netState, 0) : null) || (loc.type === 'trash' ? tr('files.trashEmpty') : loc.type === 'search' ? tr('files.noResults') : tr('files.empty')),
     emptyHint: known ? tr(known.key) : null,
     emptyAction: waitAcc ? (
@@ -1050,8 +1055,6 @@ export default function Files() {
   })();
   const sideSel = (l) => sameLoc(l, baseLoc) && !debounced;
   const dirLoc = (p) => ({ type: 'dir', path: p });
-  const dragLocal = drag && root.current ? (() => { const [lx, ly] = lord.getLayout(root.current.id); return { x: drag.x - lx, y: drag.y - ly }; })() : null;
-  const dragEntry = drag ? byPath.get(drag.paths[0]) : null;
 
   // toolbar menus open under their button, aligned to its trailing edge
   const menuUnder = (ref, items) => {
@@ -1085,29 +1088,29 @@ export default function Files() {
         {side('recent') && <SideItem t={t} label={tr('files.place.recent')} icon={<PlaceGlyph ch="◷" t={t} />} selected={sideSel({ type: 'recent' })} onClick={() => navigate({ type: 'recent' })} />}
         {side('apps') && <SideItem t={t} label={tr('files.place.apps')} icon={<PlaceGlyph ch="⌘" t={t} />} selected={sideSel({ type: 'apps' })} onClick={() => navigate({ type: 'apps' })} />}
         {dirs.filter((d) => side(d.label)).map((d) => (
-          <SideItem key={d.path} t={t} label={tr(`files.place.${d.label}`)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(d.path))}
-            onClick={() => navigate(dirLoc(d.path))} drop={{ dropPath: d.path }} hot={dropTarget === d.path} />
+          <DropSideItem key={d.path} dnd={dnd} t={t} label={tr(`files.place.${d.label}`)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(d.path))}
+            onClick={() => navigate(dirLoc(d.path))} drop={{ dropPath: d.path }} />
         ))}
         {prefs.favoriteFolders.map((f) => (
-          <SideItem key={f.path} t={t} dim={offline(f)} label={shareTitle(f.name)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(f.path))} onClick={() => openFavorite(f)}
-            drop={offline(f) ? undefined : { dropPath: f.path }} hot={dropTarget === f.path}
+          <DropSideItem key={f.path} dnd={dnd} t={t} dim={offline(f)} label={shareTitle(f.name)} icon={<FolderGlyph size={16} />} selected={sideSel(dirLoc(f.path))} onClick={() => openFavorite(f)}
+            drop={offline(f) ? undefined : { dropPath: f.path }}
             onContext={(ev) => { ev.stopPropagation?.(); const at = local(ev); setMenu({ x: at.x, y: at.y, items: [{ label: tr('files.fav.remove'), onClick: () => removeFavoriteFolder(f.path) }] }); }} />
         ))}
-        {drag && (drag.favOnly || dragEntry?.dir) ? <SideItem t={t} dim label={tr('files.fav.add')} icon={<PlaceGlyph ch="+" t={t} />} drop={{ dropPath: 'fav:' }} hot={dropTarget === 'fav:'} /> : null}
-        <CloudSection t={t} accounts={cf.accounts} hidden={userSettings.cloudHidden || []} sideSel={(p) => sideSel(dirLoc(p))} navigate={(p) => navigate(dirLoc(p))} dropTarget={dropTarget}
+        <FavDropSlot dnd={dnd} t={t} label={tr('files.fav.add')} icon={<PlaceGlyph ch="+" t={t} />} />
+        <CloudSection t={t} accounts={cf.accounts} hidden={userSettings.cloudHidden || []} sideSel={(p) => sideSel(dirLoc(p))} navigate={(p) => navigate(dirLoc(p))} dnd={dnd}
           onContext={(ev, it) => { ev.stopPropagation?.(); const at = local(ev); setMenu({ x: at.x, y: at.y, items: [
             { label: tr('files.menu.openTab'), onClick: () => newTabAt(dirLoc(it.path)) },
             { label: tr('cloud.settingsMenu'), onClick: () => wm.open('settings', { args: { section: 'cloud', page: it.id, nonce: Date.now() } }) }] }); }} />
         <SideTitle t={t}>{tr('files.locations')}</SideTitle>
-        {side('home') && <SideItem t={t} label={tr('files.place.home')} icon={<PlaceGlyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
-          drop={{ dropPath: fs.home() }} hot={dropTarget === fs.home()} />}
+        {side('home') && <DropSideItem dnd={dnd} t={t} label={tr('files.place.home')} icon={<PlaceGlyph ch="⌂" t={t} />} selected={sideSel(homeLoc())} onClick={() => navigate(homeLoc())}
+          drop={{ dropPath: fs.home() }} />}
         {side('computer') && <SideItem t={t} label={computerName()} icon={<DriveGlyph color={t.accent} />} selected={sideSel(computerLoc())} onClick={() => navigate(computerLoc())} />}
         {lan.available() && side('network') && <SideItem t={t} label={tr('files.place.network')} icon={<NetGlyph color={t.accent} />} selected={sideSel({ type: 'network' })} onClick={() => navigate({ type: 'network' })} />}
         {side('volumes') && volumes.filter((v) => !cloudModel.isCloudVolume(v, fs.home())).map((v) => {
           const rel = volumeRelease(diskList, v.path, v.fs);
           return (
-            <SideItem key={v.path} t={t} label={isShareFs(v.fs) ? shareTitle(v.name) : v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
-              drop={{ dropPath: v.path }} hot={dropTarget === v.path} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null}
+            <DropSideItem key={v.path} dnd={dnd} t={t} label={isShareFs(v.fs) ? shareTitle(v.name) : v.name} icon={<DriveGlyph color={t.accent} />} selected={sideSel(dirLoc(v.path))} onClick={() => navigate(dirLoc(v.path))}
+              drop={{ dropPath: v.path }} trail={rel ? { glyph: '⏏', onClick: () => release(rel, v.path) } : null}
               onContext={isShareFs(v.fs) ? (ev) => pinMenu(ev, v) : undefined}
               onPress={(ev) => { press.current = { paths: [v.path], x: ev.x, y: ev.y, favOnly: true }; }} />
           );
@@ -1120,8 +1123,8 @@ export default function Files() {
           <SideItem key={p.name} t={t} dim label={p.label || tr('files.disk.unnamed', { size: formatBytes(p.size) })} icon={<DriveGlyph color={t.textDim} />}
             onClick={() => mount(p)} />
         ))}
-        {side('trash') && <SideItem t={t} label={tr('files.place.trash')} icon={<TrashGlyph color={t.accent} />} selected={sideSel({ type: 'trash' })} onClick={() => navigate({ type: 'trash' })}
-          drop={{ dropTrash: true }} hot={dropTarget === 'trash:'} />}
+        {side('trash') && <DropSideItem dnd={dnd} t={t} label={tr('files.place.trash')} icon={<TrashGlyph color={t.accent} />} selected={sideSel({ type: 'trash' })} onClick={() => navigate({ type: 'trash' })}
+          drop={{ dropTrash: true }} />}
         {side('tags') && <SideTitle t={t}>{tr('files.tags')}</SideTitle>}
         {side('tags') && Object.entries(TAG_COLORS).filter(([color]) => !prefs.hiddenTags.includes(color)).map(([color, hex]) => (
           <SideItem key={color} t={t} label={tagName(color)} icon={<Dot color={hex} />} selected={sideSel({ type: 'tag', color })} onClick={() => navigate({ type: 'tag', color })} />
@@ -1193,9 +1196,10 @@ export default function Files() {
           <View style={{ flexDirection: 'row', height: 28, backgroundColor: t.mode === 'dark' ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.045)' }}>
             <Hairline edge="bottom" />
             {tabs.map((x, i) => (
-              <View key={x.id} onClick={() => { setActive(i); setSelected(new Set()); }} {...(x.loc.type === 'dir' ? { dropPath: x.loc.path } : {})}
+              <DropHot key={x.id} dnd={dnd} path={x.loc.type === 'dir' && i !== active ? x.loc.path : null}>{(hot) => (
+              <View onClick={() => { setActive(i); setSelected(new Set()); }} {...(x.loc.type === 'dir' ? { dropPath: x.loc.path } : {})}
                 style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.s, gap: 6,
-                  backgroundColor: dropTarget && x.loc.path === dropTarget && i !== active ? t.accent : i === active ? t.windowBg : 'transparent' }}>
+                  backgroundColor: hot ? t.accent : i === active ? t.windowBg : 'transparent' }}>
                 {i > 0 && <Hairline edge="start" />}
                 <View onClick={(ev) => { ev.stopPropagation(); closeTab(i); }} style={{ width: 16, height: 16, borderRadius: 4, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ fontSize: 9, color: t.textDim }}>✕</Text>
@@ -1203,6 +1207,7 @@ export default function Files() {
                 <Text style={{ flex: 1, fontSize: typeScale.callout, fontWeight: i === active ? 600 : 400, color: i === active ? t.text : t.textDim, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden' }}>{locTitle(x.loc, dirs)}</Text>
                 <View style={{ width: 16 }} />
               </View>
+              )}</DropHot>
             ))}
             <View onClick={() => newTabAt()} style={{ width: 32, alignItems: 'center', justifyContent: 'center' }}>
               <Hairline edge="start" />
@@ -1251,26 +1256,8 @@ export default function Files() {
       </View>
 
       {sb.narrow && sb.shown ? <SidebarOverlay width={sideW} onClose={sb.close}>{sideScroll}</SidebarOverlay> : null}
-      {/* what is being dragged: in the desktop's drag layer, above every window, so it follows the pointer into another
-          app (a window that takes files shows a +); in its own window only when there are no desktop layers */}
-      {drag && (shellLayers() || dragLocal) && (() => {
-        const ghost = (
-        <View style={{ position: 'absolute', left: (shellLayers() ? drag.x : dragLocal.x) - 20, top: (shellLayers() ? drag.y : dragLocal.y) - 20, pointerEvents: 'none', opacity: 0.85 }}>
-          {drag.favOnly || dragEntry?.dir ? <FolderGlyph size={40} /> : <DocGlyph size={40} kind="other" ext="" dark={t.mode === 'dark'} />}
-          {drag.paths.length > 1 && (
-            <View style={{ position: 'absolute', right: -6, top: -6, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>{drag.paths.length}</Text>
-            </View>
-          )}
-          {(drag.alt || drag.takes) && (
-            <View style={{ position: 'absolute', left: 28, top: 26, width: 18, height: 18, borderRadius: 9, backgroundColor: '#30d158', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 13 }}>+</Text>
-            </View>
-          )}
-        </View>
-        );
-        return shellLayers() ? <Layer name="drag">{ghost}</Layer> : ghost;
-      })()}
+      {/* what is being dragged (dnd.jsx): above every window, following the pointer into another app */}
+      <DragGhost dnd={dnd} root={root} t={t} />
       {quickEntry && <QuickLook e={quickEntry} index={flat.indexOf(quickEntry)} count={flat.length} onClose={() => setQuick(false)} />}
       {infoEntry && <InfoPanel e={infoEntry} onClose={() => setInfo(false)} openers={infoEntry.dir || infoEntry.app ? [] : openersFor(infoEntry, launcherApps, tr)}
         extra={cf.accountOf(infoEntry.path) ? <CloudInfo e={infoEntry} cf={cf} onShare={(x) => { setInfo(false); setSharing(x); }} /> : null} />}

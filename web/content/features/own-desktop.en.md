@@ -73,7 +73,7 @@ LordOS aims at modest machines. A few real measurements from the project's test 
 
 [[chart:memory-0891]]
 
-These numbers come from virtual machines, one board and the maintainer's PC. Reports from 22 real machines, some with LordBench runs, are in the [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). They are a starting point, not a promise for every machine.
+These numbers come from virtual machines, one board and the maintainer's PC. Reports from 24 real machines, some with LordBench runs, are in the [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). They are a starting point, not a promise for every machine.
 
 [[shot:2]]
 
@@ -169,7 +169,7 @@ The compositor drives several displays at once, extended or mirrored, and draws 
 
 ## Honest limits
 
-- **NVIDIA cards are not verified yet.** GPU composition works on real Intel graphics from 2010 (Ironlake) to 2019 (Whiskey Lake), Cherry Trail and Gemini Lake, and on four AMD generations from GCN 2 to RDNA 4, on the 22 machines in the [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md); no NVIDIA card has been reported, nor AMD integrated graphics or Intel graphics newer than Whiskey Lake (`docs/GPU.md`).
+- **NVIDIA cards are verified on one machine only.** GPU composition works on real Intel graphics from 2010 (Ironlake) to 2019 (Whiskey Lake), Cherry Trail and Gemini Lake, and on five AMD generations from TeraScale 2 (a Radeon HD 5450) to RDNA 4, among the 24 machines in the [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md). One NVIDIA card has been reported, an RTX 3060 on NVIDIA's proprietary driver: the desktop works there and is drawn with the CPU, since LordOS doesn't compose with that driver. Mesa's nouveau and NVK, which are included, have not been tried on any NVIDIA card, and nobody has reported AMD integrated graphics or Intel graphics newer than Whiskey Lake yet (`docs/GPU.md`).
 - **GPU drag, on by default in 0.8.7, is verified on V3D and SVGA3D only.** On a Raspberry Pi 5, in real drags, it halves the session's CPU alone and takes a memory load from 29 to 35 frames a second. On any other GPU only its self-test guards it, and `LORD_GPU_DRAG=0` turns it off (`docs/GPU.md`).
 - **Multiple displays were tested with two virtual heads and on one PC with a Radeon RX 580 and three monitors** (`docs/DISPLAYS.md`), the author's own LordOS machine, used every day installed on bare metal since November 2026. That PC brought the hardware cursor's size and the login screen on the chosen main display in 0.8.8.6, and in 0.8.8.7 the hand-off that keeps DisplayPort monitors lit across lock, logout and login. Beyond it, [21 more machines from the community](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md) (9 hardware reports and 12 machines named in other issues) cover Intel (14) and AMD (3 more: a FirePro W6150M, an RX 7800 XT on two 120 Hz monitors and an RX 9060 XT) graphics, from laptops to x86 tablets; no NVIDIA card has been reported yet, and DisplayPort hubs are untested.
 - **The Raspberry Pi 5 has been tested with one HDMI monitor only.** Since 0.8.4.1 the image shows the login screen and the desktop on an HDMI monitor from the first boot, and LordBench measured it there; two monitors and 4K have not been tested on the board yet (`docs/RASPBERRY.md`).
