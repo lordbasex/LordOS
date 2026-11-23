@@ -2,6 +2,7 @@
 // name), notes, whether its guest tools open files (opens: Files' "Open with", openwith.js), what closing its window does (onClose), whether it opens in apps mode (appsMode) and whether it keeps this computer awake (keepAwake, read by
 // lord.vm.awake too). <machine>/app.json, written by the app as the person; machine.json stays lord-vm's alone.
 import { fs } from '@lordos/sdk';
+import { cpuWindows } from './model.js';
 
 const cache = new Map();         // dir → { mtime, meta }: the library reads it every 1.5 s
 
@@ -35,6 +36,9 @@ export function readMeta(dir) {
       if (typeof j.toolsAuto === 'boolean') meta.toolsAuto = j.toolsAuto;
       // its guest tools open files sent from Files' "Open with" (7.3): 'windows' (the system they said), or false
       if (j.opens === 'windows' || j.opens === 'other' || j.opens === false) meta.opens = j.opens;
+      // the vCPUs chosen from the recommendation while it ran ("Use N", Configure → CPU & memory): set by startPrep
+      // (ui.jsx) with lord-vm --set before its next start
+      if (Number.isInteger(j.nextVcpus) && j.nextVcpus >= 1 && j.nextVcpus <= 64) meta.nextVcpus = j.nextVcpus;
     }
   } catch (e) { meta = {}; }
   cache.set(dir, { mtime: st?.mtime, meta });
@@ -44,4 +48,19 @@ export function readMeta(dir) {
 export function writeMeta(dir, patch) {
   const next = { ...readMeta(dir), ...patch };
   try { fs.write(`${dir}/app.json`, JSON.stringify(next, null, 2)); cache.delete(dir); return true; } catch (e) { return false; }
+}
+
+// what its vCPUs used (<machine>/cpu-usage.json, written by lord-vm while it runs: model.js cpuWindows), read again only
+// when it changed
+const cpuCache = new Map();      // dir → { mtime, windows }
+export function readCpuUse(dir) {
+  let st = null;
+  try { st = fs.stat(`${dir}/cpu-usage.json`); } catch (e) { return []; }
+  if (!st) return [];
+  const hit = cpuCache.get(dir);
+  if (hit && hit.mtime === st.mtime) return hit.windows;
+  let windows = [];
+  try { windows = cpuWindows(fs.read(`${dir}/cpu-usage.json`)); } catch (e) { windows = []; }
+  cpuCache.set(dir, { mtime: st.mtime, windows });
+  return windows;
 }

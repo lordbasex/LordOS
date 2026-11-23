@@ -11,14 +11,14 @@ import {
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
-  chipCounts, specParts, restLine, gvtGpu, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
+  chipCounts, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
 import { Sheet, Sym } from './kit.jsx';
 import { BUILTIN } from './profiles.js';
 import { loadProfiles, storeRev } from './store.js';
 import { usePal, has, gb, bytes, gib, OsMark, Bar, Btn, PopMenu, markColors, overlayRoot, vmRefusal, startPrep } from './ui.jsx';
-import { readMeta } from './meta.js';
+import { readMeta, readCpuUse } from './meta.js';
 import { CloneSheet } from './clone.jsx';
 import { withAsk } from './openwith.js';
 
@@ -141,7 +141,21 @@ function Picture({ m, sys, on, height, radius = 0 }) {
 }
 const sysOf = (m) => (m.meta?.os ? { id: m.meta.os, name: m.meta.osName || '' } : systemOf(m.name));
 
-function Card({ m, u, sel, onSelect, onMenu, windowed, picH, gpuName }) {
+// the vCPU recommendation's line under the numbers (Configure → CPU & memory has the reason and "Use N")
+function VcpuHint({ m, host }) {
+  const p = usePal();
+  const adv = host ? vcpuAdvice(m.cpuWindows, m.vcpus, host) : null;
+  const next = m.meta?.nextVcpus && m.meta.nextVcpus !== m.vcpus ? m.meta.nextVcpus : 0;
+  if (!adv && !next) return null;
+  return (
+    <View onClick={(e) => { e.stopPropagation?.(); openConfigure(m, 'cpu'); }} style={{ marginTop: 4, alignSelf: 'flex-start' }}>
+      <Text style={{ fontSize: 12, color: p.accent, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>
+        {next ? tr('machines.cfg.vcpu.pending', { n: next }) : tr('machines.lib.vcpuHint', { n: adv.n })}</Text>
+    </View>
+  );
+}
+
+function Card({ m, u, sel, onSelect, onMenu, windowed, picH, gpuName, host }) {
   const p = usePal();
   const a = actionsOf(m);
   const st = stateOf(m, windowed);
@@ -187,6 +201,7 @@ function Card({ m, u, sel, onSelect, onMenu, windowed, picH, gpuName }) {
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: 18, fontWeight: 600, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{m.name}</Text>
           <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{specLine(m)}</Text>
+          <VcpuHint m={m} host={host} />
         </View>
         <MoreBtn m={m} onMenu={onMenu} />
       </View>
@@ -226,7 +241,7 @@ function NewCard({ onClick, picH, row }) {
 
 // one machine in the list view (the approved mock "List"): picture, name and its state in color, the numbers line, CPU
 // and memory while it runs (else since when it's off), Start or Open, ···
-function ListRow({ m, u, sel, onSelect, onMenu, windowed }) {
+function ListRow({ m, u, sel, onSelect, onMenu, windowed, host }) {
   const p = usePal();
   const a = actionsOf(m);
   const st = stateOf(m, windowed);
@@ -248,6 +263,7 @@ function ListRow({ m, u, sel, onSelect, onMenu, windowed }) {
           </View>
         </View>
         <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{specLine(m)}</Text>
+        <VcpuHint m={m} host={host} />
       </View>
       {narrow ? null : st.on ? (
         <View style={{ width: 180, gap: 6 }}>
@@ -519,6 +535,7 @@ export function Library() {
       m.baseBytes = s.baseBytes || 0;
       try { const st = fs.stat(`${m.dir}/thumb.png`); m.thumbTime = st?.mtime || 0; } catch (e) { m.thumbTime = 0; }
       m.meta = readMeta(m.dir);
+      m.cpuWindows = readCpuUse(m.dir);
       const u = usage(prev.current[m.dir], s, m.vcpus);
       if (u) next[m.dir] = u;
       prev.current[m.dir] = s.at ? s : null;
@@ -618,7 +635,7 @@ export function Library() {
   const cells = [{ isNew: true }, ...sorted];
   const rows = [];
   for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
-  const cardProps = (m) => ({ m, u: usages[m.dir], sel: sel === m.dir, onSelect: () => setSel(m.dir), windowed: wins.split(' ').includes(winIdOf(m)),
+  const cardProps = (m) => ({ m, u: usages[m.dir], sel: sel === m.dir, onSelect: () => setSel(m.dir), windowed: wins.split(' ').includes(winIdOf(m)), host,
     onMenu: (e) => setMenu({ x: e.x, y: e.y, m }) });
   const newMachine = () => setPage('new');
 

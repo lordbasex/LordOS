@@ -2,12 +2,12 @@
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. The name is the exception (6.26): while
 // the machine runs it changes alone (`lord-vm --rename`), and its folders follow it once it's off.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn } from './model.js';
+  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
-import { readMeta, writeMeta } from './meta.js';
+import { readMeta, writeMeta, readCpuUse } from './meta.js';
 import { defaultsOf } from './store.js';
 import { SideRow, PaneHeader, Pill, Section } from './kit.jsx';
 import { BUILTIN, builtinProfile, onHost } from './profiles.js';
@@ -103,6 +103,31 @@ let carried = null;
 // lord-vm's problem ('name-taken') as Configure's text key
 const PROBLEMS = { 'name-taken': 'nameTaken', 'folder-taken': 'folderTaken', 'transfer-taken': 'transferTaken' };
 const problemKey = (pr) => `machines.cfg.rn.${PROBLEMS[pr] || 'badName'}`;
+
+// The vCPU recommendation (docs/VIRTUALIZATION.md, "vCPU recommendation"): what the machine's vCPUs used over its runs
+// (lord-vm's cpu-usage.json) and the count suggested from it, with the reason. "Use N" writes it now when the machine is
+// off, or for its next start while it runs or is suspended (app.json nextVcpus, applied by startPrep); never by itself.
+function VcpuAdvice({ m, host, meta, later, busy, use, keep }) {
+  const p = usePal();
+  const adv = vcpuAdvice(readCpuUse(m.dir), m.vcpus, host);
+  const next = meta.nextVcpus && meta.nextVcpus !== m.vcpus ? meta.nextVcpus : 0;
+  if (!adv && !next) return null;
+  return (
+    <View style={{ gap: 8, alignItems: 'flex-start', padding: 14, borderRadius: 12, backgroundColor: p.card, border: `1px solid ${p.line}` }}>
+      {adv ? <>
+        <Text style={{ fontSize: 13, fontWeight: 600, color: p.text, textAlign: 'start' }}>{tr(`machines.cfg.vcpu.${adv.kind}`, { n: adv.n })}</Text>
+        <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
+          {tr('machines.cfg.vcpu.why', { avg: formatNumber(adv.avg, 1), total: adv.vcpus, hours: formatNumber(Math.round(adv.hours)), peak: formatNumber(adv.peak, 1) })}
+          {' '}{tr(`machines.cfg.vcpu.${adv.kind}Note`)}</Text>
+      </> : null}
+      {next ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Text style={{ fontSize: 12, color: p.text, textAlign: 'start' }}>{tr('machines.cfg.vcpu.pending', { n: next })}</Text>
+        <Btn label={tr('machines.cfg.vcpu.keep', { n: m.vcpus })} onClick={keep} />
+      </View> : <Btn primary label={tr('machines.cfg.vcpu.use', { n: adv.n })} disabled={busy} onClick={() => use(adv.n)} />}
+      {!next && later ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.cfg.vcpu.later')}</Text> : null}
+    </View>
+  );
+}
 
 export function Configure({ dir, section: section0, onClose }) {
   const p = usePal();
@@ -309,6 +334,9 @@ export function Configure({ dir, section: section0, onClose }) {
         <Btn label={tr('machines.cfg.memlockChange')} onClick={() => wm.open('settings', { args: { section: 'gpus', nonce: Date.now() } })} />
       </View> : null}
       {cur.vcpus > (host?.vcpusRecommended || 99) ? <Text style={{ fontSize: 12, color: '#ff9f0a', textAlign: 'start' }}>{tr('machines.new.warn.vcpus', { n: host.vcpusRecommended })}</Text> : null}
+      <VcpuAdvice m={m} host={host} meta={meta} later={running || !!m.suspended} busy={!!job}
+        use={(n) => { if (running || m.suspended) { writeMeta(dir, { nextVcpus: n }); setMeta(readMeta(dir)); } else { setDraft((d) => { const { vcpus, ...rest } = d; return rest; }); save({ vcpus: n }); } }}
+        keep={() => { writeMeta(dir, { nextVcpus: undefined }); setMeta(readMeta(dir)); }} />
     </>;
   } else if (sec === 'display') {
     // 3D (6.10): Linux machines on a computer that can give it; a machine that has it can always go back to 2D

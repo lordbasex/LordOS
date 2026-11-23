@@ -36,7 +36,12 @@ eq('half of a small computer', P.cpuCap(small), 2);
 eq('one processor at least', P.cpuCap({ cpus: 1 }), 1);
 const prod = P.onHost(P.builtinProfile('productivity', host), host, { gpuReady: false, no3d: '' });
 eq('productivity here (the mock: 4 of 20, 8 GB, 64 GB)', [prod.vcpus, prod.memoryMb, prod.diskGb, prod.graphics, prod.clipboard, prod.transfer], [4, 8192, 64, '3d', 'both', true]);
-eq('development: half the processors', P.onHost(P.builtinProfile('development', host), host).vcpus, 10);
+// 'half' (development, games, design): half of the physical cores, six at most (model.js vcpuDefault), not "many"
+eq('development: half the cores (20 threads, 10 cores)', P.onHost(P.builtinProfile('development', { ...host, cores: 10 }), { ...host, cores: 10 }).vcpus, 5);
+eq('development: no cores said, half of half the threads', P.onHost(P.builtinProfile('development', host), host).vcpus, 5);
+eq('games: six at most on a big computer', P.onHost(P.builtinProfile('games', { ...host, cpus: 64, cores: 32, vcpusRecommended: 63 }), { ...host, cpus: 64, cores: 32, vcpusRecommended: 63 }).vcpus, 6);
+eq('design: a 4-core computer gets 2', P.onHost(P.builtinProfile('design', small), { ...small, cores: 4 }).vcpus, 2);
+eq('a profile\'s own number stays (up to half the processors)', P.onHost({ ...P.builtinProfile('development', host), resources: { ...P.builtinProfile('development', host).resources, cpus: 8 } }, host).vcpus, 8);
 eq('games: a graphics card only when one is set up', [P.onHost(P.builtinProfile('games', host), host, { gpuReady: false }).gpu, P.onHost(P.builtinProfile('games', host), host, { gpuReady: true }).gpu], ['', 'intel-shared']);
 eq('games captures the mouse', P.builtinProfile('games', host).input.mouse, 'capture');
 eq('3D only where it can be had', P.onHost(P.builtinProfile('design', host), host, { no3d: 'gpu' }).graphics, '2d');
