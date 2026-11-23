@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/qmp.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -42,7 +42,7 @@ build/lordos-guest-win.exe: ../tools/guest-win/lordos-guest-win.c ../tools/guest
 	@mkdir -p build
 	$(dir $(MINGW_CC))x86_64-w64-mingw32-windres -I ../tools/guest-win ../tools/guest-win/lordos-guest-win.rc -O coff -o build/lordos-guest-win.res
 	$(MINGW_CC) -O2 $(WARN) -std=gnu11 -municode -mwindows -static -static-libgcc -s -o $@ ../tools/guest-win/lordos-guest-win.c src/vm/vmagent.c \
-		build/lordos-guest-win.res -lole32 -loleaut32 -luuid -lwindowscodecs -ldwmapi -lwtsapi32 -lshell32 -lgdi32 -luser32 -lbcrypt
+		build/lordos-guest-win.res -lole32 -loleaut32 -luuid -lwindowscodecs -ldwmapi -lwtsapi32 -lshell32 -lgdi32 -luser32 -lbcrypt -lpowrprof
 else
 all: lordos-guest-win-skipped
 lordos-guest-win-skipped:
@@ -72,7 +72,7 @@ endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
-test: build/vmpace-test build/vmmem-test build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test test-vm-import
+test: build/vmpace-test build/vmmem-test build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test build/vmcpu-test test-vm-import
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
 # and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage,
@@ -102,6 +102,12 @@ build/vmpace-test: tests/vmpace_test.c src/vm/vmpace.h src/vm/vmproto.h
 build/vmthumb-test: tests/vmthumb_test.c src/vm/vmthumb.c src/vm/vmthumb.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmthumb_test.c src/vm/vmthumb.c -lpthread
+	./$@ || { rm -f $@; exit 1; }
+# what a machine's vCPUs use (vmcpu.c, the Machines app's vCPU recommendation): the stat line, QEMU's vCPU thread names,
+# the windows of five minutes and cpu-usage.json, under ASan and UBSan; no QEMU needed (its own threads stand in)
+build/vmcpu-test: tests/vmcpu_test.c src/vm/vmcpu.c src/vm/vmcpu.h src/sec/json.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcpu_test.c src/vm/vmcpu.c src/sec/json.c -lpthread
 	./$@ || { rm -f $@; exit 1; }
 
 build/http-resume-test: tests/http_resume_test.c src/pkg/http.c src/pkg/pubhost.c src/pkg/crypto.c src/sec/cgroup.c src/pkg/http.h
@@ -140,7 +146,7 @@ build/vm-test: tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c $(VM_COMMON) $(VM_
 	./$@ || { rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
-VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c
+VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmpin.c
 VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
 $(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
 build/lord-server: $(VM_SRV_OBJ)

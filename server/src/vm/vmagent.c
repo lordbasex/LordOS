@@ -609,6 +609,28 @@ int ag_extra_parse(const uint8_t *p, size_t n, int *off) {
     return 0;
 }
 
+int ag_perf_parse(const uint8_t *p, size_t n, int *on) {
+    if (!p || n != 1 || p[0] > 1) return -1;
+    if (on) *on = p[0];
+    return 0;
+}
+
+int ag_perfstate_parse(const uint8_t *p, size_t n, int *on, unsigned *done, unsigned *failed) {
+    if (!p || n != AG_PERFSTATE_BYTES || p[0] > 1 || (p[1] & ~AGPF_ALL) || (p[2] & ~AGPF_ALL) || (p[1] & p[2])) return -1;
+    if (on) *on = p[0];
+    if (done) *done = p[1];
+    if (failed) *failed = p[2];
+    return 0;
+}
+
+int ag_perfstate_write(uint8_t out[AG_PERFSTATE_BYTES], int on, unsigned done, unsigned failed) {
+    if (!out || (on != 0 && on != 1) || (done & ~(unsigned)AGPF_ALL) || (failed & ~(unsigned)AGPF_ALL) || (done & failed)) return -1;
+    out[0] = (uint8_t)on;
+    out[1] = (uint8_t)done;
+    out[2] = (uint8_t)failed;
+    return 0;
+}
+
 int ag_displays_extra(const AgDisplay *d, int n, int shown) {
     if (!d || n < 2 || shown < 0 || shown >= n || !(d[shown].flags & AGDS_HW)) return 0;
     for (int i = 0; i < n; i++) if (i != shown && !(d[i].flags & AGDS_HW)) return 1;
@@ -915,6 +937,7 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 5 && !memcmp(p + s0, "extra", 5)) caps |= AG_HELLO_EXTRA;
         else if (l == 8 && !memcmp(p + s0, "extraoff", 8)) caps |= AG_HELLO_EXTRAOFF;
         else if (l == 8 && !memcmp(p + s0, "stopping", 8)) caps |= AG_HELLO_STOPPING;
+        else if (l == 4 && !memcmp(p + s0, "perf", 4)) caps |= AG_HELLO_PERF;
     }
     return caps;
 }

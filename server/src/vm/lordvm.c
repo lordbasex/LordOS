@@ -31,7 +31,9 @@
 #include "vmunattend.h"
 #include "vmhoststop.h"
 #include "vmgvtwin.h"
+#include "vmpin.h"
 #include "vmlog.h"
+#include "vmcpu.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -871,7 +873,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 typedef struct { int fd, control; } Client;
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
-       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET };
+       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 /* a file dropped on the machine's window, for the guest (VM_FILE) */
@@ -1061,6 +1063,8 @@ static struct {
     char lag_disps[AG_DISPLAYS_MAX * 128];   /* the guest's displays (AGK_DISPLAYS) as last logged, "" none yet */
     int layout[6];                          /* where the picture sits in the guest's desktop (VM_GUEST_LAYOUT), 0s none */
     int lag_extra, lag_extraoff, extra_avail; /* the tools turn off an extra display (AGK_EXTRA); one is off; one is there */
+    int lag_perf;                           /* the tools apply the performance profile (AGK_PERF, "perf", w11) */
+    unsigned perf_said;                     /* the last AGK_PERFSTATE logged, as 1 << 24 | on << 16 | done << 8 | failed; 0 none */
     AgDisplay disp_list[AG_DISPLAYS_MAX];   /* the guest's displays (AGK_DISPLAYS) as last said, for the tablet's layout */
     int disp_n, disp_shown;
     int tablet;                             /* how the guest maps the tablet (AGK_TABLET, AG_TABLET_*; 0 not said yet) */
@@ -1076,6 +1080,13 @@ static struct {
     char fx_otok[AG_OPEN_TOKEN + 1];
     Sha256 fx_hs;
     OpWait opw[OP_MAX];
+    /* what the vCPUs use (vmcpu.h): their threads' stat files, opened before lord-vm's own Landlock; the next sample */
+    int cpu_fd[VMCPU_FDS], cpu_nfd;
+    long long cpu_at;
+    /* vCPU pinning (3.7.1): the plan, /proc/<qemu>/task opened before the Landlock, the vCPU threads last set */
+    VmPinPlan pin;
+    int pin_on, pin_q, pin_dfd, pin_n;
+    int pin_tids[VMPIN_VCPUS];
 } S;
 
 /* what the guest said of the transfer folder */
@@ -1152,6 +1163,60 @@ static int qmp_do(const char *cmd, const char *args, int kind, int client, uint3
     if (qmp_command(&S.qmp, cmd, args, pass_fd)) { vlog("QMP %s: can't send", cmd); return -1; }
     pq_push(kind, client, seq, keep_fd);
     return 0;
+}
+
+/* ---- vCPU pinning (docs/VIRTUALIZATION.md 3.7.1, vmpin.c) ----
+ * Made at start, before lord-vm's own Landlock: the topology from /sys, the CPUs QEMU may run on (its affinity: the
+ * cgroup's cpuset), the cores other machines' vCPUs hold, and /proc/<qemu>/task kept open. QEMU names its vCPU threads
+ * in query-cpus-fast; asked again after a reset and a resume, and set again when they changed. */
+static VmTopo pin_topo;
+static cpu_set_t pin_allowed, pin_held;
+
+static void pin_query(void) {
+    if (S.pin_on && !S.pin_q && !qmp_do("query-cpus-fast", NULL, P_PINQ, -1, 0, -1, -1)) S.pin_q = 1;
+}
+
+static void pin_prepare(void) {
+    if (vmpin_topo_read("/sys", &pin_topo) || sched_getaffinity(S.qemu, sizeof pin_allowed, &pin_allowed)) {
+        vlog("cpu pinning: this computer's topology can't be read: not pinned");
+        return;
+    }
+    int on = S.m.cpu_pin == VM_PIN_AUTO || (S.m.cpu_pin == VM_PIN_DEFAULT && vmpin_default_on(&pin_topo, &pin_allowed, S.m.vcpus));
+    if (!on) { vlog("cpu pinning: off (%s)", S.m.cpu_pin == VM_PIN_OFF ? "chosen" : "this computer's default for the machine"); return; }
+    vmpin_taken(S.qemu, &pin_held);
+    if (vmpin_plan(&pin_topo, &pin_allowed, &pin_held, S.m.vcpus, &S.pin) != VMPIN_EACH) { vlog("cpu pinning: not pinned: %s", S.pin.why); return; }
+    char p[64];
+    snprintf(p, sizeof p, "/proc/%d/task", (int)S.qemu);
+    S.pin_dfd = open(p, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (S.pin_dfd < 0) { vlog("cpu pinning: %s: %s: not pinned", p, strerror(errno)); return; }
+    S.pin_on = 1;
+    pin_query();
+}
+
+static void pin_reply(const JVal *ret, int ok, const char *desc) {
+    S.pin_q = 0;
+    if (!ok || !ret || ret->type != J_ARR) { vlog("cpu pinning: query-cpus-fast: %.120s", ok ? "not a list" : desc); return; }
+    int tids[VMPIN_VCPUS], n = 0;
+    for (const JVal *c = ret->kid; c; c = c->next) {
+        double idx = json_num(c, "cpu-index", -1), tid = json_num(c, "thread-id", -1);
+        if (n >= VMPIN_VCPUS || idx != n || tid < 1 || tid > 1e9) { vlog("cpu pinning: QEMU's vCPU list isn't usable"); return; }
+        tids[n++] = (int)tid;
+    }
+    if (n == S.pin_n && !memcmp(tids, S.pin_tids, sizeof tids[0] * (size_t)n)) return;     /* the same threads, still set */
+    if (n != S.pin.nv && vmpin_plan(&pin_topo, &pin_allowed, &pin_held, n, &S.pin) != VMPIN_EACH) {
+        vlog("cpu pinning: %d vCPUs now: %s", n, S.pin.why);
+        return;
+    }
+    int r = vmpin_apply(&S.pin, S.pin_dfd, tids, n);
+    if (r < 0) { vlog("cpu pinning: QEMU's vCPU threads couldn't be set: %s", strerror(errno)); return; }
+    char cpus[256], rest[256];
+    size_t o = 0;
+    cpus[0] = 0;
+    for (int i = 0; i < n && o < sizeof cpus - 8; i++) o += (size_t)snprintf(cpus + o, sizeof cpus - o, "%s%d", i ? "," : "", S.pin.vcpu_cpu[i]);
+    vmpin_list(&S.pin.rest, rest, sizeof rest);
+    vlog("cpu pinning: %s; vCPUs on CPUs %s, QEMU's other %d threads on %s%s", S.pin.why, cpus, r - n, rest, S.pin_n ? " (again: the threads changed)" : "");
+    S.pin_n = n;
+    memcpy(S.pin_tids, tids, sizeof tids[0] * (size_t)n);
 }
 
 /* ---- cgroups ---- */
@@ -2341,6 +2406,7 @@ static int start_machine(void) {
     S.qmp_up = 1;
     S.oom0 = read_oom_kills();
     qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
+    pin_prepare();
     if (S.resuming) return 0;
     /* a vGPU: its vCPUs run once QEMU may lock the machine's memory (vm-memlock, asked by lord-server) */
     if (S.vgpu && !vgpu_memlock_ok()) {
@@ -4770,6 +4836,7 @@ static void drain_lag(void) {
                 S.lag_extra = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRA) != 0;
                 S.lag_extraoff = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_EXTRAOFF) != 0;
                 if (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_STOPPING) stop_announces = 1;
+                S.lag_perf = (ag_hello_caps((const uint8_t *)t + 13, l - 13) & AG_HELLO_PERF) != 0;
                 /* "noclip": the helper runs but the guest has no clipboard tool (xclip, wl-clipboard); it says hello
                  * again with "clipboard" once one is installed */
                 unsigned hc = ag_hello_caps((const uint8_t *)t + 13, l - 13);
@@ -4791,6 +4858,9 @@ static void drain_lag(void) {
                 static const char me[] = "lord-vm 2 clipboard clipx clipreq elevated";   /* elevated: LAGW_ELEVATED is understood */
                 lag_send(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }
+                /* the performance profile (7.1.4): said after every hello, off too, so tools that kept it from an
+                 * earlier run (a crash) put the guest's own settings back */
+                if (S.lag_perf) { uint8_t b = S.m.perf_profile ? 1 : 0; lag_send(AGK_PERF, &b, 1); }
                 ag_broadcast();
                 ptr_begin();                    /* the tools say "pointer": the display driver's pointer, once per run */
                 gvt_begin();                    /* the tools say "gvt": Intel's driver for the vGPU, once per run */
@@ -4863,6 +4933,21 @@ static void drain_lag(void) {
                 S.extra_avail = ag_displays_extra(d, n, shown);
                 int caps = (S.ag_caps & ~VAC_EXTRA) | (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0);
                 if (caps != S.ag_caps) { S.ag_caps = caps; ag_broadcast(); }
+            }
+        } else if (f.kind == AGK_PERFSTATE && S.lag_hello && S.lag_perf) {
+            /* what the tools did with the performance profile: for the log only */
+            int on;
+            unsigned done, failed;
+            if (ag_perfstate_parse(f.data, f.len, &on, &done, &failed)) vlog("agent: the guest's performance profile: malformed");
+            else if ((1u << 24 | (unsigned)on << 16 | done << 8 | failed) != S.perf_said) {
+                S.perf_said = 1u << 24 | (unsigned)on << 16 | done << 8 | failed;
+                char d[64], x[64];
+                snprintf(d, sizeof d, "%s%s%s", done & AGPF_POWER ? " power plan" : "", done & AGPF_EFFECTS ? " visual effects" : "",
+                         done & AGPF_TRANSPARENCY ? " transparency" : "");
+                snprintf(x, sizeof x, "%s%s%s", failed & AGPF_POWER ? " power plan" : "", failed & AGPF_EFFECTS ? " visual effects" : "",
+                         failed & AGPF_TRANSPARENCY ? " transparency" : "");
+                vlog("agent: the guest's performance profile is %s (%s:%s; refused:%s)", on ? "on" : "off", on ? "applied" : "put back",
+                     d[0] ? d : " nothing", x[0] ? x : " nothing");
             }
         } else if (f.kind == AGK_TABLET && S.lag_hello) {
             /* how the guest maps the absolute tablet (tools w10, from the tablet's own raw input) */
@@ -5359,7 +5444,8 @@ static void on_qmp_event(const JVal *root) {
     if (!strcmp(ev, "STOP")) { if (S.state == VS_RUNNING) set_state(VS_PAUSED, VR_USER, 0, ""); }
     else if (!strcmp(ev, "RESUME")) {
         if (S.state == VS_PAUSED || S.state == VS_STARTING) set_state(VS_RUNNING, S.state == VS_STARTING ? VR_NONE : VR_USER, 0, "");
-        ag_timesync();                  /* the guest's clock stood still while it was paused or saved */
+        ag_timesync();
+        pin_query();                    /* the vCPU threads are still the ones set (checked) */                  /* the guest's clock stood still while it was paused or saved */
     }
     else if (!strcmp(ev, "SHUTDOWN")) {
         int guest = data ? json_bool(data, "guest", 0) : 0;
@@ -5373,6 +5459,7 @@ static void on_qmp_event(const JVal *root) {
         if (S.state != VS_STOPPING) set_state(VS_STOPPING, guest ? VR_GUEST_SHUTDOWN : VR_POWEROFF, 0, why ? why : "");
     } else if (!strcmp(ev, "RESET")) {
         stop_notice = 0;                /* the guest's restart happened inside QEMU: what it said is done with */
+        pin_query();
         if (S.state == VS_RUNNING || S.state == VS_PAUSED) set_state(S.state, VR_GUEST_RESET, 0, "");
     } else if (!strcmp(ev, "GUEST_PANICKED")) { S.panic = 1; vlog("qemu: the guest panicked"); }
     else if (!strcmp(ev, "POWERDOWN")) vlog("qemu: power button pressed");
@@ -5382,7 +5469,7 @@ static void on_qmp_event(const JVal *root) {
         if (id && !strcmp(id, "qga-port")) { S.qga_open = open; if (open) qga_sync(); else ag_lost("the guest closed qemu-guest-agent's port"); }
         else if (id && !strcmp(id, "lag-port")) {
             vlog("agent: the guest %s org.lordos.agent", open ? "opened" : "closed");
-            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
+            if (!open) { if (S.layout[4]) { static const int none[6]; layout_set(none); } S.lag_hello = 0; S.lag_disps[0] = 0; S.lag_clipx = S.lag_clipreq = S.lag_display = S.lag_windows = S.lag_open = S.lag_place = S.lag_pointer = S.lag_gvt = S.lag_extra = S.lag_extraoff = S.extra_avail = S.lag_perf = 0; S.perf_said = 0; S.disp_n = 0; S.tablet = 0; S.tablet_far = 0; S.lag_win_n = 0; S.clip_gen = 0; S.ag_caps &= ~VAC_LAG; S.lag_n = 0; lag_windows_off(); open_all_end(); ag_broadcast(); }
         }
     } else if (!strcmp(ev, "JOB_STATUS_CHANGE")) {
         const char *id = data ? json_str(data, "id") : NULL, *st = data ? json_str(data, "status") : NULL;
@@ -5483,6 +5570,7 @@ static void on_qmp_reply(const JVal *root, int ok) {
         break;
     case P_JOBQ: if (S.snap_kind) snap_concluded(root, ok); break;
     case P_NET: break;                                  /* the old backend may already be gone */
+    case P_PINQ: pin_reply(ok ? json_get(root, "return") : NULL, ok, desc); break;
     case P_MICE: S.mice_q = 0; mice_answer(ok ? json_get(root, "return") : NULL, p.client, p.seq, desc); break;
     case P_MOUSE_SET:
         /* human-monitor-command answers HMP's own words as "return" (empty when mouse_set took it) */
@@ -5538,6 +5626,44 @@ static void drain_qmp(void) {
     }
 }
 
+/* ---- what the vCPUs use (vmcpu.h, the Machines app's vCPU recommendation) ---- */
+
+static VmCpu cpu_use;
+
+/* the vCPU threads' stat files, while lord-vm may still open them, and the summary of earlier runs */
+static void cpu_begin(void) {
+    S.cpu_nfd = vmcpu_open((long)S.qemu, S.cpu_fd, VMCPU_FDS);
+    vmcpu_init(&cpu_use, S.m.vcpus);
+    if (S.cpu_nfd <= 0) { S.cpu_nfd = 0; vlog("vCPU use: QEMU's vCPU threads weren't found: not measured"); return; }
+    char path[PATH_MAX + 32];
+    snprintf(path, sizeof path, "%s/%s", S.dir, VMCPU_FILE);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd >= 0) {
+        static char buf[64 + VMCPU_KEEP * 64];
+        ssize_t n = read(fd, buf, sizeof buf);
+        close(fd);
+        if (n > 0 && vmcpu_load(&cpu_use, buf, (size_t)n, (long long)time(NULL))) vlog("vCPU use: %s isn't readable: starting over", VMCPU_FILE);
+    }
+    S.cpu_at = now_ms() + VMCPU_SAMPLE_MS;
+}
+
+/* once a minute: the vCPUs' time while they run; a window of five minutes closed is saved */
+static void cpu_tick(long long now) {
+    S.cpu_at = now + VMCPU_SAMPLE_MS;
+    if (S.state != VS_RUNNING) { vmcpu_hold(&cpu_use); return; }
+    if (vmcpu_sample(&cpu_use, now, vmcpu_ticks(S.cpu_fd, S.cpu_nfd), sysconf(_SC_CLK_TCK), (long long)time(NULL)) && vmcpu_save(&cpu_use, S.dir))
+        vlog("vCPU use: can't write %s", VMCPU_FILE);
+}
+
+/* QEMU ended: what's left of the last window, and the files closed */
+static void cpu_end(void) {
+    if (!S.cpu_nfd) return;
+    if (vmcpu_flush(&cpu_use, (long long)time(NULL)) && vmcpu_save(&cpu_use, S.dir)) vlog("vCPU use: can't write %s", VMCPU_FILE);
+    for (int i = 0; i < S.cpu_nfd; i++) close(S.cpu_fd[i]);
+    S.cpu_nfd = 0;
+    S.cpu_at = 0;
+}
+
 /* ---- QEMU's end ---- */
 
 static void unattended_done(void);
@@ -5557,6 +5683,7 @@ static void qemu_exited(int status) {
     }
     S.qemu_done = 1;
     S.qemu_status = status;
+    cpu_end();
     int st = VS_STOPPED, why = VR_POWEROFF, code = 0;
     char d[160] = "";
     long oom = read_oom_kills();
@@ -5799,6 +5926,7 @@ static void loop(void) {
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
         if (S.win_key_at && (next < 0 || S.win_key_at < next)) next = S.win_key_at;
+        if (S.cpu_at && (next < 0 || S.cpu_at < next)) next = S.cpu_at;
         if (mice_watched() && S.mice_at && (next < 0 || S.mice_at < next)) next = S.mice_at;
         long long cl = child_logs_next();
         if (cl >= 0 && (next < 0 || cl < next)) next = cl;
@@ -5807,6 +5935,7 @@ static void loop(void) {
         if (poll(p, (nfds_t)n, to) < 0 && errno != EINTR) { vlog("poll: %s", strerror(errno)); break; }
         now = now_ms();
         child_logs_tick(now, 0);
+        if (S.cpu_at && now >= S.cpu_at) cpu_tick(now);
         if (S.migq_next && now >= S.migq_next) { S.migq_next = now + 500; qmp_do("query-migrate", NULL, P_MIGQ, -1, 0, -1, -1); }
         if (S.qga_fd >= 0 && S.ag_next && now >= S.ag_next) ag_tick(now);
         if (S.win_key_at && now >= S.win_key_at) {
@@ -6332,6 +6461,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
             if (S.keeper < 0) { S.keeper = 0; vlog("network: no keeper: a passt that ends isn't replaced"); }
         }
         logind_open();
+        cpu_begin();
         S.sandbox |= vm_jail_self(S.dir, S.rundir, S.xfer_on && S.xfer_dfd >= 0 ? S.xfer_path : NULL);
         vlog("lord-vm: own Landlock %s", S.sandbox & VMS_SUPERVISOR_LANDLOCK ? "applied (machine folder only)" : "not available");
         VmMsg i = info_msg();
@@ -6594,7 +6724,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -6645,7 +6775,9 @@ static int cmd_set(const char *dir, int argc, char **argv) {
             if (gpu < 0) { fprintf(stderr, "lord-vm: --gpu none|intel-whole|intel-shared\n"); return 2; }
             continue;
         }
+        if (!strcmp(a, "--cpu-pin")) { pin = !strcmp(v, "off") ? VM_PIN_OFF : !strcmp(v, "auto") ? VM_PIN_AUTO : !strcmp(v, "default") ? VM_PIN_DEFAULT : -1; if (pin < 0) { fprintf(stderr, "lord-vm: --cpu-pin off|auto|default\n"); return 2; } continue; }
         if (!strcmp(a, "--capture-fullscreen")) { capfs = parse_enum(v, "off", "on"); if (capfs < 0) { fprintf(stderr, "lord-vm: --capture-fullscreen on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--perf-profile")) { perf = parse_enum(v, "off", "on"); if (perf < 0) { fprintf(stderr, "lord-vm: --perf-profile on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
@@ -6729,6 +6861,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (cask >= 0) { m.clipboard_ask = cask; if (cask) m.schema = VM_SCHEMA; }
     if (ptr >= 0) { m.pointer_guest = ptr; if (ptr) m.schema = VM_SCHEMA; }
     if (capfs >= 0) { m.capture_fullscreen = capfs; if (capfs) m.schema = VM_SCHEMA; }
+    if (perf >= 0) { m.perf_profile = perf; if (perf) m.schema = VM_SCHEMA; }
+    if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
     if (gpu >= 0) { m.vgpu = gpu; if (gpu) { m.schema = VM_SCHEMA; if (gfx < 0) m.graphics = VM_GFX_2D; } }
@@ -8318,6 +8452,8 @@ static int usage(void) {
             "                         [--clipboard-ask on|off]   (ask before each paste into and copy out of the machine)\n"
             "                         [--pointer lordos|guest]   (who draws a Windows guest's pointer: LordOS, or its display driver)\n"
             "                         [--capture-fullscreen on|off]   (the window captures the mouse when it goes full screen)\n"
+            "                         [--perf-profile on|off]   (the guest tools switch the guest to its performance profile while it runs)\n"
+            "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"
             "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"

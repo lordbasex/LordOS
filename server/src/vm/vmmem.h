@@ -1,4 +1,4 @@
-/* vmmem.h — how a machine's memory is backed (docs/VIRTUALIZATION.md 3.7.1, "Guest memory and huge pages"). Pure logic,
+/* vmmem.h — how a machine's memory is backed (docs/VIRTUALIZATION.md 3.7.2, "Guest memory and huge pages"). Pure logic,
  * used by lord-vm's QEMU command line (lordvm.c mem_args) and tested by vmmem-test.
  *
  *   - Without a shared folder or the transfer folder: QEMU's own anonymous memory. QEMU asks for transparent huge pages

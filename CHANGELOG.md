@@ -10,6 +10,38 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ## [Unreleased]
 
+### Added
+- **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
+  Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
+  threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores
+  and SMT siblings (docs/VIRTUALIZATION.md 3.7.1).
+  - **How.** `lord-vm` does it to its own child with `sched_setaffinity`: no root, no new privilege, no admin action.
+    Right after QEMU starts (paused) and before lord-vm's own Landlock it reads the topology from
+    `/sys/devices/system/cpu` (package, core and SMT siblings; capacity from `cpu_capacity`, the hybrid `cpu_core` /
+    `cpu_atom` lists or the maximum frequency, so P and E cores are told apart on any vendor), takes the CPUs QEMU may
+    use from its affinity (the cgroup's cpuset is respected), notes the cores other machines' vCPUs already hold, and
+    keeps `/proc/<qemu>/task` open. QEMU's `query-cpus-fast` names the vCPU threads; a thread id that isn't QEMU's own
+    is refused. Asked again after each reset and resume, set again when the threads changed.
+  - **The choice** (`server/src/vm/vmpin.c`): the desktop keeps 1 physical core (2 from 6 cores), with its siblings,
+    the lowest-numbered P cores (E cores when that would leave the machine fewer than 2 P cores); the others are ranked
+    P before E, faster first; one vCPU per physical core, then the siblings; more vCPUs than those CPUs, or fewer than
+    3 cores, and nothing is pinned. QEMU's other threads get the CPUs no vCPU uses, without the vCPUs' siblings and
+    other machines' cores while some are left. A second machine started meanwhile takes other cores.
+  - **Default**, measured on a 10-core, 20-thread desktop with a desktop-like load on the host (6 threads, each a 60 Hz
+    frame of 6 ms) and a CPU loop on every vCPU of a scratch guest, 4 alternated runs each: with 8 vCPUs pinning cut
+    the host's frame p99 from 15.2 to 9.9 ms and its frames over 16.7 ms from 1.7 % to 0.12 %, and the guest ran 2.7 %
+    faster; with 4 vCPUs the p99 went from 7.5 to 6.1 ms with the guest 0.6 % slower and steadier; with 2 vCPUs the
+    guest was 1.7 % slower. So a machine without a choice of its own gets Automatic with 4 vCPUs or more on a computer
+    with 8 physical cores or more, and Off otherwise; Configure shows which.
+  - `machine.json` schema 13: `"cpu_pin": "off" | "auto"`, written only when chosen; a file without it reads as before
+    (the machine's default), and an older file is upgraded on its next write as with every schema. `lord-vm --set DIR --cpu-pin off|auto|default`; `lord.vm.set(dir, { cpuPin })`, and
+    `lord.vm.list()` gives `cpuPin` (what the machine gets) and `cpuPinChosen`. Texts in all 35 languages.
+  - Tests: `build/vmpin-test` (in `make test`, under ASan and UBSan): the choice on invented computers (SMT, hybrid
+    6P+8E and 2P+8E, big.LITTLE, two packages, 2-, 4- and 6-core hosts, restricted cpusets, cores held by another
+    machine), the sysfs reader over invented trees (offline CPUs, malformed lists) and setting it on the test's own
+    threads; `vm-test` for schema 13. Checked with KVM on scratch machines: `taskset` shows each `CPU n/KVM` thread on
+    its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
+
 ### Fixed
 - **Launching an app that is already running brings its window forward, even when it runs once and takes the launch
   over (Google Chrome).** Seen on the maintainer's PC (2026-11-23): session restore started Chrome at login and its
@@ -154,7 +186,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `never` (the kernel's default). **Measured** with the same QEMU memory options: dependent random reads over 1 GB
     took 76 ns with host huge pages against 112 ns with the shared memfd (guest huge pages; 111 against 153 ns with guest
     4 KB pages), and touching new memory took a third longer. Setting `shmem_enabled` to `advise` would give the shared
-    memory 2 MB pages too; it's a system setting, proposed in docs/VIRTUALIZATION.md 3.7.1 and not built.
+    memory 2 MB pages too; it's a system setting, proposed in docs/VIRTUALIZATION.md 3.7.2 and not built.
   - Tests: `build/vmmem-test` (`/proc/meminfo`'s fields, hugetlb only when it all fits).
 
 - **Machines: a machine's disks get an I/O thread of their own and bypass the host's cache on ext4 and XFS** (in
@@ -240,6 +272,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Deactivated). `apps/store/installedmodel.js`; the `filter` argument also takes `lordos`, `debian`, `flathub` and
   `web`.
 - Three new texts (`store.installed.noneDebian`, `noneFlathub`, `noneWeb`), in all 35 languages.
+
+### Documentation
+
+- **Machines: `docs/VIRTUALIZATION.md` audited against the code** (asked by the maintainer on 2026-11-23: "the source
+  code is the absolute truth"). A new "Status checklist" near the top lists every feature the design describes, each
+  with its mark (done, done but not checked on real hardware, partial, not built), a percentage and the file that
+  implements it, in 14 weighted areas; the Machines app scores **66 %** overall (engine 82 %, getting a system in
+  76 %, the app 74 %, snapshots and storage 54 %, network 83 %, devices 56 %, host integration 68 %, graphics 46 %,
+  guest tools 75 %, command line 50 %, system ties 50 %, security 70 %, performance 7 %, tests 56 %). The six
+  performance items being worked on (unchanged frames and hidden displays, huge pages, a vCPU recommendation, the disk
+  path with an iothread, io_uring and O_DIRECT, a guest-side profile, vCPU pinning) are listed as planned. Statements
+  the code contradicts were fixed: the admin actions (no `vm-usb-allow` or usbredir exists; the real list is named),
+  the cgroup scope name, Landlock's writable folder (`disks/` only), our seccomp filter (a built denylist, not "to
+  test"), the files on disk, the schema (12), the credentials' descriptors, the New Machine steps (five, automatic
+  virtio-win guest setup on by default), the machine window's menus, Configure's sections, Host only (passt on 127.0.0.1) and
+  Bridged (a macvtap with `vhost=off`), what a snapshot holds, live linked clones (the source must be off), the agent's
+  state light, Install Agent (through qemu-guest-agent, no disc), tool updates (automatic), the Shell (the serial
+  console), the Logs window, file copy (drops only), edition selection in virtio-win guests (by image name with the KMS client key),
+  virtio-win guests on arm64 (not built), the packaging (inside `lordos`, QEMU installed on demand), the tests that run, and the
+  open questions the code has settled. Features the doc didn't describe were added. `docs/MACHINES-GPU.md`: no longer
+  called a plan; Settings → Graphics cards offers only Machines (shared), and its admin actions are built.
 
 ### Tests
 
@@ -339,6 +392,53 @@ In development; the latest release is 0.8.9.5-beta.
     `filesInfo`, `cameraNatives` (the camera list both ways, each after the camera suspended) and `appsOpen` (each
     native app alone; `PERF_APPS`). `build/uevent-test` covers `video4linux`, `build/fsasync-test` `fsasync_submit_fn`.
 ### Added
+
+- **A performance profile per machine, applied inside a guest by the LordOS guest tools** (in development; the latest
+  release is 0.8.9.5-beta). Approved by the maintainer on 2026-11-23 (Machines performance, item 5). Configure → Guest
+  agent → **Performance profile**, shown for guests that use the LordOS guest tools for their system (w11), off by default (machine.json
+  `perf_profile`, schema 13, written only when on; `lord-vm --set DIR --perf-profile on|off`; `lord.vm.set`
+  `perfProfile`). Details in `docs/VIRTUALIZATION.md` 7.1.4.
+  - **How it gets there.** Tools that say `perf` in their hello (guest tools w11) get one frame after every hello:
+    `AGK_PERF` (kind 23), exactly one byte, 1 on or 0 off, so tools that kept the profile from an earlier run put
+    the guest's own settings back. They answer `AGK_PERFSTATE` (kind 24, exactly 3 bytes: on, the parts done and the
+    parts the system refused, each within `AGPF_ALL`, never a part in both), which lord-vm parses with
+    `ag_perfstate_parse` and only logs ("the guest's performance profile is on (applied: power plan visual effects
+    transparency; refused: nothing)"). Nothing else comes from the host: no command, path or value.
+  - **What the tools do, as the signed-in person and nothing more:** the High performance power plan
+    (`PowerSetActiveScheme`, powrprof; a standard user may switch plans unless a policy says otherwise), the visual
+    effects "Adjust for best performance" turns off (animations in and of windows, menus, combo boxes, tooltips,
+    smooth list scrolling, selection fade, pointer and window shadows, window contents while dragging) for this
+    session only (`SystemParametersInfo` without `SPIF_UPDATEINIFILE`), and transparency (`EnableTransparency` in
+    the person's own registry). What was there before is kept in `HKCU\Software\LordOS\GuestWin` `PerfSaved` and
+    put back when the host says off, when the tools let the port go (log off, another session at the console, exit),
+    and when they start after a crash; a part goes back only while it is still what the tools set.
+  - **Not done, for a review first:** pausing the guest's search indexing service while idle (a service needs
+    administrator rights; the tools never run elevated) and the profile in Linux guests (power-profiles-daemon over the system D-Bus or
+    `powerprofilesctl`, and a desktop's animations through `gsettings`, are a new connection or new programs for the
+    Linux helper, whose approved list is `xclip`, `wl-clipboard` and `systemctl --user show-environment`).
+  - **Tests:** `build/vm-test` (machine.json schema 13: true, false, wrong types, below 13, the round trip; `AGK_PERF`
+    and every one of the 16 777 216 three-byte `AGK_PERFSTATE` payloads against the rule; the `perf` hello word),
+    `tests/vm_model_test.mjs` (the shipped guest tools are w11). The guest tools build with mingw-w64 with no
+    warning and import only system DLLs (powrprof added). Not yet checked in a running guest.
+- **Machines suggests a vCPU count from what a machine really uses** (in development; the latest release is
+  0.8.9.5-beta). Approved by the maintainer on 2026-11-23, after his guest with 10 vCPUs idled at 10 to 28 % of one
+  core in apps mode with a text editor. Details in `docs/VIRTUALIZATION.md` 6.27.
+  - **Measured by lord-vm**: the CPU time of QEMU's vCPU threads (`CPU <n>/KVM`), read once a minute while the machine
+    runs from their `/proc/<qemu>/task/<tid>/stat` files, opened before lord-vm's own Landlock and re-read with `pread`
+    (no Landlock rule added). A rolling summary goes to `<machine>/cpu-usage.json`: one entry per 5 minutes of running
+    time with the vCPU count, the average and the busiest minute, at most 24 h of running time and 30 days
+    (`server/src/vm/vmcpu.c`).
+  - **The suggestion** (`apps/machines/model.js` `vcpuAdvice`), after 2 h of running time at the current count: fewer
+    when 95 % of the time it used under 30 % of its vCPUs (enough for its busy minutes at about 60 %, never under 2);
+    more when half the time it used 85 % or over (half again, up to the computer's processors less one in eight for the
+    desktop). Configure → CPU & memory shows it with the reason ("over its last 6 h of running time it used 0.2 of its
+    10 vCPU on average, and 1.1 in its busiest minutes") and **Use N**: at once when the machine is off, at its next
+    start while it runs or is suspended. The library's card and row say "Suggested: N vCPU". Nothing changes by itself.
+  - **New machines get fewer vCPUs by default**: the profiles that asked for "half" (Development, Games, Design) now give
+    half of the computer's physical cores, 6 at most, instead of half its threads (5 instead of 10 on a 10-core,
+    20-thread PC). `lord.vm.host()` gains `cores`.
+  - Texts in all 35 languages (Machines settings' "half" note updated to say cores, 6 at most).
+  - Tests: `build/vmcpu-test` (new, in `make -C server test`), `tests/vm_model_test.mjs`, `tests/vm_profiles_test.mjs`.
 
 - **Renaming a machine renames its folder and its transfer folder too** (in development; the latest release is
   0.8.9.5-beta). Asked by the maintainer on 2026-11-23: a guest machine renamed in Configure → General kept its folder

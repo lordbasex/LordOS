@@ -613,6 +613,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 10 && m->pointer_guest) return fail(err, n, VM_E_FIELD, "pointer needs schema 10");
     if (m->capture_fullscreen & ~1) return fail(err, n, VM_E_RANGE, "capture_fullscreen is true or false");
     if (m->schema < 12 && m->capture_fullscreen) return fail(err, n, VM_E_FIELD, "capture_fullscreen needs schema 12");
+    if (m->perf_profile & ~1) return fail(err, n, VM_E_RANGE, "perf_profile is true or false");
+    if (m->schema < 13 && m->perf_profile) return fail(err, n, VM_E_FIELD, "perf_profile needs schema 13");
+    if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
+    if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
     for (int i = 0; m->transfer && i < m->n_shares; i++)
         if (!strcmp(m->share_tag[i], VM_XFER_TAG)) return fail(err, n, VM_E_RANGE, "shares: the tag " VM_XFER_TAG " is the transfer folder's");
@@ -662,7 +666,7 @@ static const char *const KEYS[] = {
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
-    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", NULL,
+    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -702,6 +706,7 @@ static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NU
 static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_DEV_NAMES[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_VGPU_NAMES[] = { "", "intel-whole", "intel-shared", NULL };
+const char *const VM_PIN_NAMES[] = { "", "off", "auto", NULL };
 const char *const VM_BOOT_NAMES[] = { "disk", "cd", "network", NULL };
 
 int vm_boot_parse(const char *s, int order[VM_BOOT_DEVS]) {
@@ -930,6 +935,18 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *cf = json_get(o, "capture_fullscreen");
         if (cf && cf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "capture_fullscreen must be true or false"); goto out; }
         m->capture_fullscreen = cf ? json_bool(o, "capture_fullscreen", 0) : 0;
+        /* schema 13: missing means the guest's performance profile is off */
+        const JVal *pp = json_get(o, "perf_profile");
+        if (pp && pp->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "perf_profile must be true or false"); goto out; }
+        m->perf_profile = pp ? json_bool(o, "perf_profile", 0) : 0;
+        /* schema 13: missing means this computer's default (vmpin_default_on) */
+        char pin[8];
+        if ((r = get_str(o, "cpu_pin", pin, sizeof pin, 0, err, n))) goto out;
+        m->cpu_pin = VM_PIN_DEFAULT;
+        if (pin[0]) {
+            for (int i = 1; VM_PIN_NAMES[i]; i++) if (!strcmp(pin, VM_PIN_NAMES[i])) m->cpu_pin = i;
+            if (!m->cpu_pin) { r = fail(err, n, VM_E_RANGE, "cpu_pin is off or auto"); goto out; }
+        }
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -1024,6 +1041,8 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 10 && m->pointer_guest) jb_raw(&b, ",\n  \"pointer\": \"guest\"");
     if (m->schema >= 11 && m->vgpu) { jb_raw(&b, ",\n  \"gpu\": "); jb_str(&b, VM_VGPU_NAMES[m->vgpu]); }
     if (m->schema >= 12 && m->capture_fullscreen) jb_raw(&b, ",\n  \"capture_fullscreen\": true");
+    if (m->schema >= 13 && m->perf_profile) jb_raw(&b, ",\n  \"perf_profile\": true");
+    if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
     if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);
@@ -1165,6 +1184,24 @@ void vm_machine_defaults(VmMachine *m, const VmHost *h, int arch) {
     m->transfer = 1;
     vm_now_iso(m->created);
     memcpy(m->updated, m->created, sizeof m->updated);
+}
+
+int vm_host_cores(int cpus) {
+    int n = 0, seen = 0;
+    for (int i = 0; i < 4096 && seen < cpus; i++) {
+        char p[96], buf[64];
+        snprintf(p, sizeof p, "/sys/devices/system/cpu/cpu%d/topology/thread_siblings_list", i);
+        int fd = open(p, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) continue;
+        ssize_t k = read(fd, buf, sizeof buf - 1);
+        close(fd);
+        if (k <= 0) continue;
+        buf[k] = 0;
+        seen++;
+        /* a core is counted once, at its first thread ("0,10", "0-1") */
+        if (atoi(buf) == i) n++;
+    }
+    return n > 0 && n <= cpus ? n : cpus;
 }
 
 void vm_host_probe(VmHost *h) {

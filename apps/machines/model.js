@@ -456,6 +456,77 @@ export function usage(prev, cur, vcpus) {
   return out;
 }
 
+// ---- vCPU recommendation (docs/VIRTUALIZATION.md, "vCPU recommendation") ----
+// lord-vm keeps what a machine's vCPUs used in <dir>/cpu-usage.json (server/src/vm/vmcpu.h): one window per 5 minutes
+// of running time, [end (Unix s), seconds, vCPUs, average, busiest minute] (both in hundredths of a core). The app
+// suggests a count from them; it never changes the machine by itself.
+export const VCPU_ADVICE = {
+  minSecs: 2 * 3600,        // at least two hours of running time at the current count
+  maxAgeSecs: 30 * 86400,   // windows of the last 30 days
+  low: 0.3,                 // fewer: 95 % of the time under 30 % of the vCPUs
+  high: 0.85,               // more: half the time or more at 85 % of them or over
+  target: 0.6,              // a fewer count keeps the busy minutes at about 60 % of it
+  floor: 2,                 // never suggests fewer than two
+};
+
+// cpu-usage.json's text → its windows [{ t, secs, vcpus, avg, peak }] (cores, not hundredths); [] when it isn't one
+export function cpuWindows(text) {
+  let j = null;
+  try { j = JSON.parse(text); } catch (e) { return []; }
+  if (!j || j.format !== 1 || !Array.isArray(j.windows)) return [];
+  const ok = (x) => Number.isFinite(x) && x >= 0;
+  return j.windows.filter((w) => Array.isArray(w) && w.length === 5 && w.every(ok) && w[1] > 0 && Number.isInteger(w[2]) && w[2] >= 1 && w[3] <= w[2] * 100 && w[4] <= w[2] * 100)
+    .map(([t, secs, vcpus, avg, peak]) => ({ t, secs, vcpus, avg: avg / 100, peak: Math.max(avg, peak) / 100 }));
+}
+
+// the value under which `frac` of the time falls (windows weighted by their seconds)
+function weightedQuantile(ws, key, frac) {
+  const s = [...ws].sort((a, b) => a[key] - b[key]);
+  const total = s.reduce((a, w) => a + w.secs, 0);
+  let acc = 0;
+  for (const w of s) { acc += w.secs; if (acc >= total * frac) return w[key]; }
+  return s.length ? s[s.length - 1][key] : 0;
+}
+
+// The most vCPUs a suggestion gives one machine here: this computer's processors less a reserve for the desktop
+// (one in eight, at least one), never more than lord-vm recommends
+export function vcpuCeiling(host) {
+  const cpus = Math.max(1, host?.cpus | 0 || 1);
+  const rec = Math.max(1, host?.vcpusRecommended | 0 || cpus - 1 || 1);
+  return Math.max(1, Math.min(rec, cpus - Math.max(1, Math.ceil(cpus / 8))));
+}
+
+// A new machine's processors when its profile asks for "half": half of this computer's physical cores, six at most
+// (a guest rarely uses more, and every vCPU is a thread the host schedules), never more than cpuCap
+export function vcpuDefault(host, cap) {
+  const cores = Math.max(1, host?.cores | 0 || Math.floor((host?.cpus | 0 || 2) / 2) || 1);
+  return Math.max(1, Math.min(cap ?? 64, 6, Math.floor(cores / 2) || 1));
+}
+
+// What a machine used and the count suggested from it, or null when there's nothing to say:
+//   { kind: 'fewer'|'more', n, avg (cores on average), p95, peak (cores), hours (of running time measured), vcpus }
+// Only windows at the machine's current count, of the last 30 days, weighted by their length. Fewer: when 95 % of the
+// time it stayed under 30 % of its vCPUs, enough for its busy minutes (95th percentile) at about 60 %, at least two. More:
+// when half the time or more it used 85 % or over (a busy spell now and then, a build, doesn't count), half again (at
+// least one more) up to vcpuCeiling.
+export function vcpuAdvice(windows, vcpus, host, now = Date.now() / 1000) {
+  const n0 = vcpus | 0;
+  if (n0 < 1 || !Array.isArray(windows)) return null;
+  const ws = windows.filter((w) => w.vcpus === n0 && w.t <= now + 86400 && now - w.t <= VCPU_ADVICE.maxAgeSecs);
+  const secs = ws.reduce((a, w) => a + w.secs, 0);
+  if (secs < VCPU_ADVICE.minSecs) return null;
+  const avg = ws.reduce((a, w) => a + w.avg * w.secs, 0) / secs;
+  const p50 = weightedQuantile(ws, 'avg', 0.5), p95 = weightedQuantile(ws, 'avg', 0.95), peak = weightedQuantile(ws, 'peak', 0.95);
+  const base = { avg, p95, peak, hours: secs / 3600, vcpus: n0 };
+  const ceil = vcpuCeiling(host);
+  if (p50 >= VCPU_ADVICE.high * n0 && n0 < ceil) return { ...base, kind: 'more', n: Math.min(ceil, n0 + Math.max(1, Math.ceil(n0 / 2))) };
+  if (p95 < VCPU_ADVICE.low * n0) {
+    const n = Math.max(VCPU_ADVICE.floor, Math.ceil(peak / VCPU_ADVICE.target - 1e-9));
+    if (n < n0) return { ...base, kind: 'fewer', n };
+  }
+  return null;
+}
+
 // The three bars at the top: machines running, the memory they use against this computer's, and free disk space
 // where machines live. Each { value: [a, b], frac } or null where there's no real number.
 export function summaryOf(list, usages, host) {
@@ -601,7 +672,7 @@ export function clipState(agent, cfg) {
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w10', linux: '6' };
+export const TOOLS_SHIPPED = { windows: 'w11', linux: '6' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older

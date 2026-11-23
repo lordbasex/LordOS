@@ -68,7 +68,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "13", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "14", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -111,7 +111,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":13,\"whatever\":true}";
+    const char newer[] = "{\"schema\":14,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -480,6 +480,66 @@ static void test_schema(void) {
             m.capture_fullscreen = 2; m.schema = VM_SCHEMA;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 12);
+        }
+        /* schema 13: perf_profile (the guest's performance profile, 7.1.4), true or false, written only when true, never
+         * below 13 */
+        {
+            struct { const char *add; int schema, want, on; } s13[] = {
+                { "\"perf_profile\":true", 13, VM_OK, 1 }, { "\"perf_profile\":false", 13, VM_OK, 0 }, { "\"agent\":true", 13, VM_OK, 0 },
+                { "\"perf_profile\":1", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":\"on\"", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":null", 13, VM_E_FIELD, 0 },
+                { "\"perf_profile\":true", 12, VM_E_FIELD, 0 }, { "\"perf_profile\":false", 12, VM_OK, 0 },
+                { "\"perf_profile\":true", 14, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s13[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s13[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s13[i].want) fprintf(stderr, "  schema 13 %s (%d): got %d (%s)\n", s13[i].add, s13[i].schema, r, err);
+                CHECK(r == s13[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.perf_profile == s13[i].on);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"perf_profile\": true") == s13[i].on && !strstr(jj, "\"perf_profile\": false"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.perf_profile);
+            m.perf_profile = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.perf_profile = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 13);
+        }
+        /* schema 13: cpu_pin (vCPU pinning, 3.7.1), "off" or "auto", written only when chosen, never below 13 */
+        {
+            struct { const char *add; int schema, want, pin; } s13p[] = {
+                { "\"cpu_pin\":\"off\"", 13, VM_OK, VM_PIN_OFF }, { "\"cpu_pin\":\"auto\"", 13, VM_OK, VM_PIN_AUTO },
+                { "\"agent\":true", 13, VM_OK, VM_PIN_DEFAULT }, { "\"cpu_pin\":\"\"", 13, VM_OK, VM_PIN_DEFAULT },
+                { "\"cpu_pin\":\"on\"", 13, VM_E_RANGE, 0 }, { "\"cpu_pin\":\"default\"", 13, VM_E_RANGE, 0 }, { "\"cpu_pin\":true", 13, VM_E_FIELD, 0 },
+                { "\"cpu_pin\":\"auto\"", 12, VM_E_FIELD, 0 }, { "\"cpu_pin\":\"off\"", 12, VM_E_FIELD, 0 },
+            };
+            for (size_t i = 0; i < sizeof s13p / sizeof s13p[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s13p[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s13p[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s13p[i].want) fprintf(stderr, "  schema 13 %s (%d): got %d (%s)\n", s13p[i].add, s13p[i].schema, r, err);
+                CHECK(r == s13p[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.cpu_pin == s13p[i].pin);
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"cpu_pin\"") == (s13p[i].pin != VM_PIN_DEFAULT));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && m.cpu_pin == VM_PIN_DEFAULT);
+            m.cpu_pin = VM_PIN_AUTO;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.cpu_pin = 3; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 13);
         }
         /* which of QEMU's mice "Capture mouse" makes the active one (query-mice's answer, untrusted) */
         {
@@ -1837,6 +1897,41 @@ static void test_tablet_layout(void) {
     m.a = VAG_EXTRA_ON; CHECK(vm_msg_valid(&m, 1));
     m.a = VAG_EXTRA_ON + 1; CHECK(!vm_msg_valid(&m, 1));
     m = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXTRA | VAC_EXTRA_OFF, 0, 0, "1\tx"); CHECK(vm_msg_valid(&m, 0));
+    /* the guest's performance profile (w11, 7.1.4): AGK_PERF one byte, 0 or 1; AGK_PERFSTATE three bytes, on, the parts
+     * done and refused, known bits only and never a part in both */
+    {
+        int on = -1;
+        unsigned done = 99, failed = 99;
+        CHECK(!ag_perf_parse((const uint8_t *)"\x01", 1, &on) && on == 1 && !ag_perf_parse((const uint8_t *)"\x00", 1, &on) && on == 0);
+        CHECK(ag_perf_parse((const uint8_t *)"\x02", 1, &on) == -1 && ag_perf_parse((const uint8_t *)"\xff", 1, &on) == -1);
+        CHECK(ag_perf_parse((const uint8_t *)"\x01\x00", 2, &on) == -1 && ag_perf_parse((const uint8_t *)"", 0, &on) == -1 && ag_perf_parse(NULL, 1, &on) == -1);
+        CHECK(!ag_perf_parse((const uint8_t *)"\x01", 1, NULL));
+        uint8_t ps[AG_PERFSTATE_BYTES + 1] = { 0 };
+        CHECK(!ag_perfstate_write(ps, 1, AGPF_POWER | AGPF_EFFECTS, AGPF_TRANSPARENCY));
+        CHECK(ps[0] == 1 && ps[1] == 3 && ps[2] == 4);
+        CHECK(!ag_perfstate_parse(ps, AG_PERFSTATE_BYTES, &on, &done, &failed) && on == 1 && done == (AGPF_POWER | AGPF_EFFECTS) && failed == AGPF_TRANSPARENCY);
+        CHECK(!ag_perfstate_write(ps, 0, AGPF_ALL, 0) && !ag_perfstate_parse(ps, AG_PERFSTATE_BYTES, &on, &done, &failed) && on == 0 && done == AGPF_ALL && !failed);
+        CHECK(!ag_perfstate_write(ps, 1, 0, 0) && !ag_perfstate_parse(ps, AG_PERFSTATE_BYTES, NULL, NULL, NULL));
+        CHECK(ag_perfstate_parse(ps, AG_PERFSTATE_BYTES - 1, &on, &done, &failed) == -1 && ag_perfstate_parse(ps, AG_PERFSTATE_BYTES + 1, &on, &done, &failed) == -1);
+        CHECK(ag_perfstate_parse(NULL, AG_PERFSTATE_BYTES, &on, &done, &failed) == -1);
+        const uint8_t bad[][3] = { { 2, 0, 0 }, { 1, 8, 0 }, { 1, 0, 8 }, { 1, AGPF_POWER, AGPF_POWER }, { 0, AGPF_ALL, AGPF_EFFECTS }, { 0xff, 0, 0 }, { 1, 0x80, 0 } };
+        for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(ag_perfstate_parse(bad[i], 3, &on, &done, &failed) == -1);
+        CHECK(ag_perfstate_write(ps, 2, 0, 0) == -1 && ag_perfstate_write(ps, -1, 0, 0) == -1 && ag_perfstate_write(ps, 1, 8, 0) == -1);
+        CHECK(ag_perfstate_write(ps, 1, AGPF_POWER, AGPF_POWER) == -1 && ag_perfstate_write(NULL, 1, 0, 0) == -1);
+        /* every well-formed byte triple parses, every other is refused: the whole space */
+        int good = 0, wrong = 0;
+        for (int a = 0; a < 256; a++)
+            for (int b = 0; b < 256; b++)
+                for (int c2 = 0; c2 < 256; c2++) {
+                    uint8_t x[3] = { (uint8_t)a, (uint8_t)b, (uint8_t)c2 };
+                    int ok = a <= 1 && !(b & ~AGPF_ALL) && !(c2 & ~AGPF_ALL) && !(b & c2);
+                    if ((ag_perfstate_parse(x, 3, NULL, NULL, NULL) == 0) != ok) wrong++;
+                    good += ok;
+                }
+        CHECK(!wrong && good == 2 * 27);                              /* each part in done, failed or neither: 3^3, on or off */
+        CHECK(ag_hello_caps((const uint8_t *)"w11 extra tablet perf", 21) == (AG_HELLO_EXTRA | AG_HELLO_PERF));
+        CHECK(ag_hello_caps((const uint8_t *)"w11 perfs per perf2", 19) == 0);
+    }
 }
 
 /* LAG_WINREFUSED and LAGW_ELEVATED (w8: a window that runs as administrator in Windows) */

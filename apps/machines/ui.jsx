@@ -3,6 +3,7 @@
 import { View, Text, Image, Overlay, screen, addListener, useTheme, errorText, admin, useSettings, useStore, createStore, fs, useAppWindow, LordOSLogo, t as tr } from '@lordos/sdk';
 import { logoFor } from './logos.js';
 import { storeRev } from './store.js';
+import { readMeta, writeMeta } from './meta.js';
 import { COLOR_HEX } from './systems.js';
 import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg, memlockFits, windowMachineId, followDir } from './model.js';
 import { useEffect, useRef, useState } from 'react';
@@ -384,11 +385,25 @@ export async function gvtUp(m) {
   await admin.run('vm-gvt-create', gvtArg(m, type), undefined, { quiet: true });
 }
 
-// Everything a start needs from the admin helper, in order: the bridged network, then the graphics card. Rejects with
-// the translated message to show
+// The vCPUs chosen from the recommendation while the machine ran (app.json nextVcpus, Configure's "Use N"): written
+// with lord-vm --set (a job) just before it starts. A suspended machine keeps them for the start after its next shutdown
+// (lord-vm refuses to change a saved machine's vCPUs); a refusal only leaves the count it had
+export async function vcpusUp(m) {
+  const want = m?.dir ? readMeta(m.dir).nextVcpus : 0;
+  if (!want || m.suspended) return;
+  if (want !== m.vcpus && typeof lord !== 'undefined' && lord.vm?.set) {
+    const id = lord.vm.set(m.dir, { vcpus: want });
+    if (id) await new Promise((done) => { const tick = () => { const r = lord.vm.job(id); if (!r || r.done) done(); else setTimeout(tick, 100); }; tick(); });
+  }
+  writeMeta(m.dir, { nextVcpus: undefined });
+}
+
+// Everything a start needs from the admin helper, in order: the vCPUs chosen while it ran, the bridged network, then the
+// graphics card. Rejects with the translated message to show
 export async function startPrep(m) {
+  await vcpusUp(m);
   await bridgeUp(m).catch((e) => { throw new Error(tr('machines.win.bridgeFailed', { why: e.message })); });
   await gvtUp(m).catch((e) => { throw new Error(tr('machines.win.gvtFailed', { why: e.message })); });
 }
 // whether a start goes through startPrep first
-export const needsPrep = (m) => m?.network === 'bridged' || !!m?.gpu;
+export const needsPrep = (m) => m?.network === 'bridged' || !!m?.gpu || (!!m?.dir && !m.suspended && !!readMeta(m.dir).nextVcpus);

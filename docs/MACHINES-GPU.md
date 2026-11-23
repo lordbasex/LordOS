@@ -1,6 +1,6 @@
-# Machines: a smoother picture, and a real GPU for a machine (plan)
+# Machines: a smoother picture, and a real GPU for a machine
 
-Status: **plan, approved in principle by the maintainer on 2026-11-21**. Part 1 steps 1, 2, 3 and 6 are built (2026-11-21,
+Status (audited against the code 2026-11-23): **approved in principle by the maintainer on 2026-11-21**, partly built. Part 1 steps 1, 2, 3 and 6 are built (2026-11-21,
 released in 0.8.9.5: "Part 1 — done" below), and so are Part 2's Mode A (Intel GVT-g) and Settings → Graphics cards
 ("Mode A — built" below, also in 0.8.9.5); the rest is not built yet. Each step that needs
 root or widens a sandbox goes through the maintainer's review and an AGENTS.md entry before it is built. Design and
@@ -397,7 +397,9 @@ second while idle and 2 while hidden instead of 33; to be measured on that machi
 
 ### Settings → Graphics cards (approved in principle 2026-11-21; built, "Mode A — built" above)
 
-The person never runs a command: a computer with more than one GPU is managed from **Settings → Graphics cards**.
+The person never runs a command: a computer's GPUs are managed from **Settings → Graphics cards** (shown with any GPU since
+0.8.9.5). Built (audited 2026-11-23): Unused and **Machines: shared** only; `gpu-role` parses Dedicated and AI and answers
+`gpu.roleNotYet` (`vmgpu_admin.c`), and Settings shows Dedicated as a note for later. The design:
 
 - Every GPU is listed with what uses it. The one driving the desktop is fixed and never offered for anything else.
 - A GPU nobody uses is suggested: "You have a graphics card that isn't used. Use it for Machines or for AI?"
@@ -407,7 +409,8 @@ The person never runs a command: a computer with more than one GPU is managed fr
   A role the hardware can't take is shown disabled with the reason. Each role says what it gains and what it costs
   (for example: a machine with a GPU can't be suspended).
 - Changing a role needs a restart, said plainly; "Unused" always undoes it.
-- Underneath: closed `admin.c` actions (for review and an AGENTS.md entry before they're built), e.g.
+- Underneath: closed `admin.c` actions (built: `gpu-role`, `vm-gvt-create`, `vm-gvt-remove`, `gpu-min-freq`, `vm-memlock`,
+  `gpu-memlock-cap` in `vmgpu_admin.c`, tested by `vmgpu-test`; the table above), e.g.
   `gpu-role <pci address> <unused|machines-shared|machines-dedicated|ai>`. Root validates the address against the GPUs
   it detects itself, refuses the desktop's GPU, writes only fixed files (`/etc/modprobe.d/lordos-gpu.conf`,
   `/etc/modules-load.d/lordos-gpu.conf`, the vfio-pci binding for a dedicated card) and runs `update-initramfs`; no
