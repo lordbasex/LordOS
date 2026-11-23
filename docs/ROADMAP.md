@@ -819,9 +819,9 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
   "direct deb" delivery in the Store's package engine (today "direct" exists only for vendor APT repositories). The same
   option is worth considering for the other mirrored vendor `.deb`s (ArtCraft, goose, opencode).
 
-## Release 0.8.9 (planned)
+## Release 0.8.9 (released 2026-11-18; the open items below carry over)
 
-- [ ] **Lord Workspaces** (approved by the maintainer on 2026-11-15; in development on `lordos-workspaces`,
+- [ ] **Lord Workspaces** (approved by the maintainer on 2026-11-15; shipped in 0.8.9,
   `WORKSPACES.md`): a third theme with activities, a Context Spine, tiling per display and three effects styles
   (Opaque, Translucent, Crystal). Built and checked in headless sessions and scene tests; still to check on a real
   session with real monitors, Linux apps with their own bar, right to left and the GPU path, then the screenshots for
@@ -843,7 +843,7 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
     `lord.net.interfaces()`'s `ssid` (0.8.9.1, #192).
 
 - [ ] **Later, from GitHub suggestions** (maintainer's decisions 2026-11-15, "más adelante"):
-  - [x] Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)), in development for 0.8.8.10:
+  - [x] Display scale below 100 % ([#158](https://github.com/lordbasex/LordOS/issues/158)), shipped in 0.8.9:
     75 % and 80 % only, never 50 % (docs/DISPLAYS.md, "Below 100 %"); Wayland and X11 clients stay at 100 % and are drawn
     smaller. Still to check with a screenshot on the VM and on a real 1280 × 800 laptop.
   - Lord Flow personalisation ([#151](https://github.com/lordbasex/LordOS/issues/151)): the menu bar at the bottom,
@@ -1530,7 +1530,9 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   - another architecture (arm64 on a PC, amd64 on the Pi) through TCG emulation: it works, but 5–20×
     slower;
   - later, a lightweight engine of our own only for Linux guests (like crosvm/Firecracker).
-- [ ] **Android:** our own container with LineageOS and apps from our Store.
+- [ ] **Android:** only as a machine in Machines (maintainer's decision 2026-11-22): the Android 13 card (Bliss OS
+  16.9.7 FOSS, amd64 only) shipped in 0.8.9.5; a newer image and arm64 are open question 6 of `VIRTUALIZATION.md`.
+  No Android container in LordOS: Android apps in the Store are for the separate LordBridge project (`LORDBRIDGE.md`).
 - [ ] **Firewall, ask mode** (an alert on the first connection attempt, like a per-app network monitor).
 - [ ] **Accessibility:** screen reader, zoom, high contrast.
 - [ ] Full **demo video** (installation + tour, English voice-over with Spanish

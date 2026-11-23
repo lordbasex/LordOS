@@ -1,6 +1,6 @@
 # Explicit sync for Linux apps (`linux-drm-syncobj-v1`): the plan
 
-**Status: approved by the maintainer and built on 2026-11-22 (in development, branch `feat/wl-syncobj`).** The design
+**Status: approved by the maintainer and built on 2026-11-22 (branch `feat/wl-syncobj`), released in 0.8.9.5.** The design
 below is the one that was approved; "As built" right after it says where the code differs and why. Clients that don't
 bind the global keep implicit sync (dma-resv), as `docs/GPU.md` says. Code: `server/src/wl/syncobj.h` (the pure rules),
 `server/src/wl/syncobj.c` (the kernel side), the protocol and the commit queue in `server/src/wl/wl.c`.

@@ -1,6 +1,6 @@
 # Lord Workspaces
 
-**In development** after 0.8.8.9 Beta (approved by the maintainer on 2026-11-15). Lord Workspaces (`themes/workspaces`)
+**Released in 0.8.9** (approved by the maintainer on 2026-11-15, built after 0.8.8.9 Beta). Lord Workspaces (`themes/workspaces`)
 is LordOS's third desktop theme, next to Lord Flow (`themes/default`) and Lord Classic (`themes/classic`), and it
 changes neither of them. It organizes the desktop by **activities**: each activity is a desktop with a name, an icon,
 a colour, the apps pinned to it and a tiling layout for every display, and its windows sit in a group frame. It came
@@ -223,7 +223,7 @@ default:
   the status cluster are on the main display. **Search, the Control Center and Add window open on the display under
   the pointer** (or the one whose button was used).
 - **Mirrored displays** show one picture, laid out for the main display.
-- **The apps of each display** (0.8.9.5, in development; `sdk/displayapps.js`, rules in `sdk/displayappsmodel.js`, for
+- **The apps of each display** (since 0.8.9.5; `sdk/displayapps.js`, rules in `sdk/displayappsmodel.js`, for
   every theme). The SDK keeps, per display by connector, the apps opened there (counted once per half hour) and the
   apps open there together for a minute and a half, in tile order with the display's layout and divider
   (`describeDisplay` in `index.jsx`, `tileApps` in `tiler.js`). Small and pruned: 8 displays, 12 apps and 6 sets per

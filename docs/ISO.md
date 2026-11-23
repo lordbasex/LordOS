@@ -89,7 +89,7 @@ guest's IP); its units have `ConditionVirtualization=vmware` and stay inactive e
 part (`open-vm-tools-desktop`, X11) and are not supported yet. GPU or CPU composition on VMware:
 see `GPU.md`.
 
-**QEMU/KVM guests** (in development, after 0.8.9) get `qemu-guest-agent` too: Debian's udev rule starts it only when the
+**QEMU/KVM guests** get `qemu-guest-agent` too, from the next live ISO (the `lordos` package's side shipped in 0.8.9.5, which had no new images): Debian's udev rule starts it only when the
 host gives the machine the `org.qemu.guest_agent.0` port, so it stays inactive on a computer and on a machine without an
 agent. With it, and `lordos-guest.service` from the `lordos` package (`VIRTUALIZATION.md` 7.2), a LordOS machine made by
 Machines' LordOS card has its guest agent and apps mode from the first boot. Installed systems keep getting it as the

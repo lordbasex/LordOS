@@ -1,7 +1,7 @@
 # Performance of 0.8.9 and 0.8.9.1
 
 How much memory and processor a LordOS desktop session uses at rest, measured on real hardware for the 0.8.9
-release and for the 0.8.9.1 memory work (in development). Every number here comes from a CSV in
+release and for the 0.8.9.1 memory work (released 2026-11-19). Every number here comes from a CSV in
 [`perf/0.8.9/`](perf/0.8.9/) or [`perf/0.8.9.1/`](perf/0.8.9.1/), so it can be checked and repeated.
 
 How each MB was found, down to the line of code, is in [`perf/MEMORY-HEAPTRACK.md`](perf/MEMORY-HEAPTRACK.md);

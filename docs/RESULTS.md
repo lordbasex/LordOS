@@ -73,7 +73,7 @@ the two apart.
 
 | Version | Machine | Conditions | What |
 |---|---|---|---|
-| 0.8.9.1 (in development) | the maintainer's PC | i9-10900, RX 580, 3 × 1920×1080, Lord Workspaces, 7 widgets and a Terminal running Claude Code at rest, a fresh session per build | `lord-server` 269 → 183 MB RSS over the memory work, 2.4 % of one core (`docs/PERFORMANCE-0.8.9.md`, `docs/perf/0.8.9.1/`) |
+| 0.8.9.1 | the maintainer's PC | i9-10900, RX 580, 3 × 1920×1080, Lord Workspaces, 7 widgets and a Terminal running Claude Code at rest, a fresh session per build | `lord-server` 269 → 183 MB RSS over the memory work, 2.4 % of one core (`docs/PERFORMANCE-0.8.9.md`, `docs/perf/0.8.9.1/`) |
 | 0.8.9-beta | the maintainer's PC | the same PC, fresh sessions | the floor 177 MB and 0.2 % of one core; Lord Workspaces' slideshow on 19.0 %, off 2.0 % (`docs/PERFORMANCE-0.8.9.md`, `docs/perf/0.8.9/`) |
 | 0.8.9-beta | Raspberry Pi 5 16 GB | headless autologin session after a reboot, Lord Flow, 1 h | `lord-server` 113 MB, 6.1 % of one core (0.8.8.9-beta: 116 MB, 3.4 %) (`docs/PERFORMANCE-0.8.9.md`) |
 | 0.8.6-beta | `pi5-16gb-hdmi` | Raspberry Pi 5 16 GB, HDMI | First frame 7.63 s after the kernel; 489 MB used at idle; sustained 7.0 GFLOP/s from start to end, 50 → 59 °C (`ondemand`, the autologin session, LordBench Full) |

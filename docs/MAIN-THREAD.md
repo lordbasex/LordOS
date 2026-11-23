@@ -122,7 +122,7 @@ components that read that setting. The heap stays flat over repeated actions (St
 few tens of KB up and down); Monitor's grows by ~600 KB in its first minute (its 60-second sample history) and
 then stays.
 
-## The Terminal's titles (0.8.9.5, in development)
+## The Terminal's titles (0.8.9.5)
 
 A program that animates its title (Claude Code's spinner) re-rendered the whole Terminal window and the theme's root for
 every change: 1310 `__lordTerm` pauses in two hours of the maintainer's session, the longest 329 ms. The window now

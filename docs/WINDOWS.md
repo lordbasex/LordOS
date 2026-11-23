@@ -459,7 +459,7 @@ Window and Help menus (its in-window menu strip, since it has no menu bar).
   never lord-server itself; an X11 window is only asked to close (every X11 app shares Xwayland); a
   built-in app that runs in the session closes without its close guard.
 
-## Always on top (in development; the latest release is 0.8.9.4)
+## Always on top (since 0.8.9.5)
 
 A window can be kept over every normal window, in every theme (Lord Flow, Lord Classic, Lord Workspaces, Lord Celeste),
 because the rule is in the SDK (`sdk/desktopmodel.js`, `stackOrder`):
@@ -501,7 +501,7 @@ Checked by `tests/desktop_model_test.mjs` (stacking against focus, dialogs, cove
 checked, turned off, a dialog, the Overview), `x11-conformance-client` (the property at map, staying on top while
 another window has the keyboard, toggles, `_NET_WM_STATE_BELOW`) and `docs/wayland-proofs/x11-always-on-top.png`.
 
-## Settings → Appearance → Window options (in development; the latest release is 0.8.9.4)
+## Settings → Appearance → Window options (since 0.8.9.5)
 
 Three personal choices about every window, the same in all four themes because they live in the SDK (GitHub #151 and
 #219). Each default is how LordOS always behaved, so nothing changes for anyone who doesn't choose them. They are saved

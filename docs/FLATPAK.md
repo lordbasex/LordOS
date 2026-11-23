@@ -3,7 +3,7 @@
 **Status (2026-11-20): phase 1 released in LordOS 0.8.9.4** (x86-64 PCs; lordos.org/features/flatpak). Approved on 2026-11-19, built on branch `feat/flatpak`. On 2026-11-19 the maintainer approved
 the seven exceptions E1–E7 below (recorded in `AGENTS.md`, "Flatpak as an app source") and decided: phase 1 on x86-64
 PCs only (the Raspberry Pi 5 in phase 2); Flathub's `verified` subset by default, the rest behind a Store setting; apps
-that need Flatpak's sub-sandboxes (Chromium/Electron through zypak) are marked "not yet supported"; open question 11 as decided there (every Flatpak app in the view). No compatibility with any Flathub app is claimed until
+that need Flatpak's sub-sandboxes (Chromium/Electron through zypak) were marked "not yet supported" and run since 0.8.9.5 ("Sub-sandboxes" below); open question 11 as decided there (every Flatpak app in the view). No compatibility with any Flathub app is claimed until
 the test plan has run. The history of the review follows.
 
 **Update (2026-11-20, after the test plan): the maintainer asked for X11 the way GNOME and KDE give it, for the
@@ -466,7 +466,7 @@ callers are Linux apps outside Flatpak; none of them identifies a Flatpak app ye
 
 | Interface | Status | What it does in LordOS |
 |---|---|---|
-| `org.freedesktop.portal.Settings` | served (0.8.6) | dark or light mode, accent, contrast, title bar buttons, GTK 3 theme, fonts and their antialiasing (in development, "Fonts" below); `SettingChanged` live |
+| `org.freedesktop.portal.Settings` | served (0.8.6) | dark or light mode, accent, contrast, title bar buttons, GTK 3 theme, fonts and their antialiasing (since 0.8.9.5, "Fonts" below); `SettingChanged` live |
 | `org.freedesktop.portal.FileChooser` | served (version 2) | `OpenFile`, `SaveFile`: the shell's own file dialog, the answer only to the app that asked |
 | `org.freedesktop.portal.OpenURI` | served (version 3; 0.8.8.8) | `OpenURI` (http and https to the default browser, only an address every URL parser reads the same way: printable ASCII, no backslash, no user info, no `%` in the host, a numeric host only as a dotted IPv4, so the question names the host the browser goes to; a `file://` address like `OpenFile`), `OpenFile` and `OpenDirectory` with the file as an fd, used only for its name: it must still name the same file, inside the home folder or the user's disks, outside `fsops_protected`, and opening never takes an executable or a `.desktop` file. Its device, inode and type are kept and checked again right before it opens (`portalcheck.c`), so a file swapped while the question was up is refused. Opened the way LordOS opens everything else (`sdk/sysopen.js`); an app that is not the one with the keyboard (the bus's pid against the focused Wayland client's, or the same app scope) makes the person confirm it first |
 | `org.freedesktop.portal.Inhibit` | served (version 1; 0.8.8.8) | `Inhibit` with the idle or suspend flag counts as the compositor's idle inhibition (`wl_idle_inhibited()`, the screen-off, lock and sleep timers); released by `Request.Close` or when the caller leaves the bus. Logout and user-switch flags are accepted and do nothing; no `CreateMonitor` |
@@ -535,7 +535,7 @@ question 2); since the Spawn helper ("Sub-sandboxes") they install like any othe
 `org.freedesktop.portal.Flatpak` is not a "never" row any more: it is LordOS's own Spawn, which only starts the same
 app in a sub-sandbox. Checked on VM 127 with GNOME Calculator and MarkText.
 
-**Display and toolkit (in development, after 0.8.9.4; `apps/store/fhlook.js`, `flathubmodel.displayOf`/`toolkitOf`):**
+**Display and toolkit (since 0.8.9.5; `apps/store/fhlook.js`, `flathubmodel.displayOf`/`toolkitOf`):**
 an app's page also says, from the same metadata and before it is installed, how the app shows its windows and what it
 is built with. Display follows Flatpak 1.16's own rule (Debian 13's; `common/flatpak-run-sockets.c`: with
 `fallback-x11`, X11 only when the app got no Wayland): `wayland` alone is **Wayland**; `wayland` with `fallback-x11` is
@@ -653,7 +653,7 @@ categories, license, developer, verified (`flathub::verification::verified`) and
 date ("The Store's home" below). The Store shows the verified ones by
 default (maintainer's decision); the filter is the shell's, the index carries every app.
 
-**Descriptions (in development, after 0.8.9.4):** an app's page shows what it says about itself, AppStream's
+**Descriptions (since 0.8.9.5):** an app's page shows what it says about itself, AppStream's
 `<description>`, like Flathub's site and other app centres do. The same helper, with nothing new (no syscall, no
 network, still only the C library), takes the component's own `<description>` (never a release's) in the person's
 language with the scoring of the name (`es-AR`: `es_AR`, then `es`, then the untranslated one; translations per
@@ -669,7 +669,7 @@ Flathub's catalog of 2026-11-22 (52 MB of XML, 3381 apps): the index grew from 0
 description, four were cut at 4 KB, and the helper still reads the whole file in about 0.1 s, far under its 512 MB cap
 (it keeps one 4 KB buffer per app being read, nothing more).
 
-### The Store's home (in development, after 0.8.9.4)
+### The Store's home (since 0.8.9.5)
 
 The maintainer asked on 2026-11-22 for a larger catalog the way Bazaar (GNOME's Flatpak app centre) shows it:
 collections, categories and subcategories. The Store's Flathub section now opens on a home built only from the catalog
@@ -691,7 +691,7 @@ above, so nothing about where data comes from changed:
   `lord.flatpak.catalog()` gives it as `updated` (seconds). The model ignores a date before 2000, more than a day in
   the future or not a whole number. On the catalog of 2026-11-22 every one of the 3381 x86-64 apps has one.
 
-### Rankings from Flathub's API (E10, approved by the maintainer on 2026-11-22; in development)
+### Rankings from Flathub's API (E10, approved by the maintainer on 2026-11-22; since 0.8.9.5)
 
 Bazaar's Popular, Trending, Recently added and the app of the day/week come from Flathub's web API
 (`https://flathub.org/api/v2/collection/{popular,trending,recently-added,recently-updated,verified}`,
