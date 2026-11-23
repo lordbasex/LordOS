@@ -43,6 +43,7 @@
 #include "lord_version.h"
 #include "input.h"
 #include "inputkind.h"
+#include "softpace.h"
 #include "kms.h"
 #include "drmcard.h"
 #include <sys/resource.h>
@@ -316,7 +317,7 @@ static int out_count(const Server *s) {
 static Out *main_out(Server *s) { return &s->out[s->out[s->main_out].on ? s->main_out : 0]; }
 /* page flips that complete before vblank (see the main loop): consecutive early flips seen, 0..8 */
 static int flip_instant, flip_told;
-static double pace_next;                /* the next frame's slot when frames are paced in software, ms */
+static SoftPace pace_sw;                /* the next frame's slot when frames are paced in software (softpace.h) */
 
 static FPipe fpipe;                     /* LORD_PIPELINE (fpipe.h), read once at startup */
 static void prep_undo_all(Server *s) { for (int i = 0; i < OUT_MAX; i++) prep_undo(&s->out[i]); }
@@ -3377,18 +3378,15 @@ int main(int argc, char **argv) {
          * is paced to the mode's refresh, or the compositor and every app draw hundreds of frames a second */
         int soft = !s.headless && flip_instant >= 3;
         if (soft) hz = main_out(&s)->kms.mode.vrefresh > 0 ? main_out(&s)->kms.mode.vrefresh : 60;
-        /* frames start on a fixed grid of 1000/hz ms (a software vblank): waiting in whole milliseconds
-         * then never adds up, so 60 Hz stays 60 frames a second, not 57 */
+        /* frames start on a fixed grid of 1000/hz ms (a software vblank, softpace.h): a late one starts the grid
+         * again, and the next frame waits half a refresh after one shown late (painted slowly) */
         double pace = 0, period = 1000.0 / hz, tnow = now_ms();
-        if (s.headless || soft) {
-            if (!pace_next || tnow - pace_next > period) pace_next = tnow;     /* idle, or fell behind */
-            pace = pace_next - tnow;
-        }
+        if (s.headless || soft) pace = softpace_wait(&pace_sw, tnow, period);
         if (wants && (!all_busy(&s) || ahead) && pace <= 0) {
             render(&s);
             js_vm_painted();                /* the machines' frames it showed: lord-vmdisplay may send the next ones */
             wants = 0;
-            if (s.headless || soft) pace_next += period;
+            if (s.headless || soft) { softpace_started(&pace_sw, period); softpace_shown(&pace_sw, now_ms(), period); }
         }
         if (wants && pace > 0 && (delay < 0 || pace < delay)) delay = pace;
         /* sharing a screen or a window with a Linux app (the ScreenCast portal): its frames, after this render's damage */

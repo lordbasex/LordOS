@@ -438,6 +438,12 @@ build/inputkind-test: tests/inputkind_test.c src/inputkind.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -o $@ tests/inputkind_test.c
 	./$@
+# the software vblank (headless, flips that complete at once): a grid, never two frames closer than a refresh (src/softpace.h)
+test: build/softpace-test
+build/softpace-test: tests/softpace_test.c src/softpace.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -Isrc -o $@ tests/softpace_test.c
+	./$@ || { rm -f $@; exit 1; }
 # the frame callbacks of minimized windows and windows on a hidden desktop: once a second (src/wl/framegate.h)
 test: build/framegate-test
 build/framegate-test: tests/framegate_test.c src/wl/framegate.h
