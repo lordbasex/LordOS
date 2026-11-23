@@ -40,6 +40,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Still on the roadmap** (docs/ROADMAP.md): several named jobs, a schedule per job, folders outside the home
     folder, choosing source folders, keeping the computer awake and the jobs list.
 
+- **Snippets in the clipboard history, in development (the latest release is 0.8.9.4; first step of #205).** The full
+  clipboard panel (❖⇧V) has two tabs, **History | Snippets**. Snippets are texts you keep to paste again, each with a
+  name, in the order you choose (a greeting, an address, a signature). Global keys that paste a snippet without opening
+  the panel are **not** part of this step: they need their own design and security review (a key must never take an
+  app's own shortcut, Linux apps included, or keys typed into another app) and stay on the roadmap with the rest of
+  #205 (conflict detection, per-snippet enable/disable).
+  - **Adding:** **+ New snippet** (typed), **+ From clipboard** (the text copied last), and **Save as snippet** on any
+    text in the history (a button in its preview and a new right-click menu on its row: Paste, Pin, Save as snippet,
+    Delete). Each opens an editor with a name (optional: the first line is used) and the text (plain text, several
+    lines allowed); Enter in the name field or Save keeps it first in the list.
+  - **Using:** Enter or a click pastes it the same way as a history entry: into the LordOS text field that had focus,
+    or into the frontmost Linux app with a Ctrl+V sent only to that app; otherwise it stays copied. A pasted snippet
+    isn't added to the history a second time.
+  - **Managing:** Edit (name and text, so renaming too), Move up / Move down or Alt+↑ ↓ (not while a search shows only
+    part of the list), Delete with a second confirmation (Del twice does the same), and the same actions on a right
+    click. ↑ ↓ select as in the history, the search filters both tabs and each tab shows its matches while searching,
+    Ctrl+Tab switches tabs, Escape closes the editor before the panel. A click on a tab, a filter or a button gives the
+    keys back to the search field (before, a click on a filter left the arrow keys without a target).
+  - **Rules** (`sdk/snippetsmodel.js`, pure): at most 200 snippets of up to 64 KB of UTF-8 text each, names of up to
+    80 characters; line breaks and tabs are kept, NUL and other control characters (escape sequences included) are
+    dropped; the same text can't be two snippets (the editor names the one that has it). The file is read back with
+    every rule applied again, so one edited by hand can't break the panel.
+  - **Passwords:** From clipboard refuses what a password field or a password manager copied (the same `sensitive`
+    mark that keeps it out of the history).
+  - **Storage:** `~/.local/share/lordos/clipboard/snippets.json`, next to the history, saved whatever the history's
+    settings say. A new native call, `lord.clipboard.saveStore(name, text)` (`server/src/ui/js_term.c`), writes it and
+    `history.json`: only those two names (no path from JS), atomically, the file 0600 and the folder 0700 (set back to
+    0700 when an older version made it 0755), at most 32 MB, never through a link put in place of the folder. So the
+    history is now readable by its owner only too; it is rewritten that way on its next save, with no migration. The
+    folder stays off `lord.fs`'s deny list, as the history always was: it holds no security decision and starts
+    nothing. Isolated apps don't get `saveStore` (their `lord.clipboard` is the broker's).
+  - **Text:** 28 new keys (`shell.clipboard.tab.*`, `shell.clipboard.snippets.*`, `saveAsSnippet`, `searchSnippets`)
+    in all 35 languages.
+  - **Tests:** `server/tests/snippets_model_test.mjs` (41 checks: add, edit and rename, delete, reorder, search, the
+    file's round trip and repair, the count and size limits, a full file below 32 MB) and
+    `clipboard_snippets_scene.mjs` (25 checks: the real panel over the stub `lord`: tabs, search, paste, From
+    clipboard, save through `saveStore`, Alt+↓, Del twice, a password refused, Save as snippet, Escape), both in
+    `run_suites.sh`. Docs: `docs/SPOTLIGHT.md` (Snippets, who can read the files), `docs/ROADMAP.md`.
 - **Lord Classic's start menu shows apps by category, in development (the latest release is 0.8.9.4; from #210's
   idea).** All apps now has a small switch next to its title, **A–Z | Categories**. A–Z is the list it always was;
   Categories lists the groups that hold at least one app, each with its count, and a click opens or closes a group to

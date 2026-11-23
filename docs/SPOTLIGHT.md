@@ -81,7 +81,10 @@ and the time.
 - **❖⇧V, full panel:**
   - filters: All, Text, Links, Images, Code, Colors, Files, Pinned;
   - preview, origin, date and length;
-  - Paste, Pin and Delete; Del deletes; «Delete all» keeps the pinned items.
+  - Paste, Pin, Save as snippet and Delete (also on a right click); Del deletes; «Delete all» keeps the pinned
+    items;
+  - two tabs, **History | Snippets** (Ctrl+Tab switches); the search filters both, and each tab shows how many
+    match while searching.
 - **Paste.** Choosing something copies it again and pastes it where you were:
   - into the LordOS text field that had focus;
   - or into the frontmost Linux app, with a Ctrl+V that the compositor sends only to that app
@@ -95,11 +98,40 @@ and the time.
   - code: several lines with code syntax or indentation;
   - image or text.
 
+### Snippets (GitHub #205)
+
+Texts you keep to paste again, each with a name, in the order you choose: a greeting, an address, a signature.
+They are in the full panel's **Snippets** tab (❖⇧V).
+
+- **Adding one:** **+ New snippet** (typed), **+ From clipboard** (the text copied last), or **Save as snippet** on a
+  history entry (its button or its right-click menu). Each opens the editor: a name (optional: the first line is used)
+  and the text (plain text, several lines allowed). Enter in the name field, or Save, keeps it at the top of the list.
+- **Using one:** Enter or a click pastes it exactly as a history entry is pasted: into the LordOS text field that had
+  focus, or into the frontmost Linux app with a Ctrl+V sent only to that app; otherwise it stays copied. A pasted
+  snippet is not added to the history again.
+- **Managing them:** Edit (the name and the text: renaming is editing the name), Move up and Move down (or Alt+↑ ↓;
+  not while a search shows only part of the list), Delete (asks once more; Del twice does the same). The right-click
+  menu has the same actions. ↑ ↓ select, as in the history, and Escape closes the editor before the panel.
+- **Rules** (`sdk/snippetsmodel.js`): at most 200 snippets of up to 64 KB of text each (UTF-8) and names of up to 80
+  characters. Line breaks and tabs are kept; other control characters are dropped. The same text can't be two
+  snippets: the editor names the one that has it. A file edited by hand is read with every rule applied again.
+- **Passwords:** **From clipboard** refuses what a password field or a password manager copied (the same
+  `sensitive` mark that keeps it out of the history).
+- **Saved** in `~/.local/share/lordos/clipboard/snippets.json`, always (the history's Save setting and «Clear on log
+  out» are about the history only).
+- **Not yet:** global keys that paste a snippet without opening the panel. They need their own security review (a key
+  must never take another app's shortcut or keys typed into it) and stay on the roadmap.
+
 ### Where it is stored
 
 - **Files:**
   - `~/.local/share/lordos/clipboard/history.json`, with the entries;
+  - `snippets.json`, with the snippets;
   - `img-*.png` next to it, with the images.
+- **Who can read them:** `history.json` and `snippets.json` are written by `lord.clipboard.saveStore(name, text)`,
+  which takes only those two names (no path), writes the file whole and atomically as 0600, and makes the folder 0700
+  (also when an older version made it 0755), so a copied text or a snippet is readable by its owner only. The folder
+  is not on `lord.fs`'s deny list: it decides nothing about security and starts nothing, and the theme reads it.
 - **How images are stored:** the compositor leaves the latest image in
   `$XDG_RUNTIME_DIR/lordos/clip-N.png`, which is lost on reboot. That's why
   `lord.clipboard.saveImage(path)` copies it to the home folder. It validates the path with the
