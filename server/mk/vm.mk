@@ -72,7 +72,7 @@ endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
-test: build/vmpace-test build/vmmem-test build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/vmunattend-test build/vmthumb-test build/vmcpu-test test-vm-import
+test: build/vmpace-test build/vmmem-test build/vm-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/http-retry-test build/vmunattend-test build/vmthumb-test build/vmcpu-test test-vm-import
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
 # and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage,
@@ -113,6 +113,11 @@ build/vmcpu-test: tests/vmcpu_test.c src/vm/vmcpu.c src/vm/vmcpu.h src/sec/json.
 build/http-resume-test: tests/http_resume_test.c src/pkg/http.c src/pkg/pubhost.c src/pkg/crypto.c src/sec/cgroup.c src/pkg/http.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -DLORD_HTTP_TEST -o $@ tests/http_resume_test.c src/pkg/http.c src/pkg/pubhost.c src/pkg/crypto.c src/sec/cgroup.c
+	./$@ || { rm -f $@; exit 1; }
+# the request line's '+' and a signed redirect refused with 403/5xx asked for again from the original URL (get_one)
+build/http-retry-test: tests/http_retry_test.c src/pkg/http.c src/pkg/pubhost.c src/pkg/crypto.c src/sec/cgroup.c src/pkg/http.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -DLORD_HTTP_TEST -o $@ tests/http_retry_test.c src/pkg/http.c src/pkg/pubhost.c src/pkg/crypto.c src/sec/cgroup.c
 	./$@ || { rm -f $@; exit 1; }
 # what an import refuses and how it merges (6.22): needs qemu-img, qemu-io and python3, no KVM; skipped without them
 .PHONY: test-vm-import
