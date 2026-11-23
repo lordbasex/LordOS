@@ -48,25 +48,25 @@ Apps that only speak X11 open through Xwayland, started on demand, with our own 
 | `wp_security_context_manager_v1` | 1 | a sandbox (Flatpak 1.15 and later) hands over a listening socket for one app; its clients are tagged with the engine, app id and instance id, count as sandboxed and don't see the trusted-only globals (0.8.8.8, built, not yet checked on the VM, `secctx.c`, see "Security contexts") |
 | `xdg_toplevel_icon_manager_v1` | 1 | a window's own icon, shown only when its app has no installed icon (an AppImage, Wine, a game); buffers copied, re-encoded and size-limited, names ignored (see "Window icons", 0.8.9.5) |
 | `ext_idle_notifier_v1` | 1 | an app is told when the person is away from the computer and back, only once they allowed it (the `idle` permission, asked once per app; see "Idle notifications", 0.8.9.5) |
-| `xdg_toplevel_drag_manager_v1` | 1 | tab tear-off: during a drag a window follows the pointer at the app's offset, is never the drag's target and stays where it is let go (`tldrag.c`; checked 2026-11-22 with Chromium 156 on a headless lord-server, tear-off and reattach, and `tests/shellx_headless.sh`; see "Shell extras", in development) |
-| `xdg_toplevel_tag_manager_v1` | 1 | a window's untranslated tag keys its own remembered place (each kind of window of an app reopens where it was); its description names it while it has no title (`tltag.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
-| `xdg_system_bell_v1` | 1 | the bell: LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app (`sysbell.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
-| `xdg_session_manager_v1` | 1 | an app's windows come back where they were when it starts again: sessions with random ids, scoped to the program lord-server checked, kept in `~/.config/lordos/wl-sessions` (`xsession.c`; checked 2026-11-22, headless; see "Shell extras", in development) |
-| `ext_background_effect_manager_v1` | 1 | blur behind a region of a window, drawn with the UI's own backdrop blur; offered only on the CPU path with transparency and blur on, none on the GPU path (`bgeffect.c`; checked 2026-11-22, headless CPU path; see "Shell extras", in development) |
+| `xdg_toplevel_drag_manager_v1` | 1 | tab tear-off: during a drag a window follows the pointer at the app's offset, is never the drag's target and stays where it is let go (`tldrag.c`; checked 2026-11-22 with Chromium 156 on a headless lord-server, tear-off and reattach, and `tests/shellx_headless.sh`; see "Shell extras", 0.8.9.5) |
+| `xdg_toplevel_tag_manager_v1` | 1 | a window's untranslated tag keys its own remembered place (each kind of window of an app reopens where it was); its description names it while it has no title (`tltag.c`; checked 2026-11-22, headless; see "Shell extras", 0.8.9.5) |
+| `xdg_system_bell_v1` | 1 | the bell: LordOS's alert sound (not in Do Not Disturb) and a window not in front marked as wanting attention; at most one ring every 250 ms per app (`sysbell.c`; checked 2026-11-22, headless; see "Shell extras", 0.8.9.5) |
+| `xdg_session_manager_v1` | 1 | an app's windows come back where they were when it starts again: sessions with random ids, scoped to the program lord-server checked, kept in `~/.config/lordos/wl-sessions` (`xsession.c`; checked 2026-11-22, headless; see "Shell extras", 0.8.9.5) |
+| `ext_background_effect_manager_v1` | 1 | blur behind a region of a window, drawn with the UI's own backdrop blur; offered only on the CPU path with transparency and blur on, none on the GPU path (`bgeffect.c`; checked 2026-11-22, headless CPU path; see "Shell extras", 0.8.9.5) |
 | `wp_drm_lease_device_v1` | 1 | a VR headset's connector (one the kernel marks `non-desktop`) leased to an app the person allowed: Allow once, Always allow or Don't allow (the `vr` permission); only while a headset is plugged into lord-server's card, never to a sandboxed or isolated app or Xwayland, revoked on unplug, permission taken back, lock, user switch or text console (0.8.9.5, approved by the maintainer 2026-11-22, checked with `drmlease-test` and `drmlease-e2e-test`, not yet with a real headset; see "DRM leases") |
 | `wp_single_pixel_buffer_manager_v1` | 1 | a buffer of one pixel (premultiplied RGBA), usually stretched by a viewport: a background, a fade (0.8.9.5) |
 | `wp_alpha_modifier_v1` | 1 | a surface's opacity, double-buffered, applied to that surface only (not its subsurfaces), GPU and CPU paths (0.8.9.5) |
 | `wl_fixes` | 1 | core protocol (wayland.xml 1.24): `destroy_registry` destroys a `wl_registry` the client no longer needs, so a long-lived client's registries don't pile up in lord-server and keep getting `global` events; lord-server sends `delete_id` and the id is reused. Debian 13's libwayland is 1.23, so the interface is generated from `third_party/wayland/wl-fixes.xml`, vendored from wayland.xml 1.24 (`wlfixes.c`, `mk/wlfixes.mk`). In development; checked 2026-11-22 against a headless lord-server (`tests/wlfixes_client.c`, the "fixes" part of `tests/wlperf_headless.sh`): the destroyed registry's id comes back for a new registry, which gets every global once, and a non-registry argument is a display error; not yet checked with a real app |
-| `wp_color_manager_v1` (color-management-v1) | 1 | an app describes its pixels' colour and LordOS converts them to the SDR sRGB / gamma 2.2 it drives every display with: parametric descriptions only (`set_primaries`, `set_tf_power`; no ICC, no luminances or mastering metadata, no scRGB), perceptual and relative intents, transfer functions gamma22, srgb, ext_linear, bt1886, gamma28 and power curves, every named set of primaries; each output's description (target primaries from its EDID) and the surface's preferred one. No HDR. Checked 2026-11-22 headless (`tests/color_headless.sh`: everything advertised, every error, linear light on screen as converted) and with GTK 4.18.6 (`GDK_DEBUG=color-mgmt`); see "Colour management" (0.8.9.5, in development) |
-| `wp_color_representation_manager_v1` (color-representation-v1) | 1 | alpha modes premultiplied electrical, premultiplied optical and straight (converted); coefficients and range identity / full only, since lord-server imports no YUV buffer. Checked 2026-11-22 headless (`tests/color_headless.sh`); see "Colour management" (0.8.9.5, in development) |
-| `zwp_tablet_manager_v2` (tablet-v2) | 2 | graphics tablets (in development, 2026-11-22): pens with pressure, tilt, distance, rotation, slider and their buttons, pads with buttons, rings, strips and dials (2: `bustype`, dials), read from evdev by our own `tablet.c` (no libinput or libwacom). Supported: everything the protocol has but the tool's `wheel` (a Wacom mouse's) and pad modes beyond one. Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire); the global and Xwayland's `get_tablet_seat` seen with a headless lord-server; **not yet with a real tablet or on the VM**. See "Graphics tablets" |
-| `wp_pointer_warp_v1` (pointer-warp) | 1 | an app moves the pointer to a point of its own window (in development, 2026-11-22): only with the pointer over it, the serial of the enter it got and the keyboard, inside the surface, never while the pointer is locked or in a drag (`pwarp.h`). The XML is wayland-protocols 1.45's, kept in `server/protocols/`. Checked by `build/wltablet-test`; **not yet with an app on the VM**. See "Pointer warp" |
-| `wp_fifo_manager_v1` (fifo-v1) | 1 | an update waits until the display it is on has shown the one before it for a refresh: Mesa's Vulkan FIFO present mode without frame callbacks (`timing.c`, see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22 with vkcube on lavapipe and `wltiming-client`) |
-| `wp_commit_timing_manager_v1` (commit-timing-v1) | 1 | an update is not shown before its target time on `wp_presentation`'s clock (see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22: within 1 ms of the target, Mesa's FIFO uses it) |
-| `wp_tearing_control_manager_v1` (tearing-control-v1) | 1 | the hint is kept; "async" flips a fullscreen app's own buffer without waiting for vblank only when it is scanned out alone and the driver can (`DRM_CAP_ASYNC_PAGE_FLIP`); otherwise vsync (see "Frame timing"; 0.8.9.5, in development: the hint checked headless 2026-11-22, the torn flip not yet checked on hardware) |
-| `wp_content_type_manager_v1` (content-type-v1) | 1 | none, photo, video or game, kept per surface and applied on commit; nothing uses it yet (see "Frame timing"; 0.8.9.5, in development, checked headless 2026-11-22) |
+| `wp_color_manager_v1` (color-management-v1) | 1 | an app describes its pixels' colour and LordOS converts them to the SDR sRGB / gamma 2.2 it drives every display with: parametric descriptions only (`set_primaries`, `set_tf_power`; no ICC, no luminances or mastering metadata, no scRGB), perceptual and relative intents, transfer functions gamma22, srgb, ext_linear, bt1886, gamma28 and power curves, every named set of primaries; each output's description (target primaries from its EDID) and the surface's preferred one. No HDR. Checked 2026-11-22 headless (`tests/color_headless.sh`: everything advertised, every error, linear light on screen as converted) and with GTK 4.18.6 (`GDK_DEBUG=color-mgmt`); see "Colour management" (0.8.9.5) |
+| `wp_color_representation_manager_v1` (color-representation-v1) | 1 | alpha modes premultiplied electrical, premultiplied optical and straight (converted); coefficients and range identity / full only, since lord-server imports no YUV buffer. Checked 2026-11-22 headless (`tests/color_headless.sh`); see "Colour management" (0.8.9.5) |
+| `zwp_tablet_manager_v2` (tablet-v2) | 2 | graphics tablets (0.8.9.5, 2026-11-22): pens with pressure, tilt, distance, rotation, slider and their buttons, pads with buttons, rings, strips and dials (2: `bustype`, dials), read from evdev by our own `tablet.c` (no libinput or libwacom). Supported: everything the protocol has but the tool's `wheel` (a Wacom mouse's) and pad modes beyond one. Checked by `build/tablet-test` (synthetic evdev sequences) and `build/wltablet-test` (libwayland clients on the wire); the global and Xwayland's `get_tablet_seat` seen with a headless lord-server; **not yet with a real tablet or on the VM**. See "Graphics tablets" |
+| `wp_pointer_warp_v1` (pointer-warp) | 1 | an app moves the pointer to a point of its own window (0.8.9.5, 2026-11-22): only with the pointer over it, the serial of the enter it got and the keyboard, inside the surface, never while the pointer is locked or in a drag (`pwarp.h`). The XML is wayland-protocols 1.45's, kept in `server/protocols/`. Checked by `build/wltablet-test`; **not yet with an app on the VM**. See "Pointer warp" |
+| `wp_fifo_manager_v1` (fifo-v1) | 1 | an update waits until the display it is on has shown the one before it for a refresh: Mesa's Vulkan FIFO present mode without frame callbacks (`timing.c`, see "Frame timing"; 0.8.9.5, checked headless 2026-11-22 with vkcube on lavapipe and `wltiming-client`) |
+| `wp_commit_timing_manager_v1` (commit-timing-v1) | 1 | an update is not shown before its target time on `wp_presentation`'s clock (see "Frame timing"; 0.8.9.5, checked headless 2026-11-22: within 1 ms of the target, Mesa's FIFO uses it) |
+| `wp_tearing_control_manager_v1` (tearing-control-v1) | 1 | the hint is kept; "async" flips a fullscreen app's own buffer without waiting for vblank only when it is scanned out alone and the driver can (`DRM_CAP_ASYNC_PAGE_FLIP`); otherwise vsync (see "Frame timing"; 0.8.9.5: the hint checked headless 2026-11-22, the torn flip not yet checked on hardware) |
+| `wp_content_type_manager_v1` (content-type-v1) | 1 | none, photo, video or game, kept per surface and applied on commit; nothing uses it yet (see "Frame timing"; 0.8.9.5, checked headless 2026-11-22) |
 | `zwp_linux_dmabuf_v1` 5 (every plane with the same modifier), `wp_presentation` 2 (feedback per display), `wp_viewporter` 1, `zwp_relative_pointer_manager_v1` 1, `zwp_pointer_constraints_v1` 1 | | GPU buffers, presentation feedback, cropping and scaling, games' pointer (see `GPU.md` and `DISPLAYS.md`) |
-| `wp_linux_drm_syncobj_manager_v1` (explicit sync) | 1 | a dmabuf frame comes with an acquire point (its rendering is done) and a release point (LordOS is done with it): the frame is applied once its acquire point is signalled, without blocking, and the release point is signalled after the CPU copy or after the frame that replaced it on the GPU path; every protocol error, per-client limits. Offered when a render node has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), on the GPU and the CPU path (0.8.9.5, in development; checked 2026-11-22 with `tests/syncobj_client.c` against a headless lord-server on the CPU path, and Mesa 25.0.7's Vulkan WSI, `vkcube`, on an AMD RX 580: 600 frames at 60 fps in FIFO and 1500 at 330 fps in mailbox, every one with `set_acquire_point`/`set_release_point`; see "Explicit sync") |
+| `wp_linux_drm_syncobj_manager_v1` (explicit sync) | 1 | a dmabuf frame comes with an acquire point (its rendering is done) and a release point (LordOS is done with it): the frame is applied once its acquire point is signalled, without blocking, and the release point is signalled after the CPU copy or after the frame that replaced it on the GPU path; every protocol error, per-client limits. Offered when a render node has timeline syncobjs and `SYNCOBJ_EVENTFD` (Linux 6.6), on the GPU and the CPU path (0.8.9.5; checked 2026-11-22 with `tests/syncobj_client.c` against a headless lord-server on the CPU path, and Mesa 25.0.7's Vulkan WSI, `vkcube`, on an AMD RX 580: 600 frames at 60 fps in FIFO and 1500 at 330 fps in mailbox, every one with `set_acquire_point`/`set_release_point`; see "Explicit sync") |
 
 Every protocol, with what lord-server offers next to KDE's KWin and GNOME's Mutter and why some are left out on
 purpose, is in "Protocol table (generated)" below and on [lordos.org/wayland-protocols-table](https://lordos.org/wayland-protocols-table/),
@@ -574,7 +574,7 @@ and
 session) checks a second inhibitor's error, destroy and ask again, a surface destroyed before its inhibitor and a
 client leaving with one; `hold 30` keeps a window with an inhibitor and prints `active`, `inactive` and its keys.
 
-### Graphics tablets (`zwp_tablet_manager_v2`, in development)
+### Graphics tablets (`zwp_tablet_manager_v2`, 0.8.9.5)
 
 Approved by the maintainer on 2026-11-22. Wacom, Huion, XP-Pen and pen displays reach Krita, GIMP, Inkscape, GTK 4 and
 Qt 6 apps with pressure and tilt, and X apps through Xwayland, which binds tablet-v2 itself (seen with a headless
@@ -643,7 +643,7 @@ middle, lifted) and dial (detents and high resolution). `build/wltablet-test` (`
 the wire (`WLTABLET_LOG=1` prints what the client heard). **Unverified:** a real Wacom (or other) tablet, and Krita or
 GTK 4 on the VM with a uinput tablet.
 
-### Pointer warp (`wp_pointer_warp_v1`, in development)
+### Pointer warp (`wp_pointer_warp_v1`, 0.8.9.5)
 
 Approved by the maintainer on 2026-11-22. An app asks to put the pointer at a point of its surface
 (`warp_pointer(surface, pointer, x, y, serial)`): a game or a 3D tool re-centring it, a VM's guest cursor. lord-server
@@ -1431,7 +1431,7 @@ sandboxed helper `lord-screencast`, the only binary that links `libpipewire-0.3`
   pipewire" without the daemon), `build/dbus-test` (fds sent with replies, in order), `build/pwguard-test` (a screen
   node is not a camera) and `tests/screencast_model_test.mjs` (the chooser's choices).
 
-## Frames, titles and damage (0.8.9.5, in development)
+## Frames, titles and damage (0.8.9.5)
 
 The Wayland audit of 2026-11-22 (items 1–7, approved by the maintainer that day) made the compositor do less per app
 frame. `tests/wlperf_headless.sh` checks each part against a headless lord-server with `build/wlperf-client`
@@ -1501,7 +1501,7 @@ frame. `tests/wlperf_headless.sh` checks each part against a headless lord-serve
   hole there, as for any translucent app pixel). `wlperf-client protocols` binds both and shows a one-pixel window at
   50 %.
 
-## Frame timing (fifo-v1, commit-timing-v1, tearing-control-v1, content-type-v1; 0.8.9.5, in development)
+## Frame timing (fifo-v1, commit-timing-v1, tearing-control-v1, content-type-v1; 0.8.9.5)
 
 Approved by the maintainer on 2026-11-22 ("everything the compositor is missing"). The four globals are made in
 `server/src/wl/timing.c`; the decisions are pure functions in `server/src/wl/wltiming.h` (`build/wltiming-test`);
@@ -1852,7 +1852,7 @@ trusted programs show as not offered). The number is the version of the protocol
 | [text-input-unstable-v2](https://wayland.app/protocols/) (deprecated) | kde | — | 1 | — | KDE's older text input; text-input-unstable-v3 is offered. |
 
 <!-- END wayland-protocols table -->
-## Conformance (`tools/wl-conformance.mjs`, in development)
+## Conformance (`tools/wl-conformance.mjs`, 0.8.9.5)
 
 A script checks the compositor **point by point** against the protocol XML files and gives every advertised
 global, and every X11 area, a score from 0 to 100 %. The numbers below are from 2026-11-22 (X11 re-recorded after "Always on top", branch `feat/always-on-top`)
@@ -2141,11 +2141,11 @@ its main flow and one check per protocol error, each check's hint naming every r
 hooks. An X11
 item or pattern goes in `tools/wl-conformance/xwayland.json`, its dynamic checks in `server/tests/x11_conformance.c`
 under the same item id.
-## Shell extras (in development, approved by the maintainer 2026-11-22)
+## Shell extras (0.8.9.5, approved by the maintainer 2026-11-22)
 
 Five protocols that make Linux windows behave as on a full desktop, one file each in `server/src/wl/` (`wlshell.h`
-lists them and the few hooks `wl.c` calls; they read `wl.c`'s state only through its `wl__` helpers). The latest
-release is 0.8.9.4; these are in development. None of them reads another app's windows, the screen, the clipboard or
+lists them and the few hooks `wl.c` calls; they read `wl.c`'s state only through its `wl__` helpers). They ship
+since 0.8.9.5. None of them reads another app's windows, the screen, the clipboard or
 input, so none is hidden from sandboxed clients (`secctx_hidden`).
 
 | | |
@@ -2231,7 +2231,7 @@ input, so none is hidden from sandboxed clients (`secctx_hidden`).
   tear-off with `SHELLX_DRAG=1` and root for the session's `remote.sock`, through `tests/shellx_inject.py`) and
   `build/fsops-test` (the sessions folder is protected).
 
-## Two wl_seat bindings (Firefox) and menus drawn as subsurfaces (0.8.9.5, in development, checked 2026-11-22)
+## Two wl_seat bindings (Firefox) and menus drawn as subsurfaces (0.8.9.5, checked 2026-11-22)
 
 The open item from October 19 ("Firefox ESR 153 ignored mouse clicks on VM 119 … two `wl_seat` bindings from the same
 client get the events twice") was checked again on VM 127 on 2026-11-22, with Firefox ESR 153.6 on Wayland
@@ -2275,7 +2275,7 @@ client get the events twice") was checked again on VM 127 on 2026-11-22, with Fi
   checks ran, the 0.8.9.4 build installed on VM 127 (`0.8.9.4+ws95`) crashed once in its render threads (`libc`,
   reading freed memory) as a `<select>` list closed; not seen again on the current build across a dozen opens.
 
-## Colour management (`wp_color_manager_v1`, `wp_color_representation_manager_v1`, 0.8.9.5, in development, approved by the maintainer 2026-11-22)
+## Colour management (`wp_color_manager_v1`, `wp_color_representation_manager_v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
 
 LordOS drives every display as an **SDR sRGB display**: sRGB (BT.709) primaries, D65 white, encoded for a gamma 2.2
 display, 8 bits a channel. HDR output (PQ, HLG, more than 8 bits, the display's HDR metadata) is **out of scope**: it
@@ -2343,7 +2343,7 @@ advertised (`server/src/wl/wlcolor.c`, the conversion in `colorconv.c`).
   session was not used), mpv `--vo=gpu-next` and the Weston colour tools (not installed on the development machine), a
   real display's EDID primaries (to check on the dev VM, whose virtio display reports sRGB's).
 
-## Explicit sync (`linux-drm-syncobj-v1`, 0.8.9.5, approved by the maintainer 2026-11-22, in development)
+## Explicit sync (`linux-drm-syncobj-v1`, 0.8.9.5, approved by the maintainer 2026-11-22)
 
 With implicit sync a GPU buffer's own fences (its dma-resv) make LordOS's reading of it wait for the app's rendering.
 With explicit sync the app hands over two timeline points with each buffer instead: NVIDIA's driver needs it (it has no
