@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 const D = await import(path.join(here, '../../apps/machines/diag.js'));
-const { stateView, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
+const { stateView, offers2d, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -22,6 +22,9 @@ eq('running', stateView('running', 'none'), { key: 'running', tone: 'run', activ
 eq('paused', stateView('paused', 'user').key, 'paused');
 eq('crashed keeps why', stateView('crashed', 'out-of-memory'), { key: 'crashed', tone: 'bad', active: false, why: 'out-of-memory' });
 eq('crashed no why', stateView('crashed', 'none').why, 'qemu-failed');
+eq('QEMU 3D abort keeps its why', stateView('crashed', 'qemu-3d-crash'), { key: 'crashed', tone: 'bad', active: false, why: 'qemu-3d-crash' });
+eq('QEMU 3D abort, recorded as off', stateView('stopped', 'qemu-3d-crash').why, 'qemu-3d-crash');
+eq('2D offered after the 3D abort only', [offers2d('qemu-3d-crash'), offers2d('qemu-signal'), offers2d(null)], [true, false, false]);
 eq('stopped clean', stateView('stopped', 'guest-shutdown'), { key: 'stopped', tone: 'off', active: false, why: null });
 eq('stopped after forced', stateView('stopped', 'forced').why, 'forced');
 eq('start failed', stateView('stopped', 'start-failed').why, 'start-failed');

@@ -508,6 +508,14 @@ int vm_budget_fits(const VmHost *h, long running_mb, long want_mb) {
     return running_mb >= 0 && want_mb > 0 && running_mb + want_mb <= h->ram_mb - floor;
 }
 
+const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing) {
+    if (m->devices == VM_DEV_WINDOWS) return "3D graphics are for Linux machines";
+    if (m->display != VM_DISPLAY_WINDOW) return "the machine has no display";
+    if (m->arch != VM_ARCH_AMD64 || host_arch != VM_ARCH_AMD64) return "3D graphics are for amd64 machines on amd64 computers for now";
+    if (installing) return "this start installs the system, a text console (and QEMU's 3D display aborts at the installer's restart): 3D comes at the next start";
+    return NULL;
+}
+
 int vm_machine_check_host(const VmMachine *m, const VmHost *h, char *err, size_t n, char *warn, size_t wn) {
     if (warn && wn) warn[0] = 0;
     if (m->accel == VM_ACCEL_KVM) {

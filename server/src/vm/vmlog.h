@@ -53,6 +53,13 @@ int vmlog_repeat(VmLogRep *r, const char *line, size_t n, long long now, char *s
 /* the loop's tick: the repeats not said yet, once VMLOG_SUMMARY_MS went by since the last time; 1 when *sum holds one */
 int vmlog_repeat_tick(VmLogRep *r, long long now, char *sum, size_t cap);
 
+/* A line of QEMU's stderr that is QEMU's known 3D abort: QEMU 10.0-11.1 with -display dbus,gl=on, when the guest resets
+ * virtio-gpu-gl (a Linux guest's shutdown or restart on kernels with virtio_dev_shutdown, Debian's 6.12.117 and later),
+ * makes the placeholder surface's texture in the vCPU thread without a GL context and asserts in dbus-listener.c:
+ * "qemu-system-x86_64: ../ui/dbus-listener.c:511: dbus_scanout_texture: Assertion `tex_id' failed." (QEMU issue 4918,
+ * docs/VIRTUALIZATION.md "Graphics 3D"). 1 it is. */
+int vmlog_qemu_3d_abort(const char *line, size_t n);
+
 /* dir/base.log → dir/base.1.log, …, base.(keep-1).log (the oldest dropped), and a new, empty dir/base.log opened for
  * appending (0600, O_CLOEXEC, O_NOFOLLOW). Its fd, or -1. keep 1..9. */
 int vmlog_rotate(const char *dir, const char *base, int keep);

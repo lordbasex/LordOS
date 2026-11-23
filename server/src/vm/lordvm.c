@@ -116,6 +116,7 @@ static const char *const STATE_NAME[VS_COUNT] = { "stopped", "starting", "runnin
 static const char *const REASON_NAME[VR_COUNT] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
     "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed",
+    "qemu-3d-crash",
 };
 
 /* ---- log ---- */
@@ -170,9 +171,13 @@ static ChildLog *child_of(const char *who) {
     return &child_log[CHILD_LOGS - 1];
 }
 
+/* this run's QEMU wrote its known 3D abort (vmlog_qemu_3d_abort): its end is VR_QEMU_3D_ABORT, not a plain crash */
+static int qemu_3d_abort_seen;
+
 static void child_line(void *ctx, const char *line, size_t n) {
     ChildLog *c = ctx;
     char sum[160];
+    if (c == &child_log[0] && vmlog_qemu_3d_abort(line, n)) qemu_3d_abort_seen = 1;
     int say = vmlog_repeat(&c->rep, line, n, now_ms_log(), sum, sizeof sum);
     if (sum[0]) vlog("%s: %s", c->who, sum);
     if (say) vlog("%s: %.*s", c->who, (int)(n > 900 ? 900 : n), line);
@@ -1694,18 +1699,17 @@ static int pick_render_node(char *out, size_t n) {
 }
 
 /* Graphics 3D only for a Linux machine in a window, amd64 on amd64 (QEMU 10.0's 3D aborts on arm64's firmware reset,
- * 3.2), with QEMU's GL modules and a render node; otherwise the machine starts with 2D graphics and the log says why.
- * Only then does QEMU's sandbox get the render node (vm_jail_qemu, VmQemuJail.render). */
+ * 3.2), not on an unattended install's start (vm_gl_refusal), with QEMU's GL modules and a render node; otherwise the
+ * machine starts with 2D graphics and the log says why. Only then does QEMU's sandbox get the render node (vm_jail_qemu,
+ * VmQemuJail.render). */
 static void decide_graphics(void) {
     S.gl = 0;
     S.render[0] = 0;
     if (S.m.graphics != VM_GFX_3D) return;
-    const char *why = NULL;
     VmHost h;
     vm_host_probe(&h);
-    if (S.m.devices == VM_DEV_WINDOWS) why = "3D graphics are for Linux machines";
-    else if (S.m.display != VM_DISPLAY_WINDOW) why = "the machine has no display";
-    else if (S.m.arch != VM_ARCH_AMD64 || h.arch != VM_ARCH_AMD64) why = "3D graphics are for amd64 machines on amd64 computers for now";
+    const char *why = vm_gl_refusal(&S.m, h.arch, S.unattended);
+    if (why) S.render[0] = 0;
     else if (!strcmp(S.render_want, "none")) why = "the desktop draws without a GPU";
     else if (!gl_modules()) why = "QEMU's OpenGL modules (qemu-system-modules-opengl) aren't installed";
     else if (S.render_want[0] && strcmp(S.render_want, "none") && !render_node_ok(S.render_want)) why = "the desktop's render node can't be opened";
@@ -2102,6 +2106,7 @@ static int start_machine(void) {
     if (S.m.drivers[0] && !file_exists(S.m.drivers)) { vlog("note: the drivers disc is gone (%s): the machine starts without it", S.m.drivers); S.m.drivers[0] = 0; }
     S.unattended = 0;
     S.install_done = 0;
+    qemu_3d_abort_seen = 0;
     S.win_seed = 0;
     S.win_armed = 0;
     {
@@ -5407,7 +5412,14 @@ static void drain_qmp(void) {
 /* ---- QEMU's end ---- */
 
 static void unattended_done(void);
+static void pump_fd(int *fd, const char *who);
 static void qemu_exited(int status) {
+    /* what QEMU wrote just before it ended (an assertion's line names the crash): read now, while it's there */
+    for (int k = 0; k < 20 && S.qemu_err >= 0; k++) {
+        struct pollfd pf = { .fd = S.qemu_err, .events = POLLIN };
+        if (poll(&pf, 1, 0) <= 0) break;
+        pump_fd(&S.qemu_err, "qemu");
+    }
     S.qemu_done = 1;
     S.qemu_status = status;
     int st = VS_STOPPED, why = VR_POWEROFF, code = 0;
@@ -5434,6 +5446,12 @@ static void qemu_exited(int status) {
     } else if (WIFSIGNALED(status)) {
         code = WTERMSIG(status);
         if (S.killed && (S.forced || S.poweroff)) why = S.forced ? VR_FORCED : VR_POWEROFF;
+        else if (code == SIGABRT && qemu_3d_abort_seen) {
+            /* QEMU issue 4918: the guest reset its virtio-gpu-gl (a Linux guest's shutdown or restart, Debian 6.12.117+)
+             * and QEMU's D-Bus display asserted. The guest had finished shutting down; Machines offers 2D graphics */
+            st = VS_CRASHED; why = VR_QEMU_3D_ABORT;
+            snprintf(d, sizeof d, "QEMU's 3D display aborted when the guest reset its graphics (QEMU issue 4918)");
+        }
         else if (oom > S.oom0) { st = VS_CRASHED; why = VR_OUT_OF_MEMORY; snprintf(d, sizeof d, "the machine went over its memory limit (%ld MB)", vm_mem_limit_mb(&S.m)); }
         else { st = VS_CRASHED; why = VR_QEMU_SIGNAL; snprintf(d, sizeof d, "QEMU died from signal %d (%s)", code, strsignal(code)); }
     }
@@ -6046,7 +6064,8 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     }
     RunInfo prev;
     int crashed = !runinfo_read(S.dir, &prev) && prev.state == VS_CRASHED &&
-                  (prev.reason == VR_QEMU_SIGNAL || prev.reason == VR_OUT_OF_MEMORY || prev.reason == VR_SUPERVISOR_LOST);
+                  (prev.reason == VR_QEMU_SIGNAL || prev.reason == VR_QEMU_3D_ABORT || prev.reason == VR_OUT_OF_MEMORY ||
+                   prev.reason == VR_SUPERVISOR_LOST);
     int lost = recover();
     ops_recover(S.dir, 1);
     if (lost || crashed) {
