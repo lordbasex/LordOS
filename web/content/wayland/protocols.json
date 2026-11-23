@@ -29,9 +29,9 @@
   "gaps": []
  },
  "conformance": {
-  "date": "2026-11-22",
-  "commit": "6e5f3045",
-  "dirty": true,
+  "date": "2026-11-23",
+  "commit": "535e79a0",
+  "dirty": false,
   "tool": "tools/wl-conformance.mjs",
   "schema": 1,
   "env": {
@@ -391,8 +391,8 @@
     "version": 1,
     "advertised": true,
     "score": 100,
-    "points": 95,
-    "total": 95,
+    "points": 98,
+    "total": 98,
     "skipped": 0,
     "depth": "complete",
     "proofs": []
@@ -2463,8 +2463,8 @@
    },
    "conf": {
     "score": 100,
-    "points": 95,
-    "total": 95,
+    "points": 98,
+    "total": 98,
     "skipped": 0,
     "depth": "complete",
     "globals": [

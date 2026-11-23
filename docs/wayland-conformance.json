@@ -1,8 +1,8 @@
 {
  "schema": 1,
- "date": "2026-11-22",
- "commit": "6e5f30452c78b35ec56ad02a7dd380767928030e",
- "dirty": true,
+ "date": "2026-11-23",
+ "commit": "535e79a07048303cf2c8fb08549111b68632ceaf",
+ "dirty": false,
  "tool": "tools/wl-conformance.mjs",
  "method": "docs/WAYLAND.md#conformance",
  "weights": {
@@ -265,7 +265,7 @@
    "xml": "/usr/share/wayland-protocols/staging/ext-idle-notify/ext-idle-notify-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7437",
+   "where": "server/src/wl/wl.c:7453",
    "interfaces": [
     "ext_idle_notifier_v1",
     "ext_idle_notification_v1"
@@ -372,7 +372,7 @@
    "xml": "third_party/plasma-wayland-protocols/server-decoration.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7461",
+   "where": "server/src/wl/wl.c:7477",
    "interfaces": [
     "org_kde_kwin_server_decoration_manager",
     "org_kde_kwin_server_decoration"
@@ -510,7 +510,7 @@
    "xml": "/usr/share/wayland/wayland.xml",
    "version": 6,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7417",
+   "where": "server/src/wl/wl.c:7433",
    "interfaces": [
     "wl_compositor",
     "wl_region",
@@ -966,7 +966,7 @@
    "xml": "/usr/share/wayland/wayland.xml",
    "version": 3,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7422",
+   "where": "server/src/wl/wl.c:7438",
    "interfaces": [
     "wl_data_device_manager",
     "wl_data_device",
@@ -1766,7 +1766,7 @@
    "xml": "/usr/share/wayland/wayland.xml",
    "version": 9,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7421",
+   "where": "server/src/wl/wl.c:7437",
    "interfaces": [
     "wl_seat",
     "wl_touch",
@@ -2001,7 +2001,7 @@
      "hint": "wl_keyboard.leave",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:7160"
+     "where": "server/src/wl/wl.c:7176"
     },
     {
      "kind": "static",
@@ -2380,7 +2380,7 @@
    "version": 2,
    "advertised": true,
    "libwayland": true,
-   "where": "server/src/wl/wl.c:7416",
+   "where": "server/src/wl/wl.c:7432",
    "interfaces": [
     "wl_shm",
     "wl_shm_pool",
@@ -2591,7 +2591,7 @@
    "xml": "/usr/share/wayland/wayland.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7418",
+   "where": "server/src/wl/wl.c:7434",
    "interfaces": [
     "wl_subcompositor",
     "wl_subsurface"
@@ -2788,7 +2788,7 @@
    "xml": "/usr/share/wayland-protocols/staging/alpha-modifier/alpha-modifier-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7451",
+   "where": "server/src/wl/wl.c:7467",
    "interfaces": [
     "wp_alpha_modifier_v1",
     "wp_alpha_modifier_surface_v1"
@@ -4311,7 +4311,7 @@
      "what": "wp_commit_timing_manager_v1.get_timer,wp_commit_timer_v1.set_timestamp",
      "weight": 3,
      "result": "pass",
-     "msg": "commits with a target 100, 250 and 400 ms ahead applied at or after it: 3 of 3 (from -0.6 to +0.7 ms of their targets)",
+     "msg": "commits with a target 100, 250 and 400 ms ahead applied at or after it: 3 of 3 (from 0.0 to +1.5 ms of their targets)",
      "where": null
     },
     {
@@ -4320,7 +4320,7 @@
      "what": "wp_commit_timer_v1.set_timestamp",
      "weight": 3,
      "result": "pass",
-     "msg": "the next commit, with no timestamp, is not held: 15 ms",
+     "msg": "the next commit, with no timestamp, is not held: 16 ms",
      "where": null
     },
     {
@@ -4496,7 +4496,7 @@
    "xml": "/usr/share/wayland-protocols/staging/cursor-shape/cursor-shape-v1.xml",
    "version": 2,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7455",
+   "where": "server/src/wl/wl.c:7471",
    "interfaces": [
     "wp_cursor_shape_manager_v1",
     "wp_cursor_shape_device_v1"
@@ -5096,7 +5096,7 @@
      "what": "wp_fifo_manager_v1.get_fifo,wp_fifo_v1.set_barrier,wp_fifo_v1.wait_barrier",
      "weight": 3,
      "result": "pass",
-     "msg": "a commit waiting on the barrier the one before it set applied a refresh later: 5 of 5 (closest 11.3 ms; 60 Hz headless)",
+     "msg": "a commit waiting on the barrier the one before it set applied a refresh later: 5 of 5 (closest 17 ms apart by the frames' times; 60 Hz headless)",
      "where": null
     },
     {
@@ -5105,7 +5105,7 @@
      "what": "wp_fifo_v1.wait_barrier",
      "weight": 3,
      "result": "pass",
-     "msg": "wait_barrier with no barrier up applies at once: yes (4 ms)",
+     "msg": "wait_barrier with no barrier up applies at once: yes (15 ms)",
      "where": null
     },
     {
@@ -5143,7 +5143,7 @@
    "xml": "/usr/share/wayland-protocols/staging/fractional-scale/fractional-scale-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7420",
+   "where": "server/src/wl/wl.c:7436",
    "interfaces": [
     "wp_fractional_scale_manager_v1",
     "wp_fractional_scale_v1"
@@ -5266,7 +5266,7 @@
    "xml": "/usr/share/wayland-protocols/staging/linux-drm-syncobj/linux-drm-syncobj-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7447",
+   "where": "server/src/wl/wl.c:7463",
    "interfaces": [
     "wp_linux_drm_syncobj_manager_v1",
     "wp_linux_drm_syncobj_timeline_v1",
@@ -5693,7 +5693,7 @@
    "xml": "/usr/share/wayland-protocols/stable/presentation-time/presentation-time.xml",
    "version": 2,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7448",
+   "where": "server/src/wl/wl.c:7464",
    "interfaces": [
     "wp_presentation",
     "wp_presentation_feedback"
@@ -6081,7 +6081,7 @@
    "xml": "/usr/share/wayland-protocols/staging/single-pixel-buffer/single-pixel-buffer-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7450",
+   "where": "server/src/wl/wl.c:7466",
    "interfaces": [
     "wp_single_pixel_buffer_manager_v1",
     "wl_buffer"
@@ -6314,7 +6314,7 @@
    "xml": "/usr/share/wayland-protocols/stable/viewporter/viewporter.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7449",
+   "where": "server/src/wl/wl.c:7465",
    "interfaces": [
     "wp_viewporter",
     "wp_viewport"
@@ -6525,7 +6525,7 @@
    "xml": "/usr/share/wayland-protocols/staging/xdg-activation/xdg-activation-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7458",
+   "where": "server/src/wl/wl.c:7474",
    "interfaces": [
     "xdg_activation_v1",
     "xdg_activation_token_v1"
@@ -6703,15 +6703,15 @@
    "xml": "server/protocols/xdg-session-management-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/xsession.c:362",
+   "where": "server/src/wl/xsession.c:358",
    "interfaces": [
     "xdg_session_manager_v1",
     "xdg_session_v1",
     "xdg_toplevel_session_v1"
    ],
    "score": 100,
-   "points": 95,
-   "total": 95,
+   "points": 98,
+   "total": 98,
    "skipped": 0,
    "complete": true,
    "depth": "protocol-specific",
@@ -6729,7 +6729,7 @@
      "hint": "xdg_session_manager_v1.destroy",
      "result": "pass",
      "msg": "handled (m_impl)",
-     "where": "server/src/wl/xsession.c:298"
+     "where": "server/src/wl/xsession.c:294"
     },
     {
      "kind": "static",
@@ -6739,7 +6739,7 @@
      "hint": "xdg_session_manager_v1.get_session",
      "result": "pass",
      "msg": "handled (m_impl)",
-     "where": "server/src/wl/xsession.c:299"
+     "where": "server/src/wl/xsession.c:295"
     },
     {
      "kind": "static",
@@ -6749,7 +6749,7 @@
      "hint": "xdg_session_manager_v1.error.in_use",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/xsession.c:317"
+     "where": "server/src/wl/xsession.c:313"
     },
     {
      "kind": "static",
@@ -6759,7 +6759,7 @@
      "hint": "xdg_session_manager_v1.error.invalid_session_id",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/xsession.c:305"
+     "where": "server/src/wl/xsession.c:301"
     },
     {
      "kind": "static",
@@ -6769,7 +6769,7 @@
      "hint": "xdg_session_manager_v1.error.invalid_reason",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/xsession.c:301"
+     "where": "server/src/wl/xsession.c:297"
     },
     {
      "kind": "static",
@@ -6779,7 +6779,7 @@
      "hint": "xdg_session_v1.destroy",
      "result": "pass",
      "msg": "handled (s_impl)",
-     "where": "server/src/wl/xsession.c:245"
+     "where": "server/src/wl/xsession.c:241"
     },
     {
      "kind": "static",
@@ -6789,7 +6789,7 @@
      "hint": "xdg_session_v1.remove",
      "result": "pass",
      "msg": "handled (s_impl)",
-     "where": "server/src/wl/xsession.c:246"
+     "where": "server/src/wl/xsession.c:242"
     },
     {
      "kind": "static",
@@ -6799,7 +6799,7 @@
      "hint": "xdg_session_v1.add_toplevel",
      "result": "pass",
      "msg": "handled (s_impl)",
-     "where": "server/src/wl/xsession.c:259"
+     "where": "server/src/wl/xsession.c:255"
     },
     {
      "kind": "static",
@@ -6809,7 +6809,7 @@
      "hint": "xdg_session_v1.restore_toplevel",
      "result": "pass",
      "msg": "handled (s_impl)",
-     "where": "server/src/wl/xsession.c:265"
+     "where": "server/src/wl/xsession.c:261"
     },
     {
      "kind": "static",
@@ -6819,7 +6819,7 @@
      "hint": "xdg_session_v1.remove_toplevel",
      "result": "pass",
      "msg": "handled (s_impl)",
-     "where": "server/src/wl/xsession.c:275"
+     "where": "server/src/wl/xsession.c:271"
     },
     {
      "kind": "static",
@@ -6829,7 +6829,7 @@
      "hint": "xdg_session_v1.created",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/xsession.c:346"
+     "where": "server/src/wl/xsession.c:342"
     },
     {
      "kind": "static",
@@ -6839,7 +6839,7 @@
      "hint": "xdg_session_v1.restored",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/xsession.c:345"
+     "where": "server/src/wl/xsession.c:341"
     },
     {
      "kind": "static",
@@ -6849,7 +6849,7 @@
      "hint": "xdg_session_v1.replaced",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/xsession.c:330"
+     "where": "server/src/wl/xsession.c:326"
     },
     {
      "kind": "static",
@@ -6859,7 +6859,7 @@
      "hint": "xdg_session_v1.error.name_in_use",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/xsession.c:180"
+     "where": "server/src/wl/xsession.c:176"
     },
     {
      "kind": "static",
@@ -6869,7 +6869,7 @@
      "hint": "xdg_session_v1.error.already_mapped",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/xsession.c:217"
+     "where": "server/src/wl/xsession.c:213"
     },
     {
      "kind": "static",
@@ -6879,7 +6879,7 @@
      "hint": "xdg_session_v1.error.invalid_name",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/xsession.c:175"
+     "where": "server/src/wl/xsession.c:171"
     },
     {
      "kind": "static",
@@ -6889,7 +6889,7 @@
      "hint": "xdg_session_v1.error.already_added",
      "result": "pass",
      "msg": "raised",
-     "where": "server/src/wl/xsession.c:212"
+     "where": "server/src/wl/xsession.c:208"
     },
     {
      "kind": "static",
@@ -6899,7 +6899,7 @@
      "hint": "xdg_toplevel_session_v1.destroy",
      "result": "pass",
      "msg": "handled (ts_impl)",
-     "where": "server/src/wl/xsession.c:171"
+     "where": "server/src/wl/xsession.c:167"
     },
     {
      "kind": "static",
@@ -6909,7 +6909,7 @@
      "hint": "xdg_toplevel_session_v1.rename",
      "result": "pass",
      "msg": "handled (ts_impl)",
-     "where": "server/src/wl/xsession.c:172"
+     "where": "server/src/wl/xsession.c:168"
     },
     {
      "kind": "static",
@@ -6919,7 +6919,7 @@
      "hint": "xdg_toplevel_session_v1.restored",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/xsession.c:273"
+     "where": "server/src/wl/xsession.c:269"
     },
     {
      "kind": "generic",
@@ -7027,6 +7027,15 @@
      "weight": 3,
      "result": "pass",
      "msg": "destroy: no error",
+     "where": null
+    },
+    {
+     "kind": "flow",
+     "id": "flow.session.toplevel_restored_maximized",
+     "what": "xdg_session_v1.restore_toplevel,xdg_toplevel_session_v1.restored",
+     "weight": 3,
+     "result": "pass",
+     "msg": "a window maximized as it mapped (it was), closed, then restored by name from a new connection right away: session restored 1, window restored 1 time(s): no error",
      "where": null
     },
     {
@@ -7410,7 +7419,7 @@
    "xml": "/usr/share/wayland-protocols/staging/xdg-toplevel-icon/xdg-toplevel-icon-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7436",
+   "where": "server/src/wl/wl.c:7452",
    "interfaces": [
     "xdg_toplevel_icon_manager_v1",
     "xdg_toplevel_icon_v1"
@@ -7742,7 +7751,7 @@
    "xml": "/usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml",
    "version": 7,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7426",
+   "where": "server/src/wl/wl.c:7442",
    "interfaces": [
     "xdg_wm_base",
     "xdg_surface",
@@ -8264,7 +8273,7 @@
      "hint": "xdg_toplevel.close",
      "result": "pass",
      "msg": "sent",
-     "where": "server/src/wl/wl.c:7187"
+     "where": "server/src/wl/wl.c:7203"
     },
     {
      "kind": "static",
@@ -8830,7 +8839,7 @@
    "xml": "/usr/share/wayland-protocols/staging/xdg-dialog/xdg-dialog-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7432",
+   "where": "server/src/wl/wl.c:7448",
    "interfaces": [
     "xdg_wm_dialog_v1",
     "xdg_dialog_v1"
@@ -9133,7 +9142,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/idle-inhibit/idle-inhibit-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7456",
+   "where": "server/src/wl/wl.c:7472",
    "interfaces": [
     "zwp_idle_inhibit_manager_v1",
     "zwp_idle_inhibitor_v1"
@@ -9218,7 +9227,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7457",
+   "where": "server/src/wl/wl.c:7473",
    "interfaces": [
     "zwp_keyboard_shortcuts_inhibit_manager_v1",
     "zwp_keyboard_shortcuts_inhibitor_v1"
@@ -9344,7 +9353,7 @@
    "xml": "/usr/share/wayland-protocols/stable/linux-dmabuf/linux-dmabuf-v1.xml",
    "version": 5,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7440",
+   "where": "server/src/wl/wl.c:7456",
    "interfaces": [
     "zwp_linux_dmabuf_v1",
     "zwp_linux_dmabuf_feedback_v1",
@@ -9856,7 +9865,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7454",
+   "where": "server/src/wl/wl.c:7470",
    "interfaces": [
     "zwp_pointer_constraints_v1",
     "zwp_confined_pointer_v1",
@@ -10305,7 +10314,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/primary-selection/primary-selection-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7425",
+   "where": "server/src/wl/wl.c:7441",
    "interfaces": [
     "zwp_primary_selection_device_manager_v1",
     "zwp_primary_selection_device_v1",
@@ -10513,7 +10522,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/relative-pointer/relative-pointer-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7453",
+   "where": "server/src/wl/wl.c:7469",
    "interfaces": [
     "zwp_relative_pointer_manager_v1",
     "zwp_relative_pointer_v1"
@@ -11737,7 +11746,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7427",
+   "where": "server/src/wl/wl.c:7443",
    "interfaces": [
     "zxdg_decoration_manager_v1",
     "zxdg_toplevel_decoration_v1"
@@ -11939,7 +11948,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/xdg-foreign/xdg-foreign-unstable-v2.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7430",
+   "where": "server/src/wl/wl.c:7446",
    "interfaces": [
     "zxdg_exporter_v2",
     "zxdg_exported_v2"
@@ -12062,7 +12071,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/xdg-foreign/xdg-foreign-unstable-v2.xml",
    "version": 1,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7431",
+   "where": "server/src/wl/wl.c:7447",
    "interfaces": [
     "zxdg_importer_v2",
     "zxdg_imported_v2"
@@ -12196,7 +12205,7 @@
    "xml": "/usr/share/wayland-protocols/unstable/xdg-output/xdg-output-unstable-v1.xml",
    "version": 3,
    "advertised": true,
-   "where": "server/src/wl/wl.c:7419",
+   "where": "server/src/wl/wl.c:7435",
    "interfaces": [
     "zxdg_output_manager_v1",
     "zxdg_output_v1"
@@ -12461,7 +12470,7 @@
       "what": "xwl_init",
       "weight": 3,
       "result": "pass",
-      "msg": "an X11 client connects (Xwayland started on demand) in 46 ms",
+      "msg": "an X11 client connects (Xwayland started on demand) in 42 ms",
       "hint": "xwl_init"
      },
      {

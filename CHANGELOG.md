@@ -41,7 +41,7 @@ Mode in a video call, and the Raspberry Pi with this release.
   allowed exceptions with the protocol's words, the protocols complete here but "Partly" in the table, the globals only
   the test hooks reach, timing checks that can fail once on a loaded machine, and that KWin and Mutter were never put
   through the tool); every Wayland global and X11 item with its version, score, depth, checks by kind and screenshot;
-  every one of the 1,294 checks with its result, points, message and file:line; the real programs the run started;
+  every one of the 1,295 checks with its result, points, message and file:line; the real programs the run started;
   LordOS against KWin and Mutter as wayland.app lists them (by category, the protocols LordOS offers with their
   versions, the ones only KDE or GNOME offer, and the ones left out on purpose grouped by reason); copy-and-paste
   steps for Debian 13 (packages, clone, build, run, read, compare, one protocol at a time, a live session, the
