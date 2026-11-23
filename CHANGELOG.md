@@ -12,7 +12,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 - **Machines: a restart or shutdown of the computer handles a running machine at once, and inside logind's delay.**
-  Seen on the maintainer's PC (2026-11-23): with a Windows 11 machine running (an Intel GVT-g vGPU, started paused),
+  Seen on the maintainer's PC (2026-11-23): with a guest machine running (an Intel GVT-g vGPU, started paused),
   `reboot` waited the whole 30 s ("Delay lock is active (… lord-vm) but inhibitor timeout is reached"), lord-vm only
   then logged *the computer is shutting down*, and systemd's last kill took QEMU and its VFIO device down hard (a
   suspect for the restarts that stayed on the boot splash that week).
