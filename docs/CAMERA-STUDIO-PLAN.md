@@ -7,7 +7,7 @@ The maintainer approved the whole plan and the exceptions E-S1 to E-S7 on 2026-1
 **not** approved: D3 is our own C inference, and ONNX Runtime is only the dev machine's reference in tests. The name is
 "LordOS Studio" and the status item's label "Camera" (D6); D5 and D7 to D10 take this plan's recommendations. D4: the
 package is an optional Store item (approved 2026-11-22). Phases 4 and 5 (the portal, the app) are not built yet;
-a first LordOS Studio app with the popover's controls, and Mic Mode from the capture item, are in development (11.5).
+a first LordOS Studio app with the popover's controls, and Mic Mode from the capture item, are in development (11.6).
 Sections 3.3 and 11.3 have measured numbers.
 Facts are labelled the way `GO-LINK.md` does it:
 
