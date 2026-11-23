@@ -217,9 +217,27 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     memory a shared memfd, which gets 4 KB pages only while `/sys/kernel/mm/transparent_hugepage/shmem_enabled` is
     `never` (the kernel's default). **Measured** with the same QEMU memory options: dependent random reads over 1 GB
     took 76 ns with host huge pages against 112 ns with the shared memfd (guest huge pages; 111 against 153 ns with guest
-    4 KB pages), and touching new memory took a third longer. Setting `shmem_enabled` to `advise` would give the shared
-    memory 2 MB pages too; it's a system setting, proposed in docs/VIRTUALIZATION.md 3.7.2 and not built.
+    4 KB pages), and touching new memory took a third longer. Fixed by the next entry.
   - Tests: `build/vmmem-test` (`/proc/meminfo`'s fields, hugetlb only when it all fits).
+
+- **Machines: a machine with a shared folder or the transfer folder gets 2 MB pages too** (in development; the system
+  setting approved by the maintainer on 2026-11-23). Two changes, each useless without the other:
+  - The `lordos` package sets `/sys/kernel/mm/transparent_hugepage/shmem_enabled` to `advise`
+    (`/usr/lib/tmpfiles.d/lordos-thp.conf`, applied at every boot; migration `011-0.8.9.6-shmem-huge-pages.sh` applies
+    it at once on an upgrade, only from `never`, the kernel's default, so a value an administrator chose stays). Only
+    shared memory that asks for huge pages gets them, which QEMU does for a guest's memory; tmpfs and `/dev/shm` don't
+    change. A file of the same name in `/etc/tmpfiles.d` keeps another value. Kernels without transparent huge pages
+    (the Pi 5's) skip it.
+  - lord-vm gives such a machine `memory-backend-ram,share=on` instead of `memory-backend-memfd,share=on`. QEMU maps a
+    `memory-backend-memfd` only 4 KB aligned, so it never got a 2 MB page whatever the setting (**measured**: 10 MB of
+    huge pages with `advise`); QEMU 10.0 backs shared RAM with a memfd of its own, mapped 2 MB aligned, and virtiofsd
+    still gets its descriptor. A state saved with the old backend loads with the new one. The session log now says
+    which pages shared memory gets (`memory: shared (shared folders), 2 MB transparent huge pages (shmem_enabled
+    advise)`) (`server/src/vm/vmmem.h` `vmmem_object`, `vmmem_shmem_huge`).
+  - **Measured** (a 2 GB guest doing 20 million dependent reads over a 1 GB random cycle, 5 rounds interleaved): with
+    the transfer folder, 93 ns a read before and 75 ns now, the same as a machine without a shared folder (74 ns);
+    touching and shuffling 1 GB took 1.00 s before and 0.52 s now. docs/VIRTUALIZATION.md 3.7.2.
+  - Tests: `build/vmmem-test` (the backend's `-object`, `shmem_enabled`'s value read).
 
 - **Machines: a machine's disks get an I/O thread of their own and bypass the host's cache on ext4 and XFS** (in
   development). The system disk and the data disks (virtio-blk) are served by one QEMU I/O thread instead of its main
