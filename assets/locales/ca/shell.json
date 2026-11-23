@@ -199,6 +199,7 @@
   "picker.exists": "Ja existeix un fitxer amb aquest nom.",
   "picker.viewList": "Llista",
   "picker.viewThumbs": "Miniatures",
+  "picker.noCloud": "Aquí no es pot triar una carpeta del núvol.",
   "portalOpen.titleUrl": "{app} vol obrir una pàgina web",
   "portalOpen.titleFile": "{app} vol obrir un fitxer",
   "portalOpen.titleFolder": "{app} vol obrir una carpeta",

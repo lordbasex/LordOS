@@ -203,6 +203,7 @@
   "picker.exists": "Файл із такою назвою вже існує.",
   "picker.viewList": "Список",
   "picker.viewThumbs": "Мініатюри",
+  "picker.noCloud": "Тут не можна вибрати теку в хмарі.",
   "portalOpen.titleUrl": "{app} хоче відкрити вебсторінку",
   "portalOpen.titleFile": "{app} хоче відкрити файл",
   "portalOpen.titleFolder": "{app} хоче відкрити теку",

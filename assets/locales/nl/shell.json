@@ -199,6 +199,7 @@
   "picker.exists": "Er bestaat al een bestand met deze naam.",
   "picker.viewList": "Lijst",
   "picker.viewThumbs": "Miniaturen",
+  "picker.noCloud": "Een cloudmap kan hier niet worden gekozen.",
   "portalOpen.titleUrl": "{app} wil een webpagina openen",
   "portalOpen.titleFile": "{app} wil een bestand openen",
   "portalOpen.titleFolder": "{app} wil een map openen",

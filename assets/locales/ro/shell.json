@@ -203,6 +203,7 @@
   "picker.exists": "Există deja un fișier cu acest nume.",
   "picker.viewList": "Listă",
   "picker.viewThumbs": "Miniaturi",
+  "picker.noCloud": "Aici nu se poate alege un dosar din cloud.",
   "portalOpen.titleUrl": "{app} vrea să deschidă o pagină web",
   "portalOpen.titleFile": "{app} vrea să deschidă un fișier",
   "portalOpen.titleFolder": "{app} vrea să deschidă un dosar",

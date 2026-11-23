@@ -203,6 +203,7 @@
   "picker.exists": "Файл с таким именем уже существует.",
   "picker.viewList": "Список",
   "picker.viewThumbs": "Миниатюры",
+  "picker.noCloud": "Здесь нельзя выбрать папку в облаке.",
   "portalOpen.titleUrl": "{app} хочет открыть веб-страницу",
   "portalOpen.titleFile": "{app} хочет открыть файл",
   "portalOpen.titleFolder": "{app} хочет открыть папку",

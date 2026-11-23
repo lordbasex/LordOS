@@ -195,6 +195,7 @@
   "picker.exists": "Berkas dengan nama ini sudah ada.",
   "picker.viewList": "Daftar",
   "picker.viewThumbs": "Gambar mini",
+  "picker.noCloud": "Folder Cloud tidak dapat dipilih di sini.",
   "portalOpen.titleUrl": "{app} ingin membuka halaman web",
   "portalOpen.titleFile": "{app} ingin membuka berkas",
   "portalOpen.titleFolder": "{app} ingin membuka folder",

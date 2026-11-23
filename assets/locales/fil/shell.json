@@ -199,6 +199,7 @@
   "picker.exists": "May file na may ganitong pangalan.",
   "picker.viewList": "Listahan",
   "picker.viewThumbs": "Mga Thumbnail",
+  "picker.noCloud": "Hindi puwedeng pumili rito ng folder sa cloud.",
   "portalOpen.titleUrl": "Gustong magbukas ng {app} ng isang web page",
   "portalOpen.titleFile": "Gustong magbukas ng {app} ng isang file",
   "portalOpen.titleFolder": "Gustong magbukas ng {app} ng isang folder",

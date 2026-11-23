@@ -199,6 +199,7 @@
   "picker.exists": "Bu adda fayl artıq mövcuddur.",
   "picker.viewList": "Siyahı",
   "picker.viewThumbs": "Miniatürlər",
+  "picker.noCloud": "Burada bulud qovluğu seçilə bilməz.",
   "portalOpen.titleUrl": "{app} veb səhifə açmaq istəyir",
   "portalOpen.titleFile": "{app} fayl açmaq istəyir",
   "portalOpen.titleFolder": "{app} qovluq açmaq istəyir",

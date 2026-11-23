@@ -195,6 +195,7 @@
   "picker.exists": "同じ名前のファイルがすでにあります。",
   "picker.viewList": "リスト",
   "picker.viewThumbs": "サムネール",
+  "picker.noCloud": "ここではクラウドのフォルダは選択できません。",
   "portalOpen.titleUrl": "{app} が Web ページを開こうとしています",
   "portalOpen.titleFile": "{app} がファイルを開こうとしています",
   "portalOpen.titleFolder": "{app} がフォルダを開こうとしています",

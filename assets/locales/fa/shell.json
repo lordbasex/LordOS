@@ -199,6 +199,7 @@
   "picker.exists": "فایلی با این نام از قبل وجود دارد.",
   "picker.viewList": "فهرست",
   "picker.viewThumbs": "تصویرک‌ها",
+  "picker.noCloud": "اینجا نمی‌توان پوشهٔ ابری را انتخاب کرد.",
   "portalOpen.titleUrl": "{app} می‌خواهد صفحه‌ای وب را باز کند",
   "portalOpen.titleFile": "{app} می‌خواهد فایلی را باز کند",
   "portalOpen.titleFolder": "{app} می‌خواهد پوشه‌ای را باز کند",

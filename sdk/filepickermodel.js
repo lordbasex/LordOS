@@ -106,6 +106,14 @@ export function primaryAction({ mode, multiple, dir, row, chosen = [], name = ''
   return row.dir ? { go: row.path } : { pick: row.path };
 }
 
+// A dialog that may not choose a Cloud account's folder (cloud={false}: Backups' destination, #200 and #208): an action that
+// would pick one, or a folder inside one, becomes null (the button disabled). Going into a folder stays allowed.
+export function refuseCloud(a, home) {
+  if (!a) return null;
+  const picks = a.pickMany || (a.pick ? [a.pick] : []);
+  return picks.some((p) => cloudRoot(p, home)) ? null : a;
+}
+
 // Enter opens the row under the cursor, as a double click; with no row, it is the primary button.
 export function enterAction(a) {
   if (a.row?.dir) return { go: a.row.path };

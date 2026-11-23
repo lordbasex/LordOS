@@ -195,6 +195,7 @@
   "picker.exists": "มีไฟล์ชื่อนี้อยู่แล้ว",
   "picker.viewList": "รายการ",
   "picker.viewThumbs": "ภาพขนาดย่อ",
+  "picker.noCloud": "เลือกโฟลเดอร์บนคลาวด์ที่นี่ไม่ได้",
   "portalOpen.titleUrl": "{app} ต้องการเปิดหน้าเว็บ",
   "portalOpen.titleFile": "{app} ต้องการเปิดไฟล์",
   "portalOpen.titleFolder": "{app} ต้องการเปิดโฟลเดอร์",

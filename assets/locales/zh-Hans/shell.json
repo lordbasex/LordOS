@@ -195,6 +195,7 @@
   "picker.exists": "已存在同名文件。",
   "picker.viewList": "列表",
   "picker.viewThumbs": "缩略图",
+  "picker.noCloud": "这里不能选取云端文件夹。",
   "portalOpen.titleUrl": "{app} 想要打开一个网页",
   "portalOpen.titleFile": "{app} 想要打开一个文件",
   "portalOpen.titleFolder": "{app} 想要打开一个文件夹",

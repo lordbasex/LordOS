@@ -12,6 +12,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Backups: the destination and the exclusions can be chosen in the file dialog, in development (the latest release is
+  0.8.9.4; from [#200](https://github.com/lordbasex/LordOS/issues/200)'s second idea).** Settings → Destination has
+  a **Choose…** button next to **Use Folder**, and Exclusions one next to **Add**. Each opens the system file dialog
+  (`FilePicker` in folder mode, `sdk/filepicker.jsx`) over the app; typing a path keeps working as before.
+  - **Destination:** the dialog starts at the current destination (or the home folder) and never offers a Cloud
+    account's folder, as #208 decided: it is called with the new `cloud={false}`, which takes the Cloud accounts out
+    of its sidebar, and in `~/Cloud/<account>` or a folder inside one its **Choose this folder** button is off, with
+    the note "A Cloud folder can't be chosen here." (`refuseCloud` in `sdk/filepickermodel.js`, which also covers
+    Enter; going into folders still works). lord-server's own refusal (`fsops_cloud_path`, `backup.destCloud`) is
+    unchanged and still the check that counts. A dialog that starts in a Cloud folder with `cloud={false}` starts at
+    home instead.
+  - **Exclusions:** a folder chosen or typed must be inside the home folder, which is what Backups copies. Anything
+    else (another user's folder, a disk, `/etc`, a path with `.` or `..`) shows "Only a folder inside your home folder
+    can be excluded…", and the home folder itself shows "…nothing would be left to back up." under the field, instead
+    of being stored. A chosen folder is stored relative to home like a typed one (`Videos/Large`), and the same one is
+    never added twice (`exclusionFor` and `addExclusion` in the new `apps/backup/model.js`).
+  - **Text:** five `backup.*` keys (`choose`, `pickDest`, `pickExclude`, `excludeOutside`, `excludeHome`) and
+    `shell.picker.noCloud`, in all 35 languages.
+  - **Tests:** `server/tests/backup_model_test.mjs` (in `make -C server test`): absolute, `~/` and relative paths,
+    extra slashes, outside paths and look-alike prefixes, `.` and `..`, the home folder itself, duplicates, and
+    `refuseCloud` for a Cloud account's folder, one inside it, `~/Cloud` itself and a disk; and
+    `backup_pickers_scene.mjs` (23 checks, over `textfield_menu_test.mjs`'s stub): the real app's Settings, both Choose…
+    buttons, the dialog without Cloud, its button off with the note in a Cloud account's folder, a disk's folder chosen
+    as destination, a home folder chosen and typed as exclusions, and the two errors with nothing stored.
+  - **Paper:** the Backups highlight says so, in en, es and pt.
+  - **Still on the roadmap** (docs/ROADMAP.md): several named jobs, a schedule per job, folders outside the home
+    folder, choosing source folders, keeping the computer awake and the jobs list.
+
 - **Lord Classic's start menu shows apps by category, in development (the latest release is 0.8.9.4; from #210's
   idea).** All apps now has a small switch next to its title, **A–Z | Categories**. A–Z is the list it always was;
   Categories lists the groups that hold at least one app, each with its count, and a click opens or closes a group to

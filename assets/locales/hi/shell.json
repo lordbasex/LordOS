@@ -199,6 +199,7 @@
   "picker.exists": "इस नाम की फ़ाइल पहले से मौजूद है।",
   "picker.viewList": "सूची",
   "picker.viewThumbs": "थंबनेल",
+  "picker.noCloud": "यहाँ क्लाउड फ़ोल्डर नहीं चुना जा सकता।",
   "portalOpen.titleUrl": "{app} एक वेब पेज खोलना चाहता है",
   "portalOpen.titleFile": "{app} एक फ़ाइल खोलना चाहता है",
   "portalOpen.titleFolder": "{app} एक फ़ोल्डर खोलना चाहता है",

@@ -199,6 +199,7 @@
   "picker.exists": "Já existe um arquivo com este nome.",
   "picker.viewList": "Lista",
   "picker.viewThumbs": "Miniaturas",
+  "picker.noCloud": "Não é possível escolher aqui uma pasta da nuvem.",
   "portalOpen.titleUrl": "{app} quer abrir uma página da web",
   "portalOpen.titleFile": "{app} quer abrir um arquivo",
   "portalOpen.titleFolder": "{app} quer abrir uma pasta",
