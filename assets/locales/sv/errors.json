@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "Ingen nyckel väntar på att registreras vid nästa omstart.",
   "dkms.mokNoTool": "Programmet mokutil är inte installerat.",
   "dkms.mokFailed": "Nyckeln kunde inte förberedas för nästa omstart.",
-  "media.protectedWindow": "Det här fönstret är skyddat och kan inte fångas ensamt. I skärmbilder visas det svart."
+  "media.protectedWindow": "Det här fönstret är skyddat och kan inte fångas ensamt. I skärmbilder visas det svart.",
+  "llm.busy": "Sentinela analyserar redan flera saker. Försök igen om en stund.",
+  "llm.noEngine": "Motorn för den lokala modellen är inte installerad.",
+  "llm.noModel": "Den lokala modellen är inte installerad.",
+  "sentinela.blockFailed": "Dess nätverk kunde inte blockeras."
 }

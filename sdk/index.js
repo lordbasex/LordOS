@@ -22,6 +22,14 @@ export { speak, stopSpeaking, pauseSpeaking, replaySpeaking, closePlayer, saveSp
 export { VOICE_LANGS, VOICES, voiceLabel, voicePackage, modelPackage, hasVoice, PREVIEWS_PACKAGE } from './voicecatalog.js';
 export { parseWav, levelDb, quietEnough, roomCheck, takeName, trimSilence, joinPhrases, phraseDone } from './voicerecmodel.js';
 export { scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName } from './voicemanager.js';
+// Sentinela, the process guard (docs/SENTINELA.md): its models, its rules and its session service
+export { LLM_MODELS, ENGINE_PACKAGE, llmModel, packagesForModel, llmPackageOk } from './llmcatalog.js';
+export { TRIGGERS, ACTIONS, SENTINELA_DEFAULTS, factLines } from './sentinelamodel.js';
+export {
+  sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery,
+  clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm,
+} from './sentinela.js';
+export { ShieldGlyph } from './sentinelaglyph.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows, switcherKeys, switcherGrabs, switcherHold } from './appswitcher.jsx';
 export { switcherPrefs, SWITCHER_DEFAULTS, validColor } from './switchermodel.js';
@@ -148,6 +156,7 @@ export { help } from './help.js';
 import { NotificationBanner } from './notify.js';
 import { startAlarms } from './alarms.js';
 import { startDiskWatch } from './diskwatch.js';
+import { startSentinela } from './sentinela.js';
 import { maybeStartTour } from './help.js';
 import { FirstStart, startFirstStart } from './firststart.jsx';
 import { liveStartWindow } from './livestart.js';
@@ -347,6 +356,7 @@ export function startShell(element) {
   startHardware();                      // Night Light, idle timers, battery in the menu bar (hardware.jsx)
   startTray();                          // the tray icons of Linux apps next to the status items (trayitems.jsx)
   startDiskWatch();                     // notices when a disk gets too hot or its health gets worse
+  startSentinela();                     // the process guard, once the person turns it on (docs/SENTINELA.md)
   startVideo();                         // browser video without hardware decoding (video.js, docs/VIDEO.md)
   startBrowserFrame();                  // "Browsers: tabs in the title bar" left for Chromium to quit (browserframe.js)
   setTimeout(sweepUninstalledGrants, 5000); // a screen-share grant doesn't outlive its app (share.js)

@@ -1,4 +1,4 @@
-// Settings → AI: reading aloud (docs/VOICE.md). Voice: on or off, the ❖Esc shortcut, the small player (settings.voice,
+// Settings → AI: two pages, Voice and Sentinela (Sentinela.jsx, docs/SENTINELA.md). Voice is reading aloud (docs/VOICE.md). Voice: on or off, the ❖Esc shortcut, the small player (settings.voice,
 // sdk/voice.js) and where speech is made (voice.json's backend). Per language: the standard and HD models and the
 // voices (sdk/voicecatalog.js), each heard from its recorded sample before downloading it, downloaded and removed as
 // signed lordos-voice-* packages (sdk/voicemanager.js), the one used chosen; and the person's own voices, recorded
@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from 'react';
 import { Stack, Section, SettingRow, Note } from './ui.jsx';
 import { PersonalVoiceSheet } from './PersonalVoice.jsx';
+import { SentinelaSettings } from './Sentinela.jsx';
 
 const BACKENDS = ['auto', 'cpu', 'gpu'];
 const QUALITIES = ['auto', 'standard', 'hd'];
@@ -20,7 +21,25 @@ const size = (mb) => formatBytes(mb * 1e6);
 const hasPreviews = () => [`${fs.home()}/.local/share/lordos/voice`, '/usr/share/lordos/voice']
   .some((root) => { try { return !!fs.stat(`${root}/previews/es/lola.wav`); } catch (e) { return false; } });
 
-export function AISettings() {
+// the page shown last survives the section being left; another app opens one with { section: 'ai', page: 'sentinela' }
+let lastPage = 'voice';
+
+export function AISettings({ page, alert }) {
+  const { t: tr } = useLocale();
+  const [view, setView] = useState(() => (page === 'sentinela' || page === 'voice' ? page : lastPage));
+  useEffect(() => { if (page === 'sentinela' || page === 'voice') { lastPage = page; setView(page); } }, [page, alert]);
+  const pick = (v) => { lastPage = v; setView(v); };
+  return (
+    <Stack>
+      <View style={{ alignItems: 'flex-start' }}>
+        <Segmented value={view} onChange={pick} options={[['voice', tr('settings.ai.voice')], ['sentinela', tr('sentinela.name')]]} />
+      </View>
+      {view === 'sentinela' ? <SentinelaSettings alertId={alert} /> : <VoiceSettings />}
+    </Stack>
+  );
+}
+
+function VoiceSettings() {
   const { t: tr, lang: uiLang } = useLocale();
   const th = useTheme();
   const [s, set] = useSettings();

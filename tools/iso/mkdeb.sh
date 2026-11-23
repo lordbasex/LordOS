@@ -106,7 +106,7 @@ for h in lord-media:"libavcodec-dev libavformat-dev libavutil-dev libswscale-dev
          lord-doc:"libpoppler-glib-dev libarchive-dev" lord-ocr:"libtesseract-dev" lord-tts:"tools/tts/fetch-audiocpp.sh" \
          lord-screencast:"libpipewire-0.3-dev" \
          lord-vmdisplay:"libsystemd-dev" lord-vault:"" lord-maild:"" lord-bench:"" lord-clean:"" lord-lan:"" lord-fetch:"" lord-hidpp:"" lord-appstream:"" \
-         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-pgpv:"" lordos-guest:""; do
+         lord-tls:"" lord-sql:"" lord-sftp:"" lord-vm:"" lord-pgpv:"" lord-llm:"" lordos-guest:""; do
     b=${h%%:*}; need=${h#*:}
     [ -x "server/build/$b" ] && continue
     case " ${ALLOW_MISSING:-} " in *" $b "*) echo "mkdeb: leaving out $b (ALLOW_MISSING)" >&2; continue ;; esac
@@ -189,6 +189,9 @@ if [ -x server/build/lord-tts ]; then
     # audio.cpp's description of Kyutai's HD model folders (server/mk/tts.mk; lord-tts reads it, docs/VOICE.md)
     install -m 644 server/build/lib/tts/pocket_tts_dir.json "$L/lib/tts/pocket_tts_dir.json"
 fi
+# Sentinela's launcher (docs/SENTINELA.md): lord-server starts only the lord-llm next to it, which runs LordOS's
+# llama-server (the llama.cpp package, installed from Settings with a model) in its sandbox; libc only
+install -m 755 server/build/lord-llm "$L/bin/lord-llm"
 # isolated text recognition helper, Screenshots' "copy the text" (optional: make skips it without libtesseract-dev)
 [ -x server/build/lord-ocr ] && install -m 755 server/build/lord-ocr "$L/bin/lord-ocr"
 # DEBUG_SYMBOLS=1 (test packages): the symbols of lord-server and lord-sessiond, kept next to the package as
@@ -208,7 +211,7 @@ fi
 "$STRIP" --strip-unneeded "$L/bin/lord-server" "$L/bin/lord-sessiond" "$L/bin/lord-netd" "$L/bin/lord-netperm" "$L/bin/lord-fand" "$L/bin/lord-pkexec" "$L/bin/lord-autoinstall" "$L/bin/lord-browser-prefs" "$L/bin/lordos-firstrun" "$PKG/usr/lib/systemd/system-sleep/lordos-lid-wake" 2>/dev/null || true
 [ -x "$L/bin/lord-doc" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-doc" 2>/dev/null || true; }
 [ -x "$L/bin/lord-ocr" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-ocr" 2>/dev/null || true; }
-"$STRIP" --strip-unneeded "$L/bin/lord-claude-status" "$L/bin/lord-say" 2>/dev/null || true
+"$STRIP" --strip-unneeded "$L/bin/lord-claude-status" "$L/bin/lord-say" "$L/bin/lord-llm" 2>/dev/null || true
 [ -x "$L/bin/lord-tts" ] && { "$STRIP" --strip-unneeded "$L/bin/lord-tts" 2>/dev/null || true; }
 # lord-server only launches the lord-media in its own folder (media: video, photos, camera, recorder)
 [ -x server/build/lord-media ] && install -m 755 server/build/lord-media "$L/bin/lord-media"

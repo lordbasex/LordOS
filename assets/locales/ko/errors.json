@@ -925,5 +925,9 @@
   "dkms.mokNothingPending": "다음 재시동 때 등록을 기다리는 키가 없습니다.",
   "dkms.mokNoTool": "mokutil 프로그램이 설치되어 있지 않습니다.",
   "dkms.mokFailed": "다음 재시동을 위한 키를 준비하지 못했습니다.",
-  "media.protectedWindow": "이 윈도우는 보호되어 있어 따로 캡처할 수 없습니다. 화면 캡처에서는 검게 표시됩니다."
+  "media.protectedWindow": "이 윈도우는 보호되어 있어 따로 캡처할 수 없습니다. 화면 캡처에서는 검게 표시됩니다.",
+  "llm.busy": "Sentinela가 이미 여러 항목을 분석하고 있습니다. 잠시 후에 다시 시도하십시오.",
+  "llm.noEngine": "로컬 모델 엔진이 설치되어 있지 않습니다.",
+  "llm.noModel": "그 로컬 모델은 설치되어 있지 않습니다.",
+  "sentinela.blockFailed": "네트워크를 차단하지 못했습니다."
 }

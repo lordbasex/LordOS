@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "No key is waiting to be enrolled at the next restart.",
   "dkms.mokNoTool": "The mokutil program isn't installed.",
   "dkms.mokFailed": "The key couldn't be prepared for the next restart.",
-  "media.protectedWindow": "This window is protected, so it can't be captured on its own. In captures of the screen it shows black."
+  "media.protectedWindow": "This window is protected, so it can't be captured on its own. In captures of the screen it shows black.",
+  "llm.busy": "Sentinela is already analyzing several things. Try again in a moment.",
+  "llm.noEngine": "The local model engine isn't installed.",
+  "llm.noModel": "That local model isn't installed.",
+  "sentinela.blockFailed": "Its network couldn't be blocked."
 }

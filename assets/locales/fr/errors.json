@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "Aucune clé n’attend d’être inscrite au prochain redémarrage.",
   "dkms.mokNoTool": "Le programme mokutil n’est pas installé.",
   "dkms.mokFailed": "La clé n’a pas pu être préparée pour le prochain redémarrage.",
-  "media.protectedWindow": "Cette fenêtre est protégée : elle ne peut pas être capturée seule. Dans les captures de l’écran, elle apparaît en noir."
+  "media.protectedWindow": "Cette fenêtre est protégée : elle ne peut pas être capturée seule. Dans les captures de l’écran, elle apparaît en noir.",
+  "llm.busy": "Sentinela analyse déjà plusieurs choses. Réessayez dans un instant.",
+  "llm.noEngine": "Le moteur du modèle local n’est pas installé.",
+  "llm.noModel": "Ce modèle local n’est pas installé.",
+  "sentinela.blockFailed": "Son réseau n’a pas pu être bloqué."
 }

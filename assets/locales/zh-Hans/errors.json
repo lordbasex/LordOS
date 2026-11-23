@@ -925,5 +925,9 @@
   "dkms.mokNothingPending": "没有密钥在等待下次重新启动时注册。",
   "dkms.mokNoTool": "未安装 mokutil 程序。",
   "dkms.mokFailed": "无法为下次重新启动准备密钥。",
-  "media.protectedWindow": "此窗口受保护，无法单独截取。在屏幕截图中它显示为黑色。"
+  "media.protectedWindow": "此窗口受保护，无法单独截取。在屏幕截图中它显示为黑色。",
+  "llm.busy": "Sentinela 正在分析多项内容。请稍后再试。",
+  "llm.noEngine": "未安装本地模型引擎。",
+  "llm.noModel": "未安装该本地模型。",
+  "sentinela.blockFailed": "无法阻止其联网。"
 }

@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "No hi ha cap clau esperant inscriure’s al proper reinici.",
   "dkms.mokNoTool": "El programa mokutil no està instal·lat.",
   "dkms.mokFailed": "No s’ha pogut preparar la clau per al proper reinici.",
-  "media.protectedWindow": "Aquesta finestra està protegida: no es pot capturar sola. A les captures de la pantalla surt en negre."
+  "media.protectedWindow": "Aquesta finestra està protegida: no es pot capturar sola. A les captures de la pantalla surt en negre.",
+  "llm.busy": "Sentinela ja està analitzant diverses coses. Torna-ho a provar d’aquí a un moment.",
+  "llm.noEngine": "El motor del model local no està instal·lat.",
+  "llm.noModel": "Aquest model local no està instal·lat.",
+  "sentinela.blockFailed": "No s’ha pogut bloquejar la seva xarxa."
 }

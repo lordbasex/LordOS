@@ -15,11 +15,14 @@
  *   mapFrame()                  the latest ready frame { seq, width, height, lon, lat, ppd, ms, data } or null
  *   detail(pid, start)          Get Info: which process the thread describes once per second (0: none)
  *   detailInfo()                its latest details (procctl.c), or null if nothing new
- *   signal(pid, start, kind)    stops one of the user's own processes: kind 'TERM' or 'KILL'; null or
+ *   signal(pid, start, kind)    stops one of the user's own processes: kind 'TERM' or 'KILL' ('STOP', 'CONT' and
+ *                               'LOWER', nice 19 and idle I/O, for Sentinela's Pause, Resume and Limit); null or
  *                               an error code (proc.gone, proc.protected…, proc.notOwn, proc.denied).
  *                               Other users' processes go through the root helper (proc-signal,
  *                               administrators only; sdk/monitor.js).
  *   watchDisks(on)              disk temperatures with the Monitor closed (every 30 s; sdk/diskwatch.js)
+ *   watchProcs(on)              Sentinela: the process list every 10 s, Monitor open or not (sdk/sentinela.js)
+ *   procsWatched(language)      its latest list, the same objects as processes(), or null if nothing new
  *   diskTemps()                 the latest { t, disks: [{ name, model, sensor, temp, tempMax, … }] } or
  *                               null if nothing new; it does not keep the 4 Hz sampling awake
  *   wantVoltage(on)             Monitor → Voltage on screen: the thread reads the voltages about every 2 s
@@ -250,12 +253,34 @@ enum { PK_PID, PK_PPID, PK_UID, PK_USER, PK_NAME, PK_CMD, PK_EXE, PK_STATE, PK_T
 static const char *const PK_NAMES[PK_N] = { "pid", "ppid", "uid", "user", "name", "cmd", "exe", "state", "threads", "cpu", "rss",
                                             "start", "st", "self", "prot", "pss" };
 
+static JSValue procs_object(JSContext *c, MonProcs *pl, const char *lang);
+
 static JSValue f_processes(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char lang[16];
     if (arg_lang(c, argc, argv, lang, sizeof lang)) return JS_EXCEPTION;
     MonProcs *pl = mon_procs_take(&seq_procs);
     if (!pl) return JS_NULL;
+    return procs_object(c, pl, lang);
+}
+
+/* Sentinela (docs/SENTINELA.md): the list every 10 s with the Monitor closed, the same objects as processes() */
+static uint64_t seq_wprocs;
+static JSValue f_watch_procs(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    mon_watch_procs(argc > 0 && JS_ToBool(c, argv[0]) > 0);
+    return JS_TRUE;
+}
+static JSValue f_procs_watched(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char lang[16];
+    if (arg_lang(c, argc, argv, lang, sizeof lang)) return JS_EXCEPTION;
+    MonProcs *pl = mon_procs_watched(&seq_wprocs);
+    if (!pl) return JS_NULL;
+    return procs_object(c, pl, lang);
+}
+
+static JSValue procs_object(JSContext *c, MonProcs *pl, const char *lang) {
     AppSet as = { .lang = lang, .nfps = -1 };
     as.napps = apps_list(lang, &as.apps);
     JSAtom k[PK_N];
@@ -470,16 +495,18 @@ static JSValue f_signal(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     if (arg_proc(c, argc, argv, &pid, &start) || pid < 1 || argc < 3 || !JS_IsString(argv[2])) return js_throw_code(c, "sys.badArgument", NULL);
     const char *k = JS_ToCString(c, argv[2]);
     if (!k) return JS_EXCEPTION;
-    int sig = !strcmp(k, "TERM") ? SIGTERM : !strcmp(k, "KILL") ? SIGKILL : 0;
+    /* STOP and CONT: Sentinela's "Pause" and "Resume"; LOWER: its "Limit" (nice 19 and idle I/O on every thread) */
+    int lower = !strcmp(k, "LOWER");
+    int sig = !strcmp(k, "TERM") ? SIGTERM : !strcmp(k, "KILL") ? SIGKILL : !strcmp(k, "STOP") ? SIGSTOP : !strcmp(k, "CONT") ? SIGCONT : 0;
     JS_FreeCString(c, k);
-    if (!sig) return js_throw_code(c, "sys.badArgument", NULL);
+    if (!sig && !lower) return js_throw_code(c, "sys.badArgument", NULL);
     /* only the user's own processes here; the rest goes through the root helper (administrators) */
     char p[64];
     struct stat sb;
     snprintf(p, sizeof p, "/proc/%d", pid);
     if (stat(p, &sb)) return JS_NewString(c, "proc.gone");
     if (sb.st_uid != getuid()) return JS_NewString(c, "proc.notOwn");
-    const char *e = proc_signal(pid, start, sig, (int)getpid());
+    const char *e = lower ? proc_lower(pid, start, (int)getpid()) : proc_signal(pid, start, sig, (int)getpid());
     return e ? JS_NewString(c, e) : JS_NULL;
 }
 
@@ -584,6 +611,8 @@ static const JSCFunctionListEntry monitor_funcs[] = {
     JS_CFUNC_DEF("detailInfo", 0, f_detail_info),
     JS_CFUNC_DEF("signal", 3, f_signal),
     JS_CFUNC_DEF("watchDisks", 1, f_watch_disks),
+    JS_CFUNC_DEF("watchProcs", 1, f_watch_procs),
+    JS_CFUNC_DEF("procsWatched", 1, f_procs_watched),
     JS_CFUNC_DEF("diskTemps", 0, f_disk_temps),
     JS_CFUNC_DEF("wantVoltage", 1, f_want_voltage),
     JS_CFUNC_DEF("voltage", 0, f_voltage),

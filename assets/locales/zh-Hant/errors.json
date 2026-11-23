@@ -925,5 +925,9 @@
   "dkms.mokNothingPending": "沒有金鑰在等待下次重新啟動時登錄。",
   "dkms.mokNoTool": "未安裝 mokutil 程式。",
   "dkms.mokFailed": "無法為下次重新啟動準備金鑰。",
-  "media.protectedWindow": "此視窗受保護，無法單獨擷取。在螢幕截圖中它會顯示為黑色。"
+  "media.protectedWindow": "此視窗受保護，無法單獨擷取。在螢幕截圖中它會顯示為黑色。",
+  "llm.busy": "Sentinela 正在分析多項內容。請稍後再試。",
+  "llm.noEngine": "未安裝本機模型引擎。",
+  "llm.noModel": "未安裝該本機模型。",
+  "sentinela.blockFailed": "無法封鎖其網路。"
 }

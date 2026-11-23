@@ -925,5 +925,9 @@
   "dkms.mokNothingPending": "Tidak ada kunci yang menunggu didaftarkan pada mulai ulang berikutnya.",
   "dkms.mokNoTool": "Program mokutil tidak terpasang.",
   "dkms.mokFailed": "Kunci tidak dapat disiapkan untuk mulai ulang berikutnya.",
-  "media.protectedWindow": "Jendela ini dilindungi, jadi tidak bisa ditangkap sendirian. Pada tangkapan layar, jendela ini tampak hitam."
+  "media.protectedWindow": "Jendela ini dilindungi, jadi tidak bisa ditangkap sendirian. Pada tangkapan layar, jendela ini tampak hitam.",
+  "llm.busy": "Sentinela sedang menganalisis beberapa hal. Coba lagi sebentar lagi.",
+  "llm.noEngine": "Mesin model lokal belum terpasang.",
+  "llm.noModel": "Model lokal itu belum terpasang.",
+  "sentinela.blockFailed": "Jaringannya tidak dapat diblokir."
 }

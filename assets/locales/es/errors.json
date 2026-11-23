@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "No hay ninguna clave esperando inscribirse en el próximo reinicio.",
   "dkms.mokNoTool": "El programa mokutil no está instalado.",
   "dkms.mokFailed": "No se pudo preparar la clave para el próximo reinicio.",
-  "media.protectedWindow": "Esta ventana está protegida: no se puede capturar sola. En las capturas de la pantalla sale en negro."
+  "media.protectedWindow": "Esta ventana está protegida: no se puede capturar sola. En las capturas de la pantalla sale en negro.",
+  "llm.busy": "Sentinela ya está analizando varias cosas. Probá de nuevo en un momento.",
+  "llm.noEngine": "El motor del modelo local no está instalado.",
+  "llm.noModel": "Ese modelo local no está instalado.",
+  "sentinela.blockFailed": "No se pudo bloquear su red."
 }

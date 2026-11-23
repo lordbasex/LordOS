@@ -970,7 +970,8 @@ export default function Settings() {
           <View style={{ paddingHorizontal: pad, paddingTop: side.narrow ? spacing.l : spacing.xl, alignItems: 'center' }}>
             {/* Cloud's account page has two columns: it takes a wider column on wide windows */}
             <View style={{ width: '100%', maxWidth: section === 'cloud' ? 980 : 680 }}>
-              <Body page={section === 'network' || section === 'cloud' ? args?.page : undefined} />
+              <Body page={section === 'network' || section === 'cloud' || section === 'ai' ? args?.page : undefined}
+                alert={section === 'ai' ? args?.alert : undefined} />
             </View>
           </View>
         </ScrollView>
