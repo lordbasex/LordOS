@@ -707,6 +707,8 @@
   "cfg.agentNote": "Dalawang pribadong channel papasok sa makina: isa para sa qemu-guest-agent (estado nito, maayos na pag-shut down, ang orasan, ang journal) at isa para sa clipboard helper. Walang dumadaan sa network.",
   "cfg.agentInstall": "Sa makina",
   "cfg.agentInstallNote": "I-install ang qemu-guest-agent gamit ang package manager ng makina. Ini-install ang clipboard helper mula sa button na Agent sa bar ng makina kapag sumasagot na ang qemu-guest-agent.",
+  "win.perfProfile": "Profile ng performance",
+  "win.perfProfileNote": "Habang tumatakbo ang machine, inililipat ito ng LordOS tools sa Windows sa High performance na power plan at pinapatay ang mga animation, anino at transparency. Babalik ang lahat kapag naka-off ito o huminto ang tools. Kailangan ang LordOS tools w11 o mas bago.",
   "cfg.toolsAuto": "Awtomatikong i-update ang mga tool ng LordOS sa makinang ito",
   "cfg.toolsAutoNote": "Kapag may dalang mas bagong tool ang LordOS na ito, ini-install ang mga ito habang tumatakbo ang makina at walang kinokopya. Naka-off: may notification na nag-aalok ng update.",
   "cfg.agentOn": "Naka-on, hindi nakakonekta",

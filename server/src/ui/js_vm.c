@@ -437,6 +437,7 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
             JS_SetPropertyStr(c, o, "clipboardAsk", JS_NewBool(c, m.clipboard_ask));
             set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
             JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
+            JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
             set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
             set_str(c, o, "mac", m.mac);
             /* sound (6.9): host-side choices */
@@ -911,13 +912,13 @@ static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 }
 
 /* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
- *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest", captureFullscreen }) → job id: lord-vm --set on a
+ *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest", captureFullscreen, perfProfile }) → job id: lord-vm --set on a
  * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[54 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[56 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1034,6 +1035,10 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "captureFullscreen");
     if (JS_IsBool(v)) { args[n++] = "--capture-fullscreen"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "perfProfile");
+    if (JS_IsBool(v)) { args[n++] = "--perf-profile"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "pointer");

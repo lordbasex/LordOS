@@ -707,6 +707,8 @@
   "cfg.agentNote": "Zwei private Kanäle in die Maschine: einer für qemu-guest-agent (ihr Zustand, ein sauberes Herunterfahren, die Uhr, das Journal) und einer für das Zwischenablage-Hilfsprogramm. Nichts läuft über das Netzwerk.",
   "cfg.agentInstall": "In der Maschine",
   "cfg.agentInstallNote": "Installiere qemu-guest-agent mit der Paketverwaltung der Maschine. Das Zwischenablage-Hilfsprogramm wird über die Agent-Taste in der Leiste der Maschine installiert, sobald qemu-guest-agent antwortet.",
+  "win.perfProfile": "Leistungsprofil",
+  "win.perfProfileNote": "Während die Maschine läuft, schalten die LordOS-Tools in Windows auf den Energiesparplan „Höchstleistung“ und deaktivieren Animationen, Schatten und Transparenz. Alles wird zurückgesetzt, wenn dies aus ist oder die Tools beendet werden. Erfordert die LordOS-Tools w11 oder neuer.",
   "cfg.toolsAuto": "LordOS-Werkzeuge in dieser Maschine automatisch aktualisieren",
   "cfg.toolsAutoNote": "Bringt dieses LordOS neuere Werkzeuge mit, werden sie installiert, während die Maschine läuft und nichts kopiert wird. Aus: Eine Mitteilung bietet die Aktualisierung an.",
   "cfg.agentOn": "An, nicht verbunden",

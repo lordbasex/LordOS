@@ -707,6 +707,8 @@
   "cfg.agentNote": "머신으로 들어가는 두 개의 비공개 채널: 하나는 qemu-guest-agent용(상태, 정상 종료, 시계, 저널), 하나는 클립보드 도우미용입니다. 네트워크를 거치는 것은 없습니다.",
   "cfg.agentInstall": "머신 내부",
   "cfg.agentInstallNote": "머신의 패키지 관리자로 qemu-guest-agent를 설치하세요. 클립보드 도우미는 qemu-guest-agent가 응답하면 머신 막대의 에이전트 버튼에서 설치합니다.",
+  "win.perfProfile": "성능 프로필",
+  "win.perfProfileNote": "머신이 실행되는 동안 Windows의 LordOS 도구가 전원 관리 옵션을 고성능으로 바꾸고 애니메이션, 그림자, 투명 효과를 끕니다. 이 설정을 끄거나 도구가 멈추면 모두 원래대로 돌아갑니다. LordOS 도구 w11 이상이 필요합니다.",
   "cfg.toolsAuto": "이 머신의 LordOS 도구 자동 업데이트",
   "cfg.toolsAutoNote": "이 LordOS에 더 새로운 도구가 있으면 머신이 실행 중이고 복사 중인 것이 없을 때 설치합니다. 끔: 알림으로 업데이트를 제안합니다.",
   "cfg.agentOn": "켜짐, 연결 안 됨",

@@ -707,6 +707,8 @@
   "cfg.agentNote": "Kaksi yksityistä kanavaa koneeseen: yksi qemu-guest-agentille (sen tila, siisti sammutus, kello, järjestelmäloki) ja yksi leikepöydän apuohjelmalle. Mitään ei kulje verkon kautta.",
   "cfg.agentInstall": "Koneessa",
   "cfg.agentInstallNote": "Asenna qemu-guest-agent koneen paketinhallinnalla. Leikepöydän apuohjelma asennetaan koneen palkin Agentti-painikkeesta, kun qemu-guest-agent vastaa.",
+  "win.perfProfile": "Suorituskykyprofiili",
+  "win.perfProfileNote": "Kun kone on käynnissä, Windowsin LordOS-työkalut vaihtavat sen Paras suorituskyky -virrankäyttösuunnitelmaan ja poistavat animaatiot, varjot ja läpinäkyvyyden käytöstä. Kaikki palautuu, kun tämä on pois päältä tai työkalut pysähtyvät. Vaatii LordOS-työkalut w11 tai uudemmat.",
   "cfg.toolsAuto": "Päivitä tämän koneen LordOS-työkalut automaattisesti",
   "cfg.toolsAutoNote": "Kun tämä LordOS tuo uudemmat työkalut, ne asennetaan koneen ollessa käynnissä eikä mitään kopioida. Pois: ilmoitus tarjoaa päivitystä.",
   "cfg.agentOn": "Päällä, ei yhdistetty",

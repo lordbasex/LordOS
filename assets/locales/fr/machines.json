@@ -707,6 +707,8 @@
   "cfg.agentNote": "Deux canaux privés vers la machine : l’un pour qemu-guest-agent (son état, un arrêt propre, l’heure, le journal), l’autre pour l’aide du presse-papiers. Rien ne passe par le réseau.",
   "cfg.agentInstall": "Dans la machine",
   "cfg.agentInstallNote": "Installez qemu-guest-agent avec le gestionnaire de paquets de la machine. L’aide du presse-papiers s’installe depuis le bouton Agent de la barre de la machine quand qemu-guest-agent répond.",
+  "win.perfProfile": "Profil de performances",
+  "win.perfProfileNote": "Pendant que la machine fonctionne, les outils LordOS de Windows passent au mode d'alimentation Performances élevées et désactivent les animations, les ombres et la transparence. Tout est rétabli quand cette option est désactivée ou que les outils s'arrêtent. Nécessite les outils LordOS w11 ou plus récents.",
   "cfg.toolsAuto": "Mettre à jour automatiquement les outils LordOS de cette machine",
   "cfg.toolsAutoNote": "Quand ce LordOS apporte des outils plus récents, ils sont installés pendant que la machine fonctionne et que rien n'est en cours de copie. Désactivé : une notification propose la mise à jour.",
   "cfg.agentOn": "Activé, non connecté",

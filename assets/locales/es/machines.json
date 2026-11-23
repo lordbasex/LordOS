@@ -707,6 +707,8 @@
   "cfg.agentNote": "Dos canales privados hacia la máquina: uno para qemu-guest-agent (su estado, un apagado limpio, la hora, el diario) y otro para el ayudante del portapapeles. Nada pasa por la red.",
   "cfg.agentInstall": "En la máquina",
   "cfg.agentInstallNote": "Instalá qemu-guest-agent con el gestor de paquetes de la máquina. El ayudante del portapapeles se instala desde el botón Agente de la barra de la máquina cuando qemu-guest-agent responde.",
+  "win.perfProfile": "Perfil de rendimiento",
+  "win.perfProfileNote": "Mientras la máquina funciona, las herramientas de LordOS en Windows la pasan al plan de energía Alto rendimiento y apagan las animaciones, las sombras y la transparencia. Todo vuelve a como estaba cuando lo apagás o las herramientas se detienen. Necesita las herramientas de LordOS w11 o posteriores.",
   "cfg.toolsAuto": "Actualizar automáticamente las herramientas de LordOS en esta máquina",
   "cfg.toolsAutoNote": "Cuando este LordOS trae herramientas más nuevas, se instalan mientras la máquina corre y no se está copiando nada. Apagado: una notificación ofrece la actualización.",
   "cfg.agentOn": "Activado, sin conectar",
