@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "Kein Schlüssel wartet darauf, beim nächsten Neustart registriert zu werden.",
   "dkms.mokNoTool": "Das Programm mokutil ist nicht installiert.",
   "dkms.mokFailed": "Der Schlüssel konnte nicht für den nächsten Neustart vorbereitet werden.",
-  "media.protectedWindow": "Dieses Fenster ist geschützt und kann nicht einzeln aufgenommen werden. In Bildschirmaufnahmen erscheint es schwarz."
+  "media.protectedWindow": "Dieses Fenster ist geschützt und kann nicht einzeln aufgenommen werden. In Bildschirmaufnahmen erscheint es schwarz.",
+  "llm.busy": "Sentinela analysiert schon mehrere Dinge. Versuche es gleich noch einmal.",
+  "llm.noEngine": "Die Engine für das lokale Modell ist nicht installiert.",
+  "llm.noModel": "Dieses lokale Modell ist nicht installiert.",
+  "sentinela.blockFailed": "Sein Netzwerk konnte nicht gesperrt werden."
 }

@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "Mikään avain ei odota rekisteröintiä seuraavassa uudelleenkäynnistyksessä.",
   "dkms.mokNoTool": "mokutil-ohjelmaa ei ole asennettu.",
   "dkms.mokFailed": "Avainta ei voitu valmistella seuraavaa uudelleenkäynnistystä varten.",
-  "media.protectedWindow": "Tämä ikkuna on suojattu, joten sitä ei voi kaapata yksinään. Näytön kaappauksissa se näkyy mustana."
+  "media.protectedWindow": "Tämä ikkuna on suojattu, joten sitä ei voi kaapata yksinään. Näytön kaappauksissa se näkyy mustana.",
+  "llm.busy": "Sentinela analysoi jo useita asioita. Yritä hetken päästä uudelleen.",
+  "llm.noEngine": "Paikallisen mallin moottoria ei ole asennettu.",
+  "llm.noModel": "Sitä paikallista mallia ei ole asennettu.",
+  "sentinela.blockFailed": "Sen verkkoa ei voitu estää."
 }

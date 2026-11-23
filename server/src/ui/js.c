@@ -21,6 +21,7 @@
 #include "js_mail.h"
 #include "js_sql.h"
 #include "js_weather.h"
+#include "js_sentinela.h"
 #include "js_studio.h"
 #include "js_webapps.h"
 #include "js_sftp.h"
@@ -840,6 +841,7 @@ static void session_context(void) {
     js_help_register(ctx, lord);       /* lord.help (Help) and lord.time.zoneOffset (Clock, tzif.c) */
     js_hw_register(ctx, lord);         /* lord.display/power/bt/mime/timedate (Settings, src/hw) */
     js_voice_register(ctx, lord);      /* lord.voice: reading text aloud through lord-say (tts/speak.c, docs/VOICE.md) */
+    js_sentinela_register(ctx, lord);  /* lord.sentinela: Sentinela's local model engine (llm/engine.c, docs/SENTINELA.md) */
     prof_wrap_obj(ctx, lord, "", 0);   /* every lord.<ns>.* call timed (the stall detector) */
     JS_SetPropertyStr(ctx, g, "lord", lord);
     JS_FreeValue(ctx, g);

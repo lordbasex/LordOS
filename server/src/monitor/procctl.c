@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+#include <sys/resource.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <signal.h>
@@ -142,7 +143,7 @@ const char *proc_protected(int pid, int session_pid) {
 /* ---- signal ---- */
 
 const char *proc_signal(int pid, unsigned long long start, int sig, int session_pid) {
-    if (pid <= 0 || pid > PROC_PID_MAX || (sig != SIGTERM && sig != SIGKILL)) return "proc.badArgument";
+    if (pid <= 0 || pid > PROC_PID_MAX || (sig != SIGTERM && sig != SIGKILL && sig != SIGSTOP && sig != SIGCONT)) return "proc.badArgument";
     if (pid == 1) return "proc.protectedInit";
     /* 1. pin the process: from here on the pidfd names this process, never a later one */
     int pfd = (int)syscall(SYS_pidfd_open, pid, 0);
@@ -173,6 +174,33 @@ const char *proc_signal(int pid, unsigned long long start, int sig, int session_
     if (errno == ESRCH) return "proc.gone";
     if (errno == EPERM) return "proc.denied";
     return "proc.failed";
+}
+
+/* Sentinela's "Limit": nice 19 and idle I/O on each of the process's threads, the same checks as proc_signal (still
+ * the same process, not protected). Only raises the nice value: an unprivileged caller can't lower it anyway. */
+const char *proc_lower(int pid, unsigned long long start, int session_pid) {
+    if (pid <= 1 || pid > PROC_PID_MAX) return pid == 1 ? "proc.protectedInit" : "proc.badArgument";
+    ProcStat s;
+    if (proc_stat_read(pid, &s) || s.start != start) return "proc.gone";
+    const char *why = proc_protected(pid, session_pid);
+    if (why) return !strcmp(why, "kernel") ? "proc.protectedKernel" : !strcmp(why, "session") ? "proc.protectedSession" : "proc.protectedSystem";
+    char p[64];
+    snprintf(p, sizeof p, "/proc/%d/task", pid);
+    DIR *d = opendir(p);
+    if (!d) return "proc.gone";
+    struct dirent *e;
+    int done = 0, denied = 0;
+    while ((e = readdir(d))) {
+        if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;
+        int tid = atoi(e->d_name);
+        if (setpriority(PRIO_PROCESS, (id_t)tid, 19)) { if (errno == EPERM || errno == EACCES) denied = 1; continue; }
+        syscall(SYS_ioprio_set, 1 /* IOPRIO_WHO_PROCESS */, tid, 3 << 13 /* IOPRIO_CLASS_IDLE */);
+        done++;
+    }
+    closedir(d);
+    /* a reused PID between the check and here would have another start time */
+    if (proc_stat_read(pid, &s) || s.start != start) return "proc.gone";
+    return done ? NULL : denied ? "proc.denied" : "proc.failed";
 }
 
 /* ---- Get Info ---- */

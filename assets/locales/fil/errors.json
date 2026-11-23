@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "Walang susing naghihintay na ma-enroll sa susunod na restart.",
   "dkms.mokNoTool": "Hindi naka-install ang program na mokutil.",
   "dkms.mokFailed": "Hindi naihanda ang susi para sa susunod na restart.",
-  "media.protectedWindow": "Protektado ang window na ito kaya hindi ito makukunan nang mag-isa. Itim ito sa mga kuha ng screen."
+  "media.protectedWindow": "Protektado ang window na ito kaya hindi ito makukunan nang mag-isa. Itim ito sa mga kuha ng screen.",
+  "llm.busy": "Marami nang sinusuri ang Sentinela. Subukan ulit mamaya.",
+  "llm.noEngine": "Hindi naka-install ang engine ng lokal na modelo.",
+  "llm.noModel": "Hindi naka-install ang lokal na modelong iyon.",
+  "sentinela.blockFailed": "Hindi ma-block ang network nito."
 }

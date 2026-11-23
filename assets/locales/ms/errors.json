@@ -925,5 +925,9 @@
   "dkms.mokNothingPending": "Tiada kunci yang menunggu untuk didaftarkan pada mula semula seterusnya.",
   "dkms.mokNoTool": "Program mokutil tidak dipasang.",
   "dkms.mokFailed": "Kunci tidak dapat disediakan untuk mula semula seterusnya.",
-  "media.protectedWindow": "Tetingkap ini dilindungi, jadi ia tidak boleh ditangkap seorang diri. Dalam tangkapan skrin ia kelihatan hitam."
+  "media.protectedWindow": "Tetingkap ini dilindungi, jadi ia tidak boleh ditangkap seorang diri. Dalam tangkapan skrin ia kelihatan hitam.",
+  "llm.busy": "Sentinela sedang menganalisis beberapa perkara. Cuba lagi sebentar lagi.",
+  "llm.noEngine": "Enjin model setempat tidak dipasang.",
+  "llm.noModel": "Model setempat itu tidak dipasang.",
+  "sentinela.blockFailed": "Rangkaiannya tidak dapat disekat."
 }

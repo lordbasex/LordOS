@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "Er wacht geen sleutel om bij de volgende herstart geregistreerd te worden.",
   "dkms.mokNoTool": "Het programma mokutil is niet geïnstalleerd.",
   "dkms.mokFailed": "De sleutel kon niet worden voorbereid voor de volgende herstart.",
-  "media.protectedWindow": "Dit venster is beveiligd en kan niet apart worden vastgelegd. In opnamen van het scherm is het zwart."
+  "media.protectedWindow": "Dit venster is beveiligd en kan niet apart worden vastgelegd. In opnamen van het scherm is het zwart.",
+  "llm.busy": "Sentinela analyseert al meerdere dingen. Probeer het zo meteen opnieuw.",
+  "llm.noEngine": "De engine voor het lokale model is niet geïnstalleerd.",
+  "llm.noModel": "Dat lokale model is niet geïnstalleerd.",
+  "sentinela.blockFailed": "Het netwerk kon niet worden geblokkeerd."
 }

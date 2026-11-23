@@ -927,5 +927,9 @@
   "dkms.mokNothingPending": "Żaden klucz nie czeka na rejestrację przy następnym ponownym uruchomieniu.",
   "dkms.mokNoTool": "Program mokutil nie jest zainstalowany.",
   "dkms.mokFailed": "Nie udało się przygotować klucza na następne ponowne uruchomienie.",
-  "media.protectedWindow": "To okno jest chronione, więc nie można go przechwycić osobno. Na zrzutach ekranu jest czarne."
+  "media.protectedWindow": "To okno jest chronione, więc nie można go przechwycić osobno. Na zrzutach ekranu jest czarne.",
+  "llm.busy": "Sentinela analizuje już kilka rzeczy. Spróbuj ponownie za chwilę.",
+  "llm.noEngine": "Silnik lokalnego modelu nie jest zainstalowany.",
+  "llm.noModel": "Ten lokalny model nie jest zainstalowany.",
+  "sentinela.blockFailed": "Nie udało się zablokować jego sieci."
 }

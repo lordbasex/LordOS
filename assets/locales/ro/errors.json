@@ -927,5 +927,9 @@
   "dkms.mokNothingPending": "Nicio cheie nu așteaptă să fie înregistrată la următoarea repornire.",
   "dkms.mokNoTool": "Programul mokutil nu este instalat.",
   "dkms.mokFailed": "Cheia nu a putut fi pregătită pentru următoarea repornire.",
-  "media.protectedWindow": "Această fereastră este protejată, deci nu poate fi capturată singură. În capturile ecranului apare neagră."
+  "media.protectedWindow": "Această fereastră este protejată, deci nu poate fi capturată singură. În capturile ecranului apare neagră.",
+  "llm.busy": "Sentinela analizează deja mai multe lucruri. Încercați din nou peste câteva clipe.",
+  "llm.noEngine": "Motorul modelului local nu este instalat.",
+  "llm.noModel": "Acel model local nu este instalat.",
+  "sentinela.blockFailed": "Rețeaua lui nu a putut fi blocată."
 }

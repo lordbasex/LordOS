@@ -927,5 +927,9 @@
   "dkms.mokNothingPending": "Joks raktas nelaukia registracijos kito paleidimo iš naujo metu.",
   "dkms.mokNoTool": "Programa mokutil neįdiegta.",
   "dkms.mokFailed": "Nepavyko paruošti rakto kitam paleidimui iš naujo.",
-  "media.protectedWindow": "Šis langas apsaugotas, todėl jo negalima užfiksuoti atskirai. Ekrano kopijose jis rodomas juodas."
+  "media.protectedWindow": "Šis langas apsaugotas, todėl jo negalima užfiksuoti atskirai. Ekrano kopijose jis rodomas juodas.",
+  "llm.busy": "Sentinela jau analizuoja kelis dalykus. Bandykite dar kartą po akimirkos.",
+  "llm.noEngine": "Vietinio modelio variklis neįdiegtas.",
+  "llm.noModel": "Tas vietinis modelis neįdiegtas.",
+  "sentinela.blockFailed": "Jos tinklo užblokuoti nepavyko."
 }

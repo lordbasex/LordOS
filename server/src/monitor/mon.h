@@ -36,9 +36,14 @@ typedef struct {
     unsigned long long rss, st, pss;    /* pss: 0 when not read */
     unsigned user, name, cmd, exe, prot, sid;
 } MonProc;
-typedef struct { double t; long hz; int n; MonProc *rows; char *pool; } MonProcs;
+typedef struct { double t; long hz; int n; size_t bytes; MonProc *rows; char *pool; } MonProcs;   /* bytes: the whole block */
 MonProcs *mon_procs_take(uint64_t *seq);
 char *mon_conns_json(uint64_t *seq);
+/* Sentinela (docs/SENTINELA.md): with on, the thread builds the process list every 10 s whether the Monitor is open or
+ * not (with it open, a copy of the Monitor's own list); mon_procs_watched hands the latest over like mon_procs_take,
+ * without keeping the 4 Hz sampling awake. Off frees it. */
+void mon_watch_procs(int on);
+MonProcs *mon_procs_watched(uint64_t *seq);
 /* Get Info (procctl.c): the process whose details the thread builds once per second (pid 0: none)
  * and the latest JSON. start: its start time in ticks, so a reused PID shows as gone. */
 void mon_detail(int pid, unsigned long long start);

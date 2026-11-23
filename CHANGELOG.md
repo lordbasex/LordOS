@@ -186,6 +186,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Tests
 
+- **Sentinela** (`docs/SENTINELA.md`): `build/llm-engine-test` runs a stand-in engine in lord-llm's real sandbox and
+  checks that TCP, UDP, IPv6, netlink and packet sockets, Unix datagrams, `connect`, reading `/etc` or `/home`, writing
+  `/tmp`, exec, signals outside and namespaces are all refused, that it has its own network namespace and reads the
+  model only through its descriptor, the socket 0600 in a 0700 folder, idling, refused models and texts, and the facts
+  of a process; `tests/sentinela_model_test.mjs` (rules, summary without secrets, 16 malformed or injected answers
+  refused); `tests/sentinela_notify_scene.mjs` (a triggered rule makes a desktop notification with the right actions,
+  End from the notification, battery, Do Not Disturb, "It's mine"); `tests/sentinela_settings_scene.mjs` (off by
+  default, the model download through `pkg-install`); `tests/sentinela_real_e2e.sh` (one real analysis, by hand).
+
 - `server/tests/store_lordos_test.mjs` (26 checks, in `make test`): the shipped catalog as the shop reads it, what a
   hand-edited entry may not do (unknown kinds, a package or app id that isn't one, a settings entry with nothing to
   open), installed items, the cards' action, no categories below six entries, the search (accents and case ignored)
@@ -320,6 +329,56 @@ In development; the latest release is 0.8.9.5-beta.
   - Strings in all 35 languages. Tests: `tests/monitor_procgroup_test.mjs` (87 checks), `tests/monitor_grouped_scene.mjs`
     (22 checks), `build/procctl-test` (the owner lookup and the component scopes); screenshots with
     `tests/monitor_headless.sh` (a made-up list, nothing signalled).
+- **Sentinela, the process guard (phase 1; in development, the latest release is 0.8.9.5).** Approved by the maintainer
+  on 2026-11-23 with three new pieces: llama-server as a local model engine in its own sandbox, Qwen3 models shipped as
+  signed packages checked by SHA-256, and the service that reads the Monitor's process data. Off by default: Settings →
+  AI has two pages now, Voice and Sentinela (`apps/settings/Sentinela.jsx`). Design, privacy and the sandbox in
+  `docs/SENTINELA.md`.
+  - **Rules over the Monitor's own data.** With Sentinela on, the Monitor's thread builds the process list every 10 s
+    whether the Monitor is open or not (`lord.monitor.watchProcs`/`procsWatched`, `mon_watch_procs`; with the Monitor
+    open, a copy of its own list). `sdk/sentinelamodel.js` watches only the person's own processes, never lord-server
+    or protected ones: CPU at 80 % of a core or more in every sample of 5 minutes; memory up 256 MB and by half again
+    in 10 minutes, steadily (a spike is not a leak); a name like a kernel thread or a system daemon on a program
+    outside the system folders; a program deleted or replaced after it started, outside the system folders (package
+    updates are not news); a new entry in `~/.config/autostart`. Each fires at most once an hour per process; each
+    can be turned off. The network trigger (a program from no package reaching a new server) is shown as "coming
+    soon": it needs per-process connection records.
+  - **Facts, not contents.** When a rule fires, lord-server reads in its own thread (`lord.sentinela.facts`,
+    `server/src/llm/facts.c`) the program, whether it was deleted, the package whose dpkg list has that path (and its
+    /usr-merged twin), where it lives and up to six parents. The model's summary (`buildSummary`, at most 2000
+    characters) has names, paths with the home folder as `~` and the user name hidden, packages and numbers; never a
+    command line's arguments, the environment, a file's contents, a window's text or a password.
+  - **The local model, sandboxed.** lord-server starts `lord-llm` (new, `server/src/llm/launcher.c`, libc only) from
+    its own folder with no arguments and three descriptors (the model, its 0700 runtime folder, the engine's file).
+    lord-llm lowers itself (nice 15, batch scheduling, idle I/O, `lordos-sentinela.scope` with 2 cores and the model's
+    size plus 1.5 GB), then `llmjail_apply`: its own user and network namespace (no interface at all), Landlock (`/usr`
+    readable, only the engine and the loader executable, the model readable, only a socket in its folder; TCP denied;
+    abstract sockets and signals scoped) and seccomp (only `AF_UNIX` stream sockets, no `connect`, no `io_uring`, no
+    exec but the engine's descriptor, no namespaces, ptrace, mounts, BPF or keys), and runs LordOS's `llama-server`
+    (the `llama.cpp` package, 0.7.0) on the CPU with fixed arguments, listening only on `engine.sock` (0600). It starts
+    when an analysis is needed and stops 2 minutes after its last answer or when Sentinela is turned off.
+    `lord.sentinela` (`server/src/ui/js_sentinela.c`, desktop context only) queues jobs for the engine's thread; the
+    request's parameters and its JSON schema are fixed in C.
+  - **The answer is untrusted.** `parseVerdict` accepts only `{verdict, reason, action}` with a verdict of
+    `normal`/`suspicious`/`dangerous`, a reason of at most 400 characters and an action of the closed list (End and
+    block its network, Pause, Limit, See in Monitor, It's mine); anything else is discarded and the alert keeps the
+    rule's own words. The model only suggests; nothing runs without the person's click.
+  - **A desktop notification**, like any other system alert: banner, sound, Do Not Disturb and the notification
+    history, with the model's reason (or the rule's), "What Lumo analyzed" and up to three actions that work from the
+    notification itself; a click opens the alert in Settings with every action, Resume after Pause, and the facts. On
+    battery, without a model or without the engine: alerts with the rule's explanation, no analysis. "It's mine" is kept
+    per program and package in `settings.json`; the last 50 alerts in `~/.local/share/lordos/sentinela/alerts.json`.
+  - **Actions:** `lord.monitor.signal` also takes `STOP`, `CONT` and `LOWER` (nice 19 and idle I/O on every thread,
+    `proc_lower`), with the same checks as `TERM` (the user's own, unprotected process, the same start time). End and
+    block its network sets the app's `no-network` restriction first when the process belongs to an app.
+  - **Models:** `sdk/llmcatalog.js` lists Qwen3 1.7B (1.28 GB, recommended) and Qwen3 4B (2.5 GB), Q4_K_M from
+    `ggml-org`, Apache-2.0, with their SHA-256. `tools/llm/fetch-models.sh` downloads and checks them,
+    `tools/llm/mkdeb-llm.mjs` builds `lordos-llm-<id>` (`/usr/share/lordos/llm/<id>.gguf`). Settings installs the
+    engine and a model with `pkg-install` from the signed repository, with its progress; not published yet.
+  - **Measured** on the development PC with a fake two-thread miner: Qwen3 1.7B answered in Spanish in 8.5–11.4 s with
+    the engine cold (it starts in about 1 s) and 7.5–9 s warm, on 2 CPU threads (about 17 tokens/s).
+  - New strings in every language (`sentinela.json`, `errors.llm.*`, `errors.sentinela.blockFailed`).
+
 - **LordOS Studio is an app, and the capture item reaches it with the microphone too.** Until now LordOS Studio's
   controls opened only from the capture item by the clock, and only while an app used the camera.
   - **The LordOS Studio app** (`apps/studio`, new; in the launcher, the start menu and search of Lord Flow, Lord

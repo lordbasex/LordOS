@@ -926,5 +926,9 @@
   "dkms.mokNothingPending": "Növbəti yenidən başlatmada qeydiyyat gözləyən açar yoxdur.",
   "dkms.mokNoTool": "mokutil proqramı quraşdırılmayıb.",
   "dkms.mokFailed": "Açarı növbəti yenidən başlatma üçün hazırlamaq alınmadı.",
-  "media.protectedWindow": "Bu pəncərə qorunur, ona görə ayrıca çəkilə bilməz. Ekran şəkillərində qara görünür."
+  "media.protectedWindow": "Bu pəncərə qorunur, ona görə ayrıca çəkilə bilməz. Ekran şəkillərində qara görünür.",
+  "llm.busy": "Sentinela artıq bir neçə şeyi təhlil edir. Bir azdan yenidən cəhd edin.",
+  "llm.noEngine": "Yerli model mühərriki quraşdırılmayıb.",
+  "llm.noModel": "Həmin yerli model quraşdırılmayıb.",
+  "sentinela.blockFailed": "Onun şəbəkəsi bloklana bilmədi."
 }

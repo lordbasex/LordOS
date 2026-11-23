@@ -941,6 +941,17 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Next release after 0.8.9.5
 
+- [ ] **Sentinela, phase 1** (approved by the maintainer on 2026-11-23; `docs/SENTINELA.md`; branch `feat/sentinela`).
+  Done in code: the rules over the Monitor's process list every 10 s (high CPU for 5 minutes, memory that keeps
+  growing, a program imitating a system one, a program deleted or replaced after it started, a new autostart entry),
+  a desktop notification with the closed actions, the local model through `lord-llm` (llama-server in a user and
+  network namespace, Landlock and seccomp, a 0600 Unix socket, 2 cores, stopped after 2 minutes idle), the answer
+  checked against a fixed schema, Settings → AI → Sentinela. Left before it ships: build, sign and publish
+  `lordos-llm-qwen3-1.7b` and `lordos-llm-qwen3-4b` (`tools/llm/fetch-models.sh`, `mkdeb-llm.mjs`,
+  `tools/release/apt-repo.sh` on the maintainer's Mac); the AGENTS.md entries; a check on the VM with a real
+  screenshot (a notification and the Settings page) and on a Raspberry Pi. Later: the network trigger (per-process
+  connections), packaged programs checked against dpkg's checksums, cancelling a model download (needs a root-side
+  cancel for `pkg-install`), the engine on the GPU, the "Live statistics" board.
 - [ ] **Voice in French, German, Italian and Dutch** ([#215](https://github.com/lordbasex/LordOS/issues/215),
   maintainer's decision 2026-11-23: moved out of 0.8.9.5 so it can close). The code is done on branch
   `feat/voice-languages` (89f59f25): Standard and HD models from Kyutai (Dutch Standard is Kyutai's own 6-layer
