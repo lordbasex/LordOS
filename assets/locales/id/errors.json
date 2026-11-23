@@ -923,5 +923,6 @@
   "dkms.mokNotNeeded": "Komputer ini tidak perlu mendaftarkan kunci sekarang.",
   "dkms.mokNothingPending": "Tidak ada kunci yang menunggu didaftarkan pada mulai ulang berikutnya.",
   "dkms.mokNoTool": "Program mokutil tidak terpasang.",
-  "dkms.mokFailed": "Kunci tidak dapat disiapkan untuk mulai ulang berikutnya."
+  "dkms.mokFailed": "Kunci tidak dapat disiapkan untuk mulai ulang berikutnya.",
+  "media.protectedWindow": "Jendela ini dilindungi, jadi tidak bisa ditangkap sendirian. Pada tangkapan layar, jendela ini tampak hitam."
 }

@@ -924,5 +924,6 @@
   "dkms.mokNotNeeded": "Bu bilgisayarın şu anda anahtarı kaydetmesi gerekmiyor.",
   "dkms.mokNothingPending": "Bir sonraki yeniden başlatmada kaydedilmeyi bekleyen anahtar yok.",
   "dkms.mokNoTool": "mokutil programı yüklü değil.",
-  "dkms.mokFailed": "Anahtar bir sonraki yeniden başlatma için hazırlanamadı."
+  "dkms.mokFailed": "Anahtar bir sonraki yeniden başlatma için hazırlanamadı.",
+  "media.protectedWindow": "Bu pencere korumalı olduğundan tek başına yakalanamaz. Ekran görüntülerinde siyah görünür."
 }

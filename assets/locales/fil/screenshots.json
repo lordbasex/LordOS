@@ -97,5 +97,11 @@
   "hintAdjust": "I-drag ang mga hawakan para ayusin · Enter: kunan · Esc: kanselahin",
   "hintAdjustRecord": "I-drag ang mga hawakan para ayusin · Enter: i-record · Esc: kanselahin",
   "hintRecord": "I-drag para piliin ang lugar na ire-record · Esc: kanselahin",
-  "thumbOpen": "Buksan sa markup editor"
+  "thumbOpen": "Buksan sa markup editor",
+  "opt.printKey": "Key na Print Screen",
+  "opt.printKey.full": "Kunan ang buong screen",
+  "opt.printKey.area": "Kunan ang napiling bahagi",
+  "opt.printKey.window": "Kunan ang napiling window",
+  "opt.printKey.toolbar": "Ipakita ang toolbar",
+  "opt.printKey.none": "Walang gagawin"
 }

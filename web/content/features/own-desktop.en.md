@@ -157,7 +157,7 @@ Released on 9 November 2026.
 Released on 8 November 2026.
 
 - **Read aloud.** Speech in every app with text, ❖Esc for the selection, a small player with the voice's wave, Live Speech and a Personal Voice, all on the computer and without the internet (see *Read aloud* in the features).
-- **Screenshots on every display.** ❖⇧3 saves one file per display and ❖⇧4 selects on all of them at once, with a magnifier and a color picker; T copies the text inside the area, read by a sandboxed helper. Every capture is also on the clipboard.
+- **Screenshots on every display.** ❖⇧3 saves one file per display and ❖⇧4 selects on all of them at once, with a magnifier and a color picker; T copies the text inside the area, read by a sandboxed helper. Every capture is also on the clipboard. In development (the latest release is 0.8.9.4), Options choose what Print Screen does: the whole screen, an area, a window, the toolbar or nothing.
 - **Shake the pointer to find it.** A few quick strokes make the cursor grow for a moment; on by default in Settings → Mouse & Trackpad.
 - **Keyboard.** The Caps Lock, Num Lock and Scroll Lock lights follow the keyboard, and a user who never chose a layout types with the computer's own instead of a Latin American default.
 

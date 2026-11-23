@@ -96,5 +96,11 @@
   "hintAdjust": "Seret pegangan untuk menyesuaikan · Enter: tangkap · Esc: batal",
   "hintAdjustRecord": "Seret pegangan untuk menyesuaikan · Enter: rekam · Esc: batal",
   "hintRecord": "Seret untuk memilih area yang direkam · Esc: batal",
-  "thumbOpen": "Buka di editor markah"
+  "thumbOpen": "Buka di editor markah",
+  "opt.printKey": "Tombol Print Screen",
+  "opt.printKey.full": "Tangkap seluruh layar",
+  "opt.printKey.area": "Tangkap bagian terpilih",
+  "opt.printKey.window": "Tangkap jendela terpilih",
+  "opt.printKey.toolbar": "Tampilkan bilah",
+  "opt.printKey.none": "Jangan lakukan apa pun"
 }

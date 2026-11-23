@@ -24,7 +24,7 @@ import { kindOf } from './filekinds.js';
 import { formatBytes } from './system.js';
 import { EntryIcon, FolderGlyph, DriveGlyph } from './fileglyphs.jsx';
 import { SideItem, SideTitle, PlaceGlyph, PathCrumbs, listRowStyle, listHeaderCell, listCell, when, useWidth, userDirs, ZoomControl } from './fileparts.jsx';
-import { localDisks, startFolder, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction,
+import { localDisks, startFolder, locationPlaces, pathCrumbs, fitCrumbs, sortRows, stepRow, rangeOf, validName, primaryAction, enterAction,
   imagesOnly, viewFor, saveView, liveRange, gridStep, cloudPlaces, cloudRoot, thumbMetrics, zoomFor, saveZoom, clampZoom } from './filepickermodel.js';
 import { cloudState } from './cloud.js';
 import { windows, wm, workAreaOf, onActiveDesktop } from './windows.js';
@@ -81,13 +81,17 @@ function Tile({ e, on, live, th, m, onDown, onOpen }) {
 // mode: 'open' (the default), 'folder' (the selected folder, or the one in view) or 'save' (a name, with a question before replacing a file;
 // askReplace={false}: no question, the caller asks its own, e.g. the Terminal's "use the file that is there").
 // modal: nothing else takes the keys while it is open (the portal's dialog, over everything).
-export function FilePicker({ onPick, onClose, filter = null, title = '', multiple = false, start = '', mode = 'open', name = '', accept = '', modal = false, askReplace = true }) {
+// computer: Locations also offers the whole computer ("/"), read only, for a dialog that only reads what is picked (Settings →
+// Wallpaper: a picture in /usr/share/backgrounds or on another partition, GitHub #219). Never in a save dialog, and never
+// for the portal (a Linux app is lent only what is in the home folder and the disks).
+export function FilePicker({ onPick, onClose, filter = null, title = '', multiple = false, start = '', mode = 'open', name = '', accept = '', modal = false, askReplace = true, computer = false }) {
   const th = useTheme();
   const home = fs.home();
   const disks = useMemo(() => { try { return localDisks(fs.volumes(), home); } catch (e) { return []; } }, []);
+  const places = useMemo(() => locationPlaces(disks, { computer, mode }), [disks]);
   const dirs = useMemo(() => userDirs().filter((d) => d.label !== 'desktop'), []);
   const [nav, setNav] = useState(() => {
-    const dir = startFolder(start, home, disks);
+    const dir = startFolder(start, home, disks, computer && mode !== 'save');
     return { dir: statOf(dir)?.dir ? dir : home, back: [], fwd: [] };
   });
   const { dir } = nav;
@@ -233,7 +237,7 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
   const clouds = cloudPlaces(cloudSt && cloudSt.accounts, home, settings.get().cloudHidden || []);
   const inCloud = !!cloudRoot(dir, home);
   const showDate = width - (narrow ? 0 : SIDE_W) > 520;
-  const crumbs = pathCrumbs(dir, home).map((c) => ({ label: c.home ? t('files.place.home') : c.label, folder: true, path: c.path }));
+  const crumbs = pathCrumbs(dir, home).map((c) => ({ label: c.home ? t('files.place.home') : c.path === '/' ? t('files.place.computer') : c.label, folder: true, path: c.path }));
   const shown = fitCrumbs(crumbs);
   const label = replacing ? t('shell.picker.replace')
     : accept || (mode === 'save' ? t('shell.picker.save') : mode === 'folder' ? t('shell.picker.chooseFolder')
@@ -254,8 +258,8 @@ export function FilePicker({ onPick, onClose, filter = null, title = '', multipl
               {dirs.map((d) => place(t(`files.place.${d.label}`), d.path, <FolderGlyph size={16} />))}
               {clouds.length ? <SideTitle t={th}>{t('cloud.title')}</SideTitle> : null}
               {clouds.map((c) => place(c.name, c.path, <CloudGlyph kind="cloud" size={16} color={th.accent} />))}
-              {disks.length ? <SideTitle t={th}>{t('files.locations')}</SideTitle> : null}
-              {disks.map((v) => place(v.name, v.path, <DriveGlyph color={th.accent} />))}
+              {places.length ? <SideTitle t={th}>{t('files.locations')}</SideTitle> : null}
+              {places.map((v) => place(v.kind === 'computer' ? t('files.place.computer') : v.name, v.path, <DriveGlyph color={th.accent} />))}
             </View>
           </ScrollView>
         </View>

@@ -923,5 +923,6 @@
   "dkms.mokNotNeeded": "这台电脑现在不需要注册密钥。",
   "dkms.mokNothingPending": "没有密钥在等待下次重新启动时注册。",
   "dkms.mokNoTool": "未安装 mokutil 程序。",
-  "dkms.mokFailed": "无法为下次重新启动准备密钥。"
+  "dkms.mokFailed": "无法为下次重新启动准备密钥。",
+  "media.protectedWindow": "此窗口受保护，无法单独截取。在屏幕截图中它显示为黑色。"
 }

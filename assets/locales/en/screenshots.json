@@ -97,5 +97,11 @@
   "hintAdjust": "Drag the handles to adjust · Enter: capture · Esc: cancel",
   "hintAdjustRecord": "Drag the handles to adjust · Enter: record · Esc: cancel",
   "hintRecord": "Drag to select the area to record · Esc: cancel",
-  "thumbOpen": "Open in the markup editor"
+  "thumbOpen": "Open in the markup editor",
+  "opt.printKey": "Print Screen Key",
+  "opt.printKey.full": "Capture Entire Screen",
+  "opt.printKey.area": "Capture Selected Portion",
+  "opt.printKey.window": "Capture Selected Window",
+  "opt.printKey.toolbar": "Show the Toolbar",
+  "opt.printKey.none": "Do Nothing"
 }

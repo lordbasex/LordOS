@@ -932,5 +932,6 @@
   "capture.what.viaStudio": "透過 LordOS Studio 的相機（{camera}）",
   "capture.what.viaStudioPlain": "透過 LordOS Studio 的相機",
   "capture.what.effectsOn": "效果已開啟",
-  "capture.what.effectsOff": "無效果"
+  "capture.what.effectsOff": "無效果",
+  "shortcuts.captureWindow": "擷取一個視窗"
 }

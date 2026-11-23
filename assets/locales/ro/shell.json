@@ -946,5 +946,6 @@
   "capture.what.viaStudio": "Cameră prin LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "Cameră prin LordOS Studio",
   "capture.what.effectsOn": "efecte activate",
-  "capture.what.effectsOff": "fără efecte"
+  "capture.what.effectsOff": "fără efecte",
+  "shortcuts.captureWindow": "Captură a unei ferestre"
 }

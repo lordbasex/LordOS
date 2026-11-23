@@ -96,5 +96,11 @@
   "hintAdjust": "핸들을 드래그하여 조정 · Enter: 캡처 · Esc: 취소",
   "hintAdjustRecord": "핸들을 드래그하여 조정 · Enter: 기록 · Esc: 취소",
   "hintRecord": "드래그하여 기록할 영역 선택 · Esc: 취소",
-  "thumbOpen": "마크업 편집기에서 열기"
+  "thumbOpen": "마크업 편집기에서 열기",
+  "opt.printKey": "Print Screen 키",
+  "opt.printKey.full": "전체 화면 캡처",
+  "opt.printKey.area": "선택 영역 캡처",
+  "opt.printKey.window": "선택한 윈도우 캡처",
+  "opt.printKey.toolbar": "막대 보기",
+  "opt.printKey.none": "아무것도 하지 않음"
 }

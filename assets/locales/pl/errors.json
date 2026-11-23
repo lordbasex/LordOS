@@ -925,5 +925,6 @@
   "dkms.mokNotNeeded": "Ten komputer nie musi teraz rejestrować klucza.",
   "dkms.mokNothingPending": "Żaden klucz nie czeka na rejestrację przy następnym ponownym uruchomieniu.",
   "dkms.mokNoTool": "Program mokutil nie jest zainstalowany.",
-  "dkms.mokFailed": "Nie udało się przygotować klucza na następne ponowne uruchomienie."
+  "dkms.mokFailed": "Nie udało się przygotować klucza na następne ponowne uruchomienie.",
+  "media.protectedWindow": "To okno jest chronione, więc nie można go przechwycić osobno. Na zrzutach ekranu jest czarne."
 }

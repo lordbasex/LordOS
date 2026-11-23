@@ -939,5 +939,6 @@
   "capture.what.viaStudio": "Kamera LordOS Studion kautta ({camera})",
   "capture.what.viaStudioPlain": "Kamera LordOS Studion kautta",
   "capture.what.effectsOn": "tehosteet käytössä",
-  "capture.what.effectsOff": "ei tehosteita"
+  "capture.what.effectsOff": "ei tehosteita",
+  "shortcuts.captureWindow": "Kuvakaappaus ikkunasta"
 }

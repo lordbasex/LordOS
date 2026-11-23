@@ -398,6 +398,10 @@ EOF
     if have node; then run "screenshots-model-test (apps/screenshots)" node tests/screenshots_model_test.mjs; fi
     # the Screenshots toolbar (❖⇧5): options kept and read back, modes, keys, Save to, the remembered selection's handles
     if have node; then run "screenshots-toolbar-model-test (apps/screenshots/toolbarmodel.js)" node tests/screenshots_toolbar_model_test.mjs; fi
+    # Settings → Privacy's rows: a built-in app that declares a permission is listed before it asked (GitHub #219)
+    if have node; then run "privacy-model-test (apps/settings/privacymodel.js)" node tests/privacy_model_test.mjs; fi
+    # the clipboard history panels: keys, scrolling to the selection only, a pointer at rest never takes it (GitHub #203, #204)
+    if have node; then run "clipboard-panel-model-test (sdk/clipboardpanelmodel.js)" node tests/clipboard_panel_model_test.mjs; fi
     if have node; then run "imageedit-model-test (sdk/imageeditmodel.js)" node tests/imageedit_model_test.mjs; fi
     if have node; then run "osk-model-test (sdk/oskmodel.js)" node tests/osk_model_test.mjs
     else skip "osk-model-test (sdk/oskmodel.js)" node; fi

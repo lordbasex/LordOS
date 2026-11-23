@@ -97,5 +97,11 @@
   "hintAdjust": "Σύρετε τις λαβές για προσαρμογή · Enter: λήψη · Esc: ακύρωση",
   "hintAdjustRecord": "Σύρετε τις λαβές για προσαρμογή · Enter: εγγραφή · Esc: ακύρωση",
   "hintRecord": "Σύρετε για να επιλέξετε την περιοχή εγγραφής · Esc: ακύρωση",
-  "thumbOpen": "Άνοιγμα στον επεξεργαστή σημειώσεων"
+  "thumbOpen": "Άνοιγμα στον επεξεργαστή σημειώσεων",
+  "opt.printKey": "Πλήκτρο Print Screen",
+  "opt.printKey.full": "Λήψη ολόκληρης οθόνης",
+  "opt.printKey.area": "Λήψη επιλεγμένου τμήματος",
+  "opt.printKey.window": "Λήψη επιλεγμένου παραθύρου",
+  "opt.printKey.toolbar": "Εμφάνιση της γραμμής",
+  "opt.printKey.none": "Καμία ενέργεια"
 }

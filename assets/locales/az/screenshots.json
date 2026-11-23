@@ -97,5 +97,11 @@
   "hintAdjust": "Tənzimləmək üçün tutacaqları sürüşdürün · Enter: çək · Esc: ləğv et",
   "hintAdjustRecord": "Tənzimləmək üçün tutacaqları sürüşdürün · Enter: yaz · Esc: ləğv et",
   "hintRecord": "Yazılacaq sahəni seçmək üçün sürüşdürün · Esc: ləğv et",
-  "thumbOpen": "Qeyd redaktorunda aç"
+  "thumbOpen": "Qeyd redaktorunda aç",
+  "opt.printKey": "Print Screen düyməsi",
+  "opt.printKey.full": "Bütün ekranı çək",
+  "opt.printKey.area": "Seçilmiş hissəni çək",
+  "opt.printKey.window": "Seçilmiş pəncərəni çək",
+  "opt.printKey.toolbar": "Paneli göstər",
+  "opt.printKey.none": "Heç nə etmə"
 }

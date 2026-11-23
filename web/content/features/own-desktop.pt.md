@@ -157,7 +157,7 @@ Lançada em 9 de novembro de 2026.
 Lançada em 8 de novembro de 2026.
 
 - **Ler em voz alta.** Fala em todo app com texto, ❖Esc para a seleção, um pequeno reprodutor com a onda da voz, Fala ao vivo e uma Voz pessoal, tudo no computador e sem internet (veja *Ler em voz alta* nos recursos).
-- **Capturas em todas as telas.** ❖⇧3 salva um arquivo por tela e ❖⇧4 seleciona em todas ao mesmo tempo, com lupa e seletor de cor; T copia o texto da área, lido por um ajudante em sandbox. Toda captura também fica na área de transferência.
+- **Capturas em todas as telas.** ❖⇧3 salva um arquivo por tela e ❖⇧4 seleciona em todas ao mesmo tempo, com lupa e seletor de cor; T copia o texto da área, lido por um ajudante em sandbox. Toda captura também fica na área de transferência. Em desenvolvimento (a última versão publicada é 0.8.9.4), as Opções escolhem o que Print Screen faz: a tela inteira, uma área, uma janela, a barra ou nada.
 - **Sacudir o ponteiro para achá-lo.** Alguns movimentos rápidos aumentam o cursor por um momento; vem ativado em Ajustes → Mouse e trackpad.
 - **Teclado.** As luzes de Caps Lock, Num Lock e Scroll Lock acompanham o teclado, e um usuário que nunca escolheu um layout digita com o do computador em vez de um latino-americano padrão.
 

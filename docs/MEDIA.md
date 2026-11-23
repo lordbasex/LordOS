@@ -292,6 +292,9 @@ changing the output, so a compromised decoder must not have it. Audio goes throu
   a second canvas is kept in capture mode, repainted only in the region that changed. If there is
   none, the frame is used as is, at no cost. `media_composed` in `main.c` gives that canvas to the
   remote (`mirror_frame`) and to the recording.
+- **A window alone** (Screenshots' window capture, `until`): a protected window is refused with nothing painted for it
+  (`paint_capture_until` returns -1 when the window is, holds or is inside a protected node; `media.protectedWindow`),
+  and Screenshots does not crop a capture of the screen instead (in development, GitHub #219).
 - **Thumbnails:** the floating thumbnail and the Screenshots editor come from the same capture.
 - **Linux apps (Wayland):** the content, its popup menus and the full screen of a protected window
   also come out black (`wl.c`, `node_protected`).
@@ -308,6 +311,11 @@ How it works:
   any window.
 
 ### Permissions
+
+Screenshots' own `screen` permission starts allowed (pressing the key is the request; a "Don't Allow" saved in Settings →
+Privacy wins; `perm_builtin_default`, PRIVACY.md). Anything lord-server refuses or cannot do is thrown with its code
+(`media.denied.screen`, `media.captureFailed`, `media.protectedWindow`…) and `media.screenshot` passes it on; only a
+prompt answered no gives `null`.
 
 Screen, microphone and camera go through the system permissions (`sec/perms.c`, `PRIVACY.md`):
 

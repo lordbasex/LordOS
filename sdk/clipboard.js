@@ -21,7 +21,8 @@ import { useTheme } from './theme.js';
 import { t, formatDate } from './i18n.js';
 import { settings } from './settings.js';
 import { wm } from './windows.js';
-import { TextInput, focusToken, restoreFocus, pasteIntoFocused } from './components.jsx';
+import { TextInput, ScrollView, focusToken, restoreFocus, pasteIntoFocused } from './components.jsx';
+import { stepSel, scrollFor, hoverGate, rowWindow } from './clipboardpanelmodel.js';
 import * as fs from './fs.js';
 
 const DIR = '.local/share/lordos/clipboard';
@@ -234,12 +235,18 @@ function Swatch({ color, size = 14 }) {
   return h(View, { style: { width: size, height: size, borderRadius: 3, backgroundColor: color, border: '1px solid rgba(128,128,128,0.5)' } });
 }
 
-function Row({ item, active, th, onPick, onHover, compact }) {
+// The pointer's moves, for the panels' hover gate (clipboardpanelmodel.js): a row under a pointer at rest never takes the
+// selection the arrow keys gave (GitHub #203, #204).
+const gate = hoverGate();
+addListener('pointermove', (e) => { if (clipboardPanel.get()) gate.move(e.x, e.y); });
+const FULL_ROW_H = 46;     // the full panel's rows are all this tall (an image's 36 px and its padding), so it scrolls by rows
+
+function Row({ item, active, th, onPick, onHover, compact, height }) {
   const fg = active ? '#fff' : th.text, dim = active ? 'rgba(255,255,255,0.8)' : th.textDim;
   return h(View, {
-    onClick: onPick, onMouseEnter: onHover,
+    onClick: onPick, onMouseEnter: () => { if (gate.allow()) onHover(); },
     style: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, paddingVertical: compact ? 5 : 7, borderRadius: 7,
-      backgroundColor: active ? th.accent : 'transparent' },
+      ...(height ? { height, paddingVertical: 0 } : null), backgroundColor: active ? th.accent : 'transparent' },
   },
   item.type === 'color' ? h(Swatch, { color: item.text.trim() }) : h(Text, { style: { width: 16, fontSize: 11, color: dim, textAlign: 'center' } }, TYPE_GLYPH[item.type] || '¶'),
   item.image
@@ -277,8 +284,7 @@ function QuickPanel() {
   const shown = sortPinned(list.filter((x) => match(x, q))).slice(0, 12);
   const W = 420;
   const onKey = (e) => {
-    if (e.key === 'ArrowDown') { setSel((s) => Math.min(shown.length - 1, s + 1)); return true; }
-    if (e.key === 'ArrowUp') { setSel((s) => Math.max(0, s - 1)); return true; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { gate.key(); setSel((s) => stepSel(s, shown.length, e.key === 'ArrowUp' ? -1 : 1)); return true; }
     if (e.key === 'Enter') { if (shown[sel]) pick(shown[sel]); return true; }
     if (/^[1-9]$/.test(e.char || '') && !q) { const it = shown[Number(e.char) - 1]; if (it) pick(it); return true; }
     return false;
@@ -312,13 +318,28 @@ function FullPanel() {
   const [filter, setFilter] = useState('all');
   const [sel, setSel] = useState(0);
   const [confirm, setConfirm] = useState(false);
+  const scroll = useRef(null), listBox = useRef(null);
+  const [sight, setSight] = useState({ y: 0, h: 600 });      // the list's scroll offset and height: only those rows are made
   const close = closeClipboardPanel;
   const shown = sortPinned(list.filter((x) => match(x, q) && (filter === 'all' || (filter === 'pinned' ? x.pinned : x.type === filter))));
   const cur = shown[Math.min(sel, shown.length - 1)] || null;
   const W = Math.min(860, mainBox().width - 40), H = Math.min(540, mainBox().height - 120);
+  // the row the keys chose is scrolled into view, and only then: the list never moves by itself (GitHub #204)
+  const reveal = (i) => {
+    const sv = scroll.current;
+    let viewH = 0;
+    try { viewH = listBox.current ? lord.getLayout(listBox.current.id)[3] : 0; } catch (e) { viewH = 0; }
+    const y = sv ? scrollFor(i, FULL_ROW_H + 1, sv.offset(), viewH, 6) : null;     // rows 1 px apart, 6 px of padding
+    if (y != null) sv.scrollTo(y);
+  };
   const onKey = (e) => {
-    if (e.key === 'ArrowDown') { setSel((s) => Math.min(shown.length - 1, s + 1)); return true; }
-    if (e.key === 'ArrowUp') { setSel((s) => Math.max(0, s - 1)); return true; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      gate.key();
+      const next = stepSel(Math.min(sel, shown.length - 1), shown.length, e.key === 'ArrowUp' ? -1 : 1);
+      setSel(next);
+      reveal(next);
+      return true;
+    }
     if (e.key === 'Enter') { if (cur) pick(cur); return true; }
     if (e.key === 'Delete' && cur) { clipboard.remove(cur); return true; }
     return false;
@@ -334,22 +355,32 @@ function FullPanel() {
     },
     h(View, { style: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 } },
       h(Text, { style: { fontSize: 15, fontWeight: 700, color: th.text } }, t('shell.clipboard.title')),
-      h(TextInput, { value: q, onChange: (v) => { setQ(v); setSel(0); }, autoFocus: true, placeholder: t('shell.clipboard.search'), onKeyDown: onKey, onCancel: close, style: { flex: 1 } }),
+      h(TextInput, { value: q, onChange: (v) => { setQ(v); setSel(0); scroll.current?.scrollTo(0); }, autoFocus: true, placeholder: t('shell.clipboard.search'), onKeyDown: onKey, onCancel: close, style: { flex: 1 } }),
       confirm ? btn(t('shell.clipboard.confirmClear'), () => { clipboard.clear({ keepPinned: true }); setConfirm(false); }, true) : btn(t('shell.clipboard.clear'), () => setConfirm(true)),
       btn('✕', close)),
     h(View, { style: { height: 1, backgroundColor: th.separator } }),
     h(View, { style: { flex: 1, flexDirection: 'row' } },
       h(View, { style: { width: 150, padding: 8, gap: 2, backgroundColor: th.sidebarBg } },
-        ...FILTERS.map((f) => h(View, { key: f, onClick: () => { setFilter(f); setSel(0); },
+        ...FILTERS.map((f) => h(View, { key: f, onClick: () => { setFilter(f); setSel(0); scroll.current?.scrollTo(0); },
           style: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, height: 28, borderRadius: 6, backgroundColor: filter === f ? th.accent : 'transparent' } },
         h(Text, { style: { flex: 1, fontSize: 12, color: filter === f ? '#fff' : th.text } }, t(`shell.clipboard.filter.${f}`)),
         h(Text, { style: { fontSize: 10, color: filter === f ? '#fff' : th.textDim } }, String(count(f)))))),
-      h(View, { style: { flex: 1, padding: 6, gap: 1, overflow: 'hidden' } },
-        shown.length === 0 && h(Text, { style: { fontSize: 12, color: th.textDim, padding: 10 } }, t('shell.clipboard.empty')),
-        ...shown.slice(Math.max(0, Math.min(sel - 8, shown.length - 16)), Math.max(16, sel + 8)).map((item) => {
-          const i = shown.indexOf(item);
-          return h(Row, { key: item.id || i, item, th, active: i === sel, onHover: () => setSel(i), onPick: () => pick(item) });
-        })),
+      // every entry in a list that scrolls (the wheel, its bar, the keys); a row is selected by the keys or by a pointer that
+      // moves over it, and the selection is drawn (GitHub #203, #204)
+      // (up to 500 entries: only the rows in sight and a few around are made, the rest is empty space of their height)
+      h(View, { ref: listBox, style: { flex: 1, minWidth: 0 } },
+        h(ScrollView, { scrollRef: scroll, style: { flex: 1 }, onScroll: (y, hh) => setSight((v) => (v.y === y && v.h === hh ? v : { y, h: hh })) },
+          (() => {
+            const win = rowWindow(sight.y, sight.h, FULL_ROW_H + 1, shown.length, 6);
+            return h(View, { style: { padding: 6, gap: 1 } },
+              shown.length === 0 && h(Text, { style: { fontSize: 12, color: th.textDim, padding: 10 } }, t('shell.clipboard.empty')),
+              win.before > 0 && h(View, { key: 'before', style: { height: win.before - 1 } }),
+              ...shown.slice(win.from, win.to).map((item, k) => {
+                const i = win.from + k;
+                return h(Row, { key: item.id || i, item, th, height: FULL_ROW_H, active: i === Math.min(sel, shown.length - 1), onHover: () => setSel(i), onPick: () => pick(item) });
+              }),
+              win.after > 0 && h(View, { key: 'after', style: { height: win.after - 1 } }));
+          })())),
       h(View, { style: { width: 1, backgroundColor: th.separator } }),
       h(View, { style: { width: 280, padding: 12, gap: 8 } },
         cur ? [

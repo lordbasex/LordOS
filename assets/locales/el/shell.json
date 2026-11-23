@@ -939,5 +939,6 @@
   "capture.what.viaStudio": "Κάμερα μέσω LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "Κάμερα μέσω LordOS Studio",
   "capture.what.effectsOn": "εφέ ενεργά",
-  "capture.what.effectsOff": "χωρίς εφέ"
+  "capture.what.effectsOff": "χωρίς εφέ",
+  "shortcuts.captureWindow": "Στιγμιότυπο ενός παραθύρου"
 }

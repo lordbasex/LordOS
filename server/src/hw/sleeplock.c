@@ -94,6 +94,10 @@ static void woke(void) {
         char j[64];
         snprintf(j, sizeof j, "{\"stage\":\"resume\",\"slept\":%.0f}", slept > 0 ? slept / 1000.0 : 0.0);
         hw_emit("idle", j);
+        /* the screen comes back on by itself (GitHub #214): opening the lid or the power button is the person
+         * returning, as a key would be. The theme heard "resume" first, so a lock it asks for (lockAfterWake) is
+         * what the screen shows, and the idle timers start again from now. */
+        display_activity(clock_ms(CLOCK_MONOTONIC));
     }
     take();                             /* for the next sleep */
 }

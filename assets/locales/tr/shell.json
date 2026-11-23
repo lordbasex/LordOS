@@ -939,5 +939,6 @@
   "capture.what.viaStudio": "LordOS Studio üzerinden kamera ({camera})",
   "capture.what.viaStudioPlain": "LordOS Studio üzerinden kamera",
   "capture.what.effectsOn": "efektler açık",
-  "capture.what.effectsOff": "efekt yok"
+  "capture.what.effectsOff": "efekt yok",
+  "shortcuts.captureWindow": "Bir pencerenin ekran görüntüsü"
 }

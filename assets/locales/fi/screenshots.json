@@ -97,5 +97,11 @@
   "hintAdjust": "Säädä vetämällä kahvoja · Enter: kaappaa · Esc: peru",
   "hintAdjustRecord": "Säädä vetämällä kahvoja · Enter: tallenna · Esc: peru",
   "hintRecord": "Valitse tallennettava alue vetämällä · Esc: peru",
-  "thumbOpen": "Avaa merkintäeditorissa"
+  "thumbOpen": "Avaa merkintäeditorissa",
+  "opt.printKey": "Print Screen -näppäin",
+  "opt.printKey.full": "Kaappaa koko näyttö",
+  "opt.printKey.area": "Kaappaa valittu alue",
+  "opt.printKey.window": "Kaappaa valittu ikkuna",
+  "opt.printKey.toolbar": "Näytä palkki",
+  "opt.printKey.none": "Älä tee mitään"
 }

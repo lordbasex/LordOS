@@ -98,5 +98,11 @@
   "hintAdjust": "Przeciągnij uchwyty, aby dopasować · Enter: zrzut · Esc: anuluj",
   "hintAdjustRecord": "Przeciągnij uchwyty, aby dopasować · Enter: nagraj · Esc: anuluj",
   "hintRecord": "Przeciągnij, aby wybrać obszar do nagrania · Esc: anuluj",
-  "thumbOpen": "Otwórz w edytorze adnotacji"
+  "thumbOpen": "Otwórz w edytorze adnotacji",
+  "opt.printKey": "Klawisz Print Screen",
+  "opt.printKey.full": "Zrzut całego ekranu",
+  "opt.printKey.area": "Zrzut wybranego fragmentu",
+  "opt.printKey.window": "Zrzut wybranego okna",
+  "opt.printKey.toolbar": "Pokaż pasek",
+  "opt.printKey.none": "Nic nie rób"
 }

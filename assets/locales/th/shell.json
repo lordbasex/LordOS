@@ -932,5 +932,6 @@
   "capture.what.viaStudio": "กล้องผ่าน LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "กล้องผ่าน LordOS Studio",
   "capture.what.effectsOn": "เปิดเอฟเฟกต์",
-  "capture.what.effectsOff": "ไม่มีเอฟเฟกต์"
+  "capture.what.effectsOff": "ไม่มีเอฟเฟกต์",
+  "shortcuts.captureWindow": "จับภาพหน้าต่าง"
 }

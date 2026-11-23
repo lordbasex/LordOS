@@ -12,6 +12,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Added
 
+- **Screenshots: Options → Print Screen Key chooses what the key does (GitHub #202), in development (the latest release is
+  0.8.9.4).** The toolbar's Options menu (❖⇧5) has a new section with five choices: **Capture Entire Screen** (the
+  default, as before), **Capture Selected Portion**, **Capture Selected Window**, **Show the Toolbar** and **Do Nothing**
+  (the key then goes to the app in front, as any key LordOS doesn't take). ❖⇧3 keeps the whole screen. Settings →
+  Keyboard lists the key on the row of the action it runs (with ❖⇧3, ❖⇧4 or ❖⇧5; a window on a row of its own) and not
+  at all when it does nothing. Copying the capture to the clipboard is the existing Save to → Clipboard. The choice is
+  `settings.screenshots.printKey` (`apps/screenshots/toolbarmodel.js` `PRINT_KEY`, `printKeyLabel`; an unknown value is
+  the whole screen, so no migration). New texts `screenshots.opt.printKey*` and `shell.shortcuts.captureWindow` in all
+  35 languages. Tests: `screenshots_toolbar_model_test.mjs` (the choices, their rows), `screenshots_toolbar_scene.mjs`
+  (the section shows, Entire Screen is checked by default, a choice is saved).
+- **Settings → Wallpaper: pictures from anywhere on the computer (GitHub #219), in development (the latest release is
+  0.8.9.4).** The wallpaper's file dialog lists **This Computer** ("/") under Locations, read only, so a picture in
+  `/usr/share/backgrounds`, on another partition or anywhere else LordOS may read can be chosen; the picture is copied
+  into the person's own wallpapers by the existing root action as before. Only that dialog offers it (`<FilePicker
+  computer>`); never a save dialog, and never the file chooser Linux apps get through the portal, which still shows the
+  home folder and the disks only. `sdk/filepickermodel.js` `locationPlaces`, `startFolder(…, computer)`; tests in
+  `filepicker_model_test.mjs`.
+
 - **Store: a Flathub home with collections, categories and subcategories, in development (the latest release is
   0.8.9.4).** Flathub's section no longer opens on one long list: like the app centres on other desktops it opens on a
   home, and every page keeps the install rules as they were (Flathub's verified apps unless the section's switch shows
@@ -1699,6 +1717,49 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display error. Checked 2026-11-22 on the development machine; not yet with a real app (`docs/WAYLAND.md`).
 
 ### Fixed
+- **Print Screen said "Screenshots does not have permission to record the screen" with no way to allow it (GitHub
+  #219), in development (the latest release is 0.8.9.4).** Three things together:
+  - **The real reason is shown.** `sdk/media.js` turned every exception from `lord.media.screenshot` and `screenRecord`
+    into `null`, and Screenshots took `null` as "the permission was refused", so any failure (`media.captureFailed`,
+    a capture lord-server could not make) read as a permission problem. The SDK now passes lord-server's code on, and
+    Screenshots shows the permission text and **Open Privacy** only for `media.denied.*` and `fw.restricted.*`; any
+    other failure is told as it is (`apps/screenshots/toolbarmodel.js` `refusal`, tested).
+  - **Screenshots starts with the screen permission allowed** (approved by the maintainer 2026-11-22): pressing Print
+    Screen or a capture shortcut is the person asking for the capture. It is a default under the saved decisions, not a
+    decision written for the person: `perm_builtin_default`/`perm_get_builtin` in `server/src/sec/perms.c`, read only by
+    the desktop's own contexts (`js_media.c`'s check, `lord.perms.get`), never by the broker, and only for the id
+    `screenshots` and the `screen` permission (no package can take that id, `lpk_reserved`). A "Don't Allow" saved in
+    Settings → Privacy wins and sticks across sessions; firewall restrictions (`no-screen`) still win over both. Tests:
+    `tests/perms_default_test.c` (new; only that pair, never perm_get's, a deny wins and survives a new session).
+  - **Settings → Privacy lists built-in apps** whose manifest declares a permission even before they ever asked (it
+    listed packages and saved decisions only, so Screenshots was missing), and a permission that starts allowed offers
+    Allow and Don't Allow (Ask would only bring the default back): `apps/settings/privacymodel.js`, tested by
+    `tests/privacy_model_test.mjs` (new); `lord.perms.builtinDefault`.
+  - **Protected windows are exactly as protected as before**, now checked by tests: in a capture of the whole screen or
+    an area, and in recordings and the remote desktop, a protected window (Passwords, the on-screen keyboard, "Protect
+    the front window", a Linux window marked so) is black, painted so by lord-server (`paint.c` capture mode,
+    `media/capture.c`, `wl.c`). And a protected window asked for alone (Screenshots' window capture) is now **refused**
+    (`media.protectedWindow`, new text in all 35 languages) with nothing painted for it, where before its frame came out
+    with its content black: `paint_capture_until` returns -1 for a window that is, holds or is inside a protected node,
+    and Screenshots does not fall back to cropping a capture of the screen. `engine-test`'s new
+    `test_capture_protected`.
+- **Clipboard history: the full panel (❖⇧V) no longer scrolls by itself, and the arrow keys work (GitHub #203, #204),
+  in development (the latest release is 0.8.9.4).** The list drew a window of 16 entries around the selection and a row
+  took the selection when the pointer entered it: with the pointer resting on the list, every arrow key moved that
+  window, another row slid under the still pointer and took the selection back, so the list crept up or down on its own
+  near the edges and the keys seemed to do nothing. It is now an ordinary scrolling list with every entry (the wheel,
+  its bar, the keys), the arrow keys move a highlighted selection that is scrolled into view, and only then, Enter pastes
+  it, and a row under the pointer takes the selection only when the pointer itself moves (both panels, ❖V too). Of up
+  to 500 entries only the rows in sight and a few around are made, the rest is empty space of their height.
+  `sdk/clipboardpanelmodel.js` (`stepSel`, `scrollFor`, `rowWindow`, `hoverGate`), tested by `tests/clipboard_panel_model_test.mjs`
+  (new).
+- **The screen comes back on when the computer wakes from sleep (GitHub #214), in development (the latest release is
+  0.8.9.4).** Opening the lid (or the power button) woke the computer with the screen still dark until a key was pressed.
+  On logind's `PrepareForSleep(false)` the session on the monitor now counts it as activity
+  (`server/src/hw/sleeplock.c` `woke` → `display_activity`, which turns the displays on and restarts the idle timers),
+  right after the theme heard "resume", so the lock on waking (`lockAfterWake`, Settings' lock delay) still comes first and the
+  lock screen is what shows. A session that is not on the monitor does not touch the screen. `sleeplock-test` checks
+  both.
 - **Store: the Flathub home's category tiles keep one width on every row** (`apps/store/flathubpages.js`,
   `CategoryTiles`). The tiles grew to fill their row, so a last row with fewer tiles (four of ten at 1600 px) made each
   of them wider than the ones above; five empty, zero-height cells with the tiles' own flex now fill that row. Seen in

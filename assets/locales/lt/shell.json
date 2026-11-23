@@ -946,5 +946,6 @@
   "capture.what.viaStudio": "Kamera per LordOS Studio ({camera})",
   "capture.what.viaStudioPlain": "Kamera per LordOS Studio",
   "capture.what.effectsOn": "efektai įjungti",
-  "capture.what.effectsOff": "be efektų"
+  "capture.what.effectsOff": "be efektų",
+  "shortcuts.captureWindow": "Lango ekrano kopija"
 }

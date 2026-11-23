@@ -924,5 +924,6 @@
   "dkms.mokNotNeeded": "Kompyuta hii haihitaji kusajili ufunguo sasa.",
   "dkms.mokNothingPending": "Hakuna ufunguo unaosubiri kusajiliwa wakati wa kuwasha upya ujao.",
   "dkms.mokNoTool": "Programu ya mokutil haijasakinishwa.",
-  "dkms.mokFailed": "Ufunguo haukuweza kuandaliwa kwa ajili ya kuwasha upya ujao."
+  "dkms.mokFailed": "Ufunguo haukuweza kuandaliwa kwa ajili ya kuwasha upya ujao.",
+  "media.protectedWindow": "Dirisha hili limelindwa, kwa hivyo haliwezi kunaswa peke yake. Katika picha za skrini linaonekana jeusi."
 }

@@ -939,5 +939,6 @@
   "capture.what.viaStudio": "LordOS Studio के ज़रिए कैमरा ({camera})",
   "capture.what.viaStudioPlain": "LordOS Studio के ज़रिए कैमरा",
   "capture.what.effectsOn": "इफ़ेक्ट चालू",
-  "capture.what.effectsOff": "कोई इफ़ेक्ट नहीं"
+  "capture.what.effectsOff": "कोई इफ़ेक्ट नहीं",
+  "shortcuts.captureWindow": "एक विंडो का स्क्रीनशॉट"
 }

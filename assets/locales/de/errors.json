@@ -924,5 +924,6 @@
   "dkms.mokNotNeeded": "Dieser Computer muss den Schlüssel jetzt nicht registrieren.",
   "dkms.mokNothingPending": "Kein Schlüssel wartet darauf, beim nächsten Neustart registriert zu werden.",
   "dkms.mokNoTool": "Das Programm mokutil ist nicht installiert.",
-  "dkms.mokFailed": "Der Schlüssel konnte nicht für den nächsten Neustart vorbereitet werden."
+  "dkms.mokFailed": "Der Schlüssel konnte nicht für den nächsten Neustart vorbereitet werden.",
+  "media.protectedWindow": "Dieses Fenster ist geschützt und kann nicht einzeln aufgenommen werden. In Bildschirmaufnahmen erscheint es schwarz."
 }

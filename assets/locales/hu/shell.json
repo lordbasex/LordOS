@@ -939,5 +939,6 @@
   "capture.what.viaStudio": "Kamera a LordOS Studión keresztül ({camera})",
   "capture.what.viaStudioPlain": "Kamera a LordOS Studión keresztül",
   "capture.what.effectsOn": "effektusok be",
-  "capture.what.effectsOff": "effektusok nélkül"
+  "capture.what.effectsOff": "effektusok nélkül",
+  "shortcuts.captureWindow": "Képernyőkép egy ablakról"
 }

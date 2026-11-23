@@ -96,5 +96,11 @@
   "hintAdjust": "拖移控制點以調整 · Enter：擷取 · Esc：取消",
   "hintAdjustRecord": "拖移控制點以調整 · Enter：錄製 · Esc：取消",
   "hintRecord": "拖移以選擇要錄製的區域 · Esc：取消",
-  "thumbOpen": "在標示編輯器中打開"
+  "thumbOpen": "在標示編輯器中打開",
+  "opt.printKey": "Print Screen 鍵",
+  "opt.printKey.full": "擷取整個螢幕",
+  "opt.printKey.area": "擷取所選部分",
+  "opt.printKey.window": "擷取所選視窗",
+  "opt.printKey.toolbar": "顯示工具列",
+  "opt.printKey.none": "不執行任何動作"
 }

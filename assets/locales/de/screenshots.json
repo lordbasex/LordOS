@@ -97,5 +97,11 @@
   "hintAdjust": "Griffe ziehen zum Anpassen · Eingabe: aufnehmen · Esc: abbrechen",
   "hintAdjustRecord": "Griffe ziehen zum Anpassen · Eingabe: aufzeichnen · Esc: abbrechen",
   "hintRecord": "Ziehen, um den aufzuzeichnenden Bereich zu wählen · Esc: abbrechen",
-  "thumbOpen": "Im Markierungseditor öffnen"
+  "thumbOpen": "Im Markierungseditor öffnen",
+  "opt.printKey": "Druck-Taste",
+  "opt.printKey.full": "Gesamten Bildschirm aufnehmen",
+  "opt.printKey.area": "Ausgewählten Bereich aufnehmen",
+  "opt.printKey.window": "Ausgewähltes Fenster aufnehmen",
+  "opt.printKey.toolbar": "Leiste anzeigen",
+  "opt.printKey.none": "Nichts tun"
 }

@@ -932,5 +932,6 @@
   "capture.what.viaStudio": "LordOS Studio 経由のカメラ（{camera}）",
   "capture.what.viaStudioPlain": "LordOS Studio 経由のカメラ",
   "capture.what.effectsOn": "エフェクトオン",
-  "capture.what.effectsOff": "エフェクトなし"
+  "capture.what.effectsOff": "エフェクトなし",
+  "shortcuts.captureWindow": "ウインドウのスクリーンショット"
 }

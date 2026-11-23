@@ -924,5 +924,6 @@
   "dkms.mokNotNeeded": "Ennek a számítógépnek most nem kell regisztrálnia a kulcsot.",
   "dkms.mokNothingPending": "Nincs kulcs, amely a következő újraindításkor regisztrálásra vár.",
   "dkms.mokNoTool": "A mokutil program nincs telepítve.",
-  "dkms.mokFailed": "A kulcsot nem sikerült előkészíteni a következő újraindításra."
+  "dkms.mokFailed": "A kulcsot nem sikerült előkészíteni a következő újraindításra.",
+  "media.protectedWindow": "Ez az ablak védett, ezért önmagában nem rögzíthető. A képernyőképeken feketén jelenik meg."
 }

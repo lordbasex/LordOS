@@ -1,8 +1,9 @@
 // Settings → Privacy — per-app permissions («Privacy & Security»). Lists each
 // permission with the apps that requested it and lets you revoke it. The Monitor adds its own section
 // through registerPrivacySection (see sdk/privacy.js); this page does not know about the Monitor.
-import { View, Text, useTheme, useLocale, Segmented, useStore, perms, permsRev, privacySections, useIndicators, share, shareRev, packages, appName, getApp, spacing, typeScale, shortcutsWho, shortcutsWhoText } from '@lordos/sdk';
+import { View, Text, useTheme, useLocale, Segmented, useStore, perms, permsRev, privacySections, useIndicators, share, shareRev, packages, appName, getApp, listApps, spacing, typeScale, shortcutsWho, shortcutsWhoText } from '@lordos/sdk';
 import { Stack, Section, SettingRow, Badge, Note, StatusDot, tint } from './ui.jsx';
+import { privacyApps, permChoices } from './privacymodel.js';
 
 // Small monochrome pictures for the permissions whose usual symbols are color emoji.
 function CameraGlyph() {
@@ -70,13 +71,10 @@ const listed = (d) => !BY_IDENTITY.has(d.perm) || !!shortcutsWho(d.app);
 
 const PermBadge = ({ glyph: G, color }) => (typeof G === 'string' ? <Badge glyph={G} color={color} size={22} /> : <Badge color={color} size={22}><G /></Badge>);
 
-// Apps that declared a permission (manifest) or already have a saved decision.
-function appsFor(perm, decisions) {
-  const set = new Map();
-  for (const p of packages.list()) if ((p.permissions || []).includes(perm)) set.set(p.id, p.name);
-  for (const d of decisions) if (d.perm === perm && listed(d)) set.set(d.app, nameOf(d.app, perm));
-  return [...set.entries()];
-}
+// Apps that declared a permission (a package's or a built-in app's manifest) or already have a saved decision
+// (privacymodel.js; a built-in app is listed before it ever asked, GitHub #219).
+const appsFor = (perm, decisions) => privacyApps(perm, { packages: packages.list(), systemApps: listApps(), decisions, listed, nameOf });
+const LABEL = { allow: 'privacy.allowShort', ask: 'privacy.askShort', deny: 'privacy.denyShort' };
 
 function PermSection({ perm, glyph, color }) {
   const { t: tr } = useLocale();
@@ -89,7 +87,7 @@ function PermSection({ perm, glyph, color }) {
       {apps.map(([id, name]) => (
         <SettingRow key={id} label={name} hint={BY_IDENTITY.has(perm) ? shortcutsWhoText(id) || undefined : undefined}>
           <Segmented small value={perms.get(id, perm)} onChange={(s) => perms.set(id, perm, s)}
-            options={[['allow', tr('privacy.allowShort')], ['ask', tr('privacy.askShort')], ['deny', tr('privacy.denyShort')]]} />
+            options={permChoices(perms.builtinDefault(id, perm)).map((k) => [k, tr(LABEL[k])])} />
         </SettingRow>
       ))}
     </Section>

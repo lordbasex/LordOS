@@ -924,5 +924,6 @@
   "dkms.mokNotNeeded": "Questo computer non ha bisogno di registrare la chiave ora.",
   "dkms.mokNothingPending": "Nessuna chiave è in attesa di essere registrata al prossimo riavvio.",
   "dkms.mokNoTool": "Il programma mokutil non è installato.",
-  "dkms.mokFailed": "Non è stato possibile preparare la chiave per il prossimo riavvio."
+  "dkms.mokFailed": "Non è stato possibile preparare la chiave per il prossimo riavvio.",
+  "media.protectedWindow": "Questa finestra è protetta: non si può catturare da sola. Nelle catture dello schermo appare nera."
 }

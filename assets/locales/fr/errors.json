@@ -924,5 +924,6 @@
   "dkms.mokNotNeeded": "Cet ordinateur n’a pas besoin d’inscrire la clé maintenant.",
   "dkms.mokNothingPending": "Aucune clé n’attend d’être inscrite au prochain redémarrage.",
   "dkms.mokNoTool": "Le programme mokutil n’est pas installé.",
-  "dkms.mokFailed": "La clé n’a pas pu être préparée pour le prochain redémarrage."
+  "dkms.mokFailed": "La clé n’a pas pu être préparée pour le prochain redémarrage.",
+  "media.protectedWindow": "Cette fenêtre est protégée : elle ne peut pas être capturée seule. Dans les captures de l’écran, elle apparaît en noir."
 }

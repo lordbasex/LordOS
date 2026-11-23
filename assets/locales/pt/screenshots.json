@@ -97,5 +97,11 @@
   "hintAdjust": "Arraste as alças para ajustar · Enter: capturar · Esc: cancelar",
   "hintAdjustRecord": "Arraste as alças para ajustar · Enter: gravar · Esc: cancelar",
   "hintRecord": "Arraste para escolher a área a gravar · Esc: cancelar",
-  "thumbOpen": "Abrir no editor de marcação"
+  "thumbOpen": "Abrir no editor de marcação",
+  "opt.printKey": "Tecla Print Screen",
+  "opt.printKey.full": "Capturar a tela inteira",
+  "opt.printKey.area": "Capturar a parte selecionada",
+  "opt.printKey.window": "Capturar a janela selecionada",
+  "opt.printKey.toolbar": "Mostrar a barra",
+  "opt.printKey.none": "Não fazer nada"
 }

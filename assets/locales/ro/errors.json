@@ -925,5 +925,6 @@
   "dkms.mokNotNeeded": "Acest computer nu trebuie să înregistreze cheia acum.",
   "dkms.mokNothingPending": "Nicio cheie nu așteaptă să fie înregistrată la următoarea repornire.",
   "dkms.mokNoTool": "Programul mokutil nu este instalat.",
-  "dkms.mokFailed": "Cheia nu a putut fi pregătită pentru următoarea repornire."
+  "dkms.mokFailed": "Cheia nu a putut fi pregătită pentru următoarea repornire.",
+  "media.protectedWindow": "Această fereastră este protejată, deci nu poate fi capturată singură. În capturile ecranului apare neagră."
 }

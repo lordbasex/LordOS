@@ -97,5 +97,11 @@
   "hintAdjust": "Плъзнете дръжките за настройка · Enter: снимка · Esc: отказ",
   "hintAdjustRecord": "Плъзнете дръжките за настройка · Enter: запис · Esc: отказ",
   "hintRecord": "Плъзнете, за да изберете областта за запис · Esc: отказ",
-  "thumbOpen": "Отваряне в редактора за отбелязване"
+  "thumbOpen": "Отваряне в редактора за отбелязване",
+  "opt.printKey": "Клавиш Print Screen",
+  "opt.printKey.full": "Снимка на целия екран",
+  "opt.printKey.area": "Снимка на избрана част",
+  "opt.printKey.window": "Снимка на избран прозорец",
+  "opt.printKey.toolbar": "Показване на лентата",
+  "opt.printKey.none": "Нищо"
 }
