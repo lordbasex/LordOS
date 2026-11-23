@@ -13,6 +13,8 @@
 #include <strings.h>
 
 #define MAX_IMAGE_MB (64ull * 1024)          /* 64 GiB: far above any installer */
+/* the only place a list may be mirrored ("list"): LordOS's own site, for LordOS's own signed releases */
+#define LIST_MIRROR "https://lordos.org/releases/"
 
 static const JVal *get(const JVal *o, const char *k) {
     if (!o || o->type != J_OBJ) return NULL;
@@ -131,6 +133,18 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
             e->fprs[e->nfprs++][40] = 0;
         }
         if (bad || (!e->nfprs && e->sig_type != VMCAT_SIG_LORDOS)) break;
+        /* the list mirrored on lordos.org (vmcatalog.h): only for a LordOS release with a fixed list name, only under
+         * LIST_MIRROR, and with all three names */
+        const JVal *lm = get(a, "list");
+        if (lm) {
+            const char *ld = str(lm, "dir"), *ls = str(lm, "sums"), *lg = str(lm, "signature");
+            if (lm->type != J_OBJ || e->sig_type != VMCAT_SIG_LORDOS || !sums || !dir_ok(ld) || strncmp(ld, LIST_MIRROR, strlen(LIST_MIRROR)) ||
+                strlen(ld) <= strlen(LIST_MIRROR) || !ls || !vmcat_name_ok(ls) || strlen(ls) >= sizeof e->list_sums ||
+                !lg || !vmcat_name_ok(lg) || strlen(lg) >= sizeof e->list_sig) break;
+            snprintf(e->list_dir, sizeof e->list_dir, "%s", ld);
+            snprintf(e->list_sums, sizeof e->list_sums, "%s", ls);
+            snprintf(e->list_sig, sizeof e->list_sig, "%s", lg);
+        }
         snprintf(e->keys, sizeof e->keys, "%s", kf ? kf : "");
         snprintf(e->dir, sizeof e->dir, "%s", dir);
         snprintf(e->file_dir, sizeof e->file_dir, "%s", fdir ? fdir : dir);
@@ -144,6 +158,20 @@ int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmC
     json_free(&d);
     if (rc) memset(e, 0, sizeof *e);
     return rc;
+}
+
+int vmcat_list_source(const VmCatEntry *e, const char *name, int i, char *list, char *sig, size_t n) {
+    if (!e || !list || !sig || !n || !vmcat_name_ok(name) || i < 0) return -1;
+    list[0] = sig[0] = 0;
+    int mirror = e->list_dir[0] && e->sums[0] && !strcmp(name, e->sums);
+    if (mirror && i == 0) {
+        if (snprintf(list, n, "%s%s", e->list_dir, e->list_sums) >= (int)n || snprintf(sig, n, "%s%s", e->list_dir, e->list_sig) >= (int)n) return -1;
+        return 0;
+    }
+    if (i != mirror || !e->dir[0]) return -1;
+    if (snprintf(list, n, "%s%s", e->dir, name) >= (int)n) return -1;
+    if ((e->sig_type == VMCAT_SIG_DETACHED || e->sig_type == VMCAT_SIG_LORDOS) && snprintf(sig, n, "%s%s", e->dir, e->sig_name) >= (int)n) return -1;
+    return 0;
 }
 
 /* one line, without its end (\n, \r\n) */

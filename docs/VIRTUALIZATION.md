@@ -1486,7 +1486,8 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
   (4.1: no file is pinned): for each architecture the maker's folder (`dir`, `https://` only), its SHA-256 list, fixed
   (`sums`) or found in the folder's listing when its name changes per build (`sumsPattern`, Fedora's `CHECKSUM`), the
   image's name as an anchored extended regular expression (`file`), an optional mirror folder for the image itself
-  (`fileDir`), the card's estimate (`approxMb`) and the most a download may be (`maxMb`), plus `hashSource` (where each
+  (`fileDir`), for LordOS's own card only a copy of its signed list on lordos.org read first (`list`, "The LordOS card"
+  below), the card's estimate (`approxMb`) and the most a download may be (`maxMb`), plus `hashSource` (where each
   hash comes from) and `checked` (when the entry was last tried). Cards, in this order: **Debian 13** (the netinst ISO,
   `cdimage.debian.org/debian-cd/current`, `SHA256SUMS`), **Ubuntu 26.04** (the desktop ISO, `releases.ubuntu.com` for
   amd64 and `cdimage.ubuntu.com` for arm64, `SHA256SUMS`), **Fedora 45** (Workstation Live, `dl.fedoraproject.org` for
@@ -1685,6 +1686,19 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     `vm.listUnsigned`; one that doesn't verify (a changed list, a line added, another key, an OpenPGP signature in its
     place, another list) is `vm.listBadSignature` with `imager.badSignature`. Then the image is checked against that
     signed list like any card's. `maxMb` is 4096 for both.
+  - *Where the list comes from (in development after 0.8.9.5-beta; maintainer's decision 2026-11-23):* GitHub's release
+    downloads sometimes answer 403 on their signed redirect, so the signed list is read from **lordos.org** first and
+    from the GitHub release only if that fails; the ISO itself still comes from GitHub. The entry's `list`,
+    `{ "dir": "https://lordos.org/releases/v0.8.9-beta/", "sums": "SHA256SUMS.txt", "signature": "SHA256SUMS.sig" }`,
+    names the copy: the same bytes as the release's `SHA256SUMS` and `SHA256SUMS.sig`, the list with an extension because
+    CloudFront serves an extensionless path as a pretty-URL page. `vmcatalog.c` takes a `list` only on an entry signed
+    with `lordos-release` and a fixed `sums`, only under `https://lordos.org/releases/<something>/`, with plain names for
+    both files; anything else refuses the whole entry. `vmcat_list_source` gives the order (the copy, then `dir`'s
+    `SHA256SUMS` and `SHA256SUMS.sig`), and `vm-image-list` keeps the first list whose signature verifies; when both
+    fail, the answer is GitHub's error. Both are checked with the same compiled-in release key, so where the list comes
+    from changes nothing about what is trusted: a wrong or old file on the site fails its signature and the GitHub list
+    is read instead. The release process uploads the copy (`tools/release/publish-lists.sh`, `RELEASING.md` step 9) and
+    moves `list.dir` with the tag; `tools/web/deploy.sh` never deletes `releases/`.
   - *Size:* a card may carry `defaults`, the least a new machine of it gets over the chosen profile (`cardSize` in
     `catalog.js`; processors never more than this computer has): LordOS asks for **4 vCPU, 4 GB, 32 GB and 3D
     graphics** (3D where this computer can give it, 6.10).
@@ -1713,7 +1727,10 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     and the compiled-in key: the list verifies; a changed hash, a line added, another key, a 31-byte or PEM key, no
     signature, an empty, garbage or OpenPGP signature, the signature over Debian's list, and Debian's entry given the
     release key are all refused; entries of that kind with a key file, fingerprints, no name or a path for a name are
-    refused. `vmunattend-test`: the `lordos-auto.conf` keys and values, no answers until lord-vm names the disk and its
+    refused. The list's copy: the real entry's `list` has the tag of its `dir`, lordos.org is tried first, GitHub second
+    and nothing third; a `list` on another host, outside `releases/`, over http, with `..`, a query, a name with a path,
+    a missing name, on a maker's entry or on a `sumsPattern` entry is refused; other entries have only their own folder
+    (`vmcatalog-test`, `vm_catalog_test.mjs`). `vmunattend-test`: the `lordos-auto.conf` keys and values, no answers until lord-vm names the disk and its
     size, refused languages and command lines, and `vmu_prepare` end to end (the `LORDOSAUTO` FAT image read back, the
     file on it). `vm_catalog_test.mjs`: the card per architecture, the live ISO picked from the real list (never the
     OVA or a `.sources.tsv`), the tag against `downloads.json`, `unattendedOf`, `cardSize`. **Not run yet from the card:** the whole

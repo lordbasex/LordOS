@@ -130,7 +130,14 @@ eq('lordos: the card', [card('lordos').name, card('lordos').kind, card('lordos',
 eq('lordos: the release key, no key file', [LOS.signature, LOS.keys, LOS.fingerprints], [{ type: 'lordos-release', name: 'SHA256SUMS.sig' }, undefined, undefined]);
 const tagOf = (dir) => (/\/releases\/download\/(v[0-9]+(?:\.[0-9]+){2,3}(?:-[a-z0-9.]+)?)\/$/.exec(dir) || [])[1] || '';
 eq('lordos: one pinned release tag for both', [!!tagOf(LOS.arch.amd64.dir), tagOf(LOS.arch.amd64.dir) === tagOf(LOS.arch.arm64.dir), LOS.arch.amd64.dir.startsWith('https://github.com/lordbasex/LordOS/releases/download/')], [true, true, true]);
-eq('lordos: the card says the tag\'s version', tagOf(LOS.arch.amd64.dir).replace(/^v/, '').replace(/-.*$/, ''), LOS.release);
+// the signed list is read first from its copy on lordos.org (GitHub's release downloads sometimes answer 403), the same
+// tag as the ISO folder, with an extension (CloudFront serves extensionless paths as pages); GitHub's list is the fallback
+eq('lordos: the list from lordos.org, same tag, GitHub kept as fallback', ['amd64', 'arm64'].map((a) => {
+  const x = LOS.arch[a], l = x.list || {};
+  return [l.dir === `https://lordos.org/releases/${tagOf(x.dir)}/`, l.sums, l.signature, x.sums, /\.[a-z]+$/.test(l.sums || '')];
+}), [[true, 'SHA256SUMS.txt', 'SHA256SUMS.sig', 'SHA256SUMS', true], [true, 'SHA256SUMS.txt', 'SHA256SUMS.sig', 'SHA256SUMS', true]]);
+eq('lordos: only LordOS mirrors its list', CAT.systems.filter((s) => Object.values(s.arch || {}).some((a) => a?.list)).map((s) => s.id), ['lordos']);
+eq('lordos: the card says the tag\'s version',tagOf(LOS.arch.amd64.dir).replace(/^v/, '').replace(/-.*$/, ''), LOS.release);
 // the site's list of current images (web/content/downloads.json) is never newer than the release the card names: the release
 // process moves the tag (docs/RELEASING.md, step 1), so a release with new ISOs and an old card fails here
 const DL = JSON.parse(fs.readFileSync(path.join(here, '../../web/content/downloads.json'), 'utf8')).downloads;

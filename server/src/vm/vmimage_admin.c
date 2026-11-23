@@ -126,26 +126,27 @@ static void write_image_info(const char *sha, const char *id, const char *arch, 
     if (fclose(f) || chmod(t, 0644) || rename(t, p)) unlink(t);
 }
 
-/* the list (and, when the maker signs it apart, its signature) into lists/, checked with the entry's pinned keys; only
- * the text that was signed is kept, as lists/<id>-<arch>.list, which is all vm-image-get believes */
-static void get_signed_list(const char *id, const char *arch, const VmCatEntry *e, const char *name) {
-    char url[VMCAT_URL + 160], raw[160], sigp[160], dest[160], tmp[176];
+/* one source's list (and, when the maker signs it apart, its signature) checked with the entry's pinned keys: LIST_OK
+ * with *body (malloc) the text that was signed, or the error the action answers with (its argument in why) */
+enum { LIST_OK = 1, LIST_FAILED = 0, LIST_UNSIGNED = -1, LIST_BADSIG = -2, LIST_NOKEYS = -3 };
+static int fetch_signed_list(const char *id, const char *arch, const VmCatEntry *e, const char *lurl, const char *surl,
+                             char **body, size_t *bl, char *why, size_t wn) {
+    char raw[160], sigp[160];
     snprintf(raw, sizeof raw, VM_LISTS "/%s-%s.fetched", id, arch);
     snprintf(sigp, sizeof sigp, VM_LISTS "/%s-%s.sig", id, arch);
-    snprintf(dest, sizeof dest, VM_LISTS "/%s-%s.list", id, arch);
-    snprintf(tmp, sizeof tmp, "%s.tmp", dest);
-    unlink(dest);                                            /* a list is only there while its last check passed */
-    char old[160];
-    snprintf(old, sizeof old, VM_LISTS "/%s-%s.sums", id, arch);   /* 0.8.9's first build kept unchecked lists here */
-    unlink(old);
+    *body = NULL;
+    *bl = 0;
+    why[0] = 0;
     FetchItem it;
-    snprintf(url, sizeof url, "%s%s", e->dir, name);
-    if (fetch_one(url, raw, VM_LIST_MAX, &it)) { admin_err("vm.listFailed", "reason", it.err[0] ? it.err : "?", NULL); return; }
+    if (fetch_one(lurl, raw, VM_LIST_MAX, &it)) { snprintf(why, wn, "%s", it.err[0] ? it.err : "?"); return LIST_FAILED; }
     int have_sig = 0;
-    if (e->sig_type == VMCAT_SIG_DETACHED || e->sig_type == VMCAT_SIG_LORDOS) {
-        snprintf(url, sizeof url, "%s%s", e->dir, e->sig_name);
-        if (!fetch_one(url, sigp, 64 * 1024, &it)) have_sig = 1;
-        else if (strcmp(it.err, "pkg.http.status status=404") && strcmp(it.err, "pkg.http.status status=410")) {   /* none published: unsigned */ unlink(raw); admin_err("vm.listFailed", "reason", it.err[0] ? it.err : "?", NULL); return; }
+    if (surl[0]) {
+        if (!fetch_one(surl, sigp, 64 * 1024, &it)) have_sig = 1;
+        else if (strcmp(it.err, "pkg.http.status status=404") && strcmp(it.err, "pkg.http.status status=410")) {   /* none published: unsigned */
+            unlink(raw);
+            snprintf(why, wn, "%s", it.err[0] ? it.err : "?");
+            return LIST_FAILED;
+        }
     }
     size_t ln = 0, sn = 0, kn = 0;
     char *list = read_root_file(raw, VM_LIST_MAX, &ln), *sig = have_sig ? read_root_file(sigp, 64 * 1024, &sn) : NULL;
@@ -157,14 +158,39 @@ static void get_signed_list(const char *id, const char *arch, const VmCatEntry *
     else keys = read_root_file(kp, 1u << 20, &kn);
     unlink(raw);
     unlink(sigp);
-    char *body = NULL, why[200] = "";
-    size_t bl = 0;
-    int rc = !list ? -2 : !keys ? -3 : vmcat_verify_list(e, keys, kn, list, ln, sig, sn, (int64_t)time(NULL), &body, &bl, why, sizeof why);
+    int rc = !list ? -2 : !keys ? -3 : vmcat_verify_list(e, keys, kn, list, ln, sig, sn, (int64_t)time(NULL), body, bl, why, wn);
     free(list); free(sig); free(keys);
-    if (rc == -2) { admin_err("vm.listFailed", "reason", "pkg.http.notDownloaded", NULL); return; }
-    if (rc == -3) { admin_err("vm.listBadSignature", "name", e->keys, "reason", "pkg.pgp.unknownKeys count=0", NULL); return; }
-    if (rc == 0) { free(body); admin_err("vm.listUnsigned", "name", name, NULL); return; }
-    if (rc < 0) { free(body); admin_err("vm.listBadSignature", "name", name, "reason", why[0] ? why : "pkg.pgp.badSignature", NULL); return; }
+    if (rc == 1) return LIST_OK;
+    free(*body);
+    *body = NULL;
+    if (rc == -2) { snprintf(why, wn, "pkg.http.notDownloaded"); return LIST_FAILED; }
+    if (rc == -3) return LIST_NOKEYS;
+    if (rc == 0) return LIST_UNSIGNED;
+    if (!why[0]) snprintf(why, wn, "pkg.pgp.badSignature");
+    return LIST_BADSIG;
+}
+
+/* the list into lists/, from the first of the entry's sources (vmcat_list_source: LordOS's copy on lordos.org, then the
+ * maker's folder) whose list verifies; only the text that was signed is kept, as lists/<id>-<arch>.list, which is all
+ * vm-image-get believes. When every source fails, the answer is the last one's error. */
+static void get_signed_list(const char *id, const char *arch, const VmCatEntry *e, const char *name) {
+    char dest[160], tmp[176];
+    snprintf(dest, sizeof dest, VM_LISTS "/%s-%s.list", id, arch);
+    snprintf(tmp, sizeof tmp, "%s.tmp", dest);
+    unlink(dest);                                            /* a list is only there while its last check passed */
+    char old[160];
+    snprintf(old, sizeof old, VM_LISTS "/%s-%s.sums", id, arch);   /* 0.8.9's first build kept unchecked lists here */
+    unlink(old);
+    char lurl[VMCAT_URL + 160], surl[VMCAT_URL + 160], why[200] = "?";
+    char *body = NULL;
+    size_t bl = 0;
+    int rc = LIST_FAILED;
+    for (int i = 0; rc != LIST_OK && !vmcat_list_source(e, name, i, lurl, surl, sizeof lurl); i++)
+        rc = fetch_signed_list(id, arch, e, lurl, surl, &body, &bl, why, sizeof why);
+    if (rc == LIST_FAILED) { admin_err("vm.listFailed", "reason", why[0] ? why : "?", NULL); return; }
+    if (rc == LIST_NOKEYS) { admin_err("vm.listBadSignature", "name", e->keys, "reason", "pkg.pgp.unknownKeys count=0", NULL); return; }
+    if (rc == LIST_UNSIGNED) { admin_err("vm.listUnsigned", "name", name, NULL); return; }
+    if (rc == LIST_BADSIG) { admin_err("vm.listBadSignature", "name", name, "reason", why, NULL); return; }
     int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
     int ok = fd >= 0;
     for (size_t o = 0; ok && o < bl;) {

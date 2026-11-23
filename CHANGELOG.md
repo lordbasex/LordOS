@@ -67,6 +67,33 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     requests to the original URL and a new signed URL each time, after 2 s; a 503 once; always 403: one try and two
     more, then the 403 reported; a 404 after a redirect and a 403 without one not asked again; a redirect loop still
     stops after 5.
+- **Machines: the LordOS card reads its signed image list from lordos.org** (in development; the latest release is
+  0.8.9.5-beta; maintainer's decision 2026-11-23). GitHub's release downloads sometimes answer 403 on their signed
+  redirect, and the card then could not read `SHA256SUMS` or `SHA256SUMS.sig` at all.
+  - **What changed.** The `lordos` entry of `assets/machines/systems.json` has a `list` for each architecture,
+    `{ "dir": "https://lordos.org/releases/v0.8.9-beta/", "sums": "SHA256SUMS.txt", "signature": "SHA256SUMS.sig" }`:
+    a copy of the release's signed list on the site (same bytes; `.txt` because CloudFront serves an extensionless
+    path as a pretty-URL page). `vm-image-list` (`server/src/vm/vmimage_admin.c`) tries the sources
+    `vmcat_list_source` gives in order, the copy first, then the GitHub release's `SHA256SUMS` and `SHA256SUMS.sig`,
+    and keeps the first list whose signature verifies; when both fail, the answer is GitHub's error. The ISO itself
+    still downloads from GitHub (`dir`).
+  - **Trust is unchanged.** Both lists are checked with the same release key compiled into LordOS before any hash in
+    them is believed; a wrong or stale file on the site fails its signature and the GitHub list is read instead. The
+    root-side parser (`server/src/vm/vmcatalog.c`) accepts a `list` only on an entry signed with `lordos-release` and
+    a fixed `sums`, only under `https://lordos.org/releases/<tag>/`, with plain names for both files; any other
+    `list` refuses the whole entry.
+  - **Release process.** `tools/release/publish-lists.sh <tag> <release-dir>` (new, optional) verifies
+    `SHA256SUMS.sig` with `tools/release/lordos-release.pub.pem`, uploads `SHA256SUMS` as
+    `releases/<tag>/SHA256SUMS.txt` and `SHA256SUMS.sig` to the site's bucket (`text/plain`, `no-cache`; the account
+    from `tools/web/aws-env.sh`), invalidates `/releases/*` and compares what the site serves. `docs/RELEASING.md`
+    step 9 runs it for every release, and step 1 moves `list.dir` with the card's tag. `tools/web/deploy.sh` no
+    longer deletes `releases/` on the site (its `--delete` sync excludes it, like `apt/` and `keys/`).
+  - **Tests.** `vmcatalog-test`: the real entry's copy has the tag of its folder, lordos.org is tried first, GitHub
+    second and nothing third, other entries keep only their own folder, and a `list` on another host (including
+    `lordos.org.evil.example`), outside `releases/`, over http, with `..` or a query, with a path for a name, without
+    a name, on a maker's entry or on a `sumsPattern` entry is refused. `vm_catalog_test.mjs`: both architectures'
+    copies, the same tag as the ISO folder, an extension on the list, GitHub kept as the fallback, and only LordOS's
+    entry has one. Docs: `docs/VIRTUALIZATION.md` 3.9 ("The LordOS card"), `docs/RELEASING.md`.
 - **Machines: the library draws its machines' place from the first frame, with placeholders until they are read**
   (in development; the latest release is 0.8.9.5-beta). Reported by the maintainer: opened again (after logging back
   in), the library with the New machine card, an Ubuntu machine and a guest of the other system took 1 to 2 seconds to

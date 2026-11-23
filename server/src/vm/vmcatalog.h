@@ -31,6 +31,13 @@ typedef struct {
     /* how the maker signs the list (the system's "signature", "keys", "fingerprints") */
     int sig_type;                 /* VMCAT_SIG_DETACHED (a file in dir), VMCAT_SIG_CLEAR (the list itself) or VMCAT_SIG_LORDOS */
     char sig_name[96];            /* the detached signature's file name ("" for a clear-signed list) */
+    /* LordOS's own releases only (VMCAT_SIG_LORDOS, a fixed list name): the same signed list also published on lordos.org
+     * ("list": { "dir", "sums", "signature" }), read first because GitHub's release downloads sometimes answer 403 on
+     * their signed redirect; dir's list stays the fallback. Both are checked with the same compiled-in release key, so
+     * where the list comes from changes nothing about what is trusted. "" when the entry has none. */
+    char list_dir[VMCAT_URL];     /* https://lordos.org/releases/<tag>/ */
+    char list_sums[96];           /* the list's name there (SHA256SUMS.txt: the site needs an extension) */
+    char list_sig[96];            /* its signature's name there */
     char keys[64];                /* the maker's key file, a plain name in the keys folder ("" for VMCAT_SIG_LORDOS) */
     char fprs[VMCAT_FPRS][41];    /* the primary keys of that file that may sign (40 hex digits, upper case) */
     int nfprs;
@@ -45,6 +52,12 @@ typedef struct {
  * isn't https:// ending in '/', a pattern that isn't anchored or doesn't compile, a size out of range, no signature,
  * key file or fingerprint) */
 int vmcat_find(const char *json, size_t n, const char *id, const char *arch, VmCatEntry *e);
+
+/* where the list `name` (the entry's fixed list, or the name vm-image-list was given for a sumsPattern entry) and its
+ * signature are fetched from, in the order to try them: source i (0, 1, …) into list (and sig, "" for a clear-signed
+ * list), each of n bytes. 0, or -1 when there is no source i. Source 0 is the entry's "list" mirror when it has one and
+ * name is its fixed list; the maker's folder (dir) is always the last. The first source whose list verifies is kept. */
+int vmcat_list_source(const VmCatEntry *e, const char *name, int i, char *list, char *sig, size_t n);
 
 /* 1 if name is a plain file name (letters, digits, . _ + ~ -, 1 to 127 bytes, not starting with '.' or '-') */
 int vmcat_name_ok(const char *name);

@@ -51,8 +51,9 @@ The releases page is the project's public changelog: every release is documented
    **Machines' LordOS card** (since 0.8.9.5): when this release ships new live ISOs, point the `lordos`
    entry of `assets/machines/systems.json` at it in the same commit: both `dir` folders
    (`https://github.com/lordbasex/LordOS/releases/download/v<version>/`), `release` (the version without its suffix),
-   `approxMb` (each ISO's size in MiB, from the build), and `checked`. Its `SHA256SUMS` and `SHA256SUMS.sig` are the
-   ones step 5 writes, so nothing else changes. A release without ISOs leaves it alone. `vm_catalog_test.mjs` fails
+   `approxMb` (each ISO's size in MiB, from the build), and `checked`, and both `list.dir` folders
+   (`https://lordos.org/releases/v<version>/`, the copy of the signed list Machines reads first; step 9 uploads it).
+   Its `SHA256SUMS` and `SHA256SUMS.sig` are the ones step 5 writes, so nothing else changes. A release without ISOs leaves it alone. `vm_catalog_test.mjs` fails
    once `web/content/downloads.json` names an ISO newer than the card's tag ([VIRTUALIZATION.md](VIRTUALIZATION.md),
    3.9, "The LordOS card").
 
@@ -168,6 +169,34 @@ The releases page is the project's public changelog: every release is documented
    Leave out `--prerelease` only for a version without a suffix. The Debian installer
    (`install.sh`) finds betas too: `releases/latest` skips pre-releases, so it falls back to the
    newest release of any kind ([INSTALL-DEBIAN.md](INSTALL-DEBIAN.md)).
+
+   **The signed list on lordos.org** (every release; Machines' LordOS card reads it there first, because GitHub's
+   release downloads sometimes answer 403 on their signed redirect: [VIRTUALIZATION.md](VIRTUALIZATION.md), 3.9, "The
+   LordOS card"). On the maintainer's Mac:
+
+   ```sh
+   tools/release/publish-lists.sh v<version> <release-dir>
+   ```
+
+   It checks `SHA256SUMS.sig` against `tools/release/lordos-release.pub.pem` first and uploads nothing if it doesn't
+   verify, then copies `SHA256SUMS` as `releases/v<version>/SHA256SUMS.txt` and `SHA256SUMS.sig` as
+   `releases/v<version>/SHA256SUMS.sig` into the site's bucket (`text/plain; charset=utf-8`, `no-cache`; the profile,
+   bucket and distribution from `tools/web/aws-env.sh`, like `deploy.sh`), invalidates `/releases/*` and compares
+   what the site serves with the release's files. By hand it is the same:
+
+   ```sh
+   aws s3 cp <release-dir>/SHA256SUMS s3://<site bucket>/releases/v<version>/SHA256SUMS.txt \
+       --cache-control no-cache --content-type "text/plain; charset=utf-8"
+   aws s3 cp <release-dir>/SHA256SUMS.sig s3://<site bucket>/releases/v<version>/SHA256SUMS.sig \
+       --cache-control no-cache --content-type "text/plain; charset=utf-8"
+   aws cloudfront create-invalidation --distribution-id <distribution> --paths "/releases/*"
+   ```
+
+   The list needs its `.txt`: CloudFront serves an extensionless path as a pretty-URL page (a 404). `deploy.sh` never
+   deletes `releases/`, so older tags stay for the installed systems whose card still names them. When the card's
+   pinned tag moves (step 1), its `list.dir` moves with it, and this upload must be done before that build ships; if
+   it is missing or wrong, the card falls back to the GitHub list (same signature, same key), so it is never a
+   security problem, only the 403 workaround lost.
 10. **Check:** download from the release page and run the verification commands from the notes;
    run `curl -fsSL https://lordos.org/install.sh | sh` on a clean Debian 13; update the website if
    it names the current version.
