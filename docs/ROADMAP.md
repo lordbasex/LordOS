@@ -967,6 +967,11 @@ An update through the Store and `apt` (`CHANGELOG.md`, "0.8.8.9-beta"); no new I
 
 ## Before 1.0
 
+- [ ] **Monitors on a second graphics card** ([#186](https://github.com/lordbasex/LordOS/issues/186)). On laptops whose
+  HDMI or DisplayPort is wired to the discrete GPU (Legion Y530: GTX 1060), lord-server drives one card, so that port
+  stays dark. Drive the outputs of a second DRM device (scan out a copy of the shared buffer, or compose per card),
+  per-card in Settings → Displays, with the NVIDIA opt-in driver (docs/NVIDIA-PLAN.md) and with AMD/Intel hybrids.
+  Large; after the 0.8.9.x series.
 - [ ] **lord-web on the new WPE API (WPEPlatform)** ([#142](https://github.com/lordbasex/LordOS/issues/142), maintainer's
   decision 2026-11-15: it will be done, before 1.0). The legacy API lord-web uses (libwpe, wpebackend-fdo) is deprecated
   upstream and already missing on some distributions; Debian 13 keeps it for its whole life. Rewrite `webwin.c` on
