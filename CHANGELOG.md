@@ -830,6 +830,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   still copied; 3.3's user namespace and "Weaker isolation" notice (not built); schema 13 in 3.9; the tests that run (12).
   The "How the score is made" section shows the arithmetic, and the same table is in `docs/machines-checklist.json`
   (items, areas with weight and score, total) for tools.
+- **Machines: the status checklist audited a third time** (against `bb5baab62`, after QEMU's namespaces and seccomp
+  allowlist, the machine groups with the Whonix (Tor) card, the guests' performance profile for Linux and the search
+  indexer, shared memory's huge pages, the disk cache measurement, the LordOS list from lordos.org, protected windows and
+  Sentinela's watch of the machines landed). Every changed row was rated again and the others spot-checked: 111 rows,
+  the total **68 % → 69 % (68.94)** (engine 78 %, getting a system in 76 %, the app 75 %, snapshots and storage 60 %,
+  network 80 %, devices 56 %, host integration 68 %, graphics 46 %, guest tools 75 %, command line 48 %, system ties
+  61 %, security 74 %, performance 86 %, tests 55 %). The table, the Σ line and `docs/machines-checklist.json` disagreed
+  (67.52, 67.16 and the rows' own 67.88: the Whonix row had been raised without recomputing); all three now come from
+  the rows in one pass, and the JSON's areas also carry their item count and mean. Disposable sessions are rated 25 %:
+  only the Whonix Workstation's session in memory exists, not the feature for any machine. The Whonix row went 85 → 80 %
+  (no Delete, Rename or Repair of a group, no Start Gateway bar, no remaking a base). Rows added: Sentinela's watch of the
+  machines and protected windows. False statements fixed: section 9 said the search pause and the Linux side of the
+  performance profile weren't built; 13.8 called our seccomp filter a denylist; 19.7 said Start Fresh writes
+  `operation.json` and makes a changed base again from the archive (it refuses one); 19.9's failure table now says which
+  rows are built; 12 lists the new tests and the sandbox probe that now exists; the tools' `perf` was in fact checked in a
+  running guest.
 
 ### Tests
 
