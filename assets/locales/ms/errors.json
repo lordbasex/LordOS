@@ -61,6 +61,8 @@
   "backup.saveFailed": "Tidak dapat menyimpan tetapan sandaran",
   "backup.setupFailed": "Tidak dapat menghidupkan penyulitan",
   "backup.snapshotFailed": "Tidak dapat menyelesaikan sandaran: {errno}",
+  "backup.someFilesFailed": "Sebahagian failnya tidak dapat dipulihkan",
+  "backup.restoreStartFailed": "Tidak dapat memulakan pemulihan",
   "backup.sourceUnreadable": "Tidak dapat membaca folder sumber",
   "backup.tooManyExclusions": "Terlalu banyak pengecualian",
   "backup.verifyFailed": "Fail sandaran gagal pengesahan (telah diusik atau kunci salah)",

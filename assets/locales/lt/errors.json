@@ -61,6 +61,8 @@
   "backup.saveFailed": "Nepavyko įrašyti atsarginių kopijų nustatymų",
   "backup.setupFailed": "Nepavyko įjungti šifravimo",
   "backup.snapshotFailed": "Nepavyko baigti atsarginės kopijos: {errno}",
+  "backup.someFilesFailed": "Kai kurių jo failų nepavyko atkurti",
+  "backup.restoreStartFailed": "Nepavyko pradėti atkūrimo",
   "backup.sourceUnreadable": "Nepavyksta perskaityti šaltinio aplanko",
   "backup.tooManyExclusions": "Per daug išimčių",
   "backup.verifyFailed": "Atsarginės kopijos failas nepraėjo patikros (pakeistas arba netinkamas raktas)",

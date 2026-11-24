@@ -61,6 +61,8 @@
   "backup.saveFailed": "Could not save the backup settings",
   "backup.setupFailed": "Couldn't turn on encryption",
   "backup.snapshotFailed": "Could not finish the backup: {errno}",
+  "backup.someFilesFailed": "Some of its files couldn't be restored",
+  "backup.restoreStartFailed": "Couldn't start the restore",
   "backup.sourceUnreadable": "Cannot read the source folder",
   "backup.tooManyExclusions": "Too many exclusions",
   "backup.verifyFailed": "A backup file failed verification (tampered with or wrong key)",

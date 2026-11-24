@@ -67,7 +67,7 @@ not "CONTENTS").
 | `Checkbox` | 14 box | 4 | `checked`, `mixed` (a dash), with its label |
 | `RadioGroup` | 14 dot | 7 | `options = [[value, label, { disabled }?]]`, one under the other or in a `row` |
 | `Tabs` | 30 | — | a row of tabs, the chosen one underlined in the accent, a hairline under the row |
-| `Popover` | — | `menuRadius + 2` | a box below (or above) a control, kept inside the window; a focus scope |
+| `Popover` | — | `menuRadius + 2` | a box below (or above) a control, kept inside the window; a focus scope; drawn invisible until it has been laid out on its side (#237) |
 | `Tooltip` | 22 | `menuRadius − 2` | wraps any control: hover or keyboard focus, after 550 ms |
 | `ProgressBar` | 6 | 3 | `value` 0–1, or none for the indeterminate band |
 | `List`, `Table` | 26 rows | 6 / 10 | selection by the pointer and the keys (`multiple`: Shift ranges, Ctrl toggles), type-to-find; a `Table` has a header that sorts (`sort`, `onSort`) |

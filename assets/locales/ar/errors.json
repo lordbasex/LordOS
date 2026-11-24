@@ -61,6 +61,8 @@
   "backup.saveFailed": "تعذّر حفظ إعدادات النسخ الاحتياطي",
   "backup.setupFailed": "تعذّر تشغيل التشفير",
   "backup.snapshotFailed": "تعذّر إكمال النسخ الاحتياطي: {errno}",
+  "backup.someFilesFailed": "تعذّرت استعادة بعض ملفاته",
+  "backup.restoreStartFailed": "تعذّر بدء الاستعادة",
   "backup.sourceUnreadable": "لا يمكن قراءة المجلد المصدر",
   "backup.tooManyExclusions": "استثناءات كثيرة جدًا",
   "backup.verifyFailed": "فشل التحقق من أحد ملفات النسخة الاحتياطية (عُبث به أو المفتاح خاطئ)",

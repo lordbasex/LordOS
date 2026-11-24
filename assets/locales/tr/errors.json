@@ -61,6 +61,8 @@
   "backup.saveFailed": "Yedekleme ayarları kaydedilemedi",
   "backup.setupFailed": "Şifreleme açılamadı",
   "backup.snapshotFailed": "Yedekleme tamamlanamadı: {errno}",
+  "backup.someFilesFailed": "Dosyalarından bazıları geri yüklenemedi",
+  "backup.restoreStartFailed": "Geri yükleme başlatılamadı",
   "backup.sourceUnreadable": "Kaynak klasör okunamıyor",
   "backup.tooManyExclusions": "Çok fazla hariç tutma",
   "backup.verifyFailed": "Bir yedek dosyası doğrulamadan geçemedi (kurcalanmış ya da anahtar yanlış)",

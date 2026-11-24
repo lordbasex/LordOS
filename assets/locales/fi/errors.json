@@ -61,6 +61,8 @@
   "backup.saveFailed": "Varmuuskopioasetuksia ei voitu tallentaa",
   "backup.setupFailed": "Salausta ei voitu ottaa käyttöön",
   "backup.snapshotFailed": "Varmuuskopiota ei voitu viimeistellä: {errno}",
+  "backup.someFilesFailed": "Osaa sen tiedostoista ei voitu palauttaa",
+  "backup.restoreStartFailed": "Palautusta ei voitu aloittaa",
   "backup.sourceUnreadable": "Lähdekansiota ei voi lukea",
   "backup.tooManyExclusions": "Liian monta poissulkua",
   "backup.verifyFailed": "Varmuuskopiotiedosto ei läpäissyt tarkistusta (peukaloitu tai väärä avain)",

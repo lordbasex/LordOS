@@ -61,6 +61,8 @@
   "backup.saveFailed": "Hindi ma-save ang mga setting ng backup",
   "backup.setupFailed": "Hindi ma-on ang encryption",
   "backup.snapshotFailed": "Hindi matapos ang backup: {errno}",
+  "backup.someFilesFailed": "Hindi na-restore ang ilan sa mga file nito",
+  "backup.restoreStartFailed": "Hindi masimulan ang pag-restore",
   "backup.sourceUnreadable": "Hindi mabasa ang source folder",
   "backup.tooManyExclusions": "Masyadong maraming exclusion",
   "backup.verifyFailed": "Bumagsak sa pag-verify ang isang backup file (pinakialaman o maling key)",

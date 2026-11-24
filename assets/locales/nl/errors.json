@@ -61,6 +61,8 @@
   "backup.saveFailed": "De instellingen voor reservekopieën konden niet worden bewaard",
   "backup.setupFailed": "Versleuteling kon niet worden aangezet",
   "backup.snapshotFailed": "De reservekopie kon niet worden afgerond: {errno}",
+  "backup.someFilesFailed": "Sommige van de bestanden konden niet worden teruggezet",
+  "backup.restoreStartFailed": "Kan het terugzetten niet starten",
   "backup.sourceUnreadable": "De bronmap kan niet worden gelezen",
   "backup.tooManyExclusions": "Te veel uitsluitingen",
   "backup.verifyFailed": "Een bestand van de reservekopie kwam niet door de controle (gemanipuleerd of verkeerde sleutel)",

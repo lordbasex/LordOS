@@ -13,7 +13,7 @@ export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch, theme
 export { settings, useSettings, useTrackedSettings } from './settings.js';
 export { t, tOptional, useLocale, locale, languages, preferredLanguages, setPreferredLanguages, CORE_LANGUAGES, appName, formatDate, formatTime, formatNumber, weekdayName, monthName, setLanguage, reloadCatalogs, direction, textDirection } from './i18n.js';
 export { keyboard } from './keyboard.js';
-export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage } from './localename.js';   // glibc region names (installer, Settings)
+export { regionOf, localeOf, regionCountry, languageOfLocale, localeLanguage, regionLanguageCode, regionLabel } from './localename.js';   // glibc region names (installer, Settings)
 export { LANGUAGE_NAMES } from './langnames.js';   // languages not translated yet (Settings → Language & Region)
 export { useShortcuts, addShortcuts, runShortcut, shortcutList, shortcutsRev, shortcutTaken, addMenuBarKeys } from './shortcuts.js';
 export { ContextMenu } from './contextmenu.jsx';
@@ -120,6 +120,7 @@ export { browserProfiles, refreshBrowserProfiles, windowProfile, noteLaunchedPro
 export { BROWSERS as PROFILE_BROWSERS, isProfileBrowser, profileChoice, cleanProfileChoices, cleanDisplayProfiles } from './browserprofilemodel.js';
 export { sound, useSound, useSoundPeak, soundState, defaultSink, defaultSource, microphones, headsetMics } from './sound.js';
 export { nearbyDevices, lowEnergySide, btErrorKey } from './btlistmodel.js';   // Settings → Bluetooth's nearby list (issue #78)
+export { NO_SELECTION, clickSelect, keepShown } from './listmodel.js';   // a list's pointer selection (Shift range, Ctrl toggle), e.g. Backups' restore browser (#231)
 export { SoundOutputList, useSoundOutputs } from './soundoutputs.js';   // choosing the output by the volume (issue #58)
 export { monitor, useMonitor, monitorSamples, monitorProcesses, monitorConnections, monitorDevices, monitorDetail, MONITOR_HISTORY, diskTempHistory, DISK_TEMP_HISTORY, firewall, firewallState } from './monitor.js';
 export * as fwRule from './fwrule.js';            // checks what the user types for a firewall rule

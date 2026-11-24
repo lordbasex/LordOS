@@ -560,6 +560,12 @@ Files: usr/lib/lordos/assets/monitor/land.bin usr/lib/lordos/assets/locales/*/co
 License: public-domain
  Natural Earth (https://www.naturalearthdata.com).
 
+Files: usr/lib/lordos/assets/locales/*/languages.json
+Copyright: Unicode, Inc.
+License: Unicode-3.0
+ Language names from Unicode CLDR (https://cldr.unicode.org) through Node.js's ICU, written by
+ tools/gen-language-names.mjs. https://www.unicode.org/license.txt
+
 Files: third_party/quickjs/* third_party/stb/*
 License: MIT and public-domain
  QuickJS (MIT) and stb (public domain / MIT), compiled into lord-server.

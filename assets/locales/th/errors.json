@@ -61,6 +61,8 @@
   "backup.saveFailed": "ไม่สามารถบันทึกการตั้งค่าการสำรองข้อมูลได้",
   "backup.setupFailed": "ไม่สามารถเปิดการเข้ารหัสได้",
   "backup.snapshotFailed": "ไม่สามารถสำรองข้อมูลให้เสร็จได้: {errno}",
+  "backup.someFilesFailed": "กู้คืนไฟล์บางไฟล์ของรายการนี้ไม่ได้",
+  "backup.restoreStartFailed": "เริ่มการกู้คืนไม่ได้",
   "backup.sourceUnreadable": "ไม่สามารถอ่านโฟลเดอร์ต้นทางได้",
   "backup.tooManyExclusions": "รายการยกเว้นมากเกินไป",
   "backup.verifyFailed": "ไฟล์สำรองไฟล์หนึ่งตรวจสอบไม่ผ่าน (ถูกดัดแปลงหรือคีย์ไม่ถูกต้อง)",

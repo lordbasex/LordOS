@@ -40,3 +40,18 @@ export function languageOfLocale(name, ids) {
 // The glibc language part of an interface language: "zh-Hant" → "zh", "pt" → "pt" (regions are
 // named with it: zh_TW, pt_BR).
 export const localeLanguage = (id) => String(id || '').split('-')[0];
+
+// The glibc language of a region ("eu_FR" → "eu", "ast_ES" → "ast", "ca_ES@valencia" → "ca"), '' when it has none.
+export const regionLanguageCode = (region) => (/^([a-z]{2,3})(?=[_.@]|$)/.exec(regionOf(region)) || [])[1] || '';
+
+// A region's row in a list (#239): its language, its country and its name — "Basque · France (eu_FR)" — so the five
+// French-country regions (br, ca, eu, fr, oc) don't all read "France". `name(key)` looks a name up in the interface
+// language (Settings passes tOptional) and returns null when it has none: `languages.<code>` (generated from CLDR by
+// tools/gen-language-names.mjs) and `countries.<CC>`. Without either name the row is the bare region.
+export function regionLabel(region, name) {
+  const r = regionOf(region);
+  const ll = regionLanguageCode(r), cc = regionCountry(r);
+  const look = (key) => { try { return (typeof name === 'function' && name(key)) || ''; } catch (e) { return ''; } };
+  const words = [ll ? look(`languages.${ll}`) : '', cc ? look(`countries.${cc}`) : ''].filter(Boolean).join(' · ');
+  return words ? `${words} (${r})` : r;
+}

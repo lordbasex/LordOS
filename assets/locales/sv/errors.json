@@ -61,6 +61,8 @@
   "backup.saveFailed": "Kunde inte spara inställningarna för säkerhetskopiering",
   "backup.setupFailed": "Kunde inte slå på kryptering",
   "backup.snapshotFailed": "Kunde inte slutföra säkerhetskopieringen: {errno}",
+  "backup.someFilesFailed": "Vissa av dess filer kunde inte återställas",
+  "backup.restoreStartFailed": "Kunde inte starta återställningen",
   "backup.sourceUnreadable": "Kan inte läsa källmappen",
   "backup.tooManyExclusions": "För många undantag",
   "backup.verifyFailed": "En fil i säkerhetskopian klarade inte verifieringen (manipulerad eller fel nyckel)",

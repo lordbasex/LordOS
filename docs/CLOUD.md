@@ -783,6 +783,10 @@ a problem). `sdk/cloudcheck.js` runs it with `lord.fs` and `cloud.*` only, each 
 8. **Make a link** and stop sharing it, where the account has links.
 9. **Delete the check folder**: `lord.fs` has no delete, so the folder moves out of the cloud (a move job) into a
    scratch folder of the home, which goes to the Trash and out of it. Runs even when an earlier step failed.
+   The move's last step removes the emptied folder in the cloud; a provider that still lists the file it has just
+   deleted (pCloud, GitHub #243) makes that rmdir read ENOTEMPTY for a moment, so a move between disks tries only that
+   rmdir again, with a short backoff, for at most 4.5 s in all (`server/src/fsops.c` `rm_tree_patient`): nothing is
+   walked or deleted again, and a folder that really holds something still fails.
 10. **Delete it in the cloud**: gone from a fresh listing and nothing of it waiting to go up, 1 minute at most.
 
 Then a **report** with nothing personal: LordOS version and architecture, rclone's version, the provider's kind and

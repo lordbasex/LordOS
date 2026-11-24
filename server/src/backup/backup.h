@@ -22,6 +22,11 @@ void  backup_cancel(void);
 char *backup_list_json(void);
 char *backup_ls_json(const char *id, const char *rel, char *err, size_t n);
 int   backup_restore(const char *id, const char *rel, int replace, const char *suffix, const char *to, char *err, size_t n);
+/* Several files and folders of one backup at once (#231): the same checks per item, done one after the other in the
+ * thread (bk_restore_list); status().restore says which one is going (index of count) and lists the ones that failed. */
+#define BACKUP_RESTORE_MAX 64                             /* items in one restore (engine.h BK_RESTORE_MAX) */
+int   backup_restore_list(const char *id, const char *const *rels, int nrels, int replace, const char *suffix, const char *to,
+                          char *err, size_t n);
 int   backup_delete(const char *id, char *err, size_t n);
 /* Encryption: unlock (or, with create, set up on a destination without backups) with the
  * passphrase; the result arrives in the status (unlock). The key stays only in memory; lock()

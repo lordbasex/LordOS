@@ -61,6 +61,8 @@
   "backup.saveFailed": "Haikuweza kuhifadhi mipangilio ya nakala rudufu",
   "backup.setupFailed": "Haikuweza kuwasha usimbaji fiche",
   "backup.snapshotFailed": "Haikuweza kukamilisha nakala rudufu: {errno}",
+  "backup.someFilesFailed": "Baadhi ya faili zake hazikuweza kurejeshwa",
+  "backup.restoreStartFailed": "Imeshindwa kuanza kurejesha",
   "backup.sourceUnreadable": "Haiwezi kusoma folda chanzo",
   "backup.tooManyExclusions": "Utengaji mwingi mno",
   "backup.verifyFailed": "Faili ya nakala rudufu imeshindwa uthibitishaji (imeingiliwa au ufunguo si sahihi)",

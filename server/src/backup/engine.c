@@ -1038,3 +1038,48 @@ int bk_restore(const char *machine, const char *id, const char *rel, const char 
     if (rcancel(&x)) return 1;
     return 0;
 }
+
+int bk_restore_list_valid(const char *const *rels, int n) {
+    if (!rels || n < 1 || n > BK_RESTORE_MAX) return 0;
+    for (int i = 0; i < n; i++) {
+        if (!rels[i] || !bk_rel_valid(rels[i])) return 0;
+        if (!rels[i][0] && n > 1) return 0;     /* everything: only on its own */
+    }
+    return 1;
+}
+
+/* is a equal to b or inside the folder b? ("Docs/a.txt" in "Docs", never "Docs2/x" in "Docs") */
+static int rel_within(const char *a, const char *b) {
+    size_t k = strlen(b);
+    return !strncmp(a, b, k) && (a[k] == 0 || a[k] == '/');
+}
+
+int bk_restore_list(const char *machine, const char *id, const char *const *rels, int n, const char *base, int replace,
+                    const char *suffix, BkRestore *out, BkItem *items, void (*step)(void *ud, int i), void *ud) {
+    out->files = out->bytes = out->kept_both = out->replaced = out->skipped = out->errors = 0;
+    out->error[0] = 0;
+    if (!bk_restore_list_valid(rels, n) || !items) { lerr_set(out->error, sizeof out->error, "backup.badPath", NULL); return -1; }
+    for (int i = 0; i < n; i++) {
+        memset(&items[i], 0, sizeof items[i]);
+        items[i].r = 1;
+        for (int k = 0; k < n; k++)             /* inside another listed item (the first of two equal ones stays) */
+            if (k != i && rel_within(rels[i], rels[k]) && (strcmp(rels[i], rels[k]) || k < i)) { items[i].r = BK_ITEM_COVERED; break; }
+    }
+    for (int i = 0; i < n; i++) {
+        if (items[i].r == BK_ITEM_COVERED) continue;
+        if (out->cancel && *out->cancel) return 1;
+        if (step) step(ud, i);
+        BkRestore one = { .cancel = out->cancel, .key = out->key };
+        int r = bk_restore(machine, id, rels[i], base, replace, suffix, &one);
+        BkItem *it = &items[i];
+        it->r = r > 0 ? 1 : r < 0 || one.errors ? -1 : 0;
+        it->files = one.files; it->kept_both = one.kept_both; it->replaced = one.replaced;
+        it->skipped = one.skipped; it->errors = one.errors;
+        snprintf(it->error, sizeof it->error, "%s", one.error);
+        out->files += one.files; out->bytes += one.bytes; out->kept_both += one.kept_both;
+        out->replaced += one.replaced; out->skipped += one.skipped; out->errors += one.errors + (r < 0 ? 1 : 0);
+        if (!out->error[0] && one.error[0]) snprintf(out->error, sizeof out->error, "%s", one.error);
+        if (r > 0) return 1;
+    }
+    return 0;
+}

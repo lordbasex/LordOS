@@ -933,7 +933,7 @@ build/lordlog-test: tests/lordlog_test.c src/lordlog.c src/lordlog.h
 	    -o $@ tests/lordlog_test.c src/lordlog.c
 	./$@ || { rm -f $@; exit 1; }
 build/fsops-test: tests/fsops_test.c src/fsops.c src/fsops.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/fsops_test.c src/fsops.c -lpthread
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSOPS_TEST -o $@ tests/fsops_test.c src/fsops.c -lpthread
 # lord.fs's Async calls (Files on Cloud and network folders): a slow file system never holds the caller (0.8.8.7)
 build/fsasync-test: tests/fsasync_test.c src/fsasync.c src/fsasync.h src/fsops.c src/fsops.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -DFSASYNC_TEST -o $@ tests/fsasync_test.c src/fsasync.c src/fsops.c -lpthread

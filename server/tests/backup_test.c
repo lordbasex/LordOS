@@ -241,6 +241,8 @@ static void test_crypt(void) {
 static int holds;
 static int hold_cb(BkRun *r, const char *rel) { (void)r; if (strcmp(rel, "Machines/a.lordvm/disks")) return 0; holds++; return 1; }
 
+static void count_step(void *ud, int i) { (void)i; (*(int *)ud)++; }
+
 int main(void) {
     test_retention();
     test_rel();
@@ -431,6 +433,64 @@ int main(void) {
     rc = bk_restore(M, id1, "shortcut/x.desktop", H, 0, " (restored)", &o);
     snprintf(p, sizeof p, "%s/x.desktop", q);
     CHECK(!exists(p), "does not write into a protected folder through a link (%d)", rc);
+
+    /* several files and folders at once (#231): each item with every check of a single restore */
+    {
+        BkItem it[BK_RESTORE_MAX + 1];
+        int steps = 0;
+        snprintf(p, sizeof p, "%s/a.txt", H); unlink(p);
+        snprintf(p, sizeof p, "%s/sub/deep/c.txt", H); unlink(p);
+        snprintf(p, sizeof p, "%s/dir/b.bin", H); unlink(p);
+        const char *three[] = { "a.txt", "sub/deep", "dir" };
+        rc = bk_restore_list(M, id1, three, 3, H, 1, " (restored)", &o, it, count_step, &steps);
+        CHECK(rc == 0 && it[0].r == 0 && it[1].r == 0 && it[2].r == 0 && steps == 3, "a list: three items restored (%d %s)", rc, o.error);
+        snprintf(p, sizeof p, "%s/a.txt", H);
+        CHECK(!slurp(p, buf, sizeof buf) && !strcmp(buf, "version 1\n"), "a list: the file is back");
+        snprintf(p, sizeof p, "%s/sub/deep/c.txt", H);
+        CHECK(exists(p), "a list: the folder is back with its file");
+        snprintf(p, sizeof p, "%s/dir/b.bin", H);
+        CHECK(exists(p), "a list: the second folder too");
+        CHECK(o.files == it[0].files + it[1].files + it[2].files && o.files >= 3, "a list: the totals add the items (%llu)", (unsigned long long)o.files);
+        /* an item inside another listed folder, or listed twice, comes with it once */
+        snprintf(p, sizeof p, "%s/sub/deep/c.txt", H); unlink(p);
+        const char *nested[] = { "sub/deep/c.txt", "sub", "sub", "subway" };
+        steps = 0;
+        rc = bk_restore_list(M, id1, nested, 4, H, 0, " (restored)", &o, it, count_step, &steps);
+        CHECK(rc == 0 && it[0].r == BK_ITEM_COVERED && it[1].r == 0 && it[2].r == BK_ITEM_COVERED && steps == 2,
+              "a list: an item inside a listed folder isn't restored twice (%d %d %d %d, %d steps)", it[0].r, it[1].r, it[2].r, it[3].r, steps);
+        snprintf(q, sizeof q, "%s/sub/deep/c (restored).txt", H);
+        CHECK(exists(p) && !exists(q), "a list: no second copy of a covered file");
+        CHECK(it[3].r == -1, "a list: \"subway\" isn't inside \"sub\" (its own item, missing in the backup: %d)", it[3].r);
+        /* one bad item fails alone, with its own error; the others are restored; nothing escapes */
+        snprintf(p, sizeof p, "%s/a.txt", H); unlink(p);
+        const char *mixed[] = { "outside/passwd", "a.txt", "shortcut/x.desktop" };
+        rc = bk_restore_list(M, id1, mixed, 3, H, 0, " (restored)", &o, it, NULL, NULL);
+        snprintf(p, sizeof p, "%s/outside", H);
+        CHECK(rc == 0 && it[0].r == -1 && !strncmp(it[0].error, "backup.badPath", 14) && !exists(p), "a list: a link out of the backup is refused for its item (%s)", it[0].error);
+        snprintf(p, sizeof p, "%s/a.txt", H);
+        CHECK(it[1].r == 0 && exists(p), "a list: the good item beside it is restored");
+        snprintf(p, sizeof p, "%s/.local/share/applications/x.desktop", H);
+        CHECK(!exists(p) && it[2].files == 0, "a list: nothing written into a protected folder through a link");
+        CHECK(o.errors >= 1 && !strncmp(o.error, "backup.badPath", 14), "a list: the failure is counted (%llu %s)", (unsigned long long)o.errors, o.error);
+        /* the list is checked whole before anything is restored */
+        const char *dots[] = { "a.txt", "../../../etc/passwd" };
+        CHECK(bk_restore_list(M, id1, dots, 2, H, 0, " (restored)", &o, it, NULL, NULL) == -1, "a list with .. is refused whole");
+        const char *abs[] = { "/etc/passwd" };
+        CHECK(bk_restore_list(M, id1, abs, 1, H, 0, " (restored)", &o, it, NULL, NULL) == -1, "a list with an absolute path is refused");
+        const char *every[] = { "a.txt", "" };
+        CHECK(bk_restore_list(M, id1, every, 2, H, 0, " (restored)", &o, it, NULL, NULL) == -1, "\"everything\" only alone");
+        CHECK(bk_restore_list(M, id1, every, 0, H, 0, " (restored)", &o, it, NULL, NULL) == -1, "an empty list is refused");
+        const char *many[BK_RESTORE_MAX + 1];
+        for (int i = 0; i <= BK_RESTORE_MAX; i++) many[i] = "a.txt";
+        CHECK(bk_restore_list(M, id1, many, BK_RESTORE_MAX + 1, H, 0, " (restored)", &o, it, NULL, NULL) == -1, "at most BK_RESTORE_MAX items");
+        const char *one[] = { "a.txt" };
+        CHECK(bk_restore_list(M, id1, one, 1, "/etc", 0, " (restored)", &o, it, NULL, NULL) == 0 && it[0].r == -1, "a list: a destination outside the roots refused per item");
+        CHECK(bk_restore_list(M, id1, one, 1, H, 0, "/x", &o, it, NULL, NULL) == 0 && it[0].r == -1, "a list: a bad suffix refused per item");
+        /* cancelled: the rest isn't reached */
+        volatile int stop = 1;
+        BkRestore oc = { .cancel = &stop };
+        CHECK(bk_restore_list(M, id1, three, 3, H, 0, " (restored)", &oc, it, NULL, NULL) == 1 && it[0].r == 1 && it[2].r == 1, "a cancelled list stops");
+    }
 
     /* pruning: out of space, only the newest stays */
     int before = bk_list(M, ids, 16);

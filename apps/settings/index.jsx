@@ -7,7 +7,7 @@ import {
   View, Text, Image, useTheme, useSettings, shortcutList, shortcutsRev, themes, session, keyboard, admin, languages, setLanguage, useLocale,
   reloadCatalogs, tOptional, statusText, fs, useStore, SidebarItem, Toggle, Slider, Button, TextInput, ScrollView, SearchField, Hairline, useSystemInfo, useAppWindow, useVisitHistory, useTrackpads,
   spacing, typeScale, registerDockActions, hasTouchpad, findWallpaper, wallpaperThumb, wallpaperIdFor, wallpaperPatch, slideshowStop, displayWallpaperKey, displayLabel, WALLPAPER_CATEGORIES, GREETER_WALLPAPER, setLoginStill, setLoginImage, addWallpaperImage, removeWallpaperImage, userWallpaperName, Layer,  MOTION_SECTIONS, MOTION_RATES, motionBusy, motionItems, motionThumb, motionDownloads, useCodecs, downloadMotion, removeMotion, setLoginMotion, variantFor, userVideoProblem, media, FilePicker, screenDisplays, errorText, wm, Segmented, osk,
-  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionCountry,
+  restoreMode, setRestoreMode, restoreBrowsers, setRestoreBrowsers, preferredLanguages, setPreferredLanguages, LANGUAGE_NAMES, Overlay, ToolbarButton, regionOf, localeOf, regionLabel, compareNames,
   useSidebar, SidebarToggle, SidebarOverlay, battery, deviceList,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
@@ -490,18 +490,18 @@ function LanguageRegion() {
   };
 
   const now = new Date();
-  // the country by the code, as in the installer ("Australia · en_AU"), so a search by country finds it (#53)
-  const regionItems = [...new Map(locales.map((l) => [shortLocale(l.name), l])).values()].map((l) => {
-    const r = shortLocale(l.name), cc = regionCountry(r), name = cc ? tOptional(`countries.${cc}`) : '';
-    return [r, name ? `${name} · ${r}` : r, l.generated ? '✓' : ''];
-  });
+  // the language and the country by the code ("Basque · France (eu_FR)", #239), so a search by either finds it (#53),
+  // sorted by that label: a language's regions stay together
+  const regionItems = [...new Map(locales.map((l) => [shortLocale(l.name), l])).values()]
+    .map((l) => { const r = shortLocale(l.name); return [r, regionLabel(r, tOptional), l.generated ? '✓' : '']; })
+    .sort((a, b) => compareNames(a[1], b[1]));
   const dim = { fontSize: typeScale.body, color: t.textDim, textAlign: 'end' };
   const langName = langs.find((l) => l.id === lang)?.name || lang;
   return (
     <Stack>
       <PreferredLanguages langs={langs} onPrimary={primaryChanged} />
       <Section title={tr('settings.region.title')} footer={tr('settings.region.hint')}>
-        <SettingRow label={regionName || '—'}>
+        <SettingRow label={regionName ? regionLabel(regionName, tOptional) : '—'}>
           <Button small label={tr('settings.change')} onClick={() => setShowRegions(!showRegions)} />
         </SettingRow>
         {showRegions && <SearchList items={regionItems} value={regionName} placeholder={tr('settings.region.search')}
