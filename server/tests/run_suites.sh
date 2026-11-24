@@ -206,6 +206,10 @@ EOF
     run "migration 009 chromium-family" sh tests/migration_chromium_family_test.sh
     # (0.8.9.6) shared memory's huge pages for Machines: shmem_enabled never -> advise, nothing else (docs/VIRTUALIZATION.md 3.7.2)
     run "migration 011 shmem-huge-pages" sh tests/migration_shmem_huge_test.sh
+    # (0.8.9.6) LordOS as a Machines guest: the agent port for the video group, lordos-guest started after the update
+    run "migration 012 guest-agent-port" sh tests/migration_guest_port_test.sh
+    # the LordOS Guest Tools disc's installer: its choices per package manager, init system and prompt (tools/guest/install.sh)
+    run "guest-tools install.sh (--plan)" sh tests/guest_tools_install_test.sh
     # fastfetch / neofetch fall back to lordos-fetch; the real package wins (packaging/fallback-bin)
     run "fetch-fallback (fastfetch, neofetch)" sh tests/fetch_fallback_test.sh
     run "mmdb-test" build/mmdb-test

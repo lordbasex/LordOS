@@ -2063,6 +2063,8 @@ typedef struct {
     int xf_result;
     char xf_msg[VM_TEXT_MAX];
     int ag_result;
+    uint32_t disc_seq;                  /* the LordOS Guest Tools disc's request (VAG_DISC), and why lord-vm refused it */
+    char disc_msg[VM_TEXT_MAX];
     char ag_msg[VM_TEXT_MAX];
     char *clip_in;                      /* the guest's clipboard text (VM_CLIP_DATA), and a counter of them */
     int clip_seq;
@@ -3104,6 +3106,7 @@ static void from_vm(Sess *s) {
             break;
         case VM_REPLY:
             if (fx_reply(s, &m)) break;
+            if (s->disc_seq && m.seq == s->disc_seq) { snprintf(s->disc_msg, sizeof s->disc_msg, "%s", m.a == VME_OK ? "" : m.text); s->disc_seq = 0; }
             if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
             if (s->xf_seq && m.seq == s->xf_seq) { s->xf_result = m.a == VME_OK ? 2 : 3; snprintf(s->xf_msg, sizeof s->xf_msg, "%s", m.text); s->xf_seq = 0; }
             if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
@@ -3466,6 +3469,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         set_int(c, ag, "install", s->ag_result);
         JS_SetPropertyStr(c, ag, "lost", JS_NewBool(c, s->ag_seen && s->ag_state == VAS_WAITING && s->state == VS_RUNNING));
         set_str(c, ag, "message", s->ag_msg);
+        set_str(c, ag, "discMessage", s->disc_msg);
         set_int(c, ag, "transfer", s->xf_result);
         set_str(c, ag, "transferMessage", s->xf_msg);
         JS_SetPropertyStr(c, o, "agent", ag);
@@ -4096,7 +4100,8 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
 
 /* agent(session, 'install'|'update'|'timesync'|'shutdown') → bool: a guest agent request (poll's agent.install says how
  * Install went). 'update' is Install asked by Machines itself for older LordOS tools: the same install, marked so
- * lord-vm's log says it */
+ * lord-vm's log says it. 'disc' | 'discOut': the LordOS Guest Tools disc in or out of the machine's CD drive (a Linux
+ * guest without qemu-guest-agent; agent.caps has VAC_TOOLS_DISC while it's in, agent.discMessage says a refusal) */
 /* WinFsp's installer for agent(id, 'transfer', path): only a file the admin helper keeps in the machines' image store,
  * root's, named by its SHA-256 (images/<sha256>.iso), whose record there says it's the catalog's "winfsp" entry. The
  * descriptor, and the hash as text, go to lord-vm, which hashes the file again; the guest checks its signature too */
@@ -4132,9 +4137,19 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     const char *w = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
     int upd = w && !strcmp(w, "update");
     int a = !w ? 0 : !strcmp(w, "install") || upd ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN :
-            !strcmp(w, "transfer") ? VAG_TRANSFER : !strcmp(w, "extraOff") ? VAG_EXTRA_OFF : !strcmp(w, "extraOn") ? VAG_EXTRA_ON : 0;
+            !strcmp(w, "transfer") ? VAG_TRANSFER : !strcmp(w, "extraOff") ? VAG_EXTRA_OFF : !strcmp(w, "extraOn") ? VAG_EXTRA_ON :
+            !strcmp(w, "disc") || !strcmp(w, "discOut") ? VAG_DISC : 0;
+    int disc_in = w && !strcmp(w, "disc");
     if (w) JS_FreeCString(c, w);
     if (!s || !a || s->vm < 0) return JS_FALSE;
+    if (a == VAG_DISC) {
+        /* the LordOS Guest Tools disc in or out (lord-vm uses only its own copy and checks it; agent.discMessage says why
+         * it was refused) */
+        VmMsg m = vm_msg(VM_AGENT, ++s->seq, VAG_DISC, disc_in, 0, 0, NULL);
+        if (vm_send(s->vm, &m, -1)) return JS_FALSE;
+        s->disc_seq = m.seq; s->disc_msg[0] = 0;
+        return JS_TRUE;
+    }
     if (a == VAG_TRANSFER) {
         /* the transfer folder (6.7.1): looked at again in the guest, or (a path) WinFsp installed in a Windows guest */
         char sha[65] = "";

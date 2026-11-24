@@ -1105,7 +1105,11 @@ static void test_messages(void) {
     /* the transfer folder (6.7.1): VAG_TRANSFER is an agent request (WinFsp's hash as text, or none); the agent's state
      * says whether the guest has it (VAC_TRANSFER) or can once WinFsp is in (VAC_XFER_SETUP) */
     q = vm_msg(VM_AGENT, 7, VAG_TRANSFER, 0, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
-    q = vm_msg(VM_AGENT, 7, VAG_EXTRA_ON + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    /* the LordOS Guest Tools disc (6.17): VAG_DISC is the last agent request; VAC_TOOLS_DISC says it's in the drive */
+    q = vm_msg(VM_AGENT, 7, VAG_DISC, 1, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT, 7, VAG_DISC + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_WAITING, VAC_TOOLS_DISC, 0, 0, "\t\t"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_ALL, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0) && (VAC_ALL & VAC_TOOLS_DISC));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_FILES | VAC_TRANSFER, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_DISPLAY | (int)LAG_CAP_WINDOWS | VAC_TRANSFER | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
@@ -2046,7 +2050,8 @@ static void test_tablet_layout(void) {
     CHECK(ag_hello_caps((const uint8_t *)"6 stopped stoppings", 19) == 0);
     m = vm_msg(VM_AGENT, 1, VAG_EXTRA_OFF, 0, 0, 0, ""); CHECK(vm_msg_valid(&m, 1));
     m.a = VAG_EXTRA_ON; CHECK(vm_msg_valid(&m, 1));
-    m.a = VAG_EXTRA_ON + 1; CHECK(!vm_msg_valid(&m, 1));
+    m.a = VAG_DISC; CHECK(vm_msg_valid(&m, 1));
+    m.a = VAG_DISC + 1; CHECK(!vm_msg_valid(&m, 1));
     m = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXTRA | VAC_EXTRA_OFF, 0, 0, "1\tx"); CHECK(vm_msg_valid(&m, 0));
     /* the guest's performance profile (w11, 7.1.4): AGK_PERF one byte, 0 or 1; AGK_PERFSTATE three bytes, on, the parts
      * done and refused, known bits only and never a part in both */

@@ -49,6 +49,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `vm_storage_test.sh` (real QEMU and KVM: keys, a write kept or thrown away, swtpm's encrypted state, export
     and import, hostile exports, an encrypted group, the kept firmware, raw disks), `vmexport-test`, `vmkeysrv-test`,
     `backup-machines-test` (ASan and UBSan) and `vm_storage_model_test.mjs`.
+- **Machines: Install Agent without qemu-guest-agent, the LordOS Guest Tools disc** (in development; latest release
+  0.8.9.5). A Linux machine whose system has no qemu-guest-agent (Debian's own images, LordOS 0.8.9, most desktop
+  installs) stayed on "Waiting for the agent" with nothing to click. Its agent popover now offers **Install Agent from
+  Disc**: lord-vm puts the LordOS Guest Tools disc in the machine's CD drive (read-only, only its own copy, whose SHA-256
+  is compiled into it; never in a machine locked for anonymity, a non-Linux guest, or while the drive has a disc),
+  the popover shows the line to run in the machine, and lord-vm takes the disc out by itself once the agent answers.
+  - **The disc** (`/usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso`, volume `LORDOS_TOOLS`) is made at build time by
+    our own ISO 9660 writer (`tools/guest/mkguestiso.c`, the same bytes for the same files): `install.sh`, `lordos-guest`
+    for the package's architecture, its SHA-256, the architecture and a README.
+  - **`install.sh`** asks for the administrator's password with the machine's own prompt (`pkexec` with a desktop polkit
+    agent, else `sudo`, `doas` or `su`): Machines never sees or types it. As root it checks the processor and the
+    helper's checksum, copies `lordos-guest` with its udev rule, user unit (an XDG autostart entry without systemd) and
+    shutdown hook, installs `qemu-guest-agent` with the system's own package manager (`apt-get`, `dnf`, `yum`, `zypper`,
+    `pacman`, `apk`) and starts it (systemd or OpenRC), installs `xclip` and `wl-clipboard` best effort, and starts the
+    helper for the person who ran it. `install.sh --plan` says what it would do and changes nothing.
+  - Checked on a real Debian 13 guest under KVM with lord-vm: no agent, the disc in, `install.sh` run on the guest's
+    console, qemu-guest-agent connected 17 to 31 s later (two runs), the disc out by itself one second after, then Install through
+    qemu-guest-agent on the same guest (`server/tests/vm_guest_tools_e2e.sh`); `guesttools-test` reads the image back
+    with lord-vm's own ISO reader and checks its hash and the writer's refusals; `guest_tools_install_test.sh` checks
+    `install.sh`'s choices on 18 kinds of system; shellcheck is clean.
 - **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
   latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
   - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
@@ -74,7 +94,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - **Logs:** a virtio-win guest's event logs (System and Application, through
     the guest agent every 10 s, one fixed script); a filter by unit or source (click it); the guest's times in this
     computer's local time, with the guest's own zone named when it differs.
-  - **The LordOS tools 8 (Linux) and w12** bring the shell and the links and notifications; Machines updates older
+  - **The LordOS tools 9 (Linux) and w12** bring the shell and the links and notifications; Machines updates older
     tools by itself. machine.json schema 15 adds `guest_links` and `guest_notify`; a machine locked for anonymity
     (Whonix) refuses both.
   - Tests: `vm-test` (the new frames' parsers, fuzzed with 80 000 random frames, the link encoder, the rate limit,
@@ -548,6 +568,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: LordOS 0.8.9 inside a machine waited for the agent forever** (in development). Nothing in that LordOS
+  spoke to Machines: it had neither qemu-guest-agent nor `lordos-guest.service` (the "opened, closed" in the log at
+  start is the UEFI firmware's own virtio-serial driver, not the system). 0.8.9.5 added the service, but its udev rule
+  (`uaccess`) gives the agent port only to the person at a logind seat, and LordOS's own sessions aren't logind seats, so
+  the helper couldn't open it either; and it had no clipboard on a LordOS desktop. Now the rule gives the port to the
+  `video` group too (every LordOS desktop user is in it), the `lordos` package recommends `qemu-guest-agent`, migration
+  012 applies the rule and starts the helper right after the update (only inside a Machines guest whose agent is on), and
+  `lordos-guest` 9 takes the clipboard's text from the guest's own lord-server (`lordos-guestwin.sock` says `clipboard`;
+  only the program that holds the agent port and passes it along gets it, never a secret; the helper is non-dumpable). A 0.8.9 guest gets it by updating LordOS inside
+  the machine, or right away with the disc above.
 - **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
   hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
   re-made the first's (found while starting six test machines at once: "socket: Address already in use", then "can't

@@ -44,6 +44,7 @@
 #include "../sec/json.h"
 #include "../doc/wire.h"
 #include "../pkg/crypto.h"
+#include "guesttools.h"          /* build/gen: the LordOS Guest Tools disc's SHA-256 and architecture (mk/vm.mk) */
 
 #include <ctype.h>
 #include <dirent.h>
@@ -1127,6 +1128,10 @@ static struct {
     int inst_busy;                          /* VAG_INSTALL on its way, from the request to its answer */
     long inst_pid;                          /* the install's script in the guest (guest-exec), followed until it ends */
     long long inst_poll_at, inst_deadline;
+    /* the LordOS Guest Tools disc (VAG_DISC, 6.17): opened before lord-vm's own Landlock, checked against the SHA-256
+     * compiled in before each insert. gt_state: GT_NONE, GT_INSERTING, GT_IN (ours in the drive), GT_EJECTING;
+     * gt_eject: the agent answered, so it comes out at the next turn */
+    int gt_fd, gt_state, gt_eject;
     /* a snapshot job (VM_SNAPSHOT): which, its tag and name, who asked; --loadvm TAG at start */
     int snap_kind, snap_client;
     uint32_t snap_seq;
@@ -3160,6 +3165,7 @@ static void host_shutdown(void) {
     S.shut_deadline = S.host_t0 + S.hplan.quit_at;
 }
 
+enum { GT_NONE = 0, GT_INSERTING, GT_IN, GT_EJECTING };
 /* VM_CDROM: the disc out (open the tray, take the medium, delete its nodes), then the new one in (its descriptor into an
  * fdset, a raw node on /dev/fdset/N, insert, close the tray). QMP runs them in order; the last one answers. */
 static void cd_change(int ci, uint32_t seq, int fd, const char *path) {
@@ -3191,9 +3197,14 @@ static void cd_change(int ci, uint32_t seq, int fd, const char *path) {
     vlog("cd: %s%s", fd >= 0 ? "inserting " : "ejecting", fd >= 0 ? path : "");
 }
 
+static void gt_caps(void);
+static void ag_broadcast(void);
 static void cd_done(void) {
     S.cd_busy = 0;
     if (S.cd_err[0]) vlog("cd: failed: %s", S.cd_err);
+    /* the LordOS Guest Tools disc: in once the tray closed on it, out once it closed empty (or the change failed) */
+    if (S.gt_state == GT_INSERTING) { S.gt_state = S.cd_err[0] || !S.cd_node[0] ? GT_NONE : GT_IN; gt_caps(); if (S.gt_state == GT_IN) vlog("agent: the LordOS Guest Tools disc is in the machine's drive"); }
+    else if (S.gt_state == GT_EJECTING) { S.gt_state = S.cd_node[0] ? GT_IN : GT_NONE; gt_caps(); if (S.gt_state == GT_NONE) vlog("agent: the LordOS Guest Tools disc came out of the drive"); }
     /* machine.json says what's in the drive for the next start (lord-vm holds the lock; nothing else writes it now) */
     VmMachine m = S.m;
     snprintf(m.iso, sizeof m.iso, "%s", !S.cd_node[0] ? "" : S.cd_fdset ? S.cd_path : S.m.iso);
@@ -3202,6 +3213,72 @@ static void cd_done(void) {
     else S.m = m;
     if (S.cd_err[0]) reply(S.cd_client, S.cd_seq, VME_QMP, S.cd_err);
     else reply(S.cd_client, S.cd_seq, VME_OK, S.cd_node[0] ? "inserted" : "ejected");
+}
+
+/* ---- the LordOS Guest Tools disc (VAG_DISC; docs/VIRTUALIZATION.md 6.17) ----
+ * For a Linux guest that has no qemu-guest-agent (so Install can't copy anything in) or one that doesn't allow files
+ * and commands: lord-vm's own copy of the disc goes into the CD drive, read-only, through the same QMP steps as Change
+ * Disc. The person runs its install.sh in the guest; the guest's own prompt asks for the password (pkexec, sudo, su):
+ * nothing here types into the guest. Once qemu-guest-agent connects or lordos-guest says hello, the disc comes out. The
+ * image is the one this LordOS was built with: its SHA-256 (build/gen/guesttools.h) is checked before every insert. */
+static void gt_caps(void) {
+    int caps = (S.ag_caps & ~VAC_TOOLS_DISC) | (S.gt_state == GT_IN || S.gt_state == GT_INSERTING ? VAC_TOOLS_DISC : 0);
+    if (caps != S.ag_caps) { S.ag_caps = caps; ag_broadcast(); }
+}
+/* the image's SHA-256 is the one compiled in (pread: the descriptor's offset stays where QEMU's copy expects it) */
+static int gt_hash_ok(void) {
+    Sha256 h;
+    sha256_init(&h);
+    static uint8_t buf[65536];
+    off_t off = 0;
+    for (;;) {
+        ssize_t r = pread(S.gt_fd, buf, sizeof buf, off);
+        if (r < 0 && errno == EINTR) continue;
+        if (r < 0) return 0;
+        if (!r) break;
+        sha256_update(&h, buf, (size_t)r);
+        off += r;
+        if (off > (64 << 20)) return 0;
+    }
+    uint8_t d[32];
+    char hex[65];
+    sha256_final(&h, d);
+    for (int i = 0; i < 32; i++) snprintf(hex + 2 * i, 3, "%02x", d[i]);
+    return !strcmp(hex, GUEST_TOOLS_SHA256);
+}
+static void gt_request(int ci, uint32_t seq, int in) {
+    const char *no = NULL;
+    if (S.state != VS_RUNNING && S.state != VS_PAUSED) no = "not running";
+    else if (S.m.profile_lock || S.m.role == VM_ROLE_GATEWAY) no = "never in a machine locked for anonymity";
+    else if (S.cd_busy) no = "the drive is busy";
+    if (no) { reply(ci, seq, VME_WRONG_STATE, no); return; }
+    if (!in) {
+        if (S.gt_state != GT_IN) { reply(ci, seq, VME_OK, "ejected"); return; }
+        S.gt_eject = 0;
+        S.gt_state = GT_EJECTING;
+        vlog("agent: the LordOS Guest Tools disc comes out (asked)");
+        cd_change(ci, seq, -1, "");
+        if (!S.cd_busy) { S.gt_state = GT_IN; gt_caps(); }
+        return;
+    }
+    if (S.gt_state == GT_IN) { reply(ci, seq, VME_OK, "inserted"); return; }
+    if (S.ag_windows) no = "the disc is for Linux guests: a Windows guest gets the LordOS tools through its agent";
+    else if (S.qga_up && (S.ag_caps & VAC_EXEC) && (S.ag_caps & VAC_FILES)) no = "qemu-guest-agent answers: Install goes through it";
+    else if (S.gt_fd < 0) no = "the LordOS Guest Tools disc isn't available for this machine's architecture";
+    /* the drive's own disc stays: a live system runs from it, and an installer may still need it */
+    else if (S.cd_node[0]) no = "the CD drive holds a disc: take it out first (a live system runs from its disc: install the system first)";
+    else if (!gt_hash_ok()) { no = "the LordOS Guest Tools disc isn't the one this LordOS was built with"; vlog("agent: refused: %s", no); }
+    if (no) { reply(ci, seq, VME_WRONG_STATE, no); return; }
+    int fd = dup(S.gt_fd);
+    if (fd < 0) { reply(ci, seq, VME_INTERNAL, strerror(errno)); return; }
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
+    S.gt_eject = 0;
+    S.gt_state = GT_INSERTING;
+    gt_caps();
+    vlog("agent: the LordOS Guest Tools disc goes into the machine's drive (%s, checked)", GUEST_TOOLS_ARCH);
+    cd_change(ci, seq, fd, "");
+    close(fd);
+    if (!S.cd_busy) { S.gt_state = GT_NONE; gt_caps(); }
 }
 
 /* ---- suspend to disk and resume (6.1, 3.6) ----
@@ -4042,6 +4119,7 @@ static void ag_set(int state) {
     if (state == S.ag_state) return;
     S.ag_state = state;
     if (state == VAS_CONNECTED && S.win_seed) windows_install_done();
+    if (state == VAS_CONNECTED && S.gt_state == GT_IN) S.gt_eject = 1;     /* the tools disc did its work */
     set_state(S.state, S.reason, S.code, NULL);         /* run.json says it too: the library's agent light */
     vlog("agent: %s%s%s", state == VAS_CONNECTED ? "connected" : state == VAS_WAITING ? "waiting" : "off", state == VAS_CONNECTED ? ", " : "", state == VAS_CONNECTED ? S.ag_version : "");
     ag_broadcast();
@@ -4099,7 +4177,7 @@ static void ag_lost(const char *why) {
     /* an install of lordos-guest on its way: its next step's answer won't come */
     if (S.inst_busy) inst_reply(VME_WRONG_STATE, "qemu-guest-agent stopped answering in the guest");
     if (S.id_state == 2) { S.id_state = 1; S.id_poll_at = 0; }      /* tried again when the agent is back */
-    S.ag_caps &= VAC_LAG;
+    S.ag_caps &= VAC_LAG | VAC_TOOLS_DISC;
     ag_set(VAS_WAITING);
 }
 
@@ -4203,7 +4281,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     case AQ_INFO: {
         const char *v = ok ? json_str(r, "version") : NULL;
         snprintf(S.ag_version, sizeof S.ag_version, "%.40s", v ? v : "");
-        int caps = S.ag_caps & (VAC_LAG | VAC_TRANSFER | VAC_XFER_SETUP);
+        int caps = S.ag_caps & (VAC_LAG | VAC_TRANSFER | VAC_XFER_SETUP | VAC_TOOLS_DISC);
         const JVal *cmds = json_get(r, "supported_commands");
         for (const JVal *e = cmds && cmds->type == J_ARR ? cmds->kid : NULL; e; e = e->next) {
             const char *n = json_str(e, "name");
@@ -4352,12 +4430,15 @@ static void on_qga_reply(const JVal *root, int ok) {
  * never failing the install (offline, a locked or unknown package manager), the clipboard tool through the guest's own
  * package manager when xclip isn't there (xclip and wl-clipboard: apt-get, dnf, zypper or pacman); then the helper
  * started again in each signed-in desktop session (uid ≥ 1000 with graphical-session.target active), so the new one
- * runs now instead of at the next sign-in. lordos-guest looks for the tool every 30 s too */
+ * runs now instead of at the next sign-in. lordos-guest looks for the tool every 30 s too. In a LordOS guest (/usr/lib/lordos)
+ * the rule also gives the port to the video group and the unit hangs on default.target, as the lordos package's own do
+ * (lord-sessiond's sessions aren't logind seats and don't reach graphical-session.target: docs/VIRTUALIZATION.md 6.17) */
 static const char INSTALL_SH[] =
     "set -e; mv -f /usr/local/bin/.lordos-guest.new /usr/local/bin/lordos-guest; chmod 755 /usr/local/bin/lordos-guest; "
-    "printf '%s\\n' 'SUBSYSTEM==\"virtio-ports\", ATTR{name}==\"org.lordos.agent\", TAG+=\"uaccess\"' > /etc/udev/rules.d/71-lordos-guest.rules; "
+    "l=''; t=graphical-session.target; [ -d /usr/lib/lordos ] && { l=', GROUP=\"video\", MODE=\"0660\"'; t=default.target; }; "
+    "printf '%s%s\\n' 'SUBSYSTEM==\"virtio-ports\", ATTR{name}==\"org.lordos.agent\", TAG+=\"uaccess\"' \"$l\" > /etc/udev/rules.d/71-lordos-guest.rules; "
     "mkdir -p /etc/systemd/user; printf '%s\\n' '[Unit]' 'Description=LordOS Machines clipboard' 'After=graphical-session.target' "
-    "'[Service]' 'ExecStart=/usr/local/bin/lordos-guest' 'Restart=on-failure' 'RestartSec=3' '[Install]' 'WantedBy=graphical-session.target' "
+    "'[Service]' 'ExecStart=/usr/local/bin/lordos-guest' 'Restart=on-failure' 'RestartSec=3' '[Install]' \"WantedBy=$t\" "
     "> /etc/systemd/user/lordos-guest.service; udevadm control --reload || true; udevadm trigger --subsystem-match=virtio-ports || true; "
     "systemctl --global enable lordos-guest.service || true; "
     "{ mkdir -p /usr/lib/systemd/system-shutdown && "
@@ -4373,7 +4454,7 @@ static const char INSTALL_SH[] =
     "} </dev/null >/dev/null 2>&1 || true; "
     "for d in /run/user/[0-9]*; do u=${d##*/}; [ \"$u\" -ge 1000 ] 2>/dev/null || continue; n=$(id -nu \"$u\" 2>/dev/null) || continue; "
       "systemctl --user -M \"$n@\" daemon-reload >/dev/null 2>&1 || continue; "
-      "if systemctl --user -M \"$n@\" -q is-active graphical-session.target 2>/dev/null; then "
+      "if [ \"$t\" = default.target ] || systemctl --user -M \"$n@\" -q is-active graphical-session.target 2>/dev/null; then "
         "systemctl --user -M \"$n@\" restart lordos-guest.service >/dev/null 2>&1 || true; fi; "
     "done; true";
 static void ag_install_step(void) {
@@ -5706,6 +5787,7 @@ static void drain_lag(void) {
                 else if (notool != !!(S.ag_caps & VAC_CLIP_NOTOOL))
                     vlog("agent: lordos-guest %s", notool ? "has no clipboard tool in the guest any more" : "found a clipboard tool in the guest: the clipboard works");
                 S.lag_hello = 1;
+                if (S.gt_state == GT_IN) S.gt_eject = 1;           /* the tools disc did its work */
                 if (!S.lag_windows) lag_windows_off();
                 S.ag_caps = (S.ag_caps & ~VAC_LAG) | (clip ? VAC_CLIPBOARD : 0) | (clip && S.lag_clipreq ? VAC_CLIP_LAZY : 0) |
                             (notool ? VAC_CLIP_NOTOOL : 0) | (S.lag_display ? VAC_DISPLAY : 0) | (S.lag_windows ? (int)LAG_CAP_WINDOWS : 0) |
@@ -5859,6 +5941,12 @@ static void layout_update(void) {
 /* the agent's turn of the loop: sync, ping, the journal, the shutdown fallback */
 static void ag_tick(long long now) {
     S.ag_next = now + 1000;
+    if (S.gt_eject && S.gt_state == GT_IN && !S.cd_busy && (S.state == VS_RUNNING || S.state == VS_PAUSED)) {
+        S.gt_eject = 0;
+        S.gt_state = GT_EJECTING;
+        vlog("agent: the guest agent answers: the LordOS Guest Tools disc comes out");
+        cd_change(-1, 0, -1, "");
+    }
     if (S.acpi_at && now >= S.acpi_at) {
         S.acpi_at = 0;
         if (S.state == VS_STOPPING) { vlog("agent: the guest is still running: pressing the power button too"); qmp_do("system_powerdown", NULL, P_IGNORE, -1, 0, -1, -1); }
@@ -5997,6 +6085,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         struct stat st;
         if (fd >= 0 && (fstat(fd, &st) || !S_ISREG(st.st_mode) || (fcntl(fd, F_GETFL) & O_ACCMODE) != O_RDONLY)) { close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "not a file opened for reading"); return; }
         if (fd < 0 && !S.cd_node[0]) { reply(ci, m->seq, VME_OK, "ejected"); return; }
+        if (S.gt_state) { S.gt_state = GT_NONE; S.gt_eject = 0; gt_caps(); }      /* the person changes the disc: not ours any more */
         cd_change(ci, m->seq, fd, m->text);
         if (fd >= 0) close(fd);
         return;
@@ -6111,6 +6200,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
             reply(ci, m->seq, VME_OK, off ? "asked to turn it off" : "asked to turn it back on");
             return;
         }
+        if (m->a == VAG_DISC) { gt_request(ci, m->seq, m->b == 1); return; }
         if (!S.qga_up) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, "qemu-guest-agent isn't answering in the guest"); return; }
         if (m->a == VAG_TRANSFER) {
             /* the transfer folder (6.7.1): a Linux guest mounts it again; a Windows guest gets WinFsp, whose installer
@@ -7257,7 +7347,7 @@ static int connect_machine(const VmMachine *m);
 static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
-    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = -1;
+    S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = -1;
     S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = -1;
     for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
@@ -7416,13 +7506,24 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     if (S.m.agent) {
         /* lordos-guest for Install Agent: read now, before lord-vm's own Landlock keeps it in the machine's folder */
         static const char *const HELPER[2] = { "/usr/lib/lordos/guest/lordos-guest-arm64", "/usr/lib/lordos/guest/lordos-guest-amd64" };
-        int hfd = open(HELPER[S.m.arch], O_RDONLY | O_CLOEXEC);
+        /* development (--dev-qmp only): LORDVM_HELPER names a build that isn't installed, as LORDVM_WINTOOLS below */
+        const char *halt = getenv("LORDVM_HELPER");
+        int hfd = halt && S.dev_qmp ? open(halt, O_RDONLY | O_CLOEXEC) : -1;
+        if (hfd < 0) hfd = open(HELPER[S.m.arch], O_RDONLY | O_CLOEXEC);
         struct stat hs;
         if (hfd >= 0 && !fstat(hfd, &hs) && hs.st_size > 0 && hs.st_size < (8 << 20) && (S.helper = malloc((size_t)hs.st_size))) {
             S.helper_n = (size_t)hs.st_size;
             if (pread(hfd, S.helper, S.helper_n, 0) != (ssize_t)S.helper_n) { free(S.helper); S.helper = NULL; S.helper_n = 0; }
         }
         if (hfd >= 0) close(hfd);
+        /* the LordOS Guest Tools disc (VAG_DISC) of this build's architecture, kept open: its hash is checked at each
+         * insert. Development (--dev-qmp only): LORDVM_GUESTTOOLS names a build that isn't installed */
+        if ((S.m.arch == VM_ARCH_AMD64 && !strcmp(GUEST_TOOLS_ARCH, "amd64")) || (S.m.arch == VM_ARCH_ARM64 && !strcmp(GUEST_TOOLS_ARCH, "arm64"))) {
+            const char *alt = getenv("LORDVM_GUESTTOOLS");
+            S.gt_fd = alt && S.dev_qmp ? open(alt, O_RDONLY | O_CLOEXEC | O_NOCTTY) : -1;
+            if (S.gt_fd < 0) S.gt_fd = open("/usr/lib/lordos/guest/lordos-guest-tools-" GUEST_TOOLS_ARCH ".iso", O_RDONLY | O_CLOEXEC | O_NOCTTY);
+            if (S.gt_fd >= 0 && (fstat(S.gt_fd, &hs) || !S_ISREG(hs.st_mode))) { close(S.gt_fd); S.gt_fd = -1; }
+        }
         /* and the LordOS guest tools for a Windows guest (x86-64) */
         if (S.m.arch == VM_ARCH_AMD64) {
             /* development (--dev-qmp only): LORDVM_WINTOOLS names a build that isn't installed, and wins over the installed one */
