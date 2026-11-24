@@ -716,5 +716,12 @@
   "desc.done.pause": "Gepauzeerd.",
   "desc.done.block_network": "Het netwerk is geblokkeerd.",
   "desc.done.blocklist": "Op de blokkeerlijst: het wordt gestopt telkens als het start.",
-  "desc.blockConfirm": "“{name}” toevoegen aan de blokkeerlijst? Vanaf nu wordt het gestopt telkens als het start. Je kunt dit ongedaan maken in Instellingen → AI → Sentinela."
+  "desc.blockConfirm": "“{name}” toevoegen aan de blokkeerlijst? Vanaf nu wordt het gestopt telkens als het start. Je kunt dit ongedaan maken in Instellingen → AI → Sentinela.",
+  "comp.machine": "Machine",
+  "comp.machineNamed": "{name} (machine)",
+  "comp.machineHint": "Een virtuele machine: het netwerkverkeer van het gastsysteem. Haar eigen regels komen bij de regels voor Machines, die voor elke machine blijven beslissen.",
+  "comp.machinesRules": "Regel voor Machines",
+  "comp.forwarded": "Doorgestuurde poort {proto} {port} → {guest}",
+  "comp.forwardedLan": "Open voor het netwerk",
+  "comp.forwardedLocal": "Alleen deze computer"
 }

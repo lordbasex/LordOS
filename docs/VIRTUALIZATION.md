@@ -168,7 +168,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 |---|---|---:|---|---|
 | Shared (passt over a socketpair), Isolated (6.5) | ✅ | 100 | `lordvm.c` (`vm_passt_argv`) |  |
 | Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5) | 🧪 | 90 | `vmnet_admin.c`, `vmnet.c`, `lordvm.c` | Headless checks; `vhost=off`, no `vhost-net` |
-| Each machine named in the firewall (6.5) | 🟡 | 60 | `fw/rules.h` (`lordos:machines`), `apps/monitor/Network.jsx` | One component for every machine (Monitor names them); a forwarded port isn't shown as its own rule |
+| Each machine named in the firewall (6.5) | 🧪 | 95 | `fw/rules.c` (`fw_vm_app`, `fw_app_parent`, `fw_effective_restricted`, `fw_effective_trusted`, `fw_decide`), `netperm/npcompile.c` (`load_rules`), `sdk/netmodel.js` (`vmIdOf`, `componentOf`, `componentLabel`, `forwardedRules`), `apps/monitor/Network.jsx`, `FwRules.jsx`, `Firewall.jsx`, `apps/machines/configure.jsx` (Network → Firewall); `fw-rules-test` (`test_machine_inherits`), `npcompile-test` (random rounds with a machine and Machines against `fw_decide`), `netmodel_test.mjs` | *In development*: each machine is its own firewall app and row, `lordos:vm-<id>`, which inherits the rules, restrictions and trust of `lordos:machines` (nothing a Machines rule denies is allowed by the split); Monitor names the row after the machine and lists its forwarded ports as its own incoming lines; Settings' rule and restriction lists offer each machine; Configure → Network opens its rules. Not yet run through a live lord-netperm with a running machine (the kernel path is the same compile, tested against `fw_decide`) |
 | Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22) | 🧪 | 70 | `machine.h` (`nic_model`, `VM_EXTRA_NICS`) | An import's extra cards are kept but never connected. Added by the audit of 2026-11-23 |
 
 ### F. Devices (56 %)
@@ -2930,7 +2930,23 @@ downloading 500 MB from a server on the host (**Measured**, 2026-11-04, medians 
 
 **Decision (confirmed, open question 7 closed):** `passt` stays the default for Shared. It's 3.2× faster on amd64, about equal on the
 Pi, and it is the process the firewall can name as the machine. On the Pi its speed varies far more from run to run, which Phase 1
-looks at. QEMU 10.0 has no `-netdev passt`, so it's connected through `-netdev stream` on a socketpair (3.3). Bridged runs with `vhost=off` (QEMU opens no device), not `vhost-net`. `passt` runs as the machine's own process, in its scope, because it's the one opening the connections: the firewall has to see **that** as the machine, as it does for `desktop:lordos-rdesk`. Centinela sees each VM as an app (`desktop:lordos-vm-<id>`, **To test**): its traffic in Shared mode appears in the firewall, the map and Monitor as "Machine: name". A rule can block it. Bridged traffic bypasses this: Security says so.
+looks at. QEMU 10.0 has no `-netdev passt`, so it's connected through `-netdev stream` on a socketpair (3.3). Bridged runs with `vhost=off` (QEMU opens no device), not `vhost-net`. `passt` runs as the machine's own process, in its scope, because it's the one opening the connections: the firewall has to see **that** as the machine.
+
+**Each machine in the firewall (*in development*, "Machines to 100 %").** A running machine's scope
+`app-lordos-lordos-vm-<id>.scope` is the firewall app **`lordos:vm-<id>`** (`fw_scope_app` → `fw_vm_app`; the id is the
+machine's lowercase UUID). It never stands alone: `fw_app_parent` makes `lordos:machines` (the Machines component, also its
+downloads) its parent, and what decides for the machine is both together. `fw_decide` picks from the machine's own rules and
+the Machines rules as one list with the usual precedence (the more specific destination wins; on a tie Block beats Allow), the
+restrictions are both apps' (`fw_effective_restricted`), and trust comes from either (`fw_effective_trusted`; trust only
+decides what no rule and no restriction decides). lord-netperm compiles the same union for the kernel (`npcompile.c`
+`load_rules`, flags and trust from the two functions), so a rule, a restriction or "no incoming connections" for Machines still
+holds for every machine, and nothing the Machines rules deny becomes allowed by the split: only a rule the person writes for
+that one machine can be more specific. A group's Tor gateway keeps `lordos:tor-gateway`, inherits nothing and keeps its
+built-in restriction (19.5.1). Monitor → Network shows a row per machine named after it ("Ubuntu 24.04 (machine)"), with the
+Machines rule that decides for it too and each forwarded port as its own incoming line ("Forwarded port TCP 2222 → 22", open
+to the network or only this computer; `forwardedRules`). Settings → Privacy's rule list and restricted-apps list offer each
+machine (not a gateway), and Configure → Network has a **Firewall** row that opens that machine's rules. Bridged traffic
+bypasses all this (the guest's frames aren't sockets): Configure and Security say so.
 
 Each forwarded port has a scope: **Only this computer** by default, or **Your network**, which is a firewall rule the person sees.
 
@@ -2943,8 +2959,8 @@ shows the four modes, the card and the port list; every change needs the machine
 - **Forwarded ports (Shared and Host-only).** passt's own options, one per rule: `-t 127.0.0.1/H:G` (only this computer) or
   `-t 0.0.0.0/H:G` (the network, Shared only; a host-only machine never listens beyond loopback, whatever the file says), the same
   with `-u`. No rule: `-t none -u none` as before. passt binds them in the machine's scope, so `lord-netperm`'s bind programs decide
-  them as incoming connections of `lordos:machines` (FIREWALL.md, "Machines' downloads"): with "no incoming connections" for
-  Machines the bind is refused. Before passt starts, lord-vm binds and lets go of each port itself (`ports_free`), so a port in use
+  them as incoming connections of that machine's app, `lordos:vm-<id>`, with the Machines rules (FIREWALL.md, "Each machine its own
+  app"): with "no incoming connections" for Machines or for that machine the bind is refused. Before passt starts, lord-vm binds and lets go of each port itself (`ports_free`), so a port in use
   or a refusal by the firewall fails the start with a clear line instead of passt dying and the network's healing trying again.
   passt has no Landlock of ours (3.3) and binds nothing else; QEMU still can't bind or connect (Landlock net + seccomp).
 - **Host-only.** Also passt, with no root and no device: `-4 -o 127.0.0.1 -a 10.0.2.15 -n 24 -g 10.0.2.2 --no-dhcp-dns
@@ -4923,7 +4939,7 @@ What people don't normally get from a desktop virtualization app, and the reason
 | **A sandbox per machine** | 1 | Yes | Landlock, seccomp, cgroup scope, descriptors only: a broken engine is still shut in |
 | **Permission-gated devices** | 2 | Yes | Camera, mic, USB, folders pass the system's permission flow, one screen shows all |
 | **"Guest can see"** | 2 | Yes | One plain list of everything a guest can reach |
-| **Machines in the firewall** | 2 | Yes | Built partly: every machine is the one firewall component `lordos:machines`; Monitor tells machines apart |
+| **Machines in the firewall** | 2 | Yes | Built (*in development*): each machine its own firewall app `lordos:vm-<id>`, inheriting the rules of `lordos:machines` |
 | **No engine window, no X11** | 1 | Yes | One compositor, theme, desktops and shortcuts for all |
 | **Forwarded windows are marked** | 4 | Work | A guest's window can't pass as a host's |
 | **Guest logs and files are treated as hostile** | 2 | Yes | Escapes stripped, quarantine marking, fuzzed agent protocol |
@@ -5679,8 +5695,8 @@ The questions as they were asked:
 - **Huge pages off**, at a cost of about 30 % in random memory access (recommended, Whonix's advice), or Machines'
   default.
 - **The edition:** LXQt only (recommended), or a CLI choice too.
-- **The firewall and logs:** whether the Gateway gets its own name in the firewall (today every machine is
-  `lordos:machines`, area E), and whether `lord-vm`'s logs of group members are kept shorter.
+- **The firewall and logs:** the Gateway has its own name in the firewall (`lordos:tor-gateway`, 19.5.1) and every other
+  machine its own (`lordos:vm-<id>`, 6.5); open: whether `lord-vm`'s logs of group members are kept shorter.
 - **A fixed guest resolution** (for example 1920 × 1080 whatever the window's size), or the window's size; Tor Browser
   letterboxes either way.
 - **Generic groups:** Whonix only (recommended), or "New Group" for any machines later.

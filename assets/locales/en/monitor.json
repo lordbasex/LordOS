@@ -716,5 +716,12 @@
   "desc.done.pause": "Paused.",
   "desc.done.block_network": "Its network is blocked.",
   "desc.done.blocklist": "On the blocklist: it is ended whenever it starts.",
-  "desc.blockConfirm": "Add “{name}” to the blocklist? From now on it is ended whenever it starts. You can undo it in Settings → AI → Sentinela."
+  "desc.blockConfirm": "Add “{name}” to the blocklist? From now on it is ended whenever it starts. You can undo it in Settings → AI → Sentinela.",
+  "comp.machine": "Machine",
+  "comp.machineNamed": "{name} (machine)",
+  "comp.machineHint": "A virtual machine: its guest's network traffic. Its own rules add to the rules for Machines, which still decide for every machine.",
+  "comp.machinesRules": "Rule for Machines",
+  "comp.forwarded": "Forwarded port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Open to the network",
+  "comp.forwardedLocal": "This computer only"
 }

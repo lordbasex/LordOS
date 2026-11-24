@@ -1,6 +1,6 @@
 // netmodel_test.mjs — Monitor → Network's model (sdk/netmodel.js, 0.8.5): search tokens, filters,
 // grouping and sorting. Run by tests/run_suites.sh (needs node).
-import { parseSearch, chipFor, addChips, filterFlows, groupFlows, sortTree, fold, normView, parseCidr, cidrContains, matchesSearch, connAppKey, machinesLabel } from '../../sdk/netmodel.js';
+import { parseSearch, chipFor, addChips, filterFlows, groupFlows, sortTree, fold, normView, parseCidr, cidrContains, matchesSearch, connAppKey, machinesLabel, vmIdOf, vmAppOf, componentOf, componentLabel, forwardedRules, COMPONENTS } from '../../sdk/netmodel.js';
 
 let n = 0, bad = 0;
 const eq = (what, got, want) => {
@@ -98,6 +98,22 @@ eq('Machines row with the machines by name', machinesLabel('Machines', new Set([
 eq('Machines row: a name not known yet', machinesLabel('Machines', ['vm-3'], { 'vm-1': 'Ubuntu 24.04' }), 'Machines');
 eq('Machines row: only downloads', machinesLabel('Machines', null, null), 'Machines');
 eq('Machines row: two machines with one name', machinesLabel('Machines', ['a', 'b'], { a: 'Ubuntu', b: 'Ubuntu' }), 'Machines · Ubuntu');
+
+// ---- (Machines to 100 %) each machine its own firewall app ----
+const ID = '0f8e2a6c-1b2d-4c3e-9a7b-112233445566';
+eq('a machine app gives its id', vmIdOf(`lordos:vm-${ID}`), ID);
+eq('not a machine app', ['lordos:machines', 'lordos:tor-gateway', 'lordos:vm-', 'lordos:vm-ABC', `lordos:vm-${ID}0`, 'desktop:lordos-vm-aa', 'lordos:vm-aa ', null, 7].map(vmIdOf), [null, null, null, null, null, null, null, null, null]);
+eq('machine id to its app', [vmAppOf(ID), vmAppOf('tor-aa'), vmAppOf(''), vmAppOf(undefined)], [`lordos:vm-${ID}`, null, null, null]);
+eq('a machine is a component under Machines', componentOf(`lordos:vm-${ID}`)?.parent, 'lordos:machines');
+eq('the gateway and Machines keep their entries', [componentOf('lordos:tor-gateway') === COMPONENTS['lordos:tor-gateway'], componentOf('desktop:x')], [true, null]);
+const trx = (k, v) => (v ? `${k}:${v.name}` : k);
+eq('a machine row named after it', componentLabel(trx, `lordos:vm-${ID}`, { [ID]: 'Ubuntu 24.04' }), 'monitor.comp.machineNamed:Ubuntu 24.04');
+eq('a machine row before its name is known', componentLabel(trx, `lordos:vm-${ID}`, {}), 'monitor.comp.machine');
+eq('a component label', componentLabel(trx, 'lordos:mail'), 'monitor.comp.mail');
+eq('an app is no component', componentLabel(trx, 'desktop:x'), null);
+eq('forwarded ports as incoming lines', forwardedRules([{ proto: 'udp', host: 5353, guest: 53, open: 'lan' }, { proto: 'tcp', host: 2222, guest: 22 }, { host: 0, guest: 1 }, { host: 70000, guest: 1 }, null]),
+  [{ proto: 'tcp', port: 2222, guest: 22, open: 'this-computer' }, { proto: 'udp', port: 5353, guest: 53, open: 'lan' }]);
+eq('no ports', forwardedRules(undefined), []);
 
 console.log(`netmodel-test: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

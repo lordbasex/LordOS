@@ -716,5 +716,12 @@
   "desc.done.pause": "Duraklatıldı.",
   "desc.done.block_network": "Ağı engellendi.",
   "desc.done.blocklist": "Engel listesinde: her başladığında sonlandırılır.",
-  "desc.blockConfirm": "“{name}” engel listesine eklensin mi? Bundan sonra her başladığında sonlandırılır. Bunu Ayarlar → Yapay Zekâ → Sentinela’dan geri alabilirsiniz."
+  "desc.blockConfirm": "“{name}” engel listesine eklensin mi? Bundan sonra her başladığında sonlandırılır. Bunu Ayarlar → Yapay Zekâ → Sentinela’dan geri alabilirsiniz.",
+  "comp.machine": "Makine",
+  "comp.machineNamed": "{name} (makine)",
+  "comp.machineHint": "Bir sanal makine: konuk sisteminin ağ trafiği. Kendi kuralları Makineler kurallarına eklenir; onlar her makine için karar vermeye devam eder.",
+  "comp.machinesRules": "Makineler kuralı",
+  "comp.forwarded": "Yönlendirilen bağlantı noktası {proto} {port} → {guest}",
+  "comp.forwardedLan": "Ağa açık",
+  "comp.forwardedLocal": "Yalnızca bu bilgisayar"
 }

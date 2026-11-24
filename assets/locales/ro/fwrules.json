@@ -95,5 +95,6 @@
   },
   "pickAddress": "Selectați o adresă pentru a o permite sau bloca pentru această aplicație.",
   "recent": "conexiune recentă",
-  "recentDenied": "refuzată recent"
+  "recentDenied": "refuzată recent",
+  "machineInherits": "Regulile pentru Mașini decid și pentru această mașină. Regulile ei se adaugă: când ambele se potrivesc unei conexiuni, decide cea mai specifică, iar Blochează bate Permite."
 }

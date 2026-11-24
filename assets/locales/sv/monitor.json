@@ -716,5 +716,12 @@
   "desc.done.pause": "Pausad.",
   "desc.done.block_network": "Nätverket är blockerat.",
   "desc.done.blocklist": "På blockeringslistan: den avslutas varje gång den startar.",
-  "desc.blockConfirm": "Lägga till ”{name}” i blockeringslistan? Från och med nu avslutas den varje gång den startar. Du kan ångra det i Inställningar → AI → Sentinela."
+  "desc.blockConfirm": "Lägga till ”{name}” i blockeringslistan? Från och med nu avslutas den varje gång den startar. Du kan ångra det i Inställningar → AI → Sentinela.",
+  "comp.machine": "Maskin",
+  "comp.machineNamed": "{name} (maskin)",
+  "comp.machineHint": "En virtuell maskin: gästsystemets nätverkstrafik. Dess egna regler läggs till reglerna för Maskiner, som fortfarande avgör för varje maskin.",
+  "comp.machinesRules": "Regel för Maskiner",
+  "comp.forwarded": "Vidarebefordrad port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Öppen för nätverket",
+  "comp.forwardedLocal": "Bara den här datorn"
 }

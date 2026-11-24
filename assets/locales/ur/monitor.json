@@ -716,5 +716,12 @@
   "desc.done.pause": "روک دیا گیا۔",
   "desc.done.block_network": "اس کا نیٹ ورک بلاک ہے۔",
   "desc.done.blocklist": "بلاک لسٹ میں: جب بھی یہ شروع ہو گا، بند کر دیا جائے گا۔",
-  "desc.blockConfirm": "“{name}” کو بلاک لسٹ میں شامل کریں؟ اب سے جب بھی یہ شروع ہو گا، بند کر دیا جائے گا۔ آپ اسے ترتیبات → AI → Sentinela میں واپس لے سکتے ہیں۔"
+  "desc.blockConfirm": "“{name}” کو بلاک لسٹ میں شامل کریں؟ اب سے جب بھی یہ شروع ہو گا، بند کر دیا جائے گا۔ آپ اسے ترتیبات → AI → Sentinela میں واپس لے سکتے ہیں۔",
+  "comp.machine": "مشین",
+  "comp.machineNamed": "{name} (مشین)",
+  "comp.machineHint": "ایک ورچوئل مشین: اس کے مہمان سسٹم کا نیٹ ورک ٹریفک۔ اس کے اپنے اصول مشینز کے اصولوں میں شامل ہوتے ہیں، جو ہر مشین کے لیے فیصلہ کرتے رہتے ہیں۔",
+  "comp.machinesRules": "مشینز کا اصول",
+  "comp.forwarded": "آگے بھیجا گیا پورٹ {proto} {port} ← {guest}",
+  "comp.forwardedLan": "نیٹ ورک کے لیے کھلا",
+  "comp.forwardedLocal": "صرف یہ کمپیوٹر"
 }

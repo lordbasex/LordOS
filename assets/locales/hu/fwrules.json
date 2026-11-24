@@ -91,5 +91,6 @@
   },
   "pickAddress": "Válasszon ki egy címet, hogy engedélyezze vagy blokkolja ennek az alkalmazásnak.",
   "recent": "legutóbbi kapcsolat",
-  "recentDenied": "nemrég megtagadva"
+  "recentDenied": "nemrég megtagadva",
+  "machineInherits": "A Gépek szabályai erről a gépről is döntenek. A saját szabályai hozzájuk adódnak: ha mindkettő illik egy kapcsolatra, a pontosabb dönt, és a Tiltás erősebb az Engedélyezésnél."
 }

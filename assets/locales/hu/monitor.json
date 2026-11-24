@@ -716,5 +716,12 @@
   "desc.done.pause": "Szüneteltetve.",
   "desc.done.block_network": "A hálózata le van tiltva.",
   "desc.done.blocklist": "Tiltólistán: minden indításkor leállítjuk.",
-  "desc.blockConfirm": "Felveszed a(z) „{name}” programot a tiltólistára? Mostantól minden indításkor leállítjuk. Visszavonhatod itt: Beállítások → MI → Sentinela."
+  "desc.blockConfirm": "Felveszed a(z) „{name}” programot a tiltólistára? Mostantól minden indításkor leállítjuk. Visszavonhatod itt: Beállítások → MI → Sentinela.",
+  "comp.machine": "Gép",
+  "comp.machineNamed": "{name} (gép)",
+  "comp.machineHint": "Egy virtuális gép: a vendégrendszer hálózati forgalma. Saját szabályai a Gépek szabályaihoz adódnak, amelyek továbbra is minden gépről döntenek.",
+  "comp.machinesRules": "Gépek szabálya",
+  "comp.forwarded": "Továbbított port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Nyitva a hálózat felé",
+  "comp.forwardedLocal": "Csak ez a számítógép"
 }

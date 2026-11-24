@@ -324,7 +324,10 @@ static const char *const IPS[] = { "10.1.2.3", "10.1.2.4", "10.1.9.9", "10.9.9.9
                                    "2001:db8:1::5", "2001:db8:1::6", "2001:db8:2::1", "fe80::1", "2a00::1",
                                    "::ffff:10.1.2.3", "::ffff:8.8.8.8", "::1" };
 #define NIPS (int)(sizeof IPS / sizeof IPS[0])
-static const char *const APPS[] = { "lordos", "desktop:a", "desktop:b", "lpk:c", FW_APP_TOR_GATEWAY };
+/* (Machines to 100 %) a machine's app inherits the Machines component's rules, restrictions and trust: both here, so the
+ * random rounds compare the merged compile against fw_decide */
+static const char *const APPS[] = { "lordos", "desktop:a", "desktop:b", "lpk:c", FW_APP_TOR_GATEWAY, FW_APP_MACHINES,
+                                    "lordos:vm-0f8e2a6c-1b2d-4c3e-9a7b-112233445566" };
 #define NAPPS (int)(sizeof APPS / sizeof APPS[0])
 
 static void random_rule(FwStore *s, const char *app) {
