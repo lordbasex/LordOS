@@ -202,9 +202,63 @@ displays do. Nothing runs per frame, nothing polls.
 
 ## Several displays
 
-**Where a new window opens.** Launched from a display (its frame's + and Add window, its pinned apps, Files on the
-spine, Search opened on it), the app's next new window goes to that display, in its tiles or, with the free layout, in
-its middle; whatever display the app's saved layout names or where another has room (`aimLaunch`, `tiler.js`).
+**Where a new window opens** (reworked in development after 0.8.9.5-beta). Launched from a display (its frame's + and
+Add window, its pinned apps, **Used most on this display**, the usual apps, Files on the spine, Search opened on it),
+the app's windows go to **that display and that activity**, into the activity's layout there (or, with the free
+layout, its middle), whatever display the app's saved layout names, where the app itself puts them, or which activity
+is in view when they come (`launchOn`/`aimLaunch` in `tiler.js`, rules in `model/launches.js`):
+
+- Each launch leaves a **pending placement** keyed by the launcher id its windows carry (`launcherIdOf`:
+  `desktop:google-chrome`, `files`…), the display's connector and the activity, for 30 s. A new window takes the
+  newest placement of its own app; **another app's window never takes it** (before, any next window did). A Linux app
+  whose app_id names no installed `.desktop` (`linux:…`) or a Terminal=true app (`terminal`) may take a Linux launch
+  whose app has shown nothing yet; a LordOS app or another installed app never.
+- **Google Chrome with several profiles** shows its profile picker first: the picker takes the placement; when a window
+  that took one closes within 20 s of arriving, the placement is armed again for 20 s, so the browser window that opens
+  after the person picks a profile goes to the same display, activity and slot (both orders: a browser window that came
+  up to 3 s before the picker closed is claimed then). At most 3 re-arms per launch, 9 placements live.
+- A window that opens while another activity is in view (the person moved on while choosing) is moved to the launch's
+  activity, in its slot there.
+- **Dialogs** (X11 `WM_TRANSIENT_FOR`, `xdg_toplevel.set_parent`, xdg-foreign) open over their parent, on its display
+  and activity; one told its parent only after it showed (an X11 property read late, a GTK dialog that imports its
+  parent) is moved over it within 1.5 s, at the size it asked for (`sdk/dialogmodel.js lateParentFrame`, every theme).
+- What an app can do with this: only have its own windows land where the person just launched it. It never chooses
+  the display or the activity; a window that names another app's id only takes a placement the person made for that
+  app within its time (the earlier rule let any window take it).
+
+**The display's bar** (the frame header): next to the pinned apps, one icon per window of the activity on that display,
+**open and minimized**, in the order they opened (a focus doesn't reorder them); a minimized one has a short line under
+its icon; there is no "Minimized" label. A click brings an open window forward and a minimized one back into the slot
+it kept. **An app's icon** (a window's, a pinned app's, an app in Search's grid): resting the pointer on it lists that
+app's windows in this activity when it has two or more (two Chrome windows of different profiles), right click shows
+the same list as a menu with **New window** (opened on this display). The rows are the Dock's own
+(`sdk/dock.js appWindowItems`): each window's title as the app set it, cleaned to one line
+(`sdk/windowlistmodel.js`: control and bidi-override characters dropped, 80 characters at most), the window in front
+checked, "–" for a minimized one. A title is the app's, so a window that names itself after another app still only
+brings itself forward. **❖`** cycles the windows of the app in front within the activity (`cycleAppWindows`, listed in
+Settings → Keyboard).
+
+**Browser profiles** (in development; launching a profile awaits the maintainer's approval). The SDK reads a
+Chromium-family browser's profiles (Google Chrome, Chromium, Brave, Edge: a fixed table in `sdk/browserprofilemodel.js`)
+from the browser's own `Local State` as untrusted data: at most 1 MiB, a regular file and not a link, `JSON.parse`,
+only `profile.info_cache`, 32 profiles, folder names only of the browser's form (`Default`, `Profile N`), names
+cleaned and cut to 40 characters, colours only from integers. Which window belongs to which profile: Chrome on Linux
+names no profile in the window title (`<page> - Google Chrome`) and gives every profile the same app_id, and the title
+is the page's to choose, so it is never used; the only reliable link is a window LordOS launched for a profile (its
+launch placement ties the window to it). Those windows get the profile's colour as a dot on their icon and its name in
+the window lists. An activity keeps the profile a browser opens there (`profiles` in the activity), and each display by
+connector in `settings.browserProfiles.displays` for every theme; the activity's choice comes first. The icon menu of
+a browser offers **Open profile …**, the activity's and the display's choice only once lord-server has
+`lord.apps.launchProfile` (a closed exception proposed for approval: the browser's own system `.desktop`, one
+`--profile-directory=` argument built in C from a folder of the browser's own `Local State`); until then nothing of it
+shows and the browser opens as before.
+
+**Linux apps' file dialogs.** LordOS's `org.freedesktop.portal.FileChooser` says version 3 (was 2), the one Chromium
+and Google Chrome need before they leave their own GTK dialog: their Open and Save as dialogs are LordOS's, over the
+window that asked (its xdg-foreign handle) or on the display of the window in front, never centered across every
+display (`sdk/portalfilemodel.js`; the app's globs, Chromium's `*.[pP][dD][fF]` included, matched without RegExp).
+Checked with Google Chrome 158 (`tests/chrome_portal_headless.sh`, opt-in): Ctrl+S showed LordOS's dialog over the
+Chrome window and the file was saved where it said.
 
 The maintainer's main case is one activity spanning all his monitors (three 1080p displays daily), and that is the
 default:
@@ -514,6 +568,15 @@ What these say:
   displays (three different pictures decoded at the displays' size, one picture with the option off) and the still
   pictures back when it is off; `keyboard_default_test.mjs` migration 5; `build/engine-test` a 4K picture decoded by
   the workers at 3840 and 2560 px, and `build/engine-test bench-slideshow` times the transition.
+- `tests/launchplace_headless.sh` (in `make test`, left to right and right to left): Lord Workspaces in a headless
+  `lord-server-test` with the real launcher and `build/launchplace-client` (a fake Chrome: a profile picker, then the
+  browser window, then a dialog that names its parent late): the picker takes the free half of the display it was
+  launched from, the browser window that opens while another activity is in view goes to the launch's activity and the
+  picker's slot, the dialog is centred over it at its own size, the bar marks a minimized window and the icon's menu
+  lists the app's windows; screenshots kept in the run folder. `browser_profiles_test.mjs` (hostile `Local State`
+  files, the activity and display choice), `portal_file_model_test.mjs`, `dialog_model_test.mjs` (late parent), and
+  `workspaces_model_test.mjs`'s launches and window labels; `portal-cast-test` checks the portal's versions and a
+  Chrome-style SaveFile.
 - `theme_cost_scene.mjs` (a measurement, not in `make test`): `node tests/workspaces_test.mjs theme_cost_scene.mjs
   <default|classic|workspaces>`.
 - On screen: headless sessions on the development machine, screenshots in light and dark × Opaque, Translucent and

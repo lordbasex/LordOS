@@ -11,6 +11,43 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Lord Workspaces: each display's bar shows every window of the activity; launched windows land where they were
+  launched; Chrome's Save as is LordOS's dialog** (in development; latest release 0.8.9.5-beta).
+  - The frame header's tray (each display's bar) lists the activity's windows on that display, **open and minimized**,
+    in the order they opened, a short line under a minimized one and no "Minimized" label; a click brings an open
+    window forward or a minimized one back into the slot it kept (`themes/workspaces/components/AppWindows.jsx`).
+  - An app's icon (a window's, a pinned app's, an app in Search's grid) lists that app's windows in the activity on
+    hover (two or more) and right click, with New window opened on that display. The rows are the Dock's
+    (`appWindowItems`, `sdk/dock.js`); a title is cleaned to one plain line (`sdk/windowlistmodel.js`: control and
+    bidi-override characters dropped, 80 characters), so a window can't draw a second line or reorder its label to
+    pass for another.
+  - Launch placements keyed by the app (`themes/workspaces/model/launches.js`): a window launched from a display's
+    "+", Add window, Used most on this display, its pinned or usual apps or Search goes to that display **and that
+    activity**, into its layout slot, even if another activity is in view when it comes; another app's window no longer
+    takes the launch. Google Chrome's profile picker takes the place, and when it closes the browser window that follows
+    goes to the same display, activity and slot (both orders; at most 3 re-arms, 9 placements, 30 s / 20 s).
+  - Dialogs told their parent late (X11 `WM_TRANSIENT_FOR` read after the map, xdg-foreign) go over the parent, on its
+    display and activity, at the size they asked for (`sdk/dialogmodel.js lateParentFrame`, every theme).
+  - `org.freedesktop.portal.FileChooser` says **version 3** (was 2): Chromium and Google Chrome use LordOS's file
+    dialog for Open and Save as, over the window that asked (xdg-foreign) or on the display of the window in front,
+    never centered across all displays; the app's globs with classes (Chromium's `*.[pP][dD][fF]`) are matched by a
+    linear matcher, never a RegExp (`sdk/portalfilemodel.js`). No new privilege: any app could already call it, and the
+    answer still goes only to the caller. Checked with Google Chrome 158 in a headless session
+    (`server/tests/chrome_portal_headless.sh`, opt-in): Ctrl+S showed LordOS's dialog and the file was saved.
+  - Browser profiles, prepared (`sdk/browserprofilemodel.js`, `sdk/browserprofiles.js`): Chrome, Chromium, Brave and
+    Edge profiles read from the browser's own `Local State` as untrusted data (1 MiB, no link, `JSON.parse`, 32
+    profiles, folder names only of the form `Default`/`Profile N`, names cleaned); the profile an activity opens, and
+    per display by connector for every theme (`settings.browserProfiles`). Chrome names no profile in its window titles
+    on Linux and gives every profile one app_id, so a window's profile is known only when LordOS launched it for one;
+    that launch (`lord.apps.launchProfile`, one `--profile-directory=` argument built in C) is proposed for the
+    maintainer's approval and not built: until then no profile is offered or shown.
+  - ❖` cycles the windows of the app in front within the activity (checked in the scene; listed in Settings →
+    Keyboard).
+  - Tests: `server/tests/launchplace_headless.sh` (in `make test`, en and ar: a headless `lord-server-test`, the real
+    launcher and `build/launchplace-client`, a fake Chrome with a profile picker and a late-parent dialog, screenshots),
+    `browser_profiles_test.mjs`, `portal_file_model_test.mjs`, `dialog_model_test.mjs`, `workspaces_model_test.mjs`
+    (launches, labels), `workspaces_scene.mjs` (the bar, the icon menu, the picker flow over three displays, profiles,
+    ❖`), `portal-cast-test` (versions, a Chrome-style SaveFile). Strings in all 35 languages; docs/WORKSPACES.md.
 - **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)** (in development; latest release
   0.8.9.5-beta). They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
   took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from
