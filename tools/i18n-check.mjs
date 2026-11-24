@@ -12,12 +12,14 @@
 // (sdk/plurals.js).
 // With every language it also runs tools/err-check.mjs: error/status codes used by the server
 // without an English string, and prose (or Spanish) in ERR lines and JS exceptions, and
-// tools/brand-check.mjs: third-party brand names in the catalogs, Help, README and CHANGELOG.
+// tools/brand-check.mjs: third-party brand names in the catalogs, Help, README and CHANGELOG, and (0.8.9.6)
+// tools/desc-check.mjs: an app or LordOS program without an English description.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkErrors } from './err-check.mjs';
 import { checkBrands } from './brand-check.mjs';
+import { checkDescriptions } from './desc-check.mjs';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const { PLURALS, pluralCategories } = await import(path.join(root, 'sdk/plurals.js'));   // the rules sdk/i18n.js uses
@@ -109,5 +111,11 @@ for (const id of langs) {
   for (const line of pluralBad) console.log(line);
   bad += (l.partial ? 0 : missing.length) + varDiff.length + pluralBad.length;
 }
-if (!process.argv[2]) bad += checkErrors().problems.length + checkBrands().problems.length;
+if (!process.argv[2]) {
+  bad += checkErrors().problems.length + checkBrands().problems.length;
+  // (0.8.9.6) every LordOS app and program says what it is, in English at least (tools/desc-check.mjs)
+  const d = checkDescriptions();
+  for (const p of d.problems) console.log(`✗ ${p}`);
+  bad += d.problems.length;
+}
 process.exit(bad ? 1 : 0);

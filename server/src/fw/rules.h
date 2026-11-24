@@ -139,6 +139,11 @@ int fw_component_scope(const char *scope, char *app, size_t n);
  * (lordos-net-machines.scope, lordos:machines) still decide for every guest. 0 and the machine's id in id
  * (optional, n bytes) if scope is one, -1 otherwise. */
 #define FW_VM_SCOPE_PREFIX "app-lordos-lordos-vm-"
+/* (docs/VIRTUALIZATION.md 3.7) Since 0.8.9.6 lord-sessiond places the machines' scopes one level down, in the session's
+ * root-owned "lordos-machines.slice" (the same name as CG_MACHINES_SLICE in sec/cgroup.h): one parent for all of them,
+ * with a lower CPU and I/O weight than the rest of the session. A machine started before the update stays directly in
+ * the session folder until it stops; both places are read. */
+#define FW_VM_SLICE "lordos-machines.slice"
 int fw_vm_scope(const char *scope, char *id, size_t n);
 /* (Whonix groups) A machine group's Tor gateway runs in "app-lordos-lordos-vm-tor-<id>.scope" (vm/lordvm.c, the member
  * with uplink "tor"): firewall app FW_APP_TOR_GATEWAY, with FW_R_TOR_UPLINK built in. fw_vm_scope accepts it too (the

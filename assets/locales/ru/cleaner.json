@@ -482,5 +482,6 @@
   },
   "select.nothing": "Ничего не выбрано",
   "activity.app": "Приложение удалено",
-  "activity.system": "Очистка системы: {name}"
+  "activity.system": "Очистка системы: {name}",
+  "map.machines": "Освободить в Машинах"
 }

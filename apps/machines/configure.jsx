@@ -5,9 +5,10 @@
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber, firewall, netModel } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice } from './model.js';
+  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
+import { COLOR_HEX } from './systems.js';
 import { defaultsOf } from './store.js';
 import { SideRow, PaneHeader, Pill, Section, Sym } from './kit.jsx';
 import { BUILTIN, builtinProfile, onHost } from './profiles.js';
@@ -95,7 +96,7 @@ const Off = ({ off, children }) => <View style={{ opacity: off ? 0.45 : 1, point
 
 // Configure → Network (6.5): the mode, the wired card of a bridged machine, the forwarded ports of a shared or host-only
 // one. Everything here needs the machine off; lord-vm checks it all again (machine.c, vm_ports_check).
-function NetworkPane({ m, cur, set, running, offNote, host, issues }) {
+function NetworkPane({ m, cur, set, running, offNote, host, issues, onNewMac }) {
   const p = usePal();
   const cards = host?.cards || [];
   const mode = (x) => {
@@ -122,7 +123,10 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues }) {
           </View></Off>
         </Row>
       ) : null}
-      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} />
+      {/* a new address (5.5): lord-vm makes a random one of QEMU's 52:54:00 range, while the machine is off */}
+      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} note={tr('machines.cfg.macNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.macNew')} disabled={running || !!m.suspended} onClick={onNewMac} /></View></Off>
+      </Row>
       <Row label={tr('machines.cfg.firewall')} last note={tr(m.role === 'gateway' ? 'machines.cfg.firewallGateway'
         : cur.network === 'bridged' ? 'machines.cfg.firewallBridged' : 'machines.cfg.firewallNote')}>
         <View style={{ alignSelf: 'flex-start' }}>
@@ -213,6 +217,8 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const [sec, setSec] = useState(SECS.includes(section0) ? section0 : group ? 'group' : 'general');
   const [draft, setDraft] = useState({});
   const [meta, setMeta] = useState(() => readMeta(dir));
+  const [tagText, setTagText] = useState(() => (readMeta(dir).tags || []).join(', '));
+  const [newDiskGb, setNewDiskGb] = useState(32);
   const [job, setJob] = useState(0);
   const [msg, setMsg] = useState(() => { const c = carried && carried.dir === dir ? carried.msg : null; carried = null; return c; });
   const [picking, setPicking] = useState(false);
@@ -266,12 +272,12 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
-    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off',
+    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', cpuModel: m.cpuModel || 'host',
     guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'cpuPin' ? m.cpuPin || 'off' : k === 'cpuModel' ? m.cpuModel || 'host' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -357,6 +363,25 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
             onChange={(x) => { writeMeta(dir, { osName: x }); setMeta(readMeta(dir)); }} /></View>
         </View>
       </Row>
+      {/* the card's icon: the system's mark, or a color of its own with the name's first letter (app.json color) */}
+      <Row label={tr('machines.cfg.icon')} note={tr('machines.cfg.iconNote')}>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <View title={tr('machines.cfg.iconSystem')} onClick={() => { writeMeta(dir, { color: undefined }); setMeta(readMeta(dir)); }}
+            style={{ borderRadius: 9, padding: 2, border: `2px solid ${!meta.color ? p.accent : 'transparent'}` }}>
+            <OsMark id={meta.os || systemOf(meta.osName, m.name).id} size={28} />
+          </View>
+          {Object.keys(COLOR_HEX).map((c) => (
+            <View key={c} title={tr(`machines.set.color.${c}`)} onClick={() => { writeMeta(dir, { color: c }); setMeta(readMeta(dir)); }}
+              style={{ borderRadius: 9, padding: 2, border: `2px solid ${meta.color === c ? p.accent : 'transparent'}` }}>
+              <OsMark id="other" color={c} letter={m.name} size={28} />
+            </View>
+          ))}
+        </View>
+      </Row>
+      <Row label={tr('machines.cfg.tags')} note={tr('machines.cfg.tagsNote', { n: TAGS_MAX })}>
+        <TextInput value={tagText} placeholder={tr('machines.cfg.tagsPlaceholder')}
+          onChange={(x) => { setTagText(x); writeMeta(dir, { tags: parseTags(x) }); setMeta(readMeta(dir)); }} />
+      </Row>
       <Row label={tr('machines.cfg.profile')} note={tr('machines.cfg.profileNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><MenuBtn label={prof ? tr(`machines.as.profile.${prof}`) : tr('machines.cfg.profileCustom')}
           items={BUILTIN.map((k) => { const s = profFor(k); const gfx = builtinProfile(k, host).resources.graphics; return { label: tr(`machines.as.profile.${k}`), checked: prof === k,
@@ -425,10 +450,18 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       {/* vCPU pinning (machine.json cpu_pin, docs/VIRTUALIZATION.md 3.7.1): lord-vm gives each vCPU a core of its own,
           away from the desktop's; a machine without a choice shows what this computer gives it */}
       <Group>
-        <Row label={tr('machines.cfg.pin')} last note={[tr('machines.cfg.pinNote'), offNote].filter(Boolean).join(' ')}>
+        <Row label={tr('machines.cfg.pin')} note={[tr('machines.cfg.pinNote'), offNote].filter(Boolean).join(' ')}>
           <Off off={running}><Segmented small value={cur.cpuPin} onChange={(x) => set({ cpuPin: x })}
             options={[['off', tr('machines.cfg.off')], ['auto', tr('machines.cfg.pinAuto')]]} /></Off>
         </Row>
+        {/* the processor the guest sees (machine.json cpu_model, schema 16): this computer's, or a fixed x86-64-v2 one that is
+            the same on every amd64 computer (KVM machines on amd64 only) */}
+        {m.arch === 'amd64' && !emulated ? <Row label={tr('machines.cfg.cpuModel')} note={[tr(`machines.cfg.cpuModelNote.${cur.cpuModel}`), offNote].filter(Boolean).join(' ')}>
+          <Off off={running}><Segmented small value={cur.cpuModel} onChange={(x) => set({ cpuModel: x })}
+            options={[['host', tr('machines.cfg.cpuHost')], ['compatible', tr('machines.cfg.cpuCompat')]]} /></Off>
+        </Row> : null}
+        {/* huge pages are lord-vm's own choice, never a switch (3.7.2): said here */}
+        <Row label={tr('machines.cfg.hugePages')} value={tr('machines.cfg.hugePagesAuto')} last note={tr('machines.cfg.hugePagesNote')} />
       </Group>
       <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
         {tr('machines.cfg.cpuNote', { limit: gb(memLimit({ ...m, ...cur })), max: gb(memMax0) })}{offNote ? ` ${offNote}` : ''}</Text>
@@ -503,7 +536,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     </Group>
   </>;
   }
-  else if (sec === 'network') pane = <NetworkPane m={m} cur={cur} set={set} running={running} offNote={offNote} host={host} issues={portIssues} />;
+  else if (sec === 'network') pane = <NetworkPane m={m} cur={cur} set={set} running={running} offNote={offNote} host={host} issues={portIssues} onNewMac={() => { if (!job) save({ newMac: true }); }} />;
   else if (sec === 'sound') {
     // host-side choices (6.9): saved at once, and a running machine's window applies them at once too
     const snd = { ...soundOf(m), ...soundDevs(m), ...sndDraft };
@@ -546,7 +579,13 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Off off={running}><Stepper value={cur.diskGb} min={m.diskGb} max={2048} width={72} format={(x) => `${x} GB`} onChange={(x) => set({ diskGb: x })} /></Off>
       </Row>
     </Group>
-    {m.dataDisks ? <Group><Row label={tr('machines.cfg.dataDisks')} value={String(m.dataDisks)} last /></Group> : null}
+    {/* data disks: one more, empty (lord-vm --add-disk), while the machine is off and has no snapshot to go back to */}
+    <Group><Row label={tr('machines.cfg.dataDisks')} value={String(m.dataDisks || 0)} last note={tr('machines.cfg.addDiskNote', { n: 4 }) + (offNote ? ` ${offNote}` : '')}>
+      <Off off={running}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Stepper value={newDiskGb} min={1} max={2048} width={72} format={(x) => `${x} GB`} onChange={setNewDiskGb} />
+        <Btn label={tr('machines.cfg.addDisk')} disabled={running || !!m.suspended || !!job || (m.dataDisks || 0) >= 4 || !!m.base} onClick={() => save({ addDiskGb: newDiskGb })} />
+      </View></Off>
+    </Row></Group>
     {m.imported || m.devices === 'compat' ? <Group>
       {/* an imported machine starts on devices every system has drivers for; the fast ones need the guest's drivers first */}
       <Row label={tr('machines.cfg.devices')} value={m.devices === 'compat' ? tr('machines.cfg.devCompat', { nic: m.nicModel }) : tr('machines.cfg.devFast')} last
@@ -641,6 +680,9 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         </Row>
       ))}
     </Group>
+    {/* printers (5.5): the guest prints to the network's printers with its own driver-free IPP; this computer's printing
+        service is never opened to a guest (no machine network reaches this computer's services) */}
+    <Group><Row label={tr('machines.cfg.printers')} value={tr('machines.cfg.printersValue')} last note={tr('machines.cfg.printersNote')} /></Group>
   </>;
   else if (sec === 'agent') pane = <>
     <Group>

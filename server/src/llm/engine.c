@@ -26,7 +26,7 @@
 #define QUEUE 8
 #define RESULTS 16
 
-enum { J_ANALYZE = 1, J_FACTS };
+enum { J_ANALYZE = 1, J_FACTS, J_INVESTIGATE, J_TRANSLATE };
 typedef struct { int id, kind; char model[64]; char *system, *user; int pid; unsigned long long start; } Job;
 typedef struct { int id; char *json; } Result;
 
@@ -406,16 +406,31 @@ static const char SCHEMA[] =
     "\"action\":{\"type\":\"string\",\"enum\":[\"end_block\",\"pause\",\"limit\",\"monitor\",\"ignore\"]}},"
     "\"required\":[\"verdict\",\"reason\",\"action\"],\"additionalProperties\":false}";
 
-static char *request_body(const char *system, const char *user) {
-    size_t cap = strlen(system) * 6 + strlen(user) * 6 + sizeof SCHEMA + 512;
+/* (0.8.9.6) "Investigate with Lumo": what the program does, why it probably runs, a risk and one action of the closed list */
+static const char SCHEMA_INVESTIGATE[] =
+    "{\"type\":\"object\",\"properties\":{"
+    "\"what\":{\"type\":\"string\",\"maxLength\":400},"
+    "\"why\":{\"type\":\"string\",\"maxLength\":300},"
+    "\"risk\":{\"type\":\"string\",\"enum\":[\"low\",\"medium\",\"high\"]},"
+    "\"action\":{\"type\":\"string\",\"enum\":[\"none\",\"end\",\"pause\",\"block_network\",\"blocklist\"]}},"
+    "\"required\":[\"what\",\"why\",\"risk\",\"action\"],\"additionalProperties\":false}";
+/* (0.8.9.6) a description translated into the person's language */
+static const char SCHEMA_TRANSLATE[] =
+    "{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\",\"maxLength\":600}},"
+    "\"required\":[\"text\"],\"additionalProperties\":false}";
+
+static char *request_body(const char *system, const char *user, int kind) {
+    const char *schema = kind == J_INVESTIGATE ? SCHEMA_INVESTIGATE : kind == J_TRANSLATE ? SCHEMA_TRANSLATE : SCHEMA;
+    int max_tokens = kind == J_INVESTIGATE ? 480 : kind == J_TRANSLATE ? 360 : 256;
+    size_t cap = strlen(system) * 6 + strlen(user) * 6 + strlen(schema) + 512;
     char *b = malloc(cap), *qs = malloc(strlen(system) * 6 + 3), *qu = malloc(strlen(user) * 6 + 3);
     if (!b || !qs || !qu) { free(b); free(qs); free(qu); return NULL; }
     json_quote(qs, strlen(system) * 6 + 3, system);
     json_quote(qu, strlen(user) * 6 + 3, user);
     snprintf(b, cap, "{\"messages\":[{\"role\":\"system\",\"content\":%s},{\"role\":\"user\",\"content\":%s}],"
-                     "\"max_tokens\":256,\"temperature\":0.2,\"cache_prompt\":false,\"stream\":false,"
+                     "\"max_tokens\":%d,\"temperature\":0.2,\"cache_prompt\":false,\"stream\":false,"
                      "\"chat_template_kwargs\":{\"enable_thinking\":false},"
-                     "\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"schema\":%s}}}", qs, qu, SCHEMA);
+                     "\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"schema\":%s}}}", qs, qu, max_tokens, schema);
     free(qs);
     free(qu);
     return b;
@@ -450,7 +465,7 @@ static char *run_analyze(Job *j) {
     pthread_mutex_lock(&E.mu);
     E.state = "busy";
     pthread_mutex_unlock(&E.mu);
-    char *body = request_body(j->system, j->user);
+    char *body = request_body(j->system, j->user, j->kind);
     int status = 0;
     char *ans = NULL;
     size_t an = 0;
@@ -483,6 +498,33 @@ static char *run_analyze(Job *j) {
     json_free(&d);
     free(ans);
     return out ? out : errjson("llm.answer");
+}
+
+/* the person's click: the facts from JS, then what evidence.c reads of the program (fenced as data), then the model;
+ * the result says what was read ("evidence") */
+static char *run_investigate(Job *j) {
+    char *block = NULL;
+    char *meta = llm_evidence(j->pid, j->start, &block);
+    if (!meta) { free(block); return errjson("llm.failed"); }
+    if (strstr(meta, "\"why\":\"gone\"")) { free(meta); free(block); return errjson("proc.gone"); }
+    if (block) {
+        size_t n = strlen(j->user) + strlen(block) + 2;
+        char *u = malloc(n);
+        if (!u) { free(meta); free(block); return errjson("llm.failed"); }
+        snprintf(u, n, "%s\n%s", j->user, block);
+        free(j->user);
+        j->user = u;
+    }
+    free(block);
+    char *r = run_analyze(j);
+    if (!r) { free(meta); return NULL; }
+    size_t rl = strlen(r), n = rl + strlen(meta) + 16;
+    char *o = rl && r[rl - 1] == '}' ? malloc(n) : NULL;
+    if (o) snprintf(o, n, "%.*s,\"evidence\":%s}", (int)(rl - 1), r, meta);
+    free(meta);
+    if (!o) return r;
+    free(r);
+    return o;
 }
 
 static void *worker(void *arg) {
@@ -522,7 +564,10 @@ static void *worker(void *arg) {
         char info[PATH_MAX];
         snprintf(info, sizeof info, "%s", E.dpkg_info);
         pthread_mutex_unlock(&E.mu);
-        char *res = j.kind == J_ANALYZE ? run_analyze(&j) : llm_facts_json(j.pid, j.start, info, getenv("HOME"));
+        char *res = NULL;
+        if (j.kind == J_ANALYZE || j.kind == J_TRANSLATE) res = run_analyze(&j);
+        else if (j.kind == J_INVESTIGATE) res = run_investigate(&j);
+        else res = llm_facts_json(j.pid, j.start, info, getenv("HOME"));
         if (!res) res = errjson("llm.failed");
         free(j.system);
         free(j.user);
@@ -569,6 +614,30 @@ int llm_submit_analyze(const char *model, const char *system, const char *user) 
     snprintf(j.model, sizeof j.model, "%s", model);
     j.system = strdup(system);
     j.user = strdup(user);
+    if (!j.system || !j.user) { free(j.system); free(j.user); errno = ENOMEM; return -1; }
+    int id = submit(&j);
+    if (id < 0) { free(j.system); free(j.user); }
+    return id;
+}
+
+int llm_submit_investigate(const char *model, const char *system, const char *user, int pid, unsigned long long start) {
+    if (pid <= 0 || !llm_model_id_ok(model) || !valid_text(system, LLM_SYSTEM_MAX) || !valid_text(user, LLM_USER_MAX)) { errno = EINVAL; return -1; }
+    Job j = { .kind = J_INVESTIGATE, .pid = pid, .start = start };
+    snprintf(j.model, sizeof j.model, "%s", model);
+    j.system = strdup(system);
+    j.user = strdup(user);
+    if (!j.system || !j.user) { free(j.system); free(j.user); errno = ENOMEM; return -1; }
+    int id = submit(&j);
+    if (id < 0) { free(j.system); free(j.user); }
+    return id;
+}
+
+int llm_submit_translate(const char *model, const char *system, const char *text) {
+    if (!llm_model_id_ok(model) || !valid_text(system, LLM_SYSTEM_MAX) || !valid_text(text, LLM_TRANSLATE_MAX)) { errno = EINVAL; return -1; }
+    Job j = { .kind = J_TRANSLATE };
+    snprintf(j.model, sizeof j.model, "%s", model);
+    j.system = strdup(system);
+    j.user = strdup(text);
     if (!j.system || !j.user) { free(j.system); free(j.user); errno = ENOMEM; return -1; }
     int id = submit(&j);
     if (id < 0) { free(j.system); free(j.user); }

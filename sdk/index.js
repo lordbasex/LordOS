@@ -24,12 +24,14 @@ export { parseWav, levelDb, quietEnough, roomCheck, takeName, trimSilence, joinP
 export { scanVoices, installVoices, removeVoices, packagesFor, voiceConf, setVoiceConf, addOwnVoice, removeOwnVoice, ownVoiceName } from './voicemanager.js';
 // Sentinela, the process guard (docs/SENTINELA.md): its models, its rules and its session service
 export { LLM_MODELS, ENGINE_PACKAGE, llmModel, packagesForModel, llmPackageOk } from './llmcatalog.js';
-export { TRIGGERS, ACTIONS, SENTINELA_DEFAULTS, factLines, presentAlert } from './sentinelamodel.js';
+export { TRIGGERS, ACTIONS, SENTINELA_DEFAULTS, factLines, presentAlert, INVESTIGATE_ACTIONS, RISKS } from './sentinelamodel.js';
 export { VM_ACTIONS, vmWhy, vmFactLines } from './sentinelavm.js';
 export {
   sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery,
-  clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm,
+  clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm, lumoReady, investigateProcess, translateWithLumo,
+  sentinelaBlocked, refreshBlocked, blockProgram, unblockProgram, runInvestigateAction,
 } from './sentinela.js';
+export { describeProgram, describeApp, saveLumoTranslation, translationKey } from './describe.js';
 export { ShieldGlyph } from './sentinelaglyph.js';
 import { resetShortcuts } from './shortcuts.js';
 export { AppSwitcher, openSwitcher, cycleAppWindows, switcherKeys, switcherGrabs, switcherHold } from './appswitcher.jsx';
@@ -185,7 +187,7 @@ export {
   Dropdown, Checkbox, RadioGroup, Tabs, Popover, Tooltip, ProgressBar, Disclosure, DisclosureGlyph,
 } from './controls.jsx';
 // (0.8.8.8) lists whose rows are chosen with the pointer and the keys: Shift ranges, Ctrl toggles, type-to-find
-export { List, Table } from './lists.jsx';
+export { List, Table, TABLE_HEAD, tableWindow } from './lists.jsx';
 export { media, useMedia, usePlayer, nowPlaying, useNowPlaying, linuxPlayers, useLinuxPlayers, NowPlayingTile, mediaFormatTime, thumbFor, useThumb, userDirs, openMarkup } from './media.js';
 export { useCameras, refreshCameras } from './cameras.js';   // the camera list, made on a worker, again on hotplug
 export * as imageEdit from './imageeditmodel.js';   // the image editor's math (crop presets, resize, redaction; issue #30)

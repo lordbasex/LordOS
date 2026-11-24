@@ -14,6 +14,7 @@
  *   wheel N             N steps (+ up)                   resize W H        ask the guest for a size
  *   rate HZ             copy rate                        release           let go of everything
  *   capture 0|1         "Capture mouse" (6.25): VM_CAPTURE to lord-vm, VD_CAPTURE to lord-vmdisplay
+ *   cable 0|1           the network cable pulled or plugged in (VM_NETCABLE, the window's Devices → Network, 5.3)
  *   rel DX DY           relative motion while captured (VD_REL, as lord-server's pointer lock sends it)
  *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON | qmpf FILE (a longer command, from a file)
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
@@ -750,6 +751,7 @@ static int handle(char *line) {
     }
     else if (sscanf(line, "rate %d", &x) == 1) { vdsend(VD_RATE, x, 0); out("{\"ok\":true,\"cmd\":\"rate\"}"); }
     else if (sscanf(line, "capture %d", &x) == 1) { vdsend(VD_CAPTURE, x ? 1 : 0, 0); ask(VM_CAPTURE, x ? 1 : 0, NULL); }
+    else if (sscanf(line, "cable %d", &x) == 1) ask(VM_NETCABLE, x ? 1 : 0, NULL);   /* Devices → Network (VM_NETCABLE) */
     else if (sscanf(line, "rel %d %d", &x, &y) == 2) { vdsend(VD_REL, x, y); out("{\"ok\":true,\"cmd\":\"rel\"}"); }
     else if (sscanf(line, "noack %d", &x) == 1) { noack = x; out("{\"ok\":true,\"cmd\":\"noack\"}"); }
     else if (sscanf(line, "sound play %d", &x) >= 0 && !strncmp(line, "sound play", 10)) {

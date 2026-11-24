@@ -932,5 +932,19 @@
   "sentinela.blockFailed": "Rangkaiannya tidak dapat disekat.",
   "sentinela.machineGone": "Mesin itu tiada lagi dalam Mesin Maya.",
   "sentinela.machineFailed": "Mesin tidak menjawab.",
-  "vm.overBudget": "Memori tidak mencukupi di samping mesin yang sudah berjalan. Gantung atau matikan salah satu daripadanya, atau beri mesin ini kurang memori."
+  "vm.overBudget": "Memori tidak mencukupi di samping mesin yang sudah berjalan. Gantung atau matikan salah satu daripadanya, atau beri mesin ini kurang memori.",
+  "llm.timeout": "Model setempat mengambil masa terlalu lama untuk menjawab.",
+  "llm.failed": "Model setempat tidak dapat menjawab.",
+  "llm.answer": "Jawapan model setempat tidak dapat dibaca.",
+  "llm.start": "Model setempat tidak dapat dimulakan.",
+  "sentinela.lumo.off": "Sentinela dimatikan. Hidupkannya dalam Tetapan → AI → Sentinela.",
+  "sentinela.lumo.noEngine": "Enjin model setempat tidak dipasang.",
+  "sentinela.lumo.noModel": "Tiada model setempat dipasang untuk Sentinela.",
+  "sentinela.lumo.rejected": "Jawapan Lumo tidak dalam bentuk yang dijangka, jadi ia diketepikan.",
+  "sentinela.blockRefused": "Program LordOS sendiri, pentafsir skrip itu sendiri dan program teras sistem tidak boleh disekat.",
+  "sentinela.blockFull": "Senarai sekatan sudah penuh.",
+  "sentinela.notBlocked": "Program itu tiada dalam senarai sekatan.",
+  "sentinela.noAppNetwork": "Proses ini tiada apl sendiri yang rangkaiannya boleh disekat.",
+  "sys.failed": "Sesuatu tidak kena.",
+  "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya."
 }

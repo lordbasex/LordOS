@@ -16,16 +16,27 @@ int main(void) {
     const char *id = "6f1c0d2e-1111-4222-8333-444455556666";
     char sc[256];
 
-    /* where the scope must be */
-    CHECK(!vmwatch_scope_path(self, id, 0, sc, sizeof sc) && !strcmp(sc, "/lordos.slice/lordos-session-1000/app-lordos-lordos-vm-6f1c0d2e-1111-4222-8333-444455556666.scope"), "scope: %s", sc);
-    CHECK(!vmwatch_scope_path(self, id, 1, sc, sizeof sc) && !strcmp(sc, "/lordos.slice/lordos-session-1000/app-lordos-lordos-vm-tor-6f1c0d2e-1111-4222-8333-444455556666.scope"), "a Tor gateway's scope: %s", sc);
-    CHECK(vmwatch_scope_path("/user.slice/session-3.scope", id, 0, sc, sizeof sc) && !sc[0], "not a LordOS session: unknown");
-    CHECK(vmwatch_scope_path("/x/notasession/server", id, 0, sc, sizeof sc) && !sc[0], "a server leaf outside a session");
-    CHECK(vmwatch_scope_path(self, "../../evil", 0, sc, sizeof sc) && !sc[0], "an id with a path in it");
-    CHECK(vmwatch_scope_path(self, "", 0, sc, sizeof sc) && !sc[0], "no id");
+    /* where the scope must be: in the machines' slice (3.7), or beside the server leaf for one started before it */
+    CHECK(!vmwatch_scope_path(self, id, 0, 0, sc, sizeof sc) && !strcmp(sc, "/lordos.slice/lordos-session-1000/app-lordos-lordos-vm-6f1c0d2e-1111-4222-8333-444455556666.scope"), "old place: %s", sc);
+    CHECK(!vmwatch_scope_path(self, id, 1, 0, sc, sizeof sc) && !strcmp(sc, "/lordos.slice/lordos-session-1000/app-lordos-lordos-vm-tor-6f1c0d2e-1111-4222-8333-444455556666.scope"), "a Tor gateway's old place: %s", sc);
+    CHECK(!vmwatch_scope_path(self, id, 1, 1, sc, sizeof sc) && !strcmp(sc, "/lordos.slice/lordos-session-1000/lordos-machines.slice/app-lordos-lordos-vm-tor-6f1c0d2e-1111-4222-8333-444455556666.scope"), "a Tor gateway in the slice: %s", sc);
+    CHECK(vmwatch_scope_path("/user.slice/session-3.scope", id, 0, 1, sc, sizeof sc) && !sc[0], "not a LordOS session: unknown");
+    CHECK(vmwatch_scope_path("/x/notasession/server", id, 0, 1, sc, sizeof sc) && !sc[0], "a server leaf outside a session");
+    CHECK(vmwatch_scope_path(self, "../../evil", 0, 1, sc, sizeof sc) && !sc[0], "an id with a path in it");
+    CHECK(vmwatch_scope_path(self, "", 0, 1, sc, sizeof sc) && !sc[0], "no id");
     char tiny[16];
-    CHECK(vmwatch_scope_path(self, id, 0, tiny, sizeof tiny) && !tiny[0], "too small: nothing, not a cut path");
-    vmwatch_scope_path(self, id, 0, sc, sizeof sc);
+    CHECK(vmwatch_scope_path(self, id, 0, 1, tiny, sizeof tiny) && !tiny[0], "too small: nothing, not a cut path");
+    char mid[110];   /* fits the old place, not the slice's */
+    CHECK(vmwatch_scope_path(self, id, 0, 1, mid, sizeof mid) && !mid[0], "the slice's path doesn't fit: nothing");
+    vmwatch_scope_path(self, id, 0, 1, sc, sizeof sc);
+    CHECK(!strcmp(sc, "/lordos.slice/lordos-session-1000/lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e-1111-4222-8333-444455556666.scope"), "in the slice: %s", sc);
+    {
+        char t0[512];
+        snprintf(t0, sizeof t0, "0::/lordos.slice/lordos-session-1000/app-lordos-lordos-vm-%s.scope\n", id);
+        CHECK(!vmwatch_cg_under(t0, sc), "the old place isn't the slice's scope");
+        snprintf(t0, sizeof t0, "0::/lordos.slice/lordos-session-1000/lordos-machines.slice\n");
+        CHECK(!vmwatch_cg_under(t0, sc), "the slice itself isn't the machine's scope");
+    }
 
     /* in it: exactly, or a leaf below */
     char t[512];
@@ -38,7 +49,7 @@ int main(void) {
     /* the substring trap: names that contain it but aren't it */
     snprintf(t, sizeof t, "0::/user.slice/user-1000.slice/fake%s\n", sc);
     CHECK(!vmwatch_cg_under(t, sc), "another root that contains the path");
-    snprintf(t, sizeof t, "0::/lordos.slice/lordos-session-1000/app-lordos-lordos-vm-%s.scope2/qemu\n", id);
+    snprintf(t, sizeof t, "0::/lordos.slice/lordos-session-1000/lordos-machines.slice/app-lordos-lordos-vm-%s.scope2/qemu\n", id);
     CHECK(!vmwatch_cg_under(t, sc), "a longer name with the same start");
     snprintf(t, sizeof t, "0::/elsewhere/app-lordos-lordos-vm-%s.scope/qemu\n", id);
     CHECK(!vmwatch_cg_under(t, sc), "the scope's name under another parent");

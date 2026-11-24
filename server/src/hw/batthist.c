@@ -232,17 +232,19 @@ static void save(void) {
     free(buf);
 }
 
-static int read_scopes(BhScope *out, int max) {
-    if (!session_cg[0]) return 0;
-    DIR *d = opendir(session_cg);
-    if (!d) return 0;
-    int n = 0;
+/* the scopes in session_cg + sub ("" or "/lordos-machines.slice", the machines' slice of docs/VIRTUALIZATION.md 3.7) */
+static int read_scopes_in(const char *sub, BhScope *out, int n, int max) {
+    char base[PATH_MAX];
+    if ((size_t)snprintf(base, sizeof base, "%s%s", session_cg, sub) >= sizeof base) return n;
+    DIR *d = opendir(base);
+    if (!d) return n;
     struct dirent *e;
     while ((e = readdir(d)) && n < max) {
         if (!bh_scope_ok(e->d_name)) continue;
+        if (sub[0] && strncmp(e->d_name, "app-lordos-lordos-vm-", 21)) continue;
         char p[PATH_MAX + 96], buf[256];
         size_t nl = strlen(e->d_name);                          /* bh_scope_ok: under 80 */
-        if ((size_t)snprintf(p, sizeof p, "%s/", session_cg) + nl + 10 >= sizeof p) continue;
+        if ((size_t)snprintf(p, sizeof p, "%s/", base) + nl + 10 >= sizeof p) continue;
         strcat(p, e->d_name);
         strcat(p, "/cpu.stat");
         int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
@@ -257,6 +259,12 @@ static int read_scopes(BhScope *out, int max) {
     }
     closedir(d);
     return n;
+}
+
+static int read_scopes(BhScope *out, int max) {
+    if (!session_cg[0]) return 0;
+    int n = read_scopes_in("", out, 0, max);
+    return read_scopes_in("/lordos-machines.slice", out, n, max);
 }
 
 void batthist_tick(const PowerState *ps, int seen) {

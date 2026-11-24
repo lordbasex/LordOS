@@ -446,5 +446,6 @@
   },
   "select.nothing": "未選取任何項目",
   "activity.app": "已移除 App",
-  "activity.system": "系統清理：{name}"
+  "activity.system": "系統清理：{name}",
+  "map.machines": "在「虛擬機器」中回收"
 }

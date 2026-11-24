@@ -11,6 +11,36 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
+  lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
+  machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
+  the machines together yield to the desktop and the apps; idle cores and an idle disk are still theirs. Each machine keeps
+  its own memory and CPU limit. lord-netperm's programs look one level down into the slice, so each machine keeps its own
+  firewall policy (the Machines rules while a just-started one isn't registered). Monitor, the process owner, the battery
+  history and Sentinela's scope check find machines there and in the old place. lordos.service restarts with live
+  sessions keep the slice's limits. lord-sessiond uses the slice only while the running lord-netperm is the installed
+  one, so a half-restarted update never leaves a machine without a firewall.
+- **Machines: the app's last parts** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.1, 5.2,
+  5.3, 5.5, 6.14).
+  - **New Machine: Detect.** An installer disc chosen or dropped on the assistant gets a step of its own: what its
+    label and boot files say, which system it is, which processors it starts on, and, before anything is made, when it
+    would run emulated on this computer or when its name and its boot files disagree.
+  - **New Machine: drop, place, Fresh install.** Drop an installer disc, a disk image or another app's machine anywhere
+    on the first step. The Name step says where the machine goes and how much space is free there. After an
+    unattended install, the machine takes a "Fresh install" snapshot before its first start (on by default).
+  - **Templates.** Make Template keeps a machine as it is; its card says Template, the library has a Templates chip,
+    and New Machine from Template makes a copy to use.
+  - **Configure.** A machine's icon color and tags (the library's search finds them, `#tag` exactly); the processor
+    the guest sees (this computer's, or Compatible: the same on every computer, so a machine keeps working when it
+    moves); Add Disk (one more empty data disk); a new network card address; huge pages shown as automatic; where the
+    guest prints. `machine.json` schema 18 adds `cpu_model`.
+  - **The machine's window.** View → Scale (50 % to 200 %); with a fixed resolution the window keeps the guest's shape
+    after a resize; a dot on the bar for each device the guest can use now; Devices → Network pulls or plugs in the
+    network cable while the machine runs, and Devices → Folders.
+  - **Cleaner** sends a machine's space to Machines' Storage window (Reclaim in Machines) instead of offering its files.
+  - **Decided:** no memory ballooning (the guest would decide what it gives back, and it is one more device a guest
+    talks to); no network speed limit; this computer's printing service is never opened to a machine; machines stay in
+    the Machines library; the capture release keys stay fixed.
 - **Machines: programs, files, logs and an MCP server from the terminal, per machine with the person's consent**
   (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
   to the `machines` command, which gains:
@@ -135,6 +165,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     qemu-guest-agent on the same guest (`server/tests/vm_guest_tools_e2e.sh`); `guesttools-test` reads the image back
     with lord-vm's own ISO reader and checks its hash and the writer's refusals; `guest_tools_install_test.sh` checks
     `install.sh`'s choices on 18 kinds of system; shellcheck is clean.
+- **Monitor: Get Info says what a program is** (in development; latest release 0.8.9.5-beta). A **Description** line
+  between the command line and the tabs, in the grouped and the plain view, from what the computer already has and
+  never the network: LordOS's own programs and the kernel's threads, the app's manifest or `.desktop`/Flatpak
+  `Comment` (the person's language when it has one), the well-known system programs (systemd, (sd-pam), dbus, PipeWire,
+  WirePlumber, the portals…), the program's manual page (a translated page first, read without running `man`), the
+  service's `Description=`, and the package's description from dpkg's database, in the person's language when apt has
+  Debian's translation (matched by `Description-md5`). lord-server reads them in a worker thread
+  (`server/src/monitor/describe.c`, `lord.monitor.describe`); one SDK function gives the same text to anyone
+  (`sdk/describe.js`: `describeProgram`, `describeApp`). An English-only text says so and offers **Translate with Lumo**
+  while Sentinela is on (kept per language). On the development machine 616 of 647 processes were described, 176 of
+  them in Spanish for free. Every LordOS app and `lord-*` program must have an English description:
+  `tools/desc-check.mjs`, run by `tools/i18n-check.mjs`. `lord.apps.linux`/`flatpak` now say whether the `Comment` is in
+  the language asked (`commentLocal`).
+- **Sentinela: Investigate with Lumo** (in development; approved by the maintainer on 2026-11-24). A program Get Info
+  can't describe shows **Unknown** and, with Sentinela on and a local model installed, **Investigate with Lumo**: on that
+  click only, for the person's own process, the local model reads the facts Sentinela already sees (name, path, package
+  or none, parents, how it started, CPU, memory, socket counts) and, read by lord-server and fenced as data between two
+  markers with a random nonce, the program's script text (at most 64 KB read, 6000 bytes sent; opened by descriptor,
+  no links, a regular file the user or root owns, only when it is that interpreter's script) or a binary's metadata (ELF
+  type, size, SHA-256, loaded libraries, a sample of its strings) (`server/src/llm/evidence.c`). It answers in the
+  person's language what it does, why it probably runs, a risk and one action of a closed list, checked strictly; the
+  actions (End, Pause, Block its network, Blocklist) run only on the person's click.
+- **Sentinela: a blocklist** (in development; approved 2026-11-24). **Blocklist** puts a program (by its file's SHA-256,
+  a script by the script's, optionally with its package) on `~/.config/lordos/sentinela/blocked.json`, which only
+  lord-server writes (protected from apps and `lord.fs`), and ends it; from then on a thread of lord-server's ends it
+  with SIGKILL through a pidfd within about half a second whenever it starts in the person's account, under any name
+  (`server/src/llm/blockwatch.c`). LordOS's own programs, an interpreter itself and the system's core programs can't be
+  blocked. Settings → AI → Sentinela lists the programs with **Remove**. Stopping a program before it runs, and for every
+  user, would need a root part (fanotify `FAN_OPEN_EXEC_PERM`): proposed in docs/SENTINELA.md, not built.
 - **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
   latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
   - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
@@ -648,6 +707,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `lordos-guest` 9 takes the clipboard's text from the guest's own lord-server (`lordos-guestwin.sock` says `clipboard`;
   only the program that holds the agent port and passes it along gets it, never a secret; the helper is non-dumpable). A 0.8.9 guest gets it by updating LordOS inside
   the machine, or right away with the disc above.
+- **Monitor: opening a large group in Processes no longer freezes the desktop** (in development; latest release
+  0.8.9.5-beta). Expanding the Terminal's group with about 240 programs stopped the pointer for about a second, and the
+  list's once-a-second redraw did it again while the group stayed open: the table drew every row at once (about 12 800
+  nodes). The SDK's `Table` now draws only the rows in sight plus a margin of six (`sight`, told by the tab's
+  ScrollView), at most four new rows per pass with those in sight first, and keeps a row whose drawn values didn't
+  change (`rowSig`); a row the keys move to is scrolled into sight by its place. Measured in a headless lord-server
+  over a made-up Terminal of 240 programs (`server/tests/monitor_freeze_headless.sh`, the main thread's longest run):
+  opening 1547 ms → about 20 ms, a redraw with the group open 1110 ms → about 17 ms. The order of the rows is the same.
+  New test `tests/monitor_freeze_scene.mjs` in `make test` (a 300-program group: the first pass within 16 ms).
 - **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
   hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
   re-made the first's (found while starting six test machines at once: "socket: Address already in use", then "can't

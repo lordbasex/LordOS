@@ -933,5 +933,19 @@
   "sentinela.blockFailed": "No se pudo bloquear su red.",
   "sentinela.machineGone": "Esa máquina ya no está en Máquinas.",
   "sentinela.machineFailed": "La máquina no respondió.",
-  "vm.overBudget": "No hay memoria suficiente junto a las máquinas que ya están en marcha. Suspendé o apagá una de ellas, o dale menos memoria a esta máquina."
+  "vm.overBudget": "No hay memoria suficiente junto a las máquinas que ya están en marcha. Suspendé o apagá una de ellas, o dale menos memoria a esta máquina.",
+  "llm.timeout": "El modelo local tardó demasiado en responder.",
+  "llm.failed": "El modelo local no pudo responder.",
+  "llm.answer": "No se pudo leer la respuesta del modelo local.",
+  "llm.start": "El modelo local no pudo arrancar.",
+  "sentinela.lumo.off": "Sentinela está apagado. Activalo en Ajustes → IA → Sentinela.",
+  "sentinela.lumo.noEngine": "El motor del modelo local no está instalado.",
+  "sentinela.lumo.noModel": "No hay ningún modelo local instalado para Sentinela.",
+  "sentinela.lumo.rejected": "La respuesta de Lumo no tenía la forma esperada, así que se descartó.",
+  "sentinela.blockRefused": "No se pueden bloquear los programas propios de LordOS, un intérprete de scripts en sí ni los programas básicos del sistema.",
+  "sentinela.blockFull": "La lista de bloqueo está llena.",
+  "sentinela.notBlocked": "Ese programa no está en la lista de bloqueo.",
+  "sentinela.noAppNetwork": "Este proceso no tiene una app propia cuya red se pueda bloquear.",
+  "sys.failed": "Algo salió mal.",
+  "sys.unsupported": "Esta versión de LordOS no puede hacer eso."
 }

@@ -54,7 +54,7 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
       if (!r.ok) { setFail(r.out.trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || r.out.trim()); return; }
       let out = {};
       try { out = JSON.parse(r.out.trim().split('\n').pop()); } catch (e) { out = {}; }
-      if (out.dir) writeMeta(out.dir, { cloneOf: m.id, cloneKind: fromSnapshot ? 'clone' : kind });
+      if (out.dir) writeMeta(out.dir, { cloneOf: m.id, cloneKind: fromSnapshot ? 'clone' : kind, template: false, freshSnap: false });
       onDone(out);
     }, 400);
     return () => clearInterval(timer);

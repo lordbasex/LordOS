@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Oprește",
   "analysis.rule": "Afișat mereu: această alertă nu are nevoie de model.",
   "settings.seesMachines": "Pentru mașinile virtuale: numele, rolul și starea, de ce s-au oprit, și contoarele de CPU, memorie și rețea ale motorului lor. Niciodată ecranul, fișierele sau clipboardul lor.",
-  "sandbox.unverified": "dovada că motorul este chiar al mașinii"
+  "sandbox.unverified": "dovada că motorul este chiar al mașinii",
+  "block.ended": "Program blocat oprit: {name}",
+  "block.endedBody": "Este în lista dvs. de blocare. Verificați lista în Setări → IA → Sentinela.",
+  "block.title": "Listă de blocare",
+  "block.hint": "Aceste programe sunt oprite de fiecare dată când pornesc în contul dvs., fie că Sentinela este activată sau nu. Adăugați unul din Monitor → Informații → Investighează cu Lumo; eliminați-l ca să poată rula din nou.",
+  "block.empty": "Niciun program blocat.",
+  "block.remove": "Elimină",
+  "block.script": "Script {interp}",
+  "block.binary": "Program",
+  "block.pkg": "și toate programele din pachetul {pkg}",
+  "block.added": "blocat pe {date}"
 }

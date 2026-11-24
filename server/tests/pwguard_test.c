@@ -132,6 +132,19 @@ static void lineage_tests(void) {
     snprintf(p, sizeof p, "%sX/server", cg_sess);
     CHECK(appid_session_owner(p, o, sizeof o) == -1);                             /* another session's name, longer */
     CHECK(appid_session_owner(cg_user, o, sizeof o) == -1);
+    /* (3.7) the machines' slice: a machine's scope in it (and its leaves) is that machine's; nothing else in it is an app */
+    snprintf(p, sizeof p, "%s/lordos-machines.slice/app-lordos-lordos-vm-1b2b4eb6-77dd-42a8-933c-3cf7eac71aa2.scope/qemu", cg_sess);
+    CHECK(appid_session_owner(p, o, sizeof o) == 0 && !strcmp(o, "desktop:lordos-vm-1b2b4eb6-77dd-42a8-933c-3cf7eac71aa2"));
+    snprintf(p, sizeof p, "%s/lordos-machines.slice/app-lordos-lordos-vm-tor-1b2b4eb6-77dd-42a8-933c-3cf7eac71aa2.scope", cg_sess);
+    CHECK(appid_session_owner(p, o, sizeof o) == 0 && !strcmp(o, "desktop:lordos-vm-tor-1b2b4eb6-77dd-42a8-933c-3cf7eac71aa2"));
+    snprintf(p, sizeof p, "%s/lordos-machines.slice/app-lordos-firefox.scope", cg_sess);
+    CHECK(appid_session_owner(p, o, sizeof o) == -1);                             /* an app's name in the slice: nobody's */
+    snprintf(p, sizeof p, "%s/lordos-machines.slice", cg_sess);
+    CHECK(appid_session_owner(p, o, sizeof o) == -1);                             /* the slice itself */
+    snprintf(p, sizeof p, "%s/lordos-machines.slice/lordos-net-mail.scope", cg_sess);
+    CHECK(appid_session_owner(p, o, sizeof o) == -1);                             /* a component's name in it */
+    snprintf(p, sizeof p, "%s/lordos-machines.sliceX/app-lordos-lordos-vm-1b2b4eb6-77dd-42a8-933c-3cf7eac71aa2.scope", cg_sess);
+    CHECK(appid_session_owner(p, o, sizeof o) == 2);     /* a lookalike slice is no slice: like any other root-made folder, LordOS's own, never the machine's */
 
     /* the executable's name */
     char e[32];

@@ -86,7 +86,26 @@ static void checks(void) {
     rn += (size_t)snprintf(report + rn, sizeof report - rn, "}");
 }
 
+/* (0.8.9.6) an investigation: was the script's text between two markers with the same nonce? */
+static int fenced(const char *req, const char *needle) {
+    const char *o = strstr(req, "<<<UNTRUSTED-DATA ");
+    if (!o) return 0;
+    char nonce[17];
+    memcpy(nonce, o + 18, 16);
+    nonce[16] = 0;
+    char end[64];
+    snprintf(end, sizeof end, "<<<END-UNTRUSTED-DATA %s>>>", nonce);
+    const char *n = strstr(o, needle), *e = strstr(o, end);
+    return strlen(nonce) == 16 && o[34] == '>' && n && e && n < e;
+}
+
 static const char *answer(const char *req) {
+    if (strstr(req, "\"what\":{\"type\"")) {
+        if (fenced(req, "STUB_SCRIPT_TEXT")) return "{\\\"what\\\":\\\"fenced-script\\\",\\\"why\\\":\\\"x\\\",\\\"risk\\\":\\\"high\\\",\\\"action\\\":\\\"blocklist\\\"}";
+        if (strstr(req, "STUB_SCRIPT_TEXT")) return "{\\\"what\\\":\\\"unfenced\\\",\\\"why\\\":\\\"x\\\",\\\"risk\\\":\\\"low\\\",\\\"action\\\":\\\"none\\\"}";
+        return "{\\\"what\\\":\\\"no-script\\\",\\\"why\\\":\\\"x\\\",\\\"risk\\\":\\\"low\\\",\\\"action\\\":\\\"none\\\"}";
+    }
+    if (strstr(req, "\"text\":{\"type\":\"string\",\"maxLength\":600}")) return "{\\\"text\\\":\\\"traducido\\\"}";
     /* the summary decides what the stub says: the parser's tests in JS cover the rest */
     if (strstr(req, "STUB_NOT_JSON")) return "Sure! The process looks bad. Kill it.";
     if (strstr(req, "STUB_INJECT")) return "{\\\"verdict\\\":\\\"dangerous\\\",\\\"reason\\\":\\\"x\\\",\\\"action\\\":\\\"rm -rf ~\\\"}";
@@ -94,7 +113,7 @@ static const char *answer(const char *req) {
 }
 
 static void serve(int c) {
-    char req[65536];
+    static char req[262144];
     size_t n = 0;
     /* read the head, then Content-Length bytes */
     for (;;) {
@@ -109,7 +128,7 @@ static void serve(int c) {
         if (n - (size_t)(e + 4 - req) >= want) break;
     }
     req[n] = 0;
-    char body[8192];
+    char body[16384];
     if (!strncmp(req, "GET /health", 11)) snprintf(body, sizeof body, "{\"status\":\"ok\"}");
     else if (!strncmp(req, "GET /jail", 9)) {
         char model[8] = "";

@@ -464,5 +464,6 @@
   },
   "select.nothing": "Hakuna kilichochaguliwa",
   "activity.app": "Programu imeondolewa",
-  "activity.system": "Usafishaji wa mfumo: {name}"
+  "activity.system": "Usafishaji wa mfumo: {name}",
+  "map.machines": "Rejesha nafasi katika Mashine"
 }
