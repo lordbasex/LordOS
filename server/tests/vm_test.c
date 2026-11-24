@@ -2567,6 +2567,101 @@ static void test_guest_links(void) {
     }
 }
 
+/* files sent from the guest (6.21, AGK_SEND_*): every frame exact, names one plain file name, flow control, fuzzed */
+static void test_guest_send(void) {
+    AgSendOffer o, g;
+    memset(&o, 0, sizeof o);
+    o.id = 7; o.size = 123456789; o.flags = AGSF_EXEC;
+    for (int i = 0; i < 32; i++) o.key[i] = (uint8_t)(i * 7 + 1);
+    snprintf(o.name, sizeof o.name, "%s", "report \xc3\xa9t\xc3\xa9.pdf");
+    uint8_t b[AG_SEND_OFFER_BYTES + 8];
+    size_t n = ag_send_offer_write(&o, b, sizeof b);
+    CHECK(n == 47 + strlen(o.name) && !ag_send_offer_parse(b, n, &g) && g.id == 7 && g.size == 123456789 && g.flags == AGSF_EXEC &&
+          !memcmp(g.key, o.key, 32) && !strcmp(g.name, o.name));
+    CHECK(ag_send_offer_parse(b, n - 1, NULL) == -1 && ag_send_offer_parse(b, n + 1, NULL) == -1);
+    b[12] = 2; CHECK(ag_send_offer_parse(b, n, NULL) == -1); b[12] = AGSF_EXEC;
+    b[0] = b[1] = b[2] = b[3] = 0; CHECK(ag_send_offer_parse(b, n, NULL) == -1);
+    /* names the host never takes: a path, a parent, controls, bidi tricks, empty, not UTF-8 */
+    static const char *const bad[] = { "a/b", "..", ".", "a\\b", "x\ny", "evil\xe2\x80\xae" "fdp.exe", "", "\xff\xfe", "tab\t" };
+    for (size_t i = 0; i < sizeof bad / sizeof *bad; i++) {
+        AgSendOffer x = o;
+        snprintf(x.name, sizeof x.name, "%s", bad[i]);
+        CHECK(!ag_send_offer_write(&x, b, sizeof b));
+        CHECK(!ag_send_name_ok((const uint8_t *)bad[i], strlen(bad[i])));
+    }
+    { AgSendOffer x = o; memset(x.name, 'a', AG_NAME_MAX); x.name[AG_NAME_MAX] = 0; CHECK(ag_send_offer_write(&x, b, sizeof b) == 47 + AG_NAME_MAX); }
+    { AgSendOffer x = o; x.size = AG_SEND_SIZE_MAX + 1; CHECK(!ag_send_offer_write(&x, b, sizeof b)); }
+    CHECK(ag_send_name_ok((const uint8_t *)".bashrc", 7) && ag_send_name_ok((const uint8_t *)"a..b", 4));
+
+    /* ACCEPT: a resume carries its prefix hash; a refusal carries nothing */
+    uint8_t a[AG_SEND_ACCEPT_BYTES], sha[32], got[32];
+    memset(sha, 0xab, sizeof sha);
+    uint32_t id; uint8_t st; uint64_t off;
+    CHECK(!ag_send_accept_write(a, 7, AGSA_OK, 4096, sha) && !ag_send_accept_parse(a, sizeof a, &id, &st, &off, got) && id == 7 && st == AGSA_OK && off == 4096 && !memcmp(got, sha, 32));
+    CHECK(!ag_send_accept_write(a, 7, AGSA_OK, 0, NULL) && !ag_send_accept_parse(a, sizeof a, &id, &st, &off, got) && off == 0);
+    CHECK(!ag_send_accept_write(a, 7, AGSA_SPACE, 0, NULL) && !ag_send_accept_parse(a, sizeof a, NULL, &st, NULL, NULL) && st == AGSA_SPACE);
+    CHECK(ag_send_accept_write(a, 7, AGSA_BUSY, 10, sha) == -1 && ag_send_accept_write(a, 7, AGSA_LAST + 1, 0, NULL) == -1);
+    ag_send_accept_write(a, 7, AGSA_OK, 0, NULL); a[20] = 1; CHECK(ag_send_accept_parse(a, sizeof a, NULL, NULL, NULL, NULL) == -1);
+    ag_send_accept_write(a, 7, AGSA_REFUSED, 0, NULL); a[6] = 1; CHECK(ag_send_accept_parse(a, sizeof a, NULL, NULL, NULL, NULL) == -1);
+    CHECK(ag_send_accept_parse(a, sizeof a - 1, NULL, NULL, NULL, NULL) == -1);
+
+    /* FROM / ACK, DATA, END, DONE */
+    uint8_t q[12];
+    CHECK(!ag_send_pos_write(q, 9, 1ULL << 33) && !ag_send_pos_parse(q, 12, &id, &off) && id == 9 && off == 1ULL << 33);
+    CHECK(ag_send_pos_write(q, 0, 1) == -1 && ag_send_pos_write(q, 1, AG_SEND_SIZE_MAX + 1) == -1 && ag_send_pos_parse(q, 11, NULL, NULL) == -1);
+    static uint8_t d[12 + AG_SEND_CHUNK + 1];
+    ag_send_data_head(d, 3, 100);
+    const uint8_t *dp; uint32_t dn;
+    CHECK(!ag_send_data_parse(d, 12 + AG_SEND_CHUNK, &id, &off, &dp, &dn) && id == 3 && off == 100 && dn == AG_SEND_CHUNK && dp == d + 12);
+    CHECK(ag_send_data_parse(d, 12 + AG_SEND_CHUNK + 1, NULL, NULL, NULL, NULL) == -1 && ag_send_data_parse(d, 12, NULL, NULL, NULL, NULL) == -1);
+    ag_send_data_head(d, 3, AG_SEND_SIZE_MAX); CHECK(ag_send_data_parse(d, 13, NULL, NULL, NULL, NULL) == -1);      /* past the largest file */
+    ag_send_data_head(d, 3, AG_SEND_SIZE_MAX - 1); CHECK(!ag_send_data_parse(d, 13, NULL, NULL, NULL, NULL));
+    ag_send_data_head(d, 3, ~0ULL); CHECK(ag_send_data_parse(d, 13, NULL, NULL, NULL, NULL) == -1);                /* no wrap */
+    uint8_t e[36];
+    CHECK(!ag_send_end_write(e, 4, sha) && !ag_send_end_parse(e, 36, &id, got) && id == 4 && !memcmp(got, sha, 32) && ag_send_end_parse(e, 35, NULL, NULL) == -1);
+    uint8_t dd[5], code;
+    CHECK(!ag_send_done_write(dd, 4, AGSD_BADHASH) && !ag_send_done_parse(dd, 5, &id, &code) && code == AGSD_BADHASH);
+    CHECK(ag_send_done_write(dd, 4, AGSD_LAST + 1) == -1); dd[4] = AGSD_LAST + 1; CHECK(ag_send_done_parse(dd, 5, NULL, NULL) == -1);
+
+    /* the window: never more than AG_SEND_WINDOW past the last ACK */
+    CHECK(ag_send_room(0, 0, AG_SEND_CHUNK) && ag_send_room(AG_SEND_WINDOW - AG_SEND_CHUNK, 0, AG_SEND_CHUNK) && !ag_send_room(AG_SEND_WINDOW - AG_SEND_CHUNK + 1, 0, AG_SEND_CHUNK));
+    CHECK(!ag_send_room(5, 6, 1) && ag_send_room(AG_SEND_WINDOW + 10, 10, 0));
+
+    /* the quarantine folder's names: nothing hidden, nothing a Windows or Linux file system refuses */
+    char rn[AG_NAME_MAX + 2];
+    CHECK(!ag_recv_name(".bashrc", rn, sizeof rn) && !strcmp(rn, "_bashrc"));
+    CHECK(!ag_recv_name("CON.txt", rn, sizeof rn) && !strcmp(rn, "_CON.txt"));
+    CHECK(!ag_recv_name("a:b?.exe", rn, sizeof rn) && !strcmp(rn, "a_b_.exe"));
+    CHECK(ag_recv_name("..", rn, sizeof rn) == -1 && ag_recv_name("x\xe2\x80\xae.txt", rn, sizeof rn) == -1);
+
+    /* random bytes: what the parsers take is exactly what they promise */
+    static uint8_t r[AG_SEND_OFFER_BYTES + 64];
+    uint32_t seed = 4242;
+    for (int it = 0; it < 80000; it++) {
+        size_t len = (seed = seed * 1103515245 + 12345) % (it % 3 ? 64 : sizeof r);
+        for (size_t i = 0; i < len; i++) r[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
+        if (it % 2 && len > 47) {                     /* a plausible offer: small flags, a name length that fits, printable */
+            r[12] &= 1; r[45] = (uint8_t)(len - 47); r[46] = 0;
+            for (size_t i = 47; i < len; i++) r[i] = (uint8_t)(0x20 + r[i] % 95);
+            r[9] = r[10] = r[11] = 0;
+        }
+        AgSendOffer x;
+        if (!ag_send_offer_parse(r, len, &x)) {
+            CHECK(x.id && x.size <= AG_SEND_SIZE_MAX && !(x.flags & ~AGSF_ALL) && strlen(x.name) >= 1 && strlen(x.name) <= AG_NAME_MAX && !strchr(x.name, '/'));
+            uint8_t again[AG_SEND_OFFER_BYTES];
+            CHECK(ag_send_offer_write(&x, again, sizeof again) == len && !memcmp(again, r, len));
+            char nm[AG_NAME_MAX + 2];
+            if (!ag_recv_name(x.name, nm, sizeof nm)) CHECK(nm[0] && nm[0] != '.' && !strchr(nm, '/') && !strchr(nm, '\\') && strlen(nm) <= AG_NAME_MAX);
+        }
+        if (!ag_send_accept_parse(r, len, &id, &st, &off, got)) CHECK(len == AG_SEND_ACCEPT_BYTES && id && st <= AGSA_LAST && off <= AG_SEND_SIZE_MAX);
+        if (!ag_send_pos_parse(r, len, &id, &off)) CHECK(len == 12 && id && off <= AG_SEND_SIZE_MAX);
+        if (!ag_send_data_parse(r, len, &id, &off, &dp, &dn)) CHECK(id && dn >= 1 && dn <= AG_SEND_CHUNK && off + dn <= AG_SEND_SIZE_MAX && dp == r + 12);
+        if (!ag_send_end_parse(r, len, &id, got)) CHECK(len == 36 && id);
+        if (!ag_send_done_parse(r, len, &id, &code)) CHECK(len == 5 && id && code <= AGSD_LAST);
+    }
+    CHECK(ag_hello_caps((const uint8_t *)"9 shell send links", 18) & AG_HELLO_SEND);
+}
+
 /* a host stop's steps (vmhoststop.h, 6.1): everything, SIGKILL included, inside logind's delay with a margin */
 static void test_host_stop_plan(void) {
     VmHostStopPlan p = vm_host_stop_plan(45000);            /* LordOS's InhibitDelayMaxSec=45 */
@@ -2597,6 +2692,7 @@ static void test_host_stop_plan(void) {
 
 int main(void) {
     test_guest_links();
+    test_guest_send();
     test_gvtwin();
     test_perfwin();
     test_open_with();

@@ -330,6 +330,76 @@ void ag_shell_pair_write(uint8_t out[8], uint32_t id, uint32_t v);      /* ACK a
 /* AGK_SHELL_CLOSE: 0 well formed (id ≥ 1, status AG_SHELL_NOSTART..511) */
 int ag_shell_close_parse(const uint8_t *p, size_t n, uint32_t *id, int *status);
 
+/* Files sent from the guest to this computer (docs/VIRTUALIZATION.md 6.21: "Send to LordOS"; tools 9 and w13, "send" in
+ * their hello, the host's hello says "send" while machine.json takes them). Only the guest offers; one file at a time;
+ * every file lands in this computer's quarantine folder for that machine (<library>/Received/<machine>), never anywhere
+ * the guest names, marked as from that machine and never executable. The guest is hostile: every frame is parsed exactly,
+ * a name is one plain file name, and lord-vm never has more than AG_SEND_WINDOW bytes in flight.
+ *   AGK_SEND_OFFER guest → host: u32 id (≥ 1, the guest's own), u64 size (≤ AG_SEND_SIZE_MAX), u8 flags (AGSF_*, nothing
+ *     else), 32 bytes key (the guest's resume key: the same file offered again after a lost connection gives the same key,
+ *     opaque to the host), u16 name length (1..AG_NAME_MAX) + the file's name (ag_send_name_ok); exactly that.
+ *   AGK_SEND_ACCEPT host → guest: u32 id, u8 status (AGSA_*), u64 offset, 32 bytes: the SHA-256 of the offset bytes the host
+ *     already has of this key (a resume; zeros with offset 0); exactly AG_SEND_ACCEPT_BYTES. Any status but AGSA_OK has
+ *     offset 0 and zeros.
+ *   AGK_SEND_FROM guest → host: u32 id, u64 offset: where the data starts: the accept's offset when the guest's file starts
+ *     with those very bytes (their SHA-256 matched), else 0 (the host starts the file again). Exactly 12 bytes.
+ *   AGK_SEND_DATA guest → host: u32 id, u64 offset (exactly the next byte the host expects), 1..AG_SEND_CHUNK bytes.
+ *   AGK_SEND_ACK host → guest: u32 id, u64 offset: every byte before it is written on this computer. The guest never has
+ *     more than AG_SEND_WINDOW bytes sent past the last ACK; lord-vm ends a transfer whose guest does.
+ *   AGK_SEND_END guest → host: u32 id, 32 bytes: the SHA-256 of the whole file, sent once all of its size went; exactly
+ *     36 bytes. The host keeps the file only when its own SHA-256 of what it wrote is the same.
+ *   AGK_SEND_DONE both ways: u32 id, u8 code (AGSD_*); exactly 5 bytes. host → guest: the outcome; guest → host: it gives
+ *     up (the file couldn't be read, the person cancelled it). */
+#define AG_NAME_MAX 180                            /* a file name's bytes (ag_drop_name, below) */
+enum { AGK_SEND_OFFER = 32, AGK_SEND_ACCEPT = 33, AGK_SEND_FROM = 34, AGK_SEND_DATA = 35, AGK_SEND_ACK = 36, AGK_SEND_END = 37,
+       AGK_SEND_DONE = 38 };
+#define AG_SEND_CHUNK        65536
+#define AG_SEND_WINDOW       (4u << 20)
+#define AG_SEND_SIZE_MAX     (1ULL << 40)          /* 1 TiB */
+#define AG_SEND_OFFER_MIN    (4 + 8 + 1 + 32 + 2 + 1)
+#define AG_SEND_OFFER_BYTES  (4 + 8 + 1 + 32 + 2 + AG_NAME_MAX)
+#define AG_SEND_ACCEPT_BYTES (4 + 1 + 8 + 32)
+#define AG_SEND_OFFER_BURST  8                     /* offers: at most 8 at once, then one per 2 s */
+#define AG_SEND_OFFER_EVERY_MS 2000
+/* AGSF_EXEC: the file could be run in the guest (an x bit, an .exe): said to the person, never kept on this computer */
+enum { AGSF_EXEC = 1, AGSF_ALL = 1 };
+/* AGK_SEND_ACCEPT's status: taken (from offset); this machine doesn't take files (Configure, Sharing; no window to show
+ * them); another file is on its way; no room on this computer; refused (too many offers, a name or size this computer
+ * won't take) */
+enum { AGSA_OK = 0, AGSA_OFF = 1, AGSA_BUSY = 2, AGSA_SPACE = 3, AGSA_REFUSED = 4, AGSA_LAST = AGSA_REFUSED };
+/* AGK_SEND_DONE's code: kept; cancelled (by the person on either side); the SHA-256 differs; this computer couldn't write
+ * it, or the guest couldn't read it; no room left */
+enum { AGSD_OK = 0, AGSD_CANCELLED = 1, AGSD_BADHASH = 2, AGSD_FAILED = 3, AGSD_SPACE = 4, AGSD_LAST = AGSD_SPACE };
+typedef struct { uint32_t id; uint64_t size; uint8_t flags; uint8_t key[32]; char name[AG_NAME_MAX + 1]; } AgSendOffer;
+/* a file name from the guest this computer may take as one: 1..AG_NAME_MAX bytes, ag_note_text_ok (UTF-8, no control or
+ * bidi characters), no '/' or '\\', not "." or "..". 1 yes */
+int ag_send_name_ok(const uint8_t *p, size_t n);
+/* AGK_SEND_OFFER: 0 well formed (exact length; id ≥ 1, size ≤ AG_SEND_SIZE_MAX, flags within AGSF_ALL, the name
+ * ag_send_name_ok), the name copied NUL-terminated */
+int ag_send_offer_parse(const uint8_t *p, size_t n, AgSendOffer *o);
+size_t ag_send_offer_write(const AgSendOffer *o, uint8_t *out, size_t cap);   /* bytes, 0 not one the parser takes */
+/* AGK_SEND_ACCEPT: 0 well formed (id ≥ 1, a known status, offset ≤ AG_SEND_SIZE_MAX, offset 0 and zeros unless AGSA_OK) */
+int ag_send_accept_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *status, uint64_t *offset, uint8_t sha[32]);
+int ag_send_accept_write(uint8_t out[AG_SEND_ACCEPT_BYTES], uint32_t id, uint8_t status, uint64_t offset, const uint8_t sha[32]);
+/* AGK_SEND_FROM and AGK_SEND_ACK: u32 id (≥ 1), u64 offset (≤ AG_SEND_SIZE_MAX); 0 well formed */
+int ag_send_pos_parse(const uint8_t *p, size_t n, uint32_t *id, uint64_t *offset);
+int ag_send_pos_write(uint8_t out[12], uint32_t id, uint64_t offset);
+/* AGK_SEND_DATA: 0 well formed (id ≥ 1, offset + bytes ≤ AG_SEND_SIZE_MAX, 1..AG_SEND_CHUNK bytes; *data into the payload) */
+int ag_send_data_parse(const uint8_t *p, size_t n, uint32_t *id, uint64_t *offset, const uint8_t **data, uint32_t *dn);
+void ag_send_data_head(uint8_t out[12], uint32_t id, uint64_t offset);   /* then the bytes */
+/* AGK_SEND_END: 0 well formed (exactly 36 bytes, id ≥ 1) */
+int ag_send_end_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t sha[32]);
+int ag_send_end_write(uint8_t out[36], uint32_t id, const uint8_t sha[32]);
+/* AGK_SEND_DONE: 0 well formed (exactly 5 bytes, id ≥ 1, a known code) */
+int ag_send_done_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *code);
+int ag_send_done_write(uint8_t out[5], uint32_t id, uint8_t code);
+/* the name a received file gets in the quarantine folder: ag_drop_name's rules (safe on Linux and Windows file systems),
+ * and a leading '.' becomes '_' (nothing hidden), bidi controls refused. 0 ok, -1 nothing usable */
+int ag_recv_name(const char *in, char *out, size_t cap);
+/* the guest tools' side of flow control, pure so it is tested here: may `n` more bytes go, with `sent` the next offset
+ * to send and `acked` the last ACK's offset? 1 yes */
+int ag_send_room(uint64_t sent, uint64_t acked, uint32_t n);
+
 /* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
 #define LAG_CAP_WINDOWS 256u
 #define LAG_WIN_MAX     64
@@ -402,7 +472,6 @@ long ag_b64_decode(const char *in, size_t n, uint8_t *out, size_t cap);
  * become '_'; leading spaces and trailing spaces and dots go; "." and ".." are refused; a DOS device name (CON, PRN,
  * AUX, NUL, COM1-9, LPT1-9, with any extension) gets a '_' in front; at most AG_NAME_MAX bytes, cut on a character
  * boundary with its extension (up to 16 bytes) kept. 0 ok (out NUL-terminated), -1 nothing usable. */
-#define AG_NAME_MAX 180
 int ag_drop_name(const char *in, char *out, size_t cap);
 /* qemu-guest-agent's guest-exec output (out-data) as text for the log or the person: base64-decoded, every byte that
  * isn't printable ASCII or part of valid UTF-8 replaced by '?', line ends as spaces, trimmed; at most cap - 1 bytes. */
@@ -421,7 +490,7 @@ int ag_drop_staging_ok(const char *p, int windows);
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
 enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32, AG_HELLO_PLACE = 64,
        AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024, AG_HELLO_STOPPING = 2048,
-       AG_HELLO_PERF = 4096, AG_HELLO_SHELL = 8192, AG_HELLO_LINKS = 16384, AG_HELLO_NOTIFY = 32768 };
+       AG_HELLO_PERF = 4096, AG_HELLO_SHELL = 8192, AG_HELLO_LINKS = 16384, AG_HELLO_NOTIFY = 32768, AG_HELLO_SEND = 65536 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;
