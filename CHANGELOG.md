@@ -948,8 +948,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     the same kind of namespaces (lord-vm, the release gates).
   - **The guests** (`images.py`): Debian 13's nocloud image, SHA-512 checked against Debian's list, and one made from it
     once under KVM with qemu-guest-agent, a person's account, root on the serial console and `MH-READY` written there at
-    each boot; Microsoft's Windows 11 Enterprise Evaluation and virtio-win from their makers' servers with the SHA-256 the
-    catalog pins (8.2 GB and 0.7 GB, both matched on 2026-11-24). Cached in `/var/tmp/lordos-m100-images`, read only.
+    each boot; the 90-day evaluation of the catalog's `windows` card and virtio-win from their makers' servers with the
+    SHA-256 the catalog pins (8.2 GB and 0.7 GB, both matched on 2026-11-24). Cached in `/var/tmp/lordos-m100-images`, read only.
   - **The flows** (`flows.py`, `run.py`, `make -C server e2e-machines`): the empty library; the New Machine assistant
     from Import a machine through the file picker, the Light profile, a typed name and the review to Create and Start,
     the guest's boot and its picture in the machine's window; Shut Down; Configure (network, the guest agent); a start
@@ -965,12 +965,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     this computer can run, KVM and TCG, OVMF/AAVMF and SeaBIOS, a TPM, Secure Boot with a TPM, the compatible devices, 3D
     on each render node, the other architecture emulated: seconds to `MH-READY`, to the agent, a clean Shut Down, the
     disk's size.
-  - **The Windows install test** (`run.py windows`): the evaluation and the pinned virtio-win given to `lord.vm.create`
-    as the assistant's evaluation card gives them, started from the library card, installed without questions, done when
-    lord-vm says Windows is installed and the LordOS tools for Windows say hello.
+  - **The virtio-win install test** (`run.py windows`): the evaluation and the pinned virtio-win given to
+    `lord.vm.create` as the assistant's evaluation card gives them, started from the library card, installed without
+    questions, done when lord-vm says the install is done and the LordOS guest tools (`lordos-guest-win`) say hello.
   - **The settings → QEMU arguments table** (`server/tests/vm_qemu_args_test.py`, in `make test`, skipped without KVM):
     12 rows (defaults, BIOS without a display on an isolated network, host only, TCG, CPU and memory, compatible devices,
-    Windows 11's template, the agent on and off, boot order and menu, a shared folder and the transfer folder, 3D), each
+    the `windows` card's template (Secure Boot, TPM, Hyper-V, local clock), the agent on and off, boot order and menu, a shared folder and the transfer folder, 3D), each
     a throwaway machine started paused and its logged command line checked for what the setting adds and must not.
   - **`make -C server e2e-machines-gates`**: the three release gates with this build's lord-vm and the cached image,
     through `ns-run.sh`.

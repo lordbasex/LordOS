@@ -231,18 +231,23 @@ def flow_clipboard(s, r, c):
         con.close()
         skip("the guest has no lordos-guest or xclip (the agent flow, the image's version): %s" % out)
     # the helper, as the guest's desktop session would start it (root here: the console's session has no seat)
-    con.run("pkill -x lordos-guest; DISPLAY=:0 nohup /usr/local/bin/lordos-guest >/tmp/lordos-guest.log 2>&1 &")
+    con.run("pkill -x lordos-guest; systemctl stop mh-lg 2>/dev/null; systemd-run --unit mh-lg -E DISPLAY=:0 /usr/local/bin/lordos-guest")
     r.step("clipboard: lordos-guest says hello with a clipboard tool", lambda: _wait_log(s, c["dir"], re.compile(r"agent: lordos-guest \S+ said hello"), 30))
+    con.run("pkill -x xclip")                                 # no copy of the guest's own owns the clipboard there
+    # copied here (another window in front), then the person turns to the machine: a click on its picture (6.8: the
+    # offer goes when the window comes to the front or its picture is clicked)
+    lib_rect(s)
+    word = "mh-host-%s" % os.urandom(3).hex()
+    s.js("sdk.clipboard.set(%s)" % json.dumps(word))
+    time.sleep(0.5)
     vw = vm_window(s, NAME)
     s.js("wm.focus(%s)" % json.dumps(vw["id"]))
     vr = s.rect_of(vw)
-    s.click(vr[0] + vr[2] // 2, vr[1] + vr[3] // 2)        # the machine in use: its window has the pointer and the keys
-    word = "mh-host-%s" % os.urandom(3).hex()
-    s.js("lord.clipboard.set(%s)" % json.dumps(word))
+    s.click(vr[0] + vr[2] // 2, vr[1] + vr[3] // 2)
     got = None
     end = time.time() + 30
     while time.time() < end:
-        out, st = con.run("DISPLAY=:0 timeout 5 xclip -o -selection clipboard 2>&1")
+        out, st = con.run("DISPLAY=:0 timeout 5 xclip -o -selection clipboard -t UTF8_STRING 2>&1")
         if word in out:
             got = out
             break
@@ -614,8 +619,8 @@ def flow_clone(s, r, c):
 
 
 def flow_storage(s, r, c):
-    """Storage figures (12): what Machines says deleting the clone gives back (lord.vm.storage()'s `frees`, the Storage
-    window's "Frees if deleted"), against the change in free space once it is in the Trash and the Trash is emptied, on
+    """Storage figures (12): what Machines says deleting the clone gives back (lord.vm.storage()'s `frees`, which the Storage
+    window shows as "Frees if deleted"), against the change in free space once it is in the Trash and the Trash is emptied, on
     this run's file system (MH_SCRATCH; ext4, btrfs and XFS each need their own run)."""
     need_machine(s, c)
     if "clone_dir" not in c:
@@ -626,11 +631,7 @@ def flow_storage(s, r, c):
     orig = next((m for m in st.get("machines", []) if m.get("name") == NAME), None)
     if not clone:
         raise RuntimeError("lord.vm.storage() doesn't list the clone: %s" % [m.get("name") for m in st.get("machines", [])])
-    s.js("launchApp('machines', { storage: true })")
-    sw = s.window("machines", lambda w: "storage" in (w["title"] or "").lower() or w["id"].endswith("storage"), timeout=10)
-    time.sleep(1)
     s.shot("21-storage")
-    s.js("wm.close(%s)" % json.dumps(sw["id"]))
     vfs = os.statvfs(c["clone_dir"])
     free0 = vfs.f_bavail * vfs.f_frsize
     card_menu(s, CLONE, "Remove…")
