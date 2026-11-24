@@ -684,5 +684,6 @@
   "stats.p95Row": "95-и перцентил на CPU (1 мин)",
   "stats.memAvgRow": "Средна памет (1 · 5 · 15 мин)",
   "stats.memPeakRow": "Пикова памет (1 · 5 · 15 мин)",
-  "stats.spark": "Последна минута"
+  "stats.spark": "Последна минута",
+  "group.showMachine": "Показване на машината"
 }

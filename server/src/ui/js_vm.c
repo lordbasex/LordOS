@@ -213,6 +213,16 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     }
     char lib[PATH_MAX];
     set_str(c, o, "library", library(lib, sizeof lib, 0) ? "" : lib);
+    /* Landlock's ABI on this kernel (0: none): without it lord-vm still starts machines (seccomp and no_new_privs are
+     * what it refuses to start without) but QEMU isn't kept to its folder by the kernel; the app says "Weaker isolation
+     * on this kernel" (docs/VIRTUALIZATION.md 3.3, model.js isolationGaps) */
+    {
+        int abi = -1;
+#ifdef __NR_landlock_create_ruleset
+        abi = (int)syscall(__NR_landlock_create_ruleset, NULL, 0U, 1U /* LANDLOCK_CREATE_RULESET_VERSION */);
+#endif
+        set_int(c, o, "landlock", abi > 0 ? abi : 0);
+    }
     /* where machines live: free space and what kind of disk (a microSD card is slow for machines) */
     char where[PATH_MAX];
     const char *home = getenv("HOME");
@@ -236,6 +246,14 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (mf >= 0) { ssize_t k = read(mf, model, sizeof model - 1); close(mf); if (k > 0) model[k] = 0; }
     for (char *q = model; *q; q++) if ((unsigned char)*q < 0x20) *q = 0;
     set_str(c, o, "board", model);
+    /* nested virtualization (5.7): KVM's "nested" parameter, Y or 1 */
+    {
+        char nb[8] = "";
+        int nf = open("/sys/module/kvm_intel/parameters/nested", O_RDONLY | O_CLOEXEC);
+        if (nf < 0) nf = open("/sys/module/kvm_amd/parameters/nested", O_RDONLY | O_CLOEXEC);
+        if (nf >= 0) { ssize_t k = read(nf, nb, sizeof nb - 1); close(nf); if (k > 0) nb[k] = 0; }
+        JS_SetPropertyStr(c, o, "nested", JS_NewBool(c, nb[0] == 'Y' || nb[0] == '1'));
+    }
     char *cards = vmnet_cards_json("/sys/class/net");
     JS_SetPropertyStr(c, o, "cards", cards ? JS_ParseJSON(c, cards, strlen(cards), "<cards>") : JS_NewArray(c));
     free(cards);
@@ -316,7 +334,7 @@ static void gvt_memlock(const char *dir) {
     static int next;
     char p[PATH_MAX + 16], buf[2048];
     snprintf(p, sizeof p, "%s/run.json", dir);
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
     if (n <= 0) return;
@@ -357,7 +375,7 @@ static JSValue f_gpus(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 static void run_state(const char *dir, JSContext *c, JSValue o) {
     char p[PATH_MAX + 16], buf[2048];
     snprintf(p, sizeof p, "%s/run.json", dir);
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
     const char *state = "stopped", *reason = "none";
@@ -1133,6 +1151,123 @@ static JSValue f_refusal(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     return r;
 }
 
+/* ---- the resource budget (docs/VIRTUALIZATION.md 3.7) ----
+ * One check for every start path: the window (f_start), a start without a window (f_start_detached: the library's
+ * Start Without Window, `machines start`, a group's members). The machines already active (vm_budget_used_mb: run.json
+ * with its lord-vm alive) plus this one, each with QEMU's overhead, must fit in the RAM minus the desktop's floor; one
+ * machine alone always may start (vm_machine_check_host already kept its memory within vm_mem_max_mb). */
+static int lordvm_alive(long pid) {
+    char cp[64], comm[32] = "";
+    snprintf(cp, sizeof cp, "/proc/%ld/comm", pid);
+    int cf = pid > 0 ? open(cp, O_RDONLY | O_CLOEXEC) : -1;
+    ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
+    if (cf >= 0) close(cf);
+    return k > 0 && !strncmp(comm, "lord-vm", 7);
+}
+typedef struct { long used, max, need, free; int running, ok; } Budget;
+static void budget_of(const char *dir, Budget *b) {
+    memset(b, 0, sizeof *b);
+    b->ok = 1;
+    VmHost h;
+    vm_host_probe(&h);
+    b->max = vm_mem_max_mb(&h);
+    char lib[PATH_MAX];
+    if (!library(lib, sizeof lib, 0)) b->used = vm_budget_used_mb(lib, dir, lordvm_alive, vm_group_session_mb, &b->running);
+    b->free = b->max > b->used ? b->max - b->used : 0;
+    VmMachine m;
+    if (!dir || vm_machine_load(dir, &m, NULL, 0)) return;
+    b->need = vm_mem_limit_mb(&m) + vm_group_session_mb(dir, &m);
+    b->ok = !b->running || vm_budget_fits(&h, b->used, b->need);
+}
+/* 1 when dir may start now; else 0 with refusal() "vm.overBudget" */
+static int budget_ok(const char *dir) {
+    Budget b;
+    budget_of(dir, &b);
+    if (b.ok) return 1;
+    fprintf(stderr, "vm: %s refused: needs %ld MB, %ld MB left for machines (%d running)\n", dir, b.need, b.free, b.running);
+    snprintf(refusal, sizeof refusal, "vm.overBudget");
+    return 0;
+}
+/* memory pressure (PSI, /proc/pressure/memory "some avg10"): the share of the last 10 s some task waited for memory, in
+ * percent; -1 where the kernel has no PSI */
+static double mem_pressure(void) {
+    char buf[256];
+    int fd = open("/proc/pressure/memory", O_RDONLY | O_CLOEXEC);
+    ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (n <= 0) return -1;
+    buf[n] = 0;
+    const char *p = strstr(buf, "some avg10=");
+    if (!p) return -1;
+    double v = strtod(p + 11, NULL);
+    return v >= 0 && v <= 100 ? v : -1;
+}
+/* a small world-readable sysfs number (one line); def when missing or not a number */
+static long sysfs_num(const char *path, long def) {
+    char b[32];
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    ssize_t n = fd >= 0 ? read(fd, b, sizeof b - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (n <= 0) return def;
+    b[n] = 0;
+    char *end;
+    long v = strtol(b, &end, 10);
+    return end != b && (*end == 0 || *end == '\n') ? v : def;
+}
+/* sensors() → { tempC, fanRpm, underVoltage }: what "What this computer can run" shows while machines run (5.7): the
+ * first thermal zone (°C, -1 none), the first hwmon fan (rpm, -1 none) and a Raspberry Pi's under-voltage alarm (the
+ * rpi_volt hwmon's in0_lcrit_alarm: 1, 0, -1 none). World-readable sysfs only, nothing run. */
+static JSValue f_sensors(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    long mc = sysfs_num("/sys/class/thermal/thermal_zone0/temp", LONG_MIN);
+    long fan = -1, uv = -1;
+    DIR *d = opendir("/sys/class/hwmon");
+    struct dirent *e;
+    for (int i = 0; d && (e = readdir(d)) && i < 64; i++) {
+        if (strncmp(e->d_name, "hwmon", 5)) continue;
+        char p[96], name[32] = "";
+        snprintf(p, sizeof p, "/sys/class/hwmon/%.32s/name", e->d_name);
+        int fd = open(p, O_RDONLY | O_CLOEXEC);
+        ssize_t k = fd >= 0 ? read(fd, name, sizeof name - 1) : -1;
+        if (fd >= 0) close(fd);
+        if (k > 0) name[k] = 0;
+        if (!strcmp(name, "rpi_volt\n") || !strcmp(name, "rpi_volt")) {
+            snprintf(p, sizeof p, "/sys/class/hwmon/%.32s/in0_lcrit_alarm", e->d_name);
+            long a = sysfs_num(p, -1);
+            uv = a == 0 || a == 1 ? a : -1;
+        }
+        if (fan < 0) {
+            snprintf(p, sizeof p, "/sys/class/hwmon/%.32s/fan1_input", e->d_name);
+            long r = sysfs_num(p, -1);
+            if (r >= 0 && r < 100000) fan = r;
+        }
+    }
+    if (d) closedir(d);
+    JSValue o = JS_NewObject(c);
+    set_int(c, o, "tempC", mc > -50000 && mc < 200000 ? (int)(mc / 1000) : -1);
+    set_int(c, o, "fanRpm", (int)fan);
+    set_int(c, o, "underVoltage", (int)uv);
+    return o;
+}
+/* budget(dir?) → { usedMb, maxMb, freeMb, running, needMb, ok, pressure }: what start would decide for dir (needMb 0
+ * and ok true without one), and the library's summary (the status line) */
+static JSValue f_budget(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    int have = argc >= 1 && JS_IsString(argv[0]) && !machine_dir(c, argv[0], dir, sizeof dir);
+    Budget b;
+    budget_of(have ? dir : NULL, &b);
+    JSValue o = JS_NewObject(c);
+    JS_SetPropertyStr(c, o, "usedMb", JS_NewFloat64(c, (double)b.used));
+    JS_SetPropertyStr(c, o, "maxMb", JS_NewFloat64(c, (double)b.max));
+    JS_SetPropertyStr(c, o, "freeMb", JS_NewFloat64(c, (double)b.free));
+    JS_SetPropertyStr(c, o, "needMb", JS_NewFloat64(c, (double)b.need));
+    set_int(c, o, "running", b.running);
+    JS_SetPropertyStr(c, o, "ok", JS_NewBool(c, b.ok));
+    JS_SetPropertyStr(c, o, "pressure", JS_NewFloat64(c, mem_pressure()));
+    return o;
+}
+
 /* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
  *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest", captureFullscreen, perfProfile,
  *            cpuPin: "off"|"auto" }) → job id: lord-vm --set on a
@@ -1456,7 +1591,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     /* run.json is the person's own file: only a hint (which QEMU the Machines cards count, whether to ask lord-vm) */
     snprintf(p, sizeof p, "%s/run.json", dir);
     char buf[2048];
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
     long qpid = 0, hint_passt = 0;
@@ -2211,7 +2346,7 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     int slot = new_slot();
     if (slot < 0 || machine_dir(c, argv[0], dir, sizeof dir) || bin_path("lord-vm", bin, sizeof bin)) return JS_NewInt32(c, 0);
     last_start = time(NULL);
-    if (!machine_shares_ok(dir)) return JS_NewInt32(c, 0);
+    if (!machine_shares_ok(dir) || !budget_ok(dir)) return JS_NewInt32(c, 0);
     int sv[2], ep[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) return JS_NewInt32(c, 0);
     if (pipe2(ep, O_CLOEXEC)) { close(sv[0]); close(sv[1]); return JS_NewInt32(c, 0); }
@@ -4433,7 +4568,7 @@ static JSValue f_eject(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
 static JSValue f_start_detached(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     char dir[PATH_MAX], creds[PATH_MAX];
-    if (machine_dir(c, argv[0], dir, sizeof dir) || !machine_shares_ok(dir)) return JS_NewInt32(c, 0);
+    if (machine_dir(c, argv[0], dir, sizeof dir) || !machine_shares_ok(dir) || !budget_ok(dir)) return JS_NewInt32(c, 0);
     last_start = time(NULL);
     int have = !write_creds(creds, sizeof creds, dir);
     char *args[] = { "lord-vm", "--start", dir, "--detach", "--keep-running", have ? "--credentials-file" : NULL, creds, NULL };
@@ -4467,7 +4602,7 @@ static JSValue f_awake(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
         char p[PATH_MAX + 300], buf[2048];
         snprintf(p, sizeof p, "%s/%s/run.json", lib, e->d_name);
-        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
         ssize_t k = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
         if (fd >= 0) close(fd);
         if (k <= 0) continue;
@@ -5028,7 +5163,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 2, f_clip_send_host),
     JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
-    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
+    JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("budget", 1, f_budget), JS_CFUNC_DEF("sensors", 0, f_sensors), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
     JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act), JS_CFUNC_DEF("closeRefusals", 1, f_close_refusals),
     JS_CFUNC_DEF("guestApps", 1, f_guest_apps), JS_CFUNC_DEF("gpus", 0, f_gpus), JS_CFUNC_DEF("launch", 2, f_launch),
 };

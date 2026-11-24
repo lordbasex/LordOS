@@ -685,6 +685,96 @@ int vm_budget_fits(const VmHost *h, long running_mb, long want_mb) {
     return running_mb >= 0 && want_mb > 0 && running_mb + want_mb <= h->ram_mb - floor;
 }
 
+int vm_dir_active(const char *dir, int (*alive)(long pid)) {
+    char p[VM_PATH_MAX + 32], buf[2048];
+    if (!dir || (size_t)snprintf(p, sizeof p, "%s/run.json", dir) >= sizeof p) return 0;
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return 0;
+    struct stat rs;
+    ssize_t k = !fstat(fd, &rs) && S_ISREG(rs.st_mode) ? read(fd, buf, sizeof buf - 1) : -1;
+    close(fd);
+    if (k <= 0) return 0;
+    JDoc d;
+    if (json_parse(buf, (size_t)k, &d, NULL, 0)) return 0;
+    const char *s = json_str(d.root, "state");
+    double pd = json_num(d.root, "pid", 0);
+    int on = s && (!strcmp(s, "starting") || !strcmp(s, "running") || !strcmp(s, "paused") || !strcmp(s, "stopping"));
+    long pid = pd >= 1 && pd <= 4194304 ? (long)pd : 0;
+    json_free(&d);
+    return on && pid && (!alive || alive(pid));
+}
+
+size_t vm_backup_hold(const char *rel) {
+    if (!rel) return 0;
+    size_t n = strlen(rel);
+    static const char *const tails[] = { ".lordvm/disks", ".lordvm/suspend.state" };
+    for (int i = 0; i < 2; i++) {
+        size_t t = strlen(tails[i]);
+        if (n <= t || strcmp(rel + n - t, tails[i])) continue;
+        size_t dirlen = n - t + 7;                          /* up to and with ".lordvm" */
+        /* a name before ".lordvm": the folder's own name isn't empty and doesn't start with '.' */
+        size_t b = n - t;
+        while (b > 0 && rel[b - 1] != '/') b--;
+        if (b == n - t || rel[b] == '.') return 0;
+        return dirlen;
+    }
+    return 0;
+}
+
+/* one machine folder for vm_budget_used_mb: its limit when it is active, else 0 */
+static long budget_one(const char *dir, const struct stat *ex, int (*alive)(long), long (*extra)(const char *, const VmMachine *), int *n) {
+    struct stat st;
+    if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) return 0;
+    if (ex && st.st_dev == ex->st_dev && st.st_ino == ex->st_ino) return 0;
+    if (!vm_dir_active(dir, alive)) return 0;
+    VmMachine m;
+    if (vm_machine_load(dir, &m, NULL, 0)) return 0;
+    (*n)++;
+    long x = extra ? extra(dir, &m) : 0;
+    return vm_mem_limit_mb(&m) + (x > 0 && x <= VM_MEM_MAX_MB ? x : 0);
+}
+
+static int budget_suffix(const char *s, size_t l, const char *suf) {
+    size_t k = strlen(suf);
+    return l > k && !strcmp(s + l - k, suf);
+}
+
+long vm_budget_used_mb(const char *lib, const char *exclude, int (*alive)(long pid), long (*extra)(const char *dir, const VmMachine *m), int *n) {
+    int cnt = 0, *pn = n ? n : &cnt;
+    *pn = 0;
+    struct stat ex;
+    int have_ex = exclude && !stat(exclude, &ex);
+    DIR *d = lib ? opendir(lib) : NULL;
+    if (!d) return 0;
+    long sum = 0;
+    int seen = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) && seen < 256) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.') continue;
+        char dir[VM_PATH_MAX + 260];
+        if ((size_t)snprintf(dir, sizeof dir, "%s/%s", lib, e->d_name) >= sizeof dir) continue;
+        if (budget_suffix(e->d_name, l, ".lordvm")) { seen++; sum += budget_one(dir, have_ex ? &ex : NULL, alive, extra, pn); continue; }
+        if (!budget_suffix(e->d_name, l, ".lordgroup")) continue;
+        struct stat gs;
+        if (lstat(dir, &gs) || !S_ISDIR(gs.st_mode)) continue;
+        DIR *g = opendir(dir);
+        if (!g) continue;
+        struct dirent *f;
+        while ((f = readdir(g)) && seen < 256) {
+            size_t fl = strlen(f->d_name);
+            if (f->d_name[0] == '.' || !budget_suffix(f->d_name, fl, ".lordvm")) continue;
+            char md[VM_PATH_MAX + 520];
+            if ((size_t)snprintf(md, sizeof md, "%s/%s", dir, f->d_name) >= sizeof md) continue;
+            seen++;
+            sum += budget_one(md, have_ex ? &ex : NULL, alive, extra, pn);
+        }
+        closedir(g);
+    }
+    closedir(d);
+    return sum;
+}
+
 const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing) {
     if (m->devices == VM_DEV_WINDOWS) return "3D graphics are for Linux machines";
     if (m->display != VM_DISPLAY_WINDOW) return "the machine has no display";
@@ -1136,7 +1226,7 @@ char *vm_machine_json(const VmMachine *m) {
 }
 
 static char *read_small(const char *path, size_t max, size_t *len) {
-    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);   /* a FIFO named machine.json never blocks the caller */
     if (fd < 0) return NULL;
     struct stat st;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || (size_t)st.st_size > max) { close(fd); errno = EFBIG; return NULL; }

@@ -684,5 +684,6 @@
   "stats.p95Row": "Ika-95 na percentile ng CPU (1 min)",
   "stats.memAvgRow": "Average na memory (1 · 5 · 15 min)",
   "stats.memPeakRow": "Peak na memory (1 · 5 · 15 min)",
-  "stats.spark": "Huling minuto"
+  "stats.spark": "Huling minuto",
+  "group.showMachine": "Ipakita ang Machine"
 }

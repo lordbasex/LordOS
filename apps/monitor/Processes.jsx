@@ -16,7 +16,7 @@
 // the protected ones (PID 1, kernel threads, the session, LordOS's services and helpers,
 // PipeWire), which the table marks with `prot`. Quit All uses the same calls, once per process.
 import {
-  View, Text, ScrollView, Segmented, SearchField, ToolbarButton, Button, GroupBox, FormRow, Disclosure, typeScale, spacing, useTheme, useLocale,
+  wm, View, Text, ScrollView, Segmented, SearchField, ToolbarButton, Button, GroupBox, FormRow, Disclosure, typeScale, spacing, useTheme, useLocale,
   useStore, useSettings, useKeyboard, createStore, monitor, monitorProcesses, monitorDetail, firewall, firewallState, formatNumber,
   formatDate, formatTime, addListener, appName, Table, useNarrow, direction, Tooltip, Dropdown, Image, webAppEntry, refreshWebApps, webAppsModel,
 } from '@lordos/sdk';
@@ -427,7 +427,10 @@ export function ProcessesTab() {
           <Text style={{ fontSize: 12, fontWeight: 600, color, whiteSpace: 'nowrap' }}>{groupLabel(tr, g)}</Text>
           <OriginBadge o={groupOriginOf(g, facts)} selected={on} />
           {g.gone ? ended(dim) : null}
-          {on && g.stoppable && !g.gone ? <><View style={{ flex: 1 }} /><RowButton label={tr('monitor.group.quitAll')} color={color} onClick={() => openGroupStop(tr, g)} /></> : null}
+          {on && !g.gone && (g.stoppable || (g.kind === 'app' && machineOf(g.item?.app))) ? <View style={{ flex: 1 }} /> : null}
+          {/* a machine's row (6.14): its own window, opened by Machines (args.show: Machines opens it, protected when it must be) */}
+          {on && !g.gone && g.kind === 'app' && machineOf(g.item?.app) ? <RowButton label={tr('monitor.group.showMachine')} color={color} onClick={() => wm.open('machines', { args: { show: machineOf(g.item.app), at: Date.now() } })} /> : null}
+          {on && g.stoppable && !g.gone ? <RowButton label={tr('monitor.group.quitAll')} color={color} onClick={() => openGroupStop(tr, g)} /> : null}
         </>
       );
       case 'cpu': return g.gone ? '—' : cpuText(g.cpu, color);

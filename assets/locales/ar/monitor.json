@@ -744,5 +744,6 @@
   "stats.p95Row": "المئين 95 للمعالج (1 د)",
   "stats.memAvgRow": "متوسط الذاكرة (1 · 5 · 15 د)",
   "stats.memPeakRow": "ذروة الذاكرة (1 · 5 · 15 د)",
-  "stats.spark": "آخر دقيقة"
+  "stats.spark": "آخر دقيقة",
+  "group.showMachine": "إظهار الآلة"
 }

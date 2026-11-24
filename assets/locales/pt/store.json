@@ -369,5 +369,7 @@
   "settings.listsTitle": "Listas de pacotes",
   "settings.listsHint": "As listas de pacotes do Debian e do LordOS, de onde vêm os apps novos e as atualizações.",
   "settings.webManage": "Perfis, permissões e espaço de cada app web",
-  "settings.flathubOff": "Desativar o Flathub na Loja. Os apps que você instalou por ele continuam."
+  "settings.flathubOff": "Desativar o Flathub na Loja. Os apps que você instalou por ele continuam.",
+  "updates.qemuTitle": "Máquinas suspensas podem não retomar após esta atualização ({count})",
+  "updates.qemuText": "Esta atualização muda o QEMU, e uma sessão salva por uma versão do QEMU pode não carregar em outra. Desligue essas máquinas antes, ou escolha Retomar mesmo assim ou Descartar o estado salvo quando iniciarem."
 }

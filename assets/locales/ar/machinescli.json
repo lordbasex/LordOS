@@ -105,5 +105,6 @@
   "freshDone": "محطة عمل {name} جديدة: صورتها الموثَّقة وهوية جديدة.",
   "freshDoneBoth": "{name} جديدة: عاد الجهازان إلى صورتهما الموثَّقة بهوية جديدة.",
   "freshNotGroup": "{name} ليست مجموعة أجهزة: البدء من جديد مخصص للمجموعات.",
-  "badMember": "يقبل --member القيمة gateway أو workstation."
+  "badMember": "يقبل --member القيمة gateway أو workstation.",
+  "overBudget": "لم تبدأ {name}: تحتاج إلى {need} م.ب ويتبقى {free} م.ب للآلات. علّق آلة أخرى أو أوقفها، أو أعطها ذاكرة أقل."
 }

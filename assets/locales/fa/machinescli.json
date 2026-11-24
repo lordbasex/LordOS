@@ -105,5 +105,6 @@
   "freshDone": "Workstation ‏{name} تازه است: تصویر تأییدشده‌اش، با هویتی تازه.",
   "freshDoneBoth": "{name} تازه است: هر دو ماشین به تصویر تأییدشده‌شان برگشتند، با هویتی تازه.",
   "freshNotGroup": "{name} گروه ماشین نیست: آغاز از نو برای گروه‌هاست.",
-  "badMember": "--member مقدار gateway یا workstation می‌گیرد."
+  "badMember": "--member مقدار gateway یا workstation می‌گیرد.",
+  "overBudget": "{name} روشن نشد: به {need} مگابایت نیاز دارد و {free} مگابایت برای ماشین‌ها مانده است. ماشین دیگری را معلق یا خاموش کنید، یا به آن حافظهٔ کمتری بدهید."
 }

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 const D = await import(path.join(here, '../../apps/machines/diag.js'));
-const { stateView, offers2d, restartsAgain, offHint, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetCheck, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
+const { stateView, offers2d, restartsAgain, offHint, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetPlan, budgetLine, failCause, failActions, cardLights, isolationGaps, pipFrame, actualFrame, infoLines, canRun, sensorLines, searchMachines, sessionStarts, atLoginToggle, batteryNotice, awayStep, AWAY_SEC, changedSections, sectionsMatching, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -118,12 +118,125 @@ const pi8 = { memMaxMb: 6144 };
 eq('limit kvm', memLimit({ memoryMb: 1024, accel: 'kvm' }), 1408);
 eq('limit tcg', memLimit({ memoryMb: 1024, accel: 'tcg' }), 1664);
 const run = (dir, memoryMb, accel) => ({ dir, memoryMb, accel, state: 'running' });
-eq('alone always', budgetCheck([], { dir: 'a', memoryMb: 6144, accel: 'tcg' }, pi8).ok, true);
-eq('beside one fits', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 2048, accel: 'tcg' }, pi8), { ok: true, need: 2688, free: 3712 });
-eq('beside one, too big emulated', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 3200, accel: 'tcg' }, pi8).ok, false);
-eq('same with kvm fits', budgetCheck([run('b', 2048, 'kvm')], { dir: 'a', memoryMb: 3200, accel: 'kvm' }, pi8).ok, true);
-eq('stopped ones do not count', budgetCheck([{ dir: 'b', memoryMb: 4096, accel: 'kvm', state: 'stopped' }], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
-eq('itself does not count', budgetCheck([run('a', 4096, 'kvm')], { dir: 'a', memoryMb: 4096, accel: 'kvm' }, pi8).ok, true);
+// what the window offers when lord.vm.budget refuses a start (budgetPlan): less memory in 256 MB steps, or suspending a
+// machine that frees enough (the biggest first; never a graphics card's or a 3D one, never a stopped one)
+const me = { dir: 'a', memoryMb: 4096, accel: 'kvm' };
+const over = { ok: false, needMb: 4480, freeMb: 3000, usedMb: 3144, maxMb: 6144 };
+eq('plan when it fits', budgetPlan({ ok: true }, [], me), { lessMb: 0, suspend: [] });
+eq('plan: less memory', budgetPlan(over, [], me).lessMb, 2560);
+eq('plan: less is never more', budgetPlan({ ok: false, needMb: 1408, freeMb: 1300 }, [], { dir: 'a', memoryMb: 1024, accel: 'kvm' }).lessMb, 768);
+eq('plan: nothing under 512', budgetPlan({ ok: false, needMb: 4480, freeMb: 700 }, [], me).lessMb, 0);
+const others = [run('b', 2048, 'kvm'), { ...run('c', 1024, 'kvm') }, { ...run('d', 4096, 'kvm'), gpu: 'intel-whole' }, { ...run('e', 3072, 'kvm'), graphics: '3d' },
+  { dir: 'f', memoryMb: 8192, accel: 'kvm', state: 'stopped' }, { ...run('g', 2048, 'kvm'), state: 'paused', name: 'G' }, run('a', 4096, 'kvm')];
+// c (1408 MB) frees less than the 1480 MB missing
+eq('plan: who frees enough', budgetPlan(over, others, me).suspend.map((x) => x.dir), ['b', 'g']);
+eq('plan: their share', budgetPlan(over, others, me).suspend[1], { dir: 'g', name: 'G', mb: 2432 });
+eq('plan: too small to help', budgetPlan({ ok: false, needMb: 4480, freeMb: 1000 }, others, me).suspend.map((x) => x.dir), []);
+eq('budget line', budgetLine({ usedMb: 3144, maxMb: 6144, pressure: 12.5 }), { usedGb: 3.1, maxGb: 6, pressure: true });
+eq('budget line calm', budgetLine({ usedMb: 0, maxMb: 14160, pressure: -1 }).pressure, false);
+eq('budget line unknown', budgetLine({ maxMb: 0 }), null);
+
+// the failure page's cause and fixes (failCause, failActions)
+eq('cause: locked', failCause('start-failed', 'qemu-system-x86_64: -blockdev ...: Failed to get "write" lock\nIs another process using the image [/x/disk.qcow2]?'), 'locked');
+eq('cause: locked read', failCause('qemu-failed', 'Failed to get "shared" lock'), 'locked');
+eq('cause: missing disk', failCause('start-failed', "Could not open '/home/a/Machines/x.lordvm/disks/data1.qcow2': No such file or directory"), 'disk-missing');
+eq('cause: the reason otherwise', failCause('guest-panic', 'kernel panic'), 'guest-panic');
+eq('cause: no reason, no cause', failCause(null, 'Failed to get "write" lock'), null);
+eq('fixes: oom, less memory', failActions('out-of-memory', { memoryMb: 4096 }), [{ k: 'less', mb: 3072 }]);
+eq('fixes: oom with snapshots', failActions('out-of-memory', { memoryMb: 4096, snaps: 2 }).map((f) => f.k), ['less', 'snapshot']);
+eq('fixes: oom at the floor', failActions('out-of-memory', { memoryMb: 512 }), []);
+eq('fixes: panic, a snapshot', failActions('guest-panic', { memoryMb: 4096, snaps: 1 }), [{ k: 'snapshot' }]);
+eq('fixes: panic without one', failActions('guest-panic', { memoryMb: 4096 }), []);
+eq('fixes: locked, none', failActions('locked', { memoryMb: 4096, snaps: 3 }), []);
+eq('fixes: forced, none', failActions('forced', { memoryMb: 4096, snaps: 3 }), []);
+
+// the card's agent and disk lights (cardLights) and "Weaker isolation on this kernel" (isolationGaps)
+eq('lights: off machine', cardLights({ state: 'stopped' }, null), []);
+eq('lights: running, tools on, disk busy', cardLights({ state: 'running', agentState: 'connected' }, { disk: true }).map((l) => `${l.k}:${l.tone}:${l.key}`),
+  ['agent:on:machines.light.agent.connected', 'disk:on:machines.light.disk.busy']);
+eq('lights: waiting, idle', cardLights({ state: 'paused', agentState: 'waiting' }, { disk: false }).map((l) => l.tone), ['wait', 'off']);
+eq('lights: unknown agent word is off', cardLights({ state: 'running', agentState: '<b>' }, null)[0].key, 'machines.light.agent.off');
+eq('gaps: full sandbox', isolationGaps({ landlock: 6 }, { sandbox: 1 | 1024 | 8 }), []);
+eq('gaps: no landlock here', isolationGaps({ landlock: 0 }, null), ['landlock']);
+eq('gaps: running without landlock or namespaces', isolationGaps({ landlock: 6 }, { sandbox: 8 }), ['landlock', 'namespaces']);
+eq('gaps: no bits yet', isolationGaps({ landlock: 6 }, { sandbox: 0 }), []);
+eq('gaps: host unknown', isolationGaps(null, null), []);
+
+// Picture in Picture's frame, Actual Size and the Info menu (pipFrame, actualFrame, infoLines)
+const d1 = { x: 0, y: 0, w: 1920, h: 1080 };
+eq('pip: bottom end, the guest shape', pipFrame(d1, 1920, 1080), { x: 1496, y: 759, w: 400, h: 225 });
+eq('pip: right-to-left, bottom left', pipFrame(d1, 1920, 1080, true).x, 24);
+eq('pip: second display', pipFrame({ x: 1920, y: 0, w: 1280, h: 800 }, 1280, 800), { x: 2856, y: 504, w: 320, h: 200 });
+eq('pip: unknown shape is 16:10', pipFrame(d1, 0, 0).h, 250);
+eq('pip: never tiny', pipFrame({ x: 0, y: 0, w: 640, h: 480 }, 4000, 100), { x: 376, y: 249, w: 240, h: 135 });
+eq('pip: no display', pipFrame(null, 800, 600), null);
+eq('actual: fits', actualFrame(1280, 800, 48, { w: 1900, h: 1000 }), { w: 1280, h: 848 });
+eq('actual: clamped to the work area', actualFrame(2560, 1600, 48, { w: 1900, h: 1000 }), { w: 1900, h: 1000 });
+eq('actual: unknown', actualFrame(0, 0, 48, { w: 1900, h: 1000 }), null);
+eq('info: running', infoLines({ memoryMb: 4096 }, { cpu: 12.6, memBytes: 2147483648, disk: true }, []).map((l) => [l.key, l.vars]),
+  [['machines.info.cpu', { v: 13 }], ['machines.info.memory', { a: 2048, b: 4096 }], ['machines.light.disk.busy', {}], ['machines.info.isolated', {}]]);
+eq('info: weaker, no numbers yet', infoLines({ memoryMb: 4096 }, null, ['landlock']).map((l) => l.key), ['machines.info.weaker']);
+
+// What this computer can run (canRun) and its sensors (sensorLines)
+const pcHost = { arch: 'amd64', kvm: true, kvmDevice: true, no3d: '', nested: true };
+eq('run: amd64 PC', canRun(pcHost, { gvt: true }).map((r) => `${r.k.split('.').pop()}:${r.st}`),
+  ['native:native', 'other:slow', 'row:native', 'android:native', 'gpu:native', 'passthrough:limited', 'nested:native']);
+eq('run: the native row names the arch', canRun(pcHost)[0].vars, { arch: 'amd64' });
+eq('run: emulated arch is the other one', canRun(pcHost)[1].vars, { arch: 'arm64' });
+const piHost = { arch: 'arm64', kvm: true, kvmDevice: true, no3d: 'arch', nested: false };
+eq('run: Pi', canRun(piHost).map((r) => r.st), ['native', 'slow', 'no', 'no', 'limited', 'no', 'no']);
+eq('run: Pi notes', canRun(piHost).map((r) => r.note.split('.').slice(-2).join('.')),
+  ['note.native', 'note.amd64', 'run.noteArm', 'note.androidArm', 'no3d.arch', 'note.passthrough', 'note.nested']);
+eq('run: KVM off', canRun({ arch: 'amd64', kvm: false, kvmDevice: true, no3d: 'modules' }).map((r) => r.st).slice(0, 5), ['slow', 'slow', 'slow', 'slow', 'limited']);
+eq('run: KVM off note', canRun({ arch: 'amd64', kvm: false, kvmDevice: true })[0].note, 'machines.run.note.kvmOff');
+eq('run: no KVM at all', canRun({ arch: 'amd64', kvm: false, kvmDevice: false })[0].note, 'machines.run.note.noKvm');
+eq('run: an unknown 3D reason', canRun({ arch: 'amd64', kvm: true, no3d: 'zzz' })[4].note, 'machines.cfg.no3d.gpu');
+eq('run: no host', canRun(null), []);
+eq('sensors: all three', sensorLines({ tempC: 81, fanRpm: 3200, underVoltage: 1 }).map((l) => [l.key, l.warn]),
+  [['machines.run.temp', true], ['machines.run.fan', false], ['machines.run.powerLow', true]]);
+eq('sensors: none', sensorLines({ tempC: -1, fanRpm: -1, underVoltage: -1 }), []);
+eq('sensors: fine power', sensorLines({ tempC: 45, fanRpm: -1, underVoltage: 0 }).map((l) => l.key), ['machines.run.temp', 'machines.run.power']);
+
+// Machines and the rest of the system (ties.js): Search, start with the session, the battery notice, away
+const lib6 = [{ id: 'a', dir: '/m/Debian 13.lordvm', name: 'Debian 13', state: 'stopped' }, { id: 'b', dir: '/m/Win.lordvm', name: 'Work debian', state: 'running' },
+  { id: 'c', dir: '/m/G/gw.lordvm', name: 'Debian Gateway', state: 'stopped', groupDir: '/m/G.lordgroup' }, { id: 'd', dir: '/m/x.lordvm', name: 'x', error: 'newer', state: 'stopped' }];
+eq('search: every word, the start first', searchMachines(lib6, 'debian').map((r) => r.m.id), ['a', 'b']);
+eq('search: two words', searchMachines(lib6, 'debian 13').map((r) => r.m.id), ['a']);
+eq('search: none', searchMachines(lib6, '  '), []);
+eq('at login: off ones named, no group member, no unreadable', sessionStarts(lib6, ['a', 'b', 'c', 'd', 7]).map((m) => m.id), ['a']);
+eq('at login: nothing chosen', sessionStarts(lib6, null), []);
+eq('at login: toggle on', atLoginToggle(['a'], 'b', true), ['a', 'b']);
+eq('at login: toggle off', atLoginToggle(['a', 'b'], 'a', false), ['b']);
+eq('at login: no twice', atLoginToggle(['a'], 'a', true), ['a']);
+eq('at login: at most the max', atLoginToggle(['1', '2', '3', '4', '5', '6', '7', '8'], '9', true).length, 8);
+let bm = batteryNotice({ discharging: false }, lib6, {});
+eq('battery: on the charger', bm.notice, 0);
+bm = batteryNotice({ discharging: true }, lib6, bm.mem);
+eq('battery: unplugged with one running', bm.notice, 1);
+bm = batteryNotice({ discharging: true }, lib6, bm.mem);
+eq('battery: once per unplug', bm.notice, 0);
+bm = batteryNotice({ discharging: false }, lib6, bm.mem);
+bm = batteryNotice({ discharging: true }, [], bm.mem);
+eq('battery: none running, no notice', bm.notice, 0);
+bm = batteryNotice({ discharging: true }, lib6, bm.mem);
+eq('battery: one starts while on battery', bm.notice, 1);
+const metaA = (d) => (d === '/m/Win.lordvm' ? { autoPause: true } : {});
+eq('away: not yet', awayStep(AWAY_SEC - 1, lib6, metaA, new Set()), { pause: [], resume: [] });
+eq('away: pause the ones that chose it', awayStep(AWAY_SEC, lib6, metaA, new Set()).pause, ['/m/Win.lordvm']);
+eq('away: not twice', awayStep(AWAY_SEC, lib6, metaA, new Set(['/m/Win.lordvm'])).pause, []);
+const lib7 = lib6.map((m) => (m.id === 'b' ? { ...m, state: 'paused' } : m));
+eq('back: resume the ones it paused', awayStep(3, lib7, metaA, new Set(['/m/Win.lordvm'])).resume, ['/m/Win.lordvm']);
+eq('back: never one the person paused', awayStep(3, lib7, metaA, new Set()).resume, []);
+
+// Configure's sidebar: the sections with an unsaved change, and its search (changedSections, sectionsMatching)
+const cur0 = { name: 'A', vcpus: 2, memoryMb: 2048, ports: [] };
+const differs0 = (k, v) => JSON.stringify(v) !== JSON.stringify(cur0[k]);
+eq('dots: what changed', [...changedSections({ name: 'B', vcpus: 2, memoryMb: 4096, bogus: 1 }, differs0)].sort(), ['cpu', 'general']);
+eq('dots: nothing', [...changedSections({ name: 'A' }, differs0)], []);
+const titles = { general: 'General · Debian 13', cpu: 'CPU and memory · 2 CPU', network: 'Network · Shared' };
+eq('search: by summary', sectionsMatching(['general', 'cpu', 'network'], 'debian', (k) => titles[k]), ['general']);
+eq('search: two words', sectionsMatching(['general', 'cpu', 'network'], 'cpu memory', (k) => titles[k]), ['cpu']);
+eq('search: empty is all', sectionsMatching(['general', 'cpu'], '  ', (k) => titles[k]), ['general', 'cpu']);
 
 // the Control Center and the assistant
 eq('system from label', systemOf('Debian 13.1.0 amd64 n').id, 'debian');

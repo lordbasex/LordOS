@@ -684,5 +684,6 @@
   "stats.p95Row": "CPU کا 95واں پرسنٹائل (1 منٹ)",
   "stats.memAvgRow": "اوسط میموری (1 · 5 · 15 منٹ)",
   "stats.memPeakRow": "زیادہ سے زیادہ میموری (1 · 5 · 15 منٹ)",
-  "stats.spark": "آخری منٹ"
+  "stats.spark": "آخری منٹ",
+  "group.showMachine": "مشین دکھائیں"
 }

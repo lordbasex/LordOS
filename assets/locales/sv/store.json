@@ -369,5 +369,7 @@
   "settings.listsTitle": "Paketlistor",
   "settings.listsHint": "Debians och LordOS paketlistor, där nya appar och uppdateringar kommer ifrån.",
   "settings.webManage": "Profiler, behörigheter och utrymme för varje webbapp",
-  "settings.flathubOff": "Stäng av Flathub i Butik. Apparna du installerade därifrån finns kvar."
+  "settings.flathubOff": "Stäng av Flathub i Butik. Apparna du installerade därifrån finns kvar.",
+  "updates.qemuTitle": "Maskiner i viloläge kanske inte kan återupptas efter den här uppdateringen ({count})",
+  "updates.qemuText": "Den här uppdateringen ändrar QEMU, och en session som en QEMU-version sparat kanske inte läses in av en annan. Stäng av de maskinerna först, eller välj Återuppta ändå eller Släng sparat tillstånd när de startar."
 }

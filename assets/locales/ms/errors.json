@@ -931,5 +931,6 @@
   "llm.noModel": "Model setempat itu tidak dipasang.",
   "sentinela.blockFailed": "Rangkaiannya tidak dapat disekat.",
   "sentinela.machineGone": "Mesin itu tiada lagi dalam Mesin Maya.",
-  "sentinela.machineFailed": "Mesin tidak menjawab."
+  "sentinela.machineFailed": "Mesin tidak menjawab.",
+  "vm.overBudget": "Memori tidak mencukupi di samping mesin yang sudah berjalan. Gantung atau matikan salah satu daripadanya, atau beri mesin ini kurang memori."
 }

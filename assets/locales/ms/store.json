@@ -361,5 +361,7 @@
   "settings.listsTitle": "Senarai pakej",
   "settings.listsHint": "Senarai pakej Debian dan LordOS, sumber apl baharu dan kemas kini.",
   "settings.webManage": "Profil, kebenaran dan ruang setiap apl web",
-  "settings.flathubOff": "Matikan Flathub dalam Kedai. Apl yang anda pasang daripadanya kekal."
+  "settings.flathubOff": "Matikan Flathub dalam Kedai. Apl yang anda pasang daripadanya kekal.",
+  "updates.qemuTitle": "Mesin yang digantung mungkin tidak dapat disambung selepas kemas kini ini ({count})",
+  "updates.qemuText": "Kemas kini ini mengubah QEMU, dan sesi yang disimpan oleh satu versi QEMU mungkin tidak dapat dimuatkan dalam versi lain. Matikan mesin itu dahulu, atau pilih Sambung juga atau Buang keadaan tersimpan apabila ia bermula."
 }

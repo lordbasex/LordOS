@@ -21,7 +21,7 @@
   lord.vm.list = () => [mem('gateway'), mem('workstation'), { ...deb }];
   lord.vm.groups = () => [JSON.parse(JSON.stringify(group))];
   lord.vm.stats = () => ({ diskBytes: 3.6e9, baseBytes: 3.1e9 });
-  lord.vm.snaps = (dir) => (dir.includes('Workstation') ? [{ tag: 'a', name: 'Before banking' }] : []);
+  lord.vm.snaps = (dir) => ({ list: dir.includes('Workstation') ? [{ tag: 'a', name: 'Before banking' }] : [], max: 32, warn: 16 });   // js_vm.c f_snaps' shape
   lord.vm.job = () => null;
   lord.vm.gpus = () => [];
   // the admin helper: Whonix's releases folder, the release's listing and its SHA-512 list, as paths to files

@@ -105,5 +105,6 @@
   "freshDone": "{name} 的 Workstation 已重新開始:經過驗證的映像檔,新的身分。",
   "freshDoneBoth": "{name} 已重新開始:兩台虛擬機器都已還原為經過驗證的映像檔,並有了新的身分。",
   "freshNotGroup": "{name} 不是虛擬機器群組:重新開始只適用於群組。",
-  "badMember": "--member 的值只能是 gateway 或 workstation。"
+  "badMember": "--member 的值只能是 gateway 或 workstation。",
+  "overBudget": "{name} 未啟動:它需要 {need} MB,而留給虛擬機的只剩 {free} MB。請暫停或關閉另一台虛擬機,或給它較少的記憶體。"
 }

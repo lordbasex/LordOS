@@ -377,5 +377,7 @@
   "settings.listsTitle": "Liste de pachete",
   "settings.listsHint": "Listele de pachete Debian și LordOS, de unde vin aplicațiile noi și actualizările.",
   "settings.webManage": "Profilurile, permisiunile și spațiul fiecărei aplicații web",
-  "settings.flathubOff": "Dezactivează Flathub în Magazin. Aplicațiile instalate de acolo rămân."
+  "settings.flathubOff": "Dezactivează Flathub în Magazin. Aplicațiile instalate de acolo rămân.",
+  "updates.qemuTitle": "Mașinile suspendate s-ar putea să nu revină după această actualizare ({count})",
+  "updates.qemuText": "Această actualizare schimbă QEMU, iar o sesiune salvată de o versiune QEMU s-ar putea să nu se încarce în alta. Oprește întâi acele mașini sau alege Reia oricum ori Renunță la starea salvată când pornesc."
 }

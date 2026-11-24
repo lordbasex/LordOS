@@ -105,5 +105,6 @@
   "freshDone": "{name}'s workstation is fresh: its verified image, a new identity.",
   "freshDoneBoth": "{name} is fresh: both machines are back to their verified image, with a new identity.",
   "freshNotGroup": "{name} isn't a machine group: Start Fresh is for groups.",
-  "badMember": "--member takes gateway or workstation."
+  "badMember": "--member takes gateway or workstation.",
+  "overBudget": "{name} didn't start: it needs {need} MB and {free} MB are left for machines. Suspend or shut down another machine, or give it less memory."
 }

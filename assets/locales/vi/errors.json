@@ -931,5 +931,6 @@
   "llm.noModel": "Mô hình cục bộ đó chưa được cài đặt.",
   "sentinela.blockFailed": "Không thể chặn mạng của nó.",
   "sentinela.machineGone": "Máy đó không còn trong Máy ảo nữa.",
-  "sentinela.machineFailed": "Máy không phản hồi."
+  "sentinela.machineFailed": "Máy không phản hồi.",
+  "vm.overBudget": "Không đủ bộ nhớ bên cạnh các máy đang chạy. Hãy tạm ngưng hoặc tắt một máy trong số đó, hoặc cho máy này ít bộ nhớ hơn."
 }
