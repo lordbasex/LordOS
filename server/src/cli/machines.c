@@ -897,6 +897,8 @@ static int cmd_help(void) {
         { "machines snapshot NAME list | take LABEL | revert TAG | delete TAG", "help.snapshot" },
         { "machines clone NAME NEW_NAME [--duplicate] [--keep-identity]", "help.clone" },
         { "machines rename NAME NEW_NAME", "help.rename" },
+        { "machines fresh GROUP [--gateway] [--yes]", "help.fresh" },
+        { "machines start|stop|poweroff|status GROUP --member gateway|workstation", "help.member" },
         { "machines set NAME [--memory 8G] [--cpus 6] [--disk 64G] [--network shared|isolated|bridged|hostonly] [--bridge CARD]\n"
           "             [--clipboard off|to-guest|from-guest|both] [--clipboard-ask on|off] [--graphics 2d|3d]\n"
           "             [--gpu none|intel-whole|intel-shared] [--name NAME] [--iso FILE|none] [--display window|none]\n"
@@ -936,7 +938,65 @@ static void json_group(FILE *f, const Group *G) {
 
 /* start: through the session only (its link is lord-server's to make, 19.3): the gateway, then the workstation; open:
  * the workstation's window; stop and poweroff: here, in stop order (the workstation first), each with lord-vm */
+/* --member gateway|workstation anywhere in argv: the role (VM_ROLE_*), the option taken out of argv; 0 none, -1 bad */
+static int take_member(int *argc, char **argv) {
+    for (int i = 0; i < *argc; i++) {
+        if (strcmp(argv[i], "--member")) continue;
+        if (i + 1 >= *argc) return -1;
+        int role = !strcmp(argv[i + 1], "gateway") ? VM_ROLE_GATEWAY : !strcmp(argv[i + 1], "workstation") ? VM_ROLE_WORKSTATION : -1;
+        for (int j = i; j + 2 <= *argc; j++) argv[j] = j + 2 < *argc ? argv[j + 2] : NULL;
+        *argc -= 2;
+        return role;
+    }
+    return 0;
+}
+
+/* Start Fresh (19.7): lord-vm --group-fresh with the group off; asks first unless --yes (and never without a terminal) */
+static int cmd_group_fresh(Group *G, int argc, char **argv) {
+    int gw = 0, yes = 0;
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "--gateway")) gw = 1;
+        else if (!strcmp(argv[i], "--yes")) yes = 1;
+        else { ERR("unknown", "arg", argv[i], NULL); return VMCLI_USAGE; }
+    }
+    if (strcmp(group_view(G), "off")) { ERR("freshRunning", "name", G->g.name, NULL); return VMCLI_FAILED; }
+    if (!yes) {
+        if (!isatty(0)) { ERR("freshNeedsYes", NULL); return VMCLI_USAGE; }
+        printf("%s ", say(gw ? "freshAskBoth" : "freshAsk", "name", G->g.name, NULL));
+        fflush(stdout);
+        char ans[16] = "";
+        if (!fgets(ans, sizeof ans, stdin) || (ans[0] != 'y' && ans[0] != 'Y')) { SAY("freshKept", "name", G->g.name, NULL); return VMCLI_OK; }
+    }
+    Run r;
+    char *a[] = { NULL, "--group-fresh", G->dir, gw ? "--gateway" : NULL, NULL };
+    int st = run_lordvm(a, &r);
+    if (st) { ERR("opFailed", "name", G->g.name, "why", why_of(&r), NULL); return our_rc(st); }
+    SAY(gw ? "freshDoneBoth" : "freshDone", "name", G->g.name, NULL);
+    return VMCLI_OK;
+}
+
 static int cmd_group(Group *G, const char *cmd, int argc, char **argv) {
+    /* one member (19.9): --member gateway acts on the gateway alone; --member workstation is the group's own start
+     * (the gateway first), or the workstation alone for stop, poweroff and status */
+    int role = take_member(&argc, argv);
+    if (role < 0) { ERR("badMember", NULL); return VMCLI_USAGE; }
+    if (!strcmp(cmd, "fresh")) { if (role) { ERR("unknown", "arg", "--member", NULL); return VMCLI_USAGE; } return cmd_group_fresh(G, argc, argv); }
+    if (role && !(role == VM_ROLE_WORKSTATION && (!strcmp(cmd, "start") || !strcmp(cmd, "open")))) {
+        int j = vm_group_role(&G->g, role);
+        Machine *x = j >= 0 && G->member[j] >= 0 ? &ms[G->member[j]] : NULL;
+        if (!x) { ERR("groupDamaged", "name", G->g.name, NULL); return VMCLI_FAILED; }
+        if (!strcmp(cmd, "status")) {
+            if (argc > 1 || (argc == 1 && strcmp(argv[0], "--json"))) { ERR("unknown", "arg", argv[argc - 1], NULL); return VMCLI_USAGE; }
+            return cmd_status(x, argc == 1);
+        }
+        if (!strcmp(cmd, "start")) {
+            if (argc > 1 || (argc == 1 && strcmp(argv[0], "--no-window"))) { ERR("unknown", "arg", argv[argc - 1], NULL); return VMCLI_USAGE; }
+            return cmd_start(x, argc == 0);
+        }
+        if (argc) { ERR("unknown", "arg", argv[0], NULL); return VMCLI_USAGE; }
+        if (!strcmp(cmd, "open")) return cmd_open(x);
+        return cmd_power(x, cmd);
+    }
     if (!strcmp(cmd, "status")) {
         if (argc > 1 || (argc == 1 && strcmp(argv[0], "--json"))) { ERR("unknown", "arg", argv[argc - 1], NULL); return VMCLI_USAGE; }
         if (argc == 1) { json_group(stdout, G); printf("\n"); return 0; }
@@ -987,7 +1047,7 @@ int main(int argc, char **argv) {
         }
         return cmd_list(json, names);
     }
-    static const char *const KNOWN[] = { "status", "start", "open", "stop", "poweroff", "pause", "resume", "suspend", "reset", "snapshot", "clone", "rename", "set", NULL };
+    static const char *const KNOWN[] = { "status", "start", "open", "stop", "poweroff", "pause", "resume", "suspend", "reset", "snapshot", "clone", "rename", "set", "fresh", NULL };
     int known = 0;
     for (int i = 0; KNOWN[i]; i++) if (!strcmp(cmd, KNOWN[i])) known = 1;
     if (!known) { ERR("unknown", "arg", cmd, NULL); return VMCLI_USAGE; }
@@ -999,10 +1059,11 @@ int main(int argc, char **argv) {
         /* a machine group, by its name or folder (19.9) */
         Group *G = find_group(argv[2]);
         if (G) {
-            if (strcmp(cmd, "status") && strcmp(cmd, "start") && strcmp(cmd, "open") && strcmp(cmd, "stop") && strcmp(cmd, "poweroff")) { ERR("unknown", "arg", cmd, NULL); return VMCLI_USAGE; }
+            if (strcmp(cmd, "status") && strcmp(cmd, "start") && strcmp(cmd, "open") && strcmp(cmd, "stop") && strcmp(cmd, "poweroff") && strcmp(cmd, "fresh")) { ERR("unknown", "arg", cmd, NULL); return VMCLI_USAGE; }
             return cmd_group(G, cmd, rest, rv);
         }
     }
+    if (!strcmp(cmd, "fresh")) { ERR("freshNotGroup", "name", argv[2], NULL); return VMCLI_USAGE; }
     Machine *x = find(argv[2], &rc);
     if (!x) return rc;
     if (!strcmp(cmd, "status")) {

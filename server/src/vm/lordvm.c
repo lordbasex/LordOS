@@ -126,7 +126,7 @@ static const char *const STATE_NAME[VS_COUNT] = { "stopped", "starting", "runnin
 static const char *const REASON_NAME[VR_COUNT] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
     "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed",
-    "qemu-3d-crash", "qemu-3d-stop",
+    "qemu-3d-crash", "qemu-3d-stop", "session-full",
 };
 
 /* ---- log ---- */
@@ -946,6 +946,20 @@ static struct {
                                           * from CD or DVD" (Microsoft's DVD asks; a reset inside QEMU doesn't come here) */
     int win_keys;        /* the first start of an unattended install (disks/unattended), and its end */
     int win_armed;       /* the Enters above were set for this start (the first time it runs, paused start or not) */
+    /* a member under the anonymity profile's Shut Down (docs/VIRTUALIZATION.md 19.0, "Shut Down on Whonix's members"):
+     * keys through the display, then the power button. Step 1: Ctrl+Alt+F2 (the desktop's session becomes inactive, so
+     * logind no longer defers the power key to lxqt-powermanagement's block inhibitor); 2: Right Shift+Esc (kloak, the
+     * workstation's keystroke anonymizer, ends and lets go of the Power Button device it grabs; systemd restarts it 2 s
+     * later); 3: the ACPI power button (logind powers off: every service, Tor too, stops cleanly). The whole sequence
+     * again every 20 s while the guest runs (one that was still booting). No agent, no change to the image */
+    int pwr_step;
+    long long pwr_at;
+    /* a group's disposable session (docs/VIRTUALIZATION.md 19.7, isolation layer 6): the workstation's writable layer is a
+     * qcow2 overlay in a memfd (sess_fd, QEMU's /dev/fdset/2), over its system disk opened read-only; nothing of the
+     * session is written to a file, and it ends with QEMU. sess_cap: the bytes it may hold (the workstation's memory);
+     * full: the guest was paused at the cap (VR_SESSION_FULL), sess_mark where the next pause comes after a Resume */
+    int sess_on, sess_fd, sess_full;
+    long long sess_cap, sess_mark, sess_at;
     char un_cmd[640];
     long long shut_deadline, kill_deadline;
     Pending pq[MAX_PENDING];
@@ -1259,6 +1273,19 @@ static int cg_write(const char *dir, const char *file, const char *val) {
 
 static int qemu_procs_fd = -1, passt_procs_fd = -1, vfs_procs_fd = -1, tpm_procs_fd = -1;
 
+/* A group's disposable session (docs/VIRTUALIZATION.md 19.7): this machine is the workstation of a group whose
+ * group.json has "disposable" on, and its machine.json names that group. Its cap in MB, 0 when it isn't one: as much as
+ * the workstation's memory (at least VMG_SESSION_MIN_MB), counted in the machine's memory limit (the memfd's pages are
+ * charged to QEMU, which writes them) and in the group's budget (model.js groupBudget) */
+#define VMG_SESSION_MIN_MB 1024
+static int session_cap_mb(void) {
+    if (S.m.role != VM_ROLE_WORKSTATION || !S.m.group[0] || S.m.profile_lock != VM_LOCK_ANONYMITY) return 0;
+    char gdir[PATH_MAX];
+    VmGroup g;
+    if (!vm_group_parent(S.dir, gdir, sizeof gdir) || vm_group_load(gdir, &g, NULL, 0) || strcmp(g.id, S.m.group) || !g.disposable) return 0;
+    return S.m.memory_mb > VMG_SESSION_MIN_MB ? S.m.memory_mb : VMG_SESSION_MIN_MB;
+}
+
 /* the machine's scope, then leaves inside it when the scope is ours to divide (3.7) */
 static void setup_cgroups(void) {
     char scope[96];
@@ -1266,6 +1293,7 @@ static void setup_cgroups(void) {
     long limit = vm_mem_limit_mb(&S.m);
     int cpu = S.m.vcpus * 100 + 50;
     if (cpu > 6400) cpu = 6400;
+    limit += session_cap_mb();          /* a disposable session's memory is QEMU's too (19.7) */
     CgroupLimits lim = { .mem_high_mb = 0, .mem_max_mb = limit + 128, .cpu_percent = cpu };
     S.cg_mode = VMC_NONE;
     if (!cgroup_enter(scope, &lim)) { S.cg_mode = VMC_SCOPE; vlog("cgroup: in %s (memory.max %ld MB, cpu %d%%)", scope, limit + 128, cpu); }
@@ -1953,6 +1981,56 @@ static int decide_vgpu(void) {
 }
 
 /* fds inside QEMU: 3 /dev/kvm (or /dev/null), 4 QMP, 5 serial, 6 network (or /dev/null) */
+/* A disposable session's start (19.7): an empty qcow2 overlay over the system disk, made by the jailed qemu-img as a
+ * file of headers only (no data of the session exists yet), copied into a memfd and removed. QEMU gets the memfd as
+ * /dev/fdset/2 and opens the system disk read-only under it. 0, or -1 (fail_start said why) */
+static int qimg_overlay(const char *base, const char *out, const char *out_dir, int gb, char *err, size_t errlen);
+static int session_prepare(void) {
+    int cap = session_cap_mb();
+    if (!cap) return 0;
+    char sys[PATH_MAX + 48], tmp[PATH_MAX + 48], err[256];
+    snprintf(sys, sizeof sys, "%s/system.qcow2", S.disks);
+    snprintf(tmp, sizeof tmp, "%s/.session-empty.qcow2", S.disks);
+    unlink(tmp);
+    if (qimg_overlay(sys, tmp, S.disks, S.m.disk_gb, err, sizeof err)) { unlink(tmp); fail_start("the disposable session: qemu-img create: %.150s", err); return -1; }
+    int in = open(tmp, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    unlink(tmp);
+    int fd = memfd_create("lordos-session", MFD_CLOEXEC);
+    struct stat st;
+    int bad = in < 0 || fd < 0 || fstat(in, &st) || st.st_size <= 0 || st.st_size > (16 << 20);
+    static char buf[1 << 16];
+    for (off_t o = 0; !bad && o < st.st_size;) {
+        ssize_t k = read(in, buf, sizeof buf);
+        if (k < 0 && errno == EINTR) continue;
+        if (k <= 0 || write_all(fd, buf, (size_t)k)) { bad = 1; break; }
+        o += k;
+    }
+    if (in >= 0) close(in);
+    if (bad) { if (fd >= 0) close(fd); fail_start("the disposable session's memory couldn't be prepared"); return -1; }
+    S.sess_on = 1;
+    S.sess_fd = fd;
+    S.sess_cap = (long long)cap << 20;
+    S.sess_full = 0;
+    S.sess_mark = S.sess_cap;
+    vlog("disposable session: the workstation's changes stay in memory (at most %d MB) and are gone at power-off; its system disk is read-only", cap);
+    return 0;
+}
+/* the session's bytes in memory now (the memfd's pages) */
+static long long session_used(void) {
+    struct stat st;
+    return S.sess_on && !fstat(S.sess_fd, &st) ? (long long)st.st_blocks * 512 : 0;
+}
+/* at the cap: the guest is paused (VR_SESSION_FULL) before the memfd outgrows it; after a Resume, again 5 % later */
+static void session_check(void) {
+    if (!S.sess_on || S.state != VS_RUNNING) return;
+    long long u = session_used();
+    if (u < S.sess_mark) return;
+    vlog("disposable session: %lld MB in memory, its cap: the guest is paused (Shut Down or Force Off ends the session)", u >> 20);
+    S.sess_full = 1;
+    S.sess_mark = u + S.sess_cap / 20;
+    qmp_do("stop", NULL, P_IGNORE, -1, 0, -1, -1);
+}
+
 static void build_qemu_args(void) {
     const VmMachine *m = &S.m;
     int kvm = m->accel == VM_ACCEL_KVM, arm = m->arch == VM_ARCH_ARM64, uefi = m->firmware == VM_FW_UEFI;
@@ -2026,7 +2104,17 @@ static void build_qemu_args(void) {
         arg("-blockdev"); argj(blockdev_fmt("qcow2", "fw-vars", "fw-vars-file", 0));
     }
     snprintf(p, sizeof p, "%s/system.qcow2", S.disks);
-    if (m->base[0]) {
+    if (m->base[0] && S.sess_on) {
+        /* a disposable session (19.7): the system disk read-only over its base, the session's overlay (in memory,
+         * fdset 2) on top; the guest's disk is "sys", the top node, as always */
+        arg("-add-fd"); argf("fd=%d,set=2,opaque=session", (m->agent ? 9 : 7) + S.ncreds + sh_count() + (m->tpm ? 1 : 0));
+        arg("-blockdev"); argj(blockdev_disk("base-file", m->base, 1));
+        arg("-blockdev"); argj(blockdev_fmt("qcow2", "base", "base-file", 1));
+        arg("-blockdev"); argj(blockdev_disk("persist-file", p, 1));
+        arg("-blockdev"); arg("{\"driver\":\"qcow2\",\"node-name\":\"persist\",\"file\":\"persist-file\",\"read-only\":true,\"backing\":\"base\"}");
+        arg("-blockdev"); argj(blockdev_file("sess-file", "/dev/fdset/2", 0));
+        arg("-blockdev"); argj(blockdev_overlay("sys", "sess-file", "persist"));
+    } else if (m->base[0]) {
         arg("-blockdev"); argj(blockdev_disk("base-file", m->base, 1));
         arg("-blockdev"); argj(blockdev_fmt("qcow2", "base", "base-file", 1));
         arg("-blockdev"); argj(blockdev_disk("sys-file", p, 0));
@@ -2383,6 +2471,7 @@ static int start_machine(void) {
         S.sandbox |= VMS_PDEATHSIG;
     }
     decide_graphics();
+    if (session_prepare()) return -1;
     build_qemu_args();
     {
         char line[8192];
@@ -2416,12 +2505,13 @@ static int start_machine(void) {
         int in_ns = vm_ns_enter(S.userns);
         if (in_ns) vm_ns_setup(S.rundir);
         /* 3 kvm, 4 QMP, 5 serial, 6 network, 7.. credentials, then the status pipe (closed by exec) */
-        int fds[6 + MAX_CREDS + VM_SHARES + 3], nf = 0;
+        int fds[6 + MAX_CREDS + VM_SHARES + 4], nf = 0;
         fds[nf++] = kvm; fds[nf++] = qmp[1]; fds[nf++] = ser[1]; fds[nf++] = net[0] >= 0 ? net[0] : null;
         if (S.m.agent) { fds[nf++] = qga[1]; fds[nf++] = lag[1]; }
         for (int i = 0; i < S.ncreds; i++) fds[nf++] = S.cred_fd[i];
         for (int i = 0; i <= VM_SHARES; i++) if (sh_on(i)) fds[nf++] = S.vfs_q[i];
         if (S.m.tpm) fds[nf++] = S.tpm_q;
+        if (S.sess_on) fds[nf++] = S.sess_fd;       /* a disposable session's memory (19.7), fdset 2 */
         fds[nf++] = st[1];
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
@@ -2541,6 +2631,25 @@ static void host_kill_cap(void) {
     if (!S.kill_deadline || at < S.kill_deadline) S.kill_deadline = at;
 }
 
+/* the anonymity profile's Shut Down, one step per call (S.pwr_step, S.pwr_at; the steps are in the struct's comment) */
+static void anon_power_tick(long long now) {
+    if (!S.pwr_at || now < S.pwr_at) return;
+    if (S.state != VS_STOPPING) { S.pwr_at = 0; S.pwr_step = 0; return; }
+    if (S.pwr_step == 1) {
+        vlog("shut down: Ctrl+Alt+F2 (the guest's desktop session steps aside for logind)");
+        qmp_do("send-key", "{\"keys\":[{\"type\":\"qcode\",\"data\":\"ctrl\"},{\"type\":\"qcode\",\"data\":\"alt\"},{\"type\":\"qcode\",\"data\":\"f2\"}]}", P_IGNORE, -1, 0, -1, -1);
+        S.pwr_step = 2; S.pwr_at = now + 1000;
+    } else if (S.pwr_step == 2) {
+        vlog("shut down: Right Shift+Esc (kloak lets go of the power button)");
+        qmp_do("send-key", "{\"keys\":[{\"type\":\"qcode\",\"data\":\"shift_r\"},{\"type\":\"qcode\",\"data\":\"esc\"}]}", P_IGNORE, -1, 0, -1, -1);
+        S.pwr_step = 3; S.pwr_at = now + 300;
+    } else {
+        vlog("shut down: the power button");
+        qmp_do("system_powerdown", NULL, P_IGNORE, -1, 0, -1, -1);
+        S.pwr_step = 1; S.pwr_at = now + 20000;
+    }
+}
+
 static void begin_shutdown(int secs) {
     if (S.state == VS_PAUSED) qmp_do("cont", NULL, P_IGNORE, -1, 0, -1, -1);
     S.host_shutdown = 1;
@@ -2551,6 +2660,10 @@ static void begin_shutdown(int secs) {
         vlog("agent: asking qemu-guest-agent to shut the guest down");
         qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1);
         S.acpi_at = now_ms() + 10000;
+    } else if (S.m.profile_lock == VM_LOCK_ANONYMITY) {
+        /* Whonix's members ignore the bare power button (19.0): the keys first, the button 1.3 s later (the loop's turn) */
+        S.pwr_step = 1;
+        S.pwr_at = now_ms();
     } else {
         qmp_do("system_powerdown", NULL, P_IGNORE, -1, 0, -1, -1);
         if (S.qga_up) S.shutdown_at = now_ms() + 15000;     /* the agent, if it answers later */
@@ -5252,6 +5365,8 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
     case VM_SNAPSHOT:
         if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
         if (S.snap_kind || S.suspending) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
+        /* a disposable session keeps nothing (19.7): no snapshot of it */
+        if (S.sess_on) { reply(ci, m->seq, VME_WRONG_STATE, "a disposable session keeps nothing: no snapshots while it runs"); return; }
         /* snapshots of a running machine hold its memory: QEMU can't save virgl's state */
         if ((S.gl || S.vgpu) && m->a != VSN_DELETE) { reply(ci, m->seq, VME_WRONG_STATE, "a running machine with 3D graphics can't take or revert a snapshot with its memory: shut it down first"); return; }
         begin_snapshot(ci, m->seq, m->a, m->text);
@@ -5599,7 +5714,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
 static void on_qmp_event(const JVal *root) {
     const char *ev = json_str(root, "event");
     const JVal *data = json_get(root, "data");
-    if (!strcmp(ev, "STOP")) { if (S.state == VS_RUNNING) set_state(VS_PAUSED, VR_USER, 0, ""); }
+    if (!strcmp(ev, "STOP")) { if (S.state == VS_RUNNING) set_state(VS_PAUSED, S.sess_full ? VR_SESSION_FULL : VR_USER, 0, S.sess_full ? "the disposable session's memory is full" : ""); S.sess_full = 0; }
     else if (!strcmp(ev, "RESUME")) {
         if (S.state == VS_PAUSED || S.state == VS_STARTING) set_state(VS_RUNNING, S.state == VS_STARTING ? VR_NONE : VR_USER, 0, "");
         ag_timesync();
@@ -5842,6 +5957,8 @@ static void qemu_exited(int status) {
     S.qemu_done = 1;
     S.qemu_status = status;
     cpu_end();
+    /* a disposable session's memory goes with QEMU: lord-vm's copy of the descriptor is the last one (19.7) */
+    if (S.sess_on) { vlog("disposable session: %lld MB in memory, gone", session_used() >> 20); close(S.sess_fd); S.sess_on = 0; S.sess_fd = -1; }
     int st = VS_STOPPED, why = VR_POWEROFF, code = 0;
     char d[160] = "";
     long oom = read_oom_kills();
@@ -6085,6 +6202,8 @@ static void loop(void) {
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
         if (S.win_key_at && (next < 0 || S.win_key_at < next)) next = S.win_key_at;
+        if (S.pwr_at && (next < 0 || S.pwr_at < next)) next = S.pwr_at;
+        if (S.sess_on && (next < 0 || S.sess_at < next)) next = S.sess_at;
         if (S.cpu_at && (next < 0 || S.cpu_at < next)) next = S.cpu_at;
         if (mice_watched() && S.mice_at && (next < 0 || S.mice_at < next)) next = S.mice_at;
         long long cl = child_logs_next();
@@ -6097,6 +6216,8 @@ static void loop(void) {
         if (S.cpu_at && now >= S.cpu_at) cpu_tick(now);
         if (S.migq_next && now >= S.migq_next) { S.migq_next = now + 500; qmp_do("query-migrate", NULL, P_MIGQ, -1, 0, -1, -1); }
         if (S.qga_fd >= 0 && S.ag_next && now >= S.ag_next) ag_tick(now);
+        if (S.pwr_at && now >= S.pwr_at) anon_power_tick(now);
+        if (S.sess_on && now >= S.sess_at) { S.sess_at = now + 1000; session_check(); }
         if (S.win_key_at && now >= S.win_key_at) {
             qmp_do("send-key", "{\"keys\":[{\"type\":\"qcode\",\"data\":\"ret\"}]}", P_IGNORE, -1, 0, -1, -1);
             S.win_key_at = --S.win_keys > 0 && S.state == VS_RUNNING ? now + 700 : 0;
@@ -6428,7 +6549,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = -1;
-    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
@@ -8963,6 +9084,126 @@ out:
     return rc;
 }
 
+/* ---- Start Fresh and the group's settings (docs/VIRTUALIZATION.md 19.7) ----
+ *
+ *   lord-vm --group-fresh GROUPDIR [--gateway]
+ *       With every member off (each one's lock taken for the whole job): the workstation, and the gateway with --gateway,
+ *       back to its verified base. The base's SHA-256 is checked against group.json first (a base that changed is
+ *       refused: the group is made again from the archive). A new empty overlay over the base replaces disks/system.qcow2
+ *       by rename (its snapshots go with the old one); snapshots.json, cpu-usage.json, the logs and any picture are
+ *       removed; the member gets a new random id (QEMU's -uuid) and new MAC addresses. The other member is untouched.
+ *       {"fresh":true,"members":[…]} on stdout, exit 0; 3 a member runs; 1 anything else.
+ *   lord-vm --group-set GROUPDIR [--disposable on|off] [--fresh-gateway on|off]
+ *       group.json's switches (19.4), written by rename; the disposable session applies from the workstation's next start. */
+static int group_open(const char *arg, char *gdir, size_t n, VmGroup *g) {
+    char real[PATH_MAX];
+    if (!arg || arg[0] != '/' || !realpath(arg, real) || !vm_group_dir_ok(real) || strlen(real) >= n) { fprintf(stderr, "lord-vm: %s isn't a machine group's folder\n", arg ? arg : ""); return 2; }
+    char err[200];
+    int r = vm_group_load(real, g, err, sizeof err);
+    if (r == VM_E_NEWER) { fprintf(stderr, "lord-vm: group.json is from a newer LordOS: not changed\n"); return 1; }
+    if (r) { fprintf(stderr, "lord-vm: group.json: %s\n", err); return 1; }
+    memcpy(gdir, real, strlen(real) + 1);
+    return 0;
+}
+
+static void unlink_in(const char *dir, const char *name) {
+    char p[PATH_MAX + 64];
+    snprintf(p, sizeof p, "%s/%s", dir, name);
+    unlink(p);
+}
+
+static int cmd_group_fresh(const char *arg, int argc, char **argv) {
+    int gateway = 0;
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "--gateway")) gateway = 1;
+        else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
+    }
+    char gdir[PATH_MAX];
+    VmGroup g;
+    int r = group_open(arg, gdir, sizeof gdir, &g);
+    if (r) return r;
+    if (!g.has_image) { fprintf(stderr, "lord-vm: the group doesn't say which image its members came from\n"); return 1; }
+    /* every member off, and kept off: each one's lock for the whole job */
+    int locks[VMG_MEMBERS_MAX], nl = 0, rc = 1;
+    char mdir[VMG_MEMBERS_MAX][PATH_MAX + VMG_DIR_MAX + 2];
+    VmMachine mm[VMG_MEMBERS_MAX];
+    for (int i = 0; i < g.n; i++) {
+        snprintf(mdir[i], sizeof mdir[i], "%s/%s", gdir, g.m[i].dir);
+        char err[200];
+        if (vm_machine_load(mdir[i], &mm[i], err, sizeof err) || strcmp(mm[i].group, g.id) || mm[i].role != g.m[i].role) {
+            fprintf(stderr, "lord-vm: %s isn't this group's %s\n", g.m[i].dir, VMG_ROLE_NAMES[g.m[i].role]);
+            goto out;
+        }
+        int fd = open_lock(mdir[i]);
+        if (fd == -2) { fprintf(stderr, "lord-vm: %s is running: shut the group down first\n", g.m[i].dir); rc = 3; goto out; }
+        if (fd < 0) { fprintf(stderr, "lord-vm: can't take %s's lock\n", g.m[i].dir); goto out; }
+        locks[nl++] = fd;
+    }
+    int done[VMG_MEMBERS_MAX] = { 0 };
+    for (int i = 0; i < g.n; i++) {
+        int role = g.m[i].role;
+        if (role != VM_ROLE_WORKSTATION && !(gateway && role == VM_ROLE_GATEWAY)) continue;
+        VmMachine *m = &mm[i];
+        /* the base is still the verified one (its SHA-256 from group.json) */
+        char sha[65];
+        if (!g.base[role][0] || strcmp(m->base, g.base[role]) || sha256_file(g.base[role], sha) || strcmp(sha, g.base_sha256[role])) {
+            fprintf(stderr, "lord-vm: the %s's base isn't the verified one any more: delete the group and make it again\n", VMG_ROLE_NAMES[role]);
+            goto out;
+        }
+        char disks[PATH_MAX + VMG_DIR_MAX + 16], nw[PATH_MAX + VMG_DIR_MAX + 48], sys[PATH_MAX + VMG_DIR_MAX + 48], err[256];
+        snprintf(disks, sizeof disks, "%s/disks", mdir[i]);
+        snprintf(nw, sizeof nw, "%s/.system.qcow2.fresh", disks);
+        snprintf(sys, sizeof sys, "%s/system.qcow2", disks);
+        unlink(nw);
+        if (qimg_overlay(g.base[role], nw, disks, m->disk_gb, err, sizeof err)) { unlink(nw); fprintf(stderr, "lord-vm: qemu-img create: %.150s\n", err); goto out; }
+        if (rename(nw, sys)) { unlink(nw); fprintf(stderr, "lord-vm: can't replace %s's disk: %s\n", g.m[i].dir, strerror(errno)); goto out; }
+        /* what the old disk's life left beside it */
+        unlink_in(mdir[i], "snapshots.json");
+        unlink_in(mdir[i], VMCPU_FILE);
+        unlink_in(mdir[i], "thumb.png");
+        unlink_in(mdir[i], "suspend.state");
+        unlink_in(disks, ".session-empty.qcow2");
+        char logs[PATH_MAX + VMG_DIR_MAX + 16];
+        snprintf(logs, sizeof logs, "%s/log", mdir[i]);
+        DIR *d = opendir(logs);
+        if (d) {
+            struct dirent *e;
+            while ((e = readdir(d))) if (e->d_name[0] != '.') unlinkat(dirfd(d), e->d_name, 0);
+            closedir(d);
+        }
+        /* a new host-side identity: id (QEMU's -uuid) and MAC addresses */
+        if (vm_new_id(m->id) || vm_new_mac(m->mac)) { fprintf(stderr, "lord-vm: no random numbers\n"); goto out; }
+        if (role == VM_ROLE_GATEWAY) do { if (vm_new_mac(m->link_mac)) { fprintf(stderr, "lord-vm: no random numbers\n"); goto out; } } while (!strcmp(m->link_mac, m->mac));
+        if (vm_machine_save(mdir[i], m)) { fprintf(stderr, "lord-vm: can't write %s's machine.json\n", g.m[i].dir); goto out; }
+        done[i] = 1;
+    }
+    printf("{\"fresh\":true,\"members\":[");
+    for (int i = 0, k = 0; i < g.n; i++) if (done[i]) printf("%s\"%s\"", k++ ? "," : "", VMG_ROLE_NAMES[g.m[i].role]);
+    printf("]}\n");
+    rc = 0;
+out:
+    for (int i = 0; i < nl; i++) close(locks[i]);
+    return rc;
+}
+
+static int cmd_group_set(const char *arg, int argc, char **argv) {
+    char gdir[PATH_MAX];
+    VmGroup g;
+    int r = group_open(arg, gdir, sizeof gdir, &g);
+    if (r) return r;
+    for (int i = 0; i < argc; i++) {
+        const char *a = argv[i], *v = i + 1 < argc ? argv[++i] : NULL;
+        int on = v && !strcmp(v, "on"), off = v && !strcmp(v, "off");
+        if (!on && !off) { fprintf(stderr, "lord-vm: %s takes on or off\n", a); return 2; }
+        if (!strcmp(a, "--disposable")) g.disposable = on;
+        else if (!strcmp(a, "--fresh-gateway")) g.fresh_gateway = on;
+        else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
+    }
+    if (vm_group_save(gdir, &g)) { fprintf(stderr, "lord-vm: can't write group.json\n"); return 1; }
+    printf("{\"set\":true,\"disposable\":%s,\"freshGateway\":%s}\n", g.disposable ? "true" : "false", g.fresh_gateway ? "true" : "false");
+    return 0;
+}
+
 static int usage(void) {
     fprintf(stderr,
             "usage: lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]\n"
@@ -8995,7 +9236,9 @@ static int usage(void) {
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n"
             "       lord-vm --sha256 FILE   (an ISO's SHA-256, with progress lines)\n"
-            "       lord-vm --group-create GROUPDIR --catalog-id ID --archive FILE --sha512 HEX [--name N]   (a machine group from a verified archive)\n");
+            "       lord-vm --group-create GROUPDIR --catalog-id ID --archive FILE --sha512 HEX [--name N]   (a machine group from a verified archive)\n"
+            "       lord-vm --group-fresh GROUPDIR [--gateway]   (Start Fresh: the workstation, and the gateway too, back to the verified base)\n"
+            "       lord-vm --group-set GROUPDIR [--disposable on|off] [--fresh-gateway on|off]\n");
     return 2;
 }
 
@@ -9038,6 +9281,8 @@ int main(int argc, char **argv) {
     char **rv = argv + 3;
     if (!strcmp(cmd, "--create")) return cmd_create(dir, rest, rv);
     if (!strcmp(cmd, "--group-create")) return cmd_group_create(dir, rest, rv);
+    if (!strcmp(cmd, "--group-fresh")) return cmd_group_fresh(dir, rest, rv);
+    if (!strcmp(cmd, "--group-set")) return cmd_group_set(dir, rest, rv);
     if (!strcmp(cmd, "--start")) return cmd_start(dir, rest, rv);
     if (!strcmp(cmd, "--check")) return cmd_check(dir);
     if (!strcmp(cmd, "--set")) return cmd_set(dir, rest, rv);

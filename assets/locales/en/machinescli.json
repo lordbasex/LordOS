@@ -94,5 +94,16 @@
   "groupDamaged": "{name} is damaged: one of its machines is missing or isn't its own.",
   "gatewayFailed": "{name}'s gateway didn't start ({why}), so its workstation wasn't started.",
   "workstationFailed": "{name}'s workstation didn't start ({why}); its gateway is still running.",
-  "kind.group": "group of {count}"
+  "kind.group": "group of {count}",
+  "help.fresh": "a machine group back to its verified image with a new identity: the workstation, and the gateway too with --gateway (Tor's entry guards go with it); the group must be off",
+  "help.member": "one machine of a group: --member gateway alone; --member workstation starts the gateway first",
+  "freshRunning": "{name} is running: shut the group down first.",
+  "freshNeedsYes": "Start Fresh throws away the workstation's changes: add --yes to do it without a question.",
+  "freshAsk": "Start {name} fresh? The workstation's changes, files and snapshots go; the gateway stays as it is. [y/N]",
+  "freshAskBoth": "Start {name} fresh, gateway too? Both machines' changes go, and Tor picks new entry guards. [y/N]",
+  "freshKept": "{name} is as it was.",
+  "freshDone": "{name}'s workstation is fresh: its verified image, a new identity.",
+  "freshDoneBoth": "{name} is fresh: both machines are back to their verified image, with a new identity.",
+  "freshNotGroup": "{name} isn't a machine group: Start Fresh is for groups.",
+  "badMember": "--member takes gateway or workstation."
 }

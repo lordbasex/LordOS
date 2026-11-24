@@ -87,7 +87,7 @@ static const char *const STATES[VS_COUNT] = { "stopped", "starting", "running", 
 static const char *const REASONS[VR_COUNT] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
     "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed",
-    "qemu-3d-crash", "qemu-3d-stop",
+    "qemu-3d-crash", "qemu-3d-stop", "session-full",
 };
 
 static void reap_orphans(void);
@@ -552,7 +552,12 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         if (ge) JS_FreeCString(c, ge);
         JS_FreeValue(c, gv);
         VmMachine mm;
-        JS_SetPropertyStr(c, o, "groupOk", JS_NewBool(c, ok && !vm_machine_load(dir, &mm, NULL, 0) && !strcmp(mm.group, g->id) && mm.role == g->m[mi].role));
+        int loaded = !vm_machine_load(dir, &mm, NULL, 0);
+        JS_SetPropertyStr(c, o, "groupOk", JS_NewBool(c, ok && loaded && !strcmp(mm.group, g->id) && mm.role == g->m[mi].role));
+        /* the group's kind and the member's lock (19.5): its windows open protected (model.js machineProtected) */
+        set_str(c, o, "groupKind", g->kind == VMG_KIND_WHONIX ? "whonix" : "");
+        set_str(c, o, "profileLock", loaded ? VM_LOCK_NAMES[mm.profile_lock] : "");
+        JS_SetPropertyStr(c, o, "disposable", JS_NewBool(c, g->disposable && g->m[mi].role == VM_ROLE_WORKSTATION));
     }
     return o;
 }
@@ -1034,6 +1039,61 @@ static JSValue f_hash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     if (argc < 1 || !JS_IsString(argv[0]) || user_file(c, argv[0], path, sizeof path)) return JS_NewInt32(c, 0);
     char *args[] = { "lord-vm", "--sha256", path, NULL };
     return JS_NewInt32(c, spawn_job(args, ""));
+}
+
+/* ---- machine groups' jobs (docs/VIRTUALIZATION.md 19.6, 19.7) ----
+ * groupCreate({ catalogId, archive, sha512, name }) → job id: lord-vm --group-create <library>/<name>.lordgroup. The
+ * archive must be one the admin helper verified, in the image store (images/<sha512>.tar.xz, root's): lord-vm hashes it
+ * again and takes the members' names, caps and settings from the signed catalog, never from here.
+ * groupFresh(groupDir, gateway) → job id: lord-vm --group-fresh (Start Fresh, the group off).
+ * groupSet(groupDir, { disposable, freshGateway }) → job id: lord-vm --group-set. 0 when refused. */
+static JSValue f_group_create(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 1 || !JS_IsObject(argv[0])) return JS_NewInt32(c, 0);
+    char lib[PATH_MAX], gdir[PATH_MAX + 64], arch[PATH_MAX], cid[40] = "", sha[136] = "", name[VM_NAME_MAX + 1] = "";
+    if (library(lib, sizeof lib, 1)) return JS_NewInt32(c, 0);
+    JSValue vc = JS_GetPropertyStr(c, argv[0], "catalogId"), va = JS_GetPropertyStr(c, argv[0], "archive");
+    JSValue vs = JS_GetPropertyStr(c, argv[0], "sha512"), vn = JS_GetPropertyStr(c, argv[0], "name");
+    const char *cs = JS_ToCString(c, vc), *ss = JS_ToCString(c, vs), *ns = JS_ToCString(c, vn);
+    int ok = cs && ss && ns && strlen(cs) < sizeof cid && strlen(ss) == 128 && strlen(ns) < sizeof name && vm_name_valid(ns) &&
+             JS_IsString(va) && !user_file(c, va, arch, sizeof arch);
+    if (ok) { snprintf(cid, sizeof cid, "%s", cs); snprintf(sha, sizeof sha, "%s", ss); snprintf(name, sizeof name, "%s", ns); }
+    if (cs) JS_FreeCString(c, cs);
+    if (ss) JS_FreeCString(c, ss);
+    if (ns) JS_FreeCString(c, ns);
+    JS_FreeValue(c, vc); JS_FreeValue(c, va); JS_FreeValue(c, vs); JS_FreeValue(c, vn);
+    if (!ok) return JS_NewInt32(c, 0);
+    for (const char *p = cid; *p; p++) if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '-')) return JS_NewInt32(c, 0);
+    for (const char *p = sha; *p; p++) if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f'))) return JS_NewInt32(c, 0);
+    /* the verified download: <image store>/<sha512>.tar.xz and nothing else */
+    char want[PATH_MAX];
+    snprintf(want, sizeof want, "/var/lib/lordos/machines/images/%s.tar.xz", sha);
+    if (strcmp(arch, want)) return JS_NewInt32(c, 0);
+    struct stat st;
+    if (snprintf(gdir, sizeof gdir, "%s/%s%s", lib, name, VMG_SUFFIX) >= (int)sizeof gdir || !vm_group_dir_ok(gdir) || !lstat(gdir, &st)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--group-create", gdir, "--catalog-id", cid, "--archive", arch, "--sha512", sha, "--name", name, NULL };
+    return JS_NewInt32(c, spawn_job(args, ""));
+}
+static JSValue f_group_fresh(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char gdir[PATH_MAX];
+    if (argc < 1 || group_dir(c, argv[0], gdir, sizeof gdir)) return JS_NewInt32(c, 0);
+    int gw = argc > 1 && JS_ToBool(c, argv[1]) > 0;
+    char *args[] = { "lord-vm", "--group-fresh", gdir, gw ? "--gateway" : NULL, NULL };
+    return JS_NewInt32(c, spawn_job(args, gdir));
+}
+static JSValue f_group_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char gdir[PATH_MAX];
+    if (argc < 2 || !JS_IsObject(argv[1]) || group_dir(c, argv[0], gdir, sizeof gdir)) return JS_NewInt32(c, 0);
+    char *args[8] = { "lord-vm", "--group-set", gdir };
+    int n = 3;
+    JSValue vd = JS_GetPropertyStr(c, argv[1], "disposable"), vf = JS_GetPropertyStr(c, argv[1], "freshGateway");
+    if (JS_IsBool(vd)) { args[n++] = "--disposable"; args[n++] = JS_ToBool(c, vd) ? "on" : "off"; }
+    if (JS_IsBool(vf)) { args[n++] = "--fresh-gateway"; args[n++] = JS_ToBool(c, vf) ? "on" : "off"; }
+    JS_FreeValue(c, vd); JS_FreeValue(c, vf);
+    args[n] = NULL;
+    return JS_NewInt32(c, n > 3 ? spawn_job(args, gdir) : 0);
 }
 
 /* (security scan F5) A guest writes to a writable shared folder: never one that is, sits under or holds a path lord.fs
@@ -4774,7 +4834,7 @@ static JSValue f_import_info(JSContext *c, JSValueConst t, int argc, JSValueCons
 }
 
 static const JSCFunctionListEntry funcs[] = {
-    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
+    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("groupCreate", 1, f_group_create), JS_CFUNC_DEF("groupFresh", 2, f_group_fresh), JS_CFUNC_DEF("groupSet", 2, f_group_set), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),

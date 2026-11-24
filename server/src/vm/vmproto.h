@@ -311,6 +311,7 @@ enum {
     VR_INSTALLED,           /* an unattended install's first start ended with the installer's restart (vmunattend.h) */
     VR_QEMU_3D_ABORT,       /* QEMU aborted on its known 3D bug when the guest reset virtio-gpu-gl (vmlog_qemu_3d_abort) */
     VR_QEMU_3D_STOP,        /* the same abort, most likely the guest's own shutdown or restart (no tools to say which; vmlog_3d_abort_end) */
+    VR_SESSION_FULL,        /* a disposable session (docs/VIRTUALIZATION.md 19.7) filled its memory: the guest is paused */
     VR_COUNT
 };
 /* VM_REPLY codes */

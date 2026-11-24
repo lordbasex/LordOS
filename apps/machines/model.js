@@ -671,7 +671,7 @@ export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math
 // capture of the screen), lord.vm.protect keeps its picture from leaving as a picture of its own (no card picture,
 // screenshot, recording or snapshot picture), and its card never shows a thumb.png.
 export const ANONYMITY_PROFILE = 'anonymity';
-export const machineProtected = (m) => !!m && (m.profileLock === ANONYMITY_PROFILE || m.meta?.profile === ANONYMITY_PROFILE || m.group?.kind === 'whonix');
+export const machineProtected = (m) => !!m && (m.profileLock === ANONYMITY_PROFILE || m.meta?.profile === ANONYMITY_PROFILE || m.groupKind === 'whonix' || m.group?.kind === 'whonix');
 // The one question every call site asks (meta.js isProtectedMachine): lord.vm.list()'s entry for the machine (machine.json:
 // profile_lock, its group) and its app.json meta together, or a window of it that is already protected (home: the
 // machine's own window, so its apps-mode windows can never be less protected than it). Each part alone is enough.

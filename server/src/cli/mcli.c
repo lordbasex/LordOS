@@ -142,7 +142,7 @@ static const char *const STATES[] = { "stopped", "starting", "running", "paused"
 static const char *const REASONS[] = {
     "none", "guest-shutdown", "host-shutdown", "forced", "poweroff", "qemu-failed", "qemu-signal", "out-of-memory",
     "start-failed", "guest-panic", "supervisor-lost", "reset", "user", "suspended", "resume-failed", "installed",
-    "qemu-3d-crash", "qemu-3d-stop", NULL,
+    "qemu-3d-crash", "qemu-3d-stop", "session-full", NULL,
 };
 static int listed(const char *const *l, const char *s) { for (int i = 0; s && l[i]; i++) if (!strcmp(l[i], s)) return 1; return 0; }
 
