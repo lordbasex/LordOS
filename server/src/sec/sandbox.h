@@ -48,7 +48,10 @@ void sandbox_scope_name(const char *id, char *out, size_t n);
  * type byte of the ioctl number (_IOC_TYPE): only those types; never a generic ioctl nor
  * TIOCSTI. The helper can NOT open /dev (Landlock): it gets the device fds already
  * opened by lord-server. */
-enum { SANDBOX_IOCTL_DRM = 1, SANDBOX_IOCTL_V4L2 = 2, SANDBOX_IOCTL_DMABUF = 4, SANDBOX_IOCTL_MEDIA = 8 };
+/* SANDBOX_IOCTL_NVIDIA: only lord-nvgpu (approved 2026-11-24), the type 'F' (0x46) of NVIDIA's driver
+ * (NV_IOCTL_MAGIC in the open kernel modules' nv-ioctl-numbers.h), with Landlock's IOCTL_DEV limiting it to the
+ * /dev/nvidia* files it was given. */
+enum { SANDBOX_IOCTL_DRM = 1, SANDBOX_IOCTL_V4L2 = 2, SANDBOX_IOCTL_DMABUF = 4, SANDBOX_IOCTL_MEDIA = 8, SANDBOX_IOCTL_NVIDIA = 16 };
 
 typedef struct {
     const char *name;               /* cgroup scope name (e.g. "lord-media") */
