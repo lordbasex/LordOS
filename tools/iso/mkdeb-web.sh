@@ -8,12 +8,21 @@
 set -eu
 OUTDIR=${1:?usage: mkdeb-web.sh <output folder>}
 [ -f package.json ] && [ -d tools/iso ] || { echo "mkdeb-web.sh: run from the repository root" >&2; exit 1; }
-[ -x server/build/lord-web ] || { echo "missing server/build/lord-web (make -C server with libwpewebkit-2.0-dev, libwpebackend-fdo-1.0-dev and libegl-dev; docs/VM-SETUP.md)" >&2; exit 1; }
+[ -x server/build/lord-web ] || { echo "missing server/build/lord-web (make -C server with libwpewebkit-2.0-dev and libegl-dev, plus libwpebackend-fdo-1.0-dev for the legacy backend; docs/VM-SETUP.md)" >&2; exit 1; }
 V=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' package.json | head -1)
 ARCH=$(dpkg --print-architecture)
 STRIP=${STRIP:-strip}
-# the libraries lord-web links itself (WebKit brings GStreamer, libsoup and the rest), then WebKit's media and sandbox
-DEPS="libwpewebkit-2.0-1 (>= 2.48), libwpe-1.0-1 (>= 1.16), libwpebackend-fdo-1.0-1 (>= 1.16), libegl1, libwayland-client0, libwayland-server0, libxkbcommon0, libglib2.0-0t64, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, bubblewrap, xdg-dbus-proxy"
+# the libraries lord-web links itself (WebKit brings GStreamer, libsoup and the rest), then WebKit's media and sandbox;
+# which WebKit depends on the backend make built (mk/web.mk: build/gen/web_backend): WPEPlatform needs WPE WebKit 2.54
+# built with it (LordOS's backport for Debian 13), the legacy backend Debian 13's 2.48 with libwpe and wpebackend-fdo
+BACKEND=$(cat server/build/gen/web_backend 2>/dev/null || echo legacy)
+if [ "$BACKEND" = platform ]; then
+    DEPS="libwpewebkit-2.0-1 (>= 2.54), libegl1, libwayland-client0, libxkbcommon0, libglib2.0-0t64, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, bubblewrap, xdg-dbus-proxy"
+    ENGINE="LordOS's build of Debian's wpewebkit 2.54 for Debian 13 (WPEPlatform on)"
+else
+    DEPS="libwpewebkit-2.0-1 (>= 2.48), libwpe-1.0-1 (>= 1.16), libwpebackend-fdo-1.0-1 (>= 1.16), libegl1, libwayland-client0, libwayland-server0, libxkbcommon0, libglib2.0-0t64, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, bubblewrap, xdg-dbus-proxy"
+    ENGINE="Debian's own packages, unmodified"
+fi
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/DEBIAN" "$T/usr/lib/lordos/bin" "$T/usr/share/doc/lordos-web"
@@ -24,7 +33,7 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Files: *
 License: MIT
  See the LordOS repository. lord-web links WPE WebKit (LGPL-2.1+ and BSD), installed
- by Debian's own packages, unmodified.
+ by $ENGINE.
 C
 cat > "$T/DEBIAN/control" <<C
 Package: lordos-web
