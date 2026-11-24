@@ -684,5 +684,6 @@
   "stats.p95Row": "95ο εκατοστημόριο CPU (1 λεπ.)",
   "stats.memAvgRow": "Μέση μνήμη (1 · 5 · 15 λεπ.)",
   "stats.memPeakRow": "Μέγιστη μνήμη (1 · 5 · 15 λεπ.)",
-  "stats.spark": "Τελευταίο λεπτό"
+  "stats.spark": "Τελευταίο λεπτό",
+  "group.showMachine": "Εμφάνιση μηχανής"
 }

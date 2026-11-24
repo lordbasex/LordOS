@@ -105,5 +105,6 @@
   "freshDone": "Workstation i {name} är ny: sin verifierade avbildning, en ny identitet.",
   "freshDoneBoth": "{name} är ny: båda maskinerna är tillbaka på sin verifierade avbildning, med en ny identitet.",
   "freshNotGroup": "{name} är ingen maskingrupp: att börja om är för grupper.",
-  "badMember": "--member tar gateway eller workstation."
+  "badMember": "--member tar gateway eller workstation.",
+  "overBudget": "{name} startade inte: den behöver {need} MB och {free} MB finns kvar för maskiner. Försätt en annan maskin i viloläge eller stäng av den, eller ge den mindre minne."
 }

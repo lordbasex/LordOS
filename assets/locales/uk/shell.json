@@ -984,5 +984,6 @@
   "themeSwitch.changingTo": "Перемикання на {name}…",
   "themeSwitch.failedTitle": "Не вдалося застосувати {name}",
   "themeSwitch.refusedBody": "Його код не збігається з підписаною копією LordOS, тому його не завантажено. Стиль робочого столу залишається таким, як був.",
-  "themeSwitch.failedBody": "Він не запустився. Стиль робочого столу залишається таким, як був."
+  "themeSwitch.failedBody": "Він не запустився. Стиль робочого столу залишається таким, як був.",
+  "spotlight.section.machines": "Машини"
 }

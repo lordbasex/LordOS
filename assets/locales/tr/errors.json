@@ -932,5 +932,6 @@
   "llm.noModel": "O yerel model kurulu değil.",
   "sentinela.blockFailed": "Ağı engellenemedi.",
   "sentinela.machineGone": "O makine artık Sanal Makineler’de yok.",
-  "sentinela.machineFailed": "Makine yanıt vermedi."
+  "sentinela.machineFailed": "Makine yanıt vermedi.",
+  "vm.overBudget": "Zaten çalışan makinelerin yanında yeterli bellek yok. Birini askıya alın ya da kapatın veya bu makineye daha az bellek verin."
 }

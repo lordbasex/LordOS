@@ -933,5 +933,6 @@
   "llm.noModel": "Tas vietinis modelis neįdiegtas.",
   "sentinela.blockFailed": "Jos tinklo užblokuoti nepavyko.",
   "sentinela.machineGone": "Šios mašinos nebėra programoje „Virtualios mašinos“.",
-  "sentinela.machineFailed": "Mašina neatsakė."
+  "sentinela.machineFailed": "Mašina neatsakė.",
+  "vm.overBudget": "Šalia jau veikiančių mašinų nepakanka atminties. Pristabdykite ar išjunkite vieną iš jų arba skirkite šiai mašinai mažiau atminties."
 }

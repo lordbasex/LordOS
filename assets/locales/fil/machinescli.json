@@ -105,5 +105,6 @@
   "freshDone": "Bago na ang workstation ng {name}: ang na-verify nitong image, bagong pagkakakilanlan.",
   "freshDoneBoth": "Bago na ang {name}: bumalik ang dalawang makina sa na-verify nilang image, na may bagong pagkakakilanlan.",
   "freshNotGroup": "Hindi grupo ng makina ang {name}: para sa mga grupo ang Magsimulang Muli.",
-  "badMember": "Tumatanggap ang --member ng gateway o workstation."
+  "badMember": "Tumatanggap ang --member ng gateway o workstation.",
+  "overBudget": "Hindi nagsimula ang {name}: kailangan nito ng {need} MB at {free} MB na lang ang natitira para sa mga machine. I-suspend o i-shut down ang ibang machine, o bigyan ito ng mas kaunting memory."
 }

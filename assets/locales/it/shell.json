@@ -977,5 +977,6 @@
   "themeSwitch.changingTo": "Passaggio a {name}…",
   "themeSwitch.failedTitle": "Impossibile applicare {name}",
   "themeSwitch.refusedBody": "Il suo codice non corrisponde alla copia firmata di LordOS, quindi non è stato caricato. Lo stile della scrivania resta com’era.",
-  "themeSwitch.failedBody": "Non si è avviato. Lo stile della scrivania resta com’era."
+  "themeSwitch.failedBody": "Non si è avviato. Lo stile della scrivania resta com’era.",
+  "spotlight.section.machines": "Macchine"
 }

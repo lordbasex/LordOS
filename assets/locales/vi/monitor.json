@@ -669,5 +669,6 @@
   "stats.p95Row": "CPU bách phân vị 95 (1 phút)",
   "stats.memAvgRow": "Bộ nhớ trung bình (1 · 5 · 15 phút)",
   "stats.memPeakRow": "Bộ nhớ đỉnh (1 · 5 · 15 phút)",
-  "stats.spark": "Phút vừa qua"
+  "stats.spark": "Phút vừa qua",
+  "group.showMachine": "Hiện máy"
 }

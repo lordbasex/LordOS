@@ -368,7 +368,7 @@ static int refused_path(const Scan *s, const Src *src, const char *rel, int *exc
     char abs[PATH_MAX * 2];
     if (src_path(src, rel, abs, sizeof abs)) return 1;
     for (int i = 0; i < s->nexclude; i++) if (clean_under(abs, s->exclude[i])) { if (excl) *excl = 1; return 1; }
-    return fsops_protected(abs);
+    return fsops_protected(abs) || clean_machine_path(abs, fsops_home());
 }
 
 static int covered(const Src *src, const char *name, double mtime, double size) {

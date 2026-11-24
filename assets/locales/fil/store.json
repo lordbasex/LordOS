@@ -369,5 +369,7 @@
   "settings.listsTitle": "Mga listahan ng package",
   "settings.listsHint": "Ang mga listahan ng package ng Debian at LordOS, kung saan nanggagaling ang mga bagong app at update.",
   "settings.webManage": "Mga profile, pahintulot at espasyo ng bawat web app",
-  "settings.flathubOff": "I-off ang Flathub sa Store. Mananatili ang mga app na in-install mo mula rito."
+  "settings.flathubOff": "I-off ang Flathub sa Store. Mananatili ang mga app na in-install mo mula rito.",
+  "updates.qemuTitle": "Maaaring hindi na magpatuloy ang mga naka-suspend na machine pagkatapos ng update na ito ({count})",
+  "updates.qemuText": "Binabago ng update na ito ang QEMU, at maaaring hindi ma-load sa ibang bersyon ang session na sine-save ng isang bersyon ng QEMU. I-shut down muna ang mga machine na iyon, o piliin ang Ituloy Pa Rin o Itapon ang Naka-save na State pagsimula nila."
 }

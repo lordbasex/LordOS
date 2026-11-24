@@ -361,5 +361,7 @@
   "settings.listsTitle": "软件包列表",
   "settings.listsHint": "Debian 和 LordOS 的软件包列表，新应用和更新都来自这里。",
   "settings.webManage": "每个网页应用的配置文件、权限和占用空间",
-  "settings.flathubOff": "在商店中关闭 Flathub。从 Flathub 安装的应用会保留。"
+  "settings.flathubOff": "在商店中关闭 Flathub。从 Flathub 安装的应用会保留。",
+  "updates.qemuTitle": "挂起的虚拟机在此更新后可能无法恢复({count})",
+  "updates.qemuText": "此更新会改变 QEMU,由一个 QEMU 版本保存的会话可能无法在另一个版本中载入。请先关闭这些虚拟机,或在它们启动时选择“仍然恢复”或“丢弃保存的状态”。"
 }

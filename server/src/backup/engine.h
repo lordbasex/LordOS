@@ -40,6 +40,9 @@ struct BkRun {
     const char *excl[BK_MAX_EXCL];      /* prefixes relative to home ("Videos/large", ".cache") */
     int nexcl;
     const char *skip_real;              /* real path that is never copied (the destination, if inside home) */
+    /* A path (relative to home) the caller holds back this run, != 0 to skip it and all below it: a running
+     * machine's disks (backup.c, docs/VIRTUALIZATION.md 6.14). Counted in `skipped`. May be NULL. */
+    int  (*hold)(BkRun *r, const char *rel);
     volatile int *cancel;               /* != 0: stop as soon as possible (left to resume) */
     /* Called between files and every ~8 MB: may block (pause); returns != 0 to stop. */
     int  (*checkpoint)(BkRun *r);

@@ -355,7 +355,7 @@ all: $(ALL)
 # every prerequisite of `test` is done, tests/run_suites.sh runs them (a few seconds) and fails if any
 # fails; a suite whose tool or data isn't installed says "skipped: needs X". `make test-full` adds the
 # helpers (lord-media, lord-doc), the sandbox (Landlock kernel) and the HarfBuzz comparison.
-test: build/lord-claude-status build/popup-client build/wlperf-client build/syncobj-client build/wltiming-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
+test: build/lord-claude-status build/popup-client build/wlperf-client build/syncobj-client build/wltiming-client build/syncobj-kernel-test build/guestwin-client build/lordos-guest build/vt-dump build/vt-ring-test build/vt-keys-test build/shake-test build/term-secret-test build/term-guest-test build/term-capture-test build/shape-test build/bidi-test build/ime-test build/thbrk-test build/sound-test build/wasm-test build/net-test build/wasm-js-test build/pkg-test build/browserprefs-test build/lord-browser-prefs build/fsops-test build/portal-check-test build/fsasync-test build/sign-test build/mmdb-test build/canvas-test build/arcpath-test build/ipp-test build/tp-test build/media-test build/imgops-test
 	@sh tests/run_suites.sh
 test-full: test build/sandbox-test build/doc-test $(filter build/lord-media build/lord-doc build/lord-ocr build/lord-tts,$(ALL))
 	@sh tests/run_suites.sh full
@@ -1190,6 +1190,14 @@ build/media-test: $(MEDIA_TEST_SRC) src/media/proto.h src/media/aring.h src/medi
 
 build/vt-dump: tests/vt_dump.c build/obj/term/vt.o build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $^ $(LDLIBS)
+
+# a Machines guest's terminal stream (term_create_fd) never acts on this computer: no clipboard (OSC 52), tmux control
+# mode, links or host-side events (docs/VIRTUALIZATION.md 6.18)
+TERM_GUEST_OBJ := build/obj/term/term.o build/obj/term/vt.o build/obj/ui/stb.o build/obj/term/hold.o build/obj/term/pastefilter.o \
+	build/obj/term/pty.o build/obj/term/tcapture.o build/obj/term/tsecret.o build/obj/term/termfill.o
+build/term-guest-test: tests/term_guest_test.c tests/term_guest_stubs.c src/sec/json.c $(TERM_GUEST_OBJ)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/term_guest_test.c tests/term_guest_stubs.c src/sec/json.c $(TERM_GUEST_OBJ) $(LDLIBS) -lm
+	./$@ || { rm -f $@; exit 1; }
 
 build/term-secret-test: tests/term_secret_test.c src/term/tsecret.c src/term/tcapture.c build/obj/term/vt.o build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/term_secret_test.c src/term/tsecret.c src/term/tcapture.c build/obj/term/vt.o build/obj/ui/stb.o $(LDLIBS)

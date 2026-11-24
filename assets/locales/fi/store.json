@@ -369,5 +369,7 @@
   "settings.listsTitle": "Pakettiluettelot",
   "settings.listsHint": "Debianin ja LordOSin pakettiluettelot, joista uudet sovellukset ja päivitykset tulevat.",
   "settings.webManage": "Kunkin verkkosovelluksen profiilit, oikeudet ja tila",
-  "settings.flathubOff": "Poista Flathub käytöstä Kaupassa. Siitä asentamasi sovellukset jäävät."
+  "settings.flathubOff": "Poista Flathub käytöstä Kaupassa. Siitä asentamasi sovellukset jäävät.",
+  "updates.qemuTitle": "Keskeytetyt koneet eivät ehkä jatku tämän päivityksen jälkeen ({count})",
+  "updates.qemuText": "Tämä päivitys muuttaa QEMUa, eikä yhden QEMU-version tallentama istunto välttämättä lataudu toisessa. Sammuta ne koneet ensin tai valitse käynnistyksessä Jatka silti tai Hylkää tallennettu tila."
 }

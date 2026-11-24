@@ -13,7 +13,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ### Added
 - **Machines: encrypted machines, disposable sessions for any machine, raw disks, Export, consistent backups** (in
   development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.5, 3.6, 6.2, 6.4, 6.14, 8, 19.7). `machine.json`
-  schema 15 adds `disposable`, `encrypted`, `disk_format` and `backup`.
+  schema 16 adds `disposable`, `encrypted`, `disk_format` and `backup`.
   - **Encrypted machines.** "Encrypt this machine" in the New Machine assistant's review. Every disk, the UEFI
     variables and a disposable session's layers are qcow2 with LUKS, the TPM's state is swtpm's own encrypted state,
     and a snapshot's memory is written inside the encrypted disk. The key is 32 random bytes made by lord-server and
@@ -49,6 +49,62 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `vm_storage_test.sh` (real QEMU and KVM: keys, a write kept or thrown away, swtpm's encrypted state, export
     and import, hostile exports, an encrypted group, the kept firmware, raw disks), `vmexport-test`, `vmkeysrv-test`,
     `backup-machines-test` (ASan and UBSan) and `vm_storage_model_test.mjs`.
+- **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
+  latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
+  - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
+    there, over the guest agent's own channel (no network, no SSH, works with Isolated network), with a switch to the
+    serial console and New Shell. Linux guests: that person's own login shell in a pty; virtio-win guests: PowerShell in a
+    pseudo console. Never root or an administrator, never a program named by this computer; one shell at a time; flow
+    control both ways keeps memory flat whatever the shell writes. The terminal is titled with the machine's name and
+    marked, so it can't be taken for this computer's.
+  - **A guest's terminal stays text** (the agent's shell and the serial console): what a guest writes can no longer
+    set this computer's clipboard (OSC 52 and OSC 1337 Copy did, past the clipboard's gate and a clipboard set to Off),
+    start tmux's control mode, make links, or raise a title, notification, password prompt or any other terminal event
+    on this computer.
+  - **Links from the machine** (off by default, Configure → Sharing): a program in the guest can ask to open a web
+    link here (`lordos-guest --open-on-host URL`). Only http and https, no user name before the host, only the
+    characters a browser gets as one argument; at most 3 at once, then one per 5 s; only while the machine's window is
+    in front; one at a time. It waits in a bar over the machine's picture with the whole link and opens in the browser
+    only when the person clicks Open, which works only after the bar has been seen for a moment.
+  - **Notifications from the machine** (off by default): `lordos-guest --notify-host TITLE [BODY]` shows a
+    notification marked "From ‹machine›", plain text without control or direction characters, at most 5 at once, then
+    one per 3 s, with no actions.
+  - **The agent light turns red** when the guest agent stopped answering while the guest runs, or installing the
+    LordOS tools failed. The agent's popover lists the shell, links and notifications.
+  - **Logs:** a virtio-win guest's event logs (System and Application, through
+    the guest agent every 10 s, one fixed script); a filter by unit or source (click it); the guest's times in this
+    computer's local time, with the guest's own zone named when it differs.
+  - **The LordOS tools 8 (Linux) and w12** bring the shell and the links and notifications; Machines updates older
+    tools by itself. machine.json schema 15 adds `guest_links` and `guest_notify`; a machine locked for anonymity
+    (Whonix) refuses both.
+  - Tests: `vm-test` (the new frames' parsers, fuzzed with 80 000 random frames, the link encoder, the rate limit,
+    schema 15), `vmgroup-test` (the anonymity lock), `guest_shell_test.sh` (the shell's pty, size, exit status, 2 MB
+    with late acknowledgements never past its window, the host's close, the helper's socket), `vm_model_test.mjs`
+    (the agent's lines, the red light, the logs' times and zones).
+- **Machines: the app and its ties to the system** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
+  3.3, 3.7, 5.1, 5.3, 5.4, 5.5, 5.7, 6.1, 6.14).
+  - **One resource budget for every start.** lord-server checks it on the window's start, Start Without Window,
+    `machines start` (through the session and without one) and a group's members: the memory the library's running
+    machines hold (each with QEMU's share, a disposable session's too) plus the new one must fit in what this computer
+    lets machines use. The window offers Suspend ‹another machine› or Start with less memory; the library's status line
+    shows the memory for machines and warns "Short of memory" under memory pressure.
+  - **The failure page** names a locked disk and a missing disk from QEMU's own words, and offers Start with less memory
+    after running out and Go Back to a Snapshot.
+  - **"Weaker isolation on this kernel"**: on a kernel without Landlock the library says so, Configure → Security says
+    what applies instead, and a running machine's Info menu reads what its sandbox really applied.
+  - **The library's cards** have agent and disk lights, with words; **Pause All** on the toolbar while on battery.
+  - **The machine window**: a View menu (Window, Full Screen, Apps, Picture in Picture, Actual Size), an Info menu (CPU,
+    memory, disk, the sandbox) and Start in Full Screen. Picture in Picture is a small floating view that takes no input
+    for the guest, never for a protected machine.
+  - **What this computer can run**, for amd64 and arm64, from what the computer reports, with its temperature, fan and a
+    Raspberry Pi's power supply while machines run; in the Machine menu and on the first-run page.
+  - **Configure**: a search over the sections and a dot on each section with an unsaved change; Startup and shutdown has
+    Start with the session and Pause while I'm away (after 10 minutes without input; resumed on the next).
+  - **The rest of the system**: Search finds machines; Files shows a machine's folder as one item that opens it; Backups
+    leave out a running machine's disks and saved session (they wouldn't be a consistent copy); Cleaner never offers a
+    machine's files; Monitor's machine row has Show Machine; a notice with Pause All when the computer leaves the charger
+    while machines run; Store → Updates warns before a QEMU update while machines are suspended.
+  - Fixed on the way: the Whonix group's Start Fresh dialog counted its snapshots as none.
 - **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the
@@ -315,39 +371,54 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     both backends, by shared memory and by dmabuf. Still to check on LordOS's 2.54 backport and the VM: every web app
     feature, before the backport ships.
 - **WPE WebKit 2.54 with WPEPlatform for Debian 13, built by LordOS** (in development, not published yet; latest
-  release 0.8.9.5). Maintainer's decision of 2026-11-23, step 1 of lord-web's move to WebKit's new API
+  release 0.8.9.5). Maintainer's decisions of 2026-11-23 and 2026-11-24, for lord-web's move to WebKit's new API
   ([#142](https://github.com/lordbasex/LordOS/issues/142)). Debian 13's `wpewebkit` 2.48 is built without WPEPlatform,
-  so LordOS rebuilds Debian's own 2.54.3-1 source package for trixie as `2.54.3-1~lordos13+1`
+  so LordOS rebuilds Debian's own 2.54.3-1 source package for trixie as `2.54.3-1~lordos13+2`
   ([docs/WPEWEBKIT.md](docs/WPEWEBKIT.md)), to be published in the LordOS APT repository with its exact source.
-  - **`tools/pkg/build-wpewebkit.sh <debian-version>`** does it all from a version, in clean trixie chroots made by
-    `mmdebstrap` (trixie, trixie-updates and trixie-security only): fetches Debian's source package (pool or
+  - **`tools/pkg/build-wpewebkit.sh <debian-version> [revision]`** does it all from a version, in clean trixie chroots
+    made by `mmdebstrap` (trixie, trixie-updates and trixie-security only): fetches Debian's source package (pool or
     snapshot.debian.org), checks the `.dsc` with `dscverify` against `debian-keyring` (signed by Alberto Garcia, every
     checksum) and the release tarball's signature against the two pinned WebKit release keys (and that wpewebkit.org's
     signature is the same file as Debian's), applies LordOS's changes, installs the build dependencies from trixie,
     builds the source package and every binary package with `dpkg-buildpackage -sa` as an unprivileged user, runs
-    lintian, then installs the result in a second chroot and tests it. `TMPFS=<size>` builds in RAM.
-  - **Changes to Debian's packaging, and only these** (`tools/pkg/wpewebkit-chroot.sh`): WPEPlatform with its DRM,
-    headless and Wayland backends and the legacy libwpe API turned on explicitly (both upstream defaults, written out so
-    a changed default stops the build), `Maintainer: LordOS` (Debian's WebKit team credited in the changelog
-    and `debian/copyright`), and the changelog entry, dated one second after Debian's so a rebuild gives the same source package. Every build dependency of 2.54.3-1 is in trixie (clang 19), and no feature was turned off.
-  - **Result** (amd64, 2026-11-23): `libwpewebkit-2.0-1`, `libwpewebkit-2.0-dev`, `wpewebkit-webdriver` and
-    `libwpewebkit-doc` 2.54.3-1~lordos13+1, Debian's split unchanged; WPEPlatform is inside `libWPEWebKit-2.0.so.1` (no
-    new package) and `-dev` ships `wpe-platform-2.0.pc` with its `-drm`, `-headless` and `-wayland` files. Same SONAME
-    as trixie's 2.48 (`libWPEWebKit-2.0.so.1`) and none of 2.48's 930 exported symbols removed (424 added), so it
-    upgrades trixie's package in place for `cog`, `gstreamer1.0-wpe` and today's `lord-web`, which builds against it
-    with `-Wall -Wextra` and no warnings and passes its probe smoke test (`tests/web_probe_test.py`, sandbox on). `dpkg-buildpackage` took 26 to 33 minutes on 20 cores (five builds). lintian: no errors,
-    6 warnings, all Debian's own (Standards-Version newer than trixie's lintian, no source `Priority`, devhelp files
-    of the new WPEPlatform docs). The test renders a page through WPEPlatform's headless backend into a buffer with
-    WebKit's bubblewrap sandbox on (the test runs as its own mount namespace's root, `tools/pkg/wpewebkit-pivot.sh`,
-    since the kernel refuses user namespaces in a chroot). Not yet run on the VM, not built for arm64 (options in
-    WPEWEBKIT.md), not published.
+    lintian, then installs the result in a second chroot and tests it. `TMPFS=<size>` builds in RAM, `TEST_ONLY=1`
+    repeats the test, `ARCH=arm64` builds arm64 on an amd64 machine under qemu-user.
+  - **Changes to Debian's packaging, and only these** (`tools/pkg/wpewebkit-chroot.sh`): WPEPlatform's headless and
+    Wayland backends and the legacy libwpe API turned on explicitly (upstream defaults, written out so a changed default
+    stops the build); **WPEPlatform's DRM backend off** (maintainer, 2026-11-24), so WebKit links no `libinput` or
+    `libudev`, with its 9 symbols taken out of Debian's symbols file; `Maintainer: LordOS` (Debian's WebKit team
+    credited in the changelog and `debian/copyright`); and the changelog entry, dated one second after Debian's so a
+    rebuild gives the same source package. Every build dependency of 2.54.3-1 is in trixie (clang 19).
+  - **The test** (in a second clean chroot, as the root of its own mount namespace, `tools/pkg/wpewebkit-pivot.sh`,
+    since the kernel refuses user namespaces in a chroot and WebKit's bubblewrap sandbox needs them): `pkg-config`
+    finds `wpe-webkit-2.0`, `wpe-platform-2.0` with `-headless` and `-wayland`, `wpe-1.0` and `wpebackend-fdo-1.0`, and
+    not `wpe-platform-drm-2.0`; `readelf -d` shows no `libinput`/`libudev`; SONAME and exported symbols against
+    trixie's 2.48; the copyright files; a WPEPlatform headless program renders a page into a buffer with the sandbox
+    on; and lord-web is built from the LordOS tree on both view backends (`LORD_WEB_BACKEND=platform` and `legacy`),
+    with no warnings, then its `web-backend-test` and probe test run on each.
+  - **Result on amd64** (`+2`, 2026-11-24): `libwpewebkit-2.0-1`, `libwpewebkit-2.0-dev`, `wpewebkit-webdriver` and
+    `libwpewebkit-doc`, Debian's split unchanged (WPEPlatform is inside `libWPEWebKit-2.0.so.1`, no new package). Same
+    SONAME as trixie's 2.48 (`libWPEWebKit-2.0.so.1`), none of its 930 exported symbols removed (1345, 415 added), so it
+    upgrades trixie's package in place for `cog`, `gstreamer1.0-wpe` and lord-web. No `libinput`, no `libudev` (`+1`,
+    built with the DRM backend and never published, had both). `web-backend-test` prints `ok platform (WPE WebKit
+    2.54.3)` and `ok legacy (WPE WebKit 2.54.3)`, the probe test passes on both (peak 298 and 296 MB PSS).
+    `dpkg-buildpackage` took 26 to 41 minutes on 20 cores over seven builds. lintian: no errors, 5 warnings, all
+    Debian's own (Standards-Version newer than trixie's lintian, no source `Priority`, devhelp files of WPEPlatform's
+    docs). arm64 is being built under qemu-user (docs/WPEWEBKIT.md, "arm64"). Not yet run on the VM, not published.
   - **The source next to the binaries** (WebKit is LGPL-2.1+ and BSD): the build outputs the complete Debian source
     package (`.dsc`, upstream `.orig.tar.xz` and its `.asc`, LordOS's `.debian.tar.xz`); each binary package ships
-    Debian's `debian/copyright`. `tools/release/image-sources.sh` lists a package LordOS rebuilt (version
-    `~lordos<n>+<m>`) with origin `lordos` and its `.dsc` in `lordos.org/apt/pool/main/source/`, not
-    snapshot.debian.org; docs/WPEWEBKIT.md describes the change `apt-repo.sh` needs to publish and index it as
-    `deb-src` (not made: publishing and signing are the maintainer's). Docs: WPEWEBKIT.md (new), ARCHITECTURE.md's
-    dependency row, SOURCE-OFFER.md, WEBAPPS.md, ROADMAP.md (#142).
+    Debian's `debian/copyright`. **`tools/release/apt-repo.sh` takes source packages**: `build` accepts a `.dsc`,
+    checks every file it names by size and SHA-256, copies them append-only to `pool/main/source/<prefix>/<source>/`,
+    indexes them with `apt-ftparchive sources` in `dists/stable/main/source/Sources` (signed through `Release`), and
+    refuses a `~lordos<n>+<m>` `.deb` whose `.dsc` isn't in the pool; `publish` uploads them with the right types and
+    writes `lordos-src.sources`, a `deb-src` stanza for `apt-get source` (LordOS systems keep `lordos.sources`, `deb`
+    only). For tests only, `LORDOS_APT_TEST_KEYRING` with `LORDOS_APT_OFFLINE=1` signs a scratch tree with a throwaway
+    key (`publish` and `verify` refuse it). Checked that way: the `.debs` alone, a tampered `.debian.tar.xz` (other size;
+    same size, other hash) and a changed `.dsc` for a published version are refused; Debian's `apt` reads the tree and
+    `apt-get source --download-only wpewebkit` gets the build's exact files. Nothing was uploaded or signed with the real
+    key. `tools/release/image-sources.sh` lists a package LordOS rebuilt (version `~lordos<n>+<m>`) with origin
+    `lordos` and its `.dsc` in `lordos.org/apt/pool/main/source/`. Docs: WPEWEBKIT.md (new), RELEASING.md ("WPE
+    WebKit (LordOS's backport)"), ARCHITECTURE.md's dependency row, SOURCE-OFFER.md, WEBAPPS.md, ROADMAP.md (#142).
 - **Machines: QEMU's seccomp filter is an allowlist** (in development; latest release 0.8.9.5-beta; approved by the
   maintainer 2026-11-23 as isolation layer 3, for every machine; docs/VIRTUALIZATION.md 3.3). Our filter on QEMU used to
   refuse a list of dangerous calls and allow the rest; now it allows only the calls QEMU was measured to make, checks the

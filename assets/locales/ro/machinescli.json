@@ -105,5 +105,6 @@
   "freshDone": "Workstation-ul lui {name} e ca nou: imaginea lui verificată, o identitate nouă.",
   "freshDoneBoth": "{name} e ca nou: ambele mașini au revenit la imaginea lor verificată, cu o identitate nouă.",
   "freshNotGroup": "{name} nu este un grup de mașini: luarea de la capăt este pentru grupuri.",
-  "badMember": "--member primește gateway sau workstation."
+  "badMember": "--member primește gateway sau workstation.",
+  "overBudget": "{name} nu a pornit: are nevoie de {need} MB și au rămas {free} MB pentru mașini. Suspendă sau oprește altă mașină ori dă-i mai puțină memorie."
 }

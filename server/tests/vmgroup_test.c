@@ -162,6 +162,9 @@ static void test_machine(void) {
     CHECK(mvariant("\"microphone\": false", "\"microphone\": true") != VM_OK, "locked: microphone");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"graphics\": \"3d\"") != VM_OK, "locked: 3d");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"perf_profile\": true") != VM_OK, "locked: perf profile");
+    CHECK(mvariant("\"schema\": 14, ", "\"schema\": 15, \"guest_links\": true, ") != VM_OK, "locked: links from the guest");
+    CHECK(mvariant("\"schema\": 14, ", "\"schema\": 15, \"guest_notify\": true, ") != VM_OK, "locked: notifications from the guest");
+    CHECK(mvariant("\"schema\": 14, ", "\"schema\": 15, ") == VM_OK, "a member at schema 15");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"disk_serial\": \"X1\"") != VM_OK, "locked: disk serial");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"ports\": [{\"proto\": \"tcp\", \"host\": 2222, \"guest\": 22, \"open\": \"this-computer\"}]") != VM_OK, "tor: ports");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"shares\": [{\"tag\": \"a\", \"path\": \"/home/u/a\", \"writable\": false}]") != VM_OK, "locked: shares");

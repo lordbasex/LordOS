@@ -369,5 +369,7 @@
   "settings.listsTitle": "Paketlisten",
   "settings.listsHint": "Die Paketlisten von Debian und LordOS, aus denen neue Apps und Updates kommen.",
   "settings.webManage": "Profile, Berechtigungen und Speicherplatz jeder Web-App",
-  "settings.flathubOff": "Flathub im Store ausschalten. Die daraus installierten Apps bleiben."
+  "settings.flathubOff": "Flathub im Store ausschalten. Die daraus installierten Apps bleiben.",
+  "updates.qemuTitle": "Maschinen im Ruhezustand laufen nach diesem Update eventuell nicht weiter ({count})",
+  "updates.qemuText": "Dieses Update ändert QEMU, und eine von einer QEMU-Version gesicherte Sitzung lädt in einer anderen eventuell nicht. Fahre diese Maschinen vorher herunter oder wähle beim Start „Trotzdem fortsetzen“ oder „Gesicherten Zustand verwerfen“."
 }

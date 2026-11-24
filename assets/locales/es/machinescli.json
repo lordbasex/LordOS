@@ -105,5 +105,6 @@
   "freshDone": "La workstation de {name} está como nueva: su imagen verificada, una identidad nueva.",
   "freshDoneBoth": "{name} está como nuevo: las dos máquinas volvieron a su imagen verificada, con una identidad nueva.",
   "freshNotGroup": "{name} no es un grupo de máquinas: Empezar de cero es para grupos.",
-  "badMember": "--member acepta gateway o workstation."
+  "badMember": "--member acepta gateway o workstation.",
+  "overBudget": "{name} no se inició: necesita {need} MB y quedan {free} MB para máquinas. Suspendé o apagá otra máquina, o dale menos memoria."
 }
