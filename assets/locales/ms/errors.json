@@ -929,5 +929,7 @@
   "llm.busy": "Sentinela sedang menganalisis beberapa perkara. Cuba lagi sebentar lagi.",
   "llm.noEngine": "Enjin model setempat tidak dipasang.",
   "llm.noModel": "Model setempat itu tidak dipasang.",
-  "sentinela.blockFailed": "Rangkaiannya tidak dapat disekat."
+  "sentinela.blockFailed": "Rangkaiannya tidak dapat disekat.",
+  "sentinela.machineGone": "Mesin itu tiada lagi dalam Mesin Maya.",
+  "sentinela.machineFailed": "Mesin tidak menjawab."
 }

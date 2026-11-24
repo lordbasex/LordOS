@@ -65,5 +65,6 @@
   "ask.vr": "“{app}” {headset} VR eynəyindən istifadə etmək istəyir",
   "ask.vrNote": "Onun ekranı yalnız tətbiqə verilir; LordOS orada heç vaxt iş masanızı göstərmir. Tətbiq bağlananda, eynək ayrılanda və ya ekran kilidlənəndə geri alınır. Bunu sonra Parametrlər → Məxfilik bölməsində dəyişə bilərsiniz.",
   "perm.vr": "VR eynəkləri",
-  "permHint.vr": "VR eynəyinin ekranını birbaşa idarə edə bilən tətbiqlər. Yalnız eynəklər verilir, monitorlarınız heç vaxt; ekran kilidlənəndə, istifadəçini dəyişəndə və ya Qadağan et seçəndə geri alınır."
+  "permHint.vr": "VR eynəyinin ekranını birbaşa idarə edə bilən tətbiqlər. Yalnız eynəklər verilir, monitorlarınız heç vaxt; ekran kilidlənəndə, istifadəçini dəyişəndə və ya Qadağan et seçəndə geri alınır.",
+  "protectedCapture": "Qorunan pəncərə"
 }

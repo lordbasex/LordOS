@@ -40,7 +40,7 @@ Several methods can live side by side. The vault locks itself after 5 minutes of
 
 **The window.** The Passwords window itself runs as its own sandboxed process (`lord-server --app passwords`), not in the desktop's JavaScript. Revealed values never enter the desktop's memory. Lists show titles and user names, never secrets; a value travels only when you click reveal, copy or edit.
 
-**The screen.** The Passwords window is protected: it comes out black in screenshots, screen recordings, the remote desktop and, since 0.8.8.8, a screen or window shared with a Linux app.
+**The screen.** The Passwords window is protected: it comes out as a gray box with a lock (black up to 0.8.9.5) in screenshots, screen recordings, the remote desktop and, since 0.8.8.8, a screen or window shared with a Linux app.
 
 **The clipboard.** A copied secret stays out of the clipboard history, is marked as sensitive for Linux apps that honour that convention, and is cleared after 30 seconds (configurable) if it is still there.
 

@@ -1,15 +1,17 @@
 /* capture.c — screenshots, recording and what the remote desktop sees, with the protected
- * windows in black (see docs/MEDIA.md, «Protected windows»).
+ * windows as the protected fill (see docs/PRIVACY.md and docs/MEDIA.md, «Protected windows»).
  *
- * A window is marked protected with wm.setProtected(id, true) (the SDK sets `protected` on the
- * node of its content). On the local screen it looks normal; in any capture it's painted
- * black:
+ * A window is marked protected with wm.setProtected(id, true) or opened with { protected: true } (the SDK sets
+ * `protected` on its frame and on the node of its content). On the local screen it looks normal; in any capture it is
+ * an opaque neutral fill with a lock (paint_protected_fill), in the window's own box:
  *   - screenshot: the whole tree is repainted onto a separate canvas in «capture
- *     mode» (paint_capture), where a protected node is a black rectangle. It respects the order
+ *     mode» (paint_capture), where a protected node is that fill. It respects the order
  *     of the windows: whatever is above the protected one is visible.
- *   - recording and remote desktop: if there is any protected window, a second
+ *   - recording, remote desktop and the screen-sharing API: if there is any protected window, a second
  *     canvas in capture mode is kept, repainted only in the region that changed in each frame; if there
- *     is none, the frame is used as is (no extra cost).
+ *     is none, the frame is used as is (no extra cost). While one is on screen the GPU's read-back is
+ *     never sent (main.c) and the session composes on the CPU.
+ *   - a media source's own pixels (a machine's picture, a Remote Desk session): media_src_exportable.
  * Recording (like the remote desktop) composites on the CPU, so the frame is in memory. */
 #include "media_int.h"
 #include "imgops.h"
@@ -41,13 +43,35 @@ static double now_ms(void) {
 
 static int count_protected(const Node *n) {
     if (!n || n->type == NODE_RAW || n->s.display_none) return 0;
-    if (n->protect) return 1;
+    if (n->protect || (n->type == NODE_MEDIA && media_id_protected(n->term))) return 1;
     int c = 0;
     for (const Node *k = n->first; k; k = k->next) c += count_protected(k);
     return c;
 }
 
 int media_protected_count(void) { return count_protected(ui.root); }
+
+/* a NODE_MEDIA showing source id inside a protected node: hidden ones too (a minimized window keeps its picture) */
+static int shows_protected(const Node *n, int id, int under, int depth) {
+    if (!n || depth > 4096) return depth > 4096;
+    int p = under || n->protect;
+    if (p && n->type == NODE_MEDIA && n->term == id) return 1;
+    for (const Node *k = n->first; k; k = k->next) if (shows_protected(k, id, p, depth + 1)) return 1;
+    return 0;
+}
+
+void media_src_protect(MediaSrc *src) { if (src) src->protect = 1; }
+
+int media_id_protected(int id) {
+    MediaSrc *s = id > 0 ? media_src_get(id) : NULL;
+    return s && s->protect;
+}
+
+int media_src_exportable(MediaSrc *src) {
+    if (!src) return 0;
+    if (!src->protect && shows_protected(ui.root, src->id, 0, 0)) src->protect = 1;
+    return !src->protect;
+}
 
 static int ensure_cap(int w, int h) {
     if (cap.px && cap.w == w && cap.h == h) return 0;

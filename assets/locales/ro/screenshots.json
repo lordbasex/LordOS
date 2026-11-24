@@ -10,9 +10,9 @@
   "timer": "Temporizator",
   "timerNone": "Fără",
   "protectedNote": {
-    "one": "{count} fereastră protejată: apare neagră în capturi",
-    "few": "{count} ferestre protejate: apar negre în capturi",
-    "other": "{count} de ferestre protejate: apar negre în capturi"
+    "one": "{count} fereastră protejată: este ascunsă în capturi",
+    "few": "{count} ferestre protejate: sunt ascunse în capturi",
+    "other": "{count} de ferestre protejate: sunt ascunse în capturi"
   },
   "recent": "Recente",
   "hintArea": "Trageți pentru a selecta o zonă · Spațiu: fereastră · C: copiază culoarea · T: copiază textul · Esc: anulează",

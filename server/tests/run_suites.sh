@@ -222,6 +222,7 @@ EOF
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
     if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
+    if have node; then run "protect-model-test (sdk/protectmodel.js, Machines' protected machines)" node tests/protect_model_test.mjs; fi
     run "spectrum-test" build/spectrum-test
     if have node; then run "soundwave-model-test (sdk/soundwavemodel.js, widgetgrid.js pins)" node tests/soundwave_model_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
@@ -282,6 +283,14 @@ EOF
         0) ok "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test: off, move, resize, lock, shortcuts)" ;;
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
+    esac
+    # protected windows (docs/PRIVACY.md): drawn on the display, the protected fill in a screenshot, the remote desktop's
+    # and recording's frame, the Screenshot portal's still and a window shared alone; the other window captured as shown
+    sh tests/protected_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "protected-windows (tests/protected_headless.sh, headless lord-server-test: output, screenshot, mirror, portal, window share)" ;;
+        77) skip "protected-windows" "build/lord-server-test, python3 and node with esbuild (make, npm install)" ;;
+        *) bad "protected-windows (tests/protected_headless.sh, headless lord-server-test)"; cat "$T/out" ;;
     esac
     # launching an app that already runs (a browser's single instance) shows its window, even on a desktop not in view,
     # and a copy running with no window shows a new one (the 2026-11-23 Google Chrome case)
@@ -502,6 +511,7 @@ EOF
     if have node; then run "devices-model-test (sdk/devicesmodel.js)" node tests/devices_model_test.mjs; else skip "devices-model-test" node; fi
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
     if have node; then run "sentinela-model-test (sdk/sentinelamodel.js, sdk/llmcatalog.js)" node tests/sentinela_model_test.mjs; else skip "sentinela-model-test" node; fi
+    if have node; then run "sentinela-vm-test (sdk/sentinelavm.js: the machine rules)" node tests/sentinela_vm_test.mjs; else skip "sentinela-vm-test" node; fi
     if have node; then run "avatar-model-test (apps/settings/avatarmodel.js)" node tests/avatar_model_test.mjs; else skip "avatar-model-test" node; fi
     if have node; then run "weather-model-test (sdk/weathermodel.js)" node tests/weather_model_test.mjs; else skip "weather-model-test" node; fi
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi
@@ -870,6 +880,11 @@ EOF
     if [ -x build/lord-web ] && have python3 && have bwrap && have xdg-dbus-proxy; then
         run "web-probe-test (lord-web --probe)" python3 -I tests/web_probe_test.py build/lord-web
     else skip "web-probe-test" "wpe-webkit-2.0 (build/lord-web), bubblewrap, xdg-dbus-proxy and python3"; fi
+    # (in development) lord-web's view backend alone (src/web/webback.h, legacy or WPEPlatform, the one mk/web.mk built):
+    # a local page's pixels, a click, keys and the wheel reaching its listeners, a resize, scale 2, hidden and shown
+    if [ -x build/web-backend-test ] && have bwrap && have xdg-dbus-proxy; then
+        run "web-backend-test ($(cat build/gen/web_backend 2>/dev/null) backend)" build/web-backend-test
+    else skip "web-backend-test" "wpe-webkit-2.0 (build/web-backend-test), bubblewrap and xdg-dbus-proxy"; fi
     # (0.8.8.6) Claude Code in the Terminal's footer: the status line bridge and the footer's model
     run "claude-bridge-test (lord-claude-status)" sh tests/claude_bridge_test.sh
     if have node; then run "terminal-claude-test (apps/terminal/claude.js)" node tests/terminal_claude_test.mjs

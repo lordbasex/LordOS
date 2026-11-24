@@ -21,6 +21,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ClipAskBar } from './clipask.jsx';
 import { menus } from './ui.jsx';
 import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune, guestKeys, guestMayTakeFront, anchorPoint, cropsStale, STALE_MS } from './model.js';
+import { isProtectedMachine } from './meta.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
@@ -149,6 +150,8 @@ function sync(dir, sid, mid, name, list, gw, gh) {
   // behind the window in front, which keeps the keyboard (model.js guestMayTakeFront: no focus stealing from a Terminal)
   const front = wm.focused();
   const keep = guestMayTakeFront(front ? wm.get(front) : null, dir) ? null : front;
+  // a protected machine's guest windows are protected from their first frame, as its own window (meta.js isProtectedMachine, the same question everywhere)
+  const prot = isProtectedMachine(dir, null, !!wm.get(guests.get()[dir]?.home)?.protected);
   // bottom first, so the guest's front window ends up in front here too
   for (const w of [...plan.open].reverse()) {
     const instance = guestInstance(mid, w.id);
@@ -157,8 +160,8 @@ function sync(dir, sid, mid, name, list, gw, gh) {
     const x = { gid: w.id, winId: 0, rect: w, minimized: false, asked: null, inset: { l: 0, t: 0, r: 0, b: 0 }, popup };
     const r = placeOf(x, w, sid, k, d, have);
     const args = { guestWin: { dir, gid: w.id }, guest: { machine: name, mid, app: w.app || w.title, key: (w.app || '').toLowerCase() || String(w.id) }, csd: true };
-    const winId = popup ? wm.open('machines', { instance, frame: r, pip: r, args: { ...args, notice: true } })
-      : wm.open('machines', { instance, frame: frameAround(r, x.inset), args });
+    const winId = popup ? wm.open('machines', { instance, frame: r, pip: r, protected: prot, args: { ...args, notice: true } })
+      : wm.open('machines', { instance, frame: frameAround(r, x.inset), protected: prot, args });
     if (!winId) continue;
     x.winId = winId;
     have.set(w.id, x);

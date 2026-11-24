@@ -532,7 +532,7 @@ function FieldMenu({ anchor, at, items, onClose }) {
 }
 
 // onKeyDown(e) optional: return true if the key was already handled (e.g. Shift+Enter).
-// secure: password field (shows •, does not go through the input method and cannot be copied; protected: black in every
+// secure: password field (shows •, does not go through the input method and cannot be copied; protected: the protected fill in every
 // capture, recording, remote desktop and share). An eye at its end shows the
 // text until the field loses focus (passwordfieldmodel.js); it stays a password field meanwhile: no history, no input
 // method, nothing copied. eye: false leaves the eye out (an app with its own Show). While it has focus with Caps Lock
@@ -812,7 +812,7 @@ export function TextInput({ value, onChange, placeholder, onSubmit, onCancel, on
     </View>
   ) : null;
   return (
-    // a password field is protected (wm.setProtected's node flag): lord-server paints it black in every capture of the
+    // a password field is protected (wm.setProtected's node flag): lord-server paints it as the protected fill in every capture of the
     // screen or an area, recordings, the remote desktop and shared screens, and refuses its window captured alone
     // (paint_capture_until); the maintainer's rule: a password is never captured (GitHub #219 follow-up)
     <View ref={box} onMouseDown={onDown} onDoubleClick={onDouble} onClick={onClick} onContextMenu={onMenu}
@@ -1326,7 +1326,7 @@ export const AppHost = memo(function AppHost({ id, focused: asked }) {
   const C = app ? app.Component : null;
   const body = useMemo(() => (app ? <AppBoundary id={id} app={app.id} name={app.name || app.id}><C /></AppBoundary> : null), [id, app, C]);
   if (!app) return null;
-  // the content goes in its own node: `protected` paints it black in screenshots (wm.setProtected)
+  // the content goes in its own node: `protected` paints it as the protected fill in every capture (wm.setProtected)
   return (
     <AppWindowContext.Provider value={value}>
       <AppFocusContext.Provider value={!!focused}>

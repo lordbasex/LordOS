@@ -99,6 +99,11 @@ static void command(int fd, char *line) {
         reply(fd, host.lease(!strcmp(arg, "plug")) ? "err lease" : "ok", -1);
         return;
     }
+    if (sscanf(line, "%15s %15s %ld", verb, arg, &a) >= 2 && !strcmp(verb, "frame") && host.frame &&
+        (!strcmp(arg, "output") || !strcmp(arg, "screenshot") || !strcmp(arg, "mirror") || !strcmp(arg, "portal") || !strcmp(arg, "window"))) {
+        reply(fd, host.frame(arg, a) ? "err frame" : "ok", -1);
+        return;
+    }
     if (!strcmp(line, "xwl")) {
         int f = host.xwl();
         if (f < 0) { reply(fd, "err xwl (Xwayland is running, or no Wayland)", -1); return; }

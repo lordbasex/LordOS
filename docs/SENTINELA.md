@@ -151,6 +151,70 @@ model's text (at most 4 KB).
 The engine starts when an analysis is needed (about 1 s for the 1.7B model from a warm disk), and is stopped 2 minutes
 after its last answer (`LLM_IDLE_MS`) or when Sentinela is turned off, giving its memory back.
 
+## Machines
+
+Approved by the maintainer on 2026-11-23 (layer 9 of the anonymity group's isolation, docs/VIRTUALIZATION.md 19):
+Sentinela also watches the virtual machines of Machines (`sdk/sentinelavm.js`, pure logic). It is still off by default
+and local only; the machine rules run in the same 10-second tick as the process rules.
+
+**What it reads**, every 10 s, read-only:
+
+- `lord.vm.list()`: each machine's name, id, state, end reason (lord-vm's closed list), `since`, vCPUs, memory, network
+  setting, forwarded ports and bridge, and its role in an anonymity group (`role`, `profileLock`, the keys of
+  machine.json schema 14; a machine without them is ordinary).
+- `lord.vm.stats(dir)` of each running machine: QEMU's cgroup counters (CPU, memory) and, new for Sentinela, facts
+  that never come from `run.json` (the person's own file, only a hint that the machine runs). lord-server asks the
+  machine's lord-vm over its socket, as `lord-vm --status` does (`vmwatch_live`, 150 ms at most): the peer's pid and uid
+  come from the kernel (`SO_PEERCRED`), its answer gives QEMU's pid, the `VMS_*` sandbox bits and the cgroup mode. It is
+  **verified** only when that peer is the person's, runs the installed lord-vm (`/proc/<pid>/exe` is the `lord-vm` next
+  to lord-server; an upgraded one, "(deleted)", still counts) and the QEMU it names is its child (`PPid`). Then:
+  `qemuPid`, `sandbox`, `cgMode`, `seccomp` and `noNewPrivs` (the kernel's `/proc/<qemu>/status`), `scope` (`in` only
+  when QEMU's and lord-vm's cgroups are exactly the session's `app-lordos-lordos-vm-<id>.scope`, the sibling of
+  lord-server's own leaf, or below it, never a path that merely contains that name; `vm/vmwatch.h`), and `passt` (a
+  passt of the person's, lord-vm's child or in that scope). When `run.json` says the machine runs and none of that can be
+  verified, `verified` is `false`, and twice in a row that is itself a `vmSandbox` alert ("proof that its engine is the
+  machine's own"): forged data can never pass for a healthy sandbox.
+- `lord.monitor.watchMachines(on)` / `machinesWatched()`: with the watched process list, the Monitor's thread counts each
+  running machine's sockets by cgroup (the attribution of Monitor → Network's Machines row, `conn.c conn_machines`):
+  sockets, listening sockets, different remote addresses, TCP bytes moved since the last count. Counts only: no
+  address, port or process leaves the C side.
+
+Never the guest's screen, files, clipboard, logs' text or any address.
+
+**The rules:**
+
+| Rule | Machines | Fires when | Model |
+|---|---|---|---|
+| `vmScope` | any | QEMU's cgroup is outside its machine's scope (moved out: its limits no longer apply) | never: always shown |
+| `vmSandbox` | any | QEMU's sandbox misses Landlock (files or network), seccomp, no_new_privs or the cgroup (lord-vm's own answer and the kernel's `Seccomp`/`NoNewPrivs`); or its engine can't be verified twice in a row | never: always shown |
+| `vmLeak` | Workstation | any way out besides its link: a network setting other than `link`/`isolated`, forwarded ports, a bridge, a live passt, a socket in its scope | never: always shown |
+| `vmNet` | Gateway | after 20 minutes of its own pattern: 2 minutes at 8× its usual traffic (and 1 MB/s more), or 3× its usual remote addresses (and 15 more) | asked |
+| `vmCrash` | anonymity members | every end without being asked (`qemu-signal`, `guest-panic`, `out-of-memory`, `supervisor-lost`…), also one seen only by a new `since` | asked |
+| `vmCrashLoop` | any | 3 unexpected ends in 15 minutes; an anonymity member also 3 QEMU starts in 10 minutes | asked |
+| `vmCpu` | any | after 30 minutes of history: 10 minutes at 60 % of its vCPUs or more and 40 points above its own usual; an anonymity member also 15 minutes at 90 % or more | asked |
+| `vmMemory` | any | after 30 minutes of history: 10 minutes at 1.5× its usual memory and 512 MB more | asked |
+
+The three "always" rules can't be turned off (Settings shows them as one row, "Always on"), fire once per QEMU and
+finding, skip the model and stay on screen until the person acts. The others follow three toggles: `vmUsage`,
+`vmCrash`, `vmAnon`. The trend rules fire at most once an hour per machine. A machine's QEMU process is no longer
+judged by the process CPU and memory rules (the machine rules compare it with its own usual instead); imitation and
+replaced-program rules still apply to it.
+
+**The model** gets `machineSummary`: the rule, the name (as a quoted field), the role, vCPUs, memory and network
+setting, and the rule's numbers (CPU share, MB, KB/s, address counts, the end reason's word and its exit code). Its
+answer goes through the same `parseVerdict` and the same engine schema; its action is mapped onto the machine's
+(`end_block` → shut down, `pause` → pause, `monitor` → Monitor; the others suggest nothing). A "normal" answer can't
+silence or lower the alert.
+
+**Actions**, only from the person's click: **Shut down** (`lord.vm.stop(dir, 'shutdown')`, the guest's own shutdown),
+**Pause** / **Resume**, **Open the machine** (its window when it runs; the library otherwise, so a stopped machine isn't
+started), **Show in Monitor**. The machine is found again by its id, so a renamed machine is still reached.
+
+Tests: `build/vmwatch-test` (`make test`: the scope's exact path and lookalike cgroup paths, the installed-program
+check, the live answer from a stand-in lord-vm on a socket, a silent and a half answer), `tests/sentinela_vm_test.mjs`
+(synthetic machine stats for every rule, an unverified engine, the baselines, the summary's bounds and
+injection, the action mapping), and the machine parts of `sentinela_notify_scene.mjs` and `sentinela_settings_scene.mjs`.
+
 ## Limits
 
 - Analyses only when a rule fires; at most 4 events handled per 10-second tick; the engine queue holds 8 jobs.
@@ -165,7 +229,8 @@ after its last answer (`LLM_IDLE_MS`) or when Sentinela is turned off, giving it
 - `lord.sentinela` (desktop context only; the broker of isolated apps has none): `available()`, `models()`,
   `analyze(model, system, user)`, `facts(pid, start)`, `take(id)`, `state()`, `stop()` (`server/src/ui/js_sentinela.c`).
 - `lord.monitor.watchProcs(on)` / `procsWatched(lang)`; `lord.monitor.signal(pid, start, kind)` gained `STOP`, `CONT`
-  and `LOWER` (the user's own processes only, the same checks as `TERM`).
+  and `LOWER` (the user's own processes only, the same checks as `TERM`). `lord.monitor.watchMachines(on)` /
+  `machinesWatched()` and `lord.vm.stats`' new fields are the machine rules' ("Machines").
 - SDK: `sdk/sentinela.js` (the service, `startSentinela` from `startShell`), `sdk/sentinelamodel.js` (pure logic),
   `sdk/llmcatalog.js`, `sdk/sentinelaglyph.js`. Settings → AI → Sentinela: `apps/settings/Sentinela.jsx`.
 - Strings: `assets/locales/<lang>/sentinela.json` in every language, and `errors.llm.*`, `errors.sentinela.*`.

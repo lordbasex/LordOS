@@ -2,7 +2,7 @@
  * lord-screencast (cast.c, castproto.h). Everything is on the main loop and never waits for the helper.
  *
  * Zero cost when nothing is shared: no helper runs, nothing is painted or copied and cast_damage returns at once.
- * While a session runs, its sources are painted again in capture mode (paint_capture: protected windows black), only
+ * While a session runs, its sources are painted again in capture mode (paint_capture: protected windows as the fill), only
  * where they changed, into a canvas of their own; a frame is copied into the ring only when the consumer asked for
  * frames, the indicator is on screen and its period passed. */
 #ifndef LORD_CAST_CAST_H
@@ -56,7 +56,7 @@ double cast_timeout(void);              /* ms until cast_tick has work, -1 none 
  * source isn't there. */
 int  cast_thumb(const CastSource *src, int max);
 
-/* A still picture of src for the Screenshot portal (ui/portalshot.c), painted as a stream is (protected windows black)
+/* A still picture of src for the Screenshot portal (ui/portalshot.c), painted as a stream is (protected windows as the fill)
  * at the source's own resolution; area (x, y, w, h in logical px of the global space, or NULL) keeps only that part.
  * Opaque pixels (malloc, *w × *h), or NULL. */
 uint32_t *cast_still(const CastSource *src, const int *area, int *w, int *h);

@@ -10,8 +10,8 @@
   "timer": "Timer",
   "timerNone": "Ingen",
   "protectedNote": {
-    "one": "{count} skyddat fönster: det blir svart i skärmdumpar",
-    "other": "{count} skyddade fönster: de blir svarta i skärmdumpar"
+    "one": "{count} skyddat fönster: det döljs i skärmdumpar",
+    "other": "{count} skyddade fönster: de döljs i skärmdumpar"
   },
   "recent": "Senaste",
   "hintArea": "Dra för att markera ett område · Mellanslag: fönster · C: kopiera färgen · T: kopiera text · Esc: avbryt",

@@ -10,8 +10,8 @@
   "timer": "Ajastin",
   "timerNone": "Ei mitään",
   "protectedNote": {
-    "one": "{count} suojattu ikkuna: se näkyy kaappauksissa mustana",
-    "other": "{count} suojattua ikkunaa: ne näkyvät kaappauksissa mustina"
+    "one": "{count} suojattu ikkuna: se on piilotettu kaappauksissa",
+    "other": "{count} suojattua ikkunaa: ne on piilotettu kaappauksissa"
   },
   "recent": "Viimeaikaiset",
   "hintArea": "Valitse alue vetämällä · Välilyönti: ikkuna · C: kopioi väri · T: kopioi teksti · Esc: peru",

@@ -63,6 +63,159 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     breaking it, and the session relinking a restarted gateway. Still open: neither Whonix member powers off on ACPI's
     power button (checked with the unchanged images: forced off after 120 s), so a group's Shut Down ends as a forced
     power-off for now.
+- **Protected windows, everywhere a picture leaves** (in development; latest release 0.8.9.5; approved by the maintainer on
+  2026-11-23 as isolation layer 8 of the Whonix group, docs/VIRTUALIZATION.md 19.5, and useful for any window). A
+  protected window shows normally on the display and never appears in anything that captures the screen
+  (docs/PRIVACY.md, "Protected windows").
+  - **What a capture shows:** an opaque neutral fill (`PAINT_PROTECT_FILL`) with a small lock and "Protected window" in
+    the person's language (new `privacy.protectedCapture` in all 35 languages, set by the shell through the new
+    `lord.media.setProtectedLabel`), in the window's exact box and corners, the title bar included: partly covered,
+    moved, scaled by the overview, rotated, on any display, on the CPU and GPU paint paths. Up to 0.8.9.5 it was black,
+    and only the content was hidden. A protected Linux full screen is now the fill on its own display only (it cleared
+    every display of a capture of them all).
+  - **One rule at the lowest point:** every picture of the screen that leaves lord-server is painted in capture mode
+    (`paint_capture`, `paint_capture_until`, `paint_capture_node`; `paint_protected_fill` in `ui/paint.c`) or is a copy of
+    one (`media_composed`). Covered: screenshots and `lord.media.screenshot`, a window alone (still refused), screen
+    recording, the remote desktop, the screen-sharing API, the ScreenCast portal (screen and window) and its chooser's
+    thumbnails, the Screenshot and PickColor portals, Wayland popups and full screen.
+  - **Fixed:** a capture through a transform the screen had already rasterized (the overview's scale, an effect, a
+    protected node's own rotation) reused that cached raster, real pixels included: a screenshot or a remote frame taken
+    during the overview showed the protected window. `tf_paint` now paints such a subtree again in capture mode and
+    never keeps that raster.
+  - **The GPU's read-back** for remote viewers is never sent while a protected node is on screen (before, the frame
+    painted right after a protected window opened could go out before the session moved to the CPU path).
+  - **A media source's own pixels** leave only through `media_src_exportable` (`media/capture.c`): `lord.media.saveImage`,
+    `copyImage`, `pixels`, `ocr`, `crop`, `resize` and `rotate` refuse a source shown inside a protected window
+    (`media.protectedWindow`), and so do Remote Desk's card picture and every picture of a machine.
+  - **API:** `wm.open(app, { protected: true })`, or `"protected": true` in a native app's manifest, opens the window
+    protected from its first frame and locked (`wm.setProtected(id, false)` can't undo it); `wm.setProtected(id, on,
+    { lock })`. The flag is on the window's frame (`WindowShell`) and content (`AppHost`). Linux apps can't set it: no
+    Wayland or X11 protocol asks for it, and no client is trusted with it (`sdk/protectmodel.js`).
+  - **Machines:** a machine with the anonymity profile (`machineProtected`: machine.json `profile_lock`, app.json
+    `profile`, a Whonix group) opens its window and its apps-mode windows protected; `lord.vm.protect(session)` (new,
+    one way) refuses its card picture (`lord.vm.snapshot`; the old `thumb.png` is removed), screenshot, recording (one
+    running stops) and snapshot picture, the window doesn't offer Screenshot or Record and stops taking card pictures,
+    and the library card shows no `thumb.png` for it. Every call site asks one helper (`isProtectedMachine`, meta.js:
+    the `lord.vm.list()` entry and app.json together, or the machine's own window already protected), so the window,
+    its apps-mode windows and the card can't disagree.
+  - **Defense in depth:** in a capture, a picture whose source is marked protected (a protected machine's, whatever
+    window shows it) is the fill too, counts as a protected node for the remote desktop and keeps its window from being
+    captured alone.
+  - **Tests:** `engine-test` `test_protected_transform_cache`, `test_protected_label`, `test_protected_media` and `test_protected_fuzz` (300 random
+    scenes through every capture function at four display scales, both paint paths, the drag layer and a blurred panel:
+    no protected pixel may reach any capture); `tests/protected_headless.sh` (a headless `lord-server-test` with Lord
+    Flow: Calculator opened protected is drawn on the display and is the fill in the screenshot, the remote frame, the
+    portal still and its window share, Notes beside it captured exactly; new test hook `frame`, only in
+    `lord-server-test`); `tests/protect_model_test.mjs`.
+- **Sentinela watches the virtual machines** (in development; latest release 0.8.9.5; approved by the maintainer
+  2026-11-23 as layer 9 of the anonymity group's isolation, docs/SENTINELA.md "Machines", docs/VIRTUALIZATION.md 6.28).
+  Still off by default and local only. Every 10 s it reads what Machines already exposes (`lord.vm.list()`,
+  `lord.vm.stats(dir)`) and per-machine socket counts from the Monitor's thread.
+  - **Always alerted, without the model, and they can't be turned off:** a machine's QEMU moved out of its own cgroup
+    scope (its limits no longer apply); a QEMU sandbox missing Landlock (files or network), seccomp, no_new_privs or its
+    cgroup, from the bits lord-vm applied and from the kernel's own `/proc/<pid>/status`; the Workstation of an
+    anonymity group with any way to the network besides its link (another network setting, forwarded ports, a bridge,
+    a live passt, a socket of its own). Each fires once per QEMU and finding and stays on screen until the person acts.
+  - **New toggles** in Settings → AI → Sentinela: a machine using far more CPU or memory than its own usual (after half
+    an hour of history: 10 minutes at 60 % of its vCPUs and 40 points above its usual; 1.5× its usual memory and
+    512 MB more); a machine that keeps crashing (3 unexpected ends in 15 minutes); for an anonymity group, a Gateway
+    whose traffic (8×) or remote addresses (3×) jump far above its own pattern, any unexpected end of a member, 3
+    restarts in 10 minutes and a CPU pegged at 90 % for 15 minutes. These may ask the local model, which gets only the
+    machine's name (as a quoted field), role, settings and the rule's numbers; its answer can't silence an alert.
+  - **Actions**, each only from the person's click: Open the machine (its window when it runs, the library otherwise),
+    Show in Monitor, Pause or Resume, Shut down.
+  - **Under the hood:** `lord.vm.stats` asks the machine's own lord-vm over its socket (as `lord-vm --status`) and
+    trusts the answer only from the person's installed `lord-vm` (the kernel's `SO_PEERCRED`, `/proc/<pid>/exe`) whose
+    child is that QEMU; `run.json` is only a hint. It adds `verified`, `qemuPid`, `sandbox`, `cgMode`, the kernel's
+    `seccomp` and `noNewPrivs`, `scope` (exactly the session's machine scope or below it, never a lookalike path) and
+    `passt`. A machine that looks running but can't be verified twice in a row is itself a sandbox alert; `lord.monitor.watchMachines`/`machinesWatched` give each running
+    machine's sockets, remote addresses and TCP bytes as counts only (`conn_machines`), never an address. A machine's
+    QEMU is no longer judged by the process CPU and memory rules (the machine rules compare it with its own usual).
+  - Tests: `build/vmwatch-test` (exact scope paths against lookalikes, the installed-program check, a stand-in lord-vm
+    answering, silent or half), `tests/sentinela_vm_test.mjs` (every rule on synthetic machine stats, an unverified
+    engine, baselines, the summary's bounds and an
+    injected name, the action mapping), and machine cases in the Sentinela notification and Settings scenes. Strings in
+    all 35 languages.
+- **Machines: QEMU in its own namespaces, and non-dumpable** (in development; latest release 0.8.9.5-beta; approved by
+  the maintainer 2026-11-23; docs/VIRTUALIZATION.md 3.3, which promised both). Every machine's QEMU now starts in its own
+  user, mount, ipc, uts and net namespaces, and the kernel makes it non-dumpable at exec, so the person's other programs,
+  which run as the same user, can no longer read the guest's memory, keys or typing.
+  - **Why it was needed**: Yama (`ptrace_scope` 1 on Debian 13) stops a same-user program from attaching to QEMU, but
+    not from reading `/proc/<qemu>/environ`, `maps`, `smaps` or opening `/proc/<qemu>/fd/N` (read access): a machine
+    with a shared folder keeps its RAM in a memfd that could be reopened that way.
+  - **Non-dumpable without a new root piece**: `execve` makes a process dumpable again unless its binary or its ELF
+    interpreter is unreadable (the kernel's `would_dump`). In QEMU's own mount namespace the dynamic loader is a copy with
+    mode `0100` mounted over the loader's path (`vmsandbox.c` `private_loader`: made in lord-vm's private runtime folder
+    and unlinked once mounted, a write lease proves nobody else holds it open, then its inode and bytes are checked), so
+    QEMU is non-dumpable from its first instruction. The kernel then ties QEMU's memory to the first user namespace where
+    the copy's owner and group are both mapped; QEMU's namespace maps the person's uid only, never a group, so that is
+    the computer's own, where only root may ptrace. A namespace the person owns would have let their programs back in:
+    the user namespace alone doesn't block same-user readers (measured: `environ` readable with it and without the
+    private loader). `/proc/<qemu>/` files become root's; `status`, `stat`, `comm`, `cmdline` and `cgroup` stay readable,
+    so the vCPU use, vCPU pinning, Monitor and root's `vm-memlock` checks keep working. lord-vm checks it after exec
+    (`vm_nondumpable`) and says it in the log and in `lord-vm --status --json` (`"nondumpable"`).
+  - **Cost** (measured on the amd64 PC, Debian 13 guest, 5 starts each after a warm-up): fork to QEMU's exec 5 ms
+    against 1 ms, QMP ready 135 ms against 115 ms (spread 43–172 ms either way), boot to login 18.5 s against 18.3 s,
+    QEMU's RSS 409 MB against 404 MB (within the spread), plus a 225 KB tmpfs copy of the loader per running machine.
+    Nothing per frame or per guest exit.
+  - **The namespaces**: the user namespace is made once at lord-vm's start, while lord-vm is still dumpable (a
+    non-dumpable process can't write its own `uid_map`), by a short-lived child that maps the person's uid, and kept as a
+    descriptor (`vm_userns_open`). QEMU's child joins it and makes the mount, ipc, uts and net namespaces
+    (`vm_ns_enter`) before its Landlock and seccomp. QEMU has no capability after exec, an unconfigured loopback for a
+    network (its sockets are the ones lord-vm passed), and stays lord-vm's plain child. Landlock's rule for QEMU's own
+    `/proc` folder now goes through `/proc/self`. Where the kernel refuses user namespaces, QEMU runs as before and the
+    machine's log says so (`"namespaces":0`).
+  - **No pid namespace**: QEMU's D-Bus display couldn't authenticate lord-vmdisplay from inside one (measured: "Unexpected
+    line 'NEGOTIATE_UNIX_FD' while in WaitingForAuth state", no picture, no keyboard): GLib 2.84 refuses peer
+    credentials whose pid is 0, which is how a process outside the namespace looks from inside. Reproduced with a plain
+    GDBus server under `unshare --user --map-user --pid`; uid-only mapping without a pid namespace authenticates. So a
+    compromised QEMU can still name the person's processes: signals stay refused (Landlock's signal scope), `setpriority`
+    and `sched_setaffinity` too (QEMU's own `resourcecontrol=deny`), but reading or setting another process's limits
+    with `prlimit` is left to the seccomp allowlist.
+  - **Monitor and pinning with a root-owned `/proc` folder**: other machines' QEMUs are recognised by the real uid in
+    their `status` (`vmpin_taken`), not by the owner of their `/proc` folder; Monitor's GPU view does the same for the
+    machines' GPU use (`gpustat.c`). Monitor's process list shows QEMU under root, as it already showed lord-vm.
+  - **Tests**: `vm-jail-probe` (in `make -C server test`) goes through lord-vm's own steps and then runs a program as
+    QEMU would run, through the dynamic loader under `/usr`: from inside it can't signal, ptrace or read the memory of a
+    sibling process, can't list `/proc` or read another's, can't read `~/.ssh`, the home folder, `/etc` or a file beside
+    its disks, can't write in `/tmp`, make a socket, a user namespace or a process; from outside (the probe's own
+    ancestor, which Yama alone lets in) its environment, memory, maps, descriptors and root aren't readable and `ptrace`
+    and `process_vm_readv` are refused. `vm-jail-probe --before` runs the old jail for comparison: 9 of those checks fail
+    there. `tests/vm_isolation.sh` checks the status fields, the refused reads, `PTRACE_SEIZE` and `process_vm_readv` on
+    a real machine; it no longer lists QEMU's descriptors, which the person's programs can't any more.
+- **Web apps: lord-web on WPEPlatform, WPE WebKit's new API** (in development; the latest release is 0.8.9.5-beta;
+  issue #142, maintainer's decision 2026-11-23). Everything lord-web does with WebKit's frames and input now goes
+  through one small interface, `server/src/web/webback.h`, with two implementations, one of them built:
+  - `webback_platform.c`, on **WPEPlatform** (WPE WebKit 2.50 and later; LordOS will ship its own build of wpewebkit
+    2.54 for Debian 13 with both APIs on). lord-web brings its own platform (a `WPEDisplay`, `WPEView`, `WPEToplevel`
+    and `WPEScreen` of its own) instead of WPEPlatform's Wayland one, so it keeps its window and hands lord-server its
+    frames itself, exactly as before: a `WPEBufferDMABuf` becomes a `wl_buffer` of the window with no copy (the
+    formats and modifiers offered to WebKit are the ones lord-server announces, and its DRM device is lord-server's
+    GPU, read from EGL), a `WPEBufferSHM` is copied into one of the window's `wl_shm` buffers (the CPU path, `LORD_GPU=0`).
+    Keys (the compositor's keymap through WPEPlatform's xkb keymap), the pointer, the wheel and touchpad, touch,
+    focus, size, fractional scale, the page's cursor (by its CSS name, now exact instead of guessed from the hovered
+    element), the clipboard (WPEPlatform's `WPEClipboard`, which keeps UTF-8 as UTF-8) and the screen's size and
+    refresh rate all reach WebKit as `WPEEvent`s and WPEPlatform calls. The input method stays lord-web's
+    text-input-v3 context, now shared by both backends.
+  - `webback_legacy.c`: the libwpe + wpebackend-fdo code lord-web had, moved behind the interface unchanged, so
+    Debian 13's WPE WebKit 2.48 keeps building and working exactly as before.
+  - `mk/web.mk` picks the backend: WPEPlatform when `pkg-config` finds `wpe-platform-2.0`, else legacy;
+    `LORD_WEB_BACKEND=legacy|platform` forces one (an error when its packages are missing). When lord-web is skipped
+    the build now says why: which packages are missing for each backend, or that `WEB=0` was given. Switching backend
+    rebuilds lord-web; `tools/iso/mkdeb-web.sh` writes the Depends of the backend that was built (no `libwpe`,
+    `wpebackend-fdo` or `libwayland-server` for WPEPlatform); lord-web's log names the backend and WebKit's version.
+  - Isolation: nothing was added to lord-web's sandbox. With WPEPlatform lord-web no longer runs wpebackend-fdo's
+    nested Wayland compositor (no `libwayland-server`, no socket pair for frames: frames come over WebKit's own IPC);
+    the web process opens the GPU's render node with GBM where the legacy one opened it through EGL (WebKit's sandbox
+    exposes `/dev/dri` in both); the `WPE_*` variables WPEPlatform reads were already dropped (docs/WEBAPPS.md, "The
+    view's backend").
+  - New test, `build/web-backend-test` (`tests/web_backend_test.c`, in `make -C server test`): the backend alone,
+    headless, with a throwaway HOME and WebKit's sandbox: a local page's pixels in the frame, a click and keys reaching
+    the page's listeners and the next frame, the wheel, a resize, scale 2 (`devicePixelRatio`, the frame's size, a click
+    at the same CSS position) and hidden then visible. It passes on the legacy backend with Debian 13's 2.48.3 and on
+    both backends with Debian sid's 2.54.3; lord-web also showed a page in a window of a headless weston on 2.54.3 with
+    both backends, by shared memory and by dmabuf. Still to check on LordOS's 2.54 backport and the VM: every web app
+    feature, before the backport ships.
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores

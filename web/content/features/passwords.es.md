@@ -40,7 +40,7 @@ Varios métodos pueden convivir. Por defecto, la bóveda se cierra sola después
 
 **La ventana.** La propia ventana de Contraseñas corre como su propio proceso aislado (`lord-server --app passwords`), no en el JavaScript del escritorio. Los valores revelados nunca entran en la memoria del escritorio. Las listas muestran títulos y nombres de usuario, nunca secretos; un valor viaja solo cuando tocás revelar, copiar o editar.
 
-**La pantalla.** La ventana de Contraseñas está protegida: sale en negro en las capturas, las grabaciones de pantalla, el escritorio remoto y, desde la 0.8.8.8, al compartir pantalla o una ventana con apps de Linux.
+**La pantalla.** La ventana de Contraseñas está protegida: sale como un recuadro gris con un candado (en negro hasta la 0.8.9.5) en las capturas, las grabaciones de pantalla, el escritorio remoto y, desde la 0.8.8.8, al compartir pantalla o una ventana con apps de Linux.
 
 **El portapapeles.** Un secreto copiado queda fuera del historial del portapapeles, se marca como sensible para las apps de Linux que respetan esa convención, y se borra a los 30 segundos (configurable) si todavía sigue ahí.
 

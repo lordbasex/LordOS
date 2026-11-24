@@ -44,6 +44,8 @@
 #include "../sec/json.h"
 #include "../sec/perms.h"
 #include "../sec/restrict.h"
+#include "../sec/cgroup.h"
+#include "../vm/vmwatch.h"
 #include "../sound/snd.h"
 #include "ui.h"
 #include "../term/term.h"
@@ -1257,7 +1259,13 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 }
 
 /* stats(dir) → { cpuUsec, memBytes, ioBytes, at } from the running QEMU's cgroup (counters: the app takes the
- * differences), diskBytes (what the machine's disks use on this computer), or only diskBytes when it's off */
+ * differences), diskBytes (what the machine's disks use on this computer), or only diskBytes when it's off.
+ * While it runs, also what Sentinela's machine rules check (docs/SENTINELA.md, "Machines"), read-only and never from
+ * run.json (the person's file, a hint only): verified (false: run.json says it runs but its lord-vm didn't answer as the
+ * installed lord-vm, of this user, with that QEMU as its child), and when true qemuPid, sandbox and cgMode (the VMS_*
+ * bits and VMC_* mode the machine's lord-vm reports over its socket, as `lord-vm --status`), seccomp and noNewPrivs (the
+ * kernel's /proc/<qemu>/status), scope ("in": QEMU and lord-vm exactly in the session's app-lordos-lordos-vm-<id>.scope
+ * or below it, "out" otherwise), passt (its passt process alive) */
 static long long cg_num(const char *cg, const char *file, const char *key) {
     char p[PATH_MAX + 64], buf[4096];
     snprintf(p, sizeof p, "/sys/fs/cgroup%s/%s", cg, file);
@@ -1279,6 +1287,74 @@ static long long cg_num(const char *cg, const char *file, const char *key) {
         } else if (!strncmp(line, key, strlen(key)) && line[strlen(key)] == ' ') { sum = atoll(line + strlen(key) + 1); found = 1; break; }
     }
     return found ? sum : -1;
+}
+/* ---- what Sentinela checks of a running machine (docs/SENTINELA.md, "Machines") ---- */
+
+/* /proc/<pid>/status: PPid, Seccomp (2: a filter), NoNewPrivs */
+static int proc_status(long pid, long *ppid, int *sec, int *nnp) {
+    char p[64], st[4096];
+    snprintf(p, sizeof p, "/proc/%ld/status", pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t k = fd >= 0 ? read(fd, st, sizeof st - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (k <= 0) return -1;
+    st[k] = 0;
+    *ppid = -1; *sec = -1; *nnp = -1;
+    for (char *line = st; line && *line; line = strchr(line, '\n') ? strchr(line, '\n') + 1 : NULL) {
+        if (!strncmp(line, "PPid:", 5)) *ppid = atol(line + 5);
+        else if (!strncmp(line, "Seccomp:", 8)) *sec = atoi(line + 8);
+        else if (!strncmp(line, "NoNewPrivs:", 11)) *nnp = atoi(line + 11);
+    }
+    return *ppid < 0 ? -1 : 0;
+}
+static long proc_uid(long pid) {
+    char p[64], st[4096];
+    snprintf(p, sizeof p, "/proc/%ld/status", pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t k = fd >= 0 ? read(fd, st, sizeof st - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (k <= 0) return -1;
+    st[k] = 0;
+    const char *u = strstr(st, "\nUid:");
+    return u ? atol(u + 5) : -1;
+}
+
+/* the process runs the installed program `name` (the one next to lord-server, bin_path): an upgraded one shows as
+ * "(deleted)" and still counts */
+static int vm_exe_is(long pid, const char *name) {
+    char want[PATH_MAX], got[PATH_MAX], p[64];
+    if (pid <= 1 || bin_path(name, want, sizeof want)) return 0;
+    snprintf(p, sizeof p, "/proc/%ld/exe", pid);
+    ssize_t k = readlink(p, got, sizeof got - 1);
+    if (k <= 0) return 0;
+    got[k] = 0;
+    char rw[PATH_MAX];
+    return realpath(want, rw) && vmwatch_exe_same(got, rw);
+}
+
+/* where lord-sessiond puts a machine's scope: beside lord-server's own leaf (".../lordos-session-<uid>/server"), the
+ * exact cgroup path; "" outside a LordOS session */
+static void vm_scope_path(const char *id, char *out, size_t n) { vmwatch_scope_path(cgroup_self(), id, out, n); }
+
+/* the process's cgroup (v2) is exactly `scope` or below it */
+static int vm_in_cgroup(long pid, const char *scope) {
+    char p[64], buf[PATH_MAX + 8];
+    snprintf(p, sizeof p, "/proc/%ld/cgroup", pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    ssize_t k = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+    if (fd >= 0) close(fd);
+    if (k <= 3) return 0;
+    buf[k] = 0;
+    return vmwatch_cg_under(buf, scope);
+}
+
+/* the machine's own lord-vm, asked over its socket (vmwatch_live) */
+static int vm_live(const char *id, VmLive *lv) {
+    const char *rt = getenv("XDG_RUNTIME_DIR");
+    char base[256], path[sizeof ((struct sockaddr_un *)0)->sun_path];
+    if (rt && rt[0] == '/') snprintf(base, sizeof base, "%s", rt); else snprintf(base, sizeof base, "/run/user/%u", (unsigned)getuid());
+    if ((size_t)snprintf(path, sizeof path, "%s/lordos-vm/%s.sock", base, id) >= sizeof path) return -1;
+    return vmwatch_live(path, lv, 150);
 }
 static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
@@ -1303,18 +1379,70 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (!vm_machine_load(dir, &bm, berr, sizeof berr) && bm.base[0] && vm_base_valid(bm.base) && !stat(bm.base, &st) && S_ISREG(st.st_mode))
             JS_SetPropertyStr(c, o, "baseBytes", JS_NewFloat64(c, (double)st.st_blocks * 512));
     }
+    /* run.json is the person's own file: only a hint (which QEMU the Machines cards count, whether to ask lord-vm) */
     snprintf(p, sizeof p, "%s/run.json", dir);
     char buf[2048];
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
-    long qpid = 0;
+    long qpid = 0, hint_passt = 0;
     if (n > 0) {
         JDoc d;
         if (!json_parse(buf, (size_t)n, &d, NULL, 0)) {
             const char *s = json_str(d.root, "state");
-            if (s && (!strcmp(s, "running") || !strcmp(s, "paused"))) qpid = (long)json_num(d.root, "qemu_pid", 0);
+            if (s && (!strcmp(s, "running") || !strcmp(s, "paused"))) {
+                qpid = (long)json_num(d.root, "qemu_pid", 0);
+                hint_passt = (long)json_num(d.root, "passt_pid", 0);
+            }
             json_free(&d);
+        }
+    }
+    /* Sentinela's facts (docs/SENTINELA.md, "Machines") come from the machine's lord-vm itself, never from run.json */
+    static VmMachine sm;
+    char serr[128], scope[PATH_MAX] = "";
+    int have_m = !vm_machine_load(dir, &sm, serr, sizeof serr) && sm.id[0];
+    if (have_m) vm_scope_path(sm.id, scope, sizeof scope);
+    if (qpid > 0 && have_m) {
+        VmLive lv;
+        int ok = !vm_live(sm.id, &lv);
+        if (ok && (lv.state == VS_RUNNING || lv.state == VS_PAUSED)) {
+            /* the peer of the machine's socket is the installed lord-vm, the person's, and the QEMU it names is its child */
+            long pp = -1;
+            int sec = -1, nnp = -1;
+            ok = lv.uid == getuid() && vm_exe_is(lv.pid, "lord-vm") && lv.qemu > 1 && !proc_status(lv.qemu, &pp, &sec, &nnp) && pp == lv.pid;
+            JS_SetPropertyStr(c, o, "verified", JS_NewBool(c, ok));
+            if (ok) {
+                qpid = lv.qemu;
+                JS_SetPropertyStr(c, o, "qemuPid", JS_NewInt32(c, (int32_t)lv.qemu));
+                set_int(c, o, "seccomp", sec);
+                set_int(c, o, "noNewPrivs", nnp);
+                set_int(c, o, "sandbox", lv.sandbox);
+                set_str(c, o, "cgMode", lv.cg & VMC_NESTED ? "nested" : lv.cg & VMC_SCOPE ? "scope" : "none");
+                /* in its own machine's scope (exactly that cgroup or below it), lord-vm and QEMU both; "" when this
+                 * isn't a LordOS session and the scope's place isn't known */
+                if (scope[0]) set_str(c, o, "scope", vm_in_cgroup(lv.qemu, scope) && vm_in_cgroup(lv.pid, scope) ? "in" : "out");
+                /* its passt (Shared network): a passt of the person's, lord-vm's child or in the machine's scope */
+                long pt = hint_passt, ppp = -1;
+                int alive = 0, d1, d2;
+                if (pt > 1 && pt <= 999999999 && !proc_status(pt, &ppp, &d1, &d2)) {
+                    char comm[32] = "";
+                    snprintf(p, sizeof p, "/proc/%ld/comm", pt);
+                    int cf = open(p, O_RDONLY | O_CLOEXEC);
+                    ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
+                    if (cf >= 0) close(cf);
+                    if (k > 0) comm[k] = 0;
+                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || (scope[0] && vm_in_cgroup(pt, scope)));
+                }
+                JS_SetPropertyStr(c, o, "passt", JS_NewBool(c, alive));
+            }
+        } else if (!ok) {
+            /* no answer: unverified unless the machine stopped meanwhile */
+            int still = 0;
+            fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+            n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
+            if (fd >= 0) close(fd);
+            if (n > 0) { buf[n] = 0; still = strstr(buf, "\"state\":\"running\"") || strstr(buf, "\"state\":\"paused\""); }
+            if (still) JS_SetPropertyStr(c, o, "verified", JS_FALSE);
         }
     }
     char cg[PATH_MAX] = "";
@@ -1329,6 +1457,8 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
             if (nl) *nl = 0;
             /* QEMU's own leaf, or the machine's scope when lord-vm couldn't divide it; never an unrelated cgroup */
             if (strstr(buf + 3, "lordos-vm-") && strlen(buf + 3) < sizeof cg) snprintf(cg, sizeof cg, "%s", buf + 3);
+            /* with the scope's place known: its counters only when QEMU is really under it */
+            if (scope[0] && !vm_in_cgroup(qpid, scope)) cg[0] = 0;
         }
     }
     if (cg[0]) {
@@ -1622,6 +1752,7 @@ typedef struct {
     int console_term;                   /* the Shell (6.18): a terminal session on the serial console's stream */
     uint32_t console_seq;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
+    int protect;                        /* a protected machine's (lord.vm.protect): its picture never leaves as a picture */
     double rec_fed;
     int rec_sound;                      /* lord-vmdisplay writes the guest's sound into the recording's ring */
     int notice, notice_code, notice_seq; /* VM_NOTICE: VMN_*, its number, a counter of them, and its words */
@@ -1725,6 +1856,14 @@ static Sess *get(JSContext *c, JSValueConst v) {
 
 static int new_slot(void) { for (int i = 0; i < MAX_SESS; i++) if (!sess[i].used) return i; return -1; }
 
+/* May the session's picture leave as a picture of its own (the card's thumb.png, a screenshot, a recording, a snapshot's
+ * picture)? Not a protected machine's (lord.vm.protect), nor one shown inside a protected window: media_src_exportable,
+ * the one gate for a media source's pixels (media/capture.c; docs/PRIVACY.md "Protected windows"). */
+static int pic_out_ok(Sess *s, MediaSrc *m) {
+    if (s && s->protect) { media_src_protect(m); return 0; }
+    return m && media_src_exportable(m);
+}
+
 static int ask(Sess *s, uint16_t type, int a) {
     if (s->vm < 0) return -1;
     VmMsg m = vm_msg(type, ++s->seq, a, 0, 0, 0, NULL);
@@ -1736,6 +1875,13 @@ static void vdsend(Sess *s, int type, int a, int b) {
     vd_send(s->vd, &m, -1);
     /* input ends an idle pace (the helper ends it itself: vmpace.h) */
     if (type == VD_KEY || type == VD_MOTION || type == VD_BUTTON || type == VD_WHEEL || type == VD_REL) vmpace_input(&s->pace);
+}
+
+/* the picture's recording ends now (finished properly: the file keeps what was recorded before), its sound with it */
+static void rec_end(Sess *s, MediaSrc *r) {
+    if (r) media_src_close(r);
+    s->rec = 0;
+    if (s->rec_sound) { vdsend(s, VD_AUDIO_REC, 0, 0); s->rec_sound = 0; }
 }
 
 /* VD_PACE when what the picture needs changed (vm/vmpace.h): a picture no window shows (and nothing records) is taken
@@ -2595,6 +2741,7 @@ static void set_picture(Sess *s, int w, int h) {
     if (m && m->gtex) { m->gtex = NULL; m->gpu_drawn = 0; }
     if (!m) m = media_src_new(SK_IMAGE, "machines");
     if (!m) { munmap(map, len); close(fd); return; }
+    if (s->protect) media_src_protect(m);
     if (m->map) munmap(m->map, m->map_len);
     free(m->cache); m->cache = NULL; m->cache_w = m->cache_h = 0;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->xrgb = 1; m->frame_seq++;
@@ -2747,6 +2894,7 @@ static void from_vd(Sess *s) {
         clock_gettime(CLOCK_MONOTONIC, &ts);
         double now = ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
         if (!r || r->kind != SK_SCREENREC) { s->rec = 0; if (s->rec_sound) { vdsend(s, VD_AUDIO_REC, 0, 0); s->rec_sound = 0; } }
+        else if (!pic_out_ok(s, ms)) rec_end(s, r);         /* the picture became a protected window's: it ends here */
         else if ((frames || now - s->rec_fed > (s->rec_sound ? 1000.0 / 30 : 1000)) && media_framerec_feed(r, ms->px, ms->w, ms->h)) s->rec_fed = now;
     }
 }
@@ -3465,12 +3613,31 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    if (m && !pic_out_ok(s, m)) return JS_FALSE;        /* a protected machine has no card picture (thumb.png) */
     media_src_need_cpu(m);              /* a picture shown as a texture: read back now */
     if (!m || !m->px || m->w < 1 || m->h < 1) return JS_FALSE;
     /* a group's member under the anonymity profile (docs/VIRTUALIZATION.md 19.5): no picture of it stays on disk */
     VmMachine mm;
     if (vm_machine_load(s->dir, &mm, NULL, 0) || mm.profile_lock) return JS_FALSE;
     return JS_NewBool(c, !vm_thumb_save_async(s->dir, m->px, m->w, m->h, VM_THUMB_W));
+}
+
+/* protect(session) → bool: the machine is a protected one (Machines: the anonymity profile, docs/VIRTUALIZATION.md 19.5):
+ * from now on, for the session's life, its picture never leaves as a picture of its own (no card picture, screenshot,
+ * recording or snapshot picture; pic_out_ok), a recording running stops, and the card picture it had (thumb.png) is
+ * removed. One way: nothing turns it off. Its windows are protected by the app (wm.open's protected), so the screen's
+ * captures show them as the protected fill. */
+static JSValue f_protect(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    if (!s) return JS_FALSE;
+    s->protect = 1;
+    MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
+    media_src_protect(m);
+    if (s->rec) rec_end(s, media_src_get(s->rec));
+    char p[PATH_MAX + 16];
+    if (s->dir[0] == '/' && snprintf(p, sizeof p, "%s/thumb.png", s->dir) < (int)sizeof p) unlink(p);
+    return JS_TRUE;
 }
 
 /* screenshot(session) → the file's path, or "": the guest's picture at its size, in ~/Pictures/Screenshots as
@@ -3480,6 +3647,7 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     const char *home = getenv("HOME");
+    if (m && !pic_out_ok(s, m)) return JS_NewString(c, "");     /* a protected machine: no screenshot of it */
     media_src_need_cpu(m);
     if (!m || !m->px || !home || home[0] != '/') return JS_NewString(c, "");
     char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
@@ -3970,6 +4138,7 @@ static JSValue f_record(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     const char *home = getenv("HOME");
+    if (m && !pic_out_ok(s, m)) return JS_NewInt32(c, 0);       /* a protected machine: never recorded */
     media_src_need_cpu(m);              /* the recording reads the picture's memory from now on (gpu_show_ok) */
     if (!m || !m->px || m->w < 16 || m->h < 16 || !home || home[0] != '/' || s->rec) return JS_NewInt32(c, 0);
     char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
@@ -4151,8 +4320,10 @@ static JSValue f_snap_take(JSContext *c, JSValueConst t, int argc, JSValueConst 
     snprintf(file, sizeof file, "%s.png", tag);
     Sess *s = argc >= 3 ? get(c, argv[2]) : NULL;
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
-    media_src_need_cpu(m);
-    if (m && m->px && m->w > 0 && m->h > 0) vm_png_save(sd, file, m->px, m->w, m->h, 640);
+    int shut = (s && s->protect) || (m && !pic_out_ok(s, m));    /* a protected machine's snapshot keeps no picture */
+    if (!shut) media_src_need_cpu(m);
+    if (shut) { /* nothing: the list shows the snapshot without a picture */ }
+    else if (m && m->px && m->w > 0 && m->h > 0) vm_png_save(sd, file, m->px, m->w, m->h, 640);
     else {
         char from[PATH_MAX + 32], to[PATH_MAX + 96];
         snprintf(from, sizeof from, "%s/thumb.png", dir);
@@ -4608,7 +4779,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
-    JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
+    JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),

@@ -5,8 +5,10 @@
  *   webengine.c   WebKit: the context and network session of the profile, the view, navigation, permissions,
  *                 notifications, downloads, the file chooser, the page of an app that is offline (weboffline.h)
  *   webwin.c      the Wayland window: xdg-shell, the frame's decoration, scale, the frames WebKit draws (dmabuf or
- *                 shared memory), keyboard, pointer, touch, the clipboard, the input method (webshm.c: the pieces that
- *                 read wpebackend-fdo's own buffers)
+ *                 shared memory), keyboard, pointer, touch, the clipboard, the input method
+ *   webback.h     the seam to WPE WebKit's view: webback_legacy.c (libwpe + wpebackend-fdo, WPE 2.48; webshm.c reads
+ *                 wpebackend-fdo's own buffers) or webback_platform.c (WPEPlatform, WPE 2.50 and later), one of them
+ *                 built (mk/web.mk)
  *   webbus.c      the session bus: notifications, the OpenURI and FileChooser portals, org.lordos.WebApps1.Ask
  *   webmain.c     also --inspect: WebKit's remote inspector on 127.0.0.1 for this window only (webinspect.h), behind
  *                 webproxy.c's gate (webguard.h: a one-time address, then a cookie; Host and Origin checked)
@@ -43,9 +45,9 @@
 #include <sys/types.h>
 
 #include <wpe/webkit.h>
-#include <wpe/fdo.h>
 
 typedef struct WebWin WebWin;
+typedef struct WebBack WebBack;
 typedef struct WebTray WebTray;
 typedef struct WebProxy WebProxy;
 
@@ -62,7 +64,7 @@ typedef struct {
     WebKitWebContext *context;
     WebKitNetworkSession *session;
     WebKitWebView *view;
-    struct wpe_view_backend_exportable_fdo *exportable;
+    WebBack *back;                      /* the view's backend (webback.h) */
     WebWin *win;
     WebTray *tray;
     GDBusConnection *bus;
@@ -98,7 +100,7 @@ WebKitWebContext *web_context_new(void);                 /* memory pressure, no 
 WebKitSettings *web_settings_new(int ua_kind);           /* the user agent (WEBREG_UA_*), developer extras off, no automatic windows */
 /* the profile's Browser identity changed (SetUserAgent): the view's user agent, then the app's page loads again */
 void web_set_user_agent(Web *w, int kind);
-int web_engine_start(Web *w);                            /* the view on w->exportable, signals, first load */
+int web_engine_start(Web *w);                            /* the view on w->back, signals, first load */
 void web_quit(Web *w, int code);
 /* the window was closed: hidden behind the tray when the app runs in the background, otherwise quit */
 void web_close_requested(Web *w);

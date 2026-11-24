@@ -10,8 +10,8 @@
   "timer": "Időzítő",
   "timerNone": "Nincs",
   "protectedNote": {
-    "one": "{count} védett ablak: a felvételeken feketén jelenik meg",
-    "other": "{count} védett ablak: a felvételeken feketén jelennek meg"
+    "one": "{count} védett ablak: a felvételeken rejtve marad",
+    "other": "{count} védett ablak: a felvételeken rejtve maradnak"
   },
   "recent": "Legutóbbiak",
   "hintArea": "Húzással jelöljön ki egy területet · Szóköz: ablak · C: szín másolása · T: szöveg másolása · Esc: mégse",

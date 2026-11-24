@@ -65,5 +65,6 @@
   "ask.vr": "“{app}” wants to use the VR headset {headset}",
   "ask.vrNote": "Its display goes to the app alone; LordOS never shows your desktop there. It’s taken back when the app closes, the headset is unplugged or the screen locks. You can change this later in Settings → Privacy.",
   "perm.vr": "VR headsets",
-  "permHint.vr": "Apps that may drive a VR headset’s display directly. Only headsets are ever lent, never your monitors, and they’re taken back when the screen locks, you switch users or you choose Deny."
+  "permHint.vr": "Apps that may drive a VR headset’s display directly. Only headsets are ever lent, never your monitors, and they’re taken back when the screen locks, you switch users or you choose Deny.",
+  "protectedCapture": "Protected window"
 }

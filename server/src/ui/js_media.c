@@ -440,7 +440,7 @@ static JSValue f_transcode(JSContext *c, JSValueConst t, int argc, JSValueConst 
 
 /* ---- screenshots ---- */
 
-/* screenshot(app, { x, y, width, height, display, until, also }?) → id (with protected windows in black). until: the
+/* screenshot(app, { x, y, width, height, display, until, also }?) → id (with protected windows as the protected fill). until: the
  * node of a window's frame (wm.frameNode): what is above that window is left out (Screenshots' window capture).
  * also: with until, up to PAINT_ALSO_MAX node ids painted over the window (its sheets, wm.sheetNodes); others ignored. */
 static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -484,6 +484,7 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
 static JSValue f_crop(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc >= 5 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
     if (!s) return JS_NULL;
     int v[5] = { 0 };
     for (int i = 0; i < 5 && 1 + i < argc; i++) { double d = 0; JS_ToFloat64(c, &d, argv[1 + i]); v[i] = d == d && fabs(d) < 65536 ? (int)d : 0; }
@@ -507,6 +508,7 @@ static int arg_int_in(JSContext *c, JSValueConst v, int lo, int hi, int bad) {
 static JSValue f_resize(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc >= 3 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
     if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE)) return JS_NULL;
     int w = arg_int_in(c, argv[1], 1, MP_MAX_DIM, 0), h = arg_int_in(c, argv[2], 1, MP_MAX_DIM, 0);
     if (!w || !h) return js_throw_code(c, "media.invalidArguments", NULL);
@@ -521,6 +523,7 @@ static JSValue f_resize(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 static JSValue f_pixels(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc >= 5 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
     if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE)) return JS_NULL;
     int x = arg_int_in(c, argv[1], -65536, 65536, 1 << 30), y = arg_int_in(c, argv[2], -65536, 65536, 1 << 30);
     int w = arg_int_in(c, argv[3], 1, PIXELS_MAX, 0), h = arg_int_in(c, argv[4], 1, PIXELS_MAX, 0);
@@ -550,6 +553,7 @@ static int ocr_sid;
 static JSValue f_ocr(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
     if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE) || s->w < 1 || s->h < 1) return JS_NULL;
     const char *langs = JS_ToCString(c, argv[1]);
     if (!langs) return JS_EXCEPTION;
@@ -585,6 +589,7 @@ static JSValue f_ocr(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 static JSValue f_rotate(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
     if (!s || !s->px || (s->kind != SK_CAPTURE && s->kind != SK_IMAGE)) return JS_NULL;
     int turns = arg_int_in(c, argv[1], -3, 3, 99);
     if (turns == 99) return js_throw_code(c, "media.invalidArguments", NULL);
@@ -664,6 +669,7 @@ static JSValue f_annotate(JSContext *c, JSValueConst t, int argc, JSValueConst *
 static JSValue f_save_image(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc >= 2 ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
     const char *out = argc >= 2 ? arg_path(c, argv[1]) : NULL;
     if (!s || !s->px || !out) { if (out) JS_FreeCString(c, out); return js_throw_code(c, "media.invalidArguments", NULL); }
     char tmp[PATH_MAX + 64], dst[PATH_MAX], fmt[8], params[64];
@@ -684,6 +690,7 @@ static JSValue f_save_image(JSContext *c, JSValueConst t, int argc, JSValueConst
 static JSValue f_copy_image(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     MediaSrc *s = argc ? media_src_get(arg_id(c, argv[0])) : NULL;
+    if (s && !media_src_exportable(s)) return js_throw_code(c, "media.protectedWindow", NULL);   /* a protected window's picture */
     if (!s || !s->px) return js_throw_code(c, "media.invalidImage", NULL);
     const char *rt = getenv("XDG_RUNTIME_DIR");
     if (!rt) return js_throw_code(c, "media.noRuntimeDir", NULL);
@@ -919,6 +926,17 @@ static JSValue f_protected(JSContext *c, JSValueConst t, int argc, JSValueConst 
     return JS_NewInt32(c, media_protected_count());
 }
 
+/* setProtectedLabel(text): the words under the lock where a protected window is in a capture (paint_protected_fill), in
+ * the person's language; the shell sets it (sdk/i18n.js) at start and when the language changes. */
+static JSValue f_set_protected_label(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *s = argc > 0 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    if (!s) return js_throw_code(c, "media.invalidArguments", NULL);
+    paint_set_protected_label(s);
+    JS_FreeCString(c, s);
+    return JS_UNDEFINED;
+}
+
 static JSValue f_hwaccel(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     return JS_NewString(c, media_hwaccel());
@@ -973,6 +991,7 @@ static const JSCFunctionListEntry media_funcs[] = {
     JS_CFUNC_DEF("photo", 3, f_photo),
     JS_CFUNC_DEF("cameraRecord", 3, f_camera_record),
     JS_CFUNC_DEF("protectedCount", 0, f_protected),
+    JS_CFUNC_DEF("setProtectedLabel", 1, f_set_protected_label),
     JS_CFUNC_DEF("hwaccel", 0, f_hwaccel),
     JS_CFUNC_DEF("hwDecode", 0, f_hwdecode),
     JS_CFUNC_DEF("composition", 0, f_composition),

@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela analysiert schon mehrere Dinge. Versuche es gleich noch einmal.",
   "llm.noEngine": "Die Engine für das lokale Modell ist nicht installiert.",
   "llm.noModel": "Dieses lokale Modell ist nicht installiert.",
-  "sentinela.blockFailed": "Sein Netzwerk konnte nicht gesperrt werden."
+  "sentinela.blockFailed": "Sein Netzwerk konnte nicht gesperrt werden.",
+  "sentinela.machineGone": "Diese Maschine ist nicht mehr in „Maschinen“.",
+  "sentinela.machineFailed": "Die Maschine hat nicht geantwortet."
 }

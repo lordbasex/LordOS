@@ -2,9 +2,18 @@
 // name), notes, whether its guest tools open files (opens: Files' "Open with", openwith.js), what closing its window does (onClose), whether it opens in apps mode (appsMode) and whether it keeps this computer awake (keepAwake, read by
 // lord.vm.awake too). <machine>/app.json, written by the app as the person; machine.json stays lord-vm's alone.
 import { fs } from '@lordos/sdk';
-import { cpuWindows } from './model.js';
+import { cpuWindows, machineProtectedOf } from './model.js';
 
 const cache = new Map();         // dir → { mtime, meta }: the library reads it every 1.5 s
+
+// Is the machine in dir a protected one (model.js machineProtectedOf: the anonymity profile)? entry: its lord.vm.list()
+// entry when the caller has it (read here otherwise); homeProtected: its own window is protected already. The only way
+// Machines asks, so its window, its apps-mode windows and its card can't disagree.
+export function isProtectedMachine(dir, entry = null, homeProtected = false) {
+  let e = entry;
+  if (!e) { try { e = typeof lord !== 'undefined' && lord.vm ? lord.vm.list().find((x) => x.dir === dir) || null : null; } catch (err) { e = null; } }
+  return machineProtectedOf(e, readMeta(dir), homeProtected);
+}
 
 export function readMeta(dir) {
   let st = null;

@@ -19,6 +19,7 @@
  *     sandbox, which keeps the web content and network processes off the files, mounts for every child it starts. */
 #include "web.h"
 #include "webwin.h"
+#include "webback.h"
 #include "../sec/cgroup.h"
 #include "../sec/sandbox.h"
 
@@ -411,10 +412,10 @@ int main(int argc, char **argv) {
         fcntl(3, F_SETFD, fl | FD_CLOEXEC);
         close_range(4, ~0U, 0);
         if (isolate("lordos-webprobe")) return 1;
-        wpe_loader_init("libWPEBackend-fdo-1.0.so.1");
+        webback_process_init();
         return w->args.mode == WEBARGS_PROBE ? webprobe_run(w) : webprobe_icon_run(w);
     }
     close_range(3, ~0U, 0);
-    wpe_loader_init("libWPEBackend-fdo-1.0.so.1");
+    webback_process_init();
     return run_app(w);
 }

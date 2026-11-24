@@ -929,5 +929,7 @@
   "llm.busy": "Sentinela가 이미 여러 항목을 분석하고 있습니다. 잠시 후에 다시 시도하십시오.",
   "llm.noEngine": "로컬 모델 엔진이 설치되어 있지 않습니다.",
   "llm.noModel": "그 로컬 모델은 설치되어 있지 않습니다.",
-  "sentinela.blockFailed": "네트워크를 차단하지 못했습니다."
+  "sentinela.blockFailed": "네트워크를 차단하지 못했습니다.",
+  "sentinela.machineGone": "그 머신은 더 이상 가상 머신 앱에 없습니다.",
+  "sentinela.machineFailed": "머신이 응답하지 않았습니다."
 }

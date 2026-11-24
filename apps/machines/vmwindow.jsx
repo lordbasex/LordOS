@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
-import { readMeta, writeMeta } from './meta.js';
+import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
@@ -227,9 +227,9 @@ function Tools({ ctl, floating, compact, tiny, apps }) {
     {tiny && !ctl.rec ? null : <BarGroup>
       {!floating ? <IconBtn sym="terminal" label={tr('machines.tb.shell')} on={ctl.shell} disabled={!ctl.shell && !ctl.a.reset} onClick={ctl.toggleShell} /> : null}
       <IconBtn sym="logs" label={tr('machines.cmd.logs')} onClick={ctl.logs} />
-      <IconBtn sym="snapshot" label={tr('machines.tb.screenshot')} disabled={!a.keys} onClick={ctl.screenshot} />
+      <IconBtn sym="snapshot" label={tr('machines.tb.screenshot')} disabled={!a.keys || ctl.prot} onClick={ctl.screenshot} />
       {ctl.rec ? <IconBtn sym="stop" danger label={tr('machines.tb.recording', { t: ctl.recTime })} onClick={ctl.record} />
-        : <IconBtn sym="record" color="#ff453a" label={tr('machines.tb.record')} disabled={!a.keys} onClick={ctl.record} />}
+        : <IconBtn sym="record" color="#ff453a" label={tr('machines.tb.record')} disabled={!a.keys || ctl.prot} onClick={ctl.record} />}
     </BarGroup>}
     {ctl.rec ? <Text style={{ fontSize: 12, fontWeight: 600, color: '#ff6b6b', marginLeft: 4 }}>{ctl.recTime}</Text> : null}
     {compact ? null : <BarSep />}
@@ -420,6 +420,13 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const [gpu, setGpu] = useWindowState('vm.gpu', () => (has() ? lord.vm.list().find((x) => x.dir === dir)?.gpu || '' : ''));
   const gpuRef = useRef(gpu);
   gpuRef.current = gpu;
+  // a protected machine (the anonymity profile, model.js machineProtected): its window is protected and locked (a neutral
+  // fill in every capture of the screen), and lord.vm.protect keeps its picture from leaving as a picture of its own
+  const [prot] = useWindowState('vm.prot', () => has() && isProtectedMachine(dir));
+  const protRef = useRef(prot);
+  protRef.current = prot;
+  useEffect(() => { if (prot) wm.setProtected(winId, true, { lock: true }); }, [prot, winId]);
+  useEffect(() => { if (prot && sid) lord.vm.protect(sid); }, [prot, sid]);
   const [closing, setClosing] = useWindowState('vm.closing', false);   // false, 'shutdown' or 'suspend'
   const [askClose, setAskClose] = useWindowState('vm.ask', false);
   const [always, setAlways] = useState(false);
@@ -585,7 +592,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       // only while the guest's system is up (its agent answers, when it has one): never its firmware, boot or shutdown
       // screens, which a card would otherwise keep
       const sysUp = !cfgRef.current?.agent || q.agent?.state === 'connected';
-      if (q.display === 'up' && q.state === 'running' && sysUp && !closingRef.current && now() - z.thumb > THUMB_MS) { z.thumb = now(); lord.vm.snapshot(sid); }
+      // (never a protected machine's: no picture of it stays on disk)
+      if (!protRef.current && q.display === 'up' && q.state === 'running' && sysUp && !closingRef.current && now() - z.thumb > THUMB_MS) { z.thumb = now(); lord.vm.snapshot(sid); }
       if (q.ended) {
         lord.vm.close(sid);
         setSid(0);
@@ -732,7 +740,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     wheel.current = rest;
     if (n) lord.vm.wheel(sid, n, 0);
   };
-  const cmd = (c) => { if (sid) { if (c === 'shutdown' && st?.state === 'running' && (!cfgRef.current?.agent || st?.agent?.state === 'connected')) lord.vm.snapshot(sid); lord.vm.cmd(sid, c); } };
+  const cmd = (c) => { if (sid) { if (!prot && c === 'shutdown' && st?.state === 'running' && (!cfgRef.current?.agent || st?.agent?.state === 'connected')) lord.vm.snapshot(sid); lord.vm.cmd(sid, c); } };
   const sendCombo = (codes) => { if (sid) keysTo(sid, comboSend(codes, latchRef.current)); };
   const cad = () => sendCombo(CTRL_ALT_DEL);
   const full = useStore(windows, (ws) => !!ws.find((w) => w.id === winId)?.fullscreen);
@@ -1128,6 +1136,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     configure: (section) => setCfgSheet({ section }),
     begin: () => begin(),
     screenshot: shot,
+    prot,     // a protected machine: no screenshot or recording of its picture (lord.vm.protect refuses them too)
     power: [
       { label: tr('machines.cmd.shutdown'), disabled: !a.shutdown, onClick: () => cmd('shutdown') },
       { label: tr('machines.cmd.suspend'), disabled: !a.suspend || busy || noSuspend(st, gpu), onClick: () => cmd('suspend') },
@@ -1164,7 +1173,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         { label: tr('machines.tb.transferOpen'), disabled: !cfg.transfer, onClick: xferOpen },
         ...(xstate === 'setup' ? [{ label: tr('machines.tb.transferSetup'), onClick: xferSetup }] : []),
         '-',
-        { label: tr('machines.tb.screenshot'), disabled: !a.keys, onClick: shot },
+        { label: tr('machines.tb.screenshot'), disabled: !a.keys || prot, onClick: shot },
         { label: full ? tr('machines.cmd.exitFullscreen') : tr('machines.cmd.fullscreen'), onClick: () => wm.setFullscreen(winId, !full) },
         { label: tr('machines.tb.capture'), checked: capOn, disabled: !capOffer.offered, hint: capOffer.why === 'apps' ? tr('machines.tb.captureApps') : '', onClick: () => capDo({ type: 'toggle' }) },
         { label: tr('machines.cmd.logs'), onClick: () => openLogs(m0) },

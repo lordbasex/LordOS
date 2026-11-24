@@ -141,6 +141,9 @@ static struct {
     int watch_procs;                    /* Sentinela: the process list every WPROCS_MS, Monitor open or not */
     MonProcs *wprocs;                   /* its latest list (mon_procs_watched hands it over) */
     uint64_t wpseq;
+    int watch_machines;                 /* Sentinela's machine rules: per machine network counts with each list */
+    char *wmach;                        /* their latest JSON (conn_machines; mon_machines_watched hands a copy over) */
+    uint64_t wmseq;
     int detail_pid;                     /* Get Info: 0 = none */
     unsigned long long detail_start;
     char geo_path[PATH_MAX];
@@ -766,6 +769,17 @@ static void publish_wprocs(MonProcs *pl) {
     pthread_mutex_unlock(&M.mu);
 }
 
+/* With the watched process list, when Sentinela watches machines: their network counts (conn.c conn_machines) */
+static void publish_wmach(void) {
+    pthread_mutex_lock(&M.mu);
+    int on = M.watch_machines;
+    pthread_mutex_unlock(&M.mu);
+    if (!on) return;
+    Buf c = { 0 };
+    conn_machines(&c);
+    publish(&M.wmach, &M.wmseq, &c);
+}
+
 static void *worker(void *arg) {
     (void)arg;
     double next_watch = 0, next_volt = 0, next_wprocs = 0;
@@ -792,6 +806,7 @@ static void *worker(void *arg) {
             if (M.watch_procs && next_wprocs - now <= 0) {
                 pthread_mutex_unlock(&M.mu);
                 publish_wprocs(procs_scan());
+                publish_wmach();
                 next_wprocs = mon_now_ms() + WPROCS_MS;
                 pthread_mutex_lock(&M.mu);
                 continue;
@@ -852,6 +867,7 @@ static void *worker(void *arg) {
                         cp->rows = (MonProc *)(cp + 1);
                         cp->pool = (char *)(cp->rows + cp->n);
                         publish_wprocs(cp);
+                        publish_wmach();
                         next_wprocs = t0 + WPROCS_MS;
                     }
                     wdone = 1;
@@ -865,6 +881,7 @@ static void *worker(void *arg) {
         }
         if (wwp && !wdone && !wp && t0 >= next_wprocs) {
             publish_wprocs(procs_scan());
+            publish_wmach();
             next_wprocs = t0 + WPROCS_MS;
         }
         if (dpid > 0 && tick % 4 == 1) {
@@ -922,6 +939,7 @@ void mon_reset(void) {
     M.detail_pid = 0;
     M.watch_disks = 0;
     M.watch_procs = 0;
+    M.watch_machines = 0;
     pthread_mutex_unlock(&M.mu);
 }
 
@@ -961,6 +979,21 @@ void mon_watch_procs(int on) {
     else { free(M.wprocs); M.wprocs = NULL; }
     pthread_cond_signal(&M.cv);
     pthread_mutex_unlock(&M.mu);
+}
+
+void mon_watch_machines(int on) {
+    pthread_mutex_lock(&M.mu);
+    M.watch_machines = !!on;
+    if (!on) { free(M.wmach); M.wmach = NULL; }
+    pthread_mutex_unlock(&M.mu);
+}
+
+char *mon_machines_watched(uint64_t *seq) {
+    pthread_mutex_lock(&M.mu);
+    char *r = NULL;
+    if (M.wmach && M.wmseq != *seq) { r = strdup(M.wmach); *seq = M.wmseq; }
+    pthread_mutex_unlock(&M.mu);
+    return r;
 }
 
 /* Like the temperatures, taking it does not keep the 4 Hz sampling awake. */

@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela analyserar redan flera saker. Försök igen om en stund.",
   "llm.noEngine": "Motorn för den lokala modellen är inte installerad.",
   "llm.noModel": "Den lokala modellen är inte installerad.",
-  "sentinela.blockFailed": "Dess nätverk kunde inte blockeras."
+  "sentinela.blockFailed": "Dess nätverk kunde inte blockeras.",
+  "sentinela.machineGone": "Den maskinen finns inte längre i Maskiner.",
+  "sentinela.machineFailed": "Maskinen svarade inte."
 }

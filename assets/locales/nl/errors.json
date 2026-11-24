@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela analyseert al meerdere dingen. Probeer het zo meteen opnieuw.",
   "llm.noEngine": "De engine voor het lokale model is niet geïnstalleerd.",
   "llm.noModel": "Dat lokale model is niet geïnstalleerd.",
-  "sentinela.blockFailed": "Het netwerk kon niet worden geblokkeerd."
+  "sentinela.blockFailed": "Het netwerk kon niet worden geblokkeerd.",
+  "sentinela.machineGone": "Die machine staat niet meer in Machines.",
+  "sentinela.machineFailed": "De machine antwoordde niet."
 }

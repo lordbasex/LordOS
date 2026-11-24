@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela analysoi jo useita asioita. Yritä hetken päästä uudelleen.",
   "llm.noEngine": "Paikallisen mallin moottoria ei ole asennettu.",
   "llm.noModel": "Sitä paikallista mallia ei ole asennettu.",
-  "sentinela.blockFailed": "Sen verkkoa ei voitu estää."
+  "sentinela.blockFailed": "Sen verkkoa ei voitu estää.",
+  "sentinela.machineGone": "Konetta ei ole enää Koneet-sovelluksessa.",
+  "sentinela.machineFailed": "Kone ei vastannut."
 }

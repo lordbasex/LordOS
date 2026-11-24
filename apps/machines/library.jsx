@@ -18,7 +18,7 @@ import { Sheet, Sym } from './kit.jsx';
 import { BUILTIN } from './profiles.js';
 import { loadProfiles, storeRev } from './store.js';
 import { usePal, has, gb, bytes, gib, OsMark, Bar, Btn, PopMenu, markColors, overlayRoot, vmRefusal, startPrep } from './ui.jsx';
-import { readMeta, readCpuUse } from './meta.js';
+import { readMeta, readCpuUse, isProtectedMachine } from './meta.js';
 import { CloneSheet } from './clone.jsx';
 import { withAsk } from './openwith.js';
 
@@ -33,7 +33,9 @@ export function openMachine(m, opts) {
   const instance = `vm-${m.id || m.folder}`;
   const id = `machines#${instance}`;
   const fresh = !windows.get().some((w) => w.id === id);
-  wm.open('machines', { instance, args: { machine: m.dir, name: m.name, ...(opts?.loadvm ? { loadvm: opts.loadvm } : {}) } });
+  // a protected machine's window (the anonymity profile) is protected from its first frame: a neutral fill in every capture
+  const prot = isProtectedMachine(m.dir, m);
+  wm.open('machines', { instance, protected: prot, args: { machine: m.dir, name: m.name, ...(opts?.loadvm ? { loadvm: opts.loadvm } : {}) } });
   if (fresh) { wm.resize(id, 1024, 768 + 48); wm.center(id); }
   else playAsks.set((x) => ({ ...x, [m.dir]: (x[m.dir] || 0) + 1 }));
   return id;
@@ -129,7 +131,9 @@ function MoreBtn({ m, onMenu }) {
 }
 // a machine's picture: its last one (live while its window shows it), else its system's colors and mark
 function Picture({ m, sys, on, height, radius = 0 }) {
-  const src = thumbSrc(m.dir, m.thumbTime);
+  // a protected machine has no card picture: lord.vm.protect removed it and never writes another; one left from before
+  // isn't shown either
+  const src = isProtectedMachine(m.dir, m) ? '' : thumbSrc(m.dir, m.thumbTime);
   const [c1, c2] = markColors(sys.id);
   return (
     <View style={{ height, borderRadius: radius, overflow: 'hidden', ...(src ? { backgroundColor: '#000' } : { background: `linear-gradient(135deg, ${c2}, ${c1})` }) }}>

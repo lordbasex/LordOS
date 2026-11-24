@@ -6,7 +6,7 @@
 //   Print Screen        what Options → Print Screen Key says (GitHub #202): the entire screen by default
 // The screen permission starts allowed for this app (pressing the key is the request, GitHub #219; perms.c
 // perm_builtin_default), and a "Don't Allow" saved in Settings → Privacy wins.
-// Protected windows (wm.setProtected) come out black, and one is never captured alone: the server does that, not this app.
+// Protected windows (wm.setProtected) come out as the protected fill, and one is never captured alone: the server does that, not this app.
 // After each capture a floating thumbnail shows up; a click opens the markup editor (editor.jsx: arrow,
 // box, line, text, blur, pixelate and solid-fill redaction, crop, resize, turns). Photos and Files'
 // Quick Preview open the same editor on any picture (media.js openMarkup). Captures are saved in

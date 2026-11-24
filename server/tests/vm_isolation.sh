@@ -114,12 +114,22 @@ t "sandbox: /dev/kvm by descriptor"     'grep -q "\"kvm_fd\":1" "$W/status.json"
 t "sandbox: lord-vm's own Landlock"     'grep -q "\"supervisor_landlock\":1" "$W/status.json"'
 t "QEMU: seccomp mode 2, two or more filters, no_new_privs, no capabilities" \
   'grep -q "^Seccomp:[[:space:]]*2" /proc/$QPID/status && [ "$(sed -n "s/^Seccomp_filters:[[:space:]]*//p" /proc/$QPID/status)" -ge 2 ] && grep -q "^NoNewPrivs:[[:space:]]*1" /proc/$QPID/status && grep -q "^CapEff:[[:space:]]*0*$" /proc/$QPID/status'
-# every descriptor QEMU holds: its sockets, pipes and anonymous files, /dev/kvm, /dev/null, the machine's disks and
-# the firmware under /usr
-[ -d "/proc/$QPID/fd" ] || bad "QEMU's pid" "$QPID"
-odd=$(for f in /proc/$QPID/fd/*; do readlink "$f" 2>/dev/null; done | grep -v -e '^socket:' -e '^pipe:' -e '^anon_inode:' -e '^/memfd:' -e '^/dev/kvm$' -e '^/dev/null$' -e "^$D/disks/" -e '^/usr/' | sort -u)
-t "QEMU's descriptors: nothing outside its folder, /usr, /dev/kvm and /dev/null" '[ -z "$odd" ]' "$odd"
-t "QEMU: /dev/kvm is held (passed, not opened)" 'for f in /proc/$QPID/fd/*; do readlink "$f" 2>/dev/null; done | grep -q "^/dev/kvm$"'
+# QEMU's own namespaces and its private loader (3.3, vmsandbox.h): non-dumpable, so the person's programs (this
+# script is even its ancestor, which Yama alone lets in) can't read its memory, environment, maps or descriptors
+t "sandbox: QEMU in its own namespaces"  'grep -q "\"namespaces\":1" "$W/status.json"'
+t "sandbox: QEMU non-dumpable"           'grep -q "\"nondumpable\":1" "$W/status.json"'
+t "QEMU still runs as the person (status: Uid)" '[ "$(sed -n "s/^Uid:[[:space:]]*\([0-9]*\).*/\1/p" /proc/$QPID/status)" = "$(id -u)" ]'
+for f in environ mem maps smaps root/etc/hostname; do
+    t "the person's programs can't read QEMU's /proc/<pid>/$f" '! head -c 1 /proc/$QPID/$f >/dev/null 2>&1'
+done
+t "the person's programs can't list QEMU's descriptors" '! ls /proc/$QPID/fd/ >/dev/null 2>&1'
+t "the person's programs can't ptrace QEMU" "python3 -c 'import ctypes,sys; l=ctypes.CDLL(None,use_errno=True); sys.exit(0 if l.ptrace(0x4206,$QPID,0,0)==-1 else 1)'"
+t "the person's programs can't read QEMU's memory (process_vm_readv)" "python3 -c '
+import ctypes,sys
+l=ctypes.CDLL(None,use_errno=True); b=ctypes.create_string_buffer(64)
+class V(ctypes.Structure): _fields_=[(\"b\",ctypes.c_void_p),(\"n\",ctypes.c_size_t)]
+a=V(ctypes.cast(b,ctypes.c_void_p),64); r=V(0x400000,64)
+sys.exit(0 if l.process_vm_readv($QPID,ctypes.byref(a),1,ctypes.byref(r),1,0)==-1 else 1)'"
 cg=$(sed -n 's/^0:://p' /proc/$QPID/cgroup)
 case $cg in
     */qemu) want=$(( ($(sed -n 's/.*"memory_mb": \([0-9]*\).*/\1/p' "$D/machine.json") + 384) * 1048576 )); have=$(cat /sys/fs/cgroup$cg/memory.max)

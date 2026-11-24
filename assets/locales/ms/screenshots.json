@@ -10,7 +10,7 @@
   "timer": "Pemasa",
   "timerNone": "Tiada",
   "protectedNote": {
-    "other": "{count} tetingkap dilindungi: ia kelihatan hitam dalam tangkapan"
+    "other": "{count} tetingkap dilindungi: ia tersembunyi dalam tangkapan"
   },
   "recent": "Terkini",
   "hintArea": "Seret untuk memilih kawasan · Space: tetingkap · C: salin warna · T: salin teks · Esc: batal",

@@ -10,8 +10,8 @@
   "timer": "Retardateur",
   "timerNone": "Aucun",
   "protectedNote": {
-    "one": "{count} fenêtre protégée : elle apparaît en noir sur les captures",
-    "other": "{count} fenêtres protégées : elles apparaissent en noir sur les captures"
+    "one": "{count} fenêtre protégée : elle est masquée sur les captures",
+    "other": "{count} fenêtres protégées : elles sont masquées sur les captures"
   },
   "recent": "Récents",
   "hintArea": "Faites glisser pour sélectionner une zone · Espace : fenêtre · C : copier la couleur · T : copier le texte · Échap : annuler",

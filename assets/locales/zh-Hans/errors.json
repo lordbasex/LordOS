@@ -929,5 +929,7 @@
   "llm.busy": "Sentinela 正在分析多项内容。请稍后再试。",
   "llm.noEngine": "未安装本地模型引擎。",
   "llm.noModel": "未安装该本地模型。",
-  "sentinela.blockFailed": "无法阻止其联网。"
+  "sentinela.blockFailed": "无法阻止其联网。",
+  "sentinela.machineGone": "该虚拟机已不在“虚拟机”中。",
+  "sentinela.machineFailed": "虚拟机没有响应。"
 }

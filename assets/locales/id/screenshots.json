@@ -10,7 +10,7 @@
   "timer": "Pengatur waktu",
   "timerNone": "Tidak ada",
   "protectedNote": {
-    "other": "{count} jendela dilindungi: tampak hitam dalam tangkapan"
+    "other": "{count} jendela dilindungi: tersembunyi dalam tangkapan"
   },
   "recent": "Terbaru",
   "hintArea": "Seret untuk memilih area · Spasi: jendela · C: salin warna · T: salin teks · Esc: batal",

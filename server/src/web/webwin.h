@@ -6,8 +6,8 @@
 
 /* Connects to the session's compositor and reads its globals. NULL when there is no display or no xdg-shell. */
 WebWin *webwin_new(Web *w);
-/* After webwin_new, before any view exists: sets up wpebackend-fdo for this window (dmabuf with EGL when the
- * compositor offers linux-dmabuf and EGL works, shared memory otherwise: the CPU path) and creates w->exportable. */
+/* After webwin_new, before any view exists: starts the backend for this window (webback.h; dmabuf with EGL when the
+ * compositor offers linux-dmabuf and EGL works, shared memory otherwise: the CPU path) and sets w->back. */
 int webwin_init_backend(WebWin *win);
 /* Once WebKit's view exists: input, the input method, the clipboard */
 void webwin_attach(WebWin *win);
@@ -35,14 +35,5 @@ int webwin_send_shortcut(WebWin *win, uint32_t keysym, int shift);
  * 0 for WebKit's own Paste */
 int webwin_paste(WebWin *win);
 void webwin_free(WebWin *win);
-
-/* webshm.c: wpebackend-fdo's shared memory buffers and resources are libwayland-server objects */
-struct wpe_fdo_shm_exported_buffer;
-struct wl_resource;
-/* copies the exported buffer into dst (stride dst_stride, at most dst_h rows); its size and format first */
-int webshm_info(struct wpe_fdo_shm_exported_buffer *b, int *w, int *h, int *stride, unsigned *format);
-void webshm_copy(struct wpe_fdo_shm_exported_buffer *b, void *dst, int dst_stride, int rows);
-/* calls gone(data) once when the resource is destroyed */
-void webshm_on_destroy(struct wl_resource *res, void (*gone)(void *data), void *data);
 
 #endif

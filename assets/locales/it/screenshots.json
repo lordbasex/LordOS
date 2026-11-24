@@ -10,8 +10,8 @@
   "timer": "Timer",
   "timerNone": "Nessuno",
   "protectedNote": {
-    "one": "{count} finestra protetta: nelle catture appare nera",
-    "other": "{count} finestre protette: nelle catture appaiono nere"
+    "one": "{count} finestra protetta: nelle catture resta nascosta",
+    "other": "{count} finestre protette: nelle catture restano nascoste"
   },
   "recent": "Recenti",
   "hintArea": "Trascina per selezionare un’area · Spazio: finestra · C: copia il colore · T: copia il testo · Esc: annulla",

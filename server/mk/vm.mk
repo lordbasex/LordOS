@@ -173,6 +173,13 @@ build/vmlogind-test: tests/vmlogind_test.c src/vm/vmlogind.c src/vm/vmlogind.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ tests/vmlogind_test.c src/vm/vmlogind.c $(shell pkg-config --libs libsystemd)
 	./$@ || { rm -f $@; exit 1; }
 endif
+# QEMU's jail as a compromised QEMU finds it (vmsandbox.c's namespaces, private loader, Landlock and seccomp, then
+# exec), and what the person's other programs can't do to it; "skipped" without user namespaces or Landlock ABI 4
+test: build/vm-jail-probe
+build/vm-jail-probe: tests/vm_jail_probe.c src/vm/vmsandbox.c src/vm/vmsandbox.h src/vm/vmproto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_jail_probe.c src/vm/vmsandbox.c
+	./$@ || { rm -f $@; exit 1; }
 build/vm-test: tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) $(VM_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON)
@@ -217,3 +224,11 @@ build/vmlog-test: tests/vmlog_test.c src/vm/vmlog.c src/vm/vmlog.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmlog_test.c src/vm/vmlog.c
 	./$@ || { rm -f $@; exit 1; }
+# what Sentinela checks of a running machine (vm/vmwatch.h, js_vm.c stats): the scope's exact path, a cgroup "in" it only
+# when it is that path or below it (never a path that merely contains it), the installed lord-vm; under ASan and UBSan
+test: build/vmwatch-test
+build/vmwatch-test: tests/vmwatch_test.c src/vm/vmwatch.h src/vm/vmproto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmwatch_test.c
+	./$@ || { rm -f $@; exit 1; }
+build/obj/ui/js_vm.o: src/vm/vmwatch.h

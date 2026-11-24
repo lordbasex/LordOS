@@ -40,7 +40,7 @@ Vários métodos podem conviver. Por padrão, o cofre se tranca sozinho depois d
 
 **A janela.** A própria janela de Senhas roda como um processo em sandbox próprio (`lord-server --app passwords`), fora do JavaScript do desktop. Os valores revelados nunca entram na memória do desktop. As listas mostram títulos e nomes de usuário, nunca segredos; um valor só trafega quando você clica em revelar, copiar ou editar.
 
-**A tela.** A janela de Senhas é protegida: sai preta em capturas de tela, gravações de tela, na área de trabalho remota e, desde a 0.8.8.8, no compartilhamento de tela ou de uma janela com apps Linux.
+**A tela.** A janela de Senhas é protegida: sai como um quadro cinza com um cadeado (preta até a 0.8.9.5) em capturas de tela, gravações de tela, na área de trabalho remota e, desde a 0.8.8.8, no compartilhamento de tela ou de uma janela com apps Linux.
 
 **A área de transferência.** Um segredo copiado fica fora do histórico da área de transferência, é marcado como sensível para os apps Linux que respeitam essa convenção e é apagado depois de 30 segundos (configurável), se ainda estiver lá.
 

@@ -49,10 +49,11 @@ We took the way the apps of popular desktop systems work, never their logos or t
 | On screen | In the screenshot | On remote desktop |
 |---|---|---|
 | ![screen](protected-window-screen.png) | ![screenshot](protected-window-capture.png) | ![remote](protected-window-remote.png) |
-| Protected Notes looks normal on the local screen | The saved PNG: the Notes content is black | What the browser receives from the remote desktop (0.8.3; since 0.8.4 the same, as WebRTC video) |
+| Calculator, opened protected, looks normal on the display | The screenshot: the protected fill with its lock and label, Notes beside it as shown | What `media_composed` hands the remote desktop, the screen-sharing API and a recording |
 
-The same windows are black when a Linux app shares a screen or a window through the ScreenCast portal (0.8.8.8, see
-"Sharing a screen or a window with a Linux app" below).
+The same windows are the fill when a Linux app shares a screen or a window through the ScreenCast portal (0.8.8.8, see
+"Sharing a screen or a window with a Linux app" below). Up to 0.8.9.5 the fill was black. Pictures from
+`tests/protected_headless.sh` (headless, 2026-11-23); every path is listed in [PRIVACY.md](PRIVACY.md), "Protected windows".
 
 ### The markup editor on any picture (0.8.8.4, issue #30)
 
@@ -281,12 +282,15 @@ changing the output, so a compromised decoder must not have it. Audio goes throu
 
 ### Protected windows
 
-`wm.setProtected(id, true)` (SDK) marks a window as protected, like the capture protection of other desktop systems
-(KeePassXC uses it). The Passwords app uses it (`"protected": true` in its manifest). It looks normal on screen and comes out
-**black** in:
+`wm.setProtected(id, true)` (SDK), or `wm.open(app, { protected: true })` and `"protected": true` in a manifest (locked:
+it can't be turned off), marks a window as protected, like the capture protection of other desktop systems (KeePassXC
+uses it). The Passwords app uses it (`"protected": true` in its manifest). It looks normal on screen and comes out as
+**the protected fill** (an opaque neutral box with a lock and "Protected window", `paint_protected_fill`; black up to
+0.8.9.5) in the list below. The whole list of paths, and the rule that holds them, is in [PRIVACY.md](PRIVACY.md),
+"Protected windows":
 
 - **Screenshots** (`lord.media.screenshot`): the tree is painted again onto a separate canvas in
-  "capture mode" (`paint_capture`). A node with `protected` is a black rectangle, and whatever is
+  "capture mode" (`paint_capture`). A node with `protected` is the fill, and whatever is
   on top of the protected window shows as usual.
 - **Screen recording and remote desktop** (`server/src/remote`): if there is any protected window,
   a second canvas is kept in capture mode, repainted only in the region that changed. If there is
@@ -299,16 +303,20 @@ changing the output, so a compromised decoder must not have it. Audio goes throu
   and Screenshots does not crop a capture of the screen instead (since 0.8.9.5, GitHub #219).
 - **Thumbnails:** the floating thumbnail and the Screenshots editor come from the same capture.
 - **Linux apps (Wayland):** the content, its popup menus and the full screen of a protected window
-  also come out black (`wl.c`, `node_protected`).
+  also come out as the fill (`wl.c`, `node_protected`); a full screen only on the display it covers.
+- **A media source's own pixels** (`saveImage`, `copyImage`, `pixels`, `ocr`, `crop`, `resize`, `rotate`; a machine's
+  card picture, screenshot, recording and snapshot picture; Remote Desk's card picture): refused for a source shown in a
+  protected window (`media_src_exportable`, `media.protectedWindow`).
 
 How it works:
 
-- The SDK sets the `protected` prop on the node of the window's content (`AppHost`).
+- The SDK sets the `protected` prop on the window's frame (`WindowShell`, title bar included) and on the node of its
+  content (`AppHost`).
 - The engine stores it in `Node.protect` (`lord.setProp(id, 'protected', bool)`).
-- The theme's frame (title included) stays visible, so an app that needs it sets a generic title.
 - Screen recording composites on the CPU. Since 0.8.4 a remote desktop viewer no longer does: the
   GPU path reads the composed frame back (`gpu_read_next`), except while a protected window is on
-  screen, when the session composites on the CPU so the window can be painted black (`REMOTE.md`).
+  screen, when the session composites on the CPU so the window can be painted as the fill (`REMOTE.md`); a read-back
+  is never sent while one is on screen.
 - Screenshots has a menu item "Privacy → Protect the front window from screenshots" to use it with
   any window.
 

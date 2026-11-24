@@ -23,6 +23,9 @@
  *   watchDisks(on)              disk temperatures with the Monitor closed (every 30 s; sdk/diskwatch.js)
  *   watchProcs(on)              Sentinela: the process list every 10 s, Monitor open or not (sdk/sentinela.js)
  *   procsWatched(language)      its latest list, the same objects as processes(), or null if nothing new
+ *   watchMachines(on)           Sentinela's machine rules: with the watched list, the running machines' network counts
+ *   machinesWatched()           their latest { t, ok, machines: { <id>: { socks, listen, peers, bytes } } } (conn.c
+ *                               conn_machines: counts only, no address), or null if nothing new
  *   diskTemps()                 the latest { t, disks: [{ name, model, sensor, temp, tempMax, … }] } or
  *                               null if nothing new; it does not keep the 4 Hz sampling awake
  *   wantVoltage(on)             Monitor → Voltage on screen: the thread reads the voltages about every 2 s
@@ -280,6 +283,17 @@ static JSValue f_procs_watched(JSContext *c, JSValueConst t, int argc, JSValueCo
     MonProcs *pl = mon_procs_watched(&seq_wprocs);
     if (!pl) return JS_NULL;
     return procs_object(c, pl, lang);
+}
+
+static uint64_t seq_wmach;
+static JSValue f_watch_machines(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    mon_watch_machines(argc > 0 && JS_ToBool(c, argv[0]) > 0);
+    return JS_TRUE;
+}
+static JSValue f_machines_watched(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    return parse(c, mon_machines_watched(&seq_wmach), "<monitor.machinesWatched>");
 }
 
 static JSValue procs_object(JSContext *c, MonProcs *pl, const char *lang) {
@@ -641,6 +655,8 @@ static const JSCFunctionListEntry monitor_funcs[] = {
     JS_CFUNC_DEF("watchDisks", 1, f_watch_disks),
     JS_CFUNC_DEF("watchProcs", 1, f_watch_procs),
     JS_CFUNC_DEF("procsWatched", 1, f_procs_watched),
+    JS_CFUNC_DEF("watchMachines", 1, f_watch_machines),
+    JS_CFUNC_DEF("machinesWatched", 0, f_machines_watched),
     JS_CFUNC_DEF("diskTemps", 0, f_disk_temps),
     JS_CFUNC_DEF("wantVoltage", 1, f_want_voltage),
     JS_CFUNC_DEF("voltage", 0, f_voltage),

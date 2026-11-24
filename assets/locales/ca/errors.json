@@ -930,5 +930,7 @@
   "llm.busy": "Sentinela ja està analitzant diverses coses. Torna-ho a provar d’aquí a un moment.",
   "llm.noEngine": "El motor del model local no està instal·lat.",
   "llm.noModel": "Aquest model local no està instal·lat.",
-  "sentinela.blockFailed": "No s’ha pogut bloquejar la seva xarxa."
+  "sentinela.blockFailed": "No s’ha pogut bloquejar la seva xarxa.",
+  "sentinela.machineGone": "Aquesta màquina ja no és a Màquines.",
+  "sentinela.machineFailed": "La màquina no ha respost."
 }

@@ -6,7 +6,7 @@
  *   - the image «sources» that a `media` node (<MediaView>) draws: video frames over
  *     shared memory, decoded photos, screenshots;
  *   - the captures: screen, recording and remote desktop, always with the protected
- *     windows (`protected`) in black. */
+ *     windows (`protected`) as the protected fill. */
 #ifndef LORD_MEDIA_H
 #define LORD_MEDIA_H
 
@@ -64,14 +64,17 @@ int  media_cover_node(float x0, float y0, float x1, float y1);
 /* captures (main.c): after painting the scene and after assembling each frame. */
 void media_scene_painted(const Canvas *scene);
 typedef struct { int x, y, mode; const uint32_t *px; int w, h, hx, hy; } MediaCursor;
-/* Returns what the remote desktop sees (protected windows in black) and feeds the
+/* Returns what the remote desktop sees (protected windows as the protected fill) and feeds the
  * recording. out = the frame already composited (without cursor). */
 const Canvas *media_composed(const Canvas *out, int remote, const MediaCursor *cur);
 
 /* The LordOS arrow with its tip at (x, y), as the recordings draw the pointer (sharing a screen, cast/cast.c). */
 void media_draw_arrow(Canvas *c, int x, int y);
 
-/* Protected windows present in the tree (counted at the moment). */
+/* Protected windows present in the tree (counted at the moment), a NODE_MEDIA showing a protected source included. */
 int media_protected_count(void);
+/* Is media source id's picture a protected one (MediaSrc.protect: lord.vm.protect, or found shown in a protected
+ * window)? paint.c then paints any NODE_MEDIA showing it as the protected fill in a capture, whatever window holds it. */
+int media_id_protected(int id);
 
 #endif

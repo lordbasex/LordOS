@@ -930,5 +930,7 @@
   "llm.busy": "A Sentinela már több dolgot elemez. Próbáld újra egy kicsit később.",
   "llm.noEngine": "A helyi modell motorja nincs telepítve.",
   "llm.noModel": "Ez a helyi modell nincs telepítve.",
-  "sentinela.blockFailed": "A hálózatát nem sikerült letiltani."
+  "sentinela.blockFailed": "A hálózatát nem sikerült letiltani.",
+  "sentinela.machineGone": "Ez a gép már nincs a Gépek alkalmazásban.",
+  "sentinela.machineFailed": "A gép nem válaszolt."
 }

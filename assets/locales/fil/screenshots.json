@@ -10,8 +10,8 @@
   "timer": "Timer",
   "timerNone": "Wala",
   "protectedNote": {
-    "one": "{count} protektadong window: lumalabas itong itim sa mga capture",
-    "other": "{count} na protektadong window: lumalabas ang mga itong itim sa mga capture"
+    "one": "{count} protektadong window: nakatago ito sa mga capture",
+    "other": "{count} na protektadong window: nakatago ang mga ito sa mga capture"
   },
   "recent": "Kamakailan",
   "hintArea": "I-drag para pumili ng bahagi · Space: window · C: kopyahin ang kulay · T: kopyahin ang text · Esc: kanselahin",

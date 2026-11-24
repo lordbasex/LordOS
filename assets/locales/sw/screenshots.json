@@ -10,8 +10,8 @@
   "timer": "Kipima muda",
   "timerNone": "Hakuna",
   "protectedNote": {
-    "one": "Dirisha {count} lililolindwa: linaonekana jeusi kwenye picha zilizonaswa",
-    "other": "Madirisha {count} yaliyolindwa: yanaonekana meusi kwenye picha zilizonaswa"
+    "one": "Dirisha {count} lililolindwa: limefichwa kwenye picha zilizonaswa",
+    "other": "Madirisha {count} yaliyolindwa: yamefichwa kwenye picha zilizonaswa"
   },
   "recent": "Za hivi karibuni",
   "hintArea": "Buruta ili kuchagua eneo · Space: dirisha · C: nakili rangi · T: nakili maandishi · Esc: ghairi",

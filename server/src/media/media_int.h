@@ -104,6 +104,9 @@ typedef struct {
      * broker instead of the session; bk_msg returns 1 when it consumed the message */
     void *bk;
     int (*bk_msg)(void *src, const MediaMsg *m, const char *payload, int *fds);
+    /* its picture belongs to a protected window (shown in a NODE_MEDIA inside a protected node, or marked by its owner:
+     * lord.vm.protect): never copied out of lord-server (media_src_exportable). Set once, never cleared. */
+    int protect;
 } MediaSrc;
 
 /* media.c */
@@ -179,6 +182,11 @@ void media_view_reset(MediaSrc *s);
  * window is whole even where other windows covered it (paint_capture_until; NULL if it isn't reached).
  * also: nalso nodes painted over that window (its sheets in a shell layer), the rest still left out.
  * refused: set to 1 when until is a protected window (never captured alone: media.protectedWindow). */
+/* May src's pixels leave the compositor as a picture of their own (a file, the clipboard, OCR, a crop, a card picture, a
+ * recording)? 0 when they are a protected window's: src is shown in a NODE_MEDIA inside a protected node (hidden or
+ * minimized too), or was before, or its owner marked it (media_src_protect). The one gate for every such path. */
+int  media_src_exportable(MediaSrc *src);
+void media_src_protect(MediaSrc *src);
 MediaSrc *media_screenshot(const char *app, int x, int y, int w, int h, uint32_t display, int until, const int *also, int nalso, int *refused);
 void media_capture_size(int *w, int *h);     /* recording / remote desktop frame size (docs/DISPLAYS.md) */
 MediaSrc *media_crop(MediaSrc *src, int x, int y, int w, int h);

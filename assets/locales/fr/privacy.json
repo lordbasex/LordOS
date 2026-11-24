@@ -65,5 +65,6 @@
   "ask.vr": "« {app} » veut utiliser le casque de réalité virtuelle {headset}",
   "ask.vrNote": "Son écran est confié à l’app seule ; LordOS n’y affiche jamais votre bureau. Il est repris quand l’app se ferme, que le casque est débranché ou que l’écran se verrouille. Vous pourrez changer cela dans Réglages → Confidentialité.",
   "perm.vr": "Casques de réalité virtuelle",
-  "permHint.vr": "Apps qui peuvent piloter directement l’écran d’un casque de réalité virtuelle. Seuls des casques sont prêtés, jamais vos moniteurs, et ils sont repris quand l’écran se verrouille, que vous changez d’utilisateur ou que vous choisissez Refuser."
+  "permHint.vr": "Apps qui peuvent piloter directement l’écran d’un casque de réalité virtuelle. Seuls des casques sont prêtés, jamais vos moniteurs, et ils sont repris quand l’écran se verrouille, que vous changez d’utilisateur ou que vous choisissez Refuser.",
+  "protectedCapture": "Fenêtre protégée"
 }

@@ -105,7 +105,7 @@ typedef struct Node {
     int term;                   /* NODE_TERM: session id; NODE_SURFACE: Wayland surface id; NODE_MEDIA: source (media/) */
     float *crop;                /* NODE_MEDIA: the part of the source's picture it shows (x, y, w, h in picture pixels;
                                  * NULL the whole picture): Machines' apps mode, one window of the guest (media/mview.c) */
-    uint8_t protect;            /* protected window: black in screenshots, recordings and remote desktop (media/capture.c) */
+    uint8_t protect;            /* protected window: the protected fill in every capture (media/capture.c) */
     uint8_t rtl;                /* effective direction (computed in layout) */
     uint8_t own_tf, has_tf;     /* it has a scale/rotate; it or an ancestor has one (tf is set) */
     uint8_t layout_ok, layout_rtl;  /* its subtree is laid out for its current w × h and direction */
@@ -412,9 +412,22 @@ long  paint_gdrag_backlog(int view);
 long  paint_gdrag_feed(int view, long budget, int (*up)(void *ctx, int which, const uint32_t *px, int w, int h, Rect r),
                     void *ctx);
 Node *hit_test(Node *root, float x, float y);
-/* Capture mode (media/capture.c): protected nodes are painted black and app windows
- * are copied even when compositing on the GPU. paint_capture paints the whole tree this way. */
+/* Capture mode (media/capture.c): protected nodes are painted as the protected fill (paint_protected_fill) and app
+ * windows are copied even when compositing on the GPU. paint_capture paints the whole tree this way. Every picture of
+ * the screen that leaves the compositor is painted in this mode or is a copy of one that was (docs/PRIVACY.md
+ * "Protected windows"): this is the one place where a protected window's pixels are left out. */
 extern int paint_capture_mode;
+/* A protected window in a capture: opaque and neutral (r = g = b), never the window's own pixels; a lock and the label in
+ * the ink colour when the box has room. */
+#define PAINT_PROTECT_FILL 0xff2e2e2eu
+#define PAINT_PROTECT_INK  0xffa8a8a8u
+#define PAINT_PROTECT_LABEL_MAX 95
+/* x, y, w, h and the corner radii (top-left, top-right, bottom-right, bottom-left) in this canvas's pixels */
+void  paint_protected_fill(Canvas *c, float x, float y, float w, float h, const float r4[4]);
+/* The label under the lock, in the person's language (lord.media.setProtectedLabel): printable UTF-8, at most
+ * PAINT_PROTECT_LABEL_MAX bytes kept; "" draws the lock alone. */
+void  paint_set_protected_label(const char *s);
+const char *paint_protected_label(void);
 void  paint_capture(Canvas *c, Node *root);
 /* The same, stopping after node `last` (a window's frame): what is painted after it (the windows, menus, the
  * Dock and the panels above it) and the Wayland popups are left out, so a window comes out whole, as if
@@ -427,7 +440,7 @@ enum { PAINT_ALSO_MAX = 8 };
  * wm.setProtected): a protected window is never captured alone (the vault, a password prompt…); a capture of the
  * whole screen or an area still shows it black (paint_capture). */
 int   paint_capture_until(Canvas *c, Node *root, int last, const int *also, int n);
-/* n, a node inside it or one it is inside is protected (a protected window: black in every capture) */
+/* n, a node inside it or one it is inside is protected (a protected window: the protected fill in every capture) */
 int   paint_node_protected(const Node *n);
 /* Only that window (node, a window's frame) and its sheets (also), each only if it is in root's tree and shown: what is
  * below it and above it is left out (sharing a window, cast/cast.c). 1 if it was painted. */

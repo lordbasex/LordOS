@@ -37,7 +37,7 @@ recomputes both from the rows; the arithmetic:
 
 | Area | Weight | Items | Mean | Score | Points (weight × score) | Before |
 |---|---:|---:|---:|---:|---:|---:|
-| A. Engine, lifecycle, sandbox, display | 14 | 22 | 77.05 | 77 % | 14 × 77 % = 10.78 | 82 % |
+| A. Engine, lifecycle, sandbox, display | 14 | 22 | 77.27 | 77 % | 14 × 77 % = 10.78 | 82 % |
 | B. Getting a system in (cards, unattended, import) | 12 | 14 | 72.86 | 73 % | 12 × 73 % = 8.76 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 74.58 | 75 % | 11 × 75 % = 8.25 | 74 % |
 | D. Snapshots, clones, storage | 9 | 6 | 55.83 | 56 % | 9 × 56 % = 5.04 | 54 % |
@@ -90,7 +90,7 @@ when the desktop composes on the GPU); 3.3 named a user namespace for QEMU and a
 | KVM amd64 and arm64, TCG labelled Emulated (2.1–2.4) | ✅ | 100 | `lordvm.c` (`-accel`), `assistant.jsx` ("Other architecture…") | Pi 5, nested amd64, Xeon and the i9 PC |
 | Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2) | ✅ | 100 | `machine.c`, `js_vm.c` |  |
 | `/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4) | ✅ | 100 | `vm_admin.c` |  |
-| Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp denylist on top of QEMU's (3.3) | ✅ | 90 | `vmsandbox.c`, `lordvm.c`; `vm_isolation.sh` | No allowlist of our own; no user namespace for QEMU (3.3 says "if available": `unshare` is denied, nothing creates one); QEMU gets `RLIMIT_CORE` 0 but not `PR_SET_DUMPABLE` 0 (only lord-vm and lord-vmdisplay) |
+| Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp denylist on top of QEMU's; QEMU in its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3) | ✅ | 95 | `vmsandbox.c` (`vm_ns_enter`, `vm_ns_setup`), `lordvm.c`; `vm-jail-probe`, `vm_isolation.sh` | No allowlist of our own. Namespaces and non-dumpable QEMU in development (2026-11-23); no pid namespace (GLib refuses the D-Bus display's peer then); a GVT-g vGPU machine in them not yet booted |
 | Every helper jailed too: lord-vm's own Landlock, `qemu-img`, `swtpm`, `passt`, `virtiofsd`; lord-vmdisplay sandboxed with a self-test; render node and VFIO confined by Landlock (3.3) | ✅ | 100 | `lordvm.c` `vm_jail_self`, `vmsandbox.c` `vm_jail_tool*`, `render_rules`, `vgpu_rules`, `vmdisplay.c` `--selftest`; `vm_isolation.sh` | Added by this audit |
 | Sandbox and cgroup state reported (`lord-vm --status`: Landlock, our seccomp, KVM fd, scope), nested cgroup leaves per process (3.3, 3.7) | ✅ | 100 | `lordvm.c` (`setup_cgroups`, `--status`), `diag.js`, `logs.jsx` | Added by this audit |
 | "Weaker isolation on this kernel" notice when Landlock is missing (3.3) | ❌ | 0 |  | Only the log's "Sandbox:" line says it; lord-vm refuses to start only without seccomp or `no_new_privs`. Added by this audit |
@@ -746,7 +746,40 @@ lord-server passes `--render-node none` when it draws without a GPU, so the CPU 
 
 QEMU parses guest-controlled data all day, so **assume it can be compromised**. What a compromised QEMU may reach is the design:
 
-- Own user namespace if available (**not built**, audited again 2026-11-23: `unshare` is denied and nothing creates one), no capabilities, `no_new_privs`, in `app-lordos-lordos-vm-<id>.scope` (`setup_cgroups`, `lordvm.c`) with memory and CPU limits.
+- **Own namespaces** (in development, approved by the maintainer 2026-11-23; `vm_userns_open`, `vm_ns_enter`, `vm_ns_setup` in
+  `vmsandbox.c`): QEMU runs in its own user, mount, ipc, uts and net namespaces, with no capabilities and `no_new_privs`, in
+  `app-lordos-lordos-vm-<id>.scope` (`setup_cgroups`, `lordvm.c`) with memory and CPU limits. The user namespace is made once at
+  lord-vm's start, while lord-vm is still dumpable (a non-dumpable process can't write its own `uid_map`), by a short-lived
+  child, and kept as a descriptor; QEMU's child joins it before exec. It maps only the person's uid (so D-Bus peer credentials
+  with lord-vmdisplay still match) and no group. QEMU loses every capability at exec (its uid isn't 0 there). Its net namespace
+  has only an unconfigured loopback: its sockets are the ones lord-vm passed, and abstract unix sockets of the session are out
+  of its reach even without Landlock's scope. It stays lord-vm's plain child, so `waitpid`, PDEATHSIG, the cgroup leaf, vCPU
+  pinning and root's `vm-memlock` checks see it as before. Where the kernel refuses user namespaces QEMU runs as before and the
+  machine's log says so (`"namespaces":0` in `lord-vm --status --json`).
+  **No pid namespace**: GLib 2.84 refuses peer credentials whose pid is 0 (`linux_ucred_check_valid`), and that is what QEMU sees
+  of lord-vmdisplay from inside one, so QEMU's D-Bus display (picture, input, sound) can't authenticate: measured 2026-11-23,
+  "Unexpected line 'NEGOTIATE_UNIX_FD' while in WaitingForAuth state", and reproduced with a plain GDBus server under
+  `unshare --user --map-user --pid`. So a compromised QEMU can still name the person's processes: signals are refused
+  (Landlock's signal scope), `setpriority` and `sched_setaffinity` too (QEMU's own `resourcecontrol=deny`), `/proc` of
+  others too (Landlock), but `prlimit` on another of the person's pids is left to the seccomp allowlist (open, above).
+  No cgroup namespace: lord-vm places QEMU.
+- **Non-dumpable** (in development, same approval): `execve` makes a process dumpable again unless its binary or its ELF
+  interpreter is unreadable. In QEMU's mount namespace the dynamic loader is a copy with mode `0100` mounted over the loader's
+  path (made in lord-vm's private runtime folder and unlinked once mounted: a detached mount of a nameless `O_TMPFILE` can't be
+  moved, ENOENT; then a write lease proves nobody else holds it open, and its inode and bytes are checked), so the kernel makes
+  QEMU non-dumpable at exec. No root helper and no file shipped for it. **Measured** (2026-11-23, amd64 PC, Debian 13
+  nocloud guest, 2 vCPUs, 1 GB, 5 starts each after a warm-up, alternating): fork to QEMU's exec 5 ms against 1 ms
+  without, QMP ready 135 ms against 115 ms (spread 43–172 ms either way), boot to the serial login 18.5 s against 18.3 s,
+  QEMU's RSS at login 409 MB against 404 MB (within run-to-run spread); the loader's copy is 225 KB of tmpfs per running
+  machine. Nothing runs per frame or per guest exit, so there is no runtime cost beyond that. The kernel then looks for the first user namespace where
+  the copy's owner and group are both mapped: QEMU's maps no group, so that is the computer's own, where only root has
+  `CAP_SYS_PTRACE` (a namespace the person owns would let their programs back in). Its `/proc/<pid>` files become root's: the
+  person's other programs, lord-vm itself and the test script that started it can't read its memory (`/proc/<pid>/mem`,
+  `process_vm_readv`), environment, maps or descriptors (a memfd with guest RAM could otherwise be reopened through
+  `/proc/<pid>/fd`; Yama's `ptrace_scope` 1 blocks attaching, not reading those), nor ptrace it. lord-vm checks it after exec
+  (`vm_nondumpable`: `/proc/<pid>/environ` refused) and reports `"nondumpable"` in `lord-vm --status --json`. `status`, `stat`,
+  `comm`, `cmdline` and `cgroup` stay readable, so Monitor, the vCPU use and the vGPU checks keep working; Monitor lists QEMU
+  under root, as it already did lord-vm (also non-dumpable).
 - **Landlock:** read and execute `/usr`, read the ISO attached to this VM; read-write only that VM's `disks/` folder (`vmsandbox.h`). On kernels without
   Landlock (see 2.3) the app shows "Weaker isolation on this kernel" (**not built**: only the machine log's "Sandbox:" line says it).
 - **Seccomp:** QEMU's own `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny` plus ours. Ours is a **denylist** (`vmsandbox.c`): no
@@ -765,8 +798,8 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
 - Files are opened by the supervisor and passed by descriptor wherever QEMU allows (`/dev/fdset`).
 - No shell, no `-readconfig` from the guest's folder: arguments are built from validated settings.
 - A machine can't outlive `lord-vm`: `PR_SET_PDEATHSIG` is set before exec. QEMU's newer `-run-with exit-with-parent=on` isn't in Debian 13's version (**Measured**: the 10.0 manual lists only `async-teardown`, `chroot` and `user`). swtpm exits with QEMU.
-- `-M dump-guest-core=off`, no core dumps, and non-dumpable processes, so that guest memory doesn't land in a host file. (Audited
-  2026-11-23: QEMU gets `RLIMIT_CORE` 0; `PR_SET_DUMPABLE` 0 is set only in lord-vm and lord-vmdisplay.)
+- `-M dump-guest-core=off`, no core dumps (`RLIMIT_CORE` 0), and non-dumpable processes (lord-vm and lord-vmdisplay by
+  `PR_SET_DUMPABLE` 0, QEMU by its private loader, above), so that guest memory doesn't land in a host file.
 - One VM can't read another's folder: one process tree and one Landlock domain per VM.
 - A guest's disk file isn't encrypted by default; see 8.
 
@@ -1066,7 +1099,8 @@ lordvm-dev run|attach DIR      plays lord-server: picture memfd, frames, PNG, ty
 
 **What is enforced, and where it stops.**
 
-- QEMU: Landlock (read and execute `/usr`; read `/etc/ld.so.cache` and its own `/proc/<pid>`; read and write `disks/`; read the ISO;
+- QEMU: its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3); Landlock (read and execute `/usr`; read
+  `/etc/ld.so.cache` and its own `/proc/<pid>`; read and write `disks/`; read the ISO;
   `/dev/null`; TCP bind and connect refused; abstract unix sockets and signals scoped), `no_new_privs`, our seccomp filter (no
   `socket`, `connect`, `bind`, `listen`, `accept`, namespaces, mount, `ptrace`, `process_vm_*`, `bpf`, `perf_event_open`, `keyctl`,
   `io_uring`, `userfaultfd`, modules, kexec, `TIOCSTI`), then QEMU's own filter. Ours is a denylist: an allowlist for QEMU is still
@@ -3325,7 +3359,7 @@ now measures what a machine's vCPUs really use and suggests a count; it never ch
   new is opened, so the Landlock rules don't change) and adds their user and system time. Only while the machine is
   running: a pause, a save to disk, a sample more than three minutes after the last (the computer slept) or one with
   fewer ticks than the last only starts the count over. The cost is one small read per vCPU a minute. QMP's
-  `query-cpus-fast` gives thread ids, but in QEMU's own PID namespace, and no CPU time.
+  `query-cpus-fast` gives thread ids (QEMU has no pid namespace of its own, 3.3) but no CPU time.
 - **What it keeps**: `<machine>/cpu-usage.json`, `{"format":1,"windows":[[end, seconds, vcpus, avg, peak], ...]}`, one
   entry per 5 minutes of running time (the last of a run kept when it has a minute or more): its end in Unix seconds,
   its length, the vCPU count it ran with, the cores used on average and in its busiest minute, both in hundredths of a
@@ -3354,6 +3388,27 @@ now measures what a machine's vCPUs really use and suggests a count; it never ch
   limit, the file read back and refused; its own thread named `CPU 0/KVM` read through `vmcpu_open`/`vmcpu_ticks`),
   `tests/vm_model_test.mjs` (`cpuWindows`, `vcpuAdvice`: the maintainer's idle case, too little time, another count,
   old windows, the floor, a busy spell, saturation, the ceiling; `vcpuDefault`) and `tests/vm_profiles_test.mjs`.
+
+### 6.28 Sentinela watches the machines (built 2026-11-23, in development; approved by the maintainer 2026-11-23)
+
+Sentinela (docs/SENTINELA.md, "Machines"; off by default, local model only) reads what Machines already exposes every
+10 s: `lord.vm.list()`, `lord.vm.stats(dir)` and per-machine socket counts from the Monitor's thread
+(`lord.monitor.machinesWatched`). `stats(dir)` takes nothing of it from `run.json` (the person's file, a hint only):
+it asks the machine's lord-vm over its socket as `lord-vm --status` does, and trusts the answer only when the peer
+(`SO_PEERCRED`) is the person's installed `lord-vm` and the QEMU it names is its child. It then adds `qemuPid`,
+`sandbox` and `cgMode` (lord-vm's answer), the kernel's `seccomp` and `noNewPrivs` for that QEMU, `scope` (`in` only
+when QEMU and lord-vm are exactly in the session's `app-lordos-lordos-vm-<id>.scope` or below it) and `passt`; and
+`verified: false` when the machine looks running but can't be checked, which Sentinela alerts as a sandbox problem.
+All read-only; no new action on a machine, and lord-vm is unchanged (`src/vm/vmwatch.h`, `build/vmwatch-test`).
+
+- **Always alerted, no model:** a QEMU moved out of its machine's scope; a sandbox missing Landlock, seccomp,
+  no_new_privs or its cgroup; a Workstation of an anonymity group with any way out besides its link (19.3).
+- **Toggles:** a machine far above its own usual CPU or memory; crash loops (3 unexpected ends in 15 minutes); for an
+  anonymity group, a Gateway whose traffic or number of remote addresses jumps far above its own pattern, any
+  unexpected end of a member, restarts and a pegged CPU.
+- Alerts carry the machine's name and role; the model only gets counts and those words, never the guest's screen,
+  files or clipboard, and can't silence an alert. Actions, each from the person's click: open the machine, show it in
+  Monitor, pause or resume, shut down.
 
 ## 7. Guest tools
 
@@ -4389,6 +4444,12 @@ fixed internal addresses); Machines has to give it exactly that wiring and nothi
   different physical cores and keeping guest memory off huge pages and KSM (19.5) reduce them, nothing more.
 - The person signing in to an account that names them.
 
+**Layer 9: Sentinela** (6.28, approved 2026-11-23; off by default). With Sentinela on, a member's QEMU leaving its
+scope, a member's sandbox missing a part, or the Workstation showing any network path besides its link is always
+alerted; a Gateway whose traffic or remote addresses change sharply, unexpected ends, restarts and a pegged CPU are
+alerted too. It reads the members' `role` and `profileLock` (19.4) from `lord.vm.list()`; it watches and tells, and
+acts only on the person's click.
+
 ### 19.2 Architecture
 
 ```
@@ -4524,6 +4585,7 @@ our own channels:
 | Camera, USB, printers | none (not built anyway) | passthrough is on Whonix's unsafe list |
 | Suspend, memory snapshots, saving at host shutdown | refused | guest memory would land on this computer's disk; Whonix's XML turns suspend off. At host shutdown the guests are shut down (the `vmhoststop.h` plan without the save) |
 | Thumbnail | `thumb.png` not written (`js_vm.c`); the live picture only while running | a picture of the browsing would stay in `~/Machines` |
+| Captures of the screen (isolation layer 8; **built**, in development, approved 2026-11-23) | the members' windows and their apps-mode windows are **protected windows** (PRIVACY.md, "Protected windows"): on the display as usual, an opaque neutral fill with a lock in every screenshot, recording, remote desktop frame, screen share (whole screen or the window) and portal still. `lord.vm.protect(session)` (one way) refuses the card picture (`lord.vm.snapshot`, and the old `thumb.png` is removed), `lord.vm.screenshot`, `lord.vm.record` (one running stops) and a snapshot's picture; the library card never shows a `thumb.png` for it | the Workstation's browsing on screen would otherwise reach any capture, a remote viewer or a share |
 | Guest memory | `memory-backend-memfd,share=off` with transparent huge pages off for the QEMU process (`PR_SET_THP_DISABLE`, whatever `shmem_enabled` says), `-machine mem-merge=off` (no KSM), no hugetlb | Whonix lists huge pages and KSM as unsafe (rowhammer, cross-VM deduplication). Cost: about 30 % slower random memory access (measured in 3.7.2) |
 | Core dumps | `dump-guest-core=off`, none, non-dumpable, as every machine (3.3) | |
 | Identity | `-uuid` random per group and per Start Fresh; no `-smbios` strings (QEMU's stock "Standard PC (Q35 + ICH9, 2009)"); no disk serial; no first-boot credentials (`type=11`) | unique strings would mark the group; stock values are what every KVM Whonix shows. Whonix's own hostname and machine id inside the guests are left as Whonix sets them |
@@ -4715,7 +4777,8 @@ Clone, Duplicate and Rename of a single member aren't offered; Rename renames th
 folder, as 6.26 does for a machine).
 
 **Machine window:** the Workstation's window is the ordinary one without the locked buttons (clipboard, folders, apps,
-agent). While the Gateway is down, its bar says "No network: the Gateway is off" with **Start Gateway**.
+agent), and without Screenshot and Record. It is a protected window, opened so (built: `model.js` `machineProtected`,
+`library.jsx` `openMachine`, `vmwindow.jsx`, `appsmode.jsx`), and so is the Gateway's. While the Gateway is down, its bar says "No network: the Gateway is off" with **Start Gateway**.
 
 **Configure** for a group: a member switcher (Workstation, Gateway) over the usual one-screen Configure. The anonymity
 rows (19.5) are shown off and dimmed with "Off for anonymity". A Group section has the disposable switch, the order

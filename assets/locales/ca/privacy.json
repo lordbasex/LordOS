@@ -65,5 +65,6 @@
   "ask.vr": "«{app}» vol fer servir les ulleres de realitat virtual {headset}",
   "ask.vrNote": "La seva pantalla passa a ser només de l’app; LordOS mai no hi mostra el teu escriptori. Se li treu quan l’app es tanca, desconnectes les ulleres o es bloqueja la pantalla. Pots canviar-ho després a Configuració → Privadesa.",
   "perm.vr": "Ulleres de realitat virtual",
-  "permHint.vr": "Apps que poden controlar directament la pantalla d’unes ulleres de realitat virtual. Només es presten ulleres, mai els teus monitors, i se’ls treuen quan es bloqueja la pantalla, canvies d’usuari o tries Denega."
+  "permHint.vr": "Apps que poden controlar directament la pantalla d’unes ulleres de realitat virtual. Només es presten ulleres, mai els teus monitors, i se’ls treuen quan es bloqueja la pantalla, canvies d’usuari o tries Denega.",
+  "protectedCapture": "Finestra protegida"
 }
