@@ -2927,7 +2927,7 @@ static int start_machine(void) {
         if (S.m.kernel_boot && !S.unattended) {
             int ok = 0;
             snprintf(cp, sizeof cp, "%s/" VM_KBOOT_CMDLINE, S.disks);
-            int kfd = open(cp, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+            int kfd = open(cp, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);   /* never waits on a FIFO put there */
             ssize_t kn = kfd >= 0 ? read(kfd, S.kb_cmd, sizeof S.kb_cmd - 1) : -1;
             if (kfd >= 0) close(kfd);
             if (kn > 0) {

@@ -11,6 +11,25 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: Start Linux directly, Guest can see, each system's requirements, migrate another PC** (in development; latest
+  release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.2, 6.1, 6.11, 8).
+  - **Start Linux directly.** Configure → Boot keeps a kernel, an initial RAM disk and a command line with an installed
+    Linux machine and starts them instead of the boot loader on its disk (no firmware menu, no countdown): `machine.json`
+    schema 21 `kernel_boot`, the files copied into the machine's `disks/boot` by `lord-vm --set --kernel --initrd
+    --cmdline --kernel-boot` all or nothing (regular files only, sizes capped, the kernel's start checked for the
+    machine's architecture, the command line printable and one argument of QEMU's), the kernel at boot index 0. Refused
+    with Secure Boot, the virtio-win devices, an encrypted machine and a group's member; a clone keeps it, an export
+    leaves it off. The guest's own kernel comes out of it with `machines cp`.
+  - **Guest can see.** Configure → Security lists every channel between a machine and this computer in one place: the
+    network and its forwarded ports, the screen, keyboard and mouse, sound, the microphone, the clipboard each way, shared
+    folders, the transfer folder, the guest agent, Automation, files, links and notifications from the machine; each with
+    its state, what it does now while the machine runs, and its switch or a button to its section.
+  - **What a system needs.** The assistant's What's Missing opens the chosen system's own requirements: only its parts,
+    with its drivers and WinFsp downloaded at Create, the LordOS guest tools and an unattended install's answers.
+  - **`machines migrate`.** Another PC's whole disk becomes a machine: over the network through the person's own SSH (the
+    old PC needs only its SSH server, or a live USB; `--sudo` reads a root-only disk with that PC's sudo), or a disk
+    connected here. The size comes first and is checked, the copy is written sparse, then imported with the compatible
+    devices. Checked with a Raspberry Pi 5 as the old PC: 20 GB in 190 s, booted.
 - **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (in
   development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
   - **Send to LordOS.** A file chosen in the machine (Linux: the file manager's Send to LordOS, or `lordos-guest
@@ -737,6 +756,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: `machines cp` out of a machine refused every file over 128 KB** ("the machine gave a strange answer"): a
+  whole 128 KB piece was taken for one too long (in development).
+- **Machines: a command that went away filled its machine's `lord-vm.log`** with the same "not delivered" line several
+  times a second; now said once per client (in development).
 - **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
   QEMU's namespaces, so lord-server could no longer read which program a machine's engine runs and never counted one as
   checked. lord-server now keeps a pidfd of every lord-vm it starts (a machine started without a window sends its own) and
@@ -1211,6 +1234,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   running guest.
 
 ### Tests
+- Machines (in development): `vmkboot-test` (direct kernel boot's checks, ASan and UBSan, a random pass), schema 21 in
+  `vm-test`, the requirements, Guest can see and Start Linux directly in `vm_model_test.mjs`;
+  `tools/vm/e2e/machines/kernel-boot.py` (real QEMU/KVM: a guest's kernel taken out with `machines cp`, started directly
+  with UEFI and BIOS, a clone, the switch off, the refusals) and `server/tests/machines_see_headless.sh` (screenshots of
+  Guest can see, Start Linux directly and both Requirements pages).
 
 - **Two tests made steady on a busy computer** (in development). `webreg-test`'s stand-in web runtime wrote the files the
   test reads in place, so a loaded computer let the test read an empty one: it now writes them whole and renames them, and

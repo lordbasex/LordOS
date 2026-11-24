@@ -2114,6 +2114,14 @@ static int cmd_migrate(int argc, char **argv) {
         size_t want = total - done < sizeof buf ? (size_t)(total - done) : sizeof buf, have = 0;
         while (have < want) { ssize_t r = read(dp[0], buf + have, want - have); if (r < 0 && errno == EINTR) continue; if (r <= 0) break; have += (size_t)r; }
         if (have < want) { why = "the copy ended before the whole disk came"; break; }
+        /* a whole disk starts with its boot sector or partition table, never an image format's header: one (a qcow2 that
+         * would name a backing file, a VMDK descriptor) is refused rather than handed to the import as an image */
+        if (done == 0 && have >= 68 && (!memcmp(buf, "QFI\xfb", 4) || !memcmp(buf, "KDMV", 4) || !memcmp(buf, "COWD", 4) ||
+                                        !memcmp(buf, "# Disk DescriptorFile", 21) || !memcmp(buf, "vhdxfile", 8) || !memcmp(buf, "conectix", 8) ||
+                                        !memcmp(buf, "WithoutFreeSpace", 16) || !memcmp(buf, "WithouFreSpacExt", 16) || !memcmp(buf + 64, "\x7f\x10\xda\xbe", 4))) {
+            why = "that is a disk image file, not a whole disk: copy it and use machines import";
+            break;
+        }
         size_t z = 0;
         while (z < have && !buf[z]) z++;
         if (z == have) { if (lseek(out, (off_t)have, SEEK_CUR) < 0) { why = strerror(errno); break; } }
