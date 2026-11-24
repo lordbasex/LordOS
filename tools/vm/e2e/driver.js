@@ -2,10 +2,12 @@
 // Lets the bench (lc.py, as the session user) run a command in a real headless session through the same SDK the
 // interface uses, with no new channel into lord-server (the Cloud bench's approach): it writes ~/.e2e/cmd-<n>.js, the
 // body of an async function; this polls for it with lord.fs, runs it with { lord, wm, admin, launchApp, sleep, log }
-// and writes ~/.e2e/out-<n>.json: { ok, value } or { ok: false, error }.
+// and writes ~/.e2e/out-<n>.json: { ok, value } or { ok: false, error }. Also in scope: mh (machines/probe.js: what is on
+// screen, by text) and sdk (@lordos/sdk, the same instances the apps use).
 import { windows, wm as shellWm, createDesktop, setActiveDesktop } from '../../../sdk/windows.js';
 import { launchApp } from '../../../sdk/apps.js';
 import { admin } from '../../../sdk/admin.js';
+import * as sdk from '../../../sdk/index.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
@@ -21,6 +23,8 @@ const wm = {
   // a window opened or moved as the app or the person would (apps mode's bench: a machine's window, a guest's window dragged)
   open: (app, opts) => shellWm.open(app, opts),
   move: (id, x, y) => shellWm.move(id, x, y),
+  resize: (id, w, h) => shellWm.resize(id, w, h),
+  setFrame: (id, f) => shellWm.setFrame(id, f),
   close: (id) => shellWm.close(id),
 };
 
@@ -33,8 +37,8 @@ function start() {
     const log = (...a) => { mine.push(a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')); };
     let out;
     try {
-      const fn = new AsyncFunction('lord', 'wm', 'admin', 'launchApp', 'sleep', 'log', src);
-      const value = await fn(lord, wm, admin, launchApp, sleep, log);
+      const fn = new AsyncFunction('lord', 'wm', 'admin', 'launchApp', 'sleep', 'log', 'mh', 'sdk', src);
+      const value = await fn(lord, wm, admin, launchApp, sleep, log, globalThis.mh || null, sdk);
       out = { ok: true, value: value === undefined ? null : value, logs: mine };
     } catch (e) {
       out = { ok: false, error: String((e && (e.code || e.message)) || e), detail: e && e.stack ? String(e.stack) : null, logs: mine };

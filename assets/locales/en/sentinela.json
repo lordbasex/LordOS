@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Shut down",
   "analysis.rule": "Always shown: this alert needs no model.",
   "settings.seesMachines": "For virtual machines: their name, role and state, why they ended, and the CPU, memory and network counts of their engine. Never their screen, files or clipboard.",
-  "sandbox.unverified": "proof that its engine is the machine’s own"
+  "sandbox.unverified": "proof that its engine is the machine’s own",
+  "block.ended": "Blocked program ended: {name}",
+  "block.endedBody": "It is on your blocklist. Review the list in Settings → AI → Sentinela.",
+  "block.title": "Blocklist",
+  "block.hint": "These programs are ended whenever they start in your account, whether Sentinela is on or off. Add one from Monitor → Get Info → Investigate with Lumo; remove it to let it run again.",
+  "block.empty": "No blocked programs.",
+  "block.remove": "Remove",
+  "block.script": "{interp} script",
+  "block.binary": "Program",
+  "block.pkg": "and every program of the package {pkg}",
+  "block.added": "blocked on {date}"
 }

@@ -10,8 +10,9 @@
  *   ptr X Y             the pointer moves to (X, Y), logical pixels: the remote desktop's injection (main.c)
  *   btn B 1|0           button B (0 left, 1 middle, 2 right) pressed or released, the same way
  *   wheel N             N wheel steps (+ up)
- *   key C 1|0           modifier key C (evdev: 29 Ctrl, 42 Shift, 56 Alt, 125 ❖ only) pressed or released, as the remote
- *                       desktop types it: the window drag modifier's test (tests/moddrag_headless.sh)
+ *   key C 1|0           key C (an evdev code, 1 to 0x2ff) pressed or released, as the remote desktop types it (main.c's
+ *                       remote_key): the window drag modifier's test (tests/moddrag_headless.sh) and the Machines harness
+ *                       (tools/vm/e2e/machines), whose text goes in this way (remote.sock takes only root's connections)
  *   tablet add|remove   a fake graphics tablet's pen and pad appear or go away (tablet.c's own tablet_new)
  *   pen|pad T C V       one evdev event (type, code, value) of that pen or pad, through tablet.c and wl_tablet.c as a
  *                       real device's
@@ -40,7 +41,7 @@ typedef struct {
     int  (*tablet_event)(int pad, unsigned type, unsigned code, int value);
     int  (*xwl)(void);                                           /* the client's end, or -1 */
     int  (*lease)(int plugged);                                  /* 0 on success */
-    void (*key)(int code, int down);                             /* a modifier key (testhooks.c checks which) */
+    void (*key)(int code, int down);                             /* a key (testhooks.c checks the code's range) */
     int  (*frame)(const char *which, long node);                 /* 0 when the picture was written */
 } TestHooks;
 

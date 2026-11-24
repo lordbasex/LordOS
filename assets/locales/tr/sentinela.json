@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Kapat",
   "analysis.rule": "Her zaman gösterilir: bu uyarının modele ihtiyacı yok.",
   "settings.seesMachines": "Sanal makineler için: adları, rolleri ve durumları, neden kapandıkları ve motorlarının işlemci, bellek ve ağ sayıları. Ekranları, dosyaları ya da panoları asla görülmez.",
-  "sandbox.unverified": "motorunun gerçekten makinenin kendisine ait olduğunun kanıtı"
+  "sandbox.unverified": "motorunun gerçekten makinenin kendisine ait olduğunun kanıtı",
+  "block.ended": "Engellenen program sonlandırıldı: {name}",
+  "block.endedBody": "Engel listenizde. Listeyi Ayarlar → Yapay Zekâ → Sentinela’dan gözden geçirin.",
+  "block.title": "Engel listesi",
+  "block.hint": "Bu programlar, Sentinela açık da olsa kapalı da olsa, hesabınızda her başladıklarında sonlandırılır. Monitör → Bilgi Al → Lumo ile araştır’dan bir program ekleyin; yeniden çalışabilmesi için listeden kaldırın.",
+  "block.empty": "Engellenen program yok.",
+  "block.remove": "Kaldır",
+  "block.script": "{interp} betiği",
+  "block.binary": "Program",
+  "block.pkg": "ve {pkg} paketinin tüm programları",
+  "block.added": "{date} tarihinde engellendi"
 }

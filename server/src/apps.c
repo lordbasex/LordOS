@@ -236,6 +236,7 @@ static int parse_desktop(const char *file, const char *lang, Entry *e) {
     free(line);
     fclose(f);
     unescape(e->a.name); unescape(e->a.name_c); unescape(e->a.generic); unescape(e->a.comment);
+    e->a.comment_l10n = e->ranks[2] >= 2;
     for (int i = 0; i < e->nact; i++) unescape(e->act[i].label);
     snprintf(e->a.file, sizeof e->a.file, "%s", file);
     return 0;

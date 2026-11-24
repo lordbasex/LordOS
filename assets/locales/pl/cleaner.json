@@ -482,5 +482,6 @@
   },
   "select.nothing": "Nic nie zaznaczono",
   "activity.app": "Usunięto aplikację",
-  "activity.system": "Porządki w systemie: {name}"
+  "activity.system": "Porządki w systemie: {name}",
+  "map.machines": "Odzyskaj w Maszynach"
 }

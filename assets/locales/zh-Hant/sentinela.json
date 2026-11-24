@@ -132,5 +132,15 @@
   "action.vm_shutdown": "關機",
   "analysis.rule": "永遠顯示：此警示不需要模型。",
   "settings.seesMachines": "對於虛擬機器：名稱、角色和狀態、結束的原因，以及其引擎的 CPU、記憶體和網路計數。絕不會看到它們的螢幕、檔案或剪貼簿。",
-  "sandbox.unverified": "確認其引擎確實屬於該虛擬機器本身"
+  "sandbox.unverified": "確認其引擎確實屬於該虛擬機器本身",
+  "block.ended": "已結束被封鎖的程式：{name}",
+  "block.endedBody": "它在你的封鎖清單中。可在 設定 → AI → Sentinela 中檢視清單。",
+  "block.title": "封鎖清單",
+  "block.hint": "這些程式只要在你的帳號中啟動就會被結束，不論 Sentinela 是否開啟。可在 監視器 → 取得資訊 → 讓 Lumo 調查 中加入；將它移除即可讓它再次執行。",
+  "block.empty": "沒有被封鎖的程式。",
+  "block.remove": "移除",
+  "block.script": "{interp} 指令碼",
+  "block.binary": "程式",
+  "block.pkg": "以及套件 {pkg} 中的所有程式",
+  "block.added": "於 {date} 封鎖"
 }

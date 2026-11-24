@@ -45,7 +45,7 @@ while :; do
 done
 EOF
 chmod 755 /usr/local/bin/lordmic.sh
-printf '[Service]\nExecStart=/usr/bin/speaker-test -q -t sine -f 440 -c 2 -r 48000 -l 0\nRestart=always\n[Install]\nWantedBy=multi-user.target\n' > /etc/systemd/system/lordtone.service
+printf '[Service]\nExecStart=/usr/bin/speaker-test -t sine -f 440 -c 2 -r 48000 -l 0\nRestart=always\n[Install]\nWantedBy=multi-user.target\n' > /etc/systemd/system/lordtone.service
 printf '[Service]\nExecStart=/usr/local/bin/lordmic.sh\nRestart=always\n[Install]\nWantedBy=multi-user.target\n' > /etc/systemd/system/lordmic.service
 amixer -q sset Master 80% unmute 2>/dev/null || true
 amixer -q sset Capture 80% cap 2>/dev/null || true

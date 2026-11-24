@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Herunterfahren",
   "analysis.rule": "Wird immer angezeigt: Diese Warnung braucht kein Modell.",
   "settings.seesMachines": "Bei virtuellen Maschinen: Name, Rolle und Zustand, warum sie beendet wurden, und die CPU-, Speicher- und Netzwerkzahlen ihrer Engine. Nie ihren Bildschirm, ihre Dateien oder ihre Zwischenablage.",
-  "sandbox.unverified": "den Nachweis, dass ihr Motor wirklich der eigene der Maschine ist"
+  "sandbox.unverified": "den Nachweis, dass ihr Motor wirklich der eigene der Maschine ist",
+  "block.ended": "Gesperrtes Programm beendet: {name}",
+  "block.endedBody": "Es steht auf deiner Sperrliste. Sieh dir die Liste unter Einstellungen → KI → Sentinela an.",
+  "block.title": "Sperrliste",
+  "block.hint": "Diese Programme werden bei jedem Start in deinem Konto beendet, egal ob Sentinela ein- oder ausgeschaltet ist. Füge eines über Monitor → Informationen → Mit Lumo untersuchen hinzu; entferne es, damit es wieder laufen darf.",
+  "block.empty": "Keine gesperrten Programme.",
+  "block.remove": "Entfernen",
+  "block.script": "{interp}-Skript",
+  "block.binary": "Programm",
+  "block.pkg": "und alle Programme des Pakets {pkg}",
+  "block.added": "gesperrt am {date}"
 }

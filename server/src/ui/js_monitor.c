@@ -45,6 +45,7 @@
 #include "../monitor/map.h"
 #include "../monitor/procctl.h"
 #include "../monitor/exeown.h"
+#include "../monitor/describe.h"
 #include "../monitor/netrec.h"
 #include "../apps.h"
 #include "js_sys.h"
@@ -637,8 +638,30 @@ static JSValue f_exe_owners(JSContext *c, JSValueConst t, int argc, JSValueConst
     return o;
 }
 
+/* (0.8.9.6) describe(kind, arg, lang) → { text, long, lang } | false | null: what a program is (describe.h): kind "pkg" (an
+ * installed package's description, Debian's translation into lang when apt has it), "man" (a manual page's one-line
+ * summary) or "unit" (a systemd unit's Description=). null while it is looked up (a worker thread; the next call has
+ * it), false when nothing is known. */
+static JSValue f_describe(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 3 || !JS_IsString(argv[0]) || !JS_IsString(argv[1]) || !JS_IsString(argv[2])) return js_throw_code(c, "sys.badArgument", NULL);
+    const char *kind = JS_ToCString(c, argv[0]), *arg = JS_ToCString(c, argv[1]), *lang = JS_ToCString(c, argv[2]);
+    char *json = NULL;
+    int r = kind && arg && lang ? desc_lookup(kind, arg, lang, &json) : -1;
+    if (kind) JS_FreeCString(c, kind);
+    if (arg) JS_FreeCString(c, arg);
+    if (lang) JS_FreeCString(c, lang);
+    if (r < 0) return JS_NULL;
+    if (!r || !json) { free(json); return JS_FALSE; }
+    JSValue v = JS_ParseJSON(c, json, strlen(json), "<monitor.describe>");
+    free(json);
+    if (JS_IsException(v)) { JS_FreeValue(c, JS_GetException(c)); return JS_FALSE; }
+    return v;
+}
+
 static const JSCFunctionListEntry monitor_funcs[] = {
     JS_CFUNC_DEF("exeOwners", 1, f_exe_owners),
+    JS_CFUNC_DEF("describe", 3, f_describe),
     JS_CFUNC_DEF("netTotals", 0, f_net_totals),
     JS_CFUNC_DEF("start", 0, f_start),
     JS_CFUNC_DEF("stop", 0, f_stop),

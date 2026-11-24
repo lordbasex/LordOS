@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Sammuta",
   "analysis.rule": "Näytetään aina: tämä hälytys ei tarvitse mallia.",
   "settings.seesMachines": "Virtuaalikoneista: nimen, roolin ja tilan, miksi ne sammuivat, sekä niiden moottorin suoritin-, muisti- ja verkkolukemat. Ei koskaan niiden näyttöä, tiedostoja eikä leikepöytää.",
-  "sandbox.unverified": "todiste siitä, että sen moottori on koneen oma"
+  "sandbox.unverified": "todiste siitä, että sen moottori on koneen oma",
+  "block.ended": "Estetty ohjelma lopetettiin: {name}",
+  "block.endedBody": "Se on estolistallasi. Tarkista lista kohdassa Asetukset → Tekoäly → Sentinela.",
+  "block.title": "Estolista",
+  "block.hint": "Nämä ohjelmat lopetetaan aina, kun ne käynnistyvät tililläsi, oli Sentinela päällä tai ei. Lisää ohjelma kohdasta Monitori → Näytä tiedot → Tutki Lumolla; poista se, jos haluat sen taas toimivan.",
+  "block.empty": "Ei estettyjä ohjelmia.",
+  "block.remove": "Poista",
+  "block.script": "{interp}-skripti",
+  "block.binary": "Ohjelma",
+  "block.pkg": "ja kaikki paketin {pkg} ohjelmat",
+  "block.added": "estetty {date}"
 }

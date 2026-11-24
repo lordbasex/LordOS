@@ -97,6 +97,9 @@
  *                   d = 1: text = "OUT\tIN", the output and input (machine.json sound_out, sound_in: a node.name each, or
  *                   empty for the default; vm_sound_dev_valid), d = 0: they stay as they are.
  *                   They change nothing in QEMU: lord-server applies them itself (6.9) → VM_REPLY
+ *     VM_NETCABLE   the network card's cable while the machine runs (the window's Devices → Network, 5.3): a = 1 plugged,
+ *                   0 pulled (QMP set_link on the first card's backend, nic0). Only for the shared, host-only and bridged
+ *                   networks, never a machine group's member; nothing is written, a new run starts plugged → VM_REPLY
  *     VM_RENAME     the machine's name while it runs (lord-vm --rename, 6.26): text = the new name (vm_rename_name_ok);
  *                   lord-vm holds the lock, so it writes machine.json. Only the name: the folders keep theirs until a
  *                   rename with the machine off → VM_REPLY
@@ -188,7 +191,9 @@
  *                   until it starts again; VMN_NET_BACK: a new passt is attached, b = milliseconds without network;
  *                   VMN_RECOVERED: an interrupted operation was finished or rolled back at this start; VMN_IDENTITY: a
  *                   Clone's guest got its own hostname and machine-id; b = 1: a Windows guest's computer name, from its next
- *                   restart), b = detail number (a signal or exit status),
+ *                   restart; VMN_SHARE_LOST: a shared folder's virtiofsd ended while the machine runs, so the folder is
+ *                   gone from the guest until it starts again, b = 1 for the transfer folder, 0 for one of the person's,
+ *                   text = its tag), b = detail number (a signal or exit status),
  *                   text = detail.
  *                   Sent to every client, and again to one that connects later (VM_STATUS)
  *
@@ -280,7 +285,7 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL, VM_EXEC,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL, VM_EXEC, VM_NETCABLE,
     VM_USB,
     VM_REQ_LAST = VM_USB,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
@@ -296,7 +301,7 @@ enum { VSH_CLOSE = 0, VSH_OPEN = 1, VSH_SIZE = 2 };
  * (or it's a secret); DECLINED: the person said no (ask mode), or didn't answer in time */
 enum { VCD_BACKGROUND = 1, VCD_STALE, VCD_NONE, VCD_DECLINED, VCD_LAST = VCD_DECLINED };
 /* VM_NOTICE a */
-enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_COUNT };
+enum { VMN_NONE = 0, VMN_NET_LOST, VMN_RECOVERED, VMN_NET_BACK, VMN_IDENTITY, VMN_SHARE_LOST, VMN_COUNT };
 /* VM_JOB a, b */
 enum { VJ_NONE = 0, VJ_SUSPEND, VJ_RESUME, VJ_SNAPSHOT, VJ_REVERT, VJ_DELETE, VJ_COUNT };
 enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
@@ -512,6 +517,30 @@ static inline int vd_abs_map(int p, int pic, int off, int shown, int desk) {
     long long q = ((2 * g + 1) * pic) / (2LL * desk);
     return q < 0 ? 0 : q >= pic ? pic - 1 : (int)q;
 }
+/* All Displays (docs/VIRTUALIZATION.md 5.4): one digit 0..max-1 (lord-vmdisplay's --heads, given max = VM_HEADS_MAX + 1); -1 anything else */
+static inline int vd_head_arg(const char *s, int max) {
+    if (!s || s[0] < '0' || s[0] > '9' || s[1]) return -1;
+    int h = s[0] - '0';
+    return h < max ? h : -1;
+}
+/* The guest's desktop as the heads make it: n heads (2..8) side by side from the left in their order, tops aligned, each
+ * w[i] × h[i] (320..VD_MAX_DIM). L gets head k's layout as VD_LAYOUT takes it: its corner, its size, the desktop's size.
+ * 0 ok; -1 when the sizes or k are out of range, or the desktop would be wider than vm_layout_ok allows (L all 0) */
+static inline int vm_heads_layout(int n, const int *w, const int *h, int k, int L[6]) {
+    for (int i = 0; i < 6; i++) L[i] = 0;
+    if (n < 2 || n > 8 || k < 0 || k >= n || !w || !h) return -1;
+    long long x = 0, dw = 0, dh = 0;
+    for (int i = 0; i < n; i++) {
+        if (w[i] < 320 || h[i] < 200 || w[i] > 32767 || h[i] > 32767) return -1;
+        if (i == k) x = dw;
+        dw += w[i];
+        if (h[i] > dh) dh = h[i];
+    }
+    if (dw > 32767) return -1;
+    if (!vm_layout_ok((int)x, 0, w[k], h[k], (int)dw, (int)dh)) return -1;
+    L[0] = (int)x; L[1] = 0; L[2] = w[k]; L[3] = h[k]; L[4] = (int)dw; L[5] = (int)dh;
+    return 0;
+}
 static inline VmMsg vm_msg(uint16_t type, uint32_t seq, int a, int b, int c, int d, const char *text) {
     VmMsg m;
     memset(&m, 0, sizeof m);
@@ -545,6 +574,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_APPS || m->a == 0 || m->a == 1) &&
                       (m->type != VM_CAPTURE || m->a == 0 || m->a == 1) &&
                       (m->type != VM_RENAME || m->text[0]) &&
+                      (m->type != VM_NETCABLE || m->a == 0 || m->a == 1) &&
                       (m->type != VM_LINK || ((m->a == 0 || m->a == 1) && strnlen(m->text, VM_TEXT_MAX) == 36)) &&
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
                       (m->type != VM_SHELL || (m->a == VSH_CLOSE || ((m->a == VSH_OPEN || m->a == VSH_SIZE) && m->b >= 1 && m->b <= 1000 && m->c >= 1 && m->c <= 500))) &&

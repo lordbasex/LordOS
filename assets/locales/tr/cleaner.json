@@ -464,5 +464,6 @@
   },
   "select.nothing": "Hiçbir şey seçilmedi",
   "activity.app": "Uygulama kaldırıldı",
-  "activity.system": "Sistem temizliği: {name}"
+  "activity.system": "Sistem temizliği: {name}",
+  "map.machines": "Sanal Makineler’de geri kazan"
 }

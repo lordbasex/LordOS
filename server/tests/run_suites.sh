@@ -299,6 +299,14 @@ EOF
         77) skip "vm-whonix-xml" "KVM, QEMU, qemu-img, passt, unshare and python3" ;;
         *) bad "vm-whonix-xml (tests/vm_whonix_xml_test.sh)"; cat "$T/out" ;;
     esac
+    # Machines' settings → QEMU arguments as a table (docs/VIRTUALIZATION.md 12): a throwaway machine per row, started
+    # paused (nothing boots), its logged command line checked for what each setting adds and must not
+    python3 -I tests/vm_qemu_args_test.py >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-qemu-args (tests/vm_qemu_args_test.py: $(grep -c '^ok:' "$T/out") rows of settings against QEMU's arguments)" ;;
+        77) skip "vm-qemu-args" "KVM, QEMU, qemu-img, passt, unshare and python3" ;;
+        *) bad "vm-qemu-args (tests/vm_qemu_args_test.py)"; cat "$T/out" ;;
+    esac
     # protected windows (docs/PRIVACY.md): drawn on the display, the protected fill in a screenshot, the remote desktop's
     # and recording's frame, the Screenshot portal's still and a window shared alone; the other window captured as shown
     sh tests/protected_headless.sh >"$T/out" 2>&1
@@ -437,6 +445,7 @@ EOF
         0) ok "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)" ;;
         77) skip "machines-group-manage" "build/lord-server, lord-vm, lord-vm-testpaths, lord-vmunpack, the default theme, /dev/kvm, unshare and an installed catalog and image store to mount over" ;;
         *) bad "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)"; tail -20 "$T/out" ;;
+    esac
     # Machines' storage under real QEMU/KVM (tests/vm_storage_test.sh): encrypted machines, both disposable sessions,
     # snapshot, clone, Export (.lordvm and OVA), the import of an export (tampered and hostile), raw disks
     bash tests/vm_storage_test.sh >"$T/out" 2>&1
@@ -523,6 +532,7 @@ EOF
     if have node; then run "vm-catalog-test (apps/machines/catalog.js)" node tests/vm_catalog_test.mjs; fi
     if have node; then run "vm-windows-test (apps/machines/windows.js)" node tests/vm_windows_test.mjs; fi
     if have node; then run "vm-capture-test (apps/machines/capture.js, Capture mouse)" node tests/vm_capture_test.mjs; fi
+    if have node; then run "vm-alldisplays-test (apps/machines/alldisplays.js, All Displays)" node tests/vm_alldisplays_test.mjs; fi
     # Machines: crafted images the import must refuse (needs qemu-img and this computer's qemu-system)
     if have qemu-img && { have qemu-system-x86_64 || have qemu-system-aarch64; } && [ -x build/lord-vm ]; then run "vm-import-test" sh tests/vm_import_test.sh build
     else skip "vm-import-test" "qemu-img, qemu-system"; fi
@@ -573,6 +583,10 @@ EOF
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
     if have node; then run "sentinela-model-test (sdk/sentinelamodel.js, sdk/llmcatalog.js)" node tests/sentinela_model_test.mjs; else skip "sentinela-model-test" node; fi
     if have node; then run "sentinela-vm-test (sdk/sentinelavm.js: the machine rules)" node tests/sentinela_vm_test.mjs; else skip "sentinela-vm-test" node; fi
+    # (0.8.9.6) Investigate with Lumo: the facts, the strict answer, the evidence, a translation fenced as data
+    if have node; then run "sentinela-investigate-test (sdk/sentinelamodel.js: Investigate and Translate with Lumo)" node --no-warnings tests/sentinela_investigate_test.mjs; else skip "sentinela-investigate-test" node; fi
+    # (0.8.9.6) Get Info's description: the sources' order, the language and the fallback to English
+    if have node; then run "describe-model-test (sdk/describemodel.js)" node --no-warnings tests/describe_model_test.mjs; else skip "describe-model-test" node; fi
     if have node; then run "avatar-model-test (apps/settings/avatarmodel.js)" node tests/avatar_model_test.mjs; else skip "avatar-model-test" node; fi
     if have node; then run "weather-model-test (sdk/weathermodel.js)" node tests/weather_model_test.mjs; else skip "weather-model-test" node; fi
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi
@@ -889,6 +903,15 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "monitor-grouped-scene (apps/monitor/Processes.jsx)" node tests/menubar_test.mjs monitor_grouped_scene.mjs
     else skip "monitor-grouped-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6) Monitor → Processes: opening a group of 300 programs draws only the rows in sight, a few per pass, within
+    # a frame (the desktop froze for a second), and a redraw keeps the rows whose values didn't change
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-freeze-scene (sdk/lists.jsx Table sight, apps/monitor/Processes.jsx)" node tests/menubar_test.mjs monitor_freeze_scene.mjs
+    else skip "monitor-freeze-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6) Get Info's Description and Investigate with Lumo: only on the click, the closed actions, Blocklist asks first
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-describe-scene (apps/monitor/Describe.jsx)" node tests/menubar_test.mjs monitor_describe_scene.mjs
+    else skip "monitor-describe-scene" "node and the repository's node_modules (npm install)"; fi
     # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs

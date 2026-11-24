@@ -464,5 +464,6 @@
   },
   "select.nothing": "Walang napili",
   "activity.app": "Inalis ang app",
-  "activity.system": "Paglilinis ng system: {name}"
+  "activity.system": "Paglilinis ng system: {name}",
+  "map.machines": "Bawiin sa Mga Makina"
 }

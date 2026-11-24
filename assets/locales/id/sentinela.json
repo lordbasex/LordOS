@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Matikan",
   "analysis.rule": "Selalu ditampilkan: peringatan ini tidak butuh model.",
   "settings.seesMachines": "Untuk mesin virtual: nama, peran, dan statusnya, alasan berhenti, serta angka CPU, memori, dan jaringan dari mesin penggeraknya. Tidak pernah layar, berkas, atau papan klipnya.",
-  "sandbox.unverified": "bukti bahwa mesinnya benar-benar milik mesin itu sendiri"
+  "sandbox.unverified": "bukti bahwa mesinnya benar-benar milik mesin itu sendiri",
+  "block.ended": "Program yang diblokir dihentikan: {name}",
+  "block.endedBody": "Program ini ada di daftar blokir Anda. Tinjau daftarnya di Pengaturan → AI → Sentinela.",
+  "block.title": "Daftar blokir",
+  "block.hint": "Program-program ini dihentikan setiap kali berjalan di akun Anda, baik Sentinela aktif maupun tidak. Tambahkan dari Monitor → Lihat Info → Selidiki dengan Lumo; hapus agar bisa berjalan lagi.",
+  "block.empty": "Tidak ada program yang diblokir.",
+  "block.remove": "Hapus",
+  "block.script": "Skrip {interp}",
+  "block.binary": "Program",
+  "block.pkg": "dan semua program dari paket {pkg}",
+  "block.added": "diblokir pada {date}"
 }

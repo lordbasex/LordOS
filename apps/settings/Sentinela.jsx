@@ -2,12 +2,13 @@
 // (installed lordos-llm-* packages, or a button that downloads one with the engine, sdk/llmcatalog.js), the triggers
 // (the ready ones; the others "coming soon"), its limits, what it reads, the alerts with their facts and the closed
 // list of actions, and the programs marked "It's mine". The virtual machines' alerts (sdk/sentinelavm.js) have their own
-// actions: open the machine, show it in Monitor, pause or resume, shut down.
+// actions: open the machine, show it in Monitor, pause or resume, shut down. (0.8.9.6) The blocklist: programs ended
+// whenever they start, each with Remove.
 import {
   View, Text, Button, Toggle, useTheme, useLocale, useStore, formatBytes, formatTime, formatDate, spacing, typeScale,
   LLM_MODELS, packagesForModel, TRIGGERS, ACTIONS, VM_ACTIONS, vmWhy, vmFactLines, factLines, presentAlert, sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs,
   refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery, clearSentinelaAlerts, sentinelaActionLabel, installLlm, removeLlm,
-  ShieldGlyph, settings, fs,
+  ShieldGlyph, settings, fs, sentinelaBlocked, refreshBlocked, unblockProgram, errorText,
 } from '@lordos/sdk';
 import { useEffect, useState } from 'react';
 import { Section, SettingRow, Note, tint } from './ui.jsx';
@@ -21,6 +22,8 @@ export function SentinelaSettings({ alertId }) {
   const p = sentinelaPrefs();
   const eng = useStore(sentinelaEngine);
   const alerts = useStore(sentinelaAlerts);
+  const blocked = useStore(sentinelaBlocked);
+  useEffect(() => { refreshBlocked(); }, []);
   const [job, setJob] = useState(null);            // { id, done, total } while a model downloads
   const [msg, setMsg] = useState(null);
   const [open, setOpen] = useState(alertId || null);
@@ -130,8 +133,38 @@ export function SentinelaSettings({ alertId }) {
           </Section>
         </>
       ) : null}
+      {/* (0.8.9.6) the blocklist: it holds whether Sentinela is on or off, so it shows whenever it has programs */}
+      {p.on || blocked.length ? <BlocklistSection list={blocked} /> : null}
       {msg ? <Note tone={msg.ok ? 'ok' : 'error'}>{msg.text}</Note> : null}
     </>
+  );
+}
+
+// (0.8.9.6) Programs ended whenever they start (lord.sentinela.block, docs/SENTINELA.md "Blocklist"): each by its file's
+// SHA-256, with where it was and its package when chosen; Remove lets it run again.
+function BlocklistSection({ list }) {
+  const { t: tr } = useLocale();
+  const [busy, setBusy] = useState(null);
+  const [err, setErr] = useState(null);
+  const remove = async (x) => {
+    setBusy(x.id);
+    setErr(null);
+    const r = await unblockProgram(x.id);
+    setBusy(null);
+    if (!r.ok) setErr(errorText(r.error));
+  };
+  return (
+    <Section title={tr('sentinela.block.title')} footer={tr('sentinela.block.hint')}>
+      {list.length ? list.map((x) => (
+        <SettingRow key={x.id} label={x.name || x.path}
+          hint={[x.kind === 'script' ? tr('sentinela.block.script', { interp: x.interp || '' }) : tr('sentinela.block.binary'), x.path,
+            x.pkg ? tr('sentinela.block.pkg', { pkg: x.pkg }) : null, `SHA-256 ${String(x.id).slice(0, 16)}…`,
+            x.at ? tr('sentinela.block.added', { date: formatDate(new Date(x.at)) }) : null].filter(Boolean).join(' · ')}>
+          <Button small label={tr('sentinela.block.remove')} disabled={busy === x.id} onClick={() => remove(x)} />
+        </SettingRow>
+      )) : <SettingRow label={tr('sentinela.block.empty')} />}
+      {err ? <Note tone="error">{err}</Note> : null}
+    </Section>
   );
 }
 

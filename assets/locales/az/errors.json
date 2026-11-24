@@ -946,5 +946,19 @@
   "sentinela.blockFailed": "Onun şəbəkəsi bloklana bilmədi.",
   "sentinela.machineGone": "O maşın artıq “Virtual maşınlar”-da yoxdur.",
   "sentinela.machineFailed": "Maşın cavab vermədi.",
-  "vm.overBudget": "Artıq işləyən maşınların yanında kifayət qədər yaddaş yoxdur. Onlardan birini dayandırın və ya söndürün, ya da bu maşına daha az yaddaş verin."
+  "vm.overBudget": "Artıq işləyən maşınların yanında kifayət qədər yaddaş yoxdur. Onlardan birini dayandırın və ya söndürün, ya da bu maşına daha az yaddaş verin.",
+  "llm.timeout": "Yerli model cavab verməyə çox vaxt sərf etdi.",
+  "llm.failed": "Yerli model cavab verə bilmədi.",
+  "llm.answer": "Yerli modelin cavabı oxunmadı.",
+  "llm.start": "Yerli model başlaya bilmədi.",
+  "sentinela.lumo.off": "Sentinela sönülüdür. Onu Parametrlər → Süni intellekt → Sentinela bölməsində yandırın.",
+  "sentinela.lumo.noEngine": "Yerli model mühərriki quraşdırılmayıb.",
+  "sentinela.lumo.noModel": "Sentinela üçün heç bir yerli model quraşdırılmayıb.",
+  "sentinela.lumo.rejected": "Lumo-nun cavabı gözlənilən formada deyildi, ona görə kənara qoyuldu.",
+  "sentinela.blockRefused": "LordOS-un öz proqramları, skript interpretatorunun özü və sistemin əsas proqramları bloklana bilməz.",
+  "sentinela.blockFull": "Bloklama siyahısı doludur.",
+  "sentinela.notBlocked": "O proqram bloklama siyahısında deyil.",
+  "sentinela.noAppNetwork": "Bu prosesin şəbəkəsi bloklana bilən öz tətbiqi yoxdur.",
+  "sys.failed": "Nəsə səhv getdi.",
+  "sys.unsupported": "LordOS-un bu versiyası bunu edə bilmir."
 }

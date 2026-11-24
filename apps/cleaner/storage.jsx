@@ -3,6 +3,7 @@
 import { View, Image, cleaner, useAppWindow, useStore, windows, wm, userDirs, t as tr, formatBytes, formatDate, formatNumber, revealPath, typeScale, spacing } from '@lordos/sdk';
 import { useEffect, useMemo, useState } from 'react';
 import { Label, Glass, GlassButton, Pill, Hero, Bar, Enter, PagedList, usePal, useRail, ASIDE } from './ui.jsx';
+import { machinesSpace } from './vmspace.js';
 
 const SAFE = '#35c98f', REVIEW = '#f0b13c';
 const COLOURS = ['#7b2fe0', '#2a6fe0', '#c0349f', '#0f8f86', '#b8541a', '#a02c56', '#55577f', '#3f7fb5'];
@@ -276,6 +277,10 @@ export function StorageView({ scan, volume, onReview }) {
   const summary = volume && volume.total > 0 ? tr('cleaner.map.summary', { free: formatBytes(volume.free), safe: formatBytes(whole.safe || 0), review: formatBytes(whole.review || 0), other: formatBytes(Math.max(0, volume.total - volume.free - whole.allocated)) }) : '';
   const rel = (name) => [...data.trail.map((t) => t.name), name].join('/');
   const real = !!sel && sel.id >= 0;           // "Others" is no folder: it can be looked at, not opened or reviewed
+  // the machines' space (docs/VIRTUALIZATION.md 6.14): Cleaner never offers a machine's files (clean_machine_path), so a
+  // machine or the Machines library selected here offers Machines' own Storage window, which reclaims it safely
+  const selPath = real ? `${data.base === '/' ? '' : data.base}/${rel(sel.name)}` : '';
+  const vmSpace = real && machinesSpace(selPath, typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : '');
   const pills = [['bubbles', 'cleaner.map.viewBubbles'], ['map', 'cleaner.map.viewMap'], ['tree', 'cleaner.map.viewTree'], ...(scan.savedAt ? [] : [['types', 'cleaner.map.viewTypes']])].map(([k, key]) => <Pill key={k} label={tr(key)} on={view === k} onClick={() => setView(k)} />);
   return (
     <View style={{ flex: 1, minHeight: 0, gap: spacing.s, paddingBottom: spacing.m }}>
@@ -311,7 +316,8 @@ export function StorageView({ scan, volume, onReview }) {
       {view === 'bubbles' ? (
         <Glass style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: spacing.m, paddingHorizontal: spacing.m }}>
           <View style={{ flex: 1, minWidth: 0 }}><Label size={typeScale.callout} lines={1}>{sel ? tr('cleaner.map.selectedShort', { name: sel.name, size: formatBytes(sel.allocated) }) : tr('cleaner.map.noneSelected')}</Label></View>
-          <GlassButton small label={tr('cleaner.map.review')} disabled={!real || !!scan.savedAt} onClick={() => onReview(rel(sel.name))} />
+          {vmSpace ? <GlassButton small label={tr('cleaner.map.machines')} onClick={() => wm.open('machines', { instance: 'storage', args: { storage: true } })} />
+            : <GlassButton small label={tr('cleaner.map.review')} disabled={!real || !!scan.savedAt} onClick={() => onReview(rel(sel.name))} />}
           <GlassButton small label={tr('cleaner.show')} disabled={!real} onClick={() => revealPath(`${data.base === '/' ? '' : data.base}/${rel(sel.name)}/.`)} />
         </Glass>
       ) : null}

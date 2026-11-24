@@ -947,5 +947,19 @@
   "sentinela.blockFailed": "Rețeaua lui nu a putut fi blocată.",
   "sentinela.machineGone": "Mașina aceea nu mai este în Mașini.",
   "sentinela.machineFailed": "Mașina nu a răspuns.",
-  "vm.overBudget": "Nu este destulă memorie pe lângă mașinile care rulează deja. Suspendă sau oprește una dintre ele ori dă-i acestei mașini mai puțină memorie."
+  "vm.overBudget": "Nu este destulă memorie pe lângă mașinile care rulează deja. Suspendă sau oprește una dintre ele ori dă-i acestei mașini mai puțină memorie.",
+  "llm.timeout": "Modelul local a răspuns prea greu.",
+  "llm.failed": "Modelul local nu a putut răspunde.",
+  "llm.answer": "Răspunsul modelului local nu a putut fi citit.",
+  "llm.start": "Modelul local nu a putut porni.",
+  "sentinela.lumo.off": "Sentinela este dezactivată. Activați-o în Setări → IA → Sentinela.",
+  "sentinela.lumo.noEngine": "Motorul modelului local nu este instalat.",
+  "sentinela.lumo.noModel": "Niciun model local nu este instalat pentru Sentinela.",
+  "sentinela.lumo.rejected": "Răspunsul lui Lumo nu avea forma așteptată, așa că a fost pus deoparte.",
+  "sentinela.blockRefused": "Programele LordOS, un interpretor de scripturi în sine și programele de bază ale sistemului nu pot fi blocate.",
+  "sentinela.blockFull": "Lista de blocare este plină.",
+  "sentinela.notBlocked": "Acel program nu este în lista de blocare.",
+  "sentinela.noAppNetwork": "Acest proces nu are o aplicație proprie a cărei rețea să poată fi blocată.",
+  "sys.failed": "Ceva nu a mers bine.",
+  "sys.unsupported": "Această versiune de LordOS nu poate face asta."
 }

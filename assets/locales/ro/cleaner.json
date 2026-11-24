@@ -482,5 +482,6 @@
   },
   "select.nothing": "Nimic selectat",
   "activity.app": "Aplicație eliminată",
-  "activity.system": "Curățare a sistemului: {name}"
+  "activity.system": "Curățare a sistemului: {name}",
+  "map.machines": "Recuperează în Mașini"
 }

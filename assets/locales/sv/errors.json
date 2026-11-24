@@ -946,5 +946,19 @@
   "sentinela.blockFailed": "Dess nätverk kunde inte blockeras.",
   "sentinela.machineGone": "Den maskinen finns inte längre i Maskiner.",
   "sentinela.machineFailed": "Maskinen svarade inte.",
-  "vm.overBudget": "Inte tillräckligt med minne bredvid maskinerna som redan körs. Försätt en av dem i viloläge eller stäng av den, eller ge den här maskinen mindre minne."
+  "vm.overBudget": "Inte tillräckligt med minne bredvid maskinerna som redan körs. Försätt en av dem i viloläge eller stäng av den, eller ge den här maskinen mindre minne.",
+  "llm.timeout": "Den lokala modellen tog för lång tid att svara.",
+  "llm.failed": "Den lokala modellen kunde inte svara.",
+  "llm.answer": "Den lokala modellens svar kunde inte läsas.",
+  "llm.start": "Den lokala modellen kunde inte starta.",
+  "sentinela.lumo.off": "Sentinela är av. Slå på den i Inställningar → AI → Sentinela.",
+  "sentinela.lumo.noEngine": "Motorn för den lokala modellen är inte installerad.",
+  "sentinela.lumo.noModel": "Ingen lokal modell är installerad för Sentinela.",
+  "sentinela.lumo.rejected": "Lumos svar hade inte den väntade formen, så det lades åt sidan.",
+  "sentinela.blockRefused": "LordOS egna program, en skripttolk i sig och systemets grundläggande program kan inte blockeras.",
+  "sentinela.blockFull": "Blockeringslistan är full.",
+  "sentinela.notBlocked": "Det programmet finns inte på blockeringslistan.",
+  "sentinela.noAppNetwork": "Den här processen har ingen egen app vars nätverk kan blockeras.",
+  "sys.failed": "Något gick fel.",
+  "sys.unsupported": "Den här versionen av LordOS kan inte göra det."
 }

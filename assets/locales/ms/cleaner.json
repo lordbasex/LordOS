@@ -446,5 +446,6 @@
   },
   "select.nothing": "Tiada yang dipilih",
   "activity.app": "Apl dialih keluar",
-  "activity.system": "Pembersihan sistem: {name}"
+  "activity.system": "Pembersihan sistem: {name}",
+  "map.machines": "Tuntut semula dalam Mesin Maya"
 }

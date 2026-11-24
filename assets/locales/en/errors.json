@@ -946,5 +946,19 @@
   "sentinela.blockFailed": "Its network couldn't be blocked.",
   "sentinela.machineGone": "That machine isn't in Machines anymore.",
   "sentinela.machineFailed": "The machine didn't answer.",
-  "vm.overBudget": "Not enough memory beside the machines already running. Suspend or shut down one of them, or give this machine less memory."
+  "vm.overBudget": "Not enough memory beside the machines already running. Suspend or shut down one of them, or give this machine less memory.",
+  "llm.timeout": "The local model took too long to answer.",
+  "llm.failed": "The local model couldn't answer.",
+  "llm.answer": "The local model's answer couldn't be read.",
+  "llm.start": "The local model couldn't start.",
+  "sentinela.lumo.off": "Sentinela is off. Turn it on in Settings → AI → Sentinela.",
+  "sentinela.lumo.noEngine": "The local model engine isn't installed.",
+  "sentinela.lumo.noModel": "No local model is installed for Sentinela.",
+  "sentinela.lumo.rejected": "Lumo's answer wasn't in the expected form, so it was set aside.",
+  "sentinela.blockRefused": "LordOS's own programs, a script interpreter itself and the system's core programs can't be blocked.",
+  "sentinela.blockFull": "The blocklist is full.",
+  "sentinela.notBlocked": "That program isn't on the blocklist.",
+  "sentinela.noAppNetwork": "This process has no app of its own whose network can be blocked.",
+  "sys.failed": "Something went wrong.",
+  "sys.unsupported": "This version of LordOS can't do that."
 }

@@ -36,7 +36,8 @@ import { admin } from './admin.js';
 import { llmPackageOk } from './llmcatalog.js';
 import {
   SENTINELA_DEFAULTS, TRIGGER_DEFAULTS, createTracker, buildSummary, systemPrompt, parseVerdict, ignoreMatch, ruleAction, factLines,
-  placeOf, clean, presentAlert,
+  placeOf, clean, presentAlert, buildInvestigation, investigateSystemPrompt, parseInvestigation, evidenceOf, translateSystemPrompt,
+  translateInput, parseTranslation, INVESTIGATE_ACTIONS,
 } from './sentinelamodel.js';
 import {
   createMachineTracker, machineRow, machineSummary, machineSystemPrompt, machineNoticeActions, vmSuggested, vmWhy, vmFactLines,
@@ -409,8 +410,138 @@ export function startSentinela() {
   if (started || typeof lord === 'undefined' || !lord.sentinela || typeof lord.greeter !== 'undefined') return;
   started = true;
   loadAlerts();
+  refreshBlocked();
   sentinelaTick();
   setInterval(() => { try { sentinelaTick(); } catch (e) { console.error('sentinela:', e); } }, TICK_MS);
+  setInterval(() => { try { blockNotices(); } catch (e) { console.error('sentinela:', e); } }, BLOCK_NOTICE_MS);
+}
+
+// ---- (0.8.9.6) "Investigate with Lumo" (Monitor → Get Info, the person's click only; docs/SENTINELA.md "Investigate") ----
+
+// Sentinela on, a model chosen and installed, the engine there: what Lumo needs
+export function lumoReady() {
+  const p = sentinelaPrefs();
+  if (!p.on || !api()) return { ok: false, why: p.on ? 'noEngine' : 'off' };
+  const eng = refreshSentinelaEngine();
+  const model = p.model && eng.models.some((m) => m.id === p.model) ? p.model : null;
+  if (!eng.available) return { ok: false, why: 'noEngine' };
+  if (!model) return { ok: false, why: 'noModel' };
+  return { ok: true, model };
+}
+
+// p: the process (Monitor's list); extra: { started, conns } (Get Info's cgroup and connections). Resolves
+// { ok: true, result: { what, why, risk, action }, evidence, ms } or { ok: false, error }.
+export async function investigateProcess(p, { started = '', conns = null } = {}) {
+  const ready = lumoReady();
+  if (!ready.ok) return { ok: false, error: `sentinela.lumo.${ready.why}` };
+  const a = api();
+  let facts = null;
+  try { facts = await job(a.facts(p.pid, p.st), 15000); } catch (e) { facts = null; }
+  if (facts && facts.ok === false && facts.error === 'proc.gone') return { ok: false, error: 'proc.gone' };
+  const language = langName(locale.get().lang);
+  const user_ = buildInvestigation(p, facts, { home: home(), user: user(), started, conns, own: true, language });
+  let r = null;
+  try { r = await job(a.investigate(ready.model, investigateSystemPrompt(language), user_, p.pid, p.st), ANSWER_MAX_MS); } catch (e) { return { ok: false, error: e.code || 'llm.failed' }; }
+  if (!r) return { ok: false, error: 'llm.timeout' };
+  if (!r.ok) return { ok: false, error: r.error || 'llm.failed' };
+  const v = parseInvestigation(r.content);
+  if (!v) return { ok: false, error: 'sentinela.lumo.rejected', evidence: evidenceOf(r.evidence) };
+  return { ok: true, result: v, evidence: evidenceOf(r.evidence), ms: r.ms || 0, facts: facts && facts.ok ? facts : null };
+}
+
+// "Translate with Lumo": an English description into the person's language (kept per language by sdk/describe.js)
+export async function translateWithLumo(text) {
+  const ready = lumoReady();
+  if (!ready.ok) return { ok: false, error: `sentinela.lumo.${ready.why}` };
+  const nonce = Array.from({ length: 16 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join('');
+  const language = langName(locale.get().lang);
+  let r = null;
+  try { r = await job(api().translate(ready.model, translateSystemPrompt(language), translateInput(text, nonce)), ANSWER_MAX_MS); } catch (e) { return { ok: false, error: e.code || 'llm.failed' }; }
+  const out = r && r.ok ? parseTranslation(r.content) : null;
+  return out ? { ok: true, text: out } : { ok: false, error: r && !r.ok ? r.error || 'llm.failed' : 'sentinela.lumo.rejected' };
+}
+
+// ---- (0.8.9.6) the blocklist (docs/SENTINELA.md "Blocklist"): ended whenever it starts, kept by lord-server ----
+
+export const sentinelaBlocked = createStore([]);
+export function refreshBlocked() {
+  let l = [];
+  try { const b = api()?.blocked?.(); l = b && Array.isArray(b.entries) ? b.entries : []; } catch (e) { l = []; }
+  sentinelaBlocked.set(() => l);
+  return l;
+}
+const blockJob = (id) => new Promise((resolve) => {
+  const until = Date.now() + 60000;
+  const poll = () => {
+    let r = null;
+    try { r = api().blockTake(id); } catch (e) { resolve({ ok: false, error: 'sys.failed' }); return; }
+    if (r) resolve(r); else if (Date.now() > until) resolve({ ok: false, error: 'llm.timeout' }); else setTimeout(poll, 150);
+  };
+  setTimeout(poll, 100);
+});
+// p: the process; withPkg: every program of its package too
+export async function blockProgram(p, { withPkg = false } = {}) {
+  const a = api();
+  if (!a || typeof a.block !== 'function') return { ok: false, error: 'sys.unsupported' };
+  let id;
+  try { id = a.block(p.pid, p.st, !!withPkg); } catch (e) { return { ok: false, error: e.code || 'sys.failed' }; }
+  const r = await blockJob(id);
+  refreshBlocked();
+  return r;
+}
+export async function unblockProgram(entryId) {
+  const a = api();
+  if (!a || typeof a.unblock !== 'function') return { ok: false, error: 'sys.unsupported' };
+  let id;
+  try { id = a.unblock(entryId); } catch (e) { return { ok: false, error: e.code || 'sys.failed' }; }
+  const r = await blockJob(id);
+  refreshBlocked();
+  return r;
+}
+
+// an app's network off (the firewall's existing no-network restriction), when the process has an app scope it can apply to
+function cutNetwork(app) {
+  if (!app || !firewall.enforceable(app)) return false;
+  const st = firewall.state();
+  const cur = (st && st.restricted && st.restricted[app]) || [];
+  firewall.setRestricted(app, [...new Set([...cur, 'no-network'])]);
+  return true;
+}
+
+// An investigation's action, from the person's click only: end, pause, block_network (the app's firewall) or blocklist
+// (on the list, ended now, the app's network off). Resolves { ok, error?, network? }.
+export async function runInvestigateAction(p, action) {
+  if (!p || !INVESTIGATE_ACTIONS.includes(action) || action === 'none') return { ok: false, error: 'sys.badArgument' };
+  const sig = (kind) => { try { const r = lord.monitor.signal(p.pid, p.st, kind); return r ? { ok: false, error: r } : { ok: true }; } catch (e) { return { ok: false, error: e.code || 'proc.failed' }; } };
+  if (action === 'end') return sig('TERM');
+  if (action === 'pause') return sig('STOP');
+  if (action === 'block_network') {
+    try { return cutNetwork(p.app) ? { ok: true, network: true } : { ok: false, error: 'sentinela.noAppNetwork' }; } catch (e) { return { ok: false, error: 'sentinela.blockFailed' }; }
+  }
+  // blocklist: its network first, then on the list (which ends it, and every later start of it)
+  let network = false;
+  try { network = cutNetwork(p.app); } catch (e) { network = false; }
+  const r = await blockProgram(p);
+  if (!r.ok) return r;
+  sig('KILL');
+  return { ok: true, network, entry: r.entry };
+}
+
+// the blocklist's notices: what it ended, at most one notice per program every 10 minutes
+const BLOCK_NOTICE_MS = 3000, BLOCK_QUIET_MS = 10 * 60 * 1000;
+const lastNotice = new Map();
+function blockNotices(now = Date.now()) {
+  const a = api();
+  if (!a || typeof a.blockEvents !== 'function' || !sentinelaBlocked.get().length) return;
+  let evs = [];
+  try { evs = a.blockEvents() || []; } catch (e) { evs = []; }
+  for (const ev of evs) {
+    if (!ev || typeof ev.id !== 'string') continue;
+    if (now - (lastNotice.get(ev.id) || 0) < BLOCK_QUIET_MS) continue;
+    lastNotice.set(ev.id, now);
+    notify({ label: t('sentinela.name'), icon: ShieldGlyph, title: t('sentinela.block.ended', { name: clean(ev.name, 40) }), body: t('sentinela.block.endedBody'), sound: false,
+      defaultAction: { id: 'open', run: () => wm.open('settings', { args: { section: 'ai', page: 'sentinela', nonce: Date.now() } }) } });
+  }
 }
 
 // tests: the clock's helpers
