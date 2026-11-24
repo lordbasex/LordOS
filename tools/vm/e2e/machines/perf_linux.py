@@ -32,6 +32,9 @@ def main():
         print(o.strip()[-200:])
         before = o.strip().splitlines()[-1] if o.strip() else ""
         r.t("power-profiles-daemon runs (%s)" % before, before in ("balanced", "power-saver", "performance"))
+        o, _ = con.run("powerprofilesctl list | grep -E '^[ *]+[a-z-]+:|Driver'", 30)
+        print("   powerprofilesctl list:\n   " + o.strip().replace("\n", "\n   "))
+        has_perf = "performance:" in o        # power-profiles-daemon's placeholder driver (no cpufreq or platform profile) has none
         b64 = base64.b64encode(open(AGENT, "rb").read()).decode()
         con.run("rm -f /tmp/lg.b64", 10)
         for i in range(0, len(b64), 3000):
@@ -46,8 +49,17 @@ def main():
                        "cat /tmp/lg.log", 30)
         print(o)
         lines = o.strip().splitlines()
-        r.t("while the tools run: performance (%s)" % (lines[0] if lines else "?"), bool(lines) and lines[0].strip() == "performance")
-        r.t("while the tools run: animations off (was %s)" % anim0.strip(), len(lines) > 1 and lines[1].strip() == "false")
+        if has_perf:
+            r.t("while the tools run: performance (%s)" % (lines[0] if lines else "?"), bool(lines) and lines[0].strip() == "performance")
+        else:
+            r.t("this guest has no performance profile: the tools say it was refused and leave %s (%s)" % (before, lines[0] if lines else "?"),
+                bool(lines) and lines[0].strip() == before and "power profile was refused" in o)
+        portal = "no desktop portal" not in o
+        if portal:
+            r.t("while the tools run: animations off (was %s)" % anim0.strip(), len(lines) > 1 and lines[1].strip() == "false")
+        else:
+            r.t("no desktop portal (no desktop session): the animations stay, and the tools say why",
+                len(lines) > 1 and lines[1].strip() == anim0.strip().splitlines()[-1].strip())
         time.sleep(2)
         lg = [l for l in open(os.path.join(M, "log", "lord-vm.log"), errors="replace").read().splitlines() if "erformance" in l or "perf" in l]
         print("   | " + "\n   | ".join(lg[-4:]))
@@ -57,7 +69,8 @@ def main():
         print(o)
         lines = o.strip().splitlines()
         r.t("the tools stopped: back to %s (%s)" % (before, lines[0] if lines else "?"), bool(lines) and lines[0].strip() == before)
-        r.t("the tools stopped: animations back (%s)" % (lines[1] if len(lines) > 1 else "?"), len(lines) > 1 and lines[1].strip() == anim0.strip())
+        r.t("the tools stopped: animations as they were (%s)" % (lines[1] if len(lines) > 1 else "?"),
+            len(lines) > 1 and lines[1].strip() == anim0.strip().splitlines()[-1].strip())
         con.close()
         L.off(M)
     finally:

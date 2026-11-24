@@ -61,12 +61,16 @@ sh("install -d -o tester -g tester -m 700 /tmp/xdg-tester %s" % LIB, 30)
 open("/etc/apt/sources.list.d/snap.list", "w").write("deb [check-valid-until=no] %s trixie main\n" % SNAP)
 rc, o = sh("apt-get update -qq 2>&1 | tail -2; apt-cache madison ovmf qemu-system-x86 | grep snapshot", 600)
 print(o)
-old_ovmf = re.search(r"ovmf \| (\S+) \| %s" % re.escape(SNAP), o)
-old_qemu = re.search(r"qemu-system-x86 \| (\S+) \| %s" % re.escape(SNAP), o)
-if not old_ovmf or not old_qemu:
-    r.bad("the snapshot's versions", o[-400:]); sys.exit(r.end())
-ov, qv = old_ovmf.group(1), old_qemu.group(1)
-pk = " ".join(["%s=%s" % (p, qv) for p in QPKGS] + ["ovmf=%s" % ov])
+# each package's version in the snapshot (an architecture's package may be a rebuild: 1:10.0.2+ds-2+b1)
+def snapver(p):
+    m = re.search(r"\|\s*(\S+)\s*\|\s*%s" % re.escape(SNAP), sh("apt-cache madison %s" % p, 60)[1])
+    return m.group(1) if m else None
+vers = {p: snapver(p) for p in QPKGS + ["ovmf"]}
+print("   snapshot versions:", vers)
+if not all(vers.values()):
+    r.bad("the snapshot's versions", str(vers)); sys.exit(r.end())
+ov, qv = vers["ovmf"], vers["qemu-system-x86"]
+pk = " ".join("%s=%s" % kv for kv in vers.items())
 rc, o = sh("DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades %s 2>&1 | tail -3" % pk)
 r.t("QEMU %s and OVMF %s installed (Debian 13.0's)" % (qv, ov), ver("qemu-system-x86") == qv and ver("ovmf") == ov, o[-300:])
 q_old = sh("qemu-system-x86_64 --version | head -1", 30)[1].strip()

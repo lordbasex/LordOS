@@ -11,6 +11,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines checked on real hardware (in development; latest release 0.8.9.5-beta).** The Whonix group's release gate
+  ran on a PC in a headless session: Tor reached, an onion site answered, nothing left the computer but the Gateway's
+  connections to Tor relays, Start Gateway, the group's stop order, Start Fresh and a disposable session. Fixed on the
+  way: after Start Fresh the Workstation's old window stayed open, and the next start of the group then said it didn't
+  start. Also checked: the "Weaker isolation" notice on a kernel without Landlock, real updates of QEMU and of the UEFI
+  firmware under existing machines, a machine on hugetlb pages under the seccomp allowlist, the guest performance profile
+  in a real Linux guest, and the performance targets measured on a PC and a Raspberry Pi 5 (docs/VIRTUALIZATION.md 9).
 - **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (in
   development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
   - **Send to LordOS.** A file chosen in the machine (Linux: the file manager's Send to LordOS, or `lordos-guest

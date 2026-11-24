@@ -10,6 +10,7 @@
 #   hidden folder, which Machines won't share)
 # The same guest runs other checks that need a computer of their own (a package changed under a machine):
 #   nolandlock.py --inner pkgchange_inner.py --keep-landlock --as root     (pkgchange_inner.py says what it checks)
+#   nolandlock.py --inner bridged_inner.py --keep-landlock --as root --image   (--image: the guest image in the tree's copy)
 # Needs KVM, the guest image (images.py) and a built tree (make -C server, npm install). About 10 minutes with the network.
 import os, re, shutil, subprocess, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -37,6 +38,12 @@ def main():
         src, pics = os.path.join(L.D, "fake", "src"), os.path.join(L.D, "fake", "out")
         if subprocess.run(["cp", "-al", tree, src], capture_output=True).returncode:
             shutil.copytree(tree, src, symlinks=True, ignore=shutil.ignore_patterns(".git"))
+        if "--image" in a:                    # the harness's guest image too, for an inner script that runs a machine
+            import images
+            try:
+                os.link(images.agent_image(images.ARCH), os.path.join(src, ".mh-image.qcow2"))
+            except OSError:
+                shutil.copy(images.agent_image(images.ARCH), os.path.join(src, ".mh-image.qcow2"))
         os.makedirs(pics)
         os.chmod(pics, 0o777)
         r = L.vm("--set", M, "--share", "ro:src:%s/src" % mh.realhome(), "--share", "rw:out:%s/out" % mh.realhome())
