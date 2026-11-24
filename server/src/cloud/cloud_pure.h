@@ -227,6 +227,7 @@ typedef struct {
     int downloading;        /* coming down: core/stats with srcFs */
     double down_pct;
     int kept;               /* Keep on This Computer */
+    int busy;               /* kept, and the keeper's pass over its kept entry hasn't read it all yet (#71) */
     int error;              /* the last transfer of it failed */
 } CloudLive;
 /* "cloud" | "down" | "here" | "kept" | "up" | "error"; pct (when it's a transfer or a kept file still coming) or -1 */

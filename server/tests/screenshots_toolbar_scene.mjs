@@ -27,6 +27,15 @@ const shown = (s) => !!textNode(s);
 const click = async (id) => { __lordEvent('down', id, 2, 2, 0); __lordEvent('up', id, 2, 2, 0); await flush(); };
 // a press on a text, else on what holds it, until `done` (the row or button with the handler is one or two levels up)
 const clickText = async (s, done) => { let n = textNode(s); for (let i = 0; n && i < 4 && !done(); i++, n = parents.get(n)) await click(n); };
+// a row of the open menu is checked: a "✓" drawn in the same row as the label (GitHub #237: the check followed the
+// choice only after the menu was closed and opened again)
+const ancestors = (id) => { const a = []; for (let n = id; n; n = parents.get(n)) a.push(n); return a; };
+const checked = (label) => {
+  const l = textNode(label);
+  if (!l) return false;
+  const up = ancestors(l);
+  return [...texts].some(([id, x]) => x === '✓' && inTree(id) && ancestors(id).slice(0, 3).some((n) => up.includes(n)));
+};
 const live = () => [...styles].filter(([id]) => inTree(id) && parents.has(id));
 const litCount = () => modeButtons().filter((id) => styles.get(id).backgroundColor).length;
 // the five mode buttons, start to end (34 × 34; Close, Color and Text are 30 × 30)
@@ -71,6 +80,9 @@ check('Desktop is saved', settings.get().screenshots.saveTo === 'desktop' && set
 check('the menu stays open after a choice', shown('Save to'));
 await clickText('10 Seconds', () => settings.get().screenshots.timer === 10);
 check('the timer is saved', settings.get().screenshots.timer === 10);
+check('the open menu checks 10 Seconds at once (#237)', checked('10 Seconds') && !checked('5 Seconds'));
+await clickText('5 Seconds', () => settings.get().screenshots.timer === 5);
+check('and then 5 Seconds, still open (#237)', shown('Save to') && checked('5 Seconds') && !checked('10 Seconds'));
 await clickText('USB Headset', () => settings.get().screenshots.mic === true);
 check('the microphone is on, that one', settings.get().screenshots.mic === true && settings.get().screenshots.micSource === 'alsa_input.usb');
 await clickText('Remember Last Selection', () => settings.get().screenshots.remember === true);

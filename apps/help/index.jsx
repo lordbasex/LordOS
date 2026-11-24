@@ -3,7 +3,7 @@
 // default) and are read by the SDK (sdk/help.js → lord.help). The links settings:<section>,
 // app:<id> and help:<article> open Settings, an app or another article.
 import {
-  View, Text, useTheme, useAppWindow, useLocale, t as tr, help, Markdown, ScrollView, SidebarItem, SectionTitle, Button,
+  View, Text, useTheme, useAppWindow, useVisitHistory, useLocale, t as tr, help, Markdown, ScrollView, SidebarItem, SectionTitle, Button,
   getApp, wm, appName, settings, textDirection, SearchField, EmptyState, Hairline, Lumo, spacing, typeScale,
   useSidebar, SidebarToggle, SidebarOverlay,
 } from '@lordos/sdk';
@@ -138,6 +138,7 @@ export default function Help() {
   const [tour, setTour] = useState(false);
   const [query, setQuery] = useState('');
   const setArticle = (id) => { lastArticle = id; setArticleState(id); setTour(false); };
+  useVisitHistory(article, setArticle);         // the mouse's back and forward buttons (GitHub #234)
   useEffect(() => {
     if (args?.tour) setTour(true);
     else if (args?.article) setArticle(args.article);

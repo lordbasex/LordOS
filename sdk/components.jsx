@@ -100,7 +100,8 @@ export function Button({ label, onClick, primary, style, small, plain, disabled,
         justifyContent: 'center', alignItems: 'center', backgroundColor: bg, ...border,
         opacity: disabled ? 0.4 : waiting ? 0.75 : hover && !plain ? 0.85 : 1 }, style]}>
       {waiting ? <Spinner size={small ? 10 : 12} color={fg} /> : icon ? <Text style={{ fontSize: small ? 12 : 14, color: fg }}>{icon}</Text> : null}
-      {label != null && label !== '' ? <Text style={{ fontSize: small ? 12 : 13, fontWeight: 500, color: fg, whiteSpace: 'nowrap' }}>{label}</Text> : null}
+      {/* a button held narrower than its label (maxWidth) ends it with "…" instead of cutting both ends (GitHub #231) */}
+      {label != null && label !== '' ? <Text style={{ fontSize: small ? 12 : 13, fontWeight: 500, color: fg, whiteSpace: 'nowrap', flexShrink: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</Text> : null}
     </View>
   );
 }

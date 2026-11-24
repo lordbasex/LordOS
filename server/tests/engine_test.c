@@ -1269,6 +1269,48 @@ static Node *mk_window(Node *root, float x, float y, float w, float h) {
     return win;
 }
 
+/* GitHub #237: a Text whose content comes and goes as a node of its own (React's {on ? '✓' : ''}: the text child is
+ * created and removed, not set to ''), in a box of a fixed size. Neither the new child nor the removed one changed the
+ * Text's box, and a RAW node has no box of its own, so nothing was damaged: Screenshots' Options menu kept its old
+ * check marks on the screen until it was drawn whole again. */
+static void test_text_child_damage(void) {
+    enum { W = 200, H = 120 };
+    paint_multi_damage = 1;
+    ui_reset();
+    Node *root = view(NULL);
+    ui.root = root;
+    sn(root, "backgroundColor", 0xff1c1c1e);
+    Node *t[3];
+    for (int i = 0; i < 3; i++) {
+        t[i] = node_new(NODE_TEXT);
+        node_append(root, t[i]);
+        ss(t[i], "position", "absolute");
+        sn(t[i], "left", 20);
+        sn(t[i], "top", 20 + i * 30);
+        sn(t[i], "width", 16);
+        sn(t[i], "height", 20);
+        sn(t[i], "fontSize", 16);
+        sn(t[i], "color", 0xffffffff);
+    }
+    Node *r = node_new(NODE_RAW);
+    node_set_text(r, "M");
+    node_append(t[0], r);
+    render(root, W, H);
+    for (int step = 0; step < 4; step++) {
+        Node *from = t[step % 3], *to = t[(step + 1) % 3];
+        node_destroy(from->first);                  /* the check leaves one row… */
+        Node *c = node_new(NODE_RAW);
+        node_set_text(c, "M");
+        if (step % 2) node_insert_before(to, c, to->first); else node_append(to, c);   /* …and comes to the next */
+        layout_root(root, W, H);
+        int n = 0, where = 0;
+        float area = 0;
+        CHECK(paint_partial(root, W, H, &n, &area) >= 0, "step %d: the damage is not one box or more", step);
+        int worst = full_differs(root, W, H, &where);
+        CHECK(worst <= 1, "step %d: a text child added or removed isn't repainted (differs by %d at %d,%d)", step, worst, where % W, where / W);
+    }
+}
+
 static void test_minimize_damage(void) {
     enum { W = 640, H = 400, DOTS = 24 };
     for (int variant = 0; variant < 8; variant++) {
@@ -4352,6 +4394,7 @@ int main(int argc, char **argv) {
     test_node_ref();
     test_backdrop_band();
     test_multi_damage();
+    test_text_child_damage();
     test_minimize_damage();
     test_hidden_blur_damage();
     test_gscissor_unit();

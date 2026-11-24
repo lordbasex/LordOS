@@ -3,7 +3,7 @@
 // from the sandboxed helper lord-maild (docs/MAIL.md): IMAP with IDLE, SMTP, a local cache with
 // an offline search index, and HTML turned into our own views without running anything.
 import {
-  View, Text, useTheme, useStore, useAppWindow, useKeyboard, Button, TextInput, ScrollView, t, wm, fs, monthName, formatDate, formatTime,
+  View, Text, useTheme, useStore, useAppWindow, useNavigateButtons, useKeyboard, Button, TextInput, ScrollView, t, wm, fs, monthName, formatDate, formatTime,
   Toolbar, ToolbarButton, ToolbarSpacer, ToolbarDivider, SearchField, Hairline, direction, textDirection, Disclosure as SdkDisclosure,
   mailRequest, onMailEvent, mailStatus, mailConfig, mailAccounts, mailAvailable, addListener, clipboard, registerDockActions,
   trackMailStatus, isolatedPim, saveFile, useSidebar, useNarrow, SidebarToggle, SidebarOverlay,
@@ -486,6 +486,8 @@ function MailMain() {
   const side = useSidebar(SIDE_AT);
   const single = useNarrow(ONE_AT);
   const [opened, setOpened] = useState(false);          // one pane at a time: the message instead of the list
+  // the mouse's back and forward buttons (GitHub #234), where the window shows one pane at a time
+  useNavigateButtons((d) => { if (single) setOpened(d === 'forward' && !!sel); });
 
   useEffect(() => { setLoadErr(''); }, [JSON.stringify(src)]);
   // another mailbox: a small window's sidebar closes and the list comes back (not for a message opened from elsewhere)

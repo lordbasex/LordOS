@@ -4,7 +4,7 @@
 // read-only outside the home folder and the user's disks) and every disk, mounted or not.
 // Disk operations go through lord.fs (server/src/fsops.c); see docs/FILES.md.
 import {
-  needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
+  needsDiskFormats, openDiskFormats, View, Text, useTheme, useAppWindow, useNavigateButtons, useKeyboard, useStore, useLauncherApps, addListener, wm, fs, clipboard, archive, warmDocs,
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl,
   wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText, useSidebar, SidebarToggle, SidebarOverlay,
@@ -376,6 +376,8 @@ export default function Files() {
   const goHistory = (d) => { if (!(d < 0 ? tab.back : tab.fwd).length) return; setSelected(new Set()); patchTab((x) => historyStep(x, d, viewOf, sameLoc) || {}); };
   const goBack = () => goHistory(-1);
   const goForward = () => goHistory(1);
+  // the mouse's back and forward buttons over this window (GitHub #234)
+  useNavigateButtons((d) => goHistory(d === 'back' ? -1 : 1));
   const goUp = () => {
     if (baseLoc.type === 'archive') { navigate(baseLoc.inner ? { type: 'archive', path: baseLoc.path, inner: baseLoc.inner.split('/').slice(0, -1).join('/') } : { type: 'dir', path: fs.parent(baseLoc.path) || '/' }); return; }
     if (curDir && curDir !== '/' && curDir !== fs.home()) navigate({ type: 'dir', path: fs.parent(curDir) || '/' });

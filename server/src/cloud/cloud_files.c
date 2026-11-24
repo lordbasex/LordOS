@@ -210,6 +210,7 @@ static void live_of(Acc *a, const char *rel, CloudLive *l) {
     }
     for (int i = 0; i < a->nerrn; i++) if (!strcmp(a->errn[i], rel)) l->error = 1;
     l->kept = cloud_kept((const char *const *)a->keep, a->nkeep, rel);
+    l->busy = l->kept && cloud_kept_busy((const char *const *)a->keep, a->keep_busy, a->nkeep, rel);
     if (l->kept && cloud_fails_has(&a->kfail, rel, (long long)time(NULL))) l->error = 1;   /* #185: Keep couldn't read it */
 }
 
@@ -549,7 +550,9 @@ static void fetch_tree(const Snap *s, const char *rel, int depth, KeepPass *kp) 
     if (set_aside(s->id, rel)) return;                                        /* #185: failed lately, gone around */
     struct stat st;
     if (lstat(p, &st)) { if (errno != ENOENT) gave_up(s, kp, errno, rel); return; }   /* ENOENT: gone (in the cloud too) */
-    if (S_ISREG(st.st_mode)) { fetch(s, rel, kp); return; }
+    /* #240: an empty file has nothing to bring, and rclone keeps no copy of it: read every pass, it marked the kept
+     * entry as coming down each time */
+    if (S_ISREG(st.st_mode)) { if (st.st_size > 0) fetch(s, rel, kp); return; }
     if (!S_ISDIR(st.st_mode) || depth > WALK_DEPTH) return;
     DIR *d = opendir(p);
     if (!d) { gave_up(s, kp, errno, rel); return; }

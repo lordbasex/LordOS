@@ -811,6 +811,8 @@ EOF
     # (0.8.6) runtime/index.js's skip of unchanged styles sends the same lord.* calls as without it
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "runtime-props-test (runtime/index.js)" node tests/runtime_props_test.mjs
+        # (#234) a mouse's back and forward buttons: a navigate event for the native window under the pointer
+        run "navbuttons-test (runtime/events.js, sdk/navmodel.js)" node tests/navbuttons_test.mjs
     else skip "runtime-props-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.3, #20) ScrollView's resetKey: a new page starts at the top, the same one keeps its place
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
@@ -840,6 +842,8 @@ EOF
         run "screenshots-toolbar-scene (apps/screenshots/toolbar.jsx)" node tests/textfield_menu_test.mjs screenshots_toolbar_scene.mjs
         # (#200) Backups: Choose… for the destination (no Cloud folder) and the exclusions (inside home), typing still works
         run "backup-pickers-scene (apps/backup/index.jsx, FilePicker cloud={false})" node tests/textfield_menu_test.mjs backup_pickers_scene.mjs
+        # (#231) Backups' restore browser: a file's icon isn't an empty check box, a long name ends with … on Restore
+        run "backup-restore-scene (apps/backup/index.jsx, sdk Button)" node tests/textfield_menu_test.mjs backup_restore_scene.mjs
     else skip "notes-editor-scene" "node and the repository's node_modules (npm install)"; fi
     # a password TextInput: the eye shows it and keeps the focus, copies nothing, hides on blur; ⇪ follows Caps Lock
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then

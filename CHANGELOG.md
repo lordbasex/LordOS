@@ -11,6 +11,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)** (in development; latest release
+  0.8.9.5-beta). They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
+  took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from
+  onMouseDown, onClick and the pointer listeners, and now turns the press into a `navigate` event ('back' or
+  'forward') for the window under the pointer: `onNavigate` along the nodes under it, then `addListener('navigate')`.
+  The SDK's `useNavigateButtons(fn)` gives it to the app whose window is under the pointer (never to another window or
+  when the pointer is outside every window; an isolated app's process holds one window), and `useVisitHistory(place,
+  go)` walks a window's own history of places (`sdk/navbuttons.js`, the pure rules in `sdk/navmodel.js`). Files walks
+  its folder history (as ⌥← and ⌥→), the Store leaves an app's page and Forward opens it again, Mail in one-pane mode
+  goes back to the list and forward to the message, Settings walks the sections and Help the articles shown in that
+  window. Linux apps get the raw buttons from lord-server as before. `navbuttons-test` checks the runtime's dispatch,
+  which window takes it, the history and each app's wiring.
 - **Machines: checked for real, and what that found** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
   6.5, 6.7, 6.14, 6.16, 6.17, 6.19).
   - **Monitor names a machine's own disk and network numbers.** A running machine's row in Processes says
@@ -900,6 +912,33 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   turned runtime power management off without it). `tests/iso_firmware_test.mjs` checks that every Wi-Fi, network and
   graphics package of the Store's missing-firmware map is on the ISO, except the two left out on purpose
   (`firmware-libertas`, `firmware-nvidia-graphics`; the Store still offers them when the kernel asks).
+- **A check mark or any text that comes and goes in a box of its own size wasn't redrawn: Screenshots' Options menu kept
+  its old checks while open (GitHub #237)** (in development; latest release 0.8.9.5-beta). Choosing 5 Seconds saved it,
+  but the check stayed on None until the menu was closed and opened again. React adds and removes a Text's text node
+  (`{on ? '✓' : ''}`) instead of setting it to '', and in a Text of a fixed width neither changed the Text's box; the
+  text node has no box of its own, so nothing was damaged and the partial repaint left the old pixels (a full repaint,
+  as a screenshot makes, showed the right ones). Reproduced in a headless lord-server with the real Lord Flow, both with
+  one damage box and several. Now a text node coming into a Text or leaving it marks that Text, and the Texts around
+  it, for repaint (`text_child_changed` in `server/src/ui/node.c`); `engine-test` `test_text_child_damage` moves a
+  check mark between three fixed-width Texts and compares each partial repaint with a full one, and the Screenshots
+  toolbar scene checks the check follows the choice while the menu stays open.
+- **Backups: a file's icon looked like an empty check box, and a long name pushed the Restore button's label out at
+  both ends (GitHub #231)** (in development; latest release 0.8.9.5-beta). The restore list drew a file as a bare
+  outline, which read as a check box that never checked; it is now a page with lines. The Restore "<name>" button is
+  held to 260 px, and its label overflowed and was cut on both sides ("estore “lordos-rclone…"); every SDK `Button`'s
+  label now ends with "…" inside the button when the button is held narrower than it (`sdk/components.jsx`). New
+  `backup-restore-scene`. Choosing several files or folders to restore at once is a feature request, not in this fix.
+- **Cloud: empty files and empty folders stayed "coming down" in a folder kept on this computer (GitHub #240)** (in
+  development; latest release 0.8.9.5-beta). With In Sync with This Computer (Keep on This Computer), a 0-byte file, an
+  empty folder and a folder holding only 0-byte files kept the down arrow for ever, on Google Drive and Filen alike.
+  rclone keeps no copy of an empty file and no folder for an empty one in its cache (no `vfsMeta` entry, checked with
+  rclone's own mount), and a kept path without one read as "still coming". Now a kept path with nothing in the cache is
+  "kept" once the keeper's pass has read its kept entry whole, and "coming down" only while that pass is still running
+  (`CloudLive.busy`, `cloud_file_status` in `cloud_pure.c`); the keeper no longer opens an empty file on every pass,
+  which marked the whole kept entry as coming down each time (`fetch_tree` in `cloud_files.c`). A file added in the
+  cloud since the last pass shows kept until the next one (every 5 minutes, or at once on a provider's change notice).
+  `cloud-test` checks both cases. rclone's own lines for a mount ("vfs cache: detected external removal of cache file")
+  still can't name the account: rclone doesn't say which mount they come from (#183).
 - **Machines: a global security pass over how the new pieces work together** (in development; latest release
   0.8.9.5-beta; docs/VIRTUALIZATION.md 3.6, 6.2, 7.2, 8; docs/SENTINELA.md "Machines"). Each item had been reviewed alone;
   this pass looked at the chains between them, with a hostile guest, a hostile program of the same account and hostile

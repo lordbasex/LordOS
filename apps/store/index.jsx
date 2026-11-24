@@ -2,7 +2,7 @@
 // root) and Debian apps (our own package engine, server/src/pkg; install and remove go through the administration
 // helper).
 import {
-  View, Text, Image, useTheme, useLocale, useAppWindow, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
+  View, Text, Image, useTheme, useLocale, useAppWindow, useNavigateButtons, useStore, Button, ScrollView, SidebarItem, SectionTitle, SearchField, Hairline, EmptyState, GroupBox, Toolbar, ToolbarButton,
   packages, packageList, refreshPackages, useLauncherApps, launchApp, fs, formatBytes, wm, direction, typeScale, spacing, isSystemApp,
   admin, canDeactivate, deactivateApp, activateApp, webAppEntry, settings, addListener,
   useWebApps, suggestions, unseenSuggestions, refreshSuggestions, useSidebar, SidebarToggle, SidebarOverlay,
@@ -397,6 +397,12 @@ export default function Store() {
   const [fhSub, setFhSub] = useState(null);
   const [fhColl, setFhColl] = useState(null);
   const [app, setApp] = useState(null);
+  // the mouse's back and forward buttons (GitHub #234): back leaves an app's page, forward opens the one just left
+  const leftApp = useRef(null);
+  useNavigateButtons((d) => {
+    if (d === 'back' && app) { leftApp.current = app; setApp(null); }
+    else if (d === 'forward' && !app && leftApp.current) { setApp(leftApp.current); leftApp.current = null; }
+  });
   const [query, setQuery] = useState('');
   const [file, setFile] = useState(null);
   const deb = useDebian();

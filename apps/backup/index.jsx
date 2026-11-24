@@ -85,8 +85,14 @@ function FolderGlyph({ color = '#5ea7ff' }) {
     </View>
   );
 }
+// a page with three lines of text: a bare outline read as an empty check box, one that never checked (GitHub #231)
 function FileGlyph({ color }) {
-  return <View style={{ width: 12, height: 15, marginHorizontal: 2, borderRadius: 2.5, border: `1.5px solid ${color}` }} />;
+  const line = (w) => <View style={{ width: w, height: 1.5, borderRadius: 1, backgroundColor: color }} />;
+  return (
+    <View style={{ width: 12, height: 15, marginHorizontal: 2, borderRadius: 2.5, border: `1.5px solid ${color}`, paddingHorizontal: 1.5, justifyContent: 'center', gap: 1.5 }}>
+      {line(6)}{line(6)}{line(4)}
+    </View>
+  );
 }
 function DriveGlyph({ color }) {
   return (

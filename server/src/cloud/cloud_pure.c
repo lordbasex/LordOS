@@ -800,6 +800,9 @@ const char *cloud_file_status(const CloudMeta *m, const CloudLive *l, double *pc
     if (l->downloading) { *pct = l->down_pct; return "down"; }
     int whole = m && m->cached >= m->size;
     if (whole) return l->kept ? "kept" : "here";
+    /* #240: rclone keeps no copy of an empty file or an empty folder (no vfsMeta), so "none here" can't mean "still
+     * coming" by itself: once the keeper's pass read the kept entry whole, it had nothing to bring */
+    if (l->kept && !m && !l->busy) return "kept";
     if (l->kept) { *pct = m && m->size ? 100.0 * (double)m->cached / (double)m->size : 0; return "down"; }   /* still coming */
     return "cloud";
 }
