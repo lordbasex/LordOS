@@ -837,8 +837,8 @@ EOF
     # (#238) Notes' storage over a real temporary home: the format, titles, geometry, attachments (odd names, links,
     # folders, a huge file) and what a link or image may reach (file://, javascript:, absolute paths, ..); writes stay in ~/Notes
     if have node && [ -d ../node_modules/esbuild ]; then run "notes-store-test (apps/notes/store.js, links.js)" node tests/notes_store_test.mjs
-    if have node && [ -d ../node_modules/esbuild ]; then run "sysopen-untrusted-test (sdk/runscode.js: attachments that would run never reach a Linux app)" node tests/sysopen_untrusted_test.mjs
     else skip "notes-store-test" "node and the repository's node_modules (npm install)"; fi
+    if have node; then run "sysopen-untrusted-test (sdk/runscode.js: attachments that would run never reach a Linux app)" node tests/sysopen_untrusted_test.mjs; else skip "sysopen-untrusted-test" node; fi
     # (0.8.8.8, #117) Notes: Edit and Format menus and the editor's right-click menu send the editor's own keys
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "notes-editor-scene (apps/notes/NoteEditor.jsx, editmenu.js)" node tests/textfield_menu_test.mjs notes_editor_scene.mjs

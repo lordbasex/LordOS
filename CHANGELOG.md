@@ -933,7 +933,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 - **A note's or a mail's attachment never runs a program** (in development; #238 follow-up, automated security review).
-  Opening an attachment that its default Linux app would run (a `.desktop` launcher, an AppImage, a Windows program
+  Opening an attachment that its default Linux app would run (a `.desktop` launcher, an AppImage, a program run
   under Wine, a `.jar`, a script, an installer package; by name or by its detected type) now shows it in Files instead;
   documents, pictures, media and text still open in LordOS's own apps (`sdk/runscode.js`, `openFileWithApps`'
   `untrusted`; `tests/sysopen_untrusted_test.mjs`).
