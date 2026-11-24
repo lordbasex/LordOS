@@ -17,12 +17,16 @@ import * as fs from './fs.js';
 import { defaultOpenerId, defaultFor, nativeOf } from './defaults.js';
 import { events as calendarEvents } from './calendar.js';
 import { books as addressBooks, contacts } from './contacts.js';
+import { runsCode } from './runscode.js';
 
 export const revealPath = (path) => wm.open('files', { new: true, args: { path: fs.parent(path), select: fs.basename(path), nonce: Date.now() } });
 export const openFolder = (path) => wm.open('files', { new: true, args: { path, nonce: Date.now() } });
 
 // A web address, in the default browser. False if there isn't one, or the address has characters that aren't allowed.
 export function openUrl(url) {
+  // opts.untrusted: the file came from content (a note, a mail): LordOS's own apps above only show it; never hand it to a
+  // Linux app that would run it
+  if (opts.untrusted && runsCode(n)) return revealPath(path);
   try {
     const def = defaultOpenerId('x-scheme-handler/https');
     return !!def && lord.apps.launchUri(def.replace(/\.desktop$/, ''), url);
@@ -73,7 +77,7 @@ const SYSTEM_APPS = ['mail', 'calendar', 'contacts', 'reminders'];
 if (typeof globalThis !== 'undefined') {
   globalThis.__lordSysOpen = (kind, data) => {
     if (!data) return;
-    if (kind === 'mailopen' && typeof data.path === 'string') openFileWithApps(data.path, data.name);
+    if (kind === 'mailopen' && typeof data.path === 'string') openFileWithApps(data.path, data.name, { untrusted: true });
     else if (kind === 'launch' && SYSTEM_APPS.includes(data.app) && getApp(data.app)) {
       const args = data.args && typeof data.args === 'object' ? data.args : {};
       wm.open(data.app, data.new ? { new: true, args } : { args });

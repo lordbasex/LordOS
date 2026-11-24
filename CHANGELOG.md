@@ -932,6 +932,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **A note's or a mail's attachment never runs a program** (in development; #238 follow-up, automated security review).
+  Opening an attachment that its default Linux app would run (a `.desktop` launcher, an AppImage, a Windows program
+  under Wine, a `.jar`, a script, an installer package; by name or by its detected type) now shows it in Files instead;
+  documents, pictures, media and text still open in LordOS's own apps (`sdk/runscode.js`, `openFileWithApps`'
+  `untrusted`; `tests/sysopen_untrusted_test.mjs`).
 - **A fullscreen video in Firefox no longer repaints the desktop under it at every frame (#232)** (in development;
   latest release 0.8.9.5-beta). Firefox draws its page in a subsurface of its window that commits on its own. Since
   0.8.9.5-beta such a commit repaints its own box in a window, but in a fullscreen window it still repainted all of the

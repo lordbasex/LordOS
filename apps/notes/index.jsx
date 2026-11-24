@@ -112,7 +112,7 @@ function openLink(slug, url) {
   const a = attachmentPath(slug, url);
   if (!a) return false;
   if (textual(a.name)) { wm.open('editor', { new: true, args: { path: a.path, nonce: Date.now() } }); return true; }
-  return openFileWithApps(a.path, a.name, { reveal: false, single: true }) !== false;
+  return openFileWithApps(a.path, a.name, { reveal: false, single: true, untrusted: true }) !== false;
 }
 
 // ---- note body: reading (with outline) or editing ----

@@ -31,7 +31,7 @@ export function formatSize(n) {
 }
 
 // The same rules as Files (apps/files/ops.js), in the session (sdk/sysopen.js).
-export const openPath = (path, name) => openFileWithApps(path, name);
+export const openPath = (path, name) => openFileWithApps(path, name, { untrusted: true });
 export { revealPath };
 
 // The same rule as lord-maild (mime_safe_filename): a sender-chosen attachment name becomes a
