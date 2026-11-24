@@ -1,7 +1,7 @@
 // views.jsx — the four Files views: icons (cards), list (with expandable folders),
 // columns (Miller, with a preview) and gallery. Their scroll views are no Tab stops (focusable={false}): the arrows
 // move the selection (index.jsx), not the view.
-import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, Disclosure, formatBytes, typeScale, t as tr, StatusGlyph, StatusBadge } from '@lordos/sdk';
+import { View, Text, Image, TextInput, ScrollView, EmptyState, useTheme, addListener, direction, Disclosure, formatBytes, typeScale, t as tr, StatusGlyph, StatusBadge, bundleFor } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { EntryIcon, TagDots, tagTint } from './glyphs.jsx';
 import { kindOf, isImage, isTextual, thumbSrc } from './kinds.js';
@@ -15,7 +15,7 @@ import { DropHot } from './dnd.jsx';
 
 // folder of a search or Recents result (the last segment of the path)
 const where = (p) => { const parts = String(p).split('/'); return parts[parts.length - 2] || '/'; };
-export const kindLabel = (e) => (e.sub ? e.sub : e.app ? tr('files.kind.app') : tr(`files.kind.${kindOf(e)}`));
+export const kindLabel = (e) => (e.sub ? e.sub : e.app ? tr('files.kind.app') : bundleFor(e) ? bundleFor(e).kind() : tr(`files.kind.${kindOf(e)}`));
 
 // Name, or the field for renaming in place. font and line follow the view's zoom (viewprefs.js).
 function Name({ e, ctx, center, color, lines = 1, font, line, fieldW }) {

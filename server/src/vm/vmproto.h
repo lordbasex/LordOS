@@ -48,8 +48,9 @@
  *                   by itself because the tools are older than the ones shipped, said in the log), VAG_TRANSFER (the
  *                   transfer folder, 6.7.1: a Linux guest mounts it again; a Windows guest gets WinFsp: one descriptor, its
  *                   installer, which lord-server opened in the machines' image store, text = its SHA-256 (64 hex), checked
- *                   again here and in the guest with its signature, installed by msiexec as SYSTEM from a private folder)
- *                   → VM_REPLY
+ *                   again here and in the guest with its signature, installed by msiexec as SYSTEM from a private folder),
+ *                   VAG_DISC (b = 1: the LordOS Guest Tools disc into the CD drive, for a Linux guest without a usable
+ *                   qemu-guest-agent; b = 0: out; see below) → VM_REPLY
  *     VM_CLIP       the host's clipboard for the guest: one descriptor, a memfd of a bytes (at most VM_CLIP_MAX); b =
  *                   VCF_TEXT: UTF-8 text; VCF_CLIPX: text, HTML and/or a PNG in AGK_CLIPX's layout (vmagent.h), checked
  *                   and sanitized again here. Sent on only when machine.json's clipboard allows to-guest and
@@ -116,6 +117,12 @@
  *                   query-mice, then human-monitor-command "mouse_set N" with the USB or virtio mouse lord-vm adds beside
  *                   the tablet); a = 0, the absolute tablet again. lord-vm checks every second while the machine runs that
  *                   the one wanted is still the active one (a guest's driver that starts later takes it) → VM_REPLY
+ *     VM_EXEC       a program in the guest for the person (docs/VIRTUALIZATION.md 6.15; vmexec.h): one descriptor, a sealed
+ *                   memfd with the request (the program, its arguments, its input, a timeout). Only for a machine whose
+ *                   machine.json says "automation": true (never with the anonymity profile), running, with qemu-guest-agent's
+ *                   guest-exec, and a Linux guest; one at a time. lord-vm runs two fixed scripts through guest-exec (as root:
+ *                   find the person; as the person: the program under timeout(1)), writes each request in the machine's
+ *                   log, and answers VM_EXEC_DONE, or VM_REPLY with why not
  *     VM_LAUNCH     a = an app's place in the guest's list, b = that list's generation (VM_WINDATA c): lord-vm sends the
  *                   guest that app's token from its own copy of the list; refused when the list changed since → VM_REPLY
  *     VM_SHELL      the agent's shell (6.18; only when the guest's tools said "shell", VAC_SHELL): a = VSH_OPEN, b = columns
@@ -167,6 +174,9 @@
  *                   AGK_LINK (the link, ag_link_ok) or AGK_NOTIFY (ag_note_parse's layout), checked and written again by
  *                   lord-vm, only while machine.json allows that kind and within its rate (vmagent.h); lord-server checks
  *                   it again, offers a link only in a bar the person clicks, and shows a notification as from the machine
+ *     VM_EXEC_DONE  seq of the VM_EXEC; a = the program's exit status (0..255, 124: its time ran out), b = VMX_F_*; one
+ *                   descriptor, a sealed memfd in vmexec.h's answer layout (its output and errors, cut at their caps). Sent
+ *                   to the client that asked only
  *     VM_RECV_OFFER a file the guest's tools offer to send to this computer (6.21, AGK_SEND_OFFER, already parsed): a sealed
  *                   memfd of a bytes (≤ VM_RECV_OFFER_MAX) in AGK_SEND_OFFER's layout, b = the transfer's id (lord-vm's
  *                   counter). Only while machine.json takes files from the guest, at most one at a time, within the
@@ -272,12 +282,12 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL, VM_EXEC,
     VM_RECV, VM_RECV_CANCEL, VM_FILE_CANCEL,
     VM_REQ_LAST = VM_FILE_CANCEL,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
-    VM_SHELL_FD, VM_GUEST_NOTE, VM_RECV_OFFER, VM_RECV_STATE,
+    VM_SHELL_FD, VM_GUEST_NOTE, VM_EXEC_DONE, VM_RECV_OFFER, VM_RECV_STATE,
 };
 /* VM_RECV_STATE b: a file from the guest is being written; kept (lord-server names it); given up (d: AGSD_*); the guest's
  * connection went with it unfinished (lord-server keeps what came, for the guest's next offer of the same file) */
@@ -300,7 +310,13 @@ enum { VJS_RUNNING = 0, VJS_DONE, VJS_FAILED };
 /* VM_AGENT a, VM_AGENT_STATE a and b */
 /* VAG_EXTRA_OFF / VAG_EXTRA_ON: the guest tools turn off (and back on) a display of the guest that isn't on a PCI
  * adapter while the one the picture shows is (AGK_EXTRA; VAC_EXTRA, VAC_EXTRA_OFF say when each is offered) */
-enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER, VAG_EXTRA_OFF, VAG_EXTRA_ON };
+/* VAG_DISC (b = 1 in, 0 out): the LordOS Guest Tools disc (6.17) for a Linux guest without a usable qemu-guest-agent:
+ * lord-vm puts its own copy (/usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso, opened at the start, its SHA-256 the
+ * one compiled in) in the machine's CD drive in place of what was there, and takes it out once the guest agent answers
+ * (qemu-guest-agent connects or lordos-guest says hello) or when asked. Never in a machine locked for anonymity. The
+ * person runs its install.sh in the guest, which asks for the password with the guest's own prompt. Refused while the drive
+ * holds another disc (a live system runs from it) */
+enum { VAG_SHUTDOWN = 1, VAG_TIMESYNC, VAG_INSTALL, VAG_TRANSFER, VAG_EXTRA_OFF, VAG_EXTRA_ON, VAG_DISC };
 enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
 /* 256: LAG_CAP_WINDOWS (vmagent.h), the guest's helper does apps mode.
  * VAC_TRANSFER: the guest has the transfer folder (6.7.1) mounted (Linux: /mnt/LordOS; Windows: VirtioFsSvc runs);
@@ -314,12 +330,14 @@ enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
  * can turn it off (VAG_EXTRA_OFF); VAC_EXTRA_OFF: they turned one off and can turn it back on (VAG_EXTRA_ON);
  * VAC_SHELL: the tools said "shell": the agent's shell (VM_SHELL, 6.18); VAC_LINKS, VAC_NOTIFY: they said "links",
  * "notify" and machine.json allows them: links and notifications from the guest (VM_GUEST_NOTE, 6.12);
- * VAC_EVENTLOG: a Windows guest's event logs come through qemu-guest-agent (6.19); VAC_SEND: the tools said "send" and
- * machine.json takes files from the guest: "Send to LordOS" lands in its quarantine folder (VM_RECV_OFFER, 6.21) */
+ * VAC_EVENTLOG: a Windows guest's event logs come through qemu-guest-agent (6.19);
+ * VAC_TOOLS_DISC: the LordOS Guest Tools disc is in the machine's drive (VAG_DISC), waiting for the guest agent;
+ * VAC_SEND: the tools said "send" and machine.json takes files from the guest: "Send to LordOS" lands in its quarantine
+ * folder (VM_RECV_OFFER, 6.21) */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
        VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096, VAC_OPEN = 8192,
        VAC_PLACE = 16384, VAC_EXTRA = 32768, VAC_EXTRA_OFF = 65536, VAC_SHELL = 131072, VAC_LINKS = 262144, VAC_NOTIFY = 524288,
-       VAC_EVENTLOG = 1048576, VAC_SEND = 2097152, VAC_ALL = 4194303 };
+       VAC_EVENTLOG = 1048576, VAC_TOOLS_DISC = 2097152, VAC_SEND = 4194304, VAC_ALL = 8388607 };
 /* how long a VM_FILE with a = 1 waits for the guest tools' AGK_OPENED after the copy (a program may ask for consent) */
 #define AG_OPEN_WAIT_MS 120000
 #define VM_WINDATA_MAX (1u << 20)
@@ -523,7 +541,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     if (m->version != VM_PROTO_VERSION) return 0;
     if (to_vm) return m->type >= VM_STATUS && m->type <= VM_REQ_LAST && (m->type != VM_SHUTDOWN || (m->a >= 0 && m->a <= 600)) &&
                       (m->type != VM_SNAPSHOT || (m->a >= VSN_TAKE && m->a <= VSN_DELETE)) &&
-                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_EXTRA_ON)) &&
+                      (m->type != VM_AGENT || (m->a >= VAG_SHUTDOWN && m->a <= VAG_DISC)) &&
                       (m->type != VM_CLIP || (m->a > 0 && (uint32_t)m->a <= VM_CLIP_MAX && (m->b == VCF_TEXT || m->b == VCF_CLIPX) &&
                                               m->c >= 0 && (!m->c || (m->b == VCF_CLIPX && m->d >= 1 && m->d <= 3)))) &&
                       (m->type != VM_CLIP_OFFER || (m->a > 0 && m->b >= 1 && m->b <= 7 && (m->c == 0 || m->c == 1))) &&
@@ -564,6 +582,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     /* a: bytes in the sealed memfd, b: the transfer's id; a: the id, b: VRS_*, c: KiB written, d: AGSD_* (0..5) */
     case VM_RECV_OFFER: return m->a > 0 && m->a <= VM_RECV_OFFER_MAX && m->b > 0;
     case VM_RECV_STATE: return m->a > 0 && m->b >= VRS_RUNNING && m->b <= VRS_LAST && m->c >= 0 && m->d >= 0 && m->d <= 5;
+    case VM_EXEC_DONE: return m->a >= 0 && m->a <= 255 && m->b >= 0 && m->b <= 7;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }

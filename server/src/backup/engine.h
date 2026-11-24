@@ -8,10 +8,19 @@
  * (atomic). An interrupted run is resumed: the next one uses that partial tree as another link
  * source and then deletes it.
  *
+ * Machines (docs/VIRTUALIZATION.md 6.14): a folder named "*.lordvm" holding a machine.json is a
+ * virtual machine. Its temporary files (lock, run.json, operation.json, log/, "*.part", dot files in
+ * disks/) are left out; with "backup": false in machine.json the whole folder is. While it is copied
+ * the engine holds a shared flock on its "lock" file, so lord-vm (which takes it exclusively) cannot
+ * start it half way through. If the lock is already taken the machine is running or busy: its disks/
+ * cannot be copied consistently, so the previous snapshot's copy is carried over (hard links) and
+ * the machine is reported in vm_busy / vm_busy_names.
+ *
  * This file knows nothing about threads or JS (backup.c uses it, tests/backup_test.c tests it). */
 #ifndef LORD_BACKUP_ENGINE_H
 #define LORD_BACKUP_ENGINE_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -19,6 +28,9 @@
 #define BK_MAX_EXCL 64
 #define BK_MAX_SNAPS 4096
 #define BK_ID_LEN 18                    /* "2026-10-17-235959" + 0 */
+#define BK_VM_NAMES 8                   /* busy machines named in the status */
+#define BK_VM_NAME 64                   /* bytes of a machine's name, with the 0 */
+#define BK_VM_JSON_MAX (1u << 20)       /* a larger machine.json is not read (backed up, named after its folder) */
 
 typedef struct BkRun BkRun;
 struct BkRun {
@@ -28,6 +40,9 @@ struct BkRun {
     const char *excl[BK_MAX_EXCL];      /* prefixes relative to home ("Videos/large", ".cache") */
     int nexcl;
     const char *skip_real;              /* real path that is never copied (the destination, if inside home) */
+    /* A path (relative to home) the caller holds back this run, != 0 to skip it and all below it: a running
+     * machine's disks (backup.c, docs/VIRTUALIZATION.md 6.14). Counted in `skipped`. May be NULL. */
+    int  (*hold)(BkRun *r, const char *rel);
     volatile int *cancel;               /* != 0: stop as soon as possible (left to resume) */
     /* Called between files and every ~8 MB: may block (pause); returns != 0 to stop. */
     int  (*checkpoint)(BkRun *r);
@@ -35,10 +50,17 @@ struct BkRun {
     void *ud;
     uint64_t min_free;                  /* free bytes to keep on the destination (0: 512 MiB) */
     const uint8_t *key;                 /* 32-byte key if the destination is encrypted (crypt.h), or NULL */
+    /* Reads a machine.json (text, len bytes): *backup = 0 for "backup": false, name (n bytes) its
+     * "name". Returns 0, or -1 if it is not a valid machine.json (the machine is then backed up).
+     * NULL: every machine is backed up and named after its folder (backup.c passes bk_vm_meta). */
+    int (*vm_meta)(const char *text, size_t len, int *backup, char *name, size_t n);
     /* output */
     uint64_t total_files, total_bytes;  /* from the initial count */
     uint64_t files, bytes;              /* processed */
     uint64_t copied, linked, copied_bytes, errors, skipped;
+    uint64_t vm_busy, vm_left_out;      /* machines running (disks carried over) / with "backup": false */
+    int vm_nnames;                      /* names kept in vm_busy_names (at most BK_VM_NAMES) */
+    char vm_busy_names[BK_VM_NAMES][BK_VM_NAME];   /* UTF-8, no control characters */
     char id[BK_ID_LEN];                 /* snapshot created */
     char error[256];
 };

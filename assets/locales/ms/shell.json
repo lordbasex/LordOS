@@ -971,5 +971,6 @@
   "themeSwitch.failedTitle": "{name} tidak dapat digunakan",
   "themeSwitch.refusedBody": "Kodnya tidak sepadan dengan salinan LordOS yang ditandatangani, jadi ia tidak dimuatkan. Gaya desktop anda kekal seperti sebelumnya.",
   "themeSwitch.failedBody": "Ia tidak bermula. Gaya desktop anda kekal seperti sebelumnya.",
+  "spotlight.section.machines": "Mesin Maya",
   "guestApps.inMachine": "Dalam {machine}"
 }

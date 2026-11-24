@@ -349,7 +349,7 @@ int db_open(Db *b, const char *path, int timeout_ms) {
     return 0;
 }
 
-/* ---- the guest desktop's own notifications (lordos-guest 9, gnotes.c) ---- */
+/* ---- the guest desktop's own notifications (lordos-guest 10, gnotes.c) ---- */
 
 long db_msg_total(const uint8_t *p, size_t n) {
     if (!p) return -1;

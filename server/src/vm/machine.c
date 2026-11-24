@@ -556,6 +556,7 @@ static int check_member(const VmMachine *m, char *err, size_t n) {
             return fail(err, n, VM_E_RANGE, "locked for anonymity: SMBIOS strings and disk serials");
         if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
         if (m->guest_links || m->guest_notify) return fail(err, n, VM_E_RANGE, "locked for anonymity: links and notifications from the guest");
+        if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
     }
     return VM_OK;
 }
@@ -626,10 +627,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 4 && m->n_shares) return fail(err, n, VM_E_FIELD, "shares need schema 4");
     if (m->drivers[0] && !path_valid(m->drivers)) return fail(err, n, VM_E_RANGE, "drivers must be an absolute path without '..', ',' or control characters");
     if (m->schema < 5 && (m->devices == VM_DEV_WINDOWS || m->drivers[0])) return fail(err, n, VM_E_FIELD, "the windows devices and drivers need schema 5");
-    if ((m->devices == VM_DEV_WINDOWS || m->drivers[0]) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "the windows devices are for amd64 machines for now");
     if ((m->secure_boot | m->tpm | m->hyperv) & ~1) return fail(err, n, VM_E_RANGE, "secure_boot, tpm and hyperv are true or false");
     if (m->schema < 5 && (m->secure_boot || m->tpm || m->hyperv)) return fail(err, n, VM_E_FIELD, "secure_boot, tpm and hyperv need schema 5");
-    if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
+    /* arm64 (4.3): secure boot (AAVMF), a TPM (tpm-tis-device) and the windows devices; Hyper-V's enlightenments are x86's */
+    if (m->hyperv && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "Hyper-V enlightenments are for amd64 machines");
     if (m->secure_boot && m->firmware != VM_FW_UEFI) return fail(err, n, VM_E_RANGE, "secure boot needs UEFI");
     if (m->graphics != VM_GFX_2D && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "graphics");
     if ((m->res_w || m->res_h) && !vm_resolution_ok(m->res_w, m->res_h)) return fail(err, n, VM_E_RANGE, "resolution must be 640x480 to 7680x4320, even numbers");
@@ -663,8 +664,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 13 && m->perf_profile) return fail(err, n, VM_E_FIELD, "perf_profile needs schema 13");
     if ((m->guest_links & ~1) || (m->guest_notify & ~1)) return fail(err, n, VM_E_RANGE, "guest_links and guest_notify are true or false");
     if (m->schema < 15 && (m->guest_links || m->guest_notify)) return fail(err, n, VM_E_FIELD, "guest_links and guest_notify need schema 15");
+    if (m->automation & ~1) return fail(err, n, VM_E_RANGE, "automation is true or false");
+    if (m->schema < 17 && m->automation) return fail(err, n, VM_E_FIELD, "automation needs schema 17");
     if (m->guest_files_off & ~1) return fail(err, n, VM_E_RANGE, "guest_files is true or false");
-    if (m->schema < 16 && m->guest_files_off) return fail(err, n, VM_E_FIELD, "guest_files needs schema 16");
+    if (m->schema < 18 && m->guest_files_off) return fail(err, n, VM_E_FIELD, "guest_files needs schema 18");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
@@ -673,6 +676,15 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
+    if (m->disposable < VM_DISP_OFF || m->disposable > VM_DISP_DISK) return fail(err, n, VM_E_RANGE, "disposable is memory or disk");
+    if ((m->encrypted & ~1) || (m->raw & ~1) || (m->no_backup & ~1)) return fail(err, n, VM_E_RANGE, "encrypted, disk_format and backup");
+    if (m->schema < 16 && (m->disposable || m->encrypted || m->raw || m->no_backup)) return fail(err, n, VM_E_FIELD, "disposable, encrypted, disk_format and backup need schema 16");
+    /* raw disks (6.4): a plain file, so no snapshots, no LUKS layer and no overlay on a shared base */
+    if (m->raw && m->encrypted) return fail(err, n, VM_E_RANGE, "a raw disk can't be encrypted (qcow2 can)");
+    if (m->raw && m->base[0]) return fail(err, n, VM_E_RANGE, "a linked clone's disk is qcow2");
+    /* a group's member: its group.json holds the disposable switch (19.7) */
+    if (m->group[0] && m->disposable) return fail(err, n, VM_E_RANGE, "a group's member has its group's disposable session");
+    if (m->group[0] && m->raw) return fail(err, n, VM_E_RANGE, "a group's member's disk is qcow2");
     return check_member(m, err, n);
 }
 
@@ -685,6 +697,96 @@ long vm_mem_limit_mb(const VmMachine *m) { return (long)m->memory_mb + (m->accel
 int vm_budget_fits(const VmHost *h, long running_mb, long want_mb) {
     long floor = h->ram_mb <= 4096 ? VM_FLOOR_SMALL_MB : VM_FLOOR_MB;
     return running_mb >= 0 && want_mb > 0 && running_mb + want_mb <= h->ram_mb - floor;
+}
+
+int vm_dir_active(const char *dir, int (*alive)(long pid)) {
+    char p[VM_PATH_MAX + 32], buf[2048];
+    if (!dir || (size_t)snprintf(p, sizeof p, "%s/run.json", dir) >= sizeof p) return 0;
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return 0;
+    struct stat rs;
+    ssize_t k = !fstat(fd, &rs) && S_ISREG(rs.st_mode) ? read(fd, buf, sizeof buf - 1) : -1;
+    close(fd);
+    if (k <= 0) return 0;
+    JDoc d;
+    if (json_parse(buf, (size_t)k, &d, NULL, 0)) return 0;
+    const char *s = json_str(d.root, "state");
+    double pd = json_num(d.root, "pid", 0);
+    int on = s && (!strcmp(s, "starting") || !strcmp(s, "running") || !strcmp(s, "paused") || !strcmp(s, "stopping"));
+    long pid = pd >= 1 && pd <= 4194304 ? (long)pd : 0;
+    json_free(&d);
+    return on && pid && (!alive || alive(pid));
+}
+
+size_t vm_backup_hold(const char *rel) {
+    if (!rel) return 0;
+    size_t n = strlen(rel);
+    static const char *const tails[] = { ".lordvm/disks", ".lordvm/suspend.state" };
+    for (int i = 0; i < 2; i++) {
+        size_t t = strlen(tails[i]);
+        if (n <= t || strcmp(rel + n - t, tails[i])) continue;
+        size_t dirlen = n - t + 7;                          /* up to and with ".lordvm" */
+        /* a name before ".lordvm": the folder's own name isn't empty and doesn't start with '.' */
+        size_t b = n - t;
+        while (b > 0 && rel[b - 1] != '/') b--;
+        if (b == n - t || rel[b] == '.') return 0;
+        return dirlen;
+    }
+    return 0;
+}
+
+/* one machine folder for vm_budget_used_mb: its limit when it is active, else 0 */
+static long budget_one(const char *dir, const struct stat *ex, int (*alive)(long), long (*extra)(const char *, const VmMachine *), int *n) {
+    struct stat st;
+    if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) return 0;
+    if (ex && st.st_dev == ex->st_dev && st.st_ino == ex->st_ino) return 0;
+    if (!vm_dir_active(dir, alive)) return 0;
+    VmMachine m;
+    if (vm_machine_load(dir, &m, NULL, 0)) return 0;
+    (*n)++;
+    long x = extra ? extra(dir, &m) : 0;
+    return vm_mem_limit_mb(&m) + (x > 0 && x <= VM_MEM_MAX_MB ? x : 0);
+}
+
+static int budget_suffix(const char *s, size_t l, const char *suf) {
+    size_t k = strlen(suf);
+    return l > k && !strcmp(s + l - k, suf);
+}
+
+long vm_budget_used_mb(const char *lib, const char *exclude, int (*alive)(long pid), long (*extra)(const char *dir, const VmMachine *m), int *n) {
+    int cnt = 0, *pn = n ? n : &cnt;
+    *pn = 0;
+    struct stat ex;
+    int have_ex = exclude && !stat(exclude, &ex);
+    DIR *d = lib ? opendir(lib) : NULL;
+    if (!d) return 0;
+    long sum = 0;
+    int seen = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) && seen < 256) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.') continue;
+        char dir[VM_PATH_MAX + 260];
+        if ((size_t)snprintf(dir, sizeof dir, "%s/%s", lib, e->d_name) >= sizeof dir) continue;
+        if (budget_suffix(e->d_name, l, ".lordvm")) { seen++; sum += budget_one(dir, have_ex ? &ex : NULL, alive, extra, pn); continue; }
+        if (!budget_suffix(e->d_name, l, ".lordgroup")) continue;
+        struct stat gs;
+        if (lstat(dir, &gs) || !S_ISDIR(gs.st_mode)) continue;
+        DIR *g = opendir(dir);
+        if (!g) continue;
+        struct dirent *f;
+        while ((f = readdir(g)) && seen < 256) {
+            size_t fl = strlen(f->d_name);
+            if (f->d_name[0] == '.' || !budget_suffix(f->d_name, fl, ".lordvm")) continue;
+            char md[VM_PATH_MAX + 520];
+            if ((size_t)snprintf(md, sizeof md, "%s/%s", dir, f->d_name) >= sizeof md) continue;
+            seen++;
+            sum += budget_one(md, have_ex ? &ex : NULL, alive, extra, pn);
+        }
+        closedir(g);
+    }
+    closedir(d);
+    return sum;
 }
 
 const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing) {
@@ -700,6 +802,9 @@ int vm_machine_check_host(const VmMachine *m, const VmHost *h, char *err, size_t
     if (m->accel == VM_ACCEL_KVM) {
         if (h->arch != m->arch) return fail(err, n, VM_E_HOST, "KVM runs %s machines on a %s computer only; use emulation (tcg)", vm_arch_name(m->arch), vm_arch_name(m->arch));
         if (!h->kvm) return fail(err, n, VM_E_HOST, "this computer's /dev/kvm can't be opened (virtualization off, or the user isn't allowed)");
+        /* the windows devices on arm64 ask for a GICv3 (build_qemu_args); KVM gives one only on a GICv3 host */
+        if (m->arch == VM_ARCH_ARM64 && m->devices == VM_DEV_WINDOWS && !h->gicv3)
+            return fail(err, n, VM_E_HOST, "this computer's interrupt controller is GICv2, and KVM can't give the windows devices the GICv3 they need here; use emulation (tcg)");
     }
     if (m->vcpus > h->cpus) return fail(err, n, VM_E_HOST, "%d vCPUs, this computer has %d", m->vcpus, h->cpus);
     long mx = vm_mem_max_mb(h);
@@ -717,7 +822,8 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "guest_files", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation",
+    "guest_files", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -761,6 +867,13 @@ static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_DEV_NAMES[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_VGPU_NAMES[] = { "", "intel-whole", "intel-shared", NULL };
 const char *const VM_PIN_NAMES[] = { "", "off", "auto", NULL };
+const char *const VM_DISP_NAMES[] = { "", "memory", "disk", NULL };
+const char *vm_disk_ext(const VmMachine *m) { return m->raw ? "raw" : "qcow2"; }
+int vm_key_valid(const char *k, size_t n) {
+    if (n != 64) return 0;
+    for (size_t i = 0; i < n; i++) if (!((k[i] >= '0' && k[i] <= '9') || (k[i] >= 'a' && k[i] <= 'f'))) return 0;
+    return 1;
+}
 const char *const VM_BOOT_NAMES[] = { "disk", "cd", "network", NULL };
 
 int vm_boot_parse(const char *s, int order[VM_BOOT_DEVS]) {
@@ -998,7 +1111,11 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         if ((gl && gl->type != J_BOOL) || (gn && gn->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "guest_links and guest_notify must be true or false"); goto out; }
         m->guest_links = gl ? json_bool(o, "guest_links", 0) : 0;
         m->guest_notify = gn ? json_bool(o, "guest_notify", 0) : 0;
-        /* schema 16: missing means files from the guest are taken */
+        /* schema 17: missing means no automation (6.15) */
+        const JVal *au = json_get(o, "automation");
+        if (au && au->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "automation must be true or false"); goto out; }
+        m->automation = au ? json_bool(o, "automation", 0) : 0;
+        /* schema 18: missing means files from the guest are taken */
         const JVal *gf = json_get(o, "guest_files");
         if (gf && gf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "guest_files must be true or false"); goto out; }
         m->guest_files_off = gf ? !json_bool(o, "guest_files", 1) : 0;
@@ -1026,6 +1143,20 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         }
         if (up[0] && strcmp(up, "tor")) { r = fail(err, n, VM_E_RANGE, "uplink is tor"); goto out; }
         m->uplink_tor = up[0] != 0;
+        /* schema 16: storage; missing: as a new machine (persistent, not encrypted, qcow2, backed up) */
+        char disp[8], fmt[8];
+        if ((r = get_str(o, "disposable", disp, sizeof disp, 0, err, n)) || (r = get_str(o, "disk_format", fmt, sizeof fmt, 0, err, n))) goto out;
+        m->disposable = VM_DISP_OFF;
+        if (disp[0]) {
+            for (int i = 1; VM_DISP_NAMES[i]; i++) if (!strcmp(disp, VM_DISP_NAMES[i])) m->disposable = i;
+            if (!m->disposable) { r = fail(err, n, VM_E_RANGE, "disposable is memory or disk"); goto out; }
+        }
+        if (fmt[0] && strcmp(fmt, "raw") && strcmp(fmt, "qcow2")) { r = fail(err, n, VM_E_RANGE, "disk_format is qcow2 or raw"); goto out; }
+        m->raw = !strcmp(fmt, "raw");
+        const JVal *en = json_get(o, "encrypted"), *bk = json_get(o, "backup");
+        if ((en && en->type != J_BOOL) || (bk && bk->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "encrypted and backup are true or false"); goto out; }
+        m->encrypted = en ? json_bool(o, "encrypted", 0) : 0;
+        m->no_backup = bk ? !json_bool(o, "backup", 1) : 0;
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -1123,7 +1254,8 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 13 && m->perf_profile) jb_raw(&b, ",\n  \"perf_profile\": true");
     if (m->schema >= 15 && m->guest_links) jb_raw(&b, ",\n  \"guest_links\": true");
     if (m->schema >= 15 && m->guest_notify) jb_raw(&b, ",\n  \"guest_notify\": true");
-    if (m->schema >= 16 && m->guest_files_off) jb_raw(&b, ",\n  \"guest_files\": false");
+    if (m->schema >= 17 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
+    if (m->schema >= 18 && m->guest_files_off) jb_raw(&b, ",\n  \"guest_files\": false");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);
@@ -1132,6 +1264,12 @@ char *vm_machine_json(const VmMachine *m) {
         if (m->link_mac[0]) { jb_raw(&b, ",\n  \"link_mac\": "); jb_str(&b, m->link_mac); }
         if (m->profile_lock) { jb_raw(&b, ",\n  \"profile_lock\": "); jb_str(&b, VM_LOCK_NAMES[m->profile_lock]); }
         if (m->timers) { jb_raw(&b, ",\n  \"timers\": "); jb_str(&b, VM_TIMERS_NAMES[m->timers]); }
+    }
+    if (m->schema >= 16) {
+        if (m->disposable) { jb_raw(&b, ",\n  \"disposable\": "); jb_str(&b, VM_DISP_NAMES[m->disposable]); }
+        if (m->encrypted) jb_raw(&b, ",\n  \"encrypted\": true");
+        if (m->raw) jb_raw(&b, ",\n  \"disk_format\": \"raw\"");
+        if (m->no_backup) jb_raw(&b, ",\n  \"backup\": false");
     }
     if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
     if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }
@@ -1143,7 +1281,7 @@ char *vm_machine_json(const VmMachine *m) {
 }
 
 static char *read_small(const char *path, size_t max, size_t *len) {
-    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);   /* a FIFO named machine.json never blocks the caller */
     if (fd < 0) return NULL;
     struct stat st;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || (size_t)st.st_size > max) { close(fd); errno = EFBIG; return NULL; }
@@ -1308,6 +1446,30 @@ void vm_host_probe(VmHost *h) {
     int fd = open("/dev/kvm", O_RDWR | O_CLOEXEC);
     h->kvm = fd >= 0;
     if (fd >= 0) close(fd);
+    h->gicv3 = h->arch == VM_ARCH_ARM64 && vm_gicv3_in("/proc/interrupts") == 1;
+}
+
+int vm_gicv3_in(const char *path) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return -1;
+    char b[65536 + 8];
+    size_t keep = 0, total = 0;
+    int found = 0;
+    while (!found && total < (8u << 20)) {
+        ssize_t k = read(fd, b + keep, sizeof b - 1 - keep);
+        if (k < 0 && errno == EINTR) continue;
+        if (k <= 0) break;
+        total += (size_t)k;
+        size_t len = keep + (size_t)k;
+        b[len] = 0;
+        for (size_t i = 0; i < len; i++) if (!b[i]) b[i] = ' ';
+        if (strstr(b, "GICv3") || strstr(b, "GICv4")) found = 1;
+        /* a name cut between two reads: the last 5 bytes go first in the next */
+        keep = len < 5 ? len : 5;
+        memmove(b, b + len - keep, keep);
+    }
+    close(fd);
+    return found;
 }
 
 /* ---- images (vm_image_kind) ---- */

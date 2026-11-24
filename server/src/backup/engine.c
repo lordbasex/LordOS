@@ -8,7 +8,10 @@
  *   - fifos, sockets and devices are skipped;
  *   - a file is copied to "<name>.bkpart~" and renamed when done, so a final name is always a
  *     complete file (which is what makes resuming an interrupted run possible);
- *   - deletion only happens inside the machine folder and with validated names. */
+ *   - deletion only happens inside the machine folder and with validated names;
+ *   - virtual machines ("*.lordvm" folders, see engine.h): temporary files left out, a shared flock
+ *     on the machine's lock while its folder is copied, and a running machine's disks carried over
+ *     from the previous snapshot instead of copied half-written. */
 #include "engine.h"
 #include "../errcode.h"
 #include "../fsops.h"
@@ -23,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <unistd.h>
@@ -239,6 +243,11 @@ typedef struct {
     dev_t skip_dev;
     ino_t skip_ino;
     int has_skip, counting, stop, fatal;
+    struct {                                    /* the machine folder being walked, if any */
+        int on, busy, lockfd;                   /* lockfd: our shared flock on its lock, or -1 */
+        size_t len;                             /* strlen(rel) */
+        char rel[PATH_MAX];
+    } vm;
 } Walk;
 
 static int excluded(const Walk *w, const char *rel) {
@@ -347,6 +356,270 @@ static int copy_file(Walk *w, const char *src, const char *dst, const struct sta
     return -1;
 }
 
+/* ---- virtual machines ("*.lordvm", docs/VIRTUALIZATION.md 3.5 and 6.14) ---- */
+
+static int ends_with(const char *s, const char *suf) {
+    size_t a = strlen(s), b = strlen(suf);
+    return a > b && !strcmp(s + a - b, suf);
+}
+
+/* A machine's name for the status: valid UTF-8 (anything else becomes '?'), no control or bidi
+ * control characters, at most n - 1 bytes cut on a character boundary. */
+static void vm_clean_name(const char *in, char *out, size_t n) {
+    size_t o = 0;
+    const unsigned char *s = (const unsigned char *)in;
+    while (*s && o + 1 < n) {
+        unsigned c = *s, len = c < 0x80 ? 1 : (c & 0xe0) == 0xc0 ? 2 : (c & 0xf0) == 0xe0 ? 3 : (c & 0xf8) == 0xf0 ? 4 : 0;
+        unsigned cp = len == 1 ? c : len == 2 ? c & 0x1f : len == 3 ? c & 0x0f : c & 0x07;
+        for (unsigned i = 1; i < len; i++) {
+            if ((s[i] & 0xc0) != 0x80) { len = 0; break; }
+            cp = cp << 6 | (s[i] & 0x3fu);
+        }
+        if (len && ((len == 2 && cp < 0x80) || (len == 3 && cp < 0x800) || (len == 4 && (cp < 0x10000 || cp > 0x10ffff)) ||
+                    (cp >= 0xd800 && cp <= 0xdfff))) len = 0;
+        if (!len) { out[o++] = '?'; s++; continue; }
+        int drop = cp < 0x20 || (cp >= 0x7f && cp < 0xa0) || (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069) ||
+                   cp == 0x200e || cp == 0x200f || cp == 0x2028 || cp == 0x2029;
+        if (!drop) {
+            if (o + len >= n) break;
+            memcpy(out + o, s, len);
+            o += len;
+        }
+        s += len;
+    }
+    out[o] = 0;
+}
+
+/* machine.json of the folder dfd: 0 read (backup, name set), -1 unreadable. Never follows a link,
+ * never blocks on a fifo, never reads more than BK_VM_JSON_MAX bytes. */
+static int vm_read_meta(Walk *w, int dfd, int *backup, char *name, size_t n) {
+    *backup = 1;
+    name[0] = 0;
+    int fd = openat(dfd, "machine.json", O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    struct stat st;
+    char *buf = NULL;
+    size_t len = 0;
+    int r = -1;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_size >= 0 && (uint64_t)st.st_size <= BK_VM_JSON_MAX &&
+        (buf = malloc((size_t)st.st_size + 1))) {
+        while (len < (size_t)st.st_size) {           /* it may grow meanwhile: never read past its size then */
+            ssize_t k = read(fd, buf + len, (size_t)st.st_size - len);
+            if (k < 0 && errno == EINTR) continue;
+            if (k <= 0) break;
+            len += (size_t)k;
+        }
+        buf[len] = 0;
+        r = 0;
+    }
+    close(fd);
+    if (!r && w->r->vm_meta && w->r->vm_meta(buf, len, backup, name, n)) { *backup = 1; name[0] = 0; }
+    free(buf);
+    return r;
+}
+
+/* Takes the machine's lock shared, without waiting. 1: taken (*fd holds it); 0: not running and it
+ * cannot be started (no lock file and none can be made: a read-only folder); -1: busy (lord-vm holds
+ * it, or the lock is not a plain file: a link is never followed). */
+static int vm_lock(int dfd, int *fd) {
+    *fd = -1;
+    int lfd = openat(dfd, "lock", O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+    if (lfd < 0 && errno == ENOENT) {
+        /* lord-vm makes it the same way when it starts: made now, a start during the copy waits for us */
+        lfd = openat(dfd, "lock", O_RDONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC, 0600);
+        if (lfd < 0 && errno == EEXIST) lfd = openat(dfd, "lock", O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+        else if (lfd < 0 && (errno == EROFS || errno == EACCES || errno == EPERM)) return 0;
+    }
+    if (lfd < 0) return -1;
+    struct stat st;
+    if (fstat(lfd, &st) || !S_ISREG(st.st_mode)) { close(lfd); return -1; }
+    int r;
+    while ((r = flock(lfd, LOCK_SH | LOCK_NB)) && errno == EINTR) {}
+    if (r) { close(lfd); return -1; }
+    *fd = lfd;
+    return 1;
+}
+
+static void vm_leave(Walk *w) {
+    if (w->vm.lockfd >= 0) { flock(w->vm.lockfd, LOCK_UN); close(w->vm.lockfd); }
+    w->vm.lockfd = -1;
+    w->vm.on = w->vm.busy = 0;
+}
+
+/* The walk reached a folder named "*.lordvm" (st: its lstat). 0: an ordinary folder (no machine.json);
+ * 1: a machine (w->vm set; vm_leave once its folder is done); 2: not copied. */
+static int vm_enter(Walk *w, const char *rel, const char *src, const struct stat *st) {
+    int dfd = open(src, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (dfd < 0) return 0;                          /* the walk reports it */
+    struct stat ds, ms;
+    if (fstat(dfd, &ds) || ds.st_dev != st->st_dev || ds.st_ino != st->st_ino ||
+        fstatat(dfd, "machine.json", &ms, AT_SYMLINK_NOFOLLOW)) { close(dfd); return 0; }
+    /* anything there named machine.json makes it a machine; only a plain file is read (a link is not
+     * followed: such a machine is backed up, like one whose machine.json does not parse) */
+    int backup = 1;
+    char raw[BK_VM_NAME * 4] = "", name[BK_VM_NAME];
+    if (S_ISREG(ms.st_mode)) vm_read_meta(w, dfd, &backup, raw, sizeof raw);
+    if (!raw[0]) {
+        const char *base = strrchr(rel, '/');
+        base = base ? base + 1 : rel;
+        snprintf(raw, sizeof raw, "%.*s", (int)(strlen(base) - 7), base);     /* without ".lordvm" */
+    }
+    vm_clean_name(raw, name, sizeof name);
+    if (!backup) {
+        close(dfd);
+        if (!w->counting) w->r->vm_left_out++;
+        return 2;
+    }
+    w->vm.on = 1;
+    w->vm.busy = 0;
+    w->vm.lockfd = -1;
+    w->vm.len = strlen(rel);
+    snprintf(w->vm.rel, sizeof w->vm.rel, "%s", rel);
+    if (w->counting) { close(dfd); return 1; }
+    int lk = vm_lock(dfd, &w->vm.lockfd);
+    close(dfd);
+    if (lk > 0) {
+        /* locked: is the path still that folder? (one swapped in meanwhile is not copied) */
+        struct stat again;
+        if (lstat(src, &again) || again.st_dev != ds.st_dev || again.st_ino != ds.st_ino) {
+            vm_leave(w);
+            w->r->errors++;
+            return 2;
+        }
+    } else if (lk < 0) {
+        w->vm.busy = 1;
+        w->r->vm_busy++;
+        if (w->r->vm_nnames < BK_VM_NAMES) snprintf(w->r->vm_busy_names[w->r->vm_nnames++], BK_VM_NAME, "%s", name);
+    }
+    return 1;
+}
+
+/* rel is inside the machine folder being walked: is it one of its temporary files? */
+static int vm_temp(const Walk *w, const char *rel) {
+    if (strncmp(rel, w->vm.rel, w->vm.len) || rel[w->vm.len] != '/') return 0;
+    const char *sub = rel + w->vm.len + 1, *last = strrchr(sub, '/');
+    last = last ? last + 1 : sub;
+    if (last == sub && (!strcmp(sub, "lock") || !strcmp(sub, "run.json") || !strcmp(sub, "operation.json") || !strcmp(sub, "log")))
+        return 1;
+    if (ends_with(last, ".part")) return 1;
+    /* in disks/: session overlays, ".x.fresh", compaction temporaries */
+    return !strncmp(sub, "disks/", 6) && last[0] == '.';
+}
+
+static int vm_is_disks(const Walk *w, const char *rel) {
+    return !strncmp(rel, w->vm.rel, w->vm.len) && rel[w->vm.len] == '/' && !strcmp(rel + w->vm.len + 1, "disks");
+}
+
+/* A running machine's disks: the previous snapshot's copy (sfd: that disks/ folder) is linked into
+ * dst. A link is never followed and temporary names are skipped; where hard links are not possible
+ * (FAT) the stored file is copied as it is (already encrypted, if the destination is). */
+static void vm_carry(Walk *w, int sfd, const char *dst, const char *rel, int depth) {
+    if (depth >= MAX_DEPTH) { w->r->errors++; return; }
+    int dupfd = dup(sfd);
+    DIR *d = dupfd >= 0 ? fdopendir(dupfd) : NULL;
+    if (!d) { if (dupfd >= 0) close(dupfd); w->r->errors++; return; }
+    char **names = NULL;
+    size_t n = 0, cap = 0;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        /* ".", "..", the machine's temporaries and our own "*.bkpart~" */
+        if (e->d_name[0] == '.' || ends_with(e->d_name, ".part") || ends_with(e->d_name, ".bkpart~")) continue;
+        if (n == cap) {
+            size_t nc = cap ? cap * 2 : 16;
+            char **nn = realloc(names, nc * sizeof *nn);
+            if (!nn) break;
+            names = nn;
+            cap = nc;
+        }
+        if (!(names[n] = strdup(e->d_name))) break;
+        n++;
+    }
+    closedir(d);
+    for (size_t i = 0; i < n; i++) {
+        char dp[PATH_MAX], rp[PATH_MAX];
+        struct stat st;
+        if (check(w) || w->fatal || pathf(dp, sizeof dp, "%s/%s", dst, names[i]) || pathf(rp, sizeof rp, "%s/%s", rel, names[i]) ||
+            fstatat(sfd, names[i], &st, AT_SYMLINK_NOFOLLOW)) {
+            free(names[i]);
+            continue;
+        }
+        if (S_ISDIR(st.st_mode)) {
+            int cfd = openat(sfd, names[i], O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+            if (cfd < 0 || (mkdir(dp, 0700) && errno != EEXIST)) {
+                if (cfd >= 0) close(cfd);
+                w->r->errors++;
+            } else {
+                vm_carry(w, cfd, dp, rp, depth + 1);
+                close(cfd);
+                chmod(dp, (st.st_mode & 07777) | 0700);
+                struct timespec ts[2] = { st.st_atim, st.st_mtim };
+                utimensat(AT_FDCWD, dp, ts, AT_SYMLINK_NOFOLLOW);
+            }
+        } else if (S_ISREG(st.st_mode)) {
+            if (w->r->progress) w->r->progress(w->r, rp);
+            w->r->files++;
+            int ok = linkat(sfd, names[i], AT_FDCWD, dp, 0) == 0;
+            if (!ok && errno == EEXIST) { unlink(dp); ok = linkat(sfd, names[i], AT_FDCWD, dp, 0) == 0; }
+            if (ok) {
+                w->r->linked++;
+                w->r->bytes += (uint64_t)st.st_size;
+            } else {
+                char tmp[PATH_MAX];
+                int in = openat(sfd, names[i], O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_NOCTTY | O_CLOEXEC), out = -1, r = -1;
+                struct stat a;
+                if (in >= 0 && !fstat(in, &a) && S_ISREG(a.st_mode) && !pathf(tmp, sizeof tmp, "%s.bkpart~", dp) &&
+                    (out = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_CLOEXEC, 0600)) >= 0) {
+                    r = copy_data(w, in, out);
+                    if (!r) {
+                        fchmod(out, a.st_mode & 07777);
+                        struct timespec ts[2] = { a.st_atim, a.st_mtim };
+                        futimens(out, ts);
+                    }
+                    if (close(out) && !r) r = -1;
+                    if (!r && rename(tmp, dp)) r = -1;
+                    if (r) unlink(tmp);
+                }
+                if (in >= 0) close(in);
+                if (r == -2) { w->fatal = 1; lerr_set(w->r->error, sizeof w->r->error, "backup.noSpace", NULL); }
+                else if (r == 0) w->r->copied++;
+                else if (r < 0) w->r->errors++;
+            }
+        } else if (S_ISLNK(st.st_mode)) {
+            char target[PATH_MAX];
+            ssize_t k = readlinkat(sfd, names[i], target, sizeof target - 1);
+            w->r->files++;
+            if (k < 0) w->r->errors++;
+            else {
+                target[k] = 0;
+                unlink(dp);
+                if (symlink(target, dp)) w->r->errors++;
+            }
+        }
+        free(names[i]);
+    }
+    free(names);
+}
+
+/* The previous copy of rel (a running machine's disks/), opened one folder at a time without
+ * following links: from the previous snapshot, else from an interrupted run. -1: none. */
+static int vm_prev_disks(const Walk *w, const char *rel) {
+    const char *bases[2] = { w->link2, w->link1 };
+    for (int i = 0; i < 2; i++) {
+        if (!bases[i][0]) continue;
+        int fd = open(bases[i], O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        char tmp[PATH_MAX];
+        snprintf(tmp, sizeof tmp, "%s", rel);
+        char *save = NULL;
+        for (char *tok = strtok_r(tmp, "/", &save); tok && fd >= 0; tok = strtok_r(NULL, "/", &save)) {
+            int nfd = openat(fd, tok, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+            close(fd);
+            fd = nfd;
+        }
+        if (fd >= 0) return fd;
+    }
+    return -1;
+}
+
 static void walk(Walk *w, const char *rel, int depth);
 
 static void entry(Walk *w, const char *rel, int depth) {
@@ -355,16 +628,25 @@ static void entry(Walk *w, const char *rel, int depth) {
     if (pathf(src, sizeof src, "%s/%s", w->src, rel) || pathf(dst, sizeof dst, "%s/%s", w->dst, rel)) { w->r->errors++; return; }
     struct stat st;
     if (lstat(src, &st)) { if (errno != ENOENT) w->r->errors++; return; }
+    if (w->vm.on && vm_temp(w, rel)) return;
     if (S_ISDIR(st.st_mode)) {
         if (st.st_dev != w->home_dev || (w->has_skip && st.st_dev == w->skip_dev && st.st_ino == w->skip_ino)) return;
         if (depth >= MAX_DEPTH) { w->r->errors++; return; }
-        if (!w->counting && mkdir(dst, 0700) && errno != EEXIST) { w->r->errors++; return; }
-        walk(w, rel, depth + 1);
+        /* a machine inside a machine is an ordinary folder there (one lock at a time) */
+        int vm = !w->vm.on && ends_with(rel, ".lordvm") ? vm_enter(w, rel, src, &st) : 0;
+        if (vm == 2) return;
+        if (!w->counting && mkdir(dst, 0700) && errno != EEXIST) { w->r->errors++; if (vm) vm_leave(w); return; }
+        if (!w->counting && w->vm.on && w->vm.busy && vm_is_disks(w, rel)) {
+            /* running: the previous snapshot's disks, not a half-written copy (no previous one: none) */
+            int sfd = vm_prev_disks(w, rel);
+            if (sfd >= 0) { vm_carry(w, sfd, dst, rel, depth + 1); close(sfd); }
+        } else walk(w, rel, depth + 1);
         if (!w->counting) {
             chmod(dst, (st.st_mode & 07777) | 0700);            /* the owner can always get back in */
             struct timespec ts[2] = { st.st_atim, st.st_mtim };
             utimensat(AT_FDCWD, dst, ts, AT_SYMLINK_NOFOLLOW);
         }
+        if (vm) vm_leave(w);
         return;
     }
     if (S_ISREG(st.st_mode)) {
@@ -433,7 +715,10 @@ static void walk(Walk *w, const char *rel, int depth) {
         char r[PATH_MAX];
         size_t len = strlen(names[i]);
         int skip = len > 8 && !strcmp(names[i] + len - 8, ".bkpart~");
-        if (!skip && !pathf(r, sizeof r, "%s%s%s", rel, rel[0] ? "/" : "", names[i]) && !excluded(w, r)) entry(w, r, depth);
+        if (!skip && !pathf(r, sizeof r, "%s%s%s", rel, rel[0] ? "/" : "", names[i]) && !excluded(w, r)) {
+            if (w->r->hold && w->r->hold(w->r, r)) { if (!w->counting) w->r->skipped++; }
+            else entry(w, r, depth);
+        }
         free(names[i]);
     }
     free(names);
@@ -442,10 +727,13 @@ static void walk(Walk *w, const char *rel, int depth) {
 int bk_snapshot(BkRun *r, time_t now) {
     r->files = r->bytes = r->copied = r->linked = r->copied_bytes = r->errors = r->skipped = 0;
     r->total_files = r->total_bytes = 0;
+    r->vm_busy = r->vm_left_out = 0;
+    r->vm_nnames = 0;
     r->error[0] = r->id[0] = 0;
     static Walk w;
     memset(&w, 0, sizeof w);
     w.r = r;
+    w.vm.lockfd = -1;
     struct stat hs;
     if (pathf(w.src, sizeof w.src, "%s", r->home) || lstat(w.src, &hs) || !S_ISDIR(hs.st_mode)) {
         lerr_set(r->error, sizeof r->error, "backup.sourceUnreadable", NULL);

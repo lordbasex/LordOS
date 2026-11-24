@@ -12,13 +12,13 @@ export function systemsFor(cat, arch, opts) {
     const a = s?.arch?.[arch];
     // Windows (4.3) has no folder of its own: the person's ISO from Microsoft's page, or the pinned evaluation
     const win = s?.kind === 'windows' && Array.isArray(a?.isos);
-    // an ISO whose maker signs no list (Android, 4.2): the catalog pins its one file and hash itself (pinnedImage)
+    // an ISO whose maker signs no list: the catalog pins its one file and hash itself (pinnedImage)
     const pinned = (s?.kind || 'iso') === 'iso' && !!pinnedImage(a);
     if (!a || s.hidden || typeof s.id !== 'string' || (typeof a.file !== 'string' && !win && !pinned)) continue;
     // a machine group (Whonix, docs/VIRTUALIZATION.md 19.8): its card needs KVM on this computer's own architecture
     const group = s.kind === 'group';
     if (group && (!opts || !opts.kvm || opts.hostArch !== arch)) continue;
-    // family: what a profile's system kind suggests it for ('linux', 'windows'; Android is neither: "family" in its entry)
+    // family: what a profile's system kind suggests it for ('linux', 'windows', or "family" in its entry)
     const family = s.kind === 'windows' ? 'windows' : group ? 'group' : /^[a-z]+$/.test(s.family || '') ? s.family : 'linux';
     out.push({ id: s.id, name: String(s.name || s.id), release: String(s.release || ''), approxMb: Number(a.approxMb) || 0, kind: s.kind || 'iso', family,
       listed: !a.sums && !pinned, ...(pinned ? { pinned: true } : {}), ...(group ? { group: String(s.group || ''), members: groupMachines(s) } : {}) });
@@ -34,12 +34,6 @@ export function pinnedImage(a) {
   if (!f || !PIN_ISO.test(f.name || '') || !/^[0-9a-f]{64}$/.test(f.sha256 || '') || !/^https:\/\/[^/\s"<>\\]+\/\S+$/.test(f.url || '') ||
       !Number.isInteger(f.bytes) || f.bytes < 1) return null;
   return { name: f.name, sha: f.sha256, size: f.bytes, pinned: true };
-}
-
-// what a card says under its download (machines.dl.notice.<key>): { key, maker, date } or null
-export function noticeOf(cat, id) {
-  const s = (cat?.systems || []).find((x) => x?.id === id);
-  return s && /^[a-z]+$/.test(s.notice || '') ? { key: s.notice, maker: String(s.maker || s.name || ''), date: String(s.imageDate || '') } : null;
 }
 
 export function entryOf(cat, id, arch) {
@@ -207,9 +201,10 @@ export function downloadedImages(cat, entries, infoOf, machines, runningOf = (m)
 }
 
 // ---- unattended installs (vmunattend.h) ----
-// the answer files lord-vm makes: Debian's preseed, Ubuntu's autoinstall, Fedora's kickstart and LordOS's own
+// the answer files lord-vm makes: Debian's preseed (and Kali's, the same with its archive and tasks), Ubuntu's
+// autoinstall, Fedora's kickstart and LordOS's own
 // lordos-auto.conf (the live ISO's unattended install, docs/UNATTENDED.md)
-export const UNATTENDED_KINDS = ['preseed', 'autoinstall', 'kickstart', 'lordos'];
+export const UNATTENDED_KINDS = ['preseed', 'kali', 'autoinstall', 'kickstart', 'lordos'];
 // how a card installs without questions on this architecture: { kind, image (the entry whose image it boots: the card's
 // own, or a hidden one), kernel, initrd, append } or null
 export function unattendedOf(cat, id, arch) {
@@ -219,7 +214,9 @@ export function unattendedOf(cat, id, arch) {
   if (!u || !a || !UNATTENDED_KINDS.includes(u.kind) || typeof a.kernel !== 'string' || typeof a.initrd !== 'string') return null;
   const image = typeof u.image === 'string' ? u.image : id;
   if (!entryOf(cat, image, arch)) return null;
-  return { kind: u.kind, image, kernel: a.kernel, initrd: a.initrd, append: String(u.append || ''), release: String(s.release || '') };
+  // an architecture's own command line when it has one (arm64: the screen as the console, 4.1)
+  const append = typeof a.append === 'string' ? a.append : u.append;
+  return { kind: u.kind, image, kernel: a.kernel, initrd: a.initrd, append: String(append || ''), release: String(s.release || '') };
 }
 
 // LordOS's interface language for its unattended install: this LordOS's own, as a locale id ("es", "zh-Hans"), or "en"
@@ -229,7 +226,7 @@ export function lordosLang(lang) {
 }
 
 // A card's machine over what the profile gives (size: { vcpus, memoryMb, diskGb, gfx, ... }); host: { cpus, memMaxMb }.
-// "machine" (Android, 4.2): what the card asks whatever the profile, fitted to this computer (never more processors
+// "machine": what the card asks whatever the profile, fitted to this computer (never more processors
 // than it has, never more memory than machines may use here). "defaults" (LordOS: 4 processors, 4 GB, 32 GB, 3D):
 // the card's least size over the profile's, the processors never more than this computer has.
 export function cardSize(cat, id, size, host) {

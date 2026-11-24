@@ -684,5 +684,6 @@
   "stats.p95Row": "CPU 95:e percentil (1 min)",
   "stats.memAvgRow": "Minne snitt (1 · 5 · 15 min)",
   "stats.memPeakRow": "Minne topp (1 · 5 · 15 min)",
-  "stats.spark": "Senaste minuten"
+  "stats.spark": "Senaste minuten",
+  "group.showMachine": "Visa maskinen"
 }

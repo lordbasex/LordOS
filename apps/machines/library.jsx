@@ -7,10 +7,10 @@
 // Requirements and the Pi page are the other screens of this window.
 import {
   View, Text, Image, ScrollView, TextInput, useAppWindow, useStore, createStore, admin, fs, wm, windows, revealPath, openFolder, ConfirmDialog, useSystemInfo, statusText, useSettings, settings,
-  EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr,
+  EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr, battery,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
+import { canRun, sensorLines, cardLights, budgetLine, isolationGaps, stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
   chipCounts, libGrid, skeletonPlan, seenNext, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
@@ -20,9 +20,10 @@ import { loadProfiles, storeRev } from './store.js';
 import { usePal, has, gb, bytes, gib, OsMark, Bar, Btn, PopMenu, markColors, overlayRoot, vmRefusal, startPrep } from './ui.jsx';
 import { readMeta, readCpuUse, isProtectedMachine } from './meta.js';
 import { CloneSheet } from './clone.jsx';
+import { ExportSheet, ImportExportSheet } from './vmkey.jsx';
 import { withAsk } from './openwith.js';
 import { libraryItems, groupMenu, groupShows } from './group.js';
-import { GroupMark, TorChip, groupLine, groupStateOf, groupColors, startGroup, stopGroup, FreshDialog, GroupSnapDialog } from './groupui.jsx';
+import { GroupMark, TorChip, groupLine, groupStateOf, groupColors, startGroup, stopGroup, FreshDialog, GroupSnapDialog, DeleteGroupDialog, RenameGroupDialog, RepairGroupDialog, groupJob, groupWorkText } from './groupui.jsx';
 
 const winIdOf = (m) => `machines#vm-${m.id || m.folder}`;
 // how long the Requirements page waits for a word from the package engine before it says the network isn't answering
@@ -40,6 +41,8 @@ export function openMachine(m, opts) {
   wm.open('machines', { instance, protected: prot, args: { machine: m.dir, name: m.name, ...(opts?.loadvm ? { loadvm: opts.loadvm } : {}) } });
   if (fresh) { wm.resize(id, 1024, 768 + 48); wm.center(id); }
   else playAsks.set((x) => ({ ...x, [m.dir]: (x[m.dir] || 0) + 1 }));
+  // Start in Full Screen (5.3): the window takes its display as it opens
+  if (opts?.full) wm.setFullscreen(id, true);
   return id;
 }
 // files sent from Files' "Open with" (openwith.js): dir → [{ id, path, at }], taken by the machine's window once its
@@ -161,6 +164,25 @@ function VcpuHint({ m, host }) {
   );
 }
 
+// The agent and disk lights (5.1, model.js cardLights): a symbol in the light's color, its words beside it on a wide
+// card and always in the tooltip, so no light carries meaning by color alone
+const LIGHT_TONE = { on: '#30d158', wait: '#ffd60a', off: 'rgba(242,242,245,0.45)' };
+const LIGHT_ICON = { agent: 'agent', disk: 'disks' };
+function Lights({ m, u, words }) {
+  const ls = cardLights(m, u);
+  if (!ls.length) return null;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+      {ls.map((l) => (
+        <View key={l.k} title={tr(l.key)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Sym name={LIGHT_ICON[l.k]} size={13} color={LIGHT_TONE[l.tone]} />
+          {words ? <Text style={{ fontSize: 12, color: '#f2f2f5', whiteSpace: 'nowrap' }}>{tr(l.key)}</Text> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function Card({ m, u, sel, onSelect, onMenu, windowed, picH, gpuName, host }) {
   const p = usePal();
   const a = actionsOf(m);
@@ -187,6 +209,7 @@ function Card({ m, u, sel, onSelect, onMenu, windowed, picH, gpuName, host }) {
             <Text style={{ fontSize: 12, color: '#f2f2f5', whiteSpace: 'nowrap' }}>{gpuName}</Text>
           </View>
         ) : null}
+        {st.on ? <View style={{ ...pillStyle, position: 'absolute', insetInlineStart: 12, bottom: 12 }}><Lights m={m} u={u} words={picH >= 150} /></View> : null}
         {a.open || a.start ? (
           <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
             {a.open ? (
@@ -227,7 +250,7 @@ function GroupPicture({ height, on, radius = 0 }) {
   );
 }
 const gwOn = (item) => !!item.gw && stateView(item.gw.state, item.gw.reason).active;
-function GroupCard({ item, sel, onSelect, onMenu, onGo, picH }) {
+function GroupCard({ item, sel, onSelect, onMenu, onGo, onRepair, work, picH }) {
   const p = usePal();
   const st = groupStateOf(item);
   const wsOn = !!item.ws && stateView(item.ws.state, item.ws.reason).active;
@@ -258,12 +281,19 @@ function GroupCard({ item, sel, onSelect, onMenu, onGo, picH }) {
               </View>
             )}
           </View>
+        ) : !item.unreadable && !work ? (
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+            <View onClick={(e) => { e.stopPropagation?.(); onRepair(); }}
+              style={{ height: 40, paddingHorizontal: 18, borderRadius: 20, justifyContent: 'center', backgroundColor: hover ? 'rgba(0,0,0,0.75)' : 'rgba(0,0,0,0.6)' }}>
+              <Text style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{tr('machines.group.menu.repair')}</Text>
+            </View>
+          </View>
         ) : null}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 18 }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={{ fontSize: 18, fontWeight: 600, color: p.text, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{item.group.name}</Text>
-          <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{groupLine(item)}</Text>
+          <Text style={{ marginTop: 4, fontSize: 13, color: work ? p.accent : p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{work || groupLine(item)}</Text>
           {item.group.disposable ? <Text style={{ marginTop: 4, fontSize: 12, color: p.accent, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{tr('machines.group.disposableOn')}</Text> : null}
         </View>
         <MoreBtn m={m} onMenu={onMenu} />
@@ -271,7 +301,7 @@ function GroupCard({ item, sel, onSelect, onMenu, onGo, picH }) {
     </View>
   );
 }
-function GroupRow({ item, sel, onSelect, onMenu, onGo }) {
+function GroupRow({ item, sel, onSelect, onMenu, onGo, onRepair, work }) {
   const p = usePal();
   const st = groupStateOf(item);
   const narrow = useNarrow();
@@ -286,8 +316,13 @@ function GroupRow({ item, sel, onSelect, onMenu, onGo }) {
           <TorChip on={gwOn(item)} />
           <Text style={{ fontSize: 12, color: st.color || p.dim, whiteSpace: 'nowrap' }}>{st.text}</Text>
         </View>
-        <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{groupLine(item)}</Text>
+        <Text style={{ marginTop: 4, fontSize: 13, color: work ? p.accent : p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{work || groupLine(item)}</Text>
       </View>
+      {item.state === 'damaged' && !item.unreadable && !work ? (
+        <View onClick={(e) => { e.stopPropagation?.(); onRepair(); }} style={{ height: 34, paddingHorizontal: 16, borderRadius: 17, justifyContent: 'center', backgroundColor: p.btn }}>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: p.text }}>{tr('machines.group.menu.repair')}</Text>
+        </View>
+      ) : null}
       {item.state !== 'damaged' ? (
         <View onClick={(e) => { e.stopPropagation?.(); onGo(); }} style={{ height: 34, paddingHorizontal: 16, borderRadius: 17, justifyContent: 'center', backgroundColor: wsOn ? p.accent : p.btn }}>
           <Text style={{ fontSize: 13, fontWeight: 600, color: wsOn ? '#fff' : p.text }}>{tr(wsOn ? 'machines.open' : 'machines.start')}</Text>
@@ -350,6 +385,7 @@ function ListRow({ m, u, sel, onSelect, onMenu, windowed, host }) {
             {st.on && st.color ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: st.color }} /> : null}
             <Text style={{ fontSize: 12, color: st.color || p.dim, whiteSpace: 'nowrap' }}>{st.text}</Text>
           </View>
+          {st.on ? <View style={{ ...pillStyle }}><Lights m={m} u={u} /></View> : null}
         </View>
         <Text style={{ marginTop: 4, fontSize: 13, color: p.dim, whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' }}>{specLine(m)}</Text>
         <VcpuHint m={m} host={host} />
@@ -465,7 +501,7 @@ function Skeleton({ view, n, grid, onNew }) {
 }
 
 // FirstRun (empty library) and its "one step first" side when virtualization isn't usable yet
-function FirstRun({ host, onNew, onImport, onCheck }) {
+function FirstRun({ host, onNew, onImport, onCheck, onCanRun }) {
   const p = usePal();
   const info = useSystemInfo(60000);
   const [busy, setBusy] = useState(false);
@@ -486,6 +522,7 @@ function FirstRun({ host, onNew, onImport, onCheck }) {
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
           <Btn primary label={tr('machines.newMachine')} onClick={onNew} />
           <Btn label={tr('machines.first.import')} onClick={onImport} />
+          {onCanRun ? <Btn label={tr('machines.pi.menu')} onClick={onCanRun} /> : null}
         </View>
       </View>
       {side ? (
@@ -583,32 +620,49 @@ export function Requirements({ host, onBack, onChanged, archs }) {
   );
 }
 
-// PiView: what this board can run, and the warnings that matter on it
-function PiView({ host, list, onBack }) {
+// What this computer can run (5.7, model.js canRun): generated from what the host reports, for amd64 and arm64 alike;
+// the sensors (temperature, fan, a Pi's power supply) while machines run; the warnings that matter here
+const RUN_TONE = { native: '#8ce8b0', slow: '#ffc56e', limited: '#ffc56e', no: '#ff9a9a' };
+function ThisComputer({ host, list, gvt, onBack }) {
   const p = usePal();
-  const rows = [
-    ['native', 'arm64', '#8ce8b0'], ['slow', 'amd64', '#ffc56e'], ['limited', 'gpu', '#ffc56e'], ['no', 'passthrough', '#ff9a9a'], ['no', 'nested', '#ff9a9a'],
-  ];
+  const rows = canRun(host, { gvt });
   const emu = list.filter((m) => m.accel === 'tcg');
+  const anyOn = list.some((m) => stateView(m.state, m.reason).active);
+  const [sens, setSens] = useState(null);
+  useEffect(() => {
+    if (!anyOn || !has() || !lord.vm.sensors) { setSens(null); return undefined; }
+    const tick = () => setSens(lord.vm.sensors());
+    tick();
+    const timer = setInterval(tick, 2000);
+    return () => clearInterval(timer);
+  }, [anyOn]);
+  const sl = sensorLines(sens);
   const narrow = useNarrow();       // a small window: the notes under the table, in one scrolling column
   const page = (
     <View style={{ flex: narrow ? undefined : 1, flexDirection: narrow ? 'column' : 'row', gap: 16 }}>
       <View style={{ flex: narrow ? undefined : 1, padding: 24, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
         <Text style={{ fontSize: 20, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.pi.title', { board: host.board || tr('machines.pi.thisComputer'), ram: gb(host.ramMb) })}</Text>
-        <Text style={{ fontSize: 14, color: p.dim, textAlign: 'start' }}>{tr('machines.pi.native', { cpus: host.cpus, mem: gb(host.memMaxMb) })}</Text>
-        {rows.map(([st, k, c]) => (
-          <View key={k} style={{ minHeight: 48, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 10, backgroundColor: p.card }}>
-            <Text style={{ width: 76, fontSize: 12, fontWeight: 700, color: c, textAlign: 'start' }}>{tr(`machines.pi.st.${st}`)}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.pi.row.${k}`)}</Text>
-              <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.pi.note.${k}`)}</Text>
+        <Text style={{ fontSize: 14, color: p.dim, textAlign: 'start' }}>{tr('machines.run.native', { arch: host.arch, cpus: host.cpus, mem: gb(host.memMaxMb) })}</Text>
+        <ScrollView style={{ flex: narrow ? undefined : 1 }} contentStyle={{ gap: 8 }}>
+          {rows.map((r) => (
+            <View key={r.k} style={{ minHeight: 48, paddingHorizontal: 14, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 10, backgroundColor: p.card }}>
+              <Text style={{ width: 76, fontSize: 12, fontWeight: 700, color: RUN_TONE[r.st], textAlign: 'start' }}>{tr(`machines.pi.st.${r.st}`)}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(r.k, r.vars)}</Text>
+                <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(r.note, r.vars)}</Text>
+              </View>
             </View>
-          </View>
-        ))}
-        {narrow ? null : <View style={{ flex: 1 }} />}
+          ))}
+        </ScrollView>
         <Btn label={tr('machines.back')} onClick={onBack} style={{ alignSelf: 'flex-start' }} />
       </View>
-      <View style={{ width: narrow ? undefined : 380, gap: 12 }}>
+      <View style={{ width: narrow ? undefined : 340, gap: 12 }}>
+        {sl.length ? (
+          <View style={{ padding: 18, borderRadius: 18, backgroundColor: p.raised, gap: 6 }}>
+            <Text style={{ fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.run.sensors')}</Text>
+            {sl.map((l) => <Text key={l.key} style={{ fontSize: 13, color: l.warn ? '#ff9f0a' : p.dim, textAlign: 'start' }}>{tr(l.key, l.vars)}</Text>)}
+          </View>
+        ) : null}
         {emu.length ? (
           <View style={{ padding: 18, borderRadius: 18, backgroundColor: p.warnBg }}>
             <Text style={{ fontSize: 16, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.pi.emuTitle')}</Text>
@@ -671,6 +725,10 @@ export function Library() {
   const [groups, setGroups] = useState([]);           // the library's machine groups (lord.vm.groups(), 19.8)
   const [fresh, setFresh] = useState(null);           // a group's "Destroy and start fresh…" dialog
   const [gsnap, setGsnap] = useState(null);           // a group's "Group snapshot…" dialog
+  const [gdel, setGdel] = useState(null);             // a group's Delete… dialog (19.8)
+  const [gren, setGren] = useState(null);             // a group's Rename… dialog
+  const [gfix, setGfix] = useState(null);             // a damaged group's Repair… dialog (19.9)
+  const [work, setWork] = useState(null);             // a group job under way: { dir, kind, phase, done, total }
   // false until the first read is in: the first frame draws placeholders in the view's layout (Skeleton), never the
   // empty library (FirstRun) of a library that has machines
   const [loaded, setLoaded] = useState(false);
@@ -684,6 +742,8 @@ export function Library() {
   const [usages, setUsages] = useState({});
   const [discard, setDiscard] = useState(null);
   const [copying, setCopying] = useState(null);
+  const [exporting, setExporting] = useState(null);
+  const [importing, setImporting] = useState(false);
   const [query, setQuery] = useState('');
   const [gpuName, setGpuName] = useState('');
   const [s0] = useSettings();
@@ -741,11 +801,12 @@ export function Library() {
     wm.setMenus(winId, [{ label: tr('machines.menu.machine'), items: [
       { label: tr('machines.newMachine'), onClick: () => setPage('new') },
       { label: tr('machines.first.import'), onClick: () => { setNewMode('import'); setPage('new'); } },
+      { label: tr('machines.imp.menu'), onClick: () => setImporting(true) },
       '-',
       { label: tr('machines.set.menu'), onClick: () => openSettings('general') },
       { label: tr('machines.req.menu'), onClick: () => setPage('requirements') },
       { label: tr('machines.storage.menu'), onClick: openStorage },
-      ...(host?.arch === 'arm64' ? [{ label: tr('machines.pi.menu'), onClick: () => setPage('pi') }] : []),
+      { label: tr('machines.pi.menu'), onClick: () => setPage('pi') },
     ] }, { label: tr('machines.lib.view'), items: [
       ...LIB_VIEWS.map((k) => ({ label: tr(k === 'grid' ? 'machines.lib.viewGrid' : 'machines.lib.viewList'), checked: lv.view === k, onClick: () => putView({ view: k }) })),
       '-',
@@ -766,7 +827,7 @@ export function Library() {
   // the keyboard: arrows move the selection, Return opens or starts it, Escape clears the search
   const keys = useRef(null);
   keys.current = (e) => {
-    if (page !== 'main' || cfg || menu || del || discard || copying || fresh || gsnap) return;
+    if (page !== 'main' || cfg || menu || del || discard || copying || fresh || gsnap || gdel || gren || gfix) return;
     const i = sorted.findIndex((m) => m.dir === sel);
     const cols = lv.view === 'list' ? 1 : Math.max(1, keys.cols || 1);
     const fwd = direction() === 'rtl' ? -1 : 1;
@@ -786,6 +847,14 @@ export function Library() {
   const counts = chipCounts(items.machines, query);
   for (const g of items.groups) for (const k of Object.keys(counts)) if (groupShows(g, { query, show: k })) counts[k]++;
   const sum = summaryOf(list, usages, host);
+  // the resource budget (3.7): what the running machines hold of what machines may use here, and memory pressure
+  const bl = has() && lord.vm.budget && list.length ? budgetLine(lord.vm.budget()) : null;
+  // "Weaker isolation on this kernel" (3.3): what of QEMU's jail this kernel can't give
+  const gaps = isolationGaps(host, null);
+  // on battery with machines running: Pause All on the toolbar (6.14; the notice is ties.js's)
+  const bat = battery.get();          // not a hook: below the early return; the list is read again every 1.5 s
+  const runningNow = list.filter((m) => m.state === 'running');
+  const pauseAll = bat?.discharging && runningNow.length ? () => { for (const m of runningNow) lord.vm.stop(m.dir, 'pause'); refresh(); } : null;
   const missing = missingFor(host, [host.arch]);
   const remove = (m) => {
     setDel(null);
@@ -799,6 +868,7 @@ export function Library() {
     const stop = (how) => lord.vm.stop(m.dir, how);
     return [
       a.start ? { label: tr('machines.start'), onClick: () => openMachine(m) } : { label: tr('machines.open'), disabled: !a.open, onClick: () => openMachine(m) },
+      a.start ? { label: tr('machines.cmd.startFullscreen'), onClick: () => openMachine(m, { full: true }) } : null,
       a.start ? { label: tr('machines.cmd.startNoWindow'), onClick: () => startPrep(m).then(() => follow(lord.vm.startDetached(m.dir), m.name),
         (e) => setError(e.message)) } : null,
       { label: tr('machines.cmd.pause'), disabled: !a.pause, onClick: () => stop('pause') },
@@ -811,6 +881,7 @@ export function Library() {
       { label: tr('machines.cmd.configure'), onClick: () => setCfg({ dir: m.dir }) },
       { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m) },
       { label: tr('machines.cmd.clone'), onClick: () => setCopying(m) },
+      { label: tr('machines.cmd.export'), disabled: !a.remove || !!m.group, onClick: () => setExporting(m) },
       { label: tr('machines.cmd.logs'), onClick: () => openLogs(m) },
       { label: tr('machines.cmd.showInFiles'), onClick: () => revealPath(m.dir) },
       ...(m.transfer ? [{ label: tr('machines.tb.transferOpen'), onClick: () => { const x = lord.vm.transferFolder(m.dir); if (x) openFolder(x); } }] : []),
@@ -839,8 +910,20 @@ export function Library() {
       else if (x.k === 'logs') openLogs(item.ws);
       else if (x.k === 'showInFiles') revealPath(item.group.dir);
       else if (x.k === 'fresh') setFresh(item);
+      else if (x.k === 'stopGateway') { if (item.gw) lord.vm.stop(item.gw.dir, 'shutdown'); refresh(); }
+      else if (x.k === 'rename') setGren(item);
+      else if (x.k === 'repair') setGfix(item);
+      else if (x.k === 'delete') setGdel(item);
     },
   }));
+  // a group's lord-vm job (Delete, Rename, Repair, Start Fresh), its progress on the card, its failure in the error line
+  const groupWork = (item, kind, start) => {
+    if (work) return;
+    const dir = item.group.dir;
+    setError('');
+    setWork({ dir, kind, phase: 'work' });
+    groupJob(item, start, (s) => setWork({ dir, kind, ...s })).then((why) => { setWork(null); if (why) setError(`${item.group.name}: ${why}`); refresh(); });
+  };
   const rl = root.current ? lord.getLayout(root.current.id) : [0, 0, 1000, 700];
   // as many cards as fit at 300 px or more, the New machine card first; each picture about half as tall as wide. The
   // window's width from the window store: the root isn't laid out yet in the first frames
@@ -850,7 +933,8 @@ export function Library() {
   const skel = loaded ? null : skeletonPlan(s0.machinesSeen);
   const shell = !!list.length || (skel && !skel.empty);     // the chips and the status line: with machines, or their placeholders
   const cells = [{ isNew: true }, ...groupCells.map((g) => ({ isGroup: true, dir: g.group.dir, item: g })), ...sorted];
-  const groupProps = (g) => ({ item: g, sel: sel === g.group.dir, onSelect: () => setSel(g.group.dir), onGo: () => goGroup(g),
+  const groupProps = (g) => ({ item: g, sel: sel === g.group.dir, onSelect: () => setSel(g.group.dir), onGo: () => goGroup(g), onRepair: () => setGfix(g),
+    work: work && work.dir === g.group.dir ? groupWorkText(work) : '',
     onMenu: (e) => setMenu({ x: e.x, y: e.y, above: e.above, group: g }) });
   const rows = [];
   for (let i = 0; i < cells.length; i += cols) rows.push(cells.slice(i, i + cols));
@@ -871,10 +955,10 @@ export function Library() {
   ) : page === 'requirements' ? (
     <Sheet width={760} height={600} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><Requirements host={host} onBack={() => setPage('main')} onChanged={refresh} /></View></Sheet>
   ) : page === 'pi' ? (
-    <Sheet width={820} height={640} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><PiView host={host} list={list} onBack={() => setPage('main')} /></View></Sheet>
+    <Sheet width={820} height={640} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><ThisComputer host={host} list={list} gvt={!!gpuName} onBack={() => setPage('main')} /></View></Sheet>
   ) : null;
   if (skel && !skel.empty) body = <Skeleton view={lv.view} n={skel.cards} grid={grid} onNew={newMachine} />;
-  else if (!list.length) body = <FirstRun host={host} onNew={newMachine} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} />;
+  else if (!list.length) body = <FirstRun host={host} onNew={newMachine} onImport={() => { setNewMode('import'); setPage('new'); }} onCheck={refresh} onCanRun={() => setPage('pi')} />;
   else if (!sorted.length && !groupCells.length) body = <EmptyState icon="⌕" hint={query.trim() ? tr('machines.lib.noMatch', { q: query.trim() }) : (lv.show === 'windows' ? tr('machines.win.lib.none') : tr(`machines.lib.none.${lv.show}`))} />;
   else if (lv.view === 'list') body = (
     <ScrollView style={{ flex: 1 }} contentStyle={{ paddingHorizontal: pad, paddingVertical: 16, gap: 12 }}>
@@ -915,6 +999,7 @@ export function Library() {
             </View>
           ))}
         </View>
+        {pauseAll ? <Square icon="pause" title={tr('machines.battery.pauseAll')} onClick={pauseAll} /> : null}
         <Square primary icon="plus" title={tr('machines.newMachine')} onClick={newMachine} />
       </View>
       {list.length ? (
@@ -926,12 +1011,21 @@ export function Library() {
         </View>
       ) : shell ? <SkelChips pad={pad} /> : null}
       {error ? <Text style={{ marginHorizontal: pad, marginTop: 10, fontSize: 13, color: '#ff453a', textAlign: 'start' }}>{error}</Text> : null}
+      {gaps.length ? (
+        <View title={gaps.map((g) => tr(`machines.weak.${g}`)).join(' ')} style={{ marginHorizontal: pad, marginTop: 10, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 8,
+          backgroundColor: p.dark ? 'rgba(255,159,10,0.14)' : 'rgba(255,159,10,0.12)' }}>
+          <Sym name="security" size={16} color="#ff9f0a" />
+          <Text style={{ flex: 1, minWidth: 0, fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.weak.title')} {gaps.map((g) => tr(`machines.weak.${g}`)).join(' ')}</Text>
+        </View>
+      ) : null}
       {body}
       {shell ? (
         <View style={{ height: 40, flexDirection: 'row', alignItems: 'center', gap: narrow ? 14 : 24, paddingHorizontal: pad, borderTopWidth: 1, borderColor: p.line, overflow: 'hidden' }}>
           {list.length ? <Summary label={tr('machines.sum.running')} value={tr('machines.sum.of', { a: sum.running.a, b: sum.running.b })} /> : null}
           {list.length && sum.memory ? <Summary label={tr('machines.sum.memory')} value={tr('machines.sum.ofGb', { a: gib(sum.memory.a), b: gib(sum.memory.b) })} /> : null}
           {list.length && sum.free ? <Summary label={tr('machines.lib.freeDisk')} value={bytes(sum.free.a)} onClick={openStorage} /> : null}
+          {bl && !narrow ? <Summary label={tr('machines.sum.budget')} value={tr('machines.sum.ofGb', { a: bl.usedGb, b: bl.maxGb })} /> : null}
+          {bl?.pressure ? <Text title={tr('machines.sum.pressureHint')} style={{ fontSize: 12, fontWeight: 600, color: '#ff9f0a', whiteSpace: 'nowrap' }}>{tr('machines.sum.pressure')}</Text> : null}
         </View>
       ) : null}
       {menu ? <CardMenu at={menu} root={root} rl={rl} items={menu.group ? groupMenuFor(menu.group) : menuFor(menu.m)} onClose={() => setMenu(null)} /> : null}
@@ -941,9 +1035,14 @@ export function Library() {
       </Sheet> : null}
       {copying ? <CloneSheet m={copying} running={stateView(copying.state, copying.reason).active} onClose={() => setCopying(null)}
         onDone={(out) => { setCopying(null); refresh(); if (out?.dir) setSel(out.dir); }} /> : null}
+      {exporting ? <ExportSheet m={exporting} running={stateView(exporting.state, exporting.reason).active} onClose={() => setExporting(null)} /> : null}
+      {importing ? <ImportExportSheet onClose={() => setImporting(false)} onDone={(out) => { setImporting(false); refresh(); if (out?.dir) setSel(out.dir); }} /> : null}
       {discard ? <ConfirmDialog title={tr('machines.discard.title', { name: discard.name })} detail={tr('machines.discard.detail')} okLabel={tr('machines.fail.discardState')} cancelLabel={tr('machines.cancel')} destructive
         onOk={() => { const d = discard; setDiscard(null); follow(lord.vm.discardState(d.dir), d.name); }} onCancel={() => setDiscard(null)} /> : null}
-      {fresh ? <FreshDialog item={fresh} onCancel={() => setFresh(null)} onDone={(id) => { const g = fresh; setFresh(null); follow(id, g.group.name); refresh(); }} /> : null}
+      {fresh ? <FreshDialog item={fresh} onCancel={() => setFresh(null)} onDone={(start) => { const g = fresh; setFresh(null); groupWork(g, 'fresh', start); }} /> : null}
+      {gdel ? <DeleteGroupDialog item={gdel} onCancel={() => setGdel(null)} onOk={() => { const g = gdel; setGdel(null); groupWork(g, 'delete', () => lord.vm.groupDelete(g.group.dir)); }} /> : null}
+      {gren ? <RenameGroupDialog item={gren} onCancel={() => setGren(null)} onOk={(n) => { const g = gren; setGren(null); groupWork(g, 'rename', () => lord.vm.groupRename(g.group.dir, n)); }} /> : null}
+      {gfix ? <RepairGroupDialog item={gfix} onCancel={() => setGfix(null)} onOk={() => { const g = gfix; setGfix(null); groupWork(g, 'repair', () => lord.vm.groupRepair(g.group.dir)); }} /> : null}
       {gsnap ? <GroupSnapDialog item={gsnap} onCancel={() => setGsnap(null)} onDone={(ids) => { const g = gsnap; setGsnap(null); for (const id of ids) follow(id, g.group.name); }} /> : null}
       {del ? <ConfirmDialog title={tr('machines.deleteTitle', { name: del.name })} detail={tr('machines.deleteDetail')} okLabel={tr('machines.deleteOk')} cancelLabel={tr('machines.cancel')} destructive
         onOk={() => remove(del)} onCancel={() => setDel(null)} /> : null}

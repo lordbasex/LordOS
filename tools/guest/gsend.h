@@ -1,4 +1,4 @@
-/* gsend.h — lordos-guest 9 (docs/VIRTUALIZATION.md 6.21): "Send to LordOS", files from this guest to the host.
+/* gsend.h — lordos-guest 10 (docs/VIRTUALIZATION.md 6.21): "Send to LordOS", files from this guest to the host.
  *
  * A program of the person's (`lordos-guest --send-to-host FILE…`, which the file manager's "Send to LordOS" entry runs)
  * hands the helper a file's absolute path over $XDG_RUNTIME_DIR/lordos-guest.sock (gshell.c: same uid only); the helper

@@ -12,7 +12,7 @@
  * AGK_NOTIFY frame, the helper parses it as lord-vm will and passes it on only when the host's hello said "links" or
  * "notify" (the machine allows them), answering one GSA_* byte. `lordos-guest --open-on-host URL` and
  * `lordos-guest --notify-host TITLE [BODY]` are that program (the link percent-encoded, ag_link_encode). The helper
- * sends nothing of its own: only what a program of this person asked for (and, tools 9, the person's desktop notifications
+ * sends nothing of its own: only what a program of this person asked for (and, tools 10, the person's desktop notifications
  * while the host takes them, gnotes.h). Tools 9: a frame of kind AGK_SEND_OFFER whose payload is a file's absolute path
  * queues that file for the host (gsend.h, `lordos-guest --send-to-host FILE…`). */
 #ifndef LORDOS_GUEST_GSHELL_H

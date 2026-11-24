@@ -14,6 +14,10 @@
   "never": "Todavía no se hizo ninguna copia",
   "next": "Próxima: {when}",
   "lastError": "La última copia falló: {error}",
+  "machinesBusy": {
+    "one": "{count} máquina estaba en marcha: sus discos en esta copia son los de la anterior",
+    "other": "{count} máquinas estaban en marcha: sus discos en esta copia son los de la anterior"
+  },
   "todayAt": "hoy a las {time}",
   "now": "Copiar ahora",
   "pause": "Pausar",

@@ -14,6 +14,9 @@
   "never": "まだバックアップはありません",
   "next": "次回：{when}",
   "lastError": "前回のバックアップに失敗しました：{error}",
+  "machinesBusy": {
+    "other": "{count} 台のマシンが実行中でした：このバックアップ内のディスクは前回のものです"
+  },
   "todayAt": "今日 {time}",
   "now": "今すぐバックアップ",
   "pause": "一時停止",

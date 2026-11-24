@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "Tyyliä {name} ei voitu ottaa käyttöön",
   "themeSwitch.refusedBody": "Sen koodi ei vastaa LordOSin allekirjoitettua kopiota, joten sitä ei ladattu. Työpöytäsi tyyli pysyy ennallaan.",
   "themeSwitch.failedBody": "Se ei käynnistynyt. Työpöytäsi tyyli pysyy ennallaan.",
+  "spotlight.section.machines": "Koneet",
   "guestApps.inMachine": "Koneessa {machine}"
 }

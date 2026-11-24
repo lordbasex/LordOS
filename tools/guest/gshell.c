@@ -287,7 +287,7 @@ void gshell_client(int i, int port, unsigned host_caps) {
     if (used < 0 || (!used && cl[i].n == sizeof cl[i].b)) { cl_done(i, GSA_MALFORMED); return; }
     if (!used) return;
     if (f.kind == AGK_SEND_OFFER) {
-        /* a file to send (tools 9): its absolute path, sent on only while the host takes files */
+        /* a file to send (tools 10): its absolute path, sent on only while the host takes files */
         char path[4096 + 1];
         if (!f.len || f.len > 4096 || memchr(f.data, 0, f.len)) { cl_done(i, GSA_MALFORMED); return; }
         memcpy(path, f.data, f.len);

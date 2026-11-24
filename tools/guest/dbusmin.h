@@ -48,7 +48,7 @@ long db_msg_total(const uint8_t *p, size_t n);
 /* a monitored org.freedesktop.Notifications.Notify call (body "susssasa{sv}i"): its app name, summary and body, each cut to
  * its cap - 1 bytes (on a character boundary). 0, -1 not one */
 int db_notify_body(const DbMsg *m, char *app, size_t an, char *summary, size_t sn, char *body, size_t bn);
-/* a notification's text as plain text for the host (lordos-guest 9, docs/VIRTUALIZATION.md 6.12): markup tags dropped,
+/* a notification's text as plain text for the host (lordos-guest 10, docs/VIRTUALIZATION.md 6.12): markup tags dropped,
  * &amp; &lt; &gt; &quot; &apos; decoded, control and bidi characters as spaces, runs of spaces as one, trimmed, at most
  * max bytes cut on a character boundary; what isn't UTF-8 becomes '?'. Its length (out holds max + 1) */
 size_t db_note_plain(const char *in, char *out, size_t max);

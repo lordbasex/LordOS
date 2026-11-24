@@ -1,4 +1,4 @@
-/* gnotes.h — lordos-guest 9 (docs/VIRTUALIZATION.md 6.12): the guest desktop's own notifications, passed on to the host.
+/* gnotes.h — lordos-guest 10 (docs/VIRTUALIZATION.md 6.12): the guest desktop's own notifications, passed on to the host.
  *
  * Only while the host's hello says "notify" (machine.json "guest_notify": the person turned "Notifications from the
  * machine" on), the helper, as the person signed in at the guest's display and with its own D-Bus client (dbusmin.c: no

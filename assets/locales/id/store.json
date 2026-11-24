@@ -361,5 +361,7 @@
   "settings.listsTitle": "Daftar paket",
   "settings.listsHint": "Daftar paket Debian dan LordOS, sumber aplikasi baru dan pembaruan.",
   "settings.webManage": "Profil, izin, dan ruang setiap aplikasi web",
-  "settings.flathubOff": "Matikan Flathub di Toko. Aplikasi yang Anda pasang darinya tetap ada."
+  "settings.flathubOff": "Matikan Flathub di Toko. Aplikasi yang Anda pasang darinya tetap ada.",
+  "updates.qemuTitle": "Mesin yang ditangguhkan mungkin tidak bisa dilanjutkan setelah pembaruan ini ({count})",
+  "updates.qemuText": "Pembaruan ini mengubah QEMU, dan sesi yang disimpan oleh satu versi QEMU mungkin tidak bisa dimuat di versi lain. Matikan mesin-mesin itu dulu, atau pilih Lanjutkan saja atau Buang keadaan tersimpan saat dimulai."
 }

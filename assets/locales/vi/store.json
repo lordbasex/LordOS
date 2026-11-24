@@ -361,5 +361,7 @@
   "settings.listsTitle": "Danh sách gói",
   "settings.listsHint": "Danh sách gói của Debian và LordOS, nơi có ứng dụng mới và bản cập nhật.",
   "settings.webManage": "Hồ sơ, quyền và dung lượng của từng ứng dụng web",
-  "settings.flathubOff": "Tắt Flathub trong Cửa hàng. Các ứng dụng bạn đã cài từ đó vẫn giữ nguyên."
+  "settings.flathubOff": "Tắt Flathub trong Cửa hàng. Các ứng dụng bạn đã cài từ đó vẫn giữ nguyên.",
+  "updates.qemuTitle": "Các máy đang tạm ngưng có thể không tiếp tục được sau bản cập nhật này ({count})",
+  "updates.qemuText": "Bản cập nhật này thay đổi QEMU, và phiên do một phiên bản QEMU lưu có thể không tải được trong phiên bản khác. Hãy tắt các máy đó trước, hoặc chọn Vẫn tiếp tục hay Bỏ trạng thái đã lưu khi chúng khởi động."
 }

@@ -14,6 +14,10 @@
   "never": "Nog geen reservekopieën",
   "next": "Volgende: {when}",
   "lastError": "De laatste reservekopie is mislukt: {error}",
+  "machinesBusy": {
+    "one": "{count} machine was actief: de schijven ervan in deze reservekopie komen uit de vorige",
+    "other": "{count} machines waren actief: hun schijven in deze reservekopie komen uit de vorige"
+  },
   "todayAt": "vandaag om {time}",
   "now": "Maak nu een reservekopie",
   "pause": "Pauzeer",

@@ -931,5 +931,6 @@
   "llm.noModel": "그 로컬 모델은 설치되어 있지 않습니다.",
   "sentinela.blockFailed": "네트워크를 차단하지 못했습니다.",
   "sentinela.machineGone": "그 머신은 더 이상 가상 머신 앱에 없습니다.",
-  "sentinela.machineFailed": "머신이 응답하지 않았습니다."
+  "sentinela.machineFailed": "머신이 응답하지 않았습니다.",
+  "vm.overBudget": "이미 실행 중인 머신과 함께 쓸 메모리가 부족합니다. 그중 하나를 일시 중단하거나 종료하거나, 이 머신의 메모리를 줄이세요."
 }

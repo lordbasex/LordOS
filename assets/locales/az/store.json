@@ -369,5 +369,7 @@
   "settings.listsTitle": "Paket siyahıları",
   "settings.listsHint": "Debian və LordOS paketlərinin siyahıları; yeni tətbiqlər və yeniləmələr buradan gəlir.",
   "settings.webManage": "Hər veb tətbiqin profilləri, icazələri və tutduğu yer",
-  "settings.flathubOff": "Mağazada Flathub-ı söndür. Ondan quraşdırdığınız tətbiqlər qalır."
+  "settings.flathubOff": "Mağazada Flathub-ı söndür. Ondan quraşdırdığınız tətbiqlər qalır.",
+  "updates.qemuTitle": "Dayandırılmış maşınlar bu yeniləmədən sonra davam etməyə bilər ({count})",
+  "updates.qemuText": "Bu yeniləmə QEMU-nu dəyişir və bir QEMU versiyasının saxladığı seans digərində yüklənməyə bilər. Əvvəlcə o maşınları söndürün və ya başlayanda Yenə də davam et və ya Saxlanmış vəziyyəti at seçin."
 }

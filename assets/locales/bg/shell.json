@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "{name} не можа да бъде приложен",
   "themeSwitch.refusedBody": "Кодът му не съвпада с подписаното копие на LordOS, затова не беше зареден. Стилът на работния плот остава какъвто беше.",
   "themeSwitch.failedBody": "Не стартира. Стилът на работния плот остава какъвто беше.",
+  "spotlight.section.machines": "Машини",
   "guestApps.inMachine": "В {machine}"
 }

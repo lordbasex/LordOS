@@ -22,7 +22,12 @@
 #
 # Needs: Debian with mmdebstrap and root through sudo (mmdebstrap's root mode, for real mounts in the chroot); the
 # host's own packages are never touched. JOBS=<n> limits the build (default: every core). KEEP=1 keeps the chroots.
-# TEST_ONLY=1 runs step 3 again on the packages already in out/.
+# TEST_ONLY=1 runs step 3 again on the packages already in out/. Interrupted (a power cut while building in a tmpfs):
+# run it again; a build that had finished (its .changes and lintian summary in out/) isn't redone, REBUILD=1 redoes it.
+# out/ is on disk from the start: the build chroot writes its results straight into it (a bind mount), not at the
+# end; the test (short, and run again by a rerun) copies its report out when it ends.
+# Everything runs at the lowest CPU and I/O priority (nice 19, ionice idle): the build machine is a desktop in use.
+# JOBS defaults to every core natively and to 8 under qemu-user (ARCH other than the machine's).
 # TMPFS=<size> (e.g. 64G) builds in a tmpfs mounted on the chroot folders: on a busy hard disk, dpkg's syncs while the
 # chroots are made take far longer than the build; the build needs about 30 GB. The chroots are throwaway, so dpkg also
 # runs with force-unsafe-io in them.
@@ -52,12 +57,14 @@ SUITE=trixie
 SOURCES1="deb $MIRROR $SUITE main"
 SOURCES2="deb $MIRROR $SUITE-updates main"
 SOURCES3="deb $SECURITY $SUITE-security main"
-JOBS=${JOBS:-$(nproc)}
+JOBS=${JOBS:-$( [ "$ARCH" = "$(dpkg --print-architecture)" ] && nproc || echo 8 )}
 
 die() { echo "build-wpewebkit.sh: $*" >&2; exit 1; }
 command -v mmdebstrap >/dev/null || die "needs mmdebstrap (sudo apt-get install mmdebstrap)"
 command -v curl >/dev/null || die "needs curl"
 SUDO=; [ "$(id -u)" = 0 ] || SUDO=sudo
+# mmdebstrap and everything it starts (dpkg, the compilers, the tests) inherit this priority
+LOW="nice -n 19 ionice -c 3"
 if [ "$ARCH" != "$(dpkg --print-architecture)" ]; then
     q=$(case "$ARCH" in arm64) echo aarch64 ;; amd64) echo x86_64 ;; esac)
     grep -qs '^enabled' "/proc/sys/fs/binfmt_misc/qemu-$q" && grep -qs '^flags:.*F' "/proc/sys/fs/binfmt_misc/qemu-$q" ||
@@ -114,26 +121,32 @@ curl -fsSL -o "$WORK/in/wpewebkit-$UP.tar.xz.asc" "https://wpewebkit.org/release
 (cd "$WORK/in" && sha256sum ./* > "$WORK/out/SHA256SUMS.debian-source")
 cat "$WORK/out/SHA256SUMS.debian-source"
 
-# 2. build in a fresh chroot (kept in $WORK/build-chroot until the next run, for a look after a failure)
-if [ -z "${TEST_ONLY:-}" ]; then
+# 2. build in a fresh chroot (kept in $WORK/build-chroot until the next run, for a look after a failure); out/ is
+#    bind-mounted into it, so each result is on disk as soon as it exists
+built() { [ -s "$WORK/out/wpewebkit_${NEWVER}_$ARCH.changes" ] && [ -s "$WORK/out/lintian-summary.txt" ] && [ ! -e "$WORK/out/FAILED" ]; }
+if [ -z "${TEST_ONLY:-}" ] && { [ -n "${REBUILD:-}" ] || ! built; }; then
     fresh_dir "$WORK/build-chroot"
-    $SUDO mmdebstrap --variant=buildd --mode=root --architectures="$ARCH" --dpkgopt=force-unsafe-io \
+    # what an interrupted run left: nothing of it is kept
+    $SUDO find "$WORK/out" -maxdepth 1 -type f ! -name SHA256SUMS.debian-source -delete
+    $SUDO $LOW mmdebstrap --variant=buildd --mode=root --architectures="$ARCH" --dpkgopt=force-unsafe-io \
         --include=ca-certificates,devscripts,debian-keyring,lintian,equivs,gnupg,gpgv,fakeroot \
         --customize-hook='mkdir -p "$1/build/in" "$1/build/out"' \
         --customize-hook="sync-in $WORK/in /build/in" \
         --customize-hook="upload $HERE/wpewebkit-chroot.sh /build/wpewebkit-chroot.sh" \
-        --customize-hook="chroot \"\$1\" env JOBS=$JOBS sh /build/wpewebkit-chroot.sh build $DVER $NEWVER || { echo FAILED > \"\$1/build/out/FAILED\"; }" \
-        --customize-hook="sync-out /build/out $WORK/out" \
+        --customize-hook="mount --bind \"$WORK/out\" \"\$1/build/out\"" \
+        --customize-hook="chroot \"\$1\" env JOBS=$JOBS sh /build/wpewebkit-chroot.sh build $DVER $NEWVER || { echo FAILED > \"\$1/build/out/FAILED\"; }; sync; umount \"\$1/build/out\"" \
         "$SUITE" "$WORK/build-chroot" "$SOURCES1" "$SOURCES2" "$SOURCES3"
     $SUDO chown -R "$(id -u):$(id -g)" "$WORK/out"
     [ ! -e "$WORK/out/FAILED" ] || die "the build failed (log above; the chroot is $WORK/build-chroot)"
 else
-    ls "$WORK/out/wpewebkit_${NEWVER}_$ARCH.changes" >/dev/null || die "TEST_ONLY=1 needs a finished build in $WORK/out"
+    built || die "no finished build in $WORK/out (TEST_ONLY=1 needs one)"
+    echo "== the build in $WORK/out is complete: not built again (REBUILD=1 rebuilds)"
 fi
 
 # 3. test in another fresh chroot, with only trixie and the new packages. It runs as the root of its own mount
 #    namespace (tools/pkg/wpewebkit-pivot.sh, pivot_root): the kernel refuses user namespaces inside a chroot, and
 #    WebKit's bubblewrap sandbox needs them, so this is how the test runs WebKit with its sandbox on, like a desktop
+$SUDO rm -rf "$WORK/out/test" "$WORK/debs"
 mkdir -p "$WORK/out/test" "$WORK/debs"
 cp "$WORK/out/"*.deb "$WORK/debs/"
 rm -f "$WORK/debs/"*-dbgsym_*.deb "$WORK/debs/libwpewebkit-doc_"*.deb
@@ -145,7 +158,7 @@ if [ "$LORDOS_SRC" != none ]; then
     tar -C "$LORDOS_SRC" --exclude=server/build -cf "$WORK/lordos-src.tar" server third_party package.json
     SRC_HOOK="upload $WORK/lordos-src.tar /build/lordos-src.tar"
 fi
-$SUDO mmdebstrap --variant=apt --mode=root --architectures="$ARCH" --dpkgopt=force-unsafe-io \
+$SUDO $LOW mmdebstrap --variant=apt --mode=root --architectures="$ARCH" --dpkgopt=force-unsafe-io \
     --include=ca-certificates,gcc,libc6-dev,pkgconf,binutils,libegl-mesa0,libgl1-mesa-dri,libwpebackend-fdo-1.0-dev,passwd,make,libwayland-dev,wayland-protocols,libxkbcommon-dev,libegl-dev,python3 \
     --customize-hook='mkdir -p "$1/build/debs" "$1/build/test"' \
     --customize-hook="sync-in $WORK/debs /build/debs" \

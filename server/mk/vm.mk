@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmrecv.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmexec.c src/vm/vmexport.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -20,15 +20,15 @@ build/gen/vmsysnames.h:
 	echo '#include <asm/unistd.h>' | $(CC) -E -dM -x c - | sed -n 's/^#define __NR_\([a-z0-9_]*\) .*/{ "\1", __NR_\1 },/p' | \
 		grep -v -e '"syscalls"' -e '"arch_specific_syscall"' | LC_ALL=C sort >$@.new && [ -s $@.new ] && mv $@.new $@
 VM_HDR += build/gen/vmsysnames.h
-all: build/lord-vm build/lordos-guest
-build/lord-vm: $(LORDVM_SRC) $(VM_HDR)
+all: build/lord-vm build/lordos-guest build/lordos-guest-tools.iso
+build/lord-vm: $(LORDVM_SRC) $(VM_HDR) build/gen/guesttools.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(LORDVM_FLAGS) -o $@ $(LORDVM_SRC) $(LORDVM_LIBS)
 	chmod g-w $@
 
 # the same lord-vm with LORDVM_TEST_PATHS (lordvm.c): QEMU, qemu-img, passt and the UEFI firmware from absolute paths in
 # the environment, for the release gates on a host that keeps them elsewhere. Built only when asked, never installed.
-build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR)
+build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR) build/gen/guesttools.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(LORDVM_FLAGS) -DLORDVM_TEST_PATHS -o $@ $(LORDVM_SRC) $(LORDVM_LIBS)
 	chmod g-w $@
@@ -38,6 +38,31 @@ build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR)
 build/lordos-guest: ../tools/guest/lordos-guest.c ../tools/guest/gshell.c ../tools/guest/gshell.h ../tools/guest/x11clip.c ../tools/guest/x11clip.h ../tools/guest/perf.c ../tools/guest/perf.h ../tools/guest/dbusmin.c ../tools/guest/dbusmin.h ../tools/guest/gsend.c ../tools/guest/gsend.h ../tools/guest/gnotes.c ../tools/guest/gnotes.h src/vm/vmagent.c src/vm/vmagent.h src/pkg/crypto.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c ../tools/guest/gshell.c ../tools/guest/x11clip.c ../tools/guest/perf.c ../tools/guest/dbusmin.c ../tools/guest/gsend.c ../tools/guest/gnotes.c src/vm/vmagent.c src/pkg/crypto.c
+
+# The "LordOS Guest Tools" disc (docs/VIRTUALIZATION.md 6.17): for a Linux machine without qemu-guest-agent, a read-only
+# ISO 9660 image with lordos-guest (stripped), install.sh, its checksum and a README, made here by our own small writer
+# (tools/guest/mkguestiso.c: same bytes for the same files). Its SHA-256 is compiled into lord-vm (build/gen/guesttools.h),
+# which attaches only that image; the package installs it as /usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso.
+GUEST_TOOLS_ARCH ?= $(or $(DEB_ARCH),$(shell dpkg --print-architecture 2>/dev/null || (uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')))
+build/mkguestiso: ../tools/guest/mkguestiso.c
+	@mkdir -p build
+	$(CC) -O2 $(WARN) -std=gnu11 -o $@ ../tools/guest/mkguestiso.c
+build/lordos-guest-tools.iso: build/mkguestiso build/lordos-guest ../tools/guest/install.sh ../tools/guest/guest-tools-readme.txt
+	@mkdir -p build/guesttools
+	strip --strip-unneeded -o build/guesttools/lguest build/lordos-guest 2>/dev/null || cp build/lordos-guest build/guesttools/lguest
+	printf '%s\n' '$(GUEST_TOOLS_ARCH)' > build/guesttools/arch.txt
+	cd build/guesttools && sha256sum lguest > sha256.txt
+	./build/mkguestiso $@ LORDOS_TOOLS INSTALL.SH=../tools/guest/install.sh LGUEST=build/guesttools/lguest \
+		ARCH.TXT=build/guesttools/arch.txt SHA256.TXT=build/guesttools/sha256.txt README.TXT=../tools/guest/guest-tools-readme.txt
+# the disc read back with lord-vm's own ISO reader, its hash against guesttools.h, the writer's refusals (ASan, UBSan);
+# and install.sh's choices for each package manager, init system and prompt (tests/guest_tools_install_test.sh)
+test: build/guesttools-test
+build/guesttools-test: tests/guesttools_test.c src/vm/vmunattend.c src/vm/vmunattend.h src/sec/json.c src/pkg/crypto.c build/gen/guesttools.h build/mkguestiso
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/guesttools_test.c src/vm/vmunattend.c src/sec/json.c src/pkg/crypto.c
+	./$@ || { rm -f $@; exit 1; }
+build/gen/guesttools.h: build/lordos-guest-tools.iso
+	@mkdir -p build/gen
+	printf '#define GUEST_TOOLS_SHA256 "%s"\n#define GUEST_TOOLS_ARCH "%s"\n' "$$(sha256sum build/lordos-guest-tools.iso | cut -d' ' -f1)" '$(GUEST_TOOLS_ARCH)' > $@.new && mv $@.new $@
 
 # lordos-guest-win.exe: LordOS guest tools for Windows guests (tools/guest-win), cross-built with mingw-w64
 # (gcc-mingw-w64-x86-64-posix, docs/VM-SETUP.md): Win32 only, libgcc and winpthread linked in, no DLL of ours. Skipped
@@ -122,6 +147,13 @@ build/vmunattend-test: tests/vmunattend_test.c src/vm/vmunattend.c src/vm/vmunat
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmunattend_test.c src/vm/vmunattend.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
+# what an ISO boots on (vmiso.c, lord.vm.isoInfo): ISO 9660, El Torito, the ESP's FAT, UDF and PE headers in images
+# made by the test, hostile ones (loops, huge sizes) and a fuzz pass of random changes
+test: build/vmiso-test
+build/vmiso-test: tests/vmiso_test.c src/vm/vmiso.c src/vm/vmiso.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmiso_test.c src/vm/vmiso.c
+	./$@ || { rm -f $@; exit 1; }
 # resumed downloads (pkg/http.c, FetchItem.resume) against a server on loopback: as the user who runs it
 # how a machine's memory is backed (vmmem.h): hugetlb only when it all fits in free 2 MB pages
 build/vmmem-test: tests/vmmem_test.c src/vm/vmmem.h
@@ -140,6 +172,13 @@ build/vmthumb-test: tests/vmthumb_test.c src/vm/vmthumb.c src/vm/vmthumb.h
 	./$@ || { rm -f $@; exit 1; }
 # what a machine's vCPUs use (vmcpu.c, the Machines app's vCPU recommendation): the stat line, QEMU's vCPU thread names,
 # the windows of five minutes and cpu-usage.json, under ASan and UBSan; no QEMU needed (its own threads stand in)
+# VM_EXEC (docs/VIRTUALIZATION.md 6.15): the request, the answer and the guest's printout, the guest's two scripts under
+# /bin/sh with stub runuser and loginctl, a fuzz pass
+test: build/vmexec-test
+build/vmexec-test: tests/vmexec_test.c src/vm/vmexec.c src/vm/vmexec.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmexec_test.c src/vm/vmexec.c
+	./$@ || { rm -f $@; exit 1; }
 build/vmcpu-test: tests/vmcpu_test.c src/vm/vmcpu.c src/vm/vmcpu.h src/sec/json.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcpu_test.c src/vm/vmcpu.c src/sec/json.c -lpthread
@@ -206,7 +245,7 @@ build/guest-dbus-test: tests/guest_dbus_test.c ../tools/guest/dbusmin.c ../tools
 	./$@ || { rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
-VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmrecv.c src/vm/vmpin.c
+VM_SRV_SRC := src/ui/js_vm.c src/vm/vmkeysrv.c src/vm/vmexport.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmrecv.c src/vm/vmpin.c src/vm/vmiso.c
 VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
 $(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
 build/lord-server: $(VM_SRV_OBJ)

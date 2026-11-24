@@ -14,6 +14,9 @@
   "never": "아직 백업 없음",
   "next": "다음: {when}",
   "lastError": "마지막 백업에 실패했습니다: {error}",
+  "machinesBusy": {
+    "other": "머신 {count}대가 실행 중이었습니다: 이 백업의 디스크는 이전 백업의 것입니다"
+  },
   "todayAt": "오늘 {time}",
   "now": "지금 백업",
   "pause": "일시 정지",

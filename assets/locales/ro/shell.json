@@ -985,5 +985,6 @@
   "themeSwitch.failedTitle": "{name} nu a putut fi aplicat",
   "themeSwitch.refusedBody": "Codul său nu se potrivește cu copia semnată a LordOS, așa că nu a fost încărcat. Stilul desktopului rămâne cum era.",
   "themeSwitch.failedBody": "Nu a pornit. Stilul desktopului rămâne cum era.",
+  "spotlight.section.machines": "Mașini",
   "guestApps.inMachine": "În {machine}"
 }

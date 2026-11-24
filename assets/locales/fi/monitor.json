@@ -684,5 +684,6 @@
   "stats.p95Row": "Suorittimen 95. persentiili (1 min)",
   "stats.memAvgRow": "Muistin keskiarvo (1 · 5 · 15 min)",
   "stats.memPeakRow": "Muistin huippu (1 · 5 · 15 min)",
-  "stats.spark": "Viime minuutti"
+  "stats.spark": "Viime minuutti",
+  "group.showMachine": "Näytä kone"
 }

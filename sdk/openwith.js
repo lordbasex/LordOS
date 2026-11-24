@@ -50,3 +50,19 @@ export function setDefaultProvider(file, id) {
   return true;
 }
 export { extKey as openExtOf };
+
+// Bundles (docs/FILES.md): a folder Files shows as one item, opened by its app instead of gone into ("Open in New Tab"
+// still goes in). Registered by the session's own code (Machines: <name>.lordvm, <name>.lordgroup):
+//   registerBundle({ id, suffix, kind: () => text, open: (path) => void }) → unregister()
+//   bundleFor(entry)   the bundle a folder entry ({ dir, name }) is, or null; a name starting with '.' never is one
+const bundles = new Map();
+export function registerBundle(b) {
+  if (!b || typeof b.id !== 'string' || typeof b.suffix !== 'string' || b.suffix.length < 2 || typeof b.open !== 'function') return () => {};
+  bundles.set(b.id + b.suffix, b);
+  return () => { if (bundles.get(b.id + b.suffix) === b) bundles.delete(b.id + b.suffix); };
+}
+export function bundleFor(e) {
+  if (!e || !e.dir || typeof e.name !== 'string' || e.name.startsWith('.')) return null;
+  for (const b of bundles.values()) if (e.name.length > b.suffix.length && e.name.endsWith(b.suffix)) return b;
+  return null;
+}

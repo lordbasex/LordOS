@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "{name} اعمال نشد",
   "themeSwitch.refusedBody": "کد آن با نسخهٔ امضاشدهٔ LordOS مطابقت ندارد، پس بارگذاری نشد. سبک میز کار شما همان‌طور که بود می‌ماند.",
   "themeSwitch.failedBody": "اجرا نشد. سبک میز کار شما همان‌طور که بود می‌ماند.",
+  "spotlight.section.machines": "ماشین‌های مجازی",
   "guestApps.inMachine": "در {machine}"
 }

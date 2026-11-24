@@ -30,3 +30,11 @@ export function companionsOf(name, known = () => true) {
   const list = typeof name === 'string' && Object.prototype.hasOwnProperty.call(COMPANIONS, name) ? COMPANIONS[name] : [];
   return list.filter((p) => known(p));
 }
+
+// A QEMU update while machines are suspended (docs/VIRTUALIZATION.md 6.1): a session saved by one QEMU build may not load
+// in another, so Updates says so before the update. ups: lord.pkg.upgrades(); machines: lord.vm.list() (or []).
+// → how many machines are suspended when a QEMU package is in the update, else 0
+export function qemuUpdateRisk(ups, machines) {
+  const qemu = (ups || []).some((u) => u && typeof u.name === 'string' && /^qemu-(system|utils)/.test(u.name));
+  return qemu ? (machines || []).filter((m) => m && m.suspended).length : 0;
+}

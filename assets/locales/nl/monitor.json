@@ -684,5 +684,6 @@
   "stats.p95Row": "CPU 95e percentiel (1 min)",
   "stats.memAvgRow": "Geheugen gemiddeld (1 · 5 · 15 min)",
   "stats.memPeakRow": "Geheugen piek (1 · 5 · 15 min)",
-  "stats.spark": "Laatste minuut"
+  "stats.spark": "Laatste minuut",
+  "group.showMachine": "Machine tonen"
 }

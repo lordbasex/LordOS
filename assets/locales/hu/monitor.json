@@ -684,5 +684,6 @@
   "stats.p95Row": "CPU 95. percentilis (1 perc)",
   "stats.memAvgRow": "Memóriaátlag (1 · 5 · 15 perc)",
   "stats.memPeakRow": "Memóriacsúcs (1 · 5 · 15 perc)",
-  "stats.spark": "Utolsó perc"
+  "stats.spark": "Utolsó perc",
+  "group.showMachine": "Gép megjelenítése"
 }

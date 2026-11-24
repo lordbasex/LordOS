@@ -38,6 +38,27 @@ export function restartsAgain(state, reason) { return state === 'stopped' && rea
 // shutdown or restart), what happened and that a restart needs Start; otherwise the usual one
 export function offHint(reason) { return reason === 'qemu-3d-stop' ? 'machines.win.stopped3dHint' : 'machines.win.playHint'; }
 
+// The failure page (6.1): a cause more precise than lord-vm's reason when QEMU's own words name it (text: run.json's
+// detail and the log's last lines). 'locked': another process holds the disk's lock (QEMU's image locking: "Failed to
+// get "write" lock", "Is another process using the image"); 'disk-missing': a disk or ISO the machine names isn't there.
+// Otherwise the reason itself.
+export function failCause(why, text) {
+  const t = String(text || '');
+  if (!why) return why;
+  if (/Failed to get "(write|read|shared|consistent read)" lock|Is another process using the image/i.test(t)) return 'locked';
+  if (/Could not open '[^'\n]*': No such file or directory/i.test(t)) return 'disk-missing';
+  return why;
+}
+// the fixes that fit a cause, beyond Start Again and Configure: 'less' (start with less memory: lessMb), 'snapshot'
+// (go back to one: the machine has snapshots and stopped because of the system inside or the engine), in that order
+export function failActions(cause, { memoryMb = 0, snaps = 0 } = {}) {
+  const out = [];
+  const less = Math.floor((memoryMb * 3) / 4 / 256) * 256;
+  if (cause === 'out-of-memory' && less >= LESS_MIN_MB && less < memoryMb) out.push({ k: 'less', mb: less });
+  if (snaps > 0 && ['guest-panic', 'qemu-failed', 'qemu-signal', 'out-of-memory', 'disk-missing'].includes(cause)) out.push({ k: 'snapshot' });
+  return out;
+}
+
 // which actions a state allows (the list's buttons and the window's menu)
 export function actionsFor(state) {
   const on = state === 'running' || state === 'paused';
@@ -100,13 +121,32 @@ export function validateDraft(d, host, names = []) {
 export const OVERHEAD_MB = { kvm: 384, tcg: 640 };
 export const memLimit = (m) => (m?.memoryMb || 0) + (m?.accel === 'tcg' ? OVERHEAD_MB.tcg : OVERHEAD_MB.kvm);
 
-// At start (3.7, vm_budget_fits): the machines already running plus this one, each with QEMU's overhead, within what
-// this computer lets machines use (host.memMaxMb: RAM minus the desktop's floor). One machine alone always may start
-// (the sheet already kept its memory within memMaxMb).
-export function budgetCheck(list, m, host) {
-  const running = (list || []).filter((x) => x.dir !== m.dir && stateView(x.state).active).reduce((a, x) => a + memLimit(x), 0);
-  const need = memLimit(m), total = host?.memMaxMb || 0;
-  return { ok: running === 0 || running + need <= total, need, free: Math.max(0, total - running) };
+// The resource budget (3.7) is decided by lord-server for every start path (lord.vm.budget, js_vm.c budget_ok: the
+// window, Start Without Window, `machines start`, a group's members). When a start doesn't fit, budgetPlan says what
+// the window offers instead (b: lord.vm.budget(dir)): lessMb, the memory this machine could start with now (whole
+// 256 MB steps, at least 512 MB, less than it has; 0 when none fits), and suspend, up to three running machines whose
+// suspend would free enough, the biggest first (a graphics card's or a 3D machine's can't be suspended; pausing frees
+// nothing: a paused machine keeps its memory). Suspended, they come back where they were.
+export const LESS_MIN_MB = 512;
+export function budgetPlan(b, list, m) {
+  if (!b || b.ok || !m) return { lessMb: 0, suspend: [] };
+  const over = Math.max(0, (b.needMb || 0) - (m.memoryMb || 0));       // QEMU's share and a disposable session's
+  const fit = Math.floor(((b.freeMb || 0) - over) / 256) * 256;
+  const lessMb = fit >= LESS_MIN_MB && fit < (m.memoryMb || 0) ? fit : 0;
+  const short = (b.needMb || 0) - (b.freeMb || 0);
+  const suspend = (list || [])
+    .filter((x) => x.dir !== m.dir && (x.state === 'running' || x.state === 'paused') && !x.gpu && x.graphics !== '3d' && memLimit(x) >= short)
+    .sort((x, y) => memLimit(y) - memLimit(x))
+    .slice(0, 3)
+    .map((x) => ({ dir: x.dir, name: x.name, mb: memLimit(x) }));
+  return { lessMb, suspend };
+}
+// the library's status line (3.7): memory the running machines hold of what machines may use here, and whether the
+// computer is short of memory (PSI some avg10, percent; a warning from PRESSURE_WARN up)
+export const PRESSURE_WARN = 10;
+export function budgetLine(b) {
+  if (!b || !(b.maxMb > 0)) return null;
+  return { usedGb: Math.round((b.usedMb || 0) / 102.4) / 10, maxGb: Math.round(b.maxMb / 102.4) / 10, pressure: (b.pressure || 0) >= PRESSURE_WARN };
 }
 
 // what lord.vm.create takes
@@ -132,6 +172,18 @@ export function gfxFor(gfx, host, windows, arch = 'amd64') { return gfx === '3d'
 // a running machine with 3D (VM_INFO's VMS_RENDER_NODE): it can't be suspended or keep snapshots with its memory
 export const VMS_RENDER_NODE = 512;
 export function runs3d(st) { return !!st && ((st.sandbox | 0) & VMS_RENDER_NODE) !== 0; }
+// "Weaker isolation on this kernel" (3.3): what of QEMU's jail this computer can't give. host.landlock is the kernel's
+// Landlock ABI (0: none, so QEMU isn't kept to its folder); a running machine's VMS_* bits (st.sandbox, from its
+// lord-vm) say what was really applied: Landlock on its files (VMS_LANDLOCK_FS) and its own namespaces (VMS_NAMESPACES).
+// → [] or a list of 'landlock', 'namespaces'
+export const VMS_LANDLOCK_FS = 1, VMS_NAMESPACES = 1024;
+export function isolationGaps(host, st) {
+  const out = [];
+  const bits = st && st.sandbox > 0 ? st.sandbox | 0 : -1;
+  if ((host && host.landlock === 0) || (bits >= 0 && !(bits & VMS_LANDLOCK_FS))) out.push('landlock');
+  if (bits >= 0 && !(bits & VMS_NAMESPACES)) out.push('namespaces');
+  return out;
+}
 
 // the packages Machines still needs for the architectures in use (lord.vm.host().missing), as one list
 // what only some machines need: the TPM (swtpm) for Windows 11 (4.3); asked for when a Windows machine is made, or on
@@ -383,7 +435,7 @@ const SYSTEMS = [
   ['fedora', /fedora/i, 'Fedora'], ['mint', /\bmint\b|linuxmint/i, 'Mint'], ['arch', /\barch(linux)?\b|archlinux/i, 'Arch'],
   ['alpine', /alpine/i, 'Alpine'], ['opensuse', /suse/i, 'openSUSE'], ['kali', /kali/i, 'Kali'], ['rocky', /rocky/i, 'Rocky'],
   ['alma', /alma/i, 'Alma'], ['centos', /centos/i, 'CentOS'], ['freebsd', /freebsd/i, 'FreeBSD'], ['raspios', /raspios|raspberry/i, 'Pi OS'],
-  // Android for PCs: Bliss OS's label (BlissOS-16.9.7 (x86_64)) and file names (Bliss-v16.9.7-…), Android-x86, LineageOS
+  // a person's own Android ISO for PCs (Bliss OS, Android-x86, LineageOS): named only
   ['android', /android|blissos|\bbliss-v\d|lineage/i, 'Android'],
   // Microsoft's own volume labels (CCCOMA_X64FRE_…, CENA_X64FREE_…, CPBA_A64FRE_…) and its file names (Win11_…)
   ['windows', /\bWin1[01]_|\b(CCCOMA|CENA|CCSA|CPBA)_(X64|A64)FREE?_/i, 'Windows'],
@@ -404,6 +456,20 @@ export function archOf(name) {
   if (/aarch64|arm64/.test(s)) return 'arm64';
   if (/amd64|x86[_-]64|x64\b/.test(s)) return 'amd64';
   return '';
+}
+// an ISO's architecture (5.2): what its boot files say (lord.vm.isoInfo: the UEFI boot files' PE headers, their names, or
+// El Torito's x86 BIOS entry) wins over its file name and label; { arch, from: 'boot' | 'name' | '', other } — `other`
+// an architecture the boot files name that Machines doesn't run (riscv64), and when the boot files name two (amd64 and
+// arm64 on one disc) the name picks between them
+const RUNS = ['amd64', 'arm64'];
+export function isoArch(info, file) {
+  const boot = String(info?.arch || '');
+  const named = archOf(file) || archOf(info?.label);
+  if (info?.archFrom === 'boot' && RUNS.includes(boot)) return { arch: boot, from: 'boot', other: '' };
+  if (info?.archFrom === 'boot' && boot) return { arch: '', from: 'boot', other: boot };
+  const both = Array.isArray(info?.efiArchs) ? info.efiArchs.filter((a) => RUNS.includes(a)) : [];
+  if (named && (both.length < 2 || both.includes(named))) return { arch: named, from: 'name', other: '' };
+  return { arch: '', from: '', other: '' };
 }
 // a machine name from a system and version, unique among names
 export function suggestName(sys, version, names = []) {
@@ -445,6 +511,78 @@ export function profileOf(m, host, saved) {
 
 // Card numbers from two samples of lord.vm.stats(dir) (cgroup counters): CPU % of the machine's vCPUs, memory in
 // bytes, disk activity since the last sample. null when the machine isn't running or there's only one sample.
+// The card's agent and disk lights (5.1), while the machine runs: the agent's connection as lord-vm wrote it in run.json
+// (agentState: connected, waiting, off) and the disk's activity between two reads (usage's disk: QEMU's cgroup I/O
+// counter grew). Each light has a key for its words (the tooltip and the text beside it), never color alone.
+// → [] when it isn't running, else [{ k: 'agent', tone, key }, { k: 'disk', tone, key }]; tone 'on' | 'wait' | 'off'
+export function cardLights(m, u) {
+  if (!m || !stateView(m.state, m.reason).active) return [];
+  const ag = m.agentState === 'connected' || m.agentState === 'waiting' ? m.agentState : 'off';
+  return [
+    { k: 'agent', tone: ag === 'connected' ? 'on' : ag === 'waiting' ? 'wait' : 'off', key: `machines.light.agent.${ag}` },
+    { k: 'disk', tone: u?.disk ? 'on' : 'off', key: u?.disk ? 'machines.light.disk.busy' : 'machines.light.disk.idle' },
+  ];
+}
+
+// What this computer can run (5.7), from what the host reports (lord.vm.host(); gvt: lord.vm.gpus() lists a card that
+// can be shared), never more than the hardware gives. Each row: k (its title's key), st ('native' | 'slow' | 'limited' |
+// 'no': the words and color of section 2), note (its line's key), vars.
+export function canRun(host, { gvt = false } = {}) {
+  if (!host || !host.arch) return [];
+  const a = host.arch, other = a === 'amd64' ? 'arm64' : 'amd64', kvm = !!host.kvm;
+  const no3d = host.no3d || '';
+  return [
+    { k: 'machines.run.row.native', st: kvm ? 'native' : 'slow', note: kvm ? 'machines.run.note.native' : host.kvmDevice ? 'machines.run.note.kvmOff' : 'machines.run.note.noKvm', vars: { arch: a } },
+    { k: 'machines.run.row.other', st: 'slow', note: 'machines.pi.note.amd64', vars: { arch: other } },
+    { k: 'machines.win.run.row', st: a === 'amd64' ? (kvm ? 'native' : 'slow') : 'no', note: a === 'amd64' ? 'machines.win.run.note' : 'machines.win.run.noteArm', vars: {} },
+    { k: 'machines.run.row.android', st: a === 'amd64' ? (kvm ? 'native' : 'slow') : 'no', note: a === 'amd64' ? 'machines.run.note.android' : 'machines.run.note.androidArm', vars: {} },
+    { k: 'machines.pi.row.gpu', st: no3d ? 'limited' : 'native', note: no3d ? `machines.cfg.no3d.${['arch', 'gpu', 'modules', 'node'].includes(no3d) ? no3d : 'gpu'}` : 'machines.run.note.gpu', vars: {} },
+    { k: 'machines.pi.row.passthrough', st: gvt ? 'limited' : 'no', note: gvt ? 'machines.run.note.gvt' : a === 'arm64' ? 'machines.pi.note.passthrough' : 'machines.run.note.noGvt', vars: {} },
+    { k: 'machines.pi.row.nested', st: host.nested ? 'native' : 'no', note: host.nested ? 'machines.run.note.nested' : 'machines.pi.note.nested', vars: {} },
+  ];
+}
+// the sensors' lines while machines run (5.7; lord.vm.sensors()): only the ones this computer has
+export function sensorLines(s) {
+  const out = [];
+  if (!s) return out;
+  if (s.tempC >= 0) out.push({ key: 'machines.run.temp', vars: { t: s.tempC }, warn: s.tempC >= 80 });
+  if (s.fanRpm >= 0) out.push({ key: 'machines.run.fan', vars: { rpm: s.fanRpm }, warn: false });
+  if (s.underVoltage === 0 || s.underVoltage === 1) out.push({ key: s.underVoltage ? 'machines.run.powerLow' : 'machines.run.power', vars: {}, warn: s.underVoltage === 1 });
+  return out;
+}
+
+// Picture in Picture of a machine (5.4): a small floating view of its display at the bottom end corner of the display
+// its window is on (d: { x, y, w, h }), the guest's shape kept (gw × gh; 16:10 when unknown), PIP_W wide or a quarter
+// of the display if smaller, never under 240 × 135; `rtl`: the bottom left instead. Input stays off in it (no keys,
+// no pointer: the view is to watch, a click brings the window back).
+export const PIP_W = 400, PIP_MARGIN = 24, PIP_DOCK = 96;
+export function pipFrame(d, gw, gh, rtl = false) {
+  if (!d || !(d.w > 0) || !(d.h > 0)) return null;
+  const ratio = gw > 0 && gh > 0 ? gh / gw : 10 / 16;
+  const w = Math.max(240, Math.min(PIP_W, Math.round(d.w / 4)));
+  const h = Math.max(135, Math.round(w * ratio));
+  const x = rtl ? d.x + PIP_MARGIN : d.x + d.w - w - PIP_MARGIN;
+  return { x, y: Math.max(d.y, d.y + d.h - h - PIP_DOCK), w, h };
+}
+// Actual Size (5.3): the window's frame so the picture is the guest's display pixel for pixel (bar above it), within the
+// display's work area; null when the guest's size isn't known
+export function actualFrame(gw, gh, bar, area) {
+  if (!(gw > 0) || !(gh > 0) || !area) return null;
+  return { w: Math.min(gw, area.w), h: Math.min(gh + (bar || 0), area.h) };
+}
+// The Info menu (5.3): what this machine uses now, from two lord.vm.stats reads (model.js usage) and its sandbox
+// (isolationGaps); each line a key and its values
+export function infoLines(m, u, gaps) {
+  const out = [];
+  if (u) {
+    out.push({ key: 'machines.info.cpu', vars: { v: u.cpu != null ? Math.round(u.cpu) : '—' } });
+    out.push({ key: 'machines.info.memory', vars: { a: u.memBytes ? Math.round(u.memBytes / 1048576) : '—', b: m?.memoryMb || 0 } });
+    out.push({ key: u.disk ? 'machines.light.disk.busy' : 'machines.light.disk.idle', vars: {} });
+  }
+  out.push({ key: (gaps || []).length ? 'machines.info.weaker' : 'machines.info.isolated', vars: {} });
+  return out;
+}
+
 export function usage(prev, cur, vcpus) {
   if (!cur || !(cur.at > 0) || !(cur.cpuUsec >= 0)) return null;
   const out = { memBytes: cur.memBytes >= 0 ? cur.memBytes : null, cpu: null, disk: false };
@@ -686,7 +824,7 @@ export const machineProtectedOf = (entry, meta, homeProtected = false) =>
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
 // shell: the tools start the agent's shell (6.18, tools 8 / w12); links, notify: they pass the guest's links and
 // notifications on, and this machine takes them (6.12); eventlog: a Windows guest's event logs come in (6.19)
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, send: 2097152 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152, send: 4194304 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -709,7 +847,7 @@ export function agentLines(agent, cfg) {
     // links and notifications from the guest (6.12): off unless Configure turned them on
     ['links', !cfg?.guestLinks ? 'off' : on && caps & AGENT_CAPS.links ? 'works' : on ? 'needsTools' : 'needsAgent'],
     ['notify', !cfg?.guestNotify ? 'off' : on && caps & AGENT_CAPS.notify ? 'works' : on ? 'needsTools' : 'needsAgent'],
-    // files from the guest (6.21, "Send to LordOS"): on unless Configure turned them off; the tools 9 / w13
+    // files from the guest (6.21, "Send to LordOS"): on unless Configure turned them off; the tools 10 / w13
     ['sendFiles', cfg?.guestFiles === false ? 'off' : on && caps & AGENT_CAPS.send ? 'works' : on ? 'needsTools' : 'needsAgent'],
   ].filter(Boolean);
 }
@@ -722,11 +860,33 @@ export function clipState(agent, cfg) {
   if (caps & AGENT_CAPS.clipNoTool) return 'needsXclip';
   return guestWindows(agent) ? 'needsTools' : 'needsHelper';
 }
+// The LordOS Guest Tools disc (6.17, lordvm.c VAG_DISC): for a Linux guest without a usable qemu-guest-agent.
+// → null (nothing to offer), 'insert' (the popover offers "Install the Agent from a Disc") or 'guide' (the disc is in the
+// drive: the steps to run in the machine). Never for a protected (anonymity) machine, a Windows guest, a machine that is
+// off or whose agent is off, nor when qemu-guest-agent answers and lets Install copy files and run its script.
+export function discOffer(agent, cfg, running, isProtected) {
+  if (!cfg?.agent || !running || isProtected) return null;
+  const caps = agent?.caps || 0;
+  if (caps & AGENT_CAPS.toolsDisc) return 'guide';
+  if (guestWindows(agent)) return null;
+  if (agent?.state === 'connected' && (caps & AGENT_CAPS.exec) && (caps & AGENT_CAPS.files)) return null;
+  return 'insert';
+}
+// what to run in the machine (install.sh on the disc, volume LORDOS_TOOLS): where desktops mount it, and by hand
+export const DISC_LABEL = 'LORDOS_TOOLS';
+export const discCommands = () => [
+  { key: 'debian', cmd: `sh /media/$USER/${DISC_LABEL}/install.sh` },
+  { key: 'others', cmd: `sh /run/media/$USER/${DISC_LABEL}/install.sh` },
+  { key: 'manual', cmd: 'sudo mount -r /dev/sr0 /mnt && sh /mnt/install.sh' },
+];
+// Copy is offered only where it can reach the machine: its clipboard goes toward it (Configure) and a helper there
+// takes it. Before the agent is installed it usually can't: the command is shown to be typed
+export const discCanCopy = (agent, cfg) => clipTo(cfg?.clipboard || 'off') && !!((agent?.caps || 0) & AGENT_CAPS.clipboard);
 // the agent's popover says what to install in the guest: connected, the clipboard on, the helper there without a tool
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w13', linux: '9' };
+export const TOOLS_SHIPPED = { windows: 'w13', linux: '10' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -1640,10 +1800,12 @@ export function groupMembers(group, list) {
 const RUNNING = (s) => s === 'running' || s === 'paused';
 const ACTIVE = (s) => s === 'starting' || s === 'running' || s === 'paused' || s === 'stopping';
 // one word for the whole group: 'running' (all members), 'off' (none), 'partial', or 'damaged' (a member missing or not
-// this group's: 19.9, "A member folder… missing or invalid")
+// this group's, or a base missing: 19.9, "A member folder, a base… missing or invalid")
 export function groupState(group, list) {
   const ms = groupMembers(group, list), roles = (group?.members || []).map((x) => x.role);
   if (!roles.length || roles.some((r) => !ms[r])) return 'damaged';
+  const on0 = roles.some((r) => ACTIVE(ms[r].state));
+  if (!on0 && (group?.basesMissing || []).length) return 'damaged';
   const on = roles.filter((r) => ACTIVE(ms[r].state)).length;
   return on === 0 ? 'off' : on === roles.length && roles.every((r) => RUNNING(ms[r].state)) ? 'running' : 'partial';
 }
@@ -1656,6 +1818,8 @@ export function groupPlan(group, list, action) {
   const ms = groupMembers(group, list);
   const order = [...(group?.members || [])].sort((a, b) => (action === 'stop' ? a.stop - b.stop : a.start - b.start));
   if (!order.length || order.some((x) => !ms[x.role])) return { fail: 'damaged' };
+  // a base missing: a member off can't start (Repair makes it again first); one running keeps its open base
+  if (action === 'start' && (group?.basesMissing || []).some((r) => ms[r] && !ACTIVE(ms[r].state))) return { fail: 'damaged' };
   for (const x of order) {
     const m = ms[x.role];
     if (action === 'stop') {
@@ -1695,4 +1859,71 @@ export function groupCliPlan(req, groups, list) {
       return st === 'running' ? { code: CLI.OK, key: 'alreadyRunning', vars } : { group: g, action: 'start', window: req.verb === 'start' };
     default: return { code: CLI.USAGE, key: '', vars };
   }
+}
+
+// ---- Machines and the rest of the system (docs/VIRTUALIZATION.md 6.14; ties.js) ----
+// Search: machines whose name has every word of the query (q: lowercase, accents folded by the caller's fold), the
+// name's start first; a group's members are found through their group's card, not one by one
+export function searchMachines(list, q, fold = (s) => String(s || '').toLowerCase()) {
+  const words = String(q || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const out = [];
+  for (const m of list || []) {
+    if (!m || m.error || m.groupDir) continue;
+    const n = fold(m.name);
+    if (!words.every((w) => n.includes(w))) continue;
+    out.push({ m, score: n.startsWith(words[0]) ? 60 : 40 });
+  }
+  return out.sort((a, b) => b.score - a.score || String(a.m.name).localeCompare(String(b.m.name))).slice(0, 6);
+}
+// Start with the session: the machines settings.machinesAtLogin names by id (at most SESSION_START_MAX), off now and
+// readable, a group's members left to their group; in the library's order. The list is in settings.json, which apps
+// can't write (lord.fs's protected list): an app can't make a machine start at login.
+export const SESSION_START_MAX = 8;
+export function sessionStarts(list, ids) {
+  const want = new Set((Array.isArray(ids) ? ids : []).filter((x) => typeof x === 'string').slice(0, SESSION_START_MAX));
+  return (list || []).filter((m) => m && want.has(m.id) && !m.error && !m.groupDir && !stateView(m.state, m.reason).active);
+}
+// the ids after turning one machine on or off (at most the max, the newest kept)
+export function atLoginToggle(ids, id, on) {
+  const cur = (Array.isArray(ids) ? ids : []).filter((x) => typeof x === 'string' && x !== id);
+  return (on ? [...cur, id] : cur).slice(-SESSION_START_MAX);
+}
+// On battery (bat: the battery store, lord.power.state()): once each time the computer leaves the charger while
+// machines run, a notice with Pause All. mem: { was } between calls. → { notice: how many run, or 0; mem }
+export function batteryNotice(bat, list, mem = {}) {
+  const on = !!bat && !!bat.discharging;
+  const running = (list || []).filter((m) => m && m.state === 'running').length;
+  const notice = on && !mem.was && running > 0 ? running : 0;
+  return { notice, mem: { was: on && (!!mem.was || running > 0) } };
+}
+// "Pause while I'm away" (Configure → Startup and shutdown; app.json autoPause): after AWAY_SEC without input the
+// running machines that chose it pause; once input comes back, the ones this paused resume (a machine the person paused
+// stays paused). paused: the dirs this paused. → { pause: [dirs], resume: [dirs] }
+export const AWAY_SEC = 600;
+export function awayStep(idleSec, list, metaOf, paused) {
+  const mine = paused instanceof Set ? paused : new Set(paused || []);
+  if (idleSec >= AWAY_SEC) {
+    return { pause: (list || []).filter((m) => m && m.state === 'running' && !mine.has(m.dir) && metaOf(m.dir)?.autoPause === true).map((m) => m.dir), resume: [] };
+  }
+  return { pause: [], resume: (list || []).filter((m) => m && mine.has(m.dir) && m.state === 'paused').map((m) => m.dir) };
+}
+
+// Configure (5.5): which section each field lord-vm --set changes belongs to (the sidebar's dots: a section with a change
+// not saved yet), and the sidebar's search over the sections' titles and summaries
+export const FIELD_SECTION = {
+  name: 'general', vcpus: 'cpu', memoryMb: 'cpu', cpuPin: 'cpu', perfProfile: 'cpu', resolution: 'display', graphics: 'display',
+  gpu: 'display', pointer: 'display', captureFullscreen: 'display', network: 'network', bridge: 'network', ports: 'network',
+  nicModel: 'network', diskGb: 'disks', iso: 'disks', shares: 'sharing', transfer: 'sharing', clipboard: 'sharing', agent: 'agent',
+  bootOrder: 'boot', bootMenu: 'boot',
+};
+export function changedSections(draft, differs) {
+  const out = new Set();
+  for (const k of Object.keys(draft || {})) if (FIELD_SECTION[k] && differs(k, draft[k])) out.add(FIELD_SECTION[k]);
+  return out;
+}
+export function sectionsMatching(secs, q, textOf, fold = (s) => String(s || '').toLowerCase()) {
+  const words = fold(q).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return secs;
+  return secs.filter((k) => { const t = fold(textOf(k)); return words.every((w) => t.includes(w)); });
 }

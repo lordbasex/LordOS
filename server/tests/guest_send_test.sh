@@ -1,5 +1,5 @@
 #!/bin/sh
-# guest_send_test.sh — lordos-guest 9's "Send to LordOS" (tools/guest/gsend.c; docs/VIRTUALIZATION.md 6.21). A Python
+# guest_send_test.sh — lordos-guest 10's "Send to LordOS" (tools/guest/gsend.c; docs/VIRTUALIZATION.md 6.21). A Python
 # listener plays lord-vm on a Unix socket (--port takes one for tests):
 #   - the hello says "send"; `--send-to-host` is refused (exit 3, nothing offered) while the host's hello doesn't;
 #   - a 6 MB file is offered with its size and name, sent from 0 when the host has nothing, never more than
@@ -71,7 +71,7 @@ def wait_offer(c, t=10):
 
 c = Conn()
 h = c.hello(b'')
-check(h is not None and h.startswith('lordos-guest 9') and ' send' in h, 'hello: ' + str(h))
+check(h is not None and h.startswith('lordos-guest 10') and ' send' in h, 'hello: ' + str(h))
 r = cli(files + '/small.txt')
 check(r == 3 and wait_offer(c, 1.5) is None, 'refused while the host says no "send" (%d)' % r)
 c.send(1, b'lord-vm 2 clipboard send'); time.sleep(0.3)

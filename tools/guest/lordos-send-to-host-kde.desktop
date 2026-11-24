@@ -1,6 +1,6 @@
 [Desktop Entry]
 # "Send to LordOS" in Dolphin's context menu (KDE service menu; docs/VIRTUALIZATION.md 6.21). Installed with lordos-guest
-# (tools 9) as /usr/local/share/kio/servicemenus/lordos-send-to-host.desktop (or /usr/share/kio/servicemenus by the
+# (tools 10) as /usr/local/share/kio/servicemenus/lordos-send-to-host.desktop (or /usr/share/kio/servicemenus by the
 # lordos package), mode 0755 (Plasma 6 runs only executable service menus outside the system's own folders).
 Type=Service
 MimeType=application/octet-stream;
