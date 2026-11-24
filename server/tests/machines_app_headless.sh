@@ -30,6 +30,7 @@ cp -r "$ROOT/themes/$THEME" "$T"
 # the texts the driver looks for and clicks, in the scene's language
 LABELS=$(node -e "const m=require('$ROOT/assets/locales/$LANGID/machines.json');const f=(k,v)=>Object.entries(v||{}).reduce((s,[a,b])=>s.split('{'+a+'}').join(b),m[k]);process.stdout.write(JSON.stringify({toolsOn:m['light.agent.connected'],diskBusy:m['light.disk.busy'],weak:m['weak.title'],budget:m['sum.budget'],pressure:m['sum.pressure'],canRun:m['pi.menu'],nested:m['run.note.nested'],sensors:m['run.sensors'],back:m['back'],budgetTitle:f('budget.title',{name:'Windows 11'}),suspendDebian:f('budget.suspend',{name:'Debian 13'}),less:f('budget.less',{mb:4864}),cancel:m['cancel'],atLogin:m['cfg.atLogin'],autoPause:m['cfg.autoPause']}))")
 { printf 'globalThis.APP_L = %s;\n' "$LABELS"
+  [ "${MACHINES_REAL_HOST:-}" = 1 ] && printf 'globalThis.APP_REALHOST = true;\n'
   cat tests/machines_app_scene/pre.js "$ROOT/themes/$THEME/theme.bundle.js" tests/machines_app_scene/driver.js; } >"$T/theme.bundle.js"
 node tests/perf/manifest.mjs "$ROOT" "themes/zmapp/$THEME/theme.bundle.js" || exit 1
 chmod 700 "$D"

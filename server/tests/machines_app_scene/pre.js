@@ -12,8 +12,9 @@
     state: 'running', agentState: 'off', vmPid: 4343 };
   const win = { ...base, dir: `${L}/Windows 11.lordvm`, folder: 'Windows 11.lordvm', id: '33333333-2222-4333-8444-555555555555', name: 'Windows 11', vcpus: 4, memoryMb: 8192,
     state: 'stopped', windowsDevices: true, firmware: 'uefi', tpm: true, secureBoot: true };
+  // MACHINES_REAL_HOST=1 (APP_REALHOST): this computer's own host facts and sensors, as on a Pi (What this computer can run)
   const realHost = lord.vm && lord.vm.host;
-  lord.vm.host = () => ({ ...((realHost && realHost()) || {}), arch: 'amd64', kvm: true, kvmDevice: true, cpus: 8, cores: 4, ramMb: 16384, memMaxMb: 14336, libFreeBytes: 420e9,
+  if (!globalThis.APP_REALHOST) lord.vm.host = () => ({ ...((realHost && realHost()) || {}), arch: 'amd64', kvm: true, kvmDevice: true, cpus: 8, cores: 4, ramMb: 16384, memMaxMb: 14336, libFreeBytes: 420e9,
     libTotalBytes: 1000e9, missing: { amd64: '', arm64: '' }, ready: true, display: true, no3d: 'gpu', nested: true, landlock: 0, board: '' });
   lord.vm.list = () => [{ ...deb }, { ...fed }, { ...win }];
   lord.vm.groups = () => [];
@@ -26,7 +27,7 @@
   lord.vm.budget = (dir) => (dir && String(dir).includes('Windows')
     ? { usedMb: 8960, maxMb: 14336, freeMb: 5376, needMb: 8576, running: 2, ok: false, pressure: 14.2 }
     : { usedMb: 8960, maxMb: 14336, freeMb: 5376, needMb: 0, running: 2, ok: true, pressure: 14.2 });
-  lord.vm.sensors = () => ({ tempC: 67, fanRpm: 2400, underVoltage: -1 });
+  if (!globalThis.APP_REALHOST) lord.vm.sensors = () => ({ tempC: 67, fanRpm: 2400, underVoltage: -1 });
   lord.vm.snaps = () => ({ list: [], max: 32, warn: 16 });
   lord.vm.job = () => null;
   lord.vm.gpus = () => [];

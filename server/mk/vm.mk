@@ -47,6 +47,9 @@ build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR) build/gen/guesttools.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(LORDVM_FLAGS) -DLORDVM_TEST_PATHS -o $@ $(LORDVM_SRC) $(LORDVM_LIBS)
 	chmod g-w $@
+# the suites that run it (vm-group-manage, vm-storage, machines-group-manage in tests/run_suites.sh) must never run a
+# stale one: `make test` rebuilds it whenever lord-vm's sources changed
+test: build/lord-vm-testpaths
 
 # lordos-guest: the clipboard helper Machines installs in a Linux guest of this computer's architecture (static: it
 # runs on whatever the guest has)

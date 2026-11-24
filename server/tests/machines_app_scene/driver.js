@@ -51,7 +51,13 @@
     step('can run item', !!it);
     if (it) { if (it.onClick) it.onClick(); else sdk.appMenuClick(it.id); }
     await sleep(2500);
-    step('can run page', has(L.nested) && has(L.sensors));
+    if (globalThis.APP_REALHOST) {
+      // this computer's own facts: what the page says of them goes to the log
+      const h = lord.vm.host() || {}, s = lord.vm.sensors ? lord.vm.sensors() : null;
+      log(`real host arch=${h.arch} board=${h.board || ''} cpus=${h.cpus} ramMb=${h.ramMb} kvm=${h.kvm} sensors=${JSON.stringify(s)}`);
+      log(`page: ${[...P.texts.values()].filter((x) => /Native machines|°|rpm|power|Emulated|Runs|KVM|arm64|amd64/i.test(x)).slice(0, 16).join(' | ')}`);
+      step('can run page', has(L.sensors) && has(`Native machines are ${h.arch}`));
+    } else step('can run page', has(L.nested) && has(L.sensors));
     await shot('can-run');
     step('back', click(byText(L.back)));
     await sleep(900);

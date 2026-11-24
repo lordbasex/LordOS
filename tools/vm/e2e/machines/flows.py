@@ -947,6 +947,11 @@ def flow_s3agentlost(s, r, c):
         if w["id"].startswith("terminal"):
             s.js("wm.close(%s)" % json.dumps(w["id"]))
     vr = _vm_front(s)
+    # the shell pane falls back to the serial console when the agent's shell goes, and holds the console the checks use:
+    # closed first (its ×)
+    if s.find(T("shell.badge"), vr):
+        s.click_text("×", within=[vr[0], vr[1] + 100, vr[2], vr[3] - 100], nth=-1)
+        time.sleep(0.8)
     s.shot("s3-09-agent-ok")
     _guest(s, c, "systemctl stop qemu-guest-agent; echo done")
     r.step("s3agentlost: lord.vm.list says the agent no longer answers", lambda: s.wait_js(
@@ -977,11 +982,14 @@ def flow_s3monitor(s, r, c):
     time.sleep(1)
     if s.find("Grouped", mr):
         s.click_text("Grouped", within=mr)
+    time.sleep(1)
+    s.click_text("Search", within=mr)
+    s.type("qemu")
     time.sleep(2.5)
     s.shot("s3-11-monitor")
     got = s.texts(mr)
     c["monitor_texts"] = [x for x in got if "qemu" in x.lower() or NAME in x or "Disk" in x][:20]
-    r.t("s3monitor: Monitor lists the machine's QEMU or its row", any("qemu" in x.lower() or NAME in x for x in got), got[:60])
+    r.t("s3monitor: Monitor lists the machine's QEMU (searched)", any("qemu" in x.lower() or NAME in x for x in got), got[:60])
     s.js("wm.close(%s)" % json.dumps(s.window("monitor")["id"]))
 
 
