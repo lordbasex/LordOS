@@ -120,6 +120,8 @@ t "QEMU: seccomp mode 2, two or more filters, no_new_privs, no capabilities" \
 # script is even its ancestor, which Yama alone lets in) can't read its memory, environment, maps or descriptors
 t "sandbox: QEMU in its own namespaces"  'grep -q "\"namespaces\":1" "$W/status.json"'
 t "sandbox: QEMU non-dumpable"           'grep -q "\"nondumpable\":1" "$W/status.json"'
+# its disks folder noexec in its mount namespace (vm_ns_setup): nothing QEMU writes there can run or be mapped to run
+t "sandbox: QEMU's disks folder noexec"  'grep -q "\"noexec_disks\":1" "$W/status.json"'
 t "QEMU still runs as the person (status: Uid)" '[ "$(sed -n "s/^Uid:[[:space:]]*\([0-9]*\).*/\1/p" /proc/$QPID/status)" = "$(id -u)" ]'
 for f in environ mem maps smaps root/etc/hostname; do
     t "the person's programs can't read QEMU's /proc/<pid>/$f" '! head -c 1 /proc/$QPID/$f >/dev/null 2>&1'

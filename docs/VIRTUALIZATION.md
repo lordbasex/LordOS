@@ -791,6 +791,24 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
   (`vm_nondumpable`: `/proc/<pid>/environ` refused) and reports `"nondumpable"` in `lord-vm --status --json`. `status`, `stat`,
   `comm`, `cmdline` and `cgroup` stay readable, so Monitor, the vCPU use and the vGPU checks keep working; Monitor lists QEMU
   under root, as it already did lord-vm (also non-dumpable).
+- **Nothing QEMU writes can run** (in development, approved by the maintainer 2026-11-24; `noexec_bind` and `vm_ns_setup` in
+  `vmsandbox.c`): in QEMU's mount namespace, after the private loader is mounted and only after the user namespace is joined,
+  the machine's `disks/` folder is bound over itself and that bind remounted `noexec,nosuid,nodev`; the same is done to
+  `/dev/shm`, `/tmp`, `/var/tmp` and `$XDG_RUNTIME_DIR`, which QEMU's Landlock already keeps it from writing (they count only on
+  a kernel without Landlock). The kernel then refuses to run a file there (EACCES) or to map one executable (`mmap` or `mprotect`
+  with `PROT_EXEC`: EPERM), whatever seccomp lets through, which closes the disk-file half of the allowlist's kill fallback
+  (below). These binds and the loader's are the only mounts added there. What the outer mount had stays (read-only stays
+  read-only, its atime flags are kept; the kernel refuses to clear a flag the outer mount locked), and the loader's bind, a
+  mount of its own made before, keeps exec. Nothing QEMU needs to run lives there: qcow2 and raw disks, the NVRAM, snapshots
+  with memory (inside the qcow2) are read and written as before; swtpm, virtiofsd and passt run outside QEMU's namespaces
+  and reach it through descriptors, as do the suspend file and a disposable session's memfd; guest memory is a memfd
+  (hugetlb or not), which no mount covers. If a remount fails QEMU still runs and its log says exactly which folder and why
+  (`lord-vm: QEMU's disks folder couldn't be made noexec in its mount namespace (...)`); Landlock and seccomp still hold.
+  `lord-vm --status --json` says `"noexec_disks"`. **Checked** 2026-11-24 (amd64 PC, Debian 13): `build/vm-jail-probe` writes a
+  real program (`/usr/bin/true`'s bytes) into a file of `disks/` from inside the jail with the allowlist in its kill fallback
+  (no listener) and can neither map it executable (EPERM; with the remount left out, the same probe maps it) nor run it
+  (EACCES); and real machines booted with it: a Linux guest with 2D graphics, one with 3D graphics (virgl), and an OVMF one
+  with a TPM, through snapshot with memory and revert, reset, and suspend to a file and resume.
 - **Landlock:** read `/usr` (execute only QEMU's binary and its loader, since 2026-11-23 with the seccomp allowlist), read the ISO attached to this VM; read-write only that VM's `disks/` folder (`vmsandbox.h`). On kernels without
   Landlock (see 2.3) the app shows "Weaker isolation on this kernel" (**not built**: only the machine log's "Sandbox:" line says it).
 - **Seccomp:** QEMU's own `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny` plus ours, an
@@ -821,9 +839,8 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
     memfd (`MFD_NOEXEC_SEAL` wouldn't help: measured on 6.12, it doesn't stop `mmap` with `PROT_EXEC`) or a file of its
     `disks/` folder written to be run. `memfd_create` never takes `MFD_EXEC`. **What this doesn't stop**: anything during the
     start itself (QEMU has then read only its command line and its disks' headers); and, without a listener (the kill
-    fallback, never on Debian 13's kernel), the loader's kind passes at any time, so a memfd or a disk file QEMU wrote could
-    be mapped to run; a `noexec` bind of `disks/` in QEMU's mount namespace would close the folder's half there, but that is
-    a second mount where 3.3's namespaces allow exactly one, for the maintainer to decide. `prctl`
+    fallback, never on Debian 13's kernel), the loader's kind passes at any time, so a memfd QEMU wrote could be mapped to
+    run; a file of its `disks/` folder can't, since that folder is `noexec` in QEMU's mount namespace (above). `prctl`
     only the five options measured, and `PR_SET_DUMPABLE` refused, so QEMU can't make itself dumpable again. `prlimit64` only on
     itself, `tgkill` only its own threads (the vCPU kick), no `kill`. `seccomp` never with a listener. `execve` isn't a row; `execveat` always
     reaches lord-vm, which lets exactly one through: the first, from the child it forked, before any of QEMU runs
