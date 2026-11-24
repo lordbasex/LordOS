@@ -470,6 +470,10 @@ int ag_png_check(const uint8_t *p, size_t n, uint32_t *w, uint32_t *h);
 /* HTML from the other side, made harmless: formatting tags and their text only (see the top of vmagent.c). Returns the
  * output's length (≤ cap - 1, NUL-terminated), or -1 if it doesn't fit. Input must be valid UTF-8. */
 long ag_html_sanitize(const char *in, size_t n, char *out, size_t cap);
+/* A clipboard in AGK_CLIPX's layout, from either side, made safe to pass on: text that is UTF-8, HTML sanitized (from
+ * UTF-8), a PNG whose header is sane. The kept parts again in that layout in *out (malloc'd, *on bytes); what kept in
+ * what (for the log). 0 something is left, -1 nothing usable. Not thread-safe (one static buffer) */
+int ag_clip_clean(const uint8_t *in, size_t n, uint8_t **out, size_t *on, char *what, size_t wn);
 
 typedef struct { uint16_t kind, chan; const uint8_t *data; uint32_t len; } AgFrame;
 

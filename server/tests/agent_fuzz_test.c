@@ -83,6 +83,17 @@ static size_t seed(int kind, uint8_t *b) {
     case 12: return ag_perfstate_write(b, (int)below(2), below(8), below(8)) ? 0 : AG_PERFSTATE_BYTES;
     case 13: return lag_winrefused_write(b, below(80), (uint8_t)below(6), (uint8_t)below(6)) ? 0 : LAG_WINREFUSED_BYTES;
     case 14: { uint8_t t[130], bo[300]; size_t tn = text(t, sizeof t), bn = text(bo, sizeof bo); return ag_note_write(t, tn, bo, bn, b, CAP); }
+    case 15: { AgSendOffer o; memset(&o, 0, sizeof o); o.id = 1 + below(9); o.size = rnd() % (AG_SEND_SIZE_MAX + 2); o.flags = (uint8_t)below(4);
+               size_t t = text((uint8_t *)o.name, 1 + below(AG_NAME_MAX)); o.name[t] = 0; if (!t) { o.name[0] = 'a'; o.name[1] = 0; }
+               size_t k = ag_send_offer_write(&o, b, CAP); if (k) return k; memcpy(b, &o, 47); return 47 + text(b + 47, 200); }
+    case 16: {              /* a PNG header, then IHDR: ag_png_check */
+               static const uint8_t png[] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R', 0, 0, 1, 0, 0, 0, 0, 0x80, 8, 6, 0, 0, 0, 1, 2, 3, 4 };
+               memcpy(b, png, sizeof png); return sizeof png; }
+    case 17: {              /* HTML: ag_html_sanitize */
+               static const char *const tags[] = { "<b>", "</b>", "<script>", "</script>", "<a href=\"javascript:x\">", "<img src=x onerror=y>", "<!--", "-->", "<p style=\"x\">", "&amp;", "&#x41;", "<", ">", "\"", "<![CDATA[", "<style>", "</i>", "<a href=\"https://x\" title=\"a on=b\" onclick=z>", "<span style=\"color: red; background:url(x)\">", "<td colspan=2 align=left>", "<a href=mailto:x>", "<font face=\"Sans\" ONload=x>" };
+               size_t n = 0; int k = 1 + (int)below(20);
+               for (int i = 0; i < k && n < 900; i++) { const char *t = chance(50) ? tags[below(sizeof tags / sizeof *tags)] : "text \xc3\xa9 "; size_t l = strlen(t); memcpy(b + n, t, l); n += l; }
+               return n; }
     default: { const char *h = "lordos-guest 10 clipboard clipx clipreq windows perf shell links notify send"; size_t n = strlen(h); memcpy(b, h, n); return n; }
     }
 }
@@ -159,6 +170,68 @@ static void parse_all(const uint8_t *p, size_t n) {
     if (!lag_winrefused_parse(p, n, &id, &action, &reason)) CHECK(n == LAG_WINREFUSED_BYTES);
     const uint8_t *t, *bo; uint16_t ttn, bn;
     if (!ag_note_parse(p, n, &t, &ttn, &bo, &bn)) CHECK(inside(p, n, t, ttn) && inside(p, n, bo, bn) && ttn <= AG_NOTE_TITLE_MAX && bn <= AG_NOTE_BODY_MAX);
+    AgSendOffer so;
+    if (!ag_send_offer_parse(p, n, &so)) {
+        CHECK(so.id && so.size <= AG_SEND_SIZE_MAX && strlen(so.name) <= AG_NAME_MAX && ag_send_name_ok((const uint8_t *)so.name, strlen(so.name)));
+        size_t k = ag_send_offer_write(&so, tmp, sizeof tmp);
+        AgSendOffer s2;
+        CHECK(k == n && !ag_send_offer_parse(tmp, k, &s2) && !strcmp(s2.name, so.name));
+    }
+    /* names: a received file's (ag_recv_name) and a dropped one's (ag_drop_name), from any bytes */
+    {
+        char in[600], out[AG_NAME_MAX + 1];
+        size_t l = n < sizeof in - 1 ? n : sizeof in - 1;
+        memcpy(in, p, l); in[l] = 0;
+        if (!ag_drop_name(in, out, sizeof out)) CHECK(out[0] && strlen(out) <= AG_NAME_MAX && !strchr(out, '/') && !strchr(out, '\\') && strcmp(out, ".") && strcmp(out, ".."));
+        if (!ag_recv_name(in, out, sizeof out)) CHECK(out[0] && out[0] != '.' && strlen(out) <= AG_NAME_MAX && !strchr(out, '/') && !strchr(out, '\\'));
+        char small[8];
+        if (!ag_drop_name(in, small, sizeof small)) CHECK(strlen(small) < sizeof small);
+    }
+    uint32_t pw, ph;
+    if (!ag_png_check(p, n, &pw, &ph)) CHECK(pw >= 1 && ph >= 1 && pw <= AG_PNG_DIM && ph <= AG_PNG_DIM);
+    if (ag_utf8_ok(p, n)) {
+        static char hs[4096];
+        long hl = ag_html_sanitize((const char *)p, n, hs, sizeof hs);
+        CHECK(hl >= -1 && hl < (long)sizeof hs);
+        if (hl >= 0) { CHECK(strlen(hs) == (size_t)hl && ag_utf8_ok((const uint8_t *)hs, (size_t)hl)); CHECK(!strstr(hs, "<script") && !strstr(hs, "<style") && !strstr(hs, "<img"));
+            /* inside every tag kept: no event handler (an attribute named on...), no script URL, no url() or expression() */
+            int tags_ok = 1;
+            for (const char *q = strchr(hs, '<'); q; q = strchr(q + 1, '<')) {
+                const char *e = strchr(q, '>');
+                if (!e) { tags_ok = 0; break; }
+                char tg[1024]; size_t tl = (size_t)(e - q) < sizeof tg - 1 ? (size_t)(e - q) : sizeof tg - 1;
+                for (size_t i = 0; i < tl; i++) tg[i] = (char)(q[i] >= 'A' && q[i] <= 'Z' ? q[i] + 32 : q[i]);
+                tg[tl] = 0;
+                /* attributes as the sanitizer writes them: name="value" (the value escaped, so no '"' inside) */
+                const char *r = tg + 1;
+                while (*r && *r != ' ') r++;
+                while (*r == ' ') {
+                    r++;
+                    const char *nm = r;
+                    while (*r && *r != '=' && *r != ' ') r++;
+                    size_t nl = (size_t)(r - nm);
+                    if (*r != '=' || r[1] != '"') { tags_ok = 0; break; }
+                    const char *v = r + 2, *ve = strchr(v, '"');
+                    if (!ve) { tags_ok = 0; break; }
+                    if (nl >= 2 && nm[0] == 'o' && nm[1] == 'n') tags_ok = 0;                       /* an event handler */
+                    if (nl == 4 && !strncmp(nm, "href", 4) && strncmp(v, "http://", 7) && strncmp(v, "https://", 8) && strncmp(v, "mailto:", 7) && v[0] != '#') tags_ok = 0;
+                    if (nl == 5 && !strncmp(nm, "style", 5)) { char sv[1024]; size_t sl = (size_t)(ve - v); memcpy(sv, v, sl); sv[sl] = 0; if (strstr(sv, "url") || strstr(sv, "expression") || strstr(sv, "import") || strchr(sv, '\\')) tags_ok = 0; }
+                    r = ve + 1;
+                }
+                if (*r && *r != '/') tags_ok = 0;
+            }
+            CHECK(tags_ok); }
+        char tiny[3];
+        hl = ag_html_sanitize((const char *)p, n, tiny, sizeof tiny);
+        CHECK(hl < (long)sizeof tiny);
+    }
+    uint8_t *cc = NULL; size_t cn = 0; char what[96];
+    if (!ag_clip_clean(p, n, &cc, &cn, what, sizeof what)) {
+        AgClip c2;
+        CHECK(cc && !ag_clipx_parse(cc, cn, &c2) && (!c2.text || ag_utf8_ok(c2.text, c2.text_n)) && (!c2.png || !ag_png_check(c2.png, c2.png_n, NULL, NULL)));
+        CHECK(strlen(what) < sizeof what);
+    }
+    free(cc);
     (void)ag_hello_caps(p, n);
     (void)ag_link_ok(p, n);
 }
@@ -205,7 +278,7 @@ static void stream(void) {
 
 int main(void) {
     for (int it = 0; it < 120000; it++) {
-        size_t n = seed((int)below(16), buf);
+        size_t n = seed((int)below(19), buf);
         if (n > CAP) n = 0;
         n = mutate(buf, n, CAP);
         /* a copy of exactly n bytes on the heap, so ASan sees a read past the payload */

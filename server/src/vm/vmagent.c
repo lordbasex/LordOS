@@ -13,6 +13,7 @@
 #include "vmagent.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -398,6 +399,7 @@ int ag_drop_name(const char *in, char *out, size_t cap) {
     size_t un = k - a;
     int dev = dos_device(u, un);
     size_t lim = AG_NAME_MAX < cap - 1 ? AG_NAME_MAX : cap - 1;
+    if (dev && lim < 2) return -1;
     if (dev) lim--;
     size_t o = 0;
     if (dev) out[o++] = '_';
@@ -407,6 +409,7 @@ int ag_drop_name(const char *in, char *out, size_t cap) {
         const char *dot = NULL;
         for (size_t i = un; i > 1; i--) if (u[i - 1] == '.') { dot = u + i - 1; break; }
         size_t en = dot && (size_t)(u + un - dot) <= 16 ? (size_t)(u + un - dot) : 0;
+        if (en >= lim) en = 0;                              /* a small out: the start only (never lim - en below zero) */
         size_t head = char_start(u, lim - en);
         while (head > 0 && u[head - 1] == ' ') head--;
         if (!head) return -1;
@@ -1400,4 +1403,32 @@ int ag_recv_name(const char *in, char *out, size_t cap) {
 int ag_send_room(uint64_t sent, uint64_t acked, uint32_t n) {
     if (sent < acked || n > AG_SEND_WINDOW) return 0;
     return sent - acked + n <= AG_SEND_WINDOW;
+}
+
+/* A clipboard in AGK_CLIPX's layout, from either side, made safe to pass on: text that is UTF-8, HTML sanitized (from
+ * UTF-8), a PNG whose header is sane (lord-server re-encodes it in lord-media's sandbox before anything decodes it for
+ * real). The kept parts again in that layout, in *out (malloc); 0 something is left, -1 nothing usable. */
+int ag_clip_clean(const uint8_t *in, size_t n, uint8_t **out, size_t *on, char *what, size_t wn) {
+    AgClip c, k;
+    memset(&k, 0, sizeof k);
+    if (ag_clipx_parse(in, n, &c)) { snprintf(what, wn, "malformed"); return -1; }
+    static char html[AG_TEXT_MAX + 1];
+    uint32_t w = 0, h = 0;
+    if (c.text && ag_utf8_ok(c.text, c.text_n)) { k.text = c.text; k.text_n = c.text_n; }
+    if (c.html && ag_utf8_ok(c.html, c.html_n)) {
+        long hn = ag_html_sanitize((const char *)c.html, c.html_n, html, sizeof html);
+        if (hn > 0) { k.html = (const uint8_t *)html; k.html_n = (uint32_t)hn; }
+    }
+    if (c.png && !ag_png_check(c.png, c.png_n, &w, &h)) { k.png = c.png; k.png_n = c.png_n; }
+    snprintf(what, wn, "%s%s%s", k.text ? "text " : "", k.html ? "html " : "", k.png ? "png " : "");
+    if (k.png) { size_t l = strlen(what); snprintf(what + l, wn - l, "%ux%u ", w, h); }
+    if (c.html && !k.html) { size_t l = strlen(what); snprintf(what + l, wn - l, "(html dropped) "); }
+    if (c.png && !k.png) { size_t l = strlen(what); snprintf(what + l, wn - l, "(picture refused) "); }
+    size_t sz = ag_clipx_size(&k);
+    if (!sz) { snprintf(what, wn, "nothing usable"); return -1; }
+    *out = malloc(sz);
+    if (!*out) return -1;
+    ag_clipx_write(&k, *out);
+    *on = sz;
+    return 0;
 }

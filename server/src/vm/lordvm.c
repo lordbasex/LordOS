@@ -6373,34 +6373,6 @@ static int clip_allows(int to_guest) {
     return S.m.clipboard == VM_CLIP_BOTH || S.m.clipboard == (to_guest ? VM_CLIP_TO_GUEST : VM_CLIP_FROM_GUEST);
 }
 
-/* A clipboard in AGK_CLIPX's layout, from either side, made safe to pass on: text that is UTF-8, HTML sanitized (from
- * UTF-8), a PNG whose header is sane (lord-server re-encodes it in lord-media's sandbox before anything decodes it for
- * real). The kept parts again in that layout, in *out (malloc); 0 something is left, -1 nothing usable. */
-static int clip_clean(const uint8_t *in, size_t n, uint8_t **out, size_t *on, char *what, size_t wn) {
-    AgClip c, k;
-    memset(&k, 0, sizeof k);
-    if (ag_clipx_parse(in, n, &c)) { snprintf(what, wn, "malformed"); return -1; }
-    static char html[AG_TEXT_MAX + 1];
-    uint32_t w = 0, h = 0;
-    if (c.text && ag_utf8_ok(c.text, c.text_n)) { k.text = c.text; k.text_n = c.text_n; }
-    if (c.html && ag_utf8_ok(c.html, c.html_n)) {
-        long hn = ag_html_sanitize((const char *)c.html, c.html_n, html, sizeof html);
-        if (hn > 0) { k.html = (const uint8_t *)html; k.html_n = (uint32_t)hn; }
-    }
-    if (c.png && !ag_png_check(c.png, c.png_n, &w, &h)) { k.png = c.png; k.png_n = c.png_n; }
-    snprintf(what, wn, "%s%s%s", k.text ? "text " : "", k.html ? "html " : "", k.png ? "png " : "");
-    if (k.png) { size_t l = strlen(what); snprintf(what + l, wn - l, "%ux%u ", w, h); }
-    if (c.html && !k.html) { size_t l = strlen(what); snprintf(what + l, wn - l, "(html dropped) "); }
-    if (c.png && !k.png) { size_t l = strlen(what); snprintf(what + l, wn - l, "(picture refused) "); }
-    size_t sz = ag_clipx_size(&k);
-    if (!sz) { snprintf(what, wn, "nothing usable"); return -1; }
-    *out = malloc(sz);
-    if (!*out) return -1;
-    ag_clipx_write(&k, *out);
-    *on = sz;
-    return 0;
-}
-
 /* ---- the host's clipboard on demand (6.8): lord-server offers, the guest asks when a program there pastes, lord-server
  * answers only while the machine is in use (it holds that gate; lord-vm can't see the windows). What lord-vm checks: the
  * request parses, is for the last offer and one of its forms, the clipboard goes to the guest (machine.json), someone
@@ -7054,7 +7026,7 @@ static void drain_lag(void) {
             uint8_t *clean = NULL;
             size_t cn = 0;
             char what[64];
-            if (clip_clean(f.data, f.len, &clean, &cn, what, sizeof what)) vlog("agent: the guest's clipboard was refused (%s)", what);
+            if (ag_clip_clean(f.data, f.len, &clean, &cn, what, sizeof what)) vlog("agent: the guest's clipboard was refused (%s)", what);
             else {
                 int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
                 if (fd >= 0 && !write_all(fd, clean, cn) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {
@@ -7653,7 +7625,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
             char what[64];
             AgClip c;
             if (!clip_waiting((uint32_t)m->c, m->d)) { reply(ci, m->seq, VME_WRONG_STATE, "no such request waits"); return; }
-            if (clip_clean(buf, (size_t)n, &clean, &cn, what, sizeof what) || ag_clipx_parse(clean, cn, &c)) {
+            if (ag_clip_clean(buf, (size_t)n, &clean, &cn, what, sizeof what) || ag_clipx_parse(clean, cn, &c)) {
                 free(clean);
                 clip_answer((uint32_t)m->c, (uint8_t)m->d, AGD_NONE, NULL, 0);
                 reply(ci, m->seq, VME_BAD_REQUEST, what);
@@ -7676,7 +7648,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         uint8_t *clean = NULL;
         size_t cn = 0;
         char what[64];
-        if (clip_clean(buf, (size_t)n, &clean, &cn, what, sizeof what)) { reply(ci, m->seq, VME_BAD_REQUEST, what); return; }
+        if (ag_clip_clean(buf, (size_t)n, &clean, &cn, what, sizeof what)) { reply(ci, m->seq, VME_BAD_REQUEST, what); return; }
         if (S.lag_clipx) lag_send(AGK_CLIPX, clean, (uint32_t)cn);
         else {
             AgClip c;
