@@ -363,13 +363,14 @@ enum { AGK_SEND_OFFER = 32, AGK_SEND_ACCEPT = 33, AGK_SEND_FROM = 34, AGK_SEND_D
 #define AG_SEND_OFFER_EVERY_MS 2000
 /* AGSF_EXEC: the file could be run in the guest (an x bit, an .exe): said to the person, never kept on this computer */
 enum { AGSF_EXEC = 1, AGSF_ALL = 1 };
-/* AGK_SEND_ACCEPT's status: taken (from offset); this machine doesn't take files (Configure, Sharing; no window to show
- * them); another file is on its way; no room on this computer; refused (too many offers, a name or size this computer
- * won't take) */
+/* AGK_SEND_ACCEPT's status: taken (from offset); this machine doesn't take files (Configure, Sharing); not now (another
+ * file is on its way, or no Machines window is there to show it: offer it again later); no room on this computer; refused
+ * (too many offers, a name or size this computer won't take) */
 enum { AGSA_OK = 0, AGSA_OFF = 1, AGSA_BUSY = 2, AGSA_SPACE = 3, AGSA_REFUSED = 4, AGSA_LAST = AGSA_REFUSED };
 /* AGK_SEND_DONE's code: kept; cancelled (by the person on either side); the SHA-256 differs; this computer couldn't write
- * it, or the guest couldn't read it; no room left */
-enum { AGSD_OK = 0, AGSD_CANCELLED = 1, AGSD_BADHASH = 2, AGSD_FAILED = 3, AGSD_SPACE = 4, AGSD_LAST = AGSD_SPACE };
+ * it, or the guest couldn't read it; no room left; later (host → guest: this computer stopped it for now, its Machines
+ * window went: what came is kept, offer the same file again later and it goes on from there) */
+enum { AGSD_OK = 0, AGSD_CANCELLED = 1, AGSD_BADHASH = 2, AGSD_FAILED = 3, AGSD_SPACE = 4, AGSD_LATER = 5, AGSD_LAST = AGSD_LATER };
 typedef struct { uint32_t id; uint64_t size; uint8_t flags; uint8_t key[32]; char name[AG_NAME_MAX + 1]; } AgSendOffer;
 /* a file name from the guest this computer may take as one: 1..AG_NAME_MAX bytes, ag_note_text_ok (UTF-8, no control or
  * bidi characters), no '/' or '\\', not "." or "..". 1 yes */

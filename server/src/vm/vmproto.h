@@ -123,6 +123,14 @@
  *                   the person signed in there (AGK_SHELL_OPEN; one at a time, a new one ends the old); what's written to
  *                   it is typed into the shell, what the shell writes comes out; it ends (EOF) when the shell does.
  *                   a = VSH_SIZE, b, c: the terminal's new size (AGK_SHELL_SIZE). a = VSH_CLOSE: end it
+ *     VM_RECV       the answer to a VM_RECV_OFFER (6.21): a = the transfer's id, b = AGSA_* (vmagent.h; 0: taken); with 0,
+ *                   one descriptor: the quarantine folder's part file for it, which lord-server opened (O_RDWR, without
+ *                   following a link, a regular file of this account with one link) and which may already hold the
+ *                   start of this very file from an earlier, interrupted offer (a resume: lord-vm hashes what is there
+ *                   and offers the guest to go on from it). lord-vm writes only through that descriptor, never a path
+ *     VM_RECV_CANCEL a = a transfer's id: the person cancelled it (the guest is told, AGK_SEND_DONE cancelled)
+ *     VM_FILE_CANCEL a = a VM_FILE's seq: the person cancelled that drop (a waiting one is dropped at once; the one being
+ *                   copied stops at its next step) → that VM_FILE's VM_REPLY, VME_DENIED "cancelled"
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -159,6 +167,12 @@
  *                   AGK_LINK (the link, ag_link_ok) or AGK_NOTIFY (ag_note_parse's layout), checked and written again by
  *                   lord-vm, only while machine.json allows that kind and within its rate (vmagent.h); lord-server checks
  *                   it again, offers a link only in a bar the person clicks, and shows a notification as from the machine
+ *     VM_RECV_OFFER a file the guest's tools offer to send to this computer (6.21, AGK_SEND_OFFER, already parsed): a sealed
+ *                   memfd of a bytes (≤ VM_RECV_OFFER_MAX) in AGK_SEND_OFFER's layout, b = the transfer's id (lord-vm's
+ *                   counter). Only while machine.json takes files from the guest, at most one at a time, within the
+ *                   offers' rate. lord-server answers VM_RECV within 10 s, else the guest is told no
+ *     VM_RECV_STATE a = the transfer's id, b = VRS_*, c = KiB written so far, d = AGSD_* with VRS_FAILED. Sent every 250 ms
+ *                   while it runs, and at its end: VRS_DONE once every byte is written and its SHA-256 is the guest's
  *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
  *                   failed), c = percent (0..100, -1 unknown), text = detail
  *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (VMN_NET_LOST: passt ended while
@@ -259,11 +273,17 @@ enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
     VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL,
-    VM_REQ_LAST = VM_SHELL,
+    VM_RECV, VM_RECV_CANCEL, VM_FILE_CANCEL,
+    VM_REQ_LAST = VM_FILE_CANCEL,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
-    VM_SHELL_FD, VM_GUEST_NOTE,
+    VM_SHELL_FD, VM_GUEST_NOTE, VM_RECV_OFFER, VM_RECV_STATE,
 };
+/* VM_RECV_STATE b: a file from the guest is being written; kept (lord-server names it); given up (d: AGSD_*); the guest's
+ * connection went with it unfinished (lord-server keeps what came, for the guest's next offer of the same file) */
+enum { VRS_RUNNING = 1, VRS_DONE, VRS_FAILED, VRS_PAUSED, VRS_LAST = VRS_PAUSED };
+/* the largest VM_RECV_OFFER: an AGK_SEND_OFFER payload (vmagent.h), written again by lord-vm */
+#define VM_RECV_OFFER_MAX 256
 /* VM_SHELL a */
 enum { VSH_CLOSE = 0, VSH_OPEN = 1, VSH_SIZE = 2 };
 /* the largest VM_GUEST_NOTE: a link or a notification, in its agent frame's layout (vmagent.h) */
@@ -518,7 +538,9 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_LINK || ((m->a == 0 || m->a == 1) && strnlen(m->text, VM_TEXT_MAX) == 36)) &&
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
                       (m->type != VM_SHELL || (m->a == VSH_CLOSE || ((m->a == VSH_OPEN || m->a == VSH_SIZE) && m->b >= 1 && m->b <= 1000 && m->c >= 1 && m->c <= 500))) &&
-                      (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0));
+                      (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0)) &&
+                      (m->type != VM_RECV || (m->a > 0 && m->b >= 0 && m->b <= 4)) &&
+                      (m->type != VM_RECV_CANCEL || m->a > 0) && (m->type != VM_FILE_CANCEL || m->a > 0);
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -538,6 +560,9 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_SHELL_FD: return 1;
     /* a: bytes in the sealed memfd; b: AGK_LINK (25) or AGK_NOTIFY (26), vmagent.h */
     case VM_GUEST_NOTE: return m->a > 0 && m->a <= VM_GUEST_NOTE_MAX && (m->b == 25 || m->b == 26);
+    /* a: bytes in the sealed memfd, b: the transfer's id; a: the id, b: VRS_*, c: KiB written, d: AGSD_* (0..5) */
+    case VM_RECV_OFFER: return m->a > 0 && m->a <= VM_RECV_OFFER_MAX && m->b > 0;
+    case VM_RECV_STATE: return m->a > 0 && m->b >= VRS_RUNNING && m->b <= VRS_LAST && m->c >= 0 && m->d >= 0 && m->d <= 5;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }
