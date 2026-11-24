@@ -10,7 +10,7 @@ import {
   EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr, battery,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { canRun, sensorLines, cardLights, budgetLine, isolationGaps, stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
+import { groupJobCloses, canRun, sensorLines, cardLights, budgetLine, isolationGaps, stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
   chipCounts, libGrid, skeletonPlan, seenNext, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
@@ -926,6 +926,7 @@ export function Library() {
   const groupWork = (item, kind, start) => {
     if (work) return;
     const dir = item.group.dir;
+    for (const id of groupJobCloses(item, kind)) wm.close(id, true);
     setError('');
     setWork({ dir, kind, phase: 'work' });
     groupJob(item, start, (s) => setWork({ dir, kind, ...s })).then((why) => { setWork(null); if (why) setError(`${item.group.name}: ${why}`); refresh(); });

@@ -1,7 +1,7 @@
 // vm_group_model_test.mjs — apps/machines/model.js's machine groups (docs/VIRTUALIZATION.md 19.9): the members found in
 // lord.vm.list(), the group's state, groupPlan's start and stop order and its failures, when the link is made again, and
 // what a `machines` request with a group folder does. node server/tests/vm_group_model_test.mjs
-import { groupMembers, groupState, groupPlan, groupLinkKey, groupCliPlan, groupStartFailed, CLI } from '../../apps/machines/model.js';
+import { groupMembers, groupState, groupPlan, groupLinkKey, groupCliPlan, groupStartFailed, groupJobCloses, CLI } from '../../apps/machines/model.js';
 
 let pass = 0, fail = 0;
 function eq(name, got, want) {
@@ -73,5 +73,14 @@ eq('open: the workstation', cp('open', list('running', 'running')), { code: CLI.
 eq('open while off', cp('open', list('running', 'stopped')), { code: CLI.NOT_RUNNING, key: 'notRunning' });
 eq('release', cp('release', list('stopped', 'stopped')), { code: CLI.OK, key: '' });
 
+// a group job closes the members' windows first (Start Fresh gives the workstation a new id: its old window would start it
+// a second time with the next group start)
+const item = { ws: { id: 'w-old', state: 'stopped' }, gw: { id: 'g1', state: 'stopped' } };
+eq('fresh closes both members\' windows', groupJobCloses(item, 'fresh'), ['machines#vm-w-old', 'machines#vm-g1']);
+eq('delete too', groupJobCloses(item, 'delete').length, 2);
+eq('repair too', groupJobCloses({ ws: { folder: 'Workstation.lordvm', state: 'stopped' } }, 'repair'), ['machines#vm-Workstation.lordvm']);
+eq('rename keeps them (the id stays; windows follow the folder)', groupJobCloses(item, 'rename'), []);
+eq('never a running member\'s window', groupJobCloses({ ws: { id: 'w', state: 'running' }, gw: { id: 'g', state: 'stopped' } }, 'fresh'), ['machines#vm-g']);
+eq('a missing member', groupJobCloses({ gw: { id: 'g', state: 'stopped' } }, 'fresh'), ['machines#vm-g']);
 console.log(`vm_group_model_test: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
