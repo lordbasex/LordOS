@@ -1404,6 +1404,20 @@ static JSValue f_fs_trash_empty(JSContext *c, JSValueConst this_val, int argc, J
 }
 
 /* lord.fs.stat(path) → { name, path, dir, link, target, size, mode, user, group, mtime, atime, ctime, btime } */
+/* inheritMarks(from, to): a file a Machines guest sent (6.21) that is an archive: what was extracted from it (to, a file or a
+ * folder in the person's own places) gets its quarantine marks too. Only ever adds the marks; → how many were marked */
+static JSValue f_fs_inherit_marks(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2) return JS_NewInt32(c, 0);
+    const char *a = JS_ToCString(c, argv[0]), *b = JS_ToCString(c, argv[1]);
+    char ra[PATH_MAX], rb[PATH_MAX];
+    int n = 0;
+    if (a && b && realpath(a, ra) && realpath(b, rb) && fsops_allowed(rb)) n = fsops_inherit_marks(ra, rb);
+    if (a) JS_FreeCString(c, a);
+    if (b) JS_FreeCString(c, b);
+    return JS_NewInt32(c, n);
+}
+
 static JSValue f_fs_stat(JSContext *c, JSValueConst this_val, int argc, JSValueConst *argv) {
     (void)this_val; (void)argc;
     const char *p = JS_ToCString(c, argv[0]);
@@ -1432,6 +1446,8 @@ static JSValue f_fs_stat(JSContext *c, JSValueConst this_val, int argc, JSValueC
     JS_SetPropertyStr(c, o, "ctime", JS_NewFloat64(c, s.ctime));
     if (s.has_btime) JS_SetPropertyStr(c, o, "btime", JS_NewFloat64(c, s.btime));
     JS_SetPropertyStr(c, o, "writable", JS_NewBool(c, s.writable));
+    /* a file a Machines guest sent (6.21): Files says where it came from and never opens a runnable one by itself */
+    if (s.quarantine) { JS_SetPropertyStr(c, o, "quarantine", JS_TRUE); JS_SetPropertyStr(c, o, "fromMachine", JS_NewString(c, s.from)); }
     return o;
 }
 
@@ -1635,7 +1651,7 @@ static const JSCFunctionListEntry fs_funcs[] = {
     JS_CFUNC_DEF("restore", 1, f_fs_restore),
     JS_CFUNC_DEF("removeFromTrash", 1, f_fs_trash_remove),
     JS_CFUNC_DEF("emptyTrash", 0, f_fs_trash_empty),
-    JS_CFUNC_DEF("stat", 1, f_fs_stat),
+    JS_CFUNC_DEF("stat", 1, f_fs_stat), JS_CFUNC_DEF("inheritMarks", 2, f_fs_inherit_marks),
     JS_CFUNC_DEF("du", 2, f_fs_du),
     JS_CFUNC_DEF("free", 1, f_fs_free),
     JS_CFUNC_DEF("search", 3, f_fs_search),

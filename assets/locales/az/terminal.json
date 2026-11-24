@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "Tutulmuş çıxışda saxlanılır",
   "prefs.tr.would.highlight": "“{text}” vurğulanır",
   "prefs.tr.param": "Parametr",
-  "prefs.tr.regexFirst": "Əvvəlcə requlyar ifadəni yazın."
+  "prefs.tr.regexFirst": "Əvvəlcə requlyar ifadəni yazın.",
+  "guest.badge": "QONAQ",
+  "guest.title": "{machine} daxilində shell"
 }

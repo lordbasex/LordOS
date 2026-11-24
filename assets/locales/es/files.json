@@ -339,5 +339,8 @@
   "markupHint": "Abrir en el editor de marcado",
   "readOnly.title": "Archivos no puede cambiar “{name}”",
   "readOnly.outside": "Archivos solo puede ver esta carpeta: está fuera de tu carpeta personal y de tus discos. Para cambiarla, usá la Terminal u otra app.",
-  "readOnly.denied": "Esta carpeta es de solo lectura: sus permisos no te dejan cambiarla. Para cambiarla, usá la Terminal u otra app."
+  "readOnly.denied": "Esta carpeta es de solo lectura: sus permisos no te dejan cambiarla. Para cambiarla, usá la Terminal u otra app.",
+  "fromMachineNoRun": "«{name}» vino de la máquina {machine}. Archivos no abre programas ni instaladores de una máquina: usá Abrir con si confiás en él.",
+  "info.from": "Desde",
+  "info.fromMachine": "La máquina {machine}"
 }

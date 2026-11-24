@@ -132,7 +132,7 @@ if len(sys.argv) > 1 and sys.argv[1] == 'hadess':
     sys.exit(1 if fails else 0)
 # 1. on, off
 h = Host()
-ok(h.hello is not None and b' perf' in h.hello and h.hello.startswith(b'lordos-guest 9 '), 'hello says lordos-guest 9 ... perf (%r)' % h.hello)
+ok(h.hello is not None and b' perf' in h.hello and h.hello.startswith(b'lordos-guest 10 '), 'hello says lordos-guest 10 ... perf (%r)' % h.hello)
 ok(h.perf(1) == (1, POWER | EFFECTS, 0), 'AGK_PERF 1: power profile and animations applied')
 ok(profile() == 'performance' and anim() == 'false', 'the guest: performance, animations false in dconf (%s, %s)' % (profile(), anim()))
 ok(record() == 'lordos-guest perf 1\npower balanced\nanim 1\n', 'the record keeps balanced and animations on')

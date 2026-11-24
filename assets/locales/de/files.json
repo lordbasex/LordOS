@@ -339,5 +339,8 @@
   "markupHint": "Im Markierungseditor öffnen",
   "readOnly.title": "Dateien kann „{name}“ nicht ändern",
   "readOnly.outside": "Dateien kann diesen Ordner nur anzeigen: Er liegt außerhalb deines Benutzerordners und deiner Laufwerke. Verwende zum Ändern das Terminal oder eine andere App.",
-  "readOnly.denied": "Dieser Ordner ist schreibgeschützt: Seine Zugriffsrechte erlauben dir keine Änderungen. Verwende zum Ändern das Terminal oder eine andere App."
+  "readOnly.denied": "Dieser Ordner ist schreibgeschützt: Seine Zugriffsrechte erlauben dir keine Änderungen. Verwende zum Ändern das Terminal oder eine andere App.",
+  "fromMachineNoRun": "„{name}“ kam von der Maschine {machine}. Dateien öffnet keine Programme oder Installationsprogramme aus einer Maschine: Nutze „Öffnen mit“, wenn du ihr vertraust.",
+  "info.from": "Herkunft",
+  "info.fromMachine": "Die Maschine {machine}"
 }

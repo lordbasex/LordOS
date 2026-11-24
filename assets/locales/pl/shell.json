@@ -985,5 +985,6 @@
   "themeSwitch.failedTitle": "Nie udało się zastosować {name}",
   "themeSwitch.refusedBody": "Jego kod nie zgadza się z podpisaną kopią LordOS, więc nie został wczytany. Styl pulpitu pozostaje bez zmian.",
   "themeSwitch.failedBody": "Nie uruchomił się. Styl pulpitu pozostaje bez zmian.",
-  "spotlight.section.machines": "Maszyny"
+  "spotlight.section.machines": "Maszyny",
+  "guestApps.inMachine": "W {machine}"
 }

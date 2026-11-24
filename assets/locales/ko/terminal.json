@@ -562,5 +562,7 @@
   "prefs.tr.would.capture": "캡처된 출력에 보관",
   "prefs.tr.would.highlight": "“{text}” 강조",
   "prefs.tr.param": "매개변수",
-  "prefs.tr.regexFirst": "먼저 정규식을 입력하십시오."
+  "prefs.tr.regexFirst": "먼저 정규식을 입력하십시오.",
+  "guest.badge": "게스트",
+  "guest.title": "{machine} 안의 셸"
 }

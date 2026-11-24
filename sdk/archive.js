@@ -50,7 +50,11 @@ function extract(path, dest, { only, existing = false, onProgress } = {}) {
   if (only) args.only = only;
   if (isRawCompressed(path)) args.rawname = rawName(String(path).split('/').pop());
   try { r = lord.doc.arcExtract(docArg(path), dest, JSON.stringify(args), existing); } catch (e) { return Promise.reject(e); }
-  const p = waitFor(r.sid, r.req, { onProgress }).finally(() => lord.doc.close(r.sid));
+  const done = waitFor(r.sid, r.req, { onProgress }).finally(() => lord.doc.close(r.sid));
+  // an archive a Machines guest sent (docs/VIRTUALIZATION.md 6.21): what comes out of it is marked as from that machine
+  // too, so Files never opens a program or installer from inside it by itself
+  const first = Array.isArray(path) ? path[0] : path;
+  const p = done.then((res) => { try { if (lord.fs.inheritMarks) lord.fs.inheritMarks(String(first), dest); } catch (e) { /* not marked */ } return res; });
   p.sid = r.sid;
   return p;
 }

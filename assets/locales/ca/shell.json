@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "No s’ha pogut aplicar {name}",
   "themeSwitch.refusedBody": "El seu codi no coincideix amb la còpia signada de LordOS, així que no s’ha carregat. L’estil de l’escriptori es manté com estava.",
   "themeSwitch.failedBody": "No s’ha iniciat. L’estil de l’escriptori es manté com estava.",
-  "spotlight.section.machines": "Màquines"
+  "spotlight.section.machines": "Màquines",
+  "guestApps.inMachine": "A {machine}"
 }

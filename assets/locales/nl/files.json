@@ -339,5 +339,8 @@
   "markupHint": "Open in de markeringseditor",
   "readOnly.title": "Bestanden kan ‘{name}’ niet wijzigen",
   "readOnly.outside": "Bestanden kan deze map alleen weergeven: hij staat buiten je thuismap en je schijven. Gebruik Terminal of een andere app om hem te wijzigen.",
-  "readOnly.denied": "Deze map is alleen-lezen: de rechten ervan laten je hem niet wijzigen. Gebruik Terminal of een andere app om hem te wijzigen."
+  "readOnly.denied": "Deze map is alleen-lezen: de rechten ervan laten je hem niet wijzigen. Gebruik Terminal of een andere app om hem te wijzigen.",
+  "fromMachineNoRun": "‘{name}’ kwam van de machine {machine}. Bestanden opent geen programma's of installatieprogramma's uit een machine: gebruik Openen met als je het vertrouwt.",
+  "info.from": "Herkomst",
+  "info.fromMachine": "De machine {machine}"
 }

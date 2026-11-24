@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "A(z) {name} nem alkalmazható",
   "themeSwitch.refusedBody": "A kódja nem egyezik a LordOS aláírt példányával, ezért nem töltődött be. Az asztal stílusa marad a régi.",
   "themeSwitch.failedBody": "Nem indult el. Az asztal stílusa marad a régi.",
-  "spotlight.section.machines": "Gépek"
+  "spotlight.section.machines": "Gépek",
+  "guestApps.inMachine": "A(z) {machine} gépen"
 }

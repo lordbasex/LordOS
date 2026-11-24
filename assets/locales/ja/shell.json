@@ -971,5 +971,6 @@
   "themeSwitch.failedTitle": "{name} を適用できませんでした",
   "themeSwitch.refusedBody": "コードが LordOS の署名済みのコピーと一致しないため、読み込まれませんでした。デスクトップのスタイルは元のままです。",
   "themeSwitch.failedBody": "起動しませんでした。デスクトップのスタイルは元のままです。",
-  "spotlight.section.machines": "仮想マシン"
+  "spotlight.section.machines": "仮想マシン",
+  "guestApps.inMachine": "{machine} 内"
 }

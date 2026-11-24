@@ -30,8 +30,14 @@ check('a program calling itself kworker never gets the kernel\'s text', r.unknow
 // well-known programs and LordOS's
 check('pipewire in /usr/bin', curatedText({ exe: '/usr/bin/pipewire' })?.src === 'program');
 check('pipewire in the home folder: not', curatedText({ exe: '/home/u/bin/pipewire' }) === null);
-check('lord-media', curatedText({ exe: '/usr/lib/lordos/lord-media' })?.src === 'lordos');
+check('lord-media', curatedText({ exe: '/usr/lib/lordos/bin/lord-media' })?.src === 'lordos');
 check('a lord-* in the home folder: not', curatedText({ exe: '/home/u/lord-media' }) === null);
+// an app-controlled tree never borrows a trusted description (Flatpak's /app, /snap, /opt, a sandboxed app's own path)
+check('a lord-* under /app: not', curatedText({ exe: '/app/bin/lord-media' }) === null);
+check('a lord-* elsewhere in /usr: not', curatedText({ exe: '/usr/local/bin/lord-media' }) === null);
+check('pipewire under /snap: not', curatedText({ exe: '/snap/x/bin/pipewire' }) === null);
+check('pipewire in a Flatpak app: not', curatedText({ exe: '/usr/bin/pipewire', app: 'flatpak:org.evil.App' }) === null);
+check('lord-media in an isolated app: not', curatedText({ exe: '/usr/lib/lordos/bin/lord-media', app: 'lpk:evil' }) === null);
 check('every LordOS program listed has a text', lordosHelpers().length > 30);
 
 // a package's description: Debian's translation when lord-server found it, English marked otherwise
@@ -56,7 +62,7 @@ check('and kept in the language\'s cache', JSON.parse(caches.fr)[key] === 'Le sh
 
 // the order: a manual page's line (the program's own) before its package's, which becomes the second line
 answers = { 'man:sleep:es': { text: 'espera durante un tiempo especificado', lang: 'es' }, 'pkg:coreutils:es': { text: 'utilidades básicas de GNU', lang: 'es' } };
-r = d.describeProgram({ name: 'sleep', exe: '/opt/x/sleep', pkg: 'coreutils' }, { lang: 'es' });
+r = d.describeProgram({ name: 'sleep', exe: '/usr/bin/sleep', pkg: 'coreutils' }, { lang: 'es' });
 check('the manual page first, the package as a second line', r.src === 'man' && r.pkgText === 'utilidades básicas de GNU' && r.pkg === 'coreutils', JSON.stringify(r));
 answers = { 'unit:demo.service:es': { text: 'A made-up daemon', lang: 'en' } };
 r = d.describeProgram({ name: 'demod', exe: '/usr/sbin/demod', unit: 'demo.service' }, { lang: 'es' });
@@ -81,7 +87,7 @@ r = d.describeApp('monitor', { lang: 'pt' });
 check('a LordOS app: its manifest, English marked', r.src === 'app' && /processes/.test(r.text) && r.english === true, JSON.stringify(r));
 r = d.describeApp(launcher[0], { lang: 'es' });
 check('describeApp for a Linux app', r.src === 'desktop' && !r.english);
-r = d.describeProgram({ name: 'lord-web', exe: '/usr/lib/lordos/lord-web', app: 'desktop:lordos-web-cal' }, { lang: 'en' });
+r = d.describeProgram({ name: 'lord-web', exe: '/usr/lib/lordos/bin/lord-web', app: 'desktop:lordos-web-cal' }, { lang: 'en' });
 check('LordOS\'s own program wins over its scope', r.src === 'lordos', JSON.stringify(r));
 
 console.log(`describe-model-test: ${n} checks, ${bad} failures`);

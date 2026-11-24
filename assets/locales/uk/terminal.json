@@ -584,5 +584,7 @@
   "prefs.tr.would.capture": "зберігається в «Захопленому виводі»",
   "prefs.tr.would.highlight": "підсвічує «{text}»",
   "prefs.tr.param": "Параметр",
-  "prefs.tr.regexFirst": "Спочатку напишіть регулярний вираз."
+  "prefs.tr.regexFirst": "Спочатку напишіть регулярний вираз.",
+  "guest.badge": "ГІСТЬ",
+  "guest.title": "Оболонка в {machine}"
 }

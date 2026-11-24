@@ -1,0 +1,14 @@
+[Desktop Entry]
+# "Send to LordOS" in a Linux guest's file manager (Open With; docs/VIRTUALIZATION.md 6.21): sends the chosen files to the
+# LordOS computer this machine runs on, into its quarantine folder for this machine. Installed with lordos-guest (tools 10)
+# into /usr/local/share/applications (or /usr/share/applications by the lordos package). Every file type is a subclass of
+# application/octet-stream, so it is offered for all files; it never takes folders.
+Type=Application
+Name=Send to LordOS
+Comment=Copy these files to the LordOS computer this machine runs on
+Exec=lordos-guest --send-to-host %F
+Icon=document-send
+Terminal=false
+NoDisplay=true
+MimeType=application/octet-stream;
+Categories=Utility;

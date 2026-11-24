@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "κρατιέται στην Καταγεγραμμένη έξοδο",
   "prefs.tr.would.highlight": "επισημαίνει «{text}»",
   "prefs.tr.param": "Παράμετρος",
-  "prefs.tr.regexFirst": "Γράψτε πρώτα την κανονική έκφραση."
+  "prefs.tr.regexFirst": "Γράψτε πρώτα την κανονική έκφραση.",
+  "guest.badge": "ΦΙΛΟΞΕΝΟΥΜΕΝΟ",
+  "guest.title": "Κέλυφος μέσα στο {machine}"
 }

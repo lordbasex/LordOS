@@ -331,5 +331,8 @@
   "markupHint": "在标记编辑器中打开",
   "readOnly.title": "“文件”无法更改“{name}”",
   "readOnly.outside": "“文件”只能查看此文件夹：它位于你的个人文件夹和磁盘之外。若要更改它，请使用“终端”或其他应用。",
-  "readOnly.denied": "此文件夹为只读：其权限不允许你更改它。若要更改它，请使用“终端”或其他应用。"
+  "readOnly.denied": "此文件夹为只读：其权限不允许你更改它。若要更改它，请使用“终端”或其他应用。",
+  "fromMachineNoRun": "“{name}”来自机器 {machine}。“文件”不会打开来自机器的程序或安装程序：如果信任它，请使用“打开方式”。",
+  "info.from": "来源",
+  "info.fromMachine": "机器 {machine}"
 }

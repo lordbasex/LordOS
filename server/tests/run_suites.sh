@@ -239,6 +239,8 @@ EOF
     if have node; then run "mem-figure-test (sdk/memfigure.js)" node tests/mem_figure_test.mjs; fi
     if have node; then run "openwith-model-test (sdk/openwithmodel.js, Files' Open with providers)" node tests/openwith_model_test.mjs; fi
     if have node; then run "vm-openwith-test (apps/machines/openwith.js, a machine in Open with)" node tests/vm_openwith_test.mjs; fi
+    if have node; then run "vm-xfer-test (apps/machines/xfer.js, apps/files/quarantine.js: the file copy panel, files from a machine)" node tests/vm_xfer_test.mjs; fi
+    if have node; then run "guest-apps-test (sdk/guestappsmodel.js, guest apps in the launcher)" node tests/guest_apps_test.mjs; fi
     if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
@@ -444,6 +446,7 @@ EOF
         0) ok "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)" ;;
         77) skip "machines-group-manage" "build/lord-server, lord-vm, lord-vm-testpaths, lord-vmunpack, the default theme, /dev/kvm, unshare and an installed catalog and image store to mount over" ;;
         *) bad "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)"; tail -20 "$T/out" ;;
+    esac
     # Machines' storage under real QEMU/KVM (tests/vm_storage_test.sh): encrypted machines, both disposable sessions,
     # snapshot, clone, Export (.lordvm and OVA), the import of an export (tampered and hostile), raw disks
     bash tests/vm_storage_test.sh >"$T/out" 2>&1
@@ -473,6 +476,14 @@ EOF
         0) ok "guest-shell (tests/guest_shell_test.sh, lordos-guest's agent shell, links and notifications)" ;;
         77) skip "guest-shell" "build/lordos-guest and python3" ;;
         *) bad "guest-shell (tests/guest_shell_test.sh, lordos-guest's agent shell, links and notifications)" ;;
+    esac
+    # lordos-guest 9: "Send to LordOS" (6.21): the offer, flow control (it stops at the window), a resume after a lost
+    # connection, a prefix that differs, "not now" and "off"
+    sh tests/guest_send_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-send (tests/guest_send_test.sh, lordos-guest's Send to LordOS)" ;;
+        77) skip "guest-send" "build/lordos-guest and python3" ;;
+        *) bad "guest-send (tests/guest_send_test.sh, lordos-guest's Send to LordOS)" ;;
     esac
     # lordos-guest's performance profile on private buses: the real dconf-service, stand-ins for power-profiles-daemon
     # and the portal (tests/guest_perf_mock.py)
@@ -530,6 +541,7 @@ EOF
     if have node; then run "vm-catalog-test (apps/machines/catalog.js)" node tests/vm_catalog_test.mjs; fi
     if have node; then run "vm-windows-test (apps/machines/windows.js)" node tests/vm_windows_test.mjs; fi
     if have node; then run "vm-capture-test (apps/machines/capture.js, Capture mouse)" node tests/vm_capture_test.mjs; fi
+    if have node; then run "vm-alldisplays-test (apps/machines/alldisplays.js, All Displays)" node tests/vm_alldisplays_test.mjs; fi
     # Machines: crafted images the import must refuse (needs qemu-img and this computer's qemu-system)
     if have qemu-img && { have qemu-system-x86_64 || have qemu-system-aarch64; } && [ -x build/lord-vm ]; then run "vm-import-test" sh tests/vm_import_test.sh build
     else skip "vm-import-test" "qemu-img, qemu-system"; fi

@@ -339,5 +339,8 @@
   "markupHint": "Abrir no editor de marcação",
   "readOnly.title": "O Arquivos não pode alterar “{name}”",
   "readOnly.outside": "O Arquivos só pode ver esta pasta: ela está fora da sua pasta pessoal e dos seus discos. Para alterá-la, use o Terminal ou outro app.",
-  "readOnly.denied": "Esta pasta é somente leitura: as permissões dela não deixam você alterá-la. Para alterá-la, use o Terminal ou outro app."
+  "readOnly.denied": "Esta pasta é somente leitura: as permissões dela não deixam você alterá-la. Para alterá-la, use o Terminal ou outro app.",
+  "fromMachineNoRun": "“{name}” veio da máquina {machine}. Arquivos não abre programas nem instaladores de uma máquina: use Abrir com se confiar nele.",
+  "info.from": "De",
+  "info.fromMachine": "A máquina {machine}"
 }

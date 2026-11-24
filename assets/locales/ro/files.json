@@ -347,5 +347,8 @@
   "markupHint": "Deschide în editorul de adnotări",
   "readOnly.title": "Fișiere nu poate modifica „{name}”",
   "readOnly.outside": "Fișiere poate doar să afișeze acest dosar: se află în afara dosarului tău personal și a discurilor tale. Pentru a-l modifica, folosește Terminalul sau altă aplicație.",
-  "readOnly.denied": "Acest dosar este doar pentru citire: permisiunile lui nu îți permit să-l modifici. Pentru a-l modifica, folosește Terminalul sau altă aplicație."
+  "readOnly.denied": "Acest dosar este doar pentru citire: permisiunile lui nu îți permit să-l modifici. Pentru a-l modifica, folosește Terminalul sau altă aplicație.",
+  "fromMachineNoRun": "„{name}” a venit de la mașina {machine}. Fișiere nu deschide programe sau programe de instalare de la o mașină: folosește Deschide cu dacă ai încredere.",
+  "info.from": "Proveniență",
+  "info.fromMachine": "Mașina {machine}"
 }

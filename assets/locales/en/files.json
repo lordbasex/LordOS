@@ -339,5 +339,8 @@
   "markupHint": "Open in the markup editor",
   "readOnly.title": "Files can't change “{name}”",
   "readOnly.outside": "Files can only view this folder: it is outside your home folder and your disks. To change it, use the Terminal or another app.",
-  "readOnly.denied": "This folder is read-only: its permissions don't let you change it. To change it, use the Terminal or another app."
+  "readOnly.denied": "This folder is read-only: its permissions don't let you change it. To change it, use the Terminal or another app.",
+  "fromMachineNoRun": "“{name}” came from the machine {machine}. Files doesn’t open programs or installers from a machine: use Open With if you trust it.",
+  "info.from": "From",
+  "info.fromMachine": "The machine {machine}"
 }

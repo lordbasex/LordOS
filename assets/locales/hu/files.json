@@ -339,5 +339,8 @@
   "markupHint": "Megnyitás a jelölésszerkesztőben",
   "readOnly.title": "A Fájlok nem tudja módosítani a(z) „{name}” elemet",
   "readOnly.outside": "A Fájlok csak megjeleníteni tudja ezt a mappát: a saját mappádon és a lemezeiden kívül van. A módosításához használd a Terminált vagy egy másik appot.",
-  "readOnly.denied": "Ez a mappa írásvédett: a jogosultságai nem engedik, hogy módosítsd. A módosításához használd a Terminált vagy egy másik appot."
+  "readOnly.denied": "Ez a mappa írásvédett: a jogosultságai nem engedik, hogy módosítsd. A módosításához használd a Terminált vagy egy másik appot.",
+  "fromMachineNoRun": "„{name}” a(z) {machine} gépről jött. A Fájlok nem nyit meg programokat és telepítőket egy gépről: használd a Megnyitás ezzel parancsot, ha megbízol benne.",
+  "info.from": "Származás",
+  "info.fromMachine": "{machine} gép"
 }
