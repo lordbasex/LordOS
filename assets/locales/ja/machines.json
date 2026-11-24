@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D はどのシステムでも動作します。ゲストはプロセッサーで画面を描きます。",
   "cfg.graphics3dNote": "3D では、ゲストのアプリがこのコンピューターの GPU で描画します (OpenGL)。3D のマシンはサスペンドできず、メモリを含むスナップショットも保持できません。代わりにシャットダウンします。",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "ゲストの Vulkan アプリもこのコンピュータの GPU で描画します (venus)。ゲストには Mesa の Vulkan ドライバー、このコンピュータには GPU のメモリをマシンに割り当てられるカーネルが必要です。できない場合、マシンは OpenGL だけで起動し、その理由がログに記録されます。",
   "cfg.pointerDraw": "ポインターの描画",
   "cfg.pointerLordos": "LordOS (高速)",
   "cfg.pointerGuest": "マシン",

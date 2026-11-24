@@ -651,12 +651,12 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 20);
         }
-        /* schema 22: kernel_boot (direct kernel boot, 6.1), true or false, written only when true, never below 22; refused
+        /* schema 23: kernel_boot (direct kernel boot, 6.1), true or false, written only when true, never below 23; refused
          * with secure boot, the virtio-win devices, encryption and for a group's member */
         {
             struct { const char *add; int schema, want, on; } s21[] = {
-                { "\"kernel_boot\":true", 22, VM_OK, 1 }, { "\"kernel_boot\":false", 22, VM_OK, 0 }, { "\"kernel_boot\":1", 22, VM_E_FIELD, 0 },
-                { "\"kernel_boot\":\"on\"", 22, VM_E_FIELD, 0 }, { "\"kernel_boot\":true", 21, VM_E_FIELD, 0 }, { "\"kernel_boot\":false", 21, VM_OK, 0 },
+                { "\"kernel_boot\":true", 23, VM_OK, 1 }, { "\"kernel_boot\":false", 23, VM_OK, 0 }, { "\"kernel_boot\":1", 23, VM_E_FIELD, 0 },
+                { "\"kernel_boot\":\"on\"", 23, VM_E_FIELD, 0 }, { "\"kernel_boot\":true", 22, VM_E_FIELD, 0 }, { "\"kernel_boot\":false", 22, VM_OK, 0 },
                 { "\"kernel_boot\":true", VM_SCHEMA + 1, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s21 / sizeof s21[0]; i++) {
@@ -664,7 +664,7 @@ static void test_schema(void) {
                 const char *at = strstr(GOOD, "\"schema\":1");
                 snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s21[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s21[i].add);
                 int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
-                if (r != s21[i].want) fprintf(stderr, "  schema 22 %s (%d): got %d (%s)\n", s21[i].add, s21[i].schema, r, err);
+                if (r != s21[i].want) fprintf(stderr, "  schema 23 %s (%d): got %d (%s)\n", s21[i].add, s21[i].schema, r, err);
                 CHECK(r == s21[i].want);
                 if (r != VM_OK) continue;
                 CHECK(m.kernel_boot == s21[i].on);
@@ -691,7 +691,7 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&k, err, sizeof err) != VM_OK);
             k = m; k.kernel_boot = 0; k.encrypted = 1;
             CHECK(vm_machine_check(&k, err, sizeof err) == VM_OK);
-            CHECK(VM_SCHEMA >= 22);
+            CHECK(VM_SCHEMA >= 23);
         }
         /* schema 17: automation (6.15), true or false, written only when true, never below 17, never for anonymity */
         {

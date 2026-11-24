@@ -270,7 +270,7 @@ export function channelSet(id, on, cur) {
   return key ? { [key]: !!on } : {};
 }
 
-// Start Linux directly (6.1, schema 22): why the switch can't go on for this machine, or '' (lord-vm's
+// Start Linux directly (6.1, schema 23): why the switch can't go on for this machine, or '' (lord-vm's
 // vm_machine_check refuses the same)
 export function kbootBlocked(m) {
   if (!m) return 'none';

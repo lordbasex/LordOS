@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D toimii kaikkien järjestelmien kanssa: vieras piirtää kuvansa suorittimella.",
   "cfg.graphics3dNote": "3D:llä vieraan sovellukset piirtävät tämän tietokoneen GPU:lla (OpenGL). 3D-konetta ei voi asettaa lepotilaan eikä se voi säilyttää tilannevedoksia muisteineen: se sammutetaan sen sijaan.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Vieraan Vulkan-sovellukset piirtävät myös tämän tietokoneen GPU:lla (venus). Vieras tarvitsee Mesan Vulkan-ajurit; tämä tietokone ytimen, joka voi liittää GPU:n muistin koneisiin. Jos se ei onnistu, kone käynnistyy vain OpenGL:llä ja sen loki kertoo syyn.",
   "cfg.pointerDraw": "Osoittimen piirtää",
   "cfg.pointerLordos": "LordOS (nopeampi)",
   "cfg.pointerGuest": "Kone",

@@ -15,7 +15,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.2, 6.1, 6.11, 8).
   - **Start Linux directly.** Configure → Boot keeps a kernel, an initial RAM disk and a command line with an installed
     Linux machine and starts them instead of the boot loader on its disk (no firmware menu, no countdown): `machine.json`
-    schema 22 `kernel_boot`, the files copied into the machine's `disks/boot` by `lord-vm --set --kernel --initrd
+    schema 23 `kernel_boot`, the files copied into the machine's `disks/boot` by `lord-vm --set --kernel --initrd
     --cmdline --kernel-boot` all or nothing (regular files only, sizes capped, the kernel's start checked for the
     machine's architecture, the command line printable and one argument of QEMU's), the kernel at boot index 0. Refused
     with Secure Boot, the virtio-win devices, an encrypted machine and a group's member; a clone keeps it, an export
@@ -30,6 +30,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     old PC needs only its SSH server, or a live USB; `--sudo` reads a root-only disk with that PC's sudo), or a disk
     connected here. The size comes first and is checked, the copy is written sparse, then imported with the compatible
     devices. Checked with a Raspberry Pi 5 as the old PC: 20 GB in 190 s, booted.
+- **Machines: Vulkan for Linux guests (venus)** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.10,
+  3.3). Configure → Display → Vulkan, with Graphics 3D (machine.json schema 22, "vulkan"; lord-vm --set --vulkan). The guest's
+  Vulkan apps draw with this computer's GPU through virglrenderer's render server, which lord-vm starts in a jail of its own (a
+  pid namespace, Landlock, a seccomp allowlist with a listener, one exec, only the start's library mappings); QEMU gets the
+  connection through a small preloaded library and never forks or execs. Given only where the host can map the GPU's memory
+  into the guest (RADV and NVK need Linux 6.13; a discrete GPU with an Intel processor, Linux 6.16 and QEMU 11), else the log says
+  why. Checked with a Vulkan compute shader in a Debian 13 guest on an Intel UHD 630. The render server comes from Debian's
+  `virgl-server`, which Machines' setup installs.
+- **Machines: a smoother picture, Part 1 steps 4 and 5** (in development; docs/MACHINES-GPU.md). A machine's picture changes
+  reach lord-server as up to 8 rectangles a frame instead of one box over all of them, each damaged on its own; a 2D picture
+  is a GPU texture when the desktop composes on the GPU (only the changed rectangles uploaded, the frame presented without a UI
+  paint), and on the CPU path a scaled picture's copy is remade only where it changed.
 - **Machines: snapshots keep the settings, take notes, and come before a tools update** (in development; latest release
   0.8.9.5-beta; docs/VIRTUALIZATION.md 6.2). Each snapshot keeps `machine.json` as it was (`snapshots/<tag>.json`; a
   running machine's hardware as it started); going back puts that hardware back (processors, memory, devices, cards,
@@ -851,6 +863,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     the reply kept the helper from serving the host at all. The whole setup now has one 3 s limit.
   - **A `DISPLAY` of the form `unix:/path` was never reached** by the guest helper's clipboard on demand; it is now
     that socket.
+- **Machines: a machine with an Intel graphics card (GVT-g vGPU) hung at every start** since QEMU's seccomp allowlist: the
+  starting child asked Landlock's version after its jail, a call the allowlist sends to lord-vm, which wasn't listening yet.
+  Found by the first run of a vGPU machine under the allowlist (a Debian 13 guest on a scratch vGPU, 2026-11-24).
 - **`machines cp` out of a machine works again for files over 128 KB** (in development): a check meant to refuse a guest
   answer that doesn't fit took every full 128 KB piece for one, so such a copy failed with "a strange answer".
 - **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
@@ -1090,6 +1105,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `qemu-3d-stop`; nothing said with tools → `qemu-3d-crash`; Shut Down asked → `host-shutdown`; …), with lord-vm's
     echo received each time and the disk check at each next start. Not yet checked with a real 6.12.117 guest with 3D.
 ### Changed
+- **Machines: QEMU's render node by descriptor** (in development; docs/VIRTUALIZATION.md 3.3): lord-vm opens and checks the GPU's
+  render node, QEMU reopens that descriptor (`rendernode=/proc/self/fd/N`) and its Landlock rule is made from it, so the
+  device checked is the only one QEMU may open.
 - **Machines: an installer disc is read out of the desktop's process** (in development; docs/VIRTUALIZATION.md 5.2). The
   disc a person chooses is untrusted; its boot files are now read by `lord-vm --iso-probe` in seccomp strict mode (it can
   only read the mapped file and write one fixed 64-byte answer), and lord-server only checks that answer. Same results

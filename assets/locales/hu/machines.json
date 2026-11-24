@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "A 2D minden rendszerrel működik: a vendég a processzorral rajzolja a képét.",
   "cfg.graphics3dNote": "3D-vel a vendég alkalmazásai ennek a számítógépnek a GPU-jával rajzolnak (OpenGL). A 3D-s gépet nem lehet felfüggeszteni, és nem tarthat pillanatképeket a memóriájával: helyette leáll.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "A vendég Vulkan-alkalmazásai is ennek a számítógépnek a GPU-jával rajzolnak (venus). A vendégnek a Mesa Vulkan-illesztői kellenek, ennek a gépnek pedig olyan kernel, amely a GPU memóriáját a gépekbe tudja leképezni. Ha nem tudja, a gép csak OpenGL-lel indul, és a naplója megmondja, miért.",
   "cfg.pointerDraw": "A mutatót rajzolja",
   "cfg.pointerLordos": "LordOS (gyorsabb)",
   "cfg.pointerGuest": "A gép",

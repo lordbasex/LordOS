@@ -101,6 +101,12 @@ VMDISPLAY ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || ech
 ifeq ($(VMDISPLAY),1)
 VMDISPLAY_SRC := src/vm/vmdisplay.c src/sec/sandbox.c src/sec/cgroup.c
 all: build/lord-vmdisplay build/lordvm-dev
+# venus (docs/VIRTUALIZATION.md 6.10): the library a venus machine's QEMU preloads to take lord-vm's connection to the
+# render server (installed as /usr/lib/lordos/lib/lordos-venus-shim.so); no dependency beyond libdl
+all: build/lordos-venus-shim.so
+build/lordos-venus-shim.so: src/vm/venusshim.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -fPIC -shared -fvisibility=hidden -Wl,-z,relro,-z,now -o $@ src/vm/venusshim.c -ldl
 build/lord-vmdisplay: $(VMDISPLAY_SRC) $(VM_HDR)
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ $(VMDISPLAY_SRC) $(shell pkg-config --libs libsystemd) -lpthread
@@ -186,7 +192,12 @@ build/vmmem-test: tests/vmmem_test.c src/vm/vmmem.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmmem_test.c
 	./$@ || { rm -f $@; exit 1; }
-# direct kernel boot's checks (vmkboot.h, schema 22): the command line and a kernel's start, with a random pass
+# a machine picture's damage as a few rectangles (vmdamage.h, MACHINES-GPU.md Part 1 step 4), with a fuzz pass
+test: build/vmdamage-test
+build/vmdamage-test: tests/vmdamage_test.c src/vm/vmdamage.h src/vm/vmproto.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmdamage_test.c
+# direct kernel boot's checks (vmkboot.h, schema 23): the command line and a kernel's start, with a random pass
 test: build/vmkboot-test
 build/vmkboot-test: tests/vmkboot_test.c src/vm/vmkboot.h
 	@mkdir -p build

@@ -1,5 +1,5 @@
 # kernel-boot.py — direct kernel boot of an installed Linux guest (docs/VIRTUALIZATION.md 6.1, "Start Linux directly";
-# machine.json schema 22), end to end with real QEMU, in a scratch library in private user and mount namespaces (mh.py):
+# machine.json schema 23), end to end with real QEMU, in a scratch library in private user and mount namespaces (mh.py):
 #
 #   1. the harness's Debian 13 guest (images.py) imported with UEFI (and again with BIOS on amd64), its agent and
 #      automation on; started cold from its disk: seconds to "MH-READY" on its serial console (firmware, GRUB's menu and
@@ -171,7 +171,7 @@ def main():
             r = vm("--set", M, "--kernel", k, "--initrd", i, "--cmdline", mark + "\n", "--kernel-boot", "on")
             check("%s: --set takes the kernel, the initrd and the command line" % fw, r.returncode == 0, r.stderr)
             mj = json.load(open(os.path.join(M, "machine.json")))
-            check("%s: machine.json has kernel_boot and schema 22" % fw, mj.get("kernel_boot") is True and mj.get("schema", 0) >= 22, str(mj.get("schema")))
+            check("%s: machine.json has kernel_boot and schema 23" % fw, mj.get("kernel_boot") is True and mj.get("schema", 0) >= 23, str(mj.get("schema")))
             check("%s: disks/boot holds the copies (0600, not links)" % fw,
                   all(os.path.isfile(os.path.join(M, "disks/boot", f)) and not os.path.islink(os.path.join(M, "disks/boot", f))
                       and (os.stat(os.path.join(M, "disks/boot", f)).st_mode & 0o077) == 0 for f in ("vmlinuz", "initrd", "cmdline")))

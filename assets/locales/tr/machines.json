@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D her sistemle çalışır: konuk, görüntüsünü işlemciyle çizer.",
   "cfg.graphics3dNote": "3D ile konuğun uygulamaları bu bilgisayarın GPU’suyla çizer (OpenGL). 3D’li bir makine askıya alınamaz ve belleğiyle birlikte anlık görüntü tutamaz: bunun yerine kapanır.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Konuğun Vulkan uygulamaları da bu bilgisayarın GPU'suyla çizer (venus). Konuğun Mesa'nın Vulkan sürücülerine, bu bilgisayarın da GPU belleğini makinelere eşleyebilen bir çekirdeğe ihtiyacı var. Eşleyemezse makine yalnızca OpenGL ile başlar ve günlüğü nedenini söyler.",
   "cfg.pointerDraw": "İşaretçiyi çizen",
   "cfg.pointerLordos": "LordOS (daha hızlı)",
   "cfg.pointerGuest": "Makine",

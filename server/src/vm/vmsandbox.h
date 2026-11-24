@@ -50,7 +50,39 @@ typedef struct {
     const char *sc_drop;        /* NULL; a test build's row left out (vmseccomp.h) */
     int *notify_out;            /* NULL: kill as the default action; else the filter's listener comes back here
                                  * (cloexec; -1 none), for lord-vm alone: the child sends it and closes it before exec */
+    int render_fd;              /* > 2: the render node lord-vm opened and checked itself (3.3, "Render node by descriptor"),
+                                 * as QEMU will have it: Landlock's rule is made from this descriptor, so it names the very
+                                 * device lord-vm checked (no path looked up again), and QEMU opens it as
+                                 * rendernode=/proc/self/fd/<n>. 0..2: none (render's path is used, as before) */
+    const char *venus_shim;     /* Vulkan through venus (6.10): lordos-venus-shim.so, which QEMU preloads (read only);
+                                 * QEMU gets the render server's connection from lord-vm and never forks or execs */
 } VmQemuJail;
+
+/* venus's render server (6.10), started by lord-vm, never by QEMU: the guest's Vulkan commands are parsed there, so it
+ * is jailed like QEMU and apart from it. In the child, before execveat; returns the VMS_* bits that applied, and the
+ * caller refuses to exec without VMS_SECCOMP_OURS and VMS_NO_NEW_PRIVS, and without VMS_LANDLOCK_FS where the kernel
+ * has Landlock. Landlock: /usr read only, execute only the server and the loader, /etc/ld.so.cache, /dev/null, its own
+ * /proc, the render node (from lord-vm's descriptor, as for QEMU), /dev/dri listed, the GPU's sysfs folder read; no
+ * TCP, no abstract sockets, signals only inside its own jail (lord-vm refuses venus without Landlock ABI 6's scope), and
+ * lord-vm puts it in a pid namespace of its own. Seccomp: QEMU's allowlist with VmScOpts.venus (the render
+ * node's ioctls, its workers' forks, no exec but this one), the default action to lord-vm's listener (*notify_out) */
+typedef struct {
+    const char *render;         /* /dev/dri/renderD<N> */
+    int render_fd;              /* > 2: that node, opened and checked by lord-vm (the Landlock rule is made from it) */
+    int exec_fd;                /* VM_VENUS_SERVER opened O_PATH by lord-vm: the one execveat */
+    const char *exec_path;      /* VM_VENUS_SERVER */
+    int learn;                  /* 0; a test build's learn modes */
+    int *notify_out;            /* the filter's listener comes back here (cloexec), -1 none */
+    const char *probe_read;     /* NULL; tests/vm_jail_probe.c's own copy, which it runs in this jail (read only) */
+} VmVenusJail;
+int vm_jail_venus(const VmVenusJail *j);
+
+/* virglrenderer's render server (Debian's virgl-server package), which lord-vm starts for a venus machine */
+#define VM_VENUS_SERVER "/usr/libexec/virgl_render_server"
+/* the library QEMU preloads to take the render server's connection from lord-vm (venusshim.c) */
+#define VM_VENUS_SHIM "/usr/lib/lordos/lib/lordos-venus-shim.so"
+/* the BAR venus maps the guest's host-visible Vulkan memory through (QEMU's hostmem) */
+#define VM_VENUS_HOSTMEM_MB 4096
 
 /* In the child, before execve. Returns the VMS_* bits that applied; the caller refuses to exec without
  * VMS_SECCOMP_OURS and VMS_NO_NEW_PRIVS. */

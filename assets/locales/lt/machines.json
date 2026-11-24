@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D veikia su bet kuria sistema: svečias piešia vaizdą procesoriumi.",
   "cfg.graphics3dNote": "Su 3D svečio programos piešia šio kompiuterio GPU (OpenGL). Mašinos su 3D negalima užmigdyti ir ji negali laikyti momentinių kopijų su savo atmintimi: vietoj to ji išjungiama.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Svečio Vulkan programos taip pat piešia šio kompiuterio GPU (venus). Svečiui reikia Mesa Vulkan tvarkyklių, šiam kompiuteriui – branduolio, galinčio susieti GPU atmintį su mašinomis. Jei negali, mašina paleidžiama tik su OpenGL, o jos žurnale nurodyta kodėl.",
   "cfg.pointerDraw": "Žymeklį piešia",
   "cfg.pointerLordos": "LordOS (greičiau)",
   "cfg.pointerGuest": "Mašina",

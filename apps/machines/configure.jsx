@@ -296,7 +296,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
     pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', cpuModel: m.cpuModel || 'host',
-    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, guestFiles: m.guestFiles !== false,
+    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, guestFiles: m.guestFiles !== false, vulkan: !!m.vulkan,
     kernelBoot: !!m.kernelBoot, cmdline: m.kernelCmdline || '', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
@@ -545,9 +545,14 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
             ...resolutions(screen.width, screen.height, null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: cur.resolution === `${w}x${h}`, onClick: () => set({ resolution: `${w}x${h}` }) }))]} /></Off>
       </Row>
       <Row label={tr('machines.cfg.graphics')} last={!m.windowsDevices && !gpuRow} note={note}>
-        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set(x === '3d' ? { graphics: x, gpu: '' } : { graphics: x })}
+        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set(x === '3d' ? { graphics: x, gpu: '' } : { graphics: x, vulkan: false })}
           options={[['2d', tr('machines.cfg.graphics2d')], ['3d', tr('machines.cfg.graphics3d'), !!why3d && cur.graphics !== '3d']]} /></Off>
       </Row>
+      {/* Vulkan through venus (6.10, machine.json "vulkan"): with 3D only; lord-vm gives it when this computer can and says
+          why not in the machine's log */}
+      {cur.graphics === '3d' ? <Row label={tr('machines.cfg.vulkan')} note={[tr('machines.cfg.vulkanNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running}><Toggle on={!!cur.vulkan} onChange={(x) => set({ vulkan: x })} /></Off>
+      </Row> : null}
       {/* who draws a Windows guest's pointer (7.1.2): LordOS, from the shape the guest hands over (no round trip through
           the guest for each move), or its display driver, into the picture; applied by the guest tools at the next start.
           Not with an Intel graphics card: HWCursor is the virtio driver's, and Intel's puts the pointer on the vGPU's cursor
@@ -789,7 +794,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Off off={running}><Toggle on={cur.bootMenu} onChange={(x) => set({ bootMenu: x })} /></Off>
       </Row>
     </Group>
-    {/* Start Linux directly (6.1, machine.json kernel_boot, schema 22): the kernel, initrd and command line kept in the
+    {/* Start Linux directly (6.1, machine.json kernel_boot, schema 23): the kernel, initrd and command line kept in the
         machine's disks/boot (lord-vm copies the chosen files in) instead of the boot loader on its disk; refused with
         Secure Boot, the virtio-win devices, encryption and for a group's member (model.js kbootBlocked) */}
     {(() => {

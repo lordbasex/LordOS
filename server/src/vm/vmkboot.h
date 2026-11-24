@@ -1,5 +1,5 @@
 /* vmkboot.h — direct kernel boot of an installed Linux guest (docs/VIRTUALIZATION.md 6.1, "Start Linux directly";
- * machine.json schema 22 "kernel_boot"). Pure checks, shared by lord-vm (--set's copy and the start) and tested by
+ * machine.json schema 23 "kernel_boot"). Pure checks, shared by lord-vm (--set's copy and the start) and tested by
  * vmkboot-test under ASan and UBSan.
  *
  * The person picks a kernel, an optional initrd and a command line (Configure → Boot, or `lord-vm --set`). lord-vm copies

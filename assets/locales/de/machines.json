@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D funktioniert mit jedem System: Der Gast zeichnet sein Bild mit dem Prozessor.",
   "cfg.graphics3dNote": "Mit 3D zeichnen die Apps des Gasts mit der GPU dieses Computers (OpenGL). Eine Maschine mit 3D kann nicht in den Ruhezustand versetzt werden und keine Schnappschüsse mit ihrem Speicher behalten: Sie wird stattdessen heruntergefahren.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Vulkan-Apps des Gastes zeichnen ebenfalls mit der GPU dieses Computers (venus). Der Gast braucht die Vulkan-Treiber von Mesa, dieser Computer einen Kernel, der den Speicher der GPU in Maschinen einblenden kann. Geht das nicht, startet die Maschine nur mit OpenGL, und ihr Protokoll nennt den Grund.",
   "cfg.pointerDraw": "Zeiger gezeichnet von",
   "cfg.pointerLordos": "LordOS (schneller)",
   "cfg.pointerGuest": "Der Maschine",

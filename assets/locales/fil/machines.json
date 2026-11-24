@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "Gumagana ang 2D sa anumang system: iginuguhit ng guest ang larawan nito gamit ang processor.",
   "cfg.graphics3dNote": "Sa 3D, gumuguhit ang mga app ng guest gamit ang GPU ng computer na ito (OpenGL). Ang machine na may 3D ay hindi maisususpinde o makapagtatago ng mga snapshot kasama ang memorya nito: pinapatay ito sa halip.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Gumuguhit din ang mga Vulkan app ng guest gamit ang GPU ng computer na ito (venus). Kailangan ng guest ang mga Vulkan driver ng Mesa; kailangan ng computer na ito ng kernel na kayang i-map ang memorya ng GPU sa mga machine. Kung hindi kaya, nagsisimula ang machine sa OpenGL lang at sinasabi ng log nito kung bakit.",
   "cfg.pointerDraw": "Ang gumuguhit ng pointer",
   "cfg.pointerLordos": "LordOS (mas mabilis)",
   "cfg.pointerGuest": "Ang machine",

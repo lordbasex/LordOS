@@ -48,6 +48,9 @@
 #include "vmproto.h"
 #include "vmkeys.h"
 #include "vmpace.h"
+#include "vmdamage.h"
+
+_Static_assert(VMDMG_MAX == VD_FRAME_RECTS, "a frame's rectangles: vmdamage.h and vmproto.h agree");
 #include "../sec/sandbox.h"
 #include "../media/aring.h"
 
@@ -106,8 +109,9 @@ typedef struct {
     size_t shm_len;
     uint32_t shm_w, shm_h;
     int want_w, want_h;         /* last VD_SIZE sent */
-    /* damage waiting to be copied */
-    int dirty, dx0, dy0, dx1, dy1;
+    /* damage waiting to be copied: a few rectangles (vmdamage.h), each its own VD_FRAME */
+    int dirty;
+    VmDamage dmg;
     int frame, acked;
     long long sent_ms, next_ms;
     int rate;
@@ -228,11 +232,8 @@ static void drop_dmabuf(void) {
 }
 
 static void damage(int x, int y, int w, int h) {
-    if (!D.dirty) { D.dx0 = x; D.dy0 = y; D.dx1 = x + w; D.dy1 = y + h; D.dirty = 1; return; }
-    if (x < D.dx0) D.dx0 = x;
-    if (y < D.dy0) D.dy0 = y;
-    if (x + w > D.dx1) D.dx1 = x + w;
-    if (y + h > D.dy1) D.dy1 = y + h;
+    if (!D.dirty) { vmdmg_clear(&D.dmg); D.dirty = 1; }
+    vmdmg_add(&D.dmg, x, y, w, h);
 }
 
 /* ---- sound ---- */
@@ -550,8 +551,9 @@ static void new_size(uint32_t w, uint32_t h) {
     if (w != D.w || h != D.h) fprintf(stderr, "lord-vmdisplay %s: the guest's picture is %ux%u\n", me, w, h);
     D.w = w;
     D.h = h;
+    /* all of it, and only it: what was gathered for the old size goes */
+    vmdmg_clear(&D.dmg);
     damage(0, 0, (int)w, (int)h);
-    D.dx0 = D.dy0 = 0; D.dx1 = (int)w; D.dy1 = (int)h;
     if (D.shm && (D.shm_w != w || D.shm_h != h)) { munmap(D.shm, D.shm_len); D.shm = NULL; D.shm_len = 0; }
     if (!D.shm && (D.want_w != (int)w || D.want_h != (int)h)) {
         D.want_w = (int)w;
@@ -586,20 +588,25 @@ static int copy_damage(int x, int y, int w, int h) {
     return 0;
 }
 
+/* the damage goes out as one VD_FRAME per rectangle, all with the same frame number; f counts the rectangles still to
+ * come in this frame (0 on the last), so lord-server damages each one and answers the frame once (vmproto.h) */
 static void flush(long long now) {
     if (!D.dirty || !D.shm || D.src == SRC_NONE || D.shm_w != D.w || D.shm_h != D.h) return;
     if (!D.acked && now - D.sent_ms < ACK_WAIT_MS) return;
     if (now < D.next_ms) return;
-    int x0 = D.dx0 < 0 ? 0 : D.dx0, y0 = D.dy0 < 0 ? 0 : D.dy0;
-    int x1 = D.dx1 > (int)D.w ? (int)D.w : D.dx1, y1 = D.dy1 > (int)D.h ? (int)D.h : D.dy1;
     D.dirty = 0;
-    if (x1 <= x0 || y1 <= y0) return;
-    if (copy_damage(x0, y0, x1 - x0, y1 - y0)) return;
+    VmDamage d = D.dmg;
+    vmdmg_clear(&D.dmg);
+    vmdmg_clip(&d, (int)D.w, (int)D.h);
+    if (!d.n) return;
+    for (int i = 0; i < d.n; i++)
+        if (copy_damage(d.r[i].x0, d.r[i].y0, d.r[i].x1 - d.r[i].x0, d.r[i].y1 - d.r[i].y0)) return;
     D.frame++;
     D.acked = 0;
     D.sent_ms = now;
     D.next_ms = now + vmpace_interval(D.rate, D.pace_ms);
-    say(vd_msg(VD_FRAME, x0, y0, x1 - x0, y1 - y0, D.frame, 0), -1);
+    for (int i = 0; i < d.n; i++)
+        say(vd_msg(VD_FRAME, d.r[i].x0, d.r[i].y0, d.r[i].x1 - d.r[i].x0, d.r[i].y1 - d.r[i].y0, D.frame, d.n - 1 - i), -1);
 }
 
 /* ---- validation ---- */

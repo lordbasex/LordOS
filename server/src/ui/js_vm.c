@@ -478,7 +478,7 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
             vm_boot_spec(&m, bo, sizeof bo);
             set_str(c, o, "bootOrder", bo);
             JS_SetPropertyStr(c, o, "bootMenu", JS_NewBool(c, m.boot_menu));
-            /* direct kernel boot (schema 22, 6.1): the switch, and what disks/boot holds (the files' presence, the
+            /* direct kernel boot (schema 23, 6.1): the switch, and what disks/boot holds (the files' presence, the
              * command line when it is one lord-vm would pass) */
             JS_SetPropertyStr(c, o, "kernelBoot", JS_NewBool(c, m.kernel_boot));
             char kp[PATH_MAX + 64], kc[VM_KBOOT_CMDLINE_MAX + 1] = "";
@@ -561,6 +561,7 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         JS_SetPropertyStr(c, o, "guestFiles", JS_NewBool(c, !m.guest_files_off && !m.profile_lock));   /* files from the guest (6.21) */
         set_int(c, o, "heads", m.heads > 1 ? m.heads : 1);                       /* All Displays (5.4) */
         JS_SetPropertyStr(c, o, "automation", JS_NewBool(c, m.automation));      /* machines exec and cp may run programs (6.15) */
+        JS_SetPropertyStr(c, o, "vulkan", JS_NewBool(c, m.vulkan));              /* Vulkan through venus with 3D (6.10) */
         JS_SetPropertyStr(c, o, "usb", JS_NewBool(c, m.usb));                    /* a USB controller for this computer's devices (6.6) */
         {
             JSValue ua = JS_NewArray(c);
@@ -1714,6 +1715,12 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "automation");
     if (JS_IsBool(v)) { args[n++] = "--automation"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    /* Vulkan through venus (6.10): with 3D only; lord-vm turns it off with 2D */
+    v = JS_GetPropertyStr(c, argv[1], "vulkan");
+    if (JS_IsBool(v)) { args[n++] = "--vulkan"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
     /* host USB devices (6.6): the machine's USB controller (a device of the guest: with it off and no saved state) and the
      * devices that connect by themselves (vendor:product[:serial]); lord-vm refuses both for anonymity */
     v = JS_GetPropertyStr(c, argv[1], "usb");
@@ -1789,7 +1796,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     if (JS_IsBool(v)) { args[n++] = "--boot-menu"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
-    /* direct kernel boot (schema 22, 6.1): kernel and initrd are the person's readable files (lord-vm copies them in),
+    /* direct kernel boot (schema 23, 6.1): kernel and initrd are the person's readable files (lord-vm copies them in),
      * initrd "none" removes it, cmdline 1 to 1023 printable characters, kernelBoot the switch */
     v = JS_GetPropertyStr(c, argv[1], "kernelBoot");
     if (JS_IsBool(v)) { args[n++] = "--kernel-boot"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
@@ -2436,6 +2443,7 @@ typedef struct {
      * lord.vm.shown), frames not read while none did (the next one is read whole), and counters for Logs and tests */
     VmPace pace;
     int pic_hidden, db_skipped;
+    long pic_rects, pic_tex;            /* 2D: rectangles received (VD_FRAME), frames shown by their texture alone (Part 1 steps 4, 5) */
     long pic_skipped;
     unsigned rkey;                      /* names the picture in map for dmaread_rows_new's change test */
     /* sound (6.9): machine.json's choices, what the guest does now (VD_GUEST_AUDIO), and what this side has open. The
@@ -3881,9 +3889,15 @@ static void guest_cursor(Sess *s, int fd, int w, int h, int hx, int hy) {
     if (s->media) media_src_cursor_guest_draws(s->media, 0);
 }
 
+/* a 2D frame's rectangles (VD_FRAME, one message each; vmdamage.h), gathered over the messages one poll takes: kept
+ * apart up to FRAME_RECTS, then only their union (du) is used */
+#define FRAME_RECTS (VD_FRAME_RECTS * 4)
+
 static void from_vd(Sess *s) {
     int frames = 0, last = 0;
     struct { int x0, y0, x1, y1, c; } du = { 0, 0, 0, 0, 0 };     /* the frames' changed area, together (2D) */
+    struct { int x, y, w, h; } dr[FRAME_RECTS];
+    int ndr = 0, over = 0, pic2d = 0, whole = 0;        /* whole: frames whose last rectangle came (for the counts) */
     for (int k = 0; k < VD_POLL_MAX && s->vd >= 0; k++) {
         VdMsg m;
         int fd = -1;
@@ -3908,7 +3922,12 @@ static void from_vd(Sess *s) {
                 s->db_pending = 1; s->db_frame = m.e;
                 break;
             }
+            /* a frame is its rectangles, the last one with f = 0 (vmproto.h) */
             frames++; last = m.e;
+            if (!m.f) whole++;
+            pic2d = 1;
+            if (ndr < FRAME_RECTS) { dr[ndr].x = m.a; dr[ndr].y = m.b; dr[ndr].w = m.c; dr[ndr].h = m.d; ndr++; }
+            else over = 1;
             if (!du.c) { du.x0 = m.a; du.y0 = m.b; du.x1 = m.a + m.c; du.y1 = m.b + m.d; du.c = 1; }
             else { du.x0 = m.a < du.x0 ? m.a : du.x0; du.y0 = m.b < du.y0 ? m.b : du.y0; du.x1 = m.a + m.c > du.x1 ? m.a + m.c : du.x1; du.y1 = m.b + m.d > du.y1 ? m.b + m.d : du.y1; }
             break;
@@ -3959,12 +3978,32 @@ static void from_vd(Sess *s) {
             gpu_frame = r == 1 && ms && ms->gtex;
         }
     }
+    /* a 2D picture with the GPU composing: the picture's own memory is a texture (media_src_tex_*), its changed
+     * rectangles uploaded as they come; the GPU scales it (MACHINES-GPU.md Part 1 step 5). A hidden window's picture
+     * isn't uploaded: the texture is made whole again at the paint that shows it */
+    if (ms && s->db_cur < 0) {
+        /* 2D frames again after a dmabuf picture (the guest's driver went back to 2D): its texture isn't the picture */
+        if (pic2d && ms->gtex && ms->gtex != ms->ptex) { ms->gtex = NULL; ms->gpu_drawn = 0; ms->cpu_stale = 0; }
+        if (gpu_show_ok(s) && !s->pic_hidden) ms->tex_px = 1;
+        else if (ms->tex_px) media_src_tex_off(ms);
+    }
+    if (pic2d && frames && ms && ms->tex_px && !over) {
+        int up = 1;
+        for (int i = 0; i < ndr && up; i++) up = media_src_tex_rect(ms, dr[i].x, dr[i].y, dr[i].w, dr[i].h);
+        gpu_frame = up && ndr > 0;
+    } else if (pic2d && frames && ms && ms->tex_px && over)
+        gpu_frame = media_src_tex_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0);
     if (frames && ms) {
         ms->frame_seq++;
         int shown;
         /* a frame in the texture the last paint drew: presenting again is enough (no UI damage, no paint) */
-        if (gpu_frame && ms->gpu_drawn) { media_src_present(ms); shown = 1; }
-        else shown = du.c ? media_src_damage_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0) : (media_src_damage(ms), 1);
+        s->pic_rects += ndr;
+        if (gpu_frame && ms->gpu_drawn) { media_src_present(ms); shown = 1; if (pic2d) s->pic_tex += whole; }
+        else if (pic2d && !over && ndr > 0) {
+            /* each rectangle on its own: a clock and a moving square repaint two small boxes (Part 1 step 4) */
+            shown = 0;
+            for (int i = 0; i < ndr; i++) shown += media_src_damage_rect(ms, dr[i].x, dr[i].y, dr[i].w, dr[i].h);
+        } else shown = du.c ? media_src_damage_rect(ms, du.x0, du.y0, du.x1 - du.x0, du.y1 - du.y0) : (media_src_damage(ms), 1);
         /* what changed isn't in the part of the picture shown (zoomed in), or in apps mode in any of the guest's
          * windows shown here (or none is): nothing to paint, so the frame counts as read at once (the helper isn't
          * held 250 ms) */
@@ -3972,7 +4011,7 @@ static void from_vd(Sess *s) {
         /* the node it was drawn in went away (the window's tree was made again): one repaint of everything finds
          * the new node, and that paint binds it */
         else if (!ms->node && !media_src_crop_count(ms)) damage_add((Box){ 0, 0, 16384, 16384 });
-        s->frames += frames;
+        s->frames += pic2d ? whole : frames;
         s->ack_pending = 1; s->ack_frame = last; s->ack_seq = ms->frame_seq;
     }
     pace_tell(s);
@@ -4117,6 +4156,8 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "picReads", s->db_reads);
     set_int(c, o, "picSame", s->db_same);
     set_int(c, o, "picSkipped", s->pic_skipped);
+    set_int(c, o, "picRects", (int)s->pic_rects);
+    set_int(c, o, "picTex", (int)s->pic_tex);
     set_int(c, o, "pace", s->pace.kind);
     set_int(c, o, "cd", s->cd_state);
     /* host USB devices (6.6): what the machine holds, a request in flight, the last refusal and how many there were */

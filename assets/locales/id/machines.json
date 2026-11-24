@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D bekerja dengan sistem apa pun: tamu menggambar tampilannya dengan prosesor.",
   "cfg.graphics3dNote": "Dengan 3D, aplikasi tamu menggambar dengan GPU komputer ini (OpenGL). Mesin dengan 3D tidak bisa ditangguhkan atau menyimpan snapshot beserta memorinya: mesin dimatikan sebagai gantinya.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Aplikasi Vulkan tamu juga menggambar dengan GPU komputer ini (venus). Tamu memerlukan driver Vulkan dari Mesa; komputer ini memerlukan kernel yang dapat memetakan memori GPU ke mesin. Jika tidak bisa, mesin dimulai hanya dengan OpenGL dan lognya menyebutkan alasannya.",
   "cfg.pointerDraw": "Penunjuk digambar oleh",
   "cfg.pointerLordos": "LordOS (lebih cepat)",
   "cfg.pointerGuest": "Mesin",

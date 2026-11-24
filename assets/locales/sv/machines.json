@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D fungerar med alla system: gästen ritar sin bild med processorn.",
   "cfg.graphics3dNote": "Med 3D ritar gästens appar med den här datorns GPU (OpenGL). En maskin med 3D kan inte försättas i viloläge eller behålla ögonblicksbilder med sitt minne: den stängs av i stället.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Gästens Vulkan-appar ritar också med den här datorns GPU (venus). Gästen behöver Mesas Vulkan-drivrutiner; den här datorn en kärna som kan mappa GPU:ns minne in i maskiner. Går det inte startar maskinen bara med OpenGL och dess logg säger varför.",
   "cfg.pointerDraw": "Pekaren ritas av",
   "cfg.pointerLordos": "LordOS (snabbare)",
   "cfg.pointerGuest": "Maskinen",

@@ -67,6 +67,24 @@ Still open from step 6: the Processes tab's own React update (150 rows re-render
 per second here (`__lordTick` lines), independent of the native call; memoized or virtualized rows in the SDK's `Table`
 would fix it. A real-display (KMS) screenshot with the handed-over pointer is still to do on the dev VM.
 
+### Part 1 — steps 4 and 5 (2026-11-24, in development)
+
+- **Step 4, several damage rectangles.** lord-vmdisplay gathers QEMU's updates into at most 8 rectangles (`vm/vmdamage.h`: a
+  rectangle that overlaps or comes within 8 pixels of a kept one joins it, and the merge goes on through what the grown box
+  reaches; when all 8 are taken, the pair whose union adds the least area joins). Each goes to lord-server as its own `VD_FRAME`,
+  all with the frame's number, `f` counting the ones still to come (0 on the last); lord-server checks each with
+  `vd_rect_inside`, damages each on its own and answers the frame once. A clock and a moving square far apart are 2 rectangles
+  of 5,296 pixels, not a 340,800-pixel box (`vmdisplay-test` against a mock QEMU). `vmdamage-test` fuzzes the merge (every
+  changed pixel stays covered, no two boxes near, never more than 8). A Linux guest's console sends one rectangle a frame
+  anyway (its DRM console merges its own damage); Windows' display driver updates apart.
+- **Step 5, scaled on the GPU.** With the GPU composing, a 2D picture's own memory becomes a texture (`media_src_tex_*`): made
+  whole at the paint that first shows it (or after a new GPU context), then only each frame's rectangles are uploaded and the frame
+  is presented, with no UI paint, as a dmabuf picture's already was; a hidden window's frames aren't uploaded. On the CPU path
+  (`LORD_GPU=0`, a capture) a scaled picture's copy is remade only where the frames since the last one changed (`media_pd_note`;
+  `mview-test`: 120 random frames at three scales, pixel for pixel the same as a whole copy). Not yet seen on a real display (a
+  headless lord-server composes on the CPU).
+- **The render node by descriptor** (VIRTUALIZATION.md 3.3) and **venus** (6.10) came with these.
+
 ## Part 2 — a real GPU for a machine
 
 Linux guests already have 3D through virgl. Windows has no stable virgl driver: the experimental viogpu3d (virtio-win
