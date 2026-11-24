@@ -11,6 +11,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: real runs of sound, recording and card models** (in development; latest release 0.8.9.5-beta;
+  docs/VIRTUALIZATION.md 6.9, 6.20, 6.22). `tests/vm_sound_e2e.sh`: a headless lord-server in its own namespaces with only
+  this account's pulse socket mounted in, a guest playing a tone and recording its microphone: the speakers' PipeWire
+  stream named after the machine, the microphone closed without LordOS's permission and open with it (the guest heard the
+  maintainer's webcam microphone), a screenshot at the guest's size and an H.264 and AAC recording carrying the guest's tone
+  even with the speakers at volume 0. `tests/vm_nic_e2e.sh`: every card model booted; seven reach the internet, PCnet gets
+  its address and then only receive errors (QEMU 10.0's PCnet with Linux 6.12, documented); an import's extra cards are
+  there with their MACs, not connected, as designed.
 - **Machines: this computer's USB devices in a machine, and the camera** (in development; latest release 0.8.9.5-beta;
   docs/VIRTUALIZATION.md 6.6 and 6.9; approved by the maintainer on 2026-11-24, AGENTS.md "Machines' USB devices").
   - The machine window's **Devices** menu lists this computer's USB devices; one picked goes into the running machine

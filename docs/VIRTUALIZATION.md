@@ -42,8 +42,8 @@ recomputes both from the rows; the arithmetic:
 | B. Getting a system in (cards, unattended, import) | 12 | 13 | 87.85 | 88 % | 12 × 88 % = 10.56 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 95.17 | 95 % | 11 × 95 % = 10.45 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 85.00 | 85 % | 9 × 85 % = 7.65 | 60 % |
-| E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
-| F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
+| E. Network | 6 | 4 | 86.25 | 86 % | 6 × 86 % = 5.16 | 80 % |
+| F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 95.00 | 95 % | 6 × 95 % = 5.70 | 56 % |
 | G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 76.67 | 77 % | 12 × 77 % = 9.24 | 68 % |
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
 | I. Guest tools and agent (state, shell, logs) | 7 | 6 | 90.83 | 91 % | 7 × 91 % = 6.37 | 75 % |
@@ -52,9 +52,9 @@ recomputes both from the rows; the arithmetic:
 | L. Privacy and security model | 4 | 7 | 85.71 | 86 % | 4 × 86 % = 3.44 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 92.00 | 92 % | 3 × 92 % = 2.76 | 55 % |
-| **Total** | **100** | **110** | | | **82.77 → 83 %** | 69 % |
+| **Total** | **100** | **110** | | | **85.47 → 85 %** | 69 % |
 
-Σ = 12.88 + 10.56 + 10.45 + 7.65 + 4.80 + 3.36 + 9.24 + 3.22 + 6.37 + 2.79 + 2.67 + 3.44 + 2.58 + 2.76 = 82.77, rounded **83 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.88 + 10.56 + 10.45 + 7.65 + 5.16 + 5.70 + 9.24 + 3.22 + 6.37 + 2.79 + 2.67 + 3.44 + 2.58 + 2.76 = 85.47, rounded **85 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); the rest of guest → host links (G, +0.3); the file copy panel with drag out, USB, then camera and printers (G and F, +1.2
@@ -162,24 +162,24 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6) | 🧪 | 85 | `lordvm.c` (`--disk-format raw`, `cmd_export`, `cmd_import_lordvm`), `vmexport.c`, `vmkeysrv.c`, `backup/engine.c`, `vmkey.jsx`; `vm_storage_test.sh`, `vmexport-test`, `vmkeysrv-test`, `backup-machines-test` | *In development*, 2026-11-24: raw disk files (never host block devices: decided), encryption (8), Export as `.lordvm` with a checked manifest and as OVA, the import of an export, consistent backups. The OVA never imported into another app; the app's sheets not driven end to end; no bare disk image export (was ❌ 0) |
 | Storage window: shared extents, frees-if-deleted, downloads (6.16) | 🟡 | 75 | `storage.jsx`, `js_vm.c` (FIEMAP) | Trash, Reclaim with an estimate, the unused shared base. Never seen on btrfs or XFS; no "about" figures; no "delete old snapshots" or "remove unused media" |
 
-### E. Network (80 %)
+### E. Network (86 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | Shared (passt over a socketpair), Isolated (6.5) | ✅ | 100 | `lordvm.c` (`vm_passt_argv`) |  |
 | Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5) | 🧪 | 90 | `vmnet_admin.c`, `vmnet.c`, `lordvm.c` | Headless checks; `vhost=off`, no `vhost-net` |
 | Each machine named in the firewall (6.5) | 🟡 | 60 | `fw/rules.h` (`lordos:machines`), `apps/monitor/Network.jsx` | One component for every machine (Monitor names them); a forwarded port isn't shown as its own rule |
-| Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22) | 🧪 | 70 | `machine.h` (`nic_model`, `VM_EXTRA_NICS`) | An import's extra cards are kept but never connected. Added by the audit of 2026-11-23 |
+| Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22) | ✅ | 95 | `machine.h` (`nic_model`, `VM_EXTRA_NICS`), `lordvm.c`; `vm_nic_e2e.sh` | Booted with each model (*in development*, 2026-11-24): seven reach the internet; PCnet gets its address, then receive errors (QEMU's PCnet with Linux 6.12). Extra cards present, not connected, by design (6.22) |
 
-### F. Devices (56 %)
+### F. Devices (95 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Speakers and microphone, output and input per machine (6.9) | ✅ | 90 | `lordvm.c` (`hda-micro`), `vmdisplay.c`; microphone permission checked in `js_vm.c` | Windows guest sound not checked |
-| Recording with sound, screenshot (6.20) | 🧪 | 90 | `js_vm.c`, `vmwindow.jsx` | No automated test or recorded on-screen check (was ✅) |
+| Speakers and microphone, output and input per machine (6.9) | ✅ | 95 | `lordvm.c` (`hda-micro`), `vmdisplay.c`; microphone permission checked in `js_vm.c`; `vm_sound_e2e.sh` | Through a running lord-server with the maintainer's own microphone (*in development*, 2026-11-24): the speakers' PipeWire stream, the microphone closed without the permission and open with it, the guest hearing it. Windows guest sound not checked |
+| Recording with sound, screenshot (6.20) | ✅ | 95 | `js_vm.c` (`f_record`, `f_screenshot`), `vmwindow.jsx`; `vm_sound_e2e.sh` | Automated through a running lord-server (*in development*, 2026-11-24): a PNG at the guest's size, an H.264 and AAC recording with the guest's tone. The bar's red state and the clock's indicator not seen on screen |
 | CD/DVD change while running | ✅ | 100 | `lordvm.c` (`cd_change`) |  |
-| USB passthrough, auto-connect rules, `vm-usb-allow` (6.6) | ❌ | 0 | no usbredir anywhere |  |
-| Camera (6.9), printers (5.5) | ❌ | 0 |  |  |
+| USB passthrough, auto-connect rules, `vm-usb-allow` (6.6) | ✅ | 95 | `vmusb.c`, `vmusb_admin.c`, `vmusbshim.c`, `lordvm.c` (`usb_*`), `js_vm.c` (`usb_*`), `admin.c` (`admin_say_fd`); `vmusb-test`, `vm_usb_model_test.mjs`, `vm_usb_e2e.sh` | *In development*, 2026-11-24 (approved, AGENTS.md "Machines' USB devices"): a real webcam into a Debian guest through the real admin helper, 38 of 38. The Devices menu not seen on screen |
+| Camera (6.9), printers (5.5) | ✅ | 90 | `js_vm.c` (`usb_perm_need`), `vmwindow.jsx` (`markDeviceUse`); `vm_usb_e2e.sh` | The camera as a USB device with its permissions and indicator, captured from in a guest (*in development*). Printers as decided (5.5): USB printers like any USB device, network printers by the guest's own driverless printing; not checked with a real printer |
 
 ### G. Host integration (77 %)
 
@@ -3064,7 +3064,21 @@ Isochronous devices work: a UVC webcam through a Debian 13 guest captured 640×4
 (**Measured** 2026-11-24, below).
 
 **Checked (*in development*, 2026-11-24, amd64 PC, KVM, QEMU 10.0.13, Debian 13 guest; `tests/vm_usb_e2e.sh`, the maintainer's
-own Logitech C930e webcam, which he allowed):** __E2E__
+own Logitech C930e webcam, which he allowed; 38 of 38):** *with lordvm-dev and `vm-usb-cli` as the admin helper* — a new machine
+has `usb: true`; vm-usb-allow's descriptor went in (`VM_USB_STATE` 1); the guest listed `046d:0843` and `/dev/video0`
+"Logitech Webcam C930e" and captured 30 frames of 640×480 YUYV (18 432 000 bytes) with `v4l2-ctl`; out again it was gone
+from the guest and uvcvideo had it on this computer; QEMU's allowlist stopped no call (and in learn mode logged none beyond
+the USB rows). *Through a lord-server started as root* (its real admin helper; a private mount namespace with a scratch
+home over the real one and a tmpfs runtime folder; `tests/vm_usb_e2e.js` as its theme) — `lord.vm.usbDevices` listed the
+camera as one and the hub with `vm.usbHub`; lord-server refused the hub itself; the admin helper refused, asked directly
+through `lord.admin`, the hub, another vendor and product at the camera's address, and a malformed argument; a request JS
+made itself was answered `vm.usbReady` while no process held the node afterwards (the descriptor closed); the camera was
+refused without the camera permission (`vm.usbCameraPerm`), then for its microphone (`vm.usbMicPerm`), then went in; only
+QEMU held the node (not lord-server, not the helper); another session saw it held; `usbAuto` wrote the rule into
+machine.json while it ran; `usbDetach` took it out and its rule didn't bring it back while it stayed plugged in; at the next
+start the rule brought it in by itself; the camera permission taken away took it out within a second and its rule didn't
+bring it back; the rule removed. Not checked: the Devices menu and the indicator on screen; a hot unplug of a device in a
+machine (the code path is the same as Detach, after sysfs says it's gone); a USB disk; an arm64 host.
 
 ### 6.7 Shared folders
 
@@ -3320,8 +3334,14 @@ network reaches this computer's services. Not checked with a real printer here.
   reached the stream at the real rate (192 000 bytes a second), every byte the helper wrote was taken (0 dropped), the ring stayed
   empty between PipeWire's requests; the guest's `arecord` of the microphone ring's 440 Hz tone measured 440 Hz at the level sent,
   half of it with the guest's capture at 50 %, silence with its capture off or without a ring, always the full length (2 s took 2 s of
-  frames). *Not checked:* the whole path inside a running lord-server (the window, Configure, the permission prompt and the
-  indicator) on screen; a Windows guest.
+  frames). *Not checked:* the window, Configure, the permission prompt and the indicator on screen; a Windows guest.
+- *Checked through a running lord-server (**Measured**, *in development*, 2026-11-24, amd64 PC, `tests/vm_sound_e2e.sh`):* a
+  headless lord-server in its own namespaces (scratch home and runtime folder, only this account's pulse socket mounted in),
+  a Debian 13 guest playing a 440 Hz tone and recording its microphone in a loop. The picture came up (lord-vmdisplay), the
+  guest's sound was a PipeWire stream of Machines named after the machine (pw-dump) at the machine's volume (0: the test is
+  silent in the room); with LordOS's microphone permission refused the guest recorded and lord-server kept the microphone
+  closed (`mic: wait`; the guest heard digital silence, 3 recordings at RMS 0), allowed it opened (`live`; the guest heard
+  the maintainer's own webcam microphone, chosen as `sound_in`, RMS up to 77 in 5 recordings), taken away it closed again.
 
 ### 6.10 Graphics
 
@@ -3793,6 +3813,12 @@ checked yet:* the event logs in a running Windows guest.
 
 The camera icon saves the guest's display at its real resolution, directly from the frame, with no window around it. The record icon records display and sound to a video, with hardware encoding where available, a visible red state on the bar and the Clock bar's recording indicator. Files go to the same folder as the system's Screenshots app. No screen-capture permission is needed, since it's the VM's own frame, and protected host windows are never included.
 
+**Checked (**Measured**, *in development*, 2026-11-24, `tests/vm_sound_e2e.sh`, the run above):** `lord.vm.screenshot` wrote a
+1280×800 PNG, the guest's picture at its own size, into `~/Pictures/Screenshots`; `lord.vm.record` for 8 s gave an MP4 with
+H.264 picture and AAC sound, 7 s long, whose sound is the guest's tone (mean volume −13.5 dB) although the speakers played at
+volume 0: the recording takes the guest's sound from lord-vmdisplay's ring, not from the speakers. Not checked: the bar's
+red state and the clock's recording indicator on screen.
+
 ### 6.21 File copy with progress
 
 **Status (beta, 2026-11-05, superseded):** not built then. The agent's channel carries the clipboard (text, rich text, pictures: 3.9), not files: copy and
@@ -3961,8 +3987,16 @@ by `qemu-img` and written by hand from their file formats.
 license here), so the little-endian reading and the RTC are from the rules above, not seen; VMware's encrypted descriptors (the whole
 descriptor encrypted) are refused only when the `.vmx` or descriptor says `encryption.`; `.vhd` fixed images are recognized by name;
 an `.ova` with compressed or chunked disks is refused; `.hdd` disks split into several storages are refused; a VMDK's `ddb.uuid` serial
-can't go on SATA; extra cards aren't connected; cancelling an import from the sheet; the manifest (`.mf`) of an `.ova` isn't checked; the
+can't go on SATA; cancelling an import from the sheet; the manifest (`.mf`) of an `.ova` isn't checked; the
 plan's space estimate counts the source's files, not what the guest wrote; libvirt XML.
+
+**Card models and extra cards (**Measured**, *in development*, 2026-11-24, `tests/vm_nic_e2e.sh`, a Debian 13 guest, Shared
+network):** with `--nic-model` virtio, e1000e, e1000, e1000-82545em, e1000-82544gc, rtl8139 (Linux's 8139cp) and vmxnet3 the
+guest's card had the machine's MAC, its address from passt's DHCP and reached the internet. PCnet: the card and its address,
+then only receive errors (QEMU 10.0's PCnet with Linux 6.12's pcnet32, also with passt's MTU at 1500): a guest whose system
+has another driver should switch to it in Configure. An import's extra cards (`extra_nics`, an e1000e and an rtl8139 here)
+were in the guest with their MACs and models and no address: **present, not connected, by design** (one machine has one
+network; passt serves one guest address, and a second card on the same network would get the same one).
 
 ### 6.23 Reaching a machine from another computer
 
