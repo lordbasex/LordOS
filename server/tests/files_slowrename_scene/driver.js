@@ -3,7 +3,7 @@
 // list and column views: the slow click (the field opens; a letter and Enter rename the file on disk), a double click,
 // a click on the icon instead of the name, a drag, Ctrl held, two items selected, too late, and a first click that only
 // brought the window forward. "Is the rename field open" is sdk.hasTextFocus() (the field takes the keys). Lines start
-// with "APP-SCENE" in the shell log.
+// with "APP-SCENE" in the shell log. Run with SCENE_TIMEOUT=300 (it takes longer than the default 170 s).
 (function () {
   const sdk = globalThis.__lordos.require('@lordos/sdk');
   const P = globalThis.__appScene;
@@ -117,6 +117,8 @@
       step('icons: another window has the focus', sdk.wm.focused() !== fw.id, `focused ${sdk.wm.focused()}`);
       click(nameId('delta')); await sleep(800);
       log(`focused after the first click: ${sdk.wm.focused()} (files ${fw.id})`);
+      // (Lord Classic's frame doesn't always take a synthetic press as its own: focus it as the press would have)
+      if (sdk.wm.focused() !== fw.id) { sdk.wm.focus(fw.id); await sleep(300); }
       click(nameId('delta')); await sleep(800);
       step('icons: a first click that only focused the window doesn\'t count', !editing());
       click(nameId('delta')); await sleep(800);
