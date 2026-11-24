@@ -3,16 +3,19 @@
 // repository (tools/release/apt-repo.sh). Every package is Architecture: all and installs under
 // /usr/share/lordos/voice, where `say` looks (server/src/tts/say.c):
 //
-//   lordos-voice-<lang>            models/<lang>/standard.gguf                          (audio.cpp's Q8_0 GGUF)
+//   lordos-voice-<lang>            models/<lang>/standard.gguf                          (audio.cpp's Q8_0 GGUF), or
+//                                  models/<lang>/standard/{model.safetensors,tokenizer.model} (Kyutai's 6-layer model,
+//                                  where audio.cpp publishes no GGUF: Dutch, the catalog's standardDir)
 //   lordos-voice-<lang>-hd         models/<lang>/hd/{model.safetensors,tokenizer.model} (Kyutai's 24-layer model)
-//   lordos-voice-<lang>-<voice>    models/<lang>/embeddings/<voice>.safetensors         Depends: lordos-voice-<lang>
+//   lordos-voice-<lang>-<voice>    models/<lang>/[standard/]embeddings/<voice>.safetensors  Depends: lordos-voice-<lang>
 //   lordos-voice-<lang>-<voice>-hd models/<lang>/hd/embeddings/<voice>.safetensors      Depends: lordos-voice-<lang>-hd
 //   lordos-voice-previews          previews/<lang>/<voice>.wav, a recorded sample of each voice (make-previews.sh)
 //
 //   node tools/voice/mkdeb-voice.mjs <source folder> <output folder> <version>
 //
-// The source folder is what tools/voice/fetch-voices.sh downloads: <lang>/standard.gguf, <lang>/embeddings/,
-// <lang>/hd/{model.safetensors,tokenizer.model,embeddings/}, and previews/<lang>/<voice>.wav. The voices are
+// The source folder is what tools/voice/fetch-voices.sh downloads: <lang>/standard.gguf and <lang>/embeddings/ (or
+// <lang>/standard/{model.safetensors,tokenizer.model,embeddings/}), <lang>/hd/{model.safetensors,tokenizer.model,
+// embeddings/}, and previews/<lang>/<voice>.wav. The voices are
 // sdk/voicecatalog.js's, nothing else. A missing file is an error: a package is never built half empty. The packages
 // are reproducible (SOURCE_DATE_EPOCH from the version's date, files owned by root, sorted), and stored uncompressed:
 // the weights don't compress and xz would take minutes for nothing.
@@ -36,7 +39,7 @@ const [y, m, d] = version.split('.').map(Number);
 const epoch = Math.floor(Date.UTC(y, m - 1, d) / 1000);
 const DEST = 'usr/share/lordos/voice';
 
-const LANG_NAMES = { es: 'Spanish', en: 'English', pt: 'Portuguese' };
+const LANG_NAMES = { es: 'Spanish', en: 'English', pt: 'Portuguese', fr: 'French', de: 'German', it: 'Italian', nl: 'Dutch' };
 const SOURCE_NAMES = {
   kyutai: 'Kyutai, shipped with Pocket TTS',
   'alba-mackenna': 'Alba McKenna, https://huggingface.co/kyutai/tts-voices (alba-mackenna)',
@@ -109,10 +112,18 @@ function* walk(dir) {
 const made = [];
 for (const L of VOICE_LANGS) {
   const lang = L.id, name = LANG_NAMES[lang];
+  if (!name) throw new Error(`no English name for the language ${lang}`);
+  // the standard model: audio.cpp's GGUF, or Kyutai's own 6-layer folder where there is none (standard/)
+  const stdDir = L.standardDir ? 'standard/' : '';
   made.push(build(modelPackage(lang, false), {
     description: `${name} voice model for reading aloud (standard)`,
-    long: `Kyutai's Pocket TTS model for ${name}, as a Q8_0 GGUF (audio.cpp), for LordOS's \`say\` and Read Aloud.\nFast on any processor. Voices come in their own packages (lordos-voice-${lang}-<voice>).`,
-    files: [[path.join(src, lang, 'standard.gguf'), `models/${lang}/standard.gguf`]],
+    long: L.standardDir
+      ? `Kyutai's 6-layer Pocket TTS model for ${name} (${L.standard}), for LordOS's \`say\` and Read Aloud.\nFast on any processor. Voices come in their own packages (lordos-voice-${lang}-<voice>).`
+      : `Kyutai's Pocket TTS model for ${name}, as a Q8_0 GGUF (audio.cpp), for LordOS's \`say\` and Read Aloud.\nFast on any processor. Voices come in their own packages (lordos-voice-${lang}-<voice>).`,
+    files: L.standardDir
+      ? [[path.join(src, lang, 'standard/model.safetensors'), `models/${lang}/standard/model.safetensors`],
+        [path.join(src, lang, 'standard/tokenizer.model'), `models/${lang}/standard/tokenizer.model`]]
+      : [[path.join(src, lang, 'standard.gguf'), `models/${lang}/standard.gguf`]],
   }));
   made.push(build(modelPackage(lang, true), {
     description: `${name} voice model for reading aloud (HD)`,
@@ -123,13 +134,13 @@ for (const L of VOICE_LANGS) {
   for (const v of VOICES) {
     const extra = v.source === 'kyutai' ? '' : `\nFiles: *\nComment: the voice "${v.id}" was prepared by Kyutai from a recording by ${SOURCE_NAMES[v.source]}\nLicense: ${SOURCE_LICENSES[v.source]}\n`;
     for (const hd of [false, true]) {
-      if (!hasVoice(v.id, hd)) continue;
+      if (!hasVoice(v.id, hd, lang)) continue;
       made.push(build(voicePackage(lang, v.id, hd), {
         depends: modelPackage(lang, hd),
         description: `${voiceLabel(v.id)}: a ${name} ${hd ? 'HD ' : ''}voice for reading aloud`,
         long: `The voice "${v.id}" (${v.gender === 'f' ? 'female' : 'male'}) for Kyutai's ${name} ${hd ? '24-layer ' : ''}Pocket TTS model.`,
-        files: [[path.join(src, lang, hd ? 'hd/embeddings' : 'embeddings', `${v.id}.safetensors`),
-          `models/${lang}/${hd ? 'hd/' : ''}embeddings/${v.id}.safetensors`]],
+        files: [[path.join(src, lang, hd ? 'hd/embeddings' : `${stdDir}embeddings`, `${v.id}.safetensors`),
+          `models/${lang}/${hd ? 'hd/' : stdDir}embeddings/${v.id}.safetensors`]],
         extraCopyright: extra,
       }));
     }
@@ -137,7 +148,7 @@ for (const L of VOICE_LANGS) {
 }
 made.push(build(PREVIEWS_PACKAGE, {
   description: 'recorded samples of the voices for reading aloud',
-  long: 'A short recording of every LordOS voice in Spanish, English and Portuguese, made with the HD models,\nso a voice can be heard in Settings → AI → Voice before it is downloaded.',
+  long: `A short recording of every LordOS voice in ${VOICE_LANGS.map((L) => LANG_NAMES[L.id]).join(', ')}, made with the HD\nmodels, so a voice can be heard in Settings → AI → Voice before it is downloaded.`,
   files: VOICE_LANGS.flatMap((L) => VOICES.map((v) => [path.join(src, 'previews', L.id, `${v.id}.wav`), `previews/${L.id}/${v.id}.wav`])),
   extraCopyright: ['alba-mackenna', 'voice-zero', 'vctk'].map((k) => `\nFiles: previews/*\nComment: voices ${VOICES.filter((v) => v.source === k).map((v) => v.id).join(', ')} were prepared by Kyutai from recordings by ${SOURCE_NAMES[k]}\nLicense: ${SOURCE_LICENSES[k]}\n`).join(''),
 }));

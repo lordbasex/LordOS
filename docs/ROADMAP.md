@@ -1202,6 +1202,11 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   *Can't be done as written:* the mount's traffic as a firewall app (the kernel's client has no cgroup of an app).
   *Not built:* IPv6.
 
+- [ ] **Voice, phase 4 — more languages** (`VOICE.md`; French approved on 2026-11-22,
+  [#215](https://github.com/lordbasex/LordOS/issues/215)): French, German, Italian and Dutch done in development after
+  0.8.9.5-beta (models, voices, numbers written out as words, Settings → AI → Voice); left: the maintainer builds and signs
+  their `lordos-voice-*` packages and the new previews, and a whisper.cpp round trip like Spanish's. LordOS's own
+  voice is phase 5.
 - [x] **Flatpak and Flathub — approved 2026-11-19, phase 1 released in 0.8.9.4 (2026-11-20)** (`FLATPAK.md`; the seven exceptions E1–E7
   in `AGENTS.md`). Phase 1, x86-64 only: a Flathub switch in the Store (installs `flatpak` without Recommends, masks
   its root helper and portal), the `verified` catalog through a sandboxed parser, install/update/remove per user, the
