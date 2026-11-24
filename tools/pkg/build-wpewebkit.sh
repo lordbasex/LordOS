@@ -70,6 +70,7 @@ if [ "$ARCH" != "$(dpkg --print-architecture)" ]; then
     grep -qs '^enabled' "/proc/sys/fs/binfmt_misc/qemu-$q" && grep -qs '^flags:.*F' "/proc/sys/fs/binfmt_misc/qemu-$q" ||
         die "building $ARCH here needs qemu-user's binfmt handler for $q with the F flag (apt-get install qemu-user-static)"
 fi
+EMULATED=; [ "$ARCH" = "$(dpkg --print-architecture)" ] || EMULATED=1
 LORDOS_SRC=${LORDOS_SRC:-$(cd "$HERE/../.." && pwd)}
 [ "$LORDOS_SRC" = none ] || [ -f "$LORDOS_SRC/server/mk/web.mk" ] || die "LORDOS_SRC=$LORDOS_SRC is not a LordOS tree (or say none)"
 TMPFS=${TMPFS:-}
@@ -159,13 +160,13 @@ if [ "$LORDOS_SRC" != none ]; then
     SRC_HOOK="upload $WORK/lordos-src.tar /build/lordos-src.tar"
 fi
 $SUDO $LOW mmdebstrap --variant=apt --mode=root --architectures="$ARCH" --dpkgopt=force-unsafe-io \
-    --include=ca-certificates,gcc,libc6-dev,pkgconf,binutils,libegl-mesa0,libgl1-mesa-dri,libwpebackend-fdo-1.0-dev,passwd,make,libwayland-dev,wayland-protocols,libxkbcommon-dev,libegl-dev,python3 \
+    --include=ca-certificates,gcc,libc6-dev,pkgconf,binutils,libegl-mesa0,libgl1-mesa-dri,libwpebackend-fdo-1.0-dev,passwd,make,libwayland-dev,wayland-protocols,libxkbcommon-dev,libegl-dev,python3,mount \
     --customize-hook='mkdir -p "$1/build/debs" "$1/build/test"' \
     --customize-hook="sync-in $WORK/debs /build/debs" \
     --customize-hook="$SRC_HOOK" \
     --customize-hook="upload $HERE/wpewebkit-chroot.sh /build/wpewebkit-chroot.sh" \
     --customize-hook="upload $HERE/wpewebkit-headless-test.c /build/wpewebkit-headless-test.c" \
-    --customize-hook="unshare --mount --pid --fork sh $HERE/wpewebkit-pivot.sh \"\$1\" /bin/sh /build/wpewebkit-chroot.sh test || echo FAILED > \"\$1/build/test/FAILED\"" \
+    --customize-hook="unshare --mount --pid --fork sh $HERE/wpewebkit-pivot.sh \"\$1\" /usr/bin/env EMULATED=$EMULATED /bin/sh /build/wpewebkit-chroot.sh test || echo FAILED > \"\$1/build/test/FAILED\"" \
     --customize-hook="sync-out /build/test $WORK/out/test" \
     "$SUITE" "$WORK/test-chroot" "$SOURCES1" "$SOURCES2" "$SOURCES3"
 $SUDO chown -R "$(id -u):$(id -g)" "$WORK/out/test"

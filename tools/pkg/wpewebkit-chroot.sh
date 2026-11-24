@@ -159,10 +159,17 @@ cmd_test() {
     id -u tester >/dev/null 2>&1 || useradd -m tester
     chown tester: "$out"
     grep -q 'WEBKIT_DISABLE_SANDBOX' /proc/self/environ && die "WebKit's sandbox must stay on in the test"
-    # a user like any desktop user: WebKit starts its web and network processes in its bubblewrap sandbox
-    runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 120 "$out/wpe-headless-render" "$out/render.ppm" >> "$out/report.txt" 2>&1 ||
-        { tail -n 30 "$out/report.txt"; die "the headless render failed"; }
-    tail -n 5 "$out/report.txt"
+    # Under qemu-user (EMULATED=1: another architecture than the build machine's) WebKit can't run with its sandbox:
+    # bubblewrap's user namespaces fail there, and the sandbox is never turned off, so the programs are only built;
+    # running them needs a real machine of that architecture (docs/WPEWEBKIT.md, "arm64")
+    if [ -n "${EMULATED:-}" ]; then
+        echo "headless render: built; not run under qemu-user (needs a native $(dpkg --print-architecture) machine)" | tee -a "$out/report.txt"
+    else
+        # a user like any desktop user: WebKit starts its web and network processes in its bubblewrap sandbox
+        runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 120 "$out/wpe-headless-render" "$out/render.ppm" >> "$out/report.txt" 2>&1 ||
+            { tail -n 30 "$out/report.txt"; die "the headless render failed"; }
+        tail -n 5 "$out/report.txt"
+    fi
     rm -rf "$out/old/root"
     [ ! -f /build/lordos-src.tar ] || lordweb_check
 }
@@ -179,6 +186,10 @@ lordweb_check() {
         runuser -u tester -- make -C /build/src/server -j"$(nproc)" LORD_WEB_BACKEND=$b build/lord-web build/web-backend-test \
             > "$out/lord-web-$b.log" 2>&1 || { tail -n 30 "$out/lord-web-$b.log"; die "lord-web ($b) does not build"; }
         ! grep -E 'warning:' "$out/lord-web-$b.log" || die "lord-web ($b) builds with warnings"
+        if [ -n "${EMULATED:-}" ]; then
+            echo "lord-web ($b backend): builds without warnings; its tests not run under qemu-user" | tee -a "$out/report.txt"
+            continue
+        fi
         (cd /build/src/server && runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 300 build/web-backend-test) \
             >> "$out/report.txt" 2>&1 || { tail -n 20 "$out/report.txt"; die "web-backend-test ($b) failed"; }
         (cd /build/src/server && runuser -u tester -- env HOME=/home/tester XDG_RUNTIME_DIR=/tmp timeout 300 python3 -I tests/web_probe_test.py build/lord-web --pss) \

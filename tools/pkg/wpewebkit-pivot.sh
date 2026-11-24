@@ -25,7 +25,8 @@ mount -t tmpfs tmpfs "$R/tmp"
 cd "$R"
 mkdir -p .oldroot
 pivot_root . .oldroot
-# the host's umount, still reachable under the old root (the chroot may not have the mount package yet)
-/.oldroot/usr/bin/umount -l /.oldroot
+# the chroot's own umount (the mount package is in its --include): the host's is another architecture's binary
+# under ARCH=arm64, and its loader is not in this root
+/usr/bin/umount -l /.oldroot
 rmdir /.oldroot
 exec "$@"

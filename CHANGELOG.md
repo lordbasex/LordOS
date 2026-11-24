@@ -996,7 +996,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     2.54.3)` and `ok legacy (WPE WebKit 2.54.3)`, the probe test passes on both (peak 298 and 296 MB PSS).
     `dpkg-buildpackage` took 26 to 41 minutes on 20 cores over seven builds. lintian: no errors, 5 warnings, all
     Debian's own (Standards-Version newer than trixie's lintian, no source `Priority`, devhelp files of WPEPlatform's
-    docs). arm64 is being built under qemu-user (docs/WPEWEBKIT.md, "arm64"). Not yet run on the VM, not published.
+    docs). arm64 built under qemu-user in 11.7 h (same packages, the source package byte for byte amd64's, 0 errors and 5 warnings in lintian); its static checks pass there, while running WebKit (headless render, lord-web's tests) needs the Pi 5, since bubblewrap can't make user namespaces under qemu-user (docs/WPEWEBKIT.md, "arm64"). Not yet run on the VM, not published.
   - **The source next to the binaries** (WebKit is LGPL-2.1+ and BSD): the build outputs the complete Debian source
     package (`.dsc`, upstream `.orig.tar.xz` and its `.asc`, LordOS's `.debian.tar.xz`); each binary package ships
     Debian's `debian/copyright`. **`tools/release/apt-repo.sh` takes source packages**: `build` accepts a `.dsc`,
