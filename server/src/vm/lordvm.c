@@ -39,6 +39,7 @@
 #include "vmgroup.h"
 #include "vmcatalog.h"
 #include "vmlink.h"
+#include "vmexport.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -273,8 +274,7 @@ static int sha256_file(const char *path, char out[65]) {
  * lord-server reads it from the session keyring (owner "machines", service "machines:<id>") and hands it over on a pipe
  * (--key-fd N, any command). It lives here in one locked page that never goes to a core dump, and leaves only through a
  * new pipe per use, which QEMU and qemu-img read as a secret object, file=/proc/self/fd/N: never an argument, the
- * environment or a file. 64 lowercase hex digits (32 random bytes, LordOS's own), or a person's passphrase when an
- * encrypted export is brought in (6.4) */
+ * environment or a file. 64 lowercase hex digits (32 random bytes, LordOS's own; vm_key_valid) */
 static char *vkey;
 static size_t vkey_n;
 static int key_have(void) { return vkey && vkey_n; }
@@ -304,7 +304,7 @@ static int key_load_fd(int fd) {
     if (!vm_key_valid(vkey, vkey_n)) { key_wipe(); return -1; }
     return 0;
 }
-/* a pipe holding the key, its read end (O_CLOEXEC); at most 512 bytes, under PIPE_BUF: written whole, never blocks */
+/* a pipe holding the key, its read end (O_CLOEXEC); 64 bytes, under PIPE_BUF: written whole, never blocks */
 static int key_pipe(void) {
     int p[2];
     if (!key_have() || pipe2(p, O_CLOEXEC)) return -1;
@@ -9741,6 +9741,404 @@ static int cmd_group_set(const char *arg, int argc, char **argv) {
     return 0;
 }
 
+/* ---- Export and its import (docs/VIRTUALIZATION.md 3.6 "Moving a machine", 6.4) ----
+ *
+ *   lord-vm --export DIR --to DEST [--format lordvm|ova] [--no-snapshots] [--key-fd N]
+ *     With the machine off (its lock held for the whole job). lordvm: DEST, a new folder <name>.lordvm, gets the machine
+ *     with no external dependency (a linked clone flattened, no ISO, drivers disc, shared folder or bridge), its
+ *     snapshots unless --no-snapshots (which converts the disks), the TPM state, the kept UEFI code and manifest.json
+ *     (vmexport.h: SHA-256 and size of every file), which the import checks. An encrypted machine's disks stay
+ *     encrypted under its key: the person brings the key (its recovery key, shown in Passwords) to the other computer.
+ *     ova: DEST, a new file, an OVF 1.0 package (the .ovf, its .mf, the disks as streamOptimized VMDK) for other apps:
+ *     the system and data disks only, unencrypted, so an encrypted machine is refused. {"progress":P} lines, then
+ *     {"exported":true,"to":…,"bytes":N}.
+ *   lord-vm --import-lordvm SRC DST [--key-fd N]
+ *     SRC, an exported folder: its manifest.json read strictly and every file checked (vmx_manifest_verify: no
+ *     symlink, hard link or file not listed); then copied from the very descriptors that were hashed into DST (a new
+ *     folder beside the library's machines), machine.json parsed again and stripped of paths of the other computer,
+ *     each qcow2 checked plain; an encrypted machine's disk must open with the key given. */
+static int copy_sparse_fd(int a, const char *to) {
+    struct stat st;
+    if (fstat(a, &st) || !S_ISREG(st.st_mode)) return -1;
+    int b = open(to, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (b < 0) return -1;
+    int bad = ftruncate(b, st.st_size);
+    static char buf[1 << 20];
+    for (off_t off = 0; !bad && off < st.st_size;) {
+        off_t d = lseek(a, off, SEEK_DATA);
+        if (d < 0) break;
+        off_t h = lseek(a, d, SEEK_HOLE);
+        if (h < 0) h = st.st_size;
+        for (off_t p = d; !bad && p < h;) {
+            size_t want = (size_t)(h - p) < sizeof buf ? (size_t)(h - p) : sizeof buf;
+            ssize_t r = pread(a, buf, want, p);
+            if (r <= 0) { bad = 1; break; }
+            if (pwrite(b, buf, (size_t)r, p) != r) bad = 1;
+            p += r;
+        }
+        off = h;
+    }
+    if (!bad && fsync(b)) bad = 1;
+    close(b);
+    if (bad) unlink(to);
+    return bad ? -1 : 0;
+}
+
+static void exp_progress(double pct) { printf("{\"progress\":%.1f}\n", pct); fflush(stdout); }
+
+/* a machine's disk (format, plus its base for a linked clone) converted to out with qemu-img, jailed: reads the disk
+ * and the base, writes only in out_dir. ofmt "qcow2" (encrypted again under the key when the machine is) or "vmdk"
+ * (streamOptimized, never encrypted) */
+static int exp_convert(const VmMachine *m, const char *disk, int raw, const char *base, const char *ofmt, const char *out, const char *out_dir, char *err, size_t errlen) {
+    JBuf b;
+    jb_init(&b);
+    if (raw) { jb_raw(&b, "json:{\"driver\":\"raw\",\"read-only\":true,\"file\":{\"driver\":\"file\",\"filename\":"); jb_str(&b, disk); jb_raw(&b, "}}"); }
+    else {
+        jb_raw(&b, "json:{\"driver\":\"qcow2\",\"read-only\":true,\"file\":{\"driver\":\"file\",\"filename\":");
+        jb_str(&b, disk);
+        if (base && base[0]) {
+            /* a group member's base is the public image (not encrypted); a linked clone's is the machine's own */
+            jb_raw(&b, "},\"backing\":{\"driver\":\"qcow2\",\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":"); jb_str(&b, base);
+            jb_raw(&b, "}"); if (!m->group[0]) jb_raw(&b, enc_json()); jb_raw(&b, "}");
+        } else jb_raw(&b, "},\"backing\":null");
+        jb_raw(&b, enc_json());
+        jb_raw(&b, "}");
+    }
+    if (b.oom) { jb_free(&b); snprintf(err, errlen, "out of memory"); return -1; }
+    int vmdk = !strcmp(ofmt, "vmdk"), e = key_have() && !vmdk;
+    char *argv[16];
+    int k = 0;
+    argv[k++] = QEMU_IMG; argv[k++] = "convert"; argv[k++] = "-p"; argv[k++] = "-O"; argv[k++] = (char *)ofmt;
+    if (vmdk) { argv[k++] = "-o"; argv[k++] = "subformat=streamOptimized"; }
+    else if (e) { argv[k++] = "-o"; argv[k++] = ENC_CREATE_OPTS; }
+    argv[k++] = b.p; argv[k++] = (char *)out; argv[k] = NULL;
+    jail_read2 = base && base[0] ? base : NULL;
+    int r = run_tool_in(argv, err, errlen, disk, out_dir);
+    jail_read2 = NULL;
+    jb_free(&b);
+    return r;
+}
+
+static long long tree_bytes(const char *dir) {
+    long long n = 0;
+    DIR *d = opendir(dir);
+    struct dirent *e;
+    while (d && (e = readdir(d))) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        char p[PATH_MAX + 300];
+        struct stat st;
+        snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
+        if (lstat(p, &st)) continue;
+        if (S_ISDIR(st.st_mode)) n += tree_bytes(p);
+        else if (S_ISREG(st.st_mode)) n += (long long)st.st_blocks * 512;
+    }
+    if (d) closedir(d);
+    return n;
+}
+
+static int cmd_export(const char *dir, int argc, char **argv) {
+    const char *to = NULL;
+    int ova = 0, nosnap = 0;
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "--to") && i + 1 < argc) to = argv[++i];
+        else if (!strcmp(argv[i], "--format") && i + 1 < argc) { ova = parse_enum(argv[++i], "lordvm", "ova"); if (ova < 0) { fprintf(stderr, "lord-vm: --format lordvm|ova\n"); return 2; } }
+        else if (!strcmp(argv[i], "--no-snapshots")) nosnap = 1;
+        else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
+    }
+    if (!to || to[0] != '/') { fprintf(stderr, "lord-vm: --export DIR --to /absolute/destination\n"); return 2; }
+    char real[PATH_MAX], err[256];
+    if (!realpath(dir, real) || !dir_ok(real)) { fprintf(stderr, "lord-vm: %s: not a machine folder\n", dir); return 1; }
+    VmMachine m;
+    if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+    if (m.encrypted && !key_have()) { fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); return 1; }
+    if (!m.encrypted && key_have()) key_wipe();
+    if (ova && m.encrypted) { fprintf(stderr, "lord-vm: an OVA can't be encrypted: export an encrypted machine as .lordvm\n"); return 1; }
+    if (m.group[0]) { fprintf(stderr, "lord-vm: a group's member doesn't move alone\n"); return 1; }
+    /* the destination: a new name in an existing folder of this account, never inside the machine */
+    char dparent[PATH_MAX], dreal[PATH_MAX + 64], tmp[PATH_MAX + 96];
+    snprintf(dparent, sizeof dparent, "%s", to);
+    char *sl = strrchr(dparent, '/');
+    if (!sl || !sl[1] || !strcmp(sl + 1, ".") || !strcmp(sl + 1, "..")) { fprintf(stderr, "lord-vm: --to names a new file or folder\n"); return 2; }
+    *sl = 0;
+    char rp[PATH_MAX];
+    if (!realpath(dparent[0] ? dparent : "/", rp)) { fprintf(stderr, "lord-vm: %s: %s\n", dparent, strerror(errno)); return 1; }
+    snprintf(dreal, sizeof dreal, "%s/%s", rp, sl + 1);
+    size_t rl = strlen(real);
+    if (!strncmp(dreal, real, rl) && (dreal[rl] == '/' || !dreal[rl])) { fprintf(stderr, "lord-vm: the export can't go inside the machine\n"); return 2; }
+    if (!access(dreal, F_OK) || errno != ENOENT) { fprintf(stderr, "lord-vm: %s exists\n", dreal); return 1; }
+    if (!ova && (strlen(dreal) < 8 || strcmp(dreal + strlen(dreal) - 7, ".lordvm"))) { fprintf(stderr, "lord-vm: a .lordvm export's folder ends in .lordvm\n"); return 2; }
+    int lock = open_lock(real);
+    if (lock == -2) { fprintf(stderr, "lord-vm: the machine is running: shut it down first\n"); return 3; }
+    if (lock < 0) { fprintf(stderr, "lord-vm: can't take the machine's lock\n"); return 1; }
+    ops_recover(real, 0);
+    int rc = 1;
+    char st[PATH_MAX + 32];
+    snprintf(st, sizeof st, "%s/suspend.state", real);
+    if (file_exists(st)) { fprintf(stderr, "lord-vm: the machine has a saved session: resume it and shut it down first (a saved state moves only with the same QEMU and CPU)\n"); close(lock); return 1; }
+    snprintf(tmp, sizeof tmp, "%s/.%s.part-%d", rp, sl + 1, (int)getpid());
+    if (mkdir(tmp, 0700)) { fprintf(stderr, "lord-vm: can't make %s: %s\n", tmp, strerror(errno)); close(lock); return 1; }
+    char dd[PATH_MAX + 128], p1[PATH_MAX + 200], p2[PATH_MAX + 200];
+    snprintf(dd, sizeof dd, "%s/disks", tmp);
+    mkdir(dd, 0700);
+    VmSnap snaps[VM_SNAPS_MAX];
+    int nsnaps = m.raw ? 0 : vm_snaps_load(real, snaps, VM_SNAPS_MAX);
+    /* a linked clone is flattened; snapshots stay only in a copy (convert drops them) */
+    int convert = nosnap || m.base[0] || ova;
+    int keep_snaps = !convert && nsnaps > 0;
+    const char *ext = vm_disk_ext(&m);
+    int nd = 1 + m.n_data;
+    long long total = 0;
+    for (int i = 0; i < nd; i++) {
+        struct stat s2;
+        if (i) snprintf(p1, sizeof p1, "%s/disks/data-%d.%s", real, i, ext); else snprintf(p1, sizeof p1, "%s/disks/system.%s", real, ext);
+        if (!stat(p1, &s2)) total += (long long)s2.st_blocks * 512;
+    }
+    long long done = 0;
+    VmxOvfInfo oi;
+    memset(&oi, 0, sizeof oi);
+    char vmdk_name[VMX_OVF_DISKS][32];
+    for (int i = 0; i < nd; i++) {
+        if (i) snprintf(p1, sizeof p1, "%s/disks/data-%d.%s", real, i, ext); else snprintf(p1, sizeof p1, "%s/disks/system.%s", real, ext);
+        struct stat s2;
+        if (stat(p1, &s2)) { fprintf(stderr, "lord-vm: a disk is missing: %s\n", p1); goto out; }
+        if (!m.raw && disk_plain(p1, err, sizeof err) && !(i == 0 && m.base[0])) { fprintf(stderr, "lord-vm: %s: %s\n", p1, err); goto out; }
+        if (ova) {
+            snprintf(vmdk_name[i], sizeof vmdk_name[i], "disk%d.vmdk", i + 1);
+            snprintf(p2, sizeof p2, "%s/%s", tmp, vmdk_name[i]);
+        } else if (i) snprintf(p2, sizeof p2, "%s/data-%d.%s", dd, i, ext);
+        else snprintf(p2, sizeof p2, "%s/system.%s", dd, ext);
+        int bad;
+        if (convert) bad = exp_convert(&m, p1, m.raw, i == 0 ? m.base : NULL, ova ? "vmdk" : ext, p2, ova ? tmp : dd, err, sizeof err);
+        else { bad = copy_reflink(p1, p2) && copy_sparse(p1, p2); if (bad) snprintf(err, sizeof err, "%s", strerror(errno)); }
+        if (bad) { fprintf(stderr, "lord-vm: exporting disk %d failed: %.200s\n", i + 1, err); goto out; }
+        done += (long long)s2.st_blocks * 512;
+        exp_progress(total > 0 ? 95.0 * (double)done / (double)total : 95.0);
+        if (ova) {
+            oi.disk[i].file = vmdk_name[i];
+            oi.disk[i].capacity = (uint64_t)(i ? m.data_gb[i - 1] : m.disk_gb) << 30;
+            struct stat s3;
+            oi.disk[i].file_size = !stat(p2, &s3) ? (uint64_t)s3.st_size : 0;
+        }
+    }
+    if (ova) {
+        /* the OVF package: the descriptor, its manifest, then the disks (OVF 1.0 asks for this order in the tar) */
+        oi.name = m.name; oi.vcpus = m.vcpus; oi.memory_mb = (uint64_t)m.memory_mb; oi.efi = m.firmware == VM_FW_UEFI;
+        oi.os = m.devices == VM_DEV_WINDOWS ? "windows" : "linux"; oi.ndisks = nd;
+        char *ovf = vmx_ovf(&oi);
+        if (!ovf) { fprintf(stderr, "lord-vm: the OVF descriptor couldn't be made\n"); goto out; }
+        char ovfname[48] = "machine.ovf", mfname[48] = "machine.mf";
+        const char *names[VMX_OVF_DISKS + 1];
+        char sums[VMX_OVF_DISKS + 1][65];
+        const char *sump[VMX_OVF_DISKS + 1];
+        names[0] = ovfname;
+        {
+            uint8_t dg[32];
+            sha256(ovf, strlen(ovf), dg);
+            for (int k = 0; k < 32; k++) snprintf(sums[0] + 2 * k, 3, "%02x", dg[k]);
+        }
+        for (int i = 0; i < nd; i++) {
+            snprintf(p2, sizeof p2, "%s/%s", tmp, vmdk_name[i]);
+            names[i + 1] = vmdk_name[i];
+            if (sha256_file(p2, sums[i + 1])) { free(ovf); fprintf(stderr, "lord-vm: can't read %s\n", p2); goto out; }
+        }
+        for (int i = 0; i <= nd; i++) sump[i] = sums[i];
+        char *mf = vmx_mf(names, sump, nd + 1);
+        int of = open(dreal, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+        long long now = (long long)time(NULL);
+        int bad = !mf || of < 0 || vmx_tar_bytes(of, ovfname, ovf, strlen(ovf), now) || vmx_tar_bytes(of, mfname, mf, strlen(mf), now);
+        for (int i = 0; !bad && i < nd; i++) {
+            snprintf(p2, sizeof p2, "%s/%s", tmp, vmdk_name[i]);
+            int in = open(p2, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+            struct stat s3;
+            bad = in < 0 || fstat(in, &s3) || vmx_tar_file(of, vmdk_name[i], in, (long long)s3.st_size, now);
+            if (in >= 0) close(in);
+        }
+        if (!bad) bad = vmx_tar_end(of) || fsync(of);
+        if (of >= 0) close(of);
+        free(ovf); free(mf);
+        if (bad) { unlink(dreal); fprintf(stderr, "lord-vm: writing the OVA failed: %s\n", strerror(errno)); goto out; }
+        rm_tree(tmp);
+        tmp[0] = 0;
+    } else {
+        /* the rest of the folder, then machine.json without the other computer's paths, then the manifest */
+        snprintf(p1, sizeof p1, "%s/disks/nvram.qcow2", real); snprintf(p2, sizeof p2, "%s/nvram.qcow2", dd);
+        if (m.firmware == VM_FW_UEFI && (convert && nsnaps ? exp_convert(&m, p1, 0, NULL, "qcow2", p2, dd, err, sizeof err) : copy_sparse(p1, p2))) { fprintf(stderr, "lord-vm: copying the UEFI variables failed\n"); goto out; }
+        if (m.tpm) {
+            snprintf(p2, sizeof p2, "%s/tpm", dd); mkdir(p2, 0700);
+            snprintf(p1, sizeof p1, "%s/disks/tpm/tpm2-00.permall", real); snprintf(p2, sizeof p2, "%s/tpm/tpm2-00.permall", dd);
+            if (file_exists(p1) && copy_sparse(p1, p2)) { fprintf(stderr, "lord-vm: copying the TPM's state failed\n"); goto out; }
+            for (int i = 0; keep_snaps && i < nsnaps; i++) {
+                snprintf(p1, sizeof p1, "%s/disks/tpm/snap-%.32s.permall", real, snaps[i].tag); snprintf(p2, sizeof p2, "%s/tpm/snap-%.32s.permall", dd, snaps[i].tag);
+                if (file_exists(p1) && copy_sparse(p1, p2)) { fprintf(stderr, "lord-vm: copying a snapshot's TPM state failed\n"); goto out; }
+            }
+        }
+        static const char *const small[] = { FW_KEPT, "cpu-usage.json", "snapshots.json" };
+        for (int i = 0; i < 3; i++) {
+            if (i == 2 && !keep_snaps) continue;
+            snprintf(p1, sizeof p1, "%s/%s", real, small[i]); snprintf(p2, sizeof p2, "%s/%s", tmp, small[i]);
+            if (file_exists(p1) && copy_sparse(p1, p2)) { fprintf(stderr, "lord-vm: copying %s failed\n", small[i]); goto out; }
+        }
+        VmMachine n = m;
+        n.base[0] = n.iso[0] = n.drivers[0] = n.bridge[0] = 0;
+        n.n_shares = 0;
+        if (n.network == VM_NET_BRIDGED) n.network = VM_NET_SHARED;
+        if (vm_machine_save(tmp, &n)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
+        /* the manifest of every file there now */
+        const char *rel[VMX_MAX_FILES];
+        char relb[VMX_MAX_FILES][VMX_PATH_MAX];
+        int nr = 0;
+        static const char *const top[] = { "machine.json", FW_KEPT, "cpu-usage.json", "snapshots.json" };
+        for (int i = 0; i < 4; i++) { snprintf(p1, sizeof p1, "%s/%s", tmp, top[i]); if (file_exists(p1)) snprintf(relb[nr++], VMX_PATH_MAX, "%s", top[i]); }
+        DIR *d = opendir(dd);
+        struct dirent *e;
+        while (d && (e = readdir(d)) && nr < VMX_MAX_FILES - 1) {
+            if (e->d_name[0] == '.') continue;
+            if (!strcmp(e->d_name, "tpm")) {
+                snprintf(p1, sizeof p1, "%s/tpm", dd);
+                DIR *t = opendir(p1);
+                struct dirent *f;
+                while (t && (f = readdir(t)) && nr < VMX_MAX_FILES) {
+                    if (f->d_name[0] == '.') continue;
+                    snprintf(relb[nr], VMX_PATH_MAX, "disks/tpm/%.40s", f->d_name);
+                    if (vmx_path_ok(relb[nr])) nr++;
+                }
+                if (t) closedir(t);
+                continue;
+            }
+            snprintf(relb[nr], VMX_PATH_MAX, "disks/%.40s", e->d_name);
+            if (vmx_path_ok(relb[nr])) nr++;
+        }
+        if (d) closedir(d);
+        for (int i = 0; i < nr; i++) rel[i] = relb[i];
+        VmxManifest man;
+        memset(&man, 0, sizeof man);
+        int tfd = open(tmp, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+        if (tfd < 0 || vmx_manifest_build(tfd, rel, nr, &man, NULL, NULL, err, sizeof err)) { if (tfd >= 0) close(tfd); fprintf(stderr, "lord-vm: the manifest: %s\n", err); goto out; }
+        close(tfd);
+        memcpy(man.id, n.id, sizeof man.id);
+        snprintf(man.name, sizeof man.name, "%s", n.name);
+        vm_now_iso(man.created);
+        man.encrypted = n.encrypted;
+        man.snapshots = keep_snaps;
+        char *mj = vmx_manifest_json(&man);
+        snprintf(p2, sizeof p2, "%s/manifest.json", tmp);
+        int mf = mj ? open(p2, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600) : -1;
+        int bad = mf < 0 || write_all(mf, mj, strlen(mj)) || fsync(mf);
+        if (mf >= 0) close(mf);
+        free(mj);
+        if (bad) { fprintf(stderr, "lord-vm: can't write manifest.json\n"); goto out; }
+        if (rename(tmp, dreal)) { fprintf(stderr, "lord-vm: can't put the export in place: %s\n", strerror(errno)); goto out; }
+        tmp[0] = 0;
+    }
+    exp_progress(100);
+    {
+        struct stat s4;
+        long long bytes = ova ? (!stat(dreal, &s4) ? (long long)s4.st_size : 0) : tree_bytes(dreal);
+        printf("{\"exported\":true,\"to\":");
+        print_json_str(dreal);
+        printf(",\"format\":\"%s\",\"bytes\":%lld,\"snapshots\":%s,\"encrypted\":%s}\n", ova ? "ova" : "lordvm", bytes, keep_snaps ? "true" : "false", m.encrypted ? "true" : "false");
+    }
+    rc = 0;
+out:
+    if (tmp[0]) rm_tree(tmp);
+    close(lock);
+    return rc;
+}
+
+static int cmd_import_lordvm(const char *src, int argc, char **argv) {
+    if (argc < 1) { fprintf(stderr, "lord-vm: --import-lordvm SRC DST [--key-fd N]\n"); return 2; }
+    const char *dst = argv[0];
+    if (argc > 1) { fprintf(stderr, "lord-vm: unknown option %s\n", argv[1]); return 2; }
+    char real[PATH_MAX], err[256];
+    if (!realpath(src, real)) { fprintf(stderr, "lord-vm: %s: %s\n", src, strerror(errno)); return 1; }
+    int sfd = open(real, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    if (sfd < 0) { fprintf(stderr, "lord-vm: %s isn't a folder\n", real); return 1; }
+    /* the manifest: at most VMX_MANIFEST_MAX, regular, read through the folder's descriptor */
+    int mfd = openat(sfd, "manifest.json", O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    struct stat st;
+    if (mfd < 0 || fstat(mfd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > (off_t)VMX_MANIFEST_MAX) {
+        if (mfd >= 0) close(mfd);
+        close(sfd);
+        fprintf(stderr, "lord-vm: %s has no manifest.json: not a LordOS export\n", real);
+        return 1;
+    }
+    char *mt = malloc((size_t)st.st_size + 1);
+    ssize_t got = mt ? pread(mfd, mt, (size_t)st.st_size, 0) : -1;
+    close(mfd);
+    VmxManifest man;
+    if (got != st.st_size || vmx_manifest_parse(mt, (size_t)got, &man, err, sizeof err)) { free(mt); close(sfd); fprintf(stderr, "lord-vm: the manifest: %s\n", err[0] ? err : "unreadable"); return 1; }
+    free(mt);
+    if (man.encrypted && !key_have()) { close(sfd); fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); return 4; }
+    if (!man.encrypted && key_have()) key_wipe();
+    int fds[VMX_MAX_FILES];
+    printf("{\"progress\":0,\"stage\":\"verify\"}\n");
+    fflush(stdout);
+    if (vmx_manifest_verify(sfd, &man, fds, NULL, NULL, err, sizeof err)) { close(sfd); fprintf(stderr, "lord-vm: the export doesn't match its manifest: %s\n", err); return 1; }
+    close(sfd);
+    int rc = 1;
+    char tmp[PATH_MAX + 96] = "", lib[PATH_MAX], dreal[PATH_MAX + 64];
+    snprintf(dreal, sizeof dreal, "%s", dst);
+    char *sl = strrchr(dreal, '/');
+    if (!dir_ok(dst) || !sl || sl == dreal) { fprintf(stderr, "lord-vm: %s: an absolute folder without ',' or control characters\n", dst); goto out; }
+    snprintf(lib, sizeof lib, "%.*s", (int)(sl - dreal), dreal);
+    char lreal[PATH_MAX];
+    if (!realpath(lib, lreal)) { fprintf(stderr, "lord-vm: %s: %s\n", lib, strerror(errno)); goto out; }
+    if (!access(dreal, F_OK) || errno != ENOENT) { fprintf(stderr, "lord-vm: %s exists\n", dreal); goto out; }
+    snprintf(tmp, sizeof tmp, "%s/.%s.part-%d", lreal, sl + 1, (int)getpid());
+    if (mkdir(tmp, 0700)) { fprintf(stderr, "lord-vm: can't make %s\n", tmp); tmp[0] = 0; goto out; }
+    char p[PATH_MAX + 200];
+    snprintf(p, sizeof p, "%s/disks", tmp); mkdir(p, 0700);
+    snprintf(p, sizeof p, "%s/log", tmp); mkdir(p, 0700);
+    for (int i = 0; i < man.n; i++) {
+        if (!strncmp(man.e[i].path, "disks/tpm/", 10)) { snprintf(p, sizeof p, "%s/disks/tpm", tmp); mkdir(p, 0700); }
+        snprintf(p, sizeof p, "%s/%s", tmp, man.e[i].path);
+        if (copy_sparse_fd(fds[i], p)) { fprintf(stderr, "lord-vm: copying %s failed\n", man.e[i].path); goto out; }
+        printf("{\"progress\":%.1f,\"stage\":\"copy\"}\n", 90.0 * (i + 1) / man.n);
+        fflush(stdout);
+    }
+    {
+        /* machine.json again, strictly, and nothing of the other computer's paths (3.6) */
+        VmMachine m;
+        if (vm_machine_load(tmp, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: machine.json: %s\n", err); goto out; }
+        if (strcmp(m.id, man.id) || m.encrypted != man.encrypted) { fprintf(stderr, "lord-vm: machine.json doesn't match the manifest\n"); goto out; }
+        if (m.base[0] || m.group[0]) { fprintf(stderr, "lord-vm: an export is a whole machine: no shared base or group\n"); goto out; }
+        m.iso[0] = m.drivers[0] = m.bridge[0] = 0;
+        m.n_shares = 0;
+        if (m.network == VM_NET_BRIDGED) m.network = VM_NET_SHARED;
+        char disks[VM_NDISKS][PATH_MAX + 64];
+        int nd = disk_files(tmp, &m, disks);
+        for (int k = 0; k < nd; k++) {
+            if (!file_exists(disks[k])) { fprintf(stderr, "lord-vm: a disk is missing from the export\n"); goto out; }
+            int raw = m.raw && !(m.firmware == VM_FW_UEFI && k == 1);
+            if (!raw && disk_plain(disks[k], err, sizeof err)) { fprintf(stderr, "lord-vm: a disk can't be used: %s\n", err); goto out; }
+            /* an encrypted disk must open with the key given: qemu-img check, jailed, reading that disk only */
+            if (!raw && m.encrypted) {
+                JBuf b;
+                jb_init(&b);
+                jb_raw(&b, "json:{\"driver\":\"qcow2\",\"read-only\":true,\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":");
+                jb_str(&b, disks[k]);
+                jb_raw(&b, "}"); jb_raw(&b, enc_json()); jb_raw(&b, "}");
+                char *ck[] = { QEMU_IMG, "check", "-q", b.p, NULL };
+                int bad = b.oom || run_tool_in(ck, err, sizeof err, disks[k], NULL);
+                jb_free(&b);
+                if (bad) { fprintf(stderr, "lord-vm: the key doesn't open this machine's disks\n"); rc = 5; goto out; }
+            }
+        }
+        vm_now_iso(m.updated);
+        if (vm_machine_save(tmp, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
+        if (rename(tmp, dreal)) { fprintf(stderr, "lord-vm: can't put the machine in place: %s\n", strerror(errno)); goto out; }
+        tmp[0] = 0;
+        printf("{\"imported\":true,\"dir\":");
+        print_json_str(dreal);
+        printf(",\"id\":\"%s\",\"encrypted\":%s}\n", m.id, m.encrypted ? "true" : "false");
+        rc = 0;
+    }
+out:
+    for (int i = 0; i < man.n; i++) close(fds[i]);
+    if (tmp[0]) rm_tree(tmp);
+    return rc;
+}
+
 static int usage(void) {
     fprintf(stderr,
             "usage: lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]\n"
@@ -9841,6 +10239,8 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--compact")) return cmd_compact(dir, rest, rv);
     if (!strcmp(cmd, "--import-plan")) return cmd_import_plan(dir, rest, rv);
     if (!strcmp(cmd, "--import-machine")) return cmd_import_machine(dir, rest, rv);
+    if (!strcmp(cmd, "--export")) return cmd_export(dir, rest, rv);
+    if (!strcmp(cmd, "--import-lordvm")) return cmd_import_lordvm(dir, rest, rv);
     static const struct { const char *name; int type; } C[] = {
         { "--status", VM_STATUS }, { "--stop", VM_SHUTDOWN }, { "--poweroff", VM_POWEROFF }, { "--pause", VM_PAUSE },
         { "--resume", VM_RESUME }, { "--reset", VM_RESET }, { "--qmp", VM_QMP }, { "--cdrom", VM_CDROM }, { "--suspend", VM_SUSPEND }, { "--agent", VM_AGENT },

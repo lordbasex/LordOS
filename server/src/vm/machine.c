@@ -768,13 +768,8 @@ const char *const VM_PIN_NAMES[] = { "", "off", "auto", NULL };
 const char *const VM_DISP_NAMES[] = { "", "memory", "disk", NULL };
 const char *vm_disk_ext(const VmMachine *m) { return m->raw ? "raw" : "qcow2"; }
 int vm_key_valid(const char *k, size_t n) {
-    if (n == 64) {
-        int hex = 1;
-        for (size_t i = 0; i < n; i++) if (!((k[i] >= '0' && k[i] <= '9') || (k[i] >= 'a' && k[i] <= 'f'))) hex = 0;
-        if (hex) return 1;
-    }
-    if (n < 8 || n > 512) return 0;
-    for (size_t i = 0; i < n; i++) if ((unsigned char)k[i] < 0x20 || k[i] == 0x7f) return 0;
+    if (n != 64) return 0;
+    for (size_t i = 0; i < n; i++) if (!((k[i] >= '0' && k[i] <= '9') || (k[i] >= 'a' && k[i] <= 'f'))) return 0;
     return 1;
 }
 const char *const VM_BOOT_NAMES[] = { "disk", "cd", "network", NULL };

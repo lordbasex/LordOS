@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmexport.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)

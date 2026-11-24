@@ -383,8 +383,8 @@ int vm_base_valid(const char *s);
 
 /* the disks' file extension: "raw" for a raw machine, else "qcow2" (disks/system.<ext>, data-N.<ext>) */
 const char *vm_disk_ext(const VmMachine *m);
-/* a key lord-vm accepts for an encrypted machine: 64 lowercase hex digits (32 random bytes) or a person's passphrase of
- * 8 to 512 bytes of printable UTF-8 with no control characters (an export's, 6.4) */
+/* a key lord-vm accepts for an encrypted machine: exactly 64 lowercase hex digits (32 random bytes made by lord-server;
+ * shown to the person as the machine's recovery key, which brings an exported machine in on another computer) */
 int vm_key_valid(const char *k, size_t n);
 
 const char *vm_arch_name(int arch);     /* "arm64", "amd64" */
