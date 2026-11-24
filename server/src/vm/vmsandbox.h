@@ -49,6 +49,10 @@ typedef struct {
     const char *sc_drop;        /* NULL; a test build's row left out (vmseccomp.h) */
     int *notify_out;            /* NULL: kill as the default action; else the filter's listener comes back here
                                  * (cloexec; -1 none), for lord-vm alone: the child sends it and closes it before exec */
+    int render_fd;              /* > 2: the render node lord-vm opened and checked itself (3.3, "Render node by descriptor"),
+                                 * as QEMU will have it: Landlock's rule is made from this descriptor, so it names the very
+                                 * device lord-vm checked (no path looked up again), and QEMU opens it as
+                                 * rendernode=/proc/self/fd/<n>. 0..2: none (render's path is used, as before) */
 } VmQemuJail;
 
 /* In the child, before execve. Returns the VMS_* bits that applied; the caller refuses to exec without

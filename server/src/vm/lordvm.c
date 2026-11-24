@@ -1071,6 +1071,9 @@ static struct {
     /* 3D (virgl, 6.10): machine.json asks for it and this start can give it (decide_graphics); the render node QEMU opens */
     int gl;
     char render[32], render_want[32];
+    /* the render node (3D's or a vGPU's iGPU's) opened and checked here, QEMU's by descriptor (render_open; 3.3), and its
+     * number in QEMU (rendernode=/proc/self/fd/<render_qfd>, after the session's layers); -1 none */
+    int render_fd, render_qfd;
     /* an Intel GVT-g vGPU this run (decide_vgpu, docs/MACHINES-GPU.md Mode A): its render node (the iGPU's, where QEMU
      * makes the picture's dmabufs), /dev/vfio/<group>, the picture's size, and whether the guest asked for a restart
      * (QEMU runs with -action reboot=shutdown: a reset is an exit, and Machines starts it again) */
@@ -2109,6 +2112,24 @@ static int render_node_ok(const char *p) {
     return !stat(p, &st) && S_ISCHR(st.st_mode) && major(st.st_rdev) == 226 && !access(p, R_OK | W_OK);
 }
 
+/* The render node QEMU gets, opened here (3.3, "Render node by descriptor"): a DRM render node (character device, major
+ * 226, minor 128..255) whose sysfs name is the path's own renderD<minor>. QEMU gets this descriptor and opens it as
+ * /proc/self/fd/<n> (its rendernode= takes only a path: util/drm.c open()s it), and its Landlock rule is made from it,
+ * so the device checked here is the one QEMU may use, whatever /dev/dri says after. -1 when it doesn't check out */
+static int render_open(const char *p) {
+    if (!render_node_ok(p)) return -1;
+    int fd = open(p, O_RDWR | O_CLOEXEC | O_NOCTTY | O_NONBLOCK);
+    if (fd < 0) return -1;
+    struct stat st;
+    char sys[96];
+    unsigned mi = 0;
+    if (fstat(fd, &st) || !S_ISCHR(st.st_mode) || major(st.st_rdev) != 226 || (mi = minor(st.st_rdev)) < 128 || mi > 255 ||
+        (unsigned)atoi(p + 16) != mi) { close(fd); return -1; }
+    snprintf(sys, sizeof sys, "/sys/dev/char/226:%u/device/drm/renderD%u", mi, mi);
+    if (access(sys, F_OK)) { close(fd); return -1; }
+    return fd;
+}
+
 /* the one asked for (lord-server names the one its own GPU path uses), else the first this user can open */
 static int pick_render_node(char *out, size_t n) {
     if (S.render_want[0]) {
@@ -2131,6 +2152,8 @@ static int pick_render_node(char *out, size_t n) {
 static void decide_graphics(void) {
     S.gl = 0;
     S.render[0] = 0;
+    if (S.render_fd >= 0) close(S.render_fd);
+    S.render_fd = S.render_qfd = -1;
     if (S.m.graphics != VM_GFX_3D) return;
     VmHost h;
     vm_host_probe(&h);
@@ -2140,6 +2163,7 @@ static void decide_graphics(void) {
     else if (!gl_modules()) why = "QEMU's OpenGL modules (qemu-system-modules-opengl) aren't installed";
     else if (S.render_want[0] && strcmp(S.render_want, "none") && !render_node_ok(S.render_want)) why = "the desktop's render node can't be opened";
     else if (pick_render_node(S.render, sizeof S.render)) why = "no GPU render node can be opened";
+    else if ((S.render_fd = render_open(S.render)) < 0) why = "the render node isn't a DRM render node lord-vm can open";
     if (why) { S.render[0] = 0; vlog("graphics: 2D instead of 3D: %s", why); return; }
     S.gl = 1;
     vlog("graphics: 3D (virgl) on %s", S.render);
@@ -2194,7 +2218,9 @@ static int decide_vgpu(void) {
     for (struct dirent *e; d && (e = readdir(d));)
         if (!strncmp(e->d_name, "renderD", 7) && strlen(e->d_name) < 12) snprintf(S.vgpu_render, sizeof S.vgpu_render, "/dev/dri/%s", e->d_name);
     if (d) closedir(d);
-    if (!S.vgpu_render[0] || !render_node_ok(S.vgpu_render)) { fail_start("the Intel graphics card's render node can't be opened"); return -1; }
+    if (S.render_fd >= 0) close(S.render_fd);
+    S.render_fd = S.render_qfd = -1;
+    if (!S.vgpu_render[0] || (S.render_fd = render_open(S.vgpu_render)) < 0) { fail_start("the Intel graphics card's render node can't be opened"); return -1; }
     /* /dev/vfio/<group>: given to this user by the admin helper */
     snprintf(p, sizeof p, "/dev/vfio/%d", grp);
     struct stat st;
@@ -2652,7 +2678,10 @@ static void build_qemu_args(void) {
         } else { arg("-device"); arg(vga); }
     }
     char dbus_disp[96];
-    if (S.gl || S.vgpu) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.vgpu ? S.vgpu_render : S.render);
+    /* the render node by descriptor (render_open): QEMU opens /proc/self/fd/<n>, the device lord-vm checked */
+    S.render_qfd = (S.gl || S.vgpu) && S.render_fd >= 0 ? xfd++ : -1;
+    if ((S.gl || S.vgpu) && S.render_qfd >= 0) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=/proc/self/fd/%d,audiodev=snd0", S.render_qfd);
+    else if (S.gl || S.vgpu) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.vgpu ? S.vgpu_render : S.render);
     else snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,audiodev=snd0");
     if (m->display == VM_DISPLAY_WINDOW && (m->devices == VM_DEV_COMPAT || m->devices == VM_DEV_WINDOWS)) {
         /* a USB tablet (and keyboard on arm64) on xHCI: drivers every system has */
@@ -2973,6 +3002,7 @@ static int start_machine(void) {
         if (S.fw_fd >= 0) fds[nf++] = S.fw_fd;
         if (S.sess_on && S.sess_fd >= 0) fds[nf++] = S.sess_fd;
         for (int k = 0; S.sess_on && k < S.sess_n; k++) fds[nf++] = S.sess_fds[k];
+        if (S.render_qfd >= 0) fds[nf++] = S.render_fd;
         fds[nf++] = st[1];
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
@@ -2983,7 +3013,8 @@ static int start_machine(void) {
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
                          S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL,
-                         S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, xfd, qargv[0], S.sc_learn, sc_drop_row(), &lfd };
+                         S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, xfd, qargv[0], S.sc_learn, sc_drop_row(), &lfd,
+                         S.render_qfd };
         int mask = xfd >= 0 ? vm_jail_qemu(&j) | (in_ns ? VMS_NAMESPACES : 0) | (nsb & VMNS_NOEXEC ? VMS_NOEXEC_DISKS : 0) : 0;
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
@@ -3031,6 +3062,7 @@ static int start_machine(void) {
     /* QEMU has read its key (or will, from its own copy of the pipe): lord-vm's goes */
     if (S.key_fd >= 0) { close(S.key_fd); S.key_fd = -1; }
     if (S.fw_fd >= 0) { close(S.fw_fd); S.fw_fd = -1; }
+    if (S.render_fd >= 0) { close(S.render_fd); S.render_fd = -1; }
     if (net[0] >= 0) close(net[0]);
     S.qemu_err = qerr[0];
     S.serial_fd = ser[0];
@@ -7515,7 +7547,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = -1;
-    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = S.render_fd = S.render_qfd = -1;
     for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;

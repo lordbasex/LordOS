@@ -2224,6 +2224,7 @@ typedef struct {
      * lord.vm.shown), frames not read while none did (the next one is read whole), and counters for Logs and tests */
     VmPace pace;
     int pic_hidden, db_skipped;
+    long pic_rects, pic_tex;            /* 2D: rectangles received (VD_FRAME), frames shown by their texture alone (Part 1 steps 4, 5) */
     long pic_skipped;
     unsigned rkey;                      /* names the picture in map for dmaread_rows_new's change test */
     /* sound (6.9): machine.json's choices, what the guest does now (VD_GUEST_AUDIO), and what this side has open. The
@@ -3386,7 +3387,8 @@ static void from_vd(Sess *s) {
         ms->frame_seq++;
         int shown;
         /* a frame in the texture the last paint drew: presenting again is enough (no UI damage, no paint) */
-        if (gpu_frame && ms->gpu_drawn) { media_src_present(ms); shown = 1; }
+        s->pic_rects += ndr;
+        if (gpu_frame && ms->gpu_drawn) { media_src_present(ms); shown = 1; if (pic2d) s->pic_tex += whole; }
         else if (pic2d && !over && ndr > 0) {
             /* each rectangle on its own: a clock and a moving square repaint two small boxes (Part 1 step 4) */
             shown = 0;
@@ -3543,6 +3545,8 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "picReads", s->db_reads);
     set_int(c, o, "picSame", s->db_same);
     set_int(c, o, "picSkipped", s->pic_skipped);
+    set_int(c, o, "picRects", (int)s->pic_rects);
+    set_int(c, o, "picTex", (int)s->pic_tex);
     set_int(c, o, "pace", s->pace.kind);
     set_int(c, o, "cd", s->cd_state);
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;

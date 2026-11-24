@@ -83,6 +83,17 @@ static int rule(int rs, const char *path, uint64_t allow, uint64_t handled) {
     return r;
 }
 
+/* the same for a file already open (a device lord-vm opened and checked itself): a file's rights only */
+static int rule_fd(int rs, int fd, uint64_t allow, uint64_t handled) {
+    allow &= FILE_RIGHTS
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+        | LANDLOCK_ACCESS_FS_IOCTL_DEV
+#endif
+        ;
+    struct landlock_path_beneath_attr pb = { .allowed_access = allow & handled, .parent_fd = fd };
+    return (int)syscall(SYS_landlock_add_rule, rs, LANDLOCK_RULE_PATH_BENEATH, &pb, 0U);
+}
+
 /* ---- seccomp: the image tools' denylist (qemu-img; QEMU itself has the allowlist, vmseccomp.c) ---- */
 
 #define NR(x) (x)
@@ -173,14 +184,17 @@ static int tool_filter(struct sock_filter *f, int cap, int threads_only) {
 
 /* 3D graphics (vmsandbox.h): the render node read, write and ioctl; what Mesa reads to know the GPU behind it. A path
  * that isn't a DRM render node is refused (-1), and nothing is allowed then. */
-static int render_rules(int rs, const char *node, uint64_t h) {
+static int render_rules(int rs, const char *node, int fd, uint64_t h) {
     struct stat st;
-    if (strncmp(node, "/dev/dri/renderD", 16) || stat(node, &st) || !S_ISCHR(st.st_mode) || major(st.st_rdev) != 226 || minor(st.st_rdev) < 128) return -1;
+    if (strncmp(node, "/dev/dri/renderD", 16)) return -1;
+    if (fd > 2 ? fstat(fd, &st) : stat(node, &st)) return -1;
+    if (!S_ISCHR(st.st_mode) || major(st.st_rdev) != 226 || minor(st.st_rdev) < 128 || minor(st.st_rdev) > 255) return -1;
     uint64_t dev = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE;
 #ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
     dev |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
 #endif
-    if (rule(rs, node, dev, h)) return -1;
+    /* by descriptor: the rule is on the device lord-vm opened and checked, whatever /dev/dri holds now */
+    if (fd > 2 ? rule_fd(rs, fd, dev, h) : rule(rs, node, dev, h)) return -1;
     /* libdrm's drmGetDevice2 lists /dev/dri and reads the GPU's PCI folder in sysfs; without either Mesa's EGL doesn't
      * start (measured 2026-11-20, amdgpu). Listing /dev/dri shows names only: opening card0 or another node is still
      * refused. The way through /sys/dev/char is a link and needs no rule. */
@@ -251,7 +265,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
             }
             /* 3D: a render node that doesn't check out gets no rule (QEMU's EGL then fails and it exits); it never costs
              * the rest of the sandbox */
-            if (j->render && j->render[0]) render_rules(rs, j->render, h);
+            if (j->render && j->render[0]) render_rules(rs, j->render, j->render_fd, h);
             /* a vGPU whose paths don't check out costs the whole sandbox: QEMU doesn't run (the caller refuses) */
             if (j->vgpu_dev && j->vgpu_dev[0] && vgpu_rules(rs, j->vgpu_dev, j->vgpu_group, h)) ok = 0;
             if (j->vgpu_dev && j->vgpu_rom && j->vgpu_rom[0] && rule(rs, j->vgpu_rom, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
