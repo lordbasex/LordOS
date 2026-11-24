@@ -112,6 +112,7 @@
   "help.console": "ang serial console ng machine sa terminal na ito; Ctrl+] para lumabas",
   "help.mcp": "isang lokal na MCP server sa standard input at output, para sa coding agent: kumikilos lamang sa mga machine na naka-on ang automation",
   "help.apply": "gumagawa o nagbabago ng machine mula sa maikling text file (pangalan, memory, processor, disk, network, iso, port, folder)",
+  "help.import": "nagdadala ng machine mula sa ibang virtualization app (.vmx, .vbox, .utm, .pvm, .ova o disk) kasama ang pagkakakilanlan nito, gaya ng Migrate sa app",
   "noAutomation": "Naka-off ang automation para sa {name}: i-on ito sa I-configure nito.",
   "execFailed": "Hindi ito napatakbo ng {name}: {why}",
   "outputCut": "Mas mahaba ang output kaysa sa bumalik: ang simula lang ang ipinapakita.",
@@ -124,8 +125,8 @@
   "noLog": "Wala pang ganitong log para sa {name}.",
   "consoleHint": "Ang serial console ng {name}. Ctrl+] para lumabas.",
   "applyBad": "{file}, linya {line}: {why}",
-  "applyAskShares": "Ibinabahagi ng {file} ang mga folder mong ito sa {name}: {list}. Payagan? [y/N]",
-  "applyNoShares": "Walang nabago: hindi pinayagan ang mga shared folder.",
+  "applyAskShares": "Hinihingi ng {file} para sa {name} ang mga ito, na lumalampas sa machine: {list}. Payagan? [y/N]",
+  "applyNoShares": "Walang nabago: hindi pinayagan ang lumalampas sa machine (sa terminal lang ito nagtatanong).",
   "applyCreated": "Ginawa ang {name} ayon sa sinasabi ng {file}.",
   "applyUpdated": "Nasa {name} na ang mga setting mula sa {file}.",
   "applyRunning": "Tumatakbo ang {name}: i-shut down ito para baguhin mula sa file."

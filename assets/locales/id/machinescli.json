@@ -112,6 +112,7 @@
   "help.console": "konsol serial mesin di terminal ini; Ctrl+] untuk keluar",
   "help.mcp": "server MCP lokal di masukan dan keluaran standar, untuk agen pemrograman: hanya bertindak pada mesin dengan otomatisasi aktif",
   "help.apply": "membuat atau mengubah mesin dari berkas teks pendek (nama, memori, prosesor, disk, jaringan, iso, port, folder)",
+  "help.import": "membawa mesin dari aplikasi virtualisasi lain (.vmx, .vbox, .utm, .pvm, .ova, atau disk) dengan identitasnya, seperti Migrasi di aplikasi",
   "noAutomation": "Otomatisasi nonaktif untuk {name}: aktifkan di Konfigurasinya.",
   "execFailed": "{name} tidak bisa menjalankannya: {why}",
   "outputCut": "Keluaran lebih panjang daripada yang kembali: hanya bagian awalnya yang ditampilkan.",
@@ -124,8 +125,8 @@
   "noLog": "Belum ada log itu untuk {name}.",
   "consoleHint": "Konsol serial {name}. Ctrl+] untuk keluar.",
   "applyBad": "{file}, baris {line}: {why}",
-  "applyAskShares": "{file} membagikan folder Anda ini dengan {name}: {list}. Izinkan? [y/N]",
-  "applyNoShares": "Tidak ada yang berubah: folder bersama tidak diizinkan.",
+  "applyAskShares": "{file} meminta untuk {name} hal-hal yang menjangkau ke luar mesin: {list}. Izinkan? [y/N]",
+  "applyNoShares": "Tidak ada yang berubah: hal yang menjangkau ke luar mesin tidak diizinkan (hanya ditanyakan di terminal).",
   "applyCreated": "{name} dibuat seperti kata {file}.",
   "applyUpdated": "{name} kini memakai pengaturan dari {file}.",
   "applyRunning": "{name} sedang berjalan: matikan untuk mengubahnya dari berkas."

@@ -112,6 +112,7 @@
   "help.console": "konsola szeregowa maszyny w tym terminalu; Ctrl+] wychodzi",
   "help.mcp": "lokalny serwer MCP na standardowym wejściu i wyjściu, dla agenta programistycznego: działa tylko na maszynach z włączoną automatyzacją",
   "help.apply": "tworzy lub zmienia maszynę z krótkiego pliku tekstowego (nazwa, pamięć, procesory, dysk, sieć, iso, porty, foldery)",
+  "help.import": "sprowadza maszynę z innej aplikacji do wirtualizacji (.vmx, .vbox, .utm, .pvm, .ova lub dysk) z jej tożsamością, jak Migruj w aplikacji",
   "noAutomation": "Automatyzacja jest wyłączona dla {name}: włącz ją w jej Konfiguruj.",
   "execFailed": "{name} nie mogła tego uruchomić: {why}",
   "outputCut": "Wyjście było dłuższe niż to, co wraca: pokazano tylko początek.",
@@ -124,8 +125,8 @@
   "noLog": "Nie ma jeszcze takiego dziennika dla {name}.",
   "consoleHint": "Konsola szeregowa {name}. Ctrl+] wychodzi.",
   "applyBad": "{file}, wiersz {line}: {why}",
-  "applyAskShares": "{file} udostępnia te twoje foldery maszynie {name}: {list}. Zezwolić? [y/N]",
-  "applyNoShares": "Nic nie zmieniono: nie zezwolono na udostępnione foldery.",
+  "applyAskShares": "{file} prosi dla {name} o to, co wychodzi poza maszynę: {list}. Zezwolić? [y/N]",
+  "applyNoShares": "Nic nie zmieniono: nie zezwolono na to, co wychodzi poza maszynę (pytanie pada tylko w terminalu).",
   "applyCreated": "Utworzono {name} zgodnie z {file}.",
   "applyUpdated": "{name} ma teraz ustawienia z {file}.",
   "applyRunning": "{name} działa: wyłącz ją, aby zmienić ją z pliku."

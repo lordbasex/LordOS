@@ -112,6 +112,7 @@
   "help.console": "la consola sèrie de la màquina en aquest terminal; Ctrl+] en surt",
   "help.mcp": "un servidor MCP local per l'entrada i la sortida estàndard, per a un agent de programació: només actua en màquines amb l'automatització activada",
   "help.apply": "crea o canvia una màquina a partir d'un fitxer de text curt (nom, memòria, processadors, disc, xarxa, iso, ports, carpetes)",
+  "help.import": "porta una màquina d'una altra app de virtualització (un .vmx, .vbox, .utm, .pvm, .ova o un disc) amb la seva identitat, com Migra a l'app",
   "noAutomation": "L'automatització està desactivada per a {name}: activa-la al seu Configura.",
   "execFailed": "{name} no ho ha pogut executar: {why}",
   "outputCut": "La sortida era més llarga del que torna: només se'n mostra el començament.",
@@ -124,8 +125,8 @@
   "noLog": "Encara no hi ha aquest registre per a {name}.",
   "consoleHint": "La consola sèrie de {name}. Ctrl+] en surt.",
   "applyBad": "{file}, línia {line}: {why}",
-  "applyAskShares": "{file} comparteix aquestes carpetes teves amb {name}: {list}. Ho permets? [y/N]",
-  "applyNoShares": "No s'ha canviat res: les carpetes compartides no s'han permès.",
+  "applyAskShares": "{file} demana per a {name} això, que va més enllà de la màquina: {list}. Ho permets? [y/N]",
+  "applyNoShares": "No s'ha canviat res: no s'ha permès el que va més enllà de la màquina (només es pregunta en un terminal).",
   "applyCreated": "S'ha creat {name} com diu {file}.",
   "applyUpdated": "{name} ja té la configuració que dona {file}.",
   "applyRunning": "{name} està en marxa: atura-la per canviar-la des d'un fitxer."

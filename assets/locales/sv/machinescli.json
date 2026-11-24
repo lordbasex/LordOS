@@ -112,6 +112,7 @@
   "help.console": "maskinens seriekonsol i den här terminalen; Ctrl+] avslutar",
   "help.mcp": "en lokal MCP-server på standard in och ut, för en kodningsagent: den agerar bara på maskiner med automatisering på",
   "help.apply": "skapar eller ändrar en maskin från en kort textfil (namn, minne, processorer, disk, nätverk, iso, portar, mappar)",
+  "help.import": "hämtar en maskin från en annan virtualiseringsapp (en .vmx, .vbox, .utm, .pvm, .ova eller en disk) med dess identitet, som Migrera i appen",
   "noAutomation": "Automatisering är av för {name}: slå på den i dess Konfigurera.",
   "execFailed": "{name} kunde inte köra det: {why}",
   "outputCut": "Utdata var längre än det som kommer tillbaka: bara början visas.",
@@ -124,8 +125,8 @@
   "noLog": "Den loggen finns inte för {name} än.",
   "consoleHint": "Seriekonsolen för {name}. Ctrl+] avslutar.",
   "applyBad": "{file}, rad {line}: {why}",
-  "applyAskShares": "{file} delar dessa mappar av dina med {name}: {list}. Tillåta? [y/N]",
-  "applyNoShares": "Inget ändrades: de delade mapparna tilläts inte.",
+  "applyAskShares": "{file} begär detta för {name}, som når utanför maskinen: {list}. Tillåta? [y/N]",
+  "applyNoShares": "Inget ändrades: det som når utanför maskinen tilläts inte (frågan ställs bara i en terminal).",
   "applyCreated": "{name} skapades så som {file} säger.",
   "applyUpdated": "{name} har nu inställningarna från {file}.",
   "applyRunning": "{name} körs: stäng av den för att ändra den från en fil."

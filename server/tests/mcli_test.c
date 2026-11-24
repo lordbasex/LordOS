@@ -411,6 +411,36 @@ static void test_rpc(void) {
     (void)id;
 }
 
+/* the security review of 2026-11-24: an MCP name never a path; an apply file's boundary settings listed; its ISO placed */
+static void test_review(void) {
+    CHECK(mcli_mcp_name_ok("Debian Dev") && mcli_mcp_name_ok("Año") && mcli_mcp_name_ok("ceb6f9df-1627-4006-b3bb-0043f9938883"));
+    CHECK(!mcli_mcp_name_ok(NULL) && !mcli_mcp_name_ok("") && !mcli_mcp_name_ok("/tmp/evil.lordvm") && !mcli_mcp_name_ok("evil.lordvm") &&
+          !mcli_mcp_name_ok("evil.LORDVM") && !mcli_mcp_name_ok("../Machines/x") && !mcli_mcp_name_ok("w.lordgroup") && !mcli_mcp_name_ok("..") &&
+          !mcli_mcp_name_ok("a\nb") && !mcli_mcp_name_ok("x/"));
+    McliApply *a = malloc(sizeof *a);
+    int line;
+    const char *why;
+    char out[2000];
+    /* a hostile file: every boundary setting at once */
+    const char hostile[] = "name = \"Dev\"\niso = \"/home/a/Downloads/x.iso\"\nports = [\"tcp:2222:22:lan\"]\nshares = [\"rw:h:/home/a\"]\n"
+                           "network = \"bridged\"\nclipboard = \"both\"\nagent = true\nmemory = \"2G\"\n";
+    CHECK(!mcli_apply_parse(hostile, strlen(hostile), a, &line, &why));
+    CHECK(mcli_apply_risks(a, out, sizeof out) == 6 && strstr(out, "tcp:2222:22:lan") && strstr(out, "rw:h:/home/a") && strstr(out, "bridged") &&
+          strstr(out, "both") && strstr(out, "agent") && strstr(out, "x.iso"));
+    const char host_only[] = "name = \"Dev\"\nnetwork = \"host-only\"\n";
+    CHECK(!mcli_apply_parse(host_only, strlen(host_only), a, &line, &why) && mcli_apply_risks(a, out, sizeof out) == 1);
+    const char calm[] = "name = \"Dev\"\nmemory = \"2G\"\ncpus = 2\nnetwork = \"isolated\"\nclipboard = \"off\"\nagent = false\nports = []\n";
+    CHECK(!mcli_apply_parse(calm, strlen(calm), a, &line, &why) && mcli_apply_risks(a, out, sizeof out) == 0 && !out[0]);
+    char tiny[8];
+    CHECK(!mcli_apply_parse(hostile, strlen(hostile), a, &line, &why) && mcli_apply_risks(a, tiny, sizeof tiny) == 6 && strlen(tiny) < sizeof tiny);
+    free(a);
+    const char *roots[] = { "/home/a/Downloads", "/home/a/Machines", NULL };
+    CHECK(mcli_iso_place_ok("/home/a/Downloads/debian.iso", roots) && mcli_iso_place_ok("/home/a/Machines/.images/x.IMG", roots));
+    CHECK(!mcli_iso_place_ok("/etc/passwd", roots) && !mcli_iso_place_ok("/home/a/Downloads/x.qcow2", roots) && !mcli_iso_place_ok("/home/a/x.iso", roots) &&
+          !mcli_iso_place_ok("/home/a/Downloads2/x.iso", roots) && !mcli_iso_place_ok("/home/a/Downloads/../.ssh/x.iso", roots) &&
+          !mcli_iso_place_ok("x.iso", roots) && !mcli_iso_place_ok("/home/a/Downloads/x.iso", NULL) && !mcli_iso_place_ok(NULL, roots));
+}
+
 int main(void) {
     test_sizes();
     test_resolve();
@@ -424,6 +454,7 @@ int main(void) {
     test_term_clean();
     test_apply();
     test_rpc();
+    test_review();
     fuzz_channel();
     if (fails) { fprintf(stderr, "mcli-test: %d failed\n", fails); return 1; }
     printf("mcli-test: ok\n");

@@ -112,6 +112,7 @@
   "help.console": "de seriële console van de machine in deze terminal; Ctrl+] verlaat",
   "help.mcp": "een lokale MCP-server via standaardinvoer en -uitvoer, voor een programmeeragent: hij werkt alleen op machines met automatisering aan",
   "help.apply": "maakt of wijzigt een machine vanuit een kort tekstbestand (naam, geheugen, processors, schijf, netwerk, iso, poorten, mappen)",
+  "help.import": "haalt een machine uit een andere virtualisatie-app (een .vmx, .vbox, .utm, .pvm, .ova of een schijf) met haar identiteit, zoals Migreren in de app",
   "noAutomation": "Automatisering staat uit voor {name}: zet die aan in Configureren.",
   "execFailed": "{name} kon het niet uitvoeren: {why}",
   "outputCut": "De uitvoer was langer dan wat terugkomt: alleen het begin wordt getoond.",
@@ -124,8 +125,8 @@
   "noLog": "Dit logboek is er nog niet voor {name}.",
   "consoleHint": "De seriële console van {name}. Ctrl+] verlaat.",
   "applyBad": "{file}, regel {line}: {why}",
-  "applyAskShares": "{file} deelt deze mappen van jou met {name}: {list}. Toestaan? [y/N]",
-  "applyNoShares": "Er is niets gewijzigd: de gedeelde mappen zijn niet toegestaan.",
+  "applyAskShares": "{file} vraagt voor {name} dit, dat verder reikt dan de machine: {list}. Toestaan? [y/N]",
+  "applyNoShares": "Er is niets gewijzigd: wat verder reikt dan de machine is niet toegestaan (dat wordt alleen in een terminal gevraagd).",
   "applyCreated": "{name} is gemaakt zoals {file} zegt.",
   "applyUpdated": "{name} heeft nu de instellingen uit {file}.",
   "applyRunning": "{name} draait: sluit haar af om haar vanuit een bestand te wijzigen."

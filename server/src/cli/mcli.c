@@ -439,3 +439,43 @@ int mcli_rpc_parse(const char *line, size_t n, McliRpc *r) {
 }
 
 void mcli_rpc_free(McliRpc *r) { json_free(&r->doc); memset(r, 0, sizeof *r); }
+
+/* ---- the security review of 2026-11-24 ---- */
+
+int mcli_mcp_name_ok(const char *q) {
+    size_t n = q ? strlen(q) : 0;
+    if (!n || n > 300 || strchr(q, '/')) return 0;
+    for (const unsigned char *p = (const unsigned char *)q; *p; p++) if (*p < 0x20 || *p == 0x7f) return 0;
+    if ((n >= 7 && !strcasecmp(q + n - 7, ".lordvm")) || (n >= 10 && !strcasecmp(q + n - 10, ".lordgroup"))) return 0;
+    return strcmp(q, ".") && strcmp(q, "..");
+}
+
+static void risk_add(char *out, size_t n, size_t *o, int *k, const char *a, const char *b) {
+    int w = snprintf(out + *o, *o < n ? n - *o : 0, "%s%s%s", *k ? "; " : "", a, b ? b : "");
+    if (w > 0) *o = *o + (size_t)w < n ? *o + (size_t)w : n ? n - 1 : 0;
+    (*k)++;
+}
+
+int mcli_apply_risks(const McliApply *a, char *out, size_t n) {
+    int k = 0;
+    size_t o = 0;
+    if (n) out[0] = 0;
+    if (a->iso[0]) risk_add(out, n, &o, &k, "iso = ", a->iso);
+    for (int i = 0; i < a->n_ports; i++) risk_add(out, n, &o, &k, "port ", a->ports[i]);
+    for (int i = 0; i < a->n_shares; i++) risk_add(out, n, &o, &k, "share ", a->shares[i]);
+    if (a->network[0] && strcmp(a->network, "shared") && strcmp(a->network, "isolated")) risk_add(out, n, &o, &k, "network = ", a->network);
+    if (a->clipboard[0] && strcmp(a->clipboard, "off")) risk_add(out, n, &o, &k, "clipboard = ", a->clipboard);
+    if (a->agent == 1) risk_add(out, n, &o, &k, "agent = true", NULL);
+    return k;
+}
+
+int mcli_iso_place_ok(const char *real, const char *const *roots) {
+    size_t n = real ? strlen(real) : 0;
+    if (n < 6 || real[0] != '/' || (strcasecmp(real + n - 4, ".iso") && strcasecmp(real + n - 4, ".img"))) return 0;
+    if (strstr(real, "/../") || strstr(real, "/./")) return 0;
+    for (int i = 0; roots && roots[i]; i++) {
+        size_t r = strlen(roots[i]);
+        if (r > 1 && roots[i][0] == '/' && n > r + 1 && !strncmp(real, roots[i], r) && real[r] == '/') return 1;
+    }
+    return 0;
+}

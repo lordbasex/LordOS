@@ -112,6 +112,7 @@
   "help.console": "在此終端機中開啟機器的序列主控台；按 Ctrl+] 離開",
   "help.mcp": "供程式設計代理使用的本機 MCP 伺服器，走標準輸入與輸出：只操作開啟了自動化的機器",
   "help.apply": "根據一個簡短的文字檔（名稱、記憶體、處理器、磁碟、網路、iso、連接埠、資料夾）建立或變更機器",
+  "help.import": "從其他虛擬化應用程式匯入機器（.vmx、.vbox、.utm、.pvm、.ova 或磁碟），保留其身分，與應用程式中的「移轉」相同",
   "noAutomation": "{name} 的自動化已關閉：請在其「設定」中開啟。",
   "execFailed": "{name} 無法執行它：{why}",
   "outputCut": "輸出比傳回的內容更長：只顯示開頭部分。",
@@ -124,8 +125,8 @@
   "noLog": "{name} 還沒有這個記錄。",
   "consoleHint": "{name} 的序列主控台。按 Ctrl+] 離開。",
   "applyBad": "{file}，第 {line} 行：{why}",
-  "applyAskShares": "{file} 會把你的這些資料夾分享給 {name}：{list}。允許嗎？[y/N]",
-  "applyNoShares": "沒有做任何變更：分享資料夾未獲允許。",
+  "applyAskShares": "{file} 為 {name} 要求以下超出機器範圍的設定：{list}。允許嗎？[y/N]",
+  "applyNoShares": "沒有做任何變更：超出機器範圍的設定未獲允許（只在終端機中詢問）。",
   "applyCreated": "已依照 {file} 建立 {name}。",
   "applyUpdated": "{name} 現在使用 {file} 中的設定。",
   "applyRunning": "{name} 正在執行：請先關機，再從檔案變更它。"

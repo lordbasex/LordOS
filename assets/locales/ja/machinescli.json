@@ -112,6 +112,7 @@
   "help.console": "このターミナルでマシンのシリアルコンソールを開きます。Ctrl+] で終了",
   "help.mcp": "コーディングエージェント用の、標準入出力上のローカル MCP サーバー。自動化がオンのマシンだけを操作します",
   "help.apply": "短いテキストファイル（名前、メモリ、CPU、ディスク、ネットワーク、iso、ポート、フォルダー）からマシンを作成または変更します",
+  "help.import": "ほかの仮想化アプリのマシン（.vmx、.vbox、.utm、.pvm、.ova またはディスク）を ID ごと取り込みます。アプリの「移行」と同じです",
   "noAutomation": "{name} の自動化はオフです。構成でオンにしてください。",
   "execFailed": "{name} で実行できませんでした：{why}",
   "outputCut": "出力が戻ってくる量より長かったため、先頭だけを表示しています。",
@@ -124,8 +125,8 @@
   "noLog": "{name} にはまだそのログがありません。",
   "consoleHint": "{name} のシリアルコンソール。Ctrl+] で終了します。",
   "applyBad": "{file}、{line} 行目：{why}",
-  "applyAskShares": "{file} はあなたのこれらのフォルダーを {name} と共有します：{list}。許可しますか？ [y/N]",
-  "applyNoShares": "何も変更していません：共有フォルダーが許可されませんでした。",
+  "applyAskShares": "{file} は {name} に、マシンの外に及ぶ次の設定を求めています：{list}。許可しますか？ [y/N]",
+  "applyNoShares": "何も変更していません：マシンの外に及ぶ設定は許可されませんでした（ターミナルでのみ確認します）。",
   "applyCreated": "{file} のとおりに {name} を作成しました。",
   "applyUpdated": "{name} は {file} の設定になりました。",
   "applyRunning": "{name} は実行中です。ファイルから変更するにはシャットダウンしてください。"

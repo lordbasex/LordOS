@@ -112,6 +112,7 @@
   "help.console": "la console série de la machine dans ce terminal ; Ctrl+] quitte",
   "help.mcp": "un serveur MCP local sur l'entrée et la sortie standard, pour un agent de programmation : il n'agit que sur les machines où l'automatisation est activée",
   "help.apply": "crée ou modifie une machine depuis un court fichier texte (nom, mémoire, processeurs, disque, réseau, iso, ports, dossiers)",
+  "help.import": "importe une machine d'une autre app de virtualisation (un .vmx, .vbox, .utm, .pvm, .ova ou un disque) avec son identité, comme Migrer dans l'app",
   "noAutomation": "L'automatisation est désactivée pour {name} : activez-la dans son Configurer.",
   "execFailed": "{name} n'a pas pu le lancer : {why}",
   "outputCut": "La sortie était plus longue que ce qui revient : seul son début est affiché.",
@@ -124,8 +125,8 @@
   "noLog": "Ce journal n'existe pas encore pour {name}.",
   "consoleHint": "La console série de {name}. Ctrl+] quitte.",
   "applyBad": "{file}, ligne {line} : {why}",
-  "applyAskShares": "{file} partage ces dossiers à vous avec {name} : {list}. Autoriser ? [y/N]",
-  "applyNoShares": "Rien n'a été modifié : les dossiers partagés n'ont pas été autorisés.",
+  "applyAskShares": "{file} demande pour {name} ceci, qui dépasse la machine : {list}. Autoriser ? [y/N]",
+  "applyNoShares": "Rien n'a été modifié : ce qui dépasse la machine n'a pas été autorisé (la question n'est posée que dans un terminal).",
   "applyCreated": "{name} a été créée comme le dit {file}.",
   "applyUpdated": "{name} a maintenant les réglages de {file}.",
   "applyRunning": "{name} est en marche : éteignez-la pour la modifier depuis un fichier."

@@ -112,6 +112,7 @@
   "help.console": "die serielle Konsole der Maschine in diesem Terminal; Strg+] beendet",
   "help.mcp": "ein lokaler MCP-Server über Standardeingabe und -ausgabe, für einen Programmier-Agenten: er handelt nur bei Maschinen mit eingeschalteter Automatisierung",
   "help.apply": "erstellt oder ändert eine Maschine aus einer kurzen Textdatei (Name, Speicher, Prozessoren, Festplatte, Netzwerk, ISO, Ports, Ordner)",
+  "help.import": "holt eine Maschine aus einer anderen Virtualisierungs-App (.vmx, .vbox, .utm, .pvm, .ova oder eine Festplatte) mit ihrer Identität, wie Migrieren in der App",
   "noAutomation": "Die Automatisierung ist für {name} aus: schalte sie in ihrem Konfigurieren ein.",
   "execFailed": "{name} konnte es nicht ausführen: {why}",
   "outputCut": "Die Ausgabe war länger als das, was zurückkommt: nur ihr Anfang wird gezeigt.",
@@ -124,8 +125,8 @@
   "noLog": "Dieses Protokoll gibt es für {name} noch nicht.",
   "consoleHint": "Die serielle Konsole von {name}. Strg+] beendet.",
   "applyBad": "{file}, Zeile {line}: {why}",
-  "applyAskShares": "{file} teilt diese Ordner von dir mit {name}: {list}. Erlauben? [y/N]",
-  "applyNoShares": "Nichts wurde geändert: die freigegebenen Ordner wurden nicht erlaubt.",
+  "applyAskShares": "{file} verlangt für {name} Folgendes, das über die Maschine hinausreicht: {list}. Erlauben? [y/N]",
+  "applyNoShares": "Nichts wurde geändert: was über die Maschine hinausreicht, wurde nicht erlaubt (gefragt wird nur in einem Terminal).",
   "applyCreated": "{name} wurde erstellt, wie {file} es sagt.",
   "applyUpdated": "{name} hat jetzt die Einstellungen aus {file}.",
   "applyRunning": "{name} läuft: fahre sie herunter, um sie aus einer Datei zu ändern."

@@ -112,6 +112,7 @@
   "help.console": "a gép soros konzolja ebben a terminálban; a Ctrl+] kilép",
   "help.mcp": "helyi MCP-kiszolgáló a szabványos bemeneten és kimeneten, egy programozó ügynöknek: csak bekapcsolt automatizálású gépeken cselekszik",
   "help.apply": "gépet hoz létre vagy módosít egy rövid szövegfájlból (név, memória, processzorok, lemez, hálózat, iso, portok, mappák)",
+  "help.import": "behoz egy gépet egy másik virtualizációs alkalmazásból (.vmx, .vbox, .utm, .pvm, .ova vagy lemez) az azonosságával, mint az alkalmazás Áttelepítése",
   "noAutomation": "Az automatizálás ki van kapcsolva ennél: {name}. Kapcsold be a Beállításában.",
   "execFailed": "{name} nem tudta futtatni: {why}",
   "outputCut": "A kimenet hosszabb volt annál, ami visszajön: csak az eleje látszik.",
@@ -124,8 +125,8 @@
   "noLog": "Ilyen napló még nincs ehhez: {name}.",
   "consoleHint": "{name} soros konzolja. A Ctrl+] kilép.",
   "applyBad": "{file}, {line}. sor: {why}",
-  "applyAskShares": "{file} megosztja ezeket a mappáidat ezzel: {name}: {list}. Engedélyezed? [y/N]",
-  "applyNoShares": "Semmi sem változott: a megosztott mappák nem kaptak engedélyt.",
+  "applyAskShares": "{file} ezeket kéri ehhez: {name}, amelyek túlmutatnak a gépen: {list}. Engedélyezed? [y/N]",
+  "applyNoShares": "Semmi sem változott: ami túlmutat a gépen, nem kapott engedélyt (csak terminálban kérdez).",
   "applyCreated": "{name} elkészült, ahogy {file} mondja.",
   "applyUpdated": "{name} most {file} beállításait használja.",
   "applyRunning": "{name} fut: állítsd le, hogy fájlból módosítsd."

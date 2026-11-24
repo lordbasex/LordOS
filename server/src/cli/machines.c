@@ -12,6 +12,7 @@
  *   machines exec NAME [--timeout S] [--] PROGRAM [ARGS...]      machines cp [--force] SRC DST   (one is NAME:PATH)
  *   machines logs NAME [--serial|--machine] [--follow] [--lines N]   machines console NAME
  *   machines mcp                               machines apply FILE
+ *   machines import SRC NAME [--arch A] [--devices compat|virtio] [--network shared|isolated] [--firmware uefi|bios]
  *   machines help
  * Also installed as `lordvm` (the same program; docs/VIRTUALIZATION.md 6.15).
  *
@@ -958,6 +959,7 @@ static int cmd_help(void) {
         { "machines console NAME", "help.console" },
         { "machines mcp", "help.mcp" },
         { "machines apply FILE", "help.apply" },
+        { "machines import SRC NAME [--arch A] [--devices compat|virtio] [--network shared|isolated] [--firmware uefi|bios]", "help.import" },
         { "machines set NAME [--memory 8G] [--cpus 6] [--disk 64G] [--network shared|isolated|bridged|hostonly] [--bridge CARD]\n"
           "             [--clipboard off|to-guest|from-guest|both] [--clipboard-ask on|off] [--graphics 2d|3d]\n"
           "             [--gpu none|intel-whole|intel-shared] [--name NAME] [--iso FILE|none] [--display window|none]\n"
@@ -1772,11 +1774,33 @@ static int cmd_apply(int argc, char **argv) {
         return VMCLI_USAGE;
     }
     free(t);
-    if (a->n_shares) {
-        char q[2000];
-        size_t o = 0;
-        for (int i = 0; i < a->n_shares && o < sizeof q - 1; i++) { int w = snprintf(q + o, sizeof q - o, "%s%s", i ? ", " : "", a->shares[i]); if (w > 0) o += (size_t)w; }
-        if (!ask_tty(say("applyAskShares", "file", argv[0], "name", a->name, "list", q, NULL))) { ERR("applyNoShares", NULL); free(a); return VMCLI_FAILED; }
+    /* the file came with a repository: an ISO only from the person's Downloads folder or the Machines library, resolved */
+    if (a->iso[0]) {
+        char real[PATH_MAX], dl[PATH_MAX + 16], dlr[PATH_MAX] = "", libr[PATH_MAX] = "";
+        const char *home = getenv("HOME");
+        struct stat ist;
+        snprintf(dl, sizeof dl, "%s/Downloads", home ? home : "/nonexistent");
+        if (!realpath(dl, dlr)) dlr[0] = 0;
+        library_path();
+        if (!realpath(library, libr)) libr[0] = 0;
+        const char *roots[3] = { dlr[0] ? dlr : NULL, NULL, NULL };
+        roots[dlr[0] ? 1 : 0] = libr[0] ? libr : NULL;
+        if (!realpath(a->iso, real) || lstat(real, &ist) || !S_ISREG(ist.st_mode) || !mcli_iso_place_ok(real, roots)) {
+            ERR("applyBad", "file", argv[0], "line", "0", "why", "iso must be a .iso or .img file in your Downloads folder or the Machines library", NULL);
+            free(a);
+            return VMCLI_USAGE;
+        }
+        if (strlen(real) >= sizeof a->iso) { ERR("applyBad", "file", argv[0], "line", "0", "why", "the iso path is too long", NULL); free(a); return VMCLI_USAGE; }
+        memcpy(a->iso, real, strlen(real) + 1);
+    }
+    /* everything that crosses this computer's boundary asks the person on their terminal; no terminal, no change */
+    {
+        char q[4000];
+        if (mcli_apply_risks(a, q, sizeof q) && !ask_tty(say("applyAskShares", "file", argv[0], "name", a->name, "list", q, NULL))) {
+            ERR("applyNoShares", NULL);
+            free(a);
+            return VMCLI_FAILED;
+        }
     }
     load_library();
     Machine *x = NULL;
@@ -1842,6 +1866,41 @@ static int cmd_apply(int argc, char **argv) {
     }
     free(a);
     return rc;
+}
+
+/* machines import SRC NAME [--arch A] [--devices compat|virtio] [--network shared|isolated] [--firmware uefi|bios]: a
+ * machine of another virtualization app (6.22), as the app's Migrate tile does it (lord-vm --import-machine) */
+static int cmd_import(int argc, char **argv) {
+    if (argc < 2) { ERR("missing", "what", argc ? "NAME" : "SRC", NULL); return VMCLI_USAGE; }
+    const char *src = argv[0], *name = argv[1];
+    if (!vm_name_valid(name)) { ERR("badName", NULL); return VMCLI_USAGE; }
+    char *a[24];
+    int k = 0;
+    char real[PATH_MAX];
+    if (!realpath(src, real)) { ERR("noMachine", "name", src, NULL); return VMCLI_NO_MACHINE; }
+    load_library();
+    for (int i = 0; i < nms; i++) if (!strcasecmp(ms[i].m.name, name)) { ERR("nameTaken", "name", name, NULL); return VMCLI_FAILED; }
+    if (library_path() && mkdir(library, 0700) && errno != EEXIST) { ERR("opFailed", "name", name, "why", strerror(errno), NULL); return VMCLI_FAILED; }
+    library_path();
+    char folder[64], dst[PATH_MAX + 80];
+    mcli_folder_name(name, folder, sizeof folder);
+    snprintf(dst, sizeof dst, "%s/%s.lordvm", library, folder);
+    for (int j = 2; !access(dst, F_OK) && j < 100; j++) snprintf(dst, sizeof dst, "%s/%s %d.lordvm", library, folder, j);
+    if (!access(dst, F_OK)) { ERR("nameTaken", "name", name, NULL); return VMCLI_FAILED; }
+    a[k++] = NULL; a[k++] = "--import-machine"; a[k++] = real; a[k++] = dst; a[k++] = "--name"; a[k++] = (char *)name;
+    static const char *const OPT[][3] = { { "--arch", "amd64", "arm64" }, { "--devices", "compat", "virtio" }, { "--network", "shared", "isolated" }, { "--firmware", "uefi", "bios" } };
+    for (int i = 2; i < argc; i++) {
+        int ok = 0;
+        for (size_t o = 0; o < sizeof OPT / sizeof OPT[0]; o++)
+            if (!strcmp(argv[i], OPT[o][0]) && i + 1 < argc && (!strcmp(argv[i + 1], OPT[o][1]) || !strcmp(argv[i + 1], OPT[o][2]))) { a[k++] = argv[i]; a[k++] = argv[++i]; ok = 1; break; }
+        if (!ok) { ERR("badOption", "option", argv[i], NULL); return VMCLI_USAGE; }
+    }
+    a[k] = NULL;
+    Run r;
+    int st = run_lordvm(a, &r);
+    if (st) { if (st > 0) ERR("opFailed", "name", name, "why", why_of(&r), NULL); return st < 0 ? VMCLI_FAILED : our_rc(st); }
+    SAY("cloned", "name", name, "dir", dst, NULL);
+    return 0;
 }
 
 /* ---- MCP (6.15): a local server over stdin and stdout, for a coding agent the person started ---- */
@@ -1925,7 +1984,7 @@ static int args_ok(const JVal *a, const char *const *allowed) {
 /* the machine an MCP call names, only when its person turned automation on for it */
 static Machine *mcp_machine(const char *id, const JVal *args) {
     const char *name = args ? json_str(args, "name") : NULL;
-    if (!name || !name[0] || strlen(name) > 300) { mcp_error(id, -32602, "name is missing"); return NULL; }
+    if (!name || !mcli_mcp_name_ok(name)) { mcp_error(id, -32602, "name is a machine's name in the library"); return NULL; }
     Capture c;
     int rc;
     cap_begin(&c);
@@ -1933,6 +1992,13 @@ static Machine *mcp_machine(const char *id, const JVal *args) {
     char *t = cap_end(&c);
     if (!x) { mcp_text(id, t && t[0] ? t : "no such machine", 1); free(t); return NULL; }
     free(t);
+    /* its folder: a real folder (no link) directly in the library, and its machine.json read again from there */
+    char real[PATH_MAX], lib[PATH_MAX];
+    struct stat st;
+    const char *sl = realpath(x->dir, real) ? strrchr(real, '/') : NULL;
+    int inside = sl && !lstat(x->dir, &st) && S_ISDIR(st.st_mode) && !library_path() && realpath(library, lib) &&
+                 (size_t)(sl - real) == strlen(lib) && !strncmp(real, lib, strlen(lib)) && strlen(sl) > 8 && !strcmp(sl + strlen(sl) - 7, ".lordvm");
+    if (!inside || vm_machine_load(real, &x->m, NULL, 0) != VM_OK) { mcp_text(id, "no such machine in the library", 1); return NULL; }
     if (!x->ok || !x->m.automation || x->m.profile_lock) {
         char m[400];
         snprintf(m, sizeof m, "%s", say("noAutomation", "name", x->m.name, NULL));
@@ -2128,6 +2194,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "cp")) return cmd_cp(argc - 2, argv + 2);
     if (!strcmp(cmd, "mcp")) { if (argc > 2) { ERR("unknown", "arg", argv[2], NULL); return VMCLI_USAGE; } return cmd_mcp(); }
     if (!strcmp(cmd, "apply")) return cmd_apply(argc - 2, argv + 2);
+    if (!strcmp(cmd, "import")) return cmd_import(argc - 2, argv + 2);
     static const char *const KNOWN[] = { "status", "start", "open", "stop", "poweroff", "pause", "resume", "suspend", "reset", "snapshot", "clone", "rename", "set", "fresh",
                                          "exec", "logs", "console", NULL };
     int known = 0;

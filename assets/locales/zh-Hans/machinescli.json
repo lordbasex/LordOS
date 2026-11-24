@@ -112,6 +112,7 @@
   "help.console": "在此终端中打开机器的串行控制台；按 Ctrl+] 退出",
   "help.mcp": "供编程智能体使用的本地 MCP 服务器，走标准输入和输出：只操作打开了自动化的机器",
   "help.apply": "根据一个简短的文本文件（名称、内存、处理器、磁盘、网络、iso、端口、文件夹）创建或更改机器",
+  "help.import": "从其他虚拟化应用导入机器（.vmx、.vbox、.utm、.pvm、.ova 或磁盘），保留其身份，与应用中的“迁移”相同",
   "noAutomation": "{name} 的自动化已关闭：请在其“配置”中打开。",
   "execFailed": "{name} 无法运行它：{why}",
   "outputCut": "输出比返回的内容更长：只显示开头部分。",
@@ -124,8 +125,8 @@
   "noLog": "{name} 还没有这个日志。",
   "consoleHint": "{name} 的串行控制台。按 Ctrl+] 退出。",
   "applyBad": "{file}，第 {line} 行：{why}",
-  "applyAskShares": "{file} 会把你的这些文件夹共享给 {name}：{list}。允许吗？[y/N]",
-  "applyNoShares": "没有做任何更改：共享文件夹未获允许。",
+  "applyAskShares": "{file} 为 {name} 请求以下超出机器范围的设置：{list}。允许吗？[y/N]",
+  "applyNoShares": "没有做任何更改：超出机器范围的设置未获允许（只在终端中询问）。",
   "applyCreated": "已按照 {file} 创建 {name}。",
   "applyUpdated": "{name} 现在使用 {file} 中的设置。",
   "applyRunning": "{name} 正在运行：请先关机，再从文件更改它。"

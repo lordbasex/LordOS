@@ -112,6 +112,7 @@
   "help.console": "konsol bersiri mesin dalam terminal ini; Ctrl+] untuk keluar",
   "help.mcp": "pelayan MCP setempat pada input dan output piawai, untuk ejen pengekodan: ia hanya bertindak pada mesin dengan automasi dihidupkan",
   "help.apply": "membuat atau mengubah mesin daripada fail teks pendek (nama, memori, pemproses, cakera, rangkaian, iso, port, folder)",
+  "help.import": "membawa masuk mesin daripada aplikasi pemayaan lain (.vmx, .vbox, .utm, .pvm, .ova atau cakera) dengan identitinya, seperti Pindah dalam aplikasi",
   "noAutomation": "Automasi dimatikan untuk {name}: hidupkan dalam Konfigurasinya.",
   "execFailed": "{name} tidak dapat menjalankannya: {why}",
   "outputCut": "Output lebih panjang daripada yang kembali: hanya permulaannya ditunjukkan.",
@@ -124,8 +125,8 @@
   "noLog": "Log itu belum ada untuk {name}.",
   "consoleHint": "Konsol bersiri {name}. Ctrl+] untuk keluar.",
   "applyBad": "{file}, baris {line}: {why}",
-  "applyAskShares": "{file} berkongsi folder anda ini dengan {name}: {list}. Benarkan? [y/N]",
-  "applyNoShares": "Tiada apa berubah: folder kongsi tidak dibenarkan.",
+  "applyAskShares": "{file} meminta untuk {name} perkara yang menjangkau ke luar mesin: {list}. Benarkan? [y/N]",
+  "applyNoShares": "Tiada apa berubah: perkara yang menjangkau ke luar mesin tidak dibenarkan (hanya ditanya dalam terminal).",
   "applyCreated": "{name} dibuat seperti kata {file}.",
   "applyUpdated": "{name} kini mempunyai tetapan daripada {file}.",
   "applyRunning": "{name} sedang berjalan: matikan untuk mengubahnya daripada fail."

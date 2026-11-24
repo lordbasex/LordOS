@@ -112,6 +112,7 @@
   "help.console": "maşının seriya konsolu bu terminalda; Ctrl+] çıxır",
   "help.mcp": "proqramlaşdırma agenti üçün standart giriş və çıxışda yerli MCP serveri: yalnız avtomatlaşdırması açıq maşınlarda işləyir",
   "help.apply": "qısa mətn faylından maşın yaradır və ya dəyişir (ad, yaddaş, prosessorlar, disk, şəbəkə, iso, portlar, qovluqlar)",
+  "help.import": "başqa virtuallaşdırma tətbiqindən maşını (.vmx, .vbox, .utm, .pvm, .ova və ya disk) kimliyi ilə gətirir, tətbiqdəki Köçür kimi",
   "noAutomation": "{name} üçün avtomatlaşdırma bağlıdır: onu Konfiqurasiyada açın.",
   "execFailed": "{name} bunu işə sala bilmədi: {why}",
   "outputCut": "Çıxış geri gələndən uzun idi: yalnız başlanğıcı göstərilir.",
@@ -124,8 +125,8 @@
   "noLog": "{name} üçün hələ belə jurnal yoxdur.",
   "consoleHint": "{name} seriya konsolu. Ctrl+] çıxır.",
   "applyBad": "{file}, sətir {line}: {why}",
-  "applyAskShares": "{file} bu qovluqlarınızı {name} ilə paylaşır: {list}. İcazə verilsin? [y/N]",
-  "applyNoShares": "Heç nə dəyişmədi: paylaşılan qovluqlara icazə verilmədi.",
+  "applyAskShares": "{file} {name} üçün maşından kənara çıxan bunları istəyir: {list}. İcazə verilsin? [y/N]",
+  "applyNoShares": "Heç nə dəyişmədi: maşından kənara çıxanlara icazə verilmədi (yalnız terminalda soruşulur).",
   "applyCreated": "{name} {file} dediyi kimi yaradıldı.",
   "applyUpdated": "{name} indi {file} ayarlarına malikdir.",
   "applyRunning": "{name} işləyir: fayldan dəyişmək üçün onu söndürün."

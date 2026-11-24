@@ -112,6 +112,7 @@
   "help.console": "la console seriale della macchina in questo terminale; Ctrl+] esce",
   "help.mcp": "un server MCP locale su standard input e output, per un agente di programmazione: agisce solo sulle macchine con l'automazione attiva",
   "help.apply": "crea o modifica una macchina da un breve file di testo (nome, memoria, processori, disco, rete, iso, porte, cartelle)",
+  "help.import": "porta una macchina da un'altra app di virtualizzazione (un .vmx, .vbox, .utm, .pvm, .ova o un disco) con la sua identità, come Migra nell'app",
   "noAutomation": "L'automazione è disattivata per {name}: attivala nel suo Configura.",
   "execFailed": "{name} non è riuscita a eseguirlo: {why}",
   "outputCut": "L'output era più lungo di ciò che torna: ne viene mostrato solo l'inizio.",
@@ -124,8 +125,8 @@
   "noLog": "Questo registro non c'è ancora per {name}.",
   "consoleHint": "La console seriale di {name}. Ctrl+] esce.",
   "applyBad": "{file}, riga {line}: {why}",
-  "applyAskShares": "{file} condivide queste tue cartelle con {name}: {list}. Consentire? [y/N]",
-  "applyNoShares": "Non è cambiato nulla: le cartelle condivise non sono state consentite.",
+  "applyAskShares": "{file} chiede per {name} questo, che va oltre la macchina: {list}. Consentire? [y/N]",
+  "applyNoShares": "Non è cambiato nulla: ciò che va oltre la macchina non è stato consentito (lo si chiede solo in un terminale).",
   "applyCreated": "{name} è stata creata come dice {file}.",
   "applyUpdated": "{name} ora ha le impostazioni di {file}.",
   "applyRunning": "{name} è in esecuzione: spegnila per modificarla da un file."

@@ -112,6 +112,7 @@
   "help.console": "the machine's serial console in this terminal; Ctrl+] leaves",
   "help.mcp": "a local MCP server on standard input and output, for a coding agent: it acts only on machines with automation on",
   "help.apply": "make or change a machine from a short text file (name, memory, cpus, disk, network, iso, ports, shares)",
+  "help.import": "bring in a machine of another virtualization app (a .vmx, .vbox, .utm, .pvm, .ova or a disk) with its identity, as the app's Migrate does",
   "noAutomation": "Automation is off for {name}: turn it on in its Configure.",
   "execFailed": "{name} couldn't run it: {why}",
   "outputCut": "The output was longer than what comes back: only its start is shown.",
@@ -124,8 +125,8 @@
   "noLog": "There's no such log for {name} yet.",
   "consoleHint": "The serial console of {name}. Ctrl+] leaves.",
   "applyBad": "{file}, line {line}: {why}",
-  "applyAskShares": "{file} shares these folders of yours with {name}: {list}. Allow it? [y/N]",
-  "applyNoShares": "Nothing was changed: the shared folders weren't allowed.",
+  "applyAskShares": "{file} asks {name} for these, which reach beyond the machine: {list}. Allow them? [y/N]",
+  "applyNoShares": "Nothing was changed: what reaches beyond the machine wasn't allowed (it asks on a terminal only).",
   "applyCreated": "{name} was made as {file} says.",
   "applyUpdated": "{name} now has the settings {file} gives.",
   "applyRunning": "{name} is running: shut it down to change it from a file."

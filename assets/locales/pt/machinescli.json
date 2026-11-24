@@ -112,6 +112,7 @@
   "help.console": "o console serial da máquina neste terminal; Ctrl+] sai",
   "help.mcp": "um servidor MCP local pela entrada e saída padrão, para um agente de programação: só age em máquinas com a automação ligada",
   "help.apply": "cria ou muda uma máquina a partir de um arquivo de texto curto (nome, memória, processadores, disco, rede, iso, portas, pastas)",
+  "help.import": "traz uma máquina de outro app de virtualização (um .vmx, .vbox, .utm, .pvm, .ova ou um disco) com a identidade dela, como Migrar no app",
   "noAutomation": "A automação está desligada para {name}: ligue-a no Configurar dela.",
   "execFailed": "{name} não pôde executar: {why}",
   "outputCut": "A saída era maior do que o que volta: só o começo é mostrado.",
@@ -124,8 +125,8 @@
   "noLog": "Ainda não há esse registro para {name}.",
   "consoleHint": "O console serial de {name}. Ctrl+] sai.",
   "applyBad": "{file}, linha {line}: {why}",
-  "applyAskShares": "{file} compartilha estas pastas suas com {name}: {list}. Permitir? [y/N]",
-  "applyNoShares": "Nada foi mudado: as pastas compartilhadas não foram permitidas.",
+  "applyAskShares": "{file} pede para {name} isto, que vai além da máquina: {list}. Permitir? [y/N]",
+  "applyNoShares": "Nada foi mudado: o que vai além da máquina não foi permitido (só se pergunta num terminal).",
   "applyCreated": "{name} foi criada como {file} diz.",
   "applyUpdated": "{name} agora tem os ajustes que {file} dá.",
   "applyRunning": "{name} está em execução: desligue-a para mudá-la a partir de um arquivo."

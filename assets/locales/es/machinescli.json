@@ -112,6 +112,7 @@
   "help.console": "la consola serie de la máquina en esta terminal; Ctrl+] sale",
   "help.mcp": "un servidor MCP local por la entrada y la salida estándar, para un agente de programación: solo actúa en máquinas con la automatización activada",
   "help.apply": "crea o cambia una máquina a partir de un archivo de texto corto (nombre, memoria, procesadores, disco, red, iso, puertos, carpetas)",
+  "help.import": "trae una máquina de otra app de virtualización (un .vmx, .vbox, .utm, .pvm, .ova o un disco) con su identidad, como Migrar en la app",
   "noAutomation": "La automatización está desactivada para {name}: actívala en su Configurar.",
   "execFailed": "{name} no pudo ejecutarlo: {why}",
   "outputCut": "La salida era más larga de lo que vuelve: solo se muestra su comienzo.",
@@ -124,8 +125,8 @@
   "noLog": "Todavía no hay ese registro para {name}.",
   "consoleHint": "La consola serie de {name}. Ctrl+] sale.",
   "applyBad": "{file}, línea {line}: {why}",
-  "applyAskShares": "{file} comparte estas carpetas tuyas con {name}: {list}. ¿Lo permites? [y/N]",
-  "applyNoShares": "No se cambió nada: las carpetas compartidas no se permitieron.",
+  "applyAskShares": "{file} pide para {name} esto, que va más allá de la máquina: {list}. ¿Lo permites? [y/N]",
+  "applyNoShares": "No se cambió nada: no se permitió lo que va más allá de la máquina (solo se pregunta en una terminal).",
   "applyCreated": "Se creó {name} como dice {file}.",
   "applyUpdated": "{name} ya tiene los ajustes que da {file}.",
   "applyRunning": "{name} está en marcha: apágala para cambiarla desde un archivo."

@@ -112,6 +112,7 @@
   "help.console": "makinenin seri konsolu bu terminalde; Ctrl+] çıkar",
   "help.mcp": "bir kodlama ajanı için standart giriş ve çıkışta yerel bir MCP sunucusu: yalnızca otomasyonu açık makinelerde işlem yapar",
   "help.apply": "kısa bir metin dosyasından bir makine oluşturur ya da değiştirir (ad, bellek, işlemciler, disk, ağ, iso, bağlantı noktaları, klasörler)",
+  "help.import": "başka bir sanallaştırma uygulamasındaki makineyi (.vmx, .vbox, .utm, .pvm, .ova ya da disk) kimliğiyle getirir, uygulamadaki Taşı gibi",
   "noAutomation": "{name} için otomasyon kapalı: Yapılandır'da açın.",
   "execFailed": "{name} bunu çalıştıramadı: {why}",
   "outputCut": "Çıktı geri gelenden uzundu: yalnızca başı gösteriliyor.",
@@ -124,8 +125,8 @@
   "noLog": "{name} için henüz böyle bir günlük yok.",
   "consoleHint": "{name} seri konsolu. Ctrl+] çıkar.",
   "applyBad": "{file}, satır {line}: {why}",
-  "applyAskShares": "{file}, şu klasörlerinizi {name} ile paylaşıyor: {list}. İzin verilsin mi? [y/N]",
-  "applyNoShares": "Hiçbir şey değişmedi: paylaşılan klasörlere izin verilmedi.",
+  "applyAskShares": "{file}, {name} için makinenin ötesine uzanan şunları istiyor: {list}. İzin verilsin mi? [y/N]",
+  "applyNoShares": "Hiçbir şey değişmedi: makinenin ötesine uzananlara izin verilmedi (yalnızca bir terminalde sorulur).",
   "applyCreated": "{name}, {file} dosyasının dediği gibi oluşturuldu.",
   "applyUpdated": "{name} artık {file} ayarlarına sahip.",
   "applyRunning": "{name} çalışıyor: bir dosyadan değiştirmek için kapatın."

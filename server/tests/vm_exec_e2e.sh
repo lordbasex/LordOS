@@ -9,7 +9,7 @@
 # machine.json, qemu-guest-agent answering, and VM_EXEC_USER, the person signed in to it. Run it with a private HOME and in
 # private namespaces (the pattern of tests/vm_group_link.sh), never in the person's own session. VM_EXEC_OFF: optional,
 # another machine of that library with automation off (its MCP call must be refused). Exit 77 without them.
-# Checked on 2026-11-24 with the Ubuntu 26.04.1 server machine of the Ubuntu card (unattended install), 24 of 24.
+# Checked on 2026-11-24 with the Ubuntu 26.04.1 server machine of the Ubuntu card (unattended install), 28 of 28.
 cd "$(dirname "$0")/.." || exit 1
 B=$(pwd)/build
 [ -n "${VM_EXEC_NAME:-}" ] && [ -n "${VM_EXEC_USER:-}" ] && [ -x "$B/machines" ] && command -v python3 >/dev/null 2>&1 || { echo "skipped: needs VM_EXEC_NAME, VM_EXEC_USER, build/machines and python3"; exit 77; }
@@ -51,7 +51,31 @@ $B/machines exec "$N" -- rm -f vmexec-big.bin
 $B/machines logs "$N" --machine --lines 5 | grep -q "automation: program" && ok "lord-vm's log names each program" || bad "log"
 grep -q "exec: id" "$DIR/log/automation.log" && ok "automation.log written" || bad "automation.log"
 ! grep -q "\$(id)" "$DIR/log/lord-vm.log" && ok "arguments never in the log" || bad "args in log"
+# apply files are untrusted (they come with a repository): without a terminal to ask on, boundary settings are refused
+# and nothing is made; an ISO outside Downloads or the library is refused; a calm file makes its machine
+printf 'name = "vmexec-apply-x"\nmemory = "1G"\ndisk = "2G"\nports = ["tcp:2299:22:lan"]\n' > hostile.toml
+setsid -w $B/machines apply hostile.toml </dev/null; rc=$?
+[ $rc = 1 ] && ! ls "$HOME/Machines" | grep -q vmexec-apply-x && ok "an apply file's :lan port refused without a terminal, nothing made" || bad "hostile apply ($rc)"
+: > x.iso; printf 'name = "vmexec-apply-y"\niso = "%s/x.iso"\n' "$W" > iso.toml
+setsid -w $B/machines apply iso.toml </dev/null; [ $? = 2 ] && ok "an apply file's ISO outside Downloads and the library refused" || bad "apply iso"
+printf '[machine]\nname = "vmexec-apply-calm"\nmemory = "1G"\ndisk = "2G"\nnetwork = "isolated"\n' > calm.toml
+setsid -w $B/machines apply calm.toml </dev/null && [ -f "$HOME/Machines/vmexec-apply-calm.lordvm/machine.json" ] && ok "a calm apply file makes its machine" || bad "calm apply"
+rm -rf "$HOME/Machines/vmexec-apply-calm.lordvm"
+# a machine folder outside the library, linked into it, with automation on: MCP never reaches it
+mkdir -p outside.lordvm
+python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1])); m["name"]="vmexec-outside"; m["automation"]=True; m["schema"]=max(m["schema"],15); json.dump(m,open(sys.argv[2],"w"))' "$DIR/machine.json" outside.lordvm/machine.json
+ln -sfn "$W/outside.lordvm" "$HOME/Machines/vmexec-outside.lordvm"
 J=$(python3 -I -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$N")
+o=$(printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":\"$W/outside.lordvm\",\"command\":[\"true\"]}}}" \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"run_command","arguments":{"name":"vmexec-outside","command":["true"]}}}' \
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_command","arguments":{"name":"vmexec-outside.lordvm","command":["true"]}}}' | $B/machines mcp 2>/dev/null)
+rm -f "$HOME/Machines/vmexec-outside.lordvm"
+echo "$o" | python3 -I -c '
+import json,sys
+by={m.get("id"):m for m in (json.loads(l) for l in sys.stdin if l.strip())}
+assert by[1]["error"]["code"]==-32602 and by[3]["error"]["code"]==-32602
+assert by[2]["result"]["isError"]
+' && ok "MCP: a path, a .lordvm name and a linked folder outside the library are refused" || bad "mcp paths: $o"
 JO=$(python3 -I -c 'import json,sys; print(json.dumps(sys.argv[1]))' "${VM_EXEC_OFF:-no such machine}")
 o=$(printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"1"}}}' \
   '{"jsonrpc":"2.0","method":"notifications/initialized"}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \

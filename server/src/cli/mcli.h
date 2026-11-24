@@ -85,4 +85,17 @@ typedef struct { JDoc doc; const char *method; const JVal *params; int has_id; c
 int mcli_rpc_parse(const char *line, size_t n, McliRpc *r);
 void mcli_rpc_free(McliRpc *r);
 
+/* an MCP client names a machine of the library only: 1..300 bytes, no '/', no control characters, not ending .lordvm or
+ * .lordgroup (never a folder path: it could point at a machine.json outside the library). 1 yes */
+int mcli_mcp_name_ok(const char *q);
+
+/* what an apply file asks that crosses this computer's boundary (an ISO to read, forwarded ports, shared folders, a
+ * bridged or host-only network, the clipboard, the guest agent): their list, "; "-separated, in out; how many (each one
+ * needs the person's yes on their terminal) */
+int mcli_apply_risks(const McliApply *a, char *out, size_t n);
+
+/* an apply file's ISO, resolved: a .iso or .img file directly or deeper under one of roots (NULL-terminated: the
+ * person's Downloads folder, the Machines library). 1 yes */
+int mcli_iso_place_ok(const char *real, const char *const *roots);
+
 #endif

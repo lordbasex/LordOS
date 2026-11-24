@@ -112,6 +112,7 @@
   "help.console": "mašinos nuoseklioji konsolė šiame terminale; Ctrl+] išeina",
   "help.mcp": "vietinis MCP serveris per standartinę įvestį ir išvestį programavimo agentui: veikia tik mašinose su įjungtu automatizavimu",
   "help.apply": "sukuria arba pakeičia mašiną pagal trumpą tekstinį failą (pavadinimas, atmintis, procesoriai, diskas, tinklas, iso, prievadai, aplankai)",
+  "help.import": "perkelia mašiną iš kitos virtualizavimo programos (.vmx, .vbox, .utm, .pvm, .ova arba diską) su jos tapatybe, kaip programos Perkelti",
   "noAutomation": "Automatizavimas mašinai {name} išjungtas: įjunkite jį jos konfigūracijoje.",
   "execFailed": "{name} nepavyko to paleisti: {why}",
   "outputCut": "Išvestis buvo ilgesnė nei grąžinama: rodoma tik pradžia.",
@@ -124,8 +125,8 @@
   "noLog": "Tokio žurnalo mašinai {name} dar nėra.",
   "consoleHint": "Mašinos {name} nuoseklioji konsolė. Ctrl+] išeina.",
   "applyBad": "{file}, eilutė {line}: {why}",
-  "applyAskShares": "{file} bendrina šiuos jūsų aplankus su {name}: {list}. Leisti? [y/N]",
-  "applyNoShares": "Niekas nepakeista: bendrinami aplankai neleisti.",
+  "applyAskShares": "{file} prašo mašinai {name} to, kas išeina už mašinos ribų: {list}. Leisti? [y/N]",
+  "applyNoShares": "Niekas nepakeista: tai, kas išeina už mašinos ribų, neleista (klausiama tik terminale).",
   "applyCreated": "{name} sukurta, kaip nurodo {file}.",
   "applyUpdated": "{name} dabar turi {file} nustatymus.",
   "applyRunning": "{name} veikia: išjunkite ją, kad pakeistumėte iš failo."

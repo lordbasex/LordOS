@@ -112,6 +112,7 @@
   "help.console": "consola serială a mașinii în acest terminal; Ctrl+] iese",
   "help.mcp": "un server MCP local pe intrarea și ieșirea standard, pentru un agent de programare: acționează doar pe mașinile cu automatizarea pornită",
   "help.apply": "creează sau schimbă o mașină dintr-un fișier text scurt (nume, memorie, procesoare, disc, rețea, iso, porturi, dosare)",
+  "help.import": "aduce o mașină din altă aplicație de virtualizare (un .vmx, .vbox, .utm, .pvm, .ova sau un disc) cu identitatea ei, ca Migrare din aplicație",
   "noAutomation": "Automatizarea este oprită pentru {name}: pornește-o în Configurarea ei.",
   "execFailed": "{name} nu a putut rula: {why}",
   "outputCut": "Ieșirea era mai lungă decât ce se întoarce: se arată doar începutul.",
@@ -124,8 +125,8 @@
   "noLog": "Acest jurnal nu există încă pentru {name}.",
   "consoleHint": "Consola serială a {name}. Ctrl+] iese.",
   "applyBad": "{file}, linia {line}: {why}",
-  "applyAskShares": "{file} partajează aceste dosare ale tale cu {name}: {list}. Permiți? [y/N]",
-  "applyNoShares": "Nu s-a schimbat nimic: dosarele partajate nu au fost permise.",
+  "applyAskShares": "{file} cere pentru {name} acestea, care ies din mașină: {list}. Permiți? [y/N]",
+  "applyNoShares": "Nu s-a schimbat nimic: ce iese din mașină nu a fost permis (se întreabă doar într-un terminal).",
   "applyCreated": "{name} a fost creată cum spune {file}.",
   "applyUpdated": "{name} are acum setările din {file}.",
   "applyRunning": "{name} rulează: oprește-o ca s-o schimbi dintr-un fișier."

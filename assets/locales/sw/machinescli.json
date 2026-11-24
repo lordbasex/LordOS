@@ -112,6 +112,7 @@
   "help.console": "koni ya mfululizo ya mashine katika terminal hii; Ctrl+] hutoka",
   "help.mcp": "seva ya MCP ya ndani kwenye ingizo na towe la kawaida, kwa wakala wa kuandika msimbo: hufanya kazi tu kwenye mashine zenye otomatiki imewashwa",
   "help.apply": "huunda au hubadilisha mashine kutoka faili fupi la maandishi (jina, kumbukumbu, vichakataji, diski, mtandao, iso, milango, folda)",
+  "help.import": "huleta mashine kutoka programu nyingine ya uboreshaji (.vmx, .vbox, .utm, .pvm, .ova au diski) pamoja na utambulisho wake, kama Hamisha katika programu",
   "noAutomation": "Otomatiki imezimwa kwa {name}: iwashe katika Sanidi yake.",
   "execFailed": "{name} haikuweza kuiendesha: {why}",
   "outputCut": "Matokeo yalikuwa marefu kuliko yanayorudi: mwanzo wake tu unaonyeshwa.",
@@ -124,8 +125,8 @@
   "noLog": "Bado hakuna kumbukumbu hiyo kwa {name}.",
   "consoleHint": "Koni ya mfululizo ya {name}. Ctrl+] hutoka.",
   "applyBad": "{file}, mstari {line}: {why}",
-  "applyAskShares": "{file} inashiriki folda zako hizi na {name}: {list}. Ruhusu? [y/N]",
-  "applyNoShares": "Hakuna kilichobadilika: folda zinazoshirikiwa hazikuruhusiwa.",
+  "applyAskShares": "{file} inaomba kwa {name} vitu hivi vinavyovuka mashine: {list}. Ruhusu? [y/N]",
+  "applyNoShares": "Hakuna kilichobadilika: vinavyovuka mashine havikuruhusiwa (huuliza kwenye terminal tu).",
   "applyCreated": "{name} imeundwa kama {file} inavyosema.",
   "applyUpdated": "{name} sasa ina mipangilio kutoka {file}.",
   "applyRunning": "{name} inaendeshwa: izime ili kuibadilisha kutoka faili."
