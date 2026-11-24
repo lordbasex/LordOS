@@ -256,6 +256,9 @@ int mcli_rel_path_ok(const char *p) {
             continue;
         }
         if ((unsigned char)*s < 0x20 || *s == 0x7f) return 0;
+        /* bidi controls (U+202A..U+202E, U+2066..U+2069) and line separators (U+2028, U+2029): a name that reads as another */
+        const unsigned char *u = (const unsigned char *)s;
+        if (u[0] == 0xe2 && ((u[1] == 0x80 && u[2] >= 0xa8 && u[2] <= 0xae) || (u[1] == 0x81 && u[2] >= 0xa6 && u[2] <= 0xa9))) return 0;
     }
     return 1;
 }

@@ -65,7 +65,13 @@ $B/machines cp "$N:vmexec-tree" back; [ $? != 0 ] && ok "an existing folder here
 $B/machines exec "$N" -- sh -c 'mkdir -p ~/vmexec-evil && : > "$HOME/vmexec-evil/a
 b" && : > ~/vmexec-evil/ok'
 $B/machines cp "$N:vmexec-evil" evil; [ $? != 0 ] && [ ! -e evil ] && ok "a guest name with a control character refuses the whole copy, nothing made here" || bad "evil listing"
-$B/machines exec "$N" -- rm -rf vmexec-tree vmexec-evil
+# a guest folder whose listing would make a protected folder here (autostart), even with --force: nothing made
+$B/machines exec "$N" -- sh -c 'mkdir -p ~/vmexec-cfg/.config/autostart && echo x > ~/vmexec-cfg/.config/autostart/evil.desktop'
+mkdir -p "$HOME/.config"
+$B/machines cp --force "$N:vmexec-cfg/.config" "$HOME"; r1=$?
+$B/machines cp --force "$N:vmexec-cfg/.config/autostart" "$HOME/.config"; r2=$?
+[ $r1 != 0 ] && [ $r2 != 0 ] && [ ! -e "$HOME/.config/autostart/evil.desktop" ] && [ ! -d "$HOME/.config/autostart" ] && ok "a guest folder that would make a protected folder here is refused whole, even with --force" || bad "protected folder from the guest ($r1 $r2)"
+$B/machines exec "$N" -- rm -rf vmexec-tree vmexec-evil vmexec-cfg
 $B/machines logs "$N" --machine --lines 5 | grep -q "automation: program" && ok "lord-vm's log names each program" || bad "log"
 grep -q "exec: id" "$DIR/log/automation.log" && ok "automation.log written" || bad "automation.log"
 ! grep -q "\$(id)" "$DIR/log/lord-vm.log" && ok "arguments never in the log" || bad "args in log"

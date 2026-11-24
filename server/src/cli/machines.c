@@ -1730,7 +1730,7 @@ static int tree_dir(int rootfd, const char *rel, int make) {
     for (char *s = b, *c; fd >= 0 && s && *s; s = c) {
         c = strchr(s, '/');
         if (c) *c++ = 0;
-        if (make && mkdirat(fd, s, 0777) && errno != EEXIST) { close(fd); return -1; }
+        if (make && mkdirat(fd, s, 0700) && errno != EEXIST) { close(fd); return -1; }
         int n = openat(fd, s, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
         close(fd);
         fd = n;
@@ -1762,7 +1762,7 @@ static int cp_tree_get(Machine *x, const char *gpath, const char *dst, int force
         snprintf(name, sizeof name, "%s", nm);
     }
     if (strchr(name, '/') || !mcli_rel_path_ok(name) || snprintf(real, sizeof real, "%s/%s", strcmp(dir, "/") ? dir : "", name) >= (int)sizeof real ||
-        !fs_dir_ok(dir) || !fs_dir_ok(real)) { ERR("cpOutside", "path", dst, NULL); return VMCLI_FAILED; }
+        !fs_dir_ok(dir) || !fs_ok(real)) { ERR("cpOutside", "path", dst, NULL); return VMCLI_FAILED; }
     int pfd = open(dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     char again[PATH_MAX];
     if (pfd < 0 || fd_path(pfd, again, sizeof again) || strcmp(again, dir) || !fs_dir_ok(again)) { if (pfd >= 0) close(pfd); ERR("cpOutside", "path", dst, NULL); return VMCLI_FAILED; }
@@ -1779,14 +1779,33 @@ static int cp_tree_get(Machine *x, const char *gpath, const char *dst, int force
     size_t off = 0;
     int n = 0, g;
     unsigned long long need = 0;
-    while ((g = mcli_tree_next((char *)ls, ln, &off, &e)) == 1) { need += e.size; if (++n > MCLI_TREE_MAX) { g = -1; break; } }
+    int prot = 0;
+    while ((g = mcli_tree_next((char *)ls, ln, &off, &e)) == 1) {
+        need += e.size;
+        if (++n > MCLI_TREE_MAX) { g = -1; break; }
+        /* every folder this copy would make or enter here (each prefix of the entry's path), and the file itself, must be
+         * among the person's files and never a protected path (autostart, .desktop folders, settings…): checked for the
+         * whole listing before anything is made, so a hostile listing makes nothing */
+        char hp[PATH_MAX];
+        if (snprintf(hp, sizeof hp, "%s/%s", real, e.path) >= (int)sizeof hp) { prot = 1; break; }
+        size_t base = strlen(real);
+        for (size_t i = base + 1; hp[i]; i++) {
+            if (hp[i] != '/') continue;
+            hp[i] = 0;
+            int bad = !fs_ok(hp);
+            hp[i] = '/';
+            if (bad) { prot = 1; break; }
+        }
+        if (prot || !fs_ok(hp)) { prot = 1; break; }
+    }
+    if (prot) { free(ls); close(pfd); ERR("cpOutside", "path", real, NULL); return VMCLI_FAILED; }
     if (g < 0) { free(ls); close(pfd); ERR("execFailed", "name", x->m.name, "why", "the machine gave a strange list of files", NULL); return VMCLI_FAILED; }
     struct statvfs vf;
     if (!fstatvfs(pfd, &vf) && need > (unsigned long long)vf.f_bavail * vf.f_frsize - ((unsigned long long)vf.f_bavail * vf.f_frsize / 20)) {
         free(ls); close(pfd); ERR("execFailed", "name", x->m.name, "why", strerror(ENOSPC), NULL); return VMCLI_FAILED;
     }
     /* the copy's own folder: new, or (--force) an existing folder that isn't a link */
-    if (mkdirat(pfd, name, 0777)) {
+    if (mkdirat(pfd, name, 0700)) {
         if (errno != EEXIST || !force || fstatat(pfd, name, &st, AT_SYMLINK_NOFOLLOW) || !S_ISDIR(st.st_mode)) {
             free(ls); close(pfd);
             if (errno == EEXIST || !force) ERR("cpExists", "path", real, NULL); else ERR("execFailed", "name", x->m.name, "why", strerror(errno), NULL);

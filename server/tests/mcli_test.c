@@ -299,6 +299,17 @@ static void test_tree(void) {
     CHECK(!mcli_rel_path_ok("") && !mcli_rel_path_ok(NULL) && !mcli_rel_path_ok("/etc/passwd") && !mcli_rel_path_ok("a/") && !mcli_rel_path_ok("a//b"));
     CHECK(!mcli_rel_path_ok("..") && !mcli_rel_path_ok("../x") && !mcli_rel_path_ok("a/../../x") && !mcli_rel_path_ok("a/./b") && !mcli_rel_path_ok("."));
     CHECK(!mcli_rel_path_ok("a\nb") && !mcli_rel_path_ok("a\x1b[2Jb") && !mcli_rel_path_ok("del\x7f"));
+    CHECK(!mcli_rel_path_ok("x\xe2\x80\xaetxt.exe") && !mcli_rel_path_ok("a/\xe2\x81\xa6" "b") && !mcli_rel_path_ok("ls\xe2\x80\xa8x") && mcli_rel_path_ok("dash\xe2\x80\x94ok"));
+    {
+        /* a hostile listing: "..", an absolute path, too deep, too many entries: each refused by the parser */
+        static const char H1[] = "d a\0d a/..\0";
+        size_t o = 0; McliTreeEnt h;
+        CHECK(mcli_tree_next(H1, sizeof H1 - 1, &o, &h) == 1 && mcli_tree_next(H1, sizeof H1 - 1, &o, &h) == -1);
+        char deep[256] = "d ";
+        for (int i = 0; i <= MCLI_TREE_DEPTH; i++) strcat(deep, i ? "/x" : "x");
+        o = 0;
+        CHECK(mcli_tree_next(deep, strlen(deep) + 1, &o, &h) == -1);
+    }
     {
         char deep[200] = "";
         for (int i = 0; i < MCLI_TREE_DEPTH; i++) strcat(deep, i ? "/d" : "d");
