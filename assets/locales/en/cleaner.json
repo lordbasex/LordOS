@@ -464,5 +464,6 @@
   },
   "select.nothing": "Nothing selected",
   "activity.app": "App removed",
-  "activity.system": "System cleanup: {name}"
+  "activity.system": "System cleanup: {name}",
+  "map.machines": "Reclaim in Machines"
 }
