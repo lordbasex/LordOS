@@ -1906,7 +1906,7 @@ export function awayStep(idleSec, list, metaOf, paused) {
 // Configure (5.5): which section each field lord-vm --set changes belongs to (the sidebar's dots: a section with a change
 // not saved yet), and the sidebar's search over the sections' titles and summaries
 export const FIELD_SECTION = {
-  name: 'general', vcpus: 'cpu', memoryMb: 'cpu', cpuPin: 'cpu', perfProfile: 'cpu', resolution: 'display', graphics: 'display',
+  name: 'general', vcpus: 'cpu', memoryMb: 'cpu', cpuPin: 'cpu', cpuModel: 'cpu', perfProfile: 'cpu', resolution: 'display', graphics: 'display',
   gpu: 'display', pointer: 'display', captureFullscreen: 'display', network: 'network', bridge: 'network', ports: 'network',
   nicModel: 'network', diskGb: 'disks', iso: 'disks', shares: 'sharing', transfer: 'sharing', clipboard: 'sharing', agent: 'agent',
   bootOrder: 'boot', bootMenu: 'boot',

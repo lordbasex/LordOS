@@ -7680,7 +7680,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (!lstat(dp, &dst)) { fprintf(stderr, "lord-vm: disks/data-%d.qcow2 is there already: move it away first\n", m.n_data); goto out; }
         unlink(tmp);
         char *mk[] = { QEMU_IMG, "create", "-q", "-f", "qcow2", tmp, size, NULL };
-        if (run_tool_in(mk, err, sizeof err, tmp, dd)) { unlink(tmp); fprintf(stderr, "lord-vm: making the disk failed: %s\n", err); goto out; }
+        if (run_tool_in(mk, err, sizeof err, dd, dd)) { unlink(tmp); fprintf(stderr, "lord-vm: making the disk failed: %s\n", err); goto out; }
         if (renameat2(AT_FDCWD, tmp, AT_FDCWD, dp, RENAME_NOREPLACE)) { unlink(tmp); fprintf(stderr, "lord-vm: making the disk failed: %s\n", strerror(errno)); goto out; }
     }
     vm_now_iso(m.updated);
