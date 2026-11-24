@@ -157,14 +157,13 @@ static int xconnect(const char *disp, char num[16]) {
     return -1;
 }
 
-static uint32_t intern(const char *name) {
+static uint32_t intern(const char *name, long long end) {
     uint8_t h[8] = { 16, 0 };
     size_t n = strlen(name);
     w16(h + 4, (uint32_t)n);
     uint16_t want = (uint16_t)(seq + 1);
     if (request(h, 8, name, n)) return 0;
-    /* replies and events in order: only this reply matters during setup, and it comes within 2 s */
-    long long end = mono() + 2000;
+    /* replies and events in order: only this reply matters during setup, which has one time limit (xc_open) */
     for (;;) {
         if (wait_in(32, end)) return 0;
         uint8_t t = in[0];
@@ -206,7 +205,9 @@ int xc_open(void) {
     w16(h + 8, auth ? 16 : 0);
     in_n = 0;
     uint8_t name[20] = "MIT-MAGIC-COOKIE-1";
-    long long end = mono() + 2000;
+    /* the whole setup (the connection's answer and every atom) within 3 s: a display that keeps sending events and never
+     * a reply, or answers each just in time, never holds the helper longer */
+    long long end = mono() + 3000;
     if (send_all(h, 12) || (auth && (send_all(name, 20) || send_all(ck, 16))) || wait_in(8, end)) { xc_close(); return -1; }
     size_t more = (size_t)r16(in + 6) * 4;
     if (in[0] != 1 || wait_in(8 + more, end) || more < 32) { fprintf(stderr, "lordos-guest: the X display refused the connection\n"); xc_close(); return -1; }
@@ -220,7 +221,7 @@ int xc_open(void) {
     max_req = (uint32_t)mreq * 4;
     consume(8 + more);
     wid = base | (mask & (uint32_t)-mask);      /* the lowest id of ours */
-    for (int i = 0; i < A_N; i++) if (!(atom[i] = intern(ANAMES[i]))) { xc_close(); return -1; }
+    for (int i = 0; i < A_N; i++) if (!(atom[i] = intern(ANAMES[i], end))) { xc_close(); return -1; }
     /* an InputOnly window of our own, never mapped: the selection's owner */
     uint8_t cw[32] = { 1, 0 };
     w32(cw + 4, wid); w32(cw + 8, root);

@@ -745,7 +745,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     at most 127 bytes.
   - **An X display could hold the guest helper for ever.** While it set up its connection, `lordos-guest` waited 2 s for
     each reply, but the wait started again after every event in between, so a display that kept sending events and never
-    the reply kept the helper from serving the host at all. The setup now has one 2 s limit for each reply.
+    the reply kept the helper from serving the host at all. The whole setup now has one 3 s limit.
   - **A `DISPLAY` of the form `unix:/path` was never reached** by the guest helper's clipboard on demand; it is now
     that socket.
 - **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
