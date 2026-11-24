@@ -413,6 +413,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Machines: a shared folder that stops working while the machine runs is said in its window** (in development; the
+  latest release is 0.8.9.5-beta): when a folder's virtiofsd ended (killed, crashed), the folder was gone from the guest
+  until the next start and only lord-vm's log said it. lord-vm now tells the machine's window (`VMN_SHARE_LOST`), whose
+  notice bar says "The transfer folder stopped working in this machine…" or "The shared folder “TAG” stopped working…",
+  in every language. Found by the new agent kill tests.
+- **Machines: the bare-metal release gates refused every real PC** (`tools/vm/bare-metal-gates.sh`): `systemd-detect-virt`
+  prints `none` and exits 1 on bare metal, and the script added a second `none`, so its check read "this is a virtual
+  machine (none none)". It reads the program's own words now; the gates then ran on the i9 PC for the first time (Tests).
+  The leak gate's "no zombie processes" looked at every process of the computer, so another program's child that was a
+  zombie for a moment failed it on a desktop in use; it looks at lord-vm's, QEMU's, passt's, virtiofsd's and swtpm's.
+  Its results file names passt's version from its package when passt prints none.
+- **Machines: lord-vm builds on arm64 without warnings again**: three paths of a machine group (a member's base, its disks
+  and log folders) were cut silently when too long, which gcc on the Pi warned about; they are refused instead.
 - **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
   hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
   re-made the first's (found while starting six test machines at once: "socket: Address already in use", then "can't
@@ -822,6 +835,48 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   running guest.
 
 ### Tests
+
+- **Machines: an end-to-end harness, a boot matrix and kill tests** (`tools/vm/e2e/machines/`, its README says how other
+  tests use it; docs/VIRTUALIZATION.md 12; in development, the latest release is 0.8.9.5-beta).
+  - **The harness** (`mh.py`): a real headless session, `build/lord-server-test` with the real default theme, started in
+    its own user and mount namespaces (an empty folder over the person's home, a tmpfs over their runtime folder, a
+    private `HOME` and `XDG_RUNTIME_DIR` under `/var/tmp/lordos-m100-e2e/`), so it never sees the person's files, machines
+    or session, with an empty Machines library. Pointer, buttons, wheel and keys go in through the test hooks, which call
+    the remote desktop's own injection (`remote.sock` itself takes only root's connections); pictures come from the hooks'
+    `frame output`. A test-only `probe.js` keeps lord-server's node tree on the JS side (it wraps the `lord.*` node calls,
+    nothing in the runtime changes), so a test finds a text or an icon where it is drawn, shown and on top (not under a
+    sheet, a menu or a question), and clicks it there. Commands run in the session through the bench's `driver.js`, now
+    with the probe and the SDK in scope. `build-e2e.mjs --out FILE` writes the bundle outside the tree (a development
+    build loads a theme outside the LordOS folder unchecked, so nothing in it is replaced). `ns-run.sh` runs any command in
+    the same kind of namespaces (lord-vm, the release gates).
+  - **The guests** (`images.py`): Debian 13's nocloud image, SHA-512 checked against Debian's list, and one made from it
+    once under KVM with qemu-guest-agent, a person's account, root on the serial console and `MH-READY` written there at
+    each boot; Microsoft's Windows 11 Enterprise Evaluation and virtio-win from their makers' servers with the SHA-256 the
+    catalog pins (8.2 GB and 0.7 GB, both matched on 2026-11-24). Cached in `/var/tmp/lordos-m100-images`, read only.
+  - **The flows** (`flows.py`, `run.py`, `make -C server e2e-machines`): the empty library; the New Machine assistant
+    from Import a machine through the file picker, the Light profile, a typed name and the review to Create and Start,
+    the guest's boot and its picture in the machine's window; Shut Down; Configure (network, the guest agent); a start
+    from the card; the agent's popover and Install Clipboard Helper; a file dragged from Files onto the machine's window;
+    the kill tests; Snapshots (take, go back, delete); Clone; the storage figures; a machine group's card. Each step checks
+    the texts on screen and what landed on disk or in lord-vm, and keeps a screenshot. `make e2e-machines` skips cleanly
+    without KVM or the network and isn't part of `make test`.
+  - **Agent kill tests** (the `kills` flow): qemu-guest-agent killed in the guest (the app sees it go, then come back by
+    itself when it starts again), passt killed (the network back by itself, measured), the transfer folder's virtiofsd
+    killed (the machine keeps running and its window says so, below) and lord-vm itself killed (the library says its
+    supervisor ended; a new start recovers it and the log says what it recovered).
+  - **The boot matrix** (`boot-matrix.py`, `make -C server e2e-machines-matrix`): the prepared guest under each setting
+    this computer can run, KVM and TCG, OVMF/AAVMF and SeaBIOS, a TPM, Secure Boot with a TPM, the compatible devices, 3D
+    on each render node, the other architecture emulated: seconds to `MH-READY`, to the agent, a clean Shut Down, the
+    disk's size.
+  - **The Windows install test** (`run.py windows`): the evaluation and the pinned virtio-win given to `lord.vm.create`
+    as the assistant's evaluation card gives them, started from the library card, installed without questions, done when
+    lord-vm says Windows is installed and the LordOS tools for Windows say hello.
+  - **The settings → QEMU arguments table** (`server/tests/vm_qemu_args_test.py`, in `make test`, skipped without KVM):
+    12 rows (defaults, BIOS without a display on an isolated network, host only, TCG, CPU and memory, compatible devices,
+    Windows 11's template, the agent on and off, boot order and menu, a shared folder and the transfer folder, 3D), each
+    a throwaway machine started paused and its logged command line checked for what the setting adds and must not.
+  - **`make -C server e2e-machines-gates`**: the three release gates with this build's lord-vm and the cached image,
+    through `ns-run.sh`.
 
 - **Sentinela** (`docs/SENTINELA.md`): `build/llm-engine-test` runs a stand-in engine in lord-llm's real sandbox and
   checks that TCP, UDP, IPv6, netlink and packet sockets, Unix datagrams, `connect`, reading `/etc` or `/home`, writing

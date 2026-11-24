@@ -4,7 +4,8 @@
 #                                Debian's SHA512SUMS (fetched over HTTPS from cloud.debian.org) before it is kept
 #   debian13-agent<N>-<arch>.qcow2  (N: PREP_VERSION) that image booted once under lord-vm (scratch namespaces, KVM) with a first-boot script
 #                                given as systemd credentials: root's password set (systemd-firstboot asks otherwise),
-#                                qemu-guest-agent installed from Debian, a person's account (tester, uid 1000: dropped
+#                                qemu-guest-agent, Xvfb and xclip installed from Debian (a display at :0 for the
+#                                clipboard's test), a person's account (tester, uid 1000: dropped
 #                                files go to a person's Downloads), root logged in by itself on the serial console
 #                                (the harness types commands there) and "MH-READY" written to the console at each boot;
 #                                then powered off and flattened. Read-only; <file>.sha256 next to it.
@@ -24,7 +25,7 @@ from mh import BUILD, IMAGES, ns_prefix, kvm_ok, Skip, skip, log  # noqa: E402
 BASE = "https://cloud.debian.org/images/cloud/trixie/latest"
 ARCH = {"x86_64": "amd64", "aarch64": "arm64"}.get(os.uname().machine, os.uname().machine)
 
-PREP_VERSION = 2          # raised whenever PREP changes: a new name, so a cached older image isn't used
+PREP_VERSION = 3          # raised whenever PREP changes: a new name, so a cached older image isn't used
 
 # the first boot's script: run once, as root, by a unit that the credentials add (lordvm-prep.service)
 PREP = r"""#!/bin/sh
@@ -32,12 +33,15 @@ set -x
 echo "<3>MHPREP-START" >/dev/kmsg
 ok=0
 for i in 1 2 3 4 5; do
-  if apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-guest-agent; then ok=1; break; fi
+  if apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends qemu-guest-agent xvfb xclip; then ok=1; break; fi
   sleep 5
 done
 # a person's account (uid 1000): Machines copies dropped files into a person's Downloads, never root's
 id tester >/dev/null 2>&1 || useradd -m -s /bin/bash -u 1000 tester
-mkdir -p /etc/systemd/system/serial-getty@ttyS0.service.d /etc/systemd/system/serial-getty@ttyAMA0.service.d
+. "$CREDENTIALS_DIRECTORY/mhprep2.sh"
+"""
+# its second half (a credential line holds at most 2 KB: lord-vm's --credentials-file)
+PREP2 = r"""mkdir -p /etc/systemd/system/serial-getty@ttyS0.service.d /etc/systemd/system/serial-getty@ttyAMA0.service.d
 for t in ttyS0 ttyAMA0; do
 cat > /etc/systemd/system/serial-getty@$t.service.d/autologin.conf <<'EOF'
 [Service]
@@ -45,6 +49,16 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud 115200,57600,38400,9600 %I linux
 EOF
 done
+# a display for the clipboard's test (Xvfb :0, no TCP), where lordos-guest and xclip meet; nothing draws on it
+cat > /etc/systemd/system/mh-xvfb.service <<'EOF'
+[Unit]
+Description=Machines harness: a display for the clipboard
+[Service]
+ExecStart=/usr/bin/Xvfb :0 -screen 0 1024x768x24 -nolisten tcp
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl enable mh-xvfb.service
 cat > /etc/systemd/system/mh-ready.service <<'EOF'
 [Unit]
 Description=Machines harness: the guest is up
@@ -67,7 +81,7 @@ Wants=network-online.target
 After=network-online.target
 [Service]
 Type=oneshot
-ImportCredential=mhprep.sh
+ImportCredential=mhprep*.sh
 ExecStart=/bin/sh ${CREDENTIALS_DIRECTORY}/mhprep.sh
 StandardOutput=journal+console
 """
@@ -208,6 +222,7 @@ def agent_image(arch=ARCH, accel=None):
             f.write("firstboot.locale=C.UTF-8\nfirstboot.keymap=us\nfirstboot.timezone=UTC\n")
             f.write("passwd.plaintext-password.root=%s\n" % pw)
             f.write("binary:mhprep.sh=%s\n" % b64(PREP))
+            f.write("binary:mhprep2.sh=%s\n" % b64(PREP2))
             f.write("binary:systemd.extra-unit.lordvm-prep.service=%s\n" % b64(UNIT))
             f.write("binary:systemd.unit-dropin.multi-user.target=%s\n" % b64("[Unit]\nWants=lordvm-prep.service\n"))
         os.chmod(creds, 0o600)

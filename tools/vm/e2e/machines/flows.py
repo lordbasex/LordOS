@@ -218,6 +218,50 @@ def flow_agent(s, r, c):
         r.t("agent: lordos-guest is in the guest and runs (%s)" % out.replace("\n", " "), "lordos-guest" in out, out)
 
 
+def flow_clipboard(s, r, c):
+    """The clipboard both ways (6.8), through lordos-guest and the guest's xclip on its Xvfb display: a text copied here
+    is pasted in the machine while its window is in use, and a text copied in the machine reaches this computer's
+    clipboard. Needs the agent flow's Install Clipboard Helper and Configure's Both ways."""
+    need_machine(s, c, running=True)
+    if '"clipboard": "both"' not in open(os.path.join(c["dir"], "machine.json")).read():
+        skip("the machine's clipboard isn't Both ways (the configure flow)")
+    con = s.console(c["id"])
+    out, st = con.run("command -v xclip Xvfb; pgrep -a Xvfb; [ -x /usr/local/bin/lordos-guest ] && echo HELPER")
+    if "HELPER" not in out or "xclip" not in out:
+        con.close()
+        skip("the guest has no lordos-guest or xclip (the agent flow, the image's version): %s" % out)
+    # the helper, as the guest's desktop session would start it (root here: the console's session has no seat)
+    con.run("pkill -x lordos-guest; DISPLAY=:0 nohup /usr/local/bin/lordos-guest >/tmp/lordos-guest.log 2>&1 &")
+    r.step("clipboard: lordos-guest says hello with a clipboard tool", lambda: _wait_log(s, c["dir"], re.compile(r"agent: lordos-guest \S+ said hello"), 30))
+    vw = vm_window(s, NAME)
+    s.js("wm.focus(%s)" % json.dumps(vw["id"]))
+    vr = s.rect_of(vw)
+    s.click(vr[0] + vr[2] // 2, vr[1] + vr[3] // 2)        # the machine in use: its window has the pointer and the keys
+    word = "mh-host-%s" % os.urandom(3).hex()
+    s.js("lord.clipboard.set(%s)" % json.dumps(word))
+    got = None
+    end = time.time() + 30
+    while time.time() < end:
+        out, st = con.run("DISPLAY=:0 timeout 5 xclip -o -selection clipboard 2>&1")
+        if word in out:
+            got = out
+            break
+        time.sleep(1)
+    r.t("clipboard: a text copied here is pasted in the machine (%s)" % word, got is not None, out)
+    back = "mh-guest-%s" % os.urandom(3).hex()
+    con.run("printf %s %s | DISPLAY=:0 xclip -i -selection clipboard" % ("%s", back))
+    end = time.time() + 30
+    host = None
+    while time.time() < end:
+        host = s.js("return lord.clipboard.get ? lord.clipboard.get() : null")
+        if isinstance(host, str) and back in host:
+            break
+        time.sleep(1)
+    r.t("clipboard: a text copied in the machine reaches this computer's clipboard (%s)" % back, isinstance(host, str) and back in host, host)
+    s.shot("12-clipboard")
+    con.close()
+
+
 def _wait_log(s, mdir, rx, timeout):
     end = time.time() + timeout
     while time.time() < end:
@@ -267,6 +311,63 @@ def flow_filedrop(s, r, c):
     c["drop_path"] = got.split("\n")[0] if got else None
     r.t("filedrop: the file is in the guest (%s), its bytes as on the host" % (c["drop_path"] or "-"), got is not None, out)
     s.js("wm.close(%s)" % json.dumps(s.window("files")["id"]))
+
+
+def _drag_file(s, name, vr):
+    """Files' icon of NAME (in the Documents window already open) held and carried onto the machine's window."""
+    t = s.wait_text(name, 10, s.rect_of(s.window("files")))
+    x, y, w, h = t["rect"]
+    x0, y0, x1, y1 = x + w // 2, y - 30, vr[0] + vr[2] // 2, vr[1] + 250
+    s.remote.move(x0, y0); time.sleep(0.2); s.remote.button(0, 1); time.sleep(0.3)
+    for i in range(1, 31):
+        s.remote.move(x0 + (x1 - x0) * i / 30, y0 + (y1 - y0) * i / 30); time.sleep(0.04)
+    time.sleep(0.5)
+    s.remote.button(0, 0)
+
+
+def flow_killcopy(s, r, c):
+    """Agent kill test mid-transfer (12, "Agent"): a 300 MB file dropped on the machine, and the guest agent killed in the
+    guest while it is being copied in. Nothing partial may appear in the guest's Downloads: the file is there whole (the
+    copy finished first) or not at all, and the window says what happened."""
+    need_machine(s, c, running=True)
+    s.wait_js("lord.vm.list().find((m) => m.name === %s)?.agentState === 'connected'" % json.dumps(NAME), 90)
+    src = os.path.join(s.home, "Documents", "mh-big.bin")
+    os.makedirs(os.path.dirname(src), exist_ok=True)
+    with open(src, "wb") as f:
+        for _ in range(300):
+            f.write(os.urandom(1 << 20))
+    import hashlib
+    want = hashlib.sha256(open(src, "rb").read()).hexdigest()
+    con = s.console(c["id"])
+    s.js("launchApp('files')")
+    fw = s.window("files", timeout=15)
+    s.js("wm.move(%s, 40, 420)" % json.dumps(fw["id"]))
+    time.sleep(0.8)
+    if not s.find("mh-big.bin", s.rect_of(s.window("files"))):
+        s.click_text("Documents", within=s.rect_of(s.window("files")))
+    n0 = s.vmlog(c["dir"]).count("files: copying mh-big.bin")
+    _drag_file(s, "mh-big.bin", s.rect_of(vm_window(s, NAME)))
+    r.step("killcopy: the copy starts", lambda: _until(lambda: s.vmlog(c["dir"]).count("files: copying mh-big.bin") > n0, 30, 0.1))
+    con.run("systemctl kill -s KILL qemu-guest-agent")
+    t_kill = time.time()
+    s.shot("13-killcopy")
+    # the outcome: lord-vm says the file was copied, or that it wasn't
+    rx = re.compile(r"files: mh-big\.bin (wasn't copied.*|is in the guest.*|copied.*)")
+    _until(lambda: rx.search(s.vmlog(c["dir"]).split("files: copying mh-big.bin")[-1]), 120, 1)
+    said = rx.search(s.vmlog(c["dir"]).split("files: copying mh-big.bin")[-1]).group(0)
+    c["killcopy"] = {"said": said, "s_after_kill": round(time.time() - t_kill, 1)}
+    con.run("systemctl start qemu-guest-agent")
+    out, st = con.run("for f in /home/tester/Downloads/*mh-big* /home/tester/Downloads/.*mh-big*; do [ -e \"$f\" ] && sha256sum \"$f\"; done; echo END", 120)
+    con.close()
+    files = [l.split() for l in out.splitlines() if "mh-big" in l]
+    bad = [f for f in files if len(f) < 2 or f[0] != want or not f[1].endswith("/mh-big.bin")]
+    r.t("killcopy: nothing partial in the guest's Downloads (%s)" % ("the whole file" if files and not bad else "no file" if not files else "PARTIAL"),
+        not bad, out)
+    r.t("killcopy: lord-vm says what happened (%s)" % said[:80], bool(said))
+    r.step("killcopy: the agent connects again", lambda: s.wait_js(
+        "lord.vm.list().find((m) => m.name === %s)?.agentState === 'connected'" % json.dumps(NAME), 90))
+    s.js("wm.close(%s)" % json.dumps(s.window("files")["id"]))
+    os.unlink(src)
 
 
 def flow_lifecycle(s, r, c):
@@ -435,8 +536,12 @@ def flow_configure(s, r, c):
     w = lib_rect(s)
     s.click_text("Network", within=w)
     s.click_text("Shared", within=w)
+    s.click_text("Sharing", within=w)
+    s.click_text("Both ways", within=w)
+    s.shot("16-configure-clipboard")
     s.click_text("Done", within=w)
-    r.step("configure: Network → Shared is saved", lambda: _wait_file(mj, '"network": "shared"', 20))
+    r.step("configure: Network → Shared and Clipboard → Both ways are saved", lambda: _wait_file(mj, '"network": "shared"', 20) and
+           _wait_file(mj, '"clipboard": "both"', 5))
 
 
 def _wait_file(path, text, timeout):
@@ -651,4 +756,4 @@ def _until(fn, timeout, every=1):
 
 
 EXTRA = ["premade", "windows"]
-FLOWS = ["library", "assistant", "lifecycle", "configure", "start", "agent", "filedrop", "kills", "snapshots", "clone", "storage", "group"]
+FLOWS = ["library", "assistant", "lifecycle", "configure", "start", "agent", "clipboard", "filedrop", "killcopy", "kills", "snapshots", "clone", "storage", "group"]
