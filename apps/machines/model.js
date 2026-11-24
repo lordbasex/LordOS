@@ -270,7 +270,7 @@ export function channelSet(id, on, cur) {
   return key ? { [key]: !!on } : {};
 }
 
-// Start Linux directly (6.1, schema 21): why the switch can't go on for this machine, or '' (lord-vm's
+// Start Linux directly (6.1, schema 22): why the switch can't go on for this machine, or '' (lord-vm's
 // vm_machine_check refuses the same)
 export function kbootBlocked(m) {
   if (!m) return 'none';
@@ -2095,3 +2095,35 @@ export function sectionsMatching(secs, q, textOf, fold = (s) => String(s || '').
   if (!words.length) return secs;
   return secs.filter((k) => { const t = fold(textOf(k)); return words.every((w) => t.includes(w)); });
 }
+
+// ---- host USB devices (docs/VIRTUALIZATION.md 6.6) ----
+// The Devices menu's rows from lord.vm.usbDevices() (this computer's devices) and the machine's poll (st.usb: what it holds,
+// its controller, its lock, its auto-connect rules). A hub is never shown; a device another machine holds, or that lord-server
+// won't offer (the session's own keyboard or mouse), is shown greyed with why. state: 'locked' (anonymity), 'nocontroller'
+// (machine.json's usb off: Configure turns it on with the machine off), 'empty' or 'list'.
+export const usbRule = (d) => `${d.vendor}:${d.product}${d.serial ? `:${d.serial}` : ''}`;
+export const usbName = (d) => String(d?.model || d?.maker || `${d?.vendor || '????'}:${d?.product || '????'}`).slice(0, 48);
+export function usbRows(devs, usb, sid) {
+  if (!usb || usb.locked) return { state: 'locked', rows: [] };
+  if (!usb.controller) return { state: 'nocontroller', rows: [] };
+  const held = new Set((usb.devices || []).map((d) => `${d.bus}-${d.dev}`));
+  const auto = usb.auto || [];
+  const rows = (devs || []).filter((d) => d && d.why !== 'vm.usbHub').map((d) => {
+    const on = held.has(`${d.bus}-${d.dev}`);
+    const other = !on && d.holder > 0 && d.holder !== sid;
+    const rule = usbRule(d), plain = `${d.vendor}:${d.product}`;
+    return { bus: d.bus, dev: d.dev, name: usbName(d), on, why: d.why || (other ? 'vm.usbOtherMachine' : ''), camera: !!d.camera, audio: !!d.audio,
+      storage: !!d.storage, rule, auto: auto.includes(rule) || auto.includes(plain), autoRule: auto.includes(rule) ? rule : auto.includes(plain) ? plain : rule };
+  });
+  return { state: rows.length ? 'list' : 'empty', rows };
+}
+// what the machine's USB devices capture now: the capture indicator's camera and microphone
+export const usbCamLive = (usb) => !!(usb?.devices || []).some((d) => d.camera);
+export const usbMicLive = (usb) => !!(usb?.devices || []).some((d) => d.audio);
+// an attach refused for want of LordOS's permission: the one to ask for ('' none)
+export const usbNeedsPerm = (code) => (code === 'vm.usbCameraPerm' ? 'camera' : code === 'vm.usbMicPerm' ? 'microphone' : '');
+// Configure's list of auto-connect rules, with the device's name when it is plugged in now
+export const usbAutoRows = (rules, devs) => (rules || []).map((r) => {
+  const d = (devs || []).find((x) => usbRule(x) === r || `${x.vendor}:${x.product}` === r);
+  return { rule: r, name: d ? usbName(d) : r };
+});

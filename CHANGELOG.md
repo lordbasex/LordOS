@@ -15,7 +15,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.2, 6.1, 6.11, 8).
   - **Start Linux directly.** Configure → Boot keeps a kernel, an initial RAM disk and a command line with an installed
     Linux machine and starts them instead of the boot loader on its disk (no firmware menu, no countdown): `machine.json`
-    schema 21 `kernel_boot`, the files copied into the machine's `disks/boot` by `lord-vm --set --kernel --initrd
+    schema 22 `kernel_boot`, the files copied into the machine's `disks/boot` by `lord-vm --set --kernel --initrd
     --cmdline --kernel-boot` all or nothing (regular files only, sizes capped, the kernel's start checked for the
     machine's architecture, the command line printable and one argument of QEMU's), the kernel at boot index 0. Refused
     with Secure Boot, the virtio-win devices, an encrypted machine and a group's member; a clone keeps it, an export
@@ -30,6 +30,53 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     old PC needs only its SSH server, or a live USB; `--sudo` reads a root-only disk with that PC's sudo), or a disk
     connected here. The size comes first and is checked, the copy is written sparse, then imported with the compatible
     devices. Checked with a Raspberry Pi 5 as the old PC: 20 GB in 190 s, booted.
+- **Machines: real runs of sound, recording and card models** (in development; latest release 0.8.9.5-beta;
+  docs/VIRTUALIZATION.md 6.9, 6.20, 6.22). `tests/vm_sound_e2e.sh`: a headless lord-server in its own namespaces with only
+  this account's pulse socket mounted in, a guest playing a tone and recording its microphone: the speakers' PipeWire
+  stream named after the machine, the microphone closed without LordOS's permission and open with it (the guest heard the
+  maintainer's webcam microphone), a screenshot at the guest's size and an H.264 and AAC recording carrying the guest's tone
+  even with the speakers at volume 0. `tests/vm_nic_e2e.sh`: every card model booted; seven reach the internet, PCnet gets
+  its address and then only receive errors (QEMU 10.0's PCnet with Linux 6.12, documented); an import's extra cards are
+  there with their MACs, not connected, as designed.
+- **Machines: this computer's USB devices in a machine, and the camera** (in development; latest release 0.8.9.5-beta;
+  docs/VIRTUALIZATION.md 6.6 and 6.9; approved by the maintainer on 2026-11-24, AGENTS.md "Machines' USB devices").
+  - The machine window's **Devices** menu lists this computer's USB devices; one picked goes into the running machine
+    whole (QEMU's `usb-host` on the machine's xHCI controller) and back to this computer's drivers when it is picked again,
+    when it is unplugged, or when the machine stops. One machine holds a device at a time, a machine at most 8.
+  - A new closed admin action, `vm-usb-allow "<machine id> <bus> <address> <vvvv>:<pppp>"` (anyone at the seat; storage, network
+    cards and Bluetooth adapters only for administrators): it finds the device again in sysfs, refuses a hub or root hub, a device whose keyboard or mouse a
+    process holds (the session's own), a disk this computer has mounted, uses as swap or under another block device, opens
+    `/dev/bus/usb/BBB/DDD`, checks it by its device number and sysfs again, and answers with the **descriptor**
+    (`admin_ok_fd`: SCM_RIGHTS on the helper's socket; `admin_dispatch` now reads with `recvmsg`). The node's owner, mode and
+    access list never change; nothing is written. lord-server keeps a descriptor only for a request it sent itself
+    (`js_vm_admin_reply`), hands it to the machine's lord-vm (a new request, `VM_USB`) and closes its copy; lord-vm checks it
+    again (`vmusb_fd_ok`) and gives it to QEMU through `add-fd` and `hostdevice=/dev/fdset/N`, so QEMU opens no path.
+  - QEMU's sandbox: Landlock unchanged. `lord-vm-usb.so` (`/usr/lib/lordos/lib`, new) is preloaded into the QEMU of a machine
+    with USB on and only sets libusb's default to `LIBUSB_OPTION_NO_DEVICE_DISCOVERY`, so libusb never looks at the
+    computer's other devices; the usb-host module is loaded during QEMU's start (`device-list-properties`), while
+    executable mappings are still allowed. The allowlist gains, only for such a machine, usbfs's ioctls (`'U'`) and the
+    rows `timerfd_create`, `timerfd_settime`, `timerfd_gettime` (rule `USB`): nothing else was called through a webcam's
+    capture in learn mode.
+  - machine.json schema 21: `usb` (the machine's USB controller, `qemu-xhci` on slot 0x15; new and imported machines have it,
+    an older one gets it in Configure → Sound and input with the machine off) and `usb_auto` (up to 8 `vendor:product[:serial]`
+    rules, "Connect … automatically" in the Devices menu while it runs, `VM_USB a = 2/3`, Remove in Configure, `lord-vm
+    --set --usb on|off --usb-auto RULE…|none`). A matching device goes in by itself, once while it stays plugged in, never
+    asking for a permission and never a disk (picked by hand only); an exported machine's rules are dropped at its import. Never for a machine locked for anonymity: refused by machine.json's check, lord-server and
+    lord-vm.
+  - **The camera** goes in the same way, as a USB device: a device with a video interface needs LordOS's camera permission
+    for Machines and one with sound the microphone's (checked in C; the app asks with the system prompt the first time;
+    taken away, the device leaves the machine within a second); the capture indicator shows the camera for "Machines —
+    <name>". Measured with the maintainer's own Logitech C930e (he allowed it): a Debian 13 guest saw it as
+    "Logitech Webcam C930e" (`/dev/video0`) and captured 30 frames of 640×480 YUYV at about 13 frames a second; out again,
+    uvcvideo and snd-usb-audio took it back on this computer.
+  - `lord.vm.usbDevices()`, `usbAttach(id, bus, dev)`, `usbDetach`, `usbAuto`; the poll's `usb` (`devices`, `busy`,
+    `controller`, `locked`, `err`, `auto`); the list's `usb` and `usbAuto`. 24 new strings in all 35 languages.
+  - Tests: `build/vmusb-test` (a made-up sysfs: listing, every refusal, the request, rule and line parsers with 200 000
+    random inputs, the descriptor check; ASan, UBSan), `tests/vm_usb_model_test.mjs` (the menu's rows, rules, indicator,
+    permissions), `tests/vm_usb_e2e.sh` (root, a real device, a real guest: vm-usb-allow → lord-vm → QEMU → the guest, and a
+    lord-server started as root in a private mount namespace driving `lord.vm` through the real admin helper), and
+    `build/vm-usb-cli` (vm-usb-allow as the helper runs it, for manual checks). lordvm-dev gains `usb-in`, `usb-out`,
+    `usb-auto`, `usb-noauto`.
 - **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (in
   development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
   - **Send to LordOS.** A file chosen in the machine (Linux: the file manager's Send to LordOS, or `lordos-guest
@@ -760,6 +807,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   whole 128 KB piece was taken for one too long (in development).
 - **Machines: a command that went away filled its machine's `lord-vm.log`** with the same "not delivered" line several
   times a second; now said once per client (in development).
+- **Machines: what the display engine and the guest helper take from the other side is fuzzed, and three faults it found
+  are fixed** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 8, 12).
+  - **The session's log took QEMU's words raw.** A console's label and the text of QEMU's refusals (a sound listener
+    refused, a new size refused, a missing console) went into the log as QEMU sent them, so a QEMU taken over by its
+    guest could write new lines, escape sequences or a forged entry there. They now go in as one line of printable ASCII,
+    at most 127 bytes.
+  - **An X display could hold the guest helper for ever.** While it set up its connection, `lordos-guest` waited 2 s for
+    each reply, but the wait started again after every event in between, so a display that kept sending events and never
+    the reply kept the helper from serving the host at all. The whole setup now has one 3 s limit.
+  - **A `DISPLAY` of the form `unix:/path` was never reached** by the guest helper's clipboard on demand; it is now
+    that socket.
 - **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
   QEMU's namespaces, so lord-server could no longer read which program a machine's engine runs and never counted one as
   checked. lord-server now keeps a pidfd of every lord-vm it starts (a machine started without a window sends its own) and
@@ -1239,6 +1297,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `tools/vm/e2e/machines/kernel-boot.py` (real QEMU/KVM: a guest's kernel taken out with `machines cp`, started directly
   with UEFI and BIOS, a clone, the switch off, the refusals) and `server/tests/machines_see_headless.sh` (screenshots of
   Guest can see, Start Linux directly and both Requirements pages).
+
+- **Machines: three fuzz harnesses for the guest's side** (in development; docs/VIRTUALIZATION.md 8, 12), in
+  `make -C server test`, each built with ASan and UBSan and checked by taking a bounds check out on purpose (it failed).
+  `vmdisplay-fuzz` plays a hostile QEMU against lord-vmdisplay in its own sandbox: about 12,000 seeded calls a run on the
+  display listener, its shared-memory interface and both sound listeners, with edge values, wrong signatures, pipes and
+  short or shrunk descriptors, and hostile console properties; every call must be answered, none past QEMU's 1 s, and the
+  log must stay clean. `guest-fuzz` plays the host, the guest's own lord-server, an X display, the system and session
+  buses and local programs against `lordos-guest` at once, as a user namespace's root (where it opens no shell), and
+  checks every frame it sends the host with the host's own parsers. `agent-fuzz-test` mutates well-formed payloads of
+  every frame kind of the agent's channel, both ends (500,000 checks), and cuts a stream of frames anywhere.
+  `guest-dbus-test` gained a mutation pass over well-formed D-Bus messages.
 
 - **Two tests made steady on a busy computer** (in development). `webreg-test`'s stand-in web runtime wrote the files the
   test reads in place, so a loaded computer let the test read an empty one: it now writes them whole and renames them, and

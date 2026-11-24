@@ -153,6 +153,17 @@ static void say(VdMsg m, int fd) {
     if (vd_send(D.ch, &m, fd) && errno != EAGAIN) { /* lord-server gone: the loop sees the hangup */ }
 }
 
+/* a string QEMU sent (a console's label, an error's message) as it goes in the session's log: one line of printable
+ * ASCII, anything else as '?', at most cap - 1 bytes; NULL as "?". QEMU is the guest's side: its words never write
+ * a line of their own, an escape sequence or a forged entry into the log (docs/VIRTUALIZATION.md 8) */
+static const char *qtext(const char *s, char *out, size_t cap) {
+    size_t n = 0;
+    if (!s) s = "?";
+    for (; *s && n + 1 < cap; s++) out[n++] = (unsigned char)*s >= 0x20 && (unsigned char)*s < 0x7f ? *s : '?';
+    out[n] = 0;
+    return out;
+}
+
 static void refuse(const char *what, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 static void refuse(const char *what, const char *fmt, ...) {
     D.refused++;
@@ -506,7 +517,11 @@ static const sd_bus_vtable audio_in_vt[] = {
 static int au_registered(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)e;
     *(int *)u = sd_bus_message_is_method_error(m, NULL) ? 2 : 1;
-    if (*(int *)u == 2) fprintf(stderr, "lord-vmdisplay: Register*Listener: %s\n", sd_bus_message_get_error(m) ? sd_bus_message_get_error(m)->message : "?");
+    if (*(int *)u == 2) {
+        const sd_bus_error *er = sd_bus_message_get_error(m);
+        char t[128];
+        fprintf(stderr, "lord-vmdisplay: Register*Listener: %s\n", qtext(er ? er->message : NULL, t, sizeof t));
+    }
     return 0;
 }
 
@@ -839,7 +854,8 @@ static void call_noreply(const char *iface, const char *method, const char *sig,
 static int on_ui_info(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)u; (void)e;
     const sd_bus_error *err = sd_bus_message_get_error(m);
-    if (err) fprintf(stderr, "lord-vmdisplay %s: QEMU refused the new size: %s\n", me, err->message ? err->message : err->name ? err->name : "?");
+    char t[128];
+    if (err) fprintf(stderr, "lord-vmdisplay %s: QEMU refused the new size: %s\n", me, qtext(err->message ? err->message : err->name, t, sizeof t));
     return 0;
 }
 
@@ -1175,7 +1191,8 @@ int main(int argc, char **argv) {
         int absm = 0;
         char *label = NULL;
         int good = sd_bus_get_property_string(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Label", &e, &label) >= 0;
-        if (!good) fprintf(stderr, "lord-vmdisplay: QEMU's console %d isn't there: %s\n", k, e.message ? e.message : "?");
+        char t[128];
+        if (!good) fprintf(stderr, "lord-vmdisplay: QEMU's console %d isn't there: %s\n", k, qtext(e.message, t, sizeof t));
         sd_bus_error_free(&e);
         if (good && nheads > 1) {
             /* QEMU numbers its consoles itself: Console_k must be the graphic console of output k (the virtio-gpu's outputs
@@ -1203,7 +1220,7 @@ int main(int argc, char **argv) {
         sd_bus_error_free(&e);
         D.abs_mouse = absm;
         cws[k] = cw; chs[k] = ch;
-        fprintf(stderr, "lord-vmdisplay %s: console %d \"%s\" %ux%u, mouse %s\n", argv[1], k, label ? label : "", cw, ch, absm ? "absolute" : "relative");
+        fprintf(stderr, "lord-vmdisplay %s: console %d \"%s\" %ux%u, mouse %s\n", argv[1], k, qtext(label ? label : "", t, 64), cw, ch, absm ? "absolute" : "relative");
         free(label);
     }
     /* then a listener on each: QEMU asks a new listener for its properties before it answers anything else (one blocking

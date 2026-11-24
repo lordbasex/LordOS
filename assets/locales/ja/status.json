@@ -159,6 +159,7 @@
   "pkg.why.multiarchPair": "{name} と同じバージョン",
   "gpu.roleSet": "グラフィックカードの用途を保存しました（{card}）：適用するには再起動してください",
   "vm.gvtReady": "グラフィックカードの割り当てが準備できました（{name}）",
+  "vm.usbReady": "USB デバイスの準備ができました",
   "vm.gvtGone": "グラフィックカードの割り当てを削除しました",
   "gpu.freqSet": "グラフィックカードの最低周波数を設定しました",
   "gpu.memlockSet": "マシンがロックできるメモリを保存しました",
