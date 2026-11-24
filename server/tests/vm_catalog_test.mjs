@@ -24,7 +24,7 @@ const H = (c) => c.repeat(64);
 // ---- the cards ----
 eq('amd64 cards, LordOS first', systemsFor(CAT, 'amd64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows', 'android']);
 // no installable Android ISO exists for arm64 (4.2): no card there
-eq('arm64 cards', systemsFor(CAT, 'arm64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali']);
+eq('arm64 cards (with the virtio-win guest from its maker\'s Arm64 ISO, 4.3.2)', systemsFor(CAT, 'arm64').map((s) => s.id), ['lordos', 'debian', 'ubuntu', 'fedora', 'kali', 'windows']);
 // ---- Android (4.2): one ISO pinned by the catalog, no maker's list ----
 {
   const card = systemsFor(CAT, 'amd64').find((s) => s.id === 'android');
