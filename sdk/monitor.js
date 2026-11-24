@@ -286,7 +286,7 @@ function readMachines(force) {
     for (const m of lord.vm.list() || []) {
       if (!m || typeof m.id !== 'string' || typeof m.name !== 'string') continue;
       map[m.id] = m.name;
-      info[m.id] = { name: m.name, network: typeof m.network === 'string' ? m.network : '', ports: Array.isArray(m.ports) ? m.ports : [] };
+      info[m.id] = { name: m.name, network: typeof m.network === 'string' ? m.network : '', ports: Array.isArray(m.ports) ? m.ports : [], dir: typeof m.dir === 'string' ? m.dir : '' };
       if (m.role !== 'gateway') list.push({ id: m.id, name: m.name });
     }
     vmNames = { at: vmNames.at, map, info, list };

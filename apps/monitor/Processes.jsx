@@ -25,6 +25,7 @@ import { fmt, AppGlyph, isolatedAppOf, componentName } from './index.jsx';
 import { sealPixels, SEAL_COLORS } from './seal.js';
 import { statsStore, WINDOWS } from './procstatsmodel.js';
 import { DescriptionPanel } from './Describe.jsx';
+import { VM_IO_EVERY_MS, machineIds, machineIdOf, netOf, sweep } from './vmiomodel.js';
 import {
   HOLD_MS, procKey, procText, groupRowKey, rowKeyOf, isPaused, buildGroups, filterGroups, sortGroups, sortProcs, holdOrder, holdGroups,
   flattenRows, groupSummary, snapshotOf, planStop, stillRunning, groupKeys, chainCache, originOf, groupOriginOf, passesFilter, programChoices,
@@ -67,6 +68,35 @@ const isAdmin = () => {
   if (adminCache == null) { try { adminCache = !!lord.system.info().admin; } catch (e) { adminCache = false; } }
   return adminCache;
 };
+
+// A running machine's own disk and network numbers on its row (6.14; vmiomodel.js): lord.vm.stats of each machine the
+// table shows, every VM_IO_EVERY_MS while the tab is open (it asks the machine's lord-vm over its socket), never in a draw.
+function useMachineIo(groups) {
+  const ids = machineIds(groups).join(',');
+  const [io, setIo] = useState(() => new Map());
+  useEffect(() => {
+    if (!ids) { setIo(new Map()); return undefined; }
+    const list = ids.split(',');
+    let prev = new Map();
+    const read = () => {
+      prev = sweep(prev, list, (id) => monitor.machineInfo(id)?.dir || null, (dir) => (typeof lord !== 'undefined' && lord.vm ? lord.vm.stats(dir) : null));
+      setIo(prev);
+      firewall.refresh();                       // the machines' network counts (lord-netperm's), at most once a second
+    };
+    read();
+    const h = setInterval(read, VM_IO_EVERY_MS);
+    return () => clearInterval(h);
+  }, [ids]);
+  return io;
+}
+
+// "Disk 1.2 MB/s · Network ↓ 3 KB/s ↑ 1 KB/s" after a machine's name; a part not measured is left out ('' for none)
+function machineIoText(tr, disk, net) {
+  const parts = [];
+  if (disk != null) parts.push(`${tr('monitor.disk')} ${fmt.rate(tr, disk)}`);
+  if (net) parts.push(`${tr('monitor.network')} ↓ ${fmt.rate(tr, net.rx)} ↑ ${fmt.rate(tr, net.tx)}`);
+  return parts.join(' · ');
+}
 
 const myUid = (procs) => procs?.list.find((p) => p.self)?.uid;
 const procLabel = (tr, p) => (p.app === 'lordos' ? tr('monitor.lordos') : isolatedAppOf(p) ? appName(isolatedAppOf(p)) : p.name);
@@ -361,6 +391,12 @@ export function ProcessesTab() {
     return { list, groups: [], programs, byPid, keys };
   }, [procs, reset, paused, me, tr]);
   shownGroups.list = view.groups;
+  const vmIo = useMachineIo(grouped ? view.groups : []);
+  const fwCounts = useStore(firewallState, (s) => s.counts);
+  const ioOf = (g) => {
+    const id = !g.gone && g.kind === 'app' ? machineIdOf(g.item?.app) : null;
+    return id ? machineIoText(tr, vmIo.get(id)?.disk ?? null, netOf(fwCounts, id)) : '';
+  };
   // the origin badges: ask lord-server who owns the executables on screen (answered by its worker thread)
   useEffect(() => {
     if (!procs) return;
@@ -386,7 +422,7 @@ export function ProcessesTab() {
   const rowSig = (r) => {
     if (r.group) {
       const g = r.group;
-      return `g|${lang}|${groupLabel(tr, g)}|${g.match === 'procs' || open.has(g.key) ? 1 : 0}|${formatNumber(g.cpu * 100, 1)}|${fmt.mem(g.mem)}|${g.threads}|${g.count}|${g.user}|${g.gone ? 1 : 0}|${g.stoppable ? 1 : 0}|${oSig(groupOriginOf(g, facts))}|${statSig(g)}`;
+      return `g|${lang}|${groupLabel(tr, g)}|${g.match === 'procs' || open.has(g.key) ? 1 : 0}|${formatNumber(g.cpu * 100, 1)}|${fmt.mem(g.mem)}|${g.threads}|${g.count}|${g.user}|${g.gone ? 1 : 0}|${g.stoppable ? 1 : 0}|${oSig(groupOriginOf(g, facts))}|${statSig(g)}|${ioOf(g)}`;
     }
     const p = r.proc, child = !!r.parent;
     const chain = child && !p.gone ? chainOfProc(p, view.byPid).map((l) => `${l.pid}.${l.name}.${l.app || ''}`).join('>') : '';
@@ -465,6 +501,7 @@ export function ProcessesTab() {
           <AppGlyph item={groupGlyph(g)} />
           <Text style={{ fontSize: 12, fontWeight: 600, color, whiteSpace: 'nowrap' }}>{groupLabel(tr, g)}</Text>
           <OriginBadge o={groupOriginOf(g, facts)} selected={on} />
+          {ioOf(g) ? <Text style={{ fontSize: 11, color: dim, whiteSpace: 'nowrap' }}>{ioOf(g)}</Text> : null}
           {g.gone ? ended(dim) : null}
           {on && !g.gone && (g.stoppable || (g.kind === 'app' && machineOf(g.item?.app))) ? <View style={{ flex: 1 }} /> : null}
           {/* a machine's row (6.14): its own window, opened by Machines (args.show: Machines opens it, protected when it must be) */}

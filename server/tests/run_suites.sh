@@ -765,6 +765,9 @@ EOF
     # (0.8.9.6) Monitor → Processes: Grouped, the steady list, who started it and the origin badges (apps/monitor/procgroupmodel.js)
     if have node; then run "monitor-procgroup-test (apps/monitor/procgroupmodel.js, seal.js)" node tests/monitor_procgroup_test.mjs
     else skip "monitor-procgroup-test" "node"; fi
+    # (Machines to 100 %) a running machine's own disk and network numbers on its row (apps/monitor/vmiomodel.js)
+    if have node; then run "monitor-vmio-test (apps/monitor/vmiomodel.js)" node tests/monitor_vmio_test.mjs
+    else skip "monitor-vmio-test" "node"; fi
     # (0.8.6) LordBench's model (apps/sysinfo/perf.js): references, verdicts, comparisons
     if have node; then run "sysinfo-perf-test (apps/sysinfo/perf.js)" node tests/sysinfo_perf_test.mjs
     else skip "sysinfo-perf-test" "node"; fi

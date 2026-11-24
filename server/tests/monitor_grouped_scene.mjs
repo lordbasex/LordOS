@@ -140,4 +140,22 @@ await flush();
 check('the statistics\' columns show and sort', shows(monitorEn['stats.cpuAvg']) && shows(monitorEn['stats.cpuPeak']) && shows(' ▼') && shows(monitorEn['stats.memPeak']),
   JSON.stringify([...texts.values()].filter((x) => /CPU|Mem/.test(String(x)))));
 
+// (Machines to 100 %) a running machine's row: named after the machine, with its own disk and network numbers
+// (apps/monitor/vmiomodel.js): its QEMU's cgroup counter read twice through lord.vm.stats, its scope's rates from the firewall
+const VMID = '0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0';
+let ioReads = 0;
+lord.vm = { list: () => [{ id: VMID, name: 'Work Debian', dir: '/home/alex/Machines/Work Debian.lordvm', network: 'shared', ports: [] }],
+  stats: (dir) => (dir === '/home/alex/Machines/Work Debian.lordvm' ? { at: 1000 + 2000 * ioReads, ioBytes: 4 * MB * ioReads++ } : null) };
+lord.fw = new Proxy({ poll: () => ({ counts: { [`lordos:vm-${VMID}`]: [2, 0, 9 * MB, MB, 3 * 1024, 1024, []] }, events: [] }), status: () => ({}) },
+  { get: (o, k) => (k in o ? o[k] : () => null) });
+list = [...list, P(1200, 1, 'qemu-system-x86_64', { app: `desktop:lordos-vm-${VMID}`, exe: '/usr/bin/qemu-system-x86_64', rss: 900 * MB, cpu: 0.2 })];
+publish();
+await flush();
+await wait(2300);                                       // two reads of the machine (every 2 s): a rate
+publish();
+await flush();
+check('a machine\'s row is named after the machine', shows('Work Debian'), JSON.stringify([...texts.values()].filter((x) => /Debian|Machines/.test(String(x)))));
+check('with its disk and network numbers', shows(/^Disk 2[.,]0 MB\/s · Network ↓ 3[.,]0 KB\/s ↑ 1[.,]0 KB\/s$/),
+  JSON.stringify([...texts.values()].filter((x) => /Disk|Network/.test(String(x)))));
+
 process.exit(0);
