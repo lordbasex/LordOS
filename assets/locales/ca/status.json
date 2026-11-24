@@ -168,6 +168,7 @@
   "pkg.why.multiarchPair": "La mateixa versió que {name}",
   "gpu.roleSet": "Ús de la targeta gràfica desat ({card}): reinicieu per aplicar-lo",
   "vm.gvtReady": "Part de la targeta gràfica a punt ({name})",
+  "vm.usbReady": "Dispositiu USB a punt",
   "vm.gvtGone": "Part de la targeta gràfica eliminada",
   "gpu.freqSet": "Freqüència mínima de la targeta gràfica establerta",
   "gpu.memlockSet": "S’ha desat la memòria que poden bloquejar les màquines",

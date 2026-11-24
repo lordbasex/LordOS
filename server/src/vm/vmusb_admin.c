@@ -33,7 +33,7 @@ void vm_act_usb_allow(const AdminReq *r, const char *arg, size_t len) {
     char p[64];
     snprintf(p, sizeof p, "/dev/bus/usb/%03d/%03d", bus, dev);
     int fd = open(p, O_RDWR | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY);
-    if (fd < 0) { admin_err(errno == ENOENT || errno == ENODEV ? "vm.usbGone" : "vm.usbOpen", NULL); return; }
+    if (fd < 0) { admin_err("vm.usbGone", NULL); return; }
     /* the node is that device (its number), and sysfs still says that device is there */
     VmUsbDev again;
     struct stat st;

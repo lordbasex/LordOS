@@ -168,6 +168,7 @@
   "pkg.why.multiarchPair": "{name} ile aynı sürüm",
   "gpu.roleSet": "Ekran kartının kullanımı kaydedildi ({card}): uygulamak için yeniden başlatın",
   "vm.gvtReady": "Ekran kartı payı hazır ({name})",
+  "vm.usbReady": "USB aygıtı hazır",
   "vm.gvtGone": "Ekran kartı payı kaldırıldı",
   "gpu.freqSet": "Ekran kartının en düşük frekansı ayarlandı",
   "gpu.memlockSet": "Makinelerin kilitleyebileceği bellek kaydedildi",

@@ -2518,7 +2518,7 @@ static const char *usb_refusal_here(const Sess *s, const VmUsbDev *d) {
 /* an attach: the admin helper first. "" sent, else why not (an errors.json code) */
 static const char *usb_attach(Sess *s, int bus, int dev, int ask_perm_ok) {
     VmUsbDev d;
-    if (s->vm < 0 || (s->state != VS_RUNNING && s->state != VS_PAUSED)) return "vm.usbNotRunning";
+    if (s->vm < 0 || (s->state != VS_RUNNING && s->state != VS_PAUSED)) return "vm.usbBusy";
     usb_conf(s);
     if (s->usb_lock) return "vm.usbLocked";
     if (!s->usb_ctrl) return "vm.usbNoController";
@@ -2527,7 +2527,7 @@ static const char *usb_attach(Sess *s, int bus, int dev, int ask_perm_ok) {
     const char *no = usb_refusal_here(s, &d);
     if (no[0]) return no;
     int h = usb_holder(bus, dev);
-    if (h >= 0) return h == (int)(s - sess) ? "vm.usbAlready" : "vm.usbOtherMachine";
+    if (h >= 0) return h == (int)(s - sess) ? "" : "vm.usbOtherMachine";
     if (s->usb_n >= VMUSB_PER_VM) return "vm.usbTooMany";
     const char *perm = usb_perm_need(d.flags);
     if (perm[0]) return perm;
@@ -2578,7 +2578,7 @@ int js_vm_admin_reply(int id, const char *kind, const char *text) {
     int fd = admin_take_fd(id);
     if (!s) { if (fd >= 0) close(fd); return 1; }
     if (strcmp(kind, "OK") || fd < 0) {
-        char code[48] = "vm.usbRefused";
+        char code[48] = "vm.usbQemu";
         if (!strcmp(kind, "ERR") && text) { size_t n = strcspn(text, " "); if (n > 0 && n < sizeof code && !strncmp(text, "vm.usb", 6)) { memcpy(code, text, n); code[n] = 0; } }
         if (!strcmp(kind, "ERR") && text && !strncmp(text, "admin.notAdmin", 14)) snprintf(code, sizeof code, "vm.usbStorageAdmin");
         if (fd >= 0) close(fd);
@@ -4093,7 +4093,7 @@ static JSValue f_usb_attach(JSContext *c, JSValueConst t, int argc, JSValueConst
     (void)t;
     Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
     int bus = argc >= 3 ? ival(c, argv[1]) : 0, dev = argc >= 3 ? ival(c, argv[2]) : 0;
-    if (!s) return JS_NewString(c, "vm.usbNotRunning");
+    if (!s) return JS_NewString(c, "vm.usbBusy");
     if (bus < 1 || bus > VMUSB_BUS_MAX || dev < 1 || dev > VMUSB_DEV_MAX) return JS_NewString(c, "vm.usbGone");
     const char *why = usb_attach(s, bus, dev, 1);
     if (why[0]) { snprintf(s->usb_err, sizeof s->usb_err, "%s", why); s->usb_errs++; }
