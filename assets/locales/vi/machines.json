@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Tạm dừng khi tôi vắng mặt",
   "cfg.autoPauseNote": "Tạm dừng sau 10 phút không có bàn phím hay chuột, và tiếp tục khi bạn quay lại.",
   "bundle.machine": "Máy",
-  "bundle.group": "Nhóm máy"
+  "bundle.group": "Nhóm máy",
+  "cfg.search": "Tìm kiếm",
+  "cfg.unsaved": "Đã thay đổi, chưa lưu"
 }

@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Pausa när jag är borta",
   "cfg.autoPauseNote": "Pausar efter 10 minuter utan tangentbord eller mus och fortsätter när du är tillbaka.",
   "bundle.machine": "Maskin",
-  "bundle.group": "Maskingrupp"
+  "bundle.group": "Maskingrupp",
+  "cfg.search": "Sök",
+  "cfg.unsaved": "Ändrat, inte sparat än"
 }

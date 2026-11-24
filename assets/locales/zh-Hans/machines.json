@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "我离开时暂停",
   "cfg.autoPauseNote": "10 分钟没有键盘或鼠标操作后暂停,你回来后继续。",
   "bundle.machine": "虚拟机",
-  "bundle.group": "虚拟机组"
+  "bundle.group": "虚拟机组",
+  "cfg.search": "搜索",
+  "cfg.unsaved": "已更改,尚未保存"
 }

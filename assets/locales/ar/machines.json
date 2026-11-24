@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "إيقاف مؤقت أثناء غيابي",
   "cfg.autoPauseNote": "تتوقف مؤقتًا بعد 10 دقائق دون لوحة مفاتيح أو فأرة، وتستأنف عند عودتك.",
   "bundle.machine": "آلة",
-  "bundle.group": "مجموعة آلات"
+  "bundle.group": "مجموعة آلات",
+  "cfg.search": "بحث",
+  "cfg.unsaved": "تغيّر ولم يُحفظ بعد"
 }

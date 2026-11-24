@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "আমি না থাকলে থামান",
   "cfg.autoPauseNote": "কিবোর্ড বা মাউস ছাড়া ১০ মিনিট পর থামে, আর আপনি ফিরলে চলে।",
   "bundle.machine": "মেশিন",
-  "bundle.group": "মেশিন গ্রুপ"
+  "bundle.group": "মেশিন গ্রুপ",
+  "cfg.search": "খুঁজুন",
+  "cfg.unsaved": "পরিবর্তিত, এখনো সংরক্ষিত হয়নি"
 }

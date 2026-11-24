@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Pauză cât sunt plecat",
   "cfg.autoPauseNote": "Intră în pauză după 10 minute fără tastatură sau mouse și continuă când revii.",
   "bundle.machine": "Mașină",
-  "bundle.group": "Grup de mașini"
+  "bundle.group": "Grup de mașini",
+  "cfg.search": "Caută",
+  "cfg.unsaved": "Modificat, încă nesalvat"
 }

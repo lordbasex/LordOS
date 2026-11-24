@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Wstrzymaj, gdy mnie nie ma",
   "cfg.autoPauseNote": "Wstrzymuje się po 10 minutach bez klawiatury i myszy i wznawia, gdy wrócisz.",
   "bundle.machine": "Maszyna",
-  "bundle.group": "Grupa maszyn"
+  "bundle.group": "Grupa maszyn",
+  "cfg.search": "Szukaj",
+  "cfg.unsaved": "Zmienione, jeszcze nie zapisane"
 }

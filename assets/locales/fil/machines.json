@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "I-pause habang wala ako",
   "cfg.autoPauseNote": "Humihinto pagkalipas ng 10 minutong walang keyboard o mouse, at nagpapatuloy pagbalik mo.",
   "bundle.machine": "Machine",
-  "bundle.group": "Grupo ng machine"
+  "bundle.group": "Grupo ng machine",
+  "cfg.search": "Maghanap",
+  "cfg.unsaved": "Binago, hindi pa nase-save"
 }

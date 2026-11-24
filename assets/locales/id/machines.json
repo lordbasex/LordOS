@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Jeda saat saya pergi",
   "cfg.autoPauseNote": "Berhenti sejenak setelah 10 menit tanpa keyboard atau mouse, dan lanjut saat Anda kembali.",
   "bundle.machine": "Mesin",
-  "bundle.group": "Grup mesin"
+  "bundle.group": "Grup mesin",
+  "cfg.search": "Cari",
+  "cfg.unsaved": "Diubah, belum disimpan"
 }

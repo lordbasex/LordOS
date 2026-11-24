@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Ben yokken duraklat",
   "cfg.autoPauseNote": "Klavye ya da fare olmadan 10 dakika sonra duraklar, döndüğünüzde devam eder.",
   "bundle.machine": "Makine",
-  "bundle.group": "Makine grubu"
+  "bundle.group": "Makine grubu",
+  "cfg.search": "Ara",
+  "cfg.unsaved": "Değişti, henüz kaydedilmedi"
 }

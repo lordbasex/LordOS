@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Pausar mientras no estoy",
   "cfg.autoPauseNote": "Se pausa tras 10 minutos sin teclado ni mouse, y sigue cuando volvés.",
   "bundle.machine": "Máquina",
-  "bundle.group": "Grupo de máquinas"
+  "bundle.group": "Grupo de máquinas",
+  "cfg.search": "Buscar",
+  "cfg.unsaved": "Cambiado, sin guardar todavía"
 }

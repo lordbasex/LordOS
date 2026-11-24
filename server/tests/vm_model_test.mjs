@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const M = await import(path.join(here, '../../apps/machines/model.js'));
 const D = await import(path.join(here, '../../apps/machines/diag.js'));
-const { stateView, offers2d, restartsAgain, offHint, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetPlan, budgetLine, failCause, failActions, cardLights, isolationGaps, pipFrame, actualFrame, infoLines, canRun, sensorLines, searchMachines, sessionStarts, atLoginToggle, batteryNotice, awayStep, AWAY_SEC, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
+const { stateView, offers2d, restartsAgain, offHint, actionsFor, defaultsFor, validateDraft, createRequest, missingFor, letterbox, toPicture, guestSize, refreshRate, wheelSteps, windowTitle, folderOf, memLimit, budgetPlan, budgetLine, failCause, failActions, cardLights, isolationGaps, pipFrame, actualFrame, infoLines, canRun, sensorLines, searchMachines, sessionStarts, atLoginToggle, batteryNotice, awayStep, AWAY_SEC, changedSections, sectionsMatching, systemOf, versionOf, archOf, suggestName, profileSize, usage, summaryOf, doingOf, thumbSrc, closeChoice, snapName, snapSize, cloneMethod, storageRows, storageBar, profileOf, resolutions, agentLines, agentTone, clipTo, clipFrom, soundOf, audible, soundSummary, muteToggle, micLive, micAsk } = M;
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -227,6 +227,16 @@ eq('away: not twice', awayStep(AWAY_SEC, lib6, metaA, new Set(['/m/Win.lordvm'])
 const lib7 = lib6.map((m) => (m.id === 'b' ? { ...m, state: 'paused' } : m));
 eq('back: resume the ones it paused', awayStep(3, lib7, metaA, new Set(['/m/Win.lordvm'])).resume, ['/m/Win.lordvm']);
 eq('back: never one the person paused', awayStep(3, lib7, metaA, new Set()).resume, []);
+
+// Configure's sidebar: the sections with an unsaved change, and its search (changedSections, sectionsMatching)
+const cur0 = { name: 'A', vcpus: 2, memoryMb: 2048, ports: [] };
+const differs0 = (k, v) => JSON.stringify(v) !== JSON.stringify(cur0[k]);
+eq('dots: what changed', [...changedSections({ name: 'B', vcpus: 2, memoryMb: 4096, bogus: 1 }, differs0)].sort(), ['cpu', 'general']);
+eq('dots: nothing', [...changedSections({ name: 'A' }, differs0)], []);
+const titles = { general: 'General · Debian 13', cpu: 'CPU and memory · 2 CPU', network: 'Network · Shared' };
+eq('search: by summary', sectionsMatching(['general', 'cpu', 'network'], 'debian', (k) => titles[k]), ['general']);
+eq('search: two words', sectionsMatching(['general', 'cpu', 'network'], 'cpu memory', (k) => titles[k]), ['cpu']);
+eq('search: empty is all', sectionsMatching(['general', 'cpu'], '  ', (k) => titles[k]), ['general', 'cpu']);
 
 // the Control Center and the assistant
 eq('system from label', systemOf('Debian 13.1.0 amd64 n').id, 'debian');

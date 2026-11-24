@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Tauko, kun olen poissa",
   "cfg.autoPauseNote": "Pysähtyy 10 minuutin kuluttua ilman näppäimistöä tai hiirtä ja jatkaa, kun palaat.",
   "bundle.machine": "Kone",
-  "bundle.group": "Koneryhmä"
+  "bundle.group": "Koneryhmä",
+  "cfg.search": "Hae",
+  "cfg.unsaved": "Muutettu, ei vielä tallennettu"
 }

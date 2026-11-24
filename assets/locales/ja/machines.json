@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "離席中は一時停止",
   "cfg.autoPauseNote": "キーボードやマウスの操作が 10 分ないと一時停止し、戻ると再開します。",
   "bundle.machine": "マシン",
-  "bundle.group": "マシングループ"
+  "bundle.group": "マシングループ",
+  "cfg.search": "検索",
+  "cfg.unsaved": "変更あり、未保存"
 }

@@ -699,5 +699,6 @@
   "stats.p95Row": "CPU percentila 95 (1 min)",
   "stats.memAvgRow": "Memorie medie (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memorie vârf (1 · 5 · 15 min)",
-  "stats.spark": "Ultimul minut"
+  "stats.spark": "Ultimul minut",
+  "group.showMachine": "Arată mașina"
 }

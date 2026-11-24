@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Pause while I'm away",
   "cfg.autoPauseNote": "Pauses after 10 minutes without keyboard or mouse, and resumes when you're back.",
   "bundle.machine": "Machine",
-  "bundle.group": "Machine group"
+  "bundle.group": "Machine group",
+  "cfg.search": "Search",
+  "cfg.unsaved": "Changed, not saved yet"
 }

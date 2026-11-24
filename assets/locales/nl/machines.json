@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Pauzeren als ik weg ben",
   "cfg.autoPauseNote": "Pauzeert na 10 minuten zonder toetsenbord of muis en gaat verder als je terug bent.",
   "bundle.machine": "Machine",
-  "bundle.group": "Machinegroep"
+  "bundle.group": "Machinegroep",
+  "cfg.search": "Zoeken",
+  "cfg.unsaved": "Gewijzigd, nog niet bewaard"
 }

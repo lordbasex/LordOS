@@ -684,5 +684,6 @@
   "stats.p95Row": "Asilimia ya 95 ya CPU (dak 1)",
   "stats.memAvgRow": "Wastani wa kumbukumbu (dak 1 · 5 · 15)",
   "stats.memPeakRow": "Kilele cha kumbukumbu (dak 1 · 5 · 15)",
-  "stats.spark": "Dakika ya mwisho"
+  "stats.spark": "Dakika ya mwisho",
+  "group.showMachine": "Onyesha mashine"
 }

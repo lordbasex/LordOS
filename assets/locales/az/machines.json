@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Mən yoxkən fasilə ver",
   "cfg.autoPauseNote": "Klaviatura və ya siçan olmadan 10 dəqiqədən sonra fasilə verir, qayıdanda davam edir.",
   "bundle.machine": "Maşın",
-  "bundle.group": "Maşın qrupu"
+  "bundle.group": "Maşın qrupu",
+  "cfg.search": "Axtar",
+  "cfg.unsaved": "Dəyişib, hələ saxlanmayıb"
 }

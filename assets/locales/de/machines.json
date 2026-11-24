@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Pausieren, während ich weg bin",
   "cfg.autoPauseNote": "Pausiert nach 10 Minuten ohne Tastatur oder Maus und läuft weiter, wenn du zurück bist.",
   "bundle.machine": "Maschine",
-  "bundle.group": "Maschinengruppe"
+  "bundle.group": "Maschinengruppe",
+  "cfg.search": "Suchen",
+  "cfg.unsaved": "Geändert, noch nicht gesichert"
 }

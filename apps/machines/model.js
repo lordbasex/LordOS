@@ -1857,3 +1857,22 @@ export function awayStep(idleSec, list, metaOf, paused) {
   }
   return { pause: [], resume: (list || []).filter((m) => m && mine.has(m.dir) && m.state === 'paused').map((m) => m.dir) };
 }
+
+// Configure (5.5): which section each field lord-vm --set changes belongs to (the sidebar's dots: a section with a change
+// not saved yet), and the sidebar's search over the sections' titles and summaries
+export const FIELD_SECTION = {
+  name: 'general', vcpus: 'cpu', memoryMb: 'cpu', cpuPin: 'cpu', perfProfile: 'cpu', resolution: 'display', graphics: 'display',
+  gpu: 'display', pointer: 'display', captureFullscreen: 'display', network: 'network', bridge: 'network', ports: 'network',
+  nicModel: 'network', diskGb: 'disks', iso: 'disks', shares: 'sharing', transfer: 'sharing', clipboard: 'sharing', agent: 'agent',
+  bootOrder: 'boot', bootMenu: 'boot',
+};
+export function changedSections(draft, differs) {
+  const out = new Set();
+  for (const k of Object.keys(draft || {})) if (FIELD_SECTION[k] && differs(k, draft[k])) out.add(FIELD_SECTION[k]);
+  return out;
+}
+export function sectionsMatching(secs, q, textOf, fold = (s) => String(s || '').toLowerCase()) {
+  const words = fold(q).trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return secs;
+  return secs.filter((k) => { const t = fold(textOf(k)); return words.every((w) => t.includes(w)); });
+}

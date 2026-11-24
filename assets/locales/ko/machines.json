@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "자리를 비우면 일시 정지",
   "cfg.autoPauseNote": "키보드나 마우스 입력이 10분 없으면 일시 정지하고, 돌아오면 다시 시작합니다.",
   "bundle.machine": "머신",
-  "bundle.group": "머신 그룹"
+  "bundle.group": "머신 그룹",
+  "cfg.search": "검색",
+  "cfg.unsaved": "변경됨, 아직 저장 안 됨"
 }

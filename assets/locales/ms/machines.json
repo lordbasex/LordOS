@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Jeda semasa saya tiada",
   "cfg.autoPauseNote": "Berjeda selepas 10 minit tanpa papan kekunci atau tetikus, dan bersambung apabila anda kembali.",
   "bundle.machine": "Mesin",
-  "bundle.group": "Kumpulan mesin"
+  "bundle.group": "Kumpulan mesin",
+  "cfg.search": "Cari",
+  "cfg.unsaved": "Diubah, belum disimpan"
 }

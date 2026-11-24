@@ -699,5 +699,6 @@
   "stats.p95Row": "95. percentyl CPU (1 min)",
   "stats.memAvgRow": "Średnia pamięć (1 · 5 · 15 min)",
   "stats.memPeakRow": "Szczyt pamięci (1 · 5 · 15 min)",
-  "stats.spark": "Ostatnia minuta"
+  "stats.spark": "Ostatnia minuta",
+  "group.showMachine": "Pokaż maszynę"
 }

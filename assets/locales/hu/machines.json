@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Szünet, amíg távol vagyok",
   "cfg.autoPauseNote": "10 perc billentyűzet és egér nélkül szünetel, és folytatja, amikor visszajössz.",
   "bundle.machine": "Gép",
-  "bundle.group": "Gépcsoport"
+  "bundle.group": "Gépcsoport",
+  "cfg.search": "Keresés",
+  "cfg.unsaved": "Módosítva, még nincs mentve"
 }

@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Pausa mentre no hi soc",
   "cfg.autoPauseNote": "Es posa en pausa després de 10 minuts sense teclat ni ratolí, i continua quan tornes.",
   "bundle.machine": "Màquina",
-  "bundle.group": "Grup de màquines"
+  "bundle.group": "Grup de màquines",
+  "cfg.search": "Cerca",
+  "cfg.unsaved": "Canviat, encara no desat"
 }

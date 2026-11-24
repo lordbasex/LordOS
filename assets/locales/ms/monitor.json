@@ -669,5 +669,6 @@
   "stats.p95Row": "Persentil ke-95 CPU (1 min)",
   "stats.memAvgRow": "Purata memori (1 · 5 · 15 min)",
   "stats.memPeakRow": "Puncak memori (1 · 5 · 15 min)",
-  "stats.spark": "Minit terakhir"
+  "stats.spark": "Minit terakhir",
+  "group.showMachine": "Tunjukkan mesin"
 }

@@ -1656,5 +1656,7 @@
   "cfg.autoPause": "Sitisha nikiwa sipo",
   "cfg.autoPauseNote": "Husitishwa baada ya dakika 10 bila kibodi wala kipanya, na huendelea unaporudi.",
   "bundle.machine": "Mashine",
-  "bundle.group": "Kikundi cha mashine"
+  "bundle.group": "Kikundi cha mashine",
+  "cfg.search": "Tafuta",
+  "cfg.unsaved": "Imebadilishwa, bado haijahifadhiwa"
 }

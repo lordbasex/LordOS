@@ -684,5 +684,6 @@
   "stats.p95Row": "İşlemci 95. yüzdelik (1 dk)",
   "stats.memAvgRow": "Ortalama bellek (1 · 5 · 15 dk)",
   "stats.memPeakRow": "Tepe bellek (1 · 5 · 15 dk)",
-  "stats.spark": "Son dakika"
+  "stats.spark": "Son dakika",
+  "group.showMachine": "Makineyi göster"
 }
