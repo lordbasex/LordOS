@@ -11,6 +11,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
+  lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
+  machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
+  the machines together yield to the desktop and the apps; idle cores and an idle disk are still theirs. Each machine keeps
+  its own memory and CPU limit. lord-netperm's programs look one level down into the slice, so each machine keeps its own
+  firewall policy (the Machines rules while a just-started one isn't registered). Monitor, the process owner, the battery
+  history and Sentinela's scope check find machines there and in the old place. lordos.service restarts with live
+  sessions keep the slice's limits. lord-sessiond uses the slice only while the running lord-netperm is the installed
+  one, so a half-restarted update never leaves a machine without a firewall.
 - **Machines: the app's last parts** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.1, 5.2,
   5.3, 5.5, 6.14).
   - **New Machine: Detect.** An installer disc chosen or dropped on the assistant gets a step of its own: what its

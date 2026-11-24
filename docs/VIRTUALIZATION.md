@@ -38,7 +38,7 @@ recomputes both from the rows; the arithmetic:
 
 | Area | Weight | Items | Mean | Score | Points (weight × score) | Before |
 |---|---:|---:|---:|---:|---:|---:|
-| A. Engine, lifecycle, sandbox, display | 14 | 22 | 88.86 | 89 % | 14 × 89 % = 12.46 | 78 % |
+| A. Engine, lifecycle, sandbox, display | 14 | 22 | 92.05 | 92 % | 14 × 92 % = 12.88 | 78 % |
 | B. Getting a system in (cards, unattended, import) | 12 | 13 | 87.85 | 88 % | 12 × 88 % = 10.56 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 91.00 | 91 % | 11 × 91 % = 10.01 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 85.00 | 85 % | 9 × 85 % = 7.65 | 60 % |
@@ -52,9 +52,9 @@ recomputes both from the rows; the arithmetic:
 | L. Privacy and security model | 4 | 7 | 85.71 | 86 % | 4 × 86 % = 3.44 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **110** | | | **80.80 → 81 %** | 69 % |
+| **Total** | **100** | **110** | | | **81.22 → 81 %** | 69 % |
 
-Σ = 12.46 + 10.56 + 10.01 + 7.65 + 4.80 + 3.36 + 9.24 + 3.22 + 6.37 + 2.79 + 2.67 + 3.44 + 2.58 + 1.65 = 80.80, rounded **81 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.88 + 10.56 + 10.01 + 7.65 + 4.80 + 3.36 + 9.24 + 3.22 + 6.37 + 2.79 + 2.67 + 3.44 + 2.58 + 1.65 = 81.22, rounded **81 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); the rest of guest → host links (G, +0.3); the file copy panel with drag out, USB, then camera and printers (G and F, +1.2
@@ -89,7 +89,7 @@ can see" (L, 60 → 40), recording (F, ✅ → 🧪), `isoInfo` (B, 100 → 85),
 (J, 100 → 95), and raised the failure page (A, 60 → 65), the requirements check (B, 70 → 80), Configure (C, 50 → 60),
 storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets (M, 50 → 60).
 
-### A. Engine, lifecycle, sandbox, display (89 %)
+### A. Engine, lifecycle, sandbox, display (92 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -101,7 +101,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Every helper jailed too: lord-vm's own Landlock, `qemu-img`, `swtpm`, `passt`, `virtiofsd`; lord-vmdisplay sandboxed with a self-test; `lord-vmunpack` (a group's archive) under `sandbox_apply_helper` on descriptors; render node and VFIO confined by Landlock (3.3, 19.6) | ✅ | 100 | `lordvm.c` `vm_jail_self`, `vmsandbox.c` `vm_jail_tool*`, `render_rules`, `vgpu_rules`, `vmdisplay.c` `--selftest`, `vmunpack.c`; `vm_isolation.sh`, `vmunpack-test` | Added by the audit of 2026-11-23; `lord-vmunpack` by this one |
 | Sandbox and cgroup state reported (`lord-vm --status`: Landlock, our seccomp, KVM fd, scope), nested cgroup leaves per process (3.3, 3.7) | ✅ | 100 | `lordvm.c` (`setup_cgroups`, `--status`), `diag.js`, `logs.jsx` | Added by the audit of 2026-11-23 |
 | "Weaker isolation on this kernel" notice when Landlock is missing (3.3) | 🧪 | 90 | `js_vm.c` (`host().landlock`), `model.js` `isolationGaps`, `library.jsx`, `configure.jsx` (Security), `vmwindow.jsx` (Info); `vm_model_test.mjs`, `machines_app_headless.sh` | *In development*: the library's notice, Configure → Security's sandbox line and the window's Info menu, from the kernel's Landlock ABI and the running machine's VMS bits (namespaces too); Sentinela's alert as before. Not seen on a kernel without Landlock (every test host has it) |
-| Render node by descriptor; one slice for all machines (3.3, 3.7) | ❌ | 0 | `lordvm.c` passes a path (`rendernode=`); one scope per machine | QEMU's `rendernode=` takes a path; Landlock limits it to that node (row above) |
+| Render node by descriptor; one slice for all machines (3.3, 3.7) | 🟡 | 50 | `lordvm.c` passes a path (`rendernode=`); `sec/cgroup.c` `cgroup_machines_slice` (lordos-machines.slice) | *In development*: the slice is built (the Resource budget row, 3.7); the render node still goes by path: QEMU's `rendernode=` takes a path, and Landlock limits it to that node (row above) |
 | Resource budget (3.7) | ✅ | 100 | `machine.c` `vm_budget_used_mb`, `vm_budget_fits`; `js_vm.c` `budget_ok` (`start`, `startDetached`), `lord.vm.budget`; `cli/machines.c`; `model.js` `budgetPlan`, `budgetLine`; `vmwindow.jsx`, `library.jsx`; `sec/cgroup.c` `cgroup_machines_slice`, `cgroup_netperm_current`; `np.bpf.c` `scope_id`; `netperm.c` `scan_slice`; `vm-test`, `vm_model_test.mjs`, `machines_app_headless.sh`, `cgslice-test`, `np-slice-test`, `cgroup-restart-test` | *In development*: one check in lord-server for every start path (the window, Start Without Window, `machines start` through the session and without one, a group's members, a disposable session's share counted); the window offers Suspend <another> or Start with less memory; the status line shows memory for machines and a PSI warning. One parent, `lordos-machines.slice`, made by lord-sessiond with `cpu.weight` 50 and `io.weight` 50 against the session's 100 per app and 1000 for the compositor (each machine keeps its own `memory.max` and `cpu.max`); lord-netperm, Monitor, Sentinela and the process owner follow the machines into it. Checked with a real Debian 13 guest booted by this build's lord-vm and placed by lord-sessiond's own code on a throwaway cgroup tree (`tests/vm_slice.sh`, 12 checks, both the slice and the fallback beside the server leaf), and lord-netperm's programs in the real kernel (`np-slice-test`) |
 | Files and contracts: `operation.json`, newer schema read-only, suspended-state check, the export's manifest (3.5, 3.6) | ✅ | 100 | `vmops.h` `vm_op_begin`, `machine.c`, `lordvm.c` (`cmd_export`, `cmd_import_lordvm`), `vmexport.c`; `vmexport-test`, `vm_storage_test.sh` | The export's manifest of checksums and the import that checks it (*in development*, 2026-11-24; was 90) |
 | Firmware identity kept with the machine; the old code file kept in the folder (3.6) | 🧪 | 95 | `machine.c` (`firmware_sha256`), `lordvm.c` (`fw_keep`, `--firmware-update`), `configure.jsx`; `vm_storage_test.sh` | *In development*: `firmware-code.fd` kept at the first start, used by descriptor after a change (a changed copy never), the explicit move in Configure; checked by pointing a machine at another OVMF build, not with a real package update (was 40) |
@@ -400,7 +400,7 @@ Still open in Phase 2:
 - [ ] 13.8 item 5: repeat the Pi's 4-vCPU drag on an untouched board, a memory-heavy guest at 3 vCPUs, the 1000 ms stalls with all
   cores busy (a desktop issue, also with no VM).
 - [ ] 13.8 item 6: GICV trapping cost on the 16K kernel, and a 4K kernel (open decision 4).
-- [ ] 13.8 item 7: render node by descriptor, one slice for all machines under `lord-sessiond` (3.7).
+- [ ] 13.8 item 7: render node by descriptor (the one slice for all machines under `lord-sessiond` is built, *in development*, 3.7).
 - [ ] 13.8 item 8: passt's 96–379 MB/s spread on the Pi.
 - [ ] 13.8 item 9: boot time (UEFI is 12.3 s of the Pi's 18.6 s); direct kernel boot for Linux guests.
 - [x] Our own seccomp filter on top of QEMU's: an allowlist since 2026-11-23 (in development), per architecture and per machine,
@@ -1174,7 +1174,7 @@ compromised QEMU can't change `machine.json` (and through it, what the next star
 **Limits** (3.7): vCPUs at most the host's CPUs, with a warning above all-but-one (3 on a Pi 5, 13.7); memory 256 MB up to the
 host's RAM minus 2 GB (1 GB on a 4 GB board). The machine's memory limit is its memory plus QEMU's overhead (384 MB with KVM, 640
 MB with TCG, whose translation cache is capped with `tb-size=256`); `vm_budget_fits` checks a new machine against the ones
-running. Enforcing the sum needs one slice for all machines, which lord-sessiond can't make yet (below).
+running. The machines share one parent, `lordos-machines.slice`, with a lower CPU and I/O weight than the session (*in development*, below).
 
 **Processes** of a running machine:
 
@@ -4771,7 +4771,7 @@ networking, virtiofs on both architectures, the desktop under a 3-vCPU load. Sti
 6. **GICV trapping:** the cost of interrupt-heavy work on the 16K kernel, and whether a 4K kernel removes it (open decision 4).
 7. **Not touched in Phase 0:** our own seccomp filter on top of QEMU's, Landlock on QEMU, nested cgroup leaves, mouse, pause and
    resume, and UEFI vars as qcow2 are done in 3.9 (the filter was a denylist; since 2026-11-23 it is an allowlist, 3.3; nested leaves only where lord-vm's cgroup is delegated, not
-   yet under lord-sessiond). Still open: the render node passed by descriptor, one slice for all machines (3.7), disk speed of qcow2.
+   yet under lord-sessiond). Still open: the render node passed by descriptor, disk speed of qcow2 (the one slice for all machines is built, *in development*, 3.7).
    Done since (audited 2026-11-23): D-Bus audio (`vmdisplay.c`), the clipboard (over the agent's channel), the cursor of a
    graphical guest (`VD_CURSOR`), suspend (6.1).
 8. **`passt` on the Pi:** why its speed ranges from 96 to 379 MB/s from run to run, and whether that matters for real traffic.
