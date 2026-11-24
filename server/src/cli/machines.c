@@ -27,6 +27,7 @@
 #include "mcli.h"
 #include "../sec/json.h"
 #include "../vm/machine.h"
+#include "../vm/vmgroup.h"
 #include "../vm/vmcli.h"
 #include "../web/weblangid.h"
 
@@ -138,7 +139,14 @@ typedef struct {
     char system[48];
     McliState st;
     double used;                     /* bytes its disks take */
+    int group;                       /* a machine group's member: index in gs + 1 (0: none) */
 } Machine;
+
+/* the library's machine groups (docs/VIRTUALIZATION.md 19.9): <name>.lordgroup with its group.json */
+#define MAX_GROUPS 32
+typedef struct { char dir[PATH_MAX + 260]; VmGroup g; int member[VMG_MEMBERS_MAX]; } Group;   /* member: index in ms, -1 */
+static Group gs[MAX_GROUPS];
+static int ngs;
 
 static char library[PATH_MAX];
 static Machine *ms;
@@ -210,6 +218,44 @@ static void read_machine(Machine *x) {
 
 static int by_name(const void *a, const void *b) { return strcasecmp(((const Machine *)a)->m.name, ((const Machine *)b)->m.name); }
 
+/* a group's members as machines of the list (they're machines, each with its own folder) */
+static void load_group(const char *name) {
+    if (ngs == MAX_GROUPS) return;
+    Group *G = &gs[ngs];
+    memset(G, 0, sizeof *G);
+    snprintf(G->dir, sizeof G->dir, "%s/%s", library, name);
+    struct stat st;
+    if (lstat(G->dir, &st) || !S_ISDIR(st.st_mode) || !vm_group_dir_ok(G->dir) || vm_group_load(G->dir, &G->g, NULL, 0)) return;
+    for (int i = 0; i < G->g.n && nms < MAX_MACHINES; i++) {
+        Machine *x = &ms[nms];
+        memset(x, 0, sizeof *x);
+        snprintf(x->dir, sizeof x->dir, "%s/%s", G->dir, G->g.m[i].dir);
+        char mj[PATH_MAX + 600];
+        snprintf(mj, sizeof mj, "%s/machine.json", x->dir);
+        if (lstat(x->dir, &st) || !S_ISDIR(st.st_mode) || access(mj, F_OK)) continue;
+        snprintf(x->folder, sizeof x->folder, "%.*s", (int)(strlen(G->g.m[i].dir) - 7), G->g.m[i].dir);
+        read_machine(x);
+        x->group = ngs + 1;
+        nms++;
+    }
+    ngs++;
+}
+
+/* after sorting: each group's members by role, -1 when missing or not its own (a damaged group) */
+static void index_groups(void) {
+    for (int k = 0; k < ngs; k++) {
+        for (int i = 0; i < VMG_MEMBERS_MAX; i++) gs[k].member[i] = -1;
+        for (int i = 0; i < nms; i++) {
+            if (ms[i].group != k + 1) continue;
+            for (int j = 0; j < gs[k].g.n; j++) {
+                char d[PATH_MAX + 520];
+                snprintf(d, sizeof d, "%.4000s/%.200s", gs[k].dir, gs[k].g.m[j].dir);
+                if (!strcmp(d, ms[i].dir) && ms[i].ok && !strcmp(ms[i].m.group, gs[k].g.id) && ms[i].m.role == gs[k].g.m[j].role) gs[k].member[j] = i;
+            }
+        }
+    }
+}
+
 /* the library's machines (js_vm.c f_list: <name>.lordvm folders with a machine.json) */
 static void load_library(void) {
     if (ms) return;
@@ -219,6 +265,7 @@ static void load_library(void) {
     struct dirent *e;
     while (d && (e = readdir(d)) && nms < MAX_MACHINES) {
         size_t l = strlen(e->d_name);
+        if (e->d_name[0] != '.' && l > 10 && !strcmp(e->d_name + l - 10, VMG_SUFFIX)) { load_group(e->d_name); continue; }
         if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
         Machine *x = &ms[nms];
         memset(x, 0, sizeof *x);
@@ -233,6 +280,30 @@ static void load_library(void) {
     }
     if (d) closedir(d);
     qsort(ms, (size_t)nms, sizeof *ms, by_name);
+    index_groups();
+}
+
+static void json_group(FILE *f, const Group *G);
+/* NAME → a group: its folder's path, or its name exactly (any case); NULL when it isn't one */
+static Group *find_group(const char *q) {
+    load_library();
+    char real[PATH_MAX];
+    int path = strchr(q, '/') != NULL;
+    if (path && !realpath(q, real)) return NULL;
+    for (int k = 0; k < ngs; k++) if (path ? !strcmp(gs[k].dir, real) : !strcasecmp(gs[k].g.name, q)) return &gs[k];
+    return NULL;
+}
+
+/* one word for a group: running (all), off (none), partial, damaged (a member missing or not its own) */
+static const char *group_view(const Group *G) {
+    int on = 0, run = 0;
+    for (int j = 0; j < G->g.n; j++) {
+        if (G->member[j] < 0) return "damaged";
+        const Machine *x = &ms[G->member[j]];
+        on += x->st.active;
+        run += !strcmp(x->st.state, "running") || !strcmp(x->st.state, "paused");
+    }
+    return !on ? "off" : run == G->g.n ? "running" : "partial";
 }
 
 /* NAME → a machine: a name in the library, or a machine folder's path. NULL after saying why (exit status in *rc) */
@@ -461,12 +532,14 @@ static void mem_text(int mb, char *out, size_t n) {
 
 static int cmd_list(int json, int names) {
     load_library();
-    if (names) { for (int i = 0; i < nms; i++) puts(ms[i].m.name); return 0; }
+    if (names) { for (int k = 0; k < ngs; k++) puts(gs[k].g.name); for (int i = 0; i < nms; i++) puts(ms[i].m.name); return 0; }
     if (json) {
         printf("{\"library\":");
         mcli_json_str(stdout, library);
         printf(",\"machines\":[");
         for (int i = 0; i < nms; i++) { if (i) putchar(','); json_machine(stdout, &ms[i], 0); }
+        printf("],\"groups\":[");
+        for (int k = 0; k < ngs; k++) { if (k) putchar(','); json_group(stdout, &gs[k]); }
         printf("]}\n");
         return 0;
     }
@@ -475,8 +548,26 @@ static int cmd_list(int json, int names) {
     const char *head[C] = { T("label.name"), T("label.system"), T("label.state"), T("label.cpus"), T("label.memory"), T("label.used"), T("label.gpu") };
     int w[C];
     for (int c = 0; c < C; c++) w[c] = width(head[c]);
-    char (*cells)[C][96] = calloc((size_t)nms, sizeof *cells);
+    int rows = nms + ngs;
+    char (*cells)[C][96] = calloc((size_t)rows + 1, sizeof *cells);
     if (!cells) return 1;
+    for (int k = 0; k < ngs; k++) {
+        /* a group's row: its name, "group of N", its state in one word, the members' vCPUs and memory together */
+        char (*r)[96] = cells[nms + k], n[16];
+        snprintf(n, sizeof n, "%d", gs[k].g.n);
+        snprintf(r[0], 96, "%s", gs[k].g.name);
+        snprintf(r[1], 96, "%s", say("kind.group", "count", n, NULL));
+        const char *v = group_view(&gs[k]);
+        snprintf(r[2], 96, "%s", !strcmp(v, "damaged") ? "—" : !strcmp(v, "partial") ? state_text("starting") : state_text(!strcmp(v, "running") ? "running" : "stopped"));
+        int cpus = 0, mem = 0;
+        double used = 0;
+        for (int j = 0; j < gs[k].g.n; j++) if (gs[k].member[j] >= 0) { cpus += ms[gs[k].member[j]].m.vcpus; mem += ms[gs[k].member[j]].m.memory_mb; used += ms[gs[k].member[j]].used; }
+        snprintf(r[3], 96, "%d", cpus);
+        mem_text(mem, r[4], 96);
+        mcli_bytes(used, r[5], 96);
+        snprintf(r[6], 96, "—");
+        for (int c = 0; c < C; c++) if (width(r[c]) > w[c]) w[c] = width(r[c]);
+    }
     for (int i = 0; i < nms; i++) {
         Machine *x = &ms[i];
         snprintf(cells[i][0], 96, "%s", x->m.name);
@@ -492,6 +583,7 @@ static int cmd_list(int json, int names) {
     }
     for (int c = 0; c < C; c++) cell(head[c], w[c], c == C - 1);
     putchar('\n');
+    for (int k = 0; k < ngs; k++) { for (int c = 0; c < C; c++) cell(cells[nms + k][c], w[c], c == C - 1); putchar('\n'); }
     for (int i = 0; i < nms; i++) { for (int c = 0; c < C; c++) cell(cells[i][c], w[c], c == C - 1); putchar('\n'); }
     free(cells);
     return 0;
@@ -818,6 +910,67 @@ static int cmd_help(void) {
     return 0;
 }
 
+/* ---- machine groups (docs/VIRTUALIZATION.md 19.9) ---- */
+
+static void json_group(FILE *f, const Group *G) {
+    fprintf(f, "{\"name\":");
+    mcli_json_str(f, G->g.name);
+    fprintf(f, ",\"dir\":");
+    mcli_json_str(f, G->dir);
+    fprintf(f, ",\"id\":\"%s\",\"kind\":\"whonix\",\"state\":\"%s\",\"release\":", G->g.id, group_view(G));
+    mcli_json_str(f, G->g.release);
+    fprintf(f, ",\"disposable\":%s,\"members\":[", G->g.disposable ? "true" : "false");
+    for (int j = 0; j < G->g.n; j++) {
+        const Machine *x = G->member[j] >= 0 ? &ms[G->member[j]] : NULL;
+        fprintf(f, "%s{\"role\":\"%s\",\"primary\":%s,\"state\":\"%s\",\"name\":", j ? "," : "", VMG_ROLE_NAMES[G->g.m[j].role],
+                G->g.m[j].primary ? "true" : "false", x ? x->st.view : "missing");
+        mcli_json_str(f, x ? x->m.name : "");
+        fprintf(f, ",\"dir\":");
+        char d[PATH_MAX + 520];
+        snprintf(d, sizeof d, "%s/%s", G->dir, G->g.m[j].dir);
+        mcli_json_str(f, d);
+        fprintf(f, "}");
+    }
+    fprintf(f, "]}");
+}
+
+/* start: through the session only (its link is lord-server's to make, 19.3): the gateway, then the workstation; open:
+ * the workstation's window; stop and poweroff: here, in stop order (the workstation first), each with lord-vm */
+static int cmd_group(Group *G, const char *cmd, int argc, char **argv) {
+    if (!strcmp(cmd, "status")) {
+        if (argc > 1 || (argc == 1 && strcmp(argv[0], "--json"))) { ERR("unknown", "arg", argv[argc - 1], NULL); return VMCLI_USAGE; }
+        if (argc == 1) { json_group(stdout, G); printf("\n"); return 0; }
+        printf("%s\n  %s: %s\n", G->g.name, T("label.state"), group_view(G));
+        for (int j = 0; j < G->g.n; j++) {
+            const Machine *x = G->member[j] >= 0 ? &ms[G->member[j]] : NULL;
+            printf("  %s: %s\n", x ? x->m.name : G->g.m[j].dir, x ? state_text(x->st.view) : "—");
+        }
+        printf("  %s: %s\n", T("label.folder"), G->dir);
+        return 0;
+    }
+    if (!strcmp(group_view(G), "damaged")) { ERR("groupDamaged", "name", G->g.name, NULL); return VMCLI_FAILED; }
+    if (!strcmp(cmd, "start") || !strcmp(cmd, "open")) {
+        int open = !strcmp(cmd, "open");
+        if (argc > (open ? 0 : 1) || (argc == 1 && strcmp(argv[0], "--no-window"))) { ERR("unknown", "arg", argv[argc - 1], NULL); return VMCLI_USAGE; }
+        char t[VMCLI_TEXT_MAX + 1];
+        int code = session_ask(open ? VMCLI_OPEN : argc ? VMCLI_START_DETACHED : VMCLI_START, G->dir, t, sizeof t, 15 * 60);
+        if (code < 0) { ERR("noSession", NULL); return VMCLI_NO_SESSION; }
+        return session_said(code, t);
+    }
+    if ((strcmp(cmd, "stop") && strcmp(cmd, "poweroff")) || argc) { ERR("unknown", "arg", argc ? argv[0] : cmd, NULL); return VMCLI_USAGE; }
+    int idx[VMG_MEMBERS_MAX], n = vm_group_order(&G->g, 1, idx), rc = 0;
+    for (int k = 0; k < n; k++) {
+        Machine *x = &ms[G->member[idx[k]]];
+        if (!x->st.active) continue;
+        Run r;
+        char *a[] = { NULL, !strcmp(cmd, "stop") ? "--stop" : "--poweroff", x->dir, NULL };
+        int st = run_lordvm(a, &r);
+        if (st && st != 3) { ERR("opFailed", "name", x->m.name, "why", why_of(&r), NULL); rc = our_rc(st); break; }
+    }
+    if (!rc) SAY("groupStopped", "name", G->g.name, NULL);
+    return rc;
+}
+
 int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     char exe[PATH_MAX];
@@ -840,10 +993,18 @@ int main(int argc, char **argv) {
     if (!known) { ERR("unknown", "arg", cmd, NULL); return VMCLI_USAGE; }
     if (argc < 3) { ERR("missing", "what", "NAME", NULL); return VMCLI_USAGE; }
     int rc;
-    Machine *x = find(argv[2], &rc);
-    if (!x) return rc;
     int rest = argc - 3;
     char **rv = argv + 3;
+    {
+        /* a machine group, by its name or folder (19.9) */
+        Group *G = find_group(argv[2]);
+        if (G) {
+            if (strcmp(cmd, "status") && strcmp(cmd, "start") && strcmp(cmd, "open") && strcmp(cmd, "stop") && strcmp(cmd, "poweroff")) { ERR("unknown", "arg", cmd, NULL); return VMCLI_USAGE; }
+            return cmd_group(G, cmd, rest, rv);
+        }
+    }
+    Machine *x = find(argv[2], &rc);
+    if (!x) return rc;
     if (!strcmp(cmd, "status")) {
         if (rest > 1 || (rest == 1 && strcmp(rv[0], "--json"))) { ERR("unknown", "arg", rv[rest - 1], NULL); return VMCLI_USAGE; }
         return cmd_status(x, rest == 1);

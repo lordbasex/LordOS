@@ -88,5 +88,11 @@
   "state.crashed": "Sustojo dėl klaidos",
   "state.recovered": "Išjungta (atkurta)",
   "state.suspended": "Užmigdyta",
-  "state.stopped": "Išjungta"
+  "state.stopped": "Išjungta",
+  "groupStarted": "„{name}“ veikia: pirma tinklų sietuvas, tada darbo stotis.",
+  "groupStopped": "„{name}“ išjungta: pirma darbo stotis, tada tinklų sietuvas.",
+  "groupDamaged": "„{name}“ sugadinta: trūksta vienos jos mašinos arba ji ne jos.",
+  "gatewayFailed": "„{name}“ tinklų sietuvas nepasileido ({why}), todėl darbo stotis nepaleista.",
+  "workstationFailed": "„{name}“ darbo stotis nepasileido ({why}); tinklų sietuvas vis dar veikia.",
+  "kind.group": "{count} mašinų grupė"
 }

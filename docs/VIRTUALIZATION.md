@@ -38,7 +38,7 @@ recomputes both from the rows; the arithmetic:
 | Area | Weight | Items | Mean | Score | Points (weight × score) | Before |
 |---|---:|---:|---:|---:|---:|---:|
 | A. Engine, lifecycle, sandbox, display | 14 | 22 | 77.27 | 77 % | 14 × 77 % = 10.78 | 82 % |
-| B. Getting a system in (cards, unattended, import) | 12 | 14 | 70.00 | 70 % | 12 × 70 % = 8.40 | 76 % |
+| B. Getting a system in (cards, unattended, import) | 12 | 14 | 72.86 | 73 % | 12 × 73 % = 8.76 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 74.58 | 75 % | 11 × 75 % = 8.25 | 74 % |
 | D. Snapshots, clones, storage | 9 | 6 | 55.83 | 56 % | 9 × 56 % = 5.04 | 54 % |
 | E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 83 % |
@@ -51,9 +51,9 @@ recomputes both from the rows; the arithmetic:
 | L. Privacy and security model | 4 | 6 | 71.67 | 72 % | 4 × 72 % = 2.88 | 70 % |
 | M. Performance (targets and the six items) | 3 | 7 | 79.29 | 79 % | 3 × 79 % = 2.37 | 7 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 56 % |
-| **Total** | **100** | **109** | | | **67.16 → 67 %** | 66 % |
+| **Total** | **100** | **109** | | | **67.52 → 68 %** | 66 % |
 
-Σ = 10.78 + 8.40 + 8.25 + 5.04 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 1.44 + 1.56 + 2.88 + 2.37 + 1.65 = 67.16, rounded **67 %** (before: 66 %, against `f322f87c0`). Without the planned Whonix group row (B, 0 %, section 19) it is 67.76 (68 %); building it adds +0.9.
+Σ = 10.78 + 8.76 + 8.25 + 5.04 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 1.44 + 1.56 + 2.88 + 2.37 + 1.65 = 67.52, rounded **68 %** (before: 66 %, against `f322f87c0`). The Whonix group row (B, section 19) went from 0 % to 40 % with G0–G2 on `feat/whonix-group` (+0.36); finishing it adds about +0.5 more.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); raw disks, encryption, export and backups,
@@ -86,7 +86,7 @@ when the desktop composes on the GPU); 3.3 named a user namespace for QEMU and a
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lord-vm` supervisor over direct QMP, `machine.json` schema 13, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 13`); `vm-test` | Schema 13 since `cpu_pin` and `perf_profile` |
+| `lord-vm` supervisor over direct QMP, `machine.json` schema 14, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 14`); `vm-test`, `vmgroup-test` | Schema 14 (*in development*) adds a machine group member's keys (19.4); 13 was `cpu_pin` and `perf_profile` |
 | KVM amd64 and arm64, TCG labelled Emulated (2.1–2.4) | ✅ | 100 | `lordvm.c` (`-accel`), `assistant.jsx` ("Other architecture…") | Pi 5, nested amd64, Xeon and the i9 PC |
 | Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2) | ✅ | 100 | `machine.c`, `js_vm.c` |  |
 | `/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4) | ✅ | 100 | `vm_admin.c` |  |
@@ -109,7 +109,7 @@ when the desktop composes on the GPU); 3.3 named a user namespace for QEMU and a
 | Direct kernel boot (13.8 item 9) | 🟡 | 30 | `lordvm.c` | Unattended installs only; none for an installed Linux guest |
 | Rename a machine with its folder and transfer folder (6.26) | 🧪 | 100 | `machine.c` (`renameat2`); `vm_rename.sh` | *In development*; headless |
 
-### B. Getting a system in (70 %)
+### B. Getting a system in (73 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -126,7 +126,7 @@ when the desktop composes on the GPU); 3.3 named a user namespace for QEMU and a
 | Import from other apps with identity kept (6.22) | ✅ | 95 | `vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`; `vmimport-test`, `vm_import_test.sh` | No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion |
 | Requirements check (5.2) | 🟡 | 80 | `library.jsx` `Requirements`, `model.js` `reqRows`, `missingFor`, `assistant.jsx`, `vm-enable` | Create, which starts the download, waits until the parts are in (one click through the package engine). No per-system page of drivers and tools; not through the Store |
 | Migrate from another PC (6.11) | ❌ | 0 |  | Phase 4 (the assistant's Migrate tile is the import of 6.22) |
-| Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | ❌ | 0 |  | Planned 2026-11-23; approved by the maintainer, design in section 19 |
+| Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | 🟡 | 40 | `vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_link.sh` | *In development* (`feat/whonix-group`): G0–G2 of 19.11 (download and unpacking, groups, the link, `machines`), headless end to end; no card, assistant, library menu, Configure view or Start Fresh yet |
 
 ### C. The app (75 %)
 
@@ -974,7 +974,7 @@ It stays only as a fallback, if the technical proof finds a blocker in direct QM
 
 This section is the build log of Phases 1 to 3, kept with its dates; later work changed some of what it says. Where it and the
 code differ, the code wins and the sections 5 to 7 describe what is there now. Corrections made by the audit of 2026-11-23:
-`machine.json` is at schema 13 (11 `gpu`, 12 `capture_fullscreen`, 13 `cpu_pin` and `perf_profile`) and `network` also takes `bridged` and `hostonly`; with the agent on,
+`machine.json` is at schema 14 (11 `gpu`, 12 `capture_fullscreen`, 13 `cpu_pin` and `perf_profile`, 14 a machine group member's keys, 19.4) and `network` also takes `bridged` and `hostonly`; with the agent on,
 the credential memfds start at fd 9, not 7; QEMU also gets `virtio-mouse-pci` (slot 0x14, Capture mouse), `usb-tablet` on xHCI for
 the Windows devices and a `vfio-pci` display for an Intel vGPU, and `MESA_SHADER_CACHE_DISABLE` with 3D or a vGPU; the fixed PCI
 slots now go past 8 (xHCI 0x5, HDA 0x9, seed disk 0xa, shared folders 0xb to 0xe, transfer folder 0xf, data disks 0x10 and up);
@@ -4289,15 +4289,106 @@ Decided on 2026-11-01: settings on one screen replaces tabs; Kali is in the cata
 9. ~~Does the catalog list only systems we can download freely, as recommended?~~ Settled: yes (Windows from the maker's page or its evaluation ISOs, checked against pinned hashes).
 10. Is Migrate worth its cost?
 11. Does `lordvm mcp` ship at all (no `lordvm` exists; the command is `machines`, 6.15), given that it lets a coding agent run commands in guests? Off by default is the recommendation.
-12. Machine groups and the Whonix card: the decisions listed in 19.13 are the maintainer's to take before anything is built.
+12. ~~Machine groups and the Whonix card: the decisions listed in 19.13.~~ Settled by the maintainer on 2026-11-23 (19.13); G0–G2 are built, *in development* (19.0).
 
-## 19. Machine groups and Whonix (planned)
+## 19. Machine groups and Whonix (in development)
 
-**Not built.** Asked by the maintainer on 2026-11-23: Whonix in the New Machine assistant, made as a **machine group**
-(Whonix-Gateway and Whonix-Workstation started and stopped together, shown as one card), for anonymous browsing (onion
-sites included) with no IP leak, thrown away and started again at will. This section is the design. Every statement
-about our code was checked against `test/integration-1125` at `67eb66465`, and every statement about Whonix against its
-download server and its KVM files on 2026-11-23. Nothing here is approved: 19.12 lists what needs the maintainer.
+Asked by the maintainer on 2026-11-23: Whonix in the New Machine assistant, made as a **machine group** (Whonix-Gateway and
+Whonix-Workstation started and stopped together, shown as one card), for anonymous browsing (onion sites included) with no
+IP leak, thrown away and started again at will. The design below was checked against `test/integration-1125` at
+`67eb66465` and against Whonix's download server and KVM files on 2026-11-23, and **approved by the maintainer the same
+day** with the decisions of 19.13 (19.12 lists what was approved, for AGENTS.md). Phases G0–G2 of 19.11 are built on
+`feat/whonix-group` (*in development*, not in a release); 19.0 says what exists and what the checks of G0 found.
+
+### 19.0 What is built (G0–G2, 2026-11-23)
+
+**Built and tested** (headless, on the dev host: Debian 13, QEMU 10.0.13, kernel 6.12, KVM):
+
+- **The catalog entry** `whonix` (`assets/machines/systems.json`, `"hidden": true` until the assistant has its card) with
+  Whonix's key pinned in `packaging/keys/machines/whonix-derivative.asc`. Its primary fingerprint
+  `916B 8D99 C38E AF5E 8ADC 7A2A 8D66 066A 2EEA CCDA` was compared on 2026-11-23 with Whonix's signing key page
+  (`https://www.whonix.org/wiki/Main/Project_Signing_Key`, the page `Whonix_Signing_Key` points to) and with
+  keys.openpgp.org: the same. `vmcatalog.c` learned `"hash": "sha512"`, a detached signature named by `"suffix"`, the
+  `"releases"` folder lookup with a floor, `"kind": "group"` with `"archive"` (the members' names, `maxApparentGb`,
+  `maxDataGb`) and `"machine"` (each member's vCPUs and memory).
+- **The admin actions** `vm-image-list` and `vm-image-get` for such an entry: `vm-image-list "whonix amd64"` fetches the
+  listing of `https://download.whonix.org/libvirt/` (only names are taken from it); `"whonix amd64 <release>"` that
+  release's folder; `"whonix amd64 <release> <list>"` the `.sha512sums` list and its `.asc`, verified with the pinned key
+  by `pkg/pgp.c`, kept as `lists/whonix-amd64.list` with the release beside it (`.release`). A release below the floor
+  (`18.2.4.3`), below the newest release ever verified (`lists/whonix-amd64.newest`, root's: the rollback floor no file of
+  the person's can lower) or not a release's name is refused, and the list's own name must give that very release
+  (`vmcat_release_in`: no older signed list beside a newer folder). `vm-image-get "whonix amd64 <file> <sha512>"` takes
+  only an archive whose name gives the recorded release, downloads it from that release's folder under a temporary name
+  (`<sha512>.tar.xz.dl`, 0600) and renames it to `images/<sha512>.tar.xz` (then 0644) only when the whole file's SHA-512
+  is the list's; the image lock is taken before anything, and a file at the final name that isn't root's, single-linked
+  and 0644 is thrown away, never trusted. Root hashes the bytes; it never parses the archive (`vmimage-group-test`, as
+  root of a user namespace with the network replaced). `vm-image-cancel` and `vm-image-remove` take the 128-digit names too. *Not run
+  as root here* (it needs root and the network: `tests/vm_image_cli.c`); the verification itself is `vmcatalog-test`,
+  with the real 18.2.4.3 list and signature as fixtures.
+- **`lord-vmunpack`** (`server/src/vm/vmunpack.c`, `mk/vmunpack.mk`) and a streaming decoder in `pkg/xz.c` (`xzs_*`, next to
+  the in-memory `xz_decode`). The protocol: argv `lord-vmunpack` alone, an empty environment; fd 0 the archive, fds 3 and 4
+  the gateway's and the workstation's new empty files (opened without `O_APPEND`), fd 5 one request line
+  `<maxApparentBytes> <maxDataBytes> <gatewayRegex> <workstationRegex>`, fd 1 `progress <in> <total>` lines (at most four a
+  second) and one answer, `ok <gwSize> <wsSize> <dataBytes>` or `error <word>` (`badXz truncated trailing badTar
+  badChecksum badType badName duplicate missing badSparse tooLarge tooMuchData io request`). `sandbox_apply_helper` (scope
+  `lordos-vmunpack`, 320 MB, no extra syscalls: `pread64`, `pwrite64`, `ftruncate` and `fstat` are in the base list) before
+  the first byte. xz checks: none, CRC32 and CRC64, each verified; SHA-256 checks and dictionaries over 256 MiB are refused;
+  the index must list exactly the blocks seen. The tar rules are 19.6's, plus: at most 64 members and 2²⁰ sparse
+  entries, zero runs never written (holes stay holes), at most 1 MiB of zeros after the end blocks.
+- **`lord-vm --group-create GROUPDIR --catalog-id whonix --archive FILE --sha512 HEX [--name N]`**: hashes the archive again
+  (the file handed to the helper is the verified one), starts `lord-vmunpack` (the one next to `lord-vm`), checks each
+  member with the jailed `qemu-img info -f qcow2` (no backing file, no data file, a virtual size within the cap), writes the
+  bases with the jailed `qemu-img convert -f qcow2 -O qcow2` and `check`, renames them into `<library>/.shared/`
+  (`whonix-<release>-<role>-<sha12>.qcow2`, 0444; a base already there is reused), makes `Gateway.lordvm` and
+  `Workstation.lordvm` as linked clones with the schema 14 keys, and writes `group.json` last. Progress lines
+  `{"progress":{"step":"verify|unpack|base",…}}`, then `{"created":true,…}`.
+- **`group.json`** (`vmgroup.{c,h}`, 19.4) and **`machine.json` schema 14** (`group`, `role`, `"network": "link"`,
+  `"uplink": "tor"`, `link_mac`, `profile_lock`, `timers`). The anonymity lock is in `vm_machine_check`, so `lord-vm --set`
+  (and Configure, which goes through it) can't turn on the agent, clipboard, transfer folder, shares, ports, 3D, a vGPU,
+  the microphone, SMBIOS strings, disk serials or the performance profile on a locked member.
+- **The members' QEMU** (`lordvm.c`): the link card on its own hub (`lnk0`; hub 0 and slot 0x2 on the workstation, hub 1
+  and slot 0x18 on the gateway), passt without DNS forwarding for `uplink: tor` (`--no-map-gw --no-dhcp-dns
+  --no-dhcp-search`), and for a locked member: a private `memory-backend-memfd` (never hugetlb), no transparent huge
+  pages either (`PR_SET_THP_DISABLE` on QEMU before exec: LordOS sets `shmem_enabled` to `advise` since 0.8.9.6 and QEMU
+  advises them on guest memory), `mem-merge=off`,
+  `vmport=off`, `hpet=off`, `vmgenid`, no sound card on the gateway and `ich9-intel-hda` + `hda-output` on the workstation,
+  no first-boot credentials, no suspend (VM_SUSPEND refused; at host shutdown it is shut down, never saved). The timers are
+  libvirt's (below). No `thumb.png` is written for a locked member (`js_vm.c`).
+- **`VM_LINK`** (`vmproto.h`, `lordvm.c`) and lord-server's side (`vmlink.c`, `lord.vm.link(groupDir, on)`): which two
+  machines are paired comes from the group's `group.json` and their `machine.json`, never from JS. Every link is put on
+  with QMP (`getfd`, `netdev_add socket`, `netdev_add hubport`) and the previous one taken off (`netdev_del`): **`--link-fd`
+  on the command line isn't built**, because the card is there from the start and a hot-added backend proved enough.
+- **Groups in the app's model**: `lord.vm.list()` lists the members (`groupDir`, `groupId`, `role`, `primary`, `groupOk`,
+  and every running machine's `vmPid`), `lord.vm.groups()` the groups; `machine_dir` accepts a member's folder;
+  `model.js` has `groupMembers`, `groupState`, `groupPlan` (start and stop order), `groupLinkKey`, `groupCliPlan`; `cli.js`
+  starts a group in order and links every group whose two members run under lord-vms it hasn't linked yet (every 2 s),
+  so a member started anew from anywhere is linked again.
+- **The `machines` command**: `list` shows a group's row (`group of 2`, its state, its members' vCPUs and memory together;
+  `--json` adds `"groups"`), `status NAME [--json]`, `start NAME [--no-window]` and `open NAME` through the session (exit 5
+  without one), `stop` and `poweroff` in stop order. The session channel takes a `.lordgroup` folder (`vmcli.c`).
+
+**Not built yet** (G3–G5 and what G2 left): the assistant's card and its About Whonix step, the library's group card and
+its menu (Show Workstation, Show Gateway, Start Fresh…, Disposable session), Configure's group view, Start Fresh and the
+disposable session, the Gateway's own firewall identity, the `machines fresh` command, the `--member` option, Storage's
+view of the archive and the bases, a memory budget check for the whole group, `tests/vm_whonix_xml_test.sh`, and the
+release gate on real hardware. Until the library has the group card, the two members show as two ordinary cards there.
+
+**G0 findings (2026-11-23):**
+
+| Check | Result |
+|---|---|
+| Two sandboxed QEMU 10.0.13 over one socketpair, and its swap | Works. Both members under `lord-vm` (Landlock, seccomp, KVM by descriptor), the pair handed with `VM_LINK`, frames QEMU to QEMU. QEMU's `stream` netdev can't take a descriptor once it runs (6.5), so every link is a `socket` netdev, as passt's healing does; the two framings are the same. Swapped three times in 30 ms during a 12.7 MB download through Tor in the workstation: the download finished (`code=200`); the guests never saw the cable move. On the host, `ss -xp` shows the link as one unnamed pair whose only holders are the two QEMUs; older pairs are gone |
+| The card order with the planned slots | Gateway: `eth0` = 0000:00:02.0 (passt, 10.0.2.15/24, Whonix's static address; default route via 10.0.2.2), `eth1` = 0000:00:18.0 (10.152.152.10/18). Workstation: one card, `eth0` = 0000:00:02.0, 10.152.152.11/18, default route via 10.152.152.10 and nothing else, DNS 10.152.152.10. Whonix's own configuration, unchanged, matches these slots |
+| What libvirt passes for Whonix's timers | Read in libvirt v11.3.0's `qemu_command.c` and `qemu_validate.c` with its QEMU 10.0 capabilities (no `virsh` on the dev host). Workstation: `-rtc base=utc` (`rtc present='no'` is ignored by libvirt: q35's RTC can't be removed), `-global kvm-pit.lost_tick_policy=delay` (`pit present='no'` is ignored too: libvirt never emits `pit=off`), `-machine …,hpet=off`, `-cpu host,kvmclock=off`. Gateway (its XML has `rtc tickpolicy='catchup' track='guest'`, `kvmclock present='yes'`, `pit` and `hpet` `present='no'`): `-rtc base=utc,clock=vm,driftfix=slew`, the same PIT global, `hpet=off`, `kvmclock=on`. Both: `pmu=off`, `kvm-pv-unhalt=on` (pvspinlock), `vmport=off`, `mem-merge=off` (nosharepages), `dump-guest-core=off`, `vmgenid`, `ICH9-LPC.disable_s3=1` and `disable_s4=1`. `lord-vm` gives exactly these (`timers`). Whonix's XML also has a SPICE channel (`com.redhat.spice.0`, vdagent) and a serial console; Machines gives neither (no virtio-serial at all) |
+| `pkg/pgp.c` on Whonix's real signature | Verifies the 2026-11-04 `.sha512sums.asc` (RSA signing subkey `6E97 9B28 A6F3 7C43 BE30 AFA1 CB8D 50BB 77BB 3C48`, SHA-512, a critical creation time, Sequoia's salt notation and a `file@name` notation); a changed digit, another pinned key and a time before its creation are refused. The list and signature are `vmcatalog-test` fixtures (`tests/vmimage/whonix.*`) |
+| xz speed and the unpacked sizes (LXQt 18.2.4.3) | The archive: 1,957,016,760 bytes, one xz stream of 275 blocks of 24 MiB (LZMA2, 8 MiB dictionary, CRC64) holding 6,917,150,720 bytes of tar: the license, the disclaimer, the two XMLs, then the two disks as old-GNU sparse members, each 107,384,668,160 bytes (100 GiB of qcow2 with preallocated metadata) holding 3,063,865,344 (gateway) and 3,853,221,888 (workstation) bytes of data. Our decoder: 98.7 s alone (about 70 MB/s out, 11 MB of memory); `xz -T1` 47 s; `xz -T0` 4.8 s (20 threads, 1.4 GB). `lord-vmunpack` on the whole archive: 104 s; its two files are byte for byte GNU tar's (`cmp`), slightly sparser. The whole `--group-create` from the verified archive: 236 s on the dev host. The bases: 2.85 GiB (gateway) and 3.59 GiB (workstation), 100 GiB virtual, `qemu-img check` clean. Space at the peak: the archive, the unpacked data and one base, about 11 GB |
+| The internet only through the Gateway (`tests/vm_group_link.sh`) | With both members running, `curl https://check.torproject.org/api/ip` in the workstation answers `"IsTor":true`. With the gateway off, the workstation has no network at all (`curl` times out, 10.152.152.10 unreachable: the cable is pulled, nothing else is reachable). The gateway started again is linked again by the session by itself and the workstation's Tor works again |
+| Shut Down on Whonix's members | **Open**: neither member powers off on ACPI's power button. Checked twice on the dev host: with the test disks (60 s) and with the unchanged bases made from the archive, booted to their desktop (`lord-vm --stop --timeout 120`: QEMU pressed the button, both were forced off after 120 s). With no guest agent there is no other polite way in today, so a group's Shut Down is a forced power-off after the wait. To look at before the card ships: what Whonix 18 does with the power button (LXQt's or logind's handling, the sysmaint/user split), a key sequence through the display, or asking the maintainer to accept a forced stop for these guests |
+
+**How the test disks are made** (for `tests/vm_group_link.sh`, never shipped): the two members' qcow2 files from the
+verified archive, converted to raw, `systemd.debug_shell=ttyS0` appended to every `linux` line of `/boot/grub/grub.cfg`
+with `debugfs -w` (offset of the third partition), converted back; given as `WHONIX_GW` and `WHONIX_WS`. A root shell on
+the serial console is the only change; `lord-vm`'s VM_CONSOLE reaches it.
 
 ### 19.1 Goals and threat model
 
@@ -4371,7 +4462,7 @@ acts only on the person's click.
     disks/session.qcow2                       only during a disposable session (19.7)
 ~/Machines/.shared/whonix-18.2.4.3-gateway-<sha12>.qcow2       read-only bases, made once from the verified
 ~/Machines/.shared/whonix-18.2.4.3-workstation-<sha12>.qcow2   archive (19.6), shared by every Whonix group
-/var/lib/lordos/machines/images/<sha512>.libvirt.xz             the verified download (root's, 19.6)
+/var/lib/lordos/machines/images/<sha512>.tar.xz                 the verified download (root's, 19.6)
 ```
 
 - **Members are ordinary machines.** Each member is a `.lordvm` folder with its own `machine.json`, lock, `run.json`,
@@ -4495,7 +4586,7 @@ our own channels:
 | Suspend, memory snapshots, saving at host shutdown | refused | guest memory would land on this computer's disk; Whonix's XML turns suspend off. At host shutdown the guests are shut down (the `vmhoststop.h` plan without the save) |
 | Thumbnail | `thumb.png` not written (`js_vm.c`); the live picture only while running | a picture of the browsing would stay in `~/Machines` |
 | Captures of the screen (isolation layer 8; **built**, in development, approved 2026-11-23) | the members' windows and their apps-mode windows are **protected windows** (PRIVACY.md, "Protected windows"): on the display as usual, an opaque neutral fill with a lock in every screenshot, recording, remote desktop frame, screen share (whole screen or the window) and portal still. `lord.vm.protect(session)` (one way) refuses the card picture (`lord.vm.snapshot`, and the old `thumb.png` is removed), `lord.vm.screenshot`, `lord.vm.record` (one running stops) and a snapshot's picture; the library card never shows a `thumb.png` for it | the Workstation's browsing on screen would otherwise reach any capture, a remote viewer or a share |
-| Guest memory | `memory-backend-memfd,share=off` (4 KB pages with Debian's default `shmem_enabled=never`), `-machine mem-merge=off` (no KSM), no hugetlb | Whonix lists huge pages and KSM as unsafe (rowhammer, cross-VM deduplication). Cost: about 30 % slower random memory access (measured in 3.7.2) |
+| Guest memory | `memory-backend-memfd,share=off` with transparent huge pages off for the QEMU process (`PR_SET_THP_DISABLE`, whatever `shmem_enabled` says), `-machine mem-merge=off` (no KSM), no hugetlb | Whonix lists huge pages and KSM as unsafe (rowhammer, cross-VM deduplication). Cost: about 30 % slower random memory access (measured in 3.7.2) |
 | Core dumps | `dump-guest-core=off`, none, non-dumpable, as every machine (3.3) | |
 | Identity | `-uuid` random per group and per Start Fresh; no `-smbios` strings (QEMU's stock "Standard PC (Q35 + ICH9, 2009)"); no disk serial; no first-boot credentials (`type=11`) | unique strings would mark the group; stock values are what every KVM Whonix shows. Whonix's own hostname and machine id inside the guests are left as Whonix sets them |
 | vCPU pinning | Automatic (3.7.1), the members on different physical cores with no shared SMT sibling | Whonix's XML pins the Gateway and the Workstation on CPUs 0 and 1 |
@@ -4594,7 +4685,7 @@ What changes in the existing machinery (no new admin action, but changes to two;
   back-signature, SHA-512, a critical creation-time subpacket, the notations); the three small files become a
   `vmcatalog-test` fixture.
 - `vm-image-get "<id> <arch> <file> <sha512>"` hashes the download with SHA-512 (`pkg/crypto.c` has it) and keeps it as
-  `images/<sha512>.libvirt.xz` (the extension from the entry's kind, never from JS), resumed from `.part`, at most
+  `images/<sha512>.tar.xz` (the extension from the entry's archive format, never from JS), resumed from `.part`, at most
   `maxMb`. Root still never parses the archive.
 - The signify signature is **not** checked: it is the same person's key in a second format, and it would be a second
   code path in root. The OpenPGP list signature is what every other card uses (a decision, 19.13).
@@ -4755,16 +4846,18 @@ Tor by itself (sdwdate, Tor Browser's connection screen).
 
 ### 19.11 Build plan
 
-| Phase | Work | Done when |
-|---|---|---|
-| G0, checks | the To check items: the link between two sandboxed QEMUs and its swap; the card order in both images; libvirt's arguments for the timers; `pgp.c` on the real signature; xz speed and the unpacked sizes of LXQt | each one answered here, with a date |
-| G1, download | the catalog keys (19.6), SHA-512 in `vm-image-list` and `vm-image-get`, `lord-vmunpack`, the bases through jailed `qemu-img` | bases made from a real download, tests green |
-| G2, groups | `group.json`, schema 14, groups in `lord.vm.list()`, `groupPlan`, `VM_LINK`, the library card and menu, `machines` | a headless group start and stop with the link, `vm_group_link.sh` |
-| G3, anonymity | the profile's locks and arguments (19.5) in `lord-vm`, Configure's group view | `vm-test` arguments, Configure on screen |
-| G4, fresh | Start Fresh, the disposable session, the snapshot rules | dev VM screendumps |
-| G5, release | the gate of 19.10 on real hardware, CHANGELOG, paper, site, the AGENTS.md entries | the maintainer's OK |
+| Phase | Work | Done when | State (2026-11-23) |
+|---|---|---|---|
+| G0, checks | the To check items: the link between two sandboxed QEMUs and its swap; the card order in both images; libvirt's arguments for the timers; `pgp.c` on the real signature; xz speed and the unpacked sizes of LXQt | each one answered here, with a date | done (19.0); Shut Down by ACPI still open |
+| G1, download | the catalog keys (19.6), SHA-512 in `vm-image-list` and `vm-image-get`, `lord-vmunpack`, the bases through jailed `qemu-img` | bases made from a real download, tests green | done; the admin actions not yet run as root against Whonix's server |
+| G2, groups | `group.json`, schema 14, groups in `lord.vm.list()`, `groupPlan`, `VM_LINK`, the library card and menu, `machines` | a headless group start and stop with the link, `vm_group_link.sh` | done but the library card and menu |
+| G3, anonymity | the profile's locks and arguments (19.5) in `lord-vm`, Configure's group view | `vm-test` arguments, Configure on screen | the locks and arguments built with G2; no `vm-test` of the arguments, no Configure view |
+| G4, fresh | Start Fresh, the disposable session, the snapshot rules | dev VM screendumps | not started |
+| G5, release | the gate of 19.10 on real hardware, CHANGELOG, paper, site, the AGENTS.md entries | the maintainer's OK | not started |
 
-### 19.12 Needs the maintainer's approval (to add to AGENTS.md once approved)
+### 19.12 Approved by the maintainer on 2026-11-23 (to add to AGENTS.md)
+
+All six were approved, with 6 (the overlay in memory) left to the agent that builds the disposable session.
 
 1. **A new sandboxed helper, `lord-vmunpack`**: it reads the verified Whonix archive (fd 0) and writes exactly two files
    (fds 3 and 4); `sandbox_apply_helper` with no extra syscalls; it links libc and `pkg/xz.c` only; started by `lord-vm`,
@@ -4782,6 +4875,15 @@ Tor by itself (sdwdate, Tor Browser's connection screen).
 6. If chosen: the disposable overlay in memory (a second writable path in QEMU's Landlock).
 
 ### 19.13 Decisions for the maintainer
+
+**Taken on 2026-11-23:** the newest verified release with a rollback floor (never older than a release already used);
+Start Fresh resets the Workstation only by default, the Gateway optional with a warning about Tor's entry guards; the
+anonymity settings locked with no override (clipboard, transfer and shared folders, the agents and virtio-serial, camera
+and microphone) on both members; `lord-vm` starts `lord-vmunpack`; huge pages and KSM off for members; LXQt only;
+Whonix-only groups for now (`group.json` generic enough to extend); the guest's resolution follows the window. The
+firewall identity of the Gateway (TCP out only, never the LAN) is built by another branch.
+
+The questions as they were asked:
 
 - **Start Fresh's scope:** the Workstation only by default (recommended, for Tor's guards), or both members.
 - **The release pin:** move it with each LordOS release, or take the newest verified folder with a rollback floor

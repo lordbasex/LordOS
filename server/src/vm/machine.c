@@ -514,6 +514,51 @@ int vm_bridge_ifname(const char *id, char out[VM_IFNAME_MAX + 1]) {
     return 0;
 }
 
+/* schema 14: a machine group's member (docs/VIRTUALIZATION.md 19.4, 19.5) */
+static int check_member(const VmMachine *m, char *err, size_t n) {
+    int member = m->group[0] != 0;
+    if (m->role < VM_ROLE_NONE || m->role >= VM_ROLE_COUNT || m->profile_lock < VM_LOCK_NONE || m->profile_lock > VM_LOCK_ANONYMITY ||
+        m->timers < VM_TIMERS_DEFAULT || m->timers > VM_TIMERS_WHONIX_WORKSTATION || (m->uplink_tor & ~1))
+        return fail(err, n, VM_E_RANGE, "role, uplink, profile_lock or timers");
+    if (m->schema < 14 && (member || m->role || m->uplink_tor || m->link_mac[0] || m->profile_lock || m->timers || m->network == VM_NET_LINK))
+        return fail(err, n, VM_E_FIELD, "group, role, uplink, link_mac, profile_lock, timers and the link network need schema 14");
+    if (!member) {
+        if (m->role || m->uplink_tor || m->link_mac[0] || m->profile_lock || m->timers || m->network == VM_NET_LINK)
+            return fail(err, n, VM_E_RANGE, "role, uplink, link_mac, profile_lock, timers and the link network are a group member's");
+        return VM_OK;
+    }
+    if (!vm_uuid_valid(m->group)) return fail(err, n, VM_E_RANGE, "group must be the group's id (a lowercase UUID)");
+    if (m->role == VM_ROLE_NONE) return fail(err, n, VM_E_RANGE, "a group's member has a role");
+    if (m->arch != VM_ARCH_AMD64 || m->accel != VM_ACCEL_KVM) return fail(err, n, VM_E_RANGE, "a group's members are amd64 machines with KVM");
+    if (m->role == VM_ROLE_GATEWAY) {
+        /* the way out (passt, its eth0) and the internal link (its eth1) */
+        if (m->network != VM_NET_SHARED) return fail(err, n, VM_E_RANGE, "a gateway's network is shared");
+        if (!vm_mac_valid(m->link_mac) || !strcmp(m->link_mac, m->mac)) return fail(err, n, VM_E_RANGE, "a gateway's link_mac is a MAC address of its own");
+        if (m->timers == VM_TIMERS_WHONIX_WORKSTATION) return fail(err, n, VM_E_RANGE, "timers: a workstation's on a gateway");
+    } else {
+        /* the link and nothing else */
+        if (m->network != VM_NET_LINK) return fail(err, n, VM_E_RANGE, "a workstation's network is the link");
+        if (m->link_mac[0] || m->uplink_tor) return fail(err, n, VM_E_RANGE, "link_mac and uplink are a gateway's");
+        if (m->timers == VM_TIMERS_WHONIX_GATEWAY) return fail(err, n, VM_E_RANGE, "timers: a gateway's on a workstation");
+    }
+    if (m->n_extra_macs || m->bridge[0]) return fail(err, n, VM_E_RANGE, "a group's member has no other network cards");
+    if (m->uplink_tor && m->n_ports) return fail(err, n, VM_E_RANGE, "a Tor gateway forwards no ports");
+    if (m->profile_lock == VM_LOCK_ANONYMITY) {
+        /* 19.5: nothing of this computer goes into the guests; locked, with no override (the maintainer's decision) */
+        if (m->agent) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest agent");
+        if (m->clipboard != VM_CLIP_OFF || m->clipboard_ask) return fail(err, n, VM_E_RANGE, "locked for anonymity: the clipboard");
+        if (m->transfer) return fail(err, n, VM_E_RANGE, "locked for anonymity: the transfer folder");
+        if (m->n_shares) return fail(err, n, VM_E_RANGE, "locked for anonymity: shared folders");
+        if (m->n_ports) return fail(err, n, VM_E_RANGE, "locked for anonymity: forwarded ports");
+        if (m->graphics != VM_GFX_2D || m->vgpu) return fail(err, n, VM_E_RANGE, "locked for anonymity: 3D graphics and graphics cards");
+        if (m->microphone) return fail(err, n, VM_E_RANGE, "locked for anonymity: the microphone");
+        if (m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] || m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0])
+            return fail(err, n, VM_E_RANGE, "locked for anonymity: SMBIOS strings and disk serials");
+        if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
+    }
+    return VM_OK;
+}
+
 int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 1 || m->schema > VM_SCHEMA) return fail(err, n, m->schema > VM_SCHEMA ? VM_E_NEWER : VM_E_SCHEMA, "schema %d", m->schema);
     if (!vm_uuid_valid(m->id)) return fail(err, n, VM_E_RANGE, "id is not a lowercase UUID");
@@ -532,7 +577,7 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
         for (int i = 0; i < 64; i++) { char c = m->firmware_sha256[i]; if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return fail(err, n, VM_E_RANGE, "firmware_sha256"); }
     } else if (m->firmware_code[0] || m->firmware_sha256[0]) return fail(err, n, VM_E_RANGE, "a bios machine has no firmware_code");
     if (m->display != VM_DISPLAY_WINDOW && m->display != VM_DISPLAY_NONE) return fail(err, n, VM_E_RANGE, "display");
-    if (m->network < VM_NET_SHARED || m->network > VM_NET_HOSTONLY) return fail(err, n, VM_E_RANGE, "network");
+    if (m->network < VM_NET_SHARED || m->network > VM_NET_LINK) return fail(err, n, VM_E_RANGE, "network");
     if (m->bridge[0] && !vm_ifname_valid(m->bridge)) return fail(err, n, VM_E_RANGE, "bridge must be a network interface's name");
     if (m->network == VM_NET_BRIDGED && !m->bridge[0]) return fail(err, n, VM_E_RANGE, "a bridged machine names the wired card it joins (bridge)");
     if (vm_ports_check(m->ports, m->n_ports, m->network, err, n)) return VM_E_RANGE;
@@ -623,7 +668,7 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
-    return VM_OK;
+    return check_member(m, err, n);
 }
 
 int vm_vcpus_recommended(const VmHost *h) { return h->cpus > 1 ? h->cpus - 1 : 1; }
@@ -666,7 +711,8 @@ static const char *const KEYS[] = {
     "firmware_code", "firmware_sha256", "display", "network", "mac", "iso", "created", "updated", "base", "agent", "clipboard",
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
-    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin", NULL,
+    "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -699,8 +745,11 @@ static const char *const ARCHS[] = { "arm64", "amd64", NULL };
 static const char *const ACCELS[] = { "kvm", "tcg", NULL };
 static const char *const FWS[] = { "uefi", "bios", NULL };
 static const char *const DISPLAYS[] = { "window", "none", NULL };
-static const char *const NETS[] = { "shared", "isolated", "bridged", "hostonly", NULL };
-const char *const VM_NET_NAMES[] = { "shared", "isolated", "bridged", "hostonly", NULL };
+static const char *const NETS[] = { "shared", "isolated", "bridged", "hostonly", "link", NULL };
+const char *const VM_NET_NAMES[] = { "shared", "isolated", "bridged", "hostonly", "link", NULL };
+const char *const VM_ROLE_NAMES[] = { "", "gateway", "workstation", NULL };
+const char *const VM_LOCK_NAMES[] = { "", "anonymity", NULL };
+const char *const VM_TIMERS_NAMES[] = { "", "whonix-gateway", "whonix-workstation", NULL };
 
 static const char *const CLIPS[] = { "off", "to-guest", "from-guest", "both", NULL };
 static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
@@ -947,6 +996,22 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
             for (int i = 1; VM_PIN_NAMES[i]; i++) if (!strcmp(pin, VM_PIN_NAMES[i])) m->cpu_pin = i;
             if (!m->cpu_pin) { r = fail(err, n, VM_E_RANGE, "cpu_pin is off or auto"); goto out; }
         }
+        /* schema 14: a machine group's member (19.4); missing: not a member */
+        char role[16], up[8], lock[16], tim[24];
+        if ((r = get_str(o, "group", m->group, sizeof m->group, 0, err, n)) || (r = get_str(o, "role", role, sizeof role, 0, err, n)) ||
+            (r = get_str(o, "uplink", up, sizeof up, 0, err, n)) || (r = get_str(o, "link_mac", m->link_mac, sizeof m->link_mac, 0, err, n)) ||
+            (r = get_str(o, "profile_lock", lock, sizeof lock, 0, err, n)) || (r = get_str(o, "timers", tim, sizeof tim, 0, err, n))) goto out;
+        const char *const *lists[] = { VM_ROLE_NAMES, VM_LOCK_NAMES, VM_TIMERS_NAMES };
+        const char *vals[] = { role, lock, tim };
+        int *dst[] = { &m->role, &m->profile_lock, &m->timers };
+        for (int k = 0; k < 3; k++) {
+            *dst[k] = 0;
+            if (!vals[k][0]) continue;
+            for (int i = 1; lists[k][i]; i++) if (!strcmp(vals[k], lists[k][i])) *dst[k] = i;
+            if (!*dst[k]) { r = fail(err, n, VM_E_RANGE, "role, profile_lock or timers: an unknown value"); goto out; }
+        }
+        if (up[0] && strcmp(up, "tor")) { r = fail(err, n, VM_E_RANGE, "uplink is tor"); goto out; }
+        m->uplink_tor = up[0] != 0;
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -1043,6 +1108,14 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 12 && m->capture_fullscreen) jb_raw(&b, ",\n  \"capture_fullscreen\": true");
     if (m->schema >= 13 && m->perf_profile) jb_raw(&b, ",\n  \"perf_profile\": true");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
+    if (m->schema >= 14 && m->group[0]) {
+        jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);
+        jb_raw(&b, ",\n  \"role\": "); jb_str(&b, VM_ROLE_NAMES[m->role]);
+        if (m->uplink_tor) jb_raw(&b, ",\n  \"uplink\": \"tor\"");
+        if (m->link_mac[0]) { jb_raw(&b, ",\n  \"link_mac\": "); jb_str(&b, m->link_mac); }
+        if (m->profile_lock) { jb_raw(&b, ",\n  \"profile_lock\": "); jb_str(&b, VM_LOCK_NAMES[m->profile_lock]); }
+        if (m->timers) { jb_raw(&b, ",\n  \"timers\": "); jb_str(&b, VM_TIMERS_NAMES[m->timers]); }
+    }
     if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
     if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }
     jb_raw(&b, ",\n  \"created\": "); jb_str(&b, m->created);

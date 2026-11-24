@@ -88,5 +88,11 @@
   "state.crashed": "エラーで停止",
   "state.recovered": "オフ（復旧済み）",
   "state.suspended": "サスペンド中",
-  "state.stopped": "オフ"
+  "state.stopped": "オフ",
+  "groupStarted": "{name} は実行中です（先にゲートウェイ、次にワークステーション）。",
+  "groupStopped": "{name} は停止しました（先にワークステーション、次にゲートウェイ）。",
+  "groupDamaged": "{name} は壊れています: マシンの 1 つがないか、このグループのものではありません。",
+  "gatewayFailed": "{name} のゲートウェイが起動しなかったため（{why}）、ワークステーションは起動していません。",
+  "workstationFailed": "{name} のワークステーションが起動しませんでした（{why}）。ゲートウェイは実行中のままです。",
+  "kind.group": "{count} 台のグループ"
 }

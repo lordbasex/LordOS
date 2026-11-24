@@ -88,5 +88,11 @@
   "state.crashed": "Oprită cu o eroare",
   "state.recovered": "Oprită (recuperată)",
   "state.suspended": "Suspendată",
-  "state.stopped": "Oprită"
+  "state.stopped": "Oprită",
+  "groupStarted": "{name} rulează: întâi gateway-ul, apoi stația de lucru.",
+  "groupStopped": "{name} este oprit: întâi stația de lucru, apoi gateway-ul.",
+  "groupDamaged": "{name} este deteriorat: una dintre mașinile sale lipsește sau nu este a sa.",
+  "gatewayFailed": "Gateway-ul lui {name} nu a pornit ({why}), deci stația de lucru nu a fost pornită.",
+  "workstationFailed": "Stația de lucru a lui {name} nu a pornit ({why}); gateway-ul rulează în continuare.",
+  "kind.group": "grup de {count}"
 }

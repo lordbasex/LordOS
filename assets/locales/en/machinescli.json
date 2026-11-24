@@ -88,5 +88,11 @@
   "state.crashed": "Stopped with an error",
   "state.recovered": "Off (recovered)",
   "state.suspended": "Suspended",
-  "state.stopped": "Off"
+  "state.stopped": "Off",
+  "groupStarted": "{name} is running: its gateway first, then its workstation.",
+  "groupStopped": "{name} is off: its workstation first, then its gateway.",
+  "groupDamaged": "{name} is damaged: one of its machines is missing or isn't its own.",
+  "gatewayFailed": "{name}'s gateway didn't start ({why}), so its workstation wasn't started.",
+  "workstationFailed": "{name}'s workstation didn't start ({why}); its gateway is still running.",
+  "kind.group": "group of {count}"
 }

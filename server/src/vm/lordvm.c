@@ -36,6 +36,9 @@
 #include "vmpin.h"
 #include "vmlog.h"
 #include "vmcpu.h"
+#include "vmgroup.h"
+#include "vmcatalog.h"
+#include "vmlink.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -1023,6 +1026,8 @@ static struct {
      * way to start a program), the passt it started last (followed by pidfd: not our child), QEMU's backend number
      * (pst<gen> on hub port hp<gen>), when the network went and when to try again, restarts in the last minute */
     int keeper_fd, passt_pidfd, net_gen, net_busy, net_restarts, net_gave_up;
+    /* a machine group's internal link (VM_LINK): the last backend's number (lk<gen>), and whether it's on the hub */
+    int link_gen, link_up;
     pid_t keeper, passt_ext;
     long long net_lost_at, net_retry_at, net_window_at;
     char net_err[160];
@@ -1470,6 +1475,10 @@ static int vm_passt_argv(const VmMachine *m, char **argv, int max) {
         argv[n++] = "-4"; argv[n++] = "-o"; argv[n++] = "127.0.0.1";
         argv[n++] = "-a"; argv[n++] = VM_HOSTONLY_ADDR; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = VM_HOSTONLY_GW;
         argv[n++] = "--no-dhcp-dns"; argv[n++] = "--no-dhcp-search";
+    } else if (m->uplink_tor) {
+        /* a Tor gateway (docs/VIRTUALIZATION.md 19.5): outgoing connections only; no DNS of this computer is given or
+         * forwarded (Tor resolves through its circuits), no ports, no way to this computer's loopback */
+        argv[n++] = "--no-map-gw"; argv[n++] = "--no-dhcp-dns"; argv[n++] = "--no-dhcp-search";
     } else {
         argv[n++] = "--no-map-gw"; argv[n++] = "--dns-forward"; argv[n++] = VM_DNS_ADDR;
     }
@@ -1876,6 +1885,9 @@ static int mem_backing(const VmMachine *m) {
     return b;
 }
 
+/* the hub of a group's internal link: the workstation's only card is on hub 0, a gateway's second card on hub 1 (hub 0
+ * is its passt card's) */
+#define LINK_HUB(m) ((m)->network == VM_NET_LINK ? 0 : 1)
 #define MAXARGS 192
 static char *qargv[MAXARGS];
 static int qargc;
@@ -2049,17 +2061,28 @@ static void build_qemu_args(void) {
     arg("-uuid"); arg(m->id);
     /* shared folders (6.7): vhost-user needs the guest's memory in a shared memfd; machines without one keep private memory.
      * Either may be 2 MB hugetlb pages when the administrator reserved enough (mem_backing, vmmem.h) */
-    int mem = mem_backing(m);
-    arg("-machine"); argf("%s,dump-guest-core=off%s%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "", mem != VMMEM_ANON ? ",memory-backend=mem" : "",
-                          m->secure_boot ? ",smm=on" : "");
+    /* a group's member under the anonymity profile (19.5): private 4 KB memory in a memfd, never hugetlb, no KSM
+     * (mem-merge=off), no VMware port, no HPET; Whonix's XML asks for the same (nosharepages, vmport off, hpet off) */
+    int anon = m->profile_lock == VM_LOCK_ANONYMITY;
+    int mem = anon ? VMMEM_ANON : mem_backing(m);
+    if (anon) vlog("memory: a private memfd in 4 KB pages, no KSM, no huge pages (anonymity profile)");
+    arg("-machine"); argf("%s,dump-guest-core=off%s%s%s%s", m->machine_type, uefi ? ",pflash0=fw-code,pflash1=fw-vars" : "",
+                          mem != VMMEM_ANON || anon ? ",memory-backend=mem" : "", m->secure_boot ? ",smm=on" : "",
+                          anon ? ",mem-merge=off,vmport=off,hpet=off" : m->timers ? ",hpet=off" : "");
+    if (anon) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=off", m->memory_mb); }
     /* secure boot: the firmware's variables can be written only from SMM, so the guest's system can't change its own keys */
     if (m->secure_boot) { arg("-global"); arg("driver=cfi.pflash01,property=secure,value=on"); }
     if (mem != VMMEM_ANON) { char mo[160]; arg("-object"); arg(vmmem_object(mo, sizeof mo, mem, m->memory_mb, sh_count() > 0)); }
     if (kvm) { arg("-accel"); arg("kvm,device=/dev/fdset/1"); arg("-add-fd"); arg("fd=3,set=1,opaque=kvm"); }
     else { arg("-accel"); arg("tcg,thread=multi,tb-size=256"); }
     /* Hyper-V enlightenments: what Windows asks a hypervisor for (timers, interrupts, spinlocks); with KVM only */
-    arg("-cpu"); arg(!kvm ? "max" : m->hyperv ? "host,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,hv_vpindex,hv_runtime,hv_synic,hv_stimer,hv_time,"
-                                                 "hv_frequencies,hv_reset,hv_tlbflush,hv_ipi" : "host");
+    /* a group's member: the CPU flags of its kind's libvirt XML as libvirt 11.3 turns them into QEMU's (19.5, "Time",
+     * checked 2026-11-23): pmu off, pv-unhalt on, kvmclock on for the gateway and off for the workstation */
+    if (kvm && m->timers) { arg("-cpu"); argf("host,pmu=off,kvm-pv-unhalt=on,kvmclock=%s", m->timers == VM_TIMERS_WHONIX_WORKSTATION ? "off" : "on"); }
+    else {
+        arg("-cpu"); arg(!kvm ? "max" : m->hyperv ? "host,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,hv_vpindex,hv_runtime,hv_synic,hv_stimer,hv_time,"
+                                                     "hv_frequencies,hv_reset,hv_tlbflush,hv_ipi" : "host");
+    }
     if (m->cpu_sockets) { arg("-smp"); argf("%d,sockets=%d,cores=%d,threads=%d", m->vcpus, m->cpu_sockets, m->cpu_cores, m->cpu_threads); }
     else { arg("-smp"); argf("%d", m->vcpus); }
     arg("-m"); argf("%d", m->memory_mb);
@@ -2077,6 +2100,18 @@ static void build_qemu_args(void) {
         if (any) { arg("-smbios"); arg(t1); }
     }
     if (m->rtc == VM_RTC_LOCAL) { arg("-rtc"); arg("base=localtime"); }
+    if (m->timers) {
+        /* what libvirt 11.3 makes of Whonix's <clock> (19.5, "Time"): the gateway's RTC follows the guest's clock and
+         * catches up (track='guest' tickpolicy='catchup'); the workstation's present='no' for rtc and pit is ignored by
+         * libvirt (q35's RTC and PIT can't be removed), so it gets the plain UTC RTC; the PIT's lost ticks are delayed
+         * on both; no suspend to RAM or disk (Whonix's <pm>) */
+        arg("-rtc"); arg(m->timers == VM_TIMERS_WHONIX_GATEWAY ? "base=utc,clock=vm,driftfix=slew" : "base=utc");
+        arg("-global"); arg("kvm-pit.lost_tick_policy=delay");
+        arg("-global"); arg("ICH9-LPC.disable_s3=1");
+        arg("-global"); arg("ICH9-LPC.disable_s4=1");
+    }
+    /* the generation id (Whonix's <genid/>): the guest's kernel reseeds its random generator when it changes */
+    if (anon) { arg("-device"); arg("vmgenid,guid=auto"); }
     /* the firmware's boot menu: SeaBIOS and OVMF wait 5 s at each start for Esc (fw_cfg's etc/boot-menu-wait) */
     if (m->boot_menu) { arg("-boot"); arg("menu=on,splash-time=5000"); }
     if (uefi) {
@@ -2200,6 +2235,16 @@ static void build_qemu_args(void) {
         arg("-netdev"); arg("hubport,id=hp0,hubid=0,netdev=pst0");
         arg("-device"); argf("%s,netdev=nic0,mac=%s,addr=0x2%s", NICDEV[m->nic_model], m->mac, bi_net);
     }
+    /* a group's internal link (19.3): the card exists from the start, on a hub of its own; its backend is one end of a
+     * socketpair lord-server hands over with VM_LINK, and comes and goes (link_attach). Without one the cable is pulled.
+     * A workstation's only card (slot 0x2, its eth0); a gateway's second card (slot 0x18, its eth1, after passt's) */
+    if (m->network == VM_NET_LINK) {
+        arg("-netdev"); argf("hubport,id=lnk0,hubid=%d", LINK_HUB(m));
+        arg("-device"); argf("virtio-net-pci,id=link0,netdev=lnk0,mac=%s,addr=0x2%s", m->mac, bi_net);
+    } else if (m->role == VM_ROLE_GATEWAY && m->link_mac[0]) {
+        arg("-netdev"); argf("hubport,id=lnk0,hubid=%d", LINK_HUB(m));
+        arg("-device"); argf("virtio-net-pci,id=link0,netdev=lnk0,mac=%s,addr=0x%x", m->link_mac, VM_LINK_SLOT_GATEWAY);
+    }
     /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces; not connected */
     for (int i = 0; i < m->n_extra_macs; i++) { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
     arg("-device"); arg("virtio-rng-pci,addr=0x3");
@@ -2257,8 +2302,17 @@ static void build_qemu_args(void) {
      * loading): what the guest's microphone hears is lord-server's choice, silence unless the machine's "microphone"
      * and LordOS's permission allow it (6.9). The codecs share one saved form ("hda-audio", the same output nodes), so
      * a state saved with the former hda-output still loads. */
+    if (anon) {
+        /* 19.5: a gateway has no sound card; a workstation's codec has an output only (Whonix's ich9 with codec
+         * "output"): no microphone input exists in the guest at all */
+        if (m->role == VM_ROLE_WORKSTATION) {
+            arg("-device"); arg("ich9-intel-hda,id=sound0,addr=0x9");
+            arg("-device"); arg("hda-output,id=sound0-codec0,bus=sound0.0,cad=0,audiodev=snd0");
+        }
+    } else {
     arg("-device"); arg("intel-hda,id=sound0,addr=0x9");
     arg("-device"); arg("hda-micro,id=sound0-codec0,bus=sound0.0,cad=0,audiodev=snd0");
+    }
     arg("-chardev"); arg("socket,id=qmp,fd=4"); arg("-mon"); arg("chardev=qmp,mode=control");
     arg("-chardev"); arg("socket,id=ser0,fd=5"); arg("-serial"); arg("chardev:ser0");
     if (m->agent) {
@@ -2441,6 +2495,10 @@ static int start_machine(void) {
     if (pid < 0) { fail_start("fork: %s", strerror(errno)); return -1; }
     if (!pid) {
         child_common(qemu_procs_fd);
+        /* a group's member under the anonymity profile (19.5): no transparent huge pages at all, whatever the system's
+         * THP settings say (LordOS sets shmem_enabled to advise since 0.8.9.6, and QEMU advises them on guest memory);
+         * the flag is the process's and survives exec */
+        if (S.m.profile_lock == VM_LOCK_ANONYMITY && prctl(PR_SET_THP_DISABLE, 1, 0, 0, 0)) _exit(126);
         /* QEMU quits on SIGTERM, and stopping the session's units sends it to every process of the machine's scope at
          * once: blocked here (QEMU never unblocks it), so lord-vm can still save the machine to disk (host_stop) and
          * then tell QEMU to quit */
@@ -3049,6 +3107,7 @@ static void host_stop(const char *why) {
      * to save, and a firmware that only now boots ignores the power button */
     if (S.state == VS_PAUSED && !S.ran) { vlog("the machine never ran: turning it off"); begin_poweroff(); return; }
     if (ok_state && (S.gl || S.vgpu)) { vlog("a machine with %s can't be saved to disk: shutting it down", S.vgpu ? "a graphics card" : "3D graphics (virgl can't be migrated)"); host_shutdown(); return; }
+    if (ok_state && S.m.profile_lock) { vlog("locked for anonymity: its memory is never saved to disk: shutting it down"); host_shutdown(); return; }
     if (ok_state && !S.hplan.save_until) { vlog("logind's delay leaves no time to save the machine: shutting it down"); host_shutdown(); return; }
     if (ok_state && !S.snap_kind && !S.cd_busy) { begin_suspend(-1, 0); return; }
     if (ok_state && (S.snap_kind || S.cd_busy)) return;         /* tried again from the loop once that's done */
@@ -5224,9 +5283,42 @@ static void ag_tick(long long now) {
 }
 
 static void console_out(const char *b, size_t n);
+/* ---- a machine group's internal link (VM_LINK, docs/VIRTUALIZATION.md 19.3) ----
+ * The card is on a hub of its own from the start (build_qemu_args: lnk0); each link lord-server hands over becomes the
+ * socket backend lk<gen> on hub port lh<gen>, and the previous one comes off first, as the network's healing does with
+ * passt. The descriptor must be one end of a connected AF_UNIX stream pair made by a process of this account: never a
+ * listening socket, a file, or a socket to anything else. The two QEMUs then exchange frames directly. */
+static int link_card(void) { return S.m.group[0] && (S.m.network == VM_NET_LINK || (S.m.role == VM_ROLE_GATEWAY && S.m.link_mac[0])); }
+
+static int link_fd_ok(int fd, char *why, size_t wn) { return vm_link_fd_ok(fd, why, wn); }
+
+static void link_change(int ci, uint32_t seq, int on, int fd) {
+    char a[200];
+    int old = S.link_up ? S.link_gen : 0;
+    if (!on && !old) { reply(ci, seq, VME_OK, "no link"); return; }
+    if (old) {
+        snprintf(a, sizeof a, "{\"id\":\"lh%d\"}", old);
+        qmp_do("netdev_del", a, P_NET, -1, 0, -1, -1);
+        snprintf(a, sizeof a, "{\"id\":\"lk%d\"}", old);
+        if (!on) { qmp_do("netdev_del", a, P_REPLY, ci, seq, -1, -1); S.link_up = 0; vlog("link: the cable is pulled (lk%d)", old); return; }
+        qmp_do("netdev_del", a, P_NET, -1, 0, -1, -1);
+        S.link_up = 0;
+    }
+    int gen = ++S.link_gen;
+    snprintf(a, sizeof a, "{\"fdname\":\"lk%d\"}", gen);
+    int bad = qmp_do("getfd", a, P_GETFD, -1, 0, fd, -1);
+    snprintf(a, sizeof a, "{\"type\":\"socket\",\"id\":\"lk%d\",\"fd\":\"lk%d\"}", gen, gen);
+    bad |= qmp_do("netdev_add", a, P_NET, -1, 0, -1, -1);
+    snprintf(a, sizeof a, "{\"type\":\"hubport\",\"id\":\"lh%d\",\"hubid\":%d,\"netdev\":\"lk%d\"}", gen, LINK_HUB(&S.m), gen);
+    bad |= qmp_do("netdev_add", a, P_REPLY, ci, seq, -1, -1);
+    if (bad) { reply(ci, seq, VME_BUSY, "busy"); return; }
+    S.link_up = 1;
+    vlog("link: connected to the group's other member (backend lk%d on hub %d)", gen, LINK_HUB(&S.m));
+}
+
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
-    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && (m->type != VM_QMP || !S.dev_qmp) &&
+    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && m->type != VM_LINK && (m->type != VM_QMP || !S.dev_qmp) &&
         !(m->type == VM_AGENT && m->a == VAG_TRANSFER)) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {
@@ -5286,11 +5378,24 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (fd >= 0) close(fd);
         return;
     }
+    case VM_LINK: {
+        char why[96];
+        if (!link_card()) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "this machine has no group link"); return; }
+        if (strcmp(m->text, S.m.group)) { if (fd >= 0) close(fd); vlog("link: refused: another group's"); reply(ci, m->seq, VME_BAD_REQUEST, "another group's link"); return; }
+        if (!alive) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
+        if (m->a == 1 && fd < 0) { reply(ci, m->seq, VME_BAD_REQUEST, "a link needs its descriptor"); return; }
+        if (m->a == 0 && fd >= 0) { close(fd); fd = -1; }
+        if (fd >= 0 && !link_fd_ok(fd, why, sizeof why)) { close(fd); vlog("link: refused: %s", why); reply(ci, m->seq, VME_BAD_REQUEST, why); return; }
+        link_change(ci, m->seq, m->a, fd);
+        if (fd >= 0) close(fd);
+        return;
+    }
     case VM_SUSPEND:
         if (!alive || (S.state != VS_RUNNING && S.state != VS_PAUSED)) { reply(ci, m->seq, VME_WRONG_STATE, "not running"); return; }
         if (S.suspending || S.cd_busy || S.snap_kind) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
         if (S.gl) { reply(ci, m->seq, VME_WRONG_STATE, "a machine with 3D graphics can't be suspended (virgl can't be migrated): shut it down"); return; }
         if (S.vgpu) { reply(ci, m->seq, VME_WRONG_STATE, "a machine with a graphics card can't be suspended (a vGPU can't be saved): shut it down"); return; }
+        if (S.m.profile_lock) { reply(ci, m->seq, VME_WRONG_STATE, "locked for anonymity: the guest's memory is never saved to this computer's disk"); return; }
         begin_suspend(ci, m->seq);
         return;
     case VM_SNAPSHOT:
@@ -6516,6 +6621,11 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     snprintf(S.disks, sizeof S.disks, "%s/disks", S.dir);
     char err[256];
     if (vm_machine_load(S.dir, &S.m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+    if (S.m.profile_lock == VM_LOCK_ANONYMITY && S.ncreds) {
+        /* 19.5: no first-boot credentials (SMBIOS type 11) go into a group's member */
+        for (int i = 0; i < S.ncreds; i++) { close(S.cred_fd[i]); S.cred_fd[i] = -1; }
+        S.ncreds = 0;
+    }
     S.lock_fd = open_lock(S.dir);
     if (S.lock_fd == -2) { fprintf(stderr, "lord-vm: %s is already running\n", S.m.name); return 3; }
     if (S.lock_fd < 0) { fprintf(stderr, "lord-vm: can't write in %s\n", S.dir); return 1; }
@@ -8653,6 +8763,362 @@ out:
     return rc;
 }
 
+/* ---- a machine group from a verified archive (docs/VIRTUALIZATION.md 19.2, 19.6; approved by the maintainer 2026-11-23) ----
+ *
+ *   lord-vm --group-create GROUPDIR --catalog-id ID --archive FILE --sha512 HEX [--name N]
+ *
+ * GROUPDIR is <library>/<name>.lordgroup (new). FILE is the archive the admin helper verified (images/<sha512>.tar.xz,
+ * root's; or any file whose SHA-512 is HEX: it is hashed again here before a byte of it is unpacked). The catalog entry
+ * (assets/machines/systems.json, part of LordOS's signed package; never JS) gives the members' names in the archive,
+ * the caps, the release folder and the members' vCPUs and memory.
+ *
+ * 1. lord-vmunpack (sandboxed: no files, no network, no exec) reads the archive on fd 0 and writes the two disks into two
+ *    new empty files of a staging folder in <library>/.shared (fds 3 and 4); its progress is passed on.
+ * 2. The jailed qemu-img checks each (no backing file, no external data file, a virtual size the entry allows) and
+ *    writes the base without anything of the original header we didn't choose (convert -f qcow2 -O qcow2), then checks
+ *    the result. Each base goes to <library>/.shared/<catalog>-<release>-<role>-<sha12>.qcow2 by rename, 0444; a base
+ *    already there (another group of the same archive) is used as it is.
+ * 3. The members (Gateway.lordvm, Workstation.lordvm) as linked clones of the bases, with the schema 14 keys and the
+ *    anonymity profile (19.5); random UUIDs and MAC addresses. group.json last, by rename: until then the library
+ *    doesn't show the group.
+ * Output: {"progress":{"step":"unpack","done":N,"total":N}} lines, then {"created":true,...} (exit 0), or an error on
+ * stderr (exit 1; 2 usage). The staging folder and a half-made group are removed on failure. */
+#ifdef LORDVM_TEST_PATHS
+#define VM_CATALOG_FILE test_path("LORDVM_TEST_CATALOG", "/usr/lib/lordos/assets/machines/systems.json")
+#else
+#define VM_CATALOG_FILE "/usr/lib/lordos/assets/machines/systems.json"
+#endif
+
+static int sha512_fd_hex(int fd, char out[129], long long total) {
+    Sha512 h;
+    sha512_init(&h);
+    static uint8_t b[1 << 20];
+    long long done = 0, said = -1;
+    if (lseek(fd, 0, SEEK_SET)) return -1;
+    for (;;) {
+        ssize_t k = read(fd, b, sizeof b);
+        if (k < 0 && errno == EINTR) continue;
+        if (k < 0) return -1;
+        if (!k) break;
+        sha512_update(&h, b, (size_t)k);
+        done += k;
+        long long pct = total > 0 ? done * 100 / total : 0;
+        if (pct != said) { said = pct; printf("{\"progress\":{\"step\":\"verify\",\"done\":%lld,\"total\":%lld}}\n", done, total); fflush(stdout); }
+    }
+    uint8_t d[64];
+    sha512_final(&h, d);
+    for (int i = 0; i < 64; i++) snprintf(out + i * 2, 3, "%02x", d[i]);
+    return lseek(fd, 0, SEEK_SET) ? -1 : 0;
+}
+
+/* lord-vmunpack: the helper next to this lord-vm (/usr/lib/lordos/bin, or build/ in a development tree) */
+static int vmunpack_path(char *out, size_t n) {
+    char self[PATH_MAX];
+    ssize_t k = readlink("/proc/self/exe", self, sizeof self - 1);
+    if (k <= 0) return -1;
+    self[k] = 0;
+    char *sl = strrchr(self, '/');
+    if (!sl) return -1;
+    *sl = 0;
+    if (snprintf(out, n, "%s/lord-vmunpack", self) >= (int)n) return -1;
+    struct stat st;
+    return !stat(out, &st) && S_ISREG(st.st_mode) && (st.st_mode & 0111) ? 0 : -1;
+}
+
+/* runs lord-vmunpack on the archive into gw and ws (new empty files); 0, or -1 with why */
+static int unpack_archive(int afd, const VmCatEntry *e, int gw, int ws, long long total, char *why, size_t wn) {
+    char bin[PATH_MAX];
+    if (vmunpack_path(bin, sizeof bin)) { snprintf(why, wn, "lord-vmunpack isn't installed next to lord-vm"); return -1; }
+    char req[2 * VMCAT_RE + 64];
+    int rl = snprintf(req, sizeof req, "%llu %llu %s %s\n", e->max_apparent, e->max_data, e->member_re[0], e->member_re[1]);
+    int rq[2], out[2];
+    if (rl <= 0 || rl >= (int)sizeof req || pipe2(rq, O_CLOEXEC) || pipe2(out, O_CLOEXEC)) { snprintf(why, wn, "out of descriptors"); return -1; }
+    pid_t pid = fork();
+    if (pid < 0) { snprintf(why, wn, "fork: %s", strerror(errno)); return -1; }
+    if (!pid) {
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        int null = open("/dev/null", O_RDWR | O_CLOEXEC);
+        /* fd 0 the archive, 1 the answers, 2 /dev/null, 3 and 4 the two disks, 5 the request (vmunpack.h) */
+        int want[6] = { afd, out[1], null, gw, ws, rq[0] }, tmp[6];
+        for (int i = 0; i < 6; i++) tmp[i] = fcntl(want[i], F_DUPFD_CLOEXEC, 32);
+        for (int i = 0; i < 6; i++) if (tmp[i] < 0 || dup2(tmp[i], i) != i) _exit(126);
+        syscall(SYS_close_range, 6, ~0u, 0);
+        char *const av[] = { "lord-vmunpack", NULL }, *const env[] = { NULL };
+        execve(bin, av, env);
+        _exit(127);
+    }
+    close(rq[0]);
+    close(out[1]);
+    int bad = write_all(rq[1], req, (size_t)rl);
+    close(rq[1]);
+    char line[512];
+    size_t ln = 0;
+    char last[256] = "";
+    for (;;) {
+        char c;
+        ssize_t r = read(out[0], &c, 1);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) break;
+        if (c != '\n') { if (ln < sizeof line - 1) line[ln++] = c; continue; }
+        line[ln] = 0;
+        ln = 0;
+        unsigned long long d = 0, t = 0;
+        if (sscanf(line, "progress %llu %llu", &d, &t) == 2) {
+            printf("{\"progress\":{\"step\":\"unpack\",\"done\":%llu,\"total\":%lld}}\n", d, total);
+            fflush(stdout);
+        } else snprintf(last, sizeof last, "%.200s", line);
+    }
+    close(out[0]);
+    int st;
+    while (waitpid(pid, &st, 0) < 0 && errno == EINTR) ;
+    if (bad || !WIFEXITED(st) || WEXITSTATUS(st) || strncmp(last, "ok ", 3)) {
+        /* its answer is a closed word (vmunpack.h): printable ASCII only, said as it came */
+        for (char *p = last; *p; p++) if (*p < 0x20 || *p > 0x7e) *p = '?';
+        snprintf(why, wn, "the archive couldn't be unpacked: %s", last[0] ? last : WIFSIGNALED(st) ? "killed" : "no answer");
+        return -1;
+    }
+    vlog("group: unpacked (%s)", last);
+    return 0;
+}
+
+/* qemu-img info on an unpacked member, jailed: qcow2, no backing file, no data file, a virtual size within max */
+static int member_ok(const char *path, unsigned long long max, long long *vsize, char *why, size_t wn) {
+    char out[16384];
+    char *argv[] = { QEMU_IMG, "info", "-f", "qcow2", "--output=json", (char *)path, NULL };
+    if (run_tool_in(argv, out, sizeof out, path, NULL)) { snprintf(why, wn, "qemu-img info: %.150s", out); return -1; }
+    JDoc d;
+    if (json_parse(out, strlen(out), &d, NULL, 0)) { snprintf(why, wn, "qemu-img info said something else"); return -1; }
+    const JVal *r = d.root;
+    const char *fmt = json_str(r, "format");
+    double vs = json_num(r, "virtual-size", -1);
+    int bad = !fmt || strcmp(fmt, "qcow2") || json_get(r, "backing-filename") || json_get(r, "full-backing-filename") ||
+              json_get(json_get(json_get(r, "format-specific"), "data"), "data-file") || vs <= 0 || vs > (double)max;
+    json_free(&d);
+    if (bad) { snprintf(why, wn, "a member isn't a plain qcow2 disk within the catalog's size"); return -1; }
+    *vsize = (long long)vs;
+    return 0;
+}
+
+static int make_base(const char *member, const char *staging, const char *base, char sha[65], char *why, size_t wn) {
+    char tmp[PATH_MAX + 64];
+    snprintf(tmp, sizeof tmp, "%s/base.qcow2", staging);
+    unlink(tmp);
+    char *cv[] = { QEMU_IMG, "convert", "-q", "-f", "qcow2", "-O", "qcow2", (char *)member, tmp, NULL };
+    char *ck[] = { QEMU_IMG, "check", "-q", "-f", "qcow2", tmp, NULL };
+    char err[512];
+    if (run_tool_in(cv, err, sizeof err, member, staging)) { snprintf(why, wn, "qemu-img convert: %.150s", err); unlink(tmp); return -1; }
+    if (run_tool_in(ck, err, sizeof err, tmp, NULL)) { snprintf(why, wn, "qemu-img check: %.150s", err); unlink(tmp); return -1; }
+    if (chmod(tmp, 0444) || sha256_file(tmp, sha)) { snprintf(why, wn, "can't finish the base"); unlink(tmp); return -1; }
+    if (rename(tmp, base)) { snprintf(why, wn, "can't place the base: %s", strerror(errno)); unlink(tmp); return -1; }
+    return 0;
+}
+
+/* a member: an ordinary machine folder, a linked clone of its base (19.4, 19.5) */
+static int make_member(const char *gdir, const char *folder, const char *name, int role, const char *gid, const char *base,
+                       long long vsize, int vcpus, int mem, char *why, size_t wn) {
+    VmHost h;
+    vm_host_probe(&h);
+    VmMachine m;
+    vm_machine_defaults(&m, &h, VM_ARCH_AMD64);
+    snprintf(m.name, sizeof m.name, "%s", name);
+    m.accel = VM_ACCEL_KVM;
+    m.vcpus = vcpus;
+    m.memory_mb = mem;
+    m.disk_gb = (int)((vsize + (1LL << 30) - 1) >> 30);
+    m.firmware = VM_FW_BIOS;                       /* Whonix's XML has no UEFI loader */
+    m.firmware_code[0] = m.firmware_sha256[0] = 0;
+    m.display = VM_DISPLAY_WINDOW;
+    m.agent = 0;
+    m.clipboard = VM_CLIP_OFF;
+    m.clipboard_ask = 0;
+    m.transfer = 0;
+    m.microphone = 0;
+    m.graphics = VM_GFX_2D;
+    m.n_ports = 0;
+    m.n_shares = 0;
+    snprintf(m.base, sizeof m.base, "%s", base);
+    snprintf(m.group, sizeof m.group, "%s", gid);
+    m.role = role;
+    m.profile_lock = VM_LOCK_ANONYMITY;
+    if (role == VM_ROLE_GATEWAY) {
+        m.network = VM_NET_SHARED;
+        m.uplink_tor = 1;
+        m.timers = VM_TIMERS_WHONIX_GATEWAY;
+        do { if (vm_new_mac(m.link_mac)) { snprintf(why, wn, "no random numbers"); return -1; } } while (!strcmp(m.link_mac, m.mac));
+    } else {
+        m.network = VM_NET_LINK;
+        m.timers = VM_TIMERS_WHONIX_WORKSTATION;
+    }
+    if (machine_type_for(VM_ARCH_AMD64, m.machine_type, sizeof m.machine_type)) { snprintf(why, wn, "can't read QEMU's machine types"); return -1; }
+    char err[256], warn[256];
+    if (vm_machine_check(&m, err, sizeof err) || vm_machine_check_host(&m, &h, err, sizeof err, warn, sizeof warn)) { snprintf(why, wn, "%s", err); return -1; }
+    char dir[PATH_MAX + 64], p[PATH_MAX + 96];
+    snprintf(dir, sizeof dir, "%s/%s", gdir, folder);
+    if (mkdir(dir, 0700)) { snprintf(why, wn, "can't make %s: %s", folder, strerror(errno)); return -1; }
+    snprintf(p, sizeof p, "%s/disks", dir); mkdir(p, 0700);
+    snprintf(p, sizeof p, "%s/log", dir); mkdir(p, 0700);
+    char sys[PATH_MAX + 96];
+    snprintf(sys, sizeof sys, "%s/disks/system.qcow2", dir);
+    snprintf(p, sizeof p, "%s/disks", dir);
+    if (qimg_overlay(base, sys, p, m.disk_gb, err, sizeof err)) { snprintf(why, wn, "qemu-img create: %.150s", err); return -1; }
+    if (vm_machine_save(dir, &m)) { snprintf(why, wn, "can't write %s's machine.json", folder); return -1; }
+    return 0;
+}
+
+static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
+    const char *cid = NULL, *archive = NULL, *want = NULL, *name = NULL, *dev_members[2] = { NULL, NULL };
+    for (int i = 0; i < argc; i++) {
+        const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
+        if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
+        i++;
+        if (!strcmp(a, "--catalog-id")) cid = v;
+        else if (!strcmp(a, "--archive")) archive = v;
+        else if (!strcmp(a, "--sha512")) want = v;
+        else if (!strcmp(a, "--name")) name = v;
+#ifdef LORDVM_TEST_PATHS
+        /* a test build only: the two members' disks as already unpacked files (tests/vm_group_link.sh), no archive */
+        else if (!strcmp(a, "--dev-gateway")) dev_members[0] = v;
+        else if (!strcmp(a, "--dev-workstation")) dev_members[1] = v;
+#endif
+        else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
+    }
+    int dev = dev_members[0] && dev_members[1];
+    if (!cid || (!dev && (!archive || !want))) { fprintf(stderr, "lord-vm: --group-create DIR --catalog-id ID --archive FILE --sha512 HEX [--name N]\n"); return 2; }
+    /* the group folder: new, <library>/<x>.lordgroup */
+    char gdir[PATH_MAX], lib[PATH_MAX];
+    if (strlen(gdir_arg) >= sizeof gdir || gdir_arg[0] != '/') { fprintf(stderr, "lord-vm: the group's folder is an absolute path\n"); return 2; }
+    snprintf(gdir, sizeof gdir, "%s", gdir_arg);
+    if (!vm_group_dir_ok(gdir)) { fprintf(stderr, "lord-vm: %s: a group's folder ends in .lordgroup\n", gdir); return 2; }
+    snprintf(lib, sizeof lib, "%s", gdir);
+    *strrchr(lib, '/') = 0;
+    char libreal[PATH_MAX];
+    if (!realpath(lib, libreal) || !dir_ok(libreal)) { fprintf(stderr, "lord-vm: %s isn't a folder\n", lib); return 1; }
+    if (snprintf(gdir, sizeof gdir, "%s/%s", libreal, strrchr(gdir_arg, '/') + 1) >= (int)sizeof gdir || !vm_group_dir_ok(gdir)) { fprintf(stderr, "lord-vm: the group's path is too long\n"); return 2; }
+    struct stat st;
+    if (!lstat(gdir, &st)) { fprintf(stderr, "lord-vm: %s already exists\n", gdir); return 3; }
+    /* the catalog's entry */
+    size_t cn = 0;
+    int cfd = open(VM_CATALOG_FILE, O_RDONLY | O_CLOEXEC);
+    char *cat = NULL;
+    if (cfd >= 0 && !fstat(cfd, &st) && S_ISREG(st.st_mode) && st.st_size > 0 && st.st_size < (1 << 20) && (cat = malloc((size_t)st.st_size + 1))) {
+        ssize_t r = read(cfd, cat, (size_t)st.st_size);
+        if (r == st.st_size) { cat[r] = 0; cn = (size_t)r; } else { free(cat); cat = NULL; }
+    }
+    if (cfd >= 0) close(cfd);
+    VmCatEntry e;
+    int found = cat && !vmcat_find(cat, cn, cid, "amd64", &e) && e.group;
+    free(cat);
+    if (!found) { fprintf(stderr, "lord-vm: %s isn't a machine group of the catalog\n", cid); return 1; }
+    if (!dev && !vmcat_hash_ok(&e, want)) { fprintf(stderr, "lord-vm: --sha512 is 128 hex digits\n"); return 2; }
+    /* the archive's release, from its name as the catalog's pattern accepted it (Whonix-LXQt-<release>.Intel_AMD64…) */
+    char release[32] = "", sha[129] = "";
+    const char *an = archive ? strrchr(archive, '/') : NULL;
+    an = an ? an + 1 : archive;
+    if (!dev && !vmcat_match(e.file_re, an)) { fprintf(stderr, "lord-vm: %s isn't the catalog's archive\n", an); return 1; }
+    /* the release the archive's name gives (vmcat_release_in, the same rule as the admin helper's), at least the floor */
+    if (!dev && (vmcat_release_in(&e, an, release, sizeof release) || !vmcat_release_ok(&e, release))) release[0] = 0;
+    if (!release[0] && !dev) { fprintf(stderr, "lord-vm: the archive's name gives no release the catalog accepts (at least %s)\n", e.rel_floor); return 1; }
+    if (!release[0]) snprintf(release, sizeof release, "%s", e.rel_floor[0] ? e.rel_floor : "0");
+    if (e.rel_dir[0] && vmcat_release_cmp(release, e.rel_floor) < 0) { fprintf(stderr, "lord-vm: release %s is older than the catalog's floor %s\n", release, e.rel_floor); return 1; }
+    int afd = -1;
+    long long total = 0;
+    if (!dev) {
+        afd = open(archive, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        if (afd < 0 || fstat(afd, &st) || !S_ISREG(st.st_mode)) { fprintf(stderr, "lord-vm: can't read %s\n", archive); if (afd >= 0) close(afd); return 1; }
+        total = st.st_size;
+        if ((unsigned long long)total > e.max_bytes) { fprintf(stderr, "lord-vm: the archive is larger than the catalog allows\n"); close(afd); return 1; }
+        /* hashed again here: the file handed to the helper is the one that was verified, byte for byte */
+        if (sha512_fd_hex(afd, sha, total)) { fprintf(stderr, "lord-vm: can't read %s\n", archive); close(afd); return 1; }
+        for (int i = 0; i < 128; i++) if (tolower((unsigned char)want[i]) != sha[i]) { fprintf(stderr, "lord-vm: the archive's SHA-512 isn't the verified one\n"); close(afd); return 1; }
+    } else {
+        memset(sha, '0', 128);
+        sha[128] = 0;
+    }
+    /* the bases: <library>/.shared/<id>-<release>-<role>-<sha12>.qcow2 */
+    char shared[PATH_MAX + 16], base[2][PATH_MAX + 128], bsha[2][65];
+    static const char *const RN[2] = { "gateway", "workstation" };
+    snprintf(shared, sizeof shared, "%s/.shared", libreal);
+    mkdir(shared, 0700);
+    int need = 0;
+    for (int r = 0; r < 2; r++) {
+        snprintf(base[r], sizeof base[r], "%s/%s-%s-%s-%.12s.qcow2", shared, cid, release, RN[r], dev ? "dev000000000" : sha);
+        if (!vm_base_valid(base[r])) { fprintf(stderr, "lord-vm: the library's path can't hold a base\n"); if (afd >= 0) close(afd); return 1; }
+        bsha[r][0] = 0;
+        if (!lstat(base[r], &st) && S_ISREG(st.st_mode)) { if (sha256_file(base[r], bsha[r])) need = 1; }
+        else need = 1;
+    }
+    char why[300] = "", staging[PATH_MAX + 64] = "";
+    int rc = 1;
+    if (need) {
+        snprintf(staging, sizeof staging, "%s/.unpack-XXXXXX", shared);
+        if (!mkdtemp(staging)) { fprintf(stderr, "lord-vm: can't make a folder in %s\n", shared); if (afd >= 0) close(afd); return 1; }
+        /* free space: the members' data (at most maxDataGb) twice, the unpacked files and the bases */
+        struct statvfs vf;
+        if (!statvfs(staging, &vf) && (unsigned long long)vf.f_bavail * vf.f_frsize < (dev ? 0ull : 2ull * (unsigned long long)total * 3)) {
+            snprintf(why, sizeof why, "not enough free space in the library (%llu MB free)", (unsigned long long)vf.f_bavail * vf.f_frsize >> 20);
+            goto out;
+        }
+        char mem[2][PATH_MAX + 96];
+        for (int r = 0; r < 2; r++) snprintf(mem[r], sizeof mem[r], "%s/%s.qcow2", staging, RN[r]);
+        if (!dev) {
+            int fds[2] = { -1, -1 };
+            for (int r = 0; r < 2; r++) fds[r] = open(mem[r], O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+            int bad = fds[0] < 0 || fds[1] < 0 || unpack_archive(afd, &e, fds[0], fds[1], total, why, sizeof why);
+            for (int r = 0; r < 2; r++) if (fds[r] >= 0) close(fds[r]);
+            if (bad) { if (!why[0]) snprintf(why, sizeof why, "can't make the unpacked files"); goto out; }
+        }
+        for (int r = 0; r < 2; r++) {
+            if (bsha[r][0]) continue;
+            const char *src = dev ? dev_members[r] : mem[r];
+            long long vs = 0;
+            printf("{\"progress\":{\"step\":\"base\",\"role\":\"%s\"}}\n", RN[r]);
+            fflush(stdout);
+            if (member_ok(src, e.max_apparent, &vs, why, sizeof why) || make_base(src, staging, base[r], bsha[r], why, sizeof why)) goto out;
+            if (!dev) unlink(mem[r]);
+        }
+    }
+    {
+        /* the members, then group.json */
+        long long vsz[2];
+        for (int r = 0; r < 2; r++) if (member_ok(base[r], e.max_apparent, &vsz[r], why, sizeof why)) goto out;
+        VmGroup g;
+        memset(&g, 0, sizeof g);
+        g.schema = VMG_SCHEMA;
+        g.kind = VMG_KIND_WHONIX;
+        if (vm_new_id(g.id)) { snprintf(why, sizeof why, "no random numbers"); goto out; }
+        snprintf(g.name, sizeof g.name, "%s", name && vm_name_valid(name) ? name : e.group_kind[0] == 'w' ? "Whonix" : cid);
+        g.n = 2;
+        g.m[0] = (VmGroupMember){ .role = VM_ROLE_GATEWAY, .start = 1, .stop = 2 };
+        g.m[1] = (VmGroupMember){ .role = VM_ROLE_WORKSTATION, .start = 2, .stop = 1, .primary = 1 };
+        snprintf(g.m[0].dir, sizeof g.m[0].dir, "Gateway.lordvm");
+        snprintf(g.m[1].dir, sizeof g.m[1].dir, "Workstation.lordvm");
+        g.has_image = 1;
+        snprintf(g.catalog, sizeof g.catalog, "%s", cid);
+        snprintf(g.release, sizeof g.release, "%s", release);
+        snprintf(g.edition, sizeof g.edition, "%s", e.edition);
+        memcpy(g.archive_sha512, sha, 129);
+        for (int r = 0; r < 2; r++) { if (strlen(base[r]) >= sizeof g.base[0]) { snprintf(why, sizeof why, "the base's path is too long"); goto out; } memcpy(g.base[r + 1], base[r], strlen(base[r]) + 1); memcpy(g.base_sha256[r + 1], bsha[r], 65); }
+        if (vm_group_check(&g, why, sizeof why)) goto out;
+        if (mkdir(gdir, 0700)) { snprintf(why, sizeof why, "can't make the group's folder: %s", strerror(errno)); goto out; }
+        static const char *const NM[2] = { "Gateway", "Workstation" };
+        for (int r = 0; r < 2; r++) {
+            char nm[VM_NAME_MAX + 1];
+            snprintf(nm, sizeof nm, "%.40s %s", g.name, NM[r]);
+            if (make_member(gdir, g.m[r].dir, nm, r + 1, g.id, base[r], vsz[r], e.member_vcpus[r], e.member_mem_mb[r], why, sizeof why)) { rm_tree(gdir); goto out; }
+        }
+        if (vm_group_save(gdir, &g)) { snprintf(why, sizeof why, "can't write group.json"); rm_tree(gdir); goto out; }
+        printf("{\"created\":true,\"dir\":\"");
+        for (const char *c = gdir; *c; c++) { if (*c == '"' || *c == '\\') putchar('\\'); putchar(*c); }
+        printf("\",\"id\":\"%s\",\"release\":\"%s\"}\n", g.id, release);
+        rc = 0;
+    }
+out:
+    if (staging[0]) rm_tree(staging);
+    if (afd >= 0) close(afd);
+    if (rc) fprintf(stderr, "lord-vm: %s\n", why[0] ? why : "the group couldn't be made");
+    return rc;
+}
+
 static int usage(void) {
     fprintf(stderr,
             "usage: lord-vm --create DIR [--name N] [--arch arm64|amd64] [--accel kvm|tcg] [--vcpus N] [--memory MB] [--disk GB]\n"
@@ -8684,7 +9150,8 @@ static int usage(void) {
             "       lord-vm --status DIR [--json] | --check DIR | --stop DIR [--timeout S] | --poweroff DIR | --pause DIR | --resume DIR | --reset DIR\n"
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n"
-            "       lord-vm --sha256 FILE   (an ISO's SHA-256, with progress lines)\n");
+            "       lord-vm --sha256 FILE   (an ISO's SHA-256, with progress lines)\n"
+            "       lord-vm --group-create GROUPDIR --catalog-id ID --archive FILE --sha512 HEX [--name N]   (a machine group from a verified archive)\n");
     return 2;
 }
 
@@ -8726,6 +9193,7 @@ int main(int argc, char **argv) {
     int rest = argc - 3;
     char **rv = argv + 3;
     if (!strcmp(cmd, "--create")) return cmd_create(dir, rest, rv);
+    if (!strcmp(cmd, "--group-create")) return cmd_group_create(dir, rest, rv);
     if (!strcmp(cmd, "--start")) return cmd_start(dir, rest, rv);
     if (!strcmp(cmd, "--check")) return cmd_check(dir);
     if (!strcmp(cmd, "--set")) return cmd_set(dir, rest, rv);

@@ -88,5 +88,11 @@
   "state.crashed": "오류로 중지됨",
   "state.recovered": "꺼짐(복구됨)",
   "state.suspended": "일시 중단됨",
-  "state.stopped": "꺼짐"
+  "state.stopped": "꺼짐",
+  "groupStarted": "{name} 실행 중: 게이트웨이를 먼저, 그다음 워크스테이션.",
+  "groupStopped": "{name} 꺼짐: 워크스테이션을 먼저, 그다음 게이트웨이.",
+  "groupDamaged": "{name}이(가) 손상되었습니다: 머신 하나가 없거나 이 그룹의 것이 아닙니다.",
+  "gatewayFailed": "{name}의 게이트웨이가 시작되지 않아({why}) 워크스테이션을 시작하지 않았습니다.",
+  "workstationFailed": "{name}의 워크스테이션이 시작되지 않았습니다({why}). 게이트웨이는 계속 실행 중입니다.",
+  "kind.group": "{count}대 그룹"
 }

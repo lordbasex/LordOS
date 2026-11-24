@@ -88,5 +88,11 @@
   "state.crashed": "Stoppad med ett fel",
   "state.recovered": "Av (återställd)",
   "state.suspended": "Vilar",
-  "state.stopped": "Av"
+  "state.stopped": "Av",
+  "groupStarted": "{name} körs: först gatewayen, sedan arbetsstationen.",
+  "groupStopped": "{name} är av: först arbetsstationen, sedan gatewayen.",
+  "groupDamaged": "{name} är skadad: en av dess maskiner saknas eller hör inte till den.",
+  "gatewayFailed": "Gatewayen i {name} startade inte ({why}), så arbetsstationen startades inte.",
+  "workstationFailed": "Arbetsstationen i {name} startade inte ({why}); gatewayen körs fortfarande.",
+  "kind.group": "grupp med {count}"
 }

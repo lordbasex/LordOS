@@ -5,7 +5,7 @@
  "items": [
   {
    "area": "A",
-   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 13, lock, `run.json`, crash recovery (3.8, 3.9)",
+   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 14, lock, `run.json`, crash recovery (3.8, 3.9)",
    "status": "✅",
    "pct": 100,
    "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 13`); `vm-test`",
@@ -870,10 +870,10 @@
   {
    "area": "B",
    "item": "Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": "Planned 2026-11-23; approved by the maintainer, design in section 19"
+   "status": "🟡",
+   "pct": 40,
+   "file": "vmgroup.c, vmlink.c, vmunpack.c, lordvm.c --group-create, VM_LINK; vmgroup-test, vmlink-test, vmunpack-test, vmcatalog-test, vm_group_model_test.mjs, vm_group_link.sh",
+   "note": "In development (feat/whonix-group): G0–G2 of 19.11, headless end to end; no card, assistant, library menu, Configure view or Start Fresh yet"
   }
  ],
  "areas": [
@@ -887,7 +887,7 @@
    "id": "B",
    "name": "Getting a system in",
    "weight": 12,
-   "score": 70
+   "score": 73
   },
   {
    "id": "C",
@@ -962,6 +962,6 @@
    "score": 55
   }
  ],
- "total": 67,
+ "total": 68,
  "total_exact": 67.16
 }

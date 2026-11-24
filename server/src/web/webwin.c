@@ -1,6 +1,6 @@
 /* webwin.c — lord-web's Wayland window (see web.h, webwin.h).
  *
- * WebKit's web process draws into wpebackend-fdo's nested compositor; its exportable view backend hands each frame to
+ * WebKit draws each frame through the backend (webback.h: libwpe + wpebackend-fdo, or WPEPlatform), which hands it to
  * this file, which shows it on LordOS's compositor:
  *   - dmabuf: when the compositor offers zwp_linux_dmabuf_v1 and EGL works on its display, the frame's planes become a
  *     wl_buffer of ours (no copy). A frame the compositor can't import, or one in a form we can't pass on, restarts
@@ -15,8 +15,8 @@
  * LORD_WEB_TRACE=1 logs, for each click or key, the time to the frame WebKit exports after it, to its commit and to
  * the compositor's frame callback (the frame on screen).
  *
- * Input goes to libwpe's events: the keyboard with the compositor's keymap and its key repeat, the pointer, the wheel
- * (webaxis.c: lines for a mouse wheel, pixels for a touchpad), touch. The clipboard is a normal wl_data_device: the
+ * Input goes to the backend's events (webback.h): the keyboard with the compositor's keymap and its key repeat, the
+ * pointer, the wheel (webaxis.c: lines for a mouse wheel, pixels for a touchpad), touch. The clipboard is a normal wl_data_device: the
  * session's text is mirrored into WebKit's pasteboard whenever the selection changes while the window has the
  * keyboard, and the page's copies are offered to the session. WebKit's pasteboard holds text only, and reads back as
  * Latin-1 what it holds as UTF-8 (webclip.h), so when the person pastes (Ctrl+V, Shift+Insert, the Edit menu, the
@@ -31,6 +31,7 @@
  * text-input-v3 is WebKit's input method context. */
 #include "webwin.h"
 #include "webaxis.h"
+#include "webback.h"
 #include "webclip.h"
 
 #include "xdg-shell-client-protocol.h"
@@ -55,9 +56,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <wayland-client.h>
-#include <wpe/fdo-egl.h>
-#include <wpe/unstable/fdo-shm.h>
-#include <wpe/wpe.h>
 #include <xkbcommon/xkbcommon.h>
 
 #define DEFAULT_W 1200
@@ -67,6 +65,7 @@
 #define SHM_BUFS 3
 #define MAX_OUTPUTS 8
 #define MAX_TOUCH 10
+#define MAX_FORMATS 256
 #define CLIP_MAX (16 * 1024 * 1024)
 #define CLIP_IMAGE_MAX (32 * 1024 * 1024)
 #define USER_ACTIVE_US (5 * G_USEC_PER_SEC)   /* how long after a key or a click the page may write the clipboard */
@@ -85,7 +84,7 @@ typedef struct {
 typedef struct DmaBuf DmaBuf;
 struct DmaBuf {
     WebWin *win;
-    struct wl_resource *res;            /* the web process's buffer in the nested compositor */
+    void *res;                          /* the backend's buffer (WebFrame.key) */
     struct wl_buffer *buf;              /* ours on LordOS's compositor, NULL until created */
     int w, h;
     int waiting;                        /* the newest frame: show it once created */
@@ -95,7 +94,7 @@ struct DmaBuf {
     DmaBuf *next;
 };
 
-typedef struct { struct wl_output *o; uint32_t name; int scale, entered; } Output;
+typedef struct { struct wl_output *o; uint32_t name; int scale, entered, w, h, refresh; } Output;
 
 typedef struct { char *data; size_t len, off; } Outgoing;
 
@@ -132,14 +131,18 @@ struct WebWin {
     int width, height, cfg_w, cfg_h;
     int configured, shown;
     int suspended, cfg_suspended;       /* xdg_toplevel's suspended state: applied, and pending until the configure */
-    uint32_t activity;                  /* the visible and in-window states WebKit was given */
     double scale;
     struct wl_callback *frame_cb;
     char title[512];
 
     int gpu;
     EGLDisplay egl;
-    struct wpe_view_backend *backend;
+    char render_node[64];               /* the compositor's GPU (EGL_EXT_device_query), or "" */
+    char primary_node[64];
+    uint32_t dmabuf_formats[MAX_FORMATS];   /* what the compositor imports (linux-dmabuf's modifier events) */
+    uint64_t dmabuf_modifiers[MAX_FORMATS];
+    int dmabuf_n;
+    WebBack *back;
     ShmBuf shm_bufs[SHM_BUFS];
     DmaBuf *dmabufs;
 
@@ -148,10 +151,11 @@ struct WebWin {
     struct wl_touch *touch;
     struct wp_cursor_shape_device_v1 *cursor_dev;
     int cursor_shape;
+    int cursor_named;                   /* the backend names the page's cursor: the hint from webengine.c is ignored */
     uint32_t enter_serial, input_serial;
     int focused;
     double px, py;
-    uint32_t buttons, mods;
+    uint32_t buttons, mods;             /* WEBMOD_BTN_*, WEBMOD_* */
     WebAxis axis;
     uint32_t axis_time;
     gint64 last_input_us;               /* the person's last key, click or touch in the window */
@@ -161,7 +165,6 @@ struct WebWin {
     int repeat_rate, repeat_delay;
     uint32_t repeat_key;
     guint repeat_src;
-    struct wpe_input_touch_event_raw touches[MAX_TOUCH];
 
     struct wl_data_offer *sel_offer;
     char *sel_mime;                     /* the best text type the session's selection offers */
@@ -228,7 +231,11 @@ static void update_scale(WebWin *win);
 static void out_geometry(void *d, struct wl_output *o, int32_t x, int32_t y, int32_t pw, int32_t ph, int32_t sp, const char *mk, const char *md, int32_t t) {
     (void)d; (void)o; (void)x; (void)y; (void)pw; (void)ph; (void)sp; (void)mk; (void)md; (void)t;
 }
-static void out_mode(void *d, struct wl_output *o, uint32_t f, int32_t w, int32_t h, int32_t r) { (void)d; (void)o; (void)f; (void)w; (void)h; (void)r; }
+static void out_mode(void *d, struct wl_output *o, uint32_t f, int32_t w, int32_t h, int32_t r) {
+    WebWin *win = d;
+    if (!(f & WL_OUTPUT_MODE_CURRENT)) return;
+    for (int i = 0; i < win->nout; i++) if (win->outputs[i].o == o) { win->outputs[i].w = w; win->outputs[i].h = h; win->outputs[i].refresh = r; }
+}
 static void out_done(void *d, struct wl_output *o) { (void)o; update_scale(d); }
 static void out_scale(void *d, struct wl_output *o, int32_t s) {
     WebWin *win = d;
@@ -243,6 +250,17 @@ static void seat_name(void *d, struct wl_seat *s, const char *n) { (void)d; (voi
 static const struct wl_seat_listener seat_listener = { seat_caps, seat_name };
 
 static uint32_t min_u(uint32_t a, uint32_t b) { return a < b ? a : b; }
+
+/* linux-dmabuf 3: the formats and modifiers the compositor imports (the WPEPlatform backend offers WebKit only these) */
+static void dmabuf_format(void *d, struct zwp_linux_dmabuf_v1 *m, uint32_t f) { (void)d; (void)m; (void)f; }
+static void dmabuf_modifier(void *d, struct zwp_linux_dmabuf_v1 *m, uint32_t f, uint32_t hi, uint32_t lo) {
+    (void)m;
+    WebWin *win = d;
+    if (win->dmabuf_n >= MAX_FORMATS) return;
+    win->dmabuf_formats[win->dmabuf_n] = f;
+    win->dmabuf_modifiers[win->dmabuf_n++] = (uint64_t)hi << 32 | lo;
+}
+static const struct zwp_linux_dmabuf_v1_listener dmabuf_listener = { dmabuf_format, dmabuf_modifier };
 
 static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char *iface, uint32_t ver) {
     WebWin *win = d;
@@ -261,7 +279,10 @@ static void reg_global(void *d, struct wl_registry *r, uint32_t name, const char
     }
     else if (!strcmp(iface, wp_viewporter_interface.name)) win->viewporter = wl_registry_bind(r, name, &wp_viewporter_interface, 1);
     else if (!strcmp(iface, wp_fractional_scale_manager_v1_interface.name)) win->frac_mgr = wl_registry_bind(r, name, &wp_fractional_scale_manager_v1_interface, 1);
-    else if (!strcmp(iface, zwp_linux_dmabuf_v1_interface.name) && ver >= 3) win->dmabuf = wl_registry_bind(r, name, &zwp_linux_dmabuf_v1_interface, 3);
+    else if (!strcmp(iface, zwp_linux_dmabuf_v1_interface.name) && ver >= 3) {
+        win->dmabuf = wl_registry_bind(r, name, &zwp_linux_dmabuf_v1_interface, 3);
+        zwp_linux_dmabuf_v1_add_listener(win->dmabuf, &dmabuf_listener, win);
+    }
     else if (!strcmp(iface, xdg_activation_v1_interface.name)) win->activation = wl_registry_bind(r, name, &xdg_activation_v1_interface, 1);
     else if (!strcmp(iface, zwp_text_input_manager_v3_interface.name)) win->ti_mgr = wl_registry_bind(r, name, &zwp_text_input_manager_v3_interface, 1);
     else if (!strcmp(iface, wp_cursor_shape_manager_v1_interface.name)) win->cursor_mgr = wl_registry_bind(r, name, &wp_cursor_shape_manager_v1_interface, 1);
@@ -292,11 +313,22 @@ static void set_scale(WebWin *win, double s) {
     if (s < 0.5 || s > 8) s = 1;
     if (s == win->scale) return;
     win->scale = s;
-    if (win->backend) wpe_view_backend_dispatch_set_device_scale_factor(win->backend, (float)s);
+    if (win->back) webback_set_scale(win->back, s);
+}
+
+/* the output the window is on (the first one it entered), for the backend's screen: its size and refresh rate */
+static void update_screen(WebWin *win) {
+    if (!win->back) return;
+    for (int i = 0; i < win->nout; i++) if (win->outputs[i].entered && win->outputs[i].w > 0) {
+        int s = win->outputs[i].scale > 0 ? win->outputs[i].scale : 1;
+        webback_set_screen(win->back, win->outputs[i].w / s, win->outputs[i].h / s, win->outputs[i].refresh);
+        return;
+    }
 }
 
 /* without fractional-scale: the largest integer scale of the outputs the window is on */
 static void update_scale(WebWin *win) {
+    update_screen(win);
     if (win->frac) return;
     int s = 1;
     for (int i = 0; i < win->nout; i++) if (win->outputs[i].entered && win->outputs[i].scale > s) s = win->outputs[i].scale;
@@ -324,7 +356,7 @@ static const struct wl_surface_listener surf_listener = { surf_enter, surf_leave
 
 static gboolean complete_later(gpointer d) {
     WebWin *win = d;
-    if (win->w->exportable) wpe_view_backend_exportable_fdo_dispatch_frame_complete(win->w->exportable);
+    webback_frame_done(win->back);
     return G_SOURCE_REMOVE;
 }
 
@@ -356,7 +388,7 @@ static void frame_done(void *d, struct wl_callback *cb, uint32_t t) {
     wl_callback_destroy(cb);
     win->frame_cb = NULL;
     trace_presented(win);
-    if (win->w->exportable) wpe_view_backend_exportable_fdo_dispatch_frame_complete(win->w->exportable);
+    webback_frame_done(win->back);
 }
 static const struct wl_callback_listener frame_listener = { frame_done };
 
@@ -425,18 +457,19 @@ static void first_frame(WebWin *win, int dmabuf) {
     fprintf(stderr, "lord-web: frames by %s (EGL %s)\n", dmabuf ? "dmabuf" : "shared memory", win->gpu ? "up" : "off");
 }
 
-static void export_shm(void *d, struct wpe_fdo_shm_exported_buffer *b) {
-    WebWin *win = d;
+/* a frame in shared memory: copied into one of our own wl_shm buffers (the backend gives its buffer back after) */
+static void show_shm(WebWin *win, const WebFrame *f) {
     first_frame(win, 0);
-    int w, h, stride;
-    unsigned format;
     ShmBuf *s = NULL;
     gint64 t0 = win->trace ? g_get_monotonic_time() : 0;
-    if (can_show(win) && !webshm_info(b, &w, &h, &stride, &format) && (format == WL_SHM_FORMAT_ARGB8888 || format == WL_SHM_FORMAT_XRGB8888)
-        && (s = shm_buf_get(win, w, h, format)))
-        webshm_copy(b, s->data, s->stride, s->h);
+    if (can_show(win) && (s = shm_buf_get(win, f->w, f->h, f->format))) {
+        size_t line = (size_t)f->w * 4;
+        const unsigned char *src = f->pixels;
+        unsigned char *out = s->data;
+        if (f->stride == s->stride) memcpy(out, src, (size_t)s->stride * (size_t)s->h);
+        else for (int y = 0; y < s->h; y++) memcpy(out + (size_t)y * (size_t)s->stride, src + (size_t)y * (size_t)f->stride, line);
+    }
     if (s) trace_frame(win, win->trace ? g_get_monotonic_time() - t0 : 0);
-    wpe_view_backend_exportable_fdo_dispatch_release_shm_exported_buffer(win->w->exportable, b);
     if (!s) { g_idle_add(complete_later, win); return; }
     s->busy = 1;
     present(win, s->buf, s->w, s->h);
@@ -468,7 +501,7 @@ static void dma_release(void *d, struct wl_buffer *buf) {
     DmaBuf *b = d;
     b->busy = 0;
     if (b->gone) { dma_free(b); return; }
-    if (b->win->w->exportable) wpe_view_backend_exportable_fdo_dispatch_release_buffer(b->win->w->exportable, b->res);
+    webback_release(b->win->back, b->res);
 }
 static const struct wl_buffer_listener dma_buf_listener = { dma_release };
 
@@ -482,7 +515,7 @@ static void dma_gone(void *d) {
 static void dma_show(DmaBuf *b) {
     WebWin *win = b->win;
     if (!can_show(win)) {
-        wpe_view_backend_exportable_fdo_dispatch_release_buffer(win->w->exportable, b->res);
+        webback_release(win->back, b->res);
         g_idle_add(complete_later, win);
         return;
     }
@@ -507,7 +540,7 @@ static void params_failed(void *d, struct zwp_linux_buffer_params_v1 *p) {
     WebWin *win = b->win;
     if (b->gone) { dma_free(b); b = NULL; }        /* its resource went while we waited: nothing to release */
     else {
-        if (win->w->exportable) wpe_view_backend_exportable_fdo_dispatch_release_buffer(win->w->exportable, b->res);
+        webback_release(win->back, b->res);
         b->waiting = 0;
     }
     g_idle_add(complete_later, win);
@@ -515,50 +548,78 @@ static void params_failed(void *d, struct zwp_linux_buffer_params_v1 *p) {
 }
 static const struct zwp_linux_buffer_params_v1_listener params_listener = { params_created, params_failed };
 
-static void export_dmabuf(void *d, struct wpe_view_backend_exportable_fdo_dmabuf_resource *r) {
-    WebWin *win = d;
+/* a frame on the GPU: its planes become a wl_buffer of ours once (kept for as long as the backend's buffer lives) */
+static void show_dmabuf(WebWin *win, const WebFrame *f) {
     first_frame(win, 1);
     DmaBuf *b = win->dmabufs;
-    while (b && b->res != r->buffer_resource) b = b->next;
+    while (b && b->res != f->key) b = b->next;
     if (b && b->buf) { dma_show(b); return; }
     if (b) { b->waiting = 1; return; }
     b = calloc(1, sizeof *b);
-    if (!b) { wpe_view_backend_exportable_fdo_dispatch_release_buffer(win->w->exportable, r->buffer_resource); g_idle_add(complete_later, win); return; }
+    if (!b) { webback_release(win->back, f->key); g_idle_add(complete_later, win); return; }
     b->win = win;
-    b->res = r->buffer_resource;
-    b->w = (int)r->width;
-    b->h = (int)r->height;
+    b->res = f->key;
+    b->w = f->w;
+    b->h = f->h;
     b->waiting = 1;
     b->pending = 1;
     b->next = win->dmabufs;
     win->dmabufs = b;
-    webshm_on_destroy(r->buffer_resource, dma_gone, b);
+    webback_watch(win->back, f->key, dma_gone, b);
     struct zwp_linux_buffer_params_v1 *p = zwp_linux_dmabuf_v1_create_params(win->dmabuf);
-    for (int i = 0; i < r->n_planes && i < 4; i++)
-        zwp_linux_buffer_params_v1_add(p, r->fds[i], (uint32_t)i, r->offsets[i], r->strides[i], (uint32_t)(r->modifiers[i] >> 32), (uint32_t)r->modifiers[i]);
+    for (int i = 0; i < f->n_planes && i < 4; i++)
+        zwp_linux_buffer_params_v1_add(p, f->fds[i], (uint32_t)i, f->offsets[i], f->strides[i], (uint32_t)(f->modifier >> 32), (uint32_t)f->modifier);
     zwp_linux_buffer_params_v1_add_listener(p, &params_listener, b);
-    zwp_linux_buffer_params_v1_create(p, (int32_t)r->width, (int32_t)r->height, r->format, 0);
+    zwp_linux_buffer_params_v1_create(p, (int32_t)f->w, (int32_t)f->h, f->fourcc, 0);
 }
 
-static void export_resource(void *d, struct wl_resource *res) {
+static void on_frame(void *d, const WebFrame *f) {
     WebWin *win = d;
-    wpe_view_backend_exportable_fdo_dispatch_release_buffer(win->w->exportable, res);
-    g_idle_add(complete_later, win);
-    fall_back_to_shm(win, "a frame in a form that can't be passed on");
+    if (f->kind == WEBFRAME_SHM) show_shm(win, f);
+    else if (f->kind == WEBFRAME_DMABUF && win->dmabuf) show_dmabuf(win, f);
+    else {
+        webback_release(win->back, f->key);
+        g_idle_add(complete_later, win);
+        fall_back_to_shm(win, "a frame in a form that can't be passed on");
+    }
 }
 
-static const struct wpe_view_backend_exportable_fdo_client export_client = { export_resource, export_dmabuf, export_shm, NULL, NULL };
+static void set_cursor_name(WebWin *win, int shape);
+/* the page's cursor, by its CSS name (WPEPlatform's view says it; legacy has only webwin_set_cursor_hint) */
+static void on_cursor(void *d, const char *name) {
+    static const struct { const char *css; int shape; } map[] = {
+        { "default", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT }, { "pointer", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER },
+        { "text", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_TEXT }, { "vertical-text", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_VERTICAL_TEXT },
+        { "wait", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_WAIT }, { "progress", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_PROGRESS },
+        { "help", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_HELP }, { "crosshair", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CROSSHAIR },
+        { "move", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_MOVE }, { "all-scroll", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ALL_SCROLL },
+        { "not-allowed", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NOT_ALLOWED }, { "no-drop", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NO_DROP },
+        { "grab", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB }, { "grabbing", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRABBING },
+        { "copy", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_COPY }, { "alias", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ALIAS },
+        { "context-menu", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CONTEXT_MENU }, { "cell", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_CELL },
+        { "col-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_COL_RESIZE }, { "row-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ROW_RESIZE },
+        { "n-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_N_RESIZE }, { "s-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_S_RESIZE },
+        { "e-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_E_RESIZE }, { "w-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_W_RESIZE },
+        { "ne-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NE_RESIZE }, { "nw-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NW_RESIZE },
+        { "se-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_SE_RESIZE }, { "sw-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_SW_RESIZE },
+        { "ew-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_EW_RESIZE }, { "ns-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NS_RESIZE },
+        { "nesw-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NESW_RESIZE }, { "nwse-resize", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_NWSE_RESIZE },
+        { "zoom-in", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ZOOM_IN }, { "zoom-out", WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_ZOOM_OUT },
+    };
+    WebWin *win = d;
+    int shape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT;
+    for (size_t i = 0; name && i < sizeof map / sizeof map[0]; i++) if (!strcmp(name, map[i].css)) shape = map[i].shape;
+    win->cursor_named = 1;
+    if (shape != win->cursor_shape) set_cursor_name(win, shape);
+}
+
+static const WebBackSink sink = { on_frame, on_cursor };
 
 /* ---- the toplevel ---- */
 
 /* WebKit's visible and in-window states follow the window (webpage_view_visible) */
 static void update_activity(WebWin *win) {
-    const uint32_t both = wpe_view_activity_state_visible | wpe_view_activity_state_in_window;
-    uint32_t want = webpage_view_visible(win->shown, win->configured, win->suspended) ? both : 0;
-    if (!win->backend || want == win->activity) return;
-    if (want) wpe_view_backend_add_activity_state(win->backend, both);
-    else wpe_view_backend_remove_activity_state(win->backend, both);
-    win->activity = want;
+    if (win->back) webback_set_visible(win->back, webpage_view_visible(win->shown, win->configured, win->suspended));
 }
 
 static void xsurf_configure(void *d, struct xdg_surface *xs, uint32_t serial) {
@@ -570,7 +631,7 @@ static void xsurf_configure(void *d, struct xdg_surface *xs, uint32_t serial) {
     int changed = w != win->width || h != win->height;
     win->width = w;
     win->height = h;
-    if (changed && win->backend) wpe_view_backend_dispatch_set_size(win->backend, (uint32_t)w, (uint32_t)h);
+    if (changed && win->back) webback_set_size(win->back, w, h);
     win->configured = 1;
     win->suspended = win->cfg_suspended;
     update_activity(win);
@@ -633,7 +694,7 @@ void webwin_hide(WebWin *win) {
     win->shown = 0;
     win->configured = 0;
     update_activity(win);
-    if (win->backend) wpe_view_backend_remove_activity_state(win->backend, wpe_view_activity_state_focused);
+    if (win->back) webback_set_focused(win->back, 0);
     if (win->frame_cb) { wl_callback_destroy(win->frame_cb); win->frame_cb = NULL; g_idle_add(complete_later, win); }
     if (win->deco) { zxdg_toplevel_decoration_v1_destroy(win->deco); win->deco = NULL; }
     xdg_toplevel_destroy(win->top);
@@ -650,31 +711,13 @@ int webwin_visible(WebWin *win) { return win->shown; }
 void webwin_set_title(WebWin *win, const char *title) {
     snprintf(win->title, sizeof win->title, "%s", title && title[0] ? title : win->w->app.name);
     if (win->top) xdg_toplevel_set_title(win->top, win->title);
+    if (win->back) webback_set_title(win->back, win->title);
 }
 
 /* ---- the clipboard ---- */
 
-static char *pb_read(const char *type) {
-    struct wpe_pasteboard_string s = { 0 };
-    wpe_pasteboard_get_string(wpe_pasteboard_get_singleton(), type, &s);
-    char *r = s.data && s.length ? g_strndup(s.data, (gsize)s.length) : NULL;
-    wpe_pasteboard_string_free(&s);
-    return r;
-}
-
-static void pb_write_text(const char *text, size_t len) {
-    /* zeroed: libwpe's wpe_pasteboard_string_initialize leaves a string that already has data alone, so stack garbage
-     * was written to the pasteboard (or read: a crash) and the session's text never reached the page */
-    struct wpe_pasteboard_string_pair pairs[2];
-    memset(pairs, 0, sizeof pairs);
-    wpe_pasteboard_string_initialize(&pairs[0].type, PB_TEXT, strlen(PB_TEXT));
-    wpe_pasteboard_string_initialize(&pairs[0].string, text, len);
-    wpe_pasteboard_string_initialize(&pairs[1].type, "text/plain", 10);
-    wpe_pasteboard_string_initialize(&pairs[1].string, text, len);
-    struct wpe_pasteboard_string_map map = { pairs, 2 };
-    wpe_pasteboard_write(wpe_pasteboard_get_singleton(), &map);
-    for (int i = 0; i < 2; i++) { wpe_pasteboard_string_free(&pairs[i].type); wpe_pasteboard_string_free(&pairs[i].string); }
-}
+static char *pb_read(WebWin *win, const char *type) { return webback_pb_read(win->back, type); }
+static void pb_write(WebWin *win, const char *text, size_t len) { webback_pb_write_text(win->back, text, len); }
 
 static gboolean out_write(gint fd, GIOCondition c, gpointer d) {
     Outgoing *o = d;
@@ -782,7 +825,7 @@ void webwin_offer(WebWin *win, const char *mime, GBytes *data) {
     if (!mime) {
         char *text = g_strndup(p, n);
         g_bytes_unref(data);
-        pb_write_text(text, strlen(text));
+        pb_write(win, text, strlen(text));
         g_free(win->known);
         win->known = g_strdup(text);
         offer_own(win, text, NULL, "clipboard API");
@@ -800,7 +843,7 @@ void webwin_offer_text(WebWin *win, char *text, char *html) {
     if (!text) { g_free(html); return; }
     /* WebKit's pasteboard gets the text too: a paste back into the page pastes what was copied, and the timer that
      * watches the pasteboard doesn't offer the older text again */
-    pb_write_text(text, strlen(text));
+    pb_write(win, text, strlen(text));
     g_free(win->known);
     win->known = g_strdup(text);
     offer_own(win, text, html, "copy event");
@@ -818,25 +861,7 @@ static gboolean pb_check_once(gpointer d) {
 
 /* Ctrl+<letter> (with Shift) as the page would get it from the keyboard: the key that makes that letter in the
  * compositor's keymap, pressed and released. 0 when the keymap has no such key. */
-int webwin_send_shortcut(WebWin *win, uint32_t keysym, int shift) {
-    struct wpe_input_xkb_context *x = wpe_input_xkb_context_get_default();
-    struct xkb_keymap *km = wpe_input_xkb_context_get_keymap(x);
-    if (!km || !win->backend) return 0;
-    xkb_keycode_t code = 0;
-    for (xkb_keycode_t k = xkb_keymap_min_keycode(km); k <= xkb_keymap_max_keycode(km) && !code; k++) {
-        const xkb_keysym_t *syms;
-        int n = xkb_keymap_key_get_syms_by_level(km, k, 0, 0, &syms);
-        for (int i = 0; i < n; i++) if (syms[i] == keysym) code = k;
-    }
-    if (!code) return 0;
-    uint32_t mods = wpe_input_keyboard_modifier_control | (shift ? wpe_input_keyboard_modifier_shift : 0);
-    uint32_t t = (uint32_t)(g_get_monotonic_time() / 1000);
-    for (int pressed = 1; pressed >= 0; pressed--) {
-        struct wpe_input_keyboard_event e = { t, shift ? xkb_keysym_to_upper(keysym) : keysym, code, pressed != 0, mods };
-        wpe_view_backend_dispatch_keyboard_event(win->backend, &e);
-    }
-    return 1;
-}
+int webwin_send_shortcut(WebWin *win, uint32_t keysym, int shift) { return win->back ? webback_shortcut(win->back, keysym, shift) : 0; }
 
 void webwin_after_edit(WebWin *win) {
     g_timeout_add(150, pb_check_once, win);
@@ -849,11 +874,11 @@ int webwin_user_active(WebWin *win) {
 
 static gboolean pb_watch(gpointer d) {
     WebWin *win = d;
-    char *t = pb_read(PB_TEXT);
+    char *t = pb_read(win, PB_TEXT);
     if (t && (!win->known || strcmp(t, win->known))) {
         g_free(win->known);
         win->known = g_strdup(t);
-        offer_own(win, t, pb_read(PB_HTML), "editing command");
+        offer_own(win, t, pb_read(win, PB_HTML), "editing command");
     } else g_free(t);
     return G_SOURCE_CONTINUE;
 }
@@ -903,7 +928,7 @@ static void sel_text_read(WebWin *win, struct wl_data_offer *o, GByteArray *b, v
     size_t n = 0;
     char *t = webclip_text_utf8(win->sel_mime, (const char *)b->data, b->len, &n);
     if (!t) { web_note("clipboard text refused (%u bytes, %s): not UTF-8", b->len, win->sel_mime); return; }
-    pb_write_text(t, n);
+    pb_write(win, t, n);
     g_free(win->known);
     win->known = g_strndup(t, n);
     free(t);
@@ -982,11 +1007,10 @@ int webwin_paste(WebWin *win) {
 
 /* Ctrl+V or Shift+Insert: webwin_paste. 1 when lord-web pasted (the key doesn't go to WebKit). */
 static int paste_key(WebWin *win, uint32_t key) {
-    struct xkb_state *st = wpe_input_xkb_context_get_state(wpe_input_xkb_context_get_default());
-    if (!st) return 0;
-    xkb_keysym_t sym = xkb_state_key_get_one_sym(st, key + 8);
-    int ctrl = (win->mods & wpe_input_keyboard_modifier_control) != 0, alt = (win->mods & wpe_input_keyboard_modifier_alt) != 0;
-    int shift = (win->mods & wpe_input_keyboard_modifier_shift) != 0;
+    xkb_keysym_t sym = webback_keysym(win->back, key);
+    if (!sym) return 0;
+    int ctrl = (win->mods & WEBMOD_CTRL) != 0, alt = (win->mods & WEBMOD_ALT) != 0;
+    int shift = (win->mods & WEBMOD_SHIFT) != 0;
     if (!((ctrl && !alt && (sym == XKB_KEY_v || sym == XKB_KEY_V)) || (shift && !ctrl && !alt && sym == XKB_KEY_Insert))) return 0;
     return webwin_paste(win);
 }
@@ -1127,7 +1151,7 @@ static void dd_selection(void *d, struct wl_data_device *dd, struct wl_data_offe
     if (in) { win->sel_img = in->img; win->sel_list = in->list; }
     if (!win->sel_mime && !win->source) {
         /* no text (an image, a file list only): WebKit's pasteboard must not paste the text copied before it */
-        pb_write_text("", 0);
+        pb_write(win, "", 0);
         g_free(win->known);
         win->known = NULL;
     }
@@ -1260,16 +1284,15 @@ static void ti_done(void *d, struct zwp_text_input_v3 *t, uint32_t serial) {
     ime->pend_preedit = NULL;
     ime->has_pend_preedit = 0;
 }
-static const struct zwp_text_input_v3_listener ti_listener = { ti_enter, ti_leave, ti_preedit, ti_commit, ti_delete, ti_done };
+/* designated: newer protocol headers add events (text-input-v3 2's action) lord-web never binds */
+static const struct zwp_text_input_v3_listener ti_listener = {
+    .enter = ti_enter, .leave = ti_leave, .preedit_string = ti_preedit, .commit_string = ti_commit,
+    .delete_surrounding_text = ti_delete, .done = ti_done,
+};
 
 /* ---- keyboard ---- */
 
-static void send_key(WebWin *win, uint32_t time, uint32_t key, int pressed) {
-    struct wpe_input_xkb_context *x = wpe_input_xkb_context_get_default();
-    uint32_t code = key + 8;
-    struct wpe_input_keyboard_event e = { time, wpe_input_xkb_context_get_key_code(x, code, pressed), code, pressed != 0, win->mods };
-    wpe_view_backend_dispatch_keyboard_event(win->backend, &e);
-}
+static void send_key(WebWin *win, uint32_t time, uint32_t key, int pressed) { webback_key(win->back, time, key, pressed, win->mods); }
 
 static gboolean repeat_tick(gpointer d) {
     WebWin *win = d;
@@ -1289,10 +1312,9 @@ static void repeat_stop(WebWin *win) {
 
 /* lord-web's own keys: reload, history, zoom. 1 when the key was one of them. */
 static int own_key(WebWin *win, uint32_t key) {
-    struct xkb_state *st = wpe_input_xkb_context_get_state(wpe_input_xkb_context_get_default());
-    if (!st) return 0;
-    xkb_keysym_t sym = xkb_state_key_get_one_sym(st, key + 8);
-    int ctrl = (win->mods & wpe_input_keyboard_modifier_control) != 0, alt = (win->mods & wpe_input_keyboard_modifier_alt) != 0;
+    xkb_keysym_t sym = webback_keysym(win->back, key);
+    if (!sym) return 0;
+    int ctrl = (win->mods & WEBMOD_CTRL) != 0, alt = (win->mods & WEBMOD_ALT) != 0;
     WebKitWebView *v = win->w->view;
     if (sym == XKB_KEY_F5 || (ctrl && !alt && (sym == XKB_KEY_r || sym == XKB_KEY_R))) { web_reload(win->w); return 1; }
     if (alt && !ctrl && sym == XKB_KEY_Left) { webkit_web_view_go_back(v); return 1; }
@@ -1307,17 +1329,14 @@ static int own_key(WebWin *win, uint32_t key) {
 }
 
 static void kb_keymap(void *d, struct wl_keyboard *k, uint32_t format, int32_t fd, uint32_t size) {
-    (void)d; (void)k;
+    (void)k;
+    WebWin *win = d;
     if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) { close(fd); return; }
     char *map = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
     if (map == MAP_FAILED) return;
-    struct wpe_input_xkb_context *x = wpe_input_xkb_context_get_default();
-    struct xkb_keymap *km = xkb_keymap_new_from_buffer(wpe_input_xkb_context_get_context(x), map, strnlen(map, size), XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    webback_keymap(win->back, map, strnlen(map, size));
     munmap(map, size);
-    if (!km) return;
-    wpe_input_xkb_context_set_keymap(x, km);
-    xkb_keymap_unref(km);
 }
 
 static void kb_enter(void *d, struct wl_keyboard *k, uint32_t serial, struct wl_surface *s, struct wl_array *keys) {
@@ -1325,7 +1344,7 @@ static void kb_enter(void *d, struct wl_keyboard *k, uint32_t serial, struct wl_
     WebWin *win = d;
     win->focused = 1;
     win->input_serial = serial;
-    wpe_view_backend_add_activity_state(win->backend, wpe_view_activity_state_focused);
+    webback_set_focused(win->back, 1);
     if (!win->pb_timer) win->pb_timer = g_timeout_add(400, pb_watch, win);
     if (win->ime && win->ime->enabled) ime_send_state(win->ime);
 }
@@ -1334,7 +1353,7 @@ static void kb_leave(void *d, struct wl_keyboard *k, uint32_t serial, struct wl_
     WebWin *win = d;
     win->focused = 0;
     repeat_stop(win);
-    wpe_view_backend_remove_activity_state(win->backend, wpe_view_activity_state_focused);
+    webback_set_focused(win->back, 0);
     if (win->pb_timer) { pb_watch(win); g_source_remove(win->pb_timer); win->pb_timer = 0; }
 }
 static void kb_key(void *d, struct wl_keyboard *k, uint32_t serial, uint32_t time, uint32_t key, uint32_t state) {
@@ -1346,8 +1365,7 @@ static void kb_key(void *d, struct wl_keyboard *k, uint32_t serial, uint32_t tim
     send_key(win, time, key, pressed);
     if (pressed) {
         repeat_stop(win);
-        struct xkb_keymap *km = wpe_input_xkb_context_get_keymap(wpe_input_xkb_context_get_default());
-        if (win->repeat_rate > 0 && km && xkb_keymap_key_repeats(km, key + 8)) {
+        if (win->repeat_rate > 0 && webback_key_repeats(win->back, key)) {
             win->repeat_key = key;
             win->repeat_src = g_timeout_add((guint)win->repeat_delay, repeat_start, win);
         }
@@ -1356,10 +1374,7 @@ static void kb_key(void *d, struct wl_keyboard *k, uint32_t serial, uint32_t tim
 static void kb_mods(void *d, struct wl_keyboard *k, uint32_t serial, uint32_t dep, uint32_t lat, uint32_t lock, uint32_t group) {
     (void)k; (void)serial;
     WebWin *win = d;
-    struct wpe_input_xkb_context *x = wpe_input_xkb_context_get_default();
-    struct xkb_state *st = wpe_input_xkb_context_get_state(x);
-    if (st) xkb_state_update_mask(st, dep, lat, lock, 0, 0, group);
-    win->mods = wpe_input_xkb_context_get_modifiers(x, dep, lat, lock, group);
+    win->mods = webback_modifiers(win->back, dep, lat, lock, group);
 }
 static void kb_repeat(void *d, struct wl_keyboard *k, int32_t rate, int32_t delay) {
     (void)k;
@@ -1375,28 +1390,15 @@ static void set_cursor(WebWin *win, int shape) {
     win->cursor_shape = shape;
     if (win->cursor_dev && win->enter_serial) wp_cursor_shape_device_v1_set_shape(win->cursor_dev, win->enter_serial, (uint32_t)shape);
 }
+static void set_cursor_name(WebWin *win, int shape) { set_cursor(win, shape); }
 
 void webwin_set_cursor_hint(WebWin *win, int link, int text) {
+    if (win->cursor_named) return;
     int shape = link ? WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER : text ? WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_TEXT : WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_DEFAULT;
     if (shape != win->cursor_shape) set_cursor(win, shape);
 }
 
-/* A motion names the button held (left first, then right, then middle), as GTK's does: WebKit 2.48 turns a libwpe
- * motion's button into the mouse event's, and WebCore drags a selection (or anything else) only while a motion says
- * the left button is down; with 0 a drag over text selected nothing. The click count (double and triple clicks) is
- * WebKit's own, from the presses' times and places. */
-static uint32_t motion_button(uint32_t buttons) {
-    if (buttons & wpe_input_pointer_modifier_button1) return 1;
-    if (buttons & wpe_input_pointer_modifier_button2) return 2;
-    if (buttons & wpe_input_pointer_modifier_button3) return 3;
-    return 0;
-}
-
-static void send_motion(WebWin *win, uint32_t time) {
-    uint32_t b = motion_button(win->buttons);
-    struct wpe_input_pointer_event e = { wpe_input_pointer_event_type_motion, time, (int)(win->px * win->scale), (int)(win->py * win->scale), b, b != 0, win->mods | win->buttons };
-    wpe_view_backend_dispatch_pointer_event(win->backend, &e);
-}
+static void send_motion(WebWin *win, uint32_t time) { webback_motion(win->back, time, win->px, win->py, win->mods | win->buttons); }
 
 static void ptr_enter(void *d, struct wl_pointer *p, uint32_t serial, struct wl_surface *s, wl_fixed_t x, wl_fixed_t y) {
     (void)p; (void)s;
@@ -1420,18 +1422,16 @@ static void ptr_button(void *d, struct wl_pointer *p, uint32_t serial, uint32_t 
     WebWin *win = d;
     win->input_serial = serial;
     if (state == WL_POINTER_BUTTON_STATE_PRESSED) { win->last_input_us = g_get_monotonic_time(); trace_input(win); }
-    /* libwpe's buttons: 1 left, 2 right, 3 middle */
-    uint32_t b = button == BTN_LEFT ? 1 : button == BTN_RIGHT ? 2 : button == BTN_MIDDLE ? 3 : 0;
+    int b = button == BTN_LEFT ? WEBBTN_LEFT : button == BTN_RIGHT ? WEBBTN_RIGHT : button == BTN_MIDDLE ? WEBBTN_MIDDLE : 0;
     if (!b) {
         if (state == WL_POINTER_BUTTON_STATE_PRESSED && button == BTN_SIDE) webkit_web_view_go_back(win->w->view);
         if (state == WL_POINTER_BUTTON_STATE_PRESSED && button == BTN_EXTRA) webkit_web_view_go_forward(win->w->view);
         return;
     }
-    uint32_t mask = b == 1 ? wpe_input_pointer_modifier_button1 : b == 2 ? wpe_input_pointer_modifier_button2 : wpe_input_pointer_modifier_button3;
+    uint32_t mask = b == WEBBTN_LEFT ? WEBMOD_BTN_LEFT : b == WEBBTN_RIGHT ? WEBMOD_BTN_RIGHT : WEBMOD_BTN_MIDDLE;
     int pressed = state == WL_POINTER_BUTTON_STATE_PRESSED;
     if (pressed) win->buttons |= mask; else win->buttons &= ~mask;
-    struct wpe_input_pointer_event e = { wpe_input_pointer_event_type_button, time, (int)(win->px * win->scale), (int)(win->py * win->scale), b, (uint32_t)pressed, win->mods | win->buttons };
-    wpe_view_backend_dispatch_pointer_event(win->backend, &e);
+    webback_button(win->back, time, win->px, win->py, b, pressed, win->mods | win->buttons);
 }
 static void ptr_axis(void *d, struct wl_pointer *p, uint32_t time, uint32_t axis, wl_fixed_t v) {
     (void)p;
@@ -1439,31 +1439,13 @@ static void ptr_axis(void *d, struct wl_pointer *p, uint32_t time, uint32_t axis
     win->axis_time = time;
     webaxis_value(&win->axis, axis, wl_fixed_to_double(v));
 }
-static void send_axis(WebWin *win, enum wpe_input_axis_event_type type, uint32_t axis, int32_t value, double x, double y) {
-    int px = (int)(win->px * win->scale), py = (int)(win->py * win->scale);
-    if (type & wpe_input_axis_event_type_mask_2d) {
-        struct wpe_input_axis_2d_event e = { { type, win->axis_time, px, py, 0, 0, win->mods }, x, y };
-        wpe_view_backend_dispatch_axis_event(win->backend, &e.base);
-    } else {
-        struct wpe_input_axis_event e = { type, win->axis_time, px, py, axis, value, win->mods };
-        wpe_view_backend_dispatch_axis_event(win->backend, &e);
-    }
-}
 /* the frame ends the axis events that belong together (webaxis.c decides what they make) */
 static void ptr_frame(void *d, struct wl_pointer *p) {
     (void)p;
     WebWin *win = d;
     WebAxisOut out[2];
     int n = webaxis_frame(&win->axis, win->scale, out);
-    enum wpe_input_axis_event_type smooth = (enum wpe_input_axis_event_type)(wpe_input_axis_event_type_mask_2d | wpe_input_axis_event_type_motion_smooth);
-    for (int i = 0; i < n; i++) {
-        if (out[i].kind == WEBAXIS_OUT_LINES) {
-            /* one line event per notch, on its own axis only */
-            for (int k = 0; k < (int)(out[i].y < 0 ? -out[i].y : out[i].y); k++) send_axis(win, wpe_input_axis_event_type_motion, WEBAXIS_V, out[i].y > 0 ? 1 : -1, 0, 0);
-            for (int k = 0; k < (int)(out[i].x < 0 ? -out[i].x : out[i].x); k++) send_axis(win, wpe_input_axis_event_type_motion, WEBAXIS_H, out[i].x > 0 ? 1 : -1, 0, 0);
-        } else if (out[i].kind == WEBAXIS_OUT_PIXELS) send_axis(win, smooth, 0, 0, out[i].x, out[i].y);
-        else send_axis(win, smooth, 0, 0, 0, 0);
-    }
+    if (n) webback_axis(win->back, win->axis_time, win->px, win->py, out, n, win->mods);
 }
 static void ptr_axis_source(void *d, struct wl_pointer *p, uint32_t s) { (void)p; webaxis_source(&((WebWin *)d)->axis, s); }
 static void ptr_axis_stop(void *d, struct wl_pointer *p, uint32_t t, uint32_t a) {
@@ -1475,51 +1457,37 @@ static void ptr_axis_stop(void *d, struct wl_pointer *p, uint32_t t, uint32_t a)
 static void ptr_axis_discrete(void *d, struct wl_pointer *p, uint32_t axis, int32_t v) { (void)p; webaxis_discrete(&((WebWin *)d)->axis, axis, v); }
 static void ptr_axis_120(void *d, struct wl_pointer *p, uint32_t axis, int32_t v) { (void)p; webaxis_value120(&((WebWin *)d)->axis, axis, v); }
 static void ptr_axis_rel(void *d, struct wl_pointer *p, uint32_t a, uint32_t r) { (void)d; (void)p; (void)a; (void)r; }
-static const struct wl_pointer_listener ptr_listener = { ptr_enter, ptr_leave, ptr_motion, ptr_button, ptr_axis, ptr_frame, ptr_axis_source, ptr_axis_stop, ptr_axis_discrete, ptr_axis_120, ptr_axis_rel };
+/* designated: newer libwayland adds events (wl_pointer 11's warp) of versions lord-web never binds (wl_seat 8 at most) */
+static const struct wl_pointer_listener ptr_listener = {
+    .enter = ptr_enter, .leave = ptr_leave, .motion = ptr_motion, .button = ptr_button, .axis = ptr_axis, .frame = ptr_frame,
+    .axis_source = ptr_axis_source, .axis_stop = ptr_axis_stop, .axis_discrete = ptr_axis_discrete, .axis_value120 = ptr_axis_120,
+    .axis_relative_direction = ptr_axis_rel,
+};
 
 /* ---- touch ---- */
 
-static void touch_send(WebWin *win, enum wpe_input_touch_event_type type, int id, uint32_t time) {
-    struct wpe_input_touch_event_raw pts[MAX_TOUCH];
-    int n = 0;
-    for (int i = 0; i < MAX_TOUCH; i++) if (win->touches[i].type != wpe_input_touch_event_type_null) pts[n++] = win->touches[i];
-    struct wpe_input_touch_event e = { pts, (uint64_t)n, type, id, time, win->mods };
-    wpe_view_backend_dispatch_touch_event(win->backend, &e);
-}
 static void touch_down(void *d, struct wl_touch *t, uint32_t serial, uint32_t time, struct wl_surface *s, int32_t id, wl_fixed_t x, wl_fixed_t y) {
     (void)t; (void)s;
     WebWin *win = d;
     win->input_serial = serial;
     win->last_input_us = g_get_monotonic_time();
-    if (id < 0 || id >= MAX_TOUCH) return;
-    win->touches[id] = (struct wpe_input_touch_event_raw){ wpe_input_touch_event_type_down, time, id, (int32_t)(wl_fixed_to_double(x) * win->scale), (int32_t)(wl_fixed_to_double(y) * win->scale) };
-    touch_send(win, wpe_input_touch_event_type_down, id, time);
+    webback_touch(win->back, WEBTOUCH_DOWN, id, time, wl_fixed_to_double(x), wl_fixed_to_double(y), win->mods);
 }
 static void touch_up(void *d, struct wl_touch *t, uint32_t serial, uint32_t time, int32_t id) {
     (void)t; (void)serial;
     WebWin *win = d;
-    if (id < 0 || id >= MAX_TOUCH || win->touches[id].type == wpe_input_touch_event_type_null) return;
-    win->touches[id].type = wpe_input_touch_event_type_up;
-    win->touches[id].time = time;
-    touch_send(win, wpe_input_touch_event_type_up, id, time);
-    win->touches[id].type = wpe_input_touch_event_type_null;
+    webback_touch(win->back, WEBTOUCH_UP, id, time, 0, 0, win->mods);
 }
 static void touch_motion(void *d, struct wl_touch *t, uint32_t time, int32_t id, wl_fixed_t x, wl_fixed_t y) {
     (void)t;
     WebWin *win = d;
-    if (id < 0 || id >= MAX_TOUCH || win->touches[id].type == wpe_input_touch_event_type_null) return;
-    win->touches[id] = (struct wpe_input_touch_event_raw){ wpe_input_touch_event_type_motion, time, id, (int32_t)(wl_fixed_to_double(x) * win->scale), (int32_t)(wl_fixed_to_double(y) * win->scale) };
-    touch_send(win, wpe_input_touch_event_type_motion, id, time);
+    webback_touch(win->back, WEBTOUCH_MOTION, id, time, wl_fixed_to_double(x), wl_fixed_to_double(y), win->mods);
 }
 static void touch_frame(void *d, struct wl_touch *t) { (void)d; (void)t; }
 static void touch_cancel(void *d, struct wl_touch *t) {
     (void)t;
     WebWin *win = d;
-    for (int i = 0; i < MAX_TOUCH; i++) if (win->touches[i].type != wpe_input_touch_event_type_null) {
-        win->touches[i].type = wpe_input_touch_event_type_up;
-        touch_send(win, wpe_input_touch_event_type_up, i, win->touches[i].time);
-        win->touches[i].type = wpe_input_touch_event_type_null;
-    }
+    webback_touch(win->back, WEBTOUCH_CANCEL, -1, 0, 0, 0, win->mods);
 }
 static void touch_shape(void *d, struct wl_touch *t, int32_t id, wl_fixed_t a, wl_fixed_t b) { (void)d; (void)t; (void)id; (void)a; (void)b; }
 static void touch_orient(void *d, struct wl_touch *t, int32_t id, wl_fixed_t o) { (void)d; (void)t; (void)id; (void)o; }
@@ -1528,7 +1496,7 @@ static const struct wl_touch_listener touch_listener = { touch_down, touch_up, t
 static void seat_caps(void *d, struct wl_seat *s, uint32_t caps) {
     WebWin *win = d;
     win->seat_caps = caps;
-    if (!win->backend) return;                      /* webwin_attach calls this again */
+    if (!win->back) return;                         /* webwin_attach calls this again */
     if ((caps & WL_SEAT_CAPABILITY_KEYBOARD) && !win->kbd) { win->kbd = wl_seat_get_keyboard(s); wl_keyboard_add_listener(win->kbd, &kb_listener, win); }
     if ((caps & WL_SEAT_CAPABILITY_POINTER) && !win->ptr) {
         win->ptr = wl_seat_get_pointer(s);
@@ -1580,28 +1548,57 @@ WebWin *webwin_new(Web *w) {
     return win;
 }
 
-/* EGL on the compositor's own display, for wpebackend-fdo's linux-dmabuf: 0 when it works */
+/* EGL on the compositor's own display, for the backend's linux-dmabuf: 0 when it works. Also the GPU's render node
+ * (EGL_EXT_device_query), which the WPEPlatform backend tells WebKit. */
 static int egl_up(WebWin *win) {
     PFNEGLGETPLATFORMDISPLAYEXTPROC get = (PFNEGLGETPLATFORMDISPLAYEXTPROC)eglGetProcAddress("eglGetPlatformDisplayEXT");
     win->egl = get ? get(EGL_PLATFORM_WAYLAND_KHR, win->dpy, NULL) : eglGetDisplay((EGLNativeDisplayType)win->dpy);
     if (win->egl == EGL_NO_DISPLAY || !eglInitialize(win->egl, NULL, NULL)) { win->egl = EGL_NO_DISPLAY; return -1; }
     const char *ext = eglQueryString(win->egl, EGL_EXTENSIONS);
     if (!ext || !strstr(ext, "EGL_EXT_image_dma_buf_import")) { eglTerminate(win->egl); win->egl = EGL_NO_DISPLAY; return -1; }
+    PFNEGLQUERYDISPLAYATTRIBEXTPROC qd = (PFNEGLQUERYDISPLAYATTRIBEXTPROC)eglGetProcAddress("eglQueryDisplayAttribEXT");
+    PFNEGLQUERYDEVICESTRINGEXTPROC qs = (PFNEGLQUERYDEVICESTRINGEXTPROC)eglGetProcAddress("eglQueryDeviceStringEXT");
+    EGLAttrib dev = 0;
+    if (qd && qs && qd(win->egl, EGL_DEVICE_EXT, &dev) && dev) {
+        const char *node = qs((EGLDeviceEXT)dev, EGL_DRM_RENDER_NODE_FILE_EXT);
+        if (node && !strncmp(node, "/dev/dri/renderD", 16) && strlen(node) < sizeof win->render_node) snprintf(win->render_node, sizeof win->render_node, "%s", node);
+        const char *card = qs((EGLDeviceEXT)dev, EGL_DRM_DEVICE_FILE_EXT);
+        if (card && !strncmp(card, "/dev/dri/card", 13) && strlen(card) < sizeof win->primary_node) snprintf(win->primary_node, sizeof win->primary_node, "%s", card);
+    }
     return 0;
+}
+
+static void egl_down(WebWin *win) {
+    if (win->egl != EGL_NO_DISPLAY && win->egl) eglTerminate(win->egl);
+    win->egl = EGL_NO_DISPLAY;
+    win->render_node[0] = win->primary_node[0] = 0;
 }
 
 int webwin_init_backend(WebWin *win) {
     const char *gpu = getenv("LORD_GPU");
     int try_gpu = win->dmabuf && !getenv("LORD_WEB_SHM") && !(gpu && !strcmp(gpu, "0"));
-    if (try_gpu && !egl_up(win) && wpe_fdo_initialize_for_egl_display(win->egl)) win->gpu = 1;
-    else {
-        if (win->egl != EGL_NO_DISPLAY && win->egl) { eglTerminate(win->egl); win->egl = EGL_NO_DISPLAY; }
-        if (!wpe_fdo_initialize_shm()) { fprintf(stderr, "lord-web: wpebackend-fdo could not start\n"); return -1; }
-        setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);     /* the web process draws on the CPU into shared memory */
+    WebBackConfig cfg = { .width = win->width, .height = win->height, .scale = win->scale };
+    if (try_gpu && !egl_up(win)) {
+        cfg.gpu = 1;
+        cfg.egl_display = win->egl;
+        cfg.render_node = win->render_node[0] ? win->render_node : NULL;
+        cfg.primary_node = win->primary_node[0] ? win->primary_node : NULL;
+        cfg.dmabuf_formats = win->dmabuf_formats;
+        cfg.dmabuf_modifiers = win->dmabuf_modifiers;
+        cfg.dmabuf_n = win->dmabuf_n;
+        win->back = webback_new(&cfg, &sink, win);
+        if (win->back) win->gpu = 1;
     }
-    win->w->exportable = wpe_view_backend_exportable_fdo_create(&export_client, win, (uint32_t)win->width, (uint32_t)win->height);
-    if (!win->w->exportable) return -1;
-    win->backend = wpe_view_backend_exportable_fdo_get_view_backend(win->w->exportable);
+    if (!win->back) {
+        egl_down(win);
+        WebBackConfig cpu = { .width = win->width, .height = win->height, .scale = win->scale };
+        win->back = webback_new(&cpu, &sink, win);
+        if (!win->back) return -1;
+    }
+    win->w->back = win->back;
+    update_screen(win);
+    fprintf(stderr, "lord-web: %s backend (WPE WebKit %u.%u.%u), %s\n", webback_name(), webkit_get_major_version(), webkit_get_minor_version(),
+            webkit_get_micro_version(), win->gpu ? "dmabuf" : "shared memory");
     return 0;
 }
 
@@ -1615,7 +1612,7 @@ static void ime_attach(WebWin *win) {
 }
 
 void webwin_attach(WebWin *win) {
-    if (win->scale != 1) wpe_view_backend_dispatch_set_device_scale_factor(win->backend, (float)win->scale);
+    if (win->scale != 1) webback_set_scale(win->back, win->scale);
     if (win->seat) {
         seat_caps(win, win->seat, win->seat_caps);
         if (win->ddm) { win->dd = wl_data_device_manager_get_data_device(win->ddm, win->seat); wl_data_device_add_listener(win->dd, &dd_listener, win); }
@@ -1629,6 +1626,8 @@ void webwin_free(WebWin *win) {
     repeat_stop(win);
     if (win->pb_timer) g_source_remove(win->pb_timer);
     if (win->src) { g_source_destroy(win->src); g_source_unref(win->src); }
+    webback_free(win->back);
+    win->w->back = NULL;
     wl_display_flush(win->dpy);
     wl_display_disconnect(win->dpy);
     free(win);

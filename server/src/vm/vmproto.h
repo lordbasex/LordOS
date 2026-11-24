@@ -99,6 +99,14 @@
  *     VM_RENAME     the machine's name while it runs (lord-vm --rename, 6.26): text = the new name (vm_rename_name_ok);
  *                   lord-vm holds the lock, so it writes machine.json. Only the name: the folders keep theirs until a
  *                   rename with the machine off → VM_REPLY
+ *     VM_LINK       a machine group's internal link (docs/VIRTUALIZATION.md 19.3; approved by the maintainer 2026-11-23): a = 1
+ *                   with one descriptor, one end of a socketpair(AF_UNIX, SOCK_STREAM) lord-server made for the group's
+ *                   two members; a = 0 without one, the cable is pulled. text = the group's id, which must be machine.json's
+ *                   "group"; only a member whose card is on the link (a workstation, or a gateway's second card) takes
+ *                   it. lord-vm checks the descriptor (SO_DOMAIN AF_UNIX, SO_TYPE SOCK_STREAM, the peer's SO_PEERCRED uid
+ *                   its own), hands it to QEMU (QMP getfd) and puts it on the link's hub (netdev_add socket + hubport),
+ *                   taking the previous one off (netdev_del). The frames go QEMU to QEMU; nothing on the host reads them.
+ *                   → VM_REPLY once QEMU took it
  *     VM_APPS       apps mode (7.2): a = 1 on, 0 off; sent on to the guest's helper (LAG_APPS) only when the machine's
  *                   agent is on and the helper said "windows" (LAG_CAP_WINDOWS) → VM_REPLY
  *     VM_WINACT     a window of the guest: a = its id (as the guest named it), b = LAGA_* (focus, close, minimize,
@@ -240,8 +248,8 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME,
-    VM_REQ_LAST = VM_RENAME,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK,
+    VM_REQ_LAST = VM_LINK,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
 };
@@ -486,6 +494,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_APPS || m->a == 0 || m->a == 1) &&
                       (m->type != VM_CAPTURE || m->a == 0 || m->a == 1) &&
                       (m->type != VM_RENAME || m->text[0]) &&
+                      (m->type != VM_LINK || ((m->a == 0 || m->a == 1) && strnlen(m->text, VM_TEXT_MAX) == 36)) &&
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
                       (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0));
     switch (m->type) {

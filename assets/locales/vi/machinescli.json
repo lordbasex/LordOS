@@ -88,5 +88,11 @@
   "state.crashed": "Đã dừng do lỗi",
   "state.recovered": "Đã tắt (đã khôi phục)",
   "state.suspended": "Đã tạm ngưng",
-  "state.stopped": "Đã tắt"
+  "state.stopped": "Đã tắt",
+  "groupStarted": "{name} đang chạy: cổng trước, rồi đến máy trạm.",
+  "groupStopped": "{name} đã tắt: máy trạm trước, rồi đến cổng.",
+  "groupDamaged": "{name} bị hỏng: một máy của nó bị thiếu hoặc không phải của nó.",
+  "gatewayFailed": "Cổng của {name} không khởi động ({why}), nên máy trạm không được khởi động.",
+  "workstationFailed": "Máy trạm của {name} không khởi động ({why}); cổng vẫn đang chạy.",
+  "kind.group": "nhóm {count} máy"
 }

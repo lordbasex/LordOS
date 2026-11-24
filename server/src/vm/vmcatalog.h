@@ -46,7 +46,24 @@ typedef struct {
      * size. The catalog is part of LordOS's signed package; a pinned file is kept only with that hash. */
     int npins;
     struct { char name[96]; char url[VMCAT_URL]; char sha[65]; unsigned long long bytes; } pin[VMCAT_PINS];
+    /* machine groups (docs/VIRTUALIZATION.md 19.6; approved by the maintainer on 2026-11-23): */
+    int hash;                     /* VMCAT_SHA256 (the default) or VMCAT_SHA512 ("hash": "sha512"): the list's and the download's */
+    char sig_suffix[16];          /* "signature": { "type": "detached", "suffix": ".asc" }: the list's own name plus this */
+    /* "releases": the newest release folder under rel_dir whose list verifies, never older than rel_floor (the
+     * maintainer's decision: a current Tor Browser after a Start Fresh, and no rollback below a release already used).
+     * dir is then rel_dir + "<release>/" (vmcat_release_dir); "" when the entry pins its folder */
+    char rel_dir[VMCAT_URL];
+    char rel_re[VMCAT_RE];        /* a release folder's name */
+    char rel_floor[32];
+    /* "kind": "group": the download is an archive of a machine group's disks ("archive"), unpacked by lord-vmunpack */
+    int group;
+    char group_kind[16];          /* "whonix" */
+    char edition[16];
+    char member_re[2][VMCAT_RE];  /* [0] the gateway's member, [1] the workstation's: their names in the archive */
+    unsigned long long max_apparent, max_data;   /* bytes: a member's real (sparse) size, and the data of all members */
+    int member_vcpus[2], member_mem_mb[2];      /* "machine": each member's vCPUs and memory (defaults 1 and 2048) */
 } VmCatEntry;
+enum { VMCAT_SHA256 = 256, VMCAT_SHA512 = 512 };
 
 /* the entry of `id` for `arch` ("amd64", "arm64"): 0, or -1 (not there, or the entry isn't well formed: a folder that
  * isn't https:// ending in '/', a pattern that isn't anchored or doesn't compile, a size out of range, no signature,
@@ -66,7 +83,8 @@ int vmcat_name_ok(const char *name);
 int vmcat_match(const char *re, const char *name);
 
 /* 1 if a line of the maker's list (n bytes) gives exactly this name and SHA-256 (64 hex digits, any case): GNU form
- * "<hash>  <name>" or "<hash> *<name>", or BSD form "SHA256 (<name>) = <hash>" */
+ * "<hash>  <name>" or "<hash> *<name>", or BSD form "SHA256 (<name>) = <hash>". With 128 hex digits, the same for a
+ * SHA-512 ("SHA512 (<name>) = <hash>" in BSD form) */
 int vmcat_sums_has(const char *sums, size_t n, const char *name, const char *sha_hex);
 
 /* The maker's list checked with the entry's pinned keys before any hash in it is trusted. keys: the key file's bytes;
@@ -82,6 +100,20 @@ int vmcat_verify_list(const VmCatEntry *e, const char *keys, size_t keys_len, co
 
 /* 1 if s is 64 hex digits */
 int vmcat_sha_ok(const char *s);
+/* 1 if s is the entry's hash in hex: 64 digits (SHA-256) or 128 (an entry with "hash": "sha512") */
+int vmcat_hash_ok(const VmCatEntry *e, const char *s);
+/* a release folder's name for an entry with "releases": it matches rel_re and isn't older than rel_floor (numbers
+ * compared one by one). 1 yes */
+int vmcat_release_ok(const VmCatEntry *e, const char *rel);
+/* -1, 0, 1: a release "18.2.4.3" compared to another, numerically, part by part */
+int vmcat_release_cmp(const char *a, const char *b);
+/* the release a file name of such an entry names (Whonix-LXQt-<release>.Intel_AMD64…: the first run of numbers joined by
+ * dots, at least two of them, that matches rel_re), into out; 0, or -1 when it names none or more than one different.
+ * A list's or an archive's name must name the very release whose folder it comes from (no older signed file paired with
+ * a newer folder) */
+int vmcat_release_in(const VmCatEntry *e, const char *name, char *out, size_t n);
+/* e->dir and e->file_dir set to rel_dir + rel + "/" (after vmcat_release_ok); 0, or -1 */
+int vmcat_release_dir(VmCatEntry *e, const char *rel);
 
 /* a pinned entry's file of that name and SHA-256 (any case): its index, or -1 */
 int vmcat_pin_find(const VmCatEntry *e, const char *name, const char *sha);

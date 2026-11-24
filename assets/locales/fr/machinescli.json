@@ -88,5 +88,11 @@
   "state.crashed": "Arrêtée sur une erreur",
   "state.recovered": "Éteinte (récupérée)",
   "state.suspended": "Suspendue",
-  "state.stopped": "Éteinte"
+  "state.stopped": "Éteinte",
+  "groupStarted": "{name} est en marche : d’abord sa passerelle, puis son poste de travail.",
+  "groupStopped": "{name} est éteint : d’abord son poste de travail, puis sa passerelle.",
+  "groupDamaged": "{name} est endommagé : une de ses machines manque ou n’est pas la sienne.",
+  "gatewayFailed": "La passerelle de {name} n’a pas démarré ({why}), son poste de travail n’a donc pas été démarré.",
+  "workstationFailed": "Le poste de travail de {name} n’a pas démarré ({why}) ; sa passerelle tourne toujours.",
+  "kind.group": "groupe de {count}"
 }

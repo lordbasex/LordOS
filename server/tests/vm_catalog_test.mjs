@@ -56,7 +56,9 @@ eq('Debian 13', [card('debian').name, card('debian').release], ['Debian', '13'])
 eq('every entry has its hash source and date', CAT.systems.every((s) => s.hashSource && /^\d{4}-\d\d-\d\d$/.test(s.checked)), true);
 // a pinned entry (Windows' evaluation, virtio-win; vmcatalog.h) names its files itself; every other entry has a folder
 const pinnedOf = (s) => Object.values(s.arch).some((a) => Array.isArray(a.pinned));
-eq('every folder is https', CAT.systems.filter((s) => !pinnedOf(s)).every((s) => Object.values(s.arch).every((a) => /^https:\/\/[^/]+\/.*\/$/.test(a.dir) && (!a.fileDir || /^https:\/\//.test(a.fileDir)))), true);
+// (an entry with "releases" has the folder of its release folders instead: Whonix, docs/VIRTUALIZATION.md 19.6)
+eq('every folder is https', CAT.systems.filter((s) => !pinnedOf(s)).every((s) => Object.values(s.arch).every((a) => /^https:\/\/[^/]+\/.*\/$/.test(a.releases ? a.releases.dir : a.dir) && (!a.fileDir || /^https:\/\//.test(a.fileDir)))), true);
+eq('the Whonix group is no card until the assistant has one', card('whonix'), undefined);
 for (const s of CAT.systems.filter(pinnedOf)) {
   const files = Object.values(s.arch).flatMap((a) => a.pinned || []);
   eq(`${s.id}: pinned files`, [files.length > 0, files.every((f) => /^https:\/\/[^/\s"<>\\]+\/\S+$/.test(f.url) && /^[0-9a-f]{64}$/.test(f.sha256) && Number.isInteger(f.bytes) && f.bytes > 0 &&

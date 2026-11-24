@@ -11,6 +11,58 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
+  Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
+  workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the
+  gateway. Built so far: the download, its checks and unpacking, the group, the link between its two machines, and the
+  `machines` command; the assistant's card, the library's group card, Configure's group view and Start Fresh come next.
+  - **The catalog entry** `whonix` (hidden until its card exists): Whonix's signing key pinned
+    (`packaging/keys/machines/whonix-derivative.asc`, primary key `916B 8D99 C38E AF5E 8ADC 7A2A 8D66 066A 2EEA CCDA`,
+    compared on 2026-11-23 with Whonix's signing key page and keys.openpgp.org). The catalog learned SHA-512 lists, a
+    detached signature named after its list (`.asc`), the newest release folder whose list verifies with a floor no
+    download goes below (18.2.4.3), and an archive's members and size caps.
+  - **The admin actions** `vm-image-list` and `vm-image-get` take such an entry: the release folders' listing, then the
+    release's SHA-512 list and its OpenPGP signature checked with the pinned key, then the archive. A release below the
+    catalog's floor or below the newest one ever verified (kept root-side) is refused, and a list's or an archive's name
+    must give the very release of its folder. The archive downloads under a temporary name and becomes
+    `images/<sha512>.tar.xz` only after the whole file's SHA-512 matched the list's; a file at that name that isn't in
+    that verified state is thrown away. Root hashes it and never reads its contents. `vm-image-cancel` and
+    `vm-image-remove` take the longer names.
+  - **`lord-vmunpack`**, a new sandboxed helper started by `lord-vm`: it reads the verified archive on a descriptor and
+    writes exactly the two disks into two descriptors, with no files, network or exec (`sandbox_apply_helper`, 320 MB),
+    linking only libc and LordOS's own xz decoder, which got a streaming mode (`xzs_*`: CRC32 and CRC64 checked block by
+    block, the index checked against the blocks, at most a 256 MiB dictionary, nothing after the stream's end). Its tar
+    reader takes plain and old-GNU sparse members only, with names that match the catalog's patterns, each role once,
+    ascending sparse maps inside their size, and the catalog's caps (128 GiB a disk, 24 GiB of data); holes stay holes.
+    On Whonix 18.2.4.3 LXQt (1.9 GB): 104 s, 11 MB of memory, both disks byte for byte GNU tar's.
+  - **`lord-vm --group-create`** hashes the archive again, unpacks it with `lord-vmunpack`, checks each disk with the jailed
+    `qemu-img info` (no backing file, no data file, a virtual size within the cap), writes read-only bases in
+    `~/Machines/.shared` with the jailed `qemu-img convert` (dropping the 100 GiB of preallocated metadata: 2.85 GiB and
+    3.59 GiB) and makes `<name>.lordgroup/` with its `group.json` and the two machines as linked clones of the bases.
+  - **`group.json`** (schema 1: members, roles, start and stop order, the image and its bases) and **`machine.json` schema
+    14** for members: `group`, `role`, the `link` network (one card on the group's link and nothing else),
+    `"uplink": "tor"` (the gateway's passt with no DNS forwarding and no ports), `link_mac`, `profile_lock` and `timers`.
+    The anonymity lock refuses the agent, clipboard, transfer and shared folders, ports, 3D, graphics cards, the
+    microphone, SMBIOS strings, disk serials and the performance profile, with no override. A locked member gets private
+    4 KB memory (no hugetlb, transparent huge pages off for its QEMU, no KSM), no VMware port, no HPET, a generation id, Whonix's clock devices as libvirt
+    gives them (checked in libvirt 11.3's source), no sound card on the gateway and an output-only one on the
+    workstation, no first-boot credentials, no suspend and no card picture on disk.
+  - **The internal link**: a new control message, `VM_LINK`. lord-server makes one `socketpair` per pairing and hands one
+    end to each member's `lord-vm`, which checks it (a connected AF_UNIX stream socket of this account) and puts it on the
+    card's QEMU hub, taking the previous one off. The two QEMUs exchange frames directly; nothing on the host reads them,
+    no other process can reach them, QEMU's sandbox is unchanged. A member started anew is linked again by the session
+    within 2 s; with the gateway off the workstation has no network at all.
+  - **Groups in Machines and the `machines` command**: `lord.vm.list()` lists the members with their group and role,
+    `lord.vm.groups()` the groups, `lord.vm.link()` makes a group's link; the model's `groupPlan` starts the gateway first
+    and the workstation once it runs, and stops them the other way round. `machines list` shows a group's row,
+    `machines start Whonix [--no-window]` and `open` go through the session (whose channel now takes a `.lordgroup`
+    folder), `stop` and `poweroff` act in stop order, `status --json` describes the group.
+  - **Checked on the dev host, headless**: the gateway's eth0 at slot 0x2 (passt) and eth1 at 0x18 (the link), the
+    workstation's only card at 0x2 with its only route through 10.152.152.10, Tor's own check answering `"IsTor":true`
+    from the workstation, no network for it with the gateway off, the link swapped three times during a download without
+    breaking it, and the session relinking a restarted gateway. Still open: neither Whonix member powers off on ACPI's
+    power button (checked with the unchanged images: forced off after 120 s), so a group's Shut Down ends as a forced
+    power-off for now.
 - **Protected windows, everywhere a picture leaves** (in development; latest release 0.8.9.5; approved by the maintainer on
   2026-11-23 as isolation layer 8 of the Whonix group, docs/VIRTUALIZATION.md 19.5, and useful for any window). A
   protected window shows normally on the display and never appears in anything that captures the screen
@@ -131,6 +183,39 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     and `process_vm_readv` are refused. `vm-jail-probe --before` runs the old jail for comparison: 9 of those checks fail
     there. `tests/vm_isolation.sh` checks the status fields, the refused reads, `PTRACE_SEIZE` and `process_vm_readv` on
     a real machine; it no longer lists QEMU's descriptors, which the person's programs can't any more.
+- **Web apps: lord-web on WPEPlatform, WPE WebKit's new API** (in development; the latest release is 0.8.9.5-beta;
+  issue #142, maintainer's decision 2026-11-23). Everything lord-web does with WebKit's frames and input now goes
+  through one small interface, `server/src/web/webback.h`, with two implementations, one of them built:
+  - `webback_platform.c`, on **WPEPlatform** (WPE WebKit 2.50 and later; LordOS will ship its own build of wpewebkit
+    2.54 for Debian 13 with both APIs on). lord-web brings its own platform (a `WPEDisplay`, `WPEView`, `WPEToplevel`
+    and `WPEScreen` of its own) instead of WPEPlatform's Wayland one, so it keeps its window and hands lord-server its
+    frames itself, exactly as before: a `WPEBufferDMABuf` becomes a `wl_buffer` of the window with no copy (the
+    formats and modifiers offered to WebKit are the ones lord-server announces, and its DRM device is lord-server's
+    GPU, read from EGL), a `WPEBufferSHM` is copied into one of the window's `wl_shm` buffers (the CPU path, `LORD_GPU=0`).
+    Keys (the compositor's keymap through WPEPlatform's xkb keymap), the pointer, the wheel and touchpad, touch,
+    focus, size, fractional scale, the page's cursor (by its CSS name, now exact instead of guessed from the hovered
+    element), the clipboard (WPEPlatform's `WPEClipboard`, which keeps UTF-8 as UTF-8) and the screen's size and
+    refresh rate all reach WebKit as `WPEEvent`s and WPEPlatform calls. The input method stays lord-web's
+    text-input-v3 context, now shared by both backends.
+  - `webback_legacy.c`: the libwpe + wpebackend-fdo code lord-web had, moved behind the interface unchanged, so
+    Debian 13's WPE WebKit 2.48 keeps building and working exactly as before.
+  - `mk/web.mk` picks the backend: WPEPlatform when `pkg-config` finds `wpe-platform-2.0`, else legacy;
+    `LORD_WEB_BACKEND=legacy|platform` forces one (an error when its packages are missing). When lord-web is skipped
+    the build now says why: which packages are missing for each backend, or that `WEB=0` was given. Switching backend
+    rebuilds lord-web; `tools/iso/mkdeb-web.sh` writes the Depends of the backend that was built (no `libwpe`,
+    `wpebackend-fdo` or `libwayland-server` for WPEPlatform); lord-web's log names the backend and WebKit's version.
+  - Isolation: nothing was added to lord-web's sandbox. With WPEPlatform lord-web no longer runs wpebackend-fdo's
+    nested Wayland compositor (no `libwayland-server`, no socket pair for frames: frames come over WebKit's own IPC);
+    the web process opens the GPU's render node with GBM where the legacy one opened it through EGL (WebKit's sandbox
+    exposes `/dev/dri` in both); the `WPE_*` variables WPEPlatform reads were already dropped (docs/WEBAPPS.md, "The
+    view's backend").
+  - New test, `build/web-backend-test` (`tests/web_backend_test.c`, in `make -C server test`): the backend alone,
+    headless, with a throwaway HOME and WebKit's sandbox: a local page's pixels in the frame, a click and keys reaching
+    the page's listeners and the next frame, the wheel, a resize, scale 2 (`devicePixelRatio`, the frame's size, a click
+    at the same CSS position) and hidden then visible. It passes on the legacy backend with Debian 13's 2.48.3 and on
+    both backends with Debian sid's 2.54.3; lord-web also showed a page in a window of a headless weston on 2.54.3 with
+    both backends, by shared memory and by dmabuf. Still to check on LordOS's 2.54 backport and the VM: every web app
+    feature, before the backport ships.
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores
