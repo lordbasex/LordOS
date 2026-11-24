@@ -11,6 +11,29 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: the app's last parts** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.1, 5.2,
+  5.3, 5.5, 6.14).
+  - **New Machine: Detect.** An installer disc chosen or dropped on the assistant gets a step of its own: Machines reads
+    the disc's label and its boot files and says which system it is, which processors it starts on, and, before anything
+    is made, when it would run emulated on this computer or when its name and its boot files disagree. The reader runs
+    in lord-vm under seccomp's strict mode (it can only read the mapped file and write its answer) and was tested with
+    made-up, hostile and real discs.
+  - **New Machine: drop, place, Fresh install.** Drop an installer disc, a disk image or another app's machine anywhere
+    on the first step. The Name step says where the machine goes and how much space is free there. After an
+    unattended install, the machine takes a "Fresh install" snapshot before its first start (on by default).
+  - **Templates.** Make Template keeps a machine as it is; its card says Template, the library has a Templates chip,
+    and New Machine from Template makes a copy to use.
+  - **Configure.** A machine's icon color and tags (the library's search finds them, `#tag` exactly); the processor
+    the guest sees (this computer's, or Compatible: the same on every computer, so a machine keeps working when it
+    moves); Add Disk (one more empty data disk); a new network card address; huge pages shown as automatic; where the
+    guest prints. `machine.json` schema 16 adds `cpu_model`.
+  - **The machine's window.** View → Scale (50 % to 200 %); with a fixed resolution the window keeps the guest's shape
+    after a resize; a dot on the bar for each device the guest can use now; Devices → Network pulls or plugs in the
+    network cable while the machine runs, and Devices → Folders.
+  - **Cleaner** sends a machine's space to Machines' Storage window (Reclaim in Machines) instead of offering its files.
+  - **Decided:** no memory ballooning (the guest would decide what it gives back, and it is one more device a guest
+    talks to); no network speed limit; this computer's printing service is never opened to a machine; machines stay in
+    the Machines library; the capture release keys stay fixed.
 - **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
   latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
   - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
