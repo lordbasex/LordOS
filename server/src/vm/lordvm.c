@@ -7,7 +7,7 @@
  *                        [--disk GB] [--firmware uefi|bios] [--display window|none]
  *                        [--network shared|isolated|bridged|hostonly]
  *                        [--import IMAGE] [--iso FILE]
- *   lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp]
+ *   lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--pidfd-to N] [--keep-running] [--dev-qmp]
  *                       [--credentials-file FILE]
  *     FILE: systemd credentials for the guest's first boot, one per line, NAME=VALUE or binary:NAME=BASE64.
  *     They may be secrets (a root password), so they never go on a command line or into the log: lord-vm reads
@@ -7534,7 +7534,7 @@ static void discard_state(const char *dir) {
 
 static int connect_machine(const VmMachine *m);
 static int cmd_start(const char *dir, int argc, char **argv) {
-    int detach = 0, control = -1, discard = 0;
+    int detach = 0, control = -1, discard = 0, pidfd_to = -1;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = -1;
     S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = -1;
@@ -7557,6 +7557,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         else if (!strcmp(argv[i], "--loadvm") && i + 1 < argc) { if (!vm_snap_tag_valid(argv[++i])) { fprintf(stderr, "lord-vm: --loadvm TAG\n"); return 2; } snprintf(S.loadvm, sizeof S.loadvm, "%s", argv[i]); }
         else if (!strcmp(argv[i], "--discard-state")) discard = 1;
         else if (!strcmp(argv[i], "--control-fd") && i + 1 < argc) control = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--pidfd-to") && i + 1 < argc) pidfd_to = atoi(argv[++i]);
         else if (!strcmp(argv[i], "--credentials-file") && i + 1 < argc) { if (read_credentials(argv[++i])) return 2; }
         else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
     }
@@ -7566,6 +7567,15 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         if (control < 3 || getsockopt(control, SOL_SOCKET, SO_TYPE, &type, &l) || type != SOCK_SEQPACKET) { fprintf(stderr, "lord-vm: --control-fd must be a SOCK_SEQPACKET socket\n"); return 2; }
         fcntl(control, F_SETFD, FD_CLOEXEC);
         fcntl(control, F_SETFL, O_NONBLOCK);
+    }
+    if (pidfd_to >= 0) {
+        /* lord-server's socketpair for this start (a detached one): lord-vm sends a pidfd of itself over it once it is
+         * the process that serves the machine, so lord-server can vouch for it without /proc/<pid>/exe (Sentinela,
+         * vm/vmwatch.h); one message, then it's closed */
+        int type = 0;
+        socklen_t l = sizeof type;
+        if (pidfd_to < 3 || pidfd_to == control || getsockopt(pidfd_to, SOL_SOCKET, SO_TYPE, &type, &l) || type != SOCK_SEQPACKET) { fprintf(stderr, "lord-vm: --pidfd-to must be a SOCK_SEQPACKET socket\n"); return 2; }
+        fcntl(pidfd_to, F_SETFD, FD_CLOEXEC);
     }
     /* QEMU's user namespace: made now, while lord-vm is still dumpable (vmsandbox.h) */
     S.userns = vm_userns_open();
@@ -7617,6 +7627,23 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); dup2(null, 2); if (null > 2) close(null); }
         log_stderr = 0;
+    }
+    if (pidfd_to >= 0) {
+        int me = (int)syscall(SYS_pidfd_open, getpid(), 0);
+        if (me >= 0) {
+            char one = 'p';
+            char cm[CMSG_SPACE(sizeof(int))];
+            memset(cm, 0, sizeof cm);
+            struct iovec io = { &one, 1 };
+            struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm, .msg_controllen = sizeof cm };
+            struct cmsghdr *h = CMSG_FIRSTHDR(&mh);
+            h->cmsg_level = SOL_SOCKET; h->cmsg_type = SCM_RIGHTS; h->cmsg_len = CMSG_LEN(sizeof(int));
+            memcpy(CMSG_DATA(h), &me, sizeof me);
+            if (sendmsg(pidfd_to, &mh, MSG_NOSIGNAL | MSG_DONTWAIT) != 1) vlog("start: lord-server didn't get this lord-vm's pidfd: %s", strerror(errno));
+            close(me);
+        }
+        close(pidfd_to);
+        pidfd_to = -1;
     }
     char p[PATH_MAX + 32];
     snprintf(p, sizeof p, "%s/log", S.dir);
@@ -11356,7 +11383,7 @@ static int usage(void) {
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"
-            "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
+            "       lord-vm --start DIR [--paused] [--detach] [--control-fd N] [--pidfd-to N] [--keep-running] [--dev-qmp] [--credentials-file FILE]\n"
             "                           [--render-node /dev/dri/renderDN|none]   (3D graphics: the GPU QEMU may use; none: 2D)\n"
             "                           [--resume-anyway] [--discard-state]\n"
             "       lord-vm --suspend DIR | --discard-state DIR | --agent DIR shutdown|timesync|install\n"
