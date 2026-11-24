@@ -309,39 +309,54 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     both backends, by shared memory and by dmabuf. Still to check on LordOS's 2.54 backport and the VM: every web app
     feature, before the backport ships.
 - **WPE WebKit 2.54 with WPEPlatform for Debian 13, built by LordOS** (in development, not published yet; latest
-  release 0.8.9.5). Maintainer's decision of 2026-11-23, step 1 of lord-web's move to WebKit's new API
+  release 0.8.9.5). Maintainer's decisions of 2026-11-23 and 2026-11-24, for lord-web's move to WebKit's new API
   ([#142](https://github.com/lordbasex/LordOS/issues/142)). Debian 13's `wpewebkit` 2.48 is built without WPEPlatform,
-  so LordOS rebuilds Debian's own 2.54.3-1 source package for trixie as `2.54.3-1~lordos13+1`
+  so LordOS rebuilds Debian's own 2.54.3-1 source package for trixie as `2.54.3-1~lordos13+2`
   ([docs/WPEWEBKIT.md](docs/WPEWEBKIT.md)), to be published in the LordOS APT repository with its exact source.
-  - **`tools/pkg/build-wpewebkit.sh <debian-version>`** does it all from a version, in clean trixie chroots made by
-    `mmdebstrap` (trixie, trixie-updates and trixie-security only): fetches Debian's source package (pool or
+  - **`tools/pkg/build-wpewebkit.sh <debian-version> [revision]`** does it all from a version, in clean trixie chroots
+    made by `mmdebstrap` (trixie, trixie-updates and trixie-security only): fetches Debian's source package (pool or
     snapshot.debian.org), checks the `.dsc` with `dscverify` against `debian-keyring` (signed by Alberto Garcia, every
     checksum) and the release tarball's signature against the two pinned WebKit release keys (and that wpewebkit.org's
     signature is the same file as Debian's), applies LordOS's changes, installs the build dependencies from trixie,
     builds the source package and every binary package with `dpkg-buildpackage -sa` as an unprivileged user, runs
-    lintian, then installs the result in a second chroot and tests it. `TMPFS=<size>` builds in RAM.
-  - **Changes to Debian's packaging, and only these** (`tools/pkg/wpewebkit-chroot.sh`): WPEPlatform with its DRM,
-    headless and Wayland backends and the legacy libwpe API turned on explicitly (both upstream defaults, written out so
-    a changed default stops the build), `Maintainer: LordOS` (Debian's WebKit team credited in the changelog
-    and `debian/copyright`), and the changelog entry, dated one second after Debian's so a rebuild gives the same source package. Every build dependency of 2.54.3-1 is in trixie (clang 19), and no feature was turned off.
-  - **Result** (amd64, 2026-11-23): `libwpewebkit-2.0-1`, `libwpewebkit-2.0-dev`, `wpewebkit-webdriver` and
-    `libwpewebkit-doc` 2.54.3-1~lordos13+1, Debian's split unchanged; WPEPlatform is inside `libWPEWebKit-2.0.so.1` (no
-    new package) and `-dev` ships `wpe-platform-2.0.pc` with its `-drm`, `-headless` and `-wayland` files. Same SONAME
-    as trixie's 2.48 (`libWPEWebKit-2.0.so.1`) and none of 2.48's 930 exported symbols removed (424 added), so it
-    upgrades trixie's package in place for `cog`, `gstreamer1.0-wpe` and today's `lord-web`, which builds against it
-    with `-Wall -Wextra` and no warnings and passes its probe smoke test (`tests/web_probe_test.py`, sandbox on). `dpkg-buildpackage` took 26 to 33 minutes on 20 cores (five builds). lintian: no errors,
-    6 warnings, all Debian's own (Standards-Version newer than trixie's lintian, no source `Priority`, devhelp files
-    of the new WPEPlatform docs). The test renders a page through WPEPlatform's headless backend into a buffer with
-    WebKit's bubblewrap sandbox on (the test runs as its own mount namespace's root, `tools/pkg/wpewebkit-pivot.sh`,
-    since the kernel refuses user namespaces in a chroot). Not yet run on the VM, not built for arm64 (options in
-    WPEWEBKIT.md), not published.
+    lintian, then installs the result in a second chroot and tests it. `TMPFS=<size>` builds in RAM, `TEST_ONLY=1`
+    repeats the test, `ARCH=arm64` builds arm64 on an amd64 machine under qemu-user.
+  - **Changes to Debian's packaging, and only these** (`tools/pkg/wpewebkit-chroot.sh`): WPEPlatform's headless and
+    Wayland backends and the legacy libwpe API turned on explicitly (upstream defaults, written out so a changed default
+    stops the build); **WPEPlatform's DRM backend off** (maintainer, 2026-11-24), so WebKit links no `libinput` or
+    `libudev`, with its 9 symbols taken out of Debian's symbols file; `Maintainer: LordOS` (Debian's WebKit team
+    credited in the changelog and `debian/copyright`); and the changelog entry, dated one second after Debian's so a
+    rebuild gives the same source package. Every build dependency of 2.54.3-1 is in trixie (clang 19).
+  - **The test** (in a second clean chroot, as the root of its own mount namespace, `tools/pkg/wpewebkit-pivot.sh`,
+    since the kernel refuses user namespaces in a chroot and WebKit's bubblewrap sandbox needs them): `pkg-config`
+    finds `wpe-webkit-2.0`, `wpe-platform-2.0` with `-headless` and `-wayland`, `wpe-1.0` and `wpebackend-fdo-1.0`, and
+    not `wpe-platform-drm-2.0`; `readelf -d` shows no `libinput`/`libudev`; SONAME and exported symbols against
+    trixie's 2.48; the copyright files; a WPEPlatform headless program renders a page into a buffer with the sandbox
+    on; and lord-web is built from the LordOS tree on both view backends (`LORD_WEB_BACKEND=platform` and `legacy`),
+    with no warnings, then its `web-backend-test` and probe test run on each.
+  - **Result on amd64** (`+2`, 2026-11-24): `libwpewebkit-2.0-1`, `libwpewebkit-2.0-dev`, `wpewebkit-webdriver` and
+    `libwpewebkit-doc`, Debian's split unchanged (WPEPlatform is inside `libWPEWebKit-2.0.so.1`, no new package). Same
+    SONAME as trixie's 2.48 (`libWPEWebKit-2.0.so.1`), none of its 930 exported symbols removed (1345, 415 added), so it
+    upgrades trixie's package in place for `cog`, `gstreamer1.0-wpe` and lord-web. No `libinput`, no `libudev` (`+1`,
+    built with the DRM backend and never published, had both). `web-backend-test` prints `ok platform (WPE WebKit
+    2.54.3)` and `ok legacy (WPE WebKit 2.54.3)`, the probe test passes on both (peak 298 and 296 MB PSS).
+    `dpkg-buildpackage` took 26 to 41 minutes on 20 cores over seven builds. lintian: no errors, 5 warnings, all
+    Debian's own (Standards-Version newer than trixie's lintian, no source `Priority`, devhelp files of WPEPlatform's
+    docs). arm64 is being built under qemu-user (docs/WPEWEBKIT.md, "arm64"). Not yet run on the VM, not published.
   - **The source next to the binaries** (WebKit is LGPL-2.1+ and BSD): the build outputs the complete Debian source
     package (`.dsc`, upstream `.orig.tar.xz` and its `.asc`, LordOS's `.debian.tar.xz`); each binary package ships
-    Debian's `debian/copyright`. `tools/release/image-sources.sh` lists a package LordOS rebuilt (version
-    `~lordos<n>+<m>`) with origin `lordos` and its `.dsc` in `lordos.org/apt/pool/main/source/`, not
-    snapshot.debian.org; docs/WPEWEBKIT.md describes the change `apt-repo.sh` needs to publish and index it as
-    `deb-src` (not made: publishing and signing are the maintainer's). Docs: WPEWEBKIT.md (new), ARCHITECTURE.md's
-    dependency row, SOURCE-OFFER.md, WEBAPPS.md, ROADMAP.md (#142).
+    Debian's `debian/copyright`. **`tools/release/apt-repo.sh` takes source packages**: `build` accepts a `.dsc`,
+    checks every file it names by size and SHA-256, copies them append-only to `pool/main/source/<prefix>/<source>/`,
+    indexes them with `apt-ftparchive sources` in `dists/stable/main/source/Sources` (signed through `Release`), and
+    refuses a `~lordos<n>+<m>` `.deb` whose `.dsc` isn't in the pool; `publish` uploads them with the right types and
+    writes `lordos-src.sources`, a `deb-src` stanza for `apt-get source` (LordOS systems keep `lordos.sources`, `deb`
+    only). For tests only, `LORDOS_APT_TEST_KEYRING` with `LORDOS_APT_OFFLINE=1` signs a scratch tree with a throwaway
+    key (`publish` and `verify` refuse it). Checked that way: the `.debs` alone, a tampered `.debian.tar.xz` (other size;
+    same size, other hash) and a changed `.dsc` for a published version are refused; Debian's `apt` reads the tree and
+    `apt-get source --download-only wpewebkit` gets the build's exact files. Nothing was uploaded or signed with the real
+    key. `tools/release/image-sources.sh` lists a package LordOS rebuilt (version `~lordos<n>+<m>`) with origin
+    `lordos` and its `.dsc` in `lordos.org/apt/pool/main/source/`. Docs: WPEWEBKIT.md (new), RELEASING.md ("WPE
+    WebKit (LordOS's backport)"), ARCHITECTURE.md's dependency row, SOURCE-OFFER.md, WEBAPPS.md, ROADMAP.md (#142).
 - **Machines: QEMU's seccomp filter is an allowlist** (in development; latest release 0.8.9.5-beta; approved by the
   maintainer 2026-11-23 as isolation layer 3, for every machine; docs/VIRTUALIZATION.md 3.3). Our filter on QEMU used to
   refuse a list of dangerous calls and allow the rest; now it allows only the calls QEMU was measured to make, checks the
