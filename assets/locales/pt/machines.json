@@ -661,6 +661,8 @@
   "agent.off": "Agente da máquina desligado",
   "agent.connected": "Agente conectado",
   "agent.waiting": "Aguardando o agente",
+  "agent.lost": "O agente parou de responder",
+  "agent.lostHint": "Ele respondeu antes enquanto esta máquina rodava. Conecta-se de novo sozinho quando o qemu-guest-agent voltar a rodar na máquina.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "ferramentas do LordOS {v}",
   "agent.extraOff": "Desligar a tela extra",

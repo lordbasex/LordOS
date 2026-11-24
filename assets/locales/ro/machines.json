@@ -661,6 +661,8 @@
   "agent.off": "Agent oaspete dezactivat",
   "agent.connected": "Agent conectat",
   "agent.waiting": "Se așteaptă agentul",
+  "agent.lost": "Agentul a încetat să răspundă",
+  "agent.lostHint": "A răspuns mai devreme cât timp această mașină a rulat. Se reconectează singur când qemu-guest-agent rulează din nou în mașină.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "instrumente LordOS {v}",
   "agent.extraOff": "Oprește ecranul suplimentar",

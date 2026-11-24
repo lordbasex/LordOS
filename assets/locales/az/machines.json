@@ -661,6 +661,8 @@
   "agent.off": "Qonaq agenti sönülüdür",
   "agent.connected": "Agent qoşulub",
   "agent.waiting": "Agent gözlənilir",
+  "agent.lost": "Agent cavab verməyi dayandırdı",
+  "agent.lostHint": "Bu maşın işləyərkən əvvəl cavab verirdi. qemu-guest-agent maşında yenidən işləyəndə özü yenidən qoşulur.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS alətləri {v}",
   "agent.extraOff": "Əlavə ekranı söndür",

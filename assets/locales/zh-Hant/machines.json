@@ -661,6 +661,8 @@
   "agent.off": "客體代理程式已關閉",
   "agent.connected": "代理程式已連線",
   "agent.waiting": "正在等待代理程式",
+  "agent.lost": "代理程式已停止回應",
+  "agent.lostHint": "此機器執行時它曾經回應。機器中的 qemu-guest-agent 再次執行後，它會自動重新連線。",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS 工具 {v}",
   "agent.extraOff": "關閉額外的顯示器",

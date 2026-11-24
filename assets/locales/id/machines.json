@@ -661,6 +661,8 @@
   "agent.off": "Agen tamu nonaktif",
   "agent.connected": "Agen terhubung",
   "agent.waiting": "Menunggu agen",
+  "agent.lost": "Agen berhenti merespons",
+  "agent.lostHint": "Sebelumnya agen merespons saat mesin ini berjalan. Agen tersambung lagi dengan sendirinya setelah qemu-guest-agent berjalan lagi di mesin.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "alat LordOS {v}",
   "agent.extraOff": "Matikan Layar Tambahan",

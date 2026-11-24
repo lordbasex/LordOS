@@ -661,6 +661,8 @@
   "agent.off": "Гостевой агент отключён",
   "agent.connected": "Агент подключён",
   "agent.waiting": "Ожидание агента",
+  "agent.lost": "Агент перестал отвечать",
+  "agent.lostHint": "Раньше он отвечал, пока эта машина работала. Он подключится снова сам, когда qemu-guest-agent снова заработает в машине.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "инструменты LordOS {v}",
   "agent.extraOff": "Выключить дополнительный экран",

@@ -661,6 +661,8 @@
   "agent.off": "Vierasagentti pois päältä",
   "agent.connected": "Agentti yhdistetty",
   "agent.waiting": "Odotetaan agenttia",
+  "agent.lost": "Agentti lakkasi vastaamasta",
+  "agent.lostHint": "Se vastasi aiemmin tämän koneen ollessa käynnissä. Se yhdistää uudelleen itsestään, kun qemu-guest-agent toimii taas koneessa.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS-työkalut {v}",
   "agent.extraOff": "Sammuta lisänäyttö",

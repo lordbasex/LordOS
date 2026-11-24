@@ -661,6 +661,8 @@
   "agent.off": "Agent del convidat desactivat",
   "agent.connected": "Agent connectat",
   "agent.waiting": "S’està esperant l’agent",
+  "agent.lost": "L'agent ha deixat de respondre",
+  "agent.lostHint": "Responia abans mentre aquesta màquina funcionava. Es torna a connectar sol quan qemu-guest-agent torna a funcionar a la màquina.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "eines de LordOS {v}",
   "agent.extraOff": "Apaga la pantalla addicional",

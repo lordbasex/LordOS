@@ -661,6 +661,8 @@
   "agent.off": "Agent gościa wyłączony",
   "agent.connected": "Agent połączony",
   "agent.waiting": "Oczekiwanie na agenta",
+  "agent.lost": "Agent przestał odpowiadać",
+  "agent.lostHint": "Odpowiadał wcześniej, gdy ta maszyna działała. Połączy się ponownie sam, gdy qemu-guest-agent znów zacznie działać w maszynie.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "narzędzia LordOS {v}",
   "agent.extraOff": "Wyłącz dodatkowy ekran",

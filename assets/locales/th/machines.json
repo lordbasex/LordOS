@@ -661,6 +661,8 @@
   "agent.off": "ปิดเอเจนต์ของระบบภายใน",
   "agent.connected": "เอเจนต์เชื่อมต่ออยู่",
   "agent.waiting": "กำลังรอเอเจนต์",
+  "agent.lost": "เอเจนต์หยุดตอบสนอง",
+  "agent.lostHint": "ก่อนหน้านี้เอเจนต์ตอบสนองขณะเครื่องนี้ทำงาน จะเชื่อมต่อใหม่เองเมื่อ qemu-guest-agent ทำงานในเครื่องอีกครั้ง",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "เครื่องมือ LordOS {v}",
   "agent.extraOff": "ปิดจอแสดงผลเพิ่มเติม",

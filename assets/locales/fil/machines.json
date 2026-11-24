@@ -661,6 +661,8 @@
   "agent.off": "Nakapatay ang guest agent",
   "agent.connected": "Nakakonekta ang agent",
   "agent.waiting": "Hinihintay ang agent",
+  "agent.lost": "Huminto sa pagsagot ang agent",
+  "agent.lostHint": "Sumagot ito kanina habang tumatakbo ang makinang ito. Kusa itong kokonekta muli kapag tumakbo ulit ang qemu-guest-agent sa makina.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "mga tool ng LordOS {v}",
   "agent.extraOff": "I-off ang Dagdag na Display",

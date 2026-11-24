@@ -661,6 +661,8 @@
   "agent.off": "Agente de la máquina apagado",
   "agent.connected": "Agente conectado",
   "agent.waiting": "Esperando al agente",
+  "agent.lost": "El agente dejó de responder",
+  "agent.lostHint": "Respondió antes mientras esta máquina corría. Se conecta de nuevo solo cuando qemu-guest-agent vuelve a correr en la máquina.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "herramientas de LordOS {v}",
   "agent.extraOff": "Apagar la pantalla extra",

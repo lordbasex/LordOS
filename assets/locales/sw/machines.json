@@ -661,6 +661,8 @@
   "agent.off": "Wakala wa mgeni amezimwa",
   "agent.connected": "Wakala ameunganishwa",
   "agent.waiting": "Inamsubiri wakala",
+  "agent.lost": "Wakala ameacha kujibu",
+  "agent.lostHint": "Alijibu awali wakati mashine hii ikiendesha. Huunganika tena yenyewe qemu-guest-agent inapoendesha tena kwenye mashine.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "zana za LordOS {v}",
   "agent.extraOff": "Zima Skrini ya Ziada",

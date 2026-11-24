@@ -661,6 +661,8 @@
   "agent.off": "Svečio agentas išjungtas",
   "agent.connected": "Agentas prisijungęs",
   "agent.waiting": "Laukiama agento",
+  "agent.lost": "Agentas nustojo atsakyti",
+  "agent.lostHint": "Anksčiau jis atsakydavo, kol ši mašina veikė. Jis vėl prisijungia pats, kai qemu-guest-agent vėl veikia mašinoje.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS įrankiai {v}",
   "agent.extraOff": "Išjungti papildomą ekraną",

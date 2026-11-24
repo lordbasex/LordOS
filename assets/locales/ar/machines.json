@@ -661,6 +661,8 @@
   "agent.off": "وكيل الضيف متوقف",
   "agent.connected": "الوكيل متصل",
   "agent.waiting": "في انتظار الوكيل",
+  "agent.lost": "توقف الوكيل عن الاستجابة",
+  "agent.lostHint": "استجاب سابقًا أثناء تشغيل هذا الجهاز. يتصل مجددًا من تلقاء نفسه عندما يعمل qemu-guest-agent في الجهاز مرة أخرى.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "أدوات LordOS {v}",
   "agent.extraOff": "إيقاف الشاشة الإضافية",

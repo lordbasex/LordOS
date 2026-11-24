@@ -661,6 +661,8 @@
   "agent.off": "গেস্ট এজেন্ট বন্ধ",
   "agent.connected": "এজেন্ট সংযুক্ত",
   "agent.waiting": "এজেন্টের জন্য অপেক্ষা",
+  "agent.lost": "এজেন্ট সাড়া দেওয়া বন্ধ করেছে",
+  "agent.lostHint": "এই মেশিন চলার সময় আগে সাড়া দিয়েছিল। মেশিনে qemu-guest-agent আবার চালু হলে এটি নিজে থেকেই আবার সংযুক্ত হয়।",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS টুলস {v}",
   "agent.extraOff": "অতিরিক্ত ডিসপ্লে বন্ধ করুন",

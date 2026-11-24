@@ -879,6 +879,7 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('disc: a running Linux machine with no agent answering → offered', M.discOffer(waiting, cfg, true, false), 'insert');
   eq('disc: no state yet (just started) → offered', M.discOffer(undefined, cfg, true, false), 'insert');
   eq('disc: the machine is off → nothing', M.discOffer(waiting, cfg, false, false), null);
+  eq('disc: an agent that answered earlier in this run and stopped (lost) → nothing: it is there', M.discOffer({ ...waiting, lost: true }, cfg, true, false), null);
   eq('disc: the agent is off in Configure → nothing', M.discOffer(waiting, { agent: false }, true, false), null);
   eq('disc: a protected (anonymity) machine → never', M.discOffer(waiting, cfg, true, true), null);
   eq('disc: the disc is in the drive → the steps', M.discOffer({ state: 'waiting', caps: C.toolsDisc }, cfg, true, false), 'guide');

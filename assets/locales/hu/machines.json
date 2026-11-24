@@ -661,6 +661,8 @@
   "agent.off": "Vendégügynök kikapcsolva",
   "agent.connected": "Ügynök csatlakozva",
   "agent.waiting": "Várakozás az ügynökre",
+  "agent.lost": "Az ügynök nem válaszol többé",
+  "agent.lostHint": "Korábban válaszolt, amíg ez a gép futott. Magától újra csatlakozik, amint a qemu-guest-agent ismét fut a gépen.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS-eszközök {v}",
   "agent.extraOff": "A további kijelző kikapcsolása",

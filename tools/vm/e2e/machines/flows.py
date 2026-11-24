@@ -768,5 +768,222 @@ def _until(fn, timeout, every=1):
     raise TimeoutError("not after %s s" % timeout)
 
 
-EXTRA = ["premade", "windows"]
+# ---------------------------------------------------------------- what a person sees of a running machine (sweep 3)
+# run.py premade s3prep start agent s3window s3guest s3links s3send s3shell s3agentlost s3monitor: the machine window's
+# bar and menus, the guest's links and notifications, Send to LordOS and the file copies panel, the agent's shell pane and
+# its Terminal tab, the agent's red light, and the machine's row in Monitor, each on the headless session's screen with
+# the real lord-vm and a real KVM guest. The guest's tools are this build's lordos-guest (10), put in through the transfer
+# folder and run as the guest's person (tester) as the desktop session's user unit would run it.
+
+_EN = None
+
+
+def T(key, **v):
+    """Machines' English text for a key (assets/locales/en/machines.json), {name} filled in."""
+    global _EN
+    if _EN is None:
+        _EN = json.load(open(os.path.join(os.path.dirname(BUILD), "..", "assets", "locales", "en", "machines.json")))
+    s = _EN[key]
+    for k, x in v.items():
+        s = s.replace("{%s}" % k, str(x))
+    return s
+
+
+def _vm_front(s):
+    allow_shortcuts(s)
+    vw = vm_window(s, NAME)
+    s.js("wm.focus(%s)" % json.dumps(vw["id"]))
+    time.sleep(0.4)
+    return s.rect_of(vm_window(s, NAME))
+
+
+def _guest(s, c, cmd, timeout=60):
+    con = s.console(c["id"])
+    try:
+        return con.run(cmd, timeout=timeout)
+    finally:
+        con.close()
+
+
+def flow_s3prep(s, r, c):
+    """The premade machine with the guest agent, the guest's links and notifications on (off by default), and the transfer
+    folder; changed with the machine off, as Configure does."""
+    if "dir" not in c:
+        skip("no machine (premade first)")
+    s.lordvm("--set", c["dir"], "--agent", "on", "--guest-links", "on", "--guest-notify", "on", "--transfer", "on", "--clipboard", "both")
+    mj = json.load(open(os.path.join(c["dir"], "machine.json")))
+    r.t("s3prep: agent, links, notifications and the transfer folder on", mj.get("agent") and mj.get("guest_links") and mj.get("guest_notify") and mj.get("transfer"),
+        {k: mj.get(k) for k in ("agent", "guest_links", "guest_notify", "transfer")})
+
+
+def flow_s3window(s, r, c):
+    """The machine window's bar and its menus in a running window (5.3): Actions, Devices, View (Scale, Picture in
+    Picture) and Info in the menu bar, the toolbar's buttons and device dots, each menu open on screen."""
+    need_machine(s, c, running=True)
+    vr = _vm_front(s)
+    img = s.shot("s3-01-window")
+    bar = s.texts([0, 0, s.W, 28])
+    r.t("s3window: the menu bar has Actions, Devices, View and Info", all(T(k) in bar for k in ("menu.actions", "menu.devices", "lib.view", "menu.info")), bar)
+    tb = s.find_image("-symbolic.svg", [vr[0], vr[1], vr[2], 90], all=True) or []
+    srcs = sorted({os.path.basename(x.get("src", "")) for x in tb})
+    r.t("s3window: the toolbar's buttons are drawn (%d symbols)" % len(tb), len(tb) >= 4 and any("terminal" in x for x in srcs), srcs)
+    r.t("s3window: the guest's picture is drawn under the bar", img.varied([vr[0] + 8, vr[1] + 100, vr[2] - 16, vr[3] - 140], 2))
+    want = {"menu.actions": ("cmd.pause", "tb.transferOpen", "cmd.logs"), "menu.devices": (), "lib.view": ("view.scale", "view.pip"), "menu.info": ()}
+    for i, (m, keys) in enumerate(want.items()):
+        s.click_text(T(m), within=[0, 0, s.W, 28])
+        time.sleep(0.6)
+        shot = s.shot("s3-02-menu-%d-%s" % (i, m.split(".")[1]))
+        got = s.texts()
+        r.t("s3window: %s opens%s" % (T(m), (" with " + ", ".join(T(k) for k in keys)) if keys else ""),
+            all(T(k) in got for k in keys) and shot.varied([0, 28, s.W, 300], 2), [x for x in got if len(x) < 40][:60])
+        s.press("esc")
+        time.sleep(0.4)
+    r.t("s3window: no JS error so far", not s.errors(), s.errors()[:5])
+
+
+def flow_s3guest(s, r, c):
+    """This build's lordos-guest (10) into the guest through the transfer folder (/mnt/LordOS, mounted by the agent), run
+    as the guest's person with the port theirs (what the helper's udev rule and user unit do in a desktop session)."""
+    need_machine(s, c, running=True)
+    xf = os.path.join(s.library, "Transfer", NAME)
+    r.step("s3guest: the transfer folder is there", lambda: _until(lambda: os.path.isdir(xf), 60))
+    shutil.copyfile(os.path.join(BUILD, "lordos-guest"), os.path.join(xf, "lordos-guest"))
+    con = s.console(c["id"])
+    out, st = con.run("for i in $(seq 30); do mountpoint -q /mnt/LordOS && [ -s /mnt/LordOS/lordos-guest ] && break; sleep 1; done; "
+                      "install -m755 /mnt/LordOS/lordos-guest /usr/local/bin/lordos-guest && /usr/local/bin/lordos-guest --version")
+    r.t("s3guest: lordos-guest 10 in the guest (%s)" % out.strip()[:60], "lordos-guest 10" in out, out)
+    con.run("chmod 666 /dev/virtio-ports/org.lordos.agent; loginctl enable-linger tester; for i in $(seq 20); do [ -d /run/user/1000 ] && break; sleep 0.5; done; "
+            "systemctl stop mh-lg 2>/dev/null; pkill -x lordos-guest; sleep 1; "
+            "systemd-run --unit mh-lg --uid=1000 --gid=1000 -E XDG_RUNTIME_DIR=/run/user/1000 -E HOME=/home/tester /usr/local/bin/lordos-guest")
+    con.close()
+    r.step("s3guest: it says hello to lord-vm as 10", lambda: _wait_log(s, c["dir"], re.compile(r"agent: lordos-guest 10 said hello"), 40))
+
+
+def _as_tester(cmd):
+    return "runuser -u tester -- env XDG_RUNTIME_DIR=/run/user/1000 HOME=/home/tester " + cmd
+
+
+def flow_s3links(s, r, c):
+    """A link the guest sends (6.12) shows in the window's bar with Open and Ignore and is opened only from there; a
+    notification of the guest's shows as from the machine."""
+    need_machine(s, c, running=True)
+    vr = _vm_front(s)
+    url = "https://lordos.org/mh-%s" % os.urandom(3).hex()
+    out, st = _guest(s, c, _as_tester("/usr/local/bin/lordos-guest --open-on-host %s; echo rc=$?" % url))
+    r.step("s3links: the bar offers the link (Open, Ignore)", lambda: s.wait_text(T("link.hint"), 15, vr))
+    shot = s.shot("s3-03-link-bar")
+    got = s.texts(vr)
+    r.t("s3links: the bar names the link and has Open and Ignore", any(url in x for x in got) and T("link.open") in got and T("link.ignore") in got, got[:40])
+    s.click_text(T("link.ignore"), within=vr)
+    r.step("s3links: Ignore takes the bar away (nothing opened)", lambda: s.gone_text(T("link.hint"), 10, vr))
+    r.t("s3links: no browser started", not any(w["id"] not in ("machines",) and "browser" in w["id"] for w in s.windows()), [w["id"] for w in s.windows()])
+    title = "MH note %s" % os.urandom(2).hex()
+    _guest(s, c, _as_tester("/usr/local/bin/lordos-guest --notify-host '%s' 'from inside the machine'; echo rc=$?" % title))
+    t = r.step("s3links: the guest's notification is shown", lambda: s.wait_text(title, 15))
+    s.shot("s3-04-guest-notification")
+    near = s.texts([0, 0, s.W, 220]) if t else []
+    r.t("s3links: as from the machine (%s)" % T("note.from", name=NAME), any(NAME in x for x in near), near[:20])
+
+
+def flow_s3send(s, r, c):
+    """Send to LordOS from the guest (6.21): the window's file copies panel shows it coming and done, the file lands in the
+    machine's quarantine folder (<library>/Received/<name>) whole, marked, 0600."""
+    need_machine(s, c, running=True)
+    vr = _vm_front(s)
+    out, st = _guest(s, c, "head -c 24M /dev/urandom > /home/tester/mh-send.bin; chown tester: /home/tester/mh-send.bin; sha256sum /home/tester/mh-send.bin; "
+                     + _as_tester("/usr/local/bin/lordos-guest --send-to-host /home/tester/mh-send.bin") + "; echo rc=$?")
+    m = re.search(r"([0-9a-f]{64})", out)
+    want = m.group(1) if m else None
+    r.t("s3send: the guest's tools take the file (rc=0)", "rc=0" in out and want, out[-300:])
+    r.step("s3send: the file copies panel shows it", lambda: s.wait_text(re.compile(r"mh-send\.bin"), 20, vr))
+    s.shot("s3-05-send-panel")
+    dst = os.path.join(s.library, "Received", NAME, "mh-send.bin")
+    r.step("s3send: it arrives in the quarantine folder", lambda: _until(lambda: os.path.exists(dst) and os.path.getsize(dst) == 24 << 20, 60))
+    time.sleep(1)
+    s.shot("s3-06-send-done")
+    import hashlib
+    h = hashlib.sha256(open(dst, "rb").read()).hexdigest() if os.path.exists(dst) else None
+    st_ = os.stat(dst) if os.path.exists(dst) else None
+    r.t("s3send: whole (SHA-256 as in the guest), 0600, in a 0700 folder", h == want and st_ and (st_.st_mode & 0o777) == 0o600 and
+        (os.stat(os.path.dirname(dst)).st_mode & 0o777) == 0o700, [h, want, oct(st_.st_mode) if st_ else None])
+    try:
+        mark = os.getxattr(dst, "user.lordos.quarantine")
+    except OSError:
+        mark = None
+    r.t("s3send: marked as from a machine (user.lordos.quarantine)", mark == b"1", mark)
+    got = s.texts(vr)
+    r.t("s3send: the panel says received", any(T("xfer.received") in x for x in got) or any("arrived" in x for x in s.texts()), got[:40])
+
+
+def flow_s3shell(s, r, c):
+    """The agent's shell (6.18): the toolbar's Shell opens the pane with the guest person's own shell, typed into from
+    here; Open in Terminal moves it into a Terminal tab marked as the machine's."""
+    need_machine(s, c, running=True)
+    vr = _vm_front(s)
+    s.click_icon("terminal", within=vr)
+    r.step("s3shell: the pane opens (GUEST)", lambda: s.wait_text(T("shell.badge"), 10, vr))
+    time.sleep(3)
+    word = "mh%s" % os.urandom(2).hex()
+    s.type("echo %s-$((6*7)) > /tmp/%s; id -un\n" % (word, word))
+    time.sleep(2)
+    s.shot("s3-07-shell-pane")
+    out, st = _guest(s, c, "cat /tmp/%s; stat -c %%U /tmp/%s" % (word, word))
+    r.t("s3shell: what was typed ran in the guest as the person (tester), not root", "%s-42" % word in out and "tester" in out, out)
+    if s.find(T("shell.toTerminal"), vr):
+        s.click_text(T("shell.toTerminal"), within=vr)
+        r.step("s3shell: Open in Terminal moves it (the pane says so)", lambda: s.wait_text(T("shell.inTerminal"), 15))
+        time.sleep(1.5)
+        s.shot("s3-08-shell-terminal")
+        r.t("s3shell: a Terminal window has it", any(w["id"].startswith("terminal") or w.get("app") == "terminal" for w in s.windows()), [w["id"] for w in s.windows()])
+    else:
+        r.bad("s3shell: Open in Terminal", "no button (texts: %s)" % s.texts(vr)[:30])
+
+
+def flow_s3agentlost(s, r, c):
+    """The agent's light (6.17): red when the agent stops answering while the guest runs; the popover says so; green again."""
+    need_machine(s, c, running=True)
+    _vm_front(s)
+    for w in s.windows():
+        if w["id"].startswith("terminal"):
+            s.js("wm.close(%s)" % json.dumps(w["id"]))
+    vr = _vm_front(s)
+    s.shot("s3-09-agent-ok")
+    _guest(s, c, "systemctl stop qemu-guest-agent; echo done")
+    r.step("s3agentlost: lord.vm.list says the agent no longer answers", lambda: s.wait_js(
+        "(() => { const a = lord.vm.list().find((m) => m.name === %s)?.agentState; return a && a !== 'connected'; })()" % json.dumps(NAME), 90))
+    time.sleep(2)
+    s.click_icon("agent", within=vr)
+    time.sleep(1)
+    s.shot("s3-10-agent-lost")
+    got = s.texts(vr)
+    r.t("s3agentlost: the popover says it stopped answering (%s), not that it was never installed" % T("agent.lost"), T("agent.lost") in got and T("agent.lostHint") in got
+        and T("agent.installHint") not in got, got[:30])
+    s.click(vr[0] + vr[2] - 60, vr[1] + vr[3] - 40)
+    _guest(s, c, "systemctl start qemu-guest-agent; echo done")
+    r.step("s3agentlost: connected again", lambda: s.wait_js("lord.vm.list().find((m) => m.name === %s)?.agentState === 'connected'" % json.dumps(NAME), 60))
+
+
+def flow_s3monitor(s, r, c):
+    """Monitor → Processes with the machine running: its row (named after the machine when its QEMU runs in the machine's
+    scope; the harness's session has none, so wherever its processes are) and Show Machine."""
+    need_machine(s, c, running=True)
+    s.js("launchApp('monitor')")
+    mw = s.window("monitor", timeout=15)
+    s.js("wm.setFrame(%s, { x: 30, y: 40, w: 1180, h: 700 })" % json.dumps(mw["id"]))
+    time.sleep(1.5)
+    mr = s.rect_of(s.window("monitor"))
+    if s.find("Processes", mr):
+        s.click_text("Processes", within=mr)
+    time.sleep(1)
+    if s.find("Grouped", mr):
+        s.click_text("Grouped", within=mr)
+    time.sleep(2.5)
+    s.shot("s3-11-monitor")
+    got = s.texts(mr)
+    c["monitor_texts"] = [x for x in got if "qemu" in x.lower() or NAME in x or "Disk" in x][:20]
+    r.t("s3monitor: Monitor lists the machine's QEMU or its row", any("qemu" in x.lower() or NAME in x for x in got), got[:60])
+    s.js("wm.close(%s)" % json.dumps(s.window("monitor")["id"]))
+
+
+EXTRA = ["premade", "windows", "s3prep", "s3window", "s3guest", "s3links", "s3send", "s3shell", "s3agentlost", "s3monitor"]
 FLOWS = ["library", "assistant", "lifecycle", "configure", "start", "agent", "clipboard", "filedrop", "killcopy", "kills", "snapshots", "clone", "storage", "group"]

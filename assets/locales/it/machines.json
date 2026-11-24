@@ -661,6 +661,8 @@
   "agent.off": "Agente della macchina spento",
   "agent.connected": "Agente connesso",
   "agent.waiting": "In attesa dell’agente",
+  "agent.lost": "L'agente ha smesso di rispondere",
+  "agent.lostHint": "Rispondeva prima mentre questa macchina era in funzione. Si ricollega da solo quando qemu-guest-agent torna a funzionare nella macchina.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "strumenti di LordOS {v}",
   "agent.extraOff": "Spegni lo schermo aggiuntivo",

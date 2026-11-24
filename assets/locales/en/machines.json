@@ -661,6 +661,8 @@
   "agent.off": "Guest agent off",
   "agent.connected": "Agent connected",
   "agent.waiting": "Waiting for the agent",
+  "agent.lost": "The agent stopped answering",
+  "agent.lostHint": "It answered earlier while this machine ran. It connects again by itself once qemu-guest-agent runs in the machine again.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS tools {v}",
   "agent.extraOff": "Turn Off the Extra Display",

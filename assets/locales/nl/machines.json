@@ -661,6 +661,8 @@
   "agent.off": "Gastagent uit",
   "agent.connected": "Agent verbonden",
   "agent.waiting": "Wachten op de agent",
+  "agent.lost": "De agent reageert niet meer",
+  "agent.lostHint": "Hij reageerde eerder terwijl deze machine draaide. Hij maakt vanzelf weer verbinding zodra qemu-guest-agent weer draait in de machine.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS-hulpmiddelen {v}",
   "agent.extraOff": "Extra scherm uitzetten",

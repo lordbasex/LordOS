@@ -661,6 +661,8 @@
   "agent.off": "مہمان ایجنٹ بند",
   "agent.connected": "ایجنٹ منسلک",
   "agent.waiting": "ایجنٹ کا انتظار",
+  "agent.lost": "ایجنٹ نے جواب دینا بند کر دیا",
+  "agent.lostHint": "یہ مشین چلتے وقت پہلے جواب دے رہا تھا۔ مشین میں qemu-guest-agent دوبارہ چلنے پر یہ خود ہی دوبارہ جڑ جاتا ہے۔",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS ٹولز {v}",
   "agent.extraOff": "اضافی ڈسپلے بند کریں",

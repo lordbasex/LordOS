@@ -661,6 +661,8 @@
   "agent.off": "Tác tử khách đang tắt",
   "agent.connected": "Tác tử đã kết nối",
   "agent.waiting": "Đang chờ tác tử",
+  "agent.lost": "Tác tử đã ngừng phản hồi",
+  "agent.lostHint": "Trước đó nó phản hồi khi máy này đang chạy. Nó tự kết nối lại khi qemu-guest-agent chạy lại trong máy.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "công cụ LordOS {v}",
   "agent.extraOff": "Tắt màn hình phụ",

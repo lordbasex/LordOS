@@ -960,6 +960,8 @@ export function discOffer(agent, cfg, running, isProtected) {
   const caps = agent?.caps || 0;
   if (caps & AGENT_CAPS.toolsDisc) return 'guide';
   if (guestWindows(agent)) return null;
+  // it answered earlier in this run of the guest and stopped (6.17, red): the agent is there, not a disc's matter
+  if (agent?.lost) return null;
   if (agent?.state === 'connected' && (caps & AGENT_CAPS.exec) && (caps & AGENT_CAPS.files)) return null;
   return 'insert';
 }

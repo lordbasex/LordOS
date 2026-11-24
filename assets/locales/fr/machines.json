@@ -661,6 +661,8 @@
   "agent.off": "Agent de la machine désactivé",
   "agent.connected": "Agent connecté",
   "agent.waiting": "En attente de l’agent",
+  "agent.lost": "L'agent ne répond plus",
+  "agent.lostHint": "Il répondait plus tôt pendant que cette machine tournait. Il se reconnecte tout seul dès que qemu-guest-agent tourne de nouveau dans la machine.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "outils LordOS {v}",
   "agent.extraOff": "Éteindre l'écran supplémentaire",

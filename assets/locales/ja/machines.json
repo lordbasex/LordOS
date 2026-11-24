@@ -661,6 +661,8 @@
   "agent.off": "ゲストエージェント オフ",
   "agent.connected": "エージェント接続済み",
   "agent.waiting": "エージェントを待機中",
+  "agent.lost": "エージェントが応答しなくなりました",
+  "agent.lostHint": "このマシンの実行中、以前は応答していました。マシン内で qemu-guest-agent が再び動作すると、自動的に再接続します。",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS ツール {v}",
   "agent.extraOff": "追加のディスプレイをオフにする",

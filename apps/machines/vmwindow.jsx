@@ -54,7 +54,8 @@ function AgentButton({ ctl }) {
   const g = ctl.st?.agent, cfg = ctl.cfg || {};
   // off while the machine is: nothing to wait for
   const tone = ctl.a.start ? 'off' : agentTone(g, cfg.agent);
-  const label = !cfg.agent ? tr('machines.agent.off') : g?.state === 'connected' ? tr('machines.agent.connected') : ctl.a.start ? tr('machines.agent.idle') : tr('machines.agent.waiting');
+  const label = !cfg.agent ? tr('machines.agent.off') : g?.state === 'connected' ? tr('machines.agent.connected') : ctl.a.start ? tr('machines.agent.idle')
+    : g?.lost ? tr('machines.agent.lost') : tr('machines.agent.waiting');
   // the guest's LordOS tools are older than the ones this LordOS ships: a dot, and Update in the popover
   const old = toolsOutdated(g);
   return (
@@ -95,12 +96,12 @@ function AgentPop({ ctl, onClose }) {
       <View style={{ padding: 16, gap: 8, borderRadius: 16, backgroundColor: bg, border: `1px solid ${edge}`, boxShadow: '0 18px 44px rgba(0,0,0,0.45)' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <StateDot tone={tone} size={10} />
-          <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : tr('machines.agent.waiting')}</Text>
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.off') : on ? tr('machines.agent.connected') : g?.lost ? tr('machines.agent.lost') : tr('machines.agent.waiting')}</Text>
         </View>
         {/* the system and qemu-guest-agent's version, then the LordOS tools' own line: up to date, or which version
             this LordOS brings (and whether it's on its way) */}
         {on ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{[g.system, tr('machines.agent.version', { v: g.version })].filter(Boolean).join(' · ')}</Text>
-          : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
+          : <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{!cfg.agent ? tr('machines.agent.offHint') : g?.lost ? tr('machines.agent.lostHint') : ctl.st?.state === 'running' ? tr('machines.agent.installHint') : tr('machines.agent.bootHint')}</Text>}
         {on && tl ? <Text style={{ fontSize: 12, fontWeight: tl.key === 'old' ? 600 : 400, color: tl.key === 'old' ? '#0a84ff' : p.dim, textAlign: 'start' }}>
           {tl.key === 'old' ? tr(g.install === 1 ? 'machines.agent.toolsUpdating' : 'machines.agent.toolsOld', { have: tl.have, want: tl.want })
             : tr(tl.key === 'current' ? 'machines.agent.toolsCurrent' : 'machines.agent.toolsVersion', { v: tl.have })}</Text> : null}

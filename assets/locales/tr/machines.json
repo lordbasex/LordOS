@@ -661,6 +661,8 @@
   "agent.off": "Konuk aracısı kapalı",
   "agent.connected": "Aracı bağlı",
   "agent.waiting": "Aracı bekleniyor",
+  "agent.lost": "Ajan yanıt vermeyi bıraktı",
+  "agent.lostHint": "Bu makine çalışırken daha önce yanıt veriyordu. qemu-guest-agent makinede yeniden çalıştığında kendiliğinden tekrar bağlanır.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS araçları {v}",
   "agent.extraOff": "Ek Ekranı Kapat",

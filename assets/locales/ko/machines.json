@@ -661,6 +661,8 @@
   "agent.off": "게스트 에이전트 꺼짐",
   "agent.connected": "에이전트 연결됨",
   "agent.waiting": "에이전트 기다리는 중",
+  "agent.lost": "에이전트가 응답을 멈췄습니다",
+  "agent.lostHint": "이 머신이 실행되는 동안 이전에는 응답했습니다. 머신에서 qemu-guest-agent가 다시 실행되면 자동으로 다시 연결됩니다.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS 도구 {v}",
   "agent.extraOff": "추가 디스플레이 끄기",

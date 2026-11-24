@@ -661,6 +661,8 @@
   "agent.off": "Gästagenten av",
   "agent.connected": "Agenten är ansluten",
   "agent.waiting": "Väntar på agenten",
+  "agent.lost": "Agenten slutade svara",
+  "agent.lostHint": "Den svarade tidigare medan den här maskinen körde. Den ansluter igen av sig själv när qemu-guest-agent körs i maskinen igen.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "LordOS-verktyg {v}",
   "agent.extraOff": "Stäng av extraskärmen",

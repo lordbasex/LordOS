@@ -661,6 +661,8 @@
   "agent.off": "عامل مهمان خاموش",
   "agent.connected": "عامل متصل است",
   "agent.waiting": "در انتظار عامل",
+  "agent.lost": "عامل دیگر پاسخ نمی‌دهد",
+  "agent.lostHint": "پیش‌تر هنگام اجرای این ماشین پاسخ می‌داد. وقتی qemu-guest-agent دوباره در ماشین اجرا شود، خودش دوباره وصل می‌شود.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "ابزارهای LordOS {v}",
   "agent.extraOff": "خاموش کردن نمایشگر اضافی",

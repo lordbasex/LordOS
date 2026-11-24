@@ -661,6 +661,8 @@
   "agent.off": "Ejen tetamu dimatikan",
   "agent.connected": "Ejen disambungkan",
   "agent.waiting": "Menunggu ejen",
+  "agent.lost": "Ejen berhenti menjawab",
+  "agent.lostHint": "Ia menjawab sebelum ini semasa mesin ini berjalan. Ia bersambung semula dengan sendiri apabila qemu-guest-agent berjalan semula dalam mesin.",
   "agent.version": "qemu-guest-agent {v}",
   "agent.toolsVersion": "alat LordOS {v}",
   "agent.extraOff": "Matikan Paparan Tambahan",
