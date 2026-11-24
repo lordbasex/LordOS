@@ -137,6 +137,8 @@ static int inside(char **argv) {
 
 /* one call the allowlist must stop: it never returns here (the outside kills this process at the notification) */
 static int kill_case(const char *what, pid_t sib) {
+    printf("READY\n");
+    fflush(stdout);
     struct rlimit rl;
     char b[64];
     struct iovec l = { b, sizeof b }, r = { (void *)0x400000, sizeof b };
@@ -166,6 +168,29 @@ static int kill_case(const char *what, pid_t sib) {
         ret = mprotect(p, 4096, PROT_READ | PROT_EXEC);
     }
     else if (!strcmp(what, "memfd-exec")) ret = syscall(SYS_memfd_create, "x", 0x0010 /* MFD_EXEC */);
+    else if (!strcmp(what, "mmap-x-memfd")) {
+        /* code written into a memfd (sealed against exec or not: MFD_NOEXEC_SEAL doesn't stop mmap), then mapped to run */
+        int f = (int)syscall(SYS_memfd_create, "x", 0x0008 /* MFD_NOEXEC_SEAL */ | MFD_CLOEXEC);
+        ret = f < 0 || write(f, "\xc3", 1) != 1 || ftruncate(f, 4096) ? -2 :
+              (mmap(NULL, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE, f, 0) == MAP_FAILED ? -1 : 0);
+    }
+    else if (!strcmp(what, "mmap-x-disks")) {
+        /* code written into a file of its disks folder (it can't make one there: one of its disks), then mapped to run:
+         * the loader's kind of mapping, after the start */
+        char fp[PATH_MAX + 16];
+        snprintf(fp, sizeof fp, "%s", self_path);
+        char *sl = strrchr(fp, '/');
+        if (sl) snprintf(sl, sizeof fp - (size_t)(sl - fp), "/disk.img");
+        int f = open(fp, O_RDWR | O_CLOEXEC);
+        ret = f < 0 || write(f, "\xc3", 1) != 1 || ftruncate(f, 4096) ? -2 :
+              (mmap(NULL, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE, f, 0) == MAP_FAILED ? -1 : 0);
+    }
+    else if (!strcmp(what, "mprotect-x-bti")) {
+        /* arm64 BTI's form, after the start (on amd64 the kernel would ignore the bit; refused all the same) */
+        int f = open(self_path, O_RDONLY | O_CLOEXEC);
+        void *p = f >= 0 ? mmap(NULL, 4096, PROT_READ, MAP_PRIVATE, f, 0) : MAP_FAILED;
+        ret = p == MAP_FAILED ? -2 : mprotect(p, 4096, PROT_READ | PROT_EXEC | 0x10);
+    }
     else if (!strcmp(what, "execveat-again") || !strcmp(what, "execveat-reuse")) {
         /* another binary under the number lord-vm's descriptor had: what a compromised QEMU would try */
         int f = open("/usr/bin/true", O_PATH | O_CLOEXEC);
@@ -284,27 +309,39 @@ static void kill_one(const char *what, const char *want, pid_t sib, int notify) 
         }
     }
     close(st[0]);
-    char msg[256];
+    char msg[256], early[1024] = "";
+    size_t nearly = 0;
     int named = 0, ran_on = 0;
     if (lfd >= 0) {
         struct seccomp_notif_sizes sz;
         static char req_b[512], resp_b[256];
         struct pollfd pf = { lfd, POLLIN, 0 };
-        if (!syscall(SYS_seccomp, SECCOMP_GET_NOTIF_SIZES, 0, &sz) && sz.seccomp_notif <= sizeof req_b && poll(&pf, 1, 10000) == 1) {
+        (void)pf;
+        if (!syscall(SYS_seccomp, SECCOMP_GET_NOTIF_SIZES, 0, &sz) && sz.seccomp_notif <= sizeof req_b) {
             struct seccomp_notif *req = (struct seccomp_notif *)req_b;
             struct seccomp_notif_resp *resp = (struct seccomp_notif_resp *)resp_b;
-            int done = 0, got = -1;
-            /* lord-vm's way: the start's own exec goes through (vm_sc_exec_once), then the call the probe tries */
+            int done = 0, got = -1, starting = 1;
+            /* lord-vm's way: the start's own exec goes through (vm_sc_exec_once), the loader's executable mappings while
+             * the probe starts (vm_sc_startup_exec, as lord-vm until QEMU's QMP handshake: here until the probe says
+             * READY, read before any notification that came after it); then the call the probe tries */
             for (;;) {
+                struct pollfd pw[2] = { { out[0], POLLIN, 0 }, { lfd, POLLIN, 0 } };
+                if (poll(pw, 2, 10000) <= 0) { got = -1; break; }
+                if (pw[0].revents & POLLIN) {
+                    ssize_t r = read(out[0], early + nearly, sizeof early - 1 - nearly);
+                    if (r > 0) { nearly += (size_t)r; early[nearly] = 0; if (strstr(early, "READY")) starting = 0; continue; }
+                }
+                if (!(pw[1].revents & POLLIN)) { if (pw[0].revents) { got = -1; break; } continue; }
                 memset(req_b, 0, sizeof req_b);
-                got = poll(&pf, 1, 10000) == 1 ? ioctl(lfd, SECCOMP_IOCTL_NOTIF_RECV, req) : -1;
-                if (got || !vm_sc_exec_once(req, q, &done)) break;
+                got = ioctl(lfd, SECCOMP_IOCTL_NOTIF_RECV, req);
+                if (got) break;
+                if (!vm_sc_exec_once(req, q, &done) && !(starting && done && vm_sc_startup_exec(&req->data, vm_sc_cpu_bti()))) break;
                 memset(resp_b, 0, sizeof resp_b);
                 resp->id = req->id;
                 resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
                 ioctl(lfd, SECCOMP_IOCTL_NOTIF_SEND, resp);
             }
-            if (!got && done) {
+            if (!got && done && !starting) {
                 char d[160];
                 vm_sc_describe(&req->data, d, sizeof d);
                 const char *nm = vm_sc_name(req->data.nr);
@@ -316,19 +353,20 @@ static void kill_one(const char *what, const char *want, pid_t sib, int notify) 
                 resp->id = req->id;
                 resp->error = -EPERM;
                 ioctl(lfd, SECCOMP_IOCTL_NOTIF_SEND, resp);
-            } else snprintf(msg, sizeof msg, "no notification after the exec (%s)", done ? strerror(errno) : "the exec never came");
-        } else snprintf(msg, sizeof msg, "no notification in 10 s");
+            } else snprintf(msg, sizeof msg, "no notification after the start (exec %d, starting %d, %s)", done, starting, strerror(errno));
+        } else snprintf(msg, sizeof msg, "no notification sizes");
         close(lfd);
     } else if (notify) snprintf(msg, sizeof msg, "no listener came back");
     else msg[0] = 0;
     char line[256];
+    if (strstr(early, "SURVIVED") || strstr(early, "FAIL")) { ran_on = 1; fputs(early, stdout); }
     FILE *in = fdopen(out[0], "r");
     while (in && fgets(line, sizeof line, in)) if (!strncmp(line, "SURVIVED", 8) || !strncmp(line, "FAIL", 4)) { ran_on = 1; fputs(line, stdout); }
     if (in) fclose(in);
     close(hold[1]);
     int ws = 0;
     waitpid(q, &ws, 0);
-    char what_[200];
+    char what_[300];
     if (notify) {
         snprintf(what_, sizeof what_, "allowlist: %s stops the process before it runs, named \"%s\" (%s)", what, want, msg);
         check(named && !ran_on && WIFSIGNALED(ws) && WTERMSIG(ws) == SIGKILL, what_, 0);
@@ -454,7 +492,7 @@ int main(int argc, char **argv) {
         { "bpf", "bpf" }, { "perf_event_open", "perf_event_open" }, { "userfaultfd", "userfaultfd" }, { "keyctl", "keyctl" },
         { "mount", "mount" }, { "connect", "connect" }, { "personality", "personality" }, { "prctl-ptracer", "prctl" },
         { "mmap-x-anon", "mmap" }, { "mmap-x-shared", "mmap" }, { "mprotect-x", "mprotect" }, { "memfd-exec", "memfd_create" },
-        { "execveat-again", "execveat" },
+        { "execveat-again", "execveat" }, { "mmap-x-memfd", "mmap" }, { "mmap-x-disks", "mmap" }, { "mprotect-x-bti", "mprotect" },
     };
     for (size_t i = 0; i < sizeof CASES / sizeof CASES[0]; i++) kill_one(CASES[i][0], CASES[i][1], sib, 1);
     kill_one("unshare", "unshare", sib, 0);

@@ -1100,7 +1100,7 @@ static struct {
     int pin_tids[VMPIN_VCPUS];
     /* QEMU's seccomp allowlist (vmseccomp.h): its listener, where a call the allowlist stops arrives before it runs;
      * that call's name, for the log and the failure page; a test build's learn mode and what it logged already */
-    int sc_fd, sc_learn, sc_exec_done;
+    int sc_fd, sc_learn, sc_exec_done, sc_starting;
     char sc_blocked[200];
     uint64_t sc_seen[512];
     int sc_nseen;
@@ -1397,6 +1397,12 @@ static int sc_serve(void) {
         if (vm_sc_exec_once(req, S.qemu, &S.sc_exec_done)) {
             resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
             if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp)) vlog("seccomp: the exec of QEMU couldn't be let through: %s", strerror(errno));
+            continue;
+        }
+        /* while QEMU starts, the loader's executable mappings (libraries, modules, Mesa's drivers); never after */
+        if (S.sc_starting && S.sc_exec_done && vm_sc_startup_exec(&req->data, vm_sc_cpu_bti())) {
+            resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+            if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp)) vlog("seccomp: a library's mapping couldn't be let through: %s", strerror(errno));
             continue;
         }
         if (S.sc_learn) {
@@ -2409,6 +2415,7 @@ static int start_machine(void) {
     S.sc_learn = sc_learn_mode();
     S.sc_blocked[0] = 0;
     S.sc_exec_done = 0;
+    S.sc_starting = 1;      /* until the QMP handshake: the loader's executable mappings go through (vmseccomp.h) */
     if (S.sc_fd >= 0) { close(S.sc_fd); S.sc_fd = -1; }
     {
         char cp[PATH_MAX + 64];
@@ -2641,6 +2648,7 @@ static int start_machine(void) {
         return 0;
     }
     S.qmp_up = 1;
+    S.sc_starting = 0;      /* QEMU's start is over: no executable mapping from now on (vmseccomp.h) */
     S.oom0 = read_oom_kills();
     qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
     pin_prepare();

@@ -21,9 +21,10 @@
  *   IOCTL     a few fixed requests, and the request types of the machine's devices (vmseccomp.c: KVM, DRM, VFIO, TUN)
  *   PRCTL     the options measured, PR_SET_DUMPABLE refused (QEMU stays non-dumpable)
  *   SOCKETPAIR AF_UNIX only
- *   MMAP      without TCG: executable only as a private, read-only mapping of a file (the loader's), never shared or
- *             anonymous, never writable at once; a TCG machine's code buffer needs writable and executable memory
- *   MPROTECT  without TCG: nothing made executable afterwards (arm64 with BTI: PROT_EXEC|PROT_BTI, never writable)
+ *   MMAP / MPROTECT   without TCG every PROT_EXEC goes to lord-vm, which lets through only the loader's kind (a
+ *             private read-only file mapping; arm64 BTI's PROT_EXEC|PROT_BTI mprotect) and only until QEMU's QMP
+ *             handshake; never after (vm_sc_startup_exec). A TCG machine's code buffer needs writable and executable
+ *             memory
  *   MEMFD     never MFD_EXEC
  *   PRLIMIT   pid 0 or QEMU's own (never another process's limits)
  *   TGKILL    QEMU's own pid (a signal to one of its threads: the vCPU kick)

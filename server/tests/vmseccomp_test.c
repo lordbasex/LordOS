@@ -196,8 +196,10 @@ static void program_checks(void) {
         /* executable memory without TCG: only a private, read-only mapping of a file (the loader's) */
         int mm = nr_of("mmap"), mp = nr_of("mprotect"), mf = nr_of("memfd_create");
         uint32_t wx = o.tcg ? ALLOW : deflt;
-        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE, 5) == ALLOW, "%s: a library's r-x mapping refused", tab->name);
-        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_EXEC | 0x10, MAP_PRIVATE | MAP_DENYWRITE, 5) == ALLOW, "%s: an r-x BTI mapping refused", tab->name);
+        /* the loader's kind: allowed without a listener; with one, lord-vm decides (vm_sc_startup_exec, below) */
+        uint32_t lib = o.tcg || !o.notify ? ALLOW : NOTIF;
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE, 5) == lib, "%s: a library's r-x mapping (notify=%d)", tab->name, o.notify);
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_EXEC | 0x10, MAP_PRIVATE | MAP_DENYWRITE, 5) == lib, "%s: an r-x BTI mapping", tab->name);
         CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, 5) == ALLOW, "%s: a shared rw- mapping refused", tab->name);
         CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, (uint32_t)-1) == ALLOW, "%s: anonymous rw- refused", tab->name);
         CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, (uint32_t)-1) == wx, "%s: anonymous rwx with tcg=%d", tab->name, o.tcg);
@@ -209,7 +211,7 @@ static void program_checks(void) {
         CHECK(verdict(mp, 0, 4096, PROT_READ | PROT_WRITE, 0) == ALLOW, "%s: mprotect rw- refused", tab->name);
         CHECK(verdict(mp, 0, 4096, PROT_READ | PROT_EXEC, 0) == wx, "%s: mprotect r-x with tcg=%d", tab->name, o.tcg);
         CHECK(verdict(mp, 0, 4096, PROT_WRITE | PROT_EXEC, 0) == wx, "%s: mprotect -wx with tcg=%d", tab->name, o.tcg);
-        CHECK(verdict(mp, 0, 4096, PROT_READ | PROT_EXEC | 0x10, 0) == (o.tcg || o.bti ? ALLOW : deflt), "%s: mprotect r-x BTI with bti=%d", tab->name, o.bti);
+        CHECK(verdict(mp, 0, 4096, PROT_READ | PROT_EXEC | 0x10, 0) == (o.tcg || (o.bti && !o.notify) ? ALLOW : deflt), "%s: mprotect r-x BTI with bti=%d", tab->name, o.bti);
         CHECK(verdict(mp, 0, 4096, PROT_READ | PROT_WRITE | PROT_EXEC | 0x10, 0) == wx, "%s: mprotect rwx BTI", tab->name);
         CHECK(verdict(mf, 0, 0x3, 0, 0) == ALLOW, "%s: QEMU's memfd refused", tab->name);
         CHECK(verdict(mf, 0, 0x3 | 0x0008, 0, 0) == ALLOW, "%s: a memfd with MFD_NOEXEC_SEAL refused", tab->name);
@@ -288,6 +290,25 @@ int main(void) {
         const char *k = vm_sc_name(native.rows[i].nr);
         CHECK(k && !strcmp(k, native.rows[i].name), "%s: row %s is call %d, which the kernel calls %s", native.name,
               native.rows[i].name, native.rows[i].nr, k ? k : "(nothing)");
+    }
+    /* what lord-vm lets through while QEMU starts, and only then: the loader's kind of executable mapping */
+    {
+        struct seccomp_data d;
+        memset(&d, 0, sizeof d);
+        d.nr = SYS_mmap; d.args[2] = PROT_READ | PROT_EXEC; d.args[3] = MAP_PRIVATE; d.args[4] = 5;
+        CHECK(vm_sc_startup_exec(&d, 0), "startup: a library's mapping refused");
+        d.args[3] = MAP_SHARED;
+        CHECK(!vm_sc_startup_exec(&d, 0), "startup: a shared executable mapping let through");
+        d.args[3] = MAP_PRIVATE | MAP_ANONYMOUS;
+        CHECK(!vm_sc_startup_exec(&d, 0), "startup: anonymous executable memory let through");
+        d.args[3] = MAP_PRIVATE; d.args[2] = PROT_READ | PROT_WRITE | PROT_EXEC;
+        CHECK(!vm_sc_startup_exec(&d, 0), "startup: a writable executable mapping let through");
+        d.nr = SYS_mprotect; d.args[2] = PROT_READ | PROT_EXEC | 0x10;
+        CHECK(vm_sc_startup_exec(&d, 1) && !vm_sc_startup_exec(&d, 0), "startup: BTI's mprotect");
+        d.args[2] = PROT_READ | PROT_EXEC;
+        CHECK(!vm_sc_startup_exec(&d, 1), "startup: mprotect to executable without BTI let through");
+        d.nr = SYS_openat;
+        CHECK(!vm_sc_startup_exec(&d, 1), "startup: another call let through");
     }
     /* the one exec lord-vm lets through: the first execveat of the child, nothing after it, nothing from elsewhere */
     {

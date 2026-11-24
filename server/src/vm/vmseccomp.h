@@ -38,7 +38,7 @@ typedef struct {
     int render;     /* 3D graphics or a vGPU: the render node's DRM ioctls ('d'), sync_file ('>') and dma-buf ('b') */
     int vgpu;       /* an Intel vGPU: VFIO's ioctls (';') */
     int tap;        /* a bridged network: the tap's TUN ioctls ('T' 200 and up) */
-    int bti;        /* arm64: mprotect may add PROT_EXEC together with PROT_BTI (glibc's loader on a CPU with BTI) */
+    int bti;        /* arm64 with BTI: without a listener, mprotect may add PROT_EXEC together with PROT_BTI */
     pid_t self;     /* QEMU's pid (the child's own: exec keeps it) */
     int exec_fd;    /* the descriptor of QEMU's binary, the only thing execveat may run; -1: no exec */
     int notify;     /* 1: the default action is SECCOMP_RET_USER_NOTIF (lord-vm holds the listener); 0: kill */
@@ -59,6 +59,12 @@ const char *vm_sc_name(int nr);
  * SECCOMP_USER_NOTIF_FLAG_CONTINUE: the child is single-threaded and runs lord-vm's code, so its arguments can't change);
  * *done is set, and every later execveat is 0 (QEMU is stopped) */
 int vm_sc_exec_once(const struct seccomp_notif *req, pid_t child, int *done);
+/* a PROT_EXEC mmap or mprotect lord-vm may let through while QEMU starts (until its QMP handshake): a private
+ * read-only mapping of a file, or on arm64 with BTI PROT_EXEC|PROT_BTI without PROT_WRITE. Its arguments are registers,
+ * read by the kernel, so they can't change after the check. Never after the start */
+int vm_sc_startup_exec(const struct seccomp_data *d, int bti);
+/* arm64 with BTI (glibc's loader marks libraries' code PROT_BTI with mprotect) */
+int vm_sc_cpu_bti(void);
 /* "name" or "ioctl 0x...", with what lord-vm logs about the arguments; for a notification */
 void vm_sc_describe(const struct seccomp_data *d, char *out, size_t n);
 /* the key lord-vm's learn mode logs a call once by (the call, and its ioctl request, prctl option or memory rights) */

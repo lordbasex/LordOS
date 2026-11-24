@@ -12,6 +12,7 @@
 #include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/socket.h>
+#include <sys/auxv.h>
 #include <sys/syscall.h>
 
 #define ROW(n, r) { #n, __NR_##n, VSR_##r },
@@ -166,23 +167,27 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
         return 0;
     }
     case VSR_MMAP:
-        /* without TCG, executable memory is only what the loader maps: a private, read-only mapping of a file. Never
-         * writable and executable, never shared (a second, writable mapping would write it), never anonymous */
-        if (o->tcg) { ALLOW(); return 0; }
-        LD_ARG(2);
-        JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_EXEC, 0, 4);
-        JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_WRITE, 2, 0);
-        LD_ARG(3);
-        JUMP(BPF_JMP | BPF_JSET | BPF_K, MAP_SHARED | MAP_ANONYMOUS, 0, 1);   /* MAP_SHARED_VALIDATE has MAP_SHARED's bit */
-        DEFAULT();
-        ALLOW();
-        return 0;
     case VSR_MPROTECT:
-        /* without TCG, nothing is made executable afterwards (measured: QEMU, glibc and Mesa never do on amd64 or on the
-         * Pi 5). arm64 with BTI: glibc's loader marks a library's code PROT_EXEC|PROT_BTI, never writable at once */
+        /* without TCG (whose code buffer is writable and executable): with a listener every PROT_EXEC goes to lord-vm,
+         * which lets through only what the loader does (vm_sc_startup_exec: a private read-only file mapping, arm64's
+         * PROT_EXEC|PROT_BTI mprotect) and only until QEMU's start is over (its QMP handshake: libraries, QEMU's modules
+         * and Mesa's drivers are loaded by then); after it, executable memory of any kind stops QEMU, whatever the file
+         * (a memfd or a file of its disks folder written to be run). Without a listener (the fallback) only the loader's
+         * kind passes, at any time */
         if (o->tcg) { ALLOW(); return 0; }
         LD_ARG(2);
-        if (o->bti) {
+        if (o->notify) {
+            JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_EXEC, 0, 1);
+            DEFAULT();
+            ALLOW();
+        } else if (r->rule == VSR_MMAP) {
+            JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_EXEC, 0, 4);
+            JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_WRITE, 2, 0);
+            LD_ARG(3);
+            JUMP(BPF_JMP | BPF_JSET | BPF_K, MAP_SHARED | MAP_ANONYMOUS, 0, 1);   /* MAP_SHARED_VALIDATE has MAP_SHARED's bit */
+            DEFAULT();
+            ALLOW();
+        } else if (o->bti) {
             JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_EXEC, 0, 3);
             JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_WRITE, 1, 0);
             JUMP(BPF_JMP | BPF_JSET | BPF_K, 0x10 /* PROT_BTI */, 1, 0);
@@ -298,6 +303,22 @@ int vm_sc_exec_once(const struct seccomp_notif *req, pid_t child, int *done) {
     if (req->data.nr != __NR_execveat || *done || child <= 0 || (pid_t)req->pid != child) return 0;
     *done = 1;
     return 1;
+}
+
+int vm_sc_startup_exec(const struct seccomp_data *d, int bti) {
+    uint32_t prot = (uint32_t)d->args[2];
+    if (!(prot & PROT_EXEC) || (prot & PROT_WRITE)) return 0;
+    if (d->nr == __NR_mmap) return !((uint32_t)d->args[3] & (MAP_SHARED | MAP_ANONYMOUS));
+    if (d->nr == __NR_mprotect) return bti && (prot & 0x10 /* PROT_BTI */);
+    return 0;
+}
+
+int vm_sc_cpu_bti(void) {
+#if defined(__aarch64__)
+    return !!(getauxval(AT_HWCAP2) & (1UL << 17));     /* HWCAP2_BTI */
+#else
+    return 0;
+#endif
 }
 
 int vm_sc_build(const VmScOpts *o, struct sock_filter *f, int cap) {
