@@ -3685,7 +3685,8 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     if (!m || !m->px || m->w < 1 || m->h < 1) return JS_FALSE;
     /* a group's member under the anonymity profile (docs/VIRTUALIZATION.md 19.5): no picture of it stays on disk */
     VmMachine mm;
-    if (vm_machine_load(s->dir, &mm, NULL, 0) || mm.profile_lock) return JS_FALSE;
+    /* nor of an encrypted machine (docs/VIRTUALIZATION.md 8): its folder keeps nothing of the guest in the clear */
+    if (vm_machine_load(s->dir, &mm, NULL, 0) || mm.profile_lock || mm.encrypted) return JS_FALSE;
     return JS_NewBool(c, !vm_thumb_save_async(s->dir, m->px, m->w, m->h, VM_THUMB_W));
 }
 
@@ -4388,6 +4389,11 @@ static JSValue f_snap_take(JSContext *c, JSValueConst t, int argc, JSValueConst 
     Sess *s = argc >= 3 ? get(c, argv[2]) : NULL;
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     int shut = (s && s->protect) || (m && !pic_out_ok(s, m));    /* a protected machine's snapshot keeps no picture */
+    {
+        /* nor an encrypted machine's (docs/VIRTUALIZATION.md 8): a picture would be the guest's screen in the clear */
+        VmMachine em;
+        if (!vm_machine_load(dir, &em, NULL, 0) && em.encrypted) shut = 1;
+    }
     if (!shut) media_src_need_cpu(m);
     if (shut) { /* nothing: the list shows the snapshot without a picture */ }
     else if (m && m->px && m->w > 0 && m->h > 0) vm_png_save(sd, file, m->px, m->w, m->h, 640);

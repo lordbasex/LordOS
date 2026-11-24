@@ -668,6 +668,15 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 3 && (m->devices || m->nic_model || m->n_extra_macs || m->cpu_sockets || m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] ||
                           m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0] || m->n_data || m->rtc))
         return fail(err, n, VM_E_FIELD, "devices, nic_model, extra_nics, cpu topology, smbios, serials, data_disks and rtc need schema 3");
+    if (m->disposable < VM_DISP_OFF || m->disposable > VM_DISP_DISK) return fail(err, n, VM_E_RANGE, "disposable is memory or disk");
+    if ((m->encrypted & ~1) || (m->raw & ~1) || (m->no_backup & ~1)) return fail(err, n, VM_E_RANGE, "encrypted, disk_format and backup");
+    if (m->schema < 15 && (m->disposable || m->encrypted || m->raw || m->no_backup)) return fail(err, n, VM_E_FIELD, "disposable, encrypted, disk_format and backup need schema 15");
+    /* raw disks (6.4): a plain file, so no snapshots, no LUKS layer and no overlay on a shared base */
+    if (m->raw && m->encrypted) return fail(err, n, VM_E_RANGE, "a raw disk can't be encrypted (qcow2 can)");
+    if (m->raw && m->base[0]) return fail(err, n, VM_E_RANGE, "a linked clone's disk is qcow2");
+    /* a group's member: its group.json holds the disposable switch (19.7) */
+    if (m->group[0] && m->disposable) return fail(err, n, VM_E_RANGE, "a group's member has its group's disposable session");
+    if (m->group[0] && m->raw) return fail(err, n, VM_E_RANGE, "a group's member's disk is qcow2");
     return check_member(m, err, n);
 }
 
@@ -712,7 +721,7 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "disposable", "encrypted", "disk_format", "backup", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -756,6 +765,18 @@ static const char *const DEVS[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_DEV_NAMES[] = { "virtio", "compat", "windows", NULL };
 const char *const VM_VGPU_NAMES[] = { "", "intel-whole", "intel-shared", NULL };
 const char *const VM_PIN_NAMES[] = { "", "off", "auto", NULL };
+const char *const VM_DISP_NAMES[] = { "", "memory", "disk", NULL };
+const char *vm_disk_ext(const VmMachine *m) { return m->raw ? "raw" : "qcow2"; }
+int vm_key_valid(const char *k, size_t n) {
+    if (n == 64) {
+        int hex = 1;
+        for (size_t i = 0; i < n; i++) if (!((k[i] >= '0' && k[i] <= '9') || (k[i] >= 'a' && k[i] <= 'f'))) hex = 0;
+        if (hex) return 1;
+    }
+    if (n < 8 || n > 512) return 0;
+    for (size_t i = 0; i < n; i++) if ((unsigned char)k[i] < 0x20 || k[i] == 0x7f) return 0;
+    return 1;
+}
 const char *const VM_BOOT_NAMES[] = { "disk", "cd", "network", NULL };
 
 int vm_boot_parse(const char *s, int order[VM_BOOT_DEVS]) {
@@ -1012,6 +1033,20 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         }
         if (up[0] && strcmp(up, "tor")) { r = fail(err, n, VM_E_RANGE, "uplink is tor"); goto out; }
         m->uplink_tor = up[0] != 0;
+        /* schema 15: storage; missing: as a new machine (persistent, not encrypted, qcow2, backed up) */
+        char disp[8], fmt[8];
+        if ((r = get_str(o, "disposable", disp, sizeof disp, 0, err, n)) || (r = get_str(o, "disk_format", fmt, sizeof fmt, 0, err, n))) goto out;
+        m->disposable = VM_DISP_OFF;
+        if (disp[0]) {
+            for (int i = 1; VM_DISP_NAMES[i]; i++) if (!strcmp(disp, VM_DISP_NAMES[i])) m->disposable = i;
+            if (!m->disposable) { r = fail(err, n, VM_E_RANGE, "disposable is memory or disk"); goto out; }
+        }
+        if (fmt[0] && strcmp(fmt, "raw") && strcmp(fmt, "qcow2")) { r = fail(err, n, VM_E_RANGE, "disk_format is qcow2 or raw"); goto out; }
+        m->raw = !strcmp(fmt, "raw");
+        const JVal *en = json_get(o, "encrypted"), *bk = json_get(o, "backup");
+        if ((en && en->type != J_BOOL) || (bk && bk->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "encrypted and backup are true or false"); goto out; }
+        m->encrypted = en ? json_bool(o, "encrypted", 0) : 0;
+        m->no_backup = bk ? !json_bool(o, "backup", 1) : 0;
     }
     r = vm_machine_check(m, err, n);
 out:
@@ -1115,6 +1150,12 @@ char *vm_machine_json(const VmMachine *m) {
         if (m->link_mac[0]) { jb_raw(&b, ",\n  \"link_mac\": "); jb_str(&b, m->link_mac); }
         if (m->profile_lock) { jb_raw(&b, ",\n  \"profile_lock\": "); jb_str(&b, VM_LOCK_NAMES[m->profile_lock]); }
         if (m->timers) { jb_raw(&b, ",\n  \"timers\": "); jb_str(&b, VM_TIMERS_NAMES[m->timers]); }
+    }
+    if (m->schema >= 15) {
+        if (m->disposable) { jb_raw(&b, ",\n  \"disposable\": "); jb_str(&b, VM_DISP_NAMES[m->disposable]); }
+        if (m->encrypted) jb_raw(&b, ",\n  \"encrypted\": true");
+        if (m->raw) jb_raw(&b, ",\n  \"disk_format\": \"raw\"");
+        if (m->no_backup) jb_raw(&b, ",\n  \"backup\": false");
     }
     if (m->schema >= 8 && m->sound_out[0]) { jb_raw(&b, ",\n  \"sound_out\": "); jb_str(&b, m->sound_out); }
     if (m->schema >= 8 && m->sound_in[0]) { jb_raw(&b, ",\n  \"sound_in\": "); jb_str(&b, m->sound_in); }

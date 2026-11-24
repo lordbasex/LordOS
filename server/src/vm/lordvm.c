@@ -269,24 +269,89 @@ static int sha256_file(const char *path, char out[65]) {
 }
 /* runs a program (no shell) and waits; its output goes to the log. 0 when it exited with 0. With `jail_read`, the
  * program runs inside vm_jail_tool (it may read only that file and write only in `jail_rw`) or not at all. */
+/* ---- an encrypted machine's key (docs/VIRTUALIZATION.md 8, "Encrypted machines") ----
+ * lord-server reads it from the session keyring (owner "machines", service "machines:<id>") and hands it over on a pipe
+ * (--key-fd N, any command). It lives here in one locked page that never goes to a core dump, and leaves only through a
+ * new pipe per use, which QEMU and qemu-img read as a secret object, file=/proc/self/fd/N: never an argument, the
+ * environment or a file. 64 lowercase hex digits (32 random bytes, LordOS's own), or a person's passphrase when an
+ * encrypted export is brought in (6.4) */
+static char *vkey;
+static size_t vkey_n;
+static int key_have(void) { return vkey && vkey_n; }
+static void key_wipe(void) {
+    if (vkey) { explicit_bzero(vkey, 4096); munlock(vkey, 4096); munmap(vkey, 4096); }
+    vkey = NULL;
+    vkey_n = 0;
+}
+static int key_load_fd(int fd) {
+    struct stat st;
+    if (fd < 3 || fstat(fd, &st) || !(S_ISFIFO(st.st_mode) || S_ISREG(st.st_mode))) return -1;
+    void *pg = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (pg == MAP_FAILED) return -1;
+    mlock(pg, 4096);
+    madvise(pg, 4096, MADV_DONTDUMP);
+    size_t n = 0;
+    for (;;) {
+        ssize_t r = read(fd, (char *)pg + n, 4096 - 1 - n);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) break;
+        n += (size_t)r;
+        if (n >= 4096 - 1) break;
+    }
+    close(fd);
+    vkey = pg;
+    vkey_n = n;
+    if (!vm_key_valid(vkey, vkey_n)) { key_wipe(); return -1; }
+    return 0;
+}
+/* a pipe holding the key, its read end (O_CLOEXEC); at most 512 bytes, under PIPE_BUF: written whole, never blocks */
+static int key_pipe(void) {
+    int p[2];
+    if (!key_have() || pipe2(p, O_CLOEXEC)) return -1;
+    ssize_t w = write(p[1], vkey, vkey_n);
+    close(p[1]);
+    if (w != (ssize_t)vkey_n) { close(p[0]); return -1; }
+    return p[0];
+}
+/* a qcow2 node's encryption, in QEMU's JSON (blockdev and qemu-img's json: specs), when this machine's disks have it */
+#define KEY_SECRET_ID "lvk"
+static const char *enc_json(void) { return key_have() ? ",\"encrypt\":{\"format\":\"luks\",\"key-secret\":\"" KEY_SECRET_ID "\"}" : ""; }
+/* qemu-img's options for a new encrypted qcow2: LUKS with a fast key derivation (the key is 256 random bits: PBKDF's
+ * slowness guards a guessable passphrase, and would cost every open two seconds) */
+#define ENC_CREATE_OPTS "encrypt.format=luks,encrypt.key-secret=" KEY_SECRET_ID ",encrypt.iter-time=10"
+
 static int run_tool_in(char *const argv[], char *out, size_t outcap, const char *jail_read, const char *jail_rw);
 static int run_tool(char *const argv[], char *out, size_t outcap) { return run_tool_in(argv, out, outcap, NULL, NULL); }
 static const char *jail_read2;          /* a second file the next jailed tool may read (a linked clone's base) */
 static const char *const *jail_list;    /* or a list of them (an import: a descriptor, its extents, its snapshot layers) */
 static int jail_n;
 static void (*tool_progress)(double pct); /* qemu-img convert -p's "(12.34/100%)", as it comes */
-static int run_tool_in(char *const argv[], char *out, size_t outcap, const char *jail_read, const char *jail_rw) {
+static int run_tool_in(char *const argv0[], char *out, size_t outcap, const char *jail_read, const char *jail_rw) {
+    /* an encrypted machine's qemu-img gets the key as a secret object on fd 3 (a pipe), right after its subcommand */
+    char *const *argv = argv0;
+    char *kargv[48];
+    int kp = -1;
+    if (key_have() && !strcmp(argv0[0], QEMU_IMG) && argv0[1]) {
+        int n = 0;
+        while (argv0[n]) n++;
+        if (n + 3 > (int)(sizeof kargv / sizeof kargv[0]) || (kp = key_pipe()) < 0) return -1;
+        kargv[0] = argv0[0]; kargv[1] = argv0[1];
+        kargv[2] = "--object"; kargv[3] = "secret,id=" KEY_SECRET_ID ",file=/proc/self/fd/3";
+        for (int i = 2; i <= n; i++) kargv[i + 2] = argv0[i];
+        argv = kargv;
+    }
     int p[2];
-    if (pipe2(p, O_CLOEXEC)) return -1;
+    if (pipe2(p, O_CLOEXEC)) { if (kp >= 0) close(kp); return -1; }
     pid_t pid = fork();
-    if (pid < 0) { close(p[0]); close(p[1]); return -1; }
+    if (pid < 0) { close(p[0]); close(p[1]); if (kp >= 0) close(kp); return -1; }
     if (!pid) {
         prctl(PR_SET_PDEATHSIG, SIGKILL);        /* a qemu-img never outlives the lord-vm that runs it (a killed clone) */
         dup2(p[1], 1);
         dup2(p[1], 2);
         int null = open("/dev/null", O_RDONLY);
         if (null >= 0) dup2(null, 0);
-        syscall(SYS_close_range, 3, ~0u, 0);
+        if (kp >= 0 && (kp == 3 ? fcntl(3, F_SETFD, 0) : dup2(kp, 3)) < 0) _exit(126);
+        syscall(SYS_close_range, kp >= 0 ? 4 : 3, ~0u, 0);
         if (jail_read) {
             int mask = jail_n > 0 ? vm_jail_tool_n(jail_list, jail_n, jail_rw) : vm_jail_tool2(jail_read, jail_read2, jail_rw);
             if (!(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_SECCOMP_OURS) || (vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS))) {
@@ -300,6 +365,7 @@ static int run_tool_in(char *const argv[], char *out, size_t outcap, const char 
         _exit(127);
     }
     close(p[1]);
+    if (kp >= 0) close(kp);
     size_t n = 0;
     char tmp[4096];
     for (;;) {
@@ -532,9 +598,9 @@ static int disk_plain(const char *path, char *err, size_t errlen) {
 #define VM_NDISKS (2 + VM_DATA_DISKS)
 static int disk_files(const char *dir, const VmMachine *m, char out[VM_NDISKS][PATH_MAX + 64]) {
     int n = 0;
-    snprintf(out[n++], PATH_MAX + 64, "%s/disks/system.qcow2", dir);
+    snprintf(out[n++], PATH_MAX + 64, "%s/disks/system.%s", dir, vm_disk_ext(m));
     if (m->firmware == VM_FW_UEFI) snprintf(out[n++], PATH_MAX + 64, "%s/disks/nvram.qcow2", dir);
-    for (int i = 0; i < m->n_data; i++) snprintf(out[n++], PATH_MAX + 64, "%s/disks/data-%d.qcow2", dir, i + 1);
+    for (int i = 0; i < m->n_data; i++) snprintf(out[n++], PATH_MAX + 64, "%s/disks/data-%d.%s", dir, i + 1, vm_disk_ext(m));
     return n;
 }
 
@@ -544,7 +610,7 @@ static int qimg_snap(const char *dir, const char *disk, const char *flag, const 
     jb_init(&b);
     jb_raw(&b, "json:{\"driver\":\"qcow2\",\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":");
     jb_str(&b, disk);
-    jb_raw(&b, "}}");
+    jb_raw(&b, "}"); jb_raw(&b, enc_json()); jb_raw(&b, "}");
     if (b.oom) { jb_free(&b); snprintf(err, errlen, "out of memory"); return -1; }
     char dd[PATH_MAX + 64];
     snprintf(dd, sizeof dd, "%s/disks", dir);
@@ -560,7 +626,7 @@ static int qimg_tags(const char *disk, char tags[][33], int max) {
     jb_init(&b);
     jb_raw(&b, "json:{\"driver\":\"qcow2\",\"backing\":null,\"read-only\":true,\"file\":{\"driver\":\"file\",\"filename\":");
     jb_str(&b, disk);
-    jb_raw(&b, "}}");
+    jb_raw(&b, "}"); jb_raw(&b, enc_json()); jb_raw(&b, "}");
     if (b.oom) { jb_free(&b); return -1; }
     char *argv[] = { QEMU_IMG, "info", "--output=json", "-U", b.p, NULL };
     static char out[262144];
@@ -582,11 +648,13 @@ static int qimg_tags(const char *disk, char tags[][33], int max) {
 /* after an operation that stopped in the middle: clusters a killed QEMU or qemu-img allocated but never referenced
  * are given back (qemu-img check -r leaks: only leaks, never a guess at corruption). 0 clean or repaired. */
 static int qimg_repair_leaks(const char *dir, const char *disk) {
+    size_t dl = strlen(disk);
+    if (dl > 4 && !strcmp(disk + dl - 4, ".raw")) return 0;      /* a raw disk has no qcow2 metadata to repair */
     JBuf b;
     jb_init(&b);
     jb_raw(&b, "json:{\"driver\":\"qcow2\",\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":");
     jb_str(&b, disk);
-    jb_raw(&b, "}}");
+    jb_raw(&b, "}"); jb_raw(&b, enc_json()); jb_raw(&b, "}");
     if (b.oom) { jb_free(&b); return -1; }
     char dd[PATH_MAX + 64], out[2048];
     snprintf(dd, sizeof dd, "%s/disks", dir);
@@ -627,6 +695,7 @@ static void snaps_sweep(const char *dir, const VmMachine *m) {
  * back, TPMS_DROP removes it. Machines without a TPM have nothing to do. */
 enum { TPMS_TAKE, TPMS_REVERT, TPMS_DROP };
 static int copy_sparse(const char *from, const char *to);
+static void rm_tree(const char *dir);
 static int tpm_snap(const char *dir, const VmMachine *m, int op, const char *tag) {
     if (!m->tpm || !vm_snap_tag_valid(tag)) return 0;
     char cur[PATH_MAX + 64], snap[PATH_MAX + 128];
@@ -717,7 +786,8 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     int arch = h.arch >= 0 ? h.arch : VM_ARCH_AMD64;
     const char *name = NULL, *import = NULL, *iso = NULL, *unatt = NULL;
     int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1, devs = -1, gfx = -1;
-    const char *drivers = NULL;
+    int enc = 0, raw = 0, disp_s = 0;
+    const char *drivers = NULL, *want_id = NULL;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
@@ -743,8 +813,17 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--devices")) { devs = !strcmp(v, "windows") ? VM_DEV_WINDOWS : parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat|windows\n"); return 2; } }
         else if (!strcmp(a, "--drivers")) drivers = v;
         else if (!strcmp(a, "--graphics")) { gfx = parse_enum(v, "2d", "3d"); if (gfx < 0) { fprintf(stderr, "lord-vm: --graphics 2d|3d\n"); return 2; } }
+        /* storage (schema 15): an encrypted machine (its key on --key-fd, its id given so lord-server could keep the key
+         * under it first), raw disks, a disposable session */
+        else if (!strcmp(a, "--encrypt")) { enc = parse_enum(v, "off", "on"); if (enc < 0) { fprintf(stderr, "lord-vm: --encrypt on|off\n"); return 2; } }
+        else if (!strcmp(a, "--disk-format")) { raw = parse_enum(v, "qcow2", "raw"); if (raw < 0) { fprintf(stderr, "lord-vm: --disk-format qcow2|raw\n"); return 2; } }
+        else if (!strcmp(a, "--disposable")) { disp_s = !strcmp(v, "off") ? 0 : !strcmp(v, "memory") ? VM_DISP_MEMORY : !strcmp(v, "disk") ? VM_DISP_DISK : -1; if (disp_s < 0) { fprintf(stderr, "lord-vm: --disposable off|memory|disk\n"); return 2; } }
+        else if (!strcmp(a, "--id")) { if (!vm_uuid_valid(v)) { fprintf(stderr, "lord-vm: --id is a lowercase UUID\n"); return 2; } want_id = v; }
         else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
     }
+    if (enc && !key_have()) { fprintf(stderr, "lord-vm: --encrypt on needs the machine's key on --key-fd\n"); return 2; }
+    if (!enc && key_have()) key_wipe();
+    if (enc && raw) { fprintf(stderr, "lord-vm: a raw disk can't be encrypted (qcow2 can)\n"); return 2; }
     /* an unattended install (vmunattend.h): the spec lord-server wrote (0600, the password only as a hash), read and
      * removed at once; it needs the ISO it boots from */
     VmUnattend un;
@@ -764,6 +843,10 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     }
     VmMachine m;
     vm_machine_defaults(&m, &h, arch);
+    if (want_id) memcpy(m.id, want_id, sizeof m.id);
+    m.encrypted = enc;
+    m.raw = raw;
+    m.disposable = disp_s;
     if (agent >= 0) m.agent = agent;
     if (unatt) m.agent = 1;              /* the installs bring qemu-guest-agent: Shut Down asks it first (6.1) */
     if (clip >= 0) m.clipboard = clip;
@@ -826,27 +909,29 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     snprintf(p, sizeof p, "%s/disks", real); mkdir(p, 0700);
     snprintf(p, sizeof p, "%s/log", real); mkdir(p, 0700);
     char sys[PATH_MAX + 64], size[32];
-    snprintf(sys, sizeof sys, "%s/disks/system.qcow2", real);
+    snprintf(sys, sizeof sys, "%s/disks/system.%s", real, vm_disk_ext(&m));
     snprintf(size, sizeof size, "%dG", m.disk_gb);
+    const char *ofmt = raw ? "raw" : "qcow2";
     if (import) {
         /* jailed: reads the image only, writes only in disks/; the format is named, backing is off */
-        char *spec = image_spec(impreal, impkind), dd[PATH_MAX + 64];
+        char *spec = image_spec(impreal, impkind), dd[PATH_MAX + 64], rspec[PATH_MAX + 200];
         snprintf(dd, sizeof dd, "%s/disks", real);
-        char *cv[] = { QEMU_IMG, "convert", "-q", "-O", "qcow2", spec, sys, NULL };
-        char *rs[] = { QEMU_IMG, "resize", "-q", "-f", "qcow2", sys, size, NULL };
-        int bad = !spec || run_tool_in(cv, err, sizeof err, impreal, dd) || run_tool_in(rs, err, sizeof err, sys, dd);
+        char *cv[] = { QEMU_IMG, "convert", "-q", "-O", (char *)ofmt, enc ? "-o" : spec, enc ? ENC_CREATE_OPTS : sys, enc ? spec : NULL, enc ? sys : NULL, NULL };
+        char *rs[] = { QEMU_IMG, "resize", "-q", enc ? "--image-opts" : "-f", enc ? rspec : (char *)ofmt, enc ? size : sys, enc ? NULL : size, NULL };
+        if (enc) snprintf(rspec, sizeof rspec, "driver=qcow2,file.filename=%s,encrypt.key-secret=" KEY_SECRET_ID, sys);
+        int bad = !spec || (enc && strchr(sys, ',')) || run_tool_in(cv, err, sizeof err, impreal, dd) || run_tool_in(rs, err, sizeof err, sys, dd);
         free(spec);
         char why[256];
-        if (!bad && disk_plain(sys, why, sizeof why)) { snprintf(err, sizeof err, "%s", why); bad = 1; }
+        if (!bad && !raw && disk_plain(sys, why, sizeof why)) { snprintf(err, sizeof err, "%s", why); bad = 1; }
         if (bad) { fprintf(stderr, "lord-vm: importing %s failed: %s\n", import, err); unlink(sys); return 1; }
     } else {
-        char *cr[] = { QEMU_IMG, "create", "-q", "-f", "qcow2", sys, size, NULL };
+        char *cr[] = { QEMU_IMG, "create", "-q", "-f", (char *)ofmt, enc ? "-o" : sys, enc ? ENC_CREATE_OPTS : size, enc ? sys : NULL, enc ? size : NULL, NULL };
         if (run_tool(cr, err, sizeof err)) { fprintf(stderr, "lord-vm: qemu-img create failed: %s\n", err); return 1; }
     }
     if (m.firmware == VM_FW_UEFI) {
         char nv[PATH_MAX + 64];
         snprintf(nv, sizeof nv, "%s/disks/nvram.qcow2", real);
-        char *cv[] = { QEMU_IMG, "convert", "-q", "-f", "raw", "-O", "qcow2", (char *)vars, nv, NULL };
+        char *cv[] = { QEMU_IMG, "convert", "-q", "-f", "raw", "-O", "qcow2", (char *)vars, enc ? "-o" : nv, enc ? ENC_CREATE_OPTS : NULL, enc ? nv : NULL, NULL };
         if (run_tool(cv, err, sizeof err)) { fprintf(stderr, "lord-vm: making the UEFI variables failed: %s\n", err); unlink(sys); return 1; }
     }
     if (unatt) {
@@ -961,6 +1046,16 @@ static struct {
      * full: the guest was paused at the cap (VR_SESSION_FULL), sess_mark where the next pause comes after a Resume */
     int sess_on, sess_fd, sess_full;
     long long sess_cap, sess_mark, sess_at;
+    /* a disposable session of any machine (6.2, machine.json "disposable"): one layer per writable disk (sess_fds, in
+     * disk_files' order: the system disk, the UEFI variables, the data disks), each a memfd (memory: capped at
+     * sess_cap together) or an unlinked file in disks/ (disk: nothing names it once QEMU ends); the TPM's state is a
+     * copy in lord-vm's private runtime folder (sess_tpm), removed when QEMU ends. sess_fd is the group's single one */
+    int sess_mode, sess_n, sess_fds[2 + VM_DATA_DISKS];
+    char sess_tpm[PATH_MAX + 32];
+    /* fds QEMU gets after the TPM's, in this order, each only when used: the key's pipe (key_fd, an encrypted
+     * machine's secret object), the kept UEFI code file (fw_fd, 3.6), then the session's layers. xfd_base: the first one's
+     * number in QEMU */
+    int key_fd, fw_fd, xfd_base;
     char un_cmd[640];
     long long shut_deadline, kill_deadline;
     Pending pq[MAX_PENDING];
@@ -1698,7 +1793,9 @@ static int spawn_virtiofsd(int i, char *err, size_t errlen) {
 static int spawn_swtpm(char *err, size_t errlen) {
     if (!file_exists(SWTPM)) { snprintf(err, errlen, "swtpm isn't installed (the TPM)"); return -1; }
     char dir[PATH_MAX + 32], st[PATH_MAX + 64];
-    snprintf(dir, sizeof dir, "%s/tpm", S.disks);
+    /* a disposable session's TPM writes to its copy (session_tpm) */
+    if (S.sess_on && S.sess_tpm[0]) snprintf(dir, sizeof dir, "%s", S.sess_tpm);
+    else snprintf(dir, sizeof dir, "%s/tpm", S.disks);
     if (mkdir(dir, 0700) && errno != EEXIST) { snprintf(err, errlen, "can't make the TPM's folder: %s", strerror(errno)); return -1; }
     struct stat sb;
     if (lstat(dir, &sb) || !S_ISDIR(sb.st_mode) || sb.st_uid != getuid()) { snprintf(err, errlen, "the TPM's folder isn't this account's"); return -1; }
@@ -1708,29 +1805,35 @@ static int spawn_swtpm(char *err, size_t errlen) {
     char logp[PATH_MAX + 64];
     snprintf(logp, sizeof logp, "%s/log/swtpm.log", S.dir);
     int lf = open(logp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    /* an encrypted machine (8): swtpm's own state encryption, AES-256-CBC with encrypt-then-MAC, its key derived from
+     * ours (PBKDF2) and read from a pipe on fd 4 */
+    int kp = key_have() ? key_pipe() : -1;
+    if (key_have() && kp < 0) { snprintf(err, errlen, "the key couldn't be handed to swtpm"); close(sv[0]); close(sv[1]); if (lf >= 0) close(lf); return -1; }
     pid_t pid = fork();
-    if (pid < 0) { snprintf(err, errlen, "fork: %s", strerror(errno)); close(sv[0]); close(sv[1]); if (lf >= 0) close(lf); return -1; }
+    if (pid < 0) { snprintf(err, errlen, "fork: %s", strerror(errno)); close(sv[0]); close(sv[1]); if (lf >= 0) close(lf); if (kp >= 0) close(kp); return -1; }
     if (!pid) {
         child_common(tpm_procs_fd);
         int null = open("/dev/null", O_RDWR);
         dup2(null, 0);
         dup2(lf >= 0 ? lf : null, 1);
         dup2(lf >= 0 ? lf : null, 2);
-        int fds[1] = { sv[1] };
-        place_fds(fds, 1);
+        int fds[2] = { sv[1], kp };
+        place_fds(fds, kp >= 0 ? 2 : 1);
         const char *reads[] = { "/etc/ld.so.cache" };
         int mask = vm_jail_tool_n(reads, 1, dir);
         if (!(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_SECCOMP_OURS) || (vm_landlock_abi() > 0 && !(mask & VMS_LANDLOCK_FS))) _exit(126);
         char *argv[] = { SWTPM, "socket", "--tpm2", "--tpmstate", st, "--ctrl", "type=unixio,clientfd=3", "--terminate",
-                         "--seccomp", "action=kill", "--log", "level=1", NULL };
+                         "--seccomp", "action=kill", "--log", "level=1", kp >= 0 ? "--key" : NULL, "pwdfd=4,mode=aes-256-cbc,kdf=pbkdf2", NULL };
         char *env[] = { NULL };
         execve(SWTPM, argv, env);
         _exit(127);
     }
     close(sv[1]);
     if (lf >= 0) close(lf);
+    if (kp >= 0) close(kp);
     S.tpm = pid;
-    vlog("tpm: swtpm pid %d, state in disks/tpm", (int)pid);
+    vlog("tpm: swtpm pid %d, state in %s%s", (int)pid, S.sess_on && S.sess_tpm[0] ? "the session's copy (memory)" : "disks/tpm",
+         kp >= 0 ? ", encrypted" : "");
     return sv[0];
 }
 
@@ -1892,11 +1995,21 @@ static char *blockdev_fmt(const char *drv, const char *node, const char *file, i
     return b.oom ? NULL : b.p;
 }
 
-/* a linked clone's system disk: its backing is the shared base node, named here, never the header's file name */
-static char *blockdev_overlay(const char *node, const char *file, const char *backing) {
+/* a qcow2 node of the machine's own, encrypted with the key when enc */
+static char *blockdev_fmt_enc(const char *drv, const char *node, const char *file, int ro, int enc) {
     JBuf b;
     jb_init(&b);
-    jb_printf(&b, "{\"driver\":\"qcow2\",\"node-name\":\"%s\",\"file\":\"%s\",\"read-only\":false,\"discard\":\"unmap\",\"backing\":\"%s\"}", node, file, backing);
+    jb_printf(&b, "{\"driver\":\"%s\",\"node-name\":\"%s\",\"file\":\"%s\",\"read-only\":%s%s%s%s}", drv, node, file, ro ? "true" : "false",
+              ro ? "" : ",\"discard\":\"unmap\"", !strcmp(drv, "qcow2") ? ",\"backing\":null" : "", enc && !strcmp(drv, "qcow2") ? enc_json() : "");
+    return b.oom ? NULL : b.p;
+}
+/* a qcow2 over another node (named here, never the header's backing file name): a linked clone's disk over its base, a
+ * session's layer over a disk */
+static char *blockdev_chain(const char *node, const char *file, const char *backing, int ro, int enc) {
+    JBuf b;
+    jb_init(&b);
+    jb_printf(&b, "{\"driver\":\"qcow2\",\"node-name\":\"%s\",\"file\":\"%s\",\"read-only\":%s%s,\"backing\":\"%s\"%s}", node, file,
+              ro ? "true" : "false", ro ? "" : ",\"discard\":\"unmap\"", backing, enc ? enc_json() : "");
     return b.oom ? NULL : b.p;
 }
 
@@ -2095,19 +2208,38 @@ static int decide_vgpu(void) {
  * file of headers only (no data of the session exists yet), copied into a memfd and removed. QEMU gets the memfd as
  * /dev/fdset/2 and opens the system disk read-only under it. 0, or -1 (fail_start said why) */
 static int qimg_overlay(const char *base, const char *out, const char *out_dir, int gb, char *err, size_t errlen);
-static int session_prepare(void) {
-    int cap = session_cap_mb();
-    if (!cap) return 0;
-    char sys[PATH_MAX + 48], tmp[PATH_MAX + 48], err[256];
-    snprintf(sys, sizeof sys, "%s/system.qcow2", S.disks);
-    snprintf(tmp, sizeof tmp, "%s/.session-empty.qcow2", S.disks);
+static int qimg_overlay_fmt(const char *base, const char *bfmt, const char *out, const char *out_dir, long long bytes, char *err, size_t errlen);
+/* a disk's virtual size: a qcow2 header's size field (big endian at 24), a raw file's length; -1 unknown */
+static long long disk_vsize(const char *path, int raw) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    struct stat st;
+    uint8_t h[32];
+    long long v = -1;
+    if (!fstat(fd, &st) && S_ISREG(st.st_mode)) {
+        if (raw) v = st.st_size;
+        else if (pread(fd, h, sizeof h, 0) == (ssize_t)sizeof h && !memcmp(h, "QFI\xfb", 4)) {
+            uint64_t x = 0;
+            for (int i = 24; i < 32; i++) x = x << 8 | h[i];
+            v = x > 0 && x <= ((uint64_t)VM_DISK_MAX_GB << 30) ? (long long)x : -1;
+        }
+    }
+    close(fd);
+    return v;
+}
+/* one empty layer over `under` (its format bfmt) for the session: made as a file in disks/ by the jailed qemu-img, then
+ * copied into a memfd (memory) or kept open and unlinked (disk). The descriptor, or -1 */
+static int session_layer(const char *under, const char *bfmt, long long bytes, int mode, int i) {
+    char tmp[PATH_MAX + 48], err[256];
+    snprintf(tmp, sizeof tmp, "%s/.session-%d.qcow2", S.disks, i);
     unlink(tmp);
-    if (qimg_overlay(sys, tmp, S.disks, S.m.disk_gb, err, sizeof err)) { unlink(tmp); fail_start("the disposable session: qemu-img create: %.150s", err); return -1; }
-    int in = open(tmp, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (bytes <= 0 || qimg_overlay_fmt(under, bfmt, tmp, S.disks, bytes, err, sizeof err)) { unlink(tmp); vlog("disposable session: qemu-img create: %.150s", err); return -1; }
+    int in = open(tmp, mode == VM_DISP_DISK ? O_RDWR | O_CLOEXEC | O_NOFOLLOW : O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     unlink(tmp);
+    if (in < 0 || mode == VM_DISP_DISK) return in;
     int fd = memfd_create("lordos-session", MFD_CLOEXEC);
     struct stat st;
-    int bad = in < 0 || fd < 0 || fstat(in, &st) || st.st_size <= 0 || st.st_size > (16 << 20);
+    int bad = fd < 0 || fstat(in, &st) || st.st_size <= 0 || st.st_size > (16 << 20);
     static char buf[1 << 16];
     for (off_t o = 0; !bad && o < st.st_size;) {
         ssize_t k = read(in, buf, sizeof buf);
@@ -2115,24 +2247,92 @@ static int session_prepare(void) {
         if (k <= 0 || write_all(fd, buf, (size_t)k)) { bad = 1; break; }
         o += k;
     }
-    if (in >= 0) close(in);
-    if (bad) { if (fd >= 0) close(fd); fail_start("the disposable session's memory couldn't be prepared"); return -1; }
+    close(in);
+    if (bad) { if (fd >= 0) close(fd); return -1; }
+    return fd;
+}
+static void session_close(void) {
+    for (int i = 0; i < S.sess_n; i++) if (S.sess_fds[i] >= 0) { close(S.sess_fds[i]); S.sess_fds[i] = -1; }
+    if (S.sess_fd >= 0) close(S.sess_fd);
+    S.sess_fd = -1;
+    S.sess_n = 0;
+    if (S.sess_tpm[0]) { rm_tree(S.sess_tpm); S.sess_tpm[0] = 0; }
+}
+/* the TPM's state for the session: a copy of disks/tpm in lord-vm's private runtime folder (a tmpfs), so swtpm's
+ * writes go with the session; snapshots' files (snap-*) aren't needed */
+static int session_tpm(void) {
+    char from[PATH_MAX + 32];
+    snprintf(from, sizeof from, "%s/tpm", S.disks);
+    if (snprintf(S.sess_tpm, sizeof S.sess_tpm, "%.4000s/tpm-session", S.rundir) >= (int)sizeof S.sess_tpm) { S.sess_tpm[0] = 0; return -1; }
+    rm_tree(S.sess_tpm);
+    if (mkdir(S.sess_tpm, 0700)) { S.sess_tpm[0] = 0; return -1; }
+    DIR *d = opendir(from);
+    struct dirent *e;
+    int bad = 0;
+    while (d && (e = readdir(d))) {
+        if (e->d_name[0] == '.' || !strncmp(e->d_name, "snap-", 5)) continue;
+        char a[PATH_MAX + 300], b[PATH_MAX + 300];
+        snprintf(a, sizeof a, "%s/%s", from, e->d_name);
+        snprintf(b, sizeof b, "%s/%s", S.sess_tpm, e->d_name);
+        if (file_exists(a) && copy_sparse(a, b)) bad = 1;
+    }
+    if (d) closedir(d);
+    return bad ? -1 : 0;
+}
+static int session_prepare(void) {
+    S.sess_n = 0;
+    S.sess_mode = VM_DISP_OFF;
+    int cap = session_cap_mb();
+    if (cap) {
+        /* a group's workstation (19.7): its system disk only, over its base, in memory */
+        char sys[PATH_MAX + 48];
+        snprintf(sys, sizeof sys, "%s/system.qcow2", S.disks);
+        int fd = session_layer(sys, "qcow2", (long long)S.m.disk_gb << 30, VM_DISP_MEMORY, 0);
+        if (fd < 0) { fail_start("the disposable session's memory couldn't be prepared"); return -1; }
+        S.sess_on = 1;
+        S.sess_fd = fd;
+        S.sess_mode = VM_DISP_MEMORY;
+        S.sess_cap = (long long)cap << 20;
+        S.sess_full = 0;
+        S.sess_mark = S.sess_cap;
+        vlog("disposable session: the workstation's changes stay in memory (at most %d MB) and are gone at power-off; its system disk is read-only", cap);
+        return 0;
+    }
+    if (!S.m.disposable) return 0;
+    /* any machine (6.2): every writable disk, the UEFI variables and the TPM */
+    char disks[VM_NDISKS][PATH_MAX + 64];
+    int nd = disk_files(S.dir, &S.m, disks);
+    for (int i = 0; i < nd; i++) {
+        int isnv = S.m.firmware == VM_FW_UEFI && i == 1, raw = S.m.raw && !isnv;
+        long long bytes = disk_vsize(disks[i], raw);
+        int fd = session_layer(disks[i], raw ? "raw" : "qcow2", bytes, S.m.disposable, i);
+        if (fd < 0) { S.sess_n = i; session_close(); fail_start("the disposable session's layers couldn't be prepared"); return -1; }
+        S.sess_fds[i] = fd;
+        S.sess_n = i + 1;
+    }
+    if (S.m.tpm && session_tpm()) { session_close(); fail_start("the disposable session: the TPM's state couldn't be copied"); return -1; }
     S.sess_on = 1;
-    S.sess_fd = fd;
-    S.sess_cap = (long long)cap << 20;
+    S.sess_mode = S.m.disposable;
     S.sess_full = 0;
+    S.sess_cap = S.m.disposable == VM_DISP_MEMORY ? (long long)(S.m.memory_mb > VMG_SESSION_MIN_MB ? S.m.memory_mb : VMG_SESSION_MIN_MB) << 20 : 0;
     S.sess_mark = S.sess_cap;
-    vlog("disposable session: the workstation's changes stay in memory (at most %d MB) and are gone at power-off; its system disk is read-only", cap);
+    if (S.m.disposable == VM_DISP_MEMORY)
+        vlog("disposable session: every change stays in memory (at most %lld MB) and is gone at power-off; the disks are read-only", S.sess_cap >> 20);
+    else vlog("disposable session: every change goes to unnamed files in disks/, gone at power-off; the disks are read-only");
     return 0;
 }
 /* the session's bytes in memory now (the memfd's pages) */
 static long long session_used(void) {
     struct stat st;
-    return S.sess_on && !fstat(S.sess_fd, &st) ? (long long)st.st_blocks * 512 : 0;
+    long long u = 0;
+    if (!S.sess_on) return 0;
+    if (S.sess_fd >= 0 && !fstat(S.sess_fd, &st)) u += (long long)st.st_blocks * 512;
+    for (int i = 0; i < S.sess_n; i++) if (S.sess_fds[i] >= 0 && !fstat(S.sess_fds[i], &st)) u += (long long)st.st_blocks * 512;
+    return u;
 }
 /* at the cap: the guest is paused (VR_SESSION_FULL) before the memfd outgrows it; after a Resume, again 5 % later */
 static void session_check(void) {
-    if (!S.sess_on || S.state != VS_RUNNING) return;
+    if (!S.sess_on || !S.sess_cap || S.state != VS_RUNNING) return;
     long long u = session_used();
     if (u < S.sess_mark) return;
     vlog("disposable session: %lld MB in memory, its cap: the guest is paused (Shut Down or Force Off ends the session)", u >> 20);
@@ -2206,40 +2406,72 @@ static void build_qemu_args(void) {
     if (anon) { arg("-device"); arg("vmgenid,guid=auto"); }
     /* the firmware's boot menu: SeaBIOS and OVMF wait 5 s at each start for Esc (fw_cfg's etc/boot-menu-wait) */
     if (m->boot_menu) { arg("-boot"); arg("menu=on,splash-time=5000"); }
+    /* fds after the TPM's (S.xfd_base on): the key's pipe, the kept UEFI code, the session's layers */
+    int xfd = S.xfd_base = (m->agent ? 9 : 7) + S.ncreds + sh_count() + (m->tpm ? 1 : 0);
+    if (S.key_fd >= 0) {
+        /* an encrypted machine (8): the key as a secret object read from a pipe; never an argument */
+        arg("-object"); argf("secret,id=" KEY_SECRET_ID ",file=/proc/self/fd/%d", xfd++);
+    }
+    int menc = key_have(), benc = menc && !m->group[0];     /* a group's base is Whonix's public image, not encrypted */
     if (uefi) {
-        arg("-blockdev"); argj(blockdev_file("fw-code-file", m->firmware_code, 1));
+        if (S.fw_fd >= 0) {
+            /* the code file kept with the machine (3.6): the one its variables were made with, by descriptor */
+            arg("-add-fd"); argf("fd=%d,set=3,opaque=firmware", xfd++);
+            arg("-blockdev"); argj(blockdev_file("fw-code-file", "/dev/fdset/3", 1));
+        } else { arg("-blockdev"); argj(blockdev_file("fw-code-file", m->firmware_code, 1)); }
         arg("-blockdev"); argj(blockdev_fmt("raw", "fw-code", "fw-code-file", 1));
         snprintf(p, sizeof p, "%s/nvram.qcow2", S.disks);
-        arg("-blockdev"); argj(blockdev_file("fw-vars-file", p, 0));
-        arg("-blockdev"); argj(blockdev_fmt("qcow2", "fw-vars", "fw-vars-file", 0));
     }
-    snprintf(p, sizeof p, "%s/system.qcow2", S.disks);
-    if (m->base[0] && S.sess_on) {
-        /* a disposable session (19.7): the system disk read-only over its base, the session's overlay (in memory,
-         * fdset 2) on top; the guest's disk is "sys", the top node, as always */
-        arg("-add-fd"); argf("fd=%d,set=2,opaque=session", (m->agent ? 9 : 7) + S.ncreds + sh_count() + (m->tpm ? 1 : 0));
+    /* each writable disk's chain: [base] → the disk → [the session's layer]; the guest's node is always "sys",
+     * "fw-vars", "dataN". A session's layer is fdset 4 + its index in disk_files' order (the group's single one: 2) */
+    char sys[PATH_MAX + 64];
+    snprintf(sys, sizeof sys, "%s/system.%s", S.disks, vm_disk_ext(m));
+    int gsess = m->base[0] && S.sess_on && S.sess_fd >= 0, anys = S.sess_on && S.sess_n > 0;
+    if (gsess) {
+        /* a group's disposable session (19.7): the system disk read-only over its base, the session's overlay (in memory,
+         * fdset 2) on top */
+        arg("-add-fd"); argf("fd=%d,set=2,opaque=session", xfd++);
         arg("-blockdev"); argj(blockdev_disk("base-file", m->base, 1));
-        arg("-blockdev"); argj(blockdev_fmt("qcow2", "base", "base-file", 1));
-        arg("-blockdev"); argj(blockdev_disk("persist-file", p, 1));
-        arg("-blockdev"); arg("{\"driver\":\"qcow2\",\"node-name\":\"persist\",\"file\":\"persist-file\",\"read-only\":true,\"backing\":\"base\"}");
+        arg("-blockdev"); argj(blockdev_fmt_enc("qcow2", "base", "base-file", 1, benc));
+        arg("-blockdev"); argj(blockdev_disk("persist-file", sys, 1));
+        arg("-blockdev"); argj(blockdev_chain("persist", "persist-file", "base", 1, menc));
         arg("-blockdev"); argj(blockdev_file("sess-file", "/dev/fdset/2", 0));
-        arg("-blockdev"); argj(blockdev_overlay("sys", "sess-file", "persist"));
-    } else if (m->base[0]) {
-        arg("-blockdev"); argj(blockdev_disk("base-file", m->base, 1));
-        arg("-blockdev"); argj(blockdev_fmt("qcow2", "base", "base-file", 1));
-        arg("-blockdev"); argj(blockdev_disk("sys-file", p, 0));
-        arg("-blockdev"); argj(blockdev_overlay("sys", "sys-file", "base"));
+        arg("-blockdev"); argj(blockdev_chain("sys", "sess-file", "persist", 0, menc));
     } else {
-        arg("-blockdev"); argj(blockdev_disk("sys-file", p, 0));
-        arg("-blockdev"); argj(blockdev_fmt("qcow2", "sys", "sys-file", 0));
-    }
-    for (int i = 0; i < m->n_data; i++) {
-        char fn[24], nn[16];
-        snprintf(p, sizeof p, "%s/data-%d.qcow2", S.disks, i + 1);
-        snprintf(fn, sizeof fn, "data%d-file", i + 1);
-        snprintf(nn, sizeof nn, "data%d", i + 1);
-        arg("-blockdev"); argj(blockdev_disk(fn, p, 0));
-        arg("-blockdev"); argj(blockdev_fmt("qcow2", nn, fn, 0));
+        /* the session's layers' fd numbers, in disk_files' order */
+        int sfd[2 + VM_DATA_DISKS];
+        for (int k = 0; k < S.sess_n && anys; k++) { sfd[k] = xfd++; arg("-add-fd"); argf("fd=%d,set=%d,opaque=session", sfd[k], 4 + k); }
+        const char *dn[2 + VM_DATA_DISKS];
+        char dpath[2 + VM_DATA_DISKS][PATH_MAX + 64], dnode[2 + VM_DATA_DISKS][16];
+        int nd = 0;
+        dn[nd] = "sys"; snprintf(dpath[nd], sizeof dpath[nd], "%s", sys); nd++;
+        if (uefi) { dn[nd] = "fw-vars"; snprintf(dpath[nd], sizeof dpath[nd], "%s/nvram.qcow2", S.disks); nd++; }
+        for (int i = 0; i < m->n_data; i++) {
+            snprintf(dnode[nd], sizeof dnode[nd], "data%d", i + 1);
+            dn[nd] = dnode[nd];
+            snprintf(dpath[nd], sizeof dpath[nd], "%s/data-%d.%s", S.disks, i + 1, vm_disk_ext(m));
+            nd++;
+        }
+        for (int k = 0; k < nd; k++) {
+            int isnv = uefi && k == 1, raw = m->raw && !isnv, sess = anys && k < S.sess_n;
+            char fnode[24], pnode[24], snode[24], fset[24];
+            snprintf(fnode, sizeof fnode, "%s-file", dn[k]);
+            /* the disk itself: its own node when nothing goes over it, else "<name>-disk" read-only under the layer */
+            snprintf(pnode, sizeof pnode, sess ? "%s-disk" : "%s", dn[k]);
+            if (k == 0 && m->base[0]) {
+                arg("-blockdev"); argj(blockdev_disk("base-file", m->base, 1));
+                arg("-blockdev"); argj(blockdev_fmt_enc("qcow2", "base", "base-file", 1, benc));
+            }
+            arg("-blockdev"); argj(isnv ? blockdev_file(fnode, dpath[k], sess) : blockdev_disk(fnode, dpath[k], sess));
+            if (k == 0 && m->base[0]) { arg("-blockdev"); argj(blockdev_chain(pnode, fnode, "base", sess, menc)); }
+            else { arg("-blockdev"); argj(blockdev_fmt_enc(raw ? "raw" : "qcow2", pnode, fnode, sess, raw ? 0 : menc)); }
+            if (sess) {
+                snprintf(snode, sizeof snode, "%s-sess", dn[k]);
+                snprintf(fset, sizeof fset, "/dev/fdset/%d", 4 + k);
+                arg("-blockdev"); argj(blockdev_file(snode, fset, 0));
+                arg("-blockdev"); argj(blockdev_chain(dn[k], snode, pnode, 0, menc));
+            }
+        }
     }
     /* Every PCI device has a fixed slot: with the slots QEMU picks, taking an ISO out after an install moved the
      * network card (enp0s3 became enp0s2) and the installed system's network didn't come up. Slots 1 to 6 are the
@@ -2460,6 +2692,46 @@ static int suspend_usable(char *err, size_t n);
 static const char *snap_devices(void);
 static void send_job(int kind, int status, int pct, const char *text);
 static void start_vcpus(void);
+/* The UEFI code file kept with the machine (3.6): <dir>/firmware-code.fd, a copy of the one its variables were made with
+ * (machine.json firmware_sha256). The system's file while it still is that one, and the copy is made then; after a
+ * firmware update, the kept copy, by descriptor (fw_fd), when its bytes still give that hash; else the system's file,
+ * which the log names. Moving to the new firmware is an explicit action (lord-vm --set --firmware-update). */
+#define FW_KEPT "firmware-code.fd"
+static int fw_keep(void) {
+    if (!file_exists(S.m.firmware_code)) {
+        /* the system's file is gone (the package removed or moved): the kept copy may still start the machine */
+        vlog("note: the UEFI firmware %s is missing", S.m.firmware_code);
+    }
+    char sum[65] = "", kept[PATH_MAX + 32];
+    snprintf(kept, sizeof kept, "%s/" FW_KEPT, S.dir);
+    int sys_ok = !sha256_file(S.m.firmware_code, sum) && !strcmp(sum, S.m.firmware_sha256);
+    if (sys_ok) {
+        if (!file_exists(kept)) {
+            char tmp[PATH_MAX + 48];
+            snprintf(tmp, sizeof tmp, "%s/.%s.new", S.dir, FW_KEPT);
+            unlink(tmp);
+            char ks[65];
+            if (!copy_sparse(S.m.firmware_code, tmp) && !sha256_file(tmp, ks) && !strcmp(ks, S.m.firmware_sha256) && !rename(tmp, kept))
+                vlog("firmware: a copy of the UEFI code is kept with the machine (" FW_KEPT ")");
+            else unlink(tmp);
+        }
+        return 0;
+    }
+    int fd = open(kept, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    struct stat st;
+    char ks[65];
+    if (fd >= 0 && !fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_size > 0 && st.st_size <= (64 << 20) && !sha256_fd(fd, ks) &&
+        !strcmp(ks, S.m.firmware_sha256) && lseek(fd, 0, SEEK_SET) == 0) {
+        S.fw_fd = fd;
+        vlog("firmware: the system's UEFI code changed (%.12s, was %.12s): this machine starts with the copy kept with it", sum[0] ? sum : "missing", S.m.firmware_sha256);
+        return 0;
+    }
+    if (fd >= 0) close(fd);
+    if (!sum[0]) { fail_start("the UEFI firmware is missing: %s", S.m.firmware_code); return -1; }
+    vlog("note: the UEFI firmware changed since this machine was made (%.12s, was %.12s) and no copy of the old one is kept; its variables are kept", sum, S.m.firmware_sha256);
+    return 0;
+}
+
 static int start_machine(void) {
     VmHost h;
     vm_host_probe(&h);
@@ -2467,9 +2739,13 @@ static int start_machine(void) {
     if (vm_machine_check_host(&S.m, &h, err, sizeof err, warn, sizeof warn)) { fail_start("%s", err); return -1; }
     if (warn[0]) vlog("note: %s", warn);
     char p[PATH_MAX + 64];
-    snprintf(p, sizeof p, "%s/system.qcow2", S.disks);
+    snprintf(p, sizeof p, "%s/system.%s", S.disks, vm_disk_ext(&S.m));
     if (!file_exists(p)) { fail_start("the system disk is missing: %s", p); return -1; }
-    if (S.m.base[0]) {
+    /* an encrypted machine (8) starts only with its key, from the session's keyring */
+    if (S.m.encrypted && !key_have()) { fail_start("this machine is encrypted: its key comes from your keyring (open it in Machines)"); return -1; }
+    if (!S.m.encrypted && key_have()) key_wipe();
+    if (S.m.raw) { /* a plain file: nothing to check in it */ }
+    else if (S.m.base[0]) {
         /* a linked clone (6.3): its base is checked like a system disk, and the disk itself may name a backing file,
          * which is never followed: QEMU gets the base by node */
         if (!file_exists(S.m.base)) { fail_start("the shared disk this machine was cloned from is missing: %s", S.m.base); return -1; }
@@ -2484,15 +2760,12 @@ static int start_machine(void) {
         snprintf(p, sizeof p, "%s/nvram.qcow2", S.disks);
         if (!file_exists(p)) { fail_start("the UEFI variables are missing: %s", p); return -1; }
         if (disk_plain(p, err, sizeof err)) { fail_start("the UEFI variables can't be used: %s", err); return -1; }
-        if (!file_exists(S.m.firmware_code)) { fail_start("the UEFI firmware is missing: %s", S.m.firmware_code); return -1; }
-        char sum[65];
-        if (!sha256_file(S.m.firmware_code, sum) && strcmp(sum, S.m.firmware_sha256))
-            vlog("note: the UEFI firmware changed since this machine was made (%.12s, was %.12s); its variables are kept", sum, S.m.firmware_sha256);
+        if (fw_keep()) return -1;
     }
     for (int i = 0; i < S.m.n_data; i++) {
-        snprintf(p, sizeof p, "%s/data-%d.qcow2", S.disks, i + 1);
+        snprintf(p, sizeof p, "%s/data-%d.%s", S.disks, i + 1, vm_disk_ext(&S.m));
         if (!file_exists(p)) { fail_start("data disk %d is missing: %s", i + 1, p); return -1; }
-        if (disk_plain(p, err, sizeof err)) { fail_start("data disk %d can't be used: %s", i + 1, err); return -1; }
+        if (!S.m.raw && disk_plain(p, err, sizeof err)) { fail_start("data disk %d can't be used: %s", i + 1, err); return -1; }
     }
     if (S.m.iso[0] && !file_exists(S.m.iso)) { fail_start("the attached image is missing: %s", S.m.iso); return -1; }
     if (S.m.drivers[0] && !file_exists(S.m.drivers)) { vlog("note: the drivers disc is gone (%s): the machine starts without it", S.m.drivers); S.m.drivers[0] = 0; }
@@ -2587,14 +2860,16 @@ static int start_machine(void) {
         S.sandbox |= VMS_PDEATHSIG;
     }
     if (sh_count() && start_shares()) return -1;
+    /* a disposable session's layers first: its TPM state is a copy swtpm then opens */
+    if (session_prepare()) return -1;
     if (S.m.tpm) {
         char terr[256];
         S.tpm_q = spawn_swtpm(terr, sizeof terr);
-        if (S.tpm_q < 0) { fail_start("the TPM: %s", terr); return -1; }
+        if (S.tpm_q < 0) { session_close(); fail_start("the TPM: %s", terr); return -1; }
         S.sandbox |= VMS_PDEATHSIG;
     }
     decide_graphics();
-    if (session_prepare()) return -1;
+    if (key_have() && (S.key_fd = key_pipe()) < 0) { session_close(); fail_start("the machine's key couldn't be handed to QEMU"); return -1; }
     build_qemu_args();
     {
         char line[8192];
@@ -2630,13 +2905,18 @@ static int start_machine(void) {
         int in_ns = vm_ns_enter(S.userns);
         if (in_ns) vm_ns_setup(S.rundir);
         /* 3 kvm, 4 QMP, 5 serial, 6 network, 7.. credentials, then the status pipe (closed by exec) */
-        int fds[6 + MAX_CREDS + VM_SHARES + 4], nf = 0;
+        int fds[6 + MAX_CREDS + VM_SHARES + 4 + 2 + VM_NDISKS], nf = 0;
         fds[nf++] = kvm; fds[nf++] = qmp[1]; fds[nf++] = ser[1]; fds[nf++] = net[0] >= 0 ? net[0] : null;
         if (S.m.agent) { fds[nf++] = qga[1]; fds[nf++] = lag[1]; }
         for (int i = 0; i < S.ncreds; i++) fds[nf++] = S.cred_fd[i];
         for (int i = 0; i <= VM_SHARES; i++) if (sh_on(i)) fds[nf++] = S.vfs_q[i];
         if (S.m.tpm) fds[nf++] = S.tpm_q;
-        if (S.sess_on) fds[nf++] = S.sess_fd;       /* a disposable session's memory (19.7), fdset 2 */
+        /* then (build_qemu_args' order): the key's pipe, the kept UEFI code, the group's session (fdset 2) or any
+         * machine's session layers (fdsets 4..) */
+        if (S.key_fd >= 0) fds[nf++] = S.key_fd;
+        if (S.fw_fd >= 0) fds[nf++] = S.fw_fd;
+        if (S.sess_on && S.sess_fd >= 0) fds[nf++] = S.sess_fd;
+        for (int k = 0; S.sess_on && k < S.sess_n; k++) fds[nf++] = S.sess_fds[k];
         fds[nf++] = st[1];
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
@@ -2692,6 +2972,9 @@ static int start_machine(void) {
     for (int i = 0; i < S.ncreds; i++) { close(S.cred_fd[i]); S.cred_fd[i] = -1; }
     for (int i = 0; i <= VM_SHARES; i++) if (sh_on(i) && S.vfs_q[i] >= 0) { close(S.vfs_q[i]); S.vfs_q[i] = -1; }
     if (S.tpm_q >= 0) { close(S.tpm_q); S.tpm_q = -1; }
+    /* QEMU has read its key (or will, from its own copy of the pipe): lord-vm's goes */
+    if (S.key_fd >= 0) { close(S.key_fd); S.key_fd = -1; }
+    if (S.fw_fd >= 0) { close(S.fw_fd); S.fw_fd = -1; }
     if (net[0] >= 0) close(net[0]);
     S.qemu_err = qerr[0];
     S.serial_fd = ser[0];
@@ -3806,6 +4089,7 @@ static void ag_lost(const char *why) {
 }
 
 static void journal_append(const uint8_t *data, size_t n) {
+    if (S.m.encrypted) return;          /* the guest's journal stays out of an encrypted machine's folder (8) */
     char p[PATH_MAX + 32], p1[PATH_MAX + 32];
     snprintf(p, sizeof p, "%s/log/journal.log", S.dir);
     struct stat st;
@@ -5537,6 +5821,10 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (S.gl) { reply(ci, m->seq, VME_WRONG_STATE, "a machine with 3D graphics can't be suspended (virgl can't be migrated): shut it down"); return; }
         if (S.vgpu) { reply(ci, m->seq, VME_WRONG_STATE, "a machine with a graphics card can't be suspended (a vGPU can't be saved): shut it down"); return; }
         if (S.m.profile_lock) { reply(ci, m->seq, VME_WRONG_STATE, "locked for anonymity: the guest's memory is never saved to this computer's disk"); return; }
+        /* a disposable session keeps nothing, and its layers end with QEMU (6.2) */
+        if (S.sess_on) { reply(ci, m->seq, VME_WRONG_STATE, "a disposable session keeps nothing: shut it down instead"); return; }
+        /* an encrypted machine's memory is written only inside its encrypted disks (a snapshot), never as a file (8) */
+        if (S.m.encrypted) { reply(ci, m->seq, VME_WRONG_STATE, "an encrypted machine's memory is never saved to a file: take a snapshot with its memory, or shut it down"); return; }
         begin_suspend(ci, m->seq);
         return;
     case VM_SNAPSHOT:
@@ -5544,6 +5832,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (S.snap_kind || S.suspending) { reply(ci, m->seq, VME_BUSY, "busy"); return; }
         /* a disposable session keeps nothing (19.7): no snapshot of it */
         if (S.sess_on) { reply(ci, m->seq, VME_WRONG_STATE, "a disposable session keeps nothing: no snapshots while it runs"); return; }
+        if (S.m.raw) { reply(ci, m->seq, VME_WRONG_STATE, "a machine with raw disks has no snapshots"); return; }
         /* snapshots of a running machine hold its memory: QEMU can't save virgl's state */
         if ((S.gl || S.vgpu) && m->a != VSN_DELETE) { reply(ci, m->seq, VME_WRONG_STATE, "a running machine with 3D graphics can't take or revert a snapshot with its memory: shut it down first"); return; }
         begin_snapshot(ci, m->seq, m->a, m->text);
@@ -6138,7 +6427,11 @@ static void qemu_exited(int status) {
     S.qemu_status = status;
     cpu_end();
     /* a disposable session's memory goes with QEMU: lord-vm's copy of the descriptor is the last one (19.7) */
-    if (S.sess_on) { vlog("disposable session: %lld MB in memory, gone", session_used() >> 20); close(S.sess_fd); S.sess_on = 0; S.sess_fd = -1; }
+    if (S.sess_on) {
+        vlog("disposable session: %lld MB %s, gone", session_used() >> 20, S.sess_mode == VM_DISP_DISK ? "on disk" : "in memory");
+        session_close();
+        S.sess_on = 0;
+    }
     int st = VS_STOPPED, why = VR_POWEROFF, code = 0;
     char d[160] = "";
     long oom = read_oom_kills();
@@ -6732,7 +7025,8 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = -1;
-    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = -1;
+    for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
@@ -6812,7 +7106,9 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     log_fd = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC | O_NOFOLLOW, 0600);
     snprintf(log_dir, sizeof log_dir, "%s/log", S.dir);
     snprintf(p, sizeof p, "%s/log/serial.log", S.dir);
-    S.serial_log = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    /* an encrypted machine (8): what the guest prints stays in memory (the console's ring), never in the folder */
+    if (S.m.encrypted) { unlink(p); S.serial_log = -1; }
+    else S.serial_log = open(p, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
     vlog("lord-vm %d: machine %s \"%s\" (%s, %s, %d vCPU, %d MB, %s)", (int)getpid(), S.m.id, S.m.name, vm_arch_name(S.m.arch),
          S.m.accel ? "tcg" : "kvm", S.m.vcpus, S.m.memory_mb, S.m.machine_type);
     /* the transfer folder (6.7.1): with virtiofsd there; a saved state keeps the hardware it was saved with */
@@ -6920,6 +7216,8 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         for (int i = 0; i <= VM_SHARES; i++) if (S.vfs[i] > 0) { kill(S.vfs[i], SIGKILL); waitpid(S.vfs[i], NULL, 0); S.vfs[i] = 0; }
         if (S.tpm > 0) { kill(S.tpm, SIGKILL); waitpid(S.tpm, NULL, 0); S.tpm = 0; }
         if (S.qemu > 0) { kill(S.qemu, SIGKILL); waitpid(S.qemu, NULL, 0); }
+        session_close();
+        S.sess_on = 0;
         for (int k = 0; k < 20 && S.qemu_err >= 0; k++) pump_fd(&S.qemu_err, "qemu");
         S.qemu = 0;
     }
@@ -7199,6 +7497,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
     int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1;
+    int dispo = -1, bkp = -1, fwup = 0;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -7252,6 +7551,10 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (!strcmp(a, "--cpu-pin")) { pin = !strcmp(v, "off") ? VM_PIN_OFF : !strcmp(v, "auto") ? VM_PIN_AUTO : !strcmp(v, "default") ? VM_PIN_DEFAULT : -1; if (pin < 0) { fprintf(stderr, "lord-vm: --cpu-pin off|auto|default\n"); return 2; } continue; }
         if (!strcmp(a, "--capture-fullscreen")) { capfs = parse_enum(v, "off", "on"); if (capfs < 0) { fprintf(stderr, "lord-vm: --capture-fullscreen on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--perf-profile")) { perf = parse_enum(v, "off", "on"); if (perf < 0) { fprintf(stderr, "lord-vm: --perf-profile on|off\n"); return 2; } continue; }
+        /* storage (schema 15): the disposable session (6.2), Backups (6.14), the firmware moved to this computer's (3.6) */
+        if (!strcmp(a, "--disposable")) { dispo = !strcmp(v, "off") ? 0 : !strcmp(v, "memory") ? VM_DISP_MEMORY : !strcmp(v, "disk") ? VM_DISP_DISK : -1; if (dispo < 0) { fprintf(stderr, "lord-vm: --disposable off|memory|disk\n"); return 2; } continue; }
+        if (!strcmp(a, "--backup")) { bkp = parse_enum(v, "off", "on"); if (bkp < 0) { fprintf(stderr, "lord-vm: --backup on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--firmware-update")) { fwup = parse_enum(v, "no", "yes"); if (fwup < 0) { fprintf(stderr, "lord-vm: --firmware-update yes\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
@@ -7337,6 +7640,16 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (capfs >= 0) { m.capture_fullscreen = capfs; if (capfs) m.schema = VM_SCHEMA; }
     if (perf >= 0) { m.perf_profile = perf; if (perf) m.schema = VM_SCHEMA; }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
+    if (dispo >= 0) { m.disposable = dispo; if (dispo) m.schema = VM_SCHEMA; }
+    if (bkp >= 0) { m.no_backup = !bkp; if (!bkp) m.schema = VM_SCHEMA; }
+    if (fwup && m.firmware == VM_FW_UEFI) {
+        /* the explicit move to this computer's UEFI code (3.6): its hash recorded, the kept copy replaced at the next start */
+        char sum[65], kept[PATH_MAX + 32];
+        if (sha256_file(m.firmware_code, sum)) { fprintf(stderr, "lord-vm: can't read %s\n", m.firmware_code); goto out; }
+        memcpy(m.firmware_sha256, sum, sizeof sum);
+        snprintf(kept, sizeof kept, "%s/" FW_KEPT, real);
+        unlink(kept);
+    }
     if (gfx >= 0) m.graphics = gfx;
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
     if (gpu >= 0) { m.vgpu = gpu; if (gpu) { m.schema = VM_SCHEMA; if (gfx < 0) m.graphics = VM_GFX_2D; } }
@@ -7397,12 +7710,21 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (m.disk_gb > was.disk_gb && m.base[0]) { fprintf(stderr, "lord-vm: a linked clone's disk can't grow: make a full clone of it first\n"); goto out; }
     if (m.disk_gb > was.disk_gb) {
         char sys[PATH_MAX + 64], dd[PATH_MAX + 64], size[32];
-        snprintf(sys, sizeof sys, "%s/disks/system.qcow2", real);
+        snprintf(sys, sizeof sys, "%s/disks/system.%s", real, vm_disk_ext(&m));
         snprintf(dd, sizeof dd, "%s/disks", real);
         snprintf(size, sizeof size, "%dG", m.disk_gb);
-        if (disk_plain(sys, err, sizeof err)) { fprintf(stderr, "lord-vm: system disk: %s\n", err); goto out; }
-        char *rs[] = { QEMU_IMG, "resize", "-q", "-f", "qcow2", sys, size, NULL };
-        if (run_tool_in(rs, err, sizeof err, sys, dd)) { fprintf(stderr, "lord-vm: growing the disk failed: %s\n", err); goto out; }
+        if (m.encrypted && !key_have()) { fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); goto out; }
+        if (!m.raw && disk_plain(sys, err, sizeof err)) { fprintf(stderr, "lord-vm: system disk: %s\n", err); goto out; }
+        JBuf sb_;
+        jb_init(&sb_);
+        jb_printf(&sb_, "json:{\"driver\":\"%s\",\"file\":{\"driver\":\"file\",\"filename\":", m.raw ? "raw" : "qcow2");
+        jb_str(&sb_, sys);
+        jb_raw(&sb_, m.raw ? "}}" : "},\"backing\":null");
+        if (!m.raw) { jb_raw(&sb_, enc_json()); jb_raw(&sb_, "}"); }
+        char *rs[] = { QEMU_IMG, "resize", "-q", sb_.p, size, NULL };
+        int bad = sb_.oom || run_tool_in(rs, err, sizeof err, sys, dd);
+        jb_free(&sb_);
+        if (bad) { fprintf(stderr, "lord-vm: growing the disk failed: %s\n", err); goto out; }
     }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
@@ -7443,6 +7765,10 @@ static int cmd_snapshot(const char *dir, int argc, char **argv) {
     if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
     VmMachine m;
     if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+    /* raw disks have no snapshots (6.4); an encrypted machine's are made with its key (8) */
+    if (m.raw) { fprintf(stderr, "lord-vm: a machine with raw disks has no snapshots\n"); return 1; }
+    if (m.encrypted && !key_have()) { fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); return 1; }
+    if (!m.encrypted && key_have()) key_wipe();
     snprintf(S.dir, sizeof S.dir, "%s", real);
     if (kind == VSN_TAKE) {
         if (!vm_name_valid(argv[1])) { fprintf(stderr, "lord-vm: a snapshot's name is 1 to %d bytes of text\n", VM_NAME_MAX); return 2; }
@@ -7561,13 +7887,16 @@ static int qimg_convert(const char *disk, const char *base, const char *snap, co
     jb_init(&b);
     jb_raw(&b, "json:{\"driver\":\"qcow2\",\"read-only\":true,\"file\":{\"driver\":\"file\",\"filename\":");
     jb_str(&b, disk);
-    if (base && base[0]) { jb_raw(&b, "},\"backing\":{\"driver\":\"qcow2\",\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":"); jb_str(&b, base); jb_raw(&b, "}}}"); }
-    else jb_raw(&b, "},\"backing\":null}");
+    /* an encrypted machine's disk, and its linked clone's base (that machine's disk, frozen), are LUKS under its key */
+    if (base && base[0]) { jb_raw(&b, "},\"backing\":{\"driver\":\"qcow2\",\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":"); jb_str(&b, base); jb_raw(&b, "}"); jb_raw(&b, enc_json()); jb_raw(&b, "}"); jb_raw(&b, enc_json()); jb_raw(&b, "}"); }
+    else { jb_raw(&b, "},\"backing\":null"); jb_raw(&b, enc_json()); jb_raw(&b, "}"); }
     if (b.oom) { jb_free(&b); snprintf(err, errlen, "out of memory"); return -1; }
     char sn[64];
     snprintf(sn, sizeof sn, "snapshot.name=%s", snap ? snap : "");
-    char *with[] = { QEMU_IMG, "convert", "-q", "-l", sn, "-O", "qcow2", b.p, (char *)out, NULL };
-    char *without[] = { QEMU_IMG, "convert", "-q", "-O", "qcow2", b.p, (char *)out, NULL };
+    /* and the copy is encrypted under the same key */
+    int e = key_have();
+    char *with[] = { QEMU_IMG, "convert", "-q", "-l", sn, "-O", "qcow2", e ? "-o" : b.p, e ? ENC_CREATE_OPTS : (char *)out, e ? b.p : NULL, (char *)out, NULL };
+    char *without[] = { QEMU_IMG, "convert", "-q", "-O", "qcow2", e ? "-o" : b.p, e ? ENC_CREATE_OPTS : (char *)out, e ? b.p : NULL, (char *)out, NULL };
     jail_read2 = base && base[0] ? base : NULL;
     int r = run_tool_in(snap ? with : without, err, errlen, disk, out_dir);
     jail_read2 = NULL;
@@ -7576,11 +7905,21 @@ static int qimg_convert(const char *disk, const char *base, const char *snap, co
 }
 
 /* qemu-img create of an overlay on base, without opening the base (-u, the size given) */
-static int qimg_overlay(const char *base, const char *out, const char *out_dir, int gb, char *err, size_t errlen) {
+/* an empty qcow2 over base (its format bfmt, never opened here: -u) of `bytes`; encrypted like the machine's disks when
+ * it has a key (an encrypted machine's layers are all LUKS, whatever the base: a group's base is Whonix's public image) */
+static int qimg_overlay_fmt(const char *base, const char *bfmt, const char *out, const char *out_dir, long long bytes, char *err, size_t errlen) {
     char size[32];
-    snprintf(size, sizeof size, "%dG", gb);
-    char *argv[] = { QEMU_IMG, "create", "-q", "-f", "qcow2", "-u", "-b", (char *)base, "-F", "qcow2", (char *)out, size, NULL };
+    snprintf(size, sizeof size, "%lld", bytes);
+    char *argv[16];
+    int k = 0;
+    argv[k++] = QEMU_IMG; argv[k++] = "create"; argv[k++] = "-q"; argv[k++] = "-f"; argv[k++] = "qcow2"; argv[k++] = "-u";
+    argv[k++] = "-b"; argv[k++] = (char *)base; argv[k++] = "-F"; argv[k++] = (char *)bfmt;
+    if (key_have()) { argv[k++] = "-o"; argv[k++] = ENC_CREATE_OPTS; }
+    argv[k++] = (char *)out; argv[k++] = size; argv[k] = NULL;
     return run_tool_in(argv, err, errlen, out_dir, out_dir);      /* the overlay doesn't exist yet: its folder */
+}
+static int qimg_overlay(const char *base, const char *out, const char *out_dir, int gb, char *err, size_t errlen) {
+    return qimg_overlay_fmt(base, "qcow2", out, out_dir, (long long)gb << 30, err, errlen);
 }
 
 static void rm_tree(const char *dir) {
@@ -7622,10 +7961,12 @@ static void clone_sweep(const char *lib) {
 
 static int cmd_clone(const char *src, int argc, char **argv) {
     if (argc < 1) { fprintf(stderr, "lord-vm: --clone SRC DST [--name N] [--duplicate] [--linked] [--from-snapshot TAG] [--hostname H | --keep-identity]\n"); return 2; }
-    const char *dst = argv[0], *name = NULL, *from_snap = NULL, *hostname = NULL;
+    const char *dst = argv[0], *name = NULL, *from_snap = NULL, *hostname = NULL, *new_id = NULL;
     int duplicate = 0, linked = 0, keep_identity = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--duplicate")) duplicate = 1;
+        /* a Clone's id chosen by lord-server, which keeps an encrypted machine's key under it first (8) */
+        else if (!strcmp(argv[i], "--new-id") && i + 1 < argc) { new_id = argv[++i]; if (!vm_uuid_valid(new_id)) { fprintf(stderr, "lord-vm: --new-id is a lowercase UUID\n"); return 2; } }
         else if (!strcmp(argv[i], "--linked")) linked = 1;
         else if (!strcmp(argv[i], "--keep-identity")) keep_identity = 1;
         else if (!strcmp(argv[i], "--hostname") && i + 1 < argc) { hostname = argv[++i]; if (!vm_hostname_valid(hostname)) { fprintf(stderr, "lord-vm: --hostname: one name of a-z, 0-9 and '-', at most 63\n"); return 2; } }
@@ -7647,6 +7988,11 @@ static int cmd_clone(const char *src, int argc, char **argv) {
     char st[PATH_MAX + 32];
     snprintf(st, sizeof st, "%s/suspend.state", real);
     int suspended = file_exists(st);
+    if (m.encrypted && !key_have()) { fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); goto out; }
+    if (!m.encrypted && key_have()) key_wipe();
+    if (m.encrypted && !duplicate && !new_id) { fprintf(stderr, "lord-vm: an encrypted machine's Clone needs --new-id (its key is kept under it)\n"); goto out; }
+    /* raw disks (6.4): no snapshots and no overlay, so a Clone is a copy (reflinked where the file system can) */
+    if (m.raw && (linked || from_snap)) { fprintf(stderr, "lord-vm: a machine with raw disks is copied whole: no linked clone or clone from a snapshot\n"); goto out; }
     if (suspended && !duplicate) { fprintf(stderr, "lord-vm: the machine has a saved session, which holds its identity: resume it and shut it down first, or make a Duplicate\n"); goto out; }
     if (from_snap && (duplicate || !vm_snap_tag_valid(from_snap))) { fprintf(stderr, "lord-vm: --from-snapshot makes a Clone from one snapshot\n"); goto out; }
     VmSnap snaps[VM_SNAPS_MAX];
@@ -7675,8 +8021,8 @@ static int cmd_clone(const char *src, int argc, char **argv) {
     snprintf(p1, sizeof p1, "%s/disks", tmp); mkdir(p1, 0700);
     snprintf(p1, sizeof p1, "%s/log", tmp); mkdir(p1, 0700);
     char sdisk[PATH_MAX + 64], ddisk[PATH_MAX + 128], snv[PATH_MAX + 64], dnv[PATH_MAX + 128], ddir[PATH_MAX + 64];
-    snprintf(sdisk, sizeof sdisk, "%s/disks/system.qcow2", real);
-    snprintf(ddisk, sizeof ddisk, "%s/disks/system.qcow2", tmp);
+    snprintf(sdisk, sizeof sdisk, "%s/disks/system.%s", real, vm_disk_ext(&m));
+    snprintf(ddisk, sizeof ddisk, "%s/disks/system.%s", tmp, vm_disk_ext(&m));
     snprintf(snv, sizeof snv, "%s/disks/nvram.qcow2", real);
     snprintf(dnv, sizeof dnv, "%s/disks/nvram.qcow2", tmp);
     snprintf(ddir, sizeof ddir, "%s/disks", tmp);
@@ -7717,8 +8063,8 @@ static int cmd_clone(const char *src, int argc, char **argv) {
         if (m.firmware == VM_FW_UEFI && copy_sparse(snv, dnv)) { fprintf(stderr, "lord-vm: copying the UEFI variables failed\n"); vm_op_end(real); goto out; }
         snprintf(n.base, sizeof n.base, "%.1023s", base);
         method = "linked";
-    } else if (duplicate) {
-        /* 3a. a Duplicate is the same disks, snapshots and all, holes kept */
+    } else if (duplicate || m.raw) {
+        /* 3a. a Duplicate is the same disks, snapshots and all, holes kept; so is a raw machine's Clone */
         if (copy_sparse(sdisk, ddisk) || (m.firmware == VM_FW_UEFI && copy_sparse(snv, dnv))) { fprintf(stderr, "lord-vm: copying the disks failed: %s\n", strerror(errno)); goto out; }
     } else {
         /* 3b. a Clone is converted: flattened (a linked clone's base folded in), compacted, without snapshots */
@@ -7729,10 +8075,10 @@ static int cmd_clone(const char *src, int argc, char **argv) {
     for (int i = 0; i < m.n_data; i++) {
         /* data disks (6.22) the way the system disk went: reflinked, copied with their holes, or converted */
         char sdd[PATH_MAX + 64], ddd[PATH_MAX + 128];
-        snprintf(sdd, sizeof sdd, "%s/disks/data-%d.qcow2", real, i + 1);
-        snprintf(ddd, sizeof ddd, "%s/disks/data-%d.qcow2", tmp, i + 1);
+        snprintf(sdd, sizeof sdd, "%s/disks/data-%d.%s", real, i + 1, vm_disk_ext(&m));
+        snprintf(ddd, sizeof ddd, "%s/disks/data-%d.%s", tmp, i + 1, vm_disk_ext(&m));
         int bad = !strcmp(method, "reflink") ? (copy_reflink(sdd, ddd) && copy_sparse(sdd, ddd))
-                : duplicate ? copy_sparse(sdd, ddd) : qimg_convert(sdd, NULL, from_snap, ddd, ddir, err, sizeof err);
+                : duplicate || m.raw ? copy_sparse(sdd, ddd) : qimg_convert(sdd, NULL, from_snap, ddd, ddir, err, sizeof err);
         if (bad) { fprintf(stderr, "lord-vm: copying data disk %d failed\n", i + 1); goto out; }
     }
     if (duplicate) {
@@ -7762,7 +8108,7 @@ static int cmd_clone(const char *src, int argc, char **argv) {
     } else {
         /* a Clone runs beside the original: a new SMBIOS UUID (-uuid) and MAC now; inside the guest, a new hostname and
          * machine-id at its first start, through the agent (identity.json), unless the identity is kept */
-        vm_new_id(n.id);
+        if (new_id) memcpy(n.id, new_id, sizeof n.id); else vm_new_id(n.id);
         vm_new_mac(n.mac);
         if (!keep_identity) {
             char hn[VM_HOSTNAME_MAX + 1];
@@ -7786,6 +8132,9 @@ static int cmd_clone(const char *src, int argc, char **argv) {
         if (copy_small(p1, p2)) { fprintf(stderr, "lord-vm: copying the TPM's state failed\n"); goto out; }
     }
     snprintf(p1, sizeof p1, "%s/app.json", real); snprintf(p2, sizeof p2, "%s/app.json", tmp); copy_small(p1, p2);
+    /* the UEFI code kept with the machine (3.6) goes with its variables */
+    snprintf(p1, sizeof p1, "%s/" FW_KEPT, real); snprintf(p2, sizeof p2, "%s/" FW_KEPT, tmp);
+    if (file_exists(p1) && (copy_reflink(p1, p2) && copy_sparse(p1, p2))) { fprintf(stderr, "lord-vm: copying the kept UEFI code failed\n"); goto out; }
     snprintf(p1, sizeof p1, "%s/thumb.png", real); snprintf(p2, sizeof p2, "%s/thumb.png", tmp); copy_small(p1, p2);
     if (name) {
         if (!vm_name_valid(name)) { fprintf(stderr, "lord-vm: the name isn't valid\n"); goto out; }
@@ -7820,6 +8169,10 @@ static int cmd_compact(const char *dir, int argc, char **argv) {
     snprintf(S.dir, sizeof S.dir, "%s", real);
     VmMachine m;
     if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+    /* a raw disk gives space back by itself: the guest's discards punch holes in the file (6.4) */
+    if (m.raw) { fprintf(stderr, "lord-vm: a raw disk needs no compaction: the guest's discards free its space\n"); return 1; }
+    if (m.encrypted && !key_have()) { fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); return 1; }
+    if (!m.encrypted && key_have()) key_wipe();
     char sys[PATH_MAX + 64], dd[PATH_MAX + 64], tmp[PATH_MAX + 64];
     snprintf(sys, sizeof sys, "%s/disks/system.qcow2", real);
     snprintf(dd, sizeof dd, "%s/disks", real);
@@ -7837,7 +8190,7 @@ static int cmd_compact(const char *dir, int argc, char **argv) {
         jb_init(&b);
         jb_raw(&b, "json:{\"driver\":\"qcow2\",\"read-only\":true,\"backing\":null,\"file\":{\"driver\":\"file\",\"filename\":");
         jb_str(&b, sys);
-        jb_raw(&b, "}}");
+        jb_raw(&b, "}"); jb_raw(&b, enc_json()); jb_raw(&b, "}");
         static char out[8192];
         char *argv2[] = { QEMU_IMG, "measure", "--output=json", "-U", "-O", "qcow2", b.p, NULL };
         int r = b.oom ? -1 : run_tool_in(argv2, out, sizeof out, sys, NULL);
@@ -9458,6 +9811,17 @@ static int cmd_sha256(const char *path) {
 }
 
 int main(int argc, char **argv) {
+    /* --key-fd N, anywhere after the command: an encrypted machine's key (above), taken out before the command's own
+     * options are read */
+    for (int i = 2; i + 1 < argc; i++) {
+        if (strcmp(argv[i], "--key-fd")) continue;
+        char *e;
+        long fd = strtol(argv[i + 1], &e, 10);
+        if (*e || fd < 3 || fd > 1000 || key_load_fd((int)fd)) { fprintf(stderr, "lord-vm: --key-fd: no key on that descriptor\n"); return 2; }
+        memmove(argv + i, argv + i + 2, (size_t)(argc - i - 1) * sizeof *argv);
+        argc -= 2;
+        break;
+    }
     if (argc < 3) return usage();
     if (!strcmp(argv[1], "--sha256")) return cmd_sha256(argv[2]);
     const char *cmd = argv[1], *dir = argv[2];

@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: disposable, encrypted, backup, disk_format (storage: 6.2, 6.4, 8). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 14
+#define VM_SCHEMA 15
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -44,6 +44,11 @@ enum { VM_LOCK_NONE = 0, VM_LOCK_ANONYMITY };
 extern const char *const VM_LOCK_NAMES[];  /* "", "anonymity" */
 enum { VM_TIMERS_DEFAULT = 0, VM_TIMERS_WHONIX_GATEWAY, VM_TIMERS_WHONIX_WORKSTATION };
 extern const char *const VM_TIMERS_NAMES[];   /* "", "whonix-gateway", "whonix-workstation" */
+/* schema 15, a disposable session (docs/VIRTUALIZATION.md 6.2): every writable disk, the UEFI variables and the TPM state
+ * get a temporary layer at each start, thrown away when QEMU ends: in memory (a memfd, capped at the machine's memory and
+ * counted in its limit) or on this computer's disk (an unlinked file in disks/, which nothing names after QEMU ends) */
+enum { VM_DISP_OFF = 0, VM_DISP_MEMORY, VM_DISP_DISK };
+extern const char *const VM_DISP_NAMES[];  /* "", "memory", "disk" */
 /* the internal link's card: the workstation's only card is in slot 0x2 (its eth0), the gateway's at 0x18 (its eth1, after
  * passt's card in 0x2); each on a QEMU hub of its own so that its backend can come and go (19.3) */
 #define VM_LINK_SLOT_GATEWAY 0x18
@@ -208,6 +213,17 @@ typedef struct {
     char link_mac[18];
     int profile_lock;
     int timers;
+    /* schema 15: storage (docs/VIRTUALIZATION.md 6.2, 6.4, 8), each written only when it differs from a new machine.
+     * disposable: VM_DISP_* ("disposable": "memory" | "disk"); never on a group's member (its group.json has the switch).
+     * encrypted: "encrypted": true, every disk and the UEFI variables are qcow2 with LUKS and the TPM state is swtpm's
+     * encrypted state, all under one key that lives in the session keyring (owner "machines", service "machines:<id>"),
+     * handed to lord-vm on a descriptor and to QEMU and qemu-img through a pipe (never a file, an argument or the
+     * environment). raw: "disk_format": "raw", disks/system.raw and data-N.raw, plain files (fastest, no snapshots, no
+     * encryption, no linked clone). no_backup: "backup": false, Backups leaves the folder out */
+    int disposable;
+    int encrypted;
+    int raw;
+    int no_backup;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -364,6 +380,12 @@ int vm_qcow2_plain(const uint8_t *head, size_t n, char *err, size_t errlen);
 int vm_qcow2_overlay(const uint8_t *head, size_t n, char *err, size_t errlen);
 /* a base path machine.json may name: absolute, plain, in a ".shared" folder, a .qcow2 */
 int vm_base_valid(const char *s);
+
+/* the disks' file extension: "raw" for a raw machine, else "qcow2" (disks/system.<ext>, data-N.<ext>) */
+const char *vm_disk_ext(const VmMachine *m);
+/* a key lord-vm accepts for an encrypted machine: 64 lowercase hex digits (32 random bytes) or a person's passphrase of
+ * 8 to 512 bytes of printable UTF-8 with no control characters (an export's, 6.4) */
+int vm_key_valid(const char *k, size_t n);
 
 const char *vm_arch_name(int arch);     /* "arm64", "amd64" */
 int vm_uuid_valid(const char *s);
