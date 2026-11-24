@@ -20,6 +20,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -145,6 +146,41 @@ int main(int argc, char **argv) {
     char *slash = strrchr(bindir, '/');
     if (slash) *slash = 0;
 
+    /* which lord-netperm runs (cgroup_netperm_current): a stand-in procs file in the scratch folder */
+    {
+        char pf[160], copy[160];
+        snprintf(pf, sizeof pf, "%s/procs-%d", sockdir, (int)getpid());
+        snprintf(copy, sizeof copy, "%s/lord-netperm", sockdir);
+        CHECK(cgroup_netperm_current("/nonexistent/cgroup.procs") == 1, "not running: the installed one starts next");
+        int fd = open(pf, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+        close(fd);
+        CHECK(cgroup_netperm_current(pf) == 1, "empty: restarting");
+        put(pf, "garbage\n");
+        CHECK(cgroup_netperm_current(pf) == 0, "garbage: not sure, the old place");
+        put(pf, "1\n");
+        CHECK(cgroup_netperm_current(pf) == 0, "pid 1");
+        char me[32];
+        snprintf(me, sizeof me, "%d\n", (int)getpid());
+        put(pf, me);
+        CHECK(cgroup_netperm_current(pf) == 0, "another program");
+        /* a program named lord-netperm: running from its file it is current; with the file replaced, older */
+        char cmd[400];
+        snprintf(cmd, sizeof cmd, "cp /bin/sleep '%s'", copy);
+        if (system(cmd)) { /* checked below */ }
+        pid_t sl = fork();
+        if (sl == 0) { execl(copy, "lord-netperm", "30", (char *)NULL); _exit(127); }
+        usleep(200000);
+        snprintf(me, sizeof me, "%d\n", (int)sl);
+        put(pf, me);
+        CHECK(cgroup_netperm_current(pf) == 1, "the installed lord-netperm runs");
+        unlink(copy);
+        CHECK(cgroup_netperm_current(pf) == 0, "an older lord-netperm runs (its file replaced)");
+        kill(sl, SIGKILL);
+        waitpid(sl, NULL, 0);
+        unlink(pf);
+    }
+    int current = cgroup_netperm_current(CG_NETPERM_PROCS);
+    printf("cgslice-test: this computer's lord-netperm %s\n", current ? "knows the slice (or isn't running)" : "is older than its installed file: machines go beside the server leaf");
     for (int round = 0; round < 2; round++) {
         const char *name = round == 0 ? VMID : "app-lordos-featherpad.scope";
         pid_t srv = fork();
@@ -158,11 +194,12 @@ int main(int argc, char **argv) {
         waitpid(srv, &st, 0);
         CHECK(rep == 'o' && WIFEXITED(st) && WEXITSTATUS(st) == 0, "%s: lord-sessiond's answer %c", name, rep > 0 ? rep : '?');
         char want[400];
-        if (round == 0) snprintf(want, sizeof want, "%s/" CG_MACHINES_SLICE "/%s", sess + strlen("/sys/fs/cgroup"), name);
+        if (round == 0 && current) snprintf(want, sizeof want, "%s/" CG_MACHINES_SLICE "/%s", sess + strlen("/sys/fs/cgroup"), name);
         else snprintf(want, sizeof want, "%s/%s", sess + strlen("/sys/fs/cgroup"), name);
         printf("cgslice-test: %s → %s\n", name, cg);
         CHECK(!strcmp(cg, want), "placed in %s, wanted %s", cg, want);
     }
+    if (!current) { printf("cgslice-test: the slice's own checks need this computer's lord-netperm current: skipped\n"); goto out; }
     /* the slice: root-owned, its weights; the machine's scope: its own limits inside it */
     char sl[256], sc[400];
     snprintf(sl, sizeof sl, "%s/" CG_MACHINES_SLICE, sess);

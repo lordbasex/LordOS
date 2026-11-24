@@ -160,7 +160,7 @@ int cgroup_enter(const char *name, const CgroupLimits *lim) {
     enable_controllers(base);
     /* (3.7) a machine's scope goes into the machines' slice here too, when we may make it (development) */
     char slice[PATH_MAX];
-    if (cgroup_scope_in_machines(name) && (size_t)snprintf(slice, sizeof slice, "%s/" CG_MACHINES_SLICE, base) < sizeof slice
+    if (cgroup_scope_in_machines(name) && cgroup_netperm_current(CG_NETPERM_PROCS) && (size_t)snprintf(slice, sizeof slice, "%s/" CG_MACHINES_SLICE, base) < sizeof slice
         && (!mkdir(slice, 0755) || errno == EEXIST) && !access(slice, W_OK)) {
         int sl = open(slice, O_PATH | O_DIRECTORY | O_CLOEXEC);
         if (sl >= 0) {
@@ -254,6 +254,27 @@ int cgroup_session_child_ok(const char *name) {
     return name && (!strcmp(name, "server") || cgroup_scope_name_ok(name));
 }
 #define session_child_ok cgroup_session_child_ok
+
+int cgroup_netperm_current(const char *procs) {
+    int fd = open(procs, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) return 1;                           /* not running: the installed one starts next */
+    char buf[64];
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    buf[n > 0 ? n : 0] = 0;
+    char *end;
+    long pid = strtol(buf, &end, 10);
+    if (n <= 0) return 1;                           /* empty: restarting, the installed one */
+    if (end == buf) return 0;
+    if (pid <= 1 || (*end != '\n' && *end)) return 0;
+    char p[64], exe[PATH_MAX];
+    snprintf(p, sizeof p, "/proc/%ld/exe", pid);
+    ssize_t l = readlink(p, exe, sizeof exe - 1);
+    if (l <= 0) return 0;
+    exe[l] = 0;
+    const char *base = strrchr(exe, '/');
+    return base && !strcmp(base, "/lord-netperm");  /* "/lord-netperm (deleted)": an older one still runs */
+}
 
 int cgroup_machines_slice(int sessfd) {
     if (sessfd < 0) return -1;
@@ -707,12 +728,12 @@ int cgroup_place_serve(int cfd, const char *bindir, int insecure) {
     if ((size_t)snprintf(sess, sizeof sess, "%s/lordos-session-%u", svc, (unsigned)cr.uid) >= sizeof sess) return -1;
     int sfd = open(sess, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
     if (sfd < 0) { reply(cfd, "err no session subtree"); return -1; }
-    if (cgroup_scope_in_machines(name)) {
-        /* (3.7) a machine's scope: inside the machines' slice, never beside it */
+    if (cgroup_scope_in_machines(name) && cgroup_netperm_current(CG_NETPERM_PROCS)) {
+        /* (3.7) a machine's scope goes inside the machines' slice; where the slice can't be made, beside the server
+         * leaf as before (both places are machines' to lord-netperm, Monitor and Sentinela) */
         int vfd = cgroup_machines_slice(sfd);
-        close(sfd);
-        if (vfd < 0) { reply(cfd, "err slice"); return -1; }
-        sfd = vfd;
+        if (vfd >= 0) { close(sfd); sfd = vfd; }
+        else fprintf(stderr, "cgroup: the machines' slice of session %u: %s; %s goes beside the server leaf\n", (unsigned)cr.uid, strerror(errno), name);
     }
     if (mkdirat(sfd, name, 0755) && errno != EEXIST) { close(sfd); reply(cfd, "err mkdir"); return -1; }
     int dfd = openat(sfd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
