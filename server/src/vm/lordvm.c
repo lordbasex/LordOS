@@ -857,6 +857,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     }
     VmMachine m;
     vm_machine_defaults(&m, &h, arch);
+    m.usb = 1;                          /* a USB controller for this computer's devices (6.6): a new machine has no saved state */
     if (want_id) memcpy(m.id, want_id, sizeof m.id);
     m.encrypted = enc;
     m.raw = raw;
@@ -9546,6 +9547,7 @@ static int imp_detect(const char *src, Imp *I, int want_arch, char *why, size_t 
 static int imp_machine(Imp *I, VmMachine *n, const VmHost *h, int devices, int network, int fw_over, int vcpus, int mem, char *why, size_t wn) {
     VmiMachine *m = &I->m;
     vm_machine_defaults(n, h, m->arch);
+    n->usb = 1;                         /* a USB controller for this computer's devices (6.6) */
     if (m->uuid[0]) snprintf(n->id, sizeof n->id, "%s", m->uuid);
     for (char *c = n->id; *c; c++) *c = (char)tolower((unsigned char)*c);
     if (!vm_uuid_valid(n->id)) vm_new_id(n->id);

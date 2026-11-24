@@ -527,6 +527,12 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         JS_SetPropertyStr(c, o, "guestLinks", JS_NewBool(c, m.guest_links));     /* links and notifications from the guest (6.12) */
         JS_SetPropertyStr(c, o, "guestNotify", JS_NewBool(c, m.guest_notify));
         JS_SetPropertyStr(c, o, "automation", JS_NewBool(c, m.automation));      /* machines exec and cp may run programs (6.15) */
+        JS_SetPropertyStr(c, o, "usb", JS_NewBool(c, m.usb));                    /* a USB controller for this computer's devices (6.6) */
+        {
+            JSValue ua = JS_NewArray(c);
+            for (int k = 0; k < m.n_usb_auto; k++) JS_SetPropertyUint32(c, ua, (uint32_t)k, JS_NewString(c, m.usb_auto[k]));
+            JS_SetPropertyStr(c, o, "usbAuto", ua);
+        }
         set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
         JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
         set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
@@ -1457,7 +1463,8 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[78 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char ua[VM_USB_AUTO][VM_USB_RULE_MAX + 1];
+    char *args[80 + 2 * VM_SHARES + 2 * VM_PORTS + 2 * VM_USB_AUTO], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1601,6 +1608,29 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "automation");
     if (JS_IsBool(v)) { args[n++] = "--automation"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
+    /* host USB devices (6.6): the machine's USB controller (a device of the guest: with it off and no saved state) and the
+     * devices that connect by themselves (vendor:product[:serial]); lord-vm refuses both for anonymity */
+    v = JS_GetPropertyStr(c, argv[1], "usb");
+    if (JS_IsBool(v)) { args[n++] = "--usb"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    v = JS_GetPropertyStr(c, argv[1], "usbAuto");
+    if (JS_IsArray(c, v)) {
+        uint32_t len = 0;
+        JSValue l = JS_GetPropertyStr(c, v, "length");
+        JS_ToUint32(c, &len, l);
+        JS_FreeValue(c, l);
+        if (len > VM_USB_AUTO) ok = 0;
+        else if (!len) { args[n++] = "--usb-auto"; args[n++] = "none"; }
+        for (uint32_t i = 0; ok && i < len; i++) {
+            JSValue e = JS_GetPropertyUint32(c, v, i);
+            const char *rs = JS_IsString(e) ? JS_ToCString(c, e) : NULL;
+            if (rs && vm_usb_rule_valid(rs)) { snprintf(ua[i], sizeof ua[i], "%s", rs); args[n++] = "--usb-auto"; args[n++] = ua[i]; }
+            else ok = 0;
+            if (rs) JS_FreeCString(c, rs);
+            JS_FreeValue(c, e);
+        }
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "cpuPin");
     if (JS_IsString(v)) {
         const char *s = JS_ToCString(c, v);
