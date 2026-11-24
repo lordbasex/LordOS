@@ -2545,9 +2545,9 @@ static void build_qemu_args(void) {
     snprintf(ser, sizeof ser, "%s%s", m->disk_serial[0] ? ",serial=" : "", m->disk_serial);
     /* where the firmware starts from (machine.json's boot_order, vm_boot_indexes): each device's ",bootindex=N", or
      * nothing for one not listed. An unattended install's first start: QEMU gives the installer's kernel (-kernel)
-     * boot index 0, the rest follow it */
+     * boot index 0, the rest follow it; so does a directly started kernel (schema 21) */
     int bidx[VM_BOOT_DEVS];
-    vm_boot_indexes(m, S.unattended ? 1 : 0, bidx);
+    vm_boot_indexes(m, S.unattended || S.kboot ? 1 : 0, bidx);
     char bi_sys[24] = "", bi_cd[24] = "", bi_net[24] = "";
     if (bidx[VM_BOOT_DISK] >= 0) snprintf(bi_sys, sizeof bi_sys, ",bootindex=%d", bidx[VM_BOOT_DISK]);
     if (bidx[VM_BOOT_CD] >= 0) snprintf(bi_cd, sizeof bi_cd, ",bootindex=%d", bidx[VM_BOOT_CD]);

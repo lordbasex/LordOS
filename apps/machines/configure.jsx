@@ -786,7 +786,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         </Row>
         {why ? null : <>
           <Row label={tr('machines.cfg.kboot.kernel')} value={tr(m.kernelFile ? 'machines.cfg.kboot.kept' : 'machines.cfg.kboot.none')}>
-            <Btn label={tr('machines.cfg.kboot.choose')} disabled={!!job} onClick={() => setPickKernel('kernel')} style={{ height: 28 }} />
+            <View style={{ flexDirection: 'row' }}><Btn label={tr('machines.cfg.kboot.choose')} disabled={!!job} onClick={() => setPickKernel('kernel')} style={{ height: 28 }} /></View>
           </Row>
           <Row label={tr('machines.cfg.kboot.initrd')} value={tr(m.initrdFile ? 'machines.cfg.kboot.kept' : 'machines.cfg.kboot.none')}>
             <View style={{ flexDirection: 'row', gap: 8 }}>

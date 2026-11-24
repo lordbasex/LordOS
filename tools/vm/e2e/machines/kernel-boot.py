@@ -97,6 +97,13 @@ def main():
             time.sleep(0.5)
         return False
 
+    def qemu_args(M):
+        """the running QEMU's arguments (no pid namespace: its /proc entry is this computer's)"""
+        try:
+            return open("/proc/%d/cmdline" % int(status(M).get("qemu_pid") or 0), "rb").read().split(b"\0")
+        except (OSError, ValueError):
+            return []
+
     def stop(M):
         vm("--stop", M, "--timeout", "90", timeout=150)
         end = time.time() + 120
@@ -135,7 +142,7 @@ def main():
             r = vm("--set", M, "--kernel-boot", "on")
             check("%s: the switch is refused while it runs" % fw, r.returncode != 0, r.stderr)
             # 2. the guest's own kernel, initrd and command line, taken out of it
-            k, i = os.path.join(H, "vmlinuz-guest"), os.path.join(H, "initrd-guest")
+            k, i = os.path.join(H, "vmlinuz-" + fw), os.path.join(H, "initrd-" + fw)
             # the running kernel's own files (a cloud image has no /vmlinuz link: /boot/vmlinuz-<uname -r>)
             rel = run(CLI, "exec", name, "--", "uname", "-r", timeout=60).stdout.strip()
             r1 = run(CLI, "cp", "%s:/boot/vmlinuz-%s" % (name, rel), k, timeout=300)
@@ -168,7 +175,9 @@ def main():
             rec["kernel_boot_s"] = t_k
             log = open(os.path.join(M, "log", "lord-vm.log"), errors="replace").read()
             check("%s: boots the kernel directly to MH-READY" % fw, t_k is not None, str(status(M)))
+            qa = qemu_args(M)
             check("%s: lord-vm's log says it ran disks/boot's kernel" % fw, "kernel boot: this start runs disks/boot's kernel and initrd" in log)
+            check("%s: QEMU runs with -kernel, -initrd and -append from disks/boot" % fw, b"-kernel" in qa and any(a.endswith(b"disks/boot/vmlinuz") for a in qa) and b"-initrd" in qa, str(qa[:4]))
             check("%s: the agent connects" % fw, agent_up(M))
             r = run(CLI, "exec", name, "--", "cat", "/proc/cmdline", timeout=60)
             check("%s: the guest runs with the chosen command line" % fw, "lordos.kboot=1" in r.stdout, r.stdout + r.stderr)
@@ -180,14 +189,14 @@ def main():
                 check("%s: the clone has disks/boot" % fw, all(os.path.isfile(os.path.join(C, "disks/boot", f)) for f in ("vmlinuz", "initrd", "cmdline")))
                 t_c = boot(C)
                 clog = open(os.path.join(C, "log", "lord-vm.log"), errors="replace").read()
-                check("%s: the clone boots its kernel directly" % fw, t_c is not None and "kernel boot: this start runs" in clog)
+                check("%s: the clone boots its kernel directly" % fw, t_c is not None and b"-kernel" in qemu_args(C))
                 stop(C)
                 shutil.rmtree(C, ignore_errors=True)
             r = vm("--set", M, "--kernel-boot", "off")
             check("%s: --kernel-boot off" % fw, r.returncode == 0, r.stderr)
             t_off = boot(M)
             log = open(os.path.join(M, "log", "lord-vm.log"), errors="replace").read()
-            check("%s: off: it starts from its disk again" % fw, t_off is not None and log.count("kernel boot: this start runs") == 1)
+            check("%s: off: it starts from its disk again" % fw, t_off is not None and b"-kernel" not in qemu_args(M) and len(qemu_args(M)) > 0)
             stop(M)
             rec["saved_s"] = round(t_disk - t_k, 2) if t_disk and t_k else None
             print("      %s: from the disk %s s, the kernel directly %s s" % (fw, t_disk, t_k), flush=True)
