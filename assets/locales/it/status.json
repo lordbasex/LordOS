@@ -168,6 +168,7 @@
   "pkg.why.multiarchPair": "Stessa versione di {name}",
   "gpu.roleSet": "Uso della scheda grafica salvato ({card}): riavvia per applicarlo",
   "vm.gvtReady": "Quota della scheda grafica pronta ({name})",
+  "vm.usbReady": "Dispositivo USB pronto",
   "vm.gvtGone": "Quota della scheda grafica rimossa",
   "gpu.freqSet": "Frequenza minima della scheda grafica impostata",
   "gpu.memlockSet": "Memoria bloccabile dalle macchine salvata",

@@ -133,6 +133,16 @@
  *                   the person signed in there (AGK_SHELL_OPEN; one at a time, a new one ends the old); what's written to
  *                   it is typed into the shell, what the shell writes comes out; it ends (EOF) when the shell does.
  *                   a = VSH_SIZE, b, c: the terminal's new size (AGK_SHELL_SIZE). a = VSH_CLOSE: end it
+ *     VM_USB        a host USB device (6.6; AGENTS.md "Machines' USB devices"): a = 1 with one descriptor, the device's
+ *                   /dev/bus/usb node the admin helper's vm-usb-allow opened (lord-server never opens it); text = "BUS DEV
+ *                   VVVV:PPPP" (vmusb_line_parse). lord-vm takes it only when it is a usb_device node of that bus and address
+ *                   opened for reading and writing (vmusb_fd_ok), the machine runs or is paused, isn't locked for anonymity,
+ *                   holds fewer than 8 and not that one: QMP add-fd into fdset 120 + slot, then device_add usb-host on xhci.0
+ *                   with hostdevice=/dev/fdset/N (QEMU never opens a path; libusb in QEMU looks for no other device, see
+ *                   vmusbshim.c) → VM_REPLY once QEMU took it or why not. a = 0 without one: that device out (device_del;
+ *                   its fdset removed once QEMU says DEVICE_DELETED) → VM_REPLY. a = 2 / 3: text = an auto-connect rule
+ *                   (VVVV:PPPP[:SERIAL], vm_usb_rule_valid) added to / taken from machine.json's usb_auto while it runs (lord-vm
+ *                   holds the lock, so it writes the file) → VM_REPLY
  *     VM_RECV       the answer to a VM_RECV_OFFER (6.21): a = the transfer's id, b = AGSA_* (vmagent.h; 0: taken); with 0,
  *                   one descriptor: the quarantine folder's part file for it, which lord-server opened (O_RDWR, without
  *                   following a link, a regular file of this account with one link) and which may already hold the
@@ -180,6 +190,8 @@
  *     VM_EXEC_DONE  seq of the VM_EXEC; a = the program's exit status (0..255, 124: its time ran out), b = VMX_F_*; one
  *                   descriptor, a sealed memfd in vmexec.h's answer layout (its output and errors, cut at their caps). Sent
  *                   to the client that asked only
+ *     VM_USB_STATE  a = how many host USB devices the machine holds (0..8); text = their lines ("BUS DEV VVVV:PPPP"), tab
+ *                   separated. Sent to every client on each change and after VM_STATUS
  *     VM_RECV_OFFER a file the guest's tools offer to send to this computer (6.21, AGK_SEND_OFFER, already parsed): a sealed
  *                   memfd of a bytes (≤ VM_RECV_OFFER_MAX) in AGK_SEND_OFFER's layout, b = the transfer's id (lord-vm's
  *                   counter). Only while machine.json takes files from the guest, at most one at a time, within the
@@ -289,10 +301,11 @@ enum {
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
     VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL, VM_EXEC, VM_NETCABLE,
     VM_RECV, VM_RECV_CANCEL, VM_FILE_CANCEL,
-    VM_REQ_LAST = VM_FILE_CANCEL,
+    VM_USB,
+    VM_REQ_LAST = VM_USB,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
-    VM_SHELL_FD, VM_GUEST_NOTE, VM_EXEC_DONE, VM_RECV_OFFER, VM_RECV_STATE,
+    VM_SHELL_FD, VM_GUEST_NOTE, VM_EXEC_DONE, VM_RECV_OFFER, VM_RECV_STATE, VM_USB_STATE,
 };
 /* VM_RECV_STATE b: a file from the guest is being written; kept (lord-server names it); given up (d: AGSD_*); the guest's
  * connection went with it unfinished (lord-server keeps what came, for the guest's next offer of the same file) */
@@ -588,6 +601,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
                       (m->type != VM_SHELL || (m->a == VSH_CLOSE || ((m->a == VSH_OPEN || m->a == VSH_SIZE) && m->b >= 1 && m->b <= 1000 && m->c >= 1 && m->c <= 500))) &&
                       (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0)) &&
+                      (m->type != VM_USB || (m->a >= 0 && m->a <= 3 && m->text[0])) &&
                       (m->type != VM_RECV || (m->a > 0 && m->b >= 0 && m->b <= 4)) &&
                       (m->type != VM_RECV_CANCEL || m->a > 0) && (m->type != VM_FILE_CANCEL || m->a > 0);
     switch (m->type) {
@@ -613,6 +627,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_RECV_OFFER: return m->a > 0 && m->a <= VM_RECV_OFFER_MAX && m->b > 0;
     case VM_RECV_STATE: return m->a > 0 && m->b >= VRS_RUNNING && m->b <= VRS_LAST && m->c >= 0 && m->d >= 0 && m->d <= 5;
     case VM_EXEC_DONE: return m->a >= 0 && m->a <= 255 && m->b >= 0 && m->b <= 7;
+    case VM_USB_STATE: return m->a >= 0 && m->a <= 8;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }

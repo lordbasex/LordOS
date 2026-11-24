@@ -159,6 +159,7 @@
   "pkg.why.multiarchPair": "Versi yang sama dengan {name}",
   "gpu.roleSet": "Penggunaan kartu grafis disimpan ({card}): mulai ulang untuk menerapkan",
   "vm.gvtReady": "Bagian kartu grafis siap ({name})",
+  "vm.usbReady": "Perangkat USB siap",
   "vm.gvtGone": "Bagian kartu grafis dihapus",
   "gpu.freqSet": "Frekuensi minimum kartu grafis diatur",
   "gpu.memlockSet": "Memori yang boleh dikunci mesin disimpan",

@@ -168,6 +168,7 @@
   "pkg.why.multiarchPair": "Dezelfde versie als {name}",
   "gpu.roleSet": "Gebruik van de videokaart opgeslagen ({card}): herstart om toe te passen",
   "vm.gvtReady": "Deel van de videokaart klaar ({name})",
+  "vm.usbReady": "USB-apparaat klaar",
   "vm.gvtGone": "Deel van de videokaart verwijderd",
   "gpu.freqSet": "Minimale frequentie van de videokaart ingesteld",
   "gpu.memlockSet": "Geheugen dat machines mogen vastzetten opgeslagen",

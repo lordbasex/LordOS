@@ -42,8 +42,8 @@ recomputes both from the rows; the arithmetic:
 | B. Getting a system in (cards, unattended, import) | 12 | 13 | 87.85 | 88 % | 12 × 88 % = 10.56 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 95.17 | 95 % | 11 × 95 % = 10.45 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 85.00 | 85 % | 9 × 85 % = 7.65 | 60 % |
-| E. Network | 6 | 4 | 88.75 | 89 % | 6 × 89 % = 5.34 | 80 % |
-| F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
+| E. Network | 6 | 4 | 95.00 | 95 % | 6 × 95 % = 5.70 | 80 % |
+| F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 95.00 | 95 % | 6 × 95 % = 5.70 | 56 % |
 | G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 91.11 | 91 % | 12 × 91 % = 10.92 | 68 % |
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
 | I. Guest tools and agent (state, shell, logs) | 7 | 6 | 91.67 | 92 % | 7 × 92 % = 6.44 | 75 % |
@@ -52,9 +52,9 @@ recomputes both from the rows; the arithmetic:
 | L. Privacy and security model | 4 | 7 | 87.14 | 87 % | 4 × 87 % = 3.48 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 92.00 | 92 % | 3 × 92 % = 2.76 | 55 % |
-| **Total** | **100** | **110** | | | **85.16 → 85 %** | 69 % |
+| **Total** | **100** | **110** | | | **87.86 → 88 %** | 69 % |
 
-Σ = 12.88 + 10.56 + 10.45 + 7.65 + 5.34 + 3.36 + 10.92 + 3.22 + 6.44 + 2.79 + 2.73 + 3.48 + 2.58 + 2.76 = 85.16, rounded **85 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.88 + 10.56 + 10.45 + 7.65 + 5.70 + 5.70 + 10.92 + 3.22 + 6.44 + 2.79 + 2.73 + 3.48 + 2.58 + 2.76 = 87.86, rounded **88 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); USB, then camera and printers (F, +1.2
@@ -162,24 +162,24 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6) | 🧪 | 85 | `lordvm.c` (`--disk-format raw`, `cmd_export`, `cmd_import_lordvm`), `vmexport.c`, `vmkeysrv.c`, `backup/engine.c`, `vmkey.jsx`; `vm_storage_test.sh`, `vmexport-test`, `vmkeysrv-test`, `backup-machines-test` | *In development*, 2026-11-24: raw disk files (never host block devices: decided), encryption (8), Export as `.lordvm` with a checked manifest and as OVA, the import of an export, consistent backups. The OVA never imported into another app; the app's sheets not driven end to end; no bare disk image export (was ❌ 0) |
 | Storage window: shared extents, frees-if-deleted, downloads (6.16) | 🟡 | 75 | `storage.jsx`, `js_vm.c` (FIEMAP) | Trash, Reclaim with an estimate, the unused shared base. Never seen on btrfs or XFS; no "about" figures; no "delete old snapshots" or "remove unused media" |
 
-### E. Network (89 %)
+### E. Network (95 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | Shared (passt over a socketpair), Isolated (6.5) | ✅ | 100 | `lordvm.c` (`vm_passt_argv`) |  |
 | Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5) | 🧪 | 90 | `vmnet_admin.c`, `vmnet.c`, `lordvm.c` | Headless checks; `vhost=off`, no `vhost-net` |
 | Each machine named in the firewall (6.5) | 🧪 | 95 | `fw/rules.c` (`fw_vm_app`, `fw_app_parent`, `fw_effective_restricted`, `fw_effective_trusted`, `fw_decide`), `netperm/npcompile.c` (`load_rules`), `sdk/netmodel.js` (`vmIdOf`, `componentOf`, `componentLabel`, `forwardedRules`), `apps/monitor/Network.jsx`, `FwRules.jsx`, `Firewall.jsx`, `apps/machines/configure.jsx` (Network → Firewall); `fw-rules-test` (`test_machine_inherits`), `npcompile-test` (random rounds with a machine and Machines against `fw_decide`), `netmodel_test.mjs` | *In development*: each machine is its own firewall app and row, `lordos:vm-<id>`, which inherits the rules, restrictions and trust of `lordos:machines` (nothing a Machines rule denies is allowed by the split); Monitor names the row after the machine and lists its forwarded ports as its own incoming lines; Settings' rule and restriction lists offer each machine; Configure → Network opens its rules. Not yet run through a live lord-netperm with a running machine (the kernel path is the same compile, tested against `fw_decide`) |
-| Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22) | 🧪 | 70 | `machine.h` (`nic_model`, `VM_EXTRA_NICS`) | An import's extra cards are kept but never connected. Added by the audit of 2026-11-23 |
+| Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22) | ✅ | 95 | `machine.h` (`nic_model`, `VM_EXTRA_NICS`), `lordvm.c`; `vm_nic_e2e.sh` | Booted with each model (*in development*, 2026-11-24): seven reach the internet; PCnet gets its address, then receive errors (QEMU's PCnet with Linux 6.12). Extra cards present, not connected, by design (6.22) |
 
-### F. Devices (56 %)
+### F. Devices (95 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Speakers and microphone, output and input per machine (6.9) | ✅ | 90 | `lordvm.c` (`hda-micro`), `vmdisplay.c`; microphone permission checked in `js_vm.c` | Windows guest sound not checked |
-| Recording with sound, screenshot (6.20) | 🧪 | 90 | `js_vm.c`, `vmwindow.jsx` | No automated test or recorded on-screen check (was ✅) |
+| Speakers and microphone, output and input per machine (6.9) | ✅ | 95 | `lordvm.c` (`hda-micro`), `vmdisplay.c`; microphone permission checked in `js_vm.c`; `vm_sound_e2e.sh` | Through a running lord-server with the maintainer's own microphone (*in development*, 2026-11-24): the speakers' PipeWire stream, the microphone closed without the permission and open with it, the guest hearing it. Windows guest sound not checked |
+| Recording with sound, screenshot (6.20) | ✅ | 95 | `js_vm.c` (`f_record`, `f_screenshot`), `vmwindow.jsx`; `vm_sound_e2e.sh` | Automated through a running lord-server (*in development*, 2026-11-24): a PNG at the guest's size, an H.264 and AAC recording with the guest's tone. The bar's red state and the clock's indicator not seen on screen |
 | CD/DVD change while running | ✅ | 100 | `lordvm.c` (`cd_change`) |  |
-| USB passthrough, auto-connect rules, `vm-usb-allow` (6.6) | ❌ | 0 | no usbredir anywhere |  |
-| Camera (6.9), printers (5.5) | ❌ | 0 |  |  |
+| USB passthrough, auto-connect rules, `vm-usb-allow` (6.6) | ✅ | 95 | `vmusb.c`, `vmusb_admin.c`, `vmusbshim.c`, `lordvm.c` (`usb_*`), `js_vm.c` (`usb_*`), `admin.c` (`admin_say_fd`); `vmusb-test`, `vm_usb_model_test.mjs`, `vm_usb_e2e.sh` | *In development*, 2026-11-24 (approved, AGENTS.md "Machines' USB devices"): a real webcam into a Debian guest through the real admin helper, 38 of 38. The Devices menu not seen on screen |
+| Camera (6.9), printers (5.5) | ✅ | 90 | `js_vm.c` (`usb_perm_need`), `vmwindow.jsx` (`markDeviceUse`); `vm_usb_e2e.sh` | The camera as a USB device with its permissions and indicator, captured from in a guest (*in development*). Printers as decided (5.5): USB printers like any USB device, network printers by the guest's own driverless printing; not checked with a real printer |
 
 ### G. Host integration (91 %)
 
@@ -365,7 +365,7 @@ Still open in Phase 2:
   and its revert. Not yet on the Pi 5 (arm64) nor with a virtio-win guest.
 - [ ] A Windows guest migrated from VMware Fusion end to end (the maintainer's Windows 11, once its encryption is removed in
   Fusion): NVMe disk, vmxnet3, the SMBIOS UUID and MAC kept, no TPM, Secure Boot off; activation checked.
-- [ ] USB passthrough of a device to a machine.
+- [x] USB passthrough of a device to a machine (*in development*: `vm-usb-allow` hands the device's descriptor to QEMU's usb-host, auto-connect rules, the camera as a USB device; 6.6, 6.9).
 - [x] Bridged and Host-only networks (0.8.9: a macvtap for Bridged, with `vhost=off`; passt on 127.0.0.1 for Host only; 6.5).
 - [x] File copy panel with Cancel, Send to LordOS with flow control and resume, the quarantine folder (6.21, built 2026-11-24, in development; about 83 MB/s measured through the agent's channel, target 300 MB/s). Still open: dragging straight out of a guest's window. Dropping files in is built (6.21).
 - [x] UEFI secure boot and TPM on amd64 (swtpm, its state in snapshots; 4.3.1). arm64 secure boot is still To test.
@@ -573,7 +573,7 @@ Admin helper (closed actions, root)
   vm-image-get, vm-image-get-user, vm-image-list, vm-image-remove, vm-image-cancel
 ```
 
-(Audited 2026-11-23: there is no usbredir and no USB action yet; USB passthrough is not built, 6.6.)
+(Since 2026-11-24, *in development*: a host USB device goes to QEMU's `usb-host` as a descriptor the admin helper's `vm-usb-allow` opened, through lord-server and lord-vm, no usbredir; 6.6.)
 
 ### 3.1 Parts
 
@@ -2437,8 +2437,8 @@ proportions again, keeping its width (`shapeFrame`, once per size, so a window t
 sound, microphone, shared folders), named together in one tooltip (`deviceDots`); **Devices → Network** (the mode, **Cable
 Connected**: lord-vm pulls or plugs in the first card's cable while the machine runs, `VM_NETCABLE`, QMP `set_link`; only the
 shared, host-only and bridged networks, never a group's member; a new run starts plugged in; Network Settings…) and
-**Folders** (their count, Folder Settings…). USB and the camera appear in Devices only once their backend says they are
-supported (`lord.vm.deviceCaps`, the devices work). **View → All Displays** (5.4). Checked by `vm_model_test.mjs` and a real KVM boot,
+**Folders** (their count, Folder Settings…). **USB devices and the camera** are in Devices
+(6.6, 6.9), with their dots. **View → All Displays** (5.4). Checked by `vm_model_test.mjs` and a real KVM boot,
 `vm_configure_boot.sh`: the cable pulled, the guest's card lost its carrier; plugged in, it came back. The design was:
 
 | Group | Items |
@@ -3031,7 +3031,76 @@ a "lan" port or the bridged guest, the Configure pane on screen.
 
 ### 6.6 USB
 
-**Not built (audited 2026-11-23):** no USB passthrough, no usbredir and no `vm-usb-allow` exist; machines have `qemu-xhci` with a `usb-tablet` only for the Windows devices. The design: `usbredir` over the Chardev stream: no root, device opened by a closed admin action `vm-usb-allow`, which claims the single device for that VM and writes nothing permanent. Menu lists devices with names. Auto-connect rules per VM. USB 3 through `qemu-xhci`. Weak: isochronous devices (webcams, audio) can stutter; Camera and Microphone have their own paths. Never offered: the boot disk or the keyboard in use.
+**Built (*in development*, 2026-11-24; approved by the maintainer the same day, AGENTS.md "Machines' USB devices").** A device
+of this computer goes into a running machine whole, as QEMU's `usb-host` on the machine's xHCI controller, and comes back to
+this computer's drivers when it leaves. One machine holds a device at a time, and a machine at most 8.
+
+- *How it gets there.* lord-server lists the devices from sysfs (`/sys/bus/usb/devices`, `vmusb.c`). The person picks one in
+  the window's **Devices** menu. lord-server asks the admin helper's closed action `vm-usb-allow "<machine id> <bus> <address>
+  <vvvv>:<pppp>"` (`vmusb_admin.c`), which finds the device again by its bus and address, checks it is still the one picked
+  (vendor and product), refuses what must never leave this computer (below), opens `/dev/bus/usb/BBB/DDD` read and write,
+  checks the node by its device number against sysfs and reads sysfs again after the open, then answers `vm.usbReady` with the
+  **descriptor** (SCM_RIGHTS on the helper's socket, `admin_ok_fd`). The node's owner, mode and access list never change and
+  nothing is written. lord-server takes the descriptor only for a request it sent itself (`js_vm_admin_reply`; one JS asked
+  for through `lord.admin` gets its answer but the descriptor is closed), checks it (`vmusb_fd_ok`: a `usb_device` node,
+  major 189, of that bus and address, opened read and write), hands it to the machine's lord-vm (`VM_USB`) and closes its own
+  copy. lord-vm checks it again, gives it to QEMU with QMP `add-fd` (fdset 120 + slot) and `device_add usb-host` with
+  `hostdevice=/dev/fdset/N`: QEMU never opens a path and its Landlock rules don't change. Out: `device_del`, then the fdset
+  once QEMU says `DEVICE_DELETED`; QEMU's libusb lets go of the interfaces and this computer's drivers take it back
+  (**Measured**: uvcvideo and snd-usb-audio bound again to the webcam).
+- *Never given* (checked by root, and by lord-server before it asks): a hub or a root hub (`vm.usbHub`); a device with an input
+  node (a keyboard, a mouse) that any process holds open, the session's own (`vm.usbInputInUse`); a device with a disk this
+  computer has mounted, uses as swap or under another block device (`vm.usbMounted`: eject it first); storage, a network card
+  or a Bluetooth adapter (a `net` or `bluetooth` folder under one of its interfaces) when the person isn't an administrator
+  (`vm.usbAdminOnly`: a person at the seat could otherwise cut this computer's network); a machine locked for anonymity (19.5, `vm.usbLocked`: refused by lord-server,
+  by lord-vm and by machine.json's check). The boot disk is mounted, so it is refused like any mounted disk.
+- *QEMU's side.* QEMU's usb-host calls `libusb_init`, which looks for every USB device of the computer (a netlink socket,
+  `/sys/bus/usb`, `/run/udev`): none of that is allowed in its sandbox. lord-vm preloads `lord-vm-usb.so`
+  (`/usr/lib/lordos/lib`, `vmusbshim.c`), which only sets libusb's default to `LIBUSB_OPTION_NO_DEVICE_DISCOVERY`
+  (libusb ≥ 1.0.27): libusb then works only on the descriptor it is given (`libusb_wrap_sys_device`). QEMU loads its
+  `hw-usb-host` module at start (`device-list-properties usb-host` before the QMP handshake ends), while executable mappings
+  are still the loader's: a module mapped later would stop QEMU (3.3). Its allowlist gains, only for a machine with USB on,
+  usbfs's ioctls (type `'U'`) and the `USB` rows `timerfd_create`, `timerfd_settime`, `timerfd_gettime` (`vmsyscalls.h`;
+  **Measured** in learn mode through a webcam's capture: nothing else).
+- *The controller* (machine.json schema 21, `usb`): new and imported machines have it (`lord-vm --create`); an older machine
+  gets it from Configure → Sound and input, "USB devices from this computer", with the machine off and no saved state
+  (`lord-vm --set --usb on|off`), since it is a device of the guest. A `qemu-xhci` (`id=usbx`, slot `0x15`, 8 USB 2 and 8 USB 3
+  ports); the compatible and Windows devices in a window use the xHCI they already have. A machine without it says so in the
+  menu.
+- *Auto-connect rules* (schema 21, `usb_auto`): up to 8 `vendor:product[:serial]`. The Devices menu's "Connect … automatically"
+  adds one while the machine runs (`VM_USB a = 2`, lord-vm writes machine.json; `a = 3` removes it); Configure lists them with
+  Remove, `lord-vm --set --usb-auto RULE … | none` with it off. Once a second while the machine runs lord-server brings a
+  matching device in, one at a time, each tried once while it stays plugged in (a device taken out by hand doesn't come back
+  until it is plugged in again), never asking for a permission, and never a disk (storage is only ever picked by
+  hand: a rule written elsewhere can't take this computer's disks). An exported machine's rules stay behind at its import
+  (`cmd_import_lordvm`): another computer's devices aren't this one's.
+- *Unplugged*, the device leaves the machine by itself (lord-server sees it gone from sysfs, `VM_USB a = 0`); the next start has
+  none until its rule or the person adds it again. Nothing of it survives lord-vm.
+- *What a hostile guest can do with it:* anything the device itself allows (reset it, change its configuration, rewrite a
+  firmware the device lets be rewritten): that is what passing a device means, and the menu passes only what the person picks.
+  It can't reach another device: the descriptor is that one device's usbfs node, a hub is never given, and QEMU can't open any
+  other node (Landlock, no `/dev/bus/usb`).
+
+Not built: usbredir (a device over the network), USB 3 streams beyond what QEMU's usb-host does, a per-device speed choice.
+Isochronous devices work: a UVC webcam through a Debian 13 guest captured 640×480 YUYV at about 13 frames a second
+(**Measured** 2026-11-24, below).
+
+**Checked (*in development*, 2026-11-24, amd64 PC, KVM, QEMU 10.0.13, Debian 13 guest; `tests/vm_usb_e2e.sh`, the maintainer's
+own Logitech C930e webcam, which he allowed; 38 of 38):** *with lordvm-dev and `vm-usb-cli` as the admin helper* — a new machine
+has `usb: true`; vm-usb-allow's descriptor went in (`VM_USB_STATE` 1); the guest listed `046d:0843` and `/dev/video0`
+"Logitech Webcam C930e" and captured 30 frames of 640×480 YUYV (18 432 000 bytes) with `v4l2-ctl`; out again it was gone
+from the guest and uvcvideo had it on this computer; QEMU's allowlist stopped no call (and in learn mode logged none beyond
+the USB rows). *Through a lord-server started as root* (its real admin helper; a private mount namespace with a scratch
+home over the real one and a tmpfs runtime folder; `tests/vm_usb_e2e.js` as its theme) — `lord.vm.usbDevices` listed the
+camera as one and the hub with `vm.usbHub`; lord-server refused the hub itself; the admin helper refused, asked directly
+through `lord.admin`, the hub, another vendor and product at the camera's address, and a malformed argument; a request JS
+made itself was answered `vm.usbReady` while no process held the node afterwards (the descriptor closed); the camera was
+refused without the camera permission (`vm.usbCameraPerm`), then for its microphone (`vm.usbMicPerm`), then went in; only
+QEMU held the node (not lord-server, not the helper); another session saw it held; `usbAuto` wrote the rule into
+machine.json while it ran; `usbDetach` took it out and its rule didn't bring it back while it stayed plugged in; at the next
+start the rule brought it in by itself; the camera permission taken away took it out within a second and its rule didn't
+bring it back; the rule removed. Not checked: the Devices menu and the indicator on screen; a hot unplug of a device in a
+machine (the code path is the same as Detach, after sysfs says it's gone); a USB disk; an arm64 host.
 
 ### 6.7 Shared folders
 
@@ -3217,7 +3286,29 @@ windows, so it never decides it.
 
 ### 6.9 Sound, camera, microphone
 
-Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: asked once per VM with the existing Permissions flow; camera through USB redirect or `uvc` emulation (camera not built). Off by default. Built: the speakers and the microphone through lord-vmdisplay (`hda-micro`, `sound_out`, `sound_in`).
+Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: asked once per VM with the existing Permissions flow; the camera goes in as a USB device (6.6). Off by default. Built: the speakers and the microphone through lord-vmdisplay (`hda-micro`, `sound_out`, `sound_in`), and the camera through USB (*in development*).
+
+**Built (*in development*, 2026-11-24): the camera, as a USB device of the machine (6.6).** A webcam goes in whole, through
+the Devices menu or an auto-connect rule, the way 6.6 says; the guest drives it with its own UVC driver at the camera's own
+formats (no LordOS conversion in between). Chosen over an emulated UVC device fed from LordOS's camera (Camera Studio's
+v4l2loopback or lord-media) because QEMU 10.0 has no UVC device (its `usb-video` is a later series not merged), and over
+streaming frames through the agent because a guest then needs our driver. The cost, said in the menu: while the camera is in
+the machine this computer's apps don't have it (exclusive), and Camera Studio's effects don't apply.
+
+- *Permission.* A device with a video interface (class `0x0e`) needs LordOS's camera permission for Machines, and one with an
+  audio interface (class `0x01`, a webcam's microphone, a headset) the microphone's; checked in C by lord-server
+  (`usb_perm_need`, `perm_get("machines", …)` and the restrictions) before it asks the admin helper. The app asks with the
+  system prompt the first time (`requestPermission`, once; Settings → Privacy takes it back). Taken away while the machine
+  runs, the device leaves the machine within a second (`usb_tick`), and its auto-connect rule doesn't bring it back; an
+  auto-connect rule never asks.
+- *The indicator.* While a camera is in a machine the capture indicator by the clock shows the camera for "Machines — <name>"
+  (`markDeviceUse`, as the microphone), and a device with sound the microphone.
+- *Anonymity.* Never for a machine locked for anonymity (19.5): no USB controller, no rule, refused at each step.
+
+Printers (5.5, decided 2026-11-24): a USB printer goes in like any USB device (6.6, interface class `0x07`), and the guest
+prints to the network's printers with its own driverless printing (IPP Everywhere), through its own network like any of its
+programs. This computer's own printers, behind CUPS, aren't shared with a machine: CUPS is a root service and no machine
+network reaches this computer's services. Not checked with a real printer here.
 
 **Built (since 0.8.9.5): speakers and microphone.**
 
@@ -3266,8 +3357,14 @@ Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: a
   reached the stream at the real rate (192 000 bytes a second), every byte the helper wrote was taken (0 dropped), the ring stayed
   empty between PipeWire's requests; the guest's `arecord` of the microphone ring's 440 Hz tone measured 440 Hz at the level sent,
   half of it with the guest's capture at 50 %, silence with its capture off or without a ring, always the full length (2 s took 2 s of
-  frames). *Not checked:* the whole path inside a running lord-server (the window, Configure, the permission prompt and the
-  indicator) on screen; a Windows guest.
+  frames). *Not checked:* the window, Configure, the permission prompt and the indicator on screen; a Windows guest.
+- *Checked through a running lord-server (**Measured**, *in development*, 2026-11-24, amd64 PC, `tests/vm_sound_e2e.sh`):* a
+  headless lord-server in its own namespaces (scratch home and runtime folder, only this account's pulse socket mounted in),
+  a Debian 13 guest playing a 440 Hz tone and recording its microphone in a loop. The picture came up (lord-vmdisplay), the
+  guest's sound was a PipeWire stream of Machines named after the machine (pw-dump) at the machine's volume (0: the test is
+  silent in the room); with LordOS's microphone permission refused the guest recorded and lord-server kept the microphone
+  closed (`mic: wait`; the guest heard digital silence, 3 recordings at RMS 0), allowed it opened (`live`; the guest heard
+  the maintainer's own webcam microphone, chosen as `sound_in`, RMS up to 77 in 5 recordings), taken away it closed again.
 
 ### 6.10 Graphics
 
@@ -3766,6 +3863,12 @@ checked yet:* the event logs in a running Windows guest.
 
 The camera icon saves the guest's display at its real resolution, directly from the frame, with no window around it. The record icon records display and sound to a video, with hardware encoding where available, a visible red state on the bar and the Clock bar's recording indicator. Files go to the same folder as the system's Screenshots app. No screen-capture permission is needed, since it's the VM's own frame, and protected host windows are never included.
 
+**Checked (**Measured**, *in development*, 2026-11-24, `tests/vm_sound_e2e.sh`, the run above):** `lord.vm.screenshot` wrote a
+1280×800 PNG, the guest's picture at its own size, into `~/Pictures/Screenshots`; `lord.vm.record` for 8 s gave an MP4 with
+H.264 picture and AAC sound, 7 s long, whose sound is the guest's tone (mean volume −13.5 dB) although the speakers played at
+volume 0: the recording takes the guest's sound from lord-vmdisplay's ring, not from the speakers. Not checked: the bar's
+red state and the clock's recording indicator on screen.
+
 ### 6.21 File copy with progress
 
 **Since 0.8.9.5:** files dropped on a machine's window go into the signed-in person's Downloads
@@ -4002,8 +4105,16 @@ by `qemu-img` and written by hand from their file formats.
 license here), so the little-endian reading and the RTC are from the rules above, not seen; VMware's encrypted descriptors (the whole
 descriptor encrypted) are refused only when the `.vmx` or descriptor says `encryption.`; `.vhd` fixed images are recognized by name;
 an `.ova` with compressed or chunked disks is refused; `.hdd` disks split into several storages are refused; a VMDK's `ddb.uuid` serial
-can't go on SATA; extra cards aren't connected; cancelling an import from the sheet; the manifest (`.mf`) of an `.ova` isn't checked; the
+can't go on SATA; cancelling an import from the sheet; the manifest (`.mf`) of an `.ova` isn't checked; the
 plan's space estimate counts the source's files, not what the guest wrote; libvirt XML.
+
+**Card models and extra cards (**Measured**, *in development*, 2026-11-24, `tests/vm_nic_e2e.sh`, a Debian 13 guest, Shared
+network):** with `--nic-model` virtio, e1000e, e1000, e1000-82545em, e1000-82544gc, rtl8139 (Linux's 8139cp) and vmxnet3 the
+guest's card had the machine's MAC, its address from passt's DHCP and reached the internet. PCnet: the card and its address,
+then only receive errors (QEMU 10.0's PCnet with Linux 6.12's pcnet32, also with passt's MTU at 1500): a guest whose system
+has another driver should switch to it in Configure. An import's extra cards (`extra_nics`, an e1000e and an rtl8139 here)
+were in the guest with their MACs and models and no address: **present, not connected, by design** (one machine has one
+network; passt serves one guest address, and a second card on the same network would get the same one).
 
 ### 6.23 Reaching a machine from another computer
 
@@ -5183,7 +5294,7 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Drag and drop into any guest, with progress, speed, time left | 3 | Work | Our agent |
 | Drag out of virtio-win guests | 3 | Work | Not built (6.21): Send To → LordOS instead |
 | Drag out of a Linux guest's own desktop | none | No | No agent can see the drag. Send to LordOS instead (built 2026-11-24, 6.21) |
-| USB attach, auto-connect rules | 3 | Yes | usbredir |
+| USB attach, auto-connect rules | 3 | Yes | usb-host on a descriptor from `vm-usb-allow` (6.6) |
 | Sound | 2 | Yes | |
 | Microphone and camera on request | 3 | Yes | |
 | Printers | 3 | Partly | Driverless IPP |
@@ -5615,7 +5726,7 @@ our own channels:
 | Guest agent (qemu-guest-agent and `org.lordos.agent`) | **off**: no `virtio-serial-pci` at all (`agent` false) | Whonix advises against guest additions; with no port there is no host-to-guest command path. Cost: Shut Down is ACPI only (works, 6.1), no journal in Logs, no agent state |
 | Graphics | 2D only (`virtio-vga`, the D-Bus display) | virgl would show the guest this computer's GPU and driver names (a WebGL fingerprint) |
 | Sound | Gateway: no sound card. Workstation: `ich9-intel-hda` with `hda-output` (speakers only) | Whonix's XML has an output-only codec; our usual `hda-micro` gives the guest a microphone input even when muted |
-| Camera, USB, printers | none (not built anyway) | passthrough is on Whonix's unsafe list |
+| Camera, USB, printers | none: refused for a machine locked for anonymity (no USB controller, no rule, `vm.usbLocked`) | passthrough is on Whonix's unsafe list |
 | Suspend, memory snapshots, saving at host shutdown | refused | guest memory would land on this computer's disk; Whonix's XML turns suspend off. At host shutdown the guests are shut down (the `vmhoststop.h` plan without the save) |
 | Thumbnail | `thumb.png` not written (`js_vm.c`); the live picture only while running | a picture of the browsing would stay in `~/Machines` |
 | Captures of the screen (isolation layer 8; **built**, in development, approved 2026-11-23) | the members' windows and their apps-mode windows are **protected windows** (PRIVACY.md, "Protected windows"): on the display as usual, an opaque neutral fill with a lock in every screenshot, recording, remote desktop frame, screen share (whole screen or the window) and portal still. `lord.vm.protect(session)` (one way) refuses the card picture (`lord.vm.snapshot`, and the old `thumb.png` is removed), `lord.vm.screenshot`, `lord.vm.record` (one running stops) and a snapshot's picture; the library card never shows a `thumb.png` for it | the Workstation's browsing on screen would otherwise reach any capture, a remote viewer or a share |

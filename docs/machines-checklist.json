@@ -454,26 +454,26 @@
   {
    "area": "E",
    "item": "Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22)",
-   "status": "🧪",
-   "pct": 70,
-   "file": "`machine.h` (`nic_model`, `VM_EXTRA_NICS`)",
-   "note": "An import's extra cards are kept but never connected. Added by the audit of 2026-11-23"
+   "status": "✅",
+   "pct": 95,
+   "file": "`machine.h` (`nic_model`, `VM_EXTRA_NICS`), `lordvm.c`; `vm_nic_e2e.sh`",
+   "note": "Booted with each model (*in development*, 2026-11-24): seven reach the internet; PCnet gets its address, then receive errors (QEMU's PCnet with Linux 6.12). Extra cards present, not connected, by design (6.22)"
   },
   {
    "area": "F",
    "item": "Speakers and microphone, output and input per machine (6.9)",
    "status": "✅",
-   "pct": 90,
-   "file": "`lordvm.c` (`hda-micro`), `vmdisplay.c`; microphone permission checked in `js_vm.c`",
-   "note": "Windows guest sound not checked"
+   "pct": 95,
+   "file": "`lordvm.c` (`hda-micro`), `vmdisplay.c`; microphone permission checked in `js_vm.c`; `vm_sound_e2e.sh`",
+   "note": "Through a running lord-server with the maintainer's own microphone (*in development*, 2026-11-24): the speakers' PipeWire stream, the microphone closed without the permission and open with it, the guest hearing it. Windows guest sound not checked"
   },
   {
    "area": "F",
    "item": "Recording with sound, screenshot (6.20)",
-   "status": "🧪",
-   "pct": 90,
-   "file": "`js_vm.c`, `vmwindow.jsx`",
-   "note": "No automated test or recorded on-screen check (was ✅)"
+   "status": "✅",
+   "pct": 95,
+   "file": "`js_vm.c` (`f_record`, `f_screenshot`), `vmwindow.jsx`; `vm_sound_e2e.sh`",
+   "note": "Automated through a running lord-server (*in development*, 2026-11-24): a PNG at the guest's size, an H.264 and AAC recording with the guest's tone. The bar's red state and the clock's indicator not seen on screen"
   },
   {
    "area": "F",
@@ -486,18 +486,18 @@
   {
    "area": "F",
    "item": "USB passthrough, auto-connect rules, `vm-usb-allow` (6.6)",
-   "status": "❌",
-   "pct": 0,
-   "file": "no usbredir anywhere",
-   "note": ""
+   "status": "✅",
+   "pct": 95,
+   "file": "`vmusb.c`, `vmusb_admin.c`, `vmusbshim.c`, `lordvm.c` (`usb_*`), `js_vm.c` (`usb_*`), `admin.c` (`admin_say_fd`); `vmusb-test`, `vm_usb_model_test.mjs`, `vm_usb_e2e.sh`",
+   "note": "*In development*, 2026-11-24 (approved, AGENTS.md \"Machines' USB devices\"): a real webcam into a Debian guest through the real admin helper, 38 of 38. The Devices menu not seen on screen"
   },
   {
    "area": "F",
    "item": "Camera (6.9), printers (5.5)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": ""
+   "status": "✅",
+   "pct": 90,
+   "file": "`js_vm.c` (`usb_perm_need`), `vmwindow.jsx` (`markDeviceUse`); `vm_usb_e2e.sh`",
+   "note": "The camera as a USB device with its permissions and indicator, captured from in a guest (*in development*). Printers as decided (5.5): USB printers like any USB device, network printers by the guest's own driverless printing; not checked with a real printer"
   },
   {
    "area": "G",
@@ -745,7 +745,7 @@
    "status": "✅",
    "pct": 100,
    "file": "`logclean.h`, `vmdisplay.c` (`qtext`); `vm-test` fuzz passes, `vmimport-test` mutations, `vmdisplay-fuzz`, `guest-fuzz`, `agent-fuzz-test`, `guest-dbus-test` (mutation pass)",
-   "note": "*In development* (2026-11-24): lord-vmdisplay's D-Bus side against a hostile QEMU (about 12,000 seeded calls a run: every listener, map and sound call with edge values, wrong signatures, pipes and short or shrunk descriptors; the helper under ASan and UBSan in its own sandbox: every call answered, none past QEMU's 1 s, no report); `lordos-guest` against a hostile host, guest lord-server, X display, buses and local programs at once (ASan, UBSan, as a user namespace's root where no shell opens; every frame it sends the host must parse); every agent parser of both ends under structured mutation (500,000 checks). Found and fixed: QEMU's words (a console's label, its refusals) went into the session's log raw (new lines, escapes); an X display that kept sending events held lordos-guest in its setup for ever; a `unix:/path` display wasn't reached. Each harness caught a bounds check taken out on purpose (was 90: no fuzz of lord-vmdisplay's D-Bus side or of `lordos-guest`)"
+   "note": "*In development* (2026-11-24): lord-vmdisplay's D-Bus side against a hostile QEMU (about 12,000 seeded calls a run: every listener, map and sound call with edge values, wrong signatures, pipes and short or shrunk descriptors; the helper under ASan and UBSan in its own sandbox: every call answered, none past QEMU's 1 s, no report); `lordos-guest` against a hostile host, guest lord-server, X display, buses and local programs at once (ASan, UBSan, as a user namespace's root where no shell opens; every frame it sends the host must parse); every agent parser of both ends under structured mutation (500,000 checks). Found and fixed: QEMU's words (a console's label, its refusals) went into the session's log raw (new lines, escapes); an X display that kept sending events held lordos-guest in its setup for ever (one 3 s limit now); a `unix:/path` display wasn't reached. Each harness caught a bounds check taken out on purpose (was 90: no fuzz of lord-vmdisplay's D-Bus side or of `lordos-guest`)"
   },
   {
    "area": "L",
@@ -922,16 +922,16 @@
    "name": "Network",
    "weight": 6,
    "items": 4,
-   "mean": 88.75,
-   "score": 89
+   "mean": 95.0,
+   "score": 95
   },
   {
    "id": "F",
    "name": "Devices",
    "weight": 6,
    "items": 5,
-   "mean": 56.0,
-   "score": 56
+   "mean": 95.0,
+   "score": 95
   },
   {
    "id": "G",
@@ -998,6 +998,6 @@
    "score": 92
   }
  ],
- "total": 85,
- "total_exact": 85.16
+ "total": 88,
+ "total_exact": 87.86
 }

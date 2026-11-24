@@ -168,6 +168,7 @@
   "pkg.why.multiarchPair": "Same version as {name}",
   "gpu.roleSet": "Graphics card's use saved ({card}): restart to apply",
   "vm.gvtReady": "Graphics card share ready ({name})",
+  "vm.usbReady": "USB device ready",
   "vm.gvtGone": "Graphics card share removed",
   "gpu.freqSet": "Graphics card's minimum frequency set",
   "gpu.memlockSet": "Memory machines may lock saved",

@@ -168,6 +168,7 @@
   "pkg.why.multiarchPair": "Sama versio kuin {name}",
   "gpu.roleSet": "Näytönohjaimen käyttö tallennettu ({card}): käynnistä uudelleen ottaaksesi käyttöön",
   "vm.gvtReady": "Näytönohjaimen osuus valmis ({name})",
+  "vm.usbReady": "USB-laite valmis",
   "vm.gvtGone": "Näytönohjaimen osuus poistettu",
   "gpu.freqSet": "Näytönohjaimen vähimmäistaajuus asetettu",
   "gpu.memlockSet": "Koneiden lukittavissa oleva muisti tallennettu",

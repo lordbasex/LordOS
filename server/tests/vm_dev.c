@@ -17,6 +17,8 @@
  *   cable 0|1           the network cable pulled or plugged in (VM_NETCABLE, the window's Devices → Network, 5.3)
  *   rel DX DY           relative motion while captured (VD_REL, as lord-server's pointer lock sends it)
  *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON | qmpf FILE (a longer command, from a file)
+ *   usb-in FD BUS DEV VVVV:PPPP   a host USB device (VM_USB, 6.6) whose node this process inherited open as FD
+ *   usb-out BUS DEV VVVV:PPPP | usb-auto RULE | usb-noauto RULE   out again; an auto-connect rule added, taken away
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
  *   shell C R           the agent's shell (VM_SHELL, 6.18): the guest's tools start the signed-in person's shell, C x R;
  *                       what it writes comes as "shell" events (text with control bytes as \u escapes), its end as
@@ -451,6 +453,12 @@ static void from_vm(void) {
         else if (m.type == VM_RECV_OFFER && fd >= 0) recv_offer(&m, fd);
         else if (m.type == VM_RECV_STATE) recv_state(&m);
         else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
+        else if (m.type == VM_USB_STATE) {
+            char t[VM_TEXT_MAX];
+            snprintf(t, sizeof t, "%s", m.text);
+            for (char *p = t; *p; p++) if (*p == '\t') *p = ',';
+            out("{\"ev\":\"usb\",\"n\":%d,\"devices\":\"%s\"}", m.a, t);
+        }
         else if (m.type == VM_DISPLAY_FD) {
             if (fd < 0) { out("{\"ev\":\"error\",\"what\":\"VM_DISPLAY_FD without a descriptor\"}"); continue; }
             out("{\"ev\":\"display_fd\"}");
@@ -943,7 +951,18 @@ static int handle(char *line) {
         if (vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"transfer\"}");
         else out("{\"ok\":true,\"cmd\":\"transfer\",\"seq\":%u}", seq);
         if (fd >= 0) close(fd);
-    } else if (!strncmp(line, "qmpf ", 5)) {
+    } else if (!strncmp(line, "usb-in ", 7)) {
+        /* usb-in FD BUS DEV VVVV:PPPP: a host USB device's node this process inherited open as FD (from vm-usb-cli, run as
+         * root as the admin helper would: tests/vm_usb_e2e.sh) into the machine (VM_USB a = 1) */
+        int fd = -1, used = 0;
+        if (sscanf(line + 7, "%d %n", &fd, &used) < 1 || fd < 3 || !used) { out("{\"ok\":false,\"cmd\":\"usb-in\"}"); return 0; }
+        VmMsg m = vm_msg(VM_USB, ++seq, 1, 0, 0, 0, line + 7 + used);
+        if (vm_send(vm, &m, fd)) out("{\"ok\":false,\"cmd\":\"usb-in\"}");
+        else out("{\"ok\":true,\"cmd\":\"usb-in\",\"seq\":%u}", seq);
+    } else if (!strncmp(line, "usb-out ", 8)) { ask(VM_USB, 0, line + 8); out("{\"ok\":true,\"cmd\":\"usb-out\",\"seq\":%u}", seq); }
+    else if (!strncmp(line, "usb-auto ", 9)) { ask(VM_USB, 2, line + 9); out("{\"ok\":true,\"cmd\":\"usb-auto\",\"seq\":%u}", seq); }
+    else if (!strncmp(line, "usb-noauto ", 11)) { ask(VM_USB, 3, line + 11); out("{\"ok\":true,\"cmd\":\"usb-noauto\",\"seq\":%u}", seq); }
+    else if (!strncmp(line, "qmpf ", 5)) {
         /* a QMP or guest agent command longer than a message's text, from a file (lord-vm --dev-qmp only) */
         int fd = open(line + 5, O_RDONLY | O_CLOEXEC);
         VmMsg m = vm_msg(VM_QMP, ++seq, 0, 0, 0, 0, "file");

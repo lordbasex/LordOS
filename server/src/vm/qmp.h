@@ -28,6 +28,8 @@ void qmp_close(Qmp *q);
 int  qmp_handshake(Qmp *q, int timeout_ms, char *err, size_t errlen);
 /* sends {"execute": cmd, "arguments": args} (args: a JSON object or NULL) with an optional descriptor. 0 sent */
 int  qmp_command(Qmp *q, const char *cmd, const char *args, int fd);
+/* a command and its answer, waited for (events meanwhile are dropped): only before the main loop runs. 0, or -1 and why */
+int  qmp_call(Qmp *q, const char *cmd, const char *args, int timeout_ms, char *err, size_t errlen);
 /* sends a whole command as it is (development: lord-vm --dev-qmp). 0 sent */
 int  qmp_raw(Qmp *q, const char *json);
 /* reads what's there without waiting: 0 ok, -1 QEMU closed the socket */
