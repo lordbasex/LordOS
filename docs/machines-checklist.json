@@ -39,9 +39,9 @@
    "area": "A",
    "item": "Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp allowlist on top of QEMU's own filter (a stopped call named in the log and on the failure page); QEMU in its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3)",
    "status": "✅",
-   "pct": 95,
+   "pct": 100,
    "file": "`vmsandbox.c` (`vm_ns_enter`, `vm_ns_setup`, `vm_jail_qemu`), `vmseccomp.c`, `vmsyscalls.h`, `lordvm.c` (`sc_serve`); `vmseccomp-test`, `vm-jail-probe`, `vm_isolation.sh`",
-   "note": "Namespaces, non-dumpable QEMU and the allowlist in development (2026-11-23); no pid namespace (GLib refuses the D-Bus display's peer then); a GVT-g vGPU machine, a bridged tap and hugetlb memory not yet run under the allowlist (their calls read in QEMU's source)"
+   "note": "Namespaces, non-dumpable QEMU and the allowlist in development (2026-11-23); no pid namespace for QEMU (GLib refuses the D-Bus display's peer then: a decision, 3.3). Run under the allowlist on 2026-11-24 on the dev PC: a GVT-g vGPU machine with a Debian 13 guest (which found the start hanging on a call made after the jail: fixed), a bridged machine (macvtap on the wired card, DHCP and DNS from the LAN) and hugetlb memory (1024 MB in 2 MB pages), no call stopped (was 95)"
   },
   {
    "area": "A",
@@ -70,10 +70,10 @@
   {
    "area": "A",
    "item": "Render node by descriptor; one slice for all machines (3.3, 3.7)",
-   "status": "🟡",
-   "pct": 50,
-   "file": "`lordvm.c` passes a path (`rendernode=`); `sec/cgroup.c` `cgroup_machines_slice` (lordos-machines.slice)",
-   "note": "*In development*: the slice is built (the Resource budget row, 3.7); the render node still goes by path: QEMU's `rendernode=` takes a path, and Landlock limits it to that node (row above)"
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c` (`render_open`, `rendernode=/proc/self/fd/N`), `vmsandbox.c` (`render_rules`, `rule_fd`); `sec/cgroup.c` `cgroup_machines_slice` (lordos-machines.slice)",
+   "note": "*In development*: lord-vm opens and checks the render node itself (DRM, minor 128–255, its sysfs name) and QEMU gets that descriptor; QEMU's `rendernode=` takes only a path (`util/drm.c` open()s it), so it reopens `/proc/self/fd/N`, and Landlock's rule is made from the same descriptor, so the device checked is the one QEMU may open. Checked with real 3D, venus and vGPU starts on 2026-11-24 (QEMU's fd 12 is renderD129). The slice by the app agent (the Resource budget row, 3.7) (was 50)"
   },
   {
    "area": "A",
@@ -135,9 +135,9 @@
    "area": "A",
    "item": "A 3D guest's stop named (`qemu-3d-stop`, `qemu-3d-crash`), unattended starts in 2D (3.2, 6.10)",
    "status": "🧪",
-   "pct": 90,
+   "pct": 95,
    "file": "`vmlog.c`, `lordos-guest --stopping`; `guest_stop_test.sh`",
-   "note": "*In development*; no real 6.12.117 3D guest yet"
+   "note": "*In development*; a real Debian 13 guest with kernel 6.12.118 and Graphics 3D on the RX 580 (2026-11-24): `systemctl poweroff` ends cleanly (QEMU status 0, guest-shutdown; the guest's kernel warns in `virtio_gpu_queue_fenced_ctrl_buffer` after \"Power down\") and `systemctl reboot` resets and boots again: no abort here, so the naming itself still only seen with made-up logs (was 90)"
   },
   {
    "area": "A",
@@ -575,17 +575,17 @@
    "area": "H",
    "item": "virgl 3D for Linux guests on amd64 (6.10)",
    "status": "✅",
-   "pct": 85,
-   "file": "`lordvm.c` (`decide_graphics`)",
-   "note": "RX 580; off on arm64 by decision"
+   "pct": 90,
+   "file": "`lordvm.c` (`decide_graphics`, `render_open`)",
+   "note": "RX 580; off on arm64 by decision. 2026-11-24: the render node by descriptor, a 6.12.118 guest's poweroff and reboot clean (A) (was 85)"
   },
   {
    "area": "H",
    "item": "Intel GVT-g vGPU with our GOP ROM, Windows guest (6.10.1, MACHINES-GPU.md)",
    "status": "✅",
-   "pct": 85,
-   "file": "`vmgpu*.c`, `vmgvtwin.c`; `vmgpu-test`",
-   "note": "No Linux guest on a vGPU; tested on device 0x9BC5 only"
+   "pct": 95,
+   "file": "`vmgpu*.c`, `vmgvtwin.c`, `lordvm.c` (`decide_vgpu`); `vmgpu-test`",
+   "note": "2026-11-24, a scratch `i915-GVTg_V5_8` vGPU (none of the maintainer's in use) for a Debian 13 guest under the allowlist: its i915 says \"Virtual GPU for Intel GVT-g detected\" and makes card0/renderD128; the start used to hang (Landlock's ABI asked after the jail: fixed). Tested on device 0x9BC5 only (was 85: no Linux guest)"
   },
   {
    "area": "H",
@@ -606,26 +606,26 @@
   {
    "area": "H",
    "item": "A smoother picture, Part 1 step 4: several damage rectangles (MACHINES-GPU.md)",
-   "status": "❌",
-   "pct": 0,
-   "file": "`vmdisplay.c` `damage()` merges into one box",
-   "note": "Pacing (M) changed when pictures are taken, not their damage"
+   "status": "🧪",
+   "pct": 95,
+   "file": "`vmdamage.h`, `vmdisplay.c` (`damage`, `flush`), `vmproto.h` (VD_FRAME f), `js_vm.c` (`from_vd`); `vmdamage-test` (fuzz), `vmdisplay-test`, `vm_picture_2d.sh`",
+   "note": "*In development*: up to 8 rectangles a frame, near ones merged, each its own VD_FRAME and its own damage in lord-server. Checked against a mock QEMU (a clock and a square: 2 rectangles of 5,296 pixels instead of a 340,800-pixel box) and a real Debian 13 guest headless (189 frames in 10 s, acknowledged; Linux's DRM console merges its own damage, one rectangle a frame). Not yet run with a Windows guest, whose display driver updates apart (was ❌ 0)"
   },
   {
    "area": "H",
    "item": "A smoother picture, Part 1 step 5: scaled on the GPU (MACHINES-GPU.md)",
-   "status": "🟡",
-   "pct": 40,
-   "file": "`js_vm.c` (`gtex`, `gout`), `gpu/dmaread.c`, `media/mview.c`",
-   "note": "dmabuf pictures (virgl, vGPU) are GPU textures; a 2D picture is still scaled per pixel on the CPU over the whole frame (was ❌ 0)"
+   "status": "🧪",
+   "pct": 90,
+   "file": "`media.c` (`media_src_tex_rect`, `media_src_tex_fresh`), `mview.c`, `js_vm.c` (`from_vd`); `mview-test`, `vm_picture_2d.sh`",
+   "note": "*In development*: a 2D picture's memory is a GPU texture while the GPU composes (its rectangles uploaded alone, a frame then only presented: no UI paint), and the CPU path remakes only the part of the scaled copy a frame changed (pixel-exact against a whole copy, 120 random frames). Headless lord-server composes on the CPU, so the texture path is unit-checked only: not yet on a real display (was 40)"
   },
   {
    "area": "H",
    "item": "venus (Vulkan) (6.10)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": ""
+   "status": "🧪",
+   "pct": 85,
+   "file": "`lordvm.c` (`decide_graphics`, `venus_refusal`, `spawn_venus`, `vs_serve`), `venusshim.c`, `vmsandbox.c` (`vm_jail_venus`), `vmsyscalls.h` (VENUS rows), `machine.c` (schema 21 `vulkan`), `configure.jsx`; `vm-jail-probe` (render server cases)",
+   "note": "*In development*: Configure → Display → Vulkan with 3D. lord-vm starts virglrenderer's render server in a jail of its own (pid namespace, Landlock, the allowlist with a listener, one exec, only the start's library mappings) and QEMU gets its connection through a preloaded library: QEMU never forks or execs. Checked 2026-11-24 in a Debian 13 guest on the UHD 630: a Vulkan compute shader on \"Virtio-GPU Venus (Intel UHD Graphics 630)\", 0 wrong values. Refused, with the reason in the log, where the host can't map the GPU's memory (RADV needs Linux 6.13; a discrete GPU with an Intel processor 6.16 and QEMU 11): the RX 580 under Debian 13's 6.12 crashed the guest by hand (KVM's internal error). No graphics workload with a picture yet; the switch not seen on screen"
   },
   {
    "area": "H",
@@ -633,7 +633,7 @@
    "status": "❌",
    "pct": 0,
    "file": "`vmgpu_admin.c` refuses a dedicated card",
-   "note": "\"Whole\" in Configure is the largest GVT-g type, not passthrough"
+   "note": "\"Whole\" in Configure is the largest GVT-g type, not passthrough. Not built: this computer has no spare card (the RX 580 draws the desktop, the UHD 630 is the GVT-g card and its own IOMMU group's only device) and no other device free for a vfio-pci trial; the design stays MACHINES-GPU.md's"
   },
   {
    "area": "I",
@@ -806,10 +806,10 @@
   {
    "area": "M",
    "item": "2. Huge pages for guest RAM",
-   "status": "🧪",
-   "pct": 95,
+   "status": "✅",
+   "pct": 100,
    "file": "`vmmem.h`, `lordvm.c` (`mem_backing`), `tools/iso/mkdeb.sh` (`lordos-thp.conf`), migration 011; `vmmem-test`, `migration_shmem_huge_test.sh`",
-   "note": "*In development*; private memory gets THP, shared memory (shared folders, the transfer folder) too since `memory-backend-ram,share=on` and `shmem_enabled=advise` (approved 2026-11-23; a running guest's memory seen as `ShmemPmdMapped`, 3.7.2); hugetlb only when the administrator reserved pages. Headless and on the dev host (was 85: shared memory's THP waited for approval)"
+   "note": "*In development*; private memory gets THP, shared memory (shared folders, the transfer folder) too since `memory-backend-ram,share=on` and `shmem_enabled=advise` (approved 2026-11-23; a running guest's memory seen as `ShmemPmdMapped`, 3.7.2); hugetlb only when the administrator reserved pages: run 2026-11-24 with 600 pages reserved, \"1024 MB in 2 MB hugetlb pages\", a Debian 13 guest booted and worked under the allowlist (was 95)"
   },
   {
    "area": "M",
@@ -890,8 +890,8 @@
    "name": "Engine, lifecycle, sandbox, display",
    "weight": 14,
    "items": 22,
-   "mean": 92.05,
-   "score": 92
+   "mean": 94.77,
+   "score": 95
   },
   {
    "id": "B",
@@ -946,8 +946,8 @@
    "name": "Graphics",
    "weight": 7,
    "items": 8,
-   "mean": 46.25,
-   "score": 46
+   "mean": 76.88,
+   "score": 77
   },
   {
    "id": "I",
@@ -986,7 +986,7 @@
    "name": "Performance",
    "weight": 3,
    "items": 7,
-   "mean": 85.71,
+   "mean": 86.43,
    "score": 86
   },
   {
@@ -998,6 +998,6 @@
    "score": 92
   }
  ],
- "total": 83,
- "total_exact": 82.77
+ "total": 85,
+ "total_exact": 85.36
 }

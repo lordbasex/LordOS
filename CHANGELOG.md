@@ -11,6 +11,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: Vulkan for Linux guests (venus)** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.10,
+  3.3). Configure → Display → Vulkan, with Graphics 3D (machine.json schema 21, "vulkan"; lord-vm --set --vulkan). The guest's
+  Vulkan apps draw with this computer's GPU through virglrenderer's render server, which lord-vm starts in a jail of its own (a
+  pid namespace, Landlock, a seccomp allowlist with a listener, one exec, only the start's library mappings); QEMU gets the
+  connection through a small preloaded library and never forks or execs. Given only where the host can map the GPU's memory
+  into the guest (RADV and NVK need Linux 6.13; a discrete GPU with an Intel processor, Linux 6.16 and QEMU 11), else the log says
+  why. Checked with a Vulkan compute shader in a Debian 13 guest on an Intel UHD 630. The render server comes from Debian's
+  `virgl-server`, which Machines' setup installs.
+- **Machines: a smoother picture, Part 1 steps 4 and 5** (in development; docs/MACHINES-GPU.md). A machine's picture changes
+  reach lord-server as up to 8 rectangles a frame instead of one box over all of them, each damaged on its own; a 2D picture
+  is a GPU texture when the desktop composes on the GPU (only the changed rectangles uploaded, the frame presented without a UI
+  paint), and on the CPU path a scaled picture's copy is remade only where it changed.
 - **Machines: All Displays** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.4). View → All
   Displays shows a machine across this computer's displays: one output of its virtio-gpu per display (up to four), each full
   screen at that display's size, beside the others; the machine's own window keeps the first, and each further window's
@@ -700,6 +712,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: a machine with an Intel graphics card (GVT-g vGPU) hung at every start** since QEMU's seccomp allowlist: the
+  starting child asked Landlock's version after its jail, a call the allowlist sends to lord-vm, which wasn't listening yet.
+  Found by the first run of a vGPU machine under the allowlist (a Debian 13 guest on a scratch vGPU, 2026-11-24).
 - **Machines: a machine started right after a large import timed out** (in development). `qemu-img convert` leaves the
   disk in the page cache, and QEMU's first open of it with `O_DIRECT` waited behind gigabytes of writeback past its 20 s
   to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
@@ -922,6 +937,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `qemu-3d-stop`; nothing said with tools → `qemu-3d-crash`; Shut Down asked → `host-shutdown`; …), with lord-vm's
     echo received each time and the disk check at each next start. Not yet checked with a real 6.12.117 guest with 3D.
 ### Changed
+- **Machines: QEMU's render node by descriptor** (in development; docs/VIRTUALIZATION.md 3.3): lord-vm opens and checks the GPU's
+  render node, QEMU reopens that descriptor (`rendernode=/proc/self/fd/N`) and its Landlock rule is made from it, so the
+  device checked is the only one QEMU may open.
 
 - **Machines: a guest's picture is taken less often when it doesn't change or no window shows it** (in development;
   the latest release is 0.8.9.5-beta). Seen on the maintainer's PC: a guest on an Intel GVT-g vGPU in apps mode with a
