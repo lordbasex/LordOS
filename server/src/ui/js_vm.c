@@ -2052,6 +2052,7 @@ typedef struct {
      * next helper serves; heads_mode: the current one's (0 or 1: one) */
     int head, hl_on, hlayout[6];
     int want_heads, heads_mode, hpool[VM_HEADS_MAX];
+    int hn, hw[VM_HEADS_MAX], hh[VM_HEADS_MAX];   /* head 0's: the outputs' sizes lord.vm.allDisplays gave (hn 0: none) */
     int refused_n, refused_seq;
     /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
      * did (PTRLOCK_END_*), for the window */
@@ -2517,6 +2518,8 @@ static void head_claim(Sess *s) {
         s->vd_state = -1;
         s->display_failed = 0;
         if (o->protect) s->protect = 1;
+        /* its place in the desktop the outputs make, sent once its helper says it is ready (VD_READY) */
+        s->hl_on = o->hn > s->head && !vm_heads_layout(o->hn, o->hw, o->hh, s->head, s->hlayout);
         return;
     }
 }
@@ -4051,6 +4054,8 @@ static JSValue f_all_displays(JSContext *c, JSValueConst t, int argc, JSValueCon
         maybe_display(s);
     }
     s->want_heads = want;
+    s->hn = n;
+    for (int i = 0; i < n; i++) { s->hw[i] = w[i]; s->hh[i] = h[i]; }
     for (int i = 0; i < MAX_SESS; i++) {
         Sess *o = &sess[i];
         if (!o->used || strcmp(o->id, s->id)) continue;
