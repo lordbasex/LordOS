@@ -527,6 +527,32 @@ Force Quit for the ones still open. No new privilege: `cgroup.kill` is not used,
 LordOS's and the kernel's groups can't be ended as a group (their members still can, one by one, under the usual
 rules). A child row has its own ⓧ, Quit… and Force Quit… in its menu, and Get Info.
 
+### A long group opens without a freeze (0.8.9.6, in development)
+
+Opening the Terminal's group with about 240 programs froze the desktop for a second, and again on every redraw while
+it stayed open: the table drew every row of the group at once (about 12 800 nodes, each row with its icon, badge,
+chain and cells), and the process list redraws the tab once a second. Measured in a headless lord-server over a
+made-up Terminal of 240 programs (`tests/monitor_freeze_headless.sh`, the main thread's longest run from
+`lord.stats(1)`, on a development machine with a load average of about 20): opening went from 1547 ms to about 20 ms,
+a redraw with the group open from 1110 ms to about 17 ms, closing from 185 ms to about 16 ms (the numbers vary with
+the machine's load; all of it was JavaScript, layout and paint stayed under 60 ms in total).
+
+- **Only the rows in sight are drawn** (`sdk/lists.jsx` `Table`, `sight`): the tab's ScrollView tells its offset
+  (`procSight`, in steps of 104 px), the table draws the rows in sight and six more on each side, and empty space of
+  the others' height around them. The keys still move through every row: one not drawn is scrolled into sight by its
+  place (`onRevealRow`).
+- **A few new rows per pass** (`ROW_BUDGET`, 4): rows not drawn before are drawn four at a time, those in sight
+  first, the others waiting a moment as empty rows, so a pass stays within about a frame and the pointer's input is
+  handled between passes.
+- **A redraw keeps unchanged rows** (`rowSig`): each row's text (name, values, badge, chain, statistics) is one
+  string; a row whose string, selection and stripe are the same isn't drawn again.
+- A process's letter icon is one component per name (a new one on every redraw drew every icon again), and the
+  language's description (`meta.json`) is looked up once even when a language has none.
+
+The order is the same as before (the held order and the sort don't change). `tests/monitor_freeze_scene.mjs` (in
+`make test`) opens a group of 300 programs: the first pass draws at most four rows within 16 ms, then only the rows
+in sight and the margin, a redraw makes few nodes, and scrolling to the end draws the last rows.
+
 ### A steady list (0.8.9.6, in development)
 
 While the pointer is over the table, a menu or a sheet is open, and for two seconds after the pointer leaves, the

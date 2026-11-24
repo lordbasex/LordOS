@@ -439,6 +439,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Fixed
 
+- **Monitor: opening a large group in Processes no longer freezes the desktop** (in development; latest release
+  0.8.9.5-beta). Expanding the Terminal's group with about 240 programs stopped the pointer for about a second, and the
+  list's once-a-second redraw did it again while the group stayed open: the table drew every row at once (about 12 800
+  nodes). The SDK's `Table` now draws only the rows in sight plus a margin of six (`sight`, told by the tab's
+  ScrollView), at most four new rows per pass with those in sight first, and keeps a row whose drawn values didn't
+  change (`rowSig`); a row the keys move to is scrolled into sight by its place. Measured in a headless lord-server
+  over a made-up Terminal of 240 programs (`server/tests/monitor_freeze_headless.sh`, the main thread's longest run):
+  opening 1547 ms → about 20 ms, a redraw with the group open 1110 ms → about 17 ms. The order of the rows is the same.
+  New test `tests/monitor_freeze_scene.mjs` in `make test` (a 300-program group: the first pass within 16 ms).
 - **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
   hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
   re-made the first's (found while starting six test machines at once: "socket: Address already in use", then "can't
