@@ -1,6 +1,6 @@
 /* vmdisplay_fuzz.c — lord-vmdisplay's D-Bus side against a hostile QEMU (docs/VIRTUALIZATION.md 3.2, 8).
  *
- *   build/vmdisplay-fuzz build/lord-vmdisplay-asan [seed] [calls per run]
+ *   build/vmdisplay-fuzz build/lord-vmdisplay-asan-test [seed] [calls per run]
  *
  * The guest controls what QEMU's display sends (its picture's size, stride and format, its cursor, its sound streams),
  * and a QEMU taken over by the guest controls every byte of it. This test plays such a QEMU: the console (with hostile
@@ -591,7 +591,7 @@ static int run(const char *helper, int idx, int ncall, int props) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2) { fprintf(stderr, "usage: vmdisplay-fuzz build/lord-vmdisplay-asan [seed] [calls per run]\n"); return 2; }
+    if (argc < 2) { fprintf(stderr, "usage: vmdisplay-fuzz build/lord-vmdisplay-asan-test [seed] [calls per run]\n"); return 2; }
     signal(SIGPIPE, SIG_IGN);
     uint64_t seed = argc > 2 ? strtoull(argv[2], NULL, 0) : 0x1d15ea5e;
     int ncall = argc > 3 ? atoi(argv[3]) : 2500;
