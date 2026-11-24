@@ -5,7 +5,7 @@ import {
   View, Text, useTheme, useLocale, useAppWindow, useStore, useKeyboard, Button, TextInput, ScrollView, ThemeProvider, Segmented, speechItems, registerSelection, ContextMenu,
   Toolbar, ToolbarButton, ToolbarSpacer, MenuButton, SearchField, EmptyState, textDirection,
   Markdown, markdownHeadings, toggleTask, wm, fs, formatBytes, addListener, screen, t, print, FilePicker as SysFilePicker, useFilesDrop, FilesDropHint, registerWidgetKind,
-  useSidebar, SidebarToggle, SidebarOverlay,
+  useSidebar, SidebarToggle, SidebarOverlay, Layer, openFileWithApps,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { NoteEditor } from './NoteEditor.jsx';
@@ -13,8 +13,9 @@ import { editKey, editItems, formatItems, contextItems, fromReading } from './ed
 import { CATEGORIES, EMOJIS, emojiFor, searchEmoji } from './emoji.js';
 import {
   notesStore, loadNotes, updateNote, createNote, duplicateNote, deleteNote, flushAll, attachFile, pasteClipboardImage,
-  absFolder, folder, COLORS, setupWidgets, isImage,
+  absFolder, COLORS, setupWidgets, attachmentPath, noteImageSrc,
 } from './store.js';
+import { linkTarget, textual, imageKind } from './links.js';
 
 // ---- sticky-note colors (light in both modes, with dark text) ----
 
@@ -87,7 +88,8 @@ function EmojiPicker({ onPick, onClose, x = 0, y = 0 }) {
 
 // ---- pick a file (attach, insert image): the system file dialog (sdk/filepicker.jsx), drawn like Files ----
 
-const IMAGE_FILE = { test: (name) => isImage(name) };
+// every image Photos opens: PNG and JPEG are drawn in the note, the others (WebP, HEIC, AVIF…) are attachments
+const IMAGE_FILE = { test: (name) => !!imageKind(name) };
 function FilePicker({ onPick, onClose, images }) {
   const { t: tr } = useLocale();
   return (
@@ -100,16 +102,22 @@ function FilePicker({ onPick, onClose, images }) {
 
 // ---- open a note's links and attachments ----
 
+// GitHub #238: an attachment opens by itself, never Files on the note's folder (which showed nota.md and every other
+// attachment). A text file opens in Text Editor alone; anything else with its default app (Photos shows only that
+// picture). A link is untrusted text (links.js): only the note's own files, by plain name; an address on the network,
+// another scheme or a path elsewhere opens nothing.
 function openLink(slug, url) {
-  if (/^https?:/i.test(url)) return;                     // there is no browser yet: the link is shown
-  const rel = url.startsWith('/') ? url.replace(`${fs.home()}/`, '') : `${folder(slug)}/${url}`;
-  if (/\.(txt|md|js|jsx|ts|json|c|h|py|sh|css|html|ya?ml|toml|ini|csv|log)$/i.test(rel)) wm.open('editor', { args: { path: `${fs.home()}/${rel}` } });
-  else wm.open('files', { new: true, args: { path: `${fs.home()}/${rel.split('/').slice(0, -1).join('/')}` } });
+  const target = linkTarget(url);
+  if (target.kind !== 'file') return false;              // web addresses are shown (there is no browser from Notes)
+  const a = attachmentPath(slug, url);
+  if (!a) return false;
+  if (textual(a.name)) { wm.open('editor', { new: true, args: { path: a.path, nonce: Date.now() } }); return true; }
+  return openFileWithApps(a.path, a.name, { reveal: false, single: true }) !== false;
 }
 
 // ---- note body: reading (with outline) or editing ----
 
-function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, onCommand }) {
+function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, onCommand, hold }) {
   const th = useTheme();
   const scroll = useRef(null);
   const heads = useRef(new Map());
@@ -130,7 +138,7 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
       <View ref={box} style={{ flex: 1 }}>
         <NoteEditor value={note.body} onChange={(body) => updateNote(note.slug, { body })} size={size} colors={ink} autoFocus
           apiRef={editorApi} emojiSearch={searchEmoji} padding={compact ? 8 : 14}
-          onPasteImage={() => pasteClipboardImage(note.slug)} onEscape={() => onMode('read')} onBlur={compact ? () => { if (!menuOpen.current) onMode('read'); } : undefined}
+          onPasteImage={() => pasteClipboardImage(note.slug)} onEscape={() => onMode('read')} onBlur={compact ? () => { if (!menuOpen.current && !hold?.current) onMode('read'); } : undefined}
           onCommand={(b) => { if (b === 'e') onMode('read'); else onCommand?.(b); }}
           onContextMenu={(e) => {
             const items = contextItems(t, { selected: !!editorApi.current?.selection?.(), empty: !note.body }, (a) => editorApi.current?.send?.(editKey(a)),
@@ -165,7 +173,7 @@ function NoteBody({ note, mode, onMode, editorApi, compact, showToc, size = 14, 
         <View onDoubleClick={() => onMode('edit')} style={{ paddingVertical: compact ? 10 : 20, paddingHorizontal: compact ? 10 : 28, minHeight: 60 }}>
           {note.body.trim() ? (
             // breaks: a line break typed in the editor is a line break here too (GitHub #169)
-            <Markdown source={note.body} breaks base={absFolder(note.slug)} width={Math.max(80, w - (showToc && toc.length > 1 ? 180 : 0) - (compact ? 20 : 56))} size={size}
+            <Markdown source={note.body} breaks base={absFolder(note.slug)} resolveImage={(u) => noteImageSrc(note.slug, u)} width={Math.max(80, w - (showToc && toc.length > 1 ? 180 : 0) - (compact ? 20 : 56))} size={size}
               emoji={emojiFor} onLink={(u) => openLink(note.slug, u)} onHeadingRef={(id, n) => { if (n) heads.current.set(id, n); }}
               onToggleTask={(line) => updateNote(note.slug, { body: toggleTask(note.body, line) })} />
           ) : <Text style={{ fontSize: 13, color: th.textDim }}>{t('notes.empty')}</Text>}
@@ -200,6 +208,9 @@ function NoteCard({ widget }) {
   const [emoji, setEmoji] = useState(false);
   const drag = useRef(null);
   const api = useRef(null);
+  // while the emoji picker is open its search field has the keyboard: that is not leaving the note's editor
+  const holdEdit = useRef(false);
+  holdEdit.current = emoji;
   useEffect(() => {
     const offMove = addListener('pointermove', (e) => {
       const d = drag.current;
@@ -239,12 +250,21 @@ function NoteCard({ widget }) {
             </>
           ) : <Text style={{ flex: 1, fontSize: 11, fontWeight: 600, color: '#5a5a5a', whiteSpace: 'nowrap', overflow: 'hidden' }}>{note.title || ' '}</Text>}
         </View>
-        <NoteBody note={note} mode={mode} onMode={setMode} editorApi={api} compact size={13} />
+        <NoteBody note={note} mode={mode} onMode={setMode} editorApi={api} compact size={13} hold={holdEdit} />
         <View onMouseDown={start('size')} style={{ position: 'absolute', right: 0, bottom: 0, width: 16, height: 16 }}>
           <Text style={{ fontSize: 10, color: 'rgba(0,0,0,0.35)', marginLeft: 4 }}>◢</Text>
         </View>
-        {emoji && <EmojiPicker x={Math.max(0, g.w - 304)} y={28} onClose={() => setEmoji(false)} onPick={(ch) => { api.current?.insert(ch); setEmoji(false); }} />}
       </View>
+      {/* the picker (308 px) is wider than a small note and was cut by it, in the paper's colours (GitHub #238): it
+          goes in the popover layer, on the screen beside the note, in the desktop's own colours */}
+      {emoji && (
+        <Layer name="popover">
+          <ThemeProvider tokens={th}>
+            <EmojiPicker x={Math.max(0, Math.min(screen.width - 316, g.x + g.w - 308))} y={g.y + 28 + 380 > screen.height ? Math.max(0, g.y - 380) : g.y + 28}
+              onClose={() => { setEmoji(false); api.current?.focus?.(); }} onPick={(ch) => { api.current?.insert(ch); setEmoji(false); api.current?.focus?.(); }} />
+          </ThemeProvider>
+        </Layer>
+      )}
     </ThemeProvider>
   );
 }
@@ -281,12 +301,17 @@ export default function Notes() {
   const shown = list.filter((n) => !needle || `${n.title}\n${n.body}`.toLowerCase().includes(needle));
   const note = list.find((n) => n.slug === sel) || shown[0] || null;
   editing.current = mode === 'edit';
-  // block: images and attachments go on their own line
+  // block: images and attachments go on their own line. In the reading view an insertion is an edit: the editor
+  // opens first and the text goes in at its caret (GitHub #238; the emoji and attach rows open the editor too)
+  const pendingInsert = useRef(null);
   const insert = (md, block = false) => {
     if (!md || !note) return;
-    if (mode === 'edit' && api.current) api.current.insert(block ? `\n${md}\n` : md);
-    else updateNote(note.slug, { body: `${note.body.replace(/\s*$/, '')}\n\n${md}\n` });
+    const txt = block ? `\n${md}\n` : md;
+    if (mode === 'edit' && api.current) { api.current.insert(txt); api.current.focus?.(); return; }
+    pendingInsert.current = (pendingInsert.current || '') + txt;
+    setMode('edit');
   };
+  const toEdit = () => { if (mode !== 'edit') setMode('edit'); };
   // Edit and Format menus (editmenu.js): the editor's own keys; Paste and Select All from the reading view open the
   // editor first and run once it is there
   const pendingEdit = useRef(null);
@@ -300,6 +325,9 @@ export default function Notes() {
     const a = pendingEdit.current;
     pendingEdit.current = null;
     if (a && mode === 'edit' && api.current) api.current.send(editKey(a));
+    const ins = pendingInsert.current;
+    pendingInsert.current = null;
+    if (ins && mode === 'edit' && api.current) api.current.insert(ins);
   }, [mode]);
   const newNote = () => { const s = createNote({ body: `# ${tr('notes.newTitle')}\n\n` }); setSel(s); setMode('edit'); };
   // files dragged from Files: copied into the open note (or a new one) as its images and attachments, like ⊕ does
@@ -363,7 +391,8 @@ export default function Notes() {
     <>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <SearchField value={q} onChange={setQ} placeholder={tr('notes.search')} style={{ flex: 1 }} />
-        <ToolbarButton icon="✎" title={tr('notes.new')} onClick={() => { newNote(); if (sb.narrow) sb.close(); }} />
+        {/* New Note: a plain + with its name as the tooltip (the ✎ read as "edit", GitHub #238) */}
+        <ToolbarButton icon="+" iconSize={18} title={tr('notes.new')} onClick={() => { newNote(); if (sb.narrow) sb.close(); }} />
       </View>
       <ScrollView style={{ flex: 1 }}>
         {shown.map((n) => {
@@ -406,9 +435,9 @@ export default function Notes() {
             </View>}
             <ToolbarSpacer />
             <MenuButton icon="⊕" title={tr('notes.insert')} items={[
-              { label: tr('notes.insertEmoji'), onClick: () => setPanel('emoji') },
-              { label: tr('notes.insertImage'), onClick: () => setPanel('image') },
-              { label: tr('notes.insertFile'), onClick: () => setPanel('attach') },
+              { label: tr('notes.insertEmoji'), onClick: () => { toEdit(); setPanel('emoji'); } },
+              { label: tr('notes.insertImage'), onClick: () => { toEdit(); setPanel('image'); } },
+              { label: tr('notes.insertFile'), onClick: () => { toEdit(); setPanel('attach'); } },
             ]} />
             <MenuButton title={tr('notes.more')} items={[
               { label: tr('notes.duplicate'), onClick: cmd.duplicate },
@@ -442,7 +471,7 @@ export default function Notes() {
           )}
         </View>
       ) : (
-        <EmptyState icon={<Icon size={56} />} title={tr('notes.none')} hint={tr('notes.noneHint')}
+        <EmptyState icon={<Icon size={56} />} title={tr('notes.none')}
           action={<Button primary label={tr('notes.new')} onClick={newNote} />} />
       )}
       {!sideInline && sb.shown && (
@@ -460,5 +489,7 @@ export default function Notes() {
 // Preview line of a note: the first line with text after the title, without markdown marks.
 function previewOf(body) {
   const lines = body.split('\n').map((l) => l.trim()).filter((l) => l && !/^(`{3,}|---|#)/.test(l));
-  return (lines[0] || '').replace(/^(>\s*|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '').replace(/[*_`~]|!\[[^\]]*\]\([^)]*\)/g, '').slice(0, 80);
+  // a link shows its words, not its address (a file:// or a path in the list said more than the note shows)
+  return (lines[0] || '').replace(/^(>\s*|[-*+]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+)/, '').replace(/!\[[^\]]*\]\([^)]*\)/g, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`~]/g, '').slice(0, 80);
 }

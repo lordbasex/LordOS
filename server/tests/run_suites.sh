@@ -726,6 +726,9 @@ EOF
     # the column view: what is picked in a deeper column is selected, Select All takes its column (apps/files/colview.js, GitHub #100, #170)
     if have node; then run "files-colview-test (apps/files/colview.js)" node tests/files_colview_test.mjs
     else skip "files-colview-test" "node"; fi
+    # the rubber band: the rectangle, which cards and rows it touches, Shift and Ctrl, autoscroll, right to left, one update per frame (apps/files/marquee.js, GitHub #233)
+    if have node; then run "files-marquee-test (apps/files/marquee.js)" node tests/files_marquee_test.mjs
+    else skip "files-marquee-test" "node"; fi
     # color tags and comments: the last tag and an emptied comment are removed (apps/files/tags.js, GitHub #181)
     if have node; then run "files-tags-test (apps/files/tags.js)" node tests/files_tags_test.mjs
     else skip "files-tags-test" "node"; fi
@@ -831,6 +834,10 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "textfield-menu-test (sdk/components.jsx TextInput, TextArea)" node tests/textfield_menu_test.mjs
     else skip "textfield-menu-test" "node and the repository's node_modules (npm install)"; fi
+    # (#238) Notes' storage over a real temporary home: the format, titles, geometry, attachments (odd names, links,
+    # folders, a huge file) and what a link or image may reach (file://, javascript:, absolute paths, ..); writes stay in ~/Notes
+    if have node && [ -d ../node_modules/esbuild ]; then run "notes-store-test (apps/notes/store.js, links.js)" node tests/notes_store_test.mjs
+    else skip "notes-store-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.8, #117) Notes: Edit and Format menus and the editor's right-click menu send the editor's own keys
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "notes-editor-scene (apps/notes/NoteEditor.jsx, editmenu.js)" node tests/textfield_menu_test.mjs notes_editor_scene.mjs

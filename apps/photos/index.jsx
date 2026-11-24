@@ -539,7 +539,9 @@ export default function Photos() {
     const p = win.args?.path;
     if (!p || handledNonce.get(win.id) === win.args.nonce) return;
     handledNonce.set(win.id, win.args.nonce);
-    openWithNeighbors(p);
+    // single: that image alone (a note's attachment: the note's other files are not shown, GitHub #238)
+    if (win.args.single) setViewer({ list: [{ path: p, name: baseName(p) }], index: 0 });
+    else openWithNeighbors(p);
   }, [win.args?.nonce]);
 
   // files dragged from Files: one image opens with its neighbors, several are the viewer's list; with no images, a

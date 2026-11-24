@@ -12,6 +12,7 @@ import { colWidth, clampCol, fitCol, colStrip, chainFolder } from './colview.js'
 import { iconMetrics, listMetrics, iconColumns } from './viewprefs.js';
 import { when, listRowStyle, listHeaderCell, listCell } from '../../sdk/fileparts.jsx';
 import { DropHot } from './dnd.jsx';
+import { useMarquee, MarqueeBand } from './marqueeview.jsx';
 
 // folder of a search or Recents result (the last segment of the path)
 const where = (p) => { const parts = String(p).split('/'); return parts[parts.length - 2] || '/'; };
@@ -98,8 +99,11 @@ export function IconView({ groups, ctx }) {
   const cardH = 12 + m.icon + 8 + 5 + 2 + 2 * m.line;          // paddings, the icon's box, the gap, the name's two lines
   const rowH = cardH + 8;
   let top = 12;
+  // a drag on the empty space selects what its rectangle touches (GitHub #233, marqueeview.jsx)
+  const mq = useMarquee(ctx);
   return (
-    <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} onScroll={windowed ? onScroll : undefined} focusable={false} style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} onMouseDown={mq.onDown}>
+    <ScrollView scrollRef={mq.scrollRef} resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} onScroll={windowed ? onScroll : undefined} focusable={false} style={{ flex: 1 }}>
       <View style={{ padding: 12, paddingBottom: 32 }}>
         {groups.map((g) => {
           if (g.label) top += GROUP_TITLE_H;
@@ -110,10 +114,10 @@ export function IconView({ groups, ctx }) {
             <GroupTitle g={g} t={t} />
             <View ref={grid} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {g.items.map((e, i) => {
-                if (windowed && !inSight(sight, at + Math.floor(i / cols) * rowH, rowH)) return <View key={e.path} style={{ width: m.cell, height: cardH }} />;
+                if (windowed && !inSight(sight, at + Math.floor(i / cols) * rowH, rowH)) return <View key={e.path} ref={mq.itemRef(e.path)} style={{ width: m.cell, height: cardH }} />;
                 const sel = ctx.selected.has(e.path);
                 return (
-                  <View key={e.path} {...itemHandlers(e, ctx)}
+                  <View key={e.path} ref={mq.itemRef(e.path)} {...itemHandlers(e, ctx)}
                     style={{ width: m.cell, paddingVertical: 6, alignItems: 'center', gap: 5, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }}>
                     <DropHot dnd={ctx.dnd} path={e.path}>{(hot) => (
                     <View style={{ padding: 4, borderRadius: 7, backgroundColor: hot ? t.accent : sel ? (t.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent' }}>
@@ -133,8 +137,10 @@ export function IconView({ groups, ctx }) {
           );
         })}
         {groups.every((g) => !g.items.length) && <EmptyState title={ctx.emptyText} hint={ctx.emptyHint} action={ctx.emptyAction} style={{ minHeight: 260 }} />}
+        <MarqueeBand band={mq.band} />
       </View>
     </ScrollView>
+    </View>
   );
 }
 
@@ -233,7 +239,7 @@ function ListRows({ items, depth, ctx, t, sort, alt }) {
     const odd = (alt.n++) % 2 === 1;
     rows.push(
       <DropHot key={e.path} dnd={ctx.dnd} path={e.path}>{(hot) => (
-      <View {...itemHandlers(e, ctx)}
+      <View ref={ctx.itemRef?.(e.path)} {...itemHandlers(e, ctx)}
         style={[listRowStyle(t, sel || hot, odd), { height: m.row, opacity: ctx.cut.has(e.path) ? 0.45 : 1 }]}>
         <View style={{ width: ctx.nameW, flexDirection: 'row', alignItems: 'center', gap: 6, paddingLeft: depth * 16 }}>
           <Disclosure state={e.dir && !e.trash ? (open ? 'open' : 'closed') : 'none'} color={sel ? '#fff' : t.textDim} onDown height={m.row}
@@ -272,7 +278,9 @@ export function ListView({ groups, ctx, sort, onSort }) {
   const nameW = cols.nameWidth || Math.max(NAME_MIN, room - totalWidth(cols) - extra - SIDE_PAD);
   const over = Math.max(0, need - room);
   const x = Math.min(sx, over);
-  const inner = { ...ctx, nameW };
+  // a drag on the empty space selects the rows its rectangle touches (GitHub #233, marqueeview.jsx)
+  const mq = useMarquee(ctx);
+  const inner = { ...ctx, nameW, itemRef: mq.itemRef };
   const thumb = over ? Math.max(40, room * (room / need)) : 0;
   const bar = useRef(null);
   const [sight, onScroll] = useSight();
@@ -301,7 +309,8 @@ export function ListView({ groups, ctx, sort, onSort }) {
     <View onWheel={(e) => { if (over && e.deltaX) setSx(Math.max(0, Math.min(over, x + e.deltaX))); }} style={{ flex: 1, overflow: 'hidden' }}>
       <View style={{ flex: 1, width: Math.max(room, need), [direction() === 'rtl' ? 'marginRight' : 'marginLeft']: -x }}>
         <Header sort={sort} onSort={onSort} t={t} ctx={ctx} columns={cols} onColumns={ctx.onColumns} nameW={nameW} />
-        <ScrollView resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} onScroll={windowed ? onScroll : undefined} focusable={false} style={{ flex: 1 }}>
+        <View style={{ flex: 1 }} onMouseDown={mq.onDown}>
+        <ScrollView scrollRef={mq.scrollRef} resetKey={ctx.scrollKey} onWheel={ctx.onZoomWheel} onScroll={windowed ? onScroll : undefined} focusable={false} style={{ flex: 1 }}>
           <View style={{ paddingHorizontal: 8, paddingTop: 4, paddingBottom: 32 }}>
             {groups.map((g) => (
               <View key={g.key}>
@@ -310,8 +319,10 @@ export function ListView({ groups, ctx, sort, onSort }) {
               </View>
             ))}
             {groups.every((g) => !g.items.length) && <EmptyState title={ctx.emptyText} hint={ctx.emptyHint} action={ctx.emptyAction} style={{ minHeight: 240 }} />}
+            <MarqueeBand band={mq.band} />
           </View>
         </ScrollView>
+        </View>
       </View>
       {over ? (
         <View style={{ height: 10, justifyContent: 'center', paddingHorizontal: 2 }}>

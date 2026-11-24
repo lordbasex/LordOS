@@ -23,6 +23,59 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   goes back to the list and forward to the message, Settings walks the sections and Help the articles shown in that
   window. Linux apps get the raw buttons from lord-server as before. `navbuttons-test` checks the runtime's dispatch,
   which window takes it, the history and each app's wiring.
+- **Notes: attachments open alone, a + New Note button, inserting from the reading view, the sticky note's emoji
+  picker, and links that can't reach out** (GitHub #238; in development; latest release 0.8.9.5-beta; docs/NOTES.md).
+  - **An attachment opens by itself.** A click on a note's attachment opened Files on the note's folder (with `nota.md`
+    and every other attachment in it). Now a text file opens alone in Text Editor and anything else in its default app,
+    Photos showing only that picture (`openFileWithApps(path, name, { reveal: false, single: true })`, new options in
+    `sdk/sysopen.js`; Photos' `args.single`); when no app opens it, nothing opens. Names are kept safe for the folder
+    and the link (no slashes, control or direction-override characters; spaces and parentheses percent-encoded, so
+    "my report (v2).pdf" is a working link), and a folder or a link is not attached.
+  - **New Note is a +** beside the search field, with "New Note" as its tooltip (the ✎ read as "edit"); the empty
+    state keeps its New Note button and loses the hint that pointed at the ✎.
+  - **Inserting is editing.** In the reading view, ⊕ Emoji…, Image…, Attachment… and a drop from Files open the editor
+    first and insert at its caret (before, they changed the note behind the reading view); the sticky note's 😀 did so
+    already.
+  - **Image types.** Only PNG and JPEG are drawn in a note (lord-server's decoder, `server/src/ui/stb.c`, reads only
+    those); GIF, WebP, BMP, HEIC, HEIF, AVIF and TIFF are attachments that open in Photos, and Image… now lists them.
+  - **The sticky note on the desktop (widget mode).** Its emoji picker (308 px) was drawn inside the note (260 px
+    wide, `overflow: hidden`): cut off, its Close button out of reach, and in the paper's dark-on-dark colours, so
+    category names were unreadable; and opening it switched the note back to reading. It is now drawn in the popover
+    layer beside the note, inside the screen, in the desktop's colours, and the note stays in editing until it closes.
+    Checked end to end in Lord Flow, Lord Classic, Lord Workspaces and Celeste: added from the Add widget catalog and
+    from the window's On Desktop, typed into, emoji, moved, resized, pinned in front, and after a restart in the same
+    place and still pinned.
+  - **Links can't reach out (security).** A note is untrusted markdown (written by hand, pasted, synced), so Notes now
+    opens or draws only the note's own files by plain name, real files (not links) other than `nota.md`
+    (`apps/notes/links.js`, `attachmentPath`, `noteImageSrc`): `file://`, `javascript:`, `data:` and other schemes,
+    absolute paths (before, any path in the home folder opened), `~`, `..` (encoded or not), a link planted in the
+    note's folder and remote images are neither opened nor fetched; the SDK's `<Markdown>` takes a `resolveImage`
+    for this. A note folder or `nota.md` that is a link, a `nota.md` over 8 MB and a folder name that could leave
+    `~/Notes` are not loaded or written; a header edited by hand is read within bounds; titles drop control and
+    direction-override characters; Duplicate no longer copies links or folders; the list's preview shows a link's
+    words, not its address.
+  - **Tests.** `tests/notes_store_test.mjs` (104 checks over a real temporary home: the format's round trip, titles,
+    geometry, attachments with `../`, slashes, control and direction-override characters, brackets, a 3 GB file, a
+    folder and a link; 27 hostile link forms; links planted in the folder; every write inside `~/Notes`), and
+    `tests/app_scene_headless.sh notes_scene` (a headless lord-server with real pointer and key events and screenshots:
+    the window, search, the reading view, what each link opens, ⊕ from the reading view, + New Note, Duplicate, Delete,
+    On Desktop, and the sticky note from the catalog through a restart), run in the four desktops and in Arabic.
+- **Files: rubber-band selection** (GitHub #233; in development; latest release 0.8.9.5-beta). A drag that starts on
+  the empty space of the icon or list view draws a translucent rectangle in the accent colour and selects every card or
+  row it touches; Shift adds them to what was selected, Ctrl (⌘) toggles them, and with no modifier it starts afresh. Near
+  the view's top or bottom edge the view scrolls by itself, faster the closer the pointer is, and the rectangle follows
+  (cards that scroll out of sight stay selected). A press on a card or row still selects and drags it, and a click on the
+  empty space without a drag still clears the selection, as before. The rectangle is tested against the boxes the layout
+  gave each card and row (`lord.getLayout`, in the scrolled content's own space, so scrolling doesn't move them), never a
+  hit test per node; it is physical left and top in every language, so right to left needs no flip. The selection
+  changes at most once per frame (`frameGate`) and only when the set under the rectangle changes, and the rectangle is
+  its own small node with its own store, so a drag across a big folder repaints only the cards that change. The rules
+  are pure (`apps/files/marquee.js`, `tests/files_marquee_test.mjs`, 52 checks: corners, touching, mirrored boxes,
+  modifiers, autoscroll, one update per frame); the views use them through `apps/files/marqueeview.jsx`; the SDK's
+  ScrollView now also hands its viewport (`scrollRef.current.outer`). Checked in a headless lord-server with real
+  pointer and key events (`tests/app_scene_headless.sh files_marquee_scene`, 11 checks with screenshots, in English
+  and Arabic): a 2×2 drag selects 4, Shift adds the next 2, Ctrl toggles 3, a click clears, the list view takes the 5 rows
+  it crosses, and in a folder of 400 files the view scrolls while the pointer rests at the bottom edge.
 - **Machines: checked for real, and what that found** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
   6.5, 6.7, 6.14, 6.16, 6.17, 6.19).
   - **Monitor names a machine's own disk and network numbers.** A running machine's row in Processes says
