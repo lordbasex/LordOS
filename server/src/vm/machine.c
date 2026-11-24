@@ -698,6 +698,18 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
         if (!vm_usb_rule_valid(m->usb_auto[i])) return fail(err, n, VM_E_RANGE, "usb_auto: vendor:product[:serial], lowercase hex");
         for (int k = 0; k < i; k++) if (!strcmp(m->usb_auto[i], m->usb_auto[k])) return fail(err, n, VM_E_RANGE, "usb_auto: the same rule twice");
     }
+    if (m->vulkan & ~1) return fail(err, n, VM_E_RANGE, "vulkan is true or false");
+    if (m->schema < 22 && m->vulkan) return fail(err, n, VM_E_FIELD, "vulkan needs schema 22");
+    if (m->vulkan && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "vulkan needs graphics 3d");
+    if (m->kernel_boot & ~1) return fail(err, n, VM_E_RANGE, "kernel_boot is true or false");
+    if (m->schema < 23 && m->kernel_boot) return fail(err, n, VM_E_FIELD, "kernel_boot needs schema 23");
+    /* a directly started kernel skips the boot loader: secure boot's chain would be skipped too (refused, not weakened);
+     * the virtio-win devices are another system's; an encrypted machine's boot files would lie on the disk in the clear;
+     * a group's member keeps its anonymity profile's boot */
+    if (m->kernel_boot && m->firmware == VM_FW_UEFI && m->secure_boot) return fail(err, n, VM_E_RANGE, "a kernel started directly skips secure boot: turn one of them off");
+    if (m->kernel_boot && m->devices == VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "a kernel started directly is for Linux guests");
+    if (m->kernel_boot && m->encrypted) return fail(err, n, VM_E_RANGE, "an encrypted machine's kernel and initrd would be kept in the clear: it starts from its disk");
+    if (m->kernel_boot && m->group[0]) return fail(err, n, VM_E_RANGE, "a group's member starts from its disk");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
@@ -853,7 +865,7 @@ static const char *const KEYS[] = {
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
     "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "cpu_model", "heads",
-    "guest_files", "usb_auto", "usb", NULL,
+    "guest_files", "usb_auto", "usb", "vulkan", "kernel_boot", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -1175,6 +1187,14 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
                 snprintf(m->usb_auto[m->n_usb_auto++], sizeof m->usb_auto[0], "%s", e->str);
             }
         }
+        /* schema 22: missing means no Vulkan (venus, 6.10) */
+        const JVal *vk = json_get(o, "vulkan");
+        if (vk && vk->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "vulkan must be true or false"); goto out; }
+        m->vulkan = vk ? json_bool(o, "vulkan", 0) : 0;
+        /* schema 23: missing means the boot loader on the disk */
+        const JVal *kb = json_get(o, "kernel_boot");
+        if (kb && kb->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "kernel_boot must be true or false"); goto out; }
+        m->kernel_boot = kb ? json_bool(o, "kernel_boot", 0) : 0;
         /* schema 13: missing means this computer's default (vmpin_default_on) */
         char pin[8];
         if ((r = get_str(o, "cpu_pin", pin, sizeof pin, 0, err, n))) goto out;
@@ -1320,6 +1340,8 @@ char *vm_machine_json(const VmMachine *m) {
         for (int i = 0; i < m->n_usb_auto; i++) { if (i) jb_raw(&b, ", "); jb_str(&b, m->usb_auto[i]); }
         jb_raw(&b, "]");
     }
+    if (m->schema >= 22 && m->vulkan) jb_raw(&b, ",\n  \"vulkan\": true");
+    if (m->schema >= 23 && m->kernel_boot) jb_raw(&b, ",\n  \"kernel_boot\": true");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);

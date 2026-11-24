@@ -133,5 +133,8 @@
   "applyCreated": "{name} was made as {file} says.",
   "applyUpdated": "{name} now has the settings {file} gives.",
   "applyRunning": "{name} is running: shut it down to change it from a file.",
-  "overBudget": "{name} didn't start: it needs {need} MB and {free} MB are left for machines. Suspend or shut down another machine, or give it less memory."
+  "overBudget": "{name} didn't start: it needs {need} MB and {free} MB are left for machines. Suspend or shut down another machine, or give it less memory.",
+  "help.migrate": "copy another PC's whole disk into a new machine, over the network through your SSH (or a disk connected here), and import it",
+  "migrating": "Copying the disk: {done} of {total} GB…",
+  "migratePassword": "Password for sudo on {host}: "
 }

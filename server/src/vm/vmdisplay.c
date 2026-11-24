@@ -48,6 +48,9 @@
 #include "vmproto.h"
 #include "vmkeys.h"
 #include "vmpace.h"
+#include "vmdamage.h"
+
+_Static_assert(VMDMG_MAX == VD_FRAME_RECTS, "a frame's rectangles: vmdamage.h and vmproto.h agree");
 #include "../sec/sandbox.h"
 #include "../media/aring.h"
 
@@ -106,8 +109,9 @@ typedef struct {
     size_t shm_len;
     uint32_t shm_w, shm_h;
     int want_w, want_h;         /* last VD_SIZE sent */
-    /* damage waiting to be copied */
-    int dirty, dx0, dy0, dx1, dy1;
+    /* damage waiting to be copied: a few rectangles (vmdamage.h), each its own VD_FRAME */
+    int dirty;
+    VmDamage dmg;
     int frame, acked;
     long long sent_ms, next_ms;
     int rate;
@@ -151,6 +155,17 @@ static long long now_ms(void) {
 static void say(VdMsg m, int fd) {
     if (D.ch < 0) return;
     if (vd_send(D.ch, &m, fd) && errno != EAGAIN) { /* lord-server gone: the loop sees the hangup */ }
+}
+
+/* a string QEMU sent (a console's label, an error's message) as it goes in the session's log: one line of printable
+ * ASCII, anything else as '?', at most cap - 1 bytes; NULL as "?". QEMU is the guest's side: its words never write
+ * a line of their own, an escape sequence or a forged entry into the log (docs/VIRTUALIZATION.md 8) */
+static const char *qtext(const char *s, char *out, size_t cap) {
+    size_t n = 0;
+    if (!s) s = "?";
+    for (; *s && n + 1 < cap; s++) out[n++] = (unsigned char)*s >= 0x20 && (unsigned char)*s < 0x7f ? *s : '?';
+    out[n] = 0;
+    return out;
 }
 
 static void refuse(const char *what, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
@@ -217,11 +232,8 @@ static void drop_dmabuf(void) {
 }
 
 static void damage(int x, int y, int w, int h) {
-    if (!D.dirty) { D.dx0 = x; D.dy0 = y; D.dx1 = x + w; D.dy1 = y + h; D.dirty = 1; return; }
-    if (x < D.dx0) D.dx0 = x;
-    if (y < D.dy0) D.dy0 = y;
-    if (x + w > D.dx1) D.dx1 = x + w;
-    if (y + h > D.dy1) D.dy1 = y + h;
+    if (!D.dirty) { vmdmg_clear(&D.dmg); D.dirty = 1; }
+    vmdmg_add(&D.dmg, x, y, w, h);
 }
 
 /* ---- sound ---- */
@@ -506,7 +518,11 @@ static const sd_bus_vtable audio_in_vt[] = {
 static int au_registered(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)e;
     *(int *)u = sd_bus_message_is_method_error(m, NULL) ? 2 : 1;
-    if (*(int *)u == 2) fprintf(stderr, "lord-vmdisplay: Register*Listener: %s\n", sd_bus_message_get_error(m) ? sd_bus_message_get_error(m)->message : "?");
+    if (*(int *)u == 2) {
+        const sd_bus_error *er = sd_bus_message_get_error(m);
+        char t[128];
+        fprintf(stderr, "lord-vmdisplay: Register*Listener: %s\n", qtext(er ? er->message : NULL, t, sizeof t));
+    }
     return 0;
 }
 
@@ -535,8 +551,9 @@ static void new_size(uint32_t w, uint32_t h) {
     if (w != D.w || h != D.h) fprintf(stderr, "lord-vmdisplay %s: the guest's picture is %ux%u\n", me, w, h);
     D.w = w;
     D.h = h;
+    /* all of it, and only it: what was gathered for the old size goes */
+    vmdmg_clear(&D.dmg);
     damage(0, 0, (int)w, (int)h);
-    D.dx0 = D.dy0 = 0; D.dx1 = (int)w; D.dy1 = (int)h;
     if (D.shm && (D.shm_w != w || D.shm_h != h)) { munmap(D.shm, D.shm_len); D.shm = NULL; D.shm_len = 0; }
     if (!D.shm && (D.want_w != (int)w || D.want_h != (int)h)) {
         D.want_w = (int)w;
@@ -571,20 +588,25 @@ static int copy_damage(int x, int y, int w, int h) {
     return 0;
 }
 
+/* the damage goes out as one VD_FRAME per rectangle, all with the same frame number; f counts the rectangles still to
+ * come in this frame (0 on the last), so lord-server damages each one and answers the frame once (vmproto.h) */
 static void flush(long long now) {
     if (!D.dirty || !D.shm || D.src == SRC_NONE || D.shm_w != D.w || D.shm_h != D.h) return;
     if (!D.acked && now - D.sent_ms < ACK_WAIT_MS) return;
     if (now < D.next_ms) return;
-    int x0 = D.dx0 < 0 ? 0 : D.dx0, y0 = D.dy0 < 0 ? 0 : D.dy0;
-    int x1 = D.dx1 > (int)D.w ? (int)D.w : D.dx1, y1 = D.dy1 > (int)D.h ? (int)D.h : D.dy1;
     D.dirty = 0;
-    if (x1 <= x0 || y1 <= y0) return;
-    if (copy_damage(x0, y0, x1 - x0, y1 - y0)) return;
+    VmDamage d = D.dmg;
+    vmdmg_clear(&D.dmg);
+    vmdmg_clip(&d, (int)D.w, (int)D.h);
+    if (!d.n) return;
+    for (int i = 0; i < d.n; i++)
+        if (copy_damage(d.r[i].x0, d.r[i].y0, d.r[i].x1 - d.r[i].x0, d.r[i].y1 - d.r[i].y0)) return;
     D.frame++;
     D.acked = 0;
     D.sent_ms = now;
     D.next_ms = now + vmpace_interval(D.rate, D.pace_ms);
-    say(vd_msg(VD_FRAME, x0, y0, x1 - x0, y1 - y0, D.frame, 0), -1);
+    for (int i = 0; i < d.n; i++)
+        say(vd_msg(VD_FRAME, d.r[i].x0, d.r[i].y0, d.r[i].x1 - d.r[i].x0, d.r[i].y1 - d.r[i].y0, D.frame, d.n - 1 - i), -1);
 }
 
 /* ---- validation ---- */
@@ -839,7 +861,8 @@ static void call_noreply(const char *iface, const char *method, const char *sig,
 static int on_ui_info(sd_bus_message *m, void *u, sd_bus_error *e) {
     (void)u; (void)e;
     const sd_bus_error *err = sd_bus_message_get_error(m);
-    if (err) fprintf(stderr, "lord-vmdisplay %s: QEMU refused the new size: %s\n", me, err->message ? err->message : err->name ? err->name : "?");
+    char t[128];
+    if (err) fprintf(stderr, "lord-vmdisplay %s: QEMU refused the new size: %s\n", me, qtext(err->message ? err->message : err->name, t, sizeof t));
     return 0;
 }
 
@@ -1175,7 +1198,8 @@ int main(int argc, char **argv) {
         int absm = 0;
         char *label = NULL;
         int good = sd_bus_get_property_string(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Label", &e, &label) >= 0;
-        if (!good) fprintf(stderr, "lord-vmdisplay: QEMU's console %d isn't there: %s\n", k, e.message ? e.message : "?");
+        char t[128];
+        if (!good) fprintf(stderr, "lord-vmdisplay: QEMU's console %d isn't there: %s\n", k, qtext(e.message, t, sizeof t));
         sd_bus_error_free(&e);
         if (good && nheads > 1) {
             /* QEMU numbers its consoles itself: Console_k must be the graphic console of output k (the virtio-gpu's outputs
@@ -1203,7 +1227,7 @@ int main(int argc, char **argv) {
         sd_bus_error_free(&e);
         D.abs_mouse = absm;
         cws[k] = cw; chs[k] = ch;
-        fprintf(stderr, "lord-vmdisplay %s: console %d \"%s\" %ux%u, mouse %s\n", argv[1], k, label ? label : "", cw, ch, absm ? "absolute" : "relative");
+        fprintf(stderr, "lord-vmdisplay %s: console %d \"%s\" %ux%u, mouse %s\n", argv[1], k, qtext(label ? label : "", t, 64), cw, ch, absm ? "absolute" : "relative");
         free(label);
     }
     /* then a listener on each: QEMU asks a new listener for its properties before it answers anything else (one blocking

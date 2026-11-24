@@ -10,7 +10,7 @@ import {
   EmptyState, useNarrow, useWindowWidth, addListener, direction, Overlay, screen, t as tr, battery,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { canRun, sensorLines, cardLights, budgetLine, isolationGaps, stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
+import { groupJobCloses, canRun, sensorLines, cardLights, budgetLine, isolationGaps, stateView, actionsOf, reqRows, unreadableOf, missingFor, usage, summaryOf, doingOf, thumbSrc, systemOf, libView, filterMachines, sortMachines, noSuspend,
   chipCounts, libGrid, skeletonPlan, seenNext, specParts, restLine, gvtGpu, vcpuAdvice, LIB_VIEWS, LIB_SORTS, menuSpot, popMenuHeight, displayUnder } from './model.js';
 import { Assistant } from './assistant.jsx';
 import { Configure } from './configure.jsx';
@@ -559,14 +559,14 @@ export function AppMark({ size: s }) {
 }
 
 // Requirements: what this computer has for machines, with the closed admin action that installs what's missing
-export function Requirements({ host, onBack, onChanged, archs }) {
+export function Requirements({ host, onBack, onChanged, archs, sys = null }) {
   const p = usePal();
   const info = useSystemInfo(60000);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const list = archs || [host.arch];
-  const missing = missingFor(host, list, { windows: true });
-  const rows = reqRows(host, list, missing);
+  const missing = missingFor(host, list, { windows: sys ? !!sys.windows : true });
+  const rows = reqRows(host, list, missing, sys);
   const install = async () => {
     setBusy(true); setMsg(null);
     // a network that doesn't answer: the engine gives up on its own, but the page never waits more than STALL_MS
@@ -597,7 +597,7 @@ export function Requirements({ host, onBack, onChanged, archs }) {
   };
   return (
     <View style={{ flex: 1, paddingHorizontal: 30, paddingVertical: 26, gap: 12, borderRadius: 18, backgroundColor: p.raised }}>
-      <Text style={{ fontSize: 22, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.req.page')}</Text>
+      <Text style={{ fontSize: 22, fontWeight: 700, color: p.text, textAlign: 'start' }}>{sys && sys.name ? tr('machines.req.pageFor', { name: sys.name }) : tr('machines.req.page')}</Text>
       <Text style={{ fontSize: 13, color: p.dim, textAlign: 'start' }}>{tr('machines.req.for', { arch: list.join(', ') })}</Text>
       {/* the rows scroll when they don't fit (Windows' own rows make the list tall); the buttons below always show */}
       <ScrollView style={{ flex: 1, minHeight: 0 }}>
@@ -608,7 +608,7 @@ export function Requirements({ host, onBack, onChanged, archs }) {
                 <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr(`machines.req.row.${k.split('.')[0]}`, { arch: k.split('.')[1] || '' })}</Text>
                 <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr(`machines.req.use.${k.split('.')[0]}`)}</Text>
               </View>
-              <Text style={{ fontSize: 12, fontWeight: 700, color: st === 'ready' ? '#8ce8b0' : '#ffc56e' }}>{tr(`machines.req.st.${st}`)}</Text>
+              <Text style={{ fontSize: 12, fontWeight: 700, color: st === 'ready' || st === 'builtin' ? '#8ce8b0' : '#ffc56e' }}>{tr(`machines.req.st.${st}`)}</Text>
             </View>
           ))}
         </View>
@@ -738,6 +738,7 @@ export function Library() {
   const [loaded, setLoaded] = useState(false);
   const [sel, setSel] = useState(null);
   const [page, setPage] = useState('main');          // main, new, requirements, pi: the last three as sheets over the library
+  const [reqSys, setReqSys] = useState(null);        // the Requirements page of the system chosen in the assistant (5.2), or null
   const [cfg, setCfg] = useState(null);              // Configure as a sheet: { dir, section }
   const [newMode, setNewMode] = useState(null);
   const [menu, setMenu] = useState(null);
@@ -808,7 +809,7 @@ export function Library() {
       { label: tr('machines.imp.menu'), onClick: () => setImporting(true) },
       '-',
       { label: tr('machines.set.menu'), onClick: () => openSettings('general') },
-      { label: tr('machines.req.menu'), onClick: () => setPage('requirements') },
+      { label: tr('machines.req.menu'), onClick: () => { setReqSys(null); setPage('requirements'); } },
       { label: tr('machines.storage.menu'), onClick: openStorage },
       { label: tr('machines.pi.menu'), onClick: () => setPage('pi') },
     ] }, { label: tr('machines.lib.view'), items: [
@@ -930,6 +931,7 @@ export function Library() {
   const groupWork = (item, kind, start) => {
     if (work) return;
     const dir = item.group.dir;
+    for (const id of groupJobCloses(item, kind)) wm.close(id, true);
     setError('');
     setWork({ dir, kind, phase: 'work' });
     groupJob(item, start, (s) => setWork({ dir, kind, ...s })).then((why) => { setWork(null); if (why) setError(`${item.group.name}: ${why}`); refresh(); });
@@ -960,10 +962,10 @@ export function Library() {
         onGroup={(dir) => { setPage('main'); setNewMode(null); refresh(); const it = libraryItems(lord.vm.list(), lord.vm.groups()).groups.find((x) => x.group.dir === dir); if (it) { setSel(dir); goGroup(it); } }}
         onClose={() => { setPage('main'); setNewMode(null); refresh(); }}
         onCreated={(m) => { setPage('main'); setNewMode(null); refresh(); if (m) openMachine(m); }} onConfigure={(m) => { setPage('main'); refresh(); if (m) setCfg({ dir: m.dir, section: 'cpu' }); }}
-        onNeeds={() => setPage('requirements')} />
+        onNeeds={(x) => { setReqSys(x || null); setPage('requirements'); }} />
     </Sheet>
   ) : page === 'requirements' ? (
-    <Sheet width={760} height={600} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><Requirements host={host} onBack={() => setPage('main')} onChanged={refresh} /></View></Sheet>
+    <Sheet width={760} height={600} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><Requirements host={host} sys={reqSys} archs={reqSys ? [reqSys.arch] : undefined} onBack={() => setPage('main')} onChanged={refresh} /></View></Sheet>
   ) : page === 'pi' ? (
     <Sheet width={820} height={640} onClose={() => setPage('main')}><View style={{ flex: 1, padding: 18 }}><ThisComputer host={host} list={list} gvt={!!gpuName} onBack={() => setPage('main')} /></View></Sheet>
   ) : null;
@@ -999,7 +1001,7 @@ export function Library() {
           <TextInput value={query} onChange={setQuery} placeholder={tr('machines.lib.searchMachines')} onCancel={() => setQuery('')} size={15}
             style={{ flex: 1, minWidth: 0, backgroundColor: 'transparent', borderWidth: 0, border: 'none' }} />
         </View>
-        {missing.length || (host.kvmDevice && !host.kvm) ? <Square icon="security" title={tr('machines.req.menu')} onClick={() => setPage('requirements')} /> : null}
+        {missing.length || (host.kvmDevice && !host.kvm) ? <Square icon="security" title={tr('machines.req.menu')} onClick={() => { setReqSys(null); setPage('requirements'); } } /> : null}
         {host.arch === 'arm64' && host.board && !narrow ? <Square icon="general" title={tr('machines.pi.menu')} onClick={() => setPage('pi')} /> : null}
         <View style={{ flexDirection: 'row', padding: 3, borderRadius: 10, backgroundColor: p.raised }}>
           {[['grid', 'grid', 'machines.lib.viewGrid'], ['list', 'list', 'machines.lib.viewList']].map(([k, icon, l]) => (

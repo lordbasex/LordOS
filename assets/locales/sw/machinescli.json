@@ -133,5 +133,8 @@
   "applyCreated": "{name} imeundwa kama {file} inavyosema.",
   "applyUpdated": "{name} sasa ina mipangilio kutoka {file}.",
   "applyRunning": "{name} inaendeshwa: izime ili kuibadilisha kutoka faili.",
-  "overBudget": "{name} haikuanza: inahitaji {need} MB na zimebaki {free} MB kwa mashine. Simamisha au zima mashine nyingine, au ipe kumbukumbu kidogo."
+  "overBudget": "{name} haikuanza: inahitaji {need} MB na zimebaki {free} MB kwa mashine. Simamisha au zima mashine nyingine, au ipe kumbukumbu kidogo.",
+  "help.migrate": "hunakili diski nzima ya kompyuta nyingine kwenye mashine mpya, kupitia mtandao kwa SSH yako (au diski iliyounganishwa hapa), na kuiingiza",
+  "migrating": "Inanakili diski: {done} kati ya {total} GB…",
+  "migratePassword": "Nenosiri la sudo kwenye {host}: "
 }

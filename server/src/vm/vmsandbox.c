@@ -83,6 +83,17 @@ static int rule(int rs, const char *path, uint64_t allow, uint64_t handled) {
     return r;
 }
 
+/* the same for a file already open (a device lord-vm opened and checked itself): a file's rights only */
+static int rule_fd(int rs, int fd, uint64_t allow, uint64_t handled) {
+    allow &= FILE_RIGHTS
+#ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
+        | LANDLOCK_ACCESS_FS_IOCTL_DEV
+#endif
+        ;
+    struct landlock_path_beneath_attr pb = { .allowed_access = allow & handled, .parent_fd = fd };
+    return (int)syscall(SYS_landlock_add_rule, rs, LANDLOCK_RULE_PATH_BENEATH, &pb, 0U);
+}
+
 /* ---- seccomp: the image tools' denylist (qemu-img; QEMU itself has the allowlist, vmseccomp.c) ---- */
 
 #define NR(x) (x)
@@ -173,14 +184,17 @@ static int tool_filter(struct sock_filter *f, int cap, int threads_only) {
 
 /* 3D graphics (vmsandbox.h): the render node read, write and ioctl; what Mesa reads to know the GPU behind it. A path
  * that isn't a DRM render node is refused (-1), and nothing is allowed then. */
-static int render_rules(int rs, const char *node, uint64_t h) {
+static int render_rules(int rs, const char *node, int fd, uint64_t h) {
     struct stat st;
-    if (strncmp(node, "/dev/dri/renderD", 16) || stat(node, &st) || !S_ISCHR(st.st_mode) || major(st.st_rdev) != 226 || minor(st.st_rdev) < 128) return -1;
+    if (strncmp(node, "/dev/dri/renderD", 16)) return -1;
+    if (fd > 2 ? fstat(fd, &st) : stat(node, &st)) return -1;
+    if (!S_ISCHR(st.st_mode) || major(st.st_rdev) != 226 || minor(st.st_rdev) < 128 || minor(st.st_rdev) > 255) return -1;
     uint64_t dev = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE;
 #ifdef LANDLOCK_ACCESS_FS_IOCTL_DEV
     dev |= LANDLOCK_ACCESS_FS_IOCTL_DEV;
 #endif
-    if (rule(rs, node, dev, h)) return -1;
+    /* by descriptor: the rule is on the device lord-vm opened and checked, whatever /dev/dri holds now */
+    if (fd > 2 ? rule_fd(rs, fd, dev, h) : rule(rs, node, dev, h)) return -1;
     /* libdrm's drmGetDevice2 lists /dev/dri and reads the GPU's PCI folder in sysfs; without either Mesa's EGL doesn't
      * start (measured 2026-11-20, amdgpu). Listing /dev/dri shows names only: opening card0 or another node is still
      * refused. The way through /sys/dev/char is a link and needs no rule. */
@@ -251,7 +265,9 @@ int vm_jail_qemu(const VmQemuJail *j) {
             }
             /* 3D: a render node that doesn't check out gets no rule (QEMU's EGL then fails and it exits); it never costs
              * the rest of the sandbox */
-            if (j->render && j->render[0]) render_rules(rs, j->render, h);
+            if (j->render && j->render[0]) render_rules(rs, j->render, j->render_fd, h);
+            /* venus: the library that hands virglrenderer lord-vm's connection to the render server, read only */
+            if (j->venus_shim && j->venus_shim[0] && rule(rs, j->venus_shim, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             /* a vGPU whose paths don't check out costs the whole sandbox: QEMU doesn't run (the caller refuses) */
             if (j->vgpu_dev && j->vgpu_dev[0] && vgpu_rules(rs, j->vgpu_dev, j->vgpu_group, h)) ok = 0;
             if (j->vgpu_dev && j->vgpu_rom && j->vgpu_rom[0] && rule(rs, j->vgpu_rom, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
@@ -275,6 +291,61 @@ int vm_jail_qemu(const VmQemuJail *j) {
         VmScOpts o = { .kvm = j->kvm, .tcg = j->tcg, .render = j->render && j->render[0], .vgpu = j->vgpu_dev && j->vgpu_dev[0],
                        .tap = j->tap, .usb = j->usb, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn, .bti = vm_sc_cpu_bti(),
                        .drop = j->sc_drop };
+        for (int pass = 0; pass < 2 && !(mask & VMS_SECCOMP_OURS); pass++) {
+            if (pass && (!o.notify || o.learn)) break;
+            if (pass) o.notify = 0;
+            int n = vm_sc_build(&o, filt, BPF_MAXINSNS);
+            if (n <= 0 || n > BPF_MAXINSNS) break;
+            struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
+            long r = syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, o.notify ? SECCOMP_FILTER_FLAG_NEW_LISTENER : 0, &prog);
+            if (r < 0) continue;
+            mask |= VMS_SECCOMP_OURS | VMS_SECCOMP_ALLOWLIST;
+            if (o.notify) { mask |= VMS_SECCOMP_NAMED; *j->notify_out = (int)r; }
+        }
+    }
+    return mask;
+}
+
+int vm_jail_venus(const VmVenusJail *j) {
+    int mask = 0;
+    struct rlimit no = { 0, 0 };
+    setrlimit(RLIMIT_CORE, &no);
+    if (!prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) mask |= VMS_NO_NEW_PRIVS;
+    int abi = vm_landlock_abi();
+    if (abi >= 1) {
+        struct landlock_ruleset_attr attr;
+        memset(&attr, 0, sizeof attr);
+        uint64_t h = fs_handled(abi);
+        attr.handled_access_fs = h;
+        if (abi >= 4) attr.handled_access_net = LANDLOCK_ACCESS_NET_BIND_TCP | LANDLOCK_ACCESS_NET_CONNECT_TCP;
+#ifdef LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET
+        if (abi >= 6) attr.scoped = LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET | LANDLOCK_SCOPE_SIGNAL;
+#endif
+        int rs = (int)syscall(SYS_landlock_create_ruleset, &attr, sizeof attr, 0U);
+        if (rs >= 0) {
+            uint64_t ro = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
+            uint64_t rx = ro | LANDLOCK_ACCESS_FS_EXECUTE;
+            char ldreal[PATH_MAX];
+            /* every rule must apply, the render node's too: the server is useless without it */
+            int ok = j->exec_path && j->exec_path[0] == '/' && VM_LOADER[0] && realpath(VM_LOADER, ldreal) && j->render && j->render[0] &&
+                     !rule(rs, "/usr", ro, h) && !rule(rs, j->exec_path, rx, h) && !rule(rs, ldreal, rx, h) && !rule(rs, "/proc/self", ro, h) &&
+                     !render_rules(rs, j->render, j->render_fd, h);
+            if (j->probe_read && j->probe_read[0] && rule(rs, j->probe_read, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
+            rule(rs, "/etc/ld.so.cache", LANDLOCK_ACCESS_FS_READ_FILE, h);
+            rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
+            if (ok && !syscall(SYS_landlock_restrict_self, rs, 0U)) {
+                mask |= VMS_LANDLOCK_FS;
+                if (abi >= 4) mask |= VMS_LANDLOCK_NET;
+                if (abi >= 6) mask |= VMS_LANDLOCK_SCOPE;
+            }
+            close(rs);
+        }
+    }
+    if (j->notify_out) *j->notify_out = -1;
+    if (VM_AUDIT_ARCH) {
+        static struct sock_filter filt[BPF_MAXINSNS];
+        VmScOpts o = { .render = 1, .venus = 1, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn,
+                       .bti = vm_sc_cpu_bti() };
         for (int pass = 0; pass < 2 && !(mask & VMS_SECCOMP_OURS); pass++) {
             if (pass && (!o.notify || o.learn)) break;
             if (pass) o.notify = 0;

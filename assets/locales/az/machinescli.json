@@ -133,5 +133,8 @@
   "applyCreated": "{name} {file} dediyi kimi yaradıldı.",
   "applyUpdated": "{name} indi {file} ayarlarına malikdir.",
   "applyRunning": "{name} işləyir: fayldan dəyişmək üçün onu söndürün.",
-  "overBudget": "{name} başlamadı: {need} MB lazımdır, maşınlar üçün isə {free} MB qalıb. Başqa maşını dayandırın və ya söndürün, ya da ona daha az yaddaş verin."
+  "overBudget": "{name} başlamadı: {need} MB lazımdır, maşınlar üçün isə {free} MB qalıb. Başqa maşını dayandırın və ya söndürün, ya da ona daha az yaddaş verin.",
+  "help.migrate": "başqa kompüterin bütün diskini şəbəkə ilə SSH-nizlə (və ya bura qoşulmuş diski) yeni maşına köçürür və idxal edir",
+  "migrating": "Disk köçürülür: {done} / {total} GB…",
+  "migratePassword": "{host} üzərində sudo parolu: "
 }

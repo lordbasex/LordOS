@@ -133,5 +133,8 @@
   "applyCreated": "{name} is gemaakt zoals {file} zegt.",
   "applyUpdated": "{name} heeft nu de instellingen uit {file}.",
   "applyRunning": "{name} draait: sluit haar af om haar vanuit een bestand te wijzigen.",
-  "overBudget": "{name} is niet gestart: ze heeft {need} MB nodig en er is {free} MB over voor machines. Zet een andere machine in sluimerstand of sluit die af, of geef haar minder geheugen."
+  "overBudget": "{name} is niet gestart: ze heeft {need} MB nodig en er is {free} MB over voor machines. Zet een andere machine in sluimerstand of sluit die af, of geef haar minder geheugen.",
+  "help.migrate": "kopieert de hele schijf van een andere pc naar een nieuwe machine, via het netwerk met je SSH (of een hier aangesloten schijf), en importeert die",
+  "migrating": "Schijf kopiëren: {done} van {total} GB…",
+  "migratePassword": "Wachtwoord voor sudo op {host}: "
 }

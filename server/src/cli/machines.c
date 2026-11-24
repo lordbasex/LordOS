@@ -60,6 +60,8 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 #include <sys/wait.h>
+#include <termios.h>
+#include <time.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -975,6 +977,7 @@ static int cmd_help(void) {
         { "machines mcp", "help.mcp" },
         { "machines apply FILE", "help.apply" },
         { "machines import SRC NAME [--arch A] [--devices compat|virtio] [--network shared|isolated] [--firmware uefi|bios]", "help.import" },
+        { "machines migrate [USER@]HOST:SOURCE NAME [--sudo] [--port N] [--arch A] [--devices compat|virtio] [--firmware uefi|bios]", "help.migrate" },
         { "machines set NAME [--memory 8G] [--cpus 6] [--disk 64G] [--network shared|isolated|bridged|hostonly] [--bridge CARD]\n"
           "             [--clipboard off|to-guest|from-guest|both] [--clipboard-ask on|off] [--graphics 2d|3d]\n"
           "             [--gpu none|intel-whole|intel-shared] [--name NAME] [--iso FILE|none] [--display window|none]\n"
@@ -1408,8 +1411,9 @@ static int cp_step(const Machine *x, const char *script, const char *const *args
     }
     size_t c = res.outlen < cap ? res.outlen : cap;
     /* every caller passes sizeof out - 1, so out[cap] exists: the answer is always NUL-terminated inside the buffer, and
-     * an answer that doesn't fit is refused rather than cut (it comes from the guest: hostile) */
-    if (out && cap && res.outlen >= cap) {
+     * an answer that doesn't fit is refused rather than cut (it comes from the guest: hostile). An answer of exactly cap
+     * bytes fits: a whole 128 KB piece of cp's copy out (it was refused, so every file over 128 KB failed) */
+    if (out && cap && res.outlen > cap) {
         ERR("execFailed", "name", x->m.name, "why", "the machine gave a strange answer", NULL);
         free(keep);
         return -1;
@@ -2213,6 +2217,180 @@ static int cmd_import(int argc, char **argv) {
     return 0;
 }
 
+/* ---- migrate (6.11): another PC's whole disk, over the network through the person's own SSH, or a disk connected here ----
+ *
+ *   machines migrate [USER@]HOST:SOURCE NAME [--sudo] [--port N] [--arch A] [--devices compat|virtio] [--firmware uefi|bios]
+ *   machines migrate SOURCE NAME [--sudo] [...]            (a disk or image on this computer, e.g. the old PC's disk on USB)
+ *
+ * The old PC runs nothing of ours: its SSH server is the agent (any Linux PC, a live USB of LordOS or another system). The
+ * copy is the person's own SSH session (/usr/bin/ssh, their keys and known_hosts: the old PC's host key is checked by
+ * ssh, the stream encrypted and authenticated by it), so no new listening port, no new key exchange and no new root: on
+ * the old PC the disk is read as the logged-in account, or with --sudo through its sudo (the password typed here, echo
+ * off, handed to that sudo on the session's standard input and wiped); here, a connected disk is read as the person, or
+ * with --sudo through this computer's sudo, which asks on the terminal itself. One fixed script runs there: the size of
+ * SOURCE (a block device or a file) as 20 digits, then its bytes with dd. SOURCE and HOST are checked here to a small set
+ * of characters, so they reach the remote shell inside single quotes with nothing to escape. What comes back is data
+ * only: the 20 digits parsed strictly (at most 16 TB), at most that many bytes written into a sparse raw file in the
+ * library (O_EXCL, 0600; zero blocks become holes), a stream that ends early or runs longer refused, then the import of
+ * 6.22 (jailed qemu-img, the compatible devices unless --devices virtio) and the raw file removed; Ctrl+C removes it too.
+ * The old disk must not change meanwhile: copy it with that PC off and booted from a live USB, or from a backup image */
+static char mig_tmp[PATH_MAX + 64];
+static void mig_gone(int sig) { (void)sig; if (mig_tmp[0]) unlink(mig_tmp); _exit(130); }
+static int mig_safe(const char *s, const char *extra, size_t max) {
+    size_t n = strlen(s);
+    if (!n || n > max || s[0] == '-') return 0;
+    for (const unsigned char *c = (const unsigned char *)s; *c; c++)
+        if (!((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') || strchr(extra, *c))) return 0;
+    return 1;
+}
+/* the old PC's side: SOURCE's size as 20 digits, then its bytes */
+#define MIG_SCRIPT "PATH=$PATH:/sbin:/usr/sbin; s=$(blockdev --getsize64 \"$1\" 2>/dev/null || stat -L -c %s -- \"$1\") || exit 3; " \
+                   "printf %020d \"$s\" && exec dd if=\"$1\" bs=4M status=none"
+
+static int cmd_migrate(int argc, char **argv) {
+    if (argc < 2) { ERR("missing", "what", argc ? "NAME" : "SOURCE", NULL); return VMCLI_USAGE; }
+    const char *from = argv[0], *name = argv[1];
+    if (!vm_name_valid(name)) { ERR("badName", NULL); return VMCLI_USAGE; }
+    int sudo = 0;
+    const char *port = NULL;
+    char *pass[12];
+    int np = 0;
+    static const char *const OPT[][3] = { { "--arch", "amd64", "arm64" }, { "--devices", "compat", "virtio" }, { "--firmware", "uefi", "bios" } };
+    int devs = 0;
+    for (int i = 2; i < argc; i++) {
+        if (!strcmp(argv[i], "--sudo")) { sudo = 1; continue; }
+        if (!strcmp(argv[i], "--port") && i + 1 < argc && mig_safe(argv[i + 1], "", 5) && atoi(argv[i + 1]) > 0 && atoi(argv[i + 1]) < 65536) { port = argv[++i]; continue; }
+        int ok = 0;
+        for (size_t o = 0; o < sizeof OPT / sizeof OPT[0]; o++)
+            if (!strcmp(argv[i], OPT[o][0]) && i + 1 < argc && (!strcmp(argv[i + 1], OPT[o][1]) || !strcmp(argv[i + 1], OPT[o][2]))) {
+                if (o == 1) devs = 1;
+                pass[np++] = argv[i]; pass[np++] = argv[++i]; ok = 1; break;
+            }
+        if (!ok) { ERR("badOption", "option", argv[i], NULL); return VMCLI_USAGE; }
+    }
+    /* [USER@]HOST:SOURCE, or SOURCE here */
+    char host[256] = "", src[256];
+    const char *colon = from[0] == '/' ? NULL : strchr(from, ':');
+    if (colon) {
+        if ((size_t)(colon - from) >= sizeof host) { ERR("badValue", "option", "HOST", "value", from, NULL); return VMCLI_USAGE; }
+        snprintf(host, sizeof host, "%.*s", (int)(colon - from), from);
+        snprintf(src, sizeof src, "%s", colon + 1);
+        if (!mig_safe(host, "@._-", 253)) { ERR("badValue", "option", "HOST", "value", host, NULL); return VMCLI_USAGE; }
+    } else snprintf(src, sizeof src, "%s", from);
+    if (src[0] != '/' || !mig_safe(src, "/._+-", 250) || strstr(src, "/../")) { ERR("badValue", "option", "SOURCE", "value", src, NULL); return VMCLI_USAGE; }
+    load_library();
+    for (int i = 0; i < nms; i++) if (!strcasecmp(ms[i].m.name, name)) { ERR("nameTaken", "name", name, NULL); return VMCLI_FAILED; }
+    if (library_path() && mkdir(library, 0700) && errno != EEXIST) { ERR("opFailed", "name", name, "why", strerror(errno), NULL); return VMCLI_FAILED; }
+    library_path();
+    snprintf(mig_tmp, sizeof mig_tmp, "%s/.migrate-%d.raw", library, (int)getpid());
+    int out = open(mig_tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (out < 0) { ERR("opFailed", "name", name, "why", strerror(errno), NULL); mig_tmp[0] = 0; return VMCLI_FAILED; }
+    signal(SIGINT, mig_gone);
+    signal(SIGTERM, mig_gone);
+    signal(SIGHUP, mig_gone);
+    /* the old PC's sudo password, asked here (echo off) and given to its sudo -S; never an argument */
+    char pw[256] = "";
+    if (sudo && host[0]) {
+        struct termios t0, t1;
+        int tty = isatty(0) && !tcgetattr(0, &t0);
+        fprintf(stderr, "%s", say("migratePassword", "host", host, NULL));
+        fflush(stderr);
+        if (tty) { t1 = t0; t1.c_lflag &= ~(tcflag_t)ECHO; tcsetattr(0, TCSANOW, &t1); }
+        if (!fgets(pw, sizeof pw, stdin)) pw[0] = 0;
+        if (tty) { tcsetattr(0, TCSANOW, &t0); fputc('\n', stderr); }
+        size_t l = strlen(pw);
+        if (!l || pw[l - 1] != '\n') { explicit_bzero(pw, sizeof pw); ERR("opFailed", "name", name, "why", "no password", NULL); unlink(mig_tmp); return VMCLI_FAILED; }
+    }
+    char remote[700];
+    snprintf(remote, sizeof remote, "%ssh -c '%s' lordos-migrate '%s'", sudo ? "sudo -S -p '' " : "", MIG_SCRIPT, src);
+    const char *av[24];
+    int k = 0;
+    if (host[0]) {
+        av[k++] = "/usr/bin/ssh"; av[k++] = "-T"; av[k++] = "-e"; av[k++] = "none"; av[k++] = "-o"; av[k++] = "ClearAllForwardings=yes";
+        av[k++] = "-o"; av[k++] = "ForwardAgent=no"; av[k++] = "-o"; av[k++] = "ForwardX11=no";
+        if (port) { av[k++] = "-p"; av[k++] = port; }
+        av[k++] = "--"; av[k++] = host; av[k++] = remote;
+    } else {
+        if (sudo) { av[k++] = "/usr/bin/sudo"; av[k++] = "--"; }
+        av[k++] = "/bin/sh"; av[k++] = "-c"; av[k++] = MIG_SCRIPT; av[k++] = "lordos-migrate"; av[k++] = src;
+    }
+    av[k] = NULL;
+    int dp[2], ip[2];
+    if (pipe2(dp, O_CLOEXEC) || pipe2(ip, O_CLOEXEC)) { ERR("opFailed", "name", name, "why", strerror(errno), NULL); unlink(mig_tmp); return VMCLI_FAILED; }
+    pid_t pid = fork();
+    if (pid == 0) {
+        dup2(dp[1], 1);
+        if (host[0]) dup2(ip[0], 0);       /* a local sudo asks on the terminal; ssh's own prompts use the terminal too */
+        execv(av[0], (char *const *)av);
+        _exit(127);
+    }
+    close(dp[1]); close(ip[0]);
+    if (pid < 0) { ERR("opFailed", "name", name, "why", strerror(errno), NULL); unlink(mig_tmp); return VMCLI_FAILED; }
+    if (pw[0]) { ssize_t w = write(ip[1], pw, strlen(pw)); (void)w; }
+    explicit_bzero(pw, sizeof pw);
+    close(ip[1]);
+    /* the size, then the bytes */
+    static uint8_t buf[4 << 20];
+    char hd[21];
+    size_t got = 0;
+    int rc = VMCLI_FAILED;
+    const char *why = NULL;
+    while (got < 20) { ssize_t r = read(dp[0], hd + got, 20 - got); if (r < 0 && errno == EINTR) continue; if (r <= 0) break; got += (size_t)r; }
+    hd[got] = 0;
+    unsigned long long total = 0;
+    for (size_t i = 0; i < got; i++) { if (hd[i] < '0' || hd[i] > '9') { got = 0; break; } total = total * 10 + (unsigned)(hd[i] - '0'); }
+    if (got != 20 || !total || total > (1ULL << 44)) why = "the other side didn't send a disk (is SOURCE readable there? --sudo reads it as root)";
+    unsigned long long done = 0;
+    long long last = 0;
+    while (!why && done < total) {
+        size_t want = total - done < sizeof buf ? (size_t)(total - done) : sizeof buf, have = 0;
+        while (have < want) { ssize_t r = read(dp[0], buf + have, want - have); if (r < 0 && errno == EINTR) continue; if (r <= 0) break; have += (size_t)r; }
+        if (have < want) { why = "the copy ended before the whole disk came"; break; }
+        /* a whole disk starts with its boot sector or partition table, never an image format's header: one (a qcow2 that
+         * would name a backing file, a VMDK descriptor) is refused rather than handed to the import as an image */
+        if (done == 0 && have >= 68 && (!memcmp(buf, "QFI\xfb", 4) || !memcmp(buf, "KDMV", 4) || !memcmp(buf, "COWD", 4) ||
+                                        !memcmp(buf, "# Disk DescriptorFile", 21) || !memcmp(buf, "vhdxfile", 8) || !memcmp(buf, "conectix", 8) ||
+                                        !memcmp(buf, "WithoutFreeSpace", 16) || !memcmp(buf, "WithouFreSpacExt", 16) || !memcmp(buf + 64, "\x7f\x10\xda\xbe", 4))) {
+            why = "that is a disk image file, not a whole disk: copy it and use machines import";
+            break;
+        }
+        size_t z = 0;
+        while (z < have && !buf[z]) z++;
+        if (z == have) { if (lseek(out, (off_t)have, SEEK_CUR) < 0) { why = strerror(errno); break; } }
+        else for (size_t w = 0; w < have;) { ssize_t r = write(out, buf + w, have - w); if (r < 0 && errno == EINTR) continue; if (r <= 0) { why = r < 0 ? strerror(errno) : "short write"; break; } w += (size_t)r; }
+        done += have;
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        long long now = ts.tv_sec * 1000LL + ts.tv_nsec / 1000000;
+        if (isatty(2) && (now - last > 1000 || done == total)) {
+            char a[32], b[32];
+            snprintf(a, sizeof a, "%.1f", done / 1e9); snprintf(b, sizeof b, "%.1f", total / 1e9);
+            fprintf(stderr, "\r%s", say("migrating", "done", a, "total", b, NULL));
+            last = now;
+        }
+    }
+    if (isatty(2) && total) fputc('\n', stderr);
+    if (!why) { uint8_t extra; ssize_t r = read(dp[0], &extra, 1); if (r > 0) why = "the other side sent more than the disk's size"; }
+    close(dp[0]);
+    int st = 0;
+    while (waitpid(pid, &st, 0) < 0 && errno == EINTR) {}
+    if (!why && (!WIFEXITED(st) || WEXITSTATUS(st))) why = "the copy on the other side failed";
+    if (!why && (ftruncate(out, (off_t)total) || fsync(out))) why = strerror(errno);
+    close(out);
+    if (why) { ERR("opFailed", "name", name, "why", why, NULL); unlink(mig_tmp); mig_tmp[0] = 0; return rc; }
+    /* the import of 6.22: a qcow2 machine with the compatible devices (what the old PC's system has drivers for) */
+    char *ia[16];
+    int ni = 0;
+    ia[ni++] = mig_tmp; ia[ni++] = (char *)name;
+    for (int i = 0; i < np; i++) ia[ni++] = pass[i];
+    if (!devs) { ia[ni++] = "--devices"; ia[ni++] = "compat"; }
+    ia[ni] = NULL;
+    rc = cmd_import(ni, ia);
+    unlink(mig_tmp);
+    mig_tmp[0] = 0;
+    return rc;
+}
+
 /* ---- MCP (6.15): a local server over stdin and stdout, for a coding agent the person started ---- */
 
 /* what a command printed while it ran, kept from the MCP channel (stdout) */
@@ -2531,6 +2709,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "mcp")) { if (argc > 2) { ERR("unknown", "arg", argv[2], NULL); return VMCLI_USAGE; } return cmd_mcp(); }
     if (!strcmp(cmd, "apply")) return cmd_apply(argc - 2, argv + 2);
     if (!strcmp(cmd, "import")) return cmd_import(argc - 2, argv + 2);
+    if (!strcmp(cmd, "migrate")) return cmd_migrate(argc - 2, argv + 2);
     static const char *const KNOWN[] = { "status", "start", "open", "stop", "poweroff", "pause", "resume", "suspend", "reset", "snapshot", "clone", "rename", "set", "fresh",
                                          "exec", "logs", "console", "shell", NULL };
     int known = 0;

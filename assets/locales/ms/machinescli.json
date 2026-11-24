@@ -133,5 +133,8 @@
   "applyCreated": "{name} dibuat seperti kata {file}.",
   "applyUpdated": "{name} kini mempunyai tetapan daripada {file}.",
   "applyRunning": "{name} sedang berjalan: matikan untuk mengubahnya daripada fail.",
-  "overBudget": "{name} tidak bermula: ia memerlukan {need} MB dan tinggal {free} MB untuk mesin. Gantung atau matikan mesin lain, atau beri ia kurang memori."
+  "overBudget": "{name} tidak bermula: ia memerlukan {need} MB dan tinggal {free} MB untuk mesin. Gantung atau matikan mesin lain, atau beri ia kurang memori.",
+  "help.migrate": "menyalin seluruh cakera PC lain ke mesin baharu, melalui rangkaian dengan SSH anda (atau cakera yang disambung di sini), dan mengimportnya",
+  "migrating": "Menyalin cakera: {done} daripada {total} GB…",
+  "migratePassword": "Kata laluan sudo di {host}: "
 }

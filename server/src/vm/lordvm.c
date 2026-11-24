@@ -43,6 +43,7 @@
 #include "vmlink.h"
 #include "vmexport.h"
 #include "vmusb.h"
+#include "vmkboot.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -82,6 +83,7 @@
 #include <strings.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -889,7 +891,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     vm_host_probe(&h);
     int arch = h.arch >= 0 ? h.arch : VM_ARCH_AMD64;
     const char *name = NULL, *import = NULL, *iso = NULL, *unatt = NULL;
-    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1, devs = -1, gfx = -1;
+    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1, devs = -1, gfx = -1, vk = -1;
     int enc = 0, raw = 0, disp_s = 0;
     const char *drivers = NULL, *want_id = NULL;
     for (int i = 0; i < argc; i++) {
@@ -917,6 +919,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--devices")) { devs = !strcmp(v, "windows") ? VM_DEV_WINDOWS : parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat|windows\n"); return 2; } }
         else if (!strcmp(a, "--drivers")) drivers = v;
         else if (!strcmp(a, "--graphics")) { gfx = parse_enum(v, "2d", "3d"); if (gfx < 0) { fprintf(stderr, "lord-vm: --graphics 2d|3d\n"); return 2; } }
+        else if (!strcmp(a, "--vulkan")) { vk = parse_enum(v, "off", "on"); if (vk < 0) { fprintf(stderr, "lord-vm: --vulkan on|off\n"); return 2; } }
         /* storage (schema 16): an encrypted machine (its key on --key-fd, its id given so lord-server could keep the key
          * under it first), raw disks, a disposable session */
         else if (!strcmp(a, "--encrypt")) { enc = parse_enum(v, "off", "on"); if (enc < 0) { fprintf(stderr, "lord-vm: --encrypt on|off\n"); return 2; } }
@@ -969,6 +972,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     if (devs >= 0) m.devices = devs;
     if (m.devices == VM_DEV_WINDOWS) m.nic_model = VM_NIC_VIRTIO;
     if (gfx >= 0) m.graphics = gfx;
+    if (vk > 0) { m.vulkan = 1; m.schema = VM_SCHEMA; }
     char drvreal[PATH_MAX];
     if (drivers) {
         if (!realpath(drivers, drvreal) || !file_exists(drvreal) || strlen(drvreal) >= sizeof m.drivers) { fprintf(stderr, "lord-vm: %s isn't a file\n", drivers); return 1; }
@@ -1067,7 +1071,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 /* ---- the supervisor ---- */
 
-typedef struct { int fd, control; } Client;
+typedef struct { int fd, control, gone_said; } Client;   /* gone_said: its peer went (EPIPE), said once in the log */
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
        P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ, P_USB_ADD, P_USB_DEL, P_XNIC };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
@@ -1163,6 +1167,10 @@ static struct {
      * number in QEMU */
     int key_fd, fw_fd, xfd_base;
     char un_cmd[640];
+    /* direct kernel boot (schema 23, 6.1): this start runs disks/boot's kernel (kboot), with its initrd (kboot_initrd) and
+     * the command line read and checked at the start (kb_cmd) */
+    int kboot, kboot_initrd;
+    char kb_cmd[VM_KBOOT_CMDLINE_MAX + 1];
     long long shut_deadline, kill_deadline;
     Pending pq[MAX_PENDING];
     int pq_head, pq_n;
@@ -1171,6 +1179,18 @@ static struct {
     /* 3D (virgl, 6.10): machine.json asks for it and this start can give it (decide_graphics); the render node QEMU opens */
     int gl;
     char render[32], render_want[32];
+    /* the render node (3D's or a vGPU's iGPU's) opened and checked here, QEMU's by descriptor (render_open; 3.3), and its
+     * number in QEMU (rendernode=/proc/self/fd/<render_qfd>, after the session's layers); -1 none */
+    int render_fd, render_qfd;
+    /* Vulkan through venus this run (decide_graphics: machine.json's "vulkan", and this computer can), and the one
+     * Vulkan driver its render server loads (VK_DRIVER_FILES: the render node's GPU's, never llvmpipe's JIT) */
+    int venus;
+    char venus_icd[96];
+    /* its render server, started by lord-vm (spawn_venus): the process, its pidfd, the filter's listener (vs_serve), its
+     * one exec done, QEMU's end of the connection and its number in QEMU (LORDOS_VENUS_FD) */
+    pid_t vs_pid;
+    int vs_pidfd, vs_fd, vs_exec_done, vs_qemu_end, vs_qfd, vs_starting, vs_err;
+    pid_t vs_waiter;        /* the server's parent outside its pid namespace, which only waits for it */
     /* an Intel GVT-g vGPU this run (decide_vgpu, docs/MACHINES-GPU.md Mode A): its render node (the iGPU's, where QEMU
      * makes the picture's dmabufs), /dev/vfio/<group>, the picture's size, and whether the guest asked for a restart
      * (QEMU runs with -action reboot=shutdown: a reset is an exit, and Machines starts it again) */
@@ -1379,7 +1399,13 @@ static int sh_rw(int i) { return i == VM_SHARES ? 1 : S.m.share_rw[i]; }
 static void awake_update(void);
 static void send_to(int ci, const VmMsg *m, int fd) {
     if (ci < 0 || ci >= MAX_CLIENTS || S.cl[ci].fd < 0) return;
-    if (vm_send(S.cl[ci].fd, m, fd)) vlog("client %d: message %d not delivered (%s)", ci, m->type, strerror(errno));
+    /* a peer that went away (a command killed or timed out) is dropped when the loop sees its hangup; until then each send
+     * fails: said once, not once a message (a machine's log filled with the same line several times a second) */
+    if (vm_send(S.cl[ci].fd, m, fd) && !S.cl[ci].gone_said) {
+        int e = errno;
+        vlog("client %d: message %d not delivered (%s)", ci, m->type, strerror(e));
+        if (e == EPIPE || e == ECONNRESET) S.cl[ci].gone_said = 1;
+    }
 }
 
 static void reply(int ci, uint32_t seq, int code, const char *text) {
@@ -1678,7 +1704,7 @@ static int sc_serve(void) {
             for (int i = 0; i < S.sc_nseen; i++) if (S.sc_seen[i] == key) { seen = 1; break; }
             if (!seen) {
                 if (S.sc_nseen < (int)(sizeof S.sc_seen / sizeof S.sc_seen[0])) S.sc_seen[S.sc_nseen++] = key;
-                vlog("seccomp learn: %s", what);
+                vlog("seccomp learn: %s (thread %u)", what, (unsigned)req->pid);
             }
             resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
         } else {
@@ -1702,6 +1728,259 @@ static int sc_serve(void) {
         if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp) && errno != ENOENT && S.sc_learn) vlog("seccomp learn: can't answer: %s", strerror(errno));
     }
     return stopped;
+}
+
+static void child_common(int procs_fd);
+static void place_fds(const int *want, int n);
+
+/* ---- venus's render server (docs/VIRTUALIZATION.md 6.10, "venus"; vmsandbox.h vm_jail_venus) ----
+ * lord-vm starts it, never QEMU: QEMU gets the other end of its connection (venusshim.c) and keeps the jail every 3D
+ * machine has. The server parses the guest's Vulkan commands, so it is jailed too, apart from QEMU, with a listener of
+ * its own here: its one exec (lord-vm's execveat of the binary it opened), the executable mappings of the system's
+ * libraries its loader and Vulkan make (checked by what file they are), and nothing else; any other call ends the
+ * render server (QEMU goes on; the guest loses Vulkan) and the log names it. */
+
+/* an executable mapping of the render server: only the loader's kind (a private read-only file mapping), only from the
+ * render server's own threads (tgkill(server, thread, 0) finds the thread there; signal 0 sends nothing), and only while
+ * the machine starts (vs_starting, until QEMU's QMP handshake, as QEMU's own; the vCPUs haven't run, so nothing the guest
+ * sent has reached the server yet). Its Vulkan driver is preloaded (VS_PRELOAD), so every library it will run is mapped
+ * then; after the start any executable mapping ends it. 1 to let it through */
+static int vs_lib_ok(const struct seccomp_notif *req) {
+    if (!S.vs_starting || S.vs_pid <= 0 || !vm_sc_startup_exec(&req->data, vm_sc_cpu_bti())) return 0;
+    pid_t tid = (pid_t)req->pid;
+    if (tid != S.vs_pid && syscall(SYS_tgkill, S.vs_pid, tid, 0)) return 0;
+    /* the thread must still be the one that asked (its call waits in the kernel; the id can't have been reused) */
+    return !ioctl(S.vs_fd, SECCOMP_IOCTL_NOTIF_ID_VALID, &req->id);
+}
+
+/* the Vulkan driver's library its manifest names ("library_path", a bare name in the system's library folder or a path),
+ * for the render server's LD_PRELOAD: under /usr/lib/, no "..", a regular file. 0 and the path in out */
+static int venus_icd_lib(const char *icd, char *out, size_t n) {
+    int fd = open(icd, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    char buf[4096];
+    ssize_t r = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (r <= 0) return -1;
+    buf[r] = 0;
+    char *k = strstr(buf, "\"library_path\"");
+    char *q = k ? strchr(k + 14, '"') : NULL;
+    char *e = q ? strchr(q + 1, '"') : NULL;
+    if (!e || e - q - 1 <= 0 || e - q - 1 > 200) return -1;
+    *e = 0;
+    /* a bare name (Debian's manifests): the system's library folder for this architecture */
+#if defined(__aarch64__)
+    const char *dir = "/usr/lib/aarch64-linux-gnu/";
+#else
+    const char *dir = "/usr/lib/x86_64-linux-gnu/";
+#endif
+    if ((size_t)snprintf(out, n, "%s%s", q[1] == '/' ? "" : dir, q + 1) >= n) return -1;
+    struct stat st;
+    if (strncmp(out, "/usr/lib/", 9) || strstr(out, "..") || strchr(out, ':') || strchr(out, ' ') || stat(out, &st) || !S_ISREG(st.st_mode)) return -1;
+    return 0;
+}
+
+static void vs_stop(const char *why) {
+    if (S.vs_pid > 0) {
+        if (S.vs_pidfd >= 0) syscall(SYS_pidfd_send_signal, S.vs_pidfd, SIGKILL, NULL, 0);
+        else kill(S.vs_pid, SIGKILL);
+    }
+    if (why) vlog("venus: the render server was stopped: %s; the guest has no Vulkan until the machine starts again", why);
+}
+
+/* the render server's listener: 1 when it was stopped */
+static int vs_serve(void) {
+    static struct seccomp_notif_sizes sz;
+    static int have_sz;
+    if (S.vs_fd < 0) return 0;
+    if (!have_sz) {
+        if (syscall(SYS_seccomp, SECCOMP_GET_NOTIF_SIZES, 0, &sz)) return 0;
+        have_sz = 1;
+    }
+    char req_b[512], resp_b[256];
+    if (sz.seccomp_notif > sizeof req_b || sz.seccomp_notif_resp > sizeof resp_b) return 0;
+    struct seccomp_notif *req = (struct seccomp_notif *)req_b;
+    struct seccomp_notif_resp *resp = (struct seccomp_notif_resp *)resp_b;
+    int stopped = 0;
+    for (int k = 0; k < 256; k++) {
+        struct pollfd pf = { S.vs_fd, POLLIN, 0 };
+        if (poll(&pf, 1, 0) <= 0) break;
+        if (pf.revents & (POLLHUP | POLLERR) && !(pf.revents & POLLIN)) { close(S.vs_fd); S.vs_fd = -1; break; }
+        memset(req_b, 0, sizeof req_b);
+        if (ioctl(S.vs_fd, SECCOMP_IOCTL_NOTIF_RECV, req)) { if (errno == EINTR || errno == ENOENT) continue; break; }
+        char what[160];
+        vm_sc_describe(&req->data, what, sizeof what);
+        memset(resp_b, 0, sizeof resp_b);
+        resp->id = req->id;
+        if (vm_sc_exec_once(req, S.vs_pid, &S.vs_exec_done) || (S.vs_exec_done && vs_lib_ok(req))) {
+            resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+        } else if (S.sc_learn) {
+            vlog("seccomp learn (venus): %s (thread %u)", what, (unsigned)req->pid);
+            resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+        } else {
+            char why[400];
+            snprintf(why, sizeof why, "a call its allowlist doesn't have (thread %u): %s", (unsigned)req->pid, what);
+            vs_stop(why);
+            resp->error = -EPERM;
+            stopped = 1;
+        }
+        ioctl(S.vs_fd, SECCOMP_IOCTL_NOTIF_SEND, resp);
+    }
+    return stopped;
+}
+
+#ifdef LORDVM_TEST_PATHS
+#define VENUS_SHIM test_path("LORDVM_TEST_VENUS_SHIM", VM_VENUS_SHIM)
+#else
+#define VENUS_SHIM VM_VENUS_SHIM
+#endif
+
+/* the render server for this start: a SOCK_SEQPACKET pair, the server's end as its fd 3 (--socket-fd 3), QEMU's kept in
+ * vs_qemu_end; the child in QEMU's namespaces, cgroup leaf and private loader, jailed (vm_jail_venus), then lord-vm's
+ * execveat of the binary it opened. 0 started; -1 (and venus isn't given this start) otherwise */
+static int spawn_venus(void) {
+    if (!file_exists(VENUS_SHIM)) { vlog("venus: not given: %s is missing", VENUS_SHIM); return -1; }
+    static char lib[PATH_MAX];
+    if (venus_icd_lib(S.venus_icd, lib, sizeof lib)) { vlog("venus: not given: %s names no library of the system's", S.venus_icd); return -1; }
+    S.vs_starting = 1;
+    int sp[2], st[2], ep[2];
+    if (pipe2(ep, O_CLOEXEC)) return -1;
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sp)) { close(ep[0]); close(ep[1]); return -1; }
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, st)) { close(sp[0]); close(sp[1]); return -1; }
+    int xfd = open(VM_VENUS_SERVER, O_PATH | O_CLOEXEC);
+    if (xfd < 0) { close(sp[0]); close(sp[1]); close(st[0]); close(st[1]); return -1; }
+    pid_t pid = fork();
+    if (pid < 0) { close(sp[0]); close(sp[1]); close(st[0]); close(st[1]); close(xfd); return -1; }
+    if (!pid) {
+        child_common(qemu_procs_fd);
+        int in_ns = vm_ns_enter(S.userns);
+        if (in_ns) vm_ns_setup(S.rundir, S.disks);
+        /* a pid namespace of its own (it has no D-Bus display, whose peer check stopped one for QEMU): the server is its
+         * pid 1 and sees no other process of the person's. This process stays outside it, only to wait for the server
+         * and end with it; lord-vm gets the server's pid as it sees it first, on the status socket */
+        int gp[2];
+        if (!in_ns || unshare(CLONE_NEWPID) || pipe2(gp, O_CLOEXEC)) _exit(125);
+        pid_t inner = fork();
+        if (inner < 0) _exit(125);
+        if (inner > 0) {
+            prctl(PR_SET_DUMPABLE, 0);
+            int32_t ip = (int32_t)inner;
+            if (send(st[1], &ip, sizeof ip, MSG_NOSIGNAL) != (ssize_t)sizeof ip) { kill(inner, SIGKILL); _exit(125); }
+            if (write(gp[1], "g", 1) != 1) { kill(inner, SIGKILL); _exit(125); }      /* the server's own message after this one */
+            syscall(SYS_close_range, 3, ~0u, 0);
+            int ws = 0;
+            while (waitpid(inner, &ws, 0) < 0 && errno == EINTR) {}
+            _exit(WIFEXITED(ws) ? WEXITSTATUS(ws) : 128 + WTERMSIG(ws));
+        }
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        char go;
+        close(gp[1]);
+        if (read(gp[0], &go, 1) != 1) _exit(125);
+        close(gp[0]);
+        int null = open("/dev/null", O_RDWR);
+        dup2(null, 0);
+        dup2(ep[1], 1);         /* what it says goes to the machine's log ("venus: ...") */
+        dup2(ep[1], 2);
+        /* 3 the connection, 4 the render node (its Landlock rule; the server opens the node by path), 5 the status,
+         * 6 the binary (the execveat); all but 3 closed by the exec */
+        int fds[4] = { sp[1], S.render_fd, st[1], xfd };
+        place_fds(fds, 4);
+        for (int f = 4; f <= 6; f++) fcntl(f, F_SETFD, FD_CLOEXEC);
+        int x2 = 6;
+        int lfd = -1, abi = vm_landlock_abi();      /* asked before the filter: it isn't a row */
+        VmVenusJail j = { S.render, 4, x2, VM_VENUS_SERVER, S.sc_learn, &lfd, NULL };
+        int32_t msg = vm_jail_venus(&j);
+        /* Landlock's signal scope is required (ABI 6): its signals stay inside its own jail */
+        int bad = !(msg & VMS_SECCOMP_OURS) || !(msg & VMS_NO_NEW_PRIVS) || abi < 6 || !(msg & VMS_LANDLOCK_FS) || !(msg & VMS_LANDLOCK_SCOPE);
+        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
+        struct iovec io = { &msg, sizeof msg };
+        struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1 };
+        if (lfd >= 0 && !bad) {
+            memset(&cm, 0, sizeof cm);
+            mh.msg_control = cm.b; mh.msg_controllen = sizeof cm.b;
+            struct cmsghdr *ch = CMSG_FIRSTHDR(&mh);
+            ch->cmsg_level = SOL_SOCKET; ch->cmsg_type = SCM_RIGHTS; ch->cmsg_len = CMSG_LEN(sizeof(int));
+            memcpy(CMSG_DATA(ch), &lfd, sizeof(int));
+        }
+        if (sendmsg(5, &mh, 0) < 0 || bad) _exit(126);
+        if (lfd >= 0) close(lfd);
+        /* its one Vulkan driver (no llvmpipe and its JIT), loaded at its start with everything it needs, while executable
+         * mappings are still let through (vs_lib_ok) */
+        static char vkenv[128], pre[PATH_MAX + 80];
+        snprintf(vkenv, sizeof vkenv, "VK_DRIVER_FILES=%s", S.venus_icd);
+        /* the Vulkan loader too (virglrenderer opens it when a context is made) */
+#if defined(__aarch64__)
+        snprintf(pre, sizeof pre, "LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libvulkan.so.1:%s", lib);
+#else
+        snprintf(pre, sizeof pre, "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libvulkan.so.1:%s", lib);
+#endif
+        char *argv[] = { "virgl_render_server", "--socket-fd", "3", NULL };
+        /* no Vulkan layers (Mesa's device-select layer would be another library loaded later) */
+        char *env[] = { "LC_ALL=C.UTF-8", "MESA_SHADER_CACHE_DISABLE=true", "VK_LOADER_LAYERS_DISABLE=~all~", "NODEVICE_SELECT=1", vkenv, pre, NULL };
+        syscall(SYS_execveat, x2, "", argv, env, AT_EMPTY_PATH);
+        _exit(127);
+    }
+    close(sp[1]);
+    close(st[1]);
+    close(ep[1]);
+    close(xfd);
+    if (S.vs_err >= 0) close(S.vs_err);
+    S.vs_err = ep[0];
+    fcntl(S.vs_err, F_SETFL, O_NONBLOCK);
+    S.vs_waiter = pid;
+    S.vs_pid = 0;
+    S.vs_exec_done = 0;
+    {
+        /* the server's pid outside its namespace, from its waiter */
+        int32_t ip = 0;
+        struct pollfd p1 = { st[0], POLLIN, 0 };
+        if (poll(&p1, 1, 5000) > 0 && recv(st[0], &ip, sizeof ip, 0) == (ssize_t)sizeof ip && ip > 1) S.vs_pid = (pid_t)ip;
+    }
+    if (S.vs_pid <= 0) {
+        vlog("venus: its render server's pid namespace couldn't be made: no Vulkan this start");
+        kill(pid, SIGKILL);
+        close(st[0]); close(sp[0]);
+        return -1;
+    }
+    S.vs_pidfd = (int)syscall(SYS_pidfd_open, S.vs_pid, 0);
+    int32_t got = 0;
+    union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
+    struct iovec io = { &got, sizeof got };
+    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
+    ssize_t r = -1;
+    /* never waits on the child for long: 5 s for its jail */
+    struct pollfd p0 = { st[0], POLLIN, 0 };
+    if (poll(&p0, 1, 5000) > 0) do r = recvmsg(st[0], &mh, MSG_CMSG_CLOEXEC | MSG_DONTWAIT); while (r < 0 && errno == EINTR);
+    struct cmsghdr *ch = r > 0 ? CMSG_FIRSTHDR(&mh) : NULL;
+    if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof(int))) {
+        memcpy(&S.vs_fd, CMSG_DATA(ch), sizeof(int));
+        fcntl(S.vs_fd, F_SETFL, O_NONBLOCK);
+    }
+    /* the exec (served here: it goes to the listener) or the child's end */
+    for (int k = 0; k < 500 && S.vs_fd >= 0 && !S.vs_exec_done; k++) {
+        struct pollfd pw = { S.vs_fd, POLLIN, 0 };
+        if (poll(&pw, 1, 10) > 0) vs_serve();
+    }
+    /* then its loader's mappings (its libraries and the preloaded Vulkan driver), served now, until it has been quiet for
+     * 200 ms (it then waits for QEMU on its connection), 5 s at most */
+    for (int k = 0, seen = 0; k < 40 && S.vs_fd >= 0 && S.vs_exec_done; k++) {
+        struct pollfd pw = { S.vs_fd, POLLIN, 0 };
+        if (poll(&pw, 1, seen ? 300 : 3000) <= 0) break;
+        vs_serve();
+        seen = 1;
+    }
+    close(st[0]);
+    if (r <= 0 || !(got & VMS_SECCOMP_OURS) || S.vs_fd < 0 || !S.vs_exec_done) {
+        vlog("venus: the render server's jail couldn't be set up (mask 0x%x): no Vulkan this start", (unsigned)got);
+        vs_stop(NULL);
+        close(sp[0]);
+        return -1;
+    }
+    S.vs_qemu_end = sp[0];
+    vlog("venus: render server pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d named=%d no-new-privs=%d; %s",
+         (int)pid, !!(got & VMS_LANDLOCK_FS), !!(got & VMS_LANDLOCK_NET), !!(got & VMS_LANDLOCK_SCOPE), !!(got & VMS_SECCOMP_OURS),
+         !!(got & VMS_SECCOMP_NAMED), !!(got & VMS_NO_NEW_PRIVS), S.venus_icd);
+    return 0;
 }
 
 /* the handshake's side descriptor (qmp.h) */
@@ -2252,6 +2531,24 @@ static int render_node_ok(const char *p) {
     return !stat(p, &st) && S_ISCHR(st.st_mode) && major(st.st_rdev) == 226 && !access(p, R_OK | W_OK);
 }
 
+/* The render node QEMU gets, opened here (3.3, "Render node by descriptor"): a DRM render node (character device, major
+ * 226, minor 128..255) whose sysfs name is the path's own renderD<minor>. QEMU gets this descriptor and opens it as
+ * /proc/self/fd/<n> (its rendernode= takes only a path: util/drm.c open()s it), and its Landlock rule is made from it,
+ * so the device checked here is the one QEMU may use, whatever /dev/dri says after. -1 when it doesn't check out */
+static int render_open(const char *p) {
+    if (!render_node_ok(p)) return -1;
+    int fd = open(p, O_RDWR | O_CLOEXEC | O_NOCTTY | O_NONBLOCK);
+    if (fd < 0) return -1;
+    struct stat st;
+    char sys[96];
+    unsigned mi = 0;
+    if (fstat(fd, &st) || !S_ISCHR(st.st_mode) || major(st.st_rdev) != 226 || (mi = minor(st.st_rdev)) < 128 || mi > 255 ||
+        (unsigned)atoi(p + 16) != mi) { close(fd); return -1; }
+    snprintf(sys, sizeof sys, "/sys/dev/char/226:%u/device/drm/renderD%u", mi, mi);
+    if (access(sys, F_OK)) { close(fd); return -1; }
+    return fd;
+}
+
 /* the one asked for (lord-server names the one its own GPU path uses), else the first this user can open */
 static int pick_render_node(char *out, size_t n) {
     if (S.render_want[0]) {
@@ -2267,13 +2564,104 @@ static int pick_render_node(char *out, size_t n) {
     return -1;
 }
 
+/* a file's bytes hold `needle` (the first 32 MB read; for the venus checks below) */
+static int file_has(const char *path, const char *needle) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return 0;
+    size_t nl = strlen(needle), keep = 0, total = 0;
+    char buf[65536 + 64];
+    int found = 0;
+    for (;;) {
+        ssize_t r = read(fd, buf + keep, sizeof buf - 64 - keep);
+        if (r <= 0) break;
+        total += (size_t)r;
+        size_t have = keep + (size_t)r;
+        if (memmem(buf, have, needle, nl)) { found = 1; break; }
+        keep = have < nl ? have : nl - 1;
+        memmove(buf, buf + have - keep, keep);
+        if (total > ((size_t)32 << 20)) break;
+    }
+    close(fd);
+    return found;
+}
+
+/* What the host's kernel and QEMU must do for venus to map the GPU's memory into the guest (Mesa's venus page, measured
+ * here 2026-11-24): RADV and NVK need KVM to map pages it holds no reference to ("KVM: Stop grabbing references to
+ * PFNMAP'd pages", Linux 6.13); a discrete GPU with an Intel processor, and Intel's xe driver, also need the guest's page
+ * attributes honoured (Linux 6.16 and QEMU 11's -accel kvm,honor-guest-pat=on). Without them the guest's first write to
+ * Vulkan memory it mapped stops the machine (KVM's internal error; seen on Linux 6.12 with an RX 580). NULL when this
+ * computer qualifies for that GPU's kernel driver, else why not */
+static int kernel_at_least(int maj, int min) {
+    struct utsname u;
+    int a = 0, b = 0;
+    if (uname(&u) || sscanf(u.release, "%d.%d", &a, &b) != 2) return 0;
+    return a > maj || (a == maj && b >= min);
+}
+static int cpu_is_intel(void) {
+    int fd = open("/proc/cpuinfo", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return 0;
+    char buf[1024];
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return 0;
+    buf[n] = 0;
+    return strstr(buf, "GenuineIntel") != NULL;
+}
+static const char *venus_host_refusal(const char *driver) {
+    int dgpu = strcmp(driver, "i915") != 0;          /* amdgpu, radeon, nouveau, xe: memory of the card's own */
+    if (!strcmp(driver, "i915")) return NULL;
+    if (!kernel_at_least(6, 13)) return "this computer's kernel is older than 6.13: KVM can't map the GPU's memory into the guest";
+    if ((dgpu && cpu_is_intel()) || !strcmp(driver, "xe")) {
+        if (!kernel_at_least(6, 16)) return "with this GPU and processor venus needs Linux 6.16 or later (the guest's page attributes)";
+        if (!file_has("/usr/bin/qemu-system-x86_64", "honor-guest-pat")) return "with this GPU and processor venus needs QEMU 11 or later (honor-guest-pat)";
+    }
+    return NULL;
+}
+
+/* the Vulkan driver of the render node's GPU, by its kernel driver: Mesa's RADV, ANV or NVK. 0 and its manifest's path
+ * in out, -1 for a GPU venus isn't given on */
+static int venus_icd_for(const char *node, char *out, size_t n, const char **why) {
+    struct stat st;
+    if (stat(node, &st) || !S_ISCHR(st.st_mode)) return -1;
+    char sys[96], real[PATH_MAX];
+    snprintf(sys, sizeof sys, "/sys/dev/char/%u:%u/device/driver", major(st.st_rdev), minor(st.st_rdev));
+    if (!realpath(sys, real)) return -1;
+    const char *d = strrchr(real, '/');
+    d = d ? d + 1 : real;
+    const char *icd = !strcmp(d, "amdgpu") || !strcmp(d, "radeon") ? "radeon" : !strcmp(d, "i915") || !strcmp(d, "xe") ? "intel" :
+                      !strcmp(d, "nouveau") ? "nouveau" : NULL;
+    if (!icd) return -1;
+    if (why) *why = venus_host_refusal(d);
+    snprintf(out, n, "/usr/share/vulkan/icd.d/%s_icd.json", icd);
+    if (stat(out, &st) || !S_ISREG(st.st_mode)) {
+        snprintf(out, n, "/usr/share/vulkan/icd.d/%s_icd.x86_64.json", icd);
+        if (stat(out, &st) || !S_ISREG(st.st_mode)) return -1;
+    }
+    return 0;
+}
+
+/* Vulkan through venus (6.10): QEMU's virtio-gpu-gl module with its venus property (QEMU 9.2 and later), a virglrenderer
+ * built with venus, and its render server (Debian's virgl-server, installed by vm-enable). NULL when this computer can
+ * give it, else why not */
+static const char *venus_refusal(void) {
+    if (!file_has("/usr/lib/x86_64-linux-gnu/qemu/hw-display-virtio-gpu-gl.so", "venus")) return "this QEMU has no venus";
+    if (!file_has("/usr/lib/x86_64-linux-gnu/libvirglrenderer.so.1", "VK_MESA_venus_protocol")) return "virglrenderer was built without venus";
+    struct stat st;
+    if (stat(VM_VENUS_SERVER, &st) || !S_ISREG(st.st_mode) || st.st_uid == getuid() || (st.st_mode & 022) || !(st.st_mode & 0100))
+        return "virglrenderer's render server (virgl-server) isn't installed";
+    return NULL;
+}
+
 /* Graphics 3D only for a Linux machine in a window, amd64 on amd64 (QEMU 10.0's 3D aborts on arm64's firmware reset,
  * 3.2), not on an unattended install's start (vm_gl_refusal), with QEMU's GL modules and a render node; otherwise the
  * machine starts with 2D graphics and the log says why. Only then does QEMU's sandbox get the render node (vm_jail_qemu,
  * VmQemuJail.render). */
 static void decide_graphics(void) {
     S.gl = 0;
+    S.venus = 0;
     S.render[0] = 0;
+    if (S.render_fd >= 0) close(S.render_fd);
+    S.render_fd = S.render_qfd = -1;
     if (S.m.graphics != VM_GFX_3D) return;
     VmHost h;
     vm_host_probe(&h);
@@ -2283,9 +2671,19 @@ static void decide_graphics(void) {
     else if (!gl_modules()) why = "QEMU's OpenGL modules (qemu-system-modules-opengl) aren't installed";
     else if (S.render_want[0] && strcmp(S.render_want, "none") && !render_node_ok(S.render_want)) why = "the desktop's render node can't be opened";
     else if (pick_render_node(S.render, sizeof S.render)) why = "no GPU render node can be opened";
+    else if ((S.render_fd = render_open(S.render)) < 0) why = "the render node isn't a DRM render node lord-vm can open";
     if (why) { S.render[0] = 0; vlog("graphics: 2D instead of 3D: %s", why); return; }
     S.gl = 1;
-    vlog("graphics: 3D (virgl) on %s", S.render);
+    S.venus = 0;
+    if (S.m.vulkan) {
+        const char *vwhy = venus_refusal();
+        const char *hwhy = NULL;
+        if (!vwhy && venus_icd_for(S.render, S.venus_icd, sizeof S.venus_icd, &hwhy)) vwhy = "no Vulkan driver of Mesa's for this GPU";
+        if (!vwhy && hwhy) vwhy = hwhy;
+        if (vwhy) vlog("graphics: Vulkan (venus) not given: %s", vwhy);
+        else S.venus = 1;
+    }
+    vlog("graphics: 3D (virgl%s) on %s", S.venus ? " and venus" : "", S.render);
 }
 
 /* ---- an Intel GVT-g vGPU (docs/MACHINES-GPU.md, Mode A) ---- */
@@ -2337,7 +2735,9 @@ static int decide_vgpu(void) {
     for (struct dirent *e; d && (e = readdir(d));)
         if (!strncmp(e->d_name, "renderD", 7) && strlen(e->d_name) < 12) snprintf(S.vgpu_render, sizeof S.vgpu_render, "/dev/dri/%s", e->d_name);
     if (d) closedir(d);
-    if (!S.vgpu_render[0] || !render_node_ok(S.vgpu_render)) { fail_start("the Intel graphics card's render node can't be opened"); return -1; }
+    if (S.render_fd >= 0) close(S.render_fd);
+    S.render_fd = S.render_qfd = -1;
+    if (!S.vgpu_render[0] || (S.render_fd = render_open(S.vgpu_render)) < 0) { fail_start("the Intel graphics card's render node can't be opened"); return -1; }
     /* /dev/vfio/<group>: given to this user by the admin helper */
     snprintf(p, sizeof p, "/dev/vfio/%d", grp);
     struct stat st;
@@ -2664,9 +3064,9 @@ static void build_qemu_args(void) {
     snprintf(ser, sizeof ser, "%s%s", m->disk_serial[0] ? ",serial=" : "", m->disk_serial);
     /* where the firmware starts from (machine.json's boot_order, vm_boot_indexes): each device's ",bootindex=N", or
      * nothing for one not listed. An unattended install's first start: QEMU gives the installer's kernel (-kernel)
-     * boot index 0, the rest follow it */
+     * boot index 0, the rest follow it; so does a directly started kernel (schema 23) */
     int bidx[VM_BOOT_DEVS];
-    vm_boot_indexes(m, S.unattended ? 1 : 0, bidx);
+    vm_boot_indexes(m, S.unattended || S.kboot ? 1 : 0, bidx);
     char bi_sys[24] = "", bi_cd[24] = "", bi_net[24] = "";
     if (bidx[VM_BOOT_DISK] >= 0) snprintf(bi_sys, sizeof bi_sys, ",bootindex=%d", bidx[VM_BOOT_DISK]);
     if (bidx[VM_BOOT_CD] >= 0) snprintf(bi_cd, sizeof bi_cd, ",bootindex=%d", bidx[VM_BOOT_CD]);
@@ -2775,6 +3175,13 @@ static void build_qemu_args(void) {
         }
         arg("-action"); arg("reboot=shutdown");
     }
+    if (S.kboot) {
+        /* direct kernel boot (schema 23, 6.1): the firmware loads disks/boot's kernel through fw_cfg instead of the disk's
+         * boot loader (no menu, no countdown); the files were copied in by --set, QEMU reads them inside its Landlock */
+        snprintf(p, sizeof p, "%s/" VM_KBOOT_KERNEL, S.disks); arg("-kernel"); arg(p);
+        if (S.kboot_initrd) { snprintf(p, sizeof p, "%s/" VM_KBOOT_INITRD, S.disks); arg("-initrd"); arg(p); }
+        arg("-append"); arg(S.kb_cmd);
+    }
     static const char *const NICDEV[VM_NIC_COUNT] = { "virtio-net-pci", "e1000e", "e1000", "e1000-82545em", "e1000-82544gc", "vmxnet3", "rtl8139", "pcnet" };
     if (m->network == VM_NET_BRIDGED) {
         /* the macvtap's device, opened by lord-vm (6.5): the card straight on it; no vhost (QEMU opens no device) */
@@ -2818,6 +3225,9 @@ static void build_qemu_args(void) {
          * among them, never take another size from the window while they run) */
         static char vga[96];
         snprintf(vga, sizeof vga, "%s,id=video0,addr=0x4", S.gl ? "virtio-vga-gl" : "virtio-vga");
+        /* venus: Vulkan's host-visible memory is mapped into the guest through a 64-bit BAR of this size (only what the
+         * guest's Vulkan allocates is backed, by the GPU's driver), and needs blob resources */
+        if (S.gl && S.venus && S.vs_qemu_end >= 0) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",blob=on,hostmem=%dM,venus=on", VM_VENUS_HOSTMEM_MB);
         if (m->res_w && m->res_h) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",xres=%d,yres=%d", m->res_w, m->res_h);
         /* All Displays (5.4): one output per display, each a console of the D-Bus display (Console_<n>) */
         if (m->heads > 1) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",max_outputs=%d", m->heads);
@@ -2834,7 +3244,11 @@ static void build_qemu_args(void) {
     snprintf(arm_gpu, sizeof arm_gpu, "virtio-gpu-pci,id=video0,addr=0x4");
     if (m->heads > 1) snprintf(arm_gpu + strlen(arm_gpu), sizeof arm_gpu - strlen(arm_gpu), ",max_outputs=%d", m->heads);
     char dbus_disp[96];
-    if (S.gl || S.vgpu) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.vgpu ? S.vgpu_render : S.render);
+    /* the render node by descriptor (render_open): QEMU opens /proc/self/fd/<n>, the device lord-vm checked */
+    S.render_qfd = (S.gl || S.vgpu) && S.render_fd >= 0 ? xfd++ : -1;
+    S.vs_qfd = S.gl && S.venus && S.vs_qemu_end >= 0 ? xfd++ : -1;
+    if ((S.gl || S.vgpu) && S.render_qfd >= 0) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=/proc/self/fd/%d,audiodev=snd0", S.render_qfd);
+    else if (S.gl || S.vgpu) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.vgpu ? S.vgpu_render : S.render);
     else snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,audiodev=snd0");
     if (m->display == VM_DISPLAY_WINDOW && (m->devices == VM_DEV_COMPAT || m->devices == VM_DEV_WINDOWS)) {
         /* a USB tablet (and keyboard on arm64) on xHCI: drivers every system has */
@@ -3015,6 +3429,7 @@ static int start_machine(void) {
     if (S.m.iso[0] && !file_exists(S.m.iso)) { fail_start("the attached image is missing: %s", S.m.iso); return -1; }
     if (S.m.drivers[0] && !file_exists(S.m.drivers)) { vlog("note: the drivers disc is gone (%s): the machine starts without it", S.m.drivers); S.m.drivers[0] = 0; }
     S.unattended = 0;
+    S.kboot = S.kboot_initrd = 0;
     S.install_done = 0;
     qemu_3d_abort_seen = stop_notice = stop_announces = 0;
     run_t0 = 0;
@@ -3041,6 +3456,25 @@ static int start_machine(void) {
             if (!file_exists(cp)) ok = 0;
             if (ok) { S.unattended = 1; vlog("unattended: this start installs the system (the installer's kernel and the answers)"); }
             else vlog("unattended: disks/unattended is incomplete or the ISO is gone: started as usual");
+        }
+        /* direct kernel boot (schema 23): the kernel, the initrd if there is one and a printable command line in
+         * disks/boot, else the boot loader on the disk as usual (said in the log); an unattended install's own kernel wins */
+        if (S.m.kernel_boot && !S.unattended) {
+            int ok = 0;
+            snprintf(cp, sizeof cp, "%s/" VM_KBOOT_CMDLINE, S.disks);
+            int kfd = open(cp, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);   /* never waits on a FIFO put there */
+            ssize_t kn = kfd >= 0 ? read(kfd, S.kb_cmd, sizeof S.kb_cmd - 1) : -1;
+            if (kfd >= 0) close(kfd);
+            if (kn > 0) {
+                S.kb_cmd[kn] = 0;
+                ok = kboot_cmdline_ok(S.kb_cmd);
+            }
+            snprintf(cp, sizeof cp, "%s/" VM_KBOOT_KERNEL, S.disks);
+            if (!file_exists(cp)) ok = 0;
+            snprintf(cp, sizeof cp, "%s/" VM_KBOOT_INITRD, S.disks);
+            S.kboot_initrd = file_exists(cp);
+            if (ok) { S.kboot = 1; vlog("kernel boot: this start runs disks/boot's kernel%s", S.kboot_initrd ? " and initrd" : ""); }
+            else vlog("kernel boot: disks/boot has no kernel or a usable command line: started from the disk");
         }
         /* Windows (vmu_prepare_windows): no kernel of its own; the seed disk goes in as a USB stick until the guest
          * agent's first answer says the install is done */
@@ -3114,6 +3548,8 @@ static int start_machine(void) {
         S.sandbox |= VMS_PDEATHSIG;
     }
     decide_graphics();
+    /* venus: its render server first (lord-vm's; QEMU only gets its connection) */
+    if (S.gl && S.venus && spawn_venus()) S.venus = 0;
     if (key_have() && (S.key_fd = key_pipe()) < 0) { session_close(); fail_start("the machine's key couldn't be handed to QEMU"); return -1; }
     build_qemu_args();
     {
@@ -3151,7 +3587,7 @@ static int start_machine(void) {
         int in_ns = vm_ns_enter(S.userns);
         int nsb = in_ns ? vm_ns_setup(S.rundir, S.disks) : 0;
         /* 3 kvm, 4 QMP, 5 serial, 6 network, 7.. credentials, then the status pipe (closed by exec) */
-        int fds[6 + MAX_CREDS + VM_SHARES + 4 + 2 + VM_NDISKS], nf = 0;
+        int fds[6 + MAX_CREDS + VM_SHARES + 4 + 2 + VM_NDISKS + 2], nf = 0;
         fds[nf++] = kvm; fds[nf++] = qmp[1]; fds[nf++] = ser[1]; fds[nf++] = net[0] >= 0 ? net[0] : null;
         if (S.m.agent) { fds[nf++] = qga[1]; fds[nf++] = lag[1]; }
         for (int i = 0; i < S.ncreds; i++) fds[nf++] = S.cred_fd[i];
@@ -3163,6 +3599,8 @@ static int start_machine(void) {
         if (S.fw_fd >= 0) fds[nf++] = S.fw_fd;
         if (S.sess_on && S.sess_fd >= 0) fds[nf++] = S.sess_fd;
         for (int k = 0; S.sess_on && k < S.sess_n; k++) fds[nf++] = S.sess_fds[k];
+        if (S.render_qfd >= 0) fds[nf++] = S.render_fd;
+        if (S.vs_qfd >= 0) fds[nf++] = S.vs_qemu_end;
         fds[nf++] = st[1];
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
@@ -3170,15 +3608,20 @@ static int start_machine(void) {
         /* QEMU's binary by descriptor (in this mount namespace, after the private loader): the allowlist's only exec */
         int xfd = open(qargv[0], O_PATH | O_CLOEXEC);
         int lfd = -1;
+        /* asked before the jail: landlock_create_ruleset isn't a row of the allowlist, and the child's own call would wait on
+         * a listener lord-vm doesn't hold yet (a vGPU machine hung there at every start: 2026-11-24, the first run of a vGPU
+         * under the allowlist) */
+        int ll_abi = vm_landlock_abi();
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
                          S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL,
-                         S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, usb_may(), xfd, qargv[0], S.sc_learn, sc_drop_row(), &lfd };
+                         S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, usb_may(), xfd, qargv[0], S.sc_learn, sc_drop_row(), &lfd,
+                         S.render_qfd, S.gl && S.venus && S.vs_qfd >= 0 ? VENUS_SHIM : NULL };
         int mask = xfd >= 0 ? vm_jail_qemu(&j) | (in_ns ? VMS_NAMESPACES : 0) | (nsb & VMNS_NOEXEC ? VMS_NOEXEC_DISKS : 0) : 0;
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
         /* a vGPU only inside Landlock where the kernel has it: its device rules must have applied (vgpu_rules) */
-        if (S.vgpu && vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS)) mask &= ~VMS_SECCOMP_OURS;
+        if (S.vgpu && ll_abi >= 1 && !(mask & VMS_LANDLOCK_FS)) mask &= ~VMS_SECCOMP_OURS;
         if (!(mask & VMS_SECCOMP_OURS) || !(mask & VMS_NO_NEW_PRIVS)) { msg[0] = mask; write_all(stf, msg, sizeof msg[0]); _exit(126); }
         msg[0] = mask;
         /* the mask, with the allowlist's listener for lord-vm; QEMU never keeps it (it could answer for itself) */
@@ -3199,12 +3642,18 @@ static int start_machine(void) {
             if (sent != (ssize_t)sizeof msg[0]) _exit(126);
         }
         /* 3D: Mesa in QEMU can't write a shader cache (its sandbox has no home folder): told not to try */
-        /* a machine that may get a host USB device (6.6): libusb in QEMU looks for no device of its own (vmusbshim.c) */
-        char *env[4], **ep = env;
+        /* a machine that may get a host USB device (6.6): libusb in QEMU looks for no device of its own (vmusbshim.c);
+         * venus: the library that gives virglrenderer lord-vm's connection to the render server (venusshim.c), and its fd */
+        char *env[5], **ep = env;
         *ep++ = "LC_ALL=C.UTF-8";
         if (S.gl || S.vgpu) *ep++ = "MESA_SHADER_CACHE_DISABLE=true";
-        static char preload[PATH_MAX + 16];
-        if (usb_may() && !access(USB_SHIM, R_OK) && snprintf(preload, sizeof preload, "LD_PRELOAD=%s", USB_SHIM) < (int)sizeof preload) *ep++ = preload;
+        static char preload[2 * PATH_MAX + 32], vsfd[48];
+        int pu = usb_may() && !access(USB_SHIM, R_OK), pv = S.gl && S.venus && S.vs_qfd >= 0;
+        int pn = pu && pv ? snprintf(preload, sizeof preload, "LD_PRELOAD=%s:%s", USB_SHIM, VENUS_SHIM)
+               : pu ? snprintf(preload, sizeof preload, "LD_PRELOAD=%s", USB_SHIM)
+               : pv ? snprintf(preload, sizeof preload, "LD_PRELOAD=%s", VENUS_SHIM) : 0;
+        if (pn > 0 && pn < (int)sizeof preload) *ep++ = preload;
+        if (pv) { snprintf(vsfd, sizeof vsfd, "LORDOS_VENUS_FD=%d", S.vs_qfd); *ep++ = vsfd; }
         *ep = NULL;
         syscall(SYS_execveat, xfd, "", qargv, env, AT_EMPTY_PATH);
         msg[1] = errno ? errno : ENOEXEC;
@@ -3227,6 +3676,8 @@ static int start_machine(void) {
     /* QEMU has read its key (or will, from its own copy of the pipe): lord-vm's goes */
     if (S.key_fd >= 0) { close(S.key_fd); S.key_fd = -1; }
     if (S.fw_fd >= 0) { close(S.fw_fd); S.fw_fd = -1; }
+    if (S.render_fd >= 0) { close(S.render_fd); S.render_fd = -1; }
+    if (S.vs_qemu_end >= 0) { close(S.vs_qemu_end); S.vs_qemu_end = -1; }
     if (net[0] >= 0) close(net[0]);
     S.qemu_err = qerr[0];
     S.serial_fd = ser[0];
@@ -3291,6 +3742,7 @@ static int start_machine(void) {
     if (usb_may() && qmp_call(&S.qmp, "device-list-properties", "{\"typename\":\"usb-host\"}", 10000, err, sizeof err))
         vlog("usb: QEMU's usb-host isn't there (%s): no host USB devices for this machine", err);
     S.sc_starting = 0;      /* QEMU's start is over: no executable mapping from now on (vmseccomp.h) */
+    S.vs_starting = 0;      /* nor in venus's render server */
     S.oom0 = read_oom_kills();
     qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
     pin_prepare();
@@ -7581,6 +8033,10 @@ static void qemu_exited(int status) {
     /* a call the allowlist stopped as QEMU ended: named first; the listener goes with this QEMU */
     sc_serve();
     if (S.sc_fd >= 0) { close(S.sc_fd); S.sc_fd = -1; }
+    /* venus's render server ends with it */
+    vs_serve();
+    vs_stop(NULL);
+    if (S.vs_fd >= 0) { close(S.vs_fd); S.vs_fd = -1; }
     /* what QEMU wrote just before it ended (an assertion's line names the crash): read now, while it's there */
     for (int k = 0; k < 20 && S.qemu_err >= 0; k++) {
         struct pollfd pf = { .fd = S.qemu_err, .events = POLLIN };
@@ -7694,7 +8150,15 @@ static void reap(void) {
     pid_t p;
     while ((p = waitpid(-1, &status, WNOHANG)) > 0) {
         if (p == S.qemu) { vlog("qemu: exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status)); qemu_exited(status); }
-        else if (p == S.passt) {
+        else if (p > 0 && p == S.vs_waiter) {
+            for (int k = 0; k < 20 && S.vs_err >= 0; k++) pump_fd(&S.vs_err, "venus");
+            int code = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+            /* its waiter's status: the server's exit status, or 128 + the signal that ended it (255: virglrenderer's exit
+             * when QEMU's end of the connection closes) */
+            vlog("venus: the render server ended (%d)", code);
+            S.vs_pid = S.vs_waiter = 0;
+            if (S.vs_pidfd >= 0) { close(S.vs_pidfd); S.vs_pidfd = -1; }
+        } else if (p == S.passt) {
             vlog("passt: exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
             S.passt = 0;
             if (!S.qemu_done) { int sig = WIFSIGNALED(status); net_lost(sig, sig ? WTERMSIG(status) : WEXITSTATUS(status)); }
@@ -7718,7 +8182,7 @@ static void reap(void) {
 /* ---- the loop ---- */
 
 static void add_client(int fd, int control) {
-    for (int i = 0; i < MAX_CLIENTS; i++) if (S.cl[i].fd < 0) { S.cl[i] = (Client){ fd, control }; return; }
+    for (int i = 0; i < MAX_CLIENTS; i++) if (S.cl[i].fd < 0) { S.cl[i] = (Client){ fd, control, 0 }; return; }
     close(fd);
 }
 
@@ -7835,6 +8299,7 @@ static void loop(void) {
         WATCH(S.fx_cpipe, -12);
         WATCH(S.rx_hpipe, -15);
         WATCH(S.sc_fd, -13);
+        WATCH(S.vs_fd, -40);
         /* the agent's shell: read from lord-server only while the guest's window has room; written to while some waits */
         if (S.sh_fd >= 0 && (S.sh_to_guest < AG_SHELL_WINDOW || S.sh_n)) {
             p[n] = (struct pollfd){ S.sh_fd, (short)((S.sh_to_guest < AG_SHELL_WINDOW ? POLLIN : 0) | (S.sh_n ? POLLOUT : 0)), 0 };
@@ -7949,6 +8414,7 @@ static void loop(void) {
             case -11: logind_process(); break;
             case -12: fx_xcopy_read(); break;
             case -13: sc_serve(); break;
+            case -40: vs_serve(); break;
             case -14: shell_pump(p[i].revents); break;
             case -15: rx_hash_read(); break;
             default: {
@@ -8216,7 +8682,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = S.rx_fd = S.rx_hpipe = -1;
     for (int i = 0; i < VM_EXTRA_NICS; i++) S.xnic_err[i] = -1;
-    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = S.render_fd = S.render_qfd = S.vs_pidfd = S.vs_fd = S.vs_qemu_end = S.vs_qfd = S.vs_err = -1;
     for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
@@ -8732,9 +9198,113 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
 /* Changes a machine that is off (Configure): the same checks as --create, under the machine's lock (exit 3 while it
  * runs). The disk only grows (qemu-img resize, jailed: it reads and writes the machine's disks/ only); an ISO is
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
+/* ---- direct kernel boot's files (schema 23, 6.1; vmkboot.h) ---- */
+
+/* disks/boot has a kernel and a command line */
+static int kboot_ready(const char *real) {
+    char p[PATH_MAX + 64];
+    snprintf(p, sizeof p, "%s/disks/" VM_KBOOT_KERNEL, real);
+    if (!file_exists(p)) return 0;
+    snprintf(p, sizeof p, "%s/disks/" VM_KBOOT_CMDLINE, real);
+    return file_exists(p);
+}
+
+/* one of the person's files staged as disks/boot/.new-<base> (base: "vmlinuz", "initrd"): opened without following a
+ * link, a regular file of 1 byte to max, its start checked when it is the kernel (kernel_arch >= 0), copied from the
+ * descriptor (fstat on it, so a name changed meanwhile can't swap another file in) and synced. kboot_files renames the
+ * staged files only once every one of them is in, so a refused --set changes nothing */
+static int kboot_stage(const char *real, const char *src, const char *base, long max, int kernel_arch, char *err, size_t errlen) {
+    char tmp[PATH_MAX + 80];
+    int in = open(src, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY | O_NONBLOCK), out = -1, rc = -1;
+    struct stat st;
+    if (in < 0) { snprintf(err, errlen, "%s: %s", src, strerror(errno)); return -1; }
+    if (fstat(in, &st) || !S_ISREG(st.st_mode)) { snprintf(err, errlen, "%s isn't a file", src); goto done; }
+    if (st.st_size <= 0 || st.st_size > max) { snprintf(err, errlen, "%s: a %s is 1 byte to %ld MB", src, kernel_arch >= 0 ? "kernel" : "initrd", max >> 20); goto done; }
+    if (kernel_arch >= 0) {
+        uint8_t h[VMKBOOT_HEAD];
+        ssize_t hn = pread(in, h, sizeof h, 0);
+        if (hn < 0 || !kboot_kernel_ok(h, (size_t)hn, kernel_arch == VM_ARCH_AMD64)) {
+            snprintf(err, errlen, "%s isn't a Linux kernel for %s (a bzImage on amd64; an Image, Image.gz or EFI zboot image on arm64)", src, kernel_arch == VM_ARCH_AMD64 ? "amd64" : "arm64");
+            goto done;
+        }
+    }
+    snprintf(tmp, sizeof tmp, "%s/disks/" VM_KBOOT_DIR "/.new-%s", real, base);
+    unlink(tmp);
+    out = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (out < 0) { snprintf(err, errlen, "disks/boot: %s", strerror(errno)); goto done; }
+    static uint8_t buf[1 << 20];
+    off_t left = st.st_size;
+    while (left > 0) {
+        ssize_t r = read(in, buf, sizeof buf);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) { snprintf(err, errlen, "%s: %s", src, r < 0 ? strerror(errno) : "it got shorter while being read"); goto done; }
+        if (r > left) r = (ssize_t)left;     /* a file that grew meanwhile: only the size it had */
+        if (write_all(out, buf, (size_t)r)) { snprintf(err, errlen, "disks/boot: %s", strerror(errno)); goto done; }
+        left -= r;
+    }
+    if (fsync(out)) { snprintf(err, errlen, "disks/boot: %s", strerror(errno)); goto done; }
+    rc = 0;
+done:
+    if (out >= 0) close(out);
+    if (rc && out >= 0) unlink(tmp);
+    close(in);
+    return rc;
+}
+
+/* --kernel, --initrd FILE|none, --cmdline TEXT: disks/boot made (0700) and filled, all or nothing. Refused for a machine
+ * whose checks refuse kernel_boot (secure boot, the virtio-win devices, encryption, a group): the files would never be
+ * used, and an encrypted machine's would lie in the clear */
+static int kboot_files(const char *real, const VmMachine *m, const char *kfile, const char *ifile, const char *kcmd, char *err, size_t errlen) {
+    VmMachine t = *m;
+    t.kernel_boot = 1; t.schema = VM_SCHEMA;
+    if (vm_machine_check(&t, err, errlen)) return -1;
+    char c[VM_KBOOT_CMDLINE_MAX + 2] = "";
+    if (kcmd) {
+        if (strlen(kcmd) > VM_KBOOT_CMDLINE_MAX + 1) { snprintf(err, errlen, "the command line is longer than %d characters", VM_KBOOT_CMDLINE_MAX); return -1; }
+        snprintf(c, sizeof c, "%s", kcmd);
+        if (!kboot_cmdline_clean(c)) { snprintf(err, errlen, "the command line is 1 to %d printable characters", VM_KBOOT_CMDLINE_MAX); return -1; }
+    }
+    char d[PATH_MAX + 32];
+    snprintf(d, sizeof d, "%s/disks/" VM_KBOOT_DIR, real);
+    if (mkdir(d, 0700) && errno != EEXIST) { snprintf(err, errlen, "disks/boot: %s", strerror(errno)); return -1; }
+    struct stat st;
+    if (lstat(d, &st) || !S_ISDIR(st.st_mode)) { snprintf(err, errlen, "disks/boot isn't a folder"); return -1; }
+    /* staged: the kernel, the initrd, the command line; nothing is replaced until all of them are in */
+    static const char *const base[3] = { "vmlinuz", "initrd", "cmdline" };
+    static const char *const final[3] = { VM_KBOOT_KERNEL, VM_KBOOT_INITRD, VM_KBOOT_CMDLINE };
+    int staged[3] = { 0, 0, 0 }, rc = -1;
+    char tp[PATH_MAX + 80], fp[PATH_MAX + 64];
+    int drop_initrd = ifile && !strcmp(ifile, "none");
+    if (kfile) { if (kboot_stage(real, kfile, base[0], VM_KBOOT_KERNEL_MAX, m->arch, err, errlen)) goto out; staged[0] = 1; }
+    if (ifile && !drop_initrd) { if (kboot_stage(real, ifile, base[1], VM_KBOOT_INITRD_MAX, -1, err, errlen)) goto out; staged[1] = 1; }
+    if (kcmd) {
+        snprintf(tp, sizeof tp, "%s/disks/" VM_KBOOT_DIR "/.new-cmdline", real);
+        unlink(tp);
+        int fd = open(tp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+        if (fd < 0 || write_all(fd, c, strlen(c)) || fsync(fd)) { if (fd >= 0) { close(fd); unlink(tp); } snprintf(err, errlen, "disks/boot/cmdline: %s", strerror(errno)); goto out; }
+        close(fd);
+        staged[2] = 1;
+    }
+    for (int i = 0; i < 3; i++) {
+        if (!staged[i]) continue;
+        snprintf(tp, sizeof tp, "%s/disks/" VM_KBOOT_DIR "/.new-%s", real, base[i]);
+        snprintf(fp, sizeof fp, "%s/disks/%s", real, final[i]);
+        if (rename(tp, fp)) { snprintf(err, errlen, "disks/%s: %s", final[i], strerror(errno)); goto out; }
+        staged[i] = 0;
+    }
+    if (drop_initrd) {
+        snprintf(fp, sizeof fp, "%s/disks/" VM_KBOOT_INITRD, real);
+        if (unlink(fp) && errno != ENOENT) { snprintf(err, errlen, "disks/boot/initrd: %s", strerror(errno)); goto out; }
+    }
+    rc = 0;
+out:
+    for (int i = 0; i < 3; i++) if (staged[i]) { snprintf(tp, sizeof tp, "%s/disks/" VM_KBOOT_DIR "/.new-%s", real, base[i]); unlink(tp); }
+    return rc;
+}
+
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1, heads = 0, gfiles = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1, heads = 0, gfiles = -1, vk = -1;
     int dispo = -1, bkp = -1, fwup = 0, usbc = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
@@ -8758,10 +9328,18 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     /* Configure (5.5, schema 16): --cpu-model host|compatible; --mac new (a new random address of QEMU's 52:54:00 range for
      * the first card); --add-disk GB (one more empty data disk, disks/data-<n>.qcow2, up to VM_DATA_DISKS) */
     int cpum = -1, newmac = 0, adddisk = 0;
+    /* direct kernel boot (schema 23, 6.1): --kernel FILE, --initrd FILE|none, --cmdline TEXT copy into disks/boot;
+     * --kernel-boot on|off. Allowed while suspended: the next cold start reads them, a resumed state never does */
+    const char *kfile = NULL, *ifile = NULL, *kcmd = NULL;
+    int kboot = -1;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
         i++;
+        if (!strcmp(a, "--kernel-boot")) { kboot = parse_enum(v, "off", "on"); if (kboot < 0) { fprintf(stderr, "lord-vm: --kernel-boot on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--kernel")) { kfile = v; continue; }
+        if (!strcmp(a, "--initrd")) { ifile = v; continue; }
+        if (!strcmp(a, "--cmdline")) { kcmd = v; continue; }
         if (!strcmp(a, "--cpu-model")) { cpum = parse_enum(v, "host", "compatible"); if (cpum < 0) { fprintf(stderr, "lord-vm: --cpu-model host|compatible\n"); return 2; } continue; }
         if (!strcmp(a, "--mac")) { if (strcmp(v, "new")) { fprintf(stderr, "lord-vm: --mac new\n"); return 2; } newmac = 1; continue; }
         if (!strcmp(a, "--add-disk")) {
@@ -8834,6 +9412,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         }
         if (!strcmp(a, "--devices")) { devs = parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat\n"); return 2; } continue; }
         if (!strcmp(a, "--graphics")) { gfx = parse_enum(v, "2d", "3d"); if (gfx < 0) { fprintf(stderr, "lord-vm: --graphics 2d|3d\n"); return 2; } continue; }
+        if (!strcmp(a, "--vulkan")) { vk = parse_enum(v, "off", "on"); if (vk < 0) { fprintf(stderr, "lord-vm: --vulkan on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--resolution")) {
             if (!strcmp(v, "follow")) { resw = reshh = 0; res_set = 1; continue; }
             if (vm_resolution_parse(v, &resw, &reshh)) { fprintf(stderr, "lord-vm: --resolution follow|WxH (640x480 to 7680x4320, even)\n"); return 2; }
@@ -8873,7 +9452,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || adddisk || newmac || (cpum >= 0 && cpum != m.cpu_model) || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu) || (heads && heads != (m.heads > 1 ? m.heads : 1)) || (usbc >= 0 && usbc != m.usb))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || adddisk || newmac || (cpum >= 0 && cpum != m.cpu_model) || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (vk >= 0 && vk != m.vulkan) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu) || (heads && heads != (m.heads > 1 ? m.heads : 1)) || (usbc >= 0 && usbc != m.usb))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     /* a new name (6.26): refused when another machine has it or, as the folder follows, when its folder's or transfer
      * folder's new name is taken; the same name again only brings the folder in line when it can */
@@ -8920,6 +9499,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (cpum >= 0) { m.cpu_model = cpum; if (cpum) m.schema = VM_SCHEMA; }
+    if (kboot >= 0) { m.kernel_boot = kboot; if (kboot) m.schema = VM_SCHEMA; }
     if (newmac) {
         uint8_t r[3];
         if (getrandom(r, sizeof r, 0) != (ssize_t)sizeof r) { fprintf(stderr, "lord-vm: no random bytes for the address\n"); goto out; }
@@ -8952,6 +9532,9 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
     if (gpu >= 0) { m.vgpu = gpu; if (gpu) { m.schema = VM_SCHEMA; if (gfx < 0) m.graphics = VM_GFX_2D; } }
     if (gfx == VM_GFX_3D && gpu < 0) m.vgpu = VM_VGPU_NONE;
+    /* Vulkan (venus, 6.10) rides on 3D: asked for, it is set with it; 2D (or a vGPU) turns it off */
+    if (vk >= 0) { m.vulkan = vk; if (vk) m.schema = VM_SCHEMA; }
+    if (m.graphics != VM_GFX_3D) m.vulkan = 0;
     if (m.graphics) m.schema = VM_SCHEMA;
     if (res_set) { m.res_w = resw; m.res_h = reshh; if (resw) m.schema = VM_SCHEMA; }
     if (sound >= 0) m.sound = sound;
@@ -9039,6 +9622,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (run_tool_in(mk, err, sizeof err, dd, dd)) { unlink(tmp); fprintf(stderr, "lord-vm: making the disk failed: %s\n", err); goto out; }
         if (renameat2(AT_FDCWD, tmp, AT_FDCWD, dp, RENAME_NOREPLACE)) { unlink(tmp); fprintf(stderr, "lord-vm: making the disk failed: %s\n", strerror(errno)); goto out; }
     }
+    if ((kfile || ifile || kcmd) && kboot_files(real, &m, kfile, ifile, kcmd, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); goto out; }
+    if (m.kernel_boot && !was.kernel_boot && !kboot_ready(real)) { fprintf(stderr, "lord-vm: choose the kernel and its command line first (--kernel, --cmdline)\n"); goto out; }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
     /* the name is saved: now the folders follow it. A folder that can't move keeps its name, and says why */
@@ -9454,6 +10039,16 @@ static int cmd_clone(const char *src, int argc, char **argv) {
         else snprintf(p1, sizeof p1, "%s/disks/tpm/tpm2-00.permall", real);
         snprintf(p2, sizeof p2, "%s/disks/tpm/tpm2-00.permall", tmp);
         if (copy_small(p1, p2)) { fprintf(stderr, "lord-vm: copying the TPM's state failed\n"); goto out; }
+    }
+    if (m.kernel_boot || kboot_ready(real)) {
+        /* direct kernel boot's files (schema 23) go with the disk they belong to */
+        static const char *const kb[] = { VM_KBOOT_KERNEL, VM_KBOOT_INITRD, VM_KBOOT_CMDLINE };
+        snprintf(p2, sizeof p2, "%s/disks/" VM_KBOOT_DIR, tmp);
+        if (mkdir(p2, 0700) && errno != EEXIST) { fprintf(stderr, "lord-vm: can't make the clone's boot folder\n"); goto out; }
+        for (int i = 0; i < 3; i++) {
+            snprintf(p1, sizeof p1, "%s/disks/%s", real, kb[i]); snprintf(p2, sizeof p2, "%s/disks/%s", tmp, kb[i]);
+            if (file_exists(p1) && copy_reflink(p1, p2) && copy_sparse(p1, p2)) { fprintf(stderr, "lord-vm: copying disks/%s failed\n", kb[i]); goto out; }
+        }
     }
     snprintf(p1, sizeof p1, "%s/app.json", real); snprintf(p2, sizeof p2, "%s/app.json", tmp); copy_small(p1, p2);
     /* the UEFI code kept with the machine (3.6) goes with its variables */
@@ -11876,6 +12471,7 @@ static int cmd_export(const char *dir, int argc, char **argv) {
         VmMachine n = m;
         n.base[0] = n.iso[0] = n.drivers[0] = n.bridge[0] = 0;
         n.n_shares = 0;
+        n.kernel_boot = 0;      /* disks/boot isn't exported: the machine starts from its disk's boot loader there */
         if (n.network == VM_NET_BRIDGED) n.network = VM_NET_SHARED;
         if (vm_machine_save(tmp, &n)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
         /* the manifest of every file there now */
@@ -11962,8 +12558,10 @@ static void import_untrust(VmMachine *m) {
     m->pointer_guest = 0;
     m->vgpu = VM_VGPU_NONE;
     if (m->graphics == VM_GFX_3D) m->graphics = VM_GFX_2D;
+    m->vulkan = 0;
     m->cpu_pin = VM_PIN_DEFAULT;
     m->perf_profile = 0;
+    m->kernel_boot = 0;
     m->group[0] = 0;
     m->role = VM_ROLE_NONE;
     m->profile_lock = VM_LOCK_NONE;
@@ -12092,6 +12690,7 @@ static int usage(void) {
             "                         [--port tcp|udp:HOST:GUEST[:this-computer|lan] ...] [--ports none]   (forwarded ports, replacing the list)\n"
             "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both] [--graphics 2d|3d]   (also on --create)\n"
             "                         [--boot-order auto|disk,cd,network (any order, any of them)] [--boot-menu on|off]\n"
+            "                         [--kernel FILE] [--initrd FILE|none] [--cmdline TEXT] [--kernel-boot on|off]\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "                         [--sound on|off] [--volume 0..100] [--microphone on|off] [--sound-out NODE|default] [--sound-in NODE|default]   (with the machine off; Machines changes them live)\n"
             "                         [--clipboard-ask on|off]   (ask before each paste into and copy out of the machine)\n"
@@ -12102,6 +12701,7 @@ static int usage(void) {
             "                         [--guest-notify on|off]   (the guest's notifications are shown here, as from the machine)\n"
             "                         [--heads 1-4]   (All Displays, 5.4: the guest's displays; while it is off)\n"
             "                         [--automation on|off]   (machines exec and cp may run programs in the guest: docs/VIRTUALIZATION.md 6.15)\n"
+            "                         [--vulkan on|off]   (a 3D machine's guest gets Vulkan through venus: docs/VIRTUALIZATION.md 6.10)\n"
             "                         [--guest-files on|off]   (files the guest sends land in this machine's quarantine folder; on by default)\n"
             "                         [--usb on|off]   (a USB controller for this computer's devices, with the machine off: 6.6)\n"
             "                         [--usb-auto VVVV:PPPP[:SERIAL] ...|none]   (host USB devices that go in by themselves while it runs: 6.6)\n"

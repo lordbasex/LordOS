@@ -11,6 +11,37 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: Start Linux directly, Guest can see, each system's requirements, migrate another PC** (in development; latest
+  release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.2, 6.1, 6.11, 8).
+  - **Start Linux directly.** Configure → Boot keeps a kernel, an initial RAM disk and a command line with an installed
+    Linux machine and starts them instead of the boot loader on its disk (no firmware menu, no countdown): `machine.json`
+    schema 23 `kernel_boot`, the files copied into the machine's `disks/boot` by `lord-vm --set --kernel --initrd
+    --cmdline --kernel-boot` all or nothing (regular files only, sizes capped, the kernel's start checked for the
+    machine's architecture, the command line printable and one argument of QEMU's), the kernel at boot index 0. Refused
+    with Secure Boot, the virtio-win devices, an encrypted machine and a group's member; a clone keeps it, an export
+    leaves it off. The guest's own kernel comes out of it with `machines cp`.
+  - **Guest can see.** Configure → Security lists every channel between a machine and this computer in one place: the
+    network and its forwarded ports, the screen, keyboard and mouse, sound, the microphone, the clipboard each way, shared
+    folders, the transfer folder, the guest agent, Automation, files, links and notifications from the machine; each with
+    its state, what it does now while the machine runs, and its switch or a button to its section.
+  - **What a system needs.** The assistant's What's Missing opens the chosen system's own requirements: only its parts,
+    with its drivers and WinFsp downloaded at Create, the LordOS guest tools and an unattended install's answers.
+  - **`machines migrate`.** Another PC's whole disk becomes a machine: over the network through the person's own SSH (the
+    old PC needs only its SSH server, or a live USB; `--sudo` reads a root-only disk with that PC's sudo), or a disk
+    connected here. The size comes first and is checked, the copy is written sparse, then imported with the compatible
+    devices. Checked with a Raspberry Pi 5 as the old PC: 20 GB in 190 s, booted.
+- **Machines: Vulkan for Linux guests (venus)** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.10,
+  3.3). Configure → Display → Vulkan, with Graphics 3D (machine.json schema 22, "vulkan"; lord-vm --set --vulkan). The guest's
+  Vulkan apps draw with this computer's GPU through virglrenderer's render server, which lord-vm starts in a jail of its own (a
+  pid namespace, Landlock, a seccomp allowlist with a listener, one exec, only the start's library mappings); QEMU gets the
+  connection through a small preloaded library and never forks or execs. Given only where the host can map the GPU's memory
+  into the guest (RADV and NVK need Linux 6.13; a discrete GPU with an Intel processor, Linux 6.16 and QEMU 11), else the log says
+  why. Checked with a Vulkan compute shader in a Debian 13 guest on an Intel UHD 630. The render server comes from Debian's
+  `virgl-server`, which Machines' setup installs.
+- **Machines: a smoother picture, Part 1 steps 4 and 5** (in development; docs/MACHINES-GPU.md). A machine's picture changes
+  reach lord-server as up to 8 rectangles a frame instead of one box over all of them, each damaged on its own; a 2D picture
+  is a GPU texture when the desktop composes on the GPU (only the changed rectangles uploaded, the frame presented without a UI
+  paint), and on the CPU path a scaled picture's copy is remade only where it changed.
 - **Machines: snapshots keep the settings, take notes, and come before a tools update** (in development; latest release
   0.8.9.5-beta; docs/VIRTUALIZATION.md 6.2). Each snapshot keeps `machine.json` as it was (`snapshots/<tag>.json`; a
   running machine's hardware as it started); going back puts that hardware back (processors, memory, devices, cards,
@@ -84,6 +115,13 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     lord-server started as root in a private mount namespace driving `lord.vm` through the real admin helper), and
     `build/vm-usb-cli` (vm-usb-allow as the helper runs it, for manual checks). lordvm-dev gains `usb-in`, `usb-out`,
     `usb-auto`, `usb-noauto`.
+- **Machines checked on real hardware (in development; latest release 0.8.9.5-beta).** The Whonix group's release gate
+  ran on a PC in a headless session: Tor reached, an onion site answered, nothing left the computer but the Gateway's
+  connections to Tor relays, Start Gateway, the group's stop order, Start Fresh and a disposable session. Fixed on the
+  way: after Start Fresh the Workstation's old window stayed open, and the next start of the group then said it didn't
+  start. Also checked: the "Weaker isolation" notice on a kernel without Landlock, real updates of QEMU and of the UEFI
+  firmware under existing machines, a machine on hugetlb pages under the seccomp allowlist, the guest performance profile
+  in a real Linux guest, and the performance targets measured on a PC and a Raspberry Pi 5 (docs/VIRTUALIZATION.md 9).
 - **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (in
   development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
   - **Send to LordOS.** A file chosen in the machine (Linux: the file manager's Send to LordOS, or `lordos-guest
@@ -810,6 +848,24 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: `machines cp` out of a machine refused every file over 128 KB** ("the machine gave a strange answer"): a
+  whole 128 KB piece was taken for one too long (in development).
+- **Machines: a command that went away filled its machine's `lord-vm.log`** with the same "not delivered" line several
+  times a second; now said once per client (in development).
+- **Machines: what the display engine and the guest helper take from the other side is fuzzed, and three faults it found
+  are fixed** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 8, 12).
+  - **The session's log took QEMU's words raw.** A console's label and the text of QEMU's refusals (a sound listener
+    refused, a new size refused, a missing console) went into the log as QEMU sent them, so a QEMU taken over by its
+    guest could write new lines, escape sequences or a forged entry there. They now go in as one line of printable ASCII,
+    at most 127 bytes.
+  - **An X display could hold the guest helper for ever.** While it set up its connection, `lordos-guest` waited 2 s for
+    each reply, but the wait started again after every event in between, so a display that kept sending events and never
+    the reply kept the helper from serving the host at all. The whole setup now has one 3 s limit.
+  - **A `DISPLAY` of the form `unix:/path` was never reached** by the guest helper's clipboard on demand; it is now
+    that socket.
+- **Machines: a machine with an Intel graphics card (GVT-g vGPU) hung at every start** since QEMU's seccomp allowlist: the
+  starting child asked Landlock's version after its jail, a call the allowlist sends to lord-vm, which wasn't listening yet.
+  Found by the first run of a vGPU machine under the allowlist (a Debian 13 guest on a scratch vGPU, 2026-11-24).
 - **`machines cp` out of a machine works again for files over 128 KB** (in development): a check meant to refuse a guest
   answer that doesn't fit took every full 128 KB piece for one, so such a copy failed with "a strange answer".
 - **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
@@ -1049,6 +1105,9 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `qemu-3d-stop`; nothing said with tools → `qemu-3d-crash`; Shut Down asked → `host-shutdown`; …), with lord-vm's
     echo received each time and the disk check at each next start. Not yet checked with a real 6.12.117 guest with 3D.
 ### Changed
+- **Machines: QEMU's render node by descriptor** (in development; docs/VIRTUALIZATION.md 3.3): lord-vm opens and checks the GPU's
+  render node, QEMU reopens that descriptor (`rendernode=/proc/self/fd/N`) and its Landlock rule is made from it, so the
+  device checked is the only one QEMU may open.
 - **Machines: an installer disc is read out of the desktop's process** (in development; docs/VIRTUALIZATION.md 5.2). The
   disc a person chooses is untrusted; its boot files are now read by `lord-vm --iso-probe` in seccomp strict mode (it can
   only read the mapped file and write one fixed 64-byte answer), and lord-server only checks that answer. Same results
@@ -1286,6 +1345,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   running guest.
 
 ### Tests
+- Machines (in development): `vmkboot-test` (direct kernel boot's checks, ASan and UBSan, a random pass), schema 21 in
+  `vm-test`, the requirements, Guest can see and Start Linux directly in `vm_model_test.mjs`;
+  `tools/vm/e2e/machines/kernel-boot.py` (real QEMU/KVM: a guest's kernel taken out with `machines cp`, started directly
+  with UEFI and BIOS, a clone, the switch off, the refusals) and `server/tests/machines_see_headless.sh` (screenshots of
+  Guest can see, Start Linux directly and both Requirements pages).
+
+- **Machines: three fuzz harnesses for the guest's side** (in development; docs/VIRTUALIZATION.md 8, 12), in
+  `make -C server test`, each built with ASan and UBSan and checked by taking a bounds check out on purpose (it failed).
+  `vmdisplay-fuzz` plays a hostile QEMU against lord-vmdisplay in its own sandbox: about 12,000 seeded calls a run on the
+  display listener, its shared-memory interface and both sound listeners, with edge values, wrong signatures, pipes and
+  short or shrunk descriptors, and hostile console properties; every call must be answered, none past QEMU's 1 s, and the
+  log must stay clean. `guest-fuzz` plays the host, the guest's own lord-server, an X display, the system and session
+  buses and local programs against `lordos-guest` at once, as a user namespace's root (where it opens no shell), and
+  checks every frame it sends the host with the host's own parsers. `agent-fuzz-test` mutates well-formed payloads of
+  every frame kind of the agent's channel, both ends (500,000 checks), and cuts a stream of frames anywhere.
+  `guest-dbus-test` gained a mutation pass over well-formed D-Bus messages.
 
 - **Two tests made steady on a busy computer** (in development). `webreg-test`'s stand-in web runtime wrote the files the
   test reads in place, so a loaded computer let the test read an empty one: it now writes them whole and renames them, and

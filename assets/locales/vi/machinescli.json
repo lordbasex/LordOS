@@ -133,5 +133,8 @@
   "applyCreated": "Đã tạo {name} như {file} nói.",
   "applyUpdated": "{name} giờ có các thiết lập từ {file}.",
   "applyRunning": "{name} đang chạy: hãy tắt nó để thay đổi từ tệp.",
-  "overBudget": "{name} không khởi động: cần {need} MB và còn {free} MB cho các máy. Hãy tạm ngưng hoặc tắt một máy khác, hoặc cho máy này ít bộ nhớ hơn."
+  "overBudget": "{name} không khởi động: cần {need} MB và còn {free} MB cho các máy. Hãy tạm ngưng hoặc tắt một máy khác, hoặc cho máy này ít bộ nhớ hơn.",
+  "help.migrate": "sao chép toàn bộ đĩa của máy tính khác vào một máy mới, qua mạng bằng SSH của bạn (hoặc đĩa cắm ở đây), rồi nhập nó",
+  "migrating": "Đang sao chép đĩa: {done} / {total} GB…",
+  "migratePassword": "Mật khẩu sudo trên {host}: "
 }

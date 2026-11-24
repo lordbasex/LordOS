@@ -5,7 +5,7 @@
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber, firewall, netModel } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX, usbAutoRows } from './model.js';
+  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX, usbAutoRows, guestChannels, channelSet, kbootBlocked } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
 import { COLOR_HEX } from './systems.js';
@@ -78,6 +78,28 @@ function GroupPane({ group, m, onMember }) {
 
 // a group of rows on a rounded card, with a title above it when it has one
 function Group({ children, title }) { return <Section title={title}>{children}</Section>; }
+
+// "Guest can see" (docs/VIRTUALIZATION.md 8, 16): every channel between the machine and this computer in one list, each
+// with its state now and its switch (or a button to the section that holds it); model.js guestChannels
+function GuestCanSee({ rows, running, onSet, onShow }) {
+  const p = usePal();
+  return <Group title={tr('machines.cfg.see.title')}>
+    <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', paddingHorizontal: 14, paddingTop: 10 }}>{tr('machines.cfg.see.note')}</Text>
+    {rows.map((r, i) => {
+      const state = r.live ? tr(`machines.cfg.see.live.${r.live}`) : tr(r.on ? 'machines.cfg.on' : 'machines.cfg.off');
+      const detail = r.id === 'network'
+        ? [tr('machines.cfg.see.network', { mode: r.vars.mode === 'link' ? tr('machines.cfg.see.netLink') : tr(`machines.cfg.net.${r.vars.mode}`) }), r.vars.ports ? tr('machines.cfg.see.ports', { n: r.vars.ports }) : ''].filter(Boolean).join(' ')
+        : r.id === 'display' ? tr(`machines.cfg.see.display.${r.vars.kind}`) : r.id === 'folders' && r.vars.n ? tr('machines.cfg.see.folders', r.vars) : null;
+      return <Row key={r.id} label={tr(`machines.cfg.see.row.${r.id}`)} last={i === rows.length - 1} note={detail}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Text style={{ fontSize: 12, color: r.live === 'next' ? '#ffc56e' : p.dim }}>{state}</Text>
+          {r.key ? <Off off={running || !!r.locked}><Toggle on={r.on} onChange={(x) => onSet(r.id, x)} /></Off>
+            : r.section ? <Btn label={tr('machines.cfg.see.show')} onClick={() => onShow(r.section)} style={{ height: 28 }} /> : null}
+        </View>
+      </Row>;
+    })}
+  </Group>;
+}
 function Row({ label, value, children, last, note }) {
   const p = usePal();
   return (
@@ -224,6 +246,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const [picking, setPicking] = useState(false);
   const [askAuto, setAskAuto] = useState(false);
   const [pickShare, setPickShare] = useState(false);
+  const [pickKernel, setPickKernel] = useState('');      // 'kernel' | 'initrd' while Start Linux directly's file picker is open
   const [exporting, setExporting] = useState(false);
   const [disk, setDisk] = useState(null);
   const [sndDraft, setSndDraft] = useState({});
@@ -273,11 +296,12 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
     pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', cpuModel: m.cpuModel || 'host',
-    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, guestFiles: m.guestFiles !== false, ...draft };
+    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, guestFiles: m.guestFiles !== false, vulkan: !!m.vulkan,
+    kernelBoot: !!m.kernelBoot, cmdline: m.kernelCmdline || '', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'guestFiles' ? m.guestFiles !== false : k === 'cpuPin' ? m.cpuPin || 'off' : k === 'cpuModel' ? m.cpuModel || 'host' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'guestFiles' ? m.guestFiles !== false : k === 'cpuPin' ? m.cpuPin || 'off' : k === 'cpuModel' ? m.cpuModel || 'host' : k === 'kernelBoot' ? !!m.kernelBoot : k === 'cmdline' ? m.kernelCmdline || '' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -521,9 +545,14 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
             ...resolutions(screen.width, screen.height, null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: cur.resolution === `${w}x${h}`, onClick: () => set({ resolution: `${w}x${h}` }) }))]} /></Off>
       </Row>
       <Row label={tr('machines.cfg.graphics')} last={!m.windowsDevices && !gpuRow} note={note}>
-        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set(x === '3d' ? { graphics: x, gpu: '' } : { graphics: x })}
+        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set(x === '3d' ? { graphics: x, gpu: '' } : { graphics: x, vulkan: false })}
           options={[['2d', tr('machines.cfg.graphics2d')], ['3d', tr('machines.cfg.graphics3d'), !!why3d && cur.graphics !== '3d']]} /></Off>
       </Row>
+      {/* Vulkan through venus (6.10, machine.json "vulkan"): with 3D only; lord-vm gives it when this computer can and says
+          why not in the machine's log */}
+      {cur.graphics === '3d' ? <Row label={tr('machines.cfg.vulkan')} note={[tr('machines.cfg.vulkanNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running}><Toggle on={!!cur.vulkan} onChange={(x) => set({ vulkan: x })} /></Off>
+      </Row> : null}
       {/* who draws a Windows guest's pointer (7.1.2): LordOS, from the shape the guest hands over (no round trip through
           the guest for each move), or its display driver, into the picture; applied by the guest tools at the next start.
           Not with an Intel graphics card: HWCursor is the virtio driver's, and Intel's puts the pointer on the vGPU's cursor
@@ -765,8 +794,38 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Off off={running}><Toggle on={cur.bootMenu} onChange={(x) => set({ bootMenu: x })} /></Off>
       </Row>
     </Group>
+    {/* Start Linux directly (6.1, machine.json kernel_boot, schema 23): the kernel, initrd and command line kept in the
+        machine's disks/boot (lord-vm copies the chosen files in) instead of the boot loader on its disk; refused with
+        Secure Boot, the virtio-win devices, encryption and for a group's member (model.js kbootBlocked) */}
+    {(() => {
+      const why = kbootBlocked(m);
+      const ready = !!m.kernelFile && !!String(cur.cmdline || '').trim();
+      return <Group title={tr('machines.cfg.kboot.title')}>
+        <Row label={tr('machines.cfg.kboot.on')} note={[tr(why ? `machines.cfg.kboot.no.${why}` : 'machines.cfg.kboot.note'), offNote].filter(Boolean).join(' ')}>
+          <Off off={running || !!why || (!ready && !cur.kernelBoot)}><Toggle on={cur.kernelBoot} onChange={(x) => set({ kernelBoot: x })} /></Off>
+        </Row>
+        {why ? null : <>
+          <Row label={tr('machines.cfg.kboot.kernel')} value={tr(m.kernelFile ? 'machines.cfg.kboot.kept' : 'machines.cfg.kboot.none')}>
+            <View style={{ flexDirection: 'row' }}><Btn label={tr('machines.cfg.kboot.choose')} disabled={!!job} onClick={() => setPickKernel('kernel')} style={{ height: 28 }} /></View>
+          </Row>
+          <Row label={tr('machines.cfg.kboot.initrd')} value={tr(m.initrdFile ? 'machines.cfg.kboot.kept' : 'machines.cfg.kboot.none')}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Btn label={tr('machines.cfg.kboot.choose')} disabled={!!job} onClick={() => setPickKernel('initrd')} style={{ height: 28 }} />
+              {m.initrdFile ? <Btn label={tr('machines.cfg.kboot.remove')} disabled={!!job} onClick={() => save({ initrd: 'none' })} style={{ height: 28 }} /> : null}
+            </View>
+          </Row>
+          <Row label={tr('machines.cfg.kboot.cmdline')} last note={tr('machines.cfg.kboot.how', { name: m.name })}>
+            <View style={{ flex: 1, minWidth: 200 }}><TextInput value={cur.cmdline} placeholder="root=/dev/vda1 ro quiet" onChange={(x) => set({ cmdline: x.slice(0, 1023) })} /></View>
+          </Row>
+        </>}
+      </Group>;
+    })()}
   </>;
-  else if (sec === 'security') pane = <><Group>
+  else if (sec === 'security') pane = <><GuestCanSee rows={guestChannels(cur, m, { running, agentState: m.agentState })} running={running} cur={cur}
+    onSet={(id, on) => (id === 'automation' && on ? setAskAuto(true) : set(channelSet(id, on, cur)))} onShow={setSec} />
+  {askAuto ? <ConfirmDialog title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
+    cancelLabel={tr('machines.cancel')} onOk={() => { setAskAuto(false); set({ automation: true }); }} onCancel={() => setAskAuto(false)} /> : null}
+  <Group>
     {/* encrypted machines (8): whole (disks, UEFI variables, TPM, snapshots' memory), the key in Passwords; host swap */}
     <Row label={tr('machines.cfg.sec.encryption')} value={tr(m.encrypted ? 'machines.cfg.sec.encYes' : 'machines.cfg.sec.encNo')}
       note={tr(`machines.cfg.secNote.enc.${encryptionNote(m)}`, { name: m.name })} />
@@ -783,7 +842,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     })}
   </Group></>;
 
-  const savable = ['general', 'cpu', 'display', 'network', 'disks', 'sharing', 'agent', 'boot'].includes(sec);
+  const savable = ['general', 'cpu', 'display', 'network', 'disks', 'sharing', 'agent', 'boot', 'security'].includes(sec);
   const list = (
     <View style={{ width: 250, ...(side.narrow ? { flex: 1 } : null), paddingHorizontal: 10, paddingVertical: 12, gap: 2,
       backgroundColor: p.dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)', borderEndWidth: 1, borderColor: p.line }}>
@@ -838,6 +897,8 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
           set({ shares: [...cur.shares, { tag: shareTag(path.split('/').pop(), [...cur.shares.map((y) => y.tag), 'LordOS']), path, writable: false }] });
         }} /> : null}
       {exporting ? <ExportSheet m={m} running={running} onClose={() => setExporting(false)} /> : null}
+      {pickKernel ? <FilePicker title={tr(`machines.cfg.kboot.${pickKernel}`)} onClose={() => setPickKernel('')}
+        onPick={(x) => { const f = Array.isArray(x) ? x[0] : x; const k = pickKernel; setPickKernel(''); if (f) save({ [k]: f }); }} /> : null}
       {picking ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPicking(false)}
         onPick={(x) => { setPicking(false); save({ iso: Array.isArray(x) ? x[0] : x }); }} /> : null}
       {side.narrow && side.shown ? <SidebarOverlay width={260} onClose={side.close}>{list}</SidebarOverlay> : null}

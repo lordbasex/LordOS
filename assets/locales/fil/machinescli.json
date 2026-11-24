@@ -133,5 +133,8 @@
   "applyCreated": "Ginawa ang {name} ayon sa sinasabi ng {file}.",
   "applyUpdated": "Nasa {name} na ang mga setting mula sa {file}.",
   "applyRunning": "Tumatakbo ang {name}: i-shut down ito para baguhin mula sa file.",
-  "overBudget": "Hindi nagsimula ang {name}: kailangan nito ng {need} MB at {free} MB na lang ang natitira para sa mga machine. I-suspend o i-shut down ang ibang machine, o bigyan ito ng mas kaunting memory."
+  "overBudget": "Hindi nagsimula ang {name}: kailangan nito ng {need} MB at {free} MB na lang ang natitira para sa mga machine. I-suspend o i-shut down ang ibang machine, o bigyan ito ng mas kaunting memory.",
+  "help.migrate": "kinokopya ang buong disk ng ibang PC sa bagong makina, sa network gamit ang iyong SSH (o disk na nakakabit dito), at ini-import ito",
+  "migrating": "Kinokopya ang disk: {done} sa {total} GB…",
+  "migratePassword": "Password ng sudo sa {host}: "
 }

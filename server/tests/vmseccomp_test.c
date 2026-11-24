@@ -113,7 +113,7 @@ static void table_checks(void) {
     for (int i = 0; i < tab->n; i++) {
         const VmScRow *r = &tab->rows[i];
         CHECK(r->nr >= 0 && r->nr < 1024, "%s: %s has number %d", tab->name, r->name, r->nr);
-        CHECK(r->rule >= VSR_OK && r->rule <= VSR_USB, "%s: %s has no rule", tab->name, r->name);
+        CHECK(r->rule >= VSR_OK && r->rule <= VSR_VENUSEPERM, "%s: %s has no rule", tab->name, r->name);
         for (int j = 0; j < i; j++) {
             CHECK(strcmp(r->name, tab->rows[j].name), "%s: %s is twice", tab->name, r->name);
             CHECK(r->nr != tab->rows[j].nr, "%s: %s and %s are the same call", tab->name, r->name, tab->rows[j].name);
@@ -121,7 +121,9 @@ static void table_checks(void) {
     }
     for (int i = 0; DANGEROUS[i]; i++) {
         const VmScRow *r = row(DANGEROUS[i]);
-        CHECK(!r || r->rule == VSR_EPERM || r->rule == VSR_EACCES || r->rule == VSR_ENOSYS,
+        /* VENUS rows run only under the render server's own filter (VmScOpts.venus); QEMU's gets its default (below) */
+        CHECK(!r || r->rule == VSR_EPERM || r->rule == VSR_EACCES || r->rule == VSR_ENOSYS || r->rule == VSR_VENUS ||
+              r->rule == VSR_VENUSKILL || r->rule == VSR_VENUSEPERM,
               "%s: %s may run (it must be absent or refused)", tab->name, DANGEROUS[i]);
     }
     CHECK(!row("execve"), "%s: execve is a row (QEMU's one exec is execveat on lord-vm's descriptor)", tab->name);
@@ -164,6 +166,8 @@ static void program_checks(void) {
             case VSR_ENOSYS: CHECK(got == ERRNO(ENOSYS), "%s: %s isn't ENOSYS", tab->name, r->name); break;
             /* libusb's rows (6.6): only for a machine that may get a host USB device */
             case VSR_USB: CHECK(got == (o.usb ? ALLOW : deflt), "%s: %s with usb=%d", tab->name, r->name, o.usb); break;
+            /* QEMU's filter: the render server's rows are its default */
+            case VSR_VENUS: case VSR_VENUSKILL: case VSR_VENUSEPERM: CHECK(got == deflt, "%s: %s (the render server's) runs for QEMU (0x%x)", tab->name, r->name, got); break;
             default: break;     /* the argument rules, below */
             }
         }
@@ -224,7 +228,7 @@ static void program_checks(void) {
         CHECK(verdict(mf, 0, 0x3 | 0x0010, 0, 0) == deflt, "%s: a memfd with MFD_EXEC allowed", tab->name);
         /* pids */
         int pl = nr_of("prlimit64"), tk = nr_of("tgkill");
-        CHECK(!row("kill"), "%s: kill is a row (QEMU signals its threads with tgkill only)", tab->name);
+        CHECK(!row("kill") || (row("kill")->rule == VSR_VENUSKILL && verdict(nr_of("kill"), 77, 9, 0, 0) == deflt), "%s: kill runs for QEMU (QEMU signals its threads with tgkill only; kill is the render server's row)", tab->name);
         CHECK(verdict(pl, 0, 7, 0, 0) == ALLOW, "%s: prlimit64 on itself (0) refused", tab->name);
         CHECK(verdict(pl, (uint64_t)self, 7, 0, 0) == ALLOW, "%s: prlimit64 on its pid refused", tab->name);
         CHECK(verdict(pl, 1, 7, 0, 0) == deflt, "%s: prlimit64 on pid 1 allowed", tab->name);
@@ -278,6 +282,33 @@ static void program_checks(void) {
            tab->name, tab->n, ok, ar, er, maxlen);
 }
 
+/* venus's render server's filter (vm_jail_venus): its workers' forks, kill and tgkill only to a pid above 0, prlimit
+ * on itself, thread priorities EPERM; no exec but the one */
+static void venus_checks(void) {
+    VmScOpts o = { .render = 1, .venus = 1, .notify = 1, .self = 4242, .exec_fd = 9 };
+    if (build(&o) <= 0) { CHECK(0, "%s: the render server's program", tab->name); return; }
+    int cl = nr_of("clone");
+    CHECK(verdict(cl, 0x01200011 /* CHILD_SETTID|CHILD_CLEARTID|SIGCHLD */, 0, 0, 0) == ALLOW, "%s: venus: glibc's fork refused", tab->name);
+    CHECK(verdict(cl, 17 /* SIGCHLD */, 0, 0, 0) == ALLOW, "%s: venus: a plain fork refused", tab->name);
+    CHECK(verdict(cl, 0x10000000 | 17 /* CLONE_NEWUSER */, 0, 0, 0) != ALLOW, "%s: venus: a clone into a new namespace allowed", tab->name);
+    int k = nr_of("kill");
+    CHECK(verdict(k, 77, 9, 0, 0) == ALLOW, "%s: venus: kill of its worker refused", tab->name);
+    CHECK(verdict(k, 0, 9, 0, 0) == NOTIF, "%s: venus: kill 0 (its group) not stopped", tab->name);
+    CHECK(verdict(k, 0xffffffffu, 9, 0, 0) == NOTIF, "%s: venus: kill -1 not stopped", tab->name);
+    CHECK(verdict(k, 0xfffffff0u, 9, 0, 0) == NOTIF, "%s: venus: kill of a group not stopped", tab->name);
+    int tg = nr_of("tgkill");
+    CHECK(verdict(tg, 77, 78, 0, 0) == ALLOW && verdict(tg, 0, 78, 0, 0) == NOTIF && verdict(tg, 0xffffffffu, 1, 0, 0) == NOTIF,
+          "%s: venus: tgkill not limited to a pid above 0", tab->name);
+    int pl = nr_of("prlimit64");
+    CHECK(verdict(pl, 0, 0, 0, 0) == ALLOW && verdict(pl, 4242, 0, 0, 0) == ALLOW && verdict(pl, 77, 0, 0, 0) == NOTIF,
+          "%s: venus: prlimit not limited to itself", tab->name);
+    CHECK(verdict(nr_of("setpriority"), 0, 0, 19, 0) == ERRNO(EPERM) && verdict(nr_of("sched_setscheduler"), 0, 5, 0, 0) == ERRNO(EPERM),
+          "%s: venus: thread priorities not refused with EPERM", tab->name);
+    CHECK(verdict(nr_of("wait4"), 77, 0, 0, 0) == ALLOW, "%s: venus: wait4 refused", tab->name);
+    CHECK(verdict(nr_of("execveat"), 9, 0, 0, 0x1000) == NOTIF, "%s: venus: execveat not sent to lord-vm", tab->name);
+    if (nr_of("fork") >= 0) CHECK(verdict(nr_of("fork"), 0, 0, 0, 0) == ALLOW, "%s: venus: fork refused", tab->name);
+}
+
 int main(void) {
     Table native = { 0 }, other = { 0 };
     native.rows = vm_sc_rows(&native.n);
@@ -291,6 +322,7 @@ int main(void) {
     tab = &native;
     table_checks();
     program_checks();
+    venus_checks();
     /* names this computer gives the rows match the kernel's */
     for (int i = 0; i < native.n; i++) {
         const char *k = vm_sc_name(native.rows[i].nr);

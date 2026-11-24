@@ -133,5 +133,8 @@
   "applyCreated": "{name} a été créée comme le dit {file}.",
   "applyUpdated": "{name} a maintenant les réglages de {file}.",
   "applyRunning": "{name} est en marche : éteignez-la pour la modifier depuis un fichier.",
-  "overBudget": "{name} n'a pas démarré : elle a besoin de {need} Mo et il reste {free} Mo pour les machines. Suspendez ou éteignez une autre machine, ou donnez-lui moins de mémoire."
+  "overBudget": "{name} n'a pas démarré : elle a besoin de {need} Mo et il reste {free} Mo pour les machines. Suspendez ou éteignez une autre machine, ou donnez-lui moins de mémoire.",
+  "help.migrate": "copie le disque entier d'un autre PC dans une nouvelle machine, par le réseau via votre SSH (ou un disque branché ici), et l'importe",
+  "migrating": "Copie du disque : {done} sur {total} Go…",
+  "migratePassword": "Mot de passe sudo sur {host} : "
 }

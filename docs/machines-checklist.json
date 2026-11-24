@@ -5,11 +5,11 @@
  "items": [
   {
    "area": "A",
-   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 19, lock, `run.json`, crash recovery (3.8, 3.9)",
+   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 23, lock, `run.json`, crash recovery (3.8, 3.9)",
    "status": "✅",
    "pct": 100,
-   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 19`); `vm-test`, `vmgroup-test`",
-   "note": "Schema 19 (*in development*) adds `heads` (5.4, All Displays); 18 `cpu_model` (5.5); 17 `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
+   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 23`); `vm-test`, `vmgroup-test`",
+   "note": "Schema 23 (*in development*) adds `kernel_boot` (6.1, Start Linux directly); 22 `vulkan` (6.10, venus); 21 `usb` and `usb_auto` (6.6); 20 `guest_files` (6.21); 19 `heads` (5.4, All Displays); 18 `cpu_model` (5.5); 17 `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
   },
   {
    "area": "A",
@@ -39,9 +39,9 @@
    "area": "A",
    "item": "Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp allowlist on top of QEMU's own filter (a stopped call named in the log and on the failure page); QEMU in its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3)",
    "status": "✅",
-   "pct": 95,
+   "pct": 100,
    "file": "`vmsandbox.c` (`vm_ns_enter`, `vm_ns_setup`, `vm_jail_qemu`), `vmseccomp.c`, `vmsyscalls.h`, `lordvm.c` (`sc_serve`); `vmseccomp-test`, `vm-jail-probe`, `vm_isolation.sh`",
-   "note": "Namespaces, non-dumpable QEMU and the allowlist in development (2026-11-23); no pid namespace (GLib refuses the D-Bus display's peer then); a GVT-g vGPU machine, a bridged tap and hugetlb memory not yet run under the allowlist (their calls read in QEMU's source)"
+   "note": "Namespaces, non-dumpable QEMU and the allowlist in development (2026-11-23); no pid namespace for QEMU (GLib refuses the D-Bus display's peer then: a decision, 3.3). Run under the allowlist on 2026-11-24 on the dev PC: a GVT-g vGPU machine with a Debian 13 guest (which found the start hanging on a call made after the jail: fixed), a bridged machine (macvtap on the wired card, DHCP and DNS from the LAN) and hugetlb memory (1024 MB in 2 MB pages), no call stopped (was 95)"
   },
   {
    "area": "A",
@@ -62,18 +62,18 @@
   {
    "area": "A",
    "item": "\"Weaker isolation on this kernel\" notice when Landlock is missing (3.3)",
-   "status": "🧪",
-   "pct": 90,
-   "file": "`js_vm.c` (`host().landlock`), `model.js` `isolationGaps`, `library.jsx`, `configure.jsx` (Security), `vmwindow.jsx` (Info); `vm_model_test.mjs`, `machines_app_headless.sh`",
-   "note": "*In development*: the library's notice, Configure → Security's sandbox line and the window's Info menu, from the kernel's Landlock ABI and the running machine's VMS bits (namespaces too); Sentinela's alert as before. Not seen on a kernel without Landlock (every test host has it)"
+   "status": "✅",
+   "pct": 100,
+   "file": "`js_vm.c` (`host().landlock`), `model.js` `isolationGaps`, `library.jsx`, `configure.jsx` (Security), `vmwindow.jsx` (Info); `vm_model_test.mjs`, `machines_app_headless.sh`, `tools/vm/e2e/machines/nolandlock.py`",
+   "note": "*In development*: the library's notice, Configure → Security's sandbox line and the window's Info menu, from the kernel's Landlock ABI and the running machine's VMS bits (namespaces too); Sentinela's alert as before. Seen on a kernel without Landlock on 2026-11-24 (`nolandlock.py`, 7 of 7: Debian 13's 6.12.118 booted with `lsm=` without it in a scratch machine on the i9, this tree's headless session inside; `lord.vm.host().landlock` 0, the three texts on screen, a machine started there with `landlock-fs=0` and lord-vm's \"no Landlock on this kernel\" line) (was 🧪 90)"
   },
   {
    "area": "A",
    "item": "Render node by descriptor; one slice for all machines (3.3, 3.7)",
-   "status": "🟡",
-   "pct": 50,
-   "file": "`lordvm.c` passes a path (`rendernode=`); `sec/cgroup.c` `cgroup_machines_slice` (lordos-machines.slice)",
-   "note": "*In development*: the slice is built (the Resource budget row, 3.7); the render node still goes by path: QEMU's `rendernode=` takes a path, and Landlock limits it to that node (row above)"
+   "status": "✅",
+   "pct": 100,
+   "file": "`lordvm.c` (`render_open`, `rendernode=/proc/self/fd/N`), `vmsandbox.c` (`render_rules`, `rule_fd`); `sec/cgroup.c` `cgroup_machines_slice` (lordos-machines.slice)",
+   "note": "*In development*: lord-vm opens and checks the render node itself (DRM, minor 128–255, its sysfs name) and QEMU gets that descriptor; QEMU's `rendernode=` takes only a path (`util/drm.c` open()s it), so it reopens `/proc/self/fd/N`, and Landlock's rule is made from the same descriptor, so the device checked is the one QEMU may open. Checked with real 3D, venus and vGPU starts on 2026-11-24 (QEMU's fd 12 is renderD129). The slice by the app agent (the Resource budget row, 3.7) (was 50)"
   },
   {
    "area": "A",
@@ -94,10 +94,10 @@
   {
    "area": "A",
    "item": "Firmware identity kept with the machine; the old code file kept in the folder (3.6)",
-   "status": "🧪",
-   "pct": 95,
-   "file": "`machine.c` (`firmware_sha256`), `lordvm.c` (`fw_keep`, `--firmware-update`), `configure.jsx`; `vm_storage_test.sh`",
-   "note": "*In development*: `firmware-code.fd` kept at the first start, used by descriptor after a change (a changed copy never), the explicit move in Configure; checked by pointing a machine at another OVMF build, not with a real package update (was 40)"
+   "status": "✅",
+   "pct": 100,
+   "file": "`machine.c` (`firmware_sha256`), `lordvm.c` (`fw_keep`, `--firmware-update`), `configure.jsx`; `vm_storage_test.sh`, `pkgchange_inner.py`",
+   "note": "*In development*: `firmware-code.fd` kept at the first start, used by descriptor after a change (a changed copy never), the explicit move in Configure. A real package update checked on 2026-11-24 (`nolandlock.py --inner pkgchange_inner.py`, 13 of 13, a scratch Debian 13 machine on the i9): OVMF 2025.02-8 (Debian 13.0, from snapshot.debian.org) to 2025.02-8+deb13u1 through apt; the machine started with its kept copy (\"the system's UEFI code changed\"), and after `--set --firmware-update yes` with the new one (its SHA-256 in machine.json) (was 🧪 95)"
   },
   {
    "area": "A",
@@ -135,9 +135,9 @@
    "area": "A",
    "item": "A 3D guest's stop named (`qemu-3d-stop`, `qemu-3d-crash`), unattended starts in 2D (3.2, 6.10)",
    "status": "🧪",
-   "pct": 90,
+   "pct": 95,
    "file": "`vmlog.c`, `lordos-guest --stopping`; `guest_stop_test.sh`",
-   "note": "*In development*; no real 6.12.117 3D guest yet"
+   "note": "*In development*; a real Debian 13 guest with kernel 6.12.118 and Graphics 3D on the RX 580 (2026-11-24): `systemctl poweroff` ends cleanly (QEMU status 0, guest-shutdown; the guest's kernel warns in `virtio_gpu_queue_fenced_ctrl_buffer` after \"Power down\") and `systemctl reboot` resets and boots again: no abort here, so the naming itself still only seen with made-up logs (was 90)"
   },
   {
    "area": "A",
@@ -159,17 +159,17 @@
    "area": "A",
    "item": "A state saved by another QEMU or CPU: Resume anyway or discard (6.1)",
    "status": "✅",
-   "pct": 90,
-   "file": "`lordvm.c` (`--resume-anyway`), `vmwindow.jsx`, `apps/store/syspkg.js` `qemuUpdateRisk`, `debian.js` (Updates); `store_syspkg_test.mjs`",
-   "note": "*In development*: Store → Updates warns when an update changes QEMU while machines are suspended. HDA is migrated with the state (nothing to unplug); what can't be saved (a graphics card, 3D) is never suspended"
+   "pct": 95,
+   "file": "`lordvm.c` (`--resume-anyway`), `vmwindow.jsx`, `apps/store/syspkg.js` `qemuUpdateRisk`, `debian.js` (Updates); `store_syspkg_test.mjs`, `pkgchange_inner.py`",
+   "note": "*In development*: Store → Updates warns when an update changes QEMU while machines are suspended. HDA is migrated with the state (nothing to unplug); what can't be saved (a graphics card, 3D) is never suspended. A real QEMU update checked on 2026-11-24 (scratch Debian 13 machine on the i9): a machine suspended by QEMU 10.0.2 (Debian 13.0's), apt to 10.0.13, its start refused (\"saved by QEMU …\", `resume-failed`), `--resume-anyway` resumed it and it ran. Store → Updates' warning not seen on screen (a Maintainer check)"
   },
   {
    "area": "A",
-   "item": "Direct kernel boot (13.8 item 9)",
-   "status": "🟡",
-   "pct": 30,
-   "file": "`lordvm.c`",
-   "note": "Unattended installs only; none for an installed Linux guest"
+   "item": "Direct kernel boot (13.8 item 9; 6.1, \"Start Linux directly\")",
+   "status": "✅",
+   "pct": 95,
+   "file": "`lordvm.c` (`kboot_files`, `kboot_stage`, `S.kboot`), `vmkboot.h`, `machine.c` (schema 23 `kernel_boot`), `js_vm.c` (`kernelBoot`, `kernelFile`, `kernelCmdline`; `set`), `configure.jsx` (Boot), `model.js` `kbootBlocked`; `vmkboot-test` (ASan, UBSan, a random pass), `vm-test` (schema 21), `vm_model_test.mjs`, `tools/vm/e2e/machines/kernel-boot.py`, `machines_see_headless.sh`",
+   "note": "*In development* (2026-11-24): an installed Linux guest started from its own kernel, initrd and command line kept in `disks/boot` (copied in all or nothing, checked), refused with Secure Boot, the virtio-win devices, encryption and for a group; cold start to `MH-READY` on the i9 14.74 → 7.13 s with UEFI, 12.1 → 7.02 s with BIOS, real QEMU/KVM end to end (`kernel-boot.py`, 52 of 52). Not run on arm64 (the Pi has no build of this branch; the kernel check for arm64 is unit-tested) (was 30)"
   },
   {
    "area": "A",
@@ -262,26 +262,26 @@
   {
    "area": "B",
    "item": "Requirements check (5.2)",
-   "status": "🟡",
-   "pct": 80,
-   "file": "`library.jsx` `Requirements`, `model.js` `reqRows`, `missingFor`, `assistant.jsx`, `vm-enable`",
-   "note": "Create, which starts the download, waits until the parts are in (one click through the package engine). No per-system page of drivers and tools; not through the Store"
+   "status": "✅",
+   "pct": 95,
+   "file": "`library.jsx` `Requirements` (`sys`), `model.js` `reqRows`, `missingFor`, `assistant.jsx` (What's Missing with the chosen system), `js_vm.c` `host().guestTools`, `vm-enable`; `vm_model_test.mjs`, `machines_see_headless.sh`",
+   "note": "*In development* (2026-11-24): the Review's What's Missing opens *What ‹system› needs*: only that system's parts, the TPM for a virtio-win guest, its drivers and WinFsp *At Create*, the LordOS guest tools, an unattended install's answers *Built in*; seen headless for the virtio-win card (rows and statuses). Packages through `vm-enable` (the package engine with the Store's signed sources), not the Store's window: decided 2026-11-24. Not run: an install of a missing part from this page on screen (was 80)"
   },
   {
    "area": "B",
    "item": "Migrate from another PC (6.11)",
    "status": "🟡",
-   "pct": 25,
-   "file": "`lordvm.c` `--import-machine` (a raw whole-disk image), `machines.c` `cmd_import`",
-   "note": "*In development*: a backup image of a Linux PC's disk imports and boots (a 20 GB Ubuntu 26.04.1 image, 2026-11-24, with the import's `fsync` fix). Not built: the old PC's agent and the LAN copy, a connected disk, driver injection, encrypted disks (was ❌ 0)"
+   "pct": 70,
+   "file": "`machines.c` `cmd_migrate` (`machines migrate`), `lordvm.c` `--import-machine`; `machinescli.json`",
+   "note": "*In development* (2026-11-24): another PC's whole disk over the LAN through the person's own SSH (the old PC's SSH server is the agent: no new port, crypto or root; its sudo with `--sudo`), or a disk connected here; strict size header, sparse raw file, then the import with the compatible devices. Checked from the i9 with the Pi 5 as the old PC: a 20 GB disk (root-only loop device, `--sudo`) in 190 s, imported and booted to `MH-READY`; refusals (no sudo, a shell character, a host starting with `-`). Not built: an assistant tile (terminal only), a resumed copy, driver injection (compatible devices instead, 6.11), an old PC with no SSH server unless booted from a live USB (was 25)"
   },
   {
    "area": "B",
    "item": "Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19)",
    "status": "🟡",
-   "pct": 92,
-   "file": "`vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `--group-delete`, `--group-rename`, `--group-repair`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_ui_test.mjs`, `vm_group_link.sh`, `vm_group_manage.sh`, `machines_group_manage_headless.sh`",
-   "note": "*In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive (2026-11-24; headless, screenshots of the dialogs; the Start Gateway bar node-tested only, its window being protected). Creating a group from the app was refused before (the image store's file name); fixed. Left: the release gate on real hardware (G5) and disk encryption of the members (layer 5) (was 80)"
+   "pct": 96,
+   "file": "`vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `--group-delete`, `--group-rename`, `--group-repair`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_ui_test.mjs`, `vm_group_link.sh`, `vm_group_manage.sh`, `machines_group_manage_headless.sh`, `groupJobCloses` (`model.js`)",
+   "note": "*In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive. G5 run on the i9 on 2026-11-24 in a headless session (19.10): the group made from the verified 18.2.4.3 archive (SHA-512 as its signed list; 3 min 27 s), Start the Group; in the Workstation `check.torproject.org` said IsTor true, an onion site answered 200, `1.1.1.1` saw a Tor exit (`loc=T1`), a DNS query to 1.1.1.1 failed; meanwhile the only TCP connections of the run on this computer were the Gateway's passt to two relays Onionoo lists (nothing from the Workstation's QEMU); the Gateway stopped with the Workstation running showed the Start Gateway bar, and its button brought Tor back; Shut Down the Group stopped the Workstation then the Gateway by ACPI; Destroy and Start Fresh (new id and MAC, the overlay 214 MB → 198 KB); a disposable session's 100 MB file left the disk untouched. Found and fixed: after Start Fresh the old window stayed open on the same folder, so the next group start ran in two windows and one said it didn't start (`groupJobCloses`). Left: Tor Browser itself (curl stood in), the dev VM and the maintainer's PC (Maintainer checks), disk encryption of the members (layer 5) (was 92)"
   },
   {
    "area": "C",
@@ -575,17 +575,17 @@
    "area": "H",
    "item": "virgl 3D for Linux guests on amd64 (6.10)",
    "status": "✅",
-   "pct": 85,
-   "file": "`lordvm.c` (`decide_graphics`)",
-   "note": "RX 580; off on arm64 by decision"
+   "pct": 90,
+   "file": "`lordvm.c` (`decide_graphics`, `render_open`)",
+   "note": "RX 580; off on arm64 by decision. 2026-11-24: the render node by descriptor, a 6.12.118 guest's poweroff and reboot clean (A) (was 85)"
   },
   {
    "area": "H",
    "item": "Intel GVT-g vGPU with our GOP ROM, Windows guest (6.10.1, MACHINES-GPU.md)",
    "status": "✅",
-   "pct": 85,
-   "file": "`vmgpu*.c`, `vmgvtwin.c`; `vmgpu-test`",
-   "note": "No Linux guest on a vGPU; tested on device 0x9BC5 only"
+   "pct": 95,
+   "file": "`vmgpu*.c`, `vmgvtwin.c`, `lordvm.c` (`decide_vgpu`); `vmgpu-test`",
+   "note": "2026-11-24, a scratch `i915-GVTg_V5_8` vGPU (none of the maintainer's in use) for a Debian 13 guest under the allowlist: its i915 says \"Virtual GPU for Intel GVT-g detected\" and makes card0/renderD128; the start used to hang (Landlock's ABI asked after the jail: fixed). Tested on device 0x9BC5 only (was 85: no Linux guest)"
   },
   {
    "area": "H",
@@ -606,26 +606,26 @@
   {
    "area": "H",
    "item": "A smoother picture, Part 1 step 4: several damage rectangles (MACHINES-GPU.md)",
-   "status": "❌",
-   "pct": 0,
-   "file": "`vmdisplay.c` `damage()` merges into one box",
-   "note": "Pacing (M) changed when pictures are taken, not their damage"
+   "status": "🧪",
+   "pct": 95,
+   "file": "`vmdamage.h`, `vmdisplay.c` (`damage`, `flush`), `vmproto.h` (VD_FRAME f), `js_vm.c` (`from_vd`); `vmdamage-test` (fuzz), `vmdisplay-test`, `vm_picture_2d.sh`",
+   "note": "*In development*: up to 8 rectangles a frame, near ones merged, each its own VD_FRAME and its own damage in lord-server. Checked against a mock QEMU (a clock and a square: 2 rectangles of 5,296 pixels instead of a 340,800-pixel box) and a real Debian 13 guest headless (189 frames in 10 s, acknowledged; Linux's DRM console merges its own damage, one rectangle a frame). Not yet run with a Windows guest, whose display driver updates apart (was ❌ 0)"
   },
   {
    "area": "H",
    "item": "A smoother picture, Part 1 step 5: scaled on the GPU (MACHINES-GPU.md)",
-   "status": "🟡",
-   "pct": 40,
-   "file": "`js_vm.c` (`gtex`, `gout`), `gpu/dmaread.c`, `media/mview.c`",
-   "note": "dmabuf pictures (virgl, vGPU) are GPU textures; a 2D picture is still scaled per pixel on the CPU over the whole frame (was ❌ 0)"
+   "status": "🧪",
+   "pct": 90,
+   "file": "`media.c` (`media_src_tex_rect`, `media_src_tex_fresh`), `mview.c`, `js_vm.c` (`from_vd`); `mview-test`, `vm_picture_2d.sh`",
+   "note": "*In development*: a 2D picture's memory is a GPU texture while the GPU composes (its rectangles uploaded alone, a frame then only presented: no UI paint), and the CPU path remakes only the part of the scaled copy a frame changed (pixel-exact against a whole copy, 120 random frames). Headless lord-server composes on the CPU, so the texture path is unit-checked only: not yet on a real display (was 40)"
   },
   {
    "area": "H",
    "item": "venus (Vulkan) (6.10)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": ""
+   "status": "🧪",
+   "pct": 85,
+   "file": "`lordvm.c` (`decide_graphics`, `venus_refusal`, `spawn_venus`, `vs_serve`), `venusshim.c`, `vmsandbox.c` (`vm_jail_venus`), `vmsyscalls.h` (VENUS rows), `machine.c` (schema 22 `vulkan`), `configure.jsx`; `vm-jail-probe` (render server cases)",
+   "note": "*In development*: Configure → Display → Vulkan with 3D. lord-vm starts virglrenderer's render server in a jail of its own (pid namespace, Landlock, the allowlist with a listener, one exec, only the start's library mappings) and QEMU gets its connection through a preloaded library: QEMU never forks or execs. Checked 2026-11-24 in a Debian 13 guest on the UHD 630: a Vulkan compute shader on \"Virtio-GPU Venus (Intel UHD Graphics 630)\", 0 wrong values. Refused, with the reason in the log, where the host can't map the GPU's memory (RADV needs Linux 6.13; a discrete GPU with an Intel processor 6.16 and QEMU 11): the RX 580 under Debian 13's 6.12 crashed the guest by hand (KVM's internal error). No graphics workload with a picture yet; the switch not seen on screen"
   },
   {
    "area": "H",
@@ -633,7 +633,7 @@
    "status": "❌",
    "pct": 0,
    "file": "`vmgpu_admin.c` refuses a dedicated card",
-   "note": "\"Whole\" in Configure is the largest GVT-g type, not passthrough"
+   "note": "\"Whole\" in Configure is the largest GVT-g type, not passthrough. Not built: this computer has no spare card (the RX 580 draws the desktop, the UHD 630 is the GVT-g card and its own IOMMU group's only device) and no other device free for a vfio-pci trial; the design stays MACHINES-GPU.md's"
   },
   {
    "area": "I",
@@ -743,9 +743,9 @@
    "area": "L",
    "item": "Guest data treated as hostile: logs cleaned, parsers fuzzed (8)",
    "status": "✅",
-   "pct": 90,
-   "file": "`logclean.h`; `vm-test` fuzz passes, `vmimport-test` mutations",
-   "note": "No fuzz of lord-vmdisplay's D-Bus side or of `lordos-guest`'s parser"
+   "pct": 100,
+   "file": "`logclean.h`, `vmdisplay.c` (`qtext`); `vm-test` fuzz passes, `vmimport-test` mutations, `vmdisplay-fuzz`, `guest-fuzz`, `agent-fuzz-test`, `guest-dbus-test` (mutation pass)",
+   "note": "*In development* (2026-11-24): lord-vmdisplay's D-Bus side against a hostile QEMU (about 12,000 seeded calls a run: every listener, map and sound call with edge values, wrong signatures, pipes and short or shrunk descriptors; the helper under ASan and UBSan in its own sandbox: every call answered, none past QEMU's 1 s, no report); `lordos-guest` against a hostile host, guest lord-server, X display, buses and local programs at once (ASan, UBSan, as a user namespace's root where no shell opens; every frame it sends the host must parse); every agent parser of both ends under structured mutation (500,000 checks). Found and fixed: QEMU's words (a console's label, its refusals) went into the session's log raw (new lines, escapes); an X display that kept sending events held lordos-guest in its setup for ever (one 3 s limit now); a `unix:/path` display wasn't reached. Each harness caught a bounds check taken out on purpose (was 90: no fuzz of lord-vmdisplay's D-Bus side or of `lordos-guest`)"
   },
   {
    "area": "L",
@@ -774,10 +774,10 @@
   {
    "area": "L",
    "item": "\"Guest can see\" (8, 16)",
-   "status": "🟡",
-   "pct": 40,
-   "file": "`configure.jsx` (Security: six notes on the sandbox)",
-   "note": "It doesn't list the guest's channels; each one's switch is in its own section; no single panel, no live state (was 60)"
+   "status": "✅",
+   "pct": 95,
+   "file": "`configure.jsx` (`GuestCanSee`, Security), `model.js` `guestChannels`, `channelSet`; `vm_model_test.mjs`, `machines_see_headless.sh`",
+   "note": "*In development* (2026-11-24): one list in Configure → Security of every channel (network and ports, screen, keyboard and mouse, sound, microphone, the clipboard each way, folders, transfer folder, agent, Automation, files, links, notifications), each with its state, its live state while running (agent connected or not, a change waiting for the next start) and its switch or a Show button to its section; anonymity rows locked. Seen headless (screenshots); not yet with a running guest on screen (was 40)"
   },
   {
    "area": "L",
@@ -791,9 +791,9 @@
    "area": "M",
    "item": "Targets measured: CPU, network, idle CPU, the Pi desktop, disk (9, 6.4.1)",
    "status": "🟡",
-   "pct": 60,
-   "file": "sections 6.4.1, 3.7.1, 13",
-   "note": "Disk and the host frame under pinning measured on the i9 since; pause, suspend, latency to the screen, app memory not measured; amd64 Phase 0 figures nested"
+   "pct": 80,
+   "file": "sections 6.4.1, 3.7.1, 13, `tools/vm/e2e/machines/targets.py`",
+   "note": "Measured on 2026-11-24 with `targets.py` on the i9 bare metal and the Pi 5 (section 9, \"Measured on bare metal\"): boot, CPU, disk, network, pause and resume, idle QEMU. The i9 ran with other work on it (load average about 20 of 20 threads), so its CPU and disk ratios are lower bounds. Not measured: suspend and resume with 8 GB (the run was stopped), latency to the screen, app memory, desktop frame time under load"
   },
   {
    "area": "M",
@@ -806,10 +806,10 @@
   {
    "area": "M",
    "item": "2. Huge pages for guest RAM",
-   "status": "🧪",
-   "pct": 95,
+   "status": "✅",
+   "pct": 100,
    "file": "`vmmem.h`, `lordvm.c` (`mem_backing`), `tools/iso/mkdeb.sh` (`lordos-thp.conf`), migration 011; `vmmem-test`, `migration_shmem_huge_test.sh`",
-   "note": "*In development*; private memory gets THP, shared memory (shared folders, the transfer folder) too since `memory-backend-ram,share=on` and `shmem_enabled=advise` (approved 2026-11-23; a running guest's memory seen as `ShmemPmdMapped`, 3.7.2); hugetlb only when the administrator reserved pages. Headless and on the dev host (was 85: shared memory's THP waited for approval)"
+   "note": "*In development*; private memory gets THP, shared memory (shared folders, the transfer folder) too since `memory-backend-ram,share=on` and `shmem_enabled=advise` (approved 2026-11-23; a running guest's memory seen as `ShmemPmdMapped`, 3.7.2); hugetlb only when the administrator reserved pages: run 2026-11-24 with 600 pages reserved, \"1024 MB in 2 MB hugetlb pages\", a Debian 13 guest booted and worked under the allowlist (was 95)"
   },
   {
    "area": "M",
@@ -832,8 +832,8 @@
    "item": "5. Guest-side performance profile through the guest tools",
    "status": "🧪",
    "pct": 85,
-   "file": "`lordvm.c` (`AGK_PERF`), `vmperfwin.c`, `configure.jsx`, `lordos-guest-win.c` w11, `tools/guest/perf.c` (`lordos-guest` 7); `vm-test`, `guest-dbus-test`, `guest_perf_test.sh`",
-   "note": "*In development*; Windows guests: power plan, effects, transparency (checked in the maintainer's guest) and Windows Search paused (lord-vm's fixed script as SYSTEM); Linux guests: power-profiles-daemon and GNOME's animations over D-Bus (KDE and others refused). Not yet checked in a running guest: the Search scripts and the Linux part (was 🟡 55)"
+   "file": "`lordvm.c` (`AGK_PERF`), `vmperfwin.c`, `configure.jsx`, `lordos-guest-win.c` w11, `tools/guest/perf.c` (`lordos-guest` 7); `vm-test`, `guest-dbus-test`, `guest_perf_test.sh`, `perf_linux.py`",
+   "note": "*In development*; Windows guests: power plan, effects, transparency (checked in the maintainer's guest) and Windows Search paused (lord-vm's fixed script as SYSTEM); Linux guests: power-profiles-daemon and GNOME's animations over D-Bus (KDE and others refused). Run in a real Debian 13 guest on the i9 on 2026-11-24 (`perf_linux.py`): power-profiles-daemon in a KVM guest has only its placeholder driver (no performance profile), so the tools said it was refused and left balanced, and lord-vm heard it; without a desktop portal the animations stayed, and the tools said why. Not checked: a GNOME guest, the Search scripts"
   },
   {
    "area": "M",
@@ -890,16 +890,16 @@
    "name": "Engine, lifecycle, sandbox, display",
    "weight": 14,
    "items": 22,
-   "mean": 92.05,
-   "score": 92
+   "mean": 98.64,
+   "score": 99
   },
   {
    "id": "B",
    "name": "Getting a system in",
    "weight": 12,
    "items": 13,
-   "mean": 87.85,
-   "score": 88
+   "mean": 92.77,
+   "score": 93
   },
   {
    "id": "C",
@@ -946,8 +946,8 @@
    "name": "Graphics",
    "weight": 7,
    "items": 8,
-   "mean": 46.25,
-   "score": 46
+   "mean": 76.88,
+   "score": 77
   },
   {
    "id": "I",
@@ -978,16 +978,16 @@
    "name": "Privacy and security model",
    "weight": 4,
    "items": 7,
-   "mean": 85.71,
-   "score": 86
+   "mean": 95.0,
+   "score": 95
   },
   {
    "id": "M",
    "name": "Performance",
    "weight": 3,
    "items": 7,
-   "mean": 85.71,
-   "score": 86
+   "mean": 89.29,
+   "score": 89
   },
   {
    "id": "N",
@@ -998,6 +998,6 @@
    "score": 92
   }
  ],
- "total": 89,
- "total_exact": 88.89
+ "total": 93,
+ "total_exact": 93.09
 }

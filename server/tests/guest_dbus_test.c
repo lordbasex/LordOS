@@ -258,7 +258,60 @@ static void test_notify(void) {
         CHECK(l <= 40 && strlen(out) == l);
     }
 }
+/* well-formed messages changed byte by byte (random bytes rarely get past the header): a Notify call, replies holding a
+ * variant string, a boolean, an error. Whatever is taken stays inside the message and inside the caller's caps; under
+ * ASan each message is a heap block of exactly its size */
+static void test_mutate(void) {
+    uint32_t seed = 0x6d757461;
+#define R() (seed = seed * 1103515245 + 12345, seed >> 8)
+    static const uint8_t E[] = { 0, 1, 0x7f, 0x80, 0xff, 'v', 's', 'g', 'a', '{', '(' };
+    for (int it = 0; it < 60000; it++) {
+        uint8_t body[1024], m[2048];
+        size_t n;
+        DbW w;
+        dbw_init(&w, body, sizeof body);
+        switch (it % 4) {
+        case 0:
+            dbw_str(&w, "app"); dbw_u32(&w, 0); dbw_str(&w, ""); dbw_str(&w, "Summary <b>x</b>"); dbw_str(&w, "Body &amp; more");
+            dbw_u32(&w, 0); dbw_u32(&w, 0);
+            while (w.n % 8) w.p[w.n++] = 0;
+            dbw_u32(&w, 5);
+            n = db_call_build(m, sizeof m, 9, NULL, "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Notify", "susssasa{sv}i", body, w.n);
+            break;
+        case 1: dbw_variant_str(&w, "performance"); n = reply(m, DB_RETURN, 3, 2, "v", NULL, body, w.n); break;
+        case 2: { uint8_t b[8] = { 1, 'b', 0, 0, 1, 0, 0, 0 }; n = reply(m, DB_RETURN, 3, 2, "v", NULL, b, 8); break; }
+        default: dbw_str(&w, "no such thing"); n = reply(m, DB_ERROR, 3, 2, "s", "org.freedesktop.DBus.Error.Failed", body, w.n); break;
+        }
+        int k = 1 + (int)(R() % 4);
+        while (k--) { size_t i = R() % n; m[i] = R() % 2 ? (uint8_t)(m[i] ^ (1u << (R() % 8))) : E[R() % sizeof E]; }
+        if (R() % 8 == 0) n = R() % (n + 1);
+        uint8_t *p = malloc(n ? n : 1);
+        memcpy(p, m, n);
+        DbMsg r;
+        long t = db_msg_total(p, n);
+        CHECK(t >= -1 && t <= (long)DB_SKIP_MAX);
+        int used = db_msg_parse(p, n, &r);
+        CHECK(used >= -1 && used <= (int)n);
+        if (used > 0) {
+            CHECK(!r.body_n || (r.body >= p && r.body + r.body_n <= p + used));
+            CHECK(strlen(r.sig) < sizeof r.sig && strlen(r.member) < sizeof r.member && strlen(r.iface) < sizeof r.iface && strlen(r.err) < sizeof r.err);
+            char s[16], app[8], sum[12], bo[20];
+            int b;
+            if (!db_reply_str(&r, s, sizeof s)) CHECK(strlen(s) < sizeof s);
+            db_reply_bool(&r, &b);
+            if (!db_notify_body(&r, app, sizeof app, sum, sizeof sum, bo, sizeof bo)) {
+                CHECK(strlen(app) < sizeof app && strlen(sum) < sizeof sum && strlen(bo) < sizeof bo);
+                char out[24];
+                CHECK(db_note_plain(sum, out, 20) <= 20 && strlen(out) <= 20);
+            }
+        }
+        free(p);
+    }
+#undef R
+}
+
 int main(void) {
+    test_mutate();
     test_build();
     test_parse();
     test_dconf();

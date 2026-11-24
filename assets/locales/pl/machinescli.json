@@ -133,5 +133,8 @@
   "applyCreated": "Utworzono {name} zgodnie z {file}.",
   "applyUpdated": "{name} ma teraz ustawienia z {file}.",
   "applyRunning": "{name} działa: wyłącz ją, aby zmienić ją z pliku.",
-  "overBudget": "{name} nie uruchomiła się: potrzebuje {need} MB, a dla maszyn zostało {free} MB. Wstrzymaj lub wyłącz inną maszynę albo daj jej mniej pamięci."
+  "overBudget": "{name} nie uruchomiła się: potrzebuje {need} MB, a dla maszyn zostało {free} MB. Wstrzymaj lub wyłącz inną maszynę albo daj jej mniej pamięci.",
+  "help.migrate": "kopiuje cały dysk innego komputera do nowej maszyny, przez sieć za pomocą Twojego SSH (lub dysk podłączony tutaj), i ją importuje",
+  "migrating": "Kopiowanie dysku: {done} z {total} GB…",
+  "migratePassword": "Hasło sudo na {host}: "
 }

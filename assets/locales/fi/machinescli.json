@@ -133,5 +133,8 @@
   "applyCreated": "{name} luotiin niin kuin {file} sanoo.",
   "applyUpdated": "Koneella {name} on nyt tiedoston {file} asetukset.",
   "applyRunning": "{name} on käynnissä: sammuta se muuttaaksesi sitä tiedostosta.",
-  "overBudget": "{name} ei käynnistynyt: se tarvitsee {need} Mt ja koneille on jäljellä {free} Mt. Keskeytä tai sammuta toinen kone, tai anna sille vähemmän muistia."
+  "overBudget": "{name} ei käynnistynyt: se tarvitsee {need} Mt ja koneille on jäljellä {free} Mt. Keskeytä tai sammuta toinen kone, tai anna sille vähemmän muistia.",
+  "help.migrate": "kopioi toisen tietokoneen koko levyn uudeksi koneeksi verkon yli SSH:llasi (tai tähän liitetyn levyn) ja tuo sen",
+  "migrating": "Kopioidaan levyä: {done}/{total} Gt…",
+  "migratePassword": "sudon salasana koneella {host}: "
 }
