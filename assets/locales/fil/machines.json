@@ -430,6 +430,8 @@
   "tb.cdRefused": "Hindi makatanggap ng disc ang drive ngayon.",
   "tb.cdFailed": "Hindi mapalitan ang disc: {why}",
   "win.netLost": "Huminto ang network ng makinang ito at hindi na maibalik. Babalik ito kapag nagsimula ulit ang makina; sinasabi ng log ng makina kung bakit.",
+  "win.shareLost": "Huminto sa paggana ang shared folder na “{folder}” sa machine na ito. Babalik ito kapag nag-start ulit ang machine; sinasabi ng log ng machine kung bakit.",
+  "win.transferLost": "Huminto sa paggana ang transfer folder sa machine na ito. Babalik ito kapag nag-start ulit ang machine; sinasabi ng log ng machine kung bakit.",
   "win.netReconnecting": "Huminto ang network ng makinang ito. Muling kumokonekta…",
   "win.netBack": "Bumalik na ang network ({s} s nang wala ito).",
   "cmd.suspend": "I-suspend",

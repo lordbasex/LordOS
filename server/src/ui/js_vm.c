@@ -3764,7 +3764,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     }
     set_str(c, o, "cdMessage", s->cd_msg);
     set_str(c, o, "notice", s->notice == VMN_NET_LOST ? "network-lost" : s->notice == VMN_RECOVERED ? "recovered" : s->notice == VMN_NET_BACK ? "network-back"
-                          : s->notice == VMN_IDENTITY ? "identity" : "");
+                          : s->notice == VMN_IDENTITY ? "identity" : s->notice == VMN_SHARE_LOST ? "share-lost" : "");
     set_int(c, o, "noticeCode", s->notice_code);
     set_int(c, o, "noticeSeq", s->notice_seq);
     if (s->job_kind) {

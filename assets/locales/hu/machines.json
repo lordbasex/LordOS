@@ -430,6 +430,8 @@
   "tb.cdRefused": "A meghajtó most nem tud lemezt fogadni.",
   "tb.cdFailed": "A lemezt nem sikerült cserélni: {why}",
   "win.netLost": "A gép hálózata leállt, és nem sikerült visszaállítani. A gép következő indításakor visszatér; a gépnapló megmondja, miért.",
+  "win.shareLost": "A(z) „{folder}” megosztott mappa leállt ebben a gépben. A gép következő indításakor visszatér; a gép naplója megmondja, miért.",
+  "win.transferLost": "Az átviteli mappa leállt ebben a gépben. A gép következő indításakor visszatér; a gép naplója megmondja, miért.",
   "win.netReconnecting": "A gép hálózata leállt. Újracsatlakozás…",
   "win.netBack": "A hálózat visszatért ({s} mp kiesés után).",
   "cmd.suspend": "Felfüggesztés",

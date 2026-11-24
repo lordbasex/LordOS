@@ -430,6 +430,8 @@
   "tb.cdRefused": "Sürücü indi disk qəbul edə bilmir.",
   "tb.cdFailed": "Diski dəyişmək mümkün olmadı: {why}",
   "win.netLost": "Bu maşının şəbəkəsi dayandı və bərpa edilə bilmədi. Maşın yenidən başlayanda geri qayıdır; səbəbi maşın jurnalındadır.",
+  "win.shareLost": "“{folder}” paylaşılan qovluğu bu maşında işləməyi dayandırdı. Maşın yenidən başlayanda geri qayıdır; səbəbini maşının jurnalı deyir.",
+  "win.transferLost": "Ötürmə qovluğu bu maşında işləməyi dayandırdı. Maşın yenidən başlayanda geri qayıdır; səbəbini maşının jurnalı deyir.",
   "win.netReconnecting": "Bu maşının şəbəkəsi dayandı. Yenidən qoşulur…",
   "win.netBack": "Şəbəkə geri qayıtdı ({s} san. onsuz).",
   "cmd.suspend": "Yuxu rejimi",

@@ -430,6 +430,8 @@
   "tb.cdRefused": "Enheten kan inte ta emot en skiva just nu.",
   "tb.cdFailed": "Skivan kunde inte bytas: {why}",
   "win.netLost": "Maskinens nätverk stoppade och kunde inte återställas. Det kommer tillbaka när maskinen startas igen; maskinloggen förklarar varför.",
+  "win.shareLost": "Den delade mappen ”{folder}” slutade fungera i den här maskinen. Den kommer tillbaka när maskinen startar igen; maskinens logg säger varför.",
+  "win.transferLost": "Överföringsmappen slutade fungera i den här maskinen. Den kommer tillbaka när maskinen startar igen; maskinens logg säger varför.",
   "win.netReconnecting": "Maskinens nätverk stoppade. Återansluter…",
   "win.netBack": "Nätverket är tillbaka ({s} s utan det).",
   "cmd.suspend": "Vila",

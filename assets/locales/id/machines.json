@@ -430,6 +430,8 @@
   "tb.cdRefused": "Drive tidak dapat menerima cakram sekarang.",
   "tb.cdFailed": "Cakram tidak dapat diganti: {why}",
   "win.netLost": "Jaringan mesin ini berhenti dan tidak dapat dipulihkan. Jaringan kembali saat mesin dimulai lagi; log mesin menjelaskan penyebabnya.",
+  "win.shareLost": "Folder bersama “{folder}” berhenti bekerja di mesin ini. Folder itu kembali saat mesin dinyalakan lagi; log mesin menyebutkan alasannya.",
+  "win.transferLost": "Folder transfer berhenti bekerja di mesin ini. Folder itu kembali saat mesin dinyalakan lagi; log mesin menyebutkan alasannya.",
   "win.netReconnecting": "Jaringan mesin ini berhenti. Menyambung ulang…",
   "win.netBack": "Jaringan sudah kembali ({s} dtk tanpa jaringan).",
   "cmd.suspend": "Tangguhkan",

@@ -430,6 +430,8 @@
   "tb.cdRefused": "Įrenginys dabar negali priimti disko.",
   "tb.cdFailed": "Disko pakeisti nepavyko: {why}",
   "win.netLost": "Šios mašinos tinklas sustojo ir jo nepavyko atkurti. Jis grįš, kai mašina bus paleista iš naujo; mašinos žurnalas nurodo priežastį.",
+  "win.shareLost": "Bendrinamas aplankas „{folder}“ šioje mašinoje nustojo veikti. Jis grįš, kai mašina vėl pasileis; mašinos žurnale parašyta kodėl.",
+  "win.transferLost": "Perdavimo aplankas šioje mašinoje nustojo veikti. Jis grįš, kai mašina vėl pasileis; mašinos žurnale parašyta kodėl.",
   "win.netReconnecting": "Šios mašinos tinklas sustojo. Jungiamasi iš naujo…",
   "win.netBack": "Tinklas grįžo (be jo praėjo {s} s).",
   "cmd.suspend": "Užmigdyti",

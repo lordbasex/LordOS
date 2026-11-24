@@ -430,6 +430,8 @@
   "tb.cdRefused": "驱动器现在无法放入光盘。",
   "tb.cdFailed": "无法更换光盘：{why}",
   "win.netLost": "此虚拟机的网络已停止，且无法恢复。虚拟机再次启动时网络会恢复；虚拟机日志说明了原因。",
+  "win.shareLost": "共享文件夹“{folder}”在这台机器中停止工作。机器再次启动时会恢复；原因见机器日志。",
+  "win.transferLost": "传输文件夹在这台机器中停止工作。机器再次启动时会恢复；原因见机器日志。",
   "win.netReconnecting": "此虚拟机的网络已停止。正在重新连接…",
   "win.netBack": "网络已恢复（中断了 {s} 秒）。",
   "cmd.suspend": "挂起",

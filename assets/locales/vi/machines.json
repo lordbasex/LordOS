@@ -430,6 +430,8 @@
   "tb.cdRefused": "Ổ đĩa hiện không thể nhận đĩa.",
   "tb.cdFailed": "Không thể thay đĩa: {why}",
   "win.netLost": "Mạng của máy ảo này đã dừng và không thể khôi phục. Nó sẽ hoạt động lại khi máy ảo khởi động lại; nhật ký máy ảo cho biết lý do.",
+  "win.shareLost": "Thư mục dùng chung “{folder}” đã ngừng hoạt động trong máy này. Nó sẽ trở lại khi máy khởi động lại; nhật ký của máy cho biết lý do.",
+  "win.transferLost": "Thư mục chuyển tệp đã ngừng hoạt động trong máy này. Nó sẽ trở lại khi máy khởi động lại; nhật ký của máy cho biết lý do.",
   "win.netReconnecting": "Mạng của máy ảo này đã dừng. Đang kết nối lại…",
   "win.netBack": "Mạng đã trở lại (mất {s} giây).",
   "cmd.suspend": "Tạm ngưng",

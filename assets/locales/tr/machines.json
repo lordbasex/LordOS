@@ -430,6 +430,8 @@
   "tb.cdRefused": "Sürücü şu anda disk alamıyor.",
   "tb.cdFailed": "Disk değiştirilemedi: {why}",
   "win.netLost": "Bu makinenin ağı durdu ve geri getirilemedi. Makine yeniden başladığında geri gelir; nedenini makine günlüğü söylüyor.",
+  "win.shareLost": "“{folder}” paylaşılan klasörü bu makinede çalışmayı durdurdu. Makine yeniden başladığında geri gelir; nedenini makinenin günlüğü söyler.",
+  "win.transferLost": "Aktarım klasörü bu makinede çalışmayı durdurdu. Makine yeniden başladığında geri gelir; nedenini makinenin günlüğü söyler.",
   "win.netReconnecting": "Bu makinenin ağı durdu. Yeniden bağlanılıyor…",
   "win.netBack": "Ağ geri geldi ({s} sn kesintiden sonra).",
   "cmd.suspend": "Askıya Al",

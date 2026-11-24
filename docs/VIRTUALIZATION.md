@@ -51,10 +51,10 @@ recomputes both from the rows; the arithmetic:
 | K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 91.25 | 91 % | 3 × 91 % = 2.73 | 61 % |
 | L. Privacy and security model | 4 | 7 | 85.71 | 86 % | 4 × 86 % = 3.44 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
-| N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **110** | | | **82.26 → 82 %** | 69 % |
+| N. Tests and validation on hardware | 3 | 5 | 92.00 | 92 % | 3 × 92 % = 2.76 | 55 % |
+| **Total** | **100** | **110** | | | **83.37 → 83 %** | 69 % |
 
-Σ = 12.88 + 10.56 + 10.45 + 7.65 + 5.34 + 3.36 + 9.24 + 3.22 + 6.37 + 2.79 + 2.73 + 3.44 + 2.58 + 1.65 = 82.26, rounded **82 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.88 + 10.56 + 10.45 + 7.65 + 5.34 + 3.36 + 9.24 + 3.22 + 6.37 + 2.79 + 2.73 + 3.44 + 2.58 + 2.76 = 83.37, rounded **83 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); the rest of guest → host links (G, +0.3); the file copy panel with drag out, USB, then camera and printers (G and F, +1.2
@@ -259,15 +259,15 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | 5. Guest-side performance profile through the guest tools | 🧪 | 85 | `lordvm.c` (`AGK_PERF`), `vmperfwin.c`, `configure.jsx`, `lordos-guest-win.c` w11, `tools/guest/perf.c` (`lordos-guest` 7); `vm-test`, `guest-dbus-test`, `guest_perf_test.sh` | *In development*; Windows guests: power plan, effects, transparency (checked in the maintainer's guest) and Windows Search paused (lord-vm's fixed script as SYSTEM); Linux guests: power-profiles-daemon and GNOME's animations over D-Bus (KDE and others refused). Not yet checked in a running guest: the Search scripts and the Linux part (was 🟡 55) |
 | 6. vCPU pinning | ✅ | 95 | `vmpin.c`, `lordvm.c`, `configure.jsx` (Pin cores); `vmpin-test` | *In development*; measured on the i9 (8 vCPUs: host frame p99 15.2 → 9.9 ms) |
 
-### N. Tests and validation (55 %)
+### N. Tests and validation (92 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Unit and headless suites in `make test` (12) | ✅ | 90 | `server/mk/vm.mk`, `vmpin.mk`, `tests/run_suites.sh` | 27 C programs (new: `vmseccomp`, `vm-jail-probe`, `vmgroup`, `vmlink`, `vmimage-group`, `vmunpack`, `np-torgw`, `vmwatch`, `guest-dbus`), 10 scripts (new: `vm_whonix_xml_test.sh`, `vm_group_link.sh`, `guest_perf_test.sh`, migration 011's), 12 node tests (new: `vm_group_model`, `vm_group_ui`, `sentinela_vm`, `protect_model`). No settings → QEMU arguments table test (`build_qemu_args` is static in `lordvm.c`; only a Whonix member's arguments are checked, against Whonix's XML) |
-| Release gates: isolation, integrity, recovery, leaks (12) | ✅ | 85 | `vm_*.sh`, `tools/vm/bare-metal-gates.sh` | Manual; never run on the i9 PC |
-| End-to-end bench: a headless session driven over `remote.sock` (12) | 🟡 | 50 | `tools/vm/e2e/` | Manual, not in `make test`; not every flow of 12 is scripted. Added by the audit of 2026-11-23 |
-| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | ❌ | 0 |  | No QEMU or KVM job in `.github/workflows` |
-| Hardware matrix: Pi 5 and Xeon bare metal (gates), the i9 with RX 580 and UHD 630 (3D, GVT-g) | 🟡 | 50 | CHANGELOG | No Pi 4, no 4K Pi kernel, no Intel 3D, no NVIDIA |
+| Unit and headless suites in `make test` (12) | ✅ | 100 | `server/mk/vm.mk`, `vmpin.mk`, `tests/run_suites.sh`, `tests/vm_qemu_args_test.py` | 27 C programs (new: `vmseccomp`, `vm-jail-probe`, `vmgroup`, `vmlink`, `vmimage-group`, `vmunpack`, `np-torgw`, `vmwatch`, `guest-dbus`), 11 scripts (new: `vm_whonix_xml_test.sh`, `vm_group_link.sh`, `guest_perf_test.sh`, migration 011's, and *in development* `vm_qemu_args_test.py`: settings → QEMU arguments as a table, 12 rows, 12 of 12 on the i9; skipped without KVM), 12 node tests (new: `vm_group_model`, `vm_group_ui`, `sentinela_vm`, `protect_model`) (was 90) |
+| Release gates: isolation, integrity, recovery, leaks (12) | ✅ | 100 | `vm_*.sh`, `tools/vm/bare-metal-gates.sh`, `make -C server e2e-machines-gates`, `tools/vm/e2e/machines/ns-run.sh` | Manual (minutes each). *In development*: run on the i9 PC's bare metal on 2026-11-24, in private namespaces: isolation 72 passed (2 skipped: no delegated cgroup, no session bus in the run), integrity 45, recovery 40 (1 skipped), leaks 10; the script refused every physical PC (its virtual-machine check) and the leak gate's zombie check counted other programs' children, both fixed (was 85) |
+| End-to-end bench: a headless session driven over `remote.sock` (12) | ✅ | 95 | `tools/vm/e2e/machines/` (`mh.py`, `probe.js`, `flows.py`, README), `make -C server e2e-machines` | *In development*: a headless lord-server-test with the real theme in private user and mount namespaces, a scratch library, a real Debian guest; the assistant to first boot, Shut Down, Configure, start, the agent and its install, the clipboard both ways, a file drop, kill tests, snapshots, clone, storage, a group's card, checked on screen and on disk: run on the i9 on 2026-11-24. Input through the test hooks, the remote desktop's own injection (`remote.sock` takes only root). Not scripted: apps mode (needs a LordOS guest) and USB; not in `make test` (KVM, minutes) (was 50) |
+| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | 🟡 | 90 | `tools/vm/e2e/machines/boot-matrix.py`, `images.py --windows`, `flows.py` (`windows`, `storage`, `kills`, `killcopy`) | *In development*: the boot matrix ran on the i9 (9 rows: KVM and TCG, OVMF and SeaBIOS, TPM, Secure Boot, compatible devices, 3D on both cards) and the Pi 5 (3 rows; it found that an arm64 machine with the compatible devices doesn't boot, AAVMF has no SATA driver); the virtio-win install test installed the catalog's 90-day evaluation with virtio-win 0.1.271 unattended on the i9; storage figures on ext4 only (said 1,322.4 MB, freed 1,322.2 MB; btrfs and XFS need a disk of theirs); kill tests of the agent, passt, virtiofsd and lord-vm, and of the agent mid-copy, pass. Not in a hosted CI: GitHub's runners have no KVM (was 0) |
+| Hardware matrix: Pi 5 and Xeon bare metal (gates), the i9 with RX 580 and UHD 630 (3D, GVT-g) | 🟡 | 75 | CHANGELOG; 12 (boot matrix, bare-metal gates) | Pi 5 (gates 2026-11-06, boot matrix 2026-11-24), Xeon (gates), the i9: gates on bare metal and 3D boots on both the RX 580 and the UHD 630 (2026-11-24, *in development*). No Pi 4, no Pi kernel with 4 KiB pages, no NVIDIA; a 3D machine's picture on the UHD 630 not checked (was 50) |
 
 ## Status and how to continue (read this first)
 
@@ -293,8 +293,11 @@ the machine with it (`vmActive` in `sdk/appsoffmodel.js`).
   `node tools/brand-check.mjs`.
 - Release gates (12): `server/tests/vm_isolation.sh`, `vm_integrity.sh`, `vm_recovery.sh`, `vm_leak.sh` (helpers in
   `vm_gate_lib.sh`); on a physical PC `tools/vm/bare-metal-gates.sh` runs them and writes one results file.
-- On screen in a real session: the bench in `tools/vm/e2e/` (README there): a headless LordOS session, a driver bundle, clicks and
-  screenshots over `remote.sock`.
+- On screen in a real session: the harness in `tools/vm/e2e/machines/` (README there; `make -C server e2e-machines`): a
+  headless session in private namespaces on the computer you work on, the app driven and checked on screen and on disk,
+  real guests; `make -C server e2e-machines-matrix` the boot matrix, `e2e-machines-gates` the release gates. The older
+  bench in `tools/vm/e2e/` (a session started as root with `--user`, on the build VM) is still the one for the download
+  cards, which need the administration helper.
 - Never on the maintainer's daily desktop without asking; the build VM (VM 116) and the Pi 5 may be used.
 
 ### Phase 0, technical proof: done (2026-11-04)
@@ -3050,6 +3053,13 @@ change while a state is saved. A snapshot never rolls back the host's folder: on
 now. The package `virtiofsd` comes with "What Machines Needs" (`vm-enable`), like passt. In the guest: `mount -t virtiofs
 TAG /mnt/TAG`; the transfer folder (6.7.1) is mounted by itself through the agent.
 
+*When a virtiofsd ends while the machine runs* (killed, crashed; *in development*, the agent kill tests of 12): QEMU can't
+be given a new vhost-user connection for a device it lost, so the folder is gone from the guest until the machine starts
+again. The machine keeps running; lord-vm logs it (`share N: the folder TAG is gone from the machine until it starts
+again`) and tells the machine's window (`VM_NOTICE` `VMN_SHARE_LOST`, b = 1 for the transfer folder, text its tag), which
+says so in its notice bar: "The transfer folder stopped working in this machine…" or "The shared folder “TAG” stopped
+working…". A virtiofsd that ends because QEMU closed the connection (a suspend, a shutdown) says nothing.
+
 **Measured on 2026-11-04** (virtiofsd 1.13.2, `--readonly --sandbox namespace`, section 13.5):
 
 - **Linux guests on both architectures** mount it with `mount -t virtiofs`; a 200 MB file reads back with the host's SHA-256, and writing
@@ -4554,11 +4564,14 @@ QEMU finds it), `vmgroup`, `vmlink`, `vmimage-group`, `vmunpack`, `np-torgw` (th
 `guest_stop_test.sh`, `guestwin_headless.sh`, `machinescli_headless.sh`, `vm_whonix_xml_test.sh`, `vm_group_link.sh` (with
 Whonix's disks given), `guest_perf_test.sh`, `migration_shmem_huge_test.sh` and `vm_storage_test.sh` (each skips without what it needs), and the
 node tests `vm_model`, `vm_catalog`, `vm_windows`, `vm_capture`, `vm_openwith`, `vm_cli`, `vm_profiles`, `vm_keys_scene`,
-`vm_group_model`, `vm_group_ui`, `sentinela_vm`, `protect_model` and `vm_storage_model`. Manual: the four
-gates below, `vm_import_identity.sh`, `build/vm-image-cli`, `vm-net-cli`, `vm-gvt-cli` and `lordvm-dev` (`tests/vm_dev.c`). Not
-built from the list below: the settings → QEMU arguments table test (the arguments are built in `lordvm.c`, which `vm-test`
-doesn't link), a fuzz of lord-vmdisplay's D-Bus side, a boot matrix in CI, the virtio-win install test, agent kill-mid-transfer and
-channel-refusal tests, the storage-figure test.
+`vm_group_model`, `vm_group_ui`, `sentinela_vm`, `protect_model` and `vm_storage_model`; and *in development*
+(2026-11-24)
+`vm_qemu_args_test.py`, the settings → QEMU arguments table (below). Manual: the four gates below (`make -C server
+e2e-machines-gates` runs three of them), `vm_import_identity.sh`, `build/vm-image-cli`, `vm-net-cli`, `vm-gvt-cli` and
+`lordvm-dev` (`tests/vm_dev.c`); the end-to-end harness, the boot matrix and the Windows install test (below: they need KVM,
+the network once and minutes, so they aren't in `make test`). Not built from the list below: a fuzz of lord-vmdisplay's
+D-Bus side, a boot matrix in a hosted CI (GitHub's runners have no KVM; the matrix runs on the computers below), the
+guest-side protocol fuzz and channel-refusal tests of "Agent".
 
 - **Unit:** settings → QEMU arguments in a table test, for each architecture; `machine.json` schema and migration.
 - **Sandbox:** a test that a hostile `lord-vm` child can't open `~/.ssh`, another VM's folder, or `/dev/kvm` again. Built
@@ -4575,6 +4588,102 @@ channel-refusal tests, the storage-figure test.
 - **Release gate, disk integrity:** kill `lord-vm` and QEMU (a power cut isn't simulated) during write, snapshot, revert, clone and compaction, then `qemu-img check` every disk.
 - **Release gate, failure recovery:** each interrupted operation of 3.6 ends finished or rolled back, with no terminal.
 - **Leak test:** start and stop 100 times: no orphan processes, scopes, sockets, tap devices.
+
+**Settings → QEMU arguments** (`server/tests/vm_qemu_args_test.py`, *in development*, in `make test`, skipped without KVM):
+twelve rows, each a throwaway machine made with `lord-vm --create`/`--set`, started paused (nothing boots) and its logged
+command line checked for what the setting adds and what it must not: the defaults (UEFI's pflash, virtio-blk with its
+iothread, virtio-scsi's drive, passt on its hub, the D-Bus display, the sandbox flags, no TPM or Hyper-V), BIOS without a
+display on an isolated network, host only, TCG (`-cpu max`), CPU and memory, the compatible devices (SATA, USB tablet and
+mouse), Windows 11's template (SMM, the secure pflash, the Hyper-V flags, local time, the TPM, the CD on SATA), the agent's
+two ports on and off, boot order and menu, a shared folder and the transfer folder (their slots, shared memory) and 3D
+(`virtio-vga-gl`, the render node). The arm64 rows (virtio-gpu, keyboard and tablet) run on the Pi. 12 of 12 on the i9.
+
+**End-to-end harness** (`tools/vm/e2e/machines/`, *in development*, 2026-11-24; its README says how other tests use it).
+A real headless session, `build/lord-server-test` with the real default theme, started in its own user and mount
+namespaces (an empty folder over the person's home, a tmpfs over their runtime folder, a private `HOME` and
+`XDG_RUNTIME_DIR` under `/var/tmp/lordos-m100-e2e/`), so it never sees the person's files, machines or session; its
+library is empty. Input goes through the test hooks (`ptr`, `btn`, `wheel`, `key`), which call the same injection as the
+remote desktop (`remote.sock` itself takes only root's connections, lord-sessiond's); pictures through the hooks' `frame
+output`. A test-only probe in the bundle keeps lord-server's node tree on the JS side, so a step finds a text or an icon
+where it is drawn, shown and painted on top, and clicks it there. The guest is Debian 13's nocloud image (SHA-512 from
+Debian's list), prepared once under KVM with qemu-guest-agent, a person's account and a root console. `make -C server
+e2e-machines` runs the flows; each step checks the texts a person reads, what reached the disk or lord-vm, and keeps a
+screenshot. **Run on the i9 PC on 2026-11-24: 57 of 57 checks** on this branch merged with `test/integration-1125`
+(Debian 13 guest, KVM, CPU path; 50 of 50 earlier the same day, before the clipboard and mid-copy flows): the empty library;
+the New Machine assistant from Import a machine through the file picker, Light, a typed name and the review to Create
+and Start (made in 2.2 to 6.5 s, `MH-READY` 13.9 to 21.7 s after the click, its console's text in the machine's window); Shut Down (the
+power button, then the guest's own shutdown); Configure (Network → Isolated, the guest agent on, back to Shared, each in
+`machine.json`); a start from the card; the agent's popover (what works) and Install Clipboard Helper (lordos-guest in the
+guest); the clipboard both ways (Configure's Both ways; lordos-guest and `xclip` on the guest's Xvfb display: a text copied
+here and the machine turned to is what the guest pastes, a text copied there reaches this computer's clipboard); a file
+dragged from Files onto the machine's window, in `~tester/Downloads` with its bytes; the kill tests (next
+paragraph); Snapshots (take, go back with a snapshot of now first, delete; lord-vm's list agrees); Clone (its own id and
+MAC); the storage figure (below); a machine group's card. No JS error in the session. Not covered: apps mode (it needs a
+LordOS guest; its guest side is `guestwin_headless.sh`) and USB.
+
+**Agent kill tests** (the `kills` and `killcopy` flows): qemu-guest-agent killed in the guest (lord-vm sees its port
+close and waits for it, `agentState` `waiting`; the guest's systemd started it again at once and Machines reconnected by
+itself); passt killed (lord-vm attaches a new one, "the
+network is back", and the guest resolved names again 1.0 s after the kill); the transfer folder's virtiofsd killed (the
+machine keeps running and its window says "The transfer folder stopped working…", `VMN_SHARE_LOST`, built for this: it
+was in lord-vm's log only); lord-vm itself killed (the library says its supervisor ended, a start recovers it and the log
+says what it recovered); the agent killed while a 300 MB file dropped on the window is being copied in (nothing partial in
+the guest's Downloads: the whole file or none, and lord-vm's log says which; on the i9 it said "wasn't copied:
+qemu-guest-agent stopped answering in the guest" and the Downloads folder had no trace of it).
+
+**Storage figures** (the `storage` flow): what Machines says deleting a clone frees (`lord.vm.storage()`, the Storage
+window's "Frees if deleted") against the change in free space once it went to the Trash and the Trash was emptied. ext4
+on the i9 (a full copy), two runs: said 1,075.5 MB, freed 1,073.1 MB; said 1,322.4 MB, freed 1,322.2 MB. btrfs (reflinks) and XFS aren't measured yet: the run's
+scratch folder (`MH_SCRATCH`) must be on one, and none of the test computers has such a disk (making one needs root).
+
+**Boot matrix** (`boot-matrix.py`, `make -C server e2e-machines-matrix`): the prepared guest booted by lord-vm under each
+setting the computer can run: seconds from the start to `MH-READY` on its serial console, to the agent's connection, a
+clean Shut Down (the agent, then ACPI) and its seconds, the disk's size.
+
+*The i9 PC* (bare metal: i9-10900, RX 580 `amdgpu` and UHD 630 `i915`, Debian's QEMU 10.0.13), **measured** 2026-11-24:
+
+| Row | To `MH-READY` | Agent | Shut Down | Disk |
+|---|---:|---:|---|---:|
+| KVM, UEFI (OVMF), 2D | 11.2 s | 11.2 s | 4.5 s, clean | 1,053 MB |
+| KVM, SeaBIOS, 2D | 10.2 s | 13.2 s | 4.4 s, clean | 1,052 MB |
+| KVM, UEFI, TPM 2.0 (swtpm) | 13.2 s | 13.2 s | 4.8 s, clean | 1,053 MB |
+| KVM, Secure Boot (Microsoft's keys) and a TPM: Debian's signed shim | 14.2 s | 14.2 s | 4.4 s, clean | 1,053 MB |
+| KVM, the compatible devices (SATA, USB tablet) | 13.2 s | 13.2 s | 4.3 s, clean | 1,053 MB |
+| KVM, 3D (virgl) on the UHD 630's render node | 11.3 s | 11.3 s | 5.3 s, clean | 1,053 MB |
+| KVM, 3D (virgl) on the RX 580's render node | 12.4 s | 12.4 s | 4.7 s, clean | 1,053 MB |
+| TCG (emulated), UEFI | 36.3 s | 38.3 s | 4.4 s, clean | 1,053 MB |
+| TCG (emulated), SeaBIOS | 34.3 s | 36.3 s | 5.2 s, clean | 1,052 MB |
+| arm64 emulated on amd64 | — | — | — | skipped: `qemu-system-aarch64` isn't installed there |
+
+The 3D rows check that QEMU starts with `virtio-vga-gl` and its D-Bus display on that card's render node and the guest
+boots; the picture of a 3D machine is the harness's to check with `Session(gpu=True)` (not run yet).
+
+*The Pi 5* (16 GB, LordOS kernel 6.18.57, 16 KiB pages, QEMU 10.0.13, AAVMF), **measured** 2026-11-24 in a scratch
+folder of `/var/tmp`, its desktop session untouched:
+
+| Row | To `MH-READY` | Agent | Shut Down | Disk |
+|---|---:|---:|---|---:|
+| KVM, UEFI (AAVMF), virtio | 25.6 s | 25.6 s | 1.9 s, clean | 1,166 MB |
+| TCG (arm64 emulated on the Pi) | 95.2 s | 97.2 s | 11.3 s, clean | 1,166 MB |
+| KVM, the compatible devices | **fails** | — | forced after 90 s | — |
+
+**Found:** an arm64 machine with the compatible devices doesn't boot from its disk: AAVMF has no AHCI (SATA) driver, so
+the firmware finds nothing and stops at its UEFI shell (`Shell>`; the row keeps the guest's last lines). The same row
+boots on amd64 (OVMF and SeaBIOS have it). Such a machine is made by an import of another app's arm64 machine with
+`--devices compat` (6.22); until it is fixed, an arm64 import should keep `virtio`. Not fixed in this work (the import's).
+amd64 emulated on the Pi wasn't run: the Pi had about 3 GB free, and its image and copy need more.
+
+**Windows install test** (`images.py --windows`, `run.py windows`): Microsoft's Windows 11 Enterprise Evaluation (English)
+and virtio-win 0.1.271 from their makers' servers, kept only when their SHA-256 is the one the catalog pins (both matched
+on 2026-11-24), given to `lord.vm.create` as the assistant's evaluation card gives them, started from the library card,
+installed without questions; done when lord-vm says Windows is installed and the LordOS tools for Windows say hello.
+
+**Run on the i9 PC on 2026-11-24 (KVM, 4 vCPUs, 8 GB, 64 GB disk, CPU path): 9 of 9.** The machine was made with Secure
+Boot, a TPM, Hyper-V and the windows devices; Setup ran unattended through its restarts and lord-vm said "Windows is
+installed" 25.9 minutes after the start from the card; the LordOS tools for Windows said hello (`w11`, the installed
+LordOS 0.8.9.5's) from the installed system; its desktop (the evaluation's watermark, the `tester` account) was drawn in
+the machine's window; Shut Down through the agent turned it off. Screenshots every five minutes of the install are kept
+by the run (`--out`).
 
 **Bare-metal gates.** The three gates (disk integrity, failure recovery, leaks) have run on the nested amd64 build VM
 and on the Pi 5 (3.9); on a physical amd64 PC they run with `tools/vm/bare-metal-gates.sh`, which checks the PC first
@@ -4613,8 +4722,18 @@ the end with the kit (0 processes left). Results: integrity **47 passed** (216 s
 killed: 390 ms to the guest's next fetch, then 1,102 and 2,583 ms), leaks **10 passed** (152 s; 100 cycles in 151 s,
 1,512 ms each, the slowest 5,286 ms); exit 0. pve-qemu 11.1 has `ScanoutDMABUF2` (Debian's 10.0.13 doesn't), but these
 gates run without a display, so the numbers are for the engine, the disks and the network, not for the picture. Logs
-kept outside the repository (`out/final/gates-proxmox/`). A physical PC with LordOS installed on its own disk (the
-maintainer's i9) is still to run the script as above, for Debian's QEMU and a real display.
+kept outside the repository (`out/final/gates-proxmox/`).
+
+*Bare metal, the i9 PC* (Intel Core i9-10900, 20 threads, Gigabyte Z590 AORUS ELITE, 125.6 GB, ext4 on NVMe, LordOS
+0.8.9.5 installed, kernel 6.12.118, Debian's QEMU 10.0.13) — **Measured** 2026-11-24 with `make -C server e2e-machines-gates`
+(this branch's `lord-vm`, Debian 13's nocloud image from the harness's cache), in `ns-run.sh`'s namespaces with a private
+home and runtime folder, beside the maintainer's own session and machines, which it never saw: integrity **45 passed**
+(229 s), recovery **40 passed, 1 skipped** (110 s; the snapshot delete finished before the kill; passt killed: 496 ms to
+the guest's next fetch, then 1,126 and 2,617 ms), leaks **10 passed** (153 s; 100 cycles, 1,534 ms each, the slowest
+5,571 ms). The first try refused the PC: the script read `systemd-detect-virt`'s exit status wrongly and called every
+physical computer a virtual machine (fixed). The leak gate's zombie check then failed once on another program's child
+(a package tool's, a moment as a zombie); it now looks at Machines' own programs only. The gates run without a display:
+the picture is the harness's (above).
 
 
 ## 13. Phase 0 results

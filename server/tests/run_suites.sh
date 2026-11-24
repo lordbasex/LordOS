@@ -298,6 +298,14 @@ EOF
         77) skip "vm-whonix-xml" "KVM, QEMU, qemu-img, passt, unshare and python3" ;;
         *) bad "vm-whonix-xml (tests/vm_whonix_xml_test.sh)"; cat "$T/out" ;;
     esac
+    # Machines' settings → QEMU arguments as a table (docs/VIRTUALIZATION.md 12): a throwaway machine per row, started
+    # paused (nothing boots), its logged command line checked for what each setting adds and must not
+    python3 -I tests/vm_qemu_args_test.py >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-qemu-args (tests/vm_qemu_args_test.py: $(grep -c '^ok:' "$T/out") rows of settings against QEMU's arguments)" ;;
+        77) skip "vm-qemu-args" "KVM, QEMU, qemu-img, passt, unshare and python3" ;;
+        *) bad "vm-qemu-args (tests/vm_qemu_args_test.py)"; cat "$T/out" ;;
+    esac
     # protected windows (docs/PRIVACY.md): drawn on the display, the protected fill in a screenshot, the remote desktop's
     # and recording's frame, the Screenshot portal's still and a window shared alone; the other window captured as shown
     sh tests/protected_headless.sh >"$T/out" 2>&1

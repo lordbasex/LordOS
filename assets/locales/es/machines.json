@@ -430,6 +430,8 @@
   "tb.cdRefused": "La unidad no puede tomar un disco ahora.",
   "tb.cdFailed": "No se pudo cambiar el disco: {why}",
   "win.netLost": "La red de esta máquina se detuvo y no se pudo recuperar. Vuelve cuando la máquina arranque de nuevo; el registro de la máquina dice por qué.",
+  "win.shareLost": "La carpeta compartida «{folder}» dejó de funcionar en esta máquina. Vuelve cuando la máquina arranque de nuevo; el registro de la máquina dice por qué.",
+  "win.transferLost": "La carpeta de transferencia dejó de funcionar en esta máquina. Vuelve cuando la máquina arranque de nuevo; el registro de la máquina dice por qué.",
   "win.netReconnecting": "La red de esta máquina se detuvo. Reconectando…",
   "win.netBack": "La red volvió ({s} s sin ella).",
   "cmd.suspend": "Suspender",

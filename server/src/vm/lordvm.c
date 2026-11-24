@@ -7037,7 +7037,11 @@ static void reap(void) {
             S.vfs[k] = 0;
             vlog("share %d: virtiofsd exited (%s %d)", k + 1, WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
             /* it also ends by itself when QEMU closes the connection (a suspend, a shutdown): news only while the machine runs on */
-            if (!S.qemu_done && !S.suspending && S.state == VS_RUNNING) vlog("share %d: the folder %s is gone from the machine until it starts again", k + 1, sh_tag(k));
+            if (!S.qemu_done && !S.suspending && S.state == VS_RUNNING) {
+                vlog("share %d: the folder %s is gone from the machine until it starts again", k + 1, sh_tag(k));
+                /* the machine's window says so (VMN_SHARE_LOST): nothing reconnects a vhost-user device QEMU lost */
+                notice_all(VMN_SHARE_LOST, k == VM_SHARES, sh_tag(k));
+            }
         } else if (p == S.tpm) {
             S.tpm = 0;
             vlog("tpm: swtpm exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
@@ -10528,7 +10532,8 @@ out:
  * beside it removed, a new id and new MAC addresses. 0, or -1 (said on stderr) */
 static int fresh_member(const char *mdir, const char *dirname, VmMachine *m, const char *base) {
     char disks[PATH_MAX + VMG_DIR_MAX + 16], nw[PATH_MAX + VMG_DIR_MAX + 48], sys[PATH_MAX + VMG_DIR_MAX + 48], err[256];
-    snprintf(disks, sizeof disks, "%s/disks", mdir);
+    /* a path too long is refused, not cut (gcc on arm64 warns about the truncation otherwise) */
+    if ((size_t)snprintf(disks, sizeof disks, "%s/disks", mdir) >= sizeof disks) { fprintf(stderr, "lord-vm: %s's path is too long\n", dirname); return -1; }
     snprintf(nw, sizeof nw, "%s/.system.qcow2.fresh", disks);
     snprintf(sys, sizeof sys, "%s/system.qcow2", disks);
     unlink(nw);
@@ -10541,8 +10546,7 @@ static int fresh_member(const char *mdir, const char *dirname, VmMachine *m, con
     unlink_in(mdir, "suspend.state");
     unlink_in(disks, ".session-empty.qcow2");
     char logs[PATH_MAX + VMG_DIR_MAX + 16];
-    snprintf(logs, sizeof logs, "%s/log", mdir);
-    DIR *d = opendir(logs);
+    DIR *d = (size_t)snprintf(logs, sizeof logs, "%s/log", mdir) < sizeof logs ? opendir(logs) : NULL;
     if (d) {
         struct dirent *e;
         while ((e = readdir(d))) if (e->d_name[0] != '.') unlinkat(dirfd(d), e->d_name, 0);

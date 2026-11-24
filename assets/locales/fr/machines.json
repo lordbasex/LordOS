@@ -430,6 +430,8 @@
   "tb.cdRefused": "Le lecteur ne peut pas prendre de disque maintenant.",
   "tb.cdFailed": "Le disque n'a pas pu être changé : {why}",
   "win.netLost": "Le réseau de cette machine s'est arrêté et n'a pas pu être rétabli. Il revient au prochain démarrage ; le journal de la machine dit pourquoi.",
+  "win.shareLost": "Le dossier partagé « {folder} » ne fonctionne plus dans cette machine. Il revient au prochain démarrage ; le journal de la machine dit pourquoi.",
+  "win.transferLost": "Le dossier de transfert ne fonctionne plus dans cette machine. Il revient au prochain démarrage ; le journal de la machine dit pourquoi.",
   "win.netReconnecting": "Le réseau de cette machine s'est arrêté. Reconnexion…",
   "win.netBack": "Le réseau est revenu ({s} s sans lui).",
   "cmd.suspend": "Suspendre",
