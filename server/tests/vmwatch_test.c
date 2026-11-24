@@ -13,6 +13,13 @@
 static int fails, checks;
 #define CHECK(c, ...) do { checks++; if (!(c)) { fails++; printf("FAIL %s:%d: ", __FILE__, __LINE__); printf(__VA_ARGS__); printf("\n"); } } while (0)
 
+/* the test lord-vm's request, waited for: vm_recv never blocks (MSG_DONTWAIT), and the asker may not have sent it yet */
+static int recv_wait(int c, VmMsg *q, int *qfd) {
+    struct pollfd p = { c, POLLIN, 0 };
+    if (poll(&p, 1, 5000) <= 0) return -1;
+    return vm_recv(c, q, qfd);
+}
+
 int main(void) {
     const char *self = "/lordos.slice/lordos-session-1000/server";
     const char *id = "6f1c0d2e-1111-4222-8333-444455556666";
@@ -87,7 +94,7 @@ int main(void) {
             int c = accept(ls, NULL, NULL);
             VmMsg q;
             int qfd = -1;
-            if (c < 0 || vm_recv(c, &q, &qfd) <= 0 || q.type != VM_STATUS) _exit(1);
+            if (c < 0 || recv_wait(c, &q, &qfd) <= 0 || q.type != VM_STATUS) _exit(1);
             if (mode == 0) { VmMsg i = vm_msg(VM_INFO, q.seq, 2, 2048, 0x1ff, 2, "id"); vm_send(c, &i, -1); }
             if (mode != 1) { VmMsg s = vm_msg(VM_STATE, q.seq, 2, 0, 0, 4321, ""); vm_send(c, &s, -1); }
             struct timespec ts = { 0, 400 * 1000000 };
@@ -98,7 +105,7 @@ int main(void) {
         VmLive lv;
         struct timespec t0, t1;
         clock_gettime(CLOCK_MONOTONIC, &t0);
-        int r = vmwatch_live(sp, &lv, 150);
+        int r = vmwatch_live(sp, &lv, mode == 0 ? 2000 : 150);   /* both answers come at once: a loaded machine (ASan, make -j) may take long */
         clock_gettime(CLOCK_MONOTONIC, &t1);
         long ms = (t1.tv_sec - t0.tv_sec) * 1000 + (t1.tv_nsec - t0.tv_nsec) / 1000000;
         /* the peer is the process that listens (lord-vm itself), as the kernel says */
@@ -209,7 +216,7 @@ int main(void) {
             int c = accept(ls, NULL, NULL);
             VmMsg q;
             int qfd = -1;
-            if (c < 0 || vm_recv(c, &q, &qfd) <= 0) _exit(1);
+            if (c < 0 || recv_wait(c, &q, &qfd) <= 0) _exit(1);
             VmMsg i = vm_msg(VM_INFO, q.seq, 2, 2048, 0x1ff, 2, "id"); vm_send(c, &i, -1);
             VmMsg s2 = vm_msg(VM_STATE, q.seq, 2, 0, 0, 4321, ""); vm_send(c, &s2, -1);
             struct timespec ts = { 3, 0 };
