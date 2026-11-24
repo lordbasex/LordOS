@@ -2,7 +2,7 @@
  * `machines exec`, `machines cp` and the MCP server's run_command, through lord-vm's VM_EXEC.
  *
  * Who may: lord-vm's socket is the person's alone (0700 folder, 0600 socket, SO_PEERCRED both ways), and lord-vm runs
- * a request only for a machine whose machine.json says "automation": true (schema 15; the person's consent, given in
+ * a request only for a machine whose machine.json says "automation": true (schema 16; the person's consent, given in
  * Configure; never with the anonymity profile), that runs, whose qemu-guest-agent answers with guest-exec and that is a
  * Linux guest. The program runs as the guest's signed-in person (runuser; the first account from 1000 up without a
  * session), in their home folder, under timeout(1); never as root.

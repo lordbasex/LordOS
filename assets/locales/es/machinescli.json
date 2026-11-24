@@ -131,5 +131,6 @@
   "applyNoShares": "No se cambió nada: no se permitió lo que va más allá de la máquina (solo se pregunta en una terminal).",
   "applyCreated": "Se creó {name} como dice {file}.",
   "applyUpdated": "{name} ya tiene los ajustes que da {file}.",
-  "applyRunning": "{name} está en marcha: apágala para cambiarla desde un archivo."
+  "applyRunning": "{name} está en marcha: apágala para cambiarla desde un archivo.",
+  "overBudget": "{name} no se inició: necesita {need} MB y quedan {free} MB para máquinas. Suspendé o apagá otra máquina, o dale menos memoria."
 }

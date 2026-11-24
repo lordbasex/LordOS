@@ -131,5 +131,6 @@
   "applyNoShares": "Tidak ada yang berubah: hal yang menjangkau ke luar mesin tidak diizinkan (hanya ditanyakan di terminal).",
   "applyCreated": "{name} dibuat seperti kata {file}.",
   "applyUpdated": "{name} kini memakai pengaturan dari {file}.",
-  "applyRunning": "{name} sedang berjalan: matikan untuk mengubahnya dari berkas."
+  "applyRunning": "{name} sedang berjalan: matikan untuk mengubahnya dari berkas.",
+  "overBudget": "{name} tidak mulai: butuh {need} MB dan tersisa {free} MB untuk mesin. Tangguhkan atau matikan mesin lain, atau beri memori lebih sedikit."
 }

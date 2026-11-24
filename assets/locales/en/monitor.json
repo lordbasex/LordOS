@@ -684,5 +684,6 @@
   "stats.p95Row": "CPU 95th percentile (1 min)",
   "stats.memAvgRow": "Memory average (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memory peak (1 · 5 · 15 min)",
-  "stats.spark": "Last minute"
+  "stats.spark": "Last minute",
+  "group.showMachine": "Show Machine"
 }

@@ -131,5 +131,6 @@
   "applyNoShares": "Hakuna kilichobadilika: vinavyovuka mashine havikuruhusiwa (huuliza kwenye terminal tu).",
   "applyCreated": "{name} imeundwa kama {file} inavyosema.",
   "applyUpdated": "{name} sasa ina mipangilio kutoka {file}.",
-  "applyRunning": "{name} inaendeshwa: izime ili kuibadilisha kutoka faili."
+  "applyRunning": "{name} inaendeshwa: izime ili kuibadilisha kutoka faili.",
+  "overBudget": "{name} haikuanza: inahitaji {need} MB na zimebaki {free} MB kwa mashine. Simamisha au zima mashine nyingine, au ipe kumbukumbu kidogo."
 }

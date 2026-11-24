@@ -938,6 +938,9 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 8 && !memcmp(p + s0, "extraoff", 8)) caps |= AG_HELLO_EXTRAOFF;
         else if (l == 8 && !memcmp(p + s0, "stopping", 8)) caps |= AG_HELLO_STOPPING;
         else if (l == 4 && !memcmp(p + s0, "perf", 4)) caps |= AG_HELLO_PERF;
+        else if (l == 5 && !memcmp(p + s0, "shell", 5)) caps |= AG_HELLO_SHELL;
+        else if (l == 5 && !memcmp(p + s0, "links", 5)) caps |= AG_HELLO_LINKS;
+        else if (l == 6 && !memcmp(p + s0, "notify", 6)) caps |= AG_HELLO_NOTIFY;
     }
     return caps;
 }
@@ -1077,5 +1080,185 @@ size_t lag_applist_write(const LagAppList *l, uint8_t *out, size_t cap) {
 
 int lag_applist_has(const LagAppList *l, const char *token) {
     for (int i = 0; i < l->n; i++) if (!strcmp(l->a[i].token, token)) return 1;
+    return 0;
+}
+
+/* ---- guest → host links and notifications (6.12) ---- */
+
+static int lk_hex(uint8_t c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'); }
+static int lk_alnum(uint8_t c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+/* RFC 3986's unreserved and reserved characters and '%', less ! $ ' ( ) *: the set this computer's launcher passes to a
+ * browser (apps.c apps_launch_uri); the guest's tools percent-encode the rest (ag_link_encode) */
+static const char LK_CHARS[] = "-._~:/?#[]@&=+,;%";
+static int lk_uri_char(uint8_t c) { return lk_alnum(c) || (c && strchr(LK_CHARS, c)); }
+static int lk_prefix(const uint8_t *p, size_t n, const char *s) {
+    size_t l = strlen(s);
+    if (n < l) return 0;
+    for (size_t i = 0; i < l; i++) {
+        uint8_t c = p[i];
+        if (c >= 'A' && c <= 'Z') c = (uint8_t)(c - 'A' + 'a');
+        if (c != (uint8_t)s[i]) return 0;
+    }
+    return 1;
+}
+
+int ag_link_ok(const uint8_t *p, size_t n) {
+    if (!p || !n || n > AG_LINK_MAX) return 0;
+    for (size_t i = 0; i < n; i++) {
+        if (p[i] < 0x21 || p[i] > 0x7e || !lk_uri_char(p[i])) return 0;
+        if (p[i] == '%' && (i + 2 >= n || !lk_hex(p[i + 1]) || !lk_hex(p[i + 2]))) return 0;
+    }
+    size_t s;
+    if (lk_prefix(p, n, "https://")) s = 8;
+    else if (lk_prefix(p, n, "http://")) s = 7;
+    else return 0;
+    size_t e = s;
+    while (e < n && p[e] != '/' && p[e] != '?' && p[e] != '#') e++;
+    /* the authority p[s..e): host[:port], never user:password@ */
+    if (e == s) return 0;
+    for (size_t i = s; i < e; i++) if (p[i] == '@') return 0;
+    size_t he = e;                              /* the host's end */
+    if (p[s] == '[') {
+        size_t c = s + 1;
+        while (c < e && p[c] != ']') { if (!lk_hex(p[c]) && p[c] != ':' && p[c] != '.') return 0; c++; }
+        if (c >= e || c == s + 1) return 0;
+        he = c + 1;
+        if (he < e && p[he] != ':') return 0;
+    } else {
+        for (size_t i = s; i < e; i++) if (p[i] == ':') { he = i; break; }
+        if (he == s) return 0;
+        /* labels of letters, digits and '-' (xn-- included), none empty, none starting or ending with '-' */
+        size_t ls = s;
+        for (size_t i = s; i < he; i++) {
+            uint8_t c = p[i];
+            if (c == '.') { if (i == ls || p[i - 1] == '-') return 0; ls = i + 1; }
+            else if (c == '-') { if (i == ls) return 0; }
+            else if (!lk_alnum(c)) return 0;
+        }
+        if (ls == he || p[he - 1] == '-') return 0;
+    }
+    if (he < e) {                               /* :port */
+        size_t d = he + 1;
+        if (d >= e || e - d > 5) return 0;
+        unsigned v = 0;
+        for (size_t i = d; i < e; i++) { if (p[i] < '0' || p[i] > '9') return 0; v = v * 10 + (unsigned)(p[i] - '0'); }
+        if (!v || v > 65535) return 0;
+    }
+    return 1;
+}
+
+long ag_link_encode(const uint8_t *in, size_t n, char *out, size_t cap) {
+    static const char hx[] = "0123456789ABCDEF";
+    size_t o = 0;
+    if (!in || !out || !cap) return -1;
+    for (size_t i = 0; i < n; i++) {
+        uint8_t c = in[i];
+        int keep = lk_uri_char(c) && (c != '%' || (i + 2 < n && lk_hex(in[i + 1]) && lk_hex(in[i + 2])));
+        if (keep) { if (o + 1 >= cap) return -1; out[o++] = (char)c; }
+        else { if (o + 3 >= cap) return -1; out[o++] = '%'; out[o++] = hx[c >> 4]; out[o++] = hx[c & 15]; }
+    }
+    out[o] = 0;
+    return (long)o;
+}
+
+int ag_note_text_ok(const uint8_t *p, size_t n) {
+    if (!lag_text_ok(p, n)) return 0;
+    for (size_t i = 0; i + 2 < n; i++) {
+        if (p[i] != 0xe2) continue;
+        uint8_t b = p[i + 1], c = p[i + 2];
+        if (b == 0x80 && (c == 0x8e || c == 0x8f || (c >= 0xaa && c <= 0xae))) return 0;     /* U+200E, U+200F, U+202A..E */
+        if (b == 0x81 && c >= 0xa6 && c <= 0xa9) return 0;                                    /* U+2066..U+2069 */
+    }
+    return 1;
+}
+
+int ag_note_parse(const uint8_t *p, size_t n, const uint8_t **title, uint16_t *tn, const uint8_t **body, uint16_t *bn) {
+    if (!p || n < 4 || n > AG_NOTE_BYTES) return -1;
+    size_t t = (size_t)p[0] | (size_t)p[1] << 8;
+    if (!t || t > AG_NOTE_TITLE_MAX || 2 + t + 2 > n) return -1;
+    size_t b = (size_t)p[2 + t] | (size_t)p[3 + t] << 8;
+    if (b > AG_NOTE_BODY_MAX || 4 + t + b != n) return -1;
+    if (!ag_note_text_ok(p + 2, t) || (b && !ag_note_text_ok(p + 4 + t, b))) return -1;
+    if (title) *title = p + 2;
+    if (tn) *tn = (uint16_t)t;
+    if (body) *body = p + 4 + t;
+    if (bn) *bn = (uint16_t)b;
+    return 0;
+}
+
+size_t ag_note_write(const uint8_t *title, size_t tn, const uint8_t *body, size_t bn, uint8_t *out, size_t cap) {
+    if (!title || !out || !tn || tn > AG_NOTE_TITLE_MAX || bn > AG_NOTE_BODY_MAX || (bn && !body) || 4 + tn + bn > cap) return 0;
+    if (!ag_note_text_ok(title, tn) || (bn && !ag_note_text_ok(body, bn))) return 0;
+    out[0] = (uint8_t)tn; out[1] = (uint8_t)(tn >> 8);
+    memcpy(out + 2, title, tn);
+    out[2 + tn] = (uint8_t)bn; out[3 + tn] = (uint8_t)(bn >> 8);
+    if (bn) memcpy(out + 4 + tn, body, bn);
+    return 4 + tn + bn;
+}
+
+int ag_rate_take(AgRate *r, long long now, int burst, int every_ms) {
+    if (!r || burst < 1 || every_ms < 1) return 0;
+    if (!r->at || now < r->at) { r->at = now; r->tokens = burst; }
+    long long gained = (now - r->at) / every_ms;
+    if (gained > 0) {
+        if (gained >= burst - r->tokens) { r->tokens = burst; r->at = now; }
+        else { r->tokens += (int)gained; r->at += gained * every_ms; }
+    }
+    if (r->tokens <= 0) return 0;
+    r->tokens--;
+    return 1;
+}
+
+/* ---- the agent's shell (6.18) ---- */
+
+static void sh_wr32(uint8_t *o, uint32_t v) { o[0] = (uint8_t)v; o[1] = (uint8_t)(v >> 8); o[2] = (uint8_t)(v >> 16); o[3] = (uint8_t)(v >> 24); }
+
+int ag_shell_size_parse(const uint8_t *p, size_t n, uint32_t *id, int *cols, int *rows) {
+    if (!p || n != 8) return -1;
+    uint32_t i = le32(p);
+    int c = p[4] | p[5] << 8, r = p[6] | p[7] << 8;
+    if (!i || c < 1 || c > AG_SHELL_COLS_MAX || r < 1 || r > AG_SHELL_ROWS_MAX) return -1;
+    if (id) *id = i;
+    if (cols) *cols = c;
+    if (rows) *rows = r;
+    return 0;
+}
+
+int ag_shell_size_write(uint8_t out[8], uint32_t id, int cols, int rows) {
+    if (!out || !id || cols < 1 || cols > AG_SHELL_COLS_MAX || rows < 1 || rows > AG_SHELL_ROWS_MAX) return -1;
+    sh_wr32(out, id);
+    out[4] = (uint8_t)cols; out[5] = (uint8_t)(cols >> 8);
+    out[6] = (uint8_t)rows; out[7] = (uint8_t)(rows >> 8);
+    return 0;
+}
+
+int ag_shell_data_parse(const uint8_t *p, size_t n, uint32_t *id, const uint8_t **data, uint32_t *dn) {
+    if (!p || n < 5 || n > 4 + AG_SHELL_CHUNK) return -1;
+    uint32_t i = le32(p);
+    if (!i) return -1;
+    if (id) *id = i;
+    if (data) *data = p + 4;
+    if (dn) *dn = (uint32_t)(n - 4);
+    return 0;
+}
+
+int ag_shell_ack_parse(const uint8_t *p, size_t n, uint32_t *id, uint32_t *bytes) {
+    if (!p || n != 8) return -1;
+    uint32_t i = le32(p), b = le32(p + 4);
+    if (!i || !b || b > AG_SHELL_WINDOW) return -1;
+    if (id) *id = i;
+    if (bytes) *bytes = b;
+    return 0;
+}
+
+void ag_shell_pair_write(uint8_t out[8], uint32_t id, uint32_t v) { sh_wr32(out, id); sh_wr32(out + 4, v); }
+
+int ag_shell_close_parse(const uint8_t *p, size_t n, uint32_t *id, int *status) {
+    if (!p || n != 8) return -1;
+    uint32_t i = le32(p);
+    int32_t s = (int32_t)le32(p + 4);
+    if (!i || s < AG_SHELL_NOSTART || s > 511) return -1;
+    if (id) *id = i;
+    if (status) *status = s;
     return 0;
 }

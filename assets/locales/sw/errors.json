@@ -932,5 +932,6 @@
   "llm.noModel": "Modeli hiyo ya ndani haijasakinishwa.",
   "sentinela.blockFailed": "Mtandao wake haukuweza kuzuiwa.",
   "sentinela.machineGone": "Mashine hiyo haimo tena katika Mashine.",
-  "sentinela.machineFailed": "Mashine haikujibu."
+  "sentinela.machineFailed": "Mashine haikujibu.",
+  "vm.overBudget": "Hakuna kumbukumbu ya kutosha kando ya mashine zinazoendeshwa tayari. Simamisha au zima mojawapo, au ipe mashine hii kumbukumbu kidogo."
 }

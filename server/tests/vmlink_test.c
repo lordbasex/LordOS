@@ -39,7 +39,7 @@ static void messages(void) {
     CHECK(!vm_msg_valid(&m, 1), "a short id");
     m = vm_msg(VM_LINK, 1, 1, 0, 0, 0, GID);
     CHECK(!vm_msg_valid(&m, 0), "VM_LINK is a request, never an event");
-    CHECK(VM_REQ_LAST == VM_EXEC && VM_EXEC == VM_LINK + 1, "VM_LINK, then VM_EXEC (6.15) last");
+    CHECK(VM_REQ_LAST == VM_EXEC && VM_EXEC == VM_SHELL + 1 && VM_SHELL == VM_LINK + 1, "VM_LINK, VM_SHELL, then VM_EXEC (6.15) last");
 }
 
 static void descriptors(void) {

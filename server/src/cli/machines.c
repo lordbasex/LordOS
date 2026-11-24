@@ -714,6 +714,20 @@ static int cmd_start(Machine *x, int window) {
         ERR("needsSession", "name", x->m.name, "why", T(x->m.vgpu ? "why.gpu" : "why.bridged"), NULL);
         return VMCLI_NO_SESSION;
     }
+    /* the resource budget (docs/VIRTUALIZATION.md 3.7), as the session's start paths check it (js_vm.c budget_ok) */
+    if (x->ok && !library_path()) {
+        VmHost h;
+        vm_host_probe(&h);
+        int n = 0;
+        long used = vm_budget_used_mb(library, x->dir, lordvm_alive, vm_group_session_mb, &n), need = vm_mem_limit_mb(&x->m) + vm_group_session_mb(x->dir, &x->m), mx = vm_mem_max_mb(&h);
+        if (n && !vm_budget_fits(&h, used, need)) {
+            char ns[24], fs[24];
+            snprintf(ns, sizeof ns, "%ld", need);
+            snprintf(fs, sizeof fs, "%ld", mx > used ? mx - used : 0);
+            ERR("overBudget", "name", x->m.name, "need", ns, "free", fs, NULL);
+            return VMCLI_FAILED;
+        }
+    }
     Run r;
     char *a[] = { NULL, "--start", x->dir, "--detach", "--keep-running", NULL };
     int st = run_lordvm(a, &r);

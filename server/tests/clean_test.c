@@ -350,6 +350,24 @@ static void test_names(void) {
     poll_free(&p);
 }
 
+/* Machines (docs/VIRTUALIZATION.md 6.14): a machine's files are never a candidate, wherever its folder is */
+static void test_machines(void) {
+    CHECK(clean_machine_path("/home/a/Machines", "/home/a") && clean_machine_path("/home/a/Machines/Debian.lordvm/disks/system.qcow2", "/home/a"));
+    CHECK(clean_machine_path("/home/a/Machines/Transfer/x/node_modules", "/home/a"));
+    CHECK(clean_machine_path("/media/a/usb/Old.lordvm/disks/d.qcow2", "/home/a") && clean_machine_path("/home/a/x/W.lordgroup/gw.lordvm", "/home/a"));
+    CHECK(!clean_machine_path("/home/a/MachinesOld/a.png", "/home/a") && !clean_machine_path("/home/a/Downloads/debian.iso", "/home/a"));
+    CHECK(!clean_machine_path("/home/a/.lordvm/x", "/home/a") && !clean_machine_path("/home/a/lordvm/x", "/home/a"));
+    CHECK(clean_machine_path("relative/path", "/home/a") && clean_machine_path(NULL, "/home/a"));
+    wipe();
+    put(T "/normal/ok.png", "ok");
+    put(T "/normal/Debian.lordvm/thumb.png", "a machine's");
+    Poll p;
+    run_scan(&p);
+    CHECK(!strcmp(p.state, "done"));
+    CHECK(num(p.scan, "candidates") == 1);
+    poll_free(&p);
+}
+
 static void test_limits(void) {
     wipe();
     char name[64];
@@ -2155,6 +2173,7 @@ int main(void) {
     test_symlinks();
     test_records();
     test_names();
+    test_machines();
     test_limits();
     test_protected();
     test_execute();

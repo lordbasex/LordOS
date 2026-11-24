@@ -931,5 +931,6 @@
   "llm.noModel": "未安装该本地模型。",
   "sentinela.blockFailed": "无法阻止其联网。",
   "sentinela.machineGone": "该虚拟机已不在“虚拟机”中。",
-  "sentinela.machineFailed": "虚拟机没有响应。"
+  "sentinela.machineFailed": "虚拟机没有响应。",
+  "vm.overBudget": "已有虚拟机在运行,内存不足。请挂起或关闭其中一台,或给这台虚拟机更少的内存。"
 }

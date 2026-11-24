@@ -669,5 +669,6 @@
   "stats.p95Row": "CPU 第 95 百分位（1 分钟）",
   "stats.memAvgRow": "内存平均（1 · 5 · 15 分钟）",
   "stats.memPeakRow": "内存峰值（1 · 5 · 15 分钟）",
-  "stats.spark": "最近一分钟"
+  "stats.spark": "最近一分钟",
+  "group.showMachine": "显示虚拟机"
 }

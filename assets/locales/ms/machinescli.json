@@ -131,5 +131,6 @@
   "applyNoShares": "Tiada apa berubah: perkara yang menjangkau ke luar mesin tidak dibenarkan (hanya ditanya dalam terminal).",
   "applyCreated": "{name} dibuat seperti kata {file}.",
   "applyUpdated": "{name} kini mempunyai tetapan daripada {file}.",
-  "applyRunning": "{name} sedang berjalan: matikan untuk mengubahnya daripada fail."
+  "applyRunning": "{name} sedang berjalan: matikan untuk mengubahnya daripada fail.",
+  "overBudget": "{name} tidak bermula: ia memerlukan {need} MB dan tinggal {free} MB untuk mesin. Gantung atau matikan mesin lain, atau beri ia kurang memori."
 }

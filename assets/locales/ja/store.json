@@ -361,5 +361,7 @@
   "settings.listsTitle": "パッケージリスト",
   "settings.listsHint": "新しいアプリやアップデートの入手元となる、Debian と LordOS のパッケージのリスト。",
   "settings.webManage": "各 Web アプリのプロファイル、権限、使用容量",
-  "settings.flathubOff": "ストアで Flathub をオフにします。Flathub からインストールしたアプリはそのまま残ります。"
+  "settings.flathubOff": "ストアで Flathub をオフにします。Flathub からインストールしたアプリはそのまま残ります。",
+  "updates.qemuTitle": "サスペンド中のマシンはこの更新後に再開できない場合があります({count})",
+  "updates.qemuText": "この更新は QEMU を変更します。ある QEMU ビルドで保存したセッションは、別のビルドでは読み込めないことがあります。先にそれらのマシンをシャットダウンするか、起動時に「それでも再開」か「保存状態を破棄」を選んでください。"
 }

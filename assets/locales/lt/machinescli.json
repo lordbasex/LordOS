@@ -131,5 +131,6 @@
   "applyNoShares": "Niekas nepakeista: tai, kas išeina už mašinos ribų, neleista (klausiama tik terminale).",
   "applyCreated": "{name} sukurta, kaip nurodo {file}.",
   "applyUpdated": "{name} dabar turi {file} nustatymus.",
-  "applyRunning": "{name} veikia: išjunkite ją, kad pakeistumėte iš failo."
+  "applyRunning": "{name} veikia: išjunkite ją, kad pakeistumėte iš failo.",
+  "overBudget": "{name} nepasileido: jai reikia {need} MB, o mašinoms liko {free} MB. Pristabdykite ar išjunkite kitą mašiną arba skirkite jai mažiau atminties."
 }

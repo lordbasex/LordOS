@@ -131,5 +131,6 @@
   "applyNoShares": "Heç nə dəyişmədi: maşından kənara çıxanlara icazə verilmədi (yalnız terminalda soruşulur).",
   "applyCreated": "{name} {file} dediyi kimi yaradıldı.",
   "applyUpdated": "{name} indi {file} ayarlarına malikdir.",
-  "applyRunning": "{name} işləyir: fayldan dəyişmək üçün onu söndürün."
+  "applyRunning": "{name} işləyir: fayldan dəyişmək üçün onu söndürün.",
+  "overBudget": "{name} başlamadı: {need} MB lazımdır, maşınlar üçün isə {free} MB qalıb. Başqa maşını dayandırın və ya söndürün, ya da ona daha az yaddaş verin."
 }

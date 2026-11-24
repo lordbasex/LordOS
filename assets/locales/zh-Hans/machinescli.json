@@ -131,5 +131,6 @@
   "applyNoShares": "没有做任何更改：超出机器范围的设置未获允许（只在终端中询问）。",
   "applyCreated": "已按照 {file} 创建 {name}。",
   "applyUpdated": "{name} 现在使用 {file} 中的设置。",
-  "applyRunning": "{name} 正在运行：请先关机，再从文件更改它。"
+  "applyRunning": "{name} 正在运行：请先关机，再从文件更改它。",
+  "overBudget": "{name} 未启动:它需要 {need} MB,而留给虚拟机的只剩 {free} MB。请挂起或关闭另一台虚拟机,或给它更少的内存。"
 }

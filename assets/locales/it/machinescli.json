@@ -131,5 +131,6 @@
   "applyNoShares": "Non è cambiato nulla: ciò che va oltre la macchina non è stato consentito (lo si chiede solo in un terminale).",
   "applyCreated": "{name} è stata creata come dice {file}.",
   "applyUpdated": "{name} ora ha le impostazioni di {file}.",
-  "applyRunning": "{name} è in esecuzione: spegnila per modificarla da un file."
+  "applyRunning": "{name} è in esecuzione: spegnila per modificarla da un file.",
+  "overBudget": "{name} non è partita: le servono {need} MB e ne restano {free} per le macchine. Sospendi o spegni un'altra macchina, oppure dalle meno memoria."
 }

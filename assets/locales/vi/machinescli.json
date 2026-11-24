@@ -131,5 +131,6 @@
   "applyNoShares": "Không có gì thay đổi: những thứ vượt ra ngoài máy không được cho phép (chỉ hỏi trong terminal).",
   "applyCreated": "Đã tạo {name} như {file} nói.",
   "applyUpdated": "{name} giờ có các thiết lập từ {file}.",
-  "applyRunning": "{name} đang chạy: hãy tắt nó để thay đổi từ tệp."
+  "applyRunning": "{name} đang chạy: hãy tắt nó để thay đổi từ tệp.",
+  "overBudget": "{name} không khởi động: cần {need} MB và còn {free} MB cho các máy. Hãy tạm ngưng hoặc tắt một máy khác, hoặc cho máy này ít bộ nhớ hơn."
 }

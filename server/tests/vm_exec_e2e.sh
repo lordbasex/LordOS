@@ -63,7 +63,7 @@ setsid -w $B/machines apply calm.toml </dev/null && [ -f "$HOME/Machines/vmexec-
 rm -rf "$HOME/Machines/vmexec-apply-calm.lordvm"
 # a machine folder outside the library, linked into it, with automation on: MCP never reaches it
 mkdir -p outside.lordvm
-python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1])); m["name"]="vmexec-outside"; m["automation"]=True; m["schema"]=max(m["schema"],15); json.dump(m,open(sys.argv[2],"w"))' "$DIR/machine.json" outside.lordvm/machine.json
+python3 -I -c 'import json,sys; m=json.load(open(sys.argv[1])); m["name"]="vmexec-outside"; m["automation"]=True; m["schema"]=max(m["schema"],16); json.dump(m,open(sys.argv[2],"w"))' "$DIR/machine.json" outside.lordvm/machine.json
 ln -sfn "$W/outside.lordvm" "$HOME/Machines/vmexec-outside.lordvm"
 J=$(python3 -I -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$N")
 o=$(printf '%s\n' "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"run_command\",\"arguments\":{\"name\":\"$W/outside.lordvm\",\"command\":[\"true\"]}}}" \

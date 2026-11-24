@@ -131,5 +131,6 @@
   "applyNoShares": "Semmi sem változott: ami túlmutat a gépen, nem kapott engedélyt (csak terminálban kérdez).",
   "applyCreated": "{name} elkészült, ahogy {file} mondja.",
   "applyUpdated": "{name} most {file} beállításait használja.",
-  "applyRunning": "{name} fut: állítsd le, hogy fájlból módosítsd."
+  "applyRunning": "{name} fut: állítsd le, hogy fájlból módosítsd.",
+  "overBudget": "{name} nem indult el: {need} MB kell neki, és {free} MB maradt a gépeknek. Függessz fel vagy állíts le egy másik gépet, vagy adj neki kevesebb memóriát."
 }

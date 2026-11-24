@@ -131,5 +131,6 @@
   "applyNoShares": "Er is niets gewijzigd: wat verder reikt dan de machine is niet toegestaan (dat wordt alleen in een terminal gevraagd).",
   "applyCreated": "{name} is gemaakt zoals {file} zegt.",
   "applyUpdated": "{name} heeft nu de instellingen uit {file}.",
-  "applyRunning": "{name} draait: sluit haar af om haar vanuit een bestand te wijzigen."
+  "applyRunning": "{name} draait: sluit haar af om haar vanuit een bestand te wijzigen.",
+  "overBudget": "{name} is niet gestart: ze heeft {need} MB nodig en er is {free} MB over voor machines. Zet een andere machine in sluimerstand of sluit die af, of geef haar minder geheugen."
 }

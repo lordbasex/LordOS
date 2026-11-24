@@ -131,5 +131,6 @@
   "applyNoShares": "Hiçbir şey değişmedi: makinenin ötesine uzananlara izin verilmedi (yalnızca bir terminalde sorulur).",
   "applyCreated": "{name}, {file} dosyasının dediği gibi oluşturuldu.",
   "applyUpdated": "{name} artık {file} ayarlarına sahip.",
-  "applyRunning": "{name} çalışıyor: bir dosyadan değiştirmek için kapatın."
+  "applyRunning": "{name} çalışıyor: bir dosyadan değiştirmek için kapatın.",
+  "overBudget": "{name} başlamadı: {need} MB gerekiyor ve makineler için {free} MB kaldı. Başka bir makineyi askıya alın ya da kapatın veya ona daha az bellek verin."
 }

@@ -131,5 +131,6 @@
   "applyNoShares": "沒有做任何變更：超出機器範圍的設定未獲允許（只在終端機中詢問）。",
   "applyCreated": "已依照 {file} 建立 {name}。",
   "applyUpdated": "{name} 現在使用 {file} 中的設定。",
-  "applyRunning": "{name} 正在執行：請先關機，再從檔案變更它。"
+  "applyRunning": "{name} 正在執行：請先關機，再從檔案變更它。",
+  "overBudget": "{name} 未啟動:它需要 {need} MB,而留給虛擬機的只剩 {free} MB。請暫停或關閉另一台虛擬機,或給它較少的記憶體。"
 }

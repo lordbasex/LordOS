@@ -255,6 +255,81 @@ int ag_perf_parse(const uint8_t *p, size_t n, int *on);
 int ag_perfstate_parse(const uint8_t *p, size_t n, int *on, unsigned *done, unsigned *failed);
 int ag_perfstate_write(uint8_t out[AG_PERFSTATE_BYTES], int on, unsigned done, unsigned failed);
 
+/* Guest → host links and notifications (docs/VIRTUALIZATION.md 6.12; tools 8 and w12, "links" and "notify" in their
+ * hello). The guest is hostile: neither ever runs anything on this computer by itself.
+ *   AGK_LINK guest → host: a link a program in the guest (or the person, `lordos-guest --open-on-host`) wants opened on
+ *     this computer: 1..AG_LINK_MAX bytes, exactly what ag_link_ok takes, nothing else. lord-vm passes it on only while
+ *     machine.json "guest_links" is on, at most AG_LINK_BURST at once and one per AG_LINK_EVERY_MS after; lord-server
+ *     shows it in a bar over the machine ("‹machine› wants to open ‹link›" [Ignore] [Open]) only while the machine is
+ *     in use, one at a time (another one while the bar shows is dropped, never swapped in under the person's pointer),
+ *     and opens it in this computer's browser only when the person clicks Open.
+ *   AGK_NOTIFY guest → host: a notification: u16 title length (1..AG_NOTE_TITLE_MAX) + title, u16 body length
+ *     (0..AG_NOTE_BODY_MAX) + body, exactly that; UTF-8 without control characters or bidi overrides (ag_note_text_ok).
+ *     Passed on only while machine.json "guest_notify" is on, at most AG_NOTE_BURST at once and one per
+ *     AG_NOTE_EVERY_MS after; shown by lord-server as from the machine (its name first, Machines' icon), with no action,
+ *     never with the host's privileges.
+ * Neither exists for a machine with the anonymity profile (its agent is off, and machine.json refuses both). */
+enum { AGK_LINK = 25, AGK_NOTIFY = 26 };
+#define AG_LINK_MAX        2048
+#define AG_NOTE_TITLE_MAX  120
+#define AG_NOTE_BODY_MAX   600
+#define AG_NOTE_BYTES      (4 + AG_NOTE_TITLE_MAX + AG_NOTE_BODY_MAX)
+#define AG_LINK_BURST      3
+#define AG_LINK_EVERY_MS   5000
+#define AG_NOTE_BURST      5
+#define AG_NOTE_EVERY_MS   3000
+/* 1 when p is a link this computer may offer to open: letters, digits and - . _ ~ : / ? # [ ] @ & = + , ; % only (what
+ * the launcher passes to a browser as one argument: no space, quote, backslash, parenthesis, < > { } | ^ `), every '%'
+ * followed by two hex digits; http:// or https:// (scheme in any case) + a host of letters, digits, '.' and '-' (labels
+ * not empty, not starting or ending with '-') or a bracketed IPv6 address, an optional :port (1..65535), then nothing
+ * or '/', '?' or '#' and the rest; never a user name or password before the host ('@' in the authority: a spoofing
+ * trick). No other scheme (mailto, file, javascript, data…) */
+int ag_link_ok(const uint8_t *p, size_t n);
+/* the guest's tools: a link as typed, with every byte outside that set (and a '%' not followed by two hex digits)
+ * percent-encoded, so "https://x.org/a (b)" becomes "https://x.org/a%20%28b%29". Its length (out NUL-terminated), -1
+ * when it doesn't fit cap. It doesn't make a link valid: ag_link_ok still decides */
+long ag_link_encode(const uint8_t *in, size_t n, char *out, size_t cap);
+/* text of a notification: lag_text_ok, and none of the bidi controls U+200E, U+200F, U+202A..U+202E, U+2066..U+2069
+ * (they could make it read as the host's own words). 1 yes */
+int ag_note_text_ok(const uint8_t *p, size_t n);
+/* AGK_NOTIFY: 0 well formed (exact length, both texts ag_note_text_ok); pointers into the payload */
+int ag_note_parse(const uint8_t *p, size_t n, const uint8_t **title, uint16_t *tn, const uint8_t **body, uint16_t *bn);
+/* bytes written (≤ AG_NOTE_BYTES), 0 when they aren't a notification ag_note_parse would take or don't fit */
+size_t ag_note_write(const uint8_t *title, size_t tn, const uint8_t *body, size_t bn, uint8_t *out, size_t cap);
+/* A token bucket: at most `burst` at once, then one per `every_ms`. 1 allowed now (and counted), 0 not */
+typedef struct { long long at; int tokens; } AgRate;
+int ag_rate_take(AgRate *r, long long now_ms, int burst, int every_ms);
+
+/* The agent's shell (docs/VIRTUALIZATION.md 6.18; tools 8 and w12, "shell" in their hello): a terminal inside the guest,
+ * over this channel (no network, no SSH), as the person signed in at the guest's display, never root or an
+ * administrator: the tools start that person's own login shell (Linux: their passwd entry's shell, else /bin/sh, in a
+ * new pty; Windows: PowerShell in a pseudo console), never a program, argument or path the host names. Only the host
+ * opens one; one at a time.
+ *   AGK_SHELL_OPEN host → guest: u32 id (≥ 1, a new one per shell), u16 columns, u16 rows; exactly 8 bytes
+ *   AGK_SHELL_SIZE host → guest: the same layout: the terminal's new size
+ *   AGK_SHELL_DATA both ways: u32 id, then 1..AG_SHELL_CHUNK bytes (what was typed; what the shell wrote)
+ *   AGK_SHELL_ACK  both ways: u32 id, u32 bytes (1..AG_SHELL_WINDOW): that many bytes of DATA were delivered (written to
+ *     the pty, or to lord-server's terminal). Flow control: a side never has more than AG_SHELL_WINDOW bytes of DATA
+ *     sent and not acknowledged; lord-vm ends a shell whose guest breaks that, or acknowledges more than it sent
+ *   AGK_SHELL_CLOSE both ways: u32 id, i32 status; exactly 8 bytes. host → guest: end it (status 0); guest → host: it
+ *     ended (the shell's exit status 0..255, 256 + a signal, or AG_SHELL_NOSTART: it couldn't start) */
+enum { AGK_SHELL_OPEN = 27, AGK_SHELL_DATA = 28, AGK_SHELL_SIZE = 29, AGK_SHELL_CLOSE = 30, AGK_SHELL_ACK = 31 };
+#define AG_SHELL_CHUNK    16384
+#define AG_SHELL_WINDOW   (256 * 1024)
+#define AG_SHELL_COLS_MAX 1000
+#define AG_SHELL_ROWS_MAX 500
+#define AG_SHELL_NOSTART  (-1)
+/* AGK_SHELL_OPEN and AGK_SHELL_SIZE: 0 well formed (id ≥ 1, columns 1..AG_SHELL_COLS_MAX, rows 1..AG_SHELL_ROWS_MAX) */
+int ag_shell_size_parse(const uint8_t *p, size_t n, uint32_t *id, int *cols, int *rows);
+int ag_shell_size_write(uint8_t out[8], uint32_t id, int cols, int rows);
+/* AGK_SHELL_DATA: 0 well formed (id ≥ 1, 1..AG_SHELL_CHUNK bytes; *data points into the payload) */
+int ag_shell_data_parse(const uint8_t *p, size_t n, uint32_t *id, const uint8_t **data, uint32_t *dn);
+/* AGK_SHELL_ACK: 0 well formed (id ≥ 1, 1..AG_SHELL_WINDOW) */
+int ag_shell_ack_parse(const uint8_t *p, size_t n, uint32_t *id, uint32_t *bytes);
+void ag_shell_pair_write(uint8_t out[8], uint32_t id, uint32_t v);      /* ACK and CLOSE: u32 id, u32 (or i32) value */
+/* AGK_SHELL_CLOSE: 0 well formed (id ≥ 1, status AG_SHELL_NOSTART..511) */
+int ag_shell_close_parse(const uint8_t *p, size_t n, uint32_t *id, int *status);
+
 /* apps mode: limits, the VM_AGENT_STATE b bit (vmproto.h's VAC_* go up to VAC_DISPLAY, 128), flags, actions */
 #define LAG_CAP_WINDOWS 256u
 #define LAG_WIN_MAX     64
@@ -346,7 +421,7 @@ int ag_drop_staging_ok(const char *p, int windows);
 /* the hello's capability words as bits (ag_hello_caps); LAG_CAP_WINDOWS is the VM_AGENT_STATE bit, not one of these */
 enum { AG_HELLO_CLIPBOARD = 1, AG_HELLO_CLIPX = 2, AG_HELLO_WINDOWS = 4, AG_HELLO_NOCLIP = 8, AG_HELLO_CLIPREQ = 16, AG_HELLO_OPEN = 32, AG_HELLO_PLACE = 64,
        AG_HELLO_POINTER = 128, AG_HELLO_GVT = 256, AG_HELLO_EXTRA = 512, AG_HELLO_EXTRAOFF = 1024, AG_HELLO_STOPPING = 2048,
-       AG_HELLO_PERF = 4096 };
+       AG_HELLO_PERF = 4096, AG_HELLO_SHELL = 8192, AG_HELLO_LINKS = 16384, AG_HELLO_NOTIFY = 32768 };
 typedef struct { uint32_t id, flags, owner, pid; int32_t x, y, w, h; char title[LAG_TITLE_MAX + 1], app[LAG_APP_MAX + 1]; } LagWinEntry;
 typedef struct { uint32_t serial; int n; LagWinEntry w[LAG_WIN_MAX]; } LagWinList;
 typedef struct { char name[LAG_NAME_MAX + 1], token[LAG_TOKEN_MAX + 1]; } LagAppEntry;

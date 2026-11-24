@@ -164,6 +164,9 @@ static void test_machine(void) {
     CHECK(mvariant("\"microphone\": false", "\"microphone\": true") != VM_OK, "locked: microphone");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"graphics\": \"3d\"") != VM_OK, "locked: 3d");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"perf_profile\": true") != VM_OK, "locked: perf profile");
+    CHECK(mvariant("\"schema\": 14, ", "\"schema\": 15, \"guest_links\": true, ") != VM_OK, "locked: links from the guest");
+    CHECK(mvariant("\"schema\": 14, ", "\"schema\": 15, \"guest_notify\": true, ") != VM_OK, "locked: notifications from the guest");
+    CHECK(mvariant("\"schema\": 14, ", "\"schema\": 15, ") == VM_OK, "a member at schema 15");
     {
         VmMachine x;
         CHECK(vm_machine_parse(M14, strlen(M14), &x, err, sizeof err) == VM_OK, err);

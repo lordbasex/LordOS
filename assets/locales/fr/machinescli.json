@@ -131,5 +131,6 @@
   "applyNoShares": "Rien n'a été modifié : ce qui dépasse la machine n'a pas été autorisé (la question n'est posée que dans un terminal).",
   "applyCreated": "{name} a été créée comme le dit {file}.",
   "applyUpdated": "{name} a maintenant les réglages de {file}.",
-  "applyRunning": "{name} est en marche : éteignez-la pour la modifier depuis un fichier."
+  "applyRunning": "{name} est en marche : éteignez-la pour la modifier depuis un fichier.",
+  "overBudget": "{name} n'a pas démarré : elle a besoin de {need} Mo et il reste {free} Mo pour les machines. Suspendez ou éteignez une autre machine, ou donnez-lui moins de mémoire."
 }

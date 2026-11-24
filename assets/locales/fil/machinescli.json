@@ -131,5 +131,6 @@
   "applyNoShares": "Walang nabago: hindi pinayagan ang lumalampas sa machine (sa terminal lang ito nagtatanong).",
   "applyCreated": "Ginawa ang {name} ayon sa sinasabi ng {file}.",
   "applyUpdated": "Nasa {name} na ang mga setting mula sa {file}.",
-  "applyRunning": "Tumatakbo ang {name}: i-shut down ito para baguhin mula sa file."
+  "applyRunning": "Tumatakbo ang {name}: i-shut down ito para baguhin mula sa file.",
+  "overBudget": "Hindi nagsimula ang {name}: kailangan nito ng {need} MB at {free} MB na lang ang natitira para sa mga machine. I-suspend o i-shut down ang ibang machine, o bigyan ito ng mas kaunting memory."
 }

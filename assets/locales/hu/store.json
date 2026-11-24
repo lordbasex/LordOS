@@ -369,5 +369,7 @@
   "settings.listsTitle": "Csomaglisták",
   "settings.listsHint": "A Debian és a LordOS csomaglistái, ahonnan az új alkalmazások és a frissítések érkeznek.",
   "settings.webManage": "Minden webalkalmazás profiljai, engedélyei és helyfoglalása",
-  "settings.flathubOff": "A Flathub kikapcsolása az Áruházban. Az onnan telepített alkalmazások megmaradnak."
+  "settings.flathubOff": "A Flathub kikapcsolása az Áruházban. Az onnan telepített alkalmazások megmaradnak.",
+  "updates.qemuTitle": "A felfüggesztett gépek a frissítés után talán nem folytatódnak ({count})",
+  "updates.qemuText": "Ez a frissítés módosítja a QEMU-t, és az egyik QEMU-verzió által mentett munkamenet egy másikban nem biztos, hogy betöltődik. Előbb állítsd le ezeket a gépeket, vagy indításkor válaszd a Folytatás mégis vagy a Mentett állapot elvetése lehetőséget."
 }

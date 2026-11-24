@@ -131,5 +131,6 @@
   "applyNoShares": "No s'ha canviat res: no s'ha permès el que va més enllà de la màquina (només es pregunta en un terminal).",
   "applyCreated": "S'ha creat {name} com diu {file}.",
   "applyUpdated": "{name} ja té la configuració que dona {file}.",
-  "applyRunning": "{name} està en marxa: atura-la per canviar-la des d'un fitxer."
+  "applyRunning": "{name} està en marxa: atura-la per canviar-la des d'un fitxer.",
+  "overBudget": "{name} no s'ha iniciat: necessita {need} MB i en queden {free} per a màquines. Suspèn o apaga una altra màquina, o dona-li menys memòria."
 }

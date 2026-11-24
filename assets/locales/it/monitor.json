@@ -684,5 +684,6 @@
   "stats.p95Row": "CPU 95° percentile (1 min)",
   "stats.memAvgRow": "Memoria media (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memoria picco (1 · 5 · 15 min)",
-  "stats.spark": "Ultimo minuto"
+  "stats.spark": "Ultimo minuto",
+  "group.showMachine": "Mostra la macchina"
 }

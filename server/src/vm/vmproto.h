@@ -124,6 +124,11 @@
  *                   log, and answers VM_EXEC_DONE, or VM_REPLY with why not
  *     VM_LAUNCH     a = an app's place in the guest's list, b = that list's generation (VM_WINDATA c): lord-vm sends the
  *                   guest that app's token from its own copy of the list; refused when the list changed since → VM_REPLY
+ *     VM_SHELL      the agent's shell (6.18; only when the guest's tools said "shell", VAC_SHELL): a = VSH_OPEN, b = columns
+ *                   (1..1000), c = rows (1..500) → VM_SHELL_FD with one descriptor: a stream to a new shell in the guest, as
+ *                   the person signed in there (AGK_SHELL_OPEN; one at a time, a new one ends the old); what's written to
+ *                   it is typed into the shell, what the shell writes comes out; it ends (EOF) when the shell does.
+ *                   a = VSH_SIZE, b, c: the terminal's new size (AGK_SHELL_SIZE). a = VSH_CLOSE: end it
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -155,6 +160,11 @@
  *     VM_WINREFUSED apps mode: the guest couldn't do an action to one of its windows (LAG_WINREFUSED, parsed by lord-vm):
  *                   a = the window's id, b = LAGA_* (1..5), c = LAGR_* (1 it runs as administrator, 2 the system refused).
  *                   Sent to every client
+ *     VM_SHELL_FD   seq of the VM_SHELL; the shell's stream (above)
+ *     VM_GUEST_NOTE a link or a notification from the guest (6.12): a sealed memfd of a bytes (≤ VM_GUEST_NOTE_MAX), b =
+ *                   AGK_LINK (the link, ag_link_ok) or AGK_NOTIFY (ag_note_parse's layout), checked and written again by
+ *                   lord-vm, only while machine.json allows that kind and within its rate (vmagent.h); lord-server checks
+ *                   it again, offers a link only in a bar the person clicks, and shows a notification as from the machine
  *     VM_EXEC_DONE  seq of the VM_EXEC; a = the program's exit status (0..255, 124: its time ran out), b = VMX_F_*; one
  *                   descriptor, a sealed memfd in vmexec.h's answer layout (its output and errors, cut at their caps). Sent
  *                   to the client that asked only
@@ -257,11 +267,16 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_EXEC,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL, VM_EXEC,
     VM_REQ_LAST = VM_EXEC,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
-    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT, VM_EXEC_DONE,
+    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
+    VM_SHELL_FD, VM_GUEST_NOTE, VM_EXEC_DONE,
 };
+/* VM_SHELL a */
+enum { VSH_CLOSE = 0, VSH_OPEN = 1, VSH_SIZE = 2 };
+/* the largest VM_GUEST_NOTE: a link or a notification, in its agent frame's layout (vmagent.h) */
+#define VM_GUEST_NOTE_MAX 2048
 /* VM_CLIP_DENY c: why. BACKGROUND: the machine wasn't in use (its window not in front, nor a few seconds after);
  * STALE: the host's clipboard changed since that offer, or the offer isn't the last; NONE: that form isn't there now
  * (or it's a secret); DECLINED: the person said no (ask mode), or didn't answer in time */
@@ -285,10 +300,14 @@ enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
  * VAC_OPEN: the guest's tools said "open": a dropped file can be opened there (VM_FILE a = 1, AGK_OPEN);
  * VAC_PLACE: they said "place": files dropped on an apps mode window go to that window (VM_FILE a = 2, AGK_PLACE);
  * VAC_EXTRA: the guest has a display that isn't on a PCI adapter besides the PCI one the picture shows, and its tools
- * can turn it off (VAG_EXTRA_OFF); VAC_EXTRA_OFF: they turned one off and can turn it back on (VAG_EXTRA_ON) */
+ * can turn it off (VAG_EXTRA_OFF); VAC_EXTRA_OFF: they turned one off and can turn it back on (VAG_EXTRA_ON);
+ * VAC_SHELL: the tools said "shell": the agent's shell (VM_SHELL, 6.18); VAC_LINKS, VAC_NOTIFY: they said "links",
+ * "notify" and machine.json allows them: links and notifications from the guest (VM_GUEST_NOTE, 6.12);
+ * VAC_EVENTLOG: a Windows guest's event logs come through qemu-guest-agent (6.19) */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
        VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096, VAC_OPEN = 8192,
-       VAC_PLACE = 16384, VAC_EXTRA = 32768, VAC_EXTRA_OFF = 65536, VAC_ALL = 131071 };
+       VAC_PLACE = 16384, VAC_EXTRA = 32768, VAC_EXTRA_OFF = 65536, VAC_SHELL = 131072, VAC_LINKS = 262144, VAC_NOTIFY = 524288,
+       VAC_EVENTLOG = 1048576, VAC_ALL = 2097151 };
 /* how long a VM_FILE with a = 1 waits for the guest tools' AGK_OPENED after the copy (a program may ask for consent) */
 #define AG_OPEN_WAIT_MS 120000
 #define VM_WINDATA_MAX (1u << 20)
@@ -507,6 +526,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_RENAME || m->text[0]) &&
                       (m->type != VM_LINK || ((m->a == 0 || m->a == 1) && strnlen(m->text, VM_TEXT_MAX) == 36)) &&
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
+                      (m->type != VM_SHELL || (m->a == VSH_CLOSE || ((m->a == VSH_OPEN || m->a == VSH_SIZE) && m->b >= 1 && m->b <= 1000 && m->c >= 1 && m->c <= 500))) &&
                       (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0));
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
@@ -524,6 +544,9 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_GUEST_LAYOUT: return vm_layout_ok(m->a, m->b, (m->c >> 16) & 0xffff, m->c & 0xffff, (m->d >> 16) & 0xffff, m->d & 0xffff) &&
                                  m->c >= 0 && m->d >= 0;
     case VM_WINREFUSED: return m->a != 0 && m->b >= 1 && m->b <= 5 && (m->c == 1 || m->c == 2) && m->d == 0;
+    case VM_SHELL_FD: return 1;
+    /* a: bytes in the sealed memfd; b: AGK_LINK (25) or AGK_NOTIFY (26), vmagent.h */
+    case VM_GUEST_NOTE: return m->a > 0 && m->a <= VM_GUEST_NOTE_MAX && (m->b == 25 || m->b == 26);
     case VM_EXEC_DONE: return m->a >= 0 && m->a <= 255 && m->b >= 0 && m->b <= 7;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;

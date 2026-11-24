@@ -85,6 +85,12 @@ int vm_group_dir_ok(const char *path);
 /* the group folder holding a machine folder `dir` (its parent) when that parent's name ends ".lordgroup": 1 and the
  * path in out, else 0 */
 int vm_group_parent(const char *dir, char *out, size_t n);
+/* A group's disposable session (docs/VIRTUALIZATION.md 19.7): when m (loaded from dir) is the workstation of a group
+ * whose group.json has "disposable" on, and m names that group, its cap in MB: as much as the workstation's memory, at
+ * least VMG_SESSION_MIN_MB. 0 otherwise. Counted in the machine's memory limit (lordvm.c: the memfd's pages are charged
+ * to QEMU, which writes them) and in the resource budget (vm_budget_used_mb's extra, model.js groupBudget). */
+#define VMG_SESSION_MIN_MB 1024
+long vm_group_session_mb(const char *dir, const VmMachine *m);
 
 /* ---- managing a group's folder (docs/VIRTUALIZATION.md 19.8, 19.9: Delete, Rename, Repair) ----
  * Every step works on descriptors: the library is opened once, each folder below it with openat(O_NOFOLLOW |

@@ -684,5 +684,6 @@
   "stats.p95Row": "CPU 95e centile (1 min)",
   "stats.memAvgRow": "Mémoire moyenne (1 · 5 · 15 min)",
   "stats.memPeakRow": "Pic de mémoire (1 · 5 · 15 min)",
-  "stats.spark": "Dernière minute"
+  "stats.spark": "Dernière minute",
+  "group.showMachine": "Afficher la machine"
 }

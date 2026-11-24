@@ -555,6 +555,7 @@ static int check_member(const VmMachine *m, char *err, size_t n) {
         if (m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] || m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0])
             return fail(err, n, VM_E_RANGE, "locked for anonymity: SMBIOS strings and disk serials");
         if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
+        if (m->guest_links || m->guest_notify) return fail(err, n, VM_E_RANGE, "locked for anonymity: links and notifications from the guest");
         if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
     }
     return VM_OK;
@@ -661,8 +662,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 12 && m->capture_fullscreen) return fail(err, n, VM_E_FIELD, "capture_fullscreen needs schema 12");
     if (m->perf_profile & ~1) return fail(err, n, VM_E_RANGE, "perf_profile is true or false");
     if (m->schema < 13 && m->perf_profile) return fail(err, n, VM_E_FIELD, "perf_profile needs schema 13");
+    if ((m->guest_links & ~1) || (m->guest_notify & ~1)) return fail(err, n, VM_E_RANGE, "guest_links and guest_notify are true or false");
+    if (m->schema < 15 && (m->guest_links || m->guest_notify)) return fail(err, n, VM_E_FIELD, "guest_links and guest_notify need schema 15");
     if (m->automation & ~1) return fail(err, n, VM_E_RANGE, "automation is true or false");
-    if (m->schema < 15 && m->automation) return fail(err, n, VM_E_FIELD, "automation needs schema 15");
+    if (m->schema < 16 && m->automation) return fail(err, n, VM_E_FIELD, "automation needs schema 16");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
@@ -683,6 +686,96 @@ long vm_mem_limit_mb(const VmMachine *m) { return (long)m->memory_mb + (m->accel
 int vm_budget_fits(const VmHost *h, long running_mb, long want_mb) {
     long floor = h->ram_mb <= 4096 ? VM_FLOOR_SMALL_MB : VM_FLOOR_MB;
     return running_mb >= 0 && want_mb > 0 && running_mb + want_mb <= h->ram_mb - floor;
+}
+
+int vm_dir_active(const char *dir, int (*alive)(long pid)) {
+    char p[VM_PATH_MAX + 32], buf[2048];
+    if (!dir || (size_t)snprintf(p, sizeof p, "%s/run.json", dir) >= sizeof p) return 0;
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return 0;
+    struct stat rs;
+    ssize_t k = !fstat(fd, &rs) && S_ISREG(rs.st_mode) ? read(fd, buf, sizeof buf - 1) : -1;
+    close(fd);
+    if (k <= 0) return 0;
+    JDoc d;
+    if (json_parse(buf, (size_t)k, &d, NULL, 0)) return 0;
+    const char *s = json_str(d.root, "state");
+    double pd = json_num(d.root, "pid", 0);
+    int on = s && (!strcmp(s, "starting") || !strcmp(s, "running") || !strcmp(s, "paused") || !strcmp(s, "stopping"));
+    long pid = pd >= 1 && pd <= 4194304 ? (long)pd : 0;
+    json_free(&d);
+    return on && pid && (!alive || alive(pid));
+}
+
+size_t vm_backup_hold(const char *rel) {
+    if (!rel) return 0;
+    size_t n = strlen(rel);
+    static const char *const tails[] = { ".lordvm/disks", ".lordvm/suspend.state" };
+    for (int i = 0; i < 2; i++) {
+        size_t t = strlen(tails[i]);
+        if (n <= t || strcmp(rel + n - t, tails[i])) continue;
+        size_t dirlen = n - t + 7;                          /* up to and with ".lordvm" */
+        /* a name before ".lordvm": the folder's own name isn't empty and doesn't start with '.' */
+        size_t b = n - t;
+        while (b > 0 && rel[b - 1] != '/') b--;
+        if (b == n - t || rel[b] == '.') return 0;
+        return dirlen;
+    }
+    return 0;
+}
+
+/* one machine folder for vm_budget_used_mb: its limit when it is active, else 0 */
+static long budget_one(const char *dir, const struct stat *ex, int (*alive)(long), long (*extra)(const char *, const VmMachine *), int *n) {
+    struct stat st;
+    if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) return 0;
+    if (ex && st.st_dev == ex->st_dev && st.st_ino == ex->st_ino) return 0;
+    if (!vm_dir_active(dir, alive)) return 0;
+    VmMachine m;
+    if (vm_machine_load(dir, &m, NULL, 0)) return 0;
+    (*n)++;
+    long x = extra ? extra(dir, &m) : 0;
+    return vm_mem_limit_mb(&m) + (x > 0 && x <= VM_MEM_MAX_MB ? x : 0);
+}
+
+static int budget_suffix(const char *s, size_t l, const char *suf) {
+    size_t k = strlen(suf);
+    return l > k && !strcmp(s + l - k, suf);
+}
+
+long vm_budget_used_mb(const char *lib, const char *exclude, int (*alive)(long pid), long (*extra)(const char *dir, const VmMachine *m), int *n) {
+    int cnt = 0, *pn = n ? n : &cnt;
+    *pn = 0;
+    struct stat ex;
+    int have_ex = exclude && !stat(exclude, &ex);
+    DIR *d = lib ? opendir(lib) : NULL;
+    if (!d) return 0;
+    long sum = 0;
+    int seen = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) && seen < 256) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.') continue;
+        char dir[VM_PATH_MAX + 260];
+        if ((size_t)snprintf(dir, sizeof dir, "%s/%s", lib, e->d_name) >= sizeof dir) continue;
+        if (budget_suffix(e->d_name, l, ".lordvm")) { seen++; sum += budget_one(dir, have_ex ? &ex : NULL, alive, extra, pn); continue; }
+        if (!budget_suffix(e->d_name, l, ".lordgroup")) continue;
+        struct stat gs;
+        if (lstat(dir, &gs) || !S_ISDIR(gs.st_mode)) continue;
+        DIR *g = opendir(dir);
+        if (!g) continue;
+        struct dirent *f;
+        while ((f = readdir(g)) && seen < 256) {
+            size_t fl = strlen(f->d_name);
+            if (f->d_name[0] == '.' || !budget_suffix(f->d_name, fl, ".lordvm")) continue;
+            char md[VM_PATH_MAX + 520];
+            if ((size_t)snprintf(md, sizeof md, "%s/%s", dir, f->d_name) >= sizeof md) continue;
+            seen++;
+            sum += budget_one(md, have_ex ? &ex : NULL, alive, extra, pn);
+        }
+        closedir(g);
+    }
+    closedir(d);
+    return sum;
 }
 
 const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing) {
@@ -718,7 +811,7 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "automation", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "automation", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -994,7 +1087,12 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *pp = json_get(o, "perf_profile");
         if (pp && pp->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "perf_profile must be true or false"); goto out; }
         m->perf_profile = pp ? json_bool(o, "perf_profile", 0) : 0;
-        /* schema 15: missing means no automation (6.15) */
+        /* schema 15: missing means off */
+        const JVal *gl = json_get(o, "guest_links"), *gn = json_get(o, "guest_notify");
+        if ((gl && gl->type != J_BOOL) || (gn && gn->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "guest_links and guest_notify must be true or false"); goto out; }
+        m->guest_links = gl ? json_bool(o, "guest_links", 0) : 0;
+        m->guest_notify = gn ? json_bool(o, "guest_notify", 0) : 0;
+        /* schema 16: missing means no automation (6.15) */
         const JVal *au = json_get(o, "automation");
         if (au && au->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "automation must be true or false"); goto out; }
         m->automation = au ? json_bool(o, "automation", 0) : 0;
@@ -1117,7 +1215,9 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 11 && m->vgpu) { jb_raw(&b, ",\n  \"gpu\": "); jb_str(&b, VM_VGPU_NAMES[m->vgpu]); }
     if (m->schema >= 12 && m->capture_fullscreen) jb_raw(&b, ",\n  \"capture_fullscreen\": true");
     if (m->schema >= 13 && m->perf_profile) jb_raw(&b, ",\n  \"perf_profile\": true");
-    if (m->schema >= 15 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
+    if (m->schema >= 15 && m->guest_links) jb_raw(&b, ",\n  \"guest_links\": true");
+    if (m->schema >= 15 && m->guest_notify) jb_raw(&b, ",\n  \"guest_notify\": true");
+    if (m->schema >= 16 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);
@@ -1137,7 +1237,7 @@ char *vm_machine_json(const VmMachine *m) {
 }
 
 static char *read_small(const char *path, size_t max, size_t *len) {
-    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);   /* a FIFO named machine.json never blocks the caller */
     if (fd < 0) return NULL;
     struct stat st;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || (size_t)st.st_size > max) { close(fd); errno = EFBIG; return NULL; }

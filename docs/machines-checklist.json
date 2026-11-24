@@ -5,11 +5,11 @@
  "items": [
   {
    "area": "A",
-   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 15, lock, `run.json`, crash recovery (3.8, 3.9)",
+   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 16, lock, `run.json`, crash recovery (3.8, 3.9)",
    "status": "✅",
    "pct": 100,
-   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 15`); `vm-test`, `vmgroup-test`",
-   "note": "Schema 15 (*in development*) adds `automation` (6.15); 14 a machine group member's keys (19.4)"
+   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 16`); `vm-test`, `vmgroup-test`",
+   "note": "Schema 16 (*in development*) adds `automation` (6.15); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
   },
   {
    "area": "A",
@@ -62,10 +62,10 @@
   {
    "area": "A",
    "item": "\"Weaker isolation on this kernel\" notice when Landlock is missing (3.3)",
-   "status": "🟡",
-   "pct": 20,
-   "file": "`lordvm.c` (the log's note), `sdk/sentinelavm.js` (`sandboxMissing`)",
-   "note": "The log's \"Sandbox:\" line and note say it, and Sentinela's always-shown `vmSandbox` alert names it, but only with Sentinela on (off by default); no notice in the app. lord-vm refuses to start only without seccomp or `no_new_privs` (was ❌ 0)"
+   "status": "🧪",
+   "pct": 90,
+   "file": "`js_vm.c` (`host().landlock`), `model.js` `isolationGaps`, `library.jsx`, `configure.jsx` (Security), `vmwindow.jsx` (Info); `vm_model_test.mjs`, `machines_app_headless.sh`",
+   "note": "*In development*: the library's notice, Configure → Security's sandbox line and the window's Info menu, from the kernel's Landlock ABI and the running machine's VMS bits (namespaces too); Sentinela's alert as before. Not seen on a kernel without Landlock (every test host has it)"
   },
   {
    "area": "A",
@@ -79,9 +79,9 @@
    "area": "A",
    "item": "Resource budget (3.7)",
    "status": "🟡",
-   "pct": 35,
-   "file": "`model.js` `budgetCheck`, `vmwindow.jsx`, cgroup `memory.max` and CPU limits",
-   "note": "Only the window checks it: `startDetached` and `machines start` skip it, and `vm_budget_fits` (`machine.c`) is called only by `vm-test`. No common slice, no pressure warning, no \"pause another or start with less\""
+   "pct": 80,
+   "file": "`machine.c` `vm_budget_used_mb`, `vm_budget_fits`; `js_vm.c` `budget_ok` (`start`, `startDetached`), `lord.vm.budget`; `cli/machines.c`; `model.js` `budgetPlan`, `budgetLine`; `vmwindow.jsx`, `library.jsx`; `vm-test`, `vm_model_test.mjs`, `machines_app_headless.sh`",
+   "note": "*In development*: one check in lord-server for every start path (the window, Start Without Window, `machines start` through the session and without one, a group's members, a disposable session's share counted); the window offers Suspend <another> or Start with less memory; the status line shows memory for machines and a PSI warning. Not built: one parent slice with lower CPU and I/O weight than the session (each machine keeps its own `memory.max`)"
   },
   {
    "area": "A",
@@ -150,18 +150,18 @@
   {
    "area": "A",
    "item": "Failure page with a cause and a fix (6.1)",
-   "status": "🟡",
-   "pct": 65,
-   "file": "`vmwindow.jsx`, `machines.why.*` and `fix.*`",
-   "note": "Nine named causes, each with a fix line, lord-vm's own reason, Use 2D and Resume anyway buttons; no \"start with less memory\" or \"go back to a snapshot\" action, no locked-file cause"
+   "status": "✅",
+   "pct": 90,
+   "file": "`vmwindow.jsx` (`Failed`), `model.js` `failCause`, `failActions`, `machines.why.*` and `fix.*`; `vm_model_test.mjs`",
+   "note": "*In development*: a locked disk and a missing disk named from QEMU's words, Start with less memory after running out, Go Back to a Snapshot. Checked with QEMU's messages in the model test, not with a real failure on screen"
   },
   {
    "area": "A",
    "item": "A state saved by another QEMU or CPU: Resume anyway or discard (6.1)",
-   "status": "🟡",
-   "pct": 60,
-   "file": "`lordvm.c` (`--resume-anyway`), `vmwindow.jsx`",
-   "note": "No Store warning; devices that can't be saved (HDA) aren't unplugged"
+   "status": "✅",
+   "pct": 90,
+   "file": "`lordvm.c` (`--resume-anyway`), `vmwindow.jsx`, `apps/store/syspkg.js` `qemuUpdateRisk`, `debian.js` (Updates); `store_syspkg_test.mjs`",
+   "note": "*In development*: Store → Updates warns when an update changes QEMU while machines are suspended. HDA is migrated with the state (nothing to unplug); what can't be saved (a graphics card, 3D) is never suspended"
   },
   {
    "area": "A",
@@ -287,9 +287,9 @@
    "area": "C",
    "item": "Library: toolbar, chips, grid or list, sort, search, status line, live card (5.1)",
    "status": "✅",
-   "pct": 90,
-   "file": "`library.jsx`, `model.js` (`skeletonPlan`); `vm_model_test.mjs`",
-   "note": "Placeholders from the first frame (*in development*). No agent or disk lights on the card, no Export or Templates in ···"
+   "pct": 95,
+   "file": "`library.jsx` (`Lights`), `model.js` (`skeletonPlan`, `cardLights`); `vm_model_test.mjs`, `machines_app_headless.sh`",
+   "note": "Placeholders from the first frame; agent and disk lights with words on the card and the row (*in development*). No Export or Templates in ···"
   },
   {
    "area": "C",
@@ -311,9 +311,9 @@
    "area": "C",
    "item": "Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu (5.3)",
    "status": "🟡",
-   "pct": 75,
-   "file": "`vmwindow.jsx`",
-   "note": "No View or Info menus, Scale, Actual Size, device dots, Start in Full Screen, aspect lock; no USB, Network or Camera in Devices"
+   "pct": 85,
+   "file": "`vmwindow.jsx` (View and Info menus), `library.jsx` (Start in Full Screen), `model.js` `actualFrame`, `infoLines`",
+   "note": "*In development*: View (Window, Full Screen, Apps, Picture in Picture, Actual Size), Info (CPU, memory, disk, the sandbox, Open Configuration), Start in Full Screen. Not built: Scale, device dots, the window keeping the guest's shape; no USB, Network or Camera in Devices"
   },
   {
    "area": "C",
@@ -326,18 +326,18 @@
   {
    "area": "C",
    "item": "All Displays (multi-head), Picture in Picture of a machine (5.4)",
-   "status": "❌",
-   "pct": 0,
-   "file": "`setPip` only for apps-mode popups",
-   "note": ""
+   "status": "🟡",
+   "pct": 45,
+   "file": "`vmwindow.jsx` (`PipBack`, View → Picture in Picture), `model.js` `pipFrame`; `vm_model_test.mjs`",
+   "note": "*In development*: Picture in Picture of a machine (`wm.setPip`, on the window's display, the guest's shape, no keys and no pointer for the guest, not for a protected machine). All Displays (virtio-gpu heads, one per display) not built"
   },
   {
    "area": "C",
    "item": "Configure, one window with summaries (5.5)",
    "status": "🟡",
-   "pct": 60,
-   "file": "`configure.jsx` (11 sections)",
-   "note": "Built since the last audit: Pin cores, the vCPU advice, the performance profile; the disk grows. No search, dots, Backup, ballooning, CPU model, USB rules, disk add or encryption, printers, icon and tags, MAC, speed limit; huge pages are automatic, no switch"
+   "pct": 65,
+   "file": "`configure.jsx` (11 sections), `kit.jsx` (`SideRow` dot), `model.js` `changedSections`, `sectionsMatching`",
+   "note": "Search over the sections and a dot on each with an unsaved change (*in development*). No Backup, ballooning, CPU model, USB rules, disk add or encryption, printers, icon and tags, MAC, speed limit; huge pages are automatic, no switch"
   },
   {
    "area": "C",
@@ -358,10 +358,10 @@
   {
    "area": "C",
    "item": "What this computer can run (5.7)",
-   "status": "🟡",
-   "pct": 30,
-   "file": "`library.jsx` (the Pi page, the first-run page)",
-   "note": "The first-run page covers KVM and Emulated only. No amd64 page, no sensors, not in Help"
+   "status": "🧪",
+   "pct": 85,
+   "file": "`library.jsx` (`ThisComputer`), `model.js` `canRun`, `sensorLines`, `js_vm.c` (`host().nested`, `sensors()`); `vm_model_test.mjs`, `machines_app_headless.sh`",
+   "note": "*In development*: amd64 and arm64 from what the host reports, the sensors (temperature, fan, a Pi's power supply) while machines run, in the Machine menu and on the first-run page. Not yet seen on screen on the Pi"
   },
   {
    "area": "C",
@@ -566,10 +566,10 @@
   {
    "area": "G",
    "item": "Guest → host links and notifications (6.12)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": "No agent message kind for either"
+   "status": "🟡",
+   "pct": 75,
+   "file": "`vmagent.c` (`ag_link_ok`, `ag_note_parse`, `ag_rate_take`), `lordvm.c` (`guest_note`), `js_vm.c` (`guestLinkAnswer`), `vmwindow.jsx`, `configure.jsx`, `tools/guest/gshell.c`, `lordos-guest-win.c` w12; `vm-test`, `guest_shell_test.sh`, a KVM guest (6.18)",
+   "note": "*In development*: off by default (machine.json schema 15), http and https only, a link opens only from the bar's Open (after 700 ms, while in use), notifications shown as from the machine, both rate-limited; checked in a real Debian 13 guest through `lordvm-dev`. Not built: the guest desktop's own notifications passed on by themselves, a Send to LordOS entry in the guest; not checked: the bar on screen, a Windows guest (was ❌ 0)"
   },
   {
    "area": "H",
@@ -637,19 +637,19 @@
   },
   {
    "area": "I",
-   "item": "`lordos-guest` 7: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus (6.17, 7, 7.1.4)",
+   "item": "`lordos-guest` 8: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus, the agent's shell, links and notifications (6.12, 6.17, 6.18, 7, 7.1.4)",
    "status": "✅",
    "pct": 95,
-   "file": "`tools/guest/lordos-guest.c` (`VERSION \"7\"`), `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`",
-   "note": "7 (*in development*) adds `perf` (power-profiles-daemon, GNOME's animations); checked on private buses with the real dconf-service, not yet in a running guest (was 6, 100)"
+   "file": "`tools/guest/lordos-guest.c` (`VERSION \"8\"`), `gshell.c`, `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`, `guest_shell_test.sh`",
+   "note": "8 (*in development*) adds the shell (the person's own login shell in a pty, never root) and the links and notifications socket, both checked in a running Debian 13 guest on 2026-11-24; `perf` (7) still not checked in a running guest"
   },
   {
    "area": "I",
-   "item": "`lordos-guest-win` w11: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf (7.1.2, 7.1.4)",
+   "item": "`lordos-guest-win` w12: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf, shell, links, notify (6.12, 6.18, 7.1.2, 7.1.4)",
    "status": "✅",
-   "pct": 100,
-   "file": "`tools/guest-win/lordos-guest-win.c` (`VERSION \"w11\"`); `vm-test` (`AGK_PERF`)",
-   "note": "`perf` checked in the maintainer's guest on 2026-11-23 (power plan, effects, transparency); Windows Search is lord-vm's own script through qemu-guest-agent (`vmperfwin.c`, M item 5), not the tools'. The note said `perf` wasn't checked in a running guest (7.1.4 records the check; was 95)"
+   "pct": 95,
+   "file": "`tools/guest-win/lordos-guest-win.c` (`VERSION \"w12\"`); `vm-test` (`AGK_PERF`, the shell's and links' frames)",
+   "note": "w12 (*in development*) adds PowerShell in a pseudo console (never elevated) and `--open-on-host`/`--notify-host` by `WM_COPYDATA`; cross-built with mingw-w64, not yet run in a Windows guest (w11 was 100, `perf` checked in the maintainer's guest on 2026-11-23)"
   },
   {
    "area": "I",
@@ -662,26 +662,26 @@
   {
    "area": "I",
    "item": "Agent state light and capability list (6.17)",
-   "status": "🟡",
-   "pct": 85,
-   "file": "`model.js` (`agentTone`, `agentLines`)",
-   "note": "No red state"
+   "status": "✅",
+   "pct": 95,
+   "file": "`model.js` (`agentTone`, `agentLines`), `js_vm.c` (`lost`); `vm_model_test.mjs`",
+   "note": "Red (*in development*) when the agent stopped answering while the guest runs, or the tools' install failed; the list has the agent's shell, links and notifications and a Windows guest's event logs. Not seen on screen yet (was 🟡 85: no red state)"
   },
   {
    "area": "I",
    "item": "Shell over the agent as the signed-in user (6.18)",
-   "status": "❌",
-   "pct": 15,
-   "file": "the Shell is the serial console",
-   "note": ""
+   "status": "🟡",
+   "pct": 80,
+   "file": "`tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`; `guest_shell_test.sh`, `vm-test`, a KVM guest",
+   "note": "*In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24). A pane of the machine's window, not a Terminal tab; no root or administrator switch, no `lordvm exec`; w12 not run in a Windows guest; the pane not seen on screen (was ❌ 15)"
   },
   {
    "area": "I",
    "item": "Logs: journal, serial, machine log, Overview (6.19)",
    "status": "🟡",
-   "pct": 65,
-   "file": "`logs.jsx`, `lordvm.c` (journal through qemu-ga)",
-   "note": "No Windows event logs, unit filter (a column only), time zone or Clear view"
+   "pct": 85,
+   "file": "`logs.jsx`, `diag.js` (`journalLine`, `guestZone`), `lordvm.c` (journal and `EVLOG_PS` through qemu-ga); `vm_model_test.mjs`",
+   "note": "*In development*: a Windows guest's System and Application event logs, a unit or source filter, times in local time with the guest's zone; the event logs not yet run in a Windows guest; Clear view was built already (was 65: no event logs, unit filter or time zone)"
   },
   {
    "area": "J",
@@ -696,16 +696,16 @@
    "item": "`lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24)",
    "status": "🧪",
    "pct": 80,
-   "file": "`vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 15); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh`",
+   "file": "`vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 16); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh`",
    "note": "*In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. Not built: the interactive shell, programs in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0)"
   },
   {
    "area": "K",
    "item": "Monitor: a machine as one row (6.14)",
    "status": "🟡",
-   "pct": 65,
-   "file": "`apps/monitor/Processes.jsx`, `Network.jsx`, `Gpu.jsx`",
-   "note": "Network and GPU name machines too; no drill-in"
+   "pct": 80,
+   "file": "`apps/monitor/Processes.jsx` (Show Machine), `Network.jsx`, `Gpu.jsx`; `apps/machines/index.jsx` (`args.show`)",
+   "note": "Network and GPU name machines too; a machine's row opens its processes and Show Machine opens its window (*in development*). No per-machine disk and network numbers in Monitor"
   },
   {
    "area": "K",
@@ -718,10 +718,10 @@
   {
    "area": "K",
    "item": "Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, balloon (6.14, 16)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": "No `virtio-balloon`; Cleaner, Backups and Files don't know `.lordvm`"
+   "status": "🟡",
+   "pct": 75,
+   "file": "`clean/cleanfs.c` `clean_machine_path`, `backup/engine.c` (`hold`), `backup.c`, `machine.c` `vm_backup_hold`, `vm_dir_active`, `sdk/openwith.js` `registerBundle`, `apps/files`, `apps/machines/ties.js`; `clean-test`, `backup-test`, `vm-test`, `vm_model_test.mjs`, `machines_app_headless.sh`",
+   "note": "*In development*: Cleaner never offers a machine's files; Backups hold back a running machine's disks and saved session; Files shows a machine as one item; Search finds machines; Pause All on battery (notice and toolbar); Start with the session; Pause while I'm away. No balloon (see 6.14), no Reclaim space in Cleaner (Machines' Storage window has it)"
   },
   {
    "area": "K",
@@ -890,8 +890,8 @@
    "name": "Engine, lifecycle, sandbox, display",
    "weight": 14,
    "items": 22,
-   "mean": 78.18,
-   "score": 78
+   "mean": 85.91,
+   "score": 86
   },
   {
    "id": "B",
@@ -906,8 +906,8 @@
    "name": "The app",
    "weight": 11,
    "items": 12,
-   "mean": 74.58,
-   "score": 75
+   "mean": 84.58,
+   "score": 85
   },
   {
    "id": "D",
@@ -938,8 +938,8 @@
    "name": "Host integration",
    "weight": 12,
    "items": 9,
-   "mean": 68.33,
-   "score": 68
+   "mean": 76.67,
+   "score": 77
   },
   {
    "id": "H",
@@ -954,8 +954,8 @@
    "name": "Guest tools and agent",
    "weight": 7,
    "items": 6,
-   "mean": 75.0,
-   "score": 75
+   "mean": 90.0,
+   "score": 90
   },
   {
    "id": "J",
@@ -970,12 +970,12 @@
    "name": "System ties",
    "weight": 3,
    "items": 4,
-   "mean": 61.25,
-   "score": 61
+   "mean": 83.75,
+   "score": 84
   },
   {
    "id": "L",
-   "name": "Privacy and security",
+   "name": "Privacy and security model",
    "weight": 4,
    "items": 7,
    "mean": 73.57,
@@ -991,13 +991,13 @@
   },
   {
    "id": "N",
-   "name": "Tests and validation",
+   "name": "Tests and validation on hardware",
    "weight": 3,
    "items": 5,
    "mean": 55.0,
    "score": 55
   }
  ],
- "total": 72,
- "total_exact": 71.64
+ "total": 77,
+ "total_exact": 76.68
 }

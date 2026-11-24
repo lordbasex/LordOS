@@ -131,5 +131,6 @@
   "applyNoShares": "아무것도 바꾸지 않았습니다: 머신 밖까지 닿는 설정이 허용되지 않았습니다(터미널에서만 묻습니다).",
   "applyCreated": "{file}에 적힌 대로 {name}을(를) 만들었습니다.",
   "applyUpdated": "{name}에 이제 {file}의 설정이 적용되었습니다.",
-  "applyRunning": "{name}이(가) 실행 중입니다. 파일로 바꾸려면 종료하세요."
+  "applyRunning": "{name}이(가) 실행 중입니다. 파일로 바꾸려면 종료하세요.",
+  "overBudget": "{name}이(가) 시작되지 않았습니다: {need}MB가 필요한데 머신용으로 {free}MB 남았습니다. 다른 머신을 일시 중단하거나 종료하거나, 메모리를 줄이세요."
 }

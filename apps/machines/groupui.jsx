@@ -107,7 +107,7 @@ export async function stopGroup(item, how) {
 export function FreshDialog({ item, onDone, onCancel }) {
   const p = usePal();
   const [gw, setGw] = useState(!!item.group.freshGateway);
-  const snaps = (m) => { try { return m ? (lord.vm.snaps(m.dir) || []).length : 0; } catch (e) { return 0; } };
+  const snaps = (m) => { try { return m ? (lord.vm.snaps(m.dir)?.list || []).length : 0; } catch (e) { return 0; } };
   const plan = freshPlan(item, gw, snaps);
   const go = () => {
     // the box is remembered (group.json fresh_gateway), then lord-vm --group-fresh

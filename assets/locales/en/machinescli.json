@@ -131,5 +131,6 @@
   "applyNoShares": "Nothing was changed: what reaches beyond the machine wasn't allowed (it asks on a terminal only).",
   "applyCreated": "{name} was made as {file} says.",
   "applyUpdated": "{name} now has the settings {file} gives.",
-  "applyRunning": "{name} is running: shut it down to change it from a file."
+  "applyRunning": "{name} is running: shut it down to change it from a file.",
+  "overBudget": "{name} didn't start: it needs {need} MB and {free} MB are left for machines. Suspend or shut down another machine, or give it less memory."
 }

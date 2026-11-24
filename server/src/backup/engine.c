@@ -433,7 +433,10 @@ static void walk(Walk *w, const char *rel, int depth) {
         char r[PATH_MAX];
         size_t len = strlen(names[i]);
         int skip = len > 8 && !strcmp(names[i] + len - 8, ".bkpart~");
-        if (!skip && !pathf(r, sizeof r, "%s%s%s", rel, rel[0] ? "/" : "", names[i]) && !excluded(w, r)) entry(w, r, depth);
+        if (!skip && !pathf(r, sizeof r, "%s%s%s", rel, rel[0] ? "/" : "", names[i]) && !excluded(w, r)) {
+            if (w->r->hold && w->r->hold(w->r, r)) { if (!w->counting) w->r->skipped++; }
+            else entry(w, r, depth);
+        }
         free(names[i]);
     }
     free(names);

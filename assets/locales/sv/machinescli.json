@@ -131,5 +131,6 @@
   "applyNoShares": "Inget ändrades: det som når utanför maskinen tilläts inte (frågan ställs bara i en terminal).",
   "applyCreated": "{name} skapades så som {file} säger.",
   "applyUpdated": "{name} har nu inställningarna från {file}.",
-  "applyRunning": "{name} körs: stäng av den för att ändra den från en fil."
+  "applyRunning": "{name} körs: stäng av den för att ändra den från en fil.",
+  "overBudget": "{name} startade inte: den behöver {need} MB och {free} MB finns kvar för maskiner. Försätt en annan maskin i viloläge eller stäng av den, eller ge den mindre minne."
 }

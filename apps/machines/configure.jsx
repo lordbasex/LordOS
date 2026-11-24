@@ -4,8 +4,8 @@
 // the machine runs it changes alone (`lord-vm --rename`), and its folders follow it once it's off.
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice } from './model.js';
+import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
+  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
 import { defaultsOf } from './store.js';
@@ -241,21 +241,26 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     }, 300);
     return () => clearInterval(timer);
   }, [job]);
+  const [find, setFind] = useState('');        // the sidebar's search (a hook: before the return below)
   if (!m) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: p.bg }}><Text style={{ color: p.dim }}>{tr('machines.win.gone')}</Text></View>;
 
   const running = stateView(m.state).active;
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
-    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, automation: !!m.automation, cpuPin: m.cpuPin || 'off', ...draft };
+    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off',
+    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'automation' ? !!m.automation : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
   const dirty = Object.keys(draft).some((k) => differs(k, draft[k]));
+  // the sidebar: a dot on each section with a change not saved yet, and its search
+  const changed = changedSections(draft, differs);
+  const secTitle = (k) => tr(k === 'group' ? 'machines.group.cfg.title' : `machines.cfg.sec.title.${k}`);
   // the name (6.26): what the draft's name would do (lord.vm.renamePlan reads the library), and while it's off whether
   // its folder still says another name
   const plan = has() && typeof lord.vm.renamePlan === 'function' && cur.name !== m.name ? lord.vm.renamePlan(dir, cur.name) : null;
@@ -363,8 +368,15 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Segmented small value={closeChoice(meta)} onChange={(x) => { writeMeta(dir, { onClose: x }); setMeta(readMeta(dir)); }}
           options={CLOSE_CHOICES.map((k) => [k, tr(`machines.cfg.close.${k}`)])} />
       </Row>
-      <Row label={tr('machines.cfg.keepAwake')} last note={tr('machines.cfg.keepAwakeNote')}>
+      <Row label={tr('machines.cfg.keepAwake')} note={tr('machines.cfg.keepAwakeNote')}>
         <Toggle on={meta.keepAwake !== false} onChange={(x) => { writeMeta(dir, { keepAwake: x }); setMeta(readMeta(dir)); }} />
+      </Row>
+      {/* 6.14: in settings.json (apps can't write it), by the machine's id; a group's members start with their group */}
+      {m.groupDir ? null : <Row label={tr('machines.cfg.atLogin')} note={tr('machines.cfg.atLoginNote')}>
+        <Toggle on={(settings.get().machinesAtLogin || []).includes(m.id)} onChange={(x) => { settings.set({ machinesAtLogin: atLoginToggle(settings.get().machinesAtLogin, m.id, x) }); setMeta(readMeta(dir)); }} />
+      </Row>}
+      <Row label={tr('machines.cfg.autoPause')} last note={tr('machines.cfg.autoPauseNote')}>
+        <Toggle on={meta.autoPause === true} onChange={(x) => { writeMeta(dir, { autoPause: x }); setMeta(readMeta(dir)); }} />
       </Row>
     </Group>
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}
@@ -560,6 +572,16 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         </Row>
       ) : null}
     </Group>
+    {/* links and notifications from the guest (6.12, machine.json guest_links, guest_notify): off unless turned on here;
+        a link opens only when the person clicks Open in the bar, a notification shows as from the machine */}
+    <Group>
+      <Row label={tr('machines.cfg.guestLinks')} note={tr('machines.cfg.guestLinksNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><Toggle on={cur.guestLinks} onChange={(x) => set({ guestLinks: x, ...(x ? { agent: true } : {}) })} /></Off>
+      </Row>
+      <Row label={tr('machines.cfg.guestNotify')} note={tr('machines.cfg.guestNotifyNote') + (offNote ? ` ${offNote}` : '')} last>
+        <Off off={running}><Toggle on={cur.guestNotify} onChange={(x) => set({ guestNotify: x, ...(x ? { agent: true } : {}) })} /></Off>
+      </Row>
+    </Group>
     <Group>
       <Row label={tr('machines.cfg.shares')} note={tr('machines.cfg.sharesNote') + (offNote ? ` ${offNote}` : '')} last={!cur.shares.length}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.shareAdd')} disabled={running || !!job || cur.shares.length >= 4} onClick={() => setPickShare(true)} /></View></Off>
@@ -641,7 +663,9 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   else if (sec === 'security') pane = <Group>
     {['sandbox', 'files', 'network', 'limits', 'display', 'secrets'].map((k, i, a) => {
       // the network's line follows the mode: passt listening on the forwarded ports, or the bridged card's device
-      const note = k !== 'network' ? k : m.network === 'bridged' ? 'networkBridged' : usesPorts(m.network) && m.ports?.length ? 'networkPorts' : k;
+      // the sandbox's line says what this kernel can't give ("Weaker isolation on this kernel", 3.3)
+      const note = k === 'sandbox' ? (isolationGaps(host, null).includes('landlock') ? 'sandboxWeak' : k)
+        : k !== 'network' ? k : m.network === 'bridged' ? 'networkBridged' : usesPorts(m.network) && m.ports?.length ? 'networkPorts' : k;
       return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) })} />;
     })}
   </Group>;
@@ -651,9 +675,11 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     <View style={{ width: 250, ...(side.narrow ? { flex: 1 } : null), paddingHorizontal: 10, paddingVertical: 12, gap: 2,
       backgroundColor: p.dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.025)', borderEndWidth: 1, borderColor: p.line }}>
       <Text style={{ marginHorizontal: 10, marginBottom: 6, fontSize: 12, fontWeight: 700, color: p.dim, textAlign: 'start', whiteSpace: 'nowrap', overflow: 'hidden' }}>{m.name}</Text>
+      {/* the sidebar's search (5.5): sections whose title or summary has every word */}
+      <TextInput value={find} onChange={setFind} placeholder={tr('machines.cfg.search')} onCancel={() => setFind('')} style={{ marginHorizontal: 4, marginBottom: 6 }} />
       <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 2 }}>
-        {SECS.map((k) => <SideRow key={k} icon={ICONS[k]} title={tr(k === 'group' ? 'machines.group.cfg.title' : `machines.cfg.sec.title.${k}`)} detail={summary[k]} selected={sec === k}
-          onClick={() => { setSec(k); if (side.narrow) side.close(); }} />)}
+        {sectionsMatching(SECS, find, (k) => `${secTitle(k)} ${summary[k] || ''}`).map((k) => <SideRow key={k} icon={ICONS[k]} title={secTitle(k)} detail={summary[k]} selected={sec === k}
+          dot={changed.has(k) ? tr('machines.cfg.unsaved') : ''} onClick={() => { setSec(k); if (side.narrow) side.close(); }} />)}
       </ScrollView>
     </View>
   );
