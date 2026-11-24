@@ -740,6 +740,9 @@ EOF
     # the rubber band: the rectangle, which cards and rows it touches, Shift and Ctrl, autoscroll, right to left, one update per frame (apps/files/marquee.js, GitHub #233)
     if have node; then run "files-marquee-test (apps/files/marquee.js)" node tests/files_marquee_test.mjs
     else skip "files-marquee-test" "node"; fi
+    # the slow second click that renames in place: double click, too late, drag, moved pointer, modifiers, selection, focus (sdk/slowclick.js)
+    if have node; then run "slowclick-test (sdk/slowclick.js)" node tests/slowclick_test.mjs
+    else skip "slowclick-test" "node"; fi
     # color tags and comments: the last tag and an emptied comment are removed (apps/files/tags.js, GitHub #181)
     if have node; then run "files-tags-test (apps/files/tags.js)" node tests/files_tags_test.mjs
     else skip "files-tags-test" "node"; fi

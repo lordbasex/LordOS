@@ -31,8 +31,10 @@ function Name({ e, ctx, center, color, lines = 1, font, line, fieldW }) {
       </View>
     );
   }
+  // a press on the name (not the icon) says so to the item's handler below it: a slow second click there renames
+  // (apps/files/index.jsx, sdk/slowclick.js)
   return (
-    <Text style={{ fontSize: size, color, textAlign: center ? 'center' : 'start', whiteSpace: lines === 1 ? 'nowrap' : 'normal',
+    <Text onMouseDown={(ev) => { ev.onName = true; }} style={{ fontSize: size, color, textAlign: center ? 'center' : 'start', whiteSpace: lines === 1 ? 'nowrap' : 'normal',
       overflow: 'hidden', maxHeight: lines * lh, lineHeight: lh, textOverflow: 'ellipsis', numberOfLines: lines }}>{ctx.shownName ? ctx.shownName(e) : e.name}</Text>
   );
 }
