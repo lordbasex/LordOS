@@ -796,6 +796,8 @@ EOF
     # (0.8.6) runtime/index.js's skip of unchanged styles sends the same lord.* calls as without it
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "runtime-props-test (runtime/index.js)" node tests/runtime_props_test.mjs
+        # (#234) a mouse's back and forward buttons: a navigate event for the native window under the pointer
+        run "navbuttons-test (runtime/events.js, sdk/navmodel.js)" node tests/navbuttons_test.mjs
     else skip "runtime-props-test" "node and the repository's node_modules (npm install)"; fi
     # (0.8.8.3, #20) ScrollView's resetKey: a new page starts at the top, the same one keeps its place
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then

@@ -1,5 +1,5 @@
 // events.js — mouse and keyboard events sent by lord-server, with DOM-style bubbling.
-// Props: onMouseDown, onMouseUp, onClick, onDoubleClick, onContextMenu, onMouseMove,
+// Props: onNavigate (a mouse's back and forward buttons, #234), onMouseDown, onMouseUp, onClick, onDoubleClick, onContextMenu, onMouseMove,
 // onMouseEnter, onMouseLeave, onWheel, onPinch, onSwipe; onMouseDownCapture runs before them, outermost first,
 // and nothing inside can stop it (a window comes forward on any press in it, even one a sheet keeps to itself).
 // onClick and onDoubleClick carry detail: how many clicks in a row on the same node (1, 2, 3; a fourth starts over),
@@ -12,7 +12,7 @@ import { translate, nativeKey, modifiers } from './keymap.js';
 const instances = new Map();          // native id → reconciler instance
 // pointerlock: lord.input.lockPointer's motion ({ type: 'lockmove', dx, dy }, once a frame) and its end ({ type: 'lockend',
 // why }: 0 asked, 1 ❖Esc or Ctrl+Alt, 2 the node went away, 3 the input did, 4 another lock took its place)
-const listeners = { pointermove: new Set(), pointerdown: new Set(), pointerup: new Set(), keydown: new Set(), keyup: new Set(), swipe: new Set(), pinch: new Set(), pointerlock: new Set() };
+const listeners = { navigate: new Set(), pointermove: new Set(), pointerdown: new Set(), pointerup: new Set(), keydown: new Set(), keyup: new Set(), swipe: new Set(), pinch: new Set(), pointerlock: new Set() };
 
 export const register = (inst) => instances.set(inst.id, inst);
 
@@ -129,7 +129,21 @@ globalThis.__lordEvent = (type, id, x, y, button) => {
   }
   // A mouse's back and forward buttons (3 and 4, issue #159) go to the Linux app under the pointer, not to the
   // desktop's own handlers: most onMouseDown handlers (title bars, buttons, sliders) don't look at ev.button.
-  if ((type === 'down' || type === 'up') && button > 2) return;
+  // A native window gets them as a navigation of its own instead (GitHub #234): on the press, onNavigate along the
+  // chain under the pointer (bubbling, as a click), then the 'navigate' listeners, with { direction: 'back' |
+  // 'forward', win } (win: the window under the pointer, null outside one and in an isolated app's own process).
+  if ((type === 'down' || type === 'up') && button > 2) {
+    if (type === 'down' && (button === 3 || button === 4)) {
+      const chain = chainOf(id);
+      const target = chain[0] || null;
+      const ev = makeEvent('navigate', target, x, y, button, { direction: button === 3 ? 'back' : 'forward', win: target ? windowOf(target) : null });
+      run(DiscreteEventPriority, () => {
+        dispatch(chain, 'onNavigate', ev);
+        if (!ev.stopped) for (const fn of listeners.navigate) fn(ev);
+      });
+    }
+    return;
+  }
   if (type === 'lockmove' || type === 'lockend') {
     const ev = type === 'lockmove' ? { type, node: id, dx: x, dy: y } : { type, node: id, why: x };
     run(type === 'lockmove' ? ContinuousEventPriority : DiscreteEventPriority, () => { for (const fn of listeners.pointerlock) fn(ev); });

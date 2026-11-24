@@ -11,6 +11,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)** (in development; latest release
+  0.8.9.5-beta). They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
+  took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from
+  onMouseDown, onClick and the pointer listeners, and now turns the press into a `navigate` event ('back' or
+  'forward') for the window under the pointer: `onNavigate` along the nodes under it, then `addListener('navigate')`.
+  The SDK's `useNavigateButtons(fn)` gives it to the app whose window is under the pointer (never to another window or
+  when the pointer is outside every window; an isolated app's process holds one window), and `useVisitHistory(place,
+  go)` walks a window's own history of places (`sdk/navbuttons.js`, the pure rules in `sdk/navmodel.js`). Files walks
+  its folder history (as ⌥← and ⌥→), the Store leaves an app's page and Forward opens it again, Mail in one-pane mode
+  goes back to the list and forward to the message, Settings walks the sections and Help the articles shown in that
+  window. Linux apps get the raw buttons from lord-server as before. `navbuttons-test` checks the runtime's dispatch,
+  which window takes it, the history and each app's wiring.
 - **Machines: checked for real, and what that found** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
   6.5, 6.7, 6.14, 6.16, 6.17, 6.19).
   - **Monitor names a machine's own disk and network numbers.** A running machine's row in Processes says
