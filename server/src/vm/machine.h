@@ -210,13 +210,13 @@ typedef struct {
      * when on): "guest_links": true, a link the guest's tools send is offered in a bar the person must click;
      * "guest_notify": true, the guest's notifications are shown as from the machine, rate-limited */
     int guest_links, guest_notify;
+    /* schema 19: the guest's displays (docs/VIRTUALIZATION.md 5.4, All Displays): the virtio-gpu's outputs, 1 (missing) to
+     * VM_HEADS_MAX; written only when more than one. Hardware the guest sees: changed only while the machine is off */
+    int heads;
     /* schema 18: the processor the guest sees (docs/VIRTUALIZATION.md 5.5, Configure → CPU and memory), written only when
      * chosen: "cpu_model": "compatible", a fixed x86-64-v2 model (amd64 with KVM only: the guest moves between computers and
      * keeps working after this one's processor changes); missing: "host", this computer's own processor */
     int cpu_model;                      /* VM_CPU_HOST, VM_CPU_COMPAT */
-    /* schema 19: the guest's displays (docs/VIRTUALIZATION.md 5.4, All Displays): the virtio-gpu's outputs, 1 (missing) to
-     * VM_HEADS_MAX; written only when more than one. Hardware the guest sees: changed only while the machine is off */
-    int heads;
     /* schema 14: a member of a machine group (docs/VIRTUALIZATION.md 19.4), written only for members. group: the group's
      * id (group.json "id"); role: VM_ROLE_*; uplink_tor: the gateway's passt has no DNS forwarding and no forwarded ports
      * ("uplink": "tor", with network "shared"); link_mac: the gateway's second card, on the internal link; profile_lock:

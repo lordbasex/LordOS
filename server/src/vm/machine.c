@@ -557,9 +557,9 @@ static int check_member(const VmMachine *m, char *err, size_t n) {
             return fail(err, n, VM_E_RANGE, "locked for anonymity: SMBIOS strings and disk serials");
         if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
         if (m->guest_links || m->guest_notify) return fail(err, n, VM_E_RANGE, "locked for anonymity: links and notifications from the guest");
-        if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
         /* All Displays would tell the guest how many displays this computer has, and their sizes */
         if (m->heads > 1) return fail(err, n, VM_E_RANGE, "locked for anonymity: several displays");
+        if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
     }
     return VM_OK;
 }

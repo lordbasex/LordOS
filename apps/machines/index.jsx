@@ -20,9 +20,9 @@ import { startMachinesCli } from './cli.js';
 import { startMachinesTies } from './ties.js';
 import { MachinesSettings } from './settingswin.jsx';
 import { useMachineDir } from './ui.jsx';
-import { RecoveryKeyWindow } from './vmkey.jsx';
 import { HeadWindow } from './alldisplays.jsx';
 import { headArgs } from './alldisplays.js';
+import { RecoveryKeyWindow } from './vmkey.jsx';
 
 export function Icon({ size }) { return <AppMark size={size} />; }
 
@@ -90,11 +90,11 @@ export default function App() {
     try { m = (lord.vm.list() || []).find((x) => x.id === showId && !x.error) || null; } catch (e) { m = null; }
     if (m) openMachine(m);
   }, [showId, args?.at]);
-  // an encrypted machine's recovery key (keyflow.js): a protected window of its own
-  if (args?.recoveryKey) return <RecoveryKeyWindow id={args.recoveryKey} name={args.name || ''} />;
   // All Displays (5.4): a further output of a machine's display, full screen on another display (alldisplays.jsx)
   const head = headArgs(args?.head);
   if (head) return <HeadWindow key={`${head.dir}:${head.k}`} dir={head.dir} k={head.k} name={args.name || ''} />;
+  // an encrypted machine's recovery key (keyflow.js): a protected window of its own
+  if (args?.recoveryKey) return <RecoveryKeyWindow id={args.recoveryKey} name={args.name || ''} />;
   if (args?.guestWin) return <GuestWindow dir={args.guestWin.dir} gid={args.guestWin.gid} />;
   if (args?.machine) return <MachineWindow key={dir} dir={dir} name={args.name || ''} loadvm={args.loadvm || ''} followed={dir !== dir0} />;
   if (args?.storage) return <Storage />;

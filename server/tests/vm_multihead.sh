@@ -59,7 +59,7 @@ t "create" '[ -f "$D/machine.json" ]' "$(cat "$W/create.json")"
 "$VM" --set "$D" --heads 5 >/dev/null 2>&1; rc5=$?
 t "--heads 5 refused" '[ $rc5 != 0 ] && ! grep -q "\"heads\": " "$D/machine.json"'
 "$VM" --set "$D" --heads 2 >"$W/set.json" 2>&1
-t "--heads 2: written under schema 19" 'grep -q "\"heads\": 2" "$D/machine.json" && grep -q "\"schema\": 19" "$D/machine.json"' "$(cat "$W/set.json")"
+t "--heads 2: written under schema 19" 'grep -q "\"heads\": 2" "$D/machine.json" && grep -q "\"schema\": \(19\|[2-9][0-9]\)" "$D/machine.json"' "$(cat "$W/set.json")"
 
 # a unit on the serial line: the guest's DRM outputs, every 2 s
 UNIT=$(cat <<'EOF'

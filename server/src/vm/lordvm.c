@@ -8223,8 +8223,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (perf >= 0) { m.perf_profile = perf; if (perf) m.schema = VM_SCHEMA; }
     if (glinks >= 0) { m.guest_links = glinks; if (glinks) m.schema = VM_SCHEMA; }
     if (gnote >= 0) { m.guest_notify = gnote; if (gnote) m.schema = VM_SCHEMA; }
-    if (autom >= 0) { m.automation = autom; if (autom) m.schema = VM_SCHEMA; }
     if (heads) { m.heads = heads; if (heads > 1) m.schema = VM_SCHEMA; }
+    if (autom >= 0) { m.automation = autom; if (autom) m.schema = VM_SCHEMA; }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (cpum >= 0) { m.cpu_model = cpum; if (cpum) m.schema = VM_SCHEMA; }
     if (newmac) {
@@ -11385,8 +11385,8 @@ static int usage(void) {
             "                         [--perf-profile on|off]   (the guest tools switch the guest to its performance profile while it runs)\n"
             "                         [--guest-links on|off]   (links the guest's tools send are offered to open on this computer)\n"
             "                         [--guest-notify on|off]   (the guest's notifications are shown here, as from the machine)\n"
-            "                         [--automation on|off]   (machines exec and cp may run programs in the guest: docs/VIRTUALIZATION.md 6.15)\n"
             "                         [--heads 1-4]   (All Displays, 5.4: the guest's displays; while it is off)\n"
+            "                         [--automation on|off]   (machines exec and cp may run programs in the guest: docs/VIRTUALIZATION.md 6.15)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"

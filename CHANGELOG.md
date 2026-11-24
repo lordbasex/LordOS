@@ -11,13 +11,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
-- **Machines: All Displays** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.4). A machine can
-  have up to four displays (machine.json schema 19, `"heads"`, set while it is off). View → All Displays opens one
-  full-screen window per display of this computer, each asking the guest for its display's size at its place beside the
-  others; closing one turns that output off for the guest, and Back to One Display returns. One lord-vmdisplay serves
-  every output, with a channel per output. Not for a machine with a graphics card (vGPU), apps mode or the anonymity
-  profile (it would tell the guest how many displays this computer has). Checked with a real Debian 13 guest under KVM
-  (two outputs lit, sized, drawn on and one turned off again) and headless with two made-up displays.
+- **Machines: All Displays** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.4). View → All
+  Displays shows a machine across this computer's displays: one output of its virtio-gpu per display (up to four), each full
+  screen at that display's size, beside the others; the machine's own window keeps the first, and each further window's
+  top edge has Back to One Display. A machine with fewer outputs gets them while it's off (machine.json schema 19,
+  "heads"; lord-vm --set --heads). One lord-vmdisplay serves every output on a channel of its own (QEMU's peer-to-peer
+  display serves one connection), and an output whose window goes is turned off for the guest. Not for a machine with a
+  graphics card, apps mode or a protected machine (the anonymity profile keeps one display: the guest never learns this
+  computer's displays). Checked with a real KVM guest (tests/vm_multihead.sh) and a headless scene.
 - **Machines: each machine its own firewall row** (in development; docs/FIREWALL.md, docs/VIRTUALIZATION.md 6.5). A
   running machine's traffic is the firewall app `lordos:vm-<id>`, named after the machine in Monitor, with its forwarded
   ports listed as its incoming lines; Settings' rule and restriction lists offer each machine, and Configure → Network
