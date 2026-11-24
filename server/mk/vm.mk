@@ -2,9 +2,9 @@
 # QMP, limits, state), and lord-vmdisplay, its picture and input over QEMU's peer-to-peer D-Bus display. libc and the
 # shared sandbox, cgroup and JSON code; lord-vmdisplay also links the system's D-Bus library (libsystemd), built only
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
-VM_COMMON := src/vm/machine.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
+VM_COMMON := src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -73,6 +73,25 @@ endif
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
 # The isolation test (tests/vm_isolation.sh) needs KVM and a guest image and runs on the target machines.
 test: build/vmpace-test build/vmmem-test build/vm-test build/guest-dbus-test build/vmlog-test build/vmgpu-test build/vmimport-test build/vmcatalog-test build/http-resume-test build/http-retry-test build/vmunattend-test build/vmthumb-test build/vmcpu-test test-vm-import
+# machine groups (docs/VIRTUALIZATION.md 19.4): group.json's parser, machine.json schema 14's member keys and locks, a
+# fuzz pass; under ASan and UBSan
+test: build/vmgroup-test
+build/vmgroup-test: tests/vmgroup_test.c src/vm/vmgroup.c src/vm/machine.c src/sec/json.c src/doc/wire.c $(VM_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmgroup_test.c src/vm/vmgroup.c src/vm/machine.c src/sec/json.c src/doc/wire.c
+	./$@ || { rm -f $@; exit 1; }
+# a group's link (vm/vmlink.c): VM_LINK's checks, lord-vm's descriptor check, lord-server's pairing against stand-in
+# lord-vms; under ASan and UBSan
+test: build/vmlink-test
+build/vmlink-test: tests/vmlink_test.c src/vm/vmlink.c src/vm/vmgroup.c src/vm/machine.c src/sec/json.c src/doc/wire.c $(VM_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmlink_test.c src/vm/vmlink.c src/vm/vmgroup.c src/vm/machine.c src/sec/json.c src/doc/wire.c
+	./$@ || { rm -f $@; exit 1; }
+# lord-server's side of a group's link (vm/vmlink.c) as a command, for tests/vm_group_link.sh; not installed
+all: build/vm-link-tool
+build/vm-link-tool: tests/vm_link_tool.c src/vm/vmlink.c src/vm/vmgroup.c src/vm/machine.c src/sec/json.c src/doc/wire.c $(VM_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_link_tool.c src/vm/vmlink.c src/vm/vmgroup.c src/vm/machine.c src/sec/json.c src/doc/wire.c
 # the download catalog's checks as the admin helper makes them (vmcatalog.c), over the real assets/machines/systems.json
 # and invented lists, under ASan and UBSan
 # and the makers' signatures on their lists (pkg/pgp.c) with the keys the catalog pins, over the lists of tests/vmimage,
@@ -157,7 +176,7 @@ build/guest-dbus-test: tests/guest_dbus_test.c ../tools/guest/dbusmin.c ../tools
 	./$@ || { rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
-VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmpin.c
+VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmpin.c
 VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
 $(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
 build/lord-server: $(VM_SRV_OBJ)

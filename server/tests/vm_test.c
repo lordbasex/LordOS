@@ -69,7 +69,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "14", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "15", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -112,7 +112,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":14,\"whatever\":true}";
+    const char newer[] = "{\"schema\":15,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -489,7 +489,7 @@ static void test_schema(void) {
                 { "\"perf_profile\":true", 13, VM_OK, 1 }, { "\"perf_profile\":false", 13, VM_OK, 0 }, { "\"agent\":true", 13, VM_OK, 0 },
                 { "\"perf_profile\":1", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":\"on\"", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":null", 13, VM_E_FIELD, 0 },
                 { "\"perf_profile\":true", 12, VM_E_FIELD, 0 }, { "\"perf_profile\":false", 12, VM_OK, 0 },
-                { "\"perf_profile\":true", 14, VM_E_NEWER, 0 },
+                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 15, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
                 char t[4096];

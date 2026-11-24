@@ -26,6 +26,8 @@
 #include "../vm/vmproto.h"
 #include "../vm/vmpace.h"
 #include "../vm/machine.h"
+#include "../vm/vmgroup.h"
+#include "../vm/vmlink.h"
 #include "../vm/vm_admin.h"
 #include "../vm/vmthumb.h"
 #include "../vm/vmops.h"
@@ -114,7 +116,8 @@ static int library(char *out, size_t n, int make) {
     return 0;
 }
 
-/* a machine folder the app may act on: a real folder <name>.lordvm directly in ~/Machines */
+/* a machine folder the app may act on: a real folder <name>.lordvm directly in ~/Machines, or a machine group's member,
+ * <group>.lordgroup/<name>.lordvm in ~/Machines (docs/VIRTUALIZATION.md 19.2), one level and no more */
 static int machine_dir(JSContext *c, JSValueConst v, char *out, size_t n) {
     const char *s = JS_ToCString(c, v);
     if (!s) return -1;
@@ -124,7 +127,28 @@ static int machine_dir(JSContext *c, JSValueConst v, char *out, size_t n) {
     JS_FreeCString(c, s);
     if (!ok) return -1;
     size_t ll = strlen(lib), rl = strlen(real);
-    if (strncmp(real, lib, ll) || real[ll] != '/' || strchr(real + ll + 1, '/') || rl < ll + 8 || strcmp(real + rl - 7, ".lordvm") || rl >= n) return -1;
+    if (strncmp(real, lib, ll) || real[ll] != '/' || rl < ll + 8 || strcmp(real + rl - 7, ".lordvm") || rl >= n) return -1;
+    const char *sl = strchr(real + ll + 1, '/');
+    if (sl) {
+        /* a member: its parent is a .lordgroup folder of the library, and nothing deeper */
+        char g[PATH_MAX];
+        if (strchr(sl + 1, '/') || !vm_group_parent(real, g, sizeof g) || strlen(g) != (size_t)(sl - real)) return -1;
+    }
+    memcpy(out, real, rl + 1);
+    return 0;
+}
+
+/* a machine group's folder the app may act on: a real folder <name>.lordgroup directly in ~/Machines */
+static int group_dir(JSContext *c, JSValueConst v, char *out, size_t n) {
+    const char *s = JS_ToCString(c, v);
+    if (!s) return -1;
+    char lib[PATH_MAX], real[PATH_MAX];
+    struct stat st;
+    int ok = !library(lib, sizeof lib, 0) && !lstat(s, &st) && S_ISDIR(st.st_mode) && realpath(s, real);
+    JS_FreeCString(c, s);
+    if (!ok) return -1;
+    size_t ll = strlen(lib), rl = strlen(real);
+    if (strncmp(real, lib, ll) || real[ll] != '/' || strchr(real + ll + 1, '/') || !vm_group_dir_ok(real) || rl >= n) return -1;
     memcpy(out, real, rl + 1);
     return 0;
 }
@@ -359,6 +383,7 @@ static void run_state(const char *dir, JSContext *c, JSValue o) {
                 if (cf >= 0) close(cf);
                 if (k > 0) comm[k] = 0;
                 if (k <= 0 || strncmp(comm, "lord-vm", 7)) { snprintf(st, sizeof st, "stopped"); snprintf(rs, sizeof rs, "supervisor-lost"); }
+                else set_int(c, o, "vmPid", pid);     /* its lord-vm: a group's link is made again when it changes (19.3) */
             }
             json_free(&d);
         }
@@ -382,6 +407,154 @@ static const char *pin_effective(const VmMachine *m) {
     return read > 0 && vmpin_default_on(&topo, &allowed, m->vcpus) ? "auto" : "off";
 }
 
+/* one machine of the library, or a group's member (gdir: its group folder, g its group.json, mi its index there) */
+static JSValue list_one(JSContext *c, const char *dir, const char *folder, const char *gdir, const VmGroup *g, int mi, int *gvt_running) {
+    JSValue o = JS_NewObject(c);
+    set_str(c, o, "dir", dir);
+    set_str(c, o, "folder", folder);
+    VmMachine m;
+    char err[256] = "";
+    int r = vm_machine_load(dir, &m, err, sizeof err);
+    if (r == VM_OK) {
+        set_str(c, o, "name", m.name);
+        set_str(c, o, "id", m.id);
+        set_str(c, o, "arch", vm_arch_name(m.arch));
+        set_str(c, o, "accel", m.accel == VM_ACCEL_KVM ? "kvm" : "tcg");
+        set_int(c, o, "vcpus", m.vcpus);
+        set_int(c, o, "memoryMb", m.memory_mb);
+        set_int(c, o, "diskGb", m.disk_gb);
+        set_str(c, o, "firmware", m.firmware == VM_FW_UEFI ? "uefi" : "bios");
+        JS_SetPropertyStr(c, o, "tpm", JS_NewBool(c, m.tpm));
+        JS_SetPropertyStr(c, o, "secureBoot", JS_NewBool(c, m.secure_boot));
+        {
+            /* where it starts from: "auto" or "network,disk" (vm_boot_spec), and the firmware's boot menu */
+            char bo[32];
+            vm_boot_spec(&m, bo, sizeof bo);
+            set_str(c, o, "bootOrder", bo);
+            JS_SetPropertyStr(c, o, "bootMenu", JS_NewBool(c, m.boot_menu));
+        }
+        set_str(c, o, "network", VM_NET_NAMES[m.network]);
+        set_str(c, o, "bridge", m.bridge);
+        {
+            /* forwarded ports (6.5): [{ proto, host, guest, open }] */
+            JSValue pa = JS_NewArray(c);
+            for (int i = 0; i < m.n_ports; i++) {
+                JSValue e = JS_NewObject(c);
+                set_str(c, e, "proto", m.ports[i].proto == VM_PROTO_UDP ? "udp" : "tcp");
+                set_int(c, e, "host", m.ports[i].host);
+                set_int(c, e, "guest", m.ports[i].guest);
+                set_str(c, e, "open", m.ports[i].open == VM_OPEN_LAN ? "lan" : "this-computer");
+                JS_SetPropertyUint32(c, pa, (uint32_t)i, e);
+            }
+            JS_SetPropertyStr(c, o, "ports", pa);
+        }
+        set_str(c, o, "display", m.display == VM_DISPLAY_WINDOW ? "window" : "none");
+        set_str(c, o, "iso", m.iso);
+        set_str(c, o, "base", m.base);
+        JS_SetPropertyStr(c, o, "agent", JS_NewBool(c, m.agent));
+        JS_SetPropertyStr(c, o, "clipboardAsk", JS_NewBool(c, m.clipboard_ask));
+        set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
+        JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
+        JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
+        set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
+        JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
+        set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
+        set_str(c, o, "mac", m.mac);
+        /* sound (6.9): host-side choices */
+        JS_SetPropertyStr(c, o, "sound", JS_NewBool(c, m.sound));
+        set_int(c, o, "volume", m.volume);
+        JS_SetPropertyStr(c, o, "microphone", JS_NewBool(c, m.microphone));
+        set_str(c, o, "soundOut", m.sound_out);
+        set_str(c, o, "soundIn", m.sound_in);
+        {
+            /* a Clone whose guest is still to get its own hostname and machine-id (6.3) */
+            char idh[VM_HOSTNAME_MAX + 1] = "";
+            set_str(c, o, "identityPending", vm_identity_read(dir, idh, sizeof idh) ? "" : idh);
+        }
+        set_str(c, o, "devices", m.devices == VM_DEV_COMPAT ? "compat" : "virtio");
+        /* the windows device set (4.3), and the graphics (6.10): 3D for Linux machines only */
+        JS_SetPropertyStr(c, o, "windowsDevices", JS_NewBool(c, m.devices == VM_DEV_WINDOWS));
+        set_str(c, o, "graphics", m.graphics == VM_GFX_3D ? "3d" : "2d");
+        set_str(c, o, "gpu", VM_VGPU_NAMES[m.vgpu]);        /* an Intel vGPU (schema 11): "", "intel-whole", "intel-shared" */
+        {
+            char rs[24] = "follow";
+            if (m.res_w && m.res_h) snprintf(rs, sizeof rs, "%dx%d", m.res_w, m.res_h);
+            set_str(c, o, "resolution", rs);
+        }
+        set_str(c, o, "nicModel", VM_NIC_MODELS[m.nic_model]);
+        set_int(c, o, "dataDisks", m.n_data);
+        {
+            /* shared folders (6.7): [{ tag, path, writable }] */
+            JSValue sh = JS_NewArray(c);
+            for (int i = 0; i < m.n_shares; i++) {
+                JSValue e = JS_NewObject(c);
+                set_str(c, e, "tag", m.share_tag[i]);
+                set_str(c, e, "path", m.share_path[i]);
+                JS_SetPropertyStr(c, e, "writable", JS_NewBool(c, m.share_rw[i]));
+                JS_SetPropertyUint32(c, sh, (uint32_t)i, e);
+            }
+            JS_SetPropertyStr(c, o, "shares", sh);
+            /* the transfer folder (6.7.1): on, and where it is (made at the machine's start, or by transferFolder) */
+            char xp[PATH_MAX];
+            JS_SetPropertyStr(c, o, "transfer", JS_NewBool(c, m.transfer));
+            set_str(c, o, "transferPath", vm_transfer_path(dir, xp, sizeof xp) ? "" : xp);
+        }
+        {
+            char ip[PATH_MAX + 320];
+            snprintf(ip, sizeof ip, "%s/imported.json", dir);
+            JS_SetPropertyStr(c, o, "imported", JS_NewBool(c, !access(ip, F_OK)));
+        }
+        set_str(c, o, "created", m.created);
+        set_str(c, o, "error", "");
+    } else {
+        set_str(c, o, "name", folder);
+        set_str(c, o, "error", r == VM_E_NEWER ? "newer" : "invalid");
+    }
+    run_state(dir, c, o);
+    if (r == VM_OK) {
+        JSValue sv = JS_GetPropertyStr(c, o, "state");
+        const char *ss = JS_ToCString(c, sv);
+        if (ss) {
+            unbridge_idle(&m, ss);
+            if (m.vgpu) {
+                gvt_idle(&m, ss);
+                gvt_memlock(dir);
+                if (!strcmp(ss, "running") || !strcmp(ss, "paused") || !strcmp(ss, "starting")) gvt_running++;
+            }
+            JS_FreeCString(c, ss);
+        }
+        JS_FreeValue(c, sv);
+    }
+    /* an operation that was interrupted and waits for the next start (3.6) */
+    {
+        VmOp op;
+        set_str(c, o, "operation", vm_op_read_peek(dir, &op) ? op.op : "");
+    }
+    /* a saved session (6.1): the next start resumes from it */
+    char sp[PATH_MAX + 300];
+    snprintf(sp, sizeof sp, "%s/suspend.state", dir);
+    struct stat ss;
+    JS_SetPropertyStr(c, o, "suspended", JS_NewBool(c, !lstat(sp, &ss) && S_ISREG(ss.st_mode)));
+    JS_SetPropertyStr(c, o, "stateBytes", JS_NewFloat64(c, !lstat(sp, &ss) && S_ISREG(ss.st_mode) ? (double)ss.st_blocks * 512 : 0));
+    if (gdir) {
+        /* a machine group's member (docs/VIRTUALIZATION.md 19.2): the group's folder and id, its role, whether it is the
+         * card's, and whether its machine.json names this group (else the group is damaged: 19.9) */
+        set_str(c, o, "groupDir", gdir);
+        set_str(c, o, "groupId", g->id);
+        set_str(c, o, "groupName", g->name);
+        set_str(c, o, "role", VMG_ROLE_NAMES[g->m[mi].role]);
+        JS_SetPropertyStr(c, o, "primary", JS_NewBool(c, g->m[mi].primary));
+        JSValue gv = JS_GetPropertyStr(c, o, "error");
+        const char *ge = JS_ToCString(c, gv);
+        int ok = ge && !ge[0];
+        if (ge) JS_FreeCString(c, ge);
+        JS_FreeValue(c, gv);
+        VmMachine mm;
+        JS_SetPropertyStr(c, o, "groupOk", JS_NewBool(c, ok && !vm_machine_load(dir, &mm, NULL, 0) && !strcmp(mm.group, g->id) && mm.role == g->m[mi].role));
+    }
+    return o;
+}
+
 static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc; (void)argv;
     reap_orphans();
@@ -395,148 +568,109 @@ static JSValue f_list(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     struct dirent *e;
     while ((e = readdir(d)) && n < 256) {
         size_t l = strlen(e->d_name);
-        if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
-        char dir[PATH_MAX + 260];
-        snprintf(dir, sizeof dir, "%s/%s", lib, e->d_name);
         struct stat st;
+        char dir[PATH_MAX + 520];
+        if (e->d_name[0] != '.' && l > 10 && !strcmp(e->d_name + l - 10, VMG_SUFFIX)) {
+            /* a machine group (19.2): its members, as group.json names them, one level down; at most VMG_MEMBERS_MAX */
+            char gdir[PATH_MAX + 260];
+            VmGroup g;
+            snprintf(gdir, sizeof gdir, "%s/%s", lib, e->d_name);
+            if (lstat(gdir, &st) || !S_ISDIR(st.st_mode) || !vm_group_dir_ok(gdir) || vm_group_load(gdir, &g, NULL, 0)) continue;
+            for (int i = 0; i < g.n && n < 256; i++) {
+                char mj[PATH_MAX + 540];
+                snprintf(dir, sizeof dir, "%s/%s", gdir, g.m[i].dir);
+                snprintf(mj, sizeof mj, "%s/machine.json", dir);
+                if (lstat(dir, &st) || !S_ISDIR(st.st_mode) || access(mj, F_OK)) continue;
+                char folder[VMG_DIR_MAX + 1];
+                snprintf(folder, sizeof folder, "%.*s", (int)(strlen(g.m[i].dir) - 7), g.m[i].dir);
+                JSValue o = list_one(c, dir, folder, gdir, &g, i, &gvt_running);
+                JS_SetPropertyUint32(c, arr, n++, o);
+            }
+            continue;
+        }
+        if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
+        snprintf(dir, sizeof dir, "%s/%s", lib, e->d_name);
         if (lstat(dir, &st) || !S_ISDIR(st.st_mode)) continue;
-        char mj[PATH_MAX + 300];
+        char mj[PATH_MAX + 540];
         snprintf(mj, sizeof mj, "%s/machine.json", dir);
         if (access(mj, F_OK)) continue;          /* being created (lord-vm --create writes it last) */
-        JSValue o = JS_NewObject(c);
-        set_str(c, o, "dir", dir);
         char folder[260];
         snprintf(folder, sizeof folder, "%.*s", (int)(l - 7), e->d_name);
-        set_str(c, o, "folder", folder);
-        VmMachine m;
-        char err[256] = "";
-        int r = vm_machine_load(dir, &m, err, sizeof err);
-        if (r == VM_OK) {
-            set_str(c, o, "name", m.name);
-            set_str(c, o, "id", m.id);
-            set_str(c, o, "arch", vm_arch_name(m.arch));
-            set_str(c, o, "accel", m.accel == VM_ACCEL_KVM ? "kvm" : "tcg");
-            set_int(c, o, "vcpus", m.vcpus);
-            set_int(c, o, "memoryMb", m.memory_mb);
-            set_int(c, o, "diskGb", m.disk_gb);
-            set_str(c, o, "firmware", m.firmware == VM_FW_UEFI ? "uefi" : "bios");
-            JS_SetPropertyStr(c, o, "tpm", JS_NewBool(c, m.tpm));
-            JS_SetPropertyStr(c, o, "secureBoot", JS_NewBool(c, m.secure_boot));
-            {
-                /* where it starts from: "auto" or "network,disk" (vm_boot_spec), and the firmware's boot menu */
-                char bo[32];
-                vm_boot_spec(&m, bo, sizeof bo);
-                set_str(c, o, "bootOrder", bo);
-                JS_SetPropertyStr(c, o, "bootMenu", JS_NewBool(c, m.boot_menu));
-            }
-            set_str(c, o, "network", VM_NET_NAMES[m.network]);
-            set_str(c, o, "bridge", m.bridge);
-            {
-                /* forwarded ports (6.5): [{ proto, host, guest, open }] */
-                JSValue pa = JS_NewArray(c);
-                for (int i = 0; i < m.n_ports; i++) {
-                    JSValue e = JS_NewObject(c);
-                    set_str(c, e, "proto", m.ports[i].proto == VM_PROTO_UDP ? "udp" : "tcp");
-                    set_int(c, e, "host", m.ports[i].host);
-                    set_int(c, e, "guest", m.ports[i].guest);
-                    set_str(c, e, "open", m.ports[i].open == VM_OPEN_LAN ? "lan" : "this-computer");
-                    JS_SetPropertyUint32(c, pa, (uint32_t)i, e);
-                }
-                JS_SetPropertyStr(c, o, "ports", pa);
-            }
-            set_str(c, o, "display", m.display == VM_DISPLAY_WINDOW ? "window" : "none");
-            set_str(c, o, "iso", m.iso);
-            set_str(c, o, "base", m.base);
-            JS_SetPropertyStr(c, o, "agent", JS_NewBool(c, m.agent));
-            JS_SetPropertyStr(c, o, "clipboardAsk", JS_NewBool(c, m.clipboard_ask));
-            set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
-            JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
-            JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
-            set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
-            JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
-            set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
-            set_str(c, o, "mac", m.mac);
-            /* sound (6.9): host-side choices */
-            JS_SetPropertyStr(c, o, "sound", JS_NewBool(c, m.sound));
-            set_int(c, o, "volume", m.volume);
-            JS_SetPropertyStr(c, o, "microphone", JS_NewBool(c, m.microphone));
-            set_str(c, o, "soundOut", m.sound_out);
-            set_str(c, o, "soundIn", m.sound_in);
-            {
-                /* a Clone whose guest is still to get its own hostname and machine-id (6.3) */
-                char idh[VM_HOSTNAME_MAX + 1] = "";
-                set_str(c, o, "identityPending", vm_identity_read(dir, idh, sizeof idh) ? "" : idh);
-            }
-            set_str(c, o, "devices", m.devices == VM_DEV_COMPAT ? "compat" : "virtio");
-            /* the windows device set (4.3), and the graphics (6.10): 3D for Linux machines only */
-            JS_SetPropertyStr(c, o, "windowsDevices", JS_NewBool(c, m.devices == VM_DEV_WINDOWS));
-            set_str(c, o, "graphics", m.graphics == VM_GFX_3D ? "3d" : "2d");
-            set_str(c, o, "gpu", VM_VGPU_NAMES[m.vgpu]);        /* an Intel vGPU (schema 11): "", "intel-whole", "intel-shared" */
-            {
-                char rs[24] = "follow";
-                if (m.res_w && m.res_h) snprintf(rs, sizeof rs, "%dx%d", m.res_w, m.res_h);
-                set_str(c, o, "resolution", rs);
-            }
-            set_str(c, o, "nicModel", VM_NIC_MODELS[m.nic_model]);
-            set_int(c, o, "dataDisks", m.n_data);
-            {
-                /* shared folders (6.7): [{ tag, path, writable }] */
-                JSValue sh = JS_NewArray(c);
-                for (int i = 0; i < m.n_shares; i++) {
-                    JSValue e = JS_NewObject(c);
-                    set_str(c, e, "tag", m.share_tag[i]);
-                    set_str(c, e, "path", m.share_path[i]);
-                    JS_SetPropertyStr(c, e, "writable", JS_NewBool(c, m.share_rw[i]));
-                    JS_SetPropertyUint32(c, sh, (uint32_t)i, e);
-                }
-                JS_SetPropertyStr(c, o, "shares", sh);
-                /* the transfer folder (6.7.1): on, and where it is (made at the machine's start, or by transferFolder) */
-                char xp[PATH_MAX];
-                JS_SetPropertyStr(c, o, "transfer", JS_NewBool(c, m.transfer));
-                set_str(c, o, "transferPath", vm_transfer_path(dir, xp, sizeof xp) ? "" : xp);
-            }
-            {
-                char ip[PATH_MAX + 320];
-                snprintf(ip, sizeof ip, "%s/imported.json", dir);
-                JS_SetPropertyStr(c, o, "imported", JS_NewBool(c, !access(ip, F_OK)));
-            }
-            set_str(c, o, "created", m.created);
-            set_str(c, o, "error", "");
-        } else {
-            set_str(c, o, "name", folder);
-            set_str(c, o, "error", r == VM_E_NEWER ? "newer" : "invalid");
-        }
-        run_state(dir, c, o);
-        if (r == VM_OK) {
-            JSValue sv = JS_GetPropertyStr(c, o, "state");
-            const char *ss = JS_ToCString(c, sv);
-            if (ss) {
-                unbridge_idle(&m, ss);
-                if (m.vgpu) {
-                    gvt_idle(&m, ss);
-                    gvt_memlock(dir);
-                    if (!strcmp(ss, "running") || !strcmp(ss, "paused") || !strcmp(ss, "starting")) gvt_running++;
-                }
-                JS_FreeCString(c, ss);
-            }
-            JS_FreeValue(c, sv);
-        }
-        /* an operation that was interrupted and waits for the next start (3.6) */
-        {
-            VmOp op;
-            set_str(c, o, "operation", vm_op_read_peek(dir, &op) ? op.op : "");
-        }
-        /* a saved session (6.1): the next start resumes from it */
-        char sp[PATH_MAX + 300];
-        snprintf(sp, sizeof sp, "%s/suspend.state", dir);
-        struct stat ss;
-        JS_SetPropertyStr(c, o, "suspended", JS_NewBool(c, !lstat(sp, &ss) && S_ISREG(ss.st_mode)));
-        JS_SetPropertyStr(c, o, "stateBytes", JS_NewFloat64(c, !lstat(sp, &ss) && S_ISREG(ss.st_mode) ? (double)ss.st_blocks * 512 : 0));
+        JSValue o = list_one(c, dir, folder, NULL, NULL, -1, &gvt_running);
         JS_SetPropertyUint32(c, arr, n++, o);
     }
     closedir(d);
     gvt_freq(gvt_running > 0);
     return arr;
+}
+
+/* groups() → [{ dir, id, name, kind, members: [{ role, dir, start, stop, primary }], disposable, freshGateway, release,
+ * error }]: the library's machine groups (docs/VIRTUALIZATION.md 19.2), read with vm_group_load; error "newer" or
+ * "invalid" for a group.json that can't be used (its members aren't listed then) */
+static JSValue f_groups(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    JSValue arr = JS_NewArray(c);
+    char lib[PATH_MAX];
+    if (library(lib, sizeof lib, 0)) return arr;
+    DIR *d = opendir(lib);
+    if (!d) return arr;
+    uint32_t n = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) && n < 64) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.' || l <= 10 || strcmp(e->d_name + l - 10, VMG_SUFFIX)) continue;
+        char gdir[PATH_MAX + 260];
+        struct stat st;
+        snprintf(gdir, sizeof gdir, "%s/%s", lib, e->d_name);
+        if (lstat(gdir, &st) || !S_ISDIR(st.st_mode) || !vm_group_dir_ok(gdir)) continue;
+        VmGroup g;
+        int r = vm_group_load(gdir, &g, NULL, 0);
+        JSValue o = JS_NewObject(c);
+        set_str(c, o, "dir", gdir);
+        set_str(c, o, "error", r == VM_OK ? "" : r == VM_E_NEWER ? "newer" : "invalid");
+        if (r == VM_OK) {
+            set_str(c, o, "id", g.id);
+            set_str(c, o, "name", g.name);
+            set_str(c, o, "kind", g.kind == VMG_KIND_WHONIX ? "whonix" : "");
+            set_str(c, o, "release", g.release);
+            JS_SetPropertyStr(c, o, "disposable", JS_NewBool(c, g.disposable));
+            JS_SetPropertyStr(c, o, "freshGateway", JS_NewBool(c, g.fresh_gateway));
+            JSValue ms = JS_NewArray(c);
+            for (int i = 0; i < g.n; i++) {
+                JSValue m = JS_NewObject(c);
+                char md[PATH_MAX + 520];
+                snprintf(md, sizeof md, "%s/%s", gdir, g.m[i].dir);
+                set_str(c, m, "role", VMG_ROLE_NAMES[g.m[i].role]);
+                set_str(c, m, "dir", md);
+                set_int(c, m, "start", g.m[i].start);
+                set_int(c, m, "stop", g.m[i].stop);
+                JS_SetPropertyStr(c, m, "primary", JS_NewBool(c, g.m[i].primary));
+                JS_SetPropertyUint32(c, ms, (uint32_t)i, m);
+            }
+            JS_SetPropertyStr(c, o, "members", ms);
+        } else set_str(c, o, "name", e->d_name);
+        JS_SetPropertyUint32(c, arr, n++, o);
+    }
+    closedir(d);
+    return arr;
+}
+
+/* link(groupDir, on) → "" or why not (English, for the log): the group's internal link (19.3, vm/vmlink.h). The two
+ * machines paired are the ones the group's own group.json and machine.json name; JS only names the group folder, which
+ * must be one of this library's. A new pair each time: Machines calls it once both members run, and again after either
+ * one started anew */
+static int group_dir(JSContext *c, JSValueConst v, char *out, size_t n);
+static JSValue f_link(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char gdir[PATH_MAX], why[256];
+    if (argc < 2 || group_dir(c, argv[0], gdir, sizeof gdir)) return JS_NewString(c, "not a group of this library");
+    int on = JS_ToBool(c, argv[1]);
+    if (vm_link_group(gdir, on, 3000, why, sizeof why)) {
+        fprintf(stderr, "vm: group link %s: %s\n", on ? "on" : "off", why);
+        return JS_NewString(c, why[0] ? why : "failed");
+    }
+    fprintf(stderr, "vm: group link %s (%s)\n", on ? "connected" : "pulled", gdir);
+    return JS_NewString(c, "");
 }
 
 /* ---- creating (lord-vm --create, in the background) ---- */
@@ -3333,6 +3467,9 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     media_src_need_cpu(m);              /* a picture shown as a texture: read back now */
     if (!m || !m->px || m->w < 1 || m->h < 1) return JS_FALSE;
+    /* a group's member under the anonymity profile (docs/VIRTUALIZATION.md 19.5): no picture of it stays on disk */
+    VmMachine mm;
+    if (vm_machine_load(s->dir, &mm, NULL, 0) || mm.profile_lock) return JS_FALSE;
     return JS_NewBool(c, !vm_thumb_save_async(s->dir, m->px, m->w, m->h, VM_THUMB_W));
 }
 
@@ -4466,7 +4603,7 @@ static JSValue f_import_info(JSContext *c, JSValueConst t, int argc, JSValueCons
 }
 
 static const JSCFunctionListEntry funcs[] = {
-    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
+    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),

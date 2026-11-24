@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 13
+#define VM_SCHEMA 14
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -33,8 +33,20 @@ enum { VM_DISPLAY_WINDOW = 0, VM_DISPLAY_NONE };
 /* the machine's network (6.5): shared (passt, out only, plus the forwarded ports), isolated (no card's backend), bridged
  * (a macvtap on one of this computer's wired cards: the guest is another device on that network, by its DHCP), host-only
  * (passt whose sockets are bound to 127.0.0.1: the guest reaches this computer and nothing else) */
-enum { VM_NET_SHARED = 0, VM_NET_ISOLATED, VM_NET_BRIDGED, VM_NET_HOSTONLY };
-extern const char *const VM_NET_NAMES[];   /* "shared", "isolated", "bridged", "hostonly" */
+enum { VM_NET_SHARED = 0, VM_NET_ISOLATED, VM_NET_BRIDGED, VM_NET_HOSTONLY, VM_NET_LINK };
+extern const char *const VM_NET_NAMES[];   /* "shared", "isolated", "bridged", "hostonly", "link" */
+/* schema 14, machine groups (docs/VIRTUALIZATION.md 19): "link" (a group's workstation only) is one card wired to nothing
+ * but the group's internal link (VM_LINK): no passt, no host route. A member's role in its group, its profile lock and the
+ * clock devices its kind asks for */
+enum { VM_ROLE_NONE = 0, VM_ROLE_GATEWAY, VM_ROLE_WORKSTATION, VM_ROLE_COUNT };
+extern const char *const VM_ROLE_NAMES[];  /* "", "gateway", "workstation" */
+enum { VM_LOCK_NONE = 0, VM_LOCK_ANONYMITY };
+extern const char *const VM_LOCK_NAMES[];  /* "", "anonymity" */
+enum { VM_TIMERS_DEFAULT = 0, VM_TIMERS_WHONIX_GATEWAY, VM_TIMERS_WHONIX_WORKSTATION };
+extern const char *const VM_TIMERS_NAMES[];   /* "", "whonix-gateway", "whonix-workstation" */
+/* the internal link's card: the workstation's only card is in slot 0x2 (its eth0), the gateway's at 0x18 (its eth1, after
+ * passt's card in 0x2); each on a QEMU hub of its own so that its backend can come and go (19.3) */
+#define VM_LINK_SLOT_GATEWAY 0x18
 /* forwarded ports (6.5): a port of this computer that passt opens and forwards to one of the guest's */
 enum { VM_PROTO_TCP = 0, VM_PROTO_UDP };
 enum { VM_OPEN_LOCAL = 0, VM_OPEN_LAN };    /* "this-computer" binds 127.0.0.1, "lan" 0.0.0.0 */
@@ -185,6 +197,17 @@ typedef struct {
     /* schema 13: vCPU pinning (docs/VIRTUALIZATION.md 3.7.1): "cpu_pin": "off" | "auto", written only when chosen; missing
      * is this computer's default for the machine (vmpin_default_on) */
     int cpu_pin;                        /* VM_PIN_* */
+    /* schema 14: a member of a machine group (docs/VIRTUALIZATION.md 19.4), written only for members. group: the group's
+     * id (group.json "id"); role: VM_ROLE_*; uplink_tor: the gateway's passt has no DNS forwarding and no forwarded ports
+     * ("uplink": "tor", with network "shared"); link_mac: the gateway's second card, on the internal link; profile_lock:
+     * VM_LOCK_ANONYMITY refuses every host-to-guest channel (19.5: no agent, clipboard, transfer, shares, ports, 3D, vGPU,
+     * microphone) in vm_machine_check, so --set and Configure can't turn one on; timers: VM_TIMERS_* (19.5, "Time") */
+    char group[37];
+    int role;
+    int uplink_tor;
+    char link_mac[18];
+    int profile_lock;
+    int timers;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
