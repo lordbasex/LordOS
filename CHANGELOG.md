@@ -11,6 +11,45 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: this computer's USB devices in a machine, and the camera** (in development; latest release 0.8.9.5-beta;
+  docs/VIRTUALIZATION.md 6.6 and 6.9; approved by the maintainer on 2026-11-24, AGENTS.md "Machines' USB devices").
+  - The machine window's **Devices** menu lists this computer's USB devices; one picked goes into the running machine
+    whole (QEMU's `usb-host` on the machine's xHCI controller) and back to this computer's drivers when it is picked again,
+    when it is unplugged, or when the machine stops. One machine holds a device at a time, a machine at most 8.
+  - A new closed admin action, `vm-usb-allow "<machine id> <bus> <address> <vvvv>:<pppp>"` (anyone at the seat; storage only
+    for administrators): it finds the device again in sysfs, refuses a hub or root hub, a device whose keyboard or mouse a
+    process holds (the session's own), a disk this computer has mounted, uses as swap or under another block device, opens
+    `/dev/bus/usb/BBB/DDD`, checks it by its device number and sysfs again, and answers with the **descriptor**
+    (`admin_ok_fd`: SCM_RIGHTS on the helper's socket; `admin_dispatch` now reads with `recvmsg`). The node's owner, mode and
+    access list never change; nothing is written. lord-server keeps a descriptor only for a request it sent itself
+    (`js_vm_admin_reply`), hands it to the machine's lord-vm (a new request, `VM_USB`) and closes its copy; lord-vm checks it
+    again (`vmusb_fd_ok`) and gives it to QEMU through `add-fd` and `hostdevice=/dev/fdset/N`, so QEMU opens no path.
+  - QEMU's sandbox: Landlock unchanged. `lord-vm-usb.so` (`/usr/lib/lordos/lib`, new) is preloaded into the QEMU of a machine
+    with USB on and only sets libusb's default to `LIBUSB_OPTION_NO_DEVICE_DISCOVERY`, so libusb never looks at the
+    computer's other devices; the usb-host module is loaded during QEMU's start (`device-list-properties`), while
+    executable mappings are still allowed. The allowlist gains, only for such a machine, usbfs's ioctls (`'U'`) and the
+    rows `timerfd_create`, `timerfd_settime`, `timerfd_gettime` (rule `USB`): nothing else was called through a webcam's
+    capture in learn mode.
+  - machine.json schema 18: `usb` (the machine's USB controller, `qemu-xhci` on slot 0x15; new and imported machines have it,
+    an older one gets it in Configure → Sound and input with the machine off) and `usb_auto` (up to 8 `vendor:product[:serial]`
+    rules, "Connect … automatically" in the Devices menu while it runs, `VM_USB a = 2/3`, Remove in Configure, `lord-vm
+    --set --usb on|off --usb-auto RULE…|none`). A matching device goes in by itself, once while it stays plugged in, never
+    asking for a permission. Never for a machine locked for anonymity: refused by machine.json's check, lord-server and
+    lord-vm.
+  - **The camera** goes in the same way, as a USB device: a device with a video interface needs LordOS's camera permission
+    for Machines and one with sound the microphone's (checked in C; the app asks with the system prompt the first time;
+    taken away, the device leaves the machine within a second); the capture indicator shows the camera for "Machines —
+    <name>". Measured with the maintainer's own Logitech C930e (he allowed it): a Debian 13 guest saw it as
+    "Logitech Webcam C930e" (`/dev/video0`) and captured 30 frames of 640×480 YUYV at about 13 frames a second; out again,
+    uvcvideo and snd-usb-audio took it back on this computer.
+  - `lord.vm.usbDevices()`, `usbAttach(id, bus, dev)`, `usbDetach`, `usbAuto`; the poll's `usb` (`devices`, `busy`,
+    `controller`, `locked`, `err`, `auto`); the list's `usb` and `usbAuto`. 24 new strings in all 35 languages.
+  - Tests: `build/vmusb-test` (a made-up sysfs: listing, every refusal, the request, rule and line parsers with 200 000
+    random inputs, the descriptor check; ASan, UBSan), `tests/vm_usb_model_test.mjs` (the menu's rows, rules, indicator,
+    permissions), `tests/vm_usb_e2e.sh` (root, a real device, a real guest: vm-usb-allow → lord-vm → QEMU → the guest, and a
+    lord-server started as root in a private mount namespace driving `lord.vm` through the real admin helper), and
+    `build/vm-usb-cli` (vm-usb-allow as the helper runs it, for manual checks). lordvm-dev gains `usb-in`, `usb-out`,
+    `usb-auto`, `usb-noauto`.
 - **Machines: programs, files, logs and an MCP server from the terminal, per machine with the person's consent**
   (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
   to the `machines` command, which gains:

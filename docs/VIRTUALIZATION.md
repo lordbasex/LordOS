@@ -362,7 +362,7 @@ Still open in Phase 2:
   and its revert. Not yet on the Pi 5 (arm64) nor with a virtio-win guest.
 - [ ] A Windows guest migrated from VMware Fusion end to end (the maintainer's Windows 11, once its encryption is removed in
   Fusion): NVMe disk, vmxnet3, the SMBIOS UUID and MAC kept, no TPM, Secure Boot off; activation checked.
-- [ ] USB passthrough of a device to a machine.
+- [x] USB passthrough of a device to a machine (*in development*: `vm-usb-allow` hands the device's descriptor to QEMU's usb-host, auto-connect rules, the camera as a USB device; 6.6, 6.9).
 - [x] Bridged and Host-only networks (0.8.9: a macvtap for Bridged, with `vhost=off`; passt on 127.0.0.1 for Host only; 6.5).
 - [ ] File copy panel with flow control and resume, Send to LordOS, drag out (7, target 300 MB/s). Dropping files in is built (6.21).
 - [x] UEFI secure boot and TPM on amd64 (swtpm, its state in snapshots; 4.3.1). arm64 secure boot is still To test.
@@ -569,7 +569,7 @@ Admin helper (closed actions, root)
   vm-image-get, vm-image-get-user, vm-image-list, vm-image-remove, vm-image-cancel
 ```
 
-(Audited 2026-11-23: there is no usbredir and no USB action yet; USB passthrough is not built, 6.6.)
+(Since 2026-11-24, *in development*: a host USB device goes to QEMU's `usb-host` as a descriptor the admin helper's `vm-usb-allow` opened, through lord-server and lord-vm, no usbredir; 6.6.)
 
 ### 3.1 Parts
 
@@ -2345,7 +2345,7 @@ The resolution menu is always shown, with **Follow the window** as one of its it
 with ❖Esc or Ctrl+Alt (fixed, 6.25). Built since (*in development*): a **View** menu (Window, Full Screen, Apps, **Picture in Picture**, **Actual Size**: the window
 sized to the guest's display while the resolution is fixed, `actualFrame`), an **Info** menu (CPU, memory and disk from two
 `lord.vm.stats` reads 2 s apart, the sandbox, Open Configuration…, `infoLines`) and **Start in Full Screen** in the machine's ···
-menu (the window takes its display as it opens). Not built: Scale, USB, Folders, Network and Camera in Devices, per-device
+menu (the window takes its display as it opens). Not built: Scale, Folders and Network in Devices (USB devices and the camera are there since 2026-11-24, 6.6), per-device
 status dots, the window keeping the guest's shape. The design was:
 
 | Group | Items |
@@ -2870,7 +2870,59 @@ a "lan" port or the bridged guest, the Configure pane on screen.
 
 ### 6.6 USB
 
-**Not built (audited 2026-11-23):** no USB passthrough, no usbredir and no `vm-usb-allow` exist; machines have `qemu-xhci` with a `usb-tablet` only for the Windows devices. The design: `usbredir` over the Chardev stream: no root, device opened by a closed admin action `vm-usb-allow`, which claims the single device for that VM and writes nothing permanent. Menu lists devices with names. Auto-connect rules per VM. USB 3 through `qemu-xhci`. Weak: isochronous devices (webcams, audio) can stutter; Camera and Microphone have their own paths. Never offered: the boot disk or the keyboard in use.
+**Built (*in development*, 2026-11-24; approved by the maintainer the same day, AGENTS.md "Machines' USB devices").** A device
+of this computer goes into a running machine whole, as QEMU's `usb-host` on the machine's xHCI controller, and comes back to
+this computer's drivers when it leaves. One machine holds a device at a time, and a machine at most 8.
+
+- *How it gets there.* lord-server lists the devices from sysfs (`/sys/bus/usb/devices`, `vmusb.c`). The person picks one in
+  the window's **Devices** menu. lord-server asks the admin helper's closed action `vm-usb-allow "<machine id> <bus> <address>
+  <vvvv>:<pppp>"` (`vmusb_admin.c`), which finds the device again by its bus and address, checks it is still the one picked
+  (vendor and product), refuses what must never leave this computer (below), opens `/dev/bus/usb/BBB/DDD` read and write,
+  checks the node by its device number against sysfs and reads sysfs again after the open, then answers `vm.usbReady` with the
+  **descriptor** (SCM_RIGHTS on the helper's socket, `admin_ok_fd`). The node's owner, mode and access list never change and
+  nothing is written. lord-server takes the descriptor only for a request it sent itself (`js_vm_admin_reply`; one JS asked
+  for through `lord.admin` gets its answer but the descriptor is closed), checks it (`vmusb_fd_ok`: a `usb_device` node,
+  major 189, of that bus and address, opened read and write), hands it to the machine's lord-vm (`VM_USB`) and closes its own
+  copy. lord-vm checks it again, gives it to QEMU with QMP `add-fd` (fdset 120 + slot) and `device_add usb-host` with
+  `hostdevice=/dev/fdset/N`: QEMU never opens a path and its Landlock rules don't change. Out: `device_del`, then the fdset
+  once QEMU says `DEVICE_DELETED`; QEMU's libusb lets go of the interfaces and this computer's drivers take it back
+  (**Measured**: uvcvideo and snd-usb-audio bound again to the webcam).
+- *Never given* (checked by root, and by lord-server before it asks): a hub or a root hub (`vm.usbHub`); a device with an input
+  node (a keyboard, a mouse) that any process holds open, the session's own (`vm.usbInputInUse`); a device with a disk this
+  computer has mounted, uses as swap or under another block device (`vm.usbMounted`: eject it first); storage when the person
+  isn't an administrator (`vm.usbStorageAdmin`); a machine locked for anonymity (19.5, `vm.usbLocked`: refused by lord-server,
+  by lord-vm and by machine.json's check). The boot disk is mounted, so it is refused like any mounted disk.
+- *QEMU's side.* QEMU's usb-host calls `libusb_init`, which looks for every USB device of the computer (a netlink socket,
+  `/sys/bus/usb`, `/run/udev`): none of that is allowed in its sandbox. lord-vm preloads `lord-vm-usb.so`
+  (`/usr/lib/lordos/lib`, `vmusbshim.c`), which only sets libusb's default to `LIBUSB_OPTION_NO_DEVICE_DISCOVERY`
+  (libusb ≥ 1.0.27): libusb then works only on the descriptor it is given (`libusb_wrap_sys_device`). QEMU loads its
+  `hw-usb-host` module at start (`device-list-properties usb-host` before the QMP handshake ends), while executable mappings
+  are still the loader's: a module mapped later would stop QEMU (3.3). Its allowlist gains, only for a machine with USB on,
+  usbfs's ioctls (type `'U'`) and the `USB` rows `timerfd_create`, `timerfd_settime`, `timerfd_gettime` (`vmsyscalls.h`;
+  **Measured** in learn mode through a webcam's capture: nothing else).
+- *The controller* (machine.json schema 18, `usb`): new and imported machines have it (`lord-vm --create`); an older machine
+  gets it from Configure → Sound and input, "USB devices from this computer", with the machine off and no saved state
+  (`lord-vm --set --usb on|off`), since it is a device of the guest. A `qemu-xhci` (`id=usbx`, slot `0x15`, 8 USB 2 and 8 USB 3
+  ports); the compatible and Windows devices in a window use the xHCI they already have. A machine without it says so in the
+  menu.
+- *Auto-connect rules* (schema 18, `usb_auto`): up to 8 `vendor:product[:serial]`. The Devices menu's "Connect … automatically"
+  adds one while the machine runs (`VM_USB a = 2`, lord-vm writes machine.json; `a = 3` removes it); Configure lists them with
+  Remove, `lord-vm --set --usb-auto RULE … | none` with it off. Once a second while the machine runs lord-server brings a
+  matching device in, one at a time, each tried once while it stays plugged in (a device taken out by hand doesn't come back
+  until it is plugged in again), and never asking for a permission.
+- *Unplugged*, the device leaves the machine by itself (lord-server sees it gone from sysfs, `VM_USB a = 0`); the next start has
+  none until its rule or the person adds it again. Nothing of it survives lord-vm.
+- *What a hostile guest can do with it:* anything the device itself allows (reset it, change its configuration, rewrite a
+  firmware the device lets be rewritten): that is what passing a device means, and the menu passes only what the person picks.
+  It can't reach another device: the descriptor is that one device's usbfs node, a hub is never given, and QEMU can't open any
+  other node (Landlock, no `/dev/bus/usb`).
+
+Not built: usbredir (a device over the network), USB 3 streams beyond what QEMU's usb-host does, a per-device speed choice.
+Isochronous devices work: a UVC webcam through a Debian 13 guest captured 640×480 YUYV at about 13 frames a second
+(**Measured** 2026-11-24, below).
+
+**Checked (*in development*, 2026-11-24, amd64 PC, KVM, QEMU 10.0.13, Debian 13 guest; `tests/vm_usb_e2e.sh`, the maintainer's
+own Logitech C930e webcam, which he allowed):** __E2E__
 
 ### 6.7 Shared folders
 
@@ -3048,7 +3100,27 @@ windows, so it never decides it.
 
 ### 6.9 Sound, camera, microphone
 
-Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: asked once per VM with the existing Permissions flow; camera through USB redirect or `uvc` emulation (camera not built). Off by default. Built: the speakers and the microphone through lord-vmdisplay (`hda-micro`, `sound_out`, `sound_in`).
+Sound via `audio-dbus`, into PipeWire by `lord-server`. Microphone and camera: asked once per VM with the existing Permissions flow; the camera goes in as a USB device (6.6). Off by default. Built: the speakers and the microphone through lord-vmdisplay (`hda-micro`, `sound_out`, `sound_in`), and the camera through USB (*in development*).
+
+**Built (*in development*, 2026-11-24): the camera, as a USB device of the machine (6.6).** A webcam goes in whole, through
+the Devices menu or an auto-connect rule, the way 6.6 says; the guest drives it with its own UVC driver at the camera's own
+formats (no LordOS conversion in between). Chosen over an emulated UVC device fed from LordOS's camera (Camera Studio's
+v4l2loopback or lord-media) because QEMU 10.0 has no UVC device (its `usb-video` is a later series not merged), and over
+streaming frames through the agent because a guest then needs our driver. The cost, said in the menu: while the camera is in
+the machine this computer's apps don't have it (exclusive), and Camera Studio's effects don't apply.
+
+- *Permission.* A device with a video interface (class `0x0e`) needs LordOS's camera permission for Machines, and one with an
+  audio interface (class `0x01`, a webcam's microphone, a headset) the microphone's; checked in C by lord-server
+  (`usb_perm_need`, `perm_get("machines", …)` and the restrictions) before it asks the admin helper. The app asks with the
+  system prompt the first time (`requestPermission`, once; Settings → Privacy takes it back). Taken away while the machine
+  runs, the device leaves the machine within a second (`usb_tick`), and its auto-connect rule doesn't bring it back; an
+  auto-connect rule never asks.
+- *The indicator.* While a camera is in a machine the capture indicator by the clock shows the camera for "Machines — <name>"
+  (`markDeviceUse`, as the microphone), and a device with sound the microphone.
+- *Anonymity.* Never for a machine locked for anonymity (19.5): no USB controller, no rule, refused at each step.
+
+Printers (5.5) are a separate path and not built: a USB printer goes in like any USB device (6.6, class `0x07`), but sharing
+this computer's printers with a guest over IPP is not built (5.5).
 
 **Built (since 0.8.9.5): speakers and microphone.**
 
@@ -4770,7 +4842,7 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Drag and drop into any guest, with progress, speed, time left | 3 | Work | Our agent |
 | Drag out of virtio-win guests | 3 | Work | To test |
 | Drag out of a Linux guest's own desktop | none | No | No agent can see the drag. Send to LordOS instead; Apps mode can |
-| USB attach, auto-connect rules | 3 | Yes | usbredir |
+| USB attach, auto-connect rules | 3 | Yes | usb-host on a descriptor from `vm-usb-allow` (6.6) |
 | Sound | 2 | Yes | |
 | Microphone and camera on request | 3 | Yes | |
 | Printers | 3 | Partly | Driverless IPP |
@@ -5202,7 +5274,7 @@ our own channels:
 | Guest agent (qemu-guest-agent and `org.lordos.agent`) | **off**: no `virtio-serial-pci` at all (`agent` false) | Whonix advises against guest additions; with no port there is no host-to-guest command path. Cost: Shut Down is ACPI only (works, 6.1), no journal in Logs, no agent state |
 | Graphics | 2D only (`virtio-vga`, the D-Bus display) | virgl would show the guest this computer's GPU and driver names (a WebGL fingerprint) |
 | Sound | Gateway: no sound card. Workstation: `ich9-intel-hda` with `hda-output` (speakers only) | Whonix's XML has an output-only codec; our usual `hda-micro` gives the guest a microphone input even when muted |
-| Camera, USB, printers | none (not built anyway) | passthrough is on Whonix's unsafe list |
+| Camera, USB, printers | none: refused for a machine locked for anonymity (no USB controller, no rule, `vm.usbLocked`) | passthrough is on Whonix's unsafe list |
 | Suspend, memory snapshots, saving at host shutdown | refused | guest memory would land on this computer's disk; Whonix's XML turns suspend off. At host shutdown the guests are shut down (the `vmhoststop.h` plan without the save) |
 | Thumbnail | `thumb.png` not written (`js_vm.c`); the live picture only while running | a picture of the browsing would stay in `~/Machines` |
 | Captures of the screen (isolation layer 8; **built**, in development, approved 2026-11-23) | the members' windows and their apps-mode windows are **protected windows** (PRIVACY.md, "Protected windows"): on the display as usual, an opaque neutral fill with a lock in every screenshot, recording, remote desktop frame, screen share (whole screen or the window) and portal still. `lord.vm.protect(session)` (one way) refuses the card picture (`lord.vm.snapshot`, and the old `thumb.png` is removed), `lord.vm.screenshot`, `lord.vm.record` (one running stops) and a snapshot's picture; the library card never shows a `thumb.png` for it | the Workstation's browsing on screen would otherwise reach any capture, a remote viewer or a share |
