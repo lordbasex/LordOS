@@ -11,6 +11,30 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: the app and its ties to the system** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
+  3.3, 3.7, 5.1, 5.3, 5.4, 5.5, 5.7, 6.1, 6.14).
+  - **One resource budget for every start.** lord-server checks it on the window's start, Start Without Window,
+    `machines start` (through the session and without one) and a group's members: the memory the library's running
+    machines hold (each with QEMU's share, a disposable session's too) plus the new one must fit in what this computer
+    lets machines use. The window offers Suspend ‹another machine› or Start with less memory; the library's status line
+    shows the memory for machines and warns "Short of memory" under memory pressure.
+  - **The failure page** names a locked disk and a missing disk from QEMU's own words, and offers Start with less memory
+    after running out and Go Back to a Snapshot.
+  - **"Weaker isolation on this kernel"**: on a kernel without Landlock the library says so, Configure → Security says
+    what applies instead, and a running machine's Info menu reads what its sandbox really applied.
+  - **The library's cards** have agent and disk lights, with words; **Pause All** on the toolbar while on battery.
+  - **The machine window**: a View menu (Window, Full Screen, Apps, Picture in Picture, Actual Size), an Info menu (CPU,
+    memory, disk, the sandbox) and Start in Full Screen. Picture in Picture is a small floating view that takes no input
+    for the guest, never for a protected machine.
+  - **What this computer can run**, for amd64 and arm64, from what the computer reports, with its temperature, fan and a
+    Raspberry Pi's power supply while machines run; in the Help menu and on the first-run page.
+  - **Configure**: a search over the sections and a dot on each section with an unsaved change; Startup and shutdown has
+    Start with the session and Pause while I'm away (after 10 minutes without input; resumed on the next).
+  - **The rest of the system**: Search finds machines; Files shows a machine's folder as one item that opens it; Backups
+    leave out a running machine's disks and saved session (they wouldn't be a consistent copy); Cleaner never offers a
+    machine's files; Monitor's machine row has Show Machine; a notice with Pause All when the computer leaves the charger
+    while machines run; Store → Updates warns before a QEMU update while machines are suspended.
+  - Fixed on the way: the Whonix group's Start Fresh dialog counted its snapshots as none.
 - **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the

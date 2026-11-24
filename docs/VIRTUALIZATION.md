@@ -38,9 +38,9 @@ recomputes both from the rows; the arithmetic:
 
 | Area | Weight | Items | Mean | Score | Points (weight × score) | Before |
 |---|---:|---:|---:|---:|---:|---:|
-| A. Engine, lifecycle, sandbox, display | 14 | 22 | 78.18 | 78 % | 14 × 78 % = 10.92 | 78 % |
+| A. Engine, lifecycle, sandbox, display | 14 | 22 | 85.91 | 86 % | 14 × 86 % = 12.04 | 78 % |
 | B. Getting a system in (cards, unattended, import) | 12 | 14 | 76.07 | 76 % | 12 × 76 % = 9.12 | 76 % |
-| C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 74.58 | 75 % | 11 × 75 % = 8.25 | 75 % |
+| C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 84.58 | 85 % | 11 × 85 % = 9.35 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 60.00 | 60 % | 9 × 60 % = 5.40 | 60 % |
 | E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
 | F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
@@ -48,16 +48,13 @@ recomputes both from the rows; the arithmetic:
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
 | I. Guest tools and agent (state, shell, logs) | 7 | 6 | 75.00 | 75 % | 7 × 75 % = 5.25 | 75 % |
 | J. Command line and automation | 3 | 2 | 47.50 | 48 % | 3 × 48 % = 1.44 | 48 % |
-| K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 61.25 | 61 % | 3 × 61 % = 1.83 | 61 % |
+| K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 83.75 | 84 % | 3 × 84 % = 2.52 | 61 % |
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **111** | | | **68.94 → 69 %** | 68 % |
+| **Total** | **100** | **111** | | | **71.85 → 72 %** | 69 % |
 
-Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 1.44 + 1.83 + 2.96 + 2.58 + 1.65 = 68.94, rounded **69 %** (before: 68 %, against `965a10f6e`). Before this audit the
-document's table said 67.52 and the JSON 67.16 while the rows themselves gave 67.88: the Whonix row had been raised to 85 %
-twice without the table, the Σ line and the JSON being computed again, and B's score in the table (73 %) wasn't its rows'
-mean (76 %). All three now come from the rows in one pass.
+Σ = 12.04 + 9.12 + 9.35 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 1.44 + 2.52 + 2.96 + 2.58 + 1.65 = 71.85, rounded **72 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); raw disks, encryption, export and backups
@@ -86,7 +83,7 @@ can see" (L, 60 → 40), recording (F, ✅ → 🧪), `isoInfo` (B, 100 → 85),
 (J, 100 → 95), and raised the failure page (A, 60 → 65), the requirements check (B, 70 → 80), Configure (C, 50 → 60),
 storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets (M, 50 → 60).
 
-### A. Engine, lifecycle, sandbox, display (78 %)
+### A. Engine, lifecycle, sandbox, display (86 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -97,9 +94,9 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp allowlist on top of QEMU's own filter (a stopped call named in the log and on the failure page); QEMU in its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3) | ✅ | 95 | `vmsandbox.c` (`vm_ns_enter`, `vm_ns_setup`, `vm_jail_qemu`), `vmseccomp.c`, `vmsyscalls.h`, `lordvm.c` (`sc_serve`); `vmseccomp-test`, `vm-jail-probe`, `vm_isolation.sh` | Namespaces, non-dumpable QEMU and the allowlist in development (2026-11-23); no pid namespace (GLib refuses the D-Bus display's peer then); a GVT-g vGPU machine, a bridged tap and hugetlb memory not yet run under the allowlist (their calls read in QEMU's source) |
 | Every helper jailed too: lord-vm's own Landlock, `qemu-img`, `swtpm`, `passt`, `virtiofsd`; lord-vmdisplay sandboxed with a self-test; `lord-vmunpack` (a group's archive) under `sandbox_apply_helper` on descriptors; render node and VFIO confined by Landlock (3.3, 19.6) | ✅ | 100 | `lordvm.c` `vm_jail_self`, `vmsandbox.c` `vm_jail_tool*`, `render_rules`, `vgpu_rules`, `vmdisplay.c` `--selftest`, `vmunpack.c`; `vm_isolation.sh`, `vmunpack-test` | Added by the audit of 2026-11-23; `lord-vmunpack` by this one |
 | Sandbox and cgroup state reported (`lord-vm --status`: Landlock, our seccomp, KVM fd, scope), nested cgroup leaves per process (3.3, 3.7) | ✅ | 100 | `lordvm.c` (`setup_cgroups`, `--status`), `diag.js`, `logs.jsx` | Added by the audit of 2026-11-23 |
-| "Weaker isolation on this kernel" notice when Landlock is missing (3.3) | 🟡 | 20 | `lordvm.c` (the log's note), `sdk/sentinelavm.js` (`sandboxMissing`) | The log's "Sandbox:" line and note say it, and Sentinela's always-shown `vmSandbox` alert names it, but only with Sentinela on (off by default); no notice in the app. lord-vm refuses to start only without seccomp or `no_new_privs` (was ❌ 0) |
+| "Weaker isolation on this kernel" notice when Landlock is missing (3.3) | 🧪 | 90 | `js_vm.c` (`host().landlock`), `model.js` `isolationGaps`, `library.jsx`, `configure.jsx` (Security), `vmwindow.jsx` (Info); `vm_model_test.mjs` | *In development*: the library's notice, Configure → Security's sandbox line and the window's Info menu, from the kernel's Landlock ABI and the running machine's VMS bits (namespaces too); Sentinela's alert as before. Not seen on a kernel without Landlock (every test host has it) |
 | Render node by descriptor; one slice for all machines (3.3, 3.7) | ❌ | 0 | `lordvm.c` passes a path (`rendernode=`); one scope per machine | QEMU's `rendernode=` takes a path; Landlock limits it to that node (row above) |
-| Resource budget (3.7) | 🟡 | 35 | `model.js` `budgetCheck`, `vmwindow.jsx`, cgroup `memory.max` and CPU limits | Only the window checks it: `startDetached` and `machines start` skip it, and `vm_budget_fits` (`machine.c`) is called only by `vm-test`. No common slice, no pressure warning, no "pause another or start with less" |
+| Resource budget (3.7) | 🟡 | 80 | `machine.c` `vm_budget_used_mb`, `vm_budget_fits`; `js_vm.c` `budget_ok` (`start`, `startDetached`), `lord.vm.budget`; `cli/machines.c`; `model.js` `budgetPlan`, `budgetLine`; `vmwindow.jsx`, `library.jsx`; `vm-test`, `vm_model_test.mjs` | *In development*: one check in lord-server for every start path (the window, Start Without Window, `machines start` through the session and without one, a group's members, a disposable session's share counted); the window offers Suspend <another> or Start with less memory; the status line shows memory for machines and a PSI warning. Not built: one parent slice with lower CPU and I/O weight than the session (each machine keeps its own `memory.max`) |
 | Files and contracts: `operation.json`, newer schema read-only, suspended-state check (3.5, 3.6) | ✅ | 90 | `vmops.h` `vm_op_begin`, `machine.c`, `lordvm.c` | Export manifest not built |
 | Firmware identity kept with the machine; the old code file kept in the folder (3.6) | 🟡 | 40 | `machine.c` (`firmware_sha256`), `lordvm.c` | Only the hash is recorded and a mismatch logged; the old code file isn't kept. Added by the audit of 2026-11-23 |
 | `lord-vmdisplay`: Unix.Map, SIGBUS guard, rate, dmabuf, cursor, audio (3.2) | ✅ | 95 | `vmdisplay.c`, `js_vm.c`; `vmdisplay-test` | Zero copy when the desktop composes on the GPU (the dmabuf is a texture); read back only for a recording, the CPU path or a failed import |
@@ -108,8 +105,8 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Host shutdown inside logind's 45 s delay (6.1) | 🧪 | 100 | `vmhoststop.h`, `vmlogind.c`; `vmlogind-test`; migration 010 | *In development*; fake logind plus the maintainer's PC |
 | A 3D guest's stop named (`qemu-3d-stop`, `qemu-3d-crash`), unattended starts in 2D (3.2, 6.10) | 🧪 | 90 | `vmlog.c`, `lordos-guest --stopping`; `guest_stop_test.sh` | *In development*; no real 6.12.117 3D guest yet |
 | Self-healing network (passt restarted while running) | ✅ | 100 | `lordvm.c` (keeper, `NET_MAX_RESTARTS`) |  |
-| Failure page with a cause and a fix (6.1) | 🟡 | 65 | `vmwindow.jsx`, `machines.why.*` and `fix.*` | Nine named causes, each with a fix line, lord-vm's own reason, Use 2D and Resume anyway buttons; no "start with less memory" or "go back to a snapshot" action, no locked-file cause |
-| A state saved by another QEMU or CPU: Resume anyway or discard (6.1) | 🟡 | 60 | `lordvm.c` (`--resume-anyway`), `vmwindow.jsx` | No Store warning; devices that can't be saved (HDA) aren't unplugged |
+| Failure page with a cause and a fix (6.1) | ✅ | 90 | `vmwindow.jsx` (`Failed`), `model.js` `failCause`, `failActions`, `machines.why.*` and `fix.*`; `vm_model_test.mjs` | *In development*: a locked disk and a missing disk named from QEMU's words, Start with less memory after running out, Go Back to a Snapshot. Checked with QEMU's messages in the model test, not with a real failure on screen |
+| A state saved by another QEMU or CPU: Resume anyway or discard (6.1) | ✅ | 90 | `lordvm.c` (`--resume-anyway`), `vmwindow.jsx`, `apps/store/syspkg.js` `qemuUpdateRisk`, `debian.js` (Updates); `store_syspkg_test.mjs` | *In development*: Store → Updates warns when an update changes QEMU while machines are suspended. HDA is migrated with the state (nothing to unplug); what can't be saved (a graphics card, 3D) is never suspended |
 | Direct kernel boot (13.8 item 9) | 🟡 | 30 | `lordvm.c` | Unattended installs only; none for an installed Linux guest |
 | Rename a machine with its folder and transfer folder (6.26) | 🧪 | 100 | `machine.c` (`renameat2`); `vm_rename.sh` | *In development*; headless |
 
@@ -132,20 +129,20 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Migrate from another PC (6.11) | ❌ | 0 |  | Phase 4 (the assistant's Migrate tile is the import of 6.22) |
 | Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | 🟡 | 80 | `vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_link.sh` | *In development* (`feat/whonix-group`, `feat/whonix-group-2`): G0–G4 of 19.11 (download and unpacking, groups, the link, `machines`, the card and About step, one library card with its menu, Configure's group view, Start Fresh, the disposable session in memory, the Gateway's firewall identity, a clean Shut Down), headless end to end; left: the release gate on real hardware (G5), disk encryption of the members (layer 5), Delete and Rename of a group and Repair of a damaged one (the card only names it damaged), the Workstation bar's "No network: the Gateway is off" with Start Gateway, making a missing base again from the archive (was 85: these were counted as built) |
 
-### C. The app (75 %)
+### C. The app (85 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Library: toolbar, chips, grid or list, sort, search, status line, live card (5.1) | ✅ | 90 | `library.jsx`, `model.js` (`skeletonPlan`); `vm_model_test.mjs` | Placeholders from the first frame (*in development*). No agent or disk lights on the card, no Export or Templates in ··· |
+| Library: toolbar, chips, grid or list, sort, search, status line, live card (5.1) | ✅ | 95 | `library.jsx` (`Lights`), `model.js` (`skeletonPlan`, `cardLights`); `vm_model_test.mjs` | Placeholders from the first frame; agent and disk lights with words on the card and the row (*in development*). No Export or Templates in ··· |
 | Machines settings: General, Profiles, Systems, Network, Graphics cards, Keyboard and mouse (5.1) | ✅ | 100 | `settingswin.jsx` |  |
 | New Machine assistant (5.2) | 🟡 | 70 | `assistant.jsx` (5 steps) | No Detect step, folder choice, **Fresh install** snapshot or file drop |
-| Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu (5.3) | 🟡 | 75 | `vmwindow.jsx` | No View or Info menus, Scale, Actual Size, device dots, Start in Full Screen, aspect lock; no USB, Network or Camera in Devices |
+| Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu (5.3) | 🟡 | 85 | `vmwindow.jsx` (View and Info menus), `library.jsx` (Start in Full Screen), `model.js` `actualFrame`, `infoLines` | *In development*: View (Window, Full Screen, Apps, Picture in Picture, Actual Size), Info (CPU, memory, disk, the sandbox, Open Configuration), Start in Full Screen. Not built: Scale, device dots, the window keeping the guest's shape; no USB, Network or Camera in Devices |
 | Display modes: Window, Full Screen, Apps (5.4) | ✅ | 100 | `vmwindow.jsx`, `appsmode.jsx` |  |
-| All Displays (multi-head), Picture in Picture of a machine (5.4) | ❌ | 0 | `setPip` only for apps-mode popups |  |
-| Configure, one window with summaries (5.5) | 🟡 | 60 | `configure.jsx` (11 sections) | Built since the last audit: Pin cores, the vCPU advice, the performance profile; the disk grows. No search, dots, Backup, ballooning, CPU model, USB rules, disk add or encryption, printers, icon and tags, MAC, speed limit; huge pages are automatic, no switch |
+| All Displays (multi-head), Picture in Picture of a machine (5.4) | 🟡 | 45 | `vmwindow.jsx` (`PipBack`, View → Picture in Picture), `model.js` `pipFrame`; `vm_model_test.mjs` | *In development*: Picture in Picture of a machine (`wm.setPip`, on the window's display, the guest's shape, no keys and no pointer for the guest, not for a protected machine). All Displays (virtio-gpu heads, one per display) not built |
+| Configure, one window with summaries (5.5) | 🟡 | 65 | `configure.jsx` (11 sections), `kit.jsx` (`SideRow` dot), `model.js` `changedSections`, `sectionsMatching` | Search over the sections and a dot on each with an unsaved change (*in development*). No Backup, ballooning, CPU model, USB rules, disk add or encryption, printers, icon and tags, MAC, speed limit; huge pages are automatic, no switch |
 | Profiles and `.lordprofile` (5.6) | ✅ | 95 | `profiles.js`; `vm_profiles_test.mjs` |  |
 | Official logos, opt-in (5.6.2) | ✅ | 90 | `logos.js` |  |
-| What this computer can run (5.7) | 🟡 | 30 | `library.jsx` (the Pi page, the first-run page) | The first-run page covers KVM and Emulated only. No amd64 page, no sensors, not in Help |
+| What this computer can run (5.7) | 🧪 | 85 | `library.jsx` (`ThisComputer`), `model.js` `canRun`, `sensorLines`, `js_vm.c` (`host().nested`, `sensors()`); `vm_model_test.mjs` | *In development*: amd64 and arm64 from what the host reports, the sensors (temperature, fan, a Pi's power supply) while machines run, in the Machine and Help menus and on the first-run page. Not yet seen on screen on the Pi |
 | ❖ shortcuts, Keys panel, focus gate (5.8) | ✅ | 95 | `keys.jsx`; `vm_keys_scene.mjs` | The release combination is fixed |
 | Capture mouse (6.25) | 🧪 | 90 | `capture.js`, `pointerlock.h`; `vm_capture_test.mjs` | Through `lordvm-dev` only |
 
@@ -224,13 +221,13 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | `machines` list, status, start, open, stop…, snapshot, clone, set, rename, ids, and for a machine group `fresh` and `--member` (19.9); 35 languages, `--json`, completion (6.15) | 🧪 | 95 | `server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh` | `set` doesn't pass `--cpu-pin`, `--perf-profile` or `--capture-fullscreen` (`mcli.c` `PASS[]`); no start from a memory snapshot, create, import or console |
 | `lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24) | ❌ | 0 |  |  |
 
-### K. System ties (61 %)
+### K. System ties (84 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Monitor: a machine as one row (6.14) | 🟡 | 65 | `apps/monitor/Processes.jsx`, `Network.jsx`, `Gpu.jsx` | Network and GPU name machines too; no drill-in |
+| Monitor: a machine as one row (6.14) | 🟡 | 80 | `apps/monitor/Processes.jsx` (Show Machine), `Network.jsx`, `Gpu.jsx`; `apps/machines/index.jsx` (`args.show`) | Network and GPU name machines too; a machine's row opens its processes and Show Machine opens its window (*in development*). No per-machine disk and network numbers in Monitor |
 | Idle block while a machine runs (6.14) | ✅ | 90 | `lord.vm.awake`, `vmlogind.c` |  |
-| Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, balloon (6.14, 16) | ❌ | 0 |  | No `virtio-balloon`; Cleaner, Backups and Files don't know `.lordvm` |
+| Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, balloon (6.14, 16) | 🟡 | 75 | `clean/cleanfs.c` `clean_machine_path`, `backup/engine.c` (`hold`), `backup.c`, `machine.c` `vm_backup_hold`, `vm_dir_active`, `sdk/openwith.js` `registerBundle`, `apps/files`, `apps/machines/ties.js`; `clean-test`, `backup-test`, `vm-test`, `vm_model_test.mjs` | *In development*: Cleaner never offers a machine's files; Backups hold back a running machine's disks and saved session; Files shows a machine as one item; Search finds machines; Pause All on battery (notice and toolbar); Start with the session; Pause while I'm away. No balloon (see 6.14), no Reclaim space in Cleaner (Machines' Storage window has it) |
 | Sentinela watches running machines: sandbox and scope, a Workstation's ways out, crashes, CPU, memory, a Gateway's traffic (docs/SENTINELA.md, "Machines") | 🧪 | 90 | `sdk/sentinelavm.js`, `vmwatch.h`, `js_vm.c` (`stats`: lord-vm asked over its socket, `SO_PEERCRED`), `monitor/conn.c` (`conn_machines`); `sentinela_vm_test.mjs`, `vmwatch-test` | *In development*; off by default with the rest of Sentinela; counts only, never the guest's screen, files or addresses; checked with made-up stats and headless scenes, not on a live machine on screen. Added by this audit |
 
 ### L. Privacy and security (74 %)
@@ -792,7 +789,10 @@ QEMU parses guest-controlled data all day, so **assume it can be compromised**. 
   `comm`, `cmdline` and `cgroup` stay readable, so Monitor, the vCPU use and the vGPU checks keep working; Monitor lists QEMU
   under root, as it already did lord-vm (also non-dumpable).
 - **Landlock:** read `/usr` (execute only QEMU's binary and its loader, since 2026-11-23 with the seccomp allowlist), read the ISO attached to this VM; read-write only that VM's `disks/` folder (`vmsandbox.h`). On kernels without
-  Landlock (see 2.3) the app shows "Weaker isolation on this kernel" (**not built**: only the machine log's "Sandbox:" line says it).
+  Landlock (see 2.3) the app shows "Weaker isolation on this kernel" (built, *in development*: `lord.vm.host().landlock` is the kernel's
+  Landlock ABI; the library shows a notice under its toolbar, Configure → Security's sandbox line says what applies instead, and a
+  running machine's Info menu reads its own VMS bits, which also name an engine that couldn't get its own namespaces; `model.js`
+  `isolationGaps`). The machine log's "Sandbox:" line and Sentinela's `vmSandbox` alert say it too.
 - **Seccomp:** QEMU's own `-sandbox on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny` plus ours, an
   **allowlist** (in development; approved by the maintainer 2026-11-23 as isolation layer 3, for every machine). `vmseccomp.c` builds
   it from the rows in `vmsyscalls.h`; `vm_jail_qemu` (`vmsandbox.c`) applies it before the exec, so it covers QEMU from its first
@@ -923,7 +923,9 @@ What a machine promises, so that updates don't break it.
 
 ### 3.7 Resource budget
 
-Limits per machine aren't enough: three reasonable machines can starve the desktop. All machines sit under one parent cgroup slice, with a memory ceiling for the sum, lower CPU and I/O weight than the session, and a floor kept for the desktop: **target** 2 GB, or 1 GB on a 4 GB board. Starting a machine that doesn't fit asks first: pause another, start with less, or cancel. Memory pressure (PSI) warns before swap does, and the summary header shows the budget, not only host use. Whether `lord-sessiond`'s scopes can nest under one slice is **To test** in Phase 1.
+Limits per machine aren't enough: three reasonable machines can starve the desktop. The design: all machines under one parent cgroup slice, with a memory ceiling for the sum, lower CPU and I/O weight than the session, and a floor kept for the desktop: 2 GB, or 1 GB on a 4 GB board. Starting a machine that doesn't fit asks first. Memory pressure (PSI) warns before swap does, and the summary shows the budget, not only host use.
+
+**Built (in development, "Machines to 100 %"):** the ceiling for the sum is an admission check every start goes through, in lord-server, not in the app: `lord.vm.start` (the window) and `lord.vm.startDetached` (Start Without Window, `machines start` through the session, a group's members) call `budget_ok` (`ui/js_vm.c`), and the `machines` command's own start without a session makes the same check (`cli/machines.c`). `vm_budget_used_mb` (`machine.c`) adds up the library's active machines, the top level and a group's members, each as its cgroup limit (`vm_mem_limit_mb`: guest memory plus QEMU's share) plus a disposable session's cap (`vm_group_session_mb`, `vmgroup.c`); active is what `run.json` says with its lord-vm alive (`/proc/<pid>/comm`), read with `O_NOFOLLOW`, the starting machine left out by device and inode. The sum plus the new machine must fit in RAM minus the floor (`vm_budget_fits`); one machine alone always may start (its memory is already within `vm_mem_max_mb`). A refused start says `vm.overBudget`. The window asks first (`lord.vm.budget(dir)`): **Suspend ‹another›** for up to three running machines whose suspend frees enough (pausing frees nothing; a graphics card's or a 3D machine's can't be suspended) and **Start with ‹N› MB** (the most that fits, in 256 MB steps, at least 512 MB; `model.js` `budgetPlan`), or Cancel. The library's status line shows the memory the running machines hold of what machines may use, and "Short of memory" while PSI's `some avg10` is 10 % or more (`budgetLine`). Not built: the one parent slice with lower CPU and I/O weight than the session (each machine keeps its own `memory.max` and CPU limit in its own scope). Tests: `vm-test` (the sum: running, paused, stopped, a dead supervisor, a group's member, a damaged or linked `run.json`, a linked machine folder, an out-of-range pid, the excluded folder spelled another way) and `vm_model_test.mjs` (`budgetPlan`, `budgetLine`).
 
 ### 3.7.1 vCPU pinning
 
@@ -1352,7 +1354,7 @@ showed the guest's console and login in about 2 minutes (QEMU at about one CPU),
 network's address; Shut Down from the library stopped it (`host-shutdown`). Its scope's `memory.max` was 1,879,048,192 (1024 + 640 + 128
 MB) and `cpu.max` 250000/100000.
 
-**The memory budget at start** (3.7). `vm_budget_fits` had no caller. The window now checks, before it starts a machine, the machines
+**The memory budget at start** (3.7; since replaced by lord-server's own check on every start path, 3.7 "Built"). `vm_budget_fits` had no caller. The window then checked, before it started a machine, the machines
 already running plus this one, each with QEMU's overhead (384 MB with KVM, 640 MB emulated: `memLimit` and `budgetCheck` in `model.js`),
 against what this computer lets machines use (RAM minus the desktop's floor); one machine alone may always start, since the sheet keeps
 its memory within that. On VM 125 (2,897 MB for machines) with the emulated machine running (1,664 MB), starting the 1 GB KVM machine
@@ -2127,8 +2129,12 @@ its window shows it, the last one when it's off) with the state pill, CPU and me
 name when off), ▶ to start or resume, Open while running; its name and one line "10 CPU · 8 GB · 64 GB · Bridged · Intel
 card" (`specParts`); ··· with the machine's menu. List: picture, name and state in color, the same line, CPU and memory bars
 while running, else "Last used … ago", "Resumes where you left it" or its profile (`restLine`), ▶ or Open, ···. Bottom:
-running, memory, free disk (a click opens Storage). Arrows move the selection, Return opens or starts, Escape clears the
-search; the order is in the View menu. Machines settings (gear or the Machine menu): General, Profiles (5.6), Systems
+running, memory, free disk (a click opens Storage), memory for machines (3.7) and "Short of memory" under PSI pressure. Arrows move the selection, Return opens or starts, Escape clears the
+search; the order is in the View menu. While a machine runs its card has two lights (*in development*, `Lights`, `model.js`
+`cardLights`): the guest tools' connection as lord-vm writes it in `run.json` (connected, starting, none) and the disk, lit when
+QEMU's cgroup I/O counter grew between two reads (every 1.5 s); each a symbol in its color with its words beside it on a wide card
+and always in its tooltip. On battery with machines running the toolbar has **Pause All** (6.14); on a kernel without Landlock a
+notice under the toolbar says "Weaker isolation on this kernel" (3.3). Machines settings (gear or the Machine menu): General, Profiles (5.6), Systems
 (5.6.1), Network, Graphics cards, Keyboard and mouse (`settingswin.jsx`).
 
 The original plan below is kept for reference.
@@ -2202,8 +2208,11 @@ A normal LordOS window, with a bar:
 devices, sound, microphone | shell, logs, screenshot, record | play or pause, power | Configure, full screen. Power holds Shut down,
 Suspend, Restart, Send Ctrl+Alt+Delete and Force off; the menus are **Actions**, **Devices** (CD/DVD, sound, microphone) and **Apps**.
 The resolution menu is always shown, with **Follow the window** as one of its items. Capture is Automatic by default and released
-with ❖Esc or Ctrl+Alt (fixed, 6.25). Not built: View and Info menus, Picture in Picture, Scale, Actual Size, USB, Folders, Network and
-Camera in Devices, per-device status dots, **Start in Full Screen**, the window keeping the guest's shape. The design was:
+with ❖Esc or Ctrl+Alt (fixed, 6.25). Built since (*in development*): a **View** menu (Window, Full Screen, Apps, **Picture in Picture**, **Actual Size**: the window
+sized to the guest's display while the resolution is fixed, `actualFrame`), an **Info** menu (CPU, memory and disk from two
+`lord.vm.stats` reads 2 s apart, the sandbox, Open Configuration…, `infoLines`) and **Start in Full Screen** in the machine's ···
+menu (the window takes its display as it opens). Not built: Scale, USB, Folders, Network and Camera in Devices, per-device
+status dots, the window keeping the guest's shape. The design was:
 
 | Group | Items |
 |---|---|
@@ -2230,12 +2239,13 @@ Quick actions stay on the bar itself, icons with tooltips, in this order: **agen
 | **Full Screen** | Takes one display, its own desktop | Nothing |
 | **All Displays** (not built) | One head per display | virtio-gpu multi-head |
 | **Apps** (seamless) | Guest apps as LordOS windows, no guest desktop (built, 7.2) | LordOS or Windows in the guest, with the LordOS tools |
-| **Picture in Picture** (not built for a machine's view; `setPip` is used for apps-mode popups) | Small floating view, input optional; live control off by default | Our `setPip` |
+| **Picture in Picture** (built, *in development*: View → Picture in Picture) | Small floating view at the bottom end of the window's display, the guest's shape kept (`pipFrame`); it takes no keys and no pointer for the guest (live control is off and not offered); its name and **Back to Window** show under the pointer, a double click goes back too; never for a protected machine (it floats on every desktop) | Our `setPip` |
 | **Thumbnail** (the library's card: last picture with a round Play) | Paused at last frame, one click to resume | Suspend |
 
 ### 5.5 Configuration (one screen)
 
-**Built (audited 2026-11-23, `configure.jsx`):** one window with eleven sections and their summaries: General, Startup and
+**Built (audited 2026-11-23, `configure.jsx`; the search and the dots since, *in development*):** a search over the sections'
+titles and summaries and a dot on each section with a change not saved yet (`changedSections`, `sectionsMatching`); one window with eleven sections and their summaries: General, Startup and
 shutdown, CPU and memory, Display, Network, Sound and input, Disks, Sharing, Boot, Security (what the engine can reach: sandbox,
 files, network, limits, picture and input, passwords), plus the guest agent (tools updated by themselves), Notes, "Pointer drawn by",
 compatible or fast devices and "Capture automatically in full screen". **Keep this computer awake** is on by default. Not built:
@@ -2456,7 +2466,12 @@ project's official site and stay on this computer only. The marks belong to thei
 
 ### 5.7 What this computer can run
 
-**Built only partly (audited 2026-11-23):** on arm64 a Pi page in the Machine menu (`library.jsx`); no amd64 page, no temperature, fan or voltage, not in Help or first run. The design: a screen in the app's Help and first run lists, per host, what's native, slow, limited or impossible, in the words of section 2 and with real values for this board: cores, memory, disk type. On a Pi it also warns about microSD and shows temperature, fan and voltage while machines run. It's generated from what the host reports, so it never claims more than the hardware gives.
+**Built (*in development*, `library.jsx` `ThisComputer`, `model.js` `canRun`, `sensorLines`):** one page for amd64 and arm64, in
+the Machine menu, a Help menu and on the first-run page, generated from `lord.vm.host()`: native systems (KVM, or why not: off for
+this user, or missing), the other architecture by emulation, the Windows 11 and Android cards (amd64 only), 3D graphics (or the
+reason, the same words as Configure), a shared Intel graphics card (GVT-g), nested virtualization (KVM's `nested`). While machines
+run it shows the first thermal zone's temperature, the first hwmon fan and a Raspberry Pi's power supply (the `rpi_volt` alarm),
+read from world-readable sysfs (`lord.vm.sensors()`); a microSD library and an emulated machine keep their warnings. The design: a screen in the app's Help and first run lists, per host, what's native, slow, limited or impossible, in the words of section 2 and with real values for this board: cores, memory, disk type. On a Pi it also warns about microSD and shows temperature, fan and voltage while machines run. It's generated from what the host reports, so it never claims more than the hardware gives.
 
 ### 5.8 Menus, shortcuts
 
@@ -2513,7 +2528,12 @@ Terminal in front, and a system prompt over the machine, through the real AppHos
 
 ### 6.1 Lifecycle
 
-Start, pause (vCPUs stop, instant), suspend (RAM to the folder, survives a host reboot), shut down (the guest agent first when it answers, then also the ACPI power button 10 s later; without the agent, the button, then the agent if it shows up; built in 0.8.9), force off. **Host shutdown** (in development since 0.8.9.5: `vmhoststop.h`, `vmlogind.c`): lord-vm plans the stop inside logind's 45 s delay: a save until +33 s, else the guest's own shutdown, QEMU told to quit at +41 s, SIGKILL at +44 s; a machine with a graphics card or 3D goes straight to the guest's shutdown. A machine that fails or crashes shows the machine log, a likely cause when one is known (not enough memory, a missing disk, a locked file) and a fix that fits it, such as starting with less memory or going back to a snapshot. *Not built:* disconnecting devices that can't be saved (the HDA card is migrated with the state), the Store's warning before a QEMU update, and fixes specific to each cause (the failure page has generic causes). *Built:* a state saved by another QEMU build is named before loading, with **Resume anyway** or **Discard saved state** (`lordvm.c`, `vmwindow.jsx`).
+Start, pause (vCPUs stop, instant), suspend (RAM to the folder, survives a host reboot), shut down (the guest agent first when it answers, then also the ACPI power button 10 s later; without the agent, the button, then the agent if it shows up; built in 0.8.9), force off. **Host shutdown** (in development since 0.8.9.5: `vmhoststop.h`, `vmlogind.c`): lord-vm plans the stop inside logind's 45 s delay: a save until +33 s, else the guest's own shutdown, QEMU told to quit at +41 s, SIGKILL at +44 s; a machine with a graphics card or 3D goes straight to the guest's shutdown. A machine that fails or crashes shows the machine log, a likely cause when one is known (not enough memory, a missing disk, a locked file) and a fix that fits it, such as starting with less memory or going back to a snapshot. *Built since (in development):* the failure page names a locked disk (QEMU's image locking: another process holds it) and a
+missing disk or disc image from QEMU's own words (`model.js` `failCause`), and offers the fix that fits (`failActions`): **Start
+with ‹N› MB** after running out of memory, **Go Back to a Snapshot…** when the machine has snapshots and stopped because of the
+system inside or the engine; Store → Updates warns when an update changes QEMU while machines are suspended
+(`apps/store/syspkg.js` `qemuUpdateRisk`). Nothing is unplugged before a save: the HDA card is migrated with the state, and what
+can't be saved (a graphics card, 3D graphics) is never suspended (`noSuspend`). *Built:* a state saved by another QEMU build is named before loading, with **Resume anyway** or **Discard saved state** (`lordvm.c`, `vmwindow.jsx`).
 
 ### 6.2 Snapshots
 
@@ -2981,7 +3001,34 @@ Inside a guest: amd64: the guest gets `-cpu host`, so it sees VMX or SVM whereve
 
 ### 6.14 Monitor and system ties
 
-Monitor shows each VM as one row (built: Processes groups `desktop:lordos-vm-<id>` under the machine's name; no drill-in yet). Cleaner never touches `~/Machines` without explicit choice, and offers Reclaim space. Backups skip running VM disks unless consistent. Files shows `.lordvm` as a bundle. Search finds VMs by name. Desktops treat each VM window normally. Power: laptops on battery get a notification with Pause All; a guest's load keeps the host awake while it runs, on purpose, and the battery warning says so. Built: Monitor's row and the idle block while a machine runs (`lord.vm.awake`, lord-vm's logind inhibitor). Not built: Cleaner, Backups, the Files bundle, Search, Pause All and the battery warning.
+Monitor shows each VM as one row (built: Processes groups `desktop:lordos-vm-<id>` under the machine's name; no drill-in yet). Cleaner never touches `~/Machines` without explicit choice, and offers Reclaim space. Backups skip running VM disks unless consistent. Files shows `.lordvm` as a bundle. Search finds VMs by name. Desktops treat each VM window normally. Power: laptops on battery get a notification with Pause All; a guest's load keeps the host awake while it runs, on purpose, and the battery warning says so. Built: Monitor's row and the idle block while a machine runs (`lord.vm.awake`, lord-vm's logind inhibitor). Built since (*in
+development*, "Machines to 100 %"):
+
+- **Monitor:** a machine's row opens to its processes, and **Show Machine** on the selected row opens its window through Machines
+  (`args.show`), so a protected machine's window is protected from its first frame.
+- **Cleaner** never offers a machine's files: `clean_machine_path` (`clean/cleanfs.c`) refuses the Machines library and any
+  `‹name›.lordvm` or `‹name›.lordgroup` folder wherever it is, during the scan and again when a plan is made (a duplicate disk can be
+  a linked clone's base; a "project output" can be in a guest's shared folder). Reclaiming a machine's space is Machines' Storage
+  window. Tested by `clean-test`.
+- **Backups** hold back a running machine's `disks/` and `suspend.state` (the engine's `hold` callback, `backup.c`
+  `hold_running_machine`, `machine.c` `vm_backup_hold` and `vm_dir_active`): QEMU writes them while it runs, so the copy wouldn't be
+  consistent. A machine that is off is copied like any folder. Tested by `backup-test` and `vm-test`.
+- **Files** shows `‹name›.lordvm` and `‹name›.lordgroup` as one item, a bundle (`sdk/openwith.js` `registerBundle`, `bundleFor`): its
+  kind is "Machine", and opening it opens the machine's window; Open in New Tab still goes in.
+- **Search** (❖Space) finds machines by name (`ties.js`, `searchMachines`).
+- **Power:** when the computer leaves the charger while machines run, a notice says a guest's work drains the battery and offers
+  **Pause All**; the library's toolbar has it too while on battery (`batteryNotice`).
+- **Start with the session** (Configure → Startup and shutdown): the machine starts without a window once the desktop is up, through
+  the budget like any start. The list is `settings.json`'s `machinesAtLogin` (machine ids, at most 8), which apps can't write
+  (lord.fs's protected list), so an app can't make a machine start at login. A group's members start with their group, not here.
+- **Pause while I'm away** (the same section; `app.json` `autoPause`): after 10 minutes without keyboard or mouse the machine pauses,
+  and resumes on the next input; one the person paused stays paused (`awayStep`).
+
+Not built: the balloon. A `virtio-balloon` device would let the host take memory back from an idle guest, but the guest decides how
+much it gives (a hostile one gives nothing), it is one more device model parsing what the guest writes, and Whonix lists ballooning
+among the features that weaken its anonymity (19.5). The memory a machine can use stays its `memory.max` (3.7), which the host
+enforces whatever the guest does, and the budget (3.7) keeps the sum within what this computer can give. Decision left to the
+maintainer: whether the design keeps the balloon at all.
 
 ### 6.15 Command line and coding agents
 
@@ -4769,7 +4816,7 @@ Whonix's two XMLs on the dev VM and mirror what QEMU 10.0.13 gets, rather than g
 
 Memory and vCPUs are Whonix's defaults: 2 GB and 1 vCPU each (the LXQt Gateway needs at least 768 MB, or it boots to its
 console). Configure may change the Workstation's memory and vCPUs and the Gateway's memory. The group needs about 4 GB
-free, checked by `budgetCheck` before the start.
+free, checked by `groupBudget` before the start (and each member again by lord-server's budget, 3.7).
 
 #### 19.5.1 The Gateway's firewall identity (isolation layer 4; built, in development)
 
