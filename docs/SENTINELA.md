@@ -157,7 +157,12 @@ after its last answer (`LLM_IDLE_MS`) or when Sentinela is turned off, giving it
 
 Approved by the maintainer on 2026-11-23 (layer 9 of the anonymity group's isolation, docs/VIRTUALIZATION.md 19):
 Sentinela also watches the virtual machines of Machines (`sdk/sentinelavm.js`, pure logic). It is still off by default
-and local only; the machine rules run in the same 10-second tick as the process rules.
+and local only; the machine rules run in the same 10-second tick as the process rules. A machine's QEMU and passt are
+left out of the process rules' CPU and memory checks (the machine rules judge them against the machine's own usual), and
+only when their scope is in the session's root-owned subtree (`lordos.service/lordos-session-<uid>/`, or its
+`lordos-machines.slice`): a scope named `app-lordos-lordos-vm-*` under the person's own systemd (`systemd-run --user`) is
+nobody's (`monitor/mon.c` `mon_scope_parse`; in development since the global security pass of 2026-11-24, before which a
+program could escape those checks by naming its scope so).
 
 **What it reads**, every 10 s, read-only:
 

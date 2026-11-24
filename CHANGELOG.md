@@ -867,6 +867,42 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: a global security pass over how the new pieces work together** (in development; latest release
+  0.8.9.5-beta; docs/VIRTUALIZATION.md 3.6, 6.2, 7.2, 8; docs/SENTINELA.md "Machines"). Each item had been reviewed alone;
+  this pass looked at the chains between them, with a hostile guest, a hostile program of the same account and hostile
+  downloads or exports in mind.
+  - **An encrypted machine's or a disposable session's memory is never saved at the computer's stop.** The computer's
+    shutdown, a logout and lord-server going away (SIGTERM, logind's PrepareForShutdown) saved a running machine with
+    `begin_suspend` without the checks the person's own Suspend has: an encrypted machine's whole memory, its decrypted
+    disk cache included, went to `suspend.state` in the clear, and a disposable session's memory was kept and resumed at the
+    next start over a fresh layer. `begin_suspend` is now the one gate for every way: encrypted, disposable, locked for
+    anonymity, 3D or a graphics card shut the machine down instead, and a state file on such a machine is never resumed.
+    `vm_storage_test.sh` sends lord-vm SIGTERM for an encrypted machine and both disposable kinds and checks no state is written.
+  - **An imported export keeps no guest links, notifications or automation.** A hostile `.lordvm` export could turn on
+    `guest_links`, `guest_notify` and `automation`; they came back to life as soon as the person turned the agent on here.
+    The import now clears them with the rest of the guest's boundary settings (the hostile-export test sets them and
+    `usb_auto` too).
+  - **A program can't pass for a machine in Monitor and Sentinela.** A machine's scope (`app-lordos-lordos-vm-*`) counted
+    by its name alone, so any program could run in a scope of that name under the person's own systemd and escape
+    Sentinela's CPU and memory checks, which leave a machine to its machine rules. It now counts only in the session's
+    root-owned subtree (`monitor/mon.c`, `procctl-test`).
+  - **A guest's menus stay menus.** In apps mode a guest's popup (owned, on top) was drawn at whatever place and size the
+    guest said, frameless, above the menu bar and the Dock: a guest could cover the whole screen with a fake prompt. A popup
+    is now cut to 60 % × 70 % of its display's work area, kept inside that work area, and shown only for an owner window
+    shown here for 300 ms (`model.js` `popupRect`, `popupOwnerWait`; `vm_model_test.mjs` with every place and size a guest
+    may send).
+  - **Rate limits for what a guest sends in a loop.** The guest's clipboard (each copy a memfd for lord-server and, for a
+    picture, a re-encode in lord-media: a copy loop held gigabytes) is held to 4 at once, then one per 250 ms. Apps mode's
+    window lists (8, then one per 100 ms), program lists (3, then one per 2 s; the latest waits its turn) and icons (64,
+    then one per 50 ms) too, and the same list isn't sent twice; the guest's programs are written into `app.json` at most
+    once per 2 s (an SD card on the Pi).
+  - **Machine groups:** the `qemu-img` that reads a downloaded archive's disks and makes the shared base never gets the
+    group's encryption key; a workstation whose disposable session has no base refuses to start (its disk would have been
+    writable).
+  - **Hardening:** a guest layout's corner near the largest integer no longer overflows (`vm_layout_ok`, `vd_abs_map`);
+    `agent-fuzz` now also fuzzes file offers, file names, PNG headers, HTML and the clipboard's cleaning (`ag_clip_clean`,
+    moved out of `lordvm.c`), which found `ag_drop_name` reading before its buffer for an output smaller than a file's
+    extension (never with lord-vm's own sizes).
 - **A test's lord-server never drives LordOS Studio's camera for apps** (in development). A headless session started
   by a test (`--timeout`, or the test hooks of `lord-server-test`) also started the loopback's lord-studio on the
   computer's real `/dev/video50`, which the person's own session may be feeding to a video call; it now leaves the
