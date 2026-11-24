@@ -61,6 +61,7 @@ const classify = (id) => { const a = getApp(id); return !a || a.builtin ? null :
 // A launcher app object or any id → its typed Dock id (null if it can't be pinned).
 export function dockIdOf(x) {
   if (x && typeof x === 'object') {
+    if (x.kind === 'machine') return null;          // a machine's guest app (sdk/guestappsmodel.js): never pinned
     if (x.kind === 'linux') return x.desktopId ? `desktop:${x.desktopId}` : null;
     if (x.kind === 'web' || x.kind === 'flatpak') return toTypedId(x.id);
     return toTypedId(x.package ? `lpk:${x.id}` : `app:${x.id}`);

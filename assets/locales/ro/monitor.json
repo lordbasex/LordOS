@@ -731,5 +731,12 @@
   "desc.done.pause": "Întrerupt.",
   "desc.done.block_network": "Rețeaua lui este blocată.",
   "desc.done.blocklist": "În lista de blocare: este oprit de fiecare dată când pornește.",
-  "desc.blockConfirm": "Adăugați „{name}” în lista de blocare? De acum va fi oprit de fiecare dată când pornește. Puteți anula din Setări → IA → Sentinela."
+  "desc.blockConfirm": "Adăugați „{name}” în lista de blocare? De acum va fi oprit de fiecare dată când pornește. Puteți anula din Setări → IA → Sentinela.",
+  "comp.machine": "Mașină",
+  "comp.machineNamed": "{name} (mașină)",
+  "comp.machineHint": "O mașină virtuală: traficul de rețea al sistemului invitat. Regulile ei se adaugă regulilor pentru Mașini, care decid în continuare pentru fiecare mașină.",
+  "comp.machinesRules": "Regula pentru Mașini",
+  "comp.forwarded": "Port redirecționat {proto} {port} → {guest}",
+  "comp.forwardedLan": "Deschis către rețea",
+  "comp.forwardedLocal": "Doar acest computer"
 }

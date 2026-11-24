@@ -716,5 +716,12 @@
   "desc.done.pause": "Naka-pause.",
   "desc.done.block_network": "Naka-block ang network nito.",
   "desc.done.blocklist": "Nasa blocklist: inihihinto ito tuwing magsisimula.",
-  "desc.blockConfirm": "Idagdag ang “{name}” sa blocklist? Mula ngayon, ihihinto ito tuwing magsisimula. Maaari mo itong bawiin sa Mga Setting → AI → Sentinela."
+  "desc.blockConfirm": "Idagdag ang “{name}” sa blocklist? Mula ngayon, ihihinto ito tuwing magsisimula. Maaari mo itong bawiin sa Mga Setting → AI → Sentinela.",
+  "comp.machine": "Machine",
+  "comp.machineNamed": "{name} (machine)",
+  "comp.machineHint": "Isang virtual machine: ang trapiko sa network ng guest system nito. Ang sarili nitong mga panuntunan ay idinadagdag sa mga panuntunan ng Machines, na patuloy na nagpapasya para sa bawat machine.",
+  "comp.machinesRules": "Panuntunan ng Machines",
+  "comp.forwarded": "Ipinasang port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Bukas sa network",
+  "comp.forwardedLocal": "Itong computer lang"
 }

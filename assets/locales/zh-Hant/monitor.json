@@ -701,5 +701,12 @@
   "desc.done.pause": "已暫停。",
   "desc.done.block_network": "已封鎖其網路。",
   "desc.done.blocklist": "已加入封鎖清單：它每次啟動都會被結束。",
-  "desc.blockConfirm": "要把「{name}」加入封鎖清單嗎？從現在起，它每次啟動都會被結束。你可以在 設定 → AI → Sentinela 中復原。"
+  "desc.blockConfirm": "要把「{name}」加入封鎖清單嗎？從現在起，它每次啟動都會被結束。你可以在 設定 → AI → Sentinela 中復原。",
+  "comp.machine": "機器",
+  "comp.machineNamed": "{name}（機器）",
+  "comp.machineHint": "一台虛擬機：其客體系統的網路流量。它自己的規則會加到「虛擬機」的規則上，後者仍為每台機器做決定。",
+  "comp.machinesRules": "「虛擬機」的規則",
+  "comp.forwarded": "轉送連接埠 {proto} {port} → {guest}",
+  "comp.forwardedLan": "對網路開放",
+  "comp.forwardedLocal": "僅此電腦"
 }

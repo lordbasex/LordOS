@@ -941,6 +941,7 @@ unsigned ag_hello_caps(const uint8_t *p, size_t n) {
         else if (l == 5 && !memcmp(p + s0, "shell", 5)) caps |= AG_HELLO_SHELL;
         else if (l == 5 && !memcmp(p + s0, "links", 5)) caps |= AG_HELLO_LINKS;
         else if (l == 6 && !memcmp(p + s0, "notify", 6)) caps |= AG_HELLO_NOTIFY;
+        else if (l == 4 && !memcmp(p + s0, "send", 4)) caps |= AG_HELLO_SEND;
     }
     return caps;
 }
@@ -1261,4 +1262,142 @@ int ag_shell_close_parse(const uint8_t *p, size_t n, uint32_t *id, int *status) 
     if (id) *id = i;
     if (status) *status = s;
     return 0;
+}
+
+/* ---- files sent from the guest (6.21, AGK_SEND_*) ---- */
+
+static uint64_t le64(const uint8_t *p) { return (uint64_t)le32(p) | (uint64_t)le32(p + 4) << 32; }
+static void wr64(uint8_t *o, uint64_t v) { sh_wr32(o, (uint32_t)v); sh_wr32(o + 4, (uint32_t)(v >> 32)); }
+
+int ag_send_name_ok(const uint8_t *p, size_t n) {
+    if (!p || !n || n > AG_NAME_MAX || !ag_note_text_ok(p, n)) return 0;
+    if ((n == 1 && p[0] == '.') || (n == 2 && p[0] == '.' && p[1] == '.')) return 0;
+    for (size_t i = 0; i < n; i++) if (p[i] == '/' || p[i] == '\\') return 0;
+    return 1;
+}
+
+int ag_send_offer_parse(const uint8_t *p, size_t n, AgSendOffer *o) {
+    if (!p || n < AG_SEND_OFFER_MIN || n > AG_SEND_OFFER_BYTES) return -1;
+    uint32_t id = le32(p);
+    uint64_t size = le64(p + 4);
+    uint8_t flags = p[12];
+    size_t nl = (size_t)p[45] | (size_t)p[46] << 8;
+    if (!id || size > AG_SEND_SIZE_MAX || (flags & ~AGSF_ALL) || 47 + nl != n || !ag_send_name_ok(p + 47, nl)) return -1;
+    if (o) {
+        o->id = id; o->size = size; o->flags = flags;
+        memcpy(o->key, p + 13, 32);
+        memcpy(o->name, p + 47, nl);
+        o->name[nl] = 0;
+    }
+    return 0;
+}
+
+size_t ag_send_offer_write(const AgSendOffer *o, uint8_t *out, size_t cap) {
+    if (!o || !out) return 0;
+    size_t nl = strnlen(o->name, AG_NAME_MAX + 1);
+    if (!o->id || o->size > AG_SEND_SIZE_MAX || (o->flags & ~AGSF_ALL) || !ag_send_name_ok((const uint8_t *)o->name, nl) || 47 + nl > cap) return 0;
+    sh_wr32(out, o->id);
+    wr64(out + 4, o->size);
+    out[12] = o->flags;
+    memcpy(out + 13, o->key, 32);
+    out[45] = (uint8_t)nl; out[46] = (uint8_t)(nl >> 8);
+    memcpy(out + 47, o->name, nl);
+    return 47 + nl;
+}
+
+static int all_zero(const uint8_t *p, size_t n) { for (size_t i = 0; i < n; i++) if (p[i]) return 0; return 1; }
+
+int ag_send_accept_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *status, uint64_t *offset, uint8_t sha[32]) {
+    if (!p || n != AG_SEND_ACCEPT_BYTES) return -1;
+    uint32_t i = le32(p);
+    uint8_t st = p[4];
+    uint64_t off = le64(p + 5);
+    if (!i || st > AGSA_LAST || off > AG_SEND_SIZE_MAX || (st != AGSA_OK && (off || !all_zero(p + 13, 32))) || (!off && !all_zero(p + 13, 32))) return -1;
+    if (id) *id = i;
+    if (status) *status = st;
+    if (offset) *offset = off;
+    if (sha) memcpy(sha, p + 13, 32);
+    return 0;
+}
+
+int ag_send_accept_write(uint8_t out[AG_SEND_ACCEPT_BYTES], uint32_t id, uint8_t status, uint64_t offset, const uint8_t sha[32]) {
+    if (!out || !id || status > AGSA_LAST || offset > AG_SEND_SIZE_MAX || (status != AGSA_OK && offset) || (offset && !sha)) return -1;
+    sh_wr32(out, id);
+    out[4] = status;
+    wr64(out + 5, offset);
+    if (offset) memcpy(out + 13, sha, 32); else memset(out + 13, 0, 32);
+    return ag_send_accept_parse(out, AG_SEND_ACCEPT_BYTES, NULL, NULL, NULL, NULL);
+}
+
+int ag_send_pos_parse(const uint8_t *p, size_t n, uint32_t *id, uint64_t *offset) {
+    if (!p || n != 12) return -1;
+    uint32_t i = le32(p);
+    uint64_t off = le64(p + 4);
+    if (!i || off > AG_SEND_SIZE_MAX) return -1;
+    if (id) *id = i;
+    if (offset) *offset = off;
+    return 0;
+}
+
+int ag_send_pos_write(uint8_t out[12], uint32_t id, uint64_t offset) {
+    if (!out || !id || offset > AG_SEND_SIZE_MAX) return -1;
+    sh_wr32(out, id);
+    wr64(out + 4, offset);
+    return 0;
+}
+
+int ag_send_data_parse(const uint8_t *p, size_t n, uint32_t *id, uint64_t *offset, const uint8_t **data, uint32_t *dn) {
+    if (!p || n < 13 || n > 12 + AG_SEND_CHUNK) return -1;
+    uint32_t i = le32(p);
+    uint64_t off = le64(p + 4);
+    if (!i || off > AG_SEND_SIZE_MAX || n - 12 > AG_SEND_SIZE_MAX - off) return -1;
+    if (id) *id = i;
+    if (offset) *offset = off;
+    if (data) *data = p + 12;
+    if (dn) *dn = (uint32_t)(n - 12);
+    return 0;
+}
+
+void ag_send_data_head(uint8_t out[12], uint32_t id, uint64_t offset) { sh_wr32(out, id); wr64(out + 4, offset); }
+
+int ag_send_end_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t sha[32]) {
+    if (!p || n != 36 || !le32(p)) return -1;
+    if (id) *id = le32(p);
+    if (sha) memcpy(sha, p + 4, 32);
+    return 0;
+}
+
+int ag_send_end_write(uint8_t out[36], uint32_t id, const uint8_t sha[32]) {
+    if (!out || !id || !sha) return -1;
+    sh_wr32(out, id);
+    memcpy(out + 4, sha, 32);
+    return 0;
+}
+
+int ag_send_done_parse(const uint8_t *p, size_t n, uint32_t *id, uint8_t *code) {
+    if (!p || n != 5 || !le32(p) || p[4] > AGSD_LAST) return -1;
+    if (id) *id = le32(p);
+    if (code) *code = p[4];
+    return 0;
+}
+
+int ag_send_done_write(uint8_t out[5], uint32_t id, uint8_t code) {
+    if (!out || !id || code > AGSD_LAST) return -1;
+    sh_wr32(out, id);
+    out[4] = code;
+    return 0;
+}
+
+int ag_recv_name(const char *in, char *out, size_t cap) {
+    if (!in || !out || cap < 2) return -1;
+    size_t n = strnlen(in, 4097);
+    if (n > 4096 || !ag_note_text_ok((const uint8_t *)in, n)) return -1;
+    if (ag_drop_name(in, out, cap)) return -1;
+    if (out[0] == '.') out[0] = '_';
+    return 0;
+}
+
+int ag_send_room(uint64_t sent, uint64_t acked, uint32_t n) {
+    if (sent < acked || n > AG_SEND_WINDOW) return 0;
+    return sent - acked + n <= AG_SEND_WINDOW;
 }

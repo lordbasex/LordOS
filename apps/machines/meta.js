@@ -1,7 +1,7 @@
 // meta.js — what the app keeps about a machine that lord-vm doesn't need: the system it runs (for the card's mark and
-// name), notes, whether its guest tools open files (opens: Files' "Open with", openwith.js), what closing its window does (onClose), whether it opens in apps mode (appsMode) and whether it keeps this computer awake (keepAwake, read by
+// name), notes, whether its guest tools open files (opens: Files' "Open with", openwith.js), what closing its window does (onClose), whether it opens in apps mode (appsMode), the guest's apps for the launcher (guestApps, launcherApps) and whether it keeps this computer awake (keepAwake, read by
 // lord.vm.awake too). <machine>/app.json, written by the app as the person; machine.json stays lord-vm's alone.
-import { fs } from '@lordos/sdk';
+import { fs, cleanGuestApps } from '@lordos/sdk';
 import { cpuWindows, machineProtectedOf, tagsOf } from './model.js';
 
 const cache = new Map();         // dir → { mtime, meta }: the library reads it every 1.5 s
@@ -55,6 +55,10 @@ export function readMeta(dir) {
       // the vCPUs chosen from the recommendation while it ran ("Use N", Configure → CPU & memory): set by startPrep
       // (ui.jsx) with lord-vm --set before its next start
       if (Number.isInteger(j.nextVcpus) && j.nextVcpus >= 1 && j.nextVcpus <= 64) meta.nextVcpus = j.nextVcpus;
+      // the guest's apps as apps mode last listed them (6.12: the launcher shows them while the machine is off), cleaned
+      // again on every read (sdk/guestappsmodel.js: untrusted text from the guest), and whether the launcher shows them
+      if (Array.isArray(j.guestApps)) meta.guestApps = cleanGuestApps(j.guestApps);
+      if (typeof j.launcherApps === 'boolean') meta.launcherApps = j.launcherApps;
     }
   } catch (e) { meta = {}; }
   cache.set(dir, { mtime: st?.mtime, meta });

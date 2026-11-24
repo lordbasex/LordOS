@@ -652,6 +652,9 @@ static JSValue f_info(JSContext *c, JSValueConst this_val, int argc, JSValueCons
     /* the foreground program's process group (its leader's pid: Claude Code's ~/.claude/sessions/<pid>.json) */
     JS_SetPropertyStr(c, o, "fgPid", JS_NewInt32(c, pg > 0 ? (int)pg : (int)s->pid));
     JS_SetPropertyStr(c, o, "alive", JS_NewBool(c, s->alive));
+    /* a Machines guest's stream (term_create_fd: the serial console or the agent's shell, docs/VIRTUALIZATION.md 6.18): the
+     * Terminal app may show it as a tab, marked as the guest's; nothing the guest writes acts on this computer either way */
+    JS_SetPropertyStr(c, o, "guest", JS_NewBool(c, s->t.no_clip_set != 0));
     JS_SetPropertyStr(c, o, "exitCode", JS_NewInt32(c, s->exit_code));
     JS_SetPropertyStr(c, o, "cols", JS_NewInt32(c, t->cols));
     JS_SetPropertyStr(c, o, "rows", JS_NewInt32(c, t->rows));

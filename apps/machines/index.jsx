@@ -6,6 +6,7 @@
 import { useEffect } from 'react';
 import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems, registerOpenProviders, registerBundle } from '@lordos/sdk';
 import { Library, AppMark, openInMachine, openMachine } from './library.jsx';
+import { startGuestLauncher } from './guestlaunch.js';
 import { openMachines, windowsNeedsTools } from './openwith.js';
 import { readMeta } from './meta.js';
 import { isForeignProgram } from '../../sdk/filekinds.js';
@@ -70,6 +71,8 @@ registerBundle({ id: 'machines', suffix: '.lordgroup', kind: () => tr('machines.
 setTimeout(startMachinesCli, 1000);
 // Search, start with the session, the battery notice and "Pause while I'm away" (ties.js)
 setTimeout(startMachinesTies, 1500);
+// the guests' apps of machines that are off, in the launcher and search (guestlaunch.js, 6.12)
+setTimeout(() => startGuestLauncher(openMachine), 1500);
 // apps mode's item by the clock, one per machine in it (appsstatus.jsx)
 startAppsStatus();
 

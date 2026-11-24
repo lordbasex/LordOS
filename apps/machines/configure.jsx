@@ -2,7 +2,7 @@
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. The name is the exception (6.26): while
 // the machine runs it changes alone (`lord-vm --rename`), and its folders follow it once it's off.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber, firewall, netModel } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
   portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX, usbAutoRows } from './model.js';
@@ -124,8 +124,14 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues, onNewMac }) 
         </Row>
       ) : null}
       {/* a new address (5.5): lord-vm makes a random one of QEMU's 52:54:00 range, while the machine is off */}
-      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} last note={tr('machines.cfg.macNote') + (offNote ? ` ${offNote}` : '')}>
+      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} note={tr('machines.cfg.macNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.macNew')} disabled={running || !!m.suspended} onClick={onNewMac} /></View></Off>
+      </Row>
+      <Row label={tr('machines.cfg.firewall')} last note={tr(m.role === 'gateway' ? 'machines.cfg.firewallGateway'
+        : cur.network === 'bridged' ? 'machines.cfg.firewallBridged' : 'machines.cfg.firewallNote')}>
+        <View style={{ alignSelf: 'flex-start' }}>
+          <Btn label={tr('machines.cfg.firewallRules')} disabled={!firewallAppOf(m)} onClick={() => openFirewallRules(firewallAppOf(m))} />
+        </View>
       </Row>
     </Group>
     {usesPorts(cur.network) ? (
@@ -156,6 +162,15 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues, onNewMac }) 
     ) : null}
     {lan ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, color: p.text, textAlign: 'start', lineHeight: 1.5 }}>{tr('machines.cfg.portsLanWarn')}</Text></View> : null}
   </>;
+}
+
+// (Machines to 100 %) the machine's own row in LordOS's firewall (fw/rules.h): "lordos:vm-<id>", the Machines rules
+// deciding for it too; a group's Tor gateway is "lordos:tor-gateway". Opens Settings → Privacy on its rules.
+const firewallAppOf = (m) => (m?.role === 'gateway' ? 'lordos:tor-gateway' : netModel.vmAppOf(m?.id));
+function openFirewallRules(app) {
+  if (!app) return;
+  firewall.focus.set(() => app);
+  wm.open('settings', { args: { section: 'privacy', nonce: Date.now() } });
 }
 
 // onClose: shown as a sheet over the library or the machine's window (kit.jsx), with Cancel and Done; without it, a
@@ -258,11 +273,11 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
     pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', cpuModel: m.cpuModel || 'host',
-    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, ...draft };
+    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, guestFiles: m.guestFiles !== false, ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'cpuPin' ? m.cpuPin || 'off' : k === 'cpuModel' ? m.cpuModel || 'host' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'guestFiles' ? m.guestFiles !== false : k === 'cpuPin' ? m.cpuPin || 'off' : k === 'cpuModel' ? m.cpuModel || 'host' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -405,9 +420,13 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       {m.groupDir ? null : <Row label={tr('machines.cfg.atLogin')} note={tr('machines.cfg.atLoginNote')}>
         <Toggle on={(settings.get().machinesAtLogin || []).includes(m.id)} onChange={(x) => { settings.set({ machinesAtLogin: atLoginToggle(settings.get().machinesAtLogin, m.id, x) }); setMeta(readMeta(dir)); }} />
       </Row>}
-      <Row label={tr('machines.cfg.autoPause')} last note={tr('machines.cfg.autoPauseNote')}>
+      <Row label={tr('machines.cfg.autoPause')} last={!meta.guestApps?.length} note={tr('machines.cfg.autoPauseNote')}>
         <Toggle on={meta.autoPause === true} onChange={(x) => { writeMeta(dir, { autoPause: x }); setMeta(readMeta(dir)); }} />
       </Row>
+      {/* the guest's apps in the launcher while the machine is off (6.12, guestlaunch.js): once apps mode listed them */}
+      {meta.guestApps?.length ? <Row label={tr('machines.cfg.launcherApps')} last note={tr('machines.cfg.launcherAppsNote', { count: meta.guestApps.length })}>
+        <Toggle on={meta.launcherApps !== false} onChange={(x) => { writeMeta(dir, { launcherApps: x }); setMeta(readMeta(dir)); }} />
+      </Row> : null}
     </Group>
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}
   </>;
@@ -588,7 +607,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     </Row></Group>
     {m.imported || m.devices === 'compat' ? <Group>
       {/* an imported machine starts on devices every system has drivers for; the fast ones need the guest's drivers first */}
-      <Row label={tr('machines.cfg.devices')} value={m.devices === 'compat' ? tr('machines.cfg.devCompat', { nic: m.nicModel }) : tr('machines.cfg.devFast')} last
+      <Row label={tr('machines.cfg.devices')} value={m.devices === 'compat' ? tr(m.arch === 'arm64' ? 'machines.cfg.devCompatArm' : 'machines.cfg.devCompat', { nic: m.nicModel }) : tr('machines.cfg.devFast')} last
         note={(m.devices === 'compat' ? tr('machines.cfg.devCompatNote') : tr('machines.cfg.devFastNote')) + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={m.devices === 'compat' ? tr('machines.cfg.devToFast') : tr('machines.cfg.devToCompat')} disabled={running || !!job}
           onClick={() => save(m.devices === 'compat' ? { devices: 'virtio', nicModel: 'virtio' } : { devices: 'compat', nicModel: 'e1000e' })} /></View></Off>
@@ -657,8 +676,13 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       <Row label={tr('machines.cfg.guestLinks')} note={tr('machines.cfg.guestLinksNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><Toggle on={cur.guestLinks} onChange={(x) => set({ guestLinks: x, ...(x ? { agent: true } : {}) })} /></Off>
       </Row>
-      <Row label={tr('machines.cfg.guestNotify')} note={tr('machines.cfg.guestNotifyNote') + (offNote ? ` ${offNote}` : '')} last>
+      <Row label={tr('machines.cfg.guestNotify')} note={tr('machines.cfg.guestNotifyNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><Toggle on={cur.guestNotify} onChange={(x) => set({ guestNotify: x, ...(x ? { agent: true } : {}) })} /></Off>
+      </Row>
+      {/* files the machine sends (6.21, machine.json guest_files): on unless turned off here; they land in its quarantine
+          folder (<library>/Received/<machine>), marked as from it, never runnable */}
+      <Row label={tr('machines.cfg.guestFiles')} note={tr('machines.cfg.guestFilesNote') + (offNote ? ` ${offNote}` : '')} last>
+        <Off off={running}><Toggle on={cur.guestFiles} onChange={(x) => set({ guestFiles: x })} /></Off>
       </Row>
     </Group>
     <Group>
@@ -753,7 +777,9 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       // the sandbox's line says what this kernel can't give ("Weaker isolation on this kernel", 3.3)
       const note = k === 'sandbox' ? (isolationGaps(host, null).includes('landlock') ? 'sandboxWeak' : k)
         : k !== 'network' ? k : m.network === 'bridged' ? 'networkBridged' : usesPorts(m.network) && m.ports?.length ? 'networkPorts' : k;
-      return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) })} />;
+      // a guest on passt is decided by LordOS's firewall as its own app, with the Machines rules too
+      const fw = k === 'network' && m.network !== 'bridged' && m.network !== 'isolated' ? ` ${tr('machines.cfg.secNote.firewall')}` : '';
+      return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) }) + fw} />;
     })}
   </Group></>;
 

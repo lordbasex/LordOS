@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "{name} প্রয়োগ করা যায়নি",
   "themeSwitch.refusedBody": "এর কোড LordOS-এর স্বাক্ষরিত কপির সাথে মেলে না, তাই এটি লোড করা হয়নি। আপনার ডেস্কটপের স্টাইল আগের মতোই থাকবে।",
   "themeSwitch.failedBody": "এটি চালু হয়নি। আপনার ডেস্কটপের স্টাইল আগের মতোই থাকবে।",
-  "spotlight.section.machines": "মেশিন"
+  "spotlight.section.machines": "মেশিন",
+  "guestApps.inMachine": "{machine}-এ"
 }

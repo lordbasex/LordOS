@@ -562,5 +562,7 @@
   "prefs.tr.would.capture": "保存在“捕获的输出”中",
   "prefs.tr.would.highlight": "高亮“{text}”",
   "prefs.tr.param": "参数",
-  "prefs.tr.regexFirst": "请先编写正则表达式。"
+  "prefs.tr.regexFirst": "请先编写正则表达式。",
+  "guest.badge": "客户机",
+  "guest.title": "{machine} 中的 Shell"
 }

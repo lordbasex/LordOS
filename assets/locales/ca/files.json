@@ -339,5 +339,8 @@
   "markupHint": "Obre a l’editor d’anotacions",
   "readOnly.title": "Fitxers no pot canviar «{name}»",
   "readOnly.outside": "Fitxers només pot mostrar aquesta carpeta: és fora de la teva carpeta personal i dels teus discos. Per canviar-la, fes servir el Terminal o una altra app.",
-  "readOnly.denied": "Aquesta carpeta és només de lectura: els seus permisos no et deixen canviar-la. Per canviar-la, fes servir el Terminal o una altra app."
+  "readOnly.denied": "Aquesta carpeta és només de lectura: els seus permisos no et deixen canviar-la. Per canviar-la, fes servir el Terminal o una altra app.",
+  "fromMachineNoRun": "«{name}» ve de la màquina {machine}. Fitxers no obre programes ni instal·ladors d'una màquina: fes servir Obre amb si hi confies.",
+  "info.from": "Procedència",
+  "info.fromMachine": "La màquina {machine}"
 }

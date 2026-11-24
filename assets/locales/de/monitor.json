@@ -716,5 +716,12 @@
   "desc.done.pause": "Angehalten.",
   "desc.done.block_network": "Sein Netzwerk ist gesperrt.",
   "desc.done.blocklist": "Auf der Sperrliste: Es wird bei jedem Start beendet.",
-  "desc.blockConfirm": "„{name}“ zur Sperrliste hinzufügen? Ab jetzt wird es bei jedem Start beendet. Du kannst das unter Einstellungen → KI → Sentinela rückgängig machen."
+  "desc.blockConfirm": "„{name}“ zur Sperrliste hinzufügen? Ab jetzt wird es bei jedem Start beendet. Du kannst das unter Einstellungen → KI → Sentinela rückgängig machen.",
+  "comp.machine": "Maschine",
+  "comp.machineNamed": "{name} (Maschine)",
+  "comp.machineHint": "Eine virtuelle Maschine: der Netzwerkverkehr ihres Gastsystems. Ihre eigenen Regeln kommen zu den Regeln für Maschinen hinzu, die weiter für jede Maschine entscheiden.",
+  "comp.machinesRules": "Regel für Maschinen",
+  "comp.forwarded": "Weitergeleiteter Port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Für das Netzwerk offen",
+  "comp.forwardedLocal": "Nur dieser Computer"
 }

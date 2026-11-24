@@ -159,11 +159,28 @@ function appTab(args) {
   return { tab: title ? { ...tab, title } : tab, failed: false };
 }
 
+// The agent's shell of a Machines guest (docs/VIRTUALIZATION.md 6.18), opened here from the machine's window: a tab on that
+// very session, a stream lord-vm relays (term.info().guest: lord-server made it with term_create_fd, and nothing the guest
+// writes acts on this computer: no clipboard, title, notification, secret prompt or command event). Titled "Shell inside
+// ‹machine›" and badged, so it can't be taken for one of this computer's shells; it has no process here, so what follows
+// a local or ssh process (Files mode, drops to a server, Claude's status) never starts for it. null: not a guest's stream,
+// or one a Terminal tab shows already.
+// eslint-disable-next-line no-control-regex
+const NOT_SHOWN = /[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g;
+export function guestTab(args) {
+  const sid = Number(args?.guestShell?.sid);
+  const info = Number.isInteger(sid) && sid > 0 ? term.info(sid) : null;
+  if (!info || info.guest !== true || findSession(sid)) return null;
+  const machine = String(args.guestShell.machine || '').replace(NOT_SHOWN, ' ').trim().slice(0, 80) || '?';
+  patchMeta(sid, { profile: getProfile(null).id, title: '', cwd: '', badge: T('terminal.guest.badge'), guest: machine, bell: false, activity: false, pendingText: '' });
+  return { ...newTab(null, null, sid), title: T('terminal.guest.title', { machine }) };
+}
+
 // args from another app: { cwd } starts the shell there, { typed } leaves a line typed and not run,
-// { app, title } runs a terminal app from the launcher (appTab)
+// { app, title } runs a terminal app from the launcher (appTab), { guestShell: { sid, machine } } a guest's shell (guestTab)
 export function ensureWin(wid, args) {
   if (getWin(wid)) return;
-  let tabs;
+  let tabs, guest = null;
   if (pendingLayouts.has(wid)) {
     tabs = pendingLayouts.get(wid).map((tb) => {
       const root = buildTree(tb.root);
@@ -173,6 +190,14 @@ export function ensureWin(wid, args) {
   } else if (pendingTabs.has(wid)) {
     tabs = pendingTabs.get(wid);
     pendingTabs.delete(wid);
+  } else if (args?.guestShell && (guest = guestTab(args))) {
+    tabs = [guest];
+  } else if (args?.guestShell) {
+    // not a guest's stream (gone), or a tab shows it already: that tab comes forward, and this window isn't kept (a
+    // guest's shell never turns into a shell of this computer)
+    const there = findSession(Number(args.guestShell.sid));
+    tabs = [newTab(null, null, -1)];
+    setTimeout(() => { wm.close(wid); if (there) wm.focus(there.wid); }, 0);
   } else if (typeof args?.app === 'string') {
     const r = appTab(args);
     tabs = [r.tab];
@@ -420,7 +445,8 @@ export function reconfigureAll() {
 }
 
 export function setSessionProfile(sid, profileId) {
-  // la insignia del perfil, o la que haya puesto el shell (OSC 1337 SetBadgeFormat)
+  // la insignia del perfil, o la que haya puesto el shell (OSC 1337 SetBadgeFormat); a guest's shell keeps its own
+  if (meta.get()[sid]?.guest) { patchMeta(sid, { profile: profileId }); configureSession(sid); return; }
   patchMeta(sid, { profile: profileId, badge: getProfile(profileId).badge || meta.get()[sid]?.oscBadge || '' });
   configureSession(sid);
 }

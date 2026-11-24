@@ -915,7 +915,7 @@ export const machineProtectedOf = (entry, meta, homeProtected = false) =>
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
 // shell: the tools start the agent's shell (6.18, tools 8 / w12); links, notify: they pass the guest's links and
 // notifications on, and this machine takes them (6.12); eventlog: a Windows guest's event logs come in (6.19)
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152, send: 4194304 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -938,6 +938,8 @@ export function agentLines(agent, cfg) {
     // links and notifications from the guest (6.12): off unless Configure turned them on
     ['links', !cfg?.guestLinks ? 'off' : on && caps & AGENT_CAPS.links ? 'works' : on ? 'needsTools' : 'needsAgent'],
     ['notify', !cfg?.guestNotify ? 'off' : on && caps & AGENT_CAPS.notify ? 'works' : on ? 'needsTools' : 'needsAgent'],
+    // files from the guest (6.21, "Send to LordOS"): on unless Configure turned them off; the tools 10 / w13
+    ['sendFiles', cfg?.guestFiles === false ? 'off' : on && caps & AGENT_CAPS.send ? 'works' : on ? 'needsTools' : 'needsAgent'],
   ].filter(Boolean);
 }
 // the clipboard's line: 'off' (Configure), 'works', 'needsXclip' (the helper runs but the guest has no clipboard tool),
@@ -975,7 +977,7 @@ export const discCanCopy = (agent, cfg) => clipTo(cfg?.clipboard || 'off') && !!
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w12', linux: '9' };
+export const TOOLS_SHIPPED = { windows: 'w13', linux: '10' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older

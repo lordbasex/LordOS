@@ -76,7 +76,9 @@ export function ExportSheet({ m, running, onClose }) {
   };
   const busy = !!job;
   return (
-    <Sheet title={tr('machines.exp.title', { name: m.name })} onCancel={busy ? undefined : onClose}
+    <Sheet title={tr('machines.exp.title', { name: m.name })} onCancel={busy || picking ? undefined : onClose}
+      over={picking ? <FilePicker mode="save" name={exportName(m, format)} title={tr('machines.exp.choose')} onClose={() => setPicking(false)}
+        onPick={(x) => { setPicking(false); go(Array.isArray(x) ? x[0] : x); }} /> : null}
       actions={done ? [<Btn key="ok" primary label={tr('machines.exp.close')} onClick={onClose} />]
         : [<Btn key="c" label={tr('machines.cancel')} disabled={busy} onClick={onClose} />,
           <Btn key="go" primary label={tr('machines.exp.choose')} disabled={busy || !!why} onClick={() => setPicking(true)} />]}>
@@ -94,8 +96,6 @@ export function ExportSheet({ m, running, onClose }) {
       {pct != null && !done ? <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.exp.progress', { pct: Math.round(pct) })}</Text> : null}
       {done ? <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.exp.done', { file: String(done.to || '').split('/').pop() })}</Text> : null}
       {fail ? <Text style={{ fontSize: 13, color: '#e5483f', textAlign: 'start' }}>{fail}</Text> : null}
-      {picking ? <FilePicker mode="save" name={exportName(m, format)} title={tr('machines.exp.choose')} onClose={() => setPicking(false)}
-        onPick={(x) => { setPicking(false); go(Array.isArray(x) ? x[0] : x); }} /> : null}
     </Sheet>
   );
 }
@@ -135,15 +135,15 @@ export function ImportExportSheet({ onClose, onDone }) {
     setJob(id);
   };
   return (
-    <Sheet title={tr('machines.imp.title')} onCancel={job ? undefined : onClose}
+    <Sheet title={tr('machines.imp.title')} onCancel={job || picking ? undefined : onClose}
+      over={picking ? <FilePicker mode="folder" title={tr('machines.imp.pick')} onClose={() => { setPicking(false); if (!info) onClose(); }}
+        onPick={(x) => { setPicking(false); chosen(Array.isArray(x) ? x[0] : x); }} /> : null}
       actions={[<Btn key="c" label={tr('machines.cancel')} disabled={!!job} onClick={onClose} />]}>
       <Text style={{ fontSize: 13, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>
         {info ? tr(info.encrypted ? 'machines.imp.encrypted' : 'machines.imp.plain', { name: info.name }) : tr('machines.imp.text')}
       </Text>
       {pct != null ? <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.imp.progress', { pct: Math.round(pct) })}</Text> : null}
       {fail ? <Text style={{ fontSize: 13, color: '#e5483f', textAlign: 'start' }}>{fail}</Text> : null}
-      {picking ? <FilePicker mode="folder" title={tr('machines.imp.pick')} onClose={() => { setPicking(false); if (!info) onClose(); }}
-        onPick={(x) => { setPicking(false); chosen(Array.isArray(x) ? x[0] : x); }} /> : null}
     </Sheet>
   );
 }

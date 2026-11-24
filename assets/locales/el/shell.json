@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "Δεν ήταν δυνατή η εφαρμογή του {name}",
   "themeSwitch.refusedBody": "Ο κώδικάς του δεν ταιριάζει με το υπογεγραμμένο αντίγραφο του LordOS, γι’ αυτό δεν φορτώθηκε. Το στυλ της επιφάνειας εργασίας μένει όπως ήταν.",
   "themeSwitch.failedBody": "Δεν ξεκίνησε. Το στυλ της επιφάνειας εργασίας μένει όπως ήταν.",
-  "spotlight.section.machines": "Εικονικές μηχανές"
+  "spotlight.section.machines": "Εικονικές μηχανές",
+  "guestApps.inMachine": "Στο {machine}"
 }

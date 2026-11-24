@@ -95,5 +95,6 @@
   },
   "pickAddress": "Wybierz adres, aby zezwolić na niego lub go zablokować dla tej aplikacji.",
   "recent": "niedawne połączenie",
-  "recentDenied": "niedawno zablokowane"
+  "recentDenied": "niedawno zablokowane",
+  "machineInherits": "Reguły Maszyn decydują też o tej maszynie. Jej własne reguły dochodzą do nich: gdy obie pasują do połączenia, decyduje bardziej szczegółowa, a Blokuj wygrywa z Zezwalaj."
 }

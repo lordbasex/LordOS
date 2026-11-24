@@ -701,5 +701,12 @@
   "desc.done.pause": "Dijeda.",
   "desc.done.block_network": "Rangkaiannya disekat.",
   "desc.done.blocklist": "Dalam senarai sekatan: ia ditamatkan setiap kali ia bermula.",
-  "desc.blockConfirm": "Tambah “{name}” ke senarai sekatan? Mulai sekarang ia ditamatkan setiap kali ia bermula. Anda boleh membatalkannya dalam Tetapan → AI → Sentinela."
+  "desc.blockConfirm": "Tambah “{name}” ke senarai sekatan? Mulai sekarang ia ditamatkan setiap kali ia bermula. Anda boleh membatalkannya dalam Tetapan → AI → Sentinela.",
+  "comp.machine": "Mesin",
+  "comp.machineNamed": "{name} (mesin)",
+  "comp.machineHint": "Mesin maya: trafik rangkaian sistem tetamunya. Peraturannya sendiri ditambah kepada peraturan Mesin, yang terus memutuskan untuk setiap mesin.",
+  "comp.machinesRules": "Peraturan Mesin",
+  "comp.forwarded": "Port dimajukan {proto} {port} → {guest}",
+  "comp.forwardedLan": "Terbuka kepada rangkaian",
+  "comp.forwardedLocal": "Komputer ini sahaja"
 }

@@ -75,6 +75,8 @@
 #                                         port is the video group's too (LordOS's sessions aren't logind seats, 6.17)
 #   /usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso  the LordOS Guest Tools disc Machines puts in a Linux machine
 #                                         without qemu-guest-agent (docs/VIRTUALIZATION.md 6.17); its SHA-256 is lord-vm's
+#   /usr/share/applications/lordos-send-to-host.desktop, /usr/share/kio/servicemenus/lordos-send-to-host.desktop
+#                                         "Send to LordOS" in the file managers of a LordOS machine (docs/VIRTUALIZATION.md 6.21)
 #   /usr/lib/systemd/system-shutdown/lordos-guest  systemd-shutdown's hook: in a Machines guest, tells Machines whether
 #                                         it powers off or restarts (lordos-guest --stopping; "Graphics 3D"); elsewhere
 #                                         it ends at once
@@ -283,6 +285,13 @@ if [ -x server/build/lordos-guest ]; then
     ln -sfn ../lordos-guest.service "$PKG/usr/lib/systemd/user/default.target.wants/lordos-guest.service"
     install -D -m 644 packaging/udev/71-lordos-guest.rules "$PKG/usr/lib/udev/rules.d/71-lordos-guest.rules"
     install -D -m 755 packaging/systemd/lordos-guest-shutdown "$PKG/usr/lib/systemd/system-shutdown/lordos-guest"
+    # "Send to LordOS" (docs/VIRTUALIZATION.md 6.21): Open With for every file, and Dolphin's service menu; the helper by
+    # its packaged path, which isn't in PATH
+    install -d "$PKG/usr/share/applications" "$PKG/usr/share/kio/servicemenus"
+    sed 's|^Exec=lordos-guest |Exec=/usr/lib/lordos/guest/lordos-guest |' tools/guest/lordos-send-to-host.desktop >"$PKG/usr/share/applications/lordos-send-to-host.desktop"
+    chmod 644 "$PKG/usr/share/applications/lordos-send-to-host.desktop"
+    sed 's|^Exec=lordos-guest |Exec=/usr/lib/lordos/guest/lordos-guest |' tools/guest/lordos-send-to-host-kde.desktop >"$PKG/usr/share/kio/servicemenus/lordos-send-to-host.desktop"
+    chmod 755 "$PKG/usr/share/kio/servicemenus/lordos-send-to-host.desktop"
 fi
 # the LordOS Guest Tools disc (docs/VIRTUALIZATION.md 6.17): a read-only ISO with lordos-guest, install.sh and its
 # checksum, which Machines puts in the CD drive of a Linux machine without qemu-guest-agent. lord-vm attaches it only if

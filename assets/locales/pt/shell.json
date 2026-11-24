@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "Não foi possível aplicar {name}",
   "themeSwitch.refusedBody": "O código dele não corresponde à cópia assinada do LordOS, então não foi carregado. Seu estilo de área de trabalho continua como estava.",
   "themeSwitch.failedBody": "Não iniciou. Seu estilo de área de trabalho continua como estava.",
-  "spotlight.section.machines": "Máquinas"
+  "spotlight.section.machines": "Máquinas",
+  "guestApps.inMachine": "Em {machine}"
 }

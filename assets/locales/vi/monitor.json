@@ -701,5 +701,12 @@
   "desc.done.pause": "Đã tạm dừng.",
   "desc.done.block_network": "Mạng của nó đã bị chặn.",
   "desc.done.blocklist": "Đã vào danh sách chặn: nó sẽ bị kết thúc mỗi khi khởi động.",
-  "desc.blockConfirm": "Thêm “{name}” vào danh sách chặn? Từ giờ nó sẽ bị kết thúc mỗi khi khởi động. Bạn có thể hoàn tác trong Cài đặt → AI → Sentinela."
+  "desc.blockConfirm": "Thêm “{name}” vào danh sách chặn? Từ giờ nó sẽ bị kết thúc mỗi khi khởi động. Bạn có thể hoàn tác trong Cài đặt → AI → Sentinela.",
+  "comp.machine": "Máy",
+  "comp.machineNamed": "{name} (máy)",
+  "comp.machineHint": "Một máy ảo: lưu lượng mạng của hệ thống khách. Quy tắc riêng của nó được cộng thêm vào quy tắc của Máy ảo, vốn vẫn quyết định cho mọi máy.",
+  "comp.machinesRules": "Quy tắc của Máy ảo",
+  "comp.forwarded": "Cổng chuyển tiếp {proto} {port} → {guest}",
+  "comp.forwardedLan": "Mở ra mạng",
+  "comp.forwardedLocal": "Chỉ máy tính này"
 }

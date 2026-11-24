@@ -716,5 +716,12 @@
   "desc.done.pause": "Fasiləyə verildi.",
   "desc.done.block_network": "Şəbəkəsi bloklanıb.",
   "desc.done.blocklist": "Bloklama siyahısında: hər başlayanda bitirilir.",
-  "desc.blockConfirm": "“{name}” bloklama siyahısına əlavə edilsin? Bundan sonra hər başlayanda bitiriləcək. Bunu Parametrlər → Süni intellekt → Sentinela bölməsində geri qaytara bilərsiniz."
+  "desc.blockConfirm": "“{name}” bloklama siyahısına əlavə edilsin? Bundan sonra hər başlayanda bitiriləcək. Bunu Parametrlər → Süni intellekt → Sentinela bölməsində geri qaytara bilərsiniz.",
+  "comp.machine": "Maşın",
+  "comp.machineNamed": "{name} (maşın)",
+  "comp.machineHint": "Virtual maşın: onun qonaq sisteminin şəbəkə trafiki. Öz qaydaları Maşınlar qaydalarına əlavə olunur; onlar hər maşın üçün qərar verməyə davam edir.",
+  "comp.machinesRules": "Maşınlar qaydası",
+  "comp.forwarded": "Yönləndirilmiş port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Şəbəkəyə açıq",
+  "comp.forwardedLocal": "Yalnız bu kompüter"
 }

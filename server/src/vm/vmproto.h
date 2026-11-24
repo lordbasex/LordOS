@@ -143,6 +143,14 @@
  *                   its fdset removed once QEMU says DEVICE_DELETED) → VM_REPLY. a = 2 / 3: text = an auto-connect rule
  *                   (VVVV:PPPP[:SERIAL], vm_usb_rule_valid) added to / taken from machine.json's usb_auto while it runs (lord-vm
  *                   holds the lock, so it writes the file) → VM_REPLY
+ *     VM_RECV       the answer to a VM_RECV_OFFER (6.21): a = the transfer's id, b = AGSA_* (vmagent.h; 0: taken); with 0,
+ *                   one descriptor: the quarantine folder's part file for it, which lord-server opened (O_RDWR, without
+ *                   following a link, a regular file of this account with one link) and which may already hold the
+ *                   start of this very file from an earlier, interrupted offer (a resume: lord-vm hashes what is there
+ *                   and offers the guest to go on from it). lord-vm writes only through that descriptor, never a path
+ *     VM_RECV_CANCEL a = a transfer's id: the person cancelled it (the guest is told, AGK_SEND_DONE cancelled)
+ *     VM_FILE_CANCEL a = a VM_FILE's seq: the person cancelled that drop (a waiting one is dropped at once; the one being
+ *                   copied stops at its next step) → that VM_FILE's VM_REPLY, VME_DENIED "cancelled"
  *   from lord-vm (events and replies)
  *     VM_REPLY      seq of the request; a = VME_* (0 ok); text = reason in English, for the log
  *     VM_STATE      a = VS_*, b = VR_* (why), c = QEMU's exit status or signal, d = QEMU's pid; text = detail.
@@ -184,6 +192,12 @@
  *                   to the client that asked only
  *     VM_USB_STATE  a = how many host USB devices the machine holds (0..8); text = their lines ("BUS DEV VVVV:PPPP"), tab
  *                   separated. Sent to every client on each change and after VM_STATUS
+ *     VM_RECV_OFFER a file the guest's tools offer to send to this computer (6.21, AGK_SEND_OFFER, already parsed): a sealed
+ *                   memfd of a bytes (≤ VM_RECV_OFFER_MAX) in AGK_SEND_OFFER's layout, b = the transfer's id (lord-vm's
+ *                   counter). Only while machine.json takes files from the guest, at most one at a time, within the
+ *                   offers' rate. lord-server answers VM_RECV within 10 s, else the guest is told no
+ *     VM_RECV_STATE a = the transfer's id, b = VRS_*, c = KiB written so far, d = AGSD_* with VRS_FAILED. Sent every 250 ms
+ *                   while it runs, and at its end: VRS_DONE once every byte is written and its SHA-256 is the guest's
  *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
  *                   failed), c = percent (0..100, -1 unknown), text = detail
  *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (VMN_NET_LOST: passt ended while
@@ -286,12 +300,18 @@ enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
     VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL, VM_EXEC, VM_NETCABLE,
+    VM_RECV, VM_RECV_CANCEL, VM_FILE_CANCEL,
     VM_USB,
     VM_REQ_LAST = VM_USB,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
-    VM_SHELL_FD, VM_GUEST_NOTE, VM_EXEC_DONE, VM_USB_STATE,
+    VM_SHELL_FD, VM_GUEST_NOTE, VM_EXEC_DONE, VM_RECV_OFFER, VM_RECV_STATE, VM_USB_STATE,
 };
+/* VM_RECV_STATE b: a file from the guest is being written; kept (lord-server names it); given up (d: AGSD_*); the guest's
+ * connection went with it unfinished (lord-server keeps what came, for the guest's next offer of the same file) */
+enum { VRS_RUNNING = 1, VRS_DONE, VRS_FAILED, VRS_PAUSED, VRS_LAST = VRS_PAUSED };
+/* the largest VM_RECV_OFFER: an AGK_SEND_OFFER payload (vmagent.h), written again by lord-vm */
+#define VM_RECV_OFFER_MAX 256
 /* VM_SHELL a */
 enum { VSH_CLOSE = 0, VSH_OPEN = 1, VSH_SIZE = 2 };
 /* the largest VM_GUEST_NOTE: a link or a notification, in its agent frame's layout (vmagent.h) */
@@ -329,11 +349,13 @@ enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
  * VAC_SHELL: the tools said "shell": the agent's shell (VM_SHELL, 6.18); VAC_LINKS, VAC_NOTIFY: they said "links",
  * "notify" and machine.json allows them: links and notifications from the guest (VM_GUEST_NOTE, 6.12);
  * VAC_EVENTLOG: a Windows guest's event logs come through qemu-guest-agent (6.19);
- * VAC_TOOLS_DISC: the LordOS Guest Tools disc is in the machine's drive (VAG_DISC), waiting for the guest agent */
+ * VAC_TOOLS_DISC: the LordOS Guest Tools disc is in the machine's drive (VAG_DISC), waiting for the guest agent;
+ * VAC_SEND: the tools said "send" and machine.json takes files from the guest: "Send to LordOS" lands in its quarantine
+ * folder (VM_RECV_OFFER, 6.21) */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
        VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096, VAC_OPEN = 8192,
        VAC_PLACE = 16384, VAC_EXTRA = 32768, VAC_EXTRA_OFF = 65536, VAC_SHELL = 131072, VAC_LINKS = 262144, VAC_NOTIFY = 524288,
-       VAC_EVENTLOG = 1048576, VAC_TOOLS_DISC = 2097152, VAC_ALL = 4194303 };
+       VAC_EVENTLOG = 1048576, VAC_TOOLS_DISC = 2097152, VAC_SEND = 4194304, VAC_ALL = 8388607 };
 /* how long a VM_FILE with a = 1 waits for the guest tools' AGK_OPENED after the copy (a program may ask for consent) */
 #define AG_OPEN_WAIT_MS 120000
 #define VM_WINDATA_MAX (1u << 20)
@@ -579,7 +601,9 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
                       (m->type != VM_SHELL || (m->a == VSH_CLOSE || ((m->a == VSH_OPEN || m->a == VSH_SIZE) && m->b >= 1 && m->b <= 1000 && m->c >= 1 && m->c <= 500))) &&
                       (m->type != VM_LAUNCH || (m->a >= 0 && m->a < 256 && m->b > 0)) &&
-                      (m->type != VM_USB || (m->a >= 0 && m->a <= 3 && m->text[0]));
+                      (m->type != VM_USB || (m->a >= 0 && m->a <= 3 && m->text[0])) &&
+                      (m->type != VM_RECV || (m->a > 0 && m->b >= 0 && m->b <= 4)) &&
+                      (m->type != VM_RECV_CANCEL || m->a > 0) && (m->type != VM_FILE_CANCEL || m->a > 0);
     switch (m->type) {
     case VM_REPLY: return m->a >= VME_OK && m->a <= VME_INTERNAL;
     case VM_STATE: return m->a >= 0 && m->a < VS_COUNT && m->b >= 0 && m->b < VR_COUNT;
@@ -599,6 +623,9 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_SHELL_FD: return 1;
     /* a: bytes in the sealed memfd; b: AGK_LINK (25) or AGK_NOTIFY (26), vmagent.h */
     case VM_GUEST_NOTE: return m->a > 0 && m->a <= VM_GUEST_NOTE_MAX && (m->b == 25 || m->b == 26);
+    /* a: bytes in the sealed memfd, b: the transfer's id; a: the id, b: VRS_*, c: KiB written, d: AGSD_* (0..5) */
+    case VM_RECV_OFFER: return m->a > 0 && m->a <= VM_RECV_OFFER_MAX && m->b > 0;
+    case VM_RECV_STATE: return m->a > 0 && m->b >= VRS_RUNNING && m->b <= VRS_LAST && m->c >= 0 && m->d >= 0 && m->d <= 5;
     case VM_EXEC_DONE: return m->a >= 0 && m->a <= 255 && m->b >= 0 && m->b <= 7;
     case VM_USB_STATE: return m->a >= 0 && m->a <= 8;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;

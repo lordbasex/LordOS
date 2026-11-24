@@ -339,5 +339,8 @@
   "markupHint": "Avaa merkintäeditorissa",
   "readOnly.title": "Tiedostot ei voi muuttaa kohdetta ”{name}”",
   "readOnly.outside": "Tiedostot voi vain näyttää tämän kansion: se on kotikansiosi ja levyjesi ulkopuolella. Muuta sitä Päätteellä tai muulla apilla.",
-  "readOnly.denied": "Tämä kansio on vain luku -tilassa: sen oikeudet eivät salli sinun muuttaa sitä. Muuta sitä Päätteellä tai muulla apilla."
+  "readOnly.denied": "Tämä kansio on vain luku -tilassa: sen oikeudet eivät salli sinun muuttaa sitä. Muuta sitä Päätteellä tai muulla apilla.",
+  "fromMachineNoRun": "”{name}” tuli koneelta {machine}. Tiedostot ei avaa koneelta tulleita ohjelmia tai asennusohjelmia: käytä Avaa sovelluksella, jos luotat siihen.",
+  "info.from": "Lähde",
+  "info.fromMachine": "Kone {machine}"
 }

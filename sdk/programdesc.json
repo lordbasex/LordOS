@@ -291,6 +291,7 @@
     "lord-vault-agent": "LordOS's Passwords helper.",
     "lord-vm": "Machines' runner: starts and watches one virtual machine in its sandbox.",
     "lord-vmdisplay": "Machines' display helper, in a sandbox: shows a virtual machine's screen.",
+    "lord-vm-usb": "Machines' USB library hint, loaded into a virtual machine's emulator: only lets it use the USB devices it is given.",
     "lord-vmunpack": "Machines' image unpacker, in a sandbox: unpacks a downloaded machine image.",
     "lord-web": "LordOS's web app runner: opens a web app in its own window and sandbox.",
     "lord-server-test": "LordOS's test version of the display server, for development."

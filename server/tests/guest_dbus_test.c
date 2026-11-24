@@ -205,11 +205,65 @@ static void test_record(void) {
     CHECK(perf_record_write(t, sizeof t, "balanced", 1) && perf_record_parse(t, (int)strlen(t), pw, 8, &a) == -1);
 }
 
+
+/* tools 9: a monitored Notify call (gnotes.c): its texts, and what the host gets of them (db_note_plain) */
+static void test_notify(void) {
+    uint8_t body[1024], m[2048];
+    DbW w;
+    dbw_init(&w, body, sizeof body);
+    dbw_str(&w, "Thunderbird");
+    dbw_u32(&w, 0);
+    dbw_str(&w, "mail-unread");
+    dbw_str(&w, "New mail <b>from</b> Ana");
+    dbw_str(&w, "Re: the &amp; budget line two");
+    dbw_u32(&w, 0);                                      /* as: no actions */
+    dbw_u32(&w, 0);                                      /* a{sv}: no hints, then the dict entries' 8 alignment */
+    while (w.n % 8) w.p[w.n++] = 0;
+    dbw_u32(&w, (uint32_t)-1);
+    CHECK(!w.bad);
+    size_t n = db_call_build(m, sizeof m, 7, "org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Notify", "susssasa{sv}i", body, w.n);
+    DbMsg r;
+    CHECK(n && db_msg_parse(m, n, &r) == (int)n && db_msg_total(m, n) == (long)n && db_msg_total(m, 10) == 0);
+    CHECK(!strcmp(r.member, "Notify") && !strcmp(r.iface, "org.freedesktop.Notifications"));
+    char app[32], sum[64], bo[64], out[64];
+    CHECK(!db_notify_body(&r, app, sizeof app, sum, sizeof sum, bo, sizeof bo) && !strcmp(app, "Thunderbird") && !strcmp(sum, "New mail <b>from</b> Ana"));
+    CHECK(db_note_plain(sum, out, 60) == strlen("New mail from Ana") && !strcmp(out, "New mail from Ana"));
+    db_note_plain(bo, out, 60);
+    CHECK(!strcmp(out, "Re: the & budget line two"));
+    db_note_plain("x\nline\ttwo", out, 60);
+    CHECK(!strcmp(out, "x line two"));
+    /* a cut keeps whole characters; bidi and C1 controls go; bad UTF-8 is '?' */
+    CHECK(db_note_plain("\xc3\xa9\xc3\xa9\xc3\xa9", out, 5) == 4 && !strcmp(out, "\xc3\xa9\xc3\xa9"));
+    db_note_plain("a\xe2\x80\xae" "b\xc2\x85" "c \xff d", out, 60);
+    CHECK(!strcmp(out, "a b c ? d"));
+    db_note_plain("  <i>  </i> x  ", out, 60);
+    CHECK(!strcmp(out, "x"));
+    /* another member is not one */
+    uint8_t u[4] = { 1, 0, 0, 0 };
+    n = db_call_build(m, sizeof m, 8, NULL, "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "CloseNotification", "u", u, 4);
+    CHECK(n && db_msg_parse(m, n, &r) > 0 && db_notify_body(&r, app, sizeof app, sum, sizeof sum, bo, sizeof bo) == -1);
+    /* random bytes: never a crash, never past the message or the cap */
+    uint32_t seed = 77;
+    for (int it = 0; it < 20000; it++) {
+        uint8_t x[600];
+        size_t xn = (seed = seed * 1103515245 + 12345) % (sizeof x - 1);
+        for (size_t i = 0; i < xn; i++) x[i] = (uint8_t)((seed = seed * 1103515245 + 12345) >> 16);
+        if (xn > 4) { x[0] = 'l'; x[1] = 1; x[3] = 1; }
+        CHECK(db_msg_total(x, xn) <= (long)DB_SKIP_MAX);
+        if (db_msg_parse(x, xn, &r) > 0) db_notify_body(&r, app, sizeof app, sum, sizeof sum, bo, sizeof bo);
+        char in[600];
+        memcpy(in, x, xn);
+        in[xn] = 0;
+        size_t l = db_note_plain(in, out, 40);
+        CHECK(l <= 40 && strlen(out) == l);
+    }
+}
 int main(void) {
     test_build();
     test_parse();
     test_dconf();
     test_record();
+    test_notify();
     printf("guest-dbus-test: %d checks, %d failed\n", checks, fails);
     return fails ? 1 : 0;
 }

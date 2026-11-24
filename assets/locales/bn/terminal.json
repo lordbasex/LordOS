@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "ধরে রাখা আউটপুটে রাখা হয়",
   "prefs.tr.would.highlight": "“{text}” হাইলাইট করে",
   "prefs.tr.param": "প্যারামিটার",
-  "prefs.tr.regexFirst": "আগে রেগুলার এক্সপ্রেশন লিখুন।"
+  "prefs.tr.regexFirst": "আগে রেগুলার এক্সপ্রেশন লিখুন।",
+  "guest.badge": "গেস্ট",
+  "guest.title": "{machine}-এর ভিতরে শেল"
 }

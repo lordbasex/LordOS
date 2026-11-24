@@ -978,5 +978,6 @@
   "themeSwitch.failedTitle": "{name} kon niet worden toegepast",
   "themeSwitch.refusedBody": "De code komt niet overeen met de ondertekende kopie van LordOS en is dus niet geladen. Je bureaubladstijl blijft zoals hij was.",
   "themeSwitch.failedBody": "Hij is niet gestart. Je bureaubladstijl blijft zoals hij was.",
-  "spotlight.section.machines": "Machines"
+  "spotlight.section.machines": "Machines",
+  "guestApps.inMachine": "In {machine}"
 }

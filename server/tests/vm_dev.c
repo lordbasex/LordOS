@@ -26,6 +26,9 @@
  *   shell-size C R | shell-close
  *   console             the serial console's stream (VM_CONSOLE) in its place: shell-type types into it too
  *   (events) "note": a link or a notification from the guest (VM_GUEST_NOTE, 6.12), as lord-vm passed it on
+ *   (events) "recv-offer", "recv": a file the guest sends (VM_RECV_OFFER, 6.21), taken into the machine's quarantine
+ *                       folder as lord-server does (vmrecv.c; LORDVM_DEV_RECV=no answers "not now")
+ *   recv-cancel ID      cancel it (VM_RECV_CANCEL)          file-cancel SEQ   cancel a drop (VM_FILE_CANCEL)
  *   agent install       the guest agent's Install (VAG_INSTALL: lordos-guest, or the LordOS guest tools on Windows)
  *   agent disc | agent disc-out   the LordOS Guest Tools disc in or out of the CD drive (VAG_DISC; a guest without
  *                       qemu-guest-agent): lord-vm takes it out by itself when the agent answers
@@ -72,6 +75,7 @@
  * the guest drew with virgl. Without Mesa it only counts those frames. */
 #include "vm/vmproto.h"
 #include "vm/vmagent.h"
+#include "vm/vmrecv.h"
 #include "media/media_int.h"
 #include "media/aring.h"
 
@@ -191,6 +195,43 @@ static void guest_note_ev(const VmMsg *m, int fd) {
     out("{\"ev\":\"note\",\"kind\":\"notify\",\"title\":\"%s\",\"body\":\"%s\"}", t, t2);
 }
 
+/* files from the guest (6.21): answered as lord-server does, into the machine's quarantine folder (vmrecv.c); "recv"
+ * events. LORDVM_DEV_RECV=no answers "not now" instead */
+static char machine_dir[PATH_MAX];
+static struct { uint32_t id; int fd, dfd; uint64_t size; char name[AG_NAME_MAX + 1], part[VMRECV_PART_NAME]; } rcv = { 0, -1, -1, 0, "", "" };
+static void recv_offer(const VmMsg *m, int fd) {
+    uint8_t b[VM_RECV_OFFER_MAX];
+    AgSendOffer o;
+    char nm[AG_NAME_MAX + 1], shown[PATH_MAX];
+    int status = AGSA_REFUSED, pf = -1, dfd = -1;
+    uint64_t have = 0;
+    const char *no = getenv("LORDVM_DEV_RECV");
+    if (m->a > 0 && m->a <= (int)sizeof b && pread(fd, b, (size_t)m->a, 0) == m->a && !ag_send_offer_parse(b, (size_t)m->a, &o) && !ag_recv_name(o.name, nm, sizeof nm)) {
+        status = AGSA_BUSY;
+        if (!(no && !strcmp(no, "no")) && (dfd = vmrecv_dir_open(machine_dir, shown, sizeof shown)) >= 0) pf = vmrecv_part_open(dfd, o.key, o.size, rcv.part, &have, &status);
+    }
+    VmMsg r = vm_msg(VM_RECV, 0, m->b, pf >= 0 ? AGSA_OK : status, 0, 0, NULL);
+    vm_send(vm, &r, pf);
+    out("{\"ev\":\"recv-offer\",\"id\":%d,\"status\":%d,\"size\":%llu,\"have\":%llu}", m->b, pf >= 0 ? 0 : status, pf >= 0 ? (unsigned long long)o.size : 0ULL, (unsigned long long)have);
+    if (pf < 0) { if (dfd >= 0) close(dfd); return; }
+    if (rcv.fd >= 0) close(rcv.fd);
+    if (rcv.dfd >= 0) close(rcv.dfd);
+    rcv.id = (uint32_t)m->b; rcv.fd = pf; rcv.dfd = dfd; rcv.size = o.size;
+    snprintf(rcv.name, sizeof rcv.name, "%s", nm);
+}
+static void recv_state(const VmMsg *m) {
+    static const char *const S[] = { "", "running", "done", "failed", "paused" };
+    if ((uint32_t)m->a != rcv.id || rcv.fd < 0) return;
+    if (m->b == VRS_RUNNING) { out("{\"ev\":\"recv\",\"state\":\"running\",\"kib\":%d}", m->c); return; }
+    char fin[AG_NAME_MAX + 16] = "";
+    int marked = 0, ok = 1;
+    if (m->b == VRS_DONE) ok = !vmrecv_finish(rcv.dfd, rcv.fd, rcv.part, rcv.name, "lordvm-dev", machine_id, rcv.size, fin, sizeof fin, &marked);
+    else if (m->b == VRS_FAILED) unlinkat(rcv.dfd, rcv.part, 0);
+    out("{\"ev\":\"recv\",\"state\":\"%s\",\"kib\":%d,\"code\":%d,\"kept\":%d,\"name\":\"%s\",\"marked\":%d}", S[m->b], m->c, m->d, ok, fin, marked);
+    close(rcv.fd); close(rcv.dfd);
+    rcv.fd = rcv.dfd = -1;
+    rcv.id = 0;
+}
 /* All Displays: the further outputs' channels (LORDVM_DEV_HEADS), each with a picture of its own */
 static struct { int vd, w, h, frames; uint8_t *pic; size_t len; } xh[4] = { { .vd = -1 }, { .vd = -1 }, { .vd = -1 }, { .vd = -1 } };
 static int nheads = 1;
@@ -409,6 +450,8 @@ static void from_vm(void) {
         else if (m.type == VM_CONSOLE_FD && fd >= 0) { if (shfd >= 0) close(shfd); shfd = fd; fd = -1; fcntl(shfd, F_SETFL, O_NONBLOCK); out("{\"ev\":\"console-open\"}"); }
         else if (m.type == VM_SHELL_FD && fd >= 0) { if (shfd >= 0) close(shfd); shfd = fd; fd = -1; fcntl(shfd, F_SETFL, O_NONBLOCK); out("{\"ev\":\"shell-open\"}"); }
         else if (m.type == VM_GUEST_NOTE && fd >= 0) guest_note_ev(&m, fd);
+        else if (m.type == VM_RECV_OFFER && fd >= 0) recv_offer(&m, fd);
+        else if (m.type == VM_RECV_STATE) recv_state(&m);
         else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
         else if (m.type == VM_USB_STATE) {
             char t[VM_TEXT_MAX];
@@ -931,6 +974,8 @@ static int handle(char *line) {
         int c = 0, r = 0, size = line[5] == '-';
         if (sscanf(line + (size ? 11 : 6), "%d %d", &c, &r) == 2) { VmMsg m = vm_msg(VM_SHELL, ++seq, size ? VSH_SIZE : VSH_OPEN, c, r, 0, NULL); vm_send(vm, &m, -1); }
     } else if (!strcmp(line, "console")) ask(VM_CONSOLE, 0, NULL);
+    else if (!strncmp(line, "recv-cancel ", 12)) { VmMsg m = vm_msg(VM_RECV_CANCEL, ++seq, atoi(line + 12), 0, 0, 0, NULL); vm_send(vm, &m, -1); }
+    else if (!strncmp(line, "file-cancel ", 12)) { VmMsg m = vm_msg(VM_FILE_CANCEL, ++seq, atoi(line + 12), 0, 0, 0, NULL); vm_send(vm, &m, -1); }
     else if (!strcmp(line, "shell-close")) { VmMsg m = vm_msg(VM_SHELL, ++seq, VSH_CLOSE, 0, 0, 0, NULL); vm_send(vm, &m, -1); }
     else if (!strncmp(line, "shell-type ", 11)) {
         char t[2048];
@@ -1003,6 +1048,7 @@ int main(int argc, char **argv) {
     signal(SIGPIPE, SIG_IGN);
     if (argc < 3 || (strcmp(argv[1], "run") && strcmp(argv[1], "attach"))) { fprintf(stderr, "usage: lordvm-dev run|attach DIR [lord-vm options]\n"); return 2; }
     find_bindir();
+    if (!realpath(argv[2], machine_dir)) snprintf(machine_dir, sizeof machine_dir, "%s", argv[2]);
     if (!strcmp(argv[1], "attach")) {
         vm = connect_runtime(argv[2]);
         if (vm < 0) { out("{\"ev\":\"error\",\"what\":\"not running\"}"); return 3; }

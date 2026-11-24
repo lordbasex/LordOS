@@ -91,5 +91,6 @@
   },
   "pickAddress": "Select an address to allow or block it for this app.",
   "recent": "recent connection",
-  "recentDenied": "recently denied"
+  "recentDenied": "recently denied",
+  "machineInherits": "The rules for Machines decide for this machine too. Its own rules add to them: when both match a connection, the more specific one decides, and Block beats Allow."
 }

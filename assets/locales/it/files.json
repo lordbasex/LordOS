@@ -339,5 +339,8 @@
   "markupHint": "Apri nell’editor di annotazioni",
   "readOnly.title": "File non può modificare “{name}”",
   "readOnly.outside": "File può solo mostrare questa cartella: è fuori dalla tua cartella Inizio e dai tuoi dischi. Per modificarla, usa il Terminale o un'altra app.",
-  "readOnly.denied": "Questa cartella è di sola lettura: i suoi permessi non ti consentono di modificarla. Per modificarla, usa il Terminale o un'altra app."
+  "readOnly.denied": "Questa cartella è di sola lettura: i suoi permessi non ti consentono di modificarla. Per modificarla, usa il Terminale o un'altra app.",
+  "fromMachineNoRun": "«{name}» proviene dalla macchina {machine}. File non apre programmi o installer di una macchina: usa Apri con se ti fidi.",
+  "info.from": "Provenienza",
+  "info.fromMachine": "La macchina {machine}"
 }

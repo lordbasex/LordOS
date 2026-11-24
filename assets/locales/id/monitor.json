@@ -701,5 +701,12 @@
   "desc.done.pause": "Dijeda.",
   "desc.done.block_network": "Jaringannya diblokir.",
   "desc.done.blocklist": "Masuk daftar blokir: dihentikan setiap kali berjalan.",
-  "desc.blockConfirm": "Tambahkan “{name}” ke daftar blokir? Mulai sekarang program ini dihentikan setiap kali berjalan. Anda bisa membatalkannya di Pengaturan → AI → Sentinela."
+  "desc.blockConfirm": "Tambahkan “{name}” ke daftar blokir? Mulai sekarang program ini dihentikan setiap kali berjalan. Anda bisa membatalkannya di Pengaturan → AI → Sentinela.",
+  "comp.machine": "Mesin",
+  "comp.machineNamed": "{name} (mesin)",
+  "comp.machineHint": "Mesin virtual: lalu lintas jaringan sistem tamunya. Aturannya sendiri ditambahkan ke aturan Mesin, yang tetap memutuskan untuk setiap mesin.",
+  "comp.machinesRules": "Aturan Mesin",
+  "comp.forwarded": "Port diteruskan {proto} {port} → {guest}",
+  "comp.forwardedLan": "Terbuka ke jaringan",
+  "comp.forwardedLocal": "Hanya komputer ini"
 }

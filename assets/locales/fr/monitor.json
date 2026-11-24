@@ -716,5 +716,12 @@
   "desc.done.pause": "Suspendu.",
   "desc.done.block_network": "Son réseau est bloqué.",
   "desc.done.blocklist": "Dans la liste de blocage : il est arrêté à chaque démarrage.",
-  "desc.blockConfirm": "Ajouter « {name} » à la liste de blocage ? Désormais, il sera arrêté à chaque démarrage. Vous pouvez l’annuler dans Réglages → IA → Sentinela."
+  "desc.blockConfirm": "Ajouter « {name} » à la liste de blocage ? Désormais, il sera arrêté à chaque démarrage. Vous pouvez l’annuler dans Réglages → IA → Sentinela.",
+  "comp.machine": "Machine",
+  "comp.machineNamed": "{name} (machine)",
+  "comp.machineHint": "Une machine virtuelle : le trafic réseau de son système invité. Ses propres règles s’ajoutent aux règles de Machines, qui décident toujours pour chaque machine.",
+  "comp.machinesRules": "Règle de Machines",
+  "comp.forwarded": "Port redirigé {proto} {port} → {guest}",
+  "comp.forwardedLan": "Ouvert au réseau",
+  "comp.forwardedLocal": "Cet ordinateur seulement"
 }

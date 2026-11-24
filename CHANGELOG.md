@@ -58,6 +58,37 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     lord-server started as root in a private mount namespace driving `lord.vm` through the real admin helper), and
     `build/vm-usb-cli` (vm-usb-allow as the helper runs it, for manual checks). lordvm-dev gains `usb-in`, `usb-out`,
     `usb-auto`, `usb-noauto`.
+- **Machines: files from the machine, a file copy panel, the guest's own notifications, its apps before it runs** (in
+  development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.18, 6.21).
+  - **Send to LordOS.** A file chosen in the machine (Linux: the file manager's Send to LordOS, or `lordos-guest
+    --send-to-host FILE…`; virtio-win guests: Send To → LordOS) is copied to this computer over the guest agent's own
+    channel, one at a time, with flow control (never more than 4 MiB in flight) and resume after a lost connection (the
+    machine goes on only from a start whose SHA-256 matches what arrived), and is kept only when the whole file's SHA-256
+    is the machine's.
+  - **The quarantine folder.** Every file from a machine lands in `~/Machines/Received/<machine>/`, never anywhere the
+    machine names: folders made without following a link and never shared with other accounts, names made safe (nothing
+    arrives hidden, nothing is replaced: "name (2).ext"), the file 0600 (never executable) and marked as from that machine.
+    Files shows where it came from in Get Info and never opens a program, installer, package or desktop entry from a
+    machine with a double click (Open With still does); the marks follow copies and everything extracted from an archive
+    that came from a machine. At least 1 GiB stays free; at most 8 unfinished files are kept for a resume, none older than
+    7 days. Configure → Sharing → **Files from the machine** turns it off (machine.json schema 20, `guest_files`); a
+    machine locked for anonymity never takes files.
+  - **The file copy panel** along the bottom of the machine's window: every file on its way in (drops) or out, with its
+    size, a bar, the speed, the time left and **Cancel** (a drop can now be cancelled too), Show in Files, Open Received
+    Folder, and a received file dragged onto a folder in Files is copied there. It replaces the one progress line.
+  - **The machine's own notifications** (Linux guests, with Notifications from the machine on): the guest desktop's
+    notifications come too, as plain text marked "From ‹machine›", read by the LordOS tools as the person from that
+    person's own session bus, one kind of message only.
+  - **The machine's apps in the launcher before it runs**: the apps of a machine that has used apps mode are in the
+    launcher, the Classic start menu and search with the machine's mark; choosing one starts the machine and opens the app
+    in apps mode, only when the machine itself still lists it. Configure → General → "Its apps in the launcher".
+  - **The agent's shell in a Terminal tab**: Open in Terminal moves the machine's shell into a Terminal tab, titled and
+    marked as the machine's.
+  - **The LordOS tools 10 (Linux) and w13**; Machines updates older tools by itself. The Linux tools now write every frame
+    whole (a virtio-serial port takes at most 32 KiB a call: a large clipboard picture could be cut before).
+  - Tests: `vm-test` (the new frames, fuzzed with 80 000 random frames, the quarantine folder against links, hard links,
+    collisions and sizes, schema 20), `guest_send_test.sh`, `guest-dbus-test` (the notification monitor's parser),
+    `fsops-test` (the marks), `vm_xfer_test.mjs`, `guest_apps_test.mjs`, and a real Debian 13 KVM guest.
 - **Machines: All Displays** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.4). View → All
   Displays shows a machine across this computer's displays: one output of its virtio-gpu per display (up to four), each full
   screen at that display's size, beside the others; the machine's own window keeps the first, and each further window's
@@ -66,6 +97,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   display serves one connection), and an output whose window goes is turned off for the guest. Not for a machine with a
   graphics card, apps mode or a protected machine (the anonymity profile keeps one display: the guest never learns this
   computer's displays). Checked with a real KVM guest (tests/vm_multihead.sh) and a headless scene.
+- **Machines: each machine its own firewall row** (in development; docs/FIREWALL.md, docs/VIRTUALIZATION.md 6.5). A
+  running machine's traffic is the firewall app `lordos:vm-<id>`, named after the machine in Monitor, with its forwarded
+  ports listed as its incoming lines; Settings' rule and restriction lists offer each machine, and Configure → Network
+  opens its rules. Every machine still inherits the Machines rules, restrictions and trust (`lordos:machines`), decided as
+  one list with the usual precedence; lord-netperm compiles the same union. The Tor gateway keeps its own row and
+  inherits nothing.
 - **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
   lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
   machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
@@ -747,6 +784,21 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
+  QEMU's namespaces, so lord-server could no longer read which program a machine's engine runs and never counted one as
+  checked. lord-server now keeps a pidfd of every lord-vm it starts (a machine started without a window sends its own) and
+  checks the machine's socket against it; after lord-server restarts, a running engine is checked again only when the
+  kernel places it in the machine's own scope. A mismatch still raises the alert. Checked live on a real KVM machine.
+- **Machines: an arm64 machine with the compatible devices now boots** (in development; latest release 0.8.9.5-beta;
+  docs/VIRTUALIZATION.md 6.22, 12). Its disks were SATA, and the arm64 UEFI firmware (AAVMF) has no SATA driver, so it
+  stopped at the firmware's shell; every import of another app's arm64 machine starts on these devices. On arm64 they are
+  now NVMe disks (one controller each, the disk's own serial kept) and a USB CD/DVD that can still be changed while it runs:
+  what the firmware starts from and what arm64 guests without virtio drivers carry. Configure and the import's plan say
+  "NVMe" there (two new texts, in every language). Booted on a Raspberry Pi 5 with KVM and emulated, and emulated on a PC.
+- **Machines: the Clone sheet's buttons were cut off** at the Control Center's first size (760×500), and the file pickers
+  of Export and Bring In were drawn inside their sheets, a few lines tall. A sheet is now never taller than its window (its
+  title and buttons stay, its body scrolls), and the pickers cover the window. Every sheet and dialog of the library checked
+  at that size (`server/tests/machines_sheets_headless.sh`).
 - **Machines: a machine started right after a large import timed out** (in development). `qemu-img convert` leaves the
   disk in the page cache, and QEMU's first open of it with `O_DIRECT` waited behind gigabytes of writeback past its 20 s
   to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
@@ -969,6 +1021,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `qemu-3d-stop`; nothing said with tools → `qemu-3d-crash`; Shut Down asked → `host-shutdown`; …), with lord-vm's
     echo received each time and the disk check at each next start. Not yet checked with a real 6.12.117 guest with 3D.
 ### Changed
+- **Machines: an installer disc is read out of the desktop's process** (in development; docs/VIRTUALIZATION.md 5.2). The
+  disc a person chooses is untrusted; its boot files are now read by `lord-vm --iso-probe` in seccomp strict mode (it can
+  only read the mapped file and write one fixed 64-byte answer), and lord-server only checks that answer. Same results
+  on real discs.
 
 - **Machines: a guest's picture is taken less often when it doesn't change or no window shows it** (in development;
   the latest release is 0.8.9.5-beta). Seen on the maintainer's PC: a guest on an Intel GVT-g vGPU in apps mode with a
@@ -1203,6 +1259,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Tests
 
+- **Two tests made steady on a busy computer** (in development). `webreg-test`'s stand-in web runtime wrote the files the
+  test reads in place, so a loaded computer let the test read an empty one: it now writes them whole and renames them, and
+  each wait for one may last 10 s (it ends as soon as the file is there; its content is still checked). `wlperf`'s frame rate
+  check shared its lord-server with the paint check, which repaints every frame a second time: with a load of about 24 it
+  measured 41–44 frame callbacks a second (45 needed), 57 without it. The subsurface and damage checks now get a lord-server
+  of their own with the paint check; the bound is unchanged.
+- **Machines: the boot matrix's compatible-devices rows** `tcg-compat` and `other-tcg-compat-<arch>`, and two rows of the
+  QEMU arguments test (the compatible devices on arm64, and with a data disk).
 - **Machines: an end-to-end harness, a boot matrix and kill tests** (`tools/vm/e2e/machines/`, its README says how other
   tests use it; docs/VIRTUALIZATION.md 12; in development, the latest release is 0.8.9.5-beta).
   - **The harness** (`mh.py`): a real headless session, `build/lord-server-test` with the real default theme, started in

@@ -43,10 +43,43 @@ export const COMPONENTS = {
 };
 export const isSystemId = (id) => !!COMPONENTS[id]?.system || /^system:/.test(id || '');
 
-// (0.8.8.6) A running virtual machine's traffic is the Machines component's: its QEMU and passt run in
+// (Machines to 100 %) Each running machine is its own firewall app and row: its QEMU and passt run in
 // app-lordos-lordos-vm-<id>.scope, which lord-netperm and Monitor (fw_scope_app) both read as
-// lordos:machines, so the Machines rule decides for the guest. conn.c adds the machine's id ("cgSub");
-// the row names the machines: "Machines · Ubuntu 24.04". ids: the ids seen, names: { id: name }.
+// "lordos:vm-<id>". It inherits the Machines component's rules, restrictions and trust (fw/rules.h
+// fw_app_parent): a rule for Machines still decides for every machine; a machine's own rules only add.
+// conn.c adds the machine's id ("cgSub"). The Tor gateway keeps lordos:tor-gateway and inherits nothing.
+export const VM_APP_PREFIX = 'lordos:vm-';
+export const VM_PARENT = 'lordos:machines';
+// the machine's id of a machine's firewall app, else null (the same test as fw_app_parent)
+export const vmIdOf = (id) => (typeof id === 'string' && /^lordos:vm-[0-9a-f-]{1,36}$/.test(id) ? id.slice(VM_APP_PREFIX.length) : null);
+export const vmAppOf = (machineId) => (typeof machineId === 'string' && /^[0-9a-f-]{1,36}$/.test(machineId) ? VM_APP_PREFIX + machineId : null);
+const VM_COMPONENT = { label: 'monitor.comp.machine', icon: 'machines', hint: 'monitor.comp.machineHint', parent: VM_PARENT };
+// COMPONENTS[id], or the entry every machine's app shares
+export const componentOf = (id) => COMPONENTS[id] || (vmIdOf(id) ? VM_COMPONENT : null);
+// A component's name: a machine's is its name ("Ubuntu 24.04 (machine)"), or "Machine" while it isn't known.
+// tr: the translator, names: { machineId: name }.
+export function componentLabel(tr, id, names = {}) {
+  const vm = vmIdOf(id);
+  if (vm) {
+    const n = names?.[vm];
+    return typeof n === 'string' && n ? tr('monitor.comp.machineNamed', { name: n }) : tr('monitor.comp.machine');
+  }
+  return COMPONENTS[id] ? tr(COMPONENTS[id].label) : null;
+}
+// A machine's forwarded ports (machine.json "ports", 6.5) as the incoming lines its firewall row shows: each is its own
+// listening socket in the machine's scope, decided as that machine's incoming traffic.
+// → [{ proto: 'tcp'|'udp', port, guest, open: 'this-computer'|'lan' }], sorted by port; bad entries are dropped.
+export function forwardedRules(ports) {
+  const out = [];
+  for (const r of Array.isArray(ports) ? ports : []) {
+    const port = Number(r?.host), guest = Number(r?.guest);
+    if (!Number.isInteger(port) || port < 1 || port > 65535 || !Number.isInteger(guest) || guest < 1 || guest > 65535) continue;
+    out.push({ proto: r.proto === 'udp' ? 'udp' : 'tcp', port, guest, open: r.open === 'lan' ? 'lan' : 'this-computer' });
+  }
+  return out.sort((a, b) => a.port - b.port || a.proto.localeCompare(b.proto));
+}
+// (0.8.8.6) the Machines row (downloads) and the Tor gateway's name the machines seen: "Machines · Ubuntu 24.04".
+// ids: the ids seen, names: { id: name }.
 // Which row a connection of conn.c's list belongs to: a socket made in an app's scope is that app's
 // ("cgApp"), whoever holds it (Mail's connector's are Mail's, a guest's are Machines'); otherwise
 // lord-server's own, then the app, the executable or the process name.

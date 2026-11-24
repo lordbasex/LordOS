@@ -731,5 +731,12 @@
   "desc.done.pause": "Pristabdyta.",
   "desc.done.block_network": "Jos tinklas užblokuotas.",
   "desc.done.blocklist": "Blokavimo sąraše: ji baigiama kaskart, kai pasileidžia.",
-  "desc.blockConfirm": "Įtraukti „{name}“ į blokavimo sąrašą? Nuo šiol ji bus baigiama kaskart, kai pasileis. Tai atšaukti galite skiltyje Nustatymai → DI → Sentinela."
+  "desc.blockConfirm": "Įtraukti „{name}“ į blokavimo sąrašą? Nuo šiol ji bus baigiama kaskart, kai pasileis. Tai atšaukti galite skiltyje Nustatymai → DI → Sentinela.",
+  "comp.machine": "Mašina",
+  "comp.machineNamed": "{name} (mašina)",
+  "comp.machineHint": "Virtuali mašina: jos svečio sistemos tinklo srautas. Jos pačios taisyklės pridedamos prie Mašinų taisyklių, kurios ir toliau sprendžia už kiekvieną mašiną.",
+  "comp.machinesRules": "Mašinų taisyklė",
+  "comp.forwarded": "Peradresuotas prievadas {proto} {port} → {guest}",
+  "comp.forwardedLan": "Atviras tinklui",
+  "comp.forwardedLocal": "Tik šis kompiuteris"
 }

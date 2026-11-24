@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "kept in Captured Output",
   "prefs.tr.would.highlight": "highlights “{text}”",
   "prefs.tr.param": "Parameter",
-  "prefs.tr.regexFirst": "Write the regular expression first."
+  "prefs.tr.regexFirst": "Write the regular expression first.",
+  "guest.badge": "GUEST",
+  "guest.title": "Shell inside {machine}"
 }

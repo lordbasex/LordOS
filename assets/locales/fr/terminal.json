@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "gardée dans Sortie capturée",
   "prefs.tr.would.highlight": "surligne « {text} »",
   "prefs.tr.param": "Paramètre",
-  "prefs.tr.regexFirst": "Saisissez d’abord l’expression régulière."
+  "prefs.tr.regexFirst": "Saisissez d’abord l’expression régulière.",
+  "guest.badge": "MACHINE",
+  "guest.title": "Shell dans {machine}"
 }

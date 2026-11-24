@@ -985,5 +985,6 @@
   "themeSwitch.failedTitle": "Nepavyko pritaikyti {name}",
   "themeSwitch.refusedBody": "Jo kodas nesutampa su pasirašyta LordOS kopija, todėl jis nebuvo įkeltas. Darbalaukio stilius lieka toks, koks buvo.",
   "themeSwitch.failedBody": "Jis nepasileido. Darbalaukio stilius lieka toks, koks buvo.",
-  "spotlight.section.machines": "Virtualios mašinos"
+  "spotlight.section.machines": "Virtualios mašinos",
+  "guestApps.inMachine": "Mašinoje {machine}"
 }

@@ -688,6 +688,8 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 19 && m->heads > 1) return fail(err, n, VM_E_FIELD, "heads needs schema 19");
     /* one picture per output needs virtio-gpu's own: not an Intel vGPU's, and only on a machine with a window */
     if (m->heads > 1 && (m->vgpu || m->display != VM_DISPLAY_WINDOW)) return fail(err, n, VM_E_RANGE, "several displays need virtio graphics and a window");
+    if (m->guest_files_off & ~1) return fail(err, n, VM_E_RANGE, "guest_files is true or false");
+    if (m->schema < 20 && m->guest_files_off) return fail(err, n, VM_E_FIELD, "guest_files needs schema 20");
     if (m->n_usb_auto < 0 || m->n_usb_auto > VM_USB_AUTO) return fail(err, n, VM_E_RANGE, "at most %d usb_auto rules", VM_USB_AUTO);
     if (m->schema < 21 && m->n_usb_auto) return fail(err, n, VM_E_FIELD, "usb_auto needs schema 21");
     if (m->usb & ~1) return fail(err, n, VM_E_RANGE, "usb is true or false");
@@ -850,7 +852,8 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "cpu_model", "heads", "usb_auto", "usb", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "cpu_model", "heads",
+    "guest_files", "usb_auto", "usb", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -1152,6 +1155,10 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         m->heads = 1;
         if ((r = get_opt_int(o, "heads", &m->heads, err, n))) goto out;
         if (json_get(o, "heads") && m->heads < 1) { r = fail(err, n, VM_E_RANGE, "heads is 1 to %d", VM_HEADS_MAX); goto out; }
+        /* schema 20: missing means files from the guest are taken */
+        const JVal *gf = json_get(o, "guest_files");
+        if (gf && gf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "guest_files must be true or false"); goto out; }
+        m->guest_files_off = gf ? !json_bool(o, "guest_files", 1) : 0;
         /* schema 21: missing means no USB controller and no rule (6.6) */
         const JVal *uc = json_get(o, "usb");
         if (uc && uc->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "usb must be true or false"); goto out; }
@@ -1306,6 +1313,7 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 17 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
     if (m->schema >= 18 && m->cpu_model == VM_CPU_COMPAT) jb_raw(&b, ",\n  \"cpu_model\": \"compatible\"");
     if (m->schema >= 19 && m->heads > 1) jb_printf(&b, ",\n  \"heads\": %d", m->heads);
+    if (m->schema >= 20 && m->guest_files_off) jb_raw(&b, ",\n  \"guest_files\": false");
     if (m->schema >= 21 && m->usb) jb_raw(&b, ",\n  \"usb\": true");
     if (m->schema >= 21 && m->n_usb_auto) {
         jb_raw(&b, ",\n  \"usb_auto\": [");

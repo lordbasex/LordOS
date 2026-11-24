@@ -23,6 +23,7 @@
 
 typedef struct {
     int fd;
+    const uint8_t *map;     /* the file mapped (vmiso_probe_map, in lord-vm's probe under seccomp strict mode), or NULL */
     uint64_t size;
     unsigned reads;
     uint64_t bytes;
@@ -40,6 +41,7 @@ static int rd(Rd *r, uint64_t off, void *buf, size_t n) {
     if (r->reads >= r->max || r->bytes + n > VMISO_BYTES) { r->over = 1; return -1; }
     r->reads++;
     r->bytes += n;
+    if (r->map) { memcpy(buf, r->map + off, n); return 0; }
     size_t got = 0;
     while (got < n) {
         ssize_t k = pread(r->fd, (char *)buf + got, n - got, (off_t)(off + got));
@@ -581,11 +583,24 @@ static int udf_probe(Rd *r, VmIso *v) {
 
 /* ---- the whole ---- */
 
+static int probe(Rd *rp, VmIso *v);
 int vmiso_probe(int fd, VmIso *v, unsigned max_reads) {
     memset(v, 0, sizeof *v);
     struct stat st;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size < 17 * (off_t)SEC) return -1;
     Rd r = { .fd = fd, .size = (uint64_t)st.st_size, .max = max_reads && max_reads < VMISO_READS ? max_reads : VMISO_READS };
+    return probe(&r, v);
+}
+
+int vmiso_probe_map(const void *map, uint64_t size, VmIso *v, unsigned max_reads) {
+    memset(v, 0, sizeof *v);
+    if (!map || size < 17 * (uint64_t)SEC) return -1;
+    Rd r = { .fd = -1, .map = map, .size = size, .max = max_reads && max_reads < VMISO_READS ? max_reads : VMISO_READS };
+    return probe(&r, v);
+}
+
+static int probe(Rd *rp, VmIso *v) {
+    Rd r = *rp;
     uint8_t s[SEC], pvd_root[34], jol_root[34];
     int pvd = 0, jol = 0;
     uint32_t cat = 0;
@@ -611,14 +626,4 @@ int vmiso_probe(int fd, VmIso *v, unsigned max_reads) {
     if (cat) el_torito(&r, cat, v);
     v->reads = r.reads;
     return 0;
-}
-
-const char *vmiso_arch(const VmIso *v) {
-    unsigned m = v->efi_pe ? v->efi_pe : v->efi_named;
-    int x86 = (m & (VMISO_X64 | VMISO_IA32)) != 0, arm = (m & VMISO_AA64) != 0, rv = (m & VMISO_RISCV64) != 0;
-    if (x86 + arm + rv > 1) return "";
-    if (arm) return "arm64";
-    if (x86) return "amd64";
-    if (rv) return "riscv64";
-    return v->bios ? "amd64" : "";
 }

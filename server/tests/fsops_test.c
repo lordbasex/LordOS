@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -103,9 +104,54 @@ static void test_mount_type(void) {
     CHECK(!fsops_cloud_path("/tmp") && !fsops_cloud_path("/"));                    /* this machine's own tree */
 }
 
+
+/* a file from a Machines guest (6.21): stat shows it, a copy keeps its marks, what comes out of a marked archive is marked,
+ * and an unmarked source marks nothing (needs a file system with user xattrs: /tmp's tmpfs has them) */
+static void test_marks(void) {
+    char d[64], src[96], plain[96], out[96], sub[128], f1[160], f2[160], lnk[160];
+    snprintf(d, sizeof d, "/tmp/fsops-marks-%d", (int)getpid());
+    mkdir(d, 0700);
+    snprintf(src, sizeof src, "%s/a.zip", d);
+    snprintf(plain, sizeof plain, "%s/b.zip", d);
+    snprintf(out, sizeof out, "%s/out", d);
+    snprintf(sub, sizeof sub, "%s/out/sub", d);
+    snprintf(f1, sizeof f1, "%s/out/run.sh", d);
+    snprintf(f2, sizeof f2, "%s/out/sub/setup.deb", d);
+    snprintf(lnk, sizeof lnk, "%s/out/link", d);
+    int fd = open(src, O_CREAT | O_WRONLY, 0600); if (fd >= 0) close(fd);
+    fd = open(plain, O_CREAT | O_WRONLY, 0600); if (fd >= 0) close(fd);
+    if (setxattr(src, "user.lordos.quarantine", "1", 1, 0)) { printf("fsops-test: no user xattrs on /tmp: marks skipped\n"); return; }
+    setxattr(src, "user.lordos.from", "Win VM", 6, 0);
+    FsStat s;
+    CHECK(!fsops_stat(src, 1, &s) && s.quarantine && !strcmp(s.from, "Win VM"));
+    CHECK(!fsops_stat(plain, 1, &s) && !s.quarantine && !s.from[0]);
+    setxattr(plain, "user.lordos.quarantine", "1", 1, 0);
+    setxattr(plain, "user.lordos.from", "a\nb", 3, 0);
+    CHECK(!fsops_stat(plain, 1, &s) && s.quarantine && !s.from[0]);          /* not plain text: not shown */
+    removexattr(plain, "user.lordos.quarantine"); removexattr(plain, "user.lordos.from");
+    mkdir(out, 0755); mkdir(sub, 0755);
+    fd = open(f1, O_CREAT | O_WRONLY, 0755); if (fd >= 0) close(fd);
+    fd = open(f2, O_CREAT | O_WRONLY, 0644); if (fd >= 0) close(fd);
+    CHECK(!symlink("/etc/hostname", lnk));
+    CHECK(fsops_inherit_marks(plain, out) == 0 && getxattr(f1, "user.lordos.quarantine", NULL, 0) < 0);
+    CHECK(fsops_inherit_marks(src, out) == 4);                              /* out, sub, run.sh, setup.deb; never the link */
+    char v[32];
+    ssize_t n = getxattr(f2, "user.lordos.from", v, sizeof v);
+    CHECK(n == 6 && !memcmp(v, "Win VM", 6) && getxattr(f1, "user.lordos.quarantine", NULL, 0) == 1 && getxattr(sub, "user.lordos.quarantine", NULL, 0) == 1);
+    CHECK(getxattr("/etc/hostname", "user.lordos.quarantine", NULL, 0) < 0);
+    /* a copy keeps them */
+    int in = open(f2, O_RDONLY), o = open(plain, O_WRONLY);
+    CHECK(in >= 0 && o >= 0 && !fsops_copy_marks(in, o) && getxattr(plain, "user.lordos.quarantine", NULL, 0) == 1);
+    if (in >= 0) close(in);
+    if (o >= 0) close(o);
+    char cmd[128];
+    snprintf(cmd, sizeof cmd, "rm -rf '%s'", d);
+    CHECK(system(cmd) == 0);
+}
 int main(void) {
     test_remote_child();
     test_mount_type();
+    test_marks();
     snprintf(H, sizeof H, "/tmp/fsops-test-%d", (int)getpid());
     mkdir(H, 0755);
     fsops_init(H, "nadie");

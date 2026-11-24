@@ -584,5 +584,7 @@
   "prefs.tr.would.capture": "păstrat în Ieșire capturată",
   "prefs.tr.would.highlight": "evidențiază „{text}”",
   "prefs.tr.param": "Parametru",
-  "prefs.tr.regexFirst": "Scrieți mai întâi expresia regulată."
+  "prefs.tr.regexFirst": "Scrieți mai întâi expresia regulată.",
+  "guest.badge": "OASPETE",
+  "guest.title": "Shell în {machine}"
 }
