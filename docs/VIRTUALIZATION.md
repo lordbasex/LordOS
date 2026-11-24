@@ -129,7 +129,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Windows 11 amd64: ISO by hash, unattended, drivers, TPM, Secure Boot, KMS client key (4.3.1) | ✅ | 100 | `windows.js`, `vmunattend.c`, `lordvm.c`; `vm_windows_test.mjs` | On the maintainer's PC |
 | virtio-win guests on arm64 (4.3) | 🟡 | 70 | `machine.c` (the devices on arm64, `vm_gicv3_in`), `lordvm.c` (the arm64 template: `virt,gic-version=3`, AAVMF secure boot, `tpm-tis-device`, USB CD/DVD, ramfb), `vmunattend.c` (arm64 answers, ARM64 drivers), `systems.json` (the maker's 38 Arm64 hashes), `windows.js` `windowsEmulatedWhy`; `vm-test`, `vmunattend-test`, `vm_windows_test.mjs`, `vm_catalog_test.mjs`; the Pi 5, 2026-11-24 | *In development* (4.3.2): KVM refused on a GICv2 host (the Pi 5, measured: "KVM does not support GICv3 emulation"), so there the machine is Emulated; under TCG the template boots with secure boot enforced from the USB CD/DVD (checked with Alpine). Not checked: an install of the guest (its ~6.9 GB ISO comes only from the maker's page and didn't fit on the Pi), Setup on ramfb, the emulated x86-64 guest agent, swtpm on arm64, any GICv3 host (was ❌ 10) |
 | A person's own systems: `vm-image-get-user`, `lord-pgpv` (5.6.1) | ✅ | 95 | `systems.js`, `vmurl.c`, `vmsig.c`, `lordpgpv.c`; `vmurl-test`, `vmsig-test` |  |
-| Import from other apps with identity kept (6.22) | ✅ | 95 | `vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`, `machines import`; `vmimport-test`, `vm_import_test.sh` | No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion. *In development*: `machines import` from the terminal, and the converted disk written out before it is put in place (a machine started right after a large import timed out) |
+| Import from other apps with identity kept (6.22) | ✅ | 95 | `vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`, `machines import`; `vmimport-test`, `vm_import_test.sh`, `vm_qemu_args_test.py` (the compatible devices on both architectures), `boot-matrix.py` (`kvm-compat`, `tcg-compat`, `other-tcg-compat-arm64`) | No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion. *In development*: `machines import` from the terminal, and the converted disk written out before it is put in place (a machine started right after a large import timed out); an arm64 import's compatible devices are NVMe disks and a USB CD/DVD (AAVMF has no SATA driver; it stopped at the UEFI shell), booted on the Pi 5 with KVM and TCG and on the i9 with TCG (12) |
 | Requirements check (5.2) | 🟡 | 80 | `library.jsx` `Requirements`, `model.js` `reqRows`, `missingFor`, `assistant.jsx`, `vm-enable` | Create, which starts the download, waits until the parts are in (one click through the package engine). No per-system page of drivers and tools; not through the Store |
 | Migrate from another PC (6.11) | 🟡 | 25 | `lordvm.c` `--import-machine` (a raw whole-disk image), `machines.c` `cmd_import` | *In development*: a backup image of a Linux PC's disk imports and boots (a 20 GB Ubuntu 26.04.1 image, 2026-11-24, with the import's `fsync` fix). Not built: the old PC's agent and the LAN copy, a connected disk, driver injection, encrypted disks (was ❌ 0) |
 | Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | 🟡 | 92 | `vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `--group-delete`, `--group-rename`, `--group-repair`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_ui_test.mjs`, `vm_group_link.sh`, `vm_group_manage.sh`, `machines_group_manage_headless.sh` | *In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive (2026-11-24; headless, screenshots of the dialogs; the Start Gateway bar node-tested only, its window being protected). Creating a group from the app was refused before (the image store's file name); fixed. Left: the release gate on real hardware (G5) and disk encryption of the members (layer 5) (was 80) |
@@ -138,7 +138,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Library: toolbar, chips, grid or list, sort, search, status line, live card, Templates (5.1) | ✅ | 97 | `library.jsx` (`Lights`, Templates in ···), `model.js` (`skeletonPlan`, `cardLights`, `actionsOf`, `tagsOf`, `filterMachines`); `vm_model_test.mjs`, `machines_app_headless.sh`, `machines_app2_headless.sh` | *In development*: Templates (Make Template, the Templates chip, New Machine from Template; a template doesn't start from the library), the card's own color and tags, seen on screen in the headless scene. Export in ··· is the storage work's (`m100/storage`, `lord.vm.export`): 100 with it |
+| Library: toolbar, chips, grid or list, sort, search, status line, live card, Templates (5.1) | ✅ | 97 | `library.jsx` (`Lights`, Templates in ···), `model.js` (`skeletonPlan`, `cardLights`, `actionsOf`, `tagsOf`, `filterMachines`); `vm_model_test.mjs`, `machines_app_headless.sh`, `machines_app2_headless.sh`, `machines_sheets_headless.sh` | *In development*: Templates (Make Template, the Templates chip, New Machine from Template; a template doesn't start from the library), the card's own color and tags, seen on screen in the headless scene; every sheet and dialog of the library (Clone or Duplicate, New Machine from Template, Export and its save dialog, Bring In and its folder picker, Start Fresh, Configure's Add Disk, the recovery key's window) fits its first size, 760×500, with its buttons inside (`machines_sheets_headless.sh`). Export in ··· is the storage work's (`m100/storage`, `lord.vm.export`): 100 with it |
 | Machines settings: General, Profiles, Systems, Network, Graphics cards, Keyboard and mouse (5.1) | ✅ | 100 | `settingswin.jsx` |  |
 | New Machine assistant (5.2) | 🧪 | 100 | `assistant.jsx` (Detect step, drop, the place, Fresh install), `vm/vmiso.c` (`lord.vm.isoInfo`), `model.js` `detectPlan`, `isoArch`, `dropSource`; `vmiso-test`, `vm_model_test.mjs`, `machines_app2_headless.sh` | *In development*: Detect (label, boot files, emulated said before anything is made), drop of a file on the first step, where the machine goes (no folder choice: decided, every protection keys on the library), the Fresh install snapshot after an unattended install. The Detect and Name steps seen on screen headless with the real reader; the Fresh install snapshot after a real unattended install not yet watched |
 | Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu, Scale, device dots, the guest's shape (5.3) | 🧪 | 95 | `vmwindow.jsx` (View → Scale, `DeviceDots`, Devices → Network and Folders, shape keeping), `model.js` `scaleFrame`, `shapeFrame`, `deviceDots`, `cableOffered`, `VM_NETCABLE` (`vmproto.h`, `lordvm.c`, `js_vm.c` `netCable`); `vm_model_test.mjs`, `vmlink-test`, `vm_configure_boot.sh` | *In development*: Scale, the window keeping the guest's shape, device dots, the network cable while it runs (checked in a real KVM guest: carrier lost and back). USB and Camera show in Devices only once the devices work's backend says they're supported (`lord.vm.deviceCaps`). The new bar and menus not yet seen in a running window on screen |
@@ -157,7 +157,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 |---|---|---:|---|---|
 | Snapshots with memory, NVRAM and TPM, timeline, revert, sweep, at most 64 (6.2) | ✅ | 85 | `lordvm.c` (`tpm_snap`), `snapshots.jsx`, `vmops.h` | No `fsfreeze`, no copy of `machine.json`, no notes, no snapshot before a tools update |
 | Disposable sessions (6.2) | 🧪 | 90 | `lordvm.c` (`session_prepare`, `session_layer`, `session_tpm`), `machine.c` (`disposable`), `configure.jsx`, `storagemodel.js`; `vm_storage_test.sh`, `vm_storage_model_test.mjs`, `vm_group_link.sh` | *In development*, 2026-11-24: any machine, in memory (capped, paused when full) or on disk (unlinked files), every writable disk, the UEFI variables and the TPM; snapshots and Suspend refused; real QEMU, headless. The switch is in Configure only, not in the window or on the card (was 25) |
-| Clone, Duplicate, linked clone, Clone from Here, new identity (6.3) | ✅ | 90 | `lordvm.c` `--clone`, `vmops.c`, `clone.jsx` | The source must be off; no templates. An encrypted machine's Clone keeps its key under the Clone's id (`--new-id`, *in development*) |
+| Clone, Duplicate, linked clone, Clone from Here, new identity (6.3) | ✅ | 90 | `lordvm.c` `--clone`, `vmops.c`, `clone.jsx`; `machines_sheets_headless.sh` | The source must be off; no templates. An encrypted machine's Clone keeps its key under the Clone's id (`--new-id`, *in development*). *In development*: the sheet fits the Control Center's first size (760×500; its body scrolls, its buttons stay), checked with the other sheets in a headless scene |
 | Disks: qcow2, discard, Reclaim space, grow (6.4, 6.4.1) | ✅ | 85 | `lordvm.c` (`blockdev_disk`, `--compact --estimate`, `qemu-img resize`) | An interrupted compaction is rolled back. No qcow2 compression; the disk path itself is scored in M |
 | Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6) | 🧪 | 85 | `lordvm.c` (`--disk-format raw`, `cmd_export`, `cmd_import_lordvm`), `vmexport.c`, `vmkeysrv.c`, `backup/engine.c`, `vmkey.jsx`; `vm_storage_test.sh`, `vmexport-test`, `vmkeysrv-test`, `backup-machines-test` | *In development*, 2026-11-24: raw disk files (never host block devices: decided), encryption (8), Export as `.lordvm` with a checked manifest and as OVA, the import of an export, consistent backups. The OVA never imported into another app; the app's sheets not driven end to end; no bare disk image export (was ❌ 0) |
 | Storage window: shared extents, frees-if-deleted, downloads (6.16) | 🟡 | 75 | `storage.jsx`, `js_vm.c` (FIEMAP) | Trash, Reclaim with an estimate, the unused shared base. Never seen on btrfs or XFS; no "about" figures; no "delete old snapshots" or "remove unused media" |
@@ -266,7 +266,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Unit and headless suites in `make test` (12) | ✅ | 100 | `server/mk/vm.mk`, `vmpin.mk`, `tests/run_suites.sh`, `tests/vm_qemu_args_test.py` | 27 C programs (new: `vmseccomp`, `vm-jail-probe`, `vmgroup`, `vmlink`, `vmimage-group`, `vmunpack`, `np-torgw`, `vmwatch`, `guest-dbus`), 11 scripts (new: `vm_whonix_xml_test.sh`, `vm_group_link.sh`, `guest_perf_test.sh`, migration 011's, and *in development* `vm_qemu_args_test.py`: settings → QEMU arguments as a table, 12 rows, 12 of 12 on the i9; skipped without KVM), 12 node tests (new: `vm_group_model`, `vm_group_ui`, `sentinela_vm`, `protect_model`) (was 90) |
 | Release gates: isolation, integrity, recovery, leaks (12) | ✅ | 100 | `vm_*.sh`, `tools/vm/bare-metal-gates.sh`, `make -C server e2e-machines-gates`, `tools/vm/e2e/machines/ns-run.sh` | Manual (minutes each). *In development*: run on the i9 PC's bare metal on 2026-11-24, in private namespaces: isolation 72 passed (2 skipped: no delegated cgroup, no session bus in the run), integrity 45, recovery 40 (1 skipped), leaks 10; the script refused every physical PC (its virtual-machine check) and the leak gate's zombie check counted other programs' children, both fixed (was 85) |
 | End-to-end bench: a headless session driven over `remote.sock` (12) | ✅ | 95 | `tools/vm/e2e/machines/` (`mh.py`, `probe.js`, `flows.py`, README), `make -C server e2e-machines` | *In development*: a headless lord-server-test with the real theme in private user and mount namespaces, a scratch library, a real Debian guest; the assistant to first boot, Shut Down, Configure, start, the agent and its install, the clipboard both ways, a file drop, kill tests, snapshots, clone, storage, a group's card, checked on screen and on disk: run on the i9 on 2026-11-24. Input through the test hooks, the remote desktop's own injection (`remote.sock` takes only root). Not scripted: apps mode (needs a LordOS guest) and USB; not in `make test` (KVM, minutes) (was 50) |
-| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | 🟡 | 90 | `tools/vm/e2e/machines/boot-matrix.py`, `images.py --windows`, `flows.py` (`windows`, `storage`, `kills`, `killcopy`) | *In development*: the boot matrix ran on the i9 (9 rows: KVM and TCG, OVMF and SeaBIOS, TPM, Secure Boot, compatible devices, 3D on both cards) and the Pi 5 (3 rows; it found that an arm64 machine with the compatible devices doesn't boot, AAVMF has no SATA driver); the virtio-win install test installed the catalog's 90-day evaluation with virtio-win 0.1.271 unattended on the i9; storage figures on ext4 only (said 1,322.4 MB, freed 1,322.2 MB; btrfs and XFS need a disk of theirs); kill tests of the agent, passt, virtiofsd and lord-vm, and of the agent mid-copy, pass. Not in a hosted CI: GitHub's runners have no KVM (was 0) |
+| Boot matrix in CI, virtio-win install test, storage figures, agent kill tests (12) | 🟡 | 90 | `tools/vm/e2e/machines/boot-matrix.py`, `images.py --windows`, `flows.py` (`windows`, `storage`, `kills`, `killcopy`) | *In development*: the boot matrix ran on the i9 (9 rows: KVM and TCG, OVMF and SeaBIOS, TPM, Secure Boot, compatible devices, 3D on both cards) and the Pi 5 (5 rows: KVM and TCG, the compatible devices with both; it found that an arm64 machine with the compatible devices didn't boot, AAVMF has no SATA driver: they are NVMe and a USB CD/DVD on arm64 now, and boot on the Pi and emulated on the i9); the virtio-win install test installed the catalog's 90-day evaluation with virtio-win 0.1.271 unattended on the i9; storage figures on ext4 only (said 1,322.4 MB, freed 1,322.2 MB; btrfs and XFS need a disk of theirs); kill tests of the agent, passt, virtiofsd and lord-vm, and of the agent mid-copy, pass. Not in a hosted CI: GitHub's runners have no KVM (was 0) |
 | Hardware matrix: Pi 5 and Xeon bare metal (gates), the i9 with RX 580 and UHD 630 (3D, GVT-g) | 🟡 | 75 | CHANGELOG; 12 (boot matrix, bare-metal gates) | Pi 5 (gates 2026-11-06, boot matrix 2026-11-24), Xeon (gates), the i9: gates on bare metal and 3D boots on both the RX 580 and the UHD 630 (2026-11-24, *in development*). No Pi 4, no Pi kernel with 4 KiB pages, no NVIDIA; a 3D machine's picture on the UHD 630 not checked (was 50) |
 
 ## Status and how to continue (read this first)
@@ -3780,10 +3780,14 @@ Secure Boot off here, UEFI boot entries made again (the guest's fallback loader 
 rules left out, cards beyond the eighth, a card or a UUID the source didn't keep made new, a disk serial too long for SATA, vCPUs or memory
 cut to this computer. The other architecture is marked Emulated, with *Other architecture…* to read the plan again for the other one.
 
-**Guests without virtio drivers.** Every import starts on `devices: compat`: the system disk and data disks as `ide-hd` on SATA (q35's own
-AHCI, `ide.0`…`ide.4`; on arm64 an `ich9-ahci` in the system disk's slot), the CD/DVD as `ide-cd` on port 5 (so a drivers' disc can go in
-while it runs), a USB tablet (and keyboard on arm64) on `qemu-xhci`, and the card's own model (e1000e when the source's has no QEMU
-twin), MAC kept. Configure → Disks → *Switch to Fast Devices* (`lord-vm --set --devices virtio --nic-model virtio`, the machine off) moves
+**Guests without virtio drivers.** Every import starts on `devices: compat`: on amd64 the system disk and data disks as `ide-hd` on SATA
+(q35's own AHCI, `ide.0`…`ide.4`) and the CD/DVD as `ide-cd` on port 5 (so a drivers' disc can go in while it runs). On arm64 the disks
+are NVMe, one controller each (`nvme` in slot 1, data disks in slots 0x10–0x13; the disk's serial, else `lordvm-sys` and
+`lordvm-data<n>`), and the CD/DVD is USB mass storage (`usb-bot` with a `scsi-cd`, changeable while it runs): AAVMF has no AHCI driver,
+so a SATA disk stopped at its UEFI shell (12), while it starts from NVMe and USB storage, and arm64 guests without virtio drivers carry
+NVMe and USB storage drivers of their own (Windows on Arm's `stornvme`, Linux, the BSDs; the arm64 disks of VMware Fusion and Parallels
+are NVMe too). Both get a USB tablet (and keyboard on arm64) on `qemu-xhci`, and the card's own model (e1000e when the source's has no
+QEMU twin), MAC kept. An unattended LordOS install on such a machine erases `sda`, or `nvme0n1` on arm64. Configure → Disks → *Switch to Fast Devices* (`lord-vm --set --devices virtio --nic-model virtio`, the machine off) moves
 it to virtio once the guest has the drivers, and *Switch Back* undoes it. Installing those drivers into a guest that has none (a Windows
 guest: the virtio-win ISO, 4.3) is **Phase 3 work, not done**: today the person inserts the drivers' disc and installs them in the guest.
 
@@ -4541,13 +4545,24 @@ guest-side protocol fuzz and channel-refusal tests of "Agent".
 - **Leak test:** start and stop 100 times: no orphan processes, scopes, sockets, tap devices.
 
 **Settings → QEMU arguments** (`server/tests/vm_qemu_args_test.py`, *in development*, in `make test`, skipped without KVM):
-twelve rows, each a throwaway machine made with `lord-vm --create`/`--set`, started paused (nothing boots) and its logged
+thirteen rows, each a throwaway machine made with `lord-vm --create`/`--set`, started paused (nothing boots) and its logged
 command line checked for what the setting adds and what it must not: the defaults (UEFI's pflash, virtio-blk with its
 iothread, virtio-scsi's drive, passt on its hub, the D-Bus display, the sandbox flags, no TPM or Hyper-V), BIOS without a
-display on an isolated network, host only, TCG (`-cpu max`), CPU and memory, the compatible devices (SATA, USB tablet and
-mouse), Windows 11's template (SMM, the secure pflash, the Hyper-V flags, local time, the TPM, the CD on SATA), the agent's
+display on an isolated network, host only, TCG (`-cpu max`), CPU and memory, the compatible devices (USB tablet and mouse;
+SATA on amd64, NVMe and a USB CD/DVD on arm64, no AHCI) and with a data disk, Windows 11's template (SMM, the secure pflash, the Hyper-V flags, local time, the TPM, the CD on SATA), the agent's
 two ports on and off, boot order and menu, a shared folder and the transfer folder (their slots, shared memory) and 3D
-(`virtio-vga-gl`, the render node). The arm64 rows (virtio-gpu, keyboard and tablet) run on the Pi. 12 of 12 on the i9.
+(`virtio-vga-gl`, the render node). The arm64 rows (virtio-gpu, keyboard and tablet; the compatible devices' NVMe) run on the Pi. 13 of 13 on the i9; 10 of
+10 on the Pi (three are amd64's).
+
+**Sheets at the Control Center's first size** (`server/tests/machines_sheets_headless.sh`, *in development*, a test tool):
+a headless lord-server with a made-up library (two machines, a template, a Tor group; nothing started or changed) opens
+the Control Center at 760×500 and each of its sheets and dialogs the way a person does (a card's menu by a right click, the
+Machine menu, Configure's sidebar): Clone or Duplicate (and its body scrolled with the wheel), the Templates chip and New
+Machine from Template, Export and its save dialog, Bring In and its folder picker, Start Fresh (with "Also reset the
+Gateway" ticked, the tallest), Configure → Disks (Add Disk) and the recovery key's window; a screenshot of each, and each
+dialog's buttons are checked to be drawn whole inside the window. Before the fix only the top 10 px of the Clone sheet's buttons
+were inside the window, and the two file pickers were drawn inside their sheets' cards, cut to a sliver; now a sheet is never taller than the
+window (its title and buttons stay, its body scrolls) and the pickers cover the window. 25 of 25 steps on the i9.
 
 **End-to-end harness** (`tools/vm/e2e/machines/`, *in development*, 2026-11-24; its README says how other tests use it).
 A real headless session, `build/lord-server-test` with the real default theme, started in its own user and mount
@@ -4605,6 +4620,8 @@ clean Shut Down (the agent, then ACPI) and its seconds, the disk's size.
 | TCG (emulated), UEFI | 36.3 s | 38.3 s | 4.4 s, clean | 1,053 MB |
 | TCG (emulated), SeaBIOS | 34.3 s | 36.3 s | 5.2 s, clean | 1,052 MB |
 | arm64 emulated on amd64 | — | — | — | skipped: `qemu-system-aarch64` isn't installed there |
+| arm64 emulated on amd64 (TCG, AAVMF, virtio), 2026-11-24, later | 132.6 s | 132.6 s | 17.8 s, clean | 1,366 MB |
+| arm64 emulated on amd64, the compatible devices (NVMe, USB CD/DVD) | 132.9 s | 134.9 s | 17.9 s, clean | 1,371 MB |
 
 The 3D rows check that QEMU starts with `virtio-vga-gl` and its D-Bus display on that card's render node and the guest
 boots; the picture of a 3D machine is the harness's to check with `Session(gpu=True)` (not run yet).
@@ -4616,13 +4633,25 @@ folder of `/var/tmp`, its desktop session untouched:
 |---|---:|---:|---|---:|
 | KVM, UEFI (AAVMF), virtio | 25.6 s | 25.6 s | 1.9 s, clean | 1,166 MB |
 | TCG (arm64 emulated on the Pi) | 95.2 s | 97.2 s | 11.3 s, clean | 1,166 MB |
-| KVM, the compatible devices | **fails** | — | forced after 90 s | — |
+| KVM, the compatible devices (SATA, the first run) | **fails** | — | forced after 90 s | — |
+| KVM, UEFI (AAVMF), virtio, again with the fix (a newer prepared image) | 25.1 s | 25.2 s | 4.5 s, clean | 1,366 MB |
+| KVM, the compatible devices (NVMe, USB CD/DVD) | 25.1 s | 25.1 s | 4.9 s, clean | 1,367 MB |
+| TCG, UEFI (AAVMF), virtio | 99.5 s | 103.5 s | 9.4 s, clean | 1,371 MB |
+| TCG, the compatible devices (NVMe, USB CD/DVD) | 103.2 s | 105.2 s | 10.9 s, clean | 1,371 MB |
 
-**Found:** an arm64 machine with the compatible devices doesn't boot from its disk: AAVMF has no AHCI (SATA) driver, so
-the firmware finds nothing and stops at its UEFI shell (`Shell>`; the row keeps the guest's last lines). The same row
-boots on amd64 (OVMF and SeaBIOS have it). Such a machine is made by an import of another app's arm64 machine with
-`--devices compat` (6.22); until it is fixed, an arm64 import should keep `virtio`. Not fixed in this work (the import's).
-amd64 emulated on the Pi wasn't run: the Pi had about 3 GB free, and its image and copy need more.
+**Found and fixed:** an arm64 machine with the compatible devices didn't boot from its disk: AAVMF has no AHCI (SATA)
+driver, so the firmware found nothing and stopped at its UEFI shell (`Shell>`; the row kept the guest's last lines). The same
+row boots on amd64 (OVMF and SeaBIOS have it). Such a machine is made by an import of another app's arm64 machine (6.22,
+`--devices compat` is every import's start). Which storage AAVMF (`qemu-efi-aarch64` 2025.02) starts from was measured on the
+Pi with Debian's arm64 image and plain QEMU under KVM: virtio-blk, NVMe, `usb-storage` and `usb-bot` with a `scsi-hd` reach
+the system's login; `ich9-ahci` with an `ide-hd` stops at the shell. The compatible devices on arm64 are now NVMe disks and
+a USB CD/DVD (6.22): NVMe is in the kernels of the arm64 guests without virtio drivers (Windows on Arm's `stornvme`,
+Linux, the BSDs) and is what VMware Fusion and Parallels give their arm64 machines, and USB storage is what Windows Setup
+for Arm reads its disc from (the windows devices' choice on arm64, 4.3). The rows above with the fix: the Pi with KVM and TCG,
+and the i9 with TCG (`qemu-system-aarch64` and AAVMF unpacked from Debian's packages into a scratch folder and laid over
+`/usr/bin` and `/usr/share` in the run's own mount namespace, so nothing was installed; the i9 was loaded, about 25, by other
+work). `vm_qemu_args_test.py` checks the devices on both architectures. amd64 emulated on the Pi wasn't run: the Pi had
+about 3 GB free then, and its image and copy need more.
 
 **Windows install test** (`images.py --windows`, `run.py windows`): Microsoft's Windows 11 Enterprise Evaluation (English)
 and virtio-win 0.1.271 from their makers' servers, kept only when their SHA-256 is the one the catalog pins (both matched

@@ -142,7 +142,8 @@ export function Migrate({ host, path, names, onClose, onDone, onStart }) {
       codes.includes('new-mac') ? tr('machines.mig.netNew') : tr('machines.mig.netSame')] : null,
     [tr('machines.mig.r.firmware'), plan.firmware === 'uefi' ? 'UEFI' : 'BIOS', plan.firmware === 'uefi' ? 'UEFI' : 'BIOS'],
     plan.kind !== 'disk' ? [tr('machines.mig.r.identity'), plan.uuid || '—', plan.uuid ? tr('machines.mig.idKept') : tr('machines.mig.idNew')] : null,
-    [tr('machines.mig.r.devices'), '', tr('machines.mig.devicesCompat', { nic: plan.nic_model || 'e1000e' })],
+    // the compatible devices: SATA disks, or NVMe on arm64 (AAVMF has no SATA driver: docs/VIRTUALIZATION.md 6.22)
+    [tr('machines.mig.r.devices'), '', tr(plan.arch === 'arm64' ? 'machines.mig.devicesCompatArm' : 'machines.mig.devicesCompat', { nic: plan.nic_model || 'e1000e' })],
   ].filter(Boolean);
   const free = host?.libFreeBytes, need = plan.needs_bytes || 0;
   const other = (plan.arch === 'amd64' ? 'arm64' : 'amd64');

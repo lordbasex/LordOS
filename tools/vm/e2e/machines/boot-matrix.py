@@ -10,8 +10,10 @@
 #   kvm-uefi-2d        KVM, OVMF/AAVMF, 2D (virtio-vga / virtio-gpu)        tcg-uefi-2d    the same emulated (TCG)
 #   kvm-bios-2d        KVM, SeaBIOS (amd64)                                  tcg-bios-2d    the same emulated
 #   kvm-uefi-tpm       KVM, UEFI, a TPM 2.0 (swtpm)                          kvm-uefi-sb    KVM, Secure Boot (MS keys) and a TPM
-#   kvm-uefi-3d-<card> KVM, UEFI, 3D (virgl) on each render node             kvm-compat     KVM, the compatible devices (SATA, e1000)
+#   kvm-uefi-3d-<card> KVM, UEFI, 3D (virgl) on each render node             kvm-compat     KVM, the compatible devices
 #   other-tcg          the other architecture, emulated (arm64 on amd64, amd64 on arm64), with its own image
+#   tcg-compat         the compatible devices emulated      other-tcg-compat-<arch>  the same, the other architecture
+#                      (amd64: SATA; arm64: NVMe and a USB CD/DVD, AAVMF has no SATA driver)
 # Exit 0 when every row that ran booted; 1 otherwise; 77 when nothing could run.
 import json, os, re, shutil, subprocess, sys, tempfile, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -57,6 +59,10 @@ def rows():
     add("tcg-uefi-2d", ARCH, ["--accel", "tcg", "--firmware", "uefi"], tmo=900)
     add("tcg-bios-2d", ARCH, ["--accel", "tcg", "--firmware", "bios"], why=None if ARCH == "amd64" else "arm64 has no BIOS", tmo=900)
     add("other-tcg-%s" % OTHER, OTHER, ["--accel", "tcg", "--arch", OTHER],
+        why=None if shutil.which(QEMU[OTHER]) else "%s isn't installed" % QEMU[OTHER], tmo=1500)
+    # the compatible devices emulated: SATA on amd64; NVMe and a USB CD/DVD on arm64, where AAVMF has no SATA driver
+    add("tcg-compat", ARCH, ["--accel", "tcg", "--devices", "compat"], tmo=900)
+    add("other-tcg-compat-%s" % OTHER, OTHER, ["--accel", "tcg", "--arch", OTHER, "--devices", "compat"],
         why=None if shutil.which(QEMU[OTHER]) else "%s isn't installed" % QEMU[OTHER], tmo=1500)
     return r
 

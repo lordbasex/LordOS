@@ -401,6 +401,10 @@ static void write_text(const char *path, const char *text, mode_t mode) {
     chmod(path, mode);
 }
 
+/* how long (10 ms ticks) a check waits for a file the stand-in writes: up to 10 s on a busy computer; each wait ends as
+ * soon as the file is there, and its content is still checked */
+#define WAIT_TICKS 1000
+
 static char *read_text(const char *path) {
     size_t n;
     return webreg_read_file(path, 1 << 20, &n);
@@ -424,8 +428,10 @@ static const char FAKE[] =
     "  printf '\\211PNG\\r\\n\\032\\n\\000\\000\\000\\rIHDR\\000\\000\\000\\020\\000\\000\\000\\020\\010\\006\\000\\000\\000\\037\\363\\377a' >&3\n"
     "  exit 0\n"
     "fi\n"
-    "echo \"$@\" > \"$HOME/args-$2-$4\"\n"
-    "/usr/bin/env > \"$HOME/env-$2-$4\"\n"
+    /* written whole, then renamed: the test reads each as soon as its name is there (a busy computer once let it read
+     * the environment's file while env was still writing it, empty) */
+    "echo \"$@\" > \"$HOME/.args-$2-$4\" && mv \"$HOME/.args-$2-$4\" \"$HOME/args-$2-$4\"\n"
+    "/usr/bin/env > \"$HOME/.env-$2-$4\" && mv \"$HOME/.env-$2-$4\" \"$HOME/env-$2-$4\"\n"
     "exec /bin/sleep 30\n";
 
 /* a stand-in whose page step fails the way the runtime says it does */
@@ -566,12 +572,12 @@ static void test_manager(void) {
     CHECK(webmgr_owner(getpid(), oa, op) < 0, "not one of ours");
     snprintf(p, sizeof p, "%s/args-chat-work", root);
     char *args = NULL;
-    for (int i = 0; i < 200 && !(args = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+    for (int i = 0; i < WAIT_TICKS && !(args = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
     CHECK(args && !strcmp(args, "--app chat --profile work\n"), "argv: %s", args ? args : "(none)");
     free(args);
     snprintf(p, sizeof p, "%s/env-chat-work", root);
     char *env = NULL;
-    for (int i = 0; i < 200 && !(env = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+    for (int i = 0; i < WAIT_TICKS && !(env = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
     CHECK(env && strstr(env, "LORDOS_WEB=1") && strstr(env, "WAYLAND_DISPLAY=wayland-test") && strstr(env, "LANG=C.UTF-8") && !strstr(env, "SECRET_TOKEN"),
           "environment: %s", env ? env : "(none)");
     /* the theme has not told the desktop's mode yet: no scheme in the environment */
@@ -585,7 +591,7 @@ static void test_manager(void) {
     unsetenv("LORDOS_SESSIOND");
     snprintf(p, sizeof p, "%s/env-chat-personal", root);
     env = NULL;
-    for (int i = 0; i < 200 && !(env = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+    for (int i = 0; i < WAIT_TICKS && !(env = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
     CHECK(env && strstr(env, "LORDOS_SESSIOND=1\n") && !strstr(env, "/some/value"), "LORDOS_SESSIOND=1: %s", env ? env : "(none)");
     CHECK(env && strstr(env, "\n" WEBSCHEME_ENV "=dark\n"), "%s=dark after the theme said dark: %s", WEBSCHEME_ENV, env ? env : "(none)");
     free(env);
@@ -598,7 +604,7 @@ static void test_manager(void) {
         CHECK(!webmgr_launch("chat", sch[k][1], &raised) && raised == 0, "%s started", sch[k][1]);
         snprintf(q, sizeof q, "%s/env-chat-%s", root, sch[k][1]);
         env = NULL;
-        for (int i = 0; i < 200 && !(env = read_text(q)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+        for (int i = 0; i < WAIT_TICKS && !(env = read_text(q)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
         if (sch[k][2]) CHECK(env && strstr(env, sch[k][2]) && !strstr(env, WEBSCHEME_ENV "=dark"), "%s: %s", sch[k][2], env ? env : "(none)");
         else CHECK(env && !strstr(env, WEBSCHEME_ENV "="), "no %s after an unknown value: %s", WEBSCHEME_ENV, env ? env : "(none)");
         free(env);
@@ -632,7 +638,7 @@ static void test_manager(void) {
             CHECK(!webmgr_launch("chat", "look", &raised) && raised == 0, "look started");
             snprintf(q, sizeof q, "%s/env-chat-look", root);
             env = NULL;
-            for (int i = 0; i < 200 && !(env = read_text(q)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+            for (int i = 0; i < WAIT_TICKS && !(env = read_text(q)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
             if (cs[k].want)
                 CHECK(env && strstr(env, cs[k].want) && !strstr(env, strstr(cs[k].want, "=dark") ? WEBSCHEME_ENV "=light" : WEBSCHEME_ENV "=dark"),
                       "appearance %d: %s", k, env ? env : "(none)");
@@ -712,7 +718,7 @@ static void test_manager(void) {
         for (int i = 0; i < n; i++) if (!strcmp(r[i].profile, "work") && r[i].inspect) now = r[i].pid;
         CHECK(now > 0 && now != before && kill(before, 0) != 0, "a new process, the old one ended");
         char *ia = NULL;
-        for (int i = 0; i < 200 && !(ia = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
+        for (int i = 0; i < WAIT_TICKS && !(ia = read_text(p)); i++) { struct timespec ts = { 0, 10 * 1000000 }; nanosleep(&ts, NULL); }
         CHECK(ia && !strcmp(ia, "--app chat --profile work --inspect\n"), "argv: %s", ia ? ia : "(none)");
         free(ia);
         CHECK(!webmgr_inspect("chat", "work", &already) && already == 1, "a second Inspect only shows it");
