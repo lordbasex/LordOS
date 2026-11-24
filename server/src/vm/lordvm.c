@@ -2463,6 +2463,14 @@ static int start_machine(void) {
         if (S.passt < 0) { fail_start("can't start passt"); return -1; }
         S.passt_err = perr[0];
         vlog("passt: pid %d", (int)S.passt);
+        {
+            /* its arguments, as QEMU's are logged (tests/vm_whonix_xml_test.sh reads both) */
+            char *pa[16 + 4 * VM_PORTS], pl[1024];
+            int pn = vm_passt_argv(&S.m, pa, (int)(sizeof pa / sizeof pa[0]));
+            size_t po = 0;
+            for (int i = 0; i < pn && pa[i] && po + 2 < sizeof pl; i++) po += (size_t)snprintf(pl + po, sizeof pl - po, "%s%s", i ? " " : "", pa[i]);
+            if (pn > 0) vlog("passt: %s", pl);
+        }
         S.sandbox |= VMS_PDEATHSIG;
     }
     if (sh_count() && start_shares()) return -1;
@@ -2479,7 +2487,9 @@ static int start_machine(void) {
         char line[8192];
         size_t o = 0;
         for (int i = 0; qargv[i] && o + 2 < sizeof line; i++) o += (size_t)snprintf(line + o, sizeof line - o, "%s%s", i ? " " : "", qargv[i]);
-        vlog("qemu: %s", line);
+        /* in pieces a log line holds: "qemu: " then "qemu+ " for the rest (tests/vm_whonix_xml.py joins them) */
+        if (o > sizeof line - 1) o = sizeof line - 1;
+        for (size_t at = 0; at < o; at += 900) vlog("%s%.900s", at ? "qemu+ " : "qemu: ", line + at);
         for (int i = 0; i < S.ncreds; i++) vlog("qemu: credential %s on fd %d (value not logged)", S.cred_name[i], (S.m.agent ? 9 : 7) + i);
     }
     if (S.userns < 0) vlog("qemu: no user namespace (%s): QEMU runs in the session's namespaces, readable by the person's programs", strerror(S.userns_err));

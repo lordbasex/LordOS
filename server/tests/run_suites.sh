@@ -285,6 +285,14 @@ EOF
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
     esac
+    # a Whonix group's members (docs/VIRTUALIZATION.md 19.5): each one's QEMU and passt arguments against Whonix's own
+    # libvirt XML of the pinned release; started paused from two empty disks, nothing boots
+    bash tests/vm_whonix_xml_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-whonix-xml (tests/vm_whonix_xml_test.sh: the members' QEMU arguments against Whonix's XML)" ;;
+        77) skip "vm-whonix-xml" "KVM, QEMU, qemu-img, passt, unshare and python3" ;;
+        *) bad "vm-whonix-xml (tests/vm_whonix_xml_test.sh)"; cat "$T/out" ;;
+    esac
     # protected windows (docs/PRIVACY.md): drawn on the display, the protected fill in a screenshot, the remote desktop's
     # and recording's frame, the Screenshot portal's still and a window shared alone; the other window captured as shown
     sh tests/protected_headless.sh >"$T/out" 2>&1
