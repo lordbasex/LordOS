@@ -46,6 +46,18 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `build/vm-test` and `build/vmgroup-test`, `tests/vm_exec_e2e.sh` (28 checks, run on 2026-11-24 in a real Ubuntu
     26.04.1 machine made by the Ubuntu card on the dev PC). Not built: an interactive shell over the agent, programs in
     virtio-win guests, folders in `cp`, packages and `rebuild` in `apply`, creating a machine from a card through MCP.
+- **Machines: a machine group's Delete, Rename and Repair** (in development; docs/VIRTUALIZATION.md 19.7–19.9). The
+  group's card menu gains Rename… (the group, its members' names and its folder, with the group off; also `machines rename
+  GROUP NEW`), Delete… (for good: every member's lock held, the folder renamed out of sight, checked and removed by
+  descriptors without following links, then each base nothing else names) and Repair… on a damaged group (a base missing
+  or changed made again from the verified archive through the sandboxed `lord-vmunpack`, a missing member made again from
+  its base). Start Fresh now remakes a missing or changed base instead of refusing, fetching the archive again when it is
+  gone (refused unless its SHA-512 is the recorded one). While the Gateway is off, the Workstation's window says "No
+  network: the Gateway is off" with Start Gateway; the card offers Shut Down the Gateway when it runs alone. Fixed: creating
+  a group from the app was refused (the image store's file name never matched the catalog's pattern), and a base already
+  in `.shared` was reused without checking it. 34 new texts in all 35 languages. Tests: `vmgroup-test`,
+  `tests/vm_group_manage.sh` (37 checks), `tests/machines_group_manage_headless.sh` (20, a headless lord-server in its own
+  namespaces), `vm_group_ui_test.mjs`, `vm_group_model_test.mjs`.
 - **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the

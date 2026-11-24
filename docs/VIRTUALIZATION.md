@@ -129,7 +129,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Import from other apps with identity kept (6.22) | ✅ | 95 | `vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`; `vmimport-test`, `vm_import_test.sh` | No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion |
 | Requirements check (5.2) | 🟡 | 80 | `library.jsx` `Requirements`, `model.js` `reqRows`, `missingFor`, `assistant.jsx`, `vm-enable` | Create, which starts the download, waits until the parts are in (one click through the package engine). No per-system page of drivers and tools; not through the Store |
 | Migrate from another PC (6.11) | ❌ | 0 |  | Phase 4 (the assistant's Migrate tile is the import of 6.22) |
-| Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | 🟡 | 80 | `vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_link.sh` | *In development* (`feat/whonix-group`, `feat/whonix-group-2`): G0–G4 of 19.11 (download and unpacking, groups, the link, `machines`, the card and About step, one library card with its menu, Configure's group view, Start Fresh, the disposable session in memory, the Gateway's firewall identity, a clean Shut Down), headless end to end; left: the release gate on real hardware (G5), disk encryption of the members (layer 5), Delete and Rename of a group and Repair of a damaged one (the card only names it damaged), the Workstation bar's "No network: the Gateway is off" with Start Gateway, making a missing base again from the archive (was 85: these were counted as built) |
+| Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | 🟡 | 92 | `vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `--group-delete`, `--group-rename`, `--group-repair`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_ui_test.mjs`, `vm_group_link.sh`, `vm_group_manage.sh`, `machines_group_manage_headless.sh` | *In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive (2026-11-24; headless, screenshots of the dialogs; the Start Gateway bar node-tested only, its window being protected). Creating a group from the app was refused before (the image store's file name); fixed. Left: the release gate on real hardware (G5) and disk encryption of the members (layer 5) (was 80) |
 
 ### C. The app (75 %)
 
@@ -379,8 +379,8 @@ Still open in Phase 2:
 - [x] Local MCP server (`machines mcp` / `lordvm mcp`), `exec`, `cp`, `logs`, `apply`, per machine with automation on
   (2026-11-24, in development; 6.15, 6.24). Left: the interactive shell, virtio-win guests, folders in `cp`.
 - [ ] Migrate from another computer (6.11).
-- [ ] Machine groups and the Whonix (Tor) card (19): G0–G4 built and checked headless (in development, 2026-11-24);
-  the release gate G5 on real hardware, Delete, Rename and Repair of a group still open.
+- [ ] Machine groups and the Whonix (Tor) card (19): G0–G4, Delete, Rename and Repair of a group built and checked
+  headless (in development, 2026-11-24); the release gate G5 on real hardware and the members' disk encryption open.
 
 ### Phase 5, later: decided then
 
@@ -4918,8 +4918,11 @@ never older than the one the catalog names (a rollback floor).
   rename leaves the old disk and one after it the new one (no `operation.json`: the rename is the only step that
   counts). The member gets a new UUID and new MACs; its snapshots go (they live in the old overlay); its
   `snapshots.json`, `cpu-usage.json`, logs and pictures are removed. It takes seconds and no download. The base's
-  SHA-256 is checked against `group.json` first (a few seconds for a ~3 GB file); a mismatch is refused ("delete the
-  group and make it again"): making the base again from the archive isn't built.
+  SHA-256 is checked against `group.json` first (a few seconds for a ~3 GB file). A base missing or changed is made
+  again from the verified archive in the image store (`images/<sha512>.tar.xz`, hashed again against `group.json`'s
+  SHA-512), through the same sandboxed `lord-vmunpack` and jailed `qemu-img` as creation, under `.shared/.lock`. With no
+  archive, lord-vm exits 4 (`needArchive`) and Machines downloads it again for the group's own release (refused unless
+  the signed list still gives the same SHA-512), then runs the job again (built 2026-11-24, in development).
 - **Only the Workstation by default.** Resetting the Gateway throws away Tor's state, including its entry guards, which
   Tor keeps for months on purpose so that a hostile relay has fewer chances to become a person's guard. Whonix's own
   design keeps the Gateway long-lived (Qubes-Whonix's disposables are Workstations). The dialog offers "Also reset the
@@ -4960,6 +4963,16 @@ Play starts the group. The card's context menu:
 
 Clone, Duplicate and Rename of a single member aren't offered; Rename renames the group (`renameat2` of the group
 folder, as 6.26 does for a machine).
+
+Built (2026-11-24, in development): **Rename…** (`lord-vm --group-rename`, with the group off: `group.json`'s name, the
+members' names "NAME Gateway/Workstation" cut on a character boundary, and the folder by `renameat2(RENAME_NOREPLACE)`
+when the name asks for another, refused for a name or folder another group or machine has, `vm_group_rename_plan`; also
+`machines rename GROUP NEW`). **Delete…** (`lord-vm --group-delete`: for good, no Trash; with the group's lock and every
+member's lock held, refused while one runs; the folder is renamed out of sight, checked to be the locked one, and removed
+by descriptors without following links; then each base in `.shared` that nothing in the library or the Trash still names
+goes, under `.shared/.lock`). **Shut Down the Gateway** while it runs without its Workstation. The Workstation window's
+bar while the Gateway is down: "No network: the Gateway is off" with **Start Gateway** (node-tested only: the window is
+protected, so no capture shows it).
 
 **Machine window:** the Workstation's window is the ordinary one without the locked buttons (clipboard, folders, apps,
 agent), and without Screenshot and Record. It is a protected window, opened so (built: `model.js` `machineProtected`,
@@ -5006,10 +5019,13 @@ Tor by itself (sdwdate, Tor Browser's connection screen).
 | Host shutdown | the Workstation's guest shutdown, then the Gateway's, inside logind's 45 s (no saves, 19.5) |
 | `VM_LINK` with a bad descriptor | refused and logged; the member stays without network |
 
-Built so far (2026-11-24): the start order and the Workstation not started after a Gateway failure (`groupPlan`), the
-link going down with the Gateway and coming back with a new pair, a damaged group named on its card, the bad
-descriptor; at host shutdown each member is shut down by its own lord-vm (never saved), not in the group's order. Not built: the card's Repair and Delete of a damaged group, Start Gateway in the Workstation's
-bar and Stop Gateway on the card.
+Built (2026-11-24): the start order and the Workstation not started after a Gateway failure (`groupPlan`); the link
+going down with the Gateway and coming back with a new pair; the bad descriptor; Stop Gateway on the card when the
+Workstation fails to start, and Start Gateway in the Workstation's bar; a damaged group (a member folder missing or not
+the group's own, a base missing, or `group.json` unreadable) shown on its card with **Repair** (`lord-vm --group-repair`:
+a missing or changed base made again from the verified archive, members over a changed base started fresh, a missing
+member made again from its base, all after a confirmation) and **Delete**; a `group.json` that can't be read is deleted
+only. At host shutdown each member is shut down by its own lord-vm (never saved), not in the group's order.
 
 ### 19.10 Tests
 
@@ -5026,6 +5042,10 @@ bar and Stop Gateway on the card.
 - `tests/vm_group_link.sh` (headless, two throwaway guests of the host's kernel): frames cross the link; killing one QEMU
   takes the link down; a new pair brings it back; the Workstation-role guest reaches nothing else (no DHCP, no host, no
   internet).
+- `tests/vm_group_manage.sh` (lord-vm `--group-delete/rename/repair/fresh` on throwaway groups from a fixture archive)
+  and `tests/machines_group_manage_headless.sh` (the same through `lord.vm` in a headless lord-server in its own
+  namespaces); `vmgroup-test` also covers `vm_group_rm_at`, the group and member locks, `vm_group_rename_plan` and
+  `vm_group_base_users`.
 - `tests/vm_whonix_xml_test.sh`: reads the two XMLs of the pinned release (a fixture) and fails when Whonix asks for
   something 19.5 doesn't give (new devices, timers, memory), so that a catalog move is reviewed.
 - **A release gate on the dev VM and the maintainer's PC**, with a screendump each: the card through creation; Tor
