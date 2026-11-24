@@ -718,7 +718,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 14, paddingBottom: 8 }}>{body}</ScrollView>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderColor: p.line }}>
-        {step === 0 ? <Btn link label={arch === host.arch ? tr('machines.as.otherArch', { arch: other }) : tr('machines.as.thisArch', { arch: host.arch })}
+        {step === 0 && !onDetect ? <Btn link label={arch === host.arch ? tr('machines.as.otherArch', { arch: other }) : tr('machines.as.thisArch', { arch: host.arch })}
           onClick={() => setArch(arch === host.arch ? other : host.arch)} /> : null}
         <View style={{ flex: 1 }} />
         {step === 4 && !fail && !stopped ? null : <Pill label={(step === 0 && !onDetect) || fail || stopped ? tr('machines.cancel') : tr('machines.back')} onClick={() => ((step === 0 && !onDetect) || fail || stopped ? onClose() : goBack())} />}

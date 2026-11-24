@@ -1749,5 +1749,5 @@
   "tpl.newFrom": "New Machine from Template…",
   "tpl.make": "Make Template",
   "tpl.unmake": "Stop Being a Template",
-  "tpl.chip": "Templates {n}"
+  "tpl.chip": "Templates · {n}"
 }
