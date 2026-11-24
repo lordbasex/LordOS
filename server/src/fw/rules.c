@@ -16,6 +16,7 @@
 #endif
 #include "fw/rules.h"
 #include "fw/fwmap.h"
+#include "netperm/np_shared.h"   /* np_tor_special: the Tor gateway's special ranges, the same as the kernel's */
 #include "sec/json.h"
 
 #include <arpa/inet.h>
@@ -736,7 +737,7 @@ FwDecision fw_decide(FwStore *s, const FwQuery *q) {
     uint32_t hit = 0;
     rf |= fw_builtin_restricted(c);
     if (rf & FW_R_NO_NETWORK) hit = FW_R_NO_NETWORK;
-    else if ((rf & FW_R_TOR_UPLINK) && fw_tor_uplink_denies(q->dir, q->proto, lan, q->port)) hit = FW_R_TOR_UPLINK;
+    else if ((rf & FW_R_TOR_UPLINK) && fw_tor_uplink_denies(q->dir, q->proto, fam && np_tor_special(fam, addr) ? 1 : lan, q->port)) hit = FW_R_TOR_UPLINK;
     else if (q->dir == FW_IN && (rf & FW_R_NO_INCOMING)) hit = FW_R_NO_INCOMING;
     else if ((rf & FW_R_NO_INTERNET) && lan != 1) hit = FW_R_NO_INTERNET;   /* unknown: internet */
     else if ((rf & FW_R_NO_LAN) && lan == 1) hit = FW_R_NO_LAN;

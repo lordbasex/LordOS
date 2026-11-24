@@ -173,13 +173,17 @@ NP_INLINE int lookup_blk(NpApp *app, int fam, const np_u8 *addr) {
     return 0;
 }
 
-/* (Whonix groups) one of this computer's own addresses (np_local): the Tor gateway's restriction counts it as LAN */
-NP_INLINE int host_own(NpApp *app, int fam, const np_u8 *addr) {
+/* (Whonix groups) for the Tor gateway's restriction, an address it may never reach though it isn't LAN: one of this
+ * computer's own addresses or networks (np_local; every address when np_local didn't fit), or a special range
+ * (np_tor_special). Counted as LAN, which the restriction denies. */
+NP_INLINE int tor_lan(NpCfg *cfg, NpApp *app, int fam, const np_u8 *addr) {
     if (!(app->flags & NP_R_TOR_UPLINK) || (fam != 4 && fam != 6)) return 0;
+    if (cfg->local_full || np_tor_special(fam, addr)) return 1;
     NpLocalKey k;
     __builtin_memset(&k, 0, sizeof k);
-    k.fam = (np_u8)fam;
-    for (int i = 0; i < 16; i++) k.addr[i] = addr[i];
+    k.prefixlen = 8 + 128;
+    k.data[0] = (np_u8)fam;
+    for (int i = 0; i < 16; i++) k.data[1 + i] = addr[i];
     return bpf_map_lookup_elem(&np_local, &k) != 0;
 }
 
@@ -195,7 +199,7 @@ NP_INLINE int handle(int fam, np_u8 *addr, int port, int proto, int dir, int alw
 
     int lan = -1;
     NpList *l = lookup_list(app, fam, addr, &lan);
-    if (host_own(app, fam, addr)) lan = 1;
+    if (tor_lan(cfg, app, fam, addr)) lan = 1;
     NpRes r;
     np_decide(app, l, dir, proto, port, lan, lookup_blk(app, fam, addr), np_is_loop(fam, addr), &r);
     int deny = r.verdict == NP_V_DENY;
@@ -551,7 +555,7 @@ NP_INLINE int filter(struct __sk_buff *skb, int in) {
     if (app && app->can_deny) {
         int lan = -1;
         NpList *l = lookup_list(app, k.fam, k.addr, &lan);
-        if (host_own(app, k.fam, k.addr)) lan = 1;
+        if (tor_lan(cfg, app, k.fam, k.addr)) lan = 1;
         np_decide(app, l, dir, proto, port, lan, lookup_blk(app, k.fam, k.addr), np_is_loop(k.fam, k.addr), &r);
         /* a reset always goes through: it is what tells the other end the connection is over */
         deny = r.verdict == NP_V_DENY && !rst;

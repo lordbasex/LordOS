@@ -151,8 +151,9 @@ static struct {
     BpfRing ring;
     int cgfd;
     int ep, lfd, ifd, tfd, root_wd, dns_fd;
-    int addr_fd;                        /* rtnetlink, this computer's address changes (np_local) */
+    int addr_fd;                        /* rtnetlink, this computer's address and route changes (np_local) */
     NpLocalKey local[NP_MAX_LOCAL];     /* what np_local holds */
+    NpCfg cfg;                          /* what np_cfg holds */
     int nlocal;
     Session sess[MAX_SESS];
     int nsess;
@@ -1496,7 +1497,8 @@ static int bpf_setup(void) {
         G.progs[np++] = fd;
     }
     G.nprogs = np;
-    NpCfg cfg = { SCOPE_LEVEL, 1, USER_LEVEL, hidraw_major() };
+    NpCfg cfg = { SCOPE_LEVEL, 1, USER_LEVEL, hidraw_major(), 0 };
+    G.cfg = cfg;
     uint32_t zero = 0;
     if (bpfs_map_update(G.m_np_cfg, &zero, &cfg, BPF_ANY)) { lerr_set(G.bpf_err, sizeof G.bpf_err, "fw.bpfConfig", "errno", lerr_errno(errno), NULL); return -1; }
     logf_("%d BPF programs loaded (devices: %s, Bluetooth sockets: %s, traffic accounting: %s, hidraw major %u)", np, G.dev_ok ? "yes" : "no",
@@ -1539,33 +1541,46 @@ static void attach_service(void) {
     logf_("%d BPF programs attached to " CG_SERVICE " (scopes at level %d)", G.nlinks, SCOPE_LEVEL);
 }
 
-/* ---- this computer's own addresses (np_local) --------------------------------------------------
+/* ---- this computer's own networks (np_local) ---------------------------------------------------
  *
  * (Whonix groups, docs/FIREWALL.md "The Tor gateway") The Tor gateway's built-in restriction never lets it reach this
- * computer, whatever range its address is in (a public IPv4 or a global IPv6 on an interface): the addresses of every
- * interface, read with an RTM_GETADDR dump over rtnetlink (NETLINK_ROUTE: no AF_INET socket), go into np_local at start,
- * on every address change (RTMGRP_*_IFADDR) and with the 5-second rescan. Only addresses are taken from the answer. */
+ * computer or another machine on one of its links, whatever range their addresses are in (a public IPv4 LAN, a routed
+ * /64): every interface address as a host and with its prefix, and every directly connected route, read with
+ * RTM_GETADDR and RTM_GETROUTE dumps over rtnetlink (netperm/nplocal.c; NETLINK_ROUTE, no AF_INET socket), go into the
+ * np_local trie at start, on every address or route change (RTMGRP_*_IFADDR, RTMGRP_*_ROUTE) and with the 5-second
+ * rescan. When they can't be read or don't fit, NpCfg.local_full makes the restriction deny every address (fail
+ * closed, logged). Only addresses and prefixes are taken from the answers. */
 
 static void sync_local(void) {
     if (!G.bpf_ok) return;
     static NpLocalKey now[NP_MAX_LOCAL];
-    int n = np_host_addrs(now, NP_MAX_LOCAL);
-    if (n < 0) { logf_("this computer's addresses: rtnetlink: %s", strerror(errno)); return; }
+    int full = 0, n = np_host_addrs(now, NP_MAX_LOCAL, &full);
+    /* fail closed: networks that couldn't be read or didn't fit leave the Tor gateway with no address at all */
+    int closed = n < 0 || full;
+    if (n < 0) { logf_("this computer's networks: rtnetlink: %s: the Tor gateway's restriction denies every address", strerror(errno)); n = 0; }
+    else if (full && !G.cfg.local_full) logf_("this computer has more than %d networks: the Tor gateway's restriction denies every address", NP_MAX_LOCAL);
     uint8_t one = 1;
     for (int i = 0; i < n; i++) bpfs_map_update(G.m_np_local, &now[i], &one, BPF_ANY);
-    for (int i = 0; i < G.nlocal; i++) {
-        int keep = 0;
-        for (int k = 0; k < n && !keep; k++) keep = !memcmp(&now[k], &G.local[i], sizeof now[k]);
-        if (!keep) bpfs_map_delete(G.m_np_local, &G.local[i]);
+    if (!closed || n) {
+        for (int i = 0; i < G.nlocal; i++) {
+            int keep = 0;
+            for (int k = 0; k < n && !keep; k++) keep = !memcmp(&now[k], &G.local[i], sizeof now[k]);
+            if (!keep) bpfs_map_delete(G.m_np_local, &G.local[i]);
+        }
+        memcpy(G.local, now, sizeof now[0] * (size_t)n);
+        G.nlocal = n;
     }
-    memcpy(G.local, now, sizeof now[0] * (size_t)n);
-    G.nlocal = n;
+    if ((uint32_t)closed != G.cfg.local_full) {
+        G.cfg.local_full = (uint32_t)closed;
+        uint32_t zero = 0;
+        if (bpfs_map_update(G.m_np_cfg, &zero, &G.cfg, BPF_ANY)) logf_("np_cfg: %s", strerror(errno));
+    }
 }
 
 static int addr_watch_open(void) {
     int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC | SOCK_NONBLOCK, NETLINK_ROUTE);
     if (fd < 0) return -1;
-    struct sockaddr_nl sa = { .nl_family = AF_NETLINK, .nl_groups = RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_IFADDR };
+    struct sockaddr_nl sa = { .nl_family = AF_NETLINK, .nl_groups = RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_IFADDR | RTMGRP_IPV4_ROUTE | RTMGRP_IPV6_ROUTE };
     if (bind(fd, (struct sockaddr *)&sa, sizeof sa)) { close(fd); return -1; }
     return fd;
 }

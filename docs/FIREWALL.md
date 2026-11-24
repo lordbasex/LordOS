@@ -1218,14 +1218,25 @@ firewall identity of its own with a rule built into lord-netperm:
     gives it no DNS forwarding and no forwarded ports, and it starts and carries Tor this way); `sendmsg4/6` and the
     packet filter deny UDP as well;
   - every address that isn't the internet's: the LAN, RFC 1918, CGNAT, link-local, ULA, multicast, loopback, an
-    unknown address (`lan != 0`), and **this computer's own addresses whatever their range** (below);
+    unknown address (`lan != 0`), **this computer's own addresses and the networks of its links whatever their range**
+    (below), and the special ranges of `np_tor_special` (`np_shared.h`, the same function in `fw_decide`): 0/8,
+    100.64/10, 192.0.0/24, 192.0.2/24, 198.18/15, 198.51.100/24, 203.0.113/24, 240/4 and broadcast; and every IPv6
+    range that carries an IPv4 address inside, which a translator could turn into a LAN or host address: IPv4-compatible
+    `::/96`, IPv4-mapped `::ffff:0:0/96` (decided as its IPv4 anyway), NAT64 `64:ff9b::/96` and `64:ff9b:1::/48`, Teredo
+    `2001::/32`, 6to4 `2002::/16`; plus `100::/64` and `2001:db8::/32`. These are denied outright, whatever IPv4 they
+    carry;
   - remote ports 53 and 853 even on the internet (DNS over TCP and over TLS).
   What is left is outgoing TCP to public addresses, which is all Tor needs (guards, bridges on any port).
-- **This computer's addresses (`np_local`).** A public IPv4 or a global IPv6 on an interface would otherwise read as
-  "internet". lord-netperm reads every interface address with an RTM_GETADDR dump over rtnetlink (`netperm/nplocal.c`;
-  NETLINK_ROUTE, which its unit already allows; no AF_INET socket) at start, whenever an address changes
-  (`RTMGRP_IPV4_IFADDR`, `RTMGRP_IPV6_IFADDR`) and with the 5-second rescan, into the hash map `np_local` (at most 256).
-  The programs look it up only for an app with the Tor restriction and then count the address as LAN.
+- **This computer's networks (`np_local`).** A public IPv4 or a global IPv6 on an interface, or another machine on a
+  link whose addresses are public (a public-address LAN, a routed /64), would otherwise read as "internet". lord-netperm
+  reads every interface address (as a host, /32 or /128, and with its prefix) and every directly connected route
+  (unicast or local, no gateway, `RTA_VIA` or multipath; never a default route, nor anything shorter than /8 for IPv4 or
+  /16 for IPv6, such as a VPN's 0/1 and 128/1) with RTM_GETADDR and RTM_GETROUTE dumps over rtnetlink
+  (`netperm/nplocal.c`; NETLINK_ROUTE, which its unit already allows; no AF_INET socket), at start, whenever an address
+  or route changes (`RTMGRP_IPV4_IFADDR`, `RTMGRP_IPV6_IFADDR`, `RTMGRP_IPV4_ROUTE`, `RTMGRP_IPV6_ROUTE`) and with the
+  5-second rescan, into the LPM trie `np_local` (at most 1024 networks). The programs look it up only for an app with
+  the Tor restriction and then count the address as LAN. **Fail closed:** when the dumps fail or the networks don't fit,
+  `NpCfg.local_full` is set (and logged) and the restriction denies every address until they fit again.
 - **Not in the `user@` union.** The union of restrictions that holds a process escaped to `user@<uid>.service` leaves
   `NP_R_TOR_UPLINK` out (as it does "no microphone"): it is about one machine's passt, and under `user@` it would take UDP
   and the LAN from every process of the person while the gateway runs. passt and QEMU run sandboxed and can't ask
@@ -1237,8 +1248,11 @@ applies) and in the random rounds. `np-torgw-test` (as root; `make test` skips i
 programs with private maps and attaches them **only to a throwaway cgroup it creates**
 (`/sys/fs/cgroup/lordos-fwtest-<pid>`, removed at the end), never to `lordos.service`, `user@` or the running service;
 from a process inside it, UDP, ICMP and raw sockets, TCP to 1.1.1.1:53 and :853, to RFC 1918, link-local, loopback, ULA,
-this computer's addresses and an address put in `np_local`, and a bind are all refused with EPERM, while TCP to
-1.1.1.1:443 connects. `np-torgw-test run -- cmd` holds that policy around a command: `tests/vm_gateway_fw.sh` runs a whole
+CGNAT, 192.0.2.1, 198.18.0.1, broadcast, NAT64, 6to4, Teredo and IPv4-compatible addresses, this computer's addresses, a
+network put in `np_local` (1.0.0.0/24, while 1.0.1.77 passes), and a bind are all refused with EPERM, TCP to
+1.1.1.1:443 connects, and with `local_full` set even that is refused. Its netlink parser cases run without root (a
+public-address LAN and a routed /64 kept, a route through a gateway, a default route and a 128/1 left out, an overflow
+reported). `np-torgw-test run -- cmd` holds that policy around a command: `tests/vm_gateway_fw.sh` runs a whole
 Whonix group in it (the gateway's passt starts, the workstation's Tor check says `IsTor: true`) and, with the gateway
 guest's own nftables flushed, shows its UDP DNS, TCP 53 and 853 and LAN and host connections get nowhere while TCP 443
 connects.
