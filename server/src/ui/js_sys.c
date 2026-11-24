@@ -1432,6 +1432,8 @@ static JSValue f_fs_stat(JSContext *c, JSValueConst this_val, int argc, JSValueC
     JS_SetPropertyStr(c, o, "ctime", JS_NewFloat64(c, s.ctime));
     if (s.has_btime) JS_SetPropertyStr(c, o, "btime", JS_NewFloat64(c, s.btime));
     JS_SetPropertyStr(c, o, "writable", JS_NewBool(c, s.writable));
+    /* a file a Machines guest sent (6.21): Files says where it came from and never opens a runnable one by itself */
+    if (s.quarantine) { JS_SetPropertyStr(c, o, "quarantine", JS_TRUE); JS_SetPropertyStr(c, o, "fromMachine", JS_NewString(c, s.from)); }
     return o;
 }
 

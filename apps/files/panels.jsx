@@ -98,6 +98,7 @@ export function InfoPanel({ e, onClose, openers, extra }) {
           {extra ? null : <Row t={t} k={tr('files.info.size')} v={size} />}
           {extra ? null : <Row t={t} k={tr('files.info.where')} v={e.trash ? e.original : (st?.path || e.path).split('/').slice(0, -1).join('/') || '/'} />}
           {st?.link && <Row t={t} k={tr('files.info.link')} v={st.target} />}
+          {st?.quarantine ? <Row t={t} k={tr('files.info.from')} v={tr('files.info.fromMachine', { machine: st.fromMachine || tr('files.info.aMachine') })} /> : null}
           {st?.btime ? <Row t={t} k={tr('files.info.created')} v={fmt(st.btime)} /> : null}
           <Row t={t} k={tr('files.info.modified')} v={fmt(st?.mtime)} />
           <Row t={t} k={tr('files.info.opened')} v={fmt(st?.atime)} />

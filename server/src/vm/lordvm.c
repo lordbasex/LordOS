@@ -3508,7 +3508,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
  * untrusted: lines and frames have hard limits, and only text goes on to lord-server. */
 /* what org.lordos.agent's helper brings (kept when qemu-guest-agent comes and goes) */
 #define VAC_LAG (VAC_CLIPBOARD | VAC_CLIP_NOTOOL | VAC_CLIP_LAZY | VAC_DISPLAY | VAC_OPEN | VAC_PLACE | (int)LAG_CAP_WINDOWS | VAC_EXTRA | VAC_EXTRA_OFF | \
-                 VAC_SHELL | VAC_LINKS | VAC_NOTIFY)
+                 VAC_SHELL | VAC_LINKS | VAC_NOTIFY | VAC_SEND)
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
@@ -5693,7 +5693,7 @@ static void drain_lag(void) {
                             (S.lag_open && S.ag_windows ? VAC_OPEN : 0) | (S.lag_place && S.ag_windows ? VAC_PLACE : 0) |
                             (S.lag_extra && S.extra_avail ? VAC_EXTRA : 0) | (S.lag_extra && S.lag_extraoff ? VAC_EXTRA_OFF : 0) |
                             (S.lag_shell ? VAC_SHELL : 0) | (S.lag_links && S.m.guest_links ? VAC_LINKS : 0) |
-                            (S.lag_notify && S.m.guest_notify ? VAC_NOTIFY : 0);
+                            (S.lag_notify && S.m.guest_notify ? VAC_NOTIFY : 0) | (S.lag_send_ok && !S.m.guest_files_off && !S.m.profile_lock ? VAC_SEND : 0);
                 if (!S.lag_open && !S.lag_place) open_all_end();
                 host_hello(0);
                 if (S.lag_display && S.disp_w) { uint8_t d[8]; ag_display_write(d, S.disp_w, S.disp_h); lag_send(AGK_DISPLAY, d, 8); }

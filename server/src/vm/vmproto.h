@@ -314,11 +314,12 @@ enum { VAS_OFF = 0, VAS_WAITING, VAS_CONNECTED };
  * can turn it off (VAG_EXTRA_OFF); VAC_EXTRA_OFF: they turned one off and can turn it back on (VAG_EXTRA_ON);
  * VAC_SHELL: the tools said "shell": the agent's shell (VM_SHELL, 6.18); VAC_LINKS, VAC_NOTIFY: they said "links",
  * "notify" and machine.json allows them: links and notifications from the guest (VM_GUEST_NOTE, 6.12);
- * VAC_EVENTLOG: a Windows guest's event logs come through qemu-guest-agent (6.19) */
+ * VAC_EVENTLOG: a Windows guest's event logs come through qemu-guest-agent (6.19); VAC_SEND: the tools said "send" and
+ * machine.json takes files from the guest: "Send to LordOS" lands in its quarantine folder (VM_RECV_OFFER, 6.21) */
 enum { VAC_SHUTDOWN = 1, VAC_TIME = 2, VAC_EXEC = 4, VAC_FILES = 8, VAC_JOURNAL = 16, VAC_CLIPBOARD = 32, VAC_AWAKE = 64, VAC_DISPLAY = 128,
        VAC_TRANSFER = 512, VAC_XFER_SETUP = 1024, VAC_CLIP_NOTOOL = 2048, VAC_CLIP_LAZY = 4096, VAC_OPEN = 8192,
        VAC_PLACE = 16384, VAC_EXTRA = 32768, VAC_EXTRA_OFF = 65536, VAC_SHELL = 131072, VAC_LINKS = 262144, VAC_NOTIFY = 524288,
-       VAC_EVENTLOG = 1048576, VAC_ALL = 2097151 };
+       VAC_EVENTLOG = 1048576, VAC_SEND = 2097152, VAC_ALL = 4194303 };
 /* how long a VM_FILE with a = 1 waits for the guest tools' AGK_OPENED after the copy (a program may ask for consent) */
 #define AG_OPEN_WAIT_MS 120000
 #define VM_WINDATA_MAX (1u << 20)

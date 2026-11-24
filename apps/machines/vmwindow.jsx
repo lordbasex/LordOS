@@ -18,6 +18,8 @@ import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './ap
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
+import { TransfersPanel } from './transfers.jsx';
+import { xferStep, xferShown, xferNextExpiry } from './xfer.js';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
@@ -479,6 +481,10 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const [stuck, setStuck] = useState(false);
   // files dropped on the window, on their way into the guest (lord.vm.files): the ones still copying
   const [copies, setCopies] = useState([]);
+  // the file copy panel (6.21, transfers.jsx): drops on their way into the guest and files the guest sends, as rows
+  const [xfers, setXfers] = useState([]);
+  const recvSeen = useRef(-1);
+  const onReceived = useRef(null);
   const filesSeen = useRef(-1);
   const onFiles = useRef(null);
   const buttons = useRef(new Set());
@@ -606,6 +612,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       const stuckNow = q.display === 'up' && followRef.current && !appsRef.current && followStuck(z.asked, [q.w, q.h], z.askedAt, now());
       setStuck((x) => (x === stuckNow ? x : stuckNow));
       if (q.filesSeq !== filesSeen.current || (q.ended && filesSeen.current !== -2)) { filesSeen.current = q.ended ? -2 : q.filesSeq; onFiles.current?.(lord.vm.files(sid)); }
+      if (q.receivedSeq !== recvSeen.current || (q.ended && recvSeen.current !== -2)) { recvSeen.current = q.ended ? -2 : q.receivedSeq; onReceived.current?.(lord.vm.received(sid)); }
       // the card picture in the library, every few seconds while it runs
       // only while the guest's system is up (its agent answers, when it has one): never its firmware, boot or shutdown
       // screens, which a card would otherwise keep
@@ -816,7 +823,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
-  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify }); } }, [sid, st?.state]);
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, guestFiles: m.guestFiles !== false }); } }, [sid, st?.state]);
   // "Capture mouse" (capture.js, docs/VIRTUALIZATION.md 6.25): lord-server locks the pointer inside the picture and the
   // guest gets relative motion; ❖Esc or Ctrl+Alt (lord-server's, before any app), focus loss, apps mode or the machine
   // stopping give it back. The state belongs to the window: full screen rebuilds it, and the lock moves to the new picture
@@ -1013,6 +1020,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   onFiles.current = (list) => {
     if (!Array.isArray(list)) return;
     setCopies(list.filter((f) => f.state === 'copying'));
+    setXfers((x) => xferStep(x, { drops: list.filter((f) => !f.open && !f.place) }, Date.now()));
     // files opened from Files' "Open with": the program's window comes up as its own (apps mode), or this one in front
     const opened = list.filter((f) => f.open && f.state === 'done'), notOpened = list.filter((f) => f.open && f.state === 'failed');
     for (const f of [...opened, ...notOpened]) opening.current.delete(f.id);
@@ -1036,6 +1044,24 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     for (const f of failed) notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.drop.failed', { machine: name, name: f.name }), body: f.message, sound: false });
   };
   const line = copyLine(copies);
+  // files the guest sends ("Send to LordOS", 6.21): kept in the machine's quarantine folder; a notification when one is
+  onReceived.current = (list) => {
+    if (!Array.isArray(list)) return;
+    setXfers((x) => xferStep(x, { recvs: list }, Date.now()));
+    for (const r of list.filter((f) => f.state === 'done')) {
+      notify({ app: 'machines', label: tr('machines.title'), title: tr('machines.xfer.arrived', { name: r.name, machine: name }), body: tr('machines.xfer.arrivedBody'), sound: false,
+        actions: [{ id: 'show', label: tr('machines.xfer.show'), run: () => revealPath(r.path) }] });
+    }
+  };
+  const shownX = xferShown(xfers);
+  // a finished row goes after its time: looked at again then
+  useEffect(() => {
+    const ms = xferNextExpiry(xfers);
+    if (ms < 0) return undefined;
+    const tm = setTimeout(() => setXfers((x) => xferShown(x)), ms + 50);
+    return () => clearTimeout(tm);
+  }, [xfers]);
+  const cancelX = (r) => { if (!sid) return; if (r.dir === 'out') lord.vm.receiveCancel(sid, r.id); else lord.vm.fileCancel(sid, r.id); };
   // Files' "Open with" this machine (7.3; openwith.js): the files asked for wait here until the machine runs and its
   // guest tools can open them, then go in as drops with { open }; once one is open, apps mode (when the guest has it)
   const asks = useStore(openAsks, (x) => x[dir] || null);
@@ -1332,7 +1358,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
           </View>
         </View>
       ) : null}
-      {asks && !line && !card && !failed ? (
+      {asks && !line && !shownX.length && !card && !failed ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ maxWidth: 560, minWidth: 260, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
             <Text style={{ fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>
@@ -1341,7 +1367,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
           </View>
         </View>
       ) : null}
-      {line && !card && !failed ? (
+      {shownX.length && !card && !failed ? <TransfersPanel rows={shownX} machine={name} onCancel={cancelX} bottom={52} /> : null}
+      {line && !shownX.length && !card && !failed ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 64, alignItems: 'center', pointerEvents: 'none' }}>
           <View style={{ maxWidth: 560, minWidth: 260, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
             <Text style={{ fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>

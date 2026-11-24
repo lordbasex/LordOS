@@ -175,8 +175,21 @@ function openersOf(e, linuxApps, t) {
   return { list: out, off };
 }
 
+// A file a Machines guest sent (docs/VIRTUALIZATION.md 6.21, lord.fs.stat's quarantine): one that would run or install
+// something here when opened (a program, an installer, a desktop entry, a package) is never opened by a double click;
+// Open With still opens it when the person picks an app themselves
+const INSTALLS = /\.(deb|rpm|appimage|run|flatpak|flatpakref|flatpakrepo|snap|desktop|lpk|exe|msi|bat|cmd|com|scr|ps1|vbs|jar)$/i;
+export function quarantineBlocks(e, st) {
+  return !!(st && st.quarantine && !e.dir && (INSTALLS.test(String(e.name || '')) || isProgram(e) || isForeignProgram(e)));
+}
+
 export function openEntry(e, ctx) {
   if (e.app) { launchApp(e.id); return; }
+  if (!e.dir && !e.arc && !e.trash && typeof e.path === 'string' && !fs.isRemote(e.path)) {
+    let st = null;
+    try { st = fs.stat(e.path); } catch (err) { st = null; }
+    if (quarantineBlocks(e, st) && ctx.say) { ctx.say(ctx.t('files.fromMachineNoRun', { name: e.name, machine: st.fromMachine || ctx.t('files.info.aMachine') })); return; }
+  }
   // archives (M9): browsed like a folder; what is inside is extracted to the cache when opened
   if (e.arc) { if (e.dir) ctx.navigate({ type: 'archive', path: e.arc.file, inner: e.arc.inner }); else ctx.openArc(e); return; }
   if (e.dir) { ctx.navigate({ type: 'dir', path: e.path }); return; }

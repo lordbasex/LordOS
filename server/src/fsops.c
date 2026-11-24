@@ -33,6 +33,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/xattr.h>
 #include <time.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -263,6 +264,7 @@ static int copy_file(const char *s, const char *d, const struct stat *st, FsJob 
     if (j->cancel) ok = 0;
     if (ok) {
         fchmod(out, st->st_mode & 07777);
+        fsops_copy_marks(in, out);             /* a file from a Machines guest stays marked as one (6.21) */
         struct timespec ts[2] = { st->st_atim, st->st_mtim };
         futimens(out, ts);
     }
@@ -1174,6 +1176,30 @@ int fsops_list(const char *dir, int max, FsListFn fn, void *ud) {
     return i;
 }
 
+/* the marks a file from a Machines guest carries (vm/vmrecv.c): kept when Files copies it, so a copy is still one */
+static const char *const MARKS[] = { "user.lordos.quarantine", "user.lordos.from", "user.lordos.machine", "user.xdg.origin.url" };
+int fsops_copy_marks(int in, int out) {
+    char v[256];
+    ssize_t n = fgetxattr(in, MARKS[0], v, sizeof v);
+    if (n <= 0) return 0;
+    for (size_t i = 0; i < sizeof MARKS / sizeof *MARKS; i++) {
+        n = fgetxattr(in, MARKS[i], v, sizeof v);
+        if (n > 0 && fsetxattr(out, MARKS[i], v, (size_t)n, 0)) return -1;
+    }
+    return 0;
+}
+
+/* a mark's text shown as it is: printable, no control or bidi characters (anyone who can write the file can set it) */
+static int mark_plain(const char *s, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 0x20 || c == 0x7f) return 0;
+        if (c == 0xe2 && i + 2 < n && (((unsigned char)s[i + 1] == 0x80 && ((unsigned char)s[i + 2] == 0x8e || (unsigned char)s[i + 2] == 0x8f ||
+            ((unsigned char)s[i + 2] >= 0xaa && (unsigned char)s[i + 2] <= 0xae))) || ((unsigned char)s[i + 1] == 0x81 && (unsigned char)s[i + 2] >= 0xa6 && (unsigned char)s[i + 2] <= 0xa9))) return 0;
+    }
+    return 1;
+}
+
 int fsops_stat(const char *target, int writable_root, FsStat *o) {
     struct statx sx;
     memset(o, 0, sizeof *o);
@@ -1190,6 +1216,16 @@ int fsops_stat(const char *target, int writable_root, FsStat *o) {
     }
     o->mode = sx.stx_mode & 07777;
     o->size = (double)sx.stx_size;
+    if (!o->link && !o->dir) {
+        char q[8];
+        ssize_t qn = lgetxattr(target, "user.lordos.quarantine", q, sizeof q);
+        o->quarantine = qn > 0;
+        if (o->quarantine) {
+            ssize_t fn = lgetxattr(target, "user.lordos.from", o->from, sizeof o->from - 1);
+            o->from[fn > 0 ? fn : 0] = 0;
+            if (fn > 0 && !mark_plain(o->from, (size_t)fn)) o->from[0] = 0;
+        }
+    }
     fsops_user_name(sx.stx_uid, o->user, sizeof o->user);
     fsops_group_name(sx.stx_gid, o->group, sizeof o->group);
 #define TS(f) ((double)sx.f.tv_sec * 1000 + sx.f.tv_nsec / 1e6)
