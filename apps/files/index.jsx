@@ -8,7 +8,7 @@ import {
   formatBytes, t as tr, ScrollView, Toolbar, ToolbarButton, ToolbarGroup, SearchField, Hairline, direction, spacing, typeScale, registerDockActions,
   useDisks, admin, systemInfo, lan, shortcutTaken, useSettings, cloudModel, cloud, errorText, useCloud, formatNumber, Button, openUrl,
   wayland, linuxAppFor, shortAppName, unmountedDisks, diskRelease, statusText, useSidebar, SidebarToggle, SidebarOverlay,
-  ConfirmDialog, Checkbox, setDefaultProvider, openExtOf, openHintsFor,
+  ConfirmDialog, Checkbox, setDefaultProvider, openExtOf, openHintsFor, slowClick, DOUBLE_CLICK_MS,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FolderGlyph, TAG_COLORS, TrashGlyph, DriveGlyph } from './glyphs.jsx';
@@ -161,7 +161,13 @@ const ZOOM_AT = { position: 'absolute', top: 0, bottom: 0, insetInlineEnd: spaci
 
 export default function Files() {
   const t = useTheme();
-  const { id: wid, args } = useAppWindow();
+  const appWin = useAppWindow();
+  const { id: wid, args } = appWin;
+  // whether the window had the focus before the press now in progress: read at render, so a press that brings the window
+  // forward still sees false (the slow click that renames, below)
+  const winFocused = !!appWin.focused;
+  const focusedRef = useRef(winFocused);
+  focusedRef.current = winFocused;
   const launcherApps = useLauncherApps();
   const version = useStore(fsVersion);
   const tags = useStore(tagStore);
@@ -452,6 +458,25 @@ export default function Files() {
     } catch (e) { report(e); }
   };
   const startRename = (e = first) => { if (e && !e.app && !e.trash && blocked()) return; if (e && !e.app && !e.trash && wDir !== null) { setSelected(new Set([e.path])); setRenaming({ path: e.path, value: e.name }); } };
+  // The slow second click on a selected item's name renames it in place (sdk/slowclick.js: after the double-click
+  // interval, within 1.5 s, the pointer still, no modifier, one item selected, the window already focused). Only what
+  // Rename would change without a word: never a read-only folder (no notice pops up for a click), the Trash, an archive's
+  // inside, an app or a computer on the network.
+  const slow = useRef(null);
+  if (!slow.current) slow.current = slowClick();
+  const slowTimer = useRef(null);
+  const canSlowRename = (e) => !!e && !e.app && !e.trash && !e.arc && !e.netHost && !e.netWay && !e.netPlace && loc.type !== 'trash'
+    && loc.type !== 'archive' && wDir !== null && !roWhy && !volumes.some((v) => v.path === e.path);    // a mount point stays
+  const slowRename = useRef(null);
+  slowRename.current = (path) => {
+    const e = byPath.get(path);
+    if (!e || renaming || selected.size !== 1 || !selected.has(path) || !canSlowRename(e) || !focusedRef.current) return;
+    startRename(e);
+  };
+  const cancelSlow = () => { slow.current.cancel(); if (slowTimer.current) { clearTimeout(slowTimer.current); slowTimer.current = null; } };
+  useEffect(() => { if (!winFocused) cancelSlow(); }, [winFocused]);
+  useEffect(() => cancelSlow, [loc.type, loc.path, active]);
+  useEffect(() => () => cancelSlow(), []);
   const commitRename = () => {
     const r = renaming;
     setRenaming(null);
@@ -678,6 +703,8 @@ export default function Files() {
   // ---- selection ----
   const onItemDown = (e, ev) => {
     if (renaming && renaming.path !== e.path) commitRename();
+    slow.current.press({ key: e.path, t: lord.now(), x: ev.x, y: ev.y, button: ev.button, mods: !!(ev.shift || ev.alt || ev.ctrl || ev.meta), onName: !!ev.onName,
+      focused: focusedRef.current, sole: selected.size === 1 && selected.has(e.path), canRename: canSlowRename(e) });
     if (ev.button === 2) return;
     let next;
     if (ev.meta || ev.ctrl) { next = new Set(selected); if (next.has(e.path)) next.delete(e.path); else next.add(e.path); anchor.current = e.path; }
@@ -720,6 +747,7 @@ export default function Files() {
   };
   useEffect(() => {
     const mv = addListener('pointermove', (e) => {
+      slow.current.move(e.x, e.y);
       const p = press.current;
       if (!p) return;
       if (!p.moved && Math.hypot(e.x - p.x, e.y - p.y) < 6) return;
@@ -735,6 +763,11 @@ export default function Files() {
       dnd.target.set(target && !p.paths.includes(target) && (!p.favOnly || target === 'fav:') ? target : null);
     });
     const up = addListener('pointerup', (e) => {
+      if (e.button === 0 && slow.current.release({ t: lord.now(), x: e.x, y: e.y }) !== null) {
+        // a second press within the double-click interval cancels it (the double click opens instead)
+        if (slowTimer.current) clearTimeout(slowTimer.current);
+        slowTimer.current = setTimeout(() => { slowTimer.current = null; const k = slow.current.due(lord.now() + 20); if (k) slowRename.current(k); }, DOUBLE_CLICK_MS + 20);
+      }
       const p = press.current;
       press.current = null;
       if (!p) {
@@ -894,6 +927,7 @@ export default function Files() {
   const GO_KEYS = { h: () => navigate(homeLoc()), d: () => goDir('desktop'), o: () => goDir('documents'), c: () => navigate(computerLoc()), a: () => navigate({ type: 'apps' }),
     f: () => navigate({ type: 'recent' }), k: () => { if (lan.available()) navigate({ type: 'network' }); }, g: () => setSheet('goto') };
   useKeyboard((e) => {
+    cancelSlow();                 // a key while a slow click waits: no rename by itself (F2 and Enter still rename)
     if (renaming || confirm || menu || sheet || connAsk || remoteAsk || sharing || offlineAsk) return;
     const mod = e.meta || e.ctrl;
     const b = (e.base || e.char || '').toLowerCase();
@@ -1025,7 +1059,7 @@ export default function Files() {
         {known ? <Button label={tr('cloud.known.open')} onClick={() => openUrl(known.url)} /> : null}
       </View>
     ) : null,
-    onItemDown, onOpen: open, onContext, statOf, zoom, onZoomWheel,
+    onItemDown, onOpen: (e) => { cancelSlow(); open(e); }, onContext, statOf, zoom, onZoomWheel,
     onMarquee: (next) => { setSelected(next); if (next.size) anchor.current = [...next][next.size - 1]; },     // the rubber band (views.jsx, #233)
     cloud: { on: !!curAcc && loc.type === 'dir', status: cf.status }, cloudOnly: cf.cloudOnly,
     kidsOf: (e) => (e.netHost ? e.ways.map((w) => ({ name: w.label, path: `${e.path}/${w.id}`, dir: false, size: 0, mtime: 0, netWay: w, netParent: e.netHost, sub: w.sub || w.label })) : null), sortOpts, columns, contentW: content,
