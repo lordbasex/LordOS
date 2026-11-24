@@ -81,7 +81,8 @@ Wants=network-online.target
 After=network-online.target
 [Service]
 Type=oneshot
-ImportCredential=mhprep*.sh
+ImportCredential=mhprep.sh
+ImportCredential=mhprep2.sh
 ExecStart=/bin/sh ${CREDENTIALS_DIRECTORY}/mhprep.sh
 StandardOutput=journal+console
 """
