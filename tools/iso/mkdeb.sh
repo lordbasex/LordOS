@@ -272,6 +272,12 @@ if [ -f server/build/lord-vm-usb.so ]; then
     install -D -m 644 server/build/lord-vm-usb.so "$L/lib/lord-vm-usb.so"
     "$STRIP" --strip-unneeded "$L/lib/lord-vm-usb.so" 2>/dev/null || true
 fi
+# lordos-venus-shim.so: preloaded by lord-vm into the QEMU of a machine with Vulkan (venus), so virglrenderer takes the
+# render server's connection lord-vm made instead of forking one (docs/VIRTUALIZATION.md 3.3, 6.10); root's, 644, fixed path
+if [ -f server/build/lordos-venus-shim.so ]; then
+    install -D -m 644 server/build/lordos-venus-shim.so "$L/lib/lordos-venus-shim.so"
+    "$STRIP" --strip-unneeded "$L/lib/lordos-venus-shim.so" 2>/dev/null || true
+fi
 # lordos-guest (0.8.9 beta): the clipboard helper Machines copies into a guest of this architecture (Install Agent)
 if [ -x server/build/lordos-guest ]; then
     install -d "$L/guest"
