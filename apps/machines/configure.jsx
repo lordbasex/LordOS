@@ -592,7 +592,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     </Row></Group>
     {m.imported || m.devices === 'compat' ? <Group>
       {/* an imported machine starts on devices every system has drivers for; the fast ones need the guest's drivers first */}
-      <Row label={tr('machines.cfg.devices')} value={m.devices === 'compat' ? tr('machines.cfg.devCompat', { nic: m.nicModel }) : tr('machines.cfg.devFast')} last
+      <Row label={tr('machines.cfg.devices')} value={m.devices === 'compat' ? tr(m.arch === 'arm64' ? 'machines.cfg.devCompatArm' : 'machines.cfg.devCompat', { nic: m.nicModel }) : tr('machines.cfg.devFast')} last
         note={(m.devices === 'compat' ? tr('machines.cfg.devCompatNote') : tr('machines.cfg.devFastNote')) + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={m.devices === 'compat' ? tr('machines.cfg.devToFast') : tr('machines.cfg.devToCompat')} disabled={running || !!job}
           onClick={() => save(m.devices === 'compat' ? { devices: 'virtio', nicModel: 'virtio' } : { devices: 'compat', nicModel: 'e1000e' })} /></View></Off>

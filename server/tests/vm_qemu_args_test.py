@@ -84,9 +84,17 @@ ROWS = [
         opt("-accel", "tcg,thread=multi,tb-size=256"), opt("-cpu", "max"), lacks("/dev/fdset/1")], True),
     ("CPU and memory", ["--vcpus", "3", "--memory", "1536", "--display", "none"], ["--transfer", "off"], [], [
         opt("-smp", "3"), opt("-m", "1536")], True),
+    # SATA on amd64; on arm64 NVMe and a USB CD/DVD, since AAVMF has no AHCI driver (12: such a disk stopped at its UEFI shell)
     ("compatible devices", ["--devices", "compat", "--display", "window"], ["--transfer", "off"], [], [
-        has("ide-hd,id=sysdisk,drive=sys,bus=" + ("ide.0" if ARCH == "amd64" else "ahci.0")), has("qemu-xhci,id=xhci,addr=0x5"),
-        has("usb-tablet,bus=xhci.0"), has("usb-mouse,bus=xhci.0"), lacks("virtio-blk-pci,id=sysdisk")], True),
+        has("qemu-xhci,id=xhci,addr=0x5"), has("usb-tablet,bus=xhci.0"), has("usb-mouse,bus=xhci.0"), lacks("virtio-blk-pci,id=sysdisk")]
+     + ([has("ide-hd,id=sysdisk,drive=sys,bus=ide.0"), has("ide-cd,id=cd0,bus=ide.5")] if ARCH == "amd64" else
+        [has("nvme,id=sysdisk,drive=sys,addr=0x1,serial=lordvm-sys"), has("usb-bot,id=cdbot0,bus=xhci.0", "scsi-cd,id=cd0,bus=cdbot0.0"),
+         lacks("ich9-ahci", "ide-hd", "ide-cd"), ("one xHCI", lambda q, a: q.count("qemu-xhci") == 1)]), True),
+    ("compatible devices with a data disk, no display", ["--devices", "compat", "--display", "none"], ["--transfer", "off", "--add-disk", "1"], [], [
+        lacks("virtio-blk-pci,id=sysdisk", "virtio-blk-pci,id=datadisk1")]
+     + ([has("ide-hd,id=datadisk1,drive=data1,bus=ide.1")] if ARCH == "amd64" else
+        [has("nvme,id=datadisk1,drive=data1,addr=0x10,serial=LORDOS-DATA-1"), has("qemu-xhci,id=xhci,addr=0x5", "scsi-cd,id=cd0,bus=cdbot0.0"),
+         lacks("ich9-ahci")]), True),
     ("Windows 11 (secure boot, TPM, Hyper-V, local clock)",
      ["--devices", "windows", "--secure-boot", "on", "--tpm", "on", "--hyperv", "on", "--rtc", "local", "--display", "window"], ["--transfer", "off"], [], [
         opt_re("-machine", r"smm=on"), has("driver=cfi.pflash01,property=secure,value=on"), opt_re("-cpu", r"^host,hv_relaxed,.*hv_ipi$"),

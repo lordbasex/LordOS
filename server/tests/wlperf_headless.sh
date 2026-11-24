@@ -14,7 +14,8 @@
 #   subsurface desync subsurfaces (GTK 3's menus in Firefox) shown, redrawn, destroyed, made elsewhere and moved: every
 #              frame painted then equals a full repaint (a closed menu used to stay on screen, a new one not to show)
 #   damage     a client damaging a 10×10 square: every frame painted with only that damage equals a full repaint
-#              (LORD_PAINT_VERIFY=1, the default here; WLPERF_VERIFY=0 turns it off)
+#              (LORD_PAINT_VERIFY=1, the default here; WLPERF_VERIFY=0 turns it off); these two run on a second
+#              lord-server, with the paint check, and the others on one without it
 # Run from server/ (tests/run_suites.sh does). Exit 77 when something it needs is missing (the theme bundle: npm run
 # build), 1 on a failure or if lord-server didn't survive. WLPERF_ONLY=titles,frames runs some of them.
 cd "$(dirname "$0")/.." || exit 1
@@ -43,18 +44,32 @@ printf '{"schema": 9, "desktopChosen": true, "welcomeShown": true, "language": "
 })();
 EOF
 } >"$D/theme.js"
-env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
-    XDG_RUNTIME_DIR="$D" HOME="$D/home" LORD_GPU=0 LANG=en_US.UTF-8 LORD_HEADLESS_DRAW=1 LORD_PAINT_VERIFY=${WLPERF_VERIFY:-1} \
-    ./build/lord-server --headless 1280x800 --theme "$D/theme.js" --timeout 120 >"$D/server.log" 2>&1 &
-P=$!
-i=0 S=''
-while [ $i -lt 120 ] && [ -z "$S" ]; do
-    sleep 0.25
-    S=$(ls "$D" 2>/dev/null | grep '^wayland-[0-9]*$' | head -1)
-    i=$((i + 1))
-done
-[ -n "$S" ] || { echo "lord-server made no Wayland socket"; tail -20 "$D/home/.cache/lordos/compositor.log" 2>/dev/null; exit 1; }
-sleep 2                                     # the theme is up
+# start VERIFY: a headless lord-server with LORD_PAINT_VERIFY=VERIFY (P, its Wayland socket S). The paint check repaints
+# every frame a second time, whole, to compare: the subsurface and damage checks need it, and on a busy computer it costs
+# the frames check its rate (on the i9 with a load of about 24: 41-44 frame callbacks a second with it, 57 without), so
+# those two get a lord-server of their own with it and the others one without
+start() {
+    env -u WAYLAND_DISPLAY -u DISPLAY -u LORD_SESSIOND -u LORDOS_SESSIOND -u DBUS_SESSION_BUS_ADDRESS \
+        XDG_RUNTIME_DIR="$D" HOME="$D/home" LORD_GPU=0 LANG=en_US.UTF-8 LORD_HEADLESS_DRAW=1 LORD_PAINT_VERIFY=$1 \
+        ./build/lord-server --headless 1280x800 --theme "$D/theme.js" --timeout 120 >>"$D/server.log" 2>&1 &
+    P=$!
+    i=0 S=''
+    while [ $i -lt 120 ] && [ -z "$S" ]; do
+        sleep 0.25
+        S=$(ls "$D" 2>/dev/null | grep '^wayland-[0-9]*$' | head -1)
+        i=$((i + 1))
+    done
+    [ -n "$S" ] || { echo "lord-server made no Wayland socket"; tail -20 "$D/home/.cache/lordos/compositor.log" 2>/dev/null; exit 1; }
+    sleep 2                                 # the theme is up
+}
+# stop: the lord-server ends (a failure if it was already gone), its socket with it
+stop() {
+    kill -0 $P 2>/dev/null || { echo "lord-server is gone"; tail -20 "$D/home/.cache/lordos/compositor.log" 2>/dev/null; R=1; }
+    kill $P 2>/dev/null
+    wait $P 2>/dev/null
+    rm -f "$D/$S" "$D/$S.lock"
+}
+start 0
 LOG="$D/home/.cache/lordos/shell.log"
 R=0
 fail() { echo "FAIL $*"; R=1; }
@@ -116,6 +131,10 @@ if want fixes; then
     echo "$out"
 fi
 pv() { grep -ah 'paint-verify' "$D/home/.cache/lordos/compositor.log" "$D/server.log" 2>/dev/null; }
+if { want subsurface || want damage; } && [ "${WLPERF_VERIFY:-1}" != 0 ]; then
+    stop
+    start "${WLPERF_VERIFY:-1}"
+fi
 if want subsurface; then
     v0=$(pv | wc -l)
     client subsurface || fail "subsurface: the client"

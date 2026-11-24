@@ -141,5 +141,5 @@ KVM. The admin helper isn't there in the harness (no root), so the assistant's o
   harness; `click_icon` finds them by their source, not their pixels.
 - The session's screen is 1280×800 and its language English; flows find texts in English (`Session(lang=…)` exists, the
   flows' strings don't follow it).
-- The Control Center is made 1200×680 before its sheets: at its first size (760×500) the Clone sheet's buttons are cut
-  off below the window.
+- The Control Center is made 1200×680 before its sheets, so the rows the flows click in Configure are on screen without
+  scrolling. That every sheet and dialog fits its first size (760×500) is `server/tests/machines_sheets_headless.sh`'s.
