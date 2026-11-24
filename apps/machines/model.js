@@ -1011,12 +1011,17 @@ export function toolsLine(agent, shipped = TOOLS_SHIPPED) {
 // Only when it's safe: the agent connected for TOOLS_SETTLE_MS and nothing on its way (files copying, the transfer
 // folder's setup, an app of apps mode opening, an install the person asked for). At most TOOLS_TRIES attempts per run of
 // the machine and version, TOOLS_BACKOFF_MS apart; an attempt without an answer in TOOLS_WAIT_MS failed. Off, or given
-// up: one notification per run and version, with Update.
+// up: one notification per run and version, with Update. Before the first attempt for a version, a snapshot of the
+// machine (6.2, "Auto-snapshot before a guest's tools upgrade"; with its memory, as it runs) when `snap` says the
+// machine can have one: act 'snapshot', once per run and version; the install follows once it's done or refused.
 export const TOOLS_SETTLE_MS = 20000;
 export const TOOLS_BACKOFF_MS = [2 * 60000, 10 * 60000];
 export const TOOLS_TRIES = 3;
 export const TOOLS_WAIT_MS = 10 * 60000;
-export const TOOLS_AUTO_IDLE = { want: '', since: 0, tries: 0, next: 0, pending: 0, done: 0, told: '' };
+export const TOOLS_AUTO_IDLE = { want: '', since: 0, tries: 0, next: 0, pending: 0, done: 0, told: '', snapped: '' };
+// may the update be preceded by a snapshot: snapshots exist for it (not raw disks, not a disposable session, not 3D or a
+// graphics card while it runs: lord-vm refuses those), and there's room for one more
+export const toolsSnapOk = ({ raw, disposable, gl, count, max = 64 } = {}) => !raw && !disposable && !gl && (count || 0) < max;
 // the machine's choice, else the default for all of them (on unless turned off)
 export const toolsAutoOn = (meta, defaults) => (typeof meta?.toolsAuto === 'boolean' ? meta.toolsAuto : defaults?.toolsAuto !== false);
 // an attempt that failed: the next one after its backoff, none after the last
@@ -1028,7 +1033,7 @@ export function toolsAutoFailed(s, now) {
 // busy (something on its way, see above), now. → { s, act: null | 'install' | 'notify', why: 'off' | 'failed' (with
 // notify), result: 'ok' | 'failed' (an attempt of ours ended) }. After 'install' the caller sends it and, when
 // lord-server refuses it at once, calls toolsAutoFailed.
-export function toolsAutoStep(s0, { agent, on, busy, now }, shipped = TOOLS_SHIPPED) {
+export function toolsAutoStep(s0, { agent, on, busy, now, snap = false }, shipped = TOOLS_SHIPPED) {
   let s = { ...TOOLS_AUTO_IDLE, ...(s0 || {}) };
   const inst = agent?.install || 0;
   // our attempt on its way: how it ended. lord.vm.agent sets the session's install to 1 as it sends, so a 2 or 3 after
@@ -1054,6 +1059,7 @@ export function toolsAutoStep(s0, { agent, on, busy, now }, shipped = TOOLS_SHIP
     return { s: { ...s, told: want }, act: 'notify', why: 'failed' };
   }
   if (s.tries >= TOOLS_TRIES || now < s.next || busy || inst === 1) return { s, act: null };
+  if (snap && !s.tries && s.snapped !== want) return { s: { ...s, snapped: want }, act: 'snapshot' };
   return { s: { ...s, tries: s.tries + 1, pending: now }, act: 'install' };
 }
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
@@ -1364,6 +1370,20 @@ export function storageBar(st, images = []) {
   // an empty slice isn't shown (no "Disc images 0 MB")
   return [...parts, ['other', other]].filter(([, bytes]) => bytes > 0).map(([key, bytes]) => ({ key, bytes, frac: Math.min(1, bytes / total) }));
 }
+
+// "Delete Old Snapshots" (6.16): every snapshot but the newest (lord.vm.snaps' list is in the order they were taken; a
+// created time decides when two say otherwise). Nothing with one or none
+export function oldSnapshots(list) {
+  const xs = (Array.isArray(list) ? list : []).filter((s) => s && typeof s.tag === 'string');
+  if (xs.length < 2) return [];
+  const t = (s) => { const v = Date.parse(s.created || ''); return Number.isFinite(v) ? v : 0; };
+  const newest = xs.reduce((a, s, i) => (t(s) >= t(xs[a]) ? i : a), 0);
+  return xs.filter((s, i) => i !== newest);
+}
+
+// "Remove Unused" (6.16): the downloads no machine or group uses and that aren't a stopped download (catalog.js
+// downloadedImages' entries); one in a running machine's drive is used
+export const unusedImages = (imgs) => (Array.isArray(imgs) ? imgs : []).filter((x) => x && !x.partial && !(x.users || []).length && !(x.running || []).length);
 
 // ---- the resolution menu (5.3) ----
 

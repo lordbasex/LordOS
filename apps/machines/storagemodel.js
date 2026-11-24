@@ -29,6 +29,9 @@ export const DISPOSABLE = ['off', 'memory', 'disk'];
 export const disposableOf = (m) => (DISPOSABLE.includes(m?.disposable) ? m.disposable : 'off');
 // a disposable session can be chosen for any machine but a group's member (its group has the switch, 19.7)
 export const disposableAllowed = (m) => !!m && !m.group;
+// the switch of the machine's window and its card (6.2): on is a session in memory (Configure chooses on disk); off from
+// either kind. Only while the machine is off: it applies to its next start
+export const disposableToggle = (m) => (disposableOf(m) === 'off' ? 'memory' : 'off');
 // what a session in memory may hold before the guest pauses: the machine's memory, at least 1 GB (lordvm.c)
 export const disposableCapMb = (m) => Math.max(1024, m?.memoryMb || 0);
 

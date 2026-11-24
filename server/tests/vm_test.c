@@ -1520,6 +1520,18 @@ static void test_ops(void) {
     vm_snap_tag(tag);
     CHECK(vm_snap_tag_valid(tag));
     CHECK(!vm_snap_tag_valid("x2026") && !vm_snap_tag_valid("s;rm") && !vm_snap_tag_valid("S1") && !vm_snap_tag_valid("s") && !vm_snap_tag_valid(NULL));
+    /* a snapshot's note: UTF-8, line breaks, no other control characters, no bidi overrides, at most 1000 bytes */
+    CHECK(vm_snap_note_valid("") && vm_snap_note_valid("Before the upgrade\nkernel 6.12 / apt") && vm_snap_note_valid("Antes del cambio \xc3\xa9 \xe2\x9c\x93"));
+    CHECK(!vm_snap_note_valid(NULL) && !vm_snap_note_valid("tab\there") && !vm_snap_note_valid("cr\r") && !vm_snap_note_valid("esc\x1b[2J"));
+    CHECK(!vm_snap_note_valid("\xc3") && !vm_snap_note_valid("\xc0\xaf") && !vm_snap_note_valid("\xed\xa0\x80") && !vm_snap_note_valid("\xf4\x90\x80\x80"));
+    CHECK(!vm_snap_note_valid("rlo \xe2\x80\xae") && !vm_snap_note_valid("del\x7f") && !vm_snap_note_valid("c1 \xc2\x85"));
+    {
+        char big[VM_SNAP_NOTE_MAX + 2];
+        memset(big, 'a', sizeof big - 1); big[sizeof big - 1] = 0;
+        CHECK(!vm_snap_note_valid(big));
+        big[VM_SNAP_NOTE_MAX] = 0;
+        CHECK(vm_snap_note_valid(big));
+    }
     VmSnap a[3], b[VM_SNAPS_MAX];
     memset(a, 0, sizeof a);
     snprintf(a[0].tag, sizeof a[0].tag, "s1"); snprintf(a[0].name, sizeof a[0].name, "Fresh install"); snprintf(a[0].created, sizeof a[0].created, "2026-11-05T12:00:00Z");

@@ -10,12 +10,13 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered } from './model.js';
+import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsSnapOk, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS, launchGuest } from './appsmode.jsx';
 import { launchAsks, dropLaunchAsk } from './guestlaunch.js';
 import { launchAskStep } from '../../sdk/guestappsmodel.js';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
+import { disposableOf, disposableAllowed, disposableToggle } from './storagemodel.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
 import { gatewayBar, gatewayOf } from './group.js';
@@ -1007,7 +1008,24 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
-  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, guestFiles: m.guestFiles !== false, network: m.network, group: m.group || '' }); } }, [sid, st?.state]);
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, guestFiles: m.guestFiles !== false, network: m.network, group: m.group || '', disposable: m.disposable || 'off' }); } }, [sid, st?.state]);
+  // the disposable session's switch (6.2, Actions): lord-vm --set while the machine is off, then shown as saved
+  const [dispJob, setDispJob] = useState(null);         // { job, to }
+  useEffect(() => {
+    if (!dispJob) return undefined;
+    const timer = setInterval(() => {
+      const r = lord.vm.job(dispJob.job);
+      if (!r || !r.done) return;
+      if (r.ok) setCfg((c) => ({ ...c, disposable: dispJob.to }));
+      setDispJob(null);
+    }, 300);
+    return () => clearInterval(timer);
+  }, [dispJob]);
+  const dispSwitch = () => {
+    const to = disposableToggle(cfg);
+    const job = lord.vm.set(dir, { disposable: to });
+    if (job) setDispJob({ job, to });
+  };
   // the devices' own backend (USB, the camera): shown only once it says they're supported here (deviceCaps)
   const caps = has() && typeof lord.vm.deviceCaps === 'function' ? lord.vm.deviceCaps(dir) : null;
   const cableOk = cableOffered(cfg, running);
@@ -1292,8 +1310,10 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // button, only while nothing is on its way; off or given up, a notification with Update. Its state lives for the
   // machine's run (toolsRuns), so the window closed and opened again doesn't try again.
   const toolsBusy = useRef(false);
+  const toolsSnapJob = useRef(0);          // the snapshot before an update (model.js toolsAutoStep 'snapshot'), while it's taken
+  if (toolsSnapJob.current && lord.vm.job(toolsSnapJob.current)?.done !== false) toolsSnapJob.current = 0;
   const gl = guests.get()[dir];
-  toolsBusy.current = copies.length > 0 || opening.current.size > 0 || !!asks || xferBusy.current || xstate === 'settingUp' || st?.agent?.transfer === 1
+  toolsBusy.current = !!toolsSnapJob.current || copies.length > 0 || opening.current.size > 0 || !!asks || xferBusy.current || xstate === 'settingUp' || st?.agent?.transfer === 1
     || Object.values(gl?.launches || {}).some((e) => launchPending(e, gl.list, Date.now()));
   useEffect(() => {
     if (!sid) return undefined;
@@ -1308,8 +1328,14 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       const q = stRef.current;
       if (!q || q.ended || q.state !== 'running' || closingRef.current) return;
       const t0 = Date.now();
-      const r = toolsAutoStep(toolsRuns.get(dir), { agent: q.agent, on: toolsAutoOn(readMeta(dir), defaultsOf(settings.get().machinesDefaults)), busy: toolsBusy.current, now: t0 });
+      if (toolsSnapJob.current && lord.vm.job(toolsSnapJob.current)?.done !== false) toolsSnapJob.current = 0;
+      const sn = lord.vm.snaps(dir);
+      const c0 = cfgRef.current || {};
+      const snap = toolsSnapOk({ raw: c0.diskFormat === 'raw', disposable: !!c0.disposable && c0.disposable !== 'off', gl: c0.graphics === '3d' || !!c0.gpu, count: sn?.list?.length, max: sn?.max });
+      const r = toolsAutoStep(toolsRuns.get(dir), { agent: q.agent, on: toolsAutoOn(readMeta(dir), defaultsOf(settings.get().machinesDefaults)), busy: toolsBusy.current || !!toolsSnapJob.current, now: t0, snap });
       let s = r.s, why = r.act === 'notify' ? r.why : null;
+      // a snapshot first, with the machine's memory; the install waits until it's done (or refused: it goes on anyway)
+      if (r.act === 'snapshot') { const t = lord.vm.snapTake(dir, tr('machines.snap.beforeTools', { version: s.snapped }), sid); toolsSnapJob.current = t?.job || 0; }
       // lord-server didn't take it (the session is going away): a failed attempt
       if (r.act === 'install' && !lord.vm.agent(sid, 'update')) {
         s = toolsAutoFailed(s, t0);
@@ -1450,6 +1476,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         '-',
         { label: tr('machines.snap.takeNow'), disabled: !sid || busy || noSuspend(st, gpu) || !(st?.state === 'running' || st?.state === 'paused'), onClick: snapNow },
         { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m0) },
+        ...(disposableAllowed(cfg) ? [{ label: tr('machines.disp.switch'), checked: disposableOf(cfg) !== 'off', disabled: running || !!dispJob || !!(st && !st.ended && st.state && st.state !== 'off' && st.state !== 'crashed'),
+          hint: running ? tr('machines.disp.whenOff') : '', onClick: dispSwitch }] : []),
         '-',
         { label: tr('machines.tb.transferOpen'), disabled: !cfg.transfer, onClick: xferOpen },
         ...(xstate === 'setup' ? [{ label: tr('machines.tb.transferSetup'), onClick: xferSetup }] : []),

@@ -171,6 +171,25 @@ int vm_snaps_find(const VmSnap *s, int n, const char *tag) {
     return -1;
 }
 
+int vm_snap_note_valid(const char *s) {
+    if (!s || strlen(s) > VM_SNAP_NOTE_MAX) return 0;
+    const unsigned char *p = (const unsigned char *)s;
+    while (*p) {
+        unsigned c = *p;
+        int k = c < 0x80 ? 0 : (c & 0xe0) == 0xc0 ? 1 : (c & 0xf0) == 0xe0 ? 2 : (c & 0xf8) == 0xf0 ? 3 : -1;
+        if (k < 0 || (k == 1 && c < 0xc2) || (k == 3 && c > 0xf4)) return 0;
+        unsigned cp = k == 0 ? c : k == 1 ? c & 0x1f : k == 2 ? c & 0x0f : c & 0x07;
+        for (int i = 1; i <= k; i++) {
+            if ((p[i] & 0xc0) != 0x80) return 0;
+            cp = cp << 6 | (p[i] & 0x3f);
+        }
+        if ((k == 2 && cp < 0x800) || (k == 3 && (cp < 0x10000 || cp > 0x10ffff)) || (cp >= 0xd800 && cp <= 0xdfff)) return 0;
+        if ((cp < 0x20 && cp != '\n') || (cp >= 0x7f && cp < 0xa0) || cp == 0x2028 || cp == 0x2029 || (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069)) return 0;
+        p += k + 1;
+    }
+    return 1;
+}
+
 /* ---- identity.json (6.3) ---- */
 
 int vm_hostname_valid(const char *s) {

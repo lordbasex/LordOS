@@ -674,10 +674,94 @@ static int qimg_repair_leaks(const char *dir, const char *disk) {
     return r;
 }
 
+/* a snapshot's own files beside snapshots.json: its picture (lord-server), its note (lord-server) and the machine's
+ * settings as they were (snap_settings_keep) */
 static void snap_picture_rm(const char *dir, const char *tag) {
+    static const char *const EXT[] = { "png", "note", "json" };
     char p[PATH_MAX + 64];
-    snprintf(p, sizeof p, "%s/snapshots/%s.png", dir, tag);
-    unlink(p);
+    for (int i = 0; i < 3; i++) { snprintf(p, sizeof p, "%s/snapshots/%s.%s", dir, tag, EXT[i]); unlink(p); }
+}
+
+/* ---- the machine's settings with each snapshot (6.2) ----
+ * A snapshot holds the disks, the UEFI variables, the TPM and (taken running) the memory; the settings are the fifth
+ * part: snapshots/<tag>.json is machine.json as it was, with the hardware the guest had (a running machine's: the one it
+ * started with, not changes waiting for its next start). Going back to the snapshot puts that hardware back
+ * (snap_hw_copy's fields): a snapshot's memory only loads into the same hardware, and a disk-only one boots the system
+ * that was installed for it. The name, icon, tags, folders, clipboard and every other choice stay as they are now. */
+static void snap_hw_copy(VmMachine *to, const VmMachine *from) {
+    to->vcpus = from->vcpus; to->memory_mb = from->memory_mb;
+    to->cpu_sockets = from->cpu_sockets; to->cpu_cores = from->cpu_cores; to->cpu_threads = from->cpu_threads;
+    to->cpu_model = from->cpu_model; to->devices = from->devices; to->nic_model = from->nic_model;
+    to->n_extra_macs = from->n_extra_macs;
+    memcpy(to->extra_macs, from->extra_macs, sizeof to->extra_macs);
+    memcpy(to->extra_models, from->extra_models, sizeof to->extra_models);
+    to->graphics = from->graphics; to->heads = from->heads; to->res_w = from->res_w; to->res_h = from->res_h;
+    to->secure_boot = from->secure_boot; to->tpm = from->tpm; to->hyperv = from->hyperv; to->rtc = from->rtc;
+    to->agent = from->agent; to->transfer = from->transfer;
+    memcpy(to->mac, from->mac, sizeof to->mac);
+}
+
+/* writes snapshots/<tag>.json: machine.json now, with `hw`'s hardware (NULL: as it is); 0 ok */
+static int snap_settings_keep(const char *dir, const char *tag, const VmMachine *hw) {
+    if (!vm_snap_tag_valid(tag)) return -1;
+    VmMachine m;
+    if (vm_machine_load(dir, &m, NULL, 0)) return -1;
+    if (hw) snap_hw_copy(&m, hw);
+    char *j = vm_machine_json(&m);
+    if (!j) return -1;
+    char sd[PATH_MAX + 32], tmp[PATH_MAX + 96], to[PATH_MAX + 96];
+    snprintf(sd, sizeof sd, "%s/snapshots", dir);
+    mkdir(sd, 0700);
+    snprintf(tmp, sizeof tmp, "%s/.%s.json.tmp", sd, tag);
+    snprintf(to, sizeof to, "%s/%s.json", sd, tag);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    int ok = fd >= 0 && !write_all(fd, j, strlen(j)) && !fsync(fd);
+    if (fd >= 0) close(fd);
+    free(j);
+    if (!ok || rename(tmp, to)) { unlink(tmp); return -1; }
+    return 0;
+}
+
+/* the snapshot's settings, read back: 1 there (in *then), 0 none kept (a snapshot taken before they were), -1 unusable */
+static int snap_settings_read(const char *dir, const char *tag, VmMachine *then) {
+    char p[PATH_MAX + 96];
+    snprintf(p, sizeof p, "%s/snapshots/%s.json", dir, tag);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return errno == ENOENT ? 0 : -1;
+    static char buf[64 * 1024];
+    ssize_t n = read(fd, buf, sizeof buf);
+    close(fd);
+    if (n <= 0 || n >= (ssize_t)sizeof buf) return -1;
+    return vm_machine_parse(buf, (size_t)n, then, NULL, 0) ? -1 : 1;
+}
+
+/* before going back: a disk added after the snapshot has no part in it (its tag isn't there), so going back is refused
+ * before anything changes; 0 may go on */
+static int snap_settings_check(const char *dir, const VmMachine *now, const char *tag, char *err, size_t errlen) {
+    VmMachine then;
+    int r = snap_settings_read(dir, tag, &then);
+    if (r == 1 && strcmp(then.id, now->id)) r = -1;
+    if (r == 1 && now->n_data > then.n_data) {
+        snprintf(err, errlen, "a disk was added after this snapshot was taken (%d then, %d now): it has no part in it", then.n_data, now->n_data);
+        return -1;
+    }
+    return 0;
+}
+
+/* after going back (or before a start from the snapshot's memory): its hardware into machine.json */
+static void snap_settings_back(const char *dir, const char *tag) {
+    VmMachine then, now;
+    int r = snap_settings_read(dir, tag, &then);
+    if (r <= 0 || vm_machine_load(dir, &now, NULL, 0) || strcmp(then.id, now.id)) {
+        if (r < 0) vlog("snapshots: %s: its settings can't be read: the machine's are kept", tag);
+        return;
+    }
+    VmMachine m = now;
+    snap_hw_copy(&m, &then);
+    if (!memcmp(&m, &now, sizeof m)) return;
+    char err[160];
+    if (vm_machine_check(&m, err, sizeof err) || vm_machine_save(dir, &m)) { vlog("snapshots: %s: its settings couldn't be put back (%s): the machine's are kept", tag, err); return; }
+    vlog("snapshots: %s: the machine's hardware is as it was then (%d vCPUs, %d MB)", tag, m.vcpus, m.memory_mb);
 }
 
 /* a tag on the disks that snapshots.json doesn't list is what's left of a snapshot that didn't finish: removed at the
@@ -746,6 +830,7 @@ static int snap_take_off(const char *dir, const VmMachine *m, const char *tag, c
         snprintf(err, errlen, "can't keep the TPM's state");
         return -1;
     }
+    if (snap_settings_keep(dir, tag, NULL)) vlog("snapshots: %s: the settings couldn't be kept with it", tag);
     VmSnap sn;
     memset(&sn, 0, sizeof sn);
     snprintf(sn.tag, sizeof sn.tag, "%s", tag);
@@ -779,12 +864,14 @@ static int snap_revert_off(const char *dir, const VmMachine *m, const char *tag,
     VmSnap list[VM_SNAPS_MAX];
     int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
     if (vm_snaps_find(list, n, tag) < 0) { snprintf(err, errlen, "there's no snapshot %s", tag); return -1; }
+    if (snap_settings_check(dir, m, tag, err, errlen)) return -1;
     char disks[VM_NDISKS][PATH_MAX + 64];
     int nd = disk_files(dir, m, disks);
     if (vm_op_begin(dir, "snapshot-revert", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
     for (int i = 0; i < nd; i++) if (qimg_snap(dir, disks[i], "-a", tag, err, errlen)) return -1;     /* operation.json stays: the next open goes on */
     if (tpm_snap(dir, m, TPMS_REVERT, tag)) { snprintf(err, errlen, "can't put the TPM's state back"); return -1; }
     discard_state(dir);
+    snap_settings_back(dir, tag);
     vm_op_end(dir);
     return 0;
 }
@@ -3928,6 +4015,7 @@ static void snap_concluded(const JVal *root, int ok) {
             begin_poweroff();
             return;
         }
+        snap_settings_back(S.dir, S.snap_tag);
         vm_op_end(S.dir);
         snap_end(1, "");
     } else {
@@ -3961,6 +4049,7 @@ static void snap_taken(const JVal *root) {
     vm_now_iso(sn.created);
     sn.memory = 1;
     sn.vmstate = vmstate;
+    if (snap_settings_keep(S.dir, S.snap_tag, &S.m)) vlog("snapshots: %s: the settings couldn't be kept with it", S.snap_tag);
     list[n++] = sn;
     if (vm_snaps_save(S.dir, list, n)) { vm_op_end(S.dir); snap_end(0, "can't write snapshots.json"); return; }
     vm_op_end(S.dir);
@@ -8838,7 +8927,14 @@ static int cmd_snapshot(const char *dir, int argc, char **argv) {
     else {
         VmSnap list[VM_SNAPS_MAX];
         int n = vm_snaps_load(real, list, VM_SNAPS_MAX), i = vm_snaps_find(list, n, tag);
-        if (i >= 0 && list[i].memory) { close(lock); fprintf(stderr, "lord-vm: %s holds the machine's memory: start it with --loadvm %s\n", tag, tag); return 4; }
+        if (i >= 0 && list[i].memory) {
+            /* its memory loads only into the hardware it ran on: that goes back first */
+            if (snap_settings_check(real, &m, tag, err, sizeof err)) { close(lock); fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+            snap_settings_back(real, tag);
+            close(lock);
+            fprintf(stderr, "lord-vm: %s holds the machine's memory: start it with --loadvm %s\n", tag, tag);
+            return 4;
+        }
         rc = snap_revert_off(real, &m, tag, err, sizeof err);
     }
     close(lock);
@@ -8903,6 +8999,8 @@ static int copy_reflink(const char *from, const char *to) {
 
 /* qemu-img convert of a qcow2 (with its base when it has one), jailed: it reads the disk (and the base) and writes
  * only in out_dir. snap: a snapshot's tag to copy instead of the current state, or NULL */
+/* --compact --compress: the copy's clusters compressed (qemu-img convert -c, zlib), never with encryption (qcow2 can't) */
+static int qimg_compress;
 static int qimg_convert(const char *disk, const char *base, const char *snap, const char *out, const char *out_dir, char *err, size_t errlen) {
     JBuf b;
     jb_init(&b);
@@ -8918,6 +9016,8 @@ static int qimg_convert(const char *disk, const char *base, const char *snap, co
     int e = key_have();
     char *with[] = { QEMU_IMG, "convert", "-q", "-l", sn, "-O", "qcow2", e ? "-o" : b.p, e ? ENC_CREATE_OPTS : (char *)out, e ? b.p : NULL, (char *)out, NULL };
     char *without[] = { QEMU_IMG, "convert", "-q", "-O", "qcow2", e ? "-o" : b.p, e ? ENC_CREATE_OPTS : (char *)out, e ? b.p : NULL, (char *)out, NULL };
+    char *compressed[] = { QEMU_IMG, "convert", "-q", "-c", "-O", "qcow2", b.p, (char *)out, NULL };
+    if (qimg_compress && !snap && !e) { jail_read2 = NULL; int r = run_tool_in(compressed, err, errlen, disk, out_dir); jb_free(&b); return r; }
     jail_read2 = base && base[0] ? base : NULL;
     int r = run_tool_in(snap ? with : without, err, errlen, disk, out_dir);
     jail_read2 = NULL;
@@ -9180,11 +9280,18 @@ out:
     return rc;
 }
 
-/* lord-vm --compact DIR [--estimate]: the system disk rewritten without the space it no longer uses (6.4). The machine
- * must be off, without snapshots (they'd be lost), a saved session or a base. Under operation.json "compact": the new
- * file is made beside the old one, checked, and renamed over it. --estimate prints what it would take. */
+/* lord-vm --compact DIR [--estimate] [--compress]: the system disk rewritten without the space it no longer uses (6.4).
+ * The machine must be off, without snapshots (they'd be lost), a saved session or a base. Under operation.json
+ * "compact": the new file is made beside the old one, checked, and renamed over it. --estimate prints what it would
+ * take. --compress also compresses every cluster of the copy (qcow2's own zlib compression): smaller, and what the guest
+ * writes later is stored as usual; not for an encrypted machine (qcow2 can't have both). */
 static int cmd_compact(const char *dir, int argc, char **argv) {
-    int estimate = argc > 0 && !strcmp(argv[0], "--estimate");
+    int estimate = 0;
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "--estimate")) estimate = 1;
+        else if (!strcmp(argv[i], "--compress")) qimg_compress = 1;
+        else { fprintf(stderr, "lord-vm: --compact DIR [--estimate] [--compress]\n"); return 2; }
+    }
     char real[PATH_MAX], err[256];
     if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
     snprintf(S.dir, sizeof S.dir, "%s", real);
@@ -9192,6 +9299,7 @@ static int cmd_compact(const char *dir, int argc, char **argv) {
     if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
     /* a raw disk gives space back by itself: the guest's discards punch holes in the file (6.4) */
     if (m.raw) { fprintf(stderr, "lord-vm: a raw disk needs no compaction: the guest's discards free its space\n"); return 1; }
+    if (m.encrypted && qimg_compress) { fprintf(stderr, "lord-vm: an encrypted machine's disk can't be compressed (qcow2 has no compressed encrypted clusters)\n"); return 1; }
     if (m.encrypted && !key_have()) { fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); return 1; }
     if (!m.encrypted && key_have()) key_wipe();
     char sys[PATH_MAX + 64], dd[PATH_MAX + 64], tmp[PATH_MAX + 64];
@@ -9244,7 +9352,7 @@ static int cmd_compact(const char *dir, int argc, char **argv) {
     vm_sync_dir(dd);
     vm_op_end(real);
     stat(sys, &sb);
-    printf("{\"compacted\":true,\"before\":%lld,\"after\":%lld}\n", before, (long long)sb.st_blocks * 512);
+    printf("{\"compacted\":true,\"compressed\":%s,\"before\":%lld,\"after\":%lld}\n", qimg_compress ? "true" : "false", before, (long long)sb.st_blocks * 512);
     rc = 0;
 out:
     close(lock);
@@ -11798,7 +11906,7 @@ static int usage(void) {
             "       lord-vm --suspend DIR | --discard-state DIR | --agent DIR shutdown|timesync|install\n"
             "       lord-vm --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list   (and --start DIR --loadvm TAG)\n"
             "       lord-vm --clone DIR NEWDIR [--name N] [--duplicate] [--linked] [--from-snapshot TAG] [--hostname H | --keep-identity]\n"
-            "       lord-vm --compact DIR [--estimate]\n"
+            "       lord-vm --compact DIR [--estimate] [--compress]\n"
             "       lord-vm --import-plan SRC [--arch arm64|amd64]   (a machine of another virtualization app: what comes along)\n"
             "       lord-vm --import-machine SRC DIR [--name N] [--arch A] [--devices compat|virtio] [--network shared|isolated]\n"
             "                                        [--firmware uefi|bios] [--vcpus N] [--memory MB]\n"
