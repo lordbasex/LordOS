@@ -3818,6 +3818,29 @@ static void ag_lost(const char *why) {
     ag_set(VAS_WAITING);
 }
 
+/* A Windows guest's event logs (6.19), in the journal's own short-iso shape so Logs reads them like a Linux guest's:
+ * "<time> <computer> <provider>: [critical: |error: |warning: ]<the message's first line>", oldest first, the System and
+ * Application logs, then "-- cursor: <ticks>" (UTC ticks of the newest event; the next run asks only for later ones).
+ * Compile-time text: %s is evlog_cursor's digits */
+static const char EVLOG_PS[] =
+    "$ErrorActionPreference='SilentlyContinue';[Console]::OutputEncoding=[Text.Encoding]::UTF8;$c=[int64]%s;"
+    "$f=@{LogName='System','Application'};if($c -gt 0){$f.StartTime=[DateTime]::new($c+1,[DateTimeKind]::Utc).ToLocalTime()};"
+    "$e=Get-WinEvent -FilterHashtable $f -MaxEvents 300|Sort-Object TimeCreated;$last=$c;$h=$env:COMPUTERNAME;"
+    "foreach($x in $e){$t=$x.TimeCreated.ToUniversalTime().Ticks;if($t -le $c){continue};if($t -gt $last){$last=$t};"
+    "$l=switch($x.Level){1{'critical: '}2{'error: '}3{'warning: '}default{''}};$m=(($x.Message -split \"`r?`n\")[0]);"
+    "if(-not $m){$m='event '+$x.Id};$p=($x.ProviderName -replace '[^\\w@.\\-]','-');"
+    "'{0} {1} {2}: {3}{4}' -f $x.TimeCreated.ToString('yyyy-MM-ddTHH:mm:sszzz'),$h,$p,$l,$m};'-- cursor: '+$last";
+
+/* the cursor as the script takes it: 1..19 digits, else "0" (the newest 300 again) */
+static void evlog_cursor(const char *in, char *out, size_t cap) {
+    size_t n = strlen(in);
+    int ok = n >= 1 && n <= 19;
+    for (size_t i = 0; ok && i < n; i++) ok = in[i] >= '0' && in[i] <= '9';
+    if (!ok || n + 1 > cap) { in = "0"; n = 1; }
+    memcpy(out, in, n);
+    out[n] = 0;
+}
+
 static void journal_append(const uint8_t *data, size_t n) {
     char p[PATH_MAX + 32], p1[PATH_MAX + 32];
     snprintf(p, sizeof p, "%s/log/journal.log", S.dir);
@@ -3922,6 +3945,8 @@ static void on_qga_reply(const JVal *root, int ok) {
         if (S.ag_windows && rel && atol(rel) >= 22000 && !strncmp(clean, "Windows 10", 10)) clean[9] = '1';
         /* the journal (journalctl) and keeping the guest awake (systemd-inhibit) are a Linux guest's: not claimed for Windows */
         if (S.ag_windows) S.ag_caps &= ~(VAC_JOURNAL | VAC_AWAKE);
+        /* its event logs instead, through the same guest-exec (6.19); the journal's cursor is the events' from then on */
+        if (S.ag_windows && (S.ag_caps & VAC_EXEC)) { S.ag_caps |= VAC_EVENTLOG; if (!(S.jcursor[0] >= '0' && S.jcursor[0] <= '9')) S.jcursor[0] = 0; }
         snprintf(S.ag_os, sizeof S.ag_os, "%s", clean);
         S.ag_state = -1;
         ag_set(VAS_CONNECTED);
@@ -3946,7 +3971,7 @@ static void on_qga_reply(const JVal *root, int ok) {
         break;
     }
     case AQ_PING: if (ok) S.ping_at = now_ms(); break;
-    case AQ_JEXEC: S.jpid = ok ? (long)json_num(r, "pid", 0) : 0; if (!ok) S.ag_caps &= ~VAC_JOURNAL; break;
+    case AQ_JEXEC: S.jpid = ok ? (long)json_num(r, "pid", 0) : 0; if (!ok) S.ag_caps &= ~(VAC_JOURNAL | VAC_EVENTLOG); break;
     case AQ_JSTATUS:
         if (!ok) { S.jpid = 0; break; }
         if (!json_bool(r, "exited", 0)) break;                /* asked again at the next turn */
@@ -5560,10 +5585,29 @@ static void ag_tick(long long now) {
         S.shutdown_at = 0;
         if (S.state == VS_STOPPING && (S.ag_caps & VAC_SHUTDOWN)) { vlog("agent: the guest didn't answer the power button: asking qemu-guest-agent"); qga_do("guest-shutdown", "{\"mode\":\"powerdown\"}", -1); }
     }
-    if ((S.ag_caps & VAC_JOURNAL) && now >= S.journal_at && !S.helper_handle && S.state == VS_RUNNING) {
-        S.journal_at = now + 5000;
+    if ((S.ag_caps & (VAC_JOURNAL | VAC_EVENTLOG)) && now >= S.journal_at && !S.helper_handle && S.state == VS_RUNNING) {
+        S.journal_at = now + ((S.ag_caps & VAC_EVENTLOG) ? 10000 : 5000);
         if (S.jpid) { char a[48]; snprintf(a, sizeof a, "{\"pid\":%ld}", S.jpid); qga_do("guest-exec-status", a, AQ_JSTATUS); }
-        else {
+        else if (S.ag_caps & VAC_EVENTLOG) {
+            /* a Windows guest's System and Application event logs (6.19): one fixed PowerShell script, as qemu-guest-agent
+             * runs it; the only value in it is the cursor, the last event's time in ticks, digits only (evlog_cursor):
+             * anything else from the guest's last answer starts again from the newest 300 */
+            char cur[24];
+            evlog_cursor(S.jcursor, cur, sizeof cur);
+            size_t need = sizeof EVLOG_PS + sizeof cur;
+            char *ps = malloc(need);
+            if (ps) {
+                snprintf(ps, need, EVLOG_PS, cur);
+                JBuf b;
+                jb_init(&b);
+                jb_raw(&b, "{\"path\":\"powershell.exe\",\"arg\":[\"-NoProfile\",\"-NonInteractive\",\"-ExecutionPolicy\",\"Bypass\",\"-Command\",");
+                jb_str(&b, ps);
+                jb_raw(&b, "],\"capture-output\":true}");
+                if (!b.oom) qga_do("guest-exec", b.p, AQ_JEXEC);
+                jb_free(&b);
+                free(ps);
+            }
+        } else {
             JBuf b;
             jb_init(&b);
             jb_raw(&b, "{\"path\":\"journalctl\",\"arg\":[\"-o\",\"short-iso\",\"--no-pager\",\"-n\",\"300\",\"--show-cursor\"");

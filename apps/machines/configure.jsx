@@ -246,11 +246,12 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
-    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', ...draft };
+    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off',
+    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -558,6 +559,16 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
             options={['trusted', 'ask'].map((k) => [k, tr(`machines.cfg.clipTrust.${k}`)])} /></Off>
         </Row>
       ) : null}
+    </Group>
+    {/* links and notifications from the guest (6.12, machine.json guest_links, guest_notify): off unless turned on here;
+        a link opens only when the person clicks Open in the bar, a notification shows as from the machine */}
+    <Group>
+      <Row label={tr('machines.cfg.guestLinks')} note={tr('machines.cfg.guestLinksNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><Toggle on={cur.guestLinks} onChange={(x) => set({ guestLinks: x, ...(x ? { agent: true } : {}) })} /></Off>
+      </Row>
+      <Row label={tr('machines.cfg.guestNotify')} note={tr('machines.cfg.guestNotifyNote') + (offNote ? ` ${offNote}` : '')} last>
+        <Off off={running}><Toggle on={cur.guestNotify} onChange={(x) => set({ guestNotify: x, ...(x ? { agent: true } : {}) })} /></Off>
+      </Row>
     </Group>
     <Group>
       <Row label={tr('machines.cfg.shares')} note={tr('machines.cfg.sharesNote') + (offNote ? ` ${offNote}` : '')} last={!cur.shares.length}>

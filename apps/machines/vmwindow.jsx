@@ -4,7 +4,7 @@
 // (Actions, Devices). In full screen the bar floats at the top edge. When the machine fails to start or stops with an
 // error, the window shows why, a likely fix, the log and Start Again.
 import {
-  View, Text, Image, MediaView, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
+  View, Text, Image, MediaView, Segmented, ScrollView, fs, FilePicker, Toggle, Terminal, Overlay, term, addListener, media, screen, openFileWithApps, useAppWindow, useWindowState, useStore, wm, windows, clipboard, notify, revealPath, openFolder,
   inhibitShortcuts, useNarrow, requestPermission, markDeviceUse, useFilesDrop, FilesDropHint, admin, t as tr, useSound, microphones,
   hasTextFocus, settings, useWindowsOutOfSight,
 } from '@lordos/sdk';
@@ -35,7 +35,7 @@ const toolsRuns = new Map();
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
 const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}.${x.output}.${x.input}` : '');
-const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'closeRefusedSeq', 'captured', 'captureEnds'].every((k) => a[k] === b[k])
+const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'closeRefusedSeq', 'captured', 'captureEnds', 'shell', 'guestLinkSeq', 'guestNotesSeq'].every((k) => a[k] === b[k]) && a.agent?.lost === b.agent?.lost
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
 
 // the agent's state, first on the bar (mock "Session", 6.17): a light, and a popover with what it said and what works
@@ -448,6 +448,12 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const [shell, setShell] = useWindowState('vm.shell', false);
   const [cfgSheet, setCfgSheet] = useState(null);     // Configure as a sheet over the machine's picture
   const [shellKeys, setShellKeys] = useState(false);
+  // which shell the pane shows: the agent's (the signed-in person's own shell in the guest, 6.18, with the LordOS tools 8
+  // or w12) or the serial console; the agent's when the tools have it, unless the person picked the console
+  const [shellSrc, setShellSrc] = useWindowState('vm.shellSrc', 'agent');
+  const agentShell = !!(st?.agent?.state === 'connected' && st.agent.caps & AGENT_CAPS.shell);
+  const shellUse = shellSrc === 'agent' && agentShell ? 'agent' : 'serial';
+  const shellTerm = shellUse === 'agent' ? st?.shell : st?.console;
   // the clipboard's "ask before each paste" bar (model.js clipAsk*): while it shows, the keyboard is the bar's
   const [askSt, setAskSt] = useState(clipAskEmpty);
   const askKind = clipAskShown(askSt);
@@ -672,10 +678,12 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // keyboard while in front; everything held is let go of on blur
   const live = !!sid && st?.display === 'up' && (st.state === 'running' || st.state === 'paused') && !closing && !askClose && !(shell && shellKeys) && !pickCd && !appsRef.current && !askKind;
   // the console's stream, asked for once the pane is open on a running machine
-  useEffect(() => { if (shell && sid && !st?.console && (st?.state === 'running' || st?.state === 'paused')) lord.vm.console(sid); }, [shell, sid, st?.state, !!st?.console]);
+  useEffect(() => { if (shell && shellUse === 'serial' && sid && !st?.console && (st?.state === 'running' || st?.state === 'paused')) lord.vm.console(sid); }, [shell, shellUse, sid, st?.state, !!st?.console]);
+  // the agent's shell, asked for once the pane shows it (its size follows the terminal by itself)
+  useEffect(() => { if (shell && shellUse === 'agent' && sid && !st?.shell && st?.state === 'running') lord.vm.shell(sid, 100, 14); }, [shell, shellUse, sid, st?.state, !!st?.shell]);
   useEffect(() => {
-    if (!shell || !shellKeys || !focused || !st?.console) return undefined;
-    const id = st.console;
+    if (!shell || !shellKeys || !focused || !shellTerm) return undefined;
+    const id = shellTerm;
     return addListener('keydown', (e) => {
       // the session's every key reaches this listener: only the ones typed while this window has the keyboard, now
       if (menus.open > 0 || !wm.hasKeyboard(winId)) return;
@@ -685,7 +693,18 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       e.preventDefault?.();                      // Tab goes to the machine, not to the window's buttons (sdk/focus.js)
       term.key(id, key, e.char || '', base, e.mods & 7);
     });
-  }, [shell, shellKeys, focused, st?.console]);
+  }, [shell, shellKeys, focused, shellTerm]);
+  // notifications from the guest (6.12, Configure's switch): shown as from the machine, its name first, never more
+  // than lord-vm and lord-server let through
+  useEffect(() => {
+    if (!sid || !st?.guestNotesSeq) return;
+    for (const n of lord.vm.guestNotes(sid) || []) notify({ app: 'machines', label: tr('machines.note.from', { name: name || '' }), title: n.title, body: n.body, sound: false });
+  }, [sid, st?.guestNotesSeq]);
+  // a link from the guest (6.12): a bar the person answers; Open works only after the bar has been seen a moment
+  const linkSeq = st?.guestLinkSeq || 0;
+  const [linkReady, setLinkReady] = useState(0);
+  useEffect(() => { if (!linkSeq) return undefined; const t = setTimeout(() => setLinkReady(linkSeq), 800); return () => clearTimeout(t); }, [linkSeq]);
+  const linkAnswer = (open) => { if (sid && linkSeq) lord.vm.guestLinkAnswer(sid, linkSeq, open); };
   useEffect(() => {
     if (!live || !focused) { if (sid) { lord.vm.release(sid); buttons.current.clear(); } dropLatched(); return undefined; }
     // a key pressed while one of the window's menus is open is the menu's, down and up (Esc closes it)
@@ -785,7 +804,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
-  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch }); } }, [sid, st?.state]);
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify }); } }, [sid, st?.state]);
   // "Capture mouse" (capture.js, docs/VIRTUALIZATION.md 6.25): lord-server locks the pointer inside the picture and the
   // guest gets relative motion; ❖Esc or Ctrl+Alt (lord-server's, before any app), focus loss, apps mode or the machine
   // stopping give it back. The state belongs to the window: full screen rebuilds it, and the lock moves to the new picture
@@ -1232,12 +1251,27 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
             <View style={{ paddingHorizontal: 6, height: 18, borderRadius: 4, justifyContent: 'center', backgroundColor: '#3a2a5c' }}>
               <Text style={{ fontSize: 11, fontWeight: 700, color: '#d9c9ff' }}>{tr('machines.shell.badge')}</Text>
             </View>
-            <Text style={{ flex: 1, fontSize: 12, color: '#c9c9d1', textAlign: 'start' }}>{tr('machines.shell.title', { name })}</Text>
+            <Text style={{ flex: 1, fontSize: 12, color: '#c9c9d1', textAlign: 'start' }}>{tr(shellUse === 'agent' ? 'machines.shell.agentTitle' : 'machines.shell.title', { name })}</Text>
+            {agentShell ? <Segmented small value={shellUse} onChange={(x) => setShellSrc(x)} options={[['agent', tr('machines.shell.agent')], ['serial', tr('machines.shell.serial')]]} /> : null}
+            {shellUse === 'agent' && st?.shell ? <Btn label={tr('machines.shell.new')} onClick={() => lord.vm.shell(sid, 100, 14)} style={{ height: 20, paddingHorizontal: 8 }} /> : null}
             <Text style={{ fontSize: 11, color: '#8a8a94' }}>{shellKeys ? tr('machines.shell.keysHere') : tr('machines.shell.clickHere')}</Text>
             <Btn label="×" onClick={() => { setShell(false); setShellKeys(false); }} style={{ height: 20, paddingHorizontal: 8 }} />
           </View>
-          {st?.console ? <Terminal ref={shellRef} session={st.console} style={{ flex: 1 }} />
+          {shellTerm ? <Terminal ref={shellRef} session={shellTerm} style={{ flex: 1 }} />
             : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, color: '#8a8a94' }}>{a.reset ? tr('machines.shell.connecting') : tr('machines.shell.off')}</Text></View>}
+        </View>
+      ) : null}
+      {linkSeq && st?.guestLink?.url ? (
+        <View style={{ position: 'absolute', top: BAR + 12, left: 0, right: 0, alignItems: 'center' }}>
+          <View style={{ maxWidth: 560, marginHorizontal: 16, padding: 12, gap: 8, borderRadius: 12, backgroundColor: p.dark ? '#2c2c33' : '#fbfbfd', border: `1px solid ${p.line}`, boxShadow: '0 12px 32px rgba(0,0,0,0.4)' }}>
+            <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.link.ask', { name: name || '' })}</Text>
+            <Text style={{ fontSize: 12, fontFamily: 'monospace', color: p.text, direction: 'ltr', textAlign: 'left', maxHeight: 54, overflow: 'hidden', wordBreak: 'break-all' }}>{st.guestLink.url}</Text>
+            <Text style={{ fontSize: 11, color: p.dim, textAlign: 'start' }}>{tr('machines.link.hint')}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8 }}>
+              <Btn label={tr('machines.link.ignore')} onClick={() => linkAnswer(false)} />
+              <Btn primary label={tr('machines.link.open')} disabled={linkReady !== linkSeq} onClick={() => linkAnswer(true)} />
+            </View>
+          </View>
         </View>
       ) : null}
       {st?.state === 'paused' && !card ? (

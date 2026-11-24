@@ -459,6 +459,8 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
         JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
         JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
+        JS_SetPropertyStr(c, o, "guestLinks", JS_NewBool(c, m.guest_links));     /* links and notifications from the guest (6.12) */
+        JS_SetPropertyStr(c, o, "guestNotify", JS_NewBool(c, m.guest_notify));
         set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
         JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
         set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
@@ -1139,7 +1141,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[58 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[66 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1260,6 +1262,10 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "perfProfile");
     if (JS_IsBool(v)) { args[n++] = "--perf-profile"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    v = JS_GetPropertyStr(c, argv[1], "guestLinks");
+    if (JS_IsBool(v)) { args[n++] = "--guest-links"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    v = JS_GetPropertyStr(c, argv[1], "guestNotify");
+    if (JS_IsBool(v)) { args[n++] = "--guest-notify"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
     v = JS_GetPropertyStr(c, argv[1], "cpuPin");
     if (JS_IsString(v)) {
@@ -1790,6 +1796,8 @@ typedef struct {
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
     int ag_state, ag_caps;              /* the guest agent (VM_AGENT_STATE), and what it said about itself */
+    int ag_seen;                        /* it was connected in this run of the guest (a restart forgets it): "lost" when
+                                         * it stops answering while the guest runs (the light's red state, 6.17) */
     char ag_text[VM_TEXT_MAX];
     uint32_t ag_seq;                    /* an Install Agent request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
     uint32_t xf_seq;                    /* a Set Up the Transfer Folder request (VAG_TRANSFER), the same way */
@@ -2724,6 +2732,7 @@ static void from_vm(Sess *s) {
             break;
         case VM_STATE:
             s->state = m.a; s->reason = m.b; s->code = m.c;
+            if (m.b == VR_GUEST_RESET || m.a != VS_RUNNING) s->ag_seen = 0;     /* a restarting guest's agent isn't lost */
             if (m.a == VS_STOPPED && (m.b == VR_GUEST_SHUTDOWN || m.b == VR_HOST_SHUTDOWN)) {
                 /* the system shut down by itself once: its first start is behind it */
                 char fp[PATH_MAX + 32];
@@ -2736,6 +2745,8 @@ static void from_vm(Sess *s) {
             break;
         case VM_AGENT_STATE:
             s->ag_state = m.a; s->ag_caps = m.b;
+            if (m.a == VAS_CONNECTED) s->ag_seen = 1;
+            if (m.a == VAS_OFF) s->ag_seen = 0;
             snprintf(s->ag_text, sizeof s->ag_text, "%s", m.text);
             break;
         case VM_CLIP_REQ:
@@ -3170,6 +3181,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyStr(c, o, "guestLink", l);
         if (!s->link_seen) s->link_seen = mono_ms();
     }
+    set_int(c, o, "guestLinkSeq", s->link[0] ? (int)s->link_seq : 0);
     set_int(c, o, "guestLinkDropped", s->link_dropped);
     set_int(c, o, "guestNotesSeq", s->note_seq);
     {
@@ -3187,6 +3199,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         set_str(c, ag, "system", sys);
         set_str(c, ag, "tools", tab2 ? tab2 + 1 : "");
         set_int(c, ag, "install", s->ag_result);
+        JS_SetPropertyStr(c, ag, "lost", JS_NewBool(c, s->ag_seen && s->ag_state == VAS_WAITING && s->state == VS_RUNNING));
         set_str(c, ag, "message", s->ag_msg);
         set_int(c, ag, "transfer", s->xf_result);
         set_str(c, ag, "transferMessage", s->xf_msg);

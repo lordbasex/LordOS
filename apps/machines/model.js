@@ -684,7 +684,9 @@ export const machineProtectedOf = (entry, meta, homeProtected = false) =>
 // transfer: the guest has the transfer folder (6.7.1) mounted; transferSetup: a Windows guest that gets it once WinFsp is
 // installed (Set Up the Transfer Folder); clipNoTool: the Linux guest's helper runs but the guest has no clipboard tool
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536 };
+// shell: the tools start the agent's shell (6.18, tools 8 / w12); links, notify: they pass the guest's links and
+// notifications on, and this machine takes them (6.12); eventlog: a Windows guest's event logs come in (6.19)
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -694,14 +696,19 @@ export function agentLines(agent, cfg) {
   const win = guestWindows(agent);
   return [
     ['shell', 'works'],                                       // the serial console needs no agent
-    // the journal and keeping the guest awake are systemd's (journalctl, systemd-inhibit): not lines of a Windows guest
-    win ? null : ['logs', on && caps & AGENT_CAPS.journal ? 'works' : 'needsAgent'],
+    // the agent's shell (6.18): the signed-in person's own shell, with the LordOS tools 8 / w12
+    ['agentShell', on && caps & AGENT_CAPS.shell ? 'works' : on ? 'needsTools' : 'needsAgent'],
+    // the guest's journal (systemd) or a Windows guest's event logs (6.19); keeping the guest awake is systemd's
+    ['logs', on && caps & (win ? AGENT_CAPS.eventlog : AGENT_CAPS.journal) ? 'works' : 'needsAgent'],
     ['shutdown', on && caps & AGENT_CAPS.shutdown ? 'works' : 'acpi'],
     ['time', on && caps & AGENT_CAPS.time ? 'works' : 'needsAgent'],
     win ? null : ['awake', on && caps & AGENT_CAPS.awake ? 'works' : 'needsAgent'],
     ['clipboard', clipState(agent, cfg)],
     ['resolution', !win || caps & AGENT_CAPS.display ? 'works' : 'needsTools'],
     ['folders', cfg?.shares?.length || (cfg?.transfer && caps & AGENT_CAPS.transfer) ? 'works' : 'none'], ['apps', appsBlocker(agent, cfg) || 'works'],
+    // links and notifications from the guest (6.12): off unless Configure turned them on
+    ['links', !cfg?.guestLinks ? 'off' : on && caps & AGENT_CAPS.links ? 'works' : on ? 'needsTools' : 'needsAgent'],
+    ['notify', !cfg?.guestNotify ? 'off' : on && caps & AGENT_CAPS.notify ? 'works' : on ? 'needsTools' : 'needsAgent'],
   ].filter(Boolean);
 }
 // the clipboard's line: 'off' (Configure), 'works', 'needsXclip' (the helper runs but the guest has no clipboard tool),
@@ -717,7 +724,7 @@ export function clipState(agent, cfg) {
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w11', linux: '7' };
+export const TOOLS_SHIPPED = { windows: 'w12', linux: '8' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -797,7 +804,9 @@ export function toolsAutoStep(s0, { agent, on, busy, now }, shipped = TOOLS_SHIP
   return { s: { ...s, tries: s.tries + 1, pending: now }, act: 'install' };
 }
 // the agent's light: gray (off or not installed), amber (waiting for it), green (connected)
-export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? 'run' : 'pause');
+// red ('bad'): the agent answered in this run of the guest and stopped answering while it runs (lost), or installing
+// the LordOS tools failed (install 3)
+export const agentTone = (a, configured) => (!configured ? 'off' : a?.state === 'connected' ? (a.install === 3 ? 'bad' : 'run') : a?.lost ? 'bad' : 'pause');
 
 // ---- files dropped on the window: copied into the guest's Downloads by its agent (lord.vm.sendFile) ----
 // Why a drop can't be taken now (the hint says it before the files are let go of), or null: 'off' (not running),

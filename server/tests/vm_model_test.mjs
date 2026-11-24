@@ -215,7 +215,14 @@ eq('clipNeedsTool: not while waiting', M.clipNeedsTool({ state: 'waiting', caps:
 eq('clipNeedsTool: not with the clipboard off', M.clipNeedsTool({ state: 'connected', caps: 2048 }, {}), false);
 eq('an old helper without noclip still says install', agentLines({ state: 'connected', caps: 1 }, { clipboard: 'both' }).find((l) => l[0] === 'clipboard')[1], 'needsHelper');
 eq('linux guest resolution', agentLines({ state: 'connected', caps: 1, system: 'Ubuntu 26.04' }, {}).find((l) => l[0] === 'resolution')[1], 'works');
-eq('windows guest: no journal or awake lines (systemd\'s)', agentLines({ state: 'connected', caps: 1 | 2 | 4 | 16 | 64, system: 'Windows 11 Pro' }, {}).map((l) => l[0]).filter((x) => x === 'logs' || x === 'awake'), []);
+eq('windows guest: no awake line (systemd\'s); its logs are the event logs', agentLines({ state: 'connected', caps: 1 | 2 | 4 | 16 | 64, system: 'Windows 11 Pro' }, {}).filter((l) => l[0] === 'logs' || l[0] === 'awake'), [['logs', 'needsAgent']]);
+eq('windows guest with its event logs', agentLines({ state: 'connected', caps: 1 | 1048576, system: 'Windows 11 Pro' }, {}).find((l) => l[0] === 'logs')[1], 'works');
+// the agent's shell (6.18) and links and notifications from the guest (6.12)
+eq('agent shell with tools 8', agentLines({ state: 'connected', caps: 131072 }, {}).find((l) => l[0] === 'agentShell')[1], 'works');
+eq('agent shell without', [agentLines({ state: 'connected', caps: 1 }, {}).find((l) => l[0] === 'agentShell')[1], agentLines(null, {}).find((l) => l[0] === 'agentShell')[1]], ['needsTools', 'needsAgent']);
+eq('links and notifications off unless turned on', agentLines({ state: 'connected', caps: 262144 | 524288 }, {}).filter((l) => l[0] === 'links' || l[0] === 'notify').map((l) => l[1]), ['off', 'off']);
+eq('links and notifications on', agentLines({ state: 'connected', caps: 262144 }, { guestLinks: true, guestNotify: true }).filter((l) => l[0] === 'links' || l[0] === 'notify').map((l) => l[1]), ['works', 'needsTools']);
+eq('agent tone: red when lost or a failed install', [agentTone({ state: 'waiting', lost: true }, true), agentTone({ state: 'connected', install: 3 }, true), agentTone({ state: 'waiting', lost: true }, false)], ['bad', 'bad', 'off']);
 eq('linux guest keeps them', agentLines({ state: 'connected', caps: 16 | 64, system: 'Ubuntu 26.04' }, {}).filter((l) => l[0] === 'logs' || l[0] === 'awake').map((l) => l[1]), ['works', 'works']);
 eq('agent tone', [agentTone(null, false), agentTone({ state: 'waiting' }, true), agentTone({ state: 'connected' }, true)], ['off', 'pause', 'run']);
 eq('clip ways', [clipTo('both'), clipTo('from-guest'), clipFrom('from-guest'), clipFrom('off')], [true, false, true, false]);
@@ -1051,6 +1058,20 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('no windows, no count', [M.vcpuAdvice([], 4, pc, now), M.vcpuAdvice(null, 4, pc, now), M.vcpuAdvice(idle, 0, pc, now)], [null, null, null]);
   // new machines' default for 'half': half the physical cores, six at most
   eq('default vCPUs', [M.vcpuDefault({ cpus: 20, cores: 10 }), M.vcpuDefault({ cpus: 64, cores: 32 }), M.vcpuDefault({ cpus: 4, cores: 4 }), M.vcpuDefault({ cpus: 2, cores: 1 }), M.vcpuDefault({ cpus: 20, cores: 10 }, 3)], [5, 6, 2, 1, 3]);
+}
+
+// Logs (6.19): the journal's and the event logs' lines in local time, the guest's zone, the unit filter's key
+{
+  const D = await import(path.join(here, '../../apps/machines/diag.js'));
+  const j = D.journalLine('2026-11-24T05:00:07-0300 debian systemd[1]: Started Daily apt.', 60);
+  eq('journal line: local time from the guest\'s offset', [j.at, j.offset, j.unit], ['09:00:07', -180, 'systemd']);
+  const w = D.journalLine('2026-11-24T10:00:00+05:30 WIN11 Service-Control-Manager: warning: The service stopped.', 0);
+  eq('event log line', [w.at, w.offset, w.unit], ['04:30:00', 330, 'Service-Control-Manager']);
+  eq('a line without a time', D.journalLine('-- No entries --'), { at: '', offset: null, unit: '', body: '-- No entries --' });
+  eq('zone labels', [D.tzLabel(0), D.tzLabel(-180), D.tzLabel(330)], ['UTC', 'UTC−03:00', 'UTC+05:30']);
+  eq('guest zone differs', D.guestZone(['x', '2026-11-24T05:00:07-0300 h u: a'], 60), -180);
+  eq('guest zone the same', D.guestZone(['2026-11-24T05:00:07+0100 h u: a'], 60), null);
+  eq('Z is UTC', D.journalLine('2026-11-24T05:00:07Z h u: a', 0).at, '05:00:07');
 }
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);
