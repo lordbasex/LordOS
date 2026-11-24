@@ -106,17 +106,17 @@ void gpu_cache_reset(void);
 int gpu_cards_read(const char *root, const char *pci_ids, GpuCard *out, int max);
 
 /* The whole picture as malloc'd JSON (NULL without memory):
- *   {"t","mono","hz","cards":[…],"list":[{pid,ppid,name,cmd,exe,self,model,libs,clients:[…],kfd:[…],nv:[minors]}],
+ *   {"t","mono","hz","cards":[…],"list":[{pid,ppid,name,cmd,exe,self,model,libs,clients:[…],kfd:[…],nvDev:[minors]}],
  *    "hidden":[{pid,name,kind}],"ai":[{pid,ppid,name,state,own,ticks,rss,model}],"say":[…],"vms":[{pid,ticks,rss}],
- *    "nvml":<nvml or null>,"caps":{…}}
+ *    "nv":[…] (lord-nvgpu's, only when monitor/nvgpu.h's nvgpu_json is linked and writes it),"caps":{…}}
  * root: "" for the real /proc and /sys; uid: the user's (only their processes' fds are read); self: lord-server's pid;
- * home: where lord-say's notes are (NULL: none); nvml: lord-nvgpu's validated JSON array (monitor/nvgpu.h) or NULL.
+ * home: where lord-say's notes are (NULL: none).
  *
  * Cost: /proc is walked (every process's stat, the user's processes' fd folders) only every GPU_RESCAN_MS; the
  * processes found holding a DRM, KFD or NVIDIA device are kept with the fds, and each call re-reads only those fds'
  * fdinfo (and the stat of the few processes kept), so a call between rescans costs well under a millisecond. A
  * process kept whose start time changed (pid reused) is dropped at once. */
 #define GPU_RESCAN_MS 5000
-char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, const char *home, const char *nvml);
+char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, const char *home);
 
 #endif

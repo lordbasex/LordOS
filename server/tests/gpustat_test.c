@@ -325,17 +325,17 @@ static void test_machine(void) {
     CHECK(g->sclk_mhz == 1329 && g->sclk_max == 1340 && g->mclk_mhz == 300 && g->mclk_max == 2000 && g->cur_mhz == -1);
 
     snprintf(home, sizeof home, "%s/home", root);
-    char *j = gpu_json(root, ids, (unsigned)getuid(), 4242, home, "[{\"busId\":\"x\"}]");
+    char *j = gpu_json(root, ids, (unsigned)getuid(), 4242, home);
     CHECK(j != NULL);
     if (!j) return;
     CHECK(strstr(j, "\"cards\":[{\"card\":\"card0\""));
     CHECK(strstr(j, "\"pid\":4242,\"ppid\":1,\"name\":\"game (x)\",\"cmd\":\"game\",\"exe\":\"/usr/games/game\",\"model\":\"Qwen3-8B-Q4_K_M.gguf\",\"self\":true"));
     CHECK(strstr(j, "\"kfd\":[{\"slot\":\"0000:01:00.0\",\"vram\":5242880000,\"sdmaUs\":1234,\"cu\":24}]"));
-    CHECK(strstr(j, "\"nv\":[0]}"));
+    CHECK(strstr(j, "\"nvDev\":[0]}"));
     CHECK(strstr(j, "\"link\":{\"gts\":8.0,\"width\":16}") && strstr(j, "\"memBusy\":38") && strstr(j, "\"crit\":94.0"));
     CHECK(strstr(j, "\"rc6Ms\":59211630") && strstr(j, "\"gts\":[{\"tile\":0,\"gt\":0,\"kind\":\"rc\",\"act\":2400"));
     CHECK(strstr(j, "\"nvModel\":\"NVIDIA GeForce RTX 3060\""));
-    CHECK(strstr(j, "\"nvml\":[{\"busId\":\"x\"}]"));
+    CHECK(!strstr(j, "\"nv\":["));                        /* no lord-nvgpu linked here */
     CHECK(strstr(j, "\"name\":\"llama-server\",\"state\":\"S\",\"own\":true,\"ticks\":1000,") && strstr(j, "\"model\":\"Qwen3-4B-Q4_K_M.gguf\"}"));
     CHECK(strstr(j, "\"hidden\":[]"));
     CHECK(strstr(j, "\"libs\":[\"libvulkan.so.1\",\"libvulkan_radeon.so\"]"));
@@ -359,21 +359,21 @@ static void test_machine(void) {
     put("proc/4700/stat", "4700 (newgame) S 1 4700 4700 0 -1 0 0 0 0 0 1 1 0 0 20 0 1 0 90 1000 100 0\n");
     link_to("proc/4700/fd/3", "/dev/dri/renderD128");
     put("proc/4700/fdinfo/3", "drm-driver:\tamdgpu\ndrm-client-id:\t400\ndrm-pdev:\t0000:01:00.0\n");
-    j = gpu_json(root, ids, (unsigned)getuid(), 0, home, NULL);
-    CHECK(j && strstr(j, "\"gfx\":777") && !strstr(j, "\"pid\":4700") && strstr(j, "\"nvml\":null"));
+    j = gpu_json(root, ids, (unsigned)getuid(), 0, home);
+    CHECK(j && strstr(j, "\"gfx\":777") && !strstr(j, "\"pid\":4700"));
     free(j);
     gpu_cache_reset();
-    j = gpu_json(root, ids, (unsigned)getuid(), 0, home, NULL);
+    j = gpu_json(root, ids, (unsigned)getuid(), 0, home);
     CHECK(j && strstr(j, "\"pid\":4700"));
     free(j);
     /* the pid reused by another process (its start time changed): dropped at once, before the next rescan */
     put("proc/4700/stat", "4700 (other) S 1 4700 4700 0 -1 0 0 0 0 0 1 1 0 0 20 0 1 0 91 1000 100 0\n");
-    j = gpu_json(root, ids, (unsigned)getuid(), 0, home, NULL);
+    j = gpu_json(root, ids, (unsigned)getuid(), 0, home);
     CHECK(j && !strstr(j, "\"pid\":4700"));
     free(j);
     /* seen as another user: no process's fds are read, the KFD process is listed by pid and name only, no model */
     gpu_cache_reset();
-    j = gpu_json(root, ids, (unsigned)getuid() + 1, 0, home, NULL);
+    j = gpu_json(root, ids, (unsigned)getuid() + 1, 0, home);
     CHECK(j && strstr(j, "\"list\":[]") && strstr(j, "\"hidden\":[{\"pid\":4242,\"name\":\"game (x)\",\"kind\":\"kfd\"}]"));
     CHECK(j && strstr(j, "\"own\":false,\"ticks\":1000,\"rss\":") && !strstr(j, "Qwen3"));
     free(j);
@@ -381,7 +381,7 @@ static void test_machine(void) {
     /* a note that isn't lord-say's own format, or isn't a regular file, is ignored */
     put("home/.cache/lordos/say/4400", "lord-say 1 vulkan hd es speak; rm -rf /\n");
     gpu_cache_reset();
-    j = gpu_json(root, ids, (unsigned)getuid(), 0, home, "{\"not\":\"an array\"}");
+    j = gpu_json(root, ids, (unsigned)getuid(), 0, home);
     CHECK(j && strstr(j, "\"say\":[]"));
     free(j);
 }
