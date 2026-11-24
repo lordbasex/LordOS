@@ -1189,6 +1189,34 @@ int fsops_copy_marks(int in, int out) {
     return 0;
 }
 
+static char mark_v[4][256];
+static ssize_t mark_n[4];
+static int mark_count;
+static int mark_one(const char *p, const struct stat *st, int flag, struct FTW *f) {
+    (void)f;
+    if (flag != FTW_F && flag != FTW_D && flag != FTW_DP) return 0;
+    if (!S_ISREG(st->st_mode) && !S_ISDIR(st->st_mode)) return 0;
+    int fd = open(p, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK | (S_ISDIR(st->st_mode) ? O_DIRECTORY : 0));
+    if (fd < 0) return 0;
+    int ok = 1;
+    for (int i = 0; i < 4; i++) if (mark_n[i] > 0 && fsetxattr(fd, MARKS[i], mark_v[i], (size_t)mark_n[i], 0)) ok = 0;
+    close(fd);
+    mark_count += ok;
+    return 0;
+}
+int fsops_inherit_marks(const char *src, const char *dest) {
+    int in = open(src, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
+    if (in < 0) return 0;
+    for (int i = 0; i < 4; i++) mark_n[i] = fgetxattr(in, MARKS[i], mark_v[i], sizeof mark_v[i]);
+    close(in);
+    if (mark_n[0] <= 0) return 0;
+    struct stat st;
+    if (lstat(dest, &st)) return -1;
+    mark_count = 0;
+    nftw(dest, mark_one, 16, FTW_PHYS | FTW_MOUNT);
+    return mark_count;
+}
+
 /* a mark's text shown as it is: printable, no control or bidi characters (anyone who can write the file can set it) */
 static int mark_plain(const char *s, size_t n) {
     for (size_t i = 0; i < n; i++) {

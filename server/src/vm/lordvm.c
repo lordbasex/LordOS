@@ -5924,7 +5924,7 @@ static void link_change(int ci, uint32_t seq, int on, int fd) {
 
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
-    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && m->type != VM_LINK && (m->type != VM_QMP || !S.dev_qmp) &&
+    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && m->type != VM_LINK && m->type != VM_RECV && (m->type != VM_QMP || !S.dev_qmp) &&
         !(m->type == VM_AGENT && m->a == VAG_TRANSFER)) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {

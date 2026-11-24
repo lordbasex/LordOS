@@ -347,5 +347,8 @@
   "markupHint": "Atidaryti žymėjimo rengyklėje",
   "readOnly.title": "Failai negali keisti „{name}“",
   "readOnly.outside": "Failai gali tik peržiūrėti šį aplanką: jis yra už jūsų namų aplanko ir diskų ribų. Norėdami jį keisti, naudokite Terminalą ar kitą programą.",
-  "readOnly.denied": "Šis aplankas tik skaitomas: jo leidimai neleidžia jums jo keisti. Norėdami jį keisti, naudokite Terminalą ar kitą programą."
+  "readOnly.denied": "Šis aplankas tik skaitomas: jo leidimai neleidžia jums jo keisti. Norėdami jį keisti, naudokite Terminalą ar kitą programą.",
+  "fromMachineNoRun": "„{name}“ atkeliavo iš mašinos {machine}. Failai neatveria programų ar diegimo programų iš mašinos: jei pasitikite, naudokite Atverti su.",
+  "info.from": "Kilmė",
+  "info.fromMachine": "Mašina {machine}"
 }

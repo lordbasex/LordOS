@@ -112,6 +112,10 @@ typedef struct {
 } FsStat;
 /* the marks of a file from a Machines guest (user.lordos.*, user.xdg.origin.url) copied from in to out; 0 none or copied */
 int fsops_copy_marks(int in, int out);
+/* the same marks from the file src (when it has them) onto dest and, for a folder, everything in it (never following a
+ * link): what comes out of a quarantined archive stays quarantined. The number of files and folders marked, 0 when src
+ * isn't marked, -1 dest can't be read */
+int fsops_inherit_marks(const char *src, const char *dest);
 int fsops_stat(const char *target, int writable_root, FsStat *o);  /* 0, or -1 (errno) */
 void fsops_user_name(uid_t u, char *out, size_t n);                /* "?" when unknown (thread-safe) */
 void fsops_group_name(gid_t g, char *out, size_t n);

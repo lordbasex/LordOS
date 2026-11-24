@@ -339,5 +339,8 @@
   "markupHint": "Buksan sa markup editor",
   "readOnly.title": "Hindi mababago ng Mga File ang “{name}”",
   "readOnly.outside": "Matitingnan lang ng Mga File ang folder na ito: nasa labas ito ng iyong home folder at ng iyong mga disk. Para baguhin ito, gamitin ang Terminal o ibang app.",
-  "readOnly.denied": "Read-only ang folder na ito: hindi ka pinapayagan ng mga pahintulot nito na baguhin ito. Para baguhin ito, gamitin ang Terminal o ibang app."
+  "readOnly.denied": "Read-only ang folder na ito: hindi ka pinapayagan ng mga pahintulot nito na baguhin ito. Para baguhin ito, gamitin ang Terminal o ibang app.",
+  "fromMachineNoRun": "Galing ang “{name}” sa makinang {machine}. Hindi nagbubukas ang Mga File ng mga program o installer mula sa isang makina: gamitin ang Buksan Gamit kung pinagkakatiwalaan mo ito.",
+  "info.from": "Pinagmulan",
+  "info.fromMachine": "Ang makinang {machine}"
 }
