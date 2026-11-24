@@ -1194,6 +1194,55 @@ keeps them while another runs), and the per-second counters add them together un
 scope's leaves (`qemu`, `passt`, `supervisor`) and adds the machine's id to each connection (`cgSub`), so the row reads
 "Machines · <machine name>". A name under the prefix that isn't a machine's is no app at all.
 
+### The Tor gateway (machine groups, in development)
+
+A Whonix group (`VIRTUALIZATION.md`, 19) has a Tor gateway: the one member with a way out, through its passt. Its
+traffic is Tor's, and nothing else of it should ever leave, whatever happens inside the guest (a broken Whonix
+firewall, malware as root in the gateway). Isolation layer 4 (approved by the maintainer on 2026-11-23) gives it a
+firewall identity of its own with a rule built into lord-netperm:
+
+- **Its own scope and app.** `lord-vm` puts the member whose `machine.json` says `"uplink": "tor"` in
+  `app-lordos-lordos-vm-tor-<id>.scope` instead of `app-lordos-lordos-vm-<id>.scope` (`setup_cgroups`; the `lordos-vm`
+  prefix is reserved, `app_scope_reserved`). `fw_scope_app` reads it as **`lordos:tor-gateway`** (`FW_APP_TOR_GATEWAY`),
+  `fw_vm_scope` still gives the machine's id (Monitor's row reads "Tor gateway · <name>"), and `fw_vm_scope_tor` tells
+  the two forms apart. Monitor, Settings' firewall list and the capture indicator show it as its own row
+  (`sdk/netmodel.js`, `monitor.comp.torGateway` in every language). Every other machine stays `lordos:machines`.
+- **A built-in restriction, `FW_R_TOR_UPLINK` / `NP_R_TOR_UPLINK` (bit 12).** It is outside `FW_R_ALL`, so
+  `firewall.json` can neither set nor clear it (`fw_set_restricted` refuses it); `fw_builtin_restricted` gives it to
+  `lordos:tor-gateway` and to nothing else, and `np_compile_app` ORs it into that app's `NpApp.flags` (which makes
+  `can_deny` 1, so the packet filter decides for it too). `fw_decide` and `np_decide` check it right after "no network"
+  and before any rule, trust or mode, so the owner's own rules can only take more away. It denies:
+  - anything incoming (a bind with a port, a packet on a bound port);
+  - every protocol but TCP: UDP (DNS, QUIC), ICMP and raw sockets. `cgroup/sock_create` refuses any AF_INET/AF_INET6
+    socket that isn't `SOCK_STREAM`/TCP, so the gateway's passt can't even make one (it doesn't need any: `uplink: tor`
+    gives it no DNS forwarding and no forwarded ports, and it starts and carries Tor this way); `sendmsg4/6` and the
+    packet filter deny UDP as well;
+  - every address that isn't the internet's: the LAN, RFC 1918, CGNAT, link-local, ULA, multicast, loopback, an
+    unknown address (`lan != 0`), and **this computer's own addresses whatever their range** (below);
+  - remote ports 53 and 853 even on the internet (DNS over TCP and over TLS).
+  What is left is outgoing TCP to public addresses, which is all Tor needs (guards, bridges on any port).
+- **This computer's addresses (`np_local`).** A public IPv4 or a global IPv6 on an interface would otherwise read as
+  "internet". lord-netperm reads every interface address with an RTM_GETADDR dump over rtnetlink (`netperm/nplocal.c`;
+  NETLINK_ROUTE, which its unit already allows; no AF_INET socket) at start, whenever an address changes
+  (`RTMGRP_IPV4_IFADDR`, `RTMGRP_IPV6_IFADDR`) and with the 5-second rescan, into the hash map `np_local` (at most 256).
+  The programs look it up only for an app with the Tor restriction and then count the address as LAN.
+- **Not in the `user@` union.** The union of restrictions that holds a process escaped to `user@<uid>.service` leaves
+  `NP_R_TOR_UPLINK` out (as it does "no microphone"): it is about one machine's passt, and under `user@` it would take UDP
+  and the LAN from every process of the person while the gateway runs. passt and QEMU run sandboxed and can't ask
+  systemd for a new scope.
+
+**Tests.** `npcompile-test` compares `np_decide` with `fw_decide` for the gateway's app in fixed cases (each deny above,
+TCP 443 and 9001 to public addresses allowed, an owner's allow rule that can't loosen it, an owner's deny that still
+applies) and in the random rounds. `np-torgw-test` (as root; `make test` skips it without) loads lord-netperm's real
+programs with private maps and attaches them **only to a throwaway cgroup it creates**
+(`/sys/fs/cgroup/lordos-fwtest-<pid>`, removed at the end), never to `lordos.service`, `user@` or the running service;
+from a process inside it, UDP, ICMP and raw sockets, TCP to 1.1.1.1:53 and :853, to RFC 1918, link-local, loopback, ULA,
+this computer's addresses and an address put in `np_local`, and a bind are all refused with EPERM, while TCP to
+1.1.1.1:443 connects. `np-torgw-test run -- cmd` holds that policy around a command: `tests/vm_gateway_fw.sh` runs a whole
+Whonix group in it (the gateway's passt starts, the workstation's Tor check says `IsTor: true`) and, with the gateway
+guest's own nftables flushed, shows its UDP DNS, TCP 53 and 853 and LAN and host connections get nowhere while TCP 443
+connects.
+
 ### The essential system services (0.8.5)
 
 Name resolution, time and the network service are shown but can never be blocked: they are not in

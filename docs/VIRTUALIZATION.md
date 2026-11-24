@@ -4640,6 +4640,20 @@ Memory and vCPUs are Whonix's defaults: 2 GB and 1 vCPU each (the LXQt Gateway n
 console). Configure may change the Workstation's memory and vCPUs and the Gateway's memory. The group needs about 4 GB
 free, checked by `budgetCheck` before the start.
 
+#### 19.5.1 The Gateway's firewall identity (isolation layer 4; built, in development)
+
+Approved by the maintainer on 2026-11-23. The Gateway (the member with `"uplink": "tor"`) runs in
+`app-lordos-lordos-vm-tor-<id>.scope`, the firewall app **`lordos:tor-gateway`**, with a restriction built into
+lord-netperm (`FW_R_TOR_UPLINK`, never in `firewall.json`, decided before any rule): only outgoing TCP to internet
+addresses; no incoming, no UDP, ICMP or raw socket (refused when the socket is made: the Gateway's passt needs none),
+no LAN, private, link-local, ULA, multicast, loopback or unknown address, none of this computer's own addresses
+(`np_local`, read over rtnetlink), and no remote port 53 or 853. Monitor and Settings show it as its own row, "Tor
+gateway · <name>". A Gateway guest whose own firewall failed (or root malware in it) still can't resolve a name
+outside Tor, reach the LAN or this computer, or send UDP. docs/FIREWALL.md, "The Tor gateway", has the details;
+`npcompile-test`, `np-torgw-test` (root, a throwaway cgroup) and `tests/vm_gateway_fw.sh` (a group under the policy:
+`IsTor: true` in the Workstation, and from the Gateway with its nftables flushed, UDP DNS, TCP 53/853, LAN and host
+refused while TCP 443 connects) test it.
+
 ### 19.6 Catalog entry, verification and unpacking
 
 **What Whonix publishes** (read 2026-11-23 on `https://download.whonix.org/libvirt/18.2.4.3/`; 18.2.4.3 is the current
