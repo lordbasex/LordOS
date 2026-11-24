@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { windowsEntry, driversFor, matchIso, evalFor, evalFiles, newestDownload, windowsZone, inputLocale, editionPlan, normalizeKey,
-  checkWindowsSetup, windowsHostname, windowsSize, userLocale, WIN_MIN } from '../../apps/machines/windows.js';
+  checkWindowsSetup, windowsHostname, windowsSize, userLocale, windowsEmulatedWhy, WIN_MIN } from '../../apps/machines/windows.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CAT = JSON.parse(fs.readFileSync(path.join(here, '../../assets/machines/systems.json'), 'utf8'));
@@ -16,9 +16,22 @@ function eq(name, got, want) {
 }
 
 const W = windowsEntry(CAT, 'amd64');
-eq('entry on amd64, none on arm64 yet', [!!W, windowsEntry(CAT, 'arm64')], [true, null]);
+const WA = windowsEntry(CAT, 'arm64');
+eq('entries on amd64 and arm64', [!!W, !!WA], [true, true]);
 eq('drivers: virtio-win 0.1.271, pinned', driversFor(CAT, 'amd64'), { id: 'virtio-win', name: 'virtio-win-0.1.271.iso',
   sha: 'bbe6166ad86a490caefad438fef8aa494926cb0a1b37fa1212925cfd81656429', size: 726501376 });
+// arm64 (4.3): Microsoft's Arm64 page and its 38 published hashes, no evaluation; the same drivers' disc (its ARM64 folders)
+eq('arm64: Microsoft\'s Arm64 page', [WA.page, WA.version, WA.isos.length], ['https://www.microsoft.com/software-download/windows11arm64', '26H2', 38]);
+eq('arm64: no evaluation', evalFiles(WA), []);
+eq('arm64: English (US) as published', matchIso(WA, '8992F2D2CFD2FA647E579E9EB31FC21F34DA8333C29B6170FDE17D2ED6623E9C'), { lang: 'en-US', label: 'English' });
+eq('arm64: Spanish (Mexico)', matchIso(WA, '23d5d42e8cd37fe1bacc37920eaa1ab0bb044aae0d41eeeb6a77e82a8ca9a483'), { lang: 'es-MX', label: 'Spanish (Mexico)' });
+eq('arm64: an x64 ISO\'s hash is not an Arm64 one', [matchIso(WA, '9828703784880421E6602504DFD99064E4CB739CC9B20ABA22E3934372A14F9A'), matchIso(W, '8992F2D2CFD2FA647E579E9EB31FC21F34DA8333C29B6170FDE17D2ED6623E9C')], [null, null]);
+eq('arm64: every language of amd64, each its own hash', [WA.isos.map((i) => i.lang).join(), new Set(WA.isos.map((i) => i.sha256)).size,
+  WA.isos.every((i) => /^[0-9a-f]{64}$/.test(i.sha256))], [W.isos.map((i) => i.lang).sort().join(), 38, true]);
+eq('arm64: the same drivers\' disc', driversFor(CAT, 'arm64'), driversFor(CAT, 'amd64'));
+eq('arm64: a GICv2 host (Pi 5) emulates it, a GICv3 one runs it with KVM, amd64 never asks',
+  [windowsEmulatedWhy({ arch: 'arm64', gicv3: false }, 'arm64'), windowsEmulatedWhy({ arch: 'arm64', gicv3: true }, 'arm64'),
+    windowsEmulatedWhy({ arch: 'amd64' }, 'amd64'), windowsEmulatedWhy({ arch: 'amd64' }, 'arm64')], ['gic', '', '', '']);
 
 // Microsoft's published hashes: Spanish (Spain) and Mexico are different ISOs
 eq('match: Spanish', matchIso(W, '9828703784880421E6602504DFD99064E4CB739CC9B20ABA22E3934372A14F9A'), { lang: 'es-ES', label: 'Spanish' });

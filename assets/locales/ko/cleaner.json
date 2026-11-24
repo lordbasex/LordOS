@@ -446,5 +446,6 @@
   },
   "select.nothing": "선택한 항목 없음",
   "activity.app": "앱 제거됨",
-  "activity.system": "시스템 정리: {name}"
+  "activity.system": "시스템 정리: {name}",
+  "map.machines": "가상 머신에서 확보"
 }

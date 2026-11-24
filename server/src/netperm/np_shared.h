@@ -74,6 +74,11 @@ typedef uint64_t np_u64;
 #define NP_R_NO_USB       (1u << 7)
 #define NP_R_NO_BLUETOOTH (1u << 8)
 #define NP_R_TOR_UPLINK   (1u << 12)   /* FW_R_TOR_UPLINK: built in for a machine group's Tor gateway, never from firewall.json */
+/* (Machines' slice) not a restriction: np_apps' entry of a session's lordos-machines.slice, whose machines' scopes sit one
+ * level deeper (docs/VIRTUALIZATION.md 3.7). The programs then look one level down (scope_id in np.bpf.c) and decide by
+ * that scope's own entry; a scope lord-netperm hasn't registered yet falls back to the slice's own entry (lordos:machines'
+ * rules). Set only by lord-netperm for that one directory, never from firewall.json (outside FW_R_ALL and every mask). */
+#define NP_A_SLICE        (1u << 31)
 #define NP_R_NET_MASK     (NP_R_NO_INTERNET | NP_R_NO_LAN | NP_R_NO_NETWORK | NP_R_NO_INCOMING | NP_R_TOR_UPLINK)
 #define NP_R_DEV_MASK     (NP_R_NO_CAMERA | NP_R_NO_MIC | NP_R_NO_SCREEN | NP_R_NO_USB | NP_R_NO_BLUETOOTH)
 

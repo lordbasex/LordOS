@@ -206,6 +206,10 @@ EOF
     run "migration 009 chromium-family" sh tests/migration_chromium_family_test.sh
     # (0.8.9.6) shared memory's huge pages for Machines: shmem_enabled never -> advise, nothing else (docs/VIRTUALIZATION.md 3.7.2)
     run "migration 011 shmem-huge-pages" sh tests/migration_shmem_huge_test.sh
+    # (0.8.9.6) LordOS as a Machines guest: the agent port for the video group, lordos-guest started after the update
+    run "migration 012 guest-agent-port" sh tests/migration_guest_port_test.sh
+    # the LordOS Guest Tools disc's installer: its choices per package manager, init system and prompt (tools/guest/install.sh)
+    run "guest-tools install.sh (--plan)" sh tests/guest_tools_install_test.sh
     # fastfetch / neofetch fall back to lordos-fetch; the real package wins (packaging/fallback-bin)
     run "fetch-fallback (fastfetch, neofetch)" sh tests/fetch_fallback_test.sh
     run "mmdb-test" build/mmdb-test
@@ -239,6 +243,7 @@ EOF
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
     if have node; then run "vm-group-model-test (apps/machines/model.js groupPlan: a machine group's start and stop order, its link)" node tests/vm_group_model_test.mjs; fi
+    if have node; then run "vm-storage-model-test (apps/machines/storagemodel.js: key steps, recovery key, disposable, Export)" node tests/vm_storage_model_test.mjs; fi
     if have node; then run "vm-group-ui-test (apps/machines/group.js and catalog.js: a group's one card, its menu, Start Fresh, its budget, the Whonix card)" node tests/vm_group_ui_test.mjs; fi
     if have node; then run "vm-profiles-test (apps/machines/profiles.js, systems.js: .lordprofile import, your systems, PNG logos, library chips)" node tests/vm_profiles_test.mjs; fi
     if have node; then run "photos-places-test (apps/photos/places.js)" node tests/photos_places_test.mjs; fi
@@ -401,6 +406,44 @@ EOF
         77) skip "vm-group-link" "WHONIX_GW and WHONIX_WS (Whonix's disks with a serial shell), KVM, QEMU, unshare and the default theme" ;;
         *) bad "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)"; tail -20 "$T/out" ;;
     esac
+    # machines shell and console against a stand-in lord-vm (tests/machines_shell_test.sh)
+    bash tests/machines_shell_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "machines-shell (tests/machines_shell_test.sh, machines shell and console against a stand-in lord-vm)" ;;
+        77) skip "machines-shell" "build/machines, cc and python3" ;;
+        *) bad "machines-shell (tests/machines_shell_test.sh, machines shell and console against a stand-in lord-vm)"; tail -20 "$T/out" ;;
+    esac
+    # machines exec, cp, logs and mcp against a real running Linux machine with automation on (tests/vm_exec_e2e.sh;
+    # VM_EXEC_NAME and VM_EXEC_USER, in a private HOME and namespaces)
+    bash tests/vm_exec_e2e.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-exec-e2e (tests/vm_exec_e2e.sh, machines exec, cp, logs and mcp in a real guest)" ;;
+        77) skip "vm-exec-e2e" "VM_EXEC_NAME and VM_EXEC_USER (a running Linux machine with automation on), build/machines and python3" ;;
+        *) bad "vm-exec-e2e (tests/vm_exec_e2e.sh, machines exec, cp, logs and mcp in a real guest)"; tail -20 "$T/out" ;;
+    esac
+    # a machine group's Delete, Rename and Repair, and a base made again from the verified archive, on throwaway groups
+    # made from a fixture archive (tests/vm_group_manage.sh; docs/VIRTUALIZATION.md 19.7-19.9)
+    bash tests/vm_group_manage.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-group-manage (tests/vm_group_manage.sh, lord-vm --group-delete/rename/repair/fresh on throwaway groups)" ;;
+        77) skip "vm-group-manage" "build/lord-vm-testpaths, build/lord-vmunpack, build/machines, qemu-img, qemu-io, xz, tar, python3 and /dev/kvm" ;;
+        *) bad "vm-group-manage (tests/vm_group_manage.sh, lord-vm --group-delete/rename/repair/fresh on throwaway groups)"; tail -20 "$T/out" ;;
+    esac
+    # the same through Machines' own calls in a headless lord-server, in its own namespaces (lord.vm.groups,
+    # groupRenamePlan, groupRename, groupRepair, groupDelete; tests/machines_group_manage_headless.sh)
+    bash tests/machines_group_manage_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)" ;;
+        77) skip "machines-group-manage" "build/lord-server, lord-vm, lord-vm-testpaths, lord-vmunpack, the default theme, /dev/kvm, unshare and an installed catalog and image store to mount over" ;;
+        *) bad "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)"; tail -20 "$T/out" ;;
+    # Machines' storage under real QEMU/KVM (tests/vm_storage_test.sh): encrypted machines, both disposable sessions,
+    # snapshot, clone, Export (.lordvm and OVA), the import of an export (tampered and hostile), raw disks
+    bash tests/vm_storage_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-storage (tests/vm_storage_test.sh, encryption, disposable sessions, Export, raw disks)" ;;
+        77) skip "vm-storage" "build/lord-vm, KVM, QEMU (qemu-img, qemu-io), swtpm, OVMF and python3" ;;
+        *) bad "vm-storage (tests/vm_storage_test.sh, encryption, disposable sessions, Export, raw disks)"; tail -20 "$T/out" ;;
+    esac
     # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
     sh tests/guest_clip_test.sh >"$T/out" 2>&1
     case $? in
@@ -530,6 +573,10 @@ EOF
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
     if have node; then run "sentinela-model-test (sdk/sentinelamodel.js, sdk/llmcatalog.js)" node tests/sentinela_model_test.mjs; else skip "sentinela-model-test" node; fi
     if have node; then run "sentinela-vm-test (sdk/sentinelavm.js: the machine rules)" node tests/sentinela_vm_test.mjs; else skip "sentinela-vm-test" node; fi
+    # (0.8.9.6) Investigate with Lumo: the facts, the strict answer, the evidence, a translation fenced as data
+    if have node; then run "sentinela-investigate-test (sdk/sentinelamodel.js: Investigate and Translate with Lumo)" node --no-warnings tests/sentinela_investigate_test.mjs; else skip "sentinela-investigate-test" node; fi
+    # (0.8.9.6) Get Info's description: the sources' order, the language and the fallback to English
+    if have node; then run "describe-model-test (sdk/describemodel.js)" node --no-warnings tests/describe_model_test.mjs; else skip "describe-model-test" node; fi
     if have node; then run "avatar-model-test (apps/settings/avatarmodel.js)" node tests/avatar_model_test.mjs; else skip "avatar-model-test" node; fi
     if have node; then run "weather-model-test (sdk/weathermodel.js)" node tests/weather_model_test.mjs; else skip "weather-model-test" node; fi
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi
@@ -846,6 +893,15 @@ EOF
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "monitor-grouped-scene (apps/monitor/Processes.jsx)" node tests/menubar_test.mjs monitor_grouped_scene.mjs
     else skip "monitor-grouped-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6) Monitor → Processes: opening a group of 300 programs draws only the rows in sight, a few per pass, within
+    # a frame (the desktop froze for a second), and a redraw keeps the rows whose values didn't change
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-freeze-scene (sdk/lists.jsx Table sight, apps/monitor/Processes.jsx)" node tests/menubar_test.mjs monitor_freeze_scene.mjs
+    else skip "monitor-freeze-scene" "node and the repository's node_modules (npm install)"; fi
+    # (0.8.9.6) Get Info's Description and Investigate with Lumo: only on the click, the closed actions, Blocklist asks first
+    if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
+        run "monitor-describe-scene (apps/monitor/Describe.jsx)" node tests/menubar_test.mjs monitor_describe_scene.mjs
+    else skip "monitor-describe-scene" "node and the repository's node_modules (npm install)"; fi
     # (#218) Files: dragging in a folder of 2000 files draws only the ghost and the drop highlights, never the whole window
     if have node && [ -d ../node_modules/esbuild ] && [ -d ../node_modules/react-reconciler ]; then
         run "files-drag-scene (apps/files/dnd.jsx)" node tests/menubar_test.mjs files_drag_scene.mjs

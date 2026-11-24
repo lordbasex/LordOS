@@ -446,5 +446,6 @@
   },
   "select.nothing": "未选择任何内容",
   "activity.app": "已删除应用",
-  "activity.system": "系统清理：{name}"
+  "activity.system": "系统清理：{name}",
+  "map.machines": "在“虚拟机”中回收"
 }

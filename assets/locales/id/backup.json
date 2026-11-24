@@ -14,6 +14,9 @@
   "never": "Belum ada cadangan",
   "next": "Berikutnya: {when}",
   "lastError": "Pencadangan terakhir gagal: {error}",
+  "machinesBusy": {
+    "other": "{count} mesin sedang berjalan: disknya di cadangan ini berasal dari cadangan sebelumnya"
+  },
   "todayAt": "hari ini pukul {time}",
   "now": "Cadangkan Sekarang",
   "pause": "Jeda",

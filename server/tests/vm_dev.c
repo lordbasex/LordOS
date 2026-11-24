@@ -14,6 +14,7 @@
  *   wheel N             N steps (+ up)                   resize W H        ask the guest for a size
  *   rate HZ             copy rate                        release           let go of everything
  *   capture 0|1         "Capture mouse" (6.25): VM_CAPTURE to lord-vm, VD_CAPTURE to lord-vmdisplay
+ *   cable 0|1           the network cable pulled or plugged in (VM_NETCABLE, the window's Devices → Network, 5.3)
  *   rel DX DY           relative motion while captured (VD_REL, as lord-server's pointer lock sends it)
  *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON | qmpf FILE (a longer command, from a file)
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
@@ -24,6 +25,8 @@
  *   console             the serial console's stream (VM_CONSOLE) in its place: shell-type types into it too
  *   (events) "note": a link or a notification from the guest (VM_GUEST_NOTE, 6.12), as lord-vm passed it on
  *   agent install       the guest agent's Install (VAG_INSTALL: lordos-guest, or the LordOS guest tools on Windows)
+ *   agent disc | agent disc-out   the LordOS Guest Tools disc in or out of the CD drive (VAG_DISC; a guest without
+ *                       qemu-guest-agent): lord-vm takes it out by itself when the agent answers
  *   clip-text TEXT | clip-html HTML | clip-png PATH    the host's clipboard for the guest (VM_CLIP); the guest's comes
  *                       back as "clip" events (a picture is saved as clip-in.png in the current folder)
  *   clip-offer TEXT     the host's clipboard on demand (VM_CLIP_OFFER, a helper with "clipreq"): an offer of that text;
@@ -817,6 +820,10 @@ static int handle(char *line) {
         out("{\"ok\":true,\"cmd\":\"resize\"}");
     }
     else if (!strcmp(line, "agent install")) ask(VM_AGENT, VAG_INSTALL, NULL);
+    else if (!strcmp(line, "agent disc") || !strcmp(line, "agent disc-out")) {
+        VmMsg m = vm_msg(VM_AGENT, ++seq, VAG_DISC, !strcmp(line, "agent disc"), 0, 0, NULL);
+        if (vm_send(vm, &m, -1)) out("{\"ev\":\"error\",\"what\":\"can't reach lord-vm\"}");
+    }
     else if (sscanf(line, "raw-apps %d", &x) == 1) { snprintf(a1, sizeof a1, "lag-apps %d", x ? 1 : 0); ask(VM_QMP, 0, a1); }
     else if (!strncmp(line, "raw-winact ", 11)) { snprintf(a1, sizeof a1, "lag-winact %.150s", line + 11); ask(VM_QMP, 0, a1); }
     else if (!strncmp(line, "raw-launch ", 11)) { snprintf(a1, sizeof a1, "lag-launch %.180s", line + 11); ask(VM_QMP, 0, a1); }
@@ -831,6 +838,7 @@ static int handle(char *line) {
     }
     else if (sscanf(line, "rate %d", &x) == 1) { vdsend(VD_RATE, x, 0); out("{\"ok\":true,\"cmd\":\"rate\"}"); }
     else if (sscanf(line, "capture %d", &x) == 1) { vdsend(VD_CAPTURE, x ? 1 : 0, 0); ask(VM_CAPTURE, x ? 1 : 0, NULL); }
+    else if (sscanf(line, "cable %d", &x) == 1) ask(VM_NETCABLE, x ? 1 : 0, NULL);   /* Devices → Network (VM_NETCABLE) */
     else if (sscanf(line, "rel %d %d", &x, &y) == 2) { vdsend(VD_REL, x, y); out("{\"ok\":true,\"cmd\":\"rel\"}"); }
     else if (sscanf(line, "noack %d", &x) == 1) { noack = x; out("{\"ok\":true,\"cmd\":\"noack\"}"); }
     else if (sscanf(line, "sound play %d", &x) >= 0 && !strncmp(line, "sound play", 10)) {

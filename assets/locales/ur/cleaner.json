@@ -464,5 +464,6 @@
   },
   "select.nothing": "کچھ منتخب نہیں",
   "activity.app": "ایپ ہٹا دی گئی",
-  "activity.system": "سسٹم کی صفائی: {name}"
+  "activity.system": "سسٹم کی صفائی: {name}",
+  "map.machines": "ورچوئل مشینیں میں جگہ واپس لیں"
 }

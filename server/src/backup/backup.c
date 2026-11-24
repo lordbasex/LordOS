@@ -14,6 +14,7 @@
 #include "backup.h"
 #include "../errcode.h"
 #include "engine.h"
+#include "vmmeta.h"
 #include "crypt.h"
 #include "../fsops.h"
 #include "../sec/json.h"
@@ -73,7 +74,14 @@ static BkRun run;                       /* progress of the running backup */
 static char cur_file[512];
 static double last_emit;
 /* result of the last backup */
-static struct { uint64_t files, copied, linked, bytes, errors; double secs; int ok; time_t when; char id[BK_ID_LEN]; } last;
+static struct {
+    uint64_t files, copied, linked, bytes, errors, vm_busy, vm_left_out;
+    double secs;
+    int ok, vm_nnames;
+    time_t when;
+    char id[BK_ID_LEN];
+    char vm_names[BK_VM_NAMES][BK_VM_NAME];    /* running machines whose disks were carried over */
+} last;
 /* pending restore / delete */
 static struct { int pending; char id[BK_ID_LEN], rel[PATH_MAX / 2], suffix[80], to[PATH_MAX]; int replace; } rjob;
 static struct { int pending; char id[BK_ID_LEN]; } djob;
@@ -340,6 +348,7 @@ static void do_snapshot(void) {
     run.checkpoint = checkpoint;
     run.hold = hold_running_machine;
     run.progress = progress;
+    run.vm_meta = bk_vm_meta;           /* machine.json: "backup": false and the name (docs/VIRTUALIZATION.md 6.14) */
     state = S_RUNNING;
     cancel_flag = 0;
     last_try = time(NULL);
@@ -375,6 +384,10 @@ static void do_snapshot(void) {
     last.errors = run.errors;
     last.secs = secs;
     last.when = time(NULL);
+    last.vm_busy = run.vm_busy;
+    last.vm_left_out = run.vm_left_out;
+    last.vm_nnames = run.vm_nnames;
+    memcpy(last.vm_names, run.vm_busy_names, sizeof last.vm_names);
     snprintf(last.id, sizeof last.id, "%s", r == 0 ? run.id : "");
     fprintf(stderr, "backup: %s in %.1f s: %llu files, %llu copied (%llu MB), %llu linked, %llu errors%s%s\n",
             r == 0 ? "done" : r > 0 ? "interrupted" : "failed", secs, (unsigned long long)run.files, (unsigned long long)run.copied,
@@ -580,12 +593,22 @@ void backup_dispatch(void (*fn)(const char *json)) {
 char *backup_status_json(void) {
     if (!started) return NULL;
     pthread_mutex_lock(&mu);
-    static char qf[1100], qe[600], qd[PATH_MAX * 2], qr[600];
+    static char qf[1100], qe[600], qd[PATH_MAX * 2], qr[600], qn[BK_VM_NAMES * (BK_VM_NAME * 6 + 4) + 4];
     json_quote(qf, sizeof qf, cur_file);
+    {   /* last.machinesBusyNames: the names are clean UTF-8 (engine.c); json_quote escapes the rest */
+        size_t o = 0;
+        qn[o++] = '[';
+        for (int i = 0; i < last.vm_nnames && i < BK_VM_NAMES; i++) {
+            if (i) qn[o++] = ',';
+            o += json_quote(qn + o, sizeof qn - o - 2, last.vm_names[i]);
+        }
+        qn[o++] = ']';
+        qn[o] = 0;
+    }
     json_quote(qe, sizeof qe, last_error);
     json_quote(qd, sizeof qd, cfg.dest);
     json_quote(qr, sizeof qr, rres.error);
-    size_t cap = 2048 + strlen(qf) + strlen(qe) + strlen(qd) + strlen(qr);
+    size_t cap = 2048 + strlen(qf) + strlen(qe) + strlen(qd) + strlen(qr) + strlen(qn);
     char *s = malloc(cap);
     if (!s) { pthread_mutex_unlock(&mu); return NULL; }
     struct stat st;
@@ -597,7 +620,8 @@ char *backup_status_json(void) {
              "{\"state\":\"%s\",\"battery\":%s,\"userPause\":%s,\"dest\":%s,\"destAvailable\":%s,\"destFree\":%.0f,\"destTotal\":%.0f,"
              "\"next\":%lld,\"lastOk\":%lld,"
              "\"progress\":{\"files\":%llu,\"totalFiles\":%llu,\"bytes\":%llu,\"totalBytes\":%llu,\"copied\":%llu,\"linked\":%llu,\"file\":%s},"
-             "\"last\":{\"when\":%lld,\"ok\":%d,\"id\":\"%s\",\"files\":%llu,\"copied\":%llu,\"linked\":%llu,\"bytes\":%llu,\"errors\":%llu,\"secs\":%.1f,\"error\":%s},"
+             "\"last\":{\"when\":%lld,\"ok\":%d,\"id\":\"%s\",\"files\":%llu,\"copied\":%llu,\"linked\":%llu,\"bytes\":%llu,\"errors\":%llu,\"secs\":%.1f,\"error\":%s,"
+             "\"machinesBusy\":%llu,\"machinesBusyNames\":%s,\"machinesLeftOut\":%llu},"
              "\"restore\":{\"done\":%s,\"ok\":%s,\"id\":\"%s\",\"files\":%llu,\"keptBoth\":%llu,\"replaced\":%llu,\"skipped\":%llu,\"errors\":%llu,\"error\":%s},"
              "\"encryption\":true,\"destEncrypted\":%s,\"encrypted\":%s,\"locked\":%s,\"unlock\":{\"done\":%s,\"ok\":%s,\"error\":\"%s\"}}",
              state_names[state], on_batt_pause ? "true" : "false", user_pause ? "true" : "false", qd, avail ? "true" : "false", freeb, totalb,
@@ -606,6 +630,7 @@ char *backup_status_json(void) {
              (unsigned long long)run.total_bytes, (unsigned long long)run.copied, (unsigned long long)run.linked, qf,
              (long long)last.when, last.ok, last.id, (unsigned long long)last.files, (unsigned long long)last.copied,
              (unsigned long long)last.linked, (unsigned long long)last.bytes, (unsigned long long)last.errors, last.secs, qe,
+             (unsigned long long)last.vm_busy, qn, (unsigned long long)last.vm_left_out,
              rres.done ? "true" : "false", rres.ok ? "true" : "false", rres.id, (unsigned long long)rres.files, (unsigned long long)rres.kept,
              (unsigned long long)rres.replaced, (unsigned long long)rres.skipped, (unsigned long long)rres.errors, qr,
              dest_enc ? "true" : "false", dest_enc || cfg.encrypt ? "true" : "false", (dest_enc || cfg.encrypt) && !have_key ? "true" : "false",

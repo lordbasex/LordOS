@@ -464,5 +464,6 @@
   },
   "select.nothing": "Нищо не е избрано",
   "activity.app": "Премахнато приложение",
-  "activity.system": "Почистване на системата: {name}"
+  "activity.system": "Почистване на системата: {name}",
+  "map.machines": "Освободи в Машини"
 }

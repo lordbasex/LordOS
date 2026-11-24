@@ -446,5 +446,6 @@
   },
   "select.nothing": "Chưa chọn gì",
   "activity.app": "Đã gỡ ứng dụng",
-  "activity.system": "Dọn dẹp hệ thống: {name}"
+  "activity.system": "Dọn dẹp hệ thống: {name}",
+  "map.machines": "Thu hồi trong Máy ảo"
 }

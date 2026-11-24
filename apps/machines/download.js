@@ -13,7 +13,7 @@ import { userGetArg, sigVerdict } from './systems.js';
 export async function resolveImage(id, arch) {
   const e = entryOf(CATALOG, id, arch);
   if (!e) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
-  // a pinned image (Android, 4.2): the signed catalog is its list
+  // a pinned image: the signed catalog is its list
   const pin = pinnedImage(e);
   if (pin) return pin;
   let p = await admin.run('vm-image-list', `${id} ${arch}`, null, { quiet: true });

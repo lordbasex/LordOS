@@ -14,6 +14,10 @@
   "never": "Aucune sauvegarde pour l’instant",
   "next": "Prochaine : {when}",
   "lastError": "La dernière sauvegarde a échoué : {error}",
+  "machinesBusy": {
+    "one": "{count} machine était en cours d’exécution : ses disques dans cette sauvegarde sont ceux de la précédente",
+    "other": "{count} machines étaient en cours d’exécution : leurs disques dans cette sauvegarde sont ceux de la précédente"
+  },
   "todayAt": "aujourd’hui à {time}",
   "now": "Sauvegarder maintenant",
   "pause": "Suspendre",

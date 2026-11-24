@@ -3,7 +3,7 @@
 # a virtio-gpu of two outputs; lordvm-dev plays lord-server's part with LORDVM_DEV_HEADS=2: one lord-vmdisplay --heads 2
 # (QEMU's peer-to-peer D-Bus display serves one connection) with a channel per output, as js_vm.c starts it for
 # lord.vm.allDisplays. Checks:
-#   - lord-vm --set --heads: 2 written under schema 16, 5 refused, 1 takes the key away;
+#   - lord-vm --set --heads: 2 written under schema 19, 5 refused, 1 takes the key away;
 #   - QEMU's command line has max_outputs=2 (and none with one display);
 #   - lord-vmdisplay registers a listener on Console_0 and Console_1, each checked to be that output, the sound on
 #     output 0 only;
@@ -59,7 +59,7 @@ t "create" '[ -f "$D/machine.json" ]' "$(cat "$W/create.json")"
 "$VM" --set "$D" --heads 5 >/dev/null 2>&1; rc5=$?
 t "--heads 5 refused" '[ $rc5 != 0 ] && ! grep -q "\"heads\": " "$D/machine.json"'
 "$VM" --set "$D" --heads 2 >"$W/set.json" 2>&1
-t "--heads 2: written under schema 16" 'grep -q "\"heads\": 2" "$D/machine.json" && grep -q "\"schema\": 1[6-9]" "$D/machine.json"' "$(cat "$W/set.json")"
+t "--heads 2: written under schema 19" 'grep -q "\"heads\": 2" "$D/machine.json" && grep -q "\"schema\": \(19\|[2-9][0-9]\)" "$D/machine.json"' "$(cat "$W/set.json")"
 
 # a unit on the serial line: the guest's DRM outputs, every 2 s
 UNIT=$(cat <<'EOF'

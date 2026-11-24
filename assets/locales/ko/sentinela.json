@@ -132,5 +132,15 @@
   "action.vm_shutdown": "시스템 종료",
   "analysis.rule": "항상 표시: 이 알림에는 모델이 필요하지 않습니다.",
   "settings.seesMachines": "가상 머신의 경우: 이름, 역할, 상태, 종료된 이유, 엔진의 CPU·메모리·네트워크 수치. 화면, 파일, 클립보드는 절대 보지 않습니다.",
-  "sandbox.unverified": "엔진이 실제로 그 머신의 것이라는 확인"
+  "sandbox.unverified": "엔진이 실제로 그 머신의 것이라는 확인",
+  "block.ended": "차단된 프로그램을 종료했습니다: {name}",
+  "block.endedBody": "차단 목록에 있는 프로그램입니다. 목록은 설정 → AI → Sentinela에서 확인하세요.",
+  "block.title": "차단 목록",
+  "block.hint": "이 프로그램들은 Sentinela가 켜져 있든 꺼져 있든 사용자 계정에서 시작할 때마다 종료됩니다. 모니터 → 정보 가져오기 → Lumo로 조사에서 추가하고, 다시 실행되게 하려면 제거하세요.",
+  "block.empty": "차단된 프로그램이 없습니다.",
+  "block.remove": "제거",
+  "block.script": "{interp} 스크립트",
+  "block.binary": "프로그램",
+  "block.pkg": "및 {pkg} 패키지의 모든 프로그램",
+  "block.added": "{date}에 차단됨"
 }

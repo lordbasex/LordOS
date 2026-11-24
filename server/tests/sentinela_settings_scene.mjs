@@ -4,7 +4,7 @@
 // when none is installed; Download asks pkg-install for the engine and the model only (signed packages), shows the
 // download's progress, and when it ends the model is installed and chosen; the triggers with "coming soon" for the
 // network one; the limits; an alert of the history opens with its facts and the closed list of actions; "It's mine"
-// entries can be watched again. Prints "ok <name>" or "FAIL <name> <detail>".
+// entries can be watched again; (0.8.9.6) the blocklist with Remove. Prints "ok <name>" or "FAIL <name> <detail>".
 import './sentinela_scene_stubs.js';
 import React from 'react';
 import * as rt from '@lordos/runtime';
@@ -22,7 +22,13 @@ let models = [], engine = false;
 lord.sentinela = {
   available: () => engine, models: () => models, state: () => ({ state: 'off', model: null }),
   facts: () => 0, analyze: () => 0, take: () => null, stop: () => true,
+  // (0.8.9.6) the blocklist: one program on it; Remove asks lord-server, whose answer comes on the next take
+  blocked: () => ({ version: 1, entries: blockedList }),
+  unblock: (id) => { unblocks.push(id); blockedList = blockedList.filter((x) => x.id !== id); return 7; },
+  blockTake: (id) => (id === 7 ? { ok: true } : null),
 };
+let blockedList = [{ id: 'a'.repeat(64), kind: 'binary', path: '/home/ana/.cache/x/miner', size: 1000, interp: null, pkg: null, name: 'miner', at: 1795000000000 }];
+const unblocks = [];
 lord.power = { state: () => ({ hasBattery: false }) };
 lord.fs = { ...(lord.fs || {}), home: () => '/home/ana', read: () => { throw new Error('none'); }, list: () => [], mkdir: () => true, write: () => true };
 const requests = [];
@@ -102,7 +108,15 @@ check('a program marked as mine is listed', shows('tool'));
 await click(button('sentinela.settings.unignore'));
 check('… and can be watched again', sentinelaPrefs().ignore.length === 0);
 
+// (0.8.9.6) the blocklist: listed with its path and hash, and Remove takes it off
+check('the blocklist lists the blocked program', shows('sentinela.block.title') && shows('miner') && has(/\/home\/ana\/\.cache\/x\/miner/));
+await click(button('sentinela.block.remove'));
+await new Promise((res) => setTimeout(res, 300));
+await flush();
+check('… and Remove takes it off the list', unblocks[0] === 'a'.repeat(64) && !shows('miner') && shows('sentinela.block.empty'), JSON.stringify(unblocks));
+
 settings.set((s) => ({ ...s, sentinela: { ...s.sentinela, on: false } }));
 await flush();
 check('off again: only the switch', !shows('sentinela.settings.model'));
+check('off with an empty blocklist: no blocklist either', !shows('sentinela.block.title'));
 process.exit(0);

@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Éteindre",
   "analysis.rule": "Toujours affichée : cette alerte n’a pas besoin de modèle.",
   "settings.seesMachines": "Pour les machines virtuelles : leur nom, leur rôle et leur état, pourquoi elles se sont arrêtées, et les compteurs de CPU, de mémoire et de réseau de leur moteur. Jamais leur écran, leurs fichiers ni leur presse-papiers.",
-  "sandbox.unverified": "la preuve que son moteur est bien celui de la machine"
+  "sandbox.unverified": "la preuve que son moteur est bien celui de la machine",
+  "block.ended": "Programme bloqué arrêté : {name}",
+  "block.endedBody": "Il figure dans votre liste de blocage. Consultez la liste dans Réglages → IA → Sentinela.",
+  "block.title": "Liste de blocage",
+  "block.hint": "Ces programmes sont arrêtés chaque fois qu’ils démarrent dans votre compte, que Sentinela soit activé ou non. Ajoutez-en un depuis Moniteur → Informations → Examiner avec Lumo ; retirez-le pour le laisser fonctionner à nouveau.",
+  "block.empty": "Aucun programme bloqué.",
+  "block.remove": "Retirer",
+  "block.script": "Script {interp}",
+  "block.binary": "Programme",
+  "block.pkg": "et tous les programmes du paquet {pkg}",
+  "block.added": "bloqué le {date}"
 }

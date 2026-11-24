@@ -71,7 +71,7 @@ QJS_OBJ := $(patsubst %,build/qjs/%.o,quickjs libregexp libunicode cutils dtoa)
 
 # .lpk app isolation, permissions and signing (src/sec, see docs/PRIVACY.md and docs/SIGNING.md)
 # Monitor: metrics, connections and the country of an IP (src/monitor, see docs/MONITOR.md)
-MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/exeown.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
+MON_SRC := src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/monitor/nethist.c src/monitor/netrec.c src/monitor/conn.c src/monitor/procctl.c src/monitor/proc_admin.c src/monitor/exeown.c src/monitor/describe.c src/monitor/mmdb.c src/monitor/map.c src/ui/js_monitor.c
 # Media (src/media, docs/MEDIA.md): only the lord-server side. Only lord-media links FFmpeg.
 MEDIA_SRC := src/media/mstudio.c src/media/mstudiohub.c src/ui/js_studio.c src/media/media.c src/media/svgicon.c src/media/hwdec.c src/media/mview.c src/media/capture.c src/media/annot.c src/media/imgops.c src/media/maudio.c src/media/mpulse.c src/media/proto.c src/media/mstream.c src/media/mcursor.c src/ui/js_media.c
 SEC_SRC := src/sec/json.c src/sec/sign.c src/sec/pkgstate.c src/sec/perms.c src/sec/cgroup.c src/sec/sandbox.c src/sec/brokersrv.c src/sec/brokercam.c src/sec/brokerkr.c src/sec/brokermail.c src/sec/restrict.c src/sec/appid.c src/sec/pwguard.c src/sec/codesig.c src/sec/pkgapp.c src/sec/statusitem.c src/sec/brokerclip.c
@@ -257,6 +257,13 @@ build/np-torgw-test: tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npco
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/np_torgw_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/netperm/nplocal.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
+# tests/np_slice_test.c (docs/VIRTUALIZATION.md 3.7): a machine's scope one level down in the machines' slice is decided
+# by its own entry (NP_A_SLICE), and by the slice's while it isn't registered; as root, on a throwaway cgroup
+test: build/np-slice-test
+build/np-slice-test: tests/np_slice_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h) $(NP_GEN)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/np_slice_test.c src/netperm/bpfsys.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c
+	./$@ || { rm -f $@; exit 1; }
 endif
 test: build/npcompile-test
 build/npcompile-test: tests/npcompile_test.c src/netperm/npcompile.c src/netperm/npdns.c src/fw/rules.c src/fw/dnsmap.c src/fw/fwmap.c src/sec/json.c $(wildcard src/netperm/*.h) $(wildcard src/fw/*.h)
@@ -273,6 +280,13 @@ build/lord-fand: src/fan/fand.c $(FAN_SRC) $(wildcard src/fan/*.h) src/sec/json.
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ src/fan/fand.c $(FAN_SRC) src/lordlog.c src/users/admingroups.c
 # lordos.service restarts with live sessions on systemd 258+: controllers off and limits back (src/sec/cgroup.c, #140)
+# tests/cgslice_test.c (docs/VIRTUALIZATION.md 3.7): lord-sessiond's placement of a machine's scope into the machines'
+# slice, on a throwaway tree of the real cgroupfs; as root (without root it says it skipped)
+test: build/cgslice-test
+build/cgslice-test: tests/cgslice_test.c src/sec/cgroup.c src/sec/cgroup.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -D_GNU_SOURCE '-DCG_NETPERM_PROCS="/var/tmp/lordos-slice/netperm.procs"' -o $@ tests/cgslice_test.c src/sec/cgroup.c
+	./$@ || { rm -f $@; exit 1; }
 test: build/cgroup-restart-test
 build/cgroup-restart-test: tests/cgroup_restart_test.c src/sec/cgroup.c src/sec/cgroup.h
 	@mkdir -p build
@@ -830,6 +844,15 @@ build/conn-dump: tests/conn_dump.c src/monitor/conn.c src/monitor/mon.c src/moni
 build/procctl-test: tests/procctl_test.c src/monitor/procctl.c src/monitor/procctl.h src/monitor/exeown.c src/monitor/exeown.h src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ tests/procctl_test.c src/monitor/procctl.c src/monitor/exeown.c src/monitor/mon.c src/monitor/disktemp.c src/monitor/voltage.c src/monitor/gpustat.c src/sysreport/ids.c src/hw/rpifw.c src/monitor/conn.c src/monitor/mmdb.c src/pkg/xz.c src/fw/rules.c src/fw/fwmap.c src/sec/json.c src/sec/cgroup.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
+# (0.8.9.6) Monitor → Get Info's description (src/monitor/describe.c): Debian's Description-md5, a package's description
+# and its translation, manual pages' NAME, a unit's Description=
+test: build/describe-test
+build/describe-test: tests/describe_test.c src/monitor/describe.c src/monitor/describe.h src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -fsanitize=address,undefined -fno-sanitize-recover=undefined -o $@ tests/describe_test.c src/monitor/describe.c src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o -lm -lpthread
+	./$@ || { rm -f $@; exit 1; }
+# the same from the command line, for tests/describe_coverage.mjs (a test tool, never installed)
+build/describe-cli: tests/describe_cli.c src/monitor/describe.c src/monitor/describe.h src/monitor/exeown.c src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/describe_cli.c src/monitor/describe.c src/monitor/exeown.c src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o -lm -lpthread
 # Monitor → Voltage (src/monitor/voltage.c): hwmon, batteries and adapters on fake sysfs trees, hostile values
 test: build/voltage-test
 build/voltage-test: tests/voltage_test.c src/monitor/voltage.c src/monitor/voltage.h src/hw/rpifw.c src/hw/rpifw.h

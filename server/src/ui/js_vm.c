@@ -81,6 +81,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "../vm/vmpin.h"
+#include "../vm/vmiso.h"
+#include "../vm/vmkeysrv.h"
+#include "../vault/vclient.h"
+#include "../vm/vmexport.h"
+#include "../pkg/crypto.h"
 
 extern char **environ;
 
@@ -188,6 +193,8 @@ static JSValue f_host(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     struct stat st;
     JS_SetPropertyStr(c, o, "kvmDevice", JS_NewBool(c, !stat("/dev/kvm", &st) && S_ISCHR(st.st_mode)));
     JS_SetPropertyStr(c, o, "kvm", JS_NewBool(c, kvm_usable()));
+    /* arm64: a GICv3 host, where KVM can give the windows devices the GICv3 they ask for (4.3); the Pi 5 is GICv2 */
+    JS_SetPropertyStr(c, o, "gicv3", JS_NewBool(c, h.gicv3));
     set_int(c, o, "vcpusRecommended", vm_vcpus_recommended(&h));
     set_int(c, o, "memMaxMb", vm_mem_max_mb(&h));
     char pk[512], bin[PATH_MAX];
@@ -477,9 +484,49 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
         JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
         JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
+        JS_SetPropertyStr(c, o, "cpuModel", JS_NewString(c, VM_CPU_NAMES[m.cpu_model == VM_CPU_COMPAT]));   /* 5.5, schema 18 */
+        /* storage (schema 16): 6.2, 6.4, 8; keyId: where its key lives in the keyring (its id, or its group's) */
+        set_str(c, o, "disposable", VM_DISP_NAMES[m.disposable][0] ? VM_DISP_NAMES[m.disposable] : "off");
+        JS_SetPropertyStr(c, o, "encrypted", JS_NewBool(c, m.encrypted));
+        if (m.encrypted) set_str(c, o, "keyId", m.group[0] ? m.group : m.id);
+        set_str(c, o, "diskFormat", m.raw ? "raw" : "qcow2");
+        JS_SetPropertyStr(c, o, "backup", JS_NewBool(c, !m.no_backup));
+        {
+            /* the UEFI code this machine was made with is no longer the system's (3.6): it starts with its kept copy */
+            char sum[65];
+            int changed = 0;
+            if (m.firmware == VM_FW_UEFI) {
+                int ffd = open(m.firmware_code, O_RDONLY | O_CLOEXEC);
+                struct stat fst;
+                /* hashing 4 MB on every list would cost: the kept copy's presence and the system file's size and time
+                 * are cached per machine id in a tiny table */
+                static struct { char id[37]; long long size, mtime; int changed; } fwc[16];
+                if (ffd >= 0 && !fstat(ffd, &fst)) {
+                    int hit = -1;
+                    for (int q = 0; q < 16; q++) if (!strcmp(fwc[q].id, m.id)) hit = q;
+                    if (hit >= 0 && fwc[hit].size == (long long)fst.st_size && fwc[hit].mtime == (long long)fst.st_mtime) changed = fwc[hit].changed;
+                    else {
+                        Sha256 h;
+                        uint8_t dg[32], buf[65536];
+                        ssize_t r;
+                        sha256_init(&h);
+                        while ((r = read(ffd, buf, sizeof buf)) > 0) sha256_update(&h, buf, (size_t)r);
+                        sha256_final(&h, dg);
+                        for (int q = 0; q < 32; q++) snprintf(sum + 2 * q, 3, "%02x", dg[q]);
+                        changed = strcmp(sum, m.firmware_sha256) != 0;
+                        int slot = hit >= 0 ? hit : (int)(m.id[0] % 16);
+                        snprintf(fwc[slot].id, sizeof fwc[slot].id, "%s", m.id);
+                        fwc[slot].size = (long long)fst.st_size; fwc[slot].mtime = (long long)fst.st_mtime; fwc[slot].changed = changed;
+                    }
+                }
+                if (ffd >= 0) close(ffd);
+            }
+            JS_SetPropertyStr(c, o, "firmwareChanged", JS_NewBool(c, changed));
+        }
         JS_SetPropertyStr(c, o, "guestLinks", JS_NewBool(c, m.guest_links));     /* links and notifications from the guest (6.12) */
         JS_SetPropertyStr(c, o, "guestNotify", JS_NewBool(c, m.guest_notify));
         set_int(c, o, "heads", m.heads > 1 ? m.heads : 1);                       /* All Displays (5.4) */
+        JS_SetPropertyStr(c, o, "automation", JS_NewBool(c, m.automation));      /* machines exec and cp may run programs (6.15) */
         set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
         JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
         set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
@@ -662,6 +709,7 @@ static JSValue f_groups(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
             set_str(c, o, "name", g.name);
             set_str(c, o, "kind", g.kind == VMG_KIND_WHONIX ? "whonix" : "");
             set_str(c, o, "release", g.release);
+            set_str(c, o, "catalog", g.catalog);
             JS_SetPropertyStr(c, o, "disposable", JS_NewBool(c, g.disposable));
             JS_SetPropertyStr(c, o, "freshGateway", JS_NewBool(c, g.fresh_gateway));
             /* the verified archive the members came from, and whether both bases are there (Storage: the archive may
@@ -669,8 +717,16 @@ static JSValue f_groups(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
             set_str(c, o, "archiveSha512", g.archive_sha512);
             struct stat bs;
             int both = 1;
-            for (int r = 1; r < VM_ROLE_COUNT; r++) if (!g.base[r][0] || lstat(g.base[r], &bs) || !S_ISREG(bs.st_mode)) both = 0;
+            JSValue miss = JS_NewArray(c);
+            uint32_t nm = 0;
+            for (int r = 1; r < VM_ROLE_COUNT; r++)
+                if (vm_group_role(&g, r) >= 0 && (!g.base[r][0] || lstat(g.base[r], &bs) || !S_ISREG(bs.st_mode))) { both = 0; JS_SetPropertyUint32(c, miss, nm++, JS_NewString(c, VMG_ROLE_NAMES[r])); }
             JS_SetPropertyStr(c, o, "basesThere", JS_NewBool(c, both));
+            /* the roles whose base is missing (a damaged group, 19.9: Repair makes it again from the archive) */
+            JS_SetPropertyStr(c, o, "basesMissing", miss);
+            char ap[PATH_MAX];
+            snprintf(ap, sizeof ap, "/var/lib/lordos/machines/images/%s.tar.xz", g.archive_sha512);
+            JS_SetPropertyStr(c, o, "archiveThere", JS_NewBool(c, g.archive_sha512[0] && !lstat(ap, &bs) && S_ISREG(bs.st_mode)));
             JSValue ms = JS_NewArray(c);
             for (int i = 0; i < g.n; i++) {
                 JSValue m = JS_NewObject(c);
@@ -914,6 +970,20 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     int vcpus = prop_int(c, argv[0], "vcpus"), mem = prop_int(c, argv[0], "memoryMb"), disk = prop_int(c, argv[0], "diskGb");
     char imp[PATH_MAX] = "", iso[PATH_MAX] = "";
     int isolated = 0, share = 0;
+    /* storage (schema 16): keyId (encrypted: the id lord.vm.keyNew made a key for), diskFormat "raw", disposable */
+    char cr_kid[37] = "", cr_disp[8] = "";
+    int cr_raw = 0;
+    {
+        JSValue vk = JS_GetPropertyStr(c, argv[0], "keyId"), vf = JS_GetPropertyStr(c, argv[0], "diskFormat"), vd = JS_GetPropertyStr(c, argv[0], "disposable");
+        const char *ks = JS_IsString(vk) ? JS_ToCString(c, vk) : NULL, *fs = JS_IsString(vf) ? JS_ToCString(c, vf) : NULL, *ds = JS_IsString(vd) ? JS_ToCString(c, vd) : NULL;
+        if (ks && vm_uuid_valid(ks)) snprintf(cr_kid, sizeof cr_kid, "%s", ks);
+        cr_raw = fs && !strcmp(fs, "raw");
+        if (ds && (!strcmp(ds, "memory") || !strcmp(ds, "disk"))) snprintf(cr_disp, sizeof cr_disp, "%s", ds);
+        if (ks) JS_FreeCString(c, ks);
+        if (fs) JS_FreeCString(c, fs);
+        if (ds) JS_FreeCString(c, ds);
+        JS_FreeValue(c, vk); JS_FreeValue(c, vf); JS_FreeValue(c, vd);
+    }
     {
         JSValue vsh = JS_GetPropertyStr(c, argv[0], "shareClipboard");
         share = JS_ToBool(c, vsh) > 0;
@@ -961,7 +1031,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     if (ok && JS_IsObject(vw)) {
         JSValue vdr = JS_GetPropertyStr(c, vw, "drivers");
         windows = 1;
-        if (!JS_IsString(vdr) || user_file(c, vdr, drv, sizeof drv) || strcmp(arch, "amd64")) ok = 0;
+        if (!JS_IsString(vdr) || user_file(c, vdr, drv, sizeof drv)) ok = 0;
         JS_FreeValue(c, vdr);
     }
     JS_FreeValue(c, vw);
@@ -981,9 +1051,11 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         snprintf(dir, sizeof dir, "%s/%s.lordvm", lib, folder);
         for (int k = 2; !access(dir, F_OK) && k < 100; k++) snprintf(dir, sizeof dir, "%s/%s %d.lordvm", lib, folder, k);
         int native = (!strcmp(arch, "amd64") ? VM_ARCH_AMD64 : VM_ARCH_ARM64) == host_arch();
+        /* the windows devices on arm64 ask for a GICv3: on a GICv2 host (the Pi 5) the machine is emulated (4.3) */
+        if (native && windows && !strcmp(arch, "arm64")) { VmHost hh; vm_host_probe(&hh); if (!hh.gicv3) native = 0; }
         char sv[16], sm[16], sd[16];
         snprintf(sv, sizeof sv, "%d", vcpus); snprintf(sm, sizeof sm, "%d", mem); snprintf(sd, sizeof sd, "%d", disk);
-        char *args[48] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
+        char *args[64] = { "lord-vm", "--create", dir, "--name", (char *)name, "--arch", (char *)arch, "--accel", native ? "kvm" : "tcg",
                          "--vcpus", sv, "--memory", sm, "--disk", sd, "--network", isolated ? "isolated" : "shared", has_imp ? "--import" : "--iso", has_imp ? imp : iso, NULL };
         int na = 0;
         while (args[na]) na++;
@@ -991,14 +1063,25 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
         if (share) { args[na++] = "--agent"; args[na++] = "on"; args[na++] = "--clipboard"; args[na++] = "both"; }
         /* the Design profile's 3D graphics (6.10): Linux machines only; lord-vm refuses them for the windows devices */
         if (gfx3d && !windows) { args[na++] = "--graphics"; args[na++] = "3d"; }
+        /* storage (schema 16): encrypted under the key made for keyId first (lord.vm.keyNew), raw disks, disposable */
+        if (cr_kid[0]) { args[na++] = "--encrypt"; args[na++] = "on"; args[na++] = "--id"; args[na++] = cr_kid; }
+        if (cr_raw) { args[na++] = "--disk-format"; args[na++] = "raw"; }
+        if (cr_disp[0]) { args[na++] = "--disposable"; args[na++] = cr_disp; }
         if (windows) {
+            /* Hyper-V's enlightenments are x86's: arm64 has none */
             static char *const W[] = { "--secure-boot", "on", "--tpm", "on", "--hyperv", "on", "--rtc", "local", "--devices", "windows", "--drivers" };
-            for (size_t i = 0; i < sizeof W / sizeof W[0]; i++) args[na++] = W[i];
+            for (size_t i = 0; i < sizeof W / sizeof W[0]; i++) args[na++] = i == 5 && strcmp(arch, "amd64") ? "off" : W[i];
             args[na++] = drv;
+        }
+        int cr_kp = -1;
+        if (cr_kid[0]) {
+            cr_kp = vmkey_pipe(cr_kid);
+            if (cr_kp < 0) ok = 0;                  /* the key must be made and kept first */
+            else { args[na++] = "--key-fd"; args[na++] = "3"; }
         }
         args[na] = NULL;
         int p[2];
-        if (!access(dir, F_OK) || pipe2(p, O_CLOEXEC)) ok = 0;
+        if (!ok || !access(dir, F_OK) || pipe2(p, O_CLOEXEC)) { ok = 0; if (cr_kp >= 0) close(cr_kp); }
         else {
             pid_t pid = fork();
             if (!pid) {
@@ -1006,7 +1089,8 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
                 if (null >= 0) dup2(null, 0);
                 dup2(p[1], 1);
                 dup2(p[1], 2);
-                syscall(SYS_close_range, 3, ~0u, 0);
+                if (cr_kp >= 0 && (cr_kp == 3 ? fcntl(3, F_SETFD, 0) : dup2(cr_kp, 3)) < 0) _exit(126);
+                syscall(SYS_close_range, cr_kp >= 0 ? 4 : 3, ~0u, 0);
                 sigset_t none;
                 sigemptyset(&none);
                 sigprocmask(SIG_SETMASK, &none, NULL);
@@ -1014,6 +1098,7 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
                 _exit(127);
             }
             close(p[1]);
+            if (cr_kp >= 0) close(cr_kp);
             if (pid < 0) { close(p[0]); ok = 0; }
             else {
                 fcntl(p[0], F_SETFL, O_NONBLOCK);
@@ -1032,20 +1117,52 @@ static JSValue f_create(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 }
 
 /* lord-vm with args in the background, as a job (f_job reads it); 0 when it couldn't start */
+/* the keyring id an encrypted machine's key lives under (docs/VIRTUALIZATION.md 8): its own id, or its group's for a
+ * group's member; a group's folder: its group's id when its members are encrypted. 1 and the id, or 0 not encrypted */
+static int key_id_of(const char *dir, char out[37]) {
+    VmMachine m;
+    size_t n = strlen(dir);
+    if (n > strlen(VMG_SUFFIX) && !strcmp(dir + n - strlen(VMG_SUFFIX), VMG_SUFFIX)) {
+        VmGroup g;
+        char md[PATH_MAX + 80];
+        if (vm_group_load(dir, &g, NULL, 0) || g.n < 1) return 0;
+        snprintf(md, sizeof md, "%s/%s", dir, g.m[0].dir);
+        if (vm_machine_load(md, &m, NULL, 0) || !m.encrypted) return 0;
+        memcpy(out, g.id, 37);
+        return 1;
+    }
+    if (vm_machine_load(dir, &m, NULL, 0) || !m.encrypted) return 0;
+    memcpy(out, m.group[0] ? m.group : m.id, 37);
+    return 1;
+}
+static int spawn_job_k(char *const args[], const char *dir, const char *keyid);
 static int spawn_job(char *const args[], const char *dir) {
+    char kid[37];
+    return spawn_job_k(args, dir, key_id_of(dir, kid) ? kid : NULL);
+}
+/* lord-vm with args as a job; with keyid, that key (held here: vmkey_fetch first) on fd 3 (--key-fd 3). Without the key
+ * ready the job still starts, and lord-vm says the machine's key is needed */
+static int spawn_job_k(char *const args0[], const char *dir, const char *keyid) {
+    char *args[96];
+    int na = 0;
+    while (args0[na] && na < 92) { args[na] = args0[na]; na++; }
+    int kp = keyid ? vmkey_pipe(keyid) : -1;
+    if (kp >= 0) { args[na++] = "--key-fd"; args[na++] = "3"; }
+    args[na] = NULL;
     int slot = -1;
     for (int i = 0; i < MAX_JOBS; i++) if (!jobs[i].used) { slot = i; break; }
     char bin[PATH_MAX];
-    if (slot < 0 || bin_path("lord-vm", bin, sizeof bin)) return 0;
+    if (slot < 0 || bin_path("lord-vm", bin, sizeof bin)) { if (kp >= 0) close(kp); return 0; }
     int p[2];
-    if (pipe2(p, O_CLOEXEC)) return 0;
+    if (pipe2(p, O_CLOEXEC)) { if (kp >= 0) close(kp); return 0; }
     pid_t pid = fork();
     if (!pid) {
         int null = open("/dev/null", O_RDONLY);
         if (null >= 0) dup2(null, 0);
         dup2(p[1], 1);
         dup2(p[1], 2);
-        syscall(SYS_close_range, 3, ~0u, 0);
+        if (kp >= 0 && (kp == 3 ? fcntl(3, F_SETFD, 0) : dup2(kp, 3)) < 0) _exit(126);
+        syscall(SYS_close_range, kp >= 0 ? 4 : 3, ~0u, 0);
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
@@ -1053,6 +1170,7 @@ static int spawn_job(char *const args[], const char *dir) {
         _exit(127);
     }
     close(p[1]);
+    if (kp >= 0) close(kp);
     if (pid < 0) { close(p[0]); return 0; }
     fcntl(p[0], F_SETFL, O_NONBLOCK);
     jobs[slot] = (Job){ .used = 1, .fd = p[0], .pid = pid };
@@ -1079,20 +1197,23 @@ static JSValue f_hash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 static JSValue f_group_create(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 1 || !JS_IsObject(argv[0])) return JS_NewInt32(c, 0);
-    char lib[PATH_MAX], gdir[PATH_MAX + 64], arch[PATH_MAX], cid[40] = "", sha[136] = "", name[VM_NAME_MAX + 1] = "";
+    char lib[PATH_MAX], gdir[PATH_MAX + 64], arch[PATH_MAX], cid[40] = "", sha[136] = "", name[VM_NAME_MAX + 1] = "", rel[32] = "";
     if (library(lib, sizeof lib, 1)) return JS_NewInt32(c, 0);
     JSValue vc = JS_GetPropertyStr(c, argv[0], "catalogId"), va = JS_GetPropertyStr(c, argv[0], "archive");
-    JSValue vs = JS_GetPropertyStr(c, argv[0], "sha512"), vn = JS_GetPropertyStr(c, argv[0], "name");
-    const char *cs = JS_ToCString(c, vc), *ss = JS_ToCString(c, vs), *ns = JS_ToCString(c, vn);
-    int ok = cs && ss && ns && strlen(cs) < sizeof cid && strlen(ss) == 128 && strlen(ns) < sizeof name && vm_name_valid(ns) &&
-             JS_IsString(va) && !user_file(c, va, arch, sizeof arch);
-    if (ok) { snprintf(cid, sizeof cid, "%s", cs); snprintf(sha, sizeof sha, "%s", ss); snprintf(name, sizeof name, "%s", ns); }
+    JSValue vs = JS_GetPropertyStr(c, argv[0], "sha512"), vn = JS_GetPropertyStr(c, argv[0], "name"), vr = JS_GetPropertyStr(c, argv[0], "release");
+    const char *cs = JS_ToCString(c, vc), *ss = JS_ToCString(c, vs), *ns = JS_ToCString(c, vn), *rs = JS_ToCString(c, vr);
+    int ok = cs && ss && ns && rs && strlen(cs) < sizeof cid && strlen(ss) == 128 && strlen(ns) < sizeof name && vm_name_valid(ns) &&
+             strlen(rs) && strlen(rs) < sizeof rel && JS_IsString(va) && !user_file(c, va, arch, sizeof arch);
+    if (ok) { snprintf(cid, sizeof cid, "%s", cs); snprintf(sha, sizeof sha, "%s", ss); snprintf(name, sizeof name, "%s", ns); snprintf(rel, sizeof rel, "%s", rs); }
     if (cs) JS_FreeCString(c, cs);
     if (ss) JS_FreeCString(c, ss);
     if (ns) JS_FreeCString(c, ns);
-    JS_FreeValue(c, vc); JS_FreeValue(c, va); JS_FreeValue(c, vs); JS_FreeValue(c, vn);
+    if (rs) JS_FreeCString(c, rs);
+    JS_FreeValue(c, vc); JS_FreeValue(c, va); JS_FreeValue(c, vs); JS_FreeValue(c, vn); JS_FreeValue(c, vr);
     if (!ok) return JS_NewInt32(c, 0);
     for (const char *p = cid; *p; p++) if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '-')) return JS_NewInt32(c, 0);
+    /* the release the verified list came from (numbers and dots; lord-vm checks it against the catalog's floor) */
+    for (const char *p = rel; *p; p++) if (!((*p >= '0' && *p <= '9') || *p == '.')) return JS_NewInt32(c, 0);
     for (const char *p = sha; *p; p++) if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f'))) return JS_NewInt32(c, 0);
     /* the verified download: <image store>/<sha512>.tar.xz and nothing else */
     char want[PATH_MAX];
@@ -1100,8 +1221,17 @@ static JSValue f_group_create(JSContext *c, JSValueConst t, int argc, JSValueCon
     if (strcmp(arch, want)) return JS_NewInt32(c, 0);
     struct stat st;
     if (snprintf(gdir, sizeof gdir, "%s/%s%s", lib, name, VMG_SUFFIX) >= (int)sizeof gdir || !vm_group_dir_ok(gdir) || !lstat(gdir, &st)) return JS_NewInt32(c, 0);
-    char *args[] = { "lord-vm", "--group-create", gdir, "--catalog-id", cid, "--archive", arch, "--sha512", sha, "--name", name, NULL };
-    return JS_NewInt32(c, spawn_job(args, ""));
+    /* isolation layer 5 (19.1): the members' disks encrypted under a key lord.vm.keyNew made and kept for keyId */
+    char gk[37] = "";
+    JSValue vk = JS_GetPropertyStr(c, argv[0], "keyId");
+    const char *ks = JS_IsString(vk) ? JS_ToCString(c, vk) : NULL;
+    if (ks && vm_uuid_valid(ks)) snprintf(gk, sizeof gk, "%s", ks);
+    if (ks) JS_FreeCString(c, ks);
+    JS_FreeValue(c, vk);
+    if (gk[0] && vmkey_state(gk) != VMK_READY) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--group-create", gdir, "--catalog-id", cid, "--archive", arch, "--sha512", sha, "--release", rel, "--name", name,
+                     gk[0] ? "--encrypt" : NULL, "on", "--id", gk, NULL };
+    return JS_NewInt32(c, spawn_job_k(args, "", gk[0] ? gk : NULL));
 }
 static JSValue f_group_fresh(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
@@ -1123,6 +1253,56 @@ static JSValue f_group_set(JSContext *c, JSValueConst t, int argc, JSValueConst 
     JS_FreeValue(c, vd); JS_FreeValue(c, vf);
     args[n] = NULL;
     return JS_NewInt32(c, n > 3 ? spawn_job(args, gdir) : 0);
+}
+/* groupDelete(groupDir) → job id: lord-vm --group-delete (the group and its members for good, its bases when nothing
+ * else names them; refused while a member runs). groupRename(groupDir, name) → job id: lord-vm --group-rename.
+ * groupRenamePlan(groupDir, name) → { problem: '' | 'bad-name' | 'name-taken' | 'folder-taken' | 'not-a-group', moves,
+ * folder, other }: what the rename would do, read from the library as it is (vm_group_rename_plan).
+ * groupRepair(groupDir) → job id: lord-vm --group-repair (the image store's archive, when a base is missing or changed,
+ * found by lord-vm from group.json; JS never names a file). 0 when refused. */
+static JSValue f_group_delete(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char gdir[PATH_MAX];
+    if (argc < 1 || group_dir(c, argv[0], gdir, sizeof gdir)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--group-delete", gdir, NULL };
+    return JS_NewInt32(c, spawn_job(args, gdir));
+}
+static JSValue f_group_rename(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char gdir[PATH_MAX], name[VM_NAME_MAX + 1];
+    if (argc < 2 || group_dir(c, argv[0], gdir, sizeof gdir)) return JS_NewInt32(c, 0);
+    const char *s = JS_ToCString(c, argv[1]);
+    int ok = s && strlen(s) < sizeof name && vm_rename_name_ok(s);
+    if (ok) snprintf(name, sizeof name, "%s", s);
+    if (s) JS_FreeCString(c, s);
+    if (!ok) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--group-rename", gdir, name, NULL };
+    return JS_NewInt32(c, spawn_job(args, gdir));
+}
+static JSValue f_group_rename_plan(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    static const char *const PR[] = { "", "bad-name", "name-taken", "folder-taken", "not-a-group" };
+    char gdir[PATH_MAX];
+    VmGroupRenamePlan p;
+    memset(&p, 0, sizeof p);
+    p.problem = VMG_RN_NOT_GROUP;
+    if (argc >= 2 && !group_dir(c, argv[0], gdir, sizeof gdir)) {
+        const char *s = JS_ToCString(c, argv[1]);
+        if (s) { vm_group_rename_plan(gdir, s, &p); JS_FreeCString(c, s); }
+    }
+    JSValue o = JS_NewObject(c);
+    set_str(c, o, "problem", PR[p.problem]);
+    JS_SetPropertyStr(c, o, "moves", JS_NewBool(c, p.moves));
+    set_str(c, o, "folder", p.folder);
+    set_str(c, o, "other", p.other);
+    return o;
+}
+static JSValue f_group_repair(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char gdir[PATH_MAX];
+    if (argc < 1 || group_dir(c, argv[0], gdir, sizeof gdir)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--group-repair", gdir, NULL };
+    return JS_NewInt32(c, spawn_job(args, gdir));
 }
 
 /* (security scan F5) A guest writes to a writable shared folder: never one that is, sits under or holds a path lord.fs
@@ -1271,13 +1451,13 @@ static JSValue f_budget(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 
 /* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
  *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest", captureFullscreen, perfProfile,
- *            cpuPin: "off"|"auto" }) → job id: lord-vm --set on a
+ *            cpuPin: "off"|"auto", automation }) → job id: lord-vm --set on a
  * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[68 + 2 * VM_SHARES + 2 * VM_PORTS], hds[4] = "", shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[94 + 2 * VM_SHARES + 2 * VM_PORTS], hds[4] = "", shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1398,6 +1578,20 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "perfProfile");
     if (JS_IsBool(v)) { args[n++] = "--perf-profile"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    JS_FreeValue(c, v);
+    /* storage (schema 16): the disposable session (6.2), Backups, the move to this computer's UEFI code (3.6) */
+    v = JS_GetPropertyStr(c, argv[1], "disposable");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && (!strcmp(s, "off") || !strcmp(s, "memory") || !strcmp(s, "disk"))) { args[n++] = "--disposable"; args[n++] = !strcmp(s, "off") ? "off" : !strcmp(s, "memory") ? "memory" : "disk"; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "backup");
+    if (JS_IsBool(v)) { args[n++] = "--backup"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "firmwareUpdate");
+    if (JS_ToBool(c, v) > 0) { args[n++] = "--firmware-update"; args[n++] = "yes"; }
     v = JS_GetPropertyStr(c, argv[1], "guestLinks");
     if (JS_IsBool(v)) { args[n++] = "--guest-links"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     v = JS_GetPropertyStr(c, argv[1], "guestNotify");
@@ -1406,6 +1600,27 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     /* All Displays (5.4): the guest's displays, 1..VM_HEADS_MAX (lord-vm refuses it while the machine runs or is suspended) */
     int hv = prop_int(c, argv[1], "heads");
     if (hv) { if (hv < 1 || hv > VM_HEADS_MAX) ok = 0; else { snprintf(hds, sizeof hds, "%d", hv); args[n++] = "--heads"; args[n++] = hds; } }
+    /* Configure (5.5, schema 18): the processor the guest sees; a new network card address; one more data disk (GB) */
+    v = JS_GetPropertyStr(c, argv[1], "cpuModel");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && (!strcmp(s, "host") || !strcmp(s, "compatible"))) { args[n++] = "--cpu-model"; args[n++] = !strcmp(s, "host") ? "host" : "compatible"; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "newMac");
+    if (JS_IsBool(v)) { if (JS_ToBool(c, v)) { args[n++] = "--mac"; args[n++] = "new"; } }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    char addd[16];
+    int add = prop_int(c, argv[1], "addDiskGb");
+    if (add) {
+        if (add < VM_DISK_MIN_GB || add > VM_DISK_MAX_GB) ok = 0;
+        else { snprintf(addd, sizeof addd, "%d", add); args[n++] = "--add-disk"; args[n++] = addd; }
+    }
+    /* automation (6.15): `machines exec` and `cp` may run programs in the guest; lord-vm refuses it for anonymity */
+    v = JS_GetPropertyStr(c, argv[1], "automation");
+    if (JS_IsBool(v)) { args[n++] = "--automation"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
     v = JS_GetPropertyStr(c, argv[1], "cpuPin");
     if (JS_IsString(v)) {
         const char *s = JS_ToCString(c, v);
@@ -1545,9 +1760,12 @@ static int vm_exe_is(long pid, const char *name) {
     return realpath(want, rw) && vmwatch_exe_same(got, rw);
 }
 
-/* where lord-sessiond puts a machine's scope: beside lord-server's own leaf (".../lordos-session-<uid>/server"), the
- * exact cgroup path; "" outside a LordOS session */
-static void vm_scope_path(const char *id, int tor, char *out, size_t n) { vmwatch_scope_path(cgroup_self(), id, tor, out, n); }
+/* where lord-sessiond puts a machine's scope: in the session's machines' slice (3.7), the exact cgroup path; "" outside a
+ * LordOS session. old: where a machine started before the slice existed is, beside lord-server's own leaf */
+static void vm_scope_path(const char *id, int tor, char *out, size_t n, char *old, size_t on) {
+    vmwatch_scope_path(cgroup_self(), id, tor, 1, out, n);
+    vmwatch_scope_path(cgroup_self(), id, tor, 0, old, on);
+}
 
 /* the process's cgroup (v2) is exactly `scope` or below it */
 static int vm_in_cgroup(long pid, const char *scope) {
@@ -1559,6 +1777,11 @@ static int vm_in_cgroup(long pid, const char *scope) {
     if (k <= 3) return 0;
     buf[k] = 0;
     return vmwatch_cg_under(buf, scope);
+}
+
+/* the process is under the machine's scope, in the slice or (started before it) in the old place */
+static int vm_in_scope(long pid, const char *scope, const char *old) {
+    return (scope[0] && vm_in_cgroup(pid, scope)) || (old[0] && vm_in_cgroup(pid, old));
 }
 
 /* the machine's own lord-vm, asked over its socket (vmwatch_live) */
@@ -1612,9 +1835,9 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     }
     /* Sentinela's facts (docs/SENTINELA.md, "Machines") come from the machine's lord-vm itself, never from run.json */
     static VmMachine sm;
-    char serr[128], scope[PATH_MAX] = "";
+    char serr[128], scope[PATH_MAX] = "", scope_old[PATH_MAX] = "";
     int have_m = !vm_machine_load(dir, &sm, serr, sizeof serr) && sm.id[0];
-    if (have_m) vm_scope_path(sm.id, sm.uplink_tor, scope, sizeof scope);
+    if (have_m) vm_scope_path(sm.id, sm.uplink_tor, scope, sizeof scope, scope_old, sizeof scope_old);
     if (qpid > 0 && have_m) {
         VmLive lv;
         int ok = !vm_live(sm.id, &lv);
@@ -1633,7 +1856,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
                 set_str(c, o, "cgMode", lv.cg & VMC_NESTED ? "nested" : lv.cg & VMC_SCOPE ? "scope" : "none");
                 /* in its own machine's scope (exactly that cgroup or below it), lord-vm and QEMU both; "" when this
                  * isn't a LordOS session and the scope's place isn't known */
-                if (scope[0]) set_str(c, o, "scope", vm_in_cgroup(lv.qemu, scope) && vm_in_cgroup(lv.pid, scope) ? "in" : "out");
+                if (scope[0]) set_str(c, o, "scope", vm_in_scope(lv.qemu, scope, scope_old) && vm_in_scope(lv.pid, scope, scope_old) ? "in" : "out");
                 /* its passt (Shared network): a passt of the person's, lord-vm's child or in the machine's scope */
                 long pt = hint_passt, ppp = -1;
                 int alive = 0, d1, d2;
@@ -1644,7 +1867,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
                     ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
                     if (cf >= 0) close(cf);
                     if (k > 0) comm[k] = 0;
-                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || (scope[0] && vm_in_cgroup(pt, scope)));
+                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || vm_in_scope(pt, scope, scope_old));
                 }
                 JS_SetPropertyStr(c, o, "passt", JS_NewBool(c, alive));
             }
@@ -1671,7 +1894,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
             /* QEMU's own leaf, or the machine's scope when lord-vm couldn't divide it; never an unrelated cgroup */
             if (strstr(buf + 3, "lordos-vm-") && strlen(buf + 3) < sizeof cg) snprintf(cg, sizeof cg, "%s", buf + 3);
             /* with the scope's place known: its counters only when QEMU is really under it */
-            if (scope[0] && !vm_in_cgroup(qpid, scope)) cg[0] = 0;
+            if (scope[0] && !vm_in_scope(qpid, scope, scope_old)) cg[0] = 0;
         }
     }
     if (cg[0]) {
@@ -1688,24 +1911,38 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
 /* snapshot(session) → bool: the machine's picture now as its card picture (<machine>/thumb.png) */
 static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *argv);
 
-/* isoInfo(path) → { label } : the ISO 9660 volume label (32 bytes at 0x8028), to recognize the system in it */
+/* isoInfo(path) → { label, arch, archFrom, bios, efi, efiArchs, windows } or null: what the ISO boots on, read from its
+ * boot files by vmiso.c (docs/VIRTUALIZATION.md 5.2): the volume label; arch the architecture the UEFI boot files' PE
+ * headers (or their names, or El Torito's x86 BIOS entry) name, "" when they don't say or name two; archFrom "boot"
+ * when arch came from there (model.js isoArch falls back to the file's name); efiArchs every UEFI boot file's; windows
+ * when it is an install disc (sources/install.wim|esd|swm). The ISO is the person's and untrusted: vmiso reads it
+ * through this descriptor only, with bounded, counted reads. */
 static JSValue f_isoinfo(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     char path[PATH_MAX];
-    if (user_file(c, argv[0], path, sizeof path)) return JS_NULL;
-    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (argc < 1 || !JS_IsString(argv[0]) || user_file(c, argv[0], path, sizeof path)) return JS_NULL;
+    /* on a network or cloud mount, only the volume descriptors and a few more (a slow server holds this thread) */
+    unsigned max = fsops_remote_path(path) ? 40 : 0;
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0) return JS_NULL;
-    unsigned char pvd[72];
-    ssize_t k = pread(fd, pvd, sizeof pvd, 0x8000);
+    VmIso v;
+    int rc = vmiso_probe(fd, &v, max);
     close(fd);
+    if (rc) memset(&v, 0, sizeof v);
+    const char *arch = rc ? "" : vmiso_arch(&v);
     JSValue o = JS_NewObject(c);
-    char label[33] = "";
-    if (k == (ssize_t)sizeof pvd && pvd[0] == 1 && !memcmp(pvd + 1, "CD001", 5)) {
-        memcpy(label, pvd + 40, 32);
-        for (int i = 31; i >= 0 && (label[i] == ' ' || !label[i]); i--) label[i] = 0;
-        for (int i = 0; label[i]; i++) if ((unsigned char)label[i] < 0x20 || (unsigned char)label[i] > 0x7e) label[i] = '?';
-    }
-    set_str(c, o, "label", label);
+    set_str(c, o, "label", v.label);
+    set_str(c, o, "arch", arch);
+    set_str(c, o, "archFrom", arch[0] ? "boot" : "");
+    JS_SetPropertyStr(c, o, "bios", JS_NewBool(c, v.bios));
+    JS_SetPropertyStr(c, o, "efi", JS_NewBool(c, v.efi));
+    JS_SetPropertyStr(c, o, "windows", JS_NewBool(c, v.windows));
+    JSValue a = JS_NewArray(c);
+    static const struct { unsigned bit; const char *name; } A[] = { { VMISO_X64, "amd64" }, { VMISO_AA64, "arm64" }, { VMISO_IA32, "i386" }, { VMISO_RISCV64, "riscv64" } };
+    unsigned m = v.efi_pe ? v.efi_pe : v.efi_named;
+    uint32_t n = 0;
+    for (size_t i = 0; i < sizeof A / sizeof A[0]; i++) if (m & A[i].bit) JS_SetPropertyUint32(c, a, n++, JS_NewString(c, A[i].name));
+    JS_SetPropertyStr(c, o, "efiArchs", a);
     return o;
 }
 
@@ -1933,6 +2170,8 @@ typedef struct {
     int job_kind, job_status, job_pct;  /* the last VM_JOB (suspend, resume, snapshots) */
     char job_text[VM_TEXT_MAX];
     uint32_t cd_seq;                    /* VM_CDROM: the request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
+    uint32_t cable_seq;                 /* VM_NETCABLE: the request; cable_down: pulled in this run (poll's cableOut) */
+    int cable_down, cable_want;
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
     int ag_state, ag_caps;              /* the guest agent (VM_AGENT_STATE), and what it said about itself */
@@ -1944,6 +2183,8 @@ typedef struct {
     int xf_result;
     char xf_msg[VM_TEXT_MAX];
     int ag_result;
+    uint32_t disc_seq;                  /* the LordOS Guest Tools disc's request (VAG_DISC), and why lord-vm refused it */
+    char disc_msg[VM_TEXT_MAX];
     char ag_msg[VM_TEXT_MAX];
     char *clip_in;                      /* the guest's clipboard text (VM_CLIP_DATA), and a counter of them */
     int clip_seq;
@@ -2380,19 +2621,23 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         gpu_info(&gi);
         if (gpu_active() && gi.dmabuf && gi.render_node && !strncmp(gi.render_node, "/dev/dri/renderD", 16)) snprintf(rnode, sizeof rnode, "%s", gi.render_node);
     }
+    /* an encrypted machine's key (8), held here after vmkey_fetch, on fd 4 */
+    char kid[37];
+    int kp = key_id_of(dir, kid) ? vmkey_pipe(kid) : -1;
     pid_t p = fork();
     if (!p) {
-        int ch = fcntl(sv[1], F_DUPFD, 10), e = fcntl(ep[1], F_DUPFD, 11);
+        int ch = fcntl(sv[1], F_DUPFD, 10), e = fcntl(ep[1], F_DUPFD, 11), kf = kp >= 0 ? fcntl(kp, F_DUPFD, 12) : -1;
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); }
         dup2(e, 2);
         dup2(ch, 3);
-        syscall(SYS_close_range, 4, ~0u, 0);
+        if (kf >= 0 && dup2(kf, 4) != 4) _exit(126);
+        syscall(SYS_close_range, kf >= 0 ? 5 : 4, ~0u, 0);
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
         /* no cgroup_enter here: lord-vm places itself in the machine's scope through lord-sessiond */
-        char *args[20];
+        char *args[24];
         int k = 0;
         args[k++] = "lord-vm"; args[k++] = "--start"; args[k++] = dir; args[k++] = "--control-fd"; args[k++] = "3"; args[k++] = "--paused";
         /* 3D graphics (6.10): QEMU draws on the GPU this desktop composes with, whose dmabufs it can read back; without
@@ -2402,10 +2647,12 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (discard) args[k++] = "--discard-state";
         if (loadvm[0]) { args[k++] = "--loadvm"; args[k++] = loadvm; }
         if (have_creds) { args[k++] = "--credentials-file"; args[k++] = creds; }
+        if (kp >= 0) { args[k++] = "--key-fd"; args[k++] = "4"; }
         args[k] = NULL;
         execve(bin, args, environ);
         _exit(127);
     }
+    if (kp >= 0) close(kp);
     close(sv[1]);
     close(ep[1]);
     if (p < 0) { close(sv[0]); close(ep[0]); if (have_creds) unlink(creds); return JS_NewInt32(c, 0); }
@@ -3052,8 +3299,10 @@ static void from_vm(Sess *s) {
             break;
         case VM_REPLY:
             if (fx_reply(s, &m)) break;
+            if (s->disc_seq && m.seq == s->disc_seq) { snprintf(s->disc_msg, sizeof s->disc_msg, "%s", m.a == VME_OK ? "" : m.text); s->disc_seq = 0; }
             if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
             if (s->xf_seq && m.seq == s->xf_seq) { s->xf_result = m.a == VME_OK ? 2 : 3; snprintf(s->xf_msg, sizeof s->xf_msg, "%s", m.text); s->xf_seq = 0; }
+            if (s->cable_seq && m.seq == s->cable_seq) { if (m.a == VME_OK) s->cable_down = !s->cable_want; s->cable_seq = 0; }
             if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
             if (m.a != VME_OK) {
                 snprintf(s->last_error, sizeof s->last_error, "%s", m.text);
@@ -3374,6 +3623,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "picSkipped", s->pic_skipped);
     set_int(c, o, "pace", s->pace.kind);
     set_int(c, o, "cd", s->cd_state);
+    JS_SetPropertyStr(c, o, "cableOut", JS_NewBool(c, s->cable_down));
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
     set_int(c, o, "console", s->console_term);
     /* the agent's shell: its terminal, and its size passed on to the guest when the terminal changed it */
@@ -3415,6 +3665,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         set_int(c, ag, "install", s->ag_result);
         JS_SetPropertyStr(c, ag, "lost", JS_NewBool(c, s->ag_seen && s->ag_state == VAS_WAITING && s->state == VS_RUNNING));
         set_str(c, ag, "message", s->ag_msg);
+        set_str(c, ag, "discMessage", s->disc_msg);
         set_int(c, ag, "transfer", s->xf_result);
         set_str(c, ag, "transferMessage", s->xf_msg);
         JS_SetPropertyStr(c, o, "agent", ag);
@@ -3652,6 +3903,20 @@ static JSValue f_cdrom(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (fd >= 0) close(fd);
     if (ok) { s->cd_seq = s->seq; s->cd_state = 1; s->cd_msg[0] = 0; }
     return JS_NewBool(c, ok);
+}
+
+/* netCable(id, plugged) → bool: the running machine's network cable plugged in or pulled (VM_NETCABLE, the window's
+ * Devices → Network); poll's cableOut says where it is. A new run starts plugged in. */
+static JSValue f_net_cable(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0 || s->cable_seq) return JS_FALSE;
+    int on = JS_ToBool(c, argv[1]);
+    VmMsg m = vm_msg(VM_NETCABLE, ++s->seq, on ? 1 : 0, 0, 0, 0, "");
+    if (vm_send(s->vm, &m, -1)) return JS_FALSE;
+    s->cable_seq = s->seq;
+    s->cable_want = on ? 1 : 0;
+    return JS_TRUE;
 }
 
 static JSValue f_cmd(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -3989,7 +4254,8 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     if (!m || !m->px || m->w < 1 || m->h < 1) return JS_FALSE;
     /* a group's member under the anonymity profile (docs/VIRTUALIZATION.md 19.5): no picture of it stays on disk */
     VmMachine mm;
-    if (vm_machine_load(s->dir, &mm, NULL, 0) || mm.profile_lock) return JS_FALSE;
+    /* nor of an encrypted machine (docs/VIRTUALIZATION.md 8): its folder keeps nothing of the guest in the clear */
+    if (vm_machine_load(s->dir, &mm, NULL, 0) || mm.profile_lock || mm.encrypted) return JS_FALSE;
     return JS_NewBool(c, !vm_thumb_save_async(s->dir, m->px, m->w, m->h, VM_THUMB_W));
 }
 
@@ -4099,7 +4365,8 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
 
 /* agent(session, 'install'|'update'|'timesync'|'shutdown') → bool: a guest agent request (poll's agent.install says how
  * Install went). 'update' is Install asked by Machines itself for older LordOS tools: the same install, marked so
- * lord-vm's log says it */
+ * lord-vm's log says it. 'disc' | 'discOut': the LordOS Guest Tools disc in or out of the machine's CD drive (a Linux
+ * guest without qemu-guest-agent; agent.caps has VAC_TOOLS_DISC while it's in, agent.discMessage says a refusal) */
 /* WinFsp's installer for agent(id, 'transfer', path): only a file the admin helper keeps in the machines' image store,
  * root's, named by its SHA-256 (images/<sha256>.iso), whose record there says it's the catalog's "winfsp" entry. The
  * descriptor, and the hash as text, go to lord-vm, which hashes the file again; the guest checks its signature too */
@@ -4135,9 +4402,19 @@ static JSValue f_agent(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     const char *w = argc >= 2 ? JS_ToCString(c, argv[1]) : NULL;
     int upd = w && !strcmp(w, "update");
     int a = !w ? 0 : !strcmp(w, "install") || upd ? VAG_INSTALL : !strcmp(w, "timesync") ? VAG_TIMESYNC : !strcmp(w, "shutdown") ? VAG_SHUTDOWN :
-            !strcmp(w, "transfer") ? VAG_TRANSFER : !strcmp(w, "extraOff") ? VAG_EXTRA_OFF : !strcmp(w, "extraOn") ? VAG_EXTRA_ON : 0;
+            !strcmp(w, "transfer") ? VAG_TRANSFER : !strcmp(w, "extraOff") ? VAG_EXTRA_OFF : !strcmp(w, "extraOn") ? VAG_EXTRA_ON :
+            !strcmp(w, "disc") || !strcmp(w, "discOut") ? VAG_DISC : 0;
+    int disc_in = w && !strcmp(w, "disc");
     if (w) JS_FreeCString(c, w);
     if (!s || !a || s->vm < 0) return JS_FALSE;
+    if (a == VAG_DISC) {
+        /* the LordOS Guest Tools disc in or out (lord-vm uses only its own copy and checks it; agent.discMessage says why
+         * it was refused) */
+        VmMsg m = vm_msg(VM_AGENT, ++s->seq, VAG_DISC, disc_in, 0, 0, NULL);
+        if (vm_send(s->vm, &m, -1)) return JS_FALSE;
+        s->disc_seq = m.seq; s->disc_msg[0] = 0;
+        return JS_TRUE;
+    }
     if (a == VAG_TRANSFER) {
         /* the transfer folder (6.7.1): looked at again in the guest, or (a path) WinFsp installed in a Windows guest */
         char sha[65] = "";
@@ -4812,6 +5089,11 @@ static JSValue f_snap_take(JSContext *c, JSValueConst t, int argc, JSValueConst 
     Sess *s = argc >= 3 ? get(c, argv[2]) : NULL;
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     int shut = (s && s->protect) || (m && !pic_out_ok(s, m));    /* a protected machine's snapshot keeps no picture */
+    {
+        /* nor an encrypted machine's (docs/VIRTUALIZATION.md 8): a picture would be the guest's screen in the clear */
+        VmMachine em;
+        if (!vm_machine_load(dir, &em, NULL, 0) && em.encrypted) shut = 1;
+    }
     if (!shut) media_src_need_cpu(m);
     if (shut) { /* nothing: the list shows the snapshot without a picture */ }
     else if (m && m->px && m->w > 0 && m->h > 0) vm_png_save(sd, file, m->px, m->w, m->h, 640);
@@ -4928,7 +5210,7 @@ static JSValue f_clone(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         folder_name(nm, folder, sizeof folder);
         snprintf(dst, sizeof dst, "%s/%s.lordvm", lib, folder);
         for (int k = 2; !access(dst, F_OK) && k < 100; k++) snprintf(dst, sizeof dst, "%s/%s %d.lordvm", lib, folder, k);
-        char *args[14];
+        char *args[18];
         int k = 0;
         args[k++] = "lord-vm"; args[k++] = "--clone"; args[k++] = dir; args[k++] = dst; args[k++] = "--name"; args[k++] = nm;
         if (dup) args[k++] = "--duplicate";
@@ -4936,8 +5218,19 @@ static JSValue f_clone(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (!dup && keep) args[k++] = "--keep-identity";
         else if (!dup && host[0]) { args[k++] = "--hostname"; args[k++] = host; }
         if (tg[0]) { args[k++] = "--from-snapshot"; args[k++] = tg; }
+        /* an encrypted machine's Clone: its key is kept under the new id first (lord.vm.keyCopy gave newId) */
+        char kid[37], nid[37] = "";
+        int enc = key_id_of(dir, kid);
+        if (enc && !dup) {
+            JSValue vni = JS_GetPropertyStr(c, argv[1], "newId");
+            const char *ni = JS_IsString(vni) ? JS_ToCString(c, vni) : NULL;
+            if (ni && vm_uuid_valid(ni)) snprintf(nid, sizeof nid, "%s", ni);
+            if (ni) JS_FreeCString(c, ni);
+            JS_FreeValue(c, vni);
+            if (nid[0]) { args[k++] = "--new-id"; args[k++] = nid; }
+        }
         args[k] = NULL;
-        if (access(dst, F_OK)) id = spawn_job(args, dst);
+        if (access(dst, F_OK) && (!enc || dup || nid[0])) id = spawn_job_k(args, dst, enc ? kid : NULL);
     }
     if (name) JS_FreeCString(c, name);
     if (snap) JS_FreeCString(c, snap);
@@ -5280,14 +5573,176 @@ static JSValue f_import_info(JSContext *c, JSValueConst t, int argc, JSValueCons
     return JS_NewString(c, buf);
 }
 
+/* ---- encrypted machines' keys (docs/VIRTUALIZATION.md 8; vm/vmkeysrv.h): never a key to JS, only states ---- */
+
+/* the keyring id of what v names: a machine's or group's folder of the library (its own, or its group's id), or an id */
+static int key_target(JSContext *c, JSValueConst v, char out[37]) {
+    char dir[PATH_MAX];
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        int idok = s && vm_uuid_valid(s);
+        if (idok) memcpy(out, s, 37);
+        if (s) JS_FreeCString(c, s);
+        if (idok) return 0;
+    }
+    if (!machine_dir(c, v, dir, sizeof dir) || !group_dir(c, v, dir, sizeof dir)) return key_id_of(dir, out) ? 0 : 1;
+    return -1;
+}
+/* keyState(dirOrId[, fetch]) → "none" (not encrypted) | "pending" | "ready" | "locked" | "missing" | "error"; fetch asks
+ * the keyring when the key isn't held already */
+static JSValue f_key_state(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char id[37];
+    int r = argc >= 1 ? key_target(c, argv[0], id) : -1;
+    if (r) return JS_NewString(c, "none");
+    if (argc >= 2 && JS_ToBool(c, argv[1]) > 0) {
+        int st = vmkey_state(id);
+        if (st != VMK_READY && st != VMK_PENDING) vmkey_fetch(id);
+    }
+    return JS_NewString(c, VMK_NAMES[vmkey_state(id)]);
+}
+/* keyNew(name) → a new id whose key is being made and kept (keyState(id) says when it's ready), for create or a group */
+static JSValue f_key_new(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    const char *nm = argc >= 1 && JS_IsString(argv[0]) ? JS_ToCString(c, argv[0]) : NULL;
+    char id[37];
+    int ok = nm && vm_name_valid(nm) && !vm_new_id(id) && !vmkey_new(id, nm);
+    if (nm) JS_FreeCString(c, nm);
+    return ok ? JS_NewString(c, id) : JS_NULL;
+}
+/* keyCopy(dir) → a new id that gets this encrypted machine's key too (its Clone's), or null */
+static JSValue f_key_copy(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char dir[PATH_MAX], kid[37], id[37];
+    VmMachine m;
+    if (machine_dir(c, argv[0], dir, sizeof dir) || !key_id_of(dir, kid) || vm_machine_load(dir, &m, NULL, 0) || vm_new_id(id) || vmkey_copy(kid, id, m.name)) return JS_NULL;
+    return JS_NewString(c, id);
+}
+/* keyEnter(id, recoveryKey, name) → bool: the recovery key the person typed (in a protected window) kept under id, for an
+ * exported machine brought in; its spaces and dashes are ignored. The text is wiped from this side at once */
+static JSValue f_key_enter(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    if (argc < 3) return JS_FALSE;
+    const char *id = JS_ToCString(c, argv[0]), *nm = JS_ToCString(c, argv[2]);
+    size_t kn = 0;
+    char *k = js_secret_dup(c, argv[1], &kn);
+    int ok = id && nm && k && vm_uuid_valid(id) && vm_name_valid(nm) && !vmkey_enter(id, k, nm);
+    js_secret_free(k, kn);
+    if (id) JS_FreeCString(c, id);
+    if (nm) JS_FreeCString(c, nm);
+    return JS_NewBool(c, ok);
+}
+
+/* ---- Export (6.4): lord-vm --export, and the import of an export ---- */
+
+/* a folder the person may read (and, with write, write) here, as lord.fs allows: its real path inside home or under
+ * /media, /run/media or /mnt, no control characters; never the machines' library or inside it */
+static int user_dir(JSContext *c, JSValueConst v, int write, char *out, size_t n) {
+    const char *s = JS_ToCString(c, v);
+    if (!s) return -1;
+    char r[PATH_MAX], lib[PATH_MAX];
+    struct stat st;
+    int ok = s[0] == '/' && realpath(s, r) && !stat(r, &st) && S_ISDIR(st.st_mode) && !access(r, write ? R_OK | W_OK | X_OK : R_OK | X_OK) && strlen(r) < n;
+    JS_FreeCString(c, s);
+    if (!ok) return -1;
+    for (const unsigned char *p = (const unsigned char *)r; *p; p++) if (*p < 0x20 || *p == 0x7f) return -1;
+    const char *home = getenv("HOME");
+    size_t hl = home ? strlen(home) : 0;
+    int inside = (hl > 1 && !strncmp(r, home, hl) && (r[hl] == '/' || !r[hl])) || !strncmp(r, "/media/", 7) || !strncmp(r, "/run/media/", 11) || !strncmp(r, "/mnt/", 5);
+    if (!inside) return -1;
+    if (!library(lib, sizeof lib, 0)) {
+        size_t ll = strlen(lib);
+        if (!strncmp(r, lib, ll) && (r[ll] == '/' || !r[ll]) && write) return -1;
+    }
+    memcpy(out, r, strlen(r) + 1);
+    return 0;
+}
+
+/* export(dir, { to, format: "lordvm"|"ova", noSnapshots }) → job id. `to` is the save dialog's choice: an absolute path
+ * the person picked, checked like any file lord.fs writes (user_file's rules on its folder) */
+static JSValue f_export(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX], to[PATH_MAX], parent[PATH_MAX];
+    if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
+    JSValue vt = JS_GetPropertyStr(c, argv[1], "to"), vf = JS_GetPropertyStr(c, argv[1], "format");
+    const char *ts = JS_IsString(vt) ? JS_ToCString(c, vt) : NULL, *fs = JS_IsString(vf) ? JS_ToCString(c, vf) : NULL;
+    int ova = fs && !strcmp(fs, "ova");
+    int ok = ts && ts[0] == '/' && strlen(ts) < sizeof to && (!fs || ova || !strcmp(fs, "lordvm"));
+    if (ok) snprintf(to, sizeof to, "%s", ts);
+    if (ts) JS_FreeCString(c, ts);
+    if (fs) JS_FreeCString(c, fs);
+    JS_FreeValue(c, vt); JS_FreeValue(c, vf);
+    if (!ok) return JS_NewInt32(c, 0);
+    /* its folder must be one the person may write to: an existing folder under home or their mounts, not hidden */
+    snprintf(parent, sizeof parent, "%s", to);
+    char *sl = strrchr(parent, '/');
+    if (!sl || !sl[1] || strchr(sl + 1, '\n')) return JS_NewInt32(c, 0);
+    *sl = 0;
+    JSValue pv = JS_NewString(c, parent[0] ? parent : "/");
+    char preal[PATH_MAX];
+    int bad = user_dir(c, pv, 1, preal, sizeof preal);
+    JS_FreeValue(c, pv);
+    if (bad || strlen(preal) + strlen(sl + 1) + 2 > sizeof to) return JS_NewInt32(c, 0);
+    if (snprintf(to, sizeof to, "%s/%s", preal, sl + 1) >= (int)sizeof to) return JS_NewInt32(c, 0);
+    int nosnap = opt_bool(c, argc, argv, "noSnapshots");
+    char *args[] = { "lord-vm", "--export", dir, "--to", to, "--format", ova ? "ova" : "lordvm", nosnap ? "--no-snapshots" : NULL, NULL };
+    return JS_NewInt32(c, spawn_job(args, dir));
+}
+/* exportInfo(path) → { id, name, encrypted, snapshots, files } of an export's manifest.json (parsed strictly by
+ * vmexport.c), or null */
+static JSValue f_export_info(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char src[PATH_MAX], mp[PATH_MAX + 32];
+    if (user_dir(c, argv[0], 0, src, sizeof src)) return JS_NULL;
+    snprintf(mp, sizeof mp, "%s/manifest.json", src);
+    size_t len = 0;
+    char *txt = store_file(mp, VMX_MANIFEST_MAX, &len);
+    VmxManifest man;
+    int bad = !txt || vmx_manifest_parse(txt, len, &man, NULL, 0);
+    free(txt);
+    if (bad) return JS_NULL;
+    JSValue o = JS_NewObject(c);
+    set_str(c, o, "id", man.id);
+    set_str(c, o, "name", man.name);
+    set_str(c, o, "created", man.created);
+    JS_SetPropertyStr(c, o, "encrypted", JS_NewBool(c, man.encrypted));
+    JS_SetPropertyStr(c, o, "snapshots", JS_NewBool(c, man.snapshots));
+    set_int(c, o, "files", man.n);
+    return o;
+}
+/* importExport(path) → job id: lord-vm --import-lordvm into a new folder of the library named after the export's
+ * machine. An encrypted one needs its key held first (keyEnter, or the keyring of the computer it came from) */
+static JSValue f_import_export(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    char src[PATH_MAX], lib[PATH_MAX], mp[PATH_MAX + 32], folder[64], dst[PATH_MAX + 80];
+    if (user_dir(c, argv[0], 0, src, sizeof src) || library(lib, sizeof lib, 1)) return JS_NewInt32(c, 0);
+    snprintf(mp, sizeof mp, "%s/manifest.json", src);
+    size_t len = 0;
+    char *txt = store_file(mp, VMX_MANIFEST_MAX, &len);
+    VmxManifest man;
+    int bad = !txt || vmx_manifest_parse(txt, len, &man, NULL, 0);
+    free(txt);
+    if (bad) return JS_NewInt32(c, 0);
+    folder_name(man.name, folder, sizeof folder);
+    snprintf(dst, sizeof dst, "%s/%s.lordvm", lib, folder);
+    for (int k = 2; !access(dst, F_OK) && k < 100; k++) snprintf(dst, sizeof dst, "%s/%s %d.lordvm", lib, folder, k);
+    if (!access(dst, F_OK)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--import-lordvm", src, dst, NULL };
+    return JS_NewInt32(c, spawn_job_k(args, dst, man.encrypted ? man.id : NULL));
+}
+
 static const JSCFunctionListEntry funcs[] = {
+    JS_CFUNC_DEF("keyState", 2, f_key_state), JS_CFUNC_DEF("keyNew", 1, f_key_new), JS_CFUNC_DEF("keyCopy", 1, f_key_copy),
+    JS_CFUNC_DEF("keyEnter", 3, f_key_enter), JS_CFUNC_DEF("export", 2, f_export), JS_CFUNC_DEF("exportInfo", 1, f_export_info),
+    JS_CFUNC_DEF("importExport", 1, f_import_export),
     JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("groupCreate", 1, f_group_create), JS_CFUNC_DEF("groupFresh", 2, f_group_fresh), JS_CFUNC_DEF("groupSet", 2, f_group_set), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
+    JS_CFUNC_DEF("groupDelete", 1, f_group_delete), JS_CFUNC_DEF("groupRename", 2, f_group_rename), JS_CFUNC_DEF("groupRenamePlan", 2, f_group_rename_plan), JS_CFUNC_DEF("groupRepair", 1, f_group_repair),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("allDisplays", 2, f_all_displays), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("netCable", 2, f_net_cable), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
@@ -5305,5 +5760,7 @@ static const JSCFunctionListEntry funcs[] = {
 void js_vm_register(JSContext *c, JSValue lord) {
     JSValue o = JS_NewObject(c);
     JS_SetPropertyFunctionList(c, o, funcs, sizeof funcs / sizeof funcs[0]);
+    /* the screen locks, the user switches or logs out: the encrypted machines' keys held here go (vmkeysrv.h) */
+    vc_set_lock_hook(vmkey_wipe_all);
     JS_SetPropertyStr(c, lord, "vm", o);
 }

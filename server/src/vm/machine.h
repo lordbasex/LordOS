@@ -21,11 +21,11 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). 16: heads (5.4, All Displays). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). 16: disposable, encrypted, backup, disk_format (storage: 6.2, 6.4, 8). 17: automation (6.15, `machines exec` and `cp`). 18: cpu_model (5.5). 19: heads (5.4, All Displays). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 16
-/* the most displays (virtio-gpu outputs) a machine may have: "heads" (schema 16) */
+#define VM_SCHEMA 19
+/* the most displays (virtio-gpu outputs) a machine may have: "heads" (schema 19) */
 #define VM_HEADS_MAX 4
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
@@ -46,6 +46,11 @@ enum { VM_LOCK_NONE = 0, VM_LOCK_ANONYMITY };
 extern const char *const VM_LOCK_NAMES[];  /* "", "anonymity" */
 enum { VM_TIMERS_DEFAULT = 0, VM_TIMERS_WHONIX_GATEWAY, VM_TIMERS_WHONIX_WORKSTATION };
 extern const char *const VM_TIMERS_NAMES[];   /* "", "whonix-gateway", "whonix-workstation" */
+/* schema 16, a disposable session (docs/VIRTUALIZATION.md 6.2): every writable disk, the UEFI variables and the TPM state
+ * get a temporary layer at each start, thrown away when QEMU ends: in memory (a memfd, capped at the machine's memory and
+ * counted in its limit) or on this computer's disk (an unlinked file in disks/, which nothing names after QEMU ends) */
+enum { VM_DISP_OFF = 0, VM_DISP_MEMORY, VM_DISP_DISK };
+extern const char *const VM_DISP_NAMES[];  /* "", "memory", "disk" */
 /* the internal link's card: the workstation's only card is in slot 0x2 (its eth0), the gateway's at 0x18 (its eth1, after
  * passt's card in 0x2); each on a QEMU hub of its own so that its backend can come and go (19.3) */
 #define VM_LINK_SLOT_GATEWAY 0x18
@@ -73,6 +78,8 @@ extern const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1];   /* "virtio", "e1000e
 enum { VM_RTC_UTC = 0, VM_RTC_LOCAL };
 /* vCPU pinning (schema 13): this computer's default, off, or auto (lord-vm picks the cores, vmpin.c) */
 enum { VM_PIN_DEFAULT = 0, VM_PIN_OFF, VM_PIN_AUTO };
+enum { VM_CPU_HOST = 0, VM_CPU_COMPAT };
+extern const char *const VM_CPU_NAMES[];  /* "host", "compatible" */
 extern const char *const VM_PIN_NAMES[];   /* "", "off", "auto" */
 /* the guest's graphics (schema 5): 2D, a virtio GPU whose picture QEMU draws in shared memory; 3D, virgl (virtio-vga-gl),
  * which opens the host GPU's render node from QEMU's sandbox: Linux guests only (no device set "windows") */
@@ -203,9 +210,13 @@ typedef struct {
      * when on): "guest_links": true, a link the guest's tools send is offered in a bar the person must click;
      * "guest_notify": true, the guest's notifications are shown as from the machine, rate-limited */
     int guest_links, guest_notify;
-    /* schema 16: the guest's displays (docs/VIRTUALIZATION.md 5.4, All Displays): the virtio-gpu's outputs, 1 (missing) to
+    /* schema 19: the guest's displays (docs/VIRTUALIZATION.md 5.4, All Displays): the virtio-gpu's outputs, 1 (missing) to
      * VM_HEADS_MAX; written only when more than one. Hardware the guest sees: changed only while the machine is off */
     int heads;
+    /* schema 18: the processor the guest sees (docs/VIRTUALIZATION.md 5.5, Configure → CPU and memory), written only when
+     * chosen: "cpu_model": "compatible", a fixed x86-64-v2 model (amd64 with KVM only: the guest moves between computers and
+     * keeps working after this one's processor changes); missing: "host", this computer's own processor */
+    int cpu_model;                      /* VM_CPU_HOST, VM_CPU_COMPAT */
     /* schema 14: a member of a machine group (docs/VIRTUALIZATION.md 19.4), written only for members. group: the group's
      * id (group.json "id"); role: VM_ROLE_*; uplink_tor: the gateway's passt has no DNS forwarding and no forwarded ports
      * ("uplink": "tor", with network "shared"); link_mac: the gateway's second card, on the internal link; profile_lock:
@@ -217,6 +228,21 @@ typedef struct {
     char link_mac[18];
     int profile_lock;
     int timers;
+    /* schema 16: storage (docs/VIRTUALIZATION.md 6.2, 6.4, 8), each written only when it differs from a new machine.
+     * disposable: VM_DISP_* ("disposable": "memory" | "disk"); never on a group's member (its group.json has the switch).
+     * encrypted: "encrypted": true, every disk and the UEFI variables are qcow2 with LUKS and the TPM state is swtpm's
+     * encrypted state, all under one key that lives in the session keyring (owner "machines", service "machines:<id>"),
+     * handed to lord-vm on a descriptor and to QEMU and qemu-img through a pipe (never a file, an argument or the
+     * environment). raw: "disk_format": "raw", disks/system.raw and data-N.raw, plain files (fastest, no snapshots, no
+     * encryption, no linked clone). no_backup: "backup": false, Backups leaves the folder out */
+    int disposable;
+    int encrypted;
+    int raw;
+    int no_backup;
+    /* schema 17: the person's consent to automation (docs/VIRTUALIZATION.md 6.15, "lordvm and the agent"): "automation": true
+     * lets `machines exec`, `machines cp` and the MCP server's run_command run programs in the guest, as its signed-in
+     * person, through lord-vm (VM_EXEC); written only then, missing: no. Never with VM_LOCK_ANONYMITY */
+    int automation;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -226,6 +252,9 @@ typedef struct {
     int cpus;
     long ram_mb;
     int kvm;                            /* /dev/kvm can be opened */
+    int gicv3;                          /* arm64: the interrupt controller is GICv3 (or v4), so KVM can give a guest a GICv3;
+                                         * the Raspberry Pi 5's GIC-400 is GICv2 (measured: "KVM does not support GICv3
+                                         * emulation") */
 } VmHost;
 
 enum {
@@ -370,6 +399,9 @@ const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing);
 
 /* reads this computer: arch, CPUs online, RAM, /dev/kvm access */
 void vm_host_probe(VmHost *h);
+/* 1 when an interrupts table (/proc/interrupts) names a GICv3 or GICv4 controller, 0 when not, -1 when unreadable; read
+ * in bounded chunks, at most 8 MB */
+int vm_gicv3_in(const char *path);
 /* its physical cores (each core's first thread in /sys/devices/system/cpu), at most cpus; cpus when it can't tell */
 int vm_host_cores(int cpus);
 
@@ -389,6 +421,12 @@ int vm_qcow2_plain(const uint8_t *head, size_t n, char *err, size_t errlen);
 int vm_qcow2_overlay(const uint8_t *head, size_t n, char *err, size_t errlen);
 /* a base path machine.json may name: absolute, plain, in a ".shared" folder, a .qcow2 */
 int vm_base_valid(const char *s);
+
+/* the disks' file extension: "raw" for a raw machine, else "qcow2" (disks/system.<ext>, data-N.<ext>) */
+const char *vm_disk_ext(const VmMachine *m);
+/* a key lord-vm accepts for an encrypted machine: exactly 64 lowercase hex digits (32 random bytes made by lord-server;
+ * shown to the person as the machine's recovery key, which brings an exported machine in on another computer) */
+int vm_key_valid(const char *k, size_t n);
 
 const char *vm_arch_name(int arch);     /* "arm64", "amd64" */
 int vm_uuid_valid(const char *s);

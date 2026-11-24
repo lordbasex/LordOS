@@ -104,6 +104,7 @@ static const char *const protect[] = { "/.local/share/applications", "/.config/a
                                            "/.local/share/lordos/web",      /* Web apps' data, cookies and caches, per profile: only lord-web */
                                            "/.local/share/flatpak",         /* Flatpak installations, the trusted keys, overrides and exports: only `flatpak` run by the Store (docs/FLATPAK.md, E6) */
                                            "/.config/lordos/wl-sessions",   /* Linux apps' window sessions (xdg-session-management): only lord-server (src/wl/xsstore.h) */
+                                           "/.config/lordos/sentinela",     /* (0.8.9.6) Sentinela's blocklist (programs ended whenever they start): only lord.sentinela.block/unblock (src/llm/blockwatch.h) */
                                            NULL };
 
 void fsops_protect_file(int slot, const char *real) {

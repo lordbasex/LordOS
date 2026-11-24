@@ -59,6 +59,11 @@ steps, each in a clean chroot made by `mmdebstrap` (a Debian build tool, install
    page, resize and scale, hiding, and on WPEPlatform the cursor) and its probe test (`server/tests/web_probe_test.py`),
    both with WebKit's sandbox on.
 
+Results go to disk as they are made: `out/` is bind-mounted into the build chroot (everything runs at `nice 19`, `ionice` idle: the build machine is a desktop in use), the packages are
+synced to disk before lintian runs, and the `.changes` is written last. With `TMPFS` a power cut loses only the build
+tree: running the same command again starts the build over (nothing half-done is kept), or, when a finished build
+is in `out/` (its `.changes` and lintian summary), goes straight to the test (`REBUILD=1` builds again).
+
 Results of `+2` on amd64 (2026-11-24; `out/test/report.txt`): every `pkg-config` module above found, no
 `wpe-platform-drm-2.0`, and `libWPEWebKit-2.0.so.1`'s `NEEDED` has no `libinput` or `libudev` (`+1` had both); the
 headless render passes with the sandbox on; lord-web (the tree at `test/integration-1125`, 0.8.9.5) builds on both
@@ -181,7 +186,7 @@ Debian unstable does.
 
 ## arm64
 
-Built on the amd64 build machine under qemu-user (maintainer's decision, 2026-11-24): `ARCH=arm64 JOBS=16 TMPFS=64G
+Built on the amd64 build machine under qemu-user (maintainer's decision, 2026-11-24; `JOBS` defaults to 8 there, the first run used 16 and was reniced to 19 since it loaded the desktop): `ARCH=arm64 JOBS=16 TMPFS=64G
 tools/pkg/build-wpewebkit.sh 2.54.3-1 2`, a full build (source and every package, not `-B`, so `-dev` has the
 introspection files as on amd64), in arm64 chroots made by mmdebstrap, every arm64 program run by QEMU through the
 binfmt handler (`F` flag, so it works inside the chroots). The first such build started on 2026-11-24 and is still running;

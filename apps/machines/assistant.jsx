@@ -1,6 +1,10 @@
 // The New Machine assistant (the approved mock "Assistant"), in the library window: 1 Choose what to run, 2 a profile
-// (CPU, memory, disk), 3 the name, 4 review, 5 create. The system is recognized from the ISO's volume label or the
-// file's name (name and mark), the architecture from the file's name; another architecture is emulated and says so.
+// (CPU, memory, disk), 3 the name, 4 review, 5 create. An installer disc chosen or dropped on the window (any file it
+// takes, dropped anywhere on the first step) adds the Detect step after Choose: lord-vm --iso-detect reads its volume
+// label and its UEFI and El Torito boot entries in seccomp's strict mode (server/src/vm/vmiso.h), and the step names the
+// system, the processors the disc starts on and whether it would be emulated here, before anything is made (detectPlan).
+// The Name step says where the machine goes (the library, ~/Machines, and the space free there). An unattended install
+// takes the snapshot "Fresh install" when it ends, before its first start (vmwindow.jsx; on by default, in the review).
 // Download and install: the cards of assets/machines/systems.json for the chosen architecture (catalog.js); choosing
 // one reads its maker's SHA-256 list (vm-image-list), the newest image of the release is named with its hash, and step 5
 // downloads it (vm-image-get, which keeps it only with that hash) before the machine is made from it.
@@ -12,11 +16,12 @@
 // Windows 11 (windows.js, 4.3): the person's own multi-edition ISO from Microsoft's page (found in Downloads and checked
 // against Microsoft's published SHA-256) or Microsoft's 90-day evaluation (downloaded by the helper); the machine is
 // made ready for it (secure boot, TPM 2.0, virtio-win drivers) and installs without questions or with Windows' own.
-import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, useFilesDrop, FilesDropHint, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
-import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, noticeOf, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
-import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard } from './model.js';
+import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
+import { newKey } from './keyflow.js';
+import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, isoArch, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard, detectPlan, dropSource } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
 import { customUnattended, systemState } from './systems.js';
 import { loadProfiles, loadSystems, defaultsOf, profileTitle } from './store.js';
@@ -25,21 +30,22 @@ import { SheetHeader, Pill, Round, Sym } from './kit.jsx';
 import { GroupMark, groupColors } from './groupui.jsx';
 import { writeMeta } from './meta.js';
 import { Migrate } from './migrate.jsx';
-import { windowsEntry, driversFor, matchIso, evalFiles, evalFor, newestDownload, windowsZone, inputLocale, userLocale, editionPlan, checkWindowsSetup, windowsHostname, windowsSize } from './windows.js';
+import { windowsEntry, driversFor, matchIso, evalFiles, evalFor, newestDownload, windowsZone, inputLocale, userLocale, editionPlan, checkWindowsSetup, windowsHostname, windowsSize, windowsEmulatedWhy } from './windows.js';
 import ZONES from '../../assets/machines/windows-zones.json';
 import { GroupFlow, resolveGroup } from './whonix.jsx';
 
 // what Migrate from another app takes: other apps' settings files and packages, and their disk formats
 const MIGRATE_FILES = /(\.(vmx|vbox|pvs|ovf|ova|vmdk|vdi|vhdx|vhd|hds)|\/config\.pvs)$/i;
 
+
 const STEPS = ['choose', 'profile', 'name', 'review', 'install'];
 const rowsOf = (list, n) => { const out = []; for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n)); return out; };
 
-function Tile({ title, hint, onClick, selected, disabled, mark, height = 76, children }) {
+function Tile({ title, hint, onClick, selected, disabled, mark, height = 76, drop, children }) {
   const p = usePal();
   const [hover, setHover] = useState(false);
   return (
-    <View onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <View {...(drop || {})} onClick={disabled ? undefined : onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ flex: 1, height, padding: 12, gap: 6, justifyContent: mark ? 'space-between' : 'center', borderRadius: 10, opacity: disabled ? 0.5 : 1,
         border: `1px solid ${selected ? p.accent : p.line}`, backgroundColor: selected ? (p.dark ? '#1c3550' : '#e6f1ff') : hover && !disabled ? p.btn : p.card }}>
       {mark}
@@ -61,17 +67,24 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const [sys, setSys] = useState({ id: 'other', name: '' });
   const [ver, setVer] = useState('');
   const [arch, setArch] = useState(host.arch);
+  // where a chosen ISO's architecture came from (isoArch): its boot files, its name, or an architecture Machines doesn't run
+  const [isoA, setIsoA] = useState(null);
   // profiles (Machines settings → Profiles): LordOS's five and the person's own; the default one first chosen
   const [own] = useState(loadProfiles);
   const [customs] = useState(loadSystems);
   const [profile, setProfile] = useState(() => defaultProfileId(defaultsOf(settings.get().machinesDefaults).profile, own));
   const [custom, setCustom] = useState(null);     // a system the person added (systems.js), once its image is verified
-  const [shareOn, setShareOn] = useState(true);   // the profile's shared folder, confirmed in the review
+  const [shareOn, setShareOn] = useState(true);
+  const [encrypt, setEncrypt] = useState(false);   // an encrypted machine (docs/VIRTUALIZATION.md 8), asked in the review   // the profile's shared folder, confirmed in the review
   const [gpuReady] = useState(() => { try { return !!gvtGpu(typeof lord !== 'undefined' && lord.vm?.gpus ? lord.vm.gpus() : null); } catch (e) { return false; } });
   const [name, setName] = useState('');
   const [rootPassword, setRootPassword] = useState('');
   const [customize, setCustomize] = useState(false);
   const [shareClip, setShareClip] = useState(false);
+  // the Detect step (an installer disc): shown after Choose; detect = { path, phase: 'reading' | 'done' | 'error', info }
+  const [detectPage, setDetectPage] = useState(false);
+  const [detect, setDetect] = useState(null);
+  const [freshSnap, setFreshSnap] = useState(true);   // the snapshot "Fresh install" when an unattended install ends
   const [job, setJob] = useState(0);
   const [fail, setFail] = useState(null);
   const [stopped, setStopped] = useState(false);  // Stop Download: the part is kept, Continue Download picks it up
@@ -99,7 +112,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   // card only when one is set up for machines)
   const pv = onHost(prof, host, { gpuReady, no3d: arch !== host.arch ? 'arch' : no3dReason(host, windows, arch) });
   const base = { vcpus: pv.vcpus, memoryMb: pv.memoryMb, diskGb: pv.diskGb, network: pv.network, gfx: prof.resources.graphics };
-  // Windows' minimums (4.3); a download card's own size: Android's machine whatever the profile (4.2), LordOS's least (4 processors, 4 GB, 32 GB, 3D)
+  // Windows' minimums (4.3); a download card's own size: its "machine" whatever the profile, LordOS's least (4 processors, 4 GB, 32 GB, 3D)
   const size = windows ? windowsSize(base, host) : source === 'download' && dl ? cardSize(CATALOG, dl.id, base, host) : base;
   const home = typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : '';
   const shareDir = pv.share ? shareAbs(pv.share.path, home) : '';
@@ -117,27 +130,39 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     graphics: arch === host.arch ? gfxFor(size.gfx, host, windows, arch) : '2d' };
   const v = validateDraft(d, host, names);
   const missing = missingFor(host, [arch], { windows });
-  const emulated = arch !== host.arch;
+  // a virtio-win guest on arm64 needs a GICv3: on a GICv2 computer (the Pi 5) it is emulated too (4.3, windows.js)
+  const winEmu = windows ? windowsEmulatedWhy(host, arch) : '';
+  const emulated = arch !== host.arch || !!winEmu;
 
-  const chose = (pth) => {
+  // src: the tile it came from (a drop on the ISO tile picks it before `source` says so)
+  const chose = (pth, src = source) => {
     setPath(pth);
     const file = pth.split('/').pop();
-    const label = source === 'iso' ? (lord.vm.isoInfo(pth)?.label || '') : '';
-    const s = systemOf(label, file);
+    // what the ISO boots on, from its boot files (vmiso.c), else its name (5.2)
+    const info = src === 'iso' ? lord.vm.isoInfo(pth) : null;
+    const label = info?.label || '';
+    const ia = src === 'iso' ? isoArch(info, file) : { arch: archOf(file), from: archOf(file) ? 'name' : '', other: '' };
+    setIsoA(src === 'iso' ? ia : null);
+    // the Detect step's facts (5.2): what isoInfo read, shown on its own page after Choose
+    setDetect(src === 'iso' ? { path: pth, phase: info ? 'done' : 'error', info } : null);
+    const s = info?.windows ? { id: 'windows', name: 'Windows' } : systemOf(label, file);
     // a Windows ISO goes the Windows way: checked against Microsoft's list and made into the Windows 11 template
-    if (source === 'iso' && s.id === 'windows' && windowsEntry(CATALOG, archOf(file) || archOf(label) || arch)) { pickWindows(); checkIso(pth); return; }
+    if (src === 'iso' && s.id === 'windows' && windowsEntry(CATALOG, ia.arch || arch)) { if (ia.arch) setArch(ia.arch); pickWindows(); checkIso(pth); return; }
     const vv = versionOf(label) || versionOf(file);
     setSys(s); setVer(vv);
-    const a = archOf(file) || archOf(label);
-    if (a) setArch(a);
+    if (ia.arch) setArch(ia.arch);
     setName(suggestName(s, vv, names));
   };
+  // an .iso dragged from Files onto the "Use an ISO" tile: picked as if chosen in the file picker
+  const isoDrop = useFilesDrop({ accepts: (n) => /\.iso$/i.test(n), onDrop: ({ files }) => {
+    pickSeq.current++; setDl(null); setSource('iso'); setPicking(false); chose(files[0], 'iso');
+  } });
   // an entry's maker's list (and, when the list's name changes per build, the folder's listing first), checked by the
   // helper, and the newest image in it
   const resolve = async (id, a) => {
     const e = entryOf(CATALOG, id, a);
     if (!e) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
-    // a pinned image (Android, 4.2): the signed catalog is its list
+    // a pinned image: the signed catalog is its list
     const pin = pinnedImage(e);
     if (pin) return pin;
     let p = await admin.run('vm-image-list', `${id} ${a}`, null, { quiet: true });
@@ -270,7 +295,9 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' '), profile, onClose: pv.onClose, appsMode: pv.appsMode,
           // the mouse and shortcuts choices; capturing in full screen is machine.json's (setPatch below)
           input: { mouse: pv.input.mouse, shortcuts: pv.input.shortcuts },
-          ...(source === 'custom' && custom?.kind === 'linux' ? { family: 'linux' } : {}), ...(windows ? { transferSetup: true } : {}) });
+          ...(source === 'custom' && custom?.kind === 'linux' ? { family: 'linux' } : {}), ...(windows ? { transferSetup: true } : {}),
+          // the snapshot "Fresh install" when the unattended install ends (vmwindow.jsx, reason 'installed')
+          ...((windows ? un.on : unOn) && freshSnap ? { freshSnap: true } : {}) });
         const m = lord.vm.list().find((x) => x.dir === r.dir);
         const done = () => { if (customize) onConfigure(m || null); else onCreated(m || null); };
         // what lord.vm.create doesn't take (the network mode and its ports, the clipboard's way, the transfer folder, the
@@ -318,6 +345,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     const lang = win.mode === 'eval' ? evalFile.lang : win.iso.lang;
     const req = createRequest({ ...d, path: iso });
     req.windows = { drivers };
+    if (encrypt) { try { req.keyId = await newKey(d.name); } catch (e) { setFail(e.message); return; } }
     req.unattended = { kind: 'windows', guided: !un.on, user: un.user, password: un.password, fullname: '', hostname: un.hostname,
       edition: plan.name, key: plan.key, uilang: lang, inputloc: inputLocale(un.keymap, '', lang), userloc: userLocale(hd.locale), wtz: windowsZone(ZONES, un.timezone) };
     const id = lord.vm.create(req);
@@ -368,6 +396,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
       setGot(null);
     }
     const req = createRequest(iso ? { ...d, path: iso } : d);
+    if (encrypt) { try { req.keyId = await newKey(d.name); } catch (e) { setFail(e.message); setStep(4); return; } }
     if (iso && unOn) {
       req.unattended = { kind: uo.kind, user: un.user, password: un.password, fullname: '', hostname: un.hostname, timezone: un.timezone,
         keymap: un.keymap, variant: '', locale: hd.locale || 'en_US.UTF-8', release: uo.release, kernel: uo.kernel, initrd: uo.initrd, append: uo.append, desktop: true };
@@ -390,10 +419,28 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     v.ok && !missing.length, false][step]
     : [downloading ? dl?.phase === 'ready' : !!source && !!path && !v.errors.path, true, !v.errors.name && (!unOn || (setup.ok && !!inst)),
       v.ok && !missing.length && (!downloading || !!inst), false][step];
-  const title = step === 2 && (uo || windows) ? tr('machines.as.title.setup') : tr(`machines.as.title.${STEPS[step]}`);
+  // the Detect step: only for an installer disc of the person's (a card's image and a disk image know their system)
+  const needsDetect = source === 'iso' && !!path && detect?.path === path;
+  const onDetect = step === 0 && detectPage && needsDetect;
+  const dp = needsDetect ? detectPlan(detect.phase === 'done' ? detect.info : null, path.split('/').pop(), host.arch) : null;
+  const stepName = onDetect ? 'detect' : STEPS[step] === 'name' && (uo || windows) ? 'setup' : STEPS[step];
+  const stepNo = step + 1 + (needsDetect && (step > 0 || onDetect) ? 1 : 0), stepTotal = STEPS.length + (needsDetect ? 1 : 0);
+  const title = onDetect ? tr('machines.as.title.detect') : step === 2 && (uo || windows) ? tr('machines.as.title.setup') : tr(`machines.as.title.${STEPS[step]}`);
+  const goBack = () => { if (onDetect) setDetectPage(false); else if (step === 1 && needsDetect) { setStep(0); setDetectPage(true); } else setStep(step - 1); };
+  const goOn = () => { if (step === 0 && needsDetect && !onDetect) { setDetectPage(true); return; } setDetectPage(false); setStep(step + 1); };
+  // a file dropped on the first step goes to the tile that takes it (an ISO, a disk image, another app's machine)
+  const drop = useFilesDrop({ accepts: (n) => !!dropSource(n), onDrop: ({ files }) => {
+    const f = files[0];
+    const src = f && step === 0 && !job ? dropSource(f.split('/').pop()) : null;
+    if (!src) return;
+    pickSeq.current++; setDl(null); setDetectPage(false); setPicking(false); setSource(src);
+    if (src === 'migrate') setPath(f); else chose(f, src);
+  } });
   const fileHint = (k) => (source === k && path ? path.split('/').pop() : tr(`machines.as.${k}Hint`));
   let body = null;
-  if (step === 0) body = <>
+  if (onDetect) body = <DetectPage detect={detect} dp={dp} sys={sys} ver={ver} path={path} host={host}
+    onOther={() => { setDetectPage(false); setPicking(true); }} />;
+  else if (step === 0) body = <>
     <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.as.download')}</Text>
     {/* the mock's grid of four: one row per four systems of the catalog, for the chosen architecture */}
     {rowsOf(systemsFor(CATALOG, arch, { kvm: host.kvm, hostArch: host.arch }), 4).map((row, i) => (
@@ -427,7 +474,9 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     </> : null}
     <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.as.own')}</Text>
     <View style={{ flexDirection: 'row', gap: 12 }}>
-      <Tile title={tr('machines.as.iso')} hint={fileHint('iso')} selected={source === 'iso'} onClick={() => { pickSeq.current++; setDl(null); if (source !== 'iso') setPath(''); setSource('iso'); setPicking(true); }} />
+      <Tile title={tr('machines.as.iso')} drop={isoDrop.props} selected={source === 'iso' || !!isoDrop.over?.files.length}
+        hint={isoDrop.over ? tr(isoDrop.over.files.length ? 'machines.as.isoDrop' : 'machines.as.isoDropNone') : fileHint('iso')}
+        onClick={() => { pickSeq.current++; setDl(null); if (source !== 'iso') setPath(''); setSource('iso'); setPicking(true); }} />
       <Tile title={tr('machines.as.migrate')} hint={tr('machines.as.migrateHint')} selected={source === 'migrate'} onClick={() => { pickSeq.current++; setDl(null); setPath(''); setSource('migrate'); setPicking(true); }} />
       <Tile title={tr('machines.as.import')} hint={fileHint('import')} selected={source === 'import'} onClick={() => { pickSeq.current++; setDl(null); if (source !== 'import') setPath(''); setSource('import'); setPicking(true); }} />
     </View>
@@ -444,20 +493,19 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         {dl.phase === 'error' ? <Btn label={tr('machines.dl.retry')} onClick={() => { const s = systemsFor(CATALOG, arch).find((x) => x.id === dl.id); if (s) pickDownload(s); }} /> : null}
       </View>
     ) : null}
-    {downloading && dl && noticeOf(CATALOG, dl.id) ? (() => { const nt = noticeOf(CATALOG, dl.id); return (
-      <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}>
-        <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{tr(`machines.dl.notice.${nt.key}`, { maker: nt.maker, date: nt.date })}</Text>
-      </View>); })() : null}
     {path && !downloading && !windows ? (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, backgroundColor: p.raised }}>
         <OsMark id={sys.id} size={36} />
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{[sys.name || tr('machines.as.unknownSystem'), ver].filter(Boolean).join(' ')}{`, ${arch}`}</Text>
           <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{path}</Text>
+          {source === 'iso' && isoA ? <Text style={{ fontSize: 12, color: isoA.other ? '#ff453a' : p.dim, textAlign: 'start' }}>
+            {isoA.other ? tr('machines.as.archOther', { arch: isoA.other }) : isoA.from === 'boot' ? tr('machines.as.archFromBoot', { arch })
+              : isoA.from === 'name' ? tr('machines.as.archFromName', { arch }) : tr('machines.as.archUnknown', { arch })}</Text> : null}
         </View>
       </View>
     ) : null}
-    {emulated ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{tr('machines.as.emulated', { arch, host: host.arch })}</Text></View> : null}
+    {emulated ? <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}><Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{winEmu ? tr('machines.win.noGicThree') : tr('machines.as.emulated', { arch, host: host.arch })}</Text></View> : null}
   </>;
   else if (step === 1) {
     // the mock "Profiles": two columns of cards, each with what it's for and what it gives on this computer
@@ -491,6 +539,13 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         <TextInput value={name} onChange={setName} autoFocus placeholder={tr('machines.new.namePlaceholder')} />
         {v.errors.name && name ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr(`machines.new.err.${v.errors.name}`)}</Text> : null}
       </View>
+    </View>
+    {/* where it goes: the library, the one place every protection of a machine's folder knows (5.2, "Name, place") */}
+    <View style={{ gap: 2 }}>
+      <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.as.place')}</Text>
+      <Text style={{ fontSize: 13, color: p.text, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{`~/Machines/${name || '…'}.lordvm`}</Text>
+      <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{host.libFreeBytes >= 0 && host.libTotalBytes > 0
+        ? tr('machines.as.placeFree', { free: bytes(host.libFreeBytes), disk: tr('machines.as.r.diskNew', { n: size.diskGb }) }) : tr('machines.as.placeNote')}</Text>
     </View>
     {source === 'import' ? (
       <View style={{ gap: 4 }}>
@@ -581,6 +636,22 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
           </View>
         ))}
       </View>
+      {(windows ? un.on : unOn) ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
+          <Toggle on={freshSnap} onChange={setFreshSnap} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.freshSnap')}</Text>
+            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.freshSnapHint')}</Text>
+          </View>
+        </View>
+      ) : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
+        <Toggle on={encrypt} onChange={setEncrypt} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.encrypt')}</Text>
+          <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.encryptHint')}</Text>
+        </View>
+      </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
         <Toggle on={shareClip} onChange={setShareClip} />
         <View style={{ flex: 1 }}>
@@ -637,31 +708,75 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   );
 
   // a sheet over the library (kit.jsx): its title bar with Back, the step's content, the buttons at the bottom
-  const back = step > 0 && !(step === 4 && !fail && !stopped) ? () => (stopped ? (setStopped(false), setStep(3)) : setStep(step - 1)) : null;
+  const back = (step > 0 || onDetect) && !(step === 4 && !fail && !stopped) ? () => (stopped ? (setStopped(false), setStep(3)) : goBack()) : null;
+  const canGo = onDetect ? detect?.phase !== 'reading' : can;
   return (
-    <View style={{ flex: 1 }}>
+    <View {...drop.props} style={{ flex: 1 }}>
       <SheetHeader onBack={back} title={tr('machines.newMachine')}
-        subtitle={`${tr('machines.as.stepOf', { n: step + 1, total: STEPS.length })} · ${tr(`machines.as.step.${STEPS[step] === 'name' && (uo || windows) ? 'setup' : STEPS[step]}`)}`}
+        subtitle={`${tr('machines.as.stepOf', { n: stepNo, total: stepTotal })} · ${tr(`machines.as.step.${stepName}`)}`}
         right={<Round title={tr('machines.cancel')} onClick={onClose}><Text style={{ fontSize: 15, color: p.dim }}>✕</Text></Round>} />
       <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 28, paddingVertical: 20, gap: 16 }}>
         <Text style={{ fontSize: 22, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
         <ScrollView style={{ flex: 1 }} contentStyle={{ gap: 14, paddingBottom: 8 }}>{body}</ScrollView>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderColor: p.line }}>
-        {step === 0 ? <Btn link label={arch === host.arch ? tr('machines.as.otherArch', { arch: other }) : tr('machines.as.thisArch', { arch: host.arch })}
+        {step === 0 && !onDetect ? <Btn link label={arch === host.arch ? tr('machines.as.otherArch', { arch: other }) : tr('machines.as.thisArch', { arch: host.arch })}
           onClick={() => setArch(arch === host.arch ? other : host.arch)} /> : null}
         <View style={{ flex: 1 }} />
-        {step === 4 && !fail && !stopped ? null : <Pill label={step === 0 || fail || stopped ? tr('machines.cancel') : tr('machines.back')} onClick={() => (step === 0 || fail || stopped ? onClose() : setStep(step - 1))} />}
+        {step === 4 && !fail && !stopped ? null : <Pill label={(step === 0 && !onDetect) || fail || stopped ? tr('machines.cancel') : tr('machines.back')} onClick={() => ((step === 0 && !onDetect) || fail || stopped ? onClose() : goBack())} />}
         {stopped ? <Pill primary label={tr('machines.dl.continue')} onClick={create} /> : null}
-        {step < 3 ? <Pill primary label={tr('machines.as.continue')} disabled={!can} onClick={() => setStep(step + 1)} /> : null}
+        {step < 3 ? <Pill primary label={tr('machines.as.continue')} disabled={!canGo} onClick={goOn} /> : null}
         {step === 3 ? <Pill primary label={customize ? tr('machines.as.createConfigure') : tr('machines.as.createStart')} disabled={!can} onClick={create} /> : null}
       </View>
       {picking ? <FilePicker title={source === 'iso' || windows ? tr('machines.new.pickIso') : source === 'migrate' ? tr('machines.mig.pick') : tr('machines.new.pickImage')}
         filter={source === 'iso' || windows ? /\.iso$/i : source === 'migrate' ? MIGRATE_FILES : /\.(qcow2|img|raw)$/i}
         onPick={(x) => { const pth = Array.isArray(x) ? x[0] : x; if (windows) checkIso(pth); else if (source === 'migrate') setPath(pth); else chose(pth); setPicking(false); }}
         onClose={() => { setPicking(false); if (source === 'migrate' && !path) setSource(null); }} /> : null}
+      <FilesDropHint over={step === 0 && !job ? drop.over : null} title={drop.over?.files.length ? tr('machines.as.dropHere') : tr('machines.as.dropNone')} />
     </View>
   );
+}
+
+// The Detect step (5.2): the disc's system, what it starts on, and whether this computer runs it natively
+function DetectPage({ detect, dp, sys, ver, path, host, onOther }) {
+  const p = usePal();
+  const info = detect?.phase === 'done' ? detect.info : null;
+  const archs = info ? [...dp.efi, ...(info.bios && !dp.efi.includes('amd64') ? ['amd64'] : [])].filter((x, i, a) => a.indexOf(x) === i) : [];
+  const rows = [
+    [tr('machines.as.r.system'), [sys.name || tr('machines.as.unknownSystem'), ver].filter(Boolean).join(' ')],
+    [tr('machines.as.det.label'), info?.label || '\u2014'],
+    [tr('machines.as.det.starts'), !info ? '\u2014' : archs.length ? `${archs.join(', ')} (${dp.starts.map((x) => tr(`machines.as.det.${x}`)).join(', ')})` : tr('machines.as.det.noBoot')],
+    [tr('machines.as.r.arch'), dp.emulated ? `${dp.arch}, ${tr('machines.emulatedLower')}` : dp.arch],
+  ];
+  const say = detect?.phase === 'reading' ? ['dim', tr('machines.as.det.reading')]
+    : detect?.phase === 'error' ? ['warn', tr('machines.as.det.cantRead', { arch: dp.arch })]
+    : dp.unknownArch ? ['warn', tr('machines.as.det.unknownArch', { list: dp.efi.join(', ') || '?' })]
+    : dp.emulated ? ['warn', tr('machines.as.det.emulated', { arch: dp.arch, host: host.arch })]
+    : dp.from === 'boot' ? ['ok', tr('machines.as.det.native', { arch: dp.arch })]
+    : dp.both ? ['ok', tr('machines.as.det.both', { arch: dp.arch })]
+    : ['dim', tr(dp.from === 'name' ? 'machines.as.det.fromName' : 'machines.as.det.fromHost', { arch: dp.arch })];
+  return <>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <OsMark id={sys.id} size={56} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{[sys.name || tr('machines.as.unknownSystem'), ver].filter(Boolean).join(' ')}</Text>
+        <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{path}</Text>
+      </View>
+    </View>
+    <View style={{ borderRadius: 12, backgroundColor: p.card }}>
+      {rows.map(([k, val], i) => (
+        <View key={k} style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: i < rows.length - 1 ? 1 : 0, borderColor: p.line }}>
+          <Text style={{ flex: 1, fontSize: 13, color: p.dim, textAlign: 'start' }}>{k}</Text>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: p.text, direction: 'ltr' }}>{val}</Text>
+        </View>
+      ))}
+    </View>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: say[0] === 'warn' ? p.warnBg : p.raised }}>
+      <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.5, color: say[0] === 'ok' ? '#30d158' : p.text, textAlign: 'start' }}>{say[1]}</Text>
+      {say[0] === 'warn' ? <Btn label={tr('machines.as.det.other')} onClick={onOther} /> : null}
+    </View>
+    {dp.conflict ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.det.conflict', { arch: dp.arch })}</Text> : null}
+  </>;
 }
 
 // a group card's mark: the group's two machines and a badge "Group · 2 machines"

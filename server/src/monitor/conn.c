@@ -306,23 +306,17 @@ static uint64_t cg_id(int dfd, const char *name) {
     return id;
 }
 
-static void scopes_scan(void) {
-    if (mon_now_ms() - scopes_t < 5000 && scopes_t) return;
-    scopes_t = mon_now_ms();
-    nscopes = 0;
-    const char *self = cgroup_self();                   /* ".../lordos-session-<uid>/server" */
-    char dir[PATH_MAX];
-    if (!self[0] || (size_t)snprintf(dir, sizeof dir, "/sys/fs/cgroup%s", self) >= sizeof dir) return;
-    char *sl = strrchr(dir, '/');
-    if (!sl || strcmp(sl, "/server")) return;           /* not a LordOS session */
-    *sl = 0;
-    int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+/* The scopes in one folder: the session's, or (3.7) its machines' slice, where only machines' scopes count */
+static void scopes_scan_dir(int dfd, int in_slice) {
     DIR *d = dfd >= 0 ? fdopendir(dup(dfd)) : NULL;
     struct dirent *e;
+    int slice = 0;
     while (d && (e = readdir(d)) && nscopes < 256) {
         if (e->d_type != DT_DIR || e->d_name[0] == '.') continue;
+        if (!in_slice && !strcmp(e->d_name, FW_VM_SLICE)) { slice = 1; continue; }
         char app[FW_APP_MAX], sub[40] = "";
-        if (!strcmp(e->d_name, "server")) snprintf(app, sizeof app, "lordos");
+        if (in_slice && fw_vm_scope(e->d_name, NULL, 0)) continue;
+        if (!in_slice && !strcmp(e->d_name, "server")) snprintf(app, sizeof app, "lordos");
         else if (fw_scope_app(e->d_name, app, sizeof app)) continue;      /* the same names as lord-netperm's */
         uint64_t id = cg_id(dfd, e->d_name);
         if (!id) continue;
@@ -350,6 +344,24 @@ static void scopes_scan(void) {
         if (sfd >= 0) close(sfd);
     }
     if (d) closedir(d);
+    if (slice) {
+        int vfd = openat(dfd, FW_VM_SLICE, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        if (vfd >= 0) { scopes_scan_dir(vfd, 1); close(vfd); }
+    }
+}
+
+static void scopes_scan(void) {
+    if (mon_now_ms() - scopes_t < 5000 && scopes_t) return;
+    scopes_t = mon_now_ms();
+    nscopes = 0;
+    const char *self = cgroup_self();                   /* ".../lordos-session-<uid>/server" */
+    char dir[PATH_MAX];
+    if (!self[0] || (size_t)snprintf(dir, sizeof dir, "/sys/fs/cgroup%s", self) >= sizeof dir) return;
+    char *sl = strrchr(dir, '/');
+    if (!sl || strcmp(sl, "/server")) return;           /* not a LordOS session */
+    *sl = 0;
+    int dfd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    scopes_scan_dir(dfd, 0);
     if (dfd >= 0) close(dfd);
     /* the remote desktop's bridge: forked by lord-sessiond after the sign-in, it runs as the user in
      * lordos.service's root-owned `supervisor` group and isn't dumpable, so its sockets can't be traced to
