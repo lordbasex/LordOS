@@ -140,6 +140,8 @@ function Header({ st }) {
           <Label dim size={typeScale.callout}>{line}</Label>
           {next ? <Label dim size={typeScale.callout}>{next}</Label> : null}
           {st && st.last && st.last.ok === 0 && st.last.error && !running ? <Label size={typeScale.callout} style={{ color: '#e5534b' }}>{tr('backup.lastError', { error: errText(st.last.error) })}</Label> : null}
+          {/* machines that were running: their disks in that backup are the previous backup's (docs/VIRTUALIZATION.md 6.14) */}
+          {st && st.last && st.last.ok !== 0 && st.last.machinesBusy > 0 && !running ? <Label dim size={typeScale.callout}>{tr('backup.machinesBusy', { count: st.last.machinesBusy })}</Label> : null}
           {err ? <Label size={typeScale.callout} style={{ color: '#e5534b' }}>{err}</Label> : null}
         </View>
         {running ? (

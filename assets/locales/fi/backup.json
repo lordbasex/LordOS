@@ -14,6 +14,10 @@
   "never": "Ei vielä varmuuskopioita",
   "next": "Seuraava: {when}",
   "lastError": "Viimeisin varmuuskopiointi epäonnistui: {error}",
+  "machinesBusy": {
+    "one": "{count} kone oli käynnissä: sen levyt ovat tässä varmuuskopiossa edellisestä",
+    "other": "{count} konetta oli käynnissä: niiden levyt ovat tässä varmuuskopiossa edellisestä"
+  },
   "todayAt": "tänään klo {time}",
   "now": "Varmuuskopioi nyt",
   "pause": "Keskeytä",

@@ -10,12 +10,13 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
+import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
+import { gatewayBar, gatewayOf } from './group.js';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
@@ -35,7 +36,7 @@ const THUMB_MS = 5000;
 const toolsRuns = new Map();
 // what changes the screen (frames don't: the media node repaints by itself)
 const jobKey = (j) => (j ? `${j.kind}.${j.status}.${j.pct}` : '');
-const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}` : '');
+const agKey = (g) => (g ? `${g.state}.${g.caps}.${g.version}.${g.system}.${g.tools}.${g.install}.${g.transfer}.${g.discMessage}` : '');
 const sndKey = (x) => (x ? `${x.on}.${x.volume}.${x.microphone}.${x.mic}.${x.playing}.${x.recording}.${x.output}.${x.input}` : '');
 const same = (a, b) => !!a && !!b && ['state', 'reason', 'code', 'detail', 'display', 'w', 'h', 'media', 'ended', 'lastError', 'stderr', 'cd', 'cdMessage', 'notice', 'noticeSeq', 'console', 'clipIn', 'clipBlockedRead', 'clipBlockedWrite', 'clipAsk', 'clipAskSeq', 'filesSeq', 'windowsSeq', 'iconsSeq', 'guestAppsSeq', 'closeRefusedSeq', 'captured', 'captureEnds', 'shell', 'guestLinkSeq', 'guestNotesSeq'].every((k) => a[k] === b[k]) && a.agent?.lost === b.agent?.lost
   && jobKey(a.job) === jobKey(b.job) && agKey(a.agent) === agKey(b.agent) && sndKey(a.sound) === sndKey(b.sound);
@@ -116,6 +117,9 @@ function AgentPop({ ctl, onClose }) {
               ? <Pill label={ctl.xfer.state === 'settingUp' ? tr('machines.tb.transferSettingUp') : tr('machines.tb.transferSetup')} disabled={ctl.xfer.state === 'settingUp'} onClick={ctl.xfer.setup} /> : null}
           </View>
         ) : null}
+        {/* a Linux guest without qemu-guest-agent (or one that doesn't let Install copy files): the LordOS Guest Tools
+            disc, and once it is in, what to run in the machine (model.js discOffer) */}
+        <DiscPanel ctl={ctl} g={g} cfg={cfg} mode={discOffer(g, cfg, ctl.st?.state === 'running', ctl.prot)} />
         {/* a second display in the guest that LordOS doesn't show (not on a PCI adapter): the tools turn it off when the
             person says so, and back on */}
         {on && (g.caps & AGENT_CAPS.extra) ? (
@@ -160,6 +164,43 @@ function DeviceDots({ dots }) {
   return (
     <View title={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 2, height: 28 }}>
       {dots.map((d) => <View key={d.k} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: DOT_COLOR[d.k] || '#aaa' }} />)}
+    </View>
+  );
+}
+
+// The LordOS Guest Tools disc (docs/VIRTUALIZATION.md 6.17): 'insert' offers it; 'guide' says what to run in the machine,
+// whose own prompt asks for the password (nothing is typed into the guest from here). The commands are shown to be
+// typed; Copy only where the machine's clipboard can take them (discCanCopy). lord-vm takes the disc out by itself once
+// the agent answers; "Take the Disc Out" does it now.
+function DiscPanel({ ctl, g, cfg, mode }) {
+  const p = usePal();
+  if (!mode) return null;
+  if (mode === 'insert') {
+    return (
+      <View style={{ gap: 6 }}>
+        <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.discHint')}</Text>
+        <View style={{ flexDirection: 'row' }}><Pill primary label={tr('machines.agent.discBtn')} onClick={() => lord.vm.agent(ctl.sid, 'disc')} /></View>
+        {g?.discMessage ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr('machines.agent.discErr', { text: g.discMessage })}</Text> : null}
+      </View>
+    );
+  }
+  const copy = discCanCopy(g, cfg);
+  return (
+    <View style={{ gap: 6, padding: 10, borderRadius: 12, backgroundColor: p.dark ? 'rgba(10,132,255,0.12)' : 'rgba(10,132,255,0.08)' }}>
+      <Text style={{ fontSize: 13, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.agent.discTitle')}</Text>
+      <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.discStep')}</Text>
+      {discCommands().map(({ key, cmd }) => (
+        <View key={key} style={{ gap: 2 }}>
+          <Text style={{ fontSize: 11, color: p.dim, textAlign: 'start' }}>{tr(`machines.agent.disc.${key}`)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ flex: 1, fontFamily: 'monospace', fontSize: 12, color: p.text, textAlign: 'left', direction: 'ltr' }}>{cmd}</Text>
+            {copy ? <Pill label={tr('machines.agent.discCopy')} onClick={() => clipboard.set(cmd)} /> : null}
+          </View>
+        </View>
+      ))}
+      <Text style={{ fontSize: 12, lineHeight: 1.45, color: p.dim, textAlign: 'start' }}>{tr('machines.agent.discPassword')}</Text>
+      <View style={{ flexDirection: 'row' }}><Pill label={tr('machines.agent.discOut')} onClick={() => lord.vm.agent(ctl.sid, 'discOut')} /></View>
+      {g?.discMessage ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr('machines.agent.discErr', { text: g.discMessage })}</Text> : null}
     </View>
   );
 }
@@ -747,6 +788,32 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     if (how === 'ask' || q.state === 'starting') setAskClose(true); else finish(how);
     return false;
   }), [winId]);
+
+  // a Whonix group's Workstation (docs/VIRTUALIZATION.md 19.8, 19.9): while its Gateway is down it has no network at all
+  // (the link is a pulled cable), and a bar says so with Start Gateway; the session links the two once both run
+  const inGroup = /\.lordgroup\/[^/]+\.lordvm$/.test(dir);
+  const [gwBar, setGwBar] = useState(null);           // { bar: null | 'off' | 'starting', gw }
+  const [gwAsked, setGwAsked] = useState(0);
+  useEffect(() => {
+    if (!inGroup || !has()) return undefined;
+    const look = () => {
+      try {
+        const list = lord.vm.list();
+        const ws = list.find((x) => x.dir === dir), gw = gatewayOf(ws, list);
+        const bar = gatewayBar(ws, gw);
+        setGwBar((o) => (o?.bar === bar && o?.gw?.state === gw?.state ? o : { bar, gw }));
+      } catch (e) { /* the list isn't there: no bar */ }
+    };
+    look();
+    const timer = setInterval(look, 2000);
+    return () => clearInterval(timer);
+  }, [dir, gwAsked]);
+  const startGateway = () => {
+    const gw = gwBar?.gw;
+    if (!gw) return;
+    setGwBar({ bar: 'starting', gw });
+    startPrep(gw).then(() => { lord.vm.startDetached(gw.dir); setGwAsked((n) => n + 1); }, () => setGwAsked((n) => n + 1));
+  };
 
   // lord-vm's notices (VM_NOTICE): the network going and coming back (6.5), a Clone's new identity (6.3); the good news
   // goes away by itself
@@ -1447,6 +1514,15 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       {card}
       {failed}
       {!card && !failed && !appsActive ? <ClipAskBar ask={askBar} onAnswer={askAnswer} top={(full ? 0 : BAR) + 12} /> : null}
+      {!card && !failed && gwBar?.bar ? (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: (full ? 0 : BAR) + 12, alignItems: 'center' }}>
+          <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)', border: '1px solid rgba(255,154,154,0.5)' }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: gwBar.bar === 'starting' ? '#ffd60a' : '#ff9a9a' }} />
+            <Text style={{ flexShrink: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{tr(gwBar.bar === 'starting' ? 'machines.group.gatewayStarting' : 'machines.group.noGateway')}</Text>
+            {gwBar.bar === 'off' ? <Btn label={tr('machines.group.startGateway')} onClick={startGateway} style={{ height: 28 }} /> : null}
+          </View>
+        </View>
+      ) : null}
       {!card && !failed && ((noticeOn && noticeText) || cdErr) ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center' }}>
           <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>

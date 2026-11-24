@@ -14,6 +14,10 @@
   "never": "Bado hakuna hifadhi rudufu",
   "next": "Inayofuata: {when}",
   "lastError": "Hifadhi rudufu ya mwisho imeshindwa: {error}",
+  "machinesBusy": {
+    "one": "Mashine {count} ilikuwa ikiendeshwa: diski zake katika hifadhi rudufu hii ni za ile iliyotangulia",
+    "other": "Mashine {count} zilikuwa zikiendeshwa: diski zake katika hifadhi rudufu hii ni za ile iliyotangulia"
+  },
   "todayAt": "leo saa {time}",
   "now": "Hifadhi Nakala Sasa",
   "pause": "Sitisha",

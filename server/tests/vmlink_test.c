@@ -39,7 +39,8 @@ static void messages(void) {
     CHECK(!vm_msg_valid(&m, 1), "a short id");
     m = vm_msg(VM_LINK, 1, 1, 0, 0, 0, GID);
     CHECK(!vm_msg_valid(&m, 0), "VM_LINK is a request, never an event");
-    CHECK(VM_REQ_LAST >= VM_LINK && VM_LINK < VM_REPLY, "VM_LINK is a request (VM_SHELL came after it)");
+    CHECK(VM_REQ_LAST == VM_NETCABLE && VM_NETCABLE == VM_EXEC + 1 && VM_EXEC == VM_SHELL + 1 && VM_SHELL == VM_LINK + 1,
+          "VM_LINK, VM_SHELL, VM_EXEC (6.15), then VM_NETCABLE (5.3) last");
     /* the network cable (the window's Devices → Network): plugged or pulled, nothing else */
     m = vm_msg(VM_NETCABLE, 3, 1, 0, 0, 0, "");
     CHECK(vm_msg_valid(&m, 1), "a plugged cable");

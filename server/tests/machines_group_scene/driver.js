@@ -22,6 +22,8 @@
     return out.sort((a, b) => b - a);
   };
   const byText = (text) => all(text)[0] || null;
+  // the smallest shown node with this text: a dialog's own label, never a stale entry of a node id used again since
+  const label = (text) => all(text).map((id) => [id, box(id)]).sort((a, b) => a[1][2] * a[1][3] - b[1][2] * b[1][3]).map((x) => x[0])[0] || null;
   // the "···" button nearest to a text, on its right and about its height (the card's own menu button)
   const moreNear = (text) => {
     const t = byText(text), tl = t && box(t);
@@ -69,7 +71,32 @@
     step('also gateway', click(byText(L.alsoGateway)));
     await sleep(700);
     await shot('fresh-gateway');
-    step('cancel', click(byText(L.cancel)));
+    step('cancel', click(label(L.cancel)));
+    await sleep(600);
+    // Rename… and Delete… on Whonix (19.8)
+    step('menu for rename', click(moreNear('Whonix')));
+    await sleep(700);
+    step('rename', click(byText(L.rename)));
+    await sleep(1000);
+    await shot('rename');
+    step('cancel rename', click(label(L.cancel)));
+    await sleep(600);
+    step('menu for delete', click(moreNear('Whonix')));
+    await sleep(700);
+    step('delete', click(byText(L.delete)));
+    await sleep(1000);
+    await shot('delete');
+    step('cancel delete', click(label(L.cancel)));
+    await sleep(600);
+    // the damaged group (19.9): its card, its menu, Repair…
+    await shot('damaged-card');
+    step('damaged menu', click(moreNear('Tor Work')));
+    await sleep(800);
+    await shot('damaged-menu');
+    step('repair', click(byText(L.repair)));
+    await sleep(1000);
+    await shot('repair');
+    step('cancel repair', click(label(L.cancel)));
     await sleep(600);
     step('menu again', click(moreNear('Whonix')));
     await sleep(700);

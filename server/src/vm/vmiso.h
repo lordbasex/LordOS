@@ -1,43 +1,43 @@
-/* vmiso.h — what an installer disc starts on, read from its ISO 9660 image (docs/VIRTUALIZATION.md 5.2, "Detect").
+/* vmiso.h — what an ISO a person chose boots on (docs/VIRTUALIZATION.md 5.2): its volume label, the El Torito boot
+ * catalog's platforms, the architecture of its UEFI boot files and whether it is a virtio-win guest's install disc.
  *
- * The New Machine assistant's Detect step: the volume label names the system, the disc's UEFI boot files
- * (/EFI/BOOT/BOOT<arch>.EFI) say which processors it starts on, and El Torito's boot catalog whether a BIOS (or a UEFI
- * image) starts it. The image is hostile: every offset and length is checked against the mapping, directories are read
- * at most VMISO_DIR_MAX bytes and VMISO_RECORDS records, and nothing follows a pointer twice. lord-vm --iso-detect runs
- * this on a read-only mapping after it has dropped to seccomp's strict mode (read, write, exit only).
- */
-#ifndef LORDOS_VMISO_H
-#define LORDOS_VMISO_H
+ * The ISO is untrusted. vmiso_probe reads it only through the descriptor it is given, with pread of bounded sizes at
+ * offsets checked against the file's size; it follows fixed paths only (EFI/BOOT, sources), never a whole tree, so a
+ * directory that points at itself can't loop; it counts its reads and stops at a budget. No allocation is larger than
+ * VMISO_DIR_MAX. Pure: no globals, no other I/O, so tests/vmiso_test.c fuzzes it under ASan and UBSan. */
+#ifndef VMISO_H
+#define VMISO_H
 
-#include <stddef.h>
 #include <stdint.h>
 
-#define VMISO_SECTOR    2048u
-#define VMISO_DIR_MAX   (256u * 1024u)   /* bytes of one directory read */
-#define VMISO_RECORDS   4096             /* records looked at per directory */
+/* UEFI boot files (EFI/BOOT/BOOT<arch>.EFI), by the machine their PE header names */
+enum { VMISO_X64 = 1, VMISO_AA64 = 2, VMISO_IA32 = 4, VMISO_RISCV64 = 8 };
 
-enum {                                   /* bits of VmIsoInfo.efi: the UEFI boot files found */
-    VMISO_EFI_AMD64 = 1, VMISO_EFI_ARM64 = 2, VMISO_EFI_IA32 = 4, VMISO_EFI_ARM = 8, VMISO_EFI_RISCV64 = 16,
-};
+#define VMISO_DIR_MAX (1u << 20)       /* a directory's bytes read at most */
+#define VMISO_READS 4096               /* reads at most, all of them */
+#define VMISO_BYTES (24u << 20)        /* bytes read at most, all of them */
 
 typedef struct {
-    int iso;                             /* 1: a primary volume descriptor was found ("CD001") */
-    char label[33];                      /* its volume label, printable ASCII, trailing spaces cut */
-    unsigned efi;                        /* VMISO_EFI_* */
-    int bios;                            /* El Torito's catalog has a bootable x86 (BIOS) entry */
-    int eltorito_efi;                    /* … and an EFI entry (platform 0xEF) */
-} VmIsoInfo;
+    int iso9660;          /* a primary volume descriptor */
+    int udf;              /* a UDF volume (its anchor at sector 256) that we could read */
+    char label[33];       /* the primary volume's label, printable ASCII, trailing spaces gone */
+    int bios;             /* El Torito: a bootable entry for x86 BIOS (platform 0x00) */
+    int efi;              /* El Torito: a bootable entry for UEFI (platform 0xEF) */
+    unsigned efi_named;   /* BOOT<arch>.EFI files found by their names (VMISO_*) */
+    unsigned efi_pe;      /* the machines their PE headers name: the tree's files and the El Torito ESP image's */
+    int windows;          /* sources/install.wim, .esd or .swm */
+    unsigned reads;       /* how many reads it took (tests) */
+} VmIso;
 
-/* Reads img[0..len). 0 ok (info filled; info->iso may still be 0: not an ISO 9660 image), -1 bad arguments. Never reads
- * outside img. */
-int vmiso_detect(const uint8_t *img, size_t len, VmIsoInfo *info);
+/* 0 when fd is an ISO 9660 or UDF image (out filled in as far as it could be read), -1 otherwise. max_reads (0 for
+ * VMISO_READS) caps the reads further: a file on a network mount gets a few, so a slow server can't hold the caller */
+int vmiso_probe(int fd, VmIso *out, unsigned max_reads);
 
-/* The one architecture info says the disc starts on, as the app names it ("amd64", "arm64"), or NULL when it names none
- * or both */
-const char *vmiso_arch(const VmIsoInfo *info);
+/* the architecture Machines names ("amd64", "arm64", "riscv64") its boot files are for: the PE headers first, then the
+ * files' names, then El Torito's x86 BIOS entry; "" when nothing says, or when they name both amd64 and arm64 */
+const char *vmiso_arch(const VmIso *v);
 
-/* info as one JSON line into out (n bytes): {"iso":true,"label":"…","efi":["amd64"],"bios":true,"eltoritoEfi":false}.
- * Returns the length, or -1 if it doesn't fit. */
-int vmiso_json(const VmIsoInfo *info, char *out, size_t n);
+/* a PE image's machine (the 6 bytes after "PE\0\0") as VMISO_*, 0 for another */
+unsigned vmiso_pe_machine(unsigned machine);
 
 #endif

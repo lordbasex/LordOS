@@ -1,6 +1,8 @@
 // backup.js — Backups (lord.backup, see server/src/backup and docs/SYSTEM.md).
 //
 //   const st = useBackup()            live status: { state, progress, last, next, dest, … }
+//                                     last.machinesBusy / machinesBusyNames: machines that were running, whose disks in that
+//                                     backup are the previous one's; last.machinesLeftOut: machines with "backup": false
 //   backup.config() / backup.configure({ dest, interval, pauseOnBattery, exclude })
 //   backup.runNow() / pause(on) / cancel()
 //   backup.list() → [{ id, time }]    backup.ls(id, rel) → [{ name, dir, link, size, mtime }]

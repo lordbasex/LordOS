@@ -14,6 +14,10 @@
   "never": "Inga säkerhetskopior än",
   "next": "Nästa: {when}",
   "lastError": "Den senaste säkerhetskopieringen misslyckades: {error}",
+  "machinesBusy": {
+    "one": "{count} maskin var igång: dess diskar i den här säkerhetskopian är från den förra",
+    "other": "{count} maskiner var igång: deras diskar i den här säkerhetskopian är från den förra"
+  },
   "todayAt": "i dag kl. {time}",
   "now": "Säkerhetskopiera nu",
   "pause": "Pausa",

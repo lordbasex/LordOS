@@ -14,6 +14,10 @@
   "never": "Ancora nessun backup",
   "next": "Prossimo: {when}",
   "lastError": "L’ultimo backup non è riuscito: {error}",
+  "machinesBusy": {
+    "one": "{count} macchina era in esecuzione: i suoi dischi in questo backup sono quelli del precedente",
+    "other": "{count} macchine erano in esecuzione: i loro dischi in questo backup sono quelli del precedente"
+  },
   "todayAt": "oggi alle {time}",
   "now": "Esegui backup ora",
   "pause": "Pausa",

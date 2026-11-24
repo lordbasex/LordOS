@@ -2,4 +2,8 @@
 # may open the guest's end of org.lordos.agent, the virtio-serial port Machines adds only while the machine's guest
 # agent is on. lordos-guest (lordos-guest.service, a user unit) holds it as that person. The same rule Machines' Install
 # Agent writes into other Linux guests. On a computer that isn't such a guest the port doesn't exist: nothing matches.
-SUBSYSTEM=="virtio-ports", ATTR{name}=="org.lordos.agent", TAG+="uaccess"
+# LordOS's own sessions (lord-sessiond) aren't logind seats, so uaccess gives nobody the port there (0.8.9.5 and
+# earlier: lordos-guest couldn't open it and Machines waited for the agent forever). As for the screen and sound, the
+# desktop's people are in the video group (users_admin.c, firstrun, the installer and the live user add it), so the
+# port is that group's: lordos-guest of whoever signs in first holds it (it opens only once).
+SUBSYSTEM=="virtio-ports", ATTR{name}=="org.lordos.agent", TAG+="uaccess", GROUP="video", MODE="0660"

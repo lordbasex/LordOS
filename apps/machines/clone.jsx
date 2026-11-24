@@ -8,6 +8,7 @@ import { usePal, Btn, Sheet } from './ui.jsx';
 import { Sym } from './kit.jsx';
 import { cloneMethod, cloneHostname, hostnameValid, cloneWinName, winNameValid, isWindowsMachine, WIN_NAME_MAX } from './model.js';
 import { writeMeta } from './meta.js';
+import { cloneKey, ensureKey } from './keyflow.js';
 
 function Kind({ on, icon, title, text, foot, onClick }) {
   const p = usePal();
@@ -58,10 +59,16 @@ export function CloneSheet({ m, fromSnapshot, running, onClose, onDone }) {
     }, 400);
     return () => clearInterval(timer);
   }, [job]);
-  const go = () => {
+  const go = async () => {
     setFail('');
+    // an encrypted machine (docs/VIRTUALIZATION.md 8): its key held first; a Clone's kept under the Clone's own id too
+    let newId;
+    try {
+      if (m.encrypted) await ensureKey(m.dir, { id: m.keyId, name: m.name });
+      if (m.encrypted && isClone) newId = await cloneKey(m);
+    } catch (e) { setFail(e.message); return; }
     const id = lord.vm.clone(m.dir, { name: name.trim(), duplicate: kind === 'duplicate' && !fromSnapshot, linked: how === 'linked', fromSnapshot: fromSnapshot?.tag,
-      keepIdentity: isClone && keepId, hostname: isClone && !keepId ? host : undefined });
+      keepIdentity: isClone && keepId, hostname: isClone && !keepId ? host : undefined, newId });
     if (!id) setFail(tr('machines.cfg.refused')); else setJob(id);
   };
   const blocked = running ? tr('machines.clone.running', { name: m.name }) : how === 'blocked' ? tr('machines.clone.suspended', { name: m.name }) : '';
