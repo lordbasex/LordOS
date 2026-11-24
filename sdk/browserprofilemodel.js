@@ -61,7 +61,7 @@ export function parseLocalState(text) {
 // profile name, its Wayland app_id / X11 WM_CLASS is the same for every profile ("google-chrome"; only installed web
 // apps carry the profile in theirs, "chrome-<app>-<profile dir>"), and one process serves every profile. The title is
 // the page's to choose, so it is never used: a page titled "Work" would get Work's colour. What LordOS can know is
-// the profile it launched a window for (its own --profile-directory launch, pending the maintainer's approval:
+// the profile it launched a window for (its own --profile-directory launch, approved by the maintainer 2026-11-24:
 // docs/WORKSPACES.md "Browser profiles"; the launch placement then ties the next window of that browser to it,
 // themes/workspaces/model/launches.js). launched: window id → profile folder. Returns { dir, name, color } or null.
 export function windowProfile(w, key, profilesByKey, launched = null) {

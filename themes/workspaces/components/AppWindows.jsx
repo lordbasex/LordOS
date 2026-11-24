@@ -66,11 +66,11 @@ export function appMenuItems(key, desk, d, after = null, launchable = true) {
 }
 
 // A Chromium-family browser: which of its profiles this activity opens, and this display (by connector) when the
-// activity has none. Only once lord-server has the profile launch path (lord.apps.launchProfile, awaiting the
-// maintainer's approval): without it a choice could not be honoured, so none is offered.
+// activity has none. Only once lord-server has the profile launch path (lord.apps.launchProfile, approved by the maintainer
+// 2026-11-24): without it (an older lord-server) a choice could not be honoured, so none is offered.
 function profileItems(key, desk, d, done) {
   if (!isProfileBrowser(key) || typeof lord === 'undefined' || typeof lord.apps?.launchProfile !== 'function') return [];
-  const profiles = refreshBrowserProfiles(key);
+  const profiles = refreshBrowserProfiles(key);     // the menu opening: on demand, cached by the file's mtime and size
   if (profiles.length < 2) return [];
   const conn = keyOfDisplay(d);
   const act = cleanProfileChoices(activityOf(desk).profiles);

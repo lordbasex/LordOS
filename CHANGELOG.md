@@ -34,13 +34,19 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     linear matcher, never a RegExp (`sdk/portalfilemodel.js`). No new privilege: any app could already call it, and the
     answer still goes only to the caller. Checked with Google Chrome 158 in a headless session
     (`server/tests/chrome_portal_headless.sh`, opt-in): Ctrl+S showed LordOS's dialog and the file was saved.
-  - Browser profiles, prepared (`sdk/browserprofilemodel.js`, `sdk/browserprofiles.js`): Chrome, Chromium, Brave and
-    Edge profiles read from the browser's own `Local State` as untrusted data (1 MiB, no link, `JSON.parse`, 32
-    profiles, folder names only of the form `Default`/`Profile N`, names cleaned); the profile an activity opens, and
-    per display by connector for every theme (`settings.browserProfiles`). Chrome names no profile in its window titles
-    on Linux and gives every profile one app_id, so a window's profile is known only when LordOS launched it for one;
-    that launch (`lord.apps.launchProfile`, one `--profile-directory=` argument built in C) is proposed for the
-    maintainer's approval and not built: until then no profile is offered or shown.
+  - **Browser profiles** (`sdk/browserprofilemodel.js`, `sdk/browserprofiles.js`): Chrome, Chromium, Brave and Edge
+    profiles read from the browser's own `Local State` as untrusted data (1 MiB, no link, `JSON.parse`, 32 profiles,
+    folder names only of the form `Default`/`Profile N`, names cleaned), on demand only and again only when its mtime
+    or size changed. An activity keeps the profile a browser opens there, each display by connector as the fallback for
+    every theme (`settings.browserProfiles`); the icon menu offers Open profile and both choices, and Used most on this
+    display shows "Chrome · Dev". The launch, `lord.apps.launchProfile` (approved by the maintainer 2026-11-24;
+    `apps_launch_profile` in `server/src/apps.c`): a fixed browser table in C, the system `.desktop` only, a profile
+    folder the browser's own `Local State` lists (`O_NOFOLLOW`, regular, <= 1 MiB, `sec/json.c`), one argv element
+    `--profile-directory=<profile>` built in C; desktop session only, not in the broker (`build/apps-profile-test`:
+    the argv, bad names, unlisted folders, a hostile `Local State` — not JSON, wrong shape, duplicate keys, oversize, a
+    link, a FIFO — a browser outside the table, a user `.desktop`). Chrome names no profile in its window titles on
+    Linux and gives every profile one app_id, so a window's profile (its colour dot on the bar icon, its name in the
+    window lists) is known only for a window LordOS launched for that profile.
   - ❖` cycles the windows of the app in front within the activity (checked in the scene; listed in Settings →
     Keyboard).
   - Tests: `server/tests/launchplace_headless.sh` (in `make test`, en and ar: a headless `lord-server-test`, the real

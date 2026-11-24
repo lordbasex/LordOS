@@ -18,7 +18,7 @@
 // and an app that answers with another size (a minimum size, a character grid) keeps it and stays in its tile
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
-import { windows, locksChanged, activeDesktop, desktopList, settings, launchApp, isProfileBrowser, profileChoice, noteLaunchedProfile, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm, openDisplayApps } from '@lordos/sdk';
+import { windows, locksChanged, activeDesktop, desktopList, settings, launchApp, isProfileBrowser, profileChoice, noteLaunchedProfile, refreshBrowserProfiles, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm, openDisplayApps } from '@lordos/sdk';
 import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt, dropSlot, slotLimits, trimSlots } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { addLaunch, claim, gone, pending as pendingOf, LAUNCH_MS } from './model/launches.js';
@@ -49,14 +49,17 @@ export function aimLaunch(display, n = 1, keys = null, profile = null) {
 
 // Launch app `key` from display d of the activity in view, its windows aimed there. A Chromium-family browser with a
 // profile chosen for this activity (or, failing that, for this display's connector) opens that profile, through the
-// launcher's own profile path when lord-server has it (lord.apps.launchProfile, awaiting the maintainer's approval:
+// launcher's own profile path when lord-server has it (lord.apps.launchProfile, approved by the maintainer 2026-11-24;
 // docs/WORKSPACES.md "Browser profiles"); without it the browser opens as before and no profile is claimed.
 export function launchOn(d, key) {
   if (!d || typeof key !== 'string' || !key) return false;
   const can = isProfileBrowser(key) && typeof lord !== 'undefined' && typeof lord.apps?.launchProfile === 'function';
   const dir = can ? profileChoice(key, activityOf(activeDesktop.get()).profiles, settings.get().browserProfiles, keyOfDisplay(d)) : null;
   aimLaunch(d, 1, key, dir);
-  if (dir) { try { if (lord.apps.launchProfile(key.slice('desktop:'.length), dir)) return true; } catch (e) { /* the plain launch below */ } }
+  if (dir) {
+    refreshBrowserProfiles(key);      // on demand: the window's dot and name (read again only if the file changed)
+    try { if (lord.apps.launchProfile(key.slice('desktop:'.length), dir)) return true; } catch (e) { /* the plain launch below */ }
+  }
   return launchApp(key);
 }
 // for the tests: forget every placement (a launch whose app never showed a window would otherwise wait LAUNCH_MS)

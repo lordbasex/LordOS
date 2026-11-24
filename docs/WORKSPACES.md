@@ -238,7 +238,7 @@ checked, "–" for a minimized one. A title is the app's, so a window that names
 brings itself forward. **❖`** cycles the windows of the app in front within the activity (`cycleAppWindows`, listed in
 Settings → Keyboard).
 
-**Browser profiles** (in development; launching a profile awaits the maintainer's approval). The SDK reads a
+**Browser profiles** (in development; the profile launch approved by the maintainer 2026-11-24). The SDK reads a
 Chromium-family browser's profiles (Google Chrome, Chromium, Brave, Edge: a fixed table in `sdk/browserprofilemodel.js`)
 from the browser's own `Local State` as untrusted data: at most 1 MiB, a regular file and not a link, `JSON.parse`,
 only `profile.info_cache`, 32 profiles, folder names only of the browser's form (`Default`, `Profile N`), names
@@ -248,10 +248,14 @@ is the page's to choose, so it is never used; the only reliable link is a window
 launch placement ties the window to it). Those windows get the profile's colour as a dot on their icon and its name in
 the window lists. An activity keeps the profile a browser opens there (`profiles` in the activity), and each display by
 connector in `settings.browserProfiles.displays` for every theme; the activity's choice comes first. The icon menu of
-a browser offers **Open profile …**, the activity's and the display's choice only once lord-server has
-`lord.apps.launchProfile` (a closed exception proposed for approval: the browser's own system `.desktop`, one
-`--profile-directory=` argument built in C from a folder of the browser's own `Local State`); until then nothing of it
-shows and the browser opens as before.
+a browser offers **Open profile …** and the activity's and the display's choice, and **Used most on this display** shows
+a browser with a chosen profile as "Chrome · Dev", which opens that profile. The launch is `lord.apps.launchProfile`
+(approved by the maintainer 2026-11-24; `apps_launch_profile` in `apps.c`): only the browsers of a fixed table in C,
+only from their system `.desktop` (never `~/.local/share/applications`), a profile name `Default`/`Profile N` that the
+browser's own `Local State` lists (read with `O_NOFOLLOW`, a regular file of at most 1 MiB, `sec/json.c`), and one
+argv element `--profile-directory=<profile>` built in C after the `Exec` line's; the desktop session only, never through
+the broker (`build/apps-profile-test`). The `Local State` is read only on demand (a menu opening, a launch, the card's
+quick launch showing), one stat, and parsed again only when its mtime or size changed; never on a draw.
 
 **Linux apps' file dialogs.** LordOS's `org.freedesktop.portal.FileChooser` says version 3 (was 2), the one Chromium
 and Google Chrome need before they leave their own GTK dialog: their Open and Save as dialogs are LordOS's, over the

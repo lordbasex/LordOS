@@ -8,7 +8,7 @@
 // with their layout as a suggestion: one click opens them, nothing opens by itself (sdk/displayapps.js).
 import {
   View, Text, Layer, addListener, useStore, windows, wm, desktopList, desktopName, displayFor, launchApp, useLauncherApps, deskWidgetsShown, widgetDisplayKey, t as tr,
-  useQuickApps, useDisplaySuggestion, quietDisplayApps,
+  useQuickApps, useDisplaySuggestion, quietDisplayApps, browserProfiles, refreshBrowserProfiles, isProfileBrowser, profileChoice, settings,
 } from '@lordos/sdk';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
@@ -20,7 +20,7 @@ import { FocusRing } from './BarButton.jsx';
 import { WindowsTray, AppIcon, listed, trayOrder, trayNodes } from './AppWindows.jsx';
 export { trayNodes };
 import { setCardItems } from '../barfocus.js';
-import { noteLaunch, groupHidden, activities, offered, markOffered } from '../state.js';
+import { noteLaunch, groupHidden, activities, offered, markOffered, activityOf } from '../state.js';
 
 const alpha = (hex, a) => `${hex}${Math.round(a * 255).toString(16).padStart(2, '0')}`;
 
@@ -165,7 +165,21 @@ function UsualApps({ t, sug, fid, onOpen, onLater, onNever }) {
 }
 
 // The display's quick launch: the apps used most there, recent ones first (one click opens one, on this display).
-function QuickLaunch({ t, apps, fid, onLaunch }) {
+// A browser with a profile chosen for this activity (or this display) shows as "Chrome · Dev" and opens that profile
+// (tiler.js launchOn), once lord-server has the profile launch path.
+function QuickLaunch({ t, apps, fid, onLaunch, desk, dkey }) {
+  const profiles = useStore(browserProfiles);
+  const can = typeof lord !== 'undefined' && typeof lord.apps?.launchProfile === 'function';
+  const browsers = can ? apps.filter((a) => isProfileBrowser(a.id)).map((a) => a.id).join('|') : '';
+  // read only when the card shows a browser (one stat, the file again only if it changed): never on a draw
+  useEffect(() => { for (const k of browsers ? browsers.split('|') : []) refreshBrowserProfiles(k); }, [browsers]);
+  const label = (a) => {
+    if (!can || !isProfileBrowser(a.id)) return a.name;
+    const dir = profileChoice(a.id, activityOf(desk).profiles, settings.get().browserProfiles, dkey);
+    const p = dir ? (profiles[a.id] || []).find((x) => x.dir === dir) : null;
+    return p ? `${a.name} · ${p.name}` : a.name;
+  };
+  apps = apps.map((a) => ({ ...a, name: label(a) }));
   return (
     <View style={{ alignSelf: 'stretch', gap: 6, marginTop: 4 }}>
       <Text style={{ fontSize: 11, fontWeight: 600, color: t.textDim, textAlign: 'start', marginHorizontal: 4 }}>{tr('shell.ws.quick.title')}</Text>
@@ -338,7 +352,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
                 <CardButton t={t} label={tr('shell.ws.empty.openPins')} onClick={(e) => { noteLaunch(e.x, e.y); aimLaunch(d, 1, pins.map((a) => a.id)); for (const a of pins) launchApp(a.id); }} />
               ) : null}
             </View>
-            {quick.length ? <QuickLaunch t={t} apps={quick} fid={`${fid}:q`} onLaunch={launchHere} /> : null}
+            {quick.length ? <QuickLaunch t={t} apps={quick} fid={`${fid}:q`} onLaunch={launchHere} desk={desk} dkey={dkey} /> : null}
           </Surface>
         </View>
       ) : null}
