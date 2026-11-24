@@ -1681,5 +1681,18 @@
   "bundle.machine": "Maszyna",
   "bundle.group": "Grupa maszyn",
   "cfg.search": "Szukaj",
-  "cfg.unsaved": "Zmienione, jeszcze nie zapisane"
+  "cfg.unsaved": "Zmienione, jeszcze nie zapisane",
+  "alld.item": "Wszystkie ekrany",
+  "alld.title": "{name} · Ekran {n}",
+  "alld.back": "Wróć do jednego ekranu",
+  "alld.waiting": "Oczekiwanie, aż maszyna użyje tego ekranu…",
+  "alld.why.noMachine": "Maszyna nie jest gotowa",
+  "alld.why.noWindow": "Ta maszyna nie ma ekranu",
+  "alld.why.vgpu": "Maszyna z kartą graficzną pokazuje jeden ekran",
+  "alld.why.anonymity": "Nie dla chronionej maszyny",
+  "alld.why.windows": "Sterownik ekranu tego systemu pokazuje jeden ekran",
+  "alld.why.apps": "Najpierw wyjdź z trybu aplikacji",
+  "alld.why.oneDisplay": "Ten komputer ma jeden ekran",
+  "alld.why.notRunning": "Uruchamia maszynę na wszystkich ekranach",
+  "alld.why.restart": "Najpierw wyłącz maszynę: uruchomi się ponownie z {n} ekranami"
 }

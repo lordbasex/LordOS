@@ -1681,5 +1681,18 @@
   "bundle.machine": "Màquina",
   "bundle.group": "Grup de màquines",
   "cfg.search": "Cerca",
-  "cfg.unsaved": "Canviat, encara no desat"
+  "cfg.unsaved": "Canviat, encara no desat",
+  "alld.item": "Totes les pantalles",
+  "alld.title": "{name} · Pantalla {n}",
+  "alld.back": "Torna a una pantalla",
+  "alld.waiting": "S'espera que la màquina faci servir aquesta pantalla…",
+  "alld.why.noMachine": "La màquina no està a punt",
+  "alld.why.noWindow": "Aquesta màquina no té pantalla",
+  "alld.why.vgpu": "Una màquina amb targeta gràfica mostra una pantalla",
+  "alld.why.anonymity": "No per a una màquina protegida",
+  "alld.why.windows": "El controlador de pantalla d'aquest sistema mostra una pantalla",
+  "alld.why.apps": "Primer surt del mode d'aplicacions",
+  "alld.why.oneDisplay": "Aquest ordinador té una pantalla",
+  "alld.why.notRunning": "Inicia la màquina a totes les pantalles",
+  "alld.why.restart": "Primer apaga la màquina: tornarà a iniciar-se amb {n} pantalles"
 }

@@ -1681,5 +1681,18 @@
   "bundle.machine": "Maschine",
   "bundle.group": "Maschinengruppe",
   "cfg.search": "Suchen",
-  "cfg.unsaved": "Geändert, noch nicht gesichert"
+  "cfg.unsaved": "Geändert, noch nicht gesichert",
+  "alld.item": "Alle Bildschirme",
+  "alld.title": "{name} · Bildschirm {n}",
+  "alld.back": "Zurück zu einem Bildschirm",
+  "alld.waiting": "Warten, bis die Maschine diesen Bildschirm nutzt …",
+  "alld.why.noMachine": "Die Maschine ist nicht bereit",
+  "alld.why.noWindow": "Diese Maschine hat keinen Bildschirm",
+  "alld.why.vgpu": "Eine Maschine mit Grafikkarte zeigt einen Bildschirm",
+  "alld.why.anonymity": "Nicht für eine geschützte Maschine",
+  "alld.why.windows": "Der Anzeigetreiber dieses Systems zeigt einen Bildschirm",
+  "alld.why.apps": "Zuerst den App-Modus verlassen",
+  "alld.why.oneDisplay": "Dieser Computer hat einen Bildschirm",
+  "alld.why.notRunning": "Startet die Maschine auf allen Bildschirmen",
+  "alld.why.restart": "Zuerst die Maschine herunterfahren: Sie startet dann mit {n} Bildschirmen"
 }

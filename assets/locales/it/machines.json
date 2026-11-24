@@ -1681,5 +1681,18 @@
   "bundle.machine": "Macchina",
   "bundle.group": "Gruppo di macchine",
   "cfg.search": "Cerca",
-  "cfg.unsaved": "Modificato, non ancora salvato"
+  "cfg.unsaved": "Modificato, non ancora salvato",
+  "alld.item": "Tutti gli schermi",
+  "alld.title": "{name} · Schermo {n}",
+  "alld.back": "Torna a uno schermo",
+  "alld.waiting": "In attesa che la macchina usi questo schermo…",
+  "alld.why.noMachine": "La macchina non è pronta",
+  "alld.why.noWindow": "Questa macchina non ha uno schermo",
+  "alld.why.vgpu": "Una macchina con scheda grafica mostra uno schermo",
+  "alld.why.anonymity": "Non per una macchina protetta",
+  "alld.why.windows": "Il driver video di questo sistema mostra uno schermo",
+  "alld.why.apps": "Esci prima dalla modalità app",
+  "alld.why.oneDisplay": "Questo computer ha uno schermo",
+  "alld.why.notRunning": "Avvia la macchina su tutti gli schermi",
+  "alld.why.restart": "Spegni prima la macchina: ripartirà con {n} schermi"
 }

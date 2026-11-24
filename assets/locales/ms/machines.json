@@ -1681,5 +1681,18 @@
   "bundle.machine": "Mesin",
   "bundle.group": "Kumpulan mesin",
   "cfg.search": "Cari",
-  "cfg.unsaved": "Diubah, belum disimpan"
+  "cfg.unsaved": "Diubah, belum disimpan",
+  "alld.item": "Semua Paparan",
+  "alld.title": "{name} · Paparan {n}",
+  "alld.back": "Kembali ke Satu Paparan",
+  "alld.waiting": "Menunggu mesin menggunakan paparan ini…",
+  "alld.why.noMachine": "Mesin belum sedia",
+  "alld.why.noWindow": "Mesin ini tiada paparan",
+  "alld.why.vgpu": "Mesin dengan kad grafik menunjukkan satu paparan",
+  "alld.why.anonymity": "Bukan untuk mesin yang dilindungi",
+  "alld.why.windows": "Pemacu paparan sistem ini menunjukkan satu paparan",
+  "alld.why.apps": "Keluar dari mod aplikasi dahulu",
+  "alld.why.oneDisplay": "Komputer ini ada satu paparan",
+  "alld.why.notRunning": "Memulakan mesin pada setiap paparan",
+  "alld.why.restart": "Matikan mesin dahulu: ia bermula semula dengan {n} paparan"
 }

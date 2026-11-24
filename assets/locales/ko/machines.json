@@ -1681,5 +1681,18 @@
   "bundle.machine": "머신",
   "bundle.group": "머신 그룹",
   "cfg.search": "검색",
-  "cfg.unsaved": "변경됨, 아직 저장 안 됨"
+  "cfg.unsaved": "변경됨, 아직 저장 안 됨",
+  "alld.item": "모든 디스플레이",
+  "alld.title": "{name} · 디스플레이 {n}",
+  "alld.back": "디스플레이 하나로 돌아가기",
+  "alld.waiting": "머신이 이 디스플레이를 사용하기를 기다리는 중…",
+  "alld.why.noMachine": "머신이 준비되지 않았습니다",
+  "alld.why.noWindow": "이 머신에는 디스플레이가 없습니다",
+  "alld.why.vgpu": "그래픽 카드가 있는 머신은 디스플레이 하나를 표시합니다",
+  "alld.why.anonymity": "보호된 머신에는 사용할 수 없습니다",
+  "alld.why.windows": "이 시스템의 디스플레이 드라이버는 디스플레이 하나를 표시합니다",
+  "alld.why.apps": "먼저 앱 모드를 종료하세요",
+  "alld.why.oneDisplay": "이 컴퓨터에는 디스플레이가 하나 있습니다",
+  "alld.why.notRunning": "모든 디스플레이에서 머신을 시작합니다",
+  "alld.why.restart": "먼저 머신을 종료하세요. 디스플레이 {n}개로 다시 시작합니다"
 }

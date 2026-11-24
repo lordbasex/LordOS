@@ -1681,5 +1681,18 @@
   "bundle.machine": "Machine",
   "bundle.group": "Machine group",
   "cfg.search": "Search",
-  "cfg.unsaved": "Changed, not saved yet"
+  "cfg.unsaved": "Changed, not saved yet",
+  "alld.item": "All Displays",
+  "alld.title": "{name} · Display {n}",
+  "alld.back": "Back to One Display",
+  "alld.waiting": "Waiting for the machine to use this display…",
+  "alld.why.noMachine": "The machine isn't ready",
+  "alld.why.noWindow": "This machine has no display",
+  "alld.why.vgpu": "A machine with a graphics card shows one display",
+  "alld.why.anonymity": "Not for a protected machine",
+  "alld.why.windows": "This system's display driver shows one display",
+  "alld.why.apps": "Leave apps mode first",
+  "alld.why.oneDisplay": "This computer has one display",
+  "alld.why.notRunning": "Starts the machine on every display",
+  "alld.why.restart": "Shut the machine down first: it starts again with {n} displays"
 }

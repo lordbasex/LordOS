@@ -1681,5 +1681,18 @@
   "bundle.machine": "Maskin",
   "bundle.group": "Maskingrupp",
   "cfg.search": "Sök",
-  "cfg.unsaved": "Ändrat, inte sparat än"
+  "cfg.unsaved": "Ändrat, inte sparat än",
+  "alld.item": "Alla skärmar",
+  "alld.title": "{name} · Skärm {n}",
+  "alld.back": "Tillbaka till en skärm",
+  "alld.waiting": "Väntar på att maskinen ska använda den här skärmen…",
+  "alld.why.noMachine": "Maskinen är inte redo",
+  "alld.why.noWindow": "Den här maskinen har ingen skärm",
+  "alld.why.vgpu": "En maskin med grafikkort visar en skärm",
+  "alld.why.anonymity": "Inte för en skyddad maskin",
+  "alld.why.windows": "Det här systemets skärmdrivrutin visar en skärm",
+  "alld.why.apps": "Lämna appläget först",
+  "alld.why.oneDisplay": "Den här datorn har en skärm",
+  "alld.why.notRunning": "Startar maskinen på alla skärmar",
+  "alld.why.restart": "Stäng av maskinen först: den startar igen med {n} skärmar"
 }

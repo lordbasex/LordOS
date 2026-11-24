@@ -21,6 +21,7 @@ import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons,
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
 import { opensOf, openStep, withoutAsks, askStale } from './openwith.js';
 import { Configure } from './configure.jsx';
+import { useAllDisplays } from './alldisplays.jsx';
 import { Sheet, Pill } from './kit.jsx';
 import { captureOffer, captureStep, captureEndedByServer, captureLabelKey, CAPTURE_IDLE, CAPTURE_NOTICE_MS } from './capture.js';
 
@@ -819,6 +820,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const [infoU, setInfoU] = useState(null);
   const infoPrev = useRef(null);
   const running = !!sid && (st?.state === 'running' || st?.state === 'paused');
+  // All Displays (5.4, alldisplays.jsx): one output of the guest's display full screen on each of this computer's displays
+  const ad = useAllDisplays({ sid, dir, name, winId, st, prot, appsOn, begin });
   useEffect(() => {
     if (!running || !has()) { setInfoU(null); infoPrev.current = null; return undefined; }
     const timer = setInterval(() => {
@@ -1278,6 +1281,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         { label: tr('machines.cmd.fullscreen'), checked: full, onClick: () => wm.setFullscreen(winId, !full) },
         { label: tr('machines.apps.mode'), checked: appsOn, disabled: !!appsBlocked && !appsOn, hint: !appsOn ? appsWhy : '', onClick: () => setApps(!appsOn) },
         { label: tr('machines.view.pip'), checked: pip, disabled: !running || appsOn || prot, hint: prot ? tr('machines.view.pipProtected') : '', onClick: () => (pip ? fromPip() : toPip()) },
+        ad.item,
         '-',
         { label: tr('machines.view.actual'), disabled: !running || follow || full || pip || !st?.w, hint: follow ? tr('machines.view.actualFollow') : '', onClick: actual },
       ] },
@@ -1289,7 +1293,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       ] },
       ...(appsActive ? [{ label: tr('machines.apps.menu'), items: appsMenuItems(gApps) }] : []),
     ]);
-  }, [st?.state, full, pip, follow, st?.w, st?.h, infoU, gaps.join(), iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, gRunning, cfg.transfer, xstate, capOn, capOffer.offered, focused, keys.windows]);
+  }, [st?.state, full, pip, follow, st?.w, st?.h, infoU, gaps.join(), iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, gRunning, cfg.transfer, xstate, capOn, capOffer.offered, focused, keys.windows, ad.on, ad.item.disabled, ad.item.hint]);
   // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's); in its search field, Esc is the
   // field's (it clears the search first)
   useEffect(() => (appsActive && focused && !askClose ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open && !hasTextFocus()) setApps(false); }) : undefined), [appsActive, focused, askClose]);

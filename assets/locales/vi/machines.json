@@ -1681,5 +1681,18 @@
   "bundle.machine": "Máy",
   "bundle.group": "Nhóm máy",
   "cfg.search": "Tìm kiếm",
-  "cfg.unsaved": "Đã thay đổi, chưa lưu"
+  "cfg.unsaved": "Đã thay đổi, chưa lưu",
+  "alld.item": "Tất cả màn hình",
+  "alld.title": "{name} · Màn hình {n}",
+  "alld.back": "Quay lại một màn hình",
+  "alld.waiting": "Đang chờ máy dùng màn hình này…",
+  "alld.why.noMachine": "Máy chưa sẵn sàng",
+  "alld.why.noWindow": "Máy này không có màn hình",
+  "alld.why.vgpu": "Máy có card đồ họa chỉ hiện một màn hình",
+  "alld.why.anonymity": "Không dùng cho máy được bảo vệ",
+  "alld.why.windows": "Trình điều khiển màn hình của hệ thống này chỉ hiện một màn hình",
+  "alld.why.apps": "Hãy thoát chế độ ứng dụng trước",
+  "alld.why.oneDisplay": "Máy tính này có một màn hình",
+  "alld.why.notRunning": "Khởi động máy trên mọi màn hình",
+  "alld.why.restart": "Hãy tắt máy trước: máy sẽ khởi động lại với {n} màn hình"
 }
