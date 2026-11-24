@@ -88,5 +88,11 @@
   "state.crashed": "Gestopt met een fout",
   "state.recovered": "Uit (hersteld)",
   "state.suspended": "Gesluimerd",
-  "state.stopped": "Uit"
+  "state.stopped": "Uit",
+  "groupStarted": "{name} draait: eerst de gateway, dan het werkstation.",
+  "groupStopped": "{name} is uit: eerst het werkstation, dan de gateway.",
+  "groupDamaged": "{name} is beschadigd: een van zijn machines ontbreekt of hoort er niet bij.",
+  "gatewayFailed": "De gateway van {name} is niet gestart ({why}), dus het werkstation is niet gestart.",
+  "workstationFailed": "Het werkstation van {name} is niet gestart ({why}); de gateway draait nog.",
+  "kind.group": "groep van {count}"
 }

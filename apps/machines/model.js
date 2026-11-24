@@ -1605,3 +1605,70 @@ export function menuSpot(at, w, h, b, m = 8) {
 }
 // the display under a point (screen.displays), or the main one
 export const displayUnder = (ds, x, y) => (ds || []).find((d) => x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h) || (ds || []).find((d) => d.main) || (ds || [])[0] || null;
+
+// ---- machine groups (docs/VIRTUALIZATION.md 19.2, 19.9): a Tor gateway and a workstation started and stopped together ----
+// the group's members as lord.vm.list() gives them (each with groupDir, role), keyed by role: { gateway, workstation }
+export function groupMembers(group, list) {
+  const out = {};
+  for (const m of list || []) if (m && m.groupDir === group?.dir && typeof m.role === 'string' && !m.error && m.groupOk) out[m.role] = m;
+  return out;
+}
+const RUNNING = (s) => s === 'running' || s === 'paused';
+const ACTIVE = (s) => s === 'starting' || s === 'running' || s === 'paused' || s === 'stopping';
+// one word for the whole group: 'running' (all members), 'off' (none), 'partial', or 'damaged' (a member missing or not
+// this group's: 19.9, "A member folder… missing or invalid")
+export function groupState(group, list) {
+  const ms = groupMembers(group, list), roles = (group?.members || []).map((x) => x.role);
+  if (!roles.length || roles.some((r) => !ms[r])) return 'damaged';
+  const on = roles.filter((r) => ACTIVE(ms[r].state)).length;
+  return on === 0 ? 'off' : on === roles.length && roles.every((r) => RUNNING(ms[r].state)) ? 'running' : 'partial';
+}
+// the next step of starting (action 'start') or stopping ('stop') the group, from the members' states now; called again
+// after each step until it says done. Start: in group.json's start order (the gateway first), each member only once the
+// one before it runs; the link once all run. Stop: in stop order (the workstation first), each once the one before it
+// is off. { member, role, verb }: act on that member; { wait }: a member being started or stopped; { fail }: the plan
+// stops (the gateway failed to start: the workstation isn't started, 19.9); { done } when there's nothing left.
+export function groupPlan(group, list, action) {
+  const ms = groupMembers(group, list);
+  const order = [...(group?.members || [])].sort((a, b) => (action === 'stop' ? a.stop - b.stop : a.start - b.start));
+  if (!order.length || order.some((x) => !ms[x.role])) return { fail: 'damaged' };
+  for (const x of order) {
+    const m = ms[x.role];
+    if (action === 'stop') {
+      if (m.state === 'stopped' || m.state === 'crashed' || !m.state) continue;
+      if (m.state === 'stopping' || m.state === 'starting') return { wait: m };
+      return { member: m, role: x.role, verb: 'shutdown' };
+    }
+    if (RUNNING(m.state)) continue;
+    if (m.state === 'starting' || m.state === 'stopping') return { wait: m };
+    return { member: m, role: x.role, verb: 'start' };
+  }
+  return action === 'stop' ? { done: true } : { done: true, link: true };
+}
+// a start the plan asked for ended without the member running (its state went back to stopped or crashed): the
+// gateway's failure stops the group's start; the workstation's leaves the gateway running (19.9)
+export function groupStartFailed(role) { return role === 'gateway' ? 'gatewayFailed' : 'workstationFailed'; }
+// whether the group's link should be made now (lord.vm.link): both members run and their supervisors aren't the pair
+// last linked. key: the members' lord-vm pids, so a member started anew (its QEMU gone, the old pair dead) is linked again
+export function groupLinkKey(group, list) {
+  const ms = groupMembers(group, list), roles = (group?.members || []).map((x) => x.role);
+  if (roles.length < 2 || roles.some((r) => !ms[r] || !RUNNING(ms[r].state) || !(ms[r].vmPid > 0))) return '';
+  return roles.map((r) => `${r}:${ms[r].vmPid}`).join(',');
+}
+// what a request of the `machines` command does with a group folder (vmcli.h: <dir> may end in .lordgroup): { code, key,
+// vars } to answer now, { group, action: 'start', window } to run groupPlan, or { open: m } (the primary member's window)
+export function groupCliPlan(req, groups, list) {
+  const g = (groups || []).find((x) => x && x.dir === req?.dir && !x.error);
+  if (!g) return { code: CLI.NO_MACHINE, key: 'notInLibrary', vars: {} };
+  const vars = { name: g.name };
+  const st = groupState(g, list);
+  if (req?.verb === 'release') return { code: CLI.OK, key: '', vars };
+  if (st === 'damaged') return { code: CLI.FAILED, key: 'groupDamaged', vars };
+  const primary = Object.values(groupMembers(g, list)).find((m) => m.primary);
+  switch (req.verb) {
+    case 'open': return primary && RUNNING(primary.state) ? { code: CLI.OK, key: 'opened', vars, open: primary } : { code: CLI.NOT_RUNNING, key: 'notRunning', vars };
+    case 'start': case 'start-detached':
+      return st === 'running' ? { code: CLI.OK, key: 'alreadyRunning', vars } : { group: g, action: 'start', window: req.verb === 'start' };
+    default: return { code: CLI.USAGE, key: '', vars };
+  }
+}

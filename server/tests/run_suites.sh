@@ -235,6 +235,7 @@ EOF
     if have node; then run "theme-gallery-test (sdk/themegallery.js, Settings → Appearance)" node tests/theme_gallery_test.mjs; fi
     if have node; then run "gpu-report-test (sdk/gpureport.js, Settings → Graphics cards' compatibility report)" node tests/gpu_report_test.mjs; fi
     if have node; then run "vm-cli-test (apps/machines/model.js cliPlan, the machines command's session requests)" node tests/vm_cli_test.mjs; fi
+    if have node; then run "vm-group-model-test (apps/machines/model.js groupPlan: a machine group's start and stop order, its link)" node tests/vm_group_model_test.mjs; fi
     if have node; then run "vm-profiles-test (apps/machines/profiles.js, systems.js: .lordprofile import, your systems, PNG logos, library chips)" node tests/vm_profiles_test.mjs; fi
     if have node; then run "photos-places-test (apps/photos/places.js)" node tests/photos_places_test.mjs; fi
     if have node; then run "photos-trash-test (apps/photos/trash.js)" node tests/photos_trash_test.mjs; fi
@@ -370,6 +371,15 @@ EOF
         0) ok "machines-cli (tests/machinescli_headless.sh, headless lord-server, a throwaway machine)" ;;
         77) skip "machines-cli" "build/lord-server, build/machines, build/lord-vm, KVM, QEMU and the default theme (make, npm run build)" ;;
         *) bad "machines-cli (tests/machinescli_headless.sh, headless lord-server, a throwaway machine)" ;;
+    esac
+    # a machine group (Whonix) through a headless lord-server: start order, the link, Tor only through the gateway, no
+    # network with the gateway off, relinked after its restart (tests/vm_group_link.sh; its disks are WHONIX_GW and
+    # WHONIX_WS, docs/VIRTUALIZATION.md 19.0, and several minutes)
+    bash tests/vm_group_link.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)" ;;
+        77) skip "vm-group-link" "WHONIX_GW and WHONIX_WS (Whonix's disks with a serial shell), KVM, QEMU, unshare and the default theme" ;;
+        *) bad "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)"; tail -20 "$T/out" ;;
     esac
     # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
     sh tests/guest_clip_test.sh >"$T/out" 2>&1

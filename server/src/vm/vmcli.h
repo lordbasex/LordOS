@@ -14,7 +14,8 @@
  *
  * <dir> is the machine folder's real path, which the Machines app then has to find among its own library's machines
  * (lord.vm.list(): <~/Machines>/<name>.lordvm); anything else is refused there. The parser here only checks the form:
- * an absolute path of 2 to VMCLI_DIR_MAX bytes, ending in ".lordvm", no control characters (bytes below 0x20, 0x7f),
+ * an absolute path of 2 to VMCLI_DIR_MAX bytes, ending in ".lordvm" (or ".lordgroup": a machine group's folder,
+ * docs/VIRTUALIZATION.md 19.9), no control characters (bytes below 0x20, 0x7f),
  * no "//", no "." or ".." component, no trailing '/'; the verb exactly one of the four, one space, then the path to
  * the newline. No arguments, options, names or commands ever.
  *

@@ -88,5 +88,11 @@
   "state.crashed": "خرابی کے ساتھ رک گئی",
   "state.recovered": "بند (بحال شدہ)",
   "state.suspended": "معطل",
-  "state.stopped": "بند"
+  "state.stopped": "بند",
+  "groupStarted": "{name} چل رہی ہے: پہلے گیٹ وے، پھر ورک اسٹیشن۔",
+  "groupStopped": "{name} بند ہے: پہلے ورک اسٹیشن، پھر گیٹ وے۔",
+  "groupDamaged": "{name} خراب ہے: اس کی ایک مشین موجود نہیں یا اس کی اپنی نہیں۔",
+  "gatewayFailed": "{name} کا گیٹ وے شروع نہیں ہوا ({why})، اس لیے ورک اسٹیشن شروع نہیں کیا گیا۔",
+  "workstationFailed": "{name} کا ورک اسٹیشن شروع نہیں ہوا ({why})؛ گیٹ وے اب بھی چل رہا ہے۔",
+  "kind.group": "{count} کا گروپ"
 }

@@ -88,5 +88,11 @@
   "state.crashed": "Imesimama kwa hitilafu",
   "state.recovered": "Imezimwa (imerejeshwa)",
   "state.suspended": "Imesimamishwa kwa muda",
-  "state.stopped": "Imezimwa"
+  "state.stopped": "Imezimwa",
+  "groupStarted": "{name} inaendeshwa: kwanza lango, kisha kituo cha kazi.",
+  "groupStopped": "{name} imezimwa: kwanza kituo cha kazi, kisha lango.",
+  "groupDamaged": "{name} imeharibika: moja ya mashine zake haipo au si yake.",
+  "gatewayFailed": "Lango la {name} halikuanza ({why}), kwa hiyo kituo cha kazi hakikuanzishwa.",
+  "workstationFailed": "Kituo cha kazi cha {name} hakikuanza ({why}); lango bado linaendeshwa.",
+  "kind.group": "kikundi cha {count}"
 }

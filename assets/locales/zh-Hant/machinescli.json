@@ -88,5 +88,11 @@
   "state.crashed": "因錯誤而停止",
   "state.recovered": "已關閉（已復原）",
   "state.suspended": "已暫停並儲存",
-  "state.stopped": "已關閉"
+  "state.stopped": "已關閉",
+  "groupStarted": "{name} 正在執行：先閘道，後工作站。",
+  "groupStopped": "{name} 已關閉：先工作站，後閘道。",
+  "groupDamaged": "{name} 已損壞：其中一台機器遺失或不屬於它。",
+  "gatewayFailed": "{name} 的閘道沒有啟動（{why}），因此沒有啟動工作站。",
+  "workstationFailed": "{name} 的工作站沒有啟動（{why}）；閘道仍在執行。",
+  "kind.group": "{count} 台的群組"
 }

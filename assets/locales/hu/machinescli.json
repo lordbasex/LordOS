@@ -88,5 +88,11 @@
   "state.crashed": "Hibával leállt",
   "state.recovered": "Kikapcsolva (helyreállítva)",
   "state.suspended": "Felfüggesztve",
-  "state.stopped": "Kikapcsolva"
+  "state.stopped": "Kikapcsolva",
+  "groupStarted": "A(z) {name} fut: először az átjáró, aztán a munkaállomás.",
+  "groupStopped": "A(z) {name} ki van kapcsolva: először a munkaállomás, aztán az átjáró.",
+  "groupDamaged": "A(z) {name} sérült: az egyik gépe hiányzik, vagy nem az övé.",
+  "gatewayFailed": "A(z) {name} átjárója nem indult el ({why}), ezért a munkaállomás nem indult el.",
+  "workstationFailed": "A(z) {name} munkaállomása nem indult el ({why}); az átjáró továbbra is fut.",
+  "kind.group": "{count} gépes csoport"
 }

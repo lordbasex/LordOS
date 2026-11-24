@@ -88,5 +88,11 @@
   "state.crashed": "ত্রুটিসহ থেমে গেছে",
   "state.recovered": "বন্ধ (পুনরুদ্ধার করা)",
   "state.suspended": "সাসপেন্ড করা",
-  "state.stopped": "বন্ধ"
+  "state.stopped": "বন্ধ",
+  "groupStarted": "{name} চলছে: প্রথমে গেটওয়ে, তারপর ওয়ার্কস্টেশন।",
+  "groupStopped": "{name} বন্ধ: প্রথমে ওয়ার্কস্টেশন, তারপর গেটওয়ে।",
+  "groupDamaged": "{name} ক্ষতিগ্রস্ত: এর একটি মেশিন নেই বা এটির নিজের নয়।",
+  "gatewayFailed": "{name}-এর গেটওয়ে চালু হয়নি ({why}), তাই ওয়ার্কস্টেশন চালু করা হয়নি।",
+  "workstationFailed": "{name}-এর ওয়ার্কস্টেশন চালু হয়নি ({why}); গেটওয়ে এখনও চলছে।",
+  "kind.group": "{count}টির দল"
 }

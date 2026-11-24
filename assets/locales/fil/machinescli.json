@@ -88,5 +88,11 @@
   "state.crashed": "Huminto dahil sa error",
   "state.recovered": "Nakapatay (na-recover)",
   "state.suspended": "Naka-suspend",
-  "state.stopped": "Nakapatay"
+  "state.stopped": "Nakapatay",
+  "groupStarted": "Tumatakbo ang {name}: una ang gateway, saka ang workstation.",
+  "groupStopped": "Patay ang {name}: una ang workstation, saka ang gateway.",
+  "groupDamaged": "Sira ang {name}: nawawala ang isa sa mga machine nito o hindi ito kanya.",
+  "gatewayFailed": "Hindi nagsimula ang gateway ng {name} ({why}), kaya hindi sinimulan ang workstation.",
+  "workstationFailed": "Hindi nagsimula ang workstation ng {name} ({why}); tumatakbo pa rin ang gateway.",
+  "kind.group": "grupo ng {count}"
 }

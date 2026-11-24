@@ -88,5 +88,11 @@
   "state.crashed": "Mit Fehler gestoppt",
   "state.recovered": "Aus (wiederhergestellt)",
   "state.suspended": "Im Ruhezustand",
-  "state.stopped": "Aus"
+  "state.stopped": "Aus",
+  "groupStarted": "{name} läuft: zuerst das Gateway, dann die Workstation.",
+  "groupStopped": "{name} ist aus: zuerst die Workstation, dann das Gateway.",
+  "groupDamaged": "{name} ist beschädigt: Eine seiner Maschinen fehlt oder gehört nicht dazu.",
+  "gatewayFailed": "Das Gateway von {name} ist nicht gestartet ({why}), daher wurde die Workstation nicht gestartet.",
+  "workstationFailed": "Die Workstation von {name} ist nicht gestartet ({why}); das Gateway läuft weiter.",
+  "kind.group": "Gruppe aus {count}"
 }

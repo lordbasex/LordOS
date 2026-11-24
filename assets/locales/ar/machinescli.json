@@ -88,5 +88,11 @@
   "state.crashed": "توقف بخطأ",
   "state.recovered": "متوقف (مُستعاد)",
   "state.suspended": "معلّق",
-  "state.stopped": "متوقف"
+  "state.stopped": "متوقف",
+  "groupStarted": "{name} يعمل: البوابة أولًا ثم محطة العمل.",
+  "groupStopped": "{name} متوقف: محطة العمل أولًا ثم البوابة.",
+  "groupDamaged": "{name} تالف: إحدى أجهزته مفقودة أو ليست له.",
+  "gatewayFailed": "لم تبدأ بوابة {name} ({why})، لذا لم تبدأ محطة العمل.",
+  "workstationFailed": "لم تبدأ محطة عمل {name} ({why})؛ ما زالت البوابة تعمل.",
+  "kind.group": "مجموعة من {count}"
 }

@@ -88,5 +88,11 @@
   "state.crashed": "因错误而停止",
   "state.recovered": "已关闭（已恢复）",
   "state.suspended": "已挂起",
-  "state.stopped": "已关闭"
+  "state.stopped": "已关闭",
+  "groupStarted": "{name} 正在运行：先网关，后工作站。",
+  "groupStopped": "{name} 已关闭：先工作站，后网关。",
+  "groupDamaged": "{name} 已损坏：其中一台机器缺失或不属于它。",
+  "gatewayFailed": "{name} 的网关没有启动（{why}），因此没有启动工作站。",
+  "workstationFailed": "{name} 的工作站没有启动（{why}）；网关仍在运行。",
+  "kind.group": "{count} 台的组"
 }

@@ -180,6 +180,14 @@ static void test_channel(void) {
     NO("open /m/x\x7f.lordvm\n");
     NO("open /m/x.lordvm --no-window\n");                       /* nothing after the path: its name would end otherwise */
     NO("start-detached\t/m/x.lordvm\n");
+    /* a machine group's folder (docs/VIRTUALIZATION.md 19.9) */
+    OK("start-detached /home/a/Machines/Whonix.lordgroup\n");
+    CHECK(r.verb == VMCLI_START_DETACHED && !strcmp(r.dir, "/home/a/Machines/Whonix.lordgroup"));
+    NO("open /m/.lordgroup\n");
+    NO("open /m/x.lordgroup/\n");
+    NO("open /m/../x.lordgroup\n");
+    NO("open /m/x.lordgroups\n");
+    NO("open /m/x.LORDGROUP\n");
     CHECK(vmcli_req_parse("open /m/x\0.lordvm\n", 17, &r));
     /* the longest path, and one byte more */
     memcpy(line, "open /", 6);

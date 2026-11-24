@@ -1,7 +1,7 @@
 # The machines command (src/cli, docs/VIRTUALIZATION.md "From the terminal"; approved by the maintainer 2026-11-21):
 # Machines from the terminal. libc only: lord-vm on the library's folders, and the session channel (vm/vmcli.c) for
 # start and open. Installed as /usr/lib/lordos/bin/machines with /usr/bin/machines a link to it (tools/iso/mkdeb.sh).
-MCLI_SRC := src/cli/machines.c src/cli/mcli.c src/vm/vmcli.c src/vm/machine.c src/sec/json.c src/doc/wire.c
+MCLI_SRC := src/cli/machines.c src/cli/mcli.c src/vm/vmcli.c src/vm/machine.c src/vm/vmgroup.c src/sec/json.c src/doc/wire.c
 MCLI_HDR := src/cli/mcli.h src/vm/vmcli.h src/vm/machine.h src/sec/json.h src/doc/wire.h src/web/weblangid.h
 all: build/machines
 build/machines: $(MCLI_SRC) $(MCLI_HDR)

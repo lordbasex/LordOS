@@ -88,5 +88,11 @@
   "state.crashed": "त्रुटि के साथ रुकी",
   "state.recovered": "बंद (पुनर्प्राप्त)",
   "state.suspended": "निलंबित",
-  "state.stopped": "बंद"
+  "state.stopped": "बंद",
+  "groupStarted": "{name} चल रहा है: पहले गेटवे, फिर वर्कस्टेशन।",
+  "groupStopped": "{name} बंद है: पहले वर्कस्टेशन, फिर गेटवे।",
+  "groupDamaged": "{name} खराब है: इसकी एक मशीन गायब है या इसकी अपनी नहीं है।",
+  "gatewayFailed": "{name} का गेटवे शुरू नहीं हुआ ({why}), इसलिए वर्कस्टेशन शुरू नहीं किया गया।",
+  "workstationFailed": "{name} का वर्कस्टेशन शुरू नहीं हुआ ({why}); गेटवे अब भी चल रहा है।",
+  "kind.group": "{count} का समूह"
 }
