@@ -6,7 +6,8 @@
 #
 # Parts (each prints its figures; --json writes them all):
 #   boot     seconds from `lord-vm --start` to the guest's "MH-READY" on its serial console, UEFI and SeaBIOS (amd64), 3 runs
-#   cpu      SHA-256 of 4 GiB of zeros (coreutils) and a Python loop, best of 3, in the guest and on this computer
+#   cpu      SHA-256 of a 1 GiB file in memory (tmpfs) and of 4 GiB of zeros through a pipe (coreutils), and a Python
+#            loop, best of 3, in the guest and on this computer
 #   disk     dd of 2 GiB with direct I/O, write then read, in the guest (its qcow2 disk, virtio-blk, the iothread) and on
 #            this computer in the same folder as the library (best of 3)
 #   net      iperf3 over the Shared network (passt), 10 s each way, through a port forwarded to the guest
@@ -181,14 +182,22 @@ def main():
                 res["idle_qemu_pct_of_core"] = round(100 * (c1 - c0) / (t1 - t0), 2)
                 print("idle: QEMU %.2f %% of a core (60 s, 90 s after boot)" % res["idle_qemu_pct_of_core"], flush=True)
             if "cpu" in parts:
-                con.run("mkdir -p /mnt/t && mount -t tmpfs -o size=1g tmpfs /mnt/t", 30)
+                # SHA-256 of a 1 GiB file in memory (tmpfs: no disk, no pipe), and of 4 GiB of zeros through a pipe
+                con.run("mkdir -p /mnt/t && mount -t tmpfs -o size=1200m tmpfs /mnt/t && head -c 1G /dev/urandom > /mnt/t/f", 120)
+                g0 = timed_guest(con, "sha256sum /mnt/t/f")
+                hf = "/dev/shm/lordos-targets-%d" % os.getpid()
+                sh("head -c 1G /dev/urandom > %s" % hf)
+                h0 = timed_host("sha256sum %s" % hf)
+                os.unlink(hf)
+                con.run("rm -f /mnt/t/f", 30)
                 g1 = timed_guest(con, "head -c 4G /dev/zero | sha256sum")
                 h1 = timed_host("head -c 4G /dev/zero | sha256sum")
                 out, _ = con.run("command -v python3 || (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-minimal) >/dev/null 2>&1; command -v python3", 600)
                 py = "python3 -c 'sum(i*i for i in range(30000000))'"
                 g2 = timed_guest(con, py) if "python3" in out else None
                 h2 = timed_host(py)
-                res["cpu"] = {"sha256_4g": {"guest_s": round(g1, 2), "host_s": round(h1, 2), "pct": round(100 * h1 / g1, 1)},
+                res["cpu"] = {"sha256_file_1g": {"guest_s": round(g0, 2), "host_s": round(h0, 2), "pct": round(100 * h0 / g0, 1)},
+                              "sha256_pipe_4g": {"guest_s": round(g1, 2), "host_s": round(h1, 2), "pct": round(100 * h1 / g1, 1)},
                               "python": {"guest_s": round(g2, 2) if g2 else None, "host_s": round(h2, 2), "pct": round(100 * h2 / g2, 1) if g2 else None}}
                 print("cpu: %s" % res["cpu"], flush=True)
             if "disk" in parts:

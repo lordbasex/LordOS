@@ -1927,6 +1927,15 @@ export function groupPlan(group, list, action) {
 }
 // a start the plan asked for ended without the member running (its state went back to stopped or crashed): the
 // gateway's failure stops the group's start; the workstation's leaves the gateway running (19.9)
+// the windows a group job closes before it runs (19.7, 19.8): Start Fresh gives a member a new id, Delete and Repair
+// remove or make a member again; a member's window kept open would still follow its folder under the old id, and the
+// group's next start would run in two windows, one of them then saying the machine didn't start (found by the release
+// gate on real hardware, 2026-11-24). Only windows of members that aren't running: these jobs need the group off.
+export function groupJobCloses(item, kind) {
+  if (kind !== 'fresh' && kind !== 'delete' && kind !== 'repair') return [];
+  return [item?.ws, item?.gw].filter((m) => m && (m.id || m.folder) && !stateView(m.state, m.reason).active)
+    .map((m) => `machines#vm-${m.id || m.folder}`);
+}
 export function groupStartFailed(role) { return role === 'gateway' ? 'gatewayFailed' : 'workstationFailed'; }
 // whether the group's link should be made now (lord.vm.link): both members run and their supervisors aren't the pair
 // last linked. key: the members' lord-vm pids, so a member started anew (its QEMU gone, the old pair dead) is linked again
