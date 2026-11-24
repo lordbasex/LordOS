@@ -4778,7 +4778,7 @@ development*, a test tool; the same made-up library with `machines_see_scene/pre
 and channels on, one with Secure Boot, a computer missing passt): Configure → Security's list (every channel, the network's
 mode, the folder count, Show opening its section), Configure → Boot with the kernel and initrd kept and with Secure Boot's
 refusal, the Machine menu's Requirements page, and the assistant's virtio-win card → the 90-day image → Review → What's
-Missing → its own page (the TPM, drivers and WinFsp *At Create*, its guest tools). 30 of 30 steps on the i9, 2026-11-24.
+Missing → its own page (the TPM, drivers and WinFsp *At Create*, its guest tools). 23 of 23 steps on the i9, 2026-11-24.
 
 **Direct kernel boot with real QEMU** (`tools/vm/e2e/machines/kernel-boot.py`, *in development*; KVM, private
 namespaces, the harness's Debian 13 guest): with UEFI and with BIOS, the guest booted from its disk, its own kernel and

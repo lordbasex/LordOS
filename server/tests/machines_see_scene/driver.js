@@ -114,7 +114,7 @@
     await sleep(1500);
     const title = [...P.texts.values()].find((s) => s.startsWith(f('req.pageFor', { name: '' }).trim().split(' ')[0]) && s !== M['req.page']) || '';
     step('requirements: the system\'s own page', has(f('req.pageFor', { name: 'Windows 11' })), title);
-    step('requirements: its rows (the TPM, drivers, WinFsp, its tools, the network missing)', has(M['req.row.tpm']) && has(M['req.row.drivers']) && has(M['req.row.winfsp']) && has(M['req.row.toolsWin']) && has(M['req.st.download']));
+    step('requirements: its rows (the TPM, drivers, WinFsp, its tools, the network to install)', has(M['req.row.tpm']) && has(M['req.row.drivers']) && has(M['req.row.winfsp']) && has(M['req.row.toolsWin']) && has(M['req.st.download']));
     await shot('requirements-system');
     log('done');
   })().catch((e) => log(`error missing ${e && e.stack}`));
