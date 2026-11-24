@@ -38,8 +38,8 @@ recomputes both from the rows; the arithmetic:
 
 | Area | Weight | Items | Mean | Score | Points (weight × score) | Before |
 |---|---:|---:|---:|---:|---:|---:|
-| A. Engine, lifecycle, sandbox, display | 14 | 22 | 92.05 | 92 % | 14 × 92 % = 12.88 | 78 % |
-| B. Getting a system in (cards, unattended, import) | 12 | 13 | 87.85 | 88 % | 12 × 88 % = 10.56 | 76 % |
+| A. Engine, lifecycle, sandbox, display | 14 | 22 | 95.00 | 95 % | 14 × 95 % = 13.30 | 78 % |
+| B. Getting a system in (cards, unattended, import) | 12 | 13 | 92.46 | 92 % | 12 × 92 % = 11.04 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 95.17 | 95 % | 11 × 95 % = 10.45 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 85.00 | 85 % | 9 × 85 % = 7.65 | 60 % |
 | E. Network | 6 | 4 | 88.75 | 89 % | 6 × 89 % = 5.34 | 80 % |
@@ -49,12 +49,12 @@ recomputes both from the rows; the arithmetic:
 | I. Guest tools and agent (state, shell, logs) | 7 | 6 | 91.67 | 92 % | 7 × 92 % = 6.44 | 75 % |
 | J. Command line and automation | 3 | 2 | 92.50 | 93 % | 3 × 93 % = 2.79 | 48 % |
 | K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 91.25 | 91 % | 3 × 91 % = 2.73 | 61 % |
-| L. Privacy and security model | 4 | 7 | 85.71 | 86 % | 4 × 86 % = 3.44 | 74 % |
+| L. Privacy and security model | 4 | 7 | 93.57 | 94 % | 4 × 94 % = 3.76 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 92.00 | 92 % | 3 × 92 % = 2.76 | 55 % |
-| **Total** | **100** | **110** | | | **85.12 → 85 %** | 69 % |
+| **Total** | **100** | **110** | | | **86.34 → 86 %** | 69 % |
 
-Σ = 12.88 + 10.56 + 10.45 + 7.65 + 5.34 + 3.36 + 10.92 + 3.22 + 6.44 + 2.79 + 2.73 + 3.44 + 2.58 + 2.76 = 85.12, rounded **85 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 13.30 + 11.04 + 10.45 + 7.65 + 5.34 + 3.36 + 10.92 + 3.22 + 6.44 + 2.79 + 2.73 + 3.76 + 2.58 + 2.76 = 86.34, rounded **86 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); USB, then camera and printers (F, +1.2
@@ -89,7 +89,7 @@ can see" (L, 60 → 40), recording (F, ✅ → 🧪), `isoInfo` (B, 100 → 85),
 (J, 100 → 95), and raised the failure page (A, 60 → 65), the requirements check (B, 70 → 80), Configure (C, 50 → 60),
 storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets (M, 50 → 60).
 
-### A. Engine, lifecycle, sandbox, display (92 %)
+### A. Engine, lifecycle, sandbox, display (95 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -113,10 +113,10 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Self-healing network (passt restarted while running) | ✅ | 100 | `lordvm.c` (keeper, `NET_MAX_RESTARTS`) |  |
 | Failure page with a cause and a fix (6.1) | ✅ | 90 | `vmwindow.jsx` (`Failed`), `model.js` `failCause`, `failActions`, `machines.why.*` and `fix.*`; `vm_model_test.mjs` | *In development*: a locked disk and a missing disk named from QEMU's words, Start with less memory after running out, Go Back to a Snapshot. Checked with QEMU's messages in the model test, not with a real failure on screen |
 | A state saved by another QEMU or CPU: Resume anyway or discard (6.1) | ✅ | 90 | `lordvm.c` (`--resume-anyway`), `vmwindow.jsx`, `apps/store/syspkg.js` `qemuUpdateRisk`, `debian.js` (Updates); `store_syspkg_test.mjs` | *In development*: Store → Updates warns when an update changes QEMU while machines are suspended. HDA is migrated with the state (nothing to unplug); what can't be saved (a graphics card, 3D) is never suspended |
-| Direct kernel boot (13.8 item 9; 6.1, "Start Linux directly") | ✅ | 95 | `lordvm.c` (`kboot_files`, `kboot_stage`, `S.kboot`), `vmkboot.h`, `machine.c` (schema 21 `kernel_boot`), `js_vm.c` (`kernelBoot`, `kernelFile`, `kernelCmdline`; `set`), `configure.jsx` (Boot), `model.js` `kbootBlocked`; `vmkboot-test` (ASan, UBSan, a random pass), `vm-test` (schema 21), `vm_model_test.mjs`, `tools/vm/e2e/machines/kernel-boot.py`, `machines_see_headless.sh` | *In development* (2026-11-24): an installed Linux guest started from its own kernel, initrd and command line kept in `disks/boot` (copied in all or nothing, checked), refused with Secure Boot, the virtio-win devices, encryption and for a group; KBOOT_ROW. Not run on arm64 (the Pi has no build of this branch; the kernel check for arm64 is unit-tested) (was 30) |
+| Direct kernel boot (13.8 item 9; 6.1, "Start Linux directly") | ✅ | 95 | `lordvm.c` (`kboot_files`, `kboot_stage`, `S.kboot`), `vmkboot.h`, `machine.c` (schema 21 `kernel_boot`), `js_vm.c` (`kernelBoot`, `kernelFile`, `kernelCmdline`; `set`), `configure.jsx` (Boot), `model.js` `kbootBlocked`; `vmkboot-test` (ASan, UBSan, a random pass), `vm-test` (schema 21), `vm_model_test.mjs`, `tools/vm/e2e/machines/kernel-boot.py`, `machines_see_headless.sh` | *In development* (2026-11-24): an installed Linux guest started from its own kernel, initrd and command line kept in `disks/boot` (copied in all or nothing, checked), refused with Secure Boot, the virtio-win devices, encryption and for a group; cold start to `MH-READY` on the i9 14.74 → 7.13 s with UEFI, 12.1 → 7.02 s with BIOS, real QEMU/KVM end to end (`kernel-boot.py`, 52 of 52). Not run on arm64 (the Pi has no build of this branch; the kernel check for arm64 is unit-tested) (was 30) |
 | Rename a machine with its folder and transfer folder (6.26) | 🧪 | 100 | `machine.c` (`renameat2`); `vm_rename.sh` | *In development*; headless |
 
-### B. Getting a system in (88 %)
+### B. Getting a system in (92 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -235,7 +235,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Cleaner, Backups, Files bundle, Search, Pause All on battery, start with the session, auto-pause, Reclaim in Machines (6.14, 16) | ✅ | 100 | `clean/cleanfs.c` `clean_machine_path`, `apps/cleaner/vmspace.js` `machinesSpace`, `backup/engine.c` (`hold`), `backup.c`, `machine.c` `vm_backup_hold`, `vm_dir_active`, `sdk/openwith.js` `registerBundle`, `apps/files`, `apps/machines/ties.js`; `clean-test`, `backup-test`, `vm-test`, `vm_model_test.mjs`, `machines_app_headless.sh` | *In development*: Cleaner never offers a machine's files and its Storage view sends a machine's space to Machines' Storage window (Reclaim in Machines); Backups hold back a running machine's disks and saved session; Files shows a machine as one item; Search finds machines; Pause All on battery; Start with the session; Pause while I'm away. No balloon: decided 2026-11-24 (6.14) |
 | Sentinela watches running machines: sandbox and scope, a Workstation's ways out, crashes, CPU, memory, a Gateway's traffic (docs/SENTINELA.md, "Machines") | 🧪 | 95 | `sdk/sentinelavm.js`, `vmwatch.h` (`vmwatch_procs_*`, `vmwatch_cg_lordvm`, `SO_PEERPIDFD`), `js_vm.c` (`stats`: lord-vm asked over its socket, `SO_PEERCRED`, `vm_vouched`; a pidfd kept by `start` and, through `lord-vm --pidfd-to`, by `startDetached`), `monitor/conn.c` (`conn_machines`); `sentinela_vm_test.mjs`, `vmwatch-test`, `sentinela_vm_live.sh` | *In development*; off by default; counts only. **Run live on 2026-11-24** (`sentinela_vm_live.sh`: a real KVM machine under a headless session, Sentinela on, screenshots): it first found a false alert (lord-vm is non-dumpable, so `/proc/<lord-vm>/exe` can't be read and nothing was verified); fixed the same day with pidfds lord-server keeps of every lord-vm it starts (adopting one after its own restart only from `SO_PEERPIDFD` in the machine's own scope). Run again: verified on every read, no unverified alert, vmSandbox names only the cgroup a headless run lacks. Not run: a real LordOS session with scopes, the adoption after a lord-server restart (unit-tested only) |
 
-### L. Privacy and security (86 %)
+### L. Privacy and security (94 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -5149,7 +5149,9 @@ networking, virtiofs on both architectures, the desktop under a 3-vCPU load. Sti
 8. **`passt` on the Pi:** why its speed ranges from 96 to 379 MB/s from run to run, and whether that matters for real traffic.
 9. **Boot time:** UEFI firmware is 12.3 s of the Pi's 18.6 s. Whether a lighter firmware setup or direct kernel boot for Linux guests is
    worth offering. **Answered (2026-11-24):** direct kernel boot is offered as Configure → Boot → *Start Linux directly* (6.1);
-   it skips the boot loader and its countdown, the firmware stays. KBOOT_RESULTS
+   it skips the boot loader and its countdown, the firmware stays. **Measured** on the i9 (KVM, 2 vCPUs, the harness's Debian 13
+   guest, a cold start to `MH-READY` on its serial console): UEFI 14.74 s from the disk, 7.13 s with its kernel started directly;
+   SeaBIOS 12.1 s and 7.02 s (`kernel-boot.py`, 52 of 52 checks). The Pi's figure with AAVMF is still to measure.
 
 ## 14. Phases
 
@@ -5220,7 +5222,7 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Cards for Ubuntu, Fedora, Debian, Kali, always the newest image of each release | 2 | Yes | 4.1 |
 | Any ISO of the host's architecture | 1 | Yes | |
 | Install from ISO with detection of system and architecture | 1 | Yes | |
-| Requirements check with one-click install | 2 | Yes | Through the Store |
+| Requirements check with one-click install | 2 | Yes | Per chosen system; packages through `vm-enable` (the Store's engine and signed sources) |
 | Automatic install, Linux guests | 2 | Yes | |
 | virtio-win guest with optional unattended install, skipping Setup | 3 | Partly | amd64 and arm64; can't be promised across releases; no activation (4.3) |
 | Drivers attached during install, tools at the end | 3 | Yes | Pinned versions |

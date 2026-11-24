@@ -5,11 +5,11 @@
  "items": [
   {
    "area": "A",
-   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 19, lock, `run.json`, crash recovery (3.8, 3.9)",
+   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 21, lock, `run.json`, crash recovery (3.8, 3.9)",
    "status": "✅",
    "pct": 100,
-   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 19`); `vm-test`, `vmgroup-test`",
-   "note": "Schema 19 (*in development*) adds `heads` (5.4, All Displays); 18 `cpu_model` (5.5); 17 `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
+   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 21`); `vm-test`, `vmgroup-test`",
+   "note": "Schema 21 (*in development*) adds `kernel_boot` (6.1, Start Linux directly); 20 `guest_files` (6.21); 19 `heads` (5.4, All Displays); 18 `cpu_model` (5.5); 17 `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
   },
   {
    "area": "A",
@@ -165,11 +165,11 @@
   },
   {
    "area": "A",
-   "item": "Direct kernel boot (13.8 item 9)",
-   "status": "🟡",
-   "pct": 30,
-   "file": "`lordvm.c`",
-   "note": "Unattended installs only; none for an installed Linux guest"
+   "item": "Direct kernel boot (13.8 item 9; 6.1, \"Start Linux directly\")",
+   "status": "✅",
+   "pct": 95,
+   "file": "`lordvm.c` (`kboot_files`, `kboot_stage`, `S.kboot`), `vmkboot.h`, `machine.c` (schema 21 `kernel_boot`), `js_vm.c` (`kernelBoot`, `kernelFile`, `kernelCmdline`; `set`), `configure.jsx` (Boot), `model.js` `kbootBlocked`; `vmkboot-test` (ASan, UBSan, a random pass), `vm-test` (schema 21), `vm_model_test.mjs`, `tools/vm/e2e/machines/kernel-boot.py`, `machines_see_headless.sh`",
+   "note": "*In development* (2026-11-24): an installed Linux guest started from its own kernel, initrd and command line kept in `disks/boot` (copied in all or nothing, checked), refused with Secure Boot, the virtio-win devices, encryption and for a group; cold start to `MH-READY` on the i9 14.74 → 7.13 s with UEFI, 12.1 → 7.02 s with BIOS, real QEMU/KVM end to end (`kernel-boot.py`, 52 of 52). Not run on arm64 (the Pi has no build of this branch; the kernel check for arm64 is unit-tested) (was 30)"
   },
   {
    "area": "A",
@@ -262,18 +262,18 @@
   {
    "area": "B",
    "item": "Requirements check (5.2)",
-   "status": "🟡",
-   "pct": 80,
-   "file": "`library.jsx` `Requirements`, `model.js` `reqRows`, `missingFor`, `assistant.jsx`, `vm-enable`",
-   "note": "Create, which starts the download, waits until the parts are in (one click through the package engine). No per-system page of drivers and tools; not through the Store"
+   "status": "✅",
+   "pct": 95,
+   "file": "`library.jsx` `Requirements` (`sys`), `model.js` `reqRows`, `missingFor`, `assistant.jsx` (What's Missing with the chosen system), `js_vm.c` `host().guestTools`, `vm-enable`; `vm_model_test.mjs`, `machines_see_headless.sh`",
+   "note": "*In development* (2026-11-24): the Review's What's Missing opens *What ‹system› needs*: only that system's parts, the TPM for a virtio-win guest, its drivers and WinFsp *At Create*, the LordOS guest tools, an unattended install's answers *Built in*; seen headless for the virtio-win card (rows and statuses). Packages through `vm-enable` (the package engine with the Store's signed sources), not the Store's window: decided 2026-11-24. Not run: an install of a missing part from this page on screen (was 80)"
   },
   {
    "area": "B",
    "item": "Migrate from another PC (6.11)",
    "status": "🟡",
-   "pct": 25,
-   "file": "`lordvm.c` `--import-machine` (a raw whole-disk image), `machines.c` `cmd_import`",
-   "note": "*In development*: a backup image of a Linux PC's disk imports and boots (a 20 GB Ubuntu 26.04.1 image, 2026-11-24, with the import's `fsync` fix). Not built: the old PC's agent and the LAN copy, a connected disk, driver injection, encrypted disks (was ❌ 0)"
+   "pct": 70,
+   "file": "`machines.c` `cmd_migrate` (`machines migrate`), `lordvm.c` `--import-machine`; `machinescli.json`",
+   "note": "*In development* (2026-11-24): another PC's whole disk over the LAN through the person's own SSH (the old PC's SSH server is the agent: no new port, crypto or root; its sudo with `--sudo`), or a disk connected here; strict size header, sparse raw file, then the import with the compatible devices. Checked from the i9 with the Pi 5 as the old PC: a 20 GB disk (root-only loop device, `--sudo`) in 190 s, imported and booted to `MH-READY`; refusals (no sudo, a shell character, a host starting with `-`). Not built: an assistant tile (terminal only), a resumed copy, driver injection (compatible devices instead, 6.11), an old PC with no SSH server unless booted from a live USB (was 25)"
   },
   {
    "area": "B",
@@ -774,10 +774,10 @@
   {
    "area": "L",
    "item": "\"Guest can see\" (8, 16)",
-   "status": "🟡",
-   "pct": 40,
-   "file": "`configure.jsx` (Security: six notes on the sandbox)",
-   "note": "It doesn't list the guest's channels; each one's switch is in its own section; no single panel, no live state (was 60)"
+   "status": "✅",
+   "pct": 95,
+   "file": "`configure.jsx` (`GuestCanSee`, Security), `model.js` `guestChannels`, `channelSet`; `vm_model_test.mjs`, `machines_see_headless.sh`",
+   "note": "*In development* (2026-11-24): one list in Configure → Security of every channel (network and ports, screen, keyboard and mouse, sound, microphone, the clipboard each way, folders, transfer folder, agent, Automation, files, links, notifications), each with its state, its live state while running (agent connected or not, a change waiting for the next start) and its switch or a Show button to its section; anonymity rows locked. Seen headless (screenshots); not yet with a running guest on screen (was 40)"
   },
   {
    "area": "L",
@@ -890,16 +890,16 @@
    "name": "Engine, lifecycle, sandbox, display",
    "weight": 14,
    "items": 22,
-   "mean": 92.05,
-   "score": 92
+   "mean": 95.0,
+   "score": 95
   },
   {
    "id": "B",
    "name": "Getting a system in",
    "weight": 12,
    "items": 13,
-   "mean": 87.85,
-   "score": 88
+   "mean": 92.46,
+   "score": 92
   },
   {
    "id": "C",
@@ -978,8 +978,8 @@
    "name": "Privacy and security model",
    "weight": 4,
    "items": 7,
-   "mean": 85.71,
-   "score": 86
+   "mean": 93.57,
+   "score": 94
   },
   {
    "id": "M",
@@ -998,6 +998,6 @@
    "score": 92
   }
  ],
- "total": 85,
- "total_exact": 85.12
+ "total": 86,
+ "total_exact": 86.34
 }
