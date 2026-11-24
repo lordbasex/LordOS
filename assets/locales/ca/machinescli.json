@@ -112,6 +112,7 @@
   "help.cp": "copia un fitxer a una màquina o des d'ella; un costat és NOM:CAMÍ (~ és la carpeta personal de la persona allà)",
   "help.logs": "el diari del sistema convidat, la seva consola sèrie (--serial) o el registre de la màquina (--machine); --follow continua llegint",
   "help.console": "la consola sèrie de la màquina en aquest terminal; Ctrl+] en surt",
+  "help.shell": "una shell com la persona que ha iniciat la sessió a la màquina, amb les seves eines de LordOS; Ctrl+] en surt",
   "help.mcp": "un servidor MCP local per l'entrada i la sortida estàndard, per a un agent de programació: només actua en màquines amb l'automatització activada",
   "help.apply": "crea o canvia una màquina a partir d'un fitxer de text curt (nom, memòria, processadors, disc, xarxa, iso, ports, carpetes)",
   "help.import": "porta una màquina d'una altra app de virtualització (un .vmx, .vbox, .utm, .pvm, .ova o un disc) amb la seva identitat, com Migra a l'app",

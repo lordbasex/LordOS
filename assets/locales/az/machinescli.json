@@ -112,6 +112,7 @@
   "help.cp": "faylı maşına və ya maşından kopyalayır; bir tərəf AD:YOL olur (~ oradakı şəxsin ev qovluğudur)",
   "help.logs": "qonaq sistemin jurnalı, seriya konsolu (--serial) və ya maşının öz jurnalı (--machine); --follow oxumağa davam edir",
   "help.console": "maşının seriya konsolu bu terminalda; Ctrl+] çıxır",
+  "help.shell": "maşına daxil olmuş şəxs kimi, onun LordOS alətləri vasitəsilə bir qabıq; Ctrl+] çıxır",
   "help.mcp": "proqramlaşdırma agenti üçün standart giriş və çıxışda yerli MCP serveri: yalnız avtomatlaşdırması açıq maşınlarda işləyir",
   "help.apply": "qısa mətn faylından maşın yaradır və ya dəyişir (ad, yaddaş, prosessorlar, disk, şəbəkə, iso, portlar, qovluqlar)",
   "help.import": "başqa virtuallaşdırma tətbiqindən maşını (.vmx, .vbox, .utm, .pvm, .ova və ya disk) kimliyi ilə gətirir, tətbiqdəki Köçür kimi",

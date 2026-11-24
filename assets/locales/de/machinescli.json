@@ -112,6 +112,7 @@
   "help.cp": "kopiert eine Datei in eine Maschine oder aus ihr; eine Seite ist NAME:PFAD (~ ist dort der persönliche Ordner der Person)",
   "help.logs": "das Journal des Gastsystems, seine serielle Konsole (--serial) oder das Protokoll der Maschine (--machine); --follow liest weiter",
   "help.console": "die serielle Konsole der Maschine in diesem Terminal; Strg+] beendet",
+  "help.shell": "eine Shell als die in der Maschine angemeldete Person, über ihre LordOS-Werkzeuge; Strg+] beendet",
   "help.mcp": "ein lokaler MCP-Server über Standardeingabe und -ausgabe, für einen Programmier-Agenten: er handelt nur bei Maschinen mit eingeschalteter Automatisierung",
   "help.apply": "erstellt oder ändert eine Maschine aus einer kurzen Textdatei (Name, Speicher, Prozessoren, Festplatte, Netzwerk, ISO, Ports, Ordner)",
   "help.import": "holt eine Maschine aus einer anderen Virtualisierungs-App (.vmx, .vbox, .utm, .pvm, .ova oder eine Festplatte) mit ihrer Identität, wie Migrieren in der App",

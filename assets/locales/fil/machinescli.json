@@ -112,6 +112,7 @@
   "help.cp": "kinokopya ang isang file papasok o palabas ng machine; ang isang panig ay PANGALAN:PATH (~ ang home folder ng tao roon)",
   "help.logs": "ang journal ng guest system, ang serial console nito (--serial) o ang sariling log ng machine (--machine); patuloy na nagbabasa ang --follow",
   "help.console": "ang serial console ng machine sa terminal na ito; Ctrl+] para lumabas",
+  "help.shell": "isang shell bilang taong naka-sign in sa machine, sa pamamagitan ng mga LordOS tool nito; Ctrl+] para lumabas",
   "help.mcp": "isang lokal na MCP server sa standard input at output, para sa coding agent: kumikilos lamang sa mga machine na naka-on ang automation",
   "help.apply": "gumagawa o nagbabago ng machine mula sa maikling text file (pangalan, memory, processor, disk, network, iso, port, folder)",
   "help.import": "nagdadala ng machine mula sa ibang virtualization app (.vmx, .vbox, .utm, .pvm, .ova o disk) kasama ang pagkakakilanlan nito, gaya ng Migrate sa app",

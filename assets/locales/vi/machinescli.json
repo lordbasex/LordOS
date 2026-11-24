@@ -112,6 +112,7 @@
   "help.cp": "sao chép một tệp vào máy hoặc ra khỏi máy; một bên là TÊN:ĐƯỜNG_DẪN (~ là thư mục nhà của người đó ở đó)",
   "help.logs": "nhật ký của hệ thống khách, bảng điều khiển nối tiếp (--serial) hoặc nhật ký của chính máy (--machine); --follow tiếp tục đọc",
   "help.console": "bảng điều khiển nối tiếp của máy trong terminal này; Ctrl+] để thoát",
+  "help.shell": "một shell với tư cách người đã đăng nhập vào máy, qua công cụ LordOS của máy; Ctrl+] để thoát",
   "help.mcp": "một máy chủ MCP cục bộ trên đầu vào và đầu ra chuẩn, cho một tác tử lập trình: chỉ tác động lên máy đã bật tự động hóa",
   "help.apply": "tạo hoặc thay đổi một máy từ một tệp văn bản ngắn (tên, bộ nhớ, bộ xử lý, đĩa, mạng, iso, cổng, thư mục)",
   "help.import": "đưa một máy từ ứng dụng ảo hóa khác (.vmx, .vbox, .utm, .pvm, .ova hoặc một đĩa) vào cùng danh tính của nó, như Di chuyển trong ứng dụng",

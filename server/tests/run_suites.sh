@@ -401,6 +401,13 @@ EOF
         77) skip "vm-group-link" "WHONIX_GW and WHONIX_WS (Whonix's disks with a serial shell), KVM, QEMU, unshare and the default theme" ;;
         *) bad "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)"; tail -20 "$T/out" ;;
     esac
+    # machines shell and console against a stand-in lord-vm (tests/machines_shell_test.sh)
+    bash tests/machines_shell_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "machines-shell (tests/machines_shell_test.sh, machines shell and console against a stand-in lord-vm)" ;;
+        77) skip "machines-shell" "build/machines, cc and python3" ;;
+        *) bad "machines-shell (tests/machines_shell_test.sh, machines shell and console against a stand-in lord-vm)"; tail -20 "$T/out" ;;
+    esac
     # machines exec, cp, logs and mcp against a real running Linux machine with automation on (tests/vm_exec_e2e.sh;
     # VM_EXEC_NAME and VM_EXEC_USER, in a private HOME and namespaces)
     bash tests/vm_exec_e2e.sh >"$T/out" 2>&1

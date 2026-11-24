@@ -112,6 +112,7 @@
   "help.cp": "menyalin berkas ke mesin atau dari mesin; satu sisi adalah NAMA:JALUR (~ adalah folder rumah orang itu di sana)",
   "help.logs": "jurnal sistem tamu, konsol serialnya (--serial) atau log mesin itu sendiri (--machine); --follow terus membaca",
   "help.console": "konsol serial mesin di terminal ini; Ctrl+] untuk keluar",
+  "help.shell": "shell sebagai orang yang masuk ke mesin, melalui alat LordOS-nya; Ctrl+] untuk keluar",
   "help.mcp": "server MCP lokal di masukan dan keluaran standar, untuk agen pemrograman: hanya bertindak pada mesin dengan otomatisasi aktif",
   "help.apply": "membuat atau mengubah mesin dari berkas teks pendek (nama, memori, prosesor, disk, jaringan, iso, port, folder)",
   "help.import": "membawa mesin dari aplikasi virtualisasi lain (.vmx, .vbox, .utm, .pvm, .ova, atau disk) dengan identitasnya, seperti Migrasi di aplikasi",

@@ -112,6 +112,7 @@
   "help.cp": "kopioi tiedoston koneeseen tai siitä; toinen puoli on NIMI:POLKU (~ on henkilön kotikansio siellä)",
   "help.logs": "vierasjärjestelmän lokikirja, sen sarjakonsoli (--serial) tai koneen oma loki (--machine); --follow jatkaa lukemista",
   "help.console": "koneen sarjakonsoli tässä päätteessä; Ctrl+] lopettaa",
+  "help.shell": "komentotulkki koneeseen kirjautuneena henkilönä sen LordOS-työkalujen kautta; Ctrl+] lopettaa",
   "help.mcp": "paikallinen MCP-palvelin vakiosyötteessä ja -tulosteessa ohjelmointiagentille: se toimii vain koneissa, joissa automaatio on päällä",
   "help.apply": "luo tai muuttaa koneen lyhyestä tekstitiedostosta (nimi, muisti, suorittimet, levy, verkko, iso, portit, kansiot)",
   "help.import": "tuo koneen toisesta virtualisointisovelluksesta (.vmx, .vbox, .utm, .pvm, .ova tai levy) identiteetteineen, kuten sovelluksen Siirrä",

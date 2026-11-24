@@ -112,6 +112,7 @@
   "help.cp": "menyalin fail ke dalam mesin atau keluar darinya; satu sisi ialah NAMA:LALUAN (~ ialah folder rumah orang itu di sana)",
   "help.logs": "jurnal sistem tetamu, konsol bersirinya (--serial) atau log mesin itu sendiri (--machine); --follow terus membaca",
   "help.console": "konsol bersiri mesin dalam terminal ini; Ctrl+] untuk keluar",
+  "help.shell": "shell sebagai orang yang log masuk ke mesin, melalui alat LordOS-nya; Ctrl+] untuk keluar",
   "help.mcp": "pelayan MCP setempat pada input dan output piawai, untuk ejen pengekodan: ia hanya bertindak pada mesin dengan automasi dihidupkan",
   "help.apply": "membuat atau mengubah mesin daripada fail teks pendek (nama, memori, pemproses, cakera, rangkaian, iso, port, folder)",
   "help.import": "membawa masuk mesin daripada aplikasi pemayaan lain (.vmx, .vbox, .utm, .pvm, .ova atau cakera) dengan identitinya, seperti Pindah dalam aplikasi",

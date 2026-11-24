@@ -112,6 +112,7 @@
   "help.cp": "fájlt másol egy gépre vagy onnan; az egyik oldal NÉV:ÚTVONAL (~ ott a személy saját mappája)",
   "help.logs": "a vendégrendszer naplója, soros konzolja (--serial) vagy a gép saját naplója (--machine); a --follow tovább olvas",
   "help.console": "a gép soros konzolja ebben a terminálban; a Ctrl+] kilép",
+  "help.shell": "parancsértelmező a gépre bejelentkezett személyként, a LordOS-eszközein át; a Ctrl+] kilép",
   "help.mcp": "helyi MCP-kiszolgáló a szabványos bemeneten és kimeneten, egy programozó ügynöknek: csak bekapcsolt automatizálású gépeken cselekszik",
   "help.apply": "gépet hoz létre vagy módosít egy rövid szövegfájlból (név, memória, processzorok, lemez, hálózat, iso, portok, mappák)",
   "help.import": "behoz egy gépet egy másik virtualizációs alkalmazásból (.vmx, .vbox, .utm, .pvm, .ova vagy lemez) az azonosságával, mint az alkalmazás Áttelepítése",

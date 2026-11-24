@@ -112,6 +112,7 @@
   "help.cp": "nukopijuoja failą į mašiną arba iš jos; viena pusė yra PAVADINIMAS:KELIAS (~ ten yra asmens namų aplankas)",
   "help.logs": "svečio sistemos žurnalas, jos nuoseklioji konsolė (--serial) arba mašinos žurnalas (--machine); --follow skaito toliau",
   "help.console": "mašinos nuoseklioji konsolė šiame terminale; Ctrl+] išeina",
+  "help.shell": "apvalkalas kaip į mašiną prisijungęs asmuo, per jos LordOS įrankius; Ctrl+] išeina",
   "help.mcp": "vietinis MCP serveris per standartinę įvestį ir išvestį programavimo agentui: veikia tik mašinose su įjungtu automatizavimu",
   "help.apply": "sukuria arba pakeičia mašiną pagal trumpą tekstinį failą (pavadinimas, atmintis, procesoriai, diskas, tinklas, iso, prievadai, aplankai)",
   "help.import": "perkelia mašiną iš kitos virtualizavimo programos (.vmx, .vbox, .utm, .pvm, .ova arba diską) su jos tapatybe, kaip programos Perkelti",

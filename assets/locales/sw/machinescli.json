@@ -112,6 +112,7 @@
   "help.cp": "hunakili faili kuingia kwenye mashine au kutoka kwake; upande mmoja ni JINA:NJIA (~ ni folda ya nyumbani ya mtu huko)",
   "help.logs": "kumbukumbu za mfumo mgeni, koni yake ya mfululizo (--serial) au kumbukumbu ya mashine yenyewe (--machine); --follow huendelea kusoma",
   "help.console": "koni ya mfululizo ya mashine katika terminal hii; Ctrl+] hutoka",
+  "help.shell": "ganda kama mtu aliyeingia kwenye mashine, kupitia zana zake za LordOS; Ctrl+] hutoka",
   "help.mcp": "seva ya MCP ya ndani kwenye ingizo na towe la kawaida, kwa wakala wa kuandika msimbo: hufanya kazi tu kwenye mashine zenye otomatiki imewashwa",
   "help.apply": "huunda au hubadilisha mashine kutoka faili fupi la maandishi (jina, kumbukumbu, vichakataji, diski, mtandao, iso, milango, folda)",
   "help.import": "huleta mashine kutoka programu nyingine ya uboreshaji (.vmx, .vbox, .utm, .pvm, .ova au diski) pamoja na utambulisho wake, kama Hamisha katika programu",

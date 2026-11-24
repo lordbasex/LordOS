@@ -971,6 +971,7 @@ static int cmd_help(void) {
         { "machines cp [--force] FILE NAME:PATH | NAME:PATH FILE", "help.cp" },
         { "machines logs NAME [--serial|--machine] [--follow] [--lines N]", "help.logs" },
         { "machines console NAME", "help.console" },
+        { "machines shell NAME", "help.shell" },
         { "machines mcp", "help.mcp" },
         { "machines apply FILE", "help.apply" },
         { "machines import SRC NAME [--arch A] [--devices compat|virtio] [--network shared|isolated] [--firmware uefi|bios]", "help.import" },
@@ -1729,11 +1730,21 @@ static int cmd_logs(Machine *x, int argc, char **argv) {
 static struct termios saved_tio;
 static void tio_restore(void) { tcsetattr(0, TCSANOW, &saved_tio); }
 
-/* machines console NAME: the guest's serial console (lord-vm's VM_CONSOLE, the app's Shell), Ctrl+] leaves */
-static int cmd_console(Machine *x) {
+#include <sys/ioctl.h>
+static volatile sig_atomic_t winch;
+static void on_winch(int sig) { (void)sig; winch = 1; }
+
+/* machines console NAME: the guest's serial console (lord-vm's VM_CONSOLE); machines shell NAME: a shell as the person
+ * signed in to the guest, through its LordOS tools (VM_SHELL, 6.18; the app's Shell), sized to this terminal and
+ * following its size. Ctrl+] leaves either */
+static int cmd_console(Machine *x, int shell) {
     int s = vm_connect(x);
     if (s < 0) { ERR("notRunning", "name", x->m.name, NULL); return VMCLI_NOT_RUNNING; }
-    VmMsg m = vm_msg(VM_CONSOLE, 77, 0, 0, 0, 0, "");
+    struct winsize ws = { .ws_row = 24, .ws_col = 80 };
+    if (isatty(0) && (ioctl(0, TIOCGWINSZ, &ws) || !ws.ws_col || !ws.ws_row)) { ws.ws_row = 24; ws.ws_col = 80; }
+    if (ws.ws_col > 1000) ws.ws_col = 1000;
+    if (ws.ws_row > 500) ws.ws_row = 500;
+    VmMsg m = shell ? vm_msg(VM_SHELL, 77, VSH_OPEN, ws.ws_col, ws.ws_row, 0, "") : vm_msg(VM_CONSOLE, 77, 0, 0, 0, 0, "");
     if (vm_send(s, &m, -1)) { close(s); return VMCLI_FAILED; }
     int cfd = -1;
     for (int tries = 0; tries < 100 && cfd < 0; tries++) {
@@ -1744,12 +1755,13 @@ static int cmd_console(Machine *x) {
         int k = vm_recv(s, &r, &fd);
         if (k < 0) break;
         if (!k) continue;
-        if (r.seq == 77 && r.type == VM_CONSOLE_FD && fd >= 0) { cfd = fd; break; }
+        if (r.seq == 77 && r.type == (shell ? VM_SHELL_FD : VM_CONSOLE_FD) && fd >= 0) { cfd = fd; break; }
         if (fd >= 0) close(fd);
         if (r.seq == 77 && r.type == VM_REPLY) { ERR("opFailed", "name", x->m.name, "why", r.text, NULL); close(s); return VMCLI_FAILED; }
     }
     if (cfd < 0) { close(s); ERR("notRunning", "name", x->m.name, NULL); return VMCLI_NOT_RUNNING; }
-    auto_log(x, "console: opened");
+    auto_log(x, shell ? "shell: opened" : "console: opened");
+    if (shell) { struct sigaction sa = { .sa_handler = on_winch }; sigaction(SIGWINCH, &sa, NULL); }
     int tty = isatty(0);
     if (tty) {
         SAY("consoleHint", "name", x->m.name, NULL);
@@ -1759,10 +1771,24 @@ static int cmd_console(Machine *x) {
         cfmakeraw(&raw);
         tcsetattr(0, TCSANOW, &raw);
     }
-    struct pollfd pf[2] = { { 0, POLLIN, 0 }, { cfd, POLLIN, 0 } };
+    struct pollfd pf[3] = { { 0, POLLIN, 0 }, { cfd, POLLIN, 0 }, { s, POLLIN, 0 } };
     for (;;) {
-        if (poll(pf, 2, -1) < 0) { if (errno == EINTR) continue; break; }
+        if (shell && winch && isatty(0)) {
+            winch = 0;
+            if (!ioctl(0, TIOCGWINSZ, &ws) && ws.ws_col && ws.ws_row && ws.ws_col <= 1000 && ws.ws_row <= 500) {
+                VmMsg z = vm_msg(VM_SHELL, 78, VSH_SIZE, ws.ws_col, ws.ws_row, 0, "");
+                vm_send(s, &z, -1);
+            }
+        }
+        if (poll(pf, 3, -1) < 0) { if (errno == EINTR) continue; break; }
         uint8_t b[4096];
+        if (pf[2].revents) {
+            /* lord-vm's news to every client (states, agent): read and let go, so its sends never back up */
+            VmMsg ev;
+            int efd = -1, k = vm_recv(s, &ev, &efd);
+            if (efd >= 0) close(efd);
+            if (k < 0) pf[2].fd = -1;                       /* lord-vm went: the stream says the rest */
+        }
         if (pf[1].revents) {
             ssize_t k = read(cfd, b, sizeof b);
             if (k <= 0) break;
@@ -1772,7 +1798,7 @@ static int cmd_console(Machine *x) {
         }
         if (pf[0].revents) {
             ssize_t k = read(0, b, sizeof b);
-            if (k <= 0) break;
+            if (k <= 0) { pf[0].fd = -1; continue; }      /* input ended (a pipe): what the guest still says is printed until its stream ends */
             uint8_t *q = memchr(b, 0x1d, (size_t)k);
             if (q) { write_all_fd(cfd, b, (size_t)(q - b)); break; }
             write_all_fd(cfd, b, (size_t)k);
@@ -2241,7 +2267,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "apply")) return cmd_apply(argc - 2, argv + 2);
     if (!strcmp(cmd, "import")) return cmd_import(argc - 2, argv + 2);
     static const char *const KNOWN[] = { "status", "start", "open", "stop", "poweroff", "pause", "resume", "suspend", "reset", "snapshot", "clone", "rename", "set", "fresh",
-                                         "exec", "logs", "console", NULL };
+                                         "exec", "logs", "console", "shell", NULL };
     int known = 0;
     for (int i = 0; KNOWN[i]; i++) if (!strcmp(cmd, KNOWN[i])) known = 1;
     if (!known) { ERR("unknown", "arg", cmd, NULL); return VMCLI_USAGE; }
@@ -2279,6 +2305,7 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "logs")) return cmd_logs(x, rest, rv);
     if (rest) { ERR("unknown", "arg", rv[0], NULL); return VMCLI_USAGE; }
     if (!strcmp(cmd, "open")) return cmd_open(x);
-    if (!strcmp(cmd, "console")) return cmd_console(x);
+    if (!strcmp(cmd, "console")) return cmd_console(x, 0);
+    if (!strcmp(cmd, "shell")) return cmd_console(x, 1);
     return cmd_power(x, cmd);
 }

@@ -112,6 +112,7 @@
   "help.cp": "kopieert een bestand naar een machine of eruit; één kant is NAAM:PAD (~ is daar de persoonlijke map van de persoon)",
   "help.logs": "het journaal van het gastsysteem, de seriële console (--serial) of het logboek van de machine (--machine); --follow blijft lezen",
   "help.console": "de seriële console van de machine in deze terminal; Ctrl+] verlaat",
+  "help.shell": "een shell als de persoon die op de machine is aangemeld, via haar LordOS-hulpmiddelen; Ctrl+] verlaat",
   "help.mcp": "een lokale MCP-server via standaardinvoer en -uitvoer, voor een programmeeragent: hij werkt alleen op machines met automatisering aan",
   "help.apply": "maakt of wijzigt een machine vanuit een kort tekstbestand (naam, geheugen, processors, schijf, netwerk, iso, poorten, mappen)",
   "help.import": "haalt een machine uit een andere virtualisatie-app (een .vmx, .vbox, .utm, .pvm, .ova of een schijf) met haar identiteit, zoals Migreren in de app",

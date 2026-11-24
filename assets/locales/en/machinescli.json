@@ -112,6 +112,7 @@
   "help.cp": "copy a file into a machine or out of it; one side is NAME:PATH (~ is the person's home folder there)",
   "help.logs": "the guest's journal, its serial console (--serial) or the machine's own log (--machine); --follow keeps reading",
   "help.console": "the machine's serial console in this terminal; Ctrl+] leaves",
+  "help.shell": "a shell as the person signed in to the machine, through its LordOS tools; Ctrl+] leaves",
   "help.mcp": "a local MCP server on standard input and output, for a coding agent: it acts only on machines with automation on",
   "help.apply": "make or change a machine from a short text file (name, memory, cpus, disk, network, iso, ports, shares)",
   "help.import": "bring in a machine of another virtualization app (a .vmx, .vbox, .utm, .pvm, .ova or a disk) with its identity, as the app's Migrate does",

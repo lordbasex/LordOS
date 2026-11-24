@@ -112,6 +112,7 @@
   "help.cp": "copia un file in una macchina o da essa; un lato è NOME:PERCORSO (~ è la cartella personale della persona lì)",
   "help.logs": "il journal del sistema ospite, la sua console seriale (--serial) o il registro della macchina (--machine); --follow continua a leggere",
   "help.console": "la console seriale della macchina in questo terminale; Ctrl+] esce",
+  "help.shell": "una shell come la persona che ha effettuato l'accesso alla macchina, tramite i suoi strumenti LordOS; Ctrl+] esce",
   "help.mcp": "un server MCP locale su standard input e output, per un agente di programmazione: agisce solo sulle macchine con l'automazione attiva",
   "help.apply": "crea o modifica una macchina da un breve file di testo (nome, memoria, processori, disco, rete, iso, porte, cartelle)",
   "help.import": "porta una macchina da un'altra app di virtualizzazione (un .vmx, .vbox, .utm, .pvm, .ova o un disco) con la sua identità, come Migra nell'app",

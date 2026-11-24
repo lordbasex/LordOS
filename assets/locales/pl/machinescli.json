@@ -112,6 +112,7 @@
   "help.cp": "kopiuje plik do maszyny lub z niej; jedna strona to NAZWA:ŚCIEŻKA (~ to tam folder domowy osoby)",
   "help.logs": "dziennik systemu gościa, jego konsola szeregowa (--serial) lub dziennik maszyny (--machine); --follow czyta dalej",
   "help.console": "konsola szeregowa maszyny w tym terminalu; Ctrl+] wychodzi",
+  "help.shell": "powłoka jako osoba zalogowana w maszynie, przez jej narzędzia LordOS; Ctrl+] wychodzi",
   "help.mcp": "lokalny serwer MCP na standardowym wejściu i wyjściu, dla agenta programistycznego: działa tylko na maszynach z włączoną automatyzacją",
   "help.apply": "tworzy lub zmienia maszynę z krótkiego pliku tekstowego (nazwa, pamięć, procesory, dysk, sieć, iso, porty, foldery)",
   "help.import": "sprowadza maszynę z innej aplikacji do wirtualizacji (.vmx, .vbox, .utm, .pvm, .ova lub dysk) z jej tożsamością, jak Migruj w aplikacji",

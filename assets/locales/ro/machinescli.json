@@ -112,6 +112,7 @@
   "help.cp": "copiază un fișier într-o mașină sau din ea; o parte este NUME:CALE (~ este acolo dosarul personal al persoanei)",
   "help.logs": "jurnalul sistemului oaspete, consola sa serială (--serial) sau jurnalul mașinii (--machine); --follow continuă să citească",
   "help.console": "consola serială a mașinii în acest terminal; Ctrl+] iese",
+  "help.shell": "un shell ca persoana autentificată în mașină, prin uneltele LordOS ale ei; Ctrl+] iese",
   "help.mcp": "un server MCP local pe intrarea și ieșirea standard, pentru un agent de programare: acționează doar pe mașinile cu automatizarea pornită",
   "help.apply": "creează sau schimbă o mașină dintr-un fișier text scurt (nume, memorie, procesoare, disc, rețea, iso, porturi, dosare)",
   "help.import": "aduce o mașină din altă aplicație de virtualizare (un .vmx, .vbox, .utm, .pvm, .ova sau un disc) cu identitatea ei, ca Migrare din aplicație",

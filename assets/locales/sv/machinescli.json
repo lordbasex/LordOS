@@ -112,6 +112,7 @@
   "help.cp": "kopierar en fil till en maskin eller från den; en sida är NAMN:SÖKVÄG (~ är personens hemmapp där)",
   "help.logs": "gästsystemets journal, dess seriekonsol (--serial) eller maskinens logg (--machine); --follow fortsätter läsa",
   "help.console": "maskinens seriekonsol i den här terminalen; Ctrl+] avslutar",
+  "help.shell": "ett skal som personen som är inloggad i maskinen, genom dess LordOS-verktyg; Ctrl+] avslutar",
   "help.mcp": "en lokal MCP-server på standard in och ut, för en kodningsagent: den agerar bara på maskiner med automatisering på",
   "help.apply": "skapar eller ändrar en maskin från en kort textfil (namn, minne, processorer, disk, nätverk, iso, portar, mappar)",
   "help.import": "hämtar en maskin från en annan virtualiseringsapp (en .vmx, .vbox, .utm, .pvm, .ova eller en disk) med dess identitet, som Migrera i appen",

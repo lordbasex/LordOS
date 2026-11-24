@@ -112,6 +112,7 @@
   "help.cp": "bir dosyayı makineye ya da makineden kopyalar; bir taraf AD:YOL olur (~ oradaki kişinin ev klasörüdür)",
   "help.logs": "konuk sistemin günlüğü, seri konsolu (--serial) ya da makinenin kendi günlüğü (--machine); --follow okumayı sürdürür",
   "help.console": "makinenin seri konsolu bu terminalde; Ctrl+] çıkar",
+  "help.shell": "makineye oturum açmış kişi olarak, LordOS araçları üzerinden bir kabuk; Ctrl+] çıkar",
   "help.mcp": "bir kodlama ajanı için standart giriş ve çıkışta yerel bir MCP sunucusu: yalnızca otomasyonu açık makinelerde işlem yapar",
   "help.apply": "kısa bir metin dosyasından bir makine oluşturur ya da değiştirir (ad, bellek, işlemciler, disk, ağ, iso, bağlantı noktaları, klasörler)",
   "help.import": "başka bir sanallaştırma uygulamasındaki makineyi (.vmx, .vbox, .utm, .pvm, .ova ya da disk) kimliğiyle getirir, uygulamadaki Taşı gibi",
