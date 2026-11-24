@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 static int fails;
@@ -234,9 +236,97 @@ static void fuzz(void) {
     printf("fuzz: 30000 mutations, %d still valid\n", accepted);
 }
 
+/* ---- the folder helpers of Delete, Rename and Repair (19.8, 19.9), on a scratch library ---- */
+static void put_file(const char *p, const char *text) {
+    FILE *f = fopen(p, "w");
+    if (f) { fputs(text, f); fclose(f); }
+}
+
+static void test_folders(void) {
+    char tmpl[] = "/tmp/vmgroup-test.XXXXXX";
+    char *root = mkdtemp(tmpl);
+    CHECK(root != NULL, "mkdtemp");
+    if (!root) return;
+    char lib[512], p[1024], q[1024];
+    snprintf(lib, sizeof lib, "%s/Machines", root);
+    mkdir(lib, 0700);
+    /* a tree with a link to a folder outside, a link to a file outside, a nested folder */
+    char out[512];
+    snprintf(out, sizeof out, "%s/outside", root);
+    mkdir(out, 0700);
+    snprintf(p, sizeof p, "%s/canary", out);
+    put_file(p, "keep");
+    snprintf(p, sizeof p, "%s/G.lordgroup", lib); mkdir(p, 0700);
+    snprintf(p, sizeof p, "%s/G.lordgroup/A.lordvm", lib); mkdir(p, 0700);
+    snprintf(p, sizeof p, "%s/G.lordgroup/A.lordvm/disks", lib); mkdir(p, 0700);
+    snprintf(p, sizeof p, "%s/G.lordgroup/A.lordvm/disks/system.qcow2", lib); put_file(p, "x");
+    snprintf(p, sizeof p, "%s/G.lordgroup/escape", lib); CHECK(!symlink(out, p), "symlink");
+    snprintf(p, sizeof p, "%s/G.lordgroup/B.lordvm", lib); CHECK(!symlink(out, p), "symlink");
+    snprintf(q, sizeof q, "%s/canary", out);
+    snprintf(p, sizeof p, "%s/G.lordgroup/A.lordvm/file-link", lib); CHECK(!symlink(q, p), "symlink");
+    int lfd = open(lib, O_RDONLY | O_DIRECTORY);
+    CHECK(lfd >= 0, "open lib");
+    /* the group's lock: exclusive, a second taker is told it's busy */
+    int gfd = openat(lfd, "G.lordgroup", O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    int l1 = vm_group_lock_at(gfd), l2 = vm_group_lock_at(gfd);
+    CHECK(l1 >= 0 && l2 == -2, "the group's lock is exclusive");
+    if (l1 >= 0) close(l1);
+    l2 = vm_group_lock_at(gfd);
+    CHECK(l2 >= 0, "the lock is free again");
+    if (l2 >= 0) close(l2);
+    /* a member's lock opened through a folder that is a link: refused */
+    int bfd = openat(gfd, "B.lordvm", O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+    CHECK(bfd < 0, "a member folder that is a link isn't opened");
+    close(gfd);
+    /* names that aren't one entry */
+    CHECK(vm_group_rm_at(lfd, "..", 4) == -1 && vm_group_rm_at(lfd, "a/b", 4) == -1 && vm_group_rm_at(lfd, "", 4) == -1, "rm_at refuses paths");
+    /* too deep: refused, nothing outside touched */
+    CHECK(vm_group_rm_at(lfd, "G.lordgroup", 1) == -1, "rm_at stops at its depth");
+    CHECK(vm_group_rm_at(lfd, "G.lordgroup", 8) == 0, "rm_at");
+    struct stat st;
+    snprintf(p, sizeof p, "%s/G.lordgroup", lib);
+    CHECK(lstat(p, &st) && !lstat(q, &st) && S_ISREG(st.st_mode), "the tree went, the links' targets stayed");
+    snprintf(p, sizeof p, "%s", out);
+    CHECK(!lstat(p, &st) && S_ISDIR(st.st_mode), "the folder outside stayed");
+    CHECK(vm_group_rm_at(lfd, "nothing-here", 4) == 0, "rm_at of nothing");
+    /* the folder a name gives */
+    char f[256];
+    vm_group_folder_name("Tor (work)", f, sizeof f);
+    CHECK(!strcmp(f, "Tor -work.lordgroup"), f);
+    vm_group_folder_name("…", f, sizeof f);
+    CHECK(!strcmp(f, "Machine.lordgroup"), f);
+    /* the rename plan, against another group and a machine of the library */
+    VmGroup g;
+    char err[200];
+    CHECK(vm_group_parse(GOOD, strlen(GOOD), &g, err, sizeof err) == VM_OK, err);
+    snprintf(p, sizeof p, "%s/Whonix.lordgroup", lib); mkdir(p, 0700);
+    CHECK(vm_group_save(p, &g) == VM_OK, "save");
+    snprintf(g.name, sizeof g.name, "Other");
+    snprintf(q, sizeof q, "%s/Other.lordgroup", lib); mkdir(q, 0700);
+    CHECK(vm_group_save(q, &g) == VM_OK, "save other");
+    snprintf(q, sizeof q, "%s/Taken.lordgroup", lib); mkdir(q, 0700);
+    VmGroupRenamePlan rp;
+    CHECK(vm_group_rename_plan(p, "other", &rp) == VMG_RN_NAME_TAKEN && !strcmp(rp.other, "Other"), "another group's name, case ignored");
+    CHECK(vm_group_rename_plan(p, "TAKEN", &rp) == VMG_RN_FOLDER_TAKEN, "a folder of that name");
+    CHECK(vm_group_rename_plan(p, ".hidden", &rp) == VMG_RN_BAD_NAME, "a leading dot");
+    CHECK(vm_group_rename_plan(p, "Tor Work", &rp) == VMG_RN_OK && rp.moves && !strcmp(rp.folder, "Tor Work.lordgroup"), "a free name");
+    CHECK(vm_group_rename_plan(p, "Whonix", &rp) == VMG_RN_OK && !rp.moves && !strcmp(rp.folder, "Whonix.lordgroup"), "the same name keeps the folder");
+    snprintf(q, sizeof q, "%s/Whonix.lordgroup/../x.lordgroup", lib);
+    CHECK(vm_group_rename_plan(q, "Y", &rp) == VMG_RN_NOT_GROUP, "a path with ..");
+    /* a base's users: the groups that name it (Whonix and Other, both GOOD's bases), not the one skipped */
+    const char *bw = g.base[VM_ROLE_WORKSTATION];
+    CHECK(vm_group_base_users(lib, NULL, NULL, bw) == 2, "two groups name the base");
+    CHECK(vm_group_base_users(lib, NULL, "Other.lordgroup", bw) == 1, "the skipped group isn't counted");
+    CHECK(vm_group_base_users(lib, NULL, NULL, "/home/u/Machines/.shared/none.qcow2") == 0, "no users");
+    close(lfd);
+    snprintf(p, sizeof p, "rm -rf '%s'", root);
+    if (system(p)) fprintf(stderr, "can't remove %s\n", root);
+}
+
 int main(void) {
     test_group();
     test_machine();
+    test_folders();
     fuzz();
     if (fails) { fprintf(stderr, "vmgroup-test: %d failures\n", fails); return 1; }
     printf("vmgroup-test: ok\n");

@@ -18,8 +18,15 @@
   const realHost = lord.vm && lord.vm.host;
   lord.vm.host = () => ({ ...((realHost && realHost()) || {}), arch: 'amd64', kvm: true, kvmDevice: true, cpus: 8, ramMb: 16384, memMaxMb: 12288, libFreeBytes: 420e9, libTotalBytes: 1000e9,
     missing: [], qemu: { amd64: true, arm64: true }, edk2: { amd64: true, arm64: true } });
-  lord.vm.list = () => [mem('gateway'), mem('workstation'), { ...deb }];
-  lord.vm.groups = () => [JSON.parse(JSON.stringify(group))];
+  // a second group, damaged (19.9): its Workstation's folder and its Gateway's base are missing; Repair, Rename and
+  // Delete's dialogs are shown on it and on Whonix (nothing runs: every lord-vm job is refused here)
+  const G2 = '/home/scene/Machines/Tor Work.lordgroup';
+  const group2 = { ...group, dir: G2, id: 'c8d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f', name: 'Tor Work', basesThere: false, basesMissing: ['gateway'], archiveThere: false,
+    members: [{ role: 'gateway', dir: `${G2}/Gateway.lordvm`, start: 1, stop: 2, primary: false }, { role: 'workstation', dir: `${G2}/Workstation.lordvm`, start: 2, stop: 1, primary: true }] };
+  const gw2 = { ...mem('gateway'), dir: `${G2}/Gateway.lordvm`, id: '0f8e2a6c-1b2d-4c3e-9a7b-112233445577', name: 'Tor Work Gateway', groupDir: G2, groupId: group2.id, groupName: 'Tor Work' };
+  lord.vm.list = () => [mem('gateway'), mem('workstation'), { ...deb }, gw2];
+  lord.vm.groups = () => [JSON.parse(JSON.stringify(group)), JSON.parse(JSON.stringify(group2))];
+  lord.vm.groupRenamePlan = (dir, name) => ({ problem: name.toLowerCase() === 'tor work' ? 'name-taken' : '', moves: true, folder: `${name}.lordgroup`, other: 'Tor Work' });
   lord.vm.stats = () => ({ diskBytes: 3.6e9, baseBytes: 3.1e9 });
   lord.vm.snaps = (dir) => (dir.includes('Workstation') ? [{ tag: 'a', name: 'Before banking' }] : []);
   lord.vm.job = () => null;

@@ -92,6 +92,8 @@
   "groupStarted": "{name} läuft: zuerst das Gateway, dann die Workstation.",
   "groupStopped": "{name} ist aus: zuerst die Workstation, dann das Gateway.",
   "groupDamaged": "{name} ist beschädigt: Eine seiner Maschinen fehlt oder gehört nicht dazu.",
+  "groupNameTaken": "Es gibt bereits eine Gruppe oder Maschine namens „{name}“.",
+  "groupFolderTaken": "Der Ordner Machines enthält bereits „{folder}“: Wähle einen anderen Namen.",
   "gatewayFailed": "Das Gateway von {name} ist nicht gestartet ({why}), daher wurde die Workstation nicht gestartet.",
   "workstationFailed": "Die Workstation von {name} ist nicht gestartet ({why}); das Gateway läuft weiter.",
   "kind.group": "Gruppe aus {count}",

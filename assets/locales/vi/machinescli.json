@@ -92,6 +92,8 @@
   "groupStarted": "{name} đang chạy: cổng trước, rồi đến máy trạm.",
   "groupStopped": "{name} đã tắt: máy trạm trước, rồi đến cổng.",
   "groupDamaged": "{name} bị hỏng: một máy của nó bị thiếu hoặc không phải của nó.",
+  "groupNameTaken": "Đã có một nhóm hoặc máy ảo tên “{name}”.",
+  "groupFolderTaken": "Thư mục Machines đã có “{folder}”: hãy chọn tên khác.",
   "gatewayFailed": "Cổng của {name} không khởi động ({why}), nên máy trạm không được khởi động.",
   "workstationFailed": "Máy trạm của {name} không khởi động ({why}); cổng vẫn đang chạy.",
   "kind.group": "nhóm {count} máy",

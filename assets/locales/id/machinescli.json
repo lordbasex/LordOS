@@ -92,6 +92,8 @@
   "groupStarted": "{name} berjalan: gateway dulu, lalu workstation.",
   "groupStopped": "{name} mati: workstation dulu, lalu gateway.",
   "groupDamaged": "{name} rusak: salah satu mesinnya hilang atau bukan miliknya.",
+  "groupNameTaken": "Sudah ada grup atau mesin bernama “{name}”.",
+  "groupFolderTaken": "Folder Machines sudah berisi “{folder}”: pilih nama lain.",
   "gatewayFailed": "Gateway {name} tidak berjalan ({why}), jadi workstation tidak dijalankan.",
   "workstationFailed": "Workstation {name} tidak berjalan ({why}); gateway masih berjalan.",
   "kind.group": "grup {count}",

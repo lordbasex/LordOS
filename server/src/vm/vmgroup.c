@@ -2,13 +2,16 @@
 #include "vmgroup.h"
 #include "../sec/json.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -356,4 +359,136 @@ int vm_group_role(const VmGroup *g, int role) {
 int vm_group_primary(const VmGroup *g) {
     for (int i = 0; i < g->n; i++) if (g->m[i].primary) return i;
     return -1;
+}
+
+/* ---- managing a group's folder (Delete, Rename, Repair) ---- */
+
+static int rm_at(int dfd, const char *name, int depth, dev_t dev) {
+    struct stat st;
+    if (fstatat(dfd, name, &st, AT_SYMLINK_NOFOLLOW)) return errno == ENOENT ? 0 : -1;
+    if (!S_ISDIR(st.st_mode)) return unlinkat(dfd, name, 0) && errno != ENOENT ? -1 : 0;
+    if (depth <= 0 || st.st_dev != dev) { errno = st.st_dev != dev ? EXDEV : ELOOP; return -1; }
+    int fd = openat(dfd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0) {
+        /* it became a link (or anything else) since: removed as what it is now, never followed */
+        if (errno == ELOOP || errno == ENOTDIR) return unlinkat(dfd, name, 0) && errno != ENOENT ? -1 : 0;
+        return -1;
+    }
+    struct stat fst;
+    if (fstat(fd, &fst) || fst.st_dev != dev) { close(fd); errno = EXDEV; return -1; }
+    DIR *d = fdopendir(fd);
+    if (!d) { close(fd); return -1; }
+    int r = 0;
+    for (struct dirent *e; (e = readdir(d));) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        if (rm_at(dirfd(d), e->d_name, depth - 1, dev)) r = -1;
+    }
+    closedir(d);
+    if (r) return -1;
+    return unlinkat(dfd, name, AT_REMOVEDIR) && errno != ENOENT ? -1 : 0;
+}
+
+int vm_group_rm_at(int dfd, const char *name, int depth) {
+    struct stat st;
+    if (!name || !*name || strchr(name, '/') || !strcmp(name, ".") || !strcmp(name, "..")) { errno = EINVAL; return -1; }
+    if (fstat(dfd, &st)) return -1;
+    return rm_at(dfd, name, depth, st.st_dev);
+}
+
+static int lock_file_at(int dfd, const char *name) {
+    int fd = openat(dfd, name, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (fd < 0) return -1;
+    struct stat st;
+    if (fstat(fd, &st) || !S_ISREG(st.st_mode)) { close(fd); return -1; }
+    if (flock(fd, LOCK_EX | LOCK_NB)) { close(fd); return -2; }
+    return fd;
+}
+int vm_group_lock_at(int gfd) { return lock_file_at(gfd, ".lock"); }
+int vm_group_member_lock_at(int mfd) { return lock_file_at(mfd, "lock"); }
+
+static int ends(const char *s, const char *suf) {
+    size_t n = strlen(s), k = strlen(suf);
+    return n > k && !strcmp(s + n - k, suf);
+}
+
+/* the base of the machine folder dir/name, when its machine.json loads: 1 when it names `base` */
+static int names_base(const char *dir, const char *name, const char *base) {
+    char p[VM_PATH_MAX + 512];
+    if (snprintf(p, sizeof p, "%s/%s", dir, name) >= (int)sizeof p) return 0;
+    VmMachine *m = malloc(sizeof *m);
+    int r = m && vm_machine_load(p, m, NULL, 0) == VM_OK && !strcmp(m->base, base);
+    free(m);
+    return r;
+}
+
+int vm_group_base_users(const char *lib, const char *trash, const char *skip, const char *base) {
+    int n = 0;
+    DIR *d = opendir(lib);
+    for (struct dirent *e; d && (e = readdir(d));) {
+        if (e->d_name[0] == '.') continue;
+        if (ends(e->d_name, ".lordvm")) { n += names_base(lib, e->d_name, base); continue; }
+        if (!ends(e->d_name, VMG_SUFFIX) || (skip && !strcmp(e->d_name, skip))) continue;
+        char gd[VM_PATH_MAX + 512];
+        struct stat st;
+        if (snprintf(gd, sizeof gd, "%s/%s", lib, e->d_name) >= (int)sizeof gd || lstat(gd, &st) || !S_ISDIR(st.st_mode)) continue;
+        VmGroup *g = malloc(sizeof *g);
+        if (g && vm_group_load(gd, g, NULL, 0) == VM_OK)
+            for (int r = 1; r < VM_ROLE_COUNT; r++) if (!strcmp(g->base[r], base)) n++;
+        free(g);
+        DIR *gdir = opendir(gd);
+        for (struct dirent *m; gdir && (m = readdir(gdir));) if (m->d_name[0] != '.' && ends(m->d_name, ".lordvm")) n += names_base(gd, m->d_name, base);
+        if (gdir) closedir(gdir);
+    }
+    if (d) closedir(d);
+    if (trash && (d = opendir(trash))) {
+        for (struct dirent *e; (e = readdir(d));) if (e->d_name[0] != '.' && ends(e->d_name, ".lordvm")) n += names_base(trash, e->d_name, base);
+        closedir(d);
+    }
+    return n;
+}
+
+void vm_group_folder_name(const char *name, char *out, size_t n) {
+    char f[64];
+    vm_folder_name(name, f, sizeof f);
+    snprintf(out, n, "%s%s", f, VMG_SUFFIX);
+}
+
+int vm_group_rename_plan(const char *gdir, const char *name, VmGroupRenamePlan *p) {
+    memset(p, 0, sizeof *p);
+    if (!vm_rename_name_ok(name)) return p->problem = VMG_RN_BAD_NAME;
+    if (!vm_group_dir_ok(gdir)) return p->problem = VMG_RN_NOT_GROUP;
+    const char *b = strrchr(gdir, '/');
+    char lib[VM_PATH_MAX], cur[NAME_MAX + 1], now[256];
+    snprintf(lib, sizeof lib, "%.*s", (int)(b - gdir), gdir);
+    snprintf(cur, sizeof cur, "%s", b + 1);
+    /* the folder: kept while the name already gives the same one (made safe), as for a machine (6.26) */
+    char stem[NAME_MAX + 1];
+    snprintf(stem, sizeof stem, "%.*s", (int)(strlen(cur) - strlen(VMG_SUFFIX)), cur);
+    vm_group_folder_name(stem, now, sizeof now);
+    vm_group_folder_name(name, p->folder, sizeof p->folder);
+    p->moves = strcmp(now, p->folder) != 0;
+    if (!p->moves) snprintf(p->folder, sizeof p->folder, "%s", cur);
+    DIR *d = opendir(lib);
+    if (!d) return p->problem = VMG_RN_NOT_GROUP;
+    for (struct dirent *e; (e = readdir(d));) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..") || !strcmp(e->d_name, cur)) continue;
+        if (p->moves && !p->problem && !strcasecmp(e->d_name, p->folder)) p->problem = VMG_RN_FOLDER_TAKEN;
+        if (e->d_name[0] == '.') continue;
+        char od[VM_PATH_MAX + 512];
+        if (snprintf(od, sizeof od, "%s/%s", lib, e->d_name) >= (int)sizeof od) continue;
+        /* another group or machine called the same (ASCII case ignored: `machines` finds both by name that way) */
+        char other[VM_NAME_MAX + 1] = "";
+        if (ends(e->d_name, VMG_SUFFIX)) {
+            VmGroup *g = malloc(sizeof *g);
+            if (g && vm_group_load(od, g, NULL, 0) == VM_OK) snprintf(other, sizeof other, "%s", g->name);
+            free(g);
+        } else if (ends(e->d_name, ".lordvm")) {
+            VmMachine *m = malloc(sizeof *m);
+            if (m && vm_machine_load(od, m, NULL, 0) == VM_OK) snprintf(other, sizeof other, "%s", m->name);
+            free(m);
+        }
+        if (other[0] && !strcasecmp(other, name)) { snprintf(p->other, sizeof p->other, "%s", other); p->problem = VMG_RN_NAME_TAKEN; break; }
+    }
+    closedir(d);
+    return p->problem;
 }

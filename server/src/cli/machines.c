@@ -1037,12 +1037,43 @@ static int cmd_group_fresh(Group *G, int argc, char **argv) {
     return VMCLI_OK;
 }
 
+/* rename GROUP NEW_NAME (19.8): lord-vm --group-rename, with the group off: its name, its members' names and, when the
+ * name asks for another folder, the group's folder (renameat2, never over anything) */
+static int cmd_group_rename(Group *G, int argc, char **argv) {
+    if (argc < 1) { ERR("missing", "what", "NEW_NAME", NULL); return VMCLI_USAGE; }
+    if (argc > 1) { ERR("unknown", "arg", argv[1], NULL); return VMCLI_USAGE; }
+    const char *name = argv[0];
+    if (!vm_rename_name_ok(name)) { ERR("badNewName", NULL); return VMCLI_USAGE; }
+    VmGroupRenamePlan p;
+    int pr = vm_group_rename_plan(G->dir, name, &p);
+    if (!pr && !strcmp(name, G->g.name) && !p.moves) { SAY("renameNothing", "name", name, NULL); return 0; }
+    if (pr == VMG_RN_NAME_TAKEN && !strcmp(name, G->g.name)) pr = VMG_RN_OK;
+    if (pr == VMG_RN_NAME_TAKEN) { ERR("groupNameTaken", "name", p.other[0] ? p.other : name, NULL); return VMCLI_FAILED; }
+    if (pr == VMG_RN_FOLDER_TAKEN) { ERR("groupFolderTaken", "folder", p.folder, NULL); return VMCLI_FAILED; }
+    if (pr) { ERR("badNewName", NULL); return VMCLI_USAGE; }
+    char old[VM_NAME_MAX + 1];
+    snprintf(old, sizeof old, "%s", G->g.name);
+    char *a[] = { NULL, "--group-rename", G->dir, (char *)name, NULL };
+    Run r;
+    int st = run_lordvm(a, &r);
+    if (st < 0) return VMCLI_FAILED;
+    if (st) { ERR("opFailed", "name", old, "why", why_of(&r), NULL); return our_rc(st); }
+    JDoc d;
+    int have = r.no && !json_parse(r.out, r.no, &d, NULL, 0);
+    const char *folder = have ? json_str(d.root, "folder") : NULL, *dir = have ? json_str(d.root, "dir") : NULL;
+    if (folder && !strcmp(folder, "moved")) SAY("renamedFolder", "old", old, "name", name, "dir", dir ? dir : "", NULL);
+    else SAY("renamed", "old", old, "name", name, NULL);
+    if (have) json_free(&d);
+    return 0;
+}
+
 static int cmd_group(Group *G, const char *cmd, int argc, char **argv) {
     /* one member (19.9): --member gateway acts on the gateway alone; --member workstation is the group's own start
      * (the gateway first), or the workstation alone for stop, poweroff and status */
     int role = take_member(&argc, argv);
     if (role < 0) { ERR("badMember", NULL); return VMCLI_USAGE; }
     if (!strcmp(cmd, "fresh")) { if (role) { ERR("unknown", "arg", "--member", NULL); return VMCLI_USAGE; } return cmd_group_fresh(G, argc, argv); }
+    if (!strcmp(cmd, "rename")) { if (role) { ERR("unknown", "arg", "--member", NULL); return VMCLI_USAGE; } return cmd_group_rename(G, argc, argv); }
     if (role && !(role == VM_ROLE_WORKSTATION && (!strcmp(cmd, "start") || !strcmp(cmd, "open")))) {
         int j = vm_group_role(&G->g, role);
         Machine *x = j >= 0 && G->member[j] >= 0 ? &ms[G->member[j]] : NULL;
@@ -2208,7 +2239,7 @@ int main(int argc, char **argv) {
         /* a machine group, by its name or folder (19.9) */
         Group *G = find_group(argv[2]);
         if (G) {
-            if (strcmp(cmd, "status") && strcmp(cmd, "start") && strcmp(cmd, "open") && strcmp(cmd, "stop") && strcmp(cmd, "poweroff") && strcmp(cmd, "fresh")) { ERR("unknown", "arg", cmd, NULL); return VMCLI_USAGE; }
+            if (strcmp(cmd, "status") && strcmp(cmd, "start") && strcmp(cmd, "open") && strcmp(cmd, "stop") && strcmp(cmd, "poweroff") && strcmp(cmd, "fresh") && strcmp(cmd, "rename")) { ERR("unknown", "arg", cmd, NULL); return VMCLI_USAGE; }
             return cmd_group(G, cmd, rest, rv);
         }
     }

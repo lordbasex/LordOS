@@ -92,6 +92,8 @@
   "groupStarted": "{name} sedang berjalan: get laluan dahulu, kemudian stesen kerja.",
   "groupStopped": "{name} dimatikan: stesen kerja dahulu, kemudian get laluan.",
   "groupDamaged": "{name} rosak: salah satu mesinnya hilang atau bukan miliknya.",
+  "groupNameTaken": "Sudah ada kumpulan atau mesin bernama “{name}”.",
+  "groupFolderTaken": "Folder Machines sudah mempunyai “{folder}”: pilih nama lain.",
   "gatewayFailed": "Get laluan {name} tidak bermula ({why}), jadi stesen kerja tidak dimulakan.",
   "workstationFailed": "Stesen kerja {name} tidak bermula ({why}); get laluan masih berjalan.",
   "kind.group": "kumpulan {count}",

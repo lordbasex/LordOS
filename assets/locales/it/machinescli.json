@@ -92,6 +92,8 @@
   "groupStarted": "{name} è in esecuzione: prima il gateway, poi la workstation.",
   "groupStopped": "{name} è spento: prima la workstation, poi il gateway.",
   "groupDamaged": "{name} è danneggiato: una delle sue macchine manca o non è sua.",
+  "groupNameTaken": "Esiste già un gruppo o una macchina chiamata «{name}».",
+  "groupFolderTaken": "La cartella Machines contiene già «{folder}»: scegli un altro nome.",
   "gatewayFailed": "Il gateway di {name} non si è avviato ({why}), quindi la workstation non è stata avviata.",
   "workstationFailed": "La workstation di {name} non si è avviata ({why}); il gateway è ancora in esecuzione.",
   "kind.group": "gruppo di {count}",

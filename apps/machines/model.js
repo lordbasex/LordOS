@@ -1629,10 +1629,12 @@ export function groupMembers(group, list) {
 const RUNNING = (s) => s === 'running' || s === 'paused';
 const ACTIVE = (s) => s === 'starting' || s === 'running' || s === 'paused' || s === 'stopping';
 // one word for the whole group: 'running' (all members), 'off' (none), 'partial', or 'damaged' (a member missing or not
-// this group's: 19.9, "A member folder… missing or invalid")
+// this group's, or a base missing: 19.9, "A member folder, a base… missing or invalid")
 export function groupState(group, list) {
   const ms = groupMembers(group, list), roles = (group?.members || []).map((x) => x.role);
   if (!roles.length || roles.some((r) => !ms[r])) return 'damaged';
+  const on0 = roles.some((r) => ACTIVE(ms[r].state));
+  if (!on0 && (group?.basesMissing || []).length) return 'damaged';
   const on = roles.filter((r) => ACTIVE(ms[r].state)).length;
   return on === 0 ? 'off' : on === roles.length && roles.every((r) => RUNNING(ms[r].state)) ? 'running' : 'partial';
 }
@@ -1645,6 +1647,8 @@ export function groupPlan(group, list, action) {
   const ms = groupMembers(group, list);
   const order = [...(group?.members || [])].sort((a, b) => (action === 'stop' ? a.stop - b.stop : a.start - b.start));
   if (!order.length || order.some((x) => !ms[x.role])) return { fail: 'damaged' };
+  // a base missing: a member off can't start (Repair makes it again first); one running keeps its open base
+  if (action === 'start' && (group?.basesMissing || []).some((r) => ms[r] && !ACTIVE(ms[r].state))) return { fail: 'damaged' };
   for (const x of order) {
     const m = ms[x.role];
     if (action === 'stop') {

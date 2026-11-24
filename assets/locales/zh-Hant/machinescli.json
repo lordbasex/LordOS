@@ -92,6 +92,8 @@
   "groupStarted": "{name} 正在執行：先閘道，後工作站。",
   "groupStopped": "{name} 已關閉：先工作站，後閘道。",
   "groupDamaged": "{name} 已損壞：其中一台機器遺失或不屬於它。",
+  "groupNameTaken": "已有名為「{name}」的群組或虛擬機器。",
+  "groupFolderTaken": "Machines 資料夾中已有「{folder}」:請換一個名稱。",
   "gatewayFailed": "{name} 的閘道沒有啟動（{why}），因此沒有啟動工作站。",
   "workstationFailed": "{name} 的工作站沒有啟動（{why}）；閘道仍在執行。",
   "kind.group": "{count} 台的群組",

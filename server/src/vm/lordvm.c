@@ -9082,8 +9082,10 @@ out:
  * stderr (exit 1; 2 usage). The staging folder and a half-made group are removed on failure. */
 #ifdef LORDVM_TEST_PATHS
 #define VM_CATALOG_FILE test_path("LORDVM_TEST_CATALOG", "/usr/lib/lordos/assets/machines/systems.json")
+#define VM_IMAGE_STORE test_path("LORDVM_TEST_IMAGES", "/var/lib/lordos/machines/images")
 #else
 #define VM_CATALOG_FILE "/usr/lib/lordos/assets/machines/systems.json"
+#define VM_IMAGE_STORE "/var/lib/lordos/machines/images"
 #endif
 
 static int sha512_fd_hex(int fd, char out[129], long long total) {
@@ -9210,6 +9212,14 @@ static int make_base(const char *member, const char *staging, const char *base, 
     return 0;
 }
 
+/* a member's name: "<group> Gateway" or "<group> Workstation", the group's name cut to at most 40 bytes on a character's
+ * boundary (never half a UTF-8 sequence, which machine.json would refuse) */
+static void member_name(char *out, size_t n, const char *group, int role) {
+    size_t l = strlen(group);
+    if (l > 40) { l = 40; while (l && ((unsigned char)group[l] & 0xc0) == 0x80) l--; }
+    snprintf(out, n, "%.*s %s", (int)l, group, role == VM_ROLE_GATEWAY ? "Gateway" : "Workstation");
+}
+
 /* a member: an ordinary machine folder, a linked clone of its base (19.4, 19.5) */
 static int make_member(const char *gdir, const char *folder, const char *name, int role, const char *gid, const char *base,
                        long long vsize, int vcpus, int mem, char *why, size_t wn) {
@@ -9262,8 +9272,71 @@ static int make_member(const char *gdir, const char *folder, const char *name, i
     return 0;
 }
 
+/* the signed catalog's group entry `cid` for amd64; 0, or -1 */
+static int group_entry(const char *cid, VmCatEntry *e) {
+    struct stat st;
+    size_t cn = 0;
+    int cfd = open(VM_CATALOG_FILE, O_RDONLY | O_CLOEXEC);
+    char *cat = NULL;
+    if (cfd >= 0 && !fstat(cfd, &st) && S_ISREG(st.st_mode) && st.st_size > 0 && st.st_size < (1 << 20) && (cat = malloc((size_t)st.st_size + 1))) {
+        ssize_t r = read(cfd, cat, (size_t)st.st_size);
+        if (r == st.st_size) { cat[r] = 0; cn = (size_t)r; } else { free(cat); cat = NULL; }
+    }
+    if (cfd >= 0) close(cfd);
+    int found = cat && !vmcat_find(cat, cn, cid, "amd64", e) && e->group;
+    free(cat);
+    return found ? 0 : -1;
+}
+
+/* the archive: opened read-only (never a link), at most the entry's size, and hashed again here so that the file handed
+ * to lord-vmunpack is the verified one byte for byte. The descriptor, or -1 with why */
+static int open_archive(const char *archive, const VmCatEntry *e, const char *want, long long *total, char *why, size_t wn) {
+    struct stat st;
+    char sha[129];
+    int afd = open(archive, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (afd < 0 || fstat(afd, &st) || !S_ISREG(st.st_mode)) { snprintf(why, wn, "can't read the archive %s", archive); if (afd >= 0) close(afd); return -1; }
+    *total = st.st_size;
+    if ((unsigned long long)st.st_size > e->max_bytes) { snprintf(why, wn, "the archive is larger than the catalog allows"); close(afd); return -1; }
+    if (sha512_fd_hex(afd, sha, st.st_size)) { snprintf(why, wn, "can't read the archive %s", archive); close(afd); return -1; }
+    for (int i = 0; i < 128; i++) if (tolower((unsigned char)want[i]) != sha[i]) { snprintf(why, wn, "the archive's SHA-512 isn't the verified one"); close(afd); return -1; }
+    return afd;
+}
+
+/* <library>/.shared's lock (`.lock` in it): held while a group is made from bases there, and while Delete removes a base
+ * no group uses any more, so that a base is never removed under a group that just took it. Waits up to wait_ms. The
+ * descriptor, or -1 */
+static int shared_lock(const char *shared, int wait_ms) {
+    int dfd = open(shared, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (dfd < 0) return -1;
+    int fd = -1;
+    for (long long end = now_ms() + wait_ms;;) {
+        fd = vm_group_lock_at(dfd);
+        if (fd != -2 || now_ms() >= end) break;
+        usleep(100000);
+    }
+    close(dfd);
+    return fd >= 0 ? fd : -1;
+}
+
+/* whether a group of the library (lib) records `base` with this SHA-256 in its group.json */
+static int base_vouched(const char *lib, const char *base, const char *sha) {
+    DIR *d = opendir(lib);
+    int ok = 0;
+    for (struct dirent *e; d && !ok && (e = readdir(d));) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.' || l <= 10 || strcmp(e->d_name + l - 10, VMG_SUFFIX)) continue;
+        char gd[PATH_MAX + 260];
+        snprintf(gd, sizeof gd, "%s/%s", lib, e->d_name);
+        static VmGroup g;
+        if (vm_group_load(gd, &g, NULL, 0)) continue;
+        for (int r = 1; r < VM_ROLE_COUNT; r++) if (!strcmp(g.base[r], base) && !strcmp(g.base_sha256[r], sha)) ok = 1;
+    }
+    if (d) closedir(d);
+    return ok;
+}
+
 static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
-    const char *cid = NULL, *archive = NULL, *want = NULL, *name = NULL, *dev_members[2] = { NULL, NULL };
+    const char *cid = NULL, *archive = NULL, *want = NULL, *name = NULL, *relarg = NULL, *dev_members[2] = { NULL, NULL };
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
@@ -9272,6 +9345,7 @@ static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
         else if (!strcmp(a, "--archive")) archive = v;
         else if (!strcmp(a, "--sha512")) want = v;
         else if (!strcmp(a, "--name")) name = v;
+        else if (!strcmp(a, "--release")) relarg = v;
 #ifdef LORDVM_TEST_PATHS
         /* a test build only: the two members' disks as already unpacked files (tests/vm_group_link.sh), no archive */
         else if (!strcmp(a, "--dev-gateway")) dev_members[0] = v;
@@ -9294,39 +9368,33 @@ static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
     struct stat st;
     if (!lstat(gdir, &st)) { fprintf(stderr, "lord-vm: %s already exists\n", gdir); return 3; }
     /* the catalog's entry */
-    size_t cn = 0;
-    int cfd = open(VM_CATALOG_FILE, O_RDONLY | O_CLOEXEC);
-    char *cat = NULL;
-    if (cfd >= 0 && !fstat(cfd, &st) && S_ISREG(st.st_mode) && st.st_size > 0 && st.st_size < (1 << 20) && (cat = malloc((size_t)st.st_size + 1))) {
-        ssize_t r = read(cfd, cat, (size_t)st.st_size);
-        if (r == st.st_size) { cat[r] = 0; cn = (size_t)r; } else { free(cat); cat = NULL; }
-    }
-    if (cfd >= 0) close(cfd);
     VmCatEntry e;
-    int found = cat && !vmcat_find(cat, cn, cid, "amd64", &e) && e.group;
-    free(cat);
-    if (!found) { fprintf(stderr, "lord-vm: %s isn't a machine group of the catalog\n", cid); return 1; }
+    if (group_entry(cid, &e)) { fprintf(stderr, "lord-vm: %s isn't a machine group of the catalog\n", cid); return 1; }
     if (!dev && !vmcat_hash_ok(&e, want)) { fprintf(stderr, "lord-vm: --sha512 is 128 hex digits\n"); return 2; }
-    /* the archive's release, from its name as the catalog's pattern accepted it (Whonix-LXQt-<release>.Intel_AMD64…) */
-    char release[32] = "", sha[129] = "";
+    /* the archive's release: from its name as the catalog's pattern accepted it (Whonix-LXQt-<release>.Intel_AMD64…),
+     * or, for the image store's own name (<sha512>.tar.xz, which is what the app hands over: the admin helper verified
+     * that file against the signed list of the release it fetched it from), --release */
+    char release[32] = "", sha[129] = "", stored[160] = "";
     const char *an = archive ? strrchr(archive, '/') : NULL;
     an = an ? an + 1 : archive;
-    if (!dev && !vmcat_match(e.file_re, an)) { fprintf(stderr, "lord-vm: %s isn't the catalog's archive\n", an); return 1; }
-    /* the release the archive's name gives (vmcat_release_in, the same rule as the admin helper's), at least the floor */
-    if (!dev && (vmcat_release_in(&e, an, release, sizeof release) || !vmcat_release_ok(&e, release))) release[0] = 0;
+    if (!dev) snprintf(stored, sizeof stored, "%.128s.tar.xz", want);
+    int in_store = !dev && !strcasecmp(an, stored);
+    if (!dev && !in_store && !vmcat_match(e.file_re, an)) { fprintf(stderr, "lord-vm: %s isn't the catalog's archive\n", an); return 1; }
+    if (in_store && (!relarg || strlen(relarg) >= sizeof release)) { fprintf(stderr, "lord-vm: an archive of the image store needs --release\n"); return 2; }
+    /* the release (vmcat_release_in, the same rule as the admin helper's), at least the floor */
+    if (in_store) snprintf(release, sizeof release, "%s", relarg);
+    else if (!dev && vmcat_release_in(&e, an, release, sizeof release)) release[0] = 0;
+    if (!dev && release[0] && !vmcat_release_ok(&e, release)) release[0] = 0;
     if (!release[0] && !dev) { fprintf(stderr, "lord-vm: the archive's name gives no release the catalog accepts (at least %s)\n", e.rel_floor); return 1; }
     if (!release[0]) snprintf(release, sizeof release, "%s", e.rel_floor[0] ? e.rel_floor : "0");
     if (e.rel_dir[0] && vmcat_release_cmp(release, e.rel_floor) < 0) { fprintf(stderr, "lord-vm: release %s is older than the catalog's floor %s\n", release, e.rel_floor); return 1; }
     int afd = -1;
     long long total = 0;
     if (!dev) {
-        afd = open(archive, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-        if (afd < 0 || fstat(afd, &st) || !S_ISREG(st.st_mode)) { fprintf(stderr, "lord-vm: can't read %s\n", archive); if (afd >= 0) close(afd); return 1; }
-        total = st.st_size;
-        if ((unsigned long long)total > e.max_bytes) { fprintf(stderr, "lord-vm: the archive is larger than the catalog allows\n"); close(afd); return 1; }
-        /* hashed again here: the file handed to the helper is the one that was verified, byte for byte */
-        if (sha512_fd_hex(afd, sha, total)) { fprintf(stderr, "lord-vm: can't read %s\n", archive); close(afd); return 1; }
-        for (int i = 0; i < 128; i++) if (tolower((unsigned char)want[i]) != sha[i]) { fprintf(stderr, "lord-vm: the archive's SHA-512 isn't the verified one\n"); close(afd); return 1; }
+        char ow[300];
+        if ((afd = open_archive(archive, &e, want, &total, ow, sizeof ow)) < 0) { fprintf(stderr, "lord-vm: %s\n", ow); return 1; }
+        for (int i = 0; i < 128; i++) sha[i] = (char)tolower((unsigned char)want[i]);
+        sha[128] = 0;
     } else {
         memset(sha, '0', 128);
         sha[128] = 0;
@@ -9336,13 +9404,19 @@ static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
     static const char *const RN[2] = { "gateway", "workstation" };
     snprintf(shared, sizeof shared, "%s/.shared", libreal);
     mkdir(shared, 0700);
+    /* the bases aren't removed by a Delete while this group is made from them */
+    int slock = shared_lock(shared, 15 * 60 * 1000);
+    if (slock < 0) { fprintf(stderr, "lord-vm: can't take %s's lock\n", shared); if (afd >= 0) close(afd); return 1; }
     int need = 0;
     for (int r = 0; r < 2; r++) {
         snprintf(base[r], sizeof base[r], "%s/%s-%s-%s-%.12s.qcow2", shared, cid, release, RN[r], dev ? "dev000000000" : sha);
-        if (!vm_base_valid(base[r])) { fprintf(stderr, "lord-vm: the library's path can't hold a base\n"); if (afd >= 0) close(afd); return 1; }
+        if (!vm_base_valid(base[r])) { fprintf(stderr, "lord-vm: the library's path can't hold a base\n"); if (afd >= 0) close(afd); close(slock); return 1; }
         bsha[r][0] = 0;
-        if (!lstat(base[r], &st) && S_ISREG(st.st_mode)) { if (sha256_file(base[r], bsha[r])) need = 1; }
-        else need = 1;
+        /* a base already there is used only when another group of the library recorded it with these same bytes (its
+         * SHA-256 in that group.json): anything else is made again from the archive, over it */
+        if (!lstat(base[r], &st) && S_ISREG(st.st_mode) && !sha256_file(base[r], bsha[r]) && base_vouched(libreal, base[r], bsha[r])) continue;
+        bsha[r][0] = 0;
+        need = 1;
     }
     char why[300] = "", staging[PATH_MAX + 64] = "";
     int rc = 1;
@@ -9397,10 +9471,9 @@ static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
         for (int r = 0; r < 2; r++) { if (strlen(base[r]) >= sizeof g.base[0]) { snprintf(why, sizeof why, "the base's path is too long"); goto out; } memcpy(g.base[r + 1], base[r], strlen(base[r]) + 1); memcpy(g.base_sha256[r + 1], bsha[r], 65); }
         if (vm_group_check(&g, why, sizeof why)) goto out;
         if (mkdir(gdir, 0700)) { snprintf(why, sizeof why, "can't make the group's folder: %s", strerror(errno)); goto out; }
-        static const char *const NM[2] = { "Gateway", "Workstation" };
         for (int r = 0; r < 2; r++) {
             char nm[VM_NAME_MAX + 1];
-            snprintf(nm, sizeof nm, "%.40s %s", g.name, NM[r]);
+            member_name(nm, sizeof nm, g.name, r + 1);
             if (make_member(gdir, g.m[r].dir, nm, r + 1, g.id, base[r], vsz[r], e.member_vcpus[r], e.member_mem_mb[r], why, sizeof why)) { rm_tree(gdir); goto out; }
         }
         if (vm_group_save(gdir, &g)) { snprintf(why, sizeof why, "can't write group.json"); rm_tree(gdir); goto out; }
@@ -9412,19 +9485,21 @@ static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
 out:
     if (staging[0]) rm_tree(staging);
     if (afd >= 0) close(afd);
+    close(slock);
     if (rc) fprintf(stderr, "lord-vm: %s\n", why[0] ? why : "the group couldn't be made");
     return rc;
 }
 
 /* ---- Start Fresh and the group's settings (docs/VIRTUALIZATION.md 19.7) ----
  *
- *   lord-vm --group-fresh GROUPDIR [--gateway]
- *       With every member off (each one's lock taken for the whole job): the workstation, and the gateway with --gateway,
- *       back to its verified base. The base's SHA-256 is checked against group.json first (a base that changed is
- *       refused: the group is made again from the archive). A new empty overlay over the base replaces disks/system.qcow2
- *       by rename (its snapshots go with the old one); snapshots.json, cpu-usage.json, the logs and any picture are
- *       removed; the member gets a new random id (QEMU's -uuid) and new MAC addresses. The other member is untouched.
- *       {"fresh":true,"members":[…]} on stdout, exit 0; 3 a member runs; 1 anything else.
+ *   lord-vm --group-fresh GROUPDIR [--gateway] [--archive FILE]
+ *       With every member off (the group's lock and each member's taken for the whole job): the workstation, and the
+ *       gateway with --gateway, back to its verified base. The base's SHA-256 is checked against group.json first; a base
+ *       missing or changed is made again from the verified archive (FILE, or the image store's images/<sha512>.tar.xz;
+ *       exit 4 with {"needArchive":true} when there is none). A new empty overlay over the base replaces
+ *       disks/system.qcow2 by rename (its snapshots go with the old one); snapshots.json, cpu-usage.json, the logs and any
+ *       picture are removed; the member gets a new random id (QEMU's -uuid) and new MAC addresses. The other member is
+ *       untouched. {"fresh":true,"members":[…],"bases":[…]} on stdout, exit 0; 3 a member runs; 1 anything else.
  *   lord-vm --group-set GROUPDIR [--disposable on|off] [--fresh-gateway on|off]
  *       group.json's switches (19.4), written by rename; the disposable session applies from the workstation's next start. */
 static int group_open(const char *arg, char *gdir, size_t n, VmGroup *g) {
@@ -9439,82 +9514,544 @@ static int group_open(const char *arg, char *gdir, size_t n, VmGroup *g) {
 }
 
 static void unlink_in(const char *dir, const char *name) {
-    char p[PATH_MAX + 64];
+    char p[PATH_MAX + VMG_DIR_MAX + 96];
     snprintf(p, sizeof p, "%s/%s", dir, name);
     unlink(p);
 }
 
+/* ---- a group's folder, opened safely (Delete, Rename, Repair, Start Fresh; docs/VIRTUALIZATION.md 19.8, 19.9) ----
+ * The library is the real path of GROUPDIR's parent; the group folder is opened from it with O_NOFOLLOW, so a group
+ * folder that is a symbolic link is refused, and every later step that changes the library (rename, removal) works on
+ * these descriptors (renameat2, unlinkat) and never follows a link out of it. */
+typedef struct { char lib[PATH_MAX], name[NAME_MAX + 1], gdir[PATH_MAX]; int libfd, gfd, glock; } GroupAt;
+
+static void group_at_close(GroupAt *a) {
+    if (a->glock >= 0) close(a->glock);
+    if (a->gfd >= 0) close(a->gfd);
+    if (a->libfd >= 0) close(a->libfd);
+    a->glock = a->gfd = a->libfd = -1;
+}
+
+/* 0; 2 not a group folder's path; 1 can't open it; 3 another change to the group is under way (its .lock) */
+static int group_at(const char *arg, GroupAt *a) {
+    memset(a, 0, sizeof *a);
+    a->libfd = a->gfd = a->glock = -1;
+    char tmp[PATH_MAX];
+    size_t n = arg ? strlen(arg) : 0;
+    if (!n || arg[0] != '/' || n >= sizeof tmp) { fprintf(stderr, "lord-vm: %s isn't a machine group's folder\n", arg ? arg : ""); return 2; }
+    memcpy(tmp, arg, n + 1);
+    while (n > 1 && tmp[n - 1] == '/') tmp[--n] = 0;
+    char *sl = strrchr(tmp, '/');
+    if (strlen(sl + 1) > NAME_MAX) { fprintf(stderr, "lord-vm: %s isn't a machine group's folder\n", arg); return 2; }
+    snprintf(a->name, sizeof a->name, "%s", sl + 1);
+    if (sl == tmp) sl[1] = 0; else *sl = 0;
+    if (!realpath(tmp, a->lib) || snprintf(a->gdir, sizeof a->gdir, "%s/%s", a->lib, a->name) >= (int)sizeof a->gdir || !vm_group_dir_ok(a->gdir) || !dir_ok(a->gdir)) {
+        fprintf(stderr, "lord-vm: %s isn't a machine group's folder\n", arg);
+        return 2;
+    }
+    a->libfd = open(a->lib, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (a->libfd >= 0) a->gfd = openat(a->libfd, a->name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (a->gfd < 0) { fprintf(stderr, "lord-vm: %s isn't a machine group's folder\n", a->gdir); group_at_close(a); return 1; }
+    a->glock = vm_group_lock_at(a->gfd);
+    if (a->glock == -2) { fprintf(stderr, "lord-vm: another change to the group is under way\n"); a->glock = -1; group_at_close(a); return 3; }
+    if (a->glock < 0) { fprintf(stderr, "lord-vm: can't take the group's lock\n"); group_at_close(a); return 1; }
+    return 0;
+}
+
+/* a member's folder in the group (never a link) and its lock: the lock's descriptor, -2 while it runs, -3 no such
+ * folder, -1 anything else */
+static int member_lock(int gfd, const char *dir) {
+    int mfd = openat(gfd, dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (mfd < 0) return errno == ENOENT ? -3 : -1;
+    int fd = vm_group_member_lock_at(mfd);
+    close(mfd);
+    return fd;
+}
+
+/* whether member i of g is whole: its folder, a machine.json of this group and role over the group's base, its disk */
+static int member_whole(const char *gdir, const VmGroup *g, int i, VmMachine *m) {
+    char md[PATH_MAX + VMG_DIR_MAX + 2], disk[PATH_MAX + VMG_DIR_MAX + 32];
+    snprintf(md, sizeof md, "%s/%s", gdir, g->m[i].dir);
+    snprintf(disk, sizeof disk, "%s/disks/system.qcow2", md);
+    struct stat st;
+    int role = g->m[i].role;
+    return !lstat(md, &st) && S_ISDIR(st.st_mode) && vm_machine_load(md, m, NULL, 0) == VM_OK && !strcmp(m->group, g->id) && m->role == role &&
+           (!g->has_image || !strcmp(m->base, g->base[role])) && !lstat(disk, &st) && S_ISREG(st.st_mode);
+}
+
+/* a base's state against group.json: 0 the verified bytes, 1 missing, 2 changed */
+enum { BASE_OK, BASE_MISSING, BASE_CHANGED };
+static int base_state(const VmGroup *g, int role) {
+    struct stat st;
+    char sha[65];
+    if (!g->base[role][0] || lstat(g->base[role], &st) || !S_ISREG(st.st_mode)) return BASE_MISSING;
+    return sha256_file(g->base[role], sha) || strcmp(sha, g->base_sha256[role]) ? BASE_CHANGED : BASE_OK;
+}
+
+/* the verified download in the image store, when it is there: images/<sha512>.tar.xz */
+static int store_archive(const VmGroup *g, char *out, size_t n) {
+    struct stat st;
+    snprintf(out, n, "%s/%s.tar.xz", VM_IMAGE_STORE, g->archive_sha512);
+    return !lstat(out, &st) && S_ISREG(st.st_mode) ? 0 : -1;
+}
+
+/* group.json's base_sha256 for `base` in every other group of the library that names it (a base made again from the
+ * archive with other bytes than before: the same verified image, another qemu-img); a group busy with another change
+ * keeps its record and makes the base again at its own Repair */
+static void base_retag(const char *lib, const char *skip, const char *base, const char *sha) {
+    DIR *d = opendir(lib);
+    for (struct dirent *e; d && (e = readdir(d));) {
+        size_t l = strlen(e->d_name);
+        if (e->d_name[0] == '.' || l <= 10 || strcmp(e->d_name + l - 10, VMG_SUFFIX) || !strcmp(e->d_name, skip)) continue;
+        int gfd = openat(dirfd(d), e->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        if (gfd < 0) continue;
+        int lk = vm_group_lock_at(gfd);
+        char gd[PATH_MAX + 260];
+        snprintf(gd, sizeof gd, "%s/%s", lib, e->d_name);
+        static VmGroup g;
+        int changed = 0;
+        if (lk >= 0 && !vm_group_load(gd, &g, NULL, 0))
+            for (int r = 1; r < VM_ROLE_COUNT; r++) if (!strcmp(g.base[r], base) && strcmp(g.base_sha256[r], sha)) { memcpy(g.base_sha256[r], sha, 65); changed = 1; }
+        if (changed && vm_group_save(gd, &g)) vlog("group: %s keeps its old record of %s", e->d_name, base);
+        if (lk >= 0) close(lk);
+        close(gfd);
+    }
+    if (d) closedir(d);
+}
+
+/* the bases of the roles in `mask` (bit 1 << role) made again from the verified archive (19.6, 19.7): the archive hashed
+ * again (its SHA-512 must be group.json's), unpacked by lord-vmunpack into a staging folder of the library's .shared,
+ * each base made by the jailed qemu-img and renamed over its path (0444), under .shared's lock. group.json's base_sha256
+ * follows in g (the caller saves it) and in the library's other groups. 0, or -1 with why */
+static int remake_bases(const GroupAt *a, VmGroup *g, int mask, const char *archive, char *why, size_t wn) {
+    VmCatEntry e;
+    if (group_entry(g->catalog, &e)) { snprintf(why, wn, "%s isn't a machine group of the catalog any more", g->catalog); return -1; }
+    char shared[PATH_MAX + 16];
+    snprintf(shared, sizeof shared, "%s/.shared", a->lib);
+    size_t sl = strlen(shared);
+    for (int r = 1; r < VM_ROLE_COUNT; r++) {
+        if (!(mask & (1 << r))) continue;
+        /* a base is made only in this library's .shared, as a plain name there */
+        if (!vm_base_valid(g->base[r]) || strncmp(g->base[r], shared, sl) || g->base[r][sl] != '/' || strchr(g->base[r] + sl + 1, '/')) {
+            snprintf(why, wn, "the %s's base isn't in this library's .shared folder", VMG_ROLE_NAMES[r]);
+            return -1;
+        }
+    }
+    long long total = 0;
+    int afd = open_archive(archive, &e, g->archive_sha512, &total, why, wn);
+    if (afd < 0) return -1;
+    mkdir(shared, 0700);
+    int slock = shared_lock(shared, 15 * 60 * 1000), rc = -1;
+    char staging[PATH_MAX + 64] = "";
+    if (slock < 0) { snprintf(why, wn, "can't take %s's lock", shared); goto out; }
+    snprintf(staging, sizeof staging, "%s/.unpack-XXXXXX", shared);
+    if (!mkdtemp(staging)) { staging[0] = 0; snprintf(why, wn, "can't make a folder in %s", shared); goto out; }
+    struct statvfs vf;
+    if (!statvfs(staging, &vf) && (unsigned long long)vf.f_bavail * vf.f_frsize < 2ull * (unsigned long long)total * 3) {
+        snprintf(why, wn, "not enough free space in the library (%llu MB free)", (unsigned long long)vf.f_bavail * vf.f_frsize >> 20);
+        goto out;
+    }
+    static const char *const RN[2] = { "gateway", "workstation" };
+    char mem[2][PATH_MAX + 96];
+    int fds[2] = { -1, -1 };
+    for (int r = 0; r < 2; r++) {
+        snprintf(mem[r], sizeof mem[r], "%s/%s.qcow2", staging, RN[r]);
+        fds[r] = open(mem[r], O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    }
+    int bad = fds[0] < 0 || fds[1] < 0 || unpack_archive(afd, &e, fds[0], fds[1], total, why, wn);
+    for (int r = 0; r < 2; r++) if (fds[r] >= 0) close(fds[r]);
+    if (bad) { if (!why[0]) snprintf(why, wn, "can't make the unpacked files"); goto out; }
+    for (int role = 1; role < VM_ROLE_COUNT; role++) {
+        if (!(mask & (1 << role))) continue;
+        long long vs = 0;
+        char sha[65];
+        printf("{\"progress\":{\"step\":\"base\",\"role\":\"%s\"}}\n", VMG_ROLE_NAMES[role]);
+        fflush(stdout);
+        if (member_ok(mem[role - 1], e.max_apparent, &vs, why, wn) || make_base(mem[role - 1], staging, g->base[role], sha, why, wn)) goto out;
+        unlink(mem[role - 1]);
+        vlog("group: the %s's base made again from the verified archive", VMG_ROLE_NAMES[role]);
+        if (strcmp(sha, g->base_sha256[role])) {
+            memcpy(g->base_sha256[role], sha, 65);
+            base_retag(a->lib, a->name, g->base[role], sha);
+        }
+    }
+    rc = 0;
+out:
+    if (staging[0]) { int sfd = open(shared, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC); if (sfd >= 0) { vm_group_rm_at(sfd, strrchr(staging, '/') + 1, 4); close(sfd); } }
+    if (slock >= 0) close(slock);
+    close(afd);
+    return rc;
+}
+
+/* a member back to its verified base: a new empty overlay renamed over disks/system.qcow2, what the old disk's life left
+ * beside it removed, a new id and new MAC addresses. 0, or -1 (said on stderr) */
+static int fresh_member(const char *mdir, const char *dirname, VmMachine *m, const char *base) {
+    char disks[PATH_MAX + VMG_DIR_MAX + 16], nw[PATH_MAX + VMG_DIR_MAX + 48], sys[PATH_MAX + VMG_DIR_MAX + 48], err[256];
+    snprintf(disks, sizeof disks, "%s/disks", mdir);
+    snprintf(nw, sizeof nw, "%s/.system.qcow2.fresh", disks);
+    snprintf(sys, sizeof sys, "%s/system.qcow2", disks);
+    unlink(nw);
+    if (qimg_overlay(base, nw, disks, m->disk_gb, err, sizeof err)) { unlink(nw); fprintf(stderr, "lord-vm: qemu-img create: %.150s\n", err); return -1; }
+    if (rename(nw, sys)) { unlink(nw); fprintf(stderr, "lord-vm: can't replace %s's disk: %s\n", dirname, strerror(errno)); return -1; }
+    /* what the old disk's life left beside it */
+    unlink_in(mdir, "snapshots.json");
+    unlink_in(mdir, VMCPU_FILE);
+    unlink_in(mdir, "thumb.png");
+    unlink_in(mdir, "suspend.state");
+    unlink_in(disks, ".session-empty.qcow2");
+    char logs[PATH_MAX + VMG_DIR_MAX + 16];
+    snprintf(logs, sizeof logs, "%s/log", mdir);
+    DIR *d = opendir(logs);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d))) if (e->d_name[0] != '.') unlinkat(dirfd(d), e->d_name, 0);
+        closedir(d);
+    }
+    /* a new host-side identity: id (QEMU's -uuid) and MAC addresses */
+    if (vm_new_id(m->id) || vm_new_mac(m->mac)) { fprintf(stderr, "lord-vm: no random numbers\n"); return -1; }
+    if (m->role == VM_ROLE_GATEWAY) do { if (vm_new_mac(m->link_mac)) { fprintf(stderr, "lord-vm: no random numbers\n"); return -1; } } while (!strcmp(m->link_mac, m->mac));
+    if (vm_machine_save(mdir, m)) { fprintf(stderr, "lord-vm: can't write %s's machine.json\n", dirname); return -1; }
+    return 0;
+}
+
 static int cmd_group_fresh(const char *arg, int argc, char **argv) {
     int gateway = 0;
+    const char *archive = NULL;
     for (int i = 0; i < argc; i++) {
         if (!strcmp(argv[i], "--gateway")) gateway = 1;
+        else if (!strcmp(argv[i], "--archive") && i + 1 < argc) archive = argv[++i];
         else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
     }
-    char gdir[PATH_MAX];
-    VmGroup g;
-    int r = group_open(arg, gdir, sizeof gdir, &g);
+    GroupAt a;
+    int r = group_at(arg, &a);
     if (r) return r;
-    if (!g.has_image) { fprintf(stderr, "lord-vm: the group doesn't say which image its members came from\n"); return 1; }
+    static VmGroup g;
+    char err[200];
+    r = vm_group_load(a.gdir, &g, err, sizeof err);
+    if (r) { fprintf(stderr, "lord-vm: group.json: %s\n", r == VM_E_NEWER ? "from a newer LordOS: not changed" : err); group_at_close(&a); return 1; }
+    if (!g.has_image) { fprintf(stderr, "lord-vm: the group doesn't say which image its members came from\n"); group_at_close(&a); return 1; }
     /* every member off, and kept off: each one's lock for the whole job */
     int locks[VMG_MEMBERS_MAX], nl = 0, rc = 1;
     char mdir[VMG_MEMBERS_MAX][PATH_MAX + VMG_DIR_MAX + 2];
-    VmMachine mm[VMG_MEMBERS_MAX];
+    static VmMachine mm[VMG_MEMBERS_MAX];
     for (int i = 0; i < g.n; i++) {
-        snprintf(mdir[i], sizeof mdir[i], "%s/%s", gdir, g.m[i].dir);
-        char err[200];
-        if (vm_machine_load(mdir[i], &mm[i], err, sizeof err) || strcmp(mm[i].group, g.id) || mm[i].role != g.m[i].role) {
-            fprintf(stderr, "lord-vm: %s isn't this group's %s\n", g.m[i].dir, VMG_ROLE_NAMES[g.m[i].role]);
+        snprintf(mdir[i], sizeof mdir[i], "%s/%s", a.gdir, g.m[i].dir);
+        int fd = member_lock(a.gfd, g.m[i].dir);
+        if (fd == -2) { fprintf(stderr, "lord-vm: %s is running: shut the group down first\n", g.m[i].dir); rc = 3; goto out; }
+        if (fd >= 0) locks[nl++] = fd;
+        if (fd < 0 || !member_whole(a.gdir, &g, i, &mm[i])) {
+            fprintf(stderr, "lord-vm: %s isn't this group's %s: repair the group\n", g.m[i].dir, VMG_ROLE_NAMES[g.m[i].role]);
             goto out;
         }
-        int fd = open_lock(mdir[i]);
-        if (fd == -2) { fprintf(stderr, "lord-vm: %s is running: shut the group down first\n", g.m[i].dir); rc = 3; goto out; }
-        if (fd < 0) { fprintf(stderr, "lord-vm: can't take %s's lock\n", g.m[i].dir); goto out; }
-        locks[nl++] = fd;
+    }
+    /* the bases are still the verified ones (their SHA-256 from group.json); one missing or changed is made again from
+     * the verified archive (19.6), or the job stops and says the archive is needed (exit 4) */
+    int mask = 0;
+    for (int i = 0; i < g.n; i++) {
+        int role = g.m[i].role;
+        if (role != VM_ROLE_WORKSTATION && !(gateway && role == VM_ROLE_GATEWAY)) continue;
+        if (base_state(&g, role) != BASE_OK) mask |= 1 << role;
+    }
+    if (mask) {
+        char why[300] = "", have[PATH_MAX];
+        if (!archive && !store_archive(&g, have, sizeof have)) archive = have;
+        if (!archive) {
+            printf("{\"fresh\":false,\"needArchive\":true}\n");
+            fprintf(stderr, "lord-vm: a base isn't the verified one any more and the verified download isn't here to make it again\n");
+            rc = 4;
+            goto out;
+        }
+        if (remake_bases(&a, &g, mask, archive, why, sizeof why)) { fprintf(stderr, "lord-vm: %s\n", why); goto out; }
+        if (vm_group_save(a.gdir, &g)) { fprintf(stderr, "lord-vm: can't write group.json\n"); goto out; }
     }
     int done[VMG_MEMBERS_MAX] = { 0 };
     for (int i = 0; i < g.n; i++) {
         int role = g.m[i].role;
         if (role != VM_ROLE_WORKSTATION && !(gateway && role == VM_ROLE_GATEWAY)) continue;
-        VmMachine *m = &mm[i];
-        /* the base is still the verified one (its SHA-256 from group.json) */
-        char sha[65];
-        if (!g.base[role][0] || strcmp(m->base, g.base[role]) || sha256_file(g.base[role], sha) || strcmp(sha, g.base_sha256[role])) {
-            fprintf(stderr, "lord-vm: the %s's base isn't the verified one any more: delete the group and make it again\n", VMG_ROLE_NAMES[role]);
-            goto out;
-        }
-        char disks[PATH_MAX + VMG_DIR_MAX + 16], nw[PATH_MAX + VMG_DIR_MAX + 48], sys[PATH_MAX + VMG_DIR_MAX + 48], err[256];
-        snprintf(disks, sizeof disks, "%s/disks", mdir[i]);
-        snprintf(nw, sizeof nw, "%s/.system.qcow2.fresh", disks);
-        snprintf(sys, sizeof sys, "%s/system.qcow2", disks);
-        unlink(nw);
-        if (qimg_overlay(g.base[role], nw, disks, m->disk_gb, err, sizeof err)) { unlink(nw); fprintf(stderr, "lord-vm: qemu-img create: %.150s\n", err); goto out; }
-        if (rename(nw, sys)) { unlink(nw); fprintf(stderr, "lord-vm: can't replace %s's disk: %s\n", g.m[i].dir, strerror(errno)); goto out; }
-        /* what the old disk's life left beside it */
-        unlink_in(mdir[i], "snapshots.json");
-        unlink_in(mdir[i], VMCPU_FILE);
-        unlink_in(mdir[i], "thumb.png");
-        unlink_in(mdir[i], "suspend.state");
-        unlink_in(disks, ".session-empty.qcow2");
-        char logs[PATH_MAX + VMG_DIR_MAX + 16];
-        snprintf(logs, sizeof logs, "%s/log", mdir[i]);
-        DIR *d = opendir(logs);
-        if (d) {
-            struct dirent *e;
-            while ((e = readdir(d))) if (e->d_name[0] != '.') unlinkat(dirfd(d), e->d_name, 0);
-            closedir(d);
-        }
-        /* a new host-side identity: id (QEMU's -uuid) and MAC addresses */
-        if (vm_new_id(m->id) || vm_new_mac(m->mac)) { fprintf(stderr, "lord-vm: no random numbers\n"); goto out; }
-        if (role == VM_ROLE_GATEWAY) do { if (vm_new_mac(m->link_mac)) { fprintf(stderr, "lord-vm: no random numbers\n"); goto out; } } while (!strcmp(m->link_mac, m->mac));
-        if (vm_machine_save(mdir[i], m)) { fprintf(stderr, "lord-vm: can't write %s's machine.json\n", g.m[i].dir); goto out; }
+        if (fresh_member(mdir[i], g.m[i].dir, &mm[i], g.base[role])) goto out;
         done[i] = 1;
     }
     printf("{\"fresh\":true,\"members\":[");
     for (int i = 0, k = 0; i < g.n; i++) if (done[i]) printf("%s\"%s\"", k++ ? "," : "", VMG_ROLE_NAMES[g.m[i].role]);
+    printf("],\"bases\":[");
+    for (int role = 1, k = 0; role < VM_ROLE_COUNT; role++) if (mask & (1 << role)) printf("%s\"%s\"", k++ ? "," : "", VMG_ROLE_NAMES[role]);
     printf("]}\n");
     rc = 0;
 out:
     for (int i = 0; i < nl; i++) close(locks[i]);
+    group_at_close(&a);
+    return rc;
+}
+
+/* ---- Delete, Rename and Repair of a group (docs/VIRTUALIZATION.md 19.8, 19.9) ----
+ *
+ *   lord-vm --group-delete GROUPDIR
+ *       The group folder and everything in it, for good (no Trash: an anonymity member's disk isn't kept anywhere), with
+ *       every member off: the group's lock and the lock of every machine folder in it (group.json's or not) are taken
+ *       first, and a running one refuses the whole job (exit 3). The folder is renamed out of the library's sight
+ *       (.group-deleting-<pid>, renameat2 without replacing) and then removed by descriptors (vm_group_rm_at: no link
+ *       followed, no other file system entered). Then each base the group or its members named, in this library's
+ *       .shared, goes when nothing else names it any more (vm_group_base_users: the library's machines, groups and
+ *       members, and the Trash), under .shared's lock. A group.json that can't be read doesn't stop it (a damaged group
+ *       is deleted too); one from a newer LordOS does. {"deleted":true,"bases":N}.
+ *   lord-vm --group-rename GROUPDIR NAME
+ *       The group's name in group.json, its members' names ("NAME Gateway", "NAME Workstation") and, when the name asks
+ *       for another folder (vm_group_rename_plan, as for a machine in 6.26), the group folder by renameat2 without
+ *       replacing, all with every member off. Exit 5 and {"renamed":false,"problem":…} when the name or folder is taken.
+ *   lord-vm --group-repair GROUPDIR [--archive FILE]
+ *       A damaged group made whole, every member off: a base missing or changed is made again from the verified archive
+ *       (FILE, or the image store's; exit 4 with {"needArchive":true} when there is none), and the members over a changed
+ *       base start fresh (their disks were written over other bytes); a member folder missing, or whose machine.json
+ *       isn't this group's, is made again from its base (the old folder removed). group.json itself must be readable.
+ *       {"repaired":true,"members":[…],"bases":[…],"fresh":[…]}. */
+static void sweep_deleting(int libfd) {
+    DIR *d = fdopendir(dup(libfd));
+    for (struct dirent *e; d && (e = readdir(d));) {
+        if (strncmp(e->d_name, ".group-deleting-", 16)) continue;
+        long pid = atol(e->d_name + 16);
+        if (pid > 0 && (kill((pid_t)pid, 0) == 0 || errno != ESRCH)) continue;
+        if (!vm_group_rm_at(dirfd(d), e->d_name, 12)) vlog("group: a Delete that didn't finish was completed (%s)", e->d_name);
+    }
+    if (d) closedir(d);
+}
+
+static int cmd_group_delete(const char *arg, int argc, char **argv) {
+    (void)argv;
+    if (argc) { fprintf(stderr, "lord-vm: --group-delete GROUPDIR\n"); return 2; }
+    GroupAt a;
+    int r = group_at(arg, &a);
+    if (r) return r;
+    static VmGroup g;
+    int gr = vm_group_load(a.gdir, &g, NULL, 0), rc = 1;
+    if (gr == VM_E_NEWER) { fprintf(stderr, "lord-vm: group.json is from a newer LordOS: not deleted\n"); group_at_close(&a); return 1; }
+    /* every machine folder in it off and kept off; the bases they and group.json name */
+    enum { MAXM = 16 };
+    int locks[MAXM], nl = 0, nb = 0;
+    static char bases[MAXM + VM_ROLE_COUNT][VM_PATH_MAX];
+    if (gr == VM_OK) for (int k = 1; k < VM_ROLE_COUNT; k++) if (g.base[k][0]) snprintf(bases[nb++], VM_PATH_MAX, "%s", g.base[k]);
+    DIR *d = fdopendir(dup(a.gfd));
+    for (struct dirent *e; d && (e = readdir(d));) {
+        size_t l = strlen(e->d_name);
+        struct stat st;
+        if (l < 8 || strcmp(e->d_name + l - 7, ".lordvm") || fstatat(a.gfd, e->d_name, &st, AT_SYMLINK_NOFOLLOW) || !S_ISDIR(st.st_mode)) continue;
+        if (nl >= MAXM) { fprintf(stderr, "lord-vm: the group's folder holds too many machine folders\n"); goto out; }
+        int fd = member_lock(a.gfd, e->d_name);
+        if (fd == -2) { fprintf(stderr, "lord-vm: %s is running: shut the group down first\n", e->d_name); rc = 3; goto out; }
+        if (fd < 0) { fprintf(stderr, "lord-vm: can't take %s's lock\n", e->d_name); goto out; }
+        locks[nl++] = fd;
+        char md[sizeof a.gdir + NAME_MAX + 2];
+        snprintf(md, sizeof md, "%s/%s", a.gdir, e->d_name);
+        static VmMachine m;
+        if (!vm_machine_load(md, &m, NULL, 0) && m.base[0] && nb < MAXM + VM_ROLE_COUNT) snprintf(bases[nb++], VM_PATH_MAX, "%s", m.base);
+    }
+    if (d) { closedir(d); d = NULL; }
+    sweep_deleting(a.libfd);
+    char hidden[64];
+    snprintf(hidden, sizeof hidden, ".group-deleting-%d", (int)getpid());
+    if (renameat2(a.libfd, a.name, a.libfd, hidden, RENAME_NOREPLACE)) { fprintf(stderr, "lord-vm: can't take the group out of the library: %s\n", strerror(errno)); goto out; }
+    /* what was renamed is the folder whose locks are held (another process may have put something else under its name
+     * meanwhile): else it goes back, and nothing is removed */
+    struct stat was, now;
+    if (fstat(a.gfd, &was) || fstatat(a.libfd, hidden, &now, AT_SYMLINK_NOFOLLOW) || was.st_dev != now.st_dev || was.st_ino != now.st_ino) {
+        if (renameat2(a.libfd, hidden, a.libfd, a.name, RENAME_NOREPLACE)) vlog("group: %s/%s isn't the group that was checked and stays aside", a.lib, hidden);
+        fprintf(stderr, "lord-vm: the group's folder changed while it was being deleted: nothing was removed\n");
+        goto out;
+    }
+    fsync(a.libfd);
+    vlog("group: %s is being deleted", a.name);
+    if (vm_group_rm_at(a.libfd, hidden, 12)) {
+        fprintf(stderr, "lord-vm: some of the group's files couldn't be removed (%s/%s): %s\n", a.lib, hidden, strerror(errno));
+        goto out;
+    }
+    fsync(a.libfd);
+    /* the bases nothing names any more, only in this library's .shared */
+    int gone = 0;
+    char shared[PATH_MAX + 16], trash[PATH_MAX];
+    snprintf(shared, sizeof shared, "%s/.shared", a.lib);
+    size_t sl = strlen(shared);
+    const char *home = getenv("HOME");
+    int have_trash = home && home[0] == '/' && snprintf(trash, sizeof trash, "%s/.local/share/Trash/files", home) < (int)sizeof trash;
+    int slock = nb ? shared_lock(shared, 10000) : -1;
+    int sfd = slock >= 0 ? open(shared, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC) : -1;
+    for (int i = 0; sfd >= 0 && i < nb; i++) {
+        int dup_ = 0;
+        for (int k = 0; k < i; k++) if (!strcmp(bases[k], bases[i])) dup_ = 1;
+        if (dup_ || !vm_base_valid(bases[i]) || strncmp(bases[i], shared, sl) || bases[i][sl] != '/' || strchr(bases[i] + sl + 1, '/')) continue;
+        if (vm_group_base_users(a.lib, have_trash ? trash : NULL, NULL, bases[i])) continue;
+        struct stat st;
+        const char *bn = bases[i] + sl + 1;
+        if (fstatat(sfd, bn, &st, AT_SYMLINK_NOFOLLOW) || !S_ISREG(st.st_mode)) continue;
+        if (!unlinkat(sfd, bn, 0)) { gone++; vlog("group: its base %s went (nothing else names it)", bn); }
+    }
+    if (sfd >= 0) close(sfd);
+    if (slock >= 0) close(slock);
+    else if (nb) vlog("group: .shared is busy: its bases stay (Storage can remove them)");
+    printf("{\"deleted\":true,\"bases\":%d}\n", gone);
+    rc = 0;
+out:
+    if (d) closedir(d);
+    for (int i = 0; i < nl; i++) close(locks[i]);
+    group_at_close(&a);
+    return rc;
+}
+
+static int cmd_group_rename(const char *arg, int argc, char **argv) {
+    if (argc != 1) { fprintf(stderr, "lord-vm: --group-rename GROUPDIR NAME\n"); return 2; }
+    const char *name = argv[0];
+    if (!vm_rename_name_ok(name)) { fprintf(stderr, "lord-vm: a group's name is 1 to %d bytes of text, not starting with '.'\n", VM_NAME_MAX); return 2; }
+    GroupAt a;
+    int r = group_at(arg, &a);
+    if (r) return r;
+    static VmGroup g;
+    char err[200];
+    r = vm_group_load(a.gdir, &g, err, sizeof err);
+    if (r) { fprintf(stderr, "lord-vm: group.json: %s\n", r == VM_E_NEWER ? "from a newer LordOS: not changed" : err); group_at_close(&a); return 1; }
+    int locks[VMG_MEMBERS_MAX], nl = 0, rc = 1;
+    static VmMachine mm[VMG_MEMBERS_MAX];
+    for (int i = 0; i < g.n; i++) {
+        int fd = member_lock(a.gfd, g.m[i].dir);
+        if (fd == -2) { fprintf(stderr, "lord-vm: %s is running: shut the group down first\n", g.m[i].dir); rc = 3; goto out; }
+        if (fd >= 0) locks[nl++] = fd;
+        if (fd < 0 || !member_whole(a.gdir, &g, i, &mm[i])) { fprintf(stderr, "lord-vm: %s isn't this group's %s: repair the group first\n", g.m[i].dir, VMG_ROLE_NAMES[g.m[i].role]); goto out; }
+    }
+    VmGroupRenamePlan p;
+    if (vm_group_rename_plan(a.gdir, name, &p)) {
+        static const char *const PR[] = { "", "bad-name", "name-taken", "folder-taken", "not-a-group" };
+        printf("{\"renamed\":false,\"problem\":\"%s\",\"folder\":", PR[p.problem]);
+        print_json_str(p.folder);
+        printf(",\"other\":");
+        print_json_str(p.other);
+        printf("}\n");
+        rc = 5;
+        goto out;
+    }
+    /* group.json and the members' names first; then the folder */
+    snprintf(g.name, sizeof g.name, "%s", name);
+    if (vm_group_save(a.gdir, &g)) { fprintf(stderr, "lord-vm: can't write group.json\n"); goto out; }
+    for (int i = 0; i < g.n; i++) {
+        char md[sizeof a.gdir + VMG_DIR_MAX + 2];
+        snprintf(md, sizeof md, "%s/%s", a.gdir, g.m[i].dir);
+        member_name(mm[i].name, sizeof mm[i].name, name, g.m[i].role);
+        if (vm_machine_check(&mm[i], NULL, 0) || vm_machine_save(md, &mm[i])) vlog("group: %s keeps its old name", g.m[i].dir);
+    }
+    char to[sizeof a.lib + 260];
+    snprintf(to, sizeof to, "%s/%s", a.lib, p.folder);
+    const char *folder = "same";
+    if (p.moves) {
+        if (renameat2(a.libfd, a.name, a.libfd, p.folder, RENAME_NOREPLACE)) {
+            fprintf(stderr, "lord-vm: the group's folder keeps its name: %s\n", strerror(errno));
+            snprintf(to, sizeof to, "%s", a.gdir);
+            folder = "kept";
+        } else { fsync(a.libfd); folder = "moved"; }
+    } else snprintf(to, sizeof to, "%s", a.gdir);
+    printf("{\"renamed\":true,\"name\":");
+    print_json_str(name);
+    printf(",\"dir\":");
+    print_json_str(to);
+    printf(",\"folder\":\"%s\"}\n", folder);
+    rc = 0;
+out:
+    for (int i = 0; i < nl; i++) close(locks[i]);
+    group_at_close(&a);
+    return rc;
+}
+
+static int cmd_group_repair(const char *arg, int argc, char **argv) {
+    const char *archive = NULL;
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "--archive") && i + 1 < argc) archive = argv[++i];
+        else { fprintf(stderr, "lord-vm: unknown option %s\n", argv[i]); return 2; }
+    }
+    GroupAt a;
+    int r = group_at(arg, &a);
+    if (r) return r;
+    static VmGroup g;
+    char err[200];
+    r = vm_group_load(a.gdir, &g, err, sizeof err);
+    if (r == VM_E_NEWER) { fprintf(stderr, "lord-vm: group.json is from a newer LordOS: not changed\n"); group_at_close(&a); return 1; }
+    if (r) { fprintf(stderr, "lord-vm: group.json can't be read (%s): the group can only be deleted\n", err); group_at_close(&a); return 1; }
+    if (!g.has_image) { fprintf(stderr, "lord-vm: the group doesn't say which image its members came from\n"); group_at_close(&a); return 1; }
+    VmCatEntry e;
+    if (group_entry(g.catalog, &e)) { fprintf(stderr, "lord-vm: %s isn't a machine group of the catalog any more\n", g.catalog); group_at_close(&a); return 1; }
+    int locks[VMG_MEMBERS_MAX], nl = 0, rc = 1, whole[VMG_MEMBERS_MAX] = { 0 };
+    static VmMachine mm[VMG_MEMBERS_MAX];
+    for (int i = 0; i < g.n; i++) {
+        int fd = member_lock(a.gfd, g.m[i].dir);
+        if (fd == -2) { fprintf(stderr, "lord-vm: %s is running: shut the group down first\n", g.m[i].dir); rc = 3; goto out; }
+        if (fd >= 0) locks[nl++] = fd;
+        whole[i] = fd >= 0 && member_whole(a.gdir, &g, i, &mm[i]);
+    }
+    int mask = 0, changed = 0;
+    for (int role = 1; role < VM_ROLE_COUNT; role++) {
+        if (vm_group_role(&g, role) < 0) continue;
+        int s = base_state(&g, role);
+        if (s != BASE_OK) mask |= 1 << role;
+        if (s == BASE_CHANGED) changed |= 1 << role;
+    }
+    if (mask) {
+        char why[300] = "", have[PATH_MAX];
+        if (!archive && !store_archive(&g, have, sizeof have)) archive = have;
+        if (!archive) {
+            printf("{\"repaired\":false,\"needArchive\":true}\n");
+            fprintf(stderr, "lord-vm: a base is missing or changed and the verified download isn't here to make it again\n");
+            rc = 4;
+            goto out;
+        }
+        if (remake_bases(&a, &g, mask, archive, why, sizeof why)) { fprintf(stderr, "lord-vm: %s\n", why); goto out; }
+        if (vm_group_save(a.gdir, &g)) { fprintf(stderr, "lord-vm: can't write group.json\n"); goto out; }
+    }
+    int made[VMG_MEMBERS_MAX] = { 0 }, fresh[VMG_MEMBERS_MAX] = { 0 };
+    for (int i = 0; i < g.n; i++) {
+        int role = g.m[i].role;
+        char md[sizeof a.gdir + VMG_DIR_MAX + 2];
+        snprintf(md, sizeof md, "%s/%s", a.gdir, g.m[i].dir);
+        if (whole[i]) {
+            /* its disk was written over other bytes than the verified base's: it starts fresh */
+            if (changed & (1 << role)) { if (fresh_member(md, g.m[i].dir, &mm[i], g.base[role])) goto out; fresh[i] = 1; }
+            continue;
+        }
+        /* made again: in a hidden folder first, its lock taken, then renamed into place; the old folder (or whatever has
+         * that name: a file, a link) goes first, out of sight, by descriptors */
+        char old[64], tmp[64], why[300] = "";
+        snprintf(old, sizeof old, ".repair-old-%d-%d", (int)getpid(), i);
+        snprintf(tmp, sizeof tmp, ".repair-new-%d-%d", (int)getpid(), i);
+        struct stat st;
+        if (!fstatat(a.gfd, g.m[i].dir, &st, AT_SYMLINK_NOFOLLOW)) {
+            if (renameat2(a.gfd, g.m[i].dir, a.gfd, old, RENAME_NOREPLACE)) { fprintf(stderr, "lord-vm: can't move %s aside: %s\n", g.m[i].dir, strerror(errno)); goto out; }
+            if (vm_group_rm_at(a.gfd, old, 12)) vlog("group: the old %s couldn't be removed entirely (%s)", g.m[i].dir, old);
+        }
+        long long vs = 0;
+        char nm[VM_NAME_MAX + 1];
+        member_name(nm, sizeof nm, g.name, role);
+        if (member_ok(g.base[role], e.max_apparent, &vs, why, sizeof why) ||
+            make_member(a.gdir, tmp, nm, role, g.id, g.base[role], vs, e.member_vcpus[role - 1], e.member_mem_mb[role - 1], why, sizeof why)) {
+            vm_group_rm_at(a.gfd, tmp, 6);
+            fprintf(stderr, "lord-vm: %s couldn't be made again: %s\n", g.m[i].dir, why);
+            goto out;
+        }
+        int fd = member_lock(a.gfd, tmp);
+        if (fd < 0 || renameat2(a.gfd, tmp, a.gfd, g.m[i].dir, RENAME_NOREPLACE)) {
+            if (fd >= 0) close(fd);
+            vm_group_rm_at(a.gfd, tmp, 6);
+            fprintf(stderr, "lord-vm: %s couldn't be put in place\n", g.m[i].dir);
+            goto out;
+        }
+        if (nl < VMG_MEMBERS_MAX) locks[nl++] = fd; else close(fd);
+        fsync(a.gfd);
+        made[i] = 1;
+        vlog("group: %s made again from its base", g.m[i].dir);
+    }
+    printf("{\"repaired\":true,\"members\":[");
+    for (int i = 0, k = 0; i < g.n; i++) if (made[i]) printf("%s\"%s\"", k++ ? "," : "", VMG_ROLE_NAMES[g.m[i].role]);
+    printf("],\"bases\":[");
+    for (int role = 1, k = 0; role < VM_ROLE_COUNT; role++) if (mask & (1 << role)) printf("%s\"%s\"", k++ ? "," : "", VMG_ROLE_NAMES[role]);
+    printf("],\"fresh\":[");
+    for (int i = 0, k = 0; i < g.n; i++) if (fresh[i]) printf("%s\"%s\"", k++ ? "," : "", VMG_ROLE_NAMES[g.m[i].role]);
+    printf("]}\n");
+    rc = 0;
+out:
+    for (int i = 0; i < nl; i++) close(locks[i]);
+    group_at_close(&a);
     return rc;
 }
 
@@ -9569,9 +10106,10 @@ static int usage(void) {
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n"
             "       lord-vm --sha256 FILE   (an ISO's SHA-256, with progress lines)\n"
-            "       lord-vm --group-create GROUPDIR --catalog-id ID --archive FILE --sha512 HEX [--name N]   (a machine group from a verified archive)\n"
-            "       lord-vm --group-fresh GROUPDIR [--gateway]   (Start Fresh: the workstation, and the gateway too, back to the verified base)\n"
-            "       lord-vm --group-set GROUPDIR [--disposable on|off] [--fresh-gateway on|off]\n");
+            "       lord-vm --group-create GROUPDIR --catalog-id ID --archive FILE --sha512 HEX [--release R] [--name N]   (a machine group from a verified archive)\n"
+            "       lord-vm --group-fresh GROUPDIR [--gateway] [--archive FILE]   (Start Fresh: the workstation, and the gateway too, back to the verified base)\n"
+            "       lord-vm --group-set GROUPDIR [--disposable on|off] [--fresh-gateway on|off]\n"
+            "       lord-vm --group-delete GROUPDIR | --group-rename GROUPDIR NAME | --group-repair GROUPDIR [--archive FILE]\n");
     return 2;
 }
 
@@ -9616,6 +10154,9 @@ int main(int argc, char **argv) {
     if (!strcmp(cmd, "--group-create")) return cmd_group_create(dir, rest, rv);
     if (!strcmp(cmd, "--group-fresh")) return cmd_group_fresh(dir, rest, rv);
     if (!strcmp(cmd, "--group-set")) return cmd_group_set(dir, rest, rv);
+    if (!strcmp(cmd, "--group-delete")) return cmd_group_delete(dir, rest, rv);
+    if (!strcmp(cmd, "--group-rename")) return cmd_group_rename(dir, rest, rv);
+    if (!strcmp(cmd, "--group-repair")) return cmd_group_repair(dir, rest, rv);
     if (!strcmp(cmd, "--start")) return cmd_start(dir, rest, rv);
     if (!strcmp(cmd, "--check")) return cmd_check(dir);
     if (!strcmp(cmd, "--set")) return cmd_set(dir, rest, rv);

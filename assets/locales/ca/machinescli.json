@@ -92,6 +92,8 @@
   "groupStarted": "{name} està en marxa: primer la passarel·la, després l’estació de treball.",
   "groupStopped": "{name} està apagat: primer l’estació de treball, després la passarel·la.",
   "groupDamaged": "{name} està malmès: falta una de les seves màquines o no és seva.",
+  "groupNameTaken": "Ja hi ha un grup o una màquina anomenada «{name}».",
+  "groupFolderTaken": "La carpeta Machines ja té «{folder}»: tria un altre nom.",
   "gatewayFailed": "La passarel·la de {name} no ha arrencat ({why}), així que l’estació de treball no s’ha arrencat.",
   "workstationFailed": "L’estació de treball de {name} no ha arrencat ({why}); la passarel·la continua en marxa.",
   "kind.group": "grup de {count}",
