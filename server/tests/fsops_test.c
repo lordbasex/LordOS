@@ -174,6 +174,10 @@ int main(void) {
     CHECK(fsops_protected(a));
     path(a, ".config/lordos/global-shortcuts.json.tmp");
     CHECK(fsops_protected(a));
+    path(a, ".config/lordos/sentinela/blocked.json");    /* (0.8.9.6) Sentinela's blocklist: only lord.sentinela.block/unblock */
+    CHECK(fsops_protected(a));
+    path(a, ".config/lordos/sentinela/blocked.json.new");
+    CHECK(fsops_protected(a));
 
     /* a parent of a protected path can't be trashed, renamed, moved or restored over: that would take
      * the protected path with it, or bring a crafted one in */

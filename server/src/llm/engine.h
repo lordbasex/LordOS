@@ -37,6 +37,19 @@ int llm_model_id_ok(const char *id);
 /* Queue an analysis or a facts reading; a job id (> 0), or -1 (errno: EINVAL, EBUSY when 8 are queued). */
 int llm_submit_analyze(const char *model, const char *system, const char *user);
 int llm_submit_facts(int pid, unsigned long long start);
+/* (0.8.9.6) "Investigate with Lumo", on the person's click only: user (the facts JS may send) followed by what
+ * evidence.c reads of the program (a script's text or a binary's metadata, fenced as data), answered with the
+ * investigation's schema (what, why, risk, action of the closed list); the result also carries "evidence": what was
+ * read. And a description translated (its schema: one "text"). */
+#define LLM_EVIDENCE_READ (64 * 1024)             /* a script read at most */
+#define LLM_EVIDENCE_SENT 6000                    /* what of it the model reads: its context is 4096 tokens */
+#define LLM_TRANSLATE_MAX 2048
+int llm_submit_investigate(const char *model, const char *system, const char *user, int pid, unsigned long long start);
+int llm_submit_translate(const char *model, const char *system, const char *text);
+/* evidence.c: the program's evidence for the process (pid, start): a JSON of what was read ({"kind":"script"|"inline"|
+ * "binary"|"none", ...}, malloc'd, NULL on no memory) and in *block the text for the model (malloc'd, or NULL). Only the
+ * user's own processes. */
+char *llm_evidence(int pid, unsigned long long start, char **block);
 /* The result of a job as JSON (malloc'd), once, or NULL while it runs (or for an unknown id).
  *   analyze: {"ok":true,"content":"…","ms":N,"startMs":N,"tokens":N} or {"ok":false,"error":"llm.<code>"}
  *   facts:   {"ok":true,"pid":N,"exe":"…","deleted":b,"pkg":"…"|null,"place":"system|home|temp|other|none",

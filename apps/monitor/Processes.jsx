@@ -24,6 +24,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fmt, AppGlyph, isolatedAppOf, componentName } from './index.jsx';
 import { sealPixels, SEAL_COLORS } from './seal.js';
 import { statsStore, WINDOWS } from './procstatsmodel.js';
+import { DescriptionPanel } from './Describe.jsx';
 import {
   HOLD_MS, procKey, procText, groupRowKey, rowKeyOf, isPaused, buildGroups, filterGroups, sortGroups, sortProcs, holdOrder, holdGroups,
   flattenRows, groupSummary, snapshotOf, planStop, stillRunning, groupKeys, chainCache, originOf, groupOriginOf, passesFilter, programChoices,
@@ -1053,7 +1054,7 @@ function InfoSheet({ want }) {
   const gone = (ready && d.gone) || (procs && !live);
   const cmd = ready && d.cmdline ? d.cmdline.map((a) => (/[\s"']/.test(a) || !a ? JSON.stringify(a) : a)).join(' ') : '';
   return (
-    <Sheet width={620} height={620}>
+    <Sheet width={620} height={680}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
         {p ? <AppGlyph item={p} size={32} /> : null}
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -1077,6 +1078,7 @@ function InfoSheet({ want }) {
           </View>
         </View>
       ) : null}
+      {ready && !d.gone && p ? <DescriptionPanel p={live || p} d={d} own={own} /> : null}
       <View style={{ alignItems: 'center' }}>
         <Segmented appearance="neutral" value={tab} onChange={setTab}
           options={[['memory', tr('monitor.memory')], ['stats', tr('monitor.proc.tab.stats')], ['files', tr('monitor.proc.tab.files')]]} />
