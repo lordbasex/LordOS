@@ -46,15 +46,15 @@ recomputes both from the rows; the arithmetic:
 | F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
 | G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 68.33 | 68 % | 12 × 68 % = 8.16 | 68 % |
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
-| I. Guest tools and agent (state, shell, logs) | 7 | 6 | 75.00 | 75 % | 7 × 75 % = 5.25 | 75 % |
+| I. Guest tools and agent (state, shell, logs) | 7 | 6 | 75.83 | 76 % | 7 × 76 % = 5.32 | 75 % |
 | J. Command line and automation | 3 | 2 | 47.50 | 48 % | 3 × 48 % = 1.44 | 48 % |
 | K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 61.25 | 61 % | 3 × 61 % = 1.83 | 61 % |
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **111** | | | **68.94 → 69 %** | 68 % |
+| **Total** | **100** | **111** | | | **69.01 → 69 %** | 68 % |
 
-Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 1.44 + 1.83 + 2.96 + 2.58 + 1.65 = 68.94, rounded **69 %** (before: 68 %, against `965a10f6e`). Before this audit the
+Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.32 + 1.44 + 1.83 + 2.96 + 2.58 + 1.65 = 69.01, rounded **69 %** (before: 68 %, against `965a10f6e`). Before this audit the
 document's table said 67.52 and the JSON 67.16 while the rows themselves gave 67.88: the Whonix row had been raised to 85 %
 twice without the table, the Σ line and the JSON being computed again, and B's score in the table (73 %) wasn't its rows'
 mean (76 %). All three now come from the rows in one pass.
@@ -206,13 +206,13 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | venus (Vulkan) (6.10) | ❌ | 0 |  |  |
 | Whole-GPU passthrough (Mode B) (6.10, MACHINES-GPU.md) | ❌ | 0 | `vmgpu_admin.c` refuses a dedicated card | "Whole" in Configure is the largest GVT-g type, not passthrough |
 
-### I. Guest tools and agent (75 %)
+### I. Guest tools and agent (76 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lordos-guest` 7: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus (6.17, 7, 7.1.4) | ✅ | 95 | `tools/guest/lordos-guest.c` (`VERSION "7"`), `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh` | 7 (*in development*) adds `perf` (power-profiles-daemon, GNOME's animations); checked on private buses with the real dconf-service, not yet in a running guest (was 6, 100) |
+| `lordos-guest` 8: clipboard (also through a LordOS guest's own lord-server), apps-mode relay, `--stopping`, `perf` over D-Bus (6.17, 7, 7.1.4) | ✅ | 95 | `tools/guest/lordos-guest.c` (`VERSION "8"`), `perf.c`, `dbusmin.c`, `js_guestwin.c` (`holds_port`); `guest-dbus-test`, `guest_perf_test.sh`, `guestwin_headless.sh` (`--clip`) | 8 (*in development*) takes a LordOS desktop's clipboard from its lord-server (`lordos-guestwin.sock` says `clipboard`; only the port's holder): host → guest → lord-server → a new helper → host checked on a headless lord-server with a pseudo-terminal as the port, and in an installed LordOS 0.8.9 guest under KVM (6.17); `perf` not yet in a running guest (was 7, 95) |
 | `lordos-guest-win` w11: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf (7.1.2, 7.1.4) | ✅ | 100 | `tools/guest-win/lordos-guest-win.c` (`VERSION "w11"`); `vm-test` (`AGK_PERF`) | `perf` checked in the maintainer's guest on 2026-11-23 (power plan, effects, transparency); Windows Search is lord-vm's own script through qemu-guest-agent (`vmperfwin.c`, M item 5), not the tools'. The note said `perf` wasn't checked in a running guest (7.1.4 records the check; was 95) |
-| Install Agent through qemu-guest-agent; tools updated by themselves (6.17, 7.1.3) | ✅ | 90 | `lordvm.c` (`guest-file-write`), `model.js` (`TOOLS_SHIPPED`, `toolsAutoStep`) | No guest with older tools tried |
+| Install Agent through qemu-guest-agent, or without it from the LordOS Guest Tools disc; tools updated by themselves (6.17, 7.1.3) | ✅ | 95 | `lordvm.c` (`guest-file-write`, `gt_request`), `tools/guest/mkguestiso.c`, `tools/guest/install.sh`, `model.js` (`discOffer`, `TOOLS_SHIPPED`, `toolsAutoStep`); `guesttools-test`, `guest_tools_install_test.sh`, `vm_guest_tools_e2e.sh` | The disc (*in development*) checked under KVM on 2026-11-24: Debian 13 (no agent → disc → `install.sh` on its console → qemu-guest-agent connected, disc out by itself → Install through qemu-guest-agent) and an installed LordOS 0.8.9 (6.17); Fedora, openSUSE, Arch and Alpine only through `install.sh --plan`; no guest with older tools tried (was 90) |
 | Agent state light and capability list (6.17) | 🟡 | 85 | `model.js` (`agentTone`, `agentLines`) | No red state |
 | Shell over the agent as the signed-in user (6.18) | ❌ | 15 | the Shell is the serial console |  |
 | Logs: journal, serial, machine log, Overview (6.19) | 🟡 | 65 | `logs.jsx`, `lordvm.c` (journal through qemu-ga) | No Windows event logs, unit filter (a column only), time zone or Clear view |
@@ -1873,7 +1873,9 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
     default (`/usr/lib/systemd/user/default.target.wants`) that runs `/usr/lib/lordos/guest/lordos-guest` only where
     `/dev/virtio-ports/org.lordos.agent` exists, which is only inside a Machines guest whose agent is on, and
     `71-lordos-guest.rules` (the same rule the Install Agent writes in other guests: the seat's person may open the
-    port). On a computer, or a machine without the agent, nothing runs. The live ISO now also has `qemu-guest-agent`
+    port; since 0.8.9.6 also the `video` group, because LordOS's own sessions aren't logind seats and `uaccess` gave the
+    port to nobody there, 6.17 "LordOS as a guest"). On a computer, or a machine without the agent, nothing runs. The
+    package also `Recommends: qemu-guest-agent` (0.8.9.6), so an installed LordOS gets it with its next update. The live ISO now also has `qemu-guest-agent`
     (`ISO.md`): Debian's unit starts only when the host gives the `org.qemu.guest_agent.0` port. So a LordOS machine
     made by the card has its agent connected and apps mode (7.2) offered from its first boot; both reach installed
     systems with the next ISO and the next `lordos` package.
@@ -3086,7 +3088,72 @@ The first icon on the bar shows its state (`agentTone`, `model.js`): off (not co
 
 - **Connected:** the system and architecture as the agent reports them, agent version, connection time.
 - **A list of what works now, and what doesn't and why** (`agentLines`, `model.js`): Shell (the serial console), Logs, Shut Down, Time, Keep awake, Clipboard, Resolution, Folders, Apps (works when the helper lists its windows, 7.2); Windows guests leave out Logs and Keep awake. Buttons: **Sync time**, **Set Up the Transfer Folder**, and a hint when the clipboard is off. Each line comes from the agent's reported capabilities, so it's the truth for that guest, not a table in the app.
-- **Not connected:** the next step, which depends on the state. If the guest is still booting, says wait. If the agent isn't installed: an **Install Agent** button writes `lordos-guest` and its service into the guest through qemu-guest-agent (`guest-file-write`, a fixed script, `lordvm.c`); no disc and no command for the person.
+- **Not connected:** the next step, which depends on the state. If the guest is still booting, says wait. If qemu-guest-agent answers but our helper isn't there: **Install** writes `lordos-guest` and its service into the guest through qemu-guest-agent (`guest-file-write`, a fixed script, `lordvm.c` `INSTALL_SH`); no disc and no command for the person. If nothing answers (a Linux guest without qemu-guest-agent, or one whose agent doesn't allow files and commands): **Install Agent from Disc**, the LordOS Guest Tools disc below (*in development*).
+
+**The LordOS Guest Tools disc (*in development*; `tools/guest/mkguestiso.c`, `tools/guest/install.sh`, `lordvm.c` `VAG_DISC`).**
+Install through qemu-guest-agent needs qemu-guest-agent, and many Linux systems don't install it (Debian's own images,
+LordOS 0.8.9, most desktop installs). For those, Machines brings a disc:
+
+- *The disc.* A read-only ISO 9660 image, made at build time by our own writer (`mkguestiso`, the same bytes for the same
+  files) and shipped in the `lordos` package as `/usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso`: volume
+  `LORDOS_TOOLS`, with `install.sh`, `lguest` (`lordos-guest` for this LordOS's architecture, stripped), `sha256.txt` (its
+  SHA-256), `arch.txt` and `readme.txt`. Its SHA-256 is compiled into lord-vm (`build/gen/guesttools.h`, `mk/vm.mk`).
+- *Putting it in.* The agent's popover offers **Install Agent from Disc** when the machine runs, its agent is on, it isn't
+  a protected (anonymity) machine, the guest isn't Windows and qemu-guest-agent doesn't answer with files and commands
+  (`discOffer`, `model.js`). lord-vm (`gt_request`) refuses a machine locked for anonymity or a Whonix gateway, a Windows
+  guest, a guest whose qemu-guest-agent can install, a drive that holds another disc (a live system runs from its disc:
+  install the system first) and a disc whose SHA-256 isn't the compiled one; it opened the image before its own Landlock,
+  read-only, and hashes it again (pread) before each insert. The disc goes in through the same QMP steps as Change Disc
+  (`add-fd`, a `raw` node on `/dev/fdset/N`, read-only); `machine.json` doesn't keep it, so the next start has an empty
+  drive. lord-server only asks (`lord.vm.agent(id, 'disc' | 'discOut')`): it never names a file.
+- *What the person does.* The popover shows the steps: open a terminal in the machine and run the line for its system,
+  `sh /media/$USER/LORDOS_TOOLS/install.sh` (Debian, Ubuntu), `sh /run/media/$USER/LORDOS_TOOLS/install.sh` (Fedora,
+  openSUSE, Arch) or, without a desktop, `sudo mount -r /dev/sr0 /mnt && sh /mnt/install.sh`. The lines are shown to be
+  typed; **Copy** appears only where the machine's clipboard can take them (towards the guest allowed and a helper there,
+  `discCanCopy`), which before the agent exists it usually can't.
+- *The password stays in the guest.* `install.sh` asks for the administrator's password with the guest's own prompt:
+  `pkexec` when the desktop runs a polkit agent, else `sudo`, `doas` or `su` in the terminal. Machines never asks for it,
+  sees it or types it: typing a password with `send-key` would put it wherever the guest's keyboard focus happens to be (a
+  chat window, a search field, a terminal echoing it, a program that logs keys), with no way for the host to see where it
+  went, and the host would have to hold the secret to do so.
+- *What `install.sh` does* (as root, fixed commands only, no argument from anyone): checks the processor against
+  `arch.txt` and `lguest` against `sha256.txt`; copies `lordos-guest` to `/usr/local/bin` with the udev rule, user unit
+  (an XDG autostart entry without systemd) and shutdown hook that Install writes, first, because the disc comes out as soon
+  as qemu-guest-agent answers; installs `qemu-guest-agent` with the system's own package manager and repositories
+  (`apt-get`, `dnf`, `yum`, `zypper`, `pacman`, `apk`, the first found) and starts it (systemd or OpenRC); installs `xclip`
+  and `wl-clipboard` best effort (not on LordOS, below); starts `lordos-guest` again for the person who ran it
+  (`PKEXEC_UID`, `SUDO_UID`, `DOAS_UID`) or every signed-in person. On LordOS its udev rule also gives the port to the
+  `video` group. `install.sh --plan` prints these choices and changes nothing (the tests).
+- *Taking it out.* lord-vm takes the disc out by itself once qemu-guest-agent connects or `lordos-guest` says hello
+  (`gt_eject`, at the agent's next turn); **Take the Disc Out** does it at once. Changing the disc by hand forgets it.
+  From then on Install and the automatic update of older tools (7.1.3) go through qemu-guest-agent as for any guest.
+
+**LordOS as a guest, and why LordOS 0.8.9 waited for the agent forever (2026-11-24).** In the maintainer's LordOS 0.8.9
+machine the log said `agent: the guest opened org.lordos.agent` and, 4 s later, `closed`, and never a hello. That open
+and close is the UEFI firmware, not the guest's system: OVMF's virtio-serial driver opens every port whose host end is
+connected while it runs (checked with QEMU alone, no disk and no system: `VSERPORT_CHANGE open` at 1 s) and the port
+closes at `ExitBootServices`, when the kernel starts. LordOS 0.8.9's live ISO (and so its installs) had neither
+`qemu-guest-agent` nor `lordos-guest.service` (only `/usr/lib/lordos/guest/lordos-guest-amd64`, the copy Machines installs
+in other guests; checked in its `filesystem.squashfs`), so nothing in the guest ever opened either port, and Install
+couldn't work without qemu-guest-agent. 0.8.9.5 added `lordos-guest.service` and the udev rule, but the rule's `uaccess`
+gives the port only to the person at a logind seat, and LordOS's own sessions (lord-sessiond) aren't logind seats
+(SESSIONS.md "Users"): `lordos-guest` couldn't open the port there either. And `lordos-guest` had no clipboard on a LordOS
+desktop: lord-server has no data-control protocol (wl-paste can't read it) and offers its X selection only to a focused X
+window. Now (*in development*):
+
+- `71-lordos-guest.rules` gives the port to the `video` group too (`GROUP="video", MODE="0660"`): every LordOS desktop user
+  is in it (users_admin.c, firstrun, the installer, the live user), as for the screen; whoever's `lordos-guest` starts
+  first holds the port (it opens once). Elsewhere (logind seats) `uaccess` still applies.
+- The `lordos` package `Recommends: qemu-guest-agent` (the Store installs new Recommends; Debian's udev rule starts it only
+  where the port exists), and migration `012-0.8.9.6-guest-agent-port.sh` applies the rule to the port at once and starts
+  `lordos-guest` for the signed-in people, only inside a Machines guest whose agent is on. A 0.8.9 guest gets all of it by
+  updating LordOS inside the machine; the disc above works there too without updating (`install.sh` writes the same
+  `video` rule on LordOS).
+- `lordos-guest` 8 takes the clipboard from the guest's own lord-server: its `lordos-guestwin.sock` endpoint (7.2) says
+  `clipboard` in its hello, sends the clipboard's text after each change (never a secret) and takes the host's text as the
+  clipboard's (marked as from `machines`), only for the peer that holds the agent port (`js_guestwin.c` `holds_port`: one
+  of its descriptors is the port's device). On such a desktop `lordos-guest` makes no X connection (it would start
+  Xwayland for nothing) and its hello says `clipboard` without `clipx`: text only, pushed.
 
 **Protocol.** A virtio-serial port named `org.lordos.agent`, chosen over vsock because it works in every guest without extra drivers. Length-prefixed frames with a channel number, a `hello` carrying version and capabilities, skipped unknown kinds so that either side can grow, and a hard frame limit. `lord-vm`, not `lord-server`, parses it, inside the sandbox. A newer host updates older tools itself, on by default with a switch to turn it off, through qemu-guest-agent (7.1.3).
 

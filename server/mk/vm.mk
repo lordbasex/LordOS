@@ -20,15 +20,15 @@ build/gen/vmsysnames.h:
 	echo '#include <asm/unistd.h>' | $(CC) -E -dM -x c - | sed -n 's/^#define __NR_\([a-z0-9_]*\) .*/{ "\1", __NR_\1 },/p' | \
 		grep -v -e '"syscalls"' -e '"arch_specific_syscall"' | LC_ALL=C sort >$@.new && [ -s $@.new ] && mv $@.new $@
 VM_HDR += build/gen/vmsysnames.h
-all: build/lord-vm build/lordos-guest
-build/lord-vm: $(LORDVM_SRC) $(VM_HDR)
+all: build/lord-vm build/lordos-guest build/lordos-guest-tools.iso
+build/lord-vm: $(LORDVM_SRC) $(VM_HDR) build/gen/guesttools.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(LORDVM_FLAGS) -o $@ $(LORDVM_SRC) $(LORDVM_LIBS)
 	chmod g-w $@
 
 # the same lord-vm with LORDVM_TEST_PATHS (lordvm.c): QEMU, qemu-img, passt and the UEFI firmware from absolute paths in
 # the environment, for the release gates on a host that keeps them elsewhere. Built only when asked, never installed.
-build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR)
+build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR) build/gen/guesttools.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(LORDVM_FLAGS) -DLORDVM_TEST_PATHS -o $@ $(LORDVM_SRC) $(LORDVM_LIBS)
 	chmod g-w $@
@@ -38,6 +38,31 @@ build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR)
 build/lordos-guest: ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c ../tools/guest/x11clip.h ../tools/guest/perf.c ../tools/guest/perf.h ../tools/guest/dbusmin.c ../tools/guest/dbusmin.h src/vm/vmagent.c src/vm/vmagent.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c ../tools/guest/perf.c ../tools/guest/dbusmin.c src/vm/vmagent.c
+
+# The "LordOS Guest Tools" disc (docs/VIRTUALIZATION.md 6.17): for a Linux machine without qemu-guest-agent, a read-only
+# ISO 9660 image with lordos-guest (stripped), install.sh, its checksum and a README, made here by our own small writer
+# (tools/guest/mkguestiso.c: same bytes for the same files). Its SHA-256 is compiled into lord-vm (build/gen/guesttools.h),
+# which attaches only that image; the package installs it as /usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso.
+GUEST_TOOLS_ARCH ?= $(or $(DEB_ARCH),$(shell dpkg --print-architecture 2>/dev/null || (uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')))
+build/mkguestiso: ../tools/guest/mkguestiso.c
+	@mkdir -p build
+	$(CC) -O2 $(WARN) -std=gnu11 -o $@ ../tools/guest/mkguestiso.c
+build/lordos-guest-tools.iso: build/mkguestiso build/lordos-guest ../tools/guest/install.sh ../tools/guest/guest-tools-readme.txt
+	@mkdir -p build/guesttools
+	strip --strip-unneeded -o build/guesttools/lguest build/lordos-guest 2>/dev/null || cp build/lordos-guest build/guesttools/lguest
+	printf '%s\n' '$(GUEST_TOOLS_ARCH)' > build/guesttools/arch.txt
+	cd build/guesttools && sha256sum lguest > sha256.txt
+	./build/mkguestiso $@ LORDOS_TOOLS INSTALL.SH=../tools/guest/install.sh LGUEST=build/guesttools/lguest \
+		ARCH.TXT=build/guesttools/arch.txt SHA256.TXT=build/guesttools/sha256.txt README.TXT=../tools/guest/guest-tools-readme.txt
+# the disc read back with lord-vm's own ISO reader, its hash against guesttools.h, the writer's refusals (ASan, UBSan);
+# and install.sh's choices for each package manager, init system and prompt (tests/guest_tools_install_test.sh)
+test: build/guesttools-test
+build/guesttools-test: tests/guesttools_test.c src/vm/vmunattend.c src/vm/vmunattend.h src/sec/json.c src/pkg/crypto.c build/gen/guesttools.h build/mkguestiso
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/guesttools_test.c src/vm/vmunattend.c src/sec/json.c src/pkg/crypto.c
+	./$@ || { rm -f $@; exit 1; }
+build/gen/guesttools.h: build/lordos-guest-tools.iso
+	@mkdir -p build/gen
+	printf '#define GUEST_TOOLS_SHA256 "%s"\n#define GUEST_TOOLS_ARCH "%s"\n' "$$(sha256sum build/lordos-guest-tools.iso | cut -d' ' -f1)" '$(GUEST_TOOLS_ARCH)' > $@.new && mv $@.new $@
 
 # lordos-guest-win.exe: LordOS guest tools for Windows guests (tools/guest-win), cross-built with mingw-w64
 # (gcc-mingw-w64-x86-64-posix, docs/VM-SETUP.md): Win32 only, libgcc and winpthread linked in, no DLL of ours. Skipped

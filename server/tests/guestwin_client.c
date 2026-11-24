@@ -3,6 +3,11 @@
  *   guestwin-client --direct PATH   connects to lord-server's endpoint (js_guestwin.c) like lordos-guest does
  *   guestwin-client --host PATH     listens on PATH as the host's end of org.lordos.agent would be, for lordos-guest
  *                                   started with --port PATH (the relay, tools/guest/lordos-guest.c)
+ *   guestwin-client --clip LORDOS_GUEST LINK   the clipboard of a LordOS guest (tools 8): a pseudo-terminal plays the
+ *                                   agent port (LINK, a symlink to its other end, is what lord-server was told the port
+ *                                   is: LORD_GUESTWIN_PORT); lordos-guest is started on it twice. The host's text goes in
+ *                                   through lordos-guest to lord-server's clipboard, and the next lordos-guest hands it
+ *                                   back; a peer that doesn't hold the port gets no clipboard (--direct, at its end)
  * Then: the hello says "windows", the app list and the window list arrive; launching a token that isn't listed opens
  * nothing; launching a listed app opens its window; a move puts its content where asked; an action on an id that
  * isn't listed changes nothing; close takes it away. Exit 0 when all of it held. */
@@ -12,7 +17,12 @@
 #include "../src/vm/vmagent.h"
 
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
+#include <sys/prctl.h>
+#include <sys/wait.h>
+#include <termios.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,7 +31,7 @@
 #include <time.h>
 #include <unistd.h>
 
-static int fd = -1, fails;
+static int fd = -1, fails, pty_mode;
 static uint8_t buf[AG_HEAD + LAG_APPLIST_BYTES + 4096];
 static size_t have;
 static int hello_windows;
@@ -29,6 +39,9 @@ static LagWinList wl;
 static int have_list;
 static LagAppList al;
 static int have_apps, icons;
+static int clip_in, hello_clip;            /* an AGK_CLIP arrived (its text in clip_text); a hello said "clipboard" without
+                                             * "clipx": lordos-guest uses lord-server's clipboard */
+static char clip_text[256];
 
 #define CHECK(c, ...) do { if (!(c)) { fails++; fprintf(stderr, "FAIL %s:%d: ", __FILE__, __LINE__); fprintf(stderr, __VA_ARGS__); fputc('\n', stderr); } else { printf("ok: "); printf(__VA_ARGS__); putchar('\n'); } } while (0)
 
@@ -50,6 +63,8 @@ static int pump(int ms, int (*done)(void)) {
         struct pollfd p = { fd, POLLIN, 0 };
         if (poll(&p, 1, (int)left) <= 0) continue;
         ssize_t r = read(fd, buf + have, sizeof buf - have);
+        /* --clip: a pseudo-terminal's master reads EIO while no lordos-guest has the other end open (between two runs) */
+        if (r < 0 && errno == EIO && pty_mode) { usleep(50000); continue; }
         if (r <= 0) { fprintf(stderr, "the peer went away\n"); exit(1); }
         have += (size_t)r;
         for (;;) {
@@ -57,7 +72,8 @@ static int pump(int ms, int (*done)(void)) {
             int k = ag_frame_next(buf, have, &f);
             if (k < 0) { fprintf(stderr, "bad frame\n"); exit(1); }
             if (!k) break;
-            if (f.kind == AGK_HELLO) hello_windows = memmem(f.data, f.len, " windows", 8) != NULL;
+            if (f.kind == AGK_HELLO) { hello_windows = memmem(f.data, f.len, " windows", 8) != NULL; hello_clip = (ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPBOARD) && !(ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPX); }
+            else if (f.kind == AGK_CLIP) { clip_in = 1; snprintf(clip_text, sizeof clip_text, "%.*s", (int)(f.len < 255 ? f.len : 255), (const char *)f.data); }
             else if (f.kind == LAG_WINDOWS) { if (lag_winlist_read(f.data, f.len, &wl)) { fprintf(stderr, "a window list that doesn't parse\n"); fails++; } else have_list = 1; }
             else if (f.kind == LAG_APPLIST) { if (lag_applist_read(f.data, f.len, &al)) { fprintf(stderr, "an app list that doesn't parse\n"); fails++; } else have_apps = 1; }
             else if (f.kind == LAG_WINICON) { uint32_t id; uint16_t w, h; const uint8_t *px; if (lag_winicon_parse(f.data, f.len, &id, &w, &h, &px)) fails++; else icons++; }
@@ -89,7 +105,56 @@ static void act(uint32_t id, int action, int x, int y, int w, int h) {
     send_frame(LAG_WINACT, b, n);
 }
 
+static const char *want_clip;
+static int got_clip(void) { return clip_in && !strcmp(clip_text, want_clip); }
+static int clip_hello(void) { return hello_clip; }
+static pid_t spawn_guest(const char *bin, const char *port) {
+    pid_t p = fork();
+    if (!p) {
+        /* never this computer's own session: no display to find (lordos-guest asks systemd for one when these are
+         * missing), so its clipboard tools can't reach the real clipboard */
+        setenv("DISPLAY", ":999", 1); setenv("WAYLAND_DISPLAY", "lordos-test-none", 1); setenv("XDG_CURRENT_DESKTOP", "test", 1);
+        prctl(PR_SET_PDEATHSIG, SIGTERM); execl(bin, bin, "--port", port, (char *)NULL); _exit(127); }
+    return p;
+}
+
+/* --clip: the host's end of the port is the pty's master; lordos-guest opens LINK (the slave) */
+static int clip_test(const char *bin, const char *link) {
+    int m = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC);
+    if (m < 0 || grantpt(m) || unlockpt(m)) { perror("pty"); return 1; }
+    struct termios t;
+    if (tcgetattr(m, &t)) { perror("tcgetattr"); return 1; }
+    cfmakeraw(&t);
+    tcsetattr(m, TCSANOW, &t);
+    unlink(link);
+    if (symlink(ptsname(m), link)) { perror("symlink"); return 1; }
+    fd = m;
+    pty_mode = 1;
+    static const char host_hello[] = "lord-vm 2 clipboard";
+    pid_t g = spawn_guest(bin, link);
+    CHECK(pump(10000, clip_hello), "lordos-guest says hello with \"clipboard\" through lord-server (its clipboard, no tool)");
+    send_frame(AGK_HELLO, (const uint8_t *)host_hello, sizeof host_hello - 1);
+    pump(1500, NULL);           /* what lord-server had first comes through: not checked */
+    static const char text[] = "from the host: añadido \xe2\x9c\x93 42";
+    send_frame(AGK_CLIP, (const uint8_t *)text, sizeof text - 1);
+    pump(1500, NULL);
+    kill(g, SIGTERM); waitpid(g, NULL, 0);
+    clip_in = 0; hello_clip = 0; have = 0;
+    usleep(300000);
+    g = spawn_guest(bin, link);
+    CHECK(pump(10000, clip_hello), "a new lordos-guest says hello again");
+    send_frame(AGK_HELLO, (const uint8_t *)host_hello, sizeof host_hello - 1);
+    want_clip = text;
+    CHECK(pump(8000, got_clip), "lord-server kept the host's text and hands it to the next lordos-guest (\"%s\")", clip_text);
+    kill(g, SIGTERM); waitpid(g, NULL, 0);
+    unlink(link);
+    close(m);
+    fd = -1;
+    return 0;
+}
+
 int main(int argc, char **argv) {
+    if (argc == 4 && !strcmp(argv[1], "--clip")) { clip_test(argv[2], argv[3]); printf("guestwin-client --clip: %d failed\n", fails); return fails ? 1 : 0; }
     if (argc != 3) { fprintf(stderr, "usage: guestwin-client --direct|--host PATH\n"); return 2; }
     struct sockaddr_un a = { .sun_family = AF_UNIX };
     snprintf(a.sun_path, sizeof a.sun_path, "%s", argv[2]);
@@ -136,6 +201,16 @@ int main(int argc, char **argv) {
     on = 0;
     send_frame(LAG_APPS, &on, 1);
     pump(300, NULL);
+    if (!strcmp(argv[1], "--direct")) {
+        /* a program that doesn't hold the agent port asks for the clipboard: nothing comes */
+        static const char me[] = "someone 1 clipboard";
+        clip_in = 0;
+        send_frame(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
+        static const char t2[] = "not for you";
+        send_frame(AGK_CLIP, (const uint8_t *)t2, sizeof t2 - 1);
+        pump(1500, NULL);
+        CHECK(!clip_in, "a peer that doesn't hold the agent port gets no clipboard");
+    }
     printf("guestwin-client: %d icons seen, %d failed\n", icons, fails);
     return fails ? 1 : 0;
 }

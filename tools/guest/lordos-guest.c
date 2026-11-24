@@ -26,6 +26,12 @@
  * systemd the display's variables can arrive after the service started: they're read from the user's manager
  * (systemctl --user show-environment) while they're missing.
  *
+ * The clipboard on a guest that runs LordOS (tools 8): its lord-server has no data-control protocol and offers its X
+ * selection only to a focused X window, so neither wl-paste nor xclip can follow it. When lord-server's endpoint
+ * (below) says "clipboard" in its hello, that is the tool: its AGK_CLIP frames are the clipboard's text, and text from
+ * the host goes to it as AGK_CLIP (text only: the hello to the host has no "clipx" then). No X connection is made on
+ * such a desktop (it would start Xwayland for nothing).
+ *
  * Apps mode (7.2) on a guest that runs LordOS: the guest's own lord-server lists its windows on a local socket of the
  * signed-in person ($XDG_RUNTIME_DIR/lordos-guestwin.sock, server/src/ui/js_guestwin.c). While that socket answers,
  * the hello says "windows" too, and frames are relayed both ways, each checked with vmagent.c's parsers and written
@@ -76,7 +82,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define VERSION "7"
+#define VERSION "8"
 #define PORT "/dev/virtio-ports/org.lordos.agent"
 #define CLIP_MAX AG_TEXT_MAX
 
@@ -132,8 +138,8 @@ static long run(char *const argv[], const uint8_t *in, size_t in_n, uint8_t *out
 }
 
 /* ---- the clipboard's tools: which ones this guest has, in the order they're tried ---- */
-enum { T_WL = 1, T_XCLIP = 2 };
-static int tools[2], tool_n;            /* tool_n 0: none (the hello says "noclip") */
+enum { T_WL = 1, T_XCLIP = 2, T_LORD = 3 };
+static int tools[3], tool_n;            /* tool_n 0: none (the hello says "noclip") */
 static long long tool_look_at;          /* when to look for them again (0: at once) */
 static char tool_said[160];             /* what the journal was told last */
 
@@ -184,9 +190,21 @@ static void session_env(void) {
     }
 }
 
+/* the guest's own lord-server (a LordOS desktop): its endpoint is connected and its hello said "clipboard"; its text */
+static int wfd = -1;
+static int srv_clip;
+static uint8_t *srv_text;
+static size_t srv_text_n;
+
 /* looks for the tools; 1 when whether there is one changed (the hello has to be said again) */
 static int pick_tools(void) {
     int had = tool_n > 0;
+    if (wfd >= 0 && srv_clip) {
+        tool_n = 0;
+        tools[tool_n++] = T_LORD;
+        if (strcmp(tool_said, "clipboard through LordOS (lord-server)")) { fprintf(stderr, "lordos-guest: clipboard through LordOS (lord-server)\n"); snprintf(tool_said, sizeof tool_said, "%s", "clipboard through LordOS (lord-server)"); }
+        return had != 1;
+    }
     session_env();
     int x = in_path("xclip"), w = in_path("wl-paste") && in_path("wl-copy");
     const char *desk = env_set("XDG_CURRENT_DESKTOP");
@@ -215,6 +233,12 @@ static long clip_read_type(const char *type, uint8_t *out, size_t cap) {
     int text = !strcmp(type, "text");
     long n = -1;
     for (int i = 0; i < tool_n && n < 0; i++) {
+        if (tools[i] == T_LORD) {
+            if (!text) continue;
+            n = srv_text_n <= cap ? (long)srv_text_n : -1;
+            if (n > 0) memcpy(out, srv_text, srv_text_n);
+            continue;
+        }
         char *a[] = { "wl-paste", "-n", "-t", text ? "text/plain;charset=utf-8" : (char *)type, NULL };
         char *x[] = { "xclip", "-o", "-selection", "clipboard", "-t", text ? "UTF8_STRING" : (char *)type, NULL };
         n = tool_ran(run(tools[i] == T_WL ? a : x, NULL, 0, out, cap));
@@ -227,6 +251,7 @@ static long clip_read(uint8_t *out, size_t cap) { return clip_read_type("text", 
 static long clip_types(char *out, size_t cap) {
     long n = -1;
     for (int i = 0; i < tool_n && n < 0; i++) {
+        if (tools[i] == T_LORD) { n = snprintf(out, cap, "%s", srv_text_n ? "UTF8_STRING\n" : ""); continue; }
         char *a[] = { "wl-paste", "-l", NULL };
         char *x[] = { "xclip", "-o", "-selection", "clipboard", "-t", "TARGETS", NULL };
         n = tool_ran(run(tools[i] == T_WL ? a : x, NULL, 0, (uint8_t *)out, cap - 1));
@@ -241,9 +266,17 @@ static int has_type(const char *types, const char *t) {
     return 0;
 }
 
+static int send_frame(int fd, uint16_t kind, const uint8_t *p, uint32_t n);
 static int clip_write_type(const char *type, const uint8_t *p, size_t n) {
     int text = !strcmp(type, "text");
     for (int i = 0; i < tool_n; i++) {
+        if (tools[i] == T_LORD) {
+            if (!text || n > AG_TEXT_MAX || wfd < 0 || send_frame(wfd, AGK_CLIP, p, (uint32_t)n)) continue;
+            /* what lord-server now has (it doesn't echo it back) */
+            uint8_t *nt = realloc(srv_text, n ? n : 1);
+            if (nt) { srv_text = nt; memcpy(srv_text, p, n); srv_text_n = n; }
+            return 0;
+        }
         char *a[] = { "wl-copy", "--type", text ? "text/plain;charset=utf-8" : (char *)type, NULL };
         char *x[] = { "xclip", "-i", "-selection", "clipboard", "-t", text ? "UTF8_STRING" : (char *)type, NULL };
         if (tool_ran(run(tools[i] == T_WL ? a : x, p, n, NULL, 0)) >= 0) return 0;
@@ -261,8 +294,8 @@ static int send_frame(int fd, uint16_t kind, const uint8_t *p, uint32_t n) {
 
 /* ---- apps mode: the relay to the guest's own lord-server ---- */
 
-#define WIN_BUF (AG_HEAD + LAG_APPLIST_BYTES + 1024)
-static int wfd = -1;                    /* lord-server's endpoint, or -1 */
+/* frames from lord-server: the app list, or the clipboard's text (AG_TEXT_MAX), whichever is larger */
+#define WIN_BUF (AG_HEAD + (LAG_APPLIST_BYTES > AG_TEXT_MAX ? LAG_APPLIST_BYTES : AG_TEXT_MAX) + 1024)
 static uint8_t *win_in, *win_tmp;
 static size_t win_n;
 static LagAppList *app_list;            /* the launcher's apps lord-server listed: the only tokens sent on */
@@ -294,7 +327,8 @@ static void say_hello(int fd) {
     static const char perf_word[] = "";
 #endif
     /* "noclip": the helper is there but the guest has no clipboard tool (Machines says what to install) */
-    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s%s%s", tool_n ? " clipboard clipx" : " noclip", tool_n && xc_fd() >= 0 ? " clipreq" : "",
+    int lord = tool_n && tools[0] == T_LORD;          /* lord-server's clipboard: text only, no X offer */
+    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s%s%s", !tool_n ? " noclip" : lord ? " clipboard" : " clipboard clipx", tool_n && !lord && xc_fd() >= 0 ? " clipreq" : "",
              wfd >= 0 ? " windows" : "", stop_hook() ? " stopping" : "", perf_word);
     send_frame(fd, AGK_HELLO, (const uint8_t *)h, (uint32_t)strlen(h));
 }
@@ -305,6 +339,7 @@ static void win_close(int port_fd) {
     wfd = -1;
     win_n = 0;
     if (app_list) app_list->n = 0;
+    if (srv_clip) { srv_clip = 0; srv_text_n = 0; pick_tools(); }      /* back to the guest's own tools, if any */
     if (port_fd >= 0) say_hello(port_fd);          /* no "windows" any more */
 }
 
@@ -340,6 +375,16 @@ static int from_server(int port_fd) {
         if (used < 0 || (!used && win_n == WIN_BUF)) return -1;
         if (!used) break;
         size_t n = 0;
+        if (f.kind == AGK_HELLO && f.len < 200 && !srv_clip && (ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPBOARD)) {
+            /* lord-server holds the clipboard: it is the tool from now on; no X connection on this desktop */
+            srv_clip = 1;
+            xc_close();
+            pick_tools();
+            if (port_fd >= 0) say_hello(port_fd);
+        } else if (f.kind == AGK_CLIP && srv_clip && f.len <= AG_TEXT_MAX && ag_utf8_ok(f.data, f.len)) {
+            uint8_t *nt = realloc(srv_text, f.len ? f.len : 1);
+            if (nt) { srv_text = nt; memcpy(srv_text, f.data, f.len); srv_text_n = f.len; }
+        }
         if (f.kind == LAG_WINDOWS && !lag_winlist_read(f.data, f.len, win_list)) n = lag_windows_write(win_list, win_tmp, WIN_BUF);
         else if (f.kind == LAG_WINICON) {
             uint32_t id; uint16_t w, h; const uint8_t *px;
@@ -457,7 +502,9 @@ int main(int argc, char **argv) {
 #ifndef LG_NO_PERF
     perf_recover();                     /* an earlier run that ended badly left the profile on */
 #endif
-    xc_open();
+    struct stat wst;
+    int lord_desk = wpath[0] && !stat(wpath, &wst) && S_ISSOCK(wst.st_mode);
+    if (!lord_desk) xc_open();          /* a LordOS desktop: lord-server's own clipboard instead (it would start Xwayland) */
     tool_look_at = now_ms() + 30000;
     for (;;) {
         if (ending) {
@@ -482,13 +529,18 @@ int main(int argc, char **argv) {
         if (wfd < 0 && wpath[0] && now >= win_try) {
             win_try = now + 3000;
             wfd = unix_connect(wpath);
-            if (wfd >= 0) { win_n = 0; say_hello(fd); }
+            if (wfd >= 0) {
+                static const char me[] = "lordos-guest " VERSION " clipboard";     /* lord-server's clipboard, if it gives it */
+                win_n = 0;
+                send_frame(wfd, AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
+                say_hello(fd);
+            }
         }
         /* the tools again every 30 s, or at once after one couldn't be started; the hello again when that changed */
         if (now >= tool_look_at) {
             tool_look_at = now + 30000;
             int had_x = xc_fd() >= 0;
-            if (xc_fd() < 0) xc_open();
+            if (xc_fd() < 0 && !srv_clip && !(wpath[0] && !stat(wpath, &wst) && S_ISSOCK(wst.st_mode))) xc_open();
             if (pick_tools() || had_x != (xc_fd() >= 0)) say_hello(fd);
         }
         /* a program pastes the host's offer: that form asked of the host, once; no answer in time is a refusal */
