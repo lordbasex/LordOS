@@ -1333,6 +1333,8 @@ static struct {
     /* tools 8 and w12: the agent's shell (6.18), links and notifications from the guest (6.12), each said in the hello */
     int lag_shell, lag_links, lag_notify;
     AgRate link_rate, note_rate;            /* the guest's links and notifications, each at most a burst then one per interval */
+    AgRate clip_rate;                       /* the guest's clipboard (AGK_CLIP, AGK_CLIPX), the same way */
+    unsigned clip_dropped;
     int link_over, note_over;               /* refused over the rate since the last line in the log */
     /* the agent's shell (VM_SHELL): our end of lord-server's stream, the shell's id, what went to the guest and isn't
      * acknowledged yet, and what the guest wrote that lord-server's terminal hasn't read yet (at most AG_SHELL_WINDOW) */
@@ -6948,6 +6950,11 @@ static void drain_lag(void) {
                 uint8_t b = (uint8_t)mode;
                 lag_send(AGK_STOPPING, &b, 1);
             }
+        } else if ((f.kind == AGK_CLIP || f.kind == AGK_CLIPX) && S.lag_hello && clip_allows(0) && f.len &&
+                   !ag_rate_take(&S.clip_rate, now_ms(), AG_CLIP_BURST, AG_CLIP_EVERY_MS)) {
+            /* a guest that copies in a loop: what comes faster than the limit is dropped (lord-server and lord-media
+             * would hold a memfd and a picture's re-encode for each one) */
+            if (!S.clip_dropped++) vlog("agent: the guest's clipboard changes faster than %d a second: the extra ones are ignored", 1000 / AG_CLIP_EVERY_MS);
         } else if (f.kind == AGK_CLIP && S.lag_hello && clip_allows(0) && f.len && ag_utf8_ok(f.data, f.len)) {
             int fd = memfd_create("lordos-vm-clipboard", MFD_CLOEXEC | MFD_ALLOW_SEALING);
             if (fd >= 0 && !write_all(fd, f.data, f.len) && !fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL)) {

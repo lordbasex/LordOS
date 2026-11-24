@@ -276,6 +276,10 @@ enum { AGK_LINK = 25, AGK_NOTIFY = 26 };
 #define AG_NOTE_BYTES      (4 + AG_NOTE_TITLE_MAX + AG_NOTE_BODY_MAX)
 #define AG_LINK_BURST      3
 #define AG_LINK_EVERY_MS   5000
+/* the guest's clipboard (AGK_CLIP, AGK_CLIPX): each one becomes a memfd for lord-server and, for a picture, a re-encode
+ * in lord-media; a guest that copies in a loop is held to a burst, then one per interval (a person copies far slower) */
+#define AG_CLIP_BURST      4
+#define AG_CLIP_EVERY_MS   250
 #define AG_NOTE_BURST      5
 #define AG_NOTE_EVERY_MS   3000
 /* 1 when p is a link this computer may offer to open: letters, digits and - . _ ~ : / ? # [ ] @ & = + , ; % only (what
