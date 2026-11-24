@@ -565,6 +565,12 @@ char mon_scope_parse(const char *cgroup, char *id, size_t n) {
         const char *b = leaf + 11;
         size_t bl = l - 17;
         char k = 'd';
+        /* a machine's scope (app-lordos-lordos-vm-[tor-]<id>.scope) is one only where lord-sessiond made it, in the
+         * session's root-owned subtree (beside the server leaf or in lordos-machines.slice): anyone may name a scope so
+         * under user@ (systemd-run --user --scope), and Sentinela leaves a machine's CPU and memory to its machine rules,
+         * Monitor groups it as that machine (AGENTS.md: no exemption by unit name under user@) */
+        static const char SESS[] = "/system.slice/lordos.service/lordos-session-", VM[] = "lordos-vm-";
+        if (bl > sizeof VM - 1 && !strncmp(b, VM, sizeof VM - 1) && strncmp(line + 3, SESS, sizeof SESS - 1)) return 0;
         if (bl > 4 && !strncmp(b, "lpk-", 4)) { k = 'l'; b += 4; bl -= 4; }
         else if (bl > 3 && !strncmp(b, "fp-", 3)) { k = 'f'; b += 3; bl -= 3; }       /* a Flatpak app (docs/FLATPAK.md) */
         if (bl + 1 > n) return 0;

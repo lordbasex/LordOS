@@ -97,8 +97,8 @@ mkdir -p "$T/out/ova" && tar -xf "$T/out/p.ova" -C "$T/out/ova" && qemu-img info
 python3 -I - "$T/lib/h.lordvm/machine.json" <<'EOF' && ok "a hostile machine.json comes in with a new machine's safe defaults" || bad "hostile machine.json kept settings"
 import json, sys
 m = json.load(open(sys.argv[1]))
-bad = [k for k, v in {'agent': False, 'transfer': False, 'microphone': False}.items() if m.get(k, False) != v]
-bad += [k for k in ('ports', 'shares', 'iso', 'sound_out', 'sound_in', 'capture_fullscreen', 'pointer', 'perf_profile', 'cpu_pin', 'disposable', 'backup', 'group', 'role', 'profile_lock') if k in m]
+bad = [k for k, v in {'agent': False, 'transfer': False, 'microphone': False, 'guest_links': False, 'guest_notify': False, 'automation': False}.items() if m.get(k, False) != v]
+bad += [k for k in ('ports', 'shares', 'iso', 'sound_out', 'sound_in', 'capture_fullscreen', 'pointer', 'perf_profile', 'cpu_pin', 'disposable', 'backup', 'group', 'role', 'profile_lock', 'usb_auto') if k in m]
 if m.get('clipboard', 'off') != 'off' or m.get('clipboard_ask') is not True: bad.append('clipboard')
 if m.get('graphics', '2d') != '2d' or m.get('network') != 'shared': bad += ['graphics/network']
 sys.exit(1 if bad else print(*bad) or 0)

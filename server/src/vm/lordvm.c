@@ -12558,6 +12558,10 @@ static void import_untrust(VmMachine *m) {
     m->link_mac[0] = 0;
     m->microphone = 0;
     m->sound_out[0] = m->sound_in[0] = 0;
+    /* links and notifications the guest may send this computer (6.12), and running programs in it from here (6.15):
+     * the person's consent on this computer, never the file's; they would wake up as soon as the agent is turned on */
+    m->guest_links = m->guest_notify = 0;
+    m->automation = 0;
     m->clipboard = VM_CLIP_OFF;
     m->clipboard_ask = 1;
     m->transfer = 0;
