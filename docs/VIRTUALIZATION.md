@@ -3175,6 +3175,11 @@ so it can't be taken for one of this computer's.
 - *Flow control both ways* (`AGK_SHELL_ACK`): never more than 256 KiB sent and not acknowledged; lord-vm ends a shell whose
   guest sends past its window or acknowledges more than it was sent. So `cat /dev/urandom` in the guest, or a terminal that
   doesn't read, keeps memory flat.
+- *What the guest writes stays text* (2026-11-24, for this shell and the serial console alike, `term_create_fd`): it can't
+  set this computer's clipboard (OSC 52, iTerm's Copy: before this a guest could, past the clipboard's gate), start tmux's
+  control mode (its panes and protocol), or make links (OSC 8), and of the terminal's events only its output, size, bell
+  and end reach any code: no title, notification, badge, profile, command, host, secret prompt or Passwords fill or save
+  (a fake password prompt can't get a saved password offered). `term-guest-test`, `vt-ring-test`.
 - *Not built:* an administrator or root shell (the switch in Security), opening it as a tab of the Terminal app (it is a
   pane of the machine's window), `lordvm exec` and the MCP server's `run_command` (6.15).
 - *Checked:* `guest_shell_test.sh` (the pty, its size, the exit status, 2 MB with late acknowledgements never past the

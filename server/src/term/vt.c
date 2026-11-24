@@ -1203,7 +1203,7 @@ static void osc(Term *t) {
         break;
     case 8: {
         char *semi = strchr(s, ';');
-        if (!semi) break;
+        if (!semi || t->no_clip_set) break;             /* a Machines guest's stream makes no links */
         t->pen.link = semi[1] ? (uint16_t)add_link(t, semi + 1) : 0;
         break;
     }
