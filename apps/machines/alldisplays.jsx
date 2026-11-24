@@ -6,7 +6,7 @@
 //   const ad = useAllDisplays({ sid, dir, name, winId, st, prot, appsOn, begin });
 //   ad.item        the View menu's entry      ad.on   whether the machine is across the displays now
 //   <HeadWindow dir k name />                one further output's window (index.jsx, args.head)
-import { View, Text, MediaView, addListener, wm, windows, screen, createStore, useStore, useAppWindow, useWindowState, displayFor, t as tr } from '@lordos/sdk';
+import { View, Text, MediaView, addListener, wm, windows, screen, createStore, useStore, useAppWindow, displayFor, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { allDisplaysPlan, headInstance, headWindowId, HEADS_MAX } from './alldisplays.js';
 import { toPicture, guestSize, wheelSteps, familyOf } from './model.js';
@@ -14,12 +14,22 @@ import { readMeta } from './meta.js';
 
 // a further output's window asks the machine's window to go back to one display (dir → a counter)
 export const backToOne = createStore({});
+// per machine window (its id): across the displays now, and when a start was asked for to go across them. A store, not
+// the component's state: full screen remounts the app, and the window's own state (useWindowState) would lose a value
+// set by the instance that goes away
+const across = createStore({});
+const setAcross = (winId, k, v) => across.set((x) => ({ ...x, [winId]: { ...(x[winId] || {}), [k]: v } }));
+windows.subscribe(() => {
+  const ids = new Set(windows.get().map((w) => w.id));
+  if (Object.keys(across.get()).some((k) => !ids.has(k))) across.set((x) => Object.fromEntries(Object.entries(x).filter(([k]) => ids.has(k))));
+});
 
 export function useAllDisplays({ sid, dir, name, winId, st, prot, appsOn, begin }) {
   // the window's state, not the component's: full screen remounts the app
-  const [on, setOn] = useWindowState('vm.allDisplays', false);
-  const [wantAt, setWantAt] = useWindowState('vm.allDisplaysWant', 0);   // a start asked for to go across the displays
-  const want = { get current() { return wantAt; }, set current(v) { setWantAt(v); } };
+  const on = useStore(across, (x) => !!x[winId]?.on);
+  const setOn = (v) => setAcross(winId, 'on', !!v);
+  const wantAt = useStore(across, (x) => x[winId]?.want || 0);
+  const want = { get current() { return across.get()[winId]?.want || 0; }, set current(v) { setAcross(winId, 'want', v); } };
   // the machine as lord.vm.list says it (its outputs, graphics card, display), read again as it starts and stops
   const [cfg, setCfg] = useState(null);
   useEffect(() => { try { setCfg(lord.vm.list().find((x) => x.dir === dir) || null); } catch (e) { setCfg(null); } }, [dir, sid, st?.state]);
@@ -72,7 +82,7 @@ export function useAllDisplays({ sid, dir, name, winId, st, prot, appsOn, begin 
       want.current = 0;
       if (fresh) setTimeout(enter, 300);
     }
-  }, [sid, st?.display, st?.state]);
+  }, [sid, st?.display, st?.state, wantAt]);
   // the machine stopped, its window lost its picture, or a further output's window asked: back to one display
   useEffect(() => { if (on && (!sid || st?.ended || (st && st.state !== 'running' && st.state !== 'paused'))) leave(); }, [on, sid, st?.state, st?.ended]);
   const back = useStore(backToOne, (x) => x[dir] || 0);
