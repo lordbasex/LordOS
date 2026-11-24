@@ -1877,5 +1877,18 @@
   "tpl.newFrom": "Şablondan Yeni Makine…",
   "tpl.make": "Şablon Yap",
   "tpl.unmake": "Şablon Olmaktan Çıkar",
-  "tpl.chip": "Şablonlar · {n}"
+  "tpl.chip": "Şablonlar · {n}",
+  "alld.item": "Tüm Ekranlar",
+  "alld.title": "{name} · Ekran {n}",
+  "alld.back": "Tek Ekrana Dön",
+  "alld.waiting": "Makinenin bu ekranı kullanması bekleniyor…",
+  "alld.why.noMachine": "Makine hazır değil",
+  "alld.why.noWindow": "Bu makinenin ekranı yok",
+  "alld.why.vgpu": "Ekran kartlı bir makine tek ekran gösterir",
+  "alld.why.anonymity": "Korunan bir makine için değil",
+  "alld.why.windows": "Bu sistemin ekran sürücüsü tek ekran gösterir",
+  "alld.why.apps": "Önce uygulama modundan çıkın",
+  "alld.why.oneDisplay": "Bu bilgisayarın tek ekranı var",
+  "alld.why.notRunning": "Makineyi tüm ekranlarda başlatır",
+  "alld.why.restart": "Önce makineyi kapatın: {n} ekranla yeniden başlar"
 }

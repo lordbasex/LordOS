@@ -21,6 +21,8 @@ import { startMachinesTies } from './ties.js';
 import { MachinesSettings } from './settingswin.jsx';
 import { useMachineDir } from './ui.jsx';
 import { RecoveryKeyWindow } from './vmkey.jsx';
+import { HeadWindow } from './alldisplays.jsx';
+import { headArgs } from './alldisplays.js';
 
 export function Icon({ size }) { return <AppMark size={size} />; }
 
@@ -90,6 +92,9 @@ export default function App() {
   }, [showId, args?.at]);
   // an encrypted machine's recovery key (keyflow.js): a protected window of its own
   if (args?.recoveryKey) return <RecoveryKeyWindow id={args.recoveryKey} name={args.name || ''} />;
+  // All Displays (5.4): a further output of a machine's display, full screen on another display (alldisplays.jsx)
+  const head = headArgs(args?.head);
+  if (head) return <HeadWindow key={`${head.dir}:${head.k}`} dir={head.dir} k={head.k} name={args.name || ''} />;
   if (args?.guestWin) return <GuestWindow dir={args.guestWin.dir} gid={args.guestWin.gid} />;
   if (args?.machine) return <MachineWindow key={dir} dir={dir} name={args.name || ''} loadvm={args.loadvm || ''} followed={dir !== dir0} />;
   if (args?.storage) return <Storage />;

@@ -1877,5 +1877,18 @@
   "tpl.newFrom": "テンプレートから新規マシン…",
   "tpl.make": "テンプレートにする",
   "tpl.unmake": "テンプレートを解除",
-  "tpl.chip": "テンプレート · {n}"
+  "tpl.chip": "テンプレート · {n}",
+  "alld.item": "すべてのディスプレイ",
+  "alld.title": "{name} · ディスプレイ {n}",
+  "alld.back": "1 台のディスプレイに戻す",
+  "alld.waiting": "マシンがこのディスプレイを使うのを待っています…",
+  "alld.why.noMachine": "マシンの準備ができていません",
+  "alld.why.noWindow": "このマシンにはディスプレイがありません",
+  "alld.why.vgpu": "グラフィックカードを使うマシンは 1 台のディスプレイを表示します",
+  "alld.why.anonymity": "保護されたマシンには使えません",
+  "alld.why.windows": "このシステムのディスプレイドライバーは 1 台のディスプレイを表示します",
+  "alld.why.apps": "先にアプリモードを終了してください",
+  "alld.why.oneDisplay": "このコンピューターのディスプレイは 1 台です",
+  "alld.why.notRunning": "すべてのディスプレイでマシンを起動します",
+  "alld.why.restart": "先にマシンをシャットダウンしてください。{n} 台のディスプレイで再起動します"
 }

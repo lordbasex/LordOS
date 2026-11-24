@@ -1877,5 +1877,18 @@
   "tpl.newFrom": "Uusi kone pohjasta…",
   "tpl.make": "Tee pohjaksi",
   "tpl.unmake": "Lopeta pohjana oleminen",
-  "tpl.chip": "Pohjat · {n}"
+  "tpl.chip": "Pohjat · {n}",
+  "alld.item": "Kaikki näytöt",
+  "alld.title": "{name} · Näyttö {n}",
+  "alld.back": "Takaisin yhteen näyttöön",
+  "alld.waiting": "Odotetaan, että kone käyttää tätä näyttöä…",
+  "alld.why.noMachine": "Kone ei ole valmis",
+  "alld.why.noWindow": "Tällä koneella ei ole näyttöä",
+  "alld.why.vgpu": "Näytönohjaimella varustettu kone näyttää yhden näytön",
+  "alld.why.anonymity": "Ei suojatulle koneelle",
+  "alld.why.windows": "Tämän järjestelmän näyttöajuri näyttää yhden näytön",
+  "alld.why.apps": "Poistu ensin sovellustilasta",
+  "alld.why.oneDisplay": "Tässä tietokoneessa on yksi näyttö",
+  "alld.why.notRunning": "Käynnistää koneen kaikilla näytöillä",
+  "alld.why.restart": "Sammuta kone ensin: se käynnistyy uudelleen {n} näytöllä"
 }

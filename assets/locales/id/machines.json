@@ -1877,5 +1877,18 @@
   "tpl.newFrom": "Mesin Baru dari Templat…",
   "tpl.make": "Jadikan Templat",
   "tpl.unmake": "Berhenti Menjadi Templat",
-  "tpl.chip": "Templat · {n}"
+  "tpl.chip": "Templat · {n}",
+  "alld.item": "Semua Layar",
+  "alld.title": "{name} · Layar {n}",
+  "alld.back": "Kembali ke Satu Layar",
+  "alld.waiting": "Menunggu mesin memakai layar ini…",
+  "alld.why.noMachine": "Mesin belum siap",
+  "alld.why.noWindow": "Mesin ini tidak punya layar",
+  "alld.why.vgpu": "Mesin dengan kartu grafis menampilkan satu layar",
+  "alld.why.anonymity": "Bukan untuk mesin yang dilindungi",
+  "alld.why.windows": "Driver layar sistem ini menampilkan satu layar",
+  "alld.why.apps": "Keluar dulu dari mode aplikasi",
+  "alld.why.oneDisplay": "Komputer ini punya satu layar",
+  "alld.why.notRunning": "Memulai mesin di setiap layar",
+  "alld.why.restart": "Matikan mesin dulu: mesin mulai lagi dengan {n} layar"
 }

@@ -1877,5 +1877,18 @@
   "tpl.newFrom": "Nieuwe machine van sjabloon…",
   "tpl.make": "Maak sjabloon",
   "tpl.unmake": "Geen sjabloon meer",
-  "tpl.chip": "Sjablonen · {n}"
+  "tpl.chip": "Sjablonen · {n}",
+  "alld.item": "Alle schermen",
+  "alld.title": "{name} · Scherm {n}",
+  "alld.back": "Terug naar één scherm",
+  "alld.waiting": "Wachten tot de machine dit scherm gebruikt…",
+  "alld.why.noMachine": "De machine is niet klaar",
+  "alld.why.noWindow": "Deze machine heeft geen scherm",
+  "alld.why.vgpu": "Een machine met een grafische kaart toont één scherm",
+  "alld.why.anonymity": "Niet voor een beschermde machine",
+  "alld.why.windows": "Het beeldschermstuurprogramma van dit systeem toont één scherm",
+  "alld.why.apps": "Verlaat eerst de app-modus",
+  "alld.why.oneDisplay": "Deze computer heeft één scherm",
+  "alld.why.notRunning": "Start de machine op alle schermen",
+  "alld.why.restart": "Sluit de machine eerst af: ze start opnieuw met {n} schermen"
 }

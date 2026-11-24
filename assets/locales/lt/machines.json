@@ -1877,5 +1877,18 @@
   "tpl.newFrom": "Nauja mašina iš šablono…",
   "tpl.make": "Paversti šablonu",
   "tpl.unmake": "Nebebūti šablonu",
-  "tpl.chip": "Šablonai · {n}"
+  "tpl.chip": "Šablonai · {n}",
+  "alld.item": "Visi ekranai",
+  "alld.title": "{name} · {n} ekranas",
+  "alld.back": "Grįžti į vieną ekraną",
+  "alld.waiting": "Laukiama, kol mašina naudos šį ekraną…",
+  "alld.why.noMachine": "Mašina neparuošta",
+  "alld.why.noWindow": "Ši mašina neturi ekrano",
+  "alld.why.vgpu": "Mašina su vaizdo plokšte rodo vieną ekraną",
+  "alld.why.anonymity": "Ne apsaugotai mašinai",
+  "alld.why.windows": "Šios sistemos ekrano tvarkyklė rodo vieną ekraną",
+  "alld.why.apps": "Pirmiausia išeikite iš programų režimo",
+  "alld.why.oneDisplay": "Šis kompiuteris turi vieną ekraną",
+  "alld.why.notRunning": "Paleidžia mašiną visuose ekranuose",
+  "alld.why.restart": "Pirmiausia išjunkite mašiną: ji vėl pasileis su {n} ekranais"
 }
