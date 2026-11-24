@@ -700,5 +700,12 @@
   "stats.memAvgRow": "Atminties vidurkis (1 · 5 · 15 min)",
   "stats.memPeakRow": "Atminties didžiausia (1 · 5 · 15 min)",
   "stats.spark": "Paskutinė minutė",
-  "group.showMachine": "Rodyti mašiną"
+  "group.showMachine": "Rodyti mašiną",
+  "comp.machine": "Mašina",
+  "comp.machineNamed": "{name} (mašina)",
+  "comp.machineHint": "Virtuali mašina: jos svečio sistemos tinklo srautas. Jos pačios taisyklės pridedamos prie Mašinų taisyklių, kurios ir toliau sprendžia už kiekvieną mašiną.",
+  "comp.machinesRules": "Mašinų taisyklė",
+  "comp.forwarded": "Peradresuotas prievadas {proto} {port} → {guest}",
+  "comp.forwardedLan": "Atviras tinklui",
+  "comp.forwardedLocal": "Tik šis kompiuteris"
 }

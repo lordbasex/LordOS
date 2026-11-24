@@ -1681,5 +1681,11 @@
   "bundle.machine": "Máquina",
   "bundle.group": "Grupo de máquinas",
   "cfg.search": "Buscar",
-  "cfg.unsaved": "Alterado, ainda não salvo"
+  "cfg.unsaved": "Alterado, ainda não salvo",
+  "cfg.firewall": "Firewall",
+  "cfg.firewallRules": "Regras do firewall…",
+  "cfg.firewallNote": "Esta máquina tem a própria linha no firewall do LordOS e no Monitor. As regras de Máquinas também se aplicam a ela; as dela só se somam.",
+  "cfg.firewallBridged": "Numa placa em ponte, o firewall do LordOS não filtra o tráfego do convidado: as regras dele valem numa rede compartilhada ou só com este computador.",
+  "cfg.firewallGateway": "Um gateway Tor tem uma linha do firewall para todos os grupos, com a restrição embutida: só TCP de saída para a internet.",
+  "cfg.secNote.firewall": "O firewall do LordOS decide o tráfego dela como o app próprio desta máquina, com as regras de Máquinas também."
 }

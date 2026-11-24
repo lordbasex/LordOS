@@ -1681,5 +1681,11 @@
   "bundle.machine": "Kone",
   "bundle.group": "Koneryhmä",
   "cfg.search": "Hae",
-  "cfg.unsaved": "Muutettu, ei vielä tallennettu"
+  "cfg.unsaved": "Muutettu, ei vielä tallennettu",
+  "cfg.firewall": "Palomuuri",
+  "cfg.firewallRules": "Palomuurin säännöt…",
+  "cfg.firewallNote": "Tällä koneella on oma rivinsä LordOS:n palomuurissa ja Monitorissa. Koneiden säännöt koskevat myös sitä; sen omat vain lisätään.",
+  "cfg.firewallBridged": "Siltaavassa kortissa LordOS:n palomuuri ei suodata vieraan liikennettä: sen säännöt pätevät jaetussa tai vain isäntään rajatussa verkossa.",
+  "cfg.firewallGateway": "Tor-yhdyskäytävällä on yksi palomuuririvi kaikille ryhmille, sisäänrakennetulla rajoituksella: vain lähtevä TCP internetiin.",
+  "cfg.secNote.firewall": "LordOS:n palomuuri päättää sen liikenteestä tämän koneen omana sovelluksena, myös Koneiden säännöillä."
 }

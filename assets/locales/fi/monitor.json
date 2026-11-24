@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Muistin keskiarvo (1 · 5 · 15 min)",
   "stats.memPeakRow": "Muistin huippu (1 · 5 · 15 min)",
   "stats.spark": "Viime minuutti",
-  "group.showMachine": "Näytä kone"
+  "group.showMachine": "Näytä kone",
+  "comp.machine": "Kone",
+  "comp.machineNamed": "{name} (kone)",
+  "comp.machineHint": "Virtuaalikone: sen vierasjärjestelmän verkkoliikenne. Sen omat säännöt lisätään Koneiden sääntöihin, jotka päättävät edelleen jokaisesta koneesta.",
+  "comp.machinesRules": "Koneiden sääntö",
+  "comp.forwarded": "Edelleenohjattu portti {proto} {port} → {guest}",
+  "comp.forwardedLan": "Avoin verkkoon",
+  "comp.forwardedLocal": "Vain tämä tietokone"
 }

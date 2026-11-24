@@ -700,5 +700,12 @@
   "stats.memAvgRow": "Memorie medie (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memorie vârf (1 · 5 · 15 min)",
   "stats.spark": "Ultimul minut",
-  "group.showMachine": "Arată mașina"
+  "group.showMachine": "Arată mașina",
+  "comp.machine": "Mașină",
+  "comp.machineNamed": "{name} (mașină)",
+  "comp.machineHint": "O mașină virtuală: traficul de rețea al sistemului invitat. Regulile ei se adaugă regulilor pentru Mașini, care decid în continuare pentru fiecare mașină.",
+  "comp.machinesRules": "Regula pentru Mașini",
+  "comp.forwarded": "Port redirecționat {proto} {port} → {guest}",
+  "comp.forwardedLan": "Deschis către rețea",
+  "comp.forwardedLocal": "Doar acest computer"
 }

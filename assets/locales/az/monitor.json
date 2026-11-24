@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Orta yaddaş (1 · 5 · 15 dəq)",
   "stats.memPeakRow": "Pik yaddaş (1 · 5 · 15 dəq)",
   "stats.spark": "Son dəqiqə",
-  "group.showMachine": "Maşını göstər"
+  "group.showMachine": "Maşını göstər",
+  "comp.machine": "Maşın",
+  "comp.machineNamed": "{name} (maşın)",
+  "comp.machineHint": "Virtual maşın: onun qonaq sisteminin şəbəkə trafiki. Öz qaydaları Maşınlar qaydalarına əlavə olunur; onlar hər maşın üçün qərar verməyə davam edir.",
+  "comp.machinesRules": "Maşınlar qaydası",
+  "comp.forwarded": "Yönləndirilmiş port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Şəbəkəyə açıq",
+  "comp.forwardedLocal": "Yalnız bu kompüter"
 }

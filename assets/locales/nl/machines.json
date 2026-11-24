@@ -1681,5 +1681,11 @@
   "bundle.machine": "Machine",
   "bundle.group": "Machinegroep",
   "cfg.search": "Zoeken",
-  "cfg.unsaved": "Gewijzigd, nog niet bewaard"
+  "cfg.unsaved": "Gewijzigd, nog niet bewaard",
+  "cfg.firewall": "Firewall",
+  "cfg.firewallRules": "Firewallregels…",
+  "cfg.firewallNote": "Deze machine heeft een eigen rij in de firewall van LordOS en in Monitor. De regels voor Machines gelden ook voor haar; haar eigen regels komen er alleen bij.",
+  "cfg.firewallBridged": "Op een overbrugde kaart filtert de firewall van LordOS het verkeer van de gast niet: de regels gelden op een gedeeld of alleen-host-netwerk.",
+  "cfg.firewallGateway": "Een Tor-gateway heeft één firewallrij voor alle groepen, met zijn ingebouwde beperking: alleen uitgaand TCP naar internet.",
+  "cfg.secNote.firewall": "De firewall van LordOS beslist over haar verkeer als eigen app van deze machine, samen met de regels voor Machines."
 }

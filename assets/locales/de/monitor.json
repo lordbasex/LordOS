@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Speicher-Durchschnitt (1 · 5 · 15 min)",
   "stats.memPeakRow": "Speicher-Spitze (1 · 5 · 15 min)",
   "stats.spark": "Letzte Minute",
-  "group.showMachine": "Maschine zeigen"
+  "group.showMachine": "Maschine zeigen",
+  "comp.machine": "Maschine",
+  "comp.machineNamed": "{name} (Maschine)",
+  "comp.machineHint": "Eine virtuelle Maschine: der Netzwerkverkehr ihres Gastsystems. Ihre eigenen Regeln kommen zu den Regeln für Maschinen hinzu, die weiter für jede Maschine entscheiden.",
+  "comp.machinesRules": "Regel für Maschinen",
+  "comp.forwarded": "Weitergeleiteter Port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Für das Netzwerk offen",
+  "comp.forwardedLocal": "Nur dieser Computer"
 }

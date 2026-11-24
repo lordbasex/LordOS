@@ -1681,5 +1681,11 @@
   "bundle.machine": "Màquina",
   "bundle.group": "Grup de màquines",
   "cfg.search": "Cerca",
-  "cfg.unsaved": "Canviat, encara no desat"
+  "cfg.unsaved": "Canviat, encara no desat",
+  "cfg.firewall": "Tallafoc",
+  "cfg.firewallRules": "Regles del tallafoc…",
+  "cfg.firewallNote": "Aquesta màquina té la seva fila al tallafoc de LordOS i al Monitor. Les regles de Màquines també s’hi apliquen; les seves només s’hi sumen.",
+  "cfg.firewallBridged": "En una targeta en pont, el tallafoc de LordOS no filtra el trànsit del convidat: les regles s’apliquen en una xarxa compartida o només amb aquest ordinador.",
+  "cfg.firewallGateway": "Una passarel·la Tor té una fila del tallafoc per a tots els grups, amb la seva restricció integrada: només TCP de sortida cap a internet.",
+  "cfg.secNote.firewall": "El tallafoc de LordOS decideix el seu trànsit com l’app pròpia d’aquesta màquina, amb les regles de Màquines també."
 }

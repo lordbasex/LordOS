@@ -91,5 +91,6 @@
   },
   "pickAddress": "Pumili ng address para payagan o i-block ito para sa app na ito.",
   "recent": "kamakailang koneksyon",
-  "recentDenied": "kamakailang tinanggihan"
+  "recentDenied": "kamakailang tinanggihan",
+  "machineInherits": "Nagpapasya rin ang mga panuntunan ng Machines para sa machine na ito. Idinadagdag ang sarili nitong mga panuntunan: kapag parehong tumugma sa isang koneksyon, ang mas tiyak ang nagpapasya, at nananaig ang I-block sa Payagan."
 }

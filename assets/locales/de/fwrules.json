@@ -91,5 +91,6 @@
   },
   "pickAddress": "Wähle eine Adresse aus, um sie für diese App zu erlauben oder zu blockieren.",
   "recent": "letzte Verbindung",
-  "recentDenied": "kürzlich verweigert"
+  "recentDenied": "kürzlich verweigert",
+  "machineInherits": "Die Regeln für Maschinen entscheiden auch für diese Maschine. Ihre eigenen Regeln kommen hinzu: Passen beide auf eine Verbindung, entscheidet die genauere, und Blockieren schlägt Erlauben."
 }

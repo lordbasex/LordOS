@@ -1681,5 +1681,11 @@
   "bundle.machine": "Machine",
   "bundle.group": "Machine group",
   "cfg.search": "Search",
-  "cfg.unsaved": "Changed, not saved yet"
+  "cfg.unsaved": "Changed, not saved yet",
+  "cfg.firewall": "Firewall",
+  "cfg.firewallRules": "Firewall rules…",
+  "cfg.firewallNote": "This machine has its own row in LordOS's firewall and in Monitor. The rules for Machines apply to it too; its own rules only add to them.",
+  "cfg.firewallBridged": "On a bridged card LordOS's firewall doesn't filter the guest's traffic: its rules apply on a shared or host-only network.",
+  "cfg.firewallGateway": "A Tor gateway has one firewall row for every group, with its built-in restriction: only outgoing TCP to the internet.",
+  "cfg.secNote.firewall": "LordOS's firewall decides its traffic as this machine's own app, with the rules for Machines too."
 }

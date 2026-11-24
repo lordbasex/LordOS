@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Ortalama bellek (1 · 5 · 15 dk)",
   "stats.memPeakRow": "Tepe bellek (1 · 5 · 15 dk)",
   "stats.spark": "Son dakika",
-  "group.showMachine": "Makineyi göster"
+  "group.showMachine": "Makineyi göster",
+  "comp.machine": "Makine",
+  "comp.machineNamed": "{name} (makine)",
+  "comp.machineHint": "Bir sanal makine: konuk sisteminin ağ trafiği. Kendi kuralları Makineler kurallarına eklenir; onlar her makine için karar vermeye devam eder.",
+  "comp.machinesRules": "Makineler kuralı",
+  "comp.forwarded": "Yönlendirilen bağlantı noktası {proto} {port} → {guest}",
+  "comp.forwardedLan": "Ağa açık",
+  "comp.forwardedLocal": "Yalnızca bu bilgisayar"
 }

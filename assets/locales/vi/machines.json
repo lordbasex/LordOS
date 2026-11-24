@@ -1681,5 +1681,11 @@
   "bundle.machine": "Máy",
   "bundle.group": "Nhóm máy",
   "cfg.search": "Tìm kiếm",
-  "cfg.unsaved": "Đã thay đổi, chưa lưu"
+  "cfg.unsaved": "Đã thay đổi, chưa lưu",
+  "cfg.firewall": "Tường lửa",
+  "cfg.firewallRules": "Quy tắc tường lửa…",
+  "cfg.firewallNote": "Máy này có hàng riêng trong tường lửa của LordOS và trong Giám sát. Quy tắc của Máy ảo cũng áp dụng cho nó; quy tắc riêng chỉ cộng thêm.",
+  "cfg.firewallBridged": "Trên thẻ cầu nối, tường lửa của LordOS không lọc lưu lượng của khách: quy tắc của nó áp dụng trên mạng chia sẻ hoặc chỉ với máy chủ.",
+  "cfg.firewallGateway": "Cổng Tor có một hàng tường lửa cho mọi nhóm, với giới hạn sẵn có: chỉ TCP đi ra internet.",
+  "cfg.secNote.firewall": "Tường lửa của LordOS quyết định lưu lượng của nó như ứng dụng riêng của máy này, kèm quy tắc của Máy ảo."
 }

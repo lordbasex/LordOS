@@ -91,5 +91,6 @@
   },
   "pickAddress": "Bu uygulama için izin vermek veya engellemek üzere bir adres seçin.",
   "recent": "son bağlantı",
-  "recentDenied": "yakın zamanda reddedildi"
+  "recentDenied": "yakın zamanda reddedildi",
+  "machineInherits": "Makineler kuralları bu makine için de karar verir. Kendi kuralları bunlara eklenir: ikisi de bir bağlantıya uyarsa daha belirgin olan karar verir ve Engelle, İzin ver'i yener."
 }

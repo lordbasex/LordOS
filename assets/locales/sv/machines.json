@@ -1681,5 +1681,11 @@
   "bundle.machine": "Maskin",
   "bundle.group": "Maskingrupp",
   "cfg.search": "Sök",
-  "cfg.unsaved": "Ändrat, inte sparat än"
+  "cfg.unsaved": "Ändrat, inte sparat än",
+  "cfg.firewall": "Brandvägg",
+  "cfg.firewallRules": "Brandväggsregler…",
+  "cfg.firewallNote": "Den här maskinen har en egen rad i LordOS brandvägg och i Monitor. Reglerna för Maskiner gäller också för den; dess egna läggs bara till.",
+  "cfg.firewallBridged": "På ett bryggat kort filtrerar LordOS brandvägg inte gästens trafik: reglerna gäller i ett delat nätverk eller bara med värden.",
+  "cfg.firewallGateway": "En Tor-gateway har en brandväggsrad för alla grupper, med sin inbyggda begränsning: bara utgående TCP till internet.",
+  "cfg.secNote.firewall": "LordOS brandvägg avgör dess trafik som maskinens egen app, tillsammans med reglerna för Maskiner."
 }

@@ -670,5 +670,12 @@
   "stats.memAvgRow": "メモリ平均（1 · 5 · 15 分）",
   "stats.memPeakRow": "メモリ最大（1 · 5 · 15 分）",
   "stats.spark": "直近 1 分",
-  "group.showMachine": "マシンを表示"
+  "group.showMachine": "マシンを表示",
+  "comp.machine": "マシン",
+  "comp.machineNamed": "{name}（マシン）",
+  "comp.machineHint": "仮想マシン：そのゲストシステムのネットワーク通信。このマシン自身のルールは仮想マシンのルールに加わり、仮想マシンのルールは引き続きすべてのマシンに適用されます。",
+  "comp.machinesRules": "仮想マシンのルール",
+  "comp.forwarded": "転送ポート {proto} {port} → {guest}",
+  "comp.forwardedLan": "ネットワークに公開",
+  "comp.forwardedLocal": "このコンピュータのみ"
 }

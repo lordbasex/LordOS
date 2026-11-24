@@ -1681,5 +1681,11 @@
   "bundle.machine": "Mashine",
   "bundle.group": "Kikundi cha mashine",
   "cfg.search": "Tafuta",
-  "cfg.unsaved": "Imebadilishwa, bado haijahifadhiwa"
+  "cfg.unsaved": "Imebadilishwa, bado haijahifadhiwa",
+  "cfg.firewall": "Ngome",
+  "cfg.firewallRules": "Sheria za ngome…",
+  "cfg.firewallNote": "Mashine hii ina safu yake katika ngome ya LordOS na katika Monitor. Sheria za Mashine zinaihusu pia; zake huongezwa tu.",
+  "cfg.firewallBridged": "Kwenye kadi ya daraja, ngome ya LordOS haichuji trafiki ya mgeni: sheria zake hutumika kwenye mtandao wa pamoja au wa kompyuta hii tu.",
+  "cfg.firewallGateway": "Lango la Tor lina safu moja ya ngome kwa vikundi vyote, pamoja na kizuizi chake cha ndani: TCP inayotoka kwenda intaneti tu.",
+  "cfg.secNote.firewall": "Ngome ya LordOS huamua trafiki yake kama programu ya mashine hii, pamoja na sheria za Mashine."
 }

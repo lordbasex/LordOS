@@ -670,5 +670,12 @@
   "stats.memAvgRow": "Purata memori (1 · 5 · 15 min)",
   "stats.memPeakRow": "Puncak memori (1 · 5 · 15 min)",
   "stats.spark": "Minit terakhir",
-  "group.showMachine": "Tunjukkan mesin"
+  "group.showMachine": "Tunjukkan mesin",
+  "comp.machine": "Mesin",
+  "comp.machineNamed": "{name} (mesin)",
+  "comp.machineHint": "Mesin maya: trafik rangkaian sistem tetamunya. Peraturannya sendiri ditambah kepada peraturan Mesin, yang terus memutuskan untuk setiap mesin.",
+  "comp.machinesRules": "Peraturan Mesin",
+  "comp.forwarded": "Port dimajukan {proto} {port} → {guest}",
+  "comp.forwardedLan": "Terbuka kepada rangkaian",
+  "comp.forwardedLocal": "Komputer ini sahaja"
 }

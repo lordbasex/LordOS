@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Minne snitt (1 · 5 · 15 min)",
   "stats.memPeakRow": "Minne topp (1 · 5 · 15 min)",
   "stats.spark": "Senaste minuten",
-  "group.showMachine": "Visa maskinen"
+  "group.showMachine": "Visa maskinen",
+  "comp.machine": "Maskin",
+  "comp.machineNamed": "{name} (maskin)",
+  "comp.machineHint": "En virtuell maskin: gästsystemets nätverkstrafik. Dess egna regler läggs till reglerna för Maskiner, som fortfarande avgör för varje maskin.",
+  "comp.machinesRules": "Regel för Maskiner",
+  "comp.forwarded": "Vidarebefordrad port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Öppen för nätverket",
+  "comp.forwardedLocal": "Bara den här datorn"
 }

@@ -670,5 +670,12 @@
   "stats.memAvgRow": "หน่วยความจำเฉลี่ย (1 · 5 · 15 นาที)",
   "stats.memPeakRow": "หน่วยความจำสูงสุด (1 · 5 · 15 นาที)",
   "stats.spark": "นาทีล่าสุด",
-  "group.showMachine": "แสดงเครื่องเสมือน"
+  "group.showMachine": "แสดงเครื่องเสมือน",
+  "comp.machine": "เครื่อง",
+  "comp.machineNamed": "{name} (เครื่อง)",
+  "comp.machineHint": "เครื่องเสมือน: ทราฟฟิกเครือข่ายของระบบแขก กฎของเครื่องเองจะเพิ่มเข้ากับกฎของเครื่องเสมือน ซึ่งยังคงตัดสินให้ทุกเครื่อง",
+  "comp.machinesRules": "กฎของเครื่องเสมือน",
+  "comp.forwarded": "พอร์ตที่ส่งต่อ {proto} {port} → {guest}",
+  "comp.forwardedLan": "เปิดให้เครือข่าย",
+  "comp.forwardedLocal": "เฉพาะคอมพิวเตอร์นี้"
 }

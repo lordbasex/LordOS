@@ -1194,6 +1194,29 @@ keeps them while another runs), and the per-second counters add them together un
 scope's leaves (`qemu`, `passt`, `supervisor`) and adds the machine's id to each connection (`cgSub`), so the row reads
 "Machines · <machine name>". A name under the prefix that isn't a machine's is no app at all.
 
+**Each machine its own app (*in development*, "Machines to 100 %").** One app for every machine couldn't tell them apart:
+a rule for one guest was a rule for all. Now `fw_scope_app` reads a machine's scope as **`lordos:vm-<id>`** (`fw_vm_app`;
+the id is the machine's lowercase UUID, 1 to 36 of `[0-9a-f-]`), and `fw_app_parent` gives every such app the parent
+`lordos:machines`. Nothing loosens: the parent's rules, restrictions and trust keep deciding for every machine.
+
+- `fw_decide` picks from the machine's own rules and the parent's as one list, with the usual precedence (the more specific
+  destination, then the narrower port range, a concrete protocol, Block before Allow, the newest).
+- Restrictions are both apps' (`fw_effective_restricted`: own | parent | built-in): "no internet" or "no incoming
+  connections" for Machines holds for every machine, whatever the machine's own entry says. Trusting one machine never
+  lifts a restriction or a rule of either.
+- Trust comes from either app (`fw_effective_trusted`). It only decides what no rule or restriction of either decides,
+  exactly what an "allow any" rule for that machine would do, which the person can already write.
+- lord-netperm compiles the same union (`npcompile.c` `load_rules` reads both apps' rules; `NpApp.flags` and `trusted` come
+  from the two functions above), and `npcompile-test`'s random rounds compare it with `fw_decide` for a machine and for
+  Machines. Because a reload recompiles every scope, a change to a Machines rule reaches every running machine at once.
+- The Tor gateway keeps `lordos:tor-gateway`, inherits nothing and keeps `FW_R_TOR_UPLINK`. The downloads keep
+  `lordos:machines`. No other scope can produce `lordos:vm-…`: only a scope under the reserved `lordos-vm` prefix maps to
+  it, and `fw_app_parent` checks the id's form, so an app named `desktop:lordos-vm-…` or any other id inherits nothing.
+- Monitor → Network shows a row per machine, named after it (`componentLabel`), with the Machines rule beside its own and
+  each forwarded port (machine.json `ports`) as its own incoming line; Settings → Privacy's rule list and restricted-apps
+  list offer each machine (not a gateway); Machines' Configure → Network opens that machine's rules.
+- No migration: `firewall.json` keeps its rules for `lordos:machines`, which still decide for every machine.
+
 ### The Tor gateway (machine groups, in development)
 
 A Whonix group (`VIRTUALIZATION.md`, 19) has a Tor gateway: the one member with a way out, through its passt. Its
@@ -1206,7 +1229,8 @@ firewall identity of its own with a rule built into lord-netperm:
   prefix is reserved, `app_scope_reserved`). `fw_scope_app` reads it as **`lordos:tor-gateway`** (`FW_APP_TOR_GATEWAY`),
   `fw_vm_scope` still gives the machine's id (Monitor's row reads "Tor gateway · <name>"), and `fw_vm_scope_tor` tells
   the two forms apart. Monitor, Settings' firewall list and the capture indicator show it as its own row
-  (`sdk/netmodel.js`, `monitor.comp.torGateway` in every language). Every other machine stays `lordos:machines`.
+  (`sdk/netmodel.js`, `monitor.comp.torGateway` in every language). Every other machine is its own app,
+  `lordos:vm-<id>`, under `lordos:machines` ("Each machine its own app" above); the gateway inherits nothing from it.
 - **A built-in restriction, `FW_R_TOR_UPLINK` / `NP_R_TOR_UPLINK` (bit 12).** It is outside `FW_R_ALL`, so
   `firewall.json` can neither set nor clear it (`fw_set_restricted` refuses it); `fw_builtin_restricted` gives it to
   `lordos:tor-gateway` and to nothing else, and `np_compile_app` ORs it into that app's `NpApp.flags` (which makes

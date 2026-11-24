@@ -91,5 +91,6 @@
   },
   "pickAddress": "Selecciona una adreça per permetre-la o bloquejar-la per a aquesta app.",
   "recent": "connexió recent",
-  "recentDenied": "denegada recentment"
+  "recentDenied": "denegada recentment",
+  "machineInherits": "Les regles de Màquines també decideixen per aquesta màquina. Les seves se sumen: quan totes dues coincideixen amb una connexió, decideix la més específica, i Bloca guanya a Permet."
 }

@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Average na memory (1 · 5 · 15 min)",
   "stats.memPeakRow": "Peak na memory (1 · 5 · 15 min)",
   "stats.spark": "Huling minuto",
-  "group.showMachine": "Ipakita ang Machine"
+  "group.showMachine": "Ipakita ang Machine",
+  "comp.machine": "Machine",
+  "comp.machineNamed": "{name} (machine)",
+  "comp.machineHint": "Isang virtual machine: ang trapiko sa network ng guest system nito. Ang sarili nitong mga panuntunan ay idinadagdag sa mga panuntunan ng Machines, na patuloy na nagpapasya para sa bawat machine.",
+  "comp.machinesRules": "Panuntunan ng Machines",
+  "comp.forwarded": "Ipinasang port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Bukas sa network",
+  "comp.forwardedLocal": "Itong computer lang"
 }

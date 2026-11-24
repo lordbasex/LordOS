@@ -91,5 +91,6 @@
   },
   "pickAddress": "Välj en adress för att tillåta eller blockera den för den här appen.",
   "recent": "senaste anslutning",
-  "recentDenied": "nyligen nekad"
+  "recentDenied": "nyligen nekad",
+  "machineInherits": "Reglerna för Maskiner avgör också för den här maskinen. Dess egna regler läggs till: när båda matchar en anslutning avgör den mest specifika, och Blockera går före Tillåt."
 }

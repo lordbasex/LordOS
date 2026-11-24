@@ -87,5 +87,6 @@
   },
   "pickAddress": "Chọn một địa chỉ để cho phép hoặc chặn nó với ứng dụng này.",
   "recent": "kết nối gần đây",
-  "recentDenied": "bị chặn gần đây"
+  "recentDenied": "bị chặn gần đây",
+  "machineInherits": "Quy tắc của Máy ảo cũng quyết định cho máy này. Quy tắc riêng của nó được cộng thêm: khi cả hai khớp một kết nối, quy tắc cụ thể hơn quyết định, và Chặn thắng Cho phép."
 }

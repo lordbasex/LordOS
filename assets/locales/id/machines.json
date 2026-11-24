@@ -1681,5 +1681,11 @@
   "bundle.machine": "Mesin",
   "bundle.group": "Grup mesin",
   "cfg.search": "Cari",
-  "cfg.unsaved": "Diubah, belum disimpan"
+  "cfg.unsaved": "Diubah, belum disimpan",
+  "cfg.firewall": "Firewall",
+  "cfg.firewallRules": "Aturan firewall…",
+  "cfg.firewallNote": "Mesin ini punya barisnya sendiri di firewall LordOS dan di Monitor. Aturan Mesin juga berlaku untuknya; aturannya sendiri hanya menambah.",
+  "cfg.firewallBridged": "Pada kartu jembatan, firewall LordOS tidak menyaring lalu lintas tamu: aturannya berlaku di jaringan bersama atau hanya-host.",
+  "cfg.firewallGateway": "Gateway Tor punya satu baris firewall untuk semua grup, dengan batasan bawaannya: hanya TCP keluar ke internet.",
+  "cfg.secNote.firewall": "Firewall LordOS memutuskan lalu lintasnya sebagai aplikasi milik mesin ini, bersama aturan Mesin."
 }

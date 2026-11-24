@@ -670,5 +670,12 @@
   "stats.memAvgRow": "内存平均（1 · 5 · 15 分钟）",
   "stats.memPeakRow": "内存峰值（1 · 5 · 15 分钟）",
   "stats.spark": "最近一分钟",
-  "group.showMachine": "显示虚拟机"
+  "group.showMachine": "显示虚拟机",
+  "comp.machine": "机器",
+  "comp.machineNamed": "{name}（机器）",
+  "comp.machineHint": "一台虚拟机：其客户系统的网络流量。它自己的规则会加到“虚拟机”的规则上，后者仍为每台机器做决定。",
+  "comp.machinesRules": "“虚拟机”的规则",
+  "comp.forwarded": "转发端口 {proto} {port} → {guest}",
+  "comp.forwardedLan": "对网络开放",
+  "comp.forwardedLocal": "仅此电脑"
 }

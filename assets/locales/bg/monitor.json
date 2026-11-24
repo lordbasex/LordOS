@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Средна памет (1 · 5 · 15 мин)",
   "stats.memPeakRow": "Пикова памет (1 · 5 · 15 мин)",
   "stats.spark": "Последна минута",
-  "group.showMachine": "Показване на машината"
+  "group.showMachine": "Показване на машината",
+  "comp.machine": "Машина",
+  "comp.machineNamed": "{name} (машина)",
+  "comp.machineHint": "Виртуална машина: мрежовият трафик на гостуващата ѝ система. Собствените ѝ правила се добавят към правилата за Машини, които продължават да решават за всяка машина.",
+  "comp.machinesRules": "Правило за Машини",
+  "comp.forwarded": "Пренасочен порт {proto} {port} → {guest}",
+  "comp.forwardedLan": "Отворен към мрежата",
+  "comp.forwardedLocal": "Само този компютър"
 }

@@ -685,5 +685,12 @@
   "stats.memAvgRow": "গড় মেমরি (1 · 5 · 15 মিনিট)",
   "stats.memPeakRow": "সর্বোচ্চ মেমরি (1 · 5 · 15 মিনিট)",
   "stats.spark": "শেষ মিনিট",
-  "group.showMachine": "মেশিন দেখান"
+  "group.showMachine": "মেশিন দেখান",
+  "comp.machine": "মেশিন",
+  "comp.machineNamed": "{name} (মেশিন)",
+  "comp.machineHint": "একটি ভার্চুয়াল মেশিন: এর অতিথি সিস্টেমের নেটওয়ার্ক ট্রাফিক। এর নিজের নিয়মগুলো মেশিনসমূহের নিয়মের সঙ্গে যোগ হয়, যেগুলো প্রতিটি মেশিনের জন্য সিদ্ধান্ত নিতে থাকে।",
+  "comp.machinesRules": "মেশিনসমূহের নিয়ম",
+  "comp.forwarded": "ফরোয়ার্ড করা পোর্ট {proto} {port} → {guest}",
+  "comp.forwardedLan": "নেটওয়ার্কের জন্য খোলা",
+  "comp.forwardedLocal": "শুধু এই কম্পিউটার"
 }

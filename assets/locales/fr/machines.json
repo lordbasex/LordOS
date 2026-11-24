@@ -1681,5 +1681,11 @@
   "bundle.machine": "Machine",
   "bundle.group": "Groupe de machines",
   "cfg.search": "Rechercher",
-  "cfg.unsaved": "Modifié, pas encore enregistré"
+  "cfg.unsaved": "Modifié, pas encore enregistré",
+  "cfg.firewall": "Pare-feu",
+  "cfg.firewallRules": "Règles du pare-feu…",
+  "cfg.firewallNote": "Cette machine a sa propre ligne dans le pare-feu de LordOS et dans Moniteur. Les règles de Machines s’appliquent aussi à elle ; les siennes ne font que s’y ajouter.",
+  "cfg.firewallBridged": "Sur une carte en pont, le pare-feu de LordOS ne filtre pas le trafic de l’invité : ses règles s’appliquent sur un réseau partagé ou hôte seul.",
+  "cfg.firewallGateway": "Une passerelle Tor a une ligne de pare-feu pour tous les groupes, avec sa restriction intégrée : seulement du TCP sortant vers Internet.",
+  "cfg.secNote.firewall": "Le pare-feu de LordOS décide de son trafic comme de l’app propre de cette machine, avec aussi les règles de Machines."
 }

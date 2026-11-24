@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Μέση μνήμη (1 · 5 · 15 λεπ.)",
   "stats.memPeakRow": "Μέγιστη μνήμη (1 · 5 · 15 λεπ.)",
   "stats.spark": "Τελευταίο λεπτό",
-  "group.showMachine": "Εμφάνιση μηχανής"
+  "group.showMachine": "Εμφάνιση μηχανής",
+  "comp.machine": "Μηχανή",
+  "comp.machineNamed": "{name} (μηχανή)",
+  "comp.machineHint": "Μια εικονική μηχανή: η κίνηση δικτύου του φιλοξενούμενου συστήματός της. Οι δικοί της κανόνες προστίθενται στους κανόνες των Μηχανών, που εξακολουθούν να αποφασίζουν για κάθε μηχανή.",
+  "comp.machinesRules": "Κανόνας Μηχανών",
+  "comp.forwarded": "Προωθημένη θύρα {proto} {port} → {guest}",
+  "comp.forwardedLan": "Ανοιχτή στο δίκτυο",
+  "comp.forwardedLocal": "Μόνο αυτός ο υπολογιστής"
 }

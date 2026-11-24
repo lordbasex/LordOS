@@ -1681,5 +1681,11 @@
   "bundle.machine": "Mașină",
   "bundle.group": "Grup de mașini",
   "cfg.search": "Caută",
-  "cfg.unsaved": "Modificat, încă nesalvat"
+  "cfg.unsaved": "Modificat, încă nesalvat",
+  "cfg.firewall": "Firewall",
+  "cfg.firewallRules": "Reguli firewall…",
+  "cfg.firewallNote": "Această mașină are rândul ei în firewallul LordOS și în Monitor. Regulile pentru Mașini i se aplică și ei; ale ei doar se adaugă.",
+  "cfg.firewallBridged": "Pe o placă în punte, firewallul LordOS nu filtrează traficul invitatului: regulile lui se aplică într-o rețea partajată sau doar cu gazda.",
+  "cfg.firewallGateway": "Un gateway Tor are un rând de firewall pentru toate grupurile, cu restricția lui integrată: doar TCP de ieșire către internet.",
+  "cfg.secNote.firewall": "Firewallul LordOS decide traficul ei ca aplicație proprie a acestei mașini, împreună cu regulile pentru Mașini."
 }

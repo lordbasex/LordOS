@@ -1681,5 +1681,11 @@
   "bundle.machine": "Maszyna",
   "bundle.group": "Grupa maszyn",
   "cfg.search": "Szukaj",
-  "cfg.unsaved": "Zmienione, jeszcze nie zapisane"
+  "cfg.unsaved": "Zmienione, jeszcze nie zapisane",
+  "cfg.firewall": "Zapora",
+  "cfg.firewallRules": "Reguły zapory…",
+  "cfg.firewallNote": "Ta maszyna ma własny wiersz w zaporze LordOS i w Monitorze. Reguły Maszyn też jej dotyczą; jej własne tylko do nich dochodzą.",
+  "cfg.firewallBridged": "Na karcie w trybie mostu zapora LordOS nie filtruje ruchu gościa: jej reguły działają w sieci współdzielonej lub tylko z hostem.",
+  "cfg.firewallGateway": "Bramka Tor ma jeden wiersz zapory dla wszystkich grup, z wbudowanym ograniczeniem: tylko wychodzące TCP do internetu.",
+  "cfg.secNote.firewall": "Zapora LordOS decyduje o jej ruchu jako o własnej aplikacji tej maszyny, razem z regułami Maszyn."
 }

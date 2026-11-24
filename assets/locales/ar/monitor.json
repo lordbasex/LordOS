@@ -745,5 +745,12 @@
   "stats.memAvgRow": "متوسط الذاكرة (1 · 5 · 15 د)",
   "stats.memPeakRow": "ذروة الذاكرة (1 · 5 · 15 د)",
   "stats.spark": "آخر دقيقة",
-  "group.showMachine": "إظهار الآلة"
+  "group.showMachine": "إظهار الآلة",
+  "comp.machine": "آلة",
+  "comp.machineNamed": "{name} (آلة)",
+  "comp.machineHint": "آلة افتراضية: حركة شبكة نظامها الضيف. قواعدها الخاصة تُضاف إلى قواعد الآلات، التي تبقى تقرر لكل آلة.",
+  "comp.machinesRules": "قاعدة الآلات",
+  "comp.forwarded": "منفذ مُعاد توجيهه {proto} {port} ← {guest}",
+  "comp.forwardedLan": "مفتوح للشبكة",
+  "comp.forwardedLocal": "هذا الحاسوب فقط"
 }

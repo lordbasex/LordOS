@@ -670,5 +670,12 @@
   "stats.memAvgRow": "메모리 평균 (1 · 5 · 15분)",
   "stats.memPeakRow": "메모리 최대 (1 · 5 · 15분)",
   "stats.spark": "최근 1분",
-  "group.showMachine": "머신 보기"
+  "group.showMachine": "머신 보기",
+  "comp.machine": "머신",
+  "comp.machineNamed": "{name} (머신)",
+  "comp.machineHint": "가상 머신: 게스트 시스템의 네트워크 트래픽입니다. 이 머신의 규칙은 가상 머신 규칙에 더해지며, 가상 머신 규칙은 계속 모든 머신에 대해 결정합니다.",
+  "comp.machinesRules": "가상 머신 규칙",
+  "comp.forwarded": "전달된 포트 {proto} {port} → {guest}",
+  "comp.forwardedLan": "네트워크에 공개",
+  "comp.forwardedLocal": "이 컴퓨터만"
 }

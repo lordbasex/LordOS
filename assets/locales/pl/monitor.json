@@ -700,5 +700,12 @@
   "stats.memAvgRow": "Średnia pamięć (1 · 5 · 15 min)",
   "stats.memPeakRow": "Szczyt pamięci (1 · 5 · 15 min)",
   "stats.spark": "Ostatnia minuta",
-  "group.showMachine": "Pokaż maszynę"
+  "group.showMachine": "Pokaż maszynę",
+  "comp.machine": "Maszyna",
+  "comp.machineNamed": "{name} (maszyna)",
+  "comp.machineHint": "Maszyna wirtualna: ruch sieciowy jej systemu gościa. Jej własne reguły dochodzą do reguł Maszyn, które nadal decydują o każdej maszynie.",
+  "comp.machinesRules": "Reguła Maszyn",
+  "comp.forwarded": "Przekierowany port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Otwarty dla sieci",
+  "comp.forwardedLocal": "Tylko ten komputer"
 }

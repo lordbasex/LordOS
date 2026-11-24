@@ -685,5 +685,12 @@
   "stats.memAvgRow": "औसत मेमोरी (1 · 5 · 15 मिनट)",
   "stats.memPeakRow": "शिखर मेमोरी (1 · 5 · 15 मिनट)",
   "stats.spark": "पिछला मिनट",
-  "group.showMachine": "मशीन दिखाएँ"
+  "group.showMachine": "मशीन दिखाएँ",
+  "comp.machine": "मशीन",
+  "comp.machineNamed": "{name} (मशीन)",
+  "comp.machineHint": "एक वर्चुअल मशीन: उसके अतिथि सिस्टम का नेटवर्क ट्रैफ़िक। उसके अपने नियम मशीनें के नियमों में जुड़ते हैं, जो हर मशीन के लिए तय करते रहते हैं।",
+  "comp.machinesRules": "मशीनें का नियम",
+  "comp.forwarded": "आगे भेजा गया पोर्ट {proto} {port} → {guest}",
+  "comp.forwardedLan": "नेटवर्क के लिए खुला",
+  "comp.forwardedLocal": "सिर्फ़ यह कंप्यूटर"
 }

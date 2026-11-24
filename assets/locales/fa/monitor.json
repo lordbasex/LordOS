@@ -685,5 +685,12 @@
   "stats.memAvgRow": "میانگین حافظه (۱ · ۵ · ۱۵ دقیقه)",
   "stats.memPeakRow": "اوج حافظه (۱ · ۵ · ۱۵ دقیقه)",
   "stats.spark": "دقیقه آخر",
-  "group.showMachine": "نمایش ماشین"
+  "group.showMachine": "نمایش ماشین",
+  "comp.machine": "ماشین",
+  "comp.machineNamed": "{name} (ماشین)",
+  "comp.machineHint": "یک ماشین مجازی: ترافیک شبکهٔ سیستم مهمانش. قواعد خودش به قواعد ماشین‌ها افزوده می‌شود که همچنان برای هر ماشین تصمیم می‌گیرند.",
+  "comp.machinesRules": "قاعدهٔ ماشین‌ها",
+  "comp.forwarded": "درگاه هدایت‌شده {proto} {port} ← {guest}",
+  "comp.forwardedLan": "باز برای شبکه",
+  "comp.forwardedLocal": "فقط همین رایانه"
 }

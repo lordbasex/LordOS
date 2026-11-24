@@ -91,5 +91,6 @@
   },
   "pickAddress": "Kies een adres om het voor deze app toe te staan of te blokkeren.",
   "recent": "recente verbinding",
-  "recentDenied": "onlangs geweigerd"
+  "recentDenied": "onlangs geweigerd",
+  "machineInherits": "De regels voor Machines beslissen ook voor deze machine. Haar eigen regels komen erbij: als beide bij een verbinding passen, beslist de meest specifieke, en Blokkeren wint van Toestaan."
 }

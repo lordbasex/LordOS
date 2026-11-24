@@ -700,5 +700,12 @@
   "stats.memAvgRow": "Пам’ять у середньому (1 · 5 · 15 хв)",
   "stats.memPeakRow": "Пік пам’яті (1 · 5 · 15 хв)",
   "stats.spark": "Остання хвилина",
-  "group.showMachine": "Показати машину"
+  "group.showMachine": "Показати машину",
+  "comp.machine": "Машина",
+  "comp.machineNamed": "{name} (машина)",
+  "comp.machineHint": "Віртуальна машина: мережевий трафік її гостьової системи. Її власні правила додаються до правил для «Машин», які й далі вирішують за кожну машину.",
+  "comp.machinesRules": "Правило для «Машин»",
+  "comp.forwarded": "Переспрямований порт {proto} {port} → {guest}",
+  "comp.forwardedLan": "Відкритий для мережі",
+  "comp.forwardedLocal": "Лише цей комп’ютер"
 }

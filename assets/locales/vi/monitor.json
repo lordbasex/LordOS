@@ -670,5 +670,12 @@
   "stats.memAvgRow": "Bộ nhớ trung bình (1 · 5 · 15 phút)",
   "stats.memPeakRow": "Bộ nhớ đỉnh (1 · 5 · 15 phút)",
   "stats.spark": "Phút vừa qua",
-  "group.showMachine": "Hiện máy"
+  "group.showMachine": "Hiện máy",
+  "comp.machine": "Máy",
+  "comp.machineNamed": "{name} (máy)",
+  "comp.machineHint": "Một máy ảo: lưu lượng mạng của hệ thống khách. Quy tắc riêng của nó được cộng thêm vào quy tắc của Máy ảo, vốn vẫn quyết định cho mọi máy.",
+  "comp.machinesRules": "Quy tắc của Máy ảo",
+  "comp.forwarded": "Cổng chuyển tiếp {proto} {port} → {guest}",
+  "comp.forwardedLan": "Mở ra mạng",
+  "comp.forwardedLocal": "Chỉ máy tính này"
 }

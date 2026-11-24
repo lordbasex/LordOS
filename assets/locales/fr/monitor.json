@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Mémoire moyenne (1 · 5 · 15 min)",
   "stats.memPeakRow": "Pic de mémoire (1 · 5 · 15 min)",
   "stats.spark": "Dernière minute",
-  "group.showMachine": "Afficher la machine"
+  "group.showMachine": "Afficher la machine",
+  "comp.machine": "Machine",
+  "comp.machineNamed": "{name} (machine)",
+  "comp.machineHint": "Une machine virtuelle : le trafic réseau de son système invité. Ses propres règles s’ajoutent aux règles de Machines, qui décident toujours pour chaque machine.",
+  "comp.machinesRules": "Règle de Machines",
+  "comp.forwarded": "Port redirigé {proto} {port} → {guest}",
+  "comp.forwardedLan": "Ouvert au réseau",
+  "comp.forwardedLocal": "Cet ordinateur seulement"
 }

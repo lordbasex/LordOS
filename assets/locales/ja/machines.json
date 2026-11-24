@@ -1681,5 +1681,11 @@
   "bundle.machine": "マシン",
   "bundle.group": "マシングループ",
   "cfg.search": "検索",
-  "cfg.unsaved": "変更あり、未保存"
+  "cfg.unsaved": "変更あり、未保存",
+  "cfg.firewall": "ファイアウォール",
+  "cfg.firewallRules": "ファイアウォールのルール…",
+  "cfg.firewallNote": "このマシンは LordOS のファイアウォールとモニタに専用の行を持ちます。仮想マシンのルールもこのマシンに適用され、このマシン自身のルールは追加されるだけです。",
+  "cfg.firewallBridged": "ブリッジしたカードでは LordOS のファイアウォールはゲストの通信をフィルタしません。ルールは共有またはホストのみのネットワークで適用されます。",
+  "cfg.firewallGateway": "Tor ゲートウェイはすべてのグループで1つのファイアウォール行を持ち、組み込みの制限があります：インターネットへの送信 TCP のみ。",
+  "cfg.secNote.firewall": "LordOS のファイアウォールは、このマシン自身のアプリとして、仮想マシンのルールとあわせて通信を判断します。"
 }

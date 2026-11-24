@@ -670,5 +670,12 @@
   "stats.memAvgRow": "Rata-rata memori (1 · 5 · 15 mnt)",
   "stats.memPeakRow": "Puncak memori (1 · 5 · 15 mnt)",
   "stats.spark": "Menit terakhir",
-  "group.showMachine": "Tampilkan mesin"
+  "group.showMachine": "Tampilkan mesin",
+  "comp.machine": "Mesin",
+  "comp.machineNamed": "{name} (mesin)",
+  "comp.machineHint": "Mesin virtual: lalu lintas jaringan sistem tamunya. Aturannya sendiri ditambahkan ke aturan Mesin, yang tetap memutuskan untuk setiap mesin.",
+  "comp.machinesRules": "Aturan Mesin",
+  "comp.forwarded": "Port diteruskan {proto} {port} → {guest}",
+  "comp.forwardedLan": "Terbuka ke jaringan",
+  "comp.forwardedLocal": "Hanya komputer ini"
 }

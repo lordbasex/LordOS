@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Geheugen gemiddeld (1 · 5 · 15 min)",
   "stats.memPeakRow": "Geheugen piek (1 · 5 · 15 min)",
   "stats.spark": "Laatste minuut",
-  "group.showMachine": "Machine tonen"
+  "group.showMachine": "Machine tonen",
+  "comp.machine": "Machine",
+  "comp.machineNamed": "{name} (machine)",
+  "comp.machineHint": "Een virtuele machine: het netwerkverkeer van het gastsysteem. Haar eigen regels komen bij de regels voor Machines, die voor elke machine blijven beslissen.",
+  "comp.machinesRules": "Regel voor Machines",
+  "comp.forwarded": "Doorgestuurde poort {proto} {port} → {guest}",
+  "comp.forwardedLan": "Open voor het netwerk",
+  "comp.forwardedLocal": "Alleen deze computer"
 }

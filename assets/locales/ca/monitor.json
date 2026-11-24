@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Memòria mitjana (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memòria pic (1 · 5 · 15 min)",
   "stats.spark": "Últim minut",
-  "group.showMachine": "Mostra la màquina"
+  "group.showMachine": "Mostra la màquina",
+  "comp.machine": "Màquina",
+  "comp.machineNamed": "{name} (màquina)",
+  "comp.machineHint": "Una màquina virtual: el trànsit de xarxa del sistema convidat. Les seves regles se sumen a les de Màquines, que continuen decidint per totes les màquines.",
+  "comp.machinesRules": "Regla de Màquines",
+  "comp.forwarded": "Port reenviat {proto} {port} → {guest}",
+  "comp.forwardedLan": "Obert a la xarxa",
+  "comp.forwardedLocal": "Només aquest ordinador"
 }

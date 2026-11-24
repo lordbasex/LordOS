@@ -685,5 +685,12 @@
   "stats.memAvgRow": "Memory average (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memory peak (1 · 5 · 15 min)",
   "stats.spark": "Last minute",
-  "group.showMachine": "Show Machine"
+  "group.showMachine": "Show Machine",
+  "comp.machine": "Machine",
+  "comp.machineNamed": "{name} (machine)",
+  "comp.machineHint": "A virtual machine: its guest's network traffic. Its own rules add to the rules for Machines, which still decide for every machine.",
+  "comp.machinesRules": "Rule for Machines",
+  "comp.forwarded": "Forwarded port {proto} {port} → {guest}",
+  "comp.forwardedLan": "Open to the network",
+  "comp.forwardedLocal": "This computer only"
 }
