@@ -107,7 +107,16 @@ def ps(cmd, mark, sec=60):
 try:
     t0 = time.time()
     hello = re.compile(r"agent: lordos-guest (w\d+) said hello")
-    v = until(lambda: hello.search(vmlog()), 600, 2)
+    # the tools start in the person's session: the install's automatic sign-in was for its first starts only, so the
+    # person signs in at the lock screen (the `windows` flow's account), typed as a person would
+    until(lambda: "agent: connected" in vmlog(), 300, 2)
+    v = until(lambda: hello.search(vmlog()), 60, 2)
+    if not v:
+        say("key 28")
+        pump(4)
+        say("type %s\\n" % os.environ.get("MH_WIN_PASSWORD", "Vm-guest-0001"))
+        v = until(lambda: hello.search(vmlog()), 300, 2)
+        print("      signed in at the lock screen: %s" % ("the tools said hello" if v else "no hello"))
     t("the installed tools say hello (%s, %.0f s after the start)" % (v.group(1) if v else "-", time.time() - t0), bool(v), vmlog()[-800:])
     first = v.group(1) if v else ""
     if first != "w13":
@@ -128,19 +137,19 @@ try:
     t("not elevated (Administrators: False)", out is not None and "False" in out, out)
 
     # a link and a notification from the guest's tools (6.12): lord-vm passes them on (machine.json allows both)
-    exe = r"& \"$env:ProgramFiles\LordOS\lordos-guest-win.exe\""
+    exe = '& "$env:ProgramFiles\\LordOS\\lordos-guest-win.exe"'
     url = "https://lordos.org/mh-win-%s" % os.urandom(3).hex()
-    ps("%s --open-on-host %s; 'MH-L'" % (exe, url), "MH-L")
+    ps("%s --open-on-host %s; 'MH-'+'L'" % (exe, url), "MH-L")
     t("a link from the Windows guest reaches this computer's side", until(lambda: any(e.get("ev") == "note" and e.get("kind") == "link" and url in e.get("text", "") for e in events), 30, 0.5),
       [e for e in events if e.get("ev") == "note"])
     title = "MH win note %s" % os.urandom(2).hex()
-    ps("%s --notify-host '%s' 'from Windows'; 'MH-N'" % (exe, title), "MH-N")
+    ps("%s --notify-host '%s' 'from Windows'; 'MH-'+'N'" % (exe, title), "MH-N")
     t("a notification from the Windows guest", until(lambda: any(e.get("ev") == "note" and e.get("kind") == "notify" and title in e.get("title", "") for e in events), 30, 0.5),
       [e for e in events if e.get("ev") == "note"])
 
     # Send to LordOS (6.21)
     out = ps("$b=New-Object byte[] (6MB); (New-Object Random 7).NextBytes($b); [IO.File]::WriteAllBytes(\"$env:TEMP\\mh-win.bin\",$b); "
-             "(Get-FileHash \"$env:TEMP\\mh-win.bin\").Hash; %s --send-to-host \"$env:TEMP\\mh-win.bin\"; 'MH-S'" % exe, "MH-S", 120)
+             "(Get-FileHash \"$env:TEMP\\mh-win.bin\").Hash; %s --send-to-host \"$env:TEMP\\mh-win.bin\"; 'MH-'+'S'" % exe, "MH-S", 120)
     want = (re.search(r"([0-9A-F]{64})", out or "") or [None, None])[1]
     got = until(lambda: next((e for e in events if e.get("ev") == "recv" and e.get("state") == "done"), None), 120, 0.5)
     lib = os.path.dirname(D)
@@ -162,16 +171,19 @@ try:
     wf = next((j[:-5] for j in sorted(os.listdir(store)) if j.endswith(".json") and '"winfsp"' in open(os.path.join(store, j)).read()), None) if os.path.isdir(store) else None
     if wf and os.path.exists(os.path.join(store, wf + ".iso")):
         say("transfer %s %s" % (wf, os.path.join(store, wf + ".iso")))
-        ok = until(lambda: "the guest's VirtIO-FS service serves the folder" in vmlog(), 300, 2)
+        ok = until(lambda: re.search(r"the VirtIO-FS service started|the guest's VirtIO-FS service serves the folder", vmlog()), 300, 2)
         t("WinFsp installed and the VirtIO-FS service serves the transfer folder", bool(ok), vmlog()[-800:])
         xf = os.path.join(os.path.dirname(D), "Transfer", NAME)
         word = "mh-host-%s" % os.urandom(3).hex()
         if os.path.isdir(xf):
             open(os.path.join(xf, "from-host.txt"), "w").write(word)
+        n0 = len(shell_text())
         say("shell 120 30")
-        until(lambda: "PS " in shell_text()[-2000:], 30, 0.5)
-        out = ps("$d=(Get-Volume|?{$_.FileSystemLabel -eq 'LordOS'}|Select-Object -First 1).DriveLetter; 'drive='+$d; "
-                 "Get-Content \"${d}:\\from-host.txt\"; Set-Content \"${d}:\\from-guest.txt\" 'mh-guest'; 'MH-X'", "MH-X", 60)
+        until(lambda: "PS " in shell_text()[n0:], 60, 0.5)
+        pump(3)
+        # the folder's drive as the person sees it: the file system drive that holds what this computer put there
+        out = ps("$d=(Get-PSDrive -PSProvider FileSystem|?{Test-Path -LiteralPath ($_.Root+'from-host.txt')}|Select-Object -First 1).Root; 'drive='+$d; "
+                 "Get-Content -LiteralPath ($d+'from-host.txt'); Set-Content -LiteralPath ($d+'from-guest.txt') 'mh-guest'; 'MH-'+'X'", "MH-X", 60)
         print("      transfer in Windows: %s" % " ".join((out or "").split())[-200:])
         t("the drive holds what this computer put there", out is not None and word in out, out)
         g = open(os.path.join(xf, "from-guest.txt"), errors="replace").read().strip() if os.path.exists(os.path.join(xf, "from-guest.txt")) else None

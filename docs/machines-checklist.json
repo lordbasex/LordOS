@@ -281,15 +281,15 @@
    "status": "🟡",
    "pct": 96,
    "file": "`vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `--group-delete`, `--group-rename`, `--group-repair`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_ui_test.mjs`, `vm_group_link.sh`, `vm_group_manage.sh`, `machines_group_manage_headless.sh`, `groupJobCloses` (`model.js`)",
-   "note": "*In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive. G5 run on the i9 on 2026-11-24 in a headless session (19.10): the group made from the verified 18.2.4.3 archive (SHA-512 as its signed list; 3 min 27 s), Start the Group; in the Workstation `check.torproject.org` said IsTor true, an onion site answered 200, `1.1.1.1` saw a Tor exit (`loc=T1`), a DNS query to 1.1.1.1 failed; meanwhile the only TCP connections of the run on this computer were the Gateway's passt to two relays Onionoo lists (nothing from the Workstation's QEMU); the Gateway stopped with the Workstation running showed the Start Gateway bar, and its button brought Tor back; Shut Down the Group stopped the Workstation then the Gateway by ACPI; Destroy and Start Fresh (new id and MAC, the overlay 214 MB → 198 KB); a disposable session's 100 MB file left the disk untouched. Found and fixed: after Start Fresh the old window stayed open on the same folder, so the next group start ran in two windows and one said it didn't start (`groupJobCloses`). Left: Tor Browser itself (curl stood in), the dev VM and the maintainer's PC (Maintainer checks), disk encryption of the members (layer 5) (was 92)"
+   "note": "*In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive. G5 run on the i9 on 2026-11-24 in a headless session (19.10): the group made from the verified 18.2.4.3 archive (SHA-512 as its signed list; 3 min 27 s), Start the Group; in the Workstation `check.torproject.org` said IsTor true, an onion site answered 200, `1.1.1.1` saw a Tor exit (`loc=T1`), a DNS query to 1.1.1.1 failed; meanwhile the only TCP connections of the run on this computer were the Gateway's passt to two relays Onionoo lists (nothing from the Workstation's QEMU); the Gateway stopped with the Workstation running showed the Start Gateway bar, and its button brought Tor back; Shut Down the Group stopped the Workstation then the Gateway by ACPI; Destroy and Start Fresh (new id and MAC, the overlay 214 MB → 198 KB); a disposable session's 100 MB file left the disk untouched. Found and fixed: after Start Fresh the old window stayed open on the same folder, so the next group start ran in two windows and one said it didn't start (`groupJobCloses`). Left: Tor Browser itself (curl stood in), the dev VM and the maintainer's PC (Maintainer checks). Disk encryption of the members (layer 5) is built (the card's \"Encrypt the machines' disks\", `lord-vm --group-create … --encrypt on`; `vm_storage_test.sh`: both members' overlays LUKS under the group's key, the shared bases left clear; row L \"Encrypted machines\"), checked headless with real QEMU, not in the G5 run (was 92)"
   },
   {
    "area": "C",
    "item": "Library: toolbar, chips, grid or list, sort, search, status line, live card, Templates (5.1)",
    "status": "✅",
-   "pct": 97,
+   "pct": 100,
    "file": "`library.jsx` (`Lights`, Templates in ···), `model.js` (`skeletonPlan`, `cardLights`, `actionsOf`, `tagsOf`, `filterMachines`); `vm_model_test.mjs`, `machines_app_headless.sh`, `machines_app2_headless.sh`, `machines_sheets_headless.sh`",
-   "note": "*In development*: Templates (Make Template, the Templates chip, New Machine from Template; a template doesn't start from the library), the card's own color and tags, seen on screen in the headless scene; every sheet and dialog of the library (Clone or Duplicate, New Machine from Template, Export and its save dialog, Bring In and its folder picker, Start Fresh, Configure's Add Disk, the recovery key's window) fits its first size, 760×500, with its buttons inside (`machines_sheets_headless.sh`). Export in ··· is the storage work's (`m100/storage`, `lord.vm.export`): 100 with it"
+   "note": "*In development*: Templates (Make Template, the Templates chip, New Machine from Template; a template doesn't start from the library), the card's own color and tags, seen on screen in the headless scene; every sheet and dialog of the library (Clone or Duplicate, New Machine from Template, Export and its save dialog, Bring In and its folder picker, Start Fresh, Configure's Add Disk, the recovery key's window) fits its first size, 760×500, with its buttons inside (`machines_sheets_headless.sh`). Export in ··· is built (`m100/storage`, `lord.vm.export`, the Export sheet in `machines_sheets_headless.sh`) (was 97)."
   },
   {
    "area": "C",
@@ -310,10 +310,10 @@
   {
    "area": "C",
    "item": "Machine window: bar, Actions, Devices, Apps, close dialog, resolution menu, Scale, device dots, the guest's shape (5.3)",
-   "status": "🧪",
-   "pct": 95,
-   "file": "`vmwindow.jsx` (View → Scale, `DeviceDots`, Devices → Network and Folders, shape keeping), `model.js` `scaleFrame`, `shapeFrame`, `deviceDots`, `cableOffered`, `VM_NETCABLE` (`vmproto.h`, `lordvm.c`, `js_vm.c` `netCable`); `vm_model_test.mjs`, `vmlink-test`, `vm_configure_boot.sh`",
-   "note": "*In development*: Scale, the window keeping the guest's shape, device dots, the network cable while it runs (checked in a real KVM guest: carrier lost and back). USB and Camera show in Devices only once the devices work's backend says they're supported (`lord.vm.deviceCaps`). The new bar and menus not yet seen in a running window on screen"
+   "status": "✅",
+   "pct": 100,
+   "file": "`vmwindow.jsx` (View → Scale, `DeviceDots`, Devices → Network and Folders, shape keeping), `model.js` `scaleFrame`, `shapeFrame`, `deviceDots`, `cableOffered`, `VM_NETCABLE` (`vmproto.h`, `lordvm.c`, `js_vm.c` `netCable`); `vm_model_test.mjs`, `vmlink-test`, `vm_configure_boot.sh`, `flows.py` (`s3window`, `s3links`, `s3send`, `s3shell`, `s3agentlost`; 41 of 41 on 2026-11-24)",
+   "note": "*In development*: Scale, the window keeping the guest's shape, device dots, the network cable while it runs (checked in a real KVM guest: carrier lost and back). USB and Camera show in Devices only once the devices work's backend says they're supported (`lord.vm.deviceCaps`). **Seen on screen on 2026-11-24** in a headless session with a real Debian 13 guest under KVM: the bar (the light, the toolbar's buttons, the guest's picture under them), each menu of the menu bar open (Actions with Pause, Open Transfer Folder and Logs; Devices; View with Scale and Picture in Picture; Info) (was 🧪 95)."
   },
   {
    "area": "C",
@@ -358,10 +358,10 @@
   {
    "area": "C",
    "item": "What this computer can run (5.7)",
-   "status": "🧪",
-   "pct": 85,
-   "file": "`library.jsx` (`ThisComputer`), `model.js` `canRun`, `sensorLines`, `js_vm.c` (`host().nested`, `sensors()`); `vm_model_test.mjs`, `machines_app_headless.sh`",
-   "note": "*In development*: amd64 and arm64 from what the host reports, the sensors (temperature, fan, a Pi's power supply) while machines run, in the Machine menu and on the first-run page. Not yet seen on screen on the Pi"
+   "status": "✅",
+   "pct": 95,
+   "file": "`library.jsx` (`ThisComputer`), `model.js` `canRun`, `sensorLines`, `js_vm.c` (`host().nested`, `sensors()`); `vm_model_test.mjs`, `machines_app_headless.sh`, `machines_app_headless.sh` (`MACHINES_REAL_HOST=1`)",
+   "note": "*In development*: amd64 and arm64 from what the host reports, the sensors (temperature, fan, a Pi's power supply) while machines run, in the Machine menu and on the first-run page. **Run on the Raspberry Pi 5 on 2026-11-24** headless with the Pi's own facts (`MACHINES_REAL_HOST=1`: the host and the sensors not made up): the page said \"Native machines are arm64, with up to 4 cores and 13.8 GB\", arm64 systems near native speed with KVM, amd64 by emulation, 3D needing an amd64 computer, and while machines ran Temperature 39 °C, Fan 0 rpm, Power supply fine. Its texts were read from the page (the scene's screenshots failed on the Pi's headless build); the same scene on the PC saved them (was 🧪 85)."
   },
   {
    "area": "C",
@@ -422,10 +422,10 @@
   {
    "area": "D",
    "item": "Storage window: shared extents, frees-if-deleted, downloads (6.16)",
-   "status": "🧪",
-   "pct": 90,
-   "file": "`storage.jsx`, `js_vm.c` (FIEMAP, `FIEMAP_EXTENT_ENCODED`), `model.js` (`oldSnapshots`, `unusedImages`); `vm_model_test.mjs`, `flows.py` (`storage`), `tools/vm/e2e/machines/storage-fs.sh`",
-   "note": "*In development* (2026-11-24): Delete Old Snapshots (every one but the newest, asked first with the figure), Remove Unused downloads (asked first; the existing `vm-image-remove`), figures marked \"about\" when an extent is stored compressed, every disk counted (raw and data disks were left out). Seen on ext4 only: a btrfs or XFS run needs root to make and mount the scratch file systems (`storage-fs.sh`, Maintainer checks) (was 75)"
+   "status": "✅",
+   "pct": 100,
+   "file": "`storage.jsx`, `js_vm.c` (FIEMAP, `FIEMAP_EXTENT_ENCODED`), `model.js` (`oldSnapshots`, `unusedImages`); `vm_model_test.mjs`, `flows.py` (`storage`), `tools/vm/e2e/machines/storage-fs.sh`, `storage-fs.sh` (btrfs, btrfs with `compress-force=zstd`, XFS)",
+   "note": "*In development* (2026-11-24): Delete Old Snapshots (every one but the newest, asked first with the figure), Remove Unused downloads (asked first; the existing `vm-image-remove`), figures marked \"about\" when an extent is stored compressed, every disk counted (raw and data disks were left out). **Run on btrfs and XFS on 2026-11-24** (`storage-fs.sh` as the person, `sudo -n` only to mount three scratch 12 GB loop file systems under /var/tmp, unmounted and deleted after; mkfs from `dpkg -x` of Debian's btrfs-progs and xfsprogs): premade, clone and storage passed on each (7, 8 and 7 checks); the clone is a reflink there, so what Machines said deleting it frees (0.0, 0.0 and 0.1 MB) is what the file system gave back (-0.7, -0.0, -0.3 MB); with `compress-force=zstd` the figures say \"about\" (was 🧪 90)"
   },
   {
    "area": "E",
@@ -438,10 +438,10 @@
   {
    "area": "E",
    "item": "Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5)",
-   "status": "🧪",
-   "pct": 95,
-   "file": "`vmnet_admin.c`, `vmnet.c`, `lordvm.c`; `vm_nic_boot.sh`",
-   "note": "Host only checked in a real KVM guest (2026-11-24, `vm_nic_boot.sh`): the guest reached a listener on this computer's loopback through 10.0.2.2 and, on a second card, 10.0.3.2. Bridged not run: its macvtap device is made by root (`vm-net-bridge`), and in a user and network namespace the device node stays root's (measured: `/dev/tapN` owned by nobody, open refused), so it needs root (Maintainer checks). `vhost=off`, no `vhost-net` (was 90)"
+   "status": "✅",
+   "pct": 100,
+   "file": "`vmnet_admin.c`, `vmnet.c`, `lordvm.c`; `vm_nic_boot.sh`, `vm_bridge_dummy.sh`, `build/vm-net-cli-dummy`",
+   "note": "Host only checked in a real KVM guest (2026-11-24, `vm_nic_boot.sh`): the guest reached a listener on this computer's loopback through 10.0.2.2 and, on a second card, 10.0.3.2. **Bridged run on 2026-11-24** (`vm_bridge_dummy.sh`, 23 of 23; root only through `sudo -n` for a scratch dummy `lordtest0`, a macvlan peer in a scratch network namespace, all deleted after; the real wired card and the firewall untouched): the real `vm-net-bridge` refuses the dummy (`vm.bridgeNotWired`: no device behind it) and makes nothing; the admin helper's own code with only the wired-card check told the dummy is one (`vm-net-cli-dummy`, `vmnet_card` wrapped at link time, test only) makes the macvtap in bridge mode on it with the machine's MAC, the alias `lordos-vm <uid> <id>`, no address of this computer's (no IPv6 link-local either), `/dev/tapN` the person's 0600; lord-vm opens it and gives QEMU the descriptor; a Debian 13 guest under KVM has the machine's MAC and pings the peer, which sees that MAC; the cable pulled and plugged in (VM_NETCABLE) is seen by the guest and the ping works again; `vm-net-unbridge` refuses while the machine runs (`vm.bridgeInUse`) and removes the macvtap once it is off. `vhost=off`, no `vhost-net` (was 🧪 95)"
   },
   {
    "area": "E",
@@ -503,17 +503,17 @@
    "area": "G",
    "item": "Shared folders, virtiofs, read-only by default (6.7)",
    "status": "✅",
-   "pct": 90,
-   "file": "`lordvm.c` (`vhost-user-fs-pci`)",
-   "note": "Not checked on the Pi or in a Windows guest on arm64; no SMB fallback"
+   "pct": 95,
+   "file": "`lordvm.c` (`vhost-user-fs-pci`), `vm_share_boot.sh`",
+   "note": "Run on the Raspberry Pi 5 and the PC on 2026-11-24 (`vm_share_boot.sh`, 14 of 14 each, Debian 13 guests under KVM: read-only refused with \"Read-only file system\", writable and the transfer folder seen here at once, QEMU holds no folder, one virtiofsd per folder). Not checked: a virtio-win guest on arm64 (no GICv3 arm64 host here); no SMB fallback (was 90)"
   },
   {
    "area": "G",
    "item": "Transfer folder (6.7.1)",
-   "status": "🧪",
-   "pct": 90,
-   "file": "`machine.h` (`VM_XFER_*`), `lordvm.c`, `configure.jsx`",
-   "note": "Through `lordvm-dev`"
+   "status": "✅",
+   "pct": 100,
+   "file": "`machine.h` (`VM_XFER_*`), `lordvm.c`, `configure.jsx`, `vm_share_boot.sh`, `flows.py` (`s3window`, `s3links`, `s3send`, `s3shell`, `s3agentlost`; 41 of 41 on 2026-11-24)",
+   "note": "Real runs on 2026-11-24: a real lord-server session (headless) with a Debian 13 guest under KVM, where the guest's agent mounted it at /mnt/LordOS and this build's tools came in through it (`s3guest`); `vm_share_boot.sh` on the PC and on the Pi (200 MB out in 0.44 s on NVMe, 14.8 s on the Pi's SD card). In a Windows 11 guest (`win-agent.py`, 2026-11-24): WinFsp from the image store installed by lord-vm through the agent, the VirtIO-FS service started, the drive labelled LordOS read what this computer put there and what the guest wrote was here at once. (was 🧪 90)"
   },
   {
    "area": "G",
@@ -535,9 +535,9 @@
    "area": "G",
    "item": "File copy panel, flow control, resume, drag out, Send to LordOS, quarantine (6.21)",
    "status": "🟡",
-   "pct": 85,
-   "file": "`vmagent.c` (`ag_send_*`), `lordvm.c` (`rx_*`, `VM_FILE_CANCEL`), `vmrecv.c`, `js_vm.c` (`received`, `receiveCancel`, `fileCancel`), `transfers.jsx`, `xfer.js`, `tools/guest/gsend.c`, `lordos-guest-win.c` w13, `fsops.c` (marks), `apps/files/quarantine.js`; `vm-test`, `guest_send_test.sh`, `fsops-test`, `vm_xfer_test.mjs`, a KVM guest (6.21)",
-   "note": "*In development*: Send to LordOS from a real Debian 13 guest through the real lord-vm and `lordvm-dev` (48 MB whole, a resume after the guest's tools were killed mid-file, quarantine folder 0700, files 0600 and marked, names never hidden or replaced). Not built: dragging straight out of a guest's or apps-mode window (only out of the panel). Not checked: the panel on screen in a real lord-server session, w13 in a Windows guest (was ❌ 10)"
+   "pct": 95,
+   "file": "`vmagent.c` (`ag_send_*`), `lordvm.c` (`rx_*`, `VM_FILE_CANCEL`), `vmrecv.c`, `js_vm.c` (`received`, `receiveCancel`, `fileCancel`), `transfers.jsx`, `xfer.js`, `tools/guest/gsend.c`, `lordos-guest-win.c` w13, `fsops.c` (marks), `apps/files/quarantine.js`; `vm-test`, `guest_send_test.sh`, `fsops-test`, `vm_xfer_test.mjs`, a KVM guest (6.21), `flows.py` (`s3window`, `s3links`, `s3send`, `s3shell`, `s3agentlost`; 41 of 41 on 2026-11-24)",
+   "note": "*In development*: Send to LordOS from a real Debian 13 guest through the real lord-vm and `lordvm-dev` (48 MB whole, a resume after the guest's tools were killed mid-file, quarantine folder 0700, files 0600 and marked, names never hidden or replaced). Not built: dragging straight out of a guest's or apps-mode window (only out of the panel). (was ❌ 10, then 85) **On screen on 2026-11-24** (`s3send`): a 24 MB Send to LordOS from a Debian 13 guest in a real lord-server session: the window's file copies panel (\"mh-send.bin · from MH Debian\", Received, Show in Files, Open Received Folder), the \"arrived\" notification, the file whole in `<library>/Received/<name>` 0600 in a 0700 folder, marked. Send to LordOS from a Windows 11 guest with w13 (`win-agent.py`): the file whole, 0600, marked. Still not built: dragging straight out of a guest's window (was 85)."
   },
   {
    "area": "G",
@@ -566,10 +566,10 @@
   {
    "area": "G",
    "item": "Guest → host links and notifications (6.12)",
-   "status": "🟡",
-   "pct": 85,
-   "file": "`vmagent.c` (`ag_link_ok`, `ag_note_parse`, `ag_rate_take`), `lordvm.c` (`guest_note`), `js_vm.c` (`guestLinkAnswer`), `vmwindow.jsx`, `configure.jsx`, `tools/guest/gshell.c`, `gnotes.c`, `dbusmin.c` (`db_notify_body`, `db_note_plain`), `lordos-send-to-host.desktop`, `lordos-guest-win.c` w13 (Send To); `vm-test`, `guest_shell_test.sh`, `guest-dbus-test`, a KVM guest (6.18, 6.21)",
-   "note": "*In development*: off by default (machine.json schema 15), http and https only, a link opens only from the bar's Open, notifications shown as from the machine, both rate-limited; the Linux guest desktop's own notifications (a session-bus monitor for `Notify` only) checked in a real Debian 13 guest; Send to LordOS entries in the guest (Open With, Dolphin, Send To). Not buildable cleanly: a Windows guest's own notifications (needs package identity). Not checked: the bar on screen, a Windows guest (was 🟡 75)"
+   "status": "✅",
+   "pct": 95,
+   "file": "`vmagent.c` (`ag_link_ok`, `ag_note_parse`, `ag_rate_take`), `lordvm.c` (`guest_note`), `js_vm.c` (`guestLinkAnswer`), `vmwindow.jsx`, `configure.jsx`, `tools/guest/gshell.c`, `gnotes.c`, `dbusmin.c` (`db_notify_body`, `db_note_plain`), `lordos-send-to-host.desktop`, `lordos-guest-win.c` w13 (Send To); `vm-test`, `guest_shell_test.sh`, `guest-dbus-test`, a KVM guest (6.18, 6.21), `flows.py` (`s3window`, `s3links`, `s3send`, `s3shell`, `s3agentlost`; 41 of 41 on 2026-11-24)",
+   "note": "*In development*: off by default (machine.json schema 15), http and https only, a link opens only from the bar's Open, notifications shown as from the machine, both rate-limited; the Linux guest desktop's own notifications (a session-bus monitor for `Notify` only) checked in a real Debian 13 guest; Send to LordOS entries in the guest (Open With, Dolphin, Send To). Not buildable cleanly: a Windows guest's own notifications (needs package identity). (was 🟡 75, then 85) **On screen on 2026-11-24** (`s3links`): a link from the guest's tools shows in the window's bar (\"MH Debian wants to open a link on this computer\", the address, Open and Ignore; Ignore takes it away and nothing opens) and a notification shows as from the machine. From a Windows 11 guest with w13 (`--open-on-host`, `--notify-host`) both reached this computer's side (`win-agent.py`). A Windows guest's own notifications still not buildable cleanly (package identity)."
   },
   {
    "area": "H",
@@ -647,9 +647,9 @@
    "area": "I",
    "item": "`lordos-guest-win` w13: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf, shell, links, notify, send (6.12, 6.18, 6.21, 7.1.2, 7.1.4)",
    "status": "✅",
-   "pct": 95,
-   "file": "`tools/guest-win/lordos-guest-win.c` (`VERSION \"w13\"`); `vm-test` (`AGK_PERF`, the shell's and links' frames)",
-   "note": "w12 (*in development*) adds PowerShell in a pseudo console (never elevated) and `--open-on-host`/`--notify-host` by `WM_COPYDATA`; w13 adds Send to LordOS (Send To, `--send-to-host`, flow control and resume); cross-built with mingw-w64, not yet run in a Windows guest (w11 was 100, `perf` checked in the maintainer's guest on 2026-11-23)"
+   "pct": 100,
+   "file": "`tools/guest-win/lordos-guest-win.c` (`VERSION \"w13\"`); `vm-test` (`AGK_PERF`, the shell's and links' frames), `win-agent.py`",
+   "note": "w12 (*in development*) adds PowerShell in a pseudo console (never elevated) and `--open-on-host`/`--notify-host` by `WM_COPYDATA`; w13 adds Send to LordOS (Send To, `--send-to-host`, flow control and resume); cross-built with mingw-w64 (w11 was 100, `perf` checked in the maintainer's guest on 2026-11-23) **Run in a Windows 11 Enterprise Evaluation guest on 2026-11-24** (`win-agent.py`, the `windows` flow's install: Setup 19.6 min): Install LordOS Tools replaced w12 with this build's w13, which said hello; its PowerShell (not elevated), links, notifications, Send to LordOS, apps mode (the window list and 73 programs) worked."
   },
   {
    "area": "I",
@@ -663,25 +663,25 @@
    "area": "I",
    "item": "Agent state light and capability list (6.17)",
    "status": "✅",
-   "pct": 95,
-   "file": "`model.js` (`agentTone`, `agentLines`), `js_vm.c` (`lost`); `vm_model_test.mjs`",
-   "note": "Red (*in development*) when the agent stopped answering while the guest runs, or the tools' install failed; the list has the agent's shell, links and notifications and a Windows guest's event logs. Not seen on screen yet (was 🟡 85: no red state)"
+   "pct": 100,
+   "file": "`model.js` (`agentTone`, `agentLines`), `js_vm.c` (`lost`); `vm_model_test.mjs`, `flows.py` (`s3window`, `s3links`, `s3send`, `s3shell`, `s3agentlost`; 41 of 41 on 2026-11-24)",
+   "note": "Red (*in development*) when the agent stopped answering while the guest runs, or the tools' install failed; the list has the agent's shell, links and notifications and a Windows guest's event logs. (was 🟡 85: no red state) **Seen on screen on 2026-11-24** (`s3agentlost`): qemu-guest-agent stopped in a running Debian 13 guest turned the light red; its popover now says \"The agent stopped answering\" and that it connects again by itself (it said to install the agent and offered the Guest Tools disc: fixed, 35 languages; `discOffer` offers no disc for a lost agent); green again once started (was 95)."
   },
   {
    "area": "I",
    "item": "Shell over the agent as the signed-in user (6.18)",
-   "status": "🟡",
-   "pct": 85,
-   "file": "`tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`, `apps/terminal/state.js` (`guestTab`), `js_term.c` (`guest`); `guest_shell_test.sh`, `vm-test`, a KVM guest",
-   "note": "*In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24); Open in Terminal moves it into a Terminal tab marked as the machine's. No root or administrator switch; `lordvm exec` belongs to the command line's package (6.15); w12/w13 not run in a Windows guest; the pane and the tab not seen on screen (was 🟡 80)"
+   "status": "✅",
+   "pct": 95,
+   "file": "`tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`, `apps/terminal/state.js` (`guestTab`), `js_term.c` (`guest`); `guest_shell_test.sh`, `vm-test`, a KVM guest, `flows.py` (`s3window`, `s3links`, `s3send`, `s3shell`, `s3agentlost`; 41 of 41 on 2026-11-24), `win-agent.py`",
+   "note": "*In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24); Open in Terminal moves it into a Terminal tab marked as the machine's. No root or administrator switch; `lordvm exec` belongs to the command line's package (6.15) (was 🟡 80) **On screen on 2026-11-24** (`s3shell`): the toolbar's Shell opened the pane with the guest person's own bash (GUEST badge), what was typed ran as `tester`, not root; Open in Terminal moved it into a Terminal tab \"Shell inside MH Debian\" with the GUEST mark. In a Windows 11 guest with w13 (`win-agent.py`): PowerShell as `mh-win\\tester`, not elevated (Administrators: False). Still no root or administrator switch, on purpose (was 🟡 85)."
   },
   {
    "area": "I",
    "item": "Logs: journal, serial, machine log, Overview (6.19)",
-   "status": "🟡",
-   "pct": 85,
-   "file": "`logs.jsx`, `diag.js` (`journalLine`, `guestZone`), `lordvm.c` (journal and `EVLOG_PS` through qemu-ga); `vm_model_test.mjs`",
-   "note": "*In development*: a Windows guest's System and Application event logs, a unit or source filter, times in local time with the guest's zone; the event logs not yet run in a Windows guest; Clear view was built already (was 65: no event logs, unit filter or time zone)"
+   "status": "✅",
+   "pct": 95,
+   "file": "`logs.jsx`, `diag.js` (`journalLine`, `guestZone`), `lordvm.c` (journal and `EVLOG_PS` through qemu-ga); `vm_model_test.mjs`, `win-agent.py`",
+   "note": "*In development*: a Windows guest's System and Application event logs, a unit or source filter, times in local time with the guest's zone; Clear view was built already (was 65: no event logs, unit filter or time zone) **Run in a Windows 11 guest on 2026-11-24** (`win-agent.py`): the System and Application event logs read into `log/journal.log` through qemu-guest-agent every 10 s; found and fixed: two thirds of the lines were qemu-ga's own \"guest-exec called\" from this very polling (8,424 of 12,600 in 45 minutes), now left out in the script (0 of 1,002 after). The Logs window itself not watched with a Windows guest (was 🟡 85)."
   },
   {
    "area": "J",
@@ -702,10 +702,10 @@
   {
    "area": "K",
    "item": "Monitor: a machine as one row (6.14)",
-   "status": "🟡",
-   "pct": 80,
-   "file": "`apps/monitor/Processes.jsx` (Show Machine), `Network.jsx`, `Gpu.jsx`; `apps/machines/index.jsx` (`args.show`)",
-   "note": "Network and GPU name machines too; a machine's row opens its processes and Show Machine opens its window (*in development*). No per-machine disk and network numbers in Monitor"
+   "status": "🧪",
+   "pct": 95,
+   "file": "`apps/monitor/Processes.jsx` (Show Machine), `Network.jsx`, `Gpu.jsx`; `apps/machines/index.jsx` (`args.show`), `apps/monitor/vmiomodel.js`; `monitor_vmio_test.mjs`, `monitor_grouped_scene.mjs`",
+   "note": "Network and GPU name machines too; a machine's row opens its processes and Show Machine opens its window (*in development*). **Built 2026-11-24:** the row's own numbers, \"Disk 2.0 MB/s · Network ↓ 3.0 KB/s ↑ 1.0 KB/s\": its QEMU's cgroup I/O (`lord.vm.stats` every 2 s, never in a draw) and the firewall's counts for the machine's scope; a part not measured is left out. Seen in the grouped Processes scene; a real session's machine scope not on screen (the headless e2e session has no scopes: there Monitor finds its QEMU by search, `s3monitor`) (was 🟡 80)"
   },
   {
    "area": "K",
@@ -906,24 +906,24 @@
    "name": "The app",
    "weight": 11,
    "items": 12,
-   "mean": 96.0,
-   "score": 96
+   "mean": 97.5,
+   "score": 98
   },
   {
    "id": "D",
    "name": "Snapshots, clones, storage",
    "weight": 9,
    "items": 6,
-   "mean": 92.5,
-   "score": 93
+   "mean": 94.17,
+   "score": 94
   },
   {
    "id": "E",
    "name": "Network",
    "weight": 6,
    "items": 4,
-   "mean": 97.5,
-   "score": 98
+   "mean": 98.75,
+   "score": 99
   },
   {
    "id": "F",
@@ -938,8 +938,8 @@
    "name": "Host integration",
    "weight": 12,
    "items": 9,
-   "mean": 91.11,
-   "score": 91
+   "mean": 95.0,
+   "score": 95
   },
   {
    "id": "H",
@@ -954,8 +954,8 @@
    "name": "Guest tools and agent",
    "weight": 7,
    "items": 6,
-   "mean": 91.67,
-   "score": 92
+   "mean": 96.67,
+   "score": 97
   },
   {
    "id": "J",
@@ -970,8 +970,8 @@
    "name": "System ties",
    "weight": 3,
    "items": 4,
-   "mean": 91.25,
-   "score": 91
+   "mean": 95.0,
+   "score": 95
   },
   {
    "id": "L",
@@ -998,6 +998,6 @@
    "score": 92
   }
  ],
- "total": 93,
- "total_exact": 93.09
+ "total": 94,
+ "total_exact": 94.41
 }
