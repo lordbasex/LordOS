@@ -423,6 +423,14 @@ EOF
         77) skip "guest-shell" "build/lordos-guest and python3" ;;
         *) bad "guest-shell (tests/guest_shell_test.sh, lordos-guest's agent shell, links and notifications)" ;;
     esac
+    # lordos-guest 9: "Send to LordOS" (6.21): the offer, flow control (it stops at the window), a resume after a lost
+    # connection, a prefix that differs, "not now" and "off"
+    sh tests/guest_send_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-send (tests/guest_send_test.sh, lordos-guest's Send to LordOS)" ;;
+        77) skip "guest-send" "build/lordos-guest and python3" ;;
+        *) bad "guest-send (tests/guest_send_test.sh, lordos-guest's Send to LordOS)" ;;
+    esac
     # lordos-guest's performance profile on private buses: the real dconf-service, stand-ins for power-profiles-daemon
     # and the portal (tests/guest_perf_mock.py)
     sh tests/guest_perf_test.sh >"$T/out" 2>&1
