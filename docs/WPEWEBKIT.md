@@ -189,8 +189,18 @@ Debian unstable does.
 Built on the amd64 build machine under qemu-user (maintainer's decision, 2026-11-24; `JOBS` defaults to 8 there, the first run used 16 and was reniced to 19 since it loaded the desktop): `ARCH=arm64 JOBS=16 TMPFS=64G
 tools/pkg/build-wpewebkit.sh 2.54.3-1 2`, a full build (source and every package, not `-B`, so `-dev` has the
 introspection files as on amd64), in arm64 chroots made by mmdebstrap, every arm64 program run by QEMU through the
-binfmt handler (`F` flag, so it works inside the chroots). The first such build started on 2026-11-24 and is still running;
-its results go here when it ends.
+binfmt handler (`F` flag, so it works inside the chroots). Result of `+2` (2026-11-24, `/mnt/HD08TB/build/wpewebkit/2.54.3-1~lordos13+2/arm64/out/`): `dpkg-buildpackage` took
+42149 s (11.7 h, 16 jobs, most of it at nice 19 next to a busy desktop). The same four packages as on amd64. The
+source package is byte for byte amd64's (same `.dsc` and `.debian.tar.xz`, so it is published once). lintian shows
+the same 0 errors and 5 warnings. Under qemu the test checks everything that doesn't run WebKit, and it all passes:
+`pkg-config`; no `wpe-platform-drm-2.0`; no `libinput`/`libudev` in `NEEDED`; the same SONAME; none of 2.48's 930
+symbols removed (1345, 415 added); the copyright files. The headless program and lord-web on both backends are built
+with no warnings. Running WebKit isn't possible under qemu-user: bubblewrap can't create its user namespaces there
+("Creating new namespace failed"), and the sandbox is never turned off. So under emulation (`ARCH` not the machine's)
+the script builds those programs and doesn't run them. That part (the headless render, `web-backend-test` and the
+probe test on both backends) needs a real arm64 machine: the Pi 5, with the packages from `out/`, before arm64 is
+published. A test stage alone on the Pi: copy the `out/` folder there and run the script with the same version (it
+finds the finished build and only tests).
 
 The options considered (2026-11-23):
 
