@@ -26,7 +26,7 @@
  * systemd the display's variables can arrive after the service started: they're read from the user's manager
  * (systemctl --user show-environment) while they're missing.
  *
- * The clipboard on a guest that runs LordOS (tools 8): its lord-server has no data-control protocol and offers its X
+ * The clipboard on a guest that runs LordOS (tools 9): its lord-server has no data-control protocol and offers its X
  * selection only to a focused X window, so neither wl-paste nor xclip can follow it. When lord-server's endpoint
  * (below) says "clipboard" in its hello, that is the tool: its AGK_CLIP frames are the clipboard's text, and text from
  * the host goes to it as AGK_CLIP (text only: the hello to the host has no "clipx" then). No X connection is made on
@@ -52,8 +52,14 @@
  * puts it back on AGK_PERF 0, when the port goes, when it ends (SIGTERM, SIGINT, SIGHUP) and at the next start after a
  * crash. It answers AGK_PERFSTATE. Built without it (-DLG_NO_PERF), the hello doesn't say "perf".
  *
+ * The agent's shell, and links and notifications for the host (tools 8, "shell links notify" in the hello; gshell.h):
+ * the host opens a shell here as the person (their own login shell in a pty, never root, nothing named by the host);
+ * the person's programs hand this helper a link or a notification over $XDG_RUNTIME_DIR/lordos-guest.sock, which goes
+ * on only when the host's hello says the machine takes them.
+ *
  *   lordos-guest [--port PATH] [--windows PATH] [--once] [--system-bus PATH] [--session-bus PATH]
  *   lordos-guest [--port PATH] --stopping poweroff|halt|reboot|kexec
+ *   lordos-guest --open-on-host URL | --notify-host TITLE [BODY]
  *     --port: the agent's port (a character device; a Unix socket path for tests); --windows: lord-server's socket
  *     (default $XDG_RUNTIME_DIR/lordos-guestwin.sock); --once: one look at the clipboard and the port, for tests;
  *     --system-bus, --session-bus: other buses' sockets for the performance profile, for tests;
@@ -63,6 +69,7 @@
 #endif
 #include "../../server/src/vm/vmagent.h"
 #include "x11clip.h"
+#include "gshell.h"
 #ifndef LG_NO_PERF
 #include "perf.h"
 #endif
@@ -74,6 +81,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -82,7 +90,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#define VERSION "8"
+#define VERSION "9"
 #define PORT "/dev/virtio-ports/org.lordos.agent"
 #define CLIP_MAX AG_TEXT_MAX
 
@@ -291,6 +299,24 @@ static int send_frame(int fd, uint16_t kind, const uint8_t *p, uint32_t n) {
     struct iovec io[2] = { { h, AG_HEAD }, { (void *)p, n } };
     return writev(fd, io, n ? 2 : 1) == (ssize_t)(AG_HEAD + n) ? 0 : -1;
 }
+/* the hello to lord-server, with the agent port's descriptor alongside (SCM_RIGHTS): lord-server gives its clipboard
+ * only to the program that holds the port, and it can't look at this one's descriptors (it is non-dumpable) */
+static int send_hello_with_port(int sock, const char *me, int port_fd) {
+    uint8_t h[AG_HEAD];
+    size_t n = strlen(me);
+    ag_frame_head(h, AGK_HELLO, 0, (uint32_t)n);
+    struct iovec io[2] = { { h, AG_HEAD }, { (void *)me, n } };
+    union { struct cmsghdr c; char b[CMSG_SPACE(sizeof(int))]; } u;
+    struct msghdr m = { .msg_iov = io, .msg_iovlen = 2 };
+    if (port_fd >= 0) {
+        memset(&u, 0, sizeof u);
+        m.msg_control = u.b; m.msg_controllen = sizeof u.b;
+        struct cmsghdr *c = CMSG_FIRSTHDR(&m);
+        c->cmsg_level = SOL_SOCKET; c->cmsg_type = SCM_RIGHTS; c->cmsg_len = CMSG_LEN(sizeof(int));
+        memcpy(CMSG_DATA(c), &port_fd, sizeof(int));
+    }
+    return sendmsg(sock, &m, MSG_NOSIGNAL) == (ssize_t)(AG_HEAD + n) ? 0 : -1;
+}
 
 /* ---- apps mode: the relay to the guest's own lord-server ---- */
 
@@ -320,7 +346,7 @@ static int stop_hook(void) {
 }
 
 static void say_hello(int fd) {
-    char h[112];
+    char h[144];
 #ifndef LG_NO_PERF
     static const char perf_word[] = " perf";
 #else
@@ -328,8 +354,9 @@ static void say_hello(int fd) {
 #endif
     /* "noclip": the helper is there but the guest has no clipboard tool (Machines says what to install) */
     int lord = tool_n && tools[0] == T_LORD;          /* lord-server's clipboard: text only, no X offer */
-    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s%s%s", !tool_n ? " noclip" : lord ? " clipboard" : " clipboard clipx", tool_n && !lord && xc_fd() >= 0 ? " clipreq" : "",
-             wfd >= 0 ? " windows" : "", stop_hook() ? " stopping" : "", perf_word);
+    snprintf(h, sizeof h, "lordos-guest " VERSION "%s%s%s%s%s shell%s", !tool_n ? " noclip" : lord ? " clipboard" : " clipboard clipx",
+             tool_n && !lord && xc_fd() >= 0 ? " clipreq" : "",
+             wfd >= 0 ? " windows" : "", stop_hook() ? " stopping" : "", perf_word, gshell_listen_fd() >= 0 ? " links notify" : "");
     send_frame(fd, AGK_HELLO, (const uint8_t *)h, (uint32_t)strlen(h));
 }
 
@@ -469,9 +496,14 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--system-bus") && i + 1 < argc) sys_bus = argv[++i];
         else if (!strcmp(argv[i], "--session-bus") && i + 1 < argc) ses_bus = argv[++i];
         else if (!strcmp(argv[i], "--version")) { printf("lordos-guest %s\n", VERSION); return 0; }
-        else { fprintf(stderr, "usage: lordos-guest [--port PATH] [--windows PATH] [--once] [--system-bus PATH] [--session-bus PATH] | [--port PATH] --stopping VERB\n"); return 2; }
+        else if (!strcmp(argv[i], "--open-on-host") && i + 1 < argc && i + 2 == argc) return gshell_cli(argv[i], argv[i + 1], NULL);
+        else if (!strcmp(argv[i], "--notify-host") && i + 1 < argc && i + 3 >= argc) return gshell_cli(argv[i], argv[i + 1], i + 2 < argc ? argv[i + 2] : NULL);
+        else { fprintf(stderr, "usage: lordos-guest [--port PATH] [--windows PATH] [--once] [--system-bus PATH] [--session-bus PATH] | [--port PATH] --stopping VERB | --open-on-host URL | --notify-host TITLE [BODY]\n"); return 2; }
     }
     signal(SIGPIPE, SIG_IGN);
+    /* non-dumpable: another program of the same person can't attach to this one (ptrace) or open its descriptors in
+     * /proc to reach the agent port or the clipboard it carries */
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
     if (stopping) return say_stopping(port, stopping);
     /* without SA_RESTART: a wait in poll or sleep ends at the signal */
     struct sigaction sa;
@@ -505,9 +537,12 @@ int main(int argc, char **argv) {
     struct stat wst;
     int lord_desk = wpath[0] && !stat(wpath, &wst) && S_ISSOCK(wst.st_mode);
     if (!lord_desk) xc_open();          /* a LordOS desktop: lord-server's own clipboard instead (it would start Xwayland) */
+    if (!once) gshell_listen();
+    unsigned host_caps = 0;                 /* the host's hello: "links", "notify" while the machine takes them */
     tool_look_at = now_ms() + 30000;
     for (;;) {
         if (ending) {
+            gshell_end();
 #ifndef LG_NO_PERF
             if (perf_active()) perf_do(fd, 0);
 #endif
@@ -517,13 +552,16 @@ int main(int argc, char **argv) {
         /* the port went (the host's lord-vm is gone): the profile lasts only while the host holds it */
         if (fd < 0 && perf_active()) perf_do(-1, 0);
 #endif
+        if (fd < 0 && gshell_fd() >= 0) gshell_end();             /* the host is gone: so is its shell */
         if (fd < 0) {
             fd = open_port(port);
             if (fd < 0) { if (once) { perror(port); return 1; } sleep(3); continue; }
             say_hello(fd);
             have = 0;
             host_clipx = host_clipreq = 0;
+            host_caps = 0;
         }
+        gshell_expire();
         long long now = now_ms();
         /* lord-server's endpoint: tried every 3 s while it isn't there; the hello says "windows" while it is */
         if (wfd < 0 && wpath[0] && now >= win_try) {
@@ -532,7 +570,7 @@ int main(int argc, char **argv) {
             if (wfd >= 0) {
                 static const char me[] = "lordos-guest " VERSION " clipboard";     /* lord-server's clipboard, if it gives it */
                 win_n = 0;
-                send_frame(wfd, AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
+                send_hello_with_port(wfd, me, fd);
                 say_hello(fd);
             }
         }
@@ -604,12 +642,18 @@ int main(int argc, char **argv) {
             if (once) return 0;
         }
         int xfd0 = xc_fd();
-        struct pollfd pp[3] = { { fd, POLLIN, 0 }, { wfd, POLLIN, 0 }, { xfd0, POLLIN, 0 } };
+        struct pollfd pp[9] = { { fd, POLLIN, 0 }, { wfd, POLLIN, 0 }, { xfd0, POLLIN, 0 },
+                                { gshell_fd(), (short)((gshell_can_read() ? POLLIN : 0) | (gshell_wants_out() ? POLLOUT : 0)), 0 },
+                                { gshell_listen_fd(), POLLIN, 0 } };
+        for (int i = 0; i < 4; i++) pp[5 + i] = (struct pollfd){ gshell_client_fd(i), POLLIN, 0 };
         long long until = next_look - now_ms();
         if (until > 250) until = 250;          /* the requests' time limits */
-        int r = poll(pp, 3, (int)(until > 0 ? until : 0));
+        int r = poll(pp, 9, (int)(until > 0 ? until : 0));
         if (r < 0 && errno != EINTR) { close(fd); fd = -1; continue; }
         if (r <= 0) continue;
+        if (pp[3].fd >= 0 && pp[3].revents) gshell_pump(fd, pp[3].revents);
+        if (pp[4].fd >= 0 && (pp[4].revents & POLLIN)) gshell_accept();
+        for (int i = 0; i < 4; i++) if (pp[5 + i].fd >= 0 && pp[5 + i].revents) gshell_client(i, fd, host_caps);
         if (xfd0 >= 0 && (pp[2].revents & (POLLIN | POLLHUP | POLLERR)) && xc_read() < 0) say_hello(fd);
         if (wfd >= 0 && (pp[1].revents & (POLLIN | POLLHUP | POLLERR))) {
             int w = from_server(fd);
@@ -630,10 +674,12 @@ int main(int argc, char **argv) {
             if (f.kind == AGK_HELLO) {
                 host_clipx = f.len < 200 && memmem(f.data, f.len, " clipx", 6) != NULL;
                 host_clipreq = f.len < 200 && (ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPREQ);
+                host_caps = f.len < 200 ? ag_hello_caps(f.data, f.len) : 0;
                 /* a new lord-vm (after a resume) asks once: the hello again */
                 if (f.len < 200 && memmem(f.data, f.len, " ask", 4)) say_hello(fd);
             }
             if (f.kind == LAG_APPS || f.kind == LAG_WINACT || f.kind == LAG_LAUNCH) to_server(&f);
+            gshell_frame(fd, f.kind, f.data, f.len);
 #ifndef LG_NO_PERF
             int perf_on;
             /* the desktop's name (XDG_CURRENT_DESKTOP) may still be on its way from the user's manager */

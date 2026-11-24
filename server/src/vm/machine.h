@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 14
+#define VM_SCHEMA 15
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -197,6 +197,10 @@ typedef struct {
     /* schema 13: vCPU pinning (docs/VIRTUALIZATION.md 3.7.1): "cpu_pin": "off" | "auto", written only when chosen; missing
      * is this computer's default for the machine (vmpin_default_on) */
     int cpu_pin;                        /* VM_PIN_* */
+    /* schema 15: guest → host links and notifications (docs/VIRTUALIZATION.md 6.12), off unless chosen (written only
+     * when on): "guest_links": true, a link the guest's tools send is offered in a bar the person must click;
+     * "guest_notify": true, the guest's notifications are shown as from the machine, rate-limited */
+    int guest_links, guest_notify;
     /* schema 14: a member of a machine group (docs/VIRTUALIZATION.md 19.4), written only for members. group: the group's
      * id (group.json "id"); role: VM_ROLE_*; uplink_tor: the gateway's passt has no DNS forwarding and no forwarded ports
      * ("uplink": "tor", with network "shared"); link_mac: the gateway's second card, on the internal link; profile_lock:
@@ -336,6 +340,22 @@ long vm_mem_limit_mb(const VmMachine *m);
 /* Resource budget (3.7): does a machine of `want_mb` fit beside running machines using `running_mb` in total
  * (each as vm_mem_limit_mb)? 1 yes. */
 int vm_budget_fits(const VmHost *h, long running_mb, long want_mb);
+/* Resource budget (3.7), what every start path asks (js_vm.c budget_refusal: the window, startDetached, `machines start`,
+ * a group's members): the memory the library's active machines hold, each as vm_mem_limit_mb, the folder `exclude`
+ * (same device and inode) left out. Active is what run.json says (starting, running, paused, stopping) when
+ * alive(its lord-vm's pid) agrees; a machine whose supervisor died holds nothing. The library's top level and a machine
+ * group's members one level down (<name>.lordgroup/<member>.lordvm), at most 256 machines; symbolic links are never
+ * followed. extra (may be NULL) adds a machine's own share beside its limit (vm_group_session_mb: a disposable session).
+ * *n: how many were counted. A run.json or machine.json that can't be read counts nothing. */
+/* A machine folder whose run.json says it is active (starting, running, paused, stopping) with its lord-vm alive
+ * (alive(pid); NULL: run.json alone): 1, else 0. run.json is read with O_NOFOLLOW, at most 2 KB. */
+int vm_dir_active(const char *dir, int (*alive)(long pid));
+/* Backups (docs/VIRTUALIZATION.md 6.14): a path relative to the home folder that is a machine's disks folder or saved
+ * session ("<...>.lordvm/disks" or "<...>.lordvm/suspend.state", a machine at any depth, a group's members included):
+ * the length of its machine folder's part ("<...>.lordvm"), else 0. Backups holds those back while the machine runs:
+ * a disk QEMU is writing isn't a consistent copy. */
+size_t vm_backup_hold(const char *rel);
+long vm_budget_used_mb(const char *lib, const char *exclude, int (*alive)(long pid), long (*extra)(const char *dir, const VmMachine *m), int *n);
 /* Graphics 3D (virgl) for this start, the part that needs no probe of the host's files: why a machine that asks for 3D
  * starts with 2D graphics instead, or NULL (lord-vm then checks QEMU's GL modules and the render node). An unattended
  * install's start (installing: lord-vm's disks/unattended) is always 2D: the installer is a text console, and QEMU

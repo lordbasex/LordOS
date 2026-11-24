@@ -932,5 +932,6 @@
   "llm.noModel": "Aquest model local no està instal·lat.",
   "sentinela.blockFailed": "No s’ha pogut bloquejar la seva xarxa.",
   "sentinela.machineGone": "Aquesta màquina ja no és a Màquines.",
-  "sentinela.machineFailed": "La màquina no ha respost."
+  "sentinela.machineFailed": "La màquina no ha respost.",
+  "vm.overBudget": "No hi ha prou memòria al costat de les màquines que ja funcionen. Suspèn o apaga'n una, o dona menys memòria a aquesta màquina."
 }

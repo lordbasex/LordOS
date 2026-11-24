@@ -684,5 +684,6 @@
   "stats.p95Row": "CPU percentil 95 (1 min)",
   "stats.memAvgRow": "Memòria mitjana (1 · 5 · 15 min)",
   "stats.memPeakRow": "Memòria pic (1 · 5 · 15 min)",
-  "stats.spark": "Últim minut"
+  "stats.spark": "Últim minut",
+  "group.showMachine": "Mostra la màquina"
 }

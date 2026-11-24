@@ -105,5 +105,6 @@
   "freshDone": "„{name}“ workstation pradėta iš naujo: patikrintas atvaizdas, nauja tapatybė.",
   "freshDoneBoth": "„{name}“ pradėta iš naujo: abi mašinos vėl turi patikrintą atvaizdą ir naują tapatybę.",
   "freshNotGroup": "„{name}“ nėra mašinų grupė: pradėjimas iš naujo skirtas grupėms.",
-  "badMember": "--member priima gateway arba workstation."
+  "badMember": "--member priima gateway arba workstation.",
+  "overBudget": "{name} nepasileido: jai reikia {need} MB, o mašinoms liko {free} MB. Pristabdykite ar išjunkite kitą mašiną arba skirkite jai mažiau atminties."
 }

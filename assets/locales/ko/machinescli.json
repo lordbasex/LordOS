@@ -105,5 +105,6 @@
   "freshDone": "{name}의 Workstation을 새로 시작했습니다: 검증된 이미지와 새 신원입니다.",
   "freshDoneBoth": "{name}을(를) 새로 시작했습니다: 두 머신 모두 검증된 이미지로 돌아가고 새 신원을 받았습니다.",
   "freshNotGroup": "{name}은(는) 머신 그룹이 아닙니다. 새로 시작은 그룹에만 쓸 수 있습니다.",
-  "badMember": "--member에는 gateway 또는 workstation을 지정합니다."
+  "badMember": "--member에는 gateway 또는 workstation을 지정합니다.",
+  "overBudget": "{name}이(가) 시작되지 않았습니다: {need}MB가 필요한데 머신용으로 {free}MB 남았습니다. 다른 머신을 일시 중단하거나 종료하거나, 메모리를 줄이세요."
 }

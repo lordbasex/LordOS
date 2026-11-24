@@ -419,6 +419,14 @@ EOF
         77) skip "guest-stop" "build/lordos-guest and python3" ;;
         *) bad "guest-stop (tests/guest_stop_test.sh, lordos-guest's shutdown notice)" ;;
     esac
+    # lordos-guest 8: the agent's shell (pty, size, exit status, flow control, the host's close) and links and
+    # notifications for the host through its local socket (6.12, 6.18)
+    sh tests/guest_shell_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "guest-shell (tests/guest_shell_test.sh, lordos-guest's agent shell, links and notifications)" ;;
+        77) skip "guest-shell" "build/lordos-guest and python3" ;;
+        *) bad "guest-shell (tests/guest_shell_test.sh, lordos-guest's agent shell, links and notifications)" ;;
+    esac
     # lordos-guest's performance profile on private buses: the real dconf-service, stand-ins for power-profiles-daemon
     # and the portal (tests/guest_perf_mock.py)
     sh tests/guest_perf_test.sh >"$T/out" 2>&1

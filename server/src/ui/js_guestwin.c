@@ -25,9 +25,8 @@
  * say "clipboard" (lordos-guest's: "lordos-guest <v> clipboard"), lord-server sends the clipboard's text as AGK_CLIP
  * after each change (never a secret: term_clipboard_sensitive) and takes the peer's AGK_CLIP (valid UTF-8, at most
  * AG_TEXT_MAX) as the clipboard's new text, marked as coming from "machines". Only a peer that holds the agent port itself
- * (one of its descriptors is /dev/virtio-ports/org.lordos.agent's device: the port opens once) and runs the installed
- * lordos-guest (/proc/<pid>/exe is /usr/local/bin/lordos-guest or /usr/lib/lordos/guest/lordos-guest-<arch>, root's
- * files) gets or sets it: another program of the same person that connects here gets the windows as before, never the
+ * (it passes the port's descriptor with its hello, SCM_RIGHTS: a character device with the port's device number, open
+ * for reading and writing; lord-server looks at it and closes it at once, never keeping the port open) gets or sets it: another program of the same person that connects here gets the windows as before, never the
  * clipboard. lord-vm and lord-server on the host decide whether it goes on (machine.json "clipboard", the gate).
  *
  * JS: lord.guestwin.active() → the endpoint exists; poll() → [{ type: 'apps', on } | { type: 'act', id, action, x, y,
@@ -48,7 +47,6 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
-#include <dirent.h>
 #include <unistd.h>
 
 #define GW_IN_MAX   4096            /* what the peer may send in one frame (LAG_APPS, LAG_WINACT, LAG_LAUNCH, a hello) */
@@ -59,6 +57,7 @@ static int tried, lfd = -1, cfd = -1;
 static char sock_path[108];
 static uint8_t in_buf[AG_HEAD + AG_TEXT_MAX];       /* AGK_CLIP may be AG_TEXT_MAX; every other kind GW_IN_MAX */
 static int peer_clip;                   /* the peer said "clipboard" and holds the agent port */
+static int peer_port = -1;              /* the descriptor the peer passed with its hello (SCM_RIGHTS), until it is looked at */
 static unsigned clip_sent_gen;          /* the clipboard's generation last sent (or set from the peer) */
 static size_t in_n;
 static uint8_t *out_q;
@@ -107,6 +106,7 @@ static void drop_peer(void) {
     cfd = -1;
     in_n = 0;
     peer_clip = 0;
+    if (peer_port >= 0) { close(peer_port); peer_port = -1; }
     out_n = out_off = 0;
     if (apps_on) { GwEvent e = { .type = 1, .on = 0 }; push_ev(&e); apps_on = 0; }
 }
@@ -152,35 +152,14 @@ static void send_icons(void) {
 }
 
 /* does process pid hold the agent port (a descriptor on the same character device)? 1 yes */
-static int holds_port(pid_t pid) {
+static int holds_port(int fd) {
     struct stat port, st;
     /* tests (LORD_GUESTWIN=1 only): LORD_GUESTWIN_PORT names another character device as the port */
     const char *force = getenv("LORD_GUESTWIN"), *alt = getenv("LORD_GUESTWIN_PORT");
     const char *path = force && !strcmp(force, "1") && alt && alt[0] == '/' ? alt : "/dev/virtio-ports/org.lordos.agent";
-    if (pid <= 0 || stat(path, &port) || !S_ISCHR(port.st_mode)) return 0;
-    char d[64], f[96];
-    /* and it is lordos-guest itself, as installed (the package's or Install Agent's copy): not another program of the
-     * same person that took the port while the helper was gone (tests run the build's own copy) */
-    char exe[256];
-    snprintf(f, sizeof f, "/proc/%d/exe", (int)pid);
-    ssize_t el = readlink(f, exe, sizeof exe - 1);
-    if (el <= 0) return 0;
-    exe[el] = 0;
-    /* a helper still running from a file an update replaced */
-    if (el > 10 && !strcmp(exe + el - 10, " (deleted)")) exe[el - 10] = 0;
-    if (!(path == alt) && strcmp(exe, "/usr/local/bin/lordos-guest") && strcmp(exe, "/usr/lib/lordos/guest/lordos-guest-amd64") &&
-        strcmp(exe, "/usr/lib/lordos/guest/lordos-guest-arm64")) return 0;
-    snprintf(d, sizeof d, "/proc/%d/fd", (int)pid);
-    DIR *dir = opendir(d);
-    if (!dir) return 0;
-    int found = 0;
-    for (struct dirent *e; !found && (e = readdir(dir));) {
-        if (e->d_name[0] == '.' || strlen(e->d_name) > 10) continue;
-        snprintf(f, sizeof f, "%s/%s", d, e->d_name);
-        if (!stat(f, &st) && S_ISCHR(st.st_mode) && st.st_rdev == port.st_rdev) found = 1;
-    }
-    closedir(dir);
-    return found;
+    if (fd < 0 || stat(path, &port) || !S_ISCHR(port.st_mode)) return 0;
+    int fl = fcntl(fd, F_GETFL);
+    return !fstat(fd, &st) && S_ISCHR(st.st_mode) && st.st_rdev == port.st_rdev && fl >= 0 && (fl & O_ACCMODE) == O_RDWR;
 }
 
 /* the clipboard's text to the peer when it changed (not a secret, not empty, at most AG_TEXT_MAX, valid UTF-8) */
@@ -224,7 +203,6 @@ static void setup(void) {
     fprintf(stderr, "guestwin: apps mode's endpoint is listening (%s)\n", sock_path);
 }
 
-static pid_t peer_pid;
 static void take_peer(void) {
     for (;;) {
         int c = accept4(lfd, NULL, NULL, SOCK_CLOEXEC | SOCK_NONBLOCK);
@@ -234,7 +212,6 @@ static void take_peer(void) {
         if (getsockopt(c, SOL_SOCKET, SO_PEERCRED, &cr, &cl) || cr.uid != getuid()) { close(c); continue; }
         drop_peer();
         cfd = c;
-        peer_pid = cr.pid;
         clip_sent_gen = term_clipboard_gen() - 1;     /* the current text goes once the peer says "clipboard" */
         hello();
     }
@@ -248,7 +225,20 @@ static int listed(uint32_t id) {
 
 static void read_peer(void) {
     while (cfd >= 0) {
-        ssize_t r = recv(cfd, in_buf + in_n, sizeof in_buf - in_n, MSG_DONTWAIT);
+        /* recvmsg: lordos-guest passes the agent port's descriptor with its hello; any other descriptor is closed */
+        union { struct cmsghdr c; char b[CMSG_SPACE(4 * sizeof(int))]; } u;
+        struct iovec io = { in_buf + in_n, sizeof in_buf - in_n };
+        struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = u.b, .msg_controllen = sizeof u.b };
+        ssize_t r = recvmsg(cfd, &mh, MSG_DONTWAIT | MSG_CMSG_CLOEXEC);
+        for (struct cmsghdr *c = r > 0 ? CMSG_FIRSTHDR(&mh) : NULL; c; c = CMSG_NXTHDR(&mh, c)) {
+            if (c->cmsg_level != SOL_SOCKET || c->cmsg_type != SCM_RIGHTS) continue;
+            size_t k = (c->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+            for (size_t i = 0; i < k; i++) {
+                int pfd;
+                memcpy(&pfd, CMSG_DATA(c) + i * sizeof(int), sizeof pfd);
+                if (peer_port < 0 && !peer_clip) peer_port = pfd; else close(pfd);
+            }
+        }
         if (r == 0 || (r < 0 && errno != EAGAIN && errno != EINTR)) { drop_peer(); return; }
         if (r < 0) return;
         in_n += (size_t)r;
@@ -267,8 +257,9 @@ static void read_peer(void) {
             if (f.kind == AGK_HELLO && f.len < 200 && !peer_clip) {
                 /* "lordos-guest <v> clipboard": the clipboard, only for the program that holds the agent port */
                 int words = (ag_hello_caps(f.data, f.len) & AG_HELLO_CLIPBOARD) != 0;
-                if (words && holds_port(peer_pid)) { peer_clip = 1; send_clip(); }
+                if (words && holds_port(peer_port)) { peer_clip = 1; send_clip(); }
                 else if (words) fprintf(stderr, "guestwin: a peer asked for the clipboard without holding the agent port: refused\n");
+                if (peer_port >= 0) { close(peer_port); peer_port = -1; }
             } else if (f.kind == AGK_CLIP && peer_clip && f.len && f.len <= AG_TEXT_MAX && ag_utf8_ok(f.data, f.len)) {
                 /* the host's text, through lordos-guest: the clipboard's new text (and not sent back) */
                 char *t = malloc(f.len + 1);

@@ -932,5 +932,6 @@
   "llm.noModel": "Ez a helyi modell nincs telepítve.",
   "sentinela.blockFailed": "A hálózatát nem sikerült letiltani.",
   "sentinela.machineGone": "Ez a gép már nincs a Gépek alkalmazásban.",
-  "sentinela.machineFailed": "A gép nem válaszolt."
+  "sentinela.machineFailed": "A gép nem válaszolt.",
+  "vm.overBudget": "Nincs elég memória a már futó gépek mellett. Függessz fel vagy állíts le egyet közülük, vagy adj ennek a gépnek kevesebb memóriát."
 }

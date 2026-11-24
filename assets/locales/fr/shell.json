@@ -977,5 +977,6 @@
   "themeSwitch.changingTo": "Passage à {name}…",
   "themeSwitch.failedTitle": "Impossible d’appliquer {name}",
   "themeSwitch.refusedBody": "Son code ne correspond pas à la copie signée de LordOS, il n’a donc pas été chargé. Le style de votre bureau reste tel qu’il était.",
-  "themeSwitch.failedBody": "Il n’a pas démarré. Le style de votre bureau reste tel qu’il était."
+  "themeSwitch.failedBody": "Il n’a pas démarré. Le style de votre bureau reste tel qu’il était.",
+  "spotlight.section.machines": "Machines"
 }

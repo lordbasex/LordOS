@@ -31,6 +31,62 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     qemu-guest-agent on the same guest (`server/tests/vm_guest_tools_e2e.sh`); `guesttools-test` reads the image back
     with lord-vm's own ISO reader and checks its hash and the writer's refusals; `guest_tools_install_test.sh` checks
     `install.sh`'s choices on 18 kinds of system; shellcheck is clean.
+- **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
+  latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
+  - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
+    there, over the guest agent's own channel (no network, no SSH, works with Isolated network), with a switch to the
+    serial console and New Shell. Linux guests: that person's own login shell in a pty; virtio-win guests: PowerShell in a
+    pseudo console. Never root or an administrator, never a program named by this computer; one shell at a time; flow
+    control both ways keeps memory flat whatever the shell writes. The terminal is titled with the machine's name and
+    marked, so it can't be taken for this computer's.
+  - **A guest's terminal stays text** (the agent's shell and the serial console): what a guest writes can no longer
+    set this computer's clipboard (OSC 52 and OSC 1337 Copy did, past the clipboard's gate and a clipboard set to Off),
+    start tmux's control mode, make links, or raise a title, notification, password prompt or any other terminal event
+    on this computer.
+  - **Links from the machine** (off by default, Configure → Sharing): a program in the guest can ask to open a web
+    link here (`lordos-guest --open-on-host URL`). Only http and https, no user name before the host, only the
+    characters a browser gets as one argument; at most 3 at once, then one per 5 s; only while the machine's window is
+    in front; one at a time. It waits in a bar over the machine's picture with the whole link and opens in the browser
+    only when the person clicks Open, which works only after the bar has been seen for a moment.
+  - **Notifications from the machine** (off by default): `lordos-guest --notify-host TITLE [BODY]` shows a
+    notification marked "From ‹machine›", plain text without control or direction characters, at most 5 at once, then
+    one per 3 s, with no actions.
+  - **The agent light turns red** when the guest agent stopped answering while the guest runs, or installing the
+    LordOS tools failed. The agent's popover lists the shell, links and notifications.
+  - **Logs:** a virtio-win guest's event logs (System and Application, through
+    the guest agent every 10 s, one fixed script); a filter by unit or source (click it); the guest's times in this
+    computer's local time, with the guest's own zone named when it differs.
+  - **The LordOS tools 9 (Linux) and w12** bring the shell and the links and notifications; Machines updates older
+    tools by itself. machine.json schema 15 adds `guest_links` and `guest_notify`; a machine locked for anonymity
+    (Whonix) refuses both.
+  - Tests: `vm-test` (the new frames' parsers, fuzzed with 80 000 random frames, the link encoder, the rate limit,
+    schema 15), `vmgroup-test` (the anonymity lock), `guest_shell_test.sh` (the shell's pty, size, exit status, 2 MB
+    with late acknowledgements never past its window, the host's close, the helper's socket), `vm_model_test.mjs`
+    (the agent's lines, the red light, the logs' times and zones).
+- **Machines: the app and its ties to the system** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
+  3.3, 3.7, 5.1, 5.3, 5.4, 5.5, 5.7, 6.1, 6.14).
+  - **One resource budget for every start.** lord-server checks it on the window's start, Start Without Window,
+    `machines start` (through the session and without one) and a group's members: the memory the library's running
+    machines hold (each with QEMU's share, a disposable session's too) plus the new one must fit in what this computer
+    lets machines use. The window offers Suspend ‹another machine› or Start with less memory; the library's status line
+    shows the memory for machines and warns "Short of memory" under memory pressure.
+  - **The failure page** names a locked disk and a missing disk from QEMU's own words, and offers Start with less memory
+    after running out and Go Back to a Snapshot.
+  - **"Weaker isolation on this kernel"**: on a kernel without Landlock the library says so, Configure → Security says
+    what applies instead, and a running machine's Info menu reads what its sandbox really applied.
+  - **The library's cards** have agent and disk lights, with words; **Pause All** on the toolbar while on battery.
+  - **The machine window**: a View menu (Window, Full Screen, Apps, Picture in Picture, Actual Size), an Info menu (CPU,
+    memory, disk, the sandbox) and Start in Full Screen. Picture in Picture is a small floating view that takes no input
+    for the guest, never for a protected machine.
+  - **What this computer can run**, for amd64 and arm64, from what the computer reports, with its temperature, fan and a
+    Raspberry Pi's power supply while machines run; in the Machine menu and on the first-run page.
+  - **Configure**: a search over the sections and a dot on each section with an unsaved change; Startup and shutdown has
+    Start with the session and Pause while I'm away (after 10 minutes without input; resumed on the next).
+  - **The rest of the system**: Search finds machines; Files shows a machine's folder as one item that opens it; Backups
+    leave out a running machine's disks and saved session (they wouldn't be a consistent copy); Cleaner never offers a
+    machine's files; Monitor's machine row has Show Machine; a notice with Pause All when the computer leaves the charger
+    while machines run; Store → Updates warns before a QEMU update while machines are suspended.
+  - Fixed on the way: the Whonix group's Start Fresh dialog counted its snapshots as none.
 - **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the
@@ -481,8 +537,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   the helper couldn't open it either; and it had no clipboard on a LordOS desktop. Now the rule gives the port to the
   `video` group too (every LordOS desktop user is in it), the `lordos` package recommends `qemu-guest-agent`, migration
   012 applies the rule and starts the helper right after the update (only inside a Machines guest whose agent is on), and
-  `lordos-guest` 8 takes the clipboard's text from the guest's own lord-server (`lordos-guestwin.sock` says `clipboard`;
-  only the program that holds the agent port gets it, never a secret). A 0.8.9 guest gets it by updating LordOS inside
+  `lordos-guest` 9 takes the clipboard's text from the guest's own lord-server (`lordos-guestwin.sock` says `clipboard`;
+  only the program that holds the agent port and passes it along gets it, never a secret; the helper is non-dumpable). A 0.8.9 guest gets it by updating LordOS inside
   the machine, or right away with the disc above.
 - **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
   hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and

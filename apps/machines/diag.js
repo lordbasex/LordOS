@@ -45,3 +45,35 @@ export function reportText(m, log, extra) {
   for (const p of log.problems) L.push(`Problem ${p.at}: ${p.text}`);
   return `${L.join('\n')}\n`;
 }
+
+// ---- the guest's journal and event logs, as Logs shows them (6.19) ----
+// A line of journalctl's short-iso ("2026-11-24T05:00:00-0300 host unit[pid]: words") or of a Windows guest's event logs
+// (lord-vm writes them the same way): its time in this computer's local time (HH:MM:SS), the guest's offset from UTC in
+// minutes (null when the line has none), the unit or source, and the rest. A line that isn't one comes back whole.
+const JLINE = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:[.,]\d+)?(Z|[+-]\d\d:?\d\d)\s+(.*)$/;
+const pad2 = (n) => String(n).padStart(2, '0');
+export function journalLine(l, tzOffsetMin = -new Date().getTimezoneOffset()) {
+  const m = String(l || '').match(JLINE);
+  if (!m) return { at: '', offset: null, unit: '', body: String(l || '') };
+  const off = m[7] === 'Z' ? 0 : (m[7][0] === '-' ? -1 : 1) * (Number(m[7].slice(1, 3)) * 60 + Number(m[7].slice(-2)));
+  const utc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) - off * 60000;
+  const local = new Date(utc + tzOffsetMin * 60000);
+  const at = `${pad2(local.getUTCHours())}:${pad2(local.getUTCMinutes())}:${pad2(local.getUTCSeconds())}`;
+  const rest = m[8];
+  const u = rest.match(/^\S+\s+([\w@.\-]+)(\[\d+\])?:/);
+  return { at, offset: off, unit: u ? u[1] : '', body: rest };
+}
+// "UTC+05:30", "UTC−03:00", "UTC" for an offset in minutes
+export function tzLabel(min) {
+  if (!Number.isFinite(min) || !min) return 'UTC';
+  const a = Math.abs(min);
+  return `UTC${min < 0 ? '−' : '+'}${pad2(Math.floor(a / 60))}:${pad2(a % 60)}`;
+}
+// the guest's offset when its last lines say one that isn't this computer's (the footer names it), else null
+export function guestZone(lines, tzOffsetMin = -new Date().getTimezoneOffset()) {
+  for (let i = lines.length - 1; i >= 0 && i >= lines.length - 50; i--) {
+    const j = journalLine(lines[i], tzOffsetMin);
+    if (j.offset != null) return j.offset === tzOffsetMin ? null : j.offset;
+  }
+  return null;
+}

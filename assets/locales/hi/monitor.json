@@ -684,5 +684,6 @@
   "stats.p95Row": "CPU 95वाँ प्रतिशतक (1 मिनट)",
   "stats.memAvgRow": "औसत मेमोरी (1 · 5 · 15 मिनट)",
   "stats.memPeakRow": "शिखर मेमोरी (1 · 5 · 15 मिनट)",
-  "stats.spark": "पिछला मिनट"
+  "stats.spark": "पिछला मिनट",
+  "group.showMachine": "मशीन दिखाएँ"
 }

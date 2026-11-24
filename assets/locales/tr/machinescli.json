@@ -105,5 +105,6 @@
   "freshDone": "{name} grubunun workstation'ı sıfırlandı: doğrulanmış kalıbı, yeni bir kimlik.",
   "freshDoneBoth": "{name} sıfırlandı: iki makine de yeni bir kimlikle doğrulanmış kalıbına döndü.",
   "freshNotGroup": "{name} bir makine grubu değil: Sıfırdan Başlat gruplar içindir.",
-  "badMember": "--member, gateway ya da workstation alır."
+  "badMember": "--member, gateway ya da workstation alır.",
+  "overBudget": "{name} başlamadı: {need} MB gerekiyor ve makineler için {free} MB kaldı. Başka bir makineyi askıya alın ya da kapatın veya ona daha az bellek verin."
 }

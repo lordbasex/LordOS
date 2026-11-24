@@ -699,5 +699,6 @@
   "stats.p95Row": "CPU 95-asis procentilis (1 min)",
   "stats.memAvgRow": "Atminties vidurkis (1 · 5 · 15 min)",
   "stats.memPeakRow": "Atminties didžiausia (1 · 5 · 15 min)",
-  "stats.spark": "Paskutinė minutė"
+  "stats.spark": "Paskutinė minutė",
+  "group.showMachine": "Rodyti mašiną"
 }

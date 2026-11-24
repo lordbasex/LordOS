@@ -105,5 +105,6 @@
   "freshDone": "Workstation ya {name} ni mpya: picha yake iliyothibitishwa, utambulisho mpya.",
   "freshDoneBoth": "{name} ni mpya: mashine zote mbili zimerudi kwenye picha yao iliyothibitishwa, zikiwa na utambulisho mpya.",
   "freshNotGroup": "{name} si kikundi cha mashine: Anza Upya ni kwa ajili ya vikundi.",
-  "badMember": "--member inakubali gateway au workstation."
+  "badMember": "--member inakubali gateway au workstation.",
+  "overBudget": "{name} haikuanza: inahitaji {need} MB na zimebaki {free} MB kwa mashine. Simamisha au zima mashine nyingine, au ipe kumbukumbu kidogo."
 }

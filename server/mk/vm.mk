@@ -35,9 +35,9 @@ build/lord-vm-testpaths: $(LORDVM_SRC) $(VM_HDR) build/gen/guesttools.h
 
 # lordos-guest: the clipboard helper Machines installs in a Linux guest of this computer's architecture (static: it
 # runs on whatever the guest has)
-build/lordos-guest: ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c ../tools/guest/x11clip.h ../tools/guest/perf.c ../tools/guest/perf.h ../tools/guest/dbusmin.c ../tools/guest/dbusmin.h src/vm/vmagent.c src/vm/vmagent.h
+build/lordos-guest: ../tools/guest/lordos-guest.c ../tools/guest/gshell.c ../tools/guest/gshell.h ../tools/guest/x11clip.c ../tools/guest/x11clip.h ../tools/guest/perf.c ../tools/guest/perf.h ../tools/guest/dbusmin.c ../tools/guest/dbusmin.h src/vm/vmagent.c src/vm/vmagent.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c ../tools/guest/x11clip.c ../tools/guest/perf.c ../tools/guest/dbusmin.c src/vm/vmagent.c
+	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -static -o $@ ../tools/guest/lordos-guest.c ../tools/guest/gshell.c ../tools/guest/x11clip.c ../tools/guest/perf.c ../tools/guest/dbusmin.c src/vm/vmagent.c
 
 # The "LordOS Guest Tools" disc (docs/VIRTUALIZATION.md 6.17): for a Linux machine without qemu-guest-agent, a read-only
 # ISO 9660 image with lordos-guest (stripped), install.sh, its checksum and a README, made here by our own small writer

@@ -369,5 +369,7 @@
   "settings.listsTitle": "Orodha za vifurushi",
   "settings.listsHint": "Orodha za vifurushi vya Debian na LordOS, ambako programu mpya na masasisho hutoka.",
   "settings.webManage": "Wasifu, ruhusa na nafasi ya kila programu ya wavuti",
-  "settings.flathubOff": "Zima Flathub kwenye Duka. Programu ulizosakinisha kutoka humo zinabaki."
+  "settings.flathubOff": "Zima Flathub kwenye Duka. Programu ulizosakinisha kutoka humo zinabaki.",
+  "updates.qemuTitle": "Mashine zilizosimamishwa huenda zisiendelee baada ya sasisho hili ({count})",
+  "updates.qemuText": "Sasisho hili hubadilisha QEMU, na kipindi kilichohifadhiwa na toleo moja la QEMU huenda kisipakiwe katika jingine. Zima mashine hizo kwanza, au chagua Endelea hata hivyo au Tupa hali iliyohifadhiwa zinapoanza."
 }

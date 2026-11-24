@@ -977,5 +977,6 @@
   "themeSwitch.changingTo": "Byter till {name}…",
   "themeSwitch.failedTitle": "{name} kunde inte tillämpas",
   "themeSwitch.refusedBody": "Dess kod stämmer inte med den signerade kopian av LordOS, så den lästes inte in. Din skrivbordsstil förblir som den var.",
-  "themeSwitch.failedBody": "Den startade inte. Din skrivbordsstil förblir som den var."
+  "themeSwitch.failedBody": "Den startade inte. Din skrivbordsstil förblir som den var.",
+  "spotlight.section.machines": "Maskiner"
 }

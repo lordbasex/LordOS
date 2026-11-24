@@ -105,5 +105,6 @@
   "freshDone": "{name} の Workstation を新しくしました：検証済みイメージと新しい ID です。",
   "freshDoneBoth": "{name} を新しくしました：両方のマシンが検証済みイメージに戻り、新しい ID が付きました。",
   "freshNotGroup": "{name} はマシングループではありません。新しく始める機能はグループ専用です。",
-  "badMember": "--member には gateway か workstation を指定します。"
+  "badMember": "--member には gateway か workstation を指定します。",
+  "overBudget": "{name} は起動しませんでした:{need} MB 必要ですが、マシンに使えるのは残り {free} MB です。別のマシンをサスペンドかシャットダウンするか、メモリを減らしてください。"
 }

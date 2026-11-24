@@ -17,6 +17,7 @@
 #include "crypt.h"
 #include "../fsops.h"
 #include "../sec/json.h"
+#include "../vm/machine.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -95,6 +96,24 @@ static int pathf(char *out, size_t n, const char *fmt, ...) {
 }
 
 static double now_s(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (double)t.tv_sec + t.tv_nsec / 1e9; }
+
+/* a running machine's disks and saved session aren't copied: QEMU writes them while it runs, so the copy wouldn't be
+ * consistent (docs/VIRTUALIZATION.md 6.14). A machine that is off is copied as any folder. */
+static int lordvm_pid_alive(long pid) {
+    char p[64], comm[32] = "";
+    snprintf(p, sizeof p, "/proc/%ld/comm", pid);
+    int fd = pid > 0 ? open(p, O_RDONLY | O_CLOEXEC) : -1;
+    ssize_t k = fd >= 0 ? read(fd, comm, sizeof comm - 1) : -1;
+    if (fd >= 0) close(fd);
+    return k > 0 && !strncmp(comm, "lord-vm", 7);
+}
+static int hold_running_machine(BkRun *r, const char *rel) {
+    size_t n = vm_backup_hold(rel);
+    if (!n) return 0;
+    char dir[PATH_MAX];
+    if ((size_t)snprintf(dir, sizeof dir, "%s/%.*s", r->home, (int)n, rel) >= sizeof dir) return 0;
+    return vm_dir_active(dir, lordvm_pid_alive);
+}
 
 static void emit(void) { if (efd >= 0) { uint64_t one = 1; if (write(efd, &one, sizeof one) < 0) { /* full: a notification is already pending */ } } }
 
@@ -319,6 +338,7 @@ static void do_snapshot(void) {
     run.cancel = &cancel_flag;
     run.key = dest_enc && have_key ? key : NULL;
     run.checkpoint = checkpoint;
+    run.hold = hold_running_machine;
     run.progress = progress;
     state = S_RUNNING;
     cancel_flag = 0;

@@ -369,5 +369,7 @@
   "settings.listsTitle": "Paket listeleri",
   "settings.listsHint": "Yeni uygulamaların ve güncellemelerin geldiği Debian ve LordOS paket listeleri.",
   "settings.webManage": "Her web uygulamasının profilleri, izinleri ve kapladığı alan",
-  "settings.flathubOff": "Mağaza’da Flathub’ı kapat. Ondan yüklediğiniz uygulamalar kalır."
+  "settings.flathubOff": "Mağaza’da Flathub’ı kapat. Ondan yüklediğiniz uygulamalar kalır.",
+  "updates.qemuTitle": "Askıya alınmış makineler bu güncellemeden sonra devam etmeyebilir ({count})",
+  "updates.qemuText": "Bu güncelleme QEMU'yu değiştiriyor ve bir QEMU sürümünün kaydettiği oturum başka bir sürümde yüklenmeyebilir. Önce o makineleri kapatın ya da başlarken Yine de devam et veya Kayıtlı durumu at seçeneğini seçin."
 }

@@ -78,7 +78,7 @@ t "the guest has no qemu-guest-agent: the agent is waiting" '! grep -q "agent: c
 # ---- the disc ----
 cmd "agent disc"
 t "the LordOS Guest Tools disc goes in, checked" 'wait_log "Guest Tools disc goes into the machine.s drive ([a-z0-9]*, checked)" 10 && wait_log "Guest Tools disc is in the machine.s drive" 10' "$(tail -3 "$D/log/lord-vm.log")"
-t "lord-vm reports it (VAC_TOOLS_DISC in the agent's caps)" 'wait_out "\"ev\":\"agent\",\"state\":1,\"caps\":13[0-9]\{4\}" 5' "$(grep '"ev":"agent"' "$W/dev.out" | tail -2)"
+t "lord-vm reports it (VAC_TOOLS_DISC in the agent's caps)" 'sleep 2; [ -n "$(grep "\"ev\":\"agent\"" "$W/dev.out" | tail -1 | sed -n "s/.*caps\":\([0-9]*\).*/\1/p" | awk "{ if (int(\$1 / 2097152) % 2) print }")" ]' "$(grep '"ev":"agent"' "$W/dev.out" | tail -2)"
 cmd "agent disc"
 t "asked again: answered, nothing changes" 'wait_out "\"text\":\"inserted\"" 5' "$(tail -2 "$W/dev.out")"
 
@@ -90,7 +90,7 @@ type_line "mount -r /dev/sr0 /mnt && ls /mnt && sh /mnt/install.sh 2>&1 | tail -
 t "qemu-guest-agent connects once install.sh ran" 'wait_log "agent: connected" 420' "$(tail -5 "$D/log/lord-vm.log")"
 shot 03-installed
 t "the disc comes out by itself" 'wait_log "Guest Tools disc came out of the drive" 30' "$(grep -a "Guest Tools\|cd:" "$D/log/lord-vm.log" | tail -4)"
-t "the caps no longer say the disc is in" '[ -z "$(grep "\"ev\":\"agent\"" "$W/dev.out" | tail -1 | sed -n "s/.*caps\":\([0-9]*\).*/\1/p" | awk "{ if (int(\$1 / 131072) % 2) print }")" ]' "$(grep '"ev":"agent"' "$W/dev.out" | tail -1)"
+t "the caps no longer say the disc is in" '[ -z "$(grep "\"ev\":\"agent\"" "$W/dev.out" | tail -1 | sed -n "s/.*caps\":\([0-9]*\).*/\1/p" | awk "{ if (int(\$1 / 2097152) % 2) print }")" ]' "$(grep '"ev":"agent"' "$W/dev.out" | tail -1)"
 
 # ---- Install through qemu-guest-agent (the path for guests that have it): lordos-guest again, by the fixed script ----
 cmd "agent install"

@@ -669,5 +669,6 @@
   "stats.p95Row": "CPU 95 백분위수 (1분)",
   "stats.memAvgRow": "메모리 평균 (1 · 5 · 15분)",
   "stats.memPeakRow": "메모리 최대 (1 · 5 · 15분)",
-  "stats.spark": "최근 1분"
+  "stats.spark": "최근 1분",
+  "group.showMachine": "머신 보기"
 }

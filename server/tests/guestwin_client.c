@@ -16,6 +16,7 @@
 #endif
 #include "../src/vm/vmagent.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -133,6 +134,12 @@ static int clip_test(const char *bin, const char *link) {
     static const char host_hello[] = "lord-vm 2 clipboard";
     pid_t g = spawn_guest(bin, link);
     CHECK(pump(10000, clip_hello), "lordos-guest says hello with \"clipboard\" through lord-server (its clipboard, no tool)");
+    /* the helper is non-dumpable: another program of the same person can't open its descriptors (nor attach to it) */
+    char pfd[64];
+    snprintf(pfd, sizeof pfd, "/proc/%d/fd", (int)g);
+    DIR *pd = opendir(pfd);
+    CHECK(!pd && errno == EACCES, "lordos-guest is non-dumpable: its /proc fd folder is closed to its own user (%s)", pd ? "open" : strerror(errno));
+    if (pd) closedir(pd);
     send_frame(AGK_HELLO, (const uint8_t *)host_hello, sizeof host_hello - 1);
     pump(1500, NULL);           /* what lord-server had first comes through: not checked */
     static const char text[] = "from the host: añadido \xe2\x9c\x93 42";
@@ -206,10 +213,25 @@ int main(int argc, char **argv) {
         static const char me[] = "someone 1 clipboard";
         clip_in = 0;
         send_frame(AGK_HELLO, (const uint8_t *)me, sizeof me - 1);
+        /* and with another character device passed as if it were the port (SCM_RIGHTS): refused too */
+        {
+            uint8_t h[AG_HEAD];
+            ag_frame_head(h, AGK_HELLO, 0, (uint32_t)(sizeof me - 1));
+            struct iovec io[2] = { { h, AG_HEAD }, { (void *)me, sizeof me - 1 } };
+            int nul = open("/dev/null", O_RDWR | O_CLOEXEC);
+            union { struct cmsghdr c; char b[CMSG_SPACE(sizeof(int))]; } u;
+            memset(&u, 0, sizeof u);
+            struct msghdr m = { .msg_iov = io, .msg_iovlen = 2, .msg_control = u.b, .msg_controllen = sizeof u.b };
+            struct cmsghdr *c = CMSG_FIRSTHDR(&m);
+            c->cmsg_level = SOL_SOCKET; c->cmsg_type = SCM_RIGHTS; c->cmsg_len = CMSG_LEN(sizeof(int));
+            memcpy(CMSG_DATA(c), &nul, sizeof nul);
+            if (sendmsg(fd, &m, 0) < 0) perror("sendmsg");
+            close(nul);
+        }
         static const char t2[] = "not for you";
         send_frame(AGK_CLIP, (const uint8_t *)t2, sizeof t2 - 1);
         pump(1500, NULL);
-        CHECK(!clip_in, "a peer that doesn't hold the agent port gets no clipboard");
+        CHECK(!clip_in, "a peer that doesn't hold the agent port gets no clipboard (none passed, or /dev/null passed as the port)");
     }
     printf("guestwin-client: %d icons seen, %d failed\n", icons, fails);
     return fails ? 1 : 0;

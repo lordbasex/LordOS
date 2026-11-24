@@ -17,6 +17,12 @@
  *   rel DX DY           relative motion while captured (VD_REL, as lord-server's pointer lock sends it)
  *   status | pause | resume | reset | shutdown [S] | poweroff | qmp JSON | qmpf FILE (a longer command, from a file)
  *   noack 0|1           stop acknowledging frames (tests the 250 ms fallback)
+ *   shell C R           the agent's shell (VM_SHELL, 6.18): the guest's tools start the signed-in person's shell, C x R;
+ *                       what it writes comes as "shell" events (text with control bytes as \u escapes), its end as
+ *                       "shell-end"                                     shell-type TEXT  typed into it ("\n" = Enter)
+ *   shell-size C R | shell-close
+ *   console             the serial console's stream (VM_CONSOLE) in its place: shell-type types into it too
+ *   (events) "note": a link or a notification from the guest (VM_GUEST_NOTE, 6.12), as lord-vm passed it on
  *   agent install       the guest agent's Install (VAG_INSTALL: lordos-guest, or the LordOS guest tools on Windows)
  *   agent disc | agent disc-out   the LordOS Guest Tools disc in or out of the CD drive (VAG_DISC; a guest without
  *                       qemu-guest-agent): lord-vm takes it out by itself when the agent answers
@@ -142,6 +148,40 @@ static const char *const STATES[] = { "stopped", "starting", "running", "paused"
 static void ask(uint16_t type, int a, const char *text) {
     VmMsg m = vm_msg(type, ++seq, a, 0, 0, 0, text);
     if (vm_send(vm, &m, -1)) out("{\"ev\":\"error\",\"what\":\"can't reach lord-vm\"}");
+}
+
+/* the agent's shell's stream (VM_SHELL_FD), and text from the guest as a JSON string's insides */
+static int shfd = -1;
+static void jtext(const uint8_t *p, size_t n, char *o, size_t cap) {
+    size_t k = 0;
+    for (size_t i = 0; i < n && k + 8 < cap; i++) {
+        uint8_t c = p[i];
+        if (c == '"' || c == '\\') { o[k++] = '\\'; o[k++] = (char)c; }
+        else if (c < 0x20 || c == 0x7f) k += (size_t)snprintf(o + k, cap - k, "\\u%04x", c);
+        else o[k++] = (char)c;
+    }
+    o[k] = 0;
+}
+static void shell_read(void) {
+    uint8_t b[4096];
+    ssize_t r = read(shfd, b, sizeof b);
+    if (r <= 0) { if (r < 0 && (errno == EAGAIN || errno == EINTR)) return; close(shfd); shfd = -1; out("{\"ev\":\"shell-end\"}"); return; }
+    static char t[4096 * 6 + 16];
+    jtext(b, (size_t)r, t, sizeof t);
+    out("{\"ev\":\"shell\",\"text\":\"%s\"}", t);
+}
+static void guest_note_ev(const VmMsg *m, int fd) {
+    uint8_t b[VM_GUEST_NOTE_MAX];
+    static char t[VM_GUEST_NOTE_MAX * 6 + 16];
+    if (m->a <= 0 || m->a > (int)sizeof b || pread(fd, b, (size_t)m->a, 0) != m->a) return;
+    if (m->b == AGK_LINK) { jtext(b, (size_t)m->a, t, sizeof t); out("{\"ev\":\"note\",\"kind\":\"link\",\"text\":\"%s\"}", t); return; }
+    const uint8_t *ti, *bo;
+    uint16_t tn, bn;
+    if (ag_note_parse(b, (size_t)m->a, &ti, &tn, &bo, &bn)) { out("{\"ev\":\"note\",\"kind\":\"malformed\"}"); return; }
+    static char t2[AG_NOTE_BODY_MAX * 6 + 16];
+    jtext(ti, tn, t, sizeof t);
+    jtext(bo, bn, t2, sizeof t2);
+    out("{\"ev\":\"note\",\"kind\":\"notify\",\"title\":\"%s\",\"body\":\"%s\"}", t, t2);
 }
 
 static void spawn_vmdisplay(int dbus_fd) {
@@ -348,6 +388,9 @@ static void from_vm(void) {
         else if (m.type == VM_WINDATA) windata(&m, fd);
         else if (m.type == VM_CLIP_DATA) clip_got(&m, fd);
         else if (m.type == VM_CLIP_REQ) clip_req(&m);
+        else if (m.type == VM_CONSOLE_FD && fd >= 0) { if (shfd >= 0) close(shfd); shfd = fd; fd = -1; fcntl(shfd, F_SETFL, O_NONBLOCK); out("{\"ev\":\"console-open\"}"); }
+        else if (m.type == VM_SHELL_FD && fd >= 0) { if (shfd >= 0) close(shfd); shfd = fd; fd = -1; fcntl(shfd, F_SETFL, O_NONBLOCK); out("{\"ev\":\"shell-open\"}"); }
+        else if (m.type == VM_GUEST_NOTE && fd >= 0) guest_note_ev(&m, fd);
         else if (m.type == VM_REPLY) out("{\"ev\":\"reply\",\"seq\":%u,\"code\":%d,\"text\":\"%s\"}", m.seq, m.a, m.text);
         else if (m.type == VM_DISPLAY_FD) {
             if (fd < 0) { out("{\"ev\":\"error\",\"what\":\"VM_DISPLAY_FD without a descriptor\"}"); continue; }
@@ -776,6 +819,20 @@ static int handle(char *line) {
         if (fd >= 0) close(fd);
     } else if (!strncmp(line, "qmp ", 4)) { snprintf(a1, sizeof a1, "%s", line + 4); ask(VM_QMP, 0, a1); }
     else if (!strcmp(line, "agent install")) ask(VM_AGENT, VAG_INSTALL, NULL);
+    else if (!strncmp(line, "shell ", 6) || !strncmp(line, "shell-size ", 11)) {
+        int c = 0, r = 0, size = line[5] == '-';
+        if (sscanf(line + (size ? 11 : 6), "%d %d", &c, &r) == 2) { VmMsg m = vm_msg(VM_SHELL, ++seq, size ? VSH_SIZE : VSH_OPEN, c, r, 0, NULL); vm_send(vm, &m, -1); }
+    } else if (!strcmp(line, "console")) ask(VM_CONSOLE, 0, NULL);
+    else if (!strcmp(line, "shell-close")) { VmMsg m = vm_msg(VM_SHELL, ++seq, VSH_CLOSE, 0, 0, 0, NULL); vm_send(vm, &m, -1); }
+    else if (!strncmp(line, "shell-type ", 11)) {
+        char t[2048];
+        size_t k = 0;
+        for (const char *q = line + 11; *q && k + 1 < sizeof t; q++) {
+            if (q[0] == '\\' && q[1] == 'n') { t[k++] = '\n'; q++; }
+            else t[k++] = *q;
+        }
+        if (shfd < 0 || write(shfd, t, k) != (ssize_t)k) out("{\"ok\":false,\"cmd\":\"shell-type\"}");
+    }
     else if (!strcmp(line, "apps on") || !strcmp(line, "apps off")) ask(VM_APPS, !strcmp(line, "apps on"), NULL);
     else if (!strcmp(line, "windows")) print_windows();
     else if (!strcmp(line, "apps-list")) {
@@ -890,11 +947,12 @@ int main(int argc, char **argv) {
         if (vm < 0 && vd < 0) break;
         short aev = 0;
         int afd = spk ? maudio_pollfd(spk, &aev) : -1;
-        struct pollfd p[4] = { { vm, POLLIN, 0 }, { vd, POLLIN, 0 }, { stdin_open ? 0 : -1, POLLIN, 0 }, { afd, aev, 0 } };
+        struct pollfd p[5] = { { vm, POLLIN, 0 }, { vd, POLLIN, 0 }, { stdin_open ? 0 : -1, POLLIN, 0 }, { afd, aev, 0 }, { shfd, POLLIN, 0 } };
         int to = kq_h != kq_t ? 12 : frames_target >= 0 ? 50 : 500;
         if (lat.left || lat.waiting_f || lat.waiting_p || fpsm.left) to = 1;
         if ((spk || mic) && to > 10) to = 10;
-        poll(p, 4, to);
+        poll(p, 5, to);
+        if (p[4].revents && shfd >= 0) shell_read();
         /* PipeWire not there when the stream opened, or gone: tried again every 2 s while the guest plays (js_vm.c) */
         static long long spk_retry_at;
         if (spk && guest_out && maudio_failed(spk) && now_ms() >= spk_retry_at) { spk_retry_at = now_ms() + 2000; maudio_retry(spk); }
