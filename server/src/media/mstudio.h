@@ -66,6 +66,8 @@ int  mstudio_is_hub(int src_id);
 
 /* once a second from the main loop (media_reap): starts, stops and drives the hub; finds the loopback's readers */
 void mstudio_tick(void);
+/* Never start the loopback's lord-studio in this session (a test's: main.c). */
+void mstudio_hub_off(void);
 /* ms until the next tick, -1 with nothing to do */
 double mstudio_timeout(void);
 /* the capture indicator's event for the readers of the loopback (hw.c: hw_emit, kind "studio-use") */

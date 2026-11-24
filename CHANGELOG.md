@@ -867,6 +867,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **A test's lord-server never drives LordOS Studio's camera for apps** (in development). A headless session started
+  by a test (`--timeout`, or the test hooks of `lord-server-test`) also started the loopback's lord-studio on the
+  computer's real `/dev/video50`, which the person's own session may be feeding to a video call; it now leaves the
+  loopback alone (`mstudio_hub_off`). `tests/theme_switch_headless.sh` waits for the log lines it checks instead of
+  fixed sleeps, and its Wayland client lasts as long as the session: both failed on a loaded computer.
 - **Escape that closes a menu no longer reaches the app or machine behind it** (in development; latest release
   0.8.9.5-beta). Closing a menu-bar, Dock or right-click menu with Escape also sent Escape to the window in front: a
   Linux app, or the guest of a machine in Machines (found while checking Machines' window menus). A shell menu now

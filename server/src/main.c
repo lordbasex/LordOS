@@ -18,6 +18,7 @@
  * Con una señal o --timeout los shells de la Terminal quedan vivos (term/hold.c) y se
  * recuperan en el próximo arranque; las dos primeras formas los cierran.
  */
+#include "media/mstudio.h"
 #include "apps.h"
 #include "admin.h"
 #include "lordlog.h"
@@ -3087,6 +3088,12 @@ int main(int argc, char **argv) {
     if (s.greeter && !s.headless) { usage(argv[0]); return 2; }
 #ifdef LORD_TEST_HOOKS
     if (test_hooks && (!s.headless || s.greeter)) { usage(argv[0]); return 2; }   /* never on a monitor or the login screen */
+#endif
+    /* a test's session (--timeout, the test hooks) never drives LordOS Studio's loopback: /dev/video50 is the whole
+     * computer's, and the person's own session may be feeding it to a video call */
+    if (timeout_ms > 0) mstudio_hub_off();
+#ifdef LORD_TEST_HOOKS
+    if (test_hooks) mstudio_hub_off();
 #endif
     js_sys_set_greeter(s.greeter);
     wl_set_greeter(s.greeter);          /* the login screen never lets an app take the shortcuts */

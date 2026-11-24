@@ -524,7 +524,11 @@ static void hub_scan(void) {
     use_send(json);
 }
 
+static int hub_off;
+void mstudio_hub_off(void) { hub_off = 1; }
+
 void mstudio_tick(void) {
+    if (hub_off) return;
     double t = now_s();
     if (t < hub.tick_at) return;
     hub.tick_at = t + 1.0;

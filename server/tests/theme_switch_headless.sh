@@ -55,6 +55,9 @@ run_server() {   # $1: the folder; $2: the theme bundle; $3: seconds; extra argu
 
 logs() { cat "$1/home/.cache/lordos/compositor.log" "$1/home/.cache/lordos/shell.log" "$1/server.log" 2>/dev/null; }
 count() { printf '%s\n' "$1" | grep -c -- "$2"; }
+# waits (up to $3 tenths of a second) until the logs of folder $1 hold $2 at least $4 times (default once): fixed sleeps
+# failed under load (a session slow to start had theme a's file removed before it read it)
+wait_log() { local n=0; while [ $n -lt "$3" ] && [ "$(count "$(logs "$1")" "$2")" -lt "${4:-1}" ]; do sleep 0.1; n=$((n + 1)); done; }
 
 # ---- 1. the new theme throws, the running one's file is gone: the running one comes back ----
 S=$D/one
@@ -63,10 +66,11 @@ chmod 700 "$D" "$S"
 theme_a "$S/themes/a/theme.bundle.js"
 echo "throw new Error('theme b does not load');" > "$S/themes/b/theme.bundle.js"
 run_server "$S" "$S/themes/a/theme.bundle.js" 12
-sleep 1.5
+wait_log "$S" "js: theme $S/themes/a/theme.bundle.js loaded" 80
 # theme a is gone from under the running session (a package update replaced it; here it can't be read at all)
 rm -f "$S/themes/a/theme.bundle.js"
-sleep 4
+wait_log "$S" "js: theme $S/themes/a/theme.bundle.js loaded" 100 2
+sleep 0.5
 L=$(logs "$S")
 if kill -0 $P 2>/dev/null; then echo "ok   lord-server is still running after the failed switch"
 else echo "FAIL lord-server is gone"; R=1; fi
@@ -95,12 +99,13 @@ manifest() {   # $1: version; written next to the old one and renamed over it
 }
 manifest 0.8.9.4
 run_server "$S" "$S/themes/a/theme.bundle.js" 12 --fonts "$S/assets/fonts"
-sleep 1.5
+wait_log "$S" "js: theme $S/themes/a/theme.bundle.js loaded" 80
 # the update: theme b's new bundle and the new manifest that lists it
 echo "globalThis.__lordTick = function () { return 50; }; /* 0.8.9.5 */ lord.setRoot(lord.createNode('view'));" > "$S/themes/b/theme.bundle.js.dpkg-new"
 mv "$S/themes/b/theme.bundle.js.dpkg-new" "$S/themes/b/theme.bundle.js"
 manifest 0.8.9.5
-sleep 4
+wait_log "$S" "THEME a asks for b:" 100
+sleep 0.5
 L=$(logs "$S")
 R2=0
 if kill -0 $P 2>/dev/null; then echo "ok   lord-server is still running after the update and the refused switch"
@@ -132,7 +137,9 @@ printf '{"schema": 9, "desktopChosen": true, "welcomeShown": true, "language": "
 run_server "$S" "$S/themes/default/theme.bundle.js" 60
 i=0
 while [ $i -lt 40 ] && [ ! -S "$S/wayland-0" ]; do sleep 0.25; i=$((i + 1)); done
-XDG_RUNTIME_DIR="$S" WAYLAND_DISPLAY=wayland-0 ./build/wlperf-client frames 45 >"$S/client.log" 2>&1 &
+# as long as the session (60 s): the round takes over 45 s on a loaded machine, and a client that ended on its own
+# (exit 0) is not one the switches dropped
+XDG_RUNTIME_DIR="$S" WAYLAND_DISPLAY=wayland-0 ./build/wlperf-client frames 58 >"$S/client.log" 2>&1 &
 C=$!
 i=0
 while [ $i -lt 120 ] && ! grep -q "SCENE 4 " "$S/home/.cache/lordos/shell.log" 2>/dev/null; do sleep 0.5; i=$((i + 1)); done
