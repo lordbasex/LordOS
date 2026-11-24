@@ -38,10 +38,11 @@ _machines() {
                 --gpu) COMPREPLY=($(compgen -W $'none\nintel-whole\nintel-shared' -- "$cur")) ;;
                 --display) COMPREPLY=($(compgen -W $'window\nnone' -- "$cur")) ;;
                 --pointer) COMPREPLY=($(compgen -W $'lordos\nguest' -- "$cur")) ;;
+                --cpu-pin) COMPREPLY=($(compgen -W $'off\nauto\ndefault' -- "$cur")) ;;
                 --iso) COMPREPLY=($(compgen -f -- "$cur")) ;;
-                --clipboard-ask|--boot-menu|--sound|--microphone|--agent|--transfer) COMPREPLY=($(compgen -W $'on\noff' -- "$cur")) ;;
+                --clipboard-ask|--boot-menu|--sound|--microphone|--agent|--transfer|--perf-profile|--capture-fullscreen) COMPREPLY=($(compgen -W $'on\noff' -- "$cur")) ;;
                 --memory|--cpus|--disk|--name|--bridge|--port|--share|--volume|--boot-order|--resolution|--sound-out|--sound-in|--nic-model|--devices|--ports|--shares) ;;
-                *) COMPREPLY=($(compgen -W $'--memory\n--cpus\n--disk\n--name\n--network\n--bridge\n--clipboard\n--clipboard-ask\n--graphics\n--gpu\n--iso\n--display\n--port\n--ports\n--share\n--shares\n--sound\n--volume\n--microphone\n--sound-out\n--sound-in\n--agent\n--transfer\n--boot-order\n--boot-menu\n--resolution\n--pointer\n--devices\n--nic-model' -- "$cur")) ;;
+                *) COMPREPLY=($(compgen -W $'--memory\n--cpus\n--disk\n--name\n--network\n--bridge\n--clipboard\n--clipboard-ask\n--graphics\n--gpu\n--iso\n--display\n--port\n--ports\n--share\n--shares\n--sound\n--volume\n--microphone\n--sound-out\n--sound-in\n--agent\n--transfer\n--boot-order\n--boot-menu\n--resolution\n--pointer\n--devices\n--nic-model\n--cpu-pin\n--perf-profile\n--capture-fullscreen' -- "$cur")) ;;
             esac
             ;;
     esac

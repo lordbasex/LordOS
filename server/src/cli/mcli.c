@@ -57,7 +57,7 @@ int mcli_resolve(const char *const *names, int n, const char *q, int *out, int m
 static const char *const PASS[] = {
     "name", "display", "bridge", "port", "ports", "share", "shares", "iso", "agent", "clipboard", "clipboard-ask",
     "graphics", "gpu", "boot-order", "boot-menu", "sound", "volume", "microphone", "sound-out", "sound-in", "pointer",
-    "transfer", "devices", "resolution", "nic-model", NULL,
+    "transfer", "devices", "resolution", "nic-model", "cpu-pin", "perf-profile", "capture-fullscreen", NULL,
 };
 
 static char *keep(McliStore *st, const char *fmt, long long v) {

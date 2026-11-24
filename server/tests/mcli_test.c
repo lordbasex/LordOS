@@ -67,6 +67,11 @@ static void test_set(void) {
     CHECK(!mcli_set_args(7, a2, out, 64, &st, &bo, &bv));
     const char *w2[] = { "--port", "tcp:2222:22", "--port", "udp:5000:5000:lan", "--share", "rw:Docs:/home/a/Docs", "--name", "New name", NULL };
     CHECK(argv_is(out, w2));
+    /* the performance options of 3.7.1, 7.1.4 and 6.25 pass to lord-vm, which checks their values */
+    char *a2b[] = { "--cpu-pin", "auto", "--perf-profile=on", "--capture-fullscreen", "off" };
+    CHECK(!mcli_set_args(5, a2b, out, 64, &st, &bo, &bv));
+    const char *w2b[] = { "--cpu-pin", "auto", "--perf-profile", "on", "--capture-fullscreen", "off", NULL };
+    CHECK(argv_is(out, w2b));
     char *a3[] = { "--memory", "lots" };
     CHECK(mcli_set_args(2, a3, out, 64, &st, &bo, &bv) && !strcmp(bo, "--memory") && bv && !strcmp(bv, "lots"));
     char *a4[] = { "--disk", "1500M" };                                      /* not whole GB */
