@@ -973,7 +973,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 typedef struct { int fd, control; } Client;
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
-       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ };
+       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ, P_XNIC };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 /* a file dropped on the machine's window, for the guest (VM_FILE) */
@@ -1157,6 +1157,7 @@ static struct {
      * way to start a program), the passt it started last (followed by pidfd: not our child), QEMU's backend number
      * (pst<gen> on hub port hp<gen>), when the network went and when to try again, restarts in the last minute */
     int keeper_fd, passt_pidfd, net_gen, net_busy, net_restarts, net_gave_up;
+    int xnic_err[VM_EXTRA_NICS];        /* an extra card's passt's stderr (xnic_attach), held open, never read */
     /* a machine group's internal link (VM_LINK): the last backend's number (lk<gen>), and whether it's on the hub */
     int link_gen, link_up;
     pid_t keeper, passt_ext;
@@ -1641,12 +1642,28 @@ static void place_fds(const int *want, int n) {
  *  - Both: the forwarded ports (-t, -u with the address to listen on: 127.0.0.1, or 0.0.0.0 for "lan" in Shared).
  *    passt binds them in the machine's scope, so LordOS's firewall decides them as the incoming connections of
  *    Machines (FIREWALL.md, "Machines"). */
+/* An imported machine's other cards (6.22, extra_nics) in Shared and Host-only: each its own passt, started by the keeper
+ * once the machine runs (xnic_attach), in the same mode as the first card but on a network of its own, 10.0.<3+i>.0/24
+ * (the guest at .15, passt's gateway at .2), IPv4, with no forwarded port (they stay the first card's). -1: the first card */
+static int passt_extra = -1;
 static int vm_passt_argv(const VmMachine *m, char **argv, int max) {
-    static char tv[VM_PORTS][48], uv[VM_PORTS][48];
-    int n = 0, nt = vm_passt_ports(m, VM_PROTO_TCP, tv, VM_PORTS), nu = vm_passt_ports(m, VM_PROTO_UDP, uv, VM_PORTS);
+    static char tv[VM_PORTS][48], uv[VM_PORTS][48], xa[20], xg[20];
+    int xi = passt_extra >= 0 && passt_extra < VM_EXTRA_NICS ? passt_extra : -1;
+    int n = 0, nt = xi >= 0 ? 0 : vm_passt_ports(m, VM_PROTO_TCP, tv, VM_PORTS), nu = xi >= 0 ? 0 : vm_passt_ports(m, VM_PROTO_UDP, uv, VM_PORTS);
     if (max < 20 + 2 * (nt + nu)) return -1;
     argv[n++] = PASST; argv[n++] = "-f"; argv[n++] = "-q"; argv[n++] = "-1"; argv[n++] = "--fd"; argv[n++] = "3";
-    if (m->network == VM_NET_HOSTONLY) {
+    if (xi >= 0) {
+        snprintf(xa, sizeof xa, "10.0.%d.15", 3 + xi);
+        snprintf(xg, sizeof xg, "10.0.%d.2", 3 + xi);
+    }
+    if (xi >= 0 && m->network == VM_NET_HOSTONLY) {
+        argv[n++] = "-4"; argv[n++] = "-o"; argv[n++] = "127.0.0.1";
+        argv[n++] = "-a"; argv[n++] = xa; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = xg;
+        argv[n++] = "--no-dhcp-dns"; argv[n++] = "--no-dhcp-search";
+    } else if (xi >= 0) {
+        argv[n++] = "-4"; argv[n++] = "-a"; argv[n++] = xa; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = xg;
+        argv[n++] = "--no-map-gw"; argv[n++] = "--dns-forward"; argv[n++] = VM_DNS_ADDR;
+    } else if (m->network == VM_NET_HOSTONLY) {
         argv[n++] = "-4"; argv[n++] = "-o"; argv[n++] = "127.0.0.1";
         argv[n++] = "-a"; argv[n++] = VM_HOSTONLY_ADDR; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = VM_HOSTONLY_GW;
         argv[n++] = "--no-dhcp-dns"; argv[n++] = "--no-dhcp-search";
@@ -1931,6 +1948,9 @@ static void keeper_main(int sock) {
         ssize_t r = read(sock, &c, 1);
         if (r == 0 || (r < 0 && errno != EINTR)) _exit(0);
         if (r < 0) continue;
+        /* 'p' the first card's passt; '1'..'7' an imported machine's other card's (passt_extra); nothing else */
+        if (c != 'p' && !(c >= '1' && c < '1' + VM_EXTRA_NICS)) continue;
+        passt_extra = c == 'p' ? -1 : c - '1';
         int net[2] = { -1, -1 }, perr[2] = { -1, -1 }, fds[3] = { -1, -1, -1 };
         int32_t pid = -1;
         if (!socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, net) && !pipe2(perr, O_CLOEXEC)) {
@@ -2081,6 +2101,7 @@ static int mem_backing(const VmMachine *m) {
 /* the hub of a group's internal link: the workstation's only card is on hub 0, a gateway's second card on hub 1 (hub 0
  * is its passt card's) */
 #define LINK_HUB(m) ((m)->network == VM_NET_LINK ? 0 : 1)
+#define XNIC_HUB 10                     /* an imported machine's other cards' hubs: 10 .. 10 + VM_EXTRA_NICS - 1 */
 #define MAXARGS 192
 static char *qargv[MAXARGS];
 static int qargc;
@@ -2676,8 +2697,15 @@ static void build_qemu_args(void) {
         arg("-netdev"); argf("hubport,id=lnk0,hubid=%d", LINK_HUB(m));
         arg("-device"); argf("virtio-net-pci,id=link0,netdev=lnk0,mac=%s,addr=0x%x", m->link_mac, VM_LINK_SLOT_GATEWAY);
     }
-    /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces; not connected */
-    for (int i = 0; i < m->n_extra_macs; i++) { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
+    /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces. In Shared and
+     * Host-only each sits on a hub of its own (XNIC_HUB + i), where its own passt goes once the machine runs
+     * (xnic_attach); in Bridged and Isolated it has no backend: its cable is out */
+    for (int i = 0; i < m->n_extra_macs; i++) {
+        if (m->network == VM_NET_SHARED || m->network == VM_NET_HOSTONLY) {
+            arg("-netdev"); argf("hubport,id=xnic%d,hubid=%d", i + 1, XNIC_HUB + i);
+            arg("-device"); argf("%s,id=nic%d,netdev=xnic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, i + 1, m->extra_macs[i], 0x18 + i);
+        } else { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
+    }
     arg("-device"); arg("virtio-rng-pci,addr=0x3");
     /* amd64 with -nodefaults needs a display device or its kernel never starts (3.3); arm64's virt has no keyboard */
     /* 3D (decide_graphics): the same slot with virgl, and the D-Bus display shares its pictures as dmabufs (gl=on) made on
@@ -3613,23 +3641,59 @@ static void net_lost(int sig, int code) {
     S.net_retry_at = now + (S.net_restarts == 0 ? 0 : 1000LL << (S.net_restarts - 1));
 }
 
-static void net_restart(void) {
-    S.net_retry_at = 0;
-    if (S.qemu_done || !S.qmp_up || S.keeper_fd < 0) return;
-    char c = 'p';
-    if (write(S.keeper_fd, &c, 1) != 1) { vlog("network: passt's keeper is gone"); close(S.keeper_fd); S.keeper_fd = -1; net_lost(0, 0); return; }
+/* one passt from the keeper: its pid and { socket, stderr, pidfd }; -1 none started, -2 the keeper is gone */
+static int32_t keeper_ask(char c, int fds[3]) {
+    if (write(S.keeper_fd, &c, 1) != 1) return -2;
     struct pollfd pf = { S.keeper_fd, POLLIN, 0 };
     int32_t pid = -1;
-    int fds[3] = { -1, -1, -1 };
     if (poll(&pf, 1, 3000) == 1) {
-        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof fds)]; } cm;
+        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int) * 3)]; } cm;
         struct iovec io = { &pid, sizeof pid };
         struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
         ssize_t n = recvmsg(S.keeper_fd, &mh, MSG_CMSG_CLOEXEC);
         struct cmsghdr *ch = n == sizeof pid ? CMSG_FIRSTHDR(&mh) : NULL;
-        if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof fds)) memcpy(fds, CMSG_DATA(ch), sizeof fds);
+        if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof(int) * 3)) memcpy(fds, CMSG_DATA(ch), sizeof(int) * 3);
         else pid = -1;
     }
+    return pid;
+}
+
+/* An imported machine's other cards (6.22) in Shared and Host-only: each gets its own passt from the keeper, on the hub
+ * its card is on (XNIC_HUB + i), once, as the machine starts. Not healed: a passt of an extra card that ends leaves that
+ * card without network until the machine starts again. */
+static void xnic_attach(void) {
+    if (S.keeper_fd < 0 || !S.qmp_up || S.qemu_done) return;
+    for (int i = 0; i < S.m.n_extra_macs && i < VM_EXTRA_NICS; i++) {
+        int fds[3] = { -1, -1, -1 };
+        int32_t pid = keeper_ask((char)('1' + i), fds);
+        if (pid == -2) { vlog("network: passt's keeper is gone: the other cards stay without network"); return; }
+        if (pid <= 0 || fds[0] < 0) {
+            for (int k = 0; k < 3; k++) if (fds[k] >= 0) close(fds[k]);
+            vlog("network: card %d (%s): no passt could be started: its cable is out", i + 2, S.m.extra_macs[i]);
+            continue;
+        }
+        if (S.xnic_err[i] >= 0) close(S.xnic_err[i]);
+        S.xnic_err[i] = fds[1];                 /* kept open (a closed pipe would end passt at its first word); -q */
+        if (fds[2] >= 0) close(fds[2]);         /* it dies with the keeper, which dies with lord-vm or the machine's end */
+        char a[160];
+        snprintf(a, sizeof a, "{\"fdname\":\"xpst%d\"}", i + 1);
+        int bad = qmp_do("getfd", a, P_XNIC, -1, 0, fds[0], -1);
+        close(fds[0]);
+        snprintf(a, sizeof a, "{\"type\":\"socket\",\"id\":\"xpst%d\",\"fd\":\"xpst%d\"}", i + 1, i + 1);
+        bad |= qmp_do("netdev_add", a, P_XNIC, -1, 0, -1, -1);
+        snprintf(a, sizeof a, "{\"type\":\"hubport\",\"id\":\"xhp%d\",\"hubid\":%d,\"netdev\":\"xpst%d\"}", i + 1, XNIC_HUB + i, i + 1);
+        bad |= qmp_do("netdev_add", a, P_XNIC, -1, 0, -1, -1);
+        if (bad) { kill(pid, SIGKILL); vlog("network: card %d (%s): QEMU couldn't be asked to connect it", i + 2, S.m.extra_macs[i]); continue; }
+        vlog("network: card %d (%s, %s) connected: passt %d, 10.0.%d.15/24", i + 2, S.m.extra_macs[i], VM_NIC_MODELS[S.m.extra_models[i]], (int)pid, 3 + i);
+    }
+}
+
+static void net_restart(void) {
+    S.net_retry_at = 0;
+    if (S.qemu_done || !S.qmp_up || S.keeper_fd < 0) return;
+    int fds[3] = { -1, -1, -1 };
+    int32_t pid = keeper_ask('p', fds);
+    if (pid == -2) { vlog("network: passt's keeper is gone"); close(S.keeper_fd); S.keeper_fd = -1; net_lost(0, 0); return; }
     S.net_restarts++;
     if (pid <= 0 || fds[0] < 0) {
         for (int i = 0; i < 3; i++) if (fds[i] >= 0) close(fds[i]);
@@ -7150,6 +7214,7 @@ static void on_qmp_reply(const JVal *root, int ok) {
         break;
     case P_NET_ADD: if (!ok && !S.net_err[0]) snprintf(S.net_err, sizeof S.net_err, "%s", desc); break;
     case P_NET_LAST: net_attached(ok, desc); break;
+    case P_XNIC: if (!ok) vlog("network: an extra card's passt wasn't taken: %s", desc); break;
     case P_SNAPSIZE: if (S.snap_kind == VSN_TAKE) snap_taken(root); break;
     case P_RESUME: if (!ok && !S.resume_err[0]) { snprintf(S.resume_err, sizeof S.resume_err, "%s", desc); kill(S.qemu, SIGKILL); S.killed = 1; } break;
     case P_MIGQ: {
@@ -7645,6 +7710,7 @@ static void loop(void) {
     }
     if (S.keeper_fd >= 0) { close(S.keeper_fd); S.keeper_fd = -1; }
     if (S.keeper > 0) { waitpid(S.keeper, NULL, 0); S.keeper = 0; }
+    for (int i = 0; i < VM_EXTRA_NICS; i++) if (S.xnic_err[i] >= 0) { close(S.xnic_err[i]); S.xnic_err[i] = -1; }
     logind_close();
 }
 
@@ -7875,6 +7941,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0, pidfd_to = -1;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = S.rx_fd = S.rx_hpipe = -1;
+    for (int i = 0; i < VM_EXTRA_NICS; i++) S.xnic_err[i] = -1;
     S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = -1;
     for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
@@ -8125,6 +8192,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         if (S.m.network == VM_NET_SHARED || S.m.network == VM_NET_HOSTONLY) {
             S.keeper = start_keeper(&S.keeper_fd);
             if (S.keeper < 0) { S.keeper = 0; vlog("network: no keeper: a passt that ends isn't replaced"); }
+            else if (S.m.n_extra_macs) xnic_attach();
         }
         logind_open();
         cpu_begin();
