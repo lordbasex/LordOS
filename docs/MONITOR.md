@@ -805,6 +805,65 @@ machine: the tab and the Overview open with no errors, and `lord.monitor.gpu()` 
 on screen. Not yet seen: a screenshot (the headless session's `remote.sock` takes only root), Intel, NVIDIA, a
 Raspberry Pi, a VM with virtio-gpu, lord-tts actually running on the GPU.
 
+### NVIDIA (in development)
+
+NVIDIA's proprietary driver has no fdinfo usage stats, no hwmon and no `gpu_busy_percent`, so the cards above show
+almost nothing for it. Its numbers come from NVIDIA's NVML, through a sandboxed helper (approved by the maintainer
+on 2026-11-24; AGENTS.md, `lord-nvgpu`). `lord-server` never links or loads NVML and never runs `nvidia-smi`.
+
+- **When.** `monitor/nvgpu.c` starts `lord-nvgpu` (installed next to `lord-server`) only while
+  `lord.monitor.wantGpu(true)` is in force (the GPU tab or the Overview on screen) and a PCI device of vendor `0x10de`
+  is bound to the `nvidia` driver (checked at most every 30 s). At most one helper; it is killed when the view goes
+  away (`wantGpu(false)`), when the Monitor's thread goes idle, and when lord-server dies (`PR_SET_PDEATHSIG`).
+  A helper that exits, sends something malformed or doesn't answer within 5 s (15 s for the first sample, while
+  NVML initializes) is killed and started again after 2, 4, 8 … 60 s.
+- **The helper** (`monitor/nvgpu_main.c`): no arguments, an empty environment, fd 3 a `SOCK_SEQPACKET` socketpair,
+  fds 0–2 `/dev/null`, every other fd closed, `no_new_privs`. It `dlopen`s only `libnvidia-ml.so.1` from
+  `/usr/lib/x86_64-linux-gnu`, `/usr/lib/aarch64-linux-gnu`, `/usr/lib64` or `/usr/lib`, after checking that the
+  folder and each parent, and the real file behind the symlink (in one of those folders), belong to root and aren't
+  writable by group or others; `RTLD_NOW | RTLD_LOCAL`. Then `nvmlInit_v2`, the device handles and one warm-up sample,
+  and only then `sandbox_apply_helper` (scope `lordos-nvgpu`, 256 MB): no network or new sockets, no exec, threads
+  only, Landlock read-only on `/proc/driver/nvidia`, `/sys/bus/pci/devices`, `/sys/devices` and the library folders,
+  read/write/ioctl only on `/dev/nvidiactl` and `/dev/nvidia<N>`, and `ioctl` only of NVIDIA's type `'F'` (0x46,
+  `NV_IOCTL_MAGIC` in the open kernel modules' `nv-ioctl-numbers.h`; `SANDBOX_IOCTL_NVIDIA`). The sandbox goes on
+  after init because NVML's init opens the device nodes by path, may read driver files that can't be listed without
+  the hardware and asks `nvidia-persistenced`; no input reaches the helper before it (no arguments, no environment).
+- **The wire** (`monitor/nvproto.h`): lord-server sends one byte per sample, at most once a second; the helper
+  answers with one message of fixed-size records: a header (CUDA version as a number, the driver version as at most
+  31 digits and dots), one record per GPU (PCI address as numbers, utilization of SM, memory, encoder and decoder,
+  temperature, fan, power and its limit in mW, core and memory clocks, VRAM used and total, compute mode as a number,
+  ECC on/off) and one per process (GPU index, pid, memory, SM/encoder/decoder share from NVML's latest sample).
+  Numbers only.
+- **The checks** (`nvgpu_parse`): exact size for the counts, at most 64 GPUs and 256 processes; percentages 0–100,
+  temperature −50…150 °C, clocks ≤ 100 000 MHz, power ≤ 10 kW, sizes ≤ 1 PiB, compute mode 0–3, ECC 0/1, the PCI
+  address in range, the driver string NUL-terminated digits and dots; anything else becomes `null`. A process is kept
+  only if its GPU index exists, its pid is 1…4 194 304 and `/proc/<pid>` belongs to the session user, checked when
+  the sample arrives (at most 256 `stat`s per sample). Nothing is ever read from the helper on the JS thread:
+  `nvgpu_poll()` runs on the Monitor's thread with non-blocking `recv`/`send`, and `nvgpu_json()` copies the latest
+  checked sample.
+- **What JS gets.** `lord.monitor.gpu()` gains `nv: [{ bus, util: { sm, mem, enc, dec }, temp, fan, power,
+  powerLimit, clk: { core, mem }, vram: { used, total }, cuda, driver, computeMode, ecc, procs: [{ pid, mem, sm, enc,
+  dec }] }]` (power in watts, clocks in MHz, memory in bytes, temperature in °C, the rest percent; `null` when not
+  reported; `computeMode` one of `default`, `exclusiveThread`, `prohibited`, `exclusiveProcess`). Without an NVIDIA
+  card, a helper or a sample, `nv` is absent.
+- **Tested** (`build/nvgpu-test`, ASan and UBSan): hand-made messages (canned, out of range, bad sizes and headers,
+  the largest one); 120 000 mutated messages, every parsed one giving valid JSON within range; the helper end to end
+  with a fake NVML (`tests/nvgpu_fake_nvml.c`, test-only `build/lord-nvgpu-test --lib`): canned values, hostile
+  values (a billion GPUs and processes, out-of-range numbers, a driver string with no NUL, root's and impossible
+  pids), every call failing, init failing, a call that hangs (killed and restarted, `nvgpu_poll` never blocked more
+  than 100 ms), and `wantGpu(false)` killing it; and the sandbox: after it, the helper can't create a socket, exec,
+  write a file, read `/etc` or do a tty ioctl. The installed `lord-nvgpu` has no `--lib` or `--probe`.
+- **Not yet verified on NVIDIA hardware:** the exact files NVML reads after init (Landlock might need another
+  read-only path), that every NVML ioctl after init is of type `'F'` (strace shows `_IOC(..., 0x46, ...)` for the RM
+  escapes; `/dev/nvidia-uvm`, whose ioctls aren't, is not allowed and NVML shouldn't need it), the 256 MB cap,
+  per-process utilization on consumer cards, and `nvidia-persistenced`'s absence. To check on an NVIDIA machine:
+  (1) open Monitor → GPU and compare `nv` (`lord.monitor.gpu()`) with `nvidia-smi -q`; (2) run the helper by hand
+  under strace, with fd 3 a seqpacket socket and one request:
+  `python3 -c 'import socket,subprocess,os;a,b=socket.socketpair(socket.AF_UNIX,socket.SOCK_SEQPACKET);os.dup2(b.fileno(),3);p=subprocess.Popen(["strace","-f","-o","/tmp/nv.trace","/usr/lib/lordos/bin/lord-nvgpu"],pass_fds=(3,));a.send(b"s");print(len(a.recv(20000)));a.send(b"s");print(len(a.recv(20000)))'`
+  — two answers of the same size mean the sandboxed sampling works; in `/tmp/nv.trace`, after the `seccomp` line,
+  look for `EACCES` (a path Landlock refused) and `EPERM` (an ioctl type or syscall refused), and check every
+  `ioctl` is `_IOC(..., 0x46, ...)`.
+
 ## Disk temperature and health (0.8.2)
 
 ![Monitor → Disks, dark](disks-monitor-dark.png) ![Monitor → Disks, light](disks-monitor-light.png)

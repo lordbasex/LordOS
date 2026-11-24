@@ -11,6 +11,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Monitor → GPU shows NVIDIA cards' own numbers** (in development; latest release 0.8.9.5-beta; approved by the
+  maintainer on 2026-11-24). NVIDIA's proprietary driver has no fdinfo stats or hwmon, so the GPU view had almost
+  nothing for it. The new sandboxed helper `lord-nvgpu` (`server/src/monitor/nvgpu_main.c`) is the only program that
+  loads NVIDIA's NVML: `dlopen` of `libnvidia-ml.so.1` only from the fixed system library folders, folder and file
+  root's and not writable by others, `RTLD_NOW | RTLD_LOCAL`, no `LD_LIBRARY_PATH` (empty environment). After
+  `nvmlInit` it applies `sandbox_apply_helper`: no network or new sockets, no exec, Landlock read-only on the driver's
+  `/proc` and `/sys` files, `/dev/nvidiactl` and `/dev/nvidia<N>` only, and ioctls only of NVIDIA's type `'F'` (new
+  `SANDBOX_IOCTL_NVIDIA`). It answers lord-server over a socketpair with fixed-size records, numbers only (the driver
+  version as digits and dots). `server/src/monitor/nvgpu.c` starts it only while the GPU tab or the Overview is on
+  screen and a `0x10de` device is bound to `nvidia`, at most one, with a 2–60 s restart backoff, asks once a second
+  without ever blocking the Monitor's thread, range-checks every field (percent 0–100, −50…150 °C, ≤ 1 PiB, ≤ 64 GPUs
+  and 256 processes) and keeps only processes owned by the session user. `lord.monitor.gpu()` gains `nv: [...]`
+  (utilization of SM, memory, encoder and decoder, temperature, fan, power and limit, clocks, VRAM, CUDA and driver
+  versions, compute mode, ECC and per-process memory and utilization). `lord-server` never links NVML and never runs
+  `nvidia-smi`. Tests: `build/nvgpu-test` (ASan/UBSan; 120 000-case parser fuzz; the helper end to end with a
+  test-only fake NVML giving canned, hostile, failing and hanging answers; a sandbox probe that it can't open a socket,
+  exec or write). Not yet verified on NVIDIA hardware (docs/MONITOR.md, "NVIDIA").
 - **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)** (in development; latest release
   0.8.9.5-beta). They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
   took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from
