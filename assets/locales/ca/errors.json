@@ -933,5 +933,19 @@
   "sentinela.blockFailed": "No s’ha pogut bloquejar la seva xarxa.",
   "sentinela.machineGone": "Aquesta màquina ja no és a Màquines.",
   "sentinela.machineFailed": "La màquina no ha respost.",
-  "vm.overBudget": "No hi ha prou memòria al costat de les màquines que ja funcionen. Suspèn o apaga'n una, o dona menys memòria a aquesta màquina."
+  "vm.overBudget": "No hi ha prou memòria al costat de les màquines que ja funcionen. Suspèn o apaga'n una, o dona menys memòria a aquesta màquina.",
+  "llm.timeout": "El model local ha trigat massa a respondre.",
+  "llm.failed": "El model local no ha pogut respondre.",
+  "llm.answer": "No s’ha pogut llegir la resposta del model local.",
+  "llm.start": "El model local no s’ha pogut iniciar.",
+  "sentinela.lumo.off": "Sentinela està desactivat. Activa’l a Configuració → IA → Sentinela.",
+  "sentinela.lumo.noEngine": "El motor del model local no està instal·lat.",
+  "sentinela.lumo.noModel": "No hi ha cap model local instal·lat per a Sentinela.",
+  "sentinela.lumo.rejected": "La resposta de Lumo no tenia la forma esperada, així que s’ha descartat.",
+  "sentinela.blockRefused": "No es poden bloquejar els programes del mateix LordOS, un intèrpret d’scripts en si ni els programes bàsics del sistema.",
+  "sentinela.blockFull": "La llista de bloqueig és plena.",
+  "sentinela.notBlocked": "Aquest programa no és a la llista de bloqueig.",
+  "sentinela.noAppNetwork": "Aquest procés no té cap aplicació pròpia la xarxa de la qual es pugui bloquejar.",
+  "sys.failed": "Alguna cosa ha anat malament.",
+  "sys.unsupported": "Aquesta versió de LordOS no pot fer això."
 }

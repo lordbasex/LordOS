@@ -464,5 +464,6 @@
   },
   "select.nothing": "Inget markerat",
   "activity.app": "App borttagen",
-  "activity.system": "Systemrensning: {name}"
+  "activity.system": "Systemrensning: {name}",
+  "map.machines": "Frigör i Maskiner"
 }

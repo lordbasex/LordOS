@@ -132,5 +132,15 @@
   "action.vm_shutdown": "シャットダウン",
   "analysis.rule": "常に表示：このアラートにモデルは不要です。",
   "settings.seesMachines": "仮想マシンについて：名前、役割、状態、終了した理由、エンジンの CPU・メモリ・ネットワークの数値。画面、ファイル、クリップボードは決して見ません。",
-  "sandbox.unverified": "エンジンがそのマシン自身のものである確認"
+  "sandbox.unverified": "エンジンがそのマシン自身のものである確認",
+  "block.ended": "ブロックしたプログラムを終了しました：{name}",
+  "block.endedBody": "ブロックリストに入っています。リストは 設定 → AI → Sentinela で確認できます。",
+  "block.title": "ブロックリスト",
+  "block.hint": "これらのプログラムは、Sentinela のオン・オフに関係なく、あなたのアカウントで起動するたびに終了されます。モニタ → 情報を見る → Lumo で調べる から追加できます。削除すると、また動かせるようになります。",
+  "block.empty": "ブロックしたプログラムはありません。",
+  "block.remove": "削除",
+  "block.script": "{interp} スクリプト",
+  "block.binary": "プログラム",
+  "block.pkg": "とパッケージ {pkg} のすべてのプログラム",
+  "block.added": "{date} にブロック"
 }

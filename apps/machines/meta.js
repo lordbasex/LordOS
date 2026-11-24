@@ -2,7 +2,7 @@
 // name), notes, whether its guest tools open files (opens: Files' "Open with", openwith.js), what closing its window does (onClose), whether it opens in apps mode (appsMode), the guest's apps for the launcher (guestApps, launcherApps) and whether it keeps this computer awake (keepAwake, read by
 // lord.vm.awake too). <machine>/app.json, written by the app as the person; machine.json stays lord-vm's alone.
 import { fs, cleanGuestApps } from '@lordos/sdk';
-import { cpuWindows, machineProtectedOf } from './model.js';
+import { cpuWindows, machineProtectedOf, tagsOf } from './model.js';
 
 const cache = new Map();         // dir → { mtime, meta }: the library reads it every 1.5 s
 
@@ -41,6 +41,13 @@ export function readMeta(dir) {
       if (typeof j.cloneOf === 'string' && /^[0-9a-f-]{36}$/.test(j.cloneOf)) meta.cloneOf = j.cloneOf;
       if (typeof j.importedFrom === 'string') meta.importedFrom = j.importedFrom.slice(0, 1024);
       if (typeof j.transferSetup === 'boolean') meta.transferSetup = j.transferSetup;   // set up the transfer folder once (Windows)
+      // the snapshot "Fresh install" still to take when its unattended install ends (assistant.jsx, vmwindow.jsx)
+      if (typeof j.freshSnap === 'boolean') meta.freshSnap = j.freshSnap;
+      // a template (5.1): kept as it is, new machines are made from it (the library's Templates chip)
+      if (typeof j.template === 'boolean') meta.template = j.template;
+      // Configure → General: the card's own color (a key of systems.js COLOR_HEX, its mark then the name's first letter) and its tags
+      if (typeof j.color === 'string' && /^[a-z]{3,8}$/.test(j.color)) meta.color = j.color;
+      if (Array.isArray(j.tags)) meta.tags = tagsOf(j.tags);
       // the LordOS tools brought up to date by themselves (Configure → Agent); absent: Machines settings' default
       if (typeof j.toolsAuto === 'boolean') meta.toolsAuto = j.toolsAuto;
       // its guest tools open files sent from Files' "Open with" (7.3): 'windows' (the system they said), or false

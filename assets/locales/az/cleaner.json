@@ -464,5 +464,6 @@
   },
   "select.nothing": "Heç nə seçilməyib",
   "activity.app": "Tətbiq silindi",
-  "activity.system": "Sistem təmizliyi: {name}"
+  "activity.system": "Sistem təmizliyi: {name}",
+  "map.machines": "Virtual maşınlarda boşalt"
 }

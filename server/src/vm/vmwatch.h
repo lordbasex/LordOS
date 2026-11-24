@@ -14,11 +14,12 @@
 #include <time.h>
 #include <unistd.h>
 
-/* The machine's scope, beside lord-server's own leaf: self ".../lordos-session-<uid>/server" →
- * ".../lordos-session-<uid>/app-lordos-lordos-vm-<id>.scope" (tor: a group's Tor gateway, "app-lordos-lordos-vm-tor-<id>.scope",
- * lordvm.c setup_cgroups). "" (and -1) when self isn't a LordOS session's server leaf or id isn't a plain machine id
- * (hex digits and '-'). */
-static inline int vmwatch_scope_path(const char *self, const char *id, int tor, char *out, size_t n) {
+/* The machine's scope, in the session's machines' slice (docs/VIRTUALIZATION.md 3.7): self ".../lordos-session-<uid>/server" →
+ * ".../lordos-session-<uid>/lordos-machines.slice/app-lordos-lordos-vm-<id>.scope" (tor: a group's Tor gateway,
+ * "app-lordos-lordos-vm-tor-<id>.scope", lordvm.c setup_cgroups); slice 0: where a machine started before the slice
+ * existed is, beside lord-server's own leaf. "" (and -1) when self isn't a LordOS session's server leaf or id isn't a
+ * plain machine id (hex digits and '-'). */
+static inline int vmwatch_scope_path(const char *self, const char *id, int tor, int slice, char *out, size_t n) {
     if (n) out[0] = 0;
     if (!self || !id || !id[0] || strlen(id) > 36) return -1;
     for (const char *p = id; *p; p++) if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') || *p == '-')) return -1;
@@ -27,7 +28,8 @@ static inline int vmwatch_scope_path(const char *self, const char *id, int tor, 
     const char *sess = sl;
     while (sess > self && sess[-1] != '/') sess--;
     if (strncmp(sess, "lordos-session-", 15)) return -1;
-    if ((size_t)snprintf(out, n, "%.*s/app-lordos-lordos-vm-%s%s.scope", (int)(sl - self), self, tor ? "tor-" : "", id) >= n) { out[0] = 0; return -1; }
+    if ((size_t)snprintf(out, n, "%.*s/%sapp-lordos-lordos-vm-%s%s.scope", (int)(sl - self), self, slice ? "lordos-machines.slice/" : "",
+                         tor ? "tor-" : "", id) >= n) { out[0] = 0; return -1; }
     return 0;
 }
 

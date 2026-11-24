@@ -471,6 +471,31 @@ export function isoArch(info, file) {
   if (named && (both.length < 2 || both.includes(named))) return { arch: named, from: 'name', other: '' };
   return { arch: '', from: '', other: '' };
 }
+// The assistant's Detect step (5.2): what lord.vm.isoInfo read from the disc's boot files (vmiso.c: its label, the UEFI
+// boot files' architectures, El Torito's BIOS and UEFI entries; isoArch decides the architecture) against this computer.
+//   info: isoInfo's answer or null; file: its name; hostArch: 'amd64'|'arm64'
+// → { arch, from: 'boot'|'name'|'host', starts: ['uefi'?, 'bios'?], conflict: the name says another architecture than the
+//     boot files, emulated: arch isn't this computer's, both: the disc starts on amd64 and arm64 (the name or this
+//     computer decides), unknownArch: the boot files name only another processor (i386, riscv64), efi: their architectures }
+export function detectPlan(info, file, hostArch) {
+  const byName = archOf(file) || archOf(info?.label);
+  const efi = Array.isArray(info?.efiArchs) ? info.efiArchs.filter((x) => typeof x === 'string') : [];
+  const ia = isoArch(info, file);
+  const both = efi.includes('amd64') && efi.includes('arm64');
+  const unknownArch = !!ia.other;
+  const arch = ia.arch || hostArch;
+  const from = ia.from === 'boot' && ia.arch ? 'boot' : ia.from === 'name' ? 'name' : 'host';
+  const starts = [...(efi.length || info?.efi ? ['uefi'] : []), ...(info?.bios ? ['bios'] : [])];
+  return { arch, from, starts, conflict: from === 'boot' && !!byName && byName !== arch, emulated: arch !== hostArch, both, unknownArch, efi };
+}
+// a file dropped on the assistant's first step (5.2): which tile takes it, by its name (an installer disc, a disk image,
+// another app's machine as Migrate takes it), or null
+export const dropSource = (name) => {
+  const s = String(name || '');
+  if (/\.iso$/i.test(s)) return 'iso';
+  if (/\.(qcow2|img|raw)$/i.test(s)) return 'import';
+  return /(\.(vmx|vbox|pvs|ovf|ova|vmdk|vdi|vhdx|vhd|hds)|^config\.pvs)$/i.test(s) ? 'migrate' : null;
+};
 // a machine name from a system and version, unique among names
 export function suggestName(sys, version, names = []) {
   const base = [sys?.name || 'Machine', version].filter(Boolean).join(' ');
@@ -570,6 +595,52 @@ export function actualFrame(gw, gh, bar, area) {
   if (!(gw > 0) || !(gh > 0) || !area) return null;
   return { w: Math.min(gw, area.w), h: Math.min(gh + (bar || 0), area.h) };
 }
+// View → Scale (5.3): the window's frame so the picture is the guest's display at k times its size (bar above it); when
+// that doesn't fit the display's work area, the largest frame of the same shape that does (fits: false then)
+export const SCALES = [0.5, 0.75, 1.25, 1.5, 2];
+export function scaleFrame(gw, gh, k, bar, area) {
+  if (!(gw > 0) || !(gh > 0) || !(k > 0) || !area) return null;
+  const b = bar || 0;
+  let w = Math.round(gw * k), h = Math.round(gh * k);
+  const fit = Math.min(1, area.w / w, (area.h - b) / h);
+  if (fit < 1) { w = Math.floor(w * fit); h = Math.floor(h * fit); }
+  return { w: Math.max(320, w), h: Math.max(200, h) + b, fits: fit >= 1 };
+}
+// The window keeps the guest's shape (5.3) while the resolution is fixed: after the person resizes it, the frame that
+// keeps its width and gives the picture box the guest's proportions (or, when that is taller than the work area, the
+// tallest that fits, narrower). frame and box: { w, h } of the window and of the picture; null when it is already within
+// 2 pixels (or nothing is known)
+export function shapeFrame(frame, box, gw, gh, area) {
+  if (!frame || !box || !(gw > 0) || !(gh > 0) || !(box.w > 0) || !(box.h > 0)) return null;
+  const want = Math.round(box.w * gh / gw);
+  if (Math.abs(want - box.h) <= 2) return null;
+  let w = frame.w, h = frame.h + (want - box.h);
+  if (area && h > area.h) {
+    const ph = box.h + (area.h - frame.h);
+    if (ph < 100) return null;
+    w = frame.w - box.w + Math.round(ph * gw / gh);
+    h = area.h;
+  }
+  if (Math.abs(w - frame.w) <= 2 && Math.abs(h - frame.h) <= 2) return null;
+  return { w, h };
+}
+// The bar's device dots (5.3): one per device the guest can use now, each { k, key } (machines.dot.<k> its words); a
+// dot is shown only while the device is there, so what the guest has is always in sight. USB and the camera come from the
+// devices' own backend (caps from lord.vm.deviceCaps, when it is there): shown only once it says they are supported.
+export function deviceDots({ iso, heard, mic, cableOut, network, shares, transfer, caps } = {}) {
+  const out = [];
+  if (network && network !== 'isolated') out.push({ k: cableOut ? 'netOut' : 'net' });
+  if (iso) out.push({ k: 'cd' });
+  if (heard) out.push({ k: 'sound' });
+  if (mic) out.push({ k: 'mic' });
+  if ((shares | 0) > 0 || transfer) out.push({ k: 'folders' });
+  if (caps?.usb && (caps.usbAttached | 0) > 0) out.push({ k: 'usb' });
+  if (caps?.camera && caps.cameraOn) out.push({ k: 'camera' });
+  return out;
+}
+// Devices → Network: can the cable be pulled? Only the shared, host-only and bridged networks of a running machine that
+// isn't a group's member (lord-vm refuses the rest too)
+export const cableOffered = (cfg, running) => !!running && !cfg?.group && ['shared', 'hostonly', 'bridged'].includes(cfg?.network);
 // The Info menu (5.3): what this machine uses now, from two lord.vm.stats reads (model.js usage) and its sandbox
 // (isolationGaps); each line a key and its values
 export function infoLines(m, u, gaps) {
@@ -694,7 +765,7 @@ export function doingOf(m, windowed = true) {
 // which machines show (all, running, Linux, the other system's); 'off' of before is read as all
 export const LIB_VIEWS = ['grid', 'list'];
 export const LIB_SORTS = ['name', 'state', 'last', 'disk'];
-export const LIB_SHOWS = ['all', 'running', 'linux', 'windows'];
+export const LIB_SHOWS = ['all', 'running', 'linux', 'windows', 'templates'];
 export function libView(v) {
   const o = v && typeof v === 'object' ? v : {};
   return {
@@ -743,16 +814,36 @@ export function familyOf(m) {
   if (id === 'windows') return 'windows';
   return LINUX.includes(id) || m?.meta?.family === 'linux' ? 'linux' : 'other';
 }
-const shows = (m, show) => (show === 'running' ? stateView(m.state, m.reason).active : show === 'linux' || show === 'windows' ? familyOf(m) === show
+// templates (5.1, app.json template): machines kept as they are, to make new ones from (a clone); their own chip
+const shows = (m, show) => (show === 'templates' ? !!m.meta?.template : show === 'running' ? stateView(m.state, m.reason).active : show === 'linux' || show === 'windows' ? familyOf(m) === show
   : show === 'off' ? !stateView(m.state, m.reason).active : true);
-// the machines a search and the chip leave: the query matches the name, the system or the architecture
+// A machine's tags (Configure → General, app.json): trimmed, no control characters, 1 to 24 characters each, at most 8,
+// each once (case-insensitively), in the order given. "#tag" in the library's search finds them exactly.
+export const TAGS_MAX = 8, TAG_LEN = 24;
+export function tagsOf(list) {
+  const out = [];
+  for (const x of Array.isArray(list) ? list : []) {
+    if (typeof x !== 'string') continue;
+    const t = x.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().replace(/^#+/, '');
+    if (!t || [...t].length > TAG_LEN || out.some((o) => o.toLowerCase() === t.toLowerCase())) continue;
+    out.push(t);
+    if (out.length === TAGS_MAX) break;
+  }
+  return out;
+}
+// "work, test" as typed in Configure → tags
+export const parseTags = (text) => tagsOf(String(text || '').split(/[,\u060c\uff0c\u3001]/));
+// the machines a search and the chip leave: the query matches the name, the system, the architecture or a tag;
+// "#name" only a tag of that name
 export function filterMachines(list, { query, show } = {}) {
   const q = (query || '').trim().toLowerCase();
   return (list || []).filter((m) => {
     if (!shows(m, show)) return false;
     if (!q) return true;
+    const tags = (m.meta?.tags || []).map((x) => x.toLowerCase());
+    if (q.startsWith('#') && q.length > 1) return tags.includes(q.slice(1));
     const sys = m.meta?.osName || systemOf(m.name).name || '';
-    return [m.name, sys, m.arch].some((s) => (s || '').toLowerCase().includes(q));
+    return [m.name, sys, m.arch, ...tags].some((s) => (s || '').toLowerCase().includes(q));
   });
 }
 // how many machines each chip shows (the search applies to all of them)
@@ -1215,7 +1306,8 @@ export const cloneWinName = (name) => `${hostnameFrom(name).slice(0, WIN_NAME_MA
 // A machine whose machine.json this LordOS can't read (lord.vm.list's error): "newer" (a newer LordOS wrote it) or
 // "invalid"; its numbers aren't known and it can't start
 export const unreadableOf = (m) => (m?.error === 'newer' || m?.error === 'invalid' ? m.error : null);
-export const actionsOf = (m) => (unreadableOf(m) ? { ...actionsFor(m.state), start: false } : actionsFor(m?.state));
+// a template (5.1) doesn't start from the library: it stays as it was made, and New Machine from Template clones it
+export const actionsOf = (m) => (unreadableOf(m) || (m?.meta?.template && !stateView(m.state, m.reason).active) ? { ...actionsFor(m.state), start: false } : actionsFor(m?.state));
 export const isWindowsMachine = (m) => !!m && (!!m.windowsDevices || m.devices === 'windows');
 
 export function cloneMethod(info, kind, fromSnapshot = false) {
@@ -1912,7 +2004,7 @@ export function awayStep(idleSec, list, metaOf, paused) {
 // Configure (5.5): which section each field lord-vm --set changes belongs to (the sidebar's dots: a section with a change
 // not saved yet), and the sidebar's search over the sections' titles and summaries
 export const FIELD_SECTION = {
-  name: 'general', vcpus: 'cpu', memoryMb: 'cpu', cpuPin: 'cpu', perfProfile: 'cpu', resolution: 'display', graphics: 'display',
+  name: 'general', vcpus: 'cpu', memoryMb: 'cpu', cpuPin: 'cpu', cpuModel: 'cpu', perfProfile: 'cpu', resolution: 'display', graphics: 'display',
   gpu: 'display', pointer: 'display', captureFullscreen: 'display', network: 'network', bridge: 'network', ports: 'network',
   nicModel: 'network', diskGb: 'disks', iso: 'disks', shares: 'sharing', transfer: 'sharing', clipboard: 'sharing', agent: 'agent',
   bootOrder: 'boot', bootMenu: 'boot',

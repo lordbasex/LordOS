@@ -527,6 +527,78 @@ Force Quit for the ones still open. No new privilege: `cgroup.kill` is not used,
 LordOS's and the kernel's groups can't be ended as a group (their members still can, one by one, under the usual
 rules). A child row has its own ⓧ, Quit… and Force Quit… in its menu, and Get Info.
 
+### Descriptions (0.8.9.6, in development)
+
+Get Info (grouped and flat views) shows **Description** between the command line and the Memory / Statistics / Files
+tabs: what the program is, from what the computer already has, local and cheap, never running a program and never
+going to the network. One SDK function gives it to anyone who asks (`sdk/describe.js`, `describeProgram(p)` and
+`describeApp(item)`; the order and the language rules are `sdk/describemodel.js`, pure and tested); only Monitor uses
+it so far, and the Store's cards, Settings → Apps and the Dock's and launcher's tooltips can show the same text.
+
+The sources, in order (the first one in the person's language wins; with none in it, the first one, in English):
+
+1. **Kernel threads** (`prot: kernel` only, never a program that takes a kernel thread's name) and **LordOS's own
+   programs** (every `lord-*` built or shipped), from `sdk/programdesc.json`, in English.
+2. **The app**: an isolated LordOS app's manifest `description`; a web app's; a Linux or Flatpak app's `.desktop`
+   `Comment` (the `Comment[lang]` when it has one: `lord.apps.linux(lang)` now says so, `commentLocal`).
+3. **Well-known programs** of the system (systemd, (sd-pam), dbus, PipeWire, WirePlumber, the portals, polkit, udisks,
+   cron, sshd, shells, compilers, browsers…), by the executable's file name and only for a program in a system folder,
+   from `sdk/programdesc.json`, in English.
+4. **The manual page's one line** (what `whatis` shows), read by lord-server without running anything
+   (`server/src/monitor/describe.c`): `/usr/share/man/<lang>/man{1,8,6}/<name>.<n>[.gz]` first (Debian's translated
+   pages: `es`, `pt_BR`, `zh_CN`…), then `/usr/share/man`; root's files only, at most 2 MB (8 MB decompressed), the
+   first section's text after " - ", `man` and `mdoc` pages, one `.so` followed.
+5. **The service's `Description=`** for a process in a systemd unit (its cgroup), from the system's and the user's
+   unit folders.
+6. **The package's description** from dpkg's database (`/var/lib/dpkg/status`), in the person's language when apt
+   already has Debian's translation (`/var/lib/apt/lists/*_i18n_Translation-<code>`, the entry whose `Description-md5`
+   is the MD5 of the installed English description, so a translation of another version is never shown). When the main
+   text is another source's, the package's line is shown under it ("From the package coreutils: …").
+
+lord-server reads 4–6 in a worker thread and caches them (512 answers; a package's again when dpkg's database
+changes): `lord.monitor.describe(kind, arg, lang)` answers at once from the cache or `null` while it reads, and the
+sheet asks again a moment later. A text that exists only in English says so and, while Sentinela is on, offers
+**Translate with Lumo** (the local model, kept per language in `~/.cache/lordos/descriptions/<lang>.json`; see
+docs/SENTINELA.md). Nothing known: **Unknown**, and **Investigate with Lumo** for the person's own processes with
+Sentinela on and a local model installed, or a short note how to turn it on (docs/SENTINELA.md, "Investigate").
+
+Every LordOS app and program must have an English description: `tools/desc-check.mjs` (run by `tools/i18n-check.mjs`)
+fails when an `apps/<id>/manifest.json` has none or a `lord-*` the Makefiles build or `tools/iso/mkdeb.sh` ships has no
+entry. Coverage measured on the development machine (Debian 13, Spanish interface, 647 processes, `tests/describe_coverage.mjs`
+with `build/describe-cli`): 616 described (95 %): 316 kernel threads, 211 by their manual page, 50 well-known programs, 17
+by their package, 16 of LordOS's, 6 by their service; 176 of them in Spanish for free (translated manual pages and
+Debian's translations), the rest in English with "Translate with Lumo"; the 31 unknown were programs of no package in
+the home folder or a build folder, and other users' processes whose program can't be read. Tests: `build/describe-test` (MD5, a package and its translation, the
+language codes, `man` and `mdoc` summaries, a translated page first, a page not root's refused, a unit and a template),
+`tests/describe_model_test.mjs` (the order, the language and the fallback, Lumo's kept translations, pending, unknown),
+`tests/monitor_describe_scene.mjs`.
+
+### A long group opens without a freeze (0.8.9.6, in development)
+
+Opening the Terminal's group with about 240 programs froze the desktop for a second, and again on every redraw while
+it stayed open: the table drew every row of the group at once (about 12 800 nodes, each row with its icon, badge,
+chain and cells), and the process list redraws the tab once a second. Measured in a headless lord-server over a
+made-up Terminal of 240 programs (`tests/monitor_freeze_headless.sh`, the main thread's longest run from
+`lord.stats(1)`, on a development machine with a load average of about 20): opening went from 1547 ms to about 20 ms,
+a redraw with the group open from 1110 ms to about 17 ms, closing from 185 ms to about 16 ms (the numbers vary with
+the machine's load; all of it was JavaScript, layout and paint stayed under 60 ms in total).
+
+- **Only the rows in sight are drawn** (`sdk/lists.jsx` `Table`, `sight`): the tab's ScrollView tells its offset
+  (`procSight`, in steps of 104 px), the table draws the rows in sight and six more on each side, and empty space of
+  the others' height around them. The keys still move through every row: one not drawn is scrolled into sight by its
+  place (`onRevealRow`).
+- **A few new rows per pass** (`ROW_BUDGET`, 4): rows not drawn before are drawn four at a time, those in sight
+  first, the others waiting a moment as empty rows, so a pass stays within about a frame and the pointer's input is
+  handled between passes.
+- **A redraw keeps unchanged rows** (`rowSig`): each row's text (name, values, badge, chain, statistics) is one
+  string; a row whose string, selection and stripe are the same isn't drawn again.
+- A process's letter icon is one component per name (a new one on every redraw drew every icon again), and the
+  language's description (`meta.json`) is looked up once even when a language has none.
+
+The order is the same as before (the held order and the sort don't change). `tests/monitor_freeze_scene.mjs` (in
+`make test`) opens a group of 300 programs: the first pass draws at most four rows within 16 ms, then only the rows
+in sight and the margin, a redraw makes few nodes, and scrolling to the end draws the last rows.
+
 ### A steady list (0.8.9.6, in development)
 
 While the pointer is over the table, a menu or a sheet is open, and for two seconds after the pointer leaves, the

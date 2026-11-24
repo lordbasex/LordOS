@@ -78,7 +78,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "19", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "20", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -121,7 +121,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":19,\"whatever\":true}";
+    const char newer[] = "{\"schema\":20,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -567,7 +567,7 @@ static void test_schema(void) {
                 { "\"perf_profile\":true", 13, VM_OK, 1 }, { "\"perf_profile\":false", 13, VM_OK, 0 }, { "\"agent\":true", 13, VM_OK, 0 },
                 { "\"perf_profile\":1", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":\"on\"", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":null", 13, VM_E_FIELD, 0 },
                 { "\"perf_profile\":true", 12, VM_E_FIELD, 0 }, { "\"perf_profile\":false", 12, VM_OK, 0 },
-                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_OK, 1 }, { "\"perf_profile\":true", 19, VM_E_NEWER, 0 },
+                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_OK, 1 }, { "\"perf_profile\":true", 20, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
                 char t[4096];
@@ -599,7 +599,7 @@ static void test_schema(void) {
                 { "\"guest_links\":true,\"guest_notify\":true", 15, VM_OK, 1, 1 }, { "\"guest_links\":false", 15, VM_OK, 0, 0 },
                 { "\"guest_links\":1", 15, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":\"on\"", 15, VM_E_FIELD, 0, 0 },
                 { "\"guest_links\":true", 14, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":true", 14, VM_E_FIELD, 0, 0 },
-                { "\"guest_notify\":false", 14, VM_OK, 0, 0 }, { "\"guest_links\":true", 19, VM_E_NEWER, 0, 0 },
+                { "\"guest_notify\":false", 14, VM_OK, 0, 0 }, { "\"guest_links\":true", 20, VM_E_NEWER, 0, 0 },
             };
             for (size_t i = 0; i < sizeof s15 / sizeof s15[0]; i++) {
                 char t[4096];
@@ -623,18 +623,18 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 15);
         }
-        /* schema 18: guest_files (6.21), true or false, written only when false, never below 18 */
+        /* schema 19: guest_files (6.21), true or false, written only when false, never below 19 */
         {
             struct { const char *add; int schema, want, off; } s18[] = {
-                { "\"guest_files\":false", 18, VM_OK, 1 }, { "\"guest_files\":true", 18, VM_OK, 0 }, { "\"guest_files\":0", 18, VM_E_FIELD, 0 },
-                { "\"guest_files\":false", 17, VM_E_FIELD, 0 }, { "\"guest_files\":true", 17, VM_OK, 0 }, { "\"guest_files\":false", 19, VM_E_NEWER, 0 },
+                { "\"guest_files\":false", 19, VM_OK, 1 }, { "\"guest_files\":true", 19, VM_OK, 0 }, { "\"guest_files\":0", 19, VM_E_FIELD, 0 },
+                { "\"guest_files\":false", 18, VM_E_FIELD, 0 }, { "\"guest_files\":true", 18, VM_OK, 0 }, { "\"guest_files\":false", 20, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s18 / sizeof s18[0]; i++) {
                 char t[4096];
                 const char *at = strstr(GOOD, "\"schema\":1");
                 snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s18[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s18[i].add);
                 int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
-                if (r != s18[i].want) fprintf(stderr, "  schema 18 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
+                if (r != s18[i].want) fprintf(stderr, "  schema 19 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
                 CHECK(r == s18[i].want);
                 if (r != VM_OK) continue;
                 CHECK(m.guest_files_off == s18[i].off);
@@ -649,14 +649,14 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
             m.guest_files_off = 2; m.schema = VM_SCHEMA;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
-            CHECK(VM_SCHEMA >= 18);
+            CHECK(VM_SCHEMA >= 19);
         }
         /* schema 17: automation (6.15), true or false, written only when true, never below 17, never for anonymity */
         {
             struct { const char *add; int schema, want, on; } s16[] = {
                 { "\"automation\":true", 17, VM_OK, 1 }, { "\"automation\":false", 17, VM_OK, 0 }, { "\"agent\":true", 17, VM_OK, 0 },
                 { "\"automation\":1", 17, VM_E_FIELD, 0 }, { "\"automation\":\"on\"", 17, VM_E_FIELD, 0 }, { "\"automation\":null", 17, VM_E_FIELD, 0 },
-                { "\"automation\":true", 16, VM_E_FIELD, 0 }, { "\"automation\":false", 16, VM_OK, 0 }, { "\"automation\":true", 19, VM_E_NEWER, 0 },
+                { "\"automation\":true", 16, VM_E_FIELD, 0 }, { "\"automation\":false", 16, VM_OK, 0 }, { "\"automation\":true", 20, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s16 / sizeof s16[0]; i++) {
                 char t[4096];
@@ -679,6 +679,40 @@ static void test_schema(void) {
             m.automation = 2; m.schema = VM_SCHEMA;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 17);
+        }
+        /* schema 18: cpu_model (5.5), "host" or "compatible", written only when compatible, never below 18, amd64 with KVM
+         * only (GOOD is an arm64 machine) */
+        {
+            struct { const char *add; int schema, want, model; } s18[] = {
+                { "\"cpu_model\":\"host\"", 18, VM_OK, VM_CPU_HOST }, { "\"agent\":true", 18, VM_OK, VM_CPU_HOST },
+                { "\"cpu_model\":\"max\"", 18, VM_E_RANGE, 0 }, { "\"cpu_model\":true", 18, VM_E_FIELD, 0 },
+                { "\"cpu_model\":\"compatible\"", 18, VM_E_RANGE, 0 }, { "\"cpu_model\":\"compatible\"", 17, VM_E_FIELD, 0 },
+                { "\"cpu_model\":\"host\"", 20, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s18 / sizeof s18[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s18[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s18[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s18[i].want) fprintf(stderr, "  schema 19 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
+                CHECK(r == s18[i].want);
+                if (r == VM_OK) CHECK(m.cpu_model == s18[i].model);
+            }
+            /* compatible: an amd64 KVM machine, written and read back; never with TCG */
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK);
+            m.arch = VM_ARCH_AMD64; snprintf(m.machine_type, sizeof m.machine_type, "pc-q35-10.0"); m.cpu_model = VM_CPU_COMPAT; m.schema = VM_SCHEMA;
+            int cok = vm_machine_check(&m, err, sizeof err) == VM_OK;
+            if (!cok) fprintf(stderr, "  compatible amd64: %s\n", err);
+            CHECK(cok);
+            if (cok) {
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && strstr(jj, "\"cpu_model\": \"compatible\""));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && m2.cpu_model == VM_CPU_COMPAT);
+                free(jj);
+                m.accel = VM_ACCEL_TCG;
+                CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            }
+            CHECK(VM_SCHEMA >= 18);
         }
         /* schema 13: cpu_pin (vCPU pinning, 3.7.1), "off" or "auto", written only when chosen, never below 13 */
         {

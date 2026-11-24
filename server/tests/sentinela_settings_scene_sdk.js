@@ -17,6 +17,7 @@ export { TRIGGERS, ACTIONS, factLines, presentAlert } from '../../sdk/sentinelam
 export { VM_ACTIONS, vmWhy, vmFactLines } from '../../sdk/sentinelavm.js';
 export {
   sentinelaAlerts, sentinelaEngine, sentinelaPrefs, setSentinelaPrefs, refreshSentinelaEngine, runSentinelaAction, sentinelaOnBattery,
-  clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm,
+  clearSentinelaAlerts, actionLabel as sentinelaActionLabel, installLlm, removeLlm, sentinelaBlocked, refreshBlocked, unblockProgram,
 } from '../../sdk/sentinela.js';
+export { errorText } from '../../sdk/errors.js';
 export { ShieldGlyph } from '../../sdk/sentinelaglyph.js';

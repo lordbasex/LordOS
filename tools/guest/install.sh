@@ -9,7 +9,8 @@
 # desktop, else sudo or su in the terminal). The host never sees or types that password. Then, as root:
 #   1. lordos-guest from this disc as /usr/local/bin/lordos-guest (its SHA-256 checked against sha256.txt), the udev
 #      rule that lets the person at the machine's seat open its port, its user unit (or an XDG autostart entry
-#      without systemd) and the shutdown hook, as Machines' Install Agent writes them; first, because Machines takes
+#      without systemd), the shutdown hook and the file managers' "Send to LordOS" entries, as Machines' Install Agent
+#      writes them; first, because Machines takes
 #      the disc out as soon as qemu-guest-agent answers;
 #   2. qemu-guest-agent from the system's own package manager (apt-get, dnf, yum, zypper, pacman or apk) and its
 #      repositories, started now and at every boot;
@@ -138,6 +139,17 @@ else
     printf '%s\n' '[Desktop Entry]' 'Type=Application' 'Name=LordOS Machines clipboard helper' 'Exec=/usr/local/bin/lordos-guest' \
         'NoDisplay=true' > /etc/xdg/autostart/lordos-guest.desktop
 fi
+# "Send to LordOS" in the file managers (docs/VIRTUALIZATION.md 6.21; tools/guest/lordos-send-to-host*.desktop): Open With
+# for every file, and Dolphin's service menu (executable: Plasma 6 runs only those outside its own folders). Best effort
+{ install -d -m 755 /usr/local/share/applications /usr/local/share/kio/servicemenus &&
+  printf '%s\n' '[Desktop Entry]' 'Type=Application' 'Name=Send to LordOS' 'Comment=Copy these files to the LordOS computer this machine runs on' \
+      'Exec=/usr/local/bin/lordos-guest --send-to-host %F' 'Icon=document-send' 'Terminal=false' 'NoDisplay=true' \
+      'MimeType=application/octet-stream;' 'Categories=Utility;' > /usr/local/share/applications/lordos-send-to-host.desktop &&
+  chmod 644 /usr/local/share/applications/lordos-send-to-host.desktop &&
+  printf '%s\n' '[Desktop Entry]' 'Type=Service' 'MimeType=application/octet-stream;' 'Actions=sendToLordOS' 'X-KDE-Priority=TopLevel' '' \
+      '[Desktop Action sendToLordOS]' 'Name=Send to LordOS' 'Icon=document-send' 'Exec=/usr/local/bin/lordos-guest --send-to-host %F' \
+      > /usr/local/share/kio/servicemenus/lordos-send-to-host.desktop &&
+  chmod 755 /usr/local/share/kio/servicemenus/lordos-send-to-host.desktop; } 2>/dev/null || true
 
 pm_install() {     # $@: package names (fixed below)
     case $pm in

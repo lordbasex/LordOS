@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Zima",
   "analysis.rule": "Huonyeshwa kila wakati: arifa hii haihitaji modeli.",
   "settings.seesMachines": "Kwa mashine pepe: jina, jukumu na hali yake, kwa nini ziliisha, na idadi za CPU, kumbukumbu na mtandao za injini yake. Kamwe si skrini, faili wala ubao wa kunakili wake.",
-  "sandbox.unverified": "uthibitisho kwamba injini yake ni ya mashine yenyewe kweli"
+  "sandbox.unverified": "uthibitisho kwamba injini yake ni ya mashine yenyewe kweli",
+  "block.ended": "Programu iliyozuiwa imemalizwa: {name}",
+  "block.endedBody": "Iko kwenye orodha yako ya kuzuia. Kagua orodha kwenye Mipangilio → AI → Sentinela.",
+  "block.title": "Orodha ya kuzuia",
+  "block.hint": "Programu hizi humalizwa kila zinapoanza kwenye akaunti yako, iwe Sentinela imewashwa au imezimwa. Ongeza moja kutoka Kifuatiliaji → Pata Maelezo → Chunguza kwa Lumo; iondoe ili iruhusiwe kuendeshwa tena.",
+  "block.empty": "Hakuna programu zilizozuiwa.",
+  "block.remove": "Ondoa",
+  "block.script": "Skripti ya {interp}",
+  "block.binary": "Programu",
+  "block.pkg": "na kila programu ya kifurushi {pkg}",
+  "block.added": "ilizuiwa {date}"
 }

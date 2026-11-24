@@ -81,6 +81,7 @@ int vm_serial_valid(const char *s) {
     return 1;
 }
 
+const char *const VM_CPU_NAMES[] = { "host", "compatible", NULL };
 const char *const VM_NIC_MODELS[VM_NIC_COUNT + 1] = { "virtio", "e1000e", "e1000", "e1000-82545em", "e1000-82544gc", "vmxnet3", "rtl8139", "pcnet", NULL };
 
 /* 1..64 bytes of valid UTF-8, no control characters, no '/' or '\\', not only spaces */
@@ -666,8 +667,11 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 15 && (m->guest_links || m->guest_notify)) return fail(err, n, VM_E_FIELD, "guest_links and guest_notify need schema 15");
     if (m->automation & ~1) return fail(err, n, VM_E_RANGE, "automation is true or false");
     if (m->schema < 17 && m->automation) return fail(err, n, VM_E_FIELD, "automation needs schema 17");
+    if (m->cpu_model < VM_CPU_HOST || m->cpu_model > VM_CPU_COMPAT) return fail(err, n, VM_E_RANGE, "cpu_model is host or compatible");
+    if (m->schema < 18 && m->cpu_model) return fail(err, n, VM_E_FIELD, "cpu_model needs schema 18");
+    if (m->cpu_model == VM_CPU_COMPAT && (m->arch != VM_ARCH_AMD64 || m->accel != VM_ACCEL_KVM)) return fail(err, n, VM_E_RANGE, "a compatible processor is for amd64 machines with KVM");
     if (m->guest_files_off & ~1) return fail(err, n, VM_E_RANGE, "guest_files is true or false");
-    if (m->schema < 18 && m->guest_files_off) return fail(err, n, VM_E_FIELD, "guest_files needs schema 18");
+    if (m->schema < 19 && m->guest_files_off) return fail(err, n, VM_E_FIELD, "guest_files needs schema 19");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
@@ -822,7 +826,7 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation",
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "cpu_model",
     "guest_files", NULL,
 };
 
@@ -1115,7 +1119,13 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *au = json_get(o, "automation");
         if (au && au->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "automation must be true or false"); goto out; }
         m->automation = au ? json_bool(o, "automation", 0) : 0;
-        /* schema 18: missing means files from the guest are taken */
+        /* schema 18: missing means this computer's processor */
+        char cpum[16];
+        if ((r = get_str(o, "cpu_model", cpum, sizeof cpum, 0, err, n))) goto out;
+        m->cpu_model = VM_CPU_HOST;
+        if (cpum[0] && !strcmp(cpum, "compatible")) m->cpu_model = VM_CPU_COMPAT;
+        else if (cpum[0] && strcmp(cpum, "host")) { r = fail(err, n, VM_E_RANGE, "cpu_model is host or compatible"); goto out; }
+        /* schema 19: missing means files from the guest are taken */
         const JVal *gf = json_get(o, "guest_files");
         if (gf && gf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "guest_files must be true or false"); goto out; }
         m->guest_files_off = gf ? !json_bool(o, "guest_files", 1) : 0;
@@ -1255,7 +1265,8 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 15 && m->guest_links) jb_raw(&b, ",\n  \"guest_links\": true");
     if (m->schema >= 15 && m->guest_notify) jb_raw(&b, ",\n  \"guest_notify\": true");
     if (m->schema >= 17 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
-    if (m->schema >= 18 && m->guest_files_off) jb_raw(&b, ",\n  \"guest_files\": false");
+    if (m->schema >= 18 && m->cpu_model == VM_CPU_COMPAT) jb_raw(&b, ",\n  \"cpu_model\": \"compatible\"");
+    if (m->schema >= 19 && m->guest_files_off) jb_raw(&b, ",\n  \"guest_files\": false");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);

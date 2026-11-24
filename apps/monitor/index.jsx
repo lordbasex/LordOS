@@ -22,7 +22,7 @@ import { FirewallPrivacy } from './Firewall.jsx';
 import { FirewallRulesPrivacy } from './FwRules.jsx';
 import { CoolingTab } from './Cooling.jsx';
 import { DevicesTab, BatteryTab } from './Devices.jsx';
-import { ProcessesTab, ProcessLayers } from './Processes.jsx';
+import { ProcessesTab, ProcessLayers, procScroll, noteSight } from './Processes.jsx';
 import { DisksTab } from './DisksTab.jsx';
 import { VoltageTab } from './Voltage.jsx';
 import { GpuTab, OverviewGpu, OverviewAiVms } from './Gpu.jsx';
@@ -401,6 +401,7 @@ function ComponentGlyph({ comp, size }) {
   );
 }
 
+const letterIcons = new Map();
 export function AppGlyph({ item, size = 16 }) {
   if (item.app === 'lordos') return <LordOSLogo size={size} />;
   const comp = sdk.netModel?.COMPONENTS?.[item.app];
@@ -409,7 +410,10 @@ export function AppGlyph({ item, size = 16 }) {
   const iso = isolatedAppOf(item);
   if (iso?.Icon) return <iso.Icon size={size} />;
   if (item.appIcon) return <Image src={item.appIcon} style={{ width: size, height: size, objectFit: 'contain' }} />;
-  const Ico = iconFromFile(null, item.appName || item.name || '?');
+  // one component per name: a new one on every redraw would draw the letter again (a list of hundreds of processes)
+  const name = item.appName || item.name || '?';
+  let Ico = letterIcons.get(name);
+  if (!Ico) { if (letterIcons.size > 2000) letterIcons.clear(); letterIcons.set(name, (Ico = iconFromFile(null, name))); }
   return <Ico size={size} />;
 }
 
@@ -529,7 +533,7 @@ export default function Monitor() {
           <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><CoolingTab /></View>
         </ScrollView>
       ) : view === 'processes' ? (
-        <ScrollView resetKey="processes" style={{ flex: 1 }}>
+        <ScrollView resetKey="processes" style={{ flex: 1 }} scrollRef={procScroll} onScroll={noteSight}>
           <View style={{ paddingHorizontal: narrow ? 12 : 20, paddingTop: narrow ? 12 : 20, paddingBottom: 24, gap: 16 }}><ProcessesTab /></View>
         </ScrollView>
       ) : (

@@ -59,8 +59,8 @@ export function languages() {
 }
 
 function meta(lang) {
-  if (!metas.has(lang)) languages();
-  return metas.get(lang) || {};
+  if (!metas.has(lang)) { languages(); if (!metas.has(lang)) metas.set(lang, {}); }    // a language with no meta.json: asked once
+  return metas.get(lang);
 }
 
 // Initial language: the one chosen in Settings, or the one from the user's region (LANG=pt_BR.UTF-8 → pt),

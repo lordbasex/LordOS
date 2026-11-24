@@ -18,12 +18,13 @@
 import {
   wm, View, Text, ScrollView, Segmented, SearchField, ToolbarButton, Button, GroupBox, FormRow, Disclosure, typeScale, spacing, useTheme, useLocale,
   useStore, useSettings, useKeyboard, createStore, monitor, monitorProcesses, monitorDetail, firewall, firewallState, formatNumber,
-  formatDate, formatTime, addListener, appName, Table, useNarrow, direction, Tooltip, Dropdown, Image, webAppEntry, refreshWebApps, webAppsModel,
+  formatDate, formatTime, addListener, appName, Table, TABLE_HEAD, useNarrow, direction, Tooltip, Dropdown, Image, webAppEntry, refreshWebApps, webAppsModel,
 } from '@lordos/sdk';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fmt, AppGlyph, isolatedAppOf, componentName } from './index.jsx';
 import { sealPixels, SEAL_COLORS } from './seal.js';
 import { statsStore, WINDOWS } from './procstatsmodel.js';
+import { DescriptionPanel } from './Describe.jsx';
 import {
   HOLD_MS, procKey, procText, groupRowKey, rowKeyOf, isPaused, buildGroups, filterGroups, sortGroups, sortProcs, holdOrder, holdGroups,
   flattenRows, groupSummary, snapshotOf, planStop, stillRunning, groupKeys, chainCache, originOf, groupOriginOf, passesFilter, programChoices,
@@ -48,6 +49,18 @@ const toggleGroup = (key, on) => openGroups.set((s) => {
   return n;
 });
 const shownGroups = { list: [] };
+// (0.8.9.6) What of the tab is in sight: the offset and height of the ScrollView the tab is in (index.jsx), so the table
+// draws only those rows (sdk/lists.jsx Table, sight). The offset is kept in steps of SIGHT_STEP (the table draws a
+// margin of rows larger than a step), so scrolling redraws the table only every few rows. procScroll: that ScrollView
+// (its scrollRef), to bring a row the keys chose into sight.
+export const SIGHT_STEP = 104;
+export const procSight = createStore({ y: 0, h: 900 });
+export const procScroll = { current: null };
+export const noteSight = (y, h) => {
+  const q = Math.floor(Math.max(0, y) / SIGHT_STEP) * SIGHT_STEP;
+  const s = procSight.get();
+  if (s.y !== q || s.h !== h) procSight.set({ y: q, h });
+};
 
 let adminCache = null;
 const isAdmin = () => {
@@ -269,6 +282,8 @@ export function ProcessesTab() {
   const procs = useStore(monitorProcesses);
   const state = useStore(ui);
   const open = useStore(openGroups);
+  const sightNow = useStore(procSight);
+  const tableBox = useRef(null);
   const [settings, setSettings] = useSettings();
   // remembered (settings.monitor): Grouped, the order and the filters
   const prefs = settings.monitor || {};
@@ -352,7 +367,31 @@ export function ProcessesTab() {
     const shownProcs = grouped ? view.groups.flatMap((g) => [g.lead, ...g.rows]) : view.list.slice(0, 150);
     monitor.askOwners(shownProcs.map((p) => exePath(p?.exe)).filter(Boolean));
   }, [procs, grouped]);
-  const rows = grouped ? flattenRows(view.groups, open).slice(0, 400) : view.list.slice(0, 150).map((p) => ({ proc: p }));
+  // grouped: every row (a group of hundreds of processes too), drawn only while in sight (the table's sight below)
+  const rows = grouped ? flattenRows(view.groups, open) : view.list.slice(0, 150).map((p) => ({ proc: p }));
+  // the table's place in the scrolled tab (the last layout's), and the part of it in sight
+  let tableTop = 0;
+  try { tableTop = lord.getLayout(tableBox.current.id)[1] - lord.getLayout(procScroll.current.inner.current.id)[1]; } catch (e) { /* not laid out yet */ }
+  const sight = { top: sightNow.y - tableTop, height: sightNow.h + SIGHT_STEP };
+  const revealRow = (i) => {
+    const sc = procScroll.current;
+    if (!sc) return;
+    const y = tableTop + TABLE_HEAD + i * 26, y0 = sc.offset(), h = sightNow.h;
+    if (y < y0) sc.scrollTo(y - 26); else if (y + 26 > y0 + h) sc.scrollTo(y + 52 - h);
+  };
+  // what a row draws, as one text: a row whose text is the same isn't drawn again on the next process list
+  const lang = useLocale().lang;
+  const statSig = (x) => (win ? `${x.cpuAvg}|${x.cpuPeak}|${x.memAvg}|${x.memPeak}` : '');
+  const oSig = (o) => (o ? `${o.kind}:${o.origin || ''}:${o.site || ''}:${o.name || ''}:${o.signer?.signer || ''}:${o.updated ? 1 : 0}` : '');
+  const rowSig = (r) => {
+    if (r.group) {
+      const g = r.group;
+      return `g|${lang}|${groupLabel(tr, g)}|${g.match === 'procs' || open.has(g.key) ? 1 : 0}|${formatNumber(g.cpu * 100, 1)}|${fmt.mem(g.mem)}|${g.threads}|${g.count}|${g.user}|${g.gone ? 1 : 0}|${g.stoppable ? 1 : 0}|${oSig(groupOriginOf(g, facts))}|${statSig(g)}`;
+    }
+    const p = r.proc, child = !!r.parent;
+    const chain = child && !p.gone ? chainOfProc(p, view.byPid).map((l) => `${l.pid}.${l.name}.${l.app || ''}`).join('>') : '';
+    return `p|${lang}|${child ? 1 : 0}|${child ? p.name : procLabel(tr, p)}|${p.appName || ''}|${formatNumber(p.cpu * 100, 1)}|${fmt.mem(p.rss)}|${p.threads}|${p.pid}|${p.user}|${p.gone ? 1 : 0}|${p.prot || ''}|${oSig(originOf(p, facts))}|${chain}|${statSig(p)}`;
+  };
   // a link of a chain (who started it) selects that process, opening its group
   const selectProc = (l) => {
     const p = view.byPid.get(l.pid);
@@ -500,8 +539,8 @@ export function ProcessesTab() {
       </View>
       {/* the SDK's table (0.8.8.8): a press or the keys choose a row (↑ ↓, Home, End, Page Up and Page Down, typing a
           name), Enter and a double click open Get Info (on a group: open or close it); → and ← open and close a group */}
-      <View onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setLeftAt(Date.now()); }} onMouseDown={hideTip}>
-        <Table columns={cols} rows={rows} rowKey={rowKeyOf} sort={sort}
+      <View ref={tableBox} onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setLeftAt(Date.now()); }} onMouseDown={hideTip}>
+        <Table columns={cols} rows={rows} rowKey={rowKeyOf} sort={sort} sight={sight} onRevealRow={revealRow} rowSig={rowSig}
           onSort={(key) => setSort((s0) => ({ key, dir: s0.key === key ? -s0.dir : key === 'name' || key === 'user' || key === 'pid' ? 1 : -1 }))}
           selection={selRow ? [selKey] : []} textOf={(r) => (r.group ? groupLabel(tr, r.group) : procLabel(tr, r.proc))} onActivate={activate} onContextMenu={onContext}
           onRowEnter={onRowEnter} onRowLeave={onRowLeave} rowStyle={(r) => ((r.group || r.proc).gone ? { opacity: 0.55 } : null)}
@@ -1018,7 +1057,7 @@ function InfoSheet({ want }) {
   const gone = (ready && d.gone) || (procs && !live);
   const cmd = ready && d.cmdline ? d.cmdline.map((a) => (/[\s"']/.test(a) || !a ? JSON.stringify(a) : a)).join(' ') : '';
   return (
-    <Sheet width={620} height={620}>
+    <Sheet width={620} height={680}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.m }}>
         {p ? <AppGlyph item={p} size={32} /> : null}
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -1042,6 +1081,7 @@ function InfoSheet({ want }) {
           </View>
         </View>
       ) : null}
+      {ready && !d.gone && p ? <DescriptionPanel p={live || p} d={d} own={own} /> : null}
       <View style={{ alignItems: 'center' }}>
         <Segmented appearance="neutral" value={tab} onChange={setTab}
           options={[['memory', tr('monitor.memory')], ['stats', tr('monitor.proc.tab.stats')], ['files', tr('monitor.proc.tab.files')]]} />

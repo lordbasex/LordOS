@@ -2046,6 +2046,7 @@ static JSValue f_apps_linux(JSContext *c, JSValueConst this_val, int argc, JSVal
         JS_SetPropertyStr(c, o, "nameC", JS_NewString(c, a->name_c));
         JS_SetPropertyStr(c, o, "genericName", JS_NewString(c, a->generic));
         JS_SetPropertyStr(c, o, "comment", JS_NewString(c, a->comment));
+        JS_SetPropertyStr(c, o, "commentLocal", JS_NewBool(c, a->comment_l10n));
         JS_SetPropertyStr(c, o, "keywords", JS_NewString(c, a->keywords));
         JS_SetPropertyStr(c, o, "categories", JS_NewString(c, a->categories));
         JS_SetPropertyStr(c, o, "wmClass", JS_NewString(c, a->wmclass));
@@ -2390,6 +2391,7 @@ static JSValue f_apps_flatpak(JSContext *c, JSValueConst this_val, int argc, JSV
         JS_SetPropertyStr(c, o, "name", JS_NewString(c, a->name));
         JS_SetPropertyStr(c, o, "nameC", JS_NewString(c, a->name_c));
         JS_SetPropertyStr(c, o, "comment", JS_NewString(c, a->comment));
+        JS_SetPropertyStr(c, o, "commentLocal", JS_NewBool(c, a->comment_l10n));
         JS_SetPropertyStr(c, o, "keywords", JS_NewString(c, a->keywords));
         JS_SetPropertyStr(c, o, "categories", JS_NewString(c, a->categories));
         JS_SetPropertyStr(c, o, "wmClass", JS_NewString(c, a->wmclass));
