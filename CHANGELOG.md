@@ -216,6 +216,76 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     both backends with Debian sid's 2.54.3; lord-web also showed a page in a window of a headless weston on 2.54.3 with
     both backends, by shared memory and by dmabuf. Still to check on LordOS's 2.54 backport and the VM: every web app
     feature, before the backport ships.
+- **Machines: QEMU's seccomp filter is an allowlist** (in development; latest release 0.8.9.5-beta; approved by the
+  maintainer 2026-11-23 as isolation layer 3, for every machine; docs/VIRTUALIZATION.md 3.3). Our filter on QEMU used to
+  refuse a list of dangerous calls and allow the rest; now it allows only the calls QEMU was measured to make, checks the
+  arguments where it matters, and stops QEMU on anything else, naming the call.
+  - **The table** (`server/src/vm/vmsyscalls.h`, built into BPF by `vmseccomp.c`): one row per call with its rule, per
+    architecture (amd64 96 rows, arm64 92); a row the other kernel doesn't have doesn't compile there. The program is a
+    binary search on the call's number (about eight comparisons, 400–422 instructions), applied before the exec by
+    `vm_jail_qemu`, so it covers QEMU from its first instruction; QEMU's own `-sandbox` still stacks on top.
+  - **How it was measured**: the test build's learn-all mode (`LORDVM_TEST_SECCOMP=learn-all`, `lord-vm-testpaths` only)
+    sends every call that isn't a hot one to lord-vm, which logs it once and lets it go on. Debian 13's QEMU 1:10.0.13 ran
+    that way on: amd64 KVM and TCG with 2D; KVM with 3D on an AMD (radeonsi) and an Intel (i915) render node; a machine with
+    a TPM (swtpm), secure boot, Hyper-V enlightenments, a USB tablet and SATA discs at its installer; SeaBIOS with the
+    compatible devices at Ubuntu's installer; arm64 KVM and amd64 TCG on the Pi 5. Each through boot, resize, keys,
+    clipboard, sound and microphone, a shared folder (virtiofsd), the agent channels, a snapshot with memory and its
+    revert, reset, suspend to a file and resume, a CD changed while running, passt restarted, shutdown and poweroff, with
+    an `aio=native` direct disk on its I/O thread and vCPU pinning. About fifty rows of the first draft were never called and went
+    (`mbind`, `mlock*`, `msync`, `membarrier`, `timerfd_*`, `dup`, `flock`, `fsync`, `kill`, `sigaltstack`, …); a few
+    that weren't seen stay with the reason beside them (the vDSO's clock fallback, the event loop's epoll past 64
+    descriptors, glibc's `mremap`, `restart_syscall` after the vCPU kick, Mesa's `sched_yield`, GIO's `shutdown`).
+  - **Argument rules**: `ioctl` only on five fixed requests (`BLKSSZGET` and `XFS_IOC_DIOINFO` from the block layer;
+    `TCGETS`, `TIOCGWINSZ`, `FIONREAD` from GLib) and on the request types of the machine's own devices: KVM's on a KVM
+    machine; DRM's, sync_file's and dma-buf's on a 3D or vGPU machine; VFIO's on a vGPU machine; TUN's (200 and up) with a
+    bridged tap; never `TIOCSTI`. `clone` makes threads only (`clone3` ENOSYS, glibc falls back). Without TCG (whose code
+    buffer must be writable and executable) every `PROT_EXEC` in `mmap` or `mprotect` reaches lord-vm, which lets through
+    only the loader's kind (a private, read-only file mapping; arm64 with BTI: `PROT_EXEC|PROT_BTI`) and only until QEMU's
+    QMP handshake, once its libraries, modules and Mesa's drivers are loaded; after it any executable memory stops QEMU,
+    a memfd or a file of its disks included (`MFD_NOEXEC_SEAL` doesn't stop `mmap` with `PROT_EXEC`: measured).
+    `memfd_create` never takes `MFD_EXEC`. Not stopped: what happens during the start itself, and, in the kill fallback
+    without a listener (never on Debian 13's kernel), a private executable mapping of a file QEMU wrote. `prctl` only the five options
+    measured, and `PR_SET_DUMPABLE` refused, so QEMU can't make itself dumpable again. `prlimit64` only on itself (closing
+    what the namespaces work left open: QEMU could read or set another of the person's processes' limits), `tgkill` only
+    its own threads, no `kill`. `seccomp` never with a listener. One exec only: `execve` isn't a row and every
+    `execveat` reaches lord-vm, which lets through only the first, from the child it forked, before QEMU runs
+    (`vm_sc_exec_once`), and stops QEMU at any later one (a descriptor number proves nothing once QEMU runs: it can close
+    it and reuse the number). Landlock's execute right now goes only to QEMU's binary and its loader, no longer to all of
+    `/usr`. Without a listener `execveat` passes only on lord-vm's descriptor number, so only QEMU itself could run again,
+    until QEMU's own `spawn=deny` is up. Both were found by the security review of this change. Refused and never run: `socket` (EACCES), `io_uring_*` (EPERM, still not
+    approved), `kcmp` (EPERM, Mesa copes).
+  - **A stop is named**: the default action is `SECCOMP_RET_USER_NOTIF`, and lord-vm holds the filter's listener (it comes
+    back over the start's status socket; the child closes its copy before the exec, since QEMU holding it could answer for
+    its own calls). lord-vm kills QEMU before the call runs and writes the call to the log and `blocked by the sandbox:
+    <call>` to the failure page; were lord-vm gone the call fails with ENOSYS, never runs. Where the kernel refuses a
+    listener the rows run with kill as the default. `lord-vm --status --json` adds `"seccomp_allowlist"` and
+    `"seccomp_named"`. The enforced runs found one call the learn runs had missed, on the Intel 3D machine after two
+    minutes of use (`SYNC_IOC_MERGE`, Mesa merging fences): QEMU stopped with exactly that name, and sync_file and dma-buf
+    requests joined DRM's for 3D machines.
+  - **No switch for people**: only the test build reads `LORDVM_TEST_SECCOMP` (`learn`, `learn-all`, and `drop:<name>`,
+    which leaves one row out to see the stop named).
+  - **Cost** (amd64 PC, 5 alternating starts each against 0.8.9.5's denylist): fork to exec 1–2 ms either way, QMP ready
+    99–128 ms against 97–133 ms, boot to the serial login 12.06–12.39 s against 12.09–12.59 s, QEMU's RSS within the
+    spread. Per call (medians on one CPU): `read` 120.5 ns against 121.9 ns, `getppid` 101.9 against 100.8, a checked
+    ioctl 169.9 against 170.0; the kernel's cache skips the program for calls allowed whatever their arguments.
+  - **Tests**: `vmseccomp-test` (new, in `make -C server test`) builds both architectures' tables (the other one against
+    its own kernel header), checks that the dangerous calls (`ptrace`, `process_vm_*`, `kexec_*`, `bpf`,
+    `perf_event_open`, `userfaultfd`, mounts, `setns`, `unshare`, keys, modules, `execve`, `kill`, …) are absent or
+    refused, and runs the program in a small BPF interpreter for all 128 combinations of the machine's options: every row
+    reaches its rule, every other number the default, and each argument rule (about 570,000 checks), and lord-vm's
+    one-exec decision. `vm-jail-probe` now
+    also runs 28 forbidden calls each in a jailed probe of its own (a second `execveat` under lord-vm's old descriptor
+    number, anonymous or shared executable memory, code written into a memfd or into one of its disks and mapped to run
+    after the start, `mprotect` to executable (BTI's form too) and `MFD_EXEC` among them): each reaches the listener named before it runs and the
+    probe dies by SIGKILL; without a listener the same calls die by SIGSYS; threads, `eventfd`, executable memory that
+    isn't writable and TCG's writable and executable memory keep working; without a listener another binary under the
+    exec descriptor's number is refused by Landlock; the probe holds no listener and can't make
+    itself dumpable. `tests/vm_isolation.sh` checks the new status fields and, with the test build next to lord-vm, that
+    a left-out row stops QEMU with the call named.
+  - **Also run enforced**: a Whonix group (gateway and workstation linked, Tor reached, the gateway restarted and linked
+    again) through `tests/vm_group_link.sh`.
+  - **Not run under it yet**: an Intel vGPU (GVT-g), a bridged tap and hugetlb memory: their calls were read in QEMU's
+    source (VFIO's and TUN's request types are in the rules).
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores
@@ -248,6 +318,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+
+- **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
+  hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
+  re-made the first's (found while starting six test machines at once: "socket: Address already in use", then "can't
+  reach virtiofsd"). It is now named after the machine's id.
 - **Downloads: a GitHub release file refused now and then with a 403 is asked for again** (in development; the latest
   release is 0.8.9.5-beta). Reported by the maintainer: Machines → New machine → the LordOS 0.8.9 card said "Couldn't
   download the list of images: the server answered 403". `vm-image-list` downloads the release's `SHA256SUMS` and
