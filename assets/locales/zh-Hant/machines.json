@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D 適用於任何系統：客體以處理器繪製畫面。",
   "cfg.graphics3dNote": "使用 3D 時，客體的 App 會以這部電腦的 GPU 繪製（OpenGL）。使用 3D 的機器無法暫停，也無法保留含記憶體的快照：會改為關機。",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "客體的 Vulkan 應用程式也用這台電腦的 GPU 繪製 (venus)。客體需要 Mesa 的 Vulkan 驅動程式，這台電腦需要能把 GPU 記憶體對映進虛擬機的核心。若不能，虛擬機只以 OpenGL 啟動，並在記錄中說明原因。",
   "cfg.pointerDraw": "指標繪製方",
   "cfg.pointerLordos": "LordOS（較快）",
   "cfg.pointerGuest": "機器",

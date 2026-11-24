@@ -78,15 +78,15 @@
     X(kcmp, EPERM) \
     /* QEMU's own -sandbox (libseccomp), and its one exec */ \
     X(seccomp, SECCOMP) X(execveat, EXECVEAT) \
-    /* Vulkan through venus only (VSR_VENUS, docs/VIRTUALIZATION.md 6.10): virglrenderer's render server is a child QEMU \
-     * forks and execs (Landlock lets it run that one program besides QEMU), waits for and ends; every other machine \
-     * stops at these as at any call that isn't a row */ \
-    X(execve, VENUS) X(wait4, VENUS) X(waitid, VENUS) X(kill, VENUS) X(setpgid, VENUS)
+    /* venus's render server only (VSR_VENUS, docs/VIRTUALIZATION.md 6.10; its own filter, lord-vm starts it): it forks \
+     * its context workers, waits for them and ends them, a signal only to a pid above 0; QEMU stops at these as at any \
+     * call that isn't a row. Nothing here execs: the render server's one execveat is lord-vm's, as QEMU's */ \
+    X(wait4, VENUS) X(waitid, VENUS) X(kill, VENUSKILL)
 
 /* amd64 only: what glibc calls there (arm64 has the *at forms below); (kept) epoll_wait: the event loop's epoll, as
  * above; time: the vDSO's fallback */
 #define VM_SC_AMD64(X) \
-    X(fork, VENUS) X(vfork, EPERM) X(access, OK) X(readlink, OK) X(poll, OK) X(arch_prctl, OK) X(epoll_wait, OK) X(time, OK)
+    X(fork, VENUS) X(access, OK) X(readlink, OK) X(poll, OK) X(arch_prctl, OK) X(epoll_wait, OK) X(time, OK)
 
 /* arm64 only */
 #define VM_SC_ARM64(X) \

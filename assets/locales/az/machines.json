@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D istənilən sistemlə işləyir: qonaq şəklini prosessorla çəkir.",
   "cfg.graphics3dNote": "3D ilə qonağın tətbiqləri bu kompüterin GPU-su ilə çəkir (OpenGL). 3D olan maşın yuxu rejiminə keçə və yaddaşı ilə birlikdə snapşot saxlaya bilməz: əvəzinə söndürülür.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Qonağın Vulkan tətbiqləri də bu kompüterin GPU-su ilə çəkir (venus). Qonağa Mesa-nın Vulkan sürücüləri, bu kompüterə isə GPU yaddaşını maşınlara xəritələyə bilən nüvə lazımdır. Bacarmasa, maşın yalnız OpenGL ilə başlayır və jurnalı səbəbini deyir.",
   "cfg.pointerDraw": "Göstəricini çəkən",
   "cfg.pointerLordos": "LordOS (daha sürətli)",
   "cfg.pointerGuest": "Maşın",

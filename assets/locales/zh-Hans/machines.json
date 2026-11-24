@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D 适用于任何系统：客户机用处理器绘制画面。",
   "cfg.graphics3dNote": "使用 3D 时，客户机的应用会用这台电脑的 GPU 绘制（OpenGL）。使用 3D 的机器不能挂起，也不能保留含内存的快照：会改为关机。",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "客户机的 Vulkan 应用也用这台电脑的 GPU 绘制 (venus)。客户机需要 Mesa 的 Vulkan 驱动，这台电脑需要能把 GPU 内存映射进虚拟机的内核。若不能，虚拟机只以 OpenGL 启动，并在日志中说明原因。",
   "cfg.pointerDraw": "指针绘制方",
   "cfg.pointerLordos": "LordOS（更快）",
   "cfg.pointerGuest": "机器",

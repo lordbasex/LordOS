@@ -27,7 +27,7 @@
 
 /* a row's rule (vmsyscalls.h) */
 enum { VSR_OK = 1, VSR_HOT, VSR_EACCES, VSR_EPERM, VSR_ENOSYS, VSR_CLONE, VSR_IOCTL, VSR_PRCTL, VSR_SOCKETPAIR,
-       VSR_MMAP, VSR_MPROTECT, VSR_MEMFD, VSR_PRLIMIT, VSR_TGKILL, VSR_SECCOMP, VSR_EXECVEAT, VSR_VENUS };
+       VSR_MMAP, VSR_MPROTECT, VSR_MEMFD, VSR_PRLIMIT, VSR_TGKILL, VSR_SECCOMP, VSR_EXECVEAT, VSR_VENUS, VSR_VENUSKILL };
 
 typedef struct { const char *name; int nr; int rule; } VmScRow;
 
@@ -38,12 +38,12 @@ typedef struct {
     int render;     /* 3D graphics or a vGPU: the render node's DRM ioctls ('d'), sync_file ('>') and dma-buf ('b') */
     int vgpu;       /* an Intel vGPU: VFIO's ioctls (';') */
     int tap;        /* a bridged network: the tap's TUN ioctls ('T' 200 and up) */
-    int venus;      /* Vulkan through venus (6.10): QEMU's virglrenderer starts its render server, a fork and an exec of
-                     * the one program Landlock lets it run (/usr/libexec/virgl_render_server): plain forks (clone with
-                     * SIGCHLD only), execve, wait4 and kill (its own children), and the render server's own threads'
-                     * signals; VSR_VENUS rows are the default action for every other machine */
+    int venus;      /* the filter of venus's render server (6.10; lord-vm starts it, vmsandbox.h vm_jail_venus), never
+                     * QEMU's: plain forks (clone with SIGCHLD only: its context workers), wait4 and waitid, kill and
+                     * tgkill to a pid above 0 (Landlock's signal scope keeps them inside its own jail). No exec but
+                     * lord-vm's one execveat. VSR_VENUS rows are the default action for every other filter */
     int bti;        /* arm64 with BTI: without a listener, mprotect may add PROT_EXEC together with PROT_BTI */
-    pid_t self;     /* QEMU's pid (the child's own: exec keeps it); 0 with venus (its render server is another process) */
+    pid_t self;     /* QEMU's pid (the child's own: exec keeps it) */
     int exec_fd;    /* the descriptor of QEMU's binary, the only thing execveat may run; -1: no exec */
     int notify;     /* 1: the default action is SECCOMP_RET_USER_NOTIF (lord-vm holds the listener); 0: kill */
     int learn;      /* 0; test builds: 1 learn (log, go on), 2 learn-all (every row but HOT goes to lord-vm too) */

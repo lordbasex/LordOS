@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "La 2D fonctionne avec tous les systèmes : l’invité dessine son image avec le processeur.",
   "cfg.graphics3dNote": "Avec la 3D, les apps de l’invité dessinent avec le GPU de cet ordinateur (OpenGL). Une machine en 3D ne peut pas être mise en veille ni garder d’instantanés avec sa mémoire : elle s’éteint à la place.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Les apps Vulkan de l'invité dessinent aussi avec le GPU de cet ordinateur (venus). L'invité a besoin des pilotes Vulkan de Mesa ; cet ordinateur, d'un noyau capable de projeter la mémoire du GPU dans les machines. Sinon, la machine démarre avec OpenGL seulement et son journal dit pourquoi.",
   "cfg.pointerDraw": "Pointeur dessiné par",
   "cfg.pointerLordos": "LordOS (plus rapide)",
   "cfg.pointerGuest": "La machine",

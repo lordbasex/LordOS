@@ -124,7 +124,8 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
     case VSR_CLONE:
         LD_ARG(0);
         if (o->venus) {
-            /* venus: also a plain fork (glibc's: SIGCHLD with the child's tid set and cleared, nothing shared) */
+            /* the render server: also a plain fork for a context worker (glibc's: SIGCHLD with the child's tid set and
+             * cleared, nothing shared) */
             JUMP(BPF_JMP | BPF_JEQ | BPF_K, (uint32_t)(CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID | SIGCHLD), 4, 0);
             JUMP(BPF_JMP | BPF_JEQ | BPF_K, (uint32_t)SIGCHLD, 3, 0);
         }
@@ -135,6 +136,15 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
         return 0;
     case VSR_VENUS:
         if (o->venus && !learn_all) ALLOW(); else DEFAULT();
+        return 0;
+    case VSR_VENUSKILL:
+        /* kill: the render server's own processes, by a pid above 0 (never 0, -1 or a group) */
+        if (!o->venus || learn_all) { DEFAULT(); return 0; }
+        LD_ARG(0);
+        JUMP(BPF_JMP | BPF_JSET | BPF_K, 0x80000000u, 1, 0);
+        JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 1);
+        DEFAULT();
+        ALLOW();
         return 0;
     case VSR_IOCTL: {
         LD_ARG(1);
@@ -221,6 +231,16 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
         /* prlimit64: 0 or itself; tgkill: a thread of its own */
         uint32_t v[2] = { (uint32_t)o->self, 0 };
         LD_ARG(0);
+        if (o->venus && r->rule == VSR_TGKILL) {
+            /* the render server and its workers: their own threads, by a pid above 0 (Landlock's signal scope keeps a
+             * signal inside its jail); prlimit stays on 0 or the server itself, as below */
+            JUMP(BPF_JMP | BPF_JSET | BPF_K, 0x80000000u, 0, 1);
+            DEFAULT();
+            JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0, 0, 1);
+            DEFAULT();
+            ALLOW();
+            return 0;
+        }
         any_of(e, v, r->rule == VSR_PRLIMIT ? 2 : 1, e->deflt);
         return 0;
     }

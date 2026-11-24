@@ -527,6 +527,7 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         JS_SetPropertyStr(c, o, "guestNotify", JS_NewBool(c, m.guest_notify));
         set_int(c, o, "heads", m.heads > 1 ? m.heads : 1);                       /* All Displays (5.4) */
         JS_SetPropertyStr(c, o, "automation", JS_NewBool(c, m.automation));      /* machines exec and cp may run programs (6.15) */
+        JS_SetPropertyStr(c, o, "vulkan", JS_NewBool(c, m.vulkan));              /* Vulkan through venus with 3D (6.10) */
         set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
         JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
         set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
@@ -1621,6 +1622,12 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "automation");
     if (JS_IsBool(v)) { args[n++] = "--automation"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    /* Vulkan through venus (6.10): with 3D only; lord-vm turns it off with 2D */
+    v = JS_GetPropertyStr(c, argv[1], "vulkan");
+    if (JS_IsBool(v)) { args[n++] = "--vulkan"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "cpuPin");
     if (JS_IsString(v)) {
         const char *s = JS_ToCString(c, v);

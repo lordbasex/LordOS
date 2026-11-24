@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D werkt met elk systeem: de gast tekent zijn beeld met de processor.",
   "cfg.graphics3dNote": "Met 3D tekenen de apps van de gast met de GPU van deze computer (OpenGL). Een machine met 3D kan niet in de slaapstand of momentopnamen met haar geheugen houden: ze wordt in plaats daarvan afgesloten.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "De Vulkan-apps van de gast tekenen ook met de GPU van deze computer (venus). De gast heeft de Vulkan-stuurprogramma's van Mesa nodig; deze computer een kernel die het geheugen van de GPU in machines kan inlezen. Lukt dat niet, dan start de machine alleen met OpenGL en zegt het logboek waarom.",
   "cfg.pointerDraw": "Aanwijzer getekend door",
   "cfg.pointerLordos": "LordOS (sneller)",
   "cfg.pointerGuest": "De machine",

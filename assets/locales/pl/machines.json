@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D działa z każdym systemem: gość rysuje obraz procesorem.",
   "cfg.graphics3dNote": "Z 3D aplikacje gościa rysują za pomocą GPU tego komputera (OpenGL). Maszyny z 3D nie można uśpić ani zachować migawek z jej pamięcią: zamiast tego zostaje wyłączona.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Aplikacje Vulkan gościa także rysują za pomocą GPU tego komputera (venus). Gość potrzebuje sterowników Vulkan z Mesy; ten komputer jądra, które potrafi mapować pamięć GPU do maszyn. Jeśli nie potrafi, maszyna startuje tylko z OpenGL, a jej dziennik podaje powód.",
   "cfg.pointerDraw": "Wskaźnik rysuje",
   "cfg.pointerLordos": "LordOS (szybciej)",
   "cfg.pointerGuest": "Maszyna",

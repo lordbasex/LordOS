@@ -266,8 +266,8 @@ int vm_jail_qemu(const VmQemuJail *j) {
             /* 3D: a render node that doesn't check out gets no rule (QEMU's EGL then fails and it exits); it never costs
              * the rest of the sandbox */
             if (j->render && j->render[0]) render_rules(rs, j->render, j->render_fd, h);
-            /* venus: its render server, read and execute; without that rule venus isn't given (the machine doesn't start) */
-            if (j->venus && (!j->render || !j->render[0] || rule(rs, VM_VENUS_SERVER, rx, h))) ok = 0;
+            /* venus: the library that hands virglrenderer lord-vm's connection to the render server, read only */
+            if (j->venus_shim && j->venus_shim[0] && rule(rs, j->venus_shim, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
             /* a vGPU whose paths don't check out costs the whole sandbox: QEMU doesn't run (the caller refuses) */
             if (j->vgpu_dev && j->vgpu_dev[0] && vgpu_rules(rs, j->vgpu_dev, j->vgpu_group, h)) ok = 0;
             if (j->vgpu_dev && j->vgpu_rom && j->vgpu_rom[0] && rule(rs, j->vgpu_rom, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
@@ -290,7 +290,61 @@ int vm_jail_qemu(const VmQemuJail *j) {
         static struct sock_filter filt[BPF_MAXINSNS];
         VmScOpts o = { .kvm = j->kvm, .tcg = j->tcg, .render = j->render && j->render[0], .vgpu = j->vgpu_dev && j->vgpu_dev[0],
                        .tap = j->tap, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn, .bti = vm_sc_cpu_bti(),
-                       .drop = j->sc_drop, .venus = j->venus };
+                       .drop = j->sc_drop };
+        for (int pass = 0; pass < 2 && !(mask & VMS_SECCOMP_OURS); pass++) {
+            if (pass && (!o.notify || o.learn)) break;
+            if (pass) o.notify = 0;
+            int n = vm_sc_build(&o, filt, BPF_MAXINSNS);
+            if (n <= 0 || n > BPF_MAXINSNS) break;
+            struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
+            long r = syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, o.notify ? SECCOMP_FILTER_FLAG_NEW_LISTENER : 0, &prog);
+            if (r < 0) continue;
+            mask |= VMS_SECCOMP_OURS | VMS_SECCOMP_ALLOWLIST;
+            if (o.notify) { mask |= VMS_SECCOMP_NAMED; *j->notify_out = (int)r; }
+        }
+    }
+    return mask;
+}
+
+int vm_jail_venus(const VmVenusJail *j) {
+    int mask = 0;
+    struct rlimit no = { 0, 0 };
+    setrlimit(RLIMIT_CORE, &no);
+    if (!prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) mask |= VMS_NO_NEW_PRIVS;
+    int abi = vm_landlock_abi();
+    if (abi >= 1) {
+        struct landlock_ruleset_attr attr;
+        memset(&attr, 0, sizeof attr);
+        uint64_t h = fs_handled(abi);
+        attr.handled_access_fs = h;
+        if (abi >= 4) attr.handled_access_net = LANDLOCK_ACCESS_NET_BIND_TCP | LANDLOCK_ACCESS_NET_CONNECT_TCP;
+#ifdef LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET
+        if (abi >= 6) attr.scoped = LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET | LANDLOCK_SCOPE_SIGNAL;
+#endif
+        int rs = (int)syscall(SYS_landlock_create_ruleset, &attr, sizeof attr, 0U);
+        if (rs >= 0) {
+            uint64_t ro = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
+            uint64_t rx = ro | LANDLOCK_ACCESS_FS_EXECUTE;
+            char ldreal[PATH_MAX];
+            /* every rule must apply, the render node's too: the server is useless without it */
+            int ok = j->exec_path && j->exec_path[0] == '/' && VM_LOADER[0] && realpath(VM_LOADER, ldreal) && j->render && j->render[0] &&
+                     !rule(rs, "/usr", ro, h) && !rule(rs, j->exec_path, rx, h) && !rule(rs, ldreal, rx, h) && !rule(rs, "/proc/self", ro, h) &&
+                     !render_rules(rs, j->render, j->render_fd, h);
+            rule(rs, "/etc/ld.so.cache", LANDLOCK_ACCESS_FS_READ_FILE, h);
+            rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
+            if (ok && !syscall(SYS_landlock_restrict_self, rs, 0U)) {
+                mask |= VMS_LANDLOCK_FS;
+                if (abi >= 4) mask |= VMS_LANDLOCK_NET;
+                if (abi >= 6) mask |= VMS_LANDLOCK_SCOPE;
+            }
+            close(rs);
+        }
+    }
+    if (j->notify_out) *j->notify_out = -1;
+    if (VM_AUDIT_ARCH) {
+        static struct sock_filter filt[BPF_MAXINSNS];
+        VmScOpts o = { .render = 1, .venus = 1, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn,
+                       .bti = vm_sc_cpu_bti() };
         for (int pass = 0; pass < 2 && !(mask & VMS_SECCOMP_OURS); pass++) {
             if (pass && (!o.notify || o.learn)) break;
             if (pass) o.notify = 0;

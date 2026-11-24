@@ -78,6 +78,7 @@
 #include <strings.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -1080,6 +1081,10 @@ static struct {
      * Vulkan driver its render server loads (VK_DRIVER_FILES: the render node's GPU's, never llvmpipe's JIT) */
     int venus;
     char venus_icd[96];
+    /* its render server, started by lord-vm (spawn_venus): the process, its pidfd, the filter's listener (vs_serve), its
+     * one exec done, QEMU's end of the connection and its number in QEMU (LORDOS_VENUS_FD) */
+    pid_t vs_pid;
+    int vs_pidfd, vs_fd, vs_exec_done, vs_qemu_end, vs_qfd, vs_starting, vs_err;
     /* an Intel GVT-g vGPU this run (decide_vgpu, docs/MACHINES-GPU.md Mode A): its render node (the iGPU's, where QEMU
      * makes the picture's dmabufs), /dev/vfio/<group>, the picture's size, and whether the guest asked for a restart
      * (QEMU runs with -action reboot=shutdown: a reset is an exit, and Machines starts it again) */
@@ -1518,17 +1523,6 @@ static const char *sc_drop_row(void) {
     return NULL;
 }
 
-/* a thread of a process QEMU started (venus's render server, its worker processes and their threads), never one of QEMU's
- * own. Only QEMU and what it starts carry its filter, so a notifying thread that isn't in QEMU's thread group is such a
- * child's: tgkill(QEMU, thread, 0) (signal 0: nothing is sent) fails with ESRCH exactly then. A system call, not /proc
- * (lord-vm's Landlock keeps /proc closed); the notifying thread is held in the kernel while this runs, so its id can't
- * be reused meanwhile */
-static int venus_child(pid_t tid) {
-    if (S.qemu <= 0 || tid <= 1 || tid == S.qemu) return 0;
-    errno = 0;
-    return syscall(SYS_tgkill, S.qemu, tid, 0) < 0 && errno == ESRCH;
-}
-
 /* the notifications waiting on QEMU's listener. A call the allowlist stops: QEMU is killed before it runs, and its
  * name is kept for the failure page. 1 when QEMU was stopped. Learn mode: logged once, and it goes on */
 static int sc_serve(void) {
@@ -1563,10 +1557,8 @@ static int sc_serve(void) {
             if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp)) vlog("seccomp: the exec of QEMU couldn't be let through: %s", strerror(errno));
             continue;
         }
-        /* while QEMU starts, the loader's executable mappings (libraries, modules, Mesa's drivers); never after. With venus,
-         * the same kind for its render server, a process of its own QEMU started (Landlock let it run only that program)
-         * whose loader maps its libraries when the guest first asks for Vulkan, long after QEMU's start */
-        if (S.sc_exec_done && vm_sc_startup_exec(&req->data, vm_sc_cpu_bti()) && (S.sc_starting || (S.venus && venus_child(req->pid)))) {
+        /* while QEMU starts, the loader's executable mappings (libraries, modules, Mesa's drivers); never after */
+        if (S.sc_starting && S.sc_exec_done && vm_sc_startup_exec(&req->data, vm_sc_cpu_bti())) {
             resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
             if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp)) vlog("seccomp: a library's mapping couldn't be let through: %s", strerror(errno));
             continue;
@@ -1577,7 +1569,7 @@ static int sc_serve(void) {
             for (int i = 0; i < S.sc_nseen; i++) if (S.sc_seen[i] == key) { seen = 1; break; }
             if (!seen) {
                 if (S.sc_nseen < (int)(sizeof S.sc_seen / sizeof S.sc_seen[0])) S.sc_seen[S.sc_nseen++] = key;
-                vlog("seccomp learn: %s (thread %u%s)", what, (unsigned)req->pid, S.venus && venus_child(req->pid) ? ", venus's render server" : "");
+                vlog("seccomp learn: %s (thread %u)", what, (unsigned)req->pid);
             }
             resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
         } else {
@@ -1601,6 +1593,223 @@ static int sc_serve(void) {
         if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp) && errno != ENOENT && S.sc_learn) vlog("seccomp learn: can't answer: %s", strerror(errno));
     }
     return stopped;
+}
+
+static void child_common(int procs_fd);
+static void place_fds(const int *want, int n);
+
+/* ---- venus's render server (docs/VIRTUALIZATION.md 6.10, "venus"; vmsandbox.h vm_jail_venus) ----
+ * lord-vm starts it, never QEMU: QEMU gets the other end of its connection (venusshim.c) and keeps the jail every 3D
+ * machine has. The server parses the guest's Vulkan commands, so it is jailed too, apart from QEMU, with a listener of
+ * its own here: its one exec (lord-vm's execveat of the binary it opened), the executable mappings of the system's
+ * libraries its loader and Vulkan make (checked by what file they are), and nothing else; any other call ends the
+ * render server (QEMU goes on; the guest loses Vulkan) and the log names it. */
+
+/* an executable mapping of the render server: only the loader's kind (a private read-only file mapping), only from the
+ * render server's own threads (tgkill(server, thread, 0) finds the thread there; signal 0 sends nothing), and only while
+ * the machine starts (vs_starting, until QEMU's QMP handshake, as QEMU's own; the vCPUs haven't run, so nothing the guest
+ * sent has reached the server yet). Its Vulkan driver is preloaded (VS_PRELOAD), so every library it will run is mapped
+ * then; after the start any executable mapping ends it. 1 to let it through */
+static int vs_lib_ok(const struct seccomp_notif *req) {
+    if (!S.vs_starting || S.vs_pid <= 0 || !vm_sc_startup_exec(&req->data, vm_sc_cpu_bti())) return 0;
+    pid_t tid = (pid_t)req->pid;
+    if (tid != S.vs_pid && syscall(SYS_tgkill, S.vs_pid, tid, 0)) return 0;
+    /* the thread must still be the one that asked (its call waits in the kernel; the id can't have been reused) */
+    return !ioctl(S.vs_fd, SECCOMP_IOCTL_NOTIF_ID_VALID, &req->id);
+}
+
+/* the Vulkan driver's library its manifest names ("library_path", a bare name in the system's library folder or a path),
+ * for the render server's LD_PRELOAD: under /usr/lib/, no "..", a regular file. 0 and the path in out */
+static int venus_icd_lib(const char *icd, char *out, size_t n) {
+    int fd = open(icd, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return -1;
+    char buf[4096];
+    ssize_t r = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (r <= 0) return -1;
+    buf[r] = 0;
+    char *k = strstr(buf, "\"library_path\"");
+    char *q = k ? strchr(k + 14, '"') : NULL;
+    char *e = q ? strchr(q + 1, '"') : NULL;
+    if (!e || e - q - 1 <= 0 || e - q - 1 > 200) return -1;
+    *e = 0;
+    /* a bare name (Debian's manifests): the system's library folder for this architecture */
+#if defined(__aarch64__)
+    const char *dir = "/usr/lib/aarch64-linux-gnu/";
+#else
+    const char *dir = "/usr/lib/x86_64-linux-gnu/";
+#endif
+    if ((size_t)snprintf(out, n, "%s%s", q[1] == '/' ? "" : dir, q + 1) >= n) return -1;
+    struct stat st;
+    if (strncmp(out, "/usr/lib/", 9) || strstr(out, "..") || strchr(out, ':') || strchr(out, ' ') || stat(out, &st) || !S_ISREG(st.st_mode)) return -1;
+    return 0;
+}
+
+static void vs_stop(const char *why) {
+    if (S.vs_pid > 0) {
+        if (S.vs_pidfd >= 0) syscall(SYS_pidfd_send_signal, S.vs_pidfd, SIGKILL, NULL, 0);
+        else kill(S.vs_pid, SIGKILL);
+    }
+    if (why) vlog("venus: the render server was stopped: %s; the guest has no Vulkan until the machine starts again", why);
+}
+
+/* the render server's listener: 1 when it was stopped */
+static int vs_serve(void) {
+    static struct seccomp_notif_sizes sz;
+    static int have_sz;
+    if (S.vs_fd < 0) return 0;
+    if (!have_sz) {
+        if (syscall(SYS_seccomp, SECCOMP_GET_NOTIF_SIZES, 0, &sz)) return 0;
+        have_sz = 1;
+    }
+    char req_b[512], resp_b[256];
+    if (sz.seccomp_notif > sizeof req_b || sz.seccomp_notif_resp > sizeof resp_b) return 0;
+    struct seccomp_notif *req = (struct seccomp_notif *)req_b;
+    struct seccomp_notif_resp *resp = (struct seccomp_notif_resp *)resp_b;
+    int stopped = 0;
+    for (int k = 0; k < 256; k++) {
+        struct pollfd pf = { S.vs_fd, POLLIN, 0 };
+        if (poll(&pf, 1, 0) <= 0) break;
+        if (pf.revents & (POLLHUP | POLLERR) && !(pf.revents & POLLIN)) { close(S.vs_fd); S.vs_fd = -1; break; }
+        memset(req_b, 0, sizeof req_b);
+        if (ioctl(S.vs_fd, SECCOMP_IOCTL_NOTIF_RECV, req)) { if (errno == EINTR || errno == ENOENT) continue; break; }
+        char what[160];
+        vm_sc_describe(&req->data, what, sizeof what);
+        memset(resp_b, 0, sizeof resp_b);
+        resp->id = req->id;
+        if (vm_sc_exec_once(req, S.vs_pid, &S.vs_exec_done) || (S.vs_exec_done && vs_lib_ok(req))) {
+            resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+        } else if (S.sc_learn) {
+            vlog("seccomp learn (venus): %s (thread %u)", what, (unsigned)req->pid);
+            resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+        } else {
+            char why[400];
+            snprintf(why, sizeof why, "a call its allowlist doesn't have (thread %u): %s", (unsigned)req->pid, what);
+            vs_stop(why);
+            resp->error = -EPERM;
+            stopped = 1;
+        }
+        ioctl(S.vs_fd, SECCOMP_IOCTL_NOTIF_SEND, resp);
+    }
+    return stopped;
+}
+
+#ifdef LORDVM_TEST_PATHS
+#define VENUS_SHIM test_path("LORDVM_TEST_VENUS_SHIM", VM_VENUS_SHIM)
+#else
+#define VENUS_SHIM VM_VENUS_SHIM
+#endif
+
+/* the render server for this start: a SOCK_SEQPACKET pair, the server's end as its fd 3 (--socket-fd 3), QEMU's kept in
+ * vs_qemu_end; the child in QEMU's namespaces, cgroup leaf and private loader, jailed (vm_jail_venus), then lord-vm's
+ * execveat of the binary it opened. 0 started; -1 (and venus isn't given this start) otherwise */
+static int spawn_venus(void) {
+    if (!file_exists(VENUS_SHIM)) { vlog("venus: not given: %s is missing", VENUS_SHIM); return -1; }
+    static char lib[PATH_MAX];
+    if (venus_icd_lib(S.venus_icd, lib, sizeof lib)) { vlog("venus: not given: %s names no library of the system's", S.venus_icd); return -1; }
+    S.vs_starting = 1;
+    int sp[2], st[2], ep[2];
+    if (pipe2(ep, O_CLOEXEC)) return -1;
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sp)) { close(ep[0]); close(ep[1]); return -1; }
+    if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, st)) { close(sp[0]); close(sp[1]); return -1; }
+    int xfd = open(VM_VENUS_SERVER, O_PATH | O_CLOEXEC);
+    if (xfd < 0) { close(sp[0]); close(sp[1]); close(st[0]); close(st[1]); return -1; }
+    pid_t pid = fork();
+    if (pid < 0) { close(sp[0]); close(sp[1]); close(st[0]); close(st[1]); close(xfd); return -1; }
+    if (!pid) {
+        child_common(qemu_procs_fd);
+        int in_ns = vm_ns_enter(S.userns);
+        if (in_ns) vm_ns_setup(S.rundir, S.disks);
+        int null = open("/dev/null", O_RDWR);
+        dup2(null, 0);
+        dup2(ep[1], 1);         /* what it says goes to the machine's log ("venus: ...") */
+        dup2(ep[1], 2);
+        /* 3 the connection, 4 the render node (its Landlock rule; the server opens the node by path), 5 the status,
+         * 6 the binary (the execveat); all but 3 closed by the exec */
+        int fds[4] = { sp[1], S.render_fd, st[1], xfd };
+        place_fds(fds, 4);
+        for (int f = 4; f <= 6; f++) fcntl(f, F_SETFD, FD_CLOEXEC);
+        int x2 = 6;
+        int lfd = -1, abi = vm_landlock_abi();      /* asked before the filter: it isn't a row */
+        VmVenusJail j = { S.render, 4, x2, VM_VENUS_SERVER, S.sc_learn, &lfd };
+        int32_t msg = vm_jail_venus(&j);
+        int bad = !(msg & VMS_SECCOMP_OURS) || !(msg & VMS_NO_NEW_PRIVS) || (abi >= 1 && !(msg & VMS_LANDLOCK_FS));
+        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
+        struct iovec io = { &msg, sizeof msg };
+        struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1 };
+        if (lfd >= 0 && !bad) {
+            memset(&cm, 0, sizeof cm);
+            mh.msg_control = cm.b; mh.msg_controllen = sizeof cm.b;
+            struct cmsghdr *ch = CMSG_FIRSTHDR(&mh);
+            ch->cmsg_level = SOL_SOCKET; ch->cmsg_type = SCM_RIGHTS; ch->cmsg_len = CMSG_LEN(sizeof(int));
+            memcpy(CMSG_DATA(ch), &lfd, sizeof(int));
+        }
+        if (sendmsg(5, &mh, 0) < 0 || bad) _exit(126);
+        if (lfd >= 0) close(lfd);
+        /* its one Vulkan driver (no llvmpipe and its JIT), loaded at its start with everything it needs, while executable
+         * mappings are still let through (vs_lib_ok) */
+        static char vkenv[128], pre[PATH_MAX + 80];
+        snprintf(vkenv, sizeof vkenv, "VK_DRIVER_FILES=%s", S.venus_icd);
+        /* the Vulkan loader too (virglrenderer opens it when a context is made) */
+#if defined(__aarch64__)
+        snprintf(pre, sizeof pre, "LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libvulkan.so.1:%s", lib);
+#else
+        snprintf(pre, sizeof pre, "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libvulkan.so.1:%s", lib);
+#endif
+        char *argv[] = { "virgl_render_server", "--socket-fd", "3", NULL };
+        /* no Vulkan layers (Mesa's device-select layer would be another library loaded later) */
+        char *env[] = { "LC_ALL=C.UTF-8", "MESA_SHADER_CACHE_DISABLE=true", "VK_LOADER_LAYERS_DISABLE=~all~", "NODEVICE_SELECT=1", vkenv, pre, NULL };
+        syscall(SYS_execveat, x2, "", argv, env, AT_EMPTY_PATH);
+        _exit(127);
+    }
+    close(sp[1]);
+    close(st[1]);
+    close(ep[1]);
+    close(xfd);
+    if (S.vs_err >= 0) close(S.vs_err);
+    S.vs_err = ep[0];
+    fcntl(S.vs_err, F_SETFL, O_NONBLOCK);
+    S.vs_pid = pid;
+    S.vs_exec_done = 0;
+    S.vs_pidfd = (int)syscall(SYS_pidfd_open, pid, 0);
+    int32_t got = 0;
+    union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
+    struct iovec io = { &got, sizeof got };
+    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
+    ssize_t r = -1;
+    /* never waits on the child for long: 5 s for its jail */
+    struct pollfd p0 = { st[0], POLLIN, 0 };
+    if (poll(&p0, 1, 5000) > 0) do r = recvmsg(st[0], &mh, MSG_CMSG_CLOEXEC | MSG_DONTWAIT); while (r < 0 && errno == EINTR);
+    struct cmsghdr *ch = r > 0 ? CMSG_FIRSTHDR(&mh) : NULL;
+    if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof(int))) {
+        memcpy(&S.vs_fd, CMSG_DATA(ch), sizeof(int));
+        fcntl(S.vs_fd, F_SETFL, O_NONBLOCK);
+    }
+    /* the exec (served here: it goes to the listener) or the child's end */
+    for (int k = 0; k < 500 && S.vs_fd >= 0 && !S.vs_exec_done; k++) {
+        struct pollfd pw = { S.vs_fd, POLLIN, 0 };
+        if (poll(&pw, 1, 10) > 0) vs_serve();
+    }
+    /* then its loader's mappings (its libraries and the preloaded Vulkan driver), served now, until it has been quiet for
+     * 200 ms (it then waits for QEMU on its connection), 5 s at most */
+    for (int k = 0, seen = 0; k < 40 && S.vs_fd >= 0 && S.vs_exec_done; k++) {
+        struct pollfd pw = { S.vs_fd, POLLIN, 0 };
+        if (poll(&pw, 1, seen ? 300 : 3000) <= 0) break;
+        vs_serve();
+        seen = 1;
+    }
+    close(st[0]);
+    if (r <= 0 || !(got & VMS_SECCOMP_OURS) || S.vs_fd < 0 || !S.vs_exec_done) {
+        vlog("venus: the render server's jail couldn't be set up (mask 0x%x): no Vulkan this start", (unsigned)got);
+        vs_stop(NULL);
+        close(sp[0]);
+        return -1;
+    }
+    S.vs_qemu_end = sp[0];
+    vlog("venus: render server pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d named=%d no-new-privs=%d; %s",
+         (int)pid, !!(got & VMS_LANDLOCK_FS), !!(got & VMS_LANDLOCK_NET), !!(got & VMS_LANDLOCK_SCOPE), !!(got & VMS_SECCOMP_OURS),
+         !!(got & VMS_SECCOMP_NAMED), !!(got & VMS_NO_NEW_PRIVS), S.venus_icd);
+    return 0;
 }
 
 /* the handshake's side descriptor (qmp.h) */
@@ -2185,9 +2394,42 @@ static int file_has(const char *path, const char *needle) {
     return found;
 }
 
+/* What the host's kernel and QEMU must do for venus to map the GPU's memory into the guest (Mesa's venus page, measured
+ * here 2026-11-24): RADV and NVK need KVM to map pages it holds no reference to ("KVM: Stop grabbing references to
+ * PFNMAP'd pages", Linux 6.13); a discrete GPU with an Intel processor, and Intel's xe driver, also need the guest's page
+ * attributes honoured (Linux 6.16 and QEMU 11's -accel kvm,honor-guest-pat=on). Without them the guest's first write to
+ * Vulkan memory it mapped stops the machine (KVM's internal error; seen on Linux 6.12 with an RX 580). NULL when this
+ * computer qualifies for that GPU's kernel driver, else why not */
+static int kernel_at_least(int maj, int min) {
+    struct utsname u;
+    int a = 0, b = 0;
+    if (uname(&u) || sscanf(u.release, "%d.%d", &a, &b) != 2) return 0;
+    return a > maj || (a == maj && b >= min);
+}
+static int cpu_is_intel(void) {
+    int fd = open("/proc/cpuinfo", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return 0;
+    char buf[1024];
+    ssize_t n = read(fd, buf, sizeof buf - 1);
+    close(fd);
+    if (n <= 0) return 0;
+    buf[n] = 0;
+    return strstr(buf, "GenuineIntel") != NULL;
+}
+static const char *venus_host_refusal(const char *driver) {
+    int dgpu = strcmp(driver, "i915") != 0;          /* amdgpu, radeon, nouveau, xe: memory of the card's own */
+    if (!strcmp(driver, "i915")) return NULL;
+    if (!kernel_at_least(6, 13)) return "this computer's kernel is older than 6.13: KVM can't map the GPU's memory into the guest";
+    if ((dgpu && cpu_is_intel()) || !strcmp(driver, "xe")) {
+        if (!kernel_at_least(6, 16)) return "with this GPU and processor venus needs Linux 6.16 or later (the guest's page attributes)";
+        if (!file_has("/usr/bin/qemu-system-x86_64", "honor-guest-pat")) return "with this GPU and processor venus needs QEMU 11 or later (honor-guest-pat)";
+    }
+    return NULL;
+}
+
 /* the Vulkan driver of the render node's GPU, by its kernel driver: Mesa's RADV, ANV or NVK. 0 and its manifest's path
  * in out, -1 for a GPU venus isn't given on */
-static int venus_icd_for(const char *node, char *out, size_t n) {
+static int venus_icd_for(const char *node, char *out, size_t n, const char **why) {
     struct stat st;
     if (stat(node, &st) || !S_ISCHR(st.st_mode)) return -1;
     char sys[96], real[PATH_MAX];
@@ -2198,6 +2440,7 @@ static int venus_icd_for(const char *node, char *out, size_t n) {
     const char *icd = !strcmp(d, "amdgpu") || !strcmp(d, "radeon") ? "radeon" : !strcmp(d, "i915") || !strcmp(d, "xe") ? "intel" :
                       !strcmp(d, "nouveau") ? "nouveau" : NULL;
     if (!icd) return -1;
+    if (why) *why = venus_host_refusal(d);
     snprintf(out, n, "/usr/share/vulkan/icd.d/%s_icd.json", icd);
     if (stat(out, &st) || !S_ISREG(st.st_mode)) {
         snprintf(out, n, "/usr/share/vulkan/icd.d/%s_icd.x86_64.json", icd);
@@ -2227,7 +2470,7 @@ static void decide_graphics(void) {
     S.venus = 0;
     S.render[0] = 0;
     if (S.render_fd >= 0) close(S.render_fd);
-    S.render_fd = S.render_qfd = -1;
+    S.render_fd = S.render_qfd = S.vs_pidfd = S.vs_fd = S.vs_qemu_end = S.vs_qfd = S.vs_err = -1;
     if (S.m.graphics != VM_GFX_3D) return;
     VmHost h;
     vm_host_probe(&h);
@@ -2243,7 +2486,9 @@ static void decide_graphics(void) {
     S.venus = 0;
     if (S.m.vulkan) {
         const char *vwhy = venus_refusal();
-        if (!vwhy && venus_icd_for(S.render, S.venus_icd, sizeof S.venus_icd)) vwhy = "no Vulkan driver of Mesa's for this GPU";
+        const char *hwhy = NULL;
+        if (!vwhy && venus_icd_for(S.render, S.venus_icd, sizeof S.venus_icd, &hwhy)) vwhy = "no Vulkan driver of Mesa's for this GPU";
+        if (!vwhy && hwhy) vwhy = hwhy;
         if (vwhy) vlog("graphics: Vulkan (venus) not given: %s", vwhy);
         else S.venus = 1;
     }
@@ -2756,7 +3001,7 @@ static void build_qemu_args(void) {
         snprintf(vga, sizeof vga, "%s,id=video0,addr=0x4", S.gl ? "virtio-vga-gl" : "virtio-vga");
         /* venus: Vulkan's host-visible memory is mapped into the guest through a 64-bit BAR of this size (only what the
          * guest's Vulkan allocates is backed, by the GPU's driver), and needs blob resources */
-        if (S.gl && S.venus) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",blob=on,hostmem=%dM,venus=on", VM_VENUS_HOSTMEM_MB);
+        if (S.gl && S.venus && S.vs_qemu_end >= 0) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",blob=on,hostmem=%dM,venus=on", VM_VENUS_HOSTMEM_MB);
         if (m->res_w && m->res_h) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",xres=%d,yres=%d", m->res_w, m->res_h);
         /* All Displays (5.4): one output per display, each a console of the D-Bus display (Console_<n>) */
         if (m->heads > 1) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",max_outputs=%d", m->heads);
@@ -2775,6 +3020,7 @@ static void build_qemu_args(void) {
     char dbus_disp[96];
     /* the render node by descriptor (render_open): QEMU opens /proc/self/fd/<n>, the device lord-vm checked */
     S.render_qfd = (S.gl || S.vgpu) && S.render_fd >= 0 ? xfd++ : -1;
+    S.vs_qfd = S.gl && S.venus && S.vs_qemu_end >= 0 ? xfd++ : -1;
     if ((S.gl || S.vgpu) && S.render_qfd >= 0) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=/proc/self/fd/%d,audiodev=snd0", S.render_qfd);
     else if (S.gl || S.vgpu) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.vgpu ? S.vgpu_render : S.render);
     else snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,audiodev=snd0");
@@ -2836,9 +3082,7 @@ static void build_qemu_args(void) {
         arg("-chardev"); arg("socket,id=lag0,fd=8");
         arg("-device"); arg("virtserialport,bus=vser0.0,nr=2,chardev=lag0,id=lag-port,name=org.lordos.agent");
     }
-    /* venus: virglrenderer forks and execs its render server, so QEMU's own filter allows spawning; ours lets only that
-     * program run (Landlock's execute right) and its jail is QEMU's (vmsandbox.h VmQemuJail.venus) */
-    arg("-sandbox"); arg(S.venus ? "on,obsolete=deny,elevateprivileges=allow,spawn=allow,resourcecontrol=deny" : "on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny");
+    arg("-sandbox"); arg("on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny");
     arg("-msg"); arg("timestamp=on");
     arg("-S");
     if (S.resuming) { arg("-incoming"); arg("defer"); }
@@ -3050,6 +3294,8 @@ static int start_machine(void) {
         S.sandbox |= VMS_PDEATHSIG;
     }
     decide_graphics();
+    /* venus: its render server first (lord-vm's; QEMU only gets its connection) */
+    if (S.gl && S.venus && spawn_venus()) S.venus = 0;
     if (key_have() && (S.key_fd = key_pipe()) < 0) { session_close(); fail_start("the machine's key couldn't be handed to QEMU"); return -1; }
     build_qemu_args();
     {
@@ -3087,7 +3333,7 @@ static int start_machine(void) {
         int in_ns = vm_ns_enter(S.userns);
         int nsb = in_ns ? vm_ns_setup(S.rundir, S.disks) : 0;
         /* 3 kvm, 4 QMP, 5 serial, 6 network, 7.. credentials, then the status pipe (closed by exec) */
-        int fds[6 + MAX_CREDS + VM_SHARES + 4 + 2 + VM_NDISKS], nf = 0;
+        int fds[6 + MAX_CREDS + VM_SHARES + 4 + 2 + VM_NDISKS + 2], nf = 0;
         fds[nf++] = kvm; fds[nf++] = qmp[1]; fds[nf++] = ser[1]; fds[nf++] = net[0] >= 0 ? net[0] : null;
         if (S.m.agent) { fds[nf++] = qga[1]; fds[nf++] = lag[1]; }
         for (int i = 0; i < S.ncreds; i++) fds[nf++] = S.cred_fd[i];
@@ -3100,6 +3346,7 @@ static int start_machine(void) {
         if (S.sess_on && S.sess_fd >= 0) fds[nf++] = S.sess_fd;
         for (int k = 0; S.sess_on && k < S.sess_n; k++) fds[nf++] = S.sess_fds[k];
         if (S.render_qfd >= 0) fds[nf++] = S.render_fd;
+        if (S.vs_qfd >= 0) fds[nf++] = S.vs_qemu_end;
         fds[nf++] = st[1];
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
@@ -3111,7 +3358,7 @@ static int start_machine(void) {
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
                          S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL,
                          S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, xfd, qargv[0], S.sc_learn, sc_drop_row(), &lfd,
-                         S.render_qfd, S.gl && S.venus };
+                         S.render_qfd, S.gl && S.venus && S.vs_qfd >= 0 ? VENUS_SHIM : NULL };
         int mask = xfd >= 0 ? vm_jail_qemu(&j) | (in_ns ? VMS_NAMESPACES : 0) | (nsb & VMNS_NOEXEC ? VMS_NOEXEC_DISKS : 0) : 0;
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
@@ -3137,11 +3384,12 @@ static int start_machine(void) {
             if (sent != (ssize_t)sizeof msg[0]) _exit(126);
         }
         /* 3D: Mesa in QEMU can't write a shader cache (its sandbox has no home folder): told not to try */
-        /* venus: its render server loads only the render node's GPU's Vulkan driver (no llvmpipe: its JIT would need
-         * executable memory made at run time) */
-        static char vkenv[128];
-        snprintf(vkenv, sizeof vkenv, "VK_DRIVER_FILES=%s", S.venus_icd);
-        char *env[] = { "LC_ALL=C.UTF-8", S.gl || S.vgpu ? "MESA_SHADER_CACHE_DISABLE=true" : NULL, S.gl && S.venus ? vkenv : NULL, NULL };
+        /* venus: QEMU preloads the library that gives virglrenderer lord-vm's connection to the render server (venusshim.c) */
+        static char vsenv[2][PATH_MAX + 32];
+        snprintf(vsenv[0], sizeof vsenv[0], "LD_PRELOAD=%s", VENUS_SHIM);
+        snprintf(vsenv[1], sizeof vsenv[1], "LORDOS_VENUS_FD=%d", S.vs_qfd);
+        int vs = S.gl && S.venus && S.vs_qfd >= 0;
+        char *env[] = { "LC_ALL=C.UTF-8", S.gl || S.vgpu ? "MESA_SHADER_CACHE_DISABLE=true" : "LC_CTYPE=C.UTF-8", vs ? vsenv[0] : NULL, vs ? vsenv[1] : NULL, NULL };
         syscall(SYS_execveat, xfd, "", qargv, env, AT_EMPTY_PATH);
         msg[1] = errno ? errno : ENOEXEC;
         write_all(stf, &msg[1], sizeof msg[1]);
@@ -3164,6 +3412,7 @@ static int start_machine(void) {
     if (S.key_fd >= 0) { close(S.key_fd); S.key_fd = -1; }
     if (S.fw_fd >= 0) { close(S.fw_fd); S.fw_fd = -1; }
     if (S.render_fd >= 0) { close(S.render_fd); S.render_fd = -1; }
+    if (S.vs_qemu_end >= 0) { close(S.vs_qemu_end); S.vs_qemu_end = -1; }
     if (net[0] >= 0) close(net[0]);
     S.qemu_err = qerr[0];
     S.serial_fd = ser[0];
@@ -3223,6 +3472,7 @@ static int start_machine(void) {
     }
     S.qmp_up = 1;
     S.sc_starting = 0;      /* QEMU's start is over: no executable mapping from now on (vmseccomp.h) */
+    S.vs_starting = 0;      /* nor in venus's render server */
     S.oom0 = read_oom_kills();
     qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
     pin_prepare();
@@ -7034,6 +7284,10 @@ static void qemu_exited(int status) {
     /* a call the allowlist stopped as QEMU ended: named first; the listener goes with this QEMU */
     sc_serve();
     if (S.sc_fd >= 0) { close(S.sc_fd); S.sc_fd = -1; }
+    /* venus's render server ends with it */
+    vs_serve();
+    vs_stop(NULL);
+    if (S.vs_fd >= 0) { close(S.vs_fd); S.vs_fd = -1; }
     /* what QEMU wrote just before it ended (an assertion's line names the crash): read now, while it's there */
     for (int k = 0; k < 20 && S.qemu_err >= 0; k++) {
         struct pollfd pf = { .fd = S.qemu_err, .events = POLLIN };
@@ -7147,7 +7401,12 @@ static void reap(void) {
     pid_t p;
     while ((p = waitpid(-1, &status, WNOHANG)) > 0) {
         if (p == S.qemu) { vlog("qemu: exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status)); qemu_exited(status); }
-        else if (p == S.passt) {
+        else if (p > 0 && p == S.vs_pid) {
+            for (int k = 0; k < 20 && S.vs_err >= 0; k++) pump_fd(&S.vs_err, "venus");
+            vlog("venus: the render server exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
+            S.vs_pid = 0;
+            if (S.vs_pidfd >= 0) { close(S.vs_pidfd); S.vs_pidfd = -1; }
+        } else if (p == S.passt) {
             vlog("passt: exited (%s %d)", WIFEXITED(status) ? "status" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
             S.passt = 0;
             if (!S.qemu_done) { int sig = WIFSIGNALED(status); net_lost(sig, sig ? WTERMSIG(status) : WEXITSTATUS(status)); }
@@ -7287,6 +7546,7 @@ static void loop(void) {
         WATCH(S.passt_pidfd, -10);
         WATCH(S.fx_cpipe, -12);
         WATCH(S.sc_fd, -13);
+        WATCH(S.vs_fd, -40);
         /* the agent's shell: read from lord-server only while the guest's window has room; written to while some waits */
         if (S.sh_fd >= 0 && (S.sh_to_guest < AG_SHELL_WINDOW || S.sh_n)) {
             p[n] = (struct pollfd){ S.sh_fd, (short)((S.sh_to_guest < AG_SHELL_WINDOW ? POLLIN : 0) | (S.sh_n ? POLLOUT : 0)), 0 };
@@ -7399,6 +7659,7 @@ static void loop(void) {
             case -11: logind_process(); break;
             case -12: fx_xcopy_read(); break;
             case -13: sc_serve(); break;
+            case -40: vs_serve(); break;
             case -14: shell_pump(p[i].revents); break;
             default: {
                 int k = ci[i];

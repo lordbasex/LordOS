@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D hufanya kazi na mfumo wowote: mgeni huchora picha yake kwa kichakataji.",
   "cfg.graphics3dNote": "Kwa 3D, programu za mgeni huchora kwa GPU ya kompyuta hii (OpenGL). Mashine yenye 3D haiwezi kusimamishwa kwa muda wala kuweka picha za hali pamoja na kumbukumbu yake: badala yake huzimwa.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Programu za Vulkan za mgeni pia huchora kwa GPU ya kompyuta hii (venus). Mgeni anahitaji viendeshi vya Vulkan vya Mesa; kompyuta hii inahitaji kerneli inayoweza kuweka kumbukumbu ya GPU kwenye mashine. Isipoweza, mashine huanza na OpenGL pekee na kumbukumbu yake husema kwa nini.",
   "cfg.pointerDraw": "Kielekezi huchorwa na",
   "cfg.pointerLordos": "LordOS (haraka zaidi)",
   "cfg.pointerGuest": "Mashine",

@@ -325,6 +325,8 @@
   "cfg.graphics3d": "3D",
   "cfg.graphics2dNote": "2D chạy với mọi hệ thống: máy khách vẽ hình ảnh bằng bộ xử lý.",
   "cfg.graphics3dNote": "Với 3D, ứng dụng của máy khách vẽ bằng GPU của máy tính này (OpenGL). Máy có 3D không thể tạm ngưng hoặc giữ ảnh chụp nhanh kèm bộ nhớ: thay vào đó máy sẽ tắt.",
+  "cfg.vulkan": "Vulkan",
+  "cfg.vulkanNote": "Ứng dụng Vulkan của máy khách cũng vẽ bằng GPU của máy tính này (venus). Máy khách cần trình điều khiển Vulkan của Mesa; máy tính này cần nhân có thể ánh xạ bộ nhớ GPU vào máy ảo. Nếu không được, máy khởi động chỉ với OpenGL và nhật ký của nó cho biết lý do.",
   "cfg.pointerDraw": "Con trỏ do ai vẽ",
   "cfg.pointerLordos": "LordOS (nhanh hơn)",
   "cfg.pointerGuest": "Máy",

@@ -258,11 +258,11 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
     pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', cpuModel: m.cpuModel || 'host',
-    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, ...draft };
+    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, vulkan: !!m.vulkan, ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'cpuPin' ? m.cpuPin || 'off' : k === 'cpuModel' ? m.cpuModel || 'host' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'vulkan' ? !!m.vulkan : k === 'cpuPin' ? m.cpuPin || 'off' : k === 'cpuModel' ? m.cpuModel || 'host' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -500,9 +500,14 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
             ...resolutions(screen.width, screen.height, null).map(([w, h]) => ({ label: `${w} × ${h}`, checked: cur.resolution === `${w}x${h}`, onClick: () => set({ resolution: `${w}x${h}` }) }))]} /></Off>
       </Row>
       <Row label={tr('machines.cfg.graphics')} last={!m.windowsDevices && !gpuRow} note={note}>
-        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set(x === '3d' ? { graphics: x, gpu: '' } : { graphics: x })}
+        <Off off={running || (why3d && cur.graphics !== '3d')}><Segmented small value={cur.graphics} onChange={(x) => set(x === '3d' ? { graphics: x, gpu: '' } : { graphics: x, vulkan: false })}
           options={[['2d', tr('machines.cfg.graphics2d')], ['3d', tr('machines.cfg.graphics3d'), !!why3d && cur.graphics !== '3d']]} /></Off>
       </Row>
+      {/* Vulkan through venus (6.10, machine.json "vulkan"): with 3D only; lord-vm gives it when this computer can and says
+          why not in the machine's log */}
+      {cur.graphics === '3d' ? <Row label={tr('machines.cfg.vulkan')} note={[tr('machines.cfg.vulkanNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running}><Toggle on={!!cur.vulkan} onChange={(x) => set({ vulkan: x })} /></Off>
+      </Row> : null}
       {/* who draws a Windows guest's pointer (7.1.2): LordOS, from the shape the guest hands over (no round trip through
           the guest for each move), or its display driver, into the picture; applied by the guest tools at the next start.
           Not with an Intel graphics card: HWCursor is the virtio driver's, and Intel's puts the pointer on the vGPU's cursor
