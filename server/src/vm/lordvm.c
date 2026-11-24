@@ -1715,6 +1715,8 @@ static char *blockdev_file(const char *node, const char *path, int ro) {
  * Linux native AIO where the file system is ext4 or XFS and takes O_DIRECT (the guest caches for itself; a second copy in
  * the host's cache only costs memory and a copy). Not on btrfs (O_DIRECT with checksums and buffers a guest can change
  * in flight) or anything else, nor when O_DIRECT is refused: there the host's cache and QEMU's thread pool, as before.
+ * Kept for every disk after measuring real work against the host's cache (6.4.1, "Host cache or not"): boots, installs,
+ * builds and copies within 6 %, writes faster, and no second copy (16 GB of host cache for a 4 GB guest's work).
  * io_uring stays refused by QEMU's seccomp (vmsandbox.c). */
 static int disk_direct(const char *path) {
     struct statfs f;
@@ -1750,7 +1752,7 @@ static char *blockdev_overlay(const char *node, const char *file, const char *ba
     return b.oom ? NULL : b.p;
 }
 
-/* the guest's memory (vmmem.h): hugetlb 2 MB pages when enough are free and unreserved now, else a shared memfd for a
+/* the guest's memory (vmmem.h): hugetlb 2 MB pages when enough are free and unreserved now, else shared memory for a
  * machine with a shared folder or the transfer folder, else QEMU's anonymous memory (with transparent huge pages) */
 static int mem_backing(const VmMachine *m) {
     VmHuge h = { 0, 0, 0 };
@@ -1763,10 +1765,17 @@ static int mem_backing(const VmMachine *m) {
         vmmem_parse(text, &h);
     }
     int b = vmmem_choose(m->memory_mb, sh_count() > 0, &h);
+    char sh[24] = "", sht[128] = "";
+    if (b == VMMEM_SHARED && (fd = open("/sys/kernel/mm/transparent_hugepage/shmem_enabled", O_RDONLY | O_CLOEXEC)) >= 0) {
+        ssize_t n = read(fd, sht, sizeof sht - 1);
+        close(fd);
+        sht[n > 0 ? n : 0] = 0;
+    }
+    int shuge = b == VMMEM_SHARED && vmmem_shmem_huge(sht, sh, sizeof sh);
     if (b == VMMEM_HUGETLB) vlog("memory: %d MB in 2 MB hugetlb pages (%ld free, %ld reserved before this machine)", m->memory_mb, h.free, h.rsvd);
-    else vlog("memory: %s%s", b == VMMEM_SHARED ? "a shared memfd (shared folders), 4 KB pages unless the system gives shared memory huge pages"
-                                               : "QEMU's own, with transparent huge pages",
-              h.free > 0 ? " (too few free hugetlb pages for all of it)" : "");
+    else if (b == VMMEM_SHARED) vlog("memory: shared (shared folders), %s (shmem_enabled %s)%s", shuge ? "2 MB transparent huge pages" : "4 KB pages",
+                                     sh[0] ? sh : "unknown", h.free > 0 ? " (too few free hugetlb pages for all of it)" : "");
+    else vlog("memory: QEMU's own, with transparent huge pages%s", h.free > 0 ? " (too few free hugetlb pages for all of it)" : "");
     return b;
 }
 
@@ -1948,8 +1957,7 @@ static void build_qemu_args(void) {
                           m->secure_boot ? ",smm=on" : "");
     /* secure boot: the firmware's variables can be written only from SMM, so the guest's system can't change its own keys */
     if (m->secure_boot) { arg("-global"); arg("driver=cfi.pflash01,property=secure,value=on"); }
-    if (mem == VMMEM_SHARED) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=on", m->memory_mb); }
-    if (mem == VMMEM_HUGETLB) { arg("-object"); argf("memory-backend-memfd,id=mem,size=%dM,share=%s,hugetlb=on,hugetlbsize=2M,prealloc=on", m->memory_mb, sh_count() ? "on" : "off"); }
+    if (mem != VMMEM_ANON) { char mo[160]; arg("-object"); arg(vmmem_object(mo, sizeof mo, mem, m->memory_mb, sh_count() > 0)); }
     if (kvm) { arg("-accel"); arg("kvm,device=/dev/fdset/1"); arg("-add-fd"); arg("fd=3,set=1,opaque=kvm"); }
     else { arg("-accel"); arg("tcg,thread=multi,tb-size=256"); }
     /* Hyper-V enlightenments: what Windows asks a hypervisor for (timers, interrupts, spinlocks); with KVM only */
