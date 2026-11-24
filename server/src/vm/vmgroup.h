@@ -86,4 +86,41 @@ int vm_group_dir_ok(const char *path);
  * path in out, else 0 */
 int vm_group_parent(const char *dir, char *out, size_t n);
 
+/* ---- managing a group's folder (docs/VIRTUALIZATION.md 19.8, 19.9: Delete, Rename, Repair) ----
+ * Every step works on descriptors: the library is opened once, each folder below it with openat(O_NOFOLLOW |
+ * O_DIRECTORY), and nothing follows a symbolic link out of it. */
+
+/* removes the entry `name` of the open folder dfd and everything under it, never following a symbolic link (a link is
+ * removed as a link) and never crossing into another file system (a mount point is left, and the call fails). At most
+ * `depth` folder levels. 0, or -1 with errno */
+int vm_group_rm_at(int dfd, const char *name, int depth);
+
+/* the group folder's lock, `.lock` in it (flock, exclusive, never waiting): held by lord-vm for Delete, Rename, Repair
+ * and Start Fresh, so that two of them never run on one group. The descriptor (close it to let go), -2 when another
+ * holds it, -1 on error */
+int vm_group_lock_at(int gfd);
+/* a member's lock, `lock` in its folder (the same file and flock as lord-vm's own: held while it runs). -2 busy */
+int vm_group_member_lock_at(int mfd);
+
+/* how many users `base` has: the machine.json "base" of every machine folder of the library (`lib`, its *.lordvm and
+ * the *.lordvm inside each *.lordgroup) and of the Trash (`trash`, may be NULL), and every group.json of the library
+ * whose image names it. The group folder named `skip` (a name in lib, may be NULL) isn't counted */
+int vm_group_base_users(const char *lib, const char *trash, const char *skip, const char *base);
+
+/* the folder a group's name gives: vm_folder_name (machine.c), then ".lordgroup" */
+void vm_group_folder_name(const char *name, char *out, size_t n);
+
+enum { VMG_RN_OK = 0, VMG_RN_BAD_NAME, VMG_RN_NAME_TAKEN, VMG_RN_FOLDER_TAKEN, VMG_RN_NOT_GROUP };
+typedef struct {
+    int problem;                        /* VMG_RN_* */
+    int moves;                          /* the folder gets another name */
+    char folder[256];                   /* the folder's name then, ".lordgroup" included */
+    char other[VM_NAME_MAX + 1];        /* VMG_RN_NAME_TAKEN: the other group's or machine's name */
+} VmGroupRenamePlan;
+/* what renaming the group in gdir (<library>/<x>.lordgroup) to name would do, read from the library as it is: refused
+ * for a name that can't be one (vm_rename_name_ok), a name another group or machine of the library has (ASCII case
+ * ignored, as `machines` finds them), or, when the folder moves, anything else in the library with that folder's name
+ * (case ignored). Returns p->problem */
+int vm_group_rename_plan(const char *gdir, const char *name, VmGroupRenamePlan *p);
+
 #endif

@@ -92,6 +92,8 @@
   "groupStarted": "{name} يعمل: البوابة أولًا ثم محطة العمل.",
   "groupStopped": "{name} متوقف: محطة العمل أولًا ثم البوابة.",
   "groupDamaged": "{name} تالف: إحدى أجهزته مفقودة أو ليست له.",
+  "groupNameTaken": "توجد بالفعل مجموعة أو جهاز باسم «{name}».",
+  "groupFolderTaken": "يحتوي مجلد Machines بالفعل على «{folder}»: اختر اسمًا آخر.",
   "gatewayFailed": "لم تبدأ بوابة {name} ({why})، لذا لم تبدأ محطة العمل.",
   "workstationFailed": "لم تبدأ محطة عمل {name} ({why})؛ ما زالت البوابة تعمل.",
   "kind.group": "مجموعة من {count}",

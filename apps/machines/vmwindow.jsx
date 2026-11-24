@@ -16,6 +16,7 @@ import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './ap
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
 import { defaultsOf } from './store.js';
 import { ClipAskBar } from './clipask.jsx';
+import { gatewayBar, gatewayOf } from './group.js';
 import { KeysBtn, sendKeysItems } from './keys.jsx';
 import { usePal, hexOf, has, Btn, IconBtn, IconMenuBtn, BarGroup, BarSep, icons, StateDot, TONE, overlayRoot, menus, vmRefusal, startPrep, needsPrep, soundDevItems } from './ui.jsx';
 import { openLogs, openSnapshots, playAsks, openAsks } from './library.jsx';
@@ -650,6 +651,32 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     return false;
   }), [winId]);
 
+  // a Whonix group's Workstation (docs/VIRTUALIZATION.md 19.8, 19.9): while its Gateway is down it has no network at all
+  // (the link is a pulled cable), and a bar says so with Start Gateway; the session links the two once both run
+  const inGroup = /\.lordgroup\/[^/]+\.lordvm$/.test(dir);
+  const [gwBar, setGwBar] = useState(null);           // { bar: null | 'off' | 'starting', gw }
+  const [gwAsked, setGwAsked] = useState(0);
+  useEffect(() => {
+    if (!inGroup || !has()) return undefined;
+    const look = () => {
+      try {
+        const list = lord.vm.list();
+        const ws = list.find((x) => x.dir === dir), gw = gatewayOf(ws, list);
+        const bar = gatewayBar(ws, gw);
+        setGwBar((o) => (o?.bar === bar && o?.gw?.state === gw?.state ? o : { bar, gw }));
+      } catch (e) { /* the list isn't there: no bar */ }
+    };
+    look();
+    const timer = setInterval(look, 2000);
+    return () => clearInterval(timer);
+  }, [dir, gwAsked]);
+  const startGateway = () => {
+    const gw = gwBar?.gw;
+    if (!gw) return;
+    setGwBar({ bar: 'starting', gw });
+    startPrep(gw).then(() => { lord.vm.startDetached(gw.dir); setGwAsked((n) => n + 1); }, () => setGwAsked((n) => n + 1));
+  };
+
   // lord-vm's notices (VM_NOTICE): the network going and coming back (6.5), a Clone's new identity (6.3); the good news
   // goes away by itself
   const [noticeGone, setNoticeGone] = useState(0);
@@ -1250,6 +1277,15 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       {card}
       {failed}
       {!card && !failed && !appsActive ? <ClipAskBar ask={askBar} onAnswer={askAnswer} top={(full ? 0 : BAR) + 12} /> : null}
+      {!card && !failed && gwBar?.bar ? (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: (full ? 0 : BAR) + 12, alignItems: 'center' }}>
+          <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)', border: '1px solid rgba(255,154,154,0.5)' }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: gwBar.bar === 'starting' ? '#ffd60a' : '#ff9a9a' }} />
+            <Text style={{ flexShrink: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{tr(gwBar.bar === 'starting' ? 'machines.group.gatewayStarting' : 'machines.group.noGateway')}</Text>
+            {gwBar.bar === 'off' ? <Btn label={tr('machines.group.startGateway')} onClick={startGateway} style={{ height: 28 }} /> : null}
+          </View>
+        </View>
+      ) : null}
       {!card && !failed && ((noticeOn && noticeText) || cdErr) ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center' }}>
           <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>

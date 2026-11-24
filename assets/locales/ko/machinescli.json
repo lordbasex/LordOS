@@ -92,6 +92,8 @@
   "groupStarted": "{name} 실행 중: 게이트웨이를 먼저, 그다음 워크스테이션.",
   "groupStopped": "{name} 꺼짐: 워크스테이션을 먼저, 그다음 게이트웨이.",
   "groupDamaged": "{name}이(가) 손상되었습니다: 머신 하나가 없거나 이 그룹의 것이 아닙니다.",
+  "groupNameTaken": "“{name}” 이름의 그룹이나 머신이 이미 있습니다.",
+  "groupFolderTaken": "Machines 폴더에 이미 “{folder}”이(가) 있습니다. 다른 이름을 고르세요.",
   "gatewayFailed": "{name}의 게이트웨이가 시작되지 않아({why}) 워크스테이션을 시작하지 않았습니다.",
   "workstationFailed": "{name}의 워크스테이션이 시작되지 않았습니다({why}). 게이트웨이는 계속 실행 중입니다.",
   "kind.group": "{count}대 그룹",

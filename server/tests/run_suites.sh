@@ -401,6 +401,22 @@ EOF
         77) skip "vm-group-link" "WHONIX_GW and WHONIX_WS (Whonix's disks with a serial shell), KVM, QEMU, unshare and the default theme" ;;
         *) bad "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)"; tail -20 "$T/out" ;;
     esac
+    # a machine group's Delete, Rename and Repair, and a base made again from the verified archive, on throwaway groups
+    # made from a fixture archive (tests/vm_group_manage.sh; docs/VIRTUALIZATION.md 19.7-19.9)
+    bash tests/vm_group_manage.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-group-manage (tests/vm_group_manage.sh, lord-vm --group-delete/rename/repair/fresh on throwaway groups)" ;;
+        77) skip "vm-group-manage" "build/lord-vm-testpaths, build/lord-vmunpack, build/machines, qemu-img, qemu-io, xz, tar, python3 and /dev/kvm" ;;
+        *) bad "vm-group-manage (tests/vm_group_manage.sh, lord-vm --group-delete/rename/repair/fresh on throwaway groups)"; tail -20 "$T/out" ;;
+    esac
+    # the same through Machines' own calls in a headless lord-server, in its own namespaces (lord.vm.groups,
+    # groupRenamePlan, groupRename, groupRepair, groupDelete; tests/machines_group_manage_headless.sh)
+    bash tests/machines_group_manage_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)" ;;
+        77) skip "machines-group-manage" "build/lord-server, lord-vm, lord-vm-testpaths, lord-vmunpack, the default theme, /dev/kvm, unshare and an installed catalog and image store to mount over" ;;
+        *) bad "machines-group-manage (tests/machines_group_manage_headless.sh, headless lord-server, throwaway groups)"; tail -20 "$T/out" ;;
+    esac
     # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
     sh tests/guest_clip_test.sh >"$T/out" 2>&1
     case $? in

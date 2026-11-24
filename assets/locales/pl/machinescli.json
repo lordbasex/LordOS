@@ -92,6 +92,8 @@
   "groupStarted": "{name} działa: najpierw brama, potem stacja robocza.",
   "groupStopped": "{name} jest wyłączona: najpierw stacja robocza, potem brama.",
   "groupDamaged": "{name} jest uszkodzona: brakuje jednej z jej maszyn lub nie jest jej.",
+  "groupNameTaken": "Istnieje już grupa lub maszyna o nazwie „{name}”.",
+  "groupFolderTaken": "Folder Machines zawiera już „{folder}”: wybierz inną nazwę.",
   "gatewayFailed": "Brama {name} się nie uruchomiła ({why}), więc stacja robocza nie została uruchomiona.",
   "workstationFailed": "Stacja robocza {name} się nie uruchomiła ({why}); brama nadal działa.",
   "kind.group": "grupa {count}",

@@ -640,6 +640,7 @@ static JSValue f_groups(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
             set_str(c, o, "name", g.name);
             set_str(c, o, "kind", g.kind == VMG_KIND_WHONIX ? "whonix" : "");
             set_str(c, o, "release", g.release);
+            set_str(c, o, "catalog", g.catalog);
             JS_SetPropertyStr(c, o, "disposable", JS_NewBool(c, g.disposable));
             JS_SetPropertyStr(c, o, "freshGateway", JS_NewBool(c, g.fresh_gateway));
             /* the verified archive the members came from, and whether both bases are there (Storage: the archive may
@@ -647,8 +648,16 @@ static JSValue f_groups(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
             set_str(c, o, "archiveSha512", g.archive_sha512);
             struct stat bs;
             int both = 1;
-            for (int r = 1; r < VM_ROLE_COUNT; r++) if (!g.base[r][0] || lstat(g.base[r], &bs) || !S_ISREG(bs.st_mode)) both = 0;
+            JSValue miss = JS_NewArray(c);
+            uint32_t nm = 0;
+            for (int r = 1; r < VM_ROLE_COUNT; r++)
+                if (vm_group_role(&g, r) >= 0 && (!g.base[r][0] || lstat(g.base[r], &bs) || !S_ISREG(bs.st_mode))) { both = 0; JS_SetPropertyUint32(c, miss, nm++, JS_NewString(c, VMG_ROLE_NAMES[r])); }
             JS_SetPropertyStr(c, o, "basesThere", JS_NewBool(c, both));
+            /* the roles whose base is missing (a damaged group, 19.9: Repair makes it again from the archive) */
+            JS_SetPropertyStr(c, o, "basesMissing", miss);
+            char ap[PATH_MAX];
+            snprintf(ap, sizeof ap, "/var/lib/lordos/machines/images/%s.tar.xz", g.archive_sha512);
+            JS_SetPropertyStr(c, o, "archiveThere", JS_NewBool(c, g.archive_sha512[0] && !lstat(ap, &bs) && S_ISREG(bs.st_mode)));
             JSValue ms = JS_NewArray(c);
             for (int i = 0; i < g.n; i++) {
                 JSValue m = JS_NewObject(c);
@@ -1057,20 +1066,23 @@ static JSValue f_hash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 static JSValue f_group_create(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     if (argc < 1 || !JS_IsObject(argv[0])) return JS_NewInt32(c, 0);
-    char lib[PATH_MAX], gdir[PATH_MAX + 64], arch[PATH_MAX], cid[40] = "", sha[136] = "", name[VM_NAME_MAX + 1] = "";
+    char lib[PATH_MAX], gdir[PATH_MAX + 64], arch[PATH_MAX], cid[40] = "", sha[136] = "", name[VM_NAME_MAX + 1] = "", rel[32] = "";
     if (library(lib, sizeof lib, 1)) return JS_NewInt32(c, 0);
     JSValue vc = JS_GetPropertyStr(c, argv[0], "catalogId"), va = JS_GetPropertyStr(c, argv[0], "archive");
-    JSValue vs = JS_GetPropertyStr(c, argv[0], "sha512"), vn = JS_GetPropertyStr(c, argv[0], "name");
-    const char *cs = JS_ToCString(c, vc), *ss = JS_ToCString(c, vs), *ns = JS_ToCString(c, vn);
-    int ok = cs && ss && ns && strlen(cs) < sizeof cid && strlen(ss) == 128 && strlen(ns) < sizeof name && vm_name_valid(ns) &&
-             JS_IsString(va) && !user_file(c, va, arch, sizeof arch);
-    if (ok) { snprintf(cid, sizeof cid, "%s", cs); snprintf(sha, sizeof sha, "%s", ss); snprintf(name, sizeof name, "%s", ns); }
+    JSValue vs = JS_GetPropertyStr(c, argv[0], "sha512"), vn = JS_GetPropertyStr(c, argv[0], "name"), vr = JS_GetPropertyStr(c, argv[0], "release");
+    const char *cs = JS_ToCString(c, vc), *ss = JS_ToCString(c, vs), *ns = JS_ToCString(c, vn), *rs = JS_ToCString(c, vr);
+    int ok = cs && ss && ns && rs && strlen(cs) < sizeof cid && strlen(ss) == 128 && strlen(ns) < sizeof name && vm_name_valid(ns) &&
+             strlen(rs) && strlen(rs) < sizeof rel && JS_IsString(va) && !user_file(c, va, arch, sizeof arch);
+    if (ok) { snprintf(cid, sizeof cid, "%s", cs); snprintf(sha, sizeof sha, "%s", ss); snprintf(name, sizeof name, "%s", ns); snprintf(rel, sizeof rel, "%s", rs); }
     if (cs) JS_FreeCString(c, cs);
     if (ss) JS_FreeCString(c, ss);
     if (ns) JS_FreeCString(c, ns);
-    JS_FreeValue(c, vc); JS_FreeValue(c, va); JS_FreeValue(c, vs); JS_FreeValue(c, vn);
+    if (rs) JS_FreeCString(c, rs);
+    JS_FreeValue(c, vc); JS_FreeValue(c, va); JS_FreeValue(c, vs); JS_FreeValue(c, vn); JS_FreeValue(c, vr);
     if (!ok) return JS_NewInt32(c, 0);
     for (const char *p = cid; *p; p++) if (!((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '-')) return JS_NewInt32(c, 0);
+    /* the release the verified list came from (numbers and dots; lord-vm checks it against the catalog's floor) */
+    for (const char *p = rel; *p; p++) if (!((*p >= '0' && *p <= '9') || *p == '.')) return JS_NewInt32(c, 0);
     for (const char *p = sha; *p; p++) if (!((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f'))) return JS_NewInt32(c, 0);
     /* the verified download: <image store>/<sha512>.tar.xz and nothing else */
     char want[PATH_MAX];
@@ -1078,7 +1090,7 @@ static JSValue f_group_create(JSContext *c, JSValueConst t, int argc, JSValueCon
     if (strcmp(arch, want)) return JS_NewInt32(c, 0);
     struct stat st;
     if (snprintf(gdir, sizeof gdir, "%s/%s%s", lib, name, VMG_SUFFIX) >= (int)sizeof gdir || !vm_group_dir_ok(gdir) || !lstat(gdir, &st)) return JS_NewInt32(c, 0);
-    char *args[] = { "lord-vm", "--group-create", gdir, "--catalog-id", cid, "--archive", arch, "--sha512", sha, "--name", name, NULL };
+    char *args[] = { "lord-vm", "--group-create", gdir, "--catalog-id", cid, "--archive", arch, "--sha512", sha, "--release", rel, "--name", name, NULL };
     return JS_NewInt32(c, spawn_job(args, ""));
 }
 static JSValue f_group_fresh(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -1101,6 +1113,56 @@ static JSValue f_group_set(JSContext *c, JSValueConst t, int argc, JSValueConst 
     JS_FreeValue(c, vd); JS_FreeValue(c, vf);
     args[n] = NULL;
     return JS_NewInt32(c, n > 3 ? spawn_job(args, gdir) : 0);
+}
+/* groupDelete(groupDir) → job id: lord-vm --group-delete (the group and its members for good, its bases when nothing
+ * else names them; refused while a member runs). groupRename(groupDir, name) → job id: lord-vm --group-rename.
+ * groupRenamePlan(groupDir, name) → { problem: '' | 'bad-name' | 'name-taken' | 'folder-taken' | 'not-a-group', moves,
+ * folder, other }: what the rename would do, read from the library as it is (vm_group_rename_plan).
+ * groupRepair(groupDir) → job id: lord-vm --group-repair (the image store's archive, when a base is missing or changed,
+ * found by lord-vm from group.json; JS never names a file). 0 when refused. */
+static JSValue f_group_delete(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char gdir[PATH_MAX];
+    if (argc < 1 || group_dir(c, argv[0], gdir, sizeof gdir)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--group-delete", gdir, NULL };
+    return JS_NewInt32(c, spawn_job(args, gdir));
+}
+static JSValue f_group_rename(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char gdir[PATH_MAX], name[VM_NAME_MAX + 1];
+    if (argc < 2 || group_dir(c, argv[0], gdir, sizeof gdir)) return JS_NewInt32(c, 0);
+    const char *s = JS_ToCString(c, argv[1]);
+    int ok = s && strlen(s) < sizeof name && vm_rename_name_ok(s);
+    if (ok) snprintf(name, sizeof name, "%s", s);
+    if (s) JS_FreeCString(c, s);
+    if (!ok) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--group-rename", gdir, name, NULL };
+    return JS_NewInt32(c, spawn_job(args, gdir));
+}
+static JSValue f_group_rename_plan(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    static const char *const PR[] = { "", "bad-name", "name-taken", "folder-taken", "not-a-group" };
+    char gdir[PATH_MAX];
+    VmGroupRenamePlan p;
+    memset(&p, 0, sizeof p);
+    p.problem = VMG_RN_NOT_GROUP;
+    if (argc >= 2 && !group_dir(c, argv[0], gdir, sizeof gdir)) {
+        const char *s = JS_ToCString(c, argv[1]);
+        if (s) { vm_group_rename_plan(gdir, s, &p); JS_FreeCString(c, s); }
+    }
+    JSValue o = JS_NewObject(c);
+    set_str(c, o, "problem", PR[p.problem]);
+    JS_SetPropertyStr(c, o, "moves", JS_NewBool(c, p.moves));
+    set_str(c, o, "folder", p.folder);
+    set_str(c, o, "other", p.other);
+    return o;
+}
+static JSValue f_group_repair(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char gdir[PATH_MAX];
+    if (argc < 1 || group_dir(c, argv[0], gdir, sizeof gdir)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--group-repair", gdir, NULL };
+    return JS_NewInt32(c, spawn_job(args, gdir));
 }
 
 /* (security scan F5) A guest writes to a writable shared folder: never one that is, sits under or holds a path lord.fs
@@ -4857,7 +4919,7 @@ static JSValue f_import_info(JSContext *c, JSValueConst t, int argc, JSValueCons
 }
 
 static const JSCFunctionListEntry funcs[] = {
-    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("groupCreate", 1, f_group_create), JS_CFUNC_DEF("groupFresh", 2, f_group_fresh), JS_CFUNC_DEF("groupSet", 2, f_group_set), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
+    JS_CFUNC_DEF("host", 0, f_host), JS_CFUNC_DEF("list", 0, f_list), JS_CFUNC_DEF("groups", 0, f_groups), JS_CFUNC_DEF("link", 2, f_link), JS_CFUNC_DEF("groupCreate", 1, f_group_create), JS_CFUNC_DEF("groupFresh", 2, f_group_fresh), JS_CFUNC_DEF("groupSet", 2, f_group_set), JS_CFUNC_DEF("groupDelete", 1, f_group_delete), JS_CFUNC_DEF("groupRename", 2, f_group_rename), JS_CFUNC_DEF("groupRenamePlan", 2, f_group_rename_plan), JS_CFUNC_DEF("groupRepair", 1, f_group_repair), JS_CFUNC_DEF("create", 1, f_create), JS_CFUNC_DEF("hostDefaults", 0, f_host_defaults), JS_CFUNC_DEF("job", 1, f_job),
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),

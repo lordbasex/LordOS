@@ -92,6 +92,8 @@
   "groupStarted": "{name} 正在运行：先网关，后工作站。",
   "groupStopped": "{name} 已关闭：先工作站，后网关。",
   "groupDamaged": "{name} 已损坏：其中一台机器缺失或不属于它。",
+  "groupNameTaken": "已有名为“{name}”的组或虚拟机。",
+  "groupFolderTaken": "Machines 文件夹中已有“{folder}”:请换一个名称。",
   "gatewayFailed": "{name} 的网关没有启动（{why}），因此没有启动工作站。",
   "workstationFailed": "{name} 的工作站没有启动（{why}）；网关仍在运行。",
   "kind.group": "{count} 台的组",

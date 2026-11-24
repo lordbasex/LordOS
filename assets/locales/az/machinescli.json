@@ -92,6 +92,8 @@
   "groupStarted": "{name} işləyir: əvvəl şlüz, sonra iş stansiyası.",
   "groupStopped": "{name} söndürülüb: əvvəl iş stansiyası, sonra şlüz.",
   "groupDamaged": "{name} zədələnib: maşınlarından biri yoxdur və ya ona aid deyil.",
+  "groupNameTaken": "“{name}” adlı qrup və ya maşın artıq var.",
+  "groupFolderTaken": "Machines qovluğunda artıq “{folder}” var: başqa ad seçin.",
   "gatewayFailed": "{name} şlüzü başlamadı ({why}), ona görə iş stansiyası başladılmadı.",
   "workstationFailed": "{name} iş stansiyası başlamadı ({why}); şlüz hələ də işləyir.",
   "kind.group": "{count} maşınlıq qrup",

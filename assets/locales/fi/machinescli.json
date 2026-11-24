@@ -92,6 +92,8 @@
   "groupStarted": "{name} on käynnissä: ensin yhdyskäytävä, sitten työasema.",
   "groupStopped": "{name} on sammutettu: ensin työasema, sitten yhdyskäytävä.",
   "groupDamaged": "{name} on vaurioitunut: yksi sen koneista puuttuu tai ei kuulu siihen.",
+  "groupNameTaken": "Ryhmä tai kone nimeltä ”{name}” on jo olemassa.",
+  "groupFolderTaken": "Machines-kansiossa on jo ”{folder}”: valitse toinen nimi.",
   "gatewayFailed": "Kohteen {name} yhdyskäytävä ei käynnistynyt ({why}), joten työasemaa ei käynnistetty.",
   "workstationFailed": "Kohteen {name} työasema ei käynnistynyt ({why}); yhdyskäytävä on yhä käynnissä.",
   "kind.group": "{count} koneen ryhmä",

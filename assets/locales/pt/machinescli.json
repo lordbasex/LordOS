@@ -92,6 +92,8 @@
   "groupStarted": "{name} está rodando: primeiro o gateway, depois a estação de trabalho.",
   "groupStopped": "{name} está desligado: primeiro a estação de trabalho, depois o gateway.",
   "groupDamaged": "{name} está danificado: uma de suas máquinas está faltando ou não é dele.",
+  "groupNameTaken": "Já existe um grupo ou uma máquina chamada “{name}”.",
+  "groupFolderTaken": "A pasta Machines já tem “{folder}”: escolha outro nome.",
   "gatewayFailed": "O gateway de {name} não iniciou ({why}), então a estação de trabalho não foi iniciada.",
   "workstationFailed": "A estação de trabalho de {name} não iniciou ({why}); o gateway continua rodando.",
   "kind.group": "grupo de {count}",

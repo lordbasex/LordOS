@@ -92,6 +92,8 @@
   "groupStarted": "Tumatakbo ang {name}: una ang gateway, saka ang workstation.",
   "groupStopped": "Patay ang {name}: una ang workstation, saka ang gateway.",
   "groupDamaged": "Sira ang {name}: nawawala ang isa sa mga machine nito o hindi ito kanya.",
+  "groupNameTaken": "May grupo o makina nang may pangalang “{name}”.",
+  "groupFolderTaken": "May “{folder}” na sa folder na Machines: pumili ng ibang pangalan.",
   "gatewayFailed": "Hindi nagsimula ang gateway ng {name} ({why}), kaya hindi sinimulan ang workstation.",
   "workstationFailed": "Hindi nagsimula ang workstation ng {name} ({why}); tumatakbo pa rin ang gateway.",
   "kind.group": "grupo ng {count}",

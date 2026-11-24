@@ -92,6 +92,8 @@
   "groupStarted": "{name} çalışıyor: önce ağ geçidi, sonra iş istasyonu.",
   "groupStopped": "{name} kapalı: önce iş istasyonu, sonra ağ geçidi.",
   "groupDamaged": "{name} bozuk: makinelerinden biri eksik ya da ona ait değil.",
+  "groupNameTaken": "“{name}” adlı bir grup veya makine zaten var.",
+  "groupFolderTaken": "Machines klasöründe zaten “{folder}” var: başka bir ad seçin.",
   "gatewayFailed": "{name} ağ geçidi başlamadı ({why}), bu yüzden iş istasyonu başlatılmadı.",
   "workstationFailed": "{name} iş istasyonu başlamadı ({why}); ağ geçidi hâlâ çalışıyor.",
   "kind.group": "{count} makinelik grup",

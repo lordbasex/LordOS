@@ -92,6 +92,8 @@
   "groupStarted": "{name} está en marcha: primero su puerta de enlace, luego su estación de trabajo.",
   "groupStopped": "{name} está apagado: primero su estación de trabajo, luego su puerta de enlace.",
   "groupDamaged": "{name} está dañado: falta una de sus máquinas o no es suya.",
+  "groupNameTaken": "Ya hay un grupo o una máquina llamada «{name}».",
+  "groupFolderTaken": "La carpeta Machines ya tiene «{folder}»: elegí otro nombre.",
   "gatewayFailed": "La puerta de enlace de {name} no arrancó ({why}), así que su estación de trabajo no se arrancó.",
   "workstationFailed": "La estación de trabajo de {name} no arrancó ({why}); su puerta de enlace sigue en marcha.",
   "kind.group": "grupo de {count}",
