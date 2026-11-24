@@ -913,7 +913,7 @@
   "vm.usbHub": "Koncentrator USB nie może trafić do maszyny",
   "vm.usbInputInUse": "To klawiatura lub mysz używana na tym komputerze",
   "vm.usbMounted": "Ten dysk jest używany na tym komputerze: najpierw go wysuń",
-  "vm.usbStorageAdmin": "Tylko administrator może dać maszynie dysk",
+  "vm.usbAdminOnly": "Tylko administrator może dać maszynie dysk, kartę sieciową lub adapter Bluetooth",
   "vm.usbGone": "To urządzenie USB nie jest już podłączone",
   "vm.usbLocked": "Ta maszyna jest zablokowana dla anonimowości: bez urządzeń USB",
   "vm.usbNoController": "Ta maszyna nie ma kontrolera USB: włącz urządzenia USB w Konfiguruj i uruchom ją ponownie",

@@ -11452,6 +11452,8 @@ static int cmd_import_lordvm(const char *src, int argc, char **argv) {
                 if (bad) { fprintf(stderr, "lord-vm: the key doesn't open this machine's disks\n"); rc = 5; goto out; }
             }
         }
+        /* another computer's devices aren't this one's: an exported machine's auto-connect rules stay behind (6.6) */
+        m.n_usb_auto = 0;
         vm_now_iso(m.updated);
         if (vm_machine_save(tmp, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
         if (rename(tmp, dreal)) { fprintf(stderr, "lord-vm: can't put the machine in place: %s\n", strerror(errno)); goto out; }

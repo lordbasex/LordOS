@@ -912,7 +912,7 @@
   "vm.usbHub": "USB-keskitin ei voi mennä koneeseen",
   "vm.usbInputInUse": "Se on tämän tietokoneen käytössä oleva näppäimistö tai hiiri",
   "vm.usbMounted": "Levy on käytössä tällä tietokoneella: poista se ensin",
-  "vm.usbStorageAdmin": "Vain ylläpitäjä voi antaa koneelle levyn",
+  "vm.usbAdminOnly": "Vain ylläpitäjä voi antaa koneelle levyn, verkkokortin tai Bluetooth-sovittimen",
   "vm.usbGone": "USB-laite ei ole enää kytkettynä",
   "vm.usbLocked": "Tämä kone on lukittu nimettömyyttä varten: ei USB-laitteita",
   "vm.usbNoController": "Tällä koneella ei ole USB-ohjainta: ota USB-laitteet käyttöön kohdassa Määritä ja käynnistä se uudelleen",

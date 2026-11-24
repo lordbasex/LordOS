@@ -2889,8 +2889,9 @@ this computer's drivers when it leaves. One machine holds a device at a time, an
   (**Measured**: uvcvideo and snd-usb-audio bound again to the webcam).
 - *Never given* (checked by root, and by lord-server before it asks): a hub or a root hub (`vm.usbHub`); a device with an input
   node (a keyboard, a mouse) that any process holds open, the session's own (`vm.usbInputInUse`); a device with a disk this
-  computer has mounted, uses as swap or under another block device (`vm.usbMounted`: eject it first); storage when the person
-  isn't an administrator (`vm.usbStorageAdmin`); a machine locked for anonymity (19.5, `vm.usbLocked`: refused by lord-server,
+  computer has mounted, uses as swap or under another block device (`vm.usbMounted`: eject it first); storage, a network card
+  or a Bluetooth adapter (a `net` or `bluetooth` folder under one of its interfaces) when the person isn't an administrator
+  (`vm.usbAdminOnly`: a person at the seat could otherwise cut this computer's network); a machine locked for anonymity (19.5, `vm.usbLocked`: refused by lord-server,
   by lord-vm and by machine.json's check). The boot disk is mounted, so it is refused like any mounted disk.
 - *QEMU's side.* QEMU's usb-host calls `libusb_init`, which looks for every USB device of the computer (a netlink socket,
   `/sys/bus/usb`, `/run/udev`): none of that is allowed in its sandbox. lord-vm preloads `lord-vm-usb.so`
@@ -2909,7 +2910,9 @@ this computer's drivers when it leaves. One machine holds a device at a time, an
   adds one while the machine runs (`VM_USB a = 2`, lord-vm writes machine.json; `a = 3` removes it); Configure lists them with
   Remove, `lord-vm --set --usb-auto RULE … | none` with it off. Once a second while the machine runs lord-server brings a
   matching device in, one at a time, each tried once while it stays plugged in (a device taken out by hand doesn't come back
-  until it is plugged in again), and never asking for a permission.
+  until it is plugged in again), never asking for a permission, and never a disk (storage is only ever picked by
+  hand: a rule written elsewhere can't take this computer's disks). An exported machine's rules stay behind at its import
+  (`cmd_import_lordvm`): another computer's devices aren't this one's.
 - *Unplugged*, the device leaves the machine by itself (lord-server sees it gone from sysfs, `VM_USB a = 0`); the next start has
   none until its rule or the person adds it again. Nothing of it survives lord-vm.
 - *What a hostile guest can do with it:* anything the device itself allows (reset it, change its configuration, rewrite a

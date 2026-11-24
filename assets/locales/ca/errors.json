@@ -912,7 +912,7 @@
   "vm.usbHub": "Un concentrador USB no pot entrar en una màquina",
   "vm.usbInputInUse": "És el teclat o el ratolí que fa servir aquest ordinador",
   "vm.usbMounted": "Aquest disc està en ús en aquest ordinador: expulsa'l primer",
-  "vm.usbStorageAdmin": "Només un administrador pot donar un disc a una màquina",
+  "vm.usbAdminOnly": "Només un administrador pot donar a una màquina un disc, una targeta de xarxa o un adaptador Bluetooth",
   "vm.usbGone": "Aquest dispositiu USB ja no està connectat",
   "vm.usbLocked": "Aquesta màquina està bloquejada per a l'anonimat: sense dispositius USB",
   "vm.usbNoController": "Aquesta màquina no té controlador USB: activa els dispositius USB a Configura i torna-la a iniciar",

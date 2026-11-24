@@ -911,7 +911,7 @@
   "vm.usbHub": "Hub USB tidak bisa masuk ke mesin",
   "vm.usbInputInUse": "Itu keyboard atau mouse yang dipakai komputer ini",
   "vm.usbMounted": "Disk itu sedang dipakai di komputer ini: keluarkan dulu",
-  "vm.usbStorageAdmin": "Hanya administrator yang bisa memberi disk ke mesin",
+  "vm.usbAdminOnly": "Hanya administrator yang bisa memberi mesin disk, kartu jaringan, atau adaptor Bluetooth",
   "vm.usbGone": "Perangkat USB itu sudah tidak tercolok",
   "vm.usbLocked": "Mesin ini dikunci untuk anonimitas: tanpa perangkat USB",
   "vm.usbNoController": "Mesin ini tidak punya pengontrol USB: nyalakan perangkat USB di Konfigurasi lalu mulai ulang",

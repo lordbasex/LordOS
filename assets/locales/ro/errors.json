@@ -913,7 +913,7 @@
   "vm.usbHub": "Un hub USB nu poate intra într-o mașină",
   "vm.usbInputInUse": "Este tastatura sau mouse-ul folosite pe acest computer",
   "vm.usbMounted": "Discul e folosit pe acest computer: scoate-l mai întâi",
-  "vm.usbStorageAdmin": "Doar un administrator poate da un disc unei mașini",
+  "vm.usbAdminOnly": "Doar un administrator poate da unei mașini un disc, o placă de rețea sau un adaptor Bluetooth",
   "vm.usbGone": "Dispozitivul USB nu mai e conectat",
   "vm.usbLocked": "Această mașină e blocată pentru anonimat: fără dispozitive USB",
   "vm.usbNoController": "Această mașină nu are controler USB: activează dispozitivele USB în Configurează și pornește-o din nou",

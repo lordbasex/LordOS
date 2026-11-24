@@ -77,7 +77,7 @@
  *              (sysfs, /sys/bus/usb/devices) must still have that vendor and product; never a hub or a root hub
  *              (vm.usbHub), a device with an input node (keyboard, mouse) any process holds open (vm.usbInputInUse), a
  *              device with a disk this computer has mounted, uses as swap or under another block device (vm.usbMounted), or
- *              storage for someone who isn't an administrator (vm.usbStorageAdmin). Opens /dev/bus/usb/BBB/DDD read and
+ *              storage, a network card or a Bluetooth adapter for someone who isn't an administrator (vm.usbAdminOnly). Opens /dev/bus/usb/BBB/DDD read and
  *              write, checks it by its device number and sysfs again, and answers vm.usbReady with the descriptor
  *              (admin_ok_fd, SCM_RIGHTS): the node's owner, mode and access list never change and nothing is written.
  *              lord-server hands it to that machine's lord-vm and closes its own copy                         anyone

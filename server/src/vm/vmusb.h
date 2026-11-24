@@ -10,8 +10,8 @@
  *                it to QEMU through an fdset (usb-host,hostdevice=/dev/fdset/N): QEMU never opens a path
  *
  * Never given: a hub or a root hub; a device with an input device (keyboard, mouse) a process holds open (the session's
- * own); a device with a disk this computer has mounted, uses as swap or under another block device; storage when the
- * person isn't an administrator. Pure functions of a sysfs folder, /proc and /proc/self/mountinfo given as paths, so
+ * own); a device with a disk this computer has mounted, uses as swap or under another block device; storage, a network
+ * card or a Bluetooth adapter when the person isn't an administrator. Pure functions of a sysfs folder, /proc and /proc/self/mountinfo given as paths, so
  * tests/vmusb_test.c runs them on a made-up tree. */
 #ifndef LORD_VMUSB_H
 #define LORD_VMUSB_H
@@ -39,6 +39,7 @@ enum {
     VMUSB_F_BLOCK   = 1 << 6,           /* a block device below it */
     VMUSB_F_HID     = 1 << 7,           /* class 0x03 */
     VMUSB_F_PRINTER = 1 << 8,           /* class 0x07 */
+    VMUSB_F_NET     = 1 << 9,           /* a network card or a Bluetooth adapter of this computer (net/, bluetooth/ below) */
 };
 
 typedef struct {

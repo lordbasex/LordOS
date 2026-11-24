@@ -913,7 +913,7 @@
   "vm.usbHub": "USB šakotuvas negali patekti į mašiną",
   "vm.usbInputInUse": "Tai šio kompiuterio naudojama klaviatūra ar pelė",
   "vm.usbMounted": "Tas diskas naudojamas šiame kompiuteryje: pirma jį išimkite",
-  "vm.usbStorageAdmin": "Tik administratorius gali duoti mašinai diską",
+  "vm.usbAdminOnly": "Tik administratorius gali duoti mašinai diską, tinklo plokštę ar „Bluetooth“ adapterį",
   "vm.usbGone": "Tas USB įrenginys nebeprijungtas",
   "vm.usbLocked": "Ši mašina užrakinta anonimiškumui: jokių USB įrenginių",
   "vm.usbNoController": "Ši mašina neturi USB valdiklio: įjunkite USB įrenginius skiltyje Konfigūruoti ir paleiskite ją iš naujo",

@@ -912,7 +912,7 @@
   "vm.usbHub": "Un hub USB non può entrare in una macchina",
   "vm.usbInputInUse": "È la tastiera o il mouse in uso su questo computer",
   "vm.usbMounted": "Quel disco è in uso su questo computer: espellilo prima",
-  "vm.usbStorageAdmin": "Solo un amministratore può dare un disco a una macchina",
+  "vm.usbAdminOnly": "Solo un amministratore può dare a una macchina un disco, una scheda di rete o un adattatore Bluetooth",
   "vm.usbGone": "Quel dispositivo USB non è più collegato",
   "vm.usbLocked": "Questa macchina è bloccata per l'anonimato: niente dispositivi USB",
   "vm.usbNoController": "Questa macchina non ha un controller USB: attiva i dispositivi USB in Configura e riavviala",

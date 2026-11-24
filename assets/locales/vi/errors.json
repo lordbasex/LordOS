@@ -911,7 +911,7 @@
   "vm.usbHub": "Bộ chia USB không thể vào máy ảo",
   "vm.usbInputInUse": "Đó là bàn phím hoặc chuột máy tính này đang dùng",
   "vm.usbMounted": "Ổ đĩa đó đang được dùng trên máy tính này: hãy đẩy nó ra trước",
-  "vm.usbStorageAdmin": "Chỉ quản trị viên mới có thể đưa ổ đĩa cho máy ảo",
+  "vm.usbAdminOnly": "Chỉ quản trị viên mới có thể đưa cho máy ảo một ổ đĩa, card mạng hoặc bộ chuyển đổi Bluetooth",
   "vm.usbGone": "Thiết bị USB đó không còn được cắm",
   "vm.usbLocked": "Máy ảo này bị khóa để ẩn danh: không có thiết bị USB",
   "vm.usbNoController": "Máy ảo này không có bộ điều khiển USB: hãy bật thiết bị USB trong Cấu hình rồi khởi động lại",

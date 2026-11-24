@@ -167,6 +167,13 @@ static int read_dev(const char *sys, const char *name, VmUsbDev *d) {
         snprintf(q, sizeof q, "%s/%s", name, e->d_name);
         int ic;
         if (!attr(sys, q, "bInterfaceClass", b, sizeof b) && (ic = hex2(b)) >= 0) classes[nc++] = ic;
+        /* a network interface or a Bluetooth controller of this computer hangs off it */
+        struct stat ns;
+        char np[PATH_MAX];
+        snprintf(np, sizeof np, "%s/%s/net", sys, q);
+        if (!lstat(np, &ns) && S_ISDIR(ns.st_mode)) d->flags |= VMUSB_F_NET;
+        snprintf(np, sizeof np, "%s/%s/bluetooth", sys, q);
+        if (!lstat(np, &ns) && S_ISDIR(ns.st_mode)) d->flags |= VMUSB_F_NET;
     }
     if (dir) closedir(dir);
     for (int i = 0; i < nc; i++) {
@@ -339,7 +346,7 @@ const char *vmusb_refusal(const char *sys, const char *proc, const char *mountin
     VmUsbNode n[64];
     int nn = vmusb_nodes(sys, d, n, 64);
     if (vmusb_input_held(proc, n, nn, 0)) return "vm.usbInputInUse";
-    if ((d->flags & (VMUSB_F_STORAGE | VMUSB_F_BLOCK)) && !admin) return "vm.usbStorageAdmin";
+    if ((d->flags & (VMUSB_F_STORAGE | VMUSB_F_BLOCK | VMUSB_F_NET)) && !admin) return "vm.usbAdminOnly";
     if (vmusb_block_busy(sys, d, mountinfo, swaps)) return "vm.usbMounted";
     return NULL;
 }

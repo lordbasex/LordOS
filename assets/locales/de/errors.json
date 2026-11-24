@@ -912,7 +912,7 @@
   "vm.usbHub": "Ein USB-Hub kann nicht in eine Maschine",
   "vm.usbInputInUse": "Das ist die Tastatur oder Maus, die dieser Computer benutzt",
   "vm.usbMounted": "Diese Festplatte wird auf diesem Computer benutzt: zuerst auswerfen",
-  "vm.usbStorageAdmin": "Nur ein Administrator kann einer Maschine eine Festplatte geben",
+  "vm.usbAdminOnly": "Nur ein Administrator kann einer Maschine eine Festplatte, eine Netzwerkkarte oder einen Bluetooth-Adapter geben",
   "vm.usbGone": "Dieses USB-Gerät ist nicht mehr eingesteckt",
   "vm.usbLocked": "Diese Maschine ist für Anonymität gesperrt: keine USB-Geräte",
   "vm.usbNoController": "Diese Maschine hat keinen USB-Controller: USB-Geräte unter „Konfigurieren“ einschalten und neu starten",

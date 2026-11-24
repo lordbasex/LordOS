@@ -94,6 +94,13 @@ static void tree(void) {
     device("1-4", 1, 5, "05e3", "0608", "09", "USB2.0 Hub\n");
     iface("1-4", "1.0", "09");
     device("1-4.1", 1, 6, "0a12", "0001", "e0", "\n");
+    /* a Wi-Fi card and a Bluetooth adapter of this computer */
+    device("1-5", 1, 7, "2357", "0111", "00", "802.11n NIC\n");
+    iface("1-5", "1.0", "ff");
+    mk(DEV "/1-5/1-5:1.0/net/wlx0");
+    device("1-6", 1, 8, "0a12", "0001", "e0", "\n");
+    iface("1-6", "1.0", "e0");
+    mk(DEV "/1-6/1-6:1.0/bluetooth/hci0");
     /* bus 2 */
     device("usb2", 2, 1, "1d6b", "0003", "09", "xHCI Host Controller\n");
     /* a device whose attributes are garbage: left out */
@@ -115,7 +122,7 @@ static void test_list(void) {
     p(sys, DEV);
     VmUsbDev d[VMUSB_MAX];
     int n = vmusb_list(sys, d, VMUSB_MAX);
-    CHECK(n == 5, "five devices (no root hub, not the garbage one): %d", n);
+    CHECK(n == 7, "seven devices (no root hub, not the garbage one): %d", n);
     int cam = -1, kb = -1, disk = -1, hub = -1;
     for (int i = 0; i < n; i++) {
         if (d[i].vendor == 0x046d && d[i].product == 0x0843) cam = i;
@@ -161,7 +168,7 @@ static void test_refusals(void) {
     CHECK(r && !strcmp(r, "vm.usbInputInUse"), "the keyboard a process holds is refused: %s", r ? r : "(none)");
     vmusb_find(sys, 1, 4, &d);
     r = vmusb_refusal(sys, pe, mn, sw, &d, 0);
-    CHECK(r && !strcmp(r, "vm.usbStorageAdmin"), "storage for someone who isn't an administrator: %s", r ? r : "(none)");
+    CHECK(r && !strcmp(r, "vm.usbAdminOnly"), "storage for someone who isn't an administrator: %s", r ? r : "(none)");
     CHECK(vmusb_refusal(sys, pe, mn, sw, &d, 1) == NULL, "an unmounted disk for an administrator");
     r = vmusb_refusal(sys, pe, ms, sw, &d, 1);
     CHECK(r && !strcmp(r, "vm.usbMounted"), "a mounted partition: %s", r ? r : "(none)");
@@ -187,6 +194,14 @@ static void test_refusals(void) {
         r = vmusb_refusal(sys, pe, mn, sl, &d, 1);
         CHECK(r && !strcmp(r, "vm.usbMounted"), "swap on it: %s", r ? r : "(none)");
         put(DEV "/1-3/1-3:1.0/host6/target6:0:0/6:0:0:0/block/sdz/dev", "250:0\n");
+    }
+    /* a network card and a Bluetooth adapter: administrators only (someone at the seat could cut the network) */
+    for (int dv = 7; dv <= 8; dv++) {
+        VmUsbDev nd;
+        CHECK(!vmusb_find(sys, 1, dv, &nd) && (nd.flags & VMUSB_F_NET), "network or Bluetooth flag (%d)", dv);
+        r = vmusb_refusal(sys, pe, mn, sw, &nd, 0);
+        CHECK(r && !strcmp(r, "vm.usbAdminOnly"), "refused for someone who isn't an administrator (%d): %s", dv, r ? r : "(none)");
+        CHECK(vmusb_refusal(sys, pe, mn, sw, &nd, 1) == NULL, "an administrator may (%d)", dv);
     }
     /* a node that isn't usb_device's */
     VmUsbDev fake = d;

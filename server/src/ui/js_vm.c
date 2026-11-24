@@ -2457,7 +2457,7 @@ static const char *snd_target(int kind, const char *chosen) {
  * for Machines and a device with sound (a webcam's microphone, a headset) the microphone's, checked here (asked by the app
  * with the system prompt; taken away, the device leaves the machine). Never for a machine locked for anonymity. While the
  * machine runs, unplugged devices leave it and machine.json's usb_auto rules bring matching ones in (never asking). */
-static struct { int admin_id, sess, bus, dev; unsigned vendor, product; } usb_pend[8];
+static struct { int admin_id, sess, bus, dev; unsigned vendor, product; char id[37]; } usb_pend[8];
 
 static int usb_perm_ok(int perm) {
     uint32_t rf = restrict_flag_of(perm);
@@ -2541,6 +2541,7 @@ static const char *usb_attach(Sess *s, int bus, int dev, int ask_perm_ok) {
     if (id <= 0) return "vm.usbBusy";
     usb_pend[slot].admin_id = id; usb_pend[slot].sess = (int)(s - sess); usb_pend[slot].bus = bus; usb_pend[slot].dev = dev;
     usb_pend[slot].vendor = d.vendor; usb_pend[slot].product = d.product;
+    memcpy(usb_pend[slot].id, s->id, sizeof usb_pend[slot].id);
     s->usb_busy = 1;
     s->usb_err[0] = 0;
     return "";
@@ -2573,14 +2574,15 @@ int js_vm_admin_reply(int id, const char *kind, const char *text) {
     if (!strcmp(kind, "LOG")) return 1;
     int si = usb_pend[k].sess, bus = usb_pend[k].bus, dev = usb_pend[k].dev;
     unsigned v = usb_pend[k].vendor, p = usb_pend[k].product;
+    /* the same session, still that machine's (a slot freed and used again meanwhile gets nothing) */
+    Sess *s = si >= 0 && si < MAX_SESS && sess[si].used && !strcmp(sess[si].id, usb_pend[k].id) ? &sess[si] : NULL;
     usb_pend[k].admin_id = 0;
-    Sess *s = si >= 0 && si < MAX_SESS && sess[si].used ? &sess[si] : NULL;
     int fd = admin_take_fd(id);
     if (!s) { if (fd >= 0) close(fd); return 1; }
     if (strcmp(kind, "OK") || fd < 0) {
         char code[48] = "vm.usbQemu";
         if (!strcmp(kind, "ERR") && text) { size_t n = strcspn(text, " "); if (n > 0 && n < sizeof code && !strncmp(text, "vm.usb", 6)) { memcpy(code, text, n); code[n] = 0; } }
-        if (!strcmp(kind, "ERR") && text && !strncmp(text, "admin.notAdmin", 14)) snprintf(code, sizeof code, "vm.usbStorageAdmin");
+        if (!strcmp(kind, "ERR") && text && !strncmp(text, "admin.notAdmin", 14)) snprintf(code, sizeof code, "vm.usbAdminOnly");
         if (fd >= 0) close(fd);
         usb_fail(s, code);
         return 1;
@@ -2643,7 +2645,8 @@ static void usb_tick(Sess *s) {
     for (int i = 0; i < n; i++) {
         int match = 0, tried = 0;
         for (int r = 0; r < s->n_usb_auto && !match; r++) { VmUsbRule rule; if (!vmusb_rule_parse(s->usb_auto[r], &rule)) match = vmusb_rule_match(&rule, &list[i]); }
-        if (!match) continue;
+        /* never a disk by itself: a rule (an imported machine's too) only brings cameras, sound, printers, keys… */
+        if (!match || (list[i].flags & (VMUSB_F_STORAGE | VMUSB_F_BLOCK))) continue;
         for (int t = 0; t < s->usb_tried_n; t++) if (s->usb_tried[t].bus == list[i].bus && s->usb_tried[t].dev == list[i].dev) tried = 1;
         if (tried || usb_holder(list[i].bus, list[i].dev) >= 0) continue;
         if (s->usb_tried_n < (int)(sizeof s->usb_tried / sizeof *s->usb_tried)) { s->usb_tried[s->usb_tried_n].bus = list[i].bus; s->usb_tried[s->usb_tried_n].dev = list[i].dev; s->usb_tried_n++; }

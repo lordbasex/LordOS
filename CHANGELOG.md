@@ -16,8 +16,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - The machine window's **Devices** menu lists this computer's USB devices; one picked goes into the running machine
     whole (QEMU's `usb-host` on the machine's xHCI controller) and back to this computer's drivers when it is picked again,
     when it is unplugged, or when the machine stops. One machine holds a device at a time, a machine at most 8.
-  - A new closed admin action, `vm-usb-allow "<machine id> <bus> <address> <vvvv>:<pppp>"` (anyone at the seat; storage only
-    for administrators): it finds the device again in sysfs, refuses a hub or root hub, a device whose keyboard or mouse a
+  - A new closed admin action, `vm-usb-allow "<machine id> <bus> <address> <vvvv>:<pppp>"` (anyone at the seat; storage, network
+    cards and Bluetooth adapters only for administrators): it finds the device again in sysfs, refuses a hub or root hub, a device whose keyboard or mouse a
     process holds (the session's own), a disk this computer has mounted, uses as swap or under another block device, opens
     `/dev/bus/usb/BBB/DDD`, checks it by its device number and sysfs again, and answers with the **descriptor**
     (`admin_ok_fd`: SCM_RIGHTS on the helper's socket; `admin_dispatch` now reads with `recvmsg`). The node's owner, mode and
@@ -34,7 +34,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     an older one gets it in Configure → Sound and input with the machine off) and `usb_auto` (up to 8 `vendor:product[:serial]`
     rules, "Connect … automatically" in the Devices menu while it runs, `VM_USB a = 2/3`, Remove in Configure, `lord-vm
     --set --usb on|off --usb-auto RULE…|none`). A matching device goes in by itself, once while it stays plugged in, never
-    asking for a permission. Never for a machine locked for anonymity: refused by machine.json's check, lord-server and
+    asking for a permission and never a disk (picked by hand only); an exported machine's rules are dropped at its import. Never for a machine locked for anonymity: refused by machine.json's check, lord-server and
     lord-vm.
   - **The camera** goes in the same way, as a USB device: a device with a video interface needs LordOS's camera permission
     for Machines and one with sound the microphone's (checked in C; the app asks with the system prompt the first time;
