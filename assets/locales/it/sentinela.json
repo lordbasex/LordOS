@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Spegni",
   "analysis.rule": "Mostrato sempre: questo avviso non ha bisogno di un modello.",
   "settings.seesMachines": "Per le macchine virtuali: nome, ruolo e stato, perché si sono chiuse, e i conteggi di CPU, memoria e rete del loro motore. Mai il loro schermo, i loro file o i loro appunti.",
-  "sandbox.unverified": "la prova che il suo motore è proprio quello della macchina"
+  "sandbox.unverified": "la prova che il suo motore è proprio quello della macchina",
+  "block.ended": "Programma bloccato terminato: {name}",
+  "block.endedBody": "È nella tua lista di blocco. Controlla la lista in Impostazioni → IA → Sentinela.",
+  "block.title": "Lista di blocco",
+  "block.hint": "Questi programmi vengono terminati ogni volta che si avviano nel tuo account, che Sentinela sia attiva o no. Aggiungine uno da Monitor → Informazioni → Indaga con Lumo; rimuovilo per lasciarlo funzionare di nuovo.",
+  "block.empty": "Nessun programma bloccato.",
+  "block.remove": "Rimuovi",
+  "block.script": "Script {interp}",
+  "block.binary": "Programma",
+  "block.pkg": "e ogni programma del pacchetto {pkg}",
+  "block.added": "bloccato il {date}"
 }

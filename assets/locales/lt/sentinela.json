@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Išjungti",
   "analysis.rule": "Rodoma visada: šiam įspėjimui modelio nereikia.",
   "settings.seesMachines": "Virtualių mašinų: pavadinimą, vaidmenį ir būseną, kodėl jos baigė darbą, ir jų variklio CPU, atminties bei tinklo skaitiklius. Niekada jų ekrano, failų ar iškarpinės.",
-  "sandbox.unverified": "įrodymas, kad jos variklis tikrai yra pačios mašinos"
+  "sandbox.unverified": "įrodymas, kad jos variklis tikrai yra pačios mašinos",
+  "block.ended": "Užblokuota programa baigta: {name}",
+  "block.endedBody": "Ji yra jūsų blokavimo sąraše. Peržiūrėkite sąrašą skiltyje Nustatymai → DI → Sentinela.",
+  "block.title": "Blokavimo sąrašas",
+  "block.hint": "Šios programos baigiamos kaskart, kai pasileidžia jūsų paskyroje, nesvarbu, ar Sentinela įjungta, ar išjungta. Pridėkite programą per Stebėjimas → Informacija → Ištirti su Lumo; pašalinkite, kad ji vėl galėtų veikti.",
+  "block.empty": "Užblokuotų programų nėra.",
+  "block.remove": "Pašalinti",
+  "block.script": "{interp} scenarijus",
+  "block.binary": "Programa",
+  "block.pkg": "ir visos paketo {pkg} programos",
+  "block.added": "užblokuota {date}"
 }

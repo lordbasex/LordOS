@@ -932,5 +932,19 @@
   "sentinela.blockFailed": "Không thể chặn mạng của nó.",
   "sentinela.machineGone": "Máy đó không còn trong Máy ảo nữa.",
   "sentinela.machineFailed": "Máy không phản hồi.",
-  "vm.overBudget": "Không đủ bộ nhớ bên cạnh các máy đang chạy. Hãy tạm ngưng hoặc tắt một máy trong số đó, hoặc cho máy này ít bộ nhớ hơn."
+  "vm.overBudget": "Không đủ bộ nhớ bên cạnh các máy đang chạy. Hãy tạm ngưng hoặc tắt một máy trong số đó, hoặc cho máy này ít bộ nhớ hơn.",
+  "llm.timeout": "Mô hình cục bộ trả lời quá lâu.",
+  "llm.failed": "Mô hình cục bộ không thể trả lời.",
+  "llm.answer": "Không đọc được câu trả lời của mô hình cục bộ.",
+  "llm.start": "Không khởi động được mô hình cục bộ.",
+  "sentinela.lumo.off": "Sentinela đang tắt. Hãy bật nó trong Cài đặt → AI → Sentinela.",
+  "sentinela.lumo.noEngine": "Chưa cài bộ máy chạy mô hình cục bộ.",
+  "sentinela.lumo.noModel": "Chưa cài mô hình cục bộ nào cho Sentinela.",
+  "sentinela.lumo.rejected": "Câu trả lời của Lumo không đúng dạng mong đợi nên đã bị bỏ qua.",
+  "sentinela.blockRefused": "Không thể chặn các chương trình của chính LordOS, bản thân trình thông dịch tập lệnh và các chương trình cốt lõi của hệ thống.",
+  "sentinela.blockFull": "Danh sách chặn đã đầy.",
+  "sentinela.notBlocked": "Chương trình đó không có trong danh sách chặn.",
+  "sentinela.noAppNetwork": "Tiến trình này không có ứng dụng riêng nào có thể bị chặn mạng.",
+  "sys.failed": "Đã xảy ra sự cố.",
+  "sys.unsupported": "Phiên bản LordOS này không làm được việc đó."
 }

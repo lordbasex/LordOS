@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Söndür",
   "analysis.rule": "Həmişə göstərilir: bu xəbərdarlığa model lazım deyil.",
   "settings.seesMachines": "Virtual maşınlar üçün: adları, rolları və vəziyyətləri, niyə dayandıqları, həmçinin mühərriklərinin CPU, yaddaş və şəbəkə göstəriciləri. Heç vaxt ekranlarını, fayllarını və ya mübadilə buferlərini görmür.",
-  "sandbox.unverified": "mühərrikinin həqiqətən maşının özünə aid olduğunun sübutu"
+  "sandbox.unverified": "mühərrikinin həqiqətən maşının özünə aid olduğunun sübutu",
+  "block.ended": "Bloklanmış proqram bitirildi: {name}",
+  "block.endedBody": "O, bloklama siyahınızdadır. Siyahıya Parametrlər → Süni intellekt → Sentinela bölməsində baxın.",
+  "block.title": "Bloklama siyahısı",
+  "block.hint": "Bu proqramlar hesabınızda hər başlayanda bitirilir, Sentinela yanılı olsa da, sönülü olsa da. Monitor → Məlumat al → Lumo ilə araşdır yolu ilə proqram əlavə edin; yenidən işləməsi üçün onu silin.",
+  "block.empty": "Bloklanmış proqram yoxdur.",
+  "block.remove": "Sil",
+  "block.script": "{interp} skripti",
+  "block.binary": "Proqram",
+  "block.pkg": "və {pkg} paketinin bütün proqramları",
+  "block.added": "{date} tarixində bloklanıb"
 }

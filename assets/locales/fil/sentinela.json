@@ -132,5 +132,15 @@
   "action.vm_shutdown": "I-shut down",
   "analysis.rule": "Laging ipinapakita: hindi kailangan ng modelo ang alertong ito.",
   "settings.seesMachines": "Para sa mga virtual machine: ang pangalan, papel at estado nila, kung bakit sila huminto, at ang mga bilang ng CPU, memorya at network ng engine nila. Hindi kailanman ang screen, mga file o clipboard nila.",
-  "sandbox.unverified": "ang patunay na ang engine nito ay talagang sa makina mismo"
+  "sandbox.unverified": "ang patunay na ang engine nito ay talagang sa makina mismo",
+  "block.ended": "Inihinto ang naka-block na program: {name}",
+  "block.endedBody": "Nasa blocklist mo ito. Tingnan ang listahan sa Mga Setting → AI → Sentinela.",
+  "block.title": "Blocklist",
+  "block.hint": "Inihihinto ang mga program na ito tuwing magsisimula sila sa account mo, naka-on man o naka-off ang Sentinela. Magdagdag mula sa Monitor → Kunin ang Impormasyon → Suriin gamit si Lumo; alisin ito para hayaan itong tumakbo ulit.",
+  "block.empty": "Walang naka-block na program.",
+  "block.remove": "Alisin",
+  "block.script": "{interp} script",
+  "block.binary": "Program",
+  "block.pkg": "at lahat ng program ng package na {pkg}",
+  "block.added": "na-block noong {date}"
 }
