@@ -867,6 +867,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Backups: a file's icon looked like an empty check box, and a long name pushed the Restore button's label out at
+  both ends (GitHub #231)** (in development; latest release 0.8.9.5-beta). The restore list drew a file as a bare
+  outline, which read as a check box that never checked; it is now a page with lines. The Restore "<name>" button is
+  held to 260 px, and its label overflowed and was cut on both sides ("estore “lordos-rclone…"); every SDK `Button`'s
+  label now ends with "…" inside the button when the button is held narrower than it (`sdk/components.jsx`). New
+  `backup-restore-scene`. Choosing several files or folders to restore at once is a feature request, not in this fix.
 - **Cloud: empty files and empty folders stayed "coming down" in a folder kept on this computer (GitHub #240)** (in
   development; latest release 0.8.9.5-beta). With In Sync with This Computer (Keep on This Computer), a 0-byte file, an
   empty folder and a folder holding only 0-byte files kept the down arrow for ever, on Google Drive and Filen alike.
