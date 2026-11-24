@@ -95,7 +95,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     case whose `\x99est` escape swallowed the `e` (a compiler warning, a wrong test string), now split. The 191 packages
     of the four languages and the seven-language previews (`2026.11.24`, 6.15 GB: each language's Standard model
     122–209 MB, HD 642 MB, 22–23 voices of each quality) were built from the files fetched on 2026-11-22, unsigned and
-    unpublished until they are signed on the maintainer's Mac. `tts_test.sh` passes with them (HD and Standard in all four, on the CPU).
+    unpublished until they are signed on the maintainer's signing machine. `tts_test.sh` passes with them (HD and Standard in all four, on the CPU).
 
 - **Machines: checked for real, and what that found** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
   6.5, 6.7, 6.14, 6.16, 6.17, 6.19).
@@ -1440,11 +1440,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   shows six cards, arm64 five.
 
 ### Documentation
-- **Roadmap: choosing what an iCloud account syncs** ([#241](https://github.com/lordbasex/LordOS/issues/241); in
+- **Roadmap: choosing what a provider's mail, calendars and contacts account syncs** ([#241](https://github.com/lordbasex/LordOS/issues/241); in
   development, not started; latest release 0.8.9.5-beta). `docs/ROADMAP.md`, "Next release after 0.8.9.5": setup asks
   for Mail, Calendars (which ones) and Contacts; a per-collection `subscribed` flag in `lord-maild` (`pim.c`, `dav.c`)
-  with a migration of `pim/colls` that reads old lines as subscribed; labels by what is synced ("iCloud – Calendar",
-  "iCloud – Contacts"); Mail's sidebar shows the account only when it carries mail.
+  with a migration of `pim/colls` that reads old lines as subscribed; labels by what is synced ("<provider> – Calendar",
+  "<provider> – Contacts"); Mail's sidebar shows the account only when it carries mail.
 
 - **Hardware reports: #245, #230 and the graphics card report #235 (`docs/HARDWARE-REPORT.md`, updated 2026-11-24),
   in development (the latest release is 0.8.9.5-beta).** #245 adds an Acer Aspire R3-131T laptop with an Intel Celeron
