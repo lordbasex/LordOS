@@ -4193,6 +4193,9 @@ static int suspend_usable(char *err, size_t n) {
     char st[PATH_MAX + 32], meta[PATH_MAX + 32];
     state_paths(st, meta, NULL, NULL, sizeof st);
     if (!file_exists(st)) return 0;
+    /* never resumed over an encrypted machine's or a disposable session's disks (begin_suspend never writes one for them):
+     * a state file there came from elsewhere, or from before that changed */
+    if (S.m.encrypted || S.m.disposable != VM_DISP_OFF || session_cap_mb() > 0) { snprintf(err, n, "a saved state is never resumed on an encrypted or disposable machine"); return -1; }
     SuspendMeta sm;
     if (suspend_meta_read(S.dir, &sm)) { snprintf(err, n, "the saved state's description is missing or damaged"); return -1; }
     if (strcmp(sm.machine_type, S.m.machine_type) || sm.vcpus != S.m.vcpus || sm.memory_mb != S.m.memory_mb) {
@@ -4261,6 +4264,19 @@ static void suspend_done(void) {
 }
 
 static void begin_suspend(int ci, uint32_t seq) {
+    /* the one gate for every way here (the person's Suspend, the computer's shutdown, a session that ends): a machine whose
+     * memory must never become a file (encrypted: 8; a disposable session: 6.2, 19.7; locked for anonymity: 19.5) or
+     * can't be migrated (3D, a vGPU) is shut down instead, never saved */
+    const char *never = S.m.encrypted ? "an encrypted machine's memory is never saved to a file"
+                      : S.sess_on || S.m.disposable != VM_DISP_OFF ? "a disposable session keeps nothing"
+                      : S.m.profile_lock ? "locked for anonymity: its memory is never saved to disk"
+                      : S.gl || S.vgpu ? "a machine with 3D graphics or a graphics card can't be saved to disk" : NULL;
+    if (never) {
+        if (ci >= 0) { reply(ci, seq, VME_WRONG_STATE, never); return; }
+        vlog("%s: shutting it down instead", never);
+        host_shutdown();
+        return;
+    }
     char st[PATH_MAX + 32], meta[PATH_MAX + 32], tmp[PATH_MAX + 32], mtmp[PATH_MAX + 32];
     state_paths(st, meta, tmp, mtmp, sizeof st);
     if (vm_op_begin(S.dir, "suspend", NULL, tmp, NULL)) { reply(ci, seq, VME_INTERNAL, "can't write operation.json"); return; }
