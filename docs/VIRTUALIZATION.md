@@ -3040,12 +3040,12 @@ this computer's drivers when it leaves. One machine holds a device at a time, an
   are still the loader's: a module mapped later would stop QEMU (3.3). Its allowlist gains, only for a machine with USB on,
   usbfs's ioctls (type `'U'`) and the `USB` rows `timerfd_create`, `timerfd_settime`, `timerfd_gettime` (`vmsyscalls.h`;
   **Measured** in learn mode through a webcam's capture: nothing else).
-- *The controller* (machine.json schema 20, `usb`): new and imported machines have it (`lord-vm --create`); an older machine
+- *The controller* (machine.json schema 21, `usb`): new and imported machines have it (`lord-vm --create`); an older machine
   gets it from Configure → Sound and input, "USB devices from this computer", with the machine off and no saved state
   (`lord-vm --set --usb on|off`), since it is a device of the guest. A `qemu-xhci` (`id=usbx`, slot `0x15`, 8 USB 2 and 8 USB 3
   ports); the compatible and Windows devices in a window use the xHCI they already have. A machine without it says so in the
   menu.
-- *Auto-connect rules* (schema 20, `usb_auto`): up to 8 `vendor:product[:serial]`. The Devices menu's "Connect … automatically"
+- *Auto-connect rules* (schema 21, `usb_auto`): up to 8 `vendor:product[:serial]`. The Devices menu's "Connect … automatically"
   adds one while the machine runs (`VM_USB a = 2`, lord-vm writes machine.json; `a = 3` removes it); Configure lists them with
   Remove, `lord-vm --set --usb-auto RULE … | none` with it off. Once a second while the machine runs lord-server brings a
   matching device in, one at a time, each tried once while it stays plugged in (a device taken out by hand doesn't come back

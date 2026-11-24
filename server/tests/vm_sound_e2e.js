@@ -35,7 +35,7 @@ async function main() {
   // a screenshot: the guest's picture at its size, a PNG in ~/Pictures/Screenshots
   const shot = lord.vm.screenshot(sid);
   check('a screenshot', typeof shot === 'string' && /\.png$/.test(shot), String(shot));
-  out(`SHOT ${shot} ${lord.vm.poll(sid).w}x${lord.vm.poll(sid).h}`);
+  out(`SHOT ${lord.vm.poll(sid).w}x${lord.vm.poll(sid).h} ${shot}`);
   // a recording with sound, 8 s
   const id = lord.vm.record(sid);
   check('a recording starts', id > 0, String(id));

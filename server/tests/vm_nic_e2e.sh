@@ -47,7 +47,7 @@ for _ in range(10):
     time.sleep(2); n = len(lines)
     if pids: say('qmp {"execute":"guest-exec-status","arguments":{"pid":%s}}' % pids[-1])
     time.sleep(1)
-    if any('"text":"exited' in l for l in lines[n:]): break
+    if any('"text":"exited 1' in l for l in lines[n:]): break
 say('poweroff'); time.sleep(5); p.stdin.close()
 try: p.wait(timeout=60)
 except Exception: p.kill()

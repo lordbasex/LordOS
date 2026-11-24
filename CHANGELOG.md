@@ -30,7 +30,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     executable mappings are still allowed. The allowlist gains, only for such a machine, usbfs's ioctls (`'U'`) and the
     rows `timerfd_create`, `timerfd_settime`, `timerfd_gettime` (rule `USB`): nothing else was called through a webcam's
     capture in learn mode.
-  - machine.json schema 20: `usb` (the machine's USB controller, `qemu-xhci` on slot 0x15; new and imported machines have it,
+  - machine.json schema 21: `usb` (the machine's USB controller, `qemu-xhci` on slot 0x15; new and imported machines have it,
     an older one gets it in Configure → Sound and input with the machine off) and `usb_auto` (up to 8 `vendor:product[:serial]`
     rules, "Connect … automatically" in the Devices menu while it runs, `VM_USB a = 2/3`, Remove in Configure, `lord-vm
     --set --usb on|off --usb-auto RULE…|none`). A matching device goes in by itself, once while it stays plugged in, never

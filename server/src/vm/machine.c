@@ -689,9 +689,9 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     /* one picture per output needs virtio-gpu's own: not an Intel vGPU's, and only on a machine with a window */
     if (m->heads > 1 && (m->vgpu || m->display != VM_DISPLAY_WINDOW)) return fail(err, n, VM_E_RANGE, "several displays need virtio graphics and a window");
     if (m->n_usb_auto < 0 || m->n_usb_auto > VM_USB_AUTO) return fail(err, n, VM_E_RANGE, "at most %d usb_auto rules", VM_USB_AUTO);
-    if (m->schema < 20 && m->n_usb_auto) return fail(err, n, VM_E_FIELD, "usb_auto needs schema 20");
+    if (m->schema < 21 && m->n_usb_auto) return fail(err, n, VM_E_FIELD, "usb_auto needs schema 21");
     if (m->usb & ~1) return fail(err, n, VM_E_RANGE, "usb is true or false");
-    if (m->schema < 20 && m->usb) return fail(err, n, VM_E_FIELD, "usb needs schema 20");
+    if (m->schema < 21 && m->usb) return fail(err, n, VM_E_FIELD, "usb needs schema 21");
     for (int i = 0; i < m->n_usb_auto; i++) {
         if (!vm_usb_rule_valid(m->usb_auto[i])) return fail(err, n, VM_E_RANGE, "usb_auto: vendor:product[:serial], lowercase hex");
         for (int k = 0; k < i; k++) if (!strcmp(m->usb_auto[i], m->usb_auto[k])) return fail(err, n, VM_E_RANGE, "usb_auto: the same rule twice");
@@ -1152,7 +1152,7 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         m->heads = 1;
         if ((r = get_opt_int(o, "heads", &m->heads, err, n))) goto out;
         if (json_get(o, "heads") && m->heads < 1) { r = fail(err, n, VM_E_RANGE, "heads is 1 to %d", VM_HEADS_MAX); goto out; }
-        /* schema 20: missing means no USB controller and no rule (6.6) */
+        /* schema 21: missing means no USB controller and no rule (6.6) */
         const JVal *uc = json_get(o, "usb");
         if (uc && uc->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "usb must be true or false"); goto out; }
         m->usb = uc ? json_bool(o, "usb", 0) : 0;
@@ -1306,8 +1306,8 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 17 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
     if (m->schema >= 18 && m->cpu_model == VM_CPU_COMPAT) jb_raw(&b, ",\n  \"cpu_model\": \"compatible\"");
     if (m->schema >= 19 && m->heads > 1) jb_printf(&b, ",\n  \"heads\": %d", m->heads);
-    if (m->schema >= 20 && m->usb) jb_raw(&b, ",\n  \"usb\": true");
-    if (m->schema >= 20 && m->n_usb_auto) {
+    if (m->schema >= 21 && m->usb) jb_raw(&b, ",\n  \"usb\": true");
+    if (m->schema >= 21 && m->n_usb_auto) {
         jb_raw(&b, ",\n  \"usb_auto\": [");
         for (int i = 0; i < m->n_usb_auto; i++) { if (i) jb_raw(&b, ", "); jb_str(&b, m->usb_auto[i]); }
         jb_raw(&b, "]");

@@ -2,8 +2,9 @@
 # vm_sound_e2e.sh — a machine's speakers, microphone, screenshot and recording through a real lord-server (docs/
 # VIRTUALIZATION.md 6.9, 6.20). Not in `make test`: it needs KVM, QEMU, a Linux guest image with qemu-guest-agent and an
 # HDA driver (VM_SOUND_IMAGE, copied; alsa-utils is installed in the copy from the guest's own mirror when missing), this
-# account's PipeWire (its pulse socket) and its default microphone, ffprobe and ffmpeg. The machine plays at volume 0: the
-# test makes no sound in the room.
+# account's PipeWire (its pulse socket) and a microphone that hears something (VM_SOUND_IN, a source's node.name, else the
+# default one), build/lord-media (the recording), ffprobe and ffmpeg. The machine plays at volume 0: the test makes no sound
+# in the room.
 #
 # The copy gets two guest services (prepared through lordvm-dev and qemu-guest-agent): a 440 Hz tone (speaker-test) and its
 # microphone's level every 3 s (arecord, into /var/tmp/micrms.log with the boot's id). Then a headless lord-server, in its
@@ -15,7 +16,7 @@
 # its microphone heard silence without the permission and this computer's microphone with it.
 cd "$(dirname "$0")/.." || exit 1
 B=$(pwd)/build
-for f in lord-vm lordvm-dev lord-vmdisplay lord-server; do [ -x "$B/$f" ] || { echo "skipped: needs build/$f"; exit 77; }; done
+for f in lord-vm lordvm-dev lord-vmdisplay lord-server lord-media; do [ -x "$B/$f" ] || { echo "skipped: needs build/$f"; exit 77; }; done
 [ -f "${VM_SOUND_IMAGE:-}" ] || { echo "skipped: needs VM_SOUND_IMAGE"; exit 77; }
 U=$(id -u); G=$(id -g); REALHOME=$(getent passwd "$U" | cut -d: -f6)
 [ -r /dev/kvm ] && [ -S "/run/user/$U/pulse/native" ] && command -v pw-dump >/dev/null && command -v ffprobe >/dev/null && command -v unshare >/dev/null || { echo "skipped: needs KVM, this account's pulse socket, pw-dump, ffprobe and unshare"; exit 77; }
@@ -29,7 +30,7 @@ bad() { echo "FAIL: $*"; R=1; }
 cleanup() { XDG_RUNTIME_DIR="$D/run" "$B/lord-vm" --poweroff "$M" >/dev/null 2>&1; [ -n "${SP:-}" ] && kill "$SP" 2>/dev/null; [ -n "$KEEP" ] || rm -rf "$D"; }
 trap cleanup EXIT
 "$B/lord-vm" --create "$M" --name SndE2E --arch amd64 --vcpus 2 --memory 2048 --display window --import "$VM_SOUND_IMAGE" >"$D/create.log" 2>&1 || { cat "$D/create.log"; exit 1; }
-"$B/lord-vm" --set "$M" --agent on --transfer off --sound on --volume 0 --microphone on >/dev/null || exit 1
+"$B/lord-vm" --set "$M" --agent on --transfer off --sound on --volume 0 --microphone on --sound-in "${VM_SOUND_IN:-default}" >/dev/null || exit 1
 
 # ---- the guest's two services, through lordvm-dev ----
 cat > "$D/prep.sh" <<'SH'
@@ -52,6 +53,7 @@ amixer -q sset Capture 80% cap 2>/dev/null || true
 alsactl store 2>/dev/null || true
 systemctl daemon-reload
 systemctl enable lordtone.service lordmic.service >/dev/null 2>&1
+systemctl stop lordmic.service
 : > /var/tmp/micrms.log
 echo prepared
 SH
@@ -112,7 +114,8 @@ grep -q 'SNDE2E FAIL' "$L" && R=1
 grep -q 'SNDE2E DONE' "$L" || { bad "the script didn't finish"; tail -20 "$L"; }
 kill "$SP" 2>/dev/null; SP=
 # the screenshot: a PNG of the guest's size
-read -r _ _ SHOT SIZE <<< "$(grep -o 'SNDE2E SHOT .*' "$L" | head -1)"
+SIZE=$(sed -n 's/.*SNDE2E SHOT \([0-9]*x[0-9]*\) .*/\1/p' "$L" | head -1)
+SHOT=$(sed -n 's/.*SNDE2E SHOT [0-9]*x[0-9]* \(.*\)$/\1/p' "$L" | head -1)
 SHOT=${SHOT/#$REALHOME/$D/home}
 dim=$(python3 -I -c 'import struct,sys; b=open(sys.argv[1],"rb").read(24); print("%dx%d" % struct.unpack(">II", b[16:24]) if b[:8] == b"\x89PNG\r\n\x1a\n" else "not-png")' "$SHOT" 2>/dev/null)
 [ -n "$SIZE" ] && [ "$dim" = "$SIZE" ] && ok "the screenshot is a PNG of the guest's picture ($dim)" || bad "screenshot: $dim vs $SIZE ($SHOT)"
@@ -128,9 +131,9 @@ if [ -f "$MP4" ]; then
 else bad "no recording in Pictures/Screenshots"; fi
 # the microphone as the guest heard it: read back at another boot
 XDG_RUNTIME_DIR="$D/run" LORDVM_DEV_STAY_PAUSED=1 timeout 200 python3 -I "$D/drive.py" "$D/read.log" /dev/null read -- "$B/lordvm-dev" run "$M" --dev-qmp >/dev/null 2>&1
-# "BOOT <order> <recordings> <heard> <max RMS>" per boot: the one before this reading's is lord-server's
+# "BOOT <order> <recordings> <heard> <max RMS>" per boot: the first is lord-server's (the preparing boot wrote none)
 grep -o 'dev-out: .*' "$D/read.log" | sed 's/^dev-out: //' | tr '|' '\n' | grep '^BOOT ' > "$D/mic.txt"
-read -r _ _ total heard max <<< "$(tail -2 "$D/mic.txt" | head -1)"
+read -r _ _ total heard max <<< "$(head -1 "$D/mic.txt")"
 silent=$(( ${total:-0} - ${heard:-0} ))
 [ "$silent" -ge 1 ] && ok "without the permission the guest's microphone heard silence ($silent recordings at 0)" || bad "no silent recording"
 [ "$heard" -ge 1 ] && ok "with it the guest heard this computer's microphone ($heard recordings, RMS up to $max)" || bad "the guest never heard the microphone: $(head -c 400 "$D/mic.txt")"
