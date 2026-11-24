@@ -27,7 +27,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     memory, disk, the sandbox) and Start in Full Screen. Picture in Picture is a small floating view that takes no input
     for the guest, never for a protected machine.
   - **What this computer can run**, for amd64 and arm64, from what the computer reports, with its temperature, fan and a
-    Raspberry Pi's power supply while machines run; in the Help menu and on the first-run page.
+    Raspberry Pi's power supply while machines run; in the Machine menu and on the first-run page.
   - **Configure**: a search over the sections and a dot on each section with an unsaved change; Startup and shutdown has
     Start with the session and Pause while I'm away (after 10 minutes without input; resumed on the next).
   - **The rest of the system**: Search finds machines; Files shows a machine's folder as one item that opens it; Backups

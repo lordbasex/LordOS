@@ -1612,7 +1612,6 @@
   "light.disk.busy": "Disk busy",
   "light.disk.idle": "Disk idle",
   "menu.info": "Info",
-  "menu.help": "Help",
   "view.window": "Window",
   "view.pip": "Picture in Picture",
   "view.pipProtected": "Not for a protected machine",

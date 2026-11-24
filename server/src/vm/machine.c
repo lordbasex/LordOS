@@ -1216,7 +1216,7 @@ char *vm_machine_json(const VmMachine *m) {
 }
 
 static char *read_small(const char *path, size_t max, size_t *len) {
-    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);   /* a FIFO named machine.json never blocks the caller */
     if (fd < 0) return NULL;
     struct stat st;
     if (fstat(fd, &st) || !S_ISREG(st.st_mode) || (size_t)st.st_size > max) { close(fd); errno = EFBIG; return NULL; }

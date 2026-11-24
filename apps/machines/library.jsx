@@ -791,8 +791,6 @@ export function Library() {
       ...LIB_VIEWS.map((k) => ({ label: tr(k === 'grid' ? 'machines.lib.viewGrid' : 'machines.lib.viewList'), checked: lv.view === k, onClick: () => putView({ view: k }) })),
       '-',
       ...LIB_SORTS.map((k) => ({ label: tr(`machines.lib.sort.${k}`), checked: lv.sort === k, onClick: () => putView({ sort: k }) })),
-    ] }, { label: tr('machines.menu.help'), items: [
-      { label: tr('machines.pi.menu'), onClick: () => setPage('pi') },
     ] }]);
   }, [host?.arch, lv.view, lv.sort]);
 

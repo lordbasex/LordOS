@@ -333,7 +333,7 @@ static void gvt_memlock(const char *dir) {
     static int next;
     char p[PATH_MAX + 16], buf[2048];
     snprintf(p, sizeof p, "%s/run.json", dir);
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
     if (n <= 0) return;
@@ -374,7 +374,7 @@ static JSValue f_gpus(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
 static void run_state(const char *dir, JSContext *c, JSValue o) {
     char p[PATH_MAX + 16], buf[2048];
     snprintf(p, sizeof p, "%s/run.json", dir);
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
     const char *state = "stopped", *reason = "none";
@@ -1584,7 +1584,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     /* run.json is the person's own file: only a hint (which QEMU the Machines cards count, whether to ask lord-vm) */
     snprintf(p, sizeof p, "%s/run.json", dir);
     char buf[2048];
-    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     ssize_t n = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
     if (fd >= 0) close(fd);
     long qpid = 0, hint_passt = 0;
@@ -4447,7 +4447,7 @@ static JSValue f_awake(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (e->d_name[0] == '.' || l < 8 || strcmp(e->d_name + l - 7, ".lordvm")) continue;
         char p[PATH_MAX + 300], buf[2048];
         snprintf(p, sizeof p, "%s/%s/run.json", lib, e->d_name);
-        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
         ssize_t k = fd >= 0 ? read(fd, buf, sizeof buf - 1) : -1;
         if (fd >= 0) close(fd);
         if (k <= 0) continue;

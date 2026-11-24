@@ -813,7 +813,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const gaps = isolationGaps(host, st);
   // View: Picture in Picture on the window's display, Actual Size (the guest's pixels, while the resolution is fixed)
   const myFrame = () => { const w = windows.get().find((x) => x.id === winId); return w ? wm.frame(w) : null; };
-  const toPip = () => { const f0 = myFrame(); const f = f0 && pipFrame(displayFor(f0), st?.w, st?.h, direction() === 'rtl'); if (f) wm.setPip(winId, f); };
+  const toPip = () => { if (protRef.current) return; const f0 = myFrame(); const f = f0 && pipFrame(displayFor(f0), st?.w, st?.h, direction() === 'rtl'); if (f) wm.setPip(winId, f); };
   const fromPip = () => wm.setPip(winId, null);
   const actual = () => { const f0 = myFrame(); const f = f0 && actualFrame(st?.w, st?.h, BAR, workAreaOf(displayFor(f0))); if (f) wm.resize(winId, f.w, f.h); };
   const m0 = { dir, name, id: winId.split('#vm-')[1] };

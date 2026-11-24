@@ -1612,7 +1612,6 @@
   "light.disk.busy": "디스크 사용 중",
   "light.disk.idle": "디스크 유휴",
   "menu.info": "정보",
-  "menu.help": "도움말",
   "view.window": "창",
   "view.pip": "화면 속 화면",
   "view.pipProtected": "보호된 머신에는 사용할 수 없음",

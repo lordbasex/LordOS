@@ -1612,7 +1612,6 @@
   "light.disk.busy": "ディスク使用中",
   "light.disk.idle": "ディスク待機中",
   "menu.info": "情報",
-  "menu.help": "ヘルプ",
   "view.window": "ウインドウ",
   "view.pip": "ピクチャ・イン・ピクチャ",
   "view.pipProtected": "保護されたマシンでは使えません",
