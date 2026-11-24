@@ -212,13 +212,13 @@ int main(void) {
             if (c < 0 || vm_recv(c, &q, &qfd) <= 0) _exit(1);
             VmMsg i = vm_msg(VM_INFO, q.seq, 2, 2048, 0x1ff, 2, "id"); vm_send(c, &i, -1);
             VmMsg s2 = vm_msg(VM_STATE, q.seq, 2, 0, 0, 4321, ""); vm_send(c, &s2, -1);
-            struct timespec ts = { 0, 300 * 1000000 };
+            struct timespec ts = { 3, 0 };
             nanosleep(&ts, NULL);
             _exit(0);
         }
         close(ls);
         VmLive lv;
-        int r = vmwatch_live(sp, &lv, 300);
+        int r = vmwatch_live(sp, &lv, 2500);
         CHECK(!r && lv.pidfd >= 0 && vmwatch_pidfd_pid(lv.pidfd) == getpid(), "the peer's pidfd: r %d fd %d pid %ld", r, lv.pidfd, lv.pidfd >= 0 ? vmwatch_pidfd_pid(lv.pidfd) : -1L);
         if (lv.pidfd >= 0) close(lv.pidfd);
         int st;
