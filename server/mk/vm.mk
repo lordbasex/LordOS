@@ -100,6 +100,17 @@ build/vmdisplay-test: tests/vmdisplay_test.c src/vm/vmproto.h src/vm/vmpace.h bu
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ tests/vmdisplay_test.c $(shell pkg-config --libs libsystemd)
 	./$@ build/lord-vmdisplay 2>build/vmdisplay-test.err || { cat build/vmdisplay-test.err; rm -f $@; exit 1; }
+# lord-vmdisplay's D-Bus side against a hostile QEMU (docs/VIRTUALIZATION.md 8): about 12,000 seeded random listener,
+# map and sound calls with edge values, wrong signatures, short or pipe descriptors and a map shrunk under it, against
+# the helper built with ASan and UBSan in its own sandbox; every call answered, no report, QEMU's words logged clean
+test: build/vmdisplay-fuzz
+build/lord-vmdisplay-asan: $(VMDISPLAY_SRC) $(VM_HDR)
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ $(VMDISPLAY_SRC) $(shell pkg-config --libs libsystemd) -lpthread
+build/vmdisplay-fuzz: tests/vmdisplay_fuzz.c src/vm/vmproto.h src/vm/vmpace.h src/media/aring.h build/lord-vmdisplay-asan
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ tests/vmdisplay_fuzz.c $(shell pkg-config --libs libsystemd)
+	./$@ build/lord-vmdisplay-asan 2>build/vmdisplay-fuzz.err || { cat build/vmdisplay-fuzz.err; rm -f $@; exit 1; }
 endif
 
 # schema validation, the message checks of vmproto.h, QMP line reading and the key map: no QEMU needed.
