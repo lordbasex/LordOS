@@ -18,6 +18,10 @@ int  admin_known(const char *action);                 /* is it in the closed lis
  * id 0 and kind EVENT. Several actions can run at once. */
 int  admin_send(const char *action, const char *arg, size_t len);
 void admin_dispatch(void (*fn)(int id, const char *kind, const char *text));
+/* The one descriptor an action answered with (admin_ok_fd: only vm-usb-allow, its "OK vm.usbReady" line), for the code that
+ * sent that request, from inside fn: taken once (the caller closes it), -1 when there is none. One nobody takes while fn runs
+ * is closed after it: JS never gets one */
+int  admin_take_fd(int id);
 
 /* ---- lord-netd (root, started by lord-sessiond): the system network; see admin.c, docs/NETWORK.md ---- */
 int  admin_netd_serve(void);                          /* returns only on error */
@@ -51,6 +55,20 @@ static inline void admin_code(const char *kind, const char *code, ...)
     va_end(ap);
     admin_say(kind, "%s", line);
 }
+/* The same with one descriptor passed along (SCM_RIGHTS on the same message as the line); the helper keeps its own copy,
+ * the caller closes it. Only from an action that runs in the session's helper itself (not A_FORK, not lord-netd's) */
+void admin_say_fd(int fd, const char *kind, const char *fmt, ...) __attribute__((format(printf, 3, 4)));
+__attribute__((sentinel))
+static inline void admin_code_fd(int fd, const char *kind, const char *code, ...)
+{
+    char line[2048];
+    va_list ap;
+    va_start(ap, code);
+    lerr_vset(line, sizeof line, code, ap);
+    va_end(ap);
+    admin_say_fd(fd, kind, "%s", line);
+}
+#define admin_ok_fd(fd, ...) admin_code_fd((fd), "OK", __VA_ARGS__)
 #define admin_err(...) admin_code("ERR", __VA_ARGS__)
 #define admin_ok(...)  admin_code("OK", __VA_ARGS__)
 #define admin_log(...) admin_code("LOG", __VA_ARGS__)

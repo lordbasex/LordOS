@@ -568,7 +568,7 @@ static int check_member(const VmMachine *m, char *err, size_t n) {
         if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
         if (m->guest_links || m->guest_notify) return fail(err, n, VM_E_RANGE, "locked for anonymity: links and notifications from the guest");
         if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
-        if (m->n_usb_auto) return fail(err, n, VM_E_RANGE, "locked for anonymity: USB devices");
+        if (m->n_usb_auto || m->usb) return fail(err, n, VM_E_RANGE, "locked for anonymity: USB devices");
     }
     return VM_OK;
 }
@@ -680,6 +680,8 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 17 && m->automation) return fail(err, n, VM_E_FIELD, "automation needs schema 17");
     if (m->n_usb_auto < 0 || m->n_usb_auto > VM_USB_AUTO) return fail(err, n, VM_E_RANGE, "at most %d usb_auto rules", VM_USB_AUTO);
     if (m->schema < 18 && m->n_usb_auto) return fail(err, n, VM_E_FIELD, "usb_auto needs schema 18");
+    if (m->usb & ~1) return fail(err, n, VM_E_RANGE, "usb is true or false");
+    if (m->schema < 18 && m->usb) return fail(err, n, VM_E_FIELD, "usb needs schema 18");
     for (int i = 0; i < m->n_usb_auto; i++) {
         if (!vm_usb_rule_valid(m->usb_auto[i])) return fail(err, n, VM_E_RANGE, "usb_auto: vendor:product[:serial], lowercase hex");
         for (int k = 0; k < i; k++) if (!strcmp(m->usb_auto[i], m->usb_auto[k])) return fail(err, n, VM_E_RANGE, "usb_auto: the same rule twice");
@@ -838,7 +840,7 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "usb_auto", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "usb_auto", "usb", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -1130,7 +1132,10 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *au = json_get(o, "automation");
         if (au && au->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "automation must be true or false"); goto out; }
         m->automation = au ? json_bool(o, "automation", 0) : 0;
-        /* schema 18: missing means no rule (6.6) */
+        /* schema 18: missing means no USB controller and no rule (6.6) */
+        const JVal *uc = json_get(o, "usb");
+        if (uc && uc->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "usb must be true or false"); goto out; }
+        m->usb = uc ? json_bool(o, "usb", 0) : 0;
         const JVal *ua = json_get(o, "usb_auto");
         if (ua) {
             if (ua->type != J_ARR) { r = fail(err, n, VM_E_FIELD, "usb_auto must be a list"); goto out; }
@@ -1279,6 +1284,7 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 15 && m->guest_links) jb_raw(&b, ",\n  \"guest_links\": true");
     if (m->schema >= 15 && m->guest_notify) jb_raw(&b, ",\n  \"guest_notify\": true");
     if (m->schema >= 17 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
+    if (m->schema >= 18 && m->usb) jb_raw(&b, ",\n  \"usb\": true");
     if (m->schema >= 18 && m->n_usb_auto) {
         jb_raw(&b, ",\n  \"usb_auto\": [");
         for (int i = 0; i < m->n_usb_auto; i++) { if (i) jb_raw(&b, ", "); jb_str(&b, m->usb_auto[i]); }

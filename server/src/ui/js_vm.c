@@ -36,6 +36,8 @@
 #include "../vm/vmnet.h"
 #include "../vm/vmgpu.h"
 #include "../vm/vmsig.h"
+#include "../vm/vmusb.h"
+#include "../admin.h"
 #include "../wl/wl.h"
 #include "../gpu/gpu.h"
 #include "../gpu/dmaread.h"
@@ -2254,6 +2256,18 @@ typedef struct {
     /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
      * did (PTRLOCK_END_*), for the window */
     int captured, cap_ends, cap_why;
+    /* host USB devices (docs/VIRTUALIZATION.md 6.6; AGENTS.md "Machines' USB devices"): what lord-vm says the machine holds
+     * (VM_USB_STATE), with what each is (camera, microphone or speakers: the indicator and the permissions), an attach or
+     * detach in flight (the admin helper's vm-usb-allow, then VM_USB), the last refusal (an errors.json code) and a
+     * counter of them; machine.json's usb and usb_auto as last read, and the devices auto-connect tried already */
+    struct { int bus, dev, flags, out; unsigned vendor, product; char name[64]; } usb[VMUSB_PER_VM];
+    int usb_n, usb_busy, usb_ctrl, usb_lock, usb_errs, usb_tried_n;
+    uint32_t usb_seq;
+    char usb_err[48];
+    char usb_auto[VM_USB_AUTO][VM_USB_RULE_MAX + 1];
+    int n_usb_auto;
+    struct { int bus, dev; } usb_tried[16];
+    long long usb_tick_at;
 } Sess;
 static Sess sess[MAX_SESS];
 
@@ -2404,6 +2418,209 @@ static const char *snd_target(int kind, const char *chosen) {
     if (!chosen[0] || snd_device_present(kind, chosen) != 1) return "";
     if (kind == SND_SOURCE && !snd_source_is_input(chosen)) return "";
     return chosen;
+}
+
+/* ---- host USB devices (6.6) ----
+ * Listing is lord-server's (sysfs, readable by the person); opening is root's: the admin helper's vm-usb-allow checks the
+ * device again, opens /dev/bus/usb/BBB/DDD and answers with the descriptor (admin_ok_fd), which goes on to the machine's
+ * lord-vm (VM_USB) and is closed here. A device goes to one machine at a time; a camera needs LordOS's camera permission
+ * for Machines and a device with sound (a webcam's microphone, a headset) the microphone's, checked here (asked by the app
+ * with the system prompt; taken away, the device leaves the machine). Never for a machine locked for anonymity. While the
+ * machine runs, unplugged devices leave it and machine.json's usb_auto rules bring matching ones in (never asking). */
+static struct { int admin_id, sess, bus, dev; unsigned vendor, product; } usb_pend[8];
+
+static int usb_perm_ok(int perm) {
+    uint32_t rf = restrict_flag_of(perm);
+    if (rf && restrict_blocks(BUILTIN_FWID, rf)) return 0;
+    return perm_get("machines", perm) == PERM_ALLOW;
+}
+
+/* the code of what stops a device from going in now ("" none) */
+static const char *usb_perm_need(int flags) {
+    if ((flags & VMUSB_F_VIDEO) && !usb_perm_ok(PERM_CAMERA)) return "vm.usbCameraPerm";
+    if ((flags & VMUSB_F_AUDIO) && !usb_perm_ok(PERM_MICROPHONE)) return "vm.usbMicPerm";
+    return "";
+}
+
+/* which session holds that device (index), or -1 */
+static int usb_holder(int bus, int dev) {
+    for (int i = 0; i < MAX_SESS; i++) {
+        if (!sess[i].used) continue;
+        for (int k = 0; k < sess[i].usb_n; k++) if (sess[i].usb[k].bus == bus && sess[i].usb[k].dev == dev) return i;
+        for (int k = 0; k < 8; k++) if (usb_pend[k].admin_id && usb_pend[k].sess == i && usb_pend[k].bus == bus && usb_pend[k].dev == dev) return i;
+    }
+    return -1;
+}
+
+/* machine.json's usb, usb_auto and lock, read again (they change with Configure and VM_USB's rules) */
+static void usb_conf(Sess *s) {
+    VmMachine m;
+    if (vm_machine_load(s->dir, &m, NULL, 0)) return;
+    s->usb_ctrl = m.usb;
+    s->usb_lock = m.profile_lock != VM_LOCK_NONE;
+    s->n_usb_auto = m.n_usb_auto;
+    for (int i = 0; i < m.n_usb_auto; i++) snprintf(s->usb_auto[i], sizeof s->usb_auto[i], "%s", m.usb_auto[i]);
+}
+
+/* the input nodes of a device this process holds (the session's keyboard or mouse): never offered */
+static int usb_input_here(const VmUsbDev *d) {
+    VmUsbNode n[32];
+    int nn = vmusb_nodes(VMUSB_SYS, d, n, 32);
+    DIR *dd = opendir("/proc/self/fd");
+    int held = 0;
+    for (struct dirent *e; dd && !held && (e = readdir(dd));) {
+        struct stat st;
+        if (e->d_name[0] == '.' || fstatat(dirfd(dd), e->d_name, &st, 0) || !S_ISCHR(st.st_mode)) continue;
+        for (int i = 0; i < nn; i++) if (!n[i].block && major(st.st_rdev) == n[i].major && minor(st.st_rdev) == n[i].minor) { held = 1; break; }
+    }
+    if (dd) closedir(dd);
+    return held;
+}
+
+/* why lord-server won't even ask for it ("" may ask; root checks again) */
+static const char *usb_refusal_here(const Sess *s, const VmUsbDev *d) {
+    if (s && s->usb_lock) return "vm.usbLocked";
+    if (d->flags & (VMUSB_F_ROOTHUB | VMUSB_F_HUB)) return "vm.usbHub";
+    if ((d->flags & VMUSB_F_INPUT) && usb_input_here(d)) return "vm.usbInputInUse";
+    return "";
+}
+
+/* an attach: the admin helper first. "" sent, else why not (an errors.json code) */
+static const char *usb_attach(Sess *s, int bus, int dev, int ask_perm_ok) {
+    VmUsbDev d;
+    if (s->vm < 0 || (s->state != VS_RUNNING && s->state != VS_PAUSED)) return "vm.usbNotRunning";
+    usb_conf(s);
+    if (s->usb_lock) return "vm.usbLocked";
+    if (!s->usb_ctrl) return "vm.usbNoController";
+    if (s->usb_busy) return "vm.usbBusy";
+    if (vmusb_find(VMUSB_SYS, bus, dev, &d)) return "vm.usbGone";
+    const char *no = usb_refusal_here(s, &d);
+    if (no[0]) return no;
+    int h = usb_holder(bus, dev);
+    if (h >= 0) return h == (int)(s - sess) ? "vm.usbAlready" : "vm.usbOtherMachine";
+    if (s->usb_n >= VMUSB_PER_VM) return "vm.usbTooMany";
+    const char *perm = usb_perm_need(d.flags);
+    if (perm[0]) return perm;
+    (void)ask_perm_ok;
+    int slot = -1;
+    for (int k = 0; k < 8; k++) if (!usb_pend[k].admin_id) { slot = k; break; }
+    if (slot < 0 || admin_fd() < 0) return "vm.usbBusy";
+    char arg[96];
+    snprintf(arg, sizeof arg, "%s %d %d %04x:%04x", s->id, bus, dev, d.vendor, d.product);
+    int id = admin_send("vm-usb-allow", arg, strlen(arg));
+    if (id <= 0) return "vm.usbBusy";
+    usb_pend[slot].admin_id = id; usb_pend[slot].sess = (int)(s - sess); usb_pend[slot].bus = bus; usb_pend[slot].dev = dev;
+    usb_pend[slot].vendor = d.vendor; usb_pend[slot].product = d.product;
+    s->usb_busy = 1;
+    s->usb_err[0] = 0;
+    return "";
+}
+
+static int usb_detach(Sess *s, int bus, int dev) {
+    for (int k = 0; k < s->usb_n; k++) {
+        if (s->usb[k].bus != bus || s->usb[k].dev != dev || s->usb[k].out) continue;
+        char t[32];
+        snprintf(t, sizeof t, "%d %d %04x:%04x", bus, dev, s->usb[k].vendor, s->usb[k].product);
+        VmMsg m = vm_msg(VM_USB, ++s->seq, 0, 0, 0, 0, t);
+        if (vm_send(s->vm, &m, -1)) return 0;
+        s->usb[k].out = 1;
+        return 1;
+    }
+    return 0;
+}
+
+static void usb_fail(Sess *s, const char *code) {
+    snprintf(s->usb_err, sizeof s->usb_err, "%s", code);
+    s->usb_errs++;
+    s->usb_busy = 0;
+}
+
+/* the admin helper's answer to a vm-usb-allow sent here: 1 when it was one (JS never sees it) */
+int js_vm_admin_reply(int id, const char *kind, const char *text) {
+    int k = 0;
+    while (k < 8 && usb_pend[k].admin_id != id) k++;
+    if (k == 8 || id <= 0) return 0;
+    if (!strcmp(kind, "LOG")) return 1;
+    int si = usb_pend[k].sess, bus = usb_pend[k].bus, dev = usb_pend[k].dev;
+    unsigned v = usb_pend[k].vendor, p = usb_pend[k].product;
+    usb_pend[k].admin_id = 0;
+    Sess *s = si >= 0 && si < MAX_SESS && sess[si].used ? &sess[si] : NULL;
+    int fd = admin_take_fd(id);
+    if (!s) { if (fd >= 0) close(fd); return 1; }
+    if (strcmp(kind, "OK") || fd < 0) {
+        char code[48] = "vm.usbRefused";
+        if (!strcmp(kind, "ERR") && text) { size_t n = strcspn(text, " "); if (n > 0 && n < sizeof code && !strncmp(text, "vm.usb", 6)) { memcpy(code, text, n); code[n] = 0; } }
+        if (!strcmp(kind, "ERR") && text && !strncmp(text, "admin.notAdmin", 14)) snprintf(code, sizeof code, "vm.usbStorageAdmin");
+        if (fd >= 0) close(fd);
+        usb_fail(s, code);
+        return 1;
+    }
+    char t[32];
+    snprintf(t, sizeof t, "%d %d %04x:%04x", bus, dev, v, p);
+    if (vmusb_fd_ok(fd, bus, dev) || s->vm < 0) { close(fd); usb_fail(s, "vm.usbGone"); return 1; }
+    VmMsg m = vm_msg(VM_USB, ++s->seq, 1, 0, 0, 0, t);
+    int bad = vm_send(s->vm, &m, fd);
+    close(fd);
+    if (bad) { usb_fail(s, "vm.usbBusy"); return 1; }
+    s->usb_seq = s->seq;
+    return 1;
+}
+
+/* VM_USB_STATE: the devices the machine holds now */
+static void usb_state(Sess *s, const VmMsg *m) {
+    char t[VM_TEXT_MAX];
+    snprintf(t, sizeof t, "%s", m->text);
+    int n = 0;
+    for (char *save = NULL, *l = strtok_r(t, "\t", &save); l && n < VMUSB_PER_VM; l = strtok_r(NULL, "\t", &save)) {
+        int b, d;
+        unsigned v, p;
+        if (vmusb_line_parse(l, &b, &d, &v, &p)) continue;
+        int out = 0;
+        for (int k = 0; k < s->usb_n; k++) if (s->usb[k].bus == b && s->usb[k].dev == d) out = s->usb[k].out;
+        VmUsbDev dv;
+        int known = !vmusb_find(VMUSB_SYS, b, d, &dv) && dv.vendor == v && dv.product == p;
+        s->usb[n].bus = b; s->usb[n].dev = d; s->usb[n].vendor = v; s->usb[n].product = p; s->usb[n].out = out;
+        s->usb[n].flags = known ? dv.flags : 0;
+        snprintf(s->usb[n].name, sizeof s->usb[n].name, "%s", known ? dv.model : "");
+        n++;
+    }
+    s->usb_n = n;
+}
+
+/* once a second while the machine runs: unplugged devices out, a permission taken away takes its device out, and
+ * usb_auto's rules bring matching devices in (one at a time, each device tried once while it stays plugged in) */
+static void usb_tick(Sess *s) {
+    long long now = mono_ms();
+    if (now - s->usb_tick_at < 1000) return;
+    s->usb_tick_at = now;
+    if (s->vm < 0 || (s->state != VS_RUNNING && s->state != VS_PAUSED)) { s->usb_tried_n = 0; return; }
+    usb_conf(s);
+    for (int k = 0; k < s->usb_n; k++) {
+        VmUsbDev d;
+        int gone = vmusb_find(VMUSB_SYS, s->usb[k].bus, s->usb[k].dev, &d) || d.vendor != s->usb[k].vendor || d.product != s->usb[k].product;
+        if (gone || usb_perm_need(s->usb[k].flags)[0] || s->usb_lock) usb_detach(s, s->usb[k].bus, s->usb[k].dev);
+    }
+    /* tried devices that left are forgotten (plugged in again, they're tried again) */
+    int keep = 0;
+    for (int i = 0; i < s->usb_tried_n; i++) {
+        VmUsbDev d;
+        if (!vmusb_find(VMUSB_SYS, s->usb_tried[i].bus, s->usb_tried[i].dev, &d)) s->usb_tried[keep++] = s->usb_tried[i];
+    }
+    s->usb_tried_n = keep;
+    if (!s->n_usb_auto || !s->usb_ctrl || s->usb_lock || s->usb_busy) return;
+    VmUsbDev list[VMUSB_MAX];
+    int n = vmusb_list(VMUSB_SYS, list, VMUSB_MAX);
+    for (int i = 0; i < n; i++) {
+        int match = 0, tried = 0;
+        for (int r = 0; r < s->n_usb_auto && !match; r++) { VmUsbRule rule; if (!vmusb_rule_parse(s->usb_auto[r], &rule)) match = vmusb_rule_match(&rule, &list[i]); }
+        if (!match) continue;
+        for (int t = 0; t < s->usb_tried_n; t++) if (s->usb_tried[t].bus == list[i].bus && s->usb_tried[t].dev == list[i].dev) tried = 1;
+        if (tried || usb_holder(list[i].bus, list[i].dev) >= 0) continue;
+        if (s->usb_tried_n < (int)(sizeof s->usb_tried / sizeof *s->usb_tried)) { s->usb_tried[s->usb_tried_n].bus = list[i].bus; s->usb_tried[s->usb_tried_n].dev = list[i].dev; s->usb_tried_n++; }
+        const char *why = usb_attach(s, list[i].bus, list[i].dev, 0);
+        if (why[0]) { snprintf(s->usb_err, sizeof s->usb_err, "%s", why); s->usb_errs++; }
+        return;                         /* one at a time */
+    }
 }
 
 static void snd_apply(Sess *s) {
@@ -3191,7 +3408,13 @@ static void from_vm(Sess *s) {
         case VM_FILE_PROGRESS:
             for (int i = 0; i < 16; i++) if (s->fx[i].state == 1 && s->fx[i].seq == m.seq) { s->fx[i].pct = m.a; s->fx[i].via = m.b == 1; s->fx_changes++; }
             break;
+        case VM_USB_STATE: usb_state(s, &m); break;
         case VM_REPLY:
+            if (s->usb_seq && m.seq == s->usb_seq) {
+                s->usb_seq = 0;
+                s->usb_busy = 0;
+                if (m.a != VME_OK) { fprintf(stderr, "machines: a USB device didn't go into %s: %s\n", s->name, m.text); usb_fail(s, m.a == VME_DENIED ? "vm.usbNoController" : "vm.usbQemu"); }
+            }
             if (fx_reply(s, &m)) break;
             if (s->disc_seq && m.seq == s->disc_seq) { snprintf(s->disc_msg, sizeof s->disc_msg, "%s", m.a == VME_OK ? "" : m.text); s->disc_seq = 0; }
             if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
@@ -3515,6 +3738,33 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "picSkipped", s->pic_skipped);
     set_int(c, o, "pace", s->pace.kind);
     set_int(c, o, "cd", s->cd_state);
+    /* host USB devices (6.6): what the machine holds, a request in flight, the last refusal and how many there were */
+    usb_tick(s);
+    {
+        JSValue u = JS_NewObject(c), arr = JS_NewArray(c);
+        for (int k = 0; k < s->usb_n; k++) {
+            JSValue d = JS_NewObject(c);
+            char hx[8];
+            set_int(c, d, "bus", s->usb[k].bus);
+            set_int(c, d, "dev", s->usb[k].dev);
+            snprintf(hx, sizeof hx, "%04x", s->usb[k].vendor); set_str(c, d, "vendor", hx);
+            snprintf(hx, sizeof hx, "%04x", s->usb[k].product); set_str(c, d, "product", hx);
+            set_str(c, d, "name", s->usb[k].name);
+            JS_SetPropertyStr(c, d, "camera", JS_NewBool(c, !!(s->usb[k].flags & VMUSB_F_VIDEO)));
+            JS_SetPropertyStr(c, d, "audio", JS_NewBool(c, !!(s->usb[k].flags & VMUSB_F_AUDIO)));
+            JS_SetPropertyUint32(c, arr, (uint32_t)k, d);
+        }
+        JS_SetPropertyStr(c, u, "devices", arr);
+        JS_SetPropertyStr(c, u, "busy", JS_NewBool(c, s->usb_busy));
+        JS_SetPropertyStr(c, u, "controller", JS_NewBool(c, s->usb_ctrl));
+        JS_SetPropertyStr(c, u, "locked", JS_NewBool(c, s->usb_lock));
+        set_str(c, u, "err", s->usb_err);
+        set_int(c, u, "errs", s->usb_errs);
+        JSValue ra = JS_NewArray(c);
+        for (int r = 0; r < s->n_usb_auto; r++) JS_SetPropertyUint32(c, ra, (uint32_t)r, JS_NewString(c, s->usb_auto[r]));
+        JS_SetPropertyStr(c, u, "auto", ra);
+        JS_SetPropertyStr(c, o, "usb", u);
+    }
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
     set_int(c, o, "console", s->console_term);
     /* the agent's shell: its terminal, and its size passed on to the guest when the terminal changed it */
@@ -3774,6 +4024,75 @@ static JSValue f_rename(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     if (!ok) return JS_NewInt32(c, 0);
     char *args[] = { "lord-vm", "--rename", dir, name, NULL };
     return JS_NewInt32(c, spawn_job(args, dir));
+}
+
+/* usbDevices() → [{ bus, dev, vendor, product, serial, maker, model, speed, camera, audio, storage, hid, why, holder }]: this
+ * computer's USB devices (sysfs; root hubs left out) for the Devices menu. why: what keeps one from any machine ("" none:
+ * vm.usbHub, vm.usbInputInUse, the session's own keyboard or mouse); holder: the session (id) that has it, 0 none */
+static JSValue f_usb_devices(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc; (void)argv;
+    VmUsbDev l[VMUSB_MAX];
+    int n = vmusb_list(VMUSB_SYS, l, VMUSB_MAX);
+    JSValue arr = JS_NewArray(c);
+    for (int i = 0; i < n; i++) {
+        JSValue d = JS_NewObject(c);
+        char hx[8];
+        set_int(c, d, "bus", l[i].bus);
+        set_int(c, d, "dev", l[i].dev);
+        snprintf(hx, sizeof hx, "%04x", l[i].vendor); set_str(c, d, "vendor", hx);
+        snprintf(hx, sizeof hx, "%04x", l[i].product); set_str(c, d, "product", hx);
+        set_str(c, d, "serial", l[i].serial);
+        set_str(c, d, "maker", l[i].maker);
+        set_str(c, d, "model", l[i].model);
+        set_int(c, d, "speed", l[i].speed);
+        JS_SetPropertyStr(c, d, "camera", JS_NewBool(c, !!(l[i].flags & VMUSB_F_VIDEO)));
+        JS_SetPropertyStr(c, d, "audio", JS_NewBool(c, !!(l[i].flags & VMUSB_F_AUDIO)));
+        JS_SetPropertyStr(c, d, "storage", JS_NewBool(c, !!(l[i].flags & (VMUSB_F_STORAGE | VMUSB_F_BLOCK))));
+        JS_SetPropertyStr(c, d, "hid", JS_NewBool(c, !!(l[i].flags & VMUSB_F_HID)));
+        set_str(c, d, "why", usb_refusal_here(NULL, &l[i]));
+        int h = usb_holder(l[i].bus, l[i].dev);
+        set_int(c, d, "holder", h + 1);
+        JS_SetPropertyUint32(c, arr, (uint32_t)i, d);
+    }
+    return arr;
+}
+
+/* usbAttach(id, bus, dev) → "" asked (poll's usb says how it went), or why not: an errors.json code (vm.usbCameraPerm and
+ * vm.usbMicPerm: the app asks for the permission and tries again) */
+static JSValue f_usb_attach(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
+    int bus = argc >= 3 ? ival(c, argv[1]) : 0, dev = argc >= 3 ? ival(c, argv[2]) : 0;
+    if (!s) return JS_NewString(c, "vm.usbNotRunning");
+    if (bus < 1 || bus > VMUSB_BUS_MAX || dev < 1 || dev > VMUSB_DEV_MAX) return JS_NewString(c, "vm.usbGone");
+    const char *why = usb_attach(s, bus, dev, 1);
+    if (why[0]) { snprintf(s->usb_err, sizeof s->usb_err, "%s", why); s->usb_errs++; }
+    return JS_NewString(c, why);
+}
+
+/* usbDetach(id, bus, dev) → bool: that device out of the machine (it goes back to this computer's drivers) */
+static JSValue f_usb_detach(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0) return JS_FALSE;
+    return JS_NewBool(c, usb_detach(s, ival(c, argv[1]), ival(c, argv[2])));
+}
+
+/* usbAuto(id, "vvvv:pppp[:serial]", on) → bool: a device that connects by itself to this running machine, or not any more
+ * (machine.json's usb_auto, written by its lord-vm); with the machine off, configure's usbAuto */
+static JSValue f_usb_auto(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 3 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0 || !JS_IsString(argv[1])) return JS_FALSE;
+    const char *r = JS_ToCString(c, argv[1]);
+    int ok = r && vm_usb_rule_valid(r);
+    if (ok) {
+        VmMsg m = vm_msg(VM_USB, ++s->seq, JS_ToBool(c, argv[2]) ? 2 : 3, 0, 0, 0, r);
+        ok = !vm_send(s->vm, &m, -1);
+        s->usb_tick_at = 0;
+    }
+    if (r) JS_FreeCString(c, r);
+    return JS_NewBool(c, ok);
 }
 
 /* cdrom(id, path | null) → bool: a disc into the running machine's drive (the file is opened here, for the person, and
@@ -5565,6 +5884,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("usbDevices", 0, f_usb_devices), JS_CFUNC_DEF("usbAttach", 3, f_usb_attach), JS_CFUNC_DEF("usbDetach", 3, f_usb_detach), JS_CFUNC_DEF("usbAuto", 3, f_usb_auto),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),

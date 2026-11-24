@@ -118,6 +118,8 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
     switch (r->rule) {
     case VSR_HOT: ALLOW(); return 0;
     case VSR_OK: if (learn_all) DEFAULT(); else ALLOW(); return 0;
+    /* libusb in QEMU's usb-host (6.6): only a machine that may get a host USB device (VmScOpts.usb) */
+    case VSR_USB: if (o->usb && !learn_all) ALLOW(); else DEFAULT(); return 0;
     case VSR_EACCES: ERR(EACCES); return 0;
     case VSR_EPERM: ERR(EPERM); return 0;
     case VSR_ENOSYS: ERR(ENOSYS); return 0;

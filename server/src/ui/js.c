@@ -1416,6 +1416,7 @@ void js_hw_event(const char *kind, const char *json) {
 
 /* Privileged helper responses: kind = LOG | OK | ERR. */
 void js_admin_event(int id, const char *kind, const char *text) {
+    if (js_vm_admin_reply(id, kind, text)) return;      /* Machines' vm-usb-allow: its descriptor is lord-vm's, not JS's */
     if (!ctx) return;
     if (!ctx) return;
     JSValueConst args[3] = { JS_NewInt32(ctx, id), JS_NewString(ctx, kind), JS_NewString(ctx, text) };

@@ -1093,6 +1093,7 @@ static struct {
     /* host USB devices (6.6, VM_USB): each slot's device ("usb<slot>" in QEMU, its descriptor in fdset USB_FDSET + slot);
      * state 0 free, 1 being added, 2 in the machine, 3 being taken out; the client and request that asked */
     struct { int state, bus, dev, client; unsigned vendor, product; uint32_t seq; } usb[VMUSB_PER_VM];
+    char usb_bus[16];                   /* the controller's bus for them ("" none: machine.json's usb is off) */
     int usb_q[2 * VMUSB_PER_VM], usb_qn;   /* the slots of the P_USB_* replies still to come, in order */
     /* the CD/DVD drive (scsi-cd "cd0"): the disc's block node ("" empty), its fdset (0: none, the start's ISO is a path) */
     char cd_node[16], cd_new_node[16];
@@ -1260,7 +1261,7 @@ enum { XG_UNKNOWN = 0, XG_MOUNTED, XG_NEEDS_WINFSP, XG_NO_SERVICE, XG_FAILED };
 
 /* the start's shared folders: the person's (0 .. n_shares-1) and the transfer folder (VM_SHARES) */
 /* may a host USB device go into this machine (6.6)? Never into one locked for anonymity (19.5) */
-static int usb_may(void) { return S.m.profile_lock == VM_LOCK_NONE; }
+static int usb_may(void) { return S.m.profile_lock == VM_LOCK_NONE && S.m.usb; }
 static int sh_on(int i) { return (i >= 0 && i < S.m.n_shares) || (i == VM_SHARES && S.xfer_on); }
 static int sh_count(void) { return S.m.n_shares + (S.xfer_on ? 1 : 0); }
 static const char *sh_tag(int i) { return i == VM_SHARES ? VM_XFER_TAG : S.m.share_tag[i]; }
@@ -2697,6 +2698,14 @@ static void build_qemu_args(void) {
         arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
         arg("-display"); arg(dbus_disp);
     } else { arg("-audiodev"); arg("none,id=snd0"); arg("-display"); arg("none"); }
+    /* host USB devices (6.6, machine.json "usb"): the compatible and Windows devices' xHCI controller in a window has room;
+     * any other machine gets one of its own on slot 0x15, only when "usb" is on (a device of the guest: never while a
+     * state is saved, so a saved state always finds the hardware it was saved with) */
+    S.usb_bus[0] = 0;
+    if (m->usb) {
+        if (m->display == VM_DISPLAY_WINDOW && (m->devices == VM_DEV_COMPAT || m->devices == VM_DEV_WINDOWS)) snprintf(S.usb_bus, sizeof S.usb_bus, "xhci.0");
+        else { arg("-device"); arg("qemu-xhci,id=usbx,p2=8,p3=8,addr=0x15"); snprintf(S.usb_bus, sizeof S.usb_bus, "usbx.0"); }
+    }
     /* a sound card (HDA, which every Linux and Windows guest has a driver for), on its own slot after the CD/DVD
      * drive's: a machine made before it had none, and a state saved without it still loads (a device the saved
      * stream doesn't name keeps its reset state). Its codec has a speaker and a microphone (hda-micro) on every
@@ -3109,6 +3118,11 @@ static int start_machine(void) {
         return 0;
     }
     S.qmp_up = 1;
+    /* host USB devices (6.6): QEMU loads its usb-host module (hw-usb-host.so, with libusb already mapped by lord-vm-usb.so)
+     * now, while executable mappings are still the loader's; a module loaded later, at the first device_add, would stop
+     * QEMU. device-list-properties loads only that type's module and makes no device (no libusb_init) */
+    if (usb_may() && qmp_call(&S.qmp, "device-list-properties", "{\"typename\":\"usb-host\"}", 10000, err, sizeof err))
+        vlog("usb: QEMU's usb-host isn't there (%s): no host USB devices for this machine", err);
     S.sc_starting = 0;      /* QEMU's start is over: no executable mapping from now on (vmseccomp.h) */
     S.oom0 = read_oom_kills();
     qmp_do("query-version", NULL, P_VERSION, -1, 0, -1, -1);
@@ -3261,17 +3275,18 @@ static void usb_attach(int ci, uint32_t seq, int fd, const char *text) {
         reply(ci, seq, VME_BAD_REQUEST, "not a USB device's node opened for reading and writing");
         return;
     }
-    if (!usb_may()) { reply(ci, seq, VME_DENIED, "locked for anonymity: no USB devices"); return; }
+    if (S.m.profile_lock) { reply(ci, seq, VME_DENIED, "locked for anonymity: no USB devices"); return; }
     for (int i = 0; i < VMUSB_PER_VM; i++) {
         if (S.usb[i].state && S.usb[i].bus == bus && S.usb[i].dev == dev) { reply(ci, seq, VME_BUSY, "that device is already in this machine"); return; }
         if (!S.usb[i].state && slot < 0) slot = i;
     }
     if (slot < 0) { reply(ci, seq, VME_BUSY, "the machine holds 8 USB devices already"); return; }
+    if (!S.usb_bus[0]) { reply(ci, seq, VME_DENIED, "the machine has no USB controller for this computer's devices: turn on USB devices in its Configure and start it again"); return; }
     if (S.usb_qn >= 2 * VMUSB_PER_VM) { reply(ci, seq, VME_BUSY, "busy"); return; }
     char a[200];
     snprintf(a, sizeof a, "{\"fdset-id\":%d,\"opaque\":\"usb\"}", USB_FDSET + slot);
     if (qmp_do("add-fd", a, P_GETFD, -1, 0, fd, -1)) { reply(ci, seq, VME_BUSY, "busy"); return; }
-    snprintf(a, sizeof a, "{\"driver\":\"usb-host\",\"id\":\"usb%d\",\"bus\":\"xhci.0\",\"hostdevice\":\"/dev/fdset/%d\"}", slot, USB_FDSET + slot);
+    snprintf(a, sizeof a, "{\"driver\":\"usb-host\",\"id\":\"usb%d\",\"bus\":\"%s\",\"hostdevice\":\"/dev/fdset/%d\"}", slot, S.usb_bus, USB_FDSET + slot);
     if (qmp_do("device_add", a, P_USB_ADD, ci, seq, -1, -1)) {
         snprintf(a, sizeof a, "{\"fdset-id\":%d}", USB_FDSET + slot);
         qmp_do("remove-fd", a, P_IGNORE, -1, 0, -1, -1);
@@ -3314,7 +3329,7 @@ static void usb_detach(int ci, uint32_t seq, const char *text) {
  * the lock, so it writes the file); nothing changes in QEMU */
 static void usb_rule(int ci, uint32_t seq, int add, const char *rule) {
     if (!vm_usb_rule_valid(rule)) { reply(ci, seq, VME_BAD_REQUEST, "VVVV:PPPP[:SERIAL]"); return; }
-    if (add && !usb_may()) { reply(ci, seq, VME_DENIED, "locked for anonymity: no USB devices"); return; }
+    if (add && S.m.profile_lock) { reply(ci, seq, VME_DENIED, "locked for anonymity: no USB devices"); return; }
     VmMachine m = S.m;
     int at = -1;
     for (int i = 0; i < m.n_usb_auto; i++) if (!strcmp(m.usb_auto[i], rule)) at = i;
@@ -6339,7 +6354,7 @@ static void ex_reply(int kind, const JVal *root, const JVal *r, int ok) {
 
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
-    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && m->type != VM_LINK && m->type != VM_EXEC && (m->type != VM_QMP || !S.dev_qmp) &&
+    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && m->type != VM_LINK && m->type != VM_EXEC && !(m->type == VM_USB && m->a == 1) && (m->type != VM_QMP || !S.dev_qmp) &&
         !(m->type == VM_AGENT && m->a == VAG_TRANSFER)) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {
@@ -8175,7 +8190,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
     int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1;
-    int dispo = -1, bkp = -1, fwup = 0;
+    int dispo = -1, bkp = -1, fwup = 0, usbc = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -8249,6 +8264,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (!strcmp(a, "--guest-notify")) { gnote = parse_enum(v, "off", "on"); if (gnote < 0) { fprintf(stderr, "lord-vm: --guest-notify on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--usb")) { usbc = parse_enum(v, "off", "on"); if (usbc < 0) { fprintf(stderr, "lord-vm: --usb on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--volume")) {
             char *end = NULL;
             long x = strtol(v, &end, 10);
@@ -8297,7 +8313,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu) || (usbc >= 0 && usbc != m.usb))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     /* a new name (6.26): refused when another machine has it or, as the folder follows, when its folder's or transfer
      * folder's new name is taken; the same name again only brings the folder in line when it can */
@@ -8334,6 +8350,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (glinks >= 0) { m.guest_links = glinks; if (glinks) m.schema = VM_SCHEMA; }
     if (gnote >= 0) { m.guest_notify = gnote; if (gnote) m.schema = VM_SCHEMA; }
     if (autom >= 0) { m.automation = autom; if (autom) m.schema = VM_SCHEMA; }
+    if (usbc >= 0) { m.usb = usbc; if (usbc) m.schema = VM_SCHEMA; }
     if (uauto_set) {
         m.n_usb_auto = nuauto;
         for (int k = 0; k < nuauto; k++) snprintf(m.usb_auto[k], sizeof m.usb_auto[k], "%s", uauto[k]);
@@ -11466,6 +11483,7 @@ static int usage(void) {
             "                         [--guest-links on|off]   (links the guest's tools send are offered to open on this computer)\n"
             "                         [--guest-notify on|off]   (the guest's notifications are shown here, as from the machine)\n"
             "                         [--automation on|off]   (machines exec and cp may run programs in the guest: docs/VIRTUALIZATION.md 6.15)\n"
+            "                         [--usb on|off]   (a USB controller for this computer's devices, with the machine off: 6.6)\n"
             "                         [--usb-auto VVVV:PPPP[:SERIAL] ...|none]   (host USB devices that go in by themselves while it runs: 6.6)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"

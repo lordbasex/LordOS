@@ -241,6 +241,10 @@ typedef struct {
      * never with VM_LOCK_ANONYMITY */
     char usb_auto[VM_USB_AUTO][VM_USB_RULE_MAX + 1];
     int n_usb_auto;
+    /* schema 18: "usb": true, the machine has a USB controller for this computer's devices (6.6): a qemu-xhci of its own on
+     * slot 0x15 (the compatible and Windows devices in a window use their xHCI). A device of the guest, so it changes only
+     * with no saved state. Never with VM_LOCK_ANONYMITY */
+    int usb;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
