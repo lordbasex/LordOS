@@ -968,6 +968,8 @@ export default function Files() {
     if (mod && (e.key === 'Backspace' || e.key === 'Delete')) { toTrash(); return; }
     if (e.key === 'Delete') { toTrash(); return; }
     if (e.key === 'Enter') { if (first?.netHost || first?.netWay || first?.netPlace) open(first); else startRename(); return; }
+    // F2 renames too (as on Windows and most Linux file managers); Enter stays the main key
+    if (e.key === 'F2' && !mod && !e.alt && !e.shift) { if (!first?.netHost && !first?.netWay && !first?.netPlace) startRename(); return; }
     if (e.key === 'Escape') { setSelected(new Set()); setInfo(false); return; }
     if (space) { if (sel.length && !first?.netHost && !first?.netWay && !first?.netPlace) setQuick(true); return; }
     const grid = tab.view === 'icons' ? cols() : 1;

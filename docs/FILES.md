@@ -78,7 +78,7 @@ drop, color tags and search. Disk operations belong to the server (`server/src/f
   **sort** by name (natural: «2» before «10»), kind, date or size. Folders go first. Recents and
   the Trash go by date.
 - **Selection:** click, ❖/Ctrl+click, ⇧+click (range), ❖A, and typing the start of a name.
-- **Rename in place** (Enter): the name is selected and what you type replaces it
+- **Rename in place** (Enter or F2): the name is selected and what you type replaces it
   (`TextInput selectAll`, new in the SDK). Tags follow the file. A **slow second click** on the name of the selected
   item starts it too (in the icon, list and column views): the item is already the only one selected, the second click
   lands on its name (not the icon) at least the double-click interval (450 ms, the runtime's; there is no setting for
@@ -466,7 +466,7 @@ on VM 116 with the development stand-in for `lord.cloud` (`sdk/cloudmock.js`, `"
 | Ctrl + / Ctrl − / Ctrl 0, Ctrl + wheel | Zoom in / out / actual size (icons and list) |
 | ❖[ / ❖] / ❖↑ | Back / forward / enclosing folder |
 | ❖↓ or double click | Open |
-| Enter, or a slow second click on the selected name | Rename |
+| Enter or F2, or a slow second click on the selected name | Rename |
 | ❖⇧N | New folder |
 | ❖D | Duplicate |
 | ❖C / ❖X / Ctrl+V | Copy / cut / paste files (also with Ctrl) |

@@ -11,6 +11,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Files: F2 renames** the selected item too (in development; latest release 0.8.9.5-beta), like Enter and the slow
+  second click on its name.
 - **Files: a slow second click on the selected item's name renames it in place** (in development; latest release
   0.8.9.5-beta). As in the reference desktop's file manager: with one item selected, a second click on its name (not the
   icon) at least the double-click interval and at most 1.5 s after the first, within 4 px of it, with the left button
