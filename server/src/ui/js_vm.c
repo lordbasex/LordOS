@@ -2043,11 +2043,15 @@ typedef struct {
     struct { uint32_t gid; int reason; double at; } refused[8];
     int layout[6];                      /* VM_GUEST_LAYOUT, handed to lord-vmdisplay (VD_LAYOUT); 0s none */
     /* All Displays (docs/VIRTUALIZATION.md 5.4): head is the virtio-gpu output this session shows (0 the machine's own
-     * window; 1..VM_HEADS_MAX-1 an attach for another head, with lord-vmdisplay --head: no sound, no microphone, and the
-     * guest's clipboard, links, notifications and apps-mode windows stay the head 0 session's). hlayout: where this head
-     * sits in the desktop the heads make (vm_heads_layout, lord.vm.allDisplays), used instead of the guest's layout while
-     * hl_on */
+     * window; 1..VM_HEADS_MAX-1 an attach for another output: no sound, no microphone, and the guest's clipboard, links,
+     * notifications and apps-mode windows stay the head 0 session's). QEMU's peer-to-peer D-Bus display serves one
+     * connection, so one lord-vmdisplay (head 0's, started with --heads N) serves every output, each on a channel of its
+     * own: head 0's session keeps the other outputs' ends (hpool) until their sessions take them (head_claim); another
+     * output's session never asks lord-vm for the display. hlayout: where this output sits in the desktop the outputs make
+     * (vm_heads_layout, lord.vm.allDisplays), used instead of the guest's layout while hl_on. want_heads: the outputs the
+     * next helper serves; heads_mode: the current one's (0 or 1: one) */
     int head, hl_on, hlayout[6];
+    int want_heads, heads_mode, hpool[VM_HEADS_MAX];
     int refused_n, refused_seq;
     /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
      * did (PTRLOCK_END_*), for the window */
@@ -2141,6 +2145,7 @@ static void init_sess(Sess *s, const char *dir) {
     s->db_cur = -1;
     for (int i = 0; i < 4; i++) s->db[i].fd = -1;
     s->gshow = s->gpend = -1;
+    for (int i = 0; i < VM_HEADS_MAX; i++) s->hpool[i] = -1;
     snprintf(s->dir, sizeof s->dir, "%s", dir);
     VmMachine m;
     if (!vm_machine_load(dir, &m, NULL, 0)) {
@@ -2206,6 +2211,7 @@ static const char *snd_target(int kind, const char *chosen) {
 }
 
 static void snd_apply(Sess *s) {
+    if (s->head > 0) return;            /* another output's window: the sound is the machine's own window's */
     MediaSrc *ms = s->media ? media_src_get(s->media) : NULL;
     int up = s->vd >= 0 && s->vd_up && ms;
     if (up) snd_retry(s, ms);
@@ -2444,39 +2450,75 @@ static JSValue f_attach(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     s->head = head;
     if (head) {
         s->snd_on = 0; s->mic_allowed = 0;
+        s->display_asked = 1;           /* its picture comes over head 0's helper (head_claim) */
         for (int i = 0; i < MAX_SESS; i++) if (&sess[i] != s && sess[i].used && sess[i].protect && !strcmp(sess[i].id, s->id)) s->protect = 1;
     }
     ask(s, VM_STATUS, 0);
     return JS_NewInt32(c, slot + 1);
 }
 
+/* the other outputs' channels head 0's session still holds (All Displays): closed when its helper goes */
+static void hpool_close(Sess *s) {
+    for (int i = 0; i < VM_HEADS_MAX; i++) if (s->hpool[i] >= 0) { close(s->hpool[i]); s->hpool[i] = -1; }
+    s->heads_mode = 0;
+}
+
 static void spawn_vmdisplay(Sess *s, int dbus_fd) {
     char bin[PATH_MAX];
-    int sv[2];
+    int sv[2], hv[VM_HEADS_MAX][2];
+    /* All Displays (5.4): one channel more per further output of the machine's display */
+    int n = s->head == 0 && s->want_heads > 1 && s->want_heads <= VM_HEADS_MAX ? s->want_heads : 1, made = 1;
+    hpool_close(s);
     if (bin_path("lord-vmdisplay", bin, sizeof bin) || socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, sv)) { close(dbus_fd); s->display_failed = 1; return; }
+    for (; made < n; made++) if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, hv[made])) break;
+    if (made < n) {
+        for (int k = 1; k < made; k++) { close(hv[k][0]); close(hv[k][1]); }
+        close(sv[0]); close(sv[1]); close(dbus_fd); s->display_failed = 1; return;
+    }
     pid_t p = fork();
     if (!p) {
-        int a = fcntl(sv[1], F_DUPFD, 20), b = fcntl(dbus_fd, F_DUPFD, 21);
+        int a = fcntl(sv[1], F_DUPFD, 20), b = fcntl(dbus_fd, F_DUPFD, 21), hx[VM_HEADS_MAX];
+        for (int k = 1; k < n; k++) hx[k] = fcntl(hv[k][1], F_DUPFD, 30);
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, 0); dup2(null, 1); }          /* its notes go to the session's log (stderr) */
         dup2(a, 3);
         dup2(b, 4);
-        syscall(SYS_close_range, 5, ~0u, 0);
+        for (int k = 1; k < n; k++) dup2(hx[k], 4 + k);           /* output k's channel on fd 4 + k */
+        syscall(SYS_close_range, 4 + n, ~0u, 0);
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
-        /* All Displays (5.4): another head's session names its output; head 0's stays as it was (sound and microphone) */
-        char hd[2] = { (char)('0' + (s->head > 0 && s->head < VM_HEADS_MAX ? s->head : 0)), 0 };
-        char *args[] = { "lord-vmdisplay", s->id, s->head > 0 ? "--head" : NULL, hd, NULL };
+        char hn[2] = { (char)('0' + n), 0 };
+        char *args[] = { "lord-vmdisplay", s->id, n > 1 ? "--heads" : NULL, hn, NULL };
         execve(bin, args, environ);
         _exit(127);
     }
     close(sv[1]);
     close(dbus_fd);
-    if (p < 0) { close(sv[0]); s->display_failed = 1; return; }
+    for (int k = 1; k < n; k++) close(hv[k][1]);
+    if (p < 0) { close(sv[0]); for (int k = 1; k < n; k++) close(hv[k][0]); s->display_failed = 1; return; }
+    for (int k = 1; k < n; k++) s->hpool[k] = hv[k][0];
+    s->heads_mode = n;
     s->vd = sv[0];
     s->vd_pid = p;
     s->vd_up = 0;
+}
+
+/* Another output's session takes its channel from head 0's session of the same machine, once that one's helper serves
+ * it (All Displays) */
+static void head_claim(Sess *s) {
+    if (s->head <= 0 || s->vd >= 0 || s->head >= VM_HEADS_MAX || !s->id[0]) return;
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *o = &sess[i];
+        if (o == s || !o->used || o->head || strcmp(o->id, s->id) || o->heads_mode <= s->head || o->hpool[s->head] < 0) continue;
+        s->vd = o->hpool[s->head];
+        o->hpool[s->head] = -1;
+        s->vd_up = 0;
+        s->vd_state = -1;
+        s->display_failed = 0;
+        if (o->protect) s->protect = 1;
+        return;
+    }
 }
 
 static void resume_once(Sess *s) {
@@ -2485,6 +2527,7 @@ static void resume_once(Sess *s) {
 }
 
 static void maybe_display(Sess *s) {
+    if (s->head > 0) { head_claim(s); return; }     /* another output: never its own display connection (All Displays) */
     if (s->display_asked || !s->have_info || (s->state != VS_RUNNING && s->state != VS_PAUSED)) return;
     s->display_asked = 1;
     int q = ask(s, VM_DISPLAY, 0);
@@ -2710,6 +2753,7 @@ static int db_read(Sess *s, MediaSrc *ms, int *ry0, int *ry1) {
 static void drop_display(Sess *s, int close_helper) {
     ptrlock_end_owner(s);               /* no picture, no capture (it tells lord-vm and the helper first) */
     if (s->vd >= 0) { if (close_helper) vdsend(s, VD_CLOSE, 0, 0); close(s->vd); s->vd = -1; }
+    hpool_close(s);
     if (s->vd_pid > 0) {
         if (waitpid(s->vd_pid, NULL, WNOHANG) == 0) { kill(s->vd_pid, SIGKILL); waitpid(s->vd_pid, NULL, 0); }
         s->vd_pid = 0;
@@ -3272,6 +3316,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     Sess *s = get(c, argv[0]);
     if (!s) return JS_NULL;
     from_vm(s);
+    head_claim(s);
     if (s->vgpu && (s->state == VS_STARTING || s->state == VS_PAUSED)) gvt_memlock(s->dir);
     /* the picture's frames are read by lord-server's loop (js_vm_dispatch) and acknowledged after each paint
      * (js_vm_painted); this poll only reports the state */
@@ -3974,7 +4019,7 @@ static JSValue f_protect(JSContext *c, JSValueConst t, int argc, JSValueConst *a
 static JSValue f_all_displays(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     Sess *s = get(c, argv[0]);
-    if (!s || !s->id[0]) return JS_FALSE;
+    if (!s || !s->id[0] || s->head) return JS_FALSE;
     int n = 0, w[VM_HEADS_MAX], h[VM_HEADS_MAX];
     if (argc >= 2 && JS_IsArray(c, argv[1])) {
         JSValue lv = JS_GetPropertyStr(c, argv[1], "length");
@@ -3994,7 +4039,18 @@ static JSValue f_all_displays(JSContext *c, JSValueConst t, int argc, JSValueCon
         n = len;
         int L[6];
         if (vm_heads_layout(n, w, h, 0, L)) return JS_FALSE;      /* every size checked before anything changes */
+        VmMachine m;
+        if (vm_machine_load(s->dir, &m, NULL, 0) || n > m.heads || strcmp(m.id, s->id)) return JS_FALSE;
     }
+    /* a helper for that many outputs: the picture again from a new one (QEMU's display takes one connection) */
+    int want = n ? n : 1;
+    if (want != (s->heads_mode > 1 ? s->heads_mode : 1) && (s->state == VS_RUNNING || s->state == VS_PAUSED)) {
+        s->want_heads = want;
+        drop_display(s, 1);
+        s->display_asked = 0; s->display_failed = 0; s->vd_state = -1;
+        maybe_display(s);
+    }
+    s->want_heads = want;
     for (int i = 0; i < MAX_SESS; i++) {
         Sess *o = &sess[i];
         if (!o->used || strcmp(o->id, s->id)) continue;

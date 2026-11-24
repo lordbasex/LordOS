@@ -482,7 +482,7 @@ static inline int vd_abs_map(int p, int pic, int off, int shown, int desk) {
     long long q = ((2 * g + 1) * pic) / (2LL * desk);
     return q < 0 ? 0 : q >= pic ? pic - 1 : (int)q;
 }
-/* All Displays (docs/VIRTUALIZATION.md 5.4): lord-vmdisplay's --head argument, one digit 0..max-1; -1 anything else */
+/* All Displays (docs/VIRTUALIZATION.md 5.4): one digit 0..max-1 (lord-vmdisplay's --heads, given max = VM_HEADS_MAX + 1); -1 anything else */
 static inline int vd_head_arg(const char *s, int max) {
     if (!s || s[0] < '0' || s[0] > '9' || s[1]) return -1;
     int h = s[0] - '0';

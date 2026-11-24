@@ -1963,7 +1963,7 @@ static void test_tablet_layout(void) {
     /* the right edge of the shown display stays left of the other display */
     CHECK(vd_abs_map(1919, 1920, 0, 1920, 2942) * 2942LL / 1920 < 1920);
 
-    /* All Displays (5.4): lord-vmdisplay's --head and the desktop the heads make side by side */
+    /* All Displays (5.4): lord-vmdisplay's --heads digit and the desktop the outputs make side by side */
     CHECK(vd_head_arg("0", 4) == 0 && vd_head_arg("3", 4) == 3 && vd_head_arg("4", 4) == -1 && vd_head_arg("9", 4) == -1);
     CHECK(vd_head_arg("", 4) == -1 && vd_head_arg(NULL, 4) == -1 && vd_head_arg("01", 4) == -1 && vd_head_arg("-1", 4) == -1 && vd_head_arg("a", 4) == -1);
     {
