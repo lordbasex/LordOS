@@ -819,6 +819,15 @@ char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, co
         struct stat sb;
         pathf(p, sizeof p, "%s/%d", proot, pid);
         int own = !stat(p, &sb) && sb.st_uid == uid;
+        /* Machines' QEMU is non-dumpable (docs/VIRTUALIZATION.md 3.3): its /proc folder is root's, its real uid the
+         * person's. Counted as theirs for the machines' use; its descriptors stay unreadable (proc_clients finds none) */
+        int qemu = !strncmp(s.comm, "qemu-system", 11);
+        if (qemu && !own) {
+            char st[2048];
+            pathf(p, sizeof p, "%s/%d/status", proot, pid);
+            const char *u = rd(p, st, sizeof st) > 0 ? strstr(st, "\nUid:") : NULL;
+            own = u && strtol(u + 5, NULL, 10) == (long)uid;
+        }
         if (ai_name(s.comm)) {
             jp(&ai, "%s{\"pid\":%d,\"ppid\":%d,\"name\":", fai ? "" : ",", pid, s.ppid);
             jstr(&ai, s.comm);
@@ -827,7 +836,7 @@ char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, co
             if (!strcmp(s.comm, "lord-say")) say_note(&say, home, &s, uid, &fsay);
         }
         if (!own) continue;                                 /* another user's (or a sandboxed helper's) fds aren't ours to read */
-        if (!strncmp(s.comm, "qemu-system", 11)) {
+        if (qemu) {
             jp(&vms, "%s{\"pid\":%d,\"ticks\":%llu,\"rss\":%llu}", fvm ? "" : ",", pid, s.ticks, s.rss_pages * (unsigned long long)page);
             fvm = 0;
         }

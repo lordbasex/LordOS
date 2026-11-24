@@ -16,11 +16,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
+#include <sys/sendfile.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #if defined(__x86_64__)
@@ -218,9 +221,8 @@ int vm_jail_qemu(const VmQemuJail *j) {
             uint64_t ro = LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_READ_DIR;
             uint64_t rx = ro | LANDLOCK_ACCESS_FS_EXECUTE;
             uint64_t rw = ro | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE;
-            char self[64];
-            snprintf(self, sizeof self, "/proc/%d", (int)getpid());
-            int ok = !rule(rs, "/usr", rx, h) && !rule(rs, j->disks_dir, rw, h) && !rule(rs, self, ro, h);
+            /* its own /proc/<pid>, through the link */
+            int ok = !rule(rs, "/usr", rx, h) && !rule(rs, j->disks_dir, rw, h) && !rule(rs, "/proc/self", ro, h);
             rule(rs, "/etc/ld.so.cache", LANDLOCK_ACCESS_FS_READ_FILE, h);
             rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
             if (j->kvm) {
@@ -328,4 +330,168 @@ int vm_jail_self(const char *machine_dir, const char *runtime_dir, const char *x
     int r = ok && !prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) && !syscall(SYS_landlock_restrict_self, rs, 0U);
     close(rs);
     return r ? VMS_SUPERVISOR_LANDLOCK : 0;
+}
+
+/* ---- QEMU's namespaces and its private loader (vmsandbox.h; docs/VIRTUALIZATION.md 3.3) ---- */
+
+static int write_all_fd(int fd, const void *p, size_t n) {
+    const char *b = p;
+    while (n) {
+        ssize_t w = write(fd, b, n);
+        if (w < 0 && errno == EINTR) continue;
+        if (w <= 0) return -1;
+        b += w;
+        n -= (size_t)w;
+    }
+    return 0;
+}
+
+static int read_full(int fd, void *p, size_t n) {
+    char *b = p;
+    size_t got = 0;
+    while (got < n) {
+        ssize_t r = read(fd, b + got, n - got);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) break;
+        got += (size_t)r;
+    }
+    return (int)got;
+}
+
+int vm_userns_open(void) {
+    unsigned uid = (unsigned)getuid();
+    int up[2], hold[2];
+    if (pipe2(up, O_CLOEXEC)) return -1;
+    if (pipe2(hold, O_CLOEXEC)) { int e = errno; close(up[0]); close(up[1]); errno = e; return -1; }
+    pid_t h = fork();
+    if (h < 0) { int e = errno; close(up[0]); close(up[1]); close(hold[0]); close(hold[1]); errno = e; return -1; }
+    if (!h) {
+        /* the holder: makes the namespace, maps only the person's uid in it (no group: see the header), says so, and
+         * waits until the caller holds it */
+        close(up[0]);
+        close(hold[1]);
+        int32_t e = 0;
+        char map[48];
+        int n = snprintf(map, sizeof map, "%u %u 1\n", uid, uid);
+        int f = -1;
+        if (unshare(CLONE_NEWUSER)) e = errno;
+        else if ((f = open("/proc/self/uid_map", O_WRONLY | O_CLOEXEC)) < 0 || write(f, map, (size_t)n) != n) e = errno ? errno : EIO;
+        if (f >= 0) close(f);
+        if (write_all_fd(up[1], &e, sizeof e)) _exit(1);
+        char c;
+        while (read(hold[0], &c, 1) < 0 && errno == EINTR) {}
+        _exit(0);
+    }
+    close(up[1]);
+    close(hold[0]);
+    int32_t e = EIO;
+    int fd = -1;
+    if (read_full(up[0], &e, sizeof e) == (int)sizeof e && !e) {
+        char p[64];
+        snprintf(p, sizeof p, "/proc/%d/ns/user", (int)h);
+        fd = open(p, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) e = errno;
+    }
+    close(up[0]);
+    close(hold[1]);
+    while (waitpid(h, NULL, 0) < 0 && errno == EINTR) {}
+    if (fd < 0) errno = e ? e : EIO;
+    return fd;
+}
+
+int vm_ns_enter(int userns) {
+    if (userns < 0) return 0;
+    if (setns(userns, CLONE_NEWUSER)) { dprintf(2, "lord-vm: QEMU's user namespace: %s\n", strerror(errno)); return 0; }
+    if (unshare(CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWNET)) {
+        dprintf(2, "lord-vm: QEMU's mount, ipc, uts and net namespaces: %s\n", strerror(errno));
+        return 0;
+    }
+    return 1;
+}
+
+/* the dynamic loader QEMU's binary names (PT_INTERP) */
+#if defined(__x86_64__)
+#define VM_LOADER "/lib64/ld-linux-x86-64.so.2"
+#elif defined(__aarch64__)
+#define VM_LOADER "/lib/ld-linux-aarch64.so.1"
+#else
+#define VM_LOADER ""
+#endif
+
+/* the copy holds exactly the loader's bytes */
+static int same_bytes(int a, int b, off_t size) {
+    static char x[65536], y[65536];
+    for (off_t o = 0; o < size;) {
+        size_t n = (size_t)(size - o) < sizeof x ? (size_t)(size - o) : sizeof x;
+        if (pread(a, x, n, o) != (ssize_t)n || pread(b, y, n, o) != (ssize_t)n || memcmp(x, y, n)) return 0;
+        o += (off_t)n;
+    }
+    return 1;
+}
+
+/* an unreadable copy of the loader over the loader, in this mount namespace only: 0 when it's there.
+ * A file can be mounted only while it has a name (an O_TMPFILE's detached mount can't be moved: ENOENT), so the copy
+ * has one for an instant, random, in the caller's private runtime folder; then it is unlinked, a write lease proves no
+ * other descriptor is open on it (none can be opened later: no name, and our /proc is closed to the person's
+ * programs), the mount is checked to be this very file, and its bytes the loader's. Anything else: no copy. */
+static int private_loader(const char *tmpdir, char *why, size_t wn) {
+    char real[PATH_MAX], name[PATH_MAX + 64];
+    if (!VM_LOADER[0] || !realpath(VM_LOADER, real) || strncmp(real, "/usr/", 5)) { snprintf(why, wn, "no loader at %s under /usr", VM_LOADER); return -1; }
+    int src = open(real, O_RDONLY | O_CLOEXEC);
+    struct stat st;
+    if (src < 0 || fstat(src, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > (64 << 20)) {
+        snprintf(why, wn, "%s: %s", real, strerror(errno ? errno : EINVAL));
+        if (src >= 0) close(src);
+        return -1;
+    }
+    unsigned long long rnd = 0;
+    if (syscall(SYS_getrandom, &rnd, sizeof rnd, 0) != (long)sizeof rnd) rnd ^= (unsigned long long)st.st_ino * 2654435761u;
+    snprintf(name, sizeof name, "%s/.lordvm-ld-%d-%016llx", tmpdir, (int)getpid(), rnd);
+    int fd = open(name, O_CREAT | O_EXCL | O_RDWR | O_NOFOLLOW | O_CLOEXEC, 0100);
+    if (fd < 0) { snprintf(why, wn, "a private file in %s: %s", tmpdir, strerror(errno)); close(src); return -1; }
+    off_t off = 0;
+    while (off < st.st_size) {
+        ssize_t w = sendfile(fd, src, &off, (size_t)(st.st_size - off));
+        if (w < 0 && errno == EINTR) continue;
+        if (w <= 0) break;
+    }
+    int r = -1;
+    struct stat mine, there;
+    if (off != st.st_size || fchmod(fd, 0100)) snprintf(why, wn, "copy: %s", strerror(errno ? errno : EIO));
+    else if (mount(name, real, NULL, MS_BIND, NULL)) snprintf(why, wn, "mount over %s: %s", real, strerror(errno));
+    else {
+        unlink(name);
+        name[0] = 0;
+        if (fcntl(fd, F_SETLEASE, F_WRLCK)) snprintf(why, wn, "the copy is open elsewhere (%s)", strerror(errno));
+        else if (fstat(fd, &mine) || stat(real, &there) || mine.st_ino != there.st_ino || mine.st_dev != there.st_dev)
+            snprintf(why, wn, "the file mounted isn't the copy");
+        else if ((mine.st_mode & 07777) != 0100 || !same_bytes(fd, src, st.st_size)) snprintf(why, wn, "the copy changed");
+        else r = 0;
+        fcntl(fd, F_SETLEASE, F_UNLCK);
+        if (r) umount2(real, MNT_DETACH);
+    }
+    if (name[0]) unlink(name);
+    close(src);
+    close(fd);           /* still open for writing, exec would refuse the file (ETXTBSY) */
+    return r;
+}
+
+int vm_ns_setup(const char *tmpdir) {
+    int bits = 0;
+    char why[PATH_MAX + 64];
+    if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL)) {
+        dprintf(2, "lord-vm: QEMU's mount namespace: %s\n", strerror(errno));
+        return 0;
+    }
+    if (!private_loader(tmpdir && tmpdir[0] ? tmpdir : "/dev/shm", why, sizeof why)) bits |= VMNS_LOADER;
+    else dprintf(2, "lord-vm: QEMU's private loader: %s (its memory stays readable by the person's programs)\n", why);
+    return bits;
+}
+
+int vm_nondumpable(pid_t pid) {
+    char p[64];
+    snprintf(p, sizeof p, "/proc/%d/environ", (int)pid);
+    int fd = open(p, O_RDONLY | O_CLOEXEC);
+    if (fd >= 0) { close(fd); return 0; }
+    return errno == EACCES || errno == EPERM;
 }

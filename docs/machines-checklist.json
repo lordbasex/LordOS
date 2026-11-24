@@ -37,11 +37,11 @@
   },
   {
    "area": "A",
-   "item": "Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp denylist on top of QEMU's (3.3)",
+   "item": "Sandbox: Landlock (`disks/` only), PDEATHSIG, `dump-guest-core=off`, fds, our seccomp denylist on top of QEMU's; QEMU in its own user, mount, ipc, uts and net namespaces and non-dumpable (3.3)",
    "status": "✅",
-   "pct": 90,
-   "file": "`vmsandbox.c`, `lordvm.c`; `vm_isolation.sh`",
-   "note": "No allowlist of our own; no user namespace for QEMU (3.3 says \"if available\": `unshare` is denied, nothing creates one); QEMU gets `RLIMIT_CORE` 0 but not `PR_SET_DUMPABLE` 0 (only lord-vm and lord-vmdisplay)"
+   "pct": 95,
+   "file": "`vmsandbox.c` (`vm_ns_enter`, `vm_ns_setup`), `lordvm.c`; `vm-jail-probe`, `vm_isolation.sh`",
+   "note": "No allowlist of our own. Namespaces and non-dumpable QEMU in development (2026-11-23); no pid namespace (GLib refuses the D-Bus display's peer then); a GVT-g vGPU machine in them not yet booted"
   },
   {
    "area": "A",

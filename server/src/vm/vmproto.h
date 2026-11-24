@@ -315,6 +315,8 @@ enum {
     VMS_NO_NEW_PRIVS = 32, VMS_KVM_FD = 64, VMS_SUPERVISOR_LANDLOCK = 128, VMS_PDEATHSIG = 256,
     VMS_RENDER_NODE = 512,  /* 3D graphics: QEMU may open the GPU's render node (only a Linux machine with graphics "3d");
                              * such a machine can't be suspended or snapshotted with its memory (virgl can't be migrated) */
+    VMS_NAMESPACES = 1024,  /* QEMU in its own user, mount, ipc, uts and net namespaces (vmsandbox.h) */
+    VMS_NONDUMPABLE = 2048, /* QEMU non-dumpable, checked after exec: the person's programs can't read its memory */
 };
 /* VM_INFO d: cgroups */
 enum {

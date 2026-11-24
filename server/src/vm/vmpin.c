@@ -221,6 +221,15 @@ static int is_num(const char *s) {
     return 1;
 }
 
+/* the real uid in a status file ("Uid:\t<real> <effective> ..."); -1 without one */
+static long status_uid(const char *status) {
+    const char *u = strstr(status, "\nUid:");
+    if (!u) return -1;
+    char *e;
+    long v = strtol(u + 5, &e, 10);
+    return e == u + 5 || v < 0 ? -1 : v;
+}
+
 void vmpin_taken(pid_t self_qemu, cpu_set_t *taken) {
     CPU_ZERO(taken);
     DIR *d = opendir("/proc");
@@ -229,12 +238,11 @@ void vmpin_taken(pid_t self_qemu, cpu_set_t *taken) {
     uid_t me = getuid();
     while ((e = readdir(d))) {
         if (!is_num(e->d_name) || atoi(e->d_name) == self_qemu) continue;
-        char p[300], comm[64];
-        struct stat st;
-        snprintf(p, sizeof p, "/proc/%s", e->d_name);
-        if (stat(p, &st) || st.st_uid != me) continue;
+        char p[300], comm[64], status[2048];
         snprintf(p, sizeof p, "/proc/%s/comm", e->d_name);
         if (read_text(p, comm, sizeof comm) || strncmp(comm, "qemu-system", 11)) continue;
+        snprintf(p, sizeof p, "/proc/%s/status", e->d_name);
+        if (read_text(p, status, sizeof status) || status_uid(status) != (long)me) continue;
         snprintf(p, sizeof p, "/proc/%s/task", e->d_name);
         DIR *td = opendir(p);
         if (!td) continue;
