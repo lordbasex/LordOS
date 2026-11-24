@@ -5,11 +5,11 @@
  "items": [
   {
    "area": "A",
-   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 14, lock, `run.json`, crash recovery (3.8, 3.9)",
+   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 15, lock, `run.json`, crash recovery (3.8, 3.9)",
    "status": "✅",
    "pct": 100,
-   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 14`); `vm-test`, `vmgroup-test`",
-   "note": "Schema 14 (*in development*) adds a machine group member's keys (19.4); 13 was `cpu_pin` and `perf_profile`"
+   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 15`); `vm-test`, `vmgroup-test`",
+   "note": "Schema 15 (*in development*) adds `automation` (6.15); 14 a machine group member's keys (19.4)"
   },
   {
    "area": "A",
@@ -687,17 +687,17 @@
    "area": "J",
    "item": "`machines` list, status, start, open, stop…, snapshot, clone, set, rename, ids, and for a machine group `fresh` and `--member` (19.9); 35 languages, `--json`, completion (6.15)",
    "status": "🧪",
-   "pct": 95,
-   "file": "`server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh`",
-   "note": "`set` doesn't pass `--cpu-pin`, `--perf-profile` or `--capture-fullscreen` (`mcli.c` `PASS[]`); no start from a memory snapshot, create, import or console"
+   "pct": 100,
+   "file": "`server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh`, `vm_exec_e2e.sh`",
+   "note": "*In development* since the last audit: `set` passes `--cpu-pin`, `--perf-profile` and `--capture-fullscreen`; `start --no-window --snapshot TAG`, `import`, `console` (each run on 2026-11-24 against a real Ubuntu 26.04.1 machine on the dev PC, in a private home). A start in a window is still checked headless only; a machine from a card is made in the app (`apply` makes one from an ISO) (was 95)"
   },
   {
    "area": "J",
    "item": "`lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": ""
+   "status": "🧪",
+   "pct": 80,
+   "file": "`vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 15); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh`",
+   "note": "*In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. Not built: the interactive shell, programs in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0)"
   },
   {
    "area": "K",
@@ -962,8 +962,8 @@
    "name": "Command line and automation",
    "weight": 3,
    "items": 2,
-   "mean": 47.5,
-   "score": 48
+   "mean": 90.0,
+   "score": 90
   },
   {
    "id": "K",
@@ -998,6 +998,6 @@
    "score": 55
   }
  ],
- "total": 69,
- "total_exact": 68.94
+ "total": 70,
+ "total_exact": 70.2
 }

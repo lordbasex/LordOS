@@ -96,7 +96,7 @@ El resto del escritorio recibió el mismo cuidado: Ajustes, la Tienda, Archivos 
 - **El modo apps, desde la barra de menús**: un ítem junto al reloj para cada máquina, cuyo menú funciona como el menú Inicio de la máquina, y un panel con sus ventanas abiertas y sus apps.
 - **Capturar el mouse** para juegos y programas 3D; ❖Esc o Ctrl+Alt lo sueltan.
 - **Una tarjeta gráfica real para una máquina**: una parte de una iGPU Intel (de Broadwell a Comet Lake) con GVT-g, con un controlador de arranque propio de LordOS para ella, escrito a partir de fuentes públicas.
-- **`machines` en la Terminal**: listar, arrancar, detener, tomar instantáneas, clonar y cambiar máquinas desde una terminal.
+- **`machines` en la Terminal**: listar, arrancar, detener, tomar instantáneas, clonar y cambiar máquinas desde una terminal. En desarrollo: ejecutar un programa en una máquina Linux, copiar archivos hacia ella y desde ella, leer sus registros, crear una máquina desde un archivo corto guardado con un proyecto, y un servidor MCP local para agentes de programación, solo en una máquina que permitiste en su Configurar.
 
 ## Qué se probó y qué no
 

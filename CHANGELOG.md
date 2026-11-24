@@ -11,6 +11,41 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: programs, files, logs and an MCP server from the terminal, per machine with the person's consent**
+  (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
+  to the `machines` command, which gains:
+  - `machines exec NAME [--timeout S] -- PROGRAM ARGS…`: runs a program in a Linux machine as the person signed in to it
+    (never as root), in their home folder, with this terminal's input (up to 1 MB), and gives back its output and its exit
+    status (124: its time ran out, 125: it couldn't run). It goes only through the machine's own lord-vm (a new request,
+    `VM_EXEC`, a sealed memfd on lord-vm's socket, which only the person's processes reach) and qemu-guest-agent: two fixed
+    scripts, one as root that only finds the signed-in person, one as that person that runs the program under
+    `timeout`; the program, its arguments and its input are data, never script text. Output is cut at 128 KB and errors
+    at 32 KB in the guest, parsed as hostile, and shown on a terminal with control characters as `?`.
+  - `machines cp [--force] FILE NAME:PATH` and the other way: files checked by SHA-256 at the end, written under a
+    temporary name and renamed without replacing (unless `--force`); on this computer only the person's files under
+    lord.fs's rules (never a protected path), checked on the opened descriptor; a size claimed beyond the free space is
+    refused, and Ctrl+C removes the half-copied file.
+  - `machines logs NAME [--serial|--machine] [--follow]`, `machines console NAME` (the serial console, Ctrl+] leaves),
+    `machines import SRC NAME` (another app's machine, as Migrate does), `machines start NAME --no-window --snapshot TAG`
+    (from a snapshot with memory).
+  - `machines apply FILE`: a machine made or changed from a short TOML file kept beside a project. The file is untrusted:
+    an ISO, ports, shared folders, a bridged or host-only network, the clipboard and the agent it asks for are listed and
+    need the person's yes on their terminal (no terminal, no change), and its ISO must be in Downloads or the Machines
+    library.
+  - `machines mcp`: a local MCP server (JSON-RPC over standard input and output, strictly parsed) with `list_machines`,
+    `machine_status`, `start_machine`, `stop_machine`, `wait_until_ready`, `run_command`, `get_logs` and
+    `clone_machine`; only a machine of the library named by its name or id, nothing destructive.
+  - **Consent per machine**: `machine.json` schema 15 adds `"automation"`, off by default, turned on in Configure → Guest
+    agent → Automation after a question (5 new texts in all 35 languages); `machines set` can't set it; the anonymity
+    profile refuses it. lord-vm reads it again at each request and writes each program (never its arguments) in its log;
+    the command also writes `log/automation.log`. 28 new terminal texts in all 35 languages.
+  - `machines set` now passes `--cpu-pin`, `--perf-profile` and `--capture-fullscreen` to lord-vm, and the bash
+    completion knows them and the new commands (also for `lordvm`).
+  - Tests: `build/vmexec-test` (formats, limits, the guest scripts under `/bin/sh`, fuzz), `build/mcli-test` (cp sides,
+    terminal cleaning, the TOML subset, the MCP envelope and names, the apply file's boundary list, fuzz), schema 15 in
+    `build/vm-test` and `build/vmgroup-test`, `tests/vm_exec_e2e.sh` (28 checks, run on 2026-11-24 in a real Ubuntu
+    26.04.1 machine made by the Ubuntu card on the dev PC). Not built: an interactive shell over the agent, programs in
+    virtio-win guests, folders in `cp`, packages and `rebuild` in `apply`, creating a machine from a card through MCP.
 - **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the

@@ -47,14 +47,14 @@ recomputes both from the rows; the arithmetic:
 | G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 68.33 | 68 % | 12 × 68 % = 8.16 | 68 % |
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
 | I. Guest tools and agent (state, shell, logs) | 7 | 6 | 75.00 | 75 % | 7 × 75 % = 5.25 | 75 % |
-| J. Command line and automation | 3 | 2 | 47.50 | 48 % | 3 × 48 % = 1.44 | 48 % |
+| J. Command line and automation | 3 | 2 | 90.00 | 90 % | 3 × 90 % = 2.70 | 48 % |
 | K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 61.25 | 61 % | 3 × 61 % = 1.83 | 61 % |
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **110** | | | **68.94 → 69 %** | 68 % |
+| **Total** | **100** | **110** | | | **70.20 → 70 %** | 68 % |
 
-Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 1.44 + 1.83 + 2.96 + 2.58 + 1.65 = 68.94, rounded **69 %** (before: 68 %, against `965a10f6e`). Before this audit the
+Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 2.70 + 1.83 + 2.96 + 2.58 + 1.65 = 70.20, rounded **70 %** (before: 68 %, against `965a10f6e`). Before this audit the
 document's table said 67.52 and the JSON 67.16 while the rows themselves gave 67.88: the Whonix row had been raised to 85 %
 twice without the table, the Σ line and the JSON being computed again, and B's score in the table (73 %) wasn't its rows'
 mean (76 %). All three now come from the rows in one pass.
@@ -90,7 +90,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lord-vm` supervisor over direct QMP, `machine.json` schema 14, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 14`); `vm-test`, `vmgroup-test` | Schema 14 (*in development*) adds a machine group member's keys (19.4); 13 was `cpu_pin` and `perf_profile` |
+| `lord-vm` supervisor over direct QMP, `machine.json` schema 15, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 15`); `vm-test`, `vmgroup-test` | Schema 15 (*in development*) adds `automation` (6.15); 14 a machine group member's keys (19.4) |
 | KVM amd64 and arm64, TCG labelled Emulated (2.1–2.4) | ✅ | 100 | `lordvm.c` (`-accel`), `assistant.jsx` ("Other architecture…") | Pi 5, nested amd64, Xeon and the i9 PC |
 | Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2) | ✅ | 100 | `machine.c`, `js_vm.c` |  |
 | `/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4) | ✅ | 100 | `vm_admin.c` |  |
@@ -216,12 +216,12 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Shell over the agent as the signed-in user (6.18) | ❌ | 15 | the Shell is the serial console |  |
 | Logs: journal, serial, machine log, Overview (6.19) | 🟡 | 65 | `logs.jsx`, `lordvm.c` (journal through qemu-ga) | No Windows event logs, unit filter (a column only), time zone or Clear view |
 
-### J. Command line and automation (48 %)
+### J. Command line and automation (90 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `machines` list, status, start, open, stop…, snapshot, clone, set, rename, ids, and for a machine group `fresh` and `--member` (19.9); 35 languages, `--json`, completion (6.15) | 🧪 | 95 | `server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh` | `set` doesn't pass `--cpu-pin`, `--perf-profile` or `--capture-fullscreen` (`mcli.c` `PASS[]`); no start from a memory snapshot, create, import or console |
-| `lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24) | ❌ | 0 |  |  |
+| `machines` list, status, start, open, stop…, snapshot, clone, set, rename, ids, and for a machine group `fresh` and `--member` (19.9); 35 languages, `--json`, completion (6.15) | 🧪 | 100 | `server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh`, `vm_exec_e2e.sh` | *In development* since the last audit: `set` passes `--cpu-pin`, `--perf-profile` and `--capture-fullscreen`; `start --no-window --snapshot TAG`, `import`, `console` (each run on 2026-11-24 against a real Ubuntu 26.04.1 machine on the dev PC, in a private home). A start in a window is still checked headless only; a machine from a card is made in the app (`apply` makes one from an ISO) (was 95) |
+| `lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24) | 🧪 | 80 | `vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 15); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh` | *In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. Not built: the interactive shell, programs in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0) |
 
 ### K. System ties (61 %)
 
@@ -369,14 +369,15 @@ Still open in Phase 2:
   dmabuf with no copy, and latency to the screen (13.8 item 4).
 - [ ] Picture in Picture, multi-head.
 - [ ] Export, backups of machines. Monitor shows each machine as one row (6.14); no drill-in.
-- [x] Command line: built as `machines` (6.15, 0.8.9.5). Still open: shell, exec, logs, cp.
+- [x] Command line: built as `machines` (6.15, 0.8.9.5); exec, cp, logs, console, import, apply and MCP in development (2026-11-24). Still open: the interactive shell.
 - [ ] Done when: a real compatibility and security matrix per architecture (16).
 
 ### Phase 4, integration: partly built
 
 - [x] Apps mode (guest apps as windows, in the Dock) for LordOS and Windows guests (7.2). Other Linux desktops still open.
-- [ ] Reproducible machines (`lordvm apply dev.toml`, rebuild).
-- [ ] Local MCP server (`lordvm mcp`, off by default; open question 11).
+- [x] Reproducible machines (`lordvm apply dev.toml`; 2026-11-24, in development; 6.24). Left: packages and `rebuild`.
+- [x] Local MCP server (`machines mcp` / `lordvm mcp`), `exec`, `cp`, `logs`, `apply`, per machine with automation on
+  (2026-11-24, in development; 6.15, 6.24). Left: the interactive shell, virtio-win guests, folders in `cp`.
 - [ ] Migrate from another computer (6.11).
 - [ ] Machine groups and the Whonix (Tor) card (19): G0–G4 built and checked headless (in development, 2026-11-24);
   the release gate G5 on real hardware, Delete, Rename and Repair of a group still open.
@@ -2963,8 +2964,8 @@ machines help
   the name that never changes; a Duplicate shares it, so then it's the name). Options take `--opt value` or `--opt=value`;
   `--vcpus` is the same as `--cpus`; `set` also passes `--display`, `--ports`, `--shares`, `--iso`, `--agent`,
   `--clipboard-ask`, `--graphics`, `--gpu`, `--boot-order`, `--boot-menu`, `--sound`, `--volume`, `--microphone`,
-  `--sound-out`, `--sound-in`, `--pointer`, `--transfer`, `--devices`, `--nic-model`, `--resolution` and `--name` through to
-  lord-vm (not yet `--capture-fullscreen`).
+  `--sound-out`, `--sound-in`, `--pointer`, `--transfer`, `--devices`, `--nic-model`, `--resolution`, `--cpu-pin`,
+  `--perf-profile`, `--capture-fullscreen` and `--name` through to lord-vm.
 - **Everything but start and open runs `lord-vm`** (the one beside the command) on the machine's folder, exactly as the
   app does: `--status`, `--stop`, `--poweroff`, `--pause`, `--resume`, `--suspend`, `--reset`, `--snapshot`, `--clone`
   (the new folder named as the app names it), `--rename` (6.26: the same checks as the app, in the person's language
@@ -3001,23 +3002,83 @@ machines help
   view, arch, vcpus, memory_mb, disk_gb, disk_used_bytes, graphics, gpu, network}]}`; `status` adds `since`, `detail`,
   `qemu_pid`; `snapshot list --json` is lord-vm's own). Bash completion: `/usr/share/bash-completion/completions/machines`
   (`machines list --names` gives the names).
-- **Not yet:** a start from a memory snapshot (`--loadvm`: the app's Snapshots window does it), creating or importing
-  machines, the console, and the guest agent's `shell`/`exec` below.
+- **Not yet:** creating a machine from a card (the assistant's download, checks and unattended install: `apply` makes one
+  from an ISO the person already has), and the interactive shell over the agent below.
 
-#### Planned: `lordvm` and the agent
+#### `lordvm` and the agent: exec, cp, logs, console, MCP (built 2026-11-24, in development)
 
-`lordvm list|start|stop|suspend|snapshot|clone|console <name>`, plus through the agent:
+`/usr/bin/lordvm` is a second link to the same program (`lordvm exec …` and `machines exec …` are one thing). Beside the
+commands above, in development:
 
 ```sh
-lordvm shell "Debian Dev"                 # an interactive shell
-lordvm exec "Debian Dev" -- uname -m      # exits with the command's status; stdin and stdout are piped
-lordvm logs "Debian Dev"                  # follows until Ctrl+C
-lordvm cp ./build "Debian Dev":~/          # with progress, in either direction
+machines start NAME --no-window --snapshot TAG     # from a snapshot with memory (lord-vm --loadvm), TAG or its unique label
+machines exec "Debian Dev" [--timeout S] -- uname -m   # exits with the program's status (125: it couldn't run, 124: its time ran out)
+machines cp [--force] ./notes.txt "Debian Dev":~/       # files, either way; one side is NAME:PATH (~: the person's home there)
+machines logs "Debian Dev" [--serial|--machine] [--follow] [--lines N]
+machines console "Debian Dev"                      # the serial console (the app's Shell) in this terminal; Ctrl+] leaves
+machines import SRC NAME [--arch A] [--devices compat|virtio] [--network shared|isolated] [--firmware uefi|bios]
+machines apply dev.toml                            # 6.24
+machines mcp                                       # a local MCP server on stdin and stdout
 ```
 
-Same rules as the app: one small tool over the same socket, no shortcut around sandbox or admin actions, reachable only by the person's own user.
+- **Automation is the person's consent, per machine.** `machine.json` schema 15 adds `"automation": true` (written only
+  then; missing is off). It is turned on in Configure → Guest agent → Automation, only with the agent on and the machine
+  off, after a question that names what it allows; `machines set` doesn't pass it (a terminal can't give it). The
+  anonymity profile (19.5) refuses it in `vm_machine_check`, so no Whonix member can ever have it. lord-vm reads
+  `machine.json` again at each request, so the machine's file decides, not what it was at the start.
+- **How a program runs** (`server/src/vm/vmexec.h`, `vmexec.c`; lord-vm's `VM_EXEC`, `vmproto.h`). The command connects
+  to the machine's own lord-vm socket (`$XDG_RUNTIME_DIR/lordos-vm/<id>.sock`, 0700 folder, 0600 socket, `SO_PEERCRED`
+  checked both ways: the person's processes only) and sends one request as a sealed memfd (`F_SEAL_WRITE`, `SHRINK`,
+  `GROW`): the program, at most 64 arguments of up to 4 KB each and 64 KB in all, at most 1 MB of standard input, a
+  timeout of 1 s to 1 h. lord-vm refuses it unless automation is on, the machine runs, qemu-guest-agent answers with
+  `guest-exec`, the guest is Linux (a Windows guest's program would need the scheduled-task step of 6.21: not built) and
+  no other program runs. Then two fixed scripts run through `guest-exec`: as root, one only finds the signed-in person
+  (the session with a seat, else any session, else the first account from 1000 up, as file drops do) and becomes them
+  with `runuser`; as that person, the other runs the program in their home folder under `timeout -k 5`, keeps its
+  output in a private temporary folder and prints a header and at most 128 KB of output and 32 KB of errors (qemu-guest-
+  agent's answer must fit lord-vm's 256 KB line, base64 included). The program, its arguments and its input are
+  `guest-exec`'s arguments and `input-data`, never script text. What comes back is parsed as hostile (`vmx_guest_parse`:
+  exact sizes, at most the caps) and handed to the command in a sealed memfd (`VM_EXEC_DONE`). lord-vm's log names each
+  program and how much came with it, never its arguments or input; the command also writes `log/automation.log` in the
+  machine's folder. On a terminal, what the guest printed is shown with controls as `?` (a guest can't drive the
+  person's terminal); to a pipe or a file it goes as it came.
+- **cp** is built on it: a copy into the machine goes in 1 MB pieces into a temporary file the person's own script made
+  next to the destination, then is checked (size and SHA-256) and renamed (`mv -n`, `--force` replaces); a copy out comes
+  in 128 KB pieces into a temporary file on this computer, checked against the guest's SHA-256 at the end and renamed
+  without replacing (`renameat2 RENAME_NOREPLACE`, or `--force`). On this computer it reads and writes only the
+  person's files under lord.fs's own rules (`fsops.c`: the home folder and their mounts, never a protected path such as
+  `settings.json` or the vault), checked on the opened descriptor (`/proc/self/fd`), not only on the name; a size the
+  guest claims beyond the free space is refused; Ctrl+C removes the temporary file. Files only (a folder: a tar first).
+  It is slow for big files (about 1–2 MB/s out of the machine): the transfer folder (6.7.1) is the way for those.
+- **logs** prints the guest's journal (`log/journal.log`, read through the agent every 5 s, 6.19), its serial console or
+  lord-vm's own log, made safe for a terminal; `--follow` follows it across rotations. **console** is the app's Shell
+  (`VM_CONSOLE`) in the terminal.
+- **The MCP server** (`machines mcp`, or `lordvm mcp`): JSON-RPC 2.0, one message per line, over the standard input and
+  output of a process the person started (no socket, no port). Each message is parsed strictly (`mcli_rpc_parse`: only
+  `jsonrpc`, `id`, `method`, `params`; 1 MB at most); anything printed by the commands it runs is captured, never mixed
+  into the protocol. Tools: `list_machines`, `machine_status`, `start_machine` (without a window), `stop_machine` (Shut
+  Down), `wait_until_ready`, `run_command`, `get_logs`, `clone_machine`. It acts only on a machine of the library named by
+  its name or id (never a path or a `.lordvm` name; its real folder directly in the library, no link; its `machine.json`
+  read again there) whose automation is on; every call is written in the machine's `log/automation.log`. Nothing
+  destructive is offered (no delete, revert or force off). Not built: `create_machine` from a card, `requirements`,
+  `screenshot`.
+- **Who may, in one line:** the person's own processes (the same account, as for the session channel), for a machine
+  the person allowed on screen, never an anonymity machine; another process of the same account that isn't sandboxed
+  can do what the person can (it could edit `machine.json` itself), which is the boundary of a Unix account; sandboxed
+  apps (`--app`, Landlock) reach neither socket.
+- Tests: `build/vmexec-test` (the request, answer and printout formats, every limit, the two scripts under `/bin/sh` with
+  stub `runuser` and `loginctl`, a fuzz pass), `build/mcli-test` (cp's sides, JSON of any bytes, the terminal cleaning,
+  apply's file, the MCP envelope, MCP names and the apply file's boundary list, fuzz passes), `build/vm-test` and
+  `build/vmgroup-test` (schema 15, the anonymity lock), `tests/vm_exec_e2e.sh` (28 checks in a real guest: checked on
+  2026-11-24 with the Ubuntu 26.04.1 server machine made by the Ubuntu card's unattended install, 2 vCPUs, on the dev PC,
+  in a private home and namespaces: the person runs it, not root; input, exit status, timeout, the output cap; arguments
+  stay arguments; cp both ways with the hash; the refusals; the logs; MCP; apply). The memory-snapshot start was checked
+  on the same machine (a marker written after the snapshot was gone).
+- Not built: `lordvm shell` (an interactive shell as the person needs a terminal over the agent, 6.18), programs in
+  Windows guests, folders in `cp`.
 
-A local **MCP server** (`lordvm mcp`), off until turned on in Settings, lets a coding agent **build a machine**: "a Debian machine with 40 GB, user neil". Tools: `list_machines`, `requirements`, `create_machine` (card or ISO, profile, unattended), `wait_until_ready` (with progress), `machine_status`, `start`, `stop`, `clone`, `screenshot`, `run_command`, `get_logs`. A password it creates goes to the keyring and never into its replies. It speaks only over stdin of a process the person started, and runs commands as the guest's normal user (6.18). It can't touch a VM marked **No automation**, which is the default for profiles with sensitive data, and every action it takes is written to the VM's log. Destructive tools (delete, revert) ask the person on screen.
+A local **MCP server** was first planned to build machines too ("a Debian machine with 40 GB, user neil": a card, a
+profile, an unattended install, a password kept in the keyring); what is built is the list above.
 
 ### 6.16 Storage window
 
@@ -3247,7 +3308,27 @@ From another computer, a running machine is offered by LordOS's own remote deskt
 
 ### 6.24 Reproducible machines
 
-`lordvm apply dev.toml` creates or updates a machine from a short text file kept beside a project: system, resources, forwarded ports, folders, packages to install through the agent. A team gets the same environment by running one command, `lordvm rebuild` starts over from it, and the file is reviewed like code. Shared folders and root access in such a file still ask the person on screen: a file from a repository is untrusted. Phase 4.
+`lordvm apply dev.toml` creates or updates a machine from a short text file kept beside a project. **Built 2026-11-24,
+in development** (`machines apply`, `mcli_apply_parse`): a strict subset of TOML, an optional `[machine]` table, then
+`name`, `arch`, `memory`, `cpus`, `disk`, `network`, `iso`, `graphics`, `clipboard`, `agent`, `ports` and `shares`
+(one-line lists, as `machines set` takes them); an unknown or repeated key, anything after a value or another value form
+is refused with its line. A machine of that name is changed (with it off); otherwise one is made (`lord-vm --create`, then
+`--set`). The file is untrusted (it came with a repository): everything in it that reaches beyond the machine (an ISO,
+forwarded ports, shared folders, a bridged or host-only network, the clipboard, the guest agent) is listed and needs the
+person's yes on their own terminal (`/dev/tty`; no terminal, nothing changes); its ISO must be a `.iso` or `.img` file in
+the person's Downloads folder or the Machines library; automation can't be asked for in it. Example:
+
+```toml
+[machine]
+name = "Debian Dev"
+memory = "8G"
+cpus = 4
+disk = "64G"
+network = "shared"
+ports = ["tcp:2222:22"]
+```
+
+Not built: packages to install through the agent, `lordvm rebuild`, a system by card name (the file names an ISO).
 
 ### 6.25 Capture mouse (built 2026-11-22, since 0.8.9.5; approved by the maintainer 2026-11-21)
 
@@ -4244,7 +4325,7 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Shell in a guest with no network | 2 | Work | Agent |
 | Run commands from the host | 3 | Work | `lordvm` |
 | Live logs | 2 | Work | Agent |
-| MCP server, a coding agent builds a machine | 4 | Work | Off by default |
+| MCP server for coding agents | 4 | Partly | Runs programs, reads logs, starts, stops and clones machines with automation on (in development, 6.15); building a machine from a card isn't built |
 
 ### Storage, snapshots, safety
 
@@ -4283,7 +4364,7 @@ What people don't normally get from a desktop virtualization app, and the reason
 | **A budget across all machines** | 1 | Yes | The desktop keeps its share, whatever is running |
 | **Whole-machine encryption** | 3 | Partly | Memory, TPM, NVRAM and logs too, not only the disk |
 | **Unified diagnostics** | 2 | Yes | One place: machine log, guest log, agent, Monitor and firewall agree on what a machine did |
-| **Reproducible machines** | 4 | Work | A text file beside a project, `lordvm apply` |
+| **Reproducible machines** | 4 | Partly | `lordvm apply`: a text file beside a project (in development, 6.24); no packages or rebuild yet |
 | **Desktop integration** | 4 | Work | One compositor, permissions, Dock, Files and search, not an app beside the system |
 | **Claims only after testing** | always | Yes | The app and this document say what wasn't tested |
 
@@ -4319,7 +4400,7 @@ Decided on 2026-11-01: settings on one screen replaces tabs; Kali is in the cata
 8. ~~Does the first public release include virtio-win guests, or Linux only?~~ Settled: Windows 11 machines on amd64 since 0.8.9.5 (4.3.1).
 9. ~~Does the catalog list only systems we can download freely, as recommended?~~ Settled: yes (Windows from the maker's page or its evaluation ISOs, checked against pinned hashes).
 10. Is Migrate worth its cost?
-11. Does `lordvm mcp` ship at all (no `lordvm` exists; the command is `machines`, 6.15), given that it lets a coding agent run commands in guests? Off by default is the recommendation.
+11. ~~Does `lordvm mcp` ship at all?~~ Built on 2026-11-24 (in development) as the brief asked: `lordvm` is a second name of `machines`, and the MCP server acts only on a machine whose person turned automation on, never on the anonymity profile (6.15).
 12. ~~Machine groups and the Whonix card: the decisions listed in 19.13.~~ Settled by the maintainer on 2026-11-23 (19.13); G0–G2 are built, *in development* (19.0).
 
 ## 19. Machine groups and Whonix (in development)
