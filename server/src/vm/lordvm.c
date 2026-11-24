@@ -1501,8 +1501,9 @@ static int open_share(const char *path, char *err, size_t errlen) {
 static int spawn_virtiofsd(int i, char *err, size_t errlen) {
     int dfd = open_share(sh_path(i), err, errlen);
     if (dfd < 0) return -1;
-    char path[PATH_MAX + 32];
-    snprintf(path, sizeof path, "%s/fs%d.sock", S.rundir, i);
+    char path[PATH_MAX + 64];
+    /* the run folder is every machine's: the name is this machine's (two starting at once collided on fs<N>.sock) */
+    snprintf(path, sizeof path, "%s/%s-fs%d.sock", S.rundir, S.m.id, i);
     struct sockaddr_un a = { .sun_family = AF_UNIX };
     if (strlen(path) >= sizeof a.sun_path) { snprintf(err, errlen, "the run folder's path is too long"); close(dfd); return -1; }
     memcpy(a.sun_path, path, strlen(path) + 1);
