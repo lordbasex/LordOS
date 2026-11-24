@@ -344,4 +344,57 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
   eq('groups: up to 36 activities on 9 desktops', 9 * (1 + MAX_GROUPS), 36);
 }
 
+// ---- launches (model/launches.js): where a launched app's windows go ----
+{
+  const L = await import('../../themes/workspaces/model/launches.js');
+  const C = 'desktop:google-chrome.desktop';
+  let list = L.addLaunch([], { key: C, desk: 'd2', dk: 'DP-3', now: 1000 });
+  eq('launch: another app\'s window does not take it', L.claim(list, 'linux#1', 'desktop:org.gnome.gedit.desktop', 1100), null);
+  const pk = L.claim(list, 'linux#2', C, 1200);
+  eq('launch: the picker takes it (display and activity)', pk && [pk.dk, pk.desk], ['DP-3', 'd2']);
+  eq('launch: used up', L.claim(list, 'linux#3', C, 1300), null);
+  // the person picks a profile: the picker closes, the browser window opens 0.4 s later
+  const g = L.gone(list, 'linux#2', 9000, new Map(), () => '', () => false);
+  yes('picker closed soon: armed again', g.p);
+  const real = L.claim(list, 'linux#4', C, 9400);
+  eq('the real browser window follows the picker', real && [real.dk, real.desk], ['DP-3', 'd2']);
+  // order reversed: the browser window first (born 8.8 s), the picker closes at 9 s: claimed then
+  let l2 = L.addLaunch([], { key: C, desk: 'd1', dk: 'HDMI-A-1', now: 1000 });
+  L.claim(l2, 'p', C, 1100);
+  const born = new Map([['b', 8800], ['old', 500], ['x', 8900]]);
+  const keyOf = (id) => ({ b: C, old: C, x: 'desktop:other.desktop' })[id];
+  const g2 = L.gone(l2, 'p', 9000, born, keyOf, () => false);
+  eq('a browser window that came just before the picker closed is claimed', g2.early, ['b']);
+  // a window that took a placement long ago and closes: nothing armed
+  let l3 = L.addLaunch([], { key: C, desk: 'd1', dk: 'DP-1', now: 0 });
+  L.claim(l3, 'w', C, 100);
+  eq('closed long after: not armed', L.gone(l3, 'w', 100 + L.FOLLOW_MS + 1).p, null);
+  // re-arms are bounded
+  let l4 = L.addLaunch([], { key: C, desk: 'd1', dk: 'DP-1', now: 0 });
+  let n = 0, t = 10;
+  for (let i = 0; i < 10; i++) { const w = `r${i}`; if (!L.claim(l4, w, C, t)) break; n++; t += 10; L.gone(l4, w, t); t += 10; }
+  eq('re-arms bounded', n, L.MAX_REARMS + 1);
+  // expired
+  let l5 = L.addLaunch([], { key: C, desk: 'd1', dk: 'DP-1', now: 0 });
+  eq('a launch waits LAUNCH_MS at most', L.claim(l5, 'z', C, L.LAUNCH_MS + 1), null);
+  // keyless (a Search result that isn't an app): any window
+  let l6 = L.addLaunch([], { desk: 'd1', dk: 'DP-1', now: 0 });
+  yes('keyless: any new window', L.claim(l6, 'q', 'files', 10));
+  // a keyed launch whose app shows a window under an unknown app_id (no .desktop matches) still lands
+  let l7 = L.addLaunch([], { key: C, desk: 'd1', dk: 'DP-1', now: 0 });
+  eq('another installed app never takes a keyed launch', L.claim(l7, 'o', 'flatpak:org.x.Y', 10), null);
+  yes('an unknown app_id takes it while the app has shown nothing', L.claim(l7, 'u', 'linux:chrome-xyz', 20));
+  let l7b = L.addLaunch([], { key: 'linux:fakechrome', desk: 'd1', dk: 'DP-1', now: 0 });
+  eq('a launch keyed by an unknown app_id: exact only', L.claim(l7b, 'v', 'linux:gedit-like', 10), null);
+  let l7c = L.addLaunch([], { key: C, desk: 'd1', dk: 'DP-1', now: 0 });
+  eq('a LordOS app\'s window never takes a Linux launch', L.claim(l7c, 'f', 'files', 10), null);
+  // the newest launch of the same app wins; at most MAX_PENDING live
+  let l8 = L.addLaunch([], { key: C, desk: 'd1', dk: 'DP-1', now: 0 });
+  l8 = L.addLaunch(l8, { key: C, desk: 'd2', dk: 'DP-3', now: 5 });
+  eq('newest launch first', L.claim(l8, 'n', C, 10).dk, 'DP-3');
+  let l9 = [];
+  for (let i = 0; i < 20; i++) l9 = L.addLaunch(l9, { key: `k${i}`, desk: 'd', dk: 'x', now: i });
+  eq('pending bounded', l9.length, L.MAX_PENDING);
+}
+
 console.log(process.exitCode ? 'workspaces-model-test: FAILED' : `workspaces-model-test: ${ok} ok`);

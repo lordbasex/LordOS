@@ -9,6 +9,8 @@ import {
   activeDesktop, switchDesktop, compareNames, t as tr,
 } from '@lordos/sdk';
 import { aimLaunch } from '../tiler.js';
+import { appMenuItems } from './AppWindows.jsx';
+import { Menu } from '../../classic/components/Menu.jsx';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Surface } from './Surface.jsx';
 import { ActivityIcon, FolderGlyph, PageGlyph, SearchGlyph } from '../glyphs.jsx';
@@ -40,10 +42,10 @@ const Row = memo(function Row({ t, it, sec, selected, onPick, onHover }) {
   );
 });
 
-const AppTile = memo(function AppTile({ t, a, selected, onPick }) {
+const AppTile = memo(function AppTile({ t, a, selected, onPick, onMenu }) {
   const [hover, setHover] = useState(false);
   return (
-    <View onClick={(e) => onPick(a, e)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <View onClick={(e) => onPick(a, e)} onContextMenu={(e) => onMenu(a, e)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ width: 98, height: 86, alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, paddingHorizontal: 4,
         backgroundColor: selected ? t.accent : hover ? t.hover : 'transparent' }}>
       <a.Icon size={36} />
@@ -69,8 +71,12 @@ export function Search({ t, display, onClose, isOnChrome }) {
     const n = box.current?.id;
     if (n) { tween(n, { translateY: [-18, 0] }, { ms: 240, ease: EASE.back }); tween(n, { opacity: [0, 1] }, { ms: 140 }); }
   }, []);
+  // right click on an app: its windows in this activity and New window, opened on this display (AppWindows.jsx)
+  const [menu, setMenu] = useState(null);
+  const menuBox = useRef(null);
+  const openMenu = (a, e) => setMenu({ x: e.x, y: e.y, items: appMenuItems(a.id, active, display, () => { onClose(); }) });
   useEffect(() => addListener('pointerdown', (e) => {
-    for (let n = e.target; n; n = n.parent) if (n === box.current) return;
+    for (let n = e.target; n; n = n.parent) if (n === box.current || (menuBox.current && n === menuBox.current)) return;
     if (!isOnChrome(e.x, e.y)) onClose();
   }), []);
   useEffect(() => setSel(0), [query]);
@@ -83,7 +89,8 @@ export function Search({ t, display, onClose, isOnChrome }) {
     else noteLaunch(display.x + display.w / 2, display.y + display.h * 0.3);
     onClose();
     // an app opened from here shows on this display (the one the panel opened on), wherever there is room
-    if (entry.app || String(entry.it?.key || '').startsWith('app:')) aimLaunch(display);
+    if (entry.app) aimLaunch(display, 1, entry.app.id);
+    else if (String(entry.it?.key || '').startsWith('app:')) aimLaunch(display, 1, String(entry.it.key).slice(4));
     if (entry.app) launchApp(entry.app.id);
     else searchEverything.run(entry.it);
   };
@@ -129,10 +136,11 @@ export function Search({ t, display, onClose, isOnChrome }) {
           </View>
         )) : (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
-            {sorted.map((a, i) => <AppTile key={a.id} t={t} a={a} selected={i === sel} onPick={(x, e) => pick({ app: x }, e)} />)}
+            {sorted.map((a, i) => <AppTile key={a.id} t={t} a={a} selected={i === sel} onPick={(x, e) => pick({ app: x }, e)} onMenu={openMenu} />)}
           </View>
         )}
       </ScrollView>
+      {menu && <Menu t={t} x={menu.x} y={menu.y} width={280} boxRef={menuBox} onClose={() => setMenu(null)} items={menu.items} />}
     </Surface>
   );
 }
