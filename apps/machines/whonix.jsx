@@ -11,18 +11,22 @@ import { useEffect, useState } from 'react';
 import { entryOf, releaseNames, newestRelease, listingNames, newest, pickImage, progressOf, resumedOf, groupMachines } from './catalog.js';
 import { usePal, Btn, Bar, gb, bytes } from './ui.jsx';
 import { SheetHeader, Pill, Round } from './kit.jsx';
-import { sessionCapMb } from './group.js';
+import { sessionCapMb, archiveMatches } from './group.js';
 import { GroupMark, groupColors } from './groupui.jsx';
 import { OVERHEAD_MB } from './model.js';
 
-// the newest release's archive: the releases' folder, that release's folder, its signed SHA-512 list → { name, sha, size, release }
-export async function resolveGroup(cat, id, arch) {
+// the newest release's archive: the releases' folder, that release's folder, its signed SHA-512 list → { name, sha, size,
+// release }. With `only` (a group's own release, to fetch its archive again: 19.6), that release's folder alone
+export async function resolveGroup(cat, id, arch, only = '') {
   const s = (cat?.systems || []).find((x) => x?.id === id);
   const e = entryOf(cat, id, arch);
   const rel = s?.arch?.[arch]?.releases;
   if (!e || !rel) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
-  const top = await admin.run('vm-image-list', `${id} ${arch}`, null, { quiet: true });
-  const release = newestRelease(releaseNames(fs.read(String(top)), rel.pattern), rel.floor);
+  let release = only;
+  if (!release) {
+    const top = await admin.run('vm-image-list', `${id} ${arch}`, null, { quiet: true });
+    release = newestRelease(releaseNames(fs.read(String(top)), rel.pattern), rel.floor);
+  }
   if (!release) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
   const idx = await admin.run('vm-image-list', `${id} ${arch} ${release}`, null, { quiet: true });
   const list = newest(listingNames(fs.read(String(idx)), e.sumsPattern), e.sumsPattern);
@@ -31,6 +35,18 @@ export async function resolveGroup(cat, id, arch) {
   const img = pickImage(e, fs.read(String(sums)));
   if (!img) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
   return { ...img, release };
+}
+
+// a group's verified download fetched again (Repair or Start Fresh making a base again, 19.6, 19.7): its own release's
+// signed list must still name the archive group.json records (archiveSha512), or nothing is fetched; then vm-image-get as
+// in the assistant. onProgress({ done, total }). Resolves the archive's path in the image store
+export async function fetchGroupArchive(cat, group, onProgress) {
+  const img = await resolveGroup(cat, group.catalog || 'whonix', 'amd64', group.release || '');
+  if (!archiveMatches(img, group)) throw new Error(tr('machines.group.repair.otherImage'));
+  return String(await admin.run('vm-image-get', `${group.catalog || 'whonix'} amd64 ${img.name} ${img.sha}`, (l) => {
+    const g = progressOf(l);
+    if (g) onProgress?.(g);
+  }, { quiet: true }));
 }
 
 // lord-vm --group-create's progress lines ({"progress":{"step":"verify|unpack|base",…}}) → { step, frac }
@@ -116,7 +132,7 @@ export function GroupFlow({ step, setStep, dl, host, names, groupNames, onCancel
         if (r) setGot((o) => ({ phase: 'download', total: 0, ...o, done: Math.max(o?.done || 0, r) }));
       }, { quiet: true }));
     } catch (e) { setGot(null); setFail(e.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e.message || tr('machines.dl.failed')); return; }
-    const id = lord.vm.groupCreate({ catalogId: dl.id, archive, sha512: dl.image.sha, name: name.trim() });
+    const id = lord.vm.groupCreate({ catalogId: dl.id, archive, sha512: dl.image.sha, release: dl.image.release || dl.release || '', name: name.trim() });
     if (!id) { setFail(tr('machines.new.refused')); return; }
     setGot({ phase: 'verify', done: 0, total: 1 });
     setJob(id);

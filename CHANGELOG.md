@@ -11,6 +11,63 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: programs, files, logs and an MCP server from the terminal, per machine with the person's consent**
+  (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
+  to the `machines` command, which gains:
+  - `machines exec NAME [--timeout S] -- PROGRAM ARGS…`: runs a program in a Linux machine as the person signed in to it
+    (never as root), in their home folder, with this terminal's input (up to 1 MB), and gives back its output and its exit
+    status (124: its time ran out, 125: it couldn't run). It goes only through the machine's own lord-vm (a new request,
+    `VM_EXEC`, a sealed memfd on lord-vm's socket, which only the person's processes reach) and qemu-guest-agent: two fixed
+    scripts, one as root that only finds the signed-in person, one as that person that runs the program under
+    `timeout`; the program, its arguments and its input are data, never script text. Output is cut at 128 KB and errors
+    at 32 KB in the guest, parsed as hostile, and shown on a terminal with control characters as `?`.
+  - `machines cp [--force] FILE NAME:PATH` and the other way: files checked by SHA-256 at the end, written under a
+    temporary name and renamed without replacing (unless `--force`); on this computer only the person's files under
+    lord.fs's rules (never a protected path), checked on the opened descriptor; a size claimed beyond the free space is
+    refused, and Ctrl+C removes the half-copied file.
+  - `machines logs NAME [--serial|--machine] [--follow]`, `machines console NAME` (the serial console, Ctrl+] leaves),
+    `machines import SRC NAME` (another app's machine, as Migrate does), `machines start NAME --no-window --snapshot TAG`
+    (from a snapshot with memory).
+  - `machines apply FILE`: a machine made or changed from a short TOML file kept beside a project. The file is untrusted:
+    an ISO, ports, shared folders, a bridged or host-only network, the clipboard and the agent it asks for are listed and
+    need the person's yes on their terminal (no terminal, no change), and its ISO must be in Downloads or the Machines
+    library.
+  - `machines mcp`: a local MCP server (JSON-RPC over standard input and output, strictly parsed) with `list_machines`,
+    `machine_status`, `start_machine`, `stop_machine`, `wait_until_ready`, `run_command`, `get_logs` and
+    `clone_machine`; only a machine of the library named by its name or id, nothing destructive.
+  - **Consent per machine**: `machine.json` schema 15 adds `"automation"`, off by default, turned on in Configure → Guest
+    agent → Automation after a question (5 new texts in all 35 languages); `machines set` can't set it; the anonymity
+    profile refuses it. lord-vm reads it again at each request and writes each program (never its arguments) in its log;
+    the command also writes `log/automation.log`. 28 new terminal texts in all 35 languages.
+  - `machines set` now passes `--cpu-pin`, `--perf-profile` and `--capture-fullscreen` to lord-vm, and the bash
+    completion knows them and the new commands (also for `lordvm`).
+  - Tests: `build/vmexec-test` (formats, limits, the guest scripts under `/bin/sh`, fuzz), `build/mcli-test` (cp sides,
+    terminal cleaning, the TOML subset, the MCP envelope and names, the apply file's boundary list, fuzz), schema 15 in
+    `build/vm-test` and `build/vmgroup-test`, `tests/vm_exec_e2e.sh` (28 checks, run on 2026-11-24 in a real Ubuntu
+    26.04.1 machine made by the Ubuntu card on the dev PC). Not built: an interactive shell over the agent, programs in
+    virtio-win guests, folders in `cp`, packages and `rebuild` in `apply`, creating a machine from a card through MCP.
+- **Machines: an ISO's architecture from its boot files** (in development; docs/VIRTUALIZATION.md 5.2). A new reader
+  (`server/src/vm/vmiso.c`, bounded reads through one descriptor) finds the UEFI boot loaders in the ISO 9660, UDF and El
+  Torito trees and reads their PE headers; install discs are known by their `sources/install.*`; the name or label decide
+  only when the boot files say nothing, and the summary card says which. An `.iso` dropped on "Use an ISO" picks it.
+  Tests: `build/vmiso-test` (images built byte by byte, hostile ones, a fuzz pass), 9 new `isoArch` checks.
+- **Machines: virtio-win guests on arm64** (in development; 4.3.2): `virt` with GICv3, secure boot (AAVMF), a TPM on
+  `tpm-tis-device`, USB CD/DVD drives, ramfb, the ARM64 drivers in the unattended answer and the maker's 38 published
+  Arm64 ISO hashes pinned. On a computer whose GIC is version 2, such as the Raspberry Pi 5, KVM can't run it: the
+  machine is Emulated and the card says so. `swtpm` comes with `vm-enable` on arm64 too. Checked on the Pi 5 under TCG
+  with an Alpine ISO; an install of the guest itself is not yet checked. 7 new texts in all 35 languages.
+- **Machines: a machine group's Delete, Rename and Repair** (in development; docs/VIRTUALIZATION.md 19.7–19.9). The
+  group's card menu gains Rename… (the group, its members' names and its folder, with the group off; also `machines rename
+  GROUP NEW`), Delete… (for good: every member's lock held, the folder renamed out of sight, checked and removed by
+  descriptors without following links, then each base nothing else names) and Repair… on a damaged group (a base missing
+  or changed made again from the verified archive through the sandboxed `lord-vmunpack`, a missing member made again from
+  its base). Start Fresh now remakes a missing or changed base instead of refusing, fetching the archive again when it is
+  gone (refused unless its SHA-512 is the recorded one). While the Gateway is off, the Workstation's window says "No
+  network: the Gateway is off" with Start Gateway; the card offers Shut Down the Gateway when it runs alone. Fixed: creating
+  a group from the app was refused (the image store's file name never matched the catalog's pattern), and a base already
+  in `.shared` was reused without checking it. 34 new texts in all 35 languages. Tests: `vmgroup-test`,
+  `tests/vm_group_manage.sh` (37 checks), `tests/machines_group_manage_headless.sh` (20, a headless lord-server in its own
+  namespaces), `vm_group_ui_test.mjs`, `vm_group_model_test.mjs`.
 - **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the
@@ -380,6 +437,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     again) through `tests/vm_group_link.sh`.
   - **Not run under it yet**: an Intel vGPU (GVT-g), a bridged tap and hugetlb memory: their calls were read in QEMU's
     source (VFIO's and TUN's request types are in the rules).
+- **Machines: nothing QEMU writes can run** (in development; latest release 0.8.9.5-beta; approved by the maintainer
+  2026-11-24; docs/VIRTUALIZATION.md 3.3). In QEMU's own mount namespace the machine's `disks/` folder is now bound over
+  itself and that bind remounted `noexec,nosuid,nodev` (`vmsandbox.c` `noexec_bind`, from `vm_ns_setup`, after the
+  private loader is mounted and only once the user namespace is joined). The kernel then refuses to run a file there
+  (EACCES) or to map one executable (`mmap` or `mprotect` with `PROT_EXEC`: EPERM), whatever seccomp lets through.
+  - **Why**: without a listener (the seccomp allowlist's kill fallback, never on Debian 13's kernel) the allowlist lets
+    the loader's kind of mapping (private, read-only, executable) through at any time, so a compromised QEMU could write
+    code into one of its disk files and map it to run. That half of the gap is closed; a memfd it wrote is still the
+    other half (no mount covers memfds), as before.
+  - **Also**: `/dev/shm`, `/tmp`, `/var/tmp` and `$XDG_RUNTIME_DIR` get the same remount there. QEMU's Landlock already
+    keeps it from writing them; they count only on a kernel without Landlock. These binds and the loader's are the only
+    mounts in QEMU's namespace. The loader's bind, a mount of its own made before them, keeps exec. What the outer mount
+    had stays (read-only stays read-only, atime flags are kept).
+  - **Nothing QEMU uses changes**: qcow2 and raw disks, the NVRAM and snapshots with memory are read and written as
+    before; swtpm, virtiofsd and passt run outside QEMU's namespaces, and the suspend file, a disposable session's memfd
+    and guest memory (a memfd, hugetlb or not) reach QEMU as descriptors.
+  - **If it fails** QEMU still runs, and its log says which folder and why (`lord-vm: QEMU's disks folder couldn't be
+    made noexec in its mount namespace (...)`); Landlock and seccomp still hold. The log's sandbox line says
+    `noexec-disks=1` and `lord-vm --status --json` adds `"noexec_disks"`.
+  - **Tests**: `vm-jail-probe` checks from inside the jail that `disks/` and the temporary folders are `noexec`, `nosuid`
+    and `nodev`, then, with the allowlist in its kill fallback (no listener), writes a real program into a file of
+    `disks/` and can neither map it executable (EPERM; with the remount left out, the same probe maps it) nor run it
+    under lord-vm's descriptor number (EACCES). The probe's own copy moved out of `disks/` (it is read as a machine's ISO
+    is). `tests/vm_isolation.sh` checks `"noexec_disks":1`. Real machines started with it on the amd64 PC: a Debian 13
+    guest with 2D graphics and one with UEFI and a TPM (swtpm), each through boot to login, keys, a snapshot with memory
+    and its revert, reset, suspend to a file and resume, and shutdown; a LordOS live machine with 3D graphics (virgl).
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores
@@ -412,6 +495,10 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: a machine started right after a large import timed out** (in development). `qemu-img convert` leaves the
+  disk in the page cache, and QEMU's first open of it with `O_DIRECT` waited behind gigabytes of writeback past its 20 s
+  to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
+  a migration from a 20 GB whole-disk image of a Linux PC (docs/VIRTUALIZATION.md 6.11), which now imports and boots.
 
 - **Machines: two machines starting at the same moment no longer collide on a shared folder's socket**: the socket lord-vm
   hands virtiofsd was `<runtime>/lordos-vm/fs<N>.sock`, the same name for every machine, so a second start unlinked and
@@ -755,6 +842,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   Deactivated). `apps/store/installedmodel.js`; the `filter` argument also takes `lordos`, `debian`, `flathub` and
   `web`.
 - Three new texts (`store.installed.noneDebian`, `noneFlathub`, `noneWeb`), in all 35 languages.
+
+### Removed
+- **Machines: the Android card** (in development; latest release 0.8.9.5-beta). The maintainer removed it on 2026-11-24:
+  it added nothing. Gone: its entry in `assets/machines/systems.json` (the pinned Bliss OS 16.9.7 ISO), the assistant's
+  "archived image" notice under a download (`catalog.js` `noticeOf`, `machines.dl.notice.archived` in all 35
+  languages), its tests in `vm_catalog_test.mjs` and `vmcatalog-test` (the pinned-card path is now tested with a made-up
+  entry and virtio-win's pin), and its descriptions in docs/VIRTUALIZATION.md (4.2 says it was removed), the roadmap,
+  the paper and its validation table. A person's own Android ISO chosen from a file is still named as such. amd64 now
+  shows six cards, arm64 five.
 
 ### Documentation
 

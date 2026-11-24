@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmexec.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -122,6 +122,13 @@ build/vmunattend-test: tests/vmunattend_test.c src/vm/vmunattend.c src/vm/vmunat
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmunattend_test.c src/vm/vmunattend.c src/sec/json.c
 	./$@ || { rm -f $@; exit 1; }
+# what an ISO boots on (vmiso.c, lord.vm.isoInfo): ISO 9660, El Torito, the ESP's FAT, UDF and PE headers in images
+# made by the test, hostile ones (loops, huge sizes) and a fuzz pass of random changes
+test: build/vmiso-test
+build/vmiso-test: tests/vmiso_test.c src/vm/vmiso.c src/vm/vmiso.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmiso_test.c src/vm/vmiso.c
+	./$@ || { rm -f $@; exit 1; }
 # resumed downloads (pkg/http.c, FetchItem.resume) against a server on loopback: as the user who runs it
 # how a machine's memory is backed (vmmem.h): hugetlb only when it all fits in free 2 MB pages
 build/vmmem-test: tests/vmmem_test.c src/vm/vmmem.h
@@ -140,6 +147,13 @@ build/vmthumb-test: tests/vmthumb_test.c src/vm/vmthumb.c src/vm/vmthumb.h
 	./$@ || { rm -f $@; exit 1; }
 # what a machine's vCPUs use (vmcpu.c, the Machines app's vCPU recommendation): the stat line, QEMU's vCPU thread names,
 # the windows of five minutes and cpu-usage.json, under ASan and UBSan; no QEMU needed (its own threads stand in)
+# VM_EXEC (docs/VIRTUALIZATION.md 6.15): the request, the answer and the guest's printout, the guest's two scripts under
+# /bin/sh with stub runuser and loginctl, a fuzz pass
+test: build/vmexec-test
+build/vmexec-test: tests/vmexec_test.c src/vm/vmexec.c src/vm/vmexec.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmexec_test.c src/vm/vmexec.c
+	./$@ || { rm -f $@; exit 1; }
 build/vmcpu-test: tests/vmcpu_test.c src/vm/vmcpu.c src/vm/vmcpu.h src/sec/json.c
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmcpu_test.c src/vm/vmcpu.c src/sec/json.c -lpthread
@@ -206,7 +220,7 @@ build/guest-dbus-test: tests/guest_dbus_test.c ../tools/guest/dbusmin.c ../tools
 	./$@ || { rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
-VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmpin.c
+VM_SRV_SRC := src/ui/js_vm.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmpin.c src/vm/vmiso.c
 VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
 $(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
 build/lord-server: $(VM_SRV_OBJ)

@@ -116,6 +116,12 @@
  *                   query-mice, then human-monitor-command "mouse_set N" with the USB or virtio mouse lord-vm adds beside
  *                   the tablet); a = 0, the absolute tablet again. lord-vm checks every second while the machine runs that
  *                   the one wanted is still the active one (a guest's driver that starts later takes it) → VM_REPLY
+ *     VM_EXEC       a program in the guest for the person (docs/VIRTUALIZATION.md 6.15; vmexec.h): one descriptor, a sealed
+ *                   memfd with the request (the program, its arguments, its input, a timeout). Only for a machine whose
+ *                   machine.json says "automation": true (never with the anonymity profile), running, with qemu-guest-agent's
+ *                   guest-exec, and a Linux guest; one at a time. lord-vm runs two fixed scripts through guest-exec (as root:
+ *                   find the person; as the person: the program under timeout(1)), writes each request in the machine's
+ *                   log, and answers VM_EXEC_DONE, or VM_REPLY with why not
  *     VM_LAUNCH     a = an app's place in the guest's list, b = that list's generation (VM_WINDATA c): lord-vm sends the
  *                   guest that app's token from its own copy of the list; refused when the list changed since → VM_REPLY
  *   from lord-vm (events and replies)
@@ -149,6 +155,9 @@
  *     VM_WINREFUSED apps mode: the guest couldn't do an action to one of its windows (LAG_WINREFUSED, parsed by lord-vm):
  *                   a = the window's id, b = LAGA_* (1..5), c = LAGR_* (1 it runs as administrator, 2 the system refused).
  *                   Sent to every client
+ *     VM_EXEC_DONE  seq of the VM_EXEC; a = the program's exit status (0..255, 124: its time ran out), b = VMX_F_*; one
+ *                   descriptor, a sealed memfd in vmexec.h's answer layout (its output and errors, cut at their caps). Sent
+ *                   to the client that asked only
  *     VM_JOB        progress of a long request: a = VJ_* (suspend, resume, snapshot), b = VJS_* (running, done,
  *                   failed), c = percent (0..100, -1 unknown), text = detail
  *     VM_NOTICE     something the person should know that isn't a state: a = VMN_* (VMN_NET_LOST: passt ended while
@@ -248,10 +257,10 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK,
-    VM_REQ_LAST = VM_LINK,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_EXEC,
+    VM_REQ_LAST = VM_EXEC,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
-    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
+    VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT, VM_EXEC_DONE,
 };
 /* VM_CLIP_DENY c: why. BACKGROUND: the machine wasn't in use (its window not in front, nor a few seconds after);
  * STALE: the host's clipboard changed since that offer, or the offer isn't the last; NONE: that form isn't there now
@@ -328,6 +337,7 @@ enum {
     VMS_NONDUMPABLE = 2048, /* QEMU non-dumpable, checked after exec: the person's programs can't read its memory */
     VMS_SECCOMP_ALLOWLIST = 4096, /* our seccomp on QEMU is the allowlist (vmseccomp.h) */
     VMS_SECCOMP_NAMED = 8192,     /* lord-vm holds its listener: a call it stops is named in the log and failure page */
+    VMS_NOEXEC_DISKS = 16384,     /* in QEMU's mount namespace its disks folder is noexec: nothing written there runs */
 };
 /* VM_INFO d: cgroups */
 enum {
@@ -514,6 +524,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
     case VM_GUEST_LAYOUT: return vm_layout_ok(m->a, m->b, (m->c >> 16) & 0xffff, m->c & 0xffff, (m->d >> 16) & 0xffff, m->d & 0xffff) &&
                                  m->c >= 0 && m->d >= 0;
     case VM_WINREFUSED: return m->a != 0 && m->b >= 1 && m->b <= 5 && (m->c == 1 || m->c == 2) && m->d == 0;
+    case VM_EXEC_DONE: return m->a >= 0 && m->a <= 255 && m->b >= 0 && m->b <= 7;
     case VM_JOB: return m->a > VJ_NONE && m->a < VJ_COUNT && m->b >= VJS_RUNNING && m->b <= VJS_FAILED && m->c >= -1 && m->c <= 100;
     default: return 0;
     }

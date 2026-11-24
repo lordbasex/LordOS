@@ -555,6 +555,7 @@ static int check_member(const VmMachine *m, char *err, size_t n) {
         if (m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] || m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0])
             return fail(err, n, VM_E_RANGE, "locked for anonymity: SMBIOS strings and disk serials");
         if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
+        if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
     }
     return VM_OK;
 }
@@ -625,10 +626,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 4 && m->n_shares) return fail(err, n, VM_E_FIELD, "shares need schema 4");
     if (m->drivers[0] && !path_valid(m->drivers)) return fail(err, n, VM_E_RANGE, "drivers must be an absolute path without '..', ',' or control characters");
     if (m->schema < 5 && (m->devices == VM_DEV_WINDOWS || m->drivers[0])) return fail(err, n, VM_E_FIELD, "the windows devices and drivers need schema 5");
-    if ((m->devices == VM_DEV_WINDOWS || m->drivers[0]) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "the windows devices are for amd64 machines for now");
     if ((m->secure_boot | m->tpm | m->hyperv) & ~1) return fail(err, n, VM_E_RANGE, "secure_boot, tpm and hyperv are true or false");
     if (m->schema < 5 && (m->secure_boot || m->tpm || m->hyperv)) return fail(err, n, VM_E_FIELD, "secure_boot, tpm and hyperv need schema 5");
-    if ((m->secure_boot || m->tpm || m->hyperv) && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "secure boot, TPM and Hyper-V are for amd64 machines for now");
+    /* arm64 (4.3): secure boot (AAVMF), a TPM (tpm-tis-device) and the windows devices; Hyper-V's enlightenments are x86's */
+    if (m->hyperv && m->arch != VM_ARCH_AMD64) return fail(err, n, VM_E_RANGE, "Hyper-V enlightenments are for amd64 machines");
     if (m->secure_boot && m->firmware != VM_FW_UEFI) return fail(err, n, VM_E_RANGE, "secure boot needs UEFI");
     if (m->graphics != VM_GFX_2D && m->graphics != VM_GFX_3D) return fail(err, n, VM_E_RANGE, "graphics");
     if ((m->res_w || m->res_h) && !vm_resolution_ok(m->res_w, m->res_h)) return fail(err, n, VM_E_RANGE, "resolution must be 640x480 to 7680x4320, even numbers");
@@ -660,6 +661,8 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 12 && m->capture_fullscreen) return fail(err, n, VM_E_FIELD, "capture_fullscreen needs schema 12");
     if (m->perf_profile & ~1) return fail(err, n, VM_E_RANGE, "perf_profile is true or false");
     if (m->schema < 13 && m->perf_profile) return fail(err, n, VM_E_FIELD, "perf_profile needs schema 13");
+    if (m->automation & ~1) return fail(err, n, VM_E_RANGE, "automation is true or false");
+    if (m->schema < 15 && m->automation) return fail(err, n, VM_E_FIELD, "automation needs schema 15");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
@@ -695,6 +698,9 @@ int vm_machine_check_host(const VmMachine *m, const VmHost *h, char *err, size_t
     if (m->accel == VM_ACCEL_KVM) {
         if (h->arch != m->arch) return fail(err, n, VM_E_HOST, "KVM runs %s machines on a %s computer only; use emulation (tcg)", vm_arch_name(m->arch), vm_arch_name(m->arch));
         if (!h->kvm) return fail(err, n, VM_E_HOST, "this computer's /dev/kvm can't be opened (virtualization off, or the user isn't allowed)");
+        /* the windows devices on arm64 ask for a GICv3 (build_qemu_args); KVM gives one only on a GICv3 host */
+        if (m->arch == VM_ARCH_ARM64 && m->devices == VM_DEV_WINDOWS && !h->gicv3)
+            return fail(err, n, VM_E_HOST, "this computer's interrupt controller is GICv2, and KVM can't give the windows devices the GICv3 they need here; use emulation (tcg)");
     }
     if (m->vcpus > h->cpus) return fail(err, n, VM_E_HOST, "%d vCPUs, this computer has %d", m->vcpus, h->cpus);
     long mx = vm_mem_max_mb(h);
@@ -712,7 +718,7 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "automation", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -988,6 +994,10 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *pp = json_get(o, "perf_profile");
         if (pp && pp->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "perf_profile must be true or false"); goto out; }
         m->perf_profile = pp ? json_bool(o, "perf_profile", 0) : 0;
+        /* schema 15: missing means no automation (6.15) */
+        const JVal *au = json_get(o, "automation");
+        if (au && au->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "automation must be true or false"); goto out; }
+        m->automation = au ? json_bool(o, "automation", 0) : 0;
         /* schema 13: missing means this computer's default (vmpin_default_on) */
         char pin[8];
         if ((r = get_str(o, "cpu_pin", pin, sizeof pin, 0, err, n))) goto out;
@@ -1107,6 +1117,7 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 11 && m->vgpu) { jb_raw(&b, ",\n  \"gpu\": "); jb_str(&b, VM_VGPU_NAMES[m->vgpu]); }
     if (m->schema >= 12 && m->capture_fullscreen) jb_raw(&b, ",\n  \"capture_fullscreen\": true");
     if (m->schema >= 13 && m->perf_profile) jb_raw(&b, ",\n  \"perf_profile\": true");
+    if (m->schema >= 15 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);
@@ -1291,6 +1302,30 @@ void vm_host_probe(VmHost *h) {
     int fd = open("/dev/kvm", O_RDWR | O_CLOEXEC);
     h->kvm = fd >= 0;
     if (fd >= 0) close(fd);
+    h->gicv3 = h->arch == VM_ARCH_ARM64 && vm_gicv3_in("/proc/interrupts") == 1;
+}
+
+int vm_gicv3_in(const char *path) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) return -1;
+    char b[65536 + 8];
+    size_t keep = 0, total = 0;
+    int found = 0;
+    while (!found && total < (8u << 20)) {
+        ssize_t k = read(fd, b + keep, sizeof b - 1 - keep);
+        if (k < 0 && errno == EINTR) continue;
+        if (k <= 0) break;
+        total += (size_t)k;
+        size_t len = keep + (size_t)k;
+        b[len] = 0;
+        for (size_t i = 0; i < len; i++) if (!b[i]) b[i] = ' ';
+        if (strstr(b, "GICv3") || strstr(b, "GICv4")) found = 1;
+        /* a name cut between two reads: the last 5 bytes go first in the next */
+        keep = len < 5 ? len : 5;
+        memmove(b, b + len - keep, keep);
+    }
+    close(fd);
+    return found;
 }
 
 /* ---- images (vm_image_kind) ---- */

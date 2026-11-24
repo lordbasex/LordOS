@@ -383,7 +383,7 @@ const SYSTEMS = [
   ['fedora', /fedora/i, 'Fedora'], ['mint', /\bmint\b|linuxmint/i, 'Mint'], ['arch', /\barch(linux)?\b|archlinux/i, 'Arch'],
   ['alpine', /alpine/i, 'Alpine'], ['opensuse', /suse/i, 'openSUSE'], ['kali', /kali/i, 'Kali'], ['rocky', /rocky/i, 'Rocky'],
   ['alma', /alma/i, 'Alma'], ['centos', /centos/i, 'CentOS'], ['freebsd', /freebsd/i, 'FreeBSD'], ['raspios', /raspios|raspberry/i, 'Pi OS'],
-  // Android for PCs: Bliss OS's label (BlissOS-16.9.7 (x86_64)) and file names (Bliss-v16.9.7-…), Android-x86, LineageOS
+  // a person's own Android ISO for PCs (Bliss OS, Android-x86, LineageOS): named only
   ['android', /android|blissos|\bbliss-v\d|lineage/i, 'Android'],
   // Microsoft's own volume labels (CCCOMA_X64FRE_…, CENA_X64FREE_…, CPBA_A64FRE_…) and its file names (Win11_…)
   ['windows', /\bWin1[01]_|\b(CCCOMA|CENA|CCSA|CPBA)_(X64|A64)FREE?_/i, 'Windows'],
@@ -404,6 +404,20 @@ export function archOf(name) {
   if (/aarch64|arm64/.test(s)) return 'arm64';
   if (/amd64|x86[_-]64|x64\b/.test(s)) return 'amd64';
   return '';
+}
+// an ISO's architecture (5.2): what its boot files say (lord.vm.isoInfo: the UEFI boot files' PE headers, their names, or
+// El Torito's x86 BIOS entry) wins over its file name and label; { arch, from: 'boot' | 'name' | '', other } — `other`
+// an architecture the boot files name that Machines doesn't run (riscv64), and when the boot files name two (amd64 and
+// arm64 on one disc) the name picks between them
+const RUNS = ['amd64', 'arm64'];
+export function isoArch(info, file) {
+  const boot = String(info?.arch || '');
+  const named = archOf(file) || archOf(info?.label);
+  if (info?.archFrom === 'boot' && RUNS.includes(boot)) return { arch: boot, from: 'boot', other: '' };
+  if (info?.archFrom === 'boot' && boot) return { arch: '', from: 'boot', other: boot };
+  const both = Array.isArray(info?.efiArchs) ? info.efiArchs.filter((a) => RUNS.includes(a)) : [];
+  if (named && (both.length < 2 || both.includes(named))) return { arch: named, from: 'name', other: '' };
+  return { arch: '', from: '', other: '' };
 }
 // a machine name from a system and version, unique among names
 export function suggestName(sys, version, names = []) {
@@ -1629,10 +1643,12 @@ export function groupMembers(group, list) {
 const RUNNING = (s) => s === 'running' || s === 'paused';
 const ACTIVE = (s) => s === 'starting' || s === 'running' || s === 'paused' || s === 'stopping';
 // one word for the whole group: 'running' (all members), 'off' (none), 'partial', or 'damaged' (a member missing or not
-// this group's: 19.9, "A member folder… missing or invalid")
+// this group's, or a base missing: 19.9, "A member folder, a base… missing or invalid")
 export function groupState(group, list) {
   const ms = groupMembers(group, list), roles = (group?.members || []).map((x) => x.role);
   if (!roles.length || roles.some((r) => !ms[r])) return 'damaged';
+  const on0 = roles.some((r) => ACTIVE(ms[r].state));
+  if (!on0 && (group?.basesMissing || []).length) return 'damaged';
   const on = roles.filter((r) => ACTIVE(ms[r].state)).length;
   return on === 0 ? 'off' : on === roles.length && roles.every((r) => RUNNING(ms[r].state)) ? 'running' : 'partial';
 }
@@ -1645,6 +1661,8 @@ export function groupPlan(group, list, action) {
   const ms = groupMembers(group, list);
   const order = [...(group?.members || [])].sort((a, b) => (action === 'stop' ? a.stop - b.stop : a.start - b.start));
   if (!order.length || order.some((x) => !ms[x.role])) return { fail: 'damaged' };
+  // a base missing: a member off can't start (Repair makes it again first); one running keeps its open base
+  if (action === 'start' && (group?.basesMissing || []).some((r) => ms[r] && !ACTIVE(ms[r].state))) return { fail: 'damaged' };
   for (const x of order) {
     const m = ms[x.role];
     if (action === 'stop') {

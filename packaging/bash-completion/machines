@@ -1,4 +1,4 @@
-# bash completion for machines (LordOS's Machines from the terminal; server/src/cli/machines.c)
+# bash completion for machines and lordvm, the same program (LordOS's Machines from the terminal; server/src/cli/machines.c)
 # installed as /usr/share/bash-completion/completions/machines by tools/iso/mkdeb.sh
 _machines() {
     local cur prev cmd
@@ -7,13 +7,15 @@ _machines() {
     cmd=${COMP_WORDS[1]}
     local IFS=$'\n'
     if [ "$COMP_CWORD" -eq 1 ]; then
-        COMPREPLY=($(compgen -W $'list\nstatus\nstart\nopen\nstop\npoweroff\npause\nresume\nsuspend\nreset\nsnapshot\nclone\nrename\nset\nhelp' -- "$cur"))
+        COMPREPLY=($(compgen -W $'list\nstatus\nstart\nopen\nstop\npoweroff\npause\nresume\nsuspend\nreset\nsnapshot\nclone\nrename\nset\nexec\ncp\nlogs\nconsole\nmcp\napply\nhelp' -- "$cur"))
         return
     fi
     if [ "$COMP_CWORD" -eq 2 ]; then
         case $cmd in
             list) COMPREPLY=($(compgen -W '--json' -- "$cur")) ;;
-            help) ;;
+            help|mcp) ;;
+            apply) COMPREPLY=($(compgen -f -- "$cur")) ;;
+            cp) COMPREPLY=($(compgen -f -- "$cur")) ;;
             *)
                 # machine names, quoted for the shell (names may have spaces)
                 local n names=()
@@ -27,7 +29,9 @@ _machines() {
     fi
     case $cmd in
         status) COMPREPLY=($(compgen -W '--json' -- "$cur")) ;;
-        start) COMPREPLY=($(compgen -W '--no-window' -- "$cur")) ;;
+        logs) COMPREPLY=($(compgen -W $'--serial\n--machine\n--follow\n--lines' -- "$cur")) ;;
+        cp) COMPREPLY=($(compgen -f -- "$cur")) ;;
+        start) COMPREPLY=($(compgen -W $'--no-window\n--snapshot' -- "$cur")) ;;
         snapshot) [ "$COMP_CWORD" -eq 3 ] && COMPREPLY=($(compgen -W $'list\ntake\nrevert\ndelete' -- "$cur")) ;;
         clone) [ "$COMP_CWORD" -ge 4 ] && COMPREPLY=($(compgen -W $'--duplicate\n--keep-identity' -- "$cur")) ;;
         set)
@@ -47,4 +51,4 @@ _machines() {
             ;;
     esac
 }
-complete -F _machines machines
+complete -F _machines machines lordvm

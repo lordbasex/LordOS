@@ -512,6 +512,84 @@ int main(void) {
     unlink("/tmp/vmunattend-rr.iso"); unlink("/tmp/vmunattend-plain.iso"); unlink("/tmp/vmunattend-joliet.iso");
     unlink("/tmp/vmunattend-bad.iso"); unlink("/tmp/vmunattend-big.iso"); unlink("/tmp/vmunattend-past.iso"); unlink("/tmp/vmunattend-none");
 
+    /* ---- virtio-win guests (4.3): the answer file per architecture, and the drivers taken from that architecture's folders ---- */
+    {
+        static const char *const ws = "{\"kind\":\"windows\",\"user\":\"ana\",\"fullname\":\"Ana\",\"hostname\":\"MACHINE-1\",\"wpass\":\"\",\"edition\":\"Windows 11 Pro\","
+                                      "\"key\":\"W269N-WFGWX-YVC9B-4J6C9-T83GX\",\"uilang\":\"es-ES\",\"inputloc\":\"080a:0000080a\",\"wtz\":\"Argentina Standard Time\",\"arch\":\"%s\"}";
+        char js[600];
+        VmUnattend wu;
+        const char *an = NULL;
+        snprintf(js, sizeof js, ws, "arm64");
+        T("windows arm64: parsed", !vmu_parse(js, strlen(js), &wu, err, sizeof err));
+        char *x = vmu_answer(&wu, &an);
+        T("windows arm64: Autounattend.xml", x && an && !strcmp(an, "Autounattend.xml"));
+        T("windows arm64: every component for arm64", x && strstr(x, "processorArchitecture=\"arm64\"") && !strstr(x, "processorArchitecture=\"amd64\""));
+        T("windows arm64: the ARM64 drivers with pnputil, then the guest agent", x && strstr(x, "\\w11\\ARM64\\*.inf /install") &&
+          strstr(x, "qemu-ga-x86_64.msi /qn") && !strstr(x, "virtio-win-guest-tools.exe"));
+        free(x);
+        snprintf(js, sizeof js, ws, "amd64");
+        T("windows amd64: parsed", !vmu_parse(js, strlen(js), &wu, err, sizeof err));
+        x = vmu_answer(&wu, &an);
+        T("windows amd64: amd64 components and the guest tools", x && strstr(x, "processorArchitecture=\"amd64\"") && strstr(x, "virtio-win-guest-tools.exe") && !strstr(x, "ARM64"));
+        free(x);
+        snprintf(js, sizeof js, ws, "riscv64");
+        T("windows riscv64: refused", vmu_parse(js, strlen(js), &wu, err, sizeof err));
+
+        /* a drivers' disc with only the ARM64 folders: arm64 takes them, amd64 finds none */
+        Img dm = { calloc(1, 48 * 2048), 48 * 2048 };
+        uint8_t *pv = dm.d + 16 * 2048;
+        pv[0] = 1; memcpy(pv + 1, "CD001", 5); pv[6] = 1; memset(pv + 40, ' ', 32); memcpy(pv + 40, "virtio-win-0.1.271", 18);
+        rec(pv + 156, 20, 2048, 1, "\x00", NULL, 0);
+        uint8_t *tm = dm.d + 17 * 2048;
+        tm[0] = 255; memcpy(tm + 1, "CD001", 5);
+        /* 20 root; 21 VIOSTOR, 22 W11, 23 ARM64; 24 NETKVM, 25 W11, 26 ARM64; files from 30 */
+        static const char *const dn[2] = { "VIOSTOR", "NETKVM" };
+        static const char *const fn[2][4] = { { "VIOSTOR.INF;1", "VIOSTOR.SYS;1", "VIOSTOR.CAT;1", NULL }, { "NETKVM.INF;1", "NETKVM.SYS;1", "NETKVM.CAT;1", "NETKVMP.EXE;1" } };
+        size_t o = rec(dm.d + 20 * 2048, 20, 2048, 1, "\x00", NULL, 0);
+        o += rec(dm.d + 20 * 2048 + o, 20, 2048, 1, "\x01", NULL, 0);
+        unsigned file = 30;
+        for (int d = 0; d < 2; d++) {
+            unsigned top = 21 + 3 * (unsigned)d;
+            o += rec(dm.d + 20 * 2048 + o, top, 2048, 1, dn[d], NULL, 0);
+            for (unsigned lv = 0; lv < 3; lv++) {
+                uint8_t *s = dm.d + (top + lv) * 2048;
+                size_t so = rec(s, top + lv, 2048, 1, "\x00", NULL, 0);
+                so += rec(s + so, lv ? top + lv - 1 : 20, 2048, 1, "\x01", NULL, 0);
+                if (lv < 2) so += rec(s + so, top + lv + 1, 2048, 1, lv ? "ARM64" : "W11", NULL, 0);
+                else for (int f = 0; f < 4 && fn[d][f]; f++) {
+                    memcpy(dm.d + file * 2048, fn[d][f], strlen(fn[d][f]));
+                    so += rec(s + so, file++, 100, 0, fn[d][f], NULL, 0);
+                }
+            }
+        }
+        int dfd = to_fd(&dm, "/tmp/vmunattend-drivers.iso");
+        if (dfd >= 0) close(dfd);
+        char wdir[] = "/tmp/vmunattend-win-XXXXXX";
+        T("windows: a scratch folder", mkdtemp(wdir) != NULL);
+        snprintf(js, sizeof js, ws, "arm64");
+        vmu_parse(js, strlen(js), &wu, err, sizeof err);
+        int pr = vmu_prepare_windows(wdir, "/tmp/vmunattend-drivers.iso", &wu, err, sizeof err);
+        T("windows arm64: the seed disk from the ARM64 drivers", !pr);
+        if (pr) printf("      %s\n", err);
+        char sp[256];
+        snprintf(sp, sizeof sp, "%s/unattended/seed.img", wdir);
+        FILE *sf = fopen(sp, "rb");
+        static uint8_t seed[4096 * 512];
+        size_t sg = sf ? fread(seed, 1, sizeof seed, sf) : 0;
+        if (sf) fclose(sf);
+        T("windows arm64: the seed holds the drivers and the answers", sg == sizeof seed && memmem(seed, sg, "NETKVMP.EXE;1", 13) && memmem(seed, sg, "pnputil", 7));
+        static const char *const left[] = { "seed.img", "windows" };
+        for (int i = 0; i < 2; i++) { snprintf(sp, sizeof sp, "%s/unattended/%s", wdir, left[i]); unlink(sp); }
+        snprintf(sp, sizeof sp, "%s/unattended", wdir); rmdir(sp);
+        snprintf(js, sizeof js, ws, "amd64");
+        vmu_parse(js, strlen(js), &wu, err, sizeof err);
+        pr = vmu_prepare_windows(wdir, "/tmp/vmunattend-drivers.iso", &wu, err, sizeof err);
+        T("windows amd64: no amd64 folders on that disc, refused", pr && strstr(err, "viostor/w11/amd64/viostor.inf"));
+        rmdir(wdir);
+        unlink("/tmp/vmunattend-drivers.iso");
+        free(dm.d);
+    }
+
     printf("== vmunattend-test: %d passed, %d failed\n", pass, fail);
     return fail != 0;
 }

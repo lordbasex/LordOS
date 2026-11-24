@@ -6,7 +6,9 @@
 import { View, Text, TextInput, ConfirmDialog, Checkbox, t as tr } from '@lordos/sdk';
 import { useState } from 'react';
 import { groupPlan, groupStartFailed, stateView } from './model.js';
-import { groupBudget, groupSpec, freshPlan } from './group.js';
+import { groupBudget, groupSpec, freshPlan, groupDamage, renameProblemKey } from './group.js';
+import { fetchGroupArchive } from './whonix.jsx';
+import CATALOG from '../../assets/machines/systems.json';
 import { usePal, gb, gib, startPrep } from './ui.jsx';
 import { Sym } from './kit.jsx';
 
@@ -39,6 +41,7 @@ export function TorChip({ on }) {
 
 // "Group of 2 machines · 2 CPU · 4 GB"
 export function groupLine(item) {
+  if (item.unreadable) return tr('machines.group.unreadableLine');
   const s = groupSpec(item.gw, item.ws);
   return [tr('machines.group.ofN', { n: item.group.members.length }), tr('machines.lib.spec.cpu', { n: s.vcpus }), gb(s.memoryMb)].join(' · ');
 }
@@ -46,7 +49,10 @@ export function groupLine(item) {
 // the group's state in words and color (the card's pill): running, partial (the gateway alone), starting, off, damaged
 export function groupStateOf(item) {
   const ws = item.ws, gw = item.gw;
-  if (item.state === 'damaged') return { text: tr('machines.group.damaged'), color: '#ff9a9a', on: false };
+  if (item.state === 'damaged') {
+    const d = groupDamage(item);
+    return { text: tr(d.unreadable ? 'machines.group.damagedFile' : !d.members.length && d.bases.length ? 'machines.group.damagedBase' : 'machines.group.damaged'), color: '#ff9a9a', on: false };
+  }
   const wv = ws ? stateView(ws.state, ws.reason) : null, gv = gw ? stateView(gw.state, gw.reason) : null;
   if (item.state === 'running') return { text: tr('machines.lib.state.running'), color: '#30d158', on: true };
   if (ws?.state === 'starting' || gw?.state === 'starting') return { text: tr('machines.group.starting'), color: '#30d158', on: true };
@@ -106,7 +112,8 @@ export function FreshDialog({ item, onDone, onCancel }) {
   const go = () => {
     // the box is remembered (group.json fresh_gateway), then lord-vm --group-fresh
     if (!!item.group.freshGateway !== gw) lord.vm.groupSet(item.group.dir, { freshGateway: gw });
-    onDone(lord.vm.groupFresh(item.group.dir, gw));
+    // the job is started by the library (groupJob: a base missing or changed fetches the verified download first)
+    onDone(() => lord.vm.groupFresh(item.group.dir, gw));
   };
   return (
     <ConfirmDialog destructive title={tr('machines.group.fresh.title', { name: item.group.name })}
@@ -140,6 +147,82 @@ export function GroupSnapDialog({ item, onDone, onCancel }) {
       <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.group.snap.gatewayNote')}</Text>
     </ConfirmDialog>
   );
+}
+
+// ---- Delete, Rename and Repair (19.8, 19.9) ----
+// a lord-vm job of the group, followed to its end; one that needs the verified download (exit 4: a base missing or
+// changed, the archive not in the image store) fetches it again (fetchGroupArchive: the group's own release, the same
+// SHA-512) and runs once more. onState({ phase: 'work' | 'download', done, total }). Resolves '' or why it failed
+const lordVmWhy = (out) => String(out || '').trim().split('\n').filter((l) => l.startsWith('lord-vm:')).pop()?.replace(/^lord-vm:\s*/, '') || String(out || '').trim();
+export async function groupJob(item, start, onState) {
+  for (let tries = 0; tries < 2; tries++) {
+    const id = start();
+    if (!id) return tr('machines.cfg.refused');
+    onState?.({ phase: 'work' });
+    let r = null;
+    for (;;) { r = lord.vm.job(id); if (!r || r.done) break; await sleep(400); }
+    if (!r) return tr('machines.as.failed');
+    if (r.ok) return '';
+    if (r.exit === 4 && tries === 0 && !item.unreadable) {
+      onState?.({ phase: 'download', done: 0, total: 0 });
+      try { await fetchGroupArchive(CATALOG, item.group, (g) => onState?.({ phase: 'download', ...g })); }
+      catch (e) { return e.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e.message || tr('machines.dl.failed'); }
+      continue;
+    }
+    return lordVmWhy(r.out);
+  }
+  return tr('machines.as.failed');
+}
+
+// Delete… : the group and both members for good (no Trash), and the Whonix images when no other group uses them
+export function DeleteGroupDialog({ item, onOk, onCancel }) {
+  return (
+    <ConfirmDialog destructive title={tr('machines.group.delete.title', { name: item.group.name })}
+      detail={tr(item.unreadable ? 'machines.group.delete.detailDamaged' : 'machines.group.delete.detail')}
+      okLabel={tr('machines.group.delete.ok')} cancelLabel={tr('machines.cancel')} onOk={onOk} onCancel={onCancel} />
+  );
+}
+
+// Rename… : the group's name, its members' names and its folder (the group off); the field says at once why a name can't
+// be used (lord.vm.groupRenamePlan, the same answer lord-vm gives)
+export function RenameGroupDialog({ item, onOk, onCancel }) {
+  const p = usePal();
+  const [name, setName] = useState(item.group.name);
+  const n = name.trim();
+  const plan = n && n !== item.group.name && typeof lord.vm.groupRenamePlan === 'function' ? lord.vm.groupRenamePlan(item.group.dir, n) : null;
+  const bad = renameProblemKey(plan, n, item.group.name);
+  const go = () => { if (n && !bad && n !== item.group.name) onOk(n); else if (n === item.group.name) onCancel(); };
+  return (
+    <ConfirmDialog title={tr('machines.group.rename.title', { name: item.group.name })} detail={tr('machines.group.rename.detail')}
+      okLabel={tr('machines.group.rename.ok')} cancelLabel={tr('machines.cancel')} onOk={go} onCancel={onCancel}>
+      <TextInput value={name} onChange={setName} onSubmit={go} autoFocus />
+      {bad ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr(bad, { name: plan?.other || n, folder: plan?.folder || '' })}</Text>
+        : plan?.moves ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.group.rename.folder', { folder: plan.folder })}</Text> : null}
+    </ConfirmDialog>
+  );
+}
+
+// Repair… : what is damaged and what Repair does about it (each member made again from its base, each base made again
+// from the verified download, fetched first when it isn't here), after a confirmation
+export function RepairGroupDialog({ item, onOk, onCancel }) {
+  const p = usePal();
+  const d = groupDamage(item);
+  const role = (r) => tr(`machines.group.role.${r}`);
+  return (
+    <ConfirmDialog destructive title={tr('machines.group.repair.title', { name: item.group.name })} detail={tr('machines.group.repair.detail')}
+      okLabel={tr('machines.group.repair.ok')} cancelLabel={tr('machines.cancel')} onOk={onOk} onCancel={onCancel}>
+      {d.members.map((r) => <Text key={`m${r}`} style={{ fontSize: 12, color: p.text, textAlign: 'start' }}>{`• ${tr('machines.group.repair.member', { role: role(r) })}`}</Text>)}
+      {d.bases.map((r) => <Text key={`b${r}`} style={{ fontSize: 12, color: p.text, textAlign: 'start' }}>{`• ${tr('machines.group.repair.base', { role: role(r) })}`}</Text>)}
+      {d.fetch ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.group.repair.fetch')}</Text> : null}
+    </ConfirmDialog>
+  );
+}
+
+// the card's line while one of these jobs runs: { phase, done, total } → its text
+export function groupWorkText(w) {
+  if (!w) return '';
+  if (w.phase === 'download') return w.total > 1 ? tr('machines.group.work.downloadPct', { pct: Math.floor((w.done / w.total) * 100) }) : tr('machines.group.work.download');
+  return tr(`machines.group.work.${w.kind || 'repair'}`);
 }
 
 // the memory the group asks for, for the card's line while it's off ("4.4 GB to run")

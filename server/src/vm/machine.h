@@ -21,10 +21,10 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: automation (6.15, `machines exec` and `cp`). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 14
+#define VM_SCHEMA 15
 
 enum { VM_ARCH_ARM64 = 0, VM_ARCH_AMD64 };
 enum { VM_ACCEL_KVM = 0, VM_ACCEL_TCG };
@@ -208,6 +208,10 @@ typedef struct {
     char link_mac[18];
     int profile_lock;
     int timers;
+    /* schema 15: the person's consent to automation (docs/VIRTUALIZATION.md 6.15, "lordvm and the agent"): "automation": true
+     * lets `machines exec`, `machines cp` and the MCP server's run_command run programs in the guest, as its signed-in
+     * person, through lord-vm (VM_EXEC); written only then, missing: no. Never with VM_LOCK_ANONYMITY */
+    int automation;
     char created[21], updated[21];      /* UTC, "2026-11-04T20:00:00Z" */
 } VmMachine;
 
@@ -217,6 +221,9 @@ typedef struct {
     int cpus;
     long ram_mb;
     int kvm;                            /* /dev/kvm can be opened */
+    int gicv3;                          /* arm64: the interrupt controller is GICv3 (or v4), so KVM can give a guest a GICv3;
+                                         * the Raspberry Pi 5's GIC-400 is GICv2 (measured: "KVM does not support GICv3
+                                         * emulation") */
 } VmHost;
 
 enum {
@@ -345,6 +352,9 @@ const char *vm_gl_refusal(const VmMachine *m, int host_arch, int installing);
 
 /* reads this computer: arch, CPUs online, RAM, /dev/kvm access */
 void vm_host_probe(VmHost *h);
+/* 1 when an interrupts table (/proc/interrupts) names a GICv3 or GICv4 controller, 0 when not, -1 when unreadable; read
+ * in bounded chunks, at most 8 MB */
+int vm_gicv3_in(const char *path);
 /* its physical cores (each core's first thread in /sys/devices/system/cpu), at most cpus; cpus when it can't tell */
 int vm_host_cores(int cpus);
 

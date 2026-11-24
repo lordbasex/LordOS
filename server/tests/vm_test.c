@@ -69,7 +69,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "15", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "16", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -112,7 +112,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":15,\"whatever\":true}";
+    const char newer[] = "{\"schema\":16,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -234,12 +234,43 @@ static void test_schema(void) {
                 free(jj);
             }
         }
-        /* arm64 (GOOD) and a bios machine refuse them */
+        /* arm64 (GOOD, 4.3): secure boot, a TPM and the windows devices, never Hyper-V; a bios machine refuses secure boot */
         {
             char t[4096];
             const char *at = strstr(GOOD, "\"schema\":1");
             snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"tpm\":true}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
+            CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_OK);
+            snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"secure_boot\":true,\"tpm\":true,\"devices\":\"windows\",\"drivers\":\"/home/ana/virtio-win.iso\"}",
+                     (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
+            CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_OK && m.devices == VM_DEV_WINDOWS && m.secure_boot && m.tpm);
+            /* KVM gives the windows devices' GICv3 only on a GICv3 host (the Pi 5 is GICv2): refused there, emulation allowed */
+            VmHost g2 = { .arch = VM_ARCH_ARM64, .cpus = 4, .ram_mb = 16000, .kvm = 1, .gicv3 = 0 }, g3 = g2;
+            g3.gicv3 = 1;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_E_HOST && strstr(err, "GICv2"));
+            CHECK(vm_machine_check_host(&m, &g3, err, sizeof err, NULL, 0) == VM_OK);
+            m.accel = VM_ACCEL_TCG;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_OK);
+            m.accel = VM_ACCEL_KVM; m.devices = VM_DEV_VIRTIO;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_OK);       /* a Linux machine: GICv2 is fine */
+            snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"hyperv\":true}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
             CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_E_RANGE);
+            /* the interrupts table: GICv3 or GICv4 named, a name cut between two reads, GICv2 only, none */
+            {
+                char tf[] = "/tmp/vm-test-irq-XXXXXX";
+                int fd = mkstemp(tf);
+                static char big[200000];
+                memset(big, ' ', sizeof big);
+                memcpy(big + 65536 + 8 - 3, "GICv3", 5);
+                CHECK(fd >= 0 && write(fd, big, sizeof big) == (ssize_t)sizeof big);
+                CHECK(vm_gicv3_in(tf) == 1);
+                CHECK(fd >= 0 && !ftruncate(fd, 0) && pwrite(fd, " 12:  9752  GICv2  27 Level  kvm guest vtimer\n", 47, 0) == 47);
+                CHECK(vm_gicv3_in(tf) == 0);
+                CHECK(fd >= 0 && pwrite(fd, " 12:  9752  GICv4  27 Level  kvm guest vtimer\n", 47, 0) == 47);
+                CHECK(vm_gicv3_in(tf) == 1);
+                if (fd >= 0) close(fd);
+                unlink(tf);
+                CHECK(vm_gicv3_in("/nonexistent/interrupts") == -1);
+            }
             CHECK(vm_machine_parse(amd, strlen(amd), &m, err, sizeof err) == VM_OK);
             m.schema = 5; m.firmware = VM_FW_BIOS; m.firmware_code[0] = m.firmware_sha256[0] = 0; m.secure_boot = 1;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
@@ -489,7 +520,7 @@ static void test_schema(void) {
                 { "\"perf_profile\":true", 13, VM_OK, 1 }, { "\"perf_profile\":false", 13, VM_OK, 0 }, { "\"agent\":true", 13, VM_OK, 0 },
                 { "\"perf_profile\":1", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":\"on\"", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":null", 13, VM_E_FIELD, 0 },
                 { "\"perf_profile\":true", 12, VM_E_FIELD, 0 }, { "\"perf_profile\":false", 12, VM_OK, 0 },
-                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 15, VM_E_NEWER, 0 },
+                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
                 char t[4096];
@@ -512,6 +543,35 @@ static void test_schema(void) {
             m.perf_profile = 2; m.schema = VM_SCHEMA;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 13);
+        }
+        /* schema 15: automation (6.15), true or false, written only when true, never below 15, never for anonymity */
+        {
+            struct { const char *add; int schema, want, on; } s15[] = {
+                { "\"automation\":true", 15, VM_OK, 1 }, { "\"automation\":false", 15, VM_OK, 0 }, { "\"agent\":true", 15, VM_OK, 0 },
+                { "\"automation\":1", 15, VM_E_FIELD, 0 }, { "\"automation\":\"on\"", 15, VM_E_FIELD, 0 }, { "\"automation\":null", 15, VM_E_FIELD, 0 },
+                { "\"automation\":true", 14, VM_E_FIELD, 0 }, { "\"automation\":false", 14, VM_OK, 0 }, { "\"automation\":true", 16, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s15 / sizeof s15[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s15[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s15[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s15[i].want) fprintf(stderr, "  schema 15 %s (%d): got %d (%s)\n", s15[i].add, s15[i].schema, r, err);
+                CHECK(r == s15[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.automation == s15[i].on);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"automation\": true") == s15[i].on && !strstr(jj, "\"automation\": false"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.automation);
+            m.automation = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.automation = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 15);
         }
         /* schema 13: cpu_pin (vCPU pinning, 3.7.1), "off" or "auto", written only when chosen, never below 13 */
         {
@@ -878,7 +938,7 @@ static void test_host(void) {
     VmMachine m;
     char err[256], warn[256];
     vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err);
-    VmHost pi = { VM_ARCH_ARM64, 4, 16208, 1 }, small = { VM_ARCH_ARM64, 4, 3884, 1 }, pc = { VM_ARCH_AMD64, 8, 16000, 1 };
+    VmHost pi = { VM_ARCH_ARM64, 4, 16208, 1, 0 }, small = { VM_ARCH_ARM64, 4, 3884, 1, 0 }, pc = { VM_ARCH_AMD64, 8, 16000, 1, 0 };
     CHECK(vm_vcpus_recommended(&pi) == 3 && vm_mem_max_mb(&pi) == 16208 - 2048 && vm_mem_max_mb(&small) == 3884 - 1024);
     CHECK(vm_machine_check_host(&m, &pi, err, sizeof err, warn, sizeof warn) == VM_OK && !warn[0]);
     m.vcpus = 4;
