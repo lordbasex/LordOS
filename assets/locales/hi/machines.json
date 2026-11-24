@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "मशीन से सूचनाएँ",
   "cfg.guestNotifyNote": "मशीन की सूचनाएँ उसके नाम के साथ यहाँ दिखती हैं, एक बार में अधिकतम कुछ।",
   "logs.unitOnly": "केवल {unit}",
-  "logs.guestZone": "अतिथि का समय क्षेत्र: {zone}"
+  "logs.guestZone": "अतिथि का समय क्षेत्र: {zone}",
+  "launcher.missing": "{app} अब {machine} में नहीं है",
+  "launcher.missingBody": "मशीन अब उस ऐप को सूची में नहीं दिखाती, इसलिए कुछ नहीं खुला।",
+  "launcher.timeout": "{app} {machine} में नहीं खुला",
+  "launcher.timeoutBody": "ऐप मोड शुरू नहीं हुआ। इसके लिए मशीन के LordOS टूल्स और ऐसा सिस्टम चाहिए जिसके ऐप वे सूचीबद्ध कर सकें।",
+  "cfg.launcherApps": "लॉन्चर में इसके ऐप",
+  "cfg.launcherAppsNote": "ऐप मोड में मशीन ने जो ऐप सूचीबद्ध किए ({count}), वे इसके बंद रहने पर लॉन्चर और खोज में इसके नाम के साथ दिखते हैं। किसी एक को चुनने पर मशीन शुरू होती है और ऐप खुलता है।",
+  "shell.toTerminal": "टर्मिनल में खोलें",
+  "shell.inTerminal": "यह शेल एक टर्मिनल टैब में खुला है।",
+  "shell.showTerminal": "टर्मिनल दिखाएँ"
 }

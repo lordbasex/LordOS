@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "Yakalanan Çıktı’da tutulur",
   "prefs.tr.would.highlight": "“{text}” vurgulanır",
   "prefs.tr.param": "Parametre",
-  "prefs.tr.regexFirst": "Önce düzenli ifadeyi yazın."
+  "prefs.tr.regexFirst": "Önce düzenli ifadeyi yazın.",
+  "guest.badge": "KONUK",
+  "guest.title": "{machine} içinde kabuk"
 }

@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "a Rögzített kimenetbe kerül",
   "prefs.tr.would.highlight": "kiemeli: „{text}”",
   "prefs.tr.param": "Paraméter",
-  "prefs.tr.regexFirst": "Előbb írd meg a reguláris kifejezést."
+  "prefs.tr.regexFirst": "Előbb írd meg a reguláris kifejezést.",
+  "guest.badge": "VENDÉG",
+  "guest.title": "Héj a(z) {machine} gépen"
 }

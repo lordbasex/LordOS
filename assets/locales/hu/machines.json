@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Értesítések a gépből",
   "cfg.guestNotifyNote": "A gép értesítései itt jelennek meg a nevével, egyszerre legfeljebb néhány.",
   "logs.unitOnly": "Csak {unit}",
-  "logs.guestZone": "A vendég időzónája: {zone}"
+  "logs.guestZone": "A vendég időzónája: {zone}",
+  "launcher.missing": "{app} már nincs a(z) {machine} gépen",
+  "launcher.missingBody": "A gép már nem listázza ezt az alkalmazást, ezért semmi sem nyílt meg.",
+  "launcher.timeout": "{app} nem nyílt meg a(z) {machine} gépen",
+  "launcher.timeoutBody": "Az alkalmazásmód nem indult el. Szüksége van a gép LordOS-eszközeire és egy olyan rendszerre, amelynek alkalmazásait listázni tudják.",
+  "cfg.launcherApps": "Alkalmazásai az indítóban",
+  "cfg.launcherAppsNote": "A gép által alkalmazásmódban listázott alkalmazások ({count}) megjelennek az indítóban és a keresésben, amíg ki van kapcsolva, a nevével jelölve. Egy kiválasztása elindítja a gépet és megnyitja az alkalmazást.",
+  "shell.toTerminal": "Megnyitás a Terminálban",
+  "shell.inTerminal": "Ez a héj egy Terminál-lapon van megnyitva.",
+  "shell.showTerminal": "Terminál megjelenítése"
 }

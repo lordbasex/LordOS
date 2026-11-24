@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Pemberitahuan daripada mesin",
   "cfg.guestNotifyNote": "Pemberitahuan mesin muncul di sini dengan namanya, paling banyak beberapa pada satu masa.",
   "logs.unitOnly": "Hanya {unit}",
-  "logs.guestZone": "Zon waktu tetamu: {zone}"
+  "logs.guestZone": "Zon waktu tetamu: {zone}",
+  "launcher.missing": "{app} sudah tiada dalam {machine}",
+  "launcher.missingBody": "Mesin tidak lagi menyenaraikan aplikasi itu, jadi tiada apa-apa dibuka.",
+  "launcher.timeout": "{app} tidak dibuka dalam {machine}",
+  "launcher.timeoutBody": "Mod aplikasi tidak bermula. Ia memerlukan alat LordOS mesin dan sistem yang aplikasinya boleh disenaraikan oleh alat itu.",
+  "cfg.launcherApps": "Aplikasinya dalam pelancar",
+  "cfg.launcherAppsNote": "Aplikasi yang disenaraikan mesin dalam mod aplikasi ({count}) muncul dalam pelancar dan carian ketika ia dimatikan, ditanda dengan namanya. Memilih satu akan menghidupkan mesin dan membuka aplikasi itu.",
+  "shell.toTerminal": "Buka dalam Terminal",
+  "shell.inTerminal": "Shell ini terbuka dalam tab Terminal.",
+  "shell.showTerminal": "Tunjukkan Terminal"
 }

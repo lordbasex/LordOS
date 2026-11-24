@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Notificaciones de la máquina",
   "cfg.guestNotifyNote": "Las notificaciones de la máquina aparecen acá, marcadas con su nombre, pocas a la vez como máximo.",
   "logs.unitOnly": "Solo {unit}",
-  "logs.guestZone": "Zona horaria del invitado: {zone}"
+  "logs.guestZone": "Zona horaria del invitado: {zone}",
+  "launcher.missing": "{app} ya no está en {machine}",
+  "launcher.missingBody": "La máquina ya no lista esa app, así que no se abrió nada.",
+  "launcher.timeout": "{app} no se abrió en {machine}",
+  "launcher.timeoutBody": "El modo apps no arrancó. Necesita las herramientas de LordOS de la máquina y un sistema cuyas apps puedan listar.",
+  "cfg.launcherApps": "Sus apps en el lanzador",
+  "cfg.launcherAppsNote": "Las apps que la máquina listó en el modo apps ({count}) aparecen en el lanzador y en la búsqueda mientras está apagada, marcadas con su nombre. Elegir una arranca la máquina y abre la app.",
+  "shell.toTerminal": "Abrir en Terminal",
+  "shell.inTerminal": "Esta shell está abierta en una pestaña de Terminal.",
+  "shell.showTerminal": "Mostrar Terminal"
 }

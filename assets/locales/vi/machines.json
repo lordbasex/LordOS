@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Thông báo từ máy",
   "cfg.guestNotifyNote": "Thông báo của máy hiển thị tại đây kèm tên máy, mỗi lần tối đa vài cái.",
   "logs.unitOnly": "Chỉ {unit}",
-  "logs.guestZone": "Múi giờ của máy khách: {zone}"
+  "logs.guestZone": "Múi giờ của máy khách: {zone}",
+  "launcher.missing": "{app} không còn trong {machine}",
+  "launcher.missingBody": "Máy không còn liệt kê ứng dụng đó nên không có gì được mở.",
+  "launcher.timeout": "{app} không mở được trong {machine}",
+  "launcher.timeoutBody": "Chế độ ứng dụng không khởi động. Cần công cụ LordOS của máy và một hệ thống mà công cụ liệt kê được ứng dụng.",
+  "cfg.launcherApps": "Ứng dụng của máy trong trình khởi chạy",
+  "cfg.launcherAppsNote": "Các ứng dụng máy đã liệt kê ở chế độ ứng dụng ({count}) hiện trong trình khởi chạy và tìm kiếm khi máy tắt, kèm tên máy. Chọn một ứng dụng sẽ khởi động máy và mở ứng dụng.",
+  "shell.toTerminal": "Mở trong Terminal",
+  "shell.inTerminal": "Shell này đang mở trong một thẻ Terminal.",
+  "shell.showTerminal": "Hiện Terminal"
 }

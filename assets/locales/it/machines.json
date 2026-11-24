@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Notifiche dalla macchina",
   "cfg.guestNotifyNote": "Le notifiche della macchina compaiono qui con il suo nome, al massimo poche alla volta.",
   "logs.unitOnly": "Solo {unit}",
-  "logs.guestZone": "Fuso orario dell'ospite: {zone}"
+  "logs.guestZone": "Fuso orario dell'ospite: {zone}",
+  "launcher.missing": "{app} non è più in {machine}",
+  "launcher.missingBody": "La macchina non elenca più quell'app, quindi non è stato aperto nulla.",
+  "launcher.timeout": "{app} non si è aperta in {machine}",
+  "launcher.timeoutBody": "La modalità app non è partita. Servono gli strumenti LordOS della macchina e un sistema di cui sappiano elencare le app.",
+  "cfg.launcherApps": "Le sue app nel launcher",
+  "cfg.launcherAppsNote": "Le app che la macchina ha elencato in modalità app ({count}) compaiono nel launcher e nella ricerca mentre è spenta, contrassegnate dal suo nome. Sceglierne una avvia la macchina e apre l'app.",
+  "shell.toTerminal": "Apri nel Terminale",
+  "shell.inTerminal": "Questa shell è aperta in una scheda del Terminale.",
+  "shell.showTerminal": "Mostra il Terminale"
 }

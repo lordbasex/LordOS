@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Notificacions de la màquina",
   "cfg.guestNotifyNote": "Les notificacions de la màquina apareixen aquí amb el seu nom, poques alhora com a màxim.",
   "logs.unitOnly": "Només {unit}",
-  "logs.guestZone": "Zona horària del convidat: {zone}"
+  "logs.guestZone": "Zona horària del convidat: {zone}",
+  "launcher.missing": "{app} ja no és a {machine}",
+  "launcher.missingBody": "La màquina ja no llista aquesta aplicació, així que no s'ha obert res.",
+  "launcher.timeout": "{app} no s'ha obert a {machine}",
+  "launcher.timeoutBody": "El mode d'aplicacions no s'ha iniciat. Necessita les eines de LordOS de la màquina i un sistema les aplicacions del qual puguin llistar.",
+  "cfg.launcherApps": "Les seves aplicacions al llançador",
+  "cfg.launcherAppsNote": "Les aplicacions que la màquina ha llistat al mode d'aplicacions ({count}) apareixen al llançador i a la cerca mentre està apagada, marcades amb el seu nom. Triar-ne una engega la màquina i obre l'aplicació.",
+  "shell.toTerminal": "Obre al Terminal",
+  "shell.inTerminal": "Aquest intèrpret és obert en una pestanya del Terminal.",
+  "shell.showTerminal": "Mostra el Terminal"
 }

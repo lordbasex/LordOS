@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "itinatago sa Nakuhang Output",
   "prefs.tr.would.highlight": "hina-highlight ang “{text}”",
   "prefs.tr.param": "Parameter",
-  "prefs.tr.regexFirst": "Isulat muna ang regular expression."
+  "prefs.tr.regexFirst": "Isulat muna ang regular expression.",
+  "guest.badge": "GUEST",
+  "guest.title": "Shell sa loob ng {machine}"
 }

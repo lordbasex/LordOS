@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Aviseringar från maskinen",
   "cfg.guestNotifyNote": "Maskinens aviseringar visas här med dess namn, högst några åt gången.",
   "logs.unitOnly": "Bara {unit}",
-  "logs.guestZone": "Gästens tidszon: {zone}"
+  "logs.guestZone": "Gästens tidszon: {zone}",
+  "launcher.missing": "{app} finns inte längre i {machine}",
+  "launcher.missingBody": "Maskinen listar inte längre den appen, så inget öppnades.",
+  "launcher.timeout": "{app} öppnades inte i {machine}",
+  "launcher.timeoutBody": "Appläget startade inte. Det behöver maskinens LordOS-verktyg och ett system vars appar de kan lista.",
+  "cfg.launcherApps": "Dess appar i startaren",
+  "cfg.launcherAppsNote": "Apparna som maskinen listade i appläget ({count}) visas i startaren och sökningen medan den är av, märkta med dess namn. Att välja en startar maskinen och öppnar appen.",
+  "shell.toTerminal": "Öppna i Terminal",
+  "shell.inTerminal": "Det här skalet är öppet i en Terminal-flik.",
+  "shell.showTerminal": "Visa Terminal"
 }

@@ -584,5 +584,7 @@
   "prefs.tr.would.capture": "zapisane w Przechwyconym wyjściu",
   "prefs.tr.would.highlight": "wyróżnia „{text}”",
   "prefs.tr.param": "Parametr",
-  "prefs.tr.regexFirst": "Najpierw wpisz wyrażenie regularne."
+  "prefs.tr.regexFirst": "Najpierw wpisz wyrażenie regularne.",
+  "guest.badge": "GOŚĆ",
+  "guest.title": "Powłoka w {machine}"
 }

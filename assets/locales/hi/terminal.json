@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "कैप्चर किए गए आउटपुट में रखा जाता है",
   "prefs.tr.would.highlight": "“{text}” को हाइलाइट करता है",
   "prefs.tr.param": "पैरामीटर",
-  "prefs.tr.regexFirst": "पहले रेगुलर एक्सप्रेशन लिखें।"
+  "prefs.tr.regexFirst": "पहले रेगुलर एक्सप्रेशन लिखें।",
+  "guest.badge": "गेस्ट",
+  "guest.title": "{machine} के अंदर शेल"
 }

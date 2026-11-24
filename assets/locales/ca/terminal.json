@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "es guarda a Sortida capturada",
   "prefs.tr.would.highlight": "ressalta «{text}»",
   "prefs.tr.param": "Paràmetre",
-  "prefs.tr.regexFirst": "Primer escriu l’expressió regular."
+  "prefs.tr.regexFirst": "Primer escriu l’expressió regular.",
+  "guest.badge": "CONVIDAT",
+  "guest.title": "Intèrpret dins de {machine}"
 }

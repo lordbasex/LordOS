@@ -455,7 +455,17 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const [shellSrc, setShellSrc] = useWindowState('vm.shellSrc', 'agent');
   const agentShell = !!(st?.agent?.state === 'connected' && st.agent.caps & AGENT_CAPS.shell);
   const shellUse = shellSrc === 'agent' && agentShell ? 'agent' : 'serial';
-  const shellTerm = shellUse === 'agent' ? st?.shell : st?.console;
+  // the agent's shell moved to a Terminal tab ("Open in Terminal", 6.18): { sid, win } while that window shows it; the
+  // pane then says so instead of a second view of the same session (two views would fight over its size)
+  const [inTerm, setInTerm] = useWindowState('vm.shellInTerm', null);
+  const termWins = useStore(windows, (ws) => (inTerm ? ws.some((w) => w.id === inTerm.win) : false));
+  const shellElsewhere = !!(inTerm && termWins && shellUse === 'agent' && st?.shell && st.shell === inTerm.sid);
+  const shellTerm = shellUse === 'agent' ? (shellElsewhere ? 0 : st?.shell) : st?.console;
+  const shellToTerminal = () => {
+    if (!st?.shell) return;
+    const win = wm.open('terminal', { new: true, args: { guestShell: { sid: st.shell, machine: name } } });
+    if (win != null) { setInTerm({ sid: st.shell, win }); setShellKeys(false); }
+  };
   // the clipboard's "ask before each paste" bar (model.js clipAsk*): while it shows, the keyboard is the bar's
   const [askSt, setAskSt] = useState(clipAskEmpty);
   const askKind = clipAskShown(askSt);
@@ -1126,7 +1136,9 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   useEffect(() => {
     if (!lask) return undefined;
     const check = () => {
-      const step = launchAskStep(lask, appsActive ? gApps?.apps : [], Date.now());
+      // the guest's tools answered and can't list windows (no apps mode in this guest): no use waiting
+      const cant = st?.agent?.state === 'connected' && appsBlockedRef.current === 'needsTools';
+      const step = cant ? 'timeout' : launchAskStep(lask, appsActive ? gApps?.apps : [], Date.now());
       if (step === 'wait') return;
       dropLaunchAsk(dir);
       if (step === 'launch') { launchGuest(dir, { token: lask.token, name: lask.name }); return; }
@@ -1136,7 +1148,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     check();
     const t2 = setInterval(check, 5000);
     return () => clearInterval(t2);
-  }, [lask, appsActive, gApps?.apps]);
+  }, [lask, appsActive, gApps?.apps, st?.agent?.state, st?.agent?.caps]);
   // why it can't be on: the agent, or a guest whose helper can't list its windows (it needs LordOS or Windows inside)
   const appsWhy = appsBlocked === 'needsTools' ? tr('machines.win.appsNeedsTools') : appsBlocked ? tr('machines.apps.needsAgent') : '';
   const appsLabel = appsOn ? tr('machines.apps.leave') : appsWhy || tr('machines.apps.enter');
@@ -1275,10 +1287,15 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
             <Text style={{ flex: 1, fontSize: 12, color: '#c9c9d1', textAlign: 'start' }}>{tr(shellUse === 'agent' ? 'machines.shell.agentTitle' : 'machines.shell.title', { name })}</Text>
             {agentShell ? <Segmented small value={shellUse} onChange={(x) => setShellSrc(x)} options={[['agent', tr('machines.shell.agent')], ['serial', tr('machines.shell.serial')]]} /> : null}
             {shellUse === 'agent' && st?.shell ? <Btn label={tr('machines.shell.new')} onClick={() => lord.vm.shell(sid, 100, 14)} style={{ height: 20, paddingHorizontal: 8 }} /> : null}
+            {shellUse === 'agent' && st?.shell && !shellElsewhere ? <Btn label={tr('machines.shell.toTerminal')} onClick={shellToTerminal} style={{ height: 20, paddingHorizontal: 8 }} /> : null}
             <Text style={{ fontSize: 11, color: '#8a8a94' }}>{shellKeys ? tr('machines.shell.keysHere') : tr('machines.shell.clickHere')}</Text>
             <Btn label="×" onClick={() => { setShell(false); setShellKeys(false); }} style={{ height: 20, paddingHorizontal: 8 }} />
           </View>
-          {shellTerm ? <Terminal ref={shellRef} session={shellTerm} style={{ flex: 1 }} />
+          {shellElsewhere ? <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Text style={{ fontSize: 12, color: '#8a8a94' }}>{tr('machines.shell.inTerminal')}</Text>
+              <Btn label={tr('machines.shell.showTerminal')} onClick={() => wm.focus(inTerm.win)} style={{ height: 22, paddingHorizontal: 10 }} />
+            </View>
+            : shellTerm ? <Terminal ref={shellRef} session={shellTerm} style={{ flex: 1 }} />
             : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontSize: 12, color: '#8a8a94' }}>{a.reset ? tr('machines.shell.connecting') : tr('machines.shell.off')}</Text></View>}
         </View>
       ) : null}

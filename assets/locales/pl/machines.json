@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Powiadomienia z maszyny",
   "cfg.guestNotifyNote": "Powiadomienia maszyny pojawiają się tu z jej nazwą, najwyżej kilka naraz.",
   "logs.unitOnly": "Tylko {unit}",
-  "logs.guestZone": "Strefa czasowa gościa: {zone}"
+  "logs.guestZone": "Strefa czasowa gościa: {zone}",
+  "launcher.missing": "{app} nie ma już w {machine}",
+  "launcher.missingBody": "Maszyna nie wymienia już tej aplikacji, więc nic nie zostało otwarte.",
+  "launcher.timeout": "{app} nie otworzyła się w {machine}",
+  "launcher.timeoutBody": "Tryb aplikacji nie wystartował. Potrzebuje narzędzi LordOS w maszynie i systemu, którego aplikacje potrafią one wymienić.",
+  "cfg.launcherApps": "Jej aplikacje w programie uruchamiającym",
+  "cfg.launcherAppsNote": "Aplikacje wymienione przez maszynę w trybie aplikacji ({count}) pojawiają się w programie uruchamiającym i wyszukiwaniu, gdy jest wyłączona, oznaczone jej nazwą. Wybranie jednej uruchamia maszynę i otwiera aplikację.",
+  "shell.toTerminal": "Otwórz w Terminalu",
+  "shell.inTerminal": "Ta powłoka jest otwarta w karcie Terminala.",
+  "shell.showTerminal": "Pokaż Terminal"
 }

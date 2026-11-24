@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "マシンからの通知",
   "cfg.guestNotifyNote": "マシンの通知は名前付きでここに表示されます。一度に表示されるのは数件までです。",
   "logs.unitOnly": "{unit} のみ",
-  "logs.guestZone": "ゲストのタイムゾーン: {zone}"
+  "logs.guestZone": "ゲストのタイムゾーン: {zone}",
+  "launcher.missing": "{app} は {machine} にもうありません",
+  "launcher.missingBody": "マシンがそのアプリを一覧に出さなくなったため、何も開きませんでした。",
+  "launcher.timeout": "{app} を {machine} で開けませんでした",
+  "launcher.timeoutBody": "アプリモードが始まりませんでした。マシンの LordOS ツールと、ツールがアプリを一覧にできるシステムが必要です。",
+  "cfg.launcherApps": "ランチャーにアプリを表示",
+  "cfg.launcherAppsNote": "アプリモードでマシンが一覧にしたアプリ ({count} 個) は、マシンが停止中もマシン名付きでランチャーと検索に表示されます。選ぶとマシンが起動し、アプリが開きます。",
+  "shell.toTerminal": "ターミナルで開く",
+  "shell.inTerminal": "このシェルはターミナルのタブで開いています。",
+  "shell.showTerminal": "ターミナルを表示"
 }

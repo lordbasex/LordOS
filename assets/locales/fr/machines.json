@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Notifications de la machine",
   "cfg.guestNotifyNote": "Les notifications de la machine s'affichent ici avec son nom, quelques-unes à la fois au plus.",
   "logs.unitOnly": "Seulement {unit}",
-  "logs.guestZone": "Fuseau horaire de l'invité : {zone}"
+  "logs.guestZone": "Fuseau horaire de l'invité : {zone}",
+  "launcher.missing": "{app} n'est plus dans {machine}",
+  "launcher.missingBody": "La machine ne liste plus cette application, rien n'a donc été ouvert.",
+  "launcher.timeout": "{app} ne s'est pas ouverte dans {machine}",
+  "launcher.timeoutBody": "Le mode applications n'a pas démarré. Il lui faut les outils LordOS de la machine et un système dont ils savent lister les applications.",
+  "cfg.launcherApps": "Ses applications dans le lanceur",
+  "cfg.launcherAppsNote": "Les applications que la machine a listées en mode applications ({count}) apparaissent dans le lanceur et la recherche tant qu'elle est éteinte, marquées de son nom. En choisir une démarre la machine et ouvre l'application.",
+  "shell.toTerminal": "Ouvrir dans le Terminal",
+  "shell.inTerminal": "Ce shell est ouvert dans un onglet du Terminal.",
+  "shell.showTerminal": "Afficher le Terminal"
 }
