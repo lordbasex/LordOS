@@ -14,6 +14,7 @@ WEB_COMMON_PKGS := wpe-webkit-2.0 egl wayland-client xkbcommon gio-unix-2.0
 WEB_LEGACY_PKGS := $(WEB_COMMON_PKGS) wpe-1.0 wpebackend-fdo-1.0 wayland-server
 WEB_PLATFORM_PKGS := $(WEB_COMMON_PKGS) wpe-platform-2.0
 web_missing = $(strip $(foreach p,$(1),$(if $(shell pkg-config --exists $(p) 2>/dev/null && echo y),,$(p))))
+LORD_WEB_FORCED := $(if $(filter undefined,$(origin LORD_WEB_BACKEND)),,$(LORD_WEB_BACKEND))
 ifeq ($(origin LORD_WEB_BACKEND),undefined)
 LORD_WEB_BACKEND := $(if $(call web_missing,$(WEB_PLATFORM_PKGS)),$(if $(call web_missing,$(WEB_LEGACY_PKGS)),none,legacy),platform)
 endif
@@ -27,7 +28,8 @@ else
 $(error LORD_WEB_BACKEND must be legacy or platform, not "$(LORD_WEB_BACKEND)")
 endif
 WEB_MISSING := $(call web_missing,$(WEB_PKGS))
-WEB ?= $(if $(WEB_MISSING),0,1)
+# a backend asked for by name must build, unless WEB=0 says otherwise
+WEB ?= $(if $(WEB_MISSING),$(if $(filter legacy platform,$(LORD_WEB_FORCED)),1,0),1)
 ifeq ($(WEB),1)
 ifneq ($(WEB_MISSING),)
 $(error lord-web ($(LORD_WEB_BACKEND) backend) needs pkg-config packages that are missing: $(WEB_MISSING))
