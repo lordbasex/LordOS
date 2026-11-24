@@ -1062,7 +1062,10 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   decision 2026-11-15: it will be done, before 1.0). The legacy API lord-web uses (libwpe, wpebackend-fdo) is deprecated
   upstream and already missing on some distributions; Debian 13 keeps it for its whole life. Rewrite `webwin.c` on
   WPEPlatform keeping our buffer path (dmabuf, shm), input, IME, clipboard, drag and drop and fractional scale, and
-  re-test every web app feature on the VM. Watch trixie's wpewebkit security updates until then. With it comes real
+  re-test every web app feature on the VM. Watch trixie's wpewebkit security updates until then. Step 1 (maintainer's
+  decision 2026-11-23, in development): LordOS's own WPE WebKit 2.54 for trixie with WPEPlatform and the legacy API both
+  on, Debian's source package rebuilt by `tools/pkg/build-wpewebkit.sh` and published with its source in the LordOS APT
+  repository ([WPEWEBKIT.md](WPEWEBKIT.md)); from then on LordOS rebuilds it for every WebKit security release. With it comes real
   dark mode for web apps (maintainer, 2026-11-15): set `prefers-color-scheme` through the new API so CSS `@media`
   rules follow too, then bring back each app's Appearance (Light and Dark), held back until then (`WEBSCHEME_PER_APP`
   in `server/src/web/webscheme.h`, `COLOR_SCHEMES_AVAILABLE` in `sdk/webappsmodel.js`, `webAppearanceItem` in the app

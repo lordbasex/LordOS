@@ -16,7 +16,8 @@ identify the services; LordOS is not affiliated with, endorsed or sponsored by t
 ## What it is
 
 - **`lord-web`** (`server/src/web/`, C): one process per app and profile. It is the only binary that links WPE WebKit:
-  Debian 13's `libwpewebkit-2.0` 2.48, `libwpe` 1.16 and `wpebackend-fdo` 1.16, which bring GStreamer and libsoup. It
+  Debian 13's `libwpewebkit-2.0` 2.48, `libwpe` 1.16 and `wpebackend-fdo` 1.16, which bring GStreamer and libsoup (in
+  development: LordOS's own 2.54 with WPEPlatform for trixie, [WPEWEBKIT.md](WPEWEBKIT.md), still with the legacy API). It
   ships in the optional package `lordos-web` (`tools/iso/mkdeb-web.sh`, which depends on WebKit, GStreamer's good and
   bad plugins, `bubblewrap` and `xdg-dbus-proxy`; built only when `pkg-config` finds WPE, `WEB=0` skips it). Without that package the rest of LordOS works unchanged and the web app
   features say how to get it.
