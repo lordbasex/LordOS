@@ -637,9 +637,11 @@ With llvmpipe the GPU isn't worth it; that's why CPU is the default. With a real
 compositing is the GPU's work, and the CPU only uploads what changed in the UI.
 
 **Untested:**
-- **NVIDIA:** no report on any NVIDIA card (`HARDWARE-REPORT.md`); Mesa's nouveau and NVK are included, the
-  proprietary driver is not supported. Real AMD and Intel cards compose on the GPU on every reported machine: an RX 580
-  every day since 2026-11-07, a FirePro W6150M, an RX 7800 XT, an RX 9060 XT and 14 Intel GPUs from Ironlake to
+- **NVIDIA:** two reports, both on NVIDIA's own driver (`HARDWARE-REPORT.md`): an RTX 3060 on the proprietary
+  driver, composed on the CPU (#171), and an RTX 5070 Ti on the open kernel modules, smooth, its composition not in
+  the report (#235). Mesa's nouveau and NVK are included and untested; NVIDIA's driver is not supported for GPU
+  composition. Real AMD and Intel cards compose on the GPU on every reported machine: an RX 580
+  every day since 2026-11-07, a FirePro W6150M, an RX 7800 XT, an RX 9060 XT and 15 Intel GPUs from Ironlake to
   Whiskey Lake (`HARDWARE-REPORT.md`, "By GPU vendor").
 - **Importing a GPU dmabuf via EGL:** virtio-gpu doesn't accept dmabufs from another source, so in
   the VM that import fails (`EGL_BAD_ALLOC`) and udmabufs are mapped.
@@ -699,7 +701,8 @@ virgl doesn't work without a render node on the host, and VM 116 was left with `
   window was not looked into.
 - GPU drag measured with another GPU than V3D and SVGA3D: only the self-test guards those.
 - PBO uploads or a linear canvas. Moved to 0.8.7 (2026-10-30); not done in it.
-- Test on an NVIDIA card (no report yet, `HARDWARE-REPORT.md`), on AMD integrated graphics (APUs) and on Intel
+- Test on an NVIDIA card with nouveau or NVK, and GPU composition on NVIDIA's driver (two reports on that driver,
+  `HARDWARE-REPORT.md`), on AMD integrated graphics (APUs) and on Intel
   graphics newer than Whiskey Lake.
 - UI blur that includes app content (GPU pass).
 - Direct scanout of non-fullscreen windows (overlay planes).

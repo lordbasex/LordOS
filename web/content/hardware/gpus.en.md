@@ -19,6 +19,7 @@ community**: we don't own every card, so your compatibility reports are how a mo
 | AMD Radeon RX 580 (Polaris, Ellesmere) | `amdgpu`, Mesa `radeonsi` | Desktop composed on the GPU, two DisplayPort monitors, Vulkan (RADV) | ✓ Verified | LordOS team |
 | Intel UHD Graphics 630 (Comet Lake) | `i915` with GVT-g | Shared with Machines as a virtual GPU (GVT-g), next to the RX 580 drawing the desktop | ✓ Verified | LordOS team |
 | NVIDIA GeForce RTX 3060 (GA106) | `nvidia` (the proprietary driver) | The desktop works, composed on the CPU: LordOS doesn't compose on NVIDIA's proprietary driver yet | ◐ Experimental | One community report ([#171](https://github.com/lordbasex/LordOS/issues/171)) |
+| NVIDIA GeForce RTX 5070 Ti 16 GB (GB203) | `nvidia` 620.73.04 (NVIDIA's open kernel modules) | The desktop works, smooth, with no tearing or glitches; the report doesn't say whether it was composed on the GPU or the CPU. CUDA's libraries were installed and llama.cpp ran on it | ◐ Experimental | One community report ([#235](https://github.com/lordbasex/LordOS/issues/235)) |
 
 More Intel and AMD graphics run LordOS in the community's
 [hardware reports](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md); this page lists the cards

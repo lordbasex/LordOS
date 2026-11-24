@@ -1355,6 +1355,26 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Documentation
 
+- **Hardware reports: #245, #230 and the graphics card report #235 (`docs/HARDWARE-REPORT.md`, updated 2026-11-24),
+  in development (the latest release is 0.8.9.5-beta).** #245 adds an Acer Aspire R3-131T laptop with an Intel Celeron
+  N3050 (Braswell) and 2 GB of memory, booting from eMMC on 0.8.9.5-beta: every row works (GPU, display, storage,
+  network, Wi-Fi, Bluetooth, audio, power, isolation; suspend unchecked), five browser pages used about 1.3 GB, and
+  the Fn brightness keys do nothing (listed as open). #230 is the third report of #105's ASUS K72F, a fresh install on
+  0.8.9.5-beta: all works again; MuseScore and Arduino install more easily but their menus still fail (#209), and
+  network computers shown in Files don't open while a Kubuntu session on the same machine reaches them (listed as
+  open). #235 is the first graphics card report and the first RTX 50 card: an RTX 5070 Ti 16 GB on NVIDIA's open
+  kernel modules 620.73.04 draws a smooth desktop (the report, made from the command line, doesn't say how it was
+  composed), CUDA's userspace is there and llama.cpp ran on it, a long context limited only by the card's free memory.
+  Its report also shows the `nouveau` module loaded next to `nvidia`, holding no device: the report tool reads
+  `/sys/module/nouveau` correctly, so this is the system's state, and whether NVIDIA's packages keep `nouveau` out of
+  that kernel's initramfs is now an open question in `docs/NVIDIA-PLAN.md` (A.4). A new section, "Graphics card
+  reports", holds such reports. The counts are now 26 physical machines (12 with a hardware report's data, 12 named in
+  other issues, 1 graphics card report), 27 people, 15 Intel, 5 AMD and 2 NVIDIA GPUs, 19 Intel CPUs and 15 laptops,
+  with the comparison tables, what works, the open problems, the untested combinations and the thanks updated. The
+  paper (en, es, pt, §3.2, §3.5, §10.2 and §10.3, mirrored in `docs/PAPER.md`), the "Own desktop" feature page, the
+  FAQ's release, graphics and NVIDIA answers and the draft "Tested graphics cards" page (`web/content/hardware/gpus.*`,
+  still unpublished) follow, as do `docs/GPU.md`, `docs/SESSIONS.md`, `docs/BENCHMARK.md` and `docs/PAPER-VALIDATION.md`.
+
 - **Machines: design for machine groups and a Whonix (Tor) card** (`docs/VIRTUALIZATION.md` section 19, planned, nothing
   built; asked by the maintainer on 2026-11-23). Whonix-Gateway and Whonix-Workstation as one library card, started
   Gateway first and stopped Workstation first, with the members reachable from the card's menu and one name for the

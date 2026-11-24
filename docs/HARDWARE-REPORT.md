@@ -4,12 +4,12 @@ What LordOS has been run on, from the maintainer's own machine, from the hardwar
 ([issues labelled `hardware-report`](https://github.com/lordbasex/LordOS/issues?q=label%3Ahardware-report)) and from
 the other GitHub issues, open and closed, that name the machine they ran on. It is a knowledge base: what works, what
 was found and fixed, and which combinations nobody has reported yet. Every line comes from a report, its issue thread
-or this repository. Last updated 2026-11-22, after reading every issue up to #189 and the hardware reports #212, #221
-and #224.
+or this repository. Last updated 2026-11-24, after reading every issue up to #189, the hardware reports #212, #221,
+#224, #230 and #245, and the graphics card report #235.
 
-**In numbers**: 24 physical machines (the maintainer's PC, 11 machines with a hardware report's data and 12 machines
-named in other issues) from the maintainer and 21 other people, plus 4 reports from virtual machines; 25 people
-reported in all. GPU: 14 Intel, 5 AMD, 1 NVIDIA, 4 not
+**In numbers**: 26 physical machines (the maintainer's PC, 12 machines with a hardware report's data, 12 machines
+named in other issues and 1 graphics card report) from the maintainer and 23 other people, plus 4 reports from virtual
+machines; 27 people reported in all. GPU: 15 Intel, 5 AMD, 2 NVIDIA, 4 not
 given. Not one report says LordOS failed to reach the desktop on real hardware; the problems found are listed per
 machine below, with what was fixed and who confirmed it.
 
@@ -64,8 +64,8 @@ What it found and what was fixed on it:
 
 ## Community reports with the report file
 
-Eleven machines from ten people, in thirteen report issues, 2026-11-06 to 2026-11-22: #212 is a second report of
-#105's laptop, on a newer version, and #224 brought the `.json` file #171 had left out (#171 attached the page System
+Twelve machines from eleven people, in fifteen report issues, 2026-11-06 to 2026-11-24: #212 and #230 are later
+reports of #105's laptop, on newer versions, and #224 brought the `.json` file #171 had left out (#171 attached the page System
 Information opens instead; its data was the issue's summary and that page). The kind is the one the report detected from the firmware's
 chassis type; where the firmware says "desktop" for a machine the reporter describes elsewhere as a tablet, the table
 says "reported as desktop".
@@ -73,7 +73,7 @@ says "reported as desktop".
 | Issue | Machine | Kind | CPU | GPU (driver) | Boot | LordOS | Result |
 |---|---|---|---|---|---|---|---|
 | [#42](https://github.com/lordbasex/LordOS/issues/42) | Dell Latitude 7480 | laptop | Intel Core i5-7300U, 4 threads | Intel HD Graphics 620 (i915) | internal | 0.8.8.4 | All works; power *limits* (the battery holds 48 % of its design capacity: wear, not LordOS). The touchpad problem ([#43](https://github.com/lordbasex/LordOS/issues/43)) was fixed in 0.8.8.6. Later, after `firmware-intel-graphics` reached the initrd, the reporter needed `i915.enable_dc=0` to stop hard lockups soon after login (DMC firmware); no separate issue yet. Accepted into the tested-hardware catalogue. |
-| [#105](https://github.com/lordbasex/LordOS/issues/105) | ASUS K72F | laptop | Intel Pentium P6200, 2 threads | Intel Core Processor Integrated Graphics, Ironlake (i915) | internal | 0.8.8.7; 0.8.9.2 ([#212](https://github.com/lordbasex/LordOS/issues/212)) | All works. Software problems in Files, SMB and archives were reported separately ([#101](https://github.com/lordbasex/LordOS/issues/101)–[#104](https://github.com/lordbasex/LordOS/issues/104)); #101, #103 and #104 are fixed, #102 (long file names) is open. **0.8.9.2** (#212, 2026-11-20): all works again, GPU composition on Ironlake, now with an external Dell P2418D on HDMI next to the 1600×900 panel. The Dell runs at 1920×1200 rather than its native 2560×1440: this laptop's HDMI output stops at a 165 MHz TMDS clock, a limit of the hardware, not of LordOS. The issue's note about MuseScore's menus is an app problem, followed in [#209](https://github.com/lordbasex/LordOS/issues/209). |
+| [#105](https://github.com/lordbasex/LordOS/issues/105) | ASUS K72F | laptop | Intel Pentium P6200, 2 threads | Intel Core Processor Integrated Graphics, Ironlake (i915) | internal | 0.8.8.7; 0.8.9.2 ([#212](https://github.com/lordbasex/LordOS/issues/212)) | All works. Software problems in Files, SMB and archives were reported separately ([#101](https://github.com/lordbasex/LordOS/issues/101)–[#104](https://github.com/lordbasex/LordOS/issues/104)); #101, #103 and #104 are fixed, #102 (long file names) is open. **0.8.9.2** (#212, 2026-11-20): all works again, GPU composition on Ironlake, now with an external Dell P2418D on HDMI next to the 1600×900 panel. The Dell runs at 1920×1200 rather than its native 2560×1440: this laptop's HDMI output stops at a 165 MHz TMDS clock, a limit of the hardware, not of LordOS. The issue's note about MuseScore's menus is an app problem, followed in [#209](https://github.com/lordbasex/LordOS/issues/209). **0.8.9.5-beta** ([#230](https://github.com/lordbasex/LordOS/issues/230), 2026-11-23, a fresh install with every update applied): all works again (GPU, display, storage, network, Wi-Fi, audio, power and isolation; no Bluetooth row; suspend unchecked). Installing MuseScore and Arduino is easier now, but their menus still don't work (#209). New: the reporter's other computers show up in Files on the network, but opening them doesn't work, while a Kubuntu session on the same machine reaches them at once; no separate issue yet. |
 | [#129](https://github.com/lordbasex/LordOS/issues/129) | HP EliteBook 840 G6 | laptop | Intel Core i5-8365U, 8 threads | Intel UHD Graphics 620, WhiskeyLake-U GT2 (i915) | internal | 0.8.8.7 | All works; power *limits*. Installed next to Windows 11. The same person's Bose QuietComfort 35 headset works on it ([#78](https://github.com/lordbasex/LordOS/issues/78), 0.8.8.7). |
 | [#135](https://github.com/lordbasex/LordOS/issues/135) | TECLAST X98Pro | reported as desktop (the reporter calls it a tablet in [#131](https://github.com/lordbasex/LordOS/issues/131)) | Intel Atom x5-Z8500, 4 threads | Intel Atom x5-E8000/J3xxx/N3xxx integrated, Cherry Trail (i915) | eMMC | 0.8.8.7 | GPU *limits*: the 1536×2048 panel is rotated, and a rotated display is composed on the CPU. Everything else works. The tablet's power and volume buttons: [#131](https://github.com/lordbasex/LordOS/issues/131) (a fix in 0.8.8.9, not yet tried on the tablet). |
 | [#136](https://github.com/lordbasex/LordOS/issues/136) | Apple MacBookPro11,4 (2015) | laptop | Intel Core i7-4770HQ, 8 threads | Intel Crystal Well integrated, Haswell (i915) | internal | 0.8.8.8 | All works. Includes a LordBench quick run. The same person's earlier issues on this MacBook: the battery percentage that stopped updating ([#25](https://github.com/lordbasex/LordOS/issues/25), fixed in 0.8.8.3), the volume, brightness and keyboard light keys (confirmed working on 0.8.8 in [#12](https://github.com/lordbasex/LordOS/issues/12)), the QuietComfort 35 headset (confirmed on 0.8.8.7 in #78) and an LG wide monitor with no screenshot offset ([#98](https://github.com/lordbasex/LordOS/issues/98)). |
@@ -83,6 +83,17 @@ says "reported as desktop".
 | [#156](https://github.com/lordbasex/LordOS/issues/156) | Unnamed PC (no vendor in the firmware) | desktop | AMD Ryzen 7 5700X, 16 threads | AMD Radeon RX 9060 XT, Navi 44, RDNA 4 (amdgpu) | internal | 0.8.8.8 | All works; GPU composition on radeonsi (gfx1200), one HDMI monitor at 1920×1080, no battery. Includes LordBench (quick, 21 measurements). |
 | [#171](https://github.com/lordbasex/LordOS/issues/171) | Gigabyte B760M C | desktop | Intel Core i9-12900F, 24 threads, Alder Lake | NVIDIA GeForce RTX 3060, GA106 (nvidia, the proprietary driver) | installed on a USB drive (480 Mbps) | 0.8.8.9 | GPU *limits* (the proprietary driver, which LordOS doesn't support for GPU composition); display, storage, network, Wi-Fi, Bluetooth, audio and isolation work; suspend unchecked. The first report with an NVIDIA card. The `.json` file itself arrived later, in [#224](https://github.com/lordbasex/LordOS/issues/224) (2026-11-22): the issue's form says 0.8.9.4, but the file is still the 0.8.8.9 capture of 2026-11-16, and it matches this row. |
 | [#221](https://github.com/lordbasex/LordOS/issues/221) | ASUS F1A55-M LX (motherboard; no system vendor in the firmware) | desktop | AMD A4-3400 APU, 2 threads, K10 Llano | AMD Radeon HD 5450, Cedar, TeraScale 2 (kernel `radeon`, Mesa r600); only this card shows in the report | internal, a mechanical hard disk; legacy BIOS boot | 0.8.9.4 | All works: GPU composition on r600, one HDMI monitor at 1920×1080, Ethernet, audio and isolation; no Wi-Fi, Bluetooth or battery; suspend unchecked. The reporter finds it very fast and stable on this hardware. The first TeraScale 2 card and the first Llano APU. |
+| [#245](https://github.com/lordbasex/LordOS/issues/245) | Acer Aspire R3-131T | laptop | Intel Celeron N3050, 2 threads, Braswell | Intel Atom/Celeron/Pentium x5-E8000/J3xxx/N3xxx integrated, Braswell (i915) | eMMC | 0.8.9.5-beta | All works: GPU, display, storage, network, Wi-Fi, Bluetooth, audio, power and isolation; suspend unchecked. 2 GB of memory: five pages open in Brave (YouTube and Google Maps among them) used about 1.3 GB. Includes LordBench (quick, 19 measurements). Open: the Fn key with the brightness keys does nothing; no separate issue yet. The first Braswell machine and the first Acer. |
+
+## Graphics card reports
+
+Since 0.8.9.5 every computer can send a graphics card report (Settings → Graphics cards → Send a compatibility report,
+or `lordos-issue --gpu`; `docs/NVIDIA-PLAN.md`, Part 0). It names the cards and drivers but not the machine, so a
+machine that only sent this report counts in the comparison for its card alone.
+
+| Issue | Card | Driver | LordOS | Result |
+|---|---|---|---|---|
+| [#235](https://github.com/lordbasex/LordOS/issues/235) | NVIDIA GeForce RTX 5070 Ti 16 GB, GB203, Blackwell (`10de:2c05`), the only card, the boot display | `nvidia` 620.73.04, NVIDIA's open kernel modules; `nvidia-drm` modeset and fbdev on; Mesa 25.0.7; kernel 7.3.4+deb13; UEFI, Secure Boot off | 0.8.9.5-beta | The desktop works, smooth, with no flicker, tearing or glitches. The report was made from the command line, so it doesn't say whether the desktop was composed on the GPU or the CPU. CUDA's userspace is installed (`libcuda`, `nvidia-smi`): llama.cpp loaded a 4.48 GiB model, and a 131072-token context, which needs 9.01 GiB more, didn't fit in the 5.99 GiB of video memory left, while 65536 did; that is the card's free memory, not a LordOS fault. The report also shows the `nouveau` kernel module loaded next to `nvidia`, though the card is bound to `nvidia` (see "Known problems"). The first RTX 50 card and the first report on NVIDIA's open kernel modules. |
 
 ## Machines named in other issues
 
@@ -117,26 +128,26 @@ not say. Two other issues are about machines already above: [#132](https://githu
 
 ## Comparison
 
-All 24 physical machines: the maintainer's PC, the eleven with a report's data (#149 is incomplete but its data is
-readable) and the twelve from other issues. A count of "not given" means the issue does not say. Virtual machines are
+All 26 physical machines: the maintainer's PC, the twelve with a report's data (#149 is incomplete but its data is
+readable), the twelve from other issues and the graphics card report #235 (its card only). A count of "not given" means the issue does not say. Virtual machines are
 counted apart.
 
 **By GPU vendor and model family**
 
 | Vendor | Machines | Families (count) | What is known |
 |---|---|---|---|
-| Intel (i915) | 14 | Ironlake (1), Sandy Bridge HD 2000 (1), Haswell Crystal Well (1), Broadwell Iris 6100 (2), Kaby Lake HD 620 (4), Kaby Lake R and Whiskey Lake UHD 620 (2), Cherry Trail Atom (2), Gemini Lake UHD 600 (1) | GPU composition works on every one that says. The only GPU *limits* is a rotated tablet panel, which LordOS composes on the CPU by design (#135). One report of DMC firmware lockups on HD 620 with `firmware-intel-graphics`, worked around with `i915.enable_dc=0` (#42). |
+| Intel (i915) | 15 | Ironlake (1), Sandy Bridge HD 2000 (1), Haswell Crystal Well (1), Broadwell Iris 6100 (2), Kaby Lake HD 620 (4), Kaby Lake R and Whiskey Lake UHD 620 (2), Cherry Trail Atom (2), Braswell Celeron (1, #245), Gemini Lake UHD 600 (1) | GPU composition works on every one that says. The only GPU *limits* is a rotated tablet panel, which LordOS composes on the CPU by design (#135). One report of DMC firmware lockups on HD 620 with `firmware-intel-graphics`, worked around with `i915.enable_dc=0` (#42). |
 | AMD | 5 | TeraScale 2, Cedar (1, Radeon HD 5450 on the `radeon` kernel driver and Mesa r600, #221), GCN 2, Bonaire (1, FirePro W6150M on the `radeon` kernel driver), GCN 4, Polaris (1, RX 580), RDNA 3 (1, RX 7800 XT), RDNA 4 (1, RX 9060 XT) | All compose on the GPU. The cursor-plane size fix (0.8.8.6) came from the RX 580 and also fixed the FirePro; the RX 580 brought the login-screen and display hand-off fixes. Open on the RX 7800 XT: uneven window drag at 120 Hz (#159). |
-| NVIDIA | 1 | Ampere, RTX 3060 (1, #171, the proprietary driver) | One report: the desktop works and the GPU is *limits* (LordOS doesn't support the proprietary driver for GPU composition). Mesa's nouveau and NVK are included and untested. |
+| NVIDIA | 2 | Ampere, RTX 3060 (1, #171, the proprietary driver); Blackwell, RTX 5070 Ti (1, #235, NVIDIA's open kernel modules 620.73.04) | Both reach the desktop on NVIDIA's own driver. #171's GPU is *limits* (LordOS doesn't support the proprietary driver for GPU composition); #235's desktop is smooth, and its report doesn't say how it was composed. Mesa's nouveau and NVK are included and untested. |
 | Not given | 4 | MacBook Pro 2012, HP 4K laptop, ThinkPad, tablet PC | Reached the desktop; the issues are about input, scale and displays. |
 
 **By CPU**
 
 | Vendor | Machines | Generations (count) |
 |---|---|---|
-| Intel | 18 | Westmere, Pentium P6200 (1); Sandy Bridge (1); Ivy Bridge (1); Haswell (2); Broadwell (2); Kaby Lake (4); Kaby Lake R (1); Whiskey Lake (1); Comet Lake, i9-10900 (1); Alder Lake, i9-12900F (1); Cherry Trail Atom (2); Gemini Lake Celeron (1) |
+| Intel | 19 | Westmere, Pentium P6200 (1); Sandy Bridge (1); Ivy Bridge (1); Haswell (2); Broadwell (2); Kaby Lake (4); Kaby Lake R (1); Whiskey Lake (1); Comet Lake, i9-10900 (1); Alder Lake, i9-12900F (1); Cherry Trail Atom (2); Braswell Celeron N3050 (1); Gemini Lake Celeron (1) |
 | AMD | 3 | K10 Llano, A4-3400 APU (1); Zen 3, Ryzen 7 5700X (1); Zen 4, Ryzen 7 7800X3D (1) |
-| Not given | 3 | HP 4K laptop, ThinkPad, tablet PC |
+| Not given | 4 | HP 4K laptop, ThinkPad, tablet PC, #235's computer (a graphics card report) |
 
 All are x86-64. No ARM machine in the issues (the Raspberry Pi 5 is the project's own reference machine,
 `docs/RASPBERRY.md`).
@@ -145,23 +156,23 @@ All are x86-64. No ARM machine in the issues (the Raspberry Pi 5 is the project'
 
 | Kind | Machines |
 |---|---|
-| Laptop | 14 (Apple 4, Dell 3, HP 3, ASUS 2, Lenovo 2) |
+| Laptop | 15 (Apple 4, Dell 3, HP 3, ASUS 2, Lenovo 2, Acer 1) |
 | Desktop | 5 (the maintainer's, #156, #159, #171, #221) |
 | 2-in-1 | 1 (Dell Latitude 5289) |
 | Tablet | 1 (#127, as the reporter says) |
 | Reported as desktop | 2 (TECLAST X98Pro, Hampoo HI-122LP: Cherry Trail machines the reporter calls tablets in #131) |
-| Not given | 1 (the ASUS with a Celeron N4000) |
+| Not given | 2 (the ASUS with a Celeron N4000, #235's computer) |
 
 **By install and boot medium**
 
 | How | Machines |
 |---|---|
 | Installed, internal disk (from the report file) | 9 (eight reports and the maintainer's; #221 on a mechanical disk) |
-| Installed, eMMC (from the report file) | 2 |
+| Installed, eMMC (from the report file) | 3 (#135, #137, #245) |
 | Installed, USB drive (from the report data) | 1 (#171) |
 | Installed, medium not in the issue | 7 (one of them, the ZBook, with `install.sh` over an existing Debian 13) |
 | Live USB | 1 (MacBook Pro 2012) |
-| Not given | 4 |
+| Not given | 5 |
 
 **By LordOS version** (the latest version each machine was reported on)
 
@@ -173,17 +184,19 @@ All are x86-64. No ARM machine in the issues (the Raspberry Pi 5 is the project'
 | 0.8.8.7 | 6 |
 | 0.8.8.8 | 6 (the maintainer's among them) |
 | 0.8.8.9 | 1 (#171; #224's file is the same 0.8.8.9 capture) |
-| 0.8.9.2 | 1 (#105's laptop, in #212) |
 | 0.8.9.4 | 1 (#221) |
+| 0.8.9.5-beta | 3 (#105's laptop, in #230 after #212 on 0.8.9.2; #235; #245) |
 
 **What works**, each from at least one report: GPU composition on Intel graphics from 2010 (Ironlake) to 2019 (Whiskey
-Lake) and on Cherry Trail and Gemini Lake, and on five AMD generations from TeraScale 2 (a Radeon HD 5450 on `radeon`
+Lake) and on Cherry Trail, Braswell and Gemini Lake, and on five AMD generations from TeraScale 2 (a Radeon HD 5450 on `radeon`
 and r600, #221) to RDNA 4; three monitors with DisplayPort (the RX 580), two monitors at 120 Hz (the RX 7800 XT), a
 laptop with an external monitor (four reports, the latest the K72F's Dell on HDMI, #212); a 2011 Llano desktop with a
 mechanical disk and legacy BIOS boot, fast and stable (#221);
 a 15.3" 4K laptop panel at 300 %; Alps I2C touchpads (since 0.8.8.6) and Apple trackpads; automatic rotation and the
 touchscreen on Cherry Trail tablets; Wi-Fi on Broadcom BCM43602 and Intel 3165 and 8265; a Bluetooth headset on three
-laptops; the volume, brightness and keyboard light keys on two MacBook Pros; a 2 GB Celeron N4000 laptop, smooth.
+laptops; the volume, brightness and keyboard light keys on two MacBook Pros; a 2 GB Celeron N4000 laptop, smooth; a
+2 GB Celeron N3050 laptop booting from eMMC with every component working (#245); an RTX 5070 Ti on NVIDIA's open
+kernel modules, smooth (#235).
 
 **Fixed and confirmed by the person who reported it**: #2 (MacBook Pro 2012 pointer), #8 (Wi-Fi after reboot), #12
 (media keys, by two people), #57 (squashed pointer on the FirePro), #60 (rotation on the Chuwi Hi12), #67 (Alps
@@ -196,9 +209,14 @@ card visible on the ASUS K84L (#132, below the operating system); the screenshot
 two displays (#98); the Caps Lock light and a volume indicator on an ASUS Celeron N4000 (#153); window drag
 smoothness at 120 Hz, AppImages from Files, GTK4 dropdowns on native Wayland and polkit agents on a Ryzen and RX 7800 XT
 desktop (#159; its mouse back and forward buttons have a fix in 0.8.8.9, not yet confirmed there); Steam on a Latitude 5590 (#157); the FaceTime HD camera, which needs a
-driver LordOS can't ship (#21).
+driver LordOS can't ship (#21); the Fn brightness keys on the Acer Aspire R3-131T (#245); network computers shown in
+Files but not opening on the ASUS K72F, which a Kubuntu session on the same machine reaches (#230), and menus in
+MuseScore and Arduino there (#209); the `nouveau` module loaded next to NVIDIA's driver on the RTX 5070 Ti (#235: not
+bound to the card, which is on `nvidia` and works, but NVIDIA's packages should keep `nouveau` from loading at all;
+whether their blacklist reached that kernel's initramfs is to ask, `docs/NVIDIA-PLAN.md`, A.4).
 
-**Untested combinations**: NVIDIA cards other than one RTX 3060 on the proprietary driver (#171), and nouveau or NVK on any; AMD integrated graphics (APUs) on bare metal (a Radeon 780M only as a
+**Untested combinations**: NVIDIA cards other than an RTX 3060 on the proprietary driver (#171) and an RTX 5070 Ti on
+the open kernel modules (#235), and nouveau or NVK on any; AMD integrated graphics (APUs) on bare metal (a Radeon 780M only as a
 virtual machine's host, #92; #221's A4-3400 APU draws through its HD 5450 card, and only the card shows in the report); Intel Arc and Intel graphics newer than Whiskey Lake (Ice Lake, Tiger Lake, Alder Lake
 and later; #171's Alder Lake has no integrated GPU); hybrid laptops with two GPUs; DisplayPort MST hubs; 4K and HiDPI external monitors; suspend and resume
 (unchecked in every report file; only #14's Wi-Fi after waking is reported); ARM machines other than the reference
@@ -210,7 +228,7 @@ Thank you to everyone who took the time to report how LordOS runs on their machi
 confirm that a fix works:
 
 - [ootada](https://github.com/ootada): #42, #43
-- [F-iatt](https://github.com/F-iatt): #105, #212
+- [F-iatt](https://github.com/F-iatt): #105, #212, #230
 - [pct06](https://github.com/pct06): #129 and the MacBook Pro threads #3, #8, #12, #14, #21, #23, #78; confirmed #8,
   #12 and #78
 - [Touchgg](https://github.com/Touchgg): #135, #137, #60, #131; confirmed #60
@@ -221,6 +239,8 @@ confirm that a fix works:
 - [toulzemaurice-blip](https://github.com/toulzemaurice-blip): #156
 - [Diegossa2](https://github.com/Diegossa2): #171, #224
 - [javiernocito-tech](https://github.com/javiernocito-tech): #221
+- [kessbarrasa](https://github.com/kessbarrasa): #245
+- [chevro](https://github.com/chevro): #235
 - [Kazukighost](https://github.com/Kazukighost): #2; confirmed
 - [pccasto](https://github.com/pccasto): #40, #57, #94; confirmed #57
 - [rengesh2000](https://github.com/rengesh2000): #67; confirmed

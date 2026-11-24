@@ -11,8 +11,8 @@ approves (AGENTS.md: every root action needs the same review). Nothing here is c
 test matrix says so; facts marked *to verify* were not checked.
 
 Related: `docs/GPU.md` (lord-server's GPU path), `docs/MACHINES-GPU.md` (Settings → Graphics cards, `gpu-role`),
-`docs/HARDWARE-REPORT.md` (one NVIDIA report so far, #171: an RTX 3060 on NVIDIA's proprietary driver, desktop composed
-on the CPU), `docs/DESKTOP-PARITY.md` (`linux-drm-syncobj-v1`).
+`docs/HARDWARE-REPORT.md` (two NVIDIA reports so far: #171, an RTX 3060 on NVIDIA's proprietary driver, desktop composed
+on the CPU; #235, an RTX 5070 Ti on NVIDIA's open kernel modules 620.73.04, desktop smooth, composition not in the report), `docs/DESKTOP-PARITY.md` (`linux-drm-syncobj-v1`).
 
 ## Part 0 — built now: the experimental status and the compatibility report
 
@@ -147,6 +147,12 @@ A catalog entry in `apt/catalog.json`, key in `apt/keys/nvidia-cuda.asc`, read o
   upgrade (DKMS's kernel hooks run inside `dpkg`, so under our engine as under apt: to confirm on the matrix);
   `linux-headers-amd64` keeps the headers in step with the kernel. A failed build leaves the card without NVIDIA's
   module; that `nouveau`'s blacklist and the initramfs are handled by NVIDIA's packages as by Debian's is to verify.
+  The first evidence is [#235](https://github.com/lordbasex/LordOS/issues/235) (RTX 5070 Ti, `nvidia` 620.73.04 open,
+  kernel 7.3.4+deb13): the graphics report shows `nouveau` loaded next to `nvidia`, with the card bound to `nvidia`
+  and the desktop working. The report reads `/sys/module/nouveau`, so the module really is loaded (Debian builds it
+  as a module); it holds no device there, but nothing should load it once NVIDIA's driver is in. How that driver was
+  installed, and whether a `blacklist nouveau` file is in `/etc/modprobe.d` and in that kernel's initramfs, is to ask
+  in the issue.
 
 ### A.5 Secure Boot (MOK enrolment, guided) — approved 2026-11-22, built as `dkms-mok-enroll`
 

@@ -20,6 +20,7 @@ verifica un modelo.
 | AMD Radeon RX 580 (Polaris, Ellesmere) | `amdgpu`, Mesa `radeonsi` | Escritorio compuesto en la GPU, dos monitores DisplayPort, Vulkan (RADV) | ✓ Verificada | Equipo de LordOS |
 | Intel UHD Graphics 630 (Comet Lake) | `i915` con GVT-g | Compartida con Máquinas como GPU virtual (GVT-g), junto a la RX 580 que dibuja el escritorio | ✓ Verificada | Equipo de LordOS |
 | NVIDIA GeForce RTX 3060 (GA106) | `nvidia` (el driver propietario) | El escritorio funciona, compuesto en la CPU: LordOS todavía no compone sobre el driver propietario de NVIDIA | ◐ Experimental | Un informe de la comunidad ([#171](https://github.com/lordbasex/LordOS/issues/171)) |
+| NVIDIA GeForce RTX 5070 Ti 16 GB (GB203) | `nvidia` 620.73.04 (los módulos de kernel abiertos de NVIDIA) | El escritorio funciona, fluido, sin cortes ni fallas; el informe no dice si se compuso en la GPU o en la CPU. Las bibliotecas de CUDA estaban instaladas y llama.cpp corrió sobre ella | ◐ Experimental | Un informe de la comunidad ([#235](https://github.com/lordbasex/LordOS/issues/235)) |
 
 Más gráficos Intel y AMD corren LordOS en los
 [informes de hardware](https://github.com/lordbasex/LordOS/blob/main/docs/HARDWARE-REPORT.md) de la comunidad; esta
