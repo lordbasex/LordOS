@@ -39,7 +39,7 @@ recomputes both from the rows; the arithmetic:
 | Area | Weight | Items | Mean | Score | Points (weight × score) | Before |
 |---|---:|---:|---:|---:|---:|---:|
 | A. Engine, lifecycle, sandbox, display | 14 | 22 | 78.18 | 78 % | 14 × 78 % = 10.92 | 78 % |
-| B. Getting a system in (cards, unattended, import) | 12 | 13 | 75.77 | 76 % | 12 × 76 % = 9.12 | 76 % |
+| B. Getting a system in (cards, unattended, import) | 12 | 13 | 82.08 | 82 % | 12 × 82 % = 9.84 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 74.58 | 75 % | 11 × 75 % = 8.25 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 60.00 | 60 % | 9 × 60 % = 5.40 | 60 % |
 | E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
@@ -52,9 +52,9 @@ recomputes both from the rows; the arithmetic:
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **110** | | | **70.20 → 70 %** | 68 % |
+| **Total** | **100** | **110** | | | **70.92 → 71 %** | 68 % |
 
-Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 2.70 + 1.83 + 2.96 + 2.58 + 1.65 = 70.20, rounded **70 %** (before: 68 %, against `965a10f6e`). Before this audit the
+Σ = 10.92 + 9.84 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 2.70 + 1.83 + 2.96 + 2.58 + 1.65 = 70.92, rounded **71 %** (before: 68 %, against `965a10f6e`). Before this audit the
 document's table said 67.52 and the JSON 67.16 while the rows themselves gave 67.88: the Whonix row had been raised to 85 %
 twice without the table, the Σ line and the JSON being computed again, and B's score in the table (73 %) wasn't its rows'
 mean (76 %). All three now come from the rows in one pass.
@@ -113,18 +113,18 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Direct kernel boot (13.8 item 9) | 🟡 | 30 | `lordvm.c` | Unattended installs only; none for an installed Linux guest |
 | Rename a machine with its folder and transfer folder (6.26) | 🧪 | 100 | `machine.c` (`renameat2`); `vm_rename.sh` | *In development*; headless |
 
-### B. Getting a system in (76 %)
+### B. Getting a system in (82 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows on amd64 (4.1, 5.2) | ✅ | 95 | `assets/machines/systems.json`, `catalog.js`; `vmcatalog-test`, `vm_catalog_test.mjs` | Kali has no unattended install and was never run end to end |
 | Makers' OpenPGP signatures, SHA-256, resumed downloads, removal (3.9) | ✅ | 100 | `vmcatalog.c`, `vmimage_admin.c`, `pgp.h`; `http-resume-test`, `http-retry-test` | A redirect refused with 403 or 5xx starts again from the original URL (*in development*) |
-| Any ISO, recognized (5.2) | ✅ | 85 | `js_vm.c` `isoInfo`, `model.js` `systemOf`, `archOf` | Only the 32-byte volume label is read; the architecture comes from the name or label, not the boot files. No drop on the tile |
+| Any ISO, recognized (5.2) | ✅ | 95 | `vm/vmiso.c`, `js_vm.c` `isoInfo`, `model.js` `isoArch`, `assistant.jsx` (the ISO tile's drop); `vmiso-test` (ASan, UBSan, fuzz), `vm_model_test.mjs` | *In development*: the architecture from the UEFI boot files' PE headers (ISO 9660, UDF, the El Torito ESP), install discs by `sources/install.*`, the name only when they say nothing (`archFrom`); an `.iso` dropped on Use an ISO picks it. Checked with real ISOs (Alpine aarch64 named `mysystem.iso`, Ubuntu Server 26.04.1, LordOS 0.8.9, an install-disc evaluation ISO). The drop has no end-to-end UI test (was 85: only the 32-byte label was read) |
 | Unattended Linux: Debian and Ubuntu desktops to login (3.9) | ✅ | 100 | `vmunattend.c`; `vmunattend-test`; VM 116, 2026-11-07 |  |
 | Unattended Fedora to login, Ubuntu console, the arm64 cards on the Pi | 🟡 | 60 | same code (`VMU_KICKSTART`) | Never recorded through login |
 | LordOS card, `lordos-auto.conf`; its signed list read from lordos.org first, GitHub second (3.9, 4.1) | 🧪 | 85 | `vmunattend.c` (`VMU_LORDOS`), `vmcatalog.c` (`LIST_MIRROR`, `vmcat_list_source`), `vmimage_admin.c`; `vmcatalog-test` (the real list and signature) | The list copy on lordos.org is *in development*; the card's install was never run end to end from the card |
 | Windows 11 amd64: ISO by hash, unattended, drivers, TPM, Secure Boot, KMS client key (4.3.1) | ✅ | 100 | `windows.js`, `vmunattend.c`, `lordvm.c`; `vm_windows_test.mjs` | On the maintainer's PC |
-| virtio-win guests on arm64 (4.3) | ❌ | 10 | `machine.c` refuses the Windows devices on arm64 | `vmunattend.c` writes arm64 answers already |
+| virtio-win guests on arm64 (4.3) | 🟡 | 70 | `machine.c` (the devices on arm64, `vm_gicv3_in`), `lordvm.c` (the arm64 template: `virt,gic-version=3`, AAVMF secure boot, `tpm-tis-device`, USB CD/DVD, ramfb), `vmunattend.c` (arm64 answers, ARM64 drivers), `systems.json` (the maker's 38 Arm64 hashes), `windows.js` `windowsEmulatedWhy`; `vm-test`, `vmunattend-test`, `vm_windows_test.mjs`, `vm_catalog_test.mjs`; the Pi 5, 2026-11-24 | *In development* (4.3.2): KVM refused on a GICv2 host (the Pi 5, measured: "KVM does not support GICv3 emulation"), so there the machine is Emulated; under TCG the template boots with secure boot enforced from the USB CD/DVD (checked with Alpine). Not checked: an install of the guest (its ~6.9 GB ISO comes only from the maker's page and didn't fit on the Pi), Setup on ramfb, the emulated x86-64 guest agent, swtpm on arm64, any GICv3 host (was ❌ 10) |
 | A person's own systems: `vm-image-get-user`, `lord-pgpv` (5.6.1) | ✅ | 95 | `systems.js`, `vmurl.c`, `vmsig.c`, `lordpgpv.c`; `vmurl-test`, `vmsig-test` |  |
 | Import from other apps with identity kept (6.22) | ✅ | 95 | `vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`; `vmimport-test`, `vm_import_test.sh` | No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion |
 | Requirements check (5.2) | 🟡 | 80 | `library.jsx` `Requirements`, `model.js` `reqRows`, `missingFor`, `assistant.jsx`, `vm-enable` | Create, which starts the download, waits until the parts are in (one click through the package engine). No per-system page of drivers and tools; not through the Store |
@@ -2201,7 +2201,7 @@ Machines can't run (riscv64). The file is untrusted: every offset and length is 
 stops at 4,096 reads or 24 MB (40 reads on a network or cloud mount). `tests/vmiso_test.c` builds each kind of image byte
 by byte, adds hostile ones and fuzzes them under ASan and UBSan. Checked on real ISOs: Alpine 3.24.4 aarch64 virt (arm64
 from its PE headers, though its file name says nothing), an amd64 install disc's evaluation (UDF, install.wim, amd64 from
-the ESP), Ubuntu Server 26.04.1, Bliss OS 16.9.7, LordOS 0.8.9 live, virtio-win 0.1.271 (no boot files: name).
+the ESP), Ubuntu Server 26.04.1, LordOS 0.8.9 live, virtio-win 0.1.271 (no boot files: name).
 
 An `.iso` dragged from Files onto the "Use an ISO" tile is picked as if chosen in its file picker (`useFilesDrop`); another
 file says only an .iso goes there. Automatic setup of a Windows guest is **on** by default, and the person may type a

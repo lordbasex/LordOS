@@ -199,9 +199,9 @@
    "area": "B",
    "item": "Any ISO, recognized (5.2)",
    "status": "✅",
-   "pct": 85,
-   "file": "`js_vm.c` `isoInfo`, `model.js` `systemOf`, `archOf`",
-   "note": "Only the 32-byte volume label is read; the architecture comes from the name or label, not the boot files. No drop on the tile"
+   "pct": 95,
+   "file": "`vm/vmiso.c`, `js_vm.c` `isoInfo`, `model.js` `isoArch`, `assistant.jsx` (the ISO tile's drop); `vmiso-test` (ASan, UBSan, fuzz), `vm_model_test.mjs`",
+   "note": "*In development*: the architecture from the UEFI boot files' PE headers (ISO 9660, UDF, the El Torito ESP), install discs by `sources/install.*`, the name only when they say nothing (`archFrom`); an `.iso` dropped on Use an ISO picks it. Checked with real ISOs (Alpine aarch64 named `mysystem.iso`, Ubuntu Server 26.04.1, LordOS 0.8.9, an install-disc evaluation ISO). The drop has no end-to-end UI test (was 85: only the 32-byte label was read)"
   },
   {
    "area": "B",
@@ -238,10 +238,10 @@
   {
    "area": "B",
    "item": "virtio-win guests on arm64 (4.3)",
-   "status": "❌",
-   "pct": 10,
-   "file": "`machine.c` refuses the Windows devices on arm64",
-   "note": "`vmunattend.c` writes arm64 answers already"
+   "status": "🟡",
+   "pct": 70,
+   "file": "`machine.c` (the devices on arm64, `vm_gicv3_in`), `lordvm.c` (the arm64 template: `virt,gic-version=3`, AAVMF secure boot, `tpm-tis-device`, USB CD/DVD, ramfb), `vmunattend.c` (arm64 answers, ARM64 drivers), `systems.json` (the maker's 38 Arm64 hashes), `windows.js` `windowsEmulatedWhy`; `vm-test`, `vmunattend-test`, `vm_windows_test.mjs`, `vm_catalog_test.mjs`; the Pi 5, 2026-11-24",
+   "note": "*In development* (4.3.2): KVM refused on a GICv2 host (the Pi 5, measured: \"KVM does not support GICv3 emulation\"), so there the machine is Emulated; under TCG the template boots with secure boot enforced from the USB CD/DVD (checked with Alpine). Not checked: an install of the guest (its ~6.9 GB ISO comes only from the maker's page and didn't fit on the Pi), Setup on ramfb, the emulated x86-64 guest agent, swtpm on arm64, any GICv3 host (was ❌ 10)"
   },
   {
    "area": "B",
@@ -279,9 +279,9 @@
    "area": "B",
    "item": "Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19)",
    "status": "🟡",
-   "pct": 80,
-   "file": "`vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_link.sh`",
-   "note": "*In development* (`feat/whonix-group`, `feat/whonix-group-2`): G0–G4 of 19.11 (download and unpacking, groups, the link, `machines`, the card and About step, one library card with its menu, Configure's group view, Start Fresh, the disposable session in memory, the Gateway's firewall identity, a clean Shut Down), headless end to end; left: the release gate on real hardware (G5), disk encryption of the members (layer 5), Delete and Rename of a group and Repair of a damaged one (the card only names it damaged), the Workstation bar's \"No network: the Gateway is off\" with Start Gateway, making a missing base again from the archive (was 85: these were counted as built)"
+   "pct": 92,
+   "file": "`vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `--group-delete`, `--group-rename`, `--group-repair`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_ui_test.mjs`, `vm_group_link.sh`, `vm_group_manage.sh`, `machines_group_manage_headless.sh`",
+   "note": "*In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive (2026-11-24; headless, screenshots of the dialogs; the Start Gateway bar node-tested only, its window being protected). Creating a group from the app was refused before (the image store's file name); fixed. Left: the release gate on real hardware (G5) and disk encryption of the members (layer 5) (was 80)"
   },
   {
    "area": "C",
@@ -898,8 +898,8 @@
    "name": "Getting a system in",
    "weight": 12,
    "items": 13,
-   "mean": 75.77,
-   "score": 76
+   "mean": 82.08,
+   "score": 82
   },
   {
    "id": "C",
@@ -998,6 +998,6 @@
    "score": 55
   }
  ],
- "total": 70,
- "total_exact": 70.2
+ "total": 71,
+ "total_exact": 70.92
 }

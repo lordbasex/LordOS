@@ -46,6 +46,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `build/vm-test` and `build/vmgroup-test`, `tests/vm_exec_e2e.sh` (28 checks, run on 2026-11-24 in a real Ubuntu
     26.04.1 machine made by the Ubuntu card on the dev PC). Not built: an interactive shell over the agent, programs in
     virtio-win guests, folders in `cp`, packages and `rebuild` in `apply`, creating a machine from a card through MCP.
+- **Machines: an ISO's architecture from its boot files** (in development; docs/VIRTUALIZATION.md 5.2). A new reader
+  (`server/src/vm/vmiso.c`, bounded reads through one descriptor) finds the UEFI boot loaders in the ISO 9660, UDF and El
+  Torito trees and reads their PE headers; install discs are known by their `sources/install.*`; the name or label decide
+  only when the boot files say nothing, and the summary card says which. An `.iso` dropped on "Use an ISO" picks it.
+  Tests: `build/vmiso-test` (images built byte by byte, hostile ones, a fuzz pass), 9 new `isoArch` checks.
+- **Machines: virtio-win guests on arm64** (in development; 4.3.2): `virt` with GICv3, secure boot (AAVMF), a TPM on
+  `tpm-tis-device`, USB CD/DVD drives, ramfb, the ARM64 drivers in the unattended answer and the maker's 38 published
+  Arm64 ISO hashes pinned. On a computer whose GIC is version 2, such as the Raspberry Pi 5, KVM can't run it: the
+  machine is Emulated and the card says so. `swtpm` comes with `vm-enable` on arm64 too. Checked on the Pi 5 under TCG
+  with an Alpine ISO; an install of the guest itself is not yet checked. 7 new texts in all 35 languages.
 - **Machines: a machine group's Delete, Rename and Repair** (in development; docs/VIRTUALIZATION.md 19.7–19.9). The
   group's card menu gains Rename… (the group, its members' names and its folder, with the group off; also `machines rename
   GROUP NEW`), Delete… (for good: every member's lock held, the folder renamed out of sight, checked and removed by
