@@ -1995,8 +1995,11 @@ static JSValue f_isoinfo(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     unsigned max = fsops_remote_path(path) ? 40 : 0;
     int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0) return JS_NULL;
+    /* the ISO is untrusted: parsed in lord-vm --iso-probe under seccomp strict mode, never here (vmiso.h); only its fixed
+     * 64-byte answer comes back. 3 s at most (a slow mount): then nothing is known and the name decides */
     VmIso v;
-    int rc = vmiso_probe(fd, &v, max);
+    char bin[PATH_MAX];
+    int rc = bin_path("lord-vm", bin, sizeof bin) ? -1 : vmiso_run(bin, fd, max, 3000, &v);
     close(fd);
     if (rc) memset(&v, 0, sizeof v);
     const char *arch = rc ? "" : vmiso_arch(&v);

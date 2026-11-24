@@ -26,6 +26,7 @@
 #include "vmmem.h"
 #include "vmsandbox.h"
 #include "vmseccomp.h"
+#include "vmiso.h"
 #include "vmops.h"
 #include "vmagent.h"
 #include "vmimport.h"
@@ -63,7 +64,9 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <linux/fs.h>
+#include <malloc.h>
 #include <sys/mman.h>
+#include <linux/seccomp.h>
 #include <sys/prctl.h>
 #include <sys/random.h>
 #include <sys/resource.h>
@@ -11397,6 +11400,7 @@ static int usage(void) {
             "       lord-vm --cdrom DIR IMAGE|none   (a running machine's CD/DVD drive)\n"
             "       lord-vm --qmp DIR 'JSON'   (machines started with --dev-qmp)\n"
             "       lord-vm --sha256 FILE   (an ISO's SHA-256, with progress lines)\n"
+            "       lord-vm --iso-probe MAX   (lord.vm.isoInfo: the ISO on fd 0, one fixed answer on fd 1, under seccomp strict mode)\n"
             "       lord-vm --group-create GROUPDIR --catalog-id ID --archive FILE --sha512 HEX [--release R] [--name N]   (a machine group from a verified archive)\n"
             "       lord-vm --group-fresh GROUPDIR [--gateway] [--archive FILE]   (Start Fresh: the workstation, and the gateway too, back to the verified base)\n"
             "       lord-vm --group-set GROUPDIR [--disposable on|off] [--fresh-gateway on|off]\n"
@@ -11435,6 +11439,52 @@ static int cmd_sha256(const char *path) {
     return 0;
 }
 
+/* lord-vm --iso-probe MAX [--strict-check]: what an ISO a person chose boots on (lord.vm.isoInfo, docs/VIRTUALIZATION.md
+ * 5.2), out of lord-server. fd 0: the ISO, opened by lord-server; fd 1: the answer, a pipe. The file is mapped, every
+ * other descriptor closed and the process enters seccomp strict mode (read, write, exit, sigreturn: no open, no mmap,
+ * no socket) before one byte of the ISO is parsed; the parser's few allocations come from a heap grown beforehand (glibc
+ * may not map memory under strict mode). It writes VMISO_ANSWER bytes and exits. A hostile ISO that breaks the parser
+ * gets a process that can only write those bytes to lord-server, which decodes them strictly (vmiso_answer_decode).
+ * --strict-check (tests): after strict mode, a forbidden call (getpid) that must kill it. */
+static int cmd_iso_probe(int argc, char **argv) {
+    char *e;
+    long max = argc >= 3 ? strtol(argv[2], &e, 10) : -1;
+    if (argc < 3 || *e || max < 0 || max > VMISO_READS) { fprintf(stderr, "lord-vm: --iso-probe MAX (0 to %d), the ISO on fd 0\n", VMISO_READS); return 2; }
+    int check = argc >= 4 && !strcmp(argv[3], "--strict-check");
+    struct stat st;
+    uint8_t ans[VMISO_ANSWER];
+    VmIso v;
+    memset(&v, 0, sizeof v);
+    const void *map = MAP_FAILED;
+    /* 1 TB at most: an ISO is far smaller; the mapping is virtual, read lazily */
+    if (!fstat(0, &st) && S_ISREG(st.st_mode) && st.st_size >= 17 * 2048 && st.st_size <= (1LL << 40))
+        map = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, 0, 0);
+    close(0);
+    int nul = open("/dev/null", O_RDWR | O_CLOEXEC);
+    if (nul >= 0 && nul != 2) { dup2(nul, 2); close(nul); }
+    syscall(SYS_close_range, 3, ~0u, 0);
+    prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+    prctl(PR_SET_DUMPABLE, 0);
+    /* the heap the parser needs, grown now: no mmap for large blocks, no trimming, room on top */
+    mallopt(M_MMAP_MAX, 0);
+    mallopt(M_TRIM_THRESHOLD, 256 << 20);
+    mallopt(M_TOP_PAD, 16 << 20);
+    void *warm = malloc((size_t)VMISO_DIR_MAX * 4);
+    if (warm) { memset(warm, 0, (size_t)VMISO_DIR_MAX * 4); free(warm); }
+    if (syscall(SYS_seccomp, SECCOMP_SET_MODE_STRICT, 0, NULL) && prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT)) { const char m[] = "lord-vm: no seccomp strict mode\n"; (void)!write(2, m, sizeof m - 1); syscall(SYS_exit, 3); }
+    if (check) syscall(SYS_getpid);     /* must not return: strict mode kills the process */
+    int rc = map != MAP_FAILED ? vmiso_probe_map(map, (uint64_t)st.st_size, &v, (unsigned)max) : -1;
+    vmiso_answer_encode(rc, &v, ans);
+    size_t o = 0;
+    while (o < sizeof ans) {
+        ssize_t w = write(1, ans + o, sizeof ans - o);
+        if (w <= 0) break;
+        o += (size_t)w;
+    }
+    syscall(SYS_exit, o == sizeof ans ? 0 : 1);
+    return 1;
+}
+
 int main(int argc, char **argv) {
     /* --key-fd N, anywhere after the command: an encrypted machine's key (above), taken out before the command's own
      * options are read */
@@ -11448,6 +11498,7 @@ int main(int argc, char **argv) {
         break;
     }
     if (argc < 3) return usage();
+    if (!strcmp(argv[1], "--iso-probe")) return cmd_iso_probe(argc, argv);
     if (!strcmp(argv[1], "--sha256")) return cmd_sha256(argv[2]);
     const char *cmd = argv[1], *dir = argv[2];
     int rest = argc - 3;
