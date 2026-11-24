@@ -130,6 +130,14 @@ int              cloud_err_offline(const char *err);
 int              cloud_mount_gave_up(int err);
 /* a message fit for Get Info: HTML tags dropped, white space collapsed, cut at a character boundary to fit n (≤ n-1 bytes) */
 void             cloud_clean_text(const char *in, char *out, size_t n);
+/* #244: a file being moved, as the Cloud menu shows it: the last part of rel, with control characters, bidi controls and
+ * broken UTF-8 dropped, cut at a character boundary to fit n (<= n-1 bytes); "" when nothing printable is left */
+void             cloud_moving_name(const char *rel, char *out, size_t n);
+/* #244: rclone's percentage as a whole 0..100; light (the state compared to decide a push) rounds down to steps of 5, so a
+ * file moving slowly doesn't push the state more than its 20 steps */
+int              cloud_moving_pct(double pct, int light);
+#define CLOUD_MOVING_MAX 4            /* files per account in the state's "moving" list */
+#define CLOUD_MOVING_NAME 128         /* bytes of each name, the NUL included */
 /* the conflict rule (7.2): did the object in the cloud change since this copy came down? fingerprint as kept in vfsMeta,
  * the object now (size, modtime in seconds or < 0 unknown, its hashes). 1 changed, 0 the same, -1 can't tell */
 int              cloud_remote_changed(const char *fingerprint, long long size, double mtime, const char *const *hashes, int nh, int precision_s);

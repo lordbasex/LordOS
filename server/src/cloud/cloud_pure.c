@@ -414,6 +414,43 @@ void cloud_clean_text(const char *in, char *out, size_t n) {
     out[o] = 0;
 }
 
+void cloud_moving_name(const char *rel, char *out, size_t n) {
+    if (!n) return;
+    out[0] = 0;
+    if (!rel) return;
+    const char *b = strrchr(rel, '/');
+    b = b ? b + 1 : rel;
+    size_t o = 0;
+    for (const unsigned char *p = (const unsigned char *)b; *p; ) {
+        int k = *p < 0x80 ? 1 : (*p & 0xe0) == 0xc0 ? 2 : (*p & 0xf0) == 0xe0 ? 3 : (*p & 0xf8) == 0xf0 ? 4 : 0;
+        if (!k) { p++; continue; }
+        int ok = 1;
+        for (int i = 1; i < k; i++) if ((p[i] & 0xc0) != 0x80) { ok = 0; break; }
+        if (!ok) { p++; continue; }
+        unsigned cp = k == 1 ? p[0] : k == 2 ? ((p[0] & 0x1fu) << 6) | (p[1] & 0x3fu)
+                    : k == 3 ? ((p[0] & 0x0fu) << 12) | ((p[1] & 0x3fu) << 6) | (p[2] & 0x3fu)
+                    : ((p[0] & 0x07u) << 18) | ((p[1] & 0x3fu) << 12) | ((p[2] & 0x3fu) << 6) | (p[3] & 0x3fu);
+        /* overlong forms, surrogates, past U+10FFFF */
+        int bad = (k == 2 && cp < 0x80) || (k == 3 && cp < 0x800) || (k == 4 && (cp < 0x10000 || cp > 0x10ffff)) || (cp >= 0xd800 && cp <= 0xdfff);
+        /* C0, DEL, C1, and the marks that reorder or hide text (a name that reads backwards, #244) */
+        int drop = cp < 0x20 || (cp >= 0x7f && cp <= 0x9f) || cp == 0x061c || cp == 0x200e || cp == 0x200f ||
+                   (cp >= 0x202a && cp <= 0x202e) || (cp >= 0x2066 && cp <= 0x2069) || cp == 0xfeff;
+        if (!bad && !drop) {
+            if (o + (size_t)k >= n) break;
+            memcpy(out + o, p, (size_t)k);
+            o += (size_t)k;
+        }
+        p += k;
+    }
+    out[o] = 0;
+}
+
+int cloud_moving_pct(double pct, int light) {
+    if (!(pct > 0)) return 0;                  /* NaN too */
+    int v = pct >= 100 ? 100 : (int)pct;
+    return light ? v - v % 5 : v;
+}
+
 /* Go's time.Time printed with %v in UTC: "2026-11-06 22:20:08.123456789 +0000 UTC" → seconds, -1 */
 static double go_time(const char *s) {
     int Y, M, D, h, m, sec, n = 0;

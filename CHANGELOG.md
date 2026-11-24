@@ -11,6 +11,23 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Cloud: the Cloud menu shows each file moving now with its percentage** (in development; latest release 0.8.9.5-beta;
+  [#244](https://github.com/lordbasex/LordOS/issues/244); docs/CLOUD.md section 11). The panel by the clock has a
+  **Moving now** list between the accounts and Recent: an up or down arrow, the file's name and its percentage on the end
+  side (the left in right-to-left languages), at most four files, then "and N more"; it follows the accounts chosen for
+  Recent, as Settings' account tile already showed the first file.
+  - lord-server already read rclone's `transferring[]` but sent only totals; each account in the state now has a bounded
+    `moving` list (at most 4 entries, uploads first, `{ name, pct, up }`). The name is only the file's last path part,
+    with control characters, bidi marks and overrides (U+061C, U+200E/F, U+202A–U+202E, U+2066–U+2069, U+FEFF) and broken
+    or overlong UTF-8 dropped, at most 127 bytes cut at a character boundary (`cloud_moving_name`); the percentage is a
+    whole 0–100 (`cloud_moving_pct`). The state compared to decide a push rounds it down to steps of 5, so a slow transfer
+    adds at most 20 pushes, still at most two a second.
+  - `movingRows` in `sdk/cloudmodel.js` checks the list again (names, clamped percentages, accounts turned off left out);
+    the dev mock moves it. Three new texts in all 35 languages (each language's own percent format).
+  - Tests: `cloud-test` (2,457 checks) cleans names (controls, a right-to-left override that makes `exe` read as `pdf`,
+    isolates, overlong forms, surrogates, a Hebrew name kept, cuts never halfway through a character) and checks the list
+    in the state (cap, order, a name with nothing printable left out, totals still counting every file);
+    `cloud_model_test.mjs` 347 checks.
 - **Voice: French, German, Italian and Dutch, in development (the latest release is 0.8.9.5-beta).** Reading aloud, `say`,
   Live Speech and Personal Voice now speak seven languages: French ([#215](https://github.com/lordbasex/LordOS/issues/215),
   approved by the maintainer on 2026-11-22), German, Italian and Dutch join Spanish, English and Portuguese. See

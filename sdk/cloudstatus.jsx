@@ -19,7 +19,7 @@ import { ScrollView } from './components.jsx';
 import { notify } from './notify.js';
 import { openUrl } from './sysopen.js';
 import { cloud, cloudState } from './cloud.js';
-import { menuGlyph, stateLine, transfers, recentRows, allPaused, accountColor, usage, conflictName, sortAccounts, liveOnly, toggleOnly, panelAction, liveAccounts, transitions as transitionsOf } from './cloudmodel.js';
+import { menuGlyph, stateLine, transfers, recentRows, movingRows, allPaused, accountColor, usage, conflictName, sortAccounts, liveOnly, toggleOnly, panelAction, liveAccounts, transitions as transitionsOf } from './cloudmodel.js';
 import { CloudGlyph, AccountBadge } from './cloudui.jsx';
 import { installCloudMock } from './cloudmock.js';
 import { askKeyringUnlock } from './vault.js';
@@ -57,6 +57,7 @@ function Panel({ st, onClose, only, setOnly, room }) {
   const head = [tr.up ? t('cloud.goingUp', { count: tr.up }) : '', tr.down ? t('cloud.comingDown', { count: tr.down }) : ''].filter(Boolean).join(' · ');
   const sel = liveOnly(only, accs);
   const rows = recentRows(st.recent, accs, Date.now(), 5, sel);
+  const moving = movingRows(accs, sel, 4);       // #244: each file moving now with its percentage
   const paused = allPaused(st);
   const one = sel.length === 1 ? accs.find((a) => a.id === sel[0]) : accs.length === 1 ? accs[0] : null;
   const action = (a) => {
@@ -88,6 +89,14 @@ function Panel({ st, onClose, only, setOnly, room }) {
           h(Text, { style: { fontSize: 12, color: ToneColor(th, line.tone), whiteSpace: 'nowrap', overflow: 'hidden', textAlign: 'start' } }, text)),
         action(a));
       })),
+    // #244: the files moving now, each with its percentage on the end side (the name takes what is left and is cut)
+    moving.rows.length ? h(View, { style: { borderTopWidth: 1, borderTopColor: th.separator, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6 } },
+      h(Text, { style: { fontSize: 11, fontWeight: 600, color: th.textDim, paddingHorizontal: 6, paddingBottom: 2, textAlign: 'start' } }, t('cloud.menu.moving')),
+      ...moving.rows.map((m, i) => h(View, { key: `${m.account}${m.dir}${m.name}${i}`, style: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 6, paddingVertical: 4 } },
+        h(Text, { style: { width: 18, fontSize: 14, fontWeight: 700, color: m.dir === 'up' ? '#bf5af2' : '#0a84ff', textAlign: 'center' } }, m.dir === 'up' ? '↑' : '↓'),
+        h(Text, { style: { flex: 1, minWidth: 0, fontSize: 12, color: th.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'start' } }, m.name),
+        h(Text, { style: { minWidth: 44, flexShrink: 0, fontSize: 12, color: ToneColor(th, 'busy'), whiteSpace: 'nowrap', textAlign: 'end' } }, t('cloud.menu.movingPct', { pct: m.pct })))),
+      moving.more ? h(Text, { style: { fontSize: 12, color: th.textDim, paddingHorizontal: 6, paddingTop: 2, textAlign: 'start' } }, t('cloud.menu.movingMore', { count: moving.more })) : null) : null,
     rows.length || sel.length ? h(View, { style: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: th.separator, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 } },
       h(Text, { style: { flex: 1, fontSize: 11, fontWeight: 600, color: th.textDim, textAlign: 'start' } }, t('cloud.recent')),
       sel.length ? h(Text, { onClick: () => setOnly([]), style: { fontSize: 11, fontWeight: 600, color: th.accent } }, t('cloud.menu.showAll')) : null) : null,
