@@ -905,7 +905,7 @@ static void *worker(void *arg) {
             /* Monitor → GPU and the Overview's GPU card: the cards and the user's processes' DRM clients, once per second */
             static const char *const ids[] = { "/usr/share/misc/pci.ids", "/usr/share/hwdata/pci.ids" };
             const char *pci = access(ids[0], R_OK) ? ids[1] : ids[0];
-            Buf g = { .p = gpu_json("", pci, (unsigned)getuid(), (int)getpid(), M.home) };
+            Buf g = { .p = gpu_json("", pci, (unsigned)getuid(), (int)getpid(), M.home, NULL) };
             if (g.p) publish(&M.gpu, &M.gseq, &g);
         }
         if (wc && tick % 4 == 2) {

@@ -355,6 +355,9 @@ static void card_hwmon(GpuCard *g, const char *dev) {
         GpuTemp *t = &g->temp[g->ntemp];
         t->mc = (int)v;
         t->label[0] = 0;
+        pathf(p, sizeof p, "%s/temp%d_crit", hw, i);
+        long long crit = num_file(p, 200000);
+        t->crit_mc = crit >= 20000 ? (int)crit : -1;          /* a "crit" below 20 °C is not a real limit */
         pathf(p, sizeof p, "%s/temp%d_label", hw, i);
         char lb[32];
         if (rd(p, lb, sizeof lb) > 0) { lb[strcspn(lb, "\n")] = 0; if (clean_name(lb, strlen(lb), " _-", sizeof t->label)) memcpy(t->label, lb, strlen(lb) + 1); }
@@ -375,6 +378,7 @@ static void card_hwmon(GpuCard *g, const char *dev) {
     if (g->power_uw < 0) { pathf(p, sizeof p, "%s/power1_input", hw); g->power_uw = num_file(p, 2000000000ull); }
     pathf(p, sizeof p, "%s/power1_cap", hw);
     g->cap_uw = num_file(p, 2000000000ull);
+    if (g->cap_uw <= 0) { pathf(p, sizeof p, "%s/power1_max", hw); g->cap_uw = num_file(p, 2000000000ull); }   /* i915/xe: PL1 */
     pathf(p, sizeof p, "%s/energy1_input", hw);
     g->energy_uj = num_file(p, 1ull << 62);
     for (int i = 1; i <= 2; i++) {
@@ -388,6 +392,78 @@ static void card_hwmon(GpuCard *g, const char *dev) {
         if (!strcmp(lb, "sclk")) g->sclk_mhz = (int)(hz / 1000000);
         else if (!strcmp(lb, "mclk")) g->mclk_mhz = (int)(hz / 1000000);
     }
+}
+
+int gpu_link_speed(const char *text) {
+    /* "<digits>[.<digit>] GT/s[ PCIe]" */
+    const char *p = text;
+    int v = 0, k = 0;
+    while (*p >= '0' && *p <= '9' && k < 3) { v = v * 10 + (*p++ - '0'); k++; }
+    if (!k) return -1;
+    v *= 10;
+    if (*p == '.') {
+        p++;
+        if (*p < '0' || *p > '9') return -1;
+        v += *p++ - '0';
+        while (*p == '0') p++;
+        if (*p >= '0' && *p <= '9') return -1;              /* "2.5" is fine, "2.55" is not a PCIe speed */
+    }
+    if (strncmp(p, " GT/s", 5)) return -1;
+    p += 5;
+    if (!strcmp(p, " PCIe") || !strcmp(p, " PCIe\n") || !strcmp(p, "\n") || !*p) return v > 0 && v <= 1280 ? v : -1;
+    return -1;
+}
+
+void gpu_nv_info(const char *text, GpuCard *g) {
+    for (const char *l = text; l && *l; l = strchr(l, '\n') ? strchr(l, '\n') + 1 : NULL) {
+        size_t ll = strcspn(l, "\n");
+        char *dst = NULL;
+        size_t dn = 0;
+        const char *v = NULL;
+        if (!strncmp(l, "Model:", 6)) { dst = g->nv_model; dn = sizeof g->nv_model; v = l + 6; }
+        else if (!strncmp(l, "Video BIOS:", 11)) { dst = g->nv_vbios; dn = sizeof g->nv_vbios; v = l + 11; }
+        if (!dst) continue;
+        while (v < l + ll && (*v == ' ' || *v == '\t')) v++;
+        size_t vl = (size_t)(l + ll - v);
+        while (vl && (v[vl - 1] == ' ' || v[vl - 1] == '\t' || v[vl - 1] == '\r')) vl--;
+        if (!vl || vl >= dn) continue;
+        int ok = 1;
+        for (size_t i = 0; i < vl && ok; i++) ok = v[i] >= 0x20 && v[i] < 0x7f;
+        if (!ok) continue;
+        memcpy(dst, v, vl);
+        dst[vl] = 0;
+    }
+}
+
+/* xe: tile<T>/gt<G>/freq0/{act,cur,max,rp0}_freq and gtidle/{name,idle_residency_ms} */
+static void card_xe_gts(GpuCard *g, const char *dev) {
+    char p[PATH_MAX + 96];
+    for (int t = 0; t < 2; t++)
+        for (int k = 0; k < 4 && g->ngt < GPU_GTS; k++) {
+            GpuGt *x = &g->gt[g->ngt];
+            pathf(p, sizeof p, "%s/tile%d/gt%d/freq0/act_freq", dev, t, k);
+            x->act = (int)num_file(p, 100000);
+            pathf(p, sizeof p, "%s/tile%d/gt%d/freq0/cur_freq", dev, t, k);
+            x->cur = (int)num_file(p, 100000);
+            pathf(p, sizeof p, "%s/tile%d/gt%d/freq0/max_freq", dev, t, k);
+            x->max = (int)num_file(p, 100000);
+            pathf(p, sizeof p, "%s/tile%d/gt%d/freq0/rp0_freq", dev, t, k);
+            x->rp0 = (int)num_file(p, 100000);
+            pathf(p, sizeof p, "%s/tile%d/gt%d/gtidle/idle_residency_ms", dev, t, k);
+            x->idle_ms = num_file(p, 1ull << 50);
+            if (x->act < 0 && x->cur < 0 && x->max < 0 && x->idle_ms < 0) continue;
+            x->tile = t;
+            x->gt = k;
+            x->kind[0] = 0;
+            char nm[24];
+            pathf(p, sizeof p, "%s/tile%d/gt%d/gtidle/name", dev, t, k);
+            if (rd(p, nm, sizeof nm) > 0) {
+                nm[strcspn(nm, "\n")] = 0;
+                size_t l = strlen(nm);                       /* "gt0-rc", "gt1-mc" */
+                if (l > 3 && nm[l - 3] == '-' && (!strcmp(nm + l - 2, "rc") || !strcmp(nm + l - 2, "mc"))) memcpy(x->kind, nm + l - 2, 3);
+            }
+            g->ngt++;
+        }
 }
 
 static int by_card(const void *a, const void *b) { return atoi((const char *)a + 4) - atoi((const char *)b + 4); }
@@ -408,6 +484,8 @@ int gpu_cards_read(const char *root, const char *pci_ids, GpuCard *out, int max)
         memset(g, 0, sizeof *g);
         g->busy = g->fan_rpm = g->fan_max = g->fan_pct = g->sclk_mhz = g->mclk_mhz = g->sclk_max = g->mclk_max = g->cur_mhz = g->max_mhz = -1;
         g->vram_used = g->vram_total = g->vis_used = g->vis_total = g->gtt_used = g->gtt_total = g->power_uw = g->cap_uw = g->energy_uj = -1;
+        g->mem_busy = g->link_speed = g->link_width = g->link_max_speed = g->link_max_width = g->rp0_mhz = -1;
+        g->rc6_ms = -1;
         memcpy(g->card, cards[i], strlen(cards[i]) + 1);
         char dir[PATH_MAX], dev[PATH_MAX], p[PATH_MAX + 64], b[1024];
         pathf(dir, sizeof dir, "%s/%s", base, cards[i]);
@@ -442,6 +520,30 @@ int gpu_cards_read(const char *root, const char *pci_ids, GpuCard *out, int max)
         g->max_mhz = (int)num_file(p, 100000);
         if (g->cur_mhz < 0) { pathf(p, sizeof p, "%s/tile0/gt0/freq0/act_freq", dev); g->cur_mhz = (int)num_file(p, 100000); }
         if (g->max_mhz < 0) { pathf(p, sizeof p, "%s/tile0/gt0/freq0/max_freq", dev); g->max_mhz = (int)num_file(p, 100000); }
+        pathf(p, sizeof p, "%s/mem_busy_percent", dev);
+        g->mem_busy = (int)num_file(p, 100);
+        /* the PCIe link (never pcie_bw: reading it stalls the card for a second) */
+        static const char *const lk[] = { "current_link_speed", "max_link_speed" };
+        int *ls[] = { &g->link_speed, &g->link_max_speed };
+        for (int k = 0; k < 2; k++) { pathf(p, sizeof p, "%s/%s", dev, lk[k]); if (rd(p, b, 32) > 0) *ls[k] = gpu_link_speed(b); }
+        pathf(p, sizeof p, "%s/current_link_width", dev);
+        g->link_width = (int)num_file(p, 32);
+        pathf(p, sizeof p, "%s/max_link_width", dev);
+        g->link_max_width = (int)num_file(p, 32);
+        if (g->link_width == 0 || g->link_speed < 0) g->link_width = -1;   /* an integrated GPU reads "Unknown" and 0 or 255 */
+        if (g->link_max_width == 0 || g->link_max_speed < 0) g->link_max_width = -1;
+        if (g->link_width < 0) g->link_speed = -1;
+        if (g->link_max_width < 0) g->link_max_speed = -1;
+        /* i915: the top frequency it may reach and how long it slept (RC6) */
+        pathf(p, sizeof p, "%s/gt_RP0_freq_mhz", dir);
+        g->rp0_mhz = (int)num_file(p, 100000);
+        pathf(p, sizeof p, "%s/power/rc6_residency_ms", dir);
+        g->rc6_ms = num_file(p, 1ull << 50);
+        if (!strcmp(g->driver, "xe")) card_xe_gts(g, dev);
+        if (!strcmp(g->driver, "nvidia") && g->slot[0]) {
+            pathf(p, sizeof p, "%s/proc/driver/nvidia/gpus/%s/information", root, g->slot);
+            if (rd(p, b, sizeof b) > 0) gpu_nv_info(b, g);
+        }
         card_hwmon(g, dev);
         n++;
     }
@@ -479,11 +581,32 @@ static int proc_stat(const char *proot, int pid, ProcStat *s) {
     return 0;
 }
 
-/* the AI helpers LordOS starts (docs/MONITOR.md, "GPU"): the model's table (apps/monitor/gpumodel.js) says what each is */
+/* the AI engines whose processes are listed in "ai" (docs/MONITOR.md, "GPU"): LordOS's own helpers (lord-tts, lord-ocr,
+ * lord-say, lord-studio, lord-llm) and the common local model runners; the model (apps/monitor/gpumodel.js) says what
+ * each is. A name only ever labels a row: nothing is trusted because of it. */
 static int ai_name(const char *comm) {
-    static const char *const ai[] = { "lord-tts", "lord-ocr", "lord-say" };
+    static const char *const ai[] = { "lord-tts", "lord-ocr", "lord-say", "lord-studio", "lord-llm", "llama-server", "llama-cli", "ollama",
+        "ollama_llama_se", "whisper-server", "whisper-cli" };
     for (size_t i = 0; i < sizeof ai / sizeof *ai; i++) if (!strcmp(comm, ai[i])) return 1;
     return 0;
+}
+
+void gpu_argv_model(const char *argv, size_t len, char *out, size_t out_n) {
+    out[0] = 0;
+    const char *end = argv + len, *val = NULL;
+    for (const char *a = argv; a < end && !val;) {
+        const char *z = memchr(a, 0, (size_t)(end - a));
+        if (!z) break;
+        if (!strcmp(a, "-m") || !strcmp(a, "--model")) val = z + 1 < end && memchr(z + 1, 0, (size_t)(end - z - 1)) ? z + 1 : NULL;
+        else if (!strncmp(a, "--model=", 8)) val = a + 8;
+        if (!val && (!strcmp(a, "-m") || !strcmp(a, "--model"))) break;
+        a = z + 1;
+    }
+    if (!val || !*val) return;
+    const char *b = strrchr(val, '/');
+    b = b ? b + 1 : val;
+    size_t l = strlen(b);
+    if (clean_name(b, l, "._+-", out_n) && b[0] != '.') { memcpy(out, b, l); out[l] = 0; }
 }
 
 /* the libraries a process maps that tell which GPU API it uses */
@@ -549,33 +672,251 @@ static int same_client(const GpuClient *a, const GpuClient *b) {
     return a->has_id && b->has_id && a->id == b->id && !strcmp(a->pdev, b->pdev) && !strcmp(a->driver, b->driver);
 }
 
-/* the process's DRM clients (deduplicated: a client opened once and duplicated shows in several fds) */
-static int proc_clients(const char *proot, int pid, GpuClient *out, int max, char *fdbuf) {
+/* ---- the processes holding a GPU, kept between rescans ---- */
+
+#define HOLD_MAX   LIST_MAX
+#define HOLD_FDS   PROC_CLIENTS
+#define SIDE_MAX   32                   /* AI engines and machines */
+#define HIDDEN_MAX 16
+#define KFD_GPUS   8
+#define TOPO_TTL_MS 30000
+
+typedef struct {
+    int pid, ppid;
+    unsigned long long start;
+    int fds[HOLD_FDS], nfd;             /* its fds on /dev/dri */
+    int kfd;                            /* holds /dev/kfd */
+    unsigned nv;                        /* bit n: /dev/nvidia<n> (n < 31); bit 31: nvidiactl or nvidia-uvm */
+    char comm[32], cmd[64], exe[256], model[64];
+} Holder;
+
+typedef struct { int pid; unsigned long long start; int own, qemu; char model[64]; } Side;
+typedef struct { int pid; unsigned long long start; char comm[32]; } Hidden;
+
+static struct {
+    Holder h[HOLD_MAX]; int nh;
+    Side s[SIDE_MAX]; int ns;
+    Hidden x[HIDDEN_MAX]; int nx;
+    double at;
+    int valid;
+    unsigned uid;
+    char root[128];
+} HC;
+
+static struct { unsigned id; char slot[GPU_NAME]; } topo[KFD_GPUS];
+static int ntopo;
+static double topo_at;
+static char topo_root[128];
+
+void gpu_cache_reset(void) { HC.valid = 0; topo_at = 0; ntopo = 0; }
+
+/* KFD's gpu ids and their PCI slots (topology/nodes/N: gpu_id, properties' domain and location_id) */
+static void kfd_topology(const char *root) {
+    double now = now_ms(0);
+    if (topo_at > 0 && now - topo_at < TOPO_TTL_MS && !strcmp(topo_root, root)) return;
+    topo_at = now;
+    snprintf(topo_root, sizeof topo_root, "%s", root);
+    ntopo = 0;
+    for (int n = 0; n < 16 && ntopo < KFD_GPUS; n++) {
+        char p[PATH_MAX], b[4096];
+        pathf(p, sizeof p, "%s/sys/class/kfd/kfd/topology/nodes/%d/gpu_id", root, n);
+        long long id = num_file(p, 0xffffffffull);
+        if (id <= 0) continue;                               /* a CPU node reads 0 */
+        pathf(p, sizeof p, "%s/sys/class/kfd/kfd/topology/nodes/%d/properties", root, n);
+        if (rd(p, b, sizeof b) <= 0) continue;
+        long long dom = -1, loc = -1;
+        for (const char *l = b; l && *l; l = strchr(l, '\n') ? strchr(l, '\n') + 1 : NULL) {
+            char v[24];
+            const char *sp = strchr(l, ' '), *nl = strchr(l, '\n');
+            if (!sp || (nl && sp > nl)) continue;
+            size_t vl = (size_t)((nl ? nl : l + strlen(l)) - sp - 1);
+            if (vl == 0 || vl >= sizeof v) continue;
+            memcpy(v, sp + 1, vl);
+            v[vl] = 0;
+            unsigned long long x;
+            if (gpu_parse_u64(v, &x)) continue;
+            if (sp - l == 6 && !strncmp(l, "domain", 6) && x <= 0xffff) dom = (long long)x;
+            else if (sp - l == 11 && !strncmp(l, "location_id", 11) && x <= 0xffff) loc = (long long)x;
+        }
+        if (dom < 0 || loc < 0) continue;
+        topo[ntopo].id = (unsigned)id;
+        snprintf(topo[ntopo].slot, sizeof topo[ntopo].slot, "%04x:%02x:%02x.%x", (unsigned)dom, (unsigned)(loc >> 8), (unsigned)((loc >> 3) & 0x1f), (unsigned)(loc & 7));
+        ntopo++;
+    }
+}
+
+static const char *kfd_slot(unsigned id) {
+    for (int i = 0; i < ntopo; i++) if (topo[i].id == id) return topo[i].slot;
+    return "";
+}
+
+/* what one fd of a process points at: 1 a /dev/dri node, 2 /dev/kfd, 3 /dev/nvidia<n> (*minor), 4 nvidiactl/nvidia-uvm, 0 */
+static int fd_kind(const char *l, int *minor) {
+    if (!strncmp(l, "/dev/dri/", 9) && l[9]) return 1;
+    if (!strcmp(l, "/dev/kfd")) return 2;
+    if (!strcmp(l, "/dev/nvidiactl") || !strcmp(l, "/dev/nvidia-uvm")) return 4;
+    if (!strncmp(l, "/dev/nvidia", 11) && l[11] >= '0' && l[11] <= '9' && strlen(l + 11) <= 2) {
+        int m = atoi(l + 11);
+        if (m < 31 && (l[12] == 0 || (l[12] >= '0' && l[12] <= '9'))) { *minor = m; return 3; }
+    }
+    return 0;
+}
+
+static int own_pid(const char *proot, int pid, unsigned uid) {
     char p[96];
-    pathf(p, sizeof p, "%s/%d/fd", proot, pid);
-    DIR *d = opendir(p);
-    if (!d) return 0;
-    int n = 0, seen = 0;
-    for (struct dirent *e; (e = readdir(d)) && seen < PROC_FDS_MAX;) {
-        if (e->d_name[0] < '0' || e->d_name[0] > '9') continue;
-        seen++;
-        char l[64];
-        ssize_t k = readlinkat(dirfd(d), e->d_name, l, sizeof l - 1);
-        if (k <= 9) continue;
-        l[k] = 0;
-        if (strncmp(l, "/dev/dri/", 9)) continue;
+    struct stat sb;
+    pathf(p, sizeof p, "%s/%d", proot, pid);
+    return !stat(p, &sb) && sb.st_uid == uid;
+}
+
+/* the whole /proc walk: every process's stat, the user's own processes' fd folders (GPU_RESCAN_MS) */
+static void rescan(const char *root, const char *proot, unsigned uid) {
+    HC.nh = HC.ns = HC.nx = 0;
+    DIR *d = opendir(proot);
+    for (struct dirent *e; d && (e = readdir(d));) {
+        if (e->d_name[0] < '1' || e->d_name[0] > '9' || strlen(e->d_name) > 9) continue;
+        int pid = atoi(e->d_name);
+        ProcStat s;
+        if (proc_stat(proot, pid, &s)) continue;
+        int own = own_pid(proot, pid, uid);
+        /* Machines' QEMU is non-dumpable (docs/VIRTUALIZATION.md 3.3): its /proc folder is root's, its real uid the
+         * person's. Counted as theirs for the machines' use; its descriptors stay unreadable */
+        int qemu = !strncmp(s.comm, "qemu-system", 11);
+        if (qemu && !own) {
+            char p[96], st[2048];
+            pathf(p, sizeof p, "%s/%d/status", proot, pid);
+            const char *u = rd(p, st, sizeof st) > 0 ? strstr(st, "\nUid:") : NULL;
+            own = u && strtol(u + 5, NULL, 10) == (long)uid;
+        }
+        char argv[4096];
+        long argl = -1;
+        if ((ai_name(s.comm) || (qemu && own)) && HC.ns < SIDE_MAX) {
+            Side *x = &HC.s[HC.ns++];
+            memset(x, 0, sizeof *x);
+            x->pid = pid;
+            x->start = s.start;
+            x->own = own;
+            x->qemu = qemu && own;
+            if (own && !qemu) {
+                char p[96];
+                pathf(p, sizeof p, "%s/%d/cmdline", proot, pid);
+                argl = rd(p, argv, sizeof argv);
+                if (argl > 0) gpu_argv_model(argv, (size_t)argl, x->model, sizeof x->model);
+            }
+        }
+        if (!own || qemu || HC.nh >= HOLD_MAX) continue;    /* another user's (or a sandboxed helper's) fds aren't ours to read */
+        Holder h;
+        memset(&h, 0, sizeof h);
+        char p[96];
+        pathf(p, sizeof p, "%s/%d/fd", proot, pid);
+        DIR *fd = opendir(p);
+        int seen = 0;
+        for (struct dirent *f; fd && (f = readdir(fd)) && seen < PROC_FDS_MAX;) {
+            if (f->d_name[0] < '0' || f->d_name[0] > '9' || strlen(f->d_name) > 9) continue;
+            seen++;
+            char l[64];
+            ssize_t k = readlinkat(dirfd(fd), f->d_name, l, sizeof l - 1);
+            if (k <= 0) continue;
+            l[k] = 0;
+            int minor = 0, kind = fd_kind(l, &minor);
+            if (kind == 1 && h.nfd < HOLD_FDS) h.fds[h.nfd++] = atoi(f->d_name);
+            else if (kind == 2) h.kfd = 1;
+            else if (kind == 3) h.nv |= 1u << minor;
+            else if (kind == 4) h.nv |= 1u << 31;
+        }
+        if (fd) closedir(fd);
+        if (!h.nfd && !h.kfd && !h.nv) continue;
+        h.pid = pid;
+        h.ppid = s.ppid;
+        h.start = s.start;
+        memcpy(h.comm, s.comm, sizeof h.comm);
+        if (argl < 0) {
+            pathf(p, sizeof p, "%s/%d/cmdline", proot, pid);
+            argl = rd(p, argv, sizeof argv);
+        }
+        if (argl > 0) {
+            /* the program's base name (argv[0]) and the model it was given, by base name only */
+            size_t a0 = strnlen(argv, (size_t)argl);
+            char a[256];
+            size_t al = a0 < sizeof a ? a0 : sizeof a - 1;
+            memcpy(a, argv, al);
+            a[al] = 0;
+            const char *bs = strrchr(a, '/');
+            bs = bs ? bs + 1 : a;
+            size_t bl = strnlen(bs, sizeof h.cmd - 1);
+            memcpy(h.cmd, bs, bl);
+            h.cmd[bl] = 0;
+            gpu_argv_model(argv, (size_t)argl, h.model, sizeof h.model);
+        }
+        pathf(p, sizeof p, "%s/%d/exe", proot, pid);
+        ssize_t k = readlink(p, h.exe, sizeof h.exe - 1);
+        h.exe[k > 0 && (size_t)k < sizeof h.exe - 1 ? k : 0] = 0;   /* a cut path is never shown */
+        HC.h[HC.nh++] = h;
+    }
+    if (d) closedir(d);
+    /* another user's KFD process: its pid and name only (the folder names under kfd/proc are world-readable) */
+    char kp[PATH_MAX];
+    pathf(kp, sizeof kp, "%s/sys/class/kfd/kfd/proc", root);
+    DIR *k = opendir(kp);
+    for (struct dirent *e; k && (e = readdir(k)) && HC.nx < HIDDEN_MAX;) {
+        if (e->d_name[0] < '1' || e->d_name[0] > '9' || strlen(e->d_name) > 9) continue;
+        int pid = atoi(e->d_name);
+        ProcStat s;
+        if (own_pid(proot, pid, uid) || proc_stat(proot, pid, &s)) continue;
+        HC.x[HC.nx].pid = pid;
+        HC.x[HC.nx].start = s.start;
+        memcpy(HC.x[HC.nx].comm, s.comm, sizeof s.comm);
+        HC.nx++;
+    }
+    if (k) closedir(k);
+}
+
+/* a kept process's DRM clients now: only the fds found at the last rescan (deduplicated: a client opened once and
+ * duplicated shows in several fds). A fd closed or reused for something else has no drm-driver and is skipped. */
+static int holder_clients(const char *proot, const Holder *h, GpuClient *out, int max, char *fdbuf) {
+    int n = 0;
+    for (int i = 0; i < h->nfd; i++) {
         char fp[128];
-        pathf(fp, sizeof fp, "%s/%d/fdinfo/%.16s", proot, pid, e->d_name);
+        pathf(fp, sizeof fp, "%s/%d/fdinfo/%d", proot, h->pid, h->fds[i]);
         long got = rd(fp, fdbuf, GPU_FDINFO_MAX);
         if (got <= 0) continue;
         GpuClient c;
         if (gpu_fdinfo_parse(fdbuf, (size_t)got, &c)) continue;
         int dup = 0;
-        for (int i = 0; i < n && !dup; i++) dup = same_client(&out[i], &c);
+        for (int j = 0; j < n && !dup; j++) dup = same_client(&out[j], &c);
         if (!dup && n < max) out[n++] = c;
     }
-    closedir(d);
     return n;
+}
+
+/* KFD's per-process numbers: [{slot, vram, sdmaUs, cu}] (vram_<id>, sdma_<id>, stats_<id>/cu_occupancy) */
+static void holder_kfd(Js *b, const char *root, int pid) {
+    char dir[PATH_MAX];
+    pathf(dir, sizeof dir, "%s/sys/class/kfd/kfd/proc/%d", root, pid);
+    DIR *d = opendir(dir);
+    int n = 0;
+    jp(b, ",\"kfd\":[");
+    for (struct dirent *e; d && n < KFD_GPUS && (e = readdir(d));) {
+        if (strncmp(e->d_name, "vram_", 5)) continue;
+        unsigned long long id;
+        if (gpu_parse_u64(e->d_name + 5, &id) || !id || id > 0xffffffffull) continue;
+        char p[PATH_MAX + 64];
+        pathf(p, sizeof p, "%s/vram_%llu", dir, id);
+        long long vram = num_file(p, 1ull << 50);
+        pathf(p, sizeof p, "%s/sdma_%llu", dir, id);
+        long long sdma = num_file(p, 1ull << 62);
+        pathf(p, sizeof p, "%s/stats_%llu/cu_occupancy", dir, id);
+        long long cu = num_file(p, 1u << 20);
+        jp(b, "%s{\"slot\":", n ? "," : "");
+        jstr(b, kfd_slot((unsigned)id));
+        jnum(b, "vram", vram);
+        jnum(b, "sdmaUs", sdma);
+        jnum(b, "cu", cu);
+        jp(b, "}");
+        n++;
+    }
+    if (d) closedir(d);
+    jp(b, "]");
 }
 
 static void client_json(Js *b, const GpuClient *c) {
@@ -627,7 +968,8 @@ static void card_json(Js *b, const GpuCard *g, int first) {
     for (int i = 0; i < g->ntemp; i++) {
         jp(b, "%s{\"label\":", i ? "," : "");
         jstr(b, g->temp[i].label);
-        jp(b, ",\"c\":%.1f}", g->temp[i].mc / 1000.0);
+        jp(b, ",\"c\":%.1f", g->temp[i].mc / 1000.0);
+        if (g->temp[i].crit_mc > 0) jp(b, ",\"crit\":%.1f}", g->temp[i].crit_mc / 1000.0); else jp(b, ",\"crit\":null}");
     }
     jp(b, "]");
     jnum(b, "fanRpm", g->fan_rpm);
@@ -642,6 +984,26 @@ static void card_json(Js *b, const GpuCard *g, int first) {
     jnum(b, "mclkMax", g->mclk_max);
     jnum(b, "curMhz", g->cur_mhz);
     jnum(b, "maxMhz", g->max_mhz);
+    jnum(b, "memBusy", g->mem_busy);
+    if (g->link_speed > 0) jp(b, ",\"link\":{\"gts\":%d.%d,\"width\":%d}", g->link_speed / 10, g->link_speed % 10, g->link_width); else jp(b, ",\"link\":null");
+    if (g->link_max_speed > 0) jp(b, ",\"linkMax\":{\"gts\":%d.%d,\"width\":%d}", g->link_max_speed / 10, g->link_max_speed % 10, g->link_max_width); else jp(b, ",\"linkMax\":null");
+    jnum(b, "rp0Mhz", g->rp0_mhz);
+    jnum(b, "rc6Ms", g->rc6_ms);
+    jp(b, ",\"gts\":[");
+    for (int i = 0; i < g->ngt; i++) {
+        const GpuGt *x = &g->gt[i];
+        jp(b, "%s{\"tile\":%d,\"gt\":%d,\"kind\":\"%s\"", i ? "," : "", x->tile, x->gt, x->kind);
+        jnum(b, "act", x->act);
+        jnum(b, "cur", x->cur);
+        jnum(b, "max", x->max);
+        jnum(b, "rp0", x->rp0);
+        jnum(b, "idleMs", x->idle_ms);
+        jp(b, "}");
+    }
+    jp(b, "],\"nvModel\":");
+    jstr(b, g->nv_model);
+    jp(b, ",\"nvVbios\":");
+    jstr(b, g->nv_vbios);
     jp(b, "}");
 }
 
@@ -792,7 +1154,7 @@ static void say_note(Js *b, const char *home, const ProcStat *s, unsigned uid, i
     *first = 0;
 }
 
-char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, const char *home) {
+char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, const char *home, const char *nvml) {
     static GpuCard cards[GPU_CARDS];
     static GpuClient clients[PROC_CLIENTS];
     static char *caps;
@@ -802,6 +1164,14 @@ char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, co
     pathf(proot, sizeof proot, "%s/proc", root);
     char *fdbuf = malloc(GPU_FDINFO_MAX);
     if (!fdbuf) return NULL;
+    double now = now_ms(0);
+    if (!HC.valid || now - HC.at >= GPU_RESCAN_MS || HC.uid != uid || strcmp(HC.root, root)) {
+        rescan(root, proot, uid);
+        HC.at = now;
+        HC.valid = 1;
+        HC.uid = uid;
+        snprintf(HC.root, sizeof HC.root, "%s", root);
+    }
     Js b = { 0 }, ai = { 0 }, say = { 0 }, vms = { 0 };
     long hz = sysconf(_SC_CLK_TCK), page = sysconf(_SC_PAGESIZE);
     jp(&b, "{\"t\":%.0f,\"mono\":%.0f,\"hz\":%ld,\"cards\":[", now_ms(1), now_ms(0), hz);
@@ -809,67 +1179,66 @@ char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, co
     for (int i = 0; i < nc; i++) card_json(&b, &cards[i], i == 0);
     jp(&b, "],\"list\":[");
     int nlist = 0, fai = 1, fsay = 1, fvm = 1;
-    DIR *d = opendir(proot);
-    for (struct dirent *e; d && (e = readdir(d));) {
-        if (e->d_name[0] < '1' || e->d_name[0] > '9' || strlen(e->d_name) > 9) continue;
-        int pid = atoi(e->d_name);
+    int any_kfd = 0;
+    for (int i = 0; i < HC.nh; i++) any_kfd |= HC.h[i].kfd;
+    if (any_kfd) kfd_topology(root);
+    for (int i = 0; i < HC.nh; i++) {
+        Holder *h = &HC.h[i];
         ProcStat s;
-        if (proc_stat(proot, pid, &s)) continue;
-        char p[PATH_MAX];
-        struct stat sb;
-        pathf(p, sizeof p, "%s/%d", proot, pid);
-        int own = !stat(p, &sb) && sb.st_uid == uid;
-        /* Machines' QEMU is non-dumpable (docs/VIRTUALIZATION.md 3.3): its /proc folder is root's, its real uid the
-         * person's. Counted as theirs for the machines' use; its descriptors stay unreadable (proc_clients finds none) */
-        int qemu = !strncmp(s.comm, "qemu-system", 11);
-        if (qemu && !own) {
-            char st[2048];
-            pathf(p, sizeof p, "%s/%d/status", proot, pid);
-            const char *u = rd(p, st, sizeof st) > 0 ? strstr(st, "\nUid:") : NULL;
-            own = u && strtol(u + 5, NULL, 10) == (long)uid;
-        }
-        if (ai_name(s.comm)) {
-            jp(&ai, "%s{\"pid\":%d,\"ppid\":%d,\"name\":", fai ? "" : ",", pid, s.ppid);
-            jstr(&ai, s.comm);
-            jp(&ai, ",\"state\":\"%c\",\"own\":%s}", s.state, own ? "true" : "false");
-            fai = 0;
-            if (!strcmp(s.comm, "lord-say")) say_note(&say, home, &s, uid, &fsay);
-        }
-        if (!own) continue;                                 /* another user's (or a sandboxed helper's) fds aren't ours to read */
-        if (qemu) {
-            jp(&vms, "%s{\"pid\":%d,\"ticks\":%llu,\"rss\":%llu}", fvm ? "" : ",", pid, s.ticks, s.rss_pages * (unsigned long long)page);
-            fvm = 0;
-        }
-        if (nlist >= LIST_MAX) continue;
-        int n = proc_clients(proot, pid, clients, PROC_CLIENTS, fdbuf);
-        if (!n) continue;
-        char cmd[256] = "", exe[PATH_MAX] = "";
-        pathf(p, sizeof p, "%s/%d/cmdline", proot, pid);
-        long cl = rd(p, cmd, sizeof cmd);
-        if (cl > 0) {
-            char *bs = strrchr(cmd, '/');
-            if (bs) memmove(cmd, bs + 1, strlen(bs + 1) + 1);
-        }
-        pathf(p, sizeof p, "%s/%d/exe", proot, pid);
-        ssize_t k = readlink(p, exe, sizeof exe - 1);
-        exe[k > 0 ? k : 0] = 0;
-        jp(&b, "%s{\"pid\":%d,\"ppid\":%d,\"name\":", nlist ? "," : "", pid, s.ppid);
-        jstr(&b, s.comm);
+        /* gone, or the pid now belongs to another process: dropped until the next rescan */
+        if (!h->pid || proc_stat(proot, h->pid, &s) || s.start != h->start) { h->pid = 0; continue; }
+        int n = h->nfd ? holder_clients(proot, h, clients, PROC_CLIENTS, fdbuf) : 0;
+        if (!n && !h->kfd && !h->nv) continue;
+        jp(&b, "%s{\"pid\":%d,\"ppid\":%d,\"name\":", nlist ? "," : "", h->pid, s.ppid);
+        jstr(&b, h->comm);
         jp(&b, ",\"cmd\":");
-        jstr(&b, cmd);
+        jstr(&b, h->cmd);
         jp(&b, ",\"exe\":");
-        jstr(&b, exe);
-        jp(&b, ",\"self\":%s,\"libs\":[", pid == self ? "true" : "false");
+        jstr(&b, h->exe);
+        jp(&b, ",\"model\":");
+        jstr(&b, h->model);
+        jp(&b, ",\"self\":%s,\"libs\":[", h->pid == self ? "true" : "false");
         char (*libs)[64];
         int nlibs = proc_libs(proot, &s, &libs);
-        for (int i = 0; i < nlibs; i++) { if (i) jp(&b, ","); jstr(&b, libs[i]); }
+        for (int k = 0; k < nlibs; k++) { if (k) jp(&b, ","); jstr(&b, libs[k]); }
         jp(&b, "],\"clients\":[");
-        for (int i = 0; i < n; i++) { if (i) jp(&b, ","); client_json(&b, &clients[i]); }
+        for (int k = 0; k < n; k++) { if (k) jp(&b, ","); client_json(&b, &clients[k]); }
+        jp(&b, "]");
+        if (h->kfd) holder_kfd(&b, root, h->pid); else jp(&b, ",\"kfd\":[]");
+        jp(&b, ",\"nv\":[");
+        int fnv = 1;
+        for (int m = 0; m < 31; m++) if (h->nv & (1u << m)) { jp(&b, "%s%d", fnv ? "" : ",", m); fnv = 0; }
         jp(&b, "]}");
         nlist++;
     }
-    if (d) closedir(d);
-    double now = now_ms(0);
+    jp(&b, "],\"hidden\":[");
+    int fh = 1;
+    for (int i = 0; i < HC.nx; i++) {
+        ProcStat s;
+        if (proc_stat(proot, HC.x[i].pid, &s) || s.start != HC.x[i].start) continue;
+        jp(&b, "%s{\"pid\":%d,\"name\":", fh ? "" : ",", HC.x[i].pid);
+        jstr(&b, HC.x[i].comm);
+        jp(&b, ",\"kind\":\"kfd\"}");
+        fh = 0;
+    }
+    for (int i = 0; i < HC.ns; i++) {
+        Side *x = &HC.s[i];
+        ProcStat s;
+        if (proc_stat(proot, x->pid, &s) || s.start != x->start) continue;
+        if (x->qemu) {
+            jp(&vms, "%s{\"pid\":%d,\"ticks\":%llu,\"rss\":%llu}", fvm ? "" : ",", x->pid, s.ticks, s.rss_pages * (unsigned long long)page);
+            fvm = 0;
+            continue;
+        }
+        jp(&ai, "%s{\"pid\":%d,\"ppid\":%d,\"name\":", fai ? "" : ",", x->pid, s.ppid);
+        jstr(&ai, s.comm);
+        jp(&ai, ",\"state\":\"%c\",\"own\":%s,\"ticks\":%llu,\"rss\":%llu,\"model\":", s.state, x->own ? "true" : "false", s.ticks,
+           s.rss_pages * (unsigned long long)page);
+        jstr(&ai, x->model);
+        jp(&ai, "}");
+        fai = 0;
+        if (!strcmp(s.comm, "lord-say")) say_note(&say, home, &s, uid, &fsay);
+    }
     if (!caps || now - caps_at > CAPS_TTL_MS || strncmp(caps_root, root, sizeof caps_root)) {
         free(caps);
         caps = caps_build(root);
@@ -882,7 +1251,9 @@ char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, co
     jraw(&b, say.p ? say.p : "");
     jraw(&b, "],\"vms\":[");
     jraw(&b, vms.p ? vms.p : "");
-    jraw(&b, "],\"caps\":");
+    jraw(&b, "],\"nvml\":");
+    jraw(&b, nvml && nvml[0] == '[' ? nvml : "null");
+    jraw(&b, ",\"caps\":");
     jraw(&b, caps ? caps : "null");
     jraw(&b, "}");
     int bad = b.bad || ai.bad || say.bad || vms.bad;

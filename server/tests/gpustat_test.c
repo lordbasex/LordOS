@@ -114,6 +114,42 @@ static void test_small(void) {
     CHECK(gpu_say_parse("lord-say 1 cpu hd ES speak\n", &s));
     CHECK(gpu_say_parse("lord-say 1 cpu hd es speak\nmore", &s));
     CHECK(gpu_say_parse("lord-say 2 cpu hd es speak\n", &s));
+    /* the PCIe link, a model's name from argv, NVIDIA's information file */
+    CHECK(gpu_link_speed("8.0 GT/s PCIe\n") == 80 && gpu_link_speed("2.5 GT/s PCIe") == 25 && gpu_link_speed("16 GT/s\n") == 160);
+    CHECK(gpu_link_speed("32.0 GT/s PCIe") == 320 && gpu_link_speed("Unknown\n") == -1 && gpu_link_speed("8.0 GT/s PCIe garbage") == -1);
+    CHECK(gpu_link_speed("8.05 GT/s") == -1 && gpu_link_speed("9999 GT/s") == -1 && gpu_link_speed("") == -1 && gpu_link_speed(".5 GT/s") == -1);
+    char model[64];
+    static const char a1[] = "llama-server\0-c\0008192\0-m\0/home/u/models/Qwen3-8B-Q4_K_M.gguf\0--port\0008080\0";
+    gpu_argv_model(a1, sizeof a1 - 1, model, sizeof model);
+    CHECK(!strcmp(model, "Qwen3-8B-Q4_K_M.gguf"));
+    static const char a2[] = "x\0--model=/m/tiny.bin\0";
+    gpu_argv_model(a2, sizeof a2 - 1, model, sizeof model);
+    CHECK(!strcmp(model, "tiny.bin"));
+    static const char a3[] = "x\0-m\0/m/evil\"<b>.gguf\0";          /* not a clean name: nothing */
+    gpu_argv_model(a3, sizeof a3 - 1, model, sizeof model);
+    CHECK(!model[0]);
+    static const char a4[] = "x\0-m";                                   /* -m last, cut, no NUL */
+    gpu_argv_model(a4, sizeof a4 - 1, model, sizeof model);
+    CHECK(!model[0]);
+    static const char a5[] = "x\0-m\0/m/\0";                           /* a folder: no base name */
+    gpu_argv_model(a5, sizeof a5 - 1, model, sizeof model);
+    CHECK(!model[0]);
+    static const char a6[] = "x\0-m\0/m/..\0";
+    gpu_argv_model(a6, sizeof a6 - 1, model, sizeof model);
+    CHECK(!model[0]);
+    char longname[200] = "x";
+    memcpy(longname + 2, "-m", 3);
+    memset(longname + 5, 'a', 120);
+    longname[125] = 0;
+    gpu_argv_model(longname, 126, model, sizeof model);
+    CHECK(!model[0]);                                                  /* too long for the field: left out, never cut */
+    GpuCard nv;
+    memset(&nv, 0, sizeof nv);
+    gpu_nv_info("Model: \t\t NVIDIA GeForce RTX 3060\nIRQ:   \t\t 140\nGPU UUID: \t GPU-1234\nVideo BIOS: \t 94.06.2f.00.9a\nBus Type: \t PCIe\n", &nv);
+    CHECK(!strcmp(nv.nv_model, "NVIDIA GeForce RTX 3060") && !strcmp(nv.nv_vbios, "94.06.2f.00.9a"));
+    memset(&nv, 0, sizeof nv);
+    gpu_nv_info("Model: \x1b[31mred\nVideo BIOS: 0123456789012345678901234567890\n", &nv);
+    CHECK(!nv.nv_model[0] && !nv.nv_vbios[0]);
     char libs[8][64];
     const char *maps =
         "7f1c2a000000-7f1c2a100000 r-xp 00000000 08:02 1234 /usr/lib/x86_64-linux-gnu/libvulkan_radeon.so\n"
@@ -149,6 +185,12 @@ static void fake_machine(void) {
     D("hwmon/hwmon3/name", "amdgpu\n");
     D("hwmon/hwmon3/temp1_input", "47000\n");
     D("hwmon/hwmon3/temp1_label", "edge\n");
+    D("hwmon/hwmon3/temp1_crit", "94000\n");
+    D("current_link_speed", "8.0 GT/s PCIe\n");
+    D("current_link_width", "16\n");
+    D("max_link_speed", "8.0 GT/s PCIe\n");
+    D("max_link_width", "16\n");
+    D("mem_busy_percent", "38\n");
     D("hwmon/hwmon3/temp2_input", "999999999\n");          /* out of range */
     D("hwmon/hwmon3/fan1_input", "755\n");
     D("hwmon/hwmon3/fan1_max", "3700\n");
@@ -166,19 +208,70 @@ static void fake_machine(void) {
     link_to("sys/class/drm/card0/device", "../../../devices/pci0000:00/0000:00:01.0/0000:01:00.0");
     link_to("sys/class/drm/card0-DP-1/x", "y");             /* a connector, not a card */
     put("sys/class/drm/card1/uevent", "");                  /* a card with no driver bound */
+    /* an Intel iGPU (i915), an Intel Arc (xe) and an NVIDIA card, each with what its driver reports */
+    const char *igp = "sys/devices/pci0000:00/0000:00:02.0";
+    snprintf(p, sizeof p, "%s/vendor", igp); put(p, "0x8086\n");
+    snprintf(p, sizeof p, "%s/device", igp); put(p, "0x3e92\n");
+    snprintf(p, sizeof p, "%s/current_link_speed", igp); put(p, "Unknown\n");
+    snprintf(p, sizeof p, "%s/current_link_width", igp); put(p, "0\n");
+    snprintf(p, sizeof p, "%s/driver", igp); link_to(p, "../../../bus/pci/drivers/i915");
+    link_to("sys/class/drm/card2/device", "../../../devices/pci0000:00/0000:00:02.0");
+    put("sys/class/drm/card2/gt_act_freq_mhz", "350\n");
+    put("sys/class/drm/card2/gt_max_freq_mhz", "1200\n");
+    put("sys/class/drm/card2/gt_RP0_freq_mhz", "1200\n");
+    put("sys/class/drm/card2/power/rc6_residency_ms", "59211630\n");
+    const char *arc = "sys/devices/pci0000:00/0000:00:1c.0/0000:03:00.0";
+    snprintf(p, sizeof p, "%s/vendor", arc); put(p, "0x8086\n");
+    snprintf(p, sizeof p, "%s/device", arc); put(p, "0xe20b\n");
+    snprintf(p, sizeof p, "%s/current_link_speed", arc); put(p, "2.5 GT/s PCIe\n");
+    snprintf(p, sizeof p, "%s/current_link_width", arc); put(p, "1\n");
+    snprintf(p, sizeof p, "%s/max_link_speed", arc); put(p, "16.0 GT/s PCIe\n");
+    snprintf(p, sizeof p, "%s/max_link_width", arc); put(p, "999\n");   /* out of range */
+    snprintf(p, sizeof p, "%s/tile0/gt0/freq0/act_freq", arc); put(p, "2400\n");
+    snprintf(p, sizeof p, "%s/tile0/gt0/freq0/max_freq", arc); put(p, "2850\n");
+    snprintf(p, sizeof p, "%s/tile0/gt0/freq0/rp0_freq", arc); put(p, "2850\n");
+    snprintf(p, sizeof p, "%s/tile0/gt0/gtidle/idle_residency_ms", arc); put(p, "1000\n");
+    snprintf(p, sizeof p, "%s/tile0/gt0/gtidle/name", arc); put(p, "gt0-rc\n");
+    snprintf(p, sizeof p, "%s/tile0/gt1/freq0/act_freq", arc); put(p, "0\n");
+    snprintf(p, sizeof p, "%s/tile0/gt1/gtidle/name", arc); put(p, "gt1-\"mc\n");   /* not gtN-rc/mc: no kind */
+    snprintf(p, sizeof p, "%s/driver", arc); link_to(p, "../../../../bus/pci/drivers/xe");
+    link_to("sys/class/drm/card3/device", "../../../devices/pci0000:00/0000:00:1c.0/0000:03:00.0");
+    const char *nvd = "sys/devices/pci0000:00/0000:00:03.0/0000:05:00.0";
+    snprintf(p, sizeof p, "%s/vendor", nvd); put(p, "0x10de\n");
+    snprintf(p, sizeof p, "%s/device", nvd); put(p, "0x2504\n");
+    snprintf(p, sizeof p, "%s/driver", nvd); link_to(p, "../../../../bus/pci/drivers/nvidia");
+    link_to("sys/class/drm/card4/device", "../../../devices/pci0000:00/0000:00:03.0/0000:05:00.0");
+    put("proc/driver/nvidia/gpus/0000:05:00.0/information", "Model: \t\t NVIDIA GeForce RTX 3060\nIRQ:   \t\t 140\nVideo BIOS: \t 94.06.2f.00.9a\n");
+    /* ROCm's KFD: the RX 580 is gpu 9989 */
+    put("sys/class/kfd/kfd/topology/nodes/0/gpu_id", "0\n");
+    put("sys/class/kfd/kfd/topology/nodes/1/gpu_id", "9989\n");
+    put("sys/class/kfd/kfd/topology/nodes/1/properties", "cpu_cores_count 0\nsimd_count 144\nlocation_id 256\ndomain 0\nbogus\nlocation_id 99999999999999999999999\n");
+    put("sys/class/kfd/kfd/topology/nodes/2/gpu_id", "77\n");
+    put("sys/class/kfd/kfd/topology/nodes/2/properties", "location_id abc\ndomain 0\n");   /* no slot: skipped */
+    put("sys/class/kfd/kfd/proc/4242/vram_9989", "5242880000\n");
+    put("sys/class/kfd/kfd/proc/4242/sdma_9989", "1234\n");
+    put("sys/class/kfd/kfd/proc/4242/stats_9989/cu_occupancy", "24\n");
+    put("sys/class/kfd/kfd/proc/4242/vram_77x", "1\n");               /* not vram_<number>: skipped */
+    put("sys/class/kfd/kfd/proc/4242/pasid", "32770\n");
     put("pci.ids", "1002  Advanced Micro Devices, Inc. [AMD/ATI]\n\t67df  Ellesmere [Radeon RX 470/480/570/570X/580/580X/590]\n");
 
     /* a game: two fds of one client, a third client, /dev/null */
     char me[16];
     snprintf(me, sizeof me, "%d", 4242);
     put("proc/4242/stat", "4242 (game (x)) S 1 4242 4242 0 -1 4194560 100 0 0 0 250 50 0 0 20 0 8 0 777 100000 2500 0\n");
-    put("proc/4242/cmdline", "/usr/games/game\0--fast\0");
+    { static const char argv[] = "/usr/games/game\0--fast\0-m\0/home/u/models/Qwen3-8B-Q4_K_M.gguf\0"; char ap[300]; snprintf(ap, sizeof ap, "%s/proc/4242/cmdline", root);
+      FILE *f = fopen(ap, "w"); if (f) { fwrite(argv, 1, sizeof argv - 1, f); fclose(f); } }
     put("proc/4242/maps", "7f-8f r-xp 00000000 08:02 1 /usr/lib/x86_64-linux-gnu/libvulkan.so.1\n7f-8f r-xp 0 08:02 2 /usr/lib/x86_64-linux-gnu/libvulkan_radeon.so\n");
     link_to("proc/4242/exe", "/usr/games/game");
     link_to("proc/4242/fd/5", "/dev/dri/renderD128");
     link_to("proc/4242/fd/6", "/dev/dri/renderD128");
     link_to("proc/4242/fd/7", "/dev/null");
     link_to("proc/4242/fd/8", "/dev/dri/card0");
+    link_to("proc/4242/fd/9", "/dev/kfd");
+    link_to("proc/4242/fd/10", "/dev/nvidia0");
+    link_to("proc/4242/fd/11", "/dev/nvidiactl");
+    link_to("proc/4242/fd/12", "/dev/nvidia99");                      /* too high a minor: ignored */
+    put("proc/4242/fdinfo/9", "pos:\t0\n");
     put("proc/4242/fdinfo/5", AMD);
     put("proc/4242/fdinfo/6", AMD);
     put("proc/4242/fdinfo/7", "pos:\t0\n");
@@ -190,6 +283,9 @@ static void fake_machine(void) {
     put("proc/4401/stat", "4401 (lord-tts) R 4400 4400 4400 0 -1 0 0 0 0 0 1 1 0 0 20 0 1 0 61 1000 100 0\n");
     put("home/.cache/lordos/say/4400", "lord-say 1 vulkan hd es speak\n");
     put("proc/4500/stat", "4500 (qemu-system-x86) S 1 4500 4500 0 -1 0 0 0 0 0 400 100 0 0 20 0 4 0 70 1000 2048 0\n");
+    put("proc/4600/stat", "4600 (llama-server) S 1 4600 4600 0 -1 0 0 0 0 0 900 100 0 0 20 0 4 0 80 1000 4096 0\n");
+    { static const char argv[] = "llama-server\0-m\0/srv/m/Qwen3-4B-Q4_K_M.gguf\0"; char ap[300]; snprintf(ap, sizeof ap, "%s/proc/4600/cmdline", root);
+      FILE *f = fopen(ap, "w"); if (f) { fwrite(argv, 1, sizeof argv - 1, f); fclose(f); } }
     /* the installed APIs */
     put("usr/share/vulkan/icd.d/radeon_icd.json", "{\"ICD\":{\"api_version\":\"1.4.305\",\"library_path\":\"libvulkan_radeon.so\"},\"file_format_version\":\"1.0.0\"}");
     put("usr/share/vulkan/icd.d/broken_icd.json", "{not json");
@@ -209,8 +305,17 @@ static void test_machine(void) {
     snprintf(ids, sizeof ids, "%s/pci.ids", root);
     GpuCard cards[GPU_CARDS];
     int n = gpu_cards_read(root, ids, cards, GPU_CARDS);
-    CHECK(n == 1);
+    CHECK(n == 4);
     GpuCard *g = &cards[0];
+    CHECK(g->link_speed == 80 && g->link_width == 16 && g->link_max_speed == 80 && g->link_max_width == 16 && g->mem_busy == 38);
+    CHECK(g->temp[0].crit_mc == 94000 && g->rp0_mhz == -1 && g->rc6_ms == -1 && g->ngt == 0);
+    GpuCard *ig = &cards[1], *xe = &cards[2], *nvc = &cards[3];
+    CHECK(!strcmp(ig->driver, "i915") && ig->cur_mhz == 350 && ig->max_mhz == 1200 && ig->rp0_mhz == 1200 && ig->rc6_ms == 59211630);
+    CHECK(ig->link_speed == -1 && ig->link_width == -1);       /* "Unknown" and 0 lanes: an integrated GPU */
+    CHECK(!strcmp(xe->driver, "xe") && xe->link_speed == 25 && xe->link_width == 1 && xe->link_max_width == -1 && xe->link_max_speed == -1);
+    CHECK(xe->ngt == 2 && xe->gt[0].act == 2400 && xe->gt[0].rp0 == 2850 && xe->gt[0].idle_ms == 1000 && !strcmp(xe->gt[0].kind, "rc"));
+    CHECK(xe->gt[1].gt == 1 && xe->gt[1].act == 0 && !xe->gt[1].kind[0] && xe->cur_mhz == 2400);
+    CHECK(!strcmp(nvc->driver, "nvidia") && !strcmp(nvc->nv_model, "NVIDIA GeForce RTX 3060") && !strcmp(nvc->nv_vbios, "94.06.2f.00.9a"));
     CHECK(!strcmp(g->card, "card0") && !strcmp(g->driver, "amdgpu") && !strcmp(g->slot, "0000:01:00.0"));
     CHECK(!strcmp(g->vendor, "1002") && !strcmp(g->device, "67df") && strstr(g->dname, "Ellesmere") && strstr(g->vname, "AMD"));
     CHECK(g->render && g->busy == 37 && g->vram_used == 361758720 && g->vram_total == 8589934592ll && g->gtt_used == 45453312 && g->gtt_total == -1);
@@ -220,11 +325,19 @@ static void test_machine(void) {
     CHECK(g->sclk_mhz == 1329 && g->sclk_max == 1340 && g->mclk_mhz == 300 && g->mclk_max == 2000 && g->cur_mhz == -1);
 
     snprintf(home, sizeof home, "%s/home", root);
-    char *j = gpu_json(root, ids, (unsigned)getuid(), 4242, home);
+    char *j = gpu_json(root, ids, (unsigned)getuid(), 4242, home, "[{\"busId\":\"x\"}]");
     CHECK(j != NULL);
     if (!j) return;
     CHECK(strstr(j, "\"cards\":[{\"card\":\"card0\""));
-    CHECK(strstr(j, "\"pid\":4242,\"ppid\":1,\"name\":\"game (x)\",\"cmd\":\"game\",\"exe\":\"/usr/games/game\",\"self\":true"));
+    CHECK(strstr(j, "\"pid\":4242,\"ppid\":1,\"name\":\"game (x)\",\"cmd\":\"game\",\"exe\":\"/usr/games/game\",\"model\":\"Qwen3-8B-Q4_K_M.gguf\",\"self\":true"));
+    CHECK(strstr(j, "\"kfd\":[{\"slot\":\"0000:01:00.0\",\"vram\":5242880000,\"sdmaUs\":1234,\"cu\":24}]"));
+    CHECK(strstr(j, "\"nv\":[0]}"));
+    CHECK(strstr(j, "\"link\":{\"gts\":8.0,\"width\":16}") && strstr(j, "\"memBusy\":38") && strstr(j, "\"crit\":94.0"));
+    CHECK(strstr(j, "\"rc6Ms\":59211630") && strstr(j, "\"gts\":[{\"tile\":0,\"gt\":0,\"kind\":\"rc\",\"act\":2400"));
+    CHECK(strstr(j, "\"nvModel\":\"NVIDIA GeForce RTX 3060\""));
+    CHECK(strstr(j, "\"nvml\":[{\"busId\":\"x\"}]"));
+    CHECK(strstr(j, "\"name\":\"llama-server\",\"state\":\"S\",\"own\":true,\"ticks\":1000,") && strstr(j, "\"model\":\"Qwen3-4B-Q4_K_M.gguf\"}"));
+    CHECK(strstr(j, "\"hidden\":[]"));
     CHECK(strstr(j, "\"libs\":[\"libvulkan.so.1\",\"libvulkan_radeon.so\"]"));
     /* fds 5 and 6 are one client: listed once; fd 8 is another */
     const char *c217 = strstr(j, "\"id\":217");
@@ -241,9 +354,34 @@ static void test_machine(void) {
     CHECK(strstr(j, "libgallium-25.0.7-2+deb13u1.so") && strstr(j, "libcuda.so.1"));
     CHECK(strstr(j, "\"nvidia\":\"NVRM version: NVIDIA UNIX x86_64 Kernel Module  550.54.14"));
     free(j);
+    /* between rescans only the kept fds are read again: a new value shows, a new process doesn't yet */
+    put("proc/4242/fdinfo/8", "drm-driver:\tamdgpu\ndrm-client-id:\t300\ndrm-pdev:\t0000:01:00.0\ndrm-engine-gfx:\t777 ns\n");
+    put("proc/4700/stat", "4700 (newgame) S 1 4700 4700 0 -1 0 0 0 0 0 1 1 0 0 20 0 1 0 90 1000 100 0\n");
+    link_to("proc/4700/fd/3", "/dev/dri/renderD128");
+    put("proc/4700/fdinfo/3", "drm-driver:\tamdgpu\ndrm-client-id:\t400\ndrm-pdev:\t0000:01:00.0\n");
+    j = gpu_json(root, ids, (unsigned)getuid(), 0, home, NULL);
+    CHECK(j && strstr(j, "\"gfx\":777") && !strstr(j, "\"pid\":4700") && strstr(j, "\"nvml\":null"));
+    free(j);
+    gpu_cache_reset();
+    j = gpu_json(root, ids, (unsigned)getuid(), 0, home, NULL);
+    CHECK(j && strstr(j, "\"pid\":4700"));
+    free(j);
+    /* the pid reused by another process (its start time changed): dropped at once, before the next rescan */
+    put("proc/4700/stat", "4700 (other) S 1 4700 4700 0 -1 0 0 0 0 0 1 1 0 0 20 0 1 0 91 1000 100 0\n");
+    j = gpu_json(root, ids, (unsigned)getuid(), 0, home, NULL);
+    CHECK(j && !strstr(j, "\"pid\":4700"));
+    free(j);
+    /* seen as another user: no process's fds are read, the KFD process is listed by pid and name only, no model */
+    gpu_cache_reset();
+    j = gpu_json(root, ids, (unsigned)getuid() + 1, 0, home, NULL);
+    CHECK(j && strstr(j, "\"list\":[]") && strstr(j, "\"hidden\":[{\"pid\":4242,\"name\":\"game (x)\",\"kind\":\"kfd\"}]"));
+    CHECK(j && strstr(j, "\"own\":false,\"ticks\":1000,\"rss\":") && !strstr(j, "Qwen3"));
+    free(j);
+    gpu_cache_reset();
     /* a note that isn't lord-say's own format, or isn't a regular file, is ignored */
     put("home/.cache/lordos/say/4400", "lord-say 1 vulkan hd es speak; rm -rf /\n");
-    j = gpu_json(root, ids, (unsigned)getuid(), 0, home);
+    gpu_cache_reset();
+    j = gpu_json(root, ids, (unsigned)getuid(), 0, home, "{\"not\":\"an array\"}");
     CHECK(j && strstr(j, "\"say\":[]"));
     free(j);
 }
