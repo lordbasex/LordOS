@@ -996,7 +996,7 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   Not yet tried on real hardware: the virtual camera in browsers and OBS, the MOK flow, Mic Mode in a real Meet call,
   the Raspberry Pi.
 - [x] **Machines** (`VIRTUALIZATION.md`, `MACHINES-GPU.md`): Windows 11 machines with an unattended install and the
-  LordOS tools for Windows, apps mode with its status item and controller panel, a LordOS card and an Android 13 card,
+  LordOS tools for Windows, apps mode with its status item and controller panel, a LordOS card,
   sound and microphone, forwarded ports and Bridged and Host-only networks, 3D for Linux machines, Intel GVT-g with
   LordOS's own GOP option ROM, the Keys panel, Capture mouse, the `machines` command, a transfer folder, the clipboard
   on demand, and a picture at the guest's full rate.
@@ -1521,7 +1521,7 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   - **Control Center** with the list of VMs and their live thumbnail, state, start, pause,
     suspend and shut down;
   - **Installation Assistant**: cards for downloading popular guest systems,
-    Ubuntu, Debian, Fedora, Android, «Install from an ISO file», «Migrate from another PC»;
+    Ubuntu, Debian, Fedora, «Install from an ISO file», «Migrate from another PC»;
   - **VM window** with its bar (Actions, Devices: USB, CD, folders, network, sound) and
     the **Window, Full Screen, Seamless and Picture in Picture** modes;
   - **Configuration** on one screen, its sections down the side with a summary of each: General, Options (startup and shutdown,
@@ -1549,9 +1549,8 @@ An update of the package through the Store and `apt` (`CHANGELOG.md`, "0.8.9.5-b
   - another architecture (arm64 on a PC, amd64 on the Pi) through TCG emulation: it works, but 5–20×
     slower;
   - later, a lightweight engine of our own only for Linux guests (like crosvm/Firecracker).
-- [ ] **Android:** only as a machine in Machines (maintainer's decision 2026-11-22): the Android 13 card (Bliss OS
-  16.9.7 FOSS, amd64 only) shipped in 0.8.9.5; a newer image and arm64 are open question 6 of `VIRTUALIZATION.md`.
-  No Android container in LordOS: Android apps in the Store are for the separate LordBridge project (`LORDBRIDGE.md`).
+- [ ] **Android:** no Android container in LordOS: Android apps in the Store are for the separate LordBridge project
+  (`LORDBRIDGE.md`).
 - [ ] **Firewall, ask mode** (an alert on the first connection attempt, like a per-app network monitor).
 - [ ] **Accessibility:** screen reader, zoom, high contrast.
 - [ ] Full **demo video** (installation + tour, English voice-over with Spanish

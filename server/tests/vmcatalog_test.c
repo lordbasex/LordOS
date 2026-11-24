@@ -385,13 +385,12 @@ int main(int argc, char **argv) {
           !vmcat_list_source(&e, "SHA256SUMS", 1, u2, s2, sizeof u2) && !strncmp(u2, e.dir, strlen(e.dir)) && !strcmp(u2 + strlen(e.dir), "SHA256SUMS") &&
           !strncmp(s2, e.dir, strlen(e.dir)) && !strcmp(s2 + strlen(e.dir), "SHA256SUMS.sig") && vmcat_list_source(&e, "SHA256SUMS", 2, u2, s2, sizeof u2));
     }
-    /* Android (docs/VIRTUALIZATION.md 4.2): one pinned ISO for amd64, none for arm64; the helper keeps only that name and hash */
-    T("android: pinned, one ISO", !vmcat_find(cat, n, "android", "amd64", &e) && e.npins == 1 && !e.dir[0] &&
-      !strcmp(e.pin[0].name, "Bliss-v16.9.7-x86_64-OFFICIAL-foss-20241011.iso") && e.pin[0].bytes == 2342518784ull && e.max_bytes == 2342518784ull &&
-      !strncmp(e.pin[0].url, "https://downloads.sourceforge.net/project/blissos-x86/", 54));
-    T("android: its hash only", vmcat_pin_find(&e, e.pin[0].name, "735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e") == 0 &&
-      vmcat_pin_find(&e, e.pin[0].name, SHA) < 0 && vmcat_pin_find(&e, "other.iso", "735cb962ec6bd92b62eb82a812831a38d79a0dfdf12b7973d2d0f7ab001ba68e") < 0);
-    T("android: no arm64 image", vmcat_find(cat, n, "android", "arm64", &e));
+    /* a pinned file (virtio-win's ISO, docs/VIRTUALIZATION.md 4.3): no maker's list; the helper keeps only that name and hash */
+    T("virtio-win: pinned, one ISO", !vmcat_find(cat, n, "virtio-win", "amd64", &e) && e.npins == 1 && !e.dir[0] &&
+      !strcmp(e.pin[0].name, "virtio-win-0.1.271.iso") && e.pin[0].bytes == 726501376ull && e.max_bytes == 726501376ull &&
+      !strncmp(e.pin[0].url, "https://fedorapeople.org/", 25));
+    T("virtio-win: its hash only", vmcat_pin_find(&e, e.pin[0].name, "bbe6166ad86a490caefad438fef8aa494926cb0a1b37fa1212925cfd81656429") == 0 &&
+      vmcat_pin_find(&e, e.pin[0].name, SHA) < 0 && vmcat_pin_find(&e, "other.iso", "bbe6166ad86a490caefad438fef8aa494926cb0a1b37fa1212925cfd81656429") < 0);
     T("unknown id", vmcat_find(cat, n, "nothing", "amd64", &e));
     T("unknown arch", vmcat_find(cat, n, "debian", "riscv64", &e));
     T("fedora: its list's name", !vmcat_find(cat, n, "fedora", "amd64", &e) && vmcat_match(e.sums_re, "Fedora-Workstation-45-1.4-x86_64-CHECKSUM") &&

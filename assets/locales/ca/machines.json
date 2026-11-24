@@ -815,7 +815,6 @@
   "dl.reading": "S’està llegint la llista d’imatges al lloc web de {name}…",
   "dl.found": "{file}, de la llista signada del seu fabricant (signatura i SHA-256 comprovats)",
   "dl.pinned": "{file}, amb el SHA-256 fixat al catàleg signat de LordOS (es comprova en acabar la baixada)",
-  "dl.notice.archived": "{maker} ha aturat les seves imatges públiques: aquesta és l'última, del {date}, i ja no rep actualitzacions de seguretat. Ve sense les aplicacions de Google.",
   "dl.noList": "No s’ha pogut llegir la llista d’imatges: {why}",
   "dl.noImage": "ara mateix la seva llista no té cap imatge d’aquesta versió per a aquesta arquitectura",
   "dl.retry": "Torna-ho a provar",

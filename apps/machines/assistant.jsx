@@ -15,7 +15,7 @@
 import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
-import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, noticeOf, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
+import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
 import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
 import { customUnattended, systemState } from './systems.js';
@@ -99,7 +99,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   // card only when one is set up for machines)
   const pv = onHost(prof, host, { gpuReady, no3d: arch !== host.arch ? 'arch' : no3dReason(host, windows, arch) });
   const base = { vcpus: pv.vcpus, memoryMb: pv.memoryMb, diskGb: pv.diskGb, network: pv.network, gfx: prof.resources.graphics };
-  // Windows' minimums (4.3); a download card's own size: Android's machine whatever the profile (4.2), LordOS's least (4 processors, 4 GB, 32 GB, 3D)
+  // Windows' minimums (4.3); a download card's own size: its "machine" whatever the profile, LordOS's least (4 processors, 4 GB, 32 GB, 3D)
   const size = windows ? windowsSize(base, host) : source === 'download' && dl ? cardSize(CATALOG, dl.id, base, host) : base;
   const home = typeof lord !== 'undefined' && lord.fs?.home ? lord.fs.home() : '';
   const shareDir = pv.share ? shareAbs(pv.share.path, home) : '';
@@ -137,7 +137,7 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const resolve = async (id, a) => {
     const e = entryOf(CATALOG, id, a);
     if (!e) throw new Error(tr('machines.dl.noList', { why: tr('machines.dl.noImage') }));
-    // a pinned image (Android, 4.2): the signed catalog is its list
+    // a pinned image: the signed catalog is its list
     const pin = pinnedImage(e);
     if (pin) return pin;
     let p = await admin.run('vm-image-list', `${id} ${a}`, null, { quiet: true });
@@ -444,10 +444,6 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         {dl.phase === 'error' ? <Btn label={tr('machines.dl.retry')} onClick={() => { const s = systemsFor(CATALOG, arch).find((x) => x.id === dl.id); if (s) pickDownload(s); }} /> : null}
       </View>
     ) : null}
-    {downloading && dl && noticeOf(CATALOG, dl.id) ? (() => { const nt = noticeOf(CATALOG, dl.id); return (
-      <View style={{ padding: 12, borderRadius: 10, backgroundColor: p.warnBg }}>
-        <Text style={{ fontSize: 13, lineHeight: 1.5, color: p.text, textAlign: 'start' }}>{tr(`machines.dl.notice.${nt.key}`, { maker: nt.maker, date: nt.date })}</Text>
-      </View>); })() : null}
     {path && !downloading && !windows ? (
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, backgroundColor: p.raised }}>
         <OsMark id={sys.id} size={36} />

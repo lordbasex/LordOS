@@ -181,7 +181,7 @@
   },
   {
    "area": "B",
-   "item": "Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows and Android on amd64 (4.1, 5.2)",
+   "item": "Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows on amd64 (4.1, 5.2)",
    "status": "✅",
    "pct": 95,
    "file": "`assets/machines/systems.json`, `catalog.js`; `vmcatalog-test`, `vm_catalog_test.mjs`",
@@ -242,14 +242,6 @@
    "pct": 10,
    "file": "`machine.c` refuses the Windows devices on arm64",
    "note": "`vmunattend.c` writes arm64 answers already"
-  },
-  {
-   "area": "B",
-   "item": "Android 13 card, Bliss OS 16.9.7 pinned (4.2)",
-   "status": "🧪",
-   "pct": 80,
-   "file": "`systems.json` `android`",
-   "note": "Booting under Machines still to test"
   },
   {
    "area": "B",
@@ -905,8 +897,8 @@
    "id": "B",
    "name": "Getting a system in",
    "weight": 12,
-   "items": 14,
-   "mean": 76.07,
+   "items": 13,
+   "mean": 75.77,
    "score": 76
   },
   {

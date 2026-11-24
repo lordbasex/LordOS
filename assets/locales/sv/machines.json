@@ -815,7 +815,6 @@
   "dl.reading": "Läser listan över avbilder på webbplatsen för {name}…",
   "dl.found": "{file}, från tillverkarens signerade lista (signatur och SHA-256 kontrollerade)",
   "dl.pinned": "{file}, med SHA-256 fastställd i LordOS signerade katalog (kontrolleras efter nedladdningen)",
-  "dl.notice.archived": "{maker} har pausat sina offentliga avbilder: detta är den sista, från {date}, och den får inga fler säkerhetsuppdateringar. Den kommer utan Googles appar.",
   "dl.noList": "Listan över avbilder kunde inte läsas: {why}",
   "dl.noImage": "listan har för närvarande ingen avbild av den här versionen för den här arkitekturen",
   "dl.retry": "Försök igen",

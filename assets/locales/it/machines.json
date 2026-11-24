@@ -815,7 +815,6 @@
   "dl.reading": "Lettura dell’elenco delle immagini sul sito di {name}…",
   "dl.found": "{file}, dall’elenco firmato di chi la produce (firma e SHA-256 verificati)",
   "dl.pinned": "{file}, con lo SHA-256 fissato nel catalogo firmato di LordOS (verificato al termine del download)",
-  "dl.notice.archived": "{maker} ha sospeso le sue immagini pubbliche: questa è l'ultima, del {date}, e non riceve più aggiornamenti di sicurezza. È priva delle app di Google.",
   "dl.noList": "Non è stato possibile leggere l’elenco delle immagini: {why}",
   "dl.noImage": "il suo elenco ora non ha un’immagine di questa versione per questa architettura",
   "dl.retry": "Riprova",

@@ -815,7 +815,6 @@
   "dl.reading": "Inasoma orodha ya taswira kwenye tovuti ya {name}…",
   "dl.found": "{file}, kutoka orodha iliyotiwa sahihi na mtengenezaji wake (sahihi na SHA-256 zimekaguliwa)",
   "dl.pinned": "{file}, SHA-256 yake imewekwa kwenye katalogi iliyosainiwa ya LordOS (hukaguliwa baada ya kupakua)",
-  "dl.notice.archived": "{maker} imesitisha picha zake za umma: hii ndiyo ya mwisho, ya {date}, na haipati tena masasisho ya usalama. Inakuja bila programu za Google.",
   "dl.noList": "Orodha ya taswira haikuweza kusomwa: {why}",
   "dl.noImage": "orodha yake haina taswira ya toleo hili kwa usanifu huu kwa sasa",
   "dl.retry": "Jaribu Tena",

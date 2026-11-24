@@ -39,7 +39,7 @@ recomputes both from the rows; the arithmetic:
 | Area | Weight | Items | Mean | Score | Points (weight × score) | Before |
 |---|---:|---:|---:|---:|---:|---:|
 | A. Engine, lifecycle, sandbox, display | 14 | 22 | 78.18 | 78 % | 14 × 78 % = 10.92 | 78 % |
-| B. Getting a system in (cards, unattended, import) | 12 | 14 | 76.07 | 76 % | 12 × 76 % = 9.12 | 76 % |
+| B. Getting a system in (cards, unattended, import) | 12 | 13 | 75.77 | 76 % | 12 × 76 % = 9.12 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 74.58 | 75 % | 11 × 75 % = 8.25 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 60.00 | 60 % | 9 × 60 % = 5.40 | 60 % |
 | E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
@@ -52,7 +52,7 @@ recomputes both from the rows; the arithmetic:
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **111** | | | **68.94 → 69 %** | 68 % |
+| **Total** | **100** | **110** | | | **68.94 → 69 %** | 68 % |
 
 Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 1.44 + 1.83 + 2.96 + 2.58 + 1.65 = 68.94, rounded **69 %** (before: 68 %, against `965a10f6e`). Before this audit the
 document's table said 67.52 and the JSON 67.16 while the rows themselves gave 67.88: the Whonix row had been raised to 85 %
@@ -117,7 +117,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows and Android on amd64 (4.1, 5.2) | ✅ | 95 | `assets/machines/systems.json`, `catalog.js`; `vmcatalog-test`, `vm_catalog_test.mjs` | Kali has no unattended install and was never run end to end |
+| Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows on amd64 (4.1, 5.2) | ✅ | 95 | `assets/machines/systems.json`, `catalog.js`; `vmcatalog-test`, `vm_catalog_test.mjs` | Kali has no unattended install and was never run end to end |
 | Makers' OpenPGP signatures, SHA-256, resumed downloads, removal (3.9) | ✅ | 100 | `vmcatalog.c`, `vmimage_admin.c`, `pgp.h`; `http-resume-test`, `http-retry-test` | A redirect refused with 403 or 5xx starts again from the original URL (*in development*) |
 | Any ISO, recognized (5.2) | ✅ | 85 | `js_vm.c` `isoInfo`, `model.js` `systemOf`, `archOf` | Only the 32-byte volume label is read; the architecture comes from the name or label, not the boot files. No drop on the tile |
 | Unattended Linux: Debian and Ubuntu desktops to login (3.9) | ✅ | 100 | `vmunattend.c`; `vmunattend-test`; VM 116, 2026-11-07 |  |
@@ -125,7 +125,6 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | LordOS card, `lordos-auto.conf`; its signed list read from lordos.org first, GitHub second (3.9, 4.1) | 🧪 | 85 | `vmunattend.c` (`VMU_LORDOS`), `vmcatalog.c` (`LIST_MIRROR`, `vmcat_list_source`), `vmimage_admin.c`; `vmcatalog-test` (the real list and signature) | The list copy on lordos.org is *in development*; the card's install was never run end to end from the card |
 | Windows 11 amd64: ISO by hash, unattended, drivers, TPM, Secure Boot, KMS client key (4.3.1) | ✅ | 100 | `windows.js`, `vmunattend.c`, `lordvm.c`; `vm_windows_test.mjs` | On the maintainer's PC |
 | virtio-win guests on arm64 (4.3) | ❌ | 10 | `machine.c` refuses the Windows devices on arm64 | `vmunattend.c` writes arm64 answers already |
-| Android 13 card, Bliss OS 16.9.7 pinned (4.2) | 🧪 | 80 | `systems.json` `android` | Booting under Machines still to test |
 | A person's own systems: `vm-image-get-user`, `lord-pgpv` (5.6.1) | ✅ | 95 | `systems.js`, `vmurl.c`, `vmsig.c`, `lordpgpv.c`; `vmurl-test`, `vmsig-test` |  |
 | Import from other apps with identity kept (6.22) | ✅ | 95 | `vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`; `vmimport-test`, `vm_import_test.sh` | No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion |
 | Requirements check (5.2) | 🟡 | 80 | `library.jsx` `Requirements`, `model.js` `reqRows`, `missingFor`, `assistant.jsx`, `vm-enable` | Create, which starts the download, waits until the parts are in (one click through the package engine). No per-system page of drivers and tools; not through the Store |
@@ -381,7 +380,6 @@ Still open in Phase 2:
 - [ ] Migrate from another computer (6.11).
 - [ ] Machine groups and the Whonix (Tor) card (19): G0–G4 built and checked headless (in development, 2026-11-24);
   the release gate G5 on real hardware, Delete, Rename and Repair of a group still open.
-- [x] Android card (2026-11-22, amd64 only: Bliss OS 16.9.7 FOSS, pinned; 4.2). A newer image and arm64 wait for open question 6.
 
 ### Phase 5, later: decided then
 
@@ -419,7 +417,7 @@ The bar is section 16: the most complete desktop virtualization app, and visuall
 6. **Honest about limits.** No claim on a screen that hasn't been tested on that hardware.
 
 Non-goals for the first versions: servers and clusters, live migration between hosts, remote management of a host, GPU partitioning,
-containers (Android runs as a machine, 4.2; Android apps in the Store are for the separate LordBridge project, `docs/LORDBRIDGE.md`), and guests whose license ties them to one maker's hardware,
+containers (Android apps in the Store are for the separate LordBridge project, `docs/LORDBRIDGE.md`), and guests whose license ties them to one maker's hardware,
 which are not offered.
 
 ## 2. What the hardware can and can't do
@@ -1959,7 +1957,7 @@ cards (a mark, the name and release, the architecture and the size), then *Or br
 
 ### 4.1 Linux
 
-Every current Linux has virtio drivers in its kernel. Linux cards: LordOS, Debian, Ubuntu, Fedora and Kali, each for the host's architecture, plus **any ISO of that architecture** from a file and a person's own systems (5.6.1). On amd64 the New Machine assistant also shows the Windows card (4.3.1) and the Android card (4.2): seven cards, in that order (`assets/machines/systems.json`, `catalog.js`); arm64 shows five. arm64 images exist for all of them; on a Pi the UEFI arm64 ISO is the one to use, not the Pi's image.
+Every current Linux has virtio drivers in its kernel. Linux cards: LordOS, Debian, Ubuntu, Fedora and Kali, each for the host's architecture, plus **any ISO of that architecture** from a file and a person's own systems (5.6.1). On amd64 the New Machine assistant also shows the Windows card (4.3.1): six cards, in that order (`assets/machines/systems.json`, `catalog.js`); arm64 shows five. arm64 images exist for all the Linux ones; on a Pi the UEFI arm64 ISO is the one to use, not the Pi's image.
 
 **Always the newest image of a release.** The catalog doesn't pin a file. An entry names a release, the maker's list that names its images (a `SHA256SUMS` file, a directory listing, a releases file) and a file-name pattern, so "Ubuntu 26.04" keeps working when 26.04.2 appears. The app reads the list, takes the newest matching name (there is no separate check that it can still be downloaded: a removed file fails at `vm-image-get`), and verifies the download against that same list, whose signature it checks with the maker's key (confirmed for all four cards on 2026-11-06: every maker signs its list, with the keys pinned in 3.9, "The Linux download cards"). So the catalog stays small and rarely needs an update, and our own signature covers only the entry: which list and which key are trusted. LordOS itself is a guest too, since we build UEFI ISOs for both architectures.
 
@@ -1973,50 +1971,7 @@ the `lordos` package ships in LordOS guests and **Install Agent** writes into ot
 
 ### 4.2 Android
 
-**Scope (maintainer, 2026-11-22):** Android in Machines is one more installable ISO among the New Machine cards, nothing more. Android
-apps as LordOS windows (a container, the Store) are LordBridge's, later (docs/LORDBRIDGE.md), and are not designed here.
-
-**Built (2026-11-22, released in 0.8.9.5): the "Android 13" card, amd64 only.** What exists, checked 2026-11-22:
-
-| Candidate | Android | State | Image | Trust | Fits |
-|---|---|---|---|---|---|
-| Bliss OS 16.9.7, FOSS edition | 13 | archived: "Public images are paused" (blissos.org, blissos.org/status, as of August 2026); last build 2024-10-11, no more updates | installable ISO, x86_64, 2.18 GiB, SourceForge `blissos-x86/Official/BlissOS16/FOSS/Generic` | a `.sha256` next to the ISO, unsigned; SourceForge's MD5 of the upload | **the card** |
-| Android-x86 9.0-r2 | 9 | dormant since 2020-03-25 (Wikipedia, android-x86.org release note) | ISO | old | no |
-| LineageOS `virtio_x86_64` / `virtio_arm64only` (`_16k` too) | 16 (LineageOS 24.0) | not built by LineageOS ("not officially supported … no OTA", lineage wiki *libvirt-qemu*); `m isoimage-install` makes an ISO for **x86_64 only** | nobody publishes the ISO; jqssun/android-lineage-qemu publishes UTM bundles (two qcow2 disks + EFI vars) monthly (v2026.11.17) | GitHub attestations, asset SHA-256 digests | no card: a prebuilt disk, not an ISO (see below) |
-| AOSP Cuttlefish / Goldfish (SDK images) | current | Google's | crosvm/emulator images, SDK license | — | no: not plain QEMU, not free |
-| Google's GSIs | 16 | Google's | `system.img` for a device's vendor partition | — | no: not bootable alone |
-
-So: **amd64** gets Bliss OS 16.9.7 FOSS, the only maintained-until-recently installable Android ISO; **arm64 has no installable Android
-ISO at all**, so the card isn't shown there (an arm64 host that chooses amd64 sees it, emulated). Bliss OS's GApps edition is not offered:
-Google's apps aren't free software, and the FOSS edition is the default by the maintainer's rule.
-
-**Trust.** Bliss OS signs no list. The catalog pins the one file, its address and SHA-256 (`"pinned"`, like the Windows evaluation and
-virtio-win, 4.3): the project's own `.sha256` file (read 2026-11-22), the same hash computed from a download that day
-(`735cb962…a68e`, 2 342 518 784 bytes), and that download's MD5 equal to the one SourceForge recorded at the upload on 2024-10-12 (the folder's
-RSS). The admin helper keeps the download only with that hash (`vm-image-get`, `vmcat_pin_find`). The address is SourceForge's redirector
-(`downloads.sourceforge.net`), which sends to a mirror; the hash, not the mirror, is what is trusted.
-
-**The machine.** `"machine"` in the entry gives it 4 vCPUs, 4 GB, 32 GB and 3D whatever the profile (`cardSize` in catalog.js, fitted
-to the computer: never more processors than it has or memory than machines may use), on the default devices: q35, UEFI (OVMF), virtio
-disk, the CD/DVD on virtio-scsi, virtio-net, virtio-vga (`virtio-vga-gl` with 3D, virgl), the USB or virtio tablet, Intel HDA. The ISO's
-kernel (6.1.112, read from its `IKCONFIG` on 2026-11-22) has virtio-blk, virtio-scsi, `sr` and AHCI built in and virtio-gpu,
-virtio-input, virtio-net and HDA as modules, so the installer finds its own disc and the disk (**Reported** from the config, not yet
-booted under Machines: **To test** on the dev VM, with a screenshot). Install is Bliss OS's own installer (manual; no unattended mode).
-Google's services are absent; apps come from F-Droid or an APK.
-
-**What the assistant says.** The card reads "Android 13"; choosing it shows the file with "SHA-256 pinned in LordOS's signed catalog"
-(`machines.dl.pinned`) and a warning (`machines.dl.notice.archived`): Bliss OS paused its public images, this is the last one (2024-10-11)
-and it gets no more security updates; no Google apps. The mark is Machines' own green "A" (no Android or Bliss logo).
-
-**Not done, for the maintainer:**
-
-- A newer Android needs a newer image: LineageOS's `virtio_x86_64` ISO built and signed by LordOS (hours of build, ~300 GB, a monthly
-  rebuild for security patches), or a "prebuilt disk" card kind for jqssun's monthly qcow2 bundles (attested by GitHub, both
-  architectures, Android 16), which Machines' import (6.22) could take. Either replaces this card's entry with no app change but the
-  new kind.
-- arm64 (Raspberry Pi 5): only the prebuilt-disk path exists (`virtio_arm64only`, and `virtio_arm64only_16k` in the LineageOS tree,
-  **Reported**); 3D stays off on arm64 hosts (6.10).
-- When Bliss OS publishes images of its new tree, the pin is updated after an install test.
+The Android card was removed on 2026-11-24 by the maintainer's decision: it added nothing. Android apps are LordBridge's (docs/LORDBRIDGE.md).
 
 ### 4.3 virtio-win guests
 
@@ -2176,7 +2131,7 @@ product key (else the edition's KMS client key, 4.3.1). The requirements check i
 action `vm-enable`, not the Store. The design was:
 
 1. **Choose:** cards.
-   - Download: Debian, Ubuntu, Fedora, Kali (built 2026-11-06, 3.9, "The Linux download cards"); LordOS (its live ISO, signed with the release key; since 0.8.9.5, 3.9, "The LordOS card"); Android 13 (Bliss OS 16.9.7 FOSS, amd64 only, pinned; built 2026-11-22, since 0.8.9.5, 4.2).
+   - Download: Debian, Ubuntu, Fedora, Kali (built 2026-11-06, 3.9, "The Linux download cards"); LordOS (its live ISO, signed with the release key; since 0.8.9.5, 3.9, "The LordOS card").
    - "Install from an ISO file" (drag a file on it).
    - "Migrate from another app": a machine of another virtualization app (6.22). Built 2026-11-05; it took the tile the mock gave
      "Migrate from another PC" (6.11), which comes later.
@@ -4192,7 +4147,7 @@ Machines (React + LordOS SDK)
 | **1, Alpha** | `lord-vm`, `lord-vmdisplay`, sandbox, native window, qcow2 with qcow2 NVRAM, Shared network, schema and contracts (3.6), resource budget. Create, start, stop and recover without a terminal | Isolation test passes on Pi 5 and amd64 |
 | **2, Beta** | Control Center, assistant with Linux cards, requirements check, one-screen settings, profiles, snapshots, suspend, clones, Storage window, agent with state popover, Shell, Logs, unified diagnostics, screenshot and recording, resolution menu, Keep Running, clipboard. The experimental release | Full install and failure recovery are repeatable; release gates pass. Built on `machines-beta` (3.9, Phase 2, the beta) and merged with the import on `machines-089`: the gates pass on nested amd64 and, with `machines-089`, on the Pi 5 (45, 41 and 10 passed, 2026-11-06); the Linux download cards are built (3.9, "The Linux download cards"), with the makers' signatures checked, resumed downloads and removal in Storage, and driven on screen in a LordOS session through a whole Debian install (2026-11-06); the gates pass on bare-metal amd64 too. Unattended install built (3.9, "Install without questions") and seen into Debian's base system install on VM 116; Debian and Ubuntu to login done 2026-11-07; still open: Fedora to login |
 | **3, Advanced** | UEFI secure boot, TPM, virtio-win flow on both architectures with automatic setup, virgl, venus, shared folders, USB, file copy panel, Bridged, Host only, Picture in Picture, multi-head, export and import (import of other apps' machines built, 6.22), backups, Monitor, `lordvm` with shell, exec, logs and cp | A real compatibility and security matrix per architecture. Audited 2026-11-23: built are secure boot and TPM, the virtio-win flow on amd64, virgl, shared folders, Bridged, Host only, import, `machines` (without shell, exec, logs, cp) |
-| **4, Integration** | Linux Apps mode, guest apps in the Dock, reproducible machines, local MCP server, Migrate, Android card if the image exists | Each on tested hardware |
+| **4, Integration** | Linux Apps mode, guest apps in the Dock, reproducible machines, local MCP server, Migrate | Each on tested hardware |
 | **5, Later** | Our own agent for other guests' windows; a lightweight engine for Linux guests, like crosvm; GPU passthrough on PCs; reaching a machine from another computer | Decided then |
 
 ## 15. Risks
@@ -4248,7 +4203,6 @@ The bar: **the most complete desktop virtualization app there is, and the best l
 | Drivers attached during install, tools at the end | 3 | Yes | Pinned versions |
 | Migrate from a physical PC | 4 | Work | Driver injection is delicate |
 | Import qcow2, VMDK, VDI, VHDX, OVA, other tools' bundles | 3 | Yes | Built (6.22): identity kept (SMBIOS UUID, MACs, serials, firmware, topology); snapshots flattened, saved sessions refused, vTPM lost |
-| Android guest | 4 | Partly | amd64 card built (archived Bliss OS 16.9.7 ISO, Android 13, 4.2); a maintained image or arm64 needs our own build or a prebuilt-disk card |
 | Guests tied to one maker's hardware | never | No | Not offered: neither licensed nor possible on these hosts |
 
 ### Display and graphics
@@ -4360,7 +4314,7 @@ Decided on 2026-11-01: settings on one screen replaces tabs; Kali is in the cata
 3. ~~Store item (recommended) or preinstalled?~~ Settled by the code: part of the `lordos` package, can be deactivated, QEMU installed on demand (10).
 4. Do we build our own 4K kernel for the Pi if a measurement shows that it removes GICV trapping? Phase 0 didn't measure it; it moves to Phase 1 (13.8).
 5. Keep Debian's QEMU (recommended, and what the code uses) or carry our own build for features like newer venus fixes? Phase 0 adds a reason: the arm64 3D abort of 3.2.
-6. Host our own Android image for Machines (LineageOS `virtio_x86_64` ISO, or prebuilt `virtio_*` disks for both architectures), or keep the pinned Bliss OS 16.9.7 (Android 13) ISO (4.2, built 2026-11-22)? The container is LordBridge's, not Machines'.
+6. ~~An Android card in Machines?~~ Settled on 2026-11-24: no (4.2).
 7. ~~Is `passt` or QEMU's user networking the default?~~ Decided on 2026-11-04 by measurement: `passt` (6.5).
 8. ~~Does the first public release include virtio-win guests, or Linux only?~~ Settled: Windows 11 machines on amd64 since 0.8.9.5 (4.3.1).
 9. ~~Does the catalog list only systems we can download freely, as recommended?~~ Settled: yes (Windows from the maker's page or its evaluation ISOs, checked against pinned hashes).

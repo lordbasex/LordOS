@@ -756,6 +756,15 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   `web`.
 - Three new texts (`store.installed.noneDebian`, `noneFlathub`, `noneWeb`), in all 35 languages.
 
+### Removed
+- **Machines: the Android card** (in development; latest release 0.8.9.5-beta). The maintainer removed it on 2026-11-24:
+  it added nothing. Gone: its entry in `assets/machines/systems.json` (the pinned Bliss OS 16.9.7 ISO), the assistant's
+  "archived image" notice under a download (`catalog.js` `noticeOf`, `machines.dl.notice.archived` in all 35
+  languages), its tests in `vm_catalog_test.mjs` and `vmcatalog-test` (the pinned-card path is now tested with a made-up
+  entry and virtio-win's pin), and its descriptions in docs/VIRTUALIZATION.md (4.2 says it was removed), the roadmap,
+  the paper and its validation table. A person's own Android ISO chosen from a file is still named as such. amd64 now
+  shows six cards, arm64 five.
+
 ### Documentation
 
 - **Machines: design for machine groups and a Whonix (Tor) card** (`docs/VIRTUALIZATION.md` section 19, planned, nothing

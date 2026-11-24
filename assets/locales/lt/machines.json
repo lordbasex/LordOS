@@ -815,7 +815,6 @@
   "dl.reading": "Skaitomas atvaizdžių sąrašas „{name}“ svetainėje…",
   "dl.found": "{file}, iš gamintojo pasirašyto sąrašo (parašas ir SHA-256 patikrinti)",
   "dl.pinned": "{file}, jo SHA-256 įrašytas pasirašytame LordOS kataloge (tikrinama po atsisiuntimo)",
-  "dl.notice.archived": "{maker} sustabdė viešus atvaizdus: šis yra paskutinis, {date}, ir jis nebegauna saugumo naujinimų. Jame nėra „Google“ programų.",
   "dl.noList": "Atvaizdžių sąrašo perskaityti nepavyko: {why}",
   "dl.noImage": "jo sąraše šiuo metu nėra šios laidos atvaizdžio šiai architektūrai",
   "dl.retry": "Bandyti dar kartą",

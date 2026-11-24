@@ -383,7 +383,7 @@ const SYSTEMS = [
   ['fedora', /fedora/i, 'Fedora'], ['mint', /\bmint\b|linuxmint/i, 'Mint'], ['arch', /\barch(linux)?\b|archlinux/i, 'Arch'],
   ['alpine', /alpine/i, 'Alpine'], ['opensuse', /suse/i, 'openSUSE'], ['kali', /kali/i, 'Kali'], ['rocky', /rocky/i, 'Rocky'],
   ['alma', /alma/i, 'Alma'], ['centos', /centos/i, 'CentOS'], ['freebsd', /freebsd/i, 'FreeBSD'], ['raspios', /raspios|raspberry/i, 'Pi OS'],
-  // Android for PCs: Bliss OS's label (BlissOS-16.9.7 (x86_64)) and file names (Bliss-v16.9.7-…), Android-x86, LineageOS
+  // a person's own Android ISO for PCs (Bliss OS, Android-x86, LineageOS): named only
   ['android', /android|blissos|\bbliss-v\d|lineage/i, 'Android'],
   // Microsoft's own volume labels (CCCOMA_X64FRE_…, CENA_X64FREE_…, CPBA_A64FRE_…) and its file names (Win11_…)
   ['windows', /\bWin1[01]_|\b(CCCOMA|CENA|CCSA|CPBA)_(X64|A64)FREE?_/i, 'Windows'],

@@ -815,7 +815,6 @@
   "dl.reading": "Đang đọc danh sách ảnh trên trang của {name}…",
   "dl.found": "{file}, từ danh sách có chữ ký của nhà phát hành (đã kiểm tra chữ ký và SHA-256)",
   "dl.pinned": "{file}, SHA-256 được ghim trong danh mục đã ký của LordOS (kiểm tra sau khi tải xuống)",
-  "dl.notice.archived": "{maker} đã tạm dừng phát hành ảnh công khai: đây là ảnh cuối cùng, ngày {date}, và không còn nhận bản cập nhật bảo mật. Không kèm ứng dụng của Google.",
   "dl.noList": "Không thể đọc danh sách ảnh: {why}",
   "dl.noImage": "danh sách hiện không có ảnh của bản phát hành này cho kiến trúc này",
   "dl.retry": "Thử lại",
