@@ -53,7 +53,15 @@ typedef struct {
                                  * as QEMU will have it: Landlock's rule is made from this descriptor, so it names the very
                                  * device lord-vm checked (no path looked up again), and QEMU opens it as
                                  * rendernode=/proc/self/fd/<n>. 0..2: none (render's path is used, as before) */
+    int venus;                  /* Vulkan through venus (6.10, a 3D machine with "vulkan"): Landlock lets QEMU also run
+                                 * VM_VENUS_SERVER (read and execute, that one file), and the allowlist its fork, exec and
+                                 * wait (vmseccomp.h VmScOpts.venus). The render server inherits all of QEMU's jail */
 } VmQemuJail;
+
+/* virglrenderer's render server (Debian's virgl-server package): the only program a venus machine's QEMU may start */
+#define VM_VENUS_SERVER "/usr/libexec/virgl_render_server"
+/* the BAR venus maps the guest's host-visible Vulkan memory through (QEMU's hostmem) */
+#define VM_VENUS_HOSTMEM_MB 4096
 
 /* In the child, before execve. Returns the VMS_* bits that applied; the caller refuses to exec without
  * VMS_SECCOMP_OURS and VMS_NO_NEW_PRIVS. */

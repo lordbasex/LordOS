@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <linux/audit.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -122,10 +123,18 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
     case VSR_ENOSYS: ERR(ENOSYS); return 0;
     case VSR_CLONE:
         LD_ARG(0);
+        if (o->venus) {
+            /* venus: also a plain fork (glibc's: SIGCHLD with the child's tid set and cleared, nothing shared) */
+            JUMP(BPF_JMP | BPF_JEQ | BPF_K, (uint32_t)(CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID | SIGCHLD), 4, 0);
+            JUMP(BPF_JMP | BPF_JEQ | BPF_K, (uint32_t)SIGCHLD, 3, 0);
+        }
         STMT(BPF_ALU | BPF_AND | BPF_K, (uint32_t)(CLONE_NEED | CLONE_FORBID));
         JUMP(BPF_JMP | BPF_JEQ | BPF_K, (uint32_t)CLONE_NEED, 1, 0);
         ERR(EPERM);
         ALLOW();
+        return 0;
+    case VSR_VENUS:
+        if (o->venus && !learn_all) ALLOW(); else DEFAULT();
         return 0;
     case VSR_IOCTL: {
         LD_ARG(1);

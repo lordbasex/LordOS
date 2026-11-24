@@ -791,7 +791,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     vm_host_probe(&h);
     int arch = h.arch >= 0 ? h.arch : VM_ARCH_AMD64;
     const char *name = NULL, *import = NULL, *iso = NULL, *unatt = NULL;
-    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1, devs = -1, gfx = -1;
+    int accel = -1, vcpus = 0, mem = 0, disk = 0, fw = -1, disp = -1, net = -1, agent = -1, clip = -1, sb = 0, tpm = 0, hv = 0, rtc = -1, devs = -1, gfx = -1, vk = -1;
     int enc = 0, raw = 0, disp_s = 0;
     const char *drivers = NULL, *want_id = NULL;
     for (int i = 0; i < argc; i++) {
@@ -819,6 +819,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         else if (!strcmp(a, "--devices")) { devs = !strcmp(v, "windows") ? VM_DEV_WINDOWS : parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat|windows\n"); return 2; } }
         else if (!strcmp(a, "--drivers")) drivers = v;
         else if (!strcmp(a, "--graphics")) { gfx = parse_enum(v, "2d", "3d"); if (gfx < 0) { fprintf(stderr, "lord-vm: --graphics 2d|3d\n"); return 2; } }
+        else if (!strcmp(a, "--vulkan")) { vk = parse_enum(v, "off", "on"); if (vk < 0) { fprintf(stderr, "lord-vm: --vulkan on|off\n"); return 2; } }
         /* storage (schema 16): an encrypted machine (its key on --key-fd, its id given so lord-server could keep the key
          * under it first), raw disks, a disposable session */
         else if (!strcmp(a, "--encrypt")) { enc = parse_enum(v, "off", "on"); if (enc < 0) { fprintf(stderr, "lord-vm: --encrypt on|off\n"); return 2; } }
@@ -870,6 +871,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
     if (devs >= 0) m.devices = devs;
     if (m.devices == VM_DEV_WINDOWS) m.nic_model = VM_NIC_VIRTIO;
     if (gfx >= 0) m.graphics = gfx;
+    if (vk > 0) { m.vulkan = 1; m.schema = VM_SCHEMA; }
     char drvreal[PATH_MAX];
     if (drivers) {
         if (!realpath(drivers, drvreal) || !file_exists(drvreal) || strlen(drvreal) >= sizeof m.drivers) { fprintf(stderr, "lord-vm: %s isn't a file\n", drivers); return 1; }
@@ -1074,6 +1076,10 @@ static struct {
     /* the render node (3D's or a vGPU's iGPU's) opened and checked here, QEMU's by descriptor (render_open; 3.3), and its
      * number in QEMU (rendernode=/proc/self/fd/<render_qfd>, after the session's layers); -1 none */
     int render_fd, render_qfd;
+    /* Vulkan through venus this run (decide_graphics: machine.json's "vulkan", and this computer can), and the one
+     * Vulkan driver its render server loads (VK_DRIVER_FILES: the render node's GPU's, never llvmpipe's JIT) */
+    int venus;
+    char venus_icd[96];
     /* an Intel GVT-g vGPU this run (decide_vgpu, docs/MACHINES-GPU.md Mode A): its render node (the iGPU's, where QEMU
      * makes the picture's dmabufs), /dev/vfio/<group>, the picture's size, and whether the guest asked for a restart
      * (QEMU runs with -action reboot=shutdown: a reset is an exit, and Machines starts it again) */
@@ -1512,6 +1518,17 @@ static const char *sc_drop_row(void) {
     return NULL;
 }
 
+/* a thread of a process QEMU started (venus's render server, its worker processes and their threads), never one of QEMU's
+ * own. Only QEMU and what it starts carry its filter, so a notifying thread that isn't in QEMU's thread group is such a
+ * child's: tgkill(QEMU, thread, 0) (signal 0: nothing is sent) fails with ESRCH exactly then. A system call, not /proc
+ * (lord-vm's Landlock keeps /proc closed); the notifying thread is held in the kernel while this runs, so its id can't
+ * be reused meanwhile */
+static int venus_child(pid_t tid) {
+    if (S.qemu <= 0 || tid <= 1 || tid == S.qemu) return 0;
+    errno = 0;
+    return syscall(SYS_tgkill, S.qemu, tid, 0) < 0 && errno == ESRCH;
+}
+
 /* the notifications waiting on QEMU's listener. A call the allowlist stops: QEMU is killed before it runs, and its
  * name is kept for the failure page. 1 when QEMU was stopped. Learn mode: logged once, and it goes on */
 static int sc_serve(void) {
@@ -1546,8 +1563,10 @@ static int sc_serve(void) {
             if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp)) vlog("seccomp: the exec of QEMU couldn't be let through: %s", strerror(errno));
             continue;
         }
-        /* while QEMU starts, the loader's executable mappings (libraries, modules, Mesa's drivers); never after */
-        if (S.sc_starting && S.sc_exec_done && vm_sc_startup_exec(&req->data, vm_sc_cpu_bti())) {
+        /* while QEMU starts, the loader's executable mappings (libraries, modules, Mesa's drivers); never after. With venus,
+         * the same kind for its render server, a process of its own QEMU started (Landlock let it run only that program)
+         * whose loader maps its libraries when the guest first asks for Vulkan, long after QEMU's start */
+        if (S.sc_exec_done && vm_sc_startup_exec(&req->data, vm_sc_cpu_bti()) && (S.sc_starting || (S.venus && venus_child(req->pid)))) {
             resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
             if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp)) vlog("seccomp: a library's mapping couldn't be let through: %s", strerror(errno));
             continue;
@@ -1558,7 +1577,7 @@ static int sc_serve(void) {
             for (int i = 0; i < S.sc_nseen; i++) if (S.sc_seen[i] == key) { seen = 1; break; }
             if (!seen) {
                 if (S.sc_nseen < (int)(sizeof S.sc_seen / sizeof S.sc_seen[0])) S.sc_seen[S.sc_nseen++] = key;
-                vlog("seccomp learn: %s", what);
+                vlog("seccomp learn: %s (thread %u%s)", what, (unsigned)req->pid, S.venus && venus_child(req->pid) ? ", venus's render server" : "");
             }
             resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
         } else {
@@ -2145,12 +2164,67 @@ static int pick_render_node(char *out, size_t n) {
     return -1;
 }
 
+/* a file's bytes hold `needle` (the first 32 MB read; for the venus checks below) */
+static int file_has(const char *path, const char *needle) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return 0;
+    size_t nl = strlen(needle), keep = 0, total = 0;
+    char buf[65536 + 64];
+    int found = 0;
+    for (;;) {
+        ssize_t r = read(fd, buf + keep, sizeof buf - 64 - keep);
+        if (r <= 0) break;
+        total += (size_t)r;
+        size_t have = keep + (size_t)r;
+        if (memmem(buf, have, needle, nl)) { found = 1; break; }
+        keep = have < nl ? have : nl - 1;
+        memmove(buf, buf + have - keep, keep);
+        if (total > ((size_t)32 << 20)) break;
+    }
+    close(fd);
+    return found;
+}
+
+/* the Vulkan driver of the render node's GPU, by its kernel driver: Mesa's RADV, ANV or NVK. 0 and its manifest's path
+ * in out, -1 for a GPU venus isn't given on */
+static int venus_icd_for(const char *node, char *out, size_t n) {
+    struct stat st;
+    if (stat(node, &st) || !S_ISCHR(st.st_mode)) return -1;
+    char sys[96], real[PATH_MAX];
+    snprintf(sys, sizeof sys, "/sys/dev/char/%u:%u/device/driver", major(st.st_rdev), minor(st.st_rdev));
+    if (!realpath(sys, real)) return -1;
+    const char *d = strrchr(real, '/');
+    d = d ? d + 1 : real;
+    const char *icd = !strcmp(d, "amdgpu") || !strcmp(d, "radeon") ? "radeon" : !strcmp(d, "i915") || !strcmp(d, "xe") ? "intel" :
+                      !strcmp(d, "nouveau") ? "nouveau" : NULL;
+    if (!icd) return -1;
+    snprintf(out, n, "/usr/share/vulkan/icd.d/%s_icd.json", icd);
+    if (stat(out, &st) || !S_ISREG(st.st_mode)) {
+        snprintf(out, n, "/usr/share/vulkan/icd.d/%s_icd.x86_64.json", icd);
+        if (stat(out, &st) || !S_ISREG(st.st_mode)) return -1;
+    }
+    return 0;
+}
+
+/* Vulkan through venus (6.10): QEMU's virtio-gpu-gl module with its venus property (QEMU 9.2 and later), a virglrenderer
+ * built with venus, and its render server (Debian's virgl-server, installed by vm-enable). NULL when this computer can
+ * give it, else why not */
+static const char *venus_refusal(void) {
+    if (!file_has("/usr/lib/x86_64-linux-gnu/qemu/hw-display-virtio-gpu-gl.so", "venus")) return "this QEMU has no venus";
+    if (!file_has("/usr/lib/x86_64-linux-gnu/libvirglrenderer.so.1", "VK_MESA_venus_protocol")) return "virglrenderer was built without venus";
+    struct stat st;
+    if (stat(VM_VENUS_SERVER, &st) || !S_ISREG(st.st_mode) || st.st_uid == getuid() || (st.st_mode & 022) || !(st.st_mode & 0100))
+        return "virglrenderer's render server (virgl-server) isn't installed";
+    return NULL;
+}
+
 /* Graphics 3D only for a Linux machine in a window, amd64 on amd64 (QEMU 10.0's 3D aborts on arm64's firmware reset,
  * 3.2), not on an unattended install's start (vm_gl_refusal), with QEMU's GL modules and a render node; otherwise the
  * machine starts with 2D graphics and the log says why. Only then does QEMU's sandbox get the render node (vm_jail_qemu,
  * VmQemuJail.render). */
 static void decide_graphics(void) {
     S.gl = 0;
+    S.venus = 0;
     S.render[0] = 0;
     if (S.render_fd >= 0) close(S.render_fd);
     S.render_fd = S.render_qfd = -1;
@@ -2166,7 +2240,14 @@ static void decide_graphics(void) {
     else if ((S.render_fd = render_open(S.render)) < 0) why = "the render node isn't a DRM render node lord-vm can open";
     if (why) { S.render[0] = 0; vlog("graphics: 2D instead of 3D: %s", why); return; }
     S.gl = 1;
-    vlog("graphics: 3D (virgl) on %s", S.render);
+    S.venus = 0;
+    if (S.m.vulkan) {
+        const char *vwhy = venus_refusal();
+        if (!vwhy && venus_icd_for(S.render, S.venus_icd, sizeof S.venus_icd)) vwhy = "no Vulkan driver of Mesa's for this GPU";
+        if (vwhy) vlog("graphics: Vulkan (venus) not given: %s", vwhy);
+        else S.venus = 1;
+    }
+    vlog("graphics: 3D (virgl%s) on %s", S.venus ? " and venus" : "", S.render);
 }
 
 /* ---- an Intel GVT-g vGPU (docs/MACHINES-GPU.md, Mode A) ---- */
@@ -2667,6 +2748,9 @@ static void build_qemu_args(void) {
          * among them, never take another size from the window while they run) */
         static char vga[96];
         snprintf(vga, sizeof vga, "%s,id=video0,addr=0x4", S.gl ? "virtio-vga-gl" : "virtio-vga");
+        /* venus: Vulkan's host-visible memory is mapped into the guest through a 64-bit BAR of this size (only what the
+         * guest's Vulkan allocates is backed, by the GPU's driver), and needs blob resources */
+        if (S.gl && S.venus) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",blob=on,hostmem=%dM,venus=on", VM_VENUS_HOSTMEM_MB);
         if (m->res_w && m->res_h) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",xres=%d,yres=%d", m->res_w, m->res_h);
         /* an Intel vGPU instead (decide_vgpu): its own display, the OpRegion QEMU hands over (the VBT Intel's driver
          * reads), and our GOP option ROM, which lights the UEFI screen on it; the guest's resets end QEMU (they crash a
@@ -2741,7 +2825,9 @@ static void build_qemu_args(void) {
         arg("-chardev"); arg("socket,id=lag0,fd=8");
         arg("-device"); arg("virtserialport,bus=vser0.0,nr=2,chardev=lag0,id=lag-port,name=org.lordos.agent");
     }
-    arg("-sandbox"); arg("on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny");
+    /* venus: virglrenderer forks and execs its render server, so QEMU's own filter allows spawning; ours lets only that
+     * program run (Landlock's execute right) and its jail is QEMU's (vmsandbox.h VmQemuJail.venus) */
+    arg("-sandbox"); arg(S.venus ? "on,obsolete=deny,elevateprivileges=allow,spawn=allow,resourcecontrol=deny" : "on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny");
     arg("-msg"); arg("timestamp=on");
     arg("-S");
     if (S.resuming) { arg("-incoming"); arg("defer"); }
@@ -3014,7 +3100,7 @@ static int start_machine(void) {
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
                          S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL,
                          S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, xfd, qargv[0], S.sc_learn, sc_drop_row(), &lfd,
-                         S.render_qfd };
+                         S.render_qfd, S.gl && S.venus };
         int mask = xfd >= 0 ? vm_jail_qemu(&j) | (in_ns ? VMS_NAMESPACES : 0) | (nsb & VMNS_NOEXEC ? VMS_NOEXEC_DISKS : 0) : 0;
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
@@ -3040,7 +3126,11 @@ static int start_machine(void) {
             if (sent != (ssize_t)sizeof msg[0]) _exit(126);
         }
         /* 3D: Mesa in QEMU can't write a shader cache (its sandbox has no home folder): told not to try */
-        char *env[] = { "LC_ALL=C.UTF-8", S.gl || S.vgpu ? "MESA_SHADER_CACHE_DISABLE=true" : NULL, NULL };
+        /* venus: its render server loads only the render node's GPU's Vulkan driver (no llvmpipe: its JIT would need
+         * executable memory made at run time) */
+        static char vkenv[128];
+        snprintf(vkenv, sizeof vkenv, "VK_DRIVER_FILES=%s", S.venus_icd);
+        char *env[] = { "LC_ALL=C.UTF-8", S.gl || S.vgpu ? "MESA_SHADER_CACHE_DISABLE=true" : NULL, S.gl && S.venus ? vkenv : NULL, NULL };
         syscall(SYS_execveat, xfd, "", qargv, env, AT_EMPTY_PATH);
         msg[1] = errno ? errno : ENOEXEC;
         write_all(stf, &msg[1], sizeof msg[1]);
@@ -8037,7 +8127,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1, vk = -1;
     int dispo = -1, bkp = -1, fwup = 0;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
@@ -8110,6 +8200,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         }
         if (!strcmp(a, "--devices")) { devs = parse_enum(v, "virtio", "compat"); if (devs < 0) { fprintf(stderr, "lord-vm: --devices virtio|compat\n"); return 2; } continue; }
         if (!strcmp(a, "--graphics")) { gfx = parse_enum(v, "2d", "3d"); if (gfx < 0) { fprintf(stderr, "lord-vm: --graphics 2d|3d\n"); return 2; } continue; }
+        if (!strcmp(a, "--vulkan")) { vk = parse_enum(v, "off", "on"); if (vk < 0) { fprintf(stderr, "lord-vm: --vulkan on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--resolution")) {
             if (!strcmp(v, "follow")) { resw = reshh = 0; res_set = 1; continue; }
             if (vm_resolution_parse(v, &resw, &reshh)) { fprintf(stderr, "lord-vm: --resolution follow|WxH (640x480 to 7680x4320, even)\n"); return 2; }
@@ -8149,7 +8240,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (vk >= 0 && vk != m.vulkan) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     /* a new name (6.26): refused when another machine has it or, as the folder follows, when its folder's or transfer
      * folder's new name is taken; the same name again only brings the folder in line when it can */
@@ -8201,6 +8292,9 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
     if (gpu >= 0) { m.vgpu = gpu; if (gpu) { m.schema = VM_SCHEMA; if (gfx < 0) m.graphics = VM_GFX_2D; } }
     if (gfx == VM_GFX_3D && gpu < 0) m.vgpu = VM_VGPU_NONE;
+    /* Vulkan (venus, 6.10) rides on 3D: asked for, it is set with it; 2D (or a vGPU) turns it off */
+    if (vk >= 0) { m.vulkan = vk; if (vk) m.schema = VM_SCHEMA; }
+    if (m.graphics != VM_GFX_3D) m.vulkan = 0;
     if (m.graphics) m.schema = VM_SCHEMA;
     if (res_set) { m.res_w = resw; m.res_h = reshh; if (resw) m.schema = VM_SCHEMA; }
     if (sound >= 0) m.sound = sound;
@@ -11176,6 +11270,7 @@ static void import_untrust(VmMachine *m) {
     m->pointer_guest = 0;
     m->vgpu = VM_VGPU_NONE;
     if (m->graphics == VM_GFX_3D) m->graphics = VM_GFX_2D;
+    m->vulkan = 0;
     m->cpu_pin = VM_PIN_DEFAULT;
     m->perf_profile = 0;
     m->group[0] = 0;
@@ -11313,6 +11408,7 @@ static int usage(void) {
             "                         [--guest-links on|off]   (links the guest's tools send are offered to open on this computer)\n"
             "                         [--guest-notify on|off]   (the guest's notifications are shown here, as from the machine)\n"
             "                         [--automation on|off]   (machines exec and cp may run programs in the guest: docs/VIRTUALIZATION.md 6.15)\n"
+            "                         [--vulkan on|off]   (a 3D machine's guest gets Vulkan through venus: docs/VIRTUALIZATION.md 6.10)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"

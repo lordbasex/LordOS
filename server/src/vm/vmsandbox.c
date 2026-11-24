@@ -266,6 +266,8 @@ int vm_jail_qemu(const VmQemuJail *j) {
             /* 3D: a render node that doesn't check out gets no rule (QEMU's EGL then fails and it exits); it never costs
              * the rest of the sandbox */
             if (j->render && j->render[0]) render_rules(rs, j->render, j->render_fd, h);
+            /* venus: its render server, read and execute; without that rule venus isn't given (the machine doesn't start) */
+            if (j->venus && (!j->render || !j->render[0] || rule(rs, VM_VENUS_SERVER, rx, h))) ok = 0;
             /* a vGPU whose paths don't check out costs the whole sandbox: QEMU doesn't run (the caller refuses) */
             if (j->vgpu_dev && j->vgpu_dev[0] && vgpu_rules(rs, j->vgpu_dev, j->vgpu_group, h)) ok = 0;
             if (j->vgpu_dev && j->vgpu_rom && j->vgpu_rom[0] && rule(rs, j->vgpu_rom, LANDLOCK_ACCESS_FS_READ_FILE, h)) ok = 0;
@@ -288,7 +290,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
         static struct sock_filter filt[BPF_MAXINSNS];
         VmScOpts o = { .kvm = j->kvm, .tcg = j->tcg, .render = j->render && j->render[0], .vgpu = j->vgpu_dev && j->vgpu_dev[0],
                        .tap = j->tap, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn, .bti = vm_sc_cpu_bti(),
-                       .drop = j->sc_drop };
+                       .drop = j->sc_drop, .venus = j->venus };
         for (int pass = 0; pass < 2 && !(mask & VMS_SECCOMP_OURS); pass++) {
             if (pass && (!o.notify || o.learn)) break;
             if (pass) o.notify = 0;
