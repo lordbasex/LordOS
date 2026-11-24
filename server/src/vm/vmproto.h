@@ -347,6 +347,7 @@ enum {
     VMS_NONDUMPABLE = 2048, /* QEMU non-dumpable, checked after exec: the person's programs can't read its memory */
     VMS_SECCOMP_ALLOWLIST = 4096, /* our seccomp on QEMU is the allowlist (vmseccomp.h) */
     VMS_SECCOMP_NAMED = 8192,     /* lord-vm holds its listener: a call it stops is named in the log and failure page */
+    VMS_NOEXEC_DISKS = 16384,     /* in QEMU's mount namespace its disks folder is noexec: nothing written there runs */
 };
 /* VM_INFO d: cgroups */
 enum {

@@ -408,6 +408,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     again) through `tests/vm_group_link.sh`.
   - **Not run under it yet**: an Intel vGPU (GVT-g), a bridged tap and hugetlb memory: their calls were read in QEMU's
     source (VFIO's and TUN's request types are in the rules).
+- **Machines: nothing QEMU writes can run** (in development; latest release 0.8.9.5-beta; approved by the maintainer
+  2026-11-24; docs/VIRTUALIZATION.md 3.3). In QEMU's own mount namespace the machine's `disks/` folder is now bound over
+  itself and that bind remounted `noexec,nosuid,nodev` (`vmsandbox.c` `noexec_bind`, from `vm_ns_setup`, after the
+  private loader is mounted and only once the user namespace is joined). The kernel then refuses to run a file there
+  (EACCES) or to map one executable (`mmap` or `mprotect` with `PROT_EXEC`: EPERM), whatever seccomp lets through.
+  - **Why**: without a listener (the seccomp allowlist's kill fallback, never on Debian 13's kernel) the allowlist lets
+    the loader's kind of mapping (private, read-only, executable) through at any time, so a compromised QEMU could write
+    code into one of its disk files and map it to run. That half of the gap is closed; a memfd it wrote is still the
+    other half (no mount covers memfds), as before.
+  - **Also**: `/dev/shm`, `/tmp`, `/var/tmp` and `$XDG_RUNTIME_DIR` get the same remount there. QEMU's Landlock already
+    keeps it from writing them; they count only on a kernel without Landlock. These binds and the loader's are the only
+    mounts in QEMU's namespace. The loader's bind, a mount of its own made before them, keeps exec. What the outer mount
+    had stays (read-only stays read-only, atime flags are kept).
+  - **Nothing QEMU uses changes**: qcow2 and raw disks, the NVRAM and snapshots with memory are read and written as
+    before; swtpm, virtiofsd and passt run outside QEMU's namespaces, and the suspend file, a disposable session's memfd
+    and guest memory (a memfd, hugetlb or not) reach QEMU as descriptors.
+  - **If it fails** QEMU still runs, and its log says which folder and why (`lord-vm: QEMU's disks folder couldn't be
+    made noexec in its mount namespace (...)`); Landlock and seccomp still hold. The log's sandbox line says
+    `noexec-disks=1` and `lord-vm --status --json` adds `"noexec_disks"`.
+  - **Tests**: `vm-jail-probe` checks from inside the jail that `disks/` and the temporary folders are `noexec`, `nosuid`
+    and `nodev`, then, with the allowlist in its kill fallback (no listener), writes a real program into a file of
+    `disks/` and can neither map it executable (EPERM; with the remount left out, the same probe maps it) nor run it
+    under lord-vm's descriptor number (EACCES). The probe's own copy moved out of `disks/` (it is read as a machine's ISO
+    is). `tests/vm_isolation.sh` checks `"noexec_disks":1`. Real machines started with it on the amd64 PC: a Debian 13
+    guest with 2D graphics and one with UEFI and a TPM (swtpm), each through boot to login, keys, a snapshot with memory
+    and its revert, reset, suspend to a file and resume, and shutdown; a LordOS live machine with 3D graphics (virgl).
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores
