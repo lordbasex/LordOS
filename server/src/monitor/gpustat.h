@@ -108,7 +108,7 @@ int gpu_cards_read(const char *root, const char *pci_ids, GpuCard *out, int max)
 /* The whole picture as malloc'd JSON (NULL without memory):
  *   {"t","mono","hz","cards":[…],"list":[{pid,ppid,name,cmd,exe,self,model,libs,clients:[…],kfd:[…],nvDev:[minors]}],
  *    "hidden":[{pid,name,kind}],"ai":[{pid,ppid,name,state,own,ticks,rss,model}],"say":[…],"vms":[{pid,ticks,rss}],
- *    "nv":[…] (lord-nvgpu's, only when monitor/nvgpu.h's nvgpu_json is linked and writes it),"caps":{…}}
+ *    "caps":{…}}  (mon.c splices lord-nvgpu's "nv" in after this, monitor/nvgpu.h)
  * root: "" for the real /proc and /sys; uid: the user's (only their processes' fds are read); self: lord-server's pid;
  * home: where lord-say's notes are (NULL: none).
  *

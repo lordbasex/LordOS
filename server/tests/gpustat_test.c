@@ -335,7 +335,7 @@ static void test_machine(void) {
     CHECK(strstr(j, "\"link\":{\"gts\":8.0,\"width\":16}") && strstr(j, "\"memBusy\":38") && strstr(j, "\"crit\":94.0"));
     CHECK(strstr(j, "\"rc6Ms\":59211630") && strstr(j, "\"gts\":[{\"tile\":0,\"gt\":0,\"kind\":\"rc\",\"act\":2400"));
     CHECK(strstr(j, "\"nvModel\":\"NVIDIA GeForce RTX 3060\""));
-    CHECK(!strstr(j, "\"nv\":["));                        /* no lord-nvgpu linked here */
+    CHECK(!strstr(j, "\"nv\":["));                        /* lord-nvgpu's "nv" is mon.c's to add */
     CHECK(strstr(j, "\"name\":\"llama-server\",\"state\":\"S\",\"own\":true,\"ticks\":1000,") && strstr(j, "\"model\":\"Qwen3-4B-Q4_K_M.gguf\"}"));
     CHECK(strstr(j, "\"hidden\":[]"));
     CHECK(strstr(j, "\"libs\":[\"libvulkan.so.1\",\"libvulkan_radeon.so\"]"));

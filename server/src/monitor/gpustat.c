@@ -1154,10 +1154,6 @@ static void say_note(Js *b, const char *home, const ProcStat *s, unsigned uid, i
     *first = 0;
 }
 
-/* lord-nvgpu's numbers (monitor/nvgpu.h, branch mon/nvgpu-helper): writes `"nv":[…]` and returns its length, 0 with
- * nothing when there is no NVIDIA card or helper. Weak until that file is merged: absent, there is no "nv". */
-int nvgpu_json(char *out, size_t n) __attribute__((weak));
-
 char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, const char *home) {
     static GpuCard cards[GPU_CARDS];
     static GpuClient clients[PROC_CLIENTS];
@@ -1255,13 +1251,7 @@ char *gpu_json(const char *root, const char *pci_ids, unsigned uid, int self, co
     jraw(&b, say.p ? say.p : "");
     jraw(&b, "],\"vms\":[");
     jraw(&b, vms.p ? vms.p : "");
-    jraw(&b, "]");
-    if (nvgpu_json && root[0] == 0) {
-        static char nv[32768];
-        int k = nvgpu_json(nv, sizeof nv);
-        if (k > 6 && (size_t)k < sizeof nv && !strncmp(nv, "\"nv\":[", 6) && nv[k - 1] == ']' && !memchr(nv, 0, (size_t)k)) { jraw(&b, ","); jraw(&b, nv); }
-    }
-    jraw(&b, ",\"caps\":");
+    jraw(&b, "],\"caps\":");
     jraw(&b, caps ? caps : "null");
     jraw(&b, "}");
     int bad = b.bad || ai.bad || say.bad || vms.bad;
