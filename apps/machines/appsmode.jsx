@@ -22,6 +22,7 @@ import { ClipAskBar } from './clipask.jsx';
 import { menus } from './ui.jsx';
 import { appsGuestSize, guestScale, toHostRect, toGuestRect, cropOf, cropPoint, nearRect, guestKept, insideWork, isPopup, guestInstance, planWindows, guestAppItems, runningWindows, runningKey, wheelSteps, guestPlace, offsetRect, minimizedByUs, iconsToAsk, AGENT_CAPS, copyLine, placeBatch, closeRefusedOf, launchStart, launchPending, launchPrune, closeStart, closePrune, guestKeys, guestMayTakeFront, anchorPoint, cropsStale, STALE_MS } from './model.js';
 import { isProtectedMachine } from './meta.js';
+import { saveGuestApps } from './guestlaunch.js';
 
 // how long a click that brought a new clipboard into the machine waits for it (the guest's helper sets it); the machine's
 // window (vmwindow.jsx) and its apps mode windows alike
@@ -109,7 +110,13 @@ export function useAppsMode({ dir, sid, st, name, mid, home, on, ready, onLeave,
   }, [active, st?.w, st?.h, st?.media, name, st?.agent?.caps]);
   useEffect(() => {
     if (!active) return;
-    if (st.guestAppsSeq !== seen.current.a) { seen.current.a = st.guestAppsSeq; publish(dir, { apps: guestAppItems(lord.vm.guestApps(sid)) }); }
+    if (st.guestAppsSeq !== seen.current.a) {
+      seen.current.a = st.guestAppsSeq;
+      const apps = guestAppItems(lord.vm.guestApps(sid));
+      publish(dir, { apps });
+      // kept for the launcher while the machine is off (guestlaunch.js, 6.12)
+      saveGuestApps(dir, apps);
+    }
     const listed = st.windowsSeq !== seen.current.w;
     if (listed) { seen.current.w = st.windowsSeq; publish(dir, { listedAt: Date.now() }); sync(dir, sid, mid, name, lord.vm.windows(sid), st.w, st.h); }
     // icons: for every window that has none yet (one opened from a later list than its icon came with, as after a

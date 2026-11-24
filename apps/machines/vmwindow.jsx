@@ -11,7 +11,9 @@ import {
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
 import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetCheck, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
-import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
+import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS, launchGuest } from './appsmode.jsx';
+import { launchAsks, dropLaunchAsk } from './guestlaunch.js';
+import { launchAskStep } from '../../sdk/guestappsmodel.js';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
 import { defaultsOf } from './store.js';
@@ -1116,6 +1118,25 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   }, [appsActive, appsActive && shell]);
   const gApps = useStore(guests, (x) => x[dir] || null);
   const gRunning = runningKey(runningWindows(gApps?.list));
+  // a guest app chosen in the launcher while the machine was off (guestlaunch.js, 6.12): this window started the machine;
+  // apps mode goes on, and the app opens once the guest's own fresh list holds that very token (never anything else)
+  const lask = useStore(launchAsks, (x) => x[dir] || null);
+  useEffect(() => { if (lask && !appsOn) setApps(true); }, [lask]);
+  useEffect(() => () => dropLaunchAsk(dir), []);          // the window closed: the launch isn't waited for any more
+  useEffect(() => {
+    if (!lask) return undefined;
+    const check = () => {
+      const step = launchAskStep(lask, appsActive ? gApps?.apps : [], Date.now());
+      if (step === 'wait') return;
+      dropLaunchAsk(dir);
+      if (step === 'launch') { launchGuest(dir, { token: lask.token, name: lask.name }); return; }
+      notify({ app: 'machines', label: tr('machines.title'), title: tr(step === 'missing' ? 'machines.launcher.missing' : 'machines.launcher.timeout', { app: lask.name, machine: name }),
+        body: tr(step === 'missing' ? 'machines.launcher.missingBody' : 'machines.launcher.timeoutBody'), sound: false });
+    };
+    check();
+    const t2 = setInterval(check, 5000);
+    return () => clearInterval(t2);
+  }, [lask, appsActive, gApps?.apps]);
   // why it can't be on: the agent, or a guest whose helper can't list its windows (it needs LordOS or Windows inside)
   const appsWhy = appsBlocked === 'needsTools' ? tr('machines.win.appsNeedsTools') : appsBlocked ? tr('machines.apps.needsAgent') : '';
   const appsLabel = appsOn ? tr('machines.apps.leave') : appsWhy || tr('machines.apps.enter');

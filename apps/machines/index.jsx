@@ -5,7 +5,8 @@
 // one window of a guest in apps mode (appsmode.jsx), args.settings Machines settings (settingswin.jsx).
 import { useEffect } from 'react';
 import { useAppWindow, addListener, wm, t as tr, registerDockActions, registerDockActivate, registerWindowMenuItems, registerOpenProviders } from '@lordos/sdk';
-import { Library, AppMark, openInMachine } from './library.jsx';
+import { Library, AppMark, openInMachine, openMachine } from './library.jsx';
+import { startGuestLauncher } from './guestlaunch.js';
 import { openMachines, windowsNeedsTools } from './openwith.js';
 import { readMeta } from './meta.js';
 import { isForeignProgram } from '../../sdk/filekinds.js';
@@ -58,6 +59,8 @@ registerOpenProviders('machines', () => {
 
 // the `machines` command's start and open go through this session (cli.js); a moment after the desktop is up
 setTimeout(startMachinesCli, 1000);
+// the guests' apps of machines that are off, in the launcher and search (guestlaunch.js, 6.12)
+setTimeout(() => startGuestLauncher(openMachine), 1500);
 // apps mode's item by the clock, one per machine in it (appsstatus.jsx)
 startAppsStatus();
 
