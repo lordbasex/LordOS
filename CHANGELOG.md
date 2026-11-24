@@ -11,6 +11,22 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Files: rubber-band selection** (GitHub #233; in development; latest release 0.8.9.5-beta). A drag that starts on
+  the empty space of the icon or list view draws a translucent rectangle in the accent colour and selects every card or
+  row it touches; Shift adds them to what was selected, Ctrl (⌘) toggles them, and with no modifier it starts afresh. Near
+  the view's top or bottom edge the view scrolls by itself, faster the closer the pointer is, and the rectangle follows
+  (cards that scroll out of sight stay selected). A press on a card or row still selects and drags it, and a click on the
+  empty space without a drag still clears the selection, as before. The rectangle is tested against the boxes the layout
+  gave each card and row (`lord.getLayout`, in the scrolled content's own space, so scrolling doesn't move them), never a
+  hit test per node; it is physical left and top in every language, so right to left needs no flip. The selection
+  changes at most once per frame (`frameGate`) and only when the set under the rectangle changes, and the rectangle is
+  its own small node with its own store, so a drag across a big folder repaints only the cards that change. The rules
+  are pure (`apps/files/marquee.js`, `tests/files_marquee_test.mjs`, 52 checks: corners, touching, mirrored boxes,
+  modifiers, autoscroll, one update per frame); the views use them through `apps/files/marqueeview.jsx`; the SDK's
+  ScrollView now also hands its viewport (`scrollRef.current.outer`). Checked in a headless lord-server with real
+  pointer and key events (`tests/app_scene_headless.sh files_marquee_scene`, 11 checks with screenshots, in English
+  and Arabic): a 2×2 drag selects 4, Shift adds the next 2, Ctrl toggles 3, a click clears, the list view takes the 5 rows
+  it crosses, and in a folder of 400 files the view scrolls while the pointer rests at the bottom edge.
 - **Machines: checked for real, and what that found** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
   6.5, 6.7, 6.14, 6.16, 6.17, 6.19).
   - **Monitor names a machine's own disk and network numbers.** A running machine's row in Processes says

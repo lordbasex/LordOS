@@ -328,7 +328,8 @@ export function ScrollView({ style, contentStyle, children, scrollRef, gutter, r
     if (Math.round(to) !== Math.round(y)) scrolled();
     setOffset(Math.max(0, v));
   };
-  if (scrollRef) scrollRef.current = { scrollTo: jump, offset: () => y, inner };
+  // outer: the viewport (Files' rubber band scrolls by itself near its edges, apps/files/marqueeview.jsx)
+  if (scrollRef) scrollRef.current = { scrollTo: jump, offset: () => y, inner, outer };
   // onScroll(y, view): the offset after it changed (what is in sight, for lazy contents)
   const scrolledTo = useRef(onScroll);
   scrolledTo.current = onScroll;

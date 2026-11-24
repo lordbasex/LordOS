@@ -711,6 +711,9 @@ EOF
     # the column view: what is picked in a deeper column is selected, Select All takes its column (apps/files/colview.js, GitHub #100, #170)
     if have node; then run "files-colview-test (apps/files/colview.js)" node tests/files_colview_test.mjs
     else skip "files-colview-test" "node"; fi
+    # the rubber band: the rectangle, which cards and rows it touches, Shift and Ctrl, autoscroll, right to left, one update per frame (apps/files/marquee.js, GitHub #233)
+    if have node; then run "files-marquee-test (apps/files/marquee.js)" node tests/files_marquee_test.mjs
+    else skip "files-marquee-test" "node"; fi
     # color tags and comments: the last tag and an emptied comment are removed (apps/files/tags.js, GitHub #181)
     if have node; then run "files-tags-test (apps/files/tags.js)" node tests/files_tags_test.mjs
     else skip "files-tags-test" "node"; fi
