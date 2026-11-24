@@ -2,6 +2,7 @@
  * when all of the memory fits in free, unreserved 2 MB pages */
 #include "../src/vm/vmmem.h"
 #include <stdio.h>
+#include <string.h>
 
 static int n, bad;
 #define CHECK(c, ...) do { n++; if (!(c)) { bad++; fprintf(stderr, "FAIL: " __VA_ARGS__); fputc('\n', stderr); } } while (0)
@@ -33,6 +34,22 @@ int main(void) {
     CHECK(vmmem_choose(4096, 1, NULL) == VMMEM_SHARED, "nothing read: the usual backing");
     vmmem_parse("HugePages_Free: -5\nHugePages_Rsvd: -1\nHugepagesize: 2048 kB\n", &h);
     CHECK(h.free == 0 && h.rsvd == 0 && vmmem_choose(2, 0, &h) == VMMEM_ANON, "nonsense numbers count as none");
+    char o[160], v[24];
+    CHECK(!strcmp(vmmem_object(o, sizeof o, VMMEM_SHARED, 4096, 1), "memory-backend-ram,id=mem,size=4096M,share=on"),
+          "shared folders: shared RAM (QEMU's memfd, 2 MB aligned), not memory-backend-memfd: %s", o);
+    CHECK(!strcmp(vmmem_object(o, sizeof o, VMMEM_HUGETLB, 8192, 1), "memory-backend-memfd,id=mem,size=8192M,share=on,hugetlb=on,hugetlbsize=2M,prealloc=on"),
+          "hugetlb with a shared folder: %s", o);
+    CHECK(!strcmp(vmmem_object(o, sizeof o, VMMEM_HUGETLB, 8192, 0), "memory-backend-memfd,id=mem,size=8192M,share=off,hugetlb=on,hugetlbsize=2M,prealloc=on"),
+          "hugetlb without one: %s", o);
+    CHECK(!strcmp(vmmem_object(o, sizeof o, VMMEM_ANON, 8192, 0), ""), "QEMU's own memory: no -object");
+    CHECK(vmmem_shmem_huge("always within_size [advise] never deny force\n", v, sizeof v) == 1 && !strcmp(v, "advise"), "advise gives huge pages");
+    CHECK(vmmem_shmem_huge("always within_size advise [never] deny force\n", v, sizeof v) == 0 && !strcmp(v, "never"), "never doesn't");
+    CHECK(vmmem_shmem_huge("always within_size advise never [deny] force\n", v, sizeof v) == 0 && !strcmp(v, "deny"), "deny doesn't");
+    CHECK(vmmem_shmem_huge("[always] within_size advise never deny force\n", v, sizeof v) == 1, "always does");
+    CHECK(vmmem_shmem_huge("always within_size advise never deny [force]\n", v, sizeof v) == 1, "force does");
+    CHECK(vmmem_shmem_huge("", v, sizeof v) == 0 && !v[0] && vmmem_shmem_huge(NULL, v, sizeof v) == 0, "unreadable: unknown, no");
+    CHECK(vmmem_shmem_huge("[a-very-long-unknown-value-here] x", v, sizeof v) == 0 && !v[0], "too long: unknown");
+    CHECK(vmmem_shmem_huge("[] x", v, sizeof v) == 0 && !v[0] && vmmem_shmem_huge("[never", v, sizeof v) == 0, "malformed: unknown");
     if (bad) { fprintf(stderr, "vmmem-test: %d of %d failed\n", bad, n); return 1; }
     printf("vmmem-test: %d checks passed\n", n);
     return 0;
