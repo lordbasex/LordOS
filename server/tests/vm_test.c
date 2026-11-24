@@ -2879,6 +2879,13 @@ static void test_guest_links(void) {
     /* a layout whose corner is near INT_MAX: refused without a signed overflow (UBSan) */
     CHECK(!vm_layout_ok(2147483647, 0, 1, 1, 32767, 1) && !vm_layout_ok(0, 2147483647, 1, 1, 1, 32767) && vm_layout_ok(10, 0, 100, 100, 110, 100));
     CHECK(vd_abs_map(5, 100, 2147483647, 100, 200) == 5);
+    /* apps mode: a guest alternating window lists every millisecond for 10 s gets the burst then 10 a second; program
+     * lists 3 then one per 2 s; icons a whole list's worth (LAG_WIN_MAX) at once */
+    { AgRate wr = { 0, 0 }, ar = { 0, 0 }, ir = { 0, 0 }; int nw = 0, na = 0, ni = 0;
+      for (long long t = 1; t <= 10000; t++) { nw += ag_rate_take(&wr, t, AG_WINLIST_BURST, AG_WINLIST_EVERY_MS); na += ag_rate_take(&ar, t, AG_APPLIST_BURST, AG_APPLIST_EVERY_MS); }
+      for (int i = 0; i < LAG_WIN_MAX; i++) ni += ag_rate_take(&ir, 5, AG_WINICON_BURST, AG_WINICON_EVERY_MS);
+      CHECK(nw <= AG_WINLIST_BURST + 10000 / AG_WINLIST_EVERY_MS + 1 && nw >= 10000 / AG_WINLIST_EVERY_MS);
+      CHECK(na <= AG_APPLIST_BURST + 10000 / AG_APPLIST_EVERY_MS + 1 && ni == LAG_WIN_MAX && AG_WINICON_BURST >= LAG_WIN_MAX); }
     /* the guest's clipboard: a copy loop gets the burst, then 4 a second */
     { AgRate cr = { 0, 0 }; int n = 0; for (long long t = 1; t <= 10000; t += 5) n += ag_rate_take(&cr, t, AG_CLIP_BURST, AG_CLIP_EVERY_MS);
       CHECK(n >= 10000 / AG_CLIP_EVERY_MS && n <= AG_CLIP_BURST + 10000 / AG_CLIP_EVERY_MS + 1); }                                     /* the clock went back: a fresh bucket */

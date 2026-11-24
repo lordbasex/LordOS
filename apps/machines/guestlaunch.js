@@ -8,18 +8,34 @@
 // computer runs a guest's token or name.
 import { createStore, guestLauncherApps, guestLauncherItems, cleanGuestApps, sameGuestApps, appsOff } from '@lordos/sdk';
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
-import { stateView, unreadableOf } from './model.js';
+import { stateView, unreadableOf, saveDelay } from './model.js';
 
 // dir → { token, name, at }: a launch the launcher asked for, taken by the machine's window (vmwindow.jsx)
 export const launchAsks = createStore({});
 
 // apps mode's fresh list → app.json, only when it changed (and never an empty one: a guest that lists nothing yet keeps
-// what it listed last)
-export function saveGuestApps(dir, apps) {
+// what it listed last), at most once per SAVE_APPS_MS for a machine (model.js saveDelay): a guest that alternates two
+// lists would otherwise write the disk many times a second (an SD card on the Pi). The latest list waits its turn.
+const saves = new Map();     // dir → { at: the last write, apps: the list waiting, timer }
+function writeApps(dir, apps) {
   const clean = cleanGuestApps(apps);
   if (!dir || !clean.length) return false;
   if (sameGuestApps(readMeta(dir).guestApps, clean)) return false;
   return writeMeta(dir, { guestApps: clean });
+}
+export function saveGuestApps(dir, apps) {
+  if (!dir) return false;
+  const s = saves.get(dir) || { at: 0, apps: null, timer: null };
+  saves.set(dir, s);
+  const now = Date.now(), wait = saveDelay(s.at, now);
+  if (!wait && !s.timer) {
+    const wrote = writeApps(dir, apps);
+    if (wrote) s.at = now;
+    return wrote;
+  }
+  s.apps = apps;
+  if (!s.timer) s.timer = setTimeout(() => { s.timer = null; const a = s.apps; s.apps = null; if (writeApps(dir, a)) s.at = Date.now(); }, Math.max(wait, 1));
+  return false;
 }
 
 const has = () => typeof lord !== 'undefined' && lord.vm && typeof lord.vm.list === 'function';

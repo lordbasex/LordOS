@@ -1689,7 +1689,8 @@ export const offsetRect = (r, off) => (r && off && (off.x || off.y) ? { ...r, x:
 export const minimizedByUs = (askedAt, now, hostMinimized, wait = 3000) => !hostMinimized && !!askedAt && now - askedAt < wait;
 
 // the part of the guest's picture a window shows (<MediaView crop>)
-export const cropOf = (w) => [w.x, w.y, w.w, w.h];
+// (cap: { w, h } in the guest's pixels, a popup's most: the rest of a longer one is cut, never squeezed)
+export const cropOf = (w, cap) => [w.x, w.y, cap ? Math.max(1, Math.min(w.w, cap.w)) : w.w, cap ? Math.max(1, Math.min(w.h, cap.h)) : w.h];
 
 // A point over a guest's window (layout box [x, y, w, h] of its picture, crop [x, y, w, h]) → the guest's absolute
 // pointer position, inside its screen (gw × gh); null outside the box
@@ -1752,6 +1753,46 @@ export const nearRect = (a, b, tol = 2) => !!a && !!b && Math.abs(a.x - b.x) <= 
 
 // A guest window drawn as a small frameless window on top (a menu, a tooltip: owned and topmost), not a framed one
 export const isPopup = (w) => !!w && w.owner > 0 && w.topmost;
+
+// A guest's popup (a menu, a tooltip) is the guest's own picture in a frameless window on top, so it is held to what a
+// menu needs (docs/VIRTUALIZATION.md 7.2, "Popups"): at most POPUP_MAX_W of the work area's width and POPUP_MAX_H of its
+// height (a longer menu is cut), always inside the work area of its display (never over the menu bar or the Dock), and
+// only for an owner that is one of the guest's windows shown here for POPUP_OWNER_MS (a window made just to own one
+// can't be used at once). Otherwise a guest could paint a fake prompt or bar over the whole screen.
+export const POPUP_MAX_W = 0.6;
+export const POPUP_MAX_H = 0.7;
+export const POPUP_OWNER_MS = 300;
+// ms until the owner of popup w may hold it (0: now), or -1 when it has no owner window here (have: Map gid → track
+// { winId, popup, minimized, shownAt })
+export function popupOwnerWait(w, have, now) {
+  const o = w && w.owner > 0 ? have?.get(w.owner) : null;
+  if (!o || !o.winId || o.popup || o.minimized || !Number.isFinite(o.shownAt)) return -1;
+  return Math.max(0, o.shownAt + POPUP_OWNER_MS - now);
+}
+// the most of a popup this computer shows ({ w, h } in its pixels) inside work
+export function popupCap(work) {
+  if (!work || !(work.w > 0) || !(work.h > 0)) return { w: 1, h: 1 };
+  return { w: Math.max(1, Math.floor(work.w * POPUP_MAX_W)), h: Math.max(1, Math.floor(work.h * POPUP_MAX_H)) };
+}
+// a rectangle (this computer's pixels) moved inside work, cut to it where it is larger; null without a work area
+export function clampInto(r, work) {
+  if (!r || !work || !(work.w > 0) || !(work.h > 0)) return null;
+  const n = (v, d) => (Number.isFinite(v) ? v : d);
+  const w = Math.max(1, Math.min(n(r.w, 1), work.w)), h = Math.max(1, Math.min(n(r.h, 1), work.h));
+  const x = Math.min(Math.max(n(r.x, work.x), work.x), work.x + work.w - w), y = Math.min(Math.max(n(r.y, work.y), work.y), work.y + work.h - h);
+  return { ...r, x, y, w, h };
+}
+// a popup's place here: capped (popupCap), then inside work
+export function popupRect(r, work) {
+  if (!r || !work) return null;
+  const c = popupCap(work);
+  return clampInto({ ...r, w: Math.min(r.w, c.w), h: Math.min(r.h, c.h) }, work);
+}
+
+// Apps mode's list of the guest's programs is written into the machine's app.json at most once per SAVE_APPS_MS
+// (guestlaunch.js): ms to wait before the next write may go, given the last one's time (0: now)
+export const SAVE_APPS_MS = 2000;
+export const saveDelay = (last, now) => (!(last > 0) || !(now >= last) ? 0 : Math.max(0, last + SAVE_APPS_MS - now));
 
 // The LordOS window's instance name for a guest window (wm.open('machines', { instance }))
 export const guestInstance = (mid, id) => `ga-${String(mid || '').replace(/[^A-Za-z0-9-]/g, '')}-${Number(id) >>> 0}`;

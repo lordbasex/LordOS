@@ -1334,6 +1334,13 @@ static struct {
     int lag_shell, lag_links, lag_notify;
     AgRate link_rate, note_rate;            /* the guest's links and notifications, each at most a burst then one per interval */
     AgRate clip_rate;                       /* the guest's clipboard (AGK_CLIP, AGK_CLIPX), the same way */
+    /* apps mode's lists and icons, the same way (AG_WINLIST_*, AG_APPLIST_*, AG_WINICON_*): the last list of each kind
+     * sent (not sent again when the same), a list that came too soon (sent at wd_pend_at), icons dropped */
+    AgRate wl_rate, al_rate, wi_rate;
+    uint8_t *wd_last[2], *wd_pend[2];
+    size_t wd_last_n[2], wd_pend_n[2];
+    long long wd_pend_at;
+    unsigned wd_dropped;
     unsigned clip_dropped;
     int link_over, note_over;               /* refused over the rate since the last line in the log */
     /* the agent's shell (VM_SHELL): our end of lord-server's stream, the shell's id, what went to the guest and isn't
@@ -6470,8 +6477,15 @@ static void windata_send(int ci, const uint8_t *out, size_t n, int kind) {
     if (fd >= 0) close(fd);
 }
 
+/* the kinds of list held back by their rate: 0 the windows, 1 the programs */
+static void wd_pend_clear(void) {
+    for (int k = 0; k < 2; k++) { free(S.wd_pend[k]); S.wd_pend[k] = NULL; S.wd_pend_n[k] = 0; free(S.wd_last[k]); S.wd_last[k] = NULL; S.wd_last_n[k] = 0; }
+    S.wd_pend_at = 0;
+}
+
 static void lag_windows_off(void) {
     S.lag_apps = 0;
+    wd_pend_clear();
     lag_icons_forget(1);
     free(S.lag_applist);
     S.lag_applist = NULL;
@@ -6482,10 +6496,55 @@ static void lag_windows_off(void) {
  * VM_LAUNCH */
 static void layout_set(const int L[6]);
 static void layout_update(void);
+/* a list (k: 0 windows, 1 programs) sent now when its rate allows and it isn't the one sent last; else, when it is new,
+ * kept to go at wd_pend_at (the latest wins). Takes out (malloc'd). 1 when it went or waits, 0 the same as the last */
+static int wd_list_send(int k, uint8_t *out, size_t n, int kind, long long now) {
+    if (!out || !n) { free(out); return 0; }
+    if (S.wd_last[k] && S.wd_last_n[k] == n && !memcmp(S.wd_last[k], out, n)) {
+        /* the same as the last sent: nothing new for lord-server (a list waiting is older than this one: it goes) */
+        free(S.wd_pend[k]); S.wd_pend[k] = NULL; S.wd_pend_n[k] = 0;
+        free(out);
+        return 0;
+    }
+    AgRate *r = k ? &S.al_rate : &S.wl_rate;
+    int burst = k ? AG_APPLIST_BURST : AG_WINLIST_BURST, every = k ? AG_APPLIST_EVERY_MS : AG_WINLIST_EVERY_MS;
+    if (!ag_rate_take(r, now, burst, every)) {
+        free(S.wd_pend[k]);
+        S.wd_pend[k] = out; S.wd_pend_n[k] = n;
+        long long at = r->at + every;
+        if (!S.wd_pend_at || at < S.wd_pend_at) S.wd_pend_at = at;
+        if (!(S.wd_dropped++ & 0xffff)) vlog("agent: apps mode's %s change faster than their rate: the latest waits for its turn", k ? "program lists" : "window lists");
+        return 1;
+    }
+    free(S.wd_pend[k]); S.wd_pend[k] = NULL; S.wd_pend_n[k] = 0;
+    windata_send(-1, out, n, kind);
+    free(S.wd_last[k]);
+    S.wd_last[k] = out; S.wd_last_n[k] = n;
+    return 1;
+}
+
+/* the loop's turn: a list held back by its rate goes once the rate allows */
+static void wd_tick(long long now) {
+    if (!S.wd_pend_at || now < S.wd_pend_at) return;
+    S.wd_pend_at = 0;
+    for (int k = 0; k < 2; k++) {
+        if (!S.wd_pend[k]) continue;
+        uint8_t *out = S.wd_pend[k];
+        size_t n = S.wd_pend_n[k];
+        S.wd_pend[k] = NULL; S.wd_pend_n[k] = 0;
+        wd_list_send(k, out, n, k ? LAG_APPLIST : LAG_WINDOWS, now);
+    }
+}
+
 static void lag_windata(const AgFrame *f) {
     static LagWinList wl;
     uint8_t *out = NULL;
     size_t n = 0;
+    long long now = now_ms();
+    if (f->kind == LAG_WINICON && !ag_rate_take(&S.wi_rate, now, AG_WINICON_BURST, AG_WINICON_EVERY_MS)) {
+        if (!(S.wd_dropped++ & 0xffff)) vlog("agent: the guest sends window icons faster than their rate: the extra ones are dropped");
+        return;
+    }
     if (f->kind == LAG_WINDOWS) {
         if (lag_winlist_read(f->data, f->len, &wl)) { vlog("agent: a window list that doesn't parse: dropped"); return; }
         S.lag_win_n = wl.n;
@@ -6503,17 +6562,27 @@ static void lag_windata(const AgFrame *f) {
         if (lag_winicon_parse(f->data, f->len, &id, &w, &h, &px)) { vlog("agent: a window icon that doesn't parse: dropped"); return; }
         out = malloc(8 + LAG_ICON_MAX * LAG_ICON_MAX * 4);
         n = out ? lag_icon_write(id, w, h, px, out, 8 + LAG_ICON_MAX * LAG_ICON_MAX * 4) : 0;
-        if (n) lag_icon_keep(id, out, n);
+        if (n) {
+            /* the same icon for the same window again: nothing new */
+            for (int i = 0; i < LAG_WIN_MAX; i++)
+                if (S.lag_icons[i].data && S.lag_icons[i].id == id && S.lag_icons[i].n == n && !memcmp(S.lag_icons[i].data, out, n)) { free(out); return; }
+            lag_icon_keep(id, out, n);
+        }
     } else {
         LagAppList *al = malloc(sizeof *al);
         if (!al || lag_applist_read(f->data, f->len, al)) { free(al); vlog("agent: a program list that doesn't parse: dropped"); return; }
+        out = malloc(LAG_APPLIST_BYTES);
+        n = out ? lag_applist_write(al, out, LAG_APPLIST_BYTES) : 0;
+        /* the same programs as the last list sent: its generation stays (VM_LAUNCH's tokens still hold) */
+        if (n && S.wd_last[1] && S.wd_last_n[1] == n && !memcmp(S.wd_last[1], out, n)) { free(al); free(out); free(S.wd_pend[1]); S.wd_pend[1] = NULL; S.wd_pend_n[1] = 0; return; }
         free(S.lag_applist);
         S.lag_applist = al;
         S.lag_applist_gen++;
-        out = malloc(LAG_APPLIST_BYTES);
-        n = out ? lag_applist_write(al, out, LAG_APPLIST_BYTES) : 0;
         vlog("agent: the guest lists %d programs", al->n);
+        wd_list_send(1, out, n, LAG_APPLIST, now);
+        return;
     }
+    if (f->kind == LAG_WINDOWS) { wd_list_send(0, out, n, LAG_WINDOWS, now); return; }
     windata_send(-1, out, n, f->kind);
     free(out);
 }
@@ -7647,6 +7716,8 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         vlog("agent: apps mode %s", m->a ? "on" : "off");
         reply(ci, m->seq, VME_OK, "");
         /* the icons the guest already sent (it sends each window's once): a re-attached lord-server has none */
+        /* and the last lists sent: the guest's answer to LAG_APPS may be the same, which isn't sent again (wd_list_send) */
+        if (on) for (int k = 1; k >= 0; k--) if (S.wd_last[k]) windata_send(ci, S.wd_last[k], S.wd_last_n[k], k ? LAG_APPLIST : LAG_WINDOWS);
         if (on) for (int i = 0; i < LAG_WIN_MAX; i++) if (S.lag_icons[i].data) windata_send(ci, S.lag_icons[i].data, S.lag_icons[i].n, LAG_WINICON);
         return;
     }
@@ -8353,6 +8424,7 @@ static void loop(void) {
         if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
         if (S.rx_state == RX_ASKED && (next < 0 || S.rx_deadline < next)) next = S.rx_deadline;
         if (S.wi_poll_at && (next < 0 || S.wi_poll_at < next)) next = S.wi_poll_at;
+        if (S.wd_pend_at && (next < 0 || S.wd_pend_at < next)) next = S.wd_pend_at;
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
         if (S.qga_fd >= 0 && S.ag_next && (next < 0 || S.ag_next < next)) next = S.ag_next;
         if (S.kill_deadline && (next < 0 || S.kill_deadline < next)) next = S.kill_deadline;
@@ -8396,6 +8468,7 @@ static void loop(void) {
         open_tick(now);
         wi_tick(now);
         host_stop_tick(now);
+        wd_tick(now);
         vgpu_memlock_tick(now);
         if (S.shut_deadline && now >= S.shut_deadline) {
             S.shut_deadline = 0;

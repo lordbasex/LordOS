@@ -664,6 +664,35 @@ eq('near rect', [M.nearRect({ x: 0, y: 0, w: 10, h: 10 }, { x: 2, y: -2, w: 11, 
 }
 }
 eq('popup', [M.isPopup({ owner: 5, topmost: true }), M.isPopup({ owner: 5, topmost: false }), M.isPopup({ owner: 0, topmost: true })], [true, false, false]);
+{
+  // a guest's popup: capped at 60 % × 70 % of the work area, always inside it (never over the menu bar or the Dock)
+  const work = { x: 0, y: 30, w: 1920, h: 1000 };
+  eq('popup cap', M.popupCap(work), { w: 1152, h: 700 });
+  eq('save delay', [M.saveDelay(0, 5000), M.saveDelay(5000, 5000), M.saveDelay(5000, 6500), M.saveDelay(5000, 7000), M.saveDelay(9000, 5000)], [0, 2000, 500, 0, 0]);
+  eq('popup: a menu that fits stays', M.popupRect({ x: 300, y: 200, w: 240, h: 400 }, work), { x: 300, y: 200, w: 240, h: 400 });
+  eq('popup: over the menu bar moves down', M.popupRect({ x: 300, y: 0, w: 240, h: 400 }, work), { x: 300, y: 30, w: 240, h: 400 });
+  eq('popup: past the end and the Dock moves in', M.popupRect({ x: 1800, y: 900, w: 240, h: 400 }, work), { x: 1680, y: 630, w: 240, h: 400 });
+  eq('popup: a whole-screen one is cut and kept inside', M.popupRect({ x: 0, y: 0, w: 1920, h: 1080 }, work), { x: 0, y: 30, w: 1152, h: 700 });
+  // fuzz-ish: anything the guest may send (x, y ±16384, up to 16384²) ends inside the work area and under the cap
+  let inside = true;
+  const vals = [-16384, -1, 0, 1, 15, 960, 1919, 16383, 16384];
+  const sizes = [1, 8, 640, 1152, 1153, 4096, 16384];
+  for (const x of vals) for (const y of vals) for (const w of sizes) for (const h of sizes) {
+    const r = M.popupRect({ x, y, w, h }, work);
+    if (!r || r.x < work.x || r.y < work.y || r.x + r.w > work.x + work.w || r.y + r.h > work.y + work.h || r.w > 1152 || r.h > 700 || r.w < 1 || r.h < 1) inside = false;
+  }
+  eq('popup: every place and size the guest may say stays inside, capped', inside, true);
+  eq('popup: no work area', [M.popupRect({ x: 0, y: 0, w: 5, h: 5 }, null), M.clampInto({ x: 0, y: 0, w: 5, h: 5 }, { x: 0, y: 0, w: 0, h: 9 })], [null, null]);
+  eq('clamp: NaN place', M.clampInto({ x: NaN, y: undefined, w: 10, h: 10 }, work), { x: 0, y: 30, w: 10, h: 10 });
+  // the crop of a cut popup: its first part, never squeezed
+  eq('crop: capped', [M.cropOf({ x: 5, y: 6, w: 300, h: 2000 }, { w: 200, h: 700 }), M.cropOf({ x: 5, y: 6, w: 300, h: 20 })], [[5, 6, 200, 700], [5, 6, 300, 20]]);
+  // its owner: one of the guest's windows here, shown at least POPUP_OWNER_MS
+  const have = new Map([[5, { winId: 9, shownAt: 1000 }], [6, { winId: 10, shownAt: 1000, popup: true }], [7, { winId: 11, shownAt: 1000, minimized: true }], [8, { winId: 0, shownAt: 1000 }], [12, { winId: 12 }]]);
+  const pw = (owner, now) => M.popupOwnerWait({ owner, topmost: true }, have, now);
+  eq('popup owner: shown long enough', pw(5, 1000 + M.POPUP_OWNER_MS), 0);
+  eq('popup owner: just shown waits', pw(5, 1100), M.POPUP_OWNER_MS - 100);
+  eq('popup owner: unknown, a popup, minimized, no window, never shown', [pw(99, 5000), pw(6, 5000), pw(7, 5000), pw(8, 5000), pw(12, 5000), pw(0, 5000)], [-1, -1, -1, -1, -1, -1]);
+}
 eq('instance', [M.guestInstance('ab12-cd', 4294967295), M.guestInstance('a/../b', 7)], ['ga-ab12-cd-4294967295', 'ga-ab-7']);
 {
   const W = (id, x, extra = {}) => ({ id, x, y: 10, w: 300, h: 200, minimized: false, ...extra });

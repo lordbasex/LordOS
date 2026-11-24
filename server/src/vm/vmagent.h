@@ -280,6 +280,17 @@ enum { AGK_LINK = 25, AGK_NOTIFY = 26 };
  * in lord-media; a guest that copies in a loop is held to a burst, then one per interval (a person copies far slower) */
 #define AG_CLIP_BURST      4
 #define AG_CLIP_EVERY_MS   250
+/* apps mode's lists (LAG_WINDOWS, LAG_APPLIST) and icons (LAG_WINICON): each one is a memfd for lord-server, and a window
+ * list opens and closes LordOS windows; a guest that alternates them is held to a burst, then one per interval. A list
+ * that comes too soon waits (the latest wins) and goes once the interval allows; an icon that comes too soon is dropped
+ * (a guest sends each window's icon once: the burst covers a whole list's, LAG_WIN_MAX). One the same as the last sent
+ * isn't sent again. */
+#define AG_WINLIST_BURST    8
+#define AG_WINLIST_EVERY_MS 100
+#define AG_APPLIST_BURST    3
+#define AG_APPLIST_EVERY_MS 2000
+#define AG_WINICON_BURST    64
+#define AG_WINICON_EVERY_MS 50
 #define AG_NOTE_BURST      5
 #define AG_NOTE_EVERY_MS   3000
 /* 1 when p is a link this computer may offer to open: letters, digits and - . _ ~ : / ? # [ ] @ & = + , ; % only (what
