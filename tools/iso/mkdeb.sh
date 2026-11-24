@@ -66,6 +66,8 @@
 #   /usr/lib/systemd/system/smartmontools.service.d/lordos.conf  Debian's smartd stays off
 #   /usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf  gnome-keyring without the Secret Service
 #   /usr/lib/systemd/logind.conf.d/lordos-machines.conf  a shutdown waits up to 45 s for Machines to save running machines
+#   /usr/lib/tmpfiles.d/lordos-thp.conf  shared memory gets transparent huge pages where it asks for them (shmem_enabled
+#                                         advise): a machine with a shared folder gets 2 MB pages (docs/VIRTUALIZATION.md 3.7.2)
 #   /usr/lib/systemd/user/lordos-guest.service (+ default.target.wants), /usr/lib/udev/rules.d/71-lordos-guest.rules
 #                                         LordOS as a Machines guest: lordos-guest for the signed-in person, only where the
 #                                         machine's agent port org.lordos.agent exists (docs/VIRTUALIZATION.md 7.2)
@@ -396,6 +398,9 @@ install -D -m 644 packaging/systemd/smartmontools-lordos.conf "$PKG/usr/lib/syst
 install -D -m 644 packaging/systemd/gnome-keyring-lordos.conf "$PKG/usr/lib/systemd/user/gnome-keyring-daemon.service.d/lordos.conf"
 # Machines: a shutdown or restart waits up to 30 s for running machines to be saved (docs/VIRTUALIZATION.md 6.1)
 install -D -m 644 packaging/systemd/logind-lordos-machines.conf "$PKG/usr/lib/systemd/logind.conf.d/lordos-machines.conf"
+# Machines: shared memory (a machine with a shared folder or the transfer folder) gets 2 MB pages where it asks for them;
+# only "advise", so tmpfs and /dev/shm don't change (docs/VIRTUALIZATION.md 3.7.2; migration 011 applies it on upgrade)
+install -D -m 644 packaging/systemd/tmpfiles-lordos-thp.conf "$PKG/usr/lib/tmpfiles.d/lordos-thp.conf"
 # remote login (SSH) defaults, read only once openssh-server is installed (docs/REMOTE.md)
 install -D -m 644 tools/iso/rootfs/etc/ssh/sshd_config.d/10-lordos.conf "$PKG/etc/ssh/sshd_config.d/10-lordos.conf"
 # a process may only trace its own descendants: a restricted Linux app must not take over an

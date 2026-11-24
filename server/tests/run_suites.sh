@@ -204,6 +204,8 @@ EOF
     # (0.8.8.9) the Chromium-based browsers' initial preferences (src/pkg/browserprefs.c) and migration 009
     run "browserprefs-test" build/browserprefs-test
     run "migration 009 chromium-family" sh tests/migration_chromium_family_test.sh
+    # (0.8.9.6) shared memory's huge pages for Machines: shmem_enabled never -> advise, nothing else (docs/VIRTUALIZATION.md 3.7.2)
+    run "migration 011 shmem-huge-pages" sh tests/migration_shmem_huge_test.sh
     # fastfetch / neofetch fall back to lordos-fetch; the real package wins (packaging/fallback-bin)
     run "fetch-fallback (fastfetch, neofetch)" sh tests/fetch_fallback_test.sh
     run "mmdb-test" build/mmdb-test

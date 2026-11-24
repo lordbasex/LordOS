@@ -885,29 +885,49 @@ What backs a machine's memory (`lordvm.c` `mem_backing`, `server/src/vm/vmmem.h`
 | Machine | Backing | 2 MB pages |
 |---|---|---|
 | No shared folder and the transfer folder off | QEMU's own anonymous memory (`-m`) | Yes, transparent huge pages: QEMU asks for them on all guest RAM (`MADV_HUGEPAGE` in `ram_block_add`) and Debian's kernel gives them with THP `always` or `madvise`. Checked: a running 2 GB guest had 1.94 GB of `AnonHugePages` |
-| A shared folder or the transfer folder (on by default) | `memory-backend-memfd,share=on` (vhost-user: virtiofsd maps the guest's memory) | **No** on a default system: shared memory gets huge pages only with `/sys/kernel/mm/transparent_hugepage/shmem_enabled` other than `never` (Debian's default) |
+| A shared folder or the transfer folder (on by default) | `memory-backend-ram,share=on` (vhost-user: virtiofsd maps the guest's memory; QEMU 10.0 makes it a memfd and maps it 2 MB aligned) | Yes on LordOS: shared memory gets huge pages where it asks for them with `/sys/kernel/mm/transparent_hugepage/shmem_enabled` at `advise`, which the `lordos` package sets (below). Checked: a running guest's touched memory was all `ShmemPmdMapped`. With `never` (the kernel's default, or an administrator's choice), 4 KB pages; the session log says which (`memory: shared …, 2 MB transparent huge pages (shmem_enabled advise)`) |
 | Either, when the administrator reserved enough 2 MB hugetlb pages (`vm.nr_hugepages`) and all of the machine's memory fits in the free, unreserved ones at start | `memory-backend-memfd,hugetlb=on,hugetlbsize=2M,prealloc=on` (`share=on` with a shared folder) | Yes, allocated whole at start, so a guest never faults on a page that isn't there; otherwise the backing above, never a failed start |
 
-virtiofs needs the shared memfd (vhost-user maps the guest's memory into virtiofsd), so a machine with a shared folder
-can't fall back to private memory. Nothing here needs a privilege or changes a system setting.
+virtiofs needs shared memory with a descriptor (vhost-user maps the guest's memory into virtiofsd), so a machine with a
+shared folder can't fall back to private memory. lord-vm needs no privilege for any of it; the one system setting,
+`shmem_enabled`, is the `lordos` package's (below).
 
-**Measured** (2026-11-23, i9-10900, kernel 6.12.118; a throwaway guest of the host's kernel and a 9 KB init that does
-20 million dependent reads over a 1 GB random cycle, 3 runs of 3 each, the host in use; QEMU 10.0 with the same memory
-options lord-vm gives):
+**Measured** (2026-11-23, i9-10900, kernel 6.12.118, QEMU 10.0.13; a throwaway guest of the host's kernel, 2 GB, 4
+vCPUs, whose 9 KB init touches and shuffles 1 GB into one random cycle, then does 3 × 20 million dependent reads over
+it; 5 rounds, each configuration once per round, interleaved; medians of the 15 reads and of the 5 touch times; the
+host in use, with two of the maintainer's machines running):
 
-| Guest memory | Guest uses huge pages too (THP) | Guest 4 KB pages | First touch + shuffle of 1 GB |
-|---|---|---|---|
-| QEMU's own (host THP) | **76 ns** a read (75–77) | 111 ns (102–124) | 3.0 s |
-| Shared memfd (host 4 KB pages: a machine with a shared folder or the transfer folder) | 112 ns (94–162) | 153 ns (112–234) | 4.1 s |
+| Guest memory | `shmem_enabled` | Host 2 MB pages (`AnonHugePages` / `ShmemPmdMapped` of QEMU) | Read, guest THP | Read, guest 4 KB pages | Touch + shuffle 1 GB |
+|---|---|---|---|---|---|
+| QEMU's own (no shared folder) | any | ~1.16 GB of 1.2 GB touched | **74.2 ns** (73–77) | 93.1 ns (91–94) | 0.50 s |
+| `memory-backend-memfd,share=on` (before) | `never` | 10 MB | 92.9 ns (90–109) | 108.1 ns (103–126) | 1.00 s |
+| `memory-backend-memfd,share=on` | `advise` | **10 MB: none** | 93.3 ns (90–97) | 112.1 ns (107–121) | 1.03 s |
+| `memory-backend-ram,share=on` (now) | `never` | 12 MB | 108.4 ns (102–131) | 140.6 ns (133–277) | 1.11 s |
+| `memory-backend-ram,share=on` (now) | `advise` (LordOS) | ~1.15 GB | **74.6 ns** (72–79) | 96.1 ns (95–110) | **0.52 s** |
 
-So a machine with the transfer folder on reads memory at random about 30 % slower than it could, and touches new memory
-about a third slower.
+So a machine with the transfer folder now reads memory at random as fast as one without (75 against 93 ns, 20 %
+less) and touches new memory twice as fast. Two things were needed, and neither alone is enough:
 
-**Stopped for approval (system setting):** shared guest memory would get 2 MB pages with
-`shmem_enabled=advise`: only memory that asks for them (`MADV_HUGEPAGE`, which QEMU does on all guest RAM) gets them, so
-tmpfs, `/dev/shm` and other shared memory don't change. That is a system setting (sysfs, root): either a file the
-`lordos` package ships (`/usr/lib/tmpfiles.d/lordos-thp.conf`: `w /sys/kernel/mm/transparent_hugepage/shmem_enabled - - -
-- advise`), or a closed `admin.c` action that sets only that file to only `advise` or back to `never`. Not built.
+- **`shmem_enabled=advise`** (approved by the maintainer on 2026-11-23). Only memory that asks for huge pages
+  (`MADV_HUGEPAGE`, which QEMU does on all guest RAM) gets them, so tmpfs, `/dev/shm` and other shared memory don't
+  change. The `lordos` package ships `/usr/lib/tmpfiles.d/lordos-thp.conf` (`w
+  /sys/kernel/mm/transparent_hugepage/shmem_enabled - - - - advise`), which systemd-tmpfiles applies at every boot,
+  and migration `011-0.8.9.6-shmem-huge-pages.sh` applies it at once on an upgrade, only when the value is `never`
+  (an administrator's `always`, `within_size`, `deny` or `force` stays) and only with systemd running (not in an
+  image build, whose `/sys` may be the build host's). An administrator keeps another value with a file of the same
+  name in `/etc/tmpfiles.d` (an empty one keeps the kernel's). On a kernel without transparent huge pages (the Pi 5's
+  LordOS kernel) the file isn't there and both do nothing. Nothing else in sysfs is touched; lord-vm only reads it to
+  log it.
+- **`memory-backend-ram,share=on` instead of `memory-backend-memfd,share=on`.** QEMU maps a `memory-backend-memfd`
+  only 4 KB aligned (the alignment of its page size; that backend has no `align` option), so the kernel can never put
+  a 2 MB page there, whatever `shmem_enabled` says: with `advise` it still had 10 MB in huge pages. QEMU 10.0 backs
+  `memory-backend-ram,share=on` with a memfd of its own (vhost-user gets its descriptor as before) mapped 2 MB
+  aligned. Every machine type lord-vm pins is 10.0 or later, so its QEMU has this. A state saved with the old backend
+  loads with the new one and back (both are the RAM block `mem`; checked with a saved state each way). Checked with a
+  scratch machine started by lord-vm with the transfer folder: the guest mounted it and wrote a file through it, and
+  QEMU's guest memory was `ShmemPmdMapped`.
+
+The hugetlb row is unchanged (`memory-backend-memfd` with `hugetlb=on` takes its alignment from the 2 MB page size).
 
 ### 3.8 Why direct QMP, and not libvirt
 
@@ -2471,6 +2491,41 @@ a second copy of what the guest already caches; random requests then go to the d
 ~70 µs on this NVMe), where before a working set that still sat in the host's cache came back from memory. A guest's
 own cache (its memory) serves those repeats first, so the second copy mostly helped a guest that restarts.
 
+**Host cache or not: measured with real work, decided** (2026-11-23; the maintainer felt no difference and asked for
+numbers). A Debian 13 cloud guest (4 vCPUs, 4 GB, UEFI, a 40 GB qcow2 on the same NVMe and ext4, `virtio-blk` on the
+I/O thread, the `-blockdev` options lord-vm gives) ran one sequence per start, each on a fresh copy of the same disk
+with the disk file dropped from the host's cache first: boot, unpack the Linux 6.12 sources (86,618 files), install
+GIMP and Inkscape from the local package cache (`apt-get install --no-download`, 456 packages, dpkg's fsyncs), build
+`kernel/ mm/ fs/ lib/` of that tree (`make -j4`), write a 6 GB file and read it at random (fio, `O_DIRECT` in the guest,
+so the guest's own cache doesn't serve it: a working set larger than the guest's memory that fits in the host's), copy
+that file with the guest's cache dropped, power off and boot again. (a) the host's cache (`cache.direct` off, QEMU's
+thread pool) against (b) `cache.direct` with native AIO, 4 runs each, alternating which went first; medians (range):
+
+| Work | (a) host cache | (b) `cache.direct` + native AIO | (b) against (a) |
+|---|---|---|---|
+| Boot to `systemctl is-system-running`, host cache empty | 5.06 s (5.05–5.28) | 5.25 s (5.03–5.31) | +4 % |
+| Boot again right after (host cache warm in (a)) | 4.86 s (4.85–5.17) | 5.17 s (5.06–5.28) | +6 % (0.3 s) |
+| Unpack 86,618 files + `sync` | 3.74 s (3.60–3.83) | **3.24 s** (3.19–3.39) | −13 % |
+| Install 456 packages + `sync` | 29.2 s (28.9–30.7) | **27.4 s** (26.7–28.2) | −6 % |
+| Compile (`make -j4`) | 78.4 s (78.0–80.8) | 78.2 s (75.4–80.2) | the same |
+| Write 6 GB, 1 MB requests | 4.64 s (4.38–5.89) | **2.63 s** (2.62–2.64) | −43 % |
+| Random 4 KB reads, 1 at a time, over those 6 GB | **74.0k IOPS** | 14.7k IOPS | ÷5 |
+| Random 4 KB reads, 16 at a time | **359k IOPS** | 170k IOPS | ÷2.1 |
+| Copy the 6 GB file + `sync` | 5.23 s (5.18–8.51) | 5.45 s (5.33–5.49) | +4 % |
+| The disk file in the host's page cache: after boot / unpack / install / compile / fio / copy | 0.14 / 2.0 / 3.4 / 3.6 / 9.7 / **15.9 GB** | 0 | — |
+
+**Decision: keep `cache.direct` with native AIO on ext4 and XFS for every disk, with no size or memory rule.** In the
+work a person does (boot, installs, unpacking, builds, copies) the two are within ±6 %, with (b) ahead where it writes
+(installs, unpacking, large writes) and (a) ahead by 0.2–0.3 s at boot and 4 % on a copy, which nobody notices,
+matching what the maintainer felt. The one clear win of the host's cache is random reads of data the guest's own memory
+can't hold but the host's can (5× one at a time); that same data in the guest's memory is faster still, so the fix
+for such a guest is more memory, not a second copy. The price of (a) is large and grows with use: a 4 GB guest left
+15.9 GB of its disk in the host's page cache after this sequence, four times its own memory, pushing out the
+desktop's and the apps' cache, and on a 16 GB computer that is most of it. A rule by disk size or free memory was
+considered and not built: the cache grows with what the guest touches, not with the disk's size, and a computer
+with memory to spare gains only in the random-read case above. Not tried with a Windows guest (no scratch Windows
+machine on this computer); Windows caches its disk in its own memory the same way. Nothing changes in lord-vm.
+
 ### 6.5 Network
 
 | Mode | How | Reach | Notes |
@@ -2555,7 +2610,7 @@ back from the descriptor must match), and starts `virtiofsd --fd=3 --shared-dir=
 --seccomp=kill --cache=auto --migration-mode=find-paths [--readonly]` on that socket and that descriptor, so a folder of
 the path swapped for a link after the check changes nothing (a cgroup leaf of 256 MB, two CPUs; its log in `log/virtiofsd-N.log`),
 connects, removes the path and gives QEMU the connected socket (`-chardev socket,fd=`; QEMU can't make sockets). With a share,
-the guest's memory is `memory-backend-memfd,share=on`; without one nothing changes. Each folder is a `vhost-user-fs-pci` on
+the guest's memory is shared (`memory-backend-ram,share=on`, a memfd; `memory-backend-memfd` before 0.8.9.6, 3.7.2); without one nothing changes. Each folder is a `vhost-user-fs-pci` on
 slots 0xb–0xe. Suspend and snapshots with memory work: virtiofsd hands its state over (`find-paths`), and the shares can't
 change while a state is saved. A snapshot never rolls back the host's folder: on revert the guest sees the folder as it is
 now. The package `virtiofsd` comes with "What Machines Needs" (`vm-enable`), like passt. In the guest: `mount -t virtiofs
@@ -3677,11 +3732,13 @@ The LordOS rule holds: this app must not slow the desktop. It's idle until opene
 **Performance work (approved 2026-11-23; all six built on `test/integration-1125`, in development; status in the checklist's area M):**
 1. Skip frames that didn't change, and pace or pause the display of a machine whose window is hidden. **Built** (in
    development): 3.9 "Pacing the picture", docs/MACHINES-GPU.md "Pacing a machine's picture".
-2. Huge pages for guest memory. **Built** where no privilege is needed (hugetlb pages when reserved; private memory already
-   has THP); shared memory's THP (`shmem_enabled=advise`) waits for approval: 3.7.2.
+2. Huge pages for guest memory. **Built** (in development): hugetlb pages when reserved; private memory already has THP;
+   shared memory (shared folders, the transfer folder) gets THP with `shmem_enabled=advise`, set by the `lordos` package,
+   and `memory-backend-ram,share=on`: 3.7.2.
 3. A vCPU recommendation. **Built** (in development): from what the machine's vCPUs really used (`vmcpu.c`,
    `cpu-usage.json`), in Configure → CPU & memory and on the library's card; the assistant still uses the host's default (6.27).
-4. The disk path. **Built** (in development): an iothread, `cache.direct` with `aio=native` on ext4 and XFS (6.4.1).
+4. The disk path. **Built** (in development): an iothread, `cache.direct` with `aio=native` on ext4 and XFS (6.4.1);
+   kept after measuring real work against the host's cache (6.4.1, "Host cache or not").
    `io_uring` stays off: our seccomp denylist refuses `io_uring_*` (`vmsandbox.c`) and loosening it needs the maintainer's
    review (not measured against it).
 5. A guest-side performance profile applied by the guest tools. **Built** for Windows guests (tools w11, 7.1.4); pausing
