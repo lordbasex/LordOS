@@ -7441,8 +7441,9 @@ static void reap(void) {
         else if (p > 0 && p == S.vs_waiter) {
             for (int k = 0; k < 20 && S.vs_err >= 0; k++) pump_fd(&S.vs_err, "venus");
             int code = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
-            if (code > 128) vlog("venus: the render server ended (signal %d)", code - 128);
-            else vlog("venus: the render server ended (status %d)", code);
+            /* its waiter's status: the server's exit status, or 128 + the signal that ended it (255: virglrenderer's exit
+             * when QEMU's end of the connection closes) */
+            vlog("venus: the render server ended (%d)", code);
             S.vs_pid = S.vs_waiter = 0;
             if (S.vs_pidfd >= 0) { close(S.vs_pidfd); S.vs_pidfd = -1; }
         } else if (p == S.passt) {

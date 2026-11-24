@@ -81,7 +81,9 @@
     /* venus's render server only (VSR_VENUS, docs/VIRTUALIZATION.md 6.10; its own filter, lord-vm starts it): it forks \
      * its context workers, waits for them and ends them, a signal only to a pid above 0; QEMU stops at these as at any \
      * call that isn't a row. Nothing here execs: the render server's one execveat is lord-vm's, as QEMU's */ \
-    X(wait4, VENUS) X(waitid, VENUS) X(kill, VENUSKILL)
+    X(wait4, VENUS) X(waitid, VENUS) X(kill, VENUSKILL) \
+    /* the render server: Mesa (ANV) lowers its own threads' priority; refused with EPERM (it copes), never run */ \
+    X(sched_setscheduler, VENUSEPERM) X(setpriority, VENUSEPERM)
 
 /* amd64 only: what glibc calls there (arm64 has the *at forms below); (kept) epoll_wait: the event loop's epoll, as
  * above; time: the vDSO's fallback */

@@ -137,6 +137,9 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
     case VSR_VENUS:
         if (o->venus && !learn_all) ALLOW(); else DEFAULT();
         return 0;
+    case VSR_VENUSEPERM:
+        if (o->venus) ERR(EPERM); else DEFAULT();
+        return 0;
     case VSR_VENUSKILL:
         /* kill: the render server's own processes, by a pid above 0 (never 0, -1 or a group) */
         if (!o->venus || learn_all) { DEFAULT(); return 0; }
