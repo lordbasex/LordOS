@@ -5,9 +5,10 @@
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice } from './model.js';
+  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
+import { COLOR_HEX } from './systems.js';
 import { defaultsOf } from './store.js';
 import { SideRow, PaneHeader, Pill, Section, Sym } from './kit.jsx';
 import { BUILTIN, builtinProfile, onHost } from './profiles.js';
@@ -196,6 +197,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const [sec, setSec] = useState(SECS.includes(section0) ? section0 : group ? 'group' : 'general');
   const [draft, setDraft] = useState({});
   const [meta, setMeta] = useState(() => readMeta(dir));
+  const [tagText, setTagText] = useState(() => (readMeta(dir).tags || []).join(', '));
   const [job, setJob] = useState(0);
   const [msg, setMsg] = useState(() => { const c = carried && carried.dir === dir ? carried.msg : null; carried = null; return c; });
   const [picking, setPicking] = useState(false);
@@ -337,6 +339,25 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
           <View style={{ flex: 1 }}><TextInput value={meta.osName || ''} placeholder={tr('machines.cfg.systemPlaceholder')}
             onChange={(x) => { writeMeta(dir, { osName: x }); setMeta(readMeta(dir)); }} /></View>
         </View>
+      </Row>
+      {/* the card's icon: the system's mark, or a color of its own with the name's first letter (app.json color) */}
+      <Row label={tr('machines.cfg.icon')} note={tr('machines.cfg.iconNote')}>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <View title={tr('machines.cfg.iconSystem')} onClick={() => { writeMeta(dir, { color: undefined }); setMeta(readMeta(dir)); }}
+            style={{ borderRadius: 9, padding: 2, border: `2px solid ${!meta.color ? p.accent : 'transparent'}` }}>
+            <OsMark id={meta.os || systemOf(meta.osName, m.name).id} size={28} />
+          </View>
+          {Object.keys(COLOR_HEX).map((c) => (
+            <View key={c} title={tr(`machines.set.color.${c}`)} onClick={() => { writeMeta(dir, { color: c }); setMeta(readMeta(dir)); }}
+              style={{ borderRadius: 9, padding: 2, border: `2px solid ${meta.color === c ? p.accent : 'transparent'}` }}>
+              <OsMark id="other" color={c} letter={m.name} size={28} />
+            </View>
+          ))}
+        </View>
+      </Row>
+      <Row label={tr('machines.cfg.tags')} note={tr('machines.cfg.tagsNote', { n: TAGS_MAX })}>
+        <TextInput value={tagText} placeholder={tr('machines.cfg.tagsPlaceholder')}
+          onChange={(x) => { setTagText(x); writeMeta(dir, { tags: parseTags(x) }); setMeta(readMeta(dir)); }} />
       </Row>
       <Row label={tr('machines.cfg.profile')} note={tr('machines.cfg.profileNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><MenuBtn label={prof ? tr(`machines.as.profile.${prof}`) : tr('machines.cfg.profileCustom')}

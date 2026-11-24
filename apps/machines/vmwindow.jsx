@@ -659,7 +659,16 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         if (closingRef.current) { setClosing(false); wm.close(winId, true); return false; }
         // an unattended install ended with the installer's restart: lord-vm took the installer and the seed disk away,
         // so starting again is the installed system (3.9, "Unattended install")
-        if (q.state === 'stopped' && q.reason === 'installed') { setTimeout(() => begin(), 300); return false; }
+        // With "Fresh install" asked in the assistant (app.json freshSnap), the machine, off and installed, gets that
+        // snapshot first (5.2), once.
+        if (q.state === 'stopped' && q.reason === 'installed') {
+          if (!readMeta(dir).freshSnap) { setTimeout(() => begin(), 300); return false; }
+          writeMeta(dir, { freshSnap: false });
+          const r = lord.vm.snapTake(dir, tr('machines.snap.fresh'));
+          const wait = () => { const j = r?.job ? lord.vm.job(r.job) : null; if (j && !j.done) { setTimeout(wait, 400); return; } begin(); };
+          setTimeout(wait, 300);
+          return false;
+        }
         // the guest restarted and QEMU couldn't do it in place, so Machines starts it again: a machine with an Intel
         // graphics card (a reset crashes a GVT-g guest, so QEMU ends on one; docs/MACHINES-GPU.md, Mode A), or one with
         // 3D graphics whose QEMU aborted at the guest's restart (QEMU issue 4918; lord-vm says 'reset' only when the

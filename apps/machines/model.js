@@ -748,14 +748,33 @@ export function familyOf(m) {
 }
 const shows = (m, show) => (show === 'running' ? stateView(m.state, m.reason).active : show === 'linux' || show === 'windows' ? familyOf(m) === show
   : show === 'off' ? !stateView(m.state, m.reason).active : true);
-// the machines a search and the chip leave: the query matches the name, the system or the architecture
+// A machine's tags (Configure → General, app.json): trimmed, no control characters, 1 to 24 characters each, at most 8,
+// each once (case-insensitively), in the order given. "#tag" in the library's search finds them exactly.
+export const TAGS_MAX = 8, TAG_LEN = 24;
+export function tagsOf(list) {
+  const out = [];
+  for (const x of Array.isArray(list) ? list : []) {
+    if (typeof x !== 'string') continue;
+    const t = x.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().replace(/^#+/, '');
+    if (!t || [...t].length > TAG_LEN || out.some((o) => o.toLowerCase() === t.toLowerCase())) continue;
+    out.push(t);
+    if (out.length === TAGS_MAX) break;
+  }
+  return out;
+}
+// "work, test" as typed in Configure → tags
+export const parseTags = (text) => tagsOf(String(text || '').split(','));
+// the machines a search and the chip leave: the query matches the name, the system, the architecture or a tag;
+// "#name" only a tag of that name
 export function filterMachines(list, { query, show } = {}) {
   const q = (query || '').trim().toLowerCase();
   return (list || []).filter((m) => {
     if (!shows(m, show)) return false;
     if (!q) return true;
+    const tags = (m.meta?.tags || []).map((x) => x.toLowerCase());
+    if (q.startsWith('#') && q.length > 1) return tags.includes(q.slice(1));
     const sys = m.meta?.osName || systemOf(m.name).name || '';
-    return [m.name, sys, m.arch].some((s) => (s || '').toLowerCase().includes(q));
+    return [m.name, sys, m.arch, ...tags].some((s) => (s || '').toLowerCase().includes(q));
   });
 }
 // how many machines each chip shows (the search applies to all of them)

@@ -18,6 +18,7 @@ import { Sheet, Sym } from './kit.jsx';
 import { BUILTIN } from './profiles.js';
 import { loadProfiles, storeRev } from './store.js';
 import { usePal, has, gb, bytes, gib, OsMark, Bar, Btn, PopMenu, markColors, overlayRoot, vmRefusal, startPrep } from './ui.jsx';
+import { COLOR_HEX } from './systems.js';
 import { readMeta, readCpuUse, isProtectedMachine } from './meta.js';
 import { CloneSheet } from './clone.jsx';
 import { withAsk } from './openwith.js';
@@ -138,11 +139,11 @@ function Picture({ m, sys, on, height, radius = 0 }) {
   // a protected machine has no card picture: lord.vm.protect removed it and never writes another; one left from before
   // isn't shown either
   const src = isProtectedMachine(m.dir, m) ? '' : thumbSrc(m.dir, m.thumbTime);
-  const [c1, c2] = markColors(sys.id);
+  const [c1, c2] = m.meta?.color && COLOR_HEX[m.meta.color] ? [COLOR_HEX[m.meta.color][1], COLOR_HEX[m.meta.color][0]] : markColors(sys.id);
   return (
     <View style={{ height, borderRadius: radius, overflow: 'hidden', ...(src ? { backgroundColor: '#000' } : { background: `linear-gradient(135deg, ${c2}, ${c1})` }) }}>
       {src ? <Image src={src} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, objectFit: 'cover', opacity: on ? 1 : 0.72 }} /> : (
-        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}><OsMark id={sys.id} size={Math.min(56, height * 0.4)} /></View>
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}><OsMark id={sys.id} color={m.meta?.color} letter={m.name} size={Math.min(56, height * 0.4)} /></View>
       )}
     </View>
   );

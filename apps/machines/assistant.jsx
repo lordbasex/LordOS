@@ -427,10 +427,28 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
     v.ok && !missing.length, false][step]
     : [downloading ? dl?.phase === 'ready' : !!source && !!path && !v.errors.path, true, !v.errors.name && (!unOn || (setup.ok && !!inst)),
       v.ok && !missing.length && (!downloading || !!inst), false][step];
-  const title = step === 2 && (uo || windows) ? tr('machines.as.title.setup') : tr(`machines.as.title.${STEPS[step]}`);
+  // the Detect step: only for an installer disc of the person's (a card's image and a disk image know their system)
+  const needsDetect = source === 'iso' && !!path && detect?.path === path;
+  const onDetect = step === 0 && detectPage && needsDetect;
+  const dp = needsDetect ? detectPlan(detect.phase === 'done' ? detect.info : null, path.split('/').pop(), host.arch) : null;
+  const stepName = onDetect ? 'detect' : STEPS[step] === 'name' && (uo || windows) ? 'setup' : STEPS[step];
+  const stepNo = step + 1 + (needsDetect && (step > 0 || onDetect) ? 1 : 0), stepTotal = STEPS.length + (needsDetect ? 1 : 0);
+  const title = onDetect ? tr('machines.as.title.detect') : step === 2 && (uo || windows) ? tr('machines.as.title.setup') : tr(`machines.as.title.${STEPS[step]}`);
+  const goBack = () => { if (onDetect) setDetectPage(false); else if (step === 1 && needsDetect) { setStep(0); setDetectPage(true); } else setStep(step - 1); };
+  const goOn = () => { if (step === 0 && needsDetect && !onDetect) { setDetectPage(true); return; } setDetectPage(false); setStep(step + 1); };
+  // a file dropped on the first step goes to the tile that takes it (an ISO, a disk image, another app's machine)
+  const drop = useFilesDrop({ accepts: (n) => !!dropSource(n), onDrop: ({ files }) => {
+    const f = files[0];
+    const src = f && step === 0 && !job ? dropSource(f.split('/').pop()) : null;
+    if (!src) return;
+    pickSeq.current++; setDl(null); setDetectPage(false); setPicking(false); setSource(src);
+    if (src === 'migrate') setPath(f); else chose(f, src);
+  } });
   const fileHint = (k) => (source === k && path ? path.split('/').pop() : tr(`machines.as.${k}Hint`));
   let body = null;
-  if (step === 0) body = <>
+  if (onDetect) body = <DetectPage detect={detect} dp={dp} sys={sys} ver={ver} path={path} host={host}
+    onOther={() => { setDetectPage(false); setPicking(true); }} />;
+  else if (step === 0) body = <>
     <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.as.download')}</Text>
     {/* the mock's grid of four: one row per four systems of the catalog, for the chosen architecture */}
     {rowsOf(systemsFor(CATALOG, arch, { kvm: host.kvm, hostArch: host.arch }), 4).map((row, i) => (
@@ -529,6 +547,13 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         {v.errors.name && name ? <Text style={{ fontSize: 12, color: '#ff453a', textAlign: 'start' }}>{tr(`machines.new.err.${v.errors.name}`)}</Text> : null}
       </View>
     </View>
+    {/* where it goes: the library, the one place every protection of a machine's folder knows (5.2, "Name, place") */}
+    <View style={{ gap: 2 }}>
+      <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.as.place')}</Text>
+      <Text style={{ fontSize: 13, color: p.text, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{`~/Machines/${name || '…'}.lordvm`}</Text>
+      <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', lineHeight: 1.4 }}>{host.libFreeBytes >= 0 && host.libTotalBytes > 0
+        ? tr('machines.as.placeFree', { free: bytes(host.libFreeBytes), disk: tr('machines.as.r.diskNew', { n: size.diskGb }) }) : tr('machines.as.placeNote')}</Text>
+    </View>
     {source === 'import' ? (
       <View style={{ gap: 4 }}>
         <Text style={{ fontSize: 12, fontWeight: 600, color: p.dim, textAlign: 'start' }}>{tr('machines.new.rootPassword')}</Text>
@@ -618,6 +643,15 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
           </View>
         ))}
       </View>
+      {(windows ? un.on : unOn) ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
+          <Toggle on={freshSnap} onChange={setFreshSnap} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, color: p.text, textAlign: 'start' }}>{tr('machines.as.freshSnap')}</Text>
+            <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.freshSnapHint')}</Text>
+          </View>
+        </View>
+      ) : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: p.card }}>
         <Toggle on={shareClip} onChange={setShareClip} />
         <View style={{ flex: 1 }}>
@@ -674,11 +708,12 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   );
 
   // a sheet over the library (kit.jsx): its title bar with Back, the step's content, the buttons at the bottom
-  const back = step > 0 && !(step === 4 && !fail && !stopped) ? () => (stopped ? (setStopped(false), setStep(3)) : setStep(step - 1)) : null;
+  const back = (step > 0 || onDetect) && !(step === 4 && !fail && !stopped) ? () => (stopped ? (setStopped(false), setStep(3)) : goBack()) : null;
+  const canGo = onDetect ? detect?.phase !== 'reading' : can;
   return (
-    <View style={{ flex: 1 }}>
+    <View {...drop.props} style={{ flex: 1 }}>
       <SheetHeader onBack={back} title={tr('machines.newMachine')}
-        subtitle={`${tr('machines.as.stepOf', { n: step + 1, total: STEPS.length })} · ${tr(`machines.as.step.${STEPS[step] === 'name' && (uo || windows) ? 'setup' : STEPS[step]}`)}`}
+        subtitle={`${tr('machines.as.stepOf', { n: stepNo, total: stepTotal })} · ${tr(`machines.as.step.${stepName}`)}`}
         right={<Round title={tr('machines.cancel')} onClick={onClose}><Text style={{ fontSize: 15, color: p.dim }}>✕</Text></Round>} />
       <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 28, paddingVertical: 20, gap: 16 }}>
         <Text style={{ fontSize: 22, fontWeight: 700, color: p.text, textAlign: 'start' }}>{title}</Text>
@@ -688,17 +723,60 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         {step === 0 ? <Btn link label={arch === host.arch ? tr('machines.as.otherArch', { arch: other }) : tr('machines.as.thisArch', { arch: host.arch })}
           onClick={() => setArch(arch === host.arch ? other : host.arch)} /> : null}
         <View style={{ flex: 1 }} />
-        {step === 4 && !fail && !stopped ? null : <Pill label={step === 0 || fail || stopped ? tr('machines.cancel') : tr('machines.back')} onClick={() => (step === 0 || fail || stopped ? onClose() : setStep(step - 1))} />}
+        {step === 4 && !fail && !stopped ? null : <Pill label={(step === 0 && !onDetect) || fail || stopped ? tr('machines.cancel') : tr('machines.back')} onClick={() => ((step === 0 && !onDetect) || fail || stopped ? onClose() : goBack())} />}
         {stopped ? <Pill primary label={tr('machines.dl.continue')} onClick={create} /> : null}
-        {step < 3 ? <Pill primary label={tr('machines.as.continue')} disabled={!can} onClick={() => setStep(step + 1)} /> : null}
+        {step < 3 ? <Pill primary label={tr('machines.as.continue')} disabled={!canGo} onClick={goOn} /> : null}
         {step === 3 ? <Pill primary label={customize ? tr('machines.as.createConfigure') : tr('machines.as.createStart')} disabled={!can} onClick={create} /> : null}
       </View>
       {picking ? <FilePicker title={source === 'iso' || windows ? tr('machines.new.pickIso') : source === 'migrate' ? tr('machines.mig.pick') : tr('machines.new.pickImage')}
         filter={source === 'iso' || windows ? /\.iso$/i : source === 'migrate' ? MIGRATE_FILES : /\.(qcow2|img|raw)$/i}
         onPick={(x) => { const pth = Array.isArray(x) ? x[0] : x; if (windows) checkIso(pth); else if (source === 'migrate') setPath(pth); else chose(pth); setPicking(false); }}
         onClose={() => { setPicking(false); if (source === 'migrate' && !path) setSource(null); }} /> : null}
+      <FilesDropHint over={step === 0 && !job ? drop.over : null} title={drop.over?.files.length ? tr('machines.as.dropHere') : tr('machines.as.dropNone')} />
     </View>
   );
+}
+
+// The Detect step (5.2): the disc's system, what it starts on, and whether this computer runs it natively
+function DetectPage({ detect, dp, sys, ver, path, host, onOther }) {
+  const p = usePal();
+  const info = detect?.phase === 'done' ? detect.info : null;
+  const archs = info ? [...info.efi, ...(info.bios && !info.efi.includes('amd64') ? ['amd64'] : [])].filter((x, i, a) => a.indexOf(x) === i) : [];
+  const rows = [
+    [tr('machines.as.r.system'), [sys.name || tr('machines.as.unknownSystem'), ver].filter(Boolean).join(' ')],
+    [tr('machines.as.det.label'), info?.label || '\u2014'],
+    [tr('machines.as.det.starts'), !info ? '\u2014' : archs.length ? `${archs.join(', ')} (${dp.starts.map((x) => tr(`machines.as.det.${x}`)).join(', ')})` : tr('machines.as.det.noBoot')],
+    [tr('machines.as.r.arch'), dp.emulated ? `${dp.arch}, ${tr('machines.emulatedLower')}` : dp.arch],
+  ];
+  const say = detect?.phase === 'reading' ? ['dim', tr('machines.as.det.reading')]
+    : detect?.phase === 'error' ? ['warn', tr('machines.as.det.cantRead', { arch: dp.arch })]
+    : dp.unknownArch ? ['warn', tr('machines.as.det.unknownArch', { list: info.efi.join(', ') })]
+    : dp.emulated ? ['warn', tr('machines.as.det.emulated', { arch: dp.arch, host: host.arch })]
+    : dp.from === 'boot' ? ['ok', tr('machines.as.det.native', { arch: dp.arch })]
+    : dp.both ? ['ok', tr('machines.as.det.both', { arch: dp.arch })]
+    : ['dim', tr(dp.from === 'name' ? 'machines.as.det.fromName' : 'machines.as.det.fromHost', { arch: dp.arch })];
+  return <>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+      <OsMark id={sys.id} size={56} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontSize: 15, fontWeight: 700, color: p.text, textAlign: 'start' }}>{[sys.name || tr('machines.as.unknownSystem'), ver].filter(Boolean).join(' ')}</Text>
+        <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start', direction: 'ltr', whiteSpace: 'nowrap', overflow: 'hidden' }}>{path}</Text>
+      </View>
+    </View>
+    <View style={{ borderRadius: 12, backgroundColor: p.card }}>
+      {rows.map(([k, val], i) => (
+        <View key={k} style={{ flexDirection: 'row', paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: i < rows.length - 1 ? 1 : 0, borderColor: p.line }}>
+          <Text style={{ flex: 1, fontSize: 13, color: p.dim, textAlign: 'start' }}>{k}</Text>
+          <Text style={{ fontSize: 13, fontWeight: 600, color: p.text, direction: 'ltr' }}>{val}</Text>
+        </View>
+      ))}
+    </View>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 10, backgroundColor: say[0] === 'warn' ? p.warnBg : p.raised }}>
+      <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.5, color: say[0] === 'ok' ? '#30d158' : p.text, textAlign: 'start' }}>{say[1]}</Text>
+      {say[0] === 'warn' ? <Btn label={tr('machines.as.det.other')} onClick={onOther} /> : null}
+    </View>
+    {dp.conflict ? <Text style={{ fontSize: 12, color: p.dim, textAlign: 'start' }}>{tr('machines.as.det.conflict', { arch: dp.arch })}</Text> : null}
+  </>;
 }
 
 // a group card's mark: the group's two machines and a badge "Group · 2 machines"
