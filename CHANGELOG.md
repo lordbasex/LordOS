@@ -737,6 +737,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: what the display engine and the guest helper take from the other side is fuzzed, and three faults it found
+  are fixed** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 8, 12).
+  - **The session's log took QEMU's words raw.** A console's label and the text of QEMU's refusals (a sound listener
+    refused, a new size refused, a missing console) went into the log as QEMU sent them, so a QEMU taken over by its
+    guest could write new lines, escape sequences or a forged entry there. They now go in as one line of printable ASCII,
+    at most 127 bytes.
+  - **An X display could hold the guest helper for ever.** While it set up its connection, `lordos-guest` waited 2 s for
+    each reply, but the wait started again after every event in between, so a display that kept sending events and never
+    the reply kept the helper from serving the host at all. The setup now has one 2 s limit for each reply.
+  - **A `DISPLAY` of the form `unix:/path` was never reached** by the guest helper's clipboard on demand; it is now
+    that socket.
 - **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
   QEMU's namespaces, so lord-server could no longer read which program a machine's engine runs and never counted one as
   checked. lord-server now keeps a pidfd of every lord-vm it starts (a machine started without a window sends its own) and
@@ -1211,6 +1222,17 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   running guest.
 
 ### Tests
+
+- **Machines: three fuzz harnesses for the guest's side** (in development; docs/VIRTUALIZATION.md 8, 12), in
+  `make -C server test`, each built with ASan and UBSan and checked by taking a bounds check out on purpose (it failed).
+  `vmdisplay-fuzz` plays a hostile QEMU against lord-vmdisplay in its own sandbox: about 12,000 seeded calls a run on the
+  display listener, its shared-memory interface and both sound listeners, with edge values, wrong signatures, pipes and
+  short or shrunk descriptors, and hostile console properties; every call must be answered, none past QEMU's 1 s, and the
+  log must stay clean. `guest-fuzz` plays the host, the guest's own lord-server, an X display, the system and session
+  buses and local programs against `lordos-guest` at once, as a user namespace's root (where it opens no shell), and
+  checks every frame it sends the host with the host's own parsers. `agent-fuzz-test` mutates well-formed payloads of
+  every frame kind of the agent's channel, both ends (500,000 checks), and cuts a stream of frames anywhere.
+  `guest-dbus-test` gained a mutation pass over well-formed D-Bus messages.
 
 - **Two tests made steady on a busy computer** (in development). `webreg-test`'s stand-in web runtime wrote the files the
   test reads in place, so a loaded computer let the test read an empty one: it now writes them whole and renames them, and

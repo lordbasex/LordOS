@@ -743,9 +743,9 @@
    "area": "L",
    "item": "Guest data treated as hostile: logs cleaned, parsers fuzzed (8)",
    "status": "✅",
-   "pct": 90,
-   "file": "`logclean.h`; `vm-test` fuzz passes, `vmimport-test` mutations",
-   "note": "No fuzz of lord-vmdisplay's D-Bus side or of `lordos-guest`'s parser"
+   "pct": 100,
+   "file": "`logclean.h`, `vmdisplay.c` (`qtext`); `vm-test` fuzz passes, `vmimport-test` mutations, `vmdisplay-fuzz`, `guest-fuzz`, `agent-fuzz-test`, `guest-dbus-test` (mutation pass)",
+   "note": "*In development* (2026-11-24): lord-vmdisplay's D-Bus side against a hostile QEMU (about 12,000 seeded calls a run: every listener, map and sound call with edge values, wrong signatures, pipes and short or shrunk descriptors; the helper under ASan and UBSan in its own sandbox: every call answered, none past QEMU's 1 s, no report); `lordos-guest` against a hostile host, guest lord-server, X display, buses and local programs at once (ASan, UBSan, as a user namespace's root where no shell opens; every frame it sends the host must parse); every agent parser of both ends under structured mutation (500,000 checks). Found and fixed: QEMU's words (a console's label, its refusals) went into the session's log raw (new lines, escapes); an X display that kept sending events held lordos-guest in its setup for ever; a `unix:/path` display wasn't reached. Each harness caught a bounds check taken out on purpose (was 90: no fuzz of lord-vmdisplay's D-Bus side or of `lordos-guest`)"
   },
   {
    "area": "L",
@@ -978,8 +978,8 @@
    "name": "Privacy and security model",
    "weight": 4,
    "items": 7,
-   "mean": 85.71,
-   "score": 86
+   "mean": 87.14,
+   "score": 87
   },
   {
    "id": "M",
@@ -999,5 +999,5 @@
   }
  ],
  "total": 85,
- "total_exact": 85.12
+ "total_exact": 85.16
 }
