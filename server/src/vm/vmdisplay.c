@@ -866,6 +866,11 @@ static void wheel(int steps, int up_button, int down_button) {
     }
 }
 
+/* All Displays: this output off for the guest (QEMU's ui_info with no size clears it from the enabled outputs) */
+static void output_off(void) {
+    call_noreply("org.qemu.Display1.Console", "SetUIInfo", "qqiiuu", (uint16_t)0, (uint16_t)0, 0, 0, (uint32_t)0, (uint32_t)0);
+}
+
 static void release_all(void) {
     for (int k = 0; k < 768; k++) if (D.keys[k]) key(k, 0);
     for (int b = 0; b < 16; b++) if (D.buttons[b]) button(b, 0);
@@ -1336,10 +1341,12 @@ int main(int argc, char **argv) {
             int gone = (re & (POLLHUP | POLLERR) && !(re & POLLIN)) || (re & POLLIN && from_server());
             if (!gone) continue;
             if (!k) { end = 1; break; }
-            /* another output's window went: that output alone stops (its keys and buttons let go, QEMU's held call answered) */
+            /* another output's window went: that output alone stops (its keys and buttons let go, QEMU's held call answered,
+             * and the guest told the output is off, so its desktop shrinks back) */
             fprintf(stderr, "lord-vmdisplay %s: output %d's window went\n", me, k);
             release_all();
             answer_update();
+            output_off();
             close(D.ch);
             D.ch = -1;
             if (D.shm) { munmap(D.shm, D.shm_len); D.shm = NULL; D.shm_len = 0; }
@@ -1347,7 +1354,7 @@ int main(int argc, char **argv) {
         Dp = &H[0];
         if (end) break;
     }
-    for (int k = 1; k < nheads; k++) { Dp = &H[k]; release_all(); answer_update(); }
+    for (int k = 1; k < nheads; k++) { Dp = &H[k]; release_all(); answer_update(); if (D.ch >= 0) output_off(); }
     Dp = &H[0];
     release_all();
     answer_update();

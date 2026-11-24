@@ -107,6 +107,7 @@ t "output 1: at the size asked for" '[ "${w1:-}x${h1:-}" = 800x600 ]'
 before=$(grep -c '"ev":"display_stats"' "$W/dev.out")
 echo "h1 close" >&7
 t "output 1 closed alone (the helper says so)" 'wait_in "$W/dev.err" "output 1.s window went" 10'
+t "the guest turned its second output off" 'sleep 5; grep -a LORDVM-HEADS "$D/log/serial.log" | tail -1 | grep -q "Virtual-2=disconnected\|Virtual-2=connected/disabled"' "$(grep -a LORDVM-HEADS "$D/log/serial.log" | tail -1)"
 echo "type x" >&7
 t "output 0 goes on (its frames keep coming)" 'sleep 7; [ "$(grep -c "\"ev\":\"display_stats\"" "$W/dev.out")" -gt "$before" ] && ! grep -q "\"ev\":\"vmdisplay-gone\"}" "$W/dev.out"'
 t "the helper refused nothing" '! grep -q "lord-vmdisplay: refused" "$W/dev.err"' "$(grep "lord-vmdisplay: refused" "$W/dev.err" | head -3)"
