@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsSnapOk, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered } from './model.js';
+import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending, discOffer, discCommands, discCanCopy, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered, usbRows, usbCamLive, usbMicLive, usbNeedsPerm, toolsSnapOk } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS, launchGuest } from './appsmode.jsx';
 import { launchAsks, dropLaunchAsk } from './guestlaunch.js';
 import { launchAskStep } from '../../sdk/guestappsmodel.js';
@@ -1026,8 +1026,6 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
     const job = lord.vm.set(dir, { disposable: to });
     if (job) setDispJob({ job, to });
   };
-  // the devices' own backend (USB, the camera): shown only once it says they're supported here (deviceCaps)
-  const caps = has() && typeof lord.vm.deviceCaps === 'function' ? lord.vm.deviceCaps(dir) : null;
   const cableOk = cableOffered(cfg, running);
   const cableOut = !!st?.cableOut;
   // shape keeping (5.3): windowed, the resolution fixed, nothing else deciding the frame
@@ -1180,6 +1178,42 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // the capture indicator names the machine: "Machines — Windows 11 Pro"
   const micWho = name || '';
   useEffect(() => { markDeviceUse('machines', 'microphone', micOn, null, micWho); return micOn ? () => markDeviceUse('machines', 'microphone', false, null, micWho) : undefined; }, [micOn, micWho]);
+  // host USB devices (6.6): this computer's list (sysfs, read again every 2 s while the machine runs), what the machine
+  // holds (st.usb), the capture indicator for a camera or a device with sound given to it, and the last refusal shown
+  const [usbList, setUsbList] = useState([]);
+  const [usbErr, setUsbErr] = useState('');
+  const usbOn = !!sid && (st?.state === 'running' || st?.state === 'paused');
+  useEffect(() => {
+    if (!usbOn || !has() || typeof lord.vm.usbDevices !== 'function') return undefined;
+    const read = () => { try { setUsbList(lord.vm.usbDevices()); } catch (e) { /* */ } };
+    read();
+    const t = setInterval(read, 2000);
+    return () => clearInterval(t);
+  }, [usbOn]);
+  const usbView = usbRows(usbList, st?.usb, sid);
+  const usbCam = usbCamLive(st?.usb), usbMic = usbMicLive(st?.usb);
+  // the bar's USB and camera dots (deviceDots): this machine's devices now
+  const caps = { usb: !!st?.usb?.controller, usbAttached: (st?.usb?.devices || []).length, camera: true, cameraOn: usbCam };
+  useEffect(() => { markDeviceUse('machines', 'camera', usbCam, null, micWho); return usbCam ? () => markDeviceUse('machines', 'camera', false, null, micWho) : undefined; }, [usbCam, micWho]);
+  useEffect(() => { if (usbMic && !micOn) { markDeviceUse('machines', 'microphone', true, null, `${micWho} USB`); return () => markDeviceUse('machines', 'microphone', false, null, `${micWho} USB`); } return undefined; }, [usbMic, micOn, micWho]);
+  const usbErrs = st?.usb?.errs || 0;
+  const usbErrSeen = useRef(0);
+  useEffect(() => { if (usbErrs > usbErrSeen.current && st?.usb?.err) setUsbErr(st.usb.err); usbErrSeen.current = usbErrs; }, [usbErrs]);
+  // a device in or out; a camera or a device with sound first asks for LordOS's permission (the system prompt, once)
+  const usbToggle = async (r) => {
+    setUsbErr('');
+    if (r.on) { lord.vm.usbDetach(sid, r.bus, r.dev); return; }
+    let why = lord.vm.usbAttach(sid, r.bus, r.dev);
+    for (let k = 0; k < 2 && usbNeedsPerm(why); k++) {
+      if (!(await requestPermission('machines', usbNeedsPerm(why)))) break;
+      why = lord.vm.usbAttach(sid, r.bus, r.dev);
+    }
+  };
+  const usbItems = usbView.state === 'locked' ? [{ label: tr('errors.vm.usbLocked'), disabled: true }]
+    : usbView.state === 'nocontroller' ? [{ label: tr('machines.usb.noController'), onClick: () => setCfgSheet({ section: 'sound' }) }]
+    : usbView.state === 'empty' ? [{ label: tr('machines.usb.none'), disabled: true }]
+    : [...usbView.rows.map((r) => ({ label: r.name, checked: r.on, disabled: (!!r.why && !r.on) || !!st?.usb?.busy, hint: r.why && !r.on ? tr(`errors.${r.why}`) : '', onClick: () => usbToggle(r) })),
+      ...usbView.rows.filter((r) => r.on || r.auto).map((r) => ({ label: tr('machines.usb.auto', { name: r.name }), checked: r.auto, onClick: () => lord.vm.usbAuto(sid, r.autoRule, !r.auto) }))];
   // Files dragged from Files onto the picture (6.x): copied into the guest's Downloads by its agent, one at a time in
   // lord-vm; a line under the picture while they go, a notice when they're there. Only into the guest: nothing comes
   // out by dragging (a shared folder does that)
@@ -1456,9 +1490,10 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       '-',
       { label: (cfg.shares || []).length ? tr('machines.tb.foldersN', { n: cfg.shares.length }) : tr('machines.tb.folders'), disabled: true },
       { label: tr('machines.dev.folderSettings'), onClick: () => setCfgSheet({ section: 'sharing' }) },
-      // USB and the camera: their own backend's, only once it says they're supported (deviceCaps)
-      ...(caps?.usb ? ['-', { label: tr('machines.dev.usb'), onClick: () => setCfgSheet({ section: 'usb' }) }] : []),
-      ...(caps?.camera ? [{ label: tr('machines.dev.camera'), onClick: () => setCfgSheet({ section: 'camera' }) }] : []),
+      // this computer's USB devices and its camera (6.6, 6.9): each one in or out of the machine, and its rule
+      '-',
+      { label: tr('machines.usb.title'), disabled: true },
+      ...usbItems,
     ],
     dots: deviceDots({ iso, heard, mic: micOn, cableOut, network: cfg.network, shares: (cfg.shares || []).length, transfer: cfg.transfer, caps }),
   };
@@ -1620,11 +1655,11 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
           </View>
         </View>
       ) : null}
-      {!card && !failed && ((noticeOn && noticeText) || cdErr) ? (
+      {!card && !failed && ((noticeOn && noticeText) || cdErr || usbErr) ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 16, alignItems: 'center' }}>
           <View style={{ maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 12, backgroundColor: 'rgba(28,28,33,0.94)' }}>
-            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : noticeText}</Text>
-            {cdErr ? <Btn label={tr('machines.ok')} onClick={() => setCdErr('')} style={{ height: 28 }} />
+            <Text style={{ flex: 1, fontSize: 13, lineHeight: 1.4, color: '#f2f2f5', textAlign: 'start' }}>{cdErr ? tr('machines.tb.cdFailed', { why: cdErr }) : usbErr ? tr('machines.usb.failed', { why: tr(`errors.${usbErr}`) }) : noticeText}</Text>
+            {cdErr || usbErr ? <Btn label={tr('machines.ok')} onClick={() => { setCdErr(''); setUsbErr(''); }} style={{ height: 28 }} />
               : ['network-back', 'identity'].includes(st.notice) ? <Btn label={tr('machines.ok')} onClick={() => setNoticeGone(st.noticeSeq)} style={{ height: 28 }} />
               : <Btn label={tr('machines.cmd.logs')} onClick={() => openLogs(m0)} style={{ height: 28 }} />}
           </View>

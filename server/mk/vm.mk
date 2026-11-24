@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmrecv.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmiso.c src/vm/vmisoans.c src/vm/vmexec.c src/vm/vmexport.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmusb.c src/vm/vmiso.c src/vm/vmisoans.c src/vm/vmexec.c src/vm/vmexport.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -25,6 +25,21 @@ build/lord-vm: $(LORDVM_SRC) $(VM_HDR) build/gen/guesttools.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 $(LORDVM_FLAGS) -o $@ $(LORDVM_SRC) $(LORDVM_LIBS)
 	chmod g-w $@
+
+# lord-vm-usb.so (src/vm/vmusbshim.c): preloaded into a machine's QEMU so that its libusb looks for no device of its own
+# (docs/VIRTUALIZATION.md 6.6); only dlopen and dlsym of the C library. Installed as /usr/lib/lordos/lib/lord-vm-usb.so
+all: build/lord-vm-usb.so
+build/lord-vm-usb.so: src/vm/vmusbshim.c
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) -O2 $(WARN) -std=gnu11 -shared -fPIC -Wl,-z,relro,-z,now -o $@ src/vm/vmusbshim.c
+
+# vmusb.c: the host's USB devices from a made-up sysfs, the request and rule parsers (fuzzed), the refusals (an input node
+# a process holds, a mounted or held disk, storage for someone who isn't an administrator), the descriptor check
+test: build/vmusb-test
+build/vmusb-test: tests/vmusb_test.c src/vm/vmusb.c src/vm/vmusb.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmusb_test.c src/vm/vmusb.c
+	./$@ || { rm -f $@; exit 1; }
 
 # the same lord-vm with LORDVM_TEST_PATHS (lordvm.c): QEMU, qemu-img, passt and the UEFI firmware from absolute paths in
 # the environment, for the release gates on a host that keeps them elsewhere. Built only when asked, never installed.
@@ -245,11 +260,17 @@ build/guest-dbus-test: tests/guest_dbus_test.c ../tools/guest/dbusmin.c ../tools
 	./$@ || { rm -f $@; exit 1; }
 
 # lord-server's side: lord.vm (ui/js_vm.c), machine.json reading, and the admin actions vm-enable and vm-kvm
-VM_SRV_SRC := src/ui/js_vm.c src/vm/vmkeysrv.c src/vm/vmexport.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmrecv.c src/vm/vmpin.c src/vm/vmisoans.c
+VM_SRV_SRC := src/ui/js_vm.c src/vm/vmkeysrv.c src/vm/vmexport.c src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmops.c src/vm/vm_admin.c src/vm/vmnet.c src/vm/vmnet_admin.c src/vm/vmgpu.c src/vm/vmgpu_admin.c src/vm/vmimage_admin.c src/vm/vmcatalog.c src/vm/vmurl.c src/vm/vmsig.c src/vm/vmthumb.c src/vm/vmagent.c src/vm/vmrecv.c src/vm/vmpin.c src/vm/vmisoans.c src/vm/vmusb.c src/vm/vmusb_admin.c
 VM_SRV_OBJ := $(VM_SRV_SRC:src/%.c=build/obj/%.o)
 $(VM_SRV_OBJ): $(VM_HDR) src/ui/js_vm.h src/media/media_int.h src/pkg/pkg.h src/admin.h
 build/lord-server: $(VM_SRV_OBJ)
 build/obj/ui/js.o: src/ui/js_vm.h
+
+# vm-usb-allow like the admin helper runs it, for tests/vm_usb_e2e.sh and manual checks (needs root and a real device: not in
+# make test)
+build/vm-usb-cli: tests/vm_usb_cli.c src/vm/vmusb_admin.c src/vm/vmusb.c src/vm/vmusb.h src/vm/vm_admin.h src/admin.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -Isrc -o $@ tests/vm_usb_cli.c src/vm/vmusb_admin.c src/vm/vmusb.c
 
 # vm-image-* like the admin helper runs them, against the makers' servers (tests/vm_image_cli.c; a manual check, not in
 # make test: it needs root, lord-tls beside it and the network). Its catalog, keys and store are under /var/tmp/lordos-vmimage-test (root's: sudo install the catalog and packaging/keys/machines there first).

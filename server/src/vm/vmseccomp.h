@@ -27,7 +27,7 @@
 
 /* a row's rule (vmsyscalls.h) */
 enum { VSR_OK = 1, VSR_HOT, VSR_EACCES, VSR_EPERM, VSR_ENOSYS, VSR_CLONE, VSR_IOCTL, VSR_PRCTL, VSR_SOCKETPAIR,
-       VSR_MMAP, VSR_MPROTECT, VSR_MEMFD, VSR_PRLIMIT, VSR_TGKILL, VSR_SECCOMP, VSR_EXECVEAT };
+       VSR_MMAP, VSR_MPROTECT, VSR_MEMFD, VSR_PRLIMIT, VSR_TGKILL, VSR_SECCOMP, VSR_EXECVEAT, VSR_USB };
 
 typedef struct { const char *name; int nr; int rule; } VmScRow;
 
@@ -38,6 +38,8 @@ typedef struct {
     int render;     /* 3D graphics or a vGPU: the render node's DRM ioctls ('d'), sync_file ('>') and dma-buf ('b') */
     int vgpu;       /* an Intel vGPU: VFIO's ioctls (';') */
     int tap;        /* a bridged network: the tap's TUN ioctls ('T' 200 and up) */
+    int usb;        /* a machine that may get a host USB device (6.6; never one locked for anonymity): usbfs's ioctls ('U')
+                     * on the device's descriptor lord-vm hands over (USBDEVFS_*: claim, submit and reap URBs, reset) */
     int bti;        /* arm64 with BTI: without a listener, mprotect may add PROT_EXEC together with PROT_BTI */
     pid_t self;     /* QEMU's pid (the child's own: exec keeps it) */
     int exec_fd;    /* the descriptor of QEMU's binary, the only thing execveat may run; -1: no exec */

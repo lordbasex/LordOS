@@ -159,6 +159,7 @@
   "pkg.why.multiarchPair": "{name}와(과) 같은 버전",
   "gpu.roleSet": "그래픽 카드 용도를 저장했습니다({card}): 적용하려면 다시 시작하세요",
   "vm.gvtReady": "그래픽 카드 할당 준비됨({name})",
+  "vm.usbReady": "USB 장치 준비됨",
   "vm.gvtGone": "그래픽 카드 할당을 제거했습니다",
   "gpu.freqSet": "그래픽 카드 최소 주파수를 설정했습니다",
   "gpu.memlockSet": "머신들이 잠글 수 있는 메모리를 저장했습니다",

@@ -5,7 +5,7 @@
 import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber, firewall, netModel } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX } from './model.js';
+  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX, usbAutoRows } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
 import { COLOR_HEX } from './systems.js';
@@ -347,6 +347,8 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   let pane = null;
   // the anonymity profile (19.5): these sections are locked, shown as such
   const locked = m.profileLock === 'anonymity';
+  // this computer's USB devices, for the names of the auto-connect rules (6.6)
+  const usbDevs = sec === 'sound' && typeof lord.vm?.usbDevices === 'function' ? lord.vm.usbDevices() : [];
   summary.group = tr('machines.group.cfg.summary', { role: tr(`machines.group.role.${m.role || 'workstation'}`) });
   if (locked && LOCKED_SECTIONS[sec]) pane = <LockedRows keys={LOCKED_SECTIONS[sec]} />;
   else if (sec === 'group') pane = <GroupPane group={group} m={m} onMember={onMember} />;
@@ -575,6 +577,19 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Row label={tr('machines.cfg.keyboard')} value={tr('machines.cfg.keyboardValue')} />
         <Row label={tr('machines.cfg.pointer')} value={tr('machines.cfg.pointerValue')} last note={tr('machines.cfg.pointerNote')} />
       </Group>
+      {/* host USB devices (6.6): the machine's USB controller (a device of the guest: with it off) and the devices that
+          connect by themselves; never for a machine locked for anonymity */}
+      {locked ? null : <Group>
+        <Row label={tr('machines.usb.controller')} note={tr('machines.usb.controllerNote') + (offNote ? ` ${offNote}` : '')} last={!(m.usbAuto || []).length}>
+          <Off off={running}><Toggle on={!!m.usb} onChange={(x) => { if (!running && !job) save({ usb: x }); }} /></Off>
+        </Row>
+        {usbAutoRows(m.usbAuto, usbDevs).map((r, i, all) => (
+          <Row key={r.rule} label={tr('machines.usb.autoRow', { name: r.name })} last={i === all.length - 1} note={i === all.length - 1 ? tr('machines.usb.autoNote') + (offNote ? ` ${offNote}` : '') : null}>
+            <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.usb.autoRemove')} disabled={running || !!job}
+              onClick={() => save({ usbAuto: (m.usbAuto || []).filter((x) => x !== r.rule) })} /></View></Off>
+          </Row>
+        ))}
+      </Group>}
     </>;
   }
   else if (sec === 'disks') pane = <>

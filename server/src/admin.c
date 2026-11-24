@@ -119,6 +119,33 @@ void admin_say(const char *kind, const char *fmt, ...) {
     va_end(ap);
 }
 
+/* a line with one descriptor (admin_ok_fd): sendmsg on the socket to lord-server, the descriptor on the line's first
+ * byte; what sendmsg didn't take goes as plain bytes. Only where the line goes straight to lord-server */
+void admin_say_fd(int fd, const char *kind, const char *fmt, ...) {
+    char msg[1024], line[1200];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof msg, fmt, ap);
+    va_end(ap);
+    for (char *p = msg; *p; p++) if (*p == '\n' || *p == '\r') *p = ' ';
+    int n = snprintf(line, sizeof line, "%d %s %s\n", cur_id, kind, msg);
+    if (n < 0) return;
+    if ((size_t)n >= sizeof line) { n = sizeof line - 1; line[n - 1] = '\n'; }
+    if (fd < 0 || netd_main) { out_write(cur_id, line, (size_t)n); return; }
+    union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
+    memset(&cm, 0, sizeof cm);
+    struct iovec io = { line, (size_t)n };
+    struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
+    struct cmsghdr *c = CMSG_FIRSTHDR(&mh);
+    c->cmsg_level = SOL_SOCKET;
+    c->cmsg_type = SCM_RIGHTS;
+    c->cmsg_len = CMSG_LEN(sizeof(int));
+    memcpy(CMSG_DATA(c), &fd, sizeof fd);
+    ssize_t w;
+    do w = sendmsg(out_fd, &mh, MSG_NOSIGNAL); while (w < 0 && errno == EINTR);
+    if (w > 0 && w < n) write_fd_all(out_fd, line + w, (size_t)(n - w));
+}
+
 void admin_event(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -1083,9 +1110,33 @@ int admin_send(const char *action, const char *arg, size_t len) {
     return id;
 }
 
+/* descriptors that came with the helper's lines (only vm-usb-allow's: admin_ok_fd), in order, until their line is read;
+ * then the one of the line being handled, for admin_take_fd */
+static int fdq[4], fdq_n;
+static int line_fd = -1, line_id;
+
+int admin_take_fd(int id) {
+    if (id <= 0 || id != line_id || line_fd < 0) return -1;
+    int fd = line_fd;
+    line_fd = -1;
+    return fd;
+}
+
 void admin_dispatch(void (*fn)(int id, const char *kind, const char *text)) {
     for (;;) {
-        ssize_t r = read(sock, rbuf + rlen, sizeof rbuf - 1 - rlen);
+        union { struct cmsghdr h; char b[CMSG_SPACE(4 * sizeof(int))]; } cm;
+        struct iovec io = { rbuf + rlen, sizeof rbuf - 1 - rlen };
+        struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
+        ssize_t r = recvmsg(sock, &mh, MSG_CMSG_CLOEXEC);
+        for (struct cmsghdr *c = r >= 0 ? CMSG_FIRSTHDR(&mh) : NULL; c; c = CMSG_NXTHDR(&mh, c)) {
+            if (c->cmsg_level != SOL_SOCKET || c->cmsg_type != SCM_RIGHTS) continue;
+            size_t k = (c->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+            for (size_t i = 0; i < k; i++) {
+                int fd;
+                memcpy(&fd, CMSG_DATA(c) + i * sizeof(int), sizeof fd);
+                if (fdq_n < (int)(sizeof fdq / sizeof *fdq)) fdq[fdq_n++] = fd; else close(fd);
+            }
+        }
         if (r <= 0) { if (r == 0) { close(sock); sock = -1; } break; }
         rlen += (size_t)r;
         char *nl;
@@ -1096,7 +1147,15 @@ void admin_dispatch(void (*fn)(int id, const char *kind, const char *text)) {
             if (kind) {
                 kind++;
                 char *sp = strchr(kind, ' ');
+                /* the line a descriptor came with: vm-usb-allow's answer, the oldest one waiting */
+                if (sp && !strncmp(kind, "OK ", 3) && !strncmp(sp + 1, "vm.usbReady", 11) && fdq_n > 0) {
+                    line_fd = fdq[0];
+                    line_id = id;
+                    memmove(fdq, fdq + 1, (size_t)(--fdq_n) * sizeof *fdq);
+                }
                 if (sp) { *sp = 0; fn(id, kind, sp + 1); } else fn(id, kind, "");
+                if (line_fd >= 0) { close(line_fd); line_fd = -1; }
+                line_id = 0;
             }
             size_t used = (size_t)(nl - rbuf) + 1;
             memmove(rbuf, nl + 1, rlen - used);

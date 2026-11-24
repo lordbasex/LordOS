@@ -177,6 +177,7 @@
   "pkg.why.multiarchPair": "Ta sama wersja co {name}",
   "gpu.roleSet": "Zapisano przeznaczenie karty graficznej ({card}): uruchom ponownie, aby zastosować",
   "vm.gvtReady": "Część karty graficznej gotowa ({name})",
+  "vm.usbReady": "Urządzenie USB gotowe",
   "vm.gvtGone": "Usunięto część karty graficznej",
   "gpu.freqSet": "Ustawiono minimalną częstotliwość karty graficznej",
   "gpu.memlockSet": "Zapisano pamięć, którą maszyny mogą zablokować",
