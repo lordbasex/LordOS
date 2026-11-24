@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Mitteilungen aus der Maschine",
   "cfg.guestNotifyNote": "Die Mitteilungen der Maschine erscheinen hier mit ihrem Namen, höchstens einige auf einmal.",
   "logs.unitOnly": "Nur {unit}",
-  "logs.guestZone": "Zeitzone des Gasts: {zone}"
+  "logs.guestZone": "Zeitzone des Gasts: {zone}",
+  "launcher.missing": "{app} ist nicht mehr in {machine}",
+  "launcher.missingBody": "Die Maschine führt diese App nicht mehr auf, daher wurde nichts geöffnet.",
+  "launcher.timeout": "{app} wurde in {machine} nicht geöffnet",
+  "launcher.timeoutBody": "Der App-Modus ist nicht gestartet. Er braucht die LordOS-Werkzeuge der Maschine und ein System, dessen Apps sie auflisten können.",
+  "cfg.launcherApps": "Ihre Apps im Starter",
+  "cfg.launcherAppsNote": "Die Apps, die die Maschine im App-Modus aufgeführt hat ({count}), erscheinen im Starter und in der Suche, solange sie aus ist, mit ihrem Namen markiert. Eine davon zu wählen startet die Maschine und öffnet die App.",
+  "shell.toTerminal": "Im Terminal öffnen",
+  "shell.inTerminal": "Diese Shell ist in einem Terminal-Tab geöffnet.",
+  "shell.showTerminal": "Terminal zeigen"
 }

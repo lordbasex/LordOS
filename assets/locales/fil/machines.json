@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Mga abiso mula sa machine",
   "cfg.guestNotifyNote": "Lumalabas dito ang mga abiso ng machine na may pangalan nito, ilan lang sa isang pagkakataon.",
   "logs.unitOnly": "{unit} lang",
-  "logs.guestZone": "Time zone ng guest: {zone}"
+  "logs.guestZone": "Time zone ng guest: {zone}",
+  "launcher.missing": "Wala na ang {app} sa {machine}",
+  "launcher.missingBody": "Hindi na inililista ng machine ang app na iyon, kaya walang binuksan.",
+  "launcher.timeout": "Hindi nabuksan ang {app} sa {machine}",
+  "launcher.timeoutBody": "Hindi nagsimula ang apps mode. Kailangan nito ang LordOS tools ng machine at isang system na kayang ilista ng mga ito ang mga app.",
+  "cfg.launcherApps": "Ang mga app nito sa launcher",
+  "cfg.launcherAppsNote": "Ang mga app na inilista ng machine sa apps mode ({count}) ay lumalabas sa launcher at sa paghahanap habang naka-off ito, may marka ng pangalan nito. Kapag pumili ng isa, magsisimula ang machine at bubuksan ang app.",
+  "shell.toTerminal": "Buksan sa Terminal",
+  "shell.inTerminal": "Nakabukas ang shell na ito sa isang tab ng Terminal.",
+  "shell.showTerminal": "Ipakita ang Terminal"
 }

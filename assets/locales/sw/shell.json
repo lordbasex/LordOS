@@ -977,5 +977,6 @@
   "themeSwitch.changingTo": "Inabadilisha kuwa {name}…",
   "themeSwitch.failedTitle": "{name} haikuweza kutumika",
   "themeSwitch.refusedBody": "Msimbo wake haulingani na nakala iliyotiwa sahihi ya LordOS, kwa hivyo haukupakiwa. Mtindo wa eneo-kazi lako unabaki kama ulivyokuwa.",
-  "themeSwitch.failedBody": "Haikuanza. Mtindo wa eneo-kazi lako unabaki kama ulivyokuwa."
+  "themeSwitch.failedBody": "Haikuanza. Mtindo wa eneo-kazi lako unabaki kama ulivyokuwa.",
+  "guestApps.inMachine": "Ndani ya {machine}"
 }

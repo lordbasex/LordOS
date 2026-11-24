@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Pranešimai iš mašinos",
   "cfg.guestNotifyNote": "Mašinos pranešimai rodomi čia su jos pavadinimu, daugiausia keli vienu metu.",
   "logs.unitOnly": "Tik {unit}",
-  "logs.guestZone": "Svečio laiko juosta: {zone}"
+  "logs.guestZone": "Svečio laiko juosta: {zone}",
+  "launcher.missing": "{app} nebėra mašinoje {machine}",
+  "launcher.missingBody": "Mašina nebepateikia šios programos, todėl niekas nebuvo atidaryta.",
+  "launcher.timeout": "{app} neatsidarė mašinoje {machine}",
+  "launcher.timeoutBody": "Programų režimas nepasileido. Jam reikia mašinos LordOS įrankių ir sistemos, kurios programas jie gali išvardyti.",
+  "cfg.launcherApps": "Jos programos paleidiklyje",
+  "cfg.launcherAppsNote": "Programos, kurias mašina išvardijo programų režimu ({count}), rodomos paleidiklyje ir paieškoje, kol ji išjungta, pažymėtos jos pavadinimu. Pasirinkus vieną, mašina paleidžiama ir programa atidaroma.",
+  "shell.toTerminal": "Atverti Terminale",
+  "shell.inTerminal": "Šis apvalkalas atvertas Terminalo kortelėje.",
+  "shell.showTerminal": "Rodyti Terminalą"
 }

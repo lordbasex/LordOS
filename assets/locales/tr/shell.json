@@ -977,5 +977,6 @@
   "themeSwitch.changingTo": "{name} stiline geçiliyor…",
   "themeSwitch.failedTitle": "{name} uygulanamadı",
   "themeSwitch.refusedBody": "Kodu LordOS’un imzalı kopyasıyla eşleşmiyor, bu yüzden yüklenmedi. Masaüstü stiliniz olduğu gibi kalıyor.",
-  "themeSwitch.failedBody": "Başlamadı. Masaüstü stiliniz olduğu gibi kalıyor."
+  "themeSwitch.failedBody": "Başlamadı. Masaüstü stiliniz olduğu gibi kalıyor.",
+  "guestApps.inMachine": "{machine} içinde"
 }

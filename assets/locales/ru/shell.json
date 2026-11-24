@@ -984,5 +984,6 @@
   "themeSwitch.changingTo": "Переключение на {name}…",
   "themeSwitch.failedTitle": "Не удалось применить {name}",
   "themeSwitch.refusedBody": "Его код не совпадает с подписанной копией LordOS, поэтому он не был загружен. Стиль рабочего стола остаётся прежним.",
-  "themeSwitch.failedBody": "Он не запустился. Стиль рабочего стола остаётся прежним."
+  "themeSwitch.failedBody": "Он не запустился. Стиль рабочего стола остаётся прежним.",
+  "guestApps.inMachine": "В {machine}"
 }

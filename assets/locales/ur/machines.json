@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "مشین سے اطلاعات",
   "cfg.guestNotifyNote": "مشین کی اطلاعات اس کے نام کے ساتھ یہاں دکھتی ہیں، ایک وقت میں زیادہ سے زیادہ چند۔",
   "logs.unitOnly": "صرف {unit}",
-  "logs.guestZone": "مہمان کا ٹائم زون: {zone}"
+  "logs.guestZone": "مہمان کا ٹائم زون: {zone}",
+  "launcher.missing": "{app} اب {machine} میں نہیں ہے",
+  "launcher.missingBody": "مشین اب اس ایپ کی فہرست نہیں دیتی، اس لیے کچھ نہیں کھلا۔",
+  "launcher.timeout": "{app} {machine} میں نہیں کھلی",
+  "launcher.timeoutBody": "ایپس موڈ شروع نہیں ہوا۔ اسے مشین کے LordOS ٹولز اور ایسا سسٹم چاہیے جس کی ایپس وہ فہرست کر سکیں۔",
+  "cfg.launcherApps": "لانچر میں اس کی ایپس",
+  "cfg.launcherAppsNote": "ایپس موڈ میں مشین نے جو ایپس فہرست کیں ({count}) وہ اس کے بند ہونے پر اس کے نام کے ساتھ لانچر اور تلاش میں دکھائی دیتی ہیں۔ کوئی ایک چننے سے مشین شروع ہوتی ہے اور ایپ کھلتی ہے۔",
+  "shell.toTerminal": "ٹرمینل میں کھولیں",
+  "shell.inTerminal": "یہ شیل ٹرمینل کے ایک ٹیب میں کھلا ہے۔",
+  "shell.showTerminal": "ٹرمینل دکھائیں"
 }

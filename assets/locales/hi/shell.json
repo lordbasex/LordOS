@@ -977,5 +977,6 @@
   "themeSwitch.changingTo": "{name} पर बदला जा रहा है…",
   "themeSwitch.failedTitle": "{name} लागू नहीं हो सका",
   "themeSwitch.refusedBody": "इसका कोड LordOS की हस्ताक्षरित प्रति से मेल नहीं खाता, इसलिए इसे लोड नहीं किया गया। आपके डेस्कटॉप की शैली पहले जैसी ही रहेगी।",
-  "themeSwitch.failedBody": "यह शुरू नहीं हुआ। आपके डेस्कटॉप की शैली पहले जैसी ही रहेगी।"
+  "themeSwitch.failedBody": "यह शुरू नहीं हुआ। आपके डेस्कटॉप की शैली पहले जैसी ही रहेगी।",
+  "guestApps.inMachine": "{machine} में"
 }

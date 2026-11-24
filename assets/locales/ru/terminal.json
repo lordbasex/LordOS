@@ -584,5 +584,7 @@
   "prefs.tr.would.capture": "сохраняется в «Захваченном выводе»",
   "prefs.tr.would.highlight": "подсвечивает «{text}»",
   "prefs.tr.param": "Параметр",
-  "prefs.tr.regexFirst": "Сначала напишите регулярное выражение."
+  "prefs.tr.regexFirst": "Сначала напишите регулярное выражение.",
+  "guest.badge": "ГОСТЬ",
+  "guest.title": "Оболочка в {machine}"
 }

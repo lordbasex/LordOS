@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "إشعارات من الجهاز",
   "cfg.guestNotifyNote": "تظهر إشعارات الجهاز هنا مع اسمه، القليل منها في كل مرة على الأكثر.",
   "logs.unitOnly": "{unit} فقط",
-  "logs.guestZone": "المنطقة الزمنية للضيف: {zone}"
+  "logs.guestZone": "المنطقة الزمنية للضيف: {zone}",
+  "launcher.missing": "{app} لم يعد موجودًا في {machine}",
+  "launcher.missingBody": "لم تعد الآلة تذكر هذا التطبيق، لذلك لم يُفتح شيء.",
+  "launcher.timeout": "لم يُفتح {app} في {machine}",
+  "launcher.timeoutBody": "لم يبدأ وضع التطبيقات. يحتاج إلى أدوات LordOS في الآلة ونظام تستطيع سرد تطبيقاته.",
+  "cfg.launcherApps": "تطبيقاتها في المشغّل",
+  "cfg.launcherAppsNote": "التطبيقات التي ذكرتها الآلة في وضع التطبيقات ({count}) تظهر في المشغّل والبحث وهي متوقفة، مميزة باسمها. اختيار أحدها يشغّل الآلة ويفتح التطبيق.",
+  "shell.toTerminal": "فتح في الطرفية",
+  "shell.inTerminal": "سطر الأوامر هذا مفتوح في لسان من الطرفية.",
+  "shell.showTerminal": "إظهار الطرفية"
 }

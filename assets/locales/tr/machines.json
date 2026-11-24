@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Makineden bildirimler",
   "cfg.guestNotifyNote": "Makinenin bildirimleri adıyla burada görünür, aynı anda en fazla birkaç tane.",
   "logs.unitOnly": "Yalnızca {unit}",
-  "logs.guestZone": "Konuğun saat dilimi: {zone}"
+  "logs.guestZone": "Konuğun saat dilimi: {zone}",
+  "launcher.missing": "{app} artık {machine} içinde yok",
+  "launcher.missingBody": "Makine artık bu uygulamayı listelemiyor, bu yüzden hiçbir şey açılmadı.",
+  "launcher.timeout": "{app}, {machine} içinde açılmadı",
+  "launcher.timeoutBody": "Uygulama modu başlamadı. Makinenin LordOS araçlarına ve uygulamalarını listeleyebilecekleri bir sisteme ihtiyacı var.",
+  "cfg.launcherApps": "Uygulamaları başlatıcıda",
+  "cfg.launcherAppsNote": "Makinenin uygulama modunda listelediği uygulamalar ({count}) makine kapalıyken adıyla işaretlenmiş olarak başlatıcıda ve aramada görünür. Birini seçmek makineyi başlatır ve uygulamayı açar.",
+  "shell.toTerminal": "Terminal'de aç",
+  "shell.inTerminal": "Bu kabuk bir Terminal sekmesinde açık.",
+  "shell.showTerminal": "Terminal'i göster"
 }

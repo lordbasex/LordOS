@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Notifikasi dari mesin",
   "cfg.guestNotifyNote": "Notifikasi mesin muncul di sini dengan namanya, paling banyak beberapa sekaligus.",
   "logs.unitOnly": "Hanya {unit}",
-  "logs.guestZone": "Zona waktu tamu: {zone}"
+  "logs.guestZone": "Zona waktu tamu: {zone}",
+  "launcher.missing": "{app} sudah tidak ada di {machine}",
+  "launcher.missingBody": "Mesin tidak lagi mencantumkan aplikasi itu, jadi tidak ada yang dibuka.",
+  "launcher.timeout": "{app} tidak terbuka di {machine}",
+  "launcher.timeoutBody": "Mode aplikasi tidak dimulai. Mode ini memerlukan alat LordOS mesin dan sistem yang aplikasinya dapat dicantumkan oleh alat itu.",
+  "cfg.launcherApps": "Aplikasinya di peluncur",
+  "cfg.launcherAppsNote": "Aplikasi yang dicantumkan mesin dalam mode aplikasi ({count}) muncul di peluncur dan pencarian saat mesin mati, ditandai dengan namanya. Memilih salah satunya menyalakan mesin dan membuka aplikasi.",
+  "shell.toTerminal": "Buka di Terminal",
+  "shell.inTerminal": "Shell ini terbuka di tab Terminal.",
+  "shell.showTerminal": "Tampilkan Terminal"
 }

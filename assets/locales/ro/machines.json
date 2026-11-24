@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Notificări din mașină",
   "cfg.guestNotifyNote": "Notificările mașinii apar aici cu numele ei, cel mult câteva odată.",
   "logs.unitOnly": "Doar {unit}",
-  "logs.guestZone": "Fusul orar al oaspetelui: {zone}"
+  "logs.guestZone": "Fusul orar al oaspetelui: {zone}",
+  "launcher.missing": "{app} nu mai este în {machine}",
+  "launcher.missingBody": "Mașina nu mai listează acea aplicație, așa că nu s-a deschis nimic.",
+  "launcher.timeout": "{app} nu s-a deschis în {machine}",
+  "launcher.timeoutBody": "Modul aplicații nu a pornit. Are nevoie de instrumentele LordOS ale mașinii și de un sistem ale cărui aplicații le pot lista.",
+  "cfg.launcherApps": "Aplicațiile ei în lansator",
+  "cfg.launcherAppsNote": "Aplicațiile listate de mașină în modul aplicații ({count}) apar în lansator și în căutare cât timp e oprită, marcate cu numele ei. Alegerea uneia pornește mașina și deschide aplicația.",
+  "shell.toTerminal": "Deschide în Terminal",
+  "shell.inTerminal": "Acest shell este deschis într-o filă Terminal.",
+  "shell.showTerminal": "Arată Terminalul"
 }

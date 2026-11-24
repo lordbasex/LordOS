@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Arifa kutoka kwa mashine",
   "cfg.guestNotifyNote": "Arifa za mashine zinaonekana hapa pamoja na jina lake, chache tu kwa wakati mmoja.",
   "logs.unitOnly": "{unit} pekee",
-  "logs.guestZone": "Saa za eneo za mgeni: {zone}"
+  "logs.guestZone": "Saa za eneo za mgeni: {zone}",
+  "launcher.missing": "{app} haipo tena kwenye {machine}",
+  "launcher.missingBody": "Mashine haiorodheshi tena programu hiyo, kwa hiyo hakuna kilichofunguliwa.",
+  "launcher.timeout": "{app} haikufunguka kwenye {machine}",
+  "launcher.timeoutBody": "Hali ya programu haikuanza. Inahitaji zana za LordOS za mashine na mfumo ambao programu zake zinaweza kuorodheshwa nazo.",
+  "cfg.launcherApps": "Programu zake kwenye kizindua",
+  "cfg.launcherAppsNote": "Programu ambazo mashine iliorodhesha katika hali ya programu ({count}) huonekana kwenye kizindua na utafutaji ikiwa imezimwa, zikiwa na jina lake. Kuchagua moja huwasha mashine na kufungua programu.",
+  "shell.toTerminal": "Fungua kwenye Terminal",
+  "shell.inTerminal": "Shell hii iko wazi kwenye kichupo cha Terminal.",
+  "shell.showTerminal": "Onyesha Terminal"
 }

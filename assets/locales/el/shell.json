@@ -977,5 +977,6 @@
   "themeSwitch.changingTo": "Αλλαγή σε {name}…",
   "themeSwitch.failedTitle": "Δεν ήταν δυνατή η εφαρμογή του {name}",
   "themeSwitch.refusedBody": "Ο κώδικάς του δεν ταιριάζει με το υπογεγραμμένο αντίγραφο του LordOS, γι’ αυτό δεν φορτώθηκε. Το στυλ της επιφάνειας εργασίας μένει όπως ήταν.",
-  "themeSwitch.failedBody": "Δεν ξεκίνησε. Το στυλ της επιφάνειας εργασίας μένει όπως ήταν."
+  "themeSwitch.failedBody": "Δεν ξεκίνησε. Το στυλ της επιφάνειας εργασίας μένει όπως ήταν.",
+  "guestApps.inMachine": "Στο {machine}"
 }

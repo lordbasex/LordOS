@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Notifications from the machine",
   "cfg.guestNotifyNote": "The machine's notifications appear here, marked with its name, a few at a time at most.",
   "logs.unitOnly": "Only {unit}",
-  "logs.guestZone": "Guest time zone: {zone}"
+  "logs.guestZone": "Guest time zone: {zone}",
+  "launcher.missing": "{app} isn't in {machine} any more",
+  "launcher.missingBody": "The machine no longer lists that app, so nothing was opened.",
+  "launcher.timeout": "{app} didn't open in {machine}",
+  "launcher.timeoutBody": "Apps mode didn't start. It needs the machine's LordOS tools and a system whose apps they can list.",
+  "cfg.launcherApps": "Its apps in the launcher",
+  "cfg.launcherAppsNote": "The apps the machine listed in apps mode ({count}) appear in the launcher and search while it's off, marked with its name. Choosing one starts the machine and opens the app.",
+  "shell.toTerminal": "Open in Terminal",
+  "shell.inTerminal": "This shell is open in a Terminal tab.",
+  "shell.showTerminal": "Show Terminal"
 }

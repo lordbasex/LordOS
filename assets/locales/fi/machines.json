@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Ilmoitukset koneesta",
   "cfg.guestNotifyNote": "Koneen ilmoitukset näkyvät täällä sen nimellä, korkeintaan muutama kerrallaan.",
   "logs.unitOnly": "Vain {unit}",
-  "logs.guestZone": "Vieraan aikavyöhyke: {zone}"
+  "logs.guestZone": "Vieraan aikavyöhyke: {zone}",
+  "launcher.missing": "{app} ei ole enää koneessa {machine}",
+  "launcher.missingBody": "Kone ei enää luettele tätä sovellusta, joten mitään ei avattu.",
+  "launcher.timeout": "{app} ei avautunut koneessa {machine}",
+  "launcher.timeoutBody": "Sovellustila ei käynnistynyt. Se tarvitsee koneen LordOS-työkalut ja järjestelmän, jonka sovellukset ne osaavat luetella.",
+  "cfg.launcherApps": "Sen sovellukset käynnistimessä",
+  "cfg.launcherAppsNote": "Sovellukset, jotka kone luetteli sovellustilassa ({count}), näkyvät käynnistimessä ja haussa koneen ollessa sammutettu, sen nimellä merkittyinä. Yhden valitseminen käynnistää koneen ja avaa sovelluksen.",
+  "shell.toTerminal": "Avaa Päätteessä",
+  "shell.inTerminal": "Tämä komentotulkki on auki Päätteen välilehdellä.",
+  "shell.showTerminal": "Näytä Pääte"
 }

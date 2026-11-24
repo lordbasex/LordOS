@@ -573,5 +573,7 @@
   "prefs.tr.would.capture": "säilytetään Kaapatussa tulosteessa",
   "prefs.tr.would.highlight": "korostaa ”{text}”",
   "prefs.tr.param": "Parametri",
-  "prefs.tr.regexFirst": "Kirjoita ensin säännöllinen lauseke."
+  "prefs.tr.regexFirst": "Kirjoita ensin säännöllinen lauseke.",
+  "guest.badge": "VIERAS",
+  "guest.title": "Komentotulkki koneessa {machine}"
 }

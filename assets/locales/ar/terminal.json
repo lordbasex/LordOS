@@ -617,5 +617,7 @@
   "prefs.tr.would.capture": "يُحفظ في «المخرجات الملتقطة»",
   "prefs.tr.would.highlight": "يبرز «{text}»",
   "prefs.tr.param": "المعامل",
-  "prefs.tr.regexFirst": "اكتب التعبير النمطي أولًا."
+  "prefs.tr.regexFirst": "اكتب التعبير النمطي أولًا.",
+  "guest.badge": "ضيف",
+  "guest.title": "سطر أوامر داخل {machine}"
 }

@@ -977,5 +977,6 @@
   "themeSwitch.changingTo": "Cambiando a {name}…",
   "themeSwitch.failedTitle": "No se pudo aplicar {name}",
   "themeSwitch.refusedBody": "Su código no coincide con la copia firmada de LordOS, así que no se cargó. Tu estilo de escritorio sigue como estaba.",
-  "themeSwitch.failedBody": "No arrancó. Tu estilo de escritorio sigue como estaba."
+  "themeSwitch.failedBody": "No arrancó. Tu estilo de escritorio sigue como estaba.",
+  "guestApps.inMachine": "En {machine}"
 }

@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Maşından bildirişlər",
   "cfg.guestNotifyNote": "Maşının bildirişləri onun adı ilə burada görünür, eyni anda ən çox bir neçəsi.",
   "logs.unitOnly": "Yalnız {unit}",
-  "logs.guestZone": "Qonağın saat qurşağı: {zone}"
+  "logs.guestZone": "Qonağın saat qurşağı: {zone}",
+  "launcher.missing": "{app} artıq {machine} daxilində yoxdur",
+  "launcher.missingBody": "Maşın bu tətbiqi artıq siyahıya salmır, ona görə heç nə açılmadı.",
+  "launcher.timeout": "{app} {machine} daxilində açılmadı",
+  "launcher.timeoutBody": "Tətbiqlər rejimi başlamadı. Ona maşının LordOS alətləri və tətbiqlərini sıralaya bildikləri sistem lazımdır.",
+  "cfg.launcherApps": "Tətbiqləri başladıcıda",
+  "cfg.launcherAppsNote": "Maşının tətbiqlər rejimində sıraladığı tətbiqlər ({count}) o sönülü olanda başladıcıda və axtarışda onun adı ilə görünür. Birini seçmək maşını başladır və tətbiqi açır.",
+  "shell.toTerminal": "Terminalda aç",
+  "shell.inTerminal": "Bu shell Terminal vərəqəsində açıqdır.",
+  "shell.showTerminal": "Terminalı göstər"
 }

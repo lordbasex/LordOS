@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "머신의 알림",
   "cfg.guestNotifyNote": "머신의 알림이 이름과 함께 여기에 표시되며, 한 번에 최대 몇 개까지입니다.",
   "logs.unitOnly": "{unit}만",
-  "logs.guestZone": "게스트 시간대: {zone}"
+  "logs.guestZone": "게스트 시간대: {zone}",
+  "launcher.missing": "{app}이(가) 더 이상 {machine}에 없습니다",
+  "launcher.missingBody": "머신이 더 이상 그 앱을 목록에 올리지 않아 아무것도 열지 않았습니다.",
+  "launcher.timeout": "{app}이(가) {machine}에서 열리지 않았습니다",
+  "launcher.timeoutBody": "앱 모드가 시작되지 않았습니다. 머신의 LordOS 도구와, 도구가 앱 목록을 만들 수 있는 시스템이 필요합니다.",
+  "cfg.launcherApps": "런처에 앱 표시",
+  "cfg.launcherAppsNote": "앱 모드에서 머신이 목록에 올린 앱({count}개)은 머신이 꺼져 있는 동안 머신 이름과 함께 런처와 검색에 나타납니다. 하나를 고르면 머신이 시작되고 앱이 열립니다.",
+  "shell.toTerminal": "터미널에서 열기",
+  "shell.inTerminal": "이 셸은 터미널 탭에서 열려 있습니다.",
+  "shell.showTerminal": "터미널 보기"
 }

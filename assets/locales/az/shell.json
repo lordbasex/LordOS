@@ -977,5 +977,6 @@
   "themeSwitch.changingTo": "{name} üslubuna keçilir…",
   "themeSwitch.failedTitle": "{name} tətbiq edilə bilmədi",
   "themeSwitch.refusedBody": "Onun kodu LordOS-un imzalı nüsxəsi ilə uyğun gəlmir, ona görə yüklənmədi. İş masası üslubunuz olduğu kimi qalır.",
-  "themeSwitch.failedBody": "Başlamadı. İş masası üslubunuz olduğu kimi qalır."
+  "themeSwitch.failedBody": "Başlamadı. İş masası üslubunuz olduğu kimi qalır.",
+  "guestApps.inMachine": "{machine} daxilində"
 }

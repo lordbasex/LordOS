@@ -3,7 +3,10 @@
 //   - the LordOS apps installed as a package (.lpk, see docs/NATIVE-APPS.md),
 //   - the installed Linux apps (.desktop files; they open as Wayland windows),
 //   - the installed web apps (lord.webapps, docs/WEBAPPS.md; kind 'web', id "web:<app>"): each one opens
-//     with its first profile, through lord.webapps.launch.
+//     with its first profile, through lord.webapps.launch,
+//   - the apps of a Machines guest that isn't running (kind 'machine', id "vmapp:<machine id>:<hash>", sdk/guestappsmodel.js;
+//     docs/VIRTUALIZATION.md 6.12): set by the Machines app in guestLauncherApps; choosing one starts that machine and
+//     opens the app in apps mode (the guest's own token, only once its fresh list holds it). Never pinned to the Dock.
 //
 //   const list = useLauncherApps();      // [{ id, name, Icon, kind, comment, categories }]
 //   launchApp(list[0].id);
@@ -25,6 +28,7 @@ import { listApps, wm, windows, appRegistry, getApp as registryApp, openAllowed 
 import { appsOff } from './appsoff.js';
 import { launchable } from './appsoffmodel.js';
 import { webApps, refreshWebApps, launchWebApp, webAppOfWindow } from './webapps.js';
+import { isGuestAppId } from './guestappsmodel.js';
 import { launcherItem, webAppOfKey, windowLabel, profileColor, profileHex, profileInitial, profileOf } from './webappsmodel.js';
 
 const DESKTOP = 'desktop:';
@@ -100,6 +104,27 @@ const webItems = (list) => list.map((e) => { const it = launcherItem(e); return 
 const linux = createStore([]);
 const flatpak = createStore([]);
 
+// A machine's guest apps before it runs (sdk/guestappsmodel.js guestLauncherItems), set by the Machines app:
+// [{ id: "vmapp:…", name, machine, kind: 'machine', launch() }]. The guest's names are untrusted text, already cleaned
+// there; they are shown as text only, under the machine's mark and name.
+export const guestLauncherApps = createStore([]);
+const guestIcons = new Map();
+function guestAppIcon(name) {
+  if (!guestIcons.has(name)) {
+    if (guestIcons.size > 512) guestIcons.clear();
+    guestIcons.set(name, ({ size = 32 }) => {
+      const Mark = registryApp('machines')?.Icon;
+      const m = Math.max(10, Math.round(size * 0.46));
+      return h(View, { style: { width: size, height: size } },
+        h(LetterIcon, { size, name }),
+        Mark ? h(View, { style: { position: 'absolute', [direction() === 'rtl' ? 'left' : 'right']: -Math.round(m * 0.15), bottom: -Math.round(m * 0.15), width: m, height: m } }, h(Mark, { size: m })) : null);
+    });
+  }
+  return guestIcons.get(name);
+}
+const guestItems = (list) => list.map((a) => ({ id: a.id, name: a.name, kind: 'machine', machine: a.machine,
+  comment: t('shell.guestApps.inMachine', { machine: a.machine }), categories: '', Icon: guestAppIcon(a.name) }));
+
 // The installed Flatpak apps (lord.apps.flatpak, from their exported .desktop files; never their Exec line).
 function readFlatpak() {
   if (typeof lord.apps === 'undefined' || typeof lord.apps.flatpak !== 'function') return [];
@@ -140,6 +165,7 @@ export function useLauncherApps({ all = false } = {}) {
   useStore(appRegistry);
   const web = useStore(webApps);
   useEffect(refreshWebApps, []);
+  useStore(guestLauncherApps);
   return launcherList(lin, fps, web, all);
 }
 
@@ -148,11 +174,11 @@ export function useLauncherApps({ all = false } = {}) {
 // apps installed. Kept: the inputs it was made from (stores' values, which change identity when they change).
 let made = { deps: null, every: [], views: new Map() };
 function launcherList(lin, fps, web, all) {
-  const deps = [lin, fps, web, appRegistry.get(), locale.get()];
+  const deps = [lin, fps, web, appRegistry.get(), locale.get(), guestLauncherApps.get()];
   if (!made.deps || deps.some((d, i) => d !== made.deps[i])) {
     const own = listApps().map((a) => ({ ...a, kind: a.package ? 'package' : 'lordos', name: appName(a) }));
     // "go-link Desk" among the G's (#64)
-    made = { deps, every: sortByName([...own, ...lin, ...fps, ...webItems(web)], (a) => a.name), views: new Map() };
+    made = { deps, every: sortByName([...own, ...lin, ...fps, ...webItems(web), ...guestItems(guestLauncherApps.get())], (a) => a.name), views: new Map() };
   }
   const off = appsOff();
   const key = `${all ? 1 : 0}\n${off.join('\n')}`;
@@ -180,6 +206,11 @@ export function appCategory(a) {
 }
 
 export function launchApp(id) {
+  // a machine's guest app: the Machines app starts the machine and opens it there
+  if (isGuestAppId(id)) {
+    const g = guestLauncherApps.get().find((a) => a.id === id);
+    try { return !!g && typeof g.launch === 'function' && g.launch() !== false; } catch (e) { return false; }
+  }
   const web = webAppOfKey(id);
   if (web) {
     // a web app: its first profile (the Dock's menu offers the others)

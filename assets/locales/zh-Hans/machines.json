@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "来自虚拟机的通知",
   "cfg.guestNotifyNote": "虚拟机的通知会带着它的名字显示在这里，一次最多几条。",
   "logs.unitOnly": "仅 {unit}",
-  "logs.guestZone": "客户机时区：{zone}"
+  "logs.guestZone": "客户机时区：{zone}",
+  "launcher.missing": "{app} 已不在 {machine} 中",
+  "launcher.missingBody": "机器不再列出该应用，因此没有打开任何内容。",
+  "launcher.timeout": "{app} 未能在 {machine} 中打开",
+  "launcher.timeoutBody": "应用模式未启动。它需要机器中的 LordOS 工具，以及工具能列出其应用的系统。",
+  "cfg.launcherApps": "在启动器中显示其应用",
+  "cfg.launcherAppsNote": "机器在应用模式中列出的应用（{count} 个）会在机器关闭时显示在启动器和搜索中，并标有机器名称。选择其中一个会启动机器并打开该应用。",
+  "shell.toTerminal": "在终端中打开",
+  "shell.inTerminal": "此 Shell 已在终端标签页中打开。",
+  "shell.showTerminal": "显示终端"
 }

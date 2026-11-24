@@ -1611,5 +1611,14 @@
   "cfg.guestNotify": "Meldingen uit de machine",
   "cfg.guestNotifyNote": "De meldingen van de machine verschijnen hier met haar naam, hooguit een paar tegelijk.",
   "logs.unitOnly": "Alleen {unit}",
-  "logs.guestZone": "Tijdzone van de gast: {zone}"
+  "logs.guestZone": "Tijdzone van de gast: {zone}",
+  "launcher.missing": "{app} staat niet meer in {machine}",
+  "launcher.missingBody": "De machine noemt die app niet meer, dus er is niets geopend.",
+  "launcher.timeout": "{app} is niet geopend in {machine}",
+  "launcher.timeoutBody": "De appmodus is niet gestart. Hij heeft de LordOS-hulpmiddelen van de machine nodig en een systeem waarvan ze de apps kunnen opsommen.",
+  "cfg.launcherApps": "Haar apps in de starter",
+  "cfg.launcherAppsNote": "De apps die de machine in de appmodus heeft opgesomd ({count}) staan in de starter en de zoekfunctie zolang ze uit staat, gemarkeerd met haar naam. Er een kiezen start de machine en opent de app.",
+  "shell.toTerminal": "Openen in Terminal",
+  "shell.inTerminal": "Deze shell is open in een Terminal-tabblad.",
+  "shell.showTerminal": "Terminal tonen"
 }

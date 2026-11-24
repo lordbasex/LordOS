@@ -363,9 +363,13 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Segmented small value={closeChoice(meta)} onChange={(x) => { writeMeta(dir, { onClose: x }); setMeta(readMeta(dir)); }}
           options={CLOSE_CHOICES.map((k) => [k, tr(`machines.cfg.close.${k}`)])} />
       </Row>
-      <Row label={tr('machines.cfg.keepAwake')} last note={tr('machines.cfg.keepAwakeNote')}>
+      <Row label={tr('machines.cfg.keepAwake')} last={!meta.guestApps?.length} note={tr('machines.cfg.keepAwakeNote')}>
         <Toggle on={meta.keepAwake !== false} onChange={(x) => { writeMeta(dir, { keepAwake: x }); setMeta(readMeta(dir)); }} />
       </Row>
+      {/* the guest's apps in the launcher while the machine is off (6.12, guestlaunch.js): once apps mode listed them */}
+      {meta.guestApps?.length ? <Row label={tr('machines.cfg.launcherApps')} last note={tr('machines.cfg.launcherAppsNote', { count: meta.guestApps.length })}>
+        <Toggle on={meta.launcherApps !== false} onChange={(x) => { writeMeta(dir, { launcherApps: x }); setMeta(readMeta(dir)); }} />
+      </Row> : null}
     </Group>
     {m.suspended ? <Group><Row label={tr('machines.cfg.saved')} value={bytes(m.stateBytes || 0)} last note={tr('machines.cfg.savedNote')} /></Group> : null}
   </>;
