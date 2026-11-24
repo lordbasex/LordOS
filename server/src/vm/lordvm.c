@@ -9085,7 +9085,7 @@ static int make_member(const char *gdir, const char *folder, const char *name, i
     m.graphics = VM_GFX_2D;
     m.n_ports = 0;
     m.n_shares = 0;
-    snprintf(m.base, sizeof m.base, "%s", base);
+    if (snprintf(m.base, sizeof m.base, "%s", base) >= (int)sizeof m.base) { snprintf(why, wn, "the base's path is too long"); return -1; }
     snprintf(m.group, sizeof m.group, "%s", gid);
     m.role = role;
     m.profile_lock = VM_LOCK_ANONYMITY;
@@ -9335,7 +9335,7 @@ static int cmd_group_fresh(const char *arg, int argc, char **argv) {
             goto out;
         }
         char disks[PATH_MAX + VMG_DIR_MAX + 16], nw[PATH_MAX + VMG_DIR_MAX + 48], sys[PATH_MAX + VMG_DIR_MAX + 48], err[256];
-        snprintf(disks, sizeof disks, "%s/disks", mdir[i]);
+        if (snprintf(disks, sizeof disks, "%s/disks", mdir[i]) >= (int)sizeof disks) goto out;
         snprintf(nw, sizeof nw, "%s/.system.qcow2.fresh", disks);
         snprintf(sys, sizeof sys, "%s/system.qcow2", disks);
         unlink(nw);
@@ -9348,8 +9348,7 @@ static int cmd_group_fresh(const char *arg, int argc, char **argv) {
         unlink_in(mdir[i], "suspend.state");
         unlink_in(disks, ".session-empty.qcow2");
         char logs[PATH_MAX + VMG_DIR_MAX + 16];
-        snprintf(logs, sizeof logs, "%s/log", mdir[i]);
-        DIR *d = opendir(logs);
+        DIR *d = snprintf(logs, sizeof logs, "%s/log", mdir[i]) < (int)sizeof logs ? opendir(logs) : NULL;
         if (d) {
             struct dirent *e;
             while ((e = readdir(d))) if (e->d_name[0] != '.') unlinkat(dirfd(d), e->d_name, 0);
