@@ -932,5 +932,19 @@
   "llm.noModel": "Dieses lokale Modell ist nicht installiert.",
   "sentinela.blockFailed": "Sein Netzwerk konnte nicht gesperrt werden.",
   "sentinela.machineGone": "Diese Maschine ist nicht mehr in „Maschinen“.",
-  "sentinela.machineFailed": "Die Maschine hat nicht geantwortet."
+  "sentinela.machineFailed": "Die Maschine hat nicht geantwortet.",
+  "llm.timeout": "Das lokale Modell hat zu lange für die Antwort gebraucht.",
+  "llm.failed": "Das lokale Modell konnte nicht antworten.",
+  "llm.answer": "Die Antwort des lokalen Modells konnte nicht gelesen werden.",
+  "llm.start": "Das lokale Modell konnte nicht starten.",
+  "sentinela.lumo.off": "Sentinela ist ausgeschaltet. Schalte es unter Einstellungen → KI → Sentinela ein.",
+  "sentinela.lumo.noEngine": "Die Engine für das lokale Modell ist nicht installiert.",
+  "sentinela.lumo.noModel": "Für Sentinela ist kein lokales Modell installiert.",
+  "sentinela.lumo.rejected": "Lumos Antwort hatte nicht die erwartete Form und wurde daher verworfen.",
+  "sentinela.blockRefused": "Die eigenen Programme von LordOS, ein Skript-Interpreter selbst und die Kernprogramme des Systems können nicht gesperrt werden.",
+  "sentinela.blockFull": "Die Sperrliste ist voll.",
+  "sentinela.notBlocked": "Dieses Programm steht nicht auf der Sperrliste.",
+  "sentinela.noAppNetwork": "Dieser Prozess hat keine eigene App, deren Netzwerk gesperrt werden kann.",
+  "sys.failed": "Etwas ist schiefgelaufen.",
+  "sys.unsupported": "Diese Version von LordOS kann das nicht."
 }

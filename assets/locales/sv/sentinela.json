@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Stäng av",
   "analysis.rule": "Visas alltid: den här varningen behöver ingen modell.",
   "settings.seesMachines": "För virtuella maskiner: namn, roll och tillstånd, varför de avslutades, och motorns siffror för CPU, minne och nätverk. Aldrig deras skärm, filer eller urklipp.",
-  "sandbox.unverified": "beviset på att motorn verkligen är maskinens egen"
+  "sandbox.unverified": "beviset på att motorn verkligen är maskinens egen",
+  "block.ended": "Blockerat program avslutat: {name}",
+  "block.endedBody": "Det finns på din blockeringslista. Se över listan i Inställningar → AI → Sentinela.",
+  "block.title": "Blockeringslista",
+  "block.hint": "De här programmen avslutas varje gång de startar på ditt konto, oavsett om Sentinela är på eller av. Lägg till ett från Monitor → Visa info → Undersök med Lumo; ta bort det för att låta det köras igen.",
+  "block.empty": "Inga blockerade program.",
+  "block.remove": "Ta bort",
+  "block.script": "{interp}-skript",
+  "block.binary": "Program",
+  "block.pkg": "och alla program i paketet {pkg}",
+  "block.added": "blockerat {date}"
 }

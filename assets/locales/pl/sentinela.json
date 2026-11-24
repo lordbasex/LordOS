@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Wyłącz",
   "analysis.rule": "Zawsze pokazywane: ten alert nie potrzebuje modelu.",
   "settings.seesMachines": "W maszynach wirtualnych: nazwę, rolę i stan, powód zakończenia oraz liczniki CPU, pamięci i sieci ich silnika. Nigdy ich ekranu, plików ani schowka.",
-  "sandbox.unverified": "dowód, że jej silnik jest naprawdę silnikiem tej maszyny"
+  "sandbox.unverified": "dowód, że jej silnik jest naprawdę silnikiem tej maszyny",
+  "block.ended": "Zakończono zablokowany program: {name}",
+  "block.endedBody": "Jest na twojej liście blokowania. Przejrzyj listę w Ustawienia → AI → Sentinela.",
+  "block.title": "Lista blokowania",
+  "block.hint": "Te programy są kończone za każdym razem, gdy uruchomią się na twoim koncie, niezależnie od tego, czy Sentinela jest włączona. Dodaj program z Monitor → Informacje → Zbadaj z Lumo; usuń go, aby znów mógł działać.",
+  "block.empty": "Brak zablokowanych programów.",
+  "block.remove": "Usuń",
+  "block.script": "Skrypt {interp}",
+  "block.binary": "Program",
+  "block.pkg": "oraz każdy program z pakietu {pkg}",
+  "block.added": "zablokowano {date}"
 }

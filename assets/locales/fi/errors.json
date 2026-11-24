@@ -932,5 +932,19 @@
   "llm.noModel": "Sitä paikallista mallia ei ole asennettu.",
   "sentinela.blockFailed": "Sen verkkoa ei voitu estää.",
   "sentinela.machineGone": "Konetta ei ole enää Koneet-sovelluksessa.",
-  "sentinela.machineFailed": "Kone ei vastannut."
+  "sentinela.machineFailed": "Kone ei vastannut.",
+  "llm.timeout": "Paikallinen malli vastasi liian hitaasti.",
+  "llm.failed": "Paikallinen malli ei pystynyt vastaamaan.",
+  "llm.answer": "Paikallisen mallin vastausta ei voitu lukea.",
+  "llm.start": "Paikallinen malli ei käynnistynyt.",
+  "sentinela.lumo.off": "Sentinela on pois päältä. Ota se käyttöön kohdassa Asetukset → Tekoäly → Sentinela.",
+  "sentinela.lumo.noEngine": "Paikallisen mallin moottoria ei ole asennettu.",
+  "sentinela.lumo.noModel": "Sentinelalle ei ole asennettu paikallista mallia.",
+  "sentinela.lumo.rejected": "Lumon vastaus ei ollut odotetussa muodossa, joten se hylättiin.",
+  "sentinela.blockRefused": "LordOSin omia ohjelmia, itse skriptitulkkia tai järjestelmän perusohjelmia ei voi estää.",
+  "sentinela.blockFull": "Estolista on täynnä.",
+  "sentinela.notBlocked": "Ohjelma ei ole estolistalla.",
+  "sentinela.noAppNetwork": "Tällä prosessilla ei ole omaa sovellusta, jonka verkon voisi estää.",
+  "sys.failed": "Jokin meni vikaan.",
+  "sys.unsupported": "Tämä LordOS-versio ei osaa tehdä sitä."
 }

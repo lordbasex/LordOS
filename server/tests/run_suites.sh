@@ -521,6 +521,10 @@ EOF
     if have node; then run "battery-policy-test (sdk/batterypolicy.js)" node tests/battery_policy_test.mjs; else skip "battery-policy-test" node; fi
     if have node; then run "sentinela-model-test (sdk/sentinelamodel.js, sdk/llmcatalog.js)" node tests/sentinela_model_test.mjs; else skip "sentinela-model-test" node; fi
     if have node; then run "sentinela-vm-test (sdk/sentinelavm.js: the machine rules)" node tests/sentinela_vm_test.mjs; else skip "sentinela-vm-test" node; fi
+    # (0.8.9.6) Investigate with Lumo: the facts, the strict answer, the evidence, a translation fenced as data
+    if have node; then run "sentinela-investigate-test (sdk/sentinelamodel.js: Investigate and Translate with Lumo)" node --no-warnings tests/sentinela_investigate_test.mjs; else skip "sentinela-investigate-test" node; fi
+    # (0.8.9.6) Get Info's description: the sources' order, the language and the fallback to English
+    if have node; then run "describe-model-test (sdk/describemodel.js)" node --no-warnings tests/describe_model_test.mjs; else skip "describe-model-test" node; fi
     if have node; then run "avatar-model-test (apps/settings/avatarmodel.js)" node tests/avatar_model_test.mjs; else skip "avatar-model-test" node; fi
     if have node; then run "weather-model-test (sdk/weathermodel.js)" node tests/weather_model_test.mjs; else skip "weather-model-test" node; fi
     if have node; then run "vpn-model-test (sdk/vpnmodel.js)" node tests/vpn_model_test.mjs; else skip "vpn-model-test" node; fi

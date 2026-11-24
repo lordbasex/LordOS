@@ -932,5 +932,19 @@
   "llm.noModel": "Modeli hiyo ya ndani haijasakinishwa.",
   "sentinela.blockFailed": "Mtandao wake haukuweza kuzuiwa.",
   "sentinela.machineGone": "Mashine hiyo haimo tena katika Mashine.",
-  "sentinela.machineFailed": "Mashine haikujibu."
+  "sentinela.machineFailed": "Mashine haikujibu.",
+  "llm.timeout": "Modeli ya ndani ilichukua muda mrefu mno kujibu.",
+  "llm.failed": "Modeli ya ndani haikuweza kujibu.",
+  "llm.answer": "Jibu la modeli ya ndani halikuweza kusomwa.",
+  "llm.start": "Modeli ya ndani haikuweza kuanza.",
+  "sentinela.lumo.off": "Sentinela imezimwa. Iwashe kwenye Mipangilio → AI → Sentinela.",
+  "sentinela.lumo.noEngine": "Injini ya modeli ya ndani haijasakinishwa.",
+  "sentinela.lumo.noModel": "Hakuna modeli ya ndani iliyosakinishwa kwa ajili ya Sentinela.",
+  "sentinela.lumo.rejected": "Jibu la Lumo halikuwa katika umbo lililotarajiwa, kwa hivyo limewekwa kando.",
+  "sentinela.blockRefused": "Programu za LordOS zenyewe, kifasiri cha skripti chenyewe na programu za msingi za mfumo haziwezi kuzuiwa.",
+  "sentinela.blockFull": "Orodha ya kuzuia imejaa.",
+  "sentinela.notBlocked": "Programu hiyo haiko kwenye orodha ya kuzuia.",
+  "sentinela.noAppNetwork": "Mchakato huu hauna programu yake yenyewe ambayo mtandao wake unaweza kuzuiwa.",
+  "sys.failed": "Hitilafu fulani imetokea.",
+  "sys.unsupported": "Toleo hili la LordOS haliwezi kufanya hivyo."
 }

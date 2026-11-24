@@ -932,5 +932,19 @@
   "llm.noModel": "O yerel model kurulu değil.",
   "sentinela.blockFailed": "Ağı engellenemedi.",
   "sentinela.machineGone": "O makine artık Sanal Makineler’de yok.",
-  "sentinela.machineFailed": "Makine yanıt vermedi."
+  "sentinela.machineFailed": "Makine yanıt vermedi.",
+  "llm.timeout": "Yerel modelin yanıt vermesi çok uzun sürdü.",
+  "llm.failed": "Yerel model yanıt veremedi.",
+  "llm.answer": "Yerel modelin yanıtı okunamadı.",
+  "llm.start": "Yerel model başlatılamadı.",
+  "sentinela.lumo.off": "Sentinela kapalı. Ayarlar → Yapay Zekâ → Sentinela’dan açın.",
+  "sentinela.lumo.noEngine": "Yerel model motoru yüklü değil.",
+  "sentinela.lumo.noModel": "Sentinela için yüklü yerel model yok.",
+  "sentinela.lumo.rejected": "Lumo’nun yanıtı beklenen biçimde değildi, bu yüzden bir kenara bırakıldı.",
+  "sentinela.blockRefused": "LordOS’un kendi programları, bir betik yorumlayıcısının kendisi ve sistemin temel programları engellenemez.",
+  "sentinela.blockFull": "Engel listesi dolu.",
+  "sentinela.notBlocked": "Bu program engel listesinde değil.",
+  "sentinela.noAppNetwork": "Bu işlemin, ağı engellenebilecek kendine ait bir uygulaması yok.",
+  "sys.failed": "Bir şeyler ters gitti.",
+  "sys.unsupported": "LordOS’un bu sürümü bunu yapamaz."
 }

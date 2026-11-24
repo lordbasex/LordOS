@@ -53,12 +53,13 @@ export function DescriptionPanel({ p, d, own }) {
   const [done, setDone] = useState(null);             // { action, ok, error }
   const [confirm, setConfirm] = useState(false);
   const exe = exePath(p?.exe);
-  const pkg = exe ? monitor.ownerOf(exe) || null : null;
-  useEffect(() => { if (exe) monitor.askOwners([exe]); }, [exe]);
+  const owner = exe ? monitor.ownerOf(exe) : null;           // undefined while lord-server looks it up
+  const pkg = owner || null;
+  useEffect(() => { if (exe && owner === undefined) monitor.askOwners([exe]); }, [exe, tick]);
   const desc = p ? describeProgram({ ...p, pkg, unit: unitOf(d) }, { lang, apps }) : { unknown: true };
   // lord-server reads in its worker thread: asked again a moment later, a few times
   useEffect(() => {
-    if (!desc.pending && pkg !== undefined) return undefined;
+    if (!desc.pending && !desc.more && owner !== undefined) return undefined;
     if (tick > 40) return undefined;
     const id = setTimeout(() => setTick((n) => n + 1), 250);
     return () => clearTimeout(id);

@@ -931,5 +931,19 @@
   "llm.noModel": "ยังไม่ได้ติดตั้งโมเดลในเครื่องนั้น",
   "sentinela.blockFailed": "ไม่สามารถบล็อกเครือข่ายของมันได้",
   "sentinela.machineGone": "เครื่องนั้นไม่อยู่ใน “เครื่องเสมือน” แล้ว",
-  "sentinela.machineFailed": "เครื่องไม่ตอบสนอง"
+  "sentinela.machineFailed": "เครื่องไม่ตอบสนอง",
+  "llm.timeout": "โมเดลในเครื่องใช้เวลาตอบนานเกินไป",
+  "llm.failed": "โมเดลในเครื่องตอบไม่ได้",
+  "llm.answer": "อ่านคำตอบของโมเดลในเครื่องไม่ได้",
+  "llm.start": "เริ่มโมเดลในเครื่องไม่ได้",
+  "sentinela.lumo.off": "Sentinela ปิดอยู่ เปิดได้ใน การตั้งค่า → AI → Sentinela",
+  "sentinela.lumo.noEngine": "ยังไม่ได้ติดตั้งเอนจินของโมเดลในเครื่อง",
+  "sentinela.lumo.noModel": "ยังไม่ได้ติดตั้งโมเดลในเครื่องสำหรับ Sentinela",
+  "sentinela.lumo.rejected": "คำตอบของ Lumo ไม่อยู่ในรูปแบบที่คาดไว้ จึงถูกพักไว้",
+  "sentinela.blockRefused": "ไม่สามารถบล็อกโปรแกรมของ LordOS เอง ตัวแปลสคริปต์เอง หรือโปรแกรมหลักของระบบได้",
+  "sentinela.blockFull": "รายการบล็อกเต็มแล้ว",
+  "sentinela.notBlocked": "โปรแกรมนั้นไม่อยู่ในรายการบล็อก",
+  "sentinela.noAppNetwork": "โปรเซสนี้ไม่มีแอปของตัวเองที่สามารถบล็อกเครือข่ายได้",
+  "sys.failed": "เกิดข้อผิดพลาดบางอย่าง",
+  "sys.unsupported": "LordOS เวอร์ชันนี้ทำสิ่งนั้นไม่ได้"
 }

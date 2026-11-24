@@ -932,5 +932,19 @@
   "llm.noModel": "Ez a helyi modell nincs telepítve.",
   "sentinela.blockFailed": "A hálózatát nem sikerült letiltani.",
   "sentinela.machineGone": "Ez a gép már nincs a Gépek alkalmazásban.",
-  "sentinela.machineFailed": "A gép nem válaszolt."
+  "sentinela.machineFailed": "A gép nem válaszolt.",
+  "llm.timeout": "A helyi modell túl sokáig nem válaszolt.",
+  "llm.failed": "A helyi modell nem tudott válaszolni.",
+  "llm.answer": "A helyi modell válaszát nem sikerült beolvasni.",
+  "llm.start": "A helyi modell nem tudott elindulni.",
+  "sentinela.lumo.off": "A Sentinela ki van kapcsolva. Kapcsold be itt: Beállítások → MI → Sentinela.",
+  "sentinela.lumo.noEngine": "A helyi modell motorja nincs telepítve.",
+  "sentinela.lumo.noModel": "Nincs helyi modell telepítve a Sentinelához.",
+  "sentinela.lumo.rejected": "Lumo válasza nem a várt formában érkezett, ezért félretettük.",
+  "sentinela.blockRefused": "A LordOS saját programjai, maga a szkriptértelmező és a rendszer alapvető programjai nem tilthatók le.",
+  "sentinela.blockFull": "A tiltólista megtelt.",
+  "sentinela.notBlocked": "Ez a program nincs a tiltólistán.",
+  "sentinela.noAppNetwork": "Ennek a folyamatnak nincs saját alkalmazása, amelynek a hálózatát le lehetne tiltani.",
+  "sys.failed": "Valami hiba történt.",
+  "sys.unsupported": "A LordOS ezen verziója erre nem képes."
 }

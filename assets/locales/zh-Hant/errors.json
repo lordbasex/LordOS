@@ -931,5 +931,19 @@
   "llm.noModel": "未安裝該本機模型。",
   "sentinela.blockFailed": "無法封鎖其網路。",
   "sentinela.machineGone": "該虛擬機器已不在「虛擬機器」中。",
-  "sentinela.machineFailed": "虛擬機器沒有回應。"
+  "sentinela.machineFailed": "虛擬機器沒有回應。",
+  "llm.timeout": "本機模型回答的時間太長。",
+  "llm.failed": "本機模型無法回答。",
+  "llm.answer": "無法讀取本機模型的回答。",
+  "llm.start": "本機模型無法啟動。",
+  "sentinela.lumo.off": "Sentinela 已關閉。請在 設定 → AI → Sentinela 中開啟。",
+  "sentinela.lumo.noEngine": "尚未安裝本機模型引擎。",
+  "sentinela.lumo.noModel": "沒有為 Sentinela 安裝本機模型。",
+  "sentinela.lumo.rejected": "Lumo 的回答格式不符預期，已被擱置。",
+  "sentinela.blockRefused": "LordOS 自己的程式、指令碼直譯器本身以及系統的核心程式都無法封鎖。",
+  "sentinela.blockFull": "封鎖清單已滿。",
+  "sentinela.notBlocked": "該程式不在封鎖清單中。",
+  "sentinela.noAppNetwork": "這個處理程序沒有可以封鎖網路的獨立應用程式。",
+  "sys.failed": "發生了一些問題。",
+  "sys.unsupported": "此版本的 LordOS 無法做到這件事。"
 }

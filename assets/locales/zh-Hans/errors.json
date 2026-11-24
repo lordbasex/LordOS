@@ -931,5 +931,19 @@
   "llm.noModel": "未安装该本地模型。",
   "sentinela.blockFailed": "无法阻止其联网。",
   "sentinela.machineGone": "该虚拟机已不在“虚拟机”中。",
-  "sentinela.machineFailed": "虚拟机没有响应。"
+  "sentinela.machineFailed": "虚拟机没有响应。",
+  "llm.timeout": "本地模型回答时间太长。",
+  "llm.failed": "本地模型无法回答。",
+  "llm.answer": "无法读取本地模型的回答。",
+  "llm.start": "本地模型无法启动。",
+  "sentinela.lumo.off": "Sentinela 已关闭。请在 设置 → AI → Sentinela 中打开它。",
+  "sentinela.lumo.noEngine": "未安装本地模型引擎。",
+  "sentinela.lumo.noModel": "没有为 Sentinela 安装本地模型。",
+  "sentinela.lumo.rejected": "Lumo 的回答格式不符合要求，已被搁置。",
+  "sentinela.blockRefused": "LordOS 自己的程序、脚本解释器本身以及系统的核心程序都不能被拦截。",
+  "sentinela.blockFull": "拦截列表已满。",
+  "sentinela.notBlocked": "该程序不在拦截列表中。",
+  "sentinela.noAppNetwork": "这个进程没有可以阻止联网的独立应用。",
+  "sys.failed": "出了点问题。",
+  "sys.unsupported": "此版本的 LordOS 无法做到这一点。"
 }

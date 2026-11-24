@@ -932,5 +932,19 @@
   "llm.noModel": "Hindi naka-install ang lokal na modelong iyon.",
   "sentinela.blockFailed": "Hindi ma-block ang network nito.",
   "sentinela.machineGone": "Wala na ang makinang iyon sa Mga Makina.",
-  "sentinela.machineFailed": "Hindi sumagot ang makina."
+  "sentinela.machineFailed": "Hindi sumagot ang makina.",
+  "llm.timeout": "Masyadong natagalan ang lokal na modelo sa pagsagot.",
+  "llm.failed": "Hindi nakasagot ang lokal na modelo.",
+  "llm.answer": "Hindi mabasa ang sagot ng lokal na modelo.",
+  "llm.start": "Hindi makapagsimula ang lokal na modelo.",
+  "sentinela.lumo.off": "Naka-off ang Sentinela. I-on ito sa Mga Setting → AI → Sentinela.",
+  "sentinela.lumo.noEngine": "Hindi naka-install ang engine ng lokal na modelo.",
+  "sentinela.lumo.noModel": "Walang naka-install na lokal na modelo para sa Sentinela.",
+  "sentinela.lumo.rejected": "Wala sa inaasahang anyo ang sagot ni Lumo, kaya isinantabi ito.",
+  "sentinela.blockRefused": "Hindi maaaring i-block ang sariling mga program ng LordOS, ang script interpreter mismo, at ang mga pangunahing program ng system.",
+  "sentinela.blockFull": "Puno na ang blocklist.",
+  "sentinela.notBlocked": "Wala sa blocklist ang program na iyon.",
+  "sentinela.noAppNetwork": "Walang sariling app ang prosesong ito na maaaring i-block ang network.",
+  "sys.failed": "May nangyaring mali.",
+  "sys.unsupported": "Hindi iyan kaya ng bersyong ito ng LordOS."
 }

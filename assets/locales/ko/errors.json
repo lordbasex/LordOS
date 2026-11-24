@@ -931,5 +931,19 @@
   "llm.noModel": "그 로컬 모델은 설치되어 있지 않습니다.",
   "sentinela.blockFailed": "네트워크를 차단하지 못했습니다.",
   "sentinela.machineGone": "그 머신은 더 이상 가상 머신 앱에 없습니다.",
-  "sentinela.machineFailed": "머신이 응답하지 않았습니다."
+  "sentinela.machineFailed": "머신이 응답하지 않았습니다.",
+  "llm.timeout": "로컬 모델이 응답하는 데 너무 오래 걸렸습니다.",
+  "llm.failed": "로컬 모델이 응답하지 못했습니다.",
+  "llm.answer": "로컬 모델의 응답을 읽을 수 없습니다.",
+  "llm.start": "로컬 모델을 시작할 수 없습니다.",
+  "sentinela.lumo.off": "Sentinela가 꺼져 있습니다. 설정 → AI → Sentinela에서 켜세요.",
+  "sentinela.lumo.noEngine": "로컬 모델 엔진이 설치되어 있지 않습니다.",
+  "sentinela.lumo.noModel": "Sentinela용 로컬 모델이 설치되어 있지 않습니다.",
+  "sentinela.lumo.rejected": "Lumo의 응답이 예상한 형식이 아니어서 사용하지 않았습니다.",
+  "sentinela.blockRefused": "LordOS 자체 프로그램, 스크립트 인터프리터 자체, 시스템의 핵심 프로그램은 차단할 수 없습니다.",
+  "sentinela.blockFull": "차단 목록이 가득 찼습니다.",
+  "sentinela.notBlocked": "그 프로그램은 차단 목록에 없습니다.",
+  "sentinela.noAppNetwork": "이 프로세스에는 네트워크를 차단할 수 있는 자체 앱이 없습니다.",
+  "sys.failed": "문제가 발생했습니다.",
+  "sys.unsupported": "이 버전의 LordOS에서는 할 수 없습니다."
 }

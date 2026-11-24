@@ -932,5 +932,19 @@
   "llm.noModel": "Ce modèle local n’est pas installé.",
   "sentinela.blockFailed": "Son réseau n’a pas pu être bloqué.",
   "sentinela.machineGone": "Cette machine n’est plus dans Machines.",
-  "sentinela.machineFailed": "La machine n’a pas répondu."
+  "sentinela.machineFailed": "La machine n’a pas répondu.",
+  "llm.timeout": "Le modèle local a mis trop de temps à répondre.",
+  "llm.failed": "Le modèle local n’a pas pu répondre.",
+  "llm.answer": "Impossible de lire la réponse du modèle local.",
+  "llm.start": "Le modèle local n’a pas pu démarrer.",
+  "sentinela.lumo.off": "Sentinela est désactivé. Activez-le dans Réglages → IA → Sentinela.",
+  "sentinela.lumo.noEngine": "Le moteur du modèle local n’est pas installé.",
+  "sentinela.lumo.noModel": "Aucun modèle local n’est installé pour Sentinela.",
+  "sentinela.lumo.rejected": "La réponse de Lumo n’avait pas la forme attendue ; elle a donc été écartée.",
+  "sentinela.blockRefused": "Les programmes de LordOS lui-même, un interpréteur de scripts en tant que tel et les programmes essentiels du système ne peuvent pas être bloqués.",
+  "sentinela.blockFull": "La liste de blocage est pleine.",
+  "sentinela.notBlocked": "Ce programme n’est pas dans la liste de blocage.",
+  "sentinela.noAppNetwork": "Ce processus n’a pas d’app à lui dont on pourrait bloquer le réseau.",
+  "sys.failed": "Un problème est survenu.",
+  "sys.unsupported": "Cette version de LordOS ne peut pas faire cela."
 }

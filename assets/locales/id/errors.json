@@ -931,5 +931,19 @@
   "llm.noModel": "Model lokal itu belum terpasang.",
   "sentinela.blockFailed": "Jaringannya tidak dapat diblokir.",
   "sentinela.machineGone": "Mesin itu sudah tidak ada di Mesin Virtual.",
-  "sentinela.machineFailed": "Mesin tidak menjawab."
+  "sentinela.machineFailed": "Mesin tidak menjawab.",
+  "llm.timeout": "Model lokal terlalu lama menjawab.",
+  "llm.failed": "Model lokal tidak dapat menjawab.",
+  "llm.answer": "Jawaban model lokal tidak dapat dibaca.",
+  "llm.start": "Model lokal tidak dapat dijalankan.",
+  "sentinela.lumo.off": "Sentinela nonaktif. Aktifkan di Pengaturan → AI → Sentinela.",
+  "sentinela.lumo.noEngine": "Mesin model lokal belum terpasang.",
+  "sentinela.lumo.noModel": "Belum ada model lokal yang terpasang untuk Sentinela.",
+  "sentinela.lumo.rejected": "Jawaban Lumo tidak dalam bentuk yang diharapkan, jadi disisihkan.",
+  "sentinela.blockRefused": "Program milik LordOS sendiri, interpreter skrip itu sendiri, dan program inti sistem tidak dapat diblokir.",
+  "sentinela.blockFull": "Daftar blokir sudah penuh.",
+  "sentinela.notBlocked": "Program itu tidak ada di daftar blokir.",
+  "sentinela.noAppNetwork": "Proses ini tidak memiliki aplikasi sendiri yang jaringannya bisa diblokir.",
+  "sys.failed": "Terjadi kesalahan.",
+  "sys.unsupported": "Versi LordOS ini tidak dapat melakukannya."
 }
