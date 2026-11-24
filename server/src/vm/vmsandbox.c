@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/auxv.h>
 #include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
@@ -33,6 +34,15 @@
 #define VM_AUDIT_ARCH AUDIT_ARCH_AARCH64
 #else
 #define VM_AUDIT_ARCH 0
+#endif
+
+/* the dynamic loader QEMU's binary names (PT_INTERP) */
+#if defined(__x86_64__)
+#define VM_LOADER "/lib64/ld-linux-x86-64.so.2"
+#elif defined(__aarch64__)
+#define VM_LOADER "/lib/ld-linux-aarch64.so.1"
+#else
+#define VM_LOADER ""
 #endif
 
 int vm_landlock_abi(void) {
@@ -200,6 +210,15 @@ static int vgpu_rules(int rs, const char *sysdev, int group, uint64_t h) {
     return 0;
 }
 
+/* arm64 with BTI: glibc's loader marks libraries' code PROT_BTI with mprotect */
+static int vm_cpu_bti(void) {
+#if defined(__aarch64__)
+    return !!(getauxval(AT_HWCAP2) & (1UL << 17));     /* HWCAP2_BTI */
+#else
+    return 0;
+#endif
+}
+
 int vm_jail_qemu(const VmQemuJail *j) {
     int mask = 0;
     struct rlimit no = { 0, 0 };
@@ -223,7 +242,13 @@ int vm_jail_qemu(const VmQemuJail *j) {
             uint64_t rx = ro | LANDLOCK_ACCESS_FS_EXECUTE;
             uint64_t rw = ro | LANDLOCK_ACCESS_FS_WRITE_FILE | LANDLOCK_ACCESS_FS_TRUNCATE;
             /* its own /proc/<pid>, through the link */
-            int ok = !rule(rs, "/usr", rx, h) && !rule(rs, j->disks_dir, rw, h) && !rule(rs, "/proc/self", ro, h);
+            /* /usr read only; execute only QEMU's binary and the loader it names (the exec opens both for execution;
+             * libraries and Mesa's drivers are mapped, which needs no execute right). In QEMU's mount namespace the
+             * loader's path is the private copy, mounted before this */
+            char ldreal[PATH_MAX];
+            int ok = j->exec_path && j->exec_path[0] == '/' && VM_LOADER[0] && realpath(VM_LOADER, ldreal) &&
+                     !rule(rs, "/usr", ro, h) && !rule(rs, j->exec_path, rx, h) && !rule(rs, ldreal, rx, h) &&
+                     !rule(rs, j->disks_dir, rw, h) && !rule(rs, "/proc/self", ro, h);
             rule(rs, "/etc/ld.so.cache", LANDLOCK_ACCESS_FS_READ_FILE, h);
             rule(rs, "/dev/null", LANDLOCK_ACCESS_FS_READ_FILE | LANDLOCK_ACCESS_FS_WRITE_FILE, h);
             if (j->kvm) {
@@ -257,7 +282,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
     if (VM_AUDIT_ARCH) {
         static struct sock_filter filt[BPF_MAXINSNS];
         VmScOpts o = { .kvm = j->kvm, .tcg = j->tcg, .render = j->render && j->render[0], .vgpu = j->vgpu_dev && j->vgpu_dev[0],
-                       .tap = j->tap, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn,
+                       .tap = j->tap, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn, .bti = vm_cpu_bti(),
                        .drop = j->sc_drop };
         for (int pass = 0; pass < 2 && !(mask & VMS_SECCOMP_OURS); pass++) {
             if (pass && (!o.notify || o.learn)) break;
@@ -422,14 +447,6 @@ int vm_ns_enter(int userns) {
     return 1;
 }
 
-/* the dynamic loader QEMU's binary names (PT_INTERP) */
-#if defined(__x86_64__)
-#define VM_LOADER "/lib64/ld-linux-x86-64.so.2"
-#elif defined(__aarch64__)
-#define VM_LOADER "/lib/ld-linux-aarch64.so.1"
-#else
-#define VM_LOADER ""
-#endif
 
 /* the copy holds exactly the loader's bytes */
 static int same_bytes(int a, int b, off_t size) {

@@ -73,17 +73,18 @@ static int build(const VmScOpts *o) {
     return progn;
 }
 
-static uint32_t verdict(int nr, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a4) {
+static uint32_t verdict6(int nr, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4) {
     struct seccomp_data d;
     memset(&d, 0, sizeof d);
     d.nr = nr;
     d.arch = tab->arch;
-    d.args[0] = a0; d.args[1] = a1; d.args[2] = a2; d.args[4] = a4;
+    d.args[0] = a0; d.args[1] = a1; d.args[2] = a2; d.args[3] = a3; d.args[4] = a4;
     int bad = 0;
     uint32_t r = run(prog, progn, &d, &bad);
     CHECK(!bad, "%s: the program ran off its end or used an unknown instruction (call %d)", tab->name, nr);
     return r;
 }
+static uint32_t verdict(int nr, uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a4) { return verdict6(nr, a0, a1, a2, 0, a4); }
 
 static const VmScRow *row(const char *name) {
     for (int i = 0; i < tab->n; i++) if (!strcmp(tab->rows[i].name, name)) return &tab->rows[i];
@@ -135,9 +136,9 @@ static void program_checks(void) {
     const pid_t self = 4242;
     int maxlen = 0;
     /* every combination of the machine's options, with and without a listener */
-    for (int bits = 0; bits < 64; bits++) {
+    for (int bits = 0; bits < 128; bits++) {
         VmScOpts o = { .kvm = bits & 1, .tcg = !!(bits & 2), .render = !!(bits & 4), .vgpu = !!(bits & 8),
-                       .tap = !!(bits & 16), .notify = !!(bits & 32), .self = self, .exec_fd = 9, .learn = 0 };
+                       .tap = !!(bits & 16), .notify = !!(bits & 32), .bti = !!(bits & 64), .self = self, .exec_fd = 9, .learn = 0 };
         int n = build(&o);
         CHECK(n > 0 && n <= BPF_MAXINSNS, "%s: options %d: the program has %d instructions", tab->name, bits, n);
         if (n <= 0 || n > BPF_MAXINSNS) continue;
@@ -192,12 +193,27 @@ static void program_checks(void) {
         CHECK(verdict(cl, thr | 0x00001000, 0, 0, 0) == ERRNO(EPERM), "%s: CLONE_PIDFD", tab->name);
         CHECK(verdict(cl, thr & ~(uint64_t)CLONE_THREAD, 0, 0, 0) == ERRNO(EPERM), "%s: a process sharing memory", tab->name);
         if (nr_of("clone3") >= 0) CHECK(verdict(nr_of("clone3"), 0, 0, 0, 0) == ERRNO(ENOSYS), "%s: clone3 isn't ENOSYS", tab->name);
-        /* memory both writable and executable: TCG only */
-        int mm = nr_of("mmap"), mp = nr_of("mprotect");
-        CHECK(verdict(mm, 0, 4096, PROT_READ | PROT_EXEC, 0) == ALLOW, "%s: mmap r-x refused", tab->name);
-        CHECK(verdict(mm, 0, 4096, PROT_READ | PROT_WRITE, 0) == ALLOW, "%s: mmap rw- refused", tab->name);
-        CHECK(verdict(mm, 0, 4096, PROT_READ | PROT_WRITE | PROT_EXEC, 0) == (o.tcg ? ALLOW : deflt), "%s: mmap rwx with tcg=%d", tab->name, o.tcg);
-        CHECK(verdict(mp, 0, 4096, PROT_WRITE | PROT_EXEC, 0) == (o.tcg ? ALLOW : deflt), "%s: mprotect -wx with tcg=%d", tab->name, o.tcg);
+        /* executable memory without TCG: only a private, read-only mapping of a file (the loader's) */
+        int mm = nr_of("mmap"), mp = nr_of("mprotect"), mf = nr_of("memfd_create");
+        uint32_t wx = o.tcg ? ALLOW : deflt;
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE, 5) == ALLOW, "%s: a library's r-x mapping refused", tab->name);
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_EXEC | 0x10, MAP_PRIVATE | MAP_DENYWRITE, 5) == ALLOW, "%s: an r-x BTI mapping refused", tab->name);
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, 5) == ALLOW, "%s: a shared rw- mapping refused", tab->name);
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, (uint32_t)-1) == ALLOW, "%s: anonymous rw- refused", tab->name);
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, (uint32_t)-1) == wx, "%s: anonymous rwx with tcg=%d", tab->name, o.tcg);
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, (uint32_t)-1) == wx, "%s: anonymous r-x with tcg=%d", tab->name, o.tcg);
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_EXEC, MAP_SHARED, 5) == wx, "%s: a shared r-x mapping with tcg=%d", tab->name, o.tcg);
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_EXEC, 0x03 /* MAP_SHARED_VALIDATE */, 5) == wx, "%s: MAP_SHARED_VALIDATE r-x", tab->name);
+        CHECK(verdict6(mm, 0, 4096, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, 5) == wx, "%s: a file's rwx mapping with tcg=%d", tab->name, o.tcg);
+        CHECK(verdict(mp, 0, 4096, PROT_READ, 0) == ALLOW, "%s: mprotect r-- refused", tab->name);
+        CHECK(verdict(mp, 0, 4096, PROT_READ | PROT_WRITE, 0) == ALLOW, "%s: mprotect rw- refused", tab->name);
+        CHECK(verdict(mp, 0, 4096, PROT_READ | PROT_EXEC, 0) == wx, "%s: mprotect r-x with tcg=%d", tab->name, o.tcg);
+        CHECK(verdict(mp, 0, 4096, PROT_WRITE | PROT_EXEC, 0) == wx, "%s: mprotect -wx with tcg=%d", tab->name, o.tcg);
+        CHECK(verdict(mp, 0, 4096, PROT_READ | PROT_EXEC | 0x10, 0) == (o.tcg || o.bti ? ALLOW : deflt), "%s: mprotect r-x BTI with bti=%d", tab->name, o.bti);
+        CHECK(verdict(mp, 0, 4096, PROT_READ | PROT_WRITE | PROT_EXEC | 0x10, 0) == wx, "%s: mprotect rwx BTI", tab->name);
+        CHECK(verdict(mf, 0, 0x3, 0, 0) == ALLOW, "%s: QEMU's memfd refused", tab->name);
+        CHECK(verdict(mf, 0, 0x3 | 0x0008, 0, 0) == ALLOW, "%s: a memfd with MFD_NOEXEC_SEAL refused", tab->name);
+        CHECK(verdict(mf, 0, 0x3 | 0x0010, 0, 0) == deflt, "%s: a memfd with MFD_EXEC allowed", tab->name);
         /* pids */
         int pl = nr_of("prlimit64"), tk = nr_of("tgkill");
         CHECK(!row("kill"), "%s: kill is a row (QEMU signals its threads with tgkill only)", tab->name);
@@ -224,9 +240,10 @@ static void program_checks(void) {
         CHECK(verdict(nr_of("socketpair"), AF_UNIX, SOCK_STREAM, 0, 0) == ALLOW, "%s: an AF_UNIX socketpair refused", tab->name);
         CHECK(verdict(nr_of("socketpair"), AF_INET, SOCK_STREAM, 0, 0) == ERRNO(EACCES), "%s: an AF_INET socketpair", tab->name);
         CHECK(verdict(nr_of("socket"), AF_UNIX, SOCK_STREAM, 0, 0) == ERRNO(EACCES), "%s: socket allowed", tab->name);
-        /* execveat: lord-vm's descriptor and AT_EMPTY_PATH only */
+        /* execveat: with a listener always lord-vm's call (vm_sc_exec_once lets one through); without, lord-vm's
+         * descriptor number and AT_EMPTY_PATH only */
         int ex = nr_of("execveat");
-        CHECK(verdict(ex, 9, 0, 0, AT_EMPTY_PATH) == ALLOW, "%s: the exec of QEMU refused", tab->name);
+        CHECK(verdict(ex, 9, 0, 0, AT_EMPTY_PATH) == (o.notify ? NOTIF : ALLOW), "%s: the exec of QEMU with notify=%d", tab->name, o.notify);
         CHECK(verdict(ex, 10, 0, 0, AT_EMPTY_PATH) == deflt, "%s: execveat of another descriptor", tab->name);
         CHECK(verdict(ex, 9, 0, 0, 0) == deflt, "%s: execveat of a path under the descriptor", tab->name);
         CHECK(verdict(ex, (uint64_t)AT_FDCWD, 0, 0, AT_EMPTY_PATH) == deflt, "%s: execveat AT_FDCWD", tab->name);
@@ -271,6 +288,21 @@ int main(void) {
         const char *k = vm_sc_name(native.rows[i].nr);
         CHECK(k && !strcmp(k, native.rows[i].name), "%s: row %s is call %d, which the kernel calls %s", native.name,
               native.rows[i].name, native.rows[i].nr, k ? k : "(nothing)");
+    }
+    /* the one exec lord-vm lets through: the first execveat of the child, nothing after it, nothing from elsewhere */
+    {
+        struct seccomp_notif r;
+        memset(&r, 0, sizeof r);
+        int done = 0;
+        r.pid = 77; r.data.nr = SYS_openat;
+        CHECK(!vm_sc_exec_once(&r, 77, &done) && !done, "exec once: another call let through");
+        r.data.nr = SYS_execveat; r.pid = 78;
+        CHECK(!vm_sc_exec_once(&r, 77, &done) && !done, "exec once: another process's exec let through");
+        r.pid = 77;
+        CHECK(vm_sc_exec_once(&r, 77, &done) && done, "exec once: the start's own exec refused");
+        CHECK(!vm_sc_exec_once(&r, 77, &done), "exec once: a second exec let through");
+        done = 0;
+        CHECK(!vm_sc_exec_once(&r, 0, &done), "exec once: let through without a child");
     }
     if (other.n) {
         tab = &other;

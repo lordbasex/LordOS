@@ -1100,7 +1100,7 @@ static struct {
     int pin_tids[VMPIN_VCPUS];
     /* QEMU's seccomp allowlist (vmseccomp.h): its listener, where a call the allowlist stops arrives before it runs;
      * that call's name, for the log and the failure page; a test build's learn mode and what it logged already */
-    int sc_fd, sc_learn;
+    int sc_fd, sc_learn, sc_exec_done;
     char sc_blocked[200];
     uint64_t sc_seen[512];
     int sc_nseen;
@@ -1393,6 +1393,12 @@ static int sc_serve(void) {
         vm_sc_describe(&req->data, what, sizeof what);
         memset(resp_b, 0, sizeof resp_b);
         resp->id = req->id;
+        /* QEMU's one exec: the start's own, from the child before QEMU ran (vmseccomp.h); never a second */
+        if (vm_sc_exec_once(req, S.qemu, &S.sc_exec_done)) {
+            resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+            if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp)) vlog("seccomp: the exec of QEMU couldn't be let through: %s", strerror(errno));
+            continue;
+        }
         if (S.sc_learn) {
             uint64_t key = vm_sc_learn_key(&req->data);
             int seen = 0;
@@ -2402,6 +2408,7 @@ static int start_machine(void) {
     S.win_armed = 0;
     S.sc_learn = sc_learn_mode();
     S.sc_blocked[0] = 0;
+    S.sc_exec_done = 0;
     if (S.sc_fd >= 0) { close(S.sc_fd); S.sc_fd = -1; }
     {
         char cp[PATH_MAX + 64];
@@ -2531,7 +2538,7 @@ static int start_machine(void) {
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
                          S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL,
-                         S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, xfd, S.sc_learn, sc_drop_row(), &lfd };
+                         S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, xfd, qargv[0], S.sc_learn, sc_drop_row(), &lfd };
         int mask = xfd >= 0 ? vm_jail_qemu(&j) | (in_ns ? VMS_NAMESPACES : 0) : 0;
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
@@ -2608,6 +2615,7 @@ static int start_machine(void) {
         if (n == sizeof got) break;
     }
     close(st[0]);
+    S.sc_exec_done = 1;     /* the exec is over (or failed): any execveat from now on stops QEMU */
     if (n >= 4) S.sandbox |= got[0];
     if (n < 4 || !(got[0] & VMS_SECCOMP_OURS) || !(got[0] & VMS_NO_NEW_PRIVS)) { fail_start("QEMU's sandbox couldn't be set up (seccomp %d, no_new_privs %d)", !!(got[0] & VMS_SECCOMP_OURS), !!(got[0] & VMS_NO_NEW_PRIVS)); return -1; }
     if (n == sizeof got) { fail_start("can't run QEMU: %s", strerror(got[1])); return -1; }

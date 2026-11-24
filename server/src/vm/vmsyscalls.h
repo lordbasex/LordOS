@@ -21,11 +21,16 @@
  *   IOCTL     a few fixed requests, and the request types of the machine's devices (vmseccomp.c: KVM, DRM, VFIO, TUN)
  *   PRCTL     the options measured, PR_SET_DUMPABLE refused (QEMU stays non-dumpable)
  *   SOCKETPAIR AF_UNIX only
- *   MMAP / MPROTECT   no memory both writable and executable unless the machine runs TCG (its code buffer)
+ *   MMAP      without TCG: executable only as a private, read-only mapping of a file (the loader's), never shared or
+ *             anonymous, never writable at once; a TCG machine's code buffer needs writable and executable memory
+ *   MPROTECT  without TCG: nothing made executable afterwards (arm64 with BTI: PROT_EXEC|PROT_BTI, never writable)
+ *   MEMFD     never MFD_EXEC
  *   PRLIMIT   pid 0 or QEMU's own (never another process's limits)
  *   TGKILL    QEMU's own pid (a signal to one of its threads: the vCPU kick)
  *   SECCOMP   never a filter with a listener (QEMU's own -sandbox adds one without)
- *   EXECVEAT  only lord-vm's descriptor of the QEMU binary, AT_EMPTY_PATH (the one exec; execve is not a row) */
+ *   EXECVEAT  the one exec: lord-vm lets the start's own through and stops QEMU at any later one (without a listener:
+ *             lord-vm's descriptor number and AT_EMPTY_PATH, with Landlock's execute right on QEMU's binary and loader
+ *             only); execve is not a row */
 #ifndef LORD_VM_SYSCALLS_H
 #define LORD_VM_SYSCALLS_H
 
@@ -44,7 +49,7 @@
     /* files: Landlock decides which */ \
     X(openat, OK) X(close, OK) X(fcntl, OK) X(lseek, OK) X(newfstatat, OK) X(fstat, OK) X(fstatfs, OK) X(statfs, OK) \
     X(getdents64, OK) X(ftruncate, OK) X(fallocate, OK) X(fdatasync, OK) X(fadvise64, OK) X(pipe2, OK) \
-    X(memfd_create, OK) \
+    X(memfd_create, MEMFD) \
     /* its sockets are the ones lord-vm passed (QMP, serial, network, agent, D-Bus display, shares, TPM) */ \
     X(socket, EACCES) X(socketpair, SOCKETPAIR) X(sendto, OK) X(recvfrom, OK) X(setsockopt, OK) X(getsockopt, OK) \
     X(getsockname, OK) X(getpeername, OK) \

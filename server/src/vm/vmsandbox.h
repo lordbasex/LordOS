@@ -4,7 +4,7 @@
  * QEMU (in the forked child, right before execve; it lasts across exec and QEMU's own -sandbox stacks on top):
  *   - its own namespaces and a private loader that makes it non-dumpable (vm_ns_enter, vm_ns_setup below);
  *   - no_new_privs; core dumps off (RLIMIT_CORE 0);
- *   - Landlock: read and execute /usr; read /etc/ld.so.cache; read and write only <machine>/disks; read the
+ *   - Landlock: read /usr, execute only QEMU's binary and its loader; read /etc/ld.so.cache; read and write only <machine>/disks; read the
  *     attached ISO; read its own /proc/<pid>; /dev/null; /dev/kvm on KVM machines (it arrives as a descriptor, but on
  *     arm64 QEMU also opens it by path to read the host CPU's features). No other file, no other device. ABI 4+: no TCP bind or connect. ABI 6+: no abstract unix sockets or signals outside itself.
  *     A machine with 3D graphics (VmQemuJail.render: only a Linux machine with graphics "3d") also gets, for
@@ -16,8 +16,8 @@
  *     as above. Our GOP option ROM is under /usr. Seccomp lets it make VFIO's ioctls (type ';') then, and only then.
  *   - seccomp, ours: an allowlist (vmseccomp.h, the rows in vmsyscalls.h), per architecture and per machine (KVM,
  *     TCG, 3D, vGPU, a tap): only the calls QEMU was measured to make, ioctl only on its devices' request types,
- *     threads only, no memory both writable and executable without TCG, signals and limits only on itself, exec only
- *     of QEMU's own binary by descriptor. No socket(2) (EACCES): its sockets are the ones lord-vm passed. Anything
+ *     threads only, without TCG executable memory only as a private read-only file mapping, signals and limits only on itself, one exec
+ *     (lord-vm lets the start's own through, vm_sc_exec_once). No socket(2) (EACCES): its sockets are the ones lord-vm passed. Anything
  *     else stops QEMU, and lord-vm names the call (the filter's listener). QEMU's own -sandbox stacks on top.
  * lord-vm itself, once QEMU and passt run: Landlock with read and write in the machine's folder and removal in
  * its runtime folder, nothing else. Its children already exist, so this doesn't reach them. */
@@ -44,6 +44,7 @@ typedef struct {
     int tcg;                    /* TCG: its code buffer is writable and executable */
     int tap;                    /* a bridged network: the tap's TUN ioctls */
     int exec_fd;                /* the descriptor of QEMU's binary, the only thing execveat may run then (-1: none) */
+    const char *exec_path;      /* that binary's path: Landlock's execute right goes to it and its loader only */
     int learn;                  /* 0; a test build's learn modes (1, 2) */
     const char *sc_drop;        /* NULL; a test build's row left out (vmseccomp.h) */
     int *notify_out;            /* NULL: kill as the default action; else the filter's listener comes back here

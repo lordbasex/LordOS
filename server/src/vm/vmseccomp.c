@@ -166,11 +166,38 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
         return 0;
     }
     case VSR_MMAP:
-    case VSR_MPROTECT:
+        /* without TCG, executable memory is only what the loader maps: a private, read-only mapping of a file. Never
+         * writable and executable, never shared (a second, writable mapping would write it), never anonymous */
         if (o->tcg) { ALLOW(); return 0; }
         LD_ARG(2);
-        STMT(BPF_ALU | BPF_AND | BPF_K, PROT_WRITE | PROT_EXEC);
-        JUMP(BPF_JMP | BPF_JEQ | BPF_K, PROT_WRITE | PROT_EXEC, 0, 1);
+        JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_EXEC, 0, 4);
+        JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_WRITE, 2, 0);
+        LD_ARG(3);
+        JUMP(BPF_JMP | BPF_JSET | BPF_K, MAP_SHARED | MAP_ANONYMOUS, 0, 1);   /* MAP_SHARED_VALIDATE has MAP_SHARED's bit */
+        DEFAULT();
+        ALLOW();
+        return 0;
+    case VSR_MPROTECT:
+        /* without TCG, nothing is made executable afterwards (measured: QEMU, glibc and Mesa never do on amd64 or on the
+         * Pi 5). arm64 with BTI: glibc's loader marks a library's code PROT_EXEC|PROT_BTI, never writable at once */
+        if (o->tcg) { ALLOW(); return 0; }
+        LD_ARG(2);
+        if (o->bti) {
+            JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_EXEC, 0, 3);
+            JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_WRITE, 1, 0);
+            JUMP(BPF_JMP | BPF_JSET | BPF_K, 0x10 /* PROT_BTI */, 1, 0);
+            DEFAULT();
+            ALLOW();
+        } else {
+            JUMP(BPF_JMP | BPF_JSET | BPF_K, PROT_EXEC, 0, 1);
+            DEFAULT();
+            ALLOW();
+        }
+        return 0;
+    case VSR_MEMFD:
+        /* never MFD_EXEC (an executable memfd) */
+        LD_ARG(1);
+        JUMP(BPF_JMP | BPF_JSET | BPF_K, 0x0010 /* MFD_EXEC */, 0, 1);
         DEFAULT();
         ALLOW();
         return 0;
@@ -193,7 +220,12 @@ static int body(Emit *e, const VmScRow *r, const VmScOpts *o) {
         ALLOW();
         return 0;
     case VSR_EXECVEAT:
-        if (o->exec_fd < 0) { DEFAULT(); return 0; }
+        /* the one exec. With a listener every execveat goes to lord-vm, which lets only the first through (vm_sc_exec_once:
+         * the start's own, from the child before QEMU ran) and stops QEMU at any later one: a descriptor number proves
+         * nothing once QEMU runs (it can close and reuse it). Without a listener (the fallback) only lord-vm's descriptor
+         * number with AT_EMPTY_PATH passes, and then Landlock lets nothing but QEMU's binary and its loader run, and
+         * QEMU's own spawn=deny refuses exec once its sandbox is up */
+        if (o->exec_fd < 0 || o->notify) { DEFAULT(); return 0; }
         LD_ARG(0);
         JUMP(BPF_JMP | BPF_JEQ | BPF_K, (uint32_t)o->exec_fd, 0, 3);
         LD_ARG(4);
@@ -262,6 +294,12 @@ int vm_sc_build_for(const VmScRow *rows, int n, uint32_t audit_arch, const VmScO
     return r ? -1 : em.n;
 }
 
+int vm_sc_exec_once(const struct seccomp_notif *req, pid_t child, int *done) {
+    if (req->data.nr != __NR_execveat || *done || child <= 0 || (pid_t)req->pid != child) return 0;
+    *done = 1;
+    return 1;
+}
+
 int vm_sc_build(const VmScOpts *o, struct sock_filter *f, int cap) {
 #if defined(__x86_64__)
     return vm_sc_build_for(ROWS, (int)(sizeof ROWS / sizeof ROWS[0]), AUDIT_ARCH_X86_64, o, f, cap);
@@ -279,7 +317,9 @@ void vm_sc_describe(const struct seccomp_data *d, char *out, size_t n) {
     if (!name) { snprintf(nb, sizeof nb, "system call %d", d->nr); name = nb; }
     if (d->nr == __NR_ioctl) snprintf(out, n, "ioctl 0x%08x on descriptor %d", (unsigned)d->args[1], (int)d->args[0]);
     else if (d->nr == __NR_prctl) snprintf(out, n, "prctl option %d", (int)d->args[0]);
-    else if (d->nr == __NR_mmap || d->nr == __NR_mprotect) snprintf(out, n, "%s with rights 0x%x", name, (unsigned)d->args[2]);
+    else if (d->nr == __NR_mmap) snprintf(out, n, "mmap with rights 0x%x, flags 0x%x", (unsigned)d->args[2], (unsigned)d->args[3]);
+    else if (d->nr == __NR_mprotect) snprintf(out, n, "mprotect with rights 0x%x", (unsigned)d->args[2]);
+    else if (d->nr == __NR_memfd_create) snprintf(out, n, "memfd_create with flags 0x%x", (unsigned)d->args[1]);
     else if (d->nr == __NR_clone) snprintf(out, n, "clone with flags 0x%x", (unsigned)d->args[0]);
     else snprintf(out, n, "%s (0x%llx, 0x%llx, 0x%llx)", name, (unsigned long long)d->args[0], (unsigned long long)d->args[1],
                   (unsigned long long)d->args[2]);

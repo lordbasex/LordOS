@@ -60,6 +60,8 @@ static void check(int ok, const char *what, int err) {
 /* ---- inside: code running as QEMU, after exec ---- */
 
 static void *thread_main(void *a) { return a; }
+static const char *self_path;   /* this program's copy in the disks folder (argv[0] under the loader) */
+#define EXEC_FD 100             /* where the jailed side keeps its descriptor of the loader (the one exec) */
 
 static int inside(char **argv) {
     const char *w = argv[2];
@@ -118,8 +120,9 @@ static int inside(char **argv) {
     int pe = pthread_create(&th, NULL, thread_main, NULL);
     check(!pe && !pthread_join(th, NULL), "inside: makes a thread (clone3 ENOSYS, then clone) (control)", pe);
     errno = 0;
-    void *rx = mmap(NULL, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    check(rx != MAP_FAILED, "inside: maps executable memory that isn't writable (control)", errno);
+    int sf = open(self_path, O_RDONLY | O_CLOEXEC);
+    void *rx = sf >= 0 ? mmap(NULL, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE, sf, 0) : MAP_FAILED;
+    check(rx != MAP_FAILED, "inside: maps a file private, read-only and executable, as the loader does (control)", errno);
     errno = 0;
     check(eventfd(0, EFD_CLOEXEC) >= 0, "inside: eventfd (control)", errno);
     errno = 0;
@@ -153,6 +156,29 @@ static int kill_case(const char *what, pid_t sib) {
         ret = mprotect(p, 4096, PROT_READ | PROT_WRITE | PROT_EXEC);
     }
     else if (!strcmp(what, "execve")) { char *a[] = { "/usr/bin/true", NULL }; ret = execve(a[0], a, a + 1); }
+    else if (!strcmp(what, "mmap-x-anon")) ret = mmap(NULL, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0) == MAP_FAILED ? -1 : 0;
+    else if (!strcmp(what, "mmap-x-shared")) {
+        int f = open(self_path, O_RDONLY | O_CLOEXEC);
+        ret = mmap(NULL, 4096, PROT_READ | PROT_EXEC, MAP_SHARED, f, 0) == MAP_FAILED ? -1 : 0;
+    }
+    else if (!strcmp(what, "mprotect-x")) {
+        void *p = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        ret = mprotect(p, 4096, PROT_READ | PROT_EXEC);
+    }
+    else if (!strcmp(what, "memfd-exec")) ret = syscall(SYS_memfd_create, "x", 0x0010 /* MFD_EXEC */);
+    else if (!strcmp(what, "execveat-again") || !strcmp(what, "execveat-reuse")) {
+        /* another binary under the number lord-vm's descriptor had: what a compromised QEMU would try */
+        int f = open("/usr/bin/true", O_PATH | O_CLOEXEC);
+        /* fcntl, as QEMU dups (dup and dup3 aren't rows): number 100 is free again, its first owner closed at exec */
+        if (f >= 0 && f != EXEC_FD) { int g = fcntl(f, F_DUPFD_CLOEXEC, EXEC_FD); close(f); if (g != EXEC_FD) { printf("SETUP %d\n", g); return 2; } }
+        char *a[] = { "true", NULL };
+        ret = syscall(SYS_execveat, EXEC_FD, "", a, a + 1, AT_EMPTY_PATH);
+        if (!strcmp(what, "execveat-reuse")) {
+            /* without a listener seccomp passes the number: Landlock must refuse the binary */
+            printf("%s %ld %d\n", ret < 0 && errno == EACCES ? "REFUSED" : "SURVIVED", ret, errno);
+            return 0;
+        }
+    }
     else if (!strcmp(what, "bpf")) ret = syscall(SYS_bpf, 0, NULL, 0);
     else if (!strcmp(what, "perf_event_open")) ret = syscall(SYS_perf_event_open, NULL, 0, -1, -1, 0);
     else if (!strcmp(what, "userfaultfd")) ret = syscall(SYS_userfaultfd, 0);
@@ -210,8 +236,9 @@ static pid_t jailed(char **args, int out, int hold, int st, int notify, int tcg)
     /* the program is the loader under /usr (Landlock lets only /usr run); in this mount namespace it is the
      * unreadable copy, so this exec makes the probe non-dumpable exactly as QEMU's does */
     int xfd = open(loader, O_PATH | O_CLOEXEC);
+    if (xfd >= 0 && xfd != EXEC_FD) { dup3(xfd, EXEC_FD, O_CLOEXEC); close(xfd); xfd = EXEC_FD; }
     int lfd = -1;
-    VmQemuJail j = { .disks_dir = disks, .exec_fd = xfd, .tcg = tcg, .notify_out = notify ? &lfd : NULL };
+    VmQemuJail j = { .disks_dir = disks, .exec_fd = xfd, .exec_path = loader, .tcg = tcg, .notify_out = notify ? &lfd : NULL };
     int mask = xfd >= 0 ? vm_jail_qemu(&j) : 0;
     if (!(mask & VMS_SECCOMP_OURS) || !(mask & VMS_SECCOMP_ALLOWLIST) || !(mask & VMS_NO_NEW_PRIVS) || !(mask & VMS_LANDLOCK_FS) ||
         (notify && !(mask & VMS_SECCOMP_NAMED))) { printf("FAIL  jail: mask %d\n", mask); _exit(1); }
@@ -265,8 +292,19 @@ static void kill_one(const char *what, const char *want, pid_t sib, int notify) 
         struct pollfd pf = { lfd, POLLIN, 0 };
         if (!syscall(SYS_seccomp, SECCOMP_GET_NOTIF_SIZES, 0, &sz) && sz.seccomp_notif <= sizeof req_b && poll(&pf, 1, 10000) == 1) {
             struct seccomp_notif *req = (struct seccomp_notif *)req_b;
-            memset(req_b, 0, sizeof req_b);
-            if (!ioctl(lfd, SECCOMP_IOCTL_NOTIF_RECV, req)) {
+            struct seccomp_notif_resp *resp = (struct seccomp_notif_resp *)resp_b;
+            int done = 0, got = -1;
+            /* lord-vm's way: the start's own exec goes through (vm_sc_exec_once), then the call the probe tries */
+            for (;;) {
+                memset(req_b, 0, sizeof req_b);
+                got = poll(&pf, 1, 10000) == 1 ? ioctl(lfd, SECCOMP_IOCTL_NOTIF_RECV, req) : -1;
+                if (got || !vm_sc_exec_once(req, q, &done)) break;
+                memset(resp_b, 0, sizeof resp_b);
+                resp->id = req->id;
+                resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+                ioctl(lfd, SECCOMP_IOCTL_NOTIF_SEND, resp);
+            }
+            if (!got && done) {
                 char d[160];
                 vm_sc_describe(&req->data, d, sizeof d);
                 const char *nm = vm_sc_name(req->data.nr);
@@ -274,12 +312,11 @@ static void kill_one(const char *what, const char *want, pid_t sib, int notify) 
                 snprintf(msg, sizeof msg, "%s", d);
                 /* lord-vm's order: the process first, then the answer (the call never runs) */
                 kill(q, SIGKILL);
-                struct seccomp_notif_resp *resp = (struct seccomp_notif_resp *)resp_b;
                 memset(resp_b, 0, sizeof resp_b);
                 resp->id = req->id;
                 resp->error = -EPERM;
                 ioctl(lfd, SECCOMP_IOCTL_NOTIF_SEND, resp);
-            } else snprintf(msg, sizeof msg, "no notification: %s", strerror(errno));
+            } else snprintf(msg, sizeof msg, "no notification after the exec (%s)", done ? strerror(errno) : "the exec never came");
         } else snprintf(msg, sizeof msg, "no notification in 10 s");
         close(lfd);
     } else if (notify) snprintf(msg, sizeof msg, "no listener came back");
@@ -320,6 +357,7 @@ static void answered(const char *what, const char *want, int tcg, const char *la
 }
 
 int main(int argc, char **argv) {
+    self_path = argv[0];
     if (argc == 6 && !strcmp(argv[1], "--inside")) return inside(argv);
     if (argc == 4 && !strcmp(argv[1], "--kill")) return kill_case(argv[2], (pid_t)atoi(argv[3]));
     if (vm_landlock_abi() < 4) { printf("skipped: needs Landlock ABI 4 or later\n"); return 0; }
@@ -415,12 +453,15 @@ int main(int argc, char **argv) {
         { "ioctl-kvm", "ioctl" }, { "mmap-wx", "mmap" }, { "mprotect-wx", "mprotect" }, { "execve", "execve" },
         { "bpf", "bpf" }, { "perf_event_open", "perf_event_open" }, { "userfaultfd", "userfaultfd" }, { "keyctl", "keyctl" },
         { "mount", "mount" }, { "connect", "connect" }, { "personality", "personality" }, { "prctl-ptracer", "prctl" },
+        { "mmap-x-anon", "mmap" }, { "mmap-x-shared", "mmap" }, { "mprotect-x", "mprotect" }, { "memfd-exec", "memfd_create" },
+        { "execveat-again", "execveat" },
     };
     for (size_t i = 0; i < sizeof CASES / sizeof CASES[0]; i++) kill_one(CASES[i][0], CASES[i][1], sib, 1);
     kill_one("unshare", "unshare", sib, 0);
     kill_one("mmap-wx", "mmap", sib, 0);
     answered("seccomp-listener", "REFUSED", 0, "allowlist: a filter with a listener is refused (EPERM), not run");
     answered("mmap-wx-tcg", "ALLOWED", 1, "allowlist: a TCG machine may map memory writable and executable (control)");
+    answered("execveat-reuse", "REFUSED", 0, "without a listener, another binary under lord-vm's descriptor number: Landlock refuses to run it");
 
     kill(sib, SIGKILL);
     waitpid(sib, NULL, 0);

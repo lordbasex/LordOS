@@ -1,8 +1,8 @@
 /* vmseccomp.h — QEMU's seccomp allowlist (approved by the maintainer 2026-11-23; docs/VIRTUALIZATION.md 3.3).
  *
  * The rows are in vmsyscalls.h, one per system call QEMU may make, with a rule for its arguments where that matters
- * (ioctl by the machine's devices, clone threads only, prctl options, no writable and executable memory without TCG,
- * signals and limits only on itself, execveat only lord-vm's descriptor). vm_sc_build turns the rows into a classic
+ * (ioctl by the machine's devices, clone threads only, prctl options, without TCG executable memory only as a private read-only file mapping,
+ * signals and limits only on itself, one exec, which lord-vm lets through). vm_sc_build turns the rows into a classic
  * BPF program: the architecture checked first (and amd64's x32 numbers refused), then a binary search on the call's
  * number, so a call costs about eight comparisons whatever its place in the table.
  *
@@ -27,7 +27,7 @@
 
 /* a row's rule (vmsyscalls.h) */
 enum { VSR_OK = 1, VSR_HOT, VSR_EACCES, VSR_EPERM, VSR_ENOSYS, VSR_CLONE, VSR_IOCTL, VSR_PRCTL, VSR_SOCKETPAIR,
-       VSR_MMAP, VSR_MPROTECT, VSR_PRLIMIT, VSR_TGKILL, VSR_SECCOMP, VSR_EXECVEAT };
+       VSR_MMAP, VSR_MPROTECT, VSR_MEMFD, VSR_PRLIMIT, VSR_TGKILL, VSR_SECCOMP, VSR_EXECVEAT };
 
 typedef struct { const char *name; int nr; int rule; } VmScRow;
 
@@ -38,6 +38,7 @@ typedef struct {
     int render;     /* 3D graphics or a vGPU: the render node's DRM ioctls ('d'), sync_file ('>') and dma-buf ('b') */
     int vgpu;       /* an Intel vGPU: VFIO's ioctls (';') */
     int tap;        /* a bridged network: the tap's TUN ioctls ('T' 200 and up) */
+    int bti;        /* arm64: mprotect may add PROT_EXEC together with PROT_BTI (glibc's loader on a CPU with BTI) */
     pid_t self;     /* QEMU's pid (the child's own: exec keeps it) */
     int exec_fd;    /* the descriptor of QEMU's binary, the only thing execveat may run; -1: no exec */
     int notify;     /* 1: the default action is SECCOMP_RET_USER_NOTIF (lord-vm holds the listener); 0: kill */
@@ -54,6 +55,10 @@ int vm_sc_build_for(const VmScRow *rows, int n, uint32_t audit_arch, const VmScO
 int vm_sc_build(const VmScOpts *o, struct sock_filter *f, int cap);
 /* the kernel's name of call `nr` on this computer, or NULL */
 const char *vm_sc_name(int nr);
+/* a notification of execveat: 1 when it is QEMU's one exec, the first from `child` (lord-vm answers it with
+ * SECCOMP_USER_NOTIF_FLAG_CONTINUE: the child is single-threaded and runs lord-vm's code, so its arguments can't change);
+ * *done is set, and every later execveat is 0 (QEMU is stopped) */
+int vm_sc_exec_once(const struct seccomp_notif *req, pid_t child, int *done);
 /* "name" or "ioctl 0x...", with what lord-vm logs about the arguments; for a notification */
 void vm_sc_describe(const struct seccomp_data *d, char *out, size_t n);
 /* the key lord-vm's learn mode logs a call once by (the call, and its ioctl request, prctl option or memory rights) */
