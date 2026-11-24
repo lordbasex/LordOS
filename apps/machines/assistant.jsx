@@ -20,7 +20,7 @@ import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openU
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, noticeOf, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
-import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard, detectPlan } from './model.js';
+import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard, detectPlan, dropSource } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
 import { customUnattended, systemState } from './systems.js';
 import { loadProfiles, loadSystems, defaultsOf, profileTitle } from './store.js';
@@ -35,9 +35,7 @@ import { GroupFlow, resolveGroup } from './whonix.jsx';
 
 // what Migrate from another app takes: other apps' settings files and packages, and their disk formats
 const MIGRATE_FILES = /(\.(vmx|vbox|pvs|ovf|ova|vmdk|vdi|vhdx|vhd|hds)|\/config\.pvs)$/i;
-const DISK_FILES = /\.(qcow2|img|raw)$/i;
-// a file dropped on the first step: which tile takes it
-export const dropSource = (name) => (/\.iso$/i.test(name) ? 'iso' : DISK_FILES.test(name) ? 'import' : MIGRATE_FILES.test(`/${name}`) ? 'migrate' : null);
+
 
 const STEPS = ['choose', 'profile', 'name', 'review', 'install'];
 const rowsOf = (list, n) => { const out = []; for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n)); return out; };

@@ -474,6 +474,14 @@ export function detectPlan(info, file, hostArch) {
   const starts = [...(efi.length || info?.eltoritoEfi ? ['uefi'] : []), ...(info?.bios ? ['bios'] : [])];
   return { arch, from, starts, conflict: !!boot && !!byName && byName !== boot, emulated: arch !== hostArch, both, unknownArch };
 }
+// a file dropped on the assistant's first step (5.2): which tile takes it, by its name (an installer disc, a disk image,
+// another app's machine as Migrate takes it), or null
+export const dropSource = (name) => {
+  const s = String(name || '');
+  if (/\.iso$/i.test(s)) return 'iso';
+  if (/\.(qcow2|img|raw)$/i.test(s)) return 'import';
+  return /(\.(vmx|vbox|pvs|ovf|ova|vmdk|vdi|vhdx|vhd|hds)|^config\.pvs)$/i.test(s) ? 'migrate' : null;
+};
 // a machine name from a system and version, unique among names
 export function suggestName(sys, version, names = []) {
   const base = [sys?.name || 'Machine', version].filter(Boolean).join(' ');

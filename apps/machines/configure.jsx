@@ -439,7 +439,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
             the same on every amd64 computer (KVM machines on amd64 only) */}
         {m.arch === 'amd64' && !emulated ? <Row label={tr('machines.cfg.cpuModel')} note={[tr(`machines.cfg.cpuModelNote.${cur.cpuModel}`), offNote].filter(Boolean).join(' ')}>
           <Off off={running}><Segmented small value={cur.cpuModel} onChange={(x) => set({ cpuModel: x })}
-            options={[['host', tr('machines.cfg.cpuModel.host')], ['compatible', tr('machines.cfg.cpuModel.compatible')]]} /></Off>
+            options={[['host', tr('machines.cfg.cpuHost')], ['compatible', tr('machines.cfg.cpuCompat')]]} /></Off>
         </Row> : null}
         {/* huge pages are lord-vm's own choice, never a switch (3.7.2): said here */}
         <Row label={tr('machines.cfg.hugePages')} value={tr('machines.cfg.hugePagesAuto')} last note={tr('machines.cfg.hugePagesNote')} />
