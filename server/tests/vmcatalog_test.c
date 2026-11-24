@@ -214,6 +214,91 @@ static void signatures(const char *cat, size_t n, const char *fx, const char *kd
 
 static const char *const SHA = "a7ef94ac2fb9a7fec454552abd629b7cc9d5155c886165a45649f5ce6167e355";
 
+/* the Whonix group's entry (docs/VIRTUALIZATION.md 19.6): SHA-512 lists with a detached .asc beside each, the newest
+ * release folder above a floor, the archive's members; and the real 18.2.4.3 list and signature (2026-11-04, Whonix's
+ * RSA signing subkey 6E97…3C48, SHA-512, a critical creation time, Sequoia's salt notation) through pkg/pgp.c */
+static const char *const WSHA = "e57c79cb137f941a4f5341d841c1da8866182ebc9115acb17e21aed883c72c1566e3ef4e1078a07b018f41f60182db050cbcd931235051f0d7e90c0005fa5354";
+static const char *const WFILE = "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz";
+static void whonix(const char *cat, size_t n, const char *fx, const char *kd) {
+    VmCatEntry e;
+    char why[200], list[VMCAT_URL + 200], sig[VMCAT_URL + 200];
+    T("whonix: found", !vmcat_find(cat, n, "whonix", "amd64", &e));
+    T("whonix: no arm64 image", vmcat_find(cat, n, "whonix", "arm64", &e) != 0);
+    vmcat_find(cat, n, "whonix", "amd64", &e);
+    T("whonix: a group of SHA-512 lists, signed beside each", e.group && e.hash == VMCAT_SHA512 && !strcmp(e.sig_suffix, ".asc") && e.sig_type == VMCAT_SIG_DETACHED &&
+      !strcmp(e.group_kind, "whonix") && !strcmp(e.edition, "LXQt") && e.nfprs == 1 && !strcmp(e.fprs[0], "916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA"));
+    T("whonix: caps", e.max_apparent == 128ull << 30 && e.max_data == 24ull << 30 && e.max_bytes == 4096ull << 20);
+    T("whonix: the members' names", vmcat_match(e.member_re[0], "Whonix-Gateway-LXQt-18.2.4.3.Intel_AMD64.qcow2") &&
+      vmcat_match(e.member_re[1], "Whonix-Workstation-LXQt-18.2.4.3.Intel_AMD64.qcow2") && !vmcat_match(e.member_re[0], "Whonix-Workstation-LXQt-18.2.4.3.Intel_AMD64.qcow2") &&
+      !vmcat_match(e.member_re[0], "Whonix-Gateway-CLI-18.2.4.3.Intel_AMD64.qcow2") && !vmcat_match(e.member_re[1], "../Whonix-Workstation-LXQt-18.2.4.3.Intel_AMD64.qcow2") &&
+      !vmcat_match(e.member_re[0], "Whonix-Gateway.xml"));
+    T("whonix: the archive's name, not its list or torrent", vmcat_match(e.file_re, WFILE) && !vmcat_match(e.file_re, "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.torrent") &&
+      !vmcat_match(e.file_re, "Whonix-CLI-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz") && vmcat_match(e.sums_re, "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums"));
+    /* releases: the floor, the pattern, the folder */
+    T("whonix: releases at and above the floor", vmcat_release_ok(&e, "18.2.4.3") && vmcat_release_ok(&e, "18.2.10.0") && vmcat_release_ok(&e, "19.0.0.1"));
+    T("whonix: releases below the floor or not a release", !vmcat_release_ok(&e, "18.2.4.2") && !vmcat_release_ok(&e, "18.2.1.9") && !vmcat_release_ok(&e, "17.4.4.6") &&
+      !vmcat_release_ok(&e, "18.2.4") && !vmcat_release_ok(&e, "../18.2.4.3") && !vmcat_release_ok(&e, "18.2.4.3/") && !vmcat_release_ok(&e, "18.2.4.3a"));
+    T("whonix: release order", vmcat_release_cmp("18.2.10.0", "18.2.9.9") > 0 && vmcat_release_cmp("18.2.4.3", "18.2.4.3") == 0 && vmcat_release_cmp("9.0.0.0", "18.0.0.0") < 0);
+    T("whonix: the release's folder", !vmcat_release_dir(&e, "18.2.4.3") && !strcmp(e.dir, "https://download.whonix.org/libvirt/18.2.4.3/") && !strcmp(e.file_dir, e.dir));
+    T("whonix: the list's signature is its name plus .asc", !vmcat_list_source(&e, "Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums", 0, list, sig, sizeof list) &&
+      !strcmp(list, "https://download.whonix.org/libvirt/18.2.4.3/Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums") &&
+      !strcmp(sig, "https://download.whonix.org/libvirt/18.2.4.3/Whonix-LXQt-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz.sha512sums.asc") &&
+      vmcat_list_source(&e, "x.sha512sums", 1, list, sig, sizeof list) != 0);
+    T("whonix: SHA-512 hashes", vmcat_hash_ok(&e, WSHA) && !vmcat_hash_ok(&e, SHA) && !vmcat_hash_ok(&e, "e57c"));
+    /* the real list and signature */
+    size_t ln = 0, sn = 0, kn = 0;
+    char *sums = load(fx, "whonix.sums", &ln), *asc = load(fx, "whonix.asc", &sn), *keys = load(kd, e.keys, &kn);
+    T("whonix: fixtures and key file", sums && asc && keys);
+    if (!sums || !asc || !keys) { free(sums); free(asc); free(keys); return; }
+    int r = verify(&e, keys, kn, sums, ln, asc, sn, NOW, why, sizeof why);
+    T("whonix: the published 18.2.4.3 list verifies with Whonix's key", r == 1);
+    if (r != 1) printf("      %s\n", why);
+    T("whonix: the archive's line is in it", vmcat_sums_has(sums, ln, WFILE, WSHA));
+    char up[129];
+    for (int i = 0; i < 128; i++) up[i] = (char)toupper((unsigned char)WSHA[i]);
+    up[128] = 0;
+    T("whonix: any case", vmcat_sums_has(sums, ln, WFILE, up));
+    T("whonix: another name or a SHA-256 isn't", !vmcat_sums_has(sums, ln, "Whonix-CLI-18.2.4.3.Intel_AMD64.qcow2.libvirt.xz", WSHA) &&
+      !vmcat_sums_has(sums, ln, WFILE, SHA));
+    char *ch = malloc(ln + 1);
+    memcpy(ch, sums, ln + 1);
+    ch[5] = ch[5] == '0' ? '1' : '0';
+    T("whonix: a changed hash is refused", verify(&e, keys, kn, ch, ln, asc, sn, NOW, why, sizeof why) == -1);
+    T("whonix: no signature is unsigned", verify(&e, keys, kn, sums, ln, NULL, 0, NOW, why, sizeof why) == 0);
+    T("whonix: before its creation time it isn't valid", verify(&e, keys, kn, sums, ln, asc, sn, 1700000000LL, why, sizeof why) == -1);
+    /* another key pinned: refused */
+    VmCatEntry o = e;
+    memcpy(o.fprs[0], "827C8569F2518CC677FECA1AED65462EC8D5E4C5", 41);
+    T("whonix: another pinned fingerprint is refused", verify(&o, keys, kn, sums, ln, asc, sn, NOW, why, sizeof why) == -1);
+    free(ch); free(sums); free(asc); free(keys);
+    /* bad group entries */
+    static const char *const badg[] = {
+        /* a group needs SHA-512 */
+        "{\"systems\":[{\"id\":\"w\",\"kind\":\"group\",\"group\":\"whonix\",\"edition\":\"LXQt\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"archive\":{\"format\":\"tar.xz\",\"members\":{\"gateway\":\"^a$\",\"workstation\":\"^b$\"},\"maxApparentGb\":128,\"maxDataGb\":24},\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a suffix and a name */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\",\"name\":\"x.asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a suffix that is a path */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\"/../x\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* an unknown hash */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"md5\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* releases and a dir */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"releases\":{\"dir\":\"https://d.example/\",\"pattern\":\"^[0-9.]+$\",\"floor\":\"1.0\"},\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a floor its own pattern refuses */
+        "{\"systems\":[{\"id\":\"w\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"arch\":{\"amd64\":{\"releases\":{\"dir\":\"https://d.example/\",\"pattern\":\"^[0-9]+$\",\"floor\":\"1.0\"},\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a data cap above the apparent one */
+        "{\"systems\":[{\"id\":\"w\",\"kind\":\"group\",\"group\":\"whonix\",\"edition\":\"LXQt\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"archive\":{\"format\":\"tar.xz\",\"members\":{\"gateway\":\"^a$\",\"workstation\":\"^b$\"},\"maxApparentGb\":12,\"maxDataGb\":24},\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* an unknown group kind */
+        "{\"systems\":[{\"id\":\"w\",\"kind\":\"group\",\"group\":\"qubes\",\"edition\":\"LXQt\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"archive\":{\"format\":\"tar.xz\",\"members\":{\"gateway\":\"^a$\",\"workstation\":\"^b$\"},\"maxApparentGb\":128,\"maxDataGb\":24},\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+        /* a member role that doesn't exist */
+        "{\"systems\":[{\"id\":\"w\",\"kind\":\"group\",\"group\":\"whonix\",\"edition\":\"LXQt\",\"hash\":\"sha512\",\"signature\":{\"type\":\"detached\",\"suffix\":\".asc\"},\"keys\":\"k.asc\",\"fingerprints\":[\"916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA\"],\"archive\":{\"format\":\"tar.xz\",\"members\":{\"gateway\":\"^a$\",\"workstation\":\"^b$\",\"router\":\"^c$\"},\"maxApparentGb\":128,\"maxDataGb\":24},\"arch\":{\"amd64\":{\"dir\":\"https://d.example/x/\",\"sumsPattern\":\"^s$\",\"file\":\"^f$\",\"maxMb\":10}}}]}",
+    };
+    for (size_t i = 0; i < sizeof badg / sizeof badg[0]; i++) {
+        char lab[48];
+        snprintf(lab, sizeof lab, "whonix: bad entry %zu refused", i);
+        T(lab, vmcat_find(badg[i], strlen(badg[i]), "w", "amd64", &e) != 0);
+    }
+}
+
 int main(int argc, char **argv) {
     size_t n = 0;
     char *cat = argc > 1 ? slurp(argv[1], &n) : NULL;
@@ -484,6 +569,7 @@ int main(int argc, char **argv) {
     }
 
     if (argc > 3) signatures(cat, n, argv[2], argv[3]); else T("signature fixtures given", 0);
+    if (argc > 3) whonix(cat, n, argv[2], argv[3]);
 
     printf("== vmcatalog-test: %d passed, %d failed\n", pass, fail);
     return fail != 0;

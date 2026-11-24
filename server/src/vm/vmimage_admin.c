@@ -5,6 +5,7 @@
 #include "vmcatalog.h"
 #include "vmurl.h"
 #include "../pkg/http.h"
+#include "../pkg/crypto.h"
 #include "../sec/codesig.h"
 
 #include <ctype.h>
@@ -113,7 +114,7 @@ static int fetch_one(const char *url, const char *dest, uint64_t max, FetchItem 
 
 /* images/<sha256>.json, root's: what the image is, for the Storage window (the content is named by its hash only) */
 static void write_image_info(const char *sha, const char *id, const char *arch, const char *file, const char *from, uint64_t size) {
-    char p[200], t[208];
+    char p[240], t[248];
     snprintf(p, sizeof p, VM_IMAGES "/%s.json", sha);
     snprintf(t, sizeof t, "%s.tmp", p);
     FILE *f = fopen(t, "we");
@@ -204,13 +205,52 @@ static void get_signed_list(const char *id, const char *arch, const VmCatEntry *
     admin_say("OK", "%s", dest);                             /* i18n-ok: a path, parsed by apps/machines */
 }
 
+/* lists/<id>-<arch>.release: the release folder the entry's last verified list came from (an entry with "releases",
+ * vmcatalog.h), which vm-image-get downloads from; written only beside a list that verified */
+static void release_note(const char *id, const char *arch, const char *rel) {
+    char p[160], t[176];
+    snprintf(p, sizeof p, VM_LISTS "/%s-%s.release", id, arch);
+    if (!rel) { unlink(p); return; }
+    snprintf(t, sizeof t, "%s.tmp", p);
+    int fd = open(t, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0644);
+    size_t l = strlen(rel);
+    if (fd < 0) return;
+    int ok = write(fd, rel, l) == (ssize_t)l;
+    if (close(fd) || !ok || rename(t, p)) unlink(t);
+}
+
 void vm_act_image_list(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
-    char buf[256], *f[3];
+    char buf[256], *f[4];
     VmCatEntry e;
-    int n = split(arg, len, buf, sizeof buf, f, 3);
+    int n = split(arg, len, buf, sizeof buf, f, 4);
     if (n < 2 || entry_of(f[0], f[1], &e) || e.npins) { admin_err("admin.invalidArgument", NULL); return; }   /* pinned: the catalog is the list */
     store_dirs();
+    if (e.rel_dir[0]) {
+        /* an entry with "releases" (Whonix, docs/VIRTUALIZATION.md 19.6): "<id> <arch>" fetches the folder of releases'
+         * listing (only names are taken from it, each checked again here); "<id> <arch> <release>" that release's folder
+         * listing; "<id> <arch> <release> <list>" that list and its signature. A release below the catalog's floor, or
+         * not a release's name, is refused */
+        if (n >= 3 && vmcat_release_dir(&e, f[2])) { admin_err("admin.invalidArgument", NULL); return; }
+        if (n == 4) {
+            if (!e.sums_re[0] || !vmcat_match(e.sums_re, f[3])) { admin_err("admin.invalidArgument", NULL); return; }
+            release_note(f[0], f[1], NULL);
+            get_signed_list(f[0], f[1], &e, f[3]);
+            char lp[160];
+            struct stat st;
+            snprintf(lp, sizeof lp, VM_LISTS "/%s-%s.list", f[0], f[1]);
+            if (!lstat(lp, &st) && S_ISREG(st.st_mode)) release_note(f[0], f[1], f[2]);
+            return;
+        }
+        char url[VMCAT_URL + 160], dest[160];
+        snprintf(url, sizeof url, "%s", e.dir);
+        snprintf(dest, sizeof dest, VM_LISTS "/%s-%s.%s", f[0], f[1], n == 3 ? "index" : "releases");
+        FetchItem it;
+        if (fetch_one(url, dest, VM_LIST_MAX, &it)) { admin_err("vm.listFailed", "reason", it.err[0] ? it.err : "?", NULL); return; }
+        admin_say("OK", "%s", dest);                         /* i18n-ok: a path, parsed by apps/machines */
+        return;
+    }
+    if (n == 4) { admin_err("admin.invalidArgument", NULL); return; }
     if (n == 2 && e.sums[0]) { get_signed_list(f[0], f[1], &e, e.sums); return; }   /* the list has a fixed name */
     if (n == 3) {                                            /* a name found in the folder's listing (Fedora) */
         if (!e.sums_re[0] || !vmcat_match(e.sums_re, f[2])) { admin_err("admin.invalidArgument", NULL); return; }
@@ -274,11 +314,96 @@ static void image_fetch(const AdminReq *r, const char *sha, const char *url, uin
     admin_say("OK", "%s", dest);                             /* i18n-ok: a path, parsed by apps/machines */
 }
 
+/* a machine group's archive (an entry with "hash": "sha512", vmcatalog.h; docs/VIRTUALIZATION.md 19.6): the download
+ * goes to images/<sha512>.tar.xz, the name from the entry's kind, never from JS; kept only when the whole file's SHA-512
+ * is the one the verified list gives for that name. Root hashes the bytes; it never parses the archive (lord-vmunpack,
+ * sandboxed, does, in the person's lord-vm) */
+static int sha512_file(const char *path, char out[129]) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return -1;
+    Sha512 h;
+    sha512_init(&h);
+    static uint8_t b[1 << 20];
+    for (;;) {
+        ssize_t k = read(fd, b, sizeof b);
+        if (k < 0 && errno == EINTR) continue;
+        if (k < 0) { close(fd); return -1; }
+        if (!k) break;
+        sha512_update(&h, b, (size_t)k);
+    }
+    close(fd);
+    uint8_t d[64];
+    sha512_final(&h, d);
+    for (int i = 0; i < 64; i++) snprintf(out + i * 2, 3, "%02x", d[i]);
+    return 0;
+}
+
+static void archive_fetch(const AdminReq *r, const char *sha, const char *url, uint64_t max, const char *id, const char *arch, const char *file) {
+    char dest[240], lock[240];
+    snprintf(dest, sizeof dest, VM_IMAGES "/%s.tar.xz", sha);
+    struct stat st;
+    if (!lstat(dest, &st) && S_ISREG(st.st_mode) && st.st_uid == 0) { admin_say("OK", "%s", dest); return; }   /* i18n-ok: a path */
+    snprintf(lock, sizeof lock, VM_IMAGES "/%s.lock", sha);
+    int lfd = open(lock, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (lfd < 0 || flock(lfd, LOCK_EX | LOCK_NB)) { if (lfd >= 0) close(lfd); admin_err("vm.imageBusy", NULL); return; }
+    char jp[64];
+    image_job(r, jp, sizeof jp);
+    mkdir("/run/lordos", 0755);
+    FILE *jf = fopen(jp, "we");
+    if (jf) { fprintf(jf, "%d %u %s\n", (int)getpid(), (unsigned)r->uid, sha); fclose(jf); }
+    write_image_info(sha, id, arch, file, NULL, 0);
+    char pp[248];
+    snprintf(pp, sizeof pp, "%s.part", dest);
+    if (!lstat(pp, &st) && S_ISREG(st.st_mode) && st.st_uid == 0 && st.st_size > 0)
+        admin_log("vm.downloadResumed", "from", lerr_int((long long)st.st_size), NULL);   /* parsed by apps/machines */
+    FetchItem it;
+    memset(&it, 0, sizeof it);
+    int bad = -1;
+    if (snprintf(it.url, sizeof it.url, "%s", url) < (int)sizeof it.url && strlen(dest) < sizeof it.dest) {
+        snprintf(it.dest, sizeof it.dest, "%s", dest);
+        it.max = max;
+        it.resume = 1;
+        fetch_batch_in(&it, 1, vm_progress, NULL, VM_SCOPE);
+        bad = it.status != 200;
+    }
+    unlink(jp);
+    char hex[129] = "";
+    if (!bad && (sha512_file(dest, hex) || strcmp(hex, sha))) bad = 2;
+    if (bad) unlink(dest);
+    else { chmod(dest, 0644); write_image_info(sha, id, arch, file, NULL, it.size); }
+    unlink(lock);
+    close(lfd);
+    if (bad == 2) { admin_err("vm.hashMismatch", NULL); return; }
+    if (bad) { admin_err("vm.downloadFailed", "reason", it.err[0] ? it.err : "?", NULL); return; }
+    admin_say("OK", "%s", dest);                             /* i18n-ok: a path, parsed by apps/machines */
+}
+
 void vm_act_image_get(const AdminReq *r, const char *arg, size_t len) {
-    char buf[320], *f[4];
+    char buf[400], *f[4];
     VmCatEntry e;
     int n = split(arg, len, buf, sizeof buf, f, 4);
-    if (n != 4 || entry_of(f[0], f[1], &e) || !vmcat_sha_ok(f[3])) { admin_err("admin.invalidArgument", NULL); return; }
+    if (n != 4 || entry_of(f[0], f[1], &e) || !vmcat_hash_ok(&e, f[3])) { admin_err("admin.invalidArgument", NULL); return; }
+    if (e.hash == VMCAT_SHA512) {
+        /* the release folder the verified list came from (vm-image-list), the name a line of that list gives */
+        char rp[160], rel[40] = "", lp[160], hex[129];
+        snprintf(rp, sizeof rp, VM_LISTS "/%s-%s.release", f[0], f[1]);
+        snprintf(lp, sizeof lp, VM_LISTS "/%s-%s.list", f[0], f[1]);
+        size_t rl = 0, sl = 0;
+        char *rv = e.rel_dir[0] ? read_root_file(rp, 39, &rl) : NULL;
+        if (rv) { memcpy(rel, rv, rl); rel[rl] = 0; free(rv); }
+        if ((e.rel_dir[0] && vmcat_release_dir(&e, rel)) || !vmcat_match(e.file_re, f[2])) { admin_err("vm.notListed", NULL); return; }
+        for (int i = 0; i < 128; i++) hex[i] = (char)tolower((unsigned char)f[3][i]);
+        hex[128] = 0;
+        char *sums = read_root_file(lp, VM_LIST_MAX, &sl);
+        int listed = sums && vmcat_sums_has(sums, sl, f[2], hex);
+        free(sums);
+        if (!listed) { admin_err("vm.notListed", NULL); return; }
+        char url[VMCAT_URL + 160];
+        snprintf(url, sizeof url, "%s%s", e.file_dir, f[2]);
+        store_dirs();
+        archive_fetch(r, hex, url, e.max_bytes, f[0], f[1], f[2]);
+        return;
+    }
     char sha[65];
     for (int i = 0; i < 64; i++) sha[i] = (char)tolower((unsigned char)f[3][i]);
     sha[64] = 0;
@@ -372,14 +497,15 @@ void vm_act_image_get_user(const AdminReq *r, const char *arg, size_t len) {
 void vm_act_image_cancel(const AdminReq *r, const char *arg, size_t len) {
     (void)arg;
     if (len) { admin_err("admin.invalidArgument", NULL); return; }
-    char jp[64], sha[80] = "", cp[64], comm[32] = "";
+    char jp[64], sha[140] = "", cp[64], comm[32] = "";
     image_job(r, jp, sizeof jp);
     FILE *f = fopen(jp, "re");
     int pid = 0;
     unsigned uid = 0;
-    int ok = f && fscanf(f, "%d %u %79s", &pid, &uid, sha) == 3;
+    int ok = f && fscanf(f, "%d %u %139s", &pid, &uid, sha) == 3;
     if (f) fclose(f);
-    if (!ok || pid <= 1 || uid != r->uid || !vmcat_sha_ok(sha)) { admin_err("vm.nothingRunning", NULL); return; }
+    VmCatEntry e512 = { .hash = VMCAT_SHA512 };
+    if (!ok || pid <= 1 || uid != r->uid || (!vmcat_sha_ok(sha) && !vmcat_hash_ok(&e512, sha))) { admin_err("vm.nothingRunning", NULL); return; }
     snprintf(cp, sizeof cp, "/proc/%d/comm", pid);
     FILE *c = fopen(cp, "re");
     if (c) { if (!fgets(comm, sizeof comm, c)) comm[0] = 0; fclose(c); }
@@ -388,7 +514,7 @@ void vm_act_image_cancel(const AdminReq *r, const char *arg, size_t len) {
     kill(pid, SIGTERM);
     for (int i = 0; i < 40 && !kill(pid, 0); i++) usleep(50000);
     /* the part stays (<sha256>.iso.part): asking for the image again continues it; Storage removes it */
-    char p[200];
+    char p[240];
     snprintf(p, sizeof p, VM_IMAGES "/%s.lock", sha);
     unlink(p);
     admin_ok("vm.downloadCancelled", NULL);
@@ -422,18 +548,20 @@ static int open_by_someone(const char *path) {
  * CD drive (any account's: the files QEMU holds open); a part of a stopped download goes with it. */
 void vm_act_image_remove(const AdminReq *r, const char *arg, size_t len) {
     (void)r;
-    char s[65];
-    if (len != 64 || strlen(arg) != 64 || !vmcat_sha_ok(arg)) { admin_err("admin.invalidArgument", NULL); return; }
-    for (int i = 0; i < 64; i++) s[i] = (char)tolower((unsigned char)arg[i]);
-    s[64] = 0;
-    char p[200], lock[200];
-    snprintf(p, sizeof p, VM_IMAGES "/%s.iso", s);
+    char s[129];
+    VmCatEntry e512 = { .hash = VMCAT_SHA512 };
+    int big = len == 128;                                    /* a machine group's archive, images/<sha512>.tar.xz */
+    if ((len != 64 && len != 128) || strlen(arg) != len || (big ? !vmcat_hash_ok(&e512, arg) : !vmcat_sha_ok(arg))) { admin_err("admin.invalidArgument", NULL); return; }
+    for (size_t i = 0; i < len; i++) s[i] = (char)tolower((unsigned char)arg[i]);
+    s[len] = 0;
+    char p[240], lock[240];
+    snprintf(p, sizeof p, VM_IMAGES "/%s.%s", s, big ? "tar.xz" : "iso");
     snprintf(lock, sizeof lock, VM_IMAGES "/%s.lock", s);
     int lfd = open(lock, O_RDWR | O_CLOEXEC | O_NOFOLLOW);
     if (lfd >= 0 && flock(lfd, LOCK_EX | LOCK_NB)) { close(lfd); admin_err("vm.imageBusy", NULL); return; }   /* downloading */
     if (open_by_someone(p)) { if (lfd >= 0) close(lfd); admin_err("vm.imageInUse", NULL); return; }
     int rc = unlink(p) && errno != ENOENT;
-    char q[208];
+    char q[248];
     snprintf(q, sizeof q, "%s.part", p);
     if (unlink(q) && errno != ENOENT) rc = 1;
     snprintf(q, sizeof q, VM_IMAGES "/%s.json", s);
