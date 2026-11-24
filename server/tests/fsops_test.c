@@ -44,6 +44,73 @@ static void wait_job(int id) {
     CHECK(!"the task did not finish");
 }
 
+/* #243: a Cloud account may still list a file it has just deleted, so the moved folder's rmdir reads ENOTEMPTY */
+extern int (*fsops_test_rmdir)(const char *);
+static char busy_dir[512];
+static int busy_left, busy_calls;
+static int busy_rmdir(const char *p) {
+    if (!strcmp(p, busy_dir)) { busy_calls++; if (busy_left != 0) { if (busy_left > 0) busy_left--; errno = ENOTEMPTY; return -1; } }
+    return rmdir(p);
+}
+/* a job's end: 1 = done, 0 = failed (its error in err), -1 = not done within ms */
+static int job_end(int id, int ms, char *err, size_t n) {
+    for (int k = 0; k < ms / 5; k++) {
+        for (int i = 0; i < FSJOB_MAX; i++) {
+            const FsJob *j = fsjob_get(i);
+            if (j && j->id == id && __atomic_load_n(&j->done, __ATOMIC_ACQUIRE)) {
+                int ok = !j->failed;
+                snprintf(err, n, "%s", j->error);
+                fsjob_forget(id);
+                return ok;
+            }
+        }
+        usleep(5000);
+    }
+    return -1;
+}
+static double now_s(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return (double)t.tv_sec + t.tv_nsec / 1e9; }
+static void test_move_busy_folder(void) {
+    /* a cross-disk move (a tmpfs to the test home) whose source folder reads ENOTEMPTY once, then for good */
+    char src[512], dst[512], err[256], f[600];
+    snprintf(src, sizeof src, "/dev/shm/fsops-busy-%d", (int)getpid());
+    struct stat a, b;
+    mkdir(src, 0700);
+    if (lstat(src, &a) || lstat(H, &b) || a.st_dev == b.st_dev) { printf("fsops-test: busy-folder move skipped: needs /dev/shm on its own file system\n"); rmdir(src); return; }
+    snprintf(f, sizeof f, "%s/check.bin", src);
+    FILE *o = fopen(f, "w");
+    if (o) { fputs("1234", o); fclose(o); }
+    snprintf(dst, sizeof dst, "%s/check-scratch", H);
+    snprintf(busy_dir, sizeof busy_dir, "%s", src);
+    fsops_test_rmdir = busy_rmdir;
+    busy_left = 1; busy_calls = 0;
+    int id = fsjob_start(src, dst, 1, err, sizeof err);
+    CHECK(id > 0);
+    int r = job_end(id, 6000, err, sizeof err);
+    if (r != 1) fprintf(stderr, "busy move: %d %s\n", r, err);
+    CHECK(r == 1);                                   /* tried again: the move ends well (#243) */
+    CHECK(busy_calls == 2);
+    CHECK(lstat(src, &a) && errno == ENOENT);
+    CHECK(exists("check-scratch/check.bin"));
+    /* a folder that stays full: the move fails as before, after a bounded wait, and nothing else is touched */
+    mkdir(src, 0700);
+    o = fopen(f, "w");
+    if (o) { fputs("1234", o); fclose(o); }
+    snprintf(dst, sizeof dst, "%s/check-scratch2", H);
+    busy_left = -1; busy_calls = 0;
+    double t0 = now_s();
+    id = fsjob_start(src, dst, 1, err, sizeof err);
+    CHECK(id > 0);
+    r = job_end(id, 9000, err, sizeof err);
+    double took = now_s() - t0;
+    CHECK(r == 0 && !strncmp(err, "fs.moveRemoveFailed", 19));
+    CHECK(took < 5.5);                               /* at most ~5 s in all */
+    CHECK(busy_calls >= 2 && busy_calls <= 8);
+    CHECK(!lstat(src, &a) && S_ISDIR(a.st_mode));    /* the folder itself is left, only rmdir was tried again */
+    fsops_test_rmdir = rmdir;
+    rmdir(src);
+    /* the Trash never waits (it runs on the interface's thread): a refusal there is immediate */
+}
+
 static int trash_n;
 static char trash_id[1024];
 static void count_cb(void *ud, const char *id, const char *name, const char *orig, const char *date, int dir, double size) {
@@ -344,6 +411,8 @@ int main(void) {
     CHECK(id > 0);
     wait_job(id);
     CHECK(!exists("copia") && exists("movida/sub/b.txt"));
+
+    test_move_busy_folder();
 
     /* Papelera */
     path(a, "movida");
