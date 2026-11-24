@@ -103,7 +103,7 @@ ROWS = [
         has("vhost-user-fs-pci,id=share0,chardev=vfs0,tag=docs,addr=0xb"), has("tag=LordOS,addr=0xf"),
         opt_re("-object", r"share=on")], os.path.exists("/usr/libexec/virtiofsd")),
     ("3D graphics", ["--display", "window", "--graphics", "3d"], ["--transfer", "off"], ["--render-node", RENDER or ""], [
-        has("virtio-vga-gl,id=video0,addr=0x4"), opt_re("-display", r"^dbus,p2p=yes,gl=on,rendernode=/dev/dri/renderD\d+,audiodev=snd0$")],
+        has("virtio-vga-gl,id=video0,addr=0x4"), opt_re("-display", r"^dbus,p2p=yes,gl=on,rendernode=/proc/self/fd/\d+,audiodev=snd0$")],
      bool(RENDER and GL)),
 ]
 
