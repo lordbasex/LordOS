@@ -162,6 +162,12 @@ static void test_machine(void) {
     CHECK(mvariant("\"microphone\": false", "\"microphone\": true") != VM_OK, "locked: microphone");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"graphics\": \"3d\"") != VM_OK, "locked: 3d");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"perf_profile\": true") != VM_OK, "locked: perf profile");
+    {
+        VmMachine x;
+        CHECK(vm_machine_parse(M14, strlen(M14), &x, err, sizeof err) == VM_OK, err);
+        x.schema = VM_SCHEMA; x.automation = 1;
+        CHECK(vm_machine_check(&x, err, sizeof err) == VM_E_RANGE && strstr(err, "automation"), "locked: automation");
+    }
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"disk_serial\": \"X1\"") != VM_OK, "locked: disk serial");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"ports\": [{\"proto\": \"tcp\", \"host\": 2222, \"guest\": 22, \"open\": \"this-computer\"}]") != VM_OK, "tor: ports");
     CHECK(mvariant("\"agent\": false", "\"agent\": false, \"shares\": [{\"tag\": \"a\", \"path\": \"/home/u/a\", \"writable\": false}]") != VM_OK, "locked: shares");

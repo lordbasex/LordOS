@@ -44,4 +44,45 @@ void mcli_json_str(FILE *f, const char *s);
 /* a byte count as people read it, "12.3 GB", "640 MB" (out: at least 16) */
 void mcli_bytes(double b, char *out, size_t n);
 
+/* ---- exec, cp, logs, mcp and apply (docs/VIRTUALIZATION.md 6.15, 6.24) ---- */
+
+/* `machines cp`'s side in a machine: "NAME:PATH" (NAME without '/', not empty; PATH "" means the guest's home, "~").
+ * 1 and name, *path filled; 0 a path on this computer (write ./a:b for a local name with a colon) */
+int mcli_cp_side(const char *arg, char *name, size_t nn, const char **path);
+
+/* n bytes as a JSON string (quotes included): every byte that isn't valid UTF-8 becomes U+FFFD, controls are escaped */
+#include <stdint.h>
+void mcli_json_bytes(FILE *f, const uint8_t *b, size_t n);
+
+/* what a guest wrote, made safe for a terminal: newlines and tabs kept, other controls, C1 controls and broken UTF-8
+ * each one '?'. Returns the length written (out NUL-terminated, cap ≥ 5) */
+size_t mcli_term_clean(const uint8_t *b, size_t n, char *out, size_t cap);
+
+/* a reproducible machine's file (`machines apply`, 6.24): a strict subset of TOML. An optional [machine] table first,
+ * then `key = value` lines (comments with #): name, arch, memory ("8G"), disk ("64G"), network, iso, graphics,
+ * clipboard (strings), cpus (1..64), agent (true/false), ports, shares (one-line lists of strings, as `machines set`'s
+ * --port and --share take them). Unknown or repeated keys, anything after a value, other value forms: refused, with
+ * the line (*line, 0 for the whole file) and why. The values are checked again by lord-vm. */
+#define MCLI_APPLY_MAX    (64 * 1024)
+#define MCLI_APPLY_STR    1100
+#define MCLI_APPLY_PORTS  32
+#define MCLI_APPLY_SHARES 4
+typedef struct {
+    char name[65], arch[24], memory[24], disk[24], network[24], graphics[24], clipboard[24], iso[1024];
+    int cpus, agent;                        /* -1: not given */
+    char ports[MCLI_APPLY_PORTS][48];
+    char shares[MCLI_APPLY_SHARES][1100];
+    int n_ports, n_shares, ports_set, shares_set;
+} McliApply;
+int mcli_apply_parse(const char *text, size_t n, McliApply *a, int *line, const char **why);
+
+/* one MCP message (JSON-RPC 2.0, one per line, at most MCLI_RPC_MAX bytes): exactly the keys jsonrpc "2.0", method (1..64
+ * bytes), id (an integer or a string of at most 128 bytes; absent: a notification) and params (an object or array).
+ * 0 with r filled (id: its JSON text, to echo back; free with mcli_rpc_free), -1 refused */
+#include "../sec/json.h"
+#define MCLI_RPC_MAX (1 << 20)
+typedef struct { JDoc doc; const char *method; const JVal *params; int has_id; char id[800]; } McliRpc;
+int mcli_rpc_parse(const char *line, size_t n, McliRpc *r);
+void mcli_rpc_free(McliRpc *r);
+
 #endif

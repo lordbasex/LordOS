@@ -38,6 +38,7 @@
 #include "vmcpu.h"
 #include "vmgroup.h"
 #include "vmcatalog.h"
+#include "vmexec.h"
 #include "vmlink.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
@@ -1031,6 +1032,14 @@ static struct {
     uint32_t install_seq;
     int inst_busy;                          /* VAG_INSTALL on its way, from the request to its answer */
     long inst_pid;                          /* the install's script in the guest (guest-exec), followed until it ends */
+    /* VM_EXEC (6.15, vmexec.h): one program at a time for the person; who asked, its guest-exec pid, when to look and
+     * when to give up (its timeout and 30 s more), and how many ran this start (for the log) */
+    int ex_busy, ex_ci;
+    int ex_out, ex_skip;                    /* its requests in qemu-guest-agent's queue; how many answers belong to one given up */
+    uint32_t ex_seq;
+    unsigned ex_n;
+    long ex_pid;
+    long long ex_poll_at, ex_deadline;
     long long inst_poll_at, inst_deadline;
     /* a snapshot job (VM_SNAPSHOT): which, its tag and name, who asked; --loadvm TAG at start */
     int snap_kind, snap_client;
@@ -3485,7 +3494,7 @@ static void begin_snapshot(int ci, uint32_t seq, int kind, const char *text) {
 enum { AQ_IGNORE = 0, AQ_SYNC, AQ_INFO, AQ_OSINFO, AQ_PING, AQ_JEXEC, AQ_JSTATUS, AQ_FOPEN, AQ_FWRITE, AQ_FCLOSE, AQ_INSTALL, AQ_INHIBIT,
        AQ_IDEXEC, AQ_IDSTATUS, AQ_FXEXEC, AQ_FXSTATUS, AQ_FXOPEN, AQ_FXWRITE, AQ_FXCLOSE, AQ_DEVRAW,
        AQ_WIEXEC, AQ_WISTATUS, AQ_WIOPEN, AQ_WIWRITE, AQ_WICLOSE, AQ_XEXEC, AQ_XSTATUS, AQ_INSTSTATUS,
-       AQ_PEXEC, AQ_PSTATUS, AQ_GEXEC, AQ_GSTATUS, AQ_SEXEC, AQ_SSTATUS };
+       AQ_PEXEC, AQ_PSTATUS, AQ_GEXEC, AQ_GSTATUS, AQ_SEXEC, AQ_SSTATUS, AQ_EXEXEC, AQ_EXSTATUS };
 
 /* A Clone's first start (6.3): one fixed script, run as root by qemu-guest-agent, with the new hostname as its only
  * argument (checked: one DNS label). The machine-id is made again by systemd from the clone's new SMBIOS UUID (the old
@@ -3789,8 +3798,11 @@ static void inst_reply(int code, const char *text) {
     S.inst_busy = 0; S.helper_handle = 0; S.inst_pid = 0; S.inst_poll_at = 0;
 }
 
+static void ex_end(int code, const char *why);
 static void ag_lost(const char *why) {
     fx_fail_all("qemu-guest-agent stopped answering in the guest");
+    if (S.ex_busy) ex_end(VME_WRONG_STATE, "qemu-guest-agent stopped answering in the guest");
+    S.ex_out = S.ex_skip = 0;               /* the queue is emptied below */
     wi_lost("qemu-guest-agent stopped answering in the guest");
     if (S.qga_up) vlog("agent: %s", why);
     S.qga_up = 0; S.agq_n = 0; S.jpid = 0; S.inhibit_done = 0;
@@ -3830,6 +3842,7 @@ static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok);
 static void wi_on_reply(int kind, const JVal *root, const JVal *r, int ok);
 static void fx_fail_all(const char *why);
 
+static void ex_reply(int kind, const JVal *root, const JVal *r, int ok);
 static void on_qga_reply(const JVal *root, int ok) {
     if (!S.agq_n) return;
     int kind = S.agq[S.agq_head];
@@ -3843,6 +3856,7 @@ static void on_qga_reply(const JVal *root, int ok) {
     case AQ_PEXEC: case AQ_PSTATUS: ptr_reply(kind, root, r, ok); break;
     case AQ_GEXEC: case AQ_GSTATUS: gvt_reply(kind, root, r, ok); break;
     case AQ_SEXEC: case AQ_SSTATUS: search_reply(kind, root, r, ok); break;
+    case AQ_EXEXEC: case AQ_EXSTATUS: ex_reply(kind, root, r, ok); break;
     case AQ_WIEXEC: case AQ_WISTATUS: case AQ_WIOPEN: case AQ_WIWRITE: case AQ_WICLOSE: wi_on_reply(kind, root, r, ok); break;
     case AQ_DEVRAW: {
         /* --dev-qmp: a qemu-guest-agent command for the tests; a pid, or what a guest-exec printed */
@@ -5457,9 +5471,126 @@ static void link_change(int ci, uint32_t seq, int on, int fd) {
     vlog("link: connected to the group's other member (backend lk%d on hub %d)", gen, LINK_HUB(&S.m));
 }
 
+/* ---- VM_EXEC: a program in the guest for the person (docs/VIRTUALIZATION.md 6.15, vmexec.h) ----
+ * The request comes as a sealed memfd from a client of this machine's socket (the person's alone). Checked here: the
+ * person's consent in machine.json ("automation", read from the file again, so a change made since the start counts),
+ * never with the anonymity profile, the agent on and answering with guest-exec, a Linux guest, one at a time. The
+ * program, its arguments and its input reach the guest as guest-exec's arguments and input-data, never as script text.
+ * What the guest prints back is parsed as hostile (vmx_guest_parse) and handed on as bytes in a sealed memfd. */
+static void ex_end(int code, const char *why) {
+    if (!S.ex_busy) return;
+    if (code != VME_OK) { vlog("automation: program %u: %s", S.ex_n, why); reply(S.ex_ci, S.ex_seq, code, why); }
+    S.ex_busy = 0; S.ex_ci = -1; S.ex_pid = 0; S.ex_poll_at = 0; S.ex_deadline = 0;
+    S.ex_skip = S.ex_out;                   /* answers still on their way are an old program's, never the next one's */
+}
+
+static void ex_begin(int ci, uint32_t seq, int fd) {
+    VmMachine now;
+    const char *no = NULL;
+    int code = VME_DENIED;
+    size_t n = 0;
+    uint8_t *b = NULL;
+    VmxReq *rq = calloc(1, sizeof *rq);
+    if (!rq) { no = "out of memory"; code = VME_INTERNAL; }
+    else if (fd < 0 || !(b = vmx_memfd_read(fd, VMX_REQ_MAX, &n)) || vmx_req_parse(b, n, rq)) { no = "not a program to run"; code = VME_BAD_REQUEST; }
+    else if (vm_machine_load(S.dir, &now, NULL, 0) || !now.automation || !S.m.automation) no = "automation is off for this machine: turn it on in its Configure, Security";
+    else if (S.m.profile_lock || now.profile_lock) no = "automation is locked for anonymity";
+    else if (!S.m.agent) no = "the guest agent is off for this machine";
+    else if (S.qemu <= 0 || S.qemu_done || !S.qmp_up || S.state != VS_RUNNING) { no = "the machine isn't running"; code = VME_WRONG_STATE; }
+    else if (!S.qga_up || !(S.ag_caps & VAC_EXEC)) { no = "qemu-guest-agent isn't answering in the guest"; code = VME_WRONG_STATE; }
+    else if (S.ag_windows) no = "programs run this way only in Linux guests";
+    else if (S.ex_busy) { no = "another program is running in this machine"; code = VME_BUSY; }
+    if (fd >= 0) close(fd);
+    if (!no) {
+        /* guest-exec: /bin/sh -c ROOT lordos-exec PERSON TIMEOUT PROGRAM ARGS..., the input as input-data */
+        char t[16];
+        snprintf(t, sizeof t, "%u", rq->timeout);
+        JBuf j;
+        jb_init(&j);
+        jb_raw(&j, "{\"path\":\"/bin/sh\",\"arg\":[\"-c\",");
+        jb_str(&j, VMX_ROOT_SH);
+        jb_raw(&j, ",\"lordos-exec\",");
+        jb_str(&j, VMX_PERSON_SH);
+        jb_raw(&j, ",");
+        jb_str(&j, t);
+        for (int i = 0; i < rq->argc; i++) { jb_raw(&j, ","); jb_str(&j, rq->argv[i]); }
+        jb_raw(&j, "]");
+        if (rq->inlen) {
+            size_t cap = (rq->inlen + 2) / 3 * 4 + 4;
+            char *e = malloc(cap);
+            if (!e || ag_b64_encode(rq->in, rq->inlen, e, cap) <= 0) j.oom = 1;
+            else { jb_raw(&j, ",\"input-data\":\""); jb_raw(&j, e); jb_raw(&j, "\""); }
+            free(e);
+        }
+        jb_raw(&j, ",\"capture-output\":true}");
+        S.ex_n++;
+        /* the log names the program and how much came with it, never its arguments or input (they may hold secrets) */
+        char prog[48];
+        const char *base = strrchr(rq->argv[0], '/');
+        snprintf(prog, sizeof prog, "%.40s", base && base[1] ? base + 1 : rq->argv[0]);
+        for (char *q = prog; *q; q++) if ((unsigned char)*q < 0x20 || (unsigned char)*q >= 0x7f) *q = '?';
+        if (j.oom || qga_do("guest-exec", j.p, AQ_EXEXEC)) { no = "busy"; code = VME_BUSY; }
+        else {
+            S.ex_out++;
+            S.ex_busy = 1; S.ex_ci = ci; S.ex_seq = seq; S.ex_pid = 0; S.ex_poll_at = 0;
+            S.ex_deadline = now_ms() + (long long)rq->timeout * 1000 + 30000;
+            vlog("automation: program %u: %s, %d argument%s, %zu bytes of input, at most %u s", S.ex_n, prog, rq->argc - 1, rq->argc == 2 ? "" : "s", rq->inlen, rq->timeout);
+        }
+        jb_free(&j);
+    }
+    free(b);
+    free(rq);
+    if (no) reply(ci, seq, code, no);
+}
+
+static void ex_reply(int kind, const JVal *root, const JVal *r, int ok) {
+    if (S.ex_out > 0) S.ex_out--;
+    if (S.ex_skip > 0) { S.ex_skip--; return; }
+    if (!S.ex_busy) return;
+    if (kind == AQ_EXEXEC) {
+        if (!ok) { char w[VM_TEXT_MAX]; snprintf(w, sizeof w, "qemu-guest-agent refused: %.150s", qmp_error_desc(root)); ex_end(VME_QMP, w); return; }
+        S.ex_pid = (long)json_num(r, "pid", 0);
+        if (S.ex_pid <= 0) { ex_end(VME_QMP, "qemu-guest-agent gave no process"); return; }
+        S.ex_poll_at = now_ms() + 30;
+        return;
+    }
+    if (!ok) { ex_end(VME_QMP, "qemu-guest-agent lost the program"); return; }
+    if (!json_bool(r, "exited", 0)) { S.ex_poll_at = now_ms() + 60; return; }
+    /* what the person's script printed (hostile), or why the root script stopped (its exit and errors) */
+    int ec = (int)json_num(r, "exitcode", -1);
+    const char *o = json_str(r, "out-data"), *e = json_str(r, "err-data");
+    size_t ol = o ? strnlen(o, QMP_LINE_MAX) : 0, el = e ? strnlen(e, QMP_LINE_MAX) : 0;
+    uint8_t *ob = malloc(ol / 4 * 3 + 4), *eb = malloc(el / 4 * 3 + 4);
+    long on = ob ? (ol ? ag_b64_decode(o, ol, ob, ol / 4 * 3 + 4) : 0) : -1, en = eb ? (el ? ag_b64_decode(e, el, eb, el / 4 * 3 + 4) : 0) : -1;
+    VmxRes res;
+    if (on < 0 || en < 0 || vmx_guest_parse(ob, (size_t)on, &res)) {
+        /* no header: the root script refused (no person, no runuser) or the guest isn't what it says; its words, cleaned */
+        char w[VM_TEXT_MAX], t[120];
+        size_t k = 0;
+        for (long i = 0; en > 0 && i < en && k + 1 < sizeof t; i++) t[k++] = eb[i] >= 0x20 && eb[i] < 0x7f ? (char)eb[i] : ' ';
+        t[k] = 0;
+        snprintf(w, sizeof w, "the guest couldn't run it (%d)%s%.120s", ec, k ? ": " : "", t);
+        free(ob); free(eb);
+        ex_end(VME_INTERNAL, w);
+        return;
+    }
+    size_t rn;
+    uint8_t *rb = vmx_res_encode(&res, &rn);
+    int mfd = rb ? vmx_memfd("lordos-vm-exec", rb, rn) : -1;
+    free(rb);
+    if (mfd < 0) { free(ob); free(eb); ex_end(VME_INTERNAL, "out of memory"); return; }
+    vlog("automation: program %u ended with %d%s%s", S.ex_n, res.exit, res.flags & VMX_F_TIMEOUT ? " (its time ran out)" : "",
+         res.flags & (VMX_F_OUT_CUT | VMX_F_ERR_CUT) ? " (output cut)" : "");
+    VmMsg d = vm_msg(VM_EXEC_DONE, S.ex_seq, res.exit, (int)res.flags, 0, 0, "");
+    send_to(S.ex_ci, &d, mfd);
+    close(mfd);
+    free(ob); free(eb);
+    ex_end(VME_OK, "");
+}
+
 static void handle_request(int ci, const VmMsg *m, int fd) {
     if (!vm_msg_valid(m, 1)) { if (fd >= 0) close(fd); reply(ci, m->seq, VME_BAD_REQUEST, "bad request"); return; }
-    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && m->type != VM_LINK && (m->type != VM_QMP || !S.dev_qmp) &&
+    if (fd >= 0 && m->type != VM_CDROM && m->type != VM_CLIP && m->type != VM_FILE && m->type != VM_LINK && m->type != VM_EXEC && (m->type != VM_QMP || !S.dev_qmp) &&
         !(m->type == VM_AGENT && m->a == VAG_TRANSFER)) { close(fd); fd = -1; }
     int alive = S.qemu > 0 && !S.qemu_done && S.qmp_up;
     switch (m->type) {
@@ -5763,6 +5894,7 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         reply(ci, m->seq, VME_OK, "");
         return;
     }
+    case VM_EXEC: ex_begin(ci, m->seq, fd); return;
     case VM_RENAME: {
         /* the name while it runs (lord-vm --rename, 6.26): lord-vm holds the lock, so it writes machine.json; the folders
          * keep their names until a rename with the machine off (nothing here may move the folder it runs from) */
@@ -6260,6 +6392,7 @@ static void drop_client(int i) {
     close(S.cl[i].fd);
     S.cl[i].fd = -1;
     for (int k = 0; k < S.pq_n; k++) { Pending *p = &S.pq[(S.pq_head + k) % MAX_PENDING]; if (p->client == i) p->client = -1; }
+    if (S.ex_busy && S.ex_ci == i) S.ex_ci = -1;            /* its program runs on to its end; nobody gets the answer */
     /* the window that had apps mode on is gone (Keep Running): the guest shows its own desktop again */
     if (control && S.lag_apps) { uint8_t off = 0; S.lag_apps = 0; lag_send(LAG_APPS, &off, 1); vlog("agent: apps mode off (the window closed)"); }
     if (control && !S.keep_running && !S.qemu_done && S.state != VS_STOPPING) {
@@ -6378,6 +6511,8 @@ static void loop(void) {
         if (S.gvt_poll_at && (next < 0 || S.gvt_poll_at < next)) next = S.gvt_poll_at;
         if (S.search_poll_at && (next < 0 || S.search_poll_at < next)) next = S.search_poll_at;
         if (S.inst_poll_at && (next < 0 || S.inst_poll_at < next)) next = S.inst_poll_at;
+        if (S.ex_busy && S.ex_poll_at && (next < 0 || S.ex_poll_at < next)) next = S.ex_poll_at;
+        if (S.ex_busy && S.ex_deadline && (next < 0 || S.ex_deadline < next)) next = S.ex_deadline;
         if (S.fx_poll_at && (next < 0 || S.fx_poll_at < next)) next = S.fx_poll_at;
         if (S.wi_poll_at && (next < 0 || S.wi_poll_at < next)) next = S.wi_poll_at;
         if (S.migq_next && (next < 0 || S.migq_next < next)) next = S.migq_next;
@@ -6415,6 +6550,8 @@ static void loop(void) {
         if (S.ptr_poll_at && now >= S.ptr_poll_at) { char a[48]; S.ptr_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.ptr_pid); if (qga_do("guest-exec-status", a, AQ_PSTATUS)) S.ptr_poll_at = now + 300; }
         if (S.search_poll_at && now >= S.search_poll_at) { char a[48]; S.search_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.search_pid); if (qga_do("guest-exec-status", a, AQ_SSTATUS)) S.search_poll_at = now + 1000; }
         if (S.gvt_poll_at && now >= S.gvt_poll_at) { char a[48]; S.gvt_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.gvt_pid); if (qga_do("guest-exec-status", a, AQ_GSTATUS)) S.gvt_poll_at = now + 1000; }
+        if (S.ex_busy && S.ex_poll_at && now >= S.ex_poll_at) { char a[48]; S.ex_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.ex_pid); if (qga_do("guest-exec-status", a, AQ_EXSTATUS)) S.ex_poll_at = now + 300; else S.ex_out++; }
+        if (S.ex_busy && S.ex_deadline && now >= S.ex_deadline) ex_end(VME_INTERNAL, "the guest didn't say the program ended");
         if (S.inst_poll_at && now >= S.inst_poll_at) { char a[48]; S.inst_poll_at = 0; snprintf(a, sizeof a, "{\"pid\":%ld}", S.inst_pid); if (qga_do("guest-exec-status", a, AQ_INSTSTATUS)) S.inst_poll_at = now + 500; }
         fx_tick(now);
         open_tick(now);
@@ -7198,7 +7335,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, autom = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -7251,6 +7388,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         }
         if (!strcmp(a, "--cpu-pin")) { pin = !strcmp(v, "off") ? VM_PIN_OFF : !strcmp(v, "auto") ? VM_PIN_AUTO : !strcmp(v, "default") ? VM_PIN_DEFAULT : -1; if (pin < 0) { fprintf(stderr, "lord-vm: --cpu-pin off|auto|default\n"); return 2; } continue; }
         if (!strcmp(a, "--capture-fullscreen")) { capfs = parse_enum(v, "off", "on"); if (capfs < 0) { fprintf(stderr, "lord-vm: --capture-fullscreen on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--automation")) { autom = parse_enum(v, "off", "on"); if (autom < 0) { fprintf(stderr, "lord-vm: --automation on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--perf-profile")) { perf = parse_enum(v, "off", "on"); if (perf < 0) { fprintf(stderr, "lord-vm: --perf-profile on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
@@ -7336,6 +7474,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (ptr >= 0) { m.pointer_guest = ptr; if (ptr) m.schema = VM_SCHEMA; }
     if (capfs >= 0) { m.capture_fullscreen = capfs; if (capfs) m.schema = VM_SCHEMA; }
     if (perf >= 0) { m.perf_profile = perf; if (perf) m.schema = VM_SCHEMA; }
+    if (autom >= 0) { m.automation = autom; if (autom) m.schema = VM_SCHEMA; }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
@@ -9403,6 +9542,7 @@ static int usage(void) {
             "                         [--pointer lordos|guest]   (who draws a Windows guest's pointer: LordOS, or its display driver)\n"
             "                         [--capture-fullscreen on|off]   (the window captures the mouse when it goes full screen)\n"
             "                         [--perf-profile on|off]   (the guest tools switch the guest to its performance profile while it runs)\n"
+            "                         [--automation on|off]   (machines exec and cp may run programs in the guest: docs/VIRTUALIZATION.md 6.15)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"

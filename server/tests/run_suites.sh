@@ -401,6 +401,14 @@ EOF
         77) skip "vm-group-link" "WHONIX_GW and WHONIX_WS (Whonix's disks with a serial shell), KVM, QEMU, unshare and the default theme" ;;
         *) bad "vm-group-link (tests/vm_group_link.sh, headless lord-server, a Whonix group)"; tail -20 "$T/out" ;;
     esac
+    # machines exec, cp, logs and mcp against a real running Linux machine with automation on (tests/vm_exec_e2e.sh;
+    # VM_EXEC_NAME and VM_EXEC_USER, in a private HOME and namespaces)
+    bash tests/vm_exec_e2e.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-exec-e2e (tests/vm_exec_e2e.sh, machines exec, cp, logs and mcp in a real guest)" ;;
+        77) skip "vm-exec-e2e" "VM_EXEC_NAME and VM_EXEC_USER (a running Linux machine with automation on), build/machines and python3" ;;
+        *) bad "vm-exec-e2e (tests/vm_exec_e2e.sh, machines exec, cp, logs and mcp in a real guest)"; tail -20 "$T/out" ;;
+    esac
     # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
     sh tests/guest_clip_test.sh >"$T/out" 2>&1
     case $? in

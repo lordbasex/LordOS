@@ -278,6 +278,139 @@ static void fuzz_channel(void) {
     CHECK(accepted > 0);
 }
 
+
+/* ---- exec, cp, logs, mcp and apply (6.15, 6.24) ---- */
+
+static void test_cp_side(void) {
+    char n[65];
+    const char *p;
+    CHECK(mcli_cp_side("Debian Dev:~/build", n, sizeof n, &p) && !strcmp(n, "Debian Dev") && !strcmp(p, "~/build"));
+    CHECK(mcli_cp_side("deb:", n, sizeof n, &p) && !strcmp(n, "deb") && !strcmp(p, "~"));
+    CHECK(mcli_cp_side("deb:/etc/hosts", n, sizeof n, &p) && !strcmp(p, "/etc/hosts"));
+    CHECK(!mcli_cp_side("./a:b", n, sizeof n, &p) && !mcli_cp_side("/tmp/x:y", n, sizeof n, &p) && !mcli_cp_side(":x", n, sizeof n, &p) &&
+          !mcli_cp_side("plain", n, sizeof n, &p) && !mcli_cp_side(NULL, n, sizeof n, &p));
+    char small[4];
+    CHECK(!mcli_cp_side("toolong:x", small, sizeof small, &p));
+}
+
+static void test_json_bytes(void) {
+    char buf[256];
+    FILE *f = fmemopen(buf, sizeof buf, "w");
+    const uint8_t b[] = { 'a', '"', '\\', '\n', 0x01, 0xc3, 0xb1, 0xff, 0xe2, 0x82, 0xc0, 0xaf, 0xed, 0xa0, 0x80, 'z' };
+    mcli_json_bytes(f, b, sizeof b);
+    fclose(f);
+    CHECK(!strcmp(buf, "\"a\\\"\\\\\\n\\u0001ñ\\ufffd\\ufffd\\ufffd\\ufffd\\ufffd\\ufffd\\ufffd\\ufffdz\""));
+    /* whatever comes in, the result parses as JSON */
+    unsigned s = 7;
+    for (int it = 0; it < 20000; it++) {
+        uint8_t r[64];
+        for (int i = 0; i < 64; i++) { s = s * 1103515245u + 12345u; r[i] = (uint8_t)(s >> 16); }
+        char out[2048];
+        FILE *g = fmemopen(out, sizeof out, "w");
+        mcli_json_bytes(g, r, (size_t)(s % 64));
+        long len = ftell(g);
+        fclose(g);
+        JDoc d;
+        int ok = len > 0 && !json_parse(out, (size_t)len, &d, NULL, 0);
+        CHECK(ok);
+        if (ok) json_free(&d);
+    }
+}
+
+static void test_term_clean(void) {
+    char o[64];
+    const uint8_t b[] = { 'o', 'k', '\n', 0x1b, '[', '2', 'J', 0xc2, 0x9b, '1', 0xc3, 0xa9, 0x7f, '\t', 0xff };
+    size_t n = mcli_term_clean(b, sizeof b, o, sizeof o);
+    CHECK(n == strlen(o) && !strcmp(o, "ok\n?[2J?1é?\t?"));
+    for (size_t i = 0; i < n; i++) CHECK((unsigned char)o[i] != 0x1b);
+    CHECK(mcli_term_clean(b, sizeof b, o, 5) <= 4);
+}
+
+static int apply_ok(const char *t, McliApply *a) {
+    int line;
+    const char *why;
+    return !mcli_apply_parse(t, strlen(t), a, &line, &why);
+}
+
+static void test_apply(void) {
+    McliApply *a = malloc(sizeof *a);
+    const char good[] =
+        "# dev machine\n[machine]\nname = \"Debian Dev\"   # its name\nmemory = \"8G\"\ncpus = 6\ndisk = \"64G\"\nnetwork = \"shared\"\n"
+        "agent = true\nports = [\"tcp:2222:22\", \"tcp:8080:80:lan\",]\nshares = [ \"ro:src:/home/a/src\" ]\niso = \"/home/a/Descargas/debian.iso\"\r\n";
+    CHECK(apply_ok(good, a) && !strcmp(a->name, "Debian Dev") && !strcmp(a->memory, "8G") && a->cpus == 6 && !strcmp(a->disk, "64G") && a->agent == 1 &&
+          a->n_ports == 2 && !strcmp(a->ports[1], "tcp:8080:80:lan") && a->ports_set && a->n_shares == 1 && !strcmp(a->shares[0], "ro:src:/home/a/src") &&
+          !strcmp(a->iso, "/home/a/Descargas/debian.iso") && !a->graphics[0]);
+    CHECK(apply_ok("name = \"x\"\nports = []\n", a) && a->ports_set && !a->n_ports && a->cpus == -1 && a->agent == -1);
+    CHECK(apply_ok("name = \"a\\\"b\\\\c\"", a) && !strcmp(a->name, "a\"b\\c"));
+    CHECK(apply_ok("name = \"Año ñ\"", a) && !strcmp(a->name, "Año ñ"));
+    const char *bad[] = {
+        "", "memory = \"8G\"\n", "name = \"x\"\nname = \"y\"\n", "name = \"x\"\nautomation = true\n", "name = \"x\"\n[machine]\n",
+        "[machine]\n[machine]\nname=\"x\"", "[other]\nname=\"x\"", "name = x\n", "name = \"x\" y\n", "name = \"x\ny\"\n", "name = \"\"\n",
+        "name = \"x\"\ncpus = 0\n", "name = \"x\"\ncpus = 65\n", "name = \"x\"\ncpus = 07\n", "name = \"x\"\ncpus = 12345\n", "name = \"x\"\ncpus = \"4\"\n",
+        "name = \"x\"\nagent = yes\n", "name = \"x\"\nports = [\"a\" \"b\"]\n", "name = \"x\"\nports = [\"a\",\n\"b\"]\n", "name = \"x\"\nports = \"a\"\n",
+        "name = \"\\u0041\"\n", "name = \"x\\ty\x01\"\n", "name = \"\xff\"\n", "NAME = \"x\"\n", "name \"x\"\n", "[machine] x\nname = \"x\"\n",
+        "name = \"0123456789012345678901234567890123456789012345678901234567890123456789\"\n",
+        "name = \"x\"\nshares = [\"a\",\"b\",\"c\",\"d\",\"e\"]\n", "name = \"x\"\nmemory = \"8G\" # ok\ndisk = \"1\" \"2\"\n",
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) { if (apply_ok(bad[i], a)) fprintf(stderr, "  apply accepted %zu\n", i); CHECK(!apply_ok(bad[i], a)); }
+    {
+        int line; const char *why;
+        CHECK(mcli_apply_parse("name = \"x\"\n\ncpus = 99\n", 22, a, &line, &why) && line == 3 && why[0]);
+        char nul[] = "name = \"x\"\0";
+        CHECK(mcli_apply_parse(nul, sizeof nul - 1, a, &line, &why));
+        char *big = malloc(MCLI_APPLY_MAX + 2);
+        memset(big, '#', MCLI_APPLY_MAX + 1);
+        CHECK(mcli_apply_parse(big, MCLI_APPLY_MAX + 1, a, &line, &why));
+        free(big);
+    }
+    /* fuzz: flipped bytes of the good file never crash and never give a value past its buffer */
+    unsigned s = 99;
+    char t[sizeof good];
+    for (int it = 0; it < 100000; it++) {
+        memcpy(t, good, sizeof good);
+        for (int k = 0; k < 3; k++) { s = s * 1103515245u + 12345u; t[(s >> 8) % (sizeof good - 1)] = (char)(s >> 20); }
+        int line; const char *why;
+        size_t n = strlen(t);
+        if (!mcli_apply_parse(t, n, a, &line, &why)) CHECK(strlen(a->name) < sizeof a->name && a->n_ports <= MCLI_APPLY_PORTS && a->n_shares <= MCLI_APPLY_SHARES);
+    }
+    free(a);
+}
+
+static void test_rpc(void) {
+    McliRpc r;
+    const char *ok1 = "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"tools/list\"}";
+    CHECK(!mcli_rpc_parse(ok1, strlen(ok1), &r) && !strcmp(r.method, "tools/list") && r.has_id && !strcmp(r.id, "7") && !r.params);
+    mcli_rpc_free(&r);
+    const char *ok2 = "{\"jsonrpc\":\"2.0\",\"id\":\"a\\\"b\",\"method\":\"tools/call\",\"params\":{\"name\":\"x\"}}";
+    CHECK(!mcli_rpc_parse(ok2, strlen(ok2), &r) && !strcmp(r.id, "\"a\\\"b\"") && r.params && r.params->type == J_OBJ);
+    mcli_rpc_free(&r);
+    const char *ok3 = "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}";
+    CHECK(!mcli_rpc_parse(ok3, strlen(ok3), &r) && !r.has_id);
+    mcli_rpc_free(&r);
+    const char *bad[] = {
+        "", "[]", "{}", "{\"jsonrpc\":\"1.0\",\"id\":1,\"method\":\"x\"}", "{\"jsonrpc\":\"2.0\",\"id\":1}", "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"\"}",
+        "{\"jsonrpc\":\"2.0\",\"id\":1.5,\"method\":\"x\"}", "{\"jsonrpc\":\"2.0\",\"id\":null,\"method\":\"x\"}", "{\"jsonrpc\":\"2.0\",\"id\":{},\"method\":\"x\"}",
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"x\",\"params\":3}", "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"x\",\"extra\":1}",
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"x\"} trailing", "{\"jsonrpc\":\"2.0\",\"id\":1e300,\"method\":\"x\"}",
+    };
+    for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
+        int got = !mcli_rpc_parse(bad[i], strlen(bad[i]), &r);
+        if (got) { fprintf(stderr, "  rpc accepted %zu\n", i); mcli_rpc_free(&r); }
+        CHECK(!got);
+    }
+    /* the longest string id still fits escaped */
+    char line[1200], id[129];
+    memset(id, '"', 128); id[128] = 0;
+    char esc[400];
+    size_t o = 0;
+    for (int i = 0; i < 128; i++) { esc[o++] = '\\'; esc[o++] = '"'; }
+    esc[o] = 0;
+    snprintf(line, sizeof line, "{\"jsonrpc\":\"2.0\",\"id\":\"%s\",\"method\":\"ping\"}", esc);
+    CHECK(!mcli_rpc_parse(line, strlen(line), &r) && strlen(r.id) == 2 + 256);
+    mcli_rpc_free(&r);
+    (void)id;
+}
+
 int main(void) {
     test_sizes();
     test_resolve();
@@ -286,6 +419,11 @@ int main(void) {
     test_state();
     test_fill();
     test_channel();
+    test_cp_side();
+    test_json_bytes();
+    test_term_clean();
+    test_apply();
+    test_rpc();
     fuzz_channel();
     if (fails) { fprintf(stderr, "mcli-test: %d failed\n", fails); return 1; }
     printf("mcli-test: ok\n");

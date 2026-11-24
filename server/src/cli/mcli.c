@@ -229,3 +229,213 @@ void mcli_bytes(double b, char *out, size_t n) {
     else if (b >= 1e9) snprintf(out, n, "%.1f GB", b / 1e9);
     else snprintf(out, n, "%.0f MB", b / 1e6);
 }
+
+/* ---- exec, cp, logs, mcp and apply (docs/VIRTUALIZATION.md 6.15, 6.24) ---- */
+
+int mcli_cp_side(const char *arg, char *name, size_t nn, const char **path) {
+    const char *c = arg ? strchr(arg, ':') : NULL;
+    if (!c || c == arg || memchr(arg, '/', (size_t)(c - arg)) || (size_t)(c - arg) >= nn) return 0;
+    memcpy(name, arg, (size_t)(c - arg));
+    name[c - arg] = 0;
+    *path = c[1] ? c + 1 : "~";
+    return 1;
+}
+
+/* one UTF-8 character's length at p (1..4) when it is a valid one within n bytes, else 0 */
+static size_t utf8_len(const unsigned char *p, size_t n) {
+    unsigned c = p[0];
+    if (c < 0x80) return 1;
+    size_t k = c >= 0xc2 && c <= 0xdf ? 2 : c >= 0xe0 && c <= 0xef ? 3 : c >= 0xf0 && c <= 0xf4 ? 4 : 0;
+    if (!k || k > n) return 0;
+    for (size_t j = 1; j < k; j++) if ((p[j] & 0xc0) != 0x80) return 0;
+    if ((c == 0xe0 && p[1] < 0xa0) || (c == 0xed && p[1] > 0x9f) || (c == 0xf0 && p[1] < 0x90) || (c == 0xf4 && p[1] > 0x8f)) return 0;
+    return k;
+}
+
+void mcli_json_bytes(FILE *f, const uint8_t *b, size_t n) {
+    fputc('"', f);
+    for (size_t i = 0; i < n;) {
+        unsigned c = b[i];
+        if (c == '"' || c == '\\') { fputc('\\', f); fputc((int)c, f); i++; continue; }
+        if (c == '\n') { fputs("\\n", f); i++; continue; }
+        if (c == '\t') { fputs("\\t", f); i++; continue; }
+        if (c == '\r') { fputs("\\r", f); i++; continue; }
+        if (!c) { fputs("\\ufffd", f); i++; continue; }        /* NUL: many JSON readers refuse it */
+        if (c < 0x20 || c == 0x7f) { fprintf(f, "\\u%04x", c); i++; continue; }
+        size_t k = utf8_len(b + i, n - i);
+        if (!k) { fputs("\\ufffd", f); i++; continue; }
+        fwrite(b + i, 1, k, f);
+        i += k;
+    }
+    fputc('"', f);
+}
+
+size_t mcli_term_clean(const uint8_t *b, size_t n, char *out, size_t cap) {
+    size_t o = 0;
+    for (size_t i = 0; i < n && o + 4 < cap;) {
+        unsigned c = b[i];
+        if (c == '\n' || c == '\t') { out[o++] = (char)c; i++; continue; }
+        if (c < 0x20 || c == 0x7f) { out[o++] = '?'; i++; continue; }
+        size_t k = utf8_len(b + i, n - i);
+        /* C1 controls (U+0080..U+009F) act like escapes on some terminals */
+        if (!k) { out[o++] = '?'; i++; continue; }
+        if (k == 2 && c == 0xc2 && b[i + 1] < 0xa0) { out[o++] = '?'; i += 2; continue; }
+        memcpy(out + o, b + i, k);
+        o += k;
+        i += k;
+    }
+    out[o] = 0;
+    return o;
+}
+
+/* ---- a reproducible machine's file (6.24): a small, strict subset of TOML ---- */
+
+static const char *const APPLY_KEYS[] = { "name", "arch", "memory", "cpus", "disk", "network", "iso", "graphics", "agent", "clipboard", "ports", "shares", NULL };
+
+static int apply_string(const char **pp, const char *end, char *out, size_t cap) {
+    const char *p = *pp;
+    if (p >= end || *p != '"') return -1;
+    p++;
+    size_t o = 0;
+    while (p < end && *p != '"') {
+        unsigned char c = (unsigned char)*p;
+        if (c < 0x20 || c == 0x7f) return -1;
+        if (c == '\\') {
+            if (p + 1 >= end) return -1;
+            char e = p[1];
+            c = e == '"' ? '"' : e == '\\' ? '\\' : e == 't' ? '\t' : 0;
+            if (!c) return -1;
+            p += 2;
+        } else {
+            size_t k = utf8_len((const unsigned char *)p, (size_t)(end - p));
+            if (!k) return -1;
+            if (k > 1) {
+                if (o + k >= cap) return -1;
+                memcpy(out + o, p, k);
+                o += k; p += k;
+                continue;
+            }
+            p++;
+        }
+        if (o + 1 >= cap) return -1;
+        out[o++] = (char)c;
+    }
+    if (p >= end) return -1;
+    out[o] = 0;
+    *pp = p + 1;
+    return 0;
+}
+
+static const char *skip_ws(const char *p, const char *end) { while (p < end && (*p == ' ' || *p == '\t')) p++; return p; }
+
+int mcli_apply_parse(const char *text, size_t n, McliApply *a, int *line, const char **why) {
+    memset(a, 0, sizeof *a);
+    a->cpus = -1; a->agent = -1;
+    *line = 0;
+    *why = "";
+    if (!text || n > MCLI_APPLY_MAX) { *why = "the file is larger than 64 KB"; return -1; }
+    if (memchr(text, 0, n)) { *why = "the file holds a NUL byte"; return -1; }
+    unsigned seen = 0;
+    int table = 0;
+    const char *p = text, *end = text + n;
+    while (p < end) {
+        const char *e = memchr(p, '\n', (size_t)(end - p));
+        if (!e) e = end;
+        (*line)++;
+        const char *q = skip_ws(p, e), *le = e;
+        if (le > q && le[-1] == '\r') le--;
+        if (q < le && *q != '#') {
+            if (*q == '[') {
+                /* the one table this file may have, first */
+                if (table || seen || (size_t)(le - q) < 9 || memcmp(q, "[machine]", 9)) { *why = "only one [machine] table, before every key"; return -1; }
+                const char *t = skip_ws(q + 9, le);
+                if (t < le && *t != '#') { *why = "something after [machine]"; return -1; }
+                table = 1;
+            } else {
+                const char *k = q;
+                while (q < le && ((*q >= 'a' && *q <= 'z') || *q == '_')) q++;
+                size_t kl = (size_t)(q - k);
+                int ki = -1;
+                for (int i = 0; APPLY_KEYS[i]; i++) if (strlen(APPLY_KEYS[i]) == kl && !memcmp(APPLY_KEYS[i], k, kl)) ki = i;
+                if (ki < 0) { *why = "an unknown key"; return -1; }
+                if (seen & (1u << ki)) { *why = "a key given twice"; return -1; }
+                seen |= 1u << ki;
+                q = skip_ws(q, le);
+                if (q >= le || *q != '=') { *why = "a key without = and a value"; return -1; }
+                q = skip_ws(q + 1, le);
+                char sv[MCLI_APPLY_STR];
+                const char *key = APPLY_KEYS[ki];
+                if (!strcmp(key, "ports") || !strcmp(key, "shares")) {
+                    int ports = key[0] == 'p';
+                    if (q >= le || *q != '[') { *why = "a list in [ ]"; return -1; }
+                    q = skip_ws(q + 1, le);
+                    while (q < le && *q != ']') {
+                        if (apply_string(&q, le, sv, ports ? sizeof a->ports[0] : sizeof a->shares[0])) { *why = "a list of strings"; return -1; }
+                        if (ports ? a->n_ports >= MCLI_APPLY_PORTS : a->n_shares >= MCLI_APPLY_SHARES) { *why = "too many items"; return -1; }
+                        if (ports) snprintf(a->ports[a->n_ports++], sizeof a->ports[0], "%s", sv);
+                        else snprintf(a->shares[a->n_shares++], sizeof a->shares[0], "%s", sv);
+                        q = skip_ws(q, le);
+                        if (q < le && *q == ',') q = skip_ws(q + 1, le);
+                        else if (q < le && *q != ']') { *why = "items are separated by commas"; return -1; }
+                    }
+                    if (q >= le) { *why = "a list ends on its line with ]"; return -1; }
+                    q++;
+                    if (ports) a->ports_set = 1; else a->shares_set = 1;
+                } else if (!strcmp(key, "cpus")) {
+                    long v = 0;
+                    const char *d = q;
+                    while (q < le && *q >= '0' && *q <= '9' && q - d < 4) v = v * 10 + (*q++ - '0');
+                    if (q == d || (q - d > 1 && *d == '0') || v < 1 || v > 64 || (q < le && *q >= '0' && *q <= '9')) { *why = "cpus is a whole number from 1 to 64"; return -1; }
+                    a->cpus = (int)v;
+                } else if (!strcmp(key, "agent")) {
+                    if (le - q >= 4 && !memcmp(q, "true", 4)) { a->agent = 1; q += 4; }
+                    else if (le - q >= 5 && !memcmp(q, "false", 5)) { a->agent = 0; q += 5; }
+                    else { *why = "agent is true or false"; return -1; }
+                } else {
+                    if (apply_string(&q, le, sv, sizeof sv)) { *why = "a value in double quotes"; return -1; }
+                    char *dst = !strcmp(key, "name") ? a->name : !strcmp(key, "arch") ? a->arch : !strcmp(key, "memory") ? a->memory : !strcmp(key, "disk") ? a->disk :
+                                !strcmp(key, "network") ? a->network : !strcmp(key, "iso") ? a->iso : !strcmp(key, "graphics") ? a->graphics : a->clipboard;
+                    size_t cap = !strcmp(key, "iso") ? sizeof a->iso : !strcmp(key, "name") ? sizeof a->name : sizeof a->arch;
+                    if (!sv[0] || strlen(sv) >= cap) { *why = "a value that is empty or too long"; return -1; }
+                    memcpy(dst, sv, strlen(sv) + 1);
+                }
+                q = skip_ws(q, le);
+                if (q < le && *q != '#') { *why = "something after the value"; return -1; }
+            }
+        }
+        p = e < end ? e + 1 : end;
+    }
+    if (!a->name[0]) { *line = 0; *why = "name is missing"; return -1; }
+    *line = 0;
+    return 0;
+}
+
+/* ---- MCP (JSON-RPC 2.0, one message per line) ---- */
+
+int mcli_rpc_parse(const char *line, size_t n, McliRpc *r) {
+    memset(r, 0, sizeof *r);
+    if (!line || !n || n > MCLI_RPC_MAX) return -1;
+    if (json_parse(line, n, &r->doc, NULL, 0)) return -1;
+    const JVal *root = r->doc.root;
+    if (!root || root->type != J_OBJ) { json_free(&r->doc); return -1; }
+    const JVal *v = json_get(root, "jsonrpc"), *m = json_get(root, "method"), *id = json_get(root, "id"), *pa = json_get(root, "params");
+    if (!v || v->type != J_STR || strcmp(v->str, "2.0") || !m || m->type != J_STR || !m->str[0] || strlen(m->str) > 64 ||
+        (pa && pa->type != J_OBJ && pa->type != J_ARR) || (id && id->type != J_NUM && id->type != J_STR)) { json_free(&r->doc); return -1; }
+    if (id && id->type == J_STR && strlen(id->str) > 128) { json_free(&r->doc); return -1; }
+    if (id && id->type == J_NUM && (id->num != (double)(long long)id->num || id->num < -9e15 || id->num > 9e15)) { json_free(&r->doc); return -1; }
+    for (const JVal *k = root->kid; k; k = k->next)
+        if (strcmp(k->key, "jsonrpc") && strcmp(k->key, "method") && strcmp(k->key, "id") && strcmp(k->key, "params")) { json_free(&r->doc); return -1; }
+    r->method = m->str;
+    r->params = pa;
+    r->has_id = id != NULL;
+    if (id && id->type == J_NUM) snprintf(r->id, sizeof r->id, "%lld", (long long)id->num);
+    else if (id) {
+        FILE *f = fmemopen(r->id, sizeof r->id, "w");
+        if (!f) { json_free(&r->doc); return -1; }
+        mcli_json_str(f, id->str);
+        fclose(f);
+    }
+    return 0;
+}
+
+void mcli_rpc_free(McliRpc *r) { json_free(&r->doc); memset(r, 0, sizeof *r); }

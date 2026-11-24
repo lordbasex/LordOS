@@ -555,6 +555,7 @@ static int check_member(const VmMachine *m, char *err, size_t n) {
         if (m->sm_manufacturer[0] || m->sm_product[0] || m->sm_version[0] || m->sm_serial[0] || m->sm_sku[0] || m->sm_family[0] || m->disk_serial[0])
             return fail(err, n, VM_E_RANGE, "locked for anonymity: SMBIOS strings and disk serials");
         if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
+        if (m->automation) return fail(err, n, VM_E_RANGE, "locked for anonymity: automation");
     }
     return VM_OK;
 }
@@ -660,6 +661,8 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 12 && m->capture_fullscreen) return fail(err, n, VM_E_FIELD, "capture_fullscreen needs schema 12");
     if (m->perf_profile & ~1) return fail(err, n, VM_E_RANGE, "perf_profile is true or false");
     if (m->schema < 13 && m->perf_profile) return fail(err, n, VM_E_FIELD, "perf_profile needs schema 13");
+    if (m->automation & ~1) return fail(err, n, VM_E_RANGE, "automation is true or false");
+    if (m->schema < 15 && m->automation) return fail(err, n, VM_E_FIELD, "automation needs schema 15");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
@@ -712,7 +715,7 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "automation", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -988,6 +991,10 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *pp = json_get(o, "perf_profile");
         if (pp && pp->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "perf_profile must be true or false"); goto out; }
         m->perf_profile = pp ? json_bool(o, "perf_profile", 0) : 0;
+        /* schema 15: missing means no automation (6.15) */
+        const JVal *au = json_get(o, "automation");
+        if (au && au->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "automation must be true or false"); goto out; }
+        m->automation = au ? json_bool(o, "automation", 0) : 0;
         /* schema 13: missing means this computer's default (vmpin_default_on) */
         char pin[8];
         if ((r = get_str(o, "cpu_pin", pin, sizeof pin, 0, err, n))) goto out;
@@ -1107,6 +1114,7 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 11 && m->vgpu) { jb_raw(&b, ",\n  \"gpu\": "); jb_str(&b, VM_VGPU_NAMES[m->vgpu]); }
     if (m->schema >= 12 && m->capture_fullscreen) jb_raw(&b, ",\n  \"capture_fullscreen\": true");
     if (m->schema >= 13 && m->perf_profile) jb_raw(&b, ",\n  \"perf_profile\": true");
+    if (m->schema >= 15 && m->automation) jb_raw(&b, ",\n  \"automation\": true");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);

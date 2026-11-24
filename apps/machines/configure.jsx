@@ -2,7 +2,7 @@
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. The name is the exception (6.26): while
 // the machine runs it changes alone (`lord-vm --rename`), and its folders follow it once it's off.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
   portProblems, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice } from './model.js';
@@ -199,6 +199,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const [job, setJob] = useState(0);
   const [msg, setMsg] = useState(() => { const c = carried && carried.dir === dir ? carried.msg : null; carried = null; return c; });
   const [picking, setPicking] = useState(false);
+  const [askAuto, setAskAuto] = useState(false);
   const [pickShare, setPickShare] = useState(false);
   const [disk, setDisk] = useState(null);
   const [sndDraft, setSndDraft] = useState({});
@@ -246,11 +247,11 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
-    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', ...draft };
+    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, automation: !!m.automation, cpuPin: m.cpuPin || 'off', ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'automation' ? !!m.automation : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -591,6 +592,14 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       <Row label={tr('machines.cfg.perfProfile')} note={[tr(m.windowsDevices ? 'machines.win.perfProfileNote' : 'machines.cfg.perfProfileNote'), offNote].filter(Boolean).join(' ')}>
         <Off off={running}><Toggle on={cur.perfProfile} onChange={(x) => set({ perfProfile: x })} /></Off>
       </Row>
+      {/* automation (6.15, machine.json automation): `machines exec`, `machines cp` and the MCP server may run programs in
+          the guest as its signed-in person, through qemu-guest-agent; off by default, asked before it goes on, never for
+          the anonymity profile (that section is locked) */}
+      <Row label={tr('machines.cfg.automation')} note={[tr('machines.cfg.automationNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running || !cur.agent}><Toggle on={!!cur.automation} onChange={(x) => (x ? setAskAuto(true) : set({ automation: false }))} /></Off>
+      </Row>
+      {askAuto ? <ConfirmDialog title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
+        cancelLabel={tr('machines.cancel')} onOk={() => { setAskAuto(false); set({ automation: true }); }} onCancel={() => setAskAuto(false)} /> : null}
       {/* the LordOS tools brought up to date by themselves (model.js toolsAutoStep): app.json, at once, also while it runs */}
       <Row label={tr('machines.cfg.toolsAuto')} last note={tr('machines.cfg.toolsAutoNote')}>
         <Toggle on={toolsAutoOn(meta, defaultsOf(settings.get().machinesDefaults))} onChange={(x) => { writeMeta(dir, { toolsAuto: x }); setMeta(readMeta(dir)); }} />

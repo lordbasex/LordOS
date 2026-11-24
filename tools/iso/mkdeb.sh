@@ -23,6 +23,7 @@
 #   /usr/bin/machines                     Machines from the terminal (docs/VIRTUALIZATION.md "From the terminal"): a link to
 #                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
 #                                         in /usr/share/bash-completion/completions/machines
+#   /usr/bin/lordvm                       the same program (docs/VIRTUALIZATION.md 6.15: lordvm exec, cp, logs, mcp, apply)
 #   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
 #   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
@@ -168,8 +169,10 @@ install -m 755 packaging/bin/lordos-dm-check "$L/lordos-dm-check"
 install -m 755 server/build/machines "$L/bin/machines"
 "$STRIP" --strip-unneeded "$L/bin/machines" 2>/dev/null || true
 ln -s ../lib/lordos/bin/machines "$PKG/usr/bin/machines"
+ln -s ../lib/lordos/bin/machines "$PKG/usr/bin/lordvm"
 install -d "$PKG/usr/share/bash-completion/completions"
 install -m 644 packaging/bash-completion/machines "$PKG/usr/share/bash-completion/completions/machines"
+ln -s machines "$PKG/usr/share/bash-completion/completions/lordvm"
 # the visual test bench: a plain Wayland client, launched like any Linux app
 [ -x server/build/lordos-testbench ] && {
     install -m 755 server/build/lordos-testbench "$PKG/usr/bin/lordos-testbench"
