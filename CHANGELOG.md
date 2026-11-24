@@ -11,6 +11,44 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: encrypted machines, disposable sessions for any machine, raw disks, Export, consistent backups** (in
+  development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.5, 3.6, 6.2, 6.4, 6.14, 8, 19.7). `machine.json`
+  schema 15 adds `disposable`, `encrypted`, `disk_format` and `backup`.
+  - **Encrypted machines.** "Encrypt this machine" in the New Machine assistant's review. Every disk, the UEFI
+    variables and a disposable session's layers are qcow2 with LUKS, the TPM's state is swtpm's own encrypted state,
+    and a snapshot's memory is written inside the encrypted disk. The key is 32 random bytes made by lord-server and
+    kept in your keyring before the machine is made; Passwords shows it as "Machines: <name>", the machine's recovery
+    key. lord-server reads it back itself (JS only ever sees whether it's ready), holds it for two minutes in locked
+    memory, forgets it when the screen locks, and gives it to lord-vm on a pipe; QEMU, qemu-img and swtpm read it from a
+    pipe too, never from an argument, the environment or a file. With the keyring locked, the system's unlock prompt
+    opens; for a machine from another computer, its recovery key is typed in a window of its own that is never
+    captured. No card picture, snapshot picture, serial log or guest journal of an encrypted machine is kept. Suspend
+    is refused for it (it would write the memory to a file); a snapshot with memory works. Configure → Security says
+    where the key is, and that this computer's swap can still hold a machine's memory.
+  - **Encrypted machine groups** (isolation layer 5 of the Whonix card, approved 2026-11-23): "Encrypt the machines'
+    disks" on the card; each member's disk is encrypted under the group's key, the verified public base images aren't.
+    Start Fresh and the workstation's disposable session keep it encrypted.
+  - **Disposable sessions for any machine.** Configure → Disks → Disposable session: Off, In memory or On disk. Each
+    start begins from the disks as they are and everything changed is thrown away at shutdown: a layer over every disk
+    and the UEFI variables, in memory (capped at the machine's memory, the machine pauses when full) or in unnamed files
+    that go with QEMU even after a crash; the TPM's state is a copy in memory. Snapshots and Suspend are refused while
+    one runs.
+  - **Raw disks**: a machine whose disks are plain files (`lord-vm --create --disk-format raw`): the fastest, with no
+    snapshots, linked clones or encryption. Never a disk or partition of this computer.
+  - **Export** (the library's ··· and Configure → Disks): a whole machine as a `.lordvm` folder with a list of
+    checksums (an encrypted machine's stays encrypted), or as an OVA for other apps (the disks as VMDK, an OVF
+    description and its checksums). **Bring In an Exported Machine…** checks every file against the list before
+    copying, refuses anything extra, a link or a changed byte, asks for the recovery key of an encrypted machine, and
+    turns off everything the file asks of this computer (forwarded ports, shared folders, clipboard, microphone,
+    agent…), to be turned on again by you.
+  - **The UEFI firmware a machine was made with is kept in its folder**, and used after a firmware update, until
+    Configure → Disks → "Use This Computer's Firmware".
+  - **Backups and machines**: a machine is copied while it's off, holding it so it can't start half way; a running
+    machine's disks are taken from the previous backup; its temporary files are left out; Configure → Disks →
+    "Include in Backups" leaves a machine out. Backups says how many machines were running.
+  - Tests: `vm_storage_test.sh` (real QEMU and KVM: keys, a write kept or thrown away, swtpm's encrypted state, export
+    and import, hostile exports, an encrypted group, the kept firmware, raw disks), `vmexport-test`, `vmkeysrv-test`,
+    `backup-machines-test` (ASan and UBSan) and `vm_storage_model_test.mjs`.
 - **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the

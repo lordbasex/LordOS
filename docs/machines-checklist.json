@@ -85,19 +85,19 @@
   },
   {
    "area": "A",
-   "item": "Files and contracts: `operation.json`, newer schema read-only, suspended-state check (3.5, 3.6)",
+   "item": "Files and contracts: `operation.json`, newer schema read-only, suspended-state check, the export's manifest (3.5, 3.6)",
    "status": "✅",
-   "pct": 90,
-   "file": "`vmops.h` `vm_op_begin`, `machine.c`, `lordvm.c`",
-   "note": "Export manifest not built"
+   "pct": 100,
+   "file": "`vmops.h` `vm_op_begin`, `machine.c`, `lordvm.c` (`cmd_export`, `cmd_import_lordvm`), `vmexport.c`; `vmexport-test`, `vm_storage_test.sh`",
+   "note": "The export's manifest of checksums and the import that checks it (*in development*, 2026-11-24; was 90)"
   },
   {
    "area": "A",
    "item": "Firmware identity kept with the machine; the old code file kept in the folder (3.6)",
-   "status": "🟡",
-   "pct": 40,
-   "file": "`machine.c` (`firmware_sha256`), `lordvm.c`",
-   "note": "Only the hash is recorded and a mismatch logged; the old code file isn't kept. Added by the audit of 2026-11-23"
+   "status": "🧪",
+   "pct": 95,
+   "file": "`machine.c` (`firmware_sha256`), `lordvm.c` (`fw_keep`, `--firmware-update`), `configure.jsx`; `vm_storage_test.sh`",
+   "note": "*In development*: `firmware-code.fd` kept at the first start, used by descriptor after a change (a changed copy never), the explicit move in Configure; checked by pointing a machine at another OVMF build, not with a real package update (was 40)"
   },
   {
    "area": "A",
@@ -398,10 +398,10 @@
   {
    "area": "D",
    "item": "Disposable sessions (6.2)",
-   "status": "🟡",
-   "pct": 25,
-   "file": "`lordvm.c` (the memfd overlay, `session-full`), `group.js`, `configure.jsx`; `vm_group_link.sh`",
-   "note": "Built only for a Whonix group's Workstation (19.7: an empty overlay in memory, capped, paused when full, snapshots refused; *in development*, headless). The feature of 6.2 for any machine (a session thrown away at shutdown, from the window or the library) isn't built (was ❌ 0)"
+   "status": "🧪",
+   "pct": 90,
+   "file": "`lordvm.c` (`session_prepare`, `session_layer`, `session_tpm`), `machine.c` (`disposable`), `configure.jsx`, `storagemodel.js`; `vm_storage_test.sh`, `vm_storage_model_test.mjs`, `vm_group_link.sh`",
+   "note": "*In development*, 2026-11-24: any machine, in memory (capped, paused when full) or on disk (unlinked files), every writable disk, the UEFI variables and the TPM; snapshots and Suspend refused; real QEMU, headless. The switch is in Configure only, not in the window or on the card (was 25)"
   },
   {
    "area": "D",
@@ -409,7 +409,7 @@
    "status": "✅",
    "pct": 90,
    "file": "`lordvm.c` `--clone`, `vmops.c`, `clone.jsx`",
-   "note": "The source must be off; no templates"
+   "note": "The source must be off; no templates. An encrypted machine's Clone keeps its key under the Clone's id (`--new-id`, *in development*)"
   },
   {
    "area": "D",
@@ -422,10 +422,10 @@
   {
    "area": "D",
    "item": "Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": "Raw only for imports and read-only nodes; encrypted imports refused"
+   "status": "🧪",
+   "pct": 85,
+   "file": "`lordvm.c` (`--disk-format raw`, `cmd_export`, `cmd_import_lordvm`), `vmexport.c`, `vmkeysrv.c`, `backup/engine.c`, `vmkey.jsx`; `vm_storage_test.sh`, `vmexport-test`, `vmkeysrv-test`, `backup-machines-test`",
+   "note": "*In development*, 2026-11-24: raw disk files (never host block devices: decided), encryption (8), Export as `.lordvm` with a checked manifest and as OVA, the import of an export, consistent backups. The OVA never imported into another app; the app's sheets not driven end to end; no bare disk image export (was ❌ 0)"
   },
   {
    "area": "D",
@@ -790,10 +790,10 @@
   {
    "area": "L",
    "item": "Encrypted machines (8)",
-   "status": "❌",
-   "pct": 0,
-   "file": "encrypted imports are refused",
-   "note": "Nor the line in Security that host swap can hold guest memory"
+   "status": "🧪",
+   "pct": 85,
+   "file": "`lordvm.c` (`key_load_fd`, `key_pipe`, `enc_json`), `vmkeysrv.c`, `js_vm.c` (`keyState`, `keyNew`, `keyEnter`), `keyflow.js`, `vmkey.jsx`; `vm_storage_test.sh`, `vmkeysrv-test`",
+   "note": "*In development*, 2026-11-24: whole machines (disks, UEFI variables, TPM, snapshot memory, session layers) and a Whonix group's members (layer 5); key in the keyring, recovery key in a protected window; no pictures or guest logs kept; Security's swap line. Real QEMU, headless; never run with a live session's keyring on screen. No encrypting an existing machine, no Suspend (was ❌ 0)"
   },
   {
    "area": "M",
@@ -898,8 +898,8 @@
    "name": "Engine, lifecycle, sandbox, display",
    "weight": 14,
    "items": 22,
-   "mean": 78.18,
-   "score": 78
+   "mean": 81.14,
+   "score": 81
   },
   {
    "id": "B",
@@ -922,8 +922,8 @@
    "name": "Snapshots, clones, storage",
    "weight": 9,
    "items": 6,
-   "mean": 60.0,
-   "score": 60
+   "mean": 85.0,
+   "score": 85
   },
   {
    "id": "E",
@@ -986,8 +986,8 @@
    "name": "Privacy and security",
    "weight": 4,
    "items": 7,
-   "mean": 73.57,
-   "score": 74
+   "mean": 85.71,
+   "score": 86
   },
   {
    "id": "M",
@@ -1006,6 +1006,6 @@
    "score": 55
   }
  ],
- "total": 69,
- "total_exact": 68.94
+ "total": 72,
+ "total_exact": 72.09
 }
