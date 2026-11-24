@@ -2261,6 +2261,16 @@ static void record_transfers(void) {
     json_free(&d);
 }
 
+#ifdef CLOUD_TEST
+/* test builds only: a transfer as record_transfers would keep it */
+void cloud_test_transfer(const char *id, const char *name, double pct, int up) {
+    pthread_mutex_lock(&cl_mu);
+    Acc *a = cl_find(id);
+    if (a && a->nt < T_MAX) { TItem *t = &a->t[a->nt++]; t->name = strdup(name); t->bytes = 1; t->size = 100; t->pct = pct; t->up = up; }
+    pthread_mutex_unlock(&cl_mu);
+}
+#endif
+
 static void record_done(void) {
     JDoc d;
     if (rcj(RCM_TRANSFERRED, "{}", &d, NULL, 0, RC_SHORT) != 200 || !d.root) { if (d.root) json_free(&d); return; }
@@ -2655,7 +2665,21 @@ static char *state_json(int light) {
         if (un) { jb_raw(&b, ",\"name\":"); jb_str(&b, un); }
         jb_printf(&b, "},\"down\":{\"files\":%d,\"bytes\":%lld,\"done\":%lld", nd, db, light ? 0 : dd);
         if (dn) { jb_raw(&b, ",\"name\":"); jb_str(&b, dn); }
-        jb_raw(&b, "},\"kept\":[");
+        /* #244: the files moving now, each with its percentage, for the Cloud menu: at most CLOUD_MOVING_MAX, uploads first
+         * (rclone's order within each), names cleaned and cut; the totals above still count every file */
+        jb_raw(&b, "},\"moving\":[");
+        int nm = 0;
+        for (int pass = 0; pass < 2; pass++)
+            for (int k = 0; k < a->nt && nm < CLOUD_MOVING_MAX; k++) {
+                if (a->t[k].up != !pass) continue;
+                char mn[CLOUD_MOVING_NAME];
+                cloud_moving_name(a->t[k].name, mn, sizeof mn);
+                if (!mn[0]) continue;
+                jb_raw(&b, nm++ ? ",{\"name\":" : "{\"name\":");
+                jb_str(&b, mn);
+                jb_printf(&b, ",\"pct\":%d,\"up\":%s}", cloud_moving_pct(a->t[k].pct, light), a->t[k].up ? "true" : "false");
+            }
+        jb_raw(&b, "],\"kept\":[");
         for (int k = 0; k < a->nkeep; k++) {
             char kp[PATH_MAX * 2];
             cl_pf(kp, sizeof kp, "%s%s%s", dir, a->keep[k][0] ? "/" : "", a->keep[k]);

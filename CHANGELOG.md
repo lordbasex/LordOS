@@ -113,6 +113,92 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   pointer and key events (`tests/app_scene_headless.sh files_marquee_scene`, 11 checks with screenshots, in English
   and Arabic): a 2×2 drag selects 4, Shift adds the next 2, Ctrl toggles 3, a click clears, the list view takes the 5 rows
   it crosses, and in a folder of 400 files the view scrolls while the pointer rests at the bottom edge.
+- **Displays: the login and lock screens can use the desktop's scale, set by an administrator** (in development; latest
+  release 0.8.9.5-beta; [#242](https://github.com/lordbasex/LordOS/issues/242); docs/DISPLAYS.md "The login screen's
+  scale", docs/SESSIONS.md). The login screen opened every display at its recommended scale, so a 15.6" 1080p laptop
+  jumped from 125 % at login or lock to 100 % on a desktop set to 100 %. Settings → Displays has **Use this scale on the
+  login screen** under the scale. It is a setting of the computer: **only an administrator can change it**, its hint
+  says it applies to every user of this computer, others see it dimmed with "Only an administrator can change it", and
+  the hint names the login screen's current choice when it is another display or scale. Two administrators who want
+  different scales overwrite each other (the last one wins).
+  - **How:** `lord.display.setLoginScale(connector, scale)` sends `{"a":"display","scaleOn":"<connector>","scale":<pct>}`
+    on the monitor channel (the main display's message, extended; no new admin action). `lord-sessiond` takes it only from
+    the session being shown, parses the whole message strictly (`gscale_from_msg`, `server/src/remote/greeterscale.c`),
+    and checks as root, from the user it started that session for, never from the message, that the user is an
+    administrator (`is_admin`: the sudo, admin or wheel group, as for Restart with other sessions open). One request every
+    2 s at most, dropped before parsing or logging. It keeps `/var/lib/lordos/greeter-scale` (`<connector> <pct>`, root's,
+    0644, `.new` with `O_EXCL | O_NOFOLLOW` then rename, only in a `/var/lib/lordos` of root's that no one else can write;
+    read back only as a small regular file of root's that parses) and starts the login screen with
+    `LORD_MAIN_SCALE=<connector>:<pct>`. lord-server applies it only with `--greeter`, only to the display on that
+    connector and only when the display has no saved scale; the lock screen is the same login screen. Settings reads the
+    file back (`lord.display.loginScale()`). Four new texts in all 35 languages.
+  - **Tests:** `build/greeterscale-test` (new, in `make test`, ASan and UBSan; 1,082 checks): forged fields (a `user`),
+    other orders, spaces, trailing data, truncation, signs, leading zeros, huge numbers, decimals, connectors with quotes,
+    slashes, new lines, UTF-8 or 32 characters, every scale from -5 to 1000 against `out_scale_valid`, and 200,000
+    random and mutated inputs, everything accepted valid and exactly what lord-server sends; `lid-test` (43 checks) for
+    `display_plan` with `LORD_MAIN_SCALE`; `display_layout_test.mjs` (48) for the switch. Not yet checked on the VM with
+    a screenshot.
+- **Cloud: the Cloud menu shows each file moving now with its percentage** (in development; latest release 0.8.9.5-beta;
+  [#244](https://github.com/lordbasex/LordOS/issues/244); docs/CLOUD.md section 11). The panel by the clock has a
+  **Moving now** list between the accounts and Recent: an up or down arrow, the file's name and its percentage on the end
+  side (the left in right-to-left languages), at most four files, then "and N more"; it follows the accounts chosen for
+  Recent, as Settings' account tile already showed the first file.
+  - lord-server already read rclone's `transferring[]` but sent only totals; each account in the state now has a bounded
+    `moving` list (at most 4 entries, uploads first, `{ name, pct, up }`). The name is only the file's last path part,
+    with control characters, bidi marks and overrides (U+061C, U+200E/F, U+202A–U+202E, U+2066–U+2069, U+FEFF) and broken
+    or overlong UTF-8 dropped, at most 127 bytes cut at a character boundary (`cloud_moving_name`); the percentage is a
+    whole 0–100 (`cloud_moving_pct`). The state compared to decide a push rounds it down to steps of 5, so a slow transfer
+    adds at most 20 pushes, still at most two a second.
+  - `movingRows` in `sdk/cloudmodel.js` checks the list again (names, clamped percentages, accounts turned off left out);
+    the dev mock moves it. Three new texts in all 35 languages (each language's own percent format).
+  - Tests: `cloud-test` (2,457 checks) cleans names (controls, a right-to-left override that makes `exe` read as `pdf`,
+    isolates, overlong forms, surrogates, a Hebrew name kept, cuts never halfway through a character) and checks the list
+    in the state (cap, order, a name with nothing printable left out, totals still counting every file);
+    `cloud_model_test.mjs` 347 checks.
+- **Voice: French, German, Italian and Dutch, in development (the latest release is 0.8.9.5-beta).** Reading aloud, `say`,
+  Live Speech and Personal Voice now speak seven languages: French ([#215](https://github.com/lordbasex/LordOS/issues/215),
+  approved by the maintainer on 2026-11-22), German, Italian and Dutch join Spanish, English and Portuguese. See
+  `docs/VOICE.md`, phase 4.
+  - **Models**, Kyutai's Pocket TTS as before (CC-BY-4.0), each language in two qualities: **HD** is Kyutai's 24-layer
+    model (`french_24l`, `german_24l`, `italian_24l`, `dutch_24l`, 672 MB each); **Standard** is audio.cpp's Q8_0 GGUF
+    for French, German and Italian (128–129 MB) and, as audio.cpp publishes no Dutch GGUF, Kyutai's own 6-layer Dutch
+    model (`dutch`, 220 MB), read as a folder like the HD ones (`models/nl/standard/`). The same 23 voices speak every
+    language (Daan in French's and Dutch's standard models too); each new language's own voice is Kyutai's voice of it:
+    Estelle, Juergen, Giovanni and Daan. They come as signed `lordos-voice-fr*`, `-de*`, `-it*` and `-nl*` packages from
+    LordOS's APT repository, built by `tools/voice/fetch-voices.sh` and `tools/voice/mkdeb-voice.mjs` from
+    `sdk/voicecatalog.js` as the others; the previews package gets a sample of every voice in each new language.
+  - **Numbers written out as words** for the four, as for Spanish and Portuguese (`say_normalize()`,
+    `server/src/tts/saytext.c`): cardinals (French soixante-dix, soixante et onze, quatre-vingts, quatre-vingt-onze;
+    German einundzwanzig, zweitausendsechsundzwanzig; Italian ventuno, ventitré, centottanta, duemilaventisei; Dutch
+    eenentwintig, tweeëntwintig, tweeduizend zesentwintig), German and Dutch years in hundreds (1987
+    neunzehnhundertsiebenundachtzig), decimals, percentages, ordinals (1er, 2e, 21e; am 3. Mai, der 1. Platz; 1º, 11º;
+    1e, 2de, 8ste), times (quatorze heures trente, 14h30, 14 h 30; vierzehn Uhr dreißig, 14.30 Uhr; quattordici e
+    trenta; veertien uur dertig), dates (premier mai, am fünfzehnten November, primo maggio), money (vingt-cinq euros
+    cinquante, un million d'euros, eine Million Euro, una sterlina), degrees, ranges and symbols, and common
+    abbreviations (M., Mme, p. ex., etc.; z. B., d. h., usw., Nr.; Sig., Dott., ecc.; bijv., d.w.z., enz., t/m).
+  - **Telling the language:** `say_language` weighs common words of all seven and the letters only one or two use; the
+    curly apostrophe splits French words. lord-server's closed list of languages (`speak_lang_ok`, `speak.c`, and
+    `lord.voice`'s `lang`) has the four new ones, so a French, German, Italian or Dutch interface is the fallback for a
+    text too short to tell.
+  - **lord-tts:** its closed list of folder models (`DIR_LANGUAGES`, `server/src/doc/h_tts.c`) has the four HD models and
+    Dutch's standard one; it applies Kyutai's own text replacements for them (French `:` and `;` to a comma, German `;`
+    and the em dash). No new helper, library, host or permission: the same sandboxed lord-tts and the same signed
+    repository.
+  - **Settings → AI → Voice:** the language is now a pop-up with the seven (a segmented control didn't fit them in
+    every interface language); the four names are translated into all 35 interface languages. Monitor → GPU names the
+    new languages too.
+  - **Tests:** `saytext_test.c` goes from 267 to 541 checks (French 86, German 70, Italian 59, Dutch 46, and 13 that
+    tell the languages apart); `voicecatalog_test.mjs` 30; `tts_test.sh` says a sentence with numbers, a time and a date
+    in each new language, HD and standard, where its models are installed (all passed on the CPU and the GPU).
+    `fetch-voices.sh` now refuses a file Hugging Face publishes no SHA-256 for. `make-previews.sh` keeps its temporary
+    home next to the source folder: with the source on another filesystem than `/tmp`, its copy of the models failed
+    halfway and the samples were made with the installed system models instead (or not at all for a new language).
+  - **Merged for the next release (2026-11-24)** on top of 0.8.9.5-beta's integration; `saytext_test.c` had a French
+    case whose `\x99est` escape swallowed the `e` (a compiler warning, a wrong test string), now split. The 191 packages
+    of the four languages and the seven-language previews (`2026.11.24`, 6.15 GB: each language's Standard model
+    122–209 MB, HD 642 MB, 22–23 voices of each quality) were built from the files fetched on 2026-11-22, unsigned and
+    unpublished until they are signed on the maintainer's signing machine. `tts_test.sh` passes with them (HD and Standard in all four, on the CPU).
+
 - **Machines: checked for real, and what that found** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md
   6.5, 6.7, 6.14, 6.16, 6.17, 6.19).
   - **Monitor names a machine's own disk and network numbers.** A running machine's row in Processes says
@@ -1521,6 +1607,11 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   shows six cards, arm64 five.
 
 ### Documentation
+- **Roadmap: choosing what a provider's mail, calendars and contacts account syncs** ([#241](https://github.com/lordbasex/LordOS/issues/241); in
+  development, not started; latest release 0.8.9.5-beta). `docs/ROADMAP.md`, "Next release after 0.8.9.5": setup asks
+  for Mail, Calendars (which ones) and Contacts; a per-collection `subscribed` flag in `lord-maild` (`pim.c`, `dav.c`)
+  with a migration of `pim/colls` that reads old lines as subscribed; labels by what is synced ("<provider> – Calendar",
+  "<provider> – Contacts"); Mail's sidebar shows the account only when it carries mail.
 
 - **Hardware reports: #245, #230 and the graphics card report #235 (`docs/HARDWARE-REPORT.md`, updated 2026-11-24),
   in development (the latest release is 0.8.9.5-beta).** #245 adds an Acer Aspire R3-131T laptop with an Intel Celeron

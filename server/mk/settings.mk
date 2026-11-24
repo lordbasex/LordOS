@@ -65,7 +65,7 @@ build/logindlock-test: $(LOGINDLOCK_TEST_SRC) $(HW_HDR)
 # leaving display_plan (hw/display.c), with the bus and the card replaced by the test (tests/lid_test.c)
 test: build/lid-test
 LID_TEST_SRC := tests/lid_test.c src/hw/lid.c src/hw/display.c src/hw/accel.c src/hw/edid.c src/hw/modes.c src/hw/night.c \
-                src/hw/jbuf.c src/sec/json.c src/outputs.c src/vault/dbus.c
+                src/hw/jbuf.c src/sec/json.c src/outputs.c src/vault/dbus.c src/remote/greeterscale.c
 build/lid-test: $(LID_TEST_SRC) $(HW_HDR) src/outputs.h
 	@mkdir -p build
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=c11 -o $@ $(LID_TEST_SRC) -lm -lpthread

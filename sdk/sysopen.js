@@ -24,9 +24,6 @@ export const openFolder = (path) => wm.open('files', { new: true, args: { path, 
 
 // A web address, in the default browser. False if there isn't one, or the address has characters that aren't allowed.
 export function openUrl(url) {
-  // opts.untrusted: the file came from content (a note, a mail): LordOS's own apps above only show it; never hand it to a
-  // Linux app that would run it
-  if (opts.untrusted && runsCode(n)) return revealPath(path);
   try {
     const def = defaultOpenerId('x-scheme-handler/https');
     return !!def && lord.apps.launchUri(def.replace(/\.desktop$/, ''), url);
@@ -50,6 +47,9 @@ export function openCalendarApp(at) {
 
 export function openFileWithApps(path, name, opts = {}) {
   const n = String(name || path).toLowerCase();
+  // opts.untrusted: the file came from content (a note, a mail): a file that would run (by its shown name OR its real
+  // file name) never reaches any opener; it is shown in Files, or nothing when the caller asked for no reveal
+  if (opts.untrusted && (runsCode(n) || runsCode(String(path || '').split('/').pop()))) return opts.reveal === false ? false : revealPath(path);
   if (/\.pdf$/.test(n) && getApp('pdf')) return wm.open('pdf', { new: true, args: { path } });
   if (/\.(png|jpe?g|gif|webp|bmp|heic|heif|avif|tiff?)$/.test(n) && getApp('photos')) {
     return wm.open('photos', { new: true, args: opts.single ? { path, single: true, nonce: Date.now() } : { path } });

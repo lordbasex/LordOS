@@ -74,7 +74,8 @@ export function installCloudMock(home, scenario = '') {
     accounts: [
       acc('m1', 'Personal', 'dropbox', 'Dropbox', { total: 2 * TB, used: 612 * GB, free: 1388 * GB, trashed: 20 * GB }, { cacheBytes: 9.1 * GB, keptBytes: 2.1 * GB }),
       acc('m2', 'Work', 'pcloud', 'pCloud Business', { total: 1 * TB, used: 540 * GB, free: 460 * GB, trashed: 20 * GB, other: 30 * GB },
-        { state: 'syncing', cacheBytes: 7.2 * GB, keptBytes: 4.1 * GB, up: { files: 1, bytes: 86e3, done: 34e3, name: 'Budget 2027.ods' }, down: { files: 2, bytes: 1.8 * GB, done: 1.15 * GB, name: 'Kickoff recording.mp4' } }),
+        { state: 'syncing', cacheBytes: 7.2 * GB, keptBytes: 4.1 * GB, up: { files: 1, bytes: 86e3, done: 34e3, name: 'Budget 2027.ods' }, down: { files: 2, bytes: 1.8 * GB, done: 1.15 * GB, name: 'Kickoff recording.mp4' },
+          moving: [{ name: 'Budget 2027.ods', pct: 39, up: true }, { name: 'Kickoff recording.mp4', pct: 63, up: false }] }),
       // as rclone names it: the long description (Files and Settings show the provider list's short label)
       acc('m3', 'Photos archive', 's3', 'Amazon S3 Compliant Storage Providers including AWS, Alibaba, ArvanCloud, Ceph, ChinaMobile, Cloudflare, Dreamhost', null, { cacheBytes: 1.6 * GB, linksSupported: true, mounted: true }),
       acc('m4', 'Home NAS', 'webdav', 'WebDAV · Nextcloud', { total: 300 * GB, used: 7.4 * GB, free: 292.6 * GB }, { state: 'signin', cacheBytes: 0.5 * GB, linksSupported: false }),
@@ -127,6 +128,9 @@ export function installCloudMock(home, scenario = '') {
       w.down.done = Math.min(w.down.bytes, w.down.done + 22 * MB);
       if (w.down.done >= w.down.bytes) { w.down = { files: 0, bytes: 0, done: 0 }; status[`${w.mount}/Projects/Kickoff recording.mp4`] = 'here'; }
       if (w.up.done >= w.up.bytes) { w.up = { files: 1, bytes: 86e3, done: 0, name: 'Budget 2027.ods' }; }
+      // #244: the menu's "Moving now" rows follow the same transfers
+      w.moving = [...(w.up.files ? [{ name: w.up.name, pct: Math.floor((w.up.done / w.up.bytes) * 100), up: true }] : []),
+        ...(w.down.files ? [{ name: 'Kickoff recording.mp4', pct: Math.floor((w.down.done / w.down.bytes) * 100), up: false }] : [])];
     }
     push();
   }, 1000);

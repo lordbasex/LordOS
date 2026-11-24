@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { displayNumbers, snapDisplay, resolveDrop, placementOk, touches, scaleChoices, scaleTiles, scaleValid } = await import(path.join(here, '../../sdk/displaylayout.js'));
+const { displayNumbers, snapDisplay, resolveDrop, placementOk, touches, scaleChoices, scaleTiles, scaleValid, loginScaleState } = await import(path.join(here, '../../sdk/displaylayout.js'));
 
 let n = 0, bad = 0;
 const eq = (name, got, want) => {
@@ -100,6 +100,17 @@ for (const [rects, i] of [[two, 1], [two, 0], [three, 2], [three, 1], [three, 0]
   }
 }
 eq('sweep: every drop touches and never overlaps', sweepBad, 0);
+
+// #242: the login screen's scale switch
+const cur = { connector: 'eDP-1', scale: 125 };
+eq('#242 nothing chosen: off', loginScaleState(null, cur, true), { on: false, other: null, can: true });
+eq('#242 this display at this scale: on', loginScaleState({ connector: 'eDP-1', scale: 125 }, cur, true), { on: true, other: null, can: true });
+eq('#242 another scale: off, said', loginScaleState({ connector: 'eDP-1', scale: 150 }, cur, true), { on: false, other: { connector: 'eDP-1', scale: 150 }, can: true });
+eq('#242 another display: off, said', loginScaleState({ connector: 'HDMI-A-1', scale: 100 }, cur, true).other, { connector: 'HDMI-A-1', scale: 100 });
+eq('#242 not an administrator: can\'t', loginScaleState({ connector: 'eDP-1', scale: 125 }, cur, false), { on: true, other: null, can: false });
+eq('#242 a value that isn\'t valid is ignored', [loginScaleState({ connector: 'eDP-1', scale: 126 }, cur, true).other, loginScaleState({ connector: 'e"DP', scale: 125 }, cur, true).other,
+  loginScaleState({ connector: 7, scale: 125 }, cur, true).other], [null, null, null]);
+eq('#242 no display or a scale that isn\'t valid: can\'t', [loginScaleState(null, null, true).can, loginScaleState(null, { connector: 'DP-1', scale: 101 }, true).can], [false, false]);
 
 console.log(`display-layout: ${n - bad}/${n} checks passed`);
 process.exit(bad ? 1 : 0);

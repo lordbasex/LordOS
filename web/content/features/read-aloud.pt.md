@@ -52,7 +52,7 @@ Medido num PC, um Intel i9-10900 com uma Radeon RX 580: cerca de 10 segundos de 
 
 ## Limites honestos
 
-- **Três idiomas:** espanhol, inglês e português.
+- **Três idiomas na última versão (0.8.9.5-beta):** espanhol, inglês e português. Francês, alemão, italiano e holandês estão em desenvolvimento: as mesmas duas qualidades e 23 vozes, com números, datas, horas e valores lidos com as palavras de cada idioma.
 - **Primeiro você baixa um modelo.** Até lá, a Fala avisa que nenhuma voz está instalada.
 - **Não foi testado no Raspberry Pi** (os caminhos de código do processador dele e o driver gráfico do Pi 5).
 - **Ele lê o que você seleciona; não é um leitor de tela.** Um leitor de tela, zoom e alto contraste continuam no roadmap.

@@ -101,7 +101,7 @@ into `/usr/share/lordos/voice`. The voices offered and the license of each one's
 
 | Data | Used for | License |
 |---|---|---|
-| Pocket TTS models by Kyutai (https://huggingface.co/kyutai/pocket-tts): the 6-layer models as audio.cpp's Q8_0 GGUF, the 24-layer HD models (`spanish_24l`, `portuguese_24l`, `english_2026-09_24l`) as Kyutai ships them | speech in Spanish, English and Portuguese | CC-BY-4.0 — Pocket TTS © Kyutai |
+| Pocket TTS models by Kyutai (https://huggingface.co/kyutai/pocket-tts): the 6-layer models as audio.cpp's Q8_0 GGUF (Dutch's as Kyutai ships it, `dutch`: there is no GGUF of it), the 24-layer HD models (`spanish_24l`, `portuguese_24l`, `english_2026-09_24l`, `french_24l`, `german_24l`, `italian_24l`, `dutch_24l`) as Kyutai ships them | speech in Spanish, English and Portuguese; French, German, Italian and Dutch in development | CC-BY-4.0 — Pocket TTS © Kyutai |
 | Kyutai's prepared voice embeddings (https://huggingface.co/kyutai/tts-voices): Kyutai's own voices (lola, juergen, rafael, estelle, giovanni, daan), Alba McKenna, VCTK and voice-zero | the 23 voices | CC-BY-4.0 (Kyutai, Alba McKenna, VCTK); CC0-1.0 (voice-zero) |
 | The recorded previews (`lordos-voice-previews`) | hearing a voice before downloading it | made with the models and voices above, under their licenses |
 

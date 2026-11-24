@@ -36,6 +36,7 @@ static char log_prefix[96] = "lord-sessiond";
 char sd_gpu_env[24];
 char sd_cursor_env[24];
 char sd_main_display[64];
+char sd_main_scale[64];
 int sd_input_debug;
 char sd_tune_env[SD_TUNE_N][32];
 
@@ -322,7 +323,7 @@ static void spawn(const struct passwd *pw, const char *rt, const char *lang, int
         if (chdir(rd_conf.workdir)) { /* paths are absolute */ }
         /* GPU: the session uses it while it's on the monitor; lordos.gpu=0 (or the service's LORD_GPU)
          * turns it off in all of them */
-        char *env[10 + SD_TUNE_N];
+        char *env[11 + SD_TUNE_N];
         int ne = 0;
         /* fallback-bin last: fastfetch and neofetch run lordos-fetch until the real package is installed
          * (packaging/fallback-bin/fastfetch); the Terminal's zsh and fish keep this PATH, bash re-adds it from
@@ -337,6 +338,7 @@ static void spawn(const struct passwd *pw, const char *rt, const char *lang, int
         if (sd_input_debug && !greeter) env[ne++] = "LORD_INPUT_DEBUG=1";   /* key latency trace, never the login screen */
         if (greeter) env[ne++] = "LORD_GPU_DRAG=0";   /* no windows to drag there: no self-test at boot */
         if (greeter && sd_main_display[0]) env[ne++] = sd_main_display;
+        if (greeter && sd_main_scale[0]) env[ne++] = sd_main_scale;      /* #242: only the login screen */
         for (int i = 0; i < SD_TUNE_N && !greeter; i++) if (sd_tune_env[i][0]) env[ne++] = sd_tune_env[i];
         env[ne] = NULL;
         if (!greeter) cgroup_delegate_session(uid, pw->pw_gid);   /* cgroup subtree for the apps (docs/SESSIONS.md) */

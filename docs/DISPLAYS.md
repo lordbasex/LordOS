@@ -346,3 +346,47 @@ connector to `lord-sessiond` (`{"a":"display","main":"DP-2"}`) when it changes, 
 it in `/var/lib/lordos/main-display` and starts the login screen with `LORD_MAIN_DISPLAY=<connector>`.
 If that connector isn't connected, the first connected one is the main display, as before. It goes by
 connector because identical monitors can report the same EDID serial.
+
+### The login screen's scale (#242, in development after 0.8.9.5-beta)
+
+The login screen has no `displays.json`, so each display opened at its recommended scale: a 15.6" 1080p panel at
+125 % while its desktop was set to 100 %, a jump on every login and every lock. Settings → Displays now has **Use this
+scale on the login screen** under the scale of the display shown. It is a setting of the computer, not of the person:
+**only an administrator can change it**, and its hint says that it applies to every user of this computer. For anyone
+else the switch shows what is set, dimmed, with "Only an administrator can change it". When the login screen already uses
+another display's or another scale, the hint says which ("Now: 150 % on HDMI-A-1"). Two administrators who want
+different scales overwrite each other: the last one wins.
+
+- **The request.** The switch calls `lord.display.setLoginScale(connector, scale)` (0: back to the recommended scale),
+  which sends `{"a":"display","scaleOn":"eDP-1","scale":125}` to `lord-sessiond` on the monitor channel, like the main
+  display above. It is only a request: lord-server can't write the file, and the greeter (`--greeter`) refuses to send
+  it.
+- **The root side.** `lord-sessiond` takes it only from the session being shown on the monitor (`from_shown`), parses
+  the whole message strictly (`gscale_from_msg`, `server/src/remote/greeterscale.c`: that exact shape, nothing before or
+  after, a connector of `[A-Za-z0-9-]` up to 31 characters, a scale `out_scale_valid` accepts or 0, no sign, no leading
+  zero, at most 3 digits), and then decides, as root, from the user it started that session for (`shown_user`), never
+  from the message, whether that user is an administrator: the same check as for Restart with other sessions open
+  (`is_admin`, `admin_membership_is_admin` in `server/src/users/admingroups.c`: the sudo, admin or wheel group). A
+  refusal is logged and nothing changes. It takes one request every 2 s at most (the others are dropped before
+  they are parsed or logged), and writes only a change.
+- **The file.** `/var/lib/lordos/greeter-scale`, one line `<connector> <scale>`, root's, 0644, written to a `.new` with
+  `O_EXCL | O_NOFOLLOW` and renamed; `/var/lib/lordos` itself must be a directory of root's that no one else can
+  write, or nothing is saved. 0 removes it. At start `lord-sessiond` reads it back only if it is a regular file of
+  root's, not group- or world-writable, shorter than 48 bytes, that parses (`gscale_parse_file`).
+- **The login screen.** `lord-sessiond` starts the login screen (and so the lock screen, which is the same login
+  screen started in lock mode) with `LORD_MAIN_SCALE=<connector>:<scale>`. lord-server uses it only with `--greeter`,
+  only for the display on that connector, and only when the display has no saved scale of its own
+  (`greeter_scale` in `server/src/hw/display.c`); a value that doesn't parse is ignored. Every other display keeps its
+  recommended scale. A desktop session never reads it. A login screen still running when the scale changes keeps the
+  old one until it starts again (it is stopped a few seconds after a session takes the monitor, so the next lock or
+  login gets the new one).
+- **Settings reads it back.** `lord.display.loginScale()` → `{ connector, scale } | null` reads the same file (the
+  same parser); Settings reads it 0.5 s and 2.5 s after the switch, so a refused request just leaves the switch off.
+  `loginScaleState` in `sdk/displaylayout.js` decides the switch (`display_layout_test.mjs`).
+- **Tests.** `build/greeterscale-test` (in `make test`, under ASan and UBSan): good and bad messages (scales out of
+  range or off the steps, signs, leading zeros, huge numbers, decimals, strings; connectors with spaces, slashes,
+  quotes, new lines, UTF-8, 32 characters; extra fields such as a forged user, another order, spaces, trailing data,
+  truncation), the file and environment forms, every scale from -5 to 1000 against `out_scale_valid`, and 200,000
+  random and mutated inputs (everything accepted is valid and is exactly what lord-server would send).
+  `build/lid-test` checks `display_plan` with `LORD_MAIN_SCALE`: ignored by a desktop session, applied only to its
+  connector on the login screen, ignored when it doesn't parse or names another connector.

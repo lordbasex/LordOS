@@ -10,7 +10,7 @@ import {
   arrangeDisplay, setDisplayMirror, setMainDisplay, setCaptureAllDisplays, setAutoRotateDisplays, typeScale, spacing,
   nightPrefs, nightActive, setNightManual, previewNight, nightTick, sunTimes, formatTime, Button,
   identifyDisplays, IDENTIFY_MS, displayNumbers, snapDisplay, resolveDrop, displayPlacementOk, SNAP_PREVIEW_PX,
-  scaleChoices, scaleTiles, menuBarEveryDisplay, menuBarPatch, themes, wayland, x11SelfScale, setX11Scaling,
+  scaleChoices, scaleTiles, loginScaleState, loginScreenScale, setLoginScreenScale, selfIsAdmin, menuBarEveryDisplay, menuBarPatch, themes, wayland, x11SelfScale, setX11Scaling,
 } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { Section, SettingRow, PopUp, Note, Stack, TimeField } from './ui.jsx';
@@ -300,6 +300,8 @@ export function DisplaysSettings() {
   const [msg, setMsg] = useState('');
   const [selId, setSel] = useState(null);
   const [list, setList] = useState(false);       // the scale as a list instead of tiles
+  const [login, setLogin] = useState(loginScreenScale);   // #242: the login screen's scale ({ connector, scale } | null)
+  const [isAdmin] = useState(selfIsAdmin);
   if (!d) return <Note>{tr('prefs.display.unavailable')}</Note>;
   const outs = d.outputs || [];
   const act = outs.filter((o) => o.active);
@@ -328,6 +330,16 @@ export function DisplaysSettings() {
   const several = act.length > 1 || outs.length > 1;
   const nums = displayNumbers(outs);
   const x11 = !!wayland.info().x11Display;       // Xwayland is installed (docs/WAYLAND.md, "X11 apps on HiDPI displays")
+  // #242: only an administrator changes the login screen's scale (it applies to every user of this computer); lord-sessiond
+  // checks it again as root. The answer is the file lord-sessiond writes, read back.
+  const ls = loginScaleState(login, { connector: cur.connector, scale }, isAdmin);
+  const setLogin1 = (on) => {
+    if (!setLoginScreenScale(cur.connector, on ? scale : 0)) return;
+    for (const ms of [500, 2500]) setTimeout(() => setLogin(loginScreenScale()), ms);
+  };
+  const loginHint = !ls.can ? tr('prefs.display.loginScaleAdminOnly')
+    : ls.other ? `${tr('prefs.display.loginScaleHint')} ${tr('prefs.display.loginScaleOther', { scale: tr('prefs.display.scaleN', { n: ls.other.scale }), connector: ls.other.connector })}`
+      : tr('prefs.display.loginScaleHint');
   return (
     <Stack>
       <ArrangementBlock outs={outs} sel={cur.id} onSelect={setSel} mirror={d.mirror} nums={nums} t={t} tr={tr}
@@ -357,6 +369,9 @@ export function DisplaysSettings() {
         ) : <ScaleTiles choices={choices} value={scale} rec={rec} onPick={setScale} t={t} tr={tr} />}
         {/* below 100 % (75, 80: GitHub #158) the desktop is larger than the display: say what that costs */}
         {scale < 100 ? <Note style={{ paddingBottom: spacing.s }}>{tr('prefs.display.scaleSmallHint', { w: cur.w, h: cur.h })}</Note> : null}
+        <SettingRow label={tr('prefs.display.loginScale')} hint={loginHint} disabled={!ls.can}>
+          <Toggle small on={ls.on} onChange={ls.can ? setLogin1 : () => {}} />
+        </SettingRow>
         {x11 ? (
           <SettingRow label={tr('prefs.display.x11')} hint={tr('prefs.display.x11Hint')}>
             <PopUp width={210} value={x11SelfScale(s) ? 'self' : 'lordos'} onChange={setX11Scaling}

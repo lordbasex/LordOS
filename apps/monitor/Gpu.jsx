@@ -258,7 +258,7 @@ export function AiCard({ view, style, compact }) {
             {[
               e.backend === 'gpu' ? tr('monitor.gpu.ai.onGpu') : e.backend === 'cpu' ? tr(e.id === 'ocr' ? 'monitor.gpu.ai.ocrCpu' : 'monitor.gpu.ai.onCpu') : tr('monitor.gpu.ai.backendUnknown'),
               e.quality ? tr(`settings.ai.quality.${e.quality}`) : '',
-              e.lang && ['es', 'en', 'pt'].includes(e.lang) ? tr(`settings.ai.lang.${e.lang}`) : '',
+              e.lang && VOICE_LANGS.some((L) => L.id === e.lang) ? tr(`settings.ai.lang.${e.lang}`) : '',
               compact || e.backend !== 'gpu' ? '' : e.mem != null ? tr('monitor.gpu.ai.mem', { mem: formatBytes(e.mem) }) : e.hidden ? tr('monitor.gpu.ai.memHidden') : '',
             ].filter(Boolean).join(' · ')}
           </Hint>
