@@ -40,7 +40,7 @@ recomputes both from the rows; the arithmetic:
 |---|---:|---:|---:|---:|---:|---:|
 | A. Engine, lifecycle, sandbox, display | 14 | 22 | 92.05 | 92 % | 14 × 92 % = 12.88 | 78 % |
 | B. Getting a system in (cards, unattended, import) | 12 | 13 | 87.85 | 88 % | 12 × 88 % = 10.56 | 76 % |
-| C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 91.00 | 91 % | 11 × 91 % = 10.01 | 75 % |
+| C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 95.17 | 95 % | 11 × 95 % = 10.45 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 85.00 | 85 % | 9 × 85 % = 7.65 | 60 % |
 | E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
 | F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
@@ -52,9 +52,9 @@ recomputes both from the rows; the arithmetic:
 | L. Privacy and security model | 4 | 7 | 85.71 | 86 % | 4 × 86 % = 3.44 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **110** | | | **81.22 → 81 %** | 69 % |
+| **Total** | **100** | **110** | | | **81.66 → 82 %** | 69 % |
 
-Σ = 12.88 + 10.56 + 10.01 + 7.65 + 4.80 + 3.36 + 9.24 + 3.22 + 6.37 + 2.79 + 2.67 + 3.44 + 2.58 + 1.65 = 81.22, rounded **81 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.88 + 10.56 + 10.45 + 7.65 + 4.80 + 3.36 + 9.24 + 3.22 + 6.37 + 2.79 + 2.67 + 3.44 + 2.58 + 1.65 = 81.66, rounded **82 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); the rest of guest → host links (G, +0.3); the file copy panel with drag out, USB, then camera and printers (G and F, +1.2
@@ -93,7 +93,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lord-vm` supervisor over direct QMP, `machine.json` schema 17, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 17`); `vm-test`, `vmgroup-test` | Schema 17 (*in development*) adds `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4) |
+| `lord-vm` supervisor over direct QMP, `machine.json` schema 19, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 19`); `vm-test`, `vmgroup-test` | Schema 19 (*in development*) adds `heads` (5.4, All Displays); 18 `cpu_model` (5.5); 17 `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4) |
 | KVM amd64 and arm64, TCG labelled Emulated (2.1–2.4) | ✅ | 100 | `lordvm.c` (`-accel`), `assistant.jsx` ("Other architecture…") | Pi 5, nested amd64, Xeon and the i9 PC |
 | Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2) | ✅ | 100 | `machine.c`, `js_vm.c` |  |
 | `/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4) | ✅ | 100 | `vm_admin.c` |  |
@@ -134,7 +134,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Migrate from another PC (6.11) | 🟡 | 25 | `lordvm.c` `--import-machine` (a raw whole-disk image), `machines.c` `cmd_import` | *In development*: a backup image of a Linux PC's disk imports and boots (a 20 GB Ubuntu 26.04.1 image, 2026-11-24, with the import's `fsync` fix). Not built: the old PC's agent and the LAN copy, a connected disk, driver injection, encrypted disks (was ❌ 0) |
 | Whonix (Tor) card as a machine group: Gateway and Workstation, internal link, anonymity profile, Start Fresh (19) | 🟡 | 92 | `vmgroup.c`, `vmlink.c`, `vmunpack.c`, `lordvm.c` `--group-create`, `--group-delete`, `--group-rename`, `--group-repair`, `VM_LINK`; `vmgroup-test`, `vmlink-test`, `vmunpack-test`, `vmcatalog-test`, `vm_group_model_test.mjs`, `vm_group_ui_test.mjs`, `vm_group_link.sh`, `vm_group_manage.sh`, `machines_group_manage_headless.sh` | *In development*: G0–G4 plus Delete, Rename and Repair of a group, Start Gateway and Stop Gateway, and a missing or changed base made again from the archive (2026-11-24; headless, screenshots of the dialogs; the Start Gateway bar node-tested only, its window being protected). Creating a group from the app was refused before (the image store's file name); fixed. Left: the release gate on real hardware (G5) and disk encryption of the members (layer 5) (was 80) |
 
-### C. The app (91 %)
+### C. The app (95 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|

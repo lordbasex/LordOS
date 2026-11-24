@@ -11,6 +11,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: All Displays** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.4). View → All
+  Displays shows a machine across this computer's displays: one output of its virtio-gpu per display (up to four), each full
+  screen at that display's size, beside the others; the machine's own window keeps the first, and each further window's
+  top edge has Back to One Display. A machine with fewer outputs gets them while it's off (machine.json schema 19,
+  "heads"; lord-vm --set --heads). One lord-vmdisplay serves every output on a channel of its own (QEMU's peer-to-peer
+  display serves one connection), and an output whose window goes is turned off for the guest. Not for a machine with a
+  graphics card, apps mode or a protected machine (the anonymity profile keeps one display: the guest never learns this
+  computer's displays). Checked with a real KVM guest (tests/vm_multihead.sh) and a headless scene.
 - **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
   lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
   machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
