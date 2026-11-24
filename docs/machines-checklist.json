@@ -183,9 +183,9 @@
    "area": "B",
    "item": "Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows on amd64 (4.1, 5.2)",
    "status": "✅",
-   "pct": 95,
-   "file": "`assets/machines/systems.json`, `catalog.js`; `vmcatalog-test`, `vm_catalog_test.mjs`",
-   "note": "Kali has no unattended install and was never run end to end"
+   "pct": 100,
+   "file": "`assets/machines/systems.json`, `catalog.js`, `vmunattend.c` (`kali`); `vmcatalog-test`, `vm_catalog_test.mjs`, `vmunattend-test`",
+   "note": "Kali runs end to end with its own unattended install (*in development*): amd64 to the Xfce desktop in 36 min 27 s, the Pi 5 console in 11 min 5 s, 2026-11-24 (3.9, \"The cards run end to end\") (was 95: Kali had no unattended install)"
   },
   {
    "area": "B",
@@ -214,18 +214,18 @@
   {
    "area": "B",
    "item": "Unattended Fedora to login, Ubuntu console, the arm64 cards on the Pi",
-   "status": "🟡",
-   "pct": 60,
-   "file": "same code (`VMU_KICKSTART`)",
-   "note": "Never recorded through login"
+   "status": "✅",
+   "pct": 95,
+   "file": "`vmunattend.c` (`VMU_KICKSTART`, `xconfig`, `custom-environment`), `systems.json` (arm64 `append`), `catalog.js` `unattendedOf`; `vmunattend-test`, `vm_catalog_test.mjs`",
+   "note": "Fedora 45 Workstation to GDM and GNOME (21 min 47 s) and Ubuntu 26.04.1 console to login (10 min 40 s) on amd64; Debian 13.8, Fedora 45 and Kali consoles and LordOS on the Pi 5, 2026-11-24, each from its card's verified download. Fixed on the way: Fedora's desktop booted to a text login, Fedora's console install stopped (an environment renamed), arm64 installers showed only on the serial port. Not run for lack of space on the Pi: the arm64 desktops and Ubuntu arm64 (was 🟡 60)"
   },
   {
    "area": "B",
    "item": "LordOS card, `lordos-auto.conf`; its signed list read from lordos.org first, GitHub second (3.9, 4.1)",
-   "status": "🧪",
-   "pct": 85,
+   "status": "✅",
+   "pct": 95,
    "file": "`vmunattend.c` (`VMU_LORDOS`), `vmcatalog.c` (`LIST_MIRROR`, `vmcat_list_source`), `vmimage_admin.c`; `vmcatalog-test` (the real list and signature)",
-   "note": "The list copy on lordos.org is *in development*; the card's install was never run end to end from the card"
+   "note": "Run from the card end to end on 2026-11-24: on amd64 the list from lordos.org (HTTP 200), the 0.8.9 image, the install in 1 min 19 s with 3D, the greeter and the desktop; on the Pi 5 in 2 min 2 s to the greeter and the desktop. The guest agent and apps mode on first boot wait for an ISO newer than 0.8.9 (was 🧪 85)"
   },
   {
    "area": "B",
@@ -898,8 +898,8 @@
    "name": "Getting a system in",
    "weight": 12,
    "items": 13,
-   "mean": 84.0,
-   "score": 84
+   "mean": 87.85,
+   "score": 88
   },
   {
    "id": "C",
@@ -998,6 +998,6 @@
    "score": 55
   }
  ],
- "total": 71,
- "total_exact": 71.16
+ "total": 72,
+ "total_exact": 71.64
 }

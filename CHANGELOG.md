@@ -46,6 +46,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     `build/vm-test` and `build/vmgroup-test`, `tests/vm_exec_e2e.sh` (28 checks, run on 2026-11-24 in a real Ubuntu
     26.04.1 machine made by the Ubuntu card on the dev PC). Not built: an interactive shell over the agent, programs in
     virtio-win guests, folders in `cp`, packages and `rebuild` in `apply`, creating a machine from a card through MCP.
+- **Machines: Kali installs without questions, and every card was run end to end** (in development). Kali gets its own
+  unattended install (Debian's preseed with Kali's archive and tasks: Xfce and the default tools). Fedora Workstation
+  installed by its card now starts its graphical login, and Fedora without the desktop installs again (Fedora 45 renamed
+  its smallest environment). On arm64 the installers of Debian, Ubuntu, Fedora and Kali show on the machine's screen
+  instead of only on its serial port (`console=tty0 acpi=nospcr` per architecture in the catalog). lord-vm builds with no
+  warning on arm64. On 2026-11-24 every card was run from its verified download to the installed system's login on amd64
+  (Fedora 45 Workstation, Ubuntu 26.04.1 server, Kali 2026.3, LordOS 0.8.9) and on the Raspberry Pi 5 (Debian 13.8, Fedora
+  45 and Kali consoles, LordOS); the arm64 desktops and Ubuntu arm64 didn't fit on the Pi's disk.
 - **Machines: an ISO's architecture from its boot files** (in development; docs/VIRTUALIZATION.md 5.2). A new reader
   (`server/src/vm/vmiso.c`, bounded reads through one descriptor) finds the UEFI boot loaders in the ISO 9660, UDF and El
   Torito trees and reads their PE headers; install discs are known by their `sources/install.*`; the name or label decide

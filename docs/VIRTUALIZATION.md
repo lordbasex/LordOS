@@ -39,7 +39,7 @@ recomputes both from the rows; the arithmetic:
 | Area | Weight | Items | Mean | Score | Points (weight × score) | Before |
 |---|---:|---:|---:|---:|---:|---:|
 | A. Engine, lifecycle, sandbox, display | 14 | 22 | 78.18 | 78 % | 14 × 78 % = 10.92 | 78 % |
-| B. Getting a system in (cards, unattended, import) | 12 | 13 | 84.00 | 84 % | 12 × 84 % = 10.08 | 76 % |
+| B. Getting a system in (cards, unattended, import) | 12 | 13 | 87.85 | 88 % | 12 × 88 % = 10.56 | 76 % |
 | C. The app (library, assistant, window, Configure, profiles) | 11 | 12 | 74.58 | 75 % | 11 × 75 % = 8.25 | 75 % |
 | D. Snapshots, clones, storage | 9 | 6 | 60.00 | 60 % | 9 × 60 % = 5.40 | 60 % |
 | E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
@@ -52,9 +52,9 @@ recomputes both from the rows; the arithmetic:
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **110** | | | **71.16 → 71 %** | 68 % |
+| **Total** | **100** | **110** | | | **71.64 → 72 %** | 68 % |
 
-Σ = 10.92 + 10.08 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 2.70 + 1.83 + 2.96 + 2.58 + 1.65 = 71.16, rounded **71 %** (before: 68 %, against `965a10f6e`). Before this audit the
+Σ = 10.92 + 10.56 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 2.70 + 1.83 + 2.96 + 2.58 + 1.65 = 71.64, rounded **72 %** (before: 68 %, against `965a10f6e`). Before this audit the
 document's table said 67.52 and the JSON 67.16 while the rows themselves gave 67.88: the Whonix row had been raised to 85 %
 twice without the table, the Σ line and the JSON being computed again, and B's score in the table (73 %) wasn't its rows'
 mean (76 %). All three now come from the rows in one pass.
@@ -113,16 +113,16 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Direct kernel boot (13.8 item 9) | 🟡 | 30 | `lordvm.c` | Unattended installs only; none for an installed Linux guest |
 | Rename a machine with its folder and transfer folder (6.26) | 🧪 | 100 | `machine.c` (`renameat2`); `vm_rename.sh` | *In development*; headless |
 
-### B. Getting a system in (84 %)
+### B. Getting a system in (88 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows on amd64 (4.1, 5.2) | ✅ | 95 | `assets/machines/systems.json`, `catalog.js`; `vmcatalog-test`, `vm_catalog_test.mjs` | Kali has no unattended install and was never run end to end |
+| Cards LordOS, Debian, Ubuntu, Fedora, Kali per architecture; Windows on amd64 (4.1, 5.2) | ✅ | 100 | `assets/machines/systems.json`, `catalog.js`, `vmunattend.c` (`kali`); `vmcatalog-test`, `vm_catalog_test.mjs`, `vmunattend-test` | Kali runs end to end with its own unattended install (*in development*): amd64 to the Xfce desktop in 36 min 27 s, the Pi 5 console in 11 min 5 s, 2026-11-24 (3.9, "The cards run end to end") (was 95: Kali had no unattended install) |
 | Makers' OpenPGP signatures, SHA-256, resumed downloads, removal (3.9) | ✅ | 100 | `vmcatalog.c`, `vmimage_admin.c`, `pgp.h`; `http-resume-test`, `http-retry-test` | A redirect refused with 403 or 5xx starts again from the original URL (*in development*) |
 | Any ISO, recognized (5.2) | ✅ | 95 | `vm/vmiso.c`, `js_vm.c` `isoInfo`, `model.js` `isoArch`, `assistant.jsx` (the ISO tile's drop); `vmiso-test` (ASan, UBSan, fuzz), `vm_model_test.mjs` | *In development*: the architecture from the UEFI boot files' PE headers (ISO 9660, UDF, the El Torito ESP), install discs by `sources/install.*`, the name only when they say nothing (`archFrom`); an `.iso` dropped on Use an ISO picks it. Checked with real ISOs (Alpine aarch64 named `mysystem.iso`, Ubuntu Server 26.04.1, LordOS 0.8.9, an install-disc evaluation ISO). The drop has no end-to-end UI test (was 85: only the 32-byte label was read) |
 | Unattended Linux: Debian and Ubuntu desktops to login (3.9) | ✅ | 100 | `vmunattend.c`; `vmunattend-test`; VM 116, 2026-11-07 |  |
-| Unattended Fedora to login, Ubuntu console, the arm64 cards on the Pi | 🟡 | 60 | same code (`VMU_KICKSTART`) | Never recorded through login |
-| LordOS card, `lordos-auto.conf`; its signed list read from lordos.org first, GitHub second (3.9, 4.1) | 🧪 | 85 | `vmunattend.c` (`VMU_LORDOS`), `vmcatalog.c` (`LIST_MIRROR`, `vmcat_list_source`), `vmimage_admin.c`; `vmcatalog-test` (the real list and signature) | The list copy on lordos.org is *in development*; the card's install was never run end to end from the card |
+| Unattended Fedora to login, Ubuntu console, the arm64 cards on the Pi | ✅ | 95 | `vmunattend.c` (`VMU_KICKSTART`, `xconfig`, `custom-environment`), `systems.json` (arm64 `append`), `catalog.js` `unattendedOf`; `vmunattend-test`, `vm_catalog_test.mjs` | Fedora 45 Workstation to GDM and GNOME (21 min 47 s) and Ubuntu 26.04.1 console to login (10 min 40 s) on amd64; Debian 13.8, Fedora 45 and Kali consoles and LordOS on the Pi 5, 2026-11-24, each from its card's verified download. Fixed on the way: Fedora's desktop booted to a text login, Fedora's console install stopped (an environment renamed), arm64 installers showed only on the serial port. Not run for lack of space on the Pi: the arm64 desktops and Ubuntu arm64 (was 🟡 60) |
+| LordOS card, `lordos-auto.conf`; its signed list read from lordos.org first, GitHub second (3.9, 4.1) | ✅ | 95 | `vmunattend.c` (`VMU_LORDOS`), `vmcatalog.c` (`LIST_MIRROR`, `vmcat_list_source`), `vmimage_admin.c`; `vmcatalog-test` (the real list and signature) | Run from the card end to end on 2026-11-24: on amd64 the list from lordos.org (HTTP 200), the 0.8.9 image, the install in 1 min 19 s with 3D, the greeter and the desktop; on the Pi 5 in 2 min 2 s to the greeter and the desktop. The guest agent and apps mode on first boot wait for an ISO newer than 0.8.9 (was 🧪 85) |
 | Windows 11 amd64: ISO by hash, unattended, drivers, TPM, Secure Boot, KMS client key (4.3.1) | ✅ | 100 | `windows.js`, `vmunattend.c`, `lordvm.c`; `vm_windows_test.mjs` | On the maintainer's PC |
 | virtio-win guests on arm64 (4.3) | 🟡 | 70 | `machine.c` (the devices on arm64, `vm_gicv3_in`), `lordvm.c` (the arm64 template: `virt,gic-version=3`, AAVMF secure boot, `tpm-tis-device`, USB CD/DVD, ramfb), `vmunattend.c` (arm64 answers, ARM64 drivers), `systems.json` (the maker's 38 Arm64 hashes), `windows.js` `windowsEmulatedWhy`; `vm-test`, `vmunattend-test`, `vm_windows_test.mjs`, `vm_catalog_test.mjs`; the Pi 5, 2026-11-24 | *In development* (4.3.2): KVM refused on a GICv2 host (the Pi 5, measured: "KVM does not support GICv3 emulation"), so there the machine is Emulated; under TCG the template boots with secure boot enforced from the USB CD/DVD (checked with Alpine). Not checked: an install of the guest (its ~6.9 GB ISO comes only from the maker's page and didn't fit on the Pi), Setup on ramfb, the emulated x86-64 guest agent, swtpm on arm64, any GICv3 host (was ❌ 10) |
 | A person's own systems: `vm-image-get-user`, `lord-pgpv` (5.6.1) | ✅ | 95 | `systems.js`, `vmurl.c`, `vmsig.c`, `lordpgpv.c`; `vmurl-test`, `vmsig-test` |  |
@@ -337,11 +337,12 @@ Still open in Phase 2:
 - [x] **Ubuntu 26.04.1 unattended desktop install through its reboot and login** (2026-11-07, VM 116: 23 min on 2 vCPU,
   3 GB, 24 GB disk; login with the assistant's password, `u-14`, `u-15`; Shut Down through the agent 5.5 s). Needed the fix that
   keeps Ubuntu's browser package out (it only installs the snap, which fails inside the installer).
-- [ ] **Fedora 45 kickstart install through its reboot and login** (seen partitioning and downloading packages, stopped on
-  purpose).
-- [ ] Ubuntu console (no desktop) install through login.
-- [ ] Kali card end to end (only its catalog entry and signature check were exercised).
-- [ ] arm64 cards end to end on the Pi 5 (the unattended path was checked on amd64 only).
+- [x] **Fedora 45 kickstart install through its reboot and login** (2026-11-24, the dev PC: 21 min 47 s to GDM and GNOME,
+  after the `xconfig --startxonboot` fix).
+- [x] Ubuntu console (no desktop) install through login (2026-11-24, the dev PC: 10 min 40 s).
+- [x] Kali card end to end (2026-11-24: its new unattended install, 36 min 27 s to the Xfce desktop).
+- [x] arm64 cards end to end on the Pi 5 (2026-11-24: Debian, Fedora and Kali consoles and LordOS; the arm64 desktops and
+  Ubuntu arm64 didn't fit on its disk).
 - [ ] Seen, not fixed (still open at the audit): on a first start the window can stay on "Display output is not active" until it is given a size.
 - [ ] Whether the session's idle sleep was really held off by a running machine wasn't watched on screen (6.1).
 - [ ] Shared extents (reflink) in Storage weren't seen: the test machines are ext4; check on btrfs or XFS.
