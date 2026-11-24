@@ -464,5 +464,6 @@
   },
   "select.nothing": "Nichts ausgewählt",
   "activity.app": "App entfernt",
-  "activity.system": "Systembereinigung: {name}"
+  "activity.system": "Systembereinigung: {name}",
+  "map.machines": "In Maschinen freigeben"
 }

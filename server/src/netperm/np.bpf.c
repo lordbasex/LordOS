@@ -90,12 +90,35 @@ NP_INLINE int proto_of(np_u32 p) {
     return p == IPPROTO_TCP ? NP_P_TCP : p == IPPROTO_UDP ? NP_P_UDP : NP_P_OTHER;
 }
 
+/* The current process's scope at cfg->level, or (Machines' slice, NP_A_SLICE) the machine's scope one level below it
+ * when lord-netperm knows that one: the id np_apps, np_counts and np_bound are keyed by. */
+NP_INLINE np_u64 scope_id(NpCfg *cfg) {
+    np_u64 id = bpf_get_current_ancestor_cgroup_id((int)cfg->level);
+    if (!id) return 0;
+    NpApp *a = bpf_map_lookup_elem(&np_apps, &id);
+    if (a && (a->flags & NP_A_SLICE)) {
+        np_u64 in = bpf_get_current_ancestor_cgroup_id((int)cfg->level + 1);
+        if (in && bpf_map_lookup_elem(&np_apps, &in)) return in;
+    }
+    return id;
+}
+NP_INLINE np_u64 skb_scope_id(struct __sk_buff *skb, NpCfg *cfg) {
+    np_u64 id = bpf_skb_ancestor_cgroup_id(skb, (int)cfg->level);
+    if (!id) return 0;
+    NpApp *a = bpf_map_lookup_elem(&np_apps, &id);
+    if (a && (a->flags & NP_A_SLICE)) {
+        np_u64 in = bpf_skb_ancestor_cgroup_id(skb, (int)cfg->level + 1);
+        if (in && bpf_map_lookup_elem(&np_apps, &in)) return in;
+    }
+    return id;
+}
+
 /* Looks up the current process's policy: first its app scope (np_apps, ancestor at level
  * cfg->level); if it isn't there (e.g. it moved out to user@<uid> with systemd-run), the strict
  * union of the user's restricted apps (np_union, ancestor at level cfg->user_level). Returns the
  * NpApp and leaves in *cgid the key to count and report with (the scope or the user@). 0 if it doesn't apply. */
 NP_INLINE NpApp *find_app(NpCfg *cfg, np_u64 *cgid) {
-    np_u64 id = bpf_get_current_ancestor_cgroup_id((int)cfg->level);
+    np_u64 id = scope_id(cfg);
     if (id) {
         NpApp *app = bpf_map_lookup_elem(&np_apps, &id);
         if (app) { *cgid = id; return app; }
@@ -289,7 +312,7 @@ NP_INLINE void remember_bound(int port, int proto) {
     np_u32 zero = 0;
     NpCfg *cfg = bpf_map_lookup_elem(&np_cfg, &zero);
     if (!cfg) return;
-    np_u64 id = bpf_get_current_ancestor_cgroup_id((int)cfg->level);
+    np_u64 id = scope_id(cfg);
     if (!id || !bpf_map_lookup_elem(&np_counts, &id)) return;
     NpBoundKey k;
     __builtin_memset(&k, 0, sizeof k);
@@ -336,7 +359,7 @@ SEC("cgroup/sock_create") int np_sock_create(struct bpf_sock *sk) {
     np_u32 zero = 0;
     NpCfg *cfg = bpf_map_lookup_elem(&np_cfg, &zero);
     if (!cfg || !cfg->on) return 1;
-    np_u64 cgid = bpf_get_current_ancestor_cgroup_id((int)cfg->level);
+    np_u64 cgid = scope_id(cfg);
     if (!cgid) return 1;
     NpApp *app = bpf_map_lookup_elem(&np_apps, &cgid);
     if (!app) return 1;
@@ -404,7 +427,7 @@ SEC("cgroup/dev") int np_dev(struct bpf_cgroup_dev_ctx *ctx) {
          * user@ union today, so this is for a union that ever carries it). */
         np_u32 minor = ctx->minor;
         np_u32 *kind = bpf_map_lookup_elem(&np_snd, &minor);
-        np_u64 sid = bpf_get_current_ancestor_cgroup_id((int)cfg->level);
+        np_u64 sid = scope_id(cfg);
         int own = sid && sid == cgid;
         if (kind ? *kind == NP_SND_CAPTURE : own) need = NP_R_NO_MIC;
         else return 1;
@@ -500,7 +523,7 @@ NP_INLINE int filter(struct __sk_buff *skb, int in) {
     np_u32 zero = 0;
     NpCfg *cfg = bpf_map_lookup_elem(&np_cfg, &zero);
     if (!cfg) return 1;
-    np_u64 cgid = bpf_skb_ancestor_cgroup_id(skb, (int)cfg->level);
+    np_u64 cgid = skb_scope_id(skb, cfg);
     NpCount *c = cgid ? bpf_map_lookup_elem(&np_counts, &cgid) : 0;
     if (!c) return count_system(skb, in);
     /* the IP header in one read (an IP packet is at least 20 bytes; IPv6 needs 40) */

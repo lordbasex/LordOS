@@ -446,5 +446,6 @@
   },
   "select.nothing": "ไม่ได้เลือกสิ่งใด",
   "activity.app": "ลบแอปแล้ว",
-  "activity.system": "ล้างข้อมูลระบบ: {name}"
+  "activity.system": "ล้างข้อมูลระบบ: {name}",
+  "map.machines": "เรียกคืนพื้นที่ในเครื่องเสมือน"
 }

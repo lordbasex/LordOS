@@ -464,5 +464,6 @@
   },
   "select.nothing": "कुछ भी चुना नहीं गया",
   "activity.app": "ऐप हटाया गया",
-  "activity.system": "सिस्टम सफ़ाई: {name}"
+  "activity.system": "सिस्टम सफ़ाई: {name}",
+  "map.machines": "वर्चुअल मशीनें में जगह वापस लें"
 }

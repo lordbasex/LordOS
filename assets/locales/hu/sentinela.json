@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Leállítás",
   "analysis.rule": "Mindig megjelenik: ehhez a riasztáshoz nem kell modell.",
   "settings.seesMachines": "Virtuális gépeknél: a nevüket, a szerepüket és az állapotukat, hogy miért álltak le, valamint a motorjuk CPU-, memória- és hálózati számait. Soha nem látja a képernyőjüket, a fájljaikat és a vágólapjukat.",
-  "sandbox.unverified": "annak igazolása, hogy a motorja valóban a gép sajátja"
+  "sandbox.unverified": "annak igazolása, hogy a motorja valóban a gép sajátja",
+  "block.ended": "Letiltott program leállítva: {name}",
+  "block.endedBody": "Rajta van a tiltólistádon. A listát itt nézheted át: Beállítások → MI → Sentinela.",
+  "block.title": "Tiltólista",
+  "block.hint": "Ezeket a programokat minden alkalommal leállítjuk, amikor elindulnak a fiókodban, akár be van kapcsolva a Sentinela, akár nincs. Hozzáadni itt tudsz: Figyelő → Információk → Vizsgálat Lumóval; távolítsd el, ha újra futhat.",
+  "block.empty": "Nincs letiltott program.",
+  "block.remove": "Eltávolítás",
+  "block.script": "{interp}-szkript",
+  "block.binary": "Program",
+  "block.pkg": "és a(z) {pkg} csomag összes programja",
+  "block.added": "letiltva: {date}"
 }

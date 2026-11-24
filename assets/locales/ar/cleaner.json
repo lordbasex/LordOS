@@ -536,5 +536,6 @@
   },
   "select.nothing": "لم يُحدَّد شيء",
   "activity.app": "أُزيل تطبيق",
-  "activity.system": "تنظيف النظام: {name}"
+  "activity.system": "تنظيف النظام: {name}",
+  "map.machines": "الاسترداد في الأجهزة الافتراضية"
 }

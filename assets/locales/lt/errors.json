@@ -934,5 +934,19 @@
   "sentinela.blockFailed": "Jos tinklo užblokuoti nepavyko.",
   "sentinela.machineGone": "Šios mašinos nebėra programoje „Virtualios mašinos“.",
   "sentinela.machineFailed": "Mašina neatsakė.",
-  "vm.overBudget": "Šalia jau veikiančių mašinų nepakanka atminties. Pristabdykite ar išjunkite vieną iš jų arba skirkite šiai mašinai mažiau atminties."
+  "vm.overBudget": "Šalia jau veikiančių mašinų nepakanka atminties. Pristabdykite ar išjunkite vieną iš jų arba skirkite šiai mašinai mažiau atminties.",
+  "llm.timeout": "Vietinis modelis per ilgai neatsakė.",
+  "llm.failed": "Vietinis modelis negalėjo atsakyti.",
+  "llm.answer": "Nepavyko perskaityti vietinio modelio atsakymo.",
+  "llm.start": "Vietinio modelio nepavyko paleisti.",
+  "sentinela.lumo.off": "Sentinela išjungta. Įjunkite ją skiltyje Nustatymai → DI → Sentinela.",
+  "sentinela.lumo.noEngine": "Vietinio modelio variklis neįdiegtas.",
+  "sentinela.lumo.noModel": "Sentinela neįdiegtas joks vietinis modelis.",
+  "sentinela.lumo.rejected": "Lumo atsakymas buvo ne tokios formos, kokios tikėtasi, todėl jis atmestas.",
+  "sentinela.blockRefused": "Negalima blokuoti pačios LordOS programų, paties scenarijų interpretatoriaus ir pagrindinių sistemos programų.",
+  "sentinela.blockFull": "Blokavimo sąrašas pilnas.",
+  "sentinela.notBlocked": "Šios programos nėra blokavimo sąraše.",
+  "sentinela.noAppNetwork": "Šis procesas neturi savos programos, kurios tinklą būtų galima blokuoti.",
+  "sys.failed": "Kažkas nepavyko.",
+  "sys.unsupported": "Ši LordOS versija to padaryti negali."
 }

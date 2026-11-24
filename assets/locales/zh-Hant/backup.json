@@ -14,6 +14,9 @@
   "never": "尚無備份",
   "next": "下次：{when}",
   "lastError": "上次備份失敗：{error}",
+  "machinesBusy": {
+    "other": "{count} 台虛擬機器正在執行：此備份中它們的磁碟來自上一份備份"
+  },
   "todayAt": "今天 {time}",
   "now": "立即備份",
   "pause": "暫停",

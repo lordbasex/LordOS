@@ -464,5 +464,6 @@
   },
   "select.nothing": "Nincs kijelölés",
   "activity.app": "Alkalmazás eltávolítva",
-  "activity.system": "Rendszertisztítás: {name}"
+  "activity.system": "Rendszertisztítás: {name}",
+  "map.machines": "Felszabadítás a Gépekben"
 }

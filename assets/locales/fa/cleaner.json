@@ -464,5 +464,6 @@
   },
   "select.nothing": "چیزی انتخاب نشده",
   "activity.app": "برنامه حذف شد",
-  "activity.system": "پاک‌سازی سیستم: {name}"
+  "activity.system": "پاک‌سازی سیستم: {name}",
+  "map.machines": "آزادسازی در ماشین‌های مجازی"
 }

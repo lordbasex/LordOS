@@ -435,7 +435,7 @@ const SYSTEMS = [
   ['fedora', /fedora/i, 'Fedora'], ['mint', /\bmint\b|linuxmint/i, 'Mint'], ['arch', /\barch(linux)?\b|archlinux/i, 'Arch'],
   ['alpine', /alpine/i, 'Alpine'], ['opensuse', /suse/i, 'openSUSE'], ['kali', /kali/i, 'Kali'], ['rocky', /rocky/i, 'Rocky'],
   ['alma', /alma/i, 'Alma'], ['centos', /centos/i, 'CentOS'], ['freebsd', /freebsd/i, 'FreeBSD'], ['raspios', /raspios|raspberry/i, 'Pi OS'],
-  // Android for PCs: Bliss OS's label (BlissOS-16.9.7 (x86_64)) and file names (Bliss-v16.9.7-…), Android-x86, LineageOS
+  // a person's own Android ISO for PCs (Bliss OS, Android-x86, LineageOS): named only
   ['android', /android|blissos|\bbliss-v\d|lineage/i, 'Android'],
   // Microsoft's own volume labels (CCCOMA_X64FRE_…, CENA_X64FREE_…, CPBA_A64FRE_…) and its file names (Win11_…)
   ['windows', /\bWin1[01]_|\b(CCCOMA|CENA|CCSA|CPBA)_(X64|A64)FREE?_/i, 'Windows'],
@@ -457,6 +457,45 @@ export function archOf(name) {
   if (/amd64|x86[_-]64|x64\b/.test(s)) return 'amd64';
   return '';
 }
+// an ISO's architecture (5.2): what its boot files say (lord.vm.isoInfo: the UEFI boot files' PE headers, their names, or
+// El Torito's x86 BIOS entry) wins over its file name and label; { arch, from: 'boot' | 'name' | '', other } — `other`
+// an architecture the boot files name that Machines doesn't run (riscv64), and when the boot files name two (amd64 and
+// arm64 on one disc) the name picks between them
+const RUNS = ['amd64', 'arm64'];
+export function isoArch(info, file) {
+  const boot = String(info?.arch || '');
+  const named = archOf(file) || archOf(info?.label);
+  if (info?.archFrom === 'boot' && RUNS.includes(boot)) return { arch: boot, from: 'boot', other: '' };
+  if (info?.archFrom === 'boot' && boot) return { arch: '', from: 'boot', other: boot };
+  const both = Array.isArray(info?.efiArchs) ? info.efiArchs.filter((a) => RUNS.includes(a)) : [];
+  if (named && (both.length < 2 || both.includes(named))) return { arch: named, from: 'name', other: '' };
+  return { arch: '', from: '', other: '' };
+}
+// The assistant's Detect step (5.2): what lord.vm.isoInfo read from the disc's boot files (vmiso.c: its label, the UEFI
+// boot files' architectures, El Torito's BIOS and UEFI entries; isoArch decides the architecture) against this computer.
+//   info: isoInfo's answer or null; file: its name; hostArch: 'amd64'|'arm64'
+// → { arch, from: 'boot'|'name'|'host', starts: ['uefi'?, 'bios'?], conflict: the name says another architecture than the
+//     boot files, emulated: arch isn't this computer's, both: the disc starts on amd64 and arm64 (the name or this
+//     computer decides), unknownArch: the boot files name only another processor (i386, riscv64), efi: their architectures }
+export function detectPlan(info, file, hostArch) {
+  const byName = archOf(file) || archOf(info?.label);
+  const efi = Array.isArray(info?.efiArchs) ? info.efiArchs.filter((x) => typeof x === 'string') : [];
+  const ia = isoArch(info, file);
+  const both = efi.includes('amd64') && efi.includes('arm64');
+  const unknownArch = !!ia.other;
+  const arch = ia.arch || hostArch;
+  const from = ia.from === 'boot' && ia.arch ? 'boot' : ia.from === 'name' ? 'name' : 'host';
+  const starts = [...(efi.length || info?.efi ? ['uefi'] : []), ...(info?.bios ? ['bios'] : [])];
+  return { arch, from, starts, conflict: from === 'boot' && !!byName && byName !== arch, emulated: arch !== hostArch, both, unknownArch, efi };
+}
+// a file dropped on the assistant's first step (5.2): which tile takes it, by its name (an installer disc, a disk image,
+// another app's machine as Migrate takes it), or null
+export const dropSource = (name) => {
+  const s = String(name || '');
+  if (/\.iso$/i.test(s)) return 'iso';
+  if (/\.(qcow2|img|raw)$/i.test(s)) return 'import';
+  return /(\.(vmx|vbox|pvs|ovf|ova|vmdk|vdi|vhdx|vhd|hds)|^config\.pvs)$/i.test(s) ? 'migrate' : null;
+};
 // a machine name from a system and version, unique among names
 export function suggestName(sys, version, names = []) {
   const base = [sys?.name || 'Machine', version].filter(Boolean).join(' ');
@@ -556,6 +595,52 @@ export function actualFrame(gw, gh, bar, area) {
   if (!(gw > 0) || !(gh > 0) || !area) return null;
   return { w: Math.min(gw, area.w), h: Math.min(gh + (bar || 0), area.h) };
 }
+// View → Scale (5.3): the window's frame so the picture is the guest's display at k times its size (bar above it); when
+// that doesn't fit the display's work area, the largest frame of the same shape that does (fits: false then)
+export const SCALES = [0.5, 0.75, 1.25, 1.5, 2];
+export function scaleFrame(gw, gh, k, bar, area) {
+  if (!(gw > 0) || !(gh > 0) || !(k > 0) || !area) return null;
+  const b = bar || 0;
+  let w = Math.round(gw * k), h = Math.round(gh * k);
+  const fit = Math.min(1, area.w / w, (area.h - b) / h);
+  if (fit < 1) { w = Math.floor(w * fit); h = Math.floor(h * fit); }
+  return { w: Math.max(320, w), h: Math.max(200, h) + b, fits: fit >= 1 };
+}
+// The window keeps the guest's shape (5.3) while the resolution is fixed: after the person resizes it, the frame that
+// keeps its width and gives the picture box the guest's proportions (or, when that is taller than the work area, the
+// tallest that fits, narrower). frame and box: { w, h } of the window and of the picture; null when it is already within
+// 2 pixels (or nothing is known)
+export function shapeFrame(frame, box, gw, gh, area) {
+  if (!frame || !box || !(gw > 0) || !(gh > 0) || !(box.w > 0) || !(box.h > 0)) return null;
+  const want = Math.round(box.w * gh / gw);
+  if (Math.abs(want - box.h) <= 2) return null;
+  let w = frame.w, h = frame.h + (want - box.h);
+  if (area && h > area.h) {
+    const ph = box.h + (area.h - frame.h);
+    if (ph < 100) return null;
+    w = frame.w - box.w + Math.round(ph * gw / gh);
+    h = area.h;
+  }
+  if (Math.abs(w - frame.w) <= 2 && Math.abs(h - frame.h) <= 2) return null;
+  return { w, h };
+}
+// The bar's device dots (5.3): one per device the guest can use now, each { k, key } (machines.dot.<k> its words); a
+// dot is shown only while the device is there, so what the guest has is always in sight. USB and the camera come from the
+// devices' own backend (caps from lord.vm.deviceCaps, when it is there): shown only once it says they are supported.
+export function deviceDots({ iso, heard, mic, cableOut, network, shares, transfer, caps } = {}) {
+  const out = [];
+  if (network && network !== 'isolated') out.push({ k: cableOut ? 'netOut' : 'net' });
+  if (iso) out.push({ k: 'cd' });
+  if (heard) out.push({ k: 'sound' });
+  if (mic) out.push({ k: 'mic' });
+  if ((shares | 0) > 0 || transfer) out.push({ k: 'folders' });
+  if (caps?.usb && (caps.usbAttached | 0) > 0) out.push({ k: 'usb' });
+  if (caps?.camera && caps.cameraOn) out.push({ k: 'camera' });
+  return out;
+}
+// Devices → Network: can the cable be pulled? Only the shared, host-only and bridged networks of a running machine that
+// isn't a group's member (lord-vm refuses the rest too)
+export const cableOffered = (cfg, running) => !!running && !cfg?.group && ['shared', 'hostonly', 'bridged'].includes(cfg?.network);
 // The Info menu (5.3): what this machine uses now, from two lord.vm.stats reads (model.js usage) and its sandbox
 // (isolationGaps); each line a key and its values
 export function infoLines(m, u, gaps) {
@@ -680,7 +765,7 @@ export function doingOf(m, windowed = true) {
 // which machines show (all, running, Linux, the other system's); 'off' of before is read as all
 export const LIB_VIEWS = ['grid', 'list'];
 export const LIB_SORTS = ['name', 'state', 'last', 'disk'];
-export const LIB_SHOWS = ['all', 'running', 'linux', 'windows'];
+export const LIB_SHOWS = ['all', 'running', 'linux', 'windows', 'templates'];
 export function libView(v) {
   const o = v && typeof v === 'object' ? v : {};
   return {
@@ -729,16 +814,36 @@ export function familyOf(m) {
   if (id === 'windows') return 'windows';
   return LINUX.includes(id) || m?.meta?.family === 'linux' ? 'linux' : 'other';
 }
-const shows = (m, show) => (show === 'running' ? stateView(m.state, m.reason).active : show === 'linux' || show === 'windows' ? familyOf(m) === show
+// templates (5.1, app.json template): machines kept as they are, to make new ones from (a clone); their own chip
+const shows = (m, show) => (show === 'templates' ? !!m.meta?.template : show === 'running' ? stateView(m.state, m.reason).active : show === 'linux' || show === 'windows' ? familyOf(m) === show
   : show === 'off' ? !stateView(m.state, m.reason).active : true);
-// the machines a search and the chip leave: the query matches the name, the system or the architecture
+// A machine's tags (Configure → General, app.json): trimmed, no control characters, 1 to 24 characters each, at most 8,
+// each once (case-insensitively), in the order given. "#tag" in the library's search finds them exactly.
+export const TAGS_MAX = 8, TAG_LEN = 24;
+export function tagsOf(list) {
+  const out = [];
+  for (const x of Array.isArray(list) ? list : []) {
+    if (typeof x !== 'string') continue;
+    const t = x.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().replace(/^#+/, '');
+    if (!t || [...t].length > TAG_LEN || out.some((o) => o.toLowerCase() === t.toLowerCase())) continue;
+    out.push(t);
+    if (out.length === TAGS_MAX) break;
+  }
+  return out;
+}
+// "work, test" as typed in Configure → tags
+export const parseTags = (text) => tagsOf(String(text || '').split(/[,\u060c\uff0c\u3001]/));
+// the machines a search and the chip leave: the query matches the name, the system, the architecture or a tag;
+// "#name" only a tag of that name
 export function filterMachines(list, { query, show } = {}) {
   const q = (query || '').trim().toLowerCase();
   return (list || []).filter((m) => {
     if (!shows(m, show)) return false;
     if (!q) return true;
+    const tags = (m.meta?.tags || []).map((x) => x.toLowerCase());
+    if (q.startsWith('#') && q.length > 1) return tags.includes(q.slice(1));
     const sys = m.meta?.osName || systemOf(m.name).name || '';
-    return [m.name, sys, m.arch].some((s) => (s || '').toLowerCase().includes(q));
+    return [m.name, sys, m.arch, ...tags].some((s) => (s || '').toLowerCase().includes(q));
   });
 }
 // how many machines each chip shows (the search applies to all of them)
@@ -810,7 +915,7 @@ export const machineProtectedOf = (entry, meta, homeProtected = false) =>
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
 // shell: the tools start the agent's shell (6.18, tools 8 / w12); links, notify: they pass the guest's links and
 // notifications on, and this machine takes them (6.12); eventlog: a Windows guest's event logs come in (6.19)
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -844,11 +949,33 @@ export function clipState(agent, cfg) {
   if (caps & AGENT_CAPS.clipNoTool) return 'needsXclip';
   return guestWindows(agent) ? 'needsTools' : 'needsHelper';
 }
+// The LordOS Guest Tools disc (6.17, lordvm.c VAG_DISC): for a Linux guest without a usable qemu-guest-agent.
+// → null (nothing to offer), 'insert' (the popover offers "Install the Agent from a Disc") or 'guide' (the disc is in the
+// drive: the steps to run in the machine). Never for a protected (anonymity) machine, a Windows guest, a machine that is
+// off or whose agent is off, nor when qemu-guest-agent answers and lets Install copy files and run its script.
+export function discOffer(agent, cfg, running, isProtected) {
+  if (!cfg?.agent || !running || isProtected) return null;
+  const caps = agent?.caps || 0;
+  if (caps & AGENT_CAPS.toolsDisc) return 'guide';
+  if (guestWindows(agent)) return null;
+  if (agent?.state === 'connected' && (caps & AGENT_CAPS.exec) && (caps & AGENT_CAPS.files)) return null;
+  return 'insert';
+}
+// what to run in the machine (install.sh on the disc, volume LORDOS_TOOLS): where desktops mount it, and by hand
+export const DISC_LABEL = 'LORDOS_TOOLS';
+export const discCommands = () => [
+  { key: 'debian', cmd: `sh /media/$USER/${DISC_LABEL}/install.sh` },
+  { key: 'others', cmd: `sh /run/media/$USER/${DISC_LABEL}/install.sh` },
+  { key: 'manual', cmd: 'sudo mount -r /dev/sr0 /mnt && sh /mnt/install.sh' },
+];
+// Copy is offered only where it can reach the machine: its clipboard goes toward it (Configure) and a helper there
+// takes it. Before the agent is installed it usually can't: the command is shown to be typed
+export const discCanCopy = (agent, cfg) => clipTo(cfg?.clipboard || 'off') && !!((agent?.caps || 0) & AGENT_CAPS.clipboard);
 // the agent's popover says what to install in the guest: connected, the clipboard on, the helper there without a tool
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w12', linux: '8' };
+export const TOOLS_SHIPPED = { windows: 'w12', linux: '9' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -1177,7 +1304,8 @@ export const cloneWinName = (name) => `${hostnameFrom(name).slice(0, WIN_NAME_MA
 // A machine whose machine.json this LordOS can't read (lord.vm.list's error): "newer" (a newer LordOS wrote it) or
 // "invalid"; its numbers aren't known and it can't start
 export const unreadableOf = (m) => (m?.error === 'newer' || m?.error === 'invalid' ? m.error : null);
-export const actionsOf = (m) => (unreadableOf(m) ? { ...actionsFor(m.state), start: false } : actionsFor(m?.state));
+// a template (5.1) doesn't start from the library: it stays as it was made, and New Machine from Template clones it
+export const actionsOf = (m) => (unreadableOf(m) || (m?.meta?.template && !stateView(m.state, m.reason).active) ? { ...actionsFor(m.state), start: false } : actionsFor(m?.state));
 export const isWindowsMachine = (m) => !!m && (!!m.windowsDevices || m.devices === 'windows');
 
 export function cloneMethod(info, kind, fromSnapshot = false) {
@@ -1762,10 +1890,12 @@ export function groupMembers(group, list) {
 const RUNNING = (s) => s === 'running' || s === 'paused';
 const ACTIVE = (s) => s === 'starting' || s === 'running' || s === 'paused' || s === 'stopping';
 // one word for the whole group: 'running' (all members), 'off' (none), 'partial', or 'damaged' (a member missing or not
-// this group's: 19.9, "A member folder… missing or invalid")
+// this group's, or a base missing: 19.9, "A member folder, a base… missing or invalid")
 export function groupState(group, list) {
   const ms = groupMembers(group, list), roles = (group?.members || []).map((x) => x.role);
   if (!roles.length || roles.some((r) => !ms[r])) return 'damaged';
+  const on0 = roles.some((r) => ACTIVE(ms[r].state));
+  if (!on0 && (group?.basesMissing || []).length) return 'damaged';
   const on = roles.filter((r) => ACTIVE(ms[r].state)).length;
   return on === 0 ? 'off' : on === roles.length && roles.every((r) => RUNNING(ms[r].state)) ? 'running' : 'partial';
 }
@@ -1778,6 +1908,8 @@ export function groupPlan(group, list, action) {
   const ms = groupMembers(group, list);
   const order = [...(group?.members || [])].sort((a, b) => (action === 'stop' ? a.stop - b.stop : a.start - b.start));
   if (!order.length || order.some((x) => !ms[x.role])) return { fail: 'damaged' };
+  // a base missing: a member off can't start (Repair makes it again first); one running keeps its open base
+  if (action === 'start' && (group?.basesMissing || []).some((r) => ms[r] && !ACTIVE(ms[r].state))) return { fail: 'damaged' };
   for (const x of order) {
     const m = ms[x.role];
     if (action === 'stop') {
@@ -1870,7 +2002,7 @@ export function awayStep(idleSec, list, metaOf, paused) {
 // Configure (5.5): which section each field lord-vm --set changes belongs to (the sidebar's dots: a section with a change
 // not saved yet), and the sidebar's search over the sections' titles and summaries
 export const FIELD_SECTION = {
-  name: 'general', vcpus: 'cpu', memoryMb: 'cpu', cpuPin: 'cpu', perfProfile: 'cpu', resolution: 'display', graphics: 'display',
+  name: 'general', vcpus: 'cpu', memoryMb: 'cpu', cpuPin: 'cpu', cpuModel: 'cpu', perfProfile: 'cpu', resolution: 'display', graphics: 'display',
   gpu: 'display', pointer: 'display', captureFullscreen: 'display', network: 'network', bridge: 'network', ports: 'network',
   nicModel: 'network', diskGb: 'disks', iso: 'disks', shares: 'sharing', transfer: 'sharing', clipboard: 'sharing', agent: 'agent',
   bootOrder: 'boot', bootMenu: 'boot',

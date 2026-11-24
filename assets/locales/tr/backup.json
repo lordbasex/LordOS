@@ -14,6 +14,10 @@
   "never": "Henüz yedek yok",
   "next": "Sonraki: {when}",
   "lastError": "Son yedekleme başarısız oldu: {error}",
+  "machinesBusy": {
+    "one": "{count} makine çalışıyordu: bu yedekteki diskleri bir öncekinden alındı",
+    "other": "{count} makine çalışıyordu: bu yedekteki diskleri bir öncekinden alındı"
+  },
   "todayAt": "bugün {time}",
   "now": "Şimdi Yedekle",
   "pause": "Duraklat",

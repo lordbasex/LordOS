@@ -464,5 +464,6 @@
   },
   "select.nothing": "Mitään ei ole valittu",
   "activity.app": "Sovellus poistettu",
-  "activity.system": "Järjestelmän siivous: {name}"
+  "activity.system": "Järjestelmän siivous: {name}",
+  "map.machines": "Vapauta Koneissa"
 }

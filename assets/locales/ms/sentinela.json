@@ -132,5 +132,15 @@
   "action.vm_shutdown": "Matikan",
   "analysis.rule": "Sentiasa ditunjukkan: amaran ini tidak memerlukan model.",
   "settings.seesMachines": "Untuk mesin maya: nama, peranan dan keadaannya, sebab ia berhenti, serta kiraan CPU, memori dan rangkaian enjinnya. Tidak sekali-kali skrin, fail atau papan keratannya.",
-  "sandbox.unverified": "bukti bahawa enjinnya benar-benar milik mesin itu sendiri"
+  "sandbox.unverified": "bukti bahawa enjinnya benar-benar milik mesin itu sendiri",
+  "block.ended": "Program yang disekat ditamatkan: {name}",
+  "block.endedBody": "Ia ada dalam senarai sekatan anda. Semak senarai itu dalam Tetapan → AI → Sentinela.",
+  "block.title": "Senarai sekatan",
+  "block.hint": "Program-program ini ditamatkan setiap kali ia bermula dalam akaun anda, sama ada Sentinela hidup atau mati. Tambah satu daripada Monitor → Dapatkan Maklumat → Siasat dengan Lumo; buangnya untuk membenarkannya berjalan semula.",
+  "block.empty": "Tiada program yang disekat.",
+  "block.remove": "Buang",
+  "block.script": "Skrip {interp}",
+  "block.binary": "Program",
+  "block.pkg": "dan setiap program daripada pakej {pkg}",
+  "block.added": "disekat pada {date}"
 }

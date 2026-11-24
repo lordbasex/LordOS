@@ -75,7 +75,7 @@ static void test_schema(void) {
     free(j);
 
     struct { const char *key, *val; int want; } bad[] = {
-        { "schema", "16", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
+        { "schema", "19", VM_E_NEWER }, { "schema", "0", VM_E_SCHEMA }, { "schema", "\"1\"", VM_E_SCHEMA }, { "schema", NULL, VM_E_SCHEMA },
         { "id", "\"0F8E2C1A-3B4D-4E5F-8A6B-7C8D9E0F1A2B\"", VM_E_RANGE }, { "id", "\"x\"", VM_E_RANGE }, { "id", NULL, VM_E_FIELD },
         { "name", "\"\"", VM_E_RANGE }, { "name", "\"a/b\"", VM_E_RANGE }, { "name", "\"   \"", VM_E_RANGE }, { "name", "\"tab\\there\"", VM_E_RANGE },
         { "name", "\"\\u202e\"", VM_OK }, { "name", "\"x\\u2028y\"", VM_E_RANGE },
@@ -118,7 +118,7 @@ static void test_schema(void) {
     CHECK(vm_machine_parse("{", 1, &m, err, sizeof err) == VM_E_JSON);
     CHECK(vm_machine_parse(GOOD, 70 * 1024, &m, err, sizeof err) == VM_E_JSON);
     /* a newer file is refused before its other keys are judged, and isn't saved */
-    const char newer[] = "{\"schema\":16,\"whatever\":true}";
+    const char newer[] = "{\"schema\":19,\"whatever\":true}";
     CHECK(vm_machine_parse(newer, strlen(newer), &m, err, sizeof err) == VM_E_NEWER);
     VmMachine n9;
     vm_machine_parse(GOOD, strlen(GOOD), &n9, err, sizeof err);
@@ -240,12 +240,43 @@ static void test_schema(void) {
                 free(jj);
             }
         }
-        /* arm64 (GOOD) and a bios machine refuse them */
+        /* arm64 (GOOD, 4.3): secure boot, a TPM and the windows devices, never Hyper-V; a bios machine refuses secure boot */
         {
             char t[4096];
             const char *at = strstr(GOOD, "\"schema\":1");
             snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"tpm\":true}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
+            CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_OK);
+            snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"secure_boot\":true,\"tpm\":true,\"devices\":\"windows\",\"drivers\":\"/home/ana/virtio-win.iso\"}",
+                     (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
+            CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_OK && m.devices == VM_DEV_WINDOWS && m.secure_boot && m.tpm);
+            /* KVM gives the windows devices' GICv3 only on a GICv3 host (the Pi 5 is GICv2): refused there, emulation allowed */
+            VmHost g2 = { .arch = VM_ARCH_ARM64, .cpus = 4, .ram_mb = 16000, .kvm = 1, .gicv3 = 0 }, g3 = g2;
+            g3.gicv3 = 1;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_E_HOST && strstr(err, "GICv2"));
+            CHECK(vm_machine_check_host(&m, &g3, err, sizeof err, NULL, 0) == VM_OK);
+            m.accel = VM_ACCEL_TCG;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_OK);
+            m.accel = VM_ACCEL_KVM; m.devices = VM_DEV_VIRTIO;
+            CHECK(vm_machine_check_host(&m, &g2, err, sizeof err, NULL, 0) == VM_OK);       /* a Linux machine: GICv2 is fine */
+            snprintf(t, sizeof t, "%.*s\"schema\":5%.*s,\"hyperv\":true}", (int)(at - GOOD), GOOD, (int)(strlen(at) - 10 - 1), at + 10);
             CHECK(vm_machine_parse(t, strlen(t), &m, err, sizeof err) == VM_E_RANGE);
+            /* the interrupts table: GICv3 or GICv4 named, a name cut between two reads, GICv2 only, none */
+            {
+                char tf[] = "/tmp/vm-test-irq-XXXXXX";
+                int fd = mkstemp(tf);
+                static char big[200000];
+                memset(big, ' ', sizeof big);
+                memcpy(big + 65536 + 8 - 3, "GICv3", 5);
+                CHECK(fd >= 0 && write(fd, big, sizeof big) == (ssize_t)sizeof big);
+                CHECK(vm_gicv3_in(tf) == 1);
+                CHECK(fd >= 0 && !ftruncate(fd, 0) && pwrite(fd, " 12:  9752  GICv2  27 Level  kvm guest vtimer\n", 47, 0) == 47);
+                CHECK(vm_gicv3_in(tf) == 0);
+                CHECK(fd >= 0 && pwrite(fd, " 12:  9752  GICv4  27 Level  kvm guest vtimer\n", 47, 0) == 47);
+                CHECK(vm_gicv3_in(tf) == 1);
+                if (fd >= 0) close(fd);
+                unlink(tf);
+                CHECK(vm_gicv3_in("/nonexistent/interrupts") == -1);
+            }
             CHECK(vm_machine_parse(amd, strlen(amd), &m, err, sizeof err) == VM_OK);
             m.schema = 5; m.firmware = VM_FW_BIOS; m.firmware_code[0] = m.firmware_sha256[0] = 0; m.secure_boot = 1;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
@@ -488,6 +519,44 @@ static void test_schema(void) {
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 12);
         }
+        /* schema 16: storage (docs/VIRTUALIZATION.md 6.2, 6.4, 8): disposable memory|disk, encrypted, disk_format raw,
+         * backup false; each written only when it differs from a new machine, never below 16; raw excludes encrypted */
+        {
+            struct { const char *add; int schema, want; } s16[] = {
+                { "\"disposable\":\"memory\"", 16, VM_OK }, { "\"disposable\":\"disk\"", 16, VM_OK }, { "\"disposable\":\"off\"", 16, VM_E_RANGE },
+                { "\"disposable\":\"ram\"", 16, VM_E_RANGE }, { "\"disposable\":true", 16, VM_E_FIELD }, { "\"disposable\":\"memory\"", 15, VM_E_FIELD },
+                { "\"encrypted\":true", 16, VM_OK }, { "\"encrypted\":false", 16, VM_OK }, { "\"encrypted\":1", 16, VM_E_FIELD }, { "\"encrypted\":true", 15, VM_E_FIELD },
+                { "\"disk_format\":\"raw\"", 16, VM_OK }, { "\"disk_format\":\"qcow2\"", 16, VM_OK }, { "\"disk_format\":\"vmdk\"", 16, VM_E_RANGE },
+                { "\"disk_format\":\"raw\",\"encrypted\":true", 16, VM_E_RANGE }, { "\"disk_format\":\"raw\"", 15, VM_E_FIELD },
+                { "\"backup\":false", 16, VM_OK }, { "\"backup\":true", 16, VM_OK }, { "\"backup\":\"no\"", 16, VM_E_FIELD }, { "\"backup\":false", 15, VM_E_FIELD },
+                { "\"disposable\":\"disk\",\"encrypted\":true,\"backup\":false", 16, VM_OK },
+            };
+            for (size_t i = 0; i < sizeof s16 / sizeof s16[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s16[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s16[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s16[i].want) fprintf(stderr, "  schema 16 %s (%d): got %d (%s)\n", s16[i].add, s16[i].schema, r, err);
+                CHECK(r == s16[i].want);
+                if (r != VM_OK) continue;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                CHECK(jj && !strstr(jj, "\"backup\": true") && !strstr(jj, "\"encrypted\": false") && !strstr(jj, "\"disk_format\": \"qcow2\""));
+                free(jj);
+            }
+            /* a group's member: its group has the disposable switch, and its disk is qcow2 */
+            VmMachine gm;
+            vm_machine_parse(GOOD, strlen(GOOD), &gm, err, sizeof err);
+            CHECK(!strcmp(vm_disk_ext(&gm), "qcow2"));
+            gm.raw = 1;
+            CHECK(!strcmp(vm_disk_ext(&gm), "raw"));
+            /* the key's form: exactly 64 lowercase hex digits */
+            CHECK(vm_key_valid("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", 64));
+            CHECK(!vm_key_valid("0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef", 64));
+            CHECK(!vm_key_valid("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde", 63));
+            CHECK(!vm_key_valid("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg", 64));
+            CHECK(!vm_key_valid("a passphrase someone chose", 26));
+        }
         /* schema 13: perf_profile (the guest's performance profile, 7.1.4), true or false, written only when true, never
          * below 13 */
         {
@@ -495,7 +564,7 @@ static void test_schema(void) {
                 { "\"perf_profile\":true", 13, VM_OK, 1 }, { "\"perf_profile\":false", 13, VM_OK, 0 }, { "\"agent\":true", 13, VM_OK, 0 },
                 { "\"perf_profile\":1", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":\"on\"", 13, VM_E_FIELD, 0 }, { "\"perf_profile\":null", 13, VM_E_FIELD, 0 },
                 { "\"perf_profile\":true", 12, VM_E_FIELD, 0 }, { "\"perf_profile\":false", 12, VM_OK, 0 },
-                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_E_NEWER, 0 },
+                { "\"perf_profile\":true", 14, VM_OK, 1 }, { "\"perf_profile\":true", 16, VM_OK, 1 }, { "\"perf_profile\":true", 19, VM_E_NEWER, 0 },
             };
             for (size_t i = 0; i < sizeof s13 / sizeof s13[0]; i++) {
                 char t[4096];
@@ -527,7 +596,7 @@ static void test_schema(void) {
                 { "\"guest_links\":true,\"guest_notify\":true", 15, VM_OK, 1, 1 }, { "\"guest_links\":false", 15, VM_OK, 0, 0 },
                 { "\"guest_links\":1", 15, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":\"on\"", 15, VM_E_FIELD, 0, 0 },
                 { "\"guest_links\":true", 14, VM_E_FIELD, 0, 0 }, { "\"guest_notify\":true", 14, VM_E_FIELD, 0, 0 },
-                { "\"guest_notify\":false", 14, VM_OK, 0, 0 }, { "\"guest_links\":true", 16, VM_E_NEWER, 0, 0 },
+                { "\"guest_notify\":false", 14, VM_OK, 0, 0 }, { "\"guest_links\":true", 19, VM_E_NEWER, 0, 0 },
             };
             for (size_t i = 0; i < sizeof s15 / sizeof s15[0]; i++) {
                 char t[4096];
@@ -550,6 +619,69 @@ static void test_schema(void) {
             m.guest_links = 2; m.schema = VM_SCHEMA;
             CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
             CHECK(VM_SCHEMA >= 15);
+        }
+        /* schema 17: automation (6.15), true or false, written only when true, never below 17, never for anonymity */
+        {
+            struct { const char *add; int schema, want, on; } s16[] = {
+                { "\"automation\":true", 17, VM_OK, 1 }, { "\"automation\":false", 17, VM_OK, 0 }, { "\"agent\":true", 17, VM_OK, 0 },
+                { "\"automation\":1", 17, VM_E_FIELD, 0 }, { "\"automation\":\"on\"", 17, VM_E_FIELD, 0 }, { "\"automation\":null", 17, VM_E_FIELD, 0 },
+                { "\"automation\":true", 16, VM_E_FIELD, 0 }, { "\"automation\":false", 16, VM_OK, 0 }, { "\"automation\":true", 19, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s16 / sizeof s16[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s16[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s16[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s16[i].want) fprintf(stderr, "  schema 17 %s (%d): got %d (%s)\n", s16[i].add, s16[i].schema, r, err);
+                CHECK(r == s16[i].want);
+                if (r != VM_OK) continue;
+                CHECK(m.automation == s16[i].on);
+                m.schema = VM_SCHEMA;
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && !!strstr(jj, "\"automation\": true") == s16[i].on && !strstr(jj, "\"automation\": false"));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && !memcmp(&m, &m2, sizeof m));
+                free(jj);
+            }
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK && !m.automation);
+            m.automation = 1;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_FIELD);
+            m.automation = 2; m.schema = VM_SCHEMA;
+            CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            CHECK(VM_SCHEMA >= 17);
+        }
+        /* schema 18: cpu_model (5.5), "host" or "compatible", written only when compatible, never below 18, amd64 with KVM
+         * only (GOOD is an arm64 machine) */
+        {
+            struct { const char *add; int schema, want, model; } s18[] = {
+                { "\"cpu_model\":\"host\"", 18, VM_OK, VM_CPU_HOST }, { "\"agent\":true", 18, VM_OK, VM_CPU_HOST },
+                { "\"cpu_model\":\"max\"", 18, VM_E_RANGE, 0 }, { "\"cpu_model\":true", 18, VM_E_FIELD, 0 },
+                { "\"cpu_model\":\"compatible\"", 18, VM_E_RANGE, 0 }, { "\"cpu_model\":\"compatible\"", 17, VM_E_FIELD, 0 },
+                { "\"cpu_model\":\"host\"", 19, VM_E_NEWER, 0 },
+            };
+            for (size_t i = 0; i < sizeof s18 / sizeof s18[0]; i++) {
+                char t[4096];
+                const char *at = strstr(GOOD, "\"schema\":1");
+                snprintf(t, sizeof t, "%.*s\"schema\":%d%.*s,%s}", (int)(at - GOOD), GOOD, s18[i].schema, (int)(strlen(at) - 10 - 1), at + 10, s18[i].add);
+                int r = vm_machine_parse(t, strlen(t), &m, err, sizeof err);
+                if (r != s18[i].want) fprintf(stderr, "  schema 18 %s (%d): got %d (%s)\n", s18[i].add, s18[i].schema, r, err);
+                CHECK(r == s18[i].want);
+                if (r == VM_OK) CHECK(m.cpu_model == s18[i].model);
+            }
+            /* compatible: an amd64 KVM machine, written and read back; never with TCG */
+            CHECK(vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err) == VM_OK);
+            m.arch = VM_ARCH_AMD64; snprintf(m.machine_type, sizeof m.machine_type, "pc-q35-10.0"); m.cpu_model = VM_CPU_COMPAT; m.schema = VM_SCHEMA;
+            int cok = vm_machine_check(&m, err, sizeof err) == VM_OK;
+            if (!cok) fprintf(stderr, "  compatible amd64: %s\n", err);
+            CHECK(cok);
+            if (cok) {
+                char *jj = vm_machine_json(&m);
+                CHECK(jj && strstr(jj, "\"cpu_model\": \"compatible\""));
+                CHECK(jj && vm_machine_parse(jj, strlen(jj), &m2, err, sizeof err) == VM_OK && m2.cpu_model == VM_CPU_COMPAT);
+                free(jj);
+                m.accel = VM_ACCEL_TCG;
+                CHECK(vm_machine_check(&m, err, sizeof err) == VM_E_RANGE);
+            }
+            CHECK(VM_SCHEMA >= 18);
         }
         /* schema 13: cpu_pin (vCPU pinning, 3.7.1), "off" or "auto", written only when chosen, never below 13 */
         {
@@ -916,7 +1048,7 @@ static void test_host(void) {
     VmMachine m;
     char err[256], warn[256];
     vm_machine_parse(GOOD, strlen(GOOD), &m, err, sizeof err);
-    VmHost pi = { VM_ARCH_ARM64, 4, 16208, 1 }, small = { VM_ARCH_ARM64, 4, 3884, 1 }, pc = { VM_ARCH_AMD64, 8, 16000, 1 };
+    VmHost pi = { VM_ARCH_ARM64, 4, 16208, 1, 0 }, small = { VM_ARCH_ARM64, 4, 3884, 1, 0 }, pc = { VM_ARCH_AMD64, 8, 16000, 1, 0 };
     CHECK(vm_vcpus_recommended(&pi) == 3 && vm_mem_max_mb(&pi) == 16208 - 2048 && vm_mem_max_mb(&small) == 3884 - 1024);
     CHECK(vm_machine_check_host(&m, &pi, err, sizeof err, warn, sizeof warn) == VM_OK && !warn[0]);
     m.vcpus = 4;
@@ -1067,7 +1199,11 @@ static void test_messages(void) {
     /* the transfer folder (6.7.1): VAG_TRANSFER is an agent request (WinFsp's hash as text, or none); the agent's state
      * says whether the guest has it (VAC_TRANSFER) or can once WinFsp is in (VAC_XFER_SETUP) */
     q = vm_msg(VM_AGENT, 7, VAG_TRANSFER, 0, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
-    q = vm_msg(VM_AGENT, 7, VAG_EXTRA_ON + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    /* the LordOS Guest Tools disc (6.17): VAG_DISC is the last agent request; VAC_TOOLS_DISC says it's in the drive */
+    q = vm_msg(VM_AGENT, 7, VAG_DISC, 1, 0, 0, ""); CHECK(vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT, 7, VAG_DISC + 1, 0, 0, 0, ""); CHECK(!vm_msg_valid(&q, 1));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_WAITING, VAC_TOOLS_DISC, 0, 0, "\t\t"); CHECK(vm_msg_valid(&q, 0));
+    q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_ALL, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0) && (VAC_ALL & VAC_TOOLS_DISC));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_FILES | VAC_TRANSFER, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXEC | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
     q = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_DISPLAY | (int)LAG_CAP_WINDOWS | VAC_TRANSFER | VAC_XFER_SETUP, 0, 0, "1\tx"); CHECK(vm_msg_valid(&q, 0));
@@ -2008,7 +2144,8 @@ static void test_tablet_layout(void) {
     CHECK(ag_hello_caps((const uint8_t *)"6 stopped stoppings", 19) == 0);
     m = vm_msg(VM_AGENT, 1, VAG_EXTRA_OFF, 0, 0, 0, ""); CHECK(vm_msg_valid(&m, 1));
     m.a = VAG_EXTRA_ON; CHECK(vm_msg_valid(&m, 1));
-    m.a = VAG_EXTRA_ON + 1; CHECK(!vm_msg_valid(&m, 1));
+    m.a = VAG_DISC; CHECK(vm_msg_valid(&m, 1));
+    m.a = VAG_DISC + 1; CHECK(!vm_msg_valid(&m, 1));
     m = vm_msg(VM_AGENT_STATE, 0, VAS_CONNECTED, VAC_EXTRA | VAC_EXTRA_OFF, 0, 0, "1\tx"); CHECK(vm_msg_valid(&m, 0));
     /* the guest's performance profile (w11, 7.1.4): AGK_PERF one byte, 0 or 1; AGK_PERFSTATE three bytes, on, the parts
      * done and refused, known bits only and never a part in both */

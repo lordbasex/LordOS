@@ -249,6 +249,17 @@ eq('version none', versionOf('netinst.iso'), '');
 eq('arch arm', archOf('debian-13-nocloud-arm64.qcow2'), 'arm64');
 eq('arch x86', archOf('Fedora-Server-dvd-x86_64-41.iso'), 'amd64');
 eq('arch unknown', archOf('mysystem.iso'), '');
+// an ISO's architecture (lord.vm.isoInfo, vmiso.c): its boot files win over its name; the name when they don't say
+const { isoArch } = M;
+eq('arch from the boot files', isoArch({ label: 'alpine-virt 3.24.4 aarch64', arch: 'arm64', archFrom: 'boot', efiArchs: ['arm64'] }, 'mysystem.iso'), { arch: 'arm64', from: 'boot', other: '' });
+eq('boot files beat a wrong name', isoArch({ label: 'X', arch: 'amd64', archFrom: 'boot', efiArchs: ['amd64'] }, 'debian-arm64.iso'), { arch: 'amd64', from: 'boot', other: '' });
+eq('x86 BIOS only: amd64 from boot', isoArch({ label: '', arch: 'amd64', archFrom: 'boot', bios: true, efiArchs: [] }, 'x.iso'), { arch: 'amd64', from: 'boot', other: '' });
+eq('boot files silent: the name', isoArch({ label: 'MYDISC', arch: '', archFrom: '', efiArchs: [] }, 'Fedora-Server-dvd-x86_64-41.iso'), { arch: 'amd64', from: 'name', other: '' });
+eq('boot files silent: the label', isoArch({ label: 'Debian 13 arm64 n', arch: '', archFrom: '' }, 'disc.iso'), { arch: 'arm64', from: 'name', other: '' });
+eq('two architectures: the name picks one of them', isoArch({ arch: '', archFrom: '', efiArchs: ['amd64', 'arm64'] }, 'multi-arm64.iso'), { arch: 'arm64', from: 'name', other: '' });
+eq('nothing says', isoArch({ label: 'MYDISC', arch: '', archFrom: '' }, 'mysystem.iso'), { arch: '', from: '', other: '' });
+eq('riscv64: not one Machines runs', isoArch({ arch: 'riscv64', archFrom: 'boot', efiArchs: ['riscv64'] }, 'x-amd64.iso'), { arch: '', from: 'boot', other: 'riscv64' });
+eq('no info (not an ISO, or isoInfo null): the name', isoArch(null, 'ubuntu-24.04-desktop-arm64.iso'), { arch: 'arm64', from: 'name', other: '' });
 eq('name', suggestName({ name: 'Debian' }, '13', ['Debian 13']), 'Debian 13 2');
 // 5.6 on a Pi 5 (4 cores, 16 GB) and on a small VM (4 cores, 3.8 GB)
 const pi5 = { cpus: 4, vcpusRecommended: 3, ramMb: 16219, memMaxMb: 14171 }, small = { cpus: 4, vcpusRecommended: 3, ramMb: 3946, memMaxMb: 2922 };
@@ -858,6 +869,37 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('library menu key', typeof en.libraryMenu, 'string');
 }
 
+// ---- the LordOS Guest Tools disc (6.17, lordvm.c VAG_DISC): when the popover offers it, and what it shows ----
+{
+  const fsm = await import('node:fs');
+  const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
+  const C = M.AGENT_CAPS;
+  const cfg = { agent: true, clipboard: 'both' };
+  const waiting = { state: 'waiting', caps: 0 };
+  eq('disc: a running Linux machine with no agent answering → offered', M.discOffer(waiting, cfg, true, false), 'insert');
+  eq('disc: no state yet (just started) → offered', M.discOffer(undefined, cfg, true, false), 'insert');
+  eq('disc: the machine is off → nothing', M.discOffer(waiting, cfg, false, false), null);
+  eq('disc: the agent is off in Configure → nothing', M.discOffer(waiting, { agent: false }, true, false), null);
+  eq('disc: a protected (anonymity) machine → never', M.discOffer(waiting, cfg, true, true), null);
+  eq('disc: the disc is in the drive → the steps', M.discOffer({ state: 'waiting', caps: C.toolsDisc }, cfg, true, false), 'guide');
+  eq('disc: in the drive, but a protected machine → nothing', M.discOffer({ state: 'waiting', caps: C.toolsDisc }, cfg, true, true), null);
+  eq('disc: qemu-guest-agent answers with files and commands → Install goes through it', M.discOffer({ state: 'connected', caps: C.exec | C.files }, cfg, true, false), null);
+  eq('disc: qemu-guest-agent answers without guest-exec (a restricted agent) → offered', M.discOffer({ state: 'connected', caps: C.files }, cfg, true, false), 'insert');
+  eq('disc: a Windows guest → never (its own tools)', M.discOffer({ state: 'connected', caps: 0, system: 'Windows 11 Pro' }, cfg, true, false), null);
+  eq('disc: the toolsDisc bit is lord-vm\'s VAC_TOOLS_DISC', C.toolsDisc, 2097152);
+  const cmds = M.discCommands();
+  eq('disc: three lines (Debian/Ubuntu, others, by hand)', cmds.map((c) => c.key), ['debian', 'others', 'manual']);
+  eq('disc: every line names install.sh on the disc\'s label', cmds.every((c) => /\binstall\.sh$/.test(c.cmd) && (c.key === 'manual' || c.cmd.includes(`/${M.DISC_LABEL}/`))), true);
+  eq('disc: the label is mkguestiso\'s', M.DISC_LABEL, 'LORDOS_TOOLS');
+  eq('disc: no line carries a password or sudo -S', cmds.some((c) => /-S\b|passw/i.test(c.cmd)), false);
+  for (const k of ['debian', 'others', 'manual']) eq(`disc: en has agent.disc.${k}`, typeof en[`agent.disc.${k}`], 'string');
+  for (const k of ['discHint', 'discBtn', 'discErr', 'discTitle', 'discStep', 'discPassword', 'discCopy', 'discOut']) eq(`disc: en has agent.${k}`, typeof en[`agent.${k}`], 'string');
+  eq('disc: Copy only where the clipboard goes toward the guest and a helper takes it', [
+    M.discCanCopy({ caps: C.clipboard }, { clipboard: 'both' }), M.discCanCopy({ caps: C.clipboard }, { clipboard: 'to-guest' }),
+    M.discCanCopy({ caps: C.clipboard }, { clipboard: 'from-guest' }), M.discCanCopy({ caps: 0 }, { clipboard: 'both' }), M.discCanCopy(undefined, undefined),
+  ], [true, true, false, false, false]);
+}
+
 // ---- the LordOS tools: older than the ones shipped (the popover's Update, the bar's dot) ----
 {
   const fsm = await import('node:fs');
@@ -1185,6 +1227,59 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('guest zone differs', D.guestZone(['x', '2026-11-24T05:00:07-0300 h u: a'], 60), -180);
   eq('guest zone the same', D.guestZone(['2026-11-24T05:00:07+0100 h u: a'], 60), null);
   eq('Z is UTC', D.journalLine('2026-11-24T05:00:07Z h u: a', 0).at, '05:00:07');
+}
+
+// ---- the app's last parts (Machines to 100 %): Detect, drop, tags, templates, Scale, shape, device dots, Cleaner ----
+{
+  const { detectPlan, dropSource, tagsOf, parseTags, filterMachines, chipCounts, actionsOf, scaleFrame, shapeFrame, deviceDots, cableOffered, libView, SCALES } = M;
+  const C = await import(path.join(here, '../../apps/cleaner/vmspace.js'));
+  // Detect (over lord.vm.isoInfo's answer): the boot files decide; the name, then this computer, when they don't say
+  const deb = { label: 'Debian 13.2.0 amd64 n', arch: 'amd64', archFrom: 'boot', bios: true, efi: true, efiArchs: ['amd64'], windows: false };
+  eq('detect native', detectPlan(deb, 'debian-13.2.0-amd64-netinst.iso', 'amd64'), { arch: 'amd64', from: 'boot', starts: ['uefi', 'bios'], conflict: false, emulated: false, both: false, unknownArch: false, efi: ['amd64'] });
+  const arm = { label: 'LORDOS_LIVE', arch: 'arm64', archFrom: 'boot', bios: false, efi: true, efiArchs: ['arm64'] };
+  eq('detect arm64 disc on amd64: emulated', [detectPlan(arm, 'lordos.iso', 'amd64').arch, detectPlan(arm, 'lordos.iso', 'amd64').emulated], ['arm64', true]);
+  eq('detect: a name that lies', detectPlan(arm, 'something-amd64.iso', 'arm64').conflict, true);
+  const two = { label: '', arch: '', archFrom: '', bios: false, efi: true, efiArchs: ['amd64', 'arm64'] };
+  eq('detect: both architectures, the name picks', detectPlan(two, 'x-arm64.iso', 'amd64').arch, 'arm64');
+  eq('detect: both, no name: this computer', detectPlan(two, 'x.iso', 'arm64'), { arch: 'arm64', from: 'host', starts: ['uefi'], conflict: false, emulated: false, both: true, unknownArch: false, efi: ['amd64', 'arm64'] });
+  eq('detect: only riscv64', detectPlan({ label: '', arch: 'riscv64', archFrom: 'boot', efi: true, efiArchs: ['riscv64'] }, 'x.iso', 'amd64').unknownArch, true);
+  eq('detect: nothing read, from the name', detectPlan(null, 'ubuntu-24.04-live-server-arm64.iso', 'amd64'), { arch: 'arm64', from: 'name', starts: [], conflict: false, emulated: true, both: false, unknownArch: false, efi: [] });
+  eq('detect: junk efiArchs ignored', detectPlan({ arch: 'amd64', archFrom: 'boot', efi: true, efiArchs: [1, null, 'amd64'] }, 'x', 'amd64').efi, ['amd64']);
+  // drop
+  eq('drop', ['a.iso', 'b.QCOW2', 'c.raw', 'd.vmx', 'e.ova', 'config.pvs', 'f.txt', '', 'iso'].map(dropSource), ['iso', 'import', 'import', 'migrate', 'migrate', 'migrate', null, null, null]);
+  // tags
+  eq('tags cleaned', tagsOf([' work ', 'WORK', '#test', '', 'a\u0001b', 5, 'x'.repeat(25), 'w  x']), ['work', 'test', 'ab', 'w x']);
+  eq('tags at most 8', tagsOf(['1', '2', '3', '4', '5', '6', '7', '8', '9']).length, 8);
+  eq('tags typed', parseTags('work, tests,, work'), ['work', 'tests']);
+  eq('tags typed with an Arabic or a full-width comma', parseTags('a\u060cb\uff0cc\u3001d'), ['a', 'b', 'c', 'd']);
+  const lib = [{ name: 'Alpha', meta: { tags: ['Work'] }, state: 'stopped' }, { name: 'Beta', meta: { tags: ['home'], template: true }, state: 'stopped' }, { name: 'Gamma', state: 'running' }];
+  eq('search by tag text', filterMachines(lib, { query: 'wor' }).map((m) => m.name), ['Alpha']);
+  eq('search #tag exact', filterMachines(lib, { query: '#hom' }).map((m) => m.name), []);
+  eq('search #tag', filterMachines(lib, { query: '#home' }).map((m) => m.name), ['Beta']);
+  // templates
+  eq('templates chip', filterMachines(lib, { show: 'templates' }).map((m) => m.name), ['Beta']);
+  eq('templates counted', chipCounts(lib, '').templates, 1);
+  eq('templates kept in the view', libView({ show: 'templates' }).show, 'templates');
+  eq('a template does not start', [actionsOf(lib[1]).start, actionsOf(lib[0]).start], [false, true]);
+  eq('a running template can still be stopped', actionsOf({ ...lib[1], state: 'running' }).shutdown, true);
+  // Scale
+  const area = { x: 0, y: 0, w: 1920, h: 1040 };
+  eq('scale 50 %', scaleFrame(1280, 800, 0.5, 48, area), { w: 640, h: 448, fits: true });
+  eq('scale 200 % shrinks to fit', scaleFrame(1280, 800, 2, 48, area), { w: 1587, h: 1040, fits: false });
+  eq('scale unknown size', scaleFrame(0, 800, 1, 48, area), null);
+  eq('scales offered', SCALES, [0.5, 0.75, 1.25, 1.5, 2]);
+  // the guest's shape
+  eq('shape: taller box gets shorter', shapeFrame({ w: 1000, h: 900 }, { w: 1000, h: 852 }, 1600, 900, area), { w: 1000, h: 611 });
+  eq('shape: already right', shapeFrame({ w: 1000, h: 610 }, { w: 1000, h: 563 }, 1600, 900, area), null);
+  eq('shape: too tall for the area: narrower', shapeFrame({ w: 1800, h: 900 }, { w: 1800, h: 852 }, 1024, 1024, area), { w: 992, h: 1040 });
+  eq('shape: nothing known', shapeFrame(null, { w: 1, h: 1 }, 1, 1, area), null);
+  // device dots
+  eq('dots', deviceDots({ iso: '/x.iso', heard: true, mic: false, cableOut: false, network: 'shared', shares: 1, transfer: false }).map((d) => d.k), ['net', 'cd', 'sound', 'folders']);
+  eq('dots: a pulled cable, isolated has none', [deviceDots({ network: 'bridged', cableOut: true }).map((d) => d.k), deviceDots({ network: 'isolated' })], [['netOut'], []]);
+  eq('dots: USB and camera only from their backend', deviceDots({ caps: { usb: true, usbAttached: 2, camera: true, cameraOn: false } }).map((d) => d.k), ['usb']);
+  eq('cable offered', [cableOffered({ network: 'shared' }, true), cableOffered({ network: 'isolated' }, true), cableOffered({ network: 'shared', group: 'g' }, true), cableOffered({ network: 'hostonly' }, false)], [true, false, false, false]);
+  // Cleaner: a machine's space goes to Machines
+  eq('cleaner: machines space', ['/home/a/Machines', '/home/a/Machines/x.lordvm/disks', '/media/a/d/W.lordvm', '/home/a/Videos', '/home/a/MachinesOld', '/g.lordgroup/x'].map((p) => C.machinesSpace(p, '/home/a')), [true, true, true, false, false, true]);
 }
 
 console.log(`vm-model: ${n} checks, ${bad} failed`);

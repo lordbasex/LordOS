@@ -14,6 +14,10 @@
   "never": "Noch keine Backups",
   "next": "Nächstes: {when}",
   "lastError": "Das letzte Backup ist fehlgeschlagen: {error}",
+  "machinesBusy": {
+    "one": "{count} Maschine lief: ihre Datenträger in diesem Backup stammen aus dem vorherigen",
+    "other": "{count} Maschinen liefen: ihre Datenträger in diesem Backup stammen aus dem vorherigen"
+  },
   "todayAt": "heute um {time}",
   "now": "Jetzt sichern",
   "pause": "Pausieren",

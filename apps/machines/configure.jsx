@@ -2,16 +2,19 @@
 // pane. What lord-vm can change (name, CPU, memory, network, disk size, the ISO) goes through `lord-vm --set`, only
 // while the machine is off; what the app keeps (system, notes) is saved at once. The name is the exception (6.26): while
 // the machine runs it changes alone (`lord-vm --rename`), and its folders follow it once it's off.
-import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
+import { View, Text, TextInput, Stepper, Segmented, Toggle, Slider, FilePicker, ScrollView, ConfirmDialog, useAppWindow, wm, revealPath, openFolder, clipboard, t as tr, useSidebar, SidebarToggle, SidebarOverlay, screen, useSound, microphones, settings, formatNumber } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { changedSections, sectionsMatching, atLoginToggle, stateView, memLimit, systemOf, closeChoice, CLOSE_CHOICES, shareTag, mountCommand, NET_MODES, PORTS_MAX, PORT_HOST_MIN, usesPorts, portRule,
-  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice } from './model.js';
+  portProblems, isolationGaps, newPortRule, portsForMode, portInput, defaultCard, netSummary, renameNote, folderOffer, renameOutcome, folderOf, no3dReason, gfxFor, soundOf, soundSummary, soundDevs, soundDevChosen, bootList, bootMove, bootSummary, resolutions, gvtGpu, gvtSpare, gvtType, gpuIds, memlockNeed, memlockFits, memlockMaxMemory, toolsAutoOn, vcpuAdvice, parseTags, TAGS_MAX } from './model.js';
 import { usePal, has, gb, bytes, Bar, Btn, MenuBtn, OsMark, vmRefusal, soundDevText, soundDevItems, noteMoved } from './ui.jsx';
 import { readMeta, writeMeta, readCpuUse } from './meta.js';
+import { COLOR_HEX } from './systems.js';
 import { defaultsOf } from './store.js';
 import { SideRow, PaneHeader, Pill, Section, Sym } from './kit.jsx';
 import { BUILTIN, builtinProfile, onHost } from './profiles.js';
 import { LOCKED_ROWS, sessionCapMb } from './group.js';
+import { disposableOf, disposableAllowed, disposableCapMb, encryptionNote } from './storagemodel.js';
+import { ExportSheet } from './vmkey.jsx';
 
 const SECTIONS = ['general', 'startup', 'cpu', 'display', 'network', 'sound', 'disks', 'sharing', 'agent', 'boot', 'security'];
 // each section's glyph (assets/machines/symbols)
@@ -93,7 +96,7 @@ const Off = ({ off, children }) => <View style={{ opacity: off ? 0.45 : 1, point
 
 // Configure → Network (6.5): the mode, the wired card of a bridged machine, the forwarded ports of a shared or host-only
 // one. Everything here needs the machine off; lord-vm checks it all again (machine.c, vm_ports_check).
-function NetworkPane({ m, cur, set, running, offNote, host, issues }) {
+function NetworkPane({ m, cur, set, running, offNote, host, issues, onNewMac }) {
   const p = usePal();
   const cards = host?.cards || [];
   const mode = (x) => {
@@ -120,7 +123,10 @@ function NetworkPane({ m, cur, set, running, offNote, host, issues }) {
           </View></Off>
         </Row>
       ) : null}
-      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} last />
+      {/* a new address (5.5): lord-vm makes a random one of QEMU's 52:54:00 range, while the machine is off */}
+      <Row label={tr('machines.cfg.mac')} value={m.mac || '—'} last note={tr('machines.cfg.macNote') + (offNote ? ` ${offNote}` : '')}>
+        <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.macNew')} disabled={running || !!m.suspended} onClick={onNewMac} /></View></Off>
+      </Row>
     </Group>
     {usesPorts(cur.network) ? (
       <Group title={tr('machines.cfg.ports')}>
@@ -196,10 +202,14 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const [sec, setSec] = useState(SECS.includes(section0) ? section0 : group ? 'group' : 'general');
   const [draft, setDraft] = useState({});
   const [meta, setMeta] = useState(() => readMeta(dir));
+  const [tagText, setTagText] = useState(() => (readMeta(dir).tags || []).join(', '));
+  const [newDiskGb, setNewDiskGb] = useState(32);
   const [job, setJob] = useState(0);
   const [msg, setMsg] = useState(() => { const c = carried && carried.dir === dir ? carried.msg : null; carried = null; return c; });
   const [picking, setPicking] = useState(false);
+  const [askAuto, setAskAuto] = useState(false);
   const [pickShare, setPickShare] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [disk, setDisk] = useState(null);
   const [sndDraft, setSndDraft] = useState({});
   const sndSt = useSound();                          // the outputs and inputs, as Settings → Sound lists them
@@ -247,12 +257,12 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
   const cur = { name: m.name, vcpus: m.vcpus, memoryMb: m.memoryMb, diskGb: m.diskGb, network: m.network, bridge: m.bridge || '', ports: (m.ports || []).map(portRule),
     agent: !!m.agent, clipboard: m.clipboard || 'off', clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer,
     graphics: m.graphics || '2d', resolution: m.resolution || 'follow', bootOrder: m.bootOrder || 'auto', bootMenu: !!m.bootMenu,
-    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off',
-    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, ...draft };
+    pointer: m.pointer || 'lordos', gpu: m.gpu || '', captureFullscreen: !!m.captureFullscreen, perfProfile: !!m.perfProfile, cpuPin: m.cpuPin || 'off', cpuModel: m.cpuModel || 'host',
+    guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, automation: !!m.automation, ...draft };
   const set = (patch) => { setMsg(null); setDraft((d) => ({ ...d, ...patch })); };
   // the shares list is compared by value
   const differs = (k, val) => (Array.isArray(val) ? JSON.stringify(val) !== JSON.stringify(k === 'ports' ? (m.ports || []).map(portRule) : m[k] || [])
-    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'cpuPin' ? m.cpuPin || 'off' : m[k]));
+    : val !== (k === 'bridge' ? m.bridge || '' : k === 'bootOrder' ? m.bootOrder || 'auto' : k === 'bootMenu' ? !!m.bootMenu : k === 'pointer' ? m.pointer || 'lordos' : k === 'gpu' ? m.gpu || '' : k === 'captureFullscreen' ? !!m.captureFullscreen : k === 'perfProfile' ? !!m.perfProfile : k === 'guestLinks' ? !!m.guestLinks : k === 'guestNotify' ? !!m.guestNotify : k === 'automation' ? !!m.automation : k === 'cpuPin' ? m.cpuPin || 'off' : k === 'cpuModel' ? m.cpuModel || 'host' : m[k]));
   // the network's rules are checked as lord-vm checks them: Save waits until they are right
   const portIssues = portProblems(cur.ports, cur.network);
   const netBad = (usesPorts(cur.network) && portIssues.length > 0) || (cur.network === 'bridged' && !cur.bridge);
@@ -338,6 +348,25 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
             onChange={(x) => { writeMeta(dir, { osName: x }); setMeta(readMeta(dir)); }} /></View>
         </View>
       </Row>
+      {/* the card's icon: the system's mark, or a color of its own with the name's first letter (app.json color) */}
+      <Row label={tr('machines.cfg.icon')} note={tr('machines.cfg.iconNote')}>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <View title={tr('machines.cfg.iconSystem')} onClick={() => { writeMeta(dir, { color: undefined }); setMeta(readMeta(dir)); }}
+            style={{ borderRadius: 9, padding: 2, border: `2px solid ${!meta.color ? p.accent : 'transparent'}` }}>
+            <OsMark id={meta.os || systemOf(meta.osName, m.name).id} size={28} />
+          </View>
+          {Object.keys(COLOR_HEX).map((c) => (
+            <View key={c} title={tr(`machines.set.color.${c}`)} onClick={() => { writeMeta(dir, { color: c }); setMeta(readMeta(dir)); }}
+              style={{ borderRadius: 9, padding: 2, border: `2px solid ${meta.color === c ? p.accent : 'transparent'}` }}>
+              <OsMark id="other" color={c} letter={m.name} size={28} />
+            </View>
+          ))}
+        </View>
+      </Row>
+      <Row label={tr('machines.cfg.tags')} note={tr('machines.cfg.tagsNote', { n: TAGS_MAX })}>
+        <TextInput value={tagText} placeholder={tr('machines.cfg.tagsPlaceholder')}
+          onChange={(x) => { setTagText(x); writeMeta(dir, { tags: parseTags(x) }); setMeta(readMeta(dir)); }} />
+      </Row>
       <Row label={tr('machines.cfg.profile')} note={tr('machines.cfg.profileNote') + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><MenuBtn label={prof ? tr(`machines.as.profile.${prof}`) : tr('machines.cfg.profileCustom')}
           items={BUILTIN.map((k) => { const s = profFor(k); const gfx = builtinProfile(k, host).resources.graphics; return { label: tr(`machines.as.profile.${k}`), checked: prof === k,
@@ -406,10 +435,18 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       {/* vCPU pinning (machine.json cpu_pin, docs/VIRTUALIZATION.md 3.7.1): lord-vm gives each vCPU a core of its own,
           away from the desktop's; a machine without a choice shows what this computer gives it */}
       <Group>
-        <Row label={tr('machines.cfg.pin')} last note={[tr('machines.cfg.pinNote'), offNote].filter(Boolean).join(' ')}>
+        <Row label={tr('machines.cfg.pin')} note={[tr('machines.cfg.pinNote'), offNote].filter(Boolean).join(' ')}>
           <Off off={running}><Segmented small value={cur.cpuPin} onChange={(x) => set({ cpuPin: x })}
             options={[['off', tr('machines.cfg.off')], ['auto', tr('machines.cfg.pinAuto')]]} /></Off>
         </Row>
+        {/* the processor the guest sees (machine.json cpu_model, schema 16): this computer's, or a fixed x86-64-v2 one that is
+            the same on every amd64 computer (KVM machines on amd64 only) */}
+        {m.arch === 'amd64' && !emulated ? <Row label={tr('machines.cfg.cpuModel')} note={[tr(`machines.cfg.cpuModelNote.${cur.cpuModel}`), offNote].filter(Boolean).join(' ')}>
+          <Off off={running}><Segmented small value={cur.cpuModel} onChange={(x) => set({ cpuModel: x })}
+            options={[['host', tr('machines.cfg.cpuHost')], ['compatible', tr('machines.cfg.cpuCompat')]]} /></Off>
+        </Row> : null}
+        {/* huge pages are lord-vm's own choice, never a switch (3.7.2): said here */}
+        <Row label={tr('machines.cfg.hugePages')} value={tr('machines.cfg.hugePagesAuto')} last note={tr('machines.cfg.hugePagesNote')} />
       </Group>
       <Text style={{ fontSize: 12, lineHeight: 1.5, color: p.dim, textAlign: 'start' }}>
         {tr('machines.cfg.cpuNote', { limit: gb(memLimit({ ...m, ...cur })), max: gb(memMax0) })}{offNote ? ` ${offNote}` : ''}</Text>
@@ -484,7 +521,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
     </Group>
   </>;
   }
-  else if (sec === 'network') pane = <NetworkPane m={m} cur={cur} set={set} running={running} offNote={offNote} host={host} issues={portIssues} />;
+  else if (sec === 'network') pane = <NetworkPane m={m} cur={cur} set={set} running={running} offNote={offNote} host={host} issues={portIssues} onNewMac={() => { if (!job) save({ newMac: true }); }} />;
   else if (sec === 'sound') {
     // host-side choices (6.9): saved at once, and a running machine's window applies them at once too
     const snd = { ...soundOf(m), ...soundDevs(m), ...sndDraft };
@@ -527,13 +564,41 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         <Off off={running}><Stepper value={cur.diskGb} min={m.diskGb} max={2048} width={72} format={(x) => `${x} GB`} onChange={(x) => set({ diskGb: x })} /></Off>
       </Row>
     </Group>
-    {m.dataDisks ? <Group><Row label={tr('machines.cfg.dataDisks')} value={String(m.dataDisks)} last /></Group> : null}
+    {/* data disks: one more, empty (lord-vm --add-disk), while the machine is off and has no snapshot to go back to */}
+    <Group><Row label={tr('machines.cfg.dataDisks')} value={String(m.dataDisks || 0)} last note={tr('machines.cfg.addDiskNote', { n: 4 }) + (offNote ? ` ${offNote}` : '')}>
+      <Off off={running}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Stepper value={newDiskGb} min={1} max={2048} width={72} format={(x) => `${x} GB`} onChange={setNewDiskGb} />
+        <Btn label={tr('machines.cfg.addDisk')} disabled={running || !!m.suspended || !!job || (m.dataDisks || 0) >= 4 || !!m.base} onClick={() => save({ addDiskGb: newDiskGb })} />
+      </View></Off>
+    </Row></Group>
     {m.imported || m.devices === 'compat' ? <Group>
       {/* an imported machine starts on devices every system has drivers for; the fast ones need the guest's drivers first */}
       <Row label={tr('machines.cfg.devices')} value={m.devices === 'compat' ? tr('machines.cfg.devCompat', { nic: m.nicModel }) : tr('machines.cfg.devFast')} last
         note={(m.devices === 'compat' ? tr('machines.cfg.devCompatNote') : tr('machines.cfg.devFastNote')) + (offNote ? ` ${offNote}` : '')}>
         <Off off={running}><View style={{ alignSelf: 'flex-start' }}><Btn label={m.devices === 'compat' ? tr('machines.cfg.devToFast') : tr('machines.cfg.devToCompat')} disabled={running || !!job}
           onClick={() => save(m.devices === 'compat' ? { devices: 'virtio', nicModel: 'virtio' } : { devices: 'compat', nicModel: 'e1000e' })} /></View></Off>
+      </Row>
+    </Group> : null}
+    {/* storage (docs/VIRTUALIZATION.md 6.2, 6.4, 3.6): the disks' format, a disposable session, Backups, Export */}
+    <Group>
+      <Row label={tr('machines.cfg.st.format')} value={m.diskFormat === 'raw' ? tr('machines.cfg.st.raw') : tr('machines.cfg.st.qcow2')}
+        note={tr(m.diskFormat === 'raw' ? 'machines.cfg.st.rawNote' : 'machines.cfg.st.qcow2Note')} />
+      {disposableAllowed(m) ? (
+        <Row label={tr('machines.cfg.st.disposable')} note={tr(`machines.cfg.st.disposableNote.${disposableOf(m)}`, { mem: gb(disposableCapMb(m)) }) + (offNote ? ` ${offNote}` : '')}>
+          <Off off={running}><Segmented options={[['off', tr('machines.cfg.st.dispOff')], ['memory', tr('machines.cfg.st.dispMemory')], ['disk', tr('machines.cfg.st.dispDisk')]]}
+            value={disposableOf(m)} onChange={(x) => { if (!running && !job && x !== disposableOf(m)) save({ disposable: x }); }} /></Off>
+        </Row>
+      ) : null}
+      <Row label={tr('machines.cfg.st.backup')} note={tr(m.backup === false ? 'machines.cfg.st.backupOffNote' : 'machines.cfg.st.backupNote')}>
+        <Off off={running}><Toggle on={m.backup !== false} onChange={(x) => { if (!job && !running) save({ backup: x }); }} /></Off>
+      </Row>
+      <Row label={tr('machines.cfg.st.export')} note={tr('machines.cfg.st.exportNote')} last>
+        <View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.st.exportBtn')} disabled={running || !!job || !!m.group} onClick={() => setExporting(true)} /></View>
+      </Row>
+    </Group>
+    {m.firmwareChanged ? <Group>
+      <Row label={tr('machines.cfg.st.firmware')} note={tr('machines.cfg.st.firmwareNote')} last>
+        <View style={{ alignSelf: 'flex-start' }}><Btn label={tr('machines.cfg.st.firmwareUse')} disabled={running || !!job} onClick={() => save({ firmwareUpdate: true })} /></View>
       </Row>
     </Group> : null}
     <Group>
@@ -600,6 +665,9 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         </Row>
       ))}
     </Group>
+    {/* printers (5.5): the guest prints to the network's printers with its own driver-free IPP; this computer's printing
+        service is never opened to a guest (no machine network reaches this computer's services) */}
+    <Group><Row label={tr('machines.cfg.printers')} value={tr('machines.cfg.printersValue')} last note={tr('machines.cfg.printersNote')} /></Group>
   </>;
   else if (sec === 'agent') pane = <>
     <Group>
@@ -613,6 +681,14 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       <Row label={tr('machines.cfg.perfProfile')} note={[tr(m.windowsDevices ? 'machines.win.perfProfileNote' : 'machines.cfg.perfProfileNote'), offNote].filter(Boolean).join(' ')}>
         <Off off={running}><Toggle on={cur.perfProfile} onChange={(x) => set({ perfProfile: x })} /></Off>
       </Row>
+      {/* automation (6.15, machine.json automation): `machines exec`, `machines cp` and the MCP server may run programs in
+          the guest as its signed-in person, through qemu-guest-agent; off by default, asked before it goes on, never for
+          the anonymity profile (that section is locked) */}
+      <Row label={tr('machines.cfg.automation')} note={[tr('machines.cfg.automationNote'), offNote].filter(Boolean).join(' ')}>
+        <Off off={running || !cur.agent}><Toggle on={!!cur.automation} onChange={(x) => (x ? setAskAuto(true) : set({ automation: false }))} /></Off>
+      </Row>
+      {askAuto ? <ConfirmDialog title={tr('machines.cfg.automationAsk')} detail={tr('machines.cfg.automationAskDetail', { name: m.name })} okLabel={tr('machines.cfg.automationAllow')}
+        cancelLabel={tr('machines.cancel')} onOk={() => { setAskAuto(false); set({ automation: true }); }} onCancel={() => setAskAuto(false)} /> : null}
       {/* the LordOS tools brought up to date by themselves (model.js toolsAutoStep): app.json, at once, also while it runs */}
       <Row label={tr('machines.cfg.toolsAuto')} last note={tr('machines.cfg.toolsAutoNote')}>
         <Toggle on={toolsAutoOn(meta, defaultsOf(settings.get().machinesDefaults))} onChange={(x) => { writeMeta(dir, { toolsAuto: x }); setMeta(readMeta(dir)); }} />
@@ -651,7 +727,12 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
       </Row>
     </Group>
   </>;
-  else if (sec === 'security') pane = <Group>
+  else if (sec === 'security') pane = <><Group>
+    {/* encrypted machines (8): whole (disks, UEFI variables, TPM, snapshots' memory), the key in Passwords; host swap */}
+    <Row label={tr('machines.cfg.sec.encryption')} value={tr(m.encrypted ? 'machines.cfg.sec.encYes' : 'machines.cfg.sec.encNo')}
+      note={tr(`machines.cfg.secNote.enc.${encryptionNote(m)}`, { name: m.name })} />
+    <Row label={tr('machines.cfg.sec.swap')} note={tr('machines.cfg.secNote.swap')} last />
+  </Group><Group>
     {['sandbox', 'files', 'network', 'limits', 'display', 'secrets'].map((k, i, a) => {
       // the network's line follows the mode: passt listening on the forwarded ports, or the bridged card's device
       // the sandbox's line says what this kernel can't give ("Weaker isolation on this kernel", 3.3)
@@ -659,7 +740,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
         : k !== 'network' ? k : m.network === 'bridged' ? 'networkBridged' : usesPorts(m.network) && m.ports?.length ? 'networkPorts' : k;
       return <Row key={k} label={tr(`machines.cfg.sec.${k}`)} last={i === a.length - 1} note={tr(`machines.cfg.secNote.${note}`, { limit: gb(memLimit(m)) })} />;
     })}
-  </Group>;
+  </Group></>;
 
   const savable = ['general', 'cpu', 'display', 'network', 'disks', 'sharing', 'agent', 'boot'].includes(sec);
   const list = (
@@ -715,6 +796,7 @@ export function Configure({ dir, group, onMember, section: section0, onClose }) 
           if (!path || cur.shares.some((y) => y.path === path)) return;
           set({ shares: [...cur.shares, { tag: shareTag(path.split('/').pop(), [...cur.shares.map((y) => y.tag), 'LordOS']), path, writable: false }] });
         }} /> : null}
+      {exporting ? <ExportSheet m={m} running={running} onClose={() => setExporting(false)} /> : null}
       {picking ? <FilePicker title={tr('machines.new.pickIso')} filter={/\.iso$/i} onClose={() => setPicking(false)}
         onPick={(x) => { setPicking(false); save({ iso: Array.isArray(x) ? x[0] : x }); }} /> : null}
       {side.narrow && side.shown ? <SidebarOverlay width={260} onClose={side.close}>{list}</SidebarOverlay> : null}

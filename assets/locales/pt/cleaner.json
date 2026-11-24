@@ -464,5 +464,6 @@
   },
   "select.nothing": "Nada selecionado",
   "activity.app": "App removido",
-  "activity.system": "Limpeza do sistema: {name}"
+  "activity.system": "Limpeza do sistema: {name}",
+  "map.machines": "Recuperar no Máquinas"
 }

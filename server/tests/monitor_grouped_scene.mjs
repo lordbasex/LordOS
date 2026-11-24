@@ -15,7 +15,8 @@ import monitorEn from '../../assets/locales/en/monitor.json';
 
 const { parents, texts, removed } = globalThis.__lordTest;
 const h = React.createElement;
-const flush = async () => { for (let i = 0; i < 30; i++) await new Promise((res) => setImmediate(res)); };
+// (0.8.9.6) the table draws a few new rows per pass (sdk/lists.jsx ROW_BUDGET), a moment apart: flush waits for them
+const flush = async () => { for (let k = 0; k < 4; k++) { for (let i = 0; i < 30; i++) await new Promise((res) => setImmediate(res)); await new Promise((res) => setTimeout(res, 3)); } };
 const wait = (ms) => new Promise((res) => setTimeout(res, ms));
 const check = (name, ok, detail = '') => console.log(ok ? `ok ${name}` : `FAIL ${name} ${detail}`);
 
