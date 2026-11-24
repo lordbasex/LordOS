@@ -11,6 +11,54 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
+  Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
+  workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the
+  gateway. Built so far: the download, its checks and unpacking, the group, the link between its two machines, and the
+  `machines` command; the assistant's card, the library's group card, Configure's group view and Start Fresh come next.
+  - **The catalog entry** `whonix` (hidden until its card exists): Whonix's signing key pinned
+    (`packaging/keys/machines/whonix-derivative.asc`, primary key `916B 8D99 C38E AF5E 8ADC 7A2A 8D66 066A 2EEA CCDA`,
+    compared on 2026-11-23 with Whonix's signing key page and keys.openpgp.org). The catalog learned SHA-512 lists, a
+    detached signature named after its list (`.asc`), the newest release folder whose list verifies with a floor no
+    download goes below (18.2.4.3), and an archive's members and size caps.
+  - **The admin actions** `vm-image-list` and `vm-image-get` take such an entry: the release folders' listing, then the
+    release's SHA-512 list and its OpenPGP signature checked with the pinned key, then the archive into
+    `images/<sha512>.tar.xz`, kept only with the list's SHA-512 of the whole file. Root hashes it and never reads its
+    contents. `vm-image-cancel` and `vm-image-remove` take the longer names.
+  - **`lord-vmunpack`**, a new sandboxed helper started by `lord-vm`: it reads the verified archive on a descriptor and
+    writes exactly the two disks into two descriptors, with no files, network or exec (`sandbox_apply_helper`, 320 MB),
+    linking only libc and LordOS's own xz decoder, which got a streaming mode (`xzs_*`: CRC32 and CRC64 checked block by
+    block, the index checked against the blocks, at most a 256 MiB dictionary, nothing after the stream's end). Its tar
+    reader takes plain and old-GNU sparse members only, with names that match the catalog's patterns, each role once,
+    ascending sparse maps inside their size, and the catalog's caps (128 GiB a disk, 24 GiB of data); holes stay holes.
+    On Whonix 18.2.4.3 LXQt (1.9 GB): 104 s, 11 MB of memory, both disks byte for byte GNU tar's.
+  - **`lord-vm --group-create`** hashes the archive again, unpacks it with `lord-vmunpack`, checks each disk with the jailed
+    `qemu-img info` (no backing file, no data file, a virtual size within the cap), writes read-only bases in
+    `~/Machines/.shared` with the jailed `qemu-img convert` (dropping the 100 GiB of preallocated metadata: 2.85 GiB and
+    3.59 GiB) and makes `<name>.lordgroup/` with its `group.json` and the two machines as linked clones of the bases.
+  - **`group.json`** (schema 1: members, roles, start and stop order, the image and its bases) and **`machine.json` schema
+    14** for members: `group`, `role`, the `link` network (one card on the group's link and nothing else),
+    `"uplink": "tor"` (the gateway's passt with no DNS forwarding and no ports), `link_mac`, `profile_lock` and `timers`.
+    The anonymity lock refuses the agent, clipboard, transfer and shared folders, ports, 3D, graphics cards, the
+    microphone, SMBIOS strings, disk serials and the performance profile, with no override. A locked member gets private
+    4 KB memory (no huge pages, no KSM), no VMware port, no HPET, a generation id, Whonix's clock devices as libvirt
+    gives them (checked in libvirt 11.3's source), no sound card on the gateway and an output-only one on the
+    workstation, no first-boot credentials, no suspend and no card picture on disk.
+  - **The internal link**: a new control message, `VM_LINK`. lord-server makes one `socketpair` per pairing and hands one
+    end to each member's `lord-vm`, which checks it (a connected AF_UNIX stream socket of this account) and puts it on the
+    card's QEMU hub, taking the previous one off. The two QEMUs exchange frames directly; nothing on the host reads them,
+    no other process can reach them, QEMU's sandbox is unchanged. A member started anew is linked again by the session
+    within 2 s; with the gateway off the workstation has no network at all.
+  - **Groups in Machines and the `machines` command**: `lord.vm.list()` lists the members with their group and role,
+    `lord.vm.groups()` the groups, `lord.vm.link()` makes a group's link; the model's `groupPlan` starts the gateway first
+    and the workstation once it runs, and stops them the other way round. `machines list` shows a group's row,
+    `machines start Whonix [--no-window]` and `open` go through the session (whose channel now takes a `.lordgroup`
+    folder), `stop` and `poweroff` act in stop order, `status --json` describes the group.
+  - **Checked on the dev host, headless**: the gateway's eth0 at slot 0x2 (passt) and eth1 at 0x18 (the link), the
+    workstation's only card at 0x2 with its only route through 10.152.152.10, Tor's own check answering `"IsTor":true`
+    from the workstation, no network for it with the gateway off, the link swapped three times during a download without
+    breaking it, and the session relinking a restarted gateway. Shut Down through ACPI didn't power either member off
+    within 60 s (they were forced off): still to look at.
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores
