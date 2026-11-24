@@ -867,6 +867,12 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Escape that closes a menu no longer reaches the app or machine behind it** (in development; latest release
+  0.8.9.5-beta). Closing a menu-bar, Dock or right-click menu with Escape also sent Escape to the window in front: a
+  Linux app, or the guest of a machine in Machines (found while checking Machines' window menus). A shell menu now
+  holds the keyboard while it shows, like search and system prompts do (`holdKeyboard()` in `@lordos/runtime`, used by
+  the Lord Flow and Lord Classic menus, which Celeste and Workspaces share; docs/LAYERS.md); its keys, arrows and
+  Escape included, are the menu's. `server/tests/vm_keys_scene.mjs` checks it (17 checks).
 - **Machines: lord-vm keeps no dead client.** A client of a machine that shut its reading side but kept its socket never
   hung up, so lord-vm kept it for the whole run and refused every broadcast to it again ("message 71 not delivered" in a
   loop); the first refused send now marks it and the next turn of the loop drops it (`tests/vm_client_gone.sh`).

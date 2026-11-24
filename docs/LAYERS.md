@@ -86,8 +86,11 @@ import { Layer, Overlay, LAYERS } from '@lordos/sdk';
 - **The keyboard (0.8.2).** While anything shows in the `overlay`, `modal`, `system` or `capture` layers (search,
   the launcher, sheets, system prompts, the screenshot selection), no Linux app (Wayland or X11) gets the keys: `runtime/index.js` counts each
   layer's children after every commit and `sdk/wayland.js` gives the compositor keyboard focus 0
-  ([PRIVACY.md](PRIVACY.md#system-prompts-take-the-keyboard-082)). `popover` (menus, the clipboard and
-  emoji panels, which paste into the app in front) keeps the app's keyboard.
+  ([PRIVACY.md](PRIVACY.md#system-prompts-take-the-keyboard-082)). `popover` (the clipboard and emoji panels, which
+  paste into the app in front; desktop widgets) keeps the app's keyboard, except for a shell menu (the menu bar's, the
+  Dock's, a right-click's: the themes' `Menu.jsx`), which holds it while it shows (`holdKeyboard()` in
+  `@lordos/runtime`, in development): its keys, Escape included, are the menu's and never reach the app or a machine's
+  guest behind it (`server/tests/vm_keys_scene.mjs`).
 - **A window's sheets (0.8.8.7).** A `<Layer name="modal">` rendered inside an app's window (Settings' file
   dialogs and sheets) is drawn in a box of the layer's size registered as that window's (`wm.addSheet`,
   `wm.sheetNodes`). Screenshots' window capture paints those boxes over the window (`media.screenshot`'s `also`,

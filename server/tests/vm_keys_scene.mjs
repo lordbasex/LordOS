@@ -44,16 +44,25 @@ registerBuiltinApp({ id: 'vm', Component: Machine });
 registerBuiltinApp({ id: 'term', Component: Term });
 
 // a theme as the stock ones are: each framed window with focused = the top framed window of the desktop
-let prompt = false, setPrompt = null;
+let prompt = false, setPrompt = null, setMenu = null;
+// a shell menu as the themes' Menu.jsx is: in the popover layer, holding the keyboard while it shows, Escape closes it
+function ShellMenu({ onClose }) {
+  useEffect(() => rt.holdKeyboard(), []);
+  useEffect(() => rt.addListener('keydown', (e) => { if (e.key === 'Escape') onClose(); }), []);
+  return h(Layer, { name: 'popover' }, h(rt.View, null));
+}
 function Theme() {
   const { mounted, focused } = useWindows();
   const [p, set] = React.useState(false);
+  const [menu, sm] = React.useState(false);
   setPrompt = set;
+  setMenu = sm;
   prompt = p;
   return h(rt.View, null,
     ...mounted.map((w) => h(rt.View, { key: w.id }, h(AppHost, { id: w.id, focused: w.id === focused }))),
     h(FloatingWindows),
-    p ? h(Layer, { name: 'system' }, h(rt.View, null)) : null);
+    p ? h(Layer, { name: 'system' }, h(rt.View, null)) : null,
+    menu ? h(ShellMenu, { onClose: () => sm(false) }) : null);
 }
 enableShellLayers();
 wm.open('vm');
@@ -117,3 +126,17 @@ await flush();
 sent.length = 0;
 await type(30, 'a');
 check('prompt closed: the machine has its keys again', sent.some((x) => x[0] === 'key' && x[1] === 30), JSON.stringify(sent));
+
+// 5. a menu-bar menu open over the machine in front: Escape closes the menu and never reaches the guest
+setMenu(true);
+await flush();
+sent.length = 0;
+check('shell menu: wm.hasKeyboard is false for the machine', rt.shellHasKeyboard() && !wm.hasKeyboard('vm'));
+__lordKey(1, 1, 'Escape', '', 'Escape', 0);
+__lordKey(1, 0, 'Escape', '', 'Escape', 0);
+await flush();
+check('shell menu: Escape closes the menu', !rt.shellHasKeyboard());
+check('shell menu: Escape does not reach the guest', !sent.some((x) => x[0] === 'key'), JSON.stringify(sent));
+sent.length = 0;
+await type(30, 'a');
+check('menu closed: the machine has its keys again', sent.some((x) => x[0] === 'key' && x[1] === 30), JSON.stringify(sent));

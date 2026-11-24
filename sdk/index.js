@@ -7,7 +7,7 @@ import { locale, tOptional } from './i18n.js';
 import { cleanThemeMeta } from './thememeta.js';
 
 export { View, Text, Image, Terminal, Surface, MediaView, screen, addListener, useClock, system, layouts, getLayout, modifiers } from '@lordos/runtime';
-export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox } from '@lordos/runtime';
+export { displays as screenDisplays, mainDisplay, displayAt, displayFor, mainBox, holdKeyboard } from '@lordos/runtime';
 export { createStore, useStore } from './store.js';
 export { cleanThemeMeta, themeOptions, themeOptionValue, themeOptionPatch, themeAuthor } from './thememeta.js';   // theme.json's sketch and options (0.8.9)
 export { settings, useSettings, useTrackedSettings } from './settings.js';

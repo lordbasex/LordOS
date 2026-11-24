@@ -5,7 +5,7 @@
 // menu (onStep). A submenu opens on hover after a short pause and stays open while the pointer crosses other rows
 // on its way to it (the safe triangle); it opens on the side with room, the reading direction's first. A menu
 // taller than the screen scrolls (wheel or touchpad), and the keyboard keeps the highlighted item in view.
-import { View, Text, addListener, useTheme, screen, direction, ScrollView, takeTextFocus, releaseTextFocus, focusToken, restoreFocus, textFocusOwner, Layer, displayAt, insideDisplay,
+import { View, Text, addListener, useTheme, screen, direction, ScrollView, takeTextFocus, releaseTextFocus, focusToken, restoreFocus, textFocusOwner, Layer, displayAt, insideDisplay, holdKeyboard,
   SUB_DELAY, SUB_GRACE, selectable, stepIndex, edgeIndex, menuAction, typeAhead, matchIndex, subPlace, aiming } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 
@@ -64,6 +64,8 @@ const SUB_W = 160;
 // Every menu is drawn in the shell's popover layer (sdk/layers.js), above the Dock, the menu bar and
 // the windows wherever it is rendered from; its submenus go in the same layer, beside it.
 export function Menu({ x, y, items, onClose, anchor, width: minWidth = 220, above = false, sub = false, nodeRef, side = null, centered = false, onBack, keys = false, onStep, onEnter }) {
+  // while it shows, its keys are the menu's: Escape closes it and never reaches the app or machine behind (runtime holdKeyboard)
+  useEffect(() => (sub ? undefined : holdKeyboard()), []);
   const t = useTheme();
   const own = useRef(null);
   const ref = nodeRef || own;
