@@ -867,6 +867,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **A check mark or any text that comes and goes in a box of its own size wasn't redrawn: Screenshots' Options menu kept
+  its old checks while open (GitHub #237)** (in development; latest release 0.8.9.5-beta). Choosing 5 Seconds saved it,
+  but the check stayed on None until the menu was closed and opened again. React adds and removes a Text's text node
+  (`{on ? '✓' : ''}`) instead of setting it to '', and in a Text of a fixed width neither changed the Text's box; the
+  text node has no box of its own, so nothing was damaged and the partial repaint left the old pixels (a full repaint,
+  as a screenshot makes, showed the right ones). Reproduced in a headless lord-server with the real Lord Flow, both with
+  one damage box and several. Now a text node coming into a Text or leaving it marks that Text, and the Texts around
+  it, for repaint (`text_child_changed` in `server/src/ui/node.c`); `engine-test` `test_text_child_damage` moves a
+  check mark between three fixed-width Texts and compares each partial repaint with a full one, and the Screenshots
+  toolbar scene checks the check follows the choice while the menu stays open.
 - **Backups: a file's icon looked like an empty check box, and a long name pushed the Restore button's label out at
   both ends (GitHub #231)** (in development; latest release 0.8.9.5-beta). The restore list drew a file as a bare
   outline, which read as a check box that never checked; it is now a page with lines. The Restore "<name>" button is
