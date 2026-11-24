@@ -836,6 +836,9 @@ test: build/describe-test
 build/describe-test: tests/describe_test.c src/monitor/describe.c src/monitor/describe.h src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -fsanitize=address,undefined -fno-sanitize-recover=undefined -o $@ tests/describe_test.c src/monitor/describe.c src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o -lm -lpthread
 	./$@ || { rm -f $@; exit 1; }
+# the same from the command line, for tests/describe_coverage.mjs (a test tool, never installed)
+build/describe-cli: tests/describe_cli.c src/monitor/describe.c src/monitor/describe.h src/monitor/exeown.c src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/describe_cli.c src/monitor/describe.c src/monitor/exeown.c src/pkg/xz.c src/sec/json.c build/obj/ui/stb.o -lm -lpthread
 # Monitor → Voltage (src/monitor/voltage.c): hwmon, batteries and adapters on fake sysfs trees, hostile values
 test: build/voltage-test
 build/voltage-test: tests/voltage_test.c src/monitor/voltage.c src/monitor/voltage.h src/hw/rpifw.c src/hw/rpifw.h

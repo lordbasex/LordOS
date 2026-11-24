@@ -11,12 +11,13 @@ const inSystem = (exe) => SYSTEM_DIRS.some((d) => exePath(exe).startsWith(d));
 const KEYS = Object.keys(DESC.kernel).sort((a, b) => b.length - a.length);
 
 // A kernel thread's description: the exact name, else the longest key it starts with where the next character isn't a
-// lower-case letter ("kswapd0", "card1-crtc0", "kworker/3:2-events"); never for a process with a program (a program can
+// lower-case letter ("kswapd0", "card1-crtc0") or the key ends in / _ - : ("kworker/3:2-events"); never for a process with a program (a program can
 // take a kernel thread's name: Sentinela's imitation rule).
 export function kernelText(name) {
   const n = String(name || '');
   if (DESC.kernel[n]) return DESC.kernel[n];
-  const k = KEYS.find((key) => n.startsWith(key) && !/[a-z]/.test(n.charAt(key.length)));
+  // a key ending in / _ - : is a prefix of anything ("kworker/u80:2-events", "rcu_tasks_kthread")
+  const k = KEYS.find((key) => n.startsWith(key) && (/[/_:-]$/.test(key) || !/[a-z]/.test(n.charAt(key.length))));
   return k ? DESC.kernel[k] : null;
 }
 
@@ -29,7 +30,8 @@ export function curatedText(p) {
   // another user's process whose program can't be read: its name, for LordOS's services (the root ones)
   if (!exe && DESC.lordos[p.name] && p.prot) return { src: 'lordos', text: DESC.lordos[p.name] };
   if (b && DESC.programs[b] && inSystem(exe)) return { src: 'program', text: DESC.programs[b] };
-  if (!exe && (p.name === '(sd-pam)' || p.name === 'systemd') && p.prot) return { src: 'program', text: DESC.programs[p.name] };
+  // another user's (root's) process whose program can't be read: the well-known ones by their name
+  if (!exe && p.name && DESC.programs[p.name] && p.prot !== 'kernel') return { src: 'program', text: DESC.programs[p.name] };
   return null;
 }
 // the key a description is translated and kept by: where it came from and what it describes

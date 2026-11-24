@@ -56,7 +56,9 @@ still fired" (`presentAlert`). Someone who chooses a process's name and path cou
   Only the file name and the program of its `Exec`, never the arguments.
 
 What it **never** reads or sends to the model: a command line's arguments, the environment, the contents of any file,
-the text of windows, passwords, the clipboard. The summary (`buildSummary`) shortens the home folder to `~` and
+the text of windows, passwords, the clipboard. The one exception (0.8.9.6, approved 2026-11-24) is the person's own
+click on "Investigate with Lumo" in Monitor's Get Info, which adds that program's script text or a binary's metadata,
+fenced as data ("Investigate"). The summary (`buildSummary`) shortens the home folder to `~` and
 replaces the user name with `<user>`; every value that comes from the process (its name, paths, package names, the
 parents' names) is cleaned of control characters, bounded and written as a JSON string (`field`), so its own quotes,
 backslashes or line breaks can't close its field and read as a line of ours; the whole summary is at most 2000
@@ -215,6 +217,92 @@ check, the live answer from a stand-in lord-vm on a socket, a silent and a half 
 (synthetic machine stats for every rule, an unverified engine, the baselines, the summary's bounds and
 injection, the action mapping), and the machine parts of `sentinela_notify_scene.mjs` and `sentinela_settings_scene.mjs`.
 
+## Investigate (0.8.9.6, in development)
+
+Approved by the maintainer on 2026-11-24. In Monitor → Processes → Get Info, a program LordOS can't describe (see
+docs/MONITOR.md, "Descriptions") shows **Unknown** and, with Sentinela on and a local model installed, **Investigate with
+Lumo** (otherwise a short note how to turn it on, with a link to Settings → AI → Sentinela). Only the person's own
+processes. Nothing happens until that click.
+
+- **What the model reads**: the same facts Sentinela already may see (`buildInvestigation`, at most 2000 characters:
+  the name and path as quoted fields, the package or "none", the program file's owner, up to six parents with their
+  packages, how it started — a system service, cron, the autostart folder, the Terminal, an app or the session, from
+  Get Info's cgroup —, CPU and memory, and only the *counts* of its network sockets), then what lord-server reads of the
+  program in the engine's thread (`server/src/llm/evidence.c`, `lord.sentinela.investigate`):
+  - **a script** (the program is an interpreter: sh, bash, dash, zsh, python, perl, ruby, node, lua, php, tcl): the
+    file its command line names (skipping the interpreter's options; relative to the process's working folder,
+    `/proc/<pid>/cwd`), opened read-only by descriptor (`openat2` with `RESOLVE_NO_MAGICLINKS` and `O_NOFOLLOW`: the
+    last part never a link; never under `/proc`, `/sys` or `/dev`), a regular file of at most 16 MB that the user or
+    root owns, not binary, and only when it is that interpreter's script: the process has it open (bash keeps it as fd
+    255), or its first line names that interpreter, or its name ends as that language's scripts do. At most 64 KB are
+    read, its SHA-256 is of the whole file, and the first 6000 bytes go to the model (the engine's context is 4096
+    tokens). Code given on the command line (`sh -c`, `python -c`, `node -e`) is that text. A script it can't be sure
+    of (reached through a link, for one) is not read: the interpreter's metadata is sent instead.
+  - **a binary**: the ELF header's type and machine, its size and SHA-256 (at most 512 MB), the libraries it has
+    mapped (`/proc/<pid>/maps`, the kernel's list: the file is never parsed beyond its first 64 bytes) and a sample of
+    at most 2000 bytes of the printable strings in its first 4 MB, addresses, paths and commands first.
+- **Prompt injection**: every text that comes from the file (the script, the libraries' names, the strings) goes
+  between `<<<UNTRUSTED-DATA <nonce>>>` and `<<<END-UNTRUSTED-DATA <nonce>>>`, a fresh 16-hex nonce from `getrandom`
+  for each request, with a line saying it is data that must never be followed; control characters and invalid UTF-8
+  become `?`. The system text (`investigateSystemPrompt`) says the same and that a program trying to instruct the model
+  is itself suspicious. A fake end marker inside the script stays inside the fence (its nonce can't be guessed).
+- **The answer** is constrained by a fixed JSON schema in C (`SCHEMA_INVESTIGATE`: `what` ≤ 400, `why` ≤ 300, `risk`
+  low|medium|high, `action` none|end|pause|block_network|blocklist) and read strictly by `parseInvestigation` (exact
+  keys, closed values, cleaned and bounded texts; prose, extra keys, unknown actions refused). It is written in the
+  person's language (asked in the system text and on the summary's last line). The result also says what was read
+  (`evidence`: kind, interpreter, bytes, sent, hash, libraries, strings; `evidenceOf` keeps only those fields), shown
+  under the answer ("Lumo read the shell script (2 KB)").
+- **Actions** run only on the person's click, under the answer, the suggested one highlighted: **End** (TERM), **Pause**
+  (STOP) — `lord.monitor.signal`, the user's own unprotected processes —, **Block its network** (the app's existing
+  `no-network` firewall restriction; only for a process in an app's scope), and **Blocklist** (below), which asks first.
+  A "low" risk hides nothing and changes nothing.
+
+**Translate with Lumo**: a description that exists only in English (sdk/describe.js marks it) offers it while Sentinela
+is on: the text is fenced the same way (`translateInput`), the schema is one `text` ≤ 600 (`SCHEMA_TRANSLATE`), the
+answer is read strictly (`parseTranslation`, markers refused), and the result is kept per language and source in
+`~/.cache/lordos/descriptions/<lang>.json` (shown as "Translated by Lumo on this computer").
+
+## Blocklist (0.8.9.6, in development)
+
+Approved by the maintainer on 2026-11-24. **Blocklist** (after an investigation) puts the program on the person's
+blocklist and ends it now; from then on it is ended whenever it starts in their account, whether Sentinela is on or
+off. Settings → AI → Sentinela lists it (name, path, package if chosen, the hash's start, the date) with **Remove**.
+
+- **The list**: `~/.config/lordos/sentinela/blocked.json` (0600 in a 0700 folder), written only by lord-server
+  (`server/src/llm/blockwatch.c`, `lord.sentinela.block/unblock/blockTake/blocked/blockEvents`) and in
+  `fsops_protected` (`/.config/lordos/sentinela`): no app and no `lord.fs` call can write it. Each entry: the program's
+  SHA-256 (its id), kind (`binary`, or `script` with its interpreter), the path when it was blocked, its size, its name,
+  the date, and optionally its package. Read back only if it is the user's, not writable by others and under 512 KB.
+- **What it matches**: a binary by its file's size and SHA-256 wherever it was copied or renamed; a script by the
+  script's own hash (evidence.c's rules), never its interpreter; with the package option, any program that package
+  installed. Refused: LordOS's own programs (`lord-*`, `/usr/lib/lordos`), an interpreter itself (`sh -c …` has no
+  script to block), the system's core packages (lordos*, libc, coreutils, bash, dash, util-linux, systemd, dbus, login,
+  passwd, sudo, PipeWire, WirePlumber, Xwayland, procps), lord-server and its parents. A process whose program is a
+  copy of one of those core programs is never ended either.
+- **Enforcement**, with what LordOS already has and no new privilege: while the list has entries, a thread of
+  lord-server's looks at `/proc` every 500 ms (`BLOCKWATCH_MS`), only at processes of the session's uid it hasn't seen
+  (PID and start time; all of them again after the list changes), hashes a program only when its size is an entry's
+  (cached by device, inode, size and modification time), and ends a match with SIGKILL through a pidfd checked against
+  its start time. Requests (block, unblock) are queued to that thread, so hashing never blocks the screen. Each ended
+  program gives a desktop notification at most every 10 minutes. Blocking also turns the app's network off
+  (`no-network`) first when the process runs in an app's scope.
+- **Its limits**: a blocked program can run for up to about half a second before it is ended, and in that time it can
+  use the network unless it runs in an app's scope; another user's programs are not touched. Closing both gaps needs a
+  root part, which is not built:
+
+**Proposal (not built; needs the maintainer's review): an exec gate in a root service.** `lord-netperm` (or a new
+`lord-execd`, `Restart=always`, root) would hold a fanotify group with `FAN_CLASS_CONTENT` and mark
+`FAN_OPEN_EXEC_PERM` on the mounts that hold programs (`/`, `/home`, `/tmp`, `/var/tmp`, `/dev/shm`, `/opt`, removable
+media). Each exec of a regular file gives it an fd of the file before it runs; it would answer `FAN_DENY` when the
+file's SHA-256 (cached by device, inode, size and change time) is on any user's list and `FAN_ALLOW` otherwise, within
+a deadline (fail open after 200 ms so a stuck service never stops the system; never deny lordos*, the core packages
+above, or anything under `/usr/lib/lordos`). The lists would come only from each user's lord-server over a new message
+on its socket (`SO_PEERCRED`: a user's entries apply to that user's execs only, by the exec's uid; root's own list
+only from an administrator's Settings through `admin.c`), never from a path the service reads in a home folder. A
+script's exec reaches the interpreter, so scripts would still need the user-side watcher (or `FAN_OPEN_PERM` on the
+script file, which costs every open). New pieces to review: the root service or new messages on netperm.sock, the
+fanotify capability (`CAP_SYS_ADMIN`), the per-user list protocol, and the fail-open deadline.
+
 ## Limits
 
 - Analyses only when a rule fires; at most 4 events handled per 10-second tick; the engine queue holds 8 jobs.
@@ -227,7 +315,10 @@ injection, the action mapping), and the machine parts of `sentinela_notify_scene
 ## Interfaces
 
 - `lord.sentinela` (desktop context only; the broker of isolated apps has none): `available()`, `models()`,
-  `analyze(model, system, user)`, `facts(pid, start)`, `take(id)`, `state()`, `stop()` (`server/src/ui/js_sentinela.c`).
+  `analyze(model, system, user)`, `facts(pid, start)`, `take(id)`, `state()`, `stop()` (`server/src/ui/js_sentinela.c`);
+  (0.8.9.6) `investigate(model, system, user, pid, start)`, `translate(model, system, text)`, `block(pid, start,
+  withPkg)`, `unblock(id)`, `blockTake(id)`, `blocked()`, `blockEvents()`. SDK: `lumoReady`, `investigateProcess`,
+  `translateWithLumo`, `runInvestigateAction`, `blockProgram`, `unblockProgram`, `sentinelaBlocked`.
 - `lord.monitor.watchProcs(on)` / `procsWatched(lang)`; `lord.monitor.signal(pid, start, kind)` gained `STOP`, `CONT`
   and `LOWER` (the user's own processes only, the same checks as `TERM`). `lord.monitor.watchMachines(on)` /
   `machinesWatched()` and `lord.vm.stats`' new fields are the machine rules' ("Machines").
@@ -261,6 +352,16 @@ injection, the action mapping), and the machine parts of `sentinela_notify_scene
 - `tests/sentinela_settings_scene.mjs`: the page off by default; the catalog's models and Download; Download asks
   `pkg-install` for `llama.cpp lordos-llm-qwen3-1.7b` only, shows progress, chooses the model; the triggers (network
   "coming soon"); the limits; an alert's facts and every closed action; "It's mine" entries.
+- (0.8.9.6) `build/llm-engine-test` also: a script's text between two markers with the same random nonce (a fake end
+  marker inside the script stays inside), code given with `sh -c`, a binary's ELF details and libraries, a script
+  reached through a link not read, a reused PID gone, a translation; and the blocklist on synthetic programs (a program
+  of its own, never a copy of a system one): blocked by hash it is ended running and again when it starts under another
+  name, the notices, a blocked script ended while the shell still runs other commands, an interpreter itself refused,
+  the list 0600 in a 0700 folder, and after Remove it runs. `tests/sentinela_investigate_test.mjs`: the facts (no
+  arguments, a hostile name kept in its field), 11 malformed or injected answers refused, the evidence's fields, a
+  translation fenced and read strictly. `tests/monitor_describe_scene.mjs`: nothing investigated before the click, the
+  click sends that PID and start time, the answer with its risk and closed actions, Blocklist asks first, then blocks
+  and ends it. `tests/sentinela_settings_scene.mjs`: the blocklist and Remove. `build/fsops-test`: the list protected.
 - `tests/sentinela_real_e2e.sh <models folder> <id> [language]` (by hand): a fake miner, real facts from `/proc`, the
   real summary and prompt, the real llama-server in lord-llm's sandbox, the answer through `parseVerdict`.
 

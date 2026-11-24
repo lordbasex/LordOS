@@ -11,6 +11,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Monitor: Get Info says what a program is** (in development; latest release 0.8.9.5-beta). A **Description** line
+  between the command line and the tabs, in the grouped and the plain view, from what the computer already has and
+  never the network: LordOS's own programs and the kernel's threads, the app's manifest or `.desktop`/Flatpak
+  `Comment` (the person's language when it has one), the well-known system programs (systemd, (sd-pam), dbus, PipeWire,
+  WirePlumber, the portals…), the program's manual page (a translated page first, read without running `man`), the
+  service's `Description=`, and the package's description from dpkg's database, in the person's language when apt has
+  Debian's translation (matched by `Description-md5`). lord-server reads them in a worker thread
+  (`server/src/monitor/describe.c`, `lord.monitor.describe`); one SDK function gives the same text to anyone
+  (`sdk/describe.js`: `describeProgram`, `describeApp`). An English-only text says so and offers **Translate with Lumo**
+  while Sentinela is on (kept per language). On the development machine 616 of 647 processes were described, 176 of
+  them in Spanish for free. Every LordOS app and `lord-*` program must have an English description:
+  `tools/desc-check.mjs`, run by `tools/i18n-check.mjs`. `lord.apps.linux`/`flatpak` now say whether the `Comment` is in
+  the language asked (`commentLocal`).
+- **Sentinela: Investigate with Lumo** (in development; approved by the maintainer on 2026-11-24). A program Get Info
+  can't describe shows **Unknown** and, with Sentinela on and a local model installed, **Investigate with Lumo**: on that
+  click only, for the person's own process, the local model reads the facts Sentinela already sees (name, path, package
+  or none, parents, how it started, CPU, memory, socket counts) and, read by lord-server and fenced as data between two
+  markers with a random nonce, the program's script text (at most 64 KB read, 6000 bytes sent; opened by descriptor,
+  no links, a regular file the user or root owns, only when it is that interpreter's script) or a binary's metadata (ELF
+  type, size, SHA-256, loaded libraries, a sample of its strings) (`server/src/llm/evidence.c`). It answers in the
+  person's language what it does, why it probably runs, a risk and one action of a closed list, checked strictly; the
+  actions (End, Pause, Block its network, Blocklist) run only on the person's click.
+- **Sentinela: a blocklist** (in development; approved 2026-11-24). **Blocklist** puts a program (by its file's SHA-256,
+  a script by the script's, optionally with its package) on `~/.config/lordos/sentinela/blocked.json`, which only
+  lord-server writes (protected from apps and `lord.fs`), and ends it; from then on a thread of lord-server's ends it
+  with SIGKILL through a pidfd within about half a second whenever it starts in the person's account, under any name
+  (`server/src/llm/blockwatch.c`). LordOS's own programs, an interpreter itself and the system's core programs can't be
+  blocked. Settings → AI → Sentinela lists the programs with **Remove**. Stopping a program before it runs, and for every
+  user, would need a root part (fanotify `FAN_OPEN_EXEC_PERM`): proposed in docs/SENTINELA.md, not built.
 - **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the
