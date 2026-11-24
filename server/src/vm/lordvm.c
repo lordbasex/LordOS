@@ -2236,7 +2236,17 @@ static int session_layer(const char *under, const char *bfmt, long long bytes, i
     if (bytes <= 0 || qimg_overlay_fmt(under, bfmt, tmp, S.disks, bytes, err, sizeof err)) { unlink(tmp); vlog("disposable session: qemu-img create: %.150s", err); return -1; }
     int in = open(tmp, mode == VM_DISP_DISK ? O_RDWR | O_CLOEXEC | O_NOFOLLOW : O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     unlink(tmp);
-    if (in < 0 || mode == VM_DISP_DISK) return in;
+    if (in < 0) return -1;
+    /* what was opened is the layer qemu-img made, as any overlay is checked: a regular file of this account, no external
+     * data file, not marked corrupt (its backing name is never followed: QEMU gets the node) */
+    {
+        uint8_t head[VM_IMG_HEAD];
+        struct stat hs;
+        ssize_t hn = pread(in, head, sizeof head, 0);
+        if (fstat(in, &hs) || !S_ISREG(hs.st_mode) || hs.st_uid != getuid() || hs.st_nlink != 0 ||
+            vm_qcow2_overlay(head, hn > 0 ? (size_t)hn : 0, err, sizeof err)) { vlog("disposable session: the new layer isn't ours: %.150s", err); close(in); return -1; }
+    }
+    if (mode == VM_DISP_DISK) return in;
     int fd = memfd_create("lordos-session", MFD_CLOEXEC);
     struct stat st;
     int bad = fd < 0 || fstat(in, &st) || st.st_size <= 0 || st.st_size > (16 << 20);
