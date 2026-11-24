@@ -945,9 +945,10 @@ static int cmd_create(const char *dir, int argc, char **argv) {
         snprintf(dd, sizeof dd, "%s/disks", real);
         if (un.kind == VMU_WINDOWS && !m.drivers[0]) { fprintf(stderr, "lord-vm: a Windows install needs --drivers (virtio-win)\n"); unlink(sys); return 2; }
         /* LordOS (vmunattend.h): its installer erases only the disk the answers name, with exactly this size: the system
-         * disk just made (virtio-blk in slot 1, the guest's first: vda; SATA with the compatible devices: sda) */
+         * disk just made (virtio-blk in slot 1, the guest's first: vda; with the compatible devices SATA, sda, or on arm64
+         * NVMe, nvme0n1) */
         if (un.kind == VMU_LORDOS) {
-            snprintf(un.disk, sizeof un.disk, "%s", m.devices == VM_DEV_COMPAT ? "sda" : "vda");
+            snprintf(un.disk, sizeof un.disk, "%s", m.devices != VM_DEV_COMPAT ? "vda" : m.arch == VM_ARCH_ARM64 ? "nvme0n1" : "sda");
             un.disk_bytes = (unsigned long long)m.disk_gb << 30;
         }
         if (un.kind == VMU_WINDOWS ? vmu_prepare_windows(dd, m.drivers, &un, why, sizeof why) : vmu_prepare(dd, m.iso, &un, m.id, why, sizeof why)) {
@@ -2376,6 +2377,8 @@ static void build_qemu_args(void) {
     /* the windows devices on arm64 (4.3): virt with a GICv3 (vm_machine_check_host refuses KVM on a GICv2 host), USB
      * CD/DVD drives, ramfb, a TPM on the system bus */
     int win_arm = arm && m->devices == VM_DEV_WINDOWS;
+    /* the compatible devices on arm64: NVMe disks and a USB CD/DVD (below), not SATA */
+    int compat_arm = arm && m->devices == VM_DEV_COMPAT;
     char esc[2 * VM_NAME_MAX + 8], p[PATH_MAX + 64];
     qargc = 0;
     arg(QEMU_BIN_OF(m->arch));
@@ -2526,11 +2529,30 @@ static void build_qemu_args(void) {
     if (bidx[VM_BOOT_DISK] >= 0) snprintf(bi_sys, sizeof bi_sys, ",bootindex=%d", bidx[VM_BOOT_DISK]);
     if (bidx[VM_BOOT_CD] >= 0) snprintf(bi_cd, sizeof bi_cd, ",bootindex=%d", bidx[VM_BOOT_CD]);
     if (bidx[VM_BOOT_NET] >= 0) snprintf(bi_net, sizeof bi_net, ",bootindex=%d", bidx[VM_BOOT_NET]);
-    if (m->devices == VM_DEV_COMPAT) {
-        /* devices every system has a driver for (6.22): SATA (AHCI) disks and CD/DVD; q35 has its AHCI built in (ide.0
-         * to ide.5), arm64's virt gets one in the system disk's slot */
-        const char *bus = arm ? "ahci" : "ide";
-        if (arm) { arg("-device"); arg("ich9-ahci,id=ahci,addr=0x1"); }
+    if (compat_arm) {
+        /* the compatible devices on arm64 (6.22, 12): AAVMF has no AHCI (SATA) driver, so a SATA disk never boots there
+         * (it stops at its UEFI shell, measured on the Pi 5). NVMe is what it boots from and what arm64 guests without
+         * virtio drivers have in their own kernel (Windows on Arm's stornvme, Linux, the BSDs): one controller per disk,
+         * in the slots virtio's disks take; QEMU's NVMe needs a serial, the disk's own or else a fixed one. The CD/DVD
+         * is the windows devices' on arm64: USB mass storage (usb-bot) with a SCSI CD/DVD, which AAVMF starts from and
+         * guests read with their own drivers, and whose disc can still be changed (VM_CDROM's "cd0") */
+        arg("-device"); argf("nvme,id=sysdisk,drive=sys,addr=0x1,serial=%s%s", m->disk_serial[0] ? m->disk_serial : "lordvm-sys", bi_sys);
+        for (int i = 0; i < m->n_data; i++) {
+            arg("-device");
+            if (m->data_serial[i][0]) argf("nvme,id=datadisk%d,drive=data%d,addr=0x%x,serial=%s", i + 1, i + 1, 0x10 + i, m->data_serial[i]);
+            else argf("nvme,id=datadisk%d,drive=data%d,addr=0x%x,serial=lordvm-data%d", i + 1, i + 1, 0x10 + i, i + 1);
+        }
+        arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5");
+        arg("-device"); arg("usb-bot,id=cdbot0,bus=xhci.0");
+        if (m->iso[0]) {
+            arg("-blockdev"); argj(blockdev_file("cd-file", m->iso, 1));
+            arg("-blockdev"); argj(blockdev_fmt("raw", "cd", "cd-file", 1));
+            arg("-device"); argf("scsi-cd,id=cd0,bus=cdbot0.0,drive=cd%s", bi_cd);
+            snprintf(S.cd_node, sizeof S.cd_node, "cd");
+        } else { arg("-device"); argf("scsi-cd,id=cd0,bus=cdbot0.0%s", bi_cd); S.cd_node[0] = 0; }
+    } else if (m->devices == VM_DEV_COMPAT) {
+        /* devices every system has a driver for (6.22): SATA (AHCI) disks and CD/DVD, q35's own AHCI (ide.0 to ide.5) */
+        const char *bus = "ide";
         arg("-device"); argf("ide-hd,id=sysdisk,drive=sys,bus=%s.0%s%s", bus, bi_sys, ser);
         for (int i = 0; i < m->n_data; i++) {
             arg("-device"); argf("ide-hd,id=datadisk%d,drive=data%d,bus=%s.%d%s%s", i + 1, i + 1, bus, i + 1, m->data_serial[i][0] ? ",serial=" : "", m->data_serial[i]);
@@ -2666,7 +2688,7 @@ static void build_qemu_args(void) {
          * after the firmware leaves (virtio-gpu's picture stops there until viogpudo is in) */
         if (win_arm) { arg("-device"); arg("ramfb"); }
         else if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); }
-        if (m->devices != VM_DEV_WINDOWS) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
+        if (m->devices != VM_DEV_WINDOWS && !compat_arm) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
         if (arm) { arg("-device"); arg("usb-kbd,bus=xhci.0"); }
         arg("-device"); arg("usb-tablet,bus=xhci.0");
         /* "Capture mouse" (6.25): a relative mouse beside the tablet, used only while captured (mouse_set). Not the PS/2
