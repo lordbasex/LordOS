@@ -695,9 +695,9 @@
    "area": "J",
    "item": "`lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24)",
    "status": "🧪",
-   "pct": 80,
+   "pct": 85,
    "file": "`vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 16); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh`",
-   "note": "*In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. Not built: the interactive shell, programs in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0)"
+   "note": "*In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. `machines shell` (the agent's shell, checked against a stand-in lord-vm). Not built: exec in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0)"
   },
   {
    "area": "K",
@@ -962,8 +962,8 @@
    "name": "Command line and automation",
    "weight": 3,
    "items": 2,
-   "mean": 90.0,
-   "score": 90
+   "mean": 92.5,
+   "score": 93
   },
   {
    "id": "K",
@@ -999,5 +999,5 @@
   }
  ],
  "total": 77,
- "total_exact": 76.68
+ "total_exact": 76.77
 }

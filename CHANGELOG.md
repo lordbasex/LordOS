@@ -26,6 +26,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     lord.fs's rules (never a protected path), checked on the opened descriptor; a size claimed beyond the free space is
     refused, and Ctrl+C removes the half-copied file.
   - `machines logs NAME [--serial|--machine] [--follow]`, `machines console NAME` (the serial console, Ctrl+] leaves),
+    `machines shell NAME` (the agent's shell as the signed-in person, sized to the terminal),
     `machines import SRC NAME` (another app's machine, as Migrate does), `machines start NAME --no-window --snapshot TAG`
     (from a snapshot with memory).
   - `machines apply FILE`: a machine made or changed from a short TOML file kept beside a project. The file is untrusted:
@@ -44,7 +45,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   - Tests: `build/vmexec-test` (formats, limits, the guest scripts under `/bin/sh`, fuzz), `build/mcli-test` (cp sides,
     terminal cleaning, the TOML subset, the MCP envelope and names, the apply file's boundary list, fuzz), schema 16 in
     `build/vm-test` and `build/vmgroup-test`, `tests/vm_exec_e2e.sh` (28 checks, run on 2026-11-24 in a real Ubuntu
-    26.04.1 machine made by the Ubuntu card on the dev PC). Not built: an interactive shell over the agent, programs in
+    26.04.1 machine made by the Ubuntu card on the dev PC). Not built: `exec` in
     virtio-win guests, folders in `cp`, packages and `rebuild` in `apply`, creating a machine from a card through MCP.
 - **Machines: Kali installs without questions, and every card was run end to end** (in development). Kali gets its own
   unattended install (Debian's preseed with Kali's archive and tasks: Xfce and the default tools). Fedora Workstation

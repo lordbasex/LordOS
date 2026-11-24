@@ -47,14 +47,14 @@ recomputes both from the rows; the arithmetic:
 | G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 76.67 | 77 % | 12 × 77 % = 9.24 | 68 % |
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
 | I. Guest tools and agent (state, shell, logs) | 7 | 6 | 90.00 | 90 % | 7 × 90 % = 6.30 | 75 % |
-| J. Command line and automation | 3 | 2 | 90.00 | 90 % | 3 × 90 % = 2.70 | 48 % |
+| J. Command line and automation | 3 | 2 | 92.50 | 93 % | 3 × 93 % = 2.79 | 48 % |
 | K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 83.75 | 84 % | 3 × 84 % = 2.52 | 61 % |
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **110** | | | **76.68 → 77 %** | 69 % |
+| **Total** | **100** | **110** | | | **76.77 → 77 %** | 69 % |
 
-Σ = 12.04 + 10.56 + 9.35 + 5.40 + 4.80 + 3.36 + 9.24 + 3.22 + 6.30 + 2.70 + 2.52 + 2.96 + 2.58 + 1.65 = 76.68, rounded **77 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
+Σ = 12.04 + 10.56 + 9.35 + 5.40 + 4.80 + 3.36 + 9.24 + 3.22 + 6.30 + 2.79 + 2.52 + 2.96 + 2.58 + 1.65 = 76.77, rounded **77 %** (before: 69 %, the third audit against `bb5baab62`). The rows of the app and the system ties (C, K and four of A's) were changed with the code that built them (*in development*, "Machines to 100 %"); the table and the JSON are computed again from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); raw disks, encryption, export and backups
@@ -213,12 +213,12 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Shell over the agent as the signed-in user (6.18) | 🟡 | 80 | `tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`; `guest_shell_test.sh`, `vm-test`, a KVM guest | *In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24). A pane of the machine's window, not a Terminal tab; no root or administrator switch, no `lordvm exec`; w12 not run in a Windows guest; the pane not seen on screen (was ❌ 15) |
 | Logs: journal, serial, machine log, Overview (6.19) | 🟡 | 85 | `logs.jsx`, `diag.js` (`journalLine`, `guestZone`), `lordvm.c` (journal and `EVLOG_PS` through qemu-ga); `vm_model_test.mjs` | *In development*: a Windows guest's System and Application event logs, a unit or source filter, times in local time with the guest's zone; the event logs not yet run in a Windows guest; Clear view was built already (was 65: no event logs, unit filter or time zone) |
 
-### J. Command line and automation (90 %)
+### J. Command line and automation (93 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
 | `machines` list, status, start, open, stop…, snapshot, clone, set, rename, ids, and for a machine group `fresh` and `--member` (19.9); 35 languages, `--json`, completion (6.15) | 🧪 | 100 | `server/src/cli/machines.c`, `mcli.c`; `mcli-test`, `machinescli_headless.sh`, `vm_rename.sh`, `vm_exec_e2e.sh` | *In development* since the last audit: `set` passes `--cpu-pin`, `--perf-profile` and `--capture-fullscreen`; `start --no-window --snapshot TAG`, `import`, `console` (each run on 2026-11-24 against a real Ubuntu 26.04.1 machine on the dev PC, in a private home). A start in a window is still checked headless only; a machine from a card is made in the app (`apply` makes one from an ISO) (was 95) |
-| `lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24) | 🧪 | 80 | `vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 16); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh` | *In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. Not built: the interactive shell, programs in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0) |
+| `lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24) | 🧪 | 85 | `vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 16); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh` | *In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. `machines shell` (the agent's shell, checked against a stand-in lord-vm). Not built: exec in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0) |
 
 ### K. System ties (84 %)
 
@@ -367,7 +367,7 @@ Still open in Phase 2:
   dmabuf with no copy, and latency to the screen (13.8 item 4).
 - [ ] Picture in Picture, multi-head.
 - [ ] Export, backups of machines. Monitor shows each machine as one row (6.14); no drill-in.
-- [x] Command line: built as `machines` (6.15, 0.8.9.5); exec, cp, logs, console, import, apply and MCP in development (2026-11-24). Still open: the interactive shell.
+- [x] Command line: built as `machines` (6.15, 0.8.9.5); exec, cp, logs, console, shell, import, apply and MCP in development (2026-11-24).
 - [ ] Done when: a real compatibility and security matrix per architecture (16).
 
 ### Phase 4, integration: partly built
@@ -375,7 +375,7 @@ Still open in Phase 2:
 - [x] Apps mode (guest apps as windows, in the Dock) for LordOS and Windows guests (7.2). Other Linux desktops still open.
 - [x] Reproducible machines (`lordvm apply dev.toml`; 2026-11-24, in development; 6.24). Left: packages and `rebuild`.
 - [x] Local MCP server (`machines mcp` / `lordvm mcp`), `exec`, `cp`, `logs`, `apply`, per machine with automation on
-  (2026-11-24, in development; 6.15, 6.24). Left: the interactive shell, virtio-win guests, folders in `cp`.
+  (2026-11-24, in development; 6.15, 6.24). Left: exec in virtio-win guests, folders in `cp`.
 - [ ] Migrate from another computer (6.11): a backup image of a Linux PC's disk imports and boots (2026-11-24); the
   agent on the old PC, the network copy and driver injection are open.
 - [ ] Machine groups and the Whonix (Tor) card (19): G0–G4, Delete, Rename and Repair of a group built and checked
@@ -3242,7 +3242,7 @@ machines help
   `qemu_pid`; `snapshot list --json` is lord-vm's own). Bash completion: `/usr/share/bash-completion/completions/machines`
   (`machines list --names` gives the names).
 - **Not yet:** creating a machine from a card (the assistant's download, checks and unattended install: `apply` makes one
-  from an ISO the person already has), and the interactive shell over the agent below.
+  from an ISO the person already has).
 
 #### `lordvm` and the agent: exec, cp, logs, console, MCP (built 2026-11-24, in development)
 
@@ -3254,7 +3254,8 @@ machines start NAME --no-window --snapshot TAG     # from a snapshot with memory
 machines exec "Debian Dev" [--timeout S] -- uname -m   # exits with the program's status (125: it couldn't run, 124: its time ran out)
 machines cp [--force] ./notes.txt "Debian Dev":~/       # files, either way; one side is NAME:PATH (~: the person's home there)
 machines logs "Debian Dev" [--serial|--machine] [--follow] [--lines N]
-machines console "Debian Dev"                      # the serial console (the app's Shell) in this terminal; Ctrl+] leaves
+machines console "Debian Dev"                      # the serial console in this terminal; Ctrl+] leaves
+machines shell "Debian Dev"                        # a shell as the signed-in person, through the guest's LordOS tools (6.18)
 machines import SRC NAME [--arch A] [--devices compat|virtio] [--network shared|isolated] [--firmware uefi|bios]
 machines apply dev.toml                            # 6.24
 machines mcp                                       # a local MCP server on stdin and stdout
@@ -3290,8 +3291,11 @@ machines mcp                                       # a local MCP server on stdin
   guest claims beyond the free space is refused; Ctrl+C removes the temporary file. Files only (a folder: a tar first).
   It is slow for big files (about 1–2 MB/s out of the machine): the transfer folder (6.7.1) is the way for those.
 - **logs** prints the guest's journal (`log/journal.log`, read through the agent every 5 s, 6.19), its serial console or
-  lord-vm's own log, made safe for a terminal; `--follow` follows it across rotations. **console** is the app's Shell
-  (`VM_CONSOLE`) in the terminal.
+  lord-vm's own log, made safe for a terminal; `--follow` follows it across rotations. **console** is the serial console
+  (`VM_CONSOLE`) in the terminal; **shell** is the agent's shell of 6.18 (`VM_SHELL`: a shell as the signed-in person
+  through the guest's LordOS tools, sized to the terminal and resized with it), as the window's Shell gives it; both keep
+  printing after piped input ends and read lord-vm's other news so its sends never back up (`tests/machines_shell_test.sh`,
+  against a stand-in lord-vm).
 - **The MCP server** (`machines mcp`, or `lordvm mcp`): JSON-RPC 2.0, one message per line, over the standard input and
   output of a process the person started (no socket, no port). Each message is parsed strictly (`mcli_rpc_parse`: only
   `jsonrpc`, `id`, `method`, `params`; 1 MB at most); anything printed by the commands it runs is captured, never mixed
@@ -3313,8 +3317,8 @@ machines mcp                                       # a local MCP server on stdin
   in a private home and namespaces: the person runs it, not root; input, exit status, timeout, the output cap; arguments
   stay arguments; cp both ways with the hash; the refusals; the logs; MCP; apply). The memory-snapshot start was checked
   on the same machine (a marker written after the snapshot was gone).
-- Not built: `lordvm shell` (an interactive shell as the person needs a terminal over the agent, 6.18), programs in
-  Windows guests, folders in `cp`.
+- Not built: programs in virtio-win guests through `exec` (the shell works there through the guest's tools), folders in
+  `cp`.
 
 A local **MCP server** was first planned to build machines too ("a Debian machine with 40 GB, user neil": a card, a
 profile, an unattended install, a password kept in the keyring); what is built is the list above.
