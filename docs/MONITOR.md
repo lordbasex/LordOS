@@ -805,6 +805,71 @@ machine: the tab and the Overview open with no errors, and `lord.monitor.gpu()` 
 on screen. Not yet seen: a screenshot (the headless session's `remote.sock` takes only root), Intel, NVIDIA, a
 Raspberry Pi, a VM with virtio-gpu, lord-tts actually running on the GPU.
 
+### The 0.8.9.6 layout (in development; approved by the maintainer on 2026-11-24)
+
+The tab was redrawn after the mockup the maintainer approved (`/var/tmp/lordos-gpu-mock/`, the single-GPU "One" view
+is the reference). `apps/monitor/GpuView.jsx` draws it; `Gpu.jsx` keeps the sampler (`useGpu`), the fan by hand and the
+APIs card (both behind "Fan and APIs" under the card's name) and the Overview's lines.
+
+- **GPU chips**: one per card (vendor dot, short name, a three-minute load sparkline, load, temperature, VRAM). A click
+  picks the card. With two or more cards a **One / Side by side** switch shows the first two cards in two columns
+  (compact header, engines chart with the categories in its title, memory bar, a process table of App, Type, GPU, VRAM
+  and API).
+- **Header**: the vendor's color, the name, `driver · Mesa <version> (or NVIDIA's driver) · PCI slot · VRAM`, and tiles:
+  Load, Temperature (sensor and `temp*_crit` when the driver gives it), Power (of the cap; `power1_max` when there is no
+  `power1_cap`), Fan (RPM and %) or, with no fan, **Idle (RC6)** (i915 `power/rc6_residency_ms`, xe's render GT
+  `gtidle/idle_residency_ms`: the share of the last second the GPU slept), Core clock (of the DPM top, or i915's
+  `gt_RP0_freq_mhz`), Memory clock, **PCIe link** (`current_link_speed`/`width` as "Gen3 ×16", "of Gen4 ×16" when the
+  link runs below `max_link_*`). An integrated GPU's "Unknown" link is left out. `pcie_bw` is never read (it stalls
+  the card for a second) and debugfs is never read.
+- **Utilization by engine**: 3D, Compute, Video decode, Video encode, Copy (`engineCategory`), each summed over the
+  user's processes' clients this second, with a 180-sample chart (one per second, three minutes).
+- **Graphics memory**: VRAM used of total and GTT; a bar split by the type of process holding it (compute, graphics,
+  video; what no process of the user accounts for is counted as graphics) and free; amdgpu's `mem_busy_percent` as
+  "Memory controller busy"; a VRAM history chart. An integrated GPU shows the system memory its processes hold.
+- **Processes using the GPU**: App / process, PID, Type (Compute when its compute engines lead, or it maps CUDA, HIP
+  or OpenCL with no OpenGL; Video when decode/encode lead; else Graphics), GPU % with a bar split by engine, 3D, Comp,
+  Dec, Enc, Copy, VRAM, GTT and API. **Hidden** rows: another user's process that holds `/dev/kfd` (its pid is a folder
+  name in `/sys/class/kfd/kfd/proc`, world-readable): pid and name only, "its use is counted in the card total, not per
+  process". Shown on amdgpu cards only.
+- **AI on this computer**: one row per engine: the model runners (`llama-server`, `llama-cli`, `ollama`, `whisper-*`)
+  with the model's base name from their own `-m`/`--model` argument ("(from argv -m)"); Sentinela's engine, recognized
+  by the pid `lord.sentinela.state()` gives (with its model; "CPU only by design"); LordOS Voice (lord-say's note);
+  LordOS Studio; and any of the user's processes that map a model runtime (`libcuda`, `libamdhip64`, `libggml*`,
+  `libllama`, `libcudart`, `libonnxruntime`, `libtorch_cuda`) and use the GPU. "On this GPU" rows show the compute
+  share and VRAM; CPU rows show CPU (from `/proc/<pid>/stat` ticks) and RAM. A name or a model only ever labels a row:
+  a process of the same user can call itself anything and map any library, so nothing is trusted or granted because
+  of it, and the model is the base name only, `[A-Za-z0-9._+-]`, never a path and never cut.
+- **Size**: from a window of 1100×600 (the default is 1180×700) everything fits without scrolling; the table and the AI
+  list show the rows their boxes have room for (measured after each draw), with "+N more". Smaller windows scroll as
+  before. Light and dark follow the mockup's colors; right-to-left mirrors the layout (charts stay left to right).
+
+**Cost.** `gpu_json` used to walk all of `/proc` every second (15 ms with about 600 processes). Now the walk (every
+process's `stat`, the user's processes' fd folders) runs every 5 s (`GPU_RESCAN_MS`): it keeps the processes holding a
+`/dev/dri`, `/dev/kfd` or `/dev/nvidia*` fd with those fd numbers, the AI engines and machines. Each second only those
+fds' `fdinfo` and those processes' `stat` are read again: about 0.45 ms on the RX 580 PC with 8 GPU processes, plus
+about 0.4 ms for the two cards' sysfs. A kept process whose start time changed (pid reused) is dropped at once; a new
+process shows within 5 s. The reading is on the Monitor's thread, never during a draw.
+
+**New per card and per process (gpustat.c):** PCIe link, `mem_busy_percent`, `temp*_crit`, `power1_max`, i915
+`gt_RP0_freq_mhz` and `power/rc6_residency_ms`, xe `tile<T>/gt<G>/freq0/{act,cur,max,rp0}_freq` and
+`gtidle/{name,idle_residency_ms}` per GT, NVIDIA's `/proc/driver/nvidia/gpus/<slot>/information` (Model and Video BIOS
+only); ROCm's KFD per process (`/sys/class/kfd/kfd/proc/<pid>/vram_<gpu>`, `sdma_<gpu>`, `stats_<gpu>/cu_occupancy`, the
+gpu id mapped to its PCI slot through `topology/nodes/*/gpu_id` and `properties`' `domain` and `location_id`) for the
+user's own processes; which `/dev/nvidia<N>` minors a process of the user holds. `build/gpustat-test` covers each with
+fake trees and malformed files (link speeds, topology, information, argv), the cache, pid reuse and another user.
+
+**NVIDIA (lord-nvgpu).** The proprietary driver has no DRM fdinfo or sysfs sensors. A separate sandboxed helper,
+`lord-nvgpu` (approved 2026-11-24, built on its own branch), reads NVML for lord-server; `gpustat.c` links its
+`nvgpu_json` weakly and adds its `"nv"` array (per card by PCI bus id: utilization SM/memory/encoder/decoder,
+temperature, fan, power and limit, clocks, VRAM, CUDA and driver versions, compute mode, ECC; per process: pid, memory,
+SM/encoder/decoder %), and `gpumodel.js` merges it into the card (only where sysfs has nothing) and the process rows by
+pid, checking every number's range again (`mergeNv`, `nvEngines`, `nvSlot`; `gpu_model_test.mjs` with canned and
+hostile values). Without the helper there is no `"nv"` and nothing changes. Not tested on NVIDIA hardware yet.
+
+**Screenshots** with made-up data: `server/tests/gpu_headless.sh OUT [theme] [language] [WxH] [dark|light]` (the scene
+in `tests/gpu_scene/`).
+
 ## Disk temperature and health (0.8.2)
 
 ![Monitor → Disks, dark](disks-monitor-dark.png) ![Monitor → Disks, light](disks-monitor-light.png)
