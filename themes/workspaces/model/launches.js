@@ -35,8 +35,8 @@ const UNNAMED = /^(linux:|terminal$)/;
 const live = (p, now) => p.left > 0 && now >= p.t && now - p.t < p.ttl;
 
 // A new pending placement (the newest first). n: how many windows (the usual apps of a display: one per app).
-export function addLaunch(list, { key = '', desk, dk, n = 1, now }) {
-  const p = { key: typeof key === 'string' ? key : '', desk, dk, left: Math.max(1, Math.min(9, n | 0 || 1)), t: now, ttl: LAUNCH_MS, owned: new Map(), rearms: 0, seen: false };
+export function addLaunch(list, { key = '', desk, dk, n = 1, now, profile = null }) {
+  const p = { key: typeof key === 'string' ? key : '', profile: typeof profile === 'string' ? profile : null, desk, dk, left: Math.max(1, Math.min(9, n | 0 || 1)), t: now, ttl: LAUNCH_MS, owned: new Map(), rearms: 0, seen: false };
   return [p, ...list.filter((x) => live(x, now) || x.owned.size)].slice(0, MAX_PENDING);
 }
 

@@ -14,7 +14,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { ActivityIcon, PlusGlyph, SaveGlyph, MoveGlyph, LockGlyph, LayoutMini, LAYOUT_CELLS } from '../glyphs.jsx';
 import { LAYOUTS, splitterAt, ratioFrom, TILE_GAP } from '../model/layouts.js';
-import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled, aimLaunch, openUsual } from '../tiler.js';
+import { layoutOf, setLayout, saveLayout, tileable, isLocked, setLocked, tiled, aimLaunch, openUsual, launchOn } from '../tiler.js';
 import { Surface } from './Surface.jsx';
 import { FocusRing } from './BarButton.jsx';
 import { WindowsTray, AppIcon, listed, trayOrder, trayNodes } from './AppWindows.jsx';
@@ -238,7 +238,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
   const cardShown = !!showEmpty && empty;
   const showUsual = cardShown && ready && !wasOffered && !!sug && sug.apps.length > 0;
   const fid = `card:${dkey}`;
-  const launchHere = (a, e) => { if (e) noteLaunch(e.x, e.y); aimLaunch(d, 1, a.id); launchApp(a.id); };
+  const launchHere = (a, e) => { if (e) noteLaunch(e.x, e.y); launchOn(d, a.id); };
   const openTheUsual = (e) => {
     if (!sug) return;
     if (e) noteLaunch(e.x, e.y);
@@ -280,7 +280,7 @@ export const GroupFrame = memo(function GroupFrame({ t, plan, d, dkey, dname, de
           <View style={{ height: 32, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 3, borderRadius: 12, backgroundColor: t.chipBg }}>
             {pins.map((a) => (
               <AppIcon key={a.id} t={t} d={d} desk={desk} appKey={a.id} Icon={a.Icon} title={a.name} launchable
-                onClick={(e) => { noteLaunch(e.x, e.y); aimLaunch(d, 1, a.id); launchApp(a.id); }} />
+                onClick={(e) => { noteLaunch(e.x, e.y); launchOn(d, a.id); }} />
             ))}
           </View>
         ) : null}

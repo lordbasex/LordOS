@@ -18,7 +18,7 @@
 // and an app that answers with another size (a minimum size, a character grid) keeps it and stays in its tile
 // (model/layouts.js judgeFrame); at most MOVES_PER_SEC moves per window and MAX_PASSES passes per second, whatever
 // changes the windows meanwhile: past that the pass waits a second.
-import { windows, locksChanged, activeDesktop, desktopList, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm, openDisplayApps } from '@lordos/sdk';
+import { windows, locksChanged, activeDesktop, desktopList, settings, launchApp, isProfileBrowser, profileChoice, noteLaunchedProfile, getApp, launcherIdOf, screen, screenDisplays, displayFor, workAreaOf, createStore, wm, openDisplayApps } from '@lordos/sdk';
 import { tileRects, fitTile, cleanLayout, cleanRatio, defaultRatio, orderFor, homeFor, displayKeys, savedDisplay, foldMissing, judgeFrame, underBudget, slotStacks, shownIn, dropInto, slotAt, dropSlot, slotLimits, trimSlots } from './model/layouts.js';
 import { shownDisplays } from './model/geometry.js';
 import { addLaunch, claim, gone, pending as pendingOf, LAUNCH_MS } from './model/launches.js';
@@ -39,12 +39,25 @@ const lastMin = new Map();
 // its real window follow the picker there (model/launches.js).
 let launches = [];
 const born = new Map();              // window id → when the tiler first saw it (the windows open now)
-export function aimLaunch(display, n = 1, keys = null) {
+export function aimLaunch(display, n = 1, keys = null, profile = null) {
   if (!display) return;
   const dk = keyOfDisplay(display), desk = activeDesktop.get(), now = Date.now();
   const list = (Array.isArray(keys) ? keys : keys ? [keys] : []).filter((k) => typeof k === 'string' && k);
   if (!list.length) { launches = addLaunch(launches, { key: '', desk, dk, n, now }); return; }
-  for (const key of list) launches = addLaunch(launches, { key, desk, dk, n: list.length === 1 ? n : 1, now });
+  for (const key of list) launches = addLaunch(launches, { key, desk, dk, n: list.length === 1 ? n : 1, now, profile: list.length === 1 ? profile : null });
+}
+
+// Launch app `key` from display d of the activity in view, its windows aimed there. A Chromium-family browser with a
+// profile chosen for this activity (or, failing that, for this display's connector) opens that profile, through the
+// launcher's own profile path when lord-server has it (lord.apps.launchProfile, awaiting the maintainer's approval:
+// docs/WORKSPACES.md "Browser profiles"); without it the browser opens as before and no profile is claimed.
+export function launchOn(d, key) {
+  if (!d || typeof key !== 'string' || !key) return false;
+  const can = isProfileBrowser(key) && typeof lord !== 'undefined' && typeof lord.apps?.launchProfile === 'function';
+  const dir = can ? profileChoice(key, activityOf(activeDesktop.get()).profiles, settings.get().browserProfiles, keyOfDisplay(d)) : null;
+  aimLaunch(d, 1, key, dir);
+  if (dir) { try { if (lord.apps.launchProfile(key.slice('desktop:'.length), dir)) return true; } catch (e) { /* the plain launch below */ } }
+  return launchApp(key);
 }
 // for the tests: the placements still waiting
 export const pendingLaunches = () => pendingOf(launches, Date.now()).map((p) => ({ key: p.key, desk: p.desk, dk: p.dk, left: p.left }));
@@ -54,6 +67,7 @@ const placeable = (w) => !w.pip && !w.args?.skipTaskbar && tileable({ ...w, mini
 // meanwhile); with a free layout there, to that display's middle
 function placeAt(w, p, disp, keys) {
   home.set(w.id, p.dk);
+  if (p.profile) noteLaunchedProfile(w.id, p.profile);   // the profile LordOS launched it for (browserprofiles.js)
   floating.delete(w.id);
   applied.delete(w.id);
   for (const [ok, st] of order) if (!ok.endsWith(`|${p.dk}`)) order.set(ok, st.map((x) => x.filter((id) => id !== w.id)));

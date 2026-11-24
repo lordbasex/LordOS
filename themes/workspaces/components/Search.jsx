@@ -8,7 +8,7 @@ import {
   View, Text, Image, ScrollView, SearchField, addListener, useStore, useLauncherApps, launchApp, searchEverything, tOptional, desktopList, desktopName,
   activeDesktop, switchDesktop, compareNames, t as tr,
 } from '@lordos/sdk';
-import { aimLaunch } from '../tiler.js';
+import { aimLaunch, launchOn } from '../tiler.js';
 import { appMenuItems } from './AppWindows.jsx';
 import { Menu } from '../../classic/components/Menu.jsx';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
@@ -89,10 +89,11 @@ export function Search({ t, display, onClose, isOnChrome }) {
     else noteLaunch(display.x + display.w / 2, display.y + display.h * 0.3);
     onClose();
     // an app opened from here shows on this display (the one the panel opened on), wherever there is room
-    if (entry.app) aimLaunch(display, 1, entry.app.id);
-    else if (String(entry.it?.key || '').startsWith('app:')) aimLaunch(display, 1, String(entry.it.key).slice(4));
-    if (entry.app) launchApp(entry.app.id);
-    else searchEverything.run(entry.it);
+    if (entry.app) launchOn(display, entry.app.id);
+    else {
+      if (String(entry.it?.key || '').startsWith('app:')) aimLaunch(display, 1, String(entry.it.key).slice(4));
+      searchEverything.run(entry.it);
+    }
   };
   const cols = 6;
   const onKey = (e) => {

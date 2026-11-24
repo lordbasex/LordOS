@@ -115,6 +115,9 @@ export {
   dockDrag, dockPoof, beginDockDrag, registerDockTarget, dockDragJustEnded,
 } from './dock.js';
 export { cleanWindowLabel, WINDOW_LABEL_MAX } from './windowlistmodel.js';
+// Chromium-family browsers' profiles (sdk/browserprofilemodel.js): read from their Local State as untrusted data
+export { browserProfiles, refreshBrowserProfiles, windowProfile, noteLaunchedProfile, forgetLaunchedProfile, launchedProfiles } from './browserprofiles.js';
+export { BROWSERS as PROFILE_BROWSERS, isProfileBrowser, profileChoice, cleanProfileChoices, cleanDisplayProfiles } from './browserprofilemodel.js';
 export { sound, useSound, useSoundPeak, soundState, defaultSink, defaultSource, microphones, headsetMics } from './sound.js';
 export { nearbyDevices, lowEnergySide, btErrorKey } from './btlistmodel.js';   // Settings → Bluetooth's nearby list (issue #78)
 export { SoundOutputList, useSoundOutputs } from './soundoutputs.js';   // choosing the output by the volume (issue #58)

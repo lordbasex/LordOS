@@ -931,4 +931,41 @@ check('idle again: still no timer every second', intervals(1000), 0);
   for (let i = 0; i < 2; i++) await flush();
 }
 
+
+// a browser profile chosen for an activity (the activity first, the display's connector as the fallback): the launch
+// asks lord-server's profile path for that folder, only when it exists (awaiting approval), and the window it opens is
+// tied to that profile; without the path the browser opens as before
+{
+  const C = 'desktop:google-chrome.desktop';
+  const was = lord.apps;
+  const calls = [];
+  const stub = (withProfile) => new Proxy(withProfile ? { launchProfile: (id, dir) => { calls.push([id, dir]); return true; } } : {},
+    { get: (o, k) => (k in o ? o[k] : typeof k === 'string' ? () => [] : undefined) });
+  sdk.switchDesktop(desk);
+  state.updateActivity(desk, (m) => ({ ...m, profiles: { [C]: 'Profile 2', 'desktop:evil.desktop': 'Default', 'desktop:chromium.desktop': '../../x' } }));
+  check('profiles: only browsers and folder names are kept', state.activityOf(desk).profiles, { [C]: 'Profile 2' });
+  lord.apps = stub(true);
+  tiler.launchOn(R, C);
+  check('profiles: the activity\'s profile asked for', calls, [['google-chrome.desktop', 'Profile 2']]);
+  const pw = sdk.wm.open('linux', { instance: '9101', frame: { x: M.x + 50, y: 60, w: 900, h: 700 }, args: { surface: 9101, appId: 'google-chrome' } });
+  for (let i = 0; i < 3; i++) await flush();
+  check('profiles: its window on the launch\'s display', sdk.displayFor(frameOf(pw))?.id, R.id);
+  // no activity choice: the display's (by connector)
+  state.updateActivity(desk, (m) => ({ ...m, profiles: {} }));
+  sdk.settings.set({ browserProfiles: { displays: { 'HDMI-A-1': { [C]: 'Profile 3' } } } });
+  calls.length = 0;
+  tiler.launchOn(R, C);
+  tiler.launchOn(L, C);
+  check('profiles: the display\'s profile when the activity has none', calls, [['google-chrome.desktop', 'Profile 3']]);
+  // without the profile path: no profile asked, the plain launch
+  lord.apps = stub(false);
+  calls.length = 0;
+  tiler.launchOn(R, C);
+  check('profiles: no path, no profile', calls, []);
+  lord.apps = was;
+  sdk.settings.set({ browserProfiles: undefined });
+  sdk.wm.close(pw, true);
+  for (let i = 0; i < 2; i++) await flush();
+}
+
 process.exit(0);

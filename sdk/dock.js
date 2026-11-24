@@ -30,6 +30,7 @@ import { useWindows, wm, windowMenuTitle, windowAccent, appIdOf, getApp, windows
 import { pickWindow } from './desktopmodel.js';
 import { desktopSuffix } from './desktops.js';
 import { cleanWindowLabel } from './windowlistmodel.js';
+import { windowProfile } from './browserprofiles.js';
 import { screen, onScreenChange, displayFor } from '@lordos/runtime';
 import { useLauncherApps, launchApp, windowLinuxApp, shortAppName, windowAppName, LetterIcon, windowIcon } from './apps.js';
 import { t, locale } from './i18n.js';
@@ -351,7 +352,10 @@ export function appWindowItems(wins, name = '', top = wm.focused()) {
     const own = parseWindowAppId(w.args?.appId || '');
     const count = own && w.args?.web && webPrefs(settings.get(), own.app).badge ? badgeLabel(badgeTotal(webBadges.get(), own.app, own.profile)) : '';
     const hint = [count, w.minimized ? '–' : ''].filter(Boolean).join(' ');
-    return { id: w.id, label: `${cleanWindowLabel(windowMenuTitle(w)) || name}${desktopSuffix(w)}`, checked: w.id === top, dot: windowAccent(w), hint, minimized: !!w.minimized,
+    // a browser window LordOS launched for a profile: that profile's name and colour (sdk/browserprofiles.js)
+    const prof = windowProfile(w, launcherIdOf(w));
+    const title = cleanWindowLabel(windowMenuTitle(w)) || name;
+    return { id: w.id, label: `${prof ? `${title} · ${prof.name}` : title}${desktopSuffix(w)}`, checked: w.id === top, dot: windowAccent(w) || prof?.color || null, hint, minimized: !!w.minimized,
       onClick: () => wm.focus(w.id) };
   });
 }

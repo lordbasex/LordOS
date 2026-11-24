@@ -759,6 +759,9 @@ EOF
     # the FileChooser portal's dialog: the app's glob filters (Chromium's "*.[pP][dD][fF]") and where it goes (sdk/portalfilemodel.js)
     if have node; then run "portal-file-model-test (sdk/portalfilemodel.js)" node tests/portal_file_model_test.mjs
     else skip "portal-file-model-test" "node"; fi
+    # a Chromium-family browser's profiles from its own Local State (untrusted) and the profile an activity or display picks
+    if have node; then run "browser-profiles-test (sdk/browserprofilemodel.js)" node tests/browser_profiles_test.mjs
+    else skip "browser-profiles-test" "node"; fi
     # (0.8.8.8) a Linux app's global shortcuts: the sheet's rows, the combination a key names, what is refused (sdk/globalshortcutsmodel.js)
     if have node; then run "global-shortcuts-model-test (sdk/globalshortcutsmodel.js)" node tests/global_shortcuts_model_test.mjs
     else skip "global-shortcuts-model-test" "node"; fi
