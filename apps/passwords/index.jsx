@@ -1,7 +1,7 @@
 // Passwords — the LordOS password manager: items by category (a tree, with field templates) and
 // tags, favorites, archived, trash, history, 2FA codes, Wi-Fi with QR, secure notes, cards, the
 // security report, the generator, import/export and the session keyring. Everything decrypted is
-// handled by lord-vault, sandboxed and without network; this window is protected (black in
+// handled by lord-vault, sandboxed and without network; this window is protected (the protected fill in
 // screenshots, recordings and the remote desktop). See docs/PASSWORDS.md.
 // Layout (docs/DESIGN.md): a source list (search, sections, categories, tags), the item list and
 // the detail pane; under 960 px the columns get narrower so nothing is clipped.
@@ -184,7 +184,7 @@ export default function Passwords() {
   const side = useSidebar(SIDE_AT);
   const single = useNarrow(ONE_AT);
 
-  // protected: black in screenshots, recordings, the remote desktop and thumbnails
+  // protected: the protected fill in screenshots, recordings, the remote desktop and thumbnails
   useEffect(() => { if (win?.id) wm.setProtected(win.id, true); }, [win?.id]);
   useEffect(() => { wireEvents(); refreshStatus(); }, []);
   useEffect(() => {

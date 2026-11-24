@@ -11,6 +11,45 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Protected windows, everywhere a picture leaves** (in development; latest release 0.8.9.5; approved by the maintainer on
+  2026-11-23 as isolation layer 8 of the Whonix group, docs/VIRTUALIZATION.md 19.5, and useful for any window). A
+  protected window shows normally on the display and never appears in anything that captures the screen
+  (docs/PRIVACY.md, "Protected windows").
+  - **What a capture shows:** an opaque neutral fill (`PAINT_PROTECT_FILL`) with a small lock and "Protected window" in
+    the person's language (new `privacy.protectedCapture` in all 35 languages, set by the shell through the new
+    `lord.media.setProtectedLabel`), in the window's exact box and corners, the title bar included: partly covered,
+    moved, scaled by the overview, rotated, on any display, on the CPU and GPU paint paths. Up to 0.8.9.5 it was black,
+    and only the content was hidden. A protected Linux full screen is now the fill on its own display only (it cleared
+    every display of a capture of them all).
+  - **One rule at the lowest point:** every picture of the screen that leaves lord-server is painted in capture mode
+    (`paint_capture`, `paint_capture_until`, `paint_capture_node`; `paint_protected_fill` in `ui/paint.c`) or is a copy of
+    one (`media_composed`). Covered: screenshots and `lord.media.screenshot`, a window alone (still refused), screen
+    recording, the remote desktop, the screen-sharing API, the ScreenCast portal (screen and window) and its chooser's
+    thumbnails, the Screenshot and PickColor portals, Wayland popups and full screen.
+  - **Fixed:** a capture through a transform the screen had already rasterized (the overview's scale, an effect, a
+    protected node's own rotation) reused that cached raster, real pixels included: a screenshot or a remote frame taken
+    during the overview showed the protected window. `tf_paint` now paints such a subtree again in capture mode and
+    never keeps that raster.
+  - **The GPU's read-back** for remote viewers is never sent while a protected node is on screen (before, the frame
+    painted right after a protected window opened could go out before the session moved to the CPU path).
+  - **A media source's own pixels** leave only through `media_src_exportable` (`media/capture.c`): `lord.media.saveImage`,
+    `copyImage`, `pixels`, `ocr`, `crop`, `resize` and `rotate` refuse a source shown inside a protected window
+    (`media.protectedWindow`), and so do Remote Desk's card picture and every picture of a machine.
+  - **API:** `wm.open(app, { protected: true })`, or `"protected": true` in a native app's manifest, opens the window
+    protected from its first frame and locked (`wm.setProtected(id, false)` can't undo it); `wm.setProtected(id, on,
+    { lock })`. The flag is on the window's frame (`WindowShell`) and content (`AppHost`). Linux apps can't set it: no
+    Wayland or X11 protocol asks for it, and no client is trusted with it (`sdk/protectmodel.js`).
+  - **Machines:** a machine with the anonymity profile (`machineProtected`: machine.json `profile_lock`, app.json
+    `profile`, a Whonix group) opens its window and its apps-mode windows protected; `lord.vm.protect(session)` (new,
+    one way) refuses its card picture (`lord.vm.snapshot`; the old `thumb.png` is removed), screenshot, recording (one
+    running stops) and snapshot picture, the window doesn't offer Screenshot or Record and stops taking card pictures,
+    and the library card shows no `thumb.png` for it.
+  - **Tests:** `engine-test` `test_protected_transform_cache`, `test_protected_label` and `test_protected_fuzz` (300 random
+    scenes through every capture function at four display scales, both paint paths, the drag layer and a blurred panel:
+    no protected pixel may reach any capture); `tests/protected_headless.sh` (a headless `lord-server-test` with Lord
+    Flow: Calculator opened protected is drawn on the display and is the fill in the screenshot, the remote frame, the
+    portal still and its window share, Notes beside it captured exactly; new test hook `frame`, only in
+    `lord-server-test`); `tests/protect_model_test.mjs`.
 - **Machines: vCPU pinning** (in development; latest release 0.8.9.5). Configure → CPU & memory → *Pin cores*, Off or
   Automatic. With Automatic, `lord-vm` pins each of the machine's vCPU threads to a host CPU of its own and QEMU's other
   threads to the rest, so the machine and the desktop (lord-server, the sound server) don't fight over the same cores

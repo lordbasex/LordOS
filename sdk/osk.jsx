@@ -1,7 +1,7 @@
 // osk.jsx — the on-screen keyboard's panel (docs/ON-SCREEN-KEYBOARD.md): large rounded keys, Shift, two
 // pages of symbols, the theme's colors. startShell mounts it in the `input` layer and the login screen
 // at the end of its tree. `keepFocus`: pressing it leaves the field, and an open menu, as they are.
-// `protected`: it stays black in screenshots, recordings and remote desktop.
+// `protected`: it stays the protected fill in screenshots, recordings and remote desktop.
 //
 // Keys act on release (Backspace and Space on press, and they repeat while held). The rows are always
 // left to right: a keyboard doesn't mirror in Arabic or Hebrew, and each key shows the active layout.

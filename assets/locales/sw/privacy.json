@@ -65,5 +65,6 @@
   "ask.vr": "“{app}” inataka kutumia kifaa cha VR cha kichwani {headset}",
   "ask.vrNote": "Skrini yake inapewa programu hiyo pekee; LordOS haionyeshi kamwe eneo-kazi lako hapo. Inarudishwa programu inapofungwa, kifaa kinapochomolewa au skrini inapofungwa. Unaweza kubadilisha hili baadaye katika Mipangilio → Faragha.",
   "perm.vr": "Vifaa vya VR vya kichwani",
-  "permHint.vr": "Programu zinazoweza kuendesha skrini ya kifaa cha VR cha kichwani moja kwa moja. Vifaa vya kichwani pekee ndivyo vinavyoazimwa, kamwe si skrini zako, na vinarudishwa skrini inapofungwa, unapobadilisha mtumiaji au ukichagua Kataa."
+  "permHint.vr": "Programu zinazoweza kuendesha skrini ya kifaa cha VR cha kichwani moja kwa moja. Vifaa vya kichwani pekee ndivyo vinavyoazimwa, kamwe si skrini zako, na vinarudishwa skrini inapofungwa, unapobadilisha mtumiaji au ukichagua Kataa.",
+  "protectedCapture": "Dirisha lililolindwa"
 }

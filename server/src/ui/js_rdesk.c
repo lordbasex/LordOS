@@ -262,6 +262,7 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     Sess *s = argc > 1 ? get(c, argv[0]) : NULL;
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     if (!m || !m->px || m->w < 1 || m->h < 1 || (size_t)m->w * m->h * 4 > m->map_len) return JS_FALSE;
+    if (!media_src_exportable(m)) return JS_FALSE;      /* shown in a protected window: no card picture of it */
     const char *dev = JS_ToCString(c, argv[1]);
     int ok = dev && !rd_thumb_save(getenv("HOME"), dev, m->px, m->w, m->h, RD_THUMB_W);
     if (dev) JS_FreeCString(c, dev);

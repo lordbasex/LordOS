@@ -1761,7 +1761,7 @@ int portal_cast_thumb(int id, const CastSource *src) {
 /* ---- org.freedesktop.portal.Screenshot (approved by the maintainer 2026-11-22) ----
  * For apps that take screenshots (Flameshot, ksnip): the same chooser as ScreenCast, always interactive whatever the app
  * asks (hw event "portal-shot", sdk/screencast.jsx): a screen, a window or an area the person drags, or Cancel; the
- * picture is painted as a share is (protected windows black), written as a new PNG in the person's Screenshots folder
+ * picture is painted as a share is (protected windows as the fill), written as a new PNG in the person's Screenshots folder
  * (the shell names it) and, for a Flatpak app, lent into its running view (fplend.h) so it gets exactly that file. The
  * indicator says the app took a screenshot (hw event "portal-shot-taken"). PickColor: the person clicks a point; the app
  * gets that pixel's color. The same gate as ScreenCast: an app with "no screen capture" is refused, an unknown program

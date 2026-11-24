@@ -10,7 +10,7 @@
   "timer": "타이머",
   "timerNone": "없음",
   "protectedNote": {
-    "other": "보호된 창 {count}개: 캡처에서 검게 나타납니다"
+    "other": "보호된 창 {count}개: 캡처에서 가려집니다"
   },
   "recent": "최근 항목",
   "hintArea": "드래그하여 영역 선택 · Space: 창 · C: 색상 복사 · T: 텍스트 복사 · Esc: 취소",

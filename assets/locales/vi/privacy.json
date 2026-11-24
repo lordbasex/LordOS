@@ -65,5 +65,6 @@
   "ask.vr": "“{app}” muốn dùng kính VR {headset}",
   "ask.vrNote": "Màn hình của kính chỉ dành cho ứng dụng; LordOS không bao giờ hiện màn hình nền của bạn ở đó. Nó được lấy lại khi ứng dụng đóng, kính bị rút ra hoặc màn hình khóa. Bạn có thể đổi điều này sau trong Cài đặt → Quyền riêng tư.",
   "perm.vr": "Kính VR",
-  "permHint.vr": "Các ứng dụng được điều khiển trực tiếp màn hình của kính VR. Chỉ kính được cho mượn, không bao giờ là màn hình của bạn, và được lấy lại khi màn hình khóa, bạn đổi người dùng hoặc chọn Từ chối."
+  "permHint.vr": "Các ứng dụng được điều khiển trực tiếp màn hình của kính VR. Chỉ kính được cho mượn, không bao giờ là màn hình của bạn, và được lấy lại khi màn hình khóa, bạn đổi người dùng hoặc chọn Từ chối.",
+  "protectedCapture": "Cửa sổ được bảo vệ"
 }

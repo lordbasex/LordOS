@@ -65,5 +65,6 @@
   "ask.vr": "“{app}” mahu menggunakan set kepala VR {headset}",
   "ask.vrNote": "Paparannya diberikan kepada apl itu sahaja; LordOS tidak pernah menunjukkan desktop anda di situ. Ia diambil semula apabila apl ditutup, set kepala dicabut atau skrin dikunci. Anda boleh menukarnya kemudian dalam Tetapan → Privasi.",
   "perm.vr": "Set kepala VR",
-  "permHint.vr": "Apl yang boleh memacu paparan set kepala VR secara terus. Hanya set kepala yang dipinjamkan, tidak sekali-kali monitor anda, dan ia diambil semula apabila skrin dikunci, anda menukar pengguna atau memilih Tolak."
+  "permHint.vr": "Apl yang boleh memacu paparan set kepala VR secara terus. Hanya set kepala yang dipinjamkan, tidak sekali-kali monitor anda, dan ia diambil semula apabila skrin dikunci, anda menukar pengguna atau memilih Tolak.",
+  "protectedCapture": "Tetingkap dilindungi"
 }

@@ -220,6 +220,7 @@ EOF
     if have node; then run "remotecert-test (sdk/remotecert.js)" node tests/remotecert_test.mjs; fi
     if have node; then run "remotedesk-test (sdk/remotedeskmodel.js)" node tests/remotedesk_test.mjs; fi
     if have node; then run "place-model-test (sdk/placemodel.js)" node tests/place_model_test.mjs; fi
+    if have node; then run "protect-model-test (sdk/protectmodel.js, Machines' protected machines)" node tests/protect_model_test.mjs; fi
     run "spectrum-test" build/spectrum-test
     if have node; then run "soundwave-model-test (sdk/soundwavemodel.js, widgetgrid.js pins)" node tests/soundwave_model_test.mjs; fi
     if have node; then run "statusplace-test (sdk/statusplace.js)" node tests/statusplace_test.mjs; fi
@@ -279,6 +280,14 @@ EOF
         0) ok "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test: off, move, resize, lock, shortcuts)" ;;
         77) skip "moddrag" "build/lord-server-test and the default theme (make, npm run build)" ;;
         *) bad "moddrag (tests/moddrag_client.c, moddrag_x11.c, headless lord-server-test)"; cat "$T/out" ;;
+    esac
+    # protected windows (docs/PRIVACY.md): drawn on the display, the protected fill in a screenshot, the remote desktop's
+    # and recording's frame, the Screenshot portal's still and a window shared alone; the other window captured as shown
+    sh tests/protected_headless.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "protected-windows (tests/protected_headless.sh, headless lord-server-test: output, screenshot, mirror, portal, window share)" ;;
+        77) skip "protected-windows" "build/lord-server-test, python3 and node with esbuild (make, npm install)" ;;
+        *) bad "protected-windows (tests/protected_headless.sh, headless lord-server-test)"; cat "$T/out" ;;
     esac
     # launching an app that already runs (a browser's single instance) shows its window, even on a desktop not in view,
     # and a copy running with no window shows a new one (the 2026-11-23 Google Chrome case)

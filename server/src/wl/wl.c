@@ -4678,7 +4678,8 @@ void wl_paint_popups(Canvas *c) {
         if (!origin(popups[i], &x, &y)) continue;
         Surf *top = toplevel_of(popups[i]);
         if (paint_capture_mode && top && node_protected(top->node)) {   /* menu of a protected window */
-            canvas_rrect(c, PVX(x), PVY(y), popups[i]->lw * paint_view.k, popups[i]->lh * paint_view.k, 0, 0xff000000u);
+            static const float r0[4] = { 0, 0, 0, 0 };
+            paint_protected_fill(c, PVX(x), PVY(y), popups[i]->lw * paint_view.k, popups[i]->lh * paint_view.k, r0);
             continue;
         }
         paint_tree(c, popups[i], x, y, 1, (Rect){ -65536, -65536, 65536, 65536 });
@@ -4859,11 +4860,6 @@ static void blit_tree_r(Canvas *c, Surf *s, float x, float y, float sxk, float s
 
 /* CPU path: fullscreen and its menus are copied over the already built frame. */
 void wl_paint_fullscreen(Canvas *out) {
-    if (paint_capture_mode && fs_surf && fs_surf->content && node_protected(fs_surf->node)) {
-        canvas_set_clip(out, (Rect){ 0, 0, out->w, out->h });
-        canvas_clear(out, 0x000000);                /* protected fullscreen: black in the capture */
-        return;
-    }
     if (!fs_surf || !fs_surf->content) return;
     float x, y, sx, sy, fx, fy, fw, fh;
     fs_box(&x, &y, &sx, &sy);
@@ -4871,6 +4867,16 @@ void wl_paint_fullscreen(Canvas *out) {
     /* only on the display it covers (a mirror shows the same rect) */
     double vx1 = paint_view.x + (out->w - paint_view.dx) / paint_view.k, vy1 = paint_view.y + (out->h - paint_view.dy) / paint_view.k;
     if (fx >= vx1 || fy >= vy1 || fx + fw <= paint_view.x || fy + fh <= paint_view.y) return;
+    if (paint_capture_mode && node_protected(fs_surf->node)) {
+        /* a protected window in full screen: the protected fill over the display it covers, its menus with it; the
+         * other displays of a capture of them all keep their own picture */
+        static const float r0[4] = { 0, 0, 0, 0 };
+        Rect oc = out->clip;
+        canvas_set_clip(out, (Rect){ 0, 0, out->w, out->h });
+        paint_protected_fill(out, PVX(fx), PVY(fy), fw * paint_view.k, fh * paint_view.k, r0);
+        canvas_set_clip(out, oc);
+        return;
+    }
     Rect oc = out->clip;
     canvas_set_clip(out, rect_and(oc, (Rect){ (int)floorf(PVX(fx)), (int)floorf(PVY(fy)), (int)ceilf(PVX(fx + fw)), (int)ceilf(PVY(fy + fh)) }));
     blit_tree(out, fs_surf, x, y, sx, sy);

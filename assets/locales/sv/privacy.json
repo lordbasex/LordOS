@@ -65,5 +65,6 @@
   "ask.vr": "”{app}” vill använda VR-headsetet {headset}",
   "ask.vrNote": "Dess skärm går bara till appen; LordOS visar aldrig ditt skrivbord där. Den tas tillbaka när appen stängs, headsetet kopplas ur eller skärmen låses. Du kan ändra detta senare i Inställningar → Integritet.",
   "perm.vr": "VR-headset",
-  "permHint.vr": "Appar som får styra ett VR-headsets skärm direkt. Bara headset lånas ut, aldrig dina bildskärmar, och de tas tillbaka när skärmen låses, du byter användare eller väljer Neka."
+  "permHint.vr": "Appar som får styra ett VR-headsets skärm direkt. Bara headset lånas ut, aldrig dina bildskärmar, och de tas tillbaka när skärmen låses, du byter användare eller väljer Neka.",
+  "protectedCapture": "Skyddat fönster"
 }

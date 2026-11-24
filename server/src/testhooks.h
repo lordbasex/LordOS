@@ -20,6 +20,11 @@
  *                       Xwayland runs
  *   lease plug|unplug   a fake card with a desktop display and a non-desktop one (a VR headset): drm-lease-v1's global,
  *                       its connectors and leases (memfds, never a real card) with the real permission prompt
+ *   frame W [N]         one picture written as $XDG_RUNTIME_DIR/lordos-test-frame-W.ppm (binary PPM): W output, what the
+ *                       headless display shows; screenshot, media_screenshot of the whole screen; mirror, what
+ *                       media_composed hands the remote desktop, the screen-sharing API and the recording; portal, the
+ *                       Screenshot portal's still of the screen (cast_still); window N, a window (node N) shared alone.
+ *                       The protected windows' test (tests/protected_headless.sh, docs/PRIVACY.md)
  *
  * The answer is "ok" or "err <why>". Nothing here reaches a real device, card or another session. */
 #ifndef LORD_TESTHOOKS_H
@@ -36,6 +41,7 @@ typedef struct {
     int  (*xwl)(void);                                           /* the client's end, or -1 */
     int  (*lease)(int plugged);                                  /* 0 on success */
     void (*key)(int code, int down);                             /* a modifier key (testhooks.c checks which) */
+    int  (*frame)(const char *which, long node);                 /* 0 when the picture was written */
 } TestHooks;
 
 int  testhooks_start(const TestHooks *h);   /* after dropping privileges; 0 when the socket listens */

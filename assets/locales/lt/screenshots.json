@@ -10,9 +10,9 @@
   "timer": "Laikmatis",
   "timerNone": "Nėra",
   "protectedNote": {
-    "one": "{count} apsaugotas langas: ekrano kopijose jis matomas juodas",
-    "few": "{count} apsaugoti langai: ekrano kopijose jie matomi juodi",
-    "other": "{count} apsaugotų langų: ekrano kopijose jie matomi juodi"
+    "one": "{count} apsaugotas langas: ekrano kopijose jis paslėptas",
+    "few": "{count} apsaugoti langai: ekrano kopijose jie paslėpti",
+    "other": "{count} apsaugotų langų: ekrano kopijose jie paslėpti"
   },
   "recent": "Naujausios",
   "hintArea": "Vilkite, kad pažymėtumėte sritį · Space: langas · C: kopijuoti spalvą · T: kopijuoti tekstą · Esc: atšaukti",

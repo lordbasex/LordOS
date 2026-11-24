@@ -6,7 +6,7 @@
  *   - the image «sources» that a `media` node (<MediaView>) draws: video frames over
  *     shared memory, decoded photos, screenshots;
  *   - the captures: screen, recording and remote desktop, always with the protected
- *     windows (`protected`) in black. */
+ *     windows (`protected`) as the protected fill. */
 #ifndef LORD_MEDIA_H
 #define LORD_MEDIA_H
 
@@ -64,7 +64,7 @@ int  media_cover_node(float x0, float y0, float x1, float y1);
 /* captures (main.c): after painting the scene and after assembling each frame. */
 void media_scene_painted(const Canvas *scene);
 typedef struct { int x, y, mode; const uint32_t *px; int w, h, hx, hy; } MediaCursor;
-/* Returns what the remote desktop sees (protected windows in black) and feeds the
+/* Returns what the remote desktop sees (protected windows as the protected fill) and feeds the
  * recording. out = the frame already composited (without cursor). */
 const Canvas *media_composed(const Canvas *out, int remote, const MediaCursor *cur);
 

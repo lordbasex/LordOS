@@ -10,9 +10,9 @@
   "timer": "Samowyzwalacz",
   "timerNone": "Brak",
   "protectedNote": {
-    "one": "{count} chronione okno: na zrzutach jest czarne",
-    "few": "{count} chronione okna: na zrzutach są czarne",
-    "many": "{count} chronionych okien: na zrzutach są czarne"
+    "one": "{count} chronione okno: na zrzutach jest ukryte",
+    "few": "{count} chronione okna: na zrzutach są ukryte",
+    "many": "{count} chronionych okien: na zrzutach są ukryte"
   },
   "recent": "Ostatnie",
   "hintArea": "Przeciągnij, aby zaznaczyć obszar · Spacja: okno · C: kopiuj kolor · T: kopiuj tekst · Esc: anuluj",

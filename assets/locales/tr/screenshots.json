@@ -10,8 +10,8 @@
   "timer": "Zamanlayıcı",
   "timerNone": "Yok",
   "protectedNote": {
-    "one": "{count} korumalı pencere: yakalanan görüntülerde siyah görünür",
-    "other": "{count} korumalı pencere: yakalanan görüntülerde siyah görünürler"
+    "one": "{count} korumalı pencere: yakalanan görüntülerde gizlenir",
+    "other": "{count} korumalı pencere: yakalanan görüntülerde gizlenirler"
   },
   "recent": "Son kullanılanlar",
   "hintArea": "Bir alan seçmek için sürükleyin · Boşluk: pencere · C: rengi kopyala · T: metni kopyala · Esc: iptal",

@@ -10,8 +10,8 @@
   "timer": "Temporitzador",
   "timerNone": "Cap",
   "protectedNote": {
-    "one": "{count} finestra protegida: surt en negre a les captures",
-    "other": "{count} finestres protegides: surten en negre a les captures"
+    "one": "{count} finestra protegida: queda amagada a les captures",
+    "other": "{count} finestres protegides: queden amagades a les captures"
   },
   "recent": "Recents",
   "hintArea": "Arrossega per seleccionar una àrea · Espai: finestra · C: copia el color · T: copia el text · Esc: cancel·la",

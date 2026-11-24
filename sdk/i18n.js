@@ -22,6 +22,7 @@ import { fromGlibc, regionFromEnv } from './regionformat.js';
 import { compareNames } from './collate.js';
 import { PLURALS } from './plurals.js';
 import { languageOfLocale } from './localename.js';
+import { protectLabel } from './protectmodel.js';
 
 export const FALLBACK = 'en';
 // The three languages LordOS lists first everywhere (Settings, the login screen, the Imager); the
@@ -292,3 +293,13 @@ export function reloadCatalogs() {
   metas.clear();
   locale.set((l) => ({ ...l }));
 }
+
+// The words under the lock where a protected window is in a capture (lord-server draws them: paint_protected_fill), in
+// the person's language, set again when it changes. Only the desktop's own process has lord.media.setProtectedLabel (an
+// isolated app's has not, and node tests have no lord at all).
+function applyProtectedLabel() {
+  if (typeof lord === 'undefined' || typeof lord.media?.setProtectedLabel !== 'function') return;
+  try { lord.media.setProtectedLabel(protectLabel(t('privacy.protectedCapture'))); } catch (e) { /* not this process's */ }
+}
+applyProtectedLabel();
+locale.subscribe(applyProtectedLabel);

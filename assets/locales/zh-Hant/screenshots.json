@@ -10,7 +10,7 @@
   "timer": "計時器",
   "timerNone": "無",
   "protectedNote": {
-    "other": "{count} 個受保護的視窗：在擷取畫面中會呈現黑色"
+    "other": "{count} 個受保護的視窗：在擷取畫面中會被隱藏"
   },
   "recent": "最近項目",
   "hintArea": "拖移以選取區域 · 空白鍵：視窗 · C：拷貝顏色 · T：拷貝文字 · Esc：取消",

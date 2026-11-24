@@ -4376,6 +4376,7 @@ our own channels:
 | Camera, USB, printers | none (not built anyway) | passthrough is on Whonix's unsafe list |
 | Suspend, memory snapshots, saving at host shutdown | refused | guest memory would land on this computer's disk; Whonix's XML turns suspend off. At host shutdown the guests are shut down (the `vmhoststop.h` plan without the save) |
 | Thumbnail | `thumb.png` not written (`js_vm.c`); the live picture only while running | a picture of the browsing would stay in `~/Machines` |
+| Captures of the screen (isolation layer 8; **built**, in development, approved 2026-11-23) | the members' windows and their apps-mode windows are **protected windows** (PRIVACY.md, "Protected windows"): on the display as usual, an opaque neutral fill with a lock in every screenshot, recording, remote desktop frame, screen share (whole screen or the window) and portal still. `lord.vm.protect(session)` (one way) refuses the card picture (`lord.vm.snapshot`, and the old `thumb.png` is removed), `lord.vm.screenshot`, `lord.vm.record` (one running stops) and a snapshot's picture; the library card never shows a `thumb.png` for it | the Workstation's browsing on screen would otherwise reach any capture, a remote viewer or a share |
 | Guest memory | `memory-backend-memfd,share=off` (4 KB pages with Debian's default `shmem_enabled=never`), `-machine mem-merge=off` (no KSM), no hugetlb | Whonix lists huge pages and KSM as unsafe (rowhammer, cross-VM deduplication). Cost: about 30 % slower random memory access (measured in 3.7.2) |
 | Core dumps | `dump-guest-core=off`, none, non-dumpable, as every machine (3.3) | |
 | Identity | `-uuid` random per group and per Start Fresh; no `-smbios` strings (QEMU's stock "Standard PC (Q35 + ICH9, 2009)"); no disk serial; no first-boot credentials (`type=11`) | unique strings would mark the group; stock values are what every KVM Whonix shows. Whonix's own hostname and machine id inside the guests are left as Whonix sets them |
@@ -4567,7 +4568,8 @@ Clone, Duplicate and Rename of a single member aren't offered; Rename renames th
 folder, as 6.26 does for a machine).
 
 **Machine window:** the Workstation's window is the ordinary one without the locked buttons (clipboard, folders, apps,
-agent). While the Gateway is down, its bar says "No network: the Gateway is off" with **Start Gateway**.
+agent), and without Screenshot and Record. It is a protected window, opened so (built: `model.js` `machineProtected`,
+`library.jsx` `openMachine`, `vmwindow.jsx`, `appsmode.jsx`), and so is the Gateway's. While the Gateway is down, its bar says "No network: the Gateway is off" with **Start Gateway**.
 
 **Configure** for a group: a member switcher (Workstation, Gateway) over the usual one-screen Configure. The anonymity
 rows (19.5) are shown off and dimmed with "Off for anonymity". A Group section has the disposable switch, the order

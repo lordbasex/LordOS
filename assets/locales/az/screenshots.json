@@ -10,8 +10,8 @@
   "timer": "Taymer",
   "timerNone": "Yoxdur",
   "protectedNote": {
-    "one": "{count} qorunan pəncərə: çəkilişlərdə qara görünür",
-    "other": "{count} qorunan pəncərə: çəkilişlərdə qara görünür"
+    "one": "{count} qorunan pəncərə: çəkilişlərdə gizlədilir",
+    "other": "{count} qorunan pəncərə: çəkilişlərdə gizlədilir"
   },
   "recent": "Son",
   "hintArea": "Sahə seçmək üçün sürüşdürün · Boşluq: pəncərə · C: rəngi kopyala · T: mətni kopyala · Esc: ləğv et",

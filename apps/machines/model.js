@@ -665,6 +665,14 @@ export const closeChoice = (meta) => (CLOSE_CHOICES.includes(meta?.onClose) ? me
 // the card picture's path, versioned by its time so the engine loads it again when it changes ('' when none)
 export const thumbSrc = (dir, mtime) => (dir && mtime ? `${dir}/thumb.png#${Math.floor(mtime)}` : '');
 
+// A protected machine (docs/VIRTUALIZATION.md 19.5, docs/PRIVACY.md "Protected windows"): the anonymity profile, as the
+// Whonix members' machine.json profile_lock says it, or as the machine was made with it (app.json profile), or a
+// member of a Whonix group. Its window and its apps-mode windows open protected (a neutral fill with a lock in every
+// capture of the screen), lord.vm.protect keeps its picture from leaving as a picture of its own (no card picture,
+// screenshot, recording or snapshot picture), and its card never shows a thumb.png.
+export const ANONYMITY_PROFILE = 'anonymity';
+export const machineProtected = (m) => !!m && (m.profileLock === ANONYMITY_PROFILE || m.meta?.profile === ANONYMITY_PROFILE || m.group?.kind === 'whonix');
+
 // ---- the guest agent (6.17) ----
 
 // lord-vm's capability bits (vmproto.h VAC_*) → the popover's list: what works now, and what doesn't and why

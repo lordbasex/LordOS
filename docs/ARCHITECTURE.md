@@ -49,7 +49,7 @@ like React Native but on top of our display server.
 | `server/src/tp/`, `wl/wl_input.c`, `js_input.c`, `sdk/trackpad.js` | **done (VM, uinput)** | Our own touchpad and touchscreen driver on evdev (no libinput): pointer acceleration, tap, finger clicks, palm rejection, kinetic scrolling, pinch, swipe; gestures and touches for Wayland apps (see `TRACKPAD.md`) |
 | `server/src/doc/`, `js_doc.c`, `apps/pdf`, `apps/fonts`, `apps/characters` | **M9** | Documents: the sandboxed helper `lord-doc` (Poppler, libarchive, FreeType) and its apps: PDF Viewer, archives and Quick Preview in Files, Fonts, Emoji & Symbols (see `DOCUMENTS.md`) |
 | `server/src/print/`, `js_print.c`, `sdk/printdialog.jsx`, `apps/scanner` | **M9** | Printing: our own IPP client against CUPS, our own mDNS, eSCL scanners, the system print dialog (see `PRINTING.md`) |
-| `server/src/media/`, `js_media.c`, `sdk/media.js`, `apps/{photos,player,screenshots,camera,recorder}` | **M9** | Media: the sandboxed helper `lord-media` (FFmpeg, libva) and the Photos, Player, Screenshots, Camera and Recorder apps; `media` node, audio over shared memory with the PipeWire stream in lord-server, protected windows in screenshots, recording and remote desktop (see `MEDIA.md`) |
+| `server/src/media/`, `js_media.c`, `sdk/media.js`, `apps/{photos,player,screenshots,camera,recorder}` | **M9** | Media: the sandboxed helper `lord-media` (FFmpeg, libva) and the Photos, Player, Screenshots, Camera and Recorder apps; `media` node, audio over shared memory with the PipeWire stream in lord-server, protected windows in every capture (see `MEDIA.md`, `PRIVACY.md`) |
 | `server/src/netperm/`, `server/src/fw/`, `js_fw.c` | **M8** | Per-app firewall: the root service `lord-netperm` enforces the rules with cgroup BPF in the sessions; Rule column in the Monitor and Trusted / Restricted apps in Settings (see `FIREWALL.md`) |
 | `server/src/media/hwdec.c`, `sdk/video.js`, `assets/browser/video/` | **0.8.2** | Video in the browser without hardware decoding: per-boot VP9/AV1 decoding probe, the closed admin action `video-optimize` and LordOS's own Chromium extension that asks YouTube for H.264 and offers a lower quality when video stutters (see `VIDEO.md`) |
 | `server/src/fan/`, `js_fan.c`, `sdk/cooling.jsx` | **M8** | Fans: the root service `lord-fand` drives them by temperature; Settings → Cooling and Monitor → Cooling (see `FANS.md`) |
@@ -431,8 +431,10 @@ other bundle; settings persist on disk.
   without leaving the folder»).
 - Media (videos, music, photos, the camera) are decoded only in `lord-media`, sandboxed and
   without the PipeWire socket. Screen, microphone and camera ask for permission (`sec/perms.c`, checked
-  in C), and protected windows (`wm.setProtected`) come out black in screenshots, recordings and the
-  remote desktop (`MEDIA.md`).
+  in C), and protected windows (`wm.setProtected`, `wm.open`'s `protected`) are an opaque neutral fill with a lock in
+  every picture that leaves the compositor: screenshots, recordings, the remote desktop, screen sharing and portal
+  stills. Every such picture is painted in capture mode (`paint_capture*`) or is a copy of one (`media_composed`), and a
+  media source's own pixels leave only through `media_src_exportable` (`PRIVACY.md`, "Protected windows").
 - Printers: managing queues (add, remove, default) is authorized by CUPS. Only
   users in the `lpadmin` group (the administrators) can do it, identified with PeerCred over
   the unix socket. There is no new root action in `admin.c` (`PRINTING.md`).

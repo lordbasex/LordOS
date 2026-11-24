@@ -63,9 +63,9 @@
     {
       "file": "docs/protected-window-capture.png",
       "caption": {
-        "en": "A protected window comes out black in a LordOS screenshot.",
-        "es": "Una ventana protegida sale en negro en una captura de LordOS.",
-        "pt": "Uma janela protegida sai preta numa captura do LordOS."
+        "en": "A protected window (Calculator, left) comes out as a gray box with a lock in a LordOS screenshot.",
+        "es": "Una ventana protegida (Calculadora, a la izquierda) sale como un recuadro gris con un candado en una captura de LordOS.",
+        "pt": "Uma janela protegida (Calculadora, à esquerda) sai como um quadro cinza com um cadeado numa captura do LordOS."
       }
     },
     {

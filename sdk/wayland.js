@@ -186,7 +186,7 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
       if (kept?.maximized) wm.toggleMaximize(id);
       // app .lpk aislada: su nombre (del manifest) en vez del id
       { const pkg = d.appId ? getApp(d.appId) : null; wm.setTitle(id, pkg && (pkg.package || pkg.isolated) && (!d.title || d.title === d.appId) ? (pkg.isolated ? appName(pkg) : pkg.name) : (d.title || args.tagDescription || d.appId || null)); }
-      // a built-in isolated app that asks for it (manifest "protected": Passwords) is black in captures
+      // a built-in isolated app that asks for it (manifest "protected": Passwords) is the protected fill in captures
       if (d.appId && getApp(d.appId)?.isolated && getApp(d.appId)?.protected) wm.setProtected(id, true);
       wm.setCloseGuard(id, () => { lord.wayland.close(sid); return false; });   // la app decide cuándo cierra
       windowOwnIcon(sid, id);

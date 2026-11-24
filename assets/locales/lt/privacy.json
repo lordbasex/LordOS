@@ -65,5 +65,6 @@
   "ask.vr": "„{app}“ nori naudoti VR akinius {headset}",
   "ask.vrNote": "Jų ekranas atiduodamas tik programai; LordOS niekada ten nerodo jūsų darbalaukio. Jis atimamas, kai programa užsidaro, akiniai atjungiami arba ekranas užrakinamas. Vėliau tai galite pakeisti skiltyje Nustatymai → Privatumas.",
   "perm.vr": "VR akiniai",
-  "permHint.vr": "Programos, galinčios tiesiogiai valdyti VR akinių ekraną. Skolinami tik akiniai, niekada jūsų monitoriai, ir jie atimami, kai ekranas užrakinamas, keičiate naudotoją arba pasirenkate Drausti."
+  "permHint.vr": "Programos, galinčios tiesiogiai valdyti VR akinių ekraną. Skolinami tik akiniai, niekada jūsų monitoriai, ir jie atimami, kai ekranas užrakinamas, keičiate naudotoją arba pasirenkate Drausti.",
+  "protectedCapture": "Apsaugotas langas"
 }

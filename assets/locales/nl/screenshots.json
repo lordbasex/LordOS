@@ -10,8 +10,8 @@
   "timer": "Timer",
   "timerNone": "Geen",
   "protectedNote": {
-    "one": "{count} beschermd venster: het komt zwart in opnamen",
-    "other": "{count} beschermde vensters: ze komen zwart in opnamen"
+    "one": "{count} beschermd venster: het is verborgen in opnamen",
+    "other": "{count} beschermde vensters: ze zijn verborgen in opnamen"
   },
   "recent": "Recent",
   "hintArea": "Sleep om een gebied te selecteren · Spatie: venster · C: kopieer de kleur · T: kopieer tekst · Esc: annuleer",

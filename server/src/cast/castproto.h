@@ -1,7 +1,7 @@
 /* castproto.h — lord-server ↔ lord-screencast, the screen and window sharing helper (see docs/WAYLAND.md,
  * "Sharing a screen or a window", and docs/FLATPAK.md, "ScreenCast").
  *
- * lord-server owns everything that decides: which source, its pixels (protected windows already black), the PipeWire
+ * lord-server owns everything that decides: which source, its pixels (protected windows already the fill), the PipeWire
  * connections (it connects them; the helper can't make a socket). lord-screencast only turns frames into a PipeWire
  * video source node and restricts a client connection to that node:
  *   - the channel is a SOCK_SEQPACKET socketpair on the helper's fd 3: one CastMsg per packet, at most one fd with it;

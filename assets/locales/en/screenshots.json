@@ -10,8 +10,8 @@
   "timer": "Timer",
   "timerNone": "None",
   "protectedNote": {
-    "one": "{count} protected window: it comes out black in captures",
-    "other": "{count} protected windows: they come out black in captures"
+    "one": "{count} protected window: it is hidden in captures",
+    "other": "{count} protected windows: they are hidden in captures"
   },
   "recent": "Recent",
   "hintArea": "Drag to select an area · Space: window · C: copy the color · T: copy text · Esc: cancel",

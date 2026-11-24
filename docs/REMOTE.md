@@ -258,7 +258,7 @@ difference between both over the whole screen is 0.1 levels. The bridge makes th
 the session's rectangle (`enc.c`, the only image code left); it keeps no copy of the screen.
 
 **One encoder per session.** The session's `lord-server` renders as always; the frame the remote
-desktop sees (protected windows in black, from `media_composed`, or the GPU's read-back) goes to a
+desktop sees (protected windows as the protected fill, from `media_composed`, or the GPU's read-back) goes to a
 live encoder: `lord-media` in `MK_STREAM` mode, through a sealed memfd of 3 slots, like the screen
 recording. It uses H.264 with VA-API when the card encodes it, else libx264 (`ultrafast`,
 `zerolatency`, CRF 22 with a bit-rate cap, and the deblocking filter that `ultrafast` turns off), or VP8 with libvpx (`realtime`) for browsers without
@@ -304,7 +304,8 @@ paints over it.
 **The GPU keeps composing.** Until 0.8.3 a remote viewer switched the session to CPU composition.
 Now `gpu_frame` reads the composed frame back (`gpu_read_next`) once, for the encoder and the tiles,
 and the screen keeps its GPU composition. Only two cases still use the CPU path: protected windows on
-screen (they are painted black in a CPU copy of the scene) and screen recording. `LORD_REMOTE_GPU=0`
+screen (they are painted as the protected fill in a CPU copy of the scene, PRIVACY.md "Protected windows"; a read-back
+is never sent while one is on screen) and screen recording. `LORD_REMOTE_GPU=0`
 forces the CPU path. While the remote desktop reads frames back, a fullscreen app is composed rather
 than scanned out directly.
 
@@ -478,7 +479,7 @@ WebRTC-only build:
 | 10 | TURN password: every WebSocket message of a session with the relay, the journal, the config, `status.json`, the session's logs, the bridge's environment | not found (the only journal lines with it were the test harness's own `sudo` commands writing `turn.key`); `turn.key` is root 0600 and unreadable by the user |
 | 11 | TURN over TLS to a relay with a self-signed certificate and no pin | refused ("self-signed certificate"), no relay; with its pinned fingerprint, the relay worked and was the only path |
 | 12 | The bridge while video runs (with a TLS relay) | uid/gid of the user (real, effective, saved), no capabilities, `NoNewPrivs 1`, no shared mapping; descriptors: 0–2 (the journal), the TLS socket, the session socket, the pipe to its root parent, the ICE-TCP handoff listener, and its own UDP and TCP sockets created after the drop |
-| 13 | A protected window (Passwords) opened while a browser watches | black in the video, normal on the monitor |
+| 13 | A protected window (Passwords) opened while a browser watches | black in the video, normal on the monitor (since 2026-11-23 the protected fill with a lock instead of black; `tests/protected_headless.sh` checks the frame `media_composed` gives) |
 
 What stays as it is: ICE-lite answers checks from any allowed address that knows the credentials
 (they only travel inside the authenticated TLS WebSocket), as fast as they come; a relay sees the

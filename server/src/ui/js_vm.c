@@ -1488,6 +1488,7 @@ typedef struct {
     int console_term;                   /* the Shell (6.18): a terminal session on the serial console's stream */
     uint32_t console_seq;
     int rec;                            /* a recording of the picture (6.20): its media source, fed as frames come */
+    int protect;                        /* a protected machine's (lord.vm.protect): its picture never leaves as a picture */
     double rec_fed;
     int rec_sound;                      /* lord-vmdisplay writes the guest's sound into the recording's ring */
     int notice, notice_code, notice_seq; /* VM_NOTICE: VMN_*, its number, a counter of them, and its words */
@@ -1591,6 +1592,14 @@ static Sess *get(JSContext *c, JSValueConst v) {
 
 static int new_slot(void) { for (int i = 0; i < MAX_SESS; i++) if (!sess[i].used) return i; return -1; }
 
+/* May the session's picture leave as a picture of its own (the card's thumb.png, a screenshot, a recording, a snapshot's
+ * picture)? Not a protected machine's (lord.vm.protect), nor one shown inside a protected window: media_src_exportable,
+ * the one gate for a media source's pixels (media/capture.c; docs/PRIVACY.md "Protected windows"). */
+static int pic_out_ok(Sess *s, MediaSrc *m) {
+    if (s && s->protect) { media_src_protect(m); return 0; }
+    return m && media_src_exportable(m);
+}
+
 static int ask(Sess *s, uint16_t type, int a) {
     if (s->vm < 0) return -1;
     VmMsg m = vm_msg(type, ++s->seq, a, 0, 0, 0, NULL);
@@ -1602,6 +1611,13 @@ static void vdsend(Sess *s, int type, int a, int b) {
     vd_send(s->vd, &m, -1);
     /* input ends an idle pace (the helper ends it itself: vmpace.h) */
     if (type == VD_KEY || type == VD_MOTION || type == VD_BUTTON || type == VD_WHEEL || type == VD_REL) vmpace_input(&s->pace);
+}
+
+/* the picture's recording ends now (finished properly: the file keeps what was recorded before), its sound with it */
+static void rec_end(Sess *s, MediaSrc *r) {
+    if (r) media_src_close(r);
+    s->rec = 0;
+    if (s->rec_sound) { vdsend(s, VD_AUDIO_REC, 0, 0); s->rec_sound = 0; }
 }
 
 /* VD_PACE when what the picture needs changed (vm/vmpace.h): a picture no window shows (and nothing records) is taken
@@ -2461,6 +2477,7 @@ static void set_picture(Sess *s, int w, int h) {
     if (m && m->gtex) { m->gtex = NULL; m->gpu_drawn = 0; }
     if (!m) m = media_src_new(SK_IMAGE, "machines");
     if (!m) { munmap(map, len); close(fd); return; }
+    if (s->protect) media_src_protect(m);
     if (m->map) munmap(m->map, m->map_len);
     free(m->cache); m->cache = NULL; m->cache_w = m->cache_h = 0;
     m->map = map; m->map_len = len; m->px = (uint32_t *)map; m->w = w; m->h = h; m->opaque = 1; m->xrgb = 1; m->frame_seq++;
@@ -2613,6 +2630,7 @@ static void from_vd(Sess *s) {
         clock_gettime(CLOCK_MONOTONIC, &ts);
         double now = ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
         if (!r || r->kind != SK_SCREENREC) { s->rec = 0; if (s->rec_sound) { vdsend(s, VD_AUDIO_REC, 0, 0); s->rec_sound = 0; } }
+        else if (!pic_out_ok(s, ms)) rec_end(s, r);         /* the picture became a protected window's: it ends here */
         else if ((frames || now - s->rec_fed > (s->rec_sound ? 1000.0 / 30 : 1000)) && media_framerec_feed(r, ms->px, ms->w, ms->h)) s->rec_fed = now;
     }
 }
@@ -3331,9 +3349,28 @@ static JSValue f_snapshot(JSContext *c, JSValueConst t, int argc, JSValueConst *
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
+    if (m && !pic_out_ok(s, m)) return JS_FALSE;        /* a protected machine has no card picture (thumb.png) */
     media_src_need_cpu(m);              /* a picture shown as a texture: read back now */
     if (!m || !m->px || m->w < 1 || m->h < 1) return JS_FALSE;
     return JS_NewBool(c, !vm_thumb_save_async(s->dir, m->px, m->w, m->h, VM_THUMB_W));
+}
+
+/* protect(session) → bool: the machine is a protected one (Machines: the anonymity profile, docs/VIRTUALIZATION.md 19.5):
+ * from now on, for the session's life, its picture never leaves as a picture of its own (no card picture, screenshot,
+ * recording or snapshot picture; pic_out_ok), a recording running stops, and the card picture it had (thumb.png) is
+ * removed. One way: nothing turns it off. Its windows are protected by the app (wm.open's protected), so the screen's
+ * captures show them as the protected fill. */
+static JSValue f_protect(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    if (!s) return JS_FALSE;
+    s->protect = 1;
+    MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
+    media_src_protect(m);
+    if (s->rec) rec_end(s, media_src_get(s->rec));
+    char p[PATH_MAX + 16];
+    if (s->dir[0] == '/' && snprintf(p, sizeof p, "%s/thumb.png", s->dir) < (int)sizeof p) unlink(p);
+    return JS_TRUE;
 }
 
 /* screenshot(session) → the file's path, or "": the guest's picture at its size, in ~/Pictures/Screenshots as
@@ -3343,6 +3380,7 @@ static JSValue f_screenshot(JSContext *c, JSValueConst t, int argc, JSValueConst
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     const char *home = getenv("HOME");
+    if (m && !pic_out_ok(s, m)) return JS_NewString(c, "");     /* a protected machine: no screenshot of it */
     media_src_need_cpu(m);
     if (!m || !m->px || !home || home[0] != '/') return JS_NewString(c, "");
     char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
@@ -3833,6 +3871,7 @@ static JSValue f_record(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     Sess *s = get(c, argv[0]);
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
     const char *home = getenv("HOME");
+    if (m && !pic_out_ok(s, m)) return JS_NewInt32(c, 0);       /* a protected machine: never recorded */
     media_src_need_cpu(m);              /* the recording reads the picture's memory from now on (gpu_show_ok) */
     if (!m || !m->px || m->w < 16 || m->h < 16 || !home || home[0] != '/' || s->rec) return JS_NewInt32(c, 0);
     char dir[PATH_MAX], name[256], path[PATH_MAX + 260];
@@ -4014,8 +4053,10 @@ static JSValue f_snap_take(JSContext *c, JSValueConst t, int argc, JSValueConst 
     snprintf(file, sizeof file, "%s.png", tag);
     Sess *s = argc >= 3 ? get(c, argv[2]) : NULL;
     MediaSrc *m = s && s->media ? media_src_get(s->media) : NULL;
-    media_src_need_cpu(m);
-    if (m && m->px && m->w > 0 && m->h > 0) vm_png_save(sd, file, m->px, m->w, m->h, 640);
+    int shut = (s && s->protect) || (m && !pic_out_ok(s, m));    /* a protected machine's snapshot keeps no picture */
+    if (!shut) media_src_need_cpu(m);
+    if (shut) { /* nothing: the list shows the snapshot without a picture */ }
+    else if (m && m->px && m->w > 0 && m->h > 0) vm_png_save(sd, file, m->px, m->w, m->h, 640);
     else {
         char from[PATH_MAX + 32], to[PATH_MAX + 96];
         snprintf(from, sizeof from, "%s/thumb.png", dir);
@@ -4471,7 +4512,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
-    JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot),
+    JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),

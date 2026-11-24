@@ -537,7 +537,7 @@ export function PolkitPrompt() {
       : p.local ? t('passwords.polkit.typeHere') : t('passwords.polkit.noKeyboard');
   return h(View, { style: { position: 'absolute', ...mainBox(), alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 100002 } },
-  // the whole prompt is protected: black in every capture, recording, remote desktop and share (the dots count the keys)
+  // the whole prompt is protected: the protected fill in every capture, recording, remote desktop and share (the dots count the keys)
   h(View, { protected: true, style: { width: 420, padding: 18, gap: 10, borderRadius: 14, backgroundColor: th.windowBg, border: `1px solid ${th.separator}`,
     boxShadow: '0 20px 60px rgba(0,0,0,0.5)' } },
   h(Text, { style: { fontSize: 15, fontWeight: 700, color: th.text } }, t('passwords.polkit.title', { app: asker(p) })),

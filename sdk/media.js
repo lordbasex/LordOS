@@ -117,7 +117,7 @@ export const media = {
   poster: (path, maxSize = 512) => job(() => call('poster', path, maxSize)).then((r) => (r.ok ? call('take', r.id) : null)),
   edit: (app, path, out, opts) => job(() => call('edit', app, path, out, opts)),
   transcode: (app, path, out, opts) => job(() => call('transcode', app, path, out, opts)),
-  // screenshots (with protected windows in black). rect: { x, y, width, height } (logical), display (its id),
+  // screenshots (with protected windows as the protected fill). rect: { x, y, width, height } (logical), display (its id),
   // until (wm.frameNode(id): the screen up to that window and nothing above it, the window alone) and also (with
   // until: wm.sheetNodes(id), that window's sheets painted over it). null: the permission prompt was answered no (or
   // there is no lord.media); anything lord-server refuses or can't do throws its code (media.denied.screen,

@@ -65,5 +65,6 @@
   "ask.vr": "Gustong gamitin ng “{app}” ang VR headset na {headset}",
   "ask.vrNote": "Ang display nito ay para lang sa app; hindi kailanman ipinapakita ng LordOS ang desktop mo roon. Binabawi ito kapag nagsara ang app, tinanggal ang headset o nag-lock ang screen. Mababago mo ito mamaya sa Setting → Privacy.",
   "perm.vr": "Mga VR headset",
-  "permHint.vr": "Mga app na puwedeng direktang magpatakbo ng display ng VR headset. Mga headset lang ang ipinapahiram, hindi kailanman ang mga monitor mo, at binabawi kapag nag-lock ang screen, nagpalit ka ng user o pumili ka ng Tanggihan."
+  "permHint.vr": "Mga app na puwedeng direktang magpatakbo ng display ng VR headset. Mga headset lang ang ipinapahiram, hindi kailanman ang mga monitor mo, at binabawi kapag nag-lock ang screen, nagpalit ka ng user o pumili ka ng Tanggihan.",
+  "protectedCapture": "Protektadong window"
 }

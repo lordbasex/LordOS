@@ -474,7 +474,7 @@ a "Don't Allow" saved there wins and stays, and the "no screen capture" restrict
 refuses it before any permission. Settings → Privacy also lists every built-in app whose manifest declares a permission,
 before it ever asked.
 
-The default changes nothing for **protected windows**: they are painted black by lord-server itself in every capture
+The default changes nothing for **protected windows**: they are painted as the protected fill (black up to 0.8.9.5; see "Protected windows" below) by lord-server itself in every capture
 of the screen or of an area, in screen recordings, in a shared screen or window and on the remote desktop, and
 Screenshots never captures a protected window alone (its window capture is refused, `media.protectedWindow`). Passwords' window, the
 on-screen keyboard, a window marked with "Protect the front window" and a Linux window marked so are protected; the lock
@@ -485,10 +485,10 @@ every password field (`TextInput secure`, `sdk/components.jsx`: Wi-Fi, VPN, SSH 
 Users, Sharing, the remote desktop, Databases, Backup, Passwords and the login and lock screens), the keyring's unlock
 prompt (`sdk/vault.js`) and the administrator prompt a Linux app asks for through polkit (`sdk/hardware.jsx`, whose dots
 count the keys), these two whole. LordOS's own administrator actions ask for no password (`admin.c` checks the session
-user's group). A field is black in every capture of the screen or an area, in recordings, on the remote desktop and in
+user's group). A field is the protected fill in every capture of the screen or an area, in recordings, on the remote desktop and in
 shared screens, and the window that holds it is refused captured alone while it does. While anything protected is on
 screen, a remote desktop viewer is composed on the CPU and a visitor of the screen-sharing API can't type into LordOS's
-own windows (`share_key_protected`), as for any protected window. See [MEDIA.md](MEDIA.md), "Protected windows".
+own windows (`share_key_protected`), as for any protected window. See "Protected windows" below and [MEDIA.md](MEDIA.md).
 
 | | |
 |---|---|
@@ -575,6 +575,78 @@ own notice (`RemoteBadge`, docs/REMOTE.md).
 |---|---|
 | ![prompt](privacy-prompt.png) | ![indicator](privacy-indicator-microphone.png) |
 | System prompt (camera) | Before the capture indicator: the orange dot with the app recording |
+
+## Protected windows
+
+**In development** (approved by the maintainer on 2026-11-23, isolation layer 8 of the Whonix group, VIRTUALIZATION.md
+§19; useful for any window). A protected window never appears in anything that captures the screen. On the physical
+display it shows normally; in a capture it is an **opaque neutral fill** (`PAINT_PROTECT_FILL`, r = g = b) with a small
+lock and the label "Protected window" in the person's language (`privacy.protectedCapture`, set by the shell through
+`lord.media.setProtectedLabel`), in the window's exact box and corners: partly covered (what covers it still shows),
+moved, scaled (the overview) or rotated, on any display of a capture of them all, on the CPU and the GPU paint paths.
+Up to 0.8.9.5 the fill was plain black and the theme's title bar stayed visible; now the whole window is the fill.
+
+### Who sets it
+
+| Who | How | Can it be turned off? |
+|---|---|---|
+| A native app | `wm.open(app, { protected: true })`, or `"protected": true` in its manifest (Passwords) | No: locked (`protectLocked`, `sdk/protectmodel.js`) |
+| A native app, later | `wm.setProtected(id, true)` (System Information while serial numbers show; Screenshots' "Protect the front window") | Yes, `wm.setProtected(id, false)`, unless locked (`{ lock: true }` locks it) |
+| Machines | a machine with the anonymity profile (`machineProtected`: machine.json `profile_lock: "anonymity"`, app.json `profile`, a Whonix group): its window and its apps-mode windows open protected and locked, and `lord.vm.protect(session)` | No |
+| A built-in isolated app | its manifest's `"protected"` (`sdk/wayland.js`) | No |
+| A Linux app (Wayland or X11) | never by itself: no Wayland or X11 protocol asks for capture exclusion, and LordOS adds no trust in a client's word | — |
+
+The SDK puts the flag on the window's frame node (`WindowShell`'s visible box, `wm.frameNode`) and on its content node
+(`AppHost`, which also covers full screen and picture-in-picture); the engine keeps it in `Node.protect`
+(`lord.setProp(id, 'protected', bool)`). Password fields and the keyring and polkit prompts are protected nodes too.
+
+### Every path where pixels leave the compositor
+
+The rule is enforced at the lowest common point, so a new path can't forget it: **every picture of the screen that
+leaves lord-server is painted in capture mode, or is a copy of one that was.** Capture mode (`paint_capture_mode`,
+`server/src/ui/paint.c`) is the one place where a protected node becomes the fill (`paint_node_body`, and `tf_paint` for
+a transformed one); a transformed subtree that holds a protected node is always painted again in a capture, never taken
+from the raster the screen's frames cached (that raster has the real pixels: before 2026-11-23 a capture during the
+overview reused it).
+
+| Path | Where | How it is covered |
+|---|---|---|
+| Screenshots, `lord.media.screenshot` (whole screen, a display, an area) | `media/capture.c` `media_screenshot` | `paint_capture` (and `wl_paint_fullscreen` in capture mode: a protected full screen is the fill on its own display only) |
+| A window alone (Screenshots' window capture, `until`) | `paint_capture_until` | refused with nothing painted when the window is, holds or is inside a protected node (`media.protectedWindow`) |
+| Screen recording, the remote desktop (`mirror_frame`), the screen-sharing API (`share.c` takes the mirror's frame) | `main.c` `present_cpu`/`present_memory` → `media_composed` | while any protected node exists, a second canvas painted in capture mode (repainted where the frame changed) is what leaves; with none, the frame itself (no cost) |
+| The GPU's read-back for remote viewers | `main.c` `out_present` | never sent while a protected node exists (`!media_protected_count()`); `cpu_switch` moves the session to the CPU path at the next frame |
+| ScreenCast portal, a screen or a window (`lord-screencast`), and the chooser's thumbnails | `cast/cast.c` `paint_source`, `cast_thumb` | `paint_capture` / `paint_capture_node`: a protected window shared alone is the fill only |
+| Screenshot and PickColor portals | `ui/portalshot.c` → `cast_still` | the same painting as a share |
+| Wayland popups and full screen of a protected Linux window | `wl/wl.c` `wl_paint_popups`, `wl_paint_fullscreen` | the fill (`paint_protected_fill`) in capture mode |
+| A media source's own pixels: `lord.media.saveImage`, `copyImage`, `pixels`, `ocr`, `crop`, `resize`, `rotate` | `ui/js_media.c` | `media_src_exportable`: refused (`media.protectedWindow`) for a source shown in a NODE_MEDIA inside a protected node (minimized too), or marked by its owner; once found, it stays marked |
+| A machine's picture: the card picture (`lord.vm.snapshot` → `thumb.png`), `lord.vm.screenshot`, `lord.vm.record` (and a recording already running), a snapshot's picture (`lord.vm.snapTake`) | `ui/js_vm.c` `pic_out_ok` | refused for a protected session (`lord.vm.protect`, one way; it also removes the old `thumb.png`) or a picture shown in a protected window; the Machines window doesn't ask, and the library card never shows a protected machine's `thumb.png` |
+| Remote Desk's card picture (`lord.rdesk.snapshot`) | `ui/js_rdesk.c` | `media_src_exportable` |
+| Window switcher, overview and Dock previews | painted live on the local screen | shown normally on the display, the fill in any capture of it (they are nodes of the same tree) |
+
+Not a capture path of the compositor: `lord-rdesk` shows *another* computer's screen; X11 apps under Xwayland can read
+each other's windows (never a Wayland or LordOS window); the DRM device is the session's alone and a restricted app is
+denied the framebuffer device.
+
+### Tests
+
+- `build/engine-test`: `test_capture_protected` (the fill, what covers it, the window refused alone),
+  `test_protected_transform_cache` (a protected window under the overview's cached scale and its own cached rotation),
+  `test_protected_label` (the lock and label inside the box, never outside; the label cut and cleaned) and
+  `test_protected_fuzz` (300 random scenes: places, overlaps, radii, a protected frame or only its content, its own scale,
+  rotation and opacity, the overview's scale, a blurred panel over it, the drag layer, the CPU and GPU paths with their
+  caches filled first; each captured whole at 100, 125, 150 and 200 % and at an offset, each window as Screenshots'
+  `until` and shared alone: no capture may hold one protected pixel). `test_damage_fuzz` and `test_damage_pipeline`
+  unchanged.
+- `tests/protected_headless.sh` (run by `make test`): a headless `lord-server-test` with the real Lord Flow opens
+  Calculator protected and Notes beside it; the test hooks (`frame`, `testhooks.h`) write the display's picture, a
+  screenshot, the remote desktop's frame, the Screenshot portal's still and each window shared alone, and
+  `tests/protected_check.py` wants Calculator drawn on the display and the fill everywhere else, Notes identical.
+- `tests/protect_model_test.mjs`: the flag (`sdk/protectmodel.js`: open, reopen, lock, the label) and Machines'
+  `machineProtected`.
+
+| On the display | In a screenshot | What the remote desktop gets |
+|---|---|---|
+| ![screen](protected-window-screen.png) | ![screenshot](protected-window-capture.png) | ![remote](protected-window-remote.png) |
 
 ## Performance (VM 122, 4 vCPU, CPU without GPU)
 
@@ -867,7 +939,7 @@ No Linux app can copy the screen on its own: the compositor offers no capture pr
   launcher's scope), never `/proc/<pid>/comm`; a process it can't identify is "An unknown program", with a warning.
 - **The indicator first.** The screen-sharing indicator shows a pill with Stop for each session, and no frame is sent
   until that pill is on screen. Stop, a lock, a user switch, the shared window closing or the app leaving ends it.
-- **Protected windows stay black**, as in Screenshots: the frames are painted again in capture mode.
+- **Protected windows stay hidden** (the protected fill), as in Screenshots: the frames are painted again in capture mode.
 - **"No screen capture" is refused without a question** (answer 2), and an unknown sender is refused too while any
   app with that restriction runs (`csm_gate`). The PipeWire guard (`sec/pwguard.c`) hides every shared screen's node
   from a restricted app, so it can't read another app's share.

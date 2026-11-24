@@ -10,7 +10,7 @@
   "timer": "Hẹn giờ",
   "timerNone": "Không",
   "protectedNote": {
-    "other": "{count} cửa sổ được bảo vệ: chúng hiện màu đen trong ảnh chụp"
+    "other": "{count} cửa sổ được bảo vệ: chúng bị ẩn trong ảnh chụp"
   },
   "recent": "Gần đây",
   "hintArea": "Kéo để chọn một vùng · Space: cửa sổ · C: sao chép màu · T: sao chép văn bản · Esc: hủy",

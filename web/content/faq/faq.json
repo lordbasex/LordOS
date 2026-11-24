@@ -722,9 +722,9 @@
             "pt": "Posso escolher o que a tecla Print Screen faz?"
           },
           "a": {
-            "en": "Yes, since 0.8.9.5. Open the Screenshots toolbar with ❖⇧5, then Options → Print Screen Key: the whole screen (the default), an area, a window, the toolbar or nothing. Screenshots may capture the screen without asking, since pressing the key is the request; you can still set it to Deny in Settings → Privacy, and protected windows such as Passwords stay black.",
-            "es": "Sí, desde la 0.8.9.5. Abrí la barra de Capturas con ❖⇧5 y elegí Opciones → Tecla Imprimir pantalla: toda la pantalla (por defecto), un área, una ventana, la barra o nada. Capturas puede capturar la pantalla sin preguntar, porque apretar la tecla ya es el pedido; igual podés ponerlo en Denegar en Ajustes → Privacidad, y las ventanas protegidas como Contraseñas siguen en negro.",
-            "pt": "Sim, desde a 0.8.9.5. Abra a barra de Capturas com ❖⇧5 e escolha Opções → Tecla Print Screen: a tela inteira (o padrão), uma área, uma janela, a barra ou nada. Capturas pode capturar a tela sem perguntar, porque apertar a tecla já é o pedido; você ainda pode pôr em Negar em Ajustes → Privacidade, e as janelas protegidas como Senhas continuam pretas."
+            "en": "Yes, since 0.8.9.5. Open the Screenshots toolbar with ❖⇧5, then Options → Print Screen Key: the whole screen (the default), an area, a window, the toolbar or nothing. Screenshots may capture the screen without asking, since pressing the key is the request; you can still set it to Deny in Settings → Privacy, and protected windows such as Passwords stay hidden.",
+            "es": "Sí, desde la 0.8.9.5. Abrí la barra de Capturas con ❖⇧5 y elegí Opciones → Tecla Imprimir pantalla: toda la pantalla (por defecto), un área, una ventana, la barra o nada. Capturas puede capturar la pantalla sin preguntar, porque apretar la tecla ya es el pedido; igual podés ponerlo en Denegar en Ajustes → Privacidad, y las ventanas protegidas como Contraseñas siguen ocultas.",
+            "pt": "Sim, desde a 0.8.9.5. Abra a barra de Capturas com ❖⇧5 e escolha Opções → Tecla Print Screen: a tela inteira (o padrão), uma área, uma janela, a barra ou nada. Capturas pode capturar a tela sem perguntar, porque apertar a tecla já é o pedido; você ainda pode pôr em Negar em Ajustes → Privacidade, e as janelas protegidas como Senhas continuam ocultas."
           }
         },
         {
