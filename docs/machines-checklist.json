@@ -384,8 +384,8 @@
    "item": "Capture mouse (6.25)",
    "status": "🧪",
    "pct": 90,
-   "file": "`capture.js`, `pointerlock.h`; `vm_capture_test.mjs`",
-   "note": "Through `lordvm-dev` only"
+   "file": "`capture.js`, `pointerlock.h`; `vm_capture_test.mjs`, `vmdisplay-test`",
+   "note": "Measured through `lordvm-dev` (relative motion reached the guest's mice). Not seen on the real desktop: headless lord-server reads no input device, so the evdev → pointer lock → `VD_REL` path needs a person's mouse on hardware; a headless window run (2026-11-24) turned capture on and off through the window (lord-vm switched the guest's mouse both ways) but proves nothing about the motion"
   },
   {
    "area": "D",
@@ -735,9 +735,9 @@
    "area": "K",
    "item": "Sentinela watches running machines: sandbox and scope, a Workstation's ways out, crashes, CPU, memory, a Gateway's traffic (docs/SENTINELA.md, \"Machines\")",
    "status": "🧪",
-   "pct": 90,
-   "file": "`sdk/sentinelavm.js`, `vmwatch.h`, `js_vm.c` (`stats`: lord-vm asked over its socket, `SO_PEERCRED`), `monitor/conn.c` (`conn_machines`); `sentinela_vm_test.mjs`, `vmwatch-test`",
-   "note": "*In development*; off by default with the rest of Sentinela; counts only, never the guest's screen, files or addresses; checked with made-up stats and headless scenes, not on a live machine on screen. Added by this audit"
+   "pct": 85,
+   "file": "`sdk/sentinelavm.js`, `vmwatch.h`, `js_vm.c` (`stats`: lord-vm asked over its socket, `SO_PEERCRED`), `monitor/conn.c` (`conn_machines`); `sentinela_vm_test.mjs`, `vmwatch-test`, `sentinela_vm_live.sh`",
+   "note": "*In development*; off by default; counts only. **Run live on 2026-11-24** (`sentinela_vm_live.sh`: a real KVM machine under a headless session, Sentinela on, screenshots): the alert reached the screen, but it was a false one: lord-vm is non-dumpable since QEMU's namespaces (2026-11-23), so lord-server can't read `/proc/<lord-vm>/exe`, never verifies a live machine and raises vmSandbox on every one. Needs a decision on what attests lord-vm (was 90)"
   },
   {
    "area": "L",
@@ -978,8 +978,8 @@
    "name": "System ties",
    "weight": 3,
    "items": 4,
-   "mean": 90.0,
-   "score": 90
+   "mean": 88.75,
+   "score": 89
   },
   {
    "id": "L",
@@ -1007,5 +1007,5 @@
   }
  ],
  "total": 75,
- "total_exact": 74.82
+ "total_exact": 74.79
 }

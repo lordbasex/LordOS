@@ -181,6 +181,14 @@ and local only; the machine rules run in the same 10-second tick as the process 
 
 Never the guest's screen, files, clipboard, logs' text or any address.
 
+**Open (found 2026-11-24 by `server/tests/sentinela_vm_live.sh`, a live machine on screen):** lord-vm calls
+`PR_SET_DUMPABLE 0` since QEMU's namespaces (2026-11-23), and reading `/proc/<pid>/exe` is a ptrace-mode check that a
+non-dumpable process refuses to the person's own programs, lord-server included. So `vm_exe_is` is false for every live
+machine, nothing is ever verified, and after two ticks Sentinela shows vmSandbox ("proof that its engine is the machine's
+own") for each running machine. Failing closed is right, but the alert is false. What could attest lord-vm instead (a
+pidfd lord-server keeps for each lord-vm it starts, with machines it didn't start shown as "not checked"; or lord-sessiond,
+which is root, answering for a pid) is for the maintainer to decide; until then the live run fails on purpose.
+
 **The rules:**
 
 | Rule | Machines | Fires when | Model |
