@@ -11,6 +11,35 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Monitor → GPU, redrawn after the mockup the maintainer approved on 2026-11-24** (in development; latest release
+  0.8.9.5-beta; `docs/MONITOR.md`, "GPU", "The 0.8.9.6 layout"). `apps/monitor/GpuView.jsx`: a chip per GPU (vendor
+  dot, name, three-minute load sparkline, load, temperature, VRAM) and, with two or more GPUs, a One / Side-by-side
+  switch; the card's header with tiles for Load, Temperature (with `temp*_crit`), Power (of `power1_cap`, or
+  `power1_max` on Intel), Fan or Idle (RC6, from i915's `power/rc6_residency_ms` or xe's `gtidle`), Core clock (of the
+  DPM top or `gt_RP0_freq_mhz`), Memory clock and PCIe link ("Gen3 ×16", "of Gen4 ×16" when slower than the slot);
+  utilization by engine (3D, Compute, Video decode, Video encode, Copy) with a 180-sample chart; graphics memory split
+  by the type of process (compute, graphics, video) and free, amdgpu's `mem_busy_percent` and a VRAM chart; the
+  processes using the GPU (App / process, PID, Type, GPU % with a per-engine bar, 3D, Comp, Dec, Enc, Copy, VRAM, GTT,
+  API), with another user's ROCm (KFD) process as a "Hidden" row (pid and name only); and "AI on this computer": model
+  runners (`llama-server`, `llama-cli`, `ollama`, `whisper-*`) with the model's base name from their own `-m`/`--model`,
+  Sentinela's engine (by the pid `lord.sentinela.state()` reports, CPU only), LordOS Voice, LordOS Studio and any of
+  the user's processes mapping a model runtime (`libcuda`, `libamdhip64`, `libggml*`, `libllama`, …) that use the GPU.
+  From a 1100×600 window the tab fits with no scrolling (the table and the AI list show the rows their measured boxes
+  hold, then "+N more"); smaller windows scroll. Light, dark and right to left. The fan by hand and the installed APIs
+  moved behind "Fan and APIs" under the card's name. All 61 new strings in every language.
+- **Monitor → GPU reads less** (`server/src/monitor/gpustat.c`): `/proc` is walked every 5 s (`GPU_RESCAN_MS`) instead
+  of every second; the processes holding a `/dev/dri`, `/dev/kfd` or `/dev/nvidia*` fd are kept with those fds, and each
+  second only their `fdinfo` and `stat` are read again (about 0.45 ms on the RX 580 PC with 8 GPU processes, cards about
+  0.4 ms; it was 15 ms with about 600 processes). A kept process whose start time changed (pid reused) is dropped at
+  once. New fields: PCIe link, `mem_busy_percent`, `temp*_crit`, `power1_max`, i915 RC6 and RP0, xe per-GT frequencies
+  and idle, NVIDIA's `/proc/driver/nvidia/gpus/<slot>/information` (Model and Video BIOS), per-process KFD VRAM, SDMA
+  time and CU occupancy (own processes; gpu id → PCI slot through the KFD topology), `/dev/nvidia<N>` holders, and the
+  base name of a process's `-m` model. Never `pcie_bw`, never debugfs. `gpustat.c` takes lord-nvgpu's `"nv"` through a
+  weak `nvgpu_json` (the helper is built on its own branch); `gpumodel.js` merges it by PCI bus id and pid, range-checked
+  again. Tests: `build/gpustat-test` (fake i915/xe/NVIDIA/KFD trees, malformed link, topology, information and argv,
+  cache, pid reuse, another user; ASan/UBSan clean), `tests/gpu_model_test.mjs` (categories, types, memory split,
+  PCIe generation, RC6 idle, hidden rows, canned and hostile NVML numbers, AI rows, rows that fit), and screenshots with
+  made-up data from `server/tests/gpu_headless.sh`.
 - **A mouse's Back and Forward buttons work in LordOS's own apps (GitHub #234)** (in development; latest release
   0.8.9.5-beta). They reached the desktop as buttons 3 and 4 and were dropped, so that no title bar, button or slider
   took them as a press (#159); only Linux apps (Firefox, Chromium) used them. `runtime/events.js` still keeps them from
