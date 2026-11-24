@@ -4,7 +4,7 @@
 // there, in that activity's layout, wherever the app itself would put them.
 //
 // A launch leaves a pending placement: { key, desk, dk, left, t, owned, rearms }. key is the launcher id the windows
-// will carry (sdk/dock.js launcherIdOf: "desktop:google-chrome.desktop", an app id), or '' when the launcher can't name
+// will carry (sdk/dock.js launcherIdOf: "desktop:google-chrome", an app id), or '' when the launcher can't name
 // it (a Search result that isn't an app): then any new window takes it, as before. A new window takes the newest live
 // placement of its own key, or, failing that, a keyless one, or a Linux or Flatpak app's whose app has shown no window
 // yet when the window's own key names no installed app ("linux:…": its app_id doesn't match the .desktop the person

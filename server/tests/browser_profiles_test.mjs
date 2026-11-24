@@ -4,7 +4,7 @@ import { parseLocalState, skColor, windowProfile, profileChoice, cleanProfileCho
 
 let ok = 0, bad = 0;
 const eq = (name, a, b) => { if (JSON.stringify(a) === JSON.stringify(b)) ok++; else { bad++; console.log(`FAIL ${name}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); } };
-const C = 'desktop:google-chrome.desktop';
+const C = 'desktop:google-chrome';
 
 const ls = (cache) => JSON.stringify({ profile: { info_cache: cache, last_used: 'Profile 1' } });
 eq('profiles in the browser\'s order', parseLocalState(ls({ 'Profile 2': { name: 'Dev', profile_highlight_color: -16744320 }, Default: { name: 'Personal', default_avatar_fill_color: -14776091 } })),
@@ -27,7 +27,7 @@ const profs = { [C]: parseLocalState(ls({ Default: { name: 'Personal' }, 'Profil
 const w = { id: 'linux#5', title: 'Inbox - Google Chrome - Work' };
 eq('title never decides', windowProfile(w, C, profs, new Map()), null);
 eq('a launched window knows its profile', windowProfile(w, C, profs, new Map([['linux#5', 'Profile 1']]))?.name, 'Work');
-eq('not a browser', windowProfile(w, 'desktop:gedit.desktop', profs, new Map([['linux#5', 'Profile 1']])), null);
+eq('not a browser', windowProfile(w, 'desktop:gedit', profs, new Map([['linux#5', 'Profile 1']])), null);
 eq('a bad folder in the map', windowProfile(w, C, profs, new Map([['linux#5', '../x']])), null);
 // the choice: the activity first, then the display by connector
 const prefs = { displays: { 'DP-3': { [C]: 'Profile 2' }, 'bad connector!': { [C]: 'Profile 3' } } };
@@ -35,8 +35,8 @@ eq('activity first', profileChoice(C, { [C]: 'Profile 1' }, prefs, 'DP-3'), 'Pro
 eq('display as fallback', profileChoice(C, {}, prefs, 'DP-3'), 'Profile 2');
 eq('neither', profileChoice(C, {}, prefs, 'HDMI-A-1'), null);
 eq('a bad connector is dropped', cleanDisplayProfiles(prefs), { displays: { 'DP-3': { [C]: 'Profile 2' } } });
-eq('choices: browsers and folder names only', cleanProfileChoices({ [C]: '../../x', 'desktop:gedit.desktop': 'Default', 'desktop:chromium.desktop': 'Default' }), { 'desktop:chromium.desktop': 'Default' });
-eq('known browsers', [isProfileBrowser(C), isProfileBrowser('desktop:firefox-esr.desktop'), isProfileBrowser('__proto__')], [true, false, false]);
+eq('choices: browsers and folder names only', cleanProfileChoices({ [C]: '../../x', 'desktop:gedit': 'Default', 'desktop:chromium': 'Default' }), { 'desktop:chromium': 'Default' });
+eq('known browsers', [isProfileBrowser(C), isProfileBrowser('desktop:firefox-esr'), isProfileBrowser('__proto__')], [true, false, false]);
 
 console.log(`browser-profiles: ${ok} ok, ${bad} failed`);
 process.exit(bad ? 1 : 0);

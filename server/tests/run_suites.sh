@@ -332,6 +332,17 @@ EOF
         77) skip "protected-windows" "build/lord-server-test, python3 and node with esbuild (make, npm install)" ;;
         *) bad "protected-windows (tests/protected_headless.sh, headless lord-server-test)"; cat "$T/out" ;;
     esac
+    # Lord Workspaces: a window launched from a display's bar lands on that display, in that activity and its slot, even
+    # after a profile picker and with another activity in view; a dialog told its parent late goes over it; the bar
+    # marks a minimized window (themes/workspaces/model/launches.js; left to right and right to left)
+    for lp in en ar; do
+        LAUNCHPLACE_LANG=$lp LAUNCHPLACE_DIR="$T/launchplace" sh tests/launchplace_headless.sh >"$T/out" 2>&1
+        case $? in
+            0) ok "launch-placement-$lp (tests/launchplace_headless.sh, headless lord-server-test, a fake Chrome with a profile picker)" ;;
+            77) skip "launch-placement-$lp" "build/lord-server-test, build/launchplace-client, python3 and node with esbuild" ;;
+            *) bad "launch-placement-$lp (tests/launchplace_headless.sh)"; cat "$T/out" ;;
+        esac
+    done
     # launching an app that already runs (a browser's single instance) shows its window, even on a desktop not in view,
     # and a copy running with no window shows a new one (the 2026-11-23 Google Chrome case)
     sh tests/handoff_headless.sh >"$T/out" 2>&1

@@ -20,11 +20,11 @@ export const PROFILE_DIR = /^(Default|Profile [1-9][0-9]{0,3})$/;
 // The browsers whose profiles are read: launcher id → its Local State, relative to the home folder (fixed here, never
 // from the caller). Debian's Chromium and the vendors' packages from the Store (docs/PACKAGES.md "Browser defaults").
 export const BROWSERS = Object.freeze({
-  'desktop:google-chrome.desktop': '.config/google-chrome/Local State',
-  'desktop:google-chrome-beta.desktop': '.config/google-chrome-beta/Local State',
-  'desktop:chromium.desktop': '.config/chromium/Local State',
-  'desktop:brave-browser.desktop': '.config/BraveSoftware/Brave-Browser/Local State',
-  'desktop:microsoft-edge.desktop': '.config/microsoft-edge/Local State',
+  'desktop:google-chrome': '.config/google-chrome/Local State',
+  'desktop:google-chrome-beta': '.config/google-chrome-beta/Local State',
+  'desktop:chromium': '.config/chromium/Local State',
+  'desktop:brave-browser': '.config/BraveSoftware/Brave-Browser/Local State',
+  'desktop:microsoft-edge': '.config/microsoft-edge/Local State',
 });
 export const isProfileBrowser = (key) => Object.prototype.hasOwnProperty.call(BROWSERS, key);
 

@@ -347,9 +347,9 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
 // ---- launches (model/launches.js): where a launched app's windows go ----
 {
   const L = await import('../../themes/workspaces/model/launches.js');
-  const C = 'desktop:google-chrome.desktop';
+  const C = 'desktop:google-chrome';
   let list = L.addLaunch([], { key: C, desk: 'd2', dk: 'DP-3', now: 1000 });
-  eq('launch: another app\'s window does not take it', L.claim(list, 'linux#1', 'desktop:org.gnome.gedit.desktop', 1100), null);
+  eq('launch: another app\'s window does not take it', L.claim(list, 'linux#1', 'desktop:org.gnome.gedit', 1100), null);
   const pk = L.claim(list, 'linux#2', C, 1200);
   eq('launch: the picker takes it (display and activity)', pk && [pk.dk, pk.desk], ['DP-3', 'd2']);
   eq('launch: used up', L.claim(list, 'linux#3', C, 1300), null);
@@ -362,7 +362,7 @@ eq('contrast option: read from the theme options', wsPrefs({ themeOptions: { wor
   let l2 = L.addLaunch([], { key: C, desk: 'd1', dk: 'HDMI-A-1', now: 1000 });
   L.claim(l2, 'p', C, 1100);
   const born = new Map([['b', 8800], ['old', 500], ['x', 8900]]);
-  const keyOf = (id) => ({ b: C, old: C, x: 'desktop:other.desktop' })[id];
+  const keyOf = (id) => ({ b: C, old: C, x: 'desktop:other' })[id];
   const g2 = L.gone(l2, 'p', 9000, born, keyOf, () => false);
   eq('a browser window that came just before the picker closed is claimed', g2.early, ['b']);
   // a window that took a placement long ago and closes: nothing armed

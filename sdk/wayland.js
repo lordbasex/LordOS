@@ -181,7 +181,9 @@ globalThis.__lordWayland = (sid, type, d = {}) => {
         args,
         desktop: owner ? owner.desktop : saved?.desktop ?? desktopOfSurface(sid),    // restored, or still open across a theme switch
       });
-      { const f = wm.get(id); if (f) { mappedAt.set(id, { t: Date.now(), frame: { x: f.x, y: f.y, w: f.w, h: f.h } }); if (mappedAt.size > 256) mappedAt.delete(mappedAt.keys().next().value); } }
+      // when it showed and the size it asked for (not a remembered frame of its app's): a dialog told its parent late
+      mappedAt.set(id, { t: Date.now(), frame: { w, h: hh } });
+      if (mappedAt.size > 256) mappedAt.delete(mappedAt.keys().next().value);
       if (restored) { if (restored.max) wm.toggleMaximize(id); } else saved?.then(id);
       // always on top or kept below: what an X11 app asked for (_NET_WM_STATE_ABOVE / _BELOW), or the layer the
       // window had before a theme switch
