@@ -20,6 +20,7 @@ import { loadProfiles, storeRev } from './store.js';
 import { usePal, has, gb, bytes, gib, OsMark, Bar, Btn, PopMenu, markColors, overlayRoot, vmRefusal, startPrep } from './ui.jsx';
 import { readMeta, readCpuUse, isProtectedMachine } from './meta.js';
 import { CloneSheet } from './clone.jsx';
+import { ExportSheet, ImportExportSheet } from './vmkey.jsx';
 import { withAsk } from './openwith.js';
 import { libraryItems, groupMenu, groupShows } from './group.js';
 import { GroupMark, TorChip, groupLine, groupStateOf, groupColors, startGroup, stopGroup, FreshDialog, GroupSnapDialog, DeleteGroupDialog, RenameGroupDialog, RepairGroupDialog, groupJob, groupWorkText } from './groupui.jsx';
@@ -741,6 +742,8 @@ export function Library() {
   const [usages, setUsages] = useState({});
   const [discard, setDiscard] = useState(null);
   const [copying, setCopying] = useState(null);
+  const [exporting, setExporting] = useState(null);
+  const [importing, setImporting] = useState(false);
   const [query, setQuery] = useState('');
   const [gpuName, setGpuName] = useState('');
   const [s0] = useSettings();
@@ -798,6 +801,7 @@ export function Library() {
     wm.setMenus(winId, [{ label: tr('machines.menu.machine'), items: [
       { label: tr('machines.newMachine'), onClick: () => setPage('new') },
       { label: tr('machines.first.import'), onClick: () => { setNewMode('import'); setPage('new'); } },
+      { label: tr('machines.imp.menu'), onClick: () => setImporting(true) },
       '-',
       { label: tr('machines.set.menu'), onClick: () => openSettings('general') },
       { label: tr('machines.req.menu'), onClick: () => setPage('requirements') },
@@ -877,6 +881,7 @@ export function Library() {
       { label: tr('machines.cmd.configure'), onClick: () => setCfg({ dir: m.dir }) },
       { label: tr('machines.cmd.snapshots'), onClick: () => openSnapshots(m) },
       { label: tr('machines.cmd.clone'), onClick: () => setCopying(m) },
+      { label: tr('machines.cmd.export'), disabled: !a.remove || !!m.group, onClick: () => setExporting(m) },
       { label: tr('machines.cmd.logs'), onClick: () => openLogs(m) },
       { label: tr('machines.cmd.showInFiles'), onClick: () => revealPath(m.dir) },
       ...(m.transfer ? [{ label: tr('machines.tb.transferOpen'), onClick: () => { const x = lord.vm.transferFolder(m.dir); if (x) openFolder(x); } }] : []),
@@ -1030,6 +1035,8 @@ export function Library() {
       </Sheet> : null}
       {copying ? <CloneSheet m={copying} running={stateView(copying.state, copying.reason).active} onClose={() => setCopying(null)}
         onDone={(out) => { setCopying(null); refresh(); if (out?.dir) setSel(out.dir); }} /> : null}
+      {exporting ? <ExportSheet m={exporting} running={stateView(exporting.state, exporting.reason).active} onClose={() => setExporting(null)} /> : null}
+      {importing ? <ImportExportSheet onClose={() => setImporting(false)} onDone={(out) => { setImporting(false); refresh(); if (out?.dir) setSel(out.dir); }} /> : null}
       {discard ? <ConfirmDialog title={tr('machines.discard.title', { name: discard.name })} detail={tr('machines.discard.detail')} okLabel={tr('machines.fail.discardState')} cancelLabel={tr('machines.cancel')} destructive
         onOk={() => { const d = discard; setDiscard(null); follow(lord.vm.discardState(d.dir), d.name); }} onCancel={() => setDiscard(null)} /> : null}
       {fresh ? <FreshDialog item={fresh} onCancel={() => setFresh(null)} onDone={(start) => { const g = fresh; setFresh(null); groupWork(g, 'fresh', start); }} /> : null}

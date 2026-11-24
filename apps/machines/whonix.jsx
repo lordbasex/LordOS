@@ -14,6 +14,7 @@ import { SheetHeader, Pill, Round } from './kit.jsx';
 import { sessionCapMb, archiveMatches } from './group.js';
 import { GroupMark, groupColors } from './groupui.jsx';
 import { OVERHEAD_MB } from './model.js';
+import { newKey } from './keyflow.js';
 
 // the newest release's archive: the releases' folder, that release's folder, its signed SHA-512 list → { name, sha, size,
 // release }. With `only` (a group's own release, to fetch its archive again: 19.6), that release's folder alone
@@ -95,6 +96,7 @@ export function GroupFlow({ step, setStep, dl, host, names, groupNames, onCancel
   const p = usePal();
   const [name, setName] = useState('Whonix');
   const [disp, setDisp] = useState(false);
+  const [encrypt, setEncrypt] = useState(false);   // isolation layer 5: the members' disks encrypted (19.1)
   const [got, setGot] = useState(null);       // { done, total, phase: 'download' | 'verify' | 'unpack' | 'base' }
   const [fail, setFail] = useState('');
   const [job, setJob] = useState(0);
@@ -132,7 +134,10 @@ export function GroupFlow({ step, setStep, dl, host, names, groupNames, onCancel
         if (r) setGot((o) => ({ phase: 'download', total: 0, ...o, done: Math.max(o?.done || 0, r) }));
       }, { quiet: true }));
     } catch (e) { setGot(null); setFail(e.code === 'admin.unavailable' ? tr('machines.dl.noHelper') : e.message || tr('machines.dl.failed')); return; }
-    const id = lord.vm.groupCreate({ catalogId: dl.id, archive, sha512: dl.image.sha, release: dl.image.release || dl.release || '', name: name.trim() });
+    // isolation layer 5 (19.1): the members' disks encrypted under the group's key, kept in the keyring first
+    let keyId;
+    if (encrypt) { try { keyId = await newKey(name.trim()); } catch (e) { setGot(null); setFail(e.message); return; } }
+    const id = lord.vm.groupCreate({ catalogId: dl.id, archive, sha512: dl.image.sha, release: dl.image.release || dl.release || '', name: name.trim(), keyId });
     if (!id) { setFail(tr('machines.new.refused')); return; }
     setGot({ phase: 'verify', done: 0, total: 1 });
     setJob(id);
@@ -164,6 +169,13 @@ export function GroupFlow({ step, setStep, dl, host, names, groupNames, onCancel
           <Text style={{ fontSize: 12, lineHeight: 1.4, color: p.dim, textAlign: 'start' }}>{tr('machines.whonix.disposableHint', { cap: gb(sessionCapMb(members.find((m) => m.role === 'workstation'))) })}</Text>
         </View>
         <Toggle on={disp} onChange={setDisp} />
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, backgroundColor: p.dark ? '#2a1f33' : '#f3ecf7', border: `1px solid ${p.dark ? '#5a3a6e' : '#d7bfe4'}` }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14, fontWeight: 700, color: p.text, textAlign: 'start' }}>{tr('machines.whonix.encrypt')}</Text>
+          <Text style={{ fontSize: 12, lineHeight: 1.4, color: p.dim, textAlign: 'start' }}>{tr('machines.whonix.encryptHint')}</Text>
+        </View>
+        <Toggle on={encrypt} onChange={setEncrypt} />
       </View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <Btn link label={tr('machines.whonix.kvmPage')} onClick={() => openUrl('https://www.whonix.org/wiki/KVM')} />

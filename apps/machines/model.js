@@ -824,7 +824,7 @@ export const machineProtectedOf = (entry, meta, homeProtected = false) =>
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
 // shell: the tools start the agent's shell (6.18, tools 8 / w12); links, notify: they pass the guest's links and
 // notifications on, and this machine takes them (6.12); eventlog: a Windows guest's event logs come in (6.19)
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -858,11 +858,33 @@ export function clipState(agent, cfg) {
   if (caps & AGENT_CAPS.clipNoTool) return 'needsXclip';
   return guestWindows(agent) ? 'needsTools' : 'needsHelper';
 }
+// The LordOS Guest Tools disc (6.17, lordvm.c VAG_DISC): for a Linux guest without a usable qemu-guest-agent.
+// → null (nothing to offer), 'insert' (the popover offers "Install the Agent from a Disc") or 'guide' (the disc is in the
+// drive: the steps to run in the machine). Never for a protected (anonymity) machine, a Windows guest, a machine that is
+// off or whose agent is off, nor when qemu-guest-agent answers and lets Install copy files and run its script.
+export function discOffer(agent, cfg, running, isProtected) {
+  if (!cfg?.agent || !running || isProtected) return null;
+  const caps = agent?.caps || 0;
+  if (caps & AGENT_CAPS.toolsDisc) return 'guide';
+  if (guestWindows(agent)) return null;
+  if (agent?.state === 'connected' && (caps & AGENT_CAPS.exec) && (caps & AGENT_CAPS.files)) return null;
+  return 'insert';
+}
+// what to run in the machine (install.sh on the disc, volume LORDOS_TOOLS): where desktops mount it, and by hand
+export const DISC_LABEL = 'LORDOS_TOOLS';
+export const discCommands = () => [
+  { key: 'debian', cmd: `sh /media/$USER/${DISC_LABEL}/install.sh` },
+  { key: 'others', cmd: `sh /run/media/$USER/${DISC_LABEL}/install.sh` },
+  { key: 'manual', cmd: 'sudo mount -r /dev/sr0 /mnt && sh /mnt/install.sh' },
+];
+// Copy is offered only where it can reach the machine: its clipboard goes toward it (Configure) and a helper there
+// takes it. Before the agent is installed it usually can't: the command is shown to be typed
+export const discCanCopy = (agent, cfg) => clipTo(cfg?.clipboard || 'off') && !!((agent?.caps || 0) & AGENT_CAPS.clipboard);
 // the agent's popover says what to install in the guest: connected, the clipboard on, the helper there without a tool
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w12', linux: '8' };
+export const TOOLS_SHIPPED = { windows: 'w12', linux: '9' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older

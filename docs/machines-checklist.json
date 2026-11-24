@@ -5,11 +5,11 @@
  "items": [
   {
    "area": "A",
-   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 16, lock, `run.json`, crash recovery (3.8, 3.9)",
+   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 17, lock, `run.json`, crash recovery (3.8, 3.9)",
    "status": "✅",
    "pct": 100,
-   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 16`); `vm-test`, `vmgroup-test`",
-   "note": "Schema 16 (*in development*) adds `automation` (6.15); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
+   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 17`); `vm-test`, `vmgroup-test`",
+   "note": "Schema 17 (*in development*) adds `automation` (6.15); 16 the storage keys `disposable`, `encrypted`, `disk_format` and `backup` (6.2, 6.4, 8); 15 `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
   },
   {
    "area": "A",
@@ -85,19 +85,19 @@
   },
   {
    "area": "A",
-   "item": "Files and contracts: `operation.json`, newer schema read-only, suspended-state check (3.5, 3.6)",
+   "item": "Files and contracts: `operation.json`, newer schema read-only, suspended-state check, the export's manifest (3.5, 3.6)",
    "status": "✅",
-   "pct": 90,
-   "file": "`vmops.h` `vm_op_begin`, `machine.c`, `lordvm.c`",
-   "note": "Export manifest not built"
+   "pct": 100,
+   "file": "`vmops.h` `vm_op_begin`, `machine.c`, `lordvm.c` (`cmd_export`, `cmd_import_lordvm`), `vmexport.c`; `vmexport-test`, `vm_storage_test.sh`",
+   "note": "The export's manifest of checksums and the import that checks it (*in development*, 2026-11-24; was 90)"
   },
   {
    "area": "A",
    "item": "Firmware identity kept with the machine; the old code file kept in the folder (3.6)",
-   "status": "🟡",
-   "pct": 40,
-   "file": "`machine.c` (`firmware_sha256`), `lordvm.c`",
-   "note": "Only the hash is recorded and a mismatch logged; the old code file isn't kept. Added by the audit of 2026-11-23"
+   "status": "🧪",
+   "pct": 95,
+   "file": "`machine.c` (`firmware_sha256`), `lordvm.c` (`fw_keep`, `--firmware-update`), `configure.jsx`; `vm_storage_test.sh`",
+   "note": "*In development*: `firmware-code.fd` kept at the first start, used by descriptor after a change (a changed copy never), the explicit move in Configure; checked by pointing a machine at another OVMF build, not with a real package update (was 40)"
   },
   {
    "area": "A",
@@ -390,10 +390,10 @@
   {
    "area": "D",
    "item": "Disposable sessions (6.2)",
-   "status": "🟡",
-   "pct": 25,
-   "file": "`lordvm.c` (the memfd overlay, `session-full`), `group.js`, `configure.jsx`; `vm_group_link.sh`",
-   "note": "Built only for a Whonix group's Workstation (19.7: an empty overlay in memory, capped, paused when full, snapshots refused; *in development*, headless). The feature of 6.2 for any machine (a session thrown away at shutdown, from the window or the library) isn't built (was ❌ 0)"
+   "status": "🧪",
+   "pct": 90,
+   "file": "`lordvm.c` (`session_prepare`, `session_layer`, `session_tpm`), `machine.c` (`disposable`), `configure.jsx`, `storagemodel.js`; `vm_storage_test.sh`, `vm_storage_model_test.mjs`, `vm_group_link.sh`",
+   "note": "*In development*, 2026-11-24: any machine, in memory (capped, paused when full) or on disk (unlinked files), every writable disk, the UEFI variables and the TPM; snapshots and Suspend refused; real QEMU, headless. The switch is in Configure only, not in the window or on the card (was 25)"
   },
   {
    "area": "D",
@@ -401,7 +401,7 @@
    "status": "✅",
    "pct": 90,
    "file": "`lordvm.c` `--clone`, `vmops.c`, `clone.jsx`",
-   "note": "The source must be off; no templates"
+   "note": "The source must be off; no templates. An encrypted machine's Clone keeps its key under the Clone's id (`--new-id`, *in development*)"
   },
   {
    "area": "D",
@@ -414,10 +414,10 @@
   {
    "area": "D",
    "item": "Raw disks, disk encryption, export (`.lordvm`, OVA), backups (6.4, 3.6)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": "Raw only for imports and read-only nodes; encrypted imports refused"
+   "status": "🧪",
+   "pct": 85,
+   "file": "`lordvm.c` (`--disk-format raw`, `cmd_export`, `cmd_import_lordvm`), `vmexport.c`, `vmkeysrv.c`, `backup/engine.c`, `vmkey.jsx`; `vm_storage_test.sh`, `vmexport-test`, `vmkeysrv-test`, `backup-machines-test`",
+   "note": "*In development*, 2026-11-24: raw disk files (never host block devices: decided), encryption (8), Export as `.lordvm` with a checked manifest and as OVA, the import of an export, consistent backups. The OVA never imported into another app; the app's sheets not driven end to end; no bare disk image export (was ❌ 0)"
   },
   {
    "area": "D",
@@ -637,11 +637,11 @@
   },
   {
    "area": "I",
-   "item": "`lordos-guest` 8: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus, the agent's shell, links and notifications (6.12, 6.17, 6.18, 7, 7.1.4)",
+   "item": "`lordos-guest` 9: clipboard (also through a LordOS guest's own lord-server), apps-mode relay, `--stopping`, `perf` over D-Bus, the agent's shell, links and notifications (6.12, 6.17, 6.18, 7, 7.1.4)",
    "status": "✅",
    "pct": 95,
-   "file": "`tools/guest/lordos-guest.c` (`VERSION \"8\"`), `gshell.c`, `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`, `guest_shell_test.sh`",
-   "note": "8 (*in development*) adds the shell (the person's own login shell in a pty, never root) and the links and notifications socket, both checked in a running Debian 13 guest on 2026-11-24; `perf` (7) still not checked in a running guest"
+   "file": "`tools/guest/lordos-guest.c` (`VERSION \"9\"`), `gshell.c`, `perf.c`, `dbusmin.c`, `js_guestwin.c` (`holds_port`); `guest-dbus-test`, `guest_perf_test.sh`, `guest_shell_test.sh`, `guestwin_headless.sh` (`--clip`)",
+   "note": "9 (*in development*; 8 from two branches, joined) adds the shell (the person's own login shell in a pty, never root) and the links and notifications socket, both checked in a running Debian 13 guest on 2026-11-24, and a LordOS desktop's clipboard through its lord-server (only the port's holder, the installed helper; checked on a headless lord-server with a pseudo-terminal as the port, the helper's hello in an installed LordOS 0.8.9 guest under KVM); the helper is non-dumpable; `perf` (7) still not checked in a running guest"
   },
   {
    "area": "I",
@@ -653,11 +653,11 @@
   },
   {
    "area": "I",
-   "item": "Install Agent through qemu-guest-agent; tools updated by themselves (6.17, 7.1.3)",
+   "item": "Install Agent through qemu-guest-agent, or without it from the LordOS Guest Tools disc; tools updated by themselves (6.17, 7.1.3)",
    "status": "✅",
-   "pct": 90,
-   "file": "`lordvm.c` (`guest-file-write`), `model.js` (`TOOLS_SHIPPED`, `toolsAutoStep`)",
-   "note": "No guest with older tools tried"
+   "pct": 95,
+   "file": "`lordvm.c` (`guest-file-write`, `gt_request`), `tools/guest/mkguestiso.c`, `tools/guest/install.sh`, `model.js` (`discOffer`, `TOOLS_SHIPPED`, `toolsAutoStep`); `guesttools-test`, `guest_tools_install_test.sh`, `vm_guest_tools_e2e.sh`",
+   "note": "The disc (*in development*) checked under KVM on 2026-11-24: Debian 13 (no agent → disc → `install.sh` on its console → qemu-guest-agent connected, disc out by itself → Install through qemu-guest-agent) and an installed LordOS 0.8.9 (6.17); Fedora, openSUSE, Arch and Alpine only through `install.sh --plan`; no guest with older tools tried (was 90)"
   },
   {
    "area": "I",
@@ -696,7 +696,7 @@
    "item": "`lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24)",
    "status": "🧪",
    "pct": 85,
-   "file": "`vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 16); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh`",
+   "file": "`vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 17); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh`",
    "note": "*In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. `machines shell` (the agent's shell, checked against a stand-in lord-vm). Not built: exec in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0)"
   },
   {
@@ -782,10 +782,10 @@
   {
    "area": "L",
    "item": "Encrypted machines (8)",
-   "status": "❌",
-   "pct": 0,
-   "file": "encrypted imports are refused",
-   "note": "Nor the line in Security that host swap can hold guest memory"
+   "status": "🧪",
+   "pct": 85,
+   "file": "`lordvm.c` (`key_load_fd`, `key_pipe`, `enc_json`), `vmkeysrv.c`, `js_vm.c` (`keyState`, `keyNew`, `keyEnter`), `keyflow.js`, `vmkey.jsx`; `vm_storage_test.sh`, `vmkeysrv-test`",
+   "note": "*In development*, 2026-11-24: whole machines (disks, UEFI variables, TPM, snapshot memory, session layers) and a Whonix group's members (layer 5); key in the keyring, recovery key in a protected window; no pictures or guest logs kept; Security's swap line. Real QEMU, headless; never run with a live session's keyring on screen. No encrypting an existing machine, no Suspend (was ❌ 0)"
   },
   {
    "area": "M",
@@ -890,8 +890,8 @@
    "name": "Engine, lifecycle, sandbox, display",
    "weight": 14,
    "items": 22,
-   "mean": 85.91,
-   "score": 86
+   "mean": 88.86,
+   "score": 89
   },
   {
    "id": "B",
@@ -914,8 +914,8 @@
    "name": "Snapshots, clones, storage",
    "weight": 9,
    "items": 6,
-   "mean": 60.0,
-   "score": 60
+   "mean": 85.0,
+   "score": 85
   },
   {
    "id": "E",
@@ -954,8 +954,8 @@
    "name": "Guest tools and agent",
    "weight": 7,
    "items": 6,
-   "mean": 90.0,
-   "score": 90
+   "mean": 90.83,
+   "score": 91
   },
   {
    "id": "J",
@@ -978,8 +978,8 @@
    "name": "Privacy and security model",
    "weight": 4,
    "items": 7,
-   "mean": 73.57,
-   "score": 74
+   "mean": 85.71,
+   "score": 86
   },
   {
    "id": "M",
@@ -998,6 +998,6 @@
    "score": 55
   }
  ],
- "total": 77,
- "total_exact": 76.77
+ "total": 80,
+ "total_exact": 79.99
 }

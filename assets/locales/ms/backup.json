@@ -14,6 +14,9 @@
   "never": "Belum ada sandaran",
   "next": "Seterusnya: {when}",
   "lastError": "Sandaran terakhir gagal: {error}",
+  "machinesBusy": {
+    "other": "{count} mesin sedang berjalan: cakeranya dalam sandaran ini adalah daripada sandaran sebelumnya"
+  },
   "todayAt": "hari ini pada {time}",
   "now": "Sandarkan Sekarang",
   "pause": "Jeda",

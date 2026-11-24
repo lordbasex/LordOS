@@ -869,6 +869,37 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('library menu key', typeof en.libraryMenu, 'string');
 }
 
+// ---- the LordOS Guest Tools disc (6.17, lordvm.c VAG_DISC): when the popover offers it, and what it shows ----
+{
+  const fsm = await import('node:fs');
+  const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
+  const C = M.AGENT_CAPS;
+  const cfg = { agent: true, clipboard: 'both' };
+  const waiting = { state: 'waiting', caps: 0 };
+  eq('disc: a running Linux machine with no agent answering → offered', M.discOffer(waiting, cfg, true, false), 'insert');
+  eq('disc: no state yet (just started) → offered', M.discOffer(undefined, cfg, true, false), 'insert');
+  eq('disc: the machine is off → nothing', M.discOffer(waiting, cfg, false, false), null);
+  eq('disc: the agent is off in Configure → nothing', M.discOffer(waiting, { agent: false }, true, false), null);
+  eq('disc: a protected (anonymity) machine → never', M.discOffer(waiting, cfg, true, true), null);
+  eq('disc: the disc is in the drive → the steps', M.discOffer({ state: 'waiting', caps: C.toolsDisc }, cfg, true, false), 'guide');
+  eq('disc: in the drive, but a protected machine → nothing', M.discOffer({ state: 'waiting', caps: C.toolsDisc }, cfg, true, true), null);
+  eq('disc: qemu-guest-agent answers with files and commands → Install goes through it', M.discOffer({ state: 'connected', caps: C.exec | C.files }, cfg, true, false), null);
+  eq('disc: qemu-guest-agent answers without guest-exec (a restricted agent) → offered', M.discOffer({ state: 'connected', caps: C.files }, cfg, true, false), 'insert');
+  eq('disc: a Windows guest → never (its own tools)', M.discOffer({ state: 'connected', caps: 0, system: 'Windows 11 Pro' }, cfg, true, false), null);
+  eq('disc: the toolsDisc bit is lord-vm\'s VAC_TOOLS_DISC', C.toolsDisc, 2097152);
+  const cmds = M.discCommands();
+  eq('disc: three lines (Debian/Ubuntu, others, by hand)', cmds.map((c) => c.key), ['debian', 'others', 'manual']);
+  eq('disc: every line names install.sh on the disc\'s label', cmds.every((c) => /\binstall\.sh$/.test(c.cmd) && (c.key === 'manual' || c.cmd.includes(`/${M.DISC_LABEL}/`))), true);
+  eq('disc: the label is mkguestiso\'s', M.DISC_LABEL, 'LORDOS_TOOLS');
+  eq('disc: no line carries a password or sudo -S', cmds.some((c) => /-S\b|passw/i.test(c.cmd)), false);
+  for (const k of ['debian', 'others', 'manual']) eq(`disc: en has agent.disc.${k}`, typeof en[`agent.disc.${k}`], 'string');
+  for (const k of ['discHint', 'discBtn', 'discErr', 'discTitle', 'discStep', 'discPassword', 'discCopy', 'discOut']) eq(`disc: en has agent.${k}`, typeof en[`agent.${k}`], 'string');
+  eq('disc: Copy only where the clipboard goes toward the guest and a helper takes it', [
+    M.discCanCopy({ caps: C.clipboard }, { clipboard: 'both' }), M.discCanCopy({ caps: C.clipboard }, { clipboard: 'to-guest' }),
+    M.discCanCopy({ caps: C.clipboard }, { clipboard: 'from-guest' }), M.discCanCopy({ caps: 0 }, { clipboard: 'both' }), M.discCanCopy(undefined, undefined),
+  ], [true, true, false, false, false]);
+}
+
 // ---- the LordOS tools: older than the ones shipped (the popover's Update, the bar's dot) ----
 {
   const fsm = await import('node:fs');
