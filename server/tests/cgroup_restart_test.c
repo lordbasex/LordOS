@@ -185,7 +185,8 @@ int main(void) {
     CHECK(cgroup_scope_in_machines("app-lordos-lordos-vm-tor-6f1c0d2e-1111-4222-8333-444455556666.scope"), "a Tor gateway's");
     CHECK(!cgroup_scope_in_machines("app-lordos-firefox.scope") && !cgroup_scope_in_machines("lordos-machines.slice")
           && !cgroup_scope_in_machines("app-lordos-lordos-vm-.scope") && !cgroup_scope_in_machines("app-lordos-lordos-vm-x/../y.scope")
-          && !cgroup_scope_in_machines("app-lordos-lordos-vm-x.slice") && !cgroup_scope_in_machines(NULL), "not a machine's");
+          && !cgroup_scope_in_machines("app-lordos-lordos-vm-x.slice") && !cgroup_scope_in_machines(NULL)
+          && !cgroup_scope_in_machines("app-lordos-lordos-vm-tor-6f1c0d2e-1111-4222-8333-444455556666x.scope"), "not a machine's");
     CHECK(!cgroup_scope_name_ok("lordos-machines.slice"), "nobody may ask to enter the slice itself");
     CHECK(cgroup_session_child_ok("server") && cgroup_session_child_ok("app-lordos-x.scope")
           && cgroup_session_child_ok("lordos-machines.slice/app-lordos-lordos-vm-6f1c0d2e.scope"), "children");

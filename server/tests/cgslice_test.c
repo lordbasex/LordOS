@@ -8,7 +8,11 @@
  * running lord-sessiond or a session. The «client» is a child of this test that moves into the stand-in session's
  * server leaf, drops to the user and asks over a Unix socket in /var/tmp/lordos-slice/, as lord-server's lord-vm does.
  *
- *   sudo build/cgslice-test [uid]      (uid: the user to drop to, default SUDO_UID or 1000; without root it skips) */
+ *   sudo build/cgslice-test [uid]      (uid: the user to drop to, default SUDO_UID or 1000; without root it skips)
+ *   sudo build/cgslice-test serve BINDIR UID
+ *                                      the same stand-in service, answering lord-sessiond's placement requests for
+ *                                      programs from BINDIR until SIGTERM: prints "READY <session folder> <socket>"
+ *                                      (tests/vm_slice.sh starts a real machine through it) */
 #include "../src/sec/cgroup.h"
 
 #include <errno.h>
@@ -20,6 +24,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <poll.h>
 #include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -29,6 +34,9 @@ static int fails, checks;
 
 static char root[96], home_cg[PATH_MAX], sockdir[] = "/var/tmp/lordos-slice", sockpath[100];
 static const char *VMID = "app-lordos-lordos-vm-6f1c0d2e-1111-4222-8333-444455556666.scope";
+
+static volatile sig_atomic_t stop;
+static void on_term(int s) { (void)s; stop = 1; }
 
 static int put(const char *path, const char *v) {
     int fd = open(path, O_WRONLY | O_CLOEXEC);
@@ -110,7 +118,8 @@ static int ask(unsigned uid, const char *name, char *cg_out, size_t cn) {
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IOLBF, 0);
     if (geteuid() != 0) { printf("cgslice-test: skipped: needs root (sudo build/cgslice-test)\n"); return 0; }
-    unsigned uid = argc > 1 ? (unsigned)atoi(argv[1]) : getenv("SUDO_UID") ? (unsigned)atoi(getenv("SUDO_UID")) : 1000;
+    int serve = argc > 3 && !strcmp(argv[1], "serve");
+    unsigned uid = serve ? (unsigned)atoi(argv[3]) : argc > 1 ? (unsigned)atoi(argv[1]) : getenv("SUDO_UID") ? (unsigned)atoi(getenv("SUDO_UID")) : 1000;
     if (uid < 1000 || uid >= 60000) { fprintf(stderr, "cgslice-test: uid %u isn't a person's\n", uid); return 2; }
     {   /* where this process came from (read here: cgroup_self() caches its first answer, and lord-sessiond's code below must see supervisor) */
         char l[PATH_MAX - 32] = "";
@@ -145,6 +154,22 @@ int main(int argc, char **argv) {
     bindir[bl > 0 ? bl : 0] = 0;
     char *slash = strrchr(bindir, '/');
     if (slash) *slash = 0;
+    if (serve) {
+        snprintf(bindir, sizeof bindir, "%s", argv[2]);
+        signal(SIGTERM, on_term);
+        signal(SIGINT, on_term);
+        printf("READY %s %s\n", sess, sockpath);
+        while (!stop) {
+            struct pollfd pf = { lis, POLLIN, 0 };
+            if (poll(&pf, 1, 500) != 1) continue;
+            int cfd = accept(lis, NULL, NULL);
+            if (cfd < 0) continue;
+            int r = cgroup_place_serve(cfd, bindir, 1);
+            printf("placed: %s\n", r ? "refused" : "ok");
+            close(cfd);
+        }
+        goto out;
+    }
 
     /* which lord-netperm runs (cgroup_netperm_current): a stand-in procs file in the scratch folder */
     {

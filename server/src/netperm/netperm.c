@@ -642,7 +642,11 @@ static void scan_session(Session *s) {
     int slice = 0;
     while (d && (e = readdir(d))) {
         if (e->d_type != DT_DIR || e->d_name[0] == '.' || strlen(e->d_name) >= sizeof s->sc[0].name) continue;
-        if (!strcmp(e->d_name, FW_VM_SLICE)) { slice = 1; continue; }
+        if (!strcmp(e->d_name, FW_VM_SLICE)) {     /* only lord-sessiond's (root-owned): never a folder a user made there */
+            struct stat vs;
+            slice = !fstatat(dfd, e->d_name, &vs, AT_SYMLINK_NOFOLLOW) && S_ISDIR(vs.st_mode) && vs.st_uid == 0;
+            continue;
+        }
         char app[FW_APP_MAX];
         if (scope_app(e->d_name, app)) continue;
         if (see_scope(s, dfd, e->d_name, app, 0)) break;

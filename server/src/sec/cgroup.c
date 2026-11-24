@@ -109,7 +109,7 @@ int cgroup_scope_name_ok(const char *name) {
 
 int cgroup_scope_in_machines(const char *name) {
     return cgroup_scope_name_ok(name) && !strncmp(name, VM_SCOPE_PREFIX, sizeof VM_SCOPE_PREFIX - 1)
-        && strlen(name) > sizeof VM_SCOPE_PREFIX - 1 + 6;
+        && strlen(name) > sizeof VM_SCOPE_PREFIX - 1 + 6 && strlen(name) <= sizeof VM_SCOPE_PREFIX - 1 + 4 + 36 + 6;   /* "tor-" and a UUID at most */
 }
 
 /* Ask lord-sessiond (root) over CGROUP_SOCK to move THIS process into the scope. Returns 0 when
