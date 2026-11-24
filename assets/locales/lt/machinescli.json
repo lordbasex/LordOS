@@ -120,7 +120,7 @@
   "execFailed": "{name} nepavyko to paleisti: {why}",
   "outputCut": "Išvestis buvo ilgesnė nei grąžinama: rodoma tik pradžia.",
   "timedOut": "Programai mašinoje {name} baigėsi laikas ir ji sustabdyta.",
-  "cpOnlyFiles": "Galima kopijuoti tik failus: {path} nėra failas.",
+  "cpOnlyFiles": "Kopijuoti galima tik failus ir aplankus: {path} nėra nei vienas, nei kitas.",
   "cpOneSide": "Nurodykite, kuri pusė yra mašina: viena iš dviejų yra PAVADINIMAS:KELIAS, kita – šio kompiuterio failas.",
   "cpOutside": "{path} nėra tarp jūsų failų arba yra apsaugotas.",
   "cpExists": "{path} jau yra: --force jį pakeičia.",

@@ -120,7 +120,7 @@
   "execFailed": "{name} bunu çalıştıramadı: {why}",
   "outputCut": "Çıktı geri gelenden uzundu: yalnızca başı gösteriliyor.",
   "timedOut": "{name} içindeki programın süresi doldu ve durduruldu.",
-  "cpOnlyFiles": "Yalnızca dosyalar kopyalanabilir: {path} bir dosya değil.",
+  "cpOnlyFiles": "Yalnızca dosyalar ve klasörler kopyalanabilir: {path} ikisi de değil.",
   "cpOneSide": "Hangi tarafın makine olduğunu belirtin: biri AD:YOL, diğeri bu bilgisayardaki bir dosya.",
   "cpOutside": "{path} dosyalarınız arasında değil ya da korumalı.",
   "cpExists": "{path} zaten var: --force onu değiştirir.",

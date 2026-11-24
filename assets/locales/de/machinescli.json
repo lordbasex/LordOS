@@ -120,7 +120,7 @@
   "execFailed": "{name} konnte es nicht ausführen: {why}",
   "outputCut": "Die Ausgabe war länger als das, was zurückkommt: nur ihr Anfang wird gezeigt.",
   "timedOut": "Das Programm in {name} hatte keine Zeit mehr und wurde beendet.",
-  "cpOnlyFiles": "Nur Dateien können kopiert werden: {path} ist keine.",
+  "cpOnlyFiles": "Nur Dateien und Ordner können kopiert werden: {path} ist keins von beiden.",
   "cpOneSide": "Sag, welche Seite die Maschine ist: eine der beiden ist NAME:PFAD, die andere eine Datei auf diesem Computer.",
   "cpOutside": "{path} gehört nicht zu deinen Dateien, oder es ist geschützt.",
   "cpExists": "{path} gibt es schon: --force ersetzt es.",

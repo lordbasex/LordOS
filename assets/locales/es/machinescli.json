@@ -120,7 +120,7 @@
   "execFailed": "{name} no pudo ejecutarlo: {why}",
   "outputCut": "La salida era más larga de lo que vuelve: solo se muestra su comienzo.",
   "timedOut": "El programa en {name} se quedó sin tiempo y se detuvo.",
-  "cpOnlyFiles": "Solo se pueden copiar archivos: {path} no lo es.",
+  "cpOnlyFiles": "Solo se pueden copiar archivos y carpetas: {path} no es ninguna de las dos cosas.",
   "cpOneSide": "Indica qué lado es la máquina: uno de los dos es NOMBRE:RUTA, el otro un archivo de esta computadora.",
   "cpOutside": "{path} no está entre tus archivos, o está protegido.",
   "cpExists": "{path} ya existe: --force lo reemplaza.",

@@ -120,7 +120,7 @@
   "execFailed": "Hindi ito napatakbo ng {name}: {why}",
   "outputCut": "Mas mahaba ang output kaysa sa bumalik: ang simula lang ang ipinapakita.",
   "timedOut": "Naubusan ng oras ang program sa {name} at itinigil.",
-  "cpOnlyFiles": "Mga file lang ang makokopya: hindi file ang {path}.",
+  "cpOnlyFiles": "Mga file at folder lang ang maaaring kopyahin: hindi alinman dito ang {path}.",
   "cpOneSide": "Sabihin kung aling panig ang machine: ang isa ay PANGALAN:PATH, ang isa ay file sa computer na ito.",
   "cpOutside": "Wala ang {path} sa iyong mga file, o protektado ito.",
   "cpExists": "Mayroon na ang {path}: pinapalitan ito ng --force.",

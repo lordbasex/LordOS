@@ -120,7 +120,7 @@
   "execFailed": "{name} bunu işə sala bilmədi: {why}",
   "outputCut": "Çıxış geri gələndən uzun idi: yalnız başlanğıcı göstərilir.",
   "timedOut": "{name} içindəki proqramın vaxtı bitdi və dayandırıldı.",
-  "cpOnlyFiles": "Yalnız fayllar kopyalana bilər: {path} fayl deyil.",
+  "cpOnlyFiles": "Yalnız fayllar və qovluqlar köçürülə bilər: {path} heç biri deyil.",
   "cpOneSide": "Hansı tərəfin maşın olduğunu deyin: biri AD:YOL, digəri bu kompüterdəki fayldır.",
   "cpOutside": "{path} fayllarınız arasında deyil və ya qorunur.",
   "cpExists": "{path} artıq mövcuddur: --force onu əvəz edir.",

@@ -120,7 +120,7 @@
   "execFailed": "{name} không chạy được: {why}",
   "outputCut": "Đầu ra dài hơn phần trả về: chỉ hiển thị phần đầu.",
   "timedOut": "Chương trình trong {name} đã hết thời gian và bị dừng.",
-  "cpOnlyFiles": "Chỉ sao chép được tệp: {path} không phải tệp.",
+  "cpOnlyFiles": "Chỉ có thể sao chép tệp và thư mục: {path} không phải cả hai.",
   "cpOneSide": "Hãy cho biết bên nào là máy: một bên là TÊN:ĐƯỜNG_DẪN, bên kia là tệp trên máy tính này.",
   "cpOutside": "{path} không nằm trong các tệp của bạn, hoặc được bảo vệ.",
   "cpExists": "{path} đã tồn tại: --force sẽ thay thế.",
