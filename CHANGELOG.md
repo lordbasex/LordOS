@@ -731,6 +731,16 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     its CPU, a second machine on other cores, a 2-vCPU machine unpinned by default and pinned when chosen, Off kept.
 
 ### Fixed
+- **Machines: an arm64 machine with the compatible devices now boots** (in development; latest release 0.8.9.5-beta;
+  docs/VIRTUALIZATION.md 6.22, 12). Its disks were SATA, and the arm64 UEFI firmware (AAVMF) has no SATA driver, so it
+  stopped at the firmware's shell; every import of another app's arm64 machine starts on these devices. On arm64 they are
+  now NVMe disks (one controller each, the disk's own serial kept) and a USB CD/DVD that can still be changed while it runs:
+  what the firmware starts from and what arm64 guests without virtio drivers carry. Configure and the import's plan say
+  "NVMe" there (two new texts, in every language). Booted on a Raspberry Pi 5 with KVM and emulated, and emulated on a PC.
+- **Machines: the Clone sheet's buttons were cut off** at the Control Center's first size (760×500), and the file pickers
+  of Export and Bring In were drawn inside their sheets, a few lines tall. A sheet is now never taller than its window (its
+  title and buttons stay, its body scrolls), and the pickers cover the window. Every sheet and dialog of the library checked
+  at that size (`server/tests/machines_sheets_headless.sh`).
 - **Machines: a machine started right after a large import timed out** (in development). `qemu-img convert` leaves the
   disk in the page cache, and QEMU's first open of it with `O_DIRECT` waited behind gigabytes of writeback past its 20 s
   to answer QMP. The import now writes the converted disk out (`fsync`) before putting it in place. Found while checking
@@ -1187,6 +1197,14 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 
 ### Tests
 
+- **Two tests made steady on a busy computer** (in development). `webreg-test`'s stand-in web runtime wrote the files the
+  test reads in place, so a loaded computer let the test read an empty one: it now writes them whole and renames them, and
+  each wait for one may last 10 s (it ends as soon as the file is there; its content is still checked). `wlperf`'s frame rate
+  check shared its lord-server with the paint check, which repaints every frame a second time: with a load of about 24 it
+  measured 41–44 frame callbacks a second (45 needed), 57 without it. The subsurface and damage checks now get a lord-server
+  of their own with the paint check; the bound is unchanged.
+- **Machines: the boot matrix's compatible-devices rows** `tcg-compat` and `other-tcg-compat-<arch>`, and two rows of the
+  QEMU arguments test (the compatible devices on arm64, and with a data disk).
 - **Machines: an end-to-end harness, a boot matrix and kill tests** (`tools/vm/e2e/machines/`, its README says how other
   tests use it; docs/VIRTUALIZATION.md 12; in development, the latest release is 0.8.9.5-beta).
   - **The harness** (`mh.py`): a real headless session, `build/lord-server-test` with the real default theme, started in
