@@ -79,7 +79,7 @@ int vm_jail_tool_n(const char *const *reads, int nreads, const char *rw_dir);
  * (vm_nondumpable).
  *
  * Namespaces: user (only the person's uid mapped, so D-Bus peer credentials with lord-vmdisplay still match; no
- * group), mount (the private loader), ipc, uts and net (QEMU's sockets are the ones lord-vm passed; its own namespace
+ * group), mount (the private loader and the noexec remounts), ipc, uts and net (QEMU's sockets are the ones lord-vm passed; its own namespace
  * has only an unconfigured loopback). No pid namespace: GLib (2.84) refuses peer credentials whose pid is 0, which is
  * what QEMU would see of lord-vmdisplay from inside one, and the D-Bus display (picture, input, sound) then can't
  * authenticate (measured 2026-11-23). No cgroup namespace (lord-vm places QEMU). QEMU stays lord-vm's plain child.
@@ -92,9 +92,14 @@ int vm_userns_open(void);
  * all of them are there; 0 (why on stderr) when not, and the child then runs QEMU without them */
 int vm_ns_enter(int userns);
 /* then, before vm_jail_qemu: / private, the private loader (its copy made in tmpdir, a folder on a filesystem that
- * allows exec, or /dev/shm). VMNS_LOADER when it's there; why not on stderr */
-enum { VMNS_LOADER = 1 };
-int vm_ns_setup(const char *tmpdir);
+ * allows exec, or /dev/shm), then the noexec remounts: `disks` (the machine's disks folder, the only one QEMU's
+ * Landlock lets it write) and the temporary and runtime folders (/dev/shm, /tmp, /var/tmp, $XDG_RUNTIME_DIR, for a
+ * kernel without Landlock), each a bind of the folder over itself remounted noexec, nosuid and nodev, so the kernel
+ * refuses to run or map executable a file QEMU wrote, even where seccomp has no listener. Nothing else is mounted.
+ * VMNS_LOADER when the loader is there, VMNS_NOEXEC when the disks folder is noexec; why not on stderr (QEMU still
+ * runs: Landlock and seccomp hold) */
+enum { VMNS_LOADER = 1, VMNS_NOEXEC = 2 };
+int vm_ns_setup(const char *tmpdir, const char *disks);
 /* 1 when the person's programs can't read pid's memory any more (its /proc/<pid>/environ is refused to them) */
 int vm_nondumpable(pid_t pid);
 /* lord-vm, after its children started: VMS_SUPERVISOR_LANDLOCK when applied. xfer_dir (or NULL): the machine's transfer
