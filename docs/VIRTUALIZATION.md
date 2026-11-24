@@ -4572,8 +4572,9 @@ paragraph); Snapshots (take, go back with a snapshot of now first, delete; lord-
 MAC); the storage figure (below); a machine group's card. No JS error in the session. Not covered: apps mode (it needs a
 LordOS guest; its guest side is `guestwin_headless.sh`) and USB.
 
-**Agent kill tests** (the `kills` and `killcopy` flows): qemu-guest-agent killed in the guest (the app's `agentState`
-leaves `connected`, and comes back by itself once the agent runs again); passt killed (lord-vm attaches a new one, "the
+**Agent kill tests** (the `kills` and `killcopy` flows): qemu-guest-agent killed in the guest (lord-vm sees its port
+close and waits for it, `agentState` `waiting`; the guest's systemd started it again at once and Machines reconnected by
+itself); passt killed (lord-vm attaches a new one, "the
 network is back", and the guest resolved names again 1.0 s after the kill); the transfer folder's virtiofsd killed (the
 machine keeps running and its window says "The transfer folder stopped working…", `VMN_SHARE_LOST`, built for this: it
 was in lord-vm's log only); lord-vm itself killed (the library says its supervisor ended, a start recovers it and the log
