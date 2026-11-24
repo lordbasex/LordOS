@@ -6,8 +6,14 @@ import DESC from './programdesc.json' with { type: 'json' };
 const DELETED = ' (deleted)';
 const exePath = (exe) => { const s = String(exe || ''); return s.endsWith(DELETED) ? s.slice(0, -DELETED.length) : s; };
 const base = (exe) => exePath(exe).split('/').pop();
-const SYSTEM_DIRS = ['/usr/', '/bin/', '/sbin/', '/lib/', '/lib64/', '/opt/', '/snap/', '/app/'];
+// root-owned system folders only: never /app (a Flatpak's own tree, as the app sees it), /snap, /opt or a home folder,
+// whose files an app or the person's other programs could name to borrow a trusted description
+const SYSTEM_DIRS = ['/usr/', '/bin/', '/sbin/', '/lib/', '/lib64/'];
 const inSystem = (exe) => SYSTEM_DIRS.some((d) => exePath(exe).startsWith(d));
+// LordOS's own programs live only here (the package's fixed paths)
+const LORDOS_EXE = /^\/usr\/(lib\/lordos\/bin|bin)\/lord-[a-z0-9-]+$/;
+// a process inside an app's sandbox sees its own file tree: its executable's path is the app's to choose
+const sandboxed = (p) => /^(flatpak|lpk):/.test(String(p.app || ''));
 const KEYS = Object.keys(DESC.kernel).sort((a, b) => b.length - a.length);
 
 // A kernel thread's description: the exact name, else the longest key it starts with where the next character isn't a
@@ -26,10 +32,10 @@ export function kernelText(name) {
 export function curatedText(p) {
   const exe = exePath(p.exe);
   const b = base(exe) || '';
-  if (/^lord-/.test(b) && DESC.lordos[b] && (inSystem(exe) || /\/server\/build\/lord-[a-z0-9-]+$/.test(exe))) return { src: 'lordos', text: DESC.lordos[b] };
+  if (/^lord-/.test(b) && DESC.lordos[b] && !sandboxed(p) && LORDOS_EXE.test(exe)) return { src: 'lordos', text: DESC.lordos[b] };
   // another user's process whose program can't be read: its name, for LordOS's services (the root ones)
   if (!exe && DESC.lordos[p.name] && p.prot) return { src: 'lordos', text: DESC.lordos[p.name] };
-  if (b && DESC.programs[b] && inSystem(exe)) return { src: 'program', text: DESC.programs[b] };
+  if (b && DESC.programs[b] && !sandboxed(p) && inSystem(exe)) return { src: 'program', text: DESC.programs[b] };
   // another user's (root's) process whose program can't be read: the well-known ones by their name
   if (!exe && p.name && DESC.programs[p.name] && p.prot !== 'kernel') return { src: 'program', text: DESC.programs[p.name] };
   return null;
@@ -119,7 +125,7 @@ function describeProgram(p, { lang = 'en', apps = [] } = {}) {
   }
   if (c) found.push({ ...c, of: base(p.exe) || p.name, lang: 'en' });
   const b = base(p.exe);
-  if (b && inSystem(p.exe)) { const r = ask('man', b); if (r) found.push({ src: 'man', of: b, text: r.text, lang: r.lang }); }
+  if (b && !sandboxed(p) && inSystem(p.exe)) { const r = ask('man', b); if (r) found.push({ src: 'man', of: b, text: r.text, lang: r.lang }); }
   if (p.unit) { const r = ask('unit', p.unit); if (r) found.push({ src: 'unit', of: p.unit, text: r.text, lang: r.lang }); }
   let pkgDesc = null;
   if (pkg) { const r = ask('pkg', pkg); if (r) found.push((pkgDesc = { src: 'pkg', of: pkg, pkg, text: r.text, long: r.long || '', lang: r.lang })); }
