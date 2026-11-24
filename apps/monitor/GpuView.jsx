@@ -28,6 +28,8 @@ function usePalette() {
   return PALETTE[t.mode === 'dark' ? 'dark' : 'light'];
 }
 
+// a color at about 22 % opacity ('#rrggbb' + alpha; any other form is left as it is, drawn solid by the tint below it)
+const tint = (c) => (/^#[0-9a-f]{6}$/i.test(String(c)) ? `${c}38` : c);
 const pctText = (tr, v) => (v == null ? '—' : tr('monitor.pct', { v: formatNumber(Math.round(v * 100), 0) }));
 const n0 = (v) => formatNumber(Math.round(v), 0);
 
@@ -83,7 +85,7 @@ function Tile({ label, value, small, bar, color, onClick }) {
 function Pill({ text, color }) {
   const t = useTheme();
   return (
-    <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 9, backgroundColor: color ? `${color}38` : t.control }}>
+    <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 9, backgroundColor: color ? tint(color) : t.control }}>
       <Text style={{ fontSize: 10, fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{text}</Text>
     </View>
   );
@@ -277,7 +279,7 @@ function TypeTag({ type }) {
     return <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5, border: `1px dashed ${t.separator}` }}><Text style={{ fontSize: 10, fontWeight: 600, color: t.textDim }}>{tr('monitor.gpu.v.t.hidden')}</Text></View>;
   }
   return (
-    <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5, backgroundColor: `${P[TYPE_COLOR[type] || '3d']}38` }}>
+    <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5, backgroundColor: tint(P[TYPE_COLOR[type] || '3d']) }}>
       <Text style={{ fontSize: 10, fontWeight: 600, color: t.text, whiteSpace: 'nowrap' }}>{tr(`monitor.gpu.v.t.${type}`)}</Text>
     </View>
   );
@@ -467,7 +469,7 @@ export function GpuTab({ fit = false }) {
         const on = k === i && !side;
         return (
           <View key={x.key} onClick={() => { setSel(k); if (side) setMode('one'); }}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, border: `1px solid ${on ? t.accent : t.separator}`, backgroundColor: on ? `${t.accent}38` : cardBg(t) }}>
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 9, border: `1px solid ${on ? t.accent : t.separator}`, backgroundColor: on ? tint(t.accent) : cardBg(t) }}>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: VENDOR[x.driver] || t.accent }} />
             <Text style={{ fontSize: 12, fontWeight: 700, color: t.text, whiteSpace: 'nowrap' }}>{gpuLabel(tr, x).replace(/^(AMD|Intel|NVIDIA) /, '')}</Text>
             <Spark values={h.map((p) => p.busy ?? 0)} color={P['3d']} />
