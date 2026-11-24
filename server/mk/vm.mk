@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -13,6 +13,13 @@ LORDVM_FLAGS := -DVM_LOGIND $(shell pkg-config --cflags libsystemd)
 LORDVM_LIBS := $(shell pkg-config --libs libsystemd)
 LORDVM_SRC += src/vm/vmlogind.c
 endif
+# every system call's name on this computer, from the kernel's own header: lord-vm names the call its QEMU allowlist
+# (vmseccomp.c) stopped. Made at build time, so it is always this architecture's table
+build/gen/vmsysnames.h:
+	@mkdir -p build/gen
+	echo '#include <asm/unistd.h>' | $(CC) -E -dM -x c - | sed -n 's/^#define __NR_\([a-z0-9_]*\) .*/{ "\1", __NR_\1 },/p' | \
+		grep -v -e '"syscalls"' -e '"arch_specific_syscall"' | LC_ALL=C sort >$@.new && [ -s $@.new ] && mv $@.new $@
+VM_HDR += build/gen/vmsysnames.h
 all: build/lord-vm build/lordos-guest
 build/lord-vm: $(LORDVM_SRC) $(VM_HDR)
 	@mkdir -p build
@@ -145,12 +152,19 @@ build/vmlogind-test: tests/vmlogind_test.c src/vm/vmlogind.c src/vm/vmlogind.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 $(shell pkg-config --cflags libsystemd) -o $@ tests/vmlogind_test.c src/vm/vmlogind.c $(shell pkg-config --libs libsystemd)
 	./$@ || { rm -f $@; exit 1; }
 endif
+# QEMU's seccomp allowlist (vmseccomp.c): both architectures' rows (the other one's built against its own kernel header),
+# the dangerous calls absent, and the BPF program run by an interpreter for every machine option; no filter loaded
+test: build/vmseccomp-test
+build/vmseccomp-test: tests/vmseccomp_test.c tests/vmseccomp_other.c src/vm/vmseccomp.c src/vm/vmseccomp.h src/vm/vmsyscalls.h build/gen/vmsysnames.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmseccomp_test.c tests/vmseccomp_other.c src/vm/vmseccomp.c
+	./$@ || { rm -f $@; exit 1; }
 # QEMU's jail as a compromised QEMU finds it (vmsandbox.c's namespaces, private loader, Landlock and seccomp, then
 # exec), and what the person's other programs can't do to it; "skipped" without user namespaces or Landlock ABI 4
 test: build/vm-jail-probe
-build/vm-jail-probe: tests/vm_jail_probe.c src/vm/vmsandbox.c src/vm/vmsandbox.h src/vm/vmproto.h
+build/vm-jail-probe: tests/vm_jail_probe.c src/vm/vmsandbox.c src/vm/vmsandbox.h src/vm/vmproto.h src/vm/vmseccomp.c src/vm/vmseccomp.h src/vm/vmsyscalls.h build/gen/vmsysnames.h
 	@mkdir -p build
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -o $@ tests/vm_jail_probe.c src/vm/vmsandbox.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(WARN) -std=gnu11 -Ibuild/gen -o $@ tests/vm_jail_probe.c src/vm/vmsandbox.c src/vm/vmseccomp.c
 	./$@ || { rm -f $@; exit 1; }
 build/vm-test: tests/vm_test.c src/vm/qmp.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) $(VM_HDR)
 	@mkdir -p build

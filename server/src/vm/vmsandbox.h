@@ -13,14 +13,12 @@
  *     device: the primary node stays refused. Every other machine gets none of it.
  *     A machine with an Intel vGPU (VmQemuJail.vgpu_dev) gets: read, write and ioctls on /dev/vfio/vfio and its own
  *     /dev/vfio/<group> only; read on that mdev's sysfs folder (the real /sys/devices/... path); the iGPU's render node
- *     as above. Our GOP option ROM is under /usr. The VFIO ioctls need nothing from seccomp (a denylist: only TIOCSTI
- *     and TIOCLINUX are refused).
- *   - seccomp, ours: no socket(2) at all (EACCES), no connect, bind, listen or accept (its sockets are the
- *     socketpairs lord-vm passed), no namespaces (unshare, setns, clone with CLONE_NEW*), no new process (fork,
- *     vfork, clone without CLONE_THREAD: QEMU only makes threads, and a vGPU machine's raised locked-memory limit
- *     can't pass to a child), no mount, ptrace,
- *     process_vm_*, bpf, perf_event_open, keyctl, io_uring, userfaultfd, module or kexec calls, no TIOCSTI.
- *     A denylist: QEMU's own allowlist (-sandbox on,...) is applied by QEMU after it starts.
+ *     as above. Our GOP option ROM is under /usr. Seccomp lets it make VFIO's ioctls (type ';') then, and only then.
+ *   - seccomp, ours: an allowlist (vmseccomp.h, the rows in vmsyscalls.h), per architecture and per machine (KVM,
+ *     TCG, 3D, vGPU, a tap): only the calls QEMU was measured to make, ioctl only on its devices' request types,
+ *     threads only, no memory both writable and executable without TCG, signals and limits only on itself, exec only
+ *     of QEMU's own binary by descriptor. No socket(2) (EACCES): its sockets are the ones lord-vm passed. Anything
+ *     else stops QEMU, and lord-vm names the call (the filter's listener). QEMU's own -sandbox stacks on top.
  * lord-vm itself, once QEMU and passt run: Landlock with read and write in the machine's folder and removal in
  * its runtime folder, nothing else. Its children already exist, so this doesn't reach them. */
 #ifndef LORD_VM_SANDBOX_H
@@ -42,6 +40,14 @@ typedef struct {
     const char *vgpu_dev;       /* an Intel GVT-g vGPU (docs/MACHINES-GPU.md Mode A): /sys/bus/mdev/devices/<uuid>, or NULL */
     int vgpu_group;             /* its IOMMU group: /dev/vfio/<group> and the container /dev/vfio/vfio; -1 none */
     const char *vgpu_rom;       /* its option ROM, read (the package's is under /usr already; a test build's may not be) */
+    /* the seccomp allowlist (vmseccomp.h) */
+    int tcg;                    /* TCG: its code buffer is writable and executable */
+    int tap;                    /* a bridged network: the tap's TUN ioctls */
+    int exec_fd;                /* the descriptor of QEMU's binary, the only thing execveat may run then (-1: none) */
+    int learn;                  /* 0; a test build's learn modes (1, 2) */
+    const char *sc_drop;        /* NULL; a test build's row left out (vmseccomp.h) */
+    int *notify_out;            /* NULL: kill as the default action; else the filter's listener comes back here
+                                 * (cloexec; -1 none), for lord-vm alone: the child sends it and closes it before exec */
 } VmQemuJail;
 
 /* In the child, before execve. Returns the VMS_* bits that applied; the caller refuses to exec without

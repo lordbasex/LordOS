@@ -1,6 +1,7 @@
 /* vmsandbox.c — Landlock and seccomp around QEMU and lord-vm (see vmsandbox.h). */
 #include "vmsandbox.h"
 #include "vmproto.h"
+#include "vmseccomp.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -72,7 +73,7 @@ static int rule(int rs, const char *path, uint64_t allow, uint64_t handled) {
     return r;
 }
 
-/* ---- seccomp: QEMU's denylist ---- */
+/* ---- seccomp: the image tools' denylist (qemu-img; QEMU itself has the allowlist, vmseccomp.c) ---- */
 
 #define NR(x) (x)
 static const int deny_eperm[] = {
@@ -98,7 +99,7 @@ static const int deny_eperm[] = {
 
 #define CLONE_NS_FLAGS (CLONE_NEWNS | CLONE_NEWUTS | CLONE_NEWIPC | CLONE_NEWUSER | CLONE_NEWPID | CLONE_NEWNET | CLONE_NEWCGROUP)
 
-static int qemu_filter(struct sock_filter *f, int cap, int threads_only) {
+static int tool_filter(struct sock_filter *f, int cap, int threads_only) {
     int n = 0;
 #define EMIT(s) do { if (n < cap) f[n] = (struct sock_filter)s; n++; } while (0)
 #define LDNR() EMIT(BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)))
@@ -250,12 +251,24 @@ int vm_jail_qemu(const VmQemuJail *j) {
         }
     }
 
+    /* the allowlist (vmseccomp.h), last: from here on only its rows run, until exec and after. With a listener first
+     * (lord-vm names what it stops); where the kernel refuses one, the same rows with kill as the default */
+    if (j->notify_out) *j->notify_out = -1;
     if (VM_AUDIT_ARCH) {
-        static struct sock_filter filt[256];
-        int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]), 1);
-        if (n <= (int)(sizeof filt / sizeof filt[0])) {
+        static struct sock_filter filt[BPF_MAXINSNS];
+        VmScOpts o = { .kvm = j->kvm, .tcg = j->tcg, .render = j->render && j->render[0], .vgpu = j->vgpu_dev && j->vgpu_dev[0],
+                       .tap = j->tap, .self = getpid(), .exec_fd = j->exec_fd, .notify = j->notify_out != NULL, .learn = j->learn,
+                       .drop = j->sc_drop };
+        for (int pass = 0; pass < 2 && !(mask & VMS_SECCOMP_OURS); pass++) {
+            if (pass && (!o.notify || o.learn)) break;
+            if (pass) o.notify = 0;
+            int n = vm_sc_build(&o, filt, BPF_MAXINSNS);
+            if (n <= 0 || n > BPF_MAXINSNS) break;
             struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
-            if (!syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog)) mask |= VMS_SECCOMP_OURS;
+            long r = syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, o.notify ? SECCOMP_FILTER_FLAG_NEW_LISTENER : 0, &prog);
+            if (r < 0) continue;
+            mask |= VMS_SECCOMP_OURS | VMS_SECCOMP_ALLOWLIST;
+            if (o.notify) { mask |= VMS_SECCOMP_NAMED; *j->notify_out = (int)r; }
         }
     }
     return mask;
@@ -264,7 +277,7 @@ int vm_jail_qemu(const VmQemuJail *j) {
 static int apply_seccomp(void) {
     if (!VM_AUDIT_ARCH) return 0;
     static struct sock_filter filt[256];
-    int n = qemu_filter(filt, (int)(sizeof filt / sizeof filt[0]), 0);
+    int n = tool_filter(filt, (int)(sizeof filt / sizeof filt[0]), 0);
     if (n > (int)(sizeof filt / sizeof filt[0])) return 0;
     struct sock_fprog prog = { .len = (unsigned short)n, .filter = filt };
     return !syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog) ? VMS_SECCOMP_OURS : 0;

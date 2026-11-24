@@ -317,6 +317,8 @@ enum {
                              * such a machine can't be suspended or snapshotted with its memory (virgl can't be migrated) */
     VMS_NAMESPACES = 1024,  /* QEMU in its own user, mount, ipc, uts and net namespaces (vmsandbox.h) */
     VMS_NONDUMPABLE = 2048, /* QEMU non-dumpable, checked after exec: the person's programs can't read its memory */
+    VMS_SECCOMP_ALLOWLIST = 4096, /* our seccomp on QEMU is the allowlist (vmseccomp.h) */
+    VMS_SECCOMP_NAMED = 8192,     /* lord-vm holds its listener: a call it stops is named in the log and failure page */
 };
 /* VM_INFO d: cgroups */
 enum {

@@ -15,6 +15,11 @@ typedef struct {
     size_t n;
     int overflow;           /* skipping the rest of an over-long line */
     unsigned long long lines, refused;
+    /* while the handshake waits: another descriptor to serve (lord-vm's seccomp listener, vmseccomp.h). side(arg)
+     * returns nonzero when QEMU was stopped (its words in err); -1 none */
+    int side_fd;
+    int (*side)(void *arg, char *err, size_t errlen);
+    void *side_arg;
 } Qmp;
 
 int  qmp_open(Qmp *q, int fd);

@@ -25,6 +25,7 @@
 #include "vmproto.h"
 #include "vmmem.h"
 #include "vmsandbox.h"
+#include "vmseccomp.h"
 #include "vmops.h"
 #include "vmagent.h"
 #include "vmimport.h"
@@ -1092,6 +1093,12 @@ static struct {
     VmPinPlan pin;
     int pin_on, pin_q, pin_dfd, pin_n;
     int pin_tids[VMPIN_VCPUS];
+    /* QEMU's seccomp allowlist (vmseccomp.h): its listener, where a call the allowlist stops arrives before it runs;
+     * that call's name, for the log and the failure page; a test build's learn mode and what it logged already */
+    int sc_fd, sc_learn;
+    char sc_blocked[200];
+    uint64_t sc_seen[512];
+    int sc_nseen;
 } S;
 
 /* what the guest said of the transfer folder */
@@ -1331,6 +1338,94 @@ static long read_oom_kills(void) {
     buf[n] = 0;
     char *p = strstr(buf, "oom_kill ");
     return p ? atol(p + 9) : 0;
+}
+
+/* ---- QEMU's seccomp allowlist: what it stops (vmseccomp.h) ---- */
+
+/* a test build's learn modes (LORDVM_TEST_SECCOMP=learn|learn-all), and drop:NAME (that row left out, to see the stop
+ * named): the package's lord-vm has none of them */
+static int sc_learn_mode(void) {
+#ifdef LORDVM_TEST_PATHS
+    const char *v = getenv("LORDVM_TEST_SECCOMP");
+    if (v && !strcmp(v, "learn")) return 1;
+    if (v && !strcmp(v, "learn-all")) return 2;
+#endif
+    return 0;
+}
+static const char *sc_drop_row(void) {
+#ifdef LORDVM_TEST_PATHS
+    const char *v = getenv("LORDVM_TEST_SECCOMP");
+    if (v && !strncmp(v, "drop:", 5) && v[5]) return v + 5;
+#endif
+    return NULL;
+}
+
+/* the notifications waiting on QEMU's listener. A call the allowlist stops: QEMU is killed before it runs, and its
+ * name is kept for the failure page. 1 when QEMU was stopped. Learn mode: logged once, and it goes on */
+static int sc_serve(void) {
+    static struct seccomp_notif_sizes sz;
+    static int have_sz;
+    if (S.sc_fd < 0) return 0;
+    if (!have_sz) {
+        if (syscall(SYS_seccomp, SECCOMP_GET_NOTIF_SIZES, 0, &sz)) return 0;
+        have_sz = 1;
+    }
+    char req_b[512], resp_b[256];
+    if (sz.seccomp_notif > sizeof req_b || sz.seccomp_notif_resp > sizeof resp_b) return 0;
+    struct seccomp_notif *req = (struct seccomp_notif *)req_b;
+    struct seccomp_notif_resp *resp = (struct seccomp_notif_resp *)resp_b;
+    int stopped = 0;
+    for (int k = 0; k < 256; k++) {
+        struct pollfd pf = { S.sc_fd, POLLIN, 0 };
+        if (poll(&pf, 1, 0) <= 0) break;
+        if (pf.revents & (POLLHUP | POLLERR) && !(pf.revents & POLLIN)) { close(S.sc_fd); S.sc_fd = -1; break; }
+        memset(req_b, 0, sizeof req_b);
+        if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_RECV, req)) {
+            if (errno == EINTR || errno == ENOENT) continue;
+            break;
+        }
+        char what[160];
+        vm_sc_describe(&req->data, what, sizeof what);
+        memset(resp_b, 0, sizeof resp_b);
+        resp->id = req->id;
+        if (S.sc_learn) {
+            uint64_t key = vm_sc_learn_key(&req->data);
+            int seen = 0;
+            for (int i = 0; i < S.sc_nseen; i++) if (S.sc_seen[i] == key) { seen = 1; break; }
+            if (!seen) {
+                if (S.sc_nseen < (int)(sizeof S.sc_seen / sizeof S.sc_seen[0])) S.sc_seen[S.sc_nseen++] = key;
+                vlog("seccomp learn: %s", what);
+            }
+            resp->flags = SECCOMP_USER_NOTIF_FLAG_CONTINUE;
+        } else {
+            /* the call waits in the kernel: QEMU goes first, the call never runs */
+            if (S.qemu > 0 && !S.qemu_done) kill(S.qemu, SIGKILL);
+            /* the page names the call (and an ioctl's request, a prctl option, memory rights); the log has the rest */
+            if (!S.sc_blocked[0]) {
+                const char *nm = vm_sc_name(req->data.nr);
+                int argful = !nm || strstr(what, " with ") || strstr(what, "ioctl 0x") || strstr(what, "prctl option");
+                char shortw[96];
+                if (argful) snprintf(shortw, sizeof shortw, "%.80s", what);
+                else snprintf(shortw, sizeof shortw, "%s", nm);
+                char *on = strstr(shortw, " on descriptor");
+                if (on) *on = 0;
+                snprintf(S.sc_blocked, sizeof S.sc_blocked, "blocked by the sandbox: %s", shortw);
+            }
+            vlog("seccomp: QEMU made a call its allowlist doesn't have (thread %u): %s; QEMU was stopped", (unsigned)req->pid, what);
+            resp->error = -EPERM;
+            stopped = 1;
+        }
+        if (ioctl(S.sc_fd, SECCOMP_IOCTL_NOTIF_SEND, resp) && errno != ENOENT && S.sc_learn) vlog("seccomp learn: can't answer: %s", strerror(errno));
+    }
+    return stopped;
+}
+
+/* the handshake's side descriptor (qmp.h) */
+static int sc_side(void *arg, char *err, size_t errlen) {
+    (void)arg;
+    if (!sc_serve()) return 0;
+    snprintf(err, errlen, "%s", S.sc_blocked);
+    return 1;
 }
 
 /* ---- starting ---- */
@@ -2251,6 +2346,9 @@ static int start_machine(void) {
     run_t0 = 0;
     S.win_seed = 0;
     S.win_armed = 0;
+    S.sc_learn = sc_learn_mode();
+    S.sc_blocked[0] = 0;
+    if (S.sc_fd >= 0) { close(S.sc_fd); S.sc_fd = -1; }
     {
         char cp[PATH_MAX + 64];
         snprintf(cp, sizeof cp, "%s/unattended/cmdline", S.disks);
@@ -2306,7 +2404,7 @@ static int start_machine(void) {
     int qmp[2], ser[2], net[2] = { -1, -1 }, qerr[2], perr[2] = { -1, -1 }, st[2], qga[2] = { -1, -1 }, lag[2] = { -1, -1 };
     if (S.m.agent && (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, qga) || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, lag))) { fail_start("out of descriptors"); return -1; }
     if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, qmp) || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, ser) ||
-        pipe2(qerr, O_CLOEXEC) || pipe2(st, O_CLOEXEC)) { fail_start("out of descriptors"); return -1; }
+        pipe2(qerr, O_CLOEXEC) || socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, st)) { fail_start("out of descriptors"); return -1; }
     if (S.m.network == VM_NET_BRIDGED) {
         char berr[240];
         net[0] = open_bridge_tap(&S.m, berr, sizeof berr);
@@ -2369,19 +2467,40 @@ static int start_machine(void) {
         place_fds(fds, nf);
         int stf = 3 + nf - 1;
         fcntl(stf, F_SETFD, FD_CLOEXEC);
+        /* QEMU's binary by descriptor (in this mount namespace, after the private loader): the allowlist's only exec */
+        int xfd = open(qargv[0], O_PATH | O_CLOEXEC);
+        int lfd = -1;
         VmQemuJail j = { S.disks, S.m.iso[0] ? S.m.iso : NULL, S.m.firmware == VM_FW_UEFI ? S.m.firmware_code : NULL, S.m.base[0] ? S.m.base : NULL,
                          S.m.drivers[0] ? S.m.drivers : NULL, S.m.accel == VM_ACCEL_KVM, S.gl ? S.render : S.vgpu ? S.vgpu_render : NULL,
-                         S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL };
-        int mask = vm_jail_qemu(&j) | (in_ns ? VMS_NAMESPACES : 0);
+                         S.vgpu ? S.vgpu_dev : NULL, S.vgpu ? S.vgpu_group : -1, S.vgpu ? GVT_ROM : NULL,
+                         S.m.accel != VM_ACCEL_KVM, S.m.network == VM_NET_BRIDGED, xfd, S.sc_learn, sc_drop_row(), &lfd };
+        int mask = xfd >= 0 ? vm_jail_qemu(&j) | (in_ns ? VMS_NAMESPACES : 0) : 0;
         int32_t msg[2] = { mask, 0 };
         /* without our filter and no_new_privs QEMU doesn't run: the parent reads the mask and sees which */
         /* a vGPU only inside Landlock where the kernel has it: its device rules must have applied (vgpu_rules) */
         if (S.vgpu && vm_landlock_abi() >= 1 && !(mask & VMS_LANDLOCK_FS)) mask &= ~VMS_SECCOMP_OURS;
         if (!(mask & VMS_SECCOMP_OURS) || !(mask & VMS_NO_NEW_PRIVS)) { msg[0] = mask; write_all(stf, msg, sizeof msg[0]); _exit(126); }
-        write_all(stf, msg, sizeof msg[0]);
+        msg[0] = mask;
+        /* the mask, with the allowlist's listener for lord-vm; QEMU never keeps it (it could answer for itself) */
+        {
+            union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
+            struct iovec io = { msg, sizeof msg[0] };
+            struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1 };
+            if (lfd >= 0) {
+                memset(&cm, 0, sizeof cm);
+                mh.msg_control = cm.b;
+                mh.msg_controllen = sizeof cm.b;
+                struct cmsghdr *ch = CMSG_FIRSTHDR(&mh);
+                ch->cmsg_level = SOL_SOCKET; ch->cmsg_type = SCM_RIGHTS; ch->cmsg_len = CMSG_LEN(sizeof(int));
+                memcpy(CMSG_DATA(ch), &lfd, sizeof(int));
+            }
+            ssize_t sent = sendmsg(stf, &mh, MSG_NOSIGNAL);
+            if (lfd >= 0) close(lfd);
+            if (sent != (ssize_t)sizeof msg[0]) _exit(126);
+        }
         /* 3D: Mesa in QEMU can't write a shader cache (its sandbox has no home folder): told not to try */
         char *env[] = { "LC_ALL=C.UTF-8", S.gl || S.vgpu ? "MESA_SHADER_CACHE_DISABLE=true" : NULL, NULL };
-        execve(qargv[0], qargv, env);
+        syscall(SYS_execveat, xfd, "", qargv, env, AT_EMPTY_PATH);
         msg[1] = errno ? errno : ENOEXEC;
         write_all(stf, &msg[1], sizeof msg[1]);
         _exit(127);
@@ -2404,7 +2523,32 @@ static int start_machine(void) {
     S.serial_fd = ser[0];
     int32_t got[2] = { 0, 0 };
     ssize_t n = 0, r;
-    while ((r = read(st[0], (char *)got + n, sizeof got - (size_t)n)) != 0) { if (r < 0) { if (errno == EINTR) continue; break; } n += r; if (n == sizeof got) break; }
+    {
+        /* the mask first, with the listener when there is one */
+        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int))]; } cm;
+        struct iovec io = { got, sizeof got[0] };
+        struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
+        do r = recvmsg(st[0], &mh, MSG_CMSG_CLOEXEC | MSG_WAITALL); while (r < 0 && errno == EINTR);
+        if (r > 0) n = r;
+        struct cmsghdr *ch = r > 0 ? CMSG_FIRSTHDR(&mh) : NULL;
+        if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof(int))) {
+            memcpy(&S.sc_fd, CMSG_DATA(ch), sizeof(int));
+            fcntl(S.sc_fd, F_SETFL, O_NONBLOCK);
+        }
+    }
+    /* then the end (exec closed it) or exec's error; the child's last calls before exec may reach the listener (a
+     * learn mode), so it is served meanwhile */
+    while (n > 0) {
+        struct pollfd pw[2] = { { st[0], POLLIN, 0 }, { S.sc_fd, POLLIN, 0 } };
+        if (poll(pw, S.sc_fd >= 0 ? 2 : 1, -1) < 0) { if (errno == EINTR) continue; break; }
+        if (S.sc_fd >= 0 && pw[1].revents) sc_serve();
+        if (!pw[0].revents) continue;
+        r = read(st[0], (char *)got + n, sizeof got - (size_t)n);
+        if (r < 0) { if (errno == EINTR) continue; break; }
+        if (r == 0) break;
+        n += r;
+        if (n == sizeof got) break;
+    }
     close(st[0]);
     if (n >= 4) S.sandbox |= got[0];
     if (n < 4 || !(got[0] & VMS_SECCOMP_OURS) || !(got[0] & VMS_NO_NEW_PRIVS)) { fail_start("QEMU's sandbox couldn't be set up (seccomp %d, no_new_privs %d)", !!(got[0] & VMS_SECCOMP_OURS), !!(got[0] & VMS_NO_NEW_PRIVS)); return -1; }
@@ -2412,16 +2556,20 @@ static int start_machine(void) {
     S.sandbox |= VMS_SECCOMP_QEMU | VMS_PDEATHSIG;
     /* the status pipe closed at exec, after the kernel set QEMU's dumpability: what the person's programs see now */
     if (vm_nondumpable(pid)) S.sandbox |= VMS_NONDUMPABLE;
-    vlog("qemu: pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d no-new-privs=%d kvm-by-fd=%d namespaces=%d non-dumpable=%d%s",
+    vlog("qemu: pid %d; sandbox: landlock-fs=%d landlock-net=%d landlock-scope=%d seccomp(ours)=%d allowlist=%d named=%d%s no-new-privs=%d kvm-by-fd=%d namespaces=%d non-dumpable=%d%s",
          (int)pid, !!(S.sandbox & VMS_LANDLOCK_FS), !!(S.sandbox & VMS_LANDLOCK_NET), !!(S.sandbox & VMS_LANDLOCK_SCOPE),
-         !!(S.sandbox & VMS_SECCOMP_OURS), !!(S.sandbox & VMS_NO_NEW_PRIVS), !!(S.sandbox & VMS_KVM_FD),
+         !!(S.sandbox & VMS_SECCOMP_OURS), !!(S.sandbox & VMS_SECCOMP_ALLOWLIST), !!(S.sandbox & VMS_SECCOMP_NAMED),
+         S.sc_learn ? (S.sc_learn == 2 ? " LEARN-ALL(test build)" : " LEARN(test build)") : "", !!(S.sandbox & VMS_NO_NEW_PRIVS), !!(S.sandbox & VMS_KVM_FD),
          !!(S.sandbox & VMS_NAMESPACES), !!(S.sandbox & VMS_NONDUMPABLE), S.gl ? " render-node=1" : S.vgpu ? " vgpu=1" : "");
     if (!(S.sandbox & VMS_NONDUMPABLE)) vlog("note: QEMU is dumpable: the person's programs can read its memory (3.3)");
     if (!(S.sandbox & VMS_LANDLOCK_FS)) vlog("note: no Landlock on this kernel: weaker isolation (3.3)");
     if (qmp_open(&S.qmp, qmp[0])) { fail_start("out of memory"); return -1; }
+    S.qmp.side_fd = S.sc_fd;
+    S.qmp.side = sc_side;
     if (qmp_handshake(&S.qmp, 20000, err, sizeof err)) {
         vlog("qmp: %s", err);
-        fail_start("QEMU stopped before it was ready (%s): see the log", err);
+        if (S.sc_blocked[0]) fail_start("%s", S.sc_blocked);
+        else fail_start("QEMU stopped before it was ready (%s): see the log", err);
         kill(S.qemu, SIGKILL);
         S.killed = 1;
         return 0;
@@ -5723,6 +5871,9 @@ static void cpu_end(void) {
 static void unattended_done(void);
 static void pump_fd(int *fd, const char *who);
 static void qemu_exited(int status) {
+    /* a call the allowlist stopped as QEMU ended: named first; the listener goes with this QEMU */
+    sc_serve();
+    if (S.sc_fd >= 0) { close(S.sc_fd); S.sc_fd = -1; }
     /* what QEMU wrote just before it ended (an assertion's line names the crash): read now, while it's there */
     for (int k = 0; k < 20 && S.qemu_err >= 0; k++) {
         struct pollfd pf = { .fd = S.qemu_err, .events = POLLIN };
@@ -5787,6 +5938,7 @@ static void qemu_exited(int status) {
             }
             vlog("qemu: recorded as %s (%s)", STATE_NAME[st], REASON_NAME[why]);
         }
+        else if (S.sc_blocked[0] && code == SIGKILL) { st = VS_CRASHED; why = VR_QEMU_SIGNAL; snprintf(d, sizeof d, "%.150s", S.sc_blocked); }
         else if (oom > S.oom0) { st = VS_CRASHED; why = VR_OUT_OF_MEMORY; snprintf(d, sizeof d, "the machine went over its memory limit (%ld MB)", vm_mem_limit_mb(&S.m)); }
         else { st = VS_CRASHED; why = VR_QEMU_SIGNAL; snprintf(d, sizeof d, "QEMU died from signal %d (%s)", code, strsignal(code)); }
     }
@@ -5963,6 +6115,7 @@ static void loop(void) {
         if (S.lag_fd >= 0 && lag_out_off < lag_out_n) p[n - 1].events |= POLLOUT;
         WATCH(S.passt_pidfd, -10);
         WATCH(S.fx_cpipe, -12);
+        WATCH(S.sc_fd, -13);
         for (int i = 0; i < MAX_CLIENTS; i++) WATCH(S.cl[i].fd, i);
 #undef WATCH
         long long now = now_ms(), next = -1;
@@ -6061,6 +6214,7 @@ static void loop(void) {
             }
             case -11: logind_process(); break;
             case -12: fx_xcopy_read(); break;
+            case -13: sc_serve(); break;
             default: {
                 int k = ci[i];
                 if (S.cl[k].fd < 0) break;
@@ -6324,7 +6478,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = -1;
-    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = -1;
+    S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sc_fd = -1;
     S.qmp.fd = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) S.cl[i].fd = -1;
     for (int i = 0; i < argc; i++) {
@@ -6570,8 +6724,9 @@ static void print_json_str(const char *s) {
 static void print_state(const VmMachine *m, int state, int reason, int code, const char *detail, int pid, int sandbox, int cg, int json, int live) {
     if (json) {
         printf("{\"id\":\"%s\",\"state\":\"%s\",\"reason\":\"%s\",\"code\":%d,\"qemu_pid\":%d,\"live\":%s", m->id, STATE_NAME[state], REASON_NAME[reason], code, pid, live ? "true" : "false");
-        if (live) printf(",\"sandbox\":%d,\"landlock_fs\":%d,\"landlock_net\":%d,\"seccomp_ours\":%d,\"kvm_fd\":%d,\"supervisor_landlock\":%d,\"namespaces\":%d,\"nondumpable\":%d,\"cgroup\":\"%s\"",
-                         sandbox, !!(sandbox & VMS_LANDLOCK_FS), !!(sandbox & VMS_LANDLOCK_NET), !!(sandbox & VMS_SECCOMP_OURS), !!(sandbox & VMS_KVM_FD),
+        if (live) printf(",\"sandbox\":%d,\"landlock_fs\":%d,\"landlock_net\":%d,\"seccomp_ours\":%d,\"seccomp_allowlist\":%d,\"seccomp_named\":%d,\"kvm_fd\":%d,\"supervisor_landlock\":%d,\"namespaces\":%d,\"nondumpable\":%d,\"cgroup\":\"%s\"",
+                         sandbox, !!(sandbox & VMS_LANDLOCK_FS), !!(sandbox & VMS_LANDLOCK_NET), !!(sandbox & VMS_SECCOMP_OURS),
+                         !!(sandbox & VMS_SECCOMP_ALLOWLIST), !!(sandbox & VMS_SECCOMP_NAMED), !!(sandbox & VMS_KVM_FD),
                          !!(sandbox & VMS_SUPERVISOR_LANDLOCK), !!(sandbox & VMS_NAMESPACES), !!(sandbox & VMS_NONDUMPABLE), cg & VMC_NESTED ? "nested" : cg & VMC_SCOPE ? "scope" : "none");
         printf(",\"detail\":");
         print_json_str(detail);
