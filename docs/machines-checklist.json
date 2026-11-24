@@ -256,8 +256,8 @@
    "item": "Import from other apps with identity kept (6.22)",
    "status": "✅",
    "pct": 95,
-   "file": "`vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`; `vmimport-test`, `vm_import_test.sh`",
-   "note": "No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion"
+   "file": "`vmimport.c`, `migrate.jsx`, `lordvm.c` `--import-machine`, `machines import`; `vmimport-test`, `vm_import_test.sh`",
+   "note": "No libvirt XML (`vmxml.c` is a generic reader), no driver injection, no real Windows from Fusion. *In development*: `machines import` from the terminal, and the converted disk written out before it is put in place (a machine started right after a large import timed out)"
   },
   {
    "area": "B",
@@ -270,10 +270,10 @@
   {
    "area": "B",
    "item": "Migrate from another PC (6.11)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": "Phase 4 (the assistant's Migrate tile is the import of 6.22)"
+   "status": "🟡",
+   "pct": 25,
+   "file": "`lordvm.c` `--import-machine` (a raw whole-disk image), `machines.c` `cmd_import`",
+   "note": "*In development*: a backup image of a Linux PC's disk imports and boots (a 20 GB Ubuntu 26.04.1 image, 2026-11-24, with the import's `fsync` fix). Not built: the old PC's agent and the LAN copy, a connected disk, driver injection, encrypted disks (was ❌ 0)"
   },
   {
    "area": "B",
@@ -898,8 +898,8 @@
    "name": "Getting a system in",
    "weight": 12,
    "items": 13,
-   "mean": 82.08,
-   "score": 82
+   "mean": 84.0,
+   "score": 84
   },
   {
    "id": "C",
@@ -999,5 +999,5 @@
   }
  ],
  "total": 71,
- "total_exact": 70.92
+ "total_exact": 71.16
 }
