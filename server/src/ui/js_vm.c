@@ -1069,6 +1069,17 @@ static JSValue f_hash(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     return JS_NewInt32(c, spawn_job(args, ""));
 }
 
+/* isoDetect(path) → job id: lord-vm --iso-detect on an installer disc the person chose (vmiso.h; the assistant's Detect
+ * step, docs/VIRTUALIZATION.md 5.2): one line {"iso","label","efi":[…],"bios","eltoritoEfi","arch"}, read by lord-vm in
+ * seccomp's strict mode, never here */
+static JSValue f_iso_detect(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char path[PATH_MAX];
+    if (argc < 1 || !JS_IsString(argv[0]) || user_file(c, argv[0], path, sizeof path)) return JS_NewInt32(c, 0);
+    char *args[] = { "lord-vm", "--iso-detect", path, NULL };
+    return JS_NewInt32(c, spawn_job(args, ""));
+}
+
 /* ---- machine groups' jobs (docs/VIRTUALIZATION.md 19.6, 19.7) ----
  * groupCreate({ catalogId, archive, sha512, name }) → job id: lord-vm --group-create <library>/<name>.lordgroup. The
  * archive must be one the admin helper verified, in the image store (images/<sha512>.tar.xz, root's): lord-vm hashes it
@@ -5153,7 +5164,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("isoDetect", 1, f_iso_detect), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),

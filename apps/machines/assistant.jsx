@@ -1,6 +1,10 @@
 // The New Machine assistant (the approved mock "Assistant"), in the library window: 1 Choose what to run, 2 a profile
-// (CPU, memory, disk), 3 the name, 4 review, 5 create. The system is recognized from the ISO's volume label or the
-// file's name (name and mark), the architecture from the file's name; another architecture is emulated and says so.
+// (CPU, memory, disk), 3 the name, 4 review, 5 create. An installer disc chosen or dropped on the window (any file it
+// takes, dropped anywhere on the first step) adds the Detect step after Choose: lord-vm --iso-detect reads its volume
+// label and its UEFI and El Torito boot entries in seccomp's strict mode (server/src/vm/vmiso.h), and the step names the
+// system, the processors the disc starts on and whether it would be emulated here, before anything is made (detectPlan).
+// The Name step says where the machine goes (the library, ~/Machines, and the space free there). An unattended install
+// takes the snapshot "Fresh install" when it ends, before its first start (vmwindow.jsx; on by default, in the review).
 // Download and install: the cards of assets/machines/systems.json for the chosen architecture (catalog.js); choosing
 // one reads its maker's SHA-256 list (vm-image-list), the newest image of the release is named with its hash, and step 5
 // downloads it (vm-image-get, which keeps it only with that hash) before the machine is made from it.
@@ -12,11 +16,11 @@
 // Windows 11 (windows.js, 4.3): the person's own multi-edition ISO from Microsoft's page (found in Downloads and checked
 // against Microsoft's published SHA-256) or Microsoft's 90-day evaluation (downloaded by the helper); the machine is
 // made ready for it (secure boot, TPM 2.0, virtio-win drivers) and installs without questions or with Windows' own.
-import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, t as tr } from '@lordos/sdk';
+import { View, Text, TextInput, FilePicker, Toggle, ScrollView, admin, fs, openUrl, userDirs, settings, locale, useFilesDrop, FilesDropHint, t as tr } from '@lordos/sdk';
 import { useEffect, useRef, useState } from 'react';
 import CATALOG from '../../assets/machines/systems.json';
 import { systemsFor, entryOf, listingNames, newest, pickImage, pinnedImage, cardSize, noticeOf, versionIn, progressOf, resumedOf, unattendedOf, checkSetup, hostnameFor, userFor, lordosLang } from './catalog.js';
-import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard } from './model.js';
+import { validateDraft, createRequest, missingFor, systemOf, versionOf, archOf, suggestName, gfxFor, no3dReason, winfspFor, gvtGpu, defaultCard, detectPlan } from './model.js';
 import { allProfiles, profileById, builtinProfile, defaultProfileId, onHost, setPatch, shareAbs, DEFAULT_PROFILE } from './profiles.js';
 import { customUnattended, systemState } from './systems.js';
 import { loadProfiles, loadSystems, defaultsOf, profileTitle } from './store.js';
@@ -31,6 +35,9 @@ import { GroupFlow, resolveGroup } from './whonix.jsx';
 
 // what Migrate from another app takes: other apps' settings files and packages, and their disk formats
 const MIGRATE_FILES = /(\.(vmx|vbox|pvs|ovf|ova|vmdk|vdi|vhdx|vhd|hds)|\/config\.pvs)$/i;
+const DISK_FILES = /\.(qcow2|img|raw)$/i;
+// a file dropped on the first step: which tile takes it
+export const dropSource = (name) => (/\.iso$/i.test(name) ? 'iso' : DISK_FILES.test(name) ? 'import' : MIGRATE_FILES.test(`/${name}`) ? 'migrate' : null);
 
 const STEPS = ['choose', 'profile', 'name', 'review', 'install'];
 const rowsOf = (list, n) => { const out = []; for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n)); return out; };
@@ -72,6 +79,11 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const [rootPassword, setRootPassword] = useState('');
   const [customize, setCustomize] = useState(false);
   const [shareClip, setShareClip] = useState(false);
+  // the Detect step (an installer disc): shown after Choose; detect = { path, phase: 'reading' | 'done' | 'error', info }
+  const [detectPage, setDetectPage] = useState(false);
+  const [detect, setDetect] = useState(null);
+  const detectJob = useRef(0);
+  const [freshSnap, setFreshSnap] = useState(true);   // the snapshot "Fresh install" when an unattended install ends
   const [job, setJob] = useState(0);
   const [fail, setFail] = useState(null);
   const [stopped, setStopped] = useState(false);  // Stop Download: the part is kept, Continue Download picks it up
@@ -119,19 +131,42 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
   const missing = missingFor(host, [arch], { windows });
   const emulated = arch !== host.arch;
 
-  const chose = (pth) => {
+  const chose = (pth, src = source) => {
     setPath(pth);
     const file = pth.split('/').pop();
-    const label = source === 'iso' ? (lord.vm.isoInfo(pth)?.label || '') : '';
+    const label = src === 'iso' ? (lord.vm.isoInfo(pth)?.label || '') : '';
     const s = systemOf(label, file);
     // a Windows ISO goes the Windows way: checked against Microsoft's list and made into the Windows 11 template
-    if (source === 'iso' && s.id === 'windows' && windowsEntry(CATALOG, archOf(file) || archOf(label) || arch)) { pickWindows(); checkIso(pth); return; }
+    if (src === 'iso' && s.id === 'windows' && windowsEntry(CATALOG, archOf(file) || archOf(label) || arch)) { pickWindows(); checkIso(pth); return; }
+    if (src === 'iso') startDetect(pth); else setDetect(null);
     const vv = versionOf(label) || versionOf(file);
     setSys(s); setVer(vv);
     const a = archOf(file) || archOf(label);
     if (a) setArch(a);
     setName(suggestName(s, vv, names));
   };
+  // the Detect step: lord-vm reads the disc (its boot files say what it starts on); the architecture follows them
+  const startDetect = (pth) => {
+    const id = lord.vm.isoDetect ? lord.vm.isoDetect(pth) : 0;
+    detectJob.current = id;
+    setDetect(id ? { path: pth, phase: 'reading', info: null } : { path: pth, phase: 'error', info: null });
+  };
+  useEffect(() => {
+    if (detect?.phase !== 'reading') return undefined;
+    const timer = setInterval(() => {
+      const r = lord.vm.job(detectJob.current);
+      if (!r || !r.done) return;
+      clearInterval(timer);
+      let info = null;
+      for (const l of String(r.out || '').trim().split('\n')) { try { const o = JSON.parse(l); if (o && typeof o === 'object' && 'iso' in o) info = o; } catch (e) { /* not ours */ } }
+      setDetect((x) => (x && x.phase === 'reading' ? { ...x, phase: r.ok && info ? 'done' : 'error', info } : x));
+      if (r.ok && info) {
+        const dp = detectPlan(info, detect.path.split('/').pop(), host.arch);
+        if (dp.from === 'boot') setArch(dp.arch);
+      }
+    }, 200);
+    return () => clearInterval(timer);
+  }, [detect?.phase, detect?.path]);
   // an entry's maker's list (and, when the list's name changes per build, the folder's listing first), checked by the
   // helper, and the newest image in it
   const resolve = async (id, a) => {
@@ -270,7 +305,9 @@ export function Assistant({ host, mode, names, groupNames, onClose, onCreated, o
         writeMeta(r.dir, { os: sys.id, osName: [sys.name, ver].filter(Boolean).join(' '), profile, onClose: pv.onClose, appsMode: pv.appsMode,
           // the mouse and shortcuts choices; capturing in full screen is machine.json's (setPatch below)
           input: { mouse: pv.input.mouse, shortcuts: pv.input.shortcuts },
-          ...(source === 'custom' && custom?.kind === 'linux' ? { family: 'linux' } : {}), ...(windows ? { transferSetup: true } : {}) });
+          ...(source === 'custom' && custom?.kind === 'linux' ? { family: 'linux' } : {}), ...(windows ? { transferSetup: true } : {}),
+          // the snapshot "Fresh install" when the unattended install ends (vmwindow.jsx, reason 'installed')
+          ...((windows ? un.on : unOn) && freshSnap ? { freshSnap: true } : {}) });
         const m = lord.vm.list().find((x) => x.dir === r.dir);
         const done = () => { if (customize) onConfigure(m || null); else onCreated(m || null); };
         // what lord.vm.create doesn't take (the network mode and its ports, the clipboard's way, the transfer folder, the

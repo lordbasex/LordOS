@@ -26,6 +26,8 @@
 #include "vmmem.h"
 #include "vmsandbox.h"
 #include "vmseccomp.h"
+#include "vmiso.h"
+#include <linux/seccomp.h>
 #include "vmops.h"
 #include "vmagent.h"
 #include "vmimport.h"
@@ -9686,9 +9688,47 @@ static int cmd_sha256(const char *path) {
     return 0;
 }
 
+/* --iso-detect <file>: what an installer disc starts on (vmiso.h), for the assistant's Detect step. The file is mapped
+ * read-only and closed, then this process drops to seccomp's strict mode (read, write, _exit and sigreturn only) before
+ * it reads one byte of the image: whatever the image does to the reader, it can do nothing but write to the job's pipe.
+ * Prints one JSON line (vmiso_json). */
+static int cmd_iso_detect(const char *path) {
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+    struct stat st;
+    if (fd < 0 || fstat(fd, &st) || !S_ISREG(st.st_mode) || st.st_size <= 0) {
+        fprintf(stderr, "lord-vm: %s isn't a file\n", path);
+        if (fd >= 0) close(fd);
+        return 1;
+    }
+    size_t len = (size_t)st.st_size;
+    void *m = mmap(NULL, len, PROT_READ, MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (m == MAP_FAILED) { fprintf(stderr, "lord-vm: reading %s: %s\n", path, strerror(errno)); return 1; }
+    fflush(NULL);
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) || prctl(PR_SET_SECCOMP, SECCOMP_MODE_STRICT, 0, 0, 0)) {
+        fprintf(stderr, "lord-vm: no seccomp: %s\n", strerror(errno));
+        return 1;
+    }
+    /* from here: no stdio (it may allocate), no exit() (exit_group isn't allowed): the answer is written once */
+    VmIsoInfo info;
+    char out[512];
+    int n = vmiso_detect(m, len, &info) ? -1 : vmiso_json(&info, out, sizeof out - 1);
+    if (n > 0) {
+        out[n++] = '\n';
+        for (int o = 0; o < n;) {
+            ssize_t w = write(1, out + o, (size_t)(n - o));
+            if (w <= 0) break;
+            o += (int)w;
+        }
+    }
+    syscall(SYS_exit, n > 0 ? 0 : 1);
+    return 1;
+}
+
 int main(int argc, char **argv) {
     if (argc < 3) return usage();
     if (!strcmp(argv[1], "--sha256")) return cmd_sha256(argv[2]);
+    if (!strcmp(argv[1], "--iso-detect")) return cmd_iso_detect(argv[2]);
     const char *cmd = argv[1], *dir = argv[2];
     int rest = argc - 3;
     char **rv = argv + 3;

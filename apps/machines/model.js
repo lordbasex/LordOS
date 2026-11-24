@@ -457,6 +457,23 @@ export function archOf(name) {
   if (/amd64|x86[_-]64|x64\b/.test(s)) return 'amd64';
   return '';
 }
+// The assistant's Detect step (5.2): what lord-vm --iso-detect read from the disc (server/src/vm/vmiso.h: its label, the
+// UEFI boot files' architectures, whether El Torito has a BIOS entry) against the file's name and this computer.
+//   info: the job's JSON line or null (not read yet, or not an ISO 9660 disc); file: its name; hostArch: 'amd64'|'arm64'
+// → { arch, from: 'boot'|'name'|'host', starts: ['uefi'?, 'bios'?], conflict: the name says another architecture than the
+//     boot files, emulated: arch isn't this computer's, both: the disc starts on amd64 and arm64 (the name or this
+//     computer decides), unknownArch: the boot files name only others (ia32, arm, riscv64) }
+export function detectPlan(info, file, hostArch) {
+  const byName = archOf(file) || archOf(info?.label);
+  const efi = Array.isArray(info?.efi) ? info.efi.filter((x) => typeof x === 'string') : [];
+  const boot = info && (info.arch === 'amd64' || info.arch === 'arm64') ? info.arch : '';
+  const both = efi.includes('amd64') && efi.includes('arm64');
+  const unknownArch = !!info?.iso && efi.length > 0 && !efi.includes('amd64') && !efi.includes('arm64') && !info.bios;
+  const arch = boot || (both ? byName || hostArch : byName) || hostArch;
+  const from = boot ? 'boot' : byName ? 'name' : 'host';
+  const starts = [...(efi.length || info?.eltoritoEfi ? ['uefi'] : []), ...(info?.bios ? ['bios'] : [])];
+  return { arch, from, starts, conflict: !!boot && !!byName && byName !== boot, emulated: arch !== hostArch, both, unknownArch };
+}
 // a machine name from a system and version, unique among names
 export function suggestName(sys, version, names = []) {
   const base = [sys?.name || 'Machine', version].filter(Boolean).join(' ');

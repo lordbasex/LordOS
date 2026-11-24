@@ -4,7 +4,7 @@
 # when its -dev package is there. lordvm-dev plays lord-server's part for tests and development (not installed).
 VM_COMMON := src/vm/machine.c src/vm/vmgroup.c src/vm/vmlink.c src/vm/vmnet.c src/vm/vmgpu.c src/vm/vmops.c src/vm/vmagent.c src/vm/vmimport.c src/vm/vmxml.c src/sec/json.c src/doc/wire.c
 VM_HDR := $(wildcard src/vm/*.h) src/sec/json.h src/doc/wire.h src/sec/cgroup.h src/sec/sandbox.h
-LORDVM_SRC := src/vm/lordvm.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
+LORDVM_SRC := src/vm/lordvm.c src/vm/vmiso.c src/vm/vmlog.c src/vm/vmcpu.c src/vm/qmp.c src/vm/vmpin.c src/vm/vmsandbox.c src/vm/vmseccomp.c src/vm/vmunattend.c src/vm/vmgvtwin.c src/vm/vmperfwin.c $(VM_COMMON) src/sec/cgroup.c src/pkg/crypto.c src/vm/vmcatalog.c src/pkg/pgp.c src/imager/imgverify.c
 # lord-vm talks to logind (the shutdown delay and idle inhibitors, PrepareForShutdown) when the system's D-Bus library is
 # there; without it, a host shutdown still saves machines through SIGTERM
 LORDVM_LOGIND ?= $(shell pkg-config --exists libsystemd 2>/dev/null && echo 1 || echo 0)
@@ -246,3 +246,9 @@ build/vmwatch-test: tests/vmwatch_test.c src/vm/vmwatch.h src/vm/vmproto.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmwatch_test.c
 	./$@ || { rm -f $@; exit 1; }
 build/obj/ui/js_vm.o: src/vm/vmwatch.h
+# the Detect step's reader of installer discs (vmiso.c): made-up and hostile ISO 9660 images, random mutations
+test: build/vmiso-test
+build/vmiso-test: tests/vmiso_test.c src/vm/vmiso.c src/vm/vmiso.h
+	@mkdir -p build
+	$(CC) $(CPPFLAGS) $(CFLAGS) -fsanitize=address,undefined -fno-sanitize-recover=undefined $(WARN) -std=gnu11 -o $@ tests/vmiso_test.c src/vm/vmiso.c
+	./$@ || { rm -f $@; exit 1; }
