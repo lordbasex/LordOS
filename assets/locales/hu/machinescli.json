@@ -120,7 +120,7 @@
   "execFailed": "{name} nem tudta futtatni: {why}",
   "outputCut": "A kimenet hosszabb volt annál, ami visszajön: csak az eleje látszik.",
   "timedOut": "A program ebben: {name} kifutott az időből, és leállt.",
-  "cpOnlyFiles": "Csak fájlokat lehet másolni: {path} nem az.",
+  "cpOnlyFiles": "Csak fájlok és mappák másolhatók: {path} egyik sem.",
   "cpOneSide": "Add meg, melyik oldal a gép: az egyik NÉV:ÚTVONAL, a másik egy fájl ezen a számítógépen.",
   "cpOutside": "{path} nincs a fájljaid között, vagy védett.",
   "cpExists": "{path} már létezik: a --force lecseréli.",

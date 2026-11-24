@@ -120,7 +120,7 @@
   "execFailed": "{name} no ho ha pogut executar: {why}",
   "outputCut": "La sortida era més llarga del que torna: només se'n mostra el començament.",
   "timedOut": "El programa a {name} s'ha quedat sense temps i s'ha aturat.",
-  "cpOnlyFiles": "Només es poden copiar fitxers: {path} no n'és un.",
+  "cpOnlyFiles": "Només es poden copiar fitxers i carpetes: {path} no és cap de les dues coses.",
   "cpOneSide": "Digues quin costat és la màquina: un dels dos és NOM:CAMÍ, l'altre un fitxer d'aquest ordinador.",
   "cpOutside": "{path} no és entre els teus fitxers, o està protegit.",
   "cpExists": "{path} ja existeix: --force el substitueix.",

@@ -120,7 +120,7 @@
   "execFailed": "{name} tidak dapat menjalankannya: {why}",
   "outputCut": "Output lebih panjang daripada yang kembali: hanya permulaannya ditunjukkan.",
   "timedOut": "Program dalam {name} kehabisan masa dan dihentikan.",
-  "cpOnlyFiles": "Hanya fail boleh disalin: {path} bukan fail.",
+  "cpOnlyFiles": "Hanya fail dan folder boleh disalin: {path} bukan kedua-duanya.",
   "cpOneSide": "Nyatakan sisi mana mesin: salah satunya NAMA:LALUAN, yang lain fail pada komputer ini.",
   "cpOutside": "{path} bukan antara fail anda, atau ia dilindungi.",
   "cpExists": "{path} sudah wujud: --force menggantikannya.",

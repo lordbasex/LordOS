@@ -120,7 +120,7 @@
   "execFailed": "{name} n'a pas pu le lancer : {why}",
   "outputCut": "La sortie était plus longue que ce qui revient : seul son début est affiché.",
   "timedOut": "Le programme dans {name} a manqué de temps et a été arrêté.",
-  "cpOnlyFiles": "Seuls des fichiers peuvent être copiés : {path} n'en est pas un.",
+  "cpOnlyFiles": "Seuls les fichiers et dossiers peuvent être copiés : {path} n’est ni l’un ni l’autre.",
   "cpOneSide": "Indiquez quel côté est la machine : l'un des deux est NOM:CHEMIN, l'autre un fichier de cet ordinateur.",
   "cpOutside": "{path} ne fait pas partie de vos fichiers, ou il est protégé.",
   "cpExists": "{path} existe déjà : --force le remplace.",

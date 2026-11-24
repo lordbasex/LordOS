@@ -120,7 +120,7 @@
   "execFailed": "{name} tidak bisa menjalankannya: {why}",
   "outputCut": "Keluaran lebih panjang daripada yang kembali: hanya bagian awalnya yang ditampilkan.",
   "timedOut": "Program di {name} kehabisan waktu dan dihentikan.",
-  "cpOnlyFiles": "Hanya berkas yang bisa disalin: {path} bukan berkas.",
+  "cpOnlyFiles": "Hanya berkas dan folder yang dapat disalin: {path} bukan keduanya.",
   "cpOneSide": "Sebutkan sisi mana mesinnya: salah satunya NAMA:JALUR, yang lain berkas di komputer ini.",
   "cpOutside": "{path} tidak termasuk berkas Anda, atau dilindungi.",
   "cpExists": "{path} sudah ada: --force menggantinya.",

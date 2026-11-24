@@ -241,6 +241,52 @@ int mcli_cp_side(const char *arg, char *name, size_t nn, const char **path) {
     return 1;
 }
 
+int mcli_rel_path_ok(const char *p) {
+    size_t n = p ? strlen(p) : 0;
+    if (!n || n > MCLI_TREE_PATH_MAX || p[0] == '/' || p[n - 1] == '/') return 0;
+    int depth = 1;
+    const char *c = p;
+    for (const char *s = p;; s++) {
+        if (*s == '/' || !*s) {
+            size_t l = (size_t)(s - c);
+            if (!l || l > 255 || (l == 1 && c[0] == '.') || (l == 2 && c[0] == '.' && c[1] == '.')) return 0;
+            if (!*s) break;
+            if (++depth > MCLI_TREE_DEPTH) return 0;
+            c = s + 1;
+            continue;
+        }
+        if ((unsigned char)*s < 0x20 || *s == 0x7f) return 0;
+        /* bidi controls (U+202A..U+202E, U+2066..U+2069) and line separators (U+2028, U+2029): a name that reads as another */
+        const unsigned char *u = (const unsigned char *)s;
+        if (u[0] == 0xe2 && ((u[1] == 0x80 && u[2] >= 0xa8 && u[2] <= 0xae) || (u[1] == 0x81 && u[2] >= 0xa6 && u[2] <= 0xa9))) return 0;
+    }
+    return 1;
+}
+
+int mcli_tree_next(const char *b, size_t n, size_t *off, McliTreeEnt *e) {
+    if (*off >= n) return 0;
+    const char *s = b + *off, *z = memchr(s, 0, n - *off);
+    if (!z) return -1;                                      /* cut: a last entry without its end */
+    size_t l = (size_t)(z - s);
+    *off += l + 1;
+    if (l < 3 || s[1] != ' ' || (s[0] != 'd' && s[0] != 'f')) return -1;
+    const char *p = s + 2;
+    e->dir = s[0] == 'd';
+    e->size = 0;
+    if (!e->dir) {
+        if (*p < '0' || *p > '9') return -1;
+        unsigned long long v = 0;
+        int k = 0;
+        while (*p >= '0' && *p <= '9') { if (++k > 15) return -1; v = v * 10 + (unsigned)(*p - '0'); p++; }
+        if (*p != ' ') return -1;
+        p++;
+        e->size = v;
+    }
+    if (!mcli_rel_path_ok(p)) return -1;
+    e->path = p;
+    return 1;
+}
+
 /* one UTF-8 character's length at p (1..4) when it is a valid one within n bytes, else 0 */
 static size_t utf8_len(const unsigned char *p, size_t n) {
     unsigned c = p[0];

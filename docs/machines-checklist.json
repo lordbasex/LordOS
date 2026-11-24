@@ -335,9 +335,9 @@
    "area": "C",
    "item": "Configure, one window with summaries (5.5)",
    "status": "✅",
-   "pct": 90,
+   "pct": 100,
    "file": "`configure.jsx` (11 sections; icon, tags, processor, huge pages, Add Disk, New Address, printers), `kit.jsx` (`SideRow` dot), `model.js` `changedSections`, `sectionsMatching`, `parseTags`; `lordvm.c` `--cpu-model`, `--mac new`, `--add-disk`, `machine.c` (`cpu_model`, schema 18); `vm_model_test.mjs`, `machines_app2_headless.sh`, `vm_configure_boot.sh`",
-   "note": "*In development*: search and unsaved dots; icon and tags, the processor (this computer's or Compatible, booted for real), Add Disk, a new MAC, huge pages shown as automatic. Decided not to build: ballooning, a network speed limit, sharing this computer's printers, a folder outside the library. Backup and encryption come with the storage work (95 with it), USB rules with the devices work"
+   "note": "*In development*: search and unsaved dots; icon and tags, the processor (this computer's or Compatible, booted for real), Add Disk, a new MAC, huge pages shown as automatic; Backup, encryption and Export (the storage work) and USB rules (the devices work) are built. Decided not to build: ballooning, a network speed limit, sharing this computer's printers, a folder outside the library (was 90)"
   },
   {
    "area": "C",
@@ -383,17 +383,17 @@
    "area": "D",
    "item": "Snapshots with memory, NVRAM and TPM, timeline, revert, sweep, at most 64 (6.2)",
    "status": "✅",
-   "pct": 85,
-   "file": "`lordvm.c` (`tpm_snap`), `snapshots.jsx`, `vmops.h`",
-   "note": "No `fsfreeze`, no copy of `machine.json`, no notes, no snapshot before a tools update"
+   "pct": 95,
+   "file": "`lordvm.c` (`tpm_snap`, `snap_settings_keep`, `snap_settings_back`, `snap_hw_copy`), `vmops.c` (`vm_snap_note_valid`), `snapshots.jsx`, `js_vm.c` (`snapNote`), `model.js` (`toolsAutoStep` 'snapshot', `toolsSnapOk`), `vmops.h`; `vm_snap_store_test.sh`, `vm-test`, `vm_model_test.mjs`",
+   "note": "*In development* (2026-11-24): each snapshot keeps `machine.json` as it was (`snapshots/<tag>.json`; a running machine's: the hardware it runs with), going back puts its hardware back and keeps every other choice, a disk added since refuses going back before anything changes (real QEMU/KVM, 21 checks); a note of the person's own (`snapshots/<tag>.note`); a snapshot with memory before the LordOS tools update themselves. No `fsfreeze`, decided: a snapshot is either taken with the machine off (clean) or with its memory (exact), so a freeze would add nothing and a memory snapshot taken frozen would come back frozen (6.2). The notes and the settings line not seen on screen (was 85)"
   },
   {
    "area": "D",
    "item": "Disposable sessions (6.2)",
    "status": "🧪",
-   "pct": 90,
-   "file": "`lordvm.c` (`session_prepare`, `session_layer`, `session_tpm`), `machine.c` (`disposable`), `configure.jsx`, `storagemodel.js`; `vm_storage_test.sh`, `vm_storage_model_test.mjs`, `vm_group_link.sh`",
-   "note": "*In development*, 2026-11-24: any machine, in memory (capped, paused when full) or on disk (unlinked files), every writable disk, the UEFI variables and the TPM; snapshots and Suspend refused; real QEMU, headless. The switch is in Configure only, not in the window or on the card (was 25)"
+   "pct": 95,
+   "file": "`lordvm.c` (`session_prepare`, `session_layer`, `session_tpm`), `machine.c` (`disposable`), `configure.jsx`, `vmwindow.jsx` (Actions → Disposable Session), `library.jsx` (the card's menu and line), `storagemodel.js` (`disposableToggle`); `vm_storage_test.sh`, `vm_storage_model_test.mjs`, `vm_group_link.sh`",
+   "note": "*In development*, 2026-11-24: any machine, in memory (capped, paused when full) or on disk (unlinked files), every writable disk, the UEFI variables and the TPM; snapshots and Suspend refused; real QEMU, headless. The switch is now in Configure, the machine window's Actions and the card's menu (with a line on the card); the window's and the card's not seen on screen (was 90)"
   },
   {
    "area": "D",
@@ -407,9 +407,9 @@
    "area": "D",
    "item": "Disks: qcow2, discard, Reclaim space, grow (6.4, 6.4.1)",
    "status": "✅",
-   "pct": 85,
-   "file": "`lordvm.c` (`blockdev_disk`, `--compact --estimate`, `qemu-img resize`)",
-   "note": "An interrupted compaction is rolled back. No qcow2 compression; the disk path itself is scored in M"
+   "pct": 100,
+   "file": "`lordvm.c` (`blockdev_disk`, `--compact --estimate`, `--compact --compress`, `qemu-img resize`), `storage.jsx` (Compress the disk too); `vm_snap_store_test.sh`",
+   "note": "An interrupted compaction is rolled back. Compression (*in development*, 2026-11-24): Reclaim space can compress every cluster (`qemu-img convert -c`); 96 MB of data became 380 KB, `qemu-img check` passed, the data read back intact and the machine started on it under KVM; refused for an encrypted machine (qcow2 can't). The disk path itself is scored in M (was 85)"
   },
   {
    "area": "D",
@@ -422,10 +422,10 @@
   {
    "area": "D",
    "item": "Storage window: shared extents, frees-if-deleted, downloads (6.16)",
-   "status": "🟡",
-   "pct": 75,
-   "file": "`storage.jsx`, `js_vm.c` (FIEMAP)",
-   "note": "Trash, Reclaim with an estimate, the unused shared base. Never seen on btrfs or XFS; no \"about\" figures; no \"delete old snapshots\" or \"remove unused media\""
+   "status": "🧪",
+   "pct": 90,
+   "file": "`storage.jsx`, `js_vm.c` (FIEMAP, `FIEMAP_EXTENT_ENCODED`), `model.js` (`oldSnapshots`, `unusedImages`); `vm_model_test.mjs`, `flows.py` (`storage`), `tools/vm/e2e/machines/storage-fs.sh`",
+   "note": "*In development* (2026-11-24): Delete Old Snapshots (every one but the newest, asked first with the figure), Remove Unused downloads (asked first; the existing `vm-image-remove`), figures marked \"about\" when an extent is stored compressed, every disk counted (raw and data disks were left out). Seen on ext4 only: a btrfs or XFS run needs root to make and mount the scratch file systems (`storage-fs.sh`, Maintainer checks) (was 75)"
   },
   {
    "area": "E",
@@ -439,9 +439,9 @@
    "area": "E",
    "item": "Bridged (macvtap, `vm-net-bridge`), Host only (passt on 127.0.0.1), port rules (6.5)",
    "status": "🧪",
-   "pct": 90,
-   "file": "`vmnet_admin.c`, `vmnet.c`, `lordvm.c`",
-   "note": "Headless checks; `vhost=off`, no `vhost-net`"
+   "pct": 95,
+   "file": "`vmnet_admin.c`, `vmnet.c`, `lordvm.c`; `vm_nic_boot.sh`",
+   "note": "Host only checked in a real KVM guest (2026-11-24, `vm_nic_boot.sh`): the guest reached a listener on this computer's loopback through 10.0.2.2 and, on a second card, 10.0.3.2. Bridged not run: its macvtap device is made by root (`vm-net-bridge`), and in a user and network namespace the device node stays root's (measured: `/dev/tapN` owned by nobody, open refused), so it needs root (Maintainer checks). `vhost=off`, no `vhost-net` (was 90)"
   },
   {
    "area": "E",
@@ -455,9 +455,9 @@
    "area": "E",
    "item": "Network card model (`--nic-model`) and an import's extra cards (3.9, 6.22)",
    "status": "✅",
-   "pct": 95,
-   "file": "`machine.h` (`nic_model`, `VM_EXTRA_NICS`), `lordvm.c`; `vm_nic_e2e.sh`",
-   "note": "Booted with each model (*in development*, 2026-11-24): seven reach the internet; PCnet gets its address, then receive errors (QEMU's PCnet with Linux 6.12). Extra cards present, not connected, by design (6.22)"
+   "pct": 100,
+   "file": "`machine.h` (`nic_model`, `VM_EXTRA_NICS`), `lordvm.c` (`xnic_attach`, `keeper_ask`, `vm_passt_argv`); `vm_nic_e2e.sh`, `vm_nic_boot.sh`",
+   "note": "Booted with each model (*in development*, 2026-11-24): seven reach the internet; PCnet gets its address, then receive errors (QEMU's PCnet with Linux 6.12). An import's extra cards are connected (*in development*, 2026-11-24): each through its own passt on a network of its own (10.0.3.0/24, 10.0.4.0/24…), in the first card's mode, no forwarded ports; checked under KVM in Shared (addresses from passt) and Host only (this computer reached through the second card); Bridged and Isolated leave them without a cable (was 95)"
   },
   {
    "area": "F",
@@ -695,9 +695,9 @@
    "area": "J",
    "item": "`lordvm` exec, logs, cp; MCP server; `lordvm apply` (6.15, 6.24)",
    "status": "🧪",
-   "pct": 85,
-   "file": "`vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cmd_logs`, `cmd_mcp`, `cmd_apply`), `mcli.c`, `configure.jsx` (Automation), `machine.h` (schema 17); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh`",
-   "note": "*In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of eight tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC. `machines shell` (the agent's shell, checked against a stand-in lord-vm). Not built: exec in virtio-win guests, folders in cp, MCP's create_machine, requirements and screenshot, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was ❌ 0)"
+   "pct": 90,
+   "file": "`vmexec.c` (`VM_EXEC`), `lordvm.c` (`ex_begin`), `machines.c` (`cmd_exec`, `cmd_cp`, `cp_tree_put`, `cp_tree_get`, `cmd_logs`, `cmd_mcp`, `mcp_requirements`, `cmd_apply`), `mcli.c` (`mcli_rel_path_ok`, `mcli_tree_next`), `configure.jsx` (Automation), `machine.h` (schema 17); `vmexec-test`, `mcli-test`, `vm-test`, `vm_exec_e2e.sh`, `tools/vm/e2e/machines/exec-guest.sh`",
+   "note": "*In development* (2026-11-24): exec, cp, logs, console, apply and an MCP server of nine tools, per machine with automation on; 28 of 28 checks in a real Ubuntu 26.04.1 guest on the dev PC, then 38 of 38 in a throwaway Debian 13 guest (`exec-guest.sh`), with folders in `cp` both ways (links never followed, a guest listing with a protected path or a control character refused whole before anything is made), the MCP `requirements` tool, and `cp` out of a file over 128 KB working again (a cap check had refused every full chunk). `machines shell` (the agent's shell, checked against a stand-in lord-vm). Not built: exec in virtio-win guests, MCP's `create_machine` and `screenshot`, apply's packages and rebuild. Configure's Automation row not yet seen on screen (was 85)"
   },
   {
    "area": "K",
@@ -906,24 +906,24 @@
    "name": "The app",
    "weight": 11,
    "items": 12,
-   "mean": 95.17,
-   "score": 95
+   "mean": 96.0,
+   "score": 96
   },
   {
    "id": "D",
    "name": "Snapshots, clones, storage",
    "weight": 9,
    "items": 6,
-   "mean": 85.0,
-   "score": 85
+   "mean": 92.5,
+   "score": 93
   },
   {
    "id": "E",
    "name": "Network",
    "weight": 6,
    "items": 4,
-   "mean": 95.0,
-   "score": 95
+   "mean": 97.5,
+   "score": 98
   },
   {
    "id": "F",
@@ -962,8 +962,8 @@
    "name": "Command line and automation",
    "weight": 3,
    "items": 2,
-   "mean": 92.5,
-   "score": 93
+   "mean": 95.0,
+   "score": 95
   },
   {
    "id": "K",
@@ -998,6 +998,6 @@
    "score": 92
   }
  ],
- "total": 89,
- "total_exact": 89.43
+ "total": 91,
+ "total_exact": 90.5
 }

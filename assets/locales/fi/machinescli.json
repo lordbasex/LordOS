@@ -120,7 +120,7 @@
   "execFailed": "{name} ei voinut suorittaa sitä: {why}",
   "outputCut": "Tuloste oli pidempi kuin mitä palaa: vain sen alku näytetään.",
   "timedOut": "Ohjelmalta koneessa {name} loppui aika ja se pysäytettiin.",
-  "cpOnlyFiles": "Vain tiedostoja voi kopioida: {path} ei ole sellainen.",
+  "cpOnlyFiles": "Vain tiedostoja ja kansioita voi kopioida: {path} ei ole kumpikaan.",
   "cpOneSide": "Kerro, kumpi puoli on kone: toinen on NIMI:POLKU, toinen tämän tietokoneen tiedosto.",
   "cpOutside": "{path} ei ole tiedostojesi joukossa, tai se on suojattu.",
   "cpExists": "{path} on jo olemassa: --force korvaa sen.",

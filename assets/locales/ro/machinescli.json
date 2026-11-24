@@ -120,7 +120,7 @@
   "execFailed": "{name} nu a putut rula: {why}",
   "outputCut": "Ieșirea era mai lungă decât ce se întoarce: se arată doar începutul.",
   "timedOut": "Programul din {name} a rămas fără timp și a fost oprit.",
-  "cpOnlyFiles": "Se pot copia doar fișiere: {path} nu este unul.",
+  "cpOnlyFiles": "Se pot copia doar fișiere și dosare: {path} nu este niciunul.",
   "cpOneSide": "Spune care parte este mașina: una dintre ele este NUME:CALE, cealaltă un fișier de pe acest computer.",
   "cpOutside": "{path} nu este printre fișierele tale sau este protejat.",
   "cpExists": "{path} există deja: --force îl înlocuiește.",

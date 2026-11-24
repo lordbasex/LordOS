@@ -456,6 +456,14 @@ EOF
         77) skip "vm-storage" "build/lord-vm, KVM, QEMU (qemu-img, qemu-io), swtpm, OVMF and python3" ;;
         *) bad "vm-storage (tests/vm_storage_test.sh, encryption, disposable sessions, Export, raw disks)"; tail -20 "$T/out" ;;
     esac
+    # snapshots' kept settings (put back, a disk added refused, a running machine's hardware) and Reclaim space's
+    # compression (tests/vm_snap_store_test.sh), real lord-vm, qemu-img and QEMU/KVM
+    bash tests/vm_snap_store_test.sh >"$T/out" 2>&1
+    case $? in
+        0) ok "vm-snap-store (tests/vm_snap_store_test.sh, snapshots' settings, compression)" ;;
+        77) skip "vm-snap-store" "build/lord-vm, KVM, QEMU (qemu-img, qemu-io), OVMF and python3" ;;
+        *) bad "vm-snap-store (tests/vm_snap_store_test.sh, snapshots' settings, compression)"; tail -20 "$T/out" ;;
+    esac
     # lordos-guest's clipboard tool (xclip, wl-clipboard, none: the hello says "noclip"), stub tools and a socket port
     sh tests/guest_clip_test.sh >"$T/out" 2>&1
     case $? in

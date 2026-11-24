@@ -683,10 +683,94 @@ static int qimg_repair_leaks(const char *dir, const char *disk) {
     return r;
 }
 
+/* a snapshot's own files beside snapshots.json: its picture (lord-server), its note (lord-server) and the machine's
+ * settings as they were (snap_settings_keep) */
 static void snap_picture_rm(const char *dir, const char *tag) {
+    static const char *const EXT[] = { "png", "note", "json" };
     char p[PATH_MAX + 64];
-    snprintf(p, sizeof p, "%s/snapshots/%s.png", dir, tag);
-    unlink(p);
+    for (int i = 0; i < 3; i++) { snprintf(p, sizeof p, "%s/snapshots/%s.%s", dir, tag, EXT[i]); unlink(p); }
+}
+
+/* ---- the machine's settings with each snapshot (6.2) ----
+ * A snapshot holds the disks, the UEFI variables, the TPM and (taken running) the memory; the settings are the fifth
+ * part: snapshots/<tag>.json is machine.json as it was, with the hardware the guest had (a running machine's: the one it
+ * started with, not changes waiting for its next start). Going back to the snapshot puts that hardware back
+ * (snap_hw_copy's fields): a snapshot's memory only loads into the same hardware, and a disk-only one boots the system
+ * that was installed for it. The name, icon, tags, folders, clipboard and every other choice stay as they are now. */
+static void snap_hw_copy(VmMachine *to, const VmMachine *from) {
+    to->vcpus = from->vcpus; to->memory_mb = from->memory_mb;
+    to->cpu_sockets = from->cpu_sockets; to->cpu_cores = from->cpu_cores; to->cpu_threads = from->cpu_threads;
+    to->cpu_model = from->cpu_model; to->devices = from->devices; to->nic_model = from->nic_model;
+    to->n_extra_macs = from->n_extra_macs;
+    memcpy(to->extra_macs, from->extra_macs, sizeof to->extra_macs);
+    memcpy(to->extra_models, from->extra_models, sizeof to->extra_models);
+    to->graphics = from->graphics; to->heads = from->heads; to->res_w = from->res_w; to->res_h = from->res_h;
+    to->secure_boot = from->secure_boot; to->tpm = from->tpm; to->hyperv = from->hyperv; to->rtc = from->rtc;
+    to->agent = from->agent; to->transfer = from->transfer;
+    memcpy(to->mac, from->mac, sizeof to->mac);
+}
+
+/* writes snapshots/<tag>.json: machine.json now, with `hw`'s hardware (NULL: as it is); 0 ok */
+static int snap_settings_keep(const char *dir, const char *tag, const VmMachine *hw) {
+    if (!vm_snap_tag_valid(tag)) return -1;
+    VmMachine m;
+    if (vm_machine_load(dir, &m, NULL, 0)) return -1;
+    if (hw) snap_hw_copy(&m, hw);
+    char *j = vm_machine_json(&m);
+    if (!j) return -1;
+    char sd[PATH_MAX + 32], tmp[PATH_MAX + 96], to[PATH_MAX + 96];
+    snprintf(sd, sizeof sd, "%s/snapshots", dir);
+    mkdir(sd, 0700);
+    snprintf(tmp, sizeof tmp, "%s/.%s.json.tmp", sd, tag);
+    snprintf(to, sizeof to, "%s/%s.json", sd, tag);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    int ok = fd >= 0 && !write_all(fd, j, strlen(j)) && !fsync(fd);
+    if (fd >= 0) close(fd);
+    free(j);
+    if (!ok || rename(tmp, to)) { unlink(tmp); return -1; }
+    return 0;
+}
+
+/* the snapshot's settings, read back: 1 there (in *then), 0 none kept (a snapshot taken before they were), -1 unusable */
+static int snap_settings_read(const char *dir, const char *tag, VmMachine *then) {
+    char p[PATH_MAX + 96];
+    snprintf(p, sizeof p, "%s/snapshots/%s.json", dir, tag);
+    int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if (fd < 0) return errno == ENOENT ? 0 : -1;
+    static char buf[64 * 1024];
+    ssize_t n = read(fd, buf, sizeof buf);
+    close(fd);
+    if (n <= 0 || n >= (ssize_t)sizeof buf) return -1;
+    return vm_machine_parse(buf, (size_t)n, then, NULL, 0) ? -1 : 1;
+}
+
+/* before going back: a disk added after the snapshot has no part in it (its tag isn't there), so going back is refused
+ * before anything changes; 0 may go on */
+static int snap_settings_check(const char *dir, const VmMachine *now, const char *tag, char *err, size_t errlen) {
+    VmMachine then;
+    int r = snap_settings_read(dir, tag, &then);
+    if (r == 1 && strcmp(then.id, now->id)) r = -1;
+    if (r == 1 && now->n_data > then.n_data) {
+        snprintf(err, errlen, "a disk was added after this snapshot was taken (%d then, %d now): it has no part in it", then.n_data, now->n_data);
+        return -1;
+    }
+    return 0;
+}
+
+/* after going back (or before a start from the snapshot's memory): its hardware into machine.json */
+static void snap_settings_back(const char *dir, const char *tag) {
+    VmMachine then, now;
+    int r = snap_settings_read(dir, tag, &then);
+    if (r <= 0 || vm_machine_load(dir, &now, NULL, 0) || strcmp(then.id, now.id)) {
+        if (r < 0) vlog("snapshots: %s: its settings can't be read: the machine's are kept", tag);
+        return;
+    }
+    VmMachine m = now;
+    snap_hw_copy(&m, &then);
+    if (!memcmp(&m, &now, sizeof m)) return;
+    char err[160];
+    if (vm_machine_check(&m, err, sizeof err) || vm_machine_save(dir, &m)) { vlog("snapshots: %s: its settings couldn't be put back (%s): the machine's are kept", tag, err); return; }
+    vlog("snapshots: %s: the machine's hardware is as it was then (%d vCPUs, %d MB)", tag, m.vcpus, m.memory_mb);
 }
 
 /* a tag on the disks that snapshots.json doesn't list is what's left of a snapshot that didn't finish: removed at the
@@ -755,6 +839,7 @@ static int snap_take_off(const char *dir, const VmMachine *m, const char *tag, c
         snprintf(err, errlen, "can't keep the TPM's state");
         return -1;
     }
+    if (snap_settings_keep(dir, tag, NULL)) vlog("snapshots: %s: the settings couldn't be kept with it", tag);
     VmSnap sn;
     memset(&sn, 0, sizeof sn);
     snprintf(sn.tag, sizeof sn.tag, "%s", tag);
@@ -788,12 +873,14 @@ static int snap_revert_off(const char *dir, const VmMachine *m, const char *tag,
     VmSnap list[VM_SNAPS_MAX];
     int n = vm_snaps_load(dir, list, VM_SNAPS_MAX);
     if (vm_snaps_find(list, n, tag) < 0) { snprintf(err, errlen, "there's no snapshot %s", tag); return -1; }
+    if (snap_settings_check(dir, m, tag, err, errlen)) return -1;
     char disks[VM_NDISKS][PATH_MAX + 64];
     int nd = disk_files(dir, m, disks);
     if (vm_op_begin(dir, "snapshot-revert", tag, NULL, NULL)) { snprintf(err, errlen, "can't write operation.json"); return -1; }
     for (int i = 0; i < nd; i++) if (qimg_snap(dir, disks[i], "-a", tag, err, errlen)) return -1;     /* operation.json stays: the next open goes on */
     if (tpm_snap(dir, m, TPMS_REVERT, tag)) { snprintf(err, errlen, "can't put the TPM's state back"); return -1; }
     discard_state(dir);
+    snap_settings_back(dir, tag);
     vm_op_end(dir);
     return 0;
 }
@@ -983,7 +1070,7 @@ static int cmd_create(const char *dir, int argc, char **argv) {
 
 typedef struct { int fd, control, gone_said; } Client;   /* gone_said: its peer went (EPIPE), said once in the log */
 enum { P_IGNORE = 0, P_REPLY, P_GETFD, P_ADDCLIENT, P_RAW, P_CONT_START, P_CD, P_CD_LAST, P_VERSION, P_SUSPEND, P_MIGQ, P_RESUME,
-       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ, P_USB_ADD, P_USB_DEL };
+       P_SNAPJOB, P_JOBQ, P_SNAPSIZE, P_NET, P_NET_ADD, P_NET_LAST, P_MICE, P_MOUSE_SET, P_PINQ, P_USB_ADD, P_USB_DEL, P_XNIC };
 typedef struct { int kind, client; uint32_t seq; int fd; } Pending;
 
 /* a file dropped on the machine's window, for the guest (VM_FILE) */
@@ -1176,6 +1263,7 @@ static struct {
      * way to start a program), the passt it started last (followed by pidfd: not our child), QEMU's backend number
      * (pst<gen> on hub port hp<gen>), when the network went and when to try again, restarts in the last minute */
     int keeper_fd, passt_pidfd, net_gen, net_busy, net_restarts, net_gave_up;
+    int xnic_err[VM_EXTRA_NICS];        /* an extra card's passt's stderr (xnic_attach), held open, never read */
     /* a machine group's internal link (VM_LINK): the last backend's number (lk<gen>), and whether it's on the hub */
     int link_gen, link_up;
     pid_t keeper, passt_ext;
@@ -1668,12 +1756,28 @@ static void place_fds(const int *want, int n) {
  *  - Both: the forwarded ports (-t, -u with the address to listen on: 127.0.0.1, or 0.0.0.0 for "lan" in Shared).
  *    passt binds them in the machine's scope, so LordOS's firewall decides them as the incoming connections of
  *    Machines (FIREWALL.md, "Machines"). */
+/* An imported machine's other cards (6.22, extra_nics) in Shared and Host-only: each its own passt, started by the keeper
+ * once the machine runs (xnic_attach), in the same mode as the first card but on a network of its own, 10.0.<3+i>.0/24
+ * (the guest at .15, passt's gateway at .2), IPv4, with no forwarded port (they stay the first card's). -1: the first card */
+static int passt_extra = -1;
 static int vm_passt_argv(const VmMachine *m, char **argv, int max) {
-    static char tv[VM_PORTS][48], uv[VM_PORTS][48];
-    int n = 0, nt = vm_passt_ports(m, VM_PROTO_TCP, tv, VM_PORTS), nu = vm_passt_ports(m, VM_PROTO_UDP, uv, VM_PORTS);
+    static char tv[VM_PORTS][48], uv[VM_PORTS][48], xa[20], xg[20];
+    int xi = passt_extra >= 0 && passt_extra < VM_EXTRA_NICS ? passt_extra : -1;
+    int n = 0, nt = xi >= 0 ? 0 : vm_passt_ports(m, VM_PROTO_TCP, tv, VM_PORTS), nu = xi >= 0 ? 0 : vm_passt_ports(m, VM_PROTO_UDP, uv, VM_PORTS);
     if (max < 20 + 2 * (nt + nu)) return -1;
     argv[n++] = PASST; argv[n++] = "-f"; argv[n++] = "-q"; argv[n++] = "-1"; argv[n++] = "--fd"; argv[n++] = "3";
-    if (m->network == VM_NET_HOSTONLY) {
+    if (xi >= 0) {
+        snprintf(xa, sizeof xa, "10.0.%d.15", 3 + xi);
+        snprintf(xg, sizeof xg, "10.0.%d.2", 3 + xi);
+    }
+    if (xi >= 0 && m->network == VM_NET_HOSTONLY) {
+        argv[n++] = "-4"; argv[n++] = "-o"; argv[n++] = "127.0.0.1";
+        argv[n++] = "-a"; argv[n++] = xa; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = xg;
+        argv[n++] = "--no-dhcp-dns"; argv[n++] = "--no-dhcp-search";
+    } else if (xi >= 0) {
+        argv[n++] = "-4"; argv[n++] = "-a"; argv[n++] = xa; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = xg;
+        argv[n++] = "--no-map-gw"; argv[n++] = "--dns-forward"; argv[n++] = VM_DNS_ADDR;
+    } else if (m->network == VM_NET_HOSTONLY) {
         argv[n++] = "-4"; argv[n++] = "-o"; argv[n++] = "127.0.0.1";
         argv[n++] = "-a"; argv[n++] = VM_HOSTONLY_ADDR; argv[n++] = "-n"; argv[n++] = "24"; argv[n++] = "-g"; argv[n++] = VM_HOSTONLY_GW;
         argv[n++] = "--no-dhcp-dns"; argv[n++] = "--no-dhcp-search";
@@ -1958,6 +2062,9 @@ static void keeper_main(int sock) {
         ssize_t r = read(sock, &c, 1);
         if (r == 0 || (r < 0 && errno != EINTR)) _exit(0);
         if (r < 0) continue;
+        /* 'p' the first card's passt; '1'..'7' an imported machine's other card's (passt_extra); nothing else */
+        if (c != 'p' && !(c >= '1' && c < '1' + VM_EXTRA_NICS)) continue;
+        passt_extra = c == 'p' ? -1 : c - '1';
         int net[2] = { -1, -1 }, perr[2] = { -1, -1 }, fds[3] = { -1, -1, -1 };
         int32_t pid = -1;
         if (!socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, net) && !pipe2(perr, O_CLOEXEC)) {
@@ -2108,6 +2215,7 @@ static int mem_backing(const VmMachine *m) {
 /* the hub of a group's internal link: the workstation's only card is on hub 0, a gateway's second card on hub 1 (hub 0
  * is its passt card's) */
 #define LINK_HUB(m) ((m)->network == VM_NET_LINK ? 0 : 1)
+#define XNIC_HUB 10                     /* an imported machine's other cards' hubs: 10 .. 10 + VM_EXTRA_NICS - 1 */
 #define MAXARGS 192
 static char *qargv[MAXARGS];
 static int qargc;
@@ -2710,8 +2818,15 @@ static void build_qemu_args(void) {
         arg("-netdev"); argf("hubport,id=lnk0,hubid=%d", LINK_HUB(m));
         arg("-device"); argf("virtio-net-pci,id=link0,netdev=lnk0,mac=%s,addr=0x%x", m->link_mac, VM_LINK_SLOT_GATEWAY);
     }
-    /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces; not connected */
-    for (int i = 0; i < m->n_extra_macs; i++) { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
+    /* an imported machine's other cards: there with their addresses, so the guest keeps its interfaces. In Shared and
+     * Host-only each sits on a hub of its own (XNIC_HUB + i), where its own passt goes once the machine runs
+     * (xnic_attach); in Bridged and Isolated it has no backend: its cable is out */
+    for (int i = 0; i < m->n_extra_macs; i++) {
+        if (m->network == VM_NET_SHARED || m->network == VM_NET_HOSTONLY) {
+            arg("-netdev"); argf("hubport,id=xnic%d,hubid=%d", i + 1, XNIC_HUB + i);
+            arg("-device"); argf("%s,id=nic%d,netdev=xnic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, i + 1, m->extra_macs[i], 0x18 + i);
+        } else { arg("-device"); argf("%s,id=nic%d,mac=%s,addr=0x%x", NICDEV[m->extra_models[i]], i + 1, m->extra_macs[i], 0x18 + i); }
+    }
     arg("-device"); arg("virtio-rng-pci,addr=0x3");
     /* amd64 with -nodefaults needs a display device or its kernel never starts (3.3); arm64's virt has no keyboard */
     /* 3D (decide_graphics): the same slot with virgl, and the D-Bus display shares its pictures as dmabufs (gl=on) made on
@@ -3816,23 +3931,59 @@ static void net_lost(int sig, int code) {
     S.net_retry_at = now + (S.net_restarts == 0 ? 0 : 1000LL << (S.net_restarts - 1));
 }
 
-static void net_restart(void) {
-    S.net_retry_at = 0;
-    if (S.qemu_done || !S.qmp_up || S.keeper_fd < 0) return;
-    char c = 'p';
-    if (write(S.keeper_fd, &c, 1) != 1) { vlog("network: passt's keeper is gone"); close(S.keeper_fd); S.keeper_fd = -1; net_lost(0, 0); return; }
+/* one passt from the keeper: its pid and { socket, stderr, pidfd }; -1 none started, -2 the keeper is gone */
+static int32_t keeper_ask(char c, int fds[3]) {
+    if (write(S.keeper_fd, &c, 1) != 1) return -2;
     struct pollfd pf = { S.keeper_fd, POLLIN, 0 };
     int32_t pid = -1;
-    int fds[3] = { -1, -1, -1 };
     if (poll(&pf, 1, 3000) == 1) {
-        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof fds)]; } cm;
+        union { struct cmsghdr h; char b[CMSG_SPACE(sizeof(int) * 3)]; } cm;
         struct iovec io = { &pid, sizeof pid };
         struct msghdr mh = { .msg_iov = &io, .msg_iovlen = 1, .msg_control = cm.b, .msg_controllen = sizeof cm.b };
         ssize_t n = recvmsg(S.keeper_fd, &mh, MSG_CMSG_CLOEXEC);
         struct cmsghdr *ch = n == sizeof pid ? CMSG_FIRSTHDR(&mh) : NULL;
-        if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof fds)) memcpy(fds, CMSG_DATA(ch), sizeof fds);
+        if (ch && ch->cmsg_level == SOL_SOCKET && ch->cmsg_type == SCM_RIGHTS && ch->cmsg_len == CMSG_LEN(sizeof(int) * 3)) memcpy(fds, CMSG_DATA(ch), sizeof(int) * 3);
         else pid = -1;
     }
+    return pid;
+}
+
+/* An imported machine's other cards (6.22) in Shared and Host-only: each gets its own passt from the keeper, on the hub
+ * its card is on (XNIC_HUB + i), once, as the machine starts. Not healed: a passt of an extra card that ends leaves that
+ * card without network until the machine starts again. */
+static void xnic_attach(void) {
+    if (S.keeper_fd < 0 || !S.qmp_up || S.qemu_done) return;
+    for (int i = 0; i < S.m.n_extra_macs && i < VM_EXTRA_NICS; i++) {
+        int fds[3] = { -1, -1, -1 };
+        int32_t pid = keeper_ask((char)('1' + i), fds);
+        if (pid == -2) { vlog("network: passt's keeper is gone: the other cards stay without network"); return; }
+        if (pid <= 0 || fds[0] < 0) {
+            for (int k = 0; k < 3; k++) if (fds[k] >= 0) close(fds[k]);
+            vlog("network: card %d (%s): no passt could be started: its cable is out", i + 2, S.m.extra_macs[i]);
+            continue;
+        }
+        if (S.xnic_err[i] >= 0) close(S.xnic_err[i]);
+        S.xnic_err[i] = fds[1];                 /* kept open (a closed pipe would end passt at its first word); -q */
+        if (fds[2] >= 0) close(fds[2]);         /* it dies with the keeper, which dies with lord-vm or the machine's end */
+        char a[160];
+        snprintf(a, sizeof a, "{\"fdname\":\"xpst%d\"}", i + 1);
+        int bad = qmp_do("getfd", a, P_XNIC, -1, 0, fds[0], -1);
+        close(fds[0]);
+        snprintf(a, sizeof a, "{\"type\":\"socket\",\"id\":\"xpst%d\",\"fd\":\"xpst%d\"}", i + 1, i + 1);
+        bad |= qmp_do("netdev_add", a, P_XNIC, -1, 0, -1, -1);
+        snprintf(a, sizeof a, "{\"type\":\"hubport\",\"id\":\"xhp%d\",\"hubid\":%d,\"netdev\":\"xpst%d\"}", i + 1, XNIC_HUB + i, i + 1);
+        bad |= qmp_do("netdev_add", a, P_XNIC, -1, 0, -1, -1);
+        if (bad) { kill(pid, SIGKILL); vlog("network: card %d (%s): QEMU couldn't be asked to connect it", i + 2, S.m.extra_macs[i]); continue; }
+        vlog("network: card %d (%s, %s) connected: passt %d, 10.0.%d.15/24", i + 2, S.m.extra_macs[i], VM_NIC_MODELS[S.m.extra_models[i]], (int)pid, 3 + i);
+    }
+}
+
+static void net_restart(void) {
+    S.net_retry_at = 0;
+    if (S.qemu_done || !S.qmp_up || S.keeper_fd < 0) return;
+    int fds[3] = { -1, -1, -1 };
+    int32_t pid = keeper_ask('p', fds);
+    if (pid == -2) { vlog("network: passt's keeper is gone"); close(S.keeper_fd); S.keeper_fd = -1; net_lost(0, 0); return; }
     S.net_restarts++;
     if (pid <= 0 || fds[0] < 0) {
         for (int i = 0; i < 3; i++) if (fds[i] >= 0) close(fds[i]);
@@ -4067,6 +4218,7 @@ static void snap_concluded(const JVal *root, int ok) {
             begin_poweroff();
             return;
         }
+        snap_settings_back(S.dir, S.snap_tag);
         vm_op_end(S.dir);
         snap_end(1, "");
     } else {
@@ -4100,6 +4252,7 @@ static void snap_taken(const JVal *root) {
     vm_now_iso(sn.created);
     sn.memory = 1;
     sn.vmstate = vmstate;
+    if (snap_settings_keep(S.dir, S.snap_tag, &S.m)) vlog("snapshots: %s: the settings couldn't be kept with it", S.snap_tag);
     list[n++] = sn;
     if (vm_snaps_save(S.dir, list, n)) { vm_op_end(S.dir); snap_end(0, "can't write snapshots.json"); return; }
     vm_op_end(S.dir);
@@ -7373,6 +7526,7 @@ static void on_qmp_reply(const JVal *root, int ok) {
         break;
     case P_NET_ADD: if (!ok && !S.net_err[0]) snprintf(S.net_err, sizeof S.net_err, "%s", desc); break;
     case P_NET_LAST: net_attached(ok, desc); break;
+    case P_XNIC: if (!ok) vlog("network: an extra card's passt wasn't taken: %s", desc); break;
     case P_SNAPSIZE: if (S.snap_kind == VSN_TAKE) snap_taken(root); break;
     case P_RESUME: if (!ok && !S.resume_err[0]) { snprintf(S.resume_err, sizeof S.resume_err, "%s", desc); kill(S.qemu, SIGKILL); S.killed = 1; } break;
     case P_MIGQ: {
@@ -7868,6 +8022,7 @@ static void loop(void) {
     }
     if (S.keeper_fd >= 0) { close(S.keeper_fd); S.keeper_fd = -1; }
     if (S.keeper > 0) { waitpid(S.keeper, NULL, 0); S.keeper = 0; }
+    for (int i = 0; i < VM_EXTRA_NICS; i++) if (S.xnic_err[i] >= 0) { close(S.xnic_err[i]); S.xnic_err[i] = -1; }
     logind_close();
 }
 
@@ -8098,6 +8253,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
     int detach = 0, control = -1, discard = 0, pidfd_to = -1;
     memset(&S, 0, sizeof S);
     S.listen_fd = S.serial_fd = S.serial_log = S.qemu_err = S.passt_err = S.sig_fd = S.lock_fd = S.memev_fd = S.notify_fd = S.susp_fd = S.console_fd = S.qga_fd = S.lag_fd = S.fx.fd = S.sh_fd = S.gt_fd = S.rx_fd = S.rx_hpipe = -1;
+    for (int i = 0; i < VM_EXTRA_NICS; i++) S.xnic_err[i] = -1;
     S.keeper_fd = S.passt_pidfd = S.tpm_q = S.xfer_dfd = S.fx_cpipe = S.fx_stagefd = S.sess_fd = S.sc_fd = S.key_fd = S.fw_fd = -1;
     for (int i = 0; i < 2 + VM_DATA_DISKS; i++) S.sess_fds[i] = -1;
     S.qmp.fd = -1;
@@ -8348,6 +8504,7 @@ static int cmd_start(const char *dir, int argc, char **argv) {
         if (S.m.network == VM_NET_SHARED || S.m.network == VM_NET_HOSTONLY) {
             S.keeper = start_keeper(&S.keeper_fd);
             if (S.keeper < 0) { S.keeper = 0; vlog("network: no keeper: a passt that ends isn't replaced"); }
+            else if (S.m.n_extra_macs) xnic_attach();
         }
         logind_open();
         cpu_begin();
@@ -9126,7 +9283,14 @@ static int cmd_snapshot(const char *dir, int argc, char **argv) {
     else {
         VmSnap list[VM_SNAPS_MAX];
         int n = vm_snaps_load(real, list, VM_SNAPS_MAX), i = vm_snaps_find(list, n, tag);
-        if (i >= 0 && list[i].memory) { close(lock); fprintf(stderr, "lord-vm: %s holds the machine's memory: start it with --loadvm %s\n", tag, tag); return 4; }
+        if (i >= 0 && list[i].memory) {
+            /* its memory loads only into the hardware it ran on: that goes back first */
+            if (snap_settings_check(real, &m, tag, err, sizeof err)) { close(lock); fprintf(stderr, "lord-vm: %s\n", err); return 1; }
+            snap_settings_back(real, tag);
+            close(lock);
+            fprintf(stderr, "lord-vm: %s holds the machine's memory: start it with --loadvm %s\n", tag, tag);
+            return 4;
+        }
         rc = snap_revert_off(real, &m, tag, err, sizeof err);
     }
     close(lock);
@@ -9191,6 +9355,8 @@ static int copy_reflink(const char *from, const char *to) {
 
 /* qemu-img convert of a qcow2 (with its base when it has one), jailed: it reads the disk (and the base) and writes
  * only in out_dir. snap: a snapshot's tag to copy instead of the current state, or NULL */
+/* --compact --compress: the copy's clusters compressed (qemu-img convert -c, zlib), never with encryption (qcow2 can't) */
+static int qimg_compress;
 static int qimg_convert(const char *disk, const char *base, const char *snap, const char *out, const char *out_dir, char *err, size_t errlen) {
     JBuf b;
     jb_init(&b);
@@ -9206,6 +9372,8 @@ static int qimg_convert(const char *disk, const char *base, const char *snap, co
     int e = key_have();
     char *with[] = { QEMU_IMG, "convert", "-q", "-l", sn, "-O", "qcow2", e ? "-o" : b.p, e ? ENC_CREATE_OPTS : (char *)out, e ? b.p : NULL, (char *)out, NULL };
     char *without[] = { QEMU_IMG, "convert", "-q", "-O", "qcow2", e ? "-o" : b.p, e ? ENC_CREATE_OPTS : (char *)out, e ? b.p : NULL, (char *)out, NULL };
+    char *compressed[] = { QEMU_IMG, "convert", "-q", "-c", "-O", "qcow2", b.p, (char *)out, NULL };
+    if (qimg_compress && !snap && !e) { jail_read2 = NULL; int r = run_tool_in(compressed, err, errlen, disk, out_dir); jb_free(&b); return r; }
     jail_read2 = base && base[0] ? base : NULL;
     int r = run_tool_in(snap ? with : without, err, errlen, disk, out_dir);
     jail_read2 = NULL;
@@ -9478,11 +9646,18 @@ out:
     return rc;
 }
 
-/* lord-vm --compact DIR [--estimate]: the system disk rewritten without the space it no longer uses (6.4). The machine
- * must be off, without snapshots (they'd be lost), a saved session or a base. Under operation.json "compact": the new
- * file is made beside the old one, checked, and renamed over it. --estimate prints what it would take. */
+/* lord-vm --compact DIR [--estimate] [--compress]: the system disk rewritten without the space it no longer uses (6.4).
+ * The machine must be off, without snapshots (they'd be lost), a saved session or a base. Under operation.json
+ * "compact": the new file is made beside the old one, checked, and renamed over it. --estimate prints what it would
+ * take. --compress also compresses every cluster of the copy (qcow2's own zlib compression): smaller, and what the guest
+ * writes later is stored as usual; not for an encrypted machine (qcow2 can't have both). */
 static int cmd_compact(const char *dir, int argc, char **argv) {
-    int estimate = argc > 0 && !strcmp(argv[0], "--estimate");
+    int estimate = 0;
+    for (int i = 0; i < argc; i++) {
+        if (!strcmp(argv[i], "--estimate")) estimate = 1;
+        else if (!strcmp(argv[i], "--compress")) qimg_compress = 1;
+        else { fprintf(stderr, "lord-vm: --compact DIR [--estimate] [--compress]\n"); return 2; }
+    }
     char real[PATH_MAX], err[256];
     if (!realpath(dir, real)) { fprintf(stderr, "lord-vm: %s: %s\n", dir, strerror(errno)); return 1; }
     snprintf(S.dir, sizeof S.dir, "%s", real);
@@ -9490,6 +9665,7 @@ static int cmd_compact(const char *dir, int argc, char **argv) {
     if (vm_machine_load(real, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); return 1; }
     /* a raw disk gives space back by itself: the guest's discards punch holes in the file (6.4) */
     if (m.raw) { fprintf(stderr, "lord-vm: a raw disk needs no compaction: the guest's discards free its space\n"); return 1; }
+    if (m.encrypted && qimg_compress) { fprintf(stderr, "lord-vm: an encrypted machine's disk can't be compressed (qcow2 has no compressed encrypted clusters)\n"); return 1; }
     if (m.encrypted && !key_have()) { fprintf(stderr, "lord-vm: the machine is encrypted: its key is needed (--key-fd)\n"); return 1; }
     if (!m.encrypted && key_have()) key_wipe();
     char sys[PATH_MAX + 64], dd[PATH_MAX + 64], tmp[PATH_MAX + 64];
@@ -9542,7 +9718,7 @@ static int cmd_compact(const char *dir, int argc, char **argv) {
     vm_sync_dir(dd);
     vm_op_end(real);
     stat(sys, &sb);
-    printf("{\"compacted\":true,\"before\":%lld,\"after\":%lld}\n", before, (long long)sb.st_blocks * 512);
+    printf("{\"compacted\":true,\"compressed\":%s,\"before\":%lld,\"after\":%lld}\n", qimg_compress ? "true" : "false", before, (long long)sb.st_blocks * 512);
     rc = 0;
 out:
     close(lock);
@@ -12104,7 +12280,7 @@ static int usage(void) {
             "       lord-vm --suspend DIR | --discard-state DIR | --agent DIR shutdown|timesync|install\n"
             "       lord-vm --snapshot DIR take NAME [TAG] | revert TAG | delete TAG | list   (and --start DIR --loadvm TAG)\n"
             "       lord-vm --clone DIR NEWDIR [--name N] [--duplicate] [--linked] [--from-snapshot TAG] [--hostname H | --keep-identity]\n"
-            "       lord-vm --compact DIR [--estimate]\n"
+            "       lord-vm --compact DIR [--estimate] [--compress]\n"
             "       lord-vm --import-plan SRC [--arch arm64|amd64]   (a machine of another virtualization app: what comes along)\n"
             "       lord-vm --import-machine SRC DIR [--name N] [--arch A] [--devices compat|virtio] [--network shared|isolated]\n"
             "                                        [--firmware uefi|bios] [--vcpus N] [--memory MB]\n"

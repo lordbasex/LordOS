@@ -120,7 +120,7 @@
   "execFailed": "{name} couldn't run it: {why}",
   "outputCut": "The output was longer than what comes back: only its start is shown.",
   "timedOut": "The program in {name} ran out of time and was stopped.",
-  "cpOnlyFiles": "Only files can be copied: {path} isn't one.",
+  "cpOnlyFiles": "Only files and folders can be copied: {path} is neither.",
   "cpOneSide": "Say which side is the machine: one of the two is NAME:PATH, the other a file on this computer.",
   "cpOutside": "{path} isn't among your files, or it is protected.",
   "cpExists": "{path} exists already: --force replaces it.",

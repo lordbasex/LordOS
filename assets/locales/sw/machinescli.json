@@ -120,7 +120,7 @@
   "execFailed": "{name} haikuweza kuiendesha: {why}",
   "outputCut": "Matokeo yalikuwa marefu kuliko yanayorudi: mwanzo wake tu unaonyeshwa.",
   "timedOut": "Programu katika {name} iliishiwa na muda na ikasimamishwa.",
-  "cpOnlyFiles": "Faili pekee zinaweza kunakiliwa: {path} si faili.",
+  "cpOnlyFiles": "Faili na folda pekee zinaweza kunakiliwa: {path} si mojawapo.",
   "cpOneSide": "Sema upande upi ni mashine: mmoja ni JINA:NJIA, mwingine ni faili kwenye kompyuta hii.",
   "cpOutside": "{path} haimo kwenye faili zako, au imelindwa.",
   "cpExists": "{path} tayari ipo: --force huibadilisha.",

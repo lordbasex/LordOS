@@ -5707,7 +5707,36 @@ static JSValue f_awake(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
 
 /* ---- snapshots (6.2): lord-vm --snapshot as a job (through the running lord-vm when the machine is on) ---- */
 
-/* snaps(dir) → { list: [{ tag, name, created, memory, vmstate, picture }], max, warn } */
+/* snapNote(dir, tag, text) → bool: a snapshot's note (6.2), <machine>/snapshots/<tag>.note, written whole (a new file
+ * renamed over); "" removes it. Only for a snapshot snapshots.json lists */
+static JSValue f_snap_note(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    char dir[PATH_MAX];
+    if (argc < 3 || machine_dir(c, argv[0], dir, sizeof dir)) return JS_FALSE;
+    const char *tag = JS_ToCString(c, argv[1]), *text = JS_ToCString(c, argv[2]);
+    char tg[40] = "", note[VM_SNAP_NOTE_MAX + 1] = "";
+    int ok = tag && text && vm_snap_tag_valid(tag) && vm_snap_note_valid(text);
+    if (ok) { snprintf(tg, sizeof tg, "%s", tag); snprintf(note, sizeof note, "%s", text); }
+    if (tag) JS_FreeCString(c, tag);
+    if (text) JS_FreeCString(c, text);
+    if (!ok) return JS_FALSE;
+    static VmSnap list[VM_SNAPS_MAX];
+    if (vm_snaps_find(list, vm_snaps_load(dir, list, VM_SNAPS_MAX), tg) < 0) return JS_FALSE;
+    char sd[PATH_MAX + 32], to[PATH_MAX + 96], tmp[PATH_MAX + 96];
+    snprintf(sd, sizeof sd, "%s/snapshots", dir);
+    snprintf(to, sizeof to, "%s/%s.note", sd, tg);
+    if (!note[0]) return JS_NewBool(c, !unlink(to) || errno == ENOENT);
+    mkdir(sd, 0700);
+    snprintf(tmp, sizeof tmp, "%s/.%s.note.tmp", sd, tg);
+    int fd = open(tmp, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW, 0600);
+    size_t n = strlen(note);
+    int w = fd >= 0 && write(fd, note, n) == (ssize_t)n;
+    if (fd >= 0) close(fd);
+    if (!w || rename(tmp, to)) { unlink(tmp); return JS_FALSE; }
+    return JS_TRUE;
+}
+
+/* snaps(dir) → { list: [{ tag, name, created, memory, vmstate, picture, note, settings? }], max, warn } */
 static JSValue f_snaps(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t; (void)argc;
     char dir[PATH_MAX];
@@ -5726,6 +5755,32 @@ static JSValue f_snaps(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         struct stat st;
         snprintf(p, sizeof p, "%s/snapshots/%s.png", dir, list[i].tag);
         set_str(c, e, "picture", !stat(p, &st) ? p : "");
+        /* its note (snapNote), and the hardware the settings kept with it say (lord-vm snap_settings_keep) */
+        char note[VM_SNAP_NOTE_MAX + 1] = "";
+        snprintf(p, sizeof p, "%s/snapshots/%s.note", dir, list[i].tag);
+        int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        if (fd >= 0) {
+            ssize_t r = read(fd, note, VM_SNAP_NOTE_MAX);
+            note[r > 0 ? r : 0] = 0;
+            close(fd);
+            if (!vm_snap_note_valid(note)) note[0] = 0;
+        }
+        set_str(c, e, "note", note);
+        snprintf(p, sizeof p, "%s/snapshots/%s.json", dir, list[i].tag);
+        fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        if (fd >= 0) {
+            static char buf[64 * 1024];
+            ssize_t r = read(fd, buf, sizeof buf);
+            close(fd);
+            static VmMachine then;
+            if (r > 0 && r < (ssize_t)sizeof buf && !vm_machine_parse(buf, (size_t)r, &then, NULL, 0)) {
+                JSValue h = JS_NewObject(c);
+                set_int(c, h, "vcpus", then.vcpus);
+                set_int(c, h, "memoryMb", then.memory_mb);
+                set_int(c, h, "dataDisks", then.n_data);
+                JS_SetPropertyStr(c, e, "settings", h);
+            }
+        }
         JS_SetPropertyUint32(c, arr, (uint32_t)i, e);
     }
     JS_SetPropertyStr(c, o, "list", arr);
@@ -5904,17 +5959,20 @@ static JSValue f_clone(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     return JS_NewInt32(c, id);
 }
 
-/* compact(dir, estimate) → job id: lord-vm --compact [--estimate] (the estimate's out is JSON) */
+/* compact(dir, estimate[, compress]) → job id: lord-vm --compact [--estimate | --compress] (the out is JSON) */
 static JSValue f_compact(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char dir[PATH_MAX];
     if (machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    int est = argc > 1 && JS_ToBool(c, argv[1]) > 0;
-    char *args[] = { "lord-vm", "--compact", dir, est ? "--estimate" : NULL, NULL };
+    int est = argc > 1 && JS_ToBool(c, argv[1]) > 0, zip = !est && argc > 2 && JS_ToBool(c, argv[2]) > 0;
+    char *args[] = { "lord-vm", "--compact", dir, est ? "--estimate" : zip ? "--compress" : NULL, NULL };
     return JS_NewInt32(c, spawn_job(args, dir));
 }
 
-/* what a file takes on disk, and how much of it is shared with another file (reflink: FIEMAP_EXTENT_SHARED) */
+/* what a file takes on disk, and how much of it is shared with another file (reflink: FIEMAP_EXTENT_SHARED). An extent
+ * the file system stores compressed (FIEMAP_EXTENT_ENCODED: btrfs with compression) has a length that isn't what it
+ * takes, so the figures are only "about" (6.16): shared_encoded says so */
+static int shared_encoded;
 static double blocks_of(const char *p) { struct stat st; return !lstat(p, &st) && S_ISREG(st.st_mode) ? (double)st.st_blocks * 512 : 0; }
 static double shared_of(const char *p) {
     int fd = open(p, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
@@ -5932,6 +5990,7 @@ static double shared_of(const char *p) {
         for (unsigned i = 0; i < u.f.fm_mapped_extents; i++) {
             struct fiemap_extent *e = &u.f.fm_extents[i];
             if (e->fe_flags & FIEMAP_EXTENT_SHARED) shared += (double)e->fe_length;
+            if (e->fe_flags & FIEMAP_EXTENT_ENCODED) shared_encoded = 1;
             if (e->fe_flags & FIEMAP_EXTENT_LAST) last = 1;
             start = e->fe_logical + e->fe_length;
         }
@@ -6043,8 +6102,14 @@ static JSValue f_storage(JSContext *c, JSValueConst t, int argc, JSValueConst *a
         VmMachine m;
         if (vm_machine_load(p, &m, NULL, 0)) continue;
         double disks = 0, shared = 0;
-        const char *files[] = { "system.qcow2", "nvram.qcow2" };
-        for (int i = 0; i < 2; i++) { snprintf(f, sizeof f, "%s/disks/%s", p, files[i]); disks += blocks_of(f); shared += shared_of(f); }
+        shared_encoded = 0;
+        /* every disk of the machine: the system disk (qcow2 or raw), the UEFI variables, the data disks */
+        char files[2 + VM_DATA_DISKS][32];
+        int nfiles = 0;
+        snprintf(files[nfiles++], sizeof files[0], "system.%s", vm_disk_ext(&m));
+        snprintf(files[nfiles++], sizeof files[0], "nvram.qcow2");
+        for (int i = 0; i < m.n_data && i < VM_DATA_DISKS; i++) snprintf(files[nfiles++], sizeof files[0], "data-%d.qcow2", i + 1);
+        for (int i = 0; i < nfiles; i++) { snprintf(f, sizeof f, "%s/disks/%.31s", p, files[i]); disks += blocks_of(f); shared += shared_of(f); }
         snprintf(f, sizeof f, "%s/suspend.state", p);
         double state = blocks_of(f);
         shared += shared_of(f);
@@ -6075,6 +6140,8 @@ static JSValue f_storage(JSContext *c, JSValueConst t, int argc, JSValueConst *a
         JS_SetPropertyStr(c, x, "state", JS_NewFloat64(c, state));
         JS_SetPropertyStr(c, x, "other", JS_NewFloat64(c, other));
         JS_SetPropertyStr(c, x, "shared", JS_NewFloat64(c, shared));
+        JS_SetPropertyStr(c, x, "approx", JS_NewBool(c, shared_encoded));
+        JS_SetPropertyStr(c, x, "encrypted", JS_NewBool(c, m.encrypted));
         JS_SetPropertyStr(c, x, "total", JS_NewFloat64(c, all));
         JS_SetPropertyStr(c, x, "frees", JS_NewFloat64(c, frees < 0 ? 0 : frees));
         JS_SetPropertyUint32(c, arr, k++, x);
@@ -6410,7 +6477,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("netCable", 2, f_net_cable), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("usbDevices", 0, f_usb_devices), JS_CFUNC_DEF("usbAttach", 3, f_usb_attach), JS_CFUNC_DEF("usbDetach", 3, f_usb_detach), JS_CFUNC_DEF("usbAuto", 3, f_usb_auto),
-    JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
+    JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapNote", 3, f_snap_note), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),
     JS_CFUNC_DEF("storage", 0, f_storage), JS_CFUNC_DEF("record", 1, f_record), JS_CFUNC_DEF("console", 1, f_console),

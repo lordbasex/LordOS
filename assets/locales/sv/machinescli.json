@@ -120,7 +120,7 @@
   "execFailed": "{name} kunde inte köra det: {why}",
   "outputCut": "Utdata var längre än det som kommer tillbaka: bara början visas.",
   "timedOut": "Programmet i {name} fick slut på tid och stoppades.",
-  "cpOnlyFiles": "Bara filer kan kopieras: {path} är ingen.",
+  "cpOnlyFiles": "Endast filer och mappar kan kopieras: {path} är ingetdera.",
   "cpOneSide": "Säg vilken sida som är maskinen: en av dem är NAMN:SÖKVÄG, den andra en fil på den här datorn.",
   "cpOutside": "{path} hör inte till dina filer, eller är skyddad.",
   "cpExists": "{path} finns redan: --force ersätter den.",

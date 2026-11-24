@@ -1390,10 +1390,10 @@ _Static_assert(GET_CHUNK_BYTES == 131072, "GET_CHUNK's block size");
  * -1 after saying why */
 static int cp_step(const Machine *x, const char *script, const char *const *args, int na, const uint8_t *in, size_t inlen,
                    uint8_t *out, size_t cap, size_t *outlen, int *exit_status) {
-    const char *av[12];
+    const char *av[VMX_ARGC_MAX];
     int n = 0;
     av[n++] = "/bin/sh"; av[n++] = "-c"; av[n++] = script; av[n++] = "lordos-cp";
-    for (int i = 0; i < na && n < 11; i++) av[n++] = args[i];
+    for (int i = 0; i < na && n < VMX_ARGC_MAX; i++) av[n++] = args[i];
     VmxRes res;
     uint8_t *keep;
     char why[300];
@@ -1426,8 +1426,12 @@ static int cp_step(const Machine *x, const char *script, const char *const *args
 
 static void hexof(const uint8_t d[32], char out[65]) { for (int i = 0; i < 32; i++) snprintf(out + i * 2, 3, "%02x", d[i]); }
 
+/* a folder's copy (cp_tree_*): each file copied as one, without its own line; the whole copy's size at the end */
+static int cp_quiet;
+static double cp_total;
+
 static void progress(double done, double total) {
-    if (!isatty(2)) return;
+    if (!isatty(2) || cp_quiet) return;
     char a[32], b[32];
     mcli_bytes(done, a, sizeof a);
     mcli_bytes(total, b, sizeof b);
@@ -1481,7 +1485,7 @@ static int cp_put(Machine *x, const char *src, const char *gpath, int force) {
     }
     free(buf);
     close(fd);
-    if (isatty(2)) fputc('\n', stderr);
+    if (isatty(2) && !cp_quiet) fputc('\n', stderr);
     if (!rc) {
         uint8_t d[32];
         char hex[65], size[32];
@@ -1493,6 +1497,8 @@ static int cp_put(Machine *x, const char *src, const char *gpath, int force) {
             if (ex == 8) ERR("cpExists", "path", target, NULL);
             return VMCLI_FAILED;
         }
+        cp_total += done;
+        if (cp_quiet) return 0;
         char sz[32], shown[4300];
         mcli_bytes(done, sz, sizeof sz);
         mcli_term_clean((const uint8_t *)target, strlen(target), shown, sizeof shown);
@@ -1543,7 +1549,7 @@ static int cp_get(Machine *x, const char *gpath, const char *dst, int force) {
     char again[PATH_MAX];
     if (dfd < 0 || fd_path(dfd, again, sizeof again) || strcmp(again, dir) || !fs_dir_ok(again)) { if (dfd >= 0) close(dfd); ERR("cpOutside", "path", dst, NULL); return VMCLI_FAILED; }
     if (!force && !fstatat(dfd, name, &st, AT_SYMLINK_NOFOLLOW)) { close(dfd); ERR("cpExists", "path", real, NULL); return VMCLI_FAILED; }
-    uint8_t out[VMX_OUT_MAX + 1];
+    uint8_t out[VMX_OUT_MAX + 2];         /* a whole chunk (VMX_OUT_MAX) fits under the cap with its NUL */
     size_t ol;
     int ex;
     const char *a1[] = { gpath };
@@ -1592,7 +1598,7 @@ static int cp_get(Machine *x, const char *gpath, const char *dst, int force) {
         progress((double)done, (double)total);
         if (ol < GET_CHUNK_BYTES && done < total) { rc = VMCLI_FAILED; ERR("execFailed", "name", x->m.name, "why", "the file shrank while it was copied", NULL); break; }
     }
-    if (isatty(2)) fputc('\n', stderr);
+    if (isatty(2) && !cp_quiet) fputc('\n', stderr);
     if (!rc && done != total) { rc = VMCLI_FAILED; ERR("execFailed", "name", x->m.name, "why", "the file changed while it was copied", NULL); }
     if (!rc) {
         uint8_t d[32];
@@ -1617,7 +1623,8 @@ static int cp_get(Machine *x, const char *gpath, const char *dst, int force) {
     cp_dfd = -1;
     cp_tmp[0] = 0;
     close(dfd);
-    if (!rc) {
+    if (!rc) cp_total += (double)done;
+    if (!rc && !cp_quiet) {
         char sz[32];
         mcli_bytes((double)done, sz, sizeof sz);
         SAY("cpDone", "size", sz, "where", real, NULL);
@@ -1625,7 +1632,219 @@ static int cp_get(Machine *x, const char *gpath, const char *dst, int force) {
     return rc;
 }
 
-/* machines cp [--force] SRC DST: one of them NAME:PATH. Files only. */
+/* ---- cp of a folder (6.15): every file under it as cp copies one, the folders made first ----
+ * Into a machine: this computer's folder is walked by descriptor (never following a link; links, devices and the like
+ * are left out and counted), each folder made in the machine (mkdir, as the person), each file through cp_put (its own
+ * checks: the person's files, never a protected one). Out of a machine: the guest lists the folder (find, as the person:
+ * "d PATH" and "f SIZE PATH", NUL-separated, at most 128 KB) and the listing is hostile (mcli_tree_next: relative paths
+ * only, no "..", no control characters, MCLI_TREE_MAX entries, MCLI_TREE_DEPTH deep); each folder is made here one
+ * component at a time under the copy's own new folder, by descriptor, never through a link (mkdirat, openat O_NOFOLLOW),
+ * and each file comes through cp_get. A folder of the same name is refused unless --force (then merged). */
+static const char TREE_ROOT_PUT[] =
+    G_EXPAND "n=\"$2\"; if [ -d \"$s\" ]; then t=\"${s%/}/$n\"; else t=\"$s\"; fi; p=$(dirname -- \"$t\"); "
+    "[ -d \"$p\" ] || { echo \"no folder $p in the machine\" >&2; exit 2; }; "
+    "if [ -e \"$t\" ] || [ -L \"$t\" ]; then { [ \"$3\" = 1 ] && [ -d \"$t\" ] && [ ! -L \"$t\" ]; } || { echo exists >&2; exit 8; }; "
+    "else mkdir -- \"$t\" || exit 3; fi; printf '%s' \"$t\"";
+static const char TREE_MKDIRS[] = "for d; do mkdir -p -- \"$d\" || exit 3; done";
+static const char TREE_LIST[] =
+    G_EXPAND "{ [ -d \"$s\" ] && [ ! -L \"$s\" ]; } || { echo \"$s is not a folder in the machine\" >&2; exit 2; }; "
+    "cd -- \"$s\" && find . -mindepth 1 -maxdepth 32 \\( -type d -printf 'd %P\\0' \\) -o \\( -type f -printf 'f %s %P\\0' \\)";
+
+static int cp_tree_mkdirs(Machine *x, const char *const *dirs, int n) {
+    int ex;
+    for (int i = 0; i < n; i += 56) {
+        int k = n - i < 56 ? n - i : 56;
+        if (cp_step(x, TREE_MKDIRS, dirs + i, k, NULL, 0, NULL, 0, NULL, &ex)) return -1;
+    }
+    return 0;
+}
+
+typedef struct { Machine *x; int force, count, skipped; char groot[4200]; } TreePut;
+
+static int put_walk(TreePut *t, int dfd, const char *lpath, const char *grel, int depth) {
+    if (depth > MCLI_TREE_DEPTH) { ERR("execFailed", "name", t->x->m.name, "why", "the folder is too deep", NULL); return -1; }
+    int d2 = dup(dfd);
+    DIR *d = d2 >= 0 ? fdopendir(d2) : NULL;
+    if (!d) { if (d2 >= 0) close(d2); ERR("cpOutside", "path", lpath, NULL); return -1; }
+    struct dirent *e;
+    int rc = 0;
+    while (!rc && (e = readdir(d))) {
+        if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+        if (++t->count > MCLI_TREE_MAX) { ERR("execFailed", "name", t->x->m.name, "why", "more than 10000 files and folders: copy it in parts, or use the transfer folder", NULL); rc = -1; break; }
+        char lp[PATH_MAX], gr[MCLI_TREE_PATH_MAX + 2], gp[4200 + MCLI_TREE_PATH_MAX + 2];
+        if (snprintf(lp, sizeof lp, "%s/%s", lpath, e->d_name) >= (int)sizeof lp ||
+            snprintf(gr, sizeof gr, "%s%s%s", grel, grel[0] ? "/" : "", e->d_name) >= (int)sizeof gr || !mcli_rel_path_ok(gr) ||
+            snprintf(gp, sizeof gp, "%s/%s", t->groot, gr) >= (int)sizeof gp || !vmx_guest_path_ok(gp)) { t->skipped++; continue; }
+        struct stat st;
+        if (fstatat(dfd, e->d_name, &st, AT_SYMLINK_NOFOLLOW)) { t->skipped++; continue; }
+        if (S_ISDIR(st.st_mode)) {
+            const char *one[] = { gp };
+            if (cp_tree_mkdirs(t->x, one, 1)) { rc = -1; break; }
+            int sub = openat(dfd, e->d_name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+            if (sub < 0) { t->skipped++; continue; }
+            rc = put_walk(t, sub, lp, gr, depth + 1);
+            close(sub);
+        } else if (S_ISREG(st.st_mode)) {
+            char gdir[4200 + MCLI_TREE_PATH_MAX + 2];
+            snprintf(gdir, sizeof gdir, "%s", gp);
+            *strrchr(gdir, '/') = 0;
+            if (cp_put(t->x, lp, gdir, t->force)) rc = -1;
+        } else t->skipped++;               /* a link, a device, a socket: never followed, never copied */
+    }
+    closedir(d);
+    return rc;
+}
+
+static int cp_tree_put(Machine *x, const char *src, const char *gpath, int force) {
+    fs_setup();
+    char real[PATH_MAX], again[PATH_MAX];
+    if (!realpath(src, real) || !fs_dir_ok(real)) { ERR("cpOutside", "path", src, NULL); return VMCLI_FAILED; }
+    int dfd = open(real, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    if (dfd < 0 || fd_path(dfd, again, sizeof again) || strcmp(again, real) || !fs_dir_ok(again)) { if (dfd >= 0) close(dfd); ERR("cpOutside", "path", src, NULL); return VMCLI_FAILED; }
+    const char *base = strrchr(real, '/') + 1;
+    if (!base[0]) { close(dfd); ERR("cpOutside", "path", src, NULL); return VMCLI_FAILED; }
+    const char *a1[] = { gpath, base, force ? "1" : "0" };
+    uint8_t out[4300];
+    size_t ol;
+    int ex;
+    auto_log(x, "cp: a folder into the machine");
+    if (cp_step(x, TREE_ROOT_PUT, a1, 3, NULL, 0, out, sizeof out - 1, &ol, &ex)) { close(dfd); if (ex == 8) ERR("cpExists", "path", gpath, NULL); return VMCLI_FAILED; }
+    if (out[0] != '/' || !vmx_guest_path_ok((char *)out)) { close(dfd); ERR("execFailed", "name", x->m.name, "why", "the machine gave a strange path", NULL); return VMCLI_FAILED; }
+    TreePut t = { .x = x, .force = force };
+    if (strlen((char *)out) >= sizeof t.groot) { close(dfd); ERR("execFailed", "name", x->m.name, "why", "the machine gave a strange path", NULL); return VMCLI_FAILED; }
+    memcpy(t.groot, out, strlen((char *)out) + 1);
+    cp_quiet = 1; cp_total = 0;
+    int rc = put_walk(&t, dfd, real, "", 1);
+    cp_quiet = 0;
+    close(dfd);
+    if (rc) return VMCLI_FAILED;
+    char sz[32], shown[4300];
+    mcli_bytes(cp_total, sz, sizeof sz);
+    mcli_term_clean((const uint8_t *)t.groot, strlen(t.groot), shown, sizeof shown);
+    SAY("cpDone", "size", sz, "where", shown, NULL);
+    if (t.skipped) auto_log(x, "cp: %d entries that aren't files or folders left out", t.skipped);
+    return 0;
+}
+
+/* a folder rel (checked) under rootfd, made one component at a time, never through a link; its descriptor, or -1 */
+static int tree_dir(int rootfd, const char *rel, int make) {
+    char b[MCLI_TREE_PATH_MAX + 1];
+    snprintf(b, sizeof b, "%s", rel);
+    int fd = dup(rootfd);
+    for (char *s = b, *c; fd >= 0 && s && *s; s = c) {
+        c = strchr(s, '/');
+        if (c) *c++ = 0;
+        if (make && mkdirat(fd, s, 0700) && errno != EEXIST) { close(fd); return -1; }
+        int n = openat(fd, s, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        close(fd);
+        fd = n;
+    }
+    return fd;
+}
+
+static int cp_tree_get(Machine *x, const char *gpath, const char *dst, int force) {
+    fs_setup();
+    if (!vmx_guest_path_ok(gpath)) { ERR("cpOnlyFiles", "path", gpath, NULL); return VMCLI_FAILED; }
+    const char *gb = strrchr(gpath, '/');
+    gb = gb ? gb + 1 : gpath;
+    if (!strcmp(gpath, "~") || !strcmp(gpath, "~/")) gb = "home";
+    if (!gb[0] || !strcmp(gb, ".") || !strcmp(gb, "..")) { ERR("cpOnlyFiles", "path", gpath, NULL); return VMCLI_FAILED; }
+    /* where it goes: into an existing folder (the guest folder's name in it), or a new name in one */
+    char dir[PATH_MAX], name[NAME_MAX + 1], real[PATH_MAX];
+    struct stat st;
+    if (!stat(dst, &st) && S_ISDIR(st.st_mode)) {
+        if (!realpath(dst, dir)) { ERR("cpOutside", "path", dst, NULL); return VMCLI_FAILED; }
+        snprintf(name, sizeof name, "%s", gb);
+    } else {
+        char tmp[PATH_MAX];
+        snprintf(tmp, sizeof tmp, "%s", dst);
+        char *sl = strrchr(tmp, '/');
+        const char *pd = sl ? (sl == tmp ? "/" : tmp) : ".";
+        if (sl) *sl = 0;
+        const char *nm = sl ? sl + 1 : dst;
+        if (!nm[0] || !strcmp(nm, ".") || !strcmp(nm, "..") || strlen(nm) > NAME_MAX || !realpath(pd, dir)) { ERR("cpOutside", "path", dst, NULL); return VMCLI_FAILED; }
+        snprintf(name, sizeof name, "%s", nm);
+    }
+    if (strchr(name, '/') || !mcli_rel_path_ok(name) || snprintf(real, sizeof real, "%s/%s", strcmp(dir, "/") ? dir : "", name) >= (int)sizeof real ||
+        !fs_dir_ok(dir) || !fs_ok(real)) { ERR("cpOutside", "path", dst, NULL); return VMCLI_FAILED; }
+    int pfd = open(dir, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    char again[PATH_MAX];
+    if (pfd < 0 || fd_path(pfd, again, sizeof again) || strcmp(again, dir) || !fs_dir_ok(again)) { if (pfd >= 0) close(pfd); ERR("cpOutside", "path", dst, NULL); return VMCLI_FAILED; }
+    /* the guest's listing first: nothing is made here for a folder that isn't there */
+    uint8_t *ls = malloc(VMX_OUT_MAX + 1);
+    size_t ln = 0;
+    int ex;
+    const char *a1[] = { gpath };
+    auto_log(x, "cp: a folder out of the machine");
+    if (!ls || cp_step(x, TREE_LIST, a1, 1, NULL, 0, ls, VMX_OUT_MAX, &ln, &ex)) { free(ls); close(pfd); return VMCLI_FAILED; }
+    /* a listing of exactly the cap was cut by the guest: refused rather than copied in part */
+    if (ln >= VMX_OUT_MAX - 1) { free(ls); close(pfd); ERR("execFailed", "name", x->m.name, "why", "the folder lists too many files: copy it in parts, or use the transfer folder", NULL); return VMCLI_FAILED; }
+    McliTreeEnt e;
+    size_t off = 0;
+    int n = 0, g;
+    unsigned long long need = 0;
+    int prot = 0;
+    while ((g = mcli_tree_next((char *)ls, ln, &off, &e)) == 1) {
+        need += e.size;
+        if (++n > MCLI_TREE_MAX) { g = -1; break; }
+        /* every folder this copy would make or enter here (each prefix of the entry's path), and the file itself, must be
+         * among the person's files and never a protected path (autostart, .desktop folders, settings…): checked for the
+         * whole listing before anything is made, so a hostile listing makes nothing */
+        char hp[PATH_MAX];
+        if (snprintf(hp, sizeof hp, "%s/%s", real, e.path) >= (int)sizeof hp) { prot = 1; break; }
+        size_t base = strlen(real);
+        for (size_t i = base + 1; hp[i]; i++) {
+            if (hp[i] != '/') continue;
+            hp[i] = 0;
+            int bad = !fs_ok(hp);
+            hp[i] = '/';
+            if (bad) { prot = 1; break; }
+        }
+        if (prot || !fs_ok(hp)) { prot = 1; break; }
+    }
+    if (prot) { free(ls); close(pfd); ERR("cpOutside", "path", real, NULL); return VMCLI_FAILED; }
+    if (g < 0) { free(ls); close(pfd); ERR("execFailed", "name", x->m.name, "why", "the machine gave a strange list of files", NULL); return VMCLI_FAILED; }
+    struct statvfs vf;
+    if (!fstatvfs(pfd, &vf) && need > (unsigned long long)vf.f_bavail * vf.f_frsize - ((unsigned long long)vf.f_bavail * vf.f_frsize / 20)) {
+        free(ls); close(pfd); ERR("execFailed", "name", x->m.name, "why", strerror(ENOSPC), NULL); return VMCLI_FAILED;
+    }
+    /* the copy's own folder: new, or (--force) an existing folder that isn't a link */
+    if (mkdirat(pfd, name, 0700)) {
+        if (errno != EEXIST || !force || fstatat(pfd, name, &st, AT_SYMLINK_NOFOLLOW) || !S_ISDIR(st.st_mode)) {
+            free(ls); close(pfd);
+            if (errno == EEXIST || !force) ERR("cpExists", "path", real, NULL); else ERR("execFailed", "name", x->m.name, "why", strerror(errno), NULL);
+            return VMCLI_FAILED;
+        }
+    }
+    int rootfd = openat(pfd, name, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    close(pfd);
+    if (rootfd < 0 || fd_path(rootfd, again, sizeof again) || strcmp(again, real) || !fs_dir_ok(again)) {
+        if (rootfd >= 0) { close(rootfd); } free(ls); ERR("cpOutside", "path", real, NULL); return VMCLI_FAILED;
+    }
+    cp_quiet = 1; cp_total = 0;
+    int rc = 0;
+    off = 0;
+    while (!rc && mcli_tree_next((char *)ls, ln, &off, &e) == 1) {
+        char rel[MCLI_TREE_PATH_MAX + 1], gfile[8200], ldir[PATH_MAX];
+        snprintf(rel, sizeof rel, "%s", e.path);
+        if (e.dir) { int fd = tree_dir(rootfd, rel, 1); if (fd < 0) { rc = -1; ERR("execFailed", "name", x->m.name, "why", strerror(errno), NULL); } else close(fd); continue; }
+        char *sl = strrchr(rel, '/');
+        if (sl) { *sl = 0; int fd = tree_dir(rootfd, rel, 1); if (fd < 0) { rc = -1; ERR("execFailed", "name", x->m.name, "why", strerror(errno), NULL); break; } close(fd); }
+        if (snprintf(gfile, sizeof gfile, "%s%s%s", gpath, gpath[strlen(gpath) - 1] == '/' ? "" : "/", e.path) >= (int)sizeof gfile ||
+            snprintf(ldir, sizeof ldir, "%s%s%s", real, sl ? "/" : "", sl ? rel : "") >= (int)sizeof ldir) { rc = -1; ERR("cpOutside", "path", e.path, NULL); break; }
+        if (cp_get(x, gfile, ldir, force)) rc = -1;
+    }
+    cp_quiet = 0;
+    close(rootfd);
+    free(ls);
+    if (rc) return VMCLI_FAILED;
+    char sz[32];
+    mcli_bytes(cp_total, sz, sizeof sz);
+    SAY("cpDone", "size", sz, "where", real, NULL);
+    return 0;
+}
+
+/* machines cp [--force] SRC DST: one of them NAME:PATH. A file, or a folder with everything in it (cp_tree_*). */
 static int cmd_cp(int argc, char **argv) {
     int force = 0;
     const char *a[2];
@@ -1644,7 +1863,20 @@ static int cmd_cp(int argc, char **argv) {
     Machine *x = find(g0 ? n0 : n1, &rc);
     if (!x) return rc;
     if (x->ok && x->m.profile_lock) { ERR("noAutomation", "name", x->m.name, NULL); return VMCLI_FAILED; }
-    return g1 ? cp_put(x, a[0], p1, force) : cp_get(x, p0, a[1], force);
+    if (g1) {
+        struct stat st;
+        if (!stat(a[0], &st) && S_ISDIR(st.st_mode)) return cp_tree_put(x, a[0], p1, force);
+        return cp_put(x, a[0], p1, force);
+    }
+    /* out of the machine: a folder there (its listing says so) or a file */
+    static const char IS_DIR[] = G_EXPAND "[ -d \"$s\" ] && [ ! -L \"$s\" ] && printf d || printf f";
+    const char *q[] = { p0 };
+    uint8_t o[8];
+    size_t ol;
+    int ex;
+    if (!vmx_guest_path_ok(p0)) { ERR("cpOnlyFiles", "path", p0, NULL); return VMCLI_FAILED; }
+    if (cp_step(x, IS_DIR, q, 1, NULL, 0, o, sizeof o - 1, &ol, &ex)) return VMCLI_FAILED;
+    return ol == 1 && o[0] == 'd' ? cp_tree_get(x, p0, a[1], force) : cp_get(x, p0, a[1], force);
 }
 
 /* ---- logs ---- */
@@ -2222,7 +2454,9 @@ static const char MCP_TOOLS[] =
     "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"which\":{\"type\":\"string\",\"enum\":[\"journal\",\"serial\",\"machine\"]},"
     "\"lines\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":2000}},\"required\":[\"name\"],\"additionalProperties\":false}},"
     "{\"name\":\"clone_machine\",\"description\":\"Clones a machine that is off into a new one with its own identity.\","
-    "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"new_name\":{\"type\":\"string\"}},\"required\":[\"name\",\"new_name\"],\"additionalProperties\":false}}"
+    "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"new_name\":{\"type\":\"string\"}},\"required\":[\"name\",\"new_name\"],\"additionalProperties\":false}},"
+    "{\"name\":\"requirements\",\"description\":\"What this computer can run (as Machines' What This Computer Can Run says): its architecture, processors and memory, whether KVM is there, which architectures run at full speed or emulated, the memory machines may use now and the free space of the library.\","
+    "\"inputSchema\":{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}}"
     "]}";
 
 /* the arguments' keys must be among `allowed`; each a string unless listed in ints/arrays */
@@ -2285,6 +2519,29 @@ static void mcp_list(const char *id) {
     free(b);
 }
 
+/* requirements: this computer, as the app's "What this computer can run" (5.7) reads it: nothing of a machine, no path */
+static void mcp_requirements(const char *id) {
+    VmHost h;
+    vm_host_probe(&h);
+    load_library();
+    int n = 0;
+    long used = library_path() ? 0 : vm_budget_used_mb(library, "", lordvm_alive, vm_group_session_mb, &n), mx = vm_mem_max_mb(&h);
+    struct statvfs vf;
+    double free_b = !library_path() && !statvfs(library, &vf) ? (double)vf.f_bavail * vf.f_frsize : -1;
+    const char *an = h.arch == VM_ARCH_AMD64 ? "amd64" : h.arch == VM_ARCH_ARM64 ? "arm64" : "other";
+    char *b = NULL;
+    size_t bn = 0;
+    FILE *f = open_memstream(&b, &bn);
+    if (!f) { mcp_error(id, -32603, "out of memory"); return; }
+    fprintf(f, "{\"arch\":\"%s\",\"cpus\":%d,\"memory_mb\":%ld,\"kvm\":%s,", an, h.cpus, h.ram_mb, h.kvm ? "true" : "false");
+    /* each architecture: full speed with KVM on its own kind of computer, else emulated (TCG: slow) */
+    fprintf(f, "\"runs\":{\"amd64\":\"%s\",\"arm64\":\"%s\"},", h.kvm && h.arch == VM_ARCH_AMD64 ? "kvm" : "emulated", h.kvm && h.arch == VM_ARCH_ARM64 ? "kvm" : "emulated");
+    fprintf(f, "\"machines_memory_max_mb\":%ld,\"machines_memory_used_mb\":%ld,\"machines_running\":%d,\"library_free_bytes\":%.0f}", mx, used, n, free_b);
+    fclose(f);
+    mcp_result(id, (const uint8_t *)b, bn, 0);
+    free(b);
+}
+
 static void mcp_run(const char *id, Machine *x, const JVal *args) {
     const JVal *cmd = json_get(args, "command");
     const char *av[VMX_ARGC_MAX + 1];
@@ -2331,6 +2588,7 @@ static void mcp_call(const char *id, const JVal *params) {
     static const char *const K_NAME[] = { "name", NULL }, *const K_WAIT[] = { "name", "timeout", NULL }, *const K_RUN[] = { "name", "command", "input", "timeout", NULL },
                              *const K_LOGS[] = { "name", "which", "lines", NULL }, *const K_CLONE[] = { "name", "new_name", NULL }, *const K_NONE[] = { NULL };
     if (!strcmp(tool, "list_machines")) { if (!args_ok(args, K_NONE)) { mcp_error(id, -32602, "no arguments"); return; } mcp_list(id); return; }
+    if (!strcmp(tool, "requirements")) { if (!args_ok(args, K_NONE)) { mcp_error(id, -32602, "no arguments"); return; } mcp_requirements(id); return; }
     const char *const *allowed = !strcmp(tool, "wait_until_ready") ? K_WAIT : !strcmp(tool, "run_command") ? K_RUN : !strcmp(tool, "get_logs") ? K_LOGS
                                : !strcmp(tool, "clone_machine") ? K_CLONE : K_NAME;
     if (strcmp(tool, "machine_status") && strcmp(tool, "start_machine") && strcmp(tool, "stop_machine") && strcmp(tool, "wait_until_ready") &&

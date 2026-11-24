@@ -30,6 +30,32 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     old PC needs only its SSH server, or a live USB; `--sudo` reads a root-only disk with that PC's sudo), or a disk
     connected here. The size comes first and is checked, the copy is written sparse, then imported with the compatible
     devices. Checked with a Raspberry Pi 5 as the old PC: 20 GB in 190 s, booted.
+- **Machines: snapshots keep the settings, take notes, and come before a tools update** (in development; latest release
+  0.8.9.5-beta; docs/VIRTUALIZATION.md 6.2). Each snapshot keeps `machine.json` as it was (`snapshots/<tag>.json`; a
+  running machine's hardware as it started); going back puts that hardware back (processors, memory, devices, cards,
+  graphics, displays, TPM, agent channels, MAC) and keeps every other choice; a disk added since refuses going back
+  before anything changes. A note of the person's own per snapshot (Add Note…, or with the new snapshot; at most 1000
+  bytes, no control or bidi characters). When the LordOS tools bring themselves up to date, a snapshot with the
+  machine's memory comes first, once per run and version. No file system freeze, decided: a snapshot is taken off or with
+  its memory, so a freeze adds nothing. `tests/vm_snap_store_test.sh` (real QEMU/KVM, 21 checks).
+- **Machines: Reclaim space can compress the disk** (in development; 6.4). *Compress the disk too* in the sheet
+  (`lord-vm --compact DIR --compress`, `qemu-img convert -c`): 96 MB became 380 KB in the test, checked, read back and
+  booted; refused for an encrypted machine.
+- **Machines: the Storage window deletes old snapshots and removes unused downloads** (in development; 6.16). Delete Old
+  Snapshots (every one but the newest) and Remove Unused (every download no machine uses), each after a question with
+  the figure; figures read from compressed extents are marked "about"; raw and data disks are counted (they were left
+  out). `tools/vm/e2e/machines/storage-fs.sh` runs the storage flow on scratch btrfs, compressed btrfs and XFS (needs
+  sudo for the mounts).
+- **Machines: the disposable session's switch in the machine window and on the card** (in development; 6.2). Actions →
+  Disposable Session and the card's menu turn it on (in memory) or off with the machine off; the card says so.
+- **Machines: an imported machine's other network cards are connected** (in development; 6.22). Each extra card gets its
+  own passt in the first card's mode, on a network of its own (10.0.3.0/24, 10.0.4.0/24…), with no forwarded ports;
+  checked under KVM in Shared and Host only (`tests/vm_nic_boot.sh`, `tests/vm_nic_e2e.sh`).
+- **`machines cp` copies folders, and the MCP server says what this computer can run** (in development; 6.15). Folders
+  both ways as `cp -r`; links are never followed; a guest's listing is parsed as hostile and refused whole (before
+  anything is made) when it names a protected path, `..`, a control or bidi character, or goes too deep. The MCP tool
+  `requirements`. `tools/vm/e2e/machines/exec-guest.sh` runs `tests/vm_exec_e2e.sh` against a throwaway Debian 13
+  machine (38 of 38).
 - **Machines: real runs of sound, recording and card models** (in development; latest release 0.8.9.5-beta;
   docs/VIRTUALIZATION.md 6.9, 6.20, 6.22). `tests/vm_sound_e2e.sh`: a headless lord-server in its own namespaces with only
   this account's pulse socket mounted in, a guest playing a tone and recording its microphone: the speakers' PipeWire
@@ -37,7 +63,7 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
   maintainer's webcam microphone), a screenshot at the guest's size and an H.264 and AAC recording carrying the guest's tone
   even with the speakers at volume 0. `tests/vm_nic_e2e.sh`: every card model booted; seven reach the internet, PCnet gets
   its address and then only receive errors (QEMU 10.0's PCnet with Linux 6.12, documented); an import's extra cards are
-  there with their MACs, not connected, as designed.
+  there with their MACs, and now each on a network of its own (below).
 - **Machines: this computer's USB devices in a machine, and the camera** (in development; latest release 0.8.9.5-beta;
   docs/VIRTUALIZATION.md 6.6 and 6.9; approved by the maintainer on 2026-11-24, AGENTS.md "Machines' USB devices").
   - The machine window's **Devices** menu lists this computer's USB devices; one picked goes into the running machine
@@ -825,6 +851,8 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
     the reply kept the helper from serving the host at all. The whole setup now has one 3 s limit.
   - **A `DISPLAY` of the form `unix:/path` was never reached** by the guest helper's clipboard on demand; it is now
     that socket.
+- **`machines cp` out of a machine works again for files over 128 KB** (in development): a check meant to refuse a guest
+  answer that doesn't fit took every full 128 KB piece for one, so such a copy failed with "a strange answer".
 - **Sentinela: a false "weaker sandbox" alert on every running machine** (in development). lord-vm is non-dumpable since
   QEMU's namespaces, so lord-server could no longer read which program a machine's engine runs and never counted one as
   checked. lord-server now keeps a pidfd of every lord-vm it starts (a machine started without a window sends its own) and

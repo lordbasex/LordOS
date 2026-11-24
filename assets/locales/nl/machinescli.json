@@ -120,7 +120,7 @@
   "execFailed": "{name} kon het niet uitvoeren: {why}",
   "outputCut": "De uitvoer was langer dan wat terugkomt: alleen het begin wordt getoond.",
   "timedOut": "Het programma in {name} had geen tijd meer en is gestopt.",
-  "cpOnlyFiles": "Alleen bestanden kunnen worden gekopieerd: {path} is er geen.",
+  "cpOnlyFiles": "Alleen bestanden en mappen kunnen worden gekopieerd: {path} is geen van beide.",
   "cpOneSide": "Zeg welke kant de machine is: een van beide is NAAM:PAD, de andere een bestand op deze computer.",
   "cpOutside": "{path} hoort niet bij je bestanden, of is beschermd.",
   "cpExists": "{path} bestaat al: --force vervangt het.",

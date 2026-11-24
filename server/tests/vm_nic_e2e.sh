@@ -3,8 +3,8 @@
 # VIRTUALIZATION.md 3.9, 6.22) and an import's extra cards, booted for real (not in `make test`: it needs KVM, QEMU and a
 # Linux guest image with qemu-guest-agent, VM_NIC_IMAGE, copied). For each model the guest must see one card of that
 # driver with the machine's MAC, get its address from passt's DHCP and reach the internet (Shared network); with two extra
-# cards (an import's extra_nics) it must see them too, with their MACs and models, and have no address on them (present,
-# not connected, as 6.22 says). Exit 77 without what it needs.
+# cards (an import's extra_nics) it must see them too, with their MACs and models, each with an address of its own network
+# (10.0.3.15, 10.0.4.15: each card's own passt, 6.22). Exit 77 without what it needs.
 cd "$(dirname "$0")/.." || exit 1
 B=$(pwd)/build
 [ -x "$B/lord-vm" ] && [ -x "$B/lordvm-dev" ] && [ -f "${VM_NIC_IMAGE:-}" ] && [ -r /dev/kvm ] || { echo "skipped: needs build/lord-vm, build/lordvm-dev, KVM and VM_NIC_IMAGE"; exit 77; }
@@ -70,7 +70,7 @@ for model in ${VM_NIC_MODELS:-virtio e1000e e1000 e1000-82545em e1000-82544gc rt
         else bad "$model: no internet [$(echo "$o" | tr '\n' ' ' | cut -c1-200)]"; fi
     else bad "$model: [$(echo "$o" | tr '\n' ' ' | cut -c1-200)]"; fi
 done
-# an import's extra cards (extra_nics): present with their MAC and model, not connected
+# an import's extra cards (extra_nics): present with their MAC and model, each connected through its own passt
 "$B/lord-vm" --set "$M" --nic-model virtio >/dev/null
 python3 -I - "$M/machine.json" <<'PY'
 import json, sys
@@ -81,10 +81,11 @@ json.dump(m, open(p, 'w'), indent=2)
 PY
 o=$(boot extra)
 echo "$o" | grep -q "^CARD .* $MAC virtio_net [0-9]" && ok "extra cards: the first card is still on the network" || bad "extra: first card [$(echo "$o" | tr '\n' ' ' | cut -c1-200)]"
-for x in "52:54:00:ab:cd:01 e1000e" "52:54:00:ab:cd:02 8139"; do
+# each on a network of its own, through its own passt (lordvm.c xnic_attach): 10.0.3.0/24, then 10.0.4.0/24
+for x in "52:54:00:ab:cd:01 e1000e 10.0.3.15" "52:54:00:ab:cd:02 8139 10.0.4.15"; do
     set -- $x
     line=$(echo "$o" | grep "^CARD .* $1 ")
-    echo "$line" | grep -q " $2" && [ "$(echo "$line" | awk '{print NF}')" = 4 ] && ok "extra card $1 ($2) is there, with no address (not connected)" || bad "extra card $1: [$line]"
+    echo "$line" | grep -q " $2" && echo "$line" | grep -q " $3" && ok "extra card $1 ($2) is there, connected on its own network ($3)" || bad "extra card $1: [$line]"
 done
 [ $R = 0 ] && echo "vm_nic_e2e: all passed" || echo "vm_nic_e2e: FAILED (logs in $D with KEEP=1)"
 exit $R

@@ -120,7 +120,7 @@
   "execFailed": "{name} 無法執行它：{why}",
   "outputCut": "輸出比傳回的內容更長：只顯示開頭部分。",
   "timedOut": "{name} 中的程式逾時，已被停止。",
-  "cpOnlyFiles": "只能複製檔案：{path} 不是檔案。",
+  "cpOnlyFiles": "只能複製檔案和資料夾：{path} 兩者皆不是。",
   "cpOneSide": "請說明哪一邊是機器：一邊是 名稱:路徑，另一邊是這台電腦上的檔案。",
   "cpOutside": "{path} 不在你的檔案中，或者受保護。",
   "cpExists": "{path} 已存在：--force 會取代它。",
