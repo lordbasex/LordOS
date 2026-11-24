@@ -435,7 +435,7 @@ const SYSTEMS = [
   ['fedora', /fedora/i, 'Fedora'], ['mint', /\bmint\b|linuxmint/i, 'Mint'], ['arch', /\barch(linux)?\b|archlinux/i, 'Arch'],
   ['alpine', /alpine/i, 'Alpine'], ['opensuse', /suse/i, 'openSUSE'], ['kali', /kali/i, 'Kali'], ['rocky', /rocky/i, 'Rocky'],
   ['alma', /alma/i, 'Alma'], ['centos', /centos/i, 'CentOS'], ['freebsd', /freebsd/i, 'FreeBSD'], ['raspios', /raspios|raspberry/i, 'Pi OS'],
-  // Android for PCs: Bliss OS's label (BlissOS-16.9.7 (x86_64)) and file names (Bliss-v16.9.7-…), Android-x86, LineageOS
+  // a person's own Android ISO for PCs (Bliss OS, Android-x86, LineageOS): named only
   ['android', /android|blissos|\bbliss-v\d|lineage/i, 'Android'],
   // Microsoft's own volume labels (CCCOMA_X64FRE_…, CENA_X64FREE_…, CPBA_A64FRE_…) and its file names (Win11_…)
   ['windows', /\bWin1[01]_|\b(CCCOMA|CENA|CCSA|CPBA)_(X64|A64)FREE?_/i, 'Windows'],
@@ -456,6 +456,20 @@ export function archOf(name) {
   if (/aarch64|arm64/.test(s)) return 'arm64';
   if (/amd64|x86[_-]64|x64\b/.test(s)) return 'amd64';
   return '';
+}
+// an ISO's architecture (5.2): what its boot files say (lord.vm.isoInfo: the UEFI boot files' PE headers, their names, or
+// El Torito's x86 BIOS entry) wins over its file name and label; { arch, from: 'boot' | 'name' | '', other } — `other`
+// an architecture the boot files name that Machines doesn't run (riscv64), and when the boot files name two (amd64 and
+// arm64 on one disc) the name picks between them
+const RUNS = ['amd64', 'arm64'];
+export function isoArch(info, file) {
+  const boot = String(info?.arch || '');
+  const named = archOf(file) || archOf(info?.label);
+  if (info?.archFrom === 'boot' && RUNS.includes(boot)) return { arch: boot, from: 'boot', other: '' };
+  if (info?.archFrom === 'boot' && boot) return { arch: '', from: 'boot', other: boot };
+  const both = Array.isArray(info?.efiArchs) ? info.efiArchs.filter((a) => RUNS.includes(a)) : [];
+  if (named && (both.length < 2 || both.includes(named))) return { arch: named, from: 'name', other: '' };
+  return { arch: '', from: '', other: '' };
 }
 // a machine name from a system and version, unique among names
 export function suggestName(sys, version, names = []) {
@@ -810,7 +824,7 @@ export const machineProtectedOf = (entry, meta, homeProtected = false) =>
 // (xclip or wl-clipboard: lordos-guest's hello said "noclip")
 // shell: the tools start the agent's shell (6.18, tools 8 / w12); links, notify: they pass the guest's links and
 // notifications on, and this machine takes them (6.12); eventlog: a Windows guest's event logs come in (6.19)
-export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576 };
+export const AGENT_CAPS = { shutdown: 1, time: 2, exec: 4, files: 8, journal: 16, clipboard: 32, awake: 64, display: 128, windows: 256, transfer: 512, transferSetup: 1024, clipNoTool: 2048, clipLazy: 4096, open: 8192, place: 16384, extra: 32768, extraOff: 65536, shell: 131072, links: 262144, notify: 524288, eventlog: 1048576, toolsDisc: 2097152 };
 // a Windows guest (the system qemu-guest-agent reported): its clipboard and its display's size need the LordOS tools
 // (tools/guest-win), installed from the agent's popover; a Linux guest's size follows QEMU's own display by itself
 export const guestWindows = (agent) => /^windows/i.test(agent?.system || '');
@@ -844,11 +858,33 @@ export function clipState(agent, cfg) {
   if (caps & AGENT_CAPS.clipNoTool) return 'needsXclip';
   return guestWindows(agent) ? 'needsTools' : 'needsHelper';
 }
+// The LordOS Guest Tools disc (6.17, lordvm.c VAG_DISC): for a Linux guest without a usable qemu-guest-agent.
+// → null (nothing to offer), 'insert' (the popover offers "Install the Agent from a Disc") or 'guide' (the disc is in the
+// drive: the steps to run in the machine). Never for a protected (anonymity) machine, a Windows guest, a machine that is
+// off or whose agent is off, nor when qemu-guest-agent answers and lets Install copy files and run its script.
+export function discOffer(agent, cfg, running, isProtected) {
+  if (!cfg?.agent || !running || isProtected) return null;
+  const caps = agent?.caps || 0;
+  if (caps & AGENT_CAPS.toolsDisc) return 'guide';
+  if (guestWindows(agent)) return null;
+  if (agent?.state === 'connected' && (caps & AGENT_CAPS.exec) && (caps & AGENT_CAPS.files)) return null;
+  return 'insert';
+}
+// what to run in the machine (install.sh on the disc, volume LORDOS_TOOLS): where desktops mount it, and by hand
+export const DISC_LABEL = 'LORDOS_TOOLS';
+export const discCommands = () => [
+  { key: 'debian', cmd: `sh /media/$USER/${DISC_LABEL}/install.sh` },
+  { key: 'others', cmd: `sh /run/media/$USER/${DISC_LABEL}/install.sh` },
+  { key: 'manual', cmd: 'sudo mount -r /dev/sr0 /mnt && sh /mnt/install.sh' },
+];
+// Copy is offered only where it can reach the machine: its clipboard goes toward it (Configure) and a helper there
+// takes it. Before the agent is installed it usually can't: the command is shown to be typed
+export const discCanCopy = (agent, cfg) => clipTo(cfg?.clipboard || 'off') && !!((agent?.caps || 0) & AGENT_CAPS.clipboard);
 // the agent's popover says what to install in the guest: connected, the clipboard on, the helper there without a tool
 export const clipNeedsTool = (agent, cfg) => agent?.state === 'connected' && clipState(agent, cfg) === 'needsXclip';
 // The LordOS tools this LordOS ships: lordos-guest-win's VERSION (tools/guest-win) and lordos-guest's (tools/guest);
 // vm_model_test checks them against the sources. A connected guest's tools say theirs in their hello (agent.tools)
-export const TOOLS_SHIPPED = { windows: 'w12', linux: '8' };
+export const TOOLS_SHIPPED = { windows: 'w12', linux: '9' };
 const toolsVer = (v) => /^(w?)([0-9]{1,6})$/.exec(String(v || ''));
 // the guest's tools are older than the ones shipped: the agent's popover offers Update, the bar's button gets a dot.
 // "w<n>" is the Windows tools', "<n>" the Linux helper's; anything else (none yet, a newer format) isn't older
@@ -1762,10 +1798,12 @@ export function groupMembers(group, list) {
 const RUNNING = (s) => s === 'running' || s === 'paused';
 const ACTIVE = (s) => s === 'starting' || s === 'running' || s === 'paused' || s === 'stopping';
 // one word for the whole group: 'running' (all members), 'off' (none), 'partial', or 'damaged' (a member missing or not
-// this group's: 19.9, "A member folder… missing or invalid")
+// this group's, or a base missing: 19.9, "A member folder, a base… missing or invalid")
 export function groupState(group, list) {
   const ms = groupMembers(group, list), roles = (group?.members || []).map((x) => x.role);
   if (!roles.length || roles.some((r) => !ms[r])) return 'damaged';
+  const on0 = roles.some((r) => ACTIVE(ms[r].state));
+  if (!on0 && (group?.basesMissing || []).length) return 'damaged';
   const on = roles.filter((r) => ACTIVE(ms[r].state)).length;
   return on === 0 ? 'off' : on === roles.length && roles.every((r) => RUNNING(ms[r].state)) ? 'running' : 'partial';
 }
@@ -1778,6 +1816,8 @@ export function groupPlan(group, list, action) {
   const ms = groupMembers(group, list);
   const order = [...(group?.members || [])].sort((a, b) => (action === 'stop' ? a.stop - b.stop : a.start - b.start));
   if (!order.length || order.some((x) => !ms[x.role])) return { fail: 'damaged' };
+  // a base missing: a member off can't start (Repair makes it again first); one running keeps its open base
+  if (action === 'start' && (group?.basesMissing || []).some((r) => ms[r] && !ACTIVE(ms[r].state))) return { fail: 'damaged' };
   for (const x of order) {
     const m = ms[x.role];
     if (action === 'stop') {

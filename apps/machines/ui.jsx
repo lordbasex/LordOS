@@ -5,6 +5,7 @@ import { logoFor } from './logos.js';
 import { storeRev } from './store.js';
 import { readMeta, writeMeta } from './meta.js';
 import { COLOR_HEX } from './systems.js';
+import { ensureKey } from './keyflow.js';
 import { bridgeArg, soundDevChoices, gvtGpu, gvtType, gvtArg, memlockFits, windowMachineId, followDir } from './model.js';
 import { useEffect, useRef, useState } from 'react';
 
@@ -401,9 +402,11 @@ export async function vcpusUp(m) {
 // Everything a start needs from the admin helper, in order: the vCPUs chosen while it ran, the bridged network, then the
 // graphics card. Rejects with the translated message to show
 export async function startPrep(m) {
+  // an encrypted machine's key first (docs/VIRTUALIZATION.md 8): from the keyring, unlocked by the person if it's locked
+  if (m?.encrypted) await ensureKey(m.dir, { id: m.keyId, name: m.name });
   await vcpusUp(m);
   await bridgeUp(m).catch((e) => { throw new Error(tr('machines.win.bridgeFailed', { why: e.message })); });
   await gvtUp(m).catch((e) => { throw new Error(tr('machines.win.gvtFailed', { why: e.message })); });
 }
 // whether a start goes through startPrep first
-export const needsPrep = (m) => m?.network === 'bridged' || !!m?.gpu || (!!m?.dir && !m.suspended && !!readMeta(m.dir).nextVcpus);
+export const needsPrep = (m) => !!m?.encrypted || m?.network === 'bridged' || !!m?.gpu || (!!m?.dir && !m.suspended && !!readMeta(m.dir).nextVcpus);

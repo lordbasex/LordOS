@@ -401,7 +401,10 @@ int vc_pending(void) {
     return n;
 }
 
+static void (*lock_hook)(void);
+void vc_set_lock_hook(void (*fn)(void)) { lock_hook = fn; }
 void vc_lock_all(const char *why) {
+    if (lock_hook) lock_hook();                 /* lord-server's own held secrets go too (Machines' keys) */
     pthread_mutex_lock(&mu);
     int running = sock >= 0;
     pthread_mutex_unlock(&mu);

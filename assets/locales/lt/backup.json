@@ -14,6 +14,11 @@
   "never": "Atsarginių kopijų dar nėra",
   "next": "Kita: {when}",
   "lastError": "Paskutinė atsarginė kopija nepavyko: {error}",
+  "machinesBusy": {
+    "one": "{count} mašina veikė: jos diskai šioje kopijoje yra iš ankstesnės",
+    "few": "{count} mašinos veikė: jų diskai šioje kopijoje yra iš ankstesnės",
+    "other": "{count} mašinų veikė: jų diskai šioje kopijoje yra iš ankstesnės"
+  },
   "todayAt": "šiandien {time}",
   "now": "Kurti kopiją dabar",
   "pause": "Pristabdyti",

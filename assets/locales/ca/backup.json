@@ -14,6 +14,10 @@
   "never": "Encara no hi ha còpies",
   "next": "Següent: {when}",
   "lastError": "L’última còpia ha fallat: {error}",
+  "machinesBusy": {
+    "one": "{count} màquina estava en marxa: els seus discos en aquesta còpia són els de l’anterior",
+    "other": "{count} màquines estaven en marxa: els seus discos en aquesta còpia són els de l’anterior"
+  },
   "todayAt": "avui a les {time}",
   "now": "Fes una còpia ara",
   "pause": "Pausa",

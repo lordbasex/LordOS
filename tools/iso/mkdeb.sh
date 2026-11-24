@@ -23,6 +23,7 @@
 #   /usr/bin/machines                     Machines from the terminal (docs/VIRTUALIZATION.md "From the terminal"): a link to
 #                                         /usr/lib/lordos/bin/machines, which runs the lord-vm next to it; its bash completion
 #                                         in /usr/share/bash-completion/completions/machines
+#   /usr/bin/lordvm                       the same program (docs/VIRTUALIZATION.md 6.15: lordvm exec, cp, logs, mcp, apply)
 #   /usr/bin/lordos-issue                 what a bug report needs, ready to paste (CONTRIBUTING.md)
 #   /usr/lib/lordos/lordos-dm-check       another display manager enabled next to lordos.service (#187): postinst warns
 #   /usr/bin/lordos-testbench             the visual test bench (a Wayland client; docs/PAPER-VALIDATION.md), and
@@ -70,7 +71,10 @@
 #                                         advise): a machine with a shared folder gets 2 MB pages (docs/VIRTUALIZATION.md 3.7.2)
 #   /usr/lib/systemd/user/lordos-guest.service (+ default.target.wants), /usr/lib/udev/rules.d/71-lordos-guest.rules
 #                                         LordOS as a Machines guest: lordos-guest for the signed-in person, only where the
-#                                         machine's agent port org.lordos.agent exists (docs/VIRTUALIZATION.md 7.2)
+#                                         machine's agent port org.lordos.agent exists (docs/VIRTUALIZATION.md 7.2); the
+#                                         port is the video group's too (LordOS's sessions aren't logind seats, 6.17)
+#   /usr/lib/lordos/guest/lordos-guest-tools-<arch>.iso  the LordOS Guest Tools disc Machines puts in a Linux machine
+#                                         without qemu-guest-agent (docs/VIRTUALIZATION.md 6.17); its SHA-256 is lord-vm's
 #   /usr/lib/systemd/system-shutdown/lordos-guest  systemd-shutdown's hook: in a Machines guest, tells Machines whether
 #                                         it powers off or restarts (lordos-guest --stopping; "Graphics 3D"); elsewhere
 #                                         it ends at once
@@ -168,8 +172,10 @@ install -m 755 packaging/bin/lordos-dm-check "$L/lordos-dm-check"
 install -m 755 server/build/machines "$L/bin/machines"
 "$STRIP" --strip-unneeded "$L/bin/machines" 2>/dev/null || true
 ln -s ../lib/lordos/bin/machines "$PKG/usr/bin/machines"
+ln -s ../lib/lordos/bin/machines "$PKG/usr/bin/lordvm"
 install -d "$PKG/usr/share/bash-completion/completions"
 install -m 644 packaging/bash-completion/machines "$PKG/usr/share/bash-completion/completions/machines"
+ln -s machines "$PKG/usr/share/bash-completion/completions/lordvm"
 # the visual test bench: a plain Wayland client, launched like any Linux app
 [ -x server/build/lordos-testbench ] && {
     install -m 755 server/build/lordos-testbench "$PKG/usr/bin/lordos-testbench"
@@ -271,6 +277,15 @@ if [ -x server/build/lordos-guest ]; then
     ln -sfn ../lordos-guest.service "$PKG/usr/lib/systemd/user/default.target.wants/lordos-guest.service"
     install -D -m 644 packaging/udev/71-lordos-guest.rules "$PKG/usr/lib/udev/rules.d/71-lordos-guest.rules"
     install -D -m 755 packaging/systemd/lordos-guest-shutdown "$PKG/usr/lib/systemd/system-shutdown/lordos-guest"
+fi
+# the LordOS Guest Tools disc (docs/VIRTUALIZATION.md 6.17): a read-only ISO with lordos-guest, install.sh and its
+# checksum, which Machines puts in the CD drive of a Linux machine without qemu-guest-agent. lord-vm attaches it only if
+# its SHA-256 is the one compiled into it (the same make built both), so it's copied as it is: never stripped or changed
+if [ -f server/build/lordos-guest-tools.iso ]; then
+    install -D -m 644 server/build/lordos-guest-tools.iso "$L/guest/lordos-guest-tools-${DEB_ARCH:-$(dpkg --print-architecture)}.iso"
+else
+    case " ${ALLOW_MISSING:-} " in *" lordos-guest-tools.iso "*) echo "mkdeb: leaving out lordos-guest-tools.iso (ALLOW_MISSING)" >&2 ;;
+    *) echo "missing server/build/lordos-guest-tools.iso (make -C server)" >&2; exit 1 ;; esac
 fi
 # lordos-guest-win.exe: the LordOS guest tools Machines installs into a Windows guest (x86-64), cross-built with mingw-w64
 # on the build machine (server/mk/vm.mk); an amd64 package without it can't give Windows guests their clipboard, display
@@ -583,7 +598,7 @@ Maintainer: LordOS <lord.basex@gmail.com>
 Installed-Size: $SIZE
 Depends: libc6 (>= 2.38), libwayland-server0 (>= 1.22), libwayland-client0 (>= 1.22), libxkbcommon0 (>= 1.5), libcrypt1, libssl3t64 | libssl3, ca-certificates, passwd, procps, xkb-data, libfreerdp3-3, libfreerdp-client3-3, libwinpr3-3, fuse3, openssh-client, openssl, polkitd, pkexec$HWDATADEPS$RCLONEDEPS$GPUDEPS$DOCDEPS$OCRDEPS$TTSDEPS$MEDIADEPS$CASTDEPS$RTCDEPS$MICROCODEDEPS
 Breaks: lordos-web (<< $VERSION)
-Recommends: pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS
+Recommends: qemu-guest-agent, pipewire-pulse, wireplumber, logrotate, wpasupplicant, openvpn, fonts-noto-core, fonts-noto-color-emoji, fonts-dejavu-core, locales, tzdata, sudo, cups, cups-client, avahi-daemon, libnss-mdns, mesa-va-drivers, bluez, libspa-0.2-bluetooth, power-profiles-daemon, systemd-timesyncd, shared-mime-info, gsettings-desktop-schemas, xwayland, pci.ids, usb.ids, curl, wget, rsync, screen, htop, vim, mc, tcpdump, net-tools, fdisk, rfkill, jq, whiptail, zstd$OCRRECS
 Section: x11
 Priority: optional
 Protected: yes

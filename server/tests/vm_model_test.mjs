@@ -249,6 +249,17 @@ eq('version none', versionOf('netinst.iso'), '');
 eq('arch arm', archOf('debian-13-nocloud-arm64.qcow2'), 'arm64');
 eq('arch x86', archOf('Fedora-Server-dvd-x86_64-41.iso'), 'amd64');
 eq('arch unknown', archOf('mysystem.iso'), '');
+// an ISO's architecture (lord.vm.isoInfo, vmiso.c): its boot files win over its name; the name when they don't say
+const { isoArch } = M;
+eq('arch from the boot files', isoArch({ label: 'alpine-virt 3.24.4 aarch64', arch: 'arm64', archFrom: 'boot', efiArchs: ['arm64'] }, 'mysystem.iso'), { arch: 'arm64', from: 'boot', other: '' });
+eq('boot files beat a wrong name', isoArch({ label: 'X', arch: 'amd64', archFrom: 'boot', efiArchs: ['amd64'] }, 'debian-arm64.iso'), { arch: 'amd64', from: 'boot', other: '' });
+eq('x86 BIOS only: amd64 from boot', isoArch({ label: '', arch: 'amd64', archFrom: 'boot', bios: true, efiArchs: [] }, 'x.iso'), { arch: 'amd64', from: 'boot', other: '' });
+eq('boot files silent: the name', isoArch({ label: 'MYDISC', arch: '', archFrom: '', efiArchs: [] }, 'Fedora-Server-dvd-x86_64-41.iso'), { arch: 'amd64', from: 'name', other: '' });
+eq('boot files silent: the label', isoArch({ label: 'Debian 13 arm64 n', arch: '', archFrom: '' }, 'disc.iso'), { arch: 'arm64', from: 'name', other: '' });
+eq('two architectures: the name picks one of them', isoArch({ arch: '', archFrom: '', efiArchs: ['amd64', 'arm64'] }, 'multi-arm64.iso'), { arch: 'arm64', from: 'name', other: '' });
+eq('nothing says', isoArch({ label: 'MYDISC', arch: '', archFrom: '' }, 'mysystem.iso'), { arch: '', from: '', other: '' });
+eq('riscv64: not one Machines runs', isoArch({ arch: 'riscv64', archFrom: 'boot', efiArchs: ['riscv64'] }, 'x-amd64.iso'), { arch: '', from: 'boot', other: 'riscv64' });
+eq('no info (not an ISO, or isoInfo null): the name', isoArch(null, 'ubuntu-24.04-desktop-arm64.iso'), { arch: 'arm64', from: 'name', other: '' });
 eq('name', suggestName({ name: 'Debian' }, '13', ['Debian 13']), 'Debian 13 2');
 // 5.6 on a Pi 5 (4 cores, 16 GB) and on a small VM (4 cores, 3.8 GB)
 const pi5 = { cpus: 4, vcpusRecommended: 3, ramMb: 16219, memMaxMb: 14171 }, small = { cpus: 4, vcpusRecommended: 3, ramMb: 3946, memMaxMb: 2922 };
@@ -856,6 +867,37 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('requirements: tpm only with amd64', M.reqRows(host, ['arm64'], []).some(([k]) => k === 'tpm'), false);
   eq('requirements: missing swtpm', M.reqRows(host, ['amd64'], ['swtpm']).find(([k]) => k === 'tpm')[1], 'missing');
   eq('library menu key', typeof en.libraryMenu, 'string');
+}
+
+// ---- the LordOS Guest Tools disc (6.17, lordvm.c VAG_DISC): when the popover offers it, and what it shows ----
+{
+  const fsm = await import('node:fs');
+  const en = JSON.parse(fsm.readFileSync(path.join(here, '../../assets/locales/en/machines.json'), 'utf8'));
+  const C = M.AGENT_CAPS;
+  const cfg = { agent: true, clipboard: 'both' };
+  const waiting = { state: 'waiting', caps: 0 };
+  eq('disc: a running Linux machine with no agent answering → offered', M.discOffer(waiting, cfg, true, false), 'insert');
+  eq('disc: no state yet (just started) → offered', M.discOffer(undefined, cfg, true, false), 'insert');
+  eq('disc: the machine is off → nothing', M.discOffer(waiting, cfg, false, false), null);
+  eq('disc: the agent is off in Configure → nothing', M.discOffer(waiting, { agent: false }, true, false), null);
+  eq('disc: a protected (anonymity) machine → never', M.discOffer(waiting, cfg, true, true), null);
+  eq('disc: the disc is in the drive → the steps', M.discOffer({ state: 'waiting', caps: C.toolsDisc }, cfg, true, false), 'guide');
+  eq('disc: in the drive, but a protected machine → nothing', M.discOffer({ state: 'waiting', caps: C.toolsDisc }, cfg, true, true), null);
+  eq('disc: qemu-guest-agent answers with files and commands → Install goes through it', M.discOffer({ state: 'connected', caps: C.exec | C.files }, cfg, true, false), null);
+  eq('disc: qemu-guest-agent answers without guest-exec (a restricted agent) → offered', M.discOffer({ state: 'connected', caps: C.files }, cfg, true, false), 'insert');
+  eq('disc: a Windows guest → never (its own tools)', M.discOffer({ state: 'connected', caps: 0, system: 'Windows 11 Pro' }, cfg, true, false), null);
+  eq('disc: the toolsDisc bit is lord-vm\'s VAC_TOOLS_DISC', C.toolsDisc, 2097152);
+  const cmds = M.discCommands();
+  eq('disc: three lines (Debian/Ubuntu, others, by hand)', cmds.map((c) => c.key), ['debian', 'others', 'manual']);
+  eq('disc: every line names install.sh on the disc\'s label', cmds.every((c) => /\binstall\.sh$/.test(c.cmd) && (c.key === 'manual' || c.cmd.includes(`/${M.DISC_LABEL}/`))), true);
+  eq('disc: the label is mkguestiso\'s', M.DISC_LABEL, 'LORDOS_TOOLS');
+  eq('disc: no line carries a password or sudo -S', cmds.some((c) => /-S\b|passw/i.test(c.cmd)), false);
+  for (const k of ['debian', 'others', 'manual']) eq(`disc: en has agent.disc.${k}`, typeof en[`agent.disc.${k}`], 'string');
+  for (const k of ['discHint', 'discBtn', 'discErr', 'discTitle', 'discStep', 'discPassword', 'discCopy', 'discOut']) eq(`disc: en has agent.${k}`, typeof en[`agent.${k}`], 'string');
+  eq('disc: Copy only where the clipboard goes toward the guest and a helper takes it', [
+    M.discCanCopy({ caps: C.clipboard }, { clipboard: 'both' }), M.discCanCopy({ caps: C.clipboard }, { clipboard: 'to-guest' }),
+    M.discCanCopy({ caps: C.clipboard }, { clipboard: 'from-guest' }), M.discCanCopy({ caps: 0 }, { clipboard: 'both' }), M.discCanCopy(undefined, undefined),
+  ], [true, true, false, false, false]);
 }
 
 // ---- the LordOS tools: older than the ones shipped (the popover's Update, the bar's dot) ----
