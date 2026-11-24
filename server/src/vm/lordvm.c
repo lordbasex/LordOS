@@ -1069,6 +1069,7 @@ static struct {
     /* a drop through the transfer folder (6.7.1): fx_via 1; the host's copy into it (a child of lord-vm: its pid, the pipe
      * it reports on), the file's name there (.lordos-drop-<random>), whether the agent's way was tried after it failed */
     int fx_via, fx_cpipe, fx_retried, fx_stagefd, fx_dig_n;
+    int fx_cancel;                          /* the person cancelled the drop being copied: it stops at its next step */
     pid_t fx_cpid;
     char fx_stage[40], fx_token[33], fx_sha[65];
     uint8_t fx_dig[32];
@@ -4392,7 +4393,7 @@ static void fx_unstage(void) {
 
 static void fx_reset(void) {
     fx_unstage();
-    S.fx_via = S.fx_retried = 0;
+    S.fx_via = S.fx_retried = S.fx_cancel = 0;
     if (S.fx.fd >= 0) close(S.fx.fd);
     memset(&S.fx, 0, sizeof S.fx);
     S.fx.fd = -1;
@@ -4543,7 +4544,7 @@ static void fx_fail_all(const char *why) {
 static void fx_write_next(void) {
     static uint8_t buf[FX_CHUNK];
     static char b64[FX_CHUNK / 3 * 4 + 8], args[FX_CHUNK / 3 * 4 + 96];
-    while (!S.fx_eof && S.fx_inflight < FX_DEPTH) {
+    while (!S.fx_eof && !S.fx_cancel && S.fx_inflight < FX_DEPTH) {
         ssize_t n = pread(S.fx.fd, buf, sizeof buf, S.fx_sent);
         if (n < 0) { fx_fail(VME_INTERNAL, "the file couldn't be read"); return; }
         if (n == 0) { S.fx_eof = 1; break; }
@@ -4775,6 +4776,8 @@ static void fx_exec_done(const JVal *r) {
 
 static void fx_on_reply(int kind, const JVal *root, const JVal *r, int ok) {
     if (!S.fx_step) return;
+    /* cancelled: at this answer (pieces still on their way are let through first, so none is taken for the next file's) */
+    if (S.fx_cancel && (kind != AQ_FXWRITE || S.fx_inflight <= 1)) { S.fx_retried = 1; fx_fail(VME_DENIED, "cancelled"); return; }
     if (!ok) { char why[VM_TEXT_MAX]; snprintf(why, sizeof why, "qemu-guest-agent: %.160s", qmp_error_desc(root)); fx_fail(VME_QMP, why); return; }
     switch (kind) {
     case AQ_FXEXEC:
@@ -5979,6 +5982,35 @@ static void handle_request(int ci, const VmMsg *m, int fd) {
         if (fd < 0 && !S.cd_node[0]) { reply(ci, m->seq, VME_OK, "ejected"); return; }
         cd_change(ci, m->seq, fd, m->text);
         if (fd >= 0) close(fd);
+        return;
+    }
+    case VM_RECV:
+        rx_answer(ci, m, fd);
+        return;
+    case VM_RECV_CANCEL:
+        if (fd >= 0) close(fd);
+        rx_cancel((uint32_t)m->a);
+        reply(ci, m->seq, VME_OK, "cancelled");
+        return;
+    case VM_FILE_CANCEL: {
+        if (fd >= 0) close(fd);
+        /* a drop that waits goes at once; the one being copied stops at its next step (fx_on_reply, fx_write_next) */
+        for (int i = 0; i < S.fxq_n; i++) if (S.fxq[i].seq == (uint32_t)m->a) {
+            reply(S.fxq[i].client, S.fxq[i].seq, VME_DENIED, "cancelled");
+            if (S.fxq[i].fd >= 0) close(S.fxq[i].fd);
+            memmove(S.fxq + i, S.fxq + i + 1, (size_t)(S.fxq_n - i - 1) * sizeof *S.fxq);
+            S.fxq_n--;
+            vlog("files: a waiting drop was cancelled");
+            reply(ci, m->seq, VME_OK, "cancelled");
+            return;
+        }
+        if (S.fx_step && S.fx.seq == (uint32_t)m->a) {
+            S.fx_cancel = 1;
+            if (S.fx_step == FX_XCOPY) { S.fx_retried = 1; fx_fail(VME_DENIED, "cancelled"); }
+            reply(ci, m->seq, VME_OK, "cancelling");
+            return;
+        }
+        reply(ci, m->seq, VME_WRONG_STATE, "no such drop");
         return;
     }
     case VM_SHELL: {
@@ -7699,7 +7731,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, gfiles = -1;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -7754,6 +7786,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (!strcmp(a, "--capture-fullscreen")) { capfs = parse_enum(v, "off", "on"); if (capfs < 0) { fprintf(stderr, "lord-vm: --capture-fullscreen on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--perf-profile")) { perf = parse_enum(v, "off", "on"); if (perf < 0) { fprintf(stderr, "lord-vm: --perf-profile on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--guest-links")) { glinks = parse_enum(v, "off", "on"); if (glinks < 0) { fprintf(stderr, "lord-vm: --guest-links on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--guest-files")) { gfiles = parse_enum(v, "off", "on"); if (gfiles < 0) { fprintf(stderr, "lord-vm: --guest-files on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--guest-notify")) { gnote = parse_enum(v, "off", "on"); if (gnote < 0) { fprintf(stderr, "lord-vm: --guest-notify on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
@@ -7841,6 +7874,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (perf >= 0) { m.perf_profile = perf; if (perf) m.schema = VM_SCHEMA; }
     if (glinks >= 0) { m.guest_links = glinks; if (glinks) m.schema = VM_SCHEMA; }
     if (gnote >= 0) { m.guest_notify = gnote; if (gnote) m.schema = VM_SCHEMA; }
+    if (gfiles >= 0) { m.guest_files_off = !gfiles; if (!gfiles) m.schema = VM_SCHEMA; }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
@@ -9910,6 +9944,7 @@ static int usage(void) {
             "                         [--perf-profile on|off]   (the guest tools switch the guest to its performance profile while it runs)\n"
             "                         [--guest-links on|off]   (links the guest's tools send are offered to open on this computer)\n"
             "                         [--guest-notify on|off]   (the guest's notifications are shown here, as from the machine)\n"
+            "                         [--guest-files on|off]   (files the guest sends land in this machine's quarantine folder; on by default)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"
