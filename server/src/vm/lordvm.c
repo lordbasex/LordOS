@@ -2360,6 +2360,8 @@ static void build_qemu_args(void) {
         static char vga[96];
         snprintf(vga, sizeof vga, "%s,id=video0,addr=0x4", S.gl ? "virtio-vga-gl" : "virtio-vga");
         if (m->res_w && m->res_h) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",xres=%d,yres=%d", m->res_w, m->res_h);
+        /* All Displays (5.4): one output per display, each a console of the D-Bus display (Console_<n>) */
+        if (m->heads > 1) snprintf(vga + strlen(vga), sizeof vga - strlen(vga), ",max_outputs=%d", m->heads);
         /* an Intel vGPU instead (decide_vgpu): its own display, the OpRegion QEMU hands over (the VBT Intel's driver
          * reads), and our GOP option ROM, which lights the UEFI screen on it; the guest's resets end QEMU (they crash a
          * GVT-g guest otherwise, 3 of 3) and Machines starts it again */
@@ -2369,12 +2371,15 @@ static void build_qemu_args(void) {
             if (!S.unattended) { arg("-action"); arg("reboot=shutdown"); }
         } else { arg("-device"); arg(vga); }
     }
+    static char arm_gpu[64];
+    snprintf(arm_gpu, sizeof arm_gpu, "virtio-gpu-pci,id=video0,addr=0x4");
+    if (m->heads > 1) snprintf(arm_gpu + strlen(arm_gpu), sizeof arm_gpu - strlen(arm_gpu), ",max_outputs=%d", m->heads);
     char dbus_disp[96];
     if (S.gl || S.vgpu) snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,gl=on,rendernode=%s,audiodev=snd0", S.vgpu ? S.vgpu_render : S.render);
     else snprintf(dbus_disp, sizeof dbus_disp, "dbus,p2p=yes,audiodev=snd0");
     if (m->display == VM_DISPLAY_WINDOW && (m->devices == VM_DEV_COMPAT || m->devices == VM_DEV_WINDOWS)) {
         /* a USB tablet (and keyboard on arm64) on xHCI: drivers every system has */
-        if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); }
+        if (arm) { arg("-device"); arg(arm_gpu); }
         if (m->devices != VM_DEV_WINDOWS) { arg("-device"); arg("qemu-xhci,id=xhci,addr=0x5"); }
         if (arm) { arg("-device"); arg("usb-kbd,bus=xhci.0"); }
         arg("-device"); arg("usb-tablet,bus=xhci.0");
@@ -2387,7 +2392,7 @@ static void build_qemu_args(void) {
         arg("-audiodev"); arg("dbus,id=snd0,out.frequency=48000,out.channels=2,out.format=s16,in.frequency=48000,in.channels=2,in.format=s16");
         arg("-display"); arg(dbus_disp);
     } else if (m->display == VM_DISPLAY_WINDOW) {
-        if (arm) { arg("-device"); arg("virtio-gpu-pci,id=video0,addr=0x4"); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
+        if (arm) { arg("-device"); arg(arm_gpu); arg("-device"); arg("virtio-keyboard-pci,addr=0x5"); }
         arg("-device"); arg(arm ? "virtio-tablet-pci,addr=0x6" : "virtio-tablet-pci,addr=0x5");
         /* the relative mouse for "Capture mouse" (6.25), on a free slot (0x10-0x13 are the data disks, 0x18 on the extra
          * cards) */
@@ -7421,7 +7426,7 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
-    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1;
+    int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, heads = 0;
     /* shared folders (6.7): --share ro|rw:TAG:PATH, as many as wanted up to VM_SHARES, replace the list; --shares none
      * empties it */
     const char *share[VM_SHARES + 1];
@@ -7476,6 +7481,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (!strcmp(a, "--capture-fullscreen")) { capfs = parse_enum(v, "off", "on"); if (capfs < 0) { fprintf(stderr, "lord-vm: --capture-fullscreen on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--perf-profile")) { perf = parse_enum(v, "off", "on"); if (perf < 0) { fprintf(stderr, "lord-vm: --perf-profile on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--guest-links")) { glinks = parse_enum(v, "off", "on"); if (glinks < 0) { fprintf(stderr, "lord-vm: --guest-links on|off\n"); return 2; } continue; }
+        /* All Displays (5.4): the virtio-gpu's outputs, 1 to VM_HEADS_MAX (hardware: refused while suspended) */
+        if (!strcmp(a, "--heads")) { heads = (strlen(v) == 1 && v[0] >= '1' && v[0] <= '0' + VM_HEADS_MAX) ? v[0] - '0' : 0; if (!heads) { fprintf(stderr, "lord-vm: --heads 1 to %d\n", VM_HEADS_MAX); return 2; } continue; }
         if (!strcmp(a, "--guest-notify")) { gnote = parse_enum(v, "off", "on"); if (gnote < 0) { fprintf(stderr, "lord-vm: --guest-notify on|off\n"); return 2; } continue; }
         if (!strcmp(a, "--pointer")) { ptr = parse_enum(v, "lordos", "guest"); if (ptr < 0) { fprintf(stderr, "lord-vm: --pointer lordos|guest\n"); return 2; } continue; }
         if (!strcmp(a, "--transfer")) { xfer = parse_enum(v, "off", "on"); if (xfer < 0) { fprintf(stderr, "lord-vm: --transfer on|off\n"); return 2; } continue; }
@@ -7527,7 +7534,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         char st[PATH_MAX + 32];
         snprintf(st, sizeof st, "%s/suspend.state", real);
         /* the graphics card changes with 2D or 3D: a saved state holds the other one's */
-        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
+        if (file_exists(st) && (vcpus || mem || disk || net >= 0 || agent >= 0 || shares_set || ports_set || bridge || res_set || (gfx >= 0 && gfx != m.graphics) || (xfer >= 0 && xfer != m.transfer) || (gpu >= 0 && gpu != m.vgpu) || (heads && heads != (m.heads > 1 ? m.heads : 1)))) { fprintf(stderr, "lord-vm: the machine is suspended: resume it and shut it down first, or discard its saved state\n"); goto out; }
     }
     /* a new name (6.26): refused when another machine has it or, as the folder follows, when its folder's or transfer
      * folder's new name is taken; the same name again only brings the folder in line when it can */
@@ -7563,6 +7570,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (perf >= 0) { m.perf_profile = perf; if (perf) m.schema = VM_SCHEMA; }
     if (glinks >= 0) { m.guest_links = glinks; if (glinks) m.schema = VM_SCHEMA; }
     if (gnote >= 0) { m.guest_notify = gnote; if (gnote) m.schema = VM_SCHEMA; }
+    if (heads) { m.heads = heads; if (heads > 1) m.schema = VM_SCHEMA; }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (gfx >= 0) m.graphics = gfx;
     /* a vGPU and 3D graphics are one or the other: the one asked for now wins */
@@ -9632,6 +9640,7 @@ static int usage(void) {
             "                         [--perf-profile on|off]   (the guest tools switch the guest to its performance profile while it runs)\n"
             "                         [--guest-links on|off]   (links the guest's tools send are offered to open on this computer)\n"
             "                         [--guest-notify on|off]   (the guest's notifications are shown here, as from the machine)\n"
+            "                         [--heads 1-4]   (All Displays, 5.4: the guest's displays; while it is off)\n"
             "                         [--cpu-pin off|auto|default]   (each vCPU on a core of its own, away from the desktop's: docs/VIRTUALIZATION.md 3.7.1)\n"
             "                         [--transfer on|off]   (the transfer folder, <library>/Transfer/<name>, tag LordOS)\n"
             "       lord-vm --rename DIR NAME   (the machine's name; its folder and transfer folder follow while it's off, exit 5: taken)\n"

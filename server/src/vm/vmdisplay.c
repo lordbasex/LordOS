@@ -3,7 +3,12 @@
  * accept), and passes lord-server only the fixed messages of vmproto.h on fd 3. The compositor never parses
  * anything QEMU sends.
  *
- *   lord-vmdisplay <machine id>     fd 3: SOCK_SEQPACKET to lord-server; fd 4: the D-Bus connection to QEMU
+ *   lord-vmdisplay <machine id> [--head N]
+ *                                   fd 3: SOCK_SEQPACKET to lord-server; fd 4: the D-Bus connection to QEMU. --head N
+ *                                   (All Displays, docs/VIRTUALIZATION.md 5.4): the virtio-gpu's output N (0..3), QEMU's
+ *                                   Console_N, checked to be a graphic console of that head; only head 0 (or no
+ *                                   --head) takes the guest's sound and microphone, and with --head the guest is asked
+ *                                   for its size at the layout's corner (VD_LAYOUT), where the other heads sit beside it
  *   lord-vmdisplay --selftest       applies the sandbox, then tries what it must not be able to do (JSON line)
  *
  * Decisions (Phase 0, section 13.6):
@@ -68,7 +73,9 @@
 #define PIXMAN_x8r8g8b8 0x20020888u
 #define PIXMAN_a8r8g8b8 0x20028888u
 #define LISTENER_PATH "/org/qemu/Display1/Listener"
-#define CONSOLE_PATH  "/org/qemu/Display1/Console_0"
+#define HEADS_MAX     4                 /* machine.h VM_HEADS_MAX */
+static char CONSOLE_PATH[40] = "/org/qemu/Display1/Console_0";
+static int head = -1;                   /* --head N, -1 none (one display) */
 #define ACK_WAIT_MS   250
 #define RESIZE_GAP_MS 100
 #define STATS_MS      5000
@@ -910,8 +917,11 @@ static void send_input(long long now) {
         D.resize_ms = now;
         /* with an answer: QEMU says so when the display device can't be asked (a refusal used to go unseen) */
         fprintf(stderr, "lord-vmdisplay %s: the guest is asked for %dx%d\n", me, D.rw, D.rh);
+        /* one of several heads: at its corner in the desktop the heads make side by side (VD_LAYOUT, vm_layout_ok), which
+         * QEMU hands the guest as the output's suggested position */
+        int xo = head >= 0 && D.layout[4] ? D.layout[0] : 0, yo = head >= 0 && D.layout[4] ? D.layout[1] : 0;
         sd_bus_call_method_async(bus, NULL, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "SetUIInfo", on_ui_info, NULL, "qqiiuu",
-                                 (uint16_t)0, (uint16_t)0, 0, 0, (uint32_t)D.rw, (uint32_t)D.rh);
+                                 (uint16_t)0, (uint16_t)0, xo, yo, (uint32_t)D.rw, (uint32_t)D.rh);
     }
     if (D.ptr_pending) { D.ptr_pending = 0; say(vd_msg(VD_POINTER, D.ptr_x, D.ptr_y, D.ptr_on, 0, 0, 0), -1); }
 }
@@ -1108,7 +1118,12 @@ int main(int argc, char **argv) {
     prctl(PR_SET_DUMPABLE, 0);
     signal(SIGPIPE, SIG_IGN);
     if (argc == 2 && !strcmp(argv[1], "--selftest")) return selftest();
-    if (argc != 2 || !uuid_ok(argv[1])) { fprintf(stderr, "usage: lord-vmdisplay <machine id>   (fd 3: lord-server, fd 4: QEMU's D-Bus display)\n"); return 2; }
+    if (argc == 4 && !strcmp(argv[2], "--head")) head = vd_head_arg(argv[3], HEADS_MAX);
+    if ((argc != 2 && argc != 4) || !uuid_ok(argv[1]) || (argc == 4 && head < 0)) {
+        fprintf(stderr, "usage: lord-vmdisplay <machine id> [--head 0-%d]   (fd 3: lord-server, fd 4: QEMU's D-Bus display)\n", HEADS_MAX - 1);
+        return 2;
+    }
+    if (head >= 0) snprintf(CONSOLE_PATH, sizeof CONSOLE_PATH, "/org/qemu/Display1/Console_%d", head);
     me = argv[1];
     if (!is_socket(CH, SOCK_SEQPACKET) || !is_socket(DBUS_FD, SOCK_STREAM)) { fprintf(stderr, "lord-vmdisplay: fd 3 must be a SOCK_SEQPACKET and fd 4 a stream socket\n"); return 2; }
     fcntl(CH, F_SETFD, FD_CLOEXEC);
@@ -1133,6 +1148,24 @@ int main(int argc, char **argv) {
         return 1;
     }
     sd_bus_error_free(&e);
+    if (head >= 0) {
+        /* QEMU numbers its consoles itself: Console_N must be the graphic console of output N (the virtio-gpu's heads come
+         * first, one device, -nodefaults) */
+        uint32_t hh = 0xffffffffu;
+        char *type = NULL;
+        sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Head", &e, 'u', &hh);
+        sd_bus_error_free(&e);
+        sd_bus_get_property_string(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Type", &e, &type);
+        sd_bus_error_free(&e);
+        int good = hh == (uint32_t)head && type && !strcmp(type, "Graphic");
+        free(type);
+        if (!good) {
+            fprintf(stderr, "lord-vmdisplay %s: console %d isn't the display's output %d\n", argv[1], head, head);
+            free(label);
+            say(vd_msg(VD_STATE, VDS_LOST, VDR_SETUP, 0, 0, 0, 0), -1);
+            return 1;
+        }
+    }
     sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Width", &e, 'u', &cw);
     sd_bus_error_free(&e);
     sd_bus_get_property_trivial(bus, NULL, CONSOLE_PATH, "org.qemu.Display1.Console", "Height", &e, 'u', &ch);
@@ -1155,9 +1188,11 @@ int main(int argc, char **argv) {
     close(lv[1]);
     /* the guest's sound and microphone: a listener of each, on a connection of its own, if QEMU has an audio backend on
      * this display */
-    abus = register_audio(argv[1], "RegisterOutListener", "/org/qemu/Display1/AudioOutListener", "org.qemu.Display1.AudioOutListener", audio_vt);
-    ibus = register_audio(argv[1], "RegisterInListener", "/org/qemu/Display1/AudioInListener", "org.qemu.Display1.AudioInListener", audio_in_vt);
-    fprintf(stderr, "lord-vmdisplay %s: console \"%s\" %ux%u, mouse %s\n", argv[1], label ? label : "", cw, ch, absm ? "absolute" : "relative");
+    if (head <= 0) {
+        abus = register_audio(argv[1], "RegisterOutListener", "/org/qemu/Display1/AudioOutListener", "org.qemu.Display1.AudioOutListener", audio_vt);
+        ibus = register_audio(argv[1], "RegisterInListener", "/org/qemu/Display1/AudioInListener", "org.qemu.Display1.AudioInListener", audio_in_vt);
+    }
+    fprintf(stderr, "lord-vmdisplay %s: console %d \"%s\" %ux%u, mouse %s\n", argv[1], head < 0 ? 0 : head, label ? label : "", cw, ch, absm ? "absolute" : "relative");
     free(label);
 
     /* setup done: from here no files, no new sockets, no exec, threads only, in its own scope */

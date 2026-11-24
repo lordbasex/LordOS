@@ -479,6 +479,7 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
         JS_SetPropertyStr(c, o, "guestLinks", JS_NewBool(c, m.guest_links));     /* links and notifications from the guest (6.12) */
         JS_SetPropertyStr(c, o, "guestNotify", JS_NewBool(c, m.guest_notify));
+        set_int(c, o, "heads", m.heads > 1 ? m.heads : 1);                       /* All Displays (5.4) */
         set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
         JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
         set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
@@ -1276,7 +1277,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[66 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[68 + 2 * VM_SHARES + 2 * VM_PORTS], hds[4] = "", shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1402,6 +1403,9 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "guestNotify");
     if (JS_IsBool(v)) { args[n++] = "--guest-notify"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
+    /* All Displays (5.4): the guest's displays, 1..VM_HEADS_MAX (lord-vm refuses it while the machine runs or is suspended) */
+    int hv = prop_int(c, argv[1], "heads");
+    if (hv) { if (hv < 1 || hv > VM_HEADS_MAX) ok = 0; else { snprintf(hds, sizeof hds, "%d", hv); args[n++] = "--heads"; args[n++] = hds; } }
     v = JS_GetPropertyStr(c, argv[1], "cpuPin");
     if (JS_IsString(v)) {
         const char *s = JS_ToCString(c, v);
@@ -1895,7 +1899,8 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 
 /* ---- sessions: one running machine and its window ---- */
 
-#define MAX_SESS 4
+/* sessions: one per machine window, and with All Displays (5.4) one per extra head of a machine (at most VM_HEADS_MAX) */
+#define MAX_SESS 8
 /* one dmabuf of a 3D machine's picture (VD_DMABUF) and its import: a texture of the desktop's GPU (tex) or of the reader
  * on the buffer's own render node (ri, gpu/dmaread.h); gfail/rfail: that one refused it (not tried again for this dmabuf) */
 typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; DmaImg *ri; int gfail, rfail; unsigned used, gen; } VmDmabuf;
@@ -2037,6 +2042,12 @@ typedef struct {
     /* closes the guest refused (VM_WINREFUSED with LAGA_CLOSE): the last per window, newest last; closeRefusedSeq */
     struct { uint32_t gid; int reason; double at; } refused[8];
     int layout[6];                      /* VM_GUEST_LAYOUT, handed to lord-vmdisplay (VD_LAYOUT); 0s none */
+    /* All Displays (docs/VIRTUALIZATION.md 5.4): head is the virtio-gpu output this session shows (0 the machine's own
+     * window; 1..VM_HEADS_MAX-1 an attach for another head, with lord-vmdisplay --head: no sound, no microphone, and the
+     * guest's clipboard, links, notifications and apps-mode windows stay the head 0 session's). hlayout: where this head
+     * sits in the desktop the heads make (vm_heads_layout, lord.vm.allDisplays), used instead of the guest's layout while
+     * hl_on */
+    int head, hl_on, hlayout[6];
     int refused_n, refused_seq;
     /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
      * did (PTRLOCK_END_*), for the window */
@@ -2158,7 +2169,8 @@ static int mic_permitted(void) {
 /* the guest's layout to lord-vmdisplay (its tablet points at the shown display) */
 static void layout_send(Sess *s) {
     if (s->vd < 0) return;
-    VdMsg m = vd_msg(VD_LAYOUT, s->layout[0], s->layout[1], s->layout[2], s->layout[3], s->layout[4], s->layout[5]);
+    const int *L = s->hl_on ? s->hlayout : s->layout;
+    VdMsg m = vd_msg(VD_LAYOUT, L[0], L[1], L[2], L[3], L[4], L[5]);
     vd_send(s->vd, &m, -1);
 }
 static void vdsend_fd(Sess *s, int type, int a, int fd) { if (s->vd >= 0) { VdMsg m = vd_msg((uint16_t)type, a, 0, 0, 0, 0, 0); vd_send(s->vd, &m, fd); } }
@@ -2400,13 +2412,23 @@ static JSValue f_start(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     return JS_NewInt32(c, slot + 1);
 }
 
-/* a machine already running: its runtime socket ($XDG_RUNTIME_DIR/lordos-vm/<id>.sock) */
+/* a machine already running: its runtime socket ($XDG_RUNTIME_DIR/lordos-vm/<id>.sock). attach(dir, { head }) with head
+ * 1..heads-1 (All Displays, 5.4): a session that shows that output of the machine's display; it is protected when another
+ * session of the machine is (lord.vm.protect) */
 static JSValue f_attach(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
-    (void)t; (void)argc;
+    (void)t;
     char dir[PATH_MAX];
     int slot = new_slot();
     VmMachine m;
     if (slot < 0 || machine_dir(c, argv[0], dir, sizeof dir) || vm_machine_load(dir, &m, NULL, 0)) return JS_NewInt32(c, 0);
+    int head = 0;
+    if (argc >= 2 && JS_IsObject(argv[1])) {
+        JSValue v = JS_GetPropertyStr(c, argv[1], "head");
+        int32_t hv = 0;
+        if (!JS_IsUndefined(v) && (JS_ToInt32(c, &hv, v) || hv < 1 || hv >= m.heads || hv >= VM_HEADS_MAX)) { JS_FreeValue(c, v); return JS_NewInt32(c, 0); }
+        JS_FreeValue(c, v);
+        head = hv;
+    }
     const char *rt = getenv("XDG_RUNTIME_DIR");
     char base[256], path[sizeof ((struct sockaddr_un *)0)->sun_path];
     if (rt && rt[0] == '/') snprintf(base, sizeof base, "%s", rt); else snprintf(base, sizeof base, "/run/user/%u", (unsigned)getuid());
@@ -2419,6 +2441,11 @@ static JSValue f_attach(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
     init_sess(s, dir);
     s->vm = fd;
     snprintf(s->id, sizeof s->id, "%s", m.id);
+    s->head = head;
+    if (head) {
+        s->snd_on = 0; s->mic_allowed = 0;
+        for (int i = 0; i < MAX_SESS; i++) if (&sess[i] != s && sess[i].used && sess[i].protect && !strcmp(sess[i].id, s->id)) s->protect = 1;
+    }
     ask(s, VM_STATUS, 0);
     return JS_NewInt32(c, slot + 1);
 }
@@ -2438,7 +2465,9 @@ static void spawn_vmdisplay(Sess *s, int dbus_fd) {
         sigset_t none;
         sigemptyset(&none);
         sigprocmask(SIG_SETMASK, &none, NULL);
-        char *args[] = { "lord-vmdisplay", s->id, NULL };
+        /* All Displays (5.4): another head's session names its output; head 0's stays as it was (sound and microphone) */
+        char hd[2] = { (char)('0' + (s->head > 0 && s->head < VM_HEADS_MAX ? s->head : 0)), 0 };
+        char *args[] = { "lord-vmdisplay", s->id, s->head > 0 ? "--head" : NULL, hd, NULL };
         execve(bin, args, environ);
         _exit(127);
     }
@@ -2885,6 +2914,7 @@ static void from_vm(Sess *s) {
             snprintf(s->ag_text, sizeof s->ag_text, "%s", m.text);
             break;
         case VM_CLIP_REQ:
+            if (s->head > 0) break;         /* another head's window: the machine's own window answers (All Displays) */
             /* a program in the guest pastes: the host's clipboard only while the machine is in use, and in ask mode
              * only once the person says yes (clipboardAnswer) */
             if (!clip_in_use(s)) { s->blk_read++; clip_deny(s, (uint32_t)m.a, m.b, VCD_BACKGROUND); break; }
@@ -2898,6 +2928,7 @@ static void from_vm(Sess *s) {
             clip_give(s, (uint32_t)m.a, m.b);
             break;
         case VM_CLIP_DATA:
+            if (s->head > 0) break;
             /* the guest's clipboard, only while the machine is in use: in the background it's ignored (and lord-vm
              * logs it), so a guest can't change this computer's clipboard behind the person's back */
             if (fd >= 0 && !clip_in_use(s)) {
@@ -2932,7 +2963,7 @@ static void from_vm(Sess *s) {
             }
             break;
         case VM_WINDATA:
-            if (fd >= 0) windata(s, &m, fd);
+            if (fd >= 0 && s->head <= 0) windata(s, &m, fd);
             break;
         case VM_GUEST_LAYOUT:
             s->layout[0] = m.a; s->layout[1] = m.b; s->layout[2] = (m.c >> 16) & 0xffff; s->layout[3] = m.c & 0xffff;
@@ -2950,7 +2981,7 @@ static void from_vm(Sess *s) {
             }
             break;
         case VM_GUEST_NOTE:
-            if (fd >= 0) guest_note(s, &m, fd);
+            if (fd >= 0 && s->head <= 0) guest_note(s, &m, fd);
             break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
@@ -3923,12 +3954,54 @@ static JSValue f_protect(JSContext *c, JSValueConst t, int argc, JSValueConst *a
     (void)t; (void)argc;
     Sess *s = get(c, argv[0]);
     if (!s) return JS_FALSE;
-    s->protect = 1;
-    MediaSrc *m = s->media ? media_src_get(s->media) : NULL;
-    media_src_protect(m);
-    if (s->rec) rec_end(s, media_src_get(s->rec));
+    /* every session of the machine: its other heads' windows too (All Displays) */
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *o = &sess[i];
+        if (!o->used || (o != s && (!s->id[0] || strcmp(o->id, s->id)))) continue;
+        o->protect = 1;
+        media_src_protect(o->media ? media_src_get(o->media) : NULL);
+        if (o->rec) rec_end(o, media_src_get(o->rec));
+    }
     char p[PATH_MAX + 16];
     if (s->dir[0] == '/' && snprintf(p, sizeof p, "%s/thumb.png", s->dir) < (int)sizeof p) unlink(p);
+    return JS_TRUE;
+}
+
+/* allDisplays(session, [[w, h], ...] | null) → bool (docs/VIRTUALIZATION.md 5.4): the heads' sizes, head 0 first, one per
+ * output of the machine (2..its heads); the desktop they make side by side (vm_heads_layout) goes to each of the machine's
+ * sessions as its head's place: the tablet's clicks land on that head's pixels and the guest is asked for each head's size
+ * at that corner. null: back to the guest's own layout (one display again) */
+static JSValue f_all_displays(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = get(c, argv[0]);
+    if (!s || !s->id[0]) return JS_FALSE;
+    int n = 0, w[VM_HEADS_MAX], h[VM_HEADS_MAX];
+    if (argc >= 2 && JS_IsArray(c, argv[1])) {
+        JSValue lv = JS_GetPropertyStr(c, argv[1], "length");
+        int32_t len = 0;
+        JS_ToInt32(c, &len, lv);
+        JS_FreeValue(c, lv);
+        if (len < 2 || len > VM_HEADS_MAX) return JS_FALSE;
+        for (int i = 0; i < len; i++) {
+            JSValue e = JS_GetPropertyUint32(c, argv[1], (uint32_t)i);
+            JSValue a = JS_GetPropertyUint32(c, e, 0), b = JS_GetPropertyUint32(c, e, 1);
+            int32_t x = 0, y = 0;
+            int bad = JS_ToInt32(c, &x, a) || JS_ToInt32(c, &y, b);
+            JS_FreeValue(c, a); JS_FreeValue(c, b); JS_FreeValue(c, e);
+            if (bad) return JS_FALSE;
+            w[i] = x; h[i] = y;
+        }
+        n = len;
+        int L[6];
+        if (vm_heads_layout(n, w, h, 0, L)) return JS_FALSE;      /* every size checked before anything changes */
+    }
+    for (int i = 0; i < MAX_SESS; i++) {
+        Sess *o = &sess[i];
+        if (!o->used || strcmp(o->id, s->id)) continue;
+        if (n && o->head < n && !vm_heads_layout(n, w, h, o->head, o->hlayout)) o->hl_on = 1;
+        else { o->hl_on = 0; memset(o->hlayout, 0, sizeof o->hlayout); }
+        layout_send(o);
+    }
     return JS_TRUE;
 }
 
@@ -5151,7 +5224,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("start", 1, f_start), JS_CFUNC_DEF("attach", 1, f_attach), JS_CFUNC_DEF("poll", 1, f_poll), JS_CFUNC_DEF("cmd", 2, f_cmd),
     JS_CFUNC_DEF("stop", 2, f_stop), JS_CFUNC_DEF("key", 3, f_key), JS_CFUNC_DEF("motion", 3, f_motion), JS_CFUNC_DEF("button", 3, f_button),
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),
-    JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
+    JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("allDisplays", 2, f_all_displays), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
     JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),

@@ -556,6 +556,8 @@ static int check_member(const VmMachine *m, char *err, size_t n) {
             return fail(err, n, VM_E_RANGE, "locked for anonymity: SMBIOS strings and disk serials");
         if (m->perf_profile) return fail(err, n, VM_E_RANGE, "locked for anonymity: the guest's performance profile (it needs the agent)");
         if (m->guest_links || m->guest_notify) return fail(err, n, VM_E_RANGE, "locked for anonymity: links and notifications from the guest");
+        /* All Displays would tell the guest how many displays this computer has, and their sizes */
+        if (m->heads > 1) return fail(err, n, VM_E_RANGE, "locked for anonymity: several displays");
     }
     return VM_OK;
 }
@@ -663,6 +665,10 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->schema < 13 && m->perf_profile) return fail(err, n, VM_E_FIELD, "perf_profile needs schema 13");
     if ((m->guest_links & ~1) || (m->guest_notify & ~1)) return fail(err, n, VM_E_RANGE, "guest_links and guest_notify are true or false");
     if (m->schema < 15 && (m->guest_links || m->guest_notify)) return fail(err, n, VM_E_FIELD, "guest_links and guest_notify need schema 15");
+    if (m->heads < 0 || m->heads > VM_HEADS_MAX) return fail(err, n, VM_E_RANGE, "heads is 1 to %d", VM_HEADS_MAX);   /* 0: one, as a VmMachine made before the key */
+    if (m->schema < 16 && m->heads > 1) return fail(err, n, VM_E_FIELD, "heads needs schema 16");
+    /* one picture per output needs virtio-gpu's own: not an Intel vGPU's, and only on a machine with a window */
+    if (m->heads > 1 && (m->vgpu || m->display != VM_DISPLAY_WINDOW)) return fail(err, n, VM_E_RANGE, "several displays need virtio graphics and a window");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
@@ -805,7 +811,7 @@ static const char *const KEYS[] = {
     "devices", "nic_model", "extra_nics", "cpu_sockets", "cpu_cores", "cpu_threads", "smbios", "disk_serial", "data_disks", "rtc",
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
-    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", NULL,
+    "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "heads", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -1086,6 +1092,10 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         if ((gl && gl->type != J_BOOL) || (gn && gn->type != J_BOOL)) { r = fail(err, n, VM_E_FIELD, "guest_links and guest_notify must be true or false"); goto out; }
         m->guest_links = gl ? json_bool(o, "guest_links", 0) : 0;
         m->guest_notify = gn ? json_bool(o, "guest_notify", 0) : 0;
+        /* schema 16: missing means one display */
+        m->heads = 1;
+        if ((r = get_opt_int(o, "heads", &m->heads, err, n))) goto out;
+        if (json_get(o, "heads") && m->heads < 1) { r = fail(err, n, VM_E_RANGE, "heads is 1 to %d", VM_HEADS_MAX); goto out; }
         /* schema 13: missing means this computer's default (vmpin_default_on) */
         char pin[8];
         if ((r = get_str(o, "cpu_pin", pin, sizeof pin, 0, err, n))) goto out;
@@ -1207,6 +1217,7 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 13 && m->perf_profile) jb_raw(&b, ",\n  \"perf_profile\": true");
     if (m->schema >= 15 && m->guest_links) jb_raw(&b, ",\n  \"guest_links\": true");
     if (m->schema >= 15 && m->guest_notify) jb_raw(&b, ",\n  \"guest_notify\": true");
+    if (m->schema >= 16 && m->heads > 1) jb_printf(&b, ",\n  \"heads\": %d", m->heads);
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);
