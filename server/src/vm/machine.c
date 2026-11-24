@@ -678,6 +678,15 @@ int vm_machine_check(const VmMachine *m, char *err, size_t n) {
     if (m->heads > 1 && (m->vgpu || m->display != VM_DISPLAY_WINDOW)) return fail(err, n, VM_E_RANGE, "several displays need virtio graphics and a window");
     if (m->guest_files_off & ~1) return fail(err, n, VM_E_RANGE, "guest_files is true or false");
     if (m->schema < 20 && m->guest_files_off) return fail(err, n, VM_E_FIELD, "guest_files needs schema 20");
+    if (m->kernel_boot & ~1) return fail(err, n, VM_E_RANGE, "kernel_boot is true or false");
+    if (m->schema < 21 && m->kernel_boot) return fail(err, n, VM_E_FIELD, "kernel_boot needs schema 21");
+    /* a directly started kernel skips the boot loader: secure boot's chain would be skipped too (refused, not weakened);
+     * the virtio-win devices are another system's; an encrypted machine's boot files would lie on the disk in the clear;
+     * a group's member keeps its anonymity profile's boot */
+    if (m->kernel_boot && m->firmware == VM_FW_UEFI && m->secure_boot) return fail(err, n, VM_E_RANGE, "a kernel started directly skips secure boot: turn one of them off");
+    if (m->kernel_boot && m->devices == VM_DEV_WINDOWS) return fail(err, n, VM_E_RANGE, "a kernel started directly is for Linux guests");
+    if (m->kernel_boot && m->encrypted) return fail(err, n, VM_E_RANGE, "an encrypted machine's kernel and initrd would be kept in the clear: it starts from its disk");
+    if (m->kernel_boot && m->group[0]) return fail(err, n, VM_E_RANGE, "a group's member starts from its disk");
     if (m->cpu_pin < VM_PIN_DEFAULT || m->cpu_pin > VM_PIN_AUTO) return fail(err, n, VM_E_RANGE, "cpu_pin is off or auto");
     if (m->schema < 13 && m->cpu_pin) return fail(err, n, VM_E_FIELD, "cpu_pin needs schema 13");
     if (m->schema < 7 && m->transfer) return fail(err, n, VM_E_FIELD, "transfer needs schema 7");
@@ -833,7 +842,7 @@ static const char *const KEYS[] = {
     "shares", "secure_boot", "tpm", "hyperv", "drivers", "graphics", "bridge", "ports", "sound", "volume", "microphone", "resolution",
     "boot_order", "boot_menu", "transfer", "sound_out", "sound_in", "clipboard_ask", "pointer", "gpu", "capture_fullscreen", "perf_profile", "cpu_pin",
     "group", "role", "uplink", "link_mac", "profile_lock", "timers", "guest_links", "guest_notify", "disposable", "encrypted", "disk_format", "backup", "automation", "cpu_model", "heads",
-    "guest_files", NULL,
+    "guest_files", "kernel_boot", NULL,
 };
 
 static int get_str(const JVal *o, const char *k, char *out, size_t cap, int required, char *err, size_t n) {
@@ -1139,6 +1148,10 @@ int vm_machine_parse(const char *text, size_t len, VmMachine *m, char *err, size
         const JVal *gf = json_get(o, "guest_files");
         if (gf && gf->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "guest_files must be true or false"); goto out; }
         m->guest_files_off = gf ? !json_bool(o, "guest_files", 1) : 0;
+        /* schema 21: missing means the boot loader on the disk */
+        const JVal *kb = json_get(o, "kernel_boot");
+        if (kb && kb->type != J_BOOL) { r = fail(err, n, VM_E_FIELD, "kernel_boot must be true or false"); goto out; }
+        m->kernel_boot = kb ? json_bool(o, "kernel_boot", 0) : 0;
         /* schema 13: missing means this computer's default (vmpin_default_on) */
         char pin[8];
         if ((r = get_str(o, "cpu_pin", pin, sizeof pin, 0, err, n))) goto out;
@@ -1278,6 +1291,7 @@ char *vm_machine_json(const VmMachine *m) {
     if (m->schema >= 18 && m->cpu_model == VM_CPU_COMPAT) jb_raw(&b, ",\n  \"cpu_model\": \"compatible\"");
     if (m->schema >= 19 && m->heads > 1) jb_printf(&b, ",\n  \"heads\": %d", m->heads);
     if (m->schema >= 20 && m->guest_files_off) jb_raw(&b, ",\n  \"guest_files\": false");
+    if (m->schema >= 21 && m->kernel_boot) jb_raw(&b, ",\n  \"kernel_boot\": true");
     if (m->schema >= 13 && m->cpu_pin) { jb_raw(&b, ",\n  \"cpu_pin\": "); jb_str(&b, VM_PIN_NAMES[m->cpu_pin]); }
     if (m->schema >= 14 && m->group[0]) {
         jb_raw(&b, ",\n  \"group\": "); jb_str(&b, m->group);

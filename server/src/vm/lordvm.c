@@ -42,6 +42,7 @@
 #include "vmexec.h"
 #include "vmlink.h"
 #include "vmexport.h"
+#include "vmkboot.h"
 #include "../sec/cgroup.h"
 #include "../sec/json.h"
 #include "../doc/wire.h"
@@ -1067,6 +1068,10 @@ static struct {
      * number in QEMU */
     int key_fd, fw_fd, xfd_base;
     char un_cmd[640];
+    /* direct kernel boot (schema 21, 6.1): this start runs disks/boot's kernel (kboot), with its initrd (kboot_initrd) and
+     * the command line read and checked at the start (kb_cmd) */
+    int kboot, kboot_initrd;
+    char kb_cmd[VM_KBOOT_CMDLINE_MAX + 1];
     long long shut_deadline, kill_deadline;
     Pending pq[MAX_PENDING];
     int pq_head, pq_n;
@@ -2651,6 +2656,13 @@ static void build_qemu_args(void) {
         }
         arg("-action"); arg("reboot=shutdown");
     }
+    if (S.kboot) {
+        /* direct kernel boot (schema 21, 6.1): the firmware loads disks/boot's kernel through fw_cfg instead of the disk's
+         * boot loader (no menu, no countdown); the files were copied in by --set, QEMU reads them inside its Landlock */
+        snprintf(p, sizeof p, "%s/" VM_KBOOT_KERNEL, S.disks); arg("-kernel"); arg(p);
+        if (S.kboot_initrd) { snprintf(p, sizeof p, "%s/" VM_KBOOT_INITRD, S.disks); arg("-initrd"); arg(p); }
+        arg("-append"); arg(S.kb_cmd);
+    }
     static const char *const NICDEV[VM_NIC_COUNT] = { "virtio-net-pci", "e1000e", "e1000", "e1000-82545em", "e1000-82544gc", "vmxnet3", "rtl8139", "pcnet" };
     if (m->network == VM_NET_BRIDGED) {
         /* the macvtap's device, opened by lord-vm (6.5): the card straight on it; no vhost (QEMU opens no device) */
@@ -2876,6 +2888,7 @@ static int start_machine(void) {
     if (S.m.iso[0] && !file_exists(S.m.iso)) { fail_start("the attached image is missing: %s", S.m.iso); return -1; }
     if (S.m.drivers[0] && !file_exists(S.m.drivers)) { vlog("note: the drivers disc is gone (%s): the machine starts without it", S.m.drivers); S.m.drivers[0] = 0; }
     S.unattended = 0;
+    S.kboot = S.kboot_initrd = 0;
     S.install_done = 0;
     qemu_3d_abort_seen = stop_notice = stop_announces = 0;
     run_t0 = 0;
@@ -2902,6 +2915,25 @@ static int start_machine(void) {
             if (!file_exists(cp)) ok = 0;
             if (ok) { S.unattended = 1; vlog("unattended: this start installs the system (the installer's kernel and the answers)"); }
             else vlog("unattended: disks/unattended is incomplete or the ISO is gone: started as usual");
+        }
+        /* direct kernel boot (schema 21): the kernel, the initrd if there is one and a printable command line in
+         * disks/boot, else the boot loader on the disk as usual (said in the log); an unattended install's own kernel wins */
+        if (S.m.kernel_boot && !S.unattended) {
+            int ok = 0;
+            snprintf(cp, sizeof cp, "%s/" VM_KBOOT_CMDLINE, S.disks);
+            int kfd = open(cp, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+            ssize_t kn = kfd >= 0 ? read(kfd, S.kb_cmd, sizeof S.kb_cmd - 1) : -1;
+            if (kfd >= 0) close(kfd);
+            if (kn > 0) {
+                S.kb_cmd[kn] = 0;
+                ok = kboot_cmdline_ok(S.kb_cmd);
+            }
+            snprintf(cp, sizeof cp, "%s/" VM_KBOOT_KERNEL, S.disks);
+            if (!file_exists(cp)) ok = 0;
+            snprintf(cp, sizeof cp, "%s/" VM_KBOOT_INITRD, S.disks);
+            S.kboot_initrd = file_exists(cp);
+            if (ok) { S.kboot = 1; vlog("kernel boot: this start runs disks/boot's kernel%s", S.kboot_initrd ? " and initrd" : ""); }
+            else vlog("kernel boot: disks/boot has no kernel or a usable command line: started from the disk");
         }
         /* Windows (vmu_prepare_windows): no kernel of its own; the seed disk goes in as a USB stick until the guest
          * agent's first answer says the install is done */
@@ -8390,6 +8422,96 @@ static int cmd_rename(const char *dir, int argc, char **argv) {
 /* Changes a machine that is off (Configure): the same checks as --create, under the machine's lock (exit 3 while it
  * runs). The disk only grows (qemu-img resize, jailed: it reads and writes the machine's disks/ only); an ISO is
  * checked like --iso, "none" takes it out. Prints the machine as JSON. */
+/* ---- direct kernel boot's files (schema 21, 6.1; vmkboot.h) ---- */
+
+/* disks/boot has a kernel and a command line */
+static int kboot_ready(const char *real) {
+    char p[PATH_MAX + 64];
+    snprintf(p, sizeof p, "%s/disks/" VM_KBOOT_KERNEL, real);
+    if (!file_exists(p)) return 0;
+    snprintf(p, sizeof p, "%s/disks/" VM_KBOOT_CMDLINE, real);
+    return file_exists(p);
+}
+
+/* one of the person's files copied into disks/boot/NAME: opened without following a link, a regular file of 1 byte to
+ * max, its start checked when it is the kernel; written under a temporary name, synced, renamed over the old one. The
+ * copy is read from the descriptor (fstat on it), so a name changed meanwhile can't swap another file in */
+static int kboot_copy(const char *real, const char *src, const char *name, long max, int kernel_arch, char *err, size_t errlen) {
+    char dst[PATH_MAX + 64], tmp[PATH_MAX + 80];
+    int in = open(src, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NOCTTY | O_NONBLOCK), out = -1, rc = -1;
+    struct stat st;
+    if (in < 0) { snprintf(err, errlen, "%s: %s", src, strerror(errno)); return -1; }
+    if (fstat(in, &st) || !S_ISREG(st.st_mode)) { snprintf(err, errlen, "%s isn't a file", src); goto done; }
+    if (st.st_size <= 0 || st.st_size > max) { snprintf(err, errlen, "%s: a %s is 1 byte to %ld MB", src, kernel_arch >= 0 ? "kernel" : "initrd", max >> 20); goto done; }
+    if (kernel_arch >= 0) {
+        uint8_t h[VMKBOOT_HEAD];
+        ssize_t hn = pread(in, h, sizeof h, 0);
+        if (hn < 0 || !kboot_kernel_ok(h, (size_t)hn, kernel_arch == VM_ARCH_AMD64)) {
+            snprintf(err, errlen, "%s isn't a Linux kernel for %s (a bzImage on amd64; an Image, Image.gz or EFI zboot image on arm64)", src, kernel_arch == VM_ARCH_AMD64 ? "amd64" : "arm64");
+            goto done;
+        }
+    }
+    snprintf(dst, sizeof dst, "%s/disks/%s", real, name);
+    snprintf(tmp, sizeof tmp, "%s/disks/" VM_KBOOT_DIR "/.new-%s", real, strrchr(name, '/') + 1);
+    unlink(tmp);
+    out = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+    if (out < 0) { snprintf(err, errlen, "disks/%s: %s", name, strerror(errno)); goto done; }
+    static uint8_t buf[1 << 20];
+    off_t left = st.st_size;
+    while (left > 0) {
+        ssize_t r = read(in, buf, sizeof buf);
+        if (r < 0 && errno == EINTR) continue;
+        if (r <= 0) { snprintf(err, errlen, "%s: %s", src, r < 0 ? strerror(errno) : "it got shorter while being read"); goto done; }
+        if (r > left) r = (ssize_t)left;     /* a file that grew meanwhile: only the size it had */
+        if (write_all(out, buf, (size_t)r)) { snprintf(err, errlen, "disks/%s: %s", name, strerror(errno)); goto done; }
+        left -= r;
+    }
+    if (fsync(out)) { snprintf(err, errlen, "disks/%s: %s", name, strerror(errno)); goto done; }
+    close(out); out = -1;
+    if (rename(tmp, dst)) { snprintf(err, errlen, "disks/%s: %s", name, strerror(errno)); goto done; }
+    rc = 0;
+done:
+    if (out >= 0) close(out);
+    if (rc) unlink(tmp);
+    close(in);
+    return rc;
+}
+
+/* --kernel, --initrd FILE|none, --cmdline TEXT: disks/boot made (0700) and filled. Refused for a machine whose checks
+ * refuse kernel_boot (secure boot, the virtio-win devices, encryption, a group): the files would never be used, and an
+ * encrypted machine's would lie in the clear */
+static int kboot_files(const char *real, const VmMachine *m, const char *kfile, const char *ifile, const char *kcmd, char *err, size_t errlen) {
+    VmMachine t = *m;
+    t.kernel_boot = 1; t.schema = VM_SCHEMA;
+    if (vm_machine_check(&t, err, errlen)) return -1;
+    char d[PATH_MAX + 32];
+    snprintf(d, sizeof d, "%s/disks/" VM_KBOOT_DIR, real);
+    if (mkdir(d, 0700) && errno != EEXIST) { snprintf(err, errlen, "disks/boot: %s", strerror(errno)); return -1; }
+    struct stat st;
+    if (lstat(d, &st) || !S_ISDIR(st.st_mode)) { snprintf(err, errlen, "disks/boot isn't a folder"); return -1; }
+    if (kcmd) {
+        char c[VM_KBOOT_CMDLINE_MAX + 2];
+        if (strlen(kcmd) > VM_KBOOT_CMDLINE_MAX + 1) { snprintf(err, errlen, "the command line is longer than %d characters", VM_KBOOT_CMDLINE_MAX); return -1; }
+        snprintf(c, sizeof c, "%s", kcmd);
+        if (!kboot_cmdline_clean(c)) { snprintf(err, errlen, "the command line is 1 to %d printable characters", VM_KBOOT_CMDLINE_MAX); return -1; }
+        char p[PATH_MAX + 64], tmp[PATH_MAX + 80];
+        snprintf(p, sizeof p, "%s/disks/" VM_KBOOT_CMDLINE, real);
+        snprintf(tmp, sizeof tmp, "%s/disks/" VM_KBOOT_DIR "/.new-cmdline", real);
+        unlink(tmp);
+        int fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
+        if (fd < 0 || write_all(fd, c, strlen(c)) || fsync(fd)) { if (fd >= 0) close(fd); unlink(tmp); snprintf(err, errlen, "disks/boot/cmdline: %s", strerror(errno)); return -1; }
+        close(fd);
+        if (rename(tmp, p)) { unlink(tmp); snprintf(err, errlen, "disks/boot/cmdline: %s", strerror(errno)); return -1; }
+    }
+    if (kfile && kboot_copy(real, kfile, VM_KBOOT_KERNEL, VM_KBOOT_KERNEL_MAX, m->arch, err, errlen)) return -1;
+    if (ifile && !strcmp(ifile, "none")) {
+        char p[PATH_MAX + 64];
+        snprintf(p, sizeof p, "%s/disks/" VM_KBOOT_INITRD, real);
+        if (unlink(p) && errno != ENOENT) { snprintf(err, errlen, "disks/boot/initrd: %s", strerror(errno)); return -1; }
+    } else if (ifile && kboot_copy(real, ifile, VM_KBOOT_INITRD, VM_KBOOT_INITRD_MAX, -1, err, errlen)) return -1;
+    return 0;
+}
+
 static int cmd_set(const char *dir, int argc, char **argv) {
     const char *name = NULL, *iso = NULL;
     int vcpus = 0, mem = 0, disk = 0, disp = -1, net = -1, agent = -1, clip = -1, devs = -1, nicm = -1, gfx = -1, sound = -1, vol = -1, mic = -1, resw = 0, reshh = 0, res_set = 0, xfer = -1, cask = -1, ptr = -1, gpu = -1, capfs = -1, perf = -1, pin = -1, glinks = -1, gnote = -1, autom = -1, heads = 0, gfiles = -1;
@@ -8412,10 +8534,18 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     /* Configure (5.5, schema 16): --cpu-model host|compatible; --mac new (a new random address of QEMU's 52:54:00 range for
      * the first card); --add-disk GB (one more empty data disk, disks/data-<n>.qcow2, up to VM_DATA_DISKS) */
     int cpum = -1, newmac = 0, adddisk = 0;
+    /* direct kernel boot (schema 21, 6.1): --kernel FILE, --initrd FILE|none, --cmdline TEXT copy into disks/boot;
+     * --kernel-boot on|off. Allowed while suspended: the next cold start reads them, a resumed state never does */
+    const char *kfile = NULL, *ifile = NULL, *kcmd = NULL;
+    int kboot = -1;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
         i++;
+        if (!strcmp(a, "--kernel-boot")) { kboot = parse_enum(v, "off", "on"); if (kboot < 0) { fprintf(stderr, "lord-vm: --kernel-boot on|off\n"); return 2; } continue; }
+        if (!strcmp(a, "--kernel")) { kfile = v; continue; }
+        if (!strcmp(a, "--initrd")) { ifile = v; continue; }
+        if (!strcmp(a, "--cmdline")) { kcmd = v; continue; }
         if (!strcmp(a, "--cpu-model")) { cpum = parse_enum(v, "host", "compatible"); if (cpum < 0) { fprintf(stderr, "lord-vm: --cpu-model host|compatible\n"); return 2; } continue; }
         if (!strcmp(a, "--mac")) { if (strcmp(v, "new")) { fprintf(stderr, "lord-vm: --mac new\n"); return 2; } newmac = 1; continue; }
         if (!strcmp(a, "--add-disk")) {
@@ -8560,6 +8690,7 @@ static int cmd_set(const char *dir, int argc, char **argv) {
     if (gfiles >= 0) { m.guest_files_off = !gfiles; if (!gfiles) m.schema = VM_SCHEMA; }
     if (pin >= 0) { m.cpu_pin = pin; if (pin) m.schema = VM_SCHEMA; }
     if (cpum >= 0) { m.cpu_model = cpum; if (cpum) m.schema = VM_SCHEMA; }
+    if (kboot >= 0) { m.kernel_boot = kboot; if (kboot) m.schema = VM_SCHEMA; }
     if (newmac) {
         uint8_t r[3];
         if (getrandom(r, sizeof r, 0) != (ssize_t)sizeof r) { fprintf(stderr, "lord-vm: no random bytes for the address\n"); goto out; }
@@ -8679,6 +8810,8 @@ static int cmd_set(const char *dir, int argc, char **argv) {
         if (run_tool_in(mk, err, sizeof err, dd, dd)) { unlink(tmp); fprintf(stderr, "lord-vm: making the disk failed: %s\n", err); goto out; }
         if (renameat2(AT_FDCWD, tmp, AT_FDCWD, dp, RENAME_NOREPLACE)) { unlink(tmp); fprintf(stderr, "lord-vm: making the disk failed: %s\n", strerror(errno)); goto out; }
     }
+    if ((kfile || ifile || kcmd) && kboot_files(real, &m, kfile, ifile, kcmd, err, sizeof err)) { fprintf(stderr, "lord-vm: %s\n", err); goto out; }
+    if (m.kernel_boot && !was.kernel_boot && !kboot_ready(real)) { fprintf(stderr, "lord-vm: choose the kernel and its command line first (--kernel, --cmdline)\n"); goto out; }
     vm_now_iso(m.updated);
     if (vm_machine_save(real, &m)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
     /* the name is saved: now the folders follow it. A folder that can't move keeps its name, and says why */
@@ -9083,6 +9216,16 @@ static int cmd_clone(const char *src, int argc, char **argv) {
         else snprintf(p1, sizeof p1, "%s/disks/tpm/tpm2-00.permall", real);
         snprintf(p2, sizeof p2, "%s/disks/tpm/tpm2-00.permall", tmp);
         if (copy_small(p1, p2)) { fprintf(stderr, "lord-vm: copying the TPM's state failed\n"); goto out; }
+    }
+    if (m.kernel_boot || kboot_ready(real)) {
+        /* direct kernel boot's files (schema 21) go with the disk they belong to */
+        static const char *const kb[] = { VM_KBOOT_KERNEL, VM_KBOOT_INITRD, VM_KBOOT_CMDLINE };
+        snprintf(p2, sizeof p2, "%s/disks/" VM_KBOOT_DIR, tmp);
+        if (mkdir(p2, 0700) && errno != EEXIST) { fprintf(stderr, "lord-vm: can't make the clone's boot folder\n"); goto out; }
+        for (int i = 0; i < 3; i++) {
+            snprintf(p1, sizeof p1, "%s/disks/%s", real, kb[i]); snprintf(p2, sizeof p2, "%s/disks/%s", tmp, kb[i]);
+            if (file_exists(p1) && copy_reflink(p1, p2) && copy_sparse(p1, p2)) { fprintf(stderr, "lord-vm: copying disks/%s failed\n", kb[i]); goto out; }
+        }
     }
     snprintf(p1, sizeof p1, "%s/app.json", real); snprintf(p2, sizeof p2, "%s/app.json", tmp); copy_small(p1, p2);
     /* the UEFI code kept with the machine (3.6) goes with its variables */
@@ -11496,6 +11639,7 @@ static int cmd_export(const char *dir, int argc, char **argv) {
         VmMachine n = m;
         n.base[0] = n.iso[0] = n.drivers[0] = n.bridge[0] = 0;
         n.n_shares = 0;
+        n.kernel_boot = 0;      /* disks/boot isn't exported: the machine starts from its disk's boot loader there */
         if (n.network == VM_NET_BRIDGED) n.network = VM_NET_SHARED;
         if (vm_machine_save(tmp, &n)) { fprintf(stderr, "lord-vm: can't write machine.json\n"); goto out; }
         /* the manifest of every file there now */
@@ -11584,6 +11728,7 @@ static void import_untrust(VmMachine *m) {
     if (m->graphics == VM_GFX_3D) m->graphics = VM_GFX_2D;
     m->cpu_pin = VM_PIN_DEFAULT;
     m->perf_profile = 0;
+    m->kernel_boot = 0;
     m->group[0] = 0;
     m->role = VM_ROLE_NONE;
     m->profile_lock = VM_LOCK_NONE;
@@ -11710,6 +11855,7 @@ static int usage(void) {
             "                         [--port tcp|udp:HOST:GUEST[:this-computer|lan] ...] [--ports none]   (forwarded ports, replacing the list)\n"
             "                         [--agent on|off] [--clipboard off|to-guest|from-guest|both] [--graphics 2d|3d]   (also on --create)\n"
             "                         [--boot-order auto|disk,cd,network (any order, any of them)] [--boot-menu on|off]\n"
+            "                         [--kernel FILE] [--initrd FILE|none] [--cmdline TEXT] [--kernel-boot on|off]\n"
             "                         [--share ro|rw:TAG:FOLDER ...] [--shares none]   (shared folders, replacing the list)\n"
             "                         [--sound on|off] [--volume 0..100] [--microphone on|off] [--sound-out NODE|default] [--sound-in NODE|default]   (with the machine off; Machines changes them live)\n"
             "                         [--clipboard-ask on|off]   (ask before each paste into and copy out of the machine)\n"

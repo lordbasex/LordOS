@@ -21,10 +21,19 @@
 
 /* 1: Phase 1. 2 (Beta): base, agent, clipboard. 3 (Import, 6.22): devices, nic_model, extra_nics, cpu_sockets/cores/threads,
  * smbios, disk_serial, data_disks, rtc. 4 (0.8.8.7): shares. 5: secure_boot, tpm, hyperv, drivers, the windows devices,
- * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). 16: disposable, encrypted, backup, disk_format (storage: 6.2, 6.4, 8). 17: automation (6.15, `machines exec` and `cp`). 18: cpu_model (5.5). 19: heads (5.4, All Displays). 20: guest_files (6.21). An older file is read as
+ * graphics. 6: the bridged and host-only networks, bridge, ports (6.5); sound, volume, microphone (6.9); boot_order, boot_menu. 7: transfer (6.7.1). 8: sound_out, sound_in (6.9). 9: clipboard_ask (6.8). 10: pointer (7.1.2). 11: gpu (docs/MACHINES-GPU.md, Mode A). 12: capture_fullscreen (6.25). 13: perf_profile (7.1.4), cpu_pin (3.7.1). 14: group, role, the "link" network, uplink, link_mac, profile_lock, timers (machine groups, 19.4). 15: guest_links, guest_notify (6.12). 16: disposable, encrypted, backup, disk_format (storage: 6.2, 6.4, 8). 17: automation (6.15, `machines exec` and `cp`). 18: cpu_model (5.5). 19: heads (5.4, All Displays). 20: guest_files (6.21). 21: kernel_boot (direct kernel boot, 6.1). An older file is read as
  * is and written as the current schema, with a copy of the old
  * one kept beside it (machine.json.schema1); a newer one is never rewritten. */
-#define VM_SCHEMA 20
+#define VM_SCHEMA 21
+/* direct kernel boot's files, in the machine's disks/ folder (QEMU's Landlock reads only there): copied in by lord-vm --set
+ * --kernel/--initrd/--cmdline, never a link to the person's file */
+#define VM_KBOOT_DIR     "boot"
+#define VM_KBOOT_KERNEL  "boot/vmlinuz"
+#define VM_KBOOT_INITRD  "boot/initrd"
+#define VM_KBOOT_CMDLINE "boot/cmdline"
+#define VM_KBOOT_KERNEL_MAX (128L << 20)     /* a kernel image: Debian's are 8-12 MB */
+#define VM_KBOOT_INITRD_MAX (1024L << 20)    /* an initrd: Debian's 30-80 MB; dracut's "hostonly=no" a few hundred */
+#define VM_KBOOT_CMDLINE_MAX 1023            /* printable ASCII; x86's COMMAND_LINE_SIZE is 2048 */
 /* the most displays (virtio-gpu outputs) a machine may have: "heads" (schema 19) */
 #define VM_HEADS_MAX 4
 
@@ -220,6 +229,10 @@ typedef struct {
     /* schema 20: files sent from the guest (docs/VIRTUALIZATION.md 6.21, "Send to LordOS"): taken into the machine's
      * quarantine folder unless "guest_files": false (written only then); a machine locked for anonymity never takes them */
     int guest_files_off;
+    /* schema 21: direct kernel boot of an installed Linux guest (docs/VIRTUALIZATION.md 6.1, "Start Linux directly"):
+     * "kernel_boot": true (written only then) starts the kernel, initrd and command line kept in disks/boot/ (VM_KBOOT_*)
+     * instead of the boot loader on the disk; never with secure boot, the virtio-win devices, encryption or a group */
+    int kernel_boot;
     /* schema 14: a member of a machine group (docs/VIRTUALIZATION.md 19.4), written only for members. group: the group's
      * id (group.json "id"); role: VM_ROLE_*; uplink_tor: the gateway's passt has no DNS forwarding and no forwarded ports
      * ("uplink": "tor", with network "shared"); link_mac: the gateway's second card, on the internal link; profile_lock:

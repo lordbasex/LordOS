@@ -25,6 +25,7 @@
 #include "../media/aring.h"
 #include "../vm/vmproto.h"
 #include "../vm/vmpace.h"
+#include "../vm/vmkboot.h"
 #include "../vm/machine.h"
 #include "../vm/vmgroup.h"
 #include "../vm/vmlink.h"
@@ -462,6 +463,21 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
             vm_boot_spec(&m, bo, sizeof bo);
             set_str(c, o, "bootOrder", bo);
             JS_SetPropertyStr(c, o, "bootMenu", JS_NewBool(c, m.boot_menu));
+            /* direct kernel boot (schema 21, 6.1): the switch, and what disks/boot holds (the files' presence, the
+             * command line when it is one lord-vm would pass) */
+            JS_SetPropertyStr(c, o, "kernelBoot", JS_NewBool(c, m.kernel_boot));
+            char kp[PATH_MAX + 64], kc[VM_KBOOT_CMDLINE_MAX + 1] = "";
+            struct stat kst;
+            snprintf(kp, sizeof kp, "%s/disks/" VM_KBOOT_KERNEL, dir);
+            JS_SetPropertyStr(c, o, "kernelFile", JS_NewBool(c, !lstat(kp, &kst) && S_ISREG(kst.st_mode)));
+            snprintf(kp, sizeof kp, "%s/disks/" VM_KBOOT_INITRD, dir);
+            JS_SetPropertyStr(c, o, "initrdFile", JS_NewBool(c, !lstat(kp, &kst) && S_ISREG(kst.st_mode)));
+            snprintf(kp, sizeof kp, "%s/disks/" VM_KBOOT_CMDLINE, dir);
+            int kfd = open(kp, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
+            ssize_t kn = kfd >= 0 ? read(kfd, kc, sizeof kc - 1) : -1;
+            if (kfd >= 0) close(kfd);
+            if (kn > 0) kc[kn] = 0;
+            set_str(c, o, "kernelCmdline", kn > 0 && kboot_cmdline_ok(kc) ? kc : "");
         }
         set_str(c, o, "network", VM_NET_NAMES[m.network]);
         set_str(c, o, "bridge", m.bridge);
@@ -1502,13 +1518,13 @@ static JSValue f_budget(JSContext *c, JSValueConst t, int argc, JSValueConst *ar
 
 /* set(dir, { name, vcpus, memoryMb, diskGb, network, bridge, ports: [{ proto, host, guest, open }], iso,
  *            shares: [{ tag, path, writable }], bootOrder: "auto"|"network,disk"…, bootMenu, pointer: "lordos"|"guest", captureFullscreen, perfProfile,
- *            cpuPin: "off"|"auto", automation }) → job id: lord-vm --set on a
+ *            cpuPin: "off"|"auto", automation, kernelBoot, kernel, initrd: path|"none", cmdline }) → job id: lord-vm --set on a
  * machine that is off (Configure). shares replaces the list ([] empties it); lord-vm decides which folders may be shared */
 static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[94 + 2 * VM_SHARES + 2 * VM_PORTS], hds[4] = "", shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[102 + 2 * VM_SHARES + 2 * VM_PORTS], hds[4] = "", shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1727,6 +1743,33 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "bootMenu");
     if (JS_IsBool(v)) { args[n++] = "--boot-menu"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    /* direct kernel boot (schema 21, 6.1): kernel and initrd are the person's readable files (lord-vm copies them in),
+     * initrd "none" removes it, cmdline 1 to 1023 printable characters, kernelBoot the switch */
+    v = JS_GetPropertyStr(c, argv[1], "kernelBoot");
+    if (JS_IsBool(v)) { args[n++] = "--kernel-boot"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    char kfile[PATH_MAX], ifile[PATH_MAX], kcmd[VM_KBOOT_CMDLINE_MAX + 1];
+    v = JS_GetPropertyStr(c, argv[1], "kernel");
+    if (JS_IsString(v)) { if (user_file(c, v, kfile, sizeof kfile)) ok = 0; else { args[n++] = "--kernel"; args[n++] = kfile; } }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "initrd");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && !strcmp(s, "none")) snprintf(ifile, sizeof ifile, "none");
+        else if (user_file(c, v, ifile, sizeof ifile)) ok = 0;
+        if (s) JS_FreeCString(c, s);
+        args[n++] = "--initrd"; args[n++] = ifile;
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "cmdline");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && strlen(s) < sizeof kcmd) { snprintf(kcmd, sizeof kcmd, "%s", s); if (kboot_cmdline_clean(kcmd)) { args[n++] = "--cmdline"; args[n++] = kcmd; } else ok = 0; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    } else if (!JS_IsUndefined(v)) ok = 0;
     JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "iso");
     if (JS_IsString(v)) {
