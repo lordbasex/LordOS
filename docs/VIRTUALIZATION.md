@@ -44,25 +44,25 @@ recomputes both from the rows; the arithmetic:
 | D. Snapshots, clones, storage | 9 | 6 | 60.00 | 60 % | 9 × 60 % = 5.40 | 60 % |
 | E. Network | 6 | 4 | 80.00 | 80 % | 6 × 80 % = 4.80 | 80 % |
 | F. Devices (USB, sound, microphone, camera, printers) | 6 | 5 | 56.00 | 56 % | 6 × 56 % = 3.36 | 56 % |
-| G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 68.33 | 68 % | 12 × 68 % = 8.16 | 68 % |
+| G. Host integration (folders, transfer, clipboard, drag, Open with, apps mode) | 12 | 9 | 76.67 | 77 % | 12 × 77 % = 9.24 | 68 % |
 | H. Graphics (virgl, GVT-g, venus, passthrough) | 7 | 8 | 46.25 | 46 % | 7 × 46 % = 3.22 | 46 % |
-| I. Guest tools and agent (state, shell, logs) | 7 | 6 | 75.00 | 75 % | 7 × 75 % = 5.25 | 75 % |
+| I. Guest tools and agent (state, shell, logs) | 7 | 6 | 90.00 | 90 % | 7 × 90 % = 6.30 | 75 % |
 | J. Command line and automation | 3 | 2 | 47.50 | 48 % | 3 × 48 % = 1.44 | 48 % |
 | K. System ties (Monitor, power, Cleaner, Backups, Sentinela) | 3 | 4 | 61.25 | 61 % | 3 × 61 % = 1.83 | 61 % |
 | L. Privacy and security model | 4 | 7 | 73.57 | 74 % | 4 × 74 % = 2.96 | 74 % |
 | M. Performance (targets and the six items) | 3 | 7 | 85.71 | 86 % | 3 × 86 % = 2.58 | 86 % |
 | N. Tests and validation on hardware | 3 | 5 | 55.00 | 55 % | 3 × 55 % = 1.65 | 55 % |
-| **Total** | **100** | **111** | | | **68.94 → 69 %** | 68 % |
+| **Total** | **100** | **111** | | | **71.07 → 71 %** | 69 % |
 
-Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 8.16 + 3.22 + 5.25 + 1.44 + 1.83 + 2.96 + 2.58 + 1.65 = 68.94, rounded **69 %** (before: 68 %, against `965a10f6e`). Before this audit the
+Σ = 10.92 + 9.12 + 8.25 + 5.40 + 4.80 + 3.36 + 9.24 + 3.22 + 6.30 + 1.44 + 1.83 + 2.96 + 2.58 + 1.65 = 71.07, rounded **71 %** (69 % at the audit of `bb5baab62`; 68 % against `965a10f6e`). The 2026-11-24 integration work (branch `m100/integration`: the agent's shell, links and notifications from the guest, the red agent light, the logs) moved G 68 → 77 % and I 75 → 90 %. Before this audit the
 document's table said 67.52 and the JSON 67.16 while the rows themselves gave 67.88: the Whonix row had been raised to 85 %
 twice without the table, the Σ line and the JSON being computed again, and B's score in the table (73 %) wasn't its rows'
 mean (76 %). All three now come from the rows in one pass.
 
 An item's share of the total is its area's weight divided by the area's item count, so finishing it adds weight × (100 − %)
 / items. What would raise the total most: the `lordvm` tools and MCP (J, +1.5); raw disks, encryption, export and backups
-(D, +1.5); guest → host links (G, +1.3); the file copy panel with drag out, USB, then camera and printers (G and F, +1.2
-each); disposable sessions for any machine (D, +1.1); the agent shell (I, +1.0); Picture in Picture with several displays
+(D, +1.5); the rest of guest → host links (G, +0.3); the file copy panel with drag out, USB, then camera and printers (G and F, +1.2
+each); disposable sessions for any machine (D, +1.1); the rest of the agent shell (I, +0.2); Picture in Picture with several displays
 (C, +0.9); venus, whole-GPU passthrough and several damage rectangles (H, +0.9 each); Migrate from another PC (B, +0.9);
 virtio-win guests on arm64 (B, +0.8).
 
@@ -90,7 +90,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lord-vm` supervisor over direct QMP, `machine.json` schema 14, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 14`); `vm-test`, `vmgroup-test` | Schema 14 (*in development*) adds a machine group member's keys (19.4); 13 was `cpu_pin` and `perf_profile` |
+| `lord-vm` supervisor over direct QMP, `machine.json` schema 15, lock, `run.json`, crash recovery (3.8, 3.9) | ✅ | 100 | `lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 15`); `vm-test`, `vmgroup-test` | Schema 15 (*in development*) adds `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4) |
 | KVM amd64 and arm64, TCG labelled Emulated (2.1–2.4) | ✅ | 100 | `lordvm.c` (`-accel`), `assistant.jsx` ("Other architecture…") | Pi 5, nested amd64, Xeon and the i9 PC |
 | Pi defaults (3 vCPUs, RAM − 2 GB) and the microSD warning (2.2) | ✅ | 100 | `machine.c`, `js_vm.c` |  |
 | `/dev/kvm` through `vm-kvm` (ACL now, group next login) (3.4) | ✅ | 100 | `vm_admin.c` |  |
@@ -179,7 +179,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | USB passthrough, auto-connect rules, `vm-usb-allow` (6.6) | ❌ | 0 | no usbredir anywhere |  |
 | Camera (6.9), printers (5.5) | ❌ | 0 |  |  |
 
-### G. Host integration (68 %)
+### G. Host integration (77 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
@@ -191,7 +191,7 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | Open with a machine (7.3) | ✅ | 100 | `openwith.js`; `vm_openwith_test.mjs` | Windows guests |
 | Apps mode: Windows and LordOS guests (7.2) | ✅ | 90 | `appsmode.jsx`, `appsstatus.jsx`, `js_guestwin.c`; `guestwin_headless.sh` | Not other Linux desktops; no window shapes |
 | Guest apps in the launcher before the machine runs (6.12) | 🟡 | 40 | Dock `vm:<machine>:<app>` while apps mode runs | No saved list, no launcher entries, no "launch starts the machine" |
-| Guest → host links and notifications (6.12) | ❌ | 0 |  | No agent message kind for either |
+| Guest → host links and notifications (6.12) | 🟡 | 75 | `vmagent.c` (`ag_link_ok`, `ag_note_parse`, `ag_rate_take`), `lordvm.c` (`guest_note`), `js_vm.c` (`guestLinkAnswer`), `vmwindow.jsx`, `configure.jsx`, `tools/guest/gshell.c`, `lordos-guest-win.c` w12; `vm-test`, `guest_shell_test.sh`, a KVM guest (6.18) | *In development*: off by default (machine.json schema 15), http and https only, a link opens only from the bar's Open (after 700 ms, while in use), notifications shown as from the machine, both rate-limited; checked in a real Debian 13 guest through `lordvm-dev`. Not built: the guest desktop's own notifications passed on by themselves, a Send to LordOS entry in the guest; not checked: the bar on screen, a Windows guest (was ❌ 0) |
 
 ### H. Graphics (46 %)
 
@@ -206,16 +206,16 @@ storage (D), Monitor (K, 60 → 65), Part 1 step 5 (H, 0 → 40) and the targets
 | venus (Vulkan) (6.10) | ❌ | 0 |  |  |
 | Whole-GPU passthrough (Mode B) (6.10, MACHINES-GPU.md) | ❌ | 0 | `vmgpu_admin.c` refuses a dedicated card | "Whole" in Configure is the largest GVT-g type, not passthrough |
 
-### I. Guest tools and agent (75 %)
+### I. Guest tools and agent (90 %)
 
 | Feature (section) | Status | % | Evidence | Note |
 |---|---|---:|---|---|
-| `lordos-guest` 7: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus (6.17, 7, 7.1.4) | ✅ | 95 | `tools/guest/lordos-guest.c` (`VERSION "7"`), `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh` | 7 (*in development*) adds `perf` (power-profiles-daemon, GNOME's animations); checked on private buses with the real dconf-service, not yet in a running guest (was 6, 100) |
-| `lordos-guest-win` w11: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf (7.1.2, 7.1.4) | ✅ | 100 | `tools/guest-win/lordos-guest-win.c` (`VERSION "w11"`); `vm-test` (`AGK_PERF`) | `perf` checked in the maintainer's guest on 2026-11-23 (power plan, effects, transparency); Windows Search is lord-vm's own script through qemu-guest-agent (`vmperfwin.c`, M item 5), not the tools'. The note said `perf` wasn't checked in a running guest (7.1.4 records the check; was 95) |
+| `lordos-guest` 8: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus, the agent's shell, links and notifications (6.12, 6.17, 6.18, 7, 7.1.4) | ✅ | 95 | `tools/guest/lordos-guest.c` (`VERSION "8"`), `gshell.c`, `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`, `guest_shell_test.sh` | 8 (*in development*) adds the shell (the person's own login shell in a pty, never root) and the links and notifications socket, both checked in a running Debian 13 guest on 2026-11-24; `perf` (7) still not checked in a running guest |
+| `lordos-guest-win` w12: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf, shell, links, notify (6.12, 6.18, 7.1.2, 7.1.4) | ✅ | 95 | `tools/guest-win/lordos-guest-win.c` (`VERSION "w12"`); `vm-test` (`AGK_PERF`, the shell's and links' frames) | w12 (*in development*) adds PowerShell in a pseudo console (never elevated) and `--open-on-host`/`--notify-host` by `WM_COPYDATA`; cross-built with mingw-w64, not yet run in a Windows guest (w11 was 100, `perf` checked in the maintainer's guest on 2026-11-23) |
 | Install Agent through qemu-guest-agent; tools updated by themselves (6.17, 7.1.3) | ✅ | 90 | `lordvm.c` (`guest-file-write`), `model.js` (`TOOLS_SHIPPED`, `toolsAutoStep`) | No guest with older tools tried |
-| Agent state light and capability list (6.17) | 🟡 | 85 | `model.js` (`agentTone`, `agentLines`) | No red state |
-| Shell over the agent as the signed-in user (6.18) | ❌ | 15 | the Shell is the serial console |  |
-| Logs: journal, serial, machine log, Overview (6.19) | 🟡 | 65 | `logs.jsx`, `lordvm.c` (journal through qemu-ga) | No Windows event logs, unit filter (a column only), time zone or Clear view |
+| Agent state light and capability list (6.17) | ✅ | 95 | `model.js` (`agentTone`, `agentLines`), `js_vm.c` (`lost`); `vm_model_test.mjs` | Red (*in development*) when the agent stopped answering while the guest runs, or the tools' install failed; the list has the agent's shell, links and notifications and a Windows guest's event logs. Not seen on screen yet (was 🟡 85: no red state) |
+| Shell over the agent as the signed-in user (6.18) | 🟡 | 80 | `tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`; `guest_shell_test.sh`, `vm-test`, a KVM guest | *In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24). A pane of the machine's window, not a Terminal tab; no root or administrator switch, no `lordvm exec`; w12 not run in a Windows guest; the pane not seen on screen (was ❌ 15) |
+| Logs: journal, serial, machine log, Overview (6.19) | 🟡 | 85 | `logs.jsx`, `diag.js` (`journalLine`, `guestZone`), `lordvm.c` (journal and `EVLOG_PS` through qemu-ga); `vm_model_test.mjs` | *In development*: a Windows guest's System and Application event logs, a unit or source filter, times in local time with the guest's zone; the event logs not yet run in a Windows guest; Clear view was built already (was 65: no event logs, unit filter or time zone) |
 
 ### J. Command line and automation (48 %)
 
@@ -2970,10 +2970,50 @@ A small agent runs on the old PC, or the disk is read from a backup image, or th
 - Guest's apps in the launcher and Dock, with icons, marked with a small badge. Launching starts or resumes the VM.
 - Open a LordOS file with a guest app: **built** (7.3, Windows guests): Files' Open With copies it through the transfer folder or the
   agent into the guest's Downloads and opens it there.
-- Status (audited 2026-11-23): guest apps reach the Dock (`vm:<machine>:<app>`) only while apps mode runs (7.2); nothing is
-  listed before the machine runs, and the two optional items below are not built.
-- Reverse: open a link or file from the guest on the host: optional.
-- Guest notifications to the host: optional, off by default.
+- Reverse: open a link or file from the guest on the host: optional. **Links built (2026-11-24, in development)**, below; files
+  out of the guest are the transfer folder's (6.7.1).
+- Guest notifications to the host: optional, off by default. **Built (2026-11-24, in development)**, below.
+
+**Links and notifications from the guest (built 2026-11-24, *in development*; tools 8 and w12, machine.json schema 15).** The
+guest is hostile, so neither is on by default and neither ever runs anything on this computer by itself.
+
+- *Turning them on.* Configure → Sharing → **Links from the machine** and **Notifications from the machine** (machine.json
+  `"guest_links"`, `"guest_notify"`, written only when true; `lord-vm --set DIR --guest-links on|off --guest-notify on|off`).
+  Both change only with the machine off. A machine locked for anonymity (a Whonix member, 19.5) refuses both
+  (`vm_machine_check`), and its agent is off anyway. lord-vm's hello to the tools says `links` and `notify` only while
+  machine.json allows them, so the tools can tell a person who tries that this machine doesn't take them.
+- *In the guest.* Nothing is sent by the tools on their own: a program of the signed-in person asks. Linux (`lordos-guest`
+  8): `lordos-guest --open-on-host URL` and `lordos-guest --notify-host TITLE [BODY]` connect to the helper's socket,
+  `$XDG_RUNTIME_DIR/lordos-guest.sock` (0600, peers of the same uid only by `SO_PEERCRED`, four at a time, 2 s and one
+  frame each). Windows (`lordos-guest-win` w12): the same two options on `lordos-guest-win.exe`, which hand the running
+  tools of that session one frame by `WM_COPYDATA`. Either way the tools parse the frame as lord-vm will and answer with
+  an exit status: 0 sent, 1 not connected, 2 malformed, 3 this machine doesn't take them. A link is percent-encoded first
+  (`ag_link_encode`: `https://x.org/a (b)` becomes `https://x.org/a%20%28b%29`). Not built: a "Send to LordOS" entry in a
+  guest's browser or file manager, and passing the guest desktop's own notifications on by themselves.
+- *The frames* (`vmagent.h`, strict parsers in `vmagent.c`, fuzzed in `vm-test`): `AGK_LINK` (kind 25), 1..2048 bytes,
+  only `http://` or `https://`, a host of letters, digits, `.` and `-` (labels not empty, not starting or ending with `-`)
+  or a bracketed IPv6 address, an optional port 1..65535, never a user name or password before the host (`@` in the
+  authority: a spoofing trick), only letters, digits and `- . _ ~ : / ? # [ ] @ & = + , ; %` (each `%` with two hex
+  digits): the set the launcher hands a browser as one argument (`apps_launch_uri`). `AGK_NOTIFY` (kind 26): a title of
+  1..120 bytes and a body of 0..600, UTF-8 without control characters (C0, DEL, C1) or the bidi controls U+200E, U+200F,
+  U+202A–U+202E, U+2066–U+2069 (which could make the words read as this computer's own).
+- *lord-vm* takes them only from tools that said `links` or `notify` in their hello, only while machine.json allows that
+  kind, at most 3 links at once and then one per 5 s, at most 5 notifications at once and then one per 3 s
+  (`ag_rate_take`); more are dropped and counted in the machine log. It writes each again and hands lord-server a sealed
+  memfd (`VM_GUEST_NOTE`); the log says that one came, never the link or the words.
+- *lord-server* (`js_vm.c`) parses it again. A link is held only while the machine is in use (its window in front, as
+  the clipboard's gate, 6.8): one at a time; another one meanwhile is dropped, so a link is never swapped in under the
+  person's pointer. The window shows a bar: "‹machine› wants to open a link on this computer", the whole link in
+  monospace, "Open only links you expect", [Ignore] [Open]. Open is enabled after 800 ms, and lord-server itself refuses
+  an Open sooner than 700 ms after the app first saw the link (`guestLinkAnswer`: only the link it holds, never a URL from
+  JS); it opens in the default browser through the launcher. A notification is queued (at most 8 waiting) and shown by
+  the app as from the machine: "From ‹machine›" as its label, Machines' icon, no actions, no sound.
+- *Checked:* `vm-test` (the parsers, the encoder, the rate limit; 80 000 random frames), `guest_shell_test.sh` (the Linux
+  helper's socket, the hello, a link percent-encoded, a notification refused while the host says no and cut to its
+  limits when it says yes, a `file:` link refused), and in a real KVM guest (below, 6.18).
+
+**Status:** guest apps reach the Dock (`vm:<machine>:<app>`) only while apps mode runs (7.2); nothing is listed before
+the machine runs (not built).
 
 ### 6.13 Nested virtualization
 
@@ -3082,26 +3122,68 @@ How it knows: backing-file chains are read from qcow2 headers; shared extents fr
 
 `lordos-guest` is one small static binary with no Python or other runtime, so it runs on a minimal guest. It's separate from `qemu-ga`, which keeps doing time, shutdown and freeze. From version 6 it also has `--stopping <verb>`, run as root by its systemd-shutdown hook at the guest's last step to say whether it powers off or restarts (`AGK_STOPPING`, 3.2 "3D graphics"); Install Agent writes that hook as `/usr/lib/systemd/system-shutdown/lordos-guest-local` (best effort: a read-only `/usr` skips it), the `lordos` package ships it as `.../lordos-guest`, and the helper's hello says `stopping` while one is there.
 
-The first icon on the bar shows its state (`agentTone`, `model.js`): off (not connected), running (connected) or paused; tools older than the shipped ones show a blue dot. There is no red state. Clicking it opens a popover:
+The first icon on the bar shows its state (`agentTone`, `model.js`): off (not connected), running (connected), paused, or red
+(*in development*): the agent answered in this run of the guest and stopped answering while the guest runs (`lost`, kept by
+lord-server: a guest that restarts or stops isn't lost), or installing the LordOS tools failed. Tools older than the shipped
+ones show a blue dot. Clicking it opens a popover:
 
 - **Connected:** the system and architecture as the agent reports them, agent version, connection time.
-- **A list of what works now, and what doesn't and why** (`agentLines`, `model.js`): Shell (the serial console), Logs, Shut Down, Time, Keep awake, Clipboard, Resolution, Folders, Apps (works when the helper lists its windows, 7.2); Windows guests leave out Logs and Keep awake. Buttons: **Sync time**, **Set Up the Transfer Folder**, and a hint when the clipboard is off. Each line comes from the agent's reported capabilities, so it's the truth for that guest, not a table in the app.
+- **A list of what works now, and what doesn't and why** (`agentLines`, `model.js`): Shell (the serial console), Shell as the signed-in person (6.18, the tools 8 or w12), Logs (the journal; a Windows guest's event logs), Shut Down, Time, Keep awake, Clipboard, Resolution, Folders, Apps (works when the helper lists its windows, 7.2), Links and Notifications from the machine (6.12: Off unless Configure turned them on); Windows guests leave out Keep awake. Buttons: **Sync time**, **Set Up the Transfer Folder**, and a hint when the clipboard is off. Each line comes from the agent's reported capabilities, so it's the truth for that guest, not a table in the app.
 - **Not connected:** the next step, which depends on the state. If the guest is still booting, says wait. If the agent isn't installed: an **Install Agent** button writes `lordos-guest` and its service into the guest through qemu-guest-agent (`guest-file-write`, a fixed script, `lordvm.c`); no disc and no command for the person.
 
 **Protocol.** A virtio-serial port named `org.lordos.agent`, chosen over vsock because it works in every guest without extra drivers. Length-prefixed frames with a channel number, a `hello` carrying version and capabilities, skipped unknown kinds so that either side can grow, and a hard frame limit. `lord-vm`, not `lord-server`, parses it, inside the sandbox. A newer host updates older tools itself, on by default with a switch to turn it off, through qemu-guest-agent (7.1.3).
 
-**Direction of trust.** The host runs things in the guest, never the reverse. A guest can't open a channel, start a host program, or read a host path. Only the person's own user can reach a VM's socket. (Planned, not built: a profile turning the agent's shell off; there is no agent shell yet, 6.18.)
+**Direction of trust.** The host runs things in the guest, never the reverse. A guest can't open a channel, start a host program, or read a host path. Only the person's own user can reach a VM's socket. The guest's links and notifications (6.12) are offers: a link opens only when the person clicks Open, a notification is text shown as from the machine. (Planned, not built: a profile turning the agent's shell off; the agent's shell is 6.18.)
 
 ### 6.18 Shell
 
 **Built (audited 2026-11-23):** the Shell icon opens the guest's **serial console** in a pane under the picture (`vmwindow.jsx`,
-"Serial console of NAME"). **Planned, not built:** the agent shell below.
+"Serial console of NAME").
+
+**The agent's shell (built 2026-11-24, *in development*; tools 8 and w12, "shell" in their hello).** When the guest's tools
+can, the same pane shows a shell inside the guest **as the person signed in there**, over the agent (no network, no SSH: it
+works with Isolated network), with a switch to the serial console and **New Shell**. It is a LordOS terminal (`term_create_fd`,
+the same terminal as Terminal's tabs), titled "Shell inside ‹machine›, as the person signed in there" with the purple badge,
+so it can't be taken for one of this computer's.
+
+- *Linux guests* (`lordos-guest` 8, `tools/guest/gshell.c`): the helper runs as the signed-in person; on `AGK_SHELL_OPEN` it
+  starts that person's own login shell (their `/etc/passwd` shell when it is an executable listed in `/etc/shells`, else
+  `/bin/sh`, as `-name`, in their home, `TERM=xterm-256color`) in a new pty. A helper running as root opens none.
+- *Windows guests* (`lordos-guest-win` w12): PowerShell (`%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe
+  -NoLogo`, from the system folder) in a pseudo console (ConPTY, Windows 10 1809 and later), as the person, in their
+  profile folder; tools that run elevated open none.
+- *Nothing from the host names a program, an argument, a folder or a variable:* the host only types (`AGK_SHELL_DATA`),
+  sizes (`AGK_SHELL_SIZE`, from the terminal's own size) and ends it (`AGK_SHELL_CLOSE`: SIGHUP to its process group, or the
+  pseudo console closed). The shell's end comes back with its exit status. One shell at a time; a new one ends the old.
+- *Flow control both ways* (`AGK_SHELL_ACK`): never more than 256 KiB sent and not acknowledged; lord-vm ends a shell whose
+  guest sends past its window or acknowledges more than it was sent. So `cat /dev/urandom` in the guest, or a terminal that
+  doesn't read, keeps memory flat.
+- *Not built:* an administrator or root shell (the switch in Security), opening it as a tab of the Terminal app (it is a
+  pane of the machine's window), `lordvm exec` and the MCP server's `run_command` (6.15).
+- *Checked:* `guest_shell_test.sh` (the pty, its size, the exit status, 2 MB with late acknowledgements never past the
+  window, the host's close ending the shell's programs), `vm-test` (the frames, fuzzed), and on 2026-11-24 in a real KVM
+  guest (Debian 13, kernel 6.12.118) with the real lord-vm and `lordvm-dev` playing lord-server (below).
+- *Checked in a guest* (2026-11-24, the dev PC, amd64, KVM; a scratch machine with a private HOME under `/var/tmp`, the
+  Debian 13 cloud image, `lordos-guest` 8 copied in from a seed disk and run as a person `lg`, uid 1000, as its user unit
+  would; Isolated network): the tools' hello gave lord-vm the shell, links and notify capabilities (machine.json with
+  both switches on); `lordvm-dev`'s `shell 100 30` opened `lg`'s bash on `/dev/pts/0` at 30 × 100 rows and columns;
+  `lordos-guest --open-on-host 'https://lordos.org/a b(c)'` reached lord-server's side as
+  `https://lordos.org/a%20b%28c%29` and `--notify-host 'Build done' 'all 3 targets'` as that title and body (both exit
+  0; the machine log says "the guest asks to open a link", "the guest sent a notification", never their contents);
+  `exit 5` came back as "shell: ended (the shell exited with 5)". *Not checked:* the window's pane, bar and
+  notification on screen in a real lord-server session; a Windows guest (w12).
 
 The Shell icon opens LordOS's Terminal with a shell inside the guest: over the agent, not the network, so it works with no SSH and with Isolated network. **The signed-in user by default**, in a Linux shell or PowerShell. Root or an administrator shell only with an explicit switch, per machine, in Security. The same rule covers `lordvm exec` and the MCP server's `run_command`. The tab is titled with the machine's name and marked, so that a guest's shell can't be mistaken for a host's. Terminal size follows the tab.
 
 ### 6.19 Logs
 
-A window following the guest's logs as they arrive: the systemd journal in Linux (read through qemu-guest-agent's `journalctl` every 5 s, `lordvm.c`). **Built (`logs.jsx`):** sources Guest, Serial console and Machine log, an **Overview** with the diagnostics of `diag.js` and **Copy report**, text filter, levels all/warnings/errors, Pause, Copy, Save, 50 000 lines. **Not built:** Windows event logs, a unit or source filter, the guest's time zone.
+A window following the guest's logs as they arrive: the systemd journal in Linux (read through qemu-guest-agent's `journalctl` every 5 s, `lordvm.c`). **Built (`logs.jsx`):** sources Guest, Serial console and Machine log, an **Overview** with the diagnostics of `diag.js` and **Copy report**, text filter, levels all/warnings/errors, Pause, Clear view, Copy, Save, 50 000 lines.
+**Built 2026-11-24 (*in development*):** a Windows guest's **System and Application event logs** through qemu-guest-agent every
+10 s (one fixed PowerShell script, `EVLOG_PS` in `lordvm.c`, whose only value is a cursor of digits that lord-vm checks,
+`evlog_cursor`; written in the journal's short-iso shape, so Logs reads them like a Linux guest's; `VAC_EVENTLOG`); a **unit
+or source filter** (click a unit; "Only ‹unit›" takes it off); guest times shown in **this computer's local time**, with
+the guest's zone named in the footer when it differs (`diag.js` `journalLine`, `guestZone`; `vm_model_test.mjs`). *Not
+checked yet:* the event logs in a running Windows guest.
 
 - Filter by text as you type, plus level and unit or source.
 - Pause (entries keep buffering, with a count of new ones), Clear view, Copy selected, Save to a file.
@@ -3601,10 +3683,17 @@ virtio-win 0.1.271, viogpudo 100.100.104.27100), driven by `lordvm-dev` (`agent 
   token and an unlisted window ignored; the taskbar hidden while on and back after.
 - Not tested: switching between two people's sessions, Remote Desktop, a machine with a multi-monitor guest.
 
+**w12 (2026-11-24, *in development*):** "shell links notify" in the hello: the agent's shell, PowerShell in a pseudo
+console as the person and never elevated (6.18), and `lordos-guest-win.exe --open-on-host URL` / `--notify-host TITLE
+[BODY]`, which hand this session's running tools one link or notification by `WM_COPYDATA`, passed on only while the
+host's hello says it takes them (6.12). Cross-built with mingw-w64 (`build/lordos-guest-win.exe`); not yet run in a
+Windows guest.
+
 ### 7.1.3 Keeping the LordOS tools up to date (since 0.8.9.5)
 
 A guest keeps the tools it was given: a LordOS upgrade ships newer ones (`TOOLS_SHIPPED` in `apps/machines/model.js`,
-`w11` and `6` today, checked against the sources by `vm_model_test`), but before this a guest ran its older tools, with
+`w12` and `8` today (*in development*: the agent's shell, links and notifications; before them `w11` and `7`), checked
+against the sources by `vm_model_test`), but before this a guest ran its older tools, with
 their known bugs, until someone found **Update LordOS Tools** in the agent's popover. Now Machines updates them by
 itself (`toolsAutoStep`, run every second by the machine's window, `vmwindow.jsx`):
 

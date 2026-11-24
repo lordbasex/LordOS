@@ -1158,7 +1158,8 @@ static void osc_1337(Term *t, char *s) {
     else if (!strcmp(s, "Copy")) {
         const char *d = strchr(val, ':');
         char *b = b64_text(d ? d + 1 : val, 1u << 20);
-        if (b) { term_set_clipboard(b, strlen(b)); free(b); t->events |= EV_COPY; }
+        if (b && !t->no_clip_set) { term_set_clipboard(b, strlen(b)); t->events |= EV_COPY; }
+        free(b);
     } else if (!strcmp(s, "HighlightCursorLine")) { t->prof->cursor_guide = !strcmp(val, "yes") || !strcmp(val, "true"); dirty_all(t); }
 }
 
@@ -1228,7 +1229,8 @@ static void osc(Term *t) {
         char *semi = strchr(s, ';');
         if (!semi || !strcmp(semi + 1, "?")) break;    /* reading the clipboard is not allowed */
         char *b = b64_text(semi + 1, 1u << 20);
-        if (b) { term_set_clipboard(b, strlen(b)); free(b); t->events |= EV_COPY; }
+        if (b && !t->no_clip_set) { term_set_clipboard(b, strlen(b)); t->events |= EV_COPY; }
+        free(b);
         break;
     }
     case 104:

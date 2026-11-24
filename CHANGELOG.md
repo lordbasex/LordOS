@@ -11,6 +11,34 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: a shell inside the machine, links and notifications from it, and more of the logs** (in development;
+  latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.12, 6.17, 6.18, 6.19).
+  - **The agent's shell.** The Shell pane of a machine's window shows a shell inside the guest as the person signed in
+    there, over the guest agent's own channel (no network, no SSH, works with Isolated network), with a switch to the
+    serial console and New Shell. Linux guests: that person's own login shell in a pty; virtio-win guests: PowerShell in a
+    pseudo console. Never root or an administrator, never a program named by this computer; one shell at a time; flow
+    control both ways keeps memory flat whatever the shell writes. The terminal is titled with the machine's name and
+    marked, so it can't be taken for this computer's.
+  - **Links from the machine** (off by default, Configure → Sharing): a program in the guest can ask to open a web
+    link here (`lordos-guest --open-on-host URL`). Only http and https, no user name before the host, only the
+    characters a browser gets as one argument; at most 3 at once, then one per 5 s; only while the machine's window is
+    in front; one at a time. It waits in a bar over the machine's picture with the whole link and opens in the browser
+    only when the person clicks Open, which works only after the bar has been seen for a moment.
+  - **Notifications from the machine** (off by default): `lordos-guest --notify-host TITLE [BODY]` shows a
+    notification marked "From ‹machine›", plain text without control or direction characters, at most 5 at once, then
+    one per 3 s, with no actions.
+  - **The agent light turns red** when the guest agent stopped answering while the guest runs, or installing the
+    LordOS tools failed. The agent's popover lists the shell, links and notifications.
+  - **Logs:** a virtio-win guest's event logs (System and Application, through
+    the guest agent every 10 s, one fixed script); a filter by unit or source (click it); the guest's times in this
+    computer's local time, with the guest's own zone named when it differs.
+  - **The LordOS tools 8 (Linux) and w12** bring the shell and the links and notifications; Machines updates older
+    tools by itself. machine.json schema 15 adds `guest_links` and `guest_notify`; a machine locked for anonymity
+    (Whonix) refuses both.
+  - Tests: `vm-test` (the new frames' parsers, fuzzed with 80 000 random frames, the link encoder, the rate limit,
+    schema 15), `vmgroup-test` (the anonymity lock), `guest_shell_test.sh` (the shell's pty, size, exit status, 2 MB
+    with late acknowledgements never past its window, the host's close, the helper's socket), `vm_model_test.mjs`
+    (the agent's lines, the red light, the logs' times and zones).
 - **Machines: machine groups and Whonix, first part** (in development; latest release 0.8.9.5). The parts under the
   Whonix (Tor) card of docs/VIRTUALIZATION.md 19, approved by the maintainer on 2026-11-23: a Tor gateway and a
   workstation made from Whonix's official KVM images, started and stopped together, the workstation wired only to the

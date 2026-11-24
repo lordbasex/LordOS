@@ -5,11 +5,11 @@
  "items": [
   {
    "area": "A",
-   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 14, lock, `run.json`, crash recovery (3.8, 3.9)",
+   "item": "`lord-vm` supervisor over direct QMP, `machine.json` schema 15, lock, `run.json`, crash recovery (3.8, 3.9)",
    "status": "✅",
    "pct": 100,
-   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 14`); `vm-test`, `vmgroup-test`",
-   "note": "Schema 14 (*in development*) adds a machine group member's keys (19.4); 13 was `cpu_pin` and `perf_profile`"
+   "file": "`lordvm.c`, `qmp.c`, `machine.h` (`VM_SCHEMA 15`); `vm-test`, `vmgroup-test`",
+   "note": "Schema 15 (*in development*) adds `guest_links` and `guest_notify` (6.12); 14 a machine group member's keys (19.4)"
   },
   {
    "area": "A",
@@ -574,10 +574,10 @@
   {
    "area": "G",
    "item": "Guest → host links and notifications (6.12)",
-   "status": "❌",
-   "pct": 0,
-   "file": "",
-   "note": "No agent message kind for either"
+   "status": "🟡",
+   "pct": 75,
+   "file": "`vmagent.c` (`ag_link_ok`, `ag_note_parse`, `ag_rate_take`), `lordvm.c` (`guest_note`), `js_vm.c` (`guestLinkAnswer`), `vmwindow.jsx`, `configure.jsx`, `tools/guest/gshell.c`, `lordos-guest-win.c` w12; `vm-test`, `guest_shell_test.sh`, a KVM guest (6.18)",
+   "note": "*In development*: off by default (machine.json schema 15), http and https only, a link opens only from the bar's Open (after 700 ms, while in use), notifications shown as from the machine, both rate-limited; checked in a real Debian 13 guest through `lordvm-dev`. Not built: the guest desktop's own notifications passed on by themselves, a Send to LordOS entry in the guest; not checked: the bar on screen, a Windows guest (was ❌ 0)"
   },
   {
    "area": "H",
@@ -645,19 +645,19 @@
   },
   {
    "area": "I",
-   "item": "`lordos-guest` 7: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus (6.17, 7, 7.1.4)",
+   "item": "`lordos-guest` 8: clipboard, apps-mode relay, `--stopping`, `perf` over D-Bus, the agent's shell, links and notifications (6.12, 6.17, 6.18, 7, 7.1.4)",
    "status": "✅",
    "pct": 95,
-   "file": "`tools/guest/lordos-guest.c` (`VERSION \"7\"`), `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`",
-   "note": "7 (*in development*) adds `perf` (power-profiles-daemon, GNOME's animations); checked on private buses with the real dconf-service, not yet in a running guest (was 6, 100)"
+   "file": "`tools/guest/lordos-guest.c` (`VERSION \"8\"`), `gshell.c`, `perf.c`, `dbusmin.c`; `guest-dbus-test`, `guest_perf_test.sh`, `guest_shell_test.sh`",
+   "note": "8 (*in development*) adds the shell (the person's own login shell in a pty, never root) and the links and notifications socket, both checked in a running Debian 13 guest on 2026-11-24; `perf` (7) still not checked in a running guest"
   },
   {
    "area": "I",
-   "item": "`lordos-guest-win` w11: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf (7.1.2, 7.1.4)",
+   "item": "`lordos-guest-win` w12: clipboard, display, apps, open, place, pointer, gvt, extra display, tablet, perf, shell, links, notify (6.12, 6.18, 7.1.2, 7.1.4)",
    "status": "✅",
-   "pct": 100,
-   "file": "`tools/guest-win/lordos-guest-win.c` (`VERSION \"w11\"`); `vm-test` (`AGK_PERF`)",
-   "note": "`perf` checked in the maintainer's guest on 2026-11-23 (power plan, effects, transparency); Windows Search is lord-vm's own script through qemu-guest-agent (`vmperfwin.c`, M item 5), not the tools'. The note said `perf` wasn't checked in a running guest (7.1.4 records the check; was 95)"
+   "pct": 95,
+   "file": "`tools/guest-win/lordos-guest-win.c` (`VERSION \"w12\"`); `vm-test` (`AGK_PERF`, the shell's and links' frames)",
+   "note": "w12 (*in development*) adds PowerShell in a pseudo console (never elevated) and `--open-on-host`/`--notify-host` by `WM_COPYDATA`; cross-built with mingw-w64, not yet run in a Windows guest (w11 was 100, `perf` checked in the maintainer's guest on 2026-11-23)"
   },
   {
    "area": "I",
@@ -670,26 +670,26 @@
   {
    "area": "I",
    "item": "Agent state light and capability list (6.17)",
-   "status": "🟡",
-   "pct": 85,
-   "file": "`model.js` (`agentTone`, `agentLines`)",
-   "note": "No red state"
+   "status": "✅",
+   "pct": 95,
+   "file": "`model.js` (`agentTone`, `agentLines`), `js_vm.c` (`lost`); `vm_model_test.mjs`",
+   "note": "Red (*in development*) when the agent stopped answering while the guest runs, or the tools' install failed; the list has the agent's shell, links and notifications and a Windows guest's event logs. Not seen on screen yet (was 🟡 85: no red state)"
   },
   {
    "area": "I",
    "item": "Shell over the agent as the signed-in user (6.18)",
-   "status": "❌",
-   "pct": 15,
-   "file": "the Shell is the serial console",
-   "note": ""
+   "status": "🟡",
+   "pct": 80,
+   "file": "`tools/guest/gshell.c`, `lordos-guest-win.c` (ConPTY), `lordvm.c` (`shell_*`), `js_vm.c` (`shell`), `vmwindow.jsx`; `guest_shell_test.sh`, `vm-test`, a KVM guest",
+   "note": "*In development*: the signed-in person's own shell (PowerShell in virtio-win guests), flow control both ways, checked in a real Debian 13 guest through `lordvm-dev` (2026-11-24). A pane of the machine's window, not a Terminal tab; no root or administrator switch, no `lordvm exec`; w12 not run in a Windows guest; the pane not seen on screen (was ❌ 15)"
   },
   {
    "area": "I",
    "item": "Logs: journal, serial, machine log, Overview (6.19)",
    "status": "🟡",
-   "pct": 65,
-   "file": "`logs.jsx`, `lordvm.c` (journal through qemu-ga)",
-   "note": "No Windows event logs, unit filter (a column only), time zone or Clear view"
+   "pct": 85,
+   "file": "`logs.jsx`, `diag.js` (`journalLine`, `guestZone`), `lordvm.c` (journal and `EVLOG_PS` through qemu-ga); `vm_model_test.mjs`",
+   "note": "*In development*: a Windows guest's System and Application event logs, a unit or source filter, times in local time with the guest's zone; the event logs not yet run in a Windows guest; Clear view was built already (was 65: no event logs, unit filter or time zone)"
   },
   {
    "area": "J",
@@ -946,8 +946,8 @@
    "name": "Host integration",
    "weight": 12,
    "items": 9,
-   "mean": 68.33,
-   "score": 68
+   "mean": 76.67,
+   "score": 77
   },
   {
    "id": "H",
@@ -962,8 +962,8 @@
    "name": "Guest tools and agent",
    "weight": 7,
    "items": 6,
-   "mean": 75.0,
-   "score": 75
+   "mean": 90.0,
+   "score": 90
   },
   {
    "id": "J",
@@ -1006,6 +1006,6 @@
    "score": 55
   }
  ],
- "total": 69,
- "total_exact": 68.94
+ "total": 71,
+ "total_exact": 71.07
 }

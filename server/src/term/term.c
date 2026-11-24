@@ -280,6 +280,7 @@ Session *term_create_fd(int fd, int scrollback) {
     s->t.respond = respond;
     s->t.tmux = tmux_cb;
     s->t.user = s;
+    s->t.no_clip_set = 1;       /* a guest's stream (Machines): it never sets this computer's clipboard */
     fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
     s->fd = fd;
     s->pid = 0;                 /* no process: never signalled, never waited for */
