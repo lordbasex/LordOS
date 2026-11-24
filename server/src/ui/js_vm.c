@@ -484,6 +484,7 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         set_str(c, o, "pointer", m.pointer_guest ? "guest" : "lordos");   /* who draws a Windows guest's pointer (7.1.2) */
         JS_SetPropertyStr(c, o, "captureFullscreen", JS_NewBool(c, m.capture_fullscreen));   /* "Capture mouse" (6.25) */
         JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
+        JS_SetPropertyStr(c, o, "cpuModel", JS_NewString(c, VM_CPU_NAMES[m.cpu_model == VM_CPU_COMPAT]));   /* 5.5, schema 18 */
         /* storage (schema 16): 6.2, 6.4, 8; keyId: where its key lives in the keyring (its id, or its group's) */
         set_str(c, o, "disposable", VM_DISP_NAMES[m.disposable][0] ? VM_DISP_NAMES[m.disposable] : "off");
         JS_SetPropertyStr(c, o, "encrypted", JS_NewBool(c, m.encrypted));
@@ -1455,7 +1456,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[78 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[92 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1595,6 +1596,23 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "guestNotify");
     if (JS_IsBool(v)) { args[n++] = "--guest-notify"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
+    /* Configure (5.5, schema 18): the processor the guest sees; a new network card address; one more data disk (GB) */
+    v = JS_GetPropertyStr(c, argv[1], "cpuModel");
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(c, v);
+        if (s && (!strcmp(s, "host") || !strcmp(s, "compatible"))) { args[n++] = "--cpu-model"; args[n++] = !strcmp(s, "host") ? "host" : "compatible"; } else ok = 0;
+        if (s) JS_FreeCString(c, s);
+    } else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
+    v = JS_GetPropertyStr(c, argv[1], "newMac");
+    if (JS_IsBool(v)) { if (JS_ToBool(c, v)) { args[n++] = "--mac"; args[n++] = "new"; } }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    char addd[16];
+    int add = prop_int(c, argv[1], "addDiskGb");
+    if (add) {
+        if (add < VM_DISK_MIN_GB || add > VM_DISK_MAX_GB) ok = 0;
+        else { snprintf(addd, sizeof addd, "%d", add); args[n++] = "--add-disk"; args[n++] = addd; }
+    }
     /* automation (6.15): `machines exec` and `cp` may run programs in the guest; lord-vm refuses it for anonymity */
     v = JS_GetPropertyStr(c, argv[1], "automation");
     if (JS_IsBool(v)) { args[n++] = "--automation"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
@@ -1738,9 +1756,12 @@ static int vm_exe_is(long pid, const char *name) {
     return realpath(want, rw) && vmwatch_exe_same(got, rw);
 }
 
-/* where lord-sessiond puts a machine's scope: beside lord-server's own leaf (".../lordos-session-<uid>/server"), the
- * exact cgroup path; "" outside a LordOS session */
-static void vm_scope_path(const char *id, int tor, char *out, size_t n) { vmwatch_scope_path(cgroup_self(), id, tor, out, n); }
+/* where lord-sessiond puts a machine's scope: in the session's machines' slice (3.7), the exact cgroup path; "" outside a
+ * LordOS session. old: where a machine started before the slice existed is, beside lord-server's own leaf */
+static void vm_scope_path(const char *id, int tor, char *out, size_t n, char *old, size_t on) {
+    vmwatch_scope_path(cgroup_self(), id, tor, 1, out, n);
+    vmwatch_scope_path(cgroup_self(), id, tor, 0, old, on);
+}
 
 /* the process's cgroup (v2) is exactly `scope` or below it */
 static int vm_in_cgroup(long pid, const char *scope) {
@@ -1752,6 +1773,11 @@ static int vm_in_cgroup(long pid, const char *scope) {
     if (k <= 3) return 0;
     buf[k] = 0;
     return vmwatch_cg_under(buf, scope);
+}
+
+/* the process is under the machine's scope, in the slice or (started before it) in the old place */
+static int vm_in_scope(long pid, const char *scope, const char *old) {
+    return (scope[0] && vm_in_cgroup(pid, scope)) || (old[0] && vm_in_cgroup(pid, old));
 }
 
 /* the machine's own lord-vm, asked over its socket (vmwatch_live) */
@@ -1805,9 +1831,9 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     }
     /* Sentinela's facts (docs/SENTINELA.md, "Machines") come from the machine's lord-vm itself, never from run.json */
     static VmMachine sm;
-    char serr[128], scope[PATH_MAX] = "";
+    char serr[128], scope[PATH_MAX] = "", scope_old[PATH_MAX] = "";
     int have_m = !vm_machine_load(dir, &sm, serr, sizeof serr) && sm.id[0];
-    if (have_m) vm_scope_path(sm.id, sm.uplink_tor, scope, sizeof scope);
+    if (have_m) vm_scope_path(sm.id, sm.uplink_tor, scope, sizeof scope, scope_old, sizeof scope_old);
     if (qpid > 0 && have_m) {
         VmLive lv;
         int ok = !vm_live(sm.id, &lv);
@@ -1826,7 +1852,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
                 set_str(c, o, "cgMode", lv.cg & VMC_NESTED ? "nested" : lv.cg & VMC_SCOPE ? "scope" : "none");
                 /* in its own machine's scope (exactly that cgroup or below it), lord-vm and QEMU both; "" when this
                  * isn't a LordOS session and the scope's place isn't known */
-                if (scope[0]) set_str(c, o, "scope", vm_in_cgroup(lv.qemu, scope) && vm_in_cgroup(lv.pid, scope) ? "in" : "out");
+                if (scope[0]) set_str(c, o, "scope", vm_in_scope(lv.qemu, scope, scope_old) && vm_in_scope(lv.pid, scope, scope_old) ? "in" : "out");
                 /* its passt (Shared network): a passt of the person's, lord-vm's child or in the machine's scope */
                 long pt = hint_passt, ppp = -1;
                 int alive = 0, d1, d2;
@@ -1837,7 +1863,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
                     ssize_t k = cf >= 0 ? read(cf, comm, sizeof comm - 1) : -1;
                     if (cf >= 0) close(cf);
                     if (k > 0) comm[k] = 0;
-                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || (scope[0] && vm_in_cgroup(pt, scope)));
+                    alive = k > 0 && !strncmp(comm, "passt", 5) && proc_uid(pt) == getuid() && (ppp == lv.pid || vm_in_scope(pt, scope, scope_old));
                 }
                 JS_SetPropertyStr(c, o, "passt", JS_NewBool(c, alive));
             }
@@ -1864,7 +1890,7 @@ static JSValue f_stats(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
             /* QEMU's own leaf, or the machine's scope when lord-vm couldn't divide it; never an unrelated cgroup */
             if (strstr(buf + 3, "lordos-vm-") && strlen(buf + 3) < sizeof cg) snprintf(cg, sizeof cg, "%s", buf + 3);
             /* with the scope's place known: its counters only when QEMU is really under it */
-            if (scope[0] && !vm_in_cgroup(qpid, scope)) cg[0] = 0;
+            if (scope[0] && !vm_in_scope(qpid, scope, scope_old)) cg[0] = 0;
         }
     }
     if (cg[0]) {
@@ -2139,6 +2165,8 @@ typedef struct {
     int job_kind, job_status, job_pct;  /* the last VM_JOB (suspend, resume, snapshots) */
     char job_text[VM_TEXT_MAX];
     uint32_t cd_seq;                    /* VM_CDROM: the request, and how it went (0 none, 1 waiting, 2 done, 3 failed) */
+    uint32_t cable_seq;                 /* VM_NETCABLE: the request; cable_down: pulled in this run (poll's cableOut) */
+    int cable_down, cable_want;
     int cd_state;
     char cd_msg[VM_TEXT_MAX];
     int ag_state, ag_caps;              /* the guest agent (VM_AGENT_STATE), and what it said about itself */
@@ -3196,6 +3224,7 @@ static void from_vm(Sess *s) {
             if (s->disc_seq && m.seq == s->disc_seq) { snprintf(s->disc_msg, sizeof s->disc_msg, "%s", m.a == VME_OK ? "" : m.text); s->disc_seq = 0; }
             if (s->ag_seq && m.seq == s->ag_seq) { s->ag_result = m.a == VME_OK ? 2 : 3; snprintf(s->ag_msg, sizeof s->ag_msg, "%s", m.text); s->ag_seq = 0; }
             if (s->xf_seq && m.seq == s->xf_seq) { s->xf_result = m.a == VME_OK ? 2 : 3; snprintf(s->xf_msg, sizeof s->xf_msg, "%s", m.text); s->xf_seq = 0; }
+            if (s->cable_seq && m.seq == s->cable_seq) { if (m.a == VME_OK) s->cable_down = !s->cable_want; s->cable_seq = 0; }
             if (s->cd_seq && m.seq == s->cd_seq) { s->cd_state = m.a == VME_OK ? 2 : 3; snprintf(s->cd_msg, sizeof s->cd_msg, "%s", m.text); s->cd_seq = 0; }
             if (m.a != VME_OK) {
                 snprintf(s->last_error, sizeof s->last_error, "%s", m.text);
@@ -3515,6 +3544,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
     set_int(c, o, "picSkipped", s->pic_skipped);
     set_int(c, o, "pace", s->pace.kind);
     set_int(c, o, "cd", s->cd_state);
+    JS_SetPropertyStr(c, o, "cableOut", JS_NewBool(c, s->cable_down));
     if (s->console_term && !term_get(s->console_term)) s->console_term = 0;
     set_int(c, o, "console", s->console_term);
     /* the agent's shell: its terminal, and its size passed on to the guest when the terminal changed it */
@@ -3794,6 +3824,20 @@ static JSValue f_cdrom(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
     if (fd >= 0) close(fd);
     if (ok) { s->cd_seq = s->seq; s->cd_state = 1; s->cd_msg[0] = 0; }
     return JS_NewBool(c, ok);
+}
+
+/* netCable(id, plugged) → bool: the running machine's network cable plugged in or pulled (VM_NETCABLE, the window's
+ * Devices → Network); poll's cableOut says where it is. A new run starts plugged in. */
+static JSValue f_net_cable(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    if (!s || s->vm < 0 || s->cable_seq) return JS_FALSE;
+    int on = JS_ToBool(c, argv[1]);
+    VmMsg m = vm_msg(VM_NETCABLE, ++s->seq, on ? 1 : 0, 0, 0, 0, "");
+    if (vm_send(s->vm, &m, -1)) return JS_FALSE;
+    s->cable_seq = s->seq;
+    s->cable_want = on ? 1 : 0;
+    return JS_TRUE;
 }
 
 static JSValue f_cmd(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
@@ -5564,7 +5608,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("wheel", 3, f_wheel), JS_CFUNC_DEF("release", 1, f_release), JS_CFUNC_DEF("capture", 3, f_capture), JS_CFUNC_DEF("resize", 3, f_resize), JS_CFUNC_DEF("rate", 2, f_rate), JS_CFUNC_DEF("shown", 2, f_shown),
     JS_CFUNC_DEF("close", 1, f_close), JS_CFUNC_DEF("log", 3, f_log), JS_CFUNC_DEF("eject", 1, f_eject),
     JS_CFUNC_DEF("set", 2, f_set), JS_CFUNC_DEF("stats", 1, f_stats), JS_CFUNC_DEF("snapshot", 1, f_snapshot), JS_CFUNC_DEF("protect", 1, f_protect),
-    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
+    JS_CFUNC_DEF("isoInfo", 1, f_isoinfo), JS_CFUNC_DEF("hash", 1, f_hash), JS_CFUNC_DEF("netCable", 2, f_net_cable), JS_CFUNC_DEF("sigCheck", 3, f_sig_check), JS_CFUNC_DEF("screenshot", 1, f_screenshot), JS_CFUNC_DEF("cdrom", 2, f_cdrom),
     JS_CFUNC_DEF("snaps", 1, f_snaps), JS_CFUNC_DEF("snapTake", 3, f_snap_take), JS_CFUNC_DEF("snapRevert", 2, f_snap_revert),
     JS_CFUNC_DEF("snapDelete", 2, f_snap_delete),
     JS_CFUNC_DEF("cloneInfo", 1, f_clone_info), JS_CFUNC_DEF("clone", 2, f_clone), JS_CFUNC_DEF("compact", 2, f_compact),

@@ -1229,5 +1229,58 @@ eq('boot summary', [M.bootSummary('auto'), M.bootSummary(undefined), M.bootSumma
   eq('Z is UTC', D.journalLine('2026-11-24T05:00:07Z h u: a', 0).at, '05:00:07');
 }
 
+// ---- the app's last parts (Machines to 100 %): Detect, drop, tags, templates, Scale, shape, device dots, Cleaner ----
+{
+  const { detectPlan, dropSource, tagsOf, parseTags, filterMachines, chipCounts, actionsOf, scaleFrame, shapeFrame, deviceDots, cableOffered, libView, SCALES } = M;
+  const C = await import(path.join(here, '../../apps/cleaner/vmspace.js'));
+  // Detect (over lord.vm.isoInfo's answer): the boot files decide; the name, then this computer, when they don't say
+  const deb = { label: 'Debian 13.2.0 amd64 n', arch: 'amd64', archFrom: 'boot', bios: true, efi: true, efiArchs: ['amd64'], windows: false };
+  eq('detect native', detectPlan(deb, 'debian-13.2.0-amd64-netinst.iso', 'amd64'), { arch: 'amd64', from: 'boot', starts: ['uefi', 'bios'], conflict: false, emulated: false, both: false, unknownArch: false, efi: ['amd64'] });
+  const arm = { label: 'LORDOS_LIVE', arch: 'arm64', archFrom: 'boot', bios: false, efi: true, efiArchs: ['arm64'] };
+  eq('detect arm64 disc on amd64: emulated', [detectPlan(arm, 'lordos.iso', 'amd64').arch, detectPlan(arm, 'lordos.iso', 'amd64').emulated], ['arm64', true]);
+  eq('detect: a name that lies', detectPlan(arm, 'something-amd64.iso', 'arm64').conflict, true);
+  const two = { label: '', arch: '', archFrom: '', bios: false, efi: true, efiArchs: ['amd64', 'arm64'] };
+  eq('detect: both architectures, the name picks', detectPlan(two, 'x-arm64.iso', 'amd64').arch, 'arm64');
+  eq('detect: both, no name: this computer', detectPlan(two, 'x.iso', 'arm64'), { arch: 'arm64', from: 'host', starts: ['uefi'], conflict: false, emulated: false, both: true, unknownArch: false, efi: ['amd64', 'arm64'] });
+  eq('detect: only riscv64', detectPlan({ label: '', arch: 'riscv64', archFrom: 'boot', efi: true, efiArchs: ['riscv64'] }, 'x.iso', 'amd64').unknownArch, true);
+  eq('detect: nothing read, from the name', detectPlan(null, 'ubuntu-24.04-live-server-arm64.iso', 'amd64'), { arch: 'arm64', from: 'name', starts: [], conflict: false, emulated: true, both: false, unknownArch: false, efi: [] });
+  eq('detect: junk efiArchs ignored', detectPlan({ arch: 'amd64', archFrom: 'boot', efi: true, efiArchs: [1, null, 'amd64'] }, 'x', 'amd64').efi, ['amd64']);
+  // drop
+  eq('drop', ['a.iso', 'b.QCOW2', 'c.raw', 'd.vmx', 'e.ova', 'config.pvs', 'f.txt', '', 'iso'].map(dropSource), ['iso', 'import', 'import', 'migrate', 'migrate', 'migrate', null, null, null]);
+  // tags
+  eq('tags cleaned', tagsOf([' work ', 'WORK', '#test', '', 'a\u0001b', 5, 'x'.repeat(25), 'w  x']), ['work', 'test', 'ab', 'w x']);
+  eq('tags at most 8', tagsOf(['1', '2', '3', '4', '5', '6', '7', '8', '9']).length, 8);
+  eq('tags typed', parseTags('work, tests,, work'), ['work', 'tests']);
+  eq('tags typed with an Arabic or a full-width comma', parseTags('a\u060cb\uff0cc\u3001d'), ['a', 'b', 'c', 'd']);
+  const lib = [{ name: 'Alpha', meta: { tags: ['Work'] }, state: 'stopped' }, { name: 'Beta', meta: { tags: ['home'], template: true }, state: 'stopped' }, { name: 'Gamma', state: 'running' }];
+  eq('search by tag text', filterMachines(lib, { query: 'wor' }).map((m) => m.name), ['Alpha']);
+  eq('search #tag exact', filterMachines(lib, { query: '#hom' }).map((m) => m.name), []);
+  eq('search #tag', filterMachines(lib, { query: '#home' }).map((m) => m.name), ['Beta']);
+  // templates
+  eq('templates chip', filterMachines(lib, { show: 'templates' }).map((m) => m.name), ['Beta']);
+  eq('templates counted', chipCounts(lib, '').templates, 1);
+  eq('templates kept in the view', libView({ show: 'templates' }).show, 'templates');
+  eq('a template does not start', [actionsOf(lib[1]).start, actionsOf(lib[0]).start], [false, true]);
+  eq('a running template can still be stopped', actionsOf({ ...lib[1], state: 'running' }).shutdown, true);
+  // Scale
+  const area = { x: 0, y: 0, w: 1920, h: 1040 };
+  eq('scale 50 %', scaleFrame(1280, 800, 0.5, 48, area), { w: 640, h: 448, fits: true });
+  eq('scale 200 % shrinks to fit', scaleFrame(1280, 800, 2, 48, area), { w: 1587, h: 1040, fits: false });
+  eq('scale unknown size', scaleFrame(0, 800, 1, 48, area), null);
+  eq('scales offered', SCALES, [0.5, 0.75, 1.25, 1.5, 2]);
+  // the guest's shape
+  eq('shape: taller box gets shorter', shapeFrame({ w: 1000, h: 900 }, { w: 1000, h: 852 }, 1600, 900, area), { w: 1000, h: 611 });
+  eq('shape: already right', shapeFrame({ w: 1000, h: 610 }, { w: 1000, h: 563 }, 1600, 900, area), null);
+  eq('shape: too tall for the area: narrower', shapeFrame({ w: 1800, h: 900 }, { w: 1800, h: 852 }, 1024, 1024, area), { w: 992, h: 1040 });
+  eq('shape: nothing known', shapeFrame(null, { w: 1, h: 1 }, 1, 1, area), null);
+  // device dots
+  eq('dots', deviceDots({ iso: '/x.iso', heard: true, mic: false, cableOut: false, network: 'shared', shares: 1, transfer: false }).map((d) => d.k), ['net', 'cd', 'sound', 'folders']);
+  eq('dots: a pulled cable, isolated has none', [deviceDots({ network: 'bridged', cableOut: true }).map((d) => d.k), deviceDots({ network: 'isolated' })], [['netOut'], []]);
+  eq('dots: USB and camera only from their backend', deviceDots({ caps: { usb: true, usbAttached: 2, camera: true, cameraOn: false } }).map((d) => d.k), ['usb']);
+  eq('cable offered', [cableOffered({ network: 'shared' }, true), cableOffered({ network: 'isolated' }, true), cableOffered({ network: 'shared', group: 'g' }, true), cableOffered({ network: 'hostonly' }, false)], [true, false, false, false]);
+  // Cleaner: a machine's space goes to Machines
+  eq('cleaner: machines space', ['/home/a/Machines', '/home/a/Machines/x.lordvm/disks', '/media/a/d/W.lordvm', '/home/a/Videos', '/home/a/MachinesOld', '/g.lordgroup/x'].map((p) => C.machinesSpace(p, '/home/a')), [true, true, true, false, false, true]);
+}
+
 console.log(`vm-model: ${n} checks, ${bad} failed`);
 process.exit(bad ? 1 : 0);

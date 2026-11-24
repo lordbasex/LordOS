@@ -97,6 +97,9 @@
  *                   d = 1: text = "OUT\tIN", the output and input (machine.json sound_out, sound_in: a node.name each, or
  *                   empty for the default; vm_sound_dev_valid), d = 0: they stay as they are.
  *                   They change nothing in QEMU: lord-server applies them itself (6.9) → VM_REPLY
+ *     VM_NETCABLE   the network card's cable while the machine runs (the window's Devices → Network, 5.3): a = 1 plugged,
+ *                   0 pulled (QMP set_link on the first card's backend, nic0). Only for the shared, host-only and bridged
+ *                   networks, never a machine group's member; nothing is written, a new run starts plugged → VM_REPLY
  *     VM_RENAME     the machine's name while it runs (lord-vm --rename, 6.26): text = the new name (vm_rename_name_ok);
  *                   lord-vm holds the lock, so it writes machine.json. Only the name: the folders keep theirs until a
  *                   rename with the machine off → VM_REPLY
@@ -268,8 +271,8 @@
 enum {
     VM_STATUS = 1, VM_PAUSE, VM_RESUME, VM_SHUTDOWN, VM_POWEROFF, VM_RESET, VM_DISPLAY, VM_QMP,   /* requests */
     VM_CDROM, VM_SUSPEND, VM_KEEP, VM_SNAPSHOT, VM_CONSOLE, VM_AGENT, VM_CLIP, VM_SOUND, VM_FILE, VM_DISPLAY_SIZE,
-    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL, VM_EXEC,
-    VM_REQ_LAST = VM_EXEC,
+    VM_APPS, VM_WINACT, VM_LAUNCH, VM_CLIP_OFFER, VM_CLIP_DENY, VM_CAPTURE, VM_RENAME, VM_LINK, VM_SHELL, VM_EXEC, VM_NETCABLE,
+    VM_REQ_LAST = VM_NETCABLE,
     VM_REPLY = 64, VM_STATE, VM_INFO, VM_DISPLAY_FD, VM_NOTICE, VM_JOB, VM_CONSOLE_FD,           /* from lord-vm */
     VM_AGENT_STATE, VM_CLIP_DATA, VM_FILE_PROGRESS, VM_WINDATA, VM_CLIP_REQ, VM_WINREFUSED, VM_GUEST_LAYOUT,
     VM_SHELL_FD, VM_GUEST_NOTE, VM_EXEC_DONE,
@@ -532,6 +535,7 @@ static inline int vm_msg_valid(const VmMsg *m, int to_vm) {
                       (m->type != VM_APPS || m->a == 0 || m->a == 1) &&
                       (m->type != VM_CAPTURE || m->a == 0 || m->a == 1) &&
                       (m->type != VM_RENAME || m->text[0]) &&
+                      (m->type != VM_NETCABLE || m->a == 0 || m->a == 1) &&
                       (m->type != VM_LINK || ((m->a == 0 || m->a == 1) && strnlen(m->text, VM_TEXT_MAX) == 36)) &&
                       (m->type != VM_WINACT || (m->a != 0 && m->b >= 1 && m->b <= 5)) &&
                       (m->type != VM_SHELL || (m->a == VSH_CLOSE || ((m->a == VSH_OPEN || m->a == VSH_SIZE) && m->b >= 1 && m->b <= 1000 && m->c >= 1 && m->c <= 500))) &&

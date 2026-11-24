@@ -11,6 +11,36 @@ of the matching [GitHub release](https://github.com/lordbasex/LordOS/releases), 
 ## [Unreleased]
 
 ### Added
+- **Machines: one parent for every machine** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 3.7).
+  lord-sessiond places each machine's scope in its session's `lordos-machines.slice` (root-owned, made on the first
+  machine) with a fixed `cpu.weight` 50 and `io.weight` 50: half of one app's, a twentieth of the compositor's. Under load,
+  the machines together yield to the desktop and the apps; idle cores and an idle disk are still theirs. Each machine keeps
+  its own memory and CPU limit. lord-netperm's programs look one level down into the slice, so each machine keeps its own
+  firewall policy (the Machines rules while a just-started one isn't registered). Monitor, the process owner, the battery
+  history and Sentinela's scope check find machines there and in the old place. lordos.service restarts with live
+  sessions keep the slice's limits. lord-sessiond uses the slice only while the running lord-netperm is the installed
+  one, so a half-restarted update never leaves a machine without a firewall.
+- **Machines: the app's last parts** (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 5.1, 5.2,
+  5.3, 5.5, 6.14).
+  - **New Machine: Detect.** An installer disc chosen or dropped on the assistant gets a step of its own: what its
+    label and boot files say, which system it is, which processors it starts on, and, before anything is made, when it
+    would run emulated on this computer or when its name and its boot files disagree.
+  - **New Machine: drop, place, Fresh install.** Drop an installer disc, a disk image or another app's machine anywhere
+    on the first step. The Name step says where the machine goes and how much space is free there. After an
+    unattended install, the machine takes a "Fresh install" snapshot before its first start (on by default).
+  - **Templates.** Make Template keeps a machine as it is; its card says Template, the library has a Templates chip,
+    and New Machine from Template makes a copy to use.
+  - **Configure.** A machine's icon color and tags (the library's search finds them, `#tag` exactly); the processor
+    the guest sees (this computer's, or Compatible: the same on every computer, so a machine keeps working when it
+    moves); Add Disk (one more empty data disk); a new network card address; huge pages shown as automatic; where the
+    guest prints. `machine.json` schema 18 adds `cpu_model`.
+  - **The machine's window.** View → Scale (50 % to 200 %); with a fixed resolution the window keeps the guest's shape
+    after a resize; a dot on the bar for each device the guest can use now; Devices → Network pulls or plugs in the
+    network cable while the machine runs, and Devices → Folders.
+  - **Cleaner** sends a machine's space to Machines' Storage window (Reclaim in Machines) instead of offering its files.
+  - **Decided:** no memory ballooning (the guest would decide what it gives back, and it is one more device a guest
+    talks to); no network speed limit; this computer's printing service is never opened to a machine; machines stay in
+    the Machines library; the capture release keys stay fixed.
 - **Machines: programs, files, logs and an MCP server from the terminal, per machine with the person's consent**
   (in development; latest release 0.8.9.5-beta; docs/VIRTUALIZATION.md 6.15 and 6.24). `/usr/bin/lordvm` is a second link
   to the `machines` command, which gains:

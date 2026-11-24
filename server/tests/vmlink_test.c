@@ -39,7 +39,18 @@ static void messages(void) {
     CHECK(!vm_msg_valid(&m, 1), "a short id");
     m = vm_msg(VM_LINK, 1, 1, 0, 0, 0, GID);
     CHECK(!vm_msg_valid(&m, 0), "VM_LINK is a request, never an event");
-    CHECK(VM_REQ_LAST == VM_EXEC && VM_EXEC == VM_SHELL + 1 && VM_SHELL == VM_LINK + 1, "VM_LINK, VM_SHELL, then VM_EXEC (6.15) last");
+    CHECK(VM_REQ_LAST == VM_NETCABLE && VM_NETCABLE == VM_EXEC + 1 && VM_EXEC == VM_SHELL + 1 && VM_SHELL == VM_LINK + 1,
+          "VM_LINK, VM_SHELL, VM_EXEC (6.15), then VM_NETCABLE (5.3) last");
+    /* the network cable (the window's Devices → Network): plugged or pulled, nothing else */
+    m = vm_msg(VM_NETCABLE, 3, 1, 0, 0, 0, "");
+    CHECK(vm_msg_valid(&m, 1), "a plugged cable");
+    m = vm_msg(VM_NETCABLE, 3, 0, 0, 0, 0, "");
+    CHECK(vm_msg_valid(&m, 1), "a pulled network cable");
+    m = vm_msg(VM_NETCABLE, 3, 2, 0, 0, 0, "");
+    CHECK(!vm_msg_valid(&m, 1), "a cable a = 2");
+    m = vm_msg(VM_NETCABLE, 3, -1, 0, 0, 0, "");
+    CHECK(!vm_msg_valid(&m, 1), "a cable a = -1");
+    CHECK(!vm_msg_valid(&m, 0) && VM_NETCABLE <= VM_REQ_LAST, "VM_NETCABLE is a request, never an event");
 }
 
 static void descriptors(void) {

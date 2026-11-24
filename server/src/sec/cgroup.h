@@ -46,6 +46,33 @@ int cgroup_delegate_session(unsigned uid, unsigned gid);
 /* cpu.weight of the session's «server» leaf (the compositor), against 100 for each app scope and helper */
 #define CG_SERVER_CPU_WEIGHT "1000"
 
+/* (docs/VIRTUALIZATION.md 3.7) The machines' parent: every machine's scope (app-lordos-lordos-vm-<id>.scope and a
+ * Tor gateway's app-lordos-lordos-vm-tor-<id>.scope) goes into lordos-session-<uid>/lordos-machines.slice, made by
+ * lord-sessiond (root-owned like the rest of the subtree) with fixed weights: CPU and I/O half of one app scope's, a
+ * twentieth of the compositor's. Machines together then yield to the desktop and the apps under contention and still
+ * use every idle core and the whole disk otherwise; each machine keeps its own memory.max and cpu.max in its scope.
+ * No request names the slice: lord-sessiond puts a machine's scope there by its name alone. */
+#define CG_MACHINES_SLICE      "lordos-machines.slice"
+#define CG_MACHINES_CPU_WEIGHT "50"
+#define CG_MACHINES_IO_WEIGHT  "default 50"
+/* Only while the lord-netperm that runs knows the slice: one older than this lord-sessiond (the package updated, the
+ * reboot not done yet, lordos.service restarted alone) reads only the session folder, and a machine one level down
+ * would have no firewall at all. So: 1 when procs (CG_NETPERM_PROCS, systemd's root-owned file) can't be read or is
+ * empty (not running: the installed one starts next), or its first process runs the installed lord-netperm (not
+ * "(deleted)"); 0 otherwise, and the machine's scope goes beside the server leaf, where every lord-netperm reads it. */
+#ifndef CG_NETPERM_PROCS     /* tests/vm_slice.sh's build of cgslice-test points it at a stand-in */
+#define CG_NETPERM_PROCS "/sys/fs/cgroup/system.slice/lord-netperm.service/cgroup.procs"
+#endif
+int cgroup_netperm_current(const char *procs);
+/* 1 if a scope of this name belongs in CG_MACHINES_SLICE (a machine's, by its reserved prefix) */
+int cgroup_scope_in_machines(const char *name);
+/* The slice in the session folder sessfd: made if missing, root-owned, its controllers (memory, cpu, pids, and io when
+ * the kernel has it) on and the weights written. An open directory fd of it, or -1. Root only. */
+int cgroup_machines_slice(int sessfd);
+/* The same placement rule for a session child name: "server", an accepted scope, or "lordos-machines.slice/<machine
+ * scope>" (the noted limits of #140 below). 1 if accepted. */
+int cgroup_session_child_ok(const char *name);
+
 
 /* Called by lord-sessiond at startup (root, lordos.service with Delegate=yes): moves itself to the
  * "supervisor" leaf so the service root can enable memory/CPU/pids for the
