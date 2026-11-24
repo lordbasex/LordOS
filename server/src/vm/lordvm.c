@@ -9441,6 +9441,9 @@ static int make_member(const char *gdir, const char *folder, const char *name, i
     snprintf(m.base, sizeof m.base, "%s", base);
     snprintf(m.group, sizeof m.group, "%s", gid);
     m.role = role;
+    /* an encrypted group (layer 5): the member's overlay is LUKS under the group's key (qimg_overlay, below); the base,
+     * Whonix's public image, isn't */
+    m.encrypted = key_have();
     m.profile_lock = VM_LOCK_ANONYMITY;
     if (role == VM_ROLE_GATEWAY) {
         m.network = VM_NET_SHARED;
@@ -9468,7 +9471,8 @@ static int make_member(const char *gdir, const char *folder, const char *name, i
 }
 
 static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
-    const char *cid = NULL, *archive = NULL, *want = NULL, *name = NULL, *dev_members[2] = { NULL, NULL };
+    const char *cid = NULL, *archive = NULL, *want = NULL, *name = NULL, *dev_members[2] = { NULL, NULL }, *gid_want = NULL;
+    int genc = 0;
     for (int i = 0; i < argc; i++) {
         const char *a = argv[i], *v = i + 1 < argc ? argv[i + 1] : NULL;
         if (!v) { fprintf(stderr, "lord-vm: %s needs a value\n", a); return 2; }
@@ -9477,6 +9481,10 @@ static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
         else if (!strcmp(a, "--archive")) archive = v;
         else if (!strcmp(a, "--sha512")) want = v;
         else if (!strcmp(a, "--name")) name = v;
+        /* isolation layer 5 (19.1, approved 2026-11-23): the members' disks encrypted under the group's key, kept in the
+         * keyring under the group's id, which lord-server chooses first */
+        else if (!strcmp(a, "--encrypt")) { genc = parse_enum(v, "off", "on"); if (genc < 0) { fprintf(stderr, "lord-vm: --encrypt on|off\n"); return 2; } }
+        else if (!strcmp(a, "--id")) { if (!vm_uuid_valid(v)) { fprintf(stderr, "lord-vm: --id is a lowercase UUID\n"); return 2; } gid_want = v; }
 #ifdef LORDVM_TEST_PATHS
         /* a test build only: the two members' disks as already unpacked files (tests/vm_group_link.sh), no archive */
         else if (!strcmp(a, "--dev-gateway")) dev_members[0] = v;
@@ -9485,6 +9493,8 @@ static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
         else { fprintf(stderr, "lord-vm: unknown option %s\n", a); return 2; }
     }
     int dev = dev_members[0] && dev_members[1];
+    if (genc && (!key_have() || !gid_want)) { fprintf(stderr, "lord-vm: --encrypt on needs the group's key on --key-fd and its --id\n"); return 2; }
+    if (!genc && key_have()) key_wipe();
     if (!cid || (!dev && (!archive || !want))) { fprintf(stderr, "lord-vm: --group-create DIR --catalog-id ID --archive FILE --sha512 HEX [--name N]\n"); return 2; }
     /* the group folder: new, <library>/<x>.lordgroup */
     char gdir[PATH_MAX], lib[PATH_MAX];
@@ -9587,7 +9597,8 @@ static int cmd_group_create(const char *gdir_arg, int argc, char **argv) {
         memset(&g, 0, sizeof g);
         g.schema = VMG_SCHEMA;
         g.kind = VMG_KIND_WHONIX;
-        if (vm_new_id(g.id)) { snprintf(why, sizeof why, "no random numbers"); goto out; }
+        if (gid_want) memcpy(g.id, gid_want, sizeof g.id);
+        else if (vm_new_id(g.id)) { snprintf(why, sizeof why, "no random numbers"); goto out; }
         snprintf(g.name, sizeof g.name, "%s", name && vm_name_valid(name) ? name : e.group_kind[0] == 'w' ? "Whonix" : cid);
         g.n = 2;
         g.m[0] = (VmGroupMember){ .role = VM_ROLE_GATEWAY, .start = 1, .stop = 2 };
@@ -9667,6 +9678,10 @@ static int cmd_group_fresh(const char *arg, int argc, char **argv) {
     for (int i = 0; i < g.n; i++) {
         snprintf(mdir[i], sizeof mdir[i], "%s/%s", gdir, g.m[i].dir);
         char err[200];
+        if (!vm_machine_load(mdir[i], &mm[i], err, sizeof err) && mm[i].encrypted && !key_have()) {
+            fprintf(stderr, "lord-vm: the group is encrypted: its key is needed (--key-fd)\n");
+            goto out;
+        }
         if (vm_machine_load(mdir[i], &mm[i], err, sizeof err) || strcmp(mm[i].group, g.id) || mm[i].role != g.m[i].role) {
             fprintf(stderr, "lord-vm: %s isn't this group's %s\n", g.m[i].dir, VMG_ROLE_NAMES[g.m[i].role]);
             goto out;
@@ -10045,6 +10060,39 @@ out:
     return rc;
 }
 
+/* An imported machine.json is another computer's (or anyone's) file: everything that crosses the boundary between
+ * the guest and this computer goes back to what a new machine of unknown origin gets, and the person turns it on
+ * again here. Kept: the hardware the guest's system was installed on (CPU count, memory, disks, firmware, devices,
+ * network card, identity, SMBIOS strings), so that it boots as it did. */
+static void import_untrust(VmMachine *m) {
+    m->schema = VM_SCHEMA;
+    m->iso[0] = m->drivers[0] = m->bridge[0] = 0;
+    m->n_shares = 0;
+    if (m->network == VM_NET_BRIDGED || m->network == VM_NET_HOSTONLY || m->network == VM_NET_LINK) m->network = VM_NET_SHARED;
+    m->n_ports = 0;
+    m->uplink_tor = 0;
+    m->link_mac[0] = 0;
+    m->microphone = 0;
+    m->sound_out[0] = m->sound_in[0] = 0;
+    m->clipboard = VM_CLIP_OFF;
+    m->clipboard_ask = 1;
+    m->transfer = 0;
+    m->agent = 0;
+    m->capture_fullscreen = 0;
+    m->pointer_guest = 0;
+    m->vgpu = VM_VGPU_NONE;
+    if (m->graphics == VM_GFX_3D) m->graphics = VM_GFX_2D;
+    m->cpu_pin = VM_PIN_DEFAULT;
+    m->perf_profile = 0;
+    m->group[0] = 0;
+    m->role = VM_ROLE_NONE;
+    m->profile_lock = VM_LOCK_NONE;
+    m->timers = VM_TIMERS_DEFAULT;
+    m->disposable = VM_DISP_OFF;
+    m->no_backup = 0;
+    m->base[0] = 0;
+}
+
 static int cmd_import_lordvm(const char *src, int argc, char **argv) {
     if (argc < 1) { fprintf(stderr, "lord-vm: --import-lordvm SRC DST [--key-fd N]\n"); return 2; }
     const char *dst = argv[0];
@@ -10101,16 +10149,30 @@ static int cmd_import_lordvm(const char *src, int argc, char **argv) {
         VmMachine m;
         if (vm_machine_load(tmp, &m, err, sizeof err)) { fprintf(stderr, "lord-vm: machine.json: %s\n", err); goto out; }
         if (strcmp(m.id, man.id) || m.encrypted != man.encrypted) { fprintf(stderr, "lord-vm: machine.json doesn't match the manifest\n"); goto out; }
-        if (m.base[0] || m.group[0]) { fprintf(stderr, "lord-vm: an export is a whole machine: no shared base or group\n"); goto out; }
-        m.iso[0] = m.drivers[0] = m.bridge[0] = 0;
-        m.n_shares = 0;
-        if (m.network == VM_NET_BRIDGED) m.network = VM_NET_SHARED;
+        if (m.base[0] || m.group[0] || m.role || m.profile_lock) { fprintf(stderr, "lord-vm: an export is a whole machine: no shared base or group\n"); goto out; }
+        import_untrust(&m);
+        {
+            VmHost h;
+            char warn[256];
+            vm_host_probe(&h);
+            if (vm_machine_check(&m, err, sizeof err) || vm_machine_check_host(&m, &h, err, sizeof err, warn, sizeof warn)) { fprintf(stderr, "lord-vm: machine.json: %s\n", err); goto out; }
+        }
         char disks[VM_NDISKS][PATH_MAX + 64];
         int nd = disk_files(tmp, &m, disks);
         for (int k = 0; k < nd; k++) {
             if (!file_exists(disks[k])) { fprintf(stderr, "lord-vm: a disk is missing from the export\n"); goto out; }
             int raw = m.raw && !(m.firmware == VM_FW_UEFI && k == 1);
             if (!raw && disk_plain(disks[k], err, sizeof err)) { fprintf(stderr, "lord-vm: a disk can't be used: %s\n", err); goto out; }
+            /* encryption is never taken from the file: a qcow2's crypt_method (header offset 32) must say what the
+             * manifest and machine.json say, and an encrypted one must open with the key (below) */
+            if (!raw) {
+                uint8_t h[36];
+                int dfd = open(disks[k], O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+                int got = dfd >= 0 && pread(dfd, h, sizeof h, 0) == (ssize_t)sizeof h;
+                if (dfd >= 0) close(dfd);
+                uint32_t cm = got ? (uint32_t)h[32] << 24 | (uint32_t)h[33] << 16 | (uint32_t)h[34] << 8 | h[35] : 99;
+                if (cm != (m.encrypted ? 2u : 0u)) { fprintf(stderr, "lord-vm: a disk's encryption isn't what the export says\n"); goto out; }
+            }
             /* an encrypted disk must open with the key given: qemu-img check, jailed, reading that disk only */
             if (!raw && m.encrypted) {
                 JBuf b;
