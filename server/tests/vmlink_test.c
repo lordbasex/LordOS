@@ -40,6 +40,16 @@ static void messages(void) {
     m = vm_msg(VM_LINK, 1, 1, 0, 0, 0, GID);
     CHECK(!vm_msg_valid(&m, 0), "VM_LINK is a request, never an event");
     CHECK(VM_REQ_LAST >= VM_LINK && VM_LINK < VM_REPLY, "VM_LINK is a request (VM_SHELL came after it)");
+    /* the network cable (the window's Devices → Network): plugged or pulled, nothing else */
+    m = vm_msg(VM_NETCABLE, 3, 1, 0, 0, 0, "");
+    CHECK(vm_msg_valid(&m, 1), "a plugged cable");
+    m = vm_msg(VM_NETCABLE, 3, 0, 0, 0, 0, "");
+    CHECK(vm_msg_valid(&m, 1), "a pulled network cable");
+    m = vm_msg(VM_NETCABLE, 3, 2, 0, 0, 0, "");
+    CHECK(!vm_msg_valid(&m, 1), "a cable a = 2");
+    m = vm_msg(VM_NETCABLE, 3, -1, 0, 0, 0, "");
+    CHECK(!vm_msg_valid(&m, 1), "a cable a = -1");
+    CHECK(!vm_msg_valid(&m, 0) && VM_NETCABLE <= VM_REQ_LAST, "VM_NETCABLE is a request, never an event");
 }
 
 static void descriptors(void) {

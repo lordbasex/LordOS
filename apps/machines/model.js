@@ -573,6 +573,52 @@ export function actualFrame(gw, gh, bar, area) {
   if (!(gw > 0) || !(gh > 0) || !area) return null;
   return { w: Math.min(gw, area.w), h: Math.min(gh + (bar || 0), area.h) };
 }
+// View → Scale (5.3): the window's frame so the picture is the guest's display at k times its size (bar above it); when
+// that doesn't fit the display's work area, the largest frame of the same shape that does (fits: false then)
+export const SCALES = [0.5, 0.75, 1.25, 1.5, 2];
+export function scaleFrame(gw, gh, k, bar, area) {
+  if (!(gw > 0) || !(gh > 0) || !(k > 0) || !area) return null;
+  const b = bar || 0;
+  let w = Math.round(gw * k), h = Math.round(gh * k);
+  const fit = Math.min(1, area.w / w, (area.h - b) / h);
+  if (fit < 1) { w = Math.floor(w * fit); h = Math.floor(h * fit); }
+  return { w: Math.max(320, w), h: Math.max(200, h) + b, fits: fit >= 1 };
+}
+// The window keeps the guest's shape (5.3) while the resolution is fixed: after the person resizes it, the frame that
+// keeps its width and gives the picture box the guest's proportions (or, when that is taller than the work area, the
+// tallest that fits, narrower). frame and box: { w, h } of the window and of the picture; null when it is already within
+// 2 pixels (or nothing is known)
+export function shapeFrame(frame, box, gw, gh, area) {
+  if (!frame || !box || !(gw > 0) || !(gh > 0) || !(box.w > 0) || !(box.h > 0)) return null;
+  const want = Math.round(box.w * gh / gw);
+  if (Math.abs(want - box.h) <= 2) return null;
+  let w = frame.w, h = frame.h + (want - box.h);
+  if (area && h > area.h) {
+    const ph = box.h + (area.h - frame.h);
+    if (ph < 100) return null;
+    w = frame.w - box.w + Math.round(ph * gw / gh);
+    h = area.h;
+  }
+  if (Math.abs(w - frame.w) <= 2 && Math.abs(h - frame.h) <= 2) return null;
+  return { w, h };
+}
+// The bar's device dots (5.3): one per device the guest can use now, each { k, key } (machines.dot.<k> its words); a
+// dot is shown only while the device is there, so what the guest has is always in sight. USB and the camera come from the
+// devices' own backend (caps from lord.vm.deviceCaps, when it is there): shown only once it says they are supported.
+export function deviceDots({ iso, heard, mic, cableOut, network, shares, transfer, caps } = {}) {
+  const out = [];
+  if (network && network !== 'isolated') out.push({ k: cableOut ? 'netOut' : 'net' });
+  if (iso) out.push({ k: 'cd' });
+  if (heard) out.push({ k: 'sound' });
+  if (mic) out.push({ k: 'mic' });
+  if ((shares | 0) > 0 || transfer) out.push({ k: 'folders' });
+  if (caps?.usb && (caps.usbAttached | 0) > 0) out.push({ k: 'usb' });
+  if (caps?.camera && caps.cameraOn) out.push({ k: 'camera' });
+  return out;
+}
+// Devices → Network: can the cable be pulled? Only the shared, host-only and bridged networks of a running machine that
+// isn't a group's member (lord-vm refuses the rest too)
+export const cableOffered = (cfg, running) => !!running && !cfg?.group && ['shared', 'hostonly', 'bridged'].includes(cfg?.network);
 // The Info menu (5.3): what this machine uses now, from two lord.vm.stats reads (model.js usage) and its sandbox
 // (isolationGaps); each line a key and its values
 export function infoLines(m, u, gaps) {

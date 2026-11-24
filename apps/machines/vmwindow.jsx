@@ -10,7 +10,7 @@ import {
 } from '@lordos/sdk';
 import CATALOG from '../../assets/machines/systems.json';
 import { useEffect, useRef, useState } from 'react';
-import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
+import { installError, startPhase, playStarts, stateView, offers2d, restartsAgain, offHint, actionsFor, toPicture, guestSize, refreshRate, wheelSteps, budgetPlan, failCause, failActions, pipFrame, actualFrame, scaleFrame, shapeFrame, SCALES, deviceDots, cableOffered, infoLines, isolationGaps, usage, CTRL_ALT_DEL, windowTitle, closeChoice, resolutions, agentLines, agentTone, clipNeedsTool, clipTo, clipFrom, clipInUse, clipBlocked, unreadableOf, clipAskEmpty, clipAskRequest, clipAskPush, clipAskCopied, clipAskAnswer, clipAskTick, clipAskShown, thumbSrc, AGENT_CAPS, guestWindows, mountCommand, noSuspend, soundOf, soundDevs, audible, muteToggle, micLive, micAsk, dropBlocker, copyLine, midName, guestFolder, followStuck, appsBlocker, transferState, dropWay, winfspFor, autoTransferSetup, toolsOutdated, runningWindows, runningKey, launcherApps, latchToggle, latchKeyUp, comboSend, familyOf, guestKeys, toolsWant, toolsLine, toolsAutoStep, toolsAutoOn, toolsAutoFailed, TOOLS_TRIES, launchPending } from './model.js';
 import { useAppsMode, appsMenuItems, guests, guestFocus, CLIP_HOLD_MS } from './appsmode.jsx';
 import { ListHead, AppsSearch, RunningList, LaunchList, launchFirst } from './appslist.jsx';
 import { readMeta, writeMeta, isProtectedMachine } from './meta.js';
@@ -152,6 +152,18 @@ function AgentPop({ ctl, onClose }) {
   );
 }
 
+// The bar's device dots (5.3, deviceDots): one small dot per device the guest can use now, a pulled cable in amber;
+// the dots together carry one tooltip that names each, so color is never the only sign
+const DOT_COLOR = { net: '#7be3a4', netOut: '#ff9f0a', cd: '#7cc4e8', sound: '#7be3a4', mic: '#ff9f0a', folders: '#7be3a4', usb: '#7cc4e8', camera: '#ff9f0a' };
+function DeviceDots({ dots }) {
+  const label = dots.map((d) => tr(`machines.dot.${d.k}`)).join(' · ');
+  return (
+    <View title={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 2, height: 28 }}>
+      {dots.map((d) => <View key={d.k} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: DOT_COLOR[d.k] || '#aaa' }} />)}
+    </View>
+  );
+}
+
 // The bar, in groups (5.3): the agent and what it brings (clipboard, folders, apps) | the guest's display and devices |
 // shell, logs, screenshot, record | pause and power | configure and full screen. Icons, each named in its tooltip.
 // apps: apps mode's panel (AppsController), the same buttons less the ones apps mode has no use for: the resolution (the
@@ -218,6 +230,8 @@ function Tools({ ctl, floating, compact, tiny, apps }) {
       {/* Keys: held keys, the guest's combinations, single keys and the on-screen keyboard (keys.jsx) */}
       <KeysBtn ctl={ctl} />
       <IconMenuBtn sym="eject" label={tr('machines.tb.devices')} items={ctl.devices} />
+      {/* a dot for each device the guest can use now (5.3), its words in the tooltip */}
+      {ctl.dots?.length && !compact ? <DeviceDots dots={ctl.dots} /> : null}
       {/* the machine's sound (6.9): its menu mutes it or turns it back on and picks the output and input; the microphone
           shows while the guest hears it */}
       <IconMenuBtn sym={ctl.heard ? 'sound' : 'sound-off'} label={tr('machines.tb.sound')} items={ctl.soundMenu} />
@@ -513,6 +527,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const closingRef = useRef(closing);
   closingRef.current = closing;
   const followRef = useRef(follow);
+  const shapeRef = useRef(false);
   followRef.current = follow;
   overlayRoot.current = root.current;
 
@@ -641,6 +656,19 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         if (!want) z.want = null;
         else if (!z.want || z.want[0] !== want[0] || z.want[1] !== want[1]) { z.want = want; z.at = now(); }
         else if (now() - z.at > 400) { lord.vm.resize(sid, want[0], want[1]); z.last = want; z.want = null; z.asked = want; z.askedAt = now(); }
+      }
+      // a fixed resolution: after the person resized the window (the frame the same for 400 ms), it takes the guest's
+      // shape again, keeping its width (shapeFrame); tried once per frame size, so a window that can't go there isn't fought
+      if (q.display === 'up' && box.current && shapeRef.current && q.w > 0 && q.h > 0) {
+        const w0 = windows.get().find((x) => x.id === winId);
+        const f0 = w0 ? wm.frame(w0) : null, b0 = lord.getLayout(box.current.id);
+        const key = f0 ? `${f0.w}x${f0.h}:${q.w}x${q.h}` : '';
+        if (key && key !== z.shapeKey) { z.shapeKey = key; z.shapeAt = now(); z.shapeDone = false; }
+        else if (key && !z.shapeDone && now() - z.shapeAt > 400) {
+          z.shapeDone = true;
+          const s = shapeFrame(f0, { w: b0[2], h: b0[3] }, q.w, q.h, workAreaOf(displayFor(f0)));
+          if (s) wm.resize(winId, s.w, s.h);
+        }
       }
       // asked for a size the guest didn't take (Follow the window): the resolution menu says so
       const stuckNow = q.display === 'up' && followRef.current && !appsRef.current && followStuck(z.asked, [q.w, q.h], z.askedAt, now());
@@ -844,6 +872,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   const toPip = () => { if (protRef.current) return; const f0 = myFrame(); const f = f0 && pipFrame(displayFor(f0), st?.w, st?.h, direction() === 'rtl'); if (f) wm.setPip(winId, f); };
   const fromPip = () => wm.setPip(winId, null);
   const actual = () => { const f0 = myFrame(); const f = f0 && actualFrame(st?.w, st?.h, BAR, workAreaOf(displayFor(f0))); if (f) wm.resize(winId, f.w, f.h); };
+  const scaleTo = (k) => { const f0 = myFrame(); const f = f0 && scaleFrame(st?.w, st?.h, k, BAR, workAreaOf(displayFor(f0))); if (f) wm.resize(winId, f.w, f.h); };
   const m0 = { dir, name, id: winId.split('#vm-')[1] };
   const shot = () => {
     const path = sid ? lord.vm.screenshot(sid) : '';
@@ -885,7 +914,13 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
   // guest's picture is re-encoded on this side before any app sees it
   const cfgRef = useRef({});
   const [cfg, setCfg] = useState({});
-  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify }); } }, [sid, st?.state]);
+  useEffect(() => { if (!has()) return; const m = lord.vm.list().find((x) => x.dir === dir); if (m) { if (!cfgRef.current?.dir && m.resolution && m.resolution !== 'follow') setFollow(false); cfgRef.current = m; setCfg({ agent: m.agent, clipboard: m.clipboard, clipboardAsk: !!m.clipboardAsk, shares: m.shares || [], transfer: !!m.transfer, windows: !!m.windowsDevices, arch: m.arch, guestLinks: !!m.guestLinks, guestNotify: !!m.guestNotify, network: m.network, group: m.group || '' }); } }, [sid, st?.state]);
+  // the devices' own backend (USB, the camera): shown only once it says they're supported here (deviceCaps)
+  const caps = has() && typeof lord.vm.deviceCaps === 'function' ? lord.vm.deviceCaps(dir) : null;
+  const cableOk = cableOffered(cfg, running);
+  const cableOut = !!st?.cableOut;
+  // shape keeping (5.3): windowed, the resolution fixed, nothing else deciding the frame
+  shapeRef.current = !full && !pip && !appsOn && !follow;
   // "Capture mouse" (capture.js, docs/VIRTUALIZATION.md 6.25): lord-server locks the pointer inside the picture and the
   // guest gets relative motion; ❖Esc or Ctrl+Alt (lord-server's, before any app), focus loss, apps mode or the machine
   // stopping give it back. The state belongs to the window: full screen rebuilds it, and the lock moves to the new picture
@@ -1253,7 +1288,20 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       { label: tr('machines.tb.sound'), checked: heard, onClick: toggleSound },
       { label: tr('machines.cfg.microphone'), checked: snd.microphone, onClick: () => soundTo({ microphone: !snd.microphone }) },
       { label: tr('machines.tb.soundSettings'), onClick: () => setCfgSheet({ section: 'sound' }) },
+      '-',
+      // the network (5.3): its mode, the cable while it runs (VM_NETCABLE), its settings
+      { label: tr('machines.dev.network', { mode: tr(`machines.cfg.net.${cfg.network || 'shared'}`) }), disabled: true },
+      { label: tr('machines.dev.cable'), checked: cableOk && !cableOut, disabled: !cableOk, hint: !cableOk && running ? tr('machines.dev.cableNo') : '',
+        onClick: () => { if (sid) lord.vm.netCable(sid, cableOut); } },
+      { label: tr('machines.dev.networkSettings'), onClick: () => setCfgSheet({ section: 'network' }) },
+      '-',
+      { label: (cfg.shares || []).length ? tr('machines.tb.foldersN', { n: cfg.shares.length }) : tr('machines.tb.folders'), disabled: true },
+      { label: tr('machines.dev.folderSettings'), onClick: () => setCfgSheet({ section: 'sharing' }) },
+      // USB and the camera: their own backend's, only once it says they're supported (deviceCaps)
+      ...(caps?.usb ? ['-', { label: tr('machines.dev.usb'), onClick: () => setCfgSheet({ section: 'usb' }) }] : []),
+      ...(caps?.camera ? [{ label: tr('machines.dev.camera'), onClick: () => setCfgSheet({ section: 'camera' }) }] : []),
     ],
+    dots: deviceDots({ iso, heard, mic: micOn, cableOut, network: cfg.network, shares: (cfg.shares || []).length, transfer: cfg.transfer, caps }),
   };
   useEffect(() => {
     wm.setMenus(winId, [
@@ -1289,6 +1337,8 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
         { label: tr('machines.view.pip'), checked: pip, disabled: !running || appsOn || prot, hint: prot ? tr('machines.view.pipProtected') : '', onClick: () => (pip ? fromPip() : toPip()) },
         '-',
         { label: tr('machines.view.actual'), disabled: !running || follow || full || pip || !st?.w, hint: follow ? tr('machines.view.actualFollow') : '', onClick: actual },
+        { label: tr('machines.view.scale'), disabled: !running || follow || full || pip || !st?.w, hint: follow ? tr('machines.view.actualFollow') : '',
+          submenu: SCALES.map((k) => ({ label: tr('machines.view.scaleN', { n: Math.round(k * 100) }), onClick: () => scaleTo(k) })) },
       ] },
       { label: tr('machines.menu.info'), items: [
         ...infoLines(cfgRef.current, infoU, gaps).map((l) => ({ label: tr(l.key, l.vars), disabled: true })),
@@ -1298,7 +1348,7 @@ export function MachineWindow({ dir, name: name0, loadvm, followed }) {
       ] },
       ...(appsActive ? [{ label: tr('machines.apps.menu'), items: appsMenuItems(gApps) }] : []),
     ]);
-  }, [st?.state, full, pip, follow, st?.w, st?.h, infoU, gaps.join(), iso, sid, cdWant, heard, snd.microphone, appsOn, appsBlocked, appsActive, gApps?.apps, gRunning, cfg.transfer, xstate, capOn, capOffer.offered, focused, keys.windows]);
+  }, [st?.state, full, pip, follow, st?.w, st?.h, infoU, gaps.join(), iso, sid, cdWant, heard, snd.microphone, cableOut, cableOk, cfg.network, (cfg.shares || []).length, caps?.usb, caps?.camera, appsOn, appsBlocked, appsActive, gApps?.apps, gRunning, cfg.transfer, xstate, capOn, capOffer.offered, focused, keys.windows]);
   // Esc in the controller leaves apps mode (in a guest's window, Esc is the guest's); in its search field, Esc is the
   // field's (it clears the search first)
   useEffect(() => (appsActive && focused && !askClose ? addListener('keydown', (e) => { if (e.key === 'Escape' && !menus.open && !hasTextFocus()) setApps(false); }) : undefined), [appsActive, focused, askClose]);
