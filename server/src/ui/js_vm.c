@@ -79,6 +79,7 @@
 #include <sys/un.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <sys/xattr.h>
 #include <unistd.h>
 #include "../vm/vmpin.h"
 
@@ -461,6 +462,7 @@ static JSValue list_one(JSContext *c, const char *dir, const char *folder, const
         JS_SetPropertyStr(c, o, "perfProfile", JS_NewBool(c, m.perf_profile));   /* the guest's performance profile (7.1.4) */
         JS_SetPropertyStr(c, o, "guestLinks", JS_NewBool(c, m.guest_links));     /* links and notifications from the guest (6.12) */
         JS_SetPropertyStr(c, o, "guestNotify", JS_NewBool(c, m.guest_notify));
+        JS_SetPropertyStr(c, o, "guestFiles", JS_NewBool(c, !m.guest_files_off && !m.profile_lock));   /* files from the guest (6.21) */
         set_str(c, o, "cpuPin", pin_effective(&m));                                           /* "off" | "auto" (3.7.1) */
         JS_SetPropertyStr(c, o, "cpuPinChosen", JS_NewBool(c, m.cpu_pin != VM_PIN_DEFAULT));
         set_str(c, o, "clipboard", m.clipboard == VM_CLIP_BOTH ? "both" : m.clipboard == VM_CLIP_TO_GUEST ? "to-guest" : m.clipboard == VM_CLIP_FROM_GUEST ? "from-guest" : "off");
@@ -1141,7 +1143,7 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     (void)t;
     char dir[PATH_MAX];
     if (argc < 2 || !JS_IsObject(argv[1]) || machine_dir(c, argv[0], dir, sizeof dir)) return JS_NewInt32(c, 0);
-    char *args[66 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
+    char *args[72 + 2 * VM_SHARES + 2 * VM_PORTS], shv[VM_SHARES][VM_TAG_MAX + VM_PATH_MAX + 8], pv[VM_PORTS][48], br[VM_IFNAME_MAX + 1] = "", sv[16], sm[16], sd[16], name[VM_NAME_MAX + 8] = "", net[16] = "", iso[PATH_MAX] = "";
     int n = 0, ok = 1;
     args[n++] = "lord-vm"; args[n++] = "--set"; args[n++] = dir;
     JSValue v = JS_GetPropertyStr(c, argv[1], "name");
@@ -1267,6 +1269,10 @@ static JSValue f_set(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
     v = JS_GetPropertyStr(c, argv[1], "guestNotify");
     if (JS_IsBool(v)) { args[n++] = "--guest-notify"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
     else if (!JS_IsUndefined(v)) ok = 0;
+    v = JS_GetPropertyStr(c, argv[1], "guestFiles");
+    if (JS_IsBool(v)) { args[n++] = "--guest-files"; args[n++] = JS_ToBool(c, v) ? "on" : "off"; }
+    else if (!JS_IsUndefined(v)) ok = 0;
+    JS_FreeValue(c, v);
     v = JS_GetPropertyStr(c, argv[1], "cpuPin");
     if (JS_IsString(v)) {
         const char *s = JS_ToCString(c, v);
@@ -1764,6 +1770,16 @@ static JSValue f_job(JSContext *c, JSValueConst t, int argc, JSValueConst *argv)
 /* one dmabuf of a 3D machine's picture (VD_DMABUF) and its import: a texture of the desktop's GPU (tex) or of the reader
  * on the buffer's own render node (ri, gpu/dmaread.h); gfail/rfail: that one refused it (not tried again for this dmabuf) */
 typedef struct { int fd; ino_t ino; int w, h, stride, flip; uint32_t fourcc; uint64_t mod; GpuTex *tex; DmaImg *ri; int gfail, rfail; unsigned used, gen; } VmDmabuf;
+/* one file from the guest (6.21): RXS_* */
+enum { RXS_NONE = 0, RXS_RUNNING, RXS_PAUSED, RXS_DONE, RXS_FAILED };
+#define RX_SLOTS 8
+typedef struct {
+    uint32_t id;
+    int state, code, exec, marked, fd, dfd;
+    uint64_t size, got;
+    long long t0;
+    char name[AG_NAME_MAX + 1], final[AG_NAME_MAX + 16], part[96], folder[PATH_MAX];
+} RxSlot;
 typedef struct {
     int used, vm, vd, err;              /* channels; lord-vm's stderr (until its log is open) */
     pid_t vm_pid, vd_pid;
@@ -1906,10 +1922,201 @@ typedef struct {
     /* "Capture mouse" (6.25): the pointer lock is this session's (pointerlock.h); how many captures ended and why the last one
      * did (PTRLOCK_END_*), for the window */
     int captured, cap_ends, cap_why;
+    /* files sent from the guest (6.21): the transfers lord-vm passed on, their part files and quarantine folder; rx_changes
+     * counts changes for the app (poll's receivedSeq); rx_nospace: offers refused for want of room */
+    RxSlot rx[RX_SLOTS];
+    int rx_changes, rx_nospace;
 } Sess;
 static Sess sess[MAX_SESS];
 
+/* ---- files sent from the guest (6.21, VM_RECV_OFFER / VM_RECV_STATE) ----
+ * Every file from a guest lands in the machine's quarantine folder, <library>/Received/<machine folder's name>, made here
+ * (0700, each step opened without following a link, this account's own), never anywhere the guest names. lord-vm gets
+ * only the descriptor of a part file, ".lordos-part-<the guest's key in hex>" (a resume finds it again), opened O_RDWR
+ * without following a link (a regular file of this account with one link). Once lord-vm says the SHA-256 matched, the part
+ * gets its name (ag_recv_name, never replacing a file: " (2)"…), mode 0600 (never executable) and the marks of where it
+ * came from (user.lordos.from, user.lordos.machine, user.xdg.origin.url, user.lordos.quarantine), which Files shows. */
+static long long mono_ms(void);
+#define RX_RESERVE (1ULL << 30)             /* an offer must leave this much free */
+#define RX_PARTS_MAX 8                      /* parts kept for resumes, per machine; older ones go */
+#define RX_PART_DAYS 7
+
+static void rx_slot_free(RxSlot *r) {
+    if (r->fd >= 0) close(r->fd);
+    if (r->dfd >= 0) close(r->dfd);
+    memset(r, 0, sizeof *r);
+    r->fd = r->dfd = -1;
+}
+
+static void rx_free_all(Sess *s) { for (int i = 0; i < RX_SLOTS; i++) if (s->rx[i].state) rx_slot_free(&s->rx[i]); }
+
+/* the machine's quarantine folder, made when missing; -1 when it can't be one of this account's own folders */
+static int rx_dir_open(Sess *s, char *shown, size_t sn) {
+    char lib[PATH_MAX];
+    snprintf(lib, sizeof lib, "%s", s->dir);
+    size_t l = strlen(lib);
+    while (l > 1 && lib[l - 1] == '/') lib[--l] = 0;
+    char *slash = strrchr(lib, '/');
+    if (!slash || slash == lib) return -1;
+    *slash = 0;
+    char base[NAME_MAX + 1];
+    snprintf(base, sizeof base, "%s", slash + 1);
+    size_t bl = strlen(base);
+    if (bl <= 7 || strcmp(base + bl - 7, ".lordvm")) return -1;
+    base[bl - 7] = 0;
+    if (!base[0] || base[0] == '.' || strchr(base, '/')) return -1;
+    int lf = open(lib, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (lf < 0) return -1;
+    struct stat st;
+    if (mkdirat(lf, "Received", 0700) && errno != EEXIST) { close(lf); return -1; }
+    int rf = openat(lf, "Received", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    close(lf);
+    if (rf < 0 || fstat(rf, &st) || st.st_uid != getuid()) { if (rf >= 0) close(rf); return -1; }
+    if (mkdirat(rf, base, 0700) && errno != EEXIST) { close(rf); return -1; }
+    int df = openat(rf, base, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    close(rf);
+    if (df < 0 || fstat(df, &st) || st.st_uid != getuid() || (st.st_mode & 022)) { if (df >= 0) close(df); return -1; }
+    if (shown) snprintf(shown, sn, "%s/Received/%s", lib, base);
+    return df;
+}
+
+/* parts left by transfers that never came back: older than RX_PART_DAYS, or more than RX_PARTS_MAX (the oldest first);
+ * never `keep` */
+static void rx_parts_trim(int dfd, const char *keep) {
+    int d2 = dup(dfd);
+    DIR *d = d2 >= 0 ? fdopendir(d2) : NULL;
+    if (!d) { if (d2 >= 0) close(d2); return; }
+    struct { char n[96]; time_t t; } p[64];
+    int k = 0;
+    time_t now = time(NULL);
+    rewinddir(d);
+    for (struct dirent *e; (e = readdir(d));) {
+        if (strncmp(e->d_name, ".lordos-part-", 13) || strlen(e->d_name) >= sizeof p[0].n || !strcmp(e->d_name, keep)) continue;
+        struct stat st;
+        if (fstatat(dfd, e->d_name, &st, AT_SYMLINK_NOFOLLOW) || !S_ISREG(st.st_mode)) continue;
+        if (now - st.st_mtime > RX_PART_DAYS * 86400) { unlinkat(dfd, e->d_name, 0); continue; }
+        if (k < 64) { snprintf(p[k].n, sizeof p[k].n, "%s", e->d_name); p[k].t = st.st_mtime; k++; }
+    }
+    closedir(d);
+    while (k >= RX_PARTS_MAX) {                         /* room for this one */
+        int o = 0;
+        for (int i = 1; i < k; i++) if (p[i].t < p[o].t) o = i;
+        unlinkat(dfd, p[o].n, 0);
+        p[o] = p[--k];
+    }
+}
+
+static void rx_refuse(Sess *s, uint32_t id, int status) {
+    VmMsg m = vm_msg(VM_RECV, ++s->seq, (int)id, status, 0, 0, NULL);
+    if (s->vm >= 0) vm_send(s->vm, &m, -1);
+}
+
+static void rx_offer(Sess *s, const VmMsg *m, int fd) {
+    int seals = fcntl(fd, F_GET_SEALS);
+    struct stat st;
+    uint8_t b[VM_RECV_OFFER_MAX];
+    AgSendOffer o;
+    if (seals < 0 || (seals & (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW)) != (F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW) ||
+        fstat(fd, &st) || st.st_size != m->a || m->a > (int)sizeof b || pread(fd, b, (size_t)m->a, 0) != m->a ||
+        ag_send_offer_parse(b, (size_t)m->a, &o)) { rx_refuse(s, (uint32_t)m->b, AGSA_REFUSED); return; }
+    char name[AG_NAME_MAX + 1];
+    if (ag_recv_name(o.name, name, sizeof name)) { rx_refuse(s, (uint32_t)m->b, AGSA_REFUSED); return; }
+    int slot = -1;
+    for (int i = 0; i < RX_SLOTS && slot < 0; i++) if (!s->rx[i].state) slot = i;
+    /* finished entries the app hasn't listed yet make room */
+    for (int i = 0; i < RX_SLOTS && slot < 0; i++) if (s->rx[i].state >= RXS_DONE) { rx_slot_free(&s->rx[i]); slot = i; }
+    if (slot < 0) { rx_refuse(s, (uint32_t)m->b, AGSA_BUSY); return; }
+    char shown[PATH_MAX];
+    char hex0[65], part0[96];
+    for (int i = 0; i < 32; i++) snprintf(hex0 + i * 2, 3, "%02x", o.key[i]);
+    snprintf(part0, sizeof part0, ".lordos-part-%s", hex0);
+    /* the same file offered again (a resume): its paused entry gives way to this one */
+    for (int i = 0; i < RX_SLOTS; i++) if (s->rx[i].state == RXS_PAUSED && !strcmp(s->rx[i].part, part0)) rx_slot_free(&s->rx[i]);
+    int dfd = rx_dir_open(s, shown, sizeof shown);
+    if (dfd < 0) { rx_refuse(s, (uint32_t)m->b, AGSA_BUSY); return; }
+    char part[96], hex[65];
+    for (int i = 0; i < 32; i++) snprintf(hex + i * 2, 3, "%02x", o.key[i]);
+    snprintf(part, sizeof part, ".lordos-part-%s", hex);
+    rx_parts_trim(dfd, part);
+    int pf = openat(dfd, part, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC | O_NOCTTY, 0600);
+    struct stat ps;
+    if (pf < 0 || fstat(pf, &ps) || !S_ISREG(ps.st_mode) || ps.st_nlink != 1 || ps.st_uid != getuid()) {
+        if (pf >= 0) close(pf);
+        close(dfd);
+        rx_refuse(s, (uint32_t)m->b, AGSA_BUSY);
+        return;
+    }
+    uint64_t have = (uint64_t)ps.st_size <= o.size ? (uint64_t)ps.st_size : 0;
+    struct statvfs vs;
+    if (fstatvfs(dfd, &vs) || (uint64_t)vs.f_bavail * vs.f_frsize < o.size - have + RX_RESERVE) {
+        close(pf);
+        if (!have) unlinkat(dfd, part, 0);
+        close(dfd);
+        s->rx_nospace++;
+        rx_refuse(s, (uint32_t)m->b, AGSA_SPACE);
+        return;
+    }
+    int give = fcntl(pf, F_DUPFD_CLOEXEC, 0);
+    VmMsg r = vm_msg(VM_RECV, ++s->seq, m->b, AGSA_OK, 0, 0, NULL);
+    if (give < 0 || vm_send(s->vm, &r, give)) { if (give >= 0) close(give); close(pf); close(dfd); return; }
+    close(give);
+    RxSlot *x = &s->rx[slot];
+    memset(x, 0, sizeof *x);
+    x->id = (uint32_t)m->b; x->state = RXS_RUNNING; x->size = o.size; x->got = have; x->exec = (o.flags & AGSF_EXEC) != 0;
+    x->fd = pf; x->dfd = dfd; x->t0 = mono_ms();
+    snprintf(x->name, sizeof x->name, "%s", name);
+    snprintf(x->part, sizeof x->part, "%s", part);
+    snprintf(x->folder, sizeof x->folder, "%s", shown);
+    s->rx_changes++;
+}
+
+/* the kept file's name: `name`, else "stem (2).ext" … (never replacing a file); 0 renamed, -1 not */
+static int rx_name_free(RxSlot *x) {
+    char cand[AG_NAME_MAX + 16];
+    const char *dot = strrchr(x->name, '.');
+    size_t stem = dot && dot != x->name ? (size_t)(dot - x->name) : strlen(x->name);
+    for (int n = 1; n < 1000; n++) {
+        if (n == 1) snprintf(cand, sizeof cand, "%s", x->name);
+        else snprintf(cand, sizeof cand, "%.*s (%d)%s", (int)stem, x->name, n, x->name + stem);
+        if (!syscall(SYS_renameat2, x->dfd, x->part, x->dfd, cand, 1 /* RENAME_NOREPLACE */)) { snprintf(x->final, sizeof x->final, "%s", cand); return 0; }
+        if (errno != EEXIST) return -1;
+    }
+    return -1;
+}
+
+static void rx_state(Sess *s, const VmMsg *m) {
+    RxSlot *x = NULL;
+    for (int i = 0; i < RX_SLOTS && !x; i++) if (s->rx[i].state == RXS_RUNNING && s->rx[i].id == (uint32_t)m->a) x = &s->rx[i];
+    if (!x) return;
+    x->got = (uint64_t)m->c << 10;
+    if (x->got > x->size) x->got = x->size;
+    s->rx_changes++;
+    if (m->b == VRS_RUNNING) return;
+    if (m->b == VRS_PAUSED) { x->state = RXS_PAUSED; return; }      /* the part stays, for the guest's next offer */
+    if (m->b == VRS_FAILED) {
+        x->state = RXS_FAILED;
+        x->code = m->d;
+        unlinkat(x->dfd, x->part, 0);
+        return;
+    }
+    /* kept: never executable, marked as from this machine, then named */
+    struct stat st;
+    if (fstat(x->fd, &st) || (uint64_t)st.st_size != x->size) { x->state = RXS_FAILED; x->code = AGSD_FAILED; unlinkat(x->dfd, x->part, 0); return; }
+    fchmod(x->fd, 0600);
+    char origin[64];
+    snprintf(origin, sizeof origin, "lordos-machine:%s", s->id);
+    x->marked = !fsetxattr(x->fd, "user.lordos.quarantine", "1", 1, 0);
+    fsetxattr(x->fd, "user.lordos.from", s->name, strlen(s->name), 0);
+    fsetxattr(x->fd, "user.lordos.machine", s->id, strlen(s->id), 0);
+    fsetxattr(x->fd, "user.xdg.origin.url", origin, strlen(origin), 0);
+    if (rx_name_free(x)) { x->state = RXS_FAILED; x->code = AGSD_FAILED; unlinkat(x->dfd, x->part, 0); return; }
+    x->got = x->size;
+    x->state = RXS_DONE;
+}
+
+static void rx_free_all(Sess *s);
 static void win_free(Sess *s) {
+    rx_free_all(s);
     free(s->wins); s->wins = NULL;
     free(s->gapps); s->gapps = NULL;
     for (int i = 0; i < LAG_WIN_MAX; i++) { free(s->icons[i].rgba); s->icons[i].rgba = NULL; s->icons[i].id = 0; }
@@ -2817,6 +3024,12 @@ static void from_vm(Sess *s) {
         case VM_GUEST_NOTE:
             if (fd >= 0) guest_note(s, &m, fd);
             break;
+        case VM_RECV_OFFER:
+            if (fd >= 0) rx_offer(s, &m, fd);
+            break;
+        case VM_RECV_STATE:
+            rx_state(s, &m);
+            break;
         case VM_CONSOLE_FD:
             if (fd >= 0 && m.seq == s->console_seq) {
                 if (s->console_term) { Session *old = term_get(s->console_term); if (old) term_close(old); }
@@ -3247,6 +3460,7 @@ static JSValue f_poll(JSContext *c, JSValueConst t, int argc, JSValueConst *argv
         JS_SetPropertyStr(c, o, "sound", so);
     }
     set_int(c, o, "filesSeq", s->fx_changes);
+    set_int(c, o, "receivedSeq", s->rx_changes);
     set_int(c, o, "windowsSeq", s->wins_seq);
     set_int(c, o, "iconsSeq", s->icons_seq);
     set_int(c, o, "guestAppsSeq", s->gapps_seq);
@@ -3355,6 +3569,72 @@ static JSValue f_files(JSContext *c, JSValueConst t, int argc, JSValueConst *arg
         if (s->fx[i].state != 1) s->fx[i].state = 0;
     }
     return a;
+}
+
+/* received(session) → [{ id, name, size, got, state: 'receiving'|'paused'|'done'|'failed', code, path, folder, exec,
+ * marked }]: files the guest sends (6.21, "Send to LordOS"), each into the machine's quarantine folder; path once kept.
+ * Finished ones are listed once (poll's receivedSeq counts changes); receiveCancel(session, id) stops one, its part goes.
+ * fileCancel(session, id) cancels a drop on its way into the guest (files()'s id). */
+static JSValue f_received(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t; (void)argc;
+    Sess *s = get(c, argv[0]);
+    JSValue a = JS_NewArray(c);
+    if (!s) return a;
+    static const char *const ST[] = { "", "receiving", "paused", "done", "failed" };
+    static const char *const CODE[] = { "", "cancelled", "badHash", "failed", "noSpace", "later" };
+    uint32_t k = 0;
+    for (int i = 0; i < RX_SLOTS; i++) {
+        RxSlot *x = &s->rx[i];
+        if (!x->state) continue;
+        if ((x->state == RXS_RUNNING || x->state == RXS_PAUSED) && s->vm < 0) { x->state = RXS_PAUSED; }
+        JSValue o = JS_NewObject(c);
+        set_int(c, o, "id", (int)x->id);
+        set_str(c, o, "name", x->final[0] ? x->final : x->name);
+        JS_SetPropertyStr(c, o, "size", JS_NewInt64(c, (int64_t)x->size));
+        JS_SetPropertyStr(c, o, "got", JS_NewInt64(c, (int64_t)x->got));
+        set_str(c, o, "state", ST[x->state]);
+        set_str(c, o, "code", x->code >= 0 && x->code <= 5 ? CODE[x->code] : "failed");
+        set_str(c, o, "folder", x->folder);
+        JS_SetPropertyStr(c, o, "exec", JS_NewBool(c, x->exec));
+        JS_SetPropertyStr(c, o, "marked", JS_NewBool(c, x->marked));
+        JS_SetPropertyStr(c, o, "ms", JS_NewInt64(c, mono_ms() - x->t0));
+        if (x->state == RXS_DONE) {
+            char path[PATH_MAX + AG_NAME_MAX + 20];
+            snprintf(path, sizeof path, "%s/%s", x->folder, x->final);
+            set_str(c, o, "path", path);
+        }
+        JS_SetPropertyUint32(c, a, k++, o);
+        if (x->state >= RXS_DONE) rx_slot_free(x);
+    }
+    return a;
+}
+static JSValue f_receive_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    int32_t id = 0;
+    if (!s || JS_ToInt32(c, &id, argv[1]) || id <= 0) return JS_FALSE;
+    for (int i = 0; i < RX_SLOTS; i++) {
+        RxSlot *x = &s->rx[i];
+        if ((x->state != RXS_RUNNING && x->state != RXS_PAUSED) || x->id != (uint32_t)id) continue;
+        if (x->state == RXS_RUNNING && s->vm >= 0) { VmMsg m = vm_msg(VM_RECV_CANCEL, ++s->seq, id, 0, 0, 0, NULL); vm_send(s->vm, &m, -1); }
+        unlinkat(x->dfd, x->part, 0);
+        x->state = RXS_FAILED;
+        x->code = AGSD_CANCELLED;
+        s->rx_changes++;
+        return JS_TRUE;
+    }
+    return JS_FALSE;
+}
+static JSValue f_file_cancel(JSContext *c, JSValueConst t, int argc, JSValueConst *argv) {
+    (void)t;
+    Sess *s = argc >= 2 ? get(c, argv[0]) : NULL;
+    int32_t id = 0;
+    if (!s || s->vm < 0 || JS_ToInt32(c, &id, argv[1]) || id <= 0) return JS_FALSE;
+    for (int i = 0; i < 16; i++) if (s->fx[i].state == 1 && s->fx[i].seq == (uint32_t)id) {
+        VmMsg m = vm_msg(VM_FILE_CANCEL, ++s->seq, id, 0, 0, 0, NULL);
+        return JS_NewBool(c, !vm_send(s->vm, &m, -1));
+    }
+    return JS_FALSE;
 }
 
 /* transferFolder(dir) → the machine's transfer folder (6.7.1), made and claimed for it as lord-vm does at its start
@@ -5026,7 +5306,7 @@ static const JSCFunctionListEntry funcs[] = {
     JS_CFUNC_DEF("shell", 3, f_shell), JS_CFUNC_DEF("guestNotes", 1, f_guest_notes), JS_CFUNC_DEF("guestLinkAnswer", 3, f_guest_link_answer),
     JS_CFUNC_DEF("agent", 3, f_agent), JS_CFUNC_DEF("transferFolder", 1, f_transfer_folder), JS_CFUNC_DEF("transferAside", 1, f_transfer_aside), JS_CFUNC_DEF("renamePlan", 2, f_rename_plan), JS_CFUNC_DEF("rename", 2, f_rename), JS_CFUNC_DEF("clipboardSend", 2, f_clip_send), JS_CFUNC_DEF("clipboardTake", 2, f_clip_take),
     JS_CFUNC_DEF("clipboardApply", 2, f_clip_apply), JS_CFUNC_DEF("clipboardSendHost", 2, f_clip_send_host),
-    JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
+    JS_CFUNC_DEF("clipboardGate", 3, f_clip_gate), JS_CFUNC_DEF("clipboardAnswer", 3, f_clip_answer), JS_CFUNC_DEF("clipboardPreview", 2, f_clip_preview), JS_CFUNC_DEF("sendFile", 3, f_send_file), JS_CFUNC_DEF("files", 1, f_files), JS_CFUNC_DEF("received", 1, f_received), JS_CFUNC_DEF("receiveCancel", 2, f_receive_cancel), JS_CFUNC_DEF("fileCancel", 2, f_file_cancel), JS_CFUNC_DEF("removeBase", 1, f_remove_base),
     JS_CFUNC_DEF("importPlan", 2, f_import_plan), JS_CFUNC_DEF("importMachine", 1, f_import), JS_CFUNC_DEF("importInfo", 1, f_import_info),
     JS_CFUNC_DEF("startDetached", 1, f_start_detached), JS_CFUNC_DEF("sound", 2, f_sound), JS_CFUNC_DEF("refusal", 0, f_refusal), JS_CFUNC_DEF("discardState", 1, f_discard), JS_CFUNC_DEF("awake", 0, f_awake),
     JS_CFUNC_DEF("apps", 2, f_apps), JS_CFUNC_DEF("windows", 1, f_windows), JS_CFUNC_DEF("winIcon", 2, f_win_icon), JS_CFUNC_DEF("winAct", 3, f_win_act), JS_CFUNC_DEF("closeRefusals", 1, f_close_refusals),
